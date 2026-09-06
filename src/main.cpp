@@ -35329,6 +35329,166 @@ static bool WriteSplatPlyFixture(const char* path)
    return true;
 }
 
+// Writes a plain colored point cloud .ply - only x,y,z,red,green,blue
+// (uchar), nothing else - exactly what a Sketchfab/photogrammetry/
+// CloudCompare export looks like, and specifically NOT a trained 3DGS
+// export (no f_dc_*/opacity/scale_*/rot_*). Points form a regular grid with
+// known spacing so the auto-estimated radius can be checked for being in
+// the right ballpark rather than the broken fixed-1.0-world-unit default.
+static bool WriteBareColorCloudPlyFixture(const char* path, float spacing, int perAxis)
+{
+   FILE* f = std::fopen(path, "wb");
+   if (!f)
+      return false;
+
+   const int n = perAxis * perAxis * perAxis;
+   std::fprintf(f,
+                "ply\n"
+                "format binary_little_endian 1.0\n"
+                "element vertex %d\n"
+                "property float x\n"
+                "property float y\n"
+                "property float z\n"
+                "property uchar red\n"
+                "property uchar green\n"
+                "property uchar blue\n"
+                "end_header\n",
+                n);
+
+   for (int xi = 0; xi < perAxis; ++xi)
+      for (int yi = 0; yi < perAxis; ++yi)
+         for (int zi = 0; zi < perAxis; ++zi)
+         {
+            const float pos[3] = { xi * spacing, yi * spacing, zi * spacing };
+            std::fwrite(pos, sizeof(float), 3, f);
+            const unsigned char rgb[3] = {
+               (unsigned char)(xi * 40 + 20),
+               (unsigned char)(yi * 40 + 20),
+               (unsigned char)(zi * 40 + 20)
+            };
+            std::fwrite(rgb, 1, 3, f);
+         }
+
+   std::fclose(f);
+   return true;
+}
+
+// Phase-3-follow-up fixture: a real-world .ply lacking every trained-3DGS
+// property should degrade gracefully rather than render as a solid gray
+// blob - see the graceful-degradation comment in SplatIO.h. Asserts:
+//  - color comes back matching the stored red/green/blue bytes, not gray
+//  - opacity comes back as 1.0 (fully opaque), not sigmoid(0)=0.5
+//  - the auto-estimated scale is a sane, non-1.0-world-unit value
+//    proportional to the fixture's known point spacing
+//  - hadTrainedFields is false
+static bool RunBareColorCloudFixture()
+{
+   bool ok = true;
+   const char* path = "/tmp/infinite_splatio_barecloud_test.ply";
+   const float spacing = 0.2f;
+   const int perAxis = 3;
+
+   if (!WriteBareColorCloudPlyFixture(path, spacing, perAxis))
+   {
+      printf("SPLATIOTEST (bare color cloud) could not write fixture FAIL\n");
+      return false;
+   }
+
+   SplatIO::SplatCloud cloud;
+   std::string err;
+   if (!SplatIO::LoadSplatPly(path, cloud, err))
+   {
+      printf("SPLATIOTEST (bare color cloud) LoadSplatPly failed: %s FAIL\n", err.c_str());
+      std::remove(path);
+      return false;
+   }
+
+   const int expectedCount = perAxis * perAxis * perAxis;
+   if ((int)cloud.splats.size() != expectedCount)
+   {
+      printf("SPLATIOTEST (bare color cloud) expected %d splats, got %zu FAIL\n", expectedCount, cloud.splats.size());
+      ok = false;
+   }
+
+   if (cloud.hadTrainedFields)
+   {
+      printf("SPLATIOTEST (bare color cloud) hadTrainedFields should be false FAIL\n");
+      ok = false;
+   }
+
+   if (!cloud.splats.empty())
+   {
+      // Vertex 0 is (xi=0,yi=0,zi=0) -> rgb (20,20,20).
+      const SplatIO::Splat& s0 = cloud.splats[0];
+      const float expectR = 20.0f / 255.0f, expectG = 20.0f / 255.0f, expectB = 20.0f / 255.0f;
+      if (std::fabs(s0.r - expectR) > 1e-5f || std::fabs(s0.g - expectG) > 1e-5f || std::fabs(s0.b - expectB) > 1e-5f)
+      {
+         printf("SPLATIOTEST (bare color cloud) color mismatch: got (%f %f %f) want (%f %f %f) FAIL\n",
+                s0.r, s0.g, s0.b, expectR, expectG, expectB);
+         ok = false;
+      }
+
+      // Last vertex is (xi=yi=zi=perAxis-1) -> rgb (100,100,100) for perAxis=3.
+      const SplatIO::Splat& sLast = cloud.splats.back();
+      const int lastChan = (perAxis - 1) * 40 + 20;
+      const float expectLast = lastChan / 255.0f;
+      if (std::fabs(sLast.r - expectLast) > 1e-5f || std::fabs(sLast.g - expectLast) > 1e-5f ||
+          std::fabs(sLast.b - expectLast) > 1e-5f)
+      {
+         printf("SPLATIOTEST (bare color cloud) last-vertex color mismatch: got (%f %f %f) want %f FAIL\n",
+                sLast.r, sLast.g, sLast.b, expectLast);
+         ok = false;
+      }
+
+      for (const SplatIO::Splat& s : cloud.splats)
+      {
+         if (std::fabs(s.a - 1.0f) > 1e-5f)
+         {
+            printf("SPLATIOTEST (bare color cloud) opacity should be 1.0 (fully opaque), got %f FAIL\n", s.a);
+            ok = false;
+            break;
+         }
+      }
+
+      // Density-estimated radius should be a small fraction of the grid
+      // spacing's order of magnitude, not the old fixed 1.0 world-unit
+      // default - and definitely not exactly 1.0.
+      const float gotRadius = cloud.splats[0].sx;
+      if (std::fabs(gotRadius - 1.0f) < 1e-5f)
+      {
+         printf("SPLATIOTEST (bare color cloud) scale fell back to broken fixed 1.0, got %f FAIL\n", gotRadius);
+         ok = false;
+      }
+      else if (gotRadius < spacing * 0.05f || gotRadius > spacing * 5.0f)
+      {
+         printf("SPLATIOTEST (bare color cloud) auto-estimated radius %f not in ballpark of spacing %f FAIL\n",
+                gotRadius, spacing);
+         ok = false;
+      }
+      else
+      {
+         printf("SPLATIOTEST (bare color cloud) auto-estimated radius=%f (spacing=%f) OK\n", gotRadius, spacing);
+      }
+
+      // Every splat should share the same auto-estimated radius (uniform
+      // density heuristic, not per-splat).
+      for (const SplatIO::Splat& s : cloud.splats)
+      {
+         if (std::fabs(s.sx - gotRadius) > 1e-5f || std::fabs(s.sy - gotRadius) > 1e-5f ||
+             std::fabs(s.sz - gotRadius) > 1e-5f)
+         {
+            printf("SPLATIOTEST (bare color cloud) non-uniform auto radius FAIL\n");
+            ok = false;
+            break;
+         }
+      }
+   }
+
+   std::remove(path);
+   printf("%s\n", ok ? "SPLATIOTEST (bare color cloud) OK" : "SPLATIOTEST (bare color cloud) SUSPECT");
+   return ok;
+}
+
 static bool RunSplatIOFixture()
 {
    bool ok = true;
@@ -35423,9 +35583,19 @@ static bool RunSplatIOFixture()
       }
    }
 
+   // All trained-3DGS properties are present in this fixture, so the
+   // graceful-degradation fallbacks must never fire for it.
+   if (!cloud.hadTrainedFields)
+   {
+      printf("SPLATIOTEST hadTrainedFields should stay true when all fields are present FAIL\n");
+      ok = false;
+   }
+
    std::remove(path);
    printf("%s\n", ok ? "SPLATIOTEST OK" : "SPLATIOTEST SUSPECT");
-   return ok;
+
+   const bool bareOk = RunBareColorCloudFixture();
+   return ok && bareOk;
 }
 
 static bool RunSpecBlurFixture()
@@ -59598,6 +59768,79 @@ int main(int argc, char** argv)
                              derivedAfterBudget == 1 && revAfterBudget != revAfterCrop && keptBrightest &&
                              redPixels > 10 && texRevAfter != texRevBefore && previewTex != 0;
          printf("%s\n", allOk ? "SPLAT NODE TEST OK" : "SPLAT NODE TEST FAIL");
+
+         // Follow-up (graceful degradation for bare colored-point-cloud
+         // .ply, no trained 3DGS fields): end-to-end through the real
+         // SplatSourceNode, not just SplatIO. Vividly red points with no
+         // f_dc/opacity/scale properties should render as actual red pixels
+         // at a sane splat size, not the old solid gray blob.
+         {
+            const std::string plyPath = "/tmp/infinite_splatnodetest_barecloud.ply";
+            {
+               FILE* pf = std::fopen(plyPath.c_str(), "wb");
+               const int n = 64; // 4x4x4 grid
+               std::fprintf(pf,
+                            "ply\nformat binary_little_endian 1.0\nelement vertex %d\n"
+                            "property float x\nproperty float y\nproperty float z\n"
+                            "property uchar red\nproperty uchar green\nproperty uchar blue\n"
+                            "end_header\n", n);
+               std::mt19937 gridRng(123);
+               std::uniform_real_distribution<float> jitter(-0.01f, 0.01f);
+               for (int xi = 0; xi < 4; xi++)
+                  for (int yi = 0; yi < 4; yi++)
+                     for (int zi = 0; zi < 4; zi++)
+                     {
+                        const float pos[3] = { (xi - 1.5f) * 0.15f + jitter(gridRng),
+                                                (yi - 1.5f) * 0.15f + jitter(gridRng),
+                                                (zi - 1.5f) * 0.15f + jitter(gridRng) };
+                        std::fwrite(pos, sizeof(float), 3, pf);
+                        const unsigned char rgb[3] = { 230, 15, 15 }; // vivid red, uniform
+                        std::fwrite(rgb, 1, 3, pf);
+                     }
+               std::fclose(pf);
+            }
+
+            SplatSourceNode bareNode;
+            const bool bareLoaded = bareNode.Load(plyPath);
+            const bool statusFlagged = bareNode.Status().find("auto-estimated") != std::string::npos;
+            printf("  [%s] %-40s (status=\"%s\")\n", (bareLoaded && statusFlagged) ? "pass" : "FAIL",
+                   "SplatNode(bare colored .ply loads + status flags degraded mode)", bareNode.Status().c_str());
+
+            bareNode.CookIfNeeded(80010);
+            Render3DNode bareRender;
+            bareRender.geometry[0] = &bareNode;
+            bareRender.width = 128.0f; bareRender.height = 128.0f; bareRender.samples = 0;
+            bareRender.camAzimuth = 90.0f; bareRender.camElevation = 0.0f; bareRender.camDistance = 3.0f;
+            bareRender.fov = 50.0f;
+            bareRender.targetX = 0.0f; bareRender.targetY = 0.0f; bareRender.targetZ = 0.0f;
+            bareRender.CookIfNeeded(80011);
+
+            std::vector<unsigned char> barePixels((size_t)128 * 128 * 4, 0);
+            glBindTexture(GL_TEXTURE_2D, bareRender.GetOutputTexture());
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, barePixels.data());
+            glBindTexture(GL_TEXTURE_2D, 0);
+
+            // Same predicate the passing .splat-format SplatNode render
+            // check above uses ("patched into Render3D -> real EWA-splat
+            // pixels", redPixels>10) - a splat cloud whose color decoded to
+            // flat 0.5 gray (the old bug) could never trip r > b*2, so this
+            // is a direct end-to-end check that the red/green/blue bytes
+            // actually reached the rendered pixels, not the SH-DC gray
+            // default.
+            int redCount = 0;
+            for (size_t i = 0; i < barePixels.size(); i += 4)
+            {
+               const int r = barePixels[i], b = barePixels[i + 2];
+               if (r > 40 && r > b * 2)
+                  redCount++;
+            }
+            const bool colorOk = redCount > 10;
+            printf("  [%s] %-40s (redPixels=%d)\n",
+                   colorOk ? "pass" : "FAIL",
+                   "SplatNode(bare colored .ply renders real red, not gray blob)", redCount);
+
+            std::remove(plyPath.c_str());
+         }
       }
 
       // A different bug class from RENDER3DLIVETEST above: not a live-updating

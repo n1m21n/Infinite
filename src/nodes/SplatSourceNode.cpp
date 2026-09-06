@@ -90,6 +90,8 @@ bool SplatSourceNode::Load(const std::string& path)
    const size_t slash = path.find_last_of('/');
    const std::string name = (slash == std::string::npos) ? path : path.substr(slash + 1);
    mStatus = name + " - " + std::to_string(mRawCloud.splats.size()) + " splats";
+   if (!mRawCloud.hadTrainedFields)
+      mStatus += " (no scale/opacity/color data - auto-estimated)";
 
    RebuildDerivedCloud();
    return true;

@@ -45,10 +45,15 @@ namespace
       outCov[5] = m20 * m20 + m21 * m21 + m22 * m22; // zz
    }
 
-   void FinishSplat(Splat& s, float rawOpacity, float logScaleX, float logScaleY, float logScaleZ,
+   // `alpha` is the final, already-resolved 0..1 opacity (sigmoid(opacity)
+   // for a real trained field, alpha/255 or a flat default for a plain point
+   // cloud - see LoadSplatPly) - this function no longer applies sigmoid
+   // itself, since that transform is specific to the SH/opacity-logit
+   // encoding and wrong for a plain alpha byte.
+   void FinishSplat(Splat& s, float alpha, float logScaleX, float logScaleY, float logScaleZ,
                      float rw, float rx, float ry, float rz, bool haveRotation)
    {
-      s.a = Sigmoid(rawOpacity);
+      s.a = alpha;
       s.sx = std::exp(logScaleX);
       s.sy = std::exp(logScaleY);
       s.sz = std::exp(logScaleZ);
@@ -272,6 +277,17 @@ namespace SplatIO
          return false;
       }
 
+      // Presence of the trained-3DGS-specific properties, decided once from
+      // the header rather than per vertex. When any of these is absent this
+      // is (almost certainly) a plain colored point cloud, not real trained
+      // splat data - see the graceful-degradation comment in SplatIO.h.
+      const bool haveDc = hasField("f_dc_0");
+      const bool haveRgbColor = hasField("red") && hasField("green") && hasField("blue");
+      const bool haveOpacity = hasField("opacity");
+      const bool haveAlpha = hasField("alpha");
+      const bool haveScale = hasField("scale_0") && hasField("scale_1") && hasField("scale_2");
+      out.hadTrainedFields = haveDc && haveOpacity && haveScale;
+
       // --- Body: one vertex record at a time. ---
       out.splats.reserve(static_cast<size_t>(vertexCount));
       std::vector<unsigned char> record(stride);
@@ -297,14 +313,42 @@ namespace SplatIO
          s.py = readOr("y", 0.0f);
          s.pz = readOr("z", 0.0f);
 
-         const float dc0 = readOr("f_dc_0", 0.0f);
-         const float dc1 = readOr("f_dc_1", 0.0f);
-         const float dc2 = readOr("f_dc_2", 0.0f);
-         s.r = 0.5f + kShC0 * dc0;
-         s.g = 0.5f + kShC0 * dc1;
-         s.b = 0.5f + kShC0 * dc2;
+         if (haveDc)
+         {
+            const float dc0 = readOr("f_dc_0", 0.0f);
+            const float dc1 = readOr("f_dc_1", 0.0f);
+            const float dc2 = readOr("f_dc_2", 0.0f);
+            s.r = 0.5f + kShC0 * dc0;
+            s.g = 0.5f + kShC0 * dc1;
+            s.b = 0.5f + kShC0 * dc2;
+         }
+         else if (haveRgbColor)
+         {
+            // Plain PLY color bytes, not SH-DC - no SH_C0 conversion, just
+            // 0..255 -> 0..1.
+            s.r = readOr("red", 0.0f) / 255.0f;
+            s.g = readOr("green", 0.0f) / 255.0f;
+            s.b = readOr("blue", 0.0f) / 255.0f;
+         }
+         else
+         {
+            s.r = s.g = s.b = 0.5f; // genuinely no color data available
+         }
 
-         const float rawOpacity = readOr("opacity", 0.0f); // sigmoid(0) = 0.5, a sane default alpha
+         float alpha;
+         if (haveOpacity)
+         {
+            alpha = Sigmoid(readOr("opacity", 0.0f)); // sigmoid(0) = 0.5, a sane default alpha
+         }
+         else if (haveAlpha)
+         {
+            alpha = readOr("alpha", 255.0f) / 255.0f; // plain alpha byte, not a logit - no sigmoid
+         }
+         else
+         {
+            alpha = 1.0f; // no opacity concept at all - render solid, not semi-transparent
+         }
+
          const float logSx = readOr("scale_0", 0.0f);
          const float logSy = readOr("scale_1", 0.0f);
          const float logSz = readOr("scale_2", 0.0f);
@@ -314,12 +358,36 @@ namespace SplatIO
          const float ry = readOr("rot_2", 0.0f);
          const float rz = readOr("rot_3", 0.0f);
 
-         FinishSplat(s, rawOpacity, logSx, logSy, logSz, rw, rx, ry, rz, haveRot);
+         FinishSplat(s, alpha, logSx, logSy, logSz, rw, rx, ry, rz, haveRot);
          out.splats.push_back(s);
       }
 
       std::fclose(f);
       UpdateBounds(out);
+
+      // Scale fallback: scale_0/1/2 absent means FinishSplat exp()'d a
+      // default log-scale of 0 into a 1.0-world-unit radius for every splat
+      // above, which is nonsense for a typical (much smaller than 1 world
+      // unit) point-cloud scan - overwrite with a radius estimated from the
+      // cloud's own point density instead. Needs UpdateBounds()'s bounding
+      // box, hence the second pass rather than folding into the main loop.
+      if (!haveScale && !out.splats.empty())
+      {
+         const float dx = out.boundsMax[0] - out.boundsMin[0];
+         const float dy = out.boundsMax[1] - out.boundsMin[1];
+         const float dz = out.boundsMax[2] - out.boundsMin[2];
+         const float diag = std::sqrt(dx * dx + dy * dy + dz * dz);
+         // Average nearest-neighbor spacing for N points ~uniformly filling
+         // that bounding volume; guarded against splatCount == 0 above.
+         const float spacing = diag / std::cbrt(static_cast<float>(out.splats.size()));
+         const float defaultRadius = std::max(spacing * 0.5f, 1e-4f);
+         for (Splat& s : out.splats)
+         {
+            s.sx = s.sy = s.sz = defaultRadius;
+            ComputeCovariance(s.qw, s.qx, s.qy, s.qz, s.sx, s.sy, s.sz, s.cov);
+         }
+      }
+
       return true;
    }
 
