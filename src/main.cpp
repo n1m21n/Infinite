@@ -16139,6 +16139,95 @@ namespace
       }
    }
 
+   // Live incoming-signal spectrum drawn behind the response curve (the
+   // thing FabFilter Pro-Q shows) - shared by Audio Filter and EQ so both
+   // visualizers show the same live analyzer, not two separate ones. Taps
+   // the post-mix mono ring AudioEffectRuntime writes every audio block
+   // (AudioEffectNode.cpp's mSpectrumRing) and runs it through the same
+   // Hann-window + Radix2FFT recipe AudioColorRampNode::ProcessAudioFFT
+   // already uses (AudioColorRampNode.cpp) - just plotted against this
+   // visualizer's own log-frequency axis instead of feeding a color ramp.
+   struct AudioSpectrumState
+   {
+      std::vector<float> window = std::vector<float>(1024, 0.0f);
+      std::vector<float> smoothed = std::vector<float>(512, 0.0f);
+   };
+   std::map<int, AudioSpectrumState> gAudioSpectrumCache;
+
+   // Spectrum level has its own dB scale, independent of the +-24 dB gain
+   // axis the response curve uses - same relationship as Pro-Q, where the
+   // analyzer trace and the response curve share an x-axis but not a y-axis.
+   const float kAudioSpectrumFloorDb = -72.0f;
+   const float kAudioSpectrumCeilDb = 0.0f;
+
+   float AudioSpectrumDbToY(float db, float y0, float h)
+   {
+      const float t = (db - kAudioSpectrumFloorDb) / (kAudioSpectrumCeilDb - kAudioSpectrumFloorDb);
+      return y0 + h - std::clamp(t, 0.0f, 1.0f) * h;
+   }
+
+   void UpdateAudioSpectrum(AudioEffectNode* n, AudioSpectrumState& st)
+   {
+      const int winSize = 1024;
+      float tempBuf[1024];
+      const int readCount = n->ReadSpectrumSamples(tempBuf, winSize);
+      if (readCount > 0)
+      {
+         if (readCount >= winSize)
+         {
+            st.window.assign(tempBuf + (readCount - winSize), tempBuf + readCount);
+         }
+         else
+         {
+            const int keep = winSize - readCount;
+            std::copy(st.window.begin() + readCount, st.window.end(), st.window.begin());
+            std::copy(tempBuf, tempBuf + readCount, st.window.begin() + keep);
+         }
+      }
+
+      float re[1024];
+      float im[1024];
+      for (int i = 0; i < winSize; i++)
+      {
+         const float wnd = 0.5f * (1.0f - cosf(2.0f * 3.14159265358979323846f * (float)i / (float)(winSize - 1)));
+         re[i] = st.window[i] * wnd;
+         im[i] = 0.0f;
+      }
+      WaveTerrainDsp::Radix2FFT::Instance().Forward(re, im);
+
+      for (int i = 1; i < 512; i++)
+      {
+         const float mag = sqrtf(re[i] * re[i] + im[i] * im[i]) * (2.0f / (float)winSize);
+         st.smoothed[i] = st.smoothed[i] * 0.7f + mag * 0.3f;
+      }
+   }
+
+   void DrawAudioSpectrum(ImDrawList* dl, ImVec2 origin, float w, float h, double sampleRate, const AudioSpectrumState& st,
+                       bool isLight)
+   {
+      const float binWidth = (float)(sampleRate > 0.0 ? sampleRate : 44100.0) / 1024.0f;
+      const float baselineY = origin.y + h;
+      const ImU32 fillCol = isLight ? IM_COL32(70, 90, 120, 40) : IM_COL32(210, 220, 235, 40);
+      const ImU32 lineCol = isLight ? IM_COL32(70, 90, 120, 130) : IM_COL32(210, 220, 235, 130);
+
+      float prevX = FilterVizFreqToX(binWidth, origin.x, w);
+      float prevY = AudioSpectrumDbToY(20.0f * log10f(std::max(st.smoothed[1], 1.0e-6f)), origin.y, h);
+      dl->PathClear();
+      dl->PathLineTo(ImVec2(prevX, prevY));
+      for (int i = 2; i < 512; i++)
+      {
+         const float freq = (float)i * binWidth;
+         const float db = 20.0f * log10f(std::max(st.smoothed[i], 1.0e-6f));
+         const float x = FilterVizFreqToX(freq, origin.x, w);
+         const float y = AudioSpectrumDbToY(db, origin.y, h);
+         dl->AddQuadFilled(ImVec2(prevX, baselineY), ImVec2(x, baselineY), ImVec2(x, y), ImVec2(prevX, prevY), fillCol);
+         dl->PathLineTo(ImVec2(x, y));
+         prevX = x;
+         prevY = y;
+      }
+      dl->PathStroke(lineCol, 0, 1.2f);
+   }
+
    // Full-width log-frequency response curve with a draggable handle per
    // band - the reason Audio Filter is built first (§1.1): X = freq,
    // Y = gain, scroll = Q, double-click = enable/disable. This *is* the
@@ -16163,6 +16252,14 @@ namespace
 
       // Graticule that keeps this from reading as blank at rest (§3f).
       DrawFilterGraticule(dl, origin, w, h);
+
+      // Live incoming-signal spectrum, same analyzer trace the EQ's
+      // visualizer draws (DrawAudioSpectrum) - so what "shows frequencies"
+      // means is identical on both nodes rather than the Filter having a
+      // response curve with nothing behind it.
+      AudioSpectrumState& specState = gAudioSpectrumCache[gCurrentNodeIndex];
+      UpdateAudioSpectrum(n, specState);
+      DrawAudioSpectrum(dl, origin, w, h, sampleRate, specState, isLight);
 
       const float type = n->Param("type");
       const float freq = n->Param("freq");
@@ -16438,94 +16535,6 @@ namespace
       }
    }
 
-   // Live incoming-signal spectrum drawn behind the EQ curve (the thing
-   // FabFilter Pro-Q shows and this visualizer didn't). Taps the post-mix
-   // mono ring AudioEffectRuntime now writes every audio block
-   // (AudioEffectNode.cpp's mSpectrumRing) and runs it through the same
-   // Hann-window + Radix2FFT recipe AudioColorRampNode::ProcessAudioFFT
-   // already uses (AudioColorRampNode.cpp) - just plotted against this
-   // visualizer's own log-frequency axis instead of feeding a color ramp.
-   struct EqSpectrumState
-   {
-      std::vector<float> window = std::vector<float>(1024, 0.0f);
-      std::vector<float> smoothed = std::vector<float>(512, 0.0f);
-   };
-   std::map<int, EqSpectrumState> gEqSpectrumCache;
-
-   // Spectrum level has its own dB scale, independent of the +-24 dB gain
-   // axis the response curve uses - same relationship as Pro-Q, where the
-   // analyzer trace and the EQ curve share an x-axis but not a y-axis.
-   const float kEqSpectrumFloorDb = -72.0f;
-   const float kEqSpectrumCeilDb = 0.0f;
-
-   float EqSpectrumDbToY(float db, float y0, float h)
-   {
-      const float t = (db - kEqSpectrumFloorDb) / (kEqSpectrumCeilDb - kEqSpectrumFloorDb);
-      return y0 + h - std::clamp(t, 0.0f, 1.0f) * h;
-   }
-
-   void UpdateEqSpectrum(AudioEffectNode* n, EqSpectrumState& st)
-   {
-      const int winSize = 1024;
-      float tempBuf[1024];
-      const int readCount = n->ReadSpectrumSamples(tempBuf, winSize);
-      if (readCount > 0)
-      {
-         if (readCount >= winSize)
-         {
-            st.window.assign(tempBuf + (readCount - winSize), tempBuf + readCount);
-         }
-         else
-         {
-            const int keep = winSize - readCount;
-            std::copy(st.window.begin() + readCount, st.window.end(), st.window.begin());
-            std::copy(tempBuf, tempBuf + readCount, st.window.begin() + keep);
-         }
-      }
-
-      float re[1024];
-      float im[1024];
-      for (int i = 0; i < winSize; i++)
-      {
-         const float wnd = 0.5f * (1.0f - cosf(2.0f * 3.14159265358979323846f * (float)i / (float)(winSize - 1)));
-         re[i] = st.window[i] * wnd;
-         im[i] = 0.0f;
-      }
-      WaveTerrainDsp::Radix2FFT::Instance().Forward(re, im);
-
-      for (int i = 1; i < 512; i++)
-      {
-         const float mag = sqrtf(re[i] * re[i] + im[i] * im[i]) * (2.0f / (float)winSize);
-         st.smoothed[i] = st.smoothed[i] * 0.7f + mag * 0.3f;
-      }
-   }
-
-   void DrawEqSpectrum(ImDrawList* dl, ImVec2 origin, float w, float h, double sampleRate, const EqSpectrumState& st,
-                       bool isLight)
-   {
-      const float binWidth = (float)(sampleRate > 0.0 ? sampleRate : 44100.0) / 1024.0f;
-      const float baselineY = origin.y + h;
-      const ImU32 fillCol = isLight ? IM_COL32(70, 90, 120, 40) : IM_COL32(210, 220, 235, 40);
-      const ImU32 lineCol = isLight ? IM_COL32(70, 90, 120, 130) : IM_COL32(210, 220, 235, 130);
-
-      float prevX = FilterVizFreqToX(binWidth, origin.x, w);
-      float prevY = EqSpectrumDbToY(20.0f * log10f(std::max(st.smoothed[1], 1.0e-6f)), origin.y, h);
-      dl->PathClear();
-      dl->PathLineTo(ImVec2(prevX, prevY));
-      for (int i = 2; i < 512; i++)
-      {
-         const float freq = (float)i * binWidth;
-         const float db = 20.0f * log10f(std::max(st.smoothed[i], 1.0e-6f));
-         const float x = FilterVizFreqToX(freq, origin.x, w);
-         const float y = EqSpectrumDbToY(db, origin.y, h);
-         dl->AddQuadFilled(ImVec2(prevX, baselineY), ImVec2(x, baselineY), ImVec2(x, y), ImVec2(prevX, prevY), fillCol);
-         dl->PathLineTo(ImVec2(x, y));
-         prevX = x;
-         prevY = y;
-      }
-      dl->PathStroke(lineCol, 0, 1.2f);
-   }
-
    void DrawEqVisualizer(AudioEffectNode* n, double sampleRate)
    {
       const float w = gAudioBodyW;
@@ -16548,9 +16557,9 @@ namespace
 
       DrawFilterGraticule(dl, origin, w, h);
 
-      EqSpectrumState& specState = gEqSpectrumCache[gCurrentNodeIndex];
-      UpdateEqSpectrum(n, specState);
-      DrawEqSpectrum(dl, origin, w, h, sampleRate, specState, isLight);
+      AudioSpectrumState& specState = gAudioSpectrumCache[gCurrentNodeIndex];
+      UpdateAudioSpectrum(n, specState);
+      DrawAudioSpectrum(dl, origin, w, h, sampleRate, specState, isLight);
 
       EqBandValues bands[5];
       ReadEqBands(n, bands);
