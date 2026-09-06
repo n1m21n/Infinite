@@ -101,6 +101,14 @@ namespace Platform
 
    std::string OpenModelDialog();
 
+   // Native open panel filtered to Gaussian splat interchange formats
+   // (.ply/.splat). Separate from OpenModelDialog even though that dialog's
+   // filter also happens to include .ply - a .ply picked here is decoded by
+   // SplatIO::LoadSplatPly (3DGS point-cloud convention), not ModelIO's
+   // triangle-mesh reader, so it needs its own panel rather than reusing the
+   // model one and relying on the extension to disambiguate after the fact.
+   std::string OpenSplatDialog();
+
    // Patch files. Save returns the chosen path, or "" if cancelled.
    std::string OpenPatchDialog();
    std::string SavePatchDialog(const std::string& suggestedName);

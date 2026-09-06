@@ -224,6 +224,19 @@ public:
    // already happened here for real (env-light cache invalidation).
    virtual const SplatIO::SplatCloud* GetSplatCloud() { return nullptr; }
    virtual unsigned long long SplatCloudRevision() { return 0; }
+
+   // Live (per-frame, not baked into the cloud/revision above) splat render
+   // multipliers, so a knob driving splat size/opacity can be modulated at
+   // frame rate without re-cooking the static GPU data texture - the design
+   // doc's "frame domain driving splat params is already free" placement.
+   // 1.0/white by default so every existing IGeometrySource implementer is
+   // unaffected. A passthrough wrapper should forward these the same way it
+   // forwards GetSplatCloud()/SplatCloudRevision(), or a splat source's size/
+   // opacity/tint knobs silently stop working the moment a wrapper (e.g.
+   // Transform) sits between it and Render3D.
+   virtual float SplatSizeMultiplier() const { return 1.0f; }
+   virtual float SplatOpacityMultiplier() const { return 1.0f; }
+   virtual void GetSplatTint(float outRgb[3]) const { outRgb[0] = outRgb[1] = outRgb[2] = 1.0f; }
 };
 
 // --- Geometry -----------------------------------------------------------
@@ -644,6 +657,16 @@ private:
       // above): folding it into an existing counter would silently break
       // invalidation for any source that happens to alias two of them.
       unsigned long long splatRev[kSlots] = { 0, 0, 0, 0 };
+      // Live per-frame splat render multipliers (SplatSourceNode's point
+      // size/opacity/tint) - not folded into splatRev, since that only bumps
+      // on file/crop/max-splats change (see SplatSourceNode). CookIfNeeded's
+      // drawSplatSlot reads these directly every draw, so they must be in
+      // this signature or a modulated size/opacity/tint knob would freeze
+      // the render the moment the rest of the scene stopped changing - the
+      // same cache-signature trap named in new-geometry-node SKILL.md S4.
+      float splatSizeMult[kSlots] = { 1.0f, 1.0f, 1.0f, 1.0f };
+      float splatOpacityMult[kSlots] = { 1.0f, 1.0f, 1.0f, 1.0f };
+      float splatTint[kSlots][3] = { { 1, 1, 1 }, { 1, 1, 1 }, { 1, 1, 1 }, { 1, 1, 1 } };
       unsigned long long surfaceTexRev[kSlots] = { 0, 0, 0, 0 };
       Material material[kSlots];
       Mat4 modelMatrix[kSlots];
@@ -671,6 +694,10 @@ private:
             if (hasGeom[i] != o.hasGeom[i] || meshRev[i] != o.meshRev[i] ||
                 cloudRev[i] != o.cloudRev[i] || curveRev[i] != o.curveRev[i] ||
                 splatRev[i] != o.splatRev[i] ||
+                splatSizeMult[i] != o.splatSizeMult[i] ||
+                splatOpacityMult[i] != o.splatOpacityMult[i] ||
+                splatTint[i][0] != o.splatTint[i][0] || splatTint[i][1] != o.splatTint[i][1] ||
+                splatTint[i][2] != o.splatTint[i][2] ||
                 surfaceTexRev[i] != o.surfaceTexRev[i] || instanceRev[i] != o.instanceRev[i] ||
                 instanceCount[i] != o.instanceCount[i])
                return false;

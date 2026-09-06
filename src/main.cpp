@@ -148,6 +148,7 @@ namespace
 #include "nodes/SceneNodes.h"
 #include "nodes/EnvironmentNode.h"
 #include "nodes/ModelSourceNode.h"
+#include "nodes/SplatSourceNode.h"
 #include "GltfImport.h"
 #include "SplatIO.h"
 #include "nodes/Text3DNode.h"
@@ -4328,6 +4329,7 @@ namespace
             [i]() -> INode* { return GeometryNode::CreateFor(i); }, "3D");
       }
       REGISTER_NODE(ModelSourceNode, Model 3D, "3D");
+      REGISTER_NODE(SplatSourceNode, Gaussian Splat, "3D");
       REGISTER_NODE(Text3DNode, Text 3D, "3D");
       REGISTER_NODE(Null3DNode, Null 3D, "3D");
       REGISTER_NODE(OceanNode, Ocean, "3D");
@@ -21398,6 +21400,36 @@ namespace
       }
    }
 
+   // No SH-mode control: SplatIO already collapses every spherical-harmonic
+   // band down to a single flat (DC-only) linear colour at load time (see
+   // SplatIO.h's Splat::r/g/b comment - "linear color, opacity already
+   // sigmoid'd"), so there is no higher-order SH data left on the node for a
+   // mode dropdown to switch between - a control here would just be a
+   // no-op. If a future phase decodes and keeps the higher SH bands, add the
+   // dropdown then.
+   void DrawSplatSourceParams(SplatSourceNode* n)
+   {
+      if (ImGui::Button("Open splat...", ImVec2(kParamWidth, 0)))
+      {
+         const std::string path = Platform::OpenSplatDialog();
+         if (!path.empty())
+            n->Load(path);
+      }
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+      ImGui::TextUnformatted(n->Status().c_str());
+      ImGui::PopTextWrapPos();
+
+      NodeSeparator("render");
+      ModSlider("point size", &n->pointSize, 0.05f, 5.0f);
+      ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
+      ColorSwatch("tint", n->tint, n);
+
+      NodeSeparator("budget");
+      ModSlider("crop", &n->crop, 0.0f, 10.0f);
+      ModSliderInt("max splats", &n->maxSplats, 0, 4000000);
+      ImGui::TextDisabled("%zu / %zu splats", n->SplatCount(), n->RawSplatCount());
+   }
+
    void DrawGeometryParams(GeometryNode* n)
    {
       DropdownButton("shape", GeometryNode::ShapeNames(), n->shape,
@@ -26590,6 +26622,7 @@ namespace
          { "HDRI", "Loads an equirectangular .hdr or .exr image and patches into Render 3D's env input, replacing the fixed sky gradient with a real image for the background and for reflections/ambient light. Rotation turns the image around Y; intensity scales it independently of Render 3D's own env intensity. Reflections use the image's own mip chain scaled by roughness as a cheap stand-in for a proper blurred prefilter - very glossy metal will read a little softer than a full IBL renderer would give it. Use this node rather than Image Source for HDRIs - Image Source clamps to 8-bit sRGB, which throws away exactly the above-1.0 highlight range an HDRI needs." },
          { "Render 3D", "Rasterizes the geometry/camera/light/material graph into an image. Antialiasing is reduced automatically at large output sizes to stay within GPU limits. Scenes over ~2 million triangles get noticeably heavier to render. An HDRI node patched into the env input replaces the procedural sky gradient for background, reflections and ambient light." },
          { "Model 3D", "Loads a 3D model file - obj, ply, stl, usd or usdz." },
+         { "Gaussian Splat", "Loads a Gaussian splat point cloud (.ply from a 3DGS trainer, or antimatter15's compact .splat) and renders it through Render 3D's dedicated EWA-splatting pass - not as a triangle mesh. 'crop' and 'max splats' cull floaters/decimate at load time; 'point size', 'opacity' and 'tint' are live render multipliers." },
          { "Null 3D", "A pass-through node for geometry: its output is exactly its input mesh, unchanged. Useful as a stable junction point to branch geometry to several destinations." },
          { "Switcher 3D", "Cycles between up to four connected geometry inputs every N beats or seconds, forwarding whichever one is active. Can be pinned to one input with 'manual'. Unlike the 2D Switcher, there is no crossfade - it always hard-cuts, since interpolating between two arbitrary meshes' topology isn't generally well-defined." },
 
@@ -52095,6 +52128,15 @@ int main(int argc, char** argv)
          static const std::vector<std::string> kModelExt = {
             "obj", "ply", "stl", "usd", "usda", "usdc", "usdz", "abc"
          };
+         // Gaussian splat interchange formats. ".ply" overlaps kModelExt on
+         // purpose - it's the universal 3DGS convention too (see SplatIO.h) -
+         // so a bare .ply dropped on empty canvas still spawns Model 3D
+         // (unchanged, existing behaviour) unless a Gaussian Splat node
+         // already sits under the drop point, in which case the drop is
+         // unambiguous and reloads it as a splat cloud instead. ".splat" is
+         // never ambiguous and always spawns/loads the splat node.
+         static const std::vector<std::string> kSplatExt = { "ply", "splat" };
+         static const std::vector<std::string> kSplatOnlyExt = { "splat" };
          // glTF/GLB are handled by their own branch (below, checked before
          // kModelExt) rather than folded into it: on a fresh drop they
          // auto-spawn a whole Material + Image Source rig, not just a bare
@@ -52121,6 +52163,7 @@ int main(int argc, char** argv)
          AudioFileNode* dropTargetAudioFile = FindNodeUnderCanvasPoint<AudioFileNode>(canvasPos);
          AudioPluginNode* dropTargetPlugin = FindNodeUnderCanvasPoint<AudioPluginNode>(canvasPos);
          ModelSourceNode* dropTargetModel = FindNodeUnderCanvasPoint<ModelSourceNode>(canvasPos);
+         SplatSourceNode* dropTargetSplat = FindNodeUnderCanvasPoint<SplatSourceNode>(canvasPos);
          VideoSourceNode* dropTargetVideo = FindNodeUnderCanvasPoint<VideoSourceNode>(canvasPos);
          ImageSourceNode* dropTargetImage = FindNodeUnderCanvasPoint<ImageSourceNode>(canvasPos);
          FieldElementNode* dropTargetFieldElement = FindNodeUnderCanvasPoint<FieldElementNode>(canvasPos);
@@ -52479,6 +52522,20 @@ int main(int argc, char** argv)
                gPatchDirty = true;
                offset += 240.0f;
                continue;
+            }
+            else if (dropTargetSplat != nullptr && HasExtension(path, kSplatExt))
+            {
+               ensureDroppedCheckpoint();
+               dropTargetSplat->Load(path);
+               dropTargetSplat = nullptr;
+               gPatchDirty = true;
+               continue;
+            }
+            else if (HasExtension(path, kSplatOnlyExt))
+            {
+               spawned = SpawnNode("Gaussian Splat", "3D", canvasPos.x + offset, canvasPos.y);
+               if (spawned != nullptr)
+                  static_cast<SplatSourceNode*>(spawned->node.get())->Load(path);
             }
             else if (HasExtension(path, kModelExt))
             {
@@ -59388,6 +59445,161 @@ int main(int argc, char** argv)
          printf("%s\n", ok ? "SPLAT CACHE TEST OK" : "SPLAT CACHE TEST FAIL");
       }
 
+      // Phase 3 (Gaussian Splat node, docs/plans/gaussian-splat-node.md S7)
+      // exit criteria, end to end through the real SplatSourceNode - not the
+      // hand-rolled TestSplatSource used by the tests above. Writes a real
+      // .splat fixture to disk, loads it through SplatSourceNode::Load (the
+      // same path the file-picker/drop-handler use), patches the node into a
+      // real Render3DNode, and reads back actual rendered pixels - so this
+      // is checking the node, not bypassing it to call SplatIO directly.
+      if (getenv("INFINITE_SPLATNODETEST") != nullptr && frameId == 6)
+      {
+         // 32-byte .splat record layout (SplatIO.h/.cpp): pos(3xf32),
+         // scale(3xf32, linear), rgba(4xu8), rot(4xu8 quantized wxyz).
+         auto writeSplatRecord = [](std::vector<unsigned char>& buf, float x, float y, float z,
+                                     float sx, float sy, float sz, unsigned char r, unsigned char g,
+                                     unsigned char b, unsigned char a) {
+            const float pos[3] = { x, y, z };
+            const float scale[3] = { sx, sy, sz };
+            const unsigned char color[4] = { r, g, b, a };
+            const unsigned char rot[4] = { 255, 128, 128, 128 }; // identity quaternion (w=1,x=y=z=0)
+            const size_t base = buf.size();
+            buf.resize(base + 32);
+            std::memcpy(buf.data() + base, pos, 12);
+            std::memcpy(buf.data() + base + 12, scale, 12);
+            std::memcpy(buf.data() + base + 24, color, 4);
+            std::memcpy(buf.data() + base + 28, rot, 4);
+         };
+
+         std::vector<unsigned char> fixture;
+         // Two bright red splats near the origin (one clearly more
+         // opaque/larger than the other) plus two faint, tiny outliers
+         // placed symmetrically on either side (+20/-20 on X) - symmetric so
+         // they cancel out in the raw cloud's mean-position centroid
+         // (leaving it near the origin cluster, not dragged off toward one
+         // side), which is what crop's "radius from centroid" is measured
+         // against. `crop` should keep the two near-origin splats and
+         // exclude both outliers; `maxSplats` should then keep only the
+         // brighter/larger of the two survivors.
+         writeSplatRecord(fixture, 0.0f, 0.0f, 0.0f, 0.15f, 0.15f, 0.15f, 255, 20, 20, 255);
+         writeSplatRecord(fixture, 0.05f, 0.0f, 0.0f, 0.1f, 0.1f, 0.1f, 255, 20, 20, 220);
+         writeSplatRecord(fixture, 20.0f, 0.0f, 0.0f, 0.01f, 0.01f, 0.01f, 10, 10, 200, 20);
+         writeSplatRecord(fixture, -20.0f, 0.0f, 0.0f, 0.01f, 0.01f, 0.01f, 10, 10, 200, 20);
+
+         const std::string fixturePath = "/tmp/infinite_splatnodetest_fixture.splat";
+         {
+            FILE* f = std::fopen(fixturePath.c_str(), "wb");
+            const bool wrote = (f != nullptr) && (std::fwrite(fixture.data(), 1, fixture.size(), f) == fixture.size());
+            if (f) std::fclose(f);
+            printf("  [%s] %-40s\n", wrote ? "pass" : "FAIL", "SplatNode(fixture .splat written)");
+         }
+
+         SplatSourceNode node;
+         const bool loaded = node.Load(fixturePath);
+         const size_t rawCountAfterLoad = node.RawSplatCount();
+         printf("  [%s] %-40s (raw=%zu)\n", (loaded && rawCountAfterLoad == 4) ? "pass" : "FAIL",
+                "SplatNode(Load() parses the real fixture)", rawCountAfterLoad);
+
+         node.CookIfNeeded(80000);
+         const unsigned long long revAfterLoad = node.SplatCloudRevision();
+         const size_t derivedAfterLoad = node.SplatCount();
+         printf("  [%s] %-40s (derived=%zu rev=%llu)\n",
+                (derivedAfterLoad == 4 && revAfterLoad != 0) ? "pass" : "FAIL",
+                "SplatNode(uncropped derived cloud == raw cloud)", derivedAfterLoad, revAfterLoad);
+
+         // Crop to a radius that keeps the two near-origin splats and drops
+         // the far outlier - exit criterion #5 (crop actually reduces the
+         // derived cloud and bumps SplatCloudRevision so Render3D re-cooks).
+         node.crop = 1.0f;
+         node.CookIfNeeded(80001);
+         const size_t derivedAfterCrop = node.SplatCount();
+         const unsigned long long revAfterCrop = node.SplatCloudRevision();
+         printf("  [%s] %-40s (derived=%zu rev changed=%d)\n",
+                (derivedAfterCrop == 2 && revAfterCrop != revAfterLoad) ? "pass" : "FAIL",
+                "SplatNode(crop drops the far outlier + bumps revision)", derivedAfterCrop,
+                (int)(revAfterCrop != revAfterLoad));
+
+         // max splats further budgets down to 1 - should keep the more
+         // opaque/larger of the two remaining splats (first record: a=255,
+         // scale=0.15 > second record: a=220, scale=0.1).
+         node.maxSplats = 1;
+         node.CookIfNeeded(80002);
+         const size_t derivedAfterBudget = node.SplatCount();
+         const unsigned long long revAfterBudget = node.SplatCloudRevision();
+         bool keptBrightest = false;
+         if (const SplatIO::SplatCloud* cloud = node.GetSplatCloud())
+            keptBrightest = !cloud->splats.empty() && cloud->splats[0].a > 0.9f && cloud->splats[0].px == 0.0f;
+         printf("  [%s] %-40s (derived=%zu rev changed=%d kept-brightest=%d)\n",
+                (derivedAfterBudget == 1 && revAfterBudget != revAfterCrop && keptBrightest) ? "pass" : "FAIL",
+                "SplatNode(max splats budgets to top-K by opacity*scale)", derivedAfterBudget,
+                (int)(revAfterBudget != revAfterCrop), (int)keptBrightest);
+
+         // Reset crop/budget so the full cloud reaches Render3D for the
+         // pixel-readback check below.
+         node.crop = 0.0f;
+         node.maxSplats = 0;
+         node.CookIfNeeded(80003);
+
+         Render3DNode render;
+         render.geometry[0] = &node;
+         render.width = 128.0f;
+         render.height = 128.0f;
+         render.samples = 0;
+         render.camAzimuth = 90.0f;
+         render.camElevation = 0.0f;
+         render.camDistance = 6.0f;
+         render.fov = 50.0f;
+         render.targetX = 0.0f; render.targetY = 0.0f; render.targetZ = 0.0f;
+         render.CookIfNeeded(80004);
+
+         const int texW = 128, texH = 128;
+         std::vector<unsigned char> pixels((size_t)texW * texH * 4, 0);
+         glBindTexture(GL_TEXTURE_2D, render.GetOutputTexture());
+         glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+         glBindTexture(GL_TEXTURE_2D, 0);
+
+         int redPixels = 0;
+         for (size_t i = 0; i < pixels.size(); i += 4)
+         {
+            if (pixels[i] > 40 && pixels[i] > pixels[i + 2] * 2)
+               redPixels++;
+         }
+         printf("  [%s] %-40s (redPixels=%d)\n", redPixels > 10 ? "pass" : "FAIL",
+                "SplatNode(patched into Render3D -> real EWA-splat pixels)", redPixels);
+
+         // Live per-frame multiplier check: point size/opacity/tint are read
+         // straight off the node every cook (not baked into the derived
+         // cloud), and SceneSignature was extended to fold them in - so
+         // changing pointSize alone (no reload, no crop/budget change) must
+         // still bump Render3D's own TextureRevision on the next cook, or
+         // modulating this knob would silently freeze the render.
+         const unsigned long long texRevBefore = render.TextureRevision();
+         node.pointSize = 2.5f;
+         render.CookIfNeeded(80005);
+         const unsigned long long texRevAfter = render.TextureRevision();
+         printf("  [%s] %-40s\n", (texRevAfter != texRevBefore) ? "pass" : "FAIL",
+                "SplatNode(live pointSize change invalidates Render3D cache)");
+
+         // Exit criterion #2's "non-blank viewport preview": NodeViewport is
+         // the generic per-node inline preview every IGeometrySource node
+         // gets (see NodeViewport.cpp's hasSplat branch, added in this same
+         // phase) - Render() returns 0 if geo's mesh/cloud/splat-cloud is
+         // empty, so a non-zero return with the reloaded (uncropped) cloud
+         // confirms the splat-cloud-as-points preview path is actually wired
+         // up for this node, not falling through to the blank placeholder.
+         NodeViewport viewport;
+         SharedViewportCamera cam;
+         const unsigned int previewTex = viewport.Render(&node, cam, 96, 96);
+         printf("  [%s] %-40s (tex=%u)\n", previewTex != 0 ? "pass" : "FAIL",
+                "SplatNode(NodeViewport preview is non-blank)", previewTex);
+
+         const bool allOk = loaded && rawCountAfterLoad == 4 && derivedAfterLoad == 4 &&
+                             derivedAfterCrop == 2 && revAfterCrop != revAfterLoad &&
+                             derivedAfterBudget == 1 && revAfterBudget != revAfterCrop && keptBrightest &&
+                             redPixels > 10 && texRevAfter != texRevBefore && previewTex != 0;
+         printf("%s\n", allOk ? "SPLAT NODE TEST OK" : "SPLAT NODE TEST FAIL");
+      }
+
       // A different bug class from RENDER3DLIVETEST above: not a live-updating
       // source with no revision bump of its own, but the opposite direction -
       // a real upstream mesh/cloud/curve change that DOES bump a revision,
@@ -62836,6 +63048,8 @@ int main(int argc, char** argv)
                DrawGeometryParams(n);
             else if (auto* n = dynamic_cast<ModelSourceNode*>(gn.node.get()))
                DrawModelParams(n);
+            else if (auto* n = dynamic_cast<SplatSourceNode*>(gn.node.get()))
+               DrawSplatSourceParams(n);
             else if (auto* n = dynamic_cast<Text3DNode*>(gn.node.get()))
                DrawText3DParams(n);
             else if (auto* n = dynamic_cast<MeshToPointsNode*>(gn.node.get()))

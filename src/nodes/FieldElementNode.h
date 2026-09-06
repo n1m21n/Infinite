@@ -169,6 +169,13 @@ public:
    // into must still reach Render3D rather than vanishing.
    const SplatIO::SplatCloud* GetSplatCloud() override { return input ? input->GetSplatCloud() : nullptr; }
    unsigned long long SplatCloudRevision() override { return input ? input->SplatCloudRevision() : 0; }
+   float SplatSizeMultiplier() const override { return input ? input->SplatSizeMultiplier() : 1.0f; }
+   float SplatOpacityMultiplier() const override { return input ? input->SplatOpacityMultiplier() : 1.0f; }
+   void GetSplatTint(float outRgb[3]) const override
+   {
+      if (input) input->GetSplatTint(outRgb);
+      else outRgb[0] = outRgb[1] = outRgb[2] = 1.0f;
+   }
 
    // Field compilation & UI
    bool Apply();

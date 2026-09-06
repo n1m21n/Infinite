@@ -70,6 +70,25 @@ unsigned long long Switcher3DNode::SplatCloudRevision()
    return active ? active->SplatCloudRevision() : 0;
 }
 
+float Switcher3DNode::SplatSizeMultiplier() const
+{
+   IGeometrySource* active = Active();
+   return active ? active->SplatSizeMultiplier() : 1.0f;
+}
+
+float Switcher3DNode::SplatOpacityMultiplier() const
+{
+   IGeometrySource* active = Active();
+   return active ? active->SplatOpacityMultiplier() : 1.0f;
+}
+
+void Switcher3DNode::GetSplatTint(float outRgb[3]) const
+{
+   IGeometrySource* active = Active();
+   if (active) active->GetSplatTint(outRgb);
+   else outRgb[0] = outRgb[1] = outRgb[2] = 1.0f;
+}
+
 Mat4 Switcher3DNode::GetInstanceGroupMatrix() const
 {
    IGeometrySource* active = Active();

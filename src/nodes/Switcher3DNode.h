@@ -55,6 +55,9 @@ public:
    // reaching Render3D through the switch.
    const SplatIO::SplatCloud* GetSplatCloud() override;
    unsigned long long SplatCloudRevision() override;
+   float SplatSizeMultiplier() const override;
+   float SplatOpacityMultiplier() const override;
+   void GetSplatTint(float outRgb[3]) const override;
    // Same active input as PassthroughSource, so the two can't disagree about
    // which slot is live - a Transform wrapping the instancer upstream of the
    // switcher still moves the whole scatter.

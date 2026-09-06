@@ -309,6 +309,7 @@ set(COMMON_SOURCES
     src/nodes/Geometry3DNodes.cpp
     src/nodes/EnvironmentNode.cpp
     src/nodes/ModelSourceNode.cpp
+    src/nodes/SplatSourceNode.cpp
     src/nodes/Text3DNode.cpp
     src/nodes/UtilityNodes.cpp
     src/nodes/PathNode.cpp

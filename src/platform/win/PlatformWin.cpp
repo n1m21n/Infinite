@@ -273,6 +273,18 @@ namespace Platform
                            false, std::string(), err);
    }
 
+   std::string OpenSplatDialog()
+   {
+      std::string err;
+      return RunOpenDialog(L"Open Gaussian Splat",
+                           {
+                              { L"Gaussian splat", L"*.ply;*.splat" },
+                              { L"Splat PLY", L"*.ply" },
+                              { L"Compact splat", L"*.splat" },
+                           },
+                           false, std::string(), err);
+   }
+
    std::string OpenPatchDialog()
    {
       std::string err;

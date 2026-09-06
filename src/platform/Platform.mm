@@ -671,6 +671,38 @@ namespace Platform
       }
    }
 
+   std::string OpenSplatDialog()
+   {
+      @autoreleasepool
+      {
+         NSOpenPanel* panel = [NSOpenPanel openPanel];
+         [panel setCanChooseFiles:YES];
+         [panel setCanChooseDirectories:NO];
+         [panel setAllowsMultipleSelection:NO];
+         [panel setTitle:@"Open Gaussian splat"];
+
+         if (@available(macOS 11.0, *))
+         {
+            NSMutableArray<UTType*>* types = [NSMutableArray array];
+            for (NSString* ext in @[ @"ply", @"splat" ])
+            {
+               UTType* t = [UTType typeWithFilenameExtension:ext];
+               if (t != nil)
+                  [types addObject:t];
+            }
+            if ([types count] > 0)
+               [panel setAllowedContentTypes:types];
+         }
+
+         if ([panel runModal] != NSModalResponseOK)
+            return std::string();
+         NSURL* url = [[panel URLs] firstObject];
+         if (url == nil)
+            return std::string();
+         return std::string([[url path] UTF8String]);
+      }
+   }
+
    namespace
    {
       struct OutlineBuilder

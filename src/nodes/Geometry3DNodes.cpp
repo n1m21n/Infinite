@@ -1348,6 +1348,13 @@ bool Render3DNode::EnsureSplatShader()
       "uniform int uSplatTexWidth;\n"
       "uniform vec2 uViewport;\n"
       "uniform float uFillClamp;\n" // 1.0 unless the fill-rate budget clamps it
+      // Live per-source multipliers (SplatSourceNode's point size/opacity/tint
+      // knobs) - read every frame, not baked into the data texture, so they
+      // can be modulated without re-cooking it. See IGeometrySource::
+      // SplatSizeMultiplier/SplatOpacityMultiplier/GetSplatTint.
+      "uniform float uSizeMult;\n"
+      "uniform float uOpacityMult;\n"
+      "uniform vec3 uTint;\n"
 
       "out vec2 vScreenOffset;\n"
       "out vec3 vConic;\n"
@@ -1387,6 +1394,10 @@ bool Render3DNode::EnsureSplatShader()
       "                      t1.z, t2.y, t2.z);\n"
       "   mat3 M3 = mat3(uModel);\n"
       "   Sigma = M3 * Sigma * transpose(M3);\n"
+      // Point-size knob scales the ellipsoid itself (variance ~ size^2) so the
+      // quad radius and the Gaussian falloff grow together - a true "bigger
+      // splat", not just a wider soft-edge dilation.
+      "   Sigma = Sigma * (uSizeMult * uSizeMult);\n"
 
       // EWA splatting: Sigma' = J * W * Sigma * W^T * J^T, J = Jacobian of
       // the affine approximation of the perspective projection at this
@@ -1441,7 +1452,7 @@ bool Render3DNode::EnsureSplatShader()
       "   vec2 ndcOffset = screenOffset / (0.5 * uViewport);\n"
       "   gl_Position = clipCenter + vec4(ndcOffset * clipCenter.w, 0.0, 0.0);\n"
       "   vScreenOffset = screenOffset;\n"
-      "   vColor = vec4(t3.xyz, opacity);\n"
+      "   vColor = vec4(t3.xyz * uTint, clamp(opacity * uOpacityMult, 0.0, 1.0));\n"
       "}\n";
 
    static const char* kFragSrc =
@@ -1665,6 +1676,9 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
       sig.cloudRev[i] = source->PointCloudRevision();
       sig.curveRev[i] = source->CurveStamp();
       sig.splatRev[i] = source->SplatCloudRevision();
+      sig.splatSizeMult[i] = source->SplatSizeMultiplier();
+      sig.splatOpacityMult[i] = source->SplatOpacityMultiplier();
+      source->GetSplatTint(sig.splatTint[i]);
       sig.surfaceTexRev[i] = source->SurfaceTextureRevision();
       sig.material[i] = source->GetMaterial();
       sig.modelMatrix[i] = source->GetModelMatrix();
@@ -2775,7 +2789,8 @@ void Render3DNode::CookIfNeeded(int frameId)
       const float pixelsPerUnit = visibleHeight > 1.0e-6f ? (float)mHeight / visibleHeight : 0.0f;
       static const double kSampleMultiplier2[4] = { 1.0, 2.0, 4.0, 8.0 };
       const double sampleMult = kSampleMultiplier2[std::max(0, std::min(3, samples))];
-      const float radiusPixels = gpu.avgWorldRadius * 3.0f * pixelsPerUnit;
+      const float sizeMult = std::max(0.0f, source->SplatSizeMultiplier());
+      const float radiusPixels = gpu.avgWorldRadius * 3.0f * pixelsPerUnit * sizeMult;
       const double perSplatArea = 3.14159265358979323846 * (double)radiusPixels * (double)radiusPixels;
       const double estimatedFill = (double)gpu.splatCount * perSplatArea * sampleMult;
       const double kFillBudget = 5.0e8;
@@ -2802,6 +2817,12 @@ void Render3DNode::CookIfNeeded(int frameId)
       glUniformMatrix4fv(glGetUniformLocation(mSplatProgram, "uModel"), 1, GL_FALSE, model.m);
       glUniform2f(glGetUniformLocation(mSplatProgram, "uViewport"), (float)w, (float)h);
       glUniform1f(glGetUniformLocation(mSplatProgram, "uFillClamp"), fillClamp);
+      glUniform1f(glGetUniformLocation(mSplatProgram, "uSizeMult"), sizeMult);
+      glUniform1f(glGetUniformLocation(mSplatProgram, "uOpacityMult"),
+                  std::max(0.0f, source->SplatOpacityMultiplier()));
+      float tint[3] = { 1.0f, 1.0f, 1.0f };
+      source->GetSplatTint(tint);
+      glUniform3f(glGetUniformLocation(mSplatProgram, "uTint"), tint[0], tint[1], tint[2]);
 
       glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, gpu.uploadedIndexCount);
       mLastDrawCalls++;

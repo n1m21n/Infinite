@@ -112,6 +112,13 @@ public:
    {
       return input ? input->SplatCloudRevision() : 0;
    }
+   float SplatSizeMultiplier() const override { return input ? input->SplatSizeMultiplier() : 1.0f; }
+   float SplatOpacityMultiplier() const override { return input ? input->SplatOpacityMultiplier() : 1.0f; }
+   void GetSplatTint(float outRgb[3]) const override
+   {
+      if (input) input->GetSplatTint(outRgb);
+      else outRgb[0] = outRgb[1] = outRgb[2] = 1.0f;
+   }
    // When this node (or the chain of GeometryOpNodes it's wired through) sits
    // downstream of an InstanceOnPoints and op is kTransform, GetMesh() leaves
    // the stamp mesh alone and this returns the move/rotate/scale as a matrix
@@ -414,6 +421,13 @@ public:
    unsigned long long SplatCloudRevision() override
    {
       return input ? input->SplatCloudRevision() : 0;
+   }
+   float SplatSizeMultiplier() const override { return input ? input->SplatSizeMultiplier() : 1.0f; }
+   float SplatOpacityMultiplier() const override { return input ? input->SplatOpacityMultiplier() : 1.0f; }
+   void GetSplatTint(float outRgb[3]) const override
+   {
+      if (input) input->GetSplatTint(outRgb);
+      else outRgb[0] = outRgb[1] = outRgb[2] = 1.0f;
    }
    Mat4 GetInstanceGroupMatrix() const override
    {
@@ -729,6 +743,13 @@ public:
    {
       return input ? input->SplatCloudRevision() : 0;
    }
+   float SplatSizeMultiplier() const override { return input ? input->SplatSizeMultiplier() : 1.0f; }
+   float SplatOpacityMultiplier() const override { return input ? input->SplatOpacityMultiplier() : 1.0f; }
+   void GetSplatTint(float outRgb[3]) const override
+   {
+      if (input) input->GetSplatTint(outRgb);
+      else outRgb[0] = outRgb[1] = outRgb[2] = 1.0f;
+   }
    // Forwarded, not identity - see DisplacementNode for why.
    Mat4 GetModelMatrix() const override
    {
@@ -885,6 +906,13 @@ public:
    unsigned long long SplatCloudRevision() override
    {
       return sourceInput ? sourceInput->SplatCloudRevision() : 0;
+   }
+   float SplatSizeMultiplier() const override { return sourceInput ? sourceInput->SplatSizeMultiplier() : 1.0f; }
+   float SplatOpacityMultiplier() const override { return sourceInput ? sourceInput->SplatOpacityMultiplier() : 1.0f; }
+   void GetSplatTint(float outRgb[3]) const override
+   {
+      if (sourceInput) sourceInput->GetSplatTint(outRgb);
+      else outRgb[0] = outRgb[1] = outRgb[2] = 1.0f;
    }
    Mat4 GetInstanceGroupMatrix() const override
    {

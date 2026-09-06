@@ -521,15 +521,24 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
          if (p.alive) { hasCloud = true; break; }
       }
    }
-   const bool usePointCloud = !hasMesh && hasCloud;
+   // A splat-only source (SplatSourceNode) has no mesh and no Particle point
+   // cloud either - GetSplatCloud() is the only thing it offers. The real EWA
+   // render only happens through Render3D (see Geometry3DNodes.cpp); this
+   // thumbnail approximates it as plain points, same "cheap" tradeoff the
+   // design doc calls out, reusing the point-cloud path below rather than a
+   // second GL program just for this preview.
+   const SplatIO::SplatCloud* splatCloud = (!hasMesh && !hasCloud) ? geo->GetSplatCloud() : nullptr;
+   const bool hasSplat = splatCloud != nullptr && !splatCloud->Empty();
+   const bool usePointCloud = !hasMesh && (hasCloud || hasSplat);
 
-   if (!hasMesh && !hasCloud)
+   if (!hasMesh && !hasCloud && !hasSplat)
       return 0;
 
    w = std::max(16, w);
    h = std::max(16, h);
 
-   const unsigned long long revision = usePointCloud ? geo->PointCloudRevision() : geo->MeshRevision();
+   const unsigned long long revision =
+      hasSplat ? geo->SplatCloudRevision() : (usePointCloud ? geo->PointCloudRevision() : geo->MeshRevision());
    const Mat4 model = geo->GetModelMatrix();
    const Material material = geo->GetMaterial();
    const unsigned int surfaceTexture = geo->GetSurfaceTexture();
@@ -589,7 +598,25 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
    if (!EnsureFbo(w, h))
       return 0;
 
-   if (usePointCloud)
+   if (hasSplat)
+   {
+      // Position + linear color only - no ellipsoid orientation, no sort;
+      // this is a cheap approximation for the node's own inline thumbnail,
+      // not the real render.
+      std::vector<Particle> approx;
+      approx.reserve(splatCloud->splats.size());
+      for (const SplatIO::Splat& s : splatCloud->splats)
+      {
+         Particle p;
+         p.px = s.px; p.py = s.py; p.pz = s.pz;
+         p.r = s.r; p.g = s.g; p.b = s.b;
+         const double trace = (double)s.cov[0] + (double)s.cov[3] + (double)s.cov[5];
+         p.scale = (float)std::sqrt(std::max(0.0, trace / 3.0));
+         approx.push_back(p);
+      }
+      UploadPoints(approx, revision);
+   }
+   else if (usePointCloud)
       UploadPoints(*cloud, revision);
    else
       UploadMesh(mesh, revision);

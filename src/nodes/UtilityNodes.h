@@ -180,6 +180,13 @@ public:
    {
       return input ? input->SplatCloudRevision() : 0;
    }
+   float SplatSizeMultiplier() const override { return input ? input->SplatSizeMultiplier() : 1.0f; }
+   float SplatOpacityMultiplier() const override { return input ? input->SplatOpacityMultiplier() : 1.0f; }
+   void GetSplatTint(float outRgb[3]) const override
+   {
+      if (input) input->GetSplatTint(outRgb);
+      else outRgb[0] = outRgb[1] = outRgb[2] = 1.0f;
+   }
    Mat4 GetInstanceGroupMatrix() const override
    {
       return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
@@ -253,6 +260,13 @@ public:
    unsigned long long SplatCloudRevision() override
    {
       return input ? input->SplatCloudRevision() : 0;
+   }
+   float SplatSizeMultiplier() const override { return input ? input->SplatSizeMultiplier() : 1.0f; }
+   float SplatOpacityMultiplier() const override { return input ? input->SplatOpacityMultiplier() : 1.0f; }
+   void GetSplatTint(float outRgb[3]) const override
+   {
+      if (input) input->GetSplatTint(outRgb);
+      else outRgb[0] = outRgb[1] = outRgb[2] = 1.0f;
    }
    // Forwarded alongside PassthroughSource: a node that claims to pass an
    // instancer through has to pass the wrapping Transform's group matrix
@@ -413,6 +427,13 @@ public:
    unsigned long long SplatCloudRevision() override
    {
       return input ? input->SplatCloudRevision() : 0;
+   }
+   float SplatSizeMultiplier() const override { return input ? input->SplatSizeMultiplier() : 1.0f; }
+   float SplatOpacityMultiplier() const override { return input ? input->SplatOpacityMultiplier() : 1.0f; }
+   void GetSplatTint(float outRgb[3]) const override
+   {
+      if (input) input->GetSplatTint(outRgb);
+      else outRgb[0] = outRgb[1] = outRgb[2] = 1.0f;
    }
    Mat4 GetInstanceGroupMatrix() const override
    {
