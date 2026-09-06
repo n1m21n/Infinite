@@ -47901,6 +47901,12 @@ int main(int argc, char** argv)
    style.GrabRounding = 3.0f;
    style.WindowRounding = 4.0f;
    style.ItemSpacing = ImVec2(6, 5);
+   // Popups/context menus and scrollbars are chrome, not node bodies - they
+   // don't share WindowRounding/FrameRounding's blast radius (node-ui-pillars
+   // P1-P9 grid math), so they can read softer without touching a single
+   // knob row. Left unset before this, which meant they inherited 0.
+   style.PopupRounding = 12.0f;
+   style.ScrollbarRounding = 10.0f;
 
    ImGui_ImplGlfw_InitForOpenGL(window, true);
    // Installed after the backend so it chains rather than replacing ImGui's.
