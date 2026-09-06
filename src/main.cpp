@@ -136,6 +136,7 @@ namespace
 #include "nodes/ColorRampNode.h"
 #include "nodes/PaletteNode.h"
 #include "nodes/AnalyzeNodes.h"
+#include "nodes/MotionTrackNode.h"
 #include "nodes/Geometry3DNodes.h"
 #include "nodes/GeometryOpNodes.h"
 #include "nodes/FieldElementNode.h"
@@ -1522,46 +1523,47 @@ namespace
    };
    BrowserFavorites gBrowserFavorites;
 
-   // Draws a small square star button for toggling favourites on list items.
-   // Returns true if clicked.
-   bool DrawFavoriteStar(const char* id, bool isFav)
+   extern bool gPatchDirty;
+
+   // Draws a small yellow Tabler star icon on the right side of a row when favorited.
+   // Pure draw list rendering; no interactive buttons or cursor offsets so ImGuiListClipper
+   // row height is never disturbed.
+   void DrawFavoriteBadge(const ImVec2& itemMin, const ImVec2& itemMax, bool isFav)
    {
-      const float h = ImGui::GetFrameHeight();
-      const float btnW = h * 0.75f;
-      const float btnH = btnW;
-      const ImVec2 size(btnW, btnH);
-      const float rowH = h;
-
-      const float startY = ImGui::GetCursorPosY();
-      ImGui::SetCursorPosY(startY + (rowH - btnH) * 0.5f);
-
-      const bool pressed = ImGui::InvisibleButton(id, size);
-      const bool hovered = ImGui::IsItemHovered();
-
+      if (!isFav)
+         return;
       ImDrawList* dl = ImGui::GetWindowDrawList();
-      const ImVec2 bmin = ImGui::GetItemRectMin();
-      const ImVec2 bmax = ImGui::GetItemRectMax();
-      const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-      const float iconSize = btnH * 0.9f;
+      const float starSize = 11.0f;
+      const ImVec2 center(itemMax.x - 12.0f, (itemMin.y + itemMax.y) * 0.5f);
+      const ImU32 starCol = IM_COL32(255, 205, 45, 255);
+      Tabler::DrawStar(dl, center, starSize, starCol, /*filled=*/true);
+   }
 
-      ImU32 col;
-      if (isFav)
-         col = hovered ? IM_COL32(255, 225, 75, 255) : IM_COL32(255, 200, 40, 255);
-      else if (hovered)
-         col = IM_COL32(255, 215, 80, 220);
-      else
+   // Truncates a row label to fit maxWidth, appending "..." when it doesn't -
+   // browser panel rows (long sample/plugin/module names) otherwise just get
+   // clipped mid-character by the window edge with no visual cue there's more
+   // text. Measures with ImGui::CalcTextSize, so must run while the row's font
+   // is active. Byte-length binary search, not a UTF-8-aware one - matches
+   // how the rest of this file's string helpers (e.g. ILess) already treat
+   // these names as plain byte strings.
+   std::string TruncateWithEllipsis(const std::string& label, float maxWidth)
+   {
+      if (ImGui::CalcTextSize(label.c_str()).x <= maxWidth)
+         return label;
+      const char* kEllipsis = "...";
+      const float ellipsisW = ImGui::CalcTextSize(kEllipsis).x;
+      if (maxWidth <= ellipsisW)
+         return kEllipsis;
+      int lo = 0, hi = (int)label.size();
+      while (lo < hi)
       {
-         ImVec4 c = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
-         c.w *= 0.6f;
-         col = ImGui::GetColorU32(c);
+         const int mid = (lo + hi + 1) / 2;
+         if (ImGui::CalcTextSize(label.substr(0, mid).c_str()).x + ellipsisW <= maxWidth)
+            lo = mid;
+         else
+            hi = mid - 1;
       }
-
-      Tabler::DrawStar(dl, center, iconSize, col, isFav);
-      if (hovered)
-         ImGui::SetTooltip("%s", isFav ? "Remove from favourites" : "Add to favourites");
-
-      ImGui::SetCursorPosY(startY);
-      return pressed;
+      return label.substr(0, lo) + kEllipsis;
    }
 
    // ---- modulatable parameters --------------------------------------------
@@ -4441,6 +4443,7 @@ namespace
       REGISTER_NODE(ConstantNode, Constant, "Modulators");
       REGISTER_NODE(NullModulatorNode, Null Modulator, "Modulators");
       REGISTER_NODE(ImageAnalyzeNode, Image Analyze, "Modulators");
+      REGISTER_NODE(MotionTrackNode, Motion Track, "Modulators");
       REGISTER_NODE(PaletteNode, Palette, "Modulators");
       REGISTER_NODE(AudioFileNode, Audio File, "Modulators");
       REGISTER_NODE(AudioAnalyzeNode, Audio Analyze, "Modulators");
@@ -4697,6 +4700,8 @@ namespace
          return 1;
       if (dynamic_cast<ImageAnalyzeNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<MotionTrackNode*>(gn.node.get()) != nullptr)
+         return 1;
       if (dynamic_cast<PaletteNode*>(gn.node.get()) != nullptr)
          return 1; // the reference image, when it comes from the graph
       if (auto* fp = dynamic_cast<FieldPixelNode*>(gn.node.get()))
@@ -4841,6 +4846,8 @@ namespace
          return slot == 0 ? &draw->Input() : nullptr;
       if (auto* an = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()))
          return slot == 0 ? &an->Input() : nullptr;
+      if (auto* mt = dynamic_cast<MotionTrackNode*>(gn.node.get()))
+         return slot == 0 ? &mt->Input() : nullptr;
       if (auto* pal = dynamic_cast<PaletteNode*>(gn.node.get()))
          return slot == 0 ? &pal->Input() : nullptr;
       if (auto* fp = dynamic_cast<FieldPixelNode*>(gn.node.get()))
@@ -8156,6 +8163,65 @@ namespace
       {
          ImGui::TextDisabled("driven by input modulator");
       }
+   }
+
+   void DrawMotionTrackParams(MotionTrackNode* n)
+   {
+      const float w = kPreviewSize;
+
+      // Analyze button / progress bar
+      if (n->IsAnalyzing())
+      {
+         char barText[64];
+         snprintf(barText, sizeof(barText), "Analyzing... %d%% (Cancel)", (int)(n->Progress() * 100.0f));
+         if (ImGui::Button(barText, ImVec2(w, 0)))
+         {
+            n->CancelAnalysis();
+         }
+         ImGui::ProgressBar(n->Progress(), ImVec2(w, 4.0f), "");
+      }
+      else
+      {
+         const char* btnLabel = n->IsStale() ? "Re-analyze" : (n->HasTrack() ? "Re-analyze" : "Analyze");
+         if (ImGui::Button(btnLabel, ImVec2(w, 0)))
+         {
+            n->StartAnalysis();
+         }
+      }
+
+      // Status readout
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + w);
+      ImGui::TextDisabled("%s", n->Status().c_str());
+      ImGui::PopTextWrapPos();
+
+      NodeSeparator("settings", w);
+      DropdownButton("init", MotionTrackNode::InitModeNames(), n->initMode,
+                     [n](int i) { PushUndoCheckpoint(); n->initMode = i; n->MarkStale(); }, w);
+      DropdownButton("model", MotionTrackNode::MotionModelNames(), n->motionModel,
+                     [n](int i) { PushUndoCheckpoint(); n->motionModel = i; n->MarkStale(); }, w);
+
+      ImGui::BeginDisabled(n->initMode != MotionTrackNode::kManualBox);
+      ModSlider("box X", &n->manualBoxX, 0.0f, 1.0f);
+      ModSlider("box Y", &n->manualBoxY, 0.0f, 1.0f);
+      ModSlider("box W", &n->manualBoxW, 0.05f, 1.0f);
+      ModSlider("box H", &n->manualBoxH, 0.05f, 1.0f);
+      ImGui::EndDisabled();
+
+      ModSlider("search", &n->searchScale, 1.2f, 6.0f);
+      ModSliderInt("features", &n->featureCount, 8, 200);
+      ModSlider("confidence", &n->minConfidence, 0.1f, 0.99f);
+      ModSlider("adapt", &n->adapt, 0.0f, 1.0f);
+      ModSlider("smooth", &n->smooth, 0.0f, 20.0f);
+      ModSlider("fps", &n->sampleFps, 1.0f, 120.0f);
+
+      NodeSeparator("overlay", w);
+      ModCheckbox("show overlay", &n->showOverlay);
+      DropdownButton("style", MotionTrackNode::OverlayStyleNames(), n->overlayStyle,
+                     [n](int i) { PushUndoCheckpoint(); n->overlayStyle = i; }, w);
+      ColorSwatch("color", n->overlayColor, n);
+      ModSlider("size", &n->overlaySize, 0.1f, 5.0f);
+      ModSlider("offset X", &n->offsetX, -1.0f, 1.0f);
+      ModSlider("offset Y", &n->offsetY, -1.0f, 1.0f);
    }
 
    // ======================================================================
@@ -13938,8 +14004,10 @@ namespace
    const std::vector<std::string>& SampleTypeFilterNames()
    {
       // AIFF covers both "aif" and "aiff" - same format, two adjacent
-      // entries for it would be noise (see HasAudioExtension).
-      static const std::vector<std::string> names = { "All", "Favourites", "WAV", "AIFF", "CAF", "M4A", "MP3", "FLAC" };
+      // entries for it would be noise (see HasAudioExtension). No
+      // "Favourites" entry here - the sort dropdown beside this one already
+      // has a Favourites option, and showing it in both was confusing.
+      static const std::vector<std::string> names = { "All", "WAV", "AIFF", "CAF", "M4A", "MP3", "FLAC" };
       return names;
    }
 
@@ -13947,24 +14015,24 @@ namespace
    {
       switch (typeFilter)
       {
-         case 1: return gBrowserFavorites.IsFavoriteSample(e.path);
-         case 2: return e.extension == "wav";
-         case 3: return e.extension == "aif" || e.extension == "aiff";
-         case 4: return e.extension == "caf";
-         case 5: return e.extension == "m4a";
-         case 6: return e.extension == "mp3";
-         case 7: return e.extension == "flac";
+         case 1: return e.extension == "wav";
+         case 2: return e.extension == "aif" || e.extension == "aiff";
+         case 3: return e.extension == "caf";
+         case 4: return e.extension == "m4a";
+         case 5: return e.extension == "mp3";
+         case 6: return e.extension == "flac";
          default: return true; // 0 = All, and any out-of-range index
       }
    }
 
-   // "All", "Favourites", "Video", "Image", then every individual extension from
+   // "All", "Video", "Image", then every individual extension from
    // MediaExtensions.h in the same order that header lists them - the
-   // authority the OS drop handler already uses, not a second list.
+   // authority the OS drop handler already uses, not a second list. No
+   // "Favourites" entry - see SampleTypeFilterNames's comment.
    const std::vector<std::string>& MediaTypeFilterNames()
    {
       static const std::vector<std::string> names = [] {
-         std::vector<std::string> v = { "All", "Favourites", "Video", "Image" };
+         std::vector<std::string> v = { "All", "Video", "Image" };
          for (const std::string& ext : MediaExtensions::Video())
          {
             std::string upper = ext;
@@ -13989,12 +14057,10 @@ namespace
       if (typeFilter == 0)
          return true;
       if (typeFilter == 1)
-         return gBrowserFavorites.IsFavoriteMedia(e.path);
-      if (typeFilter == 2)
          return std::find(video.begin(), video.end(), e.extension) != video.end();
-      if (typeFilter == 3)
+      if (typeFilter == 2)
          return std::find(image.begin(), image.end(), e.extension) != image.end();
-      const int videoIdx = typeFilter - 4;
+      const int videoIdx = typeFilter - 3;
       if (videoIdx >= 0 && videoIdx < (int)video.size())
          return e.extension == video[videoIdx];
       const int imageIdx = videoIdx - (int)video.size();
@@ -14244,8 +14310,6 @@ namespace
             ImGui::PushID(entry.path.c_str());
 
             const float rowH = ImGui::GetFrameHeight();
-            const float starBtnW = rowH * 0.75f;
-            const float spacing = ImGui::GetStyle().ItemSpacing.x;
             const bool isFav = mediaKind ? gBrowserFavorites.IsFavoriteMedia(entry.path) : gBrowserFavorites.IsFavoriteSample(entry.path);
 
          // Media mode has no audition - images/video get no play button, and
@@ -14336,8 +14400,13 @@ namespace
          // the button (which is a separate widget one item back) never
          // begins a sample drag.
          const float availW = ImGui::GetContentRegionAvail().x;
-         const float textW = std::max(20.0f, availW - starBtnW - spacing);
-         ImGui::Selectable(entry.fileName.c_str(), false, 0, ImVec2(textW, 0));
+         // Reserved unconditionally (not just when isFav) so a row's text
+         // doesn't reflow when its favourite state toggles.
+         const float badgeReserve = 20.0f;
+         const std::string rowLabel = TruncateWithEllipsis(entry.fileName, std::max(20.0f, availW - badgeReserve));
+         ImGui::Selectable(rowLabel.c_str(), false, 0, ImVec2(availW, 0));
+         const ImVec2 selMin = ImGui::GetItemRectMin();
+         const ImVec2 selMax = ImGui::GetItemRectMax();
          if (!mediaKind && getenv("INFINITE_SAMPLERDRAGTEST") != nullptr)
          {
             const ImVec2 mn = ImGui::GetItemRectMin();
@@ -14370,13 +14439,50 @@ namespace
                ImGui::SetTooltip("%s", entry.path.c_str());
          }
 
-         ImGui::SameLine();
-         if (DrawFavoriteStar("##fav", isFav))
+         DrawFavoriteBadge(selMin, selMax, isFav);
+
+         if (ImGui::BeginPopupContextItem("##entry_ctx"))
          {
-            if (mediaKind)
-               gBrowserFavorites.ToggleMedia(entry.path);
-            else
-               gBrowserFavorites.ToggleSample(entry.path);
+            if (ImGui::MenuItem(isFav ? "Remove from favourites" : "Add to favourites"))
+            {
+               if (mediaKind)
+                  gBrowserFavorites.ToggleMedia(entry.path);
+               else
+                  gBrowserFavorites.ToggleSample(entry.path);
+            }
+            if (ImGui::MenuItem("Add to canvas"))
+            {
+               const ImVec2 spawnPos = FindFreeSpawnPosition(gViewCenterCanvas);
+               PushUndoCheckpoint();
+               if (!mediaKind)
+               {
+                  if (GraphNode* gn = SpawnNode("Sampler", "Synths", spawnPos.x, spawnPos.y))
+                  {
+                     if (auto* sampler = dynamic_cast<SamplerNode*>(gn->node.get()))
+                        sampler->LoadFile(entry.path);
+                     gPatchDirty = true;
+                  }
+               }
+               else
+               {
+                  const bool isVid = HasExtension(entry.path, kVideoExt);
+                  if (GraphNode* gn = SpawnNode(isVid ? "Video" : "Image Source", "Source", spawnPos.x, spawnPos.y))
+                  {
+                     if (isVid)
+                     {
+                        if (auto* vid = dynamic_cast<VideoSourceNode*>(gn->node.get()))
+                           vid->Open(entry.path);
+                     }
+                     else
+                     {
+                        if (auto* img = dynamic_cast<ImageSourceNode*>(gn->node.get()))
+                           img->Load(entry.path);
+                     }
+                     gPatchDirty = true;
+                  }
+               }
+            }
+            ImGui::EndPopup();
          }
 
          ImGui::PopID();
@@ -14403,9 +14509,11 @@ namespace
       return la != lb ? la < lb : a < b; // stable tiebreak on the raw string
    }
 
+   // No "Favourites" entry - the sort dropdown beside this one already has
+   // a Favourites option, and showing it in both was confusing.
    const std::vector<std::string>& PluginTypeFilterNames()
    {
-      static const std::vector<std::string> names = { "All", "Favourites", "AU", "VST3" };
+      static const std::vector<std::string> names = { "All", "AU", "VST3" };
       return names;
    }
 
@@ -14413,9 +14521,8 @@ namespace
    {
       switch (typeFilter)
       {
-         case 1: return gBrowserFavorites.IsFavoritePlugin(e.identifier);
-         case 2: return e.format == "au";
-         case 3: return e.format == "vst3";
+         case 1: return e.format == "au";
+         case 2: return e.format == "vst3";
          default: return true; // 0 = All, and any out-of-range index
       }
    }
@@ -14671,9 +14778,6 @@ namespace
          const PluginScanner::Entry& entry = *entryPtr;
          ImGui::PushID(entry.identifier.c_str());
 
-         const float rowH = ImGui::GetFrameHeight();
-         const float starBtnW = rowH * 0.75f;
-         const float spacing = ImGui::GetStyle().ItemSpacing.x;
          const bool isFav = gBrowserFavorites.IsFavoritePlugin(entry.identifier);
 
          std::string label = "[" + (entry.format == "vst3" ? std::string("VST3") : std::string("AU")) +
@@ -14682,8 +14786,11 @@ namespace
             label += "  -  " + entry.manufacturer;
 
          const float availW = ImGui::GetContentRegionAvail().x;
-         const float textW = std::max(20.0f, availW - starBtnW - spacing);
-         ImGui::Selectable(label.c_str(), false, 0, ImVec2(textW, 0));
+         const float badgeReserve = 20.0f;
+         const std::string rowLabel = TruncateWithEllipsis(label, std::max(20.0f, availW - badgeReserve));
+         ImGui::Selectable(rowLabel.c_str(), false, 0, ImVec2(availW, 0));
+         const ImVec2 selMin = ImGui::GetItemRectMin();
+         const ImVec2 selMax = ImGui::GetItemRectMax();
          if (!testRowCaptured && getenv("INFINITE_PLUGINDRAGTEST") != nullptr)
          {
             const ImVec2 mn = ImGui::GetItemRectMin();
@@ -14705,9 +14812,25 @@ namespace
          if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s\n%s", entry.format.c_str(), entry.identifier.c_str());
 
-         ImGui::SameLine();
-         if (DrawFavoriteStar("##fav", isFav))
-            gBrowserFavorites.TogglePlugin(entry.identifier);
+         DrawFavoriteBadge(selMin, selMax, isFav);
+
+         if (ImGui::BeginPopupContextItem("##plugin_ctx"))
+         {
+            if (ImGui::MenuItem(isFav ? "Remove from favourites" : "Add to favourites"))
+               gBrowserFavorites.TogglePlugin(entry.identifier);
+            if (ImGui::MenuItem("Add to canvas"))
+            {
+               const ImVec2 spawnPos = FindFreeSpawnPosition(gViewCenterCanvas);
+               PushUndoCheckpoint();
+               if (GraphNode* gn = SpawnNode("Plugin", "AudioEffects", spawnPos.x, spawnPos.y))
+               {
+                  if (auto* plugin = dynamic_cast<AudioPluginNode*>(gn->node.get()))
+                     plugin->LoadPlugin(entry);
+                  gPatchDirty = true;
+               }
+            }
+            ImGui::EndPopup();
+         }
 
          ImGui::PopID();
       }
@@ -22881,6 +23004,32 @@ namespace
       // to zoom. An InvisibleButton is what makes this safe inside the node
       // editor - while it is active the editor leaves the drag alone, which is
       // the same mechanism the in-node sliders already rely on.
+      if (auto* mt = dynamic_cast<MotionTrackNode*>(node))
+      {
+         if (mt->initMode == MotionTrackNode::kManualBox)
+         {
+            ImGui::SetCursorScreenPos(origin);
+            ImGui::InvisibleButton("##manualBoxDrag", ImVec2(size, size));
+            if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+            {
+               ImVec2 mousePos = ImGui::GetMousePos();
+               float normX = std::clamp((mousePos.x - origin.x) / size, 0.0f, 1.0f);
+               float normY = std::clamp(1.0f - (mousePos.y - origin.y) / size, 0.0f, 1.0f);
+               mt->manualBoxX = normX;
+               mt->manualBoxY = normY;
+               mt->MarkStale();
+            }
+            float boxScreenX = origin.x + mt->manualBoxX * size;
+            float boxScreenY = origin.y + (1.0f - mt->manualBoxY) * size;
+            float boxScreenW = mt->manualBoxW * size;
+            float boxScreenH = mt->manualBoxH * size;
+            dl->AddRect(ImVec2(boxScreenX - boxScreenW * 0.5f, boxScreenY - boxScreenH * 0.5f),
+                        ImVec2(boxScreenX + boxScreenW * 0.5f, boxScreenY + boxScreenH * 0.5f),
+                        IM_COL32(255, 220, 50, 230), 2.0f, 0, 1.5f);
+            return;
+         }
+      }
+
       if (render == nullptr)
       {
          ImGui::Dummy(ImVec2(size, size));
@@ -26426,6 +26575,7 @@ namespace
          { "Palette", "Samples colours from a reference image, loaded here or patched in - a patched cable overrides the loaded file, but the file is kept so unplugging falls back to it. Drag its 'out' onto the square dot beside any colour swatch to bind it - each new cable takes the next swatch, and clicking a bound swatch steps it. Its image output is a gradient of the palette." },
          { "Audio File", "Loads an audio file for playback and Audio Analyze to read. Keeps analysing even while muted - the 'audible' checkbox only controls monitoring." },
          { "Image Analyze", "Turns an image or video into control values and modulation channels. Supports UV point probes, ROI boxes, 22 math/color operations, custom algebraic formulas, and multiple modulation output taps." },
+         { "Motion Track", "Tracks the dominant moving object in a video clip using normalized cross-correlation and pyramidal Lucas-Kanade. Emits x, y, scale, rotation, and confidence as modulation signals with an in-frame visual tracking overlay." },
          { "Audio Analyze", "Extracts level, band and onset values from audio for modulation - patch any audio source into it (Audio In, Audio File, a Filter, a Mixer, an Oscillator) and every output can drive any slider in the graph. With nothing patched in it falls back to its own Start listening button, a live tap on the system's default input device. It passes its input straight through, so it can sit inline in a chain as well as hang off one as a tap. Outputs: level, low/mid/high, onset, and b1-b8, eight raw frequency bands running low to high." },
          { "Plugin", "Hosts a third-party Audio Unit effect. Drag one in from the Plugins panel (Rescan there indexes what is installed; the list is cached, so launching never rescans), or drop a .component bundle from Finder. \"open\" shows the plugin's own editor in a separate window. The sliders on the body are plugin parameters you chose to expose: turn \"configure\" on and touch a control in the plugin's own window and it appears here as a mapped row - or pick one from the dropdown, since not every plugin's editor tells the host what was touched. Each mapped row is a real param with its own modulation pin, so a Ramp or Envelope can drive it. Right-click a row to unmap it. With nothing loaded, or bypassed, audio passes through unchanged." },
          { "Oscillator", "A synth oscillator with four classic waveforms (sine, triangle, saw, square), interactive amp envelope, unison, filter, hard sync, and fine/coarse tuning. With no note cable connected, it free-runs at a set frequency; connect a note cable and it becomes polyphonic and envelope-gated." },
@@ -45999,11 +46149,6 @@ static bool RunBrowserSortTest()
       gBrowserFavorites.samples.insert("/f1/Track.wav");
       gBrowserFavorites.samples.insert("/f2/Gamma.mp3");
 
-      BrowserFilterState favState;
-      favState.typeFilter = 1; // Favourites
-      auto favOnly = FilterAndSortSampleEntries(index, "", favState, false);
-      check(favOnly.size() == 2, "sample Favourites filter length");
-
       BrowserFilterState favSortState;
       favSortState.sortMode = 3; // Favourites
       auto byFav = FilterAndSortSampleEntries(index, "", favSortState, false);
@@ -46033,7 +46178,7 @@ static bool RunBrowserSortTest()
       check(descIsReverse, "sample name sort descending reverses ascending");
 
       BrowserFilterState typeState;
-      typeState.typeFilter = 3; // AIFF - covers both "aif" and "aiff"
+      typeState.typeFilter = 2; // AIFF - covers both "aif" and "aiff"
       auto aiffOnly = FilterAndSortSampleEntries(index, "", typeState, false);
       check(aiffOnly.size() == 2, "sample AIFF filter groups aif+aiff, length");
 
@@ -46078,24 +46223,20 @@ static bool RunBrowserSortTest()
 
       gBrowserFavorites.media.clear();
       gBrowserFavorites.media.insert("clip.mp4");
-      BrowserFilterState favMediaState;
-      favMediaState.typeFilter = 1; // Favourites
-      auto favMedia = FilterAndSortSampleEntries(index, "", favMediaState, /*mediaKind=*/true);
-      check(favMedia.size() == 1 && favMedia[0]->fileName == "clip.mp4", "media Favourites type filter");
 
       BrowserFilterState videoState;
-      videoState.typeFilter = 2; // Video
+      videoState.typeFilter = 1; // Video
       auto video = FilterAndSortSampleEntries(index, "", videoState, /*mediaKind=*/true);
       check(video.size() == 2, "media Video type filter length");
 
       BrowserFilterState imageState;
-      imageState.typeFilter = 3; // Image
+      imageState.typeFilter = 2; // Image
       auto image = FilterAndSortSampleEntries(index, "", imageState, true);
       check(image.size() == 2, "media Image type filter length");
 
-      // Individual-extension options start right after "All"/"Favourites"/"Video"/"Image".
+      // Individual-extension options start right after "All"/"Video"/"Image".
       const auto& names = MediaTypeFilterNames();
-      const int pngIndex = 4 + (int)MediaExtensions::Video().size() +
+      const int pngIndex = 3 + (int)MediaExtensions::Video().size() +
          (int)(std::find(MediaExtensions::Image().begin(), MediaExtensions::Image().end(), "png") -
                MediaExtensions::Image().begin());
       BrowserFilterState pngState;
@@ -46123,10 +46264,6 @@ static bool RunBrowserSortTest()
 
       gBrowserFavorites.plugins.clear();
       gBrowserFavorites.plugins.insert("vst3:alpha");
-      BrowserFilterState favPluginState;
-      favPluginState.typeFilter = 1; // Favourites
-      auto favPlugin = FilterAndSortPluginEntries(index, "", favPluginState);
-      check(favPlugin.size() == 1 && favPlugin[0]->name == "alpha", "plugin Favourites type filter");
 
       BrowserFilterState favPluginSort;
       favPluginSort.sortMode = 3; // Favourites sort
@@ -46152,12 +46289,12 @@ static bool RunBrowserSortTest()
       check(byMfr.size() == 3 && byMfr[0]->manufacturer == "Acme", "plugin manufacturer sort");
 
       BrowserFilterState auState;
-      auState.typeFilter = 2; // AU
+      auState.typeFilter = 1; // AU
       auto auOnly = FilterAndSortPluginEntries(index, "", auState);
       check(auOnly.size() == 2, "plugin AU type filter length");
 
       BrowserFilterState vst3State;
-      vst3State.typeFilter = 3; // VST3
+      vst3State.typeFilter = 2; // VST3
       auto vst3Only = FilterAndSortPluginEntries(index, "", vst3State);
       check(vst3Only.size() == 1 && vst3Only[0]->name == "alpha", "plugin VST3 type filter length");
    }
@@ -62317,6 +62454,8 @@ int main(int argc, char** argv)
                DrawRender3DParams(n);
             else if (auto* n = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()))
                DrawImageAnalyzeParams(n);
+            else if (auto* n = dynamic_cast<MotionTrackNode*>(gn.node.get()))
+               DrawMotionTrackParams(n);
             else if (auto* n = dynamic_cast<NullModulatorNode*>(gn.node.get()))
                DrawNullModulatorParams(n);
             else if (auto* n = dynamic_cast<AudioFileNode*>(gn.node.get()))
@@ -65469,8 +65608,9 @@ int main(int argc, char** argv)
                });
                categoryIds.push_back(std::string());
                categoryNames.push_back("All");
-               categoryIds.push_back("__fav__");
-               categoryNames.push_back("Favourites");
+               // No "Favourites" entry here - the sort dropdown beside this
+               // one already has a Favourites option, and showing it in both
+               // was confusing.
                for (const std::string& c : cats)
                {
                   categoryIds.push_back(c);
@@ -65489,7 +65629,6 @@ int main(int argc, char** argv)
             const std::string categoryFilter =
                (gModulesFilter.typeFilter > 0 && gModulesFilter.typeFilter < (int)categoryIds.size())
                   ? categoryIds[gModulesFilter.typeFilter] : std::string();
-            const bool filterByFav = (categoryFilter == "__fav__");
 
             std::string spawnName, spawnCategory;
             ImGui::Separator();
@@ -65509,13 +65648,11 @@ int main(int argc, char** argv)
                std::vector<std::pair<std::string, std::string>> matches; // name, category
                for (const std::string& category : NodeFactory::Instance().GetCategories())
                {
-                  if (!categoryFilter.empty() && !filterByFav && category != categoryFilter)
+                  if (!categoryFilter.empty() && category != categoryFilter)
                      continue;
                   for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
                   {
                      if (!IsUserSpawnable(name))
-                        continue;
-                     if (filterByFav && !gBrowserFavorites.IsFavoriteModule(name))
                         continue;
                      if (!q.empty())
                      {
@@ -65553,24 +65690,35 @@ int main(int argc, char** argv)
                if (gModulesFilter.descending)
                   std::reverse(matches.begin(), matches.end());
 
-               const float rowH = ImGui::GetFrameHeight();
-               const float starBtnW = rowH * 0.75f;
-               const float spacing = ImGui::GetStyle().ItemSpacing.x;
-
                for (const auto& match : matches)
                {
                   ImGui::PushID(match.first.c_str());
                   const bool isFav = gBrowserFavorites.IsFavoriteModule(match.first);
                   const float availW = ImGui::GetContentRegionAvail().x;
-                  const float textW = std::max(20.0f, availW - starBtnW - spacing);
-                  if (ImGui::Selectable(DisplayName(match.first).c_str(), false, 0, ImVec2(textW, 0)))
+                  const float badgeReserve = 20.0f;
+                  const std::string rowLabel =
+                     TruncateWithEllipsis(DisplayName(match.first), std::max(20.0f, availW - badgeReserve));
+                  if (ImGui::Selectable(rowLabel.c_str(), false, 0, ImVec2(availW, 0)))
                   {
                      spawnName = match.first;
                      spawnCategory = match.second;
                   }
-                  ImGui::SameLine();
-                  if (DrawFavoriteStar("##fav", isFav))
-                     gBrowserFavorites.ToggleModule(match.first);
+                  if (ImGui::IsItemHovered() && rowLabel != DisplayName(match.first))
+                     ImGui::SetTooltip("%s", DisplayName(match.first).c_str());
+                  const ImVec2 selMin = ImGui::GetItemRectMin();
+                  const ImVec2 selMax = ImGui::GetItemRectMax();
+                  DrawFavoriteBadge(selMin, selMax, isFav);
+                  if (ImGui::BeginPopupContextItem("##mod_ctx"))
+                  {
+                     if (ImGui::MenuItem(isFav ? "Remove from favourites" : "Add to favourites"))
+                        gBrowserFavorites.ToggleModule(match.first);
+                     if (ImGui::MenuItem("Add to canvas"))
+                     {
+                        spawnName = match.first;
+                        spawnCategory = match.second;
+                     }
+                     ImGui::EndPopup();
+                  }
                   ImGui::PopID();
                }
             }
@@ -65579,13 +65727,9 @@ int main(int argc, char** argv)
                // Category view (default - today's behaviour, unchanged for
                // people who don't touch the sort control): grouped
                // headings in NodeFactory's own registration order.
-               const float rowH = ImGui::GetFrameHeight();
-               const float starBtnW = rowH * 0.75f;
-               const float spacing = ImGui::GetStyle().ItemSpacing.x;
-
                for (const std::string& category : NodeFactory::Instance().GetCategories())
                {
-                  if (!categoryFilter.empty() && !filterByFav && category != categoryFilter)
+                  if (!categoryFilter.empty() && category != categoryFilter)
                      continue;
                   // With a query the categories are only drawn when something in them
                   // matches, so an empty heading never sits there on its own.
@@ -65593,8 +65737,6 @@ int main(int argc, char** argv)
                   for (const std::string& name : NodeFactory::Instance().GetNodesInCategory(category))
                   {
                      if (!IsUserSpawnable(name))
-                        continue;
-                     if (filterByFav && !gBrowserFavorites.IsFavoriteModule(name))
                         continue;
                      if (q.empty())
                      {
@@ -65617,15 +65759,30 @@ int main(int argc, char** argv)
                      ImGui::PushID(name.c_str());
                      const bool isFav = gBrowserFavorites.IsFavoriteModule(name);
                      const float availW = ImGui::GetContentRegionAvail().x;
-                     const float textW = std::max(20.0f, availW - starBtnW - spacing);
-                     if (ImGui::Selectable(DisplayName(name).c_str(), false, 0, ImVec2(textW, 0)))
+                     const float badgeReserve = 20.0f;
+                     const std::string rowLabel =
+                        TruncateWithEllipsis(DisplayName(name), std::max(20.0f, availW - badgeReserve));
+                     if (ImGui::Selectable(rowLabel.c_str(), false, 0, ImVec2(availW, 0)))
                      {
                         spawnName = name;
                         spawnCategory = category;
                      }
-                     ImGui::SameLine();
-                     if (DrawFavoriteStar("##fav", isFav))
-                        gBrowserFavorites.ToggleModule(name);
+                     if (ImGui::IsItemHovered() && rowLabel != DisplayName(name))
+                        ImGui::SetTooltip("%s", DisplayName(name).c_str());
+                     const ImVec2 selMin = ImGui::GetItemRectMin();
+                     const ImVec2 selMax = ImGui::GetItemRectMax();
+                     DrawFavoriteBadge(selMin, selMax, isFav);
+                     if (ImGui::BeginPopupContextItem("##mod_cat_ctx"))
+                     {
+                        if (ImGui::MenuItem(isFav ? "Remove from favourites" : "Add to favourites"))
+                           gBrowserFavorites.ToggleModule(name);
+                        if (ImGui::MenuItem("Add to canvas"))
+                        {
+                           spawnName = name;
+                           spawnCategory = category;
+                        }
+                        ImGui::EndPopup();
+                     }
                      ImGui::PopID();
                   }
                }

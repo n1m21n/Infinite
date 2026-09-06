@@ -304,6 +304,7 @@ set(COMMON_SOURCES
     src/nodes/ColorRampNode.cpp
     src/nodes/PaletteNode.cpp
     src/nodes/AnalyzeNodes.cpp
+    src/nodes/MotionTrackNode.cpp
     src/nodes/MidiNodes.cpp
     src/nodes/Geometry3DNodes.cpp
     src/nodes/EnvironmentNode.cpp
