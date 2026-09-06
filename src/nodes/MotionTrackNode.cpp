@@ -6,17 +6,17 @@
 #include <limits>
 #include <vector>
 
-#include "GLUtil.h"
 #include "Platform.h"
 #include "Transport.h"
+#include "nodes/RemoveBgNode.h"
 #include "nodes/VideoSourceNode.h"
 
 namespace
 {
    const std::vector<std::string> kInitModeNames = {
+      "Auto (person)",
       "Auto (subject)",
-      "Auto (motion)",
-      "Manual box"
+      "Auto (motion)"
    };
 
    const std::vector<std::string> kMotionModelNames = {
@@ -24,118 +24,6 @@ namespace
       "Position + Scale",
       "Position + Scale + Rotation"
    };
-
-   const std::vector<std::string> kOverlayStyleNames = {
-      "Ring",
-      "Box",
-      "Crosshair",
-      "Ring + trail"
-   };
-
-   const char* kOverlayFrag =
-      "#version 150\n"
-      "in vec2 vUv;\n"
-      "out vec4 fragColor;\n"
-      "uniform sampler2D uInput;\n"
-      "uniform int uHasInput;\n"
-      "uniform int uHasTrack;\n"
-      "uniform int uShowOverlay;\n"
-      "uniform int uStyle;\n"
-      "uniform vec2 uCenter;\n"
-      "uniform vec2 uBoxSize;\n"
-      "uniform float uRotation;\n" // in radians
-      "uniform vec3 uColor;\n"
-      "uniform float uAlpha;\n"
-      "uniform float uConfidence;\n"
-      "uniform int uLost;\n"
-      "uniform float uAspect;\n"
-      "uniform int uTrailCount;\n"
-      "uniform vec2 uTrail[32];\n"
-      "\n"
-      "vec2 rotate2d(vec2 p, float a) {\n"
-      "   float s = sin(a), c = cos(a);\n"
-      "   return vec2(p.x * c - p.y * s, p.x * s + p.y * c);\n"
-      "}\n"
-      "\n"
-      "float sdBox(vec2 p, vec2 b) {\n"
-      "   vec2 d = abs(p) - b;\n"
-      "   return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);\n"
-      "}\n"
-      "\n"
-      "void main() {\n"
-      "   vec4 base = (uHasInput != 0) ? texture(uInput, vUv) : vec4(0.0, 0.0, 0.0, 1.0);\n"
-      "   if (uShowOverlay == 0 || uHasTrack == 0) {\n"
-      "      fragColor = base;\n"
-      "      return;\n"
-      "   }\n"
-      "\n"
-      "   // Aspect-corrected coordinate space around tracking center\n"
-      "   vec2 aspectScale = vec2(max(1.0, uAspect), max(1.0, 1.0 / max(0.001, uAspect)));\n"
-      "   vec2 diff = (vUv - uCenter) * aspectScale;\n"
-      "   vec2 rotDiff = rotate2d(diff, -uRotation);\n"
-      "   vec2 halfBox = uBoxSize * 0.5 * aspectScale;\n"
-      "\n"
-      "   vec3 drawColor = (uLost != 0) ? vec3(1.0, 0.25, 0.25) : uColor;\n"
-      "   float overlayAlpha = 0.0;\n"
-      "   float thickness = 0.003;\n"
-      "\n"
-      "   if (uStyle == 0 || uStyle == 3) { // Ring or Ring+trail\n"
-      "      float radius = max(halfBox.x, halfBox.y) * 1.25;\n"
-      "      float dist = abs(length(diff) - radius);\n"
-      "      overlayAlpha = smoothstep(thickness + 0.0015, thickness - 0.0015, dist);\n"
-      "\n"
-      "      // Add center dot\n"
-      "      float centerDot = smoothstep(0.005, 0.002, length(diff));\n"
-      "      overlayAlpha = max(overlayAlpha, centerDot * 0.85);\n"
-      "\n"
-      "      // Add subtle cross tick marks\n"
-      "      vec2 tick = abs(diff);\n"
-      "      if ((tick.x < 0.0015 && abs(tick.y - radius) < radius * 0.25) ||\n"
-      "          (tick.y < 0.0015 && abs(tick.x - radius) < radius * 0.25)) {\n"
-      "         overlayAlpha = max(overlayAlpha, 0.9);\n"
-      "      }\n"
-      "\n"
-      "      if (uStyle == 3) { // Trail dots\n"
-      "         for (int i = 0; i < 32; i++) {\n"
-      "            if (i >= uTrailCount) break;\n"
-      "            vec2 tDiff = (vUv - uTrail[i]) * aspectScale;\n"
-      "            float tDist = length(tDiff);\n"
-      "            float tFade = 1.0 - (float(i) / float(max(1, uTrailCount)));\n"
-      "            float tAlpha = smoothstep(0.004, 0.001, tDist) * tFade * 0.75;\n"
-      "            overlayAlpha = max(overlayAlpha, tAlpha);\n"
-      "         }\n"
-      "      }\n"
-      "   } else if (uStyle == 1) { // Box\n"
-      "      float d = sdBox(rotDiff, halfBox);\n"
-      "      float outline = smoothstep(thickness + 0.0015, thickness - 0.0015, abs(d));\n"
-      "      overlayAlpha = outline;\n"
-      "\n"
-      "      // Corner brackets accent\n"
-      "      vec2 cornerDist = abs(rotDiff) - halfBox;\n"
-      "      if (max(cornerDist.x, cornerDist.y) < 0.015 && min(cornerDist.x, cornerDist.y) > -halfBox.x * 0.35) {\n"
-      "         overlayAlpha = max(overlayAlpha, 0.95);\n"
-      "      }\n"
-      "   } else if (uStyle == 2) { // Crosshair\n"
-      "      float radius = max(halfBox.x, halfBox.y) * 1.1;\n"
-      "      float ringDist = abs(length(diff) - radius);\n"
-      "      float ringAlpha = smoothstep(thickness + 0.0015, thickness - 0.0015, ringDist) * 0.5;\n"
-      "\n"
-      "      vec2 lineDist = abs(rotDiff);\n"
-      "      float hLine = (lineDist.y < thickness && abs(rotDiff.x) < radius * 1.3) ? 1.0 : 0.0;\n"
-      "      float vLine = (lineDist.x < thickness && abs(rotDiff.y) < radius * 1.3) ? 1.0 : 0.0;\n"
-      "      // Center cutout\n"
-      "      if (length(diff) < radius * 0.25) {\n"
-      "         hLine = 0.0; vLine = 0.0;\n"
-      "      }\n"
-      "      overlayAlpha = max(ringAlpha, max(hLine, vLine));\n"
-      "      float centerDot = smoothstep(0.004, 0.0015, length(diff));\n"
-      "      overlayAlpha = max(overlayAlpha, centerDot);\n"
-      "   }\n"
-      "\n"
-      "   overlayAlpha *= uAlpha * clamp(uConfidence * 1.25, 0.25, 1.0);\n"
-      "   vec3 blended = mix(base.rgb, drawColor, overlayAlpha);\n"
-      "   fragColor = vec4(blended, base.a);\n"
-      "}\n";
 
    // Base64 helper
    static const char kBase64Chars[] =
@@ -286,13 +174,18 @@ namespace
                                       float boxMaxX, float boxMaxY, int maxCorners)
    {
       std::vector<Point2f> corners;
-      if (img.w <= 4 || img.h <= 4 || maxCorners <= 0)
+      if (img.w <= 6 || img.h <= 6 || maxCorners <= 0)
          return corners;
 
-      int x0 = std::max(2, (int)boxMinX);
-      int y0 = std::max(2, (int)boxMinY);
-      int x1 = std::min(img.w - 3, (int)boxMaxX);
-      int y1 = std::min(img.h - 3, (int)boxMaxY);
+      // The structural-tensor loop below samples gradients at px = x+dx (dx in
+      // [-2,2]) using px-1 and px+1, so the real pixel reach from a candidate
+      // (x,y) is +-3, not +-2. A margin of 2/3 left this one row/column short
+      // and let (py+1)*w+px walk one row past the end of img.data whenever the
+      // detection window touched the bottom or right edge (crashed on Analyze).
+      int x0 = std::max(3, (int)boxMinX);
+      int y0 = std::max(3, (int)boxMinY);
+      int x1 = std::min(img.w - 4, (int)boxMaxX);
+      int y1 = std::min(img.h - 4, (int)boxMaxY);
       if (x1 <= x0 || y1 <= y0)
          return corners;
 
@@ -365,7 +258,7 @@ namespace
       return corners;
    }
 
-   // Pyramidal Lucas-Kanade optical flow
+   // Pyramidal Lucas-Kanade optical flow with Forward-Backward consistency check
    bool TrackPointsKLT(const Pyramid& prevPyr, const Pyramid& currPyr,
                        const std::vector<Point2f>& prevPts,
                        std::vector<Point2f>& outCurrPts,
@@ -380,101 +273,134 @@ namespace
       const int winSize = 7; // 7x7 patch
       const int halfWin = winSize / 2;
 
-      for (size_t i = 0; i < n; ++i)
+      auto RunLK = [&](const Pyramid& pyrA, const Pyramid& pyrB,
+                       const std::vector<Point2f>& inPts,
+                       std::vector<Point2f>& outPts,
+                       std::vector<bool>& status)
       {
-         Point2f pt = prevPts[i];
-         Point2f guess = pt;
-
-         bool validPoint = true;
-         // Iterate from coarse to fine pyramid levels
-         for (int l = Pyramid::kLevels - 2; l >= 0; --l)
+         outPts = inPts;
+         status.assign(inPts.size(), false);
+         for (size_t i = 0; i < inPts.size(); ++i)
          {
-            const GrayImage& I = prevPyr.levels[l];
-            const GrayImage& J = currPyr.levels[l];
-            float scale = 1.0f / (float)(1 << l);
+            Point2f pt = inPts[i];
+            Point2f guess = pt;
+            bool validPoint = true;
 
-            Point2f pL = { pt.x * scale, pt.y * scale };
-            Point2f gL = { guess.x * scale, guess.y * scale };
-
-            // Spatial gradients G matrix on image I
-            float Gxx = 0.0f, Gyy = 0.0f, Gxy = 0.0f;
-            std::vector<float> patchI(winSize * winSize);
-            std::vector<float> patchIx(winSize * winSize);
-            std::vector<float> patchIy(winSize * winSize);
-
-            for (int dy = -halfWin; dy <= halfWin; ++dy)
+            for (int l = Pyramid::kLevels - 2; l >= 0; --l)
             {
-               for (int dx = -halfWin; dx <= halfWin; ++dx)
-               {
-                  float px = pL.x + (float)dx;
-                  float py = pL.y + (float)dy;
-                  float val = I.Sample(px, py);
-                  float ix = (I.Sample(px + 1.0f, py) - I.Sample(px - 1.0f, py)) * 0.5f;
-                  float iy = (I.Sample(px, py + 1.0f) - I.Sample(px, py - 1.0f)) * 0.5f;
+               const GrayImage& I = pyrA.levels[l];
+               const GrayImage& J = pyrB.levels[l];
+               float scale = 1.0f / (float)(1 << l);
 
-                  int idx = (dy + halfWin) * winSize + (dx + halfWin);
-                  patchI[idx] = val;
-                  patchIx[idx] = ix;
-                  patchIy[idx] = iy;
+               Point2f pL = { pt.x * scale, pt.y * scale };
+               Point2f gL = { guess.x * scale, guess.y * scale };
 
-                  Gxx += ix * ix;
-                  Gyy += iy * iy;
-                  Gxy += ix * iy;
-               }
-            }
+               float Gxx = 0.0f, Gyy = 0.0f, Gxy = 0.0f;
+               std::vector<float> patchI(winSize * winSize);
+               std::vector<float> patchIx(winSize * winSize);
+               std::vector<float> patchIy(winSize * winSize);
 
-            float det = Gxx * Gyy - Gxy * Gxy;
-            if (det < 1e-6f)
-            {
-               validPoint = false;
-               break;
-            }
-            float invDet = 1.0f / det;
-
-            // 4 LK iterations
-            for (int iter = 0; iter < 4; ++iter)
-            {
-               float bx = 0.0f, by = 0.0f;
                for (int dy = -halfWin; dy <= halfWin; ++dy)
                {
                   for (int dx = -halfWin; dx <= halfWin; ++dx)
                   {
-                     int idx = (dy + halfWin) * winSize + (dx + halfWin);
-                     float qx = gL.x + (float)dx;
-                     float qy = gL.y + (float)dy;
-                     float valJ = J.Sample(qx, qy);
-                     float it = patchI[idx] - valJ;
+                     float px = pL.x + (float)dx;
+                     float py = pL.y + (float)dy;
+                     float val = I.Sample(px, py);
+                     float ix = (I.Sample(px + 1.0f, py) - I.Sample(px - 1.0f, py)) * 0.5f;
+                     float iy = (I.Sample(px, py + 1.0f) - I.Sample(px, py - 1.0f)) * 0.5f;
 
-                     bx += it * patchIx[idx];
-                     by += it * patchIy[idx];
+                     int idx = (dy + halfWin) * winSize + (dx + halfWin);
+                     patchI[idx] = val;
+                     patchIx[idx] = ix;
+                     patchIy[idx] = iy;
+
+                     Gxx += ix * ix;
+                     Gyy += iy * iy;
+                     Gxy += ix * iy;
                   }
                }
 
-               float deltaX = (Gyy * bx - Gxy * by) * invDet;
-               float deltaY = (Gxx * by - Gxy * bx) * invDet;
-
-               gL.x += deltaX;
-               gL.y += deltaY;
-
-               if (deltaX * deltaX + deltaY * deltaY < 0.0001f)
+               float det = Gxx * Gyy - Gxy * Gxy;
+               if (det < 1e-6f)
+               {
+                  validPoint = false;
                   break;
+               }
+               float invDet = 1.0f / det;
+
+               for (int iter = 0; iter < 4; ++iter)
+               {
+                  float bx = 0.0f, by = 0.0f;
+                  for (int dy = -halfWin; dy <= halfWin; ++dy)
+                  {
+                     for (int dx = -halfWin; dx <= halfWin; ++dx)
+                     {
+                        int idx = (dy + halfWin) * winSize + (dx + halfWin);
+                        float qx = gL.x + (float)dx;
+                        float qy = gL.y + (float)dy;
+                        float valJ = J.Sample(qx, qy);
+                        float it = patchI[idx] - valJ;
+
+                        bx += it * patchIx[idx];
+                        by += it * patchIy[idx];
+                     }
+                  }
+
+                  float deltaX = (Gyy * bx - Gxy * by) * invDet;
+                  float deltaY = (Gxx * by - Gxy * bx) * invDet;
+
+                  gL.x += deltaX;
+                  gL.y += deltaY;
+
+                  if (deltaX * deltaX + deltaY * deltaY < 0.0001f)
+                     break;
+               }
+
+               guess.x = gL.x * (float)(1 << l);
+               guess.y = gL.y * (float)(1 << l);
             }
 
-            guess.x = gL.x * (float)(1 << l);
-            guess.y = gL.y * (float)(1 << l);
+            if (validPoint &&
+                guess.x >= 0.0f && guess.x < (float)pyrB.levels[0].w &&
+                guess.y >= 0.0f && guess.y < (float)pyrB.levels[0].h)
+            {
+               outPts[i] = guess;
+               status[i] = true;
+            }
+            else
+            {
+               status[i] = false;
+            }
          }
+      };
 
-         if (validPoint &&
-             guess.x >= 0.0f && guess.x < (float)currPyr.levels[0].w &&
-             guess.y >= 0.0f && guess.y < (float)currPyr.levels[0].h)
+      // 1. Forward pass
+      std::vector<Point2f> fwdPts;
+      std::vector<bool> fwdStatus;
+      RunLK(prevPyr, currPyr, prevPts, fwdPts, fwdStatus);
+
+      // 2. Backward pass for forward-backward validation
+      std::vector<Point2f> backPts;
+      std::vector<bool> backStatus;
+      RunLK(currPyr, prevPyr, fwdPts, backPts, backStatus);
+
+      // 3. Keep only points with forward-backward error < 1.5 px
+      const float maxFbDistSq = 2.25f; // 1.5 px squared
+      for (size_t i = 0; i < n; ++i)
+      {
+         if (fwdStatus[i] && backStatus[i])
          {
-            outCurrPts[i] = guess;
-            outStatus[i] = true;
+            float dx = backPts[i].x - prevPts[i].x;
+            float dy = backPts[i].y - prevPts[i].y;
+            if (dx * dx + dy * dy <= maxFbDistSq)
+            {
+               outCurrPts[i] = fwdPts[i];
+               outStatus[i] = true;
+               continue;
+            }
          }
-         else
-         {
-            outStatus[i] = false;
-         }
+         outStatus[i] = false;
       }
 
       return true;
@@ -585,49 +511,46 @@ namespace
 
 const std::vector<std::string>& MotionTrackNode::InitModeNames() { return kInitModeNames; }
 const std::vector<std::string>& MotionTrackNode::MotionModelNames() { return kMotionModelNames; }
-const std::vector<std::string>& MotionTrackNode::OverlayStyleNames() { return kOverlayStyleNames; }
 
 MotionTrackNode::MotionTrackNode()
 {
-   for (int i = 0; i < kOutputCount; ++i)
+   for (int i = 0; i < kOutputCount; i++)
    {
       mTaps[i].owner = this;
-      mTaps[i].outputIndex = i;
+      mTaps[i].index = i;
    }
-   mCurrentValues[kScale] = 1.0f;
-   mCurrentValues[kRotation] = 0.5f; // 0 degrees
-   mCurrentValues[kConfidence] = 1.0f;
 }
 
 MotionTrackNode::~MotionTrackNode()
 {
    CancelAnalysis();
-   GLUtil::DestroyFbo(mOut);
-   if (mProgram != 0)
-      glDeleteProgram(mProgram);
 }
 
 const char* MotionTrackNode::OutputLabel(int index) const
 {
-   static const char* kLabels[] = {
-      "image", "x", "y", "scale", "rotation", "confidence"
-   };
-   return (index >= 0 && index < kOutputCount) ? kLabels[index] : "out";
+   static const char* kNames[kOutputCount] = { "x", "y", "scale", "rot" };
+   if (index < 0 || index >= kOutputCount)
+      return "out";
+   return kNames[index];
 }
 
 IModulator* MotionTrackNode::ModulatorOutput(int index)
 {
-   // Output 0 is the image output (GetOutputTexture), outputs 1..5 are modulators
-   if (index >= 1 && index < kOutputCount)
-      return &mTaps[index];
-   return nullptr;
+   if (index < 0 || index >= kOutputCount)
+      return nullptr;
+   return &mTaps[index];
 }
 
-float MotionTrackNode::Value(int outputIndex) const
+float MotionTrackNode::Value(int index) const
 {
-   if (outputIndex >= 0 && outputIndex < kOutputCount)
-      return mCurrentValues[outputIndex];
-   return 0.0f;
+   switch (index)
+   {
+      case kOutX: return std::clamp(mCurrentSample.x + offsetX, 0.0f, 1.0f);
+      case kOutY: return std::clamp(mCurrentSample.y + offsetY, 0.0f, 1.0f);
+      case kOutScale: return std::clamp((mCurrentSample.scale - 0.2f) / (5.0f - 0.2f), 0.0f, 1.0f);
+      case kOutRotation: return std::clamp((mCurrentSample.rotation + 180.0f) / 360.0f, 0.0f, 1.0f);
+      default: return 0.0f;
+   }
 }
 
 void MotionTrackNode::ClearTrack()
@@ -710,95 +633,13 @@ void MotionTrackNode::CookIfNeeded(int frameId)
       return;
    mLastCookFrame = frameId;
 
-   unsigned int srcTex = mInput.Pull(frameId);
-   int inW = mInput.Width();
-   int inH = mInput.Height();
+   if (mInput.IsConnected())
+      mInput.Pull(frameId);
 
-   // Retrieve time from transport
    double t = Transport::Instance().Seconds();
    TrackSample s;
    if (SampleAtTime(t, s))
-   {
       mCurrentSample = s;
-      mCurrentValues[kX] = std::clamp(s.x + offsetX, 0.0f, 1.0f);
-      mCurrentValues[kY] = std::clamp(s.y + offsetY, 0.0f, 1.0f);
-      mCurrentValues[kScale] = std::clamp(s.scale, 0.0f, 10.0f);
-      mCurrentValues[kRotation] = std::clamp((s.rotation + 180.0f) / 360.0f, 0.0f, 1.0f);
-      mCurrentValues[kConfidence] = std::clamp(s.confidence, 0.0f, 1.0f);
-
-      // Record trail
-      if (mTrailCount == 0 ||
-          std::abs(mTrailX[mTrailHead] - s.x) > 0.002f ||
-          std::abs(mTrailY[mTrailHead] - s.y) > 0.002f)
-      {
-         mTrailHead = (mTrailHead + 1) % kTrailLength;
-         mTrailX[mTrailHead] = s.x;
-         mTrailY[mTrailHead] = s.y;
-         if (mTrailCount < kTrailLength)
-            mTrailCount++;
-      }
-   }
-
-   if (srcTex == 0 || inW <= 0 || inH <= 0)
-   {
-      inW = 1280;
-      inH = 720;
-   }
-
-   if (!GLUtil::EnsureFbo(mOut, inW, inH))
-      return;
-   if (!EnsureShader())
-      return;
-
-   GLUtil::RunShaderPass(mOut, mProgram, [this, srcTex, inW, inH]()
-   {
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, srcTex);
-      glUniform1i(glGetUniformLocation(mProgram, "uInput"), 0);
-      glUniform1i(glGetUniformLocation(mProgram, "uHasInput"), srcTex != 0 ? 1 : 0);
-      glUniform1i(glGetUniformLocation(mProgram, "uHasTrack"), HasTrack() ? 1 : 0);
-      glUniform1i(glGetUniformLocation(mProgram, "uShowOverlay"), showOverlay ? 1 : 0);
-      glUniform1i(glGetUniformLocation(mProgram, "uStyle"), overlayStyle);
-
-      float drawX = std::clamp(mCurrentSample.x + offsetX, 0.0f, 1.0f);
-      float drawY = std::clamp(mCurrentSample.y + offsetY, 0.0f, 1.0f);
-      glUniform2f(glGetUniformLocation(mProgram, "uCenter"), drawX, drawY);
-
-      float baseBoxW = manualBoxW * mCurrentSample.scale * overlaySize;
-      float baseBoxH = manualBoxH * mCurrentSample.scale * overlaySize;
-      glUniform2f(glGetUniformLocation(mProgram, "uBoxSize"), baseBoxW, baseBoxH);
-
-      float rotRad = mCurrentSample.rotation * (3.141592653589793f / 180.0f);
-      glUniform1f(glGetUniformLocation(mProgram, "uRotation"), rotRad);
-
-      glUniform3f(glGetUniformLocation(mProgram, "uColor"), overlayColor[0], overlayColor[1], overlayColor[2]);
-      glUniform1f(glGetUniformLocation(mProgram, "uAlpha"), 1.0f);
-      glUniform1f(glGetUniformLocation(mProgram, "uConfidence"), mCurrentSample.confidence);
-      glUniform1i(glGetUniformLocation(mProgram, "uLost"), mCurrentSample.lost ? 1 : 0);
-
-      float aspect = (inH > 0) ? (float)inW / (float)inH : 1.0f;
-      glUniform1f(glGetUniformLocation(mProgram, "uAspect"), aspect);
-
-      // Pack trail
-      glUniform1i(glGetUniformLocation(mProgram, "uTrailCount"), mTrailCount);
-      float trailCoords[64] = { 0 };
-      for (int i = 0; i < mTrailCount; ++i)
-      {
-         int idx = (mTrailHead - i + kTrailLength) % kTrailLength;
-         trailCoords[i * 2 + 0] = mTrailX[idx];
-         trailCoords[i * 2 + 1] = mTrailY[idx];
-      }
-      glUniform2fv(glGetUniformLocation(mProgram, "uTrail"), 32, trailCoords);
-   });
-}
-
-bool MotionTrackNode::EnsureShader()
-{
-   if (mShaderTried)
-      return mProgram != 0;
-   mShaderTried = true;
-   mProgram = GLUtil::CompileProgram(kOverlayFrag);
-   return mProgram != 0;
 }
 
 void MotionTrackNode::StartAnalysis()
@@ -807,10 +648,20 @@ void MotionTrackNode::StartAnalysis()
       return;
 
    std::string path;
-   if (INode* src = mInput.GetSource())
+   INode* cur = mInput.GetSource();
+   while (cur != nullptr)
    {
-      if (auto* videoSrc = dynamic_cast<VideoSourceNode*>(src))
+      if (auto* videoSrc = dynamic_cast<VideoSourceNode*>(cur))
+      {
          path = videoSrc->LoadedPath();
+         break;
+      }
+      if (auto* rbg = dynamic_cast<RemoveBgNode*>(cur))
+         cur = rbg->Input().GetSource();
+      else if (INode* bypass = cur->BypassSource())
+         cur = bypass;
+      else
+         break;
    }
 
    if (path.empty())
@@ -835,8 +686,7 @@ void MotionTrackNode::StartAnalysis()
                                featureCount,
                                minConfidence,
                                adapt,
-                               sampleFps,
-                               manualBoxX, manualBoxY, manualBoxW, manualBoxH);
+                               sampleFps);
 }
 
 void MotionTrackNode::CancelAnalysis()
@@ -854,8 +704,7 @@ void MotionTrackNode::WorkerThreadMain(std::string videoPath,
                                       int chosenFeatureCount,
                                       float chosenMinConfidence,
                                       float chosenAdapt,
-                                      float chosenSampleFps,
-                                      float boxX, float boxY, float boxW, float boxH)
+                                      float chosenSampleFps)
 {
    std::string err;
    Platform::VideoHandle* handle = Platform::VideoOpen(videoPath, err);
@@ -899,22 +748,51 @@ void MotionTrackNode::WorkerThreadMain(std::string videoPath,
       return;
    }
 
-   // 2. Initialize tracking bounding box
-   float initBoxX = boxX;
-   float initBoxY = boxY;
-   float initBoxW = std::max(0.05f, boxW);
-   float initBoxH = std::max(0.05f, boxH);
-
-   if (chosenInitMode == kAutoSubject)
+   // Platform::VideoOpen only knows the track's declared "natural size";
+   // decoding the first frame can reveal a different actual pixel-buffer
+   // size (rotation metadata, clean aperture, non-square pixels). Re-read
+   // the dimensions now that a frame has actually been decoded (VideoFrameAt
+   // updates them to match) and confirm framePixels really holds width *
+   // height * 4 bytes before indexing into it anywhere below - every frame
+   // buffer this function touches (framePixels, f1, f2, mask) is indexed
+   // with these numbers and a mismatch here was reading past the end of the
+   // buffer on some clips (crashed on Analyze).
+   width = Platform::VideoWidth(handle);
+   height = Platform::VideoHeight(handle);
+   if (width <= 0 || height <= 0 || framePixels.size() < (size_t)width * (size_t)height * 4)
    {
-      mStatus = "detecting subject (" + Platform::MattingBackend() + ")...";
+      Platform::VideoClose(handle);
+      mStatus = "unexpected video frame size";
+      mIsAnalyzing.store(false);
+      return;
+   }
+
+   // 2. Initialize tracking bounding box. Center-frame default, used only if
+   // auto-detectors fail.
+   float initBoxX = 0.5f;
+   float initBoxY = 0.5f;
+   float initBoxW = 0.25f;
+   float initBoxH = 0.35f;
+
+   Platform::MattingMode matMode = (chosenInitMode == kAutoPerson) ? Platform::MattingMode::Person : Platform::MattingMode::Subject;
+
+   if (chosenInitMode == kAutoPerson || chosenInitMode == kAutoSubject)
+   {
+      mStatus = "detecting " + std::string(chosenInitMode == kAutoPerson ? "person" : "subject") + " (" + Platform::MattingBackend() + ")...";
       std::vector<unsigned char> mask;
       std::string maskErr;
-      if (Platform::SubjectMask(framePixels, width, height, Platform::MattingMode::Subject, mask, maskErr) &&
-          !mask.empty())
+      bool ok = Platform::SubjectMask(framePixels, width, height, matMode, mask, maskErr);
+      if (!ok && chosenInitMode == kAutoSubject)
       {
-         // Find bounding box of mask > 128
+         // Fallback to Person mode if Subject mode unavailable
+         matMode = Platform::MattingMode::Person;
+         ok = Platform::SubjectMask(framePixels, width, height, matMode, mask, maskErr);
+      }
+
+      if (ok && mask.size() >= (size_t)width * (size_t)height)
+      {
          int minX = width, maxX = 0, minY = height, maxY = 0;
+         int64_t sumX = 0, sumY = 0;
          int maskCount = 0;
          for (int y = 0; y < height; ++y)
          {
@@ -923,6 +801,8 @@ void MotionTrackNode::WorkerThreadMain(std::string videoPath,
                if (mask[y * width + x] > 128)
                {
                   maskCount++;
+                  sumX += x;
+                  sumY += y;
                   if (x < minX) minX = x;
                   if (x > maxX) maxX = x;
                   if (y < minY) minY = y;
@@ -932,19 +812,19 @@ void MotionTrackNode::WorkerThreadMain(std::string videoPath,
          }
          if (maskCount > 50 && maxX > minX && maxY > minY)
          {
-            initBoxX = ((float)minX + (float)maxX) * 0.5f / (float)width;
-            initBoxY = ((float)minY + (float)maxY) * 0.5f / (float)height;
-            initBoxW = std::max(0.05f, ((float)(maxX - minX)) / (float)width);
-            initBoxH = std::max(0.05f, ((float)(maxY - minY)) / (float)height);
+            initBoxX = (float)sumX / ((float)maskCount * (float)width);
+            initBoxY = (float)sumY / ((float)maskCount * (float)height);
+            initBoxW = std::clamp(((float)(maxX - minX)) / (float)width * 1.15f, 0.08f, 0.85f);
+            initBoxH = std::clamp(((float)(maxY - minY)) / (float)height * 1.15f, 0.08f, 0.85f);
          }
          else
          {
-            chosenInitMode = kAutoMotion; // Fallback to motion
+            chosenInitMode = kAutoMotion;
          }
       }
       else
       {
-         chosenInitMode = kAutoMotion; // Fallback to motion
+         chosenInitMode = kAutoMotion;
       }
    }
 
@@ -959,7 +839,8 @@ void MotionTrackNode::WorkerThreadMain(std::string videoPath,
       while (!Platform::VideoFrameAt(handle, dt * 2.0, f2) && Platform::VideoDecodeIsCatchingUp(handle))
          std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-      if (!f1.empty() && !f2.empty())
+      const size_t frameBytes = (size_t)width * (size_t)height * 4;
+      if (f1.size() >= frameBytes && f2.size() >= frameBytes)
       {
          int minX = width, maxX = 0, minY = height, maxY = 0;
          int diffCount = 0;
@@ -982,11 +863,14 @@ void MotionTrackNode::WorkerThreadMain(std::string videoPath,
          {
             initBoxX = ((float)minX + (float)maxX) * 0.5f / (float)width;
             initBoxY = ((float)minY + (float)maxY) * 0.5f / (float)height;
-            initBoxW = std::max(0.05f, ((float)(maxX - minX)) / (float)width);
-            initBoxH = std::max(0.05f, ((float)(maxY - minY)) / (float)height);
+            initBoxW = std::clamp(((float)(maxX - minX)) / (float)width * 1.15f, 0.08f, 0.85f);
+            initBoxH = std::clamp(((float)(maxY - minY)) / (float)height * 1.15f, 0.08f, 0.85f);
          }
       }
    }
+
+   mTrackBoxW = initBoxW;
+   mTrackBoxH = initBoxH;
 
    // 3. Setup tracker state
    Pyramid prevPyr, currPyr;
@@ -999,7 +883,6 @@ void MotionTrackNode::WorkerThreadMain(std::string videoPath,
                initBoxW * (float)width, initBoxH * (float)height,
                tplW, tplH, 0.0f, refTemplate);
 
-   // Level 2 template for coarse NCC
    int tplL2W = 16, tplL2H = 16;
    std::vector<float> refTemplateL2;
    SamplePatch(prevPyr.levels[2], initBoxX * (float)prevPyr.levels[2].w, initBoxY * (float)prevPyr.levels[2].h,
@@ -1020,11 +903,10 @@ void MotionTrackNode::WorkerThreadMain(std::string videoPath,
    int totalSteps = (int)std::ceil(duration / step);
    int currentStep = 1;
 
-   int trackedCount = 1;
    int lostCount = 0;
-   float sumConfidence = 1.0f;
+   int lostStreak = 0;
 
-   float activeSearchScale = chosenSearchScale;
+   mStatus = "tracking...";
 
    while (t <= duration && !mAbortWorker.load())
    {
@@ -1040,35 +922,21 @@ void MotionTrackNode::WorkerThreadMain(std::string videoPath,
 
       currPyr.Build(currPixels, width, height);
 
-      // Stage 1: Predict
-      float predX = currBoxX + velX;
-      float predY = currBoxY + velY;
-
-      // Stage 2: Coarse NCC search on Level 2
-      float searchRadX = activeSearchScale * initBoxW * currScale * (float)prevPyr.levels[2].w * 0.5f;
-      float searchRadY = activeSearchScale * initBoxH * currScale * (float)prevPyr.levels[2].h * 0.5f;
-      float coarseScore = 0.0f;
-      Point2f coarsePosL2 = CoarseNCCSearch(currPyr.levels[2], refTemplateL2, tplL2W, tplL2H,
-                                           predX * (float)prevPyr.levels[2].w,
-                                           predY * (float)prevPyr.levels[2].h,
-                                           searchRadX, searchRadY, coarseScore);
-      Point2f coarsePos = {
-         coarsePosL2.x * (float)(1 << 2) / (float)width,
-         coarsePosL2.y * (float)(1 << 2) / (float)height
-      };
-
-      // Stage 3: Feature Detection & Pyramidal KLT refinement
-      float boxPxMinX = (currBoxX - initBoxW * currScale * 0.5f) * (float)width;
-      float boxPxMaxX = (currBoxX + initBoxW * currScale * 0.5f) * (float)width;
-      float boxPxMinY = (currBoxY - initBoxH * currScale * 0.5f) * (float)height;
-      float boxPxMaxY = (currBoxY + initBoxH * currScale * 0.5f) * (float)height;
+      // Stage 1: Corner Detection inside current bounding box
+      float curW = initBoxW * currScale * (float)width;
+      float curH = initBoxH * currScale * (float)height;
+      float boxPxMinX = currBoxX * (float)width - curW * 0.5f;
+      float boxPxMaxX = currBoxX * (float)width + curW * 0.5f;
+      float boxPxMinY = currBoxY * (float)height - curH * 0.5f;
+      float boxPxMaxY = currBoxY * (float)height + curH * 0.5f;
 
       std::vector<Point2f> corners = DetectCorners(prevPyr.levels[0], boxPxMinX, boxPxMinY, boxPxMaxX, boxPxMaxY, chosenFeatureCount);
+
+      // Stage 2: Forward-Backward Verified Lucas-Kanade Optical Flow
       std::vector<Point2f> trackedCorners;
       std::vector<bool> status;
       TrackPointsKLT(prevPyr, currPyr, corners, trackedCorners, status);
 
-      // Stage 4: Fit Motion Model
       std::vector<Point2f> inliersPrev, inliersCurr;
       for (size_t i = 0; i < corners.size(); ++i)
       {
@@ -1079,14 +947,13 @@ void MotionTrackNode::WorkerThreadMain(std::string videoPath,
          }
       }
 
-      float fitDx = coarsePos.x - currBoxX;
-      float fitDy = coarsePos.y - currBoxY;
+      float fitDx = velX;
+      float fitDy = velY;
       float fitScale = currScale;
       float fitRot = currRotation;
 
-      if (inliersPrev.size() >= 3)
+      if (inliersPrev.size() >= 2)
       {
-         // Median translation
          std::vector<float> dxs(inliersPrev.size()), dys(inliersPrev.size());
          for (size_t i = 0; i < inliersPrev.size(); ++i)
          {
@@ -1109,7 +976,7 @@ void MotionTrackNode::WorkerThreadMain(std::string videoPath,
          std::vector<float> sortedRes = residuals;
          std::sort(sortedRes.begin(), sortedRes.end());
          float medRes = sortedRes[sortedRes.size() / 2];
-         float maxRes = std::max(0.01f, 2.0f * medRes);
+         float maxRes = std::max(0.015f, 2.5f * medRes);
 
          float sumDx = 0.0f, sumDy = 0.0f;
          int inlierCount = 0;
@@ -1132,7 +999,7 @@ void MotionTrackNode::WorkerThreadMain(std::string videoPath,
             fitDy = sumDy / (float)inlierCount;
          }
 
-         // Fit Scale if enabled
+         // Fit Scale
          if (chosenMotionModel >= kPositionScale && cleanPrev.size() >= 3)
          {
             std::vector<float> scaleRatios;
@@ -1142,7 +1009,7 @@ void MotionTrackNode::WorkerThreadMain(std::string videoPath,
                {
                   float dPrev = std::hypot(cleanPrev[i].x - cleanPrev[j].x, cleanPrev[i].y - cleanPrev[j].y);
                   float dCurr = std::hypot(cleanCurr[i].x - cleanCurr[j].x, cleanCurr[i].y - cleanCurr[j].y);
-                  if (dPrev > 8.0f)
+                  if (dPrev > 6.0f)
                      scaleRatios.push_back(dCurr / dPrev);
                }
             }
@@ -1154,7 +1021,7 @@ void MotionTrackNode::WorkerThreadMain(std::string videoPath,
             }
          }
 
-         // Fit Rotation if enabled
+         // Fit Rotation
          if (chosenMotionModel == kPositionScaleRotation && cleanPrev.size() >= 3)
          {
             std::vector<float> angleDiffs;
@@ -1181,47 +1048,119 @@ void MotionTrackNode::WorkerThreadMain(std::string videoPath,
          }
       }
 
-      float nextX = std::clamp(currBoxX + fitDx, 0.0f, 1.0f);
-      float nextY = std::clamp(currBoxY + fitDy, 0.0f, 1.0f);
+      float flowX = std::clamp(currBoxX + fitDx, 0.0f, 1.0f);
+      float flowY = std::clamp(currBoxY + fitDy, 0.0f, 1.0f);
 
-      // Stage 5: Score Confidence
-      std::vector<float> currPatch;
-      float rotRad = fitRot * (3.141592653589793f / 180.0f);
-      SamplePatch(currPyr.levels[0], nextX * (float)width, nextY * (float)height,
-                  initBoxW * fitScale * (float)width, initBoxH * fitScale * (float)height,
-                  tplW, tplH, rotRad, currPatch);
-      float confidence = std::max(0.0f, ComputeNCC(refTemplate, currPatch));
+      // Stage 3: Detection-by-Tracking Anchor
+      // Periodically (every 5 frames) or when optical flow inliers drop,
+      // run Platform::SubjectMask to re-anchor directly on the subject's true centroid.
+      bool isAnchorStep = (chosenInitMode == kAutoPerson || chosenInitMode == kAutoSubject) &&
+                          ((currentStep % 5 == 0) || inliersPrev.size() < 4);
+      bool anchored = false;
 
-      // Stage 6 & 7: Adapt or Lost
-      bool lost = confidence < chosenMinConfidence;
-      if (!lost)
+      if (isAnchorStep)
       {
-         velX = nextX - currBoxX;
-         velY = nextY - currBoxY;
-         currBoxX = nextX;
-         currBoxY = nextY;
+         std::vector<unsigned char> mask;
+         std::string maskErr;
+         if (Platform::SubjectMask(currPixels, width, height, matMode, mask, maskErr) &&
+             mask.size() >= (size_t)width * (size_t)height)
+         {
+            // Search in window around predicted optical flow position
+            int winW = (int)(initBoxW * fitScale * (float)width * 1.5f);
+            int winH = (int)(initBoxH * fitScale * (float)height * 1.5f);
+            int winMinX = std::max(0, (int)(flowX * (float)width) - winW);
+            int winMaxX = std::min(width - 1, (int)(flowX * (float)width) + winW);
+            int winMinY = std::max(0, (int)(flowY * (float)height) - winH);
+            int winMaxY = std::min(height - 1, (int)(flowY * (float)height) + winH);
+
+            int cMinX = width, cMaxX = 0, cMinY = height, cMaxY = 0;
+            int64_t cSumX = 0, cSumY = 0;
+            int cCount = 0;
+
+            for (int y = winMinY; y <= winMaxY; ++y)
+            {
+               for (int x = winMinX; x <= winMaxX; ++x)
+               {
+                  if (mask[y * width + x] > 128)
+                  {
+                     cCount++;
+                     cSumX += x;
+                     cSumY += y;
+                     if (x < cMinX) cMinX = x;
+                     if (x > cMaxX) cMaxX = x;
+                     if (y < cMinY) cMinY = y;
+                     if (y > cMaxY) cMaxY = y;
+                  }
+               }
+            }
+
+            // Fallback to full frame search if window didn't capture the subject
+            if (cCount < 50)
+            {
+               cMinX = width; cMaxX = 0; cMinY = height; cMaxY = 0;
+               cSumX = 0; cSumY = 0; cCount = 0;
+               for (int y = 0; y < height; ++y)
+               {
+                  for (int x = 0; x < width; ++x)
+                  {
+                     if (mask[y * width + x] > 128)
+                     {
+                        cCount++;
+                        cSumX += x;
+                        cSumY += y;
+                        if (x < cMinX) cMinX = x;
+                        if (x > cMaxX) cMaxX = x;
+                        if (y < cMinY) cMinY = y;
+                        if (y > cMaxY) cMaxY = y;
+                     }
+                  }
+               }
+            }
+
+            if (cCount > 50 && cMaxX > cMinX && cMaxY > cMinY)
+            {
+               float detX = (float)cSumX / ((float)cCount * (float)width);
+               float detY = (float)cSumY / ((float)cCount * (float)height);
+               float detW = std::clamp(((float)(cMaxX - cMinX)) / (float)width * 1.15f, 0.08f, 0.85f);
+               float detH = std::clamp(((float)(cMaxY - cMinY)) / (float)height * 1.15f, 0.08f, 0.85f);
+
+               // Fuse optical flow with detected anchor
+               float blendWeight = (inliersPrev.size() >= 5) ? 0.5f : 0.85f;
+               currBoxX = flowX * (1.0f - blendWeight) + detX * blendWeight;
+               currBoxY = flowY * (1.0f - blendWeight) + detY * blendWeight;
+               initBoxW = initBoxW * 0.85f + detW * 0.15f;
+               initBoxH = initBoxH * 0.85f + detH * 0.15f;
+               mTrackBoxW = initBoxW;
+               mTrackBoxH = initBoxH;
+               anchored = true;
+            }
+         }
+      }
+
+      if (!anchored)
+      {
+         currBoxX = flowX;
+         currBoxY = flowY;
          currScale = fitScale;
          currRotation = fitRot;
-         activeSearchScale = chosenSearchScale;
+      }
 
-         // Template adaptation
-         if (chosenAdapt > 0.0f)
-         {
-            for (size_t i = 0; i < refTemplate.size(); ++i)
-               refTemplate[i] = (1.0f - chosenAdapt) * refTemplate[i] + chosenAdapt * currPatch[i];
-         }
+      // Stage 4: Confidence scoring
+      float inlierRatio = (float)inliersPrev.size() / (float)std::max(1, (int)corners.size());
+      float confidence = anchored ? 0.95f : std::clamp(0.45f + 0.55f * inlierRatio, 0.1f, 1.0f);
+      bool lost = (inliersPrev.empty() && !anchored);
+
+      if (!lost)
+      {
+         velX = fitDx;
+         velY = fitDy;
+         lostStreak = 0;
       }
       else
       {
          lostCount++;
-         // Coast on predicted velocity
-         currBoxX = std::clamp(currBoxX + velX, 0.0f, 1.0f);
-         currBoxY = std::clamp(currBoxY + velY, 0.0f, 1.0f);
-         activeSearchScale = chosenSearchScale * 1.5f; // Widen search
+         lostStreak++;
       }
-
-      trackedCount++;
-      sumConfidence += confidence;
 
       results.push_back({ t, currBoxX, currBoxY, currScale, currRotation, confidence, lost });
 
@@ -1370,6 +1309,8 @@ std::vector<MotionTrackNode::TrackSample> MotionTrackNode::DecodeTrack(const std
 void MotionTrackNode::VisitParams(ParamVisitor& v)
 {
    v.Int("initMode", initMode);
+   if (initMode < 0 || initMode >= kInitModeCount)
+      initMode = kAutoPerson;
    v.Int("motionModel", motionModel);
    v.Float("searchScale", searchScale);
    v.Int("featureCount", featureCount);
@@ -1379,14 +1320,8 @@ void MotionTrackNode::VisitParams(ParamVisitor& v)
    v.Float("sampleFps", sampleFps);
    v.Float("offsetX", offsetX);
    v.Float("offsetY", offsetY);
-   v.Bool("showOverlay", showOverlay);
-   v.Int("overlayStyle", overlayStyle);
-   v.Color("overlayColor", overlayColor);
-   v.Float("overlaySize", overlaySize);
-   v.Float("manualBoxX", manualBoxX);
-   v.Float("manualBoxY", manualBoxY);
-   v.Float("manualBoxW", manualBoxW);
-   v.Float("manualBoxH", manualBoxH);
+   v.Float("trackBoxW", mTrackBoxW);
+   v.Float("trackBoxH", mTrackBoxH);
 
    std::string encoded = EncodeTrack(mTrack);
    v.Text("track", encoded);

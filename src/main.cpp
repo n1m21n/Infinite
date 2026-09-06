@@ -4701,7 +4701,7 @@ namespace
       if (dynamic_cast<ImageAnalyzeNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<MotionTrackNode*>(gn.node.get()) != nullptr)
-         return 1;
+         return 1; // the video to track
       if (dynamic_cast<PaletteNode*>(gn.node.get()) != nullptr)
          return 1; // the reference image, when it comes from the graph
       if (auto* fp = dynamic_cast<FieldPixelNode*>(gn.node.get()))
@@ -8200,13 +8200,6 @@ namespace
       DropdownButton("model", MotionTrackNode::MotionModelNames(), n->motionModel,
                      [n](int i) { PushUndoCheckpoint(); n->motionModel = i; n->MarkStale(); }, w);
 
-      ImGui::BeginDisabled(n->initMode != MotionTrackNode::kManualBox);
-      ModSlider("box X", &n->manualBoxX, 0.0f, 1.0f);
-      ModSlider("box Y", &n->manualBoxY, 0.0f, 1.0f);
-      ModSlider("box W", &n->manualBoxW, 0.05f, 1.0f);
-      ModSlider("box H", &n->manualBoxH, 0.05f, 1.0f);
-      ImGui::EndDisabled();
-
       ModSlider("search", &n->searchScale, 1.2f, 6.0f);
       ModSliderInt("features", &n->featureCount, 8, 200);
       ModSlider("confidence", &n->minConfidence, 0.1f, 0.99f);
@@ -8214,12 +8207,7 @@ namespace
       ModSlider("smooth", &n->smooth, 0.0f, 20.0f);
       ModSlider("fps", &n->sampleFps, 1.0f, 120.0f);
 
-      NodeSeparator("overlay", w);
-      ModCheckbox("show overlay", &n->showOverlay);
-      DropdownButton("style", MotionTrackNode::OverlayStyleNames(), n->overlayStyle,
-                     [n](int i) { PushUndoCheckpoint(); n->overlayStyle = i; }, w);
-      ColorSwatch("color", n->overlayColor, n);
-      ModSlider("size", &n->overlaySize, 0.1f, 5.0f);
+      NodeSeparator("offset", w);
       ModSlider("offset X", &n->offsetX, -1.0f, 1.0f);
       ModSlider("offset Y", &n->offsetY, -1.0f, 1.0f);
    }
@@ -22563,6 +22551,108 @@ namespace
                   IM_COL32(90, 130, 190, 255), 4.0f, 0, 2.0f);
    }
 
+   void DrawMotionTrackPreview(MotionTrackNode* node)
+   {
+      const float size = kPreviewSize;
+      ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      DrawCheckerboardBackdrop(dl, origin, size);
+
+      INode* srcNode = node->Input().Resolved();
+      unsigned int tex = srcNode ? srcNode->GetOutputTexture(node->Input().GetSourceOutput()) : 0;
+      int w = node->Input().Width();
+      int h = node->Input().Height();
+
+      float dw = size, dh = size;
+      ImVec2 tl = origin;
+
+      if (tex != 0 && w > 0 && h > 0)
+      {
+         const float scale = size / (float)std::max(w, h);
+         dw = (float)w * scale;
+         dh = (float)h * scale;
+         tl = ImVec2(origin.x + (size - dw) * 0.5f, origin.y + (size - dh) * 0.5f);
+         dl->AddImage((ImTextureID)(intptr_t)tex, tl, ImVec2(tl.x + dw, tl.y + dh),
+                      ImVec2(0, 1), ImVec2(1, 0));
+      }
+      else
+      {
+         dl->AddText(ImVec2(origin.x + 12, origin.y + size * 0.5f - 8),
+                     IM_COL32(130, 136, 156, 255), "connect video to track");
+      }
+
+      // Border around preview
+      dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
+                  IM_COL32(70, 74, 90, 255), 4.0f);
+
+      // Tracking box overlay
+      if (node->HasTrack() && tex != 0)
+      {
+         const auto& s = node->CurrentSample();
+         const float cx = tl.x + (s.x + node->offsetX) * dw;
+         // GL textures are bottom-up, so y=0 is bottom, y=1 is top
+         const float cy = tl.y + (1.0f - (s.y + node->offsetY)) * dh;
+
+         const float bw = std::max(16.0f, node->TrackBoxW() * s.scale * dw);
+         const float bh = std::max(16.0f, node->TrackBoxH() * s.scale * dh);
+
+         const ImVec2 bMin(cx - bw * 0.5f, cy - bh * 0.5f);
+         const ImVec2 bMax(cx + bw * 0.5f, cy + bh * 0.5f);
+
+         const ImU32 boxFill = s.lost ? IM_COL32(230, 60, 40, 30) : IM_COL32(0, 230, 180, 35);
+         const ImU32 boxStroke = s.lost ? IM_COL32(240, 80, 60, 220) : IM_COL32(0, 230, 180, 220);
+         const ImU32 cornerCol = s.lost ? IM_COL32(255, 100, 80, 255) : IM_COL32(0, 255, 200, 255);
+
+         // Soft box fill
+         dl->AddRectFilled(bMin, bMax, boxFill, 2.0f);
+         // Thin outline
+         dl->AddRect(bMin, bMax, boxStroke, 2.0f, 0, 1.0f);
+
+         // Corner brackets
+         const float cLen = std::clamp(bw * 0.25f, 4.0f, 10.0f);
+         // Top-left
+         dl->AddLine(ImVec2(bMin.x, bMin.y), ImVec2(bMin.x + cLen, bMin.y), cornerCol, 2.0f);
+         dl->AddLine(ImVec2(bMin.x, bMin.y), ImVec2(bMin.x, bMin.y + cLen), cornerCol, 2.0f);
+         // Top-right
+         dl->AddLine(ImVec2(bMax.x, bMin.y), ImVec2(bMax.x - cLen, bMin.y), cornerCol, 2.0f);
+         dl->AddLine(ImVec2(bMax.x, bMin.y), ImVec2(bMax.x, bMin.y + cLen), cornerCol, 2.0f);
+         // Bottom-left
+         dl->AddLine(ImVec2(bMin.x, bMax.y), ImVec2(bMin.x + cLen, bMax.y), cornerCol, 2.0f);
+         dl->AddLine(ImVec2(bMin.x, bMax.y), ImVec2(bMin.x, bMax.y - cLen), cornerCol, 2.0f);
+         // Bottom-right
+         dl->AddLine(ImVec2(bMax.x, bMax.y), ImVec2(bMax.x - cLen, bMax.y), cornerCol, 2.0f);
+         dl->AddLine(ImVec2(bMax.x, bMax.y), ImVec2(bMax.x, bMax.y - cLen), cornerCol, 2.0f);
+
+         // Center crosshair
+         const float xLen = 3.0f;
+         dl->AddLine(ImVec2(cx - xLen, cy), ImVec2(cx + xLen, cy), cornerCol, 1.5f);
+         dl->AddLine(ImVec2(cx, cy - xLen), ImVec2(cx, cy + xLen), cornerCol, 1.5f);
+
+         // Label tag
+         const char* tag = s.lost ? "LOST" : "TRACK";
+         const ImVec2 tagMin(bMin.x, std::max(origin.y + 2.0f, bMin.y - 14.0f));
+         const ImVec2 tagMax(tagMin.x + (s.lost ? 34.0f : 42.0f), tagMin.y + 12.0f);
+         dl->AddRectFilled(tagMin, tagMax, IM_COL32(15, 20, 25, 210), 2.0f);
+         dl->AddText(ImVec2(tagMin.x + 3.0f, tagMin.y - 1.0f), cornerCol, tag);
+      }
+      else if (node->IsAnalyzing())
+      {
+         // Animated scan sweep during analysis
+         float prog = node->Progress();
+         float scanY = origin.y + prog * size;
+         dl->AddLine(ImVec2(origin.x, scanY), ImVec2(origin.x + size, scanY),
+                     IM_COL32(0, 255, 200, 200), 2.0f);
+         char pBuf[32];
+         snprintf(pBuf, sizeof(pBuf), "ANALYZING %d%%", (int)(prog * 100.0f));
+         dl->AddRectFilled(ImVec2(origin.x + 4, origin.y + 4), ImVec2(origin.x + 92, origin.y + 20),
+                           IM_COL32(15, 20, 25, 210), 3.0f);
+         dl->AddText(ImVec2(origin.x + 8, origin.y + 5), IM_COL32(0, 255, 200, 255), pBuf);
+      }
+
+      ImGui::Dummy(ImVec2(size, size));
+   }
+
    // A comment shows its note on the face of the node, not behind the params
    // (eye) toggle - the whole point of a note is to be readable without an
    // extra click, the same reasoning DrawNode's canvas is drawn directly
@@ -23004,32 +23094,6 @@ namespace
       // to zoom. An InvisibleButton is what makes this safe inside the node
       // editor - while it is active the editor leaves the drag alone, which is
       // the same mechanism the in-node sliders already rely on.
-      if (auto* mt = dynamic_cast<MotionTrackNode*>(node))
-      {
-         if (mt->initMode == MotionTrackNode::kManualBox)
-         {
-            ImGui::SetCursorScreenPos(origin);
-            ImGui::InvisibleButton("##manualBoxDrag", ImVec2(size, size));
-            if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
-            {
-               ImVec2 mousePos = ImGui::GetMousePos();
-               float normX = std::clamp((mousePos.x - origin.x) / size, 0.0f, 1.0f);
-               float normY = std::clamp(1.0f - (mousePos.y - origin.y) / size, 0.0f, 1.0f);
-               mt->manualBoxX = normX;
-               mt->manualBoxY = normY;
-               mt->MarkStale();
-            }
-            float boxScreenX = origin.x + mt->manualBoxX * size;
-            float boxScreenY = origin.y + (1.0f - mt->manualBoxY) * size;
-            float boxScreenW = mt->manualBoxW * size;
-            float boxScreenH = mt->manualBoxH * size;
-            dl->AddRect(ImVec2(boxScreenX - boxScreenW * 0.5f, boxScreenY - boxScreenH * 0.5f),
-                        ImVec2(boxScreenX + boxScreenW * 0.5f, boxScreenY + boxScreenH * 0.5f),
-                        IM_COL32(255, 220, 50, 230), 2.0f, 0, 1.5f);
-            return;
-         }
-      }
-
       if (render == nullptr)
       {
          ImGui::Dummy(ImVec2(size, size));
@@ -23355,7 +23419,8 @@ namespace
       // panel rather than producing an image.
       if (dynamic_cast<ImageAnalyzeNode*>(n) != nullptr ||
           dynamic_cast<AudioFileNode*>(n) != nullptr ||
-          dynamic_cast<AudioAnalyzeNode*>(n) != nullptr)
+          dynamic_cast<AudioAnalyzeNode*>(n) != nullptr ||
+          dynamic_cast<MotionTrackNode*>(n) != nullptr)
          return false;
       if (dynamic_cast<CameraNode*>(n) != nullptr || dynamic_cast<LightNode*>(n) != nullptr)
          return false;
@@ -62142,6 +62207,8 @@ int main(int argc, char** argv)
             DrawPalettePreview(palette);
          else if (auto* proj = dynamic_cast<ProjectionNode*>(gn.node.get()))
             DrawProjectionPreview(proj);
+         else if (auto* mt = dynamic_cast<MotionTrackNode*>(gn.node.get()))
+            DrawMotionTrackPreview(mt);
          else if (auto* fgnPreview = dynamic_cast<FieldGraphNode*>(gn.node.get()))
          {
             // Build step 15 §5.1/§5.3: an encapsulated FieldGraphNode's

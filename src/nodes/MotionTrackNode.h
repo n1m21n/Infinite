@@ -7,35 +7,23 @@
 #include <thread>
 #include <vector>
 
-#include "GLUtil.h"
 #include "INode.h"
 #include "ImageCable.h"
 #include "Modulation.h"
-#include "Platform.h"
 
 // Motion Track node.
 // Tracks the dominant moving object in a video clip using normalized cross-correlation
-// and pyramidal Lucas-Kanade optical flow. Emits position, scale, rotation, and confidence
-// as continuous modulation signals with an in-frame visual tracking overlay.
+// and pyramidal Lucas-Kanade optical flow. Emits position, scale, and rotation as
+// modulator outputs - wire them into any param (a Transform's position, for example)
+// to move something else along the tracked path. Produces no image of its own.
 class MotionTrackNode : public INode
 {
 public:
-   enum Output
-   {
-      kImage = 0,
-      kX,
-      kY,
-      kScale,
-      kRotation,
-      kConfidence,
-      kOutputCount
-   };
-
    enum InitMode
    {
-      kAutoSubject = 0,
+      kAutoPerson = 0,
+      kAutoSubject,
       kAutoMotion,
-      kManualBox,
       kInitModeCount
    };
 
@@ -47,13 +35,13 @@ public:
       kMotionModelCount
    };
 
-   enum OverlayStyle
+   enum Output
    {
-      kRing = 0,
-      kBox,
-      kCrosshair,
-      kRingTrail,
-      kOverlayStyleCount
+      kOutX = 0,
+      kOutY,
+      kOutScale,
+      kOutRotation,
+      kOutputCount
    };
 
    struct TrackSample
@@ -70,25 +58,22 @@ public:
    static INode* Create() { return new MotionTrackNode(); }
    static const std::vector<std::string>& InitModeNames();
    static const std::vector<std::string>& MotionModelNames();
-   static const std::vector<std::string>& OverlayStyleNames();
 
    MotionTrackNode();
    ~MotionTrackNode() override;
 
-   unsigned int GetOutputTexture() override { return GLUtil::FboTexture(mOut); }
-   int GetOutputWidth() const override { return mOut.w; }
-   int GetOutputHeight() const override { return mOut.h; }
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
 
    int OutputCount() const override { return kOutputCount; }
    const char* OutputLabel(int index) const override;
    IModulator* ModulatorOutput(int index) override;
+   float Value(int index) const;
 
    ImageCable& Input() { return mInput; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "image" : nullptr; }
-   INode* BypassSource() override { return mInput.GetSource(); }
-
-   float Value(int outputIndex) const;
 
    // Analysis controls & status
    void StartAnalysis();
@@ -106,11 +91,14 @@ public:
 
    // Track evaluation
    bool SampleAtTime(double seconds, TrackSample& out) const;
+   const TrackSample& CurrentSample() const { return mCurrentSample; }
    const std::vector<TrackSample>& Track() const { return mTrack; }
    void SetTrack(const std::vector<TrackSample>& samples);
+   float TrackBoxW() const { return mTrackBoxW; }
+   float TrackBoxH() const { return mTrackBoxH; }
 
    // Configuration & parameters
-   int initMode = kAutoSubject;
+   int initMode = kAutoPerson;
    int motionModel = kPositionScale;
    float searchScale = 2.0f;
    int featureCount = 40;
@@ -121,28 +109,9 @@ public:
    float offsetX = 0.0f;
    float offsetY = 0.0f;
 
-   bool showOverlay = true;
-   int overlayStyle = kRing;
-   float overlayColor[3] = { 0.0f, 1.0f, 1.0f }; // cyan
-   float overlaySize = 1.0f;
-
-   // Manual box region in normalized (0..1) coords
-   float manualBoxX = 0.5f;
-   float manualBoxY = 0.5f;
-   float manualBoxW = 0.2f;
-   float manualBoxH = 0.2f;
-
    void VisitParams(ParamVisitor& v) override;
 
 private:
-   struct Tap : public IModulator
-   {
-      MotionTrackNode* owner = nullptr;
-      int outputIndex = 0;
-      float Value01() override { return owner ? owner->Value(outputIndex) : 0.0f; }
-   };
-
-   bool EnsureShader();
    void WorkerThreadMain(std::string videoPath,
                          InitMode chosenInitMode,
                          MotionModel chosenMotionModel,
@@ -150,21 +119,26 @@ private:
                          int chosenFeatureCount,
                          float chosenMinConfidence,
                          float chosenAdapt,
-                         float chosenSampleFps,
-                         float boxX, float boxY, float boxW, float boxH);
+                         float chosenSampleFps);
 
    static std::string EncodeTrack(const std::vector<TrackSample>& track);
    static std::vector<TrackSample> DecodeTrack(const std::string& encoded);
 
+   // Publishes Value(index) as an IModulator - see AnalyzeNodes.h's identical Tap pattern.
+   struct Tap : public IModulator
+   {
+      MotionTrackNode* owner = nullptr;
+      int index = 0;
+      float Value01() override { return owner ? owner->Value(index) : 0.0f; }
+   };
+   Tap mTaps[kOutputCount];
+
    ImageCable mInput;
-   GLUtil::Fbo mOut;
-   unsigned int mProgram = 0;
-   bool mShaderTried = false;
    int mLastCookFrame = -1;
 
-   Tap mTaps[kOutputCount];
-   float mCurrentValues[kOutputCount] = { 0 };
    TrackSample mCurrentSample;
+   float mTrackBoxW = 0.25f;
+   float mTrackBoxH = 0.25f;
 
    std::vector<TrackSample> mTrack;
    std::string mStatus = "press Analyze to track";
@@ -179,11 +153,4 @@ private:
    std::atomic<bool> mAbortWorker { false };
    std::atomic<float> mProgress { 0.0f };
    mutable std::mutex mTrackMutex;
-
-   // Position trail for overlay
-   static constexpr int kTrailLength = 32;
-   float mTrailX[kTrailLength] = { 0 };
-   float mTrailY[kTrailLength] = { 0 };
-   int mTrailCount = 0;
-   int mTrailHead = 0;
 };
