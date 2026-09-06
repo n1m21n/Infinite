@@ -831,11 +831,26 @@ void FieldPixelNode::CookIfNeeded(int frameId)
       }
    }
 
-   // No native input pin (device-catalog simplification: Field Pixel is
-   // generation-only for now) - `src` in a kernel always reads the black
-   // texture/alpha-0, same as an unconnected pin used to.
+   // A declared `input pixel image` pin (bound to fld_srcTex/`src` by
+   // GlslBackend - see EmitNode's Variable case) reads whatever is patched
+   // into DeclaredImageInput(0). No pin, no connection, or a source that
+   // isn't cooked yet all fall back to the same black/alpha-0 texture an
+   // unconnected pin always read.
    unsigned int srcTex = GetDefaultBlackTexture();
    float srcAlpha = 0.0f;
+   if (DeclaredImageInputCount() > 0)
+   {
+      ImageCable* input = DeclaredImageInput(0);
+      if (input && input->IsConnected())
+      {
+         unsigned int tex = input->Pull(frameId);
+         if (tex != 0)
+         {
+            srcTex = tex;
+            srcAlpha = 1.0f;
+         }
+      }
+   }
 
    auto setupUniforms = [this, w, h, clock, dt, frameId, srcTex, srcAlpha, &hoistedValues]()
    {
