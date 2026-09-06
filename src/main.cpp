@@ -2339,6 +2339,31 @@ namespace
       return h;
    }
 
+   // Shared "this is the recommended action" emphasis for a modal dialog's
+   // button row - the app's accent color on exactly one button, matching
+   // the platform convention of a single filled default action among plain
+   // ones. Never hand-roll a one-off accent color at a call site (same
+   // reasoning as PushDropdownStyle/PushCheckboxStyle below); this is the
+   // one place it's defined. Equally valid in light and dark: it always
+   // reads against the theme's own accent, never a fixed literal.
+   inline void PushPrimaryButtonStyle()
+   {
+      const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
+      const ImVec4 accent(t.accent.r, t.accent.g, t.accent.b, 1.0f);
+      ImGui::PushStyleColor(ImGuiCol_Button, accent);
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                             ImVec4(std::min(accent.x * 1.1f, 1.0f), std::min(accent.y * 1.1f, 1.0f),
+                                    std::min(accent.z * 1.1f, 1.0f), 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                             ImVec4(accent.x * 0.82f, accent.y * 0.82f, accent.z * 0.82f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+   }
+
+   inline void PopPrimaryButtonStyle()
+   {
+      ImGui::PopStyleColor(4);
+   }
+
    inline void PushDropdownStyle()
    {
       const bool isLight = IsThemeLight();
@@ -66188,7 +66213,34 @@ int main(int argc, char** argv)
          ImGui::Text("This patch has unsaved changes.");
          ImGui::Text("Save before closing?");
          ImGui::Separator();
-         if (ImGui::Button("Save", ImVec2(100, 0)))
+         const float btnW = 100.0f;
+         const float spacing = ImGui::GetStyle().ItemSpacing.x;
+         const float totalW = btnW * 3 + spacing * 2;
+         const float avail = ImGui::GetContentRegionAvail().x;
+         if (avail > totalW)
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - totalW);
+         // Right-aligned, cancel-to-primary reading order (platform
+         // convention: the recommended default action is rightmost and
+         // the only one drawn with emphasis - matching the fix in the
+         // Recover Autosave modal below, which had the identical defect).
+         if (ImGui::Button("Cancel", ImVec2(btnW, 0)))
+         {
+            gPendingUnsavedAction = nullptr;
+            ImGui::CloseCurrentPopup();
+         }
+         ImGui::SameLine();
+         if (ImGui::Button("Don't Save", ImVec2(btnW, 0)))
+         {
+            if (gPendingUnsavedAction)
+               gPendingUnsavedAction();
+            gPendingUnsavedAction = nullptr;
+            ImGui::CloseCurrentPopup();
+         }
+         ImGui::SameLine();
+         PushPrimaryButtonStyle();
+         const bool doSave = ImGui::Button("Save", ImVec2(btnW, 0));
+         PopPrimaryButtonStyle();
+         if (doSave)
          {
             SavePatchInteractive(false);
             // Only proceed if the save actually went through - a cancelled
@@ -66201,20 +66253,6 @@ int main(int argc, char** argv)
                gPendingUnsavedAction = nullptr;
                ImGui::CloseCurrentPopup();
             }
-         }
-         ImGui::SameLine();
-         if (ImGui::Button("Don't Save", ImVec2(100, 0)))
-         {
-            if (gPendingUnsavedAction)
-               gPendingUnsavedAction();
-            gPendingUnsavedAction = nullptr;
-            ImGui::CloseCurrentPopup();
-         }
-         ImGui::SameLine();
-         if (ImGui::Button("Cancel", ImVec2(100, 0)))
-         {
-            gPendingUnsavedAction = nullptr;
-            ImGui::CloseCurrentPopup();
          }
          ImGui::EndPopup();
       }
@@ -66303,7 +66341,33 @@ int main(int argc, char** argv)
          else
             ImGui::Text("A recovered version of your work is available.");
          ImGui::Separator();
-         if (ImGui::Button("Recover", ImVec2(100, 0)))
+         {
+            const float btnW = 100.0f;
+            const float spacing = ImGui::GetStyle().ItemSpacing.x;
+            const float totalW = btnW * 2 + spacing;
+            const float avail = ImGui::GetContentRegionAvail().x;
+            if (avail > totalW)
+               ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - totalW);
+         }
+         // Discard (destructive, plain) on the left, Recover (recommended,
+         // emphasized) rightmost - same right-aligned/primary-emphasis
+         // convention as the Unsaved Changes modal above.
+         if (ImGui::Button("Discard", ImVec2(100, 0)))
+         {
+            DiscardAutosave();
+            const std::string marker = AutosaveMarkerPath();
+            if (!marker.empty())
+            {
+               std::error_code ec;
+               std::filesystem::remove(marker, ec);
+            }
+            ImGui::CloseCurrentPopup();
+         }
+         ImGui::SameLine();
+         PushPrimaryButtonStyle();
+         const bool doRecover = ImGui::Button("Recover", ImVec2(100, 0));
+         PopPrimaryButtonStyle();
+         if (doRecover)
          {
             ApplyPatchData(gPendingRecoveryData);
             gUndoStack.clear();
@@ -66314,18 +66378,6 @@ int main(int argc, char** argv)
             // A recovery that leaves the file behind offers itself again on
             // the next launch.
             DiscardAutosave();
-            ImGui::CloseCurrentPopup();
-         }
-         ImGui::SameLine();
-         if (ImGui::Button("Discard", ImVec2(100, 0)))
-         {
-            DiscardAutosave();
-            const std::string marker = AutosaveMarkerPath();
-            if (!marker.empty())
-            {
-               std::error_code ec;
-               std::filesystem::remove(marker, ec);
-            }
             ImGui::CloseCurrentPopup();
          }
          ImGui::EndPopup();
