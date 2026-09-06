@@ -54,6 +54,7 @@ What each node type does: math, state, per-node parameter UI.
 | AnalyzeNodes | Image analyze |
 | Geometry3DNodes | Surface properties struct for 3D renderer |
 | ModelSourceNode | Disk mesh import |
+| SplatSourceNode | Gaussian splat cloud import (.ply/.splat), rendered via Render3D's EWA-splatting pass |
 | Text3DNode | Extruded text geometry |
 | UtilityNodes | Comment, Group, Null, Viewport, Null3D, Material, JoinGeometry, MetaBall, MeshToPoints |
 | PathNode | Move-along-path over time |
