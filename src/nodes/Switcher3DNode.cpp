@@ -58,6 +58,18 @@ IGeometrySource* Switcher3DNode::PassthroughSource() const
    return Active();
 }
 
+const SplatIO::SplatCloud* Switcher3DNode::GetSplatCloud()
+{
+   IGeometrySource* active = Active();
+   return active ? active->GetSplatCloud() : nullptr;
+}
+
+unsigned long long Switcher3DNode::SplatCloudRevision()
+{
+   IGeometrySource* active = Active();
+   return active ? active->SplatCloudRevision() : 0;
+}
+
 Mat4 Switcher3DNode::GetInstanceGroupMatrix() const
 {
    IGeometrySource* active = Active();

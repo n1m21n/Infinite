@@ -170,6 +170,16 @@ public:
    // that walk the passthrough chain, instead of collapsing the scatter to a
    // single stamp mesh.
    IGeometrySource* PassthroughSource() const override { return input; }
+   // A null is a no-op on splats too, same reasoning as the mesh/instancer
+   // forwarding just above.
+   const SplatIO::SplatCloud* GetSplatCloud() override
+   {
+      return input ? input->GetSplatCloud() : nullptr;
+   }
+   unsigned long long SplatCloudRevision() override
+   {
+      return input ? input->SplatCloudRevision() : 0;
+   }
    Mat4 GetInstanceGroupMatrix() const override
    {
       return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
@@ -234,6 +244,16 @@ public:
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* PassthroughSource() const override { return input; }
+   // Material overrides shading, not geometry - a splat cloud upstream
+   // forwards through untouched, same as mesh/instancer below.
+   const SplatIO::SplatCloud* GetSplatCloud() override
+   {
+      return input ? input->GetSplatCloud() : nullptr;
+   }
+   unsigned long long SplatCloudRevision() override
+   {
+      return input ? input->SplatCloudRevision() : 0;
+   }
    // Forwarded alongside PassthroughSource: a node that claims to pass an
    // instancer through has to pass the wrapping Transform's group matrix
    // through with it, or the scatter draws at the origin.
@@ -384,6 +404,16 @@ public:
    MappingTransform GetMappingTransform() const override;
 
    IGeometrySource* PassthroughSource() const override { return input; }
+   // Mapping changes how textures are looked up, not the geometry itself -
+   // a splat cloud upstream forwards through untouched.
+   const SplatIO::SplatCloud* GetSplatCloud() override
+   {
+      return input ? input->GetSplatCloud() : nullptr;
+   }
+   unsigned long long SplatCloudRevision() override
+   {
+      return input ? input->SplatCloudRevision() : 0;
+   }
    Mat4 GetInstanceGroupMatrix() const override
    {
       return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();

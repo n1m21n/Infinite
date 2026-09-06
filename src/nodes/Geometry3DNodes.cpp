@@ -1102,10 +1102,13 @@ Render3DNode::~Render3DNode()
    ReleaseShadowTargets();
    for (int i = 0; i < kSlots; i++)
       ReleaseGpuMesh(mGpu[i]);
+   for (int i = 0; i < kSlots; i++)
+      ReleaseGpuSplat(mGpuSplat[i]);
    if (mProgram != 0) glDeleteProgram(mProgram);
    if (mShadowProgram != 0) glDeleteProgram(mShadowProgram);
    if (mEnvBgProgram != 0) glDeleteProgram(mEnvBgProgram);
    if (mEnvBgVao != 0) glDeleteVertexArrays(1, &mEnvBgVao);
+   if (mSplatProgram != 0) glDeleteProgram(mSplatProgram);
 }
 
 void Render3DNode::ReleaseGpuMesh(GpuMesh& gpu)
@@ -1117,6 +1120,154 @@ void Render3DNode::ReleaseGpuMesh(GpuMesh& gpu)
    if (gpu.vertexColorVbo != 0) glDeleteBuffers(1, &gpu.vertexColorVbo);
    if (gpu.vao != 0) glDeleteVertexArrays(1, &gpu.vao);
    gpu = GpuMesh();
+}
+
+void Render3DNode::ReleaseGpuSplat(GpuSplat& gpu)
+{
+   if (gpu.quadVbo != 0) glDeleteBuffers(1, &gpu.quadVbo);
+   if (gpu.indexVbo != 0) glDeleteBuffers(1, &gpu.indexVbo);
+   if (gpu.vao != 0) glDeleteVertexArrays(1, &gpu.vao);
+   if (gpu.tex != 0) glDeleteTextures(1, &gpu.tex);
+   // GpuSplat is not reassignable via `gpu = GpuSplat()` - it owns a
+   // SplatSorter, which owns a std::thread and is non-copyable/non-movable
+   // on purpose (see the SplatSorter declaration). Reset the plain-data
+   // fields by hand instead; the sorter's own thread is torn down in its
+   // own destructor when the owning Render3DNode is destroyed, not here.
+   gpu.vao = gpu.quadVbo = gpu.indexVbo = gpu.tex = 0;
+   gpu.texWidth = gpu.texHeight = 0;
+   gpu.texRevision = 0;
+   gpu.source = nullptr;
+   gpu.splatCount = 0;
+   gpu.uploadedIndexCount = 0;
+   gpu.avgWorldRadius = 0.0f;
+   gpu.hasSorted = false;
+}
+
+// --- SplatSorter ---------------------------------------------------------
+// One persistent worker thread, parked on a condition variable between
+// jobs. See docs/plans/gaussian-splat-node.md S6 "Sort" and the class doc
+// comment in Geometry3DNodes.h for the design this implements.
+Render3DNode::SplatSorter::SplatSorter()
+{
+   mThread = std::thread(&Render3DNode::SplatSorter::ThreadMain, this);
+}
+
+Render3DNode::SplatSorter::~SplatSorter()
+{
+   {
+      std::lock_guard<std::mutex> lock(mMutex);
+      mStop = true;
+   }
+   mCv.notify_one();
+   if (mThread.joinable())
+      mThread.join();
+}
+
+void Render3DNode::SplatSorter::RequestSort(const SplatIO::SplatCloud* cloud, const Mat4& modelView)
+{
+   if (cloud == nullptr)
+      return;
+   std::vector<float> positions;
+   positions.reserve(cloud->splats.size() * 3);
+   for (const SplatIO::Splat& s : cloud->splats)
+   {
+      positions.push_back(s.px);
+      positions.push_back(s.py);
+      positions.push_back(s.pz);
+   }
+   {
+      std::lock_guard<std::mutex> lock(mMutex);
+      mPendingPositions = std::move(positions);
+      mPendingModelView = modelView;
+      mHasJob = true;
+   }
+   mCv.notify_one();
+}
+
+bool Render3DNode::SplatSorter::TakeCompletedOrder(std::vector<unsigned int>& outIndices)
+{
+   std::lock_guard<std::mutex> lock(mMutex);
+   if (!mResultReady)
+      return false;
+   outIndices = std::move(mResult);
+   mResultReady = false;
+   return true;
+}
+
+void Render3DNode::SplatSorter::ThreadMain()
+{
+   for (;;)
+   {
+      std::vector<float> positions;
+      Mat4 mv;
+      {
+         std::unique_lock<std::mutex> lock(mMutex);
+         mCv.wait(lock, [this]() { return mStop || mHasJob; });
+         if (mStop)
+            return;
+         positions = std::move(mPendingPositions);
+         mv = mPendingModelView;
+         mHasJob = false;
+      }
+
+      const size_t n = positions.size() / 3;
+      if (n == 0)
+      {
+         std::lock_guard<std::mutex> lock(mMutex);
+         mResult.clear();
+         mResultReady = true;
+         continue;
+      }
+
+      // View-space depth per splat (more negative = farther from the
+      // camera, standard GL convention with the camera looking down -Z).
+      std::vector<float> depth(n);
+      float minZ = 1e30f, maxZ = -1e30f;
+      for (size_t i = 0; i < n; i++)
+      {
+         const float x = positions[i * 3 + 0], y = positions[i * 3 + 1], z = positions[i * 3 + 2];
+         const float vz = mv.m[2] * x + mv.m[6] * y + mv.m[10] * z + mv.m[14];
+         depth[i] = vz;
+         minZ = std::min(minZ, vz);
+         maxZ = std::max(maxZ, vz);
+      }
+
+      // 16-bit counting sort, O(N), 65536 buckets - the CPU-sort approach
+      // that keeps this feasible without a compute shader (see the design
+      // doc). Ascending bucket order places the most-negative (farthest)
+      // splats first, which is back-to-front - exactly the painter's-
+      // algorithm order the blend pass needs.
+      const unsigned int kBuckets = 65536;
+      const float range = std::max(maxZ - minZ, 1e-6f);
+      std::vector<unsigned short> keys(n);
+      std::vector<unsigned int> counts(kBuckets + 1, 0);
+      for (size_t i = 0; i < n; i++)
+      {
+         const float t = (depth[i] - minZ) / range;
+         const unsigned int k = std::min(kBuckets - 1, (unsigned int)(t * (float)(kBuckets - 1)));
+         keys[i] = (unsigned short)k;
+         counts[k + 1]++;
+      }
+      for (unsigned int b = 0; b < kBuckets; b++)
+         counts[b + 1] += counts[b];
+      std::vector<unsigned int> order(n);
+      std::vector<unsigned int> cursor(counts.begin(), counts.end());
+      for (size_t i = 0; i < n; i++)
+      {
+         const unsigned int k = keys[i];
+         order[cursor[k]++] = (unsigned int)i;
+      }
+
+      {
+         std::lock_guard<std::mutex> lock(mMutex);
+         // A newer job may have been requested while this one was sorting;
+         // that's fine - it will simply supersede this result on the next
+         // wake, and the render thread only ever reads the newest one
+         // TakeCompletedOrder() sees.
+         mResult = std::move(order);
+         mResultReady = true;
+      }
+   }
 }
 
 bool Render3DNode::EnsureShader()
@@ -1169,6 +1320,187 @@ bool Render3DNode::EnsureShader()
       fprintf(stderr, "Render3D link error: %s\n", log);
       glDeleteProgram(mProgram);
       mProgram = 0;
+      return false;
+   }
+
+   return true;
+}
+
+bool Render3DNode::EnsureSplatShader()
+{
+   if (mSplatShaderTried)
+      return mSplatProgram != 0;
+   mSplatShaderTried = true;
+
+   // EWA (elliptical weighted average) splatting - the WebGL2 port target
+   // named in the design doc (antimatter15/splat), not the CUDA reference.
+   // #version 150, no implicit int->float anywhere (Windows GLSL drivers
+   // reject what macOS accepts - see the windows-parity skill).
+   static const char* kVertSrc =
+      "#version 150\n"
+      "in vec2 aCorner;\n"          // per-vertex unit-quad corner, (-1..1)
+      "in uint aSplatIndex;\n"      // per-instance, divisor 1: index into uSplatTex
+
+      "uniform mat4 uView;\n"
+      "uniform mat4 uProj;\n"
+      "uniform mat4 uModel;\n"
+      "uniform sampler2D uSplatTex;\n"
+      "uniform int uSplatTexWidth;\n"
+      "uniform vec2 uViewport;\n"
+      "uniform float uFillClamp;\n" // 1.0 unless the fill-rate budget clamps it
+
+      "out vec2 vScreenOffset;\n"
+      "out vec3 vConic;\n"
+      "out vec4 vColor;\n"
+
+      "ivec2 TexelCoord(int t) {\n"
+      "   return ivec2(t - (t / uSplatTexWidth) * uSplatTexWidth, t / uSplatTexWidth);\n"
+      "}\n"
+
+      "void main() {\n"
+      "   int idx = int(aSplatIndex);\n"
+      "   int base = idx * 4;\n"
+      "   vec4 t0 = texelFetch(uSplatTex, TexelCoord(base + 0), 0);\n"
+      "   vec4 t1 = texelFetch(uSplatTex, TexelCoord(base + 1), 0);\n"
+      "   vec4 t2 = texelFetch(uSplatTex, TexelCoord(base + 2), 0);\n"
+      "   vec4 t3 = texelFetch(uSplatTex, TexelCoord(base + 3), 0);\n"
+
+      "   vec3 posWorld = (uModel * vec4(t0.xyz, 1.0)).xyz;\n"
+      "   float opacity = t0.w;\n"
+      "   vec4 posView = uView * vec4(posWorld, 1.0);\n"
+
+      // Near-plane cull: behind (or right on top of) the camera.
+      "   if (posView.z > -0.01) {\n"
+      "      gl_Position = vec4(0.0, 0.0, 2.0, 1.0);\n"
+      "      vColor = vec4(0.0);\n"
+      "      vConic = vec3(0.0);\n"
+      "      vScreenOffset = vec2(0.0);\n"
+      "      return;\n"
+      "   }\n"
+
+      // World-space 3D covariance, upper triangle unpacked into a
+      // symmetric matrix, then rotated by the model matrix's linear part
+      // (identity for an unwrapped splat source - only matters once a
+      // Transform sits upstream).
+      "   mat3 Sigma = mat3(t1.x, t1.y, t1.z,\n"
+      "                      t1.y, t2.x, t2.y,\n"
+      "                      t1.z, t2.y, t2.z);\n"
+      "   mat3 M3 = mat3(uModel);\n"
+      "   Sigma = M3 * Sigma * transpose(M3);\n"
+
+      // EWA splatting: Sigma' = J * W * Sigma * W^T * J^T, J = Jacobian of
+      // the affine approximation of the perspective projection at this
+      // splat's view-space position (Zwicker et al.), W = the view
+      // matrix's rotation part.
+      "   float focalX = uProj[0][0] * uViewport.x * 0.5;\n"
+      "   float focalY = uProj[1][1] * uViewport.y * 0.5;\n"
+      "   float invZ = 1.0 / (-posView.z);\n"
+      "   float invZ2 = invZ * invZ;\n"
+      "   mat3 J = mat3(focalX * invZ, 0.0, 0.0,\n"
+      "                 0.0, focalY * invZ, 0.0,\n"
+      "                 -focalX * posView.x * invZ2, -focalY * posView.y * invZ2, 0.0);\n"
+      "   mat3 Wm = mat3(uView);\n"
+      "   mat3 T = J * Wm;\n"
+      "   mat3 covView = T * Sigma * transpose(T);\n"
+
+      // 2x2 screen-space covariance, with a small dilation term (standard
+      // 3DGS practice) so a splat smaller than a pixel doesn't vanish
+      // entirely under the fragment-shader alpha cutoff.
+      "   float a = covView[0][0] + 0.3;\n"
+      "   float b = covView[0][1];\n"
+      "   float c = covView[1][1] + 0.3;\n"
+      "   float det = a * c - b * b;\n"
+      "   if (det <= 0.0) {\n"
+      "      gl_Position = vec4(0.0, 0.0, 2.0, 1.0);\n"
+      "      vColor = vec4(0.0);\n"
+      "      return;\n"
+      "   }\n"
+
+      // Eigendecomposition of the symmetric 2x2 [[a,b],[b,c]] - major/minor
+      // screen-space axes, quad radius = 3 sigma along each.
+      "   float mid = 0.5 * (a + c);\n"
+      "   float disc = max(0.1, mid * mid - det);\n"
+      "   float lambda1 = mid + sqrt(disc);\n"
+      "   float lambda2 = max(0.0, mid - sqrt(disc));\n"
+      "   vec2 diagDir = (abs(b) > 1.0e-6) ? normalize(vec2(b, lambda1 - a)) : vec2(1.0, 0.0);\n"
+      "   vec2 minorDir = vec2(-diagDir.y, diagDir.x);\n"
+      "   float radius1 = min(sqrt(lambda1) * 3.0, 4096.0) * uFillClamp;\n"
+      "   float radius2 = min(sqrt(lambda2) * 3.0, 4096.0) * uFillClamp;\n"
+      "   vec2 majorAxis = diagDir * radius1;\n"
+      "   vec2 minorAxis = minorDir * radius2;\n"
+
+      // Inverse covariance (the conic) for the fragment shader's Gaussian
+      // falloff, in the ORIGINAL (screen x/y) basis - not the eigenbasis -
+      // so it stays valid against vScreenOffset below, which is also in
+      // that basis.
+      "   float invDet = 1.0 / det;\n"
+      "   vConic = vec3(c * invDet, -b * invDet, a * invDet);\n"
+
+      "   vec2 screenOffset = aCorner.x * majorAxis + aCorner.y * minorAxis;\n"
+      "   vec4 clipCenter = uProj * posView;\n"
+      "   vec2 ndcOffset = screenOffset / (0.5 * uViewport);\n"
+      "   gl_Position = clipCenter + vec4(ndcOffset * clipCenter.w, 0.0, 0.0);\n"
+      "   vScreenOffset = screenOffset;\n"
+      "   vColor = vec4(t3.xyz, opacity);\n"
+      "}\n";
+
+   static const char* kFragSrc =
+      "#version 150\n"
+      "in vec2 vScreenOffset;\n"
+      "in vec3 vConic;\n"
+      "in vec4 vColor;\n"
+      "out vec4 fragColor;\n"
+      "void main() {\n"
+      "   vec2 d = vScreenOffset;\n"
+      "   float power = -0.5 * (vConic.x * d.x * d.x + vConic.z * d.y * d.y) - vConic.y * d.x * d.y;\n"
+      "   power = min(power, 0.0);\n"
+      "   float alpha = min(0.99, vColor.a * exp(power));\n"
+      "   if (alpha < 0.00392) discard;\n" // 1/255
+      // Premultiplied output - matches the pass's glBlendFunc(GL_ONE,
+      // GL_ONE_MINUS_SRC_ALPHA).
+      "   fragColor = vec4(vColor.rgb * alpha, alpha);\n"
+      "}\n";
+
+   auto compile = [](GLenum type, const char* src) -> unsigned int {
+      unsigned int shader = glCreateShader(type);
+      glShaderSource(shader, 1, &src, nullptr);
+      glCompileShader(shader);
+      GLint ok = 0;
+      glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
+      if (!ok)
+      {
+         char log[1024];
+         glGetShaderInfoLog(shader, sizeof(log), nullptr, log);
+         fprintf(stderr, "Render3D splat shader error: %s\n", log);
+         glDeleteShader(shader);
+         return 0u;
+      }
+      return shader;
+   };
+
+   const unsigned int vert = compile(GL_VERTEX_SHADER, kVertSrc);
+   const unsigned int frag = compile(GL_FRAGMENT_SHADER, kFragSrc);
+   if (vert == 0 || frag == 0)
+      return false;
+
+   mSplatProgram = glCreateProgram();
+   glBindAttribLocation(mSplatProgram, 0, "aCorner");
+   glBindAttribLocation(mSplatProgram, 1, "aSplatIndex");
+   glAttachShader(mSplatProgram, vert);
+   glAttachShader(mSplatProgram, frag);
+   glLinkProgram(mSplatProgram);
+   glDeleteShader(vert);
+   glDeleteShader(frag);
+
+   GLint linked = 0;
+   glGetProgramiv(mSplatProgram, GL_LINK_STATUS, &linked);
+   if (!linked)
+   {
+      char log[1024];
+      glGetProgramInfoLog(mSplatProgram, sizeof(log), nullptr, log);
+      fprintf(stderr, "Render3D splat link error: %s\n", log);
+      glDeleteProgram(mSplatProgram);
+      mSplatProgram = 0;
       return false;
    }
 
@@ -1332,6 +1664,7 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
       sig.meshRev[i] = source->MeshRevision();
       sig.cloudRev[i] = source->PointCloudRevision();
       sig.curveRev[i] = source->CurveStamp();
+      sig.splatRev[i] = source->SplatCloudRevision();
       sig.surfaceTexRev[i] = source->SurfaceTextureRevision();
       sig.material[i] = source->GetMaterial();
       sig.modelMatrix[i] = source->GetModelMatrix();
@@ -1961,6 +2294,13 @@ void Render3DNode::CookIfNeeded(int frameId)
       if (source == nullptr)
          return;
 
+      // Precedence: splat cloud > point cloud > mesh triangles. A splat
+      // cloud is drawn in its own dedicated pass after this one (depth
+      // write off, additive-over blend, back-to-front) - see drawSplatSlot
+      // and the pass driver below - so this lambda just excludes it here.
+      if (source->GetSplatCloud() != nullptr)
+         return;
+
       // A source with both a mesh and a point cloud (Mesh to Points, Image
       // to Points) draws as sprites, not triangles - the cloud wins.
       if (source->GetPointCloud() != nullptr)
@@ -2268,6 +2608,208 @@ void Render3DNode::CookIfNeeded(int frameId)
       }
    };
 
+   // Draws one splat-cloud slot: rebuilds the static GL_RGBA32F data texture
+   // only when SplatCloudRevision() moves, kicks off (or reuses) the
+   // background depth sort, and draws N instanced triangle-strip quads from
+   // a GL_R32UI index buffer with divisor 1. Modelled on drawCloudSlot
+   // above, but with its own GL state entirely - see docs/plans/
+   // gaussian-splat-node.md S6 for the layout this mirrors.
+   auto drawSplatSlot = [&](int i, IGeometrySource* source, const SplatIO::SplatCloud* cloud,
+                            const float camForward[3])
+   {
+      GpuSplat& gpu = mGpuSplat[i];
+      const bool sourceChanged = gpu.source != (const void*)source;
+
+      if (gpu.vao == 0)
+      {
+         glGenVertexArrays(1, &gpu.vao);
+         glGenBuffers(1, &gpu.quadVbo);
+         glGenBuffers(1, &gpu.indexVbo);
+      }
+      glBindVertexArray(gpu.vao);
+
+      if (sourceChanged)
+      {
+         gpu.texRevision = 0;
+         gpu.hasSorted = false;
+         gpu.uploadedIndexCount = 0;
+         gpu.source = source;
+
+         static const float kCorners[4][2] = { { -1.0f, -1.0f }, { 1.0f, -1.0f },
+                                               { -1.0f, 1.0f }, { 1.0f, 1.0f } };
+         glBindBuffer(GL_ARRAY_BUFFER, gpu.quadVbo);
+         glBufferData(GL_ARRAY_BUFFER, sizeof(kCorners), kCorners, GL_STATIC_DRAW);
+         glEnableVertexAttribArray(0);
+         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+      }
+
+      const unsigned long long revision = source->SplatCloudRevision();
+      if (gpu.tex == 0 || gpu.texRevision != revision)
+      {
+         const int texW = 2048;
+         const size_t n = cloud->splats.size();
+         const size_t texelsNeeded = n * 4;
+         const int texH = (int)std::max<size_t>(1, (texelsNeeded + (size_t)texW - 1) / (size_t)texW);
+
+         std::vector<float> pixels((size_t)texW * (size_t)texH * 4, 0.0f);
+         double radiusSum = 0.0;
+         for (size_t k = 0; k < n; k++)
+         {
+            const SplatIO::Splat& s = cloud->splats[k];
+            const size_t t0 = k * 4 + 0, t1 = k * 4 + 1, t2 = k * 4 + 2, t3 = k * 4 + 3;
+            pixels[t0 * 4 + 0] = s.px; pixels[t0 * 4 + 1] = s.py; pixels[t0 * 4 + 2] = s.pz;
+            pixels[t0 * 4 + 3] = s.a;
+            pixels[t1 * 4 + 0] = s.cov[0]; pixels[t1 * 4 + 1] = s.cov[1]; pixels[t1 * 4 + 2] = s.cov[2];
+            pixels[t2 * 4 + 0] = s.cov[3]; pixels[t2 * 4 + 1] = s.cov[4]; pixels[t2 * 4 + 2] = s.cov[5];
+            pixels[t3 * 4 + 0] = s.r; pixels[t3 * 4 + 1] = s.g; pixels[t3 * 4 + 2] = s.b;
+            // Covariance trace / 3, sqrt'd, is the isotropic-equivalent
+            // radius - used only for the fill-rate estimate below.
+            const double trace = (double)s.cov[0] + (double)s.cov[3] + (double)s.cov[5];
+            radiusSum += std::sqrt(std::max(0.0, trace / 3.0));
+         }
+         gpu.avgWorldRadius = n > 0 ? (float)(radiusSum / (double)n) : 0.0f;
+
+         if (gpu.tex == 0)
+            glGenTextures(1, &gpu.tex);
+         glBindTexture(GL_TEXTURE_2D, gpu.tex);
+         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, texW, texH, 0, GL_RGBA, GL_FLOAT, pixels.data());
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+         glBindTexture(GL_TEXTURE_2D, 0);
+
+         gpu.texRevision = revision;
+         gpu.texWidth = texW;
+         gpu.texHeight = texH;
+         gpu.splatCount = (int)n;
+         gpu.hasSorted = false; // force a fresh sort against the new data
+         mLastUploads++;
+
+         // VRAM / fill-rate budget warning, mirroring the point-cloud
+         // sprite guard above (Geometry3DNodes.cpp's drawCloudSlot) - a
+         // splat cloud has no equivalent clamp on the CPU side (the shader
+         // clamps radius via uFillClamp instead, computed below), so this
+         // block is print-only plus feeding that uniform.
+         const double vramBytes = (double)texW * (double)texH * 4.0 * 4.0;
+         const double kVramBudgetBytes = 512.0 * 1024.0 * 1024.0;
+         if (vramBytes > kVramBudgetBytes)
+         {
+            fprintf(stderr,
+                    "Render3D: splat cloud VRAM ~%.1f MB (slot %d, %d splats) exceeds the %.0f MB "
+                    "guideline budget - consider reducing splat count\n",
+                    vramBytes / (1024.0 * 1024.0), i, gpu.splatCount,
+                    kVramBudgetBytes / (1024.0 * 1024.0));
+         }
+      }
+
+      if (gpu.splatCount == 0)
+         return;
+
+      const Mat4 model = source->GetModelMatrix();
+
+      // Skip the sort entirely when the camera barely moved - a static
+      // camera must cost zero (see the design doc). Movement is judged
+      // relative to camDistance so the threshold scales with scene size.
+      bool needSort = !gpu.hasSorted;
+      if (gpu.hasSorted)
+      {
+         const float dot = camForward[0] * gpu.lastSortFwd[0] + camForward[1] * gpu.lastSortFwd[1] +
+                            camForward[2] * gpu.lastSortFwd[2];
+         const float dx = eye[0] - gpu.lastSortEye[0], dy = eye[1] - gpu.lastSortEye[1],
+                     dz = eye[2] - gpu.lastSortEye[2];
+         const float posDelta = std::sqrt(dx * dx + dy * dy + dz * dz);
+         const float moveThreshold = std::max(1.0e-4f, camDistance * 0.01f);
+         if (dot < 0.9995f || posDelta > moveThreshold)
+            needSort = true;
+      }
+      if (needSort)
+      {
+         const Mat4 modelView = Mat4::Multiply(view, model);
+         gpu.sorter.RequestSort(cloud, modelView);
+         gpu.lastSortFwd[0] = camForward[0]; gpu.lastSortFwd[1] = camForward[1];
+         gpu.lastSortFwd[2] = camForward[2];
+         gpu.lastSortEye[0] = eye[0]; gpu.lastSortEye[1] = eye[1]; gpu.lastSortEye[2] = eye[2];
+         gpu.hasSorted = true;
+      }
+
+      std::vector<unsigned int> newOrder;
+      if (gpu.sorter.TakeCompletedOrder(newOrder))
+      {
+         if (gpu.indexVbo == 0)
+            glGenBuffers(1, &gpu.indexVbo);
+         glBindBuffer(GL_ARRAY_BUFFER, gpu.indexVbo);
+         glBufferData(GL_ARRAY_BUFFER, newOrder.size() * sizeof(unsigned int), newOrder.data(),
+                      GL_DYNAMIC_DRAW);
+         gpu.uploadedIndexCount = (int)newOrder.size();
+         mLastUploads++;
+      }
+      else if (gpu.uploadedIndexCount == 0)
+      {
+         // Nothing has ever completed for this slot yet (first frame it's
+         // connected) - draw in file order rather than waiting, so the
+         // sort being in flight never blocks the first visible frame; the
+         // depth sort itself never blocks the render thread either way.
+         std::vector<unsigned int> identity((size_t)gpu.splatCount);
+         for (int k = 0; k < gpu.splatCount; k++)
+            identity[k] = (unsigned int)k;
+         glBindBuffer(GL_ARRAY_BUFFER, gpu.indexVbo);
+         glBufferData(GL_ARRAY_BUFFER, identity.size() * sizeof(unsigned int), identity.data(),
+                      GL_DYNAMIC_DRAW);
+         gpu.uploadedIndexCount = (int)identity.size();
+      }
+
+      if (gpu.uploadedIndexCount == 0)
+         return;
+
+      glBindBuffer(GL_ARRAY_BUFFER, gpu.indexVbo);
+      glEnableVertexAttribArray(1);
+      glVertexAttribIPointer(1, 1, GL_UNSIGNED_INT, 0, (void*)0);
+      glVertexAttribDivisor(1, 1);
+
+      // Fill-rate budget clamp, mirroring the point-cloud sprite guard: if
+      // this cloud's estimated shaded fragment count blows past budget,
+      // shrink the drawn radius uniformly rather than dropping splats.
+      const float kDeg2Rad = 3.14159265358979323846f / 180.0f;
+      const float visibleHeight = 2.0f * camDistance * std::tan(fov * 0.5f * kDeg2Rad);
+      const float pixelsPerUnit = visibleHeight > 1.0e-6f ? (float)mHeight / visibleHeight : 0.0f;
+      static const double kSampleMultiplier2[4] = { 1.0, 2.0, 4.0, 8.0 };
+      const double sampleMult = kSampleMultiplier2[std::max(0, std::min(3, samples))];
+      const float radiusPixels = gpu.avgWorldRadius * 3.0f * pixelsPerUnit;
+      const double perSplatArea = 3.14159265358979323846 * (double)radiusPixels * (double)radiusPixels;
+      const double estimatedFill = (double)gpu.splatCount * perSplatArea * sampleMult;
+      const double kFillBudget = 5.0e8;
+      float fillClamp = 1.0f;
+      if (estimatedFill > kFillBudget && perSplatArea > 0.0)
+      {
+         fillClamp = (float)std::sqrt(kFillBudget / estimatedFill);
+         if (std::fabs(fillClamp - mLastSplatFillClamp) > 0.01f * std::max(fillClamp, 1.0e-3f))
+         {
+            fprintf(stderr,
+                    "Render3D: splat cloud fill ~%.3g px/frame (budget %.3g) - clamping splat "
+                    "radius by %.4fx to stay under it\n",
+                    estimatedFill, kFillBudget, fillClamp);
+         }
+      }
+      mLastSplatFillClamp = fillClamp;
+
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, gpu.tex);
+      glUniform1i(glGetUniformLocation(mSplatProgram, "uSplatTex"), 0);
+      glUniform1i(glGetUniformLocation(mSplatProgram, "uSplatTexWidth"), gpu.texWidth);
+      glUniformMatrix4fv(glGetUniformLocation(mSplatProgram, "uView"), 1, GL_FALSE, view.m);
+      glUniformMatrix4fv(glGetUniformLocation(mSplatProgram, "uProj"), 1, GL_FALSE, proj.m);
+      glUniformMatrix4fv(glGetUniformLocation(mSplatProgram, "uModel"), 1, GL_FALSE, model.m);
+      glUniform2f(glGetUniformLocation(mSplatProgram, "uViewport"), (float)w, (float)h);
+      glUniform1f(glGetUniformLocation(mSplatProgram, "uFillClamp"), fillClamp);
+
+      glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, gpu.uploadedIndexCount);
+      mLastDrawCalls++;
+      mLastTriangles += (size_t)gpu.uploadedIndexCount * 2;
+
+      glBindTexture(GL_TEXTURE_2D, 0);
+   };
+
    // Cloud slots always draw opaque (drawCloudSlot hardcodes uTransmission to
    // 0 - sorted alpha / refraction for overlapping sprites is its own piece
    // of work, left for later), so they're excluded from both the detection
@@ -2276,7 +2818,8 @@ void Render3DNode::CookIfNeeded(int frameId)
    for (int i = 0; i < kSlots; i++)
    {
       IGeometrySource* s = geometry[i];
-      if (s != nullptr && s->GetPointCloud() == nullptr && s->GetMaterial().transmission > 0.001f)
+      if (s != nullptr && s->GetSplatCloud() == nullptr && s->GetPointCloud() == nullptr &&
+          s->GetMaterial().transmission > 0.001f)
       {
          anyTransmissive = true;
          break;
@@ -2291,7 +2834,8 @@ void Render3DNode::CookIfNeeded(int frameId)
       // Transmissive slots are deferred to the pass below, which needs a
       // snapshot of everything opaque drawn first - sampling the buffer this
       // same draw is writing to would be a feedback loop.
-      if (s->GetPointCloud() == nullptr && anyTransmissive && s->GetMaterial().transmission > 0.001f)
+      if (s->GetSplatCloud() == nullptr && s->GetPointCloud() == nullptr && anyTransmissive &&
+          s->GetMaterial().transmission > 0.001f)
          continue;
       drawSlot(i);
    }
@@ -2334,6 +2878,57 @@ void Render3DNode::CookIfNeeded(int frameId)
          drawSlot(i);
       }
       glDepthMask(GL_TRUE);
+   }
+
+   // --- splat pass: depth test on, depth write OFF, back-to-front --------
+   // Splats are transparent Gaussians, not opaque triangles - they cannot be
+   // interleaved with the opaque pass above (see docs/plans/
+   // gaussian-splat-node.md S6, "the one real ordering constraint"). Drawn
+   // last, over everything opaque/transmissive, in their own two-pass
+   // GL state (additive-over blend, no depth write).
+   if (EnsureSplatShader())
+   {
+      bool anySplat = false;
+      for (int i = 0; i < kSlots; i++)
+      {
+         IGeometrySource* s = geometry[i];
+         if (s != nullptr && s->GetSplatCloud() != nullptr)
+         {
+            anySplat = true;
+            break;
+         }
+      }
+
+      if (anySplat)
+      {
+         glDepthMask(GL_FALSE);
+         glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA); // premultiplied-alpha over
+         glDisable(GL_CULL_FACE); // billboarded quads, winding is not meaningful here
+         glUseProgram(mSplatProgram);
+
+         // World-space camera forward, extracted from the view matrix's
+         // third row (see camRight/camUp above for the same trick on the
+         // other two rows) - used only to decide whether the camera moved
+         // enough to justify a fresh CPU sort.
+         const float camForward[3] = { -view.m[2], -view.m[6], -view.m[10] };
+
+         for (int i = 0; i < kSlots; i++)
+         {
+            IGeometrySource* source = geometry[i];
+            if (source == nullptr)
+               continue;
+            const SplatIO::SplatCloud* cloud = source->GetSplatCloud();
+            if (cloud == nullptr)
+               continue;
+            drawSplatSlot(i, source, cloud, camForward);
+         }
+
+         glUseProgram(mProgram);
+         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+         if (backfaceCull)
+            glEnable(GL_CULL_FACE);
+         glDepthMask(GL_TRUE);
+      }
    }
 
    glBindVertexArray(0);

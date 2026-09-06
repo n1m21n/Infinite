@@ -66,6 +66,16 @@ public:
       return input ? input->GetMappingTransform() : MappingTransform();
    }
    IGeometrySource* PassthroughSource() const override { return input; }
+   // Audio-driven displacement moves mesh vertices only - a splat cloud
+   // upstream has none, so it forwards untouched (see DisplacementNode).
+   const SplatIO::SplatCloud* GetSplatCloud() override
+   {
+      return input ? input->GetSplatCloud() : nullptr;
+   }
+   unsigned long long SplatCloudRevision() override
+   {
+      return input ? input->SplatCloudRevision() : 0;
+   }
    Mat4 GetInstanceGroupMatrix() const override
    {
       return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();

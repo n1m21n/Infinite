@@ -8,6 +8,12 @@
 #include "ImageCable.h"
 #include "GLUtil.h"
 #include "Mesh.h"
+#include "SplatIO.h"
+
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 
 // Surface properties handed to the renderer. A struct rather than a row of
 // out-params: this already carried five, and every material feature after this
@@ -205,6 +211,19 @@ public:
    virtual float PointBaseSize() const { return 1.0f; }
    virtual const Polyline* GetCurve() { return nullptr; }
    virtual unsigned long long CurveStamp() { return 0; }
+
+   // Gaussian splat cloud, alongside (or instead of) the mesh/point cloud
+   // above. nullptr by default, matching GetPointCloud()'s convention, so
+   // every existing IGeometrySource implementer is unaffected. Render3D
+   // gives a splat cloud precedence over a point cloud or mesh triangles
+   // when a source offers more than one (see drawSlot's precedence check).
+   // A passthrough wrapper MUST forward this and SplatCloudRevision() from
+   // its input, the same way it forwards GetPointCloud()/PointCloudRevision
+   // - skipping it makes a splat source vanish behind a Transform/Material/
+   // Mapping/etc node, the same passthrough-forwarding bug class that has
+   // already happened here for real (env-light cache invalidation).
+   virtual const SplatIO::SplatCloud* GetSplatCloud() { return nullptr; }
+   virtual unsigned long long SplatCloudRevision() { return 0; }
 };
 
 // --- Geometry -----------------------------------------------------------
@@ -552,9 +571,14 @@ private:
    bool EnsureShadowResources(int size);
    bool EnsureShadowShader();
    bool EnsureEnvBgShader();
+   bool EnsureSplatShader();
    void ReleaseGpuMesh(GpuMesh& gpu);
    void ReleaseTargets();
    void ReleaseShadowTargets();
+   // ReleaseGpuSplat is declared further below, after GpuSplat itself is
+   // defined - a nested type used as a parameter type isn't visible to an
+   // earlier member declaration in the same class, unlike names only used
+   // in a function body.
 
    // Everything the actual draw (shadow + opaque + transmissive passes)
    // depends on. When this is identical to the last cook, the previous
@@ -615,6 +639,11 @@ private:
       unsigned long long meshRev[kSlots] = { 0, 0, 0, 0 };
       unsigned long long cloudRev[kSlots] = { 0, 0, 0, 0 };
       unsigned long long curveRev[kSlots] = { 0, 0, 0, 0 };
+      // Splat cloud content stamp - kept as its own field for the same
+      // reason meshRev/cloudRev/curveRev are separate (see the comment
+      // above): folding it into an existing counter would silently break
+      // invalidation for any source that happens to alias two of them.
+      unsigned long long splatRev[kSlots] = { 0, 0, 0, 0 };
       unsigned long long surfaceTexRev[kSlots] = { 0, 0, 0, 0 };
       Material material[kSlots];
       Mat4 modelMatrix[kSlots];
@@ -641,6 +670,7 @@ private:
          {
             if (hasGeom[i] != o.hasGeom[i] || meshRev[i] != o.meshRev[i] ||
                 cloudRev[i] != o.cloudRev[i] || curveRev[i] != o.curveRev[i] ||
+                splatRev[i] != o.splatRev[i] ||
                 surfaceTexRev[i] != o.surfaceTexRev[i] || instanceRev[i] != o.instanceRev[i] ||
                 instanceCount[i] != o.instanceCount[i])
                return false;
@@ -695,7 +725,83 @@ private:
    unsigned int mShadowTex = 0;
    int mShadowSize = 0;
    Mat4 mLightViewProj;
+   // Background depth-sort worker for one splat slot. GL 3.3 core has no
+   // compute shader / SSBO / GPU sort available (see docs/plans/
+   // gaussian-splat-node.md S0), so the back-to-front order is produced on
+   // the CPU, off the render thread, and the render thread never blocks on
+   // it: it uploads whatever order is newest-complete and simply keeps
+   // drawing the previous order while a sort is still in flight. One
+   // persistent thread per slot (up to kSlots of them), started once and
+   // parked on a condition variable between jobs - not spun up per sort.
+   class SplatSorter
+   {
+   public:
+      SplatSorter();
+      ~SplatSorter();
+      SplatSorter(const SplatSorter&) = delete;
+      SplatSorter& operator=(const SplatSorter&) = delete;
+
+      // Copies the splats' positions (cheap relative to a full sort) and
+      // hands the job to the worker thread. Non-blocking. A job already in
+      // flight is superseded - the worker only ever finishes the most
+      // recently requested one.
+      void RequestSort(const SplatIO::SplatCloud* cloud, const Mat4& modelView);
+      // Non-blocking poll: true (and outIndices filled) only when a NEW
+      // completed order is ready since the last call. False leaves
+      // outIndices untouched, meaning "keep drawing whatever you already
+      // uploaded".
+      bool TakeCompletedOrder(std::vector<unsigned int>& outIndices);
+
+   private:
+      void ThreadMain();
+
+      std::thread mThread;
+      std::mutex mMutex;
+      std::condition_variable mCv;
+      bool mStop = false;
+      bool mHasJob = false;
+      bool mResultReady = false;
+      std::vector<float> mPendingPositions; // xyz per splat
+      Mat4 mPendingModelView;
+      std::vector<unsigned int> mResult;
+   };
+
+   // Per-slot GPU state for a splat cloud, entirely separate from GpuMesh:
+   // a splat cloud draws instanced screen-facing quads from a static data
+   // texture plus a per-frame index buffer, never triangles/VAO-attribute
+   // layout a mesh uses. See docs/plans/gaussian-splat-node.md S6 for the
+   // GPU layout this mirrors (2048-wide GL_RGBA32F, 4 texels/splat).
+   struct GpuSplat
+   {
+      unsigned int vao = 0;
+      unsigned int quadVbo = 0;     // static unit-quad corners, 4 verts
+      unsigned int indexVbo = 0;    // GL_R32UI, divisor 1, re-uploaded per sort
+      unsigned int tex = 0;         // GL_RGBA32F splat data texture
+      int texWidth = 0, texHeight = 0;
+      unsigned long long texRevision = 0; // SplatCloudRevision() baked into `tex`
+      const void* source = nullptr;
+      int splatCount = 0;
+      int uploadedIndexCount = 0;
+      // Average per-splat world-space radius (sqrt of the covariance
+      // trace/3), computed once when the texture is rebuilt - used only for
+      // the VRAM/fill-rate budget estimate, mirroring the point-cloud sprite
+      // guard; never read by the shader.
+      float avgWorldRadius = 0.0f;
+      bool hasSorted = false;
+      float lastSortFwd[3] = { 0.0f, 0.0f, 1.0f };
+      float lastSortEye[3] = { 0.0f, 0.0f, 0.0f };
+      SplatSorter sorter;
+   };
+
+   void ReleaseGpuSplat(GpuSplat& gpu);
+
    GpuMesh mGpu[kSlots];
+   GpuSplat mGpuSplat[kSlots];
+   unsigned int mSplatProgram = 0;
+   bool mSplatShaderTried = false;
+   // Last fill-rate clamp factor reported for the splat pass, gated the same
+   // way mLastFillClamp is (only print when it actually moves).
+   float mLastSplatFillClamp = 1.0f;
    int mLastCookFrame = -1;
    // Last sprite-fill clamp factor this node reported (1 = not clamping).
    // The clamp is evaluated on every instance-buffer rebuild, which for an

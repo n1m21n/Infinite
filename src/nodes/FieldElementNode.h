@@ -161,6 +161,14 @@ public:
    float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; }
    const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
    unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
+   // Field element processing does not touch splats (see docs/plans/
+   // gaussian-splat-node.md S8 - a per-frame element-domain EWA kernel would
+   // be a deoptimization vs. the dedicated GPU path, and the sort isn't
+   // expressible there). This is pure passthrough, same as GetPointCloud/
+   // GetCurve above: a splat cloud upstream of a Field node it isn't wired
+   // into must still reach Render3D rather than vanishing.
+   const SplatIO::SplatCloud* GetSplatCloud() override { return input ? input->GetSplatCloud() : nullptr; }
+   unsigned long long SplatCloudRevision() override { return input ? input->SplatCloudRevision() : 0; }
 
    // Field compilation & UI
    bool Apply();

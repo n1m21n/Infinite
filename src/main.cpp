@@ -71,6 +71,7 @@ namespace
 #include <deque>
 #include <set>
 #include <memory>
+#include <random>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -59003,6 +59004,388 @@ int main(int argc, char** argv)
             if (!StartAudioEngine(audioRestartError))
                fprintf(stderr, "audio device: %s\n", audioRestartError.c_str());
          }
+      }
+
+      // Phase 2 Gaussian Splat render exit criterion #1 (docs/plans/
+      // gaussian-splat-node.md / gaussian-splat-prompt.md): a hardcoded
+      // 3-splat cloud - one wide+flat, one tall+thin, one rotated 45 deg -
+      // must render as three correctly oriented, correctly sized ellipses.
+      // Verified with a real glGetTexImage pixel readback, not just a
+      // revision-counter check: each splat is given a unique, saturated,
+      // otherwise-unused color so its footprint can be picked out of the
+      // framebuffer by color match alone, then the footprint's own pixel
+      // coordinates (not an assumed screen mapping) are used to measure its
+      // width/height and, for the rotated one, its covariance - so the test
+      // is checking the actual rendered shape, not just "something drew".
+      if (getenv("INFINITE_SPLATRENDERTEST") != nullptr && frameId == 6)
+      {
+         struct TestSplatSource : public IGeometrySource
+         {
+            SplatIO::SplatCloud cloud;
+            const Mesh& GetMesh() override { static Mesh empty; return empty; }
+            unsigned long long MeshRevision() override { return 0; }
+            Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+            Material GetMaterial() const override { return Material(); }
+            const SplatIO::SplatCloud* GetSplatCloud() override { return &cloud; }
+            unsigned long long SplatCloudRevision() override { return 1; }
+         };
+
+         TestSplatSource source;
+         source.cloud.splats.resize(3);
+
+         // Wide+flat: large variance along world X, tiny along Y/Z. At this
+         // camera (looking down -Z, +X world = screen right, +Y world =
+         // screen up - see the LookAt derivation this mirrors) this should
+         // project as an ellipse elongated horizontally.
+         SplatIO::Splat& wide = source.cloud.splats[0];
+         wide.px = -2.0f; wide.py = 0.0f; wide.pz = 0.0f;
+         wide.cov[0] = 1.0f; wide.cov[1] = 0.0f; wide.cov[2] = 0.0f;
+         wide.cov[3] = 0.02f; wide.cov[4] = 0.0f; wide.cov[5] = 0.02f;
+         wide.r = 1.0f; wide.g = 0.0f; wide.b = 0.0f; wide.a = 1.0f;
+
+         // Tall+thin: the transpose case - large variance along Y, tiny
+         // along X/Z - should project elongated vertically.
+         SplatIO::Splat& tall = source.cloud.splats[1];
+         tall.px = 0.0f; tall.py = 0.0f; tall.pz = 0.0f;
+         tall.cov[0] = 0.02f; tall.cov[1] = 0.0f; tall.cov[2] = 0.0f;
+         tall.cov[3] = 1.0f; tall.cov[4] = 0.0f; tall.cov[5] = 0.02f;
+         tall.r = 0.0f; tall.g = 1.0f; tall.b = 0.0f; tall.a = 1.0f;
+
+         // Rotated 45 deg: diag(1.0, 0.02) rotated 45 deg about Z gives
+         // xx=yy=0.51, xy=0.49 (see R*diag*R^T at theta=45: xx'=yy'=(a+b)/2,
+         // xy'=(a-b)/2) - an ellipse elongated along the +x/+y diagonal, with
+         // no elongation left along the pure X or Y axis.
+         SplatIO::Splat& rot45 = source.cloud.splats[2];
+         rot45.px = 2.0f; rot45.py = 0.0f; rot45.pz = 0.0f;
+         rot45.cov[0] = 0.51f; rot45.cov[1] = 0.49f; rot45.cov[2] = 0.0f;
+         rot45.cov[3] = 0.51f; rot45.cov[4] = 0.0f; rot45.cov[5] = 0.02f;
+         rot45.r = 0.0f; rot45.g = 0.0f; rot45.b = 1.0f; rot45.a = 1.0f;
+
+         Render3DNode render;
+         render.geometry[0] = &source;
+         render.width = 256.0f;
+         render.height = 256.0f;
+         render.samples = 0; // no MSAA - simplifies the readback below
+         render.camAzimuth = 90.0f;   // eye on +Z looking down -Z, +X world = screen right
+         render.camElevation = 0.0f;
+         render.camDistance = 8.0f;
+         render.fov = 50.0f;
+         render.targetX = 0.0f; render.targetY = 0.0f; render.targetZ = 0.0f;
+
+         render.CookIfNeeded(50000);
+
+         const int texW = 256, texH = 256;
+         std::vector<unsigned char> pixels((size_t)texW * texH * 4, 0);
+         glBindTexture(GL_TEXTURE_2D, render.GetOutputTexture());
+         glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+         glBindTexture(GL_TEXTURE_2D, 0);
+
+         // Pick out every pixel where one channel clearly dominates the
+         // other two (the splat's own color, alpha-blended over the dark
+         // bgColor clear) - collects that splat's on-screen footprint
+         // without assuming any particular projection math.
+         auto collectFootprint = [&](int channel) {
+            std::vector<std::pair<int,int>> pts;
+            for (int y = 0; y < texH; y++)
+            {
+               for (int x = 0; x < texW; x++)
+               {
+                  const unsigned char* p = &pixels[((size_t)y * texW + x) * 4];
+                  const int c = p[channel];
+                  const int o1 = p[(channel + 1) % 3];
+                  const int o2 = p[(channel + 2) % 3];
+                  if (c > 40 && c > o1 * 2 && c > o2 * 2)
+                     pts.push_back({ x, y });
+               }
+            }
+            return pts;
+         };
+
+         auto extent = [](const std::vector<std::pair<int,int>>& pts, float& outW, float& outH,
+                          float& outCovXY, float& outCovXX, float& outCovYY) {
+            if (pts.empty()) { outW = outH = outCovXY = outCovXX = outCovYY = 0.0f; return; }
+            double sx = 0, sy = 0;
+            int minX = 1 << 30, maxX = -(1 << 30), minY = 1 << 30, maxY = -(1 << 30);
+            for (auto& p : pts)
+            {
+               sx += p.first; sy += p.second;
+               minX = std::min(minX, p.first); maxX = std::max(maxX, p.first);
+               minY = std::min(minY, p.second); maxY = std::max(maxY, p.second);
+            }
+            const double cx = sx / pts.size(), cy = sy / pts.size();
+            double cxx = 0, cyy = 0, cxy = 0;
+            for (auto& p : pts)
+            {
+               const double dx = p.first - cx, dy = p.second - cy;
+               cxx += dx * dx; cyy += dy * dy; cxy += dx * dy;
+            }
+            cxx /= pts.size(); cyy /= pts.size(); cxy /= pts.size();
+            outW = (float)(maxX - minX);
+            outH = (float)(maxY - minY);
+            outCovXX = (float)cxx; outCovYY = (float)cyy; outCovXY = (float)cxy;
+         };
+
+         const auto redPts = collectFootprint(0);
+         const auto greenPts = collectFootprint(1);
+         const auto bluePts = collectFootprint(2);
+
+         float redW, redH, redCxy, redCxx, redCyy;
+         float greenW, greenH, greenCxy, greenCxx, greenCyy;
+         float blueW, blueH, blueCxy, blueCxx, blueCyy;
+         extent(redPts, redW, redH, redCxy, redCxx, redCyy);
+         extent(greenPts, greenW, greenH, greenCxy, greenCxx, greenCyy);
+         extent(bluePts, blueW, blueH, blueCxy, blueCxx, blueCyy);
+
+         const bool redFound = redPts.size() > 20;
+         const bool greenFound = greenPts.size() > 20;
+         const bool blueFound = bluePts.size() > 20;
+         // "Wide+flat" -> footprint noticeably wider than tall (allow some
+         // slack for the shader's dilation term and discard threshold).
+         const bool redShape = redFound && redW > redH * 1.5f;
+         // "Tall+thin" -> the transpose.
+         const bool greenShape = greenFound && greenH > greenW * 1.5f;
+         // "Rotated 45" -> comparable width/height (not axis-elongated) but
+         // a strong positive xy covariance, i.e. the pixel cloud actually
+         // leans along the diagonal rather than sitting axis-aligned.
+         const bool blueShape = blueFound && std::fabs(blueW - blueH) < std::max(blueW, blueH) * 0.5f &&
+                                blueCxy > 0.3f * std::sqrt(std::max(1.0f, blueCxx * blueCyy));
+
+         printf("  [%s] %-32s (found=%d w=%.1f h=%.1f)\n", redFound ? "pass" : "FAIL",
+                "SplatRender(wide+flat found)", (int)redFound, redW, redH);
+         printf("  [%s] %-32s\n", redShape ? "pass" : "FAIL", "SplatRender(wide+flat is wider than tall)");
+         printf("  [%s] %-32s (found=%d w=%.1f h=%.1f)\n", greenFound ? "pass" : "FAIL",
+                "SplatRender(tall+thin found)", (int)greenFound, greenW, greenH);
+         printf("  [%s] %-32s\n", greenShape ? "pass" : "FAIL", "SplatRender(tall+thin is taller than wide)");
+         printf("  [%s] %-32s (found=%d w=%.1f h=%.1f cxy=%.1f)\n", blueFound ? "pass" : "FAIL",
+                "SplatRender(rotated45 found)", (int)blueFound, blueW, blueH, blueCxy);
+         printf("  [%s] %-32s\n", blueShape ? "pass" : "FAIL", "SplatRender(rotated45 leans on diagonal)");
+         const bool allOk = redFound && greenFound && blueFound && redShape && greenShape && blueShape;
+         printf("%s\n", allOk ? "SPLAT RENDER TEST OK" : "SPLAT RENDER TEST FAIL");
+      }
+
+      // Exit criterion #2 for the splat-render phase: a large(r) synthetic
+      // cloud renders recognizably, back-to-front blending picks the correct
+      // front color as the camera orbits, and a full smooth orbit never
+      // produces a blank/crashed frame (a crude but real proxy for
+      // "no popping"). Two overlapping jittered blobs (red centered at
+      // +X, blue at -X) are used instead of a bundled .ply fixture - no
+      // sample .ply ships in this repo, and SplatIO::LoadSplatPly (Phase 1,
+      // already tested) is exercised on its own by INFINITE_SPLATIOTEST, so
+      // re-driving the parser here would not add coverage this test needs.
+      //
+      // The offset axis (world X) is chosen so that at camAzimuth=0 (eye on
+      // +X, looking down -X) and camAzimuth=180 (eye on -X) the two blobs
+      // are laterally aligned (offset is along the view axis) and so
+      // maximally overlap on screen while also being maximally separated in
+      // depth - exactly the configuration that makes the front/back choice
+      // both meaningful and checkable. At az=0 red (+X) is nearer the eye;
+      // at az=180 blue (-X) is nearer.
+      if (getenv("INFINITE_SPLATORBITTEST") != nullptr && frameId == 6)
+      {
+         struct TestSplatSource : public IGeometrySource
+         {
+            SplatIO::SplatCloud cloud;
+            const Mesh& GetMesh() override { static Mesh empty; return empty; }
+            unsigned long long MeshRevision() override { return 0; }
+            Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+            Material GetMaterial() const override { return Material(); }
+            const SplatIO::SplatCloud* GetSplatCloud() override { return &cloud; }
+            unsigned long long SplatCloudRevision() override { return 1; }
+         };
+
+         TestSplatSource source;
+         const int kPerBlob = 700;
+         source.cloud.splats.resize(kPerBlob * 2);
+
+         std::mt19937 rng(12345);
+         std::uniform_real_distribution<float> jitter(-0.15f, 0.15f);
+         auto fillBlob = [&](int startIdx, float cx, float r, float g, float b) {
+            for (int i = 0; i < kPerBlob; i++)
+            {
+               SplatIO::Splat& s = source.cloud.splats[startIdx + i];
+               s.px = cx + jitter(rng);
+               s.py = jitter(rng);
+               s.pz = jitter(rng);
+               s.cov[0] = 0.02f; s.cov[1] = 0.0f; s.cov[2] = 0.0f;
+               s.cov[3] = 0.02f; s.cov[4] = 0.0f; s.cov[5] = 0.02f;
+               s.r = r; s.g = g; s.b = b; s.a = 0.9f;
+            }
+         };
+         fillBlob(0, 0.35f, 1.0f, 0.0f, 0.0f);         // red, +X (front at az=0)
+         fillBlob(kPerBlob, -0.35f, 0.0f, 0.0f, 1.0f); // blue, -X (front at az=180)
+
+         Render3DNode render;
+         render.geometry[0] = &source;
+         render.width = 256.0f;
+         render.height = 256.0f;
+         render.samples = 0;
+         render.camElevation = 0.0f;
+         render.camDistance = 6.0f;
+         render.fov = 50.0f;
+         render.targetX = 0.0f; render.targetY = 0.0f; render.targetZ = 0.0f;
+
+         const int texW = 256, texH = 256;
+         std::vector<unsigned char> pixels((size_t)texW * texH * 4, 0);
+         int frame = 60000;
+
+         auto countColors = [&](int& redCount, int& blueCount, bool centralOnly) {
+            redCount = 0; blueCount = 0;
+            const int lo = centralOnly ? texW / 2 - 40 : 0;
+            const int hi = centralOnly ? texW / 2 + 40 : texW;
+            for (int y = lo; y < hi; y++)
+            {
+               for (int x = lo; x < hi; x++)
+               {
+                  const unsigned char* p = &pixels[((size_t)y * texW + x) * 4];
+                  if (p[0] > 40 && p[0] > p[2] * 2) redCount++;
+                  else if (p[2] > 40 && p[2] > p[0] * 2) blueCount++;
+               }
+            }
+         };
+
+         auto renderAt = [&](float azimuth) {
+            render.camAzimuth = azimuth;
+            render.CookIfNeeded(frame++);
+            glBindTexture(GL_TEXTURE_2D, render.GetOutputTexture());
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+            glBindTexture(GL_TEXTURE_2D, 0);
+         };
+
+         // Approach each checked azimuth via two close-by steps first (with a
+         // short sleep after each) so the background sorter's async result
+         // has real wall-clock time to complete for a very similar camera
+         // position before the pixel readback that's actually checked - the
+         // render thread itself never blocks on this, same as production.
+         auto settleAndRead = [&](float azimuth, int& redCount, int& blueCount, bool centralOnly) {
+            renderAt(azimuth - 2.0f);
+            std::this_thread::sleep_for(std::chrono::milliseconds(15));
+            renderAt(azimuth - 1.0f);
+            std::this_thread::sleep_for(std::chrono::milliseconds(15));
+            renderAt(azimuth);
+            countColors(redCount, blueCount, centralOnly);
+         };
+
+         int redAt0, blueAt0, redAt180, blueAt180;
+         settleAndRead(0.0f, redAt0, blueAt0, /*centralOnly=*/true);
+         settleAndRead(180.0f, redAt180, blueAt180, /*centralOnly=*/true);
+
+         const bool frontAt0Ok = redAt0 > blueAt0 && redAt0 > 20;
+         const bool frontAt180Ok = blueAt180 > redAt180 && blueAt180 > 20;
+
+         printf("  [%s] %-40s (red=%d blue=%d)\n", frontAt0Ok ? "pass" : "FAIL",
+                "SplatOrbit(az=0 red-front dominates overlap)", redAt0, blueAt0);
+         printf("  [%s] %-40s (red=%d blue=%d)\n", frontAt180Ok ? "pass" : "FAIL",
+                "SplatOrbit(az=180 blue-front dominates overlap)", redAt180, blueAt180);
+
+         // Full smooth orbit, 36 steps of 10 degrees - crude but real
+         // "no popping" proxy: every single step must still produce a
+         // populated, sane frame (neither blank nor over-saturated), with no
+         // crash and no exception across a full 360-degree sweep.
+         bool orbitOk = true;
+         int minTotal = 1 << 30, maxTotal = 0;
+         for (int step = 0; step < 36; step++)
+         {
+            renderAt((float)step * 10.0f);
+            std::this_thread::sleep_for(std::chrono::milliseconds(8));
+            int r, b;
+            countColors(r, b, /*centralOnly=*/false);
+            const int total = r + b;
+            minTotal = std::min(minTotal, total);
+            maxTotal = std::max(maxTotal, total);
+            if (total < 20 || total > texW * texH - 100)
+               orbitOk = false;
+         }
+         printf("  [%s] %-40s (minTotal=%d maxTotal=%d)\n", orbitOk ? "pass" : "FAIL",
+                "SplatOrbit(36-step orbit stays populated & sane)", minTotal, maxTotal);
+
+         const bool allOk = frontAt0Ok && frontAt180Ok && orbitOk;
+         printf("%s\n", allOk ? "SPLAT ORBIT TEST OK" : "SPLAT ORBIT TEST FAIL");
+      }
+
+      // Exit criterion #4: frame time with a static camera is unchanged from
+      // an empty scene. Render3DNode::CookIfNeeded's SceneSignature
+      // early-return (BuildSceneSignature() compares to the last cook and
+      // returns immediately when nothing that could affect pixels changed -
+      // see Geometry3DNodes.cpp) is what's supposed to make this true "for
+      // free" once splatRev[i] is folded into the signature: a static camera
+      // over a splat cloud should cost the same per-frame as a static camera
+      // over nothing at all, because neither one re-enters the draw/sort/
+      // upload path after the first cook. This is measured directly with
+      // wall-clock timing, not asserted - the whole point is to catch a
+      // regression where the early-return is accidentally bypassed (e.g. a
+      // per-frame poll of the splat sorter that isn't actually gated by it).
+      if (getenv("INFINITE_SPLATCACHETEST") != nullptr && frameId == 6)
+      {
+         struct TestSplatSource : public IGeometrySource
+         {
+            SplatIO::SplatCloud cloud;
+            const Mesh& GetMesh() override { static Mesh empty; return empty; }
+            unsigned long long MeshRevision() override { return 0; }
+            Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+            Material GetMaterial() const override { return Material(); }
+            const SplatIO::SplatCloud* GetSplatCloud() override { return &cloud; }
+            unsigned long long SplatCloudRevision() override { return 1; }
+         };
+
+         TestSplatSource source;
+         const int kCount = 20000;
+         source.cloud.splats.resize(kCount);
+         std::mt19937 rng(999);
+         std::uniform_real_distribution<float> pos(-2.0f, 2.0f);
+         for (int i = 0; i < kCount; i++)
+         {
+            SplatIO::Splat& s = source.cloud.splats[i];
+            s.px = pos(rng); s.py = pos(rng); s.pz = pos(rng);
+            s.cov[0] = 0.02f; s.cov[1] = 0.0f; s.cov[2] = 0.0f;
+            s.cov[3] = 0.02f; s.cov[4] = 0.0f; s.cov[5] = 0.02f;
+            s.r = 1.0f; s.g = 1.0f; s.b = 1.0f; s.a = 0.8f;
+         }
+
+         auto configureCamera = [](Render3DNode& r) {
+            r.width = 256.0f; r.height = 256.0f; r.samples = 0;
+            r.camAzimuth = 45.0f; r.camElevation = 20.0f; r.camDistance = 6.0f;
+            r.fov = 50.0f;
+            r.targetX = 0.0f; r.targetY = 0.0f; r.targetZ = 0.0f;
+         };
+
+         Render3DNode emptyRender;
+         configureCamera(emptyRender);
+         Render3DNode splatRender;
+         configureCamera(splatRender);
+         splatRender.geometry[0] = &source;
+
+         int frame = 70000;
+         // Warm-up cooks: real work happens here (shader compile, texture
+         // upload, first sort request) for both, so it's excluded from the
+         // timed loop below - what's timed is only the steady-state,
+         // nothing-changed cost.
+         emptyRender.CookIfNeeded(frame);
+         splatRender.CookIfNeeded(frame);
+         frame++;
+         std::this_thread::sleep_for(std::chrono::milliseconds(50)); // let the first splat sort finish
+
+         const int kIters = 300;
+         const auto t0 = std::chrono::high_resolution_clock::now();
+         for (int i = 0; i < kIters; i++)
+            emptyRender.CookIfNeeded(frame++);
+         const auto t1 = std::chrono::high_resolution_clock::now();
+         for (int i = 0; i < kIters; i++)
+            splatRender.CookIfNeeded(frame++);
+         const auto t2 = std::chrono::high_resolution_clock::now();
+
+         const double emptyMs = std::chrono::duration<double, std::milli>(t1 - t0).count() / kIters;
+         const double splatMs = std::chrono::duration<double, std::milli>(t2 - t1).count() / kIters;
+         const double deltaMs = splatMs - emptyMs;
+
+         // Generous absolute threshold (0.25ms/call) - this is checking that
+         // the early-return path was actually taken (sub-microsecond
+         // per-call cost expected on any real machine), not trying to be a
+         // tight perf regression gate.
+         const bool ok = deltaMs < 0.25;
+         printf("  [%s] %-40s (empty=%.4fms splat(%d)=%.4fms delta=%.4fms)\n",
+                ok ? "pass" : "FAIL", "SplatCache(static-camera cost matches empty scene)",
+                emptyMs, kCount, splatMs, deltaMs);
+         printf("%s\n", ok ? "SPLAT CACHE TEST OK" : "SPLAT CACHE TEST FAIL");
       }
 
       // A different bug class from RENDER3DLIVETEST above: not a live-updating

@@ -84,6 +84,16 @@ public:
       return input ? input->GetMappingTransform() : MappingTransform();
    }
    IGeometrySource* PassthroughSource() const override { return input; }
+   // MeshResynth mutates mesh vertices only - a splat cloud upstream has
+   // nothing to mutate, so it forwards untouched.
+   const SplatIO::SplatCloud* GetSplatCloud() override
+   {
+      return input ? input->GetSplatCloud() : nullptr;
+   }
+   unsigned long long SplatCloudRevision() override
+   {
+      return input ? input->SplatCloudRevision() : 0;
+   }
    Mat4 GetInstanceGroupMatrix() const override
    {
       return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
