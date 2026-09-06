@@ -34,7 +34,17 @@ public:
    // cancels any playback already looping for this param, so re-shift-
    // dragging a param that's currently replaying re-records it instead of
    // fighting the old loop.
-   void NotifyMovement(int nodeIndex, int paramIndex, float value, double nowSec);
+   //
+   // `isNewGrab` marks the first sample of a fresh grab (the caller's own
+   // ImGui::IsItemActivated() this frame) as opposed to a sample mid an
+   // already-active drag. A shift-held session that is one continuous drag
+   // never sets this past its very first sample, and plays back as smooth
+   // interpolation like before. A session built from several separate
+   // grabs - shift-click a value, release, shift-click another, release,
+   // i.e. "checkpoints" - sets it on each grab's first sample, and
+   // GetPlaybackValue then holds each checkpoint's value and jumps straight
+   // to the next rather than sliding between them.
+   void NotifyMovement(int nodeIndex, int paramIndex, float value, double nowSec, bool isNewGrab = false);
 
    // Whether this param should render its "recording" (red) visual state
    // right now - true for the rest of the session once touched (per the
@@ -57,6 +67,10 @@ private:
    {
       float value;
       double timeSec;
+      // True for the first sample of a fresh grab within a session - see
+      // NotifyMovement's isNewGrab comment. Drives the hold-then-jump
+      // playback shape in GetPlaybackValue.
+      bool startsNewGrab = false;
    };
 
    struct Playback

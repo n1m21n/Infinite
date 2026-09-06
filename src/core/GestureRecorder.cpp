@@ -27,12 +27,12 @@ void GestureRecorder::BeginFrame(bool shiftHeld, double nowSec)
    }
 }
 
-void GestureRecorder::NotifyMovement(int nodeIndex, int paramIndex, float value, double nowSec)
+void GestureRecorder::NotifyMovement(int nodeIndex, int paramIndex, float value, double nowSec, bool isNewGrab)
 {
    if (!mShiftHeld)
       return; // shouldn't happen (callers already gate on Shift) - defensive only
    const Key key(nodeIndex, paramIndex);
-   mSession[key].push_back({ value, nowSec });
+   mSession[key].push_back({ value, nowSec, isNewGrab });
    mPlayback.erase(key); // re-recording replaces whatever was looping before
 }
 
@@ -72,9 +72,21 @@ bool GestureRecorder::GetPlaybackValue(int nodeIndex, int paramIndex, double now
    {
       if (target <= s[i].timeSec)
       {
-         const double span = s[i].timeSec - s[i - 1].timeSec;
-         const double frac = (span > 0.0) ? (target - s[i - 1].timeSec) / span : 0.0;
-         outValue = s[i - 1].value + (float)frac * (s[i].value - s[i - 1].value);
+         if (s[i].startsNewGrab)
+         {
+            // Checkpoint pattern: this sample began a fresh grab, separate
+            // from the drag that produced s[i-1] - so the gap between them
+            // is a released hand, not a movement to replay smoothly. Hold
+            // the previous checkpoint's value right up to this one, then
+            // jump, instead of sliding between the two.
+            outValue = s[i - 1].value;
+         }
+         else
+         {
+            const double span = s[i].timeSec - s[i - 1].timeSec;
+            const double frac = (span > 0.0) ? (target - s[i - 1].timeSec) / span : 0.0;
+            outValue = s[i - 1].value + (float)frac * (s[i].value - s[i - 1].value);
+         }
          return true;
       }
    }

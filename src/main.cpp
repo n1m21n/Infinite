@@ -2544,6 +2544,10 @@ namespace
                   {
                      *value = std::clamp(parsed, std::min(minV, maxV), std::max(minV, maxV));
                      changed = true;
+                     // Typing a literal value is a static override - it should
+                     // win outright, not sit underneath a gesture loop that
+                     // would just overwrite it again next frame.
+                     GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
                   }
                }
             }
@@ -2668,13 +2672,14 @@ namespace
             if (recording)
                ImGui::PopStyleColor(5);
          }
-         if (ImGui::IsItemActivated())
+         const bool justActivated = ImGui::IsItemActivated();
+         if (justActivated)
          {
             PushUndoCheckpoint();
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
          }
          if (ImGui::IsItemActive() && ImGui::GetIO().KeyShift)
-            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, ImGui::GetTime());
+            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, ImGui::GetTime(), /*isNewGrab=*/justActivated);
          const bool hovered = ImGui::IsItemHovered();
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
@@ -2715,13 +2720,14 @@ namespace
          }
          // Activation is the first frame of the drag, before that frame's own
          // delta is applied, so this is still the pre-drag value.
-         if (ImGui::IsItemActivated())
+         const bool justActivated = ImGui::IsItemActivated();
+         if (justActivated)
          {
             PushUndoCheckpoint();
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
          }
          if (ImGui::IsItemActive() && ImGui::GetIO().KeyShift)
-            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, ImGui::GetTime());
+            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, ImGui::GetTime(), /*isNewGrab=*/justActivated);
          if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/false);
          // Right-click also jumps straight into the text field, same as
@@ -2838,7 +2844,8 @@ namespace
       const bool hovered = ImGui::IsItemHovered();
       const bool active = !readOnly && ImGui::IsItemActive();
       bool changed = false;
-      if (gestureNodeIndex >= 0 && ImGui::IsItemActivated())
+      const bool gestureJustActivated = ImGui::IsItemActivated();
+      if (gestureNodeIndex >= 0 && gestureJustActivated)
          GestureRecorder::Instance().StopPlayback(gestureNodeIndex, gestureParamIndex);
       if (active && ImGui::GetIO().MouseDelta.y != 0.0f)
       {
@@ -2861,7 +2868,7 @@ namespace
          }
       }
       if (active && gestureNodeIndex >= 0 && ImGui::GetIO().KeyShift)
-         GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, ImGui::GetTime());
+         GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, ImGui::GetTime(), /*isNewGrab=*/gestureJustActivated);
       if (gestureNodeIndex >= 0 && GestureRecorder::Instance().IsRecording(gestureNodeIndex, gestureParamIndex))
          fillColor = IM_COL32(235, 70, 70, 255);
 
@@ -3171,7 +3178,8 @@ namespace
       const bool hovered = ImGui::IsItemHovered();
       const bool active = !readOnly && ImGui::IsItemActive();
       bool changed = false;
-      if (gestureNodeIndex >= 0 && ImGui::IsItemActivated())
+      const bool gestureJustActivated = ImGui::IsItemActivated();
+      if (gestureNodeIndex >= 0 && gestureJustActivated)
          GestureRecorder::Instance().StopPlayback(gestureNodeIndex, gestureParamIndex);
 
       // Double-click resets to center
@@ -3197,7 +3205,7 @@ namespace
          }
       }
       if (active && gestureNodeIndex >= 0 && ImGui::GetIO().KeyShift)
-         GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, ImGui::GetTime());
+         GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, ImGui::GetTime(), /*isNewGrab=*/gestureJustActivated);
       if (gestureNodeIndex >= 0 && GestureRecorder::Instance().IsRecording(gestureNodeIndex, gestureParamIndex))
          fillColor = IM_COL32(235, 70, 70, 255);
 
@@ -3495,6 +3503,10 @@ namespace
                   {
                      *value = std::clamp(parsed, std::min(minV, maxV), std::max(minV, maxV));
                      changed = true;
+                     // Typing a literal value is a static override - it should
+                     // win outright, not sit underneath a gesture loop that
+                     // would just overwrite it again next frame.
+                     GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
                   }
                }
             }
@@ -3552,13 +3564,14 @@ namespace
       {
          changed = DrawWidget(value, recording ? IM_COL32(235, 70, 70, 255) : IM_COL32(120, 200, 255, 235),
                               /*readOnly=*/false, /*hasRange=*/false, 0.0f, 0.0f, /*activeTint=*/recording);
-         if (ImGui::IsItemActivated())
+         const bool justActivated = ImGui::IsItemActivated();
+         if (justActivated)
          {
             PushUndoCheckpoint();
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
          }
          if (ImGui::IsItemActive() && ImGui::GetIO().KeyShift)
-            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, ImGui::GetTime());
+            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, ImGui::GetTime(), /*isNewGrab=*/justActivated);
          const bool hovered = ImGui::IsItemHovered();
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/false);
