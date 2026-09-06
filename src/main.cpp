@@ -2653,13 +2653,20 @@ namespace
          {
             if (recording)
             {
+               // Hovered/Active too, not just the base FrameBg - leaving
+               // those two on the theme default meant hovering (let alone
+               // dragging) a recording slider flashed back to the ordinary
+               // blue/grey the instant the mouse was over it.
                ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.34f, 0.10f, 0.10f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.40f, 0.12f, 0.12f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.46f, 0.14f, 0.14f, 1.0f));
                ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
             }
             ImGui::SetNextItemWidth(width - box - 4.0f);
             changed = ImGui::SliderFloat(label, value, minV, maxV, fmt);
             if (recording)
-               ImGui::PopStyleColor(2);
+               ImGui::PopStyleColor(5);
          }
          if (ImGui::IsItemActivated())
          {
@@ -2691,13 +2698,20 @@ namespace
          {
             if (recording)
             {
+               // Hovered/Active too, not just the base FrameBg - leaving
+               // those two on the theme default meant hovering (let alone
+               // dragging) a recording slider flashed back to the ordinary
+               // blue/grey the instant the mouse was over it.
                ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.34f, 0.10f, 0.10f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.40f, 0.12f, 0.12f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.46f, 0.14f, 0.14f, 1.0f));
                ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
             }
             ImGui::SetNextItemWidth(width - box - 4.0f);
             changed = ImGui::SliderFloat(label, value, minV, maxV, fmt);
             if (recording)
-               ImGui::PopStyleColor(2);
+               ImGui::PopStyleColor(5);
          }
          // Activation is the first frame of the drag, before that frame's own
          // delta is applied, so this is still the pre-drag value.
@@ -2832,7 +2846,11 @@ namespace
          // knob: a fader that doesn't track the cap under the cursor reads as
          // spongy, because the eye can compare the cap to the cursor in the
          // same visual axis.
-         const float speed = ImGui::GetIO().KeyShift ? 0.2f : 1.0f;
+         // Shift used to slow the drag down for precision; it now triggers
+         // gesture recording instead (see GestureRecorder), and the two
+         // fought each other - holding Shift to record made the drag feel
+         // stuck. Always full speed.
+         const float speed = 1.0f;
          const float posNow = ValueToPos01(*value);
          const float nextPos = std::clamp(posNow - ImGui::GetIO().MouseDelta.y * speed / height, 0.0f, 1.0f);
          const float next = Pos01ToValue(nextPos);
@@ -2966,7 +2984,8 @@ namespace
    bool KnobFloat(const char* label, float* value, float minV, float maxV, const char* fmt,
                   float diameter, ImU32 fillColor, bool readOnly, float cellW = 0.0f,
                   FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
-                  bool hasRange = false, float rangeLo = 0.0f, float rangeHi = 0.0f)
+                  bool hasRange = false, float rangeLo = 0.0f, float rangeHi = 0.0f,
+                  bool activeTint = false)
    {
       const float kTwoPi = 6.28318530717958647692f;
       const float aMin = 0.75f * kTwoPi * 0.5f; // 135 deg
@@ -3001,7 +3020,11 @@ namespace
       bool changed = false;
       if (active && ImGui::GetIO().MouseDelta.y != 0.0f)
       {
-         const float speed = ImGui::GetIO().KeyShift ? 0.2f : 1.0f;
+         // Shift used to slow the drag down for precision; it now triggers
+         // gesture recording instead (see GestureRecorder), and the two
+         // fought each other - holding Shift to record made the drag feel
+         // stuck. Always full speed.
+         const float speed = 1.0f;
          const float posNow = ValueToPos01(*value);
          const float nextPos = std::clamp(posNow - ImGui::GetIO().MouseDelta.y * speed / 200.0f, 0.0f, 1.0f);
          const float next = Pos01ToValue(nextPos);
@@ -3032,7 +3055,12 @@ namespace
          dl->AddCircleFilled(center, radius, IM_COL32(220, 224, 234, 255), 32);
          dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, IM_COL32(242, 245, 250, 255), 32);
          dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
-         dl->PathStroke(IM_COL32(195, 200, 212, 255), 0, 3.0f);
+         // The guide ring covers the knob's whole travel, not just the
+         // value-proportional fill arc below - tinting it when recording is
+         // what makes the state readable at a glance regardless of where the
+         // value happens to sit (a knob near its low end barely shows any
+         // fill arc at all otherwise).
+         dl->PathStroke(activeTint ? IM_COL32(220, 90, 90, 255) : IM_COL32(195, 200, 212, 255), 0, 3.0f);
          if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
          {
             dl->PathArcTo(center, radius + 2.5f, std::min(angleLo, angleHi), std::max(angleLo, angleHi), 32);
@@ -3046,7 +3074,7 @@ namespace
          const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
          const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
          dl->AddLine(tipIn, tipOut, readOnly ? IM_COL32(140, 145, 160, 255) : IM_COL32(40, 45, 60, 255), 2.0f);
-         dl->AddCircle(center, radius, IM_COL32(175, 180, 195, 255), 32, 1.0f);
+         dl->AddCircle(center, radius, activeTint ? IM_COL32(220, 90, 90, 255) : IM_COL32(175, 180, 195, 255), 32, 1.0f);
          if (hovered && !readOnly)
             dl->AddCircle(center, radius + 2.5f, IM_COL32(0, 0, 0, 30), 32, 3.0f);
       }
@@ -3055,7 +3083,7 @@ namespace
          dl->AddCircleFilled(center, radius, IM_COL32(36, 38, 48, 255), 32);
          dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, IM_COL32(22, 23, 30, 255), 32);
          dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
-         dl->PathStroke(IM_COL32(58, 62, 76, 255), 0, 3.0f);
+         dl->PathStroke(activeTint ? IM_COL32(220, 90, 90, 255) : IM_COL32(58, 62, 76, 255), 0, 3.0f);
          if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
          {
             dl->PathArcTo(center, radius + 2.5f, std::min(angleLo, angleHi), std::max(angleLo, angleHi), 32);
@@ -3069,7 +3097,7 @@ namespace
          const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
          const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
          dl->AddLine(tipIn, tipOut, readOnly ? IM_COL32(200, 202, 212, 255) : IM_COL32(238, 240, 248, 255), 2.0f);
-         dl->AddCircle(center, radius, IM_COL32(74, 78, 94, 255), 32, 1.0f);
+         dl->AddCircle(center, radius, activeTint ? IM_COL32(220, 90, 90, 255) : IM_COL32(74, 78, 94, 255), 32, 1.0f);
          if (hovered && !readOnly)
             dl->AddCircle(center, radius + 2.5f, IM_COL32(255, 255, 255, 40), 32, 3.0f);
       }
@@ -3154,7 +3182,11 @@ namespace
       }
       else if (active && ImGui::GetIO().MouseDelta.y != 0.0f)
       {
-         const float speed = ImGui::GetIO().KeyShift ? 0.2f : 1.0f;
+         // Shift used to slow the drag down for precision; it now triggers
+         // gesture recording instead (see GestureRecorder), and the two
+         // fought each other - holding Shift to record made the drag feel
+         // stuck. Always full speed.
+         const float speed = 1.0f;
          const float posNow = ValueToPos01(*value);
          const float nextPos = std::clamp(posNow - ImGui::GetIO().MouseDelta.y * speed / 200.0f, 0.0f, 1.0f);
          const float next = Pos01ToValue(nextPos);
@@ -3342,14 +3374,14 @@ namespace
          }
       }
 
-      auto DrawWidget = [&](float* v, ImU32 col, bool readOnly, bool hasRange = false, float rangeLo = 0.0f, float rangeHi = 0.0f) -> bool
+      auto DrawWidget = [&](float* v, ImU32 col, bool readOnly, bool hasRange = false, float rangeLo = 0.0f, float rangeHi = 0.0f, bool activeTint = false) -> bool
       {
          const bool isVFader = (style == AudioWidgetStyle::VFader || style == AudioWidgetStyle::VFaderDb);
          return isVFader
             ? VFaderFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
                           p2v, v2p, hasRange, rangeLo, rangeHi)
             : KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
-                        p2v, v2p, hasRange, rangeLo, rangeHi);
+                        p2v, v2p, hasRange, rangeLo, rangeHi, activeTint);
       };
       const float widgetW = (style == AudioWidgetStyle::VFader || style == AudioWidgetStyle::VFaderDb)
                                ? kFaderWidth : diameter;
@@ -3519,7 +3551,7 @@ namespace
       else // plain interactive, including a currently-errored expression
       {
          changed = DrawWidget(value, recording ? IM_COL32(235, 70, 70, 255) : IM_COL32(120, 200, 255, 235),
-                              /*readOnly=*/false);
+                              /*readOnly=*/false, /*hasRange=*/false, 0.0f, 0.0f, /*activeTint=*/recording);
          if (ImGui::IsItemActivated())
          {
             PushUndoCheckpoint();
