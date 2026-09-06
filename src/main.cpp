@@ -1481,6 +1481,13 @@ namespace
          { "Global Scale##arpSnap", "Snap to Key##arpSnap" },
          { "Global Scale##seqSnap", "Snap to Key##seqSnap" },
          { "Global Scale##stackSnap", "Snap to Key##stackSnap" },
+         // The EQ's five band `type` dropdowns used to be one control whose
+         // target followed `selectedBand` (see DrawEqBody). Splitting them
+         // into five separately-bindable dropdowns gave each its own label,
+         // and so its own slot - band 1's is aliased back to the bare "type"
+         // the single dropdown used, so a binding saved against it still
+         // resolves to a real control.
+         { "band 1 type##eqType1", "type" },
       };
 
       const std::string* hashStr = &label;
@@ -3345,7 +3352,7 @@ namespace
                 float diameter = kKnobDiameter, float cellW = 0.0f,
                 AudioWidgetStyle style = AudioWidgetStyle::Knob, float step = 0.0f,
                 FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
-                int explicitParamIndex = -1)
+                int explicitParamIndex = -1, const char* nameOverride = nullptr)
    {
       FaderPosToValueFn p2v = posToValue;
       FaderValueToPosFn v2p = valueToPos;
@@ -3430,7 +3437,12 @@ namespace
       ref.minValue = minV;
       ref.maxValue = maxV;
       ref.step = step;
-      ref.name = label;
+      // `label` is also this knob's drawn caption, so a node with several
+      // instances of the same control (the EQ's five bands' `freq`) cannot
+      // disambiguate them by widening the caption without breaking the row.
+      // nameOverride names the *param* - what the modulation matrix and the
+      // binding menu show - independently of what the cap says.
+      ref.name = (nameOverride != nullptr) ? nameOverride : label;
       ref.posToValue = p2v;
       ref.valueToPos = v2p;
       Modulation::Instance().RegisterParam(ref);
@@ -8183,7 +8195,7 @@ namespace
                 float dia = kKnobSmall, bool dbTaper = false, bool freqTaper = false,
                 AudioWidgetStyle explicitStyle = AudioWidgetStyle::Knob,
                 FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
-                int explicitParamIndex = -1)
+                int explicitParamIndex = -1, const char* nameOverride = nullptr)
       {
          Place(dia);
          AudioWidgetStyle style = explicitStyle;
@@ -8204,7 +8216,8 @@ namespace
                style = AudioWidgetStyle::KnobLog;
             }
          }
-         ModKnob(label, v, lo, hi, fmt, dia, cellW, style, 0.0f, posToValue, valueToPos, explicitParamIndex);
+         ModKnob(label, v, lo, hi, fmt, dia, cellW, style, 0.0f, posToValue, valueToPos, explicitParamIndex,
+                 nameOverride);
          index++;
       }
 
@@ -16640,6 +16653,43 @@ namespace
    static const char* const kEqGainParam[5] = { "band1Gain", "band2Gain", "band3Gain", "band4Gain", "band5Gain" };
    static const char* const kEqOnParam[5] = { "band1On", "band2On", "band3On", "band4On", "band5On" };
 
+   // ---- per-band modulation addressing ---------------------------------
+   // Only the selected band's controls are on screen, but a modulation
+   // cable, an expression or a Shift-drag gesture recording belongs to the
+   // *band* it was made on - not to "whichever band happens to be selected
+   // when it next draws". Every band therefore needs its own pin address,
+   // which means neither of the two automatic numbering schemes can be left
+   // to do it: gParamCounter numbers by draw order (so all five bands' freq
+   // knobs collapsed onto ordinal 0) and DiscreteParamSlot numbers by label
+   // hash (so all five type dropdowns collapsed onto hash("type")).
+   //
+   // Knobs get an explicit ordinal, band-major: band b's freq/Q/gain are
+   // 3b+0 / 3b+1 / 3b+2. Band 1 therefore keeps 0/1/2 - exactly the ordinals
+   // gParamCounter used to hand out - so a `mod`/`expr` line saved before
+   // this split still lands on a real control, and on the band a freshly
+   // created EQ is selected to. Ordinals 3..14 were never issued by this
+   // node before, so nothing else in an old patch can collide with them.
+   inline int EqBandKnobParam(int band, int slot) { return band * 3 + slot; }
+   const int kEqBandKnobParamSpan = 15; // 5 bands x 3 knobs, reserved
+
+   // Dropdowns get a per-band label instead, since that is what
+   // DiscreteParamSlot hashes. Band 1's is aliased back to the bare "type"
+   // in DiscreteParamSlot's kRenameAliases, for the same
+   // old-patch-compatibility reason as the knob ordinals above.
+   static const char* const kEqTypeLabel[5] = { "band 1 type##eqType1", "band 2 type##eqType2",
+                                                "band 3 type##eqType3", "band 4 type##eqType4",
+                                                "band 5 type##eqType5" };
+   // Param names for the modulation matrix and the binding menu. The knob
+   // caps still read "freq"/"Q"/"gain" - a four-cell row has no space for
+   // "band 3 freq", and the band is already named by the dropdown beside
+   // them and by the visualizer's own caption - but five destinations all
+   // called "freq" on one node would be unreadable in the matrix, which is
+   // the one place all five are visible at once.
+   static const char* const kEqBandKnobName[5][3] = {
+      { "band 1 freq", "band 1 Q", "band 1 gain" }, { "band 2 freq", "band 2 Q", "band 2 gain" },
+      { "band 3 freq", "band 3 Q", "band 3 gain" }, { "band 4 freq", "band 4 Q", "band 4 gain" },
+      { "band 5 freq", "band 5 Q", "band 5 gain" } };
+
    struct EqBandValues
    {
       int type;
@@ -16918,6 +16968,38 @@ namespace
       // (w, h) layout space.
    }
 
+   // One band's four cells - [type v][freq][Q][gain] - at that band's own
+   // pin addresses (see kEqTypeLabel / EqBandKnobParam). Called once per band
+   // per frame: the selected band draws, the other four run under
+   // gParamRegisterOnly and only register. See DrawEqBody for why.
+   void EmitEqBandCells(AudioKnobRow& row, AudioEffectNode* n, int b, int type)
+   {
+      row.index = 0;
+      row.Dropdown(kEqTypeLabel[b], EqDsp::TypeList(), type, [n, b](int i) {
+         PushUndoCheckpoint();
+         *n->ParamPtr(kEqTypeParam[b]) = (float)i;
+      });
+      row.Knob("freq", n->ParamPtr(kEqFreqParam[b]), 20.0f, 20000.0f, "%.0f Hz", kKnobLarge,
+               /*dbTaper=*/false, /*freqTaper=*/false, AudioWidgetStyle::Knob, nullptr, nullptr,
+               EqBandKnobParam(b, 0), kEqBandKnobName[b][0]);
+      row.Knob("Q", n->ParamPtr(kEqQParam[b]), 0.1f, 18.0f, "%.2f", kKnobLarge,
+               /*dbTaper=*/false, /*freqTaper=*/false, AudioWidgetStyle::Knob, nullptr, nullptr,
+               EqBandKnobParam(b, 1), kEqBandKnobName[b][1]);
+
+      // A band type with no gain term greys its gain knob rather than
+      // dropping the cell (P5). Only meaningful while drawing - BeginDisabled
+      // under gParamRegisterOnly would push style onto whatever ImGui state
+      // the caller is in, and the knob it wraps isn't drawn anyway.
+      const bool greyGain = !EqDsp::UsesGain(type) && !gParamRegisterOnly;
+      if (greyGain)
+         ImGui::BeginDisabled();
+      row.Knob("gain", n->ParamPtr(kEqGainParam[b]), -24.0f, 24.0f, "%.1f dB", kKnobLarge,
+               /*dbTaper=*/false, /*freqTaper=*/false, AudioWidgetStyle::Knob, nullptr, nullptr,
+               EqBandKnobParam(b, 2), kEqBandKnobName[b][2]);
+      if (greyGain)
+         ImGui::EndDisabled();
+   }
+
    void DrawEqBody(GraphNode& gn, AudioEffectNode* n)
    {
       EqBandValues bands[5];
@@ -16964,25 +17046,44 @@ namespace
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
       const int selBand = std::clamp((int)(n->Param("selectedBand") + 0.5f), 0, 4);
-      const int selType = bands[selBand].type;
 
       {
          AudioKnobRow row(4);
-         row.Dropdown("type", EqDsp::TypeList(), selType, [n, selBand](int i) {
-            PushUndoCheckpoint();
-            *n->ParamPtr(kEqTypeParam[selBand]) = (float)i;
-         });
-         row.Knob("freq", n->ParamPtr(kEqFreqParam[selBand]), 20.0f, 20000.0f, "%.0f Hz", kKnobLarge);
-         row.Knob("Q", n->ParamPtr(kEqQParam[selBand]), 0.1f, 18.0f, "%.2f", kKnobLarge);
-
-         const bool gainLive = EqDsp::UsesGain(selType);
-         if (!gainLive)
-            ImGui::BeginDisabled();
-         row.Knob("gain", n->ParamPtr(kEqGainParam[selBand]), -24.0f, 24.0f, "%.1f dB", kKnobLarge);
-         if (!gainLive)
-            ImGui::EndDisabled();
+         // Every band emits its four cells every frame, not just the visible
+         // one. Both the modulation apply pass and the gesture playback pass
+         // walk Modulation::FrameParams(), so a param that stops registering
+         // stops being written - without this, patching an LFO into band 3's
+         // freq and then selecting band 1 would freeze it mid-sweep. Same
+         // reasoning, and the same gParamRegisterOnly mechanism, as
+         // AddSyncedRateCell's hidden `rate` slot.
+         //
+         // Going through the identical AudioKnobRow calls rather than
+         // hand-rolled ParamRef registrations is deliberate: the hidden
+         // bands then inherit the drawn band's taper, min/max and step
+         // automatically and cannot drift from it. A cable into a hidden
+         // band still isn't *drawn* (its pin isn't emitted, so the link pass
+         // skips it - see gDrawnParamPins) but it keeps modulating, and it
+         // reappears when that band is selected again.
+         //
+         // Fixed band order, never "selected band first": DiscreteParamSlot
+         // assigns a dropdown's slot the first time it sees the label and
+         // probes linearly on collision, so the order the five type
+         // dropdowns register in has to be the same on every frame and in
+         // every run, whichever band happens to be selected.
+         const bool savedRegisterOnly = gParamRegisterOnly;
+         for (int b = 0; b < 5; b++)
+         {
+            gParamRegisterOnly = savedRegisterOnly || (b != selBand);
+            EmitEqBandCells(row, n, b, bands[b].type);
+         }
+         gParamRegisterOnly = savedRegisterOnly;
          row.End();
       }
+      // Ordinals 0..14 belong to the five bands' knobs whether or not their
+      // band drew this frame, so anything added to this body later has to
+      // number itself from here rather than from 0 - the knobs above take
+      // explicit indices and never touch the counter themselves.
+      gParamCounter = kEqBandKnobParamSpan;
 
       EndAudioBody();
    }
