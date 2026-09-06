@@ -172,6 +172,37 @@ entry if a refactor makes it stale.
   `i` is reserved as the element-domain per-element index in Field (see
   `field-language`) — every sibling fixture in the file already used `k`.
 
+- **`IGeometrySource::GetSplatCloud()`/`SplatCloudRevision()`** (added
+  alongside `GetPointCloud`/`GetCurve` in `Geometry3DNodes.h`): the same
+  forward-vs-default decision every passthrough wrapper has to make for
+  every `IGeometrySource` virtual (§3 of `new-geometry-node`) — as of this
+  writing forwarded by `GeometryOpNode`, `DisplacementNode`, `SetColorNode`,
+  `WrapNode`, `MergeByDistanceNode`, `Null3DNode`, `MaterialNode`,
+  `MappingNode`, `AudioDisplacementNode`, `MeshResynthNode`,
+  `FieldElementNode`, and `Switcher3DNode`. `FieldElementNode`'s forward is
+  a deliberate exception to "Field doesn't touch splats"
+  (`docs/plans/gaussian-splat-node.md` §8): it's pure passthrough, not
+  processing, so a splat cloud merely routed through an unrelated Field
+  node still reaches `Render3D`. A *new* wrapper node added after this
+  point needs to make the same forward-or-default call by hand — nothing
+  enforces it automatically.
+- **`Render3DNode`'s splat draw path** (`Geometry3DNodes.cpp`): GPU state
+  lives in the private nested `GpuSplat` struct (defined after
+  `ReleaseGpuMesh`/`ReleaseTargets`/`ReleaseShadowTargets` are declared —
+  `ReleaseGpuSplat`'s own declaration had to move to *after* `GpuSplat`'s
+  definition in the class body, since a nested type isn't visible to an
+  earlier member declaration's parameter list, only to code inside function
+  bodies; see the comment left at the original declaration site). The
+  back-to-front order comes from `Render3DNode::SplatSorter`, a persistent
+  background `std::thread` the render thread polls non-blockingly
+  (`TakeCompletedOrder`) — a camera move issues a new `RequestSort` but the
+  *same* frame's draw call still uses whatever order was already available,
+  so a fresh sort is always one or more frames stale by design. `sig.splatRev[i]`
+  had to be added as its own `SceneSignature` field (not XOR-folded with
+  `meshRev`/`cloudRev`/`curveRev` — see that struct's own comment for why
+  folding revisions together already broke cache invalidation once for
+  real).
+
 ## Adding to this map
 
 At the end of a task that touched `src/`, if you found a cross-file wiring
