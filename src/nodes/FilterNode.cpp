@@ -51,7 +51,18 @@ bool FilterNode::EnsureShader()
 
    std::string src = std::string(kPreamble) + mDef.fragmentBody;
    mProgram = GLUtil::CompileProgram(src.c_str());
-   return mProgram != 0;
+   if (mProgram == 0)
+      return false;
+
+   mLocSrc = glGetUniformLocation(mProgram, "uSrc");
+   mLocSrc2 = glGetUniformLocation(mProgram, "uSrc2");
+   mLocHasSrc2 = glGetUniformLocation(mProgram, "uHasSrc2");
+   mLocTexel = glGetUniformLocation(mProgram, "uTexelSize");
+   mLocTime = glGetUniformLocation(mProgram, "uTime");
+   mParamLocs.resize(mDef.params.size());
+   for (size_t i = 0; i < mDef.params.size(); i++)
+      mParamLocs[i] = glGetUniformLocation(mProgram, mDef.params[i].uniformName.c_str());
+   return true;
 }
 
 void FilterNode::CookIfNeeded(int frameId)
@@ -87,28 +98,25 @@ void FilterNode::CookIfNeeded(int frameId)
    NodeWorkCounter()++;
    GLUtil::RunShaderPass(mOut, mProgram, [this, srcTex, srcTex2]()
    {
-      GLint locSrc = glGetUniformLocation(mProgram, "uSrc");
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, srcTex);
-      glUniform1i(locSrc, 0);
+      glUniform1i(mLocSrc, 0);
 
       // bind the second sampler to a real texture even when unused; sampling an
       // unbound unit is undefined and spams the GL driver log
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, srcTex2 != 0 ? srcTex2 : srcTex);
-      glUniform1i(glGetUniformLocation(mProgram, "uSrc2"), 1);
-      glUniform1i(glGetUniformLocation(mProgram, "uHasSrc2"), srcTex2 != 0 ? 1 : 0);
+      glUniform1i(mLocSrc2, 1);
+      glUniform1i(mLocHasSrc2, srcTex2 != 0 ? 1 : 0);
 
-      GLint locTexel = glGetUniformLocation(mProgram, "uTexelSize");
-      glUniform2f(locTexel, 1.0f / mInput.Width(), 1.0f / mInput.Height());
+      glUniform2f(mLocTexel, 1.0f / mInput.Width(), 1.0f / mInput.Height());
 
-      GLint locTime = glGetUniformLocation(mProgram, "uTime");
-      glUniform1f(locTime, (float)Transport::Instance().Seconds());
+      glUniform1f(mLocTime, (float)Transport::Instance().Seconds());
 
       for (size_t i = 0; i < mDef.params.size(); i++)
       {
          const FilterParamDef& p = mDef.params[i];
-         GLint loc = glGetUniformLocation(mProgram, p.uniformName.c_str());
+         GLint loc = mParamLocs[i];
          if (loc < 0)
             continue;
 

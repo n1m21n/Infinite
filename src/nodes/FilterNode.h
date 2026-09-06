@@ -85,6 +85,17 @@ private:
    bool mShaderTried = false;
    int mLastCookFrame = -1;
 
+   // Uniform locations are fixed for the life of a linked program, so they're
+   // looked up once in EnsureShader() rather than every cook - glGetUniformLocation
+   // is a name-hash lookup into the driver, not free, and every FilterNode pays it
+   // every uncached cook otherwise.
+   GLint mLocSrc = -1;
+   GLint mLocSrc2 = -1;
+   GLint mLocHasSrc2 = -1;
+   GLint mLocTexel = -1;
+   GLint mLocTime = -1;
+   std::vector<GLint> mParamLocs;
+
    // Filters whose shader reads uTime are inherently animated - caching them
    // on a param/upstream signature alone would freeze the animation, so they
    // always re-render (same as the pre-caching behavior).

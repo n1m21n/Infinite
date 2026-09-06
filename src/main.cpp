@@ -49113,6 +49113,106 @@ int main(int argc, char** argv)
             render->shadowsEnabled = false;
          }
       }
+      else if (getenv("INFINITE_NODECHAINPERFTEST") != nullptr)
+      {
+         // Node-chain cook-recursion stress fixture: Noise -> N x invert ->
+         // Output, wired directly via SpawnNode/CableFor->Connect (bypassing
+         // UI paste and FindFreeSpawnPosition's O(N) scan) so the
+         // measurement below isolates FilterNode::CookIfNeeded's per-frame
+         // recursive cook-walk cost from node-construction cost. Chain
+         // length from INFINITE_PERFCHAINLEN, default 800 - see the
+         // node-chain FPS investigation for why 800 (linear) vs. 1600
+         // (hangs) are the interesting comparison points.
+         const char* chainLenArg = getenv("INFINITE_PERFCHAINLEN");
+         const long chainLen = std::max(1L, atol(chainLenArg ? chainLenArg : "800"));
+         SpawnNode("Noise", "Source", 0.0f, 0.0f);
+         if (const char* resArg = getenv("INFINITE_PERFCHAINRES"))
+         {
+            auto* noise = static_cast<NoiseNode*>(gNodes[0].node.get());
+            noise->width = noise->height = (float)std::max(4L, atol(resArg));
+         }
+         for (long i = 0; i < chainLen; i++)
+            SpawnNode("invert", "Compositing", 0.0f, 0.0f);
+         SpawnNode("Output", "Utility", 0.0f, 0.0f);
+         for (size_t i = 1; i < gNodes.size(); i++)
+            CableFor(gNodes[i], 0)->Connect(gNodes[i - 1].node.get());
+      }
+      else if (const char* mixedArg = getenv("INFINITE_MIXEDSTRESSTEST"))
+      {
+         // Realistic-shape stress fixture, follow-up to the node-chain FPS
+         // investigation: that investigation's straight 1600-node chain
+         // isn't a shape any real patch takes (max ~100-150 nodes, heavily
+         // interconnected with modulation) - this fixture instead builds a
+         // fixed, moderately deep 3D geometry tree (16 primitives -> 4 join
+         // nodes -> 1 root join -> Render 3D; triangle detail scales with
+         // `scale`), a 12-voice audio rack (Oscillator -> N x Audio Filter
+         // -> Mixer -> Delay -> Audio Out; per-voice filter count scales
+         // with `scale`), and - at frameId==2 below, once params exist to
+         // bind to - a modulation-heavy top layer (LFO count scales with
+         // `scale`). Env: INFINITE_MIXEDSTRESSTEST=<scale>, default 1.0.
+         const double scale = std::max(0.1, atof(mixedArg[0] != '\0' ? mixedArg : "1.0"));
+         const int triDetail = std::max(3, (int)std::lround(scale * 40.0));
+         const int filtersPerVoice = std::max(1, (int)std::lround(scale * 2.0));
+
+         std::vector<GeometryNode*> leaves;
+         for (int i = 0; i < 16; i++)
+         {
+            GraphNode* gn = SpawnNode((i % 2 == 0) ? "Sphere" : "Cube", "3D", 0.0f, 0.0f);
+            auto* geo = static_cast<GeometryNode*>(gn->node.get());
+            geo->sides = triDetail;
+            geo->detail = triDetail;
+            leaves.push_back(geo);
+         }
+         std::vector<JoinGeometryNode*> l1Joins;
+         for (int j = 0; j < 4; j++)
+         {
+            GraphNode* gn = SpawnNode("Join Geometry", "3D", 0.0f, 0.0f);
+            auto* join = static_cast<JoinGeometryNode*>(gn->node.get());
+            for (int k = 0; k < 4; k++)
+               join->inputs[k] = leaves[j * 4 + k];
+            l1Joins.push_back(join);
+         }
+         GraphNode* rootJoinGn = SpawnNode("Join Geometry", "3D", 0.0f, 0.0f);
+         auto* rootJoin = static_cast<JoinGeometryNode*>(rootJoinGn->node.get());
+         for (int k = 0; k < 4; k++)
+            rootJoin->inputs[k] = l1Joins[k];
+         GraphNode* renderGn = SpawnNode("Render 3D", "3D", 0.0f, 0.0f);
+         auto* render = static_cast<Render3DNode*>(renderGn->node.get());
+         render->geometry[0] = rootJoin;
+         render->width = 1280.0f;
+         render->height = 720.0f;
+
+         GraphNode* mixerGn = SpawnNode("Mixer", "Utility", 0.0f, 0.0f);
+         auto* mixer = static_cast<MixerNode*>(mixerGn->node.get());
+         mixer->numChannels = 12;
+         for (int v = 0; v < 12; v++)
+         {
+            GraphNode* prev = SpawnNode("Oscillator", "Synths", 0.0f, 0.0f);
+            for (int f = 0; f < filtersPerVoice; f++)
+            {
+               GraphNode* filt = SpawnNode("Audio Filter", "AudioEffects", 0.0f, 0.0f);
+               if (AudioCable* in = filt->node->AudioInputSlot(0))
+                  in->Connect(prev->node.get());
+               prev = filt;
+            }
+            if (AudioCable* in = mixer->AudioInputSlot(v))
+               in->Connect(prev->node.get());
+         }
+         GraphNode* delayGn = SpawnNode("Delay", "AudioEffects", 0.0f, 0.0f);
+         if (AudioCable* in = delayGn->node->AudioInputSlot(0))
+            in->Connect(mixerGn->node.get());
+         GraphNode* audioOutGn = SpawnNode("Audio Out", "Utility", 0.0f, 0.0f);
+         if (AudioCable* in = audioOutGn->node->AudioInputSlot(0))
+            in->Connect(delayGn->node.get());
+         RebuildAudioTopology();
+
+         // Params start collapsed (GraphNode::showParams) - force them open
+         // so every spawned node's VisitParams actually runs during the
+         // UI's per-frame draw pass and registers with Modulation's
+         // FrameParams(), which the frameId==2 binder below depends on.
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+      }
       else if (const char* loadPatchPath = getenv("INFINITE_LOADPATCH"))
       {
          LoadPatchFrom(loadPatchPath);
@@ -60036,6 +60136,92 @@ int main(int argc, char** argv)
          }
       }
 
+      // Node-chain cook-recursion stress fixture, measurement half - see
+      // INFINITE_NODECHAINPERFTEST's setup above. The chain's Output node is
+      // already cooked every frame by the ordinary per-frame cook pass above
+      // ("apply modulation and palette"), so unlike GEOMDENSITYTEST/
+      // RESSWEEPTEST there is no explicit CookIfNeeded call here - this is
+      // deliberately measuring the real per-frame cost the reported bug is
+      // about, not an isolated call. Same warmup/sample window as those
+      // fixtures (32 frames warmup, 120 sampled) so results are comparable.
+      if (getenv("INFINITE_NODECHAINPERFTEST") != nullptr)
+      {
+         static double sSum = 0.0, sMin = 1e30, sMax = 0.0;
+         static int sSampleCount = 0;
+         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; }
+         if (getenv("INFINITE_NODECHAINPERFTEST_VERBOSE") != nullptr)
+         {
+            fprintf(stderr, "[nodechain] frame=%d lastMs=%.2f\n", frameId, gLastFrameMs);
+            fflush(stderr);
+         }
+         if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
+         {
+            sSum += gLastFrameMs;
+            sMin = std::min(sMin, gLastFrameMs);
+            sMax = std::max(sMax, gLastFrameMs);
+            sSampleCount++;
+         }
+         if (frameId == 152)
+         {
+            const double avg = sSampleCount > 0 ? sSum / sSampleCount : 0.0;
+            const double fps = avg > 0.0 ? 1000.0 / avg : 0.0;
+            printf("NODECHAINPERFTEST chainLen=%d samples=%d avgMs=%.2f minMs=%.2f maxMs=%.2f avgFps=%.1f\n",
+                   (int)gNodes.size() - 2, sSampleCount, avg, sMin, sMax, fps);
+            printf("%s\n", sSampleCount > 0 ? "NODECHAINPERFTEST DONE" : "NODECHAINPERFTEST FAIL (no samples)");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // Realistic-shape stress fixture, measurement half - see
+      // INFINITE_MIXEDSTRESSTEST's setup above (before the main loop) and
+      // its modulation-binding half above (frameId==1). Render 3D isn't an
+      // Output/Syphon/OscSend node, so - same as GEOMDENSITYTEST - it needs
+      // an explicit CookIfNeeded call here; the audio rack runs on its own
+      // via the real-time audio device once RebuildAudioTopology() was
+      // called in setup, so its CPU cost shows up as competition for the
+      // same machine, not as anything this loop calls directly. The
+      // Render3DNode* is found once by scanning gNodes (dynamic_cast) and
+      // cached from then on - a raw pointer into the node's own heap
+      // allocation (via unique_ptr), which stays valid even though the
+      // frameId==1 binder above spawns more nodes and reallocates gNodes'
+      // vector storage after this pointer is taken.
+      if (getenv("INFINITE_MIXEDSTRESSTEST") != nullptr)
+      {
+         static double sSum = 0.0, sMin = 1e30, sMax = 0.0;
+         static int sSampleCount = 0;
+         static Render3DNode* sRender = nullptr;
+         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; }
+         if (getenv("INFINITE_MIXEDSTRESSTEST_VERBOSE") != nullptr)
+         {
+            fprintf(stderr, "[mixedstress] frame=%d lastMs=%.2f nodes=%zu\n",
+                    frameId, gLastFrameMs, gNodes.size());
+            fflush(stderr);
+         }
+         if (sRender == nullptr)
+            for (GraphNode& gn : gNodes)
+               if (auto* r = dynamic_cast<Render3DNode*>(gn.node.get())) { sRender = r; break; }
+         if (sRender != nullptr && frameId >= 2)
+            sRender->CookIfNeeded(frameId);
+         if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
+         {
+            sSum += gLastFrameMs;
+            sMin = std::min(sMin, gLastFrameMs);
+            sMax = std::max(sMax, gLastFrameMs);
+            sSampleCount++;
+         }
+         if (frameId == 152)
+         {
+            const double avg = sSampleCount > 0 ? sSum / sSampleCount : 0.0;
+            const double fps = avg > 0.0 ? 1000.0 / avg : 0.0;
+            printf("MIXEDSTRESSTEST nodes=%d avgMs=%.2f minMs=%.2f maxMs=%.2f avgFps=%.1f\n",
+                   (int)gNodes.size(), avg, sMin, sMax, fps);
+            printf("%s\n", sSampleCount > 0 ? "MIXEDSTRESSTEST DONE" : "MIXEDSTRESSTEST FAIL (no samples)");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
       // Output-resolution stress fixture, measurement half - see
       // INFINITE_RESSWEEPTEST's setup above. Same warmup/sample/explicit-cook
       // scheme as GEOMDENSITYTEST.
@@ -65408,6 +65594,66 @@ int main(int argc, char** argv)
          {
             if (ref.nodeIndex == gNodes[1].index && ref.name == "Amount")
                Modulation::Instance().Bind(ref.nodeIndex, ref.paramIndex, gNodes[5].index);
+         }
+      }
+
+      // Modulation-heavy binding half of INFINITE_MIXEDSTRESSTEST - see the
+      // setup half above (before the main loop starts). Deferred to
+      // frameId==1, after this frame's own UI draw has registered every
+      // spawned node's params with Modulation's FrameParams(); binding here
+      // takes effect starting next frame, same as INFINITE_SHOWCASE above.
+      // LFO count scales with `scale`; "channels" is skipped so modulating
+      // it can't shrink Mixer's slot count out from under the audio rack
+      // wired above, and each LFO's own params are skipped so a later LFO
+      // never gets bound to modulate an earlier LFO.
+      if (const char* mixedArg = getenv("INFINITE_MIXEDSTRESSTEST"); mixedArg != nullptr && frameId == 1)
+      {
+         const double scale = std::max(0.1, atof(mixedArg[0] != '\0' ? mixedArg : "1.0"));
+         const int modCount = std::max(1, (int)std::lround(scale * 60.0));
+         auto& mod = Modulation::Instance();
+         int bound = 0;
+         for (const ParamRef& ref : mod.FrameParams())
+         {
+            if (bound >= modCount)
+               break;
+            if (ref.name == "channels")
+               continue;
+            // Structural/tessellation params: modulating these forces a full
+            // mesh rebuild every frame they change (GeometryNode::RebuildIfNeeded),
+            // which is a real, expected cost - not representative of typical
+            // modulation targets (color/position/amplitude/opacity). Excluded so
+            // this fixture stress-tests realistic modulation instead of the
+            // pathological worst case.
+            if (ref.name == "shape" || ref.name == "detail" || ref.name == "sides" ||
+                ref.name == "bevel" || ref.name == "bevelSegments")
+               continue;
+            // Render target/resource-recreating params: modulating "width"/"height"
+            // forces EnsureFbo to tear down and reallocate the render target (and
+            // shadow map) every frame it changes; "antialias" changes MSAA sample
+            // count similarly. Same reasoning as the geometry exclusion above -
+            // real but not representative of typical modulation targets.
+            if (ref.name == "width" || ref.name == "height" || ref.name == "antialias")
+               continue;
+            // Join Geometry's "mode" switches between plain concatenation
+            // (kMerge, cheap) and real mesh-boolean CSG (union/intersect/
+            // difference - JoinGeometryNode::RebuildIfNeeded ->
+            // MeshOps::Boolean), which is far more expensive per rebuild.
+            // Modulating it means periodically paying full CSG cost - a real
+            // but non-representative worst case for this fixture.
+            if (ref.name == "mode")
+               continue;
+            GraphNode* srcGn = FindNodeByIndex(ref.nodeIndex);
+            if (srcGn != nullptr && dynamic_cast<LFONode*>(srcGn->node.get()) != nullptr)
+               continue;
+            if (mod.IsModulated(ref.nodeIndex, ref.paramIndex))
+               continue;
+            GraphNode* lfo = SpawnNode("LFO", "Utility", 0.0f, 0.0f);
+            mod.Bind(ref.nodeIndex, ref.paramIndex, lfo->index);
+            bound++;
+            if (getenv("INFINITE_MIXEDSTRESSTEST_VERBOSE") != nullptr)
+               fprintf(stderr, "[mixedstress] bound node=%d param=%s (%s)\n",
+                       ref.nodeIndex, ref.name.c_str(),
+                       srcGn != nullptr ? srcGn->typeName.c_str() : "?");
          }
       }
 
