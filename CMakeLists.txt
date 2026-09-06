@@ -249,6 +249,7 @@ set(COMMON_SOURCES
     src/core/UpdateCheck.cpp
     src/core/AudioDecodeCache.cpp
     src/core/GltfImport.cpp
+    src/core/SplatIO.cpp
     src/audio/AudioEngine.cpp
     src/audio/ParamMailbox.cpp
     src/audio/MeterRing.cpp

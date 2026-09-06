@@ -148,6 +148,7 @@ namespace
 #include "nodes/EnvironmentNode.h"
 #include "nodes/ModelSourceNode.h"
 #include "GltfImport.h"
+#include "SplatIO.h"
 #include "nodes/Text3DNode.h"
 #include "nodes/UtilityNodes.h"
 #include "nodes/PointDistributionNodes.h"
@@ -35229,6 +35230,170 @@ static bool RunCycleShaperFixture()
 }
 
 // ==================================================== INFINITE_SPECBLURTEST
+// ============================================================ INFINITE_SPLATIOTEST
+//
+// Headless test for src/core/SplatIO.{h,cpp} (Gaussian splat .ply/.splat
+// loading). No GL, no node, no window - see docs/plans/gaussian-splat-node.md
+// and docs/plans/gaussian-splat-prompt.md (phase 1 exit criterion).
+//
+// Writes a small binary_little_endian .ply fixture with a deliberately
+// non-standard property order (opacity and rotation before position, plus an
+// unrelated nx/ny/nz normal block) to prove the loader builds a real
+// property->offset map instead of assuming field order, then asserts:
+//  - splat count and position bounds match what was written
+//  - a splat with stored opacity=0 comes back with a ~= 0.5 (sigmoid(0))
+//  - a splat with stored scale=0 comes back with radius 1.0 (exp(0))
+//  - re-deriving cov from the retained scale/rot reproduces splat.cov
+//    bit-for-bit, proving the retained CPU-only fields are actually usable
+//    by a later Field pass rather than having silently diverged from what
+//    the GPU texture would be built from
+static bool WriteSplatPlyFixture(const char* path)
+{
+   FILE* f = std::fopen(path, "wb");
+   if (!f)
+      return false;
+
+   // Deliberately scrambled vs. the INRIA reference order, plus an unused
+   // normal block, to exercise the offset map rather than assumed layout.
+   std::fprintf(f,
+                "ply\n"
+                "format binary_little_endian 1.0\n"
+                "element vertex 2\n"
+                "property float opacity\n"
+                "property float rot_0\n"
+                "property float rot_1\n"
+                "property float rot_2\n"
+                "property float rot_3\n"
+                "property float nx\n"
+                "property float ny\n"
+                "property float nz\n"
+                "property float x\n"
+                "property float y\n"
+                "property float z\n"
+                "property float scale_0\n"
+                "property float scale_1\n"
+                "property float scale_2\n"
+                "property float f_dc_0\n"
+                "property float f_dc_1\n"
+                "property float f_dc_2\n"
+                "end_header\n");
+
+   auto writeRecord = [&](float opacity, float rw, float rx, float ry, float rz, float x, float y, float z,
+                          float s0, float s1, float s2, float dc0, float dc1, float dc2) {
+      const float vals[] = {opacity, rw, rx, ry, rz, 0.0f, 0.0f, 0.0f, x, y, z, s0, s1, s2, dc0, dc1, dc2};
+      std::fwrite(vals, sizeof(float), sizeof(vals) / sizeof(vals[0]), f);
+   };
+
+   // Splat 0: all-default-triggering (opacity 0, scale 0, identity quat via
+   // 1,0,0,0) so the sigmoid(0)=0.5 / exp(0)=1.0 conversions are exercised.
+   writeRecord(0.0f, 1.0f, 0.0f, 0.0f, 0.0f, -2.0f, 0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+   // Splat 1: non-trivial rotation/scale/opacity/color to exercise the real
+   // covariance math and SH-DC-to-color conversion.
+   writeRecord(1.2f, 0.9238795f, 0.3826834f, 0.0f, 0.0f, 3.0f, -1.0f, 4.0f, 0.4f, -0.7f, 0.1f, 0.3f, -0.2f, 0.6f);
+
+   std::fclose(f);
+   return true;
+}
+
+static bool RunSplatIOFixture()
+{
+   bool ok = true;
+   const char* path = "/tmp/infinite_splatio_test.ply";
+
+   if (!WriteSplatPlyFixture(path))
+   {
+      printf("SPLATIOTEST could not write fixture FAIL\n");
+      return false;
+   }
+
+   SplatIO::SplatCloud cloud;
+   std::string err;
+   if (!SplatIO::LoadSplatPly(path, cloud, err))
+   {
+      printf("SPLATIOTEST LoadSplatPly failed: %s FAIL\n", err.c_str());
+      return false;
+   }
+
+   if (cloud.splats.size() != 2)
+   {
+      printf("SPLATIOTEST expected 2 splats, got %zu FAIL\n", cloud.splats.size());
+      ok = false;
+   }
+
+   if (cloud.splats.size() >= 2)
+   {
+      const SplatIO::Splat& s0 = cloud.splats[0];
+      const SplatIO::Splat& s1 = cloud.splats[1];
+
+      if (std::fabs(s0.a - 0.5f) > 1e-5f)
+      {
+         printf("SPLATIOTEST opacity=0 should decode to a~=0.5, got %f FAIL\n", s0.a);
+         ok = false;
+      }
+      if (std::fabs(s0.sx - 1.0f) > 1e-5f || std::fabs(s0.sy - 1.0f) > 1e-5f || std::fabs(s0.sz - 1.0f) > 1e-5f)
+      {
+         printf("SPLATIOTEST scale=0 should decode to radius 1.0, got (%f %f %f) FAIL\n", s0.sx, s0.sy, s0.sz);
+         ok = false;
+      }
+      if (std::fabs(s0.px - (-2.0f)) > 1e-5f || std::fabs(s0.py - 0.5f) > 1e-5f || std::fabs(s0.pz - 1.0f) > 1e-5f)
+      {
+         printf("SPLATIOTEST splat 0 position mismatch: (%f %f %f) FAIL\n", s0.px, s0.py, s0.pz);
+         ok = false;
+      }
+
+      const float expectMinX = std::min(s0.px, s1.px), expectMaxX = std::max(s0.px, s1.px);
+      const float expectMinY = std::min(s0.py, s1.py), expectMaxY = std::max(s0.py, s1.py);
+      const float expectMinZ = std::min(s0.pz, s1.pz), expectMaxZ = std::max(s0.pz, s1.pz);
+      if (std::fabs(cloud.boundsMin[0] - expectMinX) > 1e-5f || std::fabs(cloud.boundsMax[0] - expectMaxX) > 1e-5f ||
+          std::fabs(cloud.boundsMin[1] - expectMinY) > 1e-5f || std::fabs(cloud.boundsMax[1] - expectMaxY) > 1e-5f ||
+          std::fabs(cloud.boundsMin[2] - expectMinZ) > 1e-5f || std::fabs(cloud.boundsMax[2] - expectMaxZ) > 1e-5f)
+      {
+         printf("SPLATIOTEST bounds mismatch FAIL\n");
+         ok = false;
+      }
+
+      // Rebuild cov from the retained scale/rot on splat 1 (the non-trivial
+      // one) and confirm it reproduces the stored cov bit-for-bit - proving
+      // the retained fields are not a lossy afterthought.
+      float rebuilt[6];
+      {
+         const float qw = s1.qw, qx = s1.qx, qy = s1.qy, qz = s1.qz;
+         const float sx = s1.sx, sy = s1.sy, sz = s1.sz;
+         const float r00 = 1.0f - 2.0f * (qy * qy + qz * qz);
+         const float r01 = 2.0f * (qx * qy - qw * qz);
+         const float r02 = 2.0f * (qx * qz + qw * qy);
+         const float r10 = 2.0f * (qx * qy + qw * qz);
+         const float r11 = 1.0f - 2.0f * (qx * qx + qz * qz);
+         const float r12 = 2.0f * (qy * qz - qw * qx);
+         const float r20 = 2.0f * (qx * qz - qw * qy);
+         const float r21 = 2.0f * (qy * qz + qw * qx);
+         const float r22 = 1.0f - 2.0f * (qx * qx + qy * qy);
+         const float m00 = r00 * sx, m01 = r01 * sy, m02 = r02 * sz;
+         const float m10 = r10 * sx, m11 = r11 * sy, m12 = r12 * sz;
+         const float m20 = r20 * sx, m21 = r21 * sy, m22 = r22 * sz;
+         rebuilt[0] = m00 * m00 + m01 * m01 + m02 * m02;
+         rebuilt[1] = m00 * m10 + m01 * m11 + m02 * m12;
+         rebuilt[2] = m00 * m20 + m01 * m21 + m02 * m22;
+         rebuilt[3] = m10 * m10 + m11 * m11 + m12 * m12;
+         rebuilt[4] = m10 * m20 + m11 * m21 + m12 * m22;
+         rebuilt[5] = m20 * m20 + m21 * m21 + m22 * m22;
+      }
+      for (int k = 0; k < 6; ++k)
+      {
+         if (std::memcmp(&rebuilt[k], &s1.cov[k], sizeof(float)) != 0)
+         {
+            printf("SPLATIOTEST cov[%d] not bit-identical to rebuild: stored %f rebuilt %f FAIL\n", k, s1.cov[k],
+                   rebuilt[k]);
+            ok = false;
+         }
+      }
+   }
+
+   std::remove(path);
+   printf("%s\n", ok ? "SPLATIOTEST OK" : "SPLATIOTEST SUSPECT");
+   return ok;
+}
+
 static bool RunSpecBlurFixture()
 {
    bool ok = true;
@@ -47635,6 +47800,9 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_SPECBLURTEST") != nullptr)
       return RunSpecBlurFixture() ? 0 : 1;
+
+   if (getenv("INFINITE_SPLATIOTEST") != nullptr)
+      return RunSplatIOFixture() ? 0 : 1;
 
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return RunDspTest();
