@@ -215,7 +215,7 @@ set(COMMON_SOURCES
     src/core/NodeViewport.cpp
     src/core/Transport.cpp
     src/core/Modulation.cpp
-    src/core/GestureDetector.cpp
+    src/core/GestureRecorder.cpp
     src/core/Expression.cpp
     src/core/field/FieldLex.cpp
     src/core/field/FieldParse.cpp
