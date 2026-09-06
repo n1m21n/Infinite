@@ -182,6 +182,14 @@ public:
    const ParamRef* KnownParam(int nodeIndex, int paramIndex) const;
    const std::map<Key, ParamRef>& AllKnownParams() const { return mKnownParams; }
 
+   // Same key as KnownParam, but into mFrameParams instead: the live `value`
+   // pointer, valid only until the next ClearFrameParams(). A linear scan,
+   // not a map lookup - mFrameParams is small (one entry per param drawn this
+   // frame) and this is only ever called a handful of times per frame, not
+   // once per param. Returns nullptr if nothing registered this key this
+   // frame (e.g. the param's node is collapsed or on a hidden tab).
+   const ParamRef* FrameParam(int nodeIndex, int paramIndex) const;
+
 private:
    std::map<Key, Source> mLinks;
    std::map<Key, std::string> mExpressions;

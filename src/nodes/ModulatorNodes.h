@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -462,6 +463,53 @@ public:
    float constantIn = 0.5f; // used when nothing is patched
 
    void VisitParams(ParamVisitor& v) override { v.Float("constantIn", constantIn); }
+};
+
+// Watches another param and reports its position as a modulator, 0..1 over
+// that param's own declared range. Exists so an ordinary knob/slider (which
+// has a param pin but no modulator output of its own - see Modulation.h) can
+// still drive another param, by wrapping it in something Bind() accepts as a
+// source: spawned automatically when a gesture-suggested two-param link is
+// confirmed (see GestureDetector.h). Also spawnable by hand from the
+// palette like any other modulator, for the rare case someone wants this
+// wiring without going through the gesture-suggestion flow.
+//
+// Reads through Modulation::FrameParam every call rather than caching the
+// watched ParamRef's value pointer, because that pointer is only valid within
+// the single frame it was registered (Modulation.h) - a cached copy would
+// silently start reading garbage the moment the watched node reshuffles.
+// This does mean the watched param must have registered earlier in the same
+// frame for Value01() to see a fresh value; if it hasn't drawn yet this frame
+// (collapsed, hidden tab), this falls back to holding the last resolved 0.5
+// centre rather than reading stale data - matching how any dropdown-hidden
+// modulation source already behaves.
+class ParamFollowerModulatorNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new ParamFollowerModulatorNode(); }
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+
+   float Value01() override
+   {
+      const ParamRef* live = Modulation::Instance().FrameParam(watchedNodeIndex, watchedParamIndex);
+      if (live == nullptr || live->value == nullptr)
+         return 0.5f;
+      const float span = live->maxValue - live->minValue;
+      return span != 0.0f ? std::clamp((*live->value - live->minValue) / span, 0.0f, 1.0f) : 0.5f;
+   }
+
+   int watchedNodeIndex = -1;
+   int watchedParamIndex = -1;
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("watchedNodeIndex", watchedNodeIndex);
+      v.Int("watchedParamIndex", watchedParamIndex);
+   }
 };
 
 // Mirrors a modulator around a low/high pivot. Not a flat 1-v, so it does the
