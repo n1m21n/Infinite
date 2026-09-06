@@ -31566,6 +31566,13 @@ namespace
          const ImVec2 b = toMinimap(ImVec2(gn.liveX + kNodeW, gn.liveY + kNodeH));
          const bool selected = ed::IsNodeSelected(gn.NodeId());
          dl->AddRectFilled(a, b, selected ? IM_COL32(255, 190, 90, 230) : IM_COL32(110, 150, 210, 200), 2.0f);
+         if (selected)
+         {
+            // Selection must read as more than a hue swap (HIG focus/selection
+            // guidance) - add a bright outline so it's legible for colorblind
+            // users and in poor viewing conditions, on top of the color change.
+            dl->AddRect(a, b, isLight ? IM_COL32(40, 44, 55, 255) : IM_COL32(255, 255, 255, 255), 2.0f, 0, 1.5f);
+         }
       }
 
       // The current viewport, outlined - the one thing a static "map" view
