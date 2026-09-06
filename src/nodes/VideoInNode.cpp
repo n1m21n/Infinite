@@ -40,6 +40,31 @@ void VideoInNode::CloseCamera()
    }
 }
 
+std::string VideoInNode::ResolveDeviceId()
+{
+   if (!deviceId.empty())
+      return deviceId;
+
+   // Empty deviceId means "auto-pick". Resolve it against the currently known
+   // devices rather than passing it straight through to Platform::CameraOpen,
+   // whose two platform implementations disagree on what empty means (macOS
+   // falls back to AVFoundation's own default; Windows treats it as a hard
+   // failure). Match whatever the UI dropdown is already showing as selected.
+   if (mCachedDevices.empty())
+      RefreshDevices();
+
+   for (const auto& dev : mCachedDevices)
+   {
+      if (dev.isDefault)
+         return dev.uniqueId;
+   }
+
+   if (!mCachedDevices.empty())
+      return mCachedDevices[0].uniqueId;
+
+   return "";
+}
+
 void VideoInNode::ReopenCamera()
 {
    CloseCamera();
@@ -51,7 +76,7 @@ void VideoInNode::ReopenCamera()
       ? (Platform::CameraResolution)resolution
       : Platform::CameraResolution::Auto;
 
-   mCamera = Platform::CameraOpen(deviceId, res, mirror, err);
+   mCamera = Platform::CameraOpen(ResolveDeviceId(), res, mirror, err);
    if (mCamera == nullptr)
    {
       mLastError = err;
