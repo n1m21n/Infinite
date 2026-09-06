@@ -75,6 +75,7 @@ namespace Field
          std::unordered_map<std::string, std::vector<float>> stateInit;
          int offsetReadCount = 0;
          std::unordered_set<std::string> paramNames;
+         std::unordered_set<std::string> imageInputNames;
          std::vector<int> lineToIrNode;
          int currentLine = 1;
          std::string error;
@@ -202,6 +203,15 @@ namespace Field
                if (ctx.paramNames.find(name) != ctx.paramNames.end())
                {
                   return "fld_p_" + name;
+               }
+
+               // A declared `image` input aliases the same fld_srcTex/`src`
+               // path `col` already reads - no separate uniform needed, and
+               // it's what makes `col`'s existing unconnected-black-texture
+               // behaviour apply to a declared input too.
+               if (ctx.imageInputNames.find(name) != ctx.imageInputNames.end())
+               {
+                  return "src";
                }
 
                return "fld_v_" + name;
@@ -608,6 +618,27 @@ namespace Field
             ctx.paramNames.insert(p.name);
          }
          ctx.EmitLine("");
+      }
+
+      // 7b. Declared `image` inputs alias the existing fld_srcTex/`src` path
+      // (see EmitNode's Variable case) - no uniform of their own yet. Only
+      // one is wired to an actual texture (FieldPixelNode::CookIfNeeded pulls
+      // DeclaredImageInput(0) into fld_srcTex), so a second declared image
+      // input would silently share that same texture; refuse it instead
+      // until per-input samplers exist.
+      {
+         int imageInputCount = 0;
+         for (const auto& in : program.declaredInputs)
+         {
+            if (in.typeName != "image") continue;
+            imageInputCount++;
+            if (imageInputCount > 1)
+            {
+               result.error = "only one `input pixel image` is supported per Field Pixel kernel right now";
+               return result;
+            }
+            ctx.imageInputNames.insert(in.name);
+         }
       }
 
       // 8. Pixel state samplers
