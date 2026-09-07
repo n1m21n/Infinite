@@ -2229,15 +2229,21 @@ namespace
       const ImVec2 valSize = ImGui::CalcTextSize(valBuf);
       const float valX = r1.x - 7.0f - valSize.x;
       dl->PushClipRect(r0, r1, true);
+      // Light-mode readOnly was a mid grey that read as low-contrast/washed
+      // out against the card, and the light non-readOnly *name* below was
+      // accidentally reusing the dark theme's pale blue-grey outright - all
+      // but invisible on a light card. Darkened/raised-opacity across the
+      // board in both themes per feedback that every one of these read too
+      // faint.
       const ImU32 valCol = isLight
-         ? (readOnly ? IM_COL32(110, 115, 130, 255) : IM_COL32(25, 30, 45, 255))
-         : (readOnly ? IM_COL32(190, 192, 206, 255) : IM_COL32(232, 236, 246, 255));
+         ? (readOnly ? IM_COL32(78, 84, 100, 255) : IM_COL32(20, 24, 36, 255))
+         : (readOnly ? IM_COL32(205, 208, 220, 255) : IM_COL32(238, 241, 250, 255));
       dl->AddText(ImVec2(valX, textY), valCol, valBuf);
 
       dl->PushClipRect(r0, ImVec2(std::max(r0.x, valX - 6.0f), r1.y), true);
       const ImU32 nameCol = isLight
-         ? (readOnly ? IM_COL32(125, 130, 145, 255) : IM_COL32(186, 192, 208, 255))
-         : (readOnly ? IM_COL32(150, 152, 166, 255) : IM_COL32(186, 192, 208, 255));
+         ? (readOnly ? IM_COL32(100, 106, 122, 255) : IM_COL32(80, 86, 102, 255))
+         : (readOnly ? IM_COL32(178, 181, 196, 255) : IM_COL32(198, 202, 216, 255));
       dl->AddText(ImVec2(r0.x + 7.0f, textY), nameCol, name.c_str());
       dl->PopClipRect();
       dl->PopClipRect();
@@ -24182,7 +24188,8 @@ namespace
    // gParamCounter) and would otherwise collide with that same destination
    // node's own knob elsewhere in the graph.
    bool TypableRangeField(const char* strId, const std::pair<int, int>& editKey, float* value,
-                          float step, float minV, float maxV, const char* fmt)
+                          float step, float minV, float maxV, const char* fmt,
+                          bool noBorder = false)
    {
       bool changed = false;
       if (gTypedParam.count(editKey) > 0)
@@ -24238,7 +24245,15 @@ namespace
       else
       {
          PushSliderStyle();
+         // The Lo/Hi cells in the modulation matrix table already sit inside
+         // the table's own BordersInnerH/V grid lines - PushSliderStyle's
+         // light-mode hairline border around each field on top of that read
+         // as a box-within-a-box, doubled-up rather than a single grid.
+         if (noBorder)
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
          changed = ImGui::DragFloat(strId, value, step, minV, maxV, fmt);
+         if (noBorder)
+            ImGui::PopStyleVar();
          PopSliderStyle();
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
@@ -24418,12 +24433,12 @@ namespace
                ImGui::TableNextColumn();
                ImGui::SetNextItemWidth(-FLT_MIN);
                rangeChanged |= TypableRangeField("##lo", loKey, &lo, step, minV, maxV,
-                                                 isInt ? "%.0f" : "%.3f");
+                                                 isInt ? "%.0f" : "%.3f", /*noBorder=*/true);
 
                ImGui::TableNextColumn();
                ImGui::SetNextItemWidth(-FLT_MIN);
                rangeChanged |= TypableRangeField("##hi", hiKey, &hi, step, minV, maxV,
-                                                 isInt ? "%.0f" : "%.3f");
+                                                 isInt ? "%.0f" : "%.3f", /*noBorder=*/true);
 
                if (rangeChanged)
                {
