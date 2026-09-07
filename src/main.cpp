@@ -23918,7 +23918,17 @@ namespace
       const bool vertical = (dock == 1 || dock == 2);  // grip is a column, not a row
       const bool gripFirst = (dock == 0 || dock == 1); // canvas is above / to the left
 
+      // The outer child is what actually holds the resize-grip strip and the
+      // spacing between it and the content child - and ImGuiCol_ChildBg is
+      // alpha 0 by default (see ApplyTheme), so that ~11px band was showing
+      // straight THROUGH the UI to whatever happens to be painted behind it.
+      // That is the "black in light mode, grey in dark mode" band between
+      // viewports: it was never a coloured divider, it was a hole. Give the
+      // outer child the same opaque panelBg fill the content child already
+      // has so the panel is solid edge to edge.
+      PushDockedPanelStyle(/*isChild=*/true);
       ImGui::BeginChild(id, size, false);
+      PopDockedPanelStyle();
       const ImVec2 inner = ImGui::GetContentRegionAvail();
 
       auto grip = [&]()
@@ -24410,7 +24420,17 @@ namespace
       const bool vertical = (dock == 1 || dock == 2);  // grip is a column, not a row
       const bool gripFirst = (dock == 0 || dock == 1); // canvas is above / to the left
 
+      // The outer child is what actually holds the resize-grip strip and the
+      // spacing between it and the content child - and ImGuiCol_ChildBg is
+      // alpha 0 by default (see ApplyTheme), so that ~11px band was showing
+      // straight THROUGH the UI to whatever happens to be painted behind it.
+      // That is the "black in light mode, grey in dark mode" band between
+      // viewports: it was never a coloured divider, it was a hole. Give the
+      // outer child the same opaque panelBg fill the content child already
+      // has so the panel is solid edge to edge.
+      PushDockedPanelStyle(/*isChild=*/true);
       ImGui::BeginChild(id, size, false);
+      PopDockedPanelStyle();
       const ImVec2 inner = ImGui::GetContentRegionAvail();
 
       auto grip = [&]()
@@ -26601,7 +26621,17 @@ namespace
       const bool vertical = (dock == 1 || dock == 2);
       const bool gripFirst = (dock == 0 || dock == 1);
 
+      // The outer child is what actually holds the resize-grip strip and the
+      // spacing between it and the content child - and ImGuiCol_ChildBg is
+      // alpha 0 by default (see ApplyTheme), so that ~11px band was showing
+      // straight THROUGH the UI to whatever happens to be painted behind it.
+      // That is the "black in light mode, grey in dark mode" band between
+      // viewports: it was never a coloured divider, it was a hole. Give the
+      // outer child the same opaque panelBg fill the content child already
+      // has so the panel is solid edge to edge.
+      PushDockedPanelStyle(/*isChild=*/true);
       ImGui::BeginChild(id, size, false);
+      PopDockedPanelStyle();
       gPerfPanelRectMin = ImGui::GetWindowPos();
       gPerfPanelRectMax = ImVec2(gPerfPanelRectMin.x + ImGui::GetWindowSize().x,
                                  gPerfPanelRectMin.y + ImGui::GetWindowSize().y);
@@ -51443,11 +51473,19 @@ int main(int argc, char** argv)
       // easy to undercount by hand - grows a scrollbar on THIS window, which
       // reads as "a slider that moves the entire app" rather than as a
       // rounding error in one panel's layout.
+      // Zero padding: this shell has no content of its own, only the canvas
+      // and the docked panels, and each of those paints its own background
+      // and carries its own inner padding. The default 8px WindowPadding just
+      // put an 8px band of shell background around and between them - the same
+      // "bar between the viewports" the ItemSpacing gaps were producing, at
+      // the window edges and under the menu bar.
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
       ImGui::Begin("Infinite", nullptr,
                    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
                    ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoScrollbar |
                    ImGuiWindowFlags_NoScrollWithMouse);
+      ImGui::PopStyleVar();
 
       if (ImGui::BeginMenuBar())
       {
