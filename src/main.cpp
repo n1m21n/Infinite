@@ -3442,7 +3442,10 @@ namespace
                      IM_COL32(180, 185, 200, 255), 3.0f);
          dl->AddLine(ImVec2(cx - 7.0f, capY), ImVec2(cx + 7.0f, capY),
                      readOnly ? IM_COL32(140, 145, 160, 255) : IM_COL32(40, 45, 60, 255), 1.6f);
-         if (hovered && !readOnly)
+         if (active && !readOnly)
+            dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
+                        IM_COL32(50, 110, 220, 160), 4.0f, 0, 2.0f);
+         else if (hovered && !readOnly)
             dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
                         IM_COL32(0, 0, 0, 30), 4.0f, 0, 2.0f);
       }
@@ -3483,7 +3486,10 @@ namespace
                      IM_COL32(18, 19, 25, 200), 3.0f);
          dl->AddLine(ImVec2(cx - 7.0f, capY), ImVec2(cx + 7.0f, capY),
                      readOnly ? IM_COL32(200, 202, 212, 255) : IM_COL32(238, 240, 248, 255), 1.6f);
-         if (hovered && !readOnly)
+         if (active && !readOnly)
+            dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
+                        IM_COL32(110, 180, 255, 180), 4.0f, 0, 2.0f);
+         else if (hovered && !readOnly)
             dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
                         IM_COL32(255, 255, 255, 60), 4.0f, 0, 2.0f);
       }
@@ -23457,7 +23463,7 @@ namespace
       }
 
       dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
-                  IM_COL32(70, 74, 90, 255), 4.0f);
+                  ScopeBorderCol(), 4.0f);
 
       // A Render 3D preview is a viewport, not a picture: drag to orbit, scroll
       // to zoom. An InvisibleButton is what makes this safe inside the node
@@ -62757,6 +62763,7 @@ int main(int argc, char** argv)
          ImGui::BeginGroup();
 
          ImGui::TextUnformatted(NodeTitle(gn).c_str());
+         ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 2.0f);
          if (isLight)
             ImGui::PushStyleColor(ImGuiCol_Text,
                                   ImVec4(catColor.r * 0.75f, catColor.g * 0.75f,
@@ -62767,6 +62774,7 @@ int main(int argc, char** argv)
                                          catColor.b * 0.6f + 0.4f, 1.0f));
          ImGui::TextUnformatted(gn.category.c_str());
          ImGui::PopStyleColor();
+         ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 2.0f);
 
          // Moved ahead of the old call site (right before the showParams
          // dispatch below) so DrawAudioNodeBody's ModSlider calls - which
@@ -62847,8 +62855,8 @@ int main(int argc, char** argv)
             ImGui::Dummy(ImVec2(boxW, h));
             ImDrawList* dl = ImGui::GetWindowDrawList();
             ImVec2 br(origin.x + boxW, origin.y + h);
-            dl->AddRectFilled(origin, br, IM_COL32(18, 18, 24, 255), 4.0f);
-            dl->AddRect(origin, br, IM_COL32(70, 74, 90, 255), 4.0f);
+            dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+            dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
             char line[64] = "";
             if (auto* o = dynamic_cast<GeometryOpNode*>(gn.node.get()))
             {
@@ -62909,9 +62917,11 @@ int main(int argc, char** argv)
                snprintf(line, sizeof(line), "%zu points", i2p->PointCount());
             else
                snprintf(line, sizeof(line), "scene node");
-            dl->AddText(ImVec2(origin.x + 12, origin.y + 10), IM_COL32(200, 206, 226, 255),
+            dl->AddText(ImVec2(origin.x + 12, origin.y + 10),
+                        isLight ? IM_COL32(30, 36, 52, 255) : IM_COL32(200, 206, 226, 255),
                         NodeTitle(gn).c_str());
-            dl->AddText(ImVec2(origin.x + 12, origin.y + 28), IM_COL32(130, 136, 156, 255), line);
+            dl->AddText(ImVec2(origin.x + 12, origin.y + 28),
+                        isLight ? IM_COL32(95, 105, 125, 255) : IM_COL32(130, 136, 156, 255), line);
          }
          else if (dynamic_cast<GeometryNode*>(gn.node.get()) != nullptr)
          {
@@ -62922,15 +62932,18 @@ int main(int argc, char** argv)
             ImGui::Dummy(ImVec2(kPreviewSize, kPreviewSize * 0.45f));
             ImDrawList* dl = ImGui::GetWindowDrawList();
             ImVec2 br(origin.x + kPreviewSize, origin.y + kPreviewSize * 0.45f);
-            dl->AddRectFilled(origin, br, IM_COL32(18, 18, 24, 255), 4.0f);
-            dl->AddRect(origin, br, IM_COL32(70, 74, 90, 255), 4.0f);
+            dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+            dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
             const std::string& name = GeometryNode::ShapeNames()[
                std::max(0, std::min(geo->shape, (int)GeometryNode::ShapeNames().size() - 1))];
-            dl->AddText(ImVec2(origin.x + 12, origin.y + 14), IM_COL32(200, 206, 226, 255), name.c_str());
+            dl->AddText(ImVec2(origin.x + 12, origin.y + 14),
+                        isLight ? IM_COL32(30, 36, 52, 255) : IM_COL32(200, 206, 226, 255), name.c_str());
             char tris[48];
             snprintf(tris, sizeof(tris), "%zu triangles", geo->TriangleCount());
-            dl->AddText(ImVec2(origin.x + 12, origin.y + 34), IM_COL32(130, 136, 156, 255), tris);
-            dl->AddText(ImVec2(origin.x + 12, origin.y + 54), IM_COL32(130, 136, 156, 255), "geometry -> Render 3D");
+            dl->AddText(ImVec2(origin.x + 12, origin.y + 34),
+                        isLight ? IM_COL32(95, 105, 125, 255) : IM_COL32(130, 136, 156, 255), tris);
+            dl->AddText(ImVec2(origin.x + 12, origin.y + 54),
+                        isLight ? IM_COL32(95, 105, 125, 255) : IM_COL32(130, 136, 156, 255), "geometry -> Render 3D");
          }
          else if (auto* draw = dynamic_cast<DrawNode*>(gn.node.get()))
             DrawPaintablePreview(draw);
@@ -63009,6 +63022,7 @@ int main(int argc, char** argv)
          // toggle - see the comment above isAudioBody.
          if (!isAudioBody && !isComment)
          {
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 4.0f);
             const bool isWide = (dynamic_cast<Render3DNode*>(gn.node.get()) != nullptr ||
                                  dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr);
             if (isWide)
@@ -63053,16 +63067,34 @@ int main(int argc, char** argv)
                // rather than absolute (overriding it) - see 00-modulation-
                // polarity.md.
                ImGui::SameLine();
-               ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.35f, 1.0f), gn.hasBipolarParams ? "mod\xc2\xb1" : "mod");
-               modTagMin = ImGui::GetItemRectMin();
-               modTagMax = ImGui::GetItemRectMax();
+               const char* tagText = gn.hasBipolarParams ? "mod\xc2\xb1" : "mod";
+               const ImVec2 txtSz = ImGui::CalcTextSize(tagText);
+               const ImVec2 p = ImGui::GetCursorScreenPos();
+               const ImVec2 tagSz(txtSz.x + 8.0f, txtSz.y + 2.0f);
+               ImDrawList* dl = ImGui::GetWindowDrawList();
+               dl->AddRectFilled(p, ImVec2(p.x + tagSz.x, p.y + tagSz.y),
+                                 isLight ? IM_COL32(255, 235, 200, 200) : IM_COL32(70, 50, 20, 180), 3.0f);
+               dl->AddText(ImVec2(p.x + 4.0f, p.y + 1.0f),
+                           isLight ? IM_COL32(180, 100, 20, 255) : IM_COL32(255, 190, 90, 255), tagText);
+               ImGui::Dummy(tagSz);
+               modTagMin = p;
+               modTagMax = ImVec2(p.x + tagSz.x, p.y + tagSz.y);
             }
             if (palTag)
             {
                ImGui::SameLine();
-               ImGui::TextColored(ImVec4(0.5f, 0.86f, 0.74f, 1.0f), "pal");
-               palTagMin = ImGui::GetItemRectMin();
-               palTagMax = ImGui::GetItemRectMax();
+               const char* tagText = "pal";
+               const ImVec2 txtSz = ImGui::CalcTextSize(tagText);
+               const ImVec2 p = ImGui::GetCursorScreenPos();
+               const ImVec2 tagSz(txtSz.x + 8.0f, txtSz.y + 2.0f);
+               ImDrawList* dl = ImGui::GetWindowDrawList();
+               dl->AddRectFilled(p, ImVec2(p.x + tagSz.x, p.y + tagSz.y),
+                                 isLight ? IM_COL32(200, 245, 235, 200) : IM_COL32(20, 60, 50, 180), 3.0f);
+               dl->AddText(ImVec2(p.x + 4.0f, p.y + 1.0f),
+                           isLight ? IM_COL32(20, 140, 110, 255) : IM_COL32(128, 220, 190, 255), tagText);
+               ImGui::Dummy(tagSz);
+               palTagMin = p;
+               palTagMax = ImVec2(p.x + tagSz.x, p.y + tagSz.y);
             }
             // Only once the whole row is laid out: the stubs move the cursor.
             if (modTag)
