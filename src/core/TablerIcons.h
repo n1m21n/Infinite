@@ -309,4 +309,19 @@ namespace Tabler
          dl->PathStroke(col, 0, grooveStroke);
       }
    }
+
+   // Blank-icon-slot fallback: a crisp rounded rect with a subtle inner square
+   // (matching Apple SF Symbols missing asset convention) so that any unset or
+   // missing icon never silently leaves an empty rect.
+   inline void DrawPlaceholder(ImDrawList* dl, ImVec2 center, float size, ImU32 col, float customStroke = 0.0f)
+   {
+      if (!dl) return;
+      const float s = size / 24.0f;
+      const float stroke = customStroke > 0.0f ? customStroke : ImMax(1.1f, 1.4f * s);
+      auto P = [&](float x, float y) { return Point24(center, size, x, y); };
+
+      const float r = 2.5f * s;
+      dl->AddRect(P(4.5f, 4.5f), P(19.5f, 19.5f), col, r, 0, stroke);
+      dl->AddRectFilled(P(9.0f, 9.0f), P(15.0f, 15.0f), col, 1.0f * s);
+   }
 }

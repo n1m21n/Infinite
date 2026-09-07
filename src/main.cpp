@@ -52494,7 +52494,10 @@ int main(int argc, char** argv)
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = (bmax.y - bmin.y) * 0.88f;
             const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
-            draw(dl, center, iconSize, col, 0.0f);
+            if (draw != nullptr)
+               draw(dl, center, iconSize, col, 0.0f);
+            else
+               Tabler::DrawPlaceholder(dl, center, iconSize, col, 0.0f);
 
             cursorX -= itemGap;
             return clicked;
