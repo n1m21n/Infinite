@@ -2497,13 +2497,14 @@ namespace
    // Modulation/Performance matrices) has one long edge butting straight up
    // against the canvas or another docked panel, where that same white tint
    // becomes a persistent bright seam instead of a highlight, and fights the
-   // theme's own divider color used everywhere else in the app. This gives
    // docked panels the identical opaque panelBg fill (so they never fall
-   // through to the transparent-ChildBg/backbuffer bug) but borders them
-   // with the theme's own t.border - the same color every other divider in
-   // the app uses - and skips the black BorderShadow entirely, so a docked
-   // panel's edge always reads as "a normal divider," never as a special
-   // highlighted one. Tune this and PushElevatedPanelStyle independently;
+   // through to the transparent-ChildBg/backbuffer bug) and NO edge of any
+   // kind - no border, no shadow. Docked panels butt straight up against the
+   // canvas or against each other, and every edge treatment tried on that
+   // seam (white tint, then the theme's t.border) was reported as a visible
+   // bar between viewports. A panel is distinguished by its panelBg fill
+   // against the canvas' windowBg; the edge was never carrying information
+   // the fill wasn't. Tune this and PushElevatedPanelStyle independently;
    // do not merge them back into one function (see node-ui-pillars P10 and
    // the "codebase-navigation" note on this split).
    inline void PushDockedPanelStyle(bool isChild)
@@ -2513,9 +2514,9 @@ namespace
       const ImVec4 bg = isLight ? ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 0.99f)
                                  : ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 0.97f);
       ImGui::PushStyleColor(isChild ? ImGuiCol_ChildBg : ImGuiCol_WindowBg, bg);
-      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(t.border.r, t.border.g, t.border.b, 1.0f));
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
-      ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
+      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
    }
 
    inline void PopDockedPanelStyle()
@@ -23969,7 +23970,14 @@ namespace
             ImGui::SameLine();
          grip();
       }
+      // Zeroed only around EndChild, which is where ImGui charges the gap
+      // that follows this panel - the panel's own contents above keep normal
+      // spacing. Without this, the ItemSpacing between the panel and whatever
+      // is laid out next shows a strip of the shell window's windowBg, which
+      // reads as a bar separating the two viewports.
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
       ImGui::EndChild();
+      ImGui::PopStyleVar();
 
       // No divider line along the canvas-facing edge, in either theme. This
       // hairline was a fixed dark constant, then a theme-derived one, and was
@@ -24460,7 +24468,14 @@ namespace
             ImGui::SameLine();
          grip();
       }
+      // Zeroed only around EndChild, which is where ImGui charges the gap
+      // that follows this panel - the panel's own contents above keep normal
+      // spacing. Without this, the ItemSpacing between the panel and whatever
+      // is laid out next shows a strip of the shell window's windowBg, which
+      // reads as a bar separating the two viewports.
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
       ImGui::EndChild();
+      ImGui::PopStyleVar();
 
       // No divider line along the canvas-facing edge, in either theme. This
       // hairline was a fixed dark constant, then a theme-derived one, and was
@@ -26637,7 +26652,14 @@ namespace
             ImGui::SameLine();
          grip();
       }
+      // Zeroed only around EndChild, which is where ImGui charges the gap
+      // that follows this panel - the panel's own contents above keep normal
+      // spacing. Without this, the ItemSpacing between the panel and whatever
+      // is laid out next shows a strip of the shell window's windowBg, which
+      // reads as a bar separating the two viewports.
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
       ImGui::EndChild();
+      ImGui::PopStyleVar();
 
       // No divider line along the canvas-facing edge, in either theme. This
       // hairline was a fixed dark constant, then a theme-derived one, and was
@@ -52327,8 +52349,14 @@ int main(int argc, char** argv)
       if (viewportTop || viewportBottom) { topBottom += gViewportPanelHeight; topBottomRows++; }
       if (matrixTop  || matrixBottom)    { topBottom += gModMatrixHeight;     topBottomRows++; }
       if (perfTop    || perfBottom)      { topBottom += gPerfPanelHeight;     topBottomRows++; }
+      // No ItemSpacing term: every docked panel is laid out flush (its
+      // Draw*Docked zeroes the spacing around its own outer child, and the
+      // SameLine chaining below passes an explicit 0 gap), so reserving a
+      // row gap here would leave an unused windowBg strip at the bottom -
+      // which is the same visible bar, just moved.
+      (void)topBottomRows;
       const float graphHeight = std::max(150.0f,
-         ImGui::GetContentRegionAvail().y - topBottom - topBottomRows * ImGui::GetStyle().ItemSpacing.y);
+         ImGui::GetContentRegionAvail().y - topBottom);
 
       // Top- and left-docked panels draw before the canvas: nothing else in
       // this window reserves space above or left of it, so each has to
@@ -52343,17 +52371,17 @@ int main(int argc, char** argv)
       if (viewportLeft)
       {
          DrawViewportPanelDocked("##viewportpanel_left", ImVec2(gViewportPanelWidth, graphHeight));
-         ImGui::SameLine();
+         ImGui::SameLine(0.0f, 0.0f);
       }
       if (matrixLeft)
       {
          DrawModMatrixDocked("##modmatrix_left", ImVec2(gModMatrixWidth, graphHeight));
-         ImGui::SameLine();
+         ImGui::SameLine(0.0f, 0.0f);
       }
       if (perfLeft)
       {
          DrawPerfPanelDocked("##perfpanel_left", ImVec2(gPerfPanelWidth, graphHeight));
-         ImGui::SameLine();
+         ImGui::SameLine(0.0f, 0.0f);
       }
 
       // Cleared here rather than at the top of the frame: a top/left-docked
@@ -65834,7 +65862,11 @@ int main(int argc, char** argv)
                                   getenv("INFINITE_EDPERFTEST") != nullptr;
       const auto edEndStart = kEdPerf ? std::chrono::steady_clock::now()
                                       : std::chrono::steady_clock::time_point{};
+      // Flush against any bottom-docked panel, for the same reason as the
+      // Draw*Docked EndChild calls above.
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
       ed::End();
+      ImGui::PopStyleVar();
       if (kEdPerf)
       {
          const double ms = std::chrono::duration<double, std::milli>(
@@ -65950,21 +65982,21 @@ int main(int argc, char** argv)
       // Right-docked viewport panel, chained via SameLine after the canvas
       if (viewportRight)
       {
-         ImGui::SameLine();
+         ImGui::SameLine(0.0f, 0.0f);
          DrawViewportPanelDocked("##viewportpanel_right", ImVec2(gViewportPanelWidth, graphHeight));
       }
 
       // Right-docked matrix panel
       if (matrixRight)
       {
-         ImGui::SameLine();
+         ImGui::SameLine(0.0f, 0.0f);
          DrawModMatrixDocked("##modmatrix_right", ImVec2(gModMatrixWidth, graphHeight));
       }
 
       // Right-docked performance matrix
       if (perfRight)
       {
-         ImGui::SameLine();
+         ImGui::SameLine(0.0f, 0.0f);
          DrawPerfPanelDocked("##perfpanel_right", ImVec2(gPerfPanelWidth, graphHeight));
       }
 
@@ -65972,7 +66004,7 @@ int main(int argc, char** argv)
       // Always sticks to the rightmost edge of the window
       if (gNodePanelOpen)
       {
-         ImGui::SameLine();
+         ImGui::SameLine(0.0f, 0.0f);
          PushDockedPanelStyle(/*isChild=*/true);
          ImGui::BeginChild("##nodepanel", ImVec2(kNodePanelWidth, graphHeight), true);
 
