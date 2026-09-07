@@ -3653,8 +3653,14 @@ namespace
          SetAudioReadout(caption, buf);
       }
 
+      // ItemSize, not Dummy - see KnobFloat's identical comment above.
+      // Dummy's ItemAdd(bb, 0) overwrites g.LastItemData with a zero id, so a
+      // caller's IsItemActive()/IsItemHovered() right after this function
+      // returns (DrawPerfElement's dragHold(), in particular) always saw a
+      // dead id-0 item and erased the held raw drag value every frame the
+      // knob was mid-drag - which read as the bipolar knob "not responding".
       ImGui::SetCursorScreenPos(p);
-      ImGui::Dummy(ImVec2(cell, rowH));
+      ImGui::ItemSize(ImVec2(cell, rowH));
       return changed;
    }
 
@@ -13933,6 +13939,7 @@ namespace
          n->gridCanvasTopY = origin.y;
          n->gridCanvasRowH = rowH + rowGap;
          ImDrawList* dl = ImGui::GetWindowDrawList();
+         const bool isLight = IsThemeLight();
          const int curStep = n->CurrentStep();
          const double beatsPerBar = Transport::Instance().BeatsPerBar();
          const double beatsPerStep = std::max(1e-6, MusicTime::BeatsFor((MusicTime::RateDivision)n->rate));
@@ -14002,7 +14009,15 @@ namespace
                }
 
                const bool isBar = (s % stepsPerBar) == 0;
-               const ImU32 frameCol = isBar ? IM_COL32(60, 64, 78, 255) : IM_COL32(40, 43, 53, 255);
+               // Was a hardcoded near-black cell fill regardless of theme -
+               // this is the drum sequencer's own step grid (distinct from
+               // PatternNode's already theme-aware DrawPatternStepGrid), and
+               // was the source of the "black boxes" seen in light presets.
+               // Colors mirror DrawPatternStepGrid's light-mode track-lane
+               // palette (isGroupStart ? 212/218/230 : 224/228/238).
+               const ImU32 frameCol = isLight
+                  ? (isBar ? IM_COL32(210, 215, 228, 255) : IM_COL32(224, 228, 238, 255))
+                  : (isBar ? IM_COL32(60, 64, 78, 255) : IM_COL32(40, 43, 53, 255));
                dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x0 + cellW - cellGap, y0 + rowH), frameCol, 2.0f);
                if (vel > 0.0f)
                {
@@ -14030,7 +14045,6 @@ namespace
             const ImVec2 pinMax(pinCenter.x + kPinHit * 0.5f, pinCenter.y + kPinHit * 0.5f);
             ed::PinRect(pinMin, pinMax);
 
-            const bool isLight = IsThemeLight();
             dl->AddCircleFilled(pinCenter, kPinRadius, isLight ? IM_COL32(50, 120, 240, 255) : IM_COL32(150, 190, 255, 255));
             dl->AddCircle(pinCenter, kPinRadius, isLight ? IM_COL32(40, 48, 65, 255) : IM_COL32(20, 22, 30, 255), 0, 1.5f);
             ed::EndPin();
@@ -25266,7 +25280,11 @@ namespace
          else
             curVal = elem.value > 0.5f;
 
-         float btnSize = std::min(cardSize.x - 18.0f, cardSize.y - 28.0f);
+         // Sized like the Knob/Bipolar knob's diameter cap (cellSize * 0.52,
+         // clamped 28..44) rather than nearly filling the cell - the old
+         // cardSize-18/-28 formula left almost no breathing room and read as
+         // oversized next to every other control's cell padding.
+         float btnSize = std::max(28.0f, std::min(cellSize * 0.52f, 44.0f));
          float centerX = cellPos.x + (cardSize.x - btnSize) * 0.5f;
          float centerY = cellPos.y + 20.0f + (cardSize.y - 20.0f - btnSize) * 0.5f;
          ImGui::SetCursorScreenPos(ImVec2(centerX, centerY));
@@ -25518,7 +25536,19 @@ namespace
          if (speed <= 0.0f) speed = 0.01f;
          ImGui::SetNextItemWidth(boxW);
          PushSliderStyle();
+         // The box background/border were already hand-drawn above (bTL/bBR)
+         // so only PushSliderStyle's Text color should carry through here -
+         // its FrameBg/Border pushes would otherwise paint a second frame on
+         // top of the manual one, which is the "double box" the user sees
+         // (loudest in light mode, where the border is opaque).
+         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0, 0, 0, 0));
+         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0, 0, 0, 0));
+         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
+         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
          const bool numMoved = ImGui::DragFloat("##numbox", &v, speed, minV, maxV, (std::abs(maxV - minV) > 10.0f) ? "%.1f" : "%.3f");
+         ImGui::PopStyleVar();
+         ImGui::PopStyleColor(4);
          PopSliderStyle();
          dragHold(v);
          if (numMoved)
@@ -26527,8 +26557,12 @@ namespace
       ImVec2 origin = ImGui::GetCursorScreenPos();
       const float h = 90.0f;
       ImDrawList* dl = ImGui::GetWindowDrawList();
+      // Was a hardcoded near-black fill regardless of theme - on a light
+      // preset (e.g. GitHub Light) this read as a solid black box in every
+      // modulator node's (LFO, Pattern, ...) header. Reuse the same
+      // theme-aware scope palette DrawCurveEditor already uses.
       dl->AddRectFilled(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
-                        IM_COL32(18, 18, 24, 255), 4.0f);
+                        ScopeBgCol(), 4.0f);
 
       dl->PushClipRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h), true); // backstop, not the primary fix
       for (size_t i = 1; i < history.size(); i++)
@@ -26553,14 +26587,14 @@ namespace
       {
          const float y0line = origin.y + h - (0.0f - lo) / range * h;
          const float y1line = origin.y + h - (1.0f - lo) / range * h;
-         const ImU32 hairlineCol = IM_COL32(255, 255, 255, 90);
+         const ImU32 hairlineCol = ScopeMidLineCol();
          if (y0line >= origin.y && y0line <= origin.y + h)
             dl->AddLine(ImVec2(origin.x, y0line), ImVec2(origin.x + kPreviewSize, y0line), hairlineCol, 1.0f);
          if (y1line >= origin.y && y1line <= origin.y + h)
             dl->AddLine(ImVec2(origin.x, y1line), ImVec2(origin.x + kPreviewSize, y1line), hairlineCol, 1.0f);
       }
       dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
-                  outOfContract ? IM_COL32(255, 190, 90, 255) : IM_COL32(70, 74, 90, 255), 4.0f);
+                  outOfContract ? IM_COL32(255, 190, 90, 255) : ScopeBorderCol(), 4.0f);
       ImGui::Dummy(ImVec2(kPreviewSize, h));
       ImGui::Text("%.3f", value);
    }
