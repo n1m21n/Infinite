@@ -2348,6 +2348,43 @@ namespace
       return h;
    }
 
+   // ---- The one selection/emphasis ladder ----
+   //
+   // Pre-composites the theme accent over the theme panel background and
+   // returns an OPAQUE color. Every "selected / hovered / active" surface in
+   // the app used to be the accent at some *alpha* over whatever happened to
+   // sit behind it - nine different alphas across ApplyTheme alone, each
+   // compositing against a different backdrop - which is why a selected
+   // Settings tab, the browser panel's selected mode tab, a selected list row
+   // and a segmented-control's active segment all read as unrelated colors
+   // despite tracing back to one accent. Compositing here instead means a
+   // given emphasis level is the exact same RGB everywhere it appears.
+   //
+   // Three levels, one ladder, used identically by ApplyTheme (Header*/Tab*)
+   // and by every hand-drawn segmented/toggle control in a node body:
+   //   hover    - transient, the lightest touch
+   //   selected - persistent "you are here"
+   //   pressed  - momentary, the strongest
+   // Full-strength accent stays reserved for genuinely different things: the
+   // filled primary action (PushPrimaryButtonStyle below), check marks,
+   // slider grabs, drag-drop and nav highlights.
+   //
+   // Never hand-roll a "selected" blue/purple at a call site - it will not
+   // track the theme preset, and the app has ten of them.
+   inline ImVec4 AccentTint(float amount)
+   {
+      const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
+      return ImVec4(t.panelBg.r + (t.accent.r - t.panelBg.r) * amount,
+                    t.panelBg.g + (t.accent.g - t.panelBg.g) * amount,
+                    t.panelBg.b + (t.accent.b - t.panelBg.b) * amount, 1.0f);
+   }
+
+   // Dark panels take a slightly stronger mix to read at the same perceived
+   // strength as light ones, since the accent is lifted out of a darker base.
+   inline ImVec4 AccentEmphasisHover() { return AccentTint(IsThemeLight() ? 0.20f : 0.26f); }
+   inline ImVec4 AccentEmphasisSelected() { return AccentTint(IsThemeLight() ? 0.34f : 0.42f); }
+   inline ImVec4 AccentEmphasisPressed() { return AccentTint(IsThemeLight() ? 0.48f : 0.58f); }
+
    // Shared "this is the recommended action" emphasis for a modal dialog's
    // button row - the app's accent color on exactly one button, matching
    // the platform convention of a single filled default action among plain
@@ -2428,10 +2465,13 @@ namespace
       // line at 0.55/0.05 alpha still rasterizes as a visible highlight on
       // rounded corners). The BorderShadow alone gives these dialogs enough
       // depth to read as "above" the canvas without needing an edge line.
+      // Border size is zeroed here too (not just the colour) so no outline is
+      // rasterized at all - a transparent 1px border still antialiases against
+      // the rounded corner and was itself the corner-bleed users saw.
       ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
       ImGui::PushStyleColor(ImGuiCol_BorderShadow, ImVec4(0.0f, 0.0f, 0.0f, isLight ? 0.06f : 0.22f));
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
-      ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
       // Top-level floating windows (Settings, Formula/Field-*-editor) use the
       // default WindowRounding (4.0f), which reads as flat/square next to
       // this same HIG pass's PopupRounding (12.0f) - a popup and an elevated
@@ -4755,6 +4795,25 @@ namespace
                           c.b + (1.0f - c.b) * amt, 1.0f);
       };
 
+      // ---- The one selection/emphasis ladder ----
+      //
+      // Every "this is selected / hovered / active" surface in the app used to
+      // be the accent at some *alpha* over whatever happened to sit behind it:
+      // Header at 0.20, HeaderHovered 0.35, HeaderActive 0.50, TabHovered
+      // 0.35, TabActive 0.50, and a fully-opaque accent on primary buttons.
+      // Six different alphas, each compositing against a different backdrop
+      // (panelBg here, windowBg there, a table row somewhere else), which is
+      // why the Settings tab, the browser panel's Modules tab, the search
+      // panel's selected row and the Field editor's Apply button all read as
+      // four unrelated purples even though one accent feeds them all.
+      //
+      // Defined once, next to PushPrimaryButtonStyle - see the long note
+      // there. Used from here for list rows and tabs, and from node bodies
+      // for hand-drawn segmented controls, so all three stay identical.
+      const ImVec4 kEmphasisHover = AccentEmphasisHover();
+      const ImVec4 kEmphasisSelected = AccentEmphasisSelected();
+      const ImVec4 kEmphasisPressed = AccentEmphasisPressed();
+
       ImGuiStyle& style = ImGui::GetStyle();
       style.Colors[ImGuiCol_Text] = vec(t.text);
       style.Colors[ImGuiCol_TextDisabled] = vec(t.textDim);
@@ -4785,28 +4844,27 @@ namespace
       style.Colors[ImGuiCol_Button] = shade(t.panelBg, 0.08f);
       style.Colors[ImGuiCol_ButtonHovered] = shade(t.panelBg, 0.18f);
       style.Colors[ImGuiCol_ButtonActive] = isLight ? shade(t.panelBg, 0.32f) : vec(t.accent, 0.65f);
-      style.Colors[ImGuiCol_Header] = vec(t.accent, isLight ? 0.20f : 0.30f);
-      style.Colors[ImGuiCol_HeaderHovered] = vec(t.accent, isLight ? 0.35f : 0.45f);
-      style.Colors[ImGuiCol_HeaderActive] = vec(t.accent, isLight ? 0.50f : 0.60f);
+      style.Colors[ImGuiCol_Header] = kEmphasisSelected;
+      style.Colors[ImGuiCol_HeaderHovered] = kEmphasisHover;
+      style.Colors[ImGuiCol_HeaderActive] = kEmphasisPressed;
       style.Colors[ImGuiCol_Separator] = vec(t.border);
       style.Colors[ImGuiCol_SeparatorHovered] = vec(t.accent, 0.6f);
       style.Colors[ImGuiCol_SeparatorActive] = vec(t.accent);
       style.Colors[ImGuiCol_ResizeGrip] = vec(t.border, 0.4f);
       style.Colors[ImGuiCol_ResizeGripHovered] = vec(t.accent, 0.6f);
       style.Colors[ImGuiCol_ResizeGripActive] = vec(t.accent);
-      // TabActive previously used shade(panelBg, 0.15f) - a 15% shade lift off
-      // the same panelBg as the inactive Tab, which reads as barely-there next
-      // to TabHovered's flat 0.5-alpha accent fill (the *transient* hover
-      // state was louder than the *persistent* selected state - Settings'
-      // "which tab am I on" question had no real answer at a glance). Reuse
-      // the exact accent/alpha pattern already established for
-      // Header/HeaderHovered/HeaderActive (the Selectable-selected treatment
-      // used by the browser panel's Modules/Samples/Media/Plugins mode
-      // switcher) so selected-tab emphasis reads identically everywhere in
-      // the app: unselected < hovered < active.
+      // Tabs and browser-panel mode rows are the same affordance wearing two
+      // widget types, so they share the ladder exactly: unselected panelBg,
+      // then hovered, then selected. Now literally the same constants as
+      // Header/HeaderHovered/
+      // HeaderActive above - the previous attempt at this used the *hovered*
+      // and *active* alpha tiers for tabs (0.35/0.50) but the lower *idle*
+      // tier for a selected browser row (0.20), so a selected Settings tab
+      // always rendered at roughly double the strength of a selected browser
+      // tab despite the comment claiming they matched.
       style.Colors[ImGuiCol_Tab] = vec(t.panelBg);
-      style.Colors[ImGuiCol_TabHovered] = vec(t.accent, isLight ? 0.35f : 0.45f);
-      style.Colors[ImGuiCol_TabActive] = vec(t.accent, isLight ? 0.50f : 0.60f);
+      style.Colors[ImGuiCol_TabHovered] = kEmphasisHover;
+      style.Colors[ImGuiCol_TabActive] = kEmphasisSelected;
       style.Colors[ImGuiCol_TabUnfocused] = vec(t.windowBg);
       style.Colors[ImGuiCol_TabUnfocusedActive] = vec(t.panelBg);
       // ImGui's own tab bar draws a 1px full-width bar under EVERY tab strip
@@ -4816,6 +4874,19 @@ namespace
       // opens with its own SeparatorText just below. Kill it app-wide; the
       // tab fill colour above already carries the active/hover distinction.
       style.TabBarBorderSize = 0.0f;
+      // No border line on any floating window or popup, in either theme.
+      // Every "black/white edge around the dialog box" report so far has been
+      // this 1px outline: whatever colour it is given, it is wrong against one
+      // of the two backgrounds it straddles (the dialog's own fill on one side,
+      // whatever the dialog happens to be floating over on the other), so it
+      // has to be re-tuned every time either theme moves. A dialog is already
+      // distinguished by its opaque panelBg fill sitting on a different
+      // windowBg, plus its rounding and shadow - the outline was carrying no
+      // information the fill wasn't already carrying. Deleting the element is
+      // the only fix that cannot regress; docked panels push their own
+      // border size explicitly (PushDockedPanelStyle) and are unaffected.
+      style.WindowBorderSize = 0.0f;
+      style.PopupBorderSize = 0.0f;
       style.Colors[ImGuiCol_TextSelectedBg] = vec(t.accent, 0.35f);
       style.Colors[ImGuiCol_DragDropTarget] = vec(t.accent);
       style.Colors[ImGuiCol_NavHighlight] = vec(t.accent);
@@ -7517,7 +7588,7 @@ namespace
          const bool isSelected = (b == n->selected);
          if (isSelected)
          {
-            ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.20f, 0.48f, 0.88f, 1.0f) : ImVec4(0.25f, 0.55f, 0.95f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
          }
          else
@@ -14489,7 +14560,8 @@ namespace
                // findable after the list has scrolled - drawn before the
                // row's widgets so it sits behind them, not on top.
                const ImVec2 rowMax(rowScreenMin.x + ImGui::GetContentRegionAvail().x, rowScreenMin.y + rowH);
-               ImGui::GetWindowDrawList()->AddRectFilled(rowScreenMin, rowMax, IM_COL32(80, 140, 220, 60));
+               ImGui::GetWindowDrawList()->AddRectFilled(rowScreenMin, rowMax,
+                                                        ImGui::ColorConvertFloat4ToU32(AccentEmphasisHover()));
             }
 
             // Nudge the (now-shorter) button down so it sits centered
@@ -20644,7 +20716,7 @@ namespace
       {
          const bool active = (n->formatIndex == i);
          if (active)
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.45f, 0.75f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
          if (ImGui::Button(fmtNames[i], ImVec2(fmtBtnW, 0)))
          {
             n->formatIndex = i;
@@ -23827,10 +23899,12 @@ namespace
       }
    }
 
-   // The panel's outer frame at every dock position: a borderless child plus
-   // exactly one hairline along the canvas-facing edge. One line is all the
-   // separation this needs - a full border here (and another around every
-   // card inside it) just stacked up rules for no extra information.
+   // The panel's outer frame at every dock position: a borderless child, and
+   // no edge line of any kind. The panel's own opaque panelBg fill against the
+   // canvas' windowBg is the whole separation - a hairline here (never mind a
+   // full border, plus another around every card inside it) just stacked up
+   // rules for no extra information, and was a recurring theme-regression
+   // source besides.
    //
    // That same canvas-facing edge is the panel's resize handle: a thin strip
    // reserved inside the panel, so it belongs to the panel's own window and
@@ -23897,23 +23971,14 @@ namespace
       }
       ImGui::EndChild();
 
-      const ImVec2 tl = ImGui::GetItemRectMin();
-      const ImVec2 br = ImGui::GetItemRectMax();
-      // Was a fixed dark-navy constant, unwired from ApplyTheme - always
-      // near-black regardless of theme, which is invisible as a divider in
-      // dark mode's already-dark panelBg and reads as a stray dark smear in
-      // light mode. Rebase on the theme's own t.border, the same color every
-      // other divider in the app already uses.
-      const CategoryColors::UiTheme& lineTheme = CategoryColors::CurrentUiTheme();
-      const ImU32 line = ImGui::ColorConvertFloat4ToU32(ImVec4(lineTheme.border.r, lineTheme.border.g, lineTheme.border.b, 1.0f));
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      switch (dock)
-      {
-         case 0: dl->AddLine(tl, ImVec2(br.x, tl.y), line); break;          // bottom dock -> top edge
-         case 1: dl->AddLine(tl, ImVec2(tl.x, br.y), line); break;          // right dock -> left edge
-         case 2: dl->AddLine(ImVec2(br.x, tl.y), br, line); break;          // left dock -> right edge
-         default: dl->AddLine(ImVec2(tl.x, br.y), br, line); break;         // top dock -> bottom edge
-      }
+      // No divider line along the canvas-facing edge, in either theme. This
+      // hairline was a fixed dark constant, then a theme-derived one, and was
+      // reported as a wrong-coloured seam both times - like the dialog border
+      // above, it straddles two different backgrounds (panel fill on one side,
+      // canvas on the other), so no single colour is right against both and
+      // every theme change re-breaks it. The panel already reads as separate
+      // because its opaque panelBg fill differs from the canvas' windowBg;
+      // the line added no information. Removed rather than re-tuned.
    }
 
    // The dock picker for the modulation matrix, shared by the panel's own
@@ -24397,23 +24462,14 @@ namespace
       }
       ImGui::EndChild();
 
-      const ImVec2 tl = ImGui::GetItemRectMin();
-      const ImVec2 br = ImGui::GetItemRectMax();
-      // Was a fixed dark-navy constant, unwired from ApplyTheme - always
-      // near-black regardless of theme, which is invisible as a divider in
-      // dark mode's already-dark panelBg and reads as a stray dark smear in
-      // light mode. Rebase on the theme's own t.border, the same color every
-      // other divider in the app already uses.
-      const CategoryColors::UiTheme& lineTheme = CategoryColors::CurrentUiTheme();
-      const ImU32 line = ImGui::ColorConvertFloat4ToU32(ImVec4(lineTheme.border.r, lineTheme.border.g, lineTheme.border.b, 1.0f));
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      switch (dock)
-      {
-         case 0: dl->AddLine(tl, ImVec2(br.x, tl.y), line); break;          // bottom dock -> top edge
-         case 1: dl->AddLine(tl, ImVec2(tl.x, br.y), line); break;          // right dock -> left edge
-         case 2: dl->AddLine(ImVec2(br.x, tl.y), br, line); break;          // left dock -> right edge
-         default: dl->AddLine(ImVec2(tl.x, br.y), br, line); break;         // top dock -> bottom edge
-      }
+      // No divider line along the canvas-facing edge, in either theme. This
+      // hairline was a fixed dark constant, then a theme-derived one, and was
+      // reported as a wrong-coloured seam both times - like the dialog border
+      // above, it straddles two different backgrounds (panel fill on one side,
+      // canvas on the other), so no single colour is right against both and
+      // every theme change re-breaks it. The panel already reads as separate
+      // because its opaque panelBg fill differs from the canvas' windowBg;
+      // the line added no information. Removed rather than re-tuned.
    }
 
    // ---- Performance Matrix ----
@@ -26205,8 +26261,8 @@ namespace
       // Mode Switch Button (Edit / Perform)
       if (gPerfEditMode)
       {
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.46f, 0.82f, 1.0f));
-         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.54f, 0.90f, 1.0f));
+         ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, AccentEmphasisPressed());
          if (ImGui::Button("Edit Mode", ImVec2(86, 24)))
             gPerfEditMode = false;
          ImGui::PopStyleColor(2);
@@ -26583,23 +26639,14 @@ namespace
       }
       ImGui::EndChild();
 
-      const ImVec2 tl = ImGui::GetItemRectMin();
-      const ImVec2 br = ImGui::GetItemRectMax();
-      // Was a fixed dark-navy constant, unwired from ApplyTheme - always
-      // near-black regardless of theme, which is invisible as a divider in
-      // dark mode's already-dark panelBg and reads as a stray dark smear in
-      // light mode. Rebase on the theme's own t.border, the same color every
-      // other divider in the app already uses.
-      const CategoryColors::UiTheme& lineTheme = CategoryColors::CurrentUiTheme();
-      const ImU32 line = ImGui::ColorConvertFloat4ToU32(ImVec4(lineTheme.border.r, lineTheme.border.g, lineTheme.border.b, 1.0f));
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      switch (dock)
-      {
-         case 0: dl->AddLine(tl, ImVec2(br.x, tl.y), line); break;
-         case 1: dl->AddLine(tl, ImVec2(tl.x, br.y), line); break;
-         case 2: dl->AddLine(ImVec2(br.x, tl.y), br, line); break;
-         default: dl->AddLine(ImVec2(tl.x, br.y), br, line); break;
-      }
+      // No divider line along the canvas-facing edge, in either theme. This
+      // hairline was a fixed dark constant, then a theme-derived one, and was
+      // reported as a wrong-coloured seam both times - like the dialog border
+      // above, it straddles two different backgrounds (panel fill on one side,
+      // canvas on the other), so no single colour is right against both and
+      // every theme change re-breaks it. The panel already reads as separate
+      // because its opaque panelBg fill differs from the canvas' windowBg;
+      // the line added no information. Removed rather than re-tuned.
    }
 
    void DrawModulatorMeter(IModulator* mod, int nodeIndex)
@@ -62901,7 +62948,7 @@ int main(int argc, char** argv)
                const float halfBtnW = (kPreviewSize - ImGui::GetStyle().ItemSpacing.x) / 2.0f;
                const bool pngActive = (n->imageFormat == 0);
                if (pngActive)
-                  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.45f, 0.75f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
                if (ImGui::Button(".png##imgPng", ImVec2(halfBtnW, 0)))
                {
                   n->imageFormat = 0;
@@ -62918,7 +62965,7 @@ int main(int argc, char** argv)
 
                const bool jpgActive = (n->imageFormat == 1);
                if (jpgActive)
-                  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.45f, 0.75f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
                if (ImGui::Button(".jpg##imgJpg", ImVec2(halfBtnW, 0)))
                {
                   n->imageFormat = 1;
@@ -62955,7 +63002,7 @@ int main(int argc, char** argv)
                ImGui::BeginDisabled(n->IsRecording());
                const bool mp4Active = (n->videoFormat == 0);
                if (mp4Active)
-                  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.45f, 0.75f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
                if (ImGui::Button(".mp4##vidMp4", ImVec2(halfBtnW, 0)))
                {
                   n->videoFormat = 0;
@@ -62972,7 +63019,7 @@ int main(int argc, char** argv)
 
                const bool movActive = (n->videoFormat == 1);
                if (movActive)
-                  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.45f, 0.75f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
                if (ImGui::Button(".mov##vidMov", ImVec2(halfBtnW, 0)))
                {
                   n->videoFormat = 1;
