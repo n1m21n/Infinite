@@ -2536,68 +2536,6 @@ namespace
       ImGui::PopStyleColor(2);
    }
 
-   // Draws a Tabler-style X in place of ImGui's own built-in title-bar close
-   // cross, which has a visibly different stroke weight/proportion from the
-   // hand-drawn Tabler::DrawX used everywhere else in the app (Samples-panel
-   // folder remove, mod-matrix Unbind, ...) - the two icon families read as
-   // inconsistent side by side. Mirrors ImGui::CloseButton's own geometry
-   // and hit-testing (imgui_widgets.cpp) exactly, just swapping the glyph it
-   // draws: same hover-circle background, same "shrink the hit-rect when
-   // the button covers most of a tiny window" tweak, same clipped-but-still-
-   // interactable behavior that keeps Alt+Right,Activate able to close a
-   // window via keyboard nav.
-   // Call this immediately after ImGui::Begin(title, nullptr) - passing
-   // nullptr instead of &openFlag suppresses ImGui's own close button
-   // entirely (has_close_button = (p_open != NULL) in imgui.cpp Begin()),
-   // rather than leaving it there to draw over. This function sets
-   // *openFlag = false on click, so callers see identical behavior to
-   // passing p_open straight into Begin.
-   inline void DrawWindowTablerCloseButton(bool* openFlag)
-   {
-      ImGuiWindow* window = ImGui::GetCurrentWindow();
-      if (!window)
-         return;
-      ImGuiStyle& style = ImGui::GetStyle();
-      const ImRect titleBarRect = window->TitleBarRect();
-      const float buttonSz = ImGui::GetFontSize();
-      const ImVec2 pos(titleBarRect.Max.x - style.FramePadding.x - buttonSz,
-                        titleBarRect.Min.y + style.FramePadding.y);
-
-      const ImGuiID id = window->GetID("#CLOSE");
-      const ImRect bb(pos, pos + ImVec2(buttonSz, buttonSz));
-      ImRect bbInteract = bb;
-      const float areaToVisibleRatio = window->OuterRectClipped.GetArea() / bb.GetArea();
-      if (areaToVisibleRatio < 1.5f)
-         bbInteract.Expand(ImTrunc(bbInteract.GetSize() * -0.25f));
-
-      // window->ClipRect has already been narrowed to the content region by
-      // the time Begin() returns to caller code - it excludes the title bar
-      // entirely, so ItemAdd's bb.Overlaps(window->ClipRect) test (and
-      // ButtonBehavior's hover test, which clips the same way) silently
-      // fails for a bb up in the title bar and nothing gets drawn or
-      // becomes interactive. Native CloseButton never hits this because it
-      // runs from inside Begin(), before that narrowing happens. Widen back
-      // to the full window rect for just this call, then restore.
-      ImGui::PushClipRect(window->Pos, window->Pos + window->Size, false);
-      const bool isClipped = !ImGui::ItemAdd(bbInteract, id);
-      bool hovered = false, held = false;
-      const bool pressed = ImGui::ButtonBehavior(bbInteract, id, &hovered, &held);
-      if (!isClipped)
-      {
-         const ImVec2 center = bb.GetCenter();
-         if (hovered)
-         {
-            const ImU32 bgCol = ImGui::GetColorU32(held ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered);
-            window->DrawList->AddCircleFilled(center, ImMax(2.0f, buttonSz * 0.5f + 1.0f), bgCol);
-         }
-         const ImU32 crossCol = hovered ? ImGui::GetColorU32(ImGuiCol_Text) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
-         Tabler::DrawX(window->DrawList, center, buttonSz * 0.72f, crossCol);
-      }
-      ImGui::PopClipRect();
-      if (pressed && openFlag)
-         *openFlag = false;
-   }
-
    // ---- The one panel seam ----
    //
    // What separates two adjacent panes, after several rounds of getting this
@@ -29863,16 +29801,12 @@ namespace
       ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       ImGui::SetNextWindowSize(ImVec2(740, 560), ImGuiCond_FirstUseEver);
       PushElevatedPanelStyle(/*isChild=*/false);
-      // nullptr instead of `open` suppresses ImGui's own close cross so
-      // DrawWindowTablerCloseButton can draw the Tabler-styled one used
-      // everywhere else in the app instead - see that function's comment.
-      if (!ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_NoCollapse))
+      if (!ImGui::Begin("Settings", open, ImGuiWindowFlags_NoCollapse))
       {
          ImGui::End();
          PopElevatedPanelStyle();
          return;
       }
-      DrawWindowTablerCloseButton(open);
 
       if (ImGui::BeginTabBar("SettingsTabs", ImGuiTabBarFlags_None))
       {
@@ -66601,9 +66535,8 @@ int main(int argc, char** argv)
       {
          ImGui::SetNextWindowSize(ImVec2(620, 460), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Formula editor", nullptr))
+         if (ImGui::Begin("Formula editor", &gFormulaEditorOpen))
          {
-            DrawWindowTablerCloseButton(&gFormulaEditorOpen);
             ImGui::TextDisabled("body of  vec4 shape(vec2 uv, vec2 p, float t)");
             ImGui::TextDisabled("p is centred (-0.5..0.5), t is transport seconds, uA-uD are the knobs");
             ImGui::Separator();
@@ -66658,9 +66591,8 @@ int main(int argc, char** argv)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Field element editor", nullptr))
+         if (ImGui::Begin("Field element editor", &gFieldElementEditorOpen))
          {
-            DrawWindowTablerCloseButton(&gFieldElementEditorOpen);
             ImGui::TextDisabled("Field element-domain kernel (per-vertex). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t");
             ImGui::TextDisabled("User attributes: 'attrib float heat = 0'. Frame rate expressions are automatically hoisted.");
             ImGui::Separator();
@@ -66730,9 +66662,8 @@ int main(int argc, char** argv)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Field primitive editor", nullptr))
+         if (ImGui::Begin("Field primitive editor", &gFieldPrimitiveEditorOpen))
          {
-            DrawWindowTablerCloseButton(&gFieldPrimitiveEditorOpen);
             ImGui::TextDisabled("Field primitive generator (from scratch). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t");
             ImGui::TextDisabled("Pure 3D geometry generator. Frame rate expressions are automatically hoisted.");
             ImGui::Separator();
@@ -66780,9 +66711,8 @@ int main(int argc, char** argv)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Field pixel editor", nullptr))
+         if (ImGui::Begin("Field pixel editor", &gFieldPixelEditorOpen))
          {
-            DrawWindowTablerCloseButton(&gFieldPixelEditorOpen);
             ImGui::TextDisabled("Field pixel-domain kernel (per-pixel fragment shader).");
             ImGui::TextDisabled("Reserved: uv (vec2), xy (vec2), res (vec2), aspect, col (vec3), alpha, t, dt, frame");
             ImGui::Separator();
@@ -66845,9 +66775,8 @@ int main(int argc, char** argv)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Field effect editor", nullptr))
+         if (ImGui::Begin("Field effect editor", &gFieldSampleEditorOpen))
          {
-            DrawWindowTablerCloseButton(&gFieldSampleEditorOpen);
             ImGui::TextDisabled("Field effect kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, out");
             ImGui::TextDisabled("'state float x = 0' declares per-voice memory (resets on note-on/steal). 'param float p = 0..1' exposes a modulatable knob.");
             ImGui::Separator();
@@ -66910,9 +66839,8 @@ int main(int argc, char** argv)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Field synth editor", nullptr))
+         if (ImGui::Begin("Field synth editor", &gFieldSynthEditorOpen))
          {
-            DrawWindowTablerCloseButton(&gFieldSynthEditorOpen);
             ImGui::TextDisabled("Field polyphonic synth kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, freq, gate, out");
             ImGui::TextDisabled("'state float x = 0' declares per-voice memory (resets on note-on/steal). 'param float p = 0..1' exposes a modulatable knob.");
             ImGui::Separator();
@@ -66975,9 +66903,8 @@ int main(int argc, char** argv)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Field graph editor", nullptr))
+         if (ImGui::Begin("Field graph editor", &gFieldGraphEditorOpen))
          {
-            DrawWindowTablerCloseButton(&gFieldGraphEditorOpen);
             ImGui::TextDisabled("Field graph-domain kernel (edit-time, runs once). emit(\"Type Name\", k0, k1, ...) -> handle");
             ImGui::TextDisabled("connect(src, srcSlot, dst, dstSlot)   set(handle, \"paramName\", value)   place(handle, x, y)");
             ImGui::Separator();
