@@ -2148,7 +2148,8 @@ namespace
    // depends on) and only the pixels are ours.
    bool AudioSliderFloat(const char* label, float* value, float minV, float maxV, const char* fmt,
                          float width, ImU32 fillColor, bool readOnly,
-                         FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr)
+                         FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
+                         bool vividState = false)
    {
       const bool isLight = IsThemeLight();
       if (isLight)
@@ -2211,9 +2212,14 @@ namespace
       const float fillX = r0.x + (r1.x - r0.x) * t;
       if (t > 0.0f)
       {
-         // Deliberately low alpha: the fill is a tint the label and value
-         // stay readable over, not a solid block that hides them.
-         const ImU32 alpha = isLight ? 110 : 86;
+         // Deliberately low alpha for the plain interactive fill: it's a
+         // tint the label and value stay readable over, not a solid block
+         // that hides them. modulated/expression/recording get the knob's
+         // own full-strength ring color instead (see KnobFloat's fillColor
+         // stroke) - those three states are exactly what the user pointed at
+         // saying "match the knob's saturation", and a translucent wash of
+         // the same RGB read as a different, washed-out color next to it.
+         const ImU32 alpha = vividState ? (isLight ? 225 : 205) : (isLight ? 110 : 86);
          const ImU32 soft = (fillColor & 0x00FFFFFF) | (alpha << 24);
          dl->AddRectFilled(r0, ImVec2(fillX, r1.y), soft, 3.0f);
       }
@@ -2229,21 +2235,37 @@ namespace
       const ImVec2 valSize = ImGui::CalcTextSize(valBuf);
       const float valX = r1.x - 7.0f - valSize.x;
       dl->PushClipRect(r0, r1, true);
-      // Light-mode readOnly was a mid grey that read as low-contrast/washed
-      // out against the card, and the light non-readOnly *name* below was
-      // accidentally reusing the dark theme's pale blue-grey outright - all
-      // but invisible on a light card. Darkened/raised-opacity across the
-      // board in both themes per feedback that every one of these read too
-      // faint.
-      const ImU32 valCol = isLight
-         ? (readOnly ? IM_COL32(78, 84, 100, 255) : IM_COL32(20, 24, 36, 255))
-         : (readOnly ? IM_COL32(205, 208, 220, 255) : IM_COL32(238, 241, 250, 255));
+      ImU32 valCol, nameCol;
+      if (vividState)
+      {
+         // The near-opaque fill above can sit under the whole track width at
+         // t=1, so the fixed grey pair below (tuned for the old near-black/
+         // near-white track) would go low-contrast against a bright fill
+         // (amber) - picked by the fill's own luminance instead of
+         // hardcoding per-hue.
+         const int fr = (int)(fillColor & 0xFF), fg = (int)((fillColor >> 8) & 0xFF), fb = (int)((fillColor >> 16) & 0xFF);
+         const bool onDark = (0.299f * fr + 0.587f * fg + 0.114f * fb) < 150.0f;
+         valCol = onDark ? IM_COL32(245, 246, 250, 255) : IM_COL32(15, 15, 18, 255);
+         nameCol = onDark ? IM_COL32(226, 228, 236, 220) : IM_COL32(35, 35, 40, 220);
+      }
+      else
+      {
+         // Light-mode readOnly was a mid grey that read as low-contrast/washed
+         // out against the card, and the light non-readOnly *name* below was
+         // accidentally reusing the dark theme's pale blue-grey outright - all
+         // but invisible on a light card. Darkened/raised-opacity across the
+         // board in both themes per feedback that every one of these read too
+         // faint.
+         valCol = isLight
+            ? (readOnly ? IM_COL32(78, 84, 100, 255) : IM_COL32(20, 24, 36, 255))
+            : (readOnly ? IM_COL32(205, 208, 220, 255) : IM_COL32(238, 241, 250, 255));
+         nameCol = isLight
+            ? (readOnly ? IM_COL32(100, 106, 122, 255) : IM_COL32(80, 86, 102, 255))
+            : (readOnly ? IM_COL32(178, 181, 196, 255) : IM_COL32(198, 202, 216, 255));
+      }
       dl->AddText(ImVec2(valX, textY), valCol, valBuf);
 
       dl->PushClipRect(r0, ImVec2(std::max(r0.x, valX - 6.0f), r1.y), true);
-      const ImU32 nameCol = isLight
-         ? (readOnly ? IM_COL32(100, 106, 122, 255) : IM_COL32(80, 86, 102, 255))
-         : (readOnly ? IM_COL32(178, 181, 196, 255) : IM_COL32(198, 202, 216, 255));
       dl->AddText(ImVec2(r0.x + 7.0f, textY), nameCol, name.c_str());
       dl->PopClipRect();
       dl->PopClipRect();
@@ -3001,7 +3023,8 @@ namespace
          if (audioStyle)
          {
             AudioSliderFloat(label, &shown, minV, maxV, fmt, width - box - 4.0f,
-                             IM_COL32(255, 190, 90, 255), /*readOnly=*/true, posToValue, valueToPos);
+                             IM_COL32(255, 190, 90, 255), /*readOnly=*/true, posToValue, valueToPos,
+                             /*vividState=*/true);
          }
          else
          {
@@ -3054,7 +3077,8 @@ namespace
          if (audioStyle)
          {
             AudioSliderFloat(label, &shown, minV, maxV, fmt, width - box - 4.0f - exprSuffixW,
-                             IM_COL32(170, 130, 255, 255), /*readOnly=*/true, posToValue, valueToPos);
+                             IM_COL32(170, 130, 255, 255), /*readOnly=*/true, posToValue, valueToPos,
+                             /*vividState=*/true);
          }
          else
          {
@@ -3116,7 +3140,8 @@ namespace
          if (audioStyle)
          {
             changed = AudioSliderFloat(label, value, minV, maxV, fmt, width - box - 4.0f,
-                                       activeCol, /*readOnly=*/false, posToValue, valueToPos);
+                                       activeCol, /*readOnly=*/false, posToValue, valueToPos,
+                                       /*vividState=*/recording);
          }
          else
          {
@@ -3176,7 +3201,8 @@ namespace
          if (audioStyle)
          {
             changed = AudioSliderFloat(label, value, minV, maxV, fmt, width - box - 4.0f,
-                                       activeCol, /*readOnly=*/false, posToValue, valueToPos);
+                                       activeCol, /*readOnly=*/false, posToValue, valueToPos,
+                                       /*vividState=*/recording);
          }
          else
          {
