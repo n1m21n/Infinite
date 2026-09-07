@@ -118,6 +118,18 @@
 // (use 'Metrics->Tools->Item Picker' to pick widgets with the mouse and break into them for easy debugging.)
 //#define IM_DEBUG_BREAK  IM_ASSERT(0)
 //#define IM_DEBUG_BREAK  __debugbreak()
+// Infinite: the stock definition (imgui_internal.h) is __builtin_debugtrap()
+// on this platform - a real SIGTRAP. That's fine under a debugger, but
+// Infinite ships as a plain double-clicked .app with no debugger attached,
+// so clicking an item with Metrics/Debugger's Item Picker (which Infinite
+// exposes via Menu > "UI Debugger") crashed the whole app outright the
+// moment it fired - confirmed via ~/Library/Logs/DiagnosticReports
+// (EXC_BREAKPOINT/SIGTRAP inside ImGui::ItemHoverable's
+// `if (g.DebugItemPickerBreakId == id) IM_DEBUG_BREAK();`). A no-op here
+// keeps the Item Picker's yellow hover-outline highlighting usable (that
+// part doesn't need this macro) while making the actual "break" a harmless
+// no-op instead of a crash.
+#define IM_DEBUG_BREAK()  ((void)0)
 
 //---- Debug Tools: Enable slower asserts
 //#define IMGUI_DEBUG_PARANOID
