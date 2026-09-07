@@ -1026,14 +1026,6 @@ namespace
       std::function<void(int)> onSelect;
       int current = 0;
       bool justOpened = false;
-      // The opening button's screen-space rect, captured via
-      // ed::CanvasToScreen() at the call site (still inside the node
-      // editor's canvas transform at that point) so the popup - drawn later,
-      // outside the canvas - can bridge back to it with a connecting tail.
-      // Zero-sized (Min==Max) means "no anchor known"; the tail is skipped
-      // rather than drawn from a stale/degenerate rect.
-      ImVec2 anchorMin = ImVec2(0.0f, 0.0f);
-      ImVec2 anchorMax = ImVec2(0.0f, 0.0f);
    };
    DropdownRequest gDropdown;
 
@@ -1045,23 +1037,6 @@ namespace
    // where GetItemRectMin/Max() is already real screen space and running it
    // through CanvasToScreen would silently apply a stale/unrelated pan+zoom.
    bool gInsideNodeCanvas = false;
-
-   // Call immediately after the button that opens the dropdown. Only records
-   // an anchor while inside a node body (see gInsideNodeCanvas) - see
-   // DropdownRequest::anchorMin for why the conversion only makes sense there.
-   inline void SetDropdownAnchorFromLastItem()
-   {
-      if (gInsideNodeCanvas)
-      {
-         gDropdown.anchorMin = ed::CanvasToScreen(ImGui::GetItemRectMin());
-         gDropdown.anchorMax = ed::CanvasToScreen(ImGui::GetItemRectMax());
-      }
-      else
-      {
-         gDropdown.anchorMin = ImVec2(0.0f, 0.0f);
-         gDropdown.anchorMax = ImVec2(0.0f, 0.0f);
-      }
-   }
 
    // Same story for ImGui's colour picker: opened inside a node it inherits the
    // canvas transform and the hue bar / sliders stop tracking the cursor. Route
@@ -2452,11 +2427,22 @@ namespace
       ImGui::PushStyleColor(ImGuiCol_BorderShadow, ImVec4(0.0f, 0.0f, 0.0f, isLight ? 0.06f : 0.22f));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
+      // Top-level floating windows (Settings, Formula/Field-*-editor) use the
+      // default WindowRounding (4.0f), which reads as flat/square next to
+      // this same HIG pass's PopupRounding (12.0f) - a popup and an elevated
+      // window are both "material above the canvas" and should read as the
+      // same shape language. Only the isChild==false path gets the bump;
+      // docked child panels (Modulation/Performance matrices, node browser)
+      // are governed by ImGuiStyleVar_ChildRounding, not WindowRounding, so
+      // pushing this unconditionally is harmless for them - kept
+      // unconditional (rather than gated on isChild) so the push/pop count
+      // here stays a fixed constant regardless of which path runs.
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, isChild ? ImGui::GetStyle().WindowRounding : 12.0f);
    }
 
    inline void PopElevatedPanelStyle()
    {
-      ImGui::PopStyleVar(2);
+      ImGui::PopStyleVar(3);
       ImGui::PopStyleColor(3);
    }
 
@@ -2563,7 +2549,6 @@ namespace
          gDropdown.onSelect = std::move(onSelect);
          gDropdown.current = safeCurrent;
          gDropdown.justOpened = true;
-         SetDropdownAnchorFromLastItem();
       }
       PopDropdownStyle();
       if (!showCaption)
@@ -4764,9 +4749,19 @@ namespace
       style.Colors[ImGuiCol_ResizeGrip] = vec(t.border, 0.4f);
       style.Colors[ImGuiCol_ResizeGripHovered] = vec(t.accent, 0.6f);
       style.Colors[ImGuiCol_ResizeGripActive] = vec(t.accent);
+      // TabActive previously used shade(panelBg, 0.15f) - a 15% shade lift off
+      // the same panelBg as the inactive Tab, which reads as barely-there next
+      // to TabHovered's flat 0.5-alpha accent fill (the *transient* hover
+      // state was louder than the *persistent* selected state - Settings'
+      // "which tab am I on" question had no real answer at a glance). Reuse
+      // the exact accent/alpha pattern already established for
+      // Header/HeaderHovered/HeaderActive (the Selectable-selected treatment
+      // used by the browser panel's Modules/Samples/Media/Plugins mode
+      // switcher) so selected-tab emphasis reads identically everywhere in
+      // the app: unselected < hovered < active.
       style.Colors[ImGuiCol_Tab] = vec(t.panelBg);
-      style.Colors[ImGuiCol_TabHovered] = vec(t.accent, 0.5f);
-      style.Colors[ImGuiCol_TabActive] = shade(t.panelBg, 0.15f);
+      style.Colors[ImGuiCol_TabHovered] = vec(t.accent, isLight ? 0.35f : 0.45f);
+      style.Colors[ImGuiCol_TabActive] = vec(t.accent, isLight ? 0.50f : 0.60f);
       style.Colors[ImGuiCol_TabUnfocused] = vec(t.windowBg);
       style.Colors[ImGuiCol_TabUnfocusedActive] = vec(t.panelBg);
       style.Colors[ImGuiCol_TextSelectedBg] = vec(t.accent, 0.35f);
@@ -6177,7 +6172,6 @@ namespace
                n2->LoadDeviceFile(device);
          };
          gDropdown.justOpened = true;
-         SetDropdownAnchorFromLastItem();
       }
       PopDropdownStyle();
 
@@ -8716,7 +8710,6 @@ namespace
                gDropdown.onSelect = std::move(onSelect);
                gDropdown.current = safe;
                gDropdown.justOpened = true;
-               SetDropdownAnchorFromLastItem();
             }
             if (h.registered)
                DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
@@ -8802,7 +8795,6 @@ namespace
                      gDropdown.onSelect = std::move(onSelect);
                      gDropdown.current = safe;
                      gDropdown.justOpened = true;
-                     SetDropdownAnchorFromLastItem();
                   }
                   if (h.registered)
                      DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
@@ -11043,7 +11035,6 @@ namespace
          gDropdown.onSelect = std::move(onSelect);
          gDropdown.current = safe;
          gDropdown.justOpened = true;
-         SetDropdownAnchorFromLastItem();
       }
       if (h.registered)
          DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
@@ -15057,7 +15048,6 @@ namespace
             };
             gDropdown.current = currentIdx;
             gDropdown.justOpened = true;
-            SetDropdownAnchorFromLastItem();
          }
          PopDropdownStyle();
       }
@@ -65496,47 +65486,6 @@ int main(int argc, char** argv)
                ImGui::SetScrollHereY(0.5f);
          }
 
-         // Speech-bubble-style connecting tail back to the button that
-         // opened this popup (HIG style pass stage 2, item B) - only when
-         // an anchor was actually recorded (SetDropdownAnchorFromLastItem
-         // skips it for the handful of non-node call sites, e.g. the docked
-         // browser panel's filter dropdowns, where there is no canvas
-         // transform to convert through). Drawn on the foreground draw list
-         // rather than this window's own - a window's draw list is clipped
-         // to its own rect, which would cut off a tail poking outside it.
-         if (gDropdown.anchorMin.x != gDropdown.anchorMax.x ||
-             gDropdown.anchorMin.y != gDropdown.anchorMax.y)
-         {
-            const ImVec2 winPos = ImGui::GetWindowPos();
-            const ImVec2 winSize = ImGui::GetWindowSize();
-            const float anchorCenterX = (gDropdown.anchorMin.x + gDropdown.anchorMax.x) * 0.5f;
-            // ImGui's own popup placement already decided above-vs-below the
-            // anchor button (and can flip it to fit the viewport) - read
-            // that decision back from where the popup actually landed
-            // rather than re-deriving it, so the tail always agrees with
-            // the popup's real position.
-            const bool popupBelow = winPos.y >= gDropdown.anchorMin.y;
-            constexpr float kHalfW = 6.0f;
-            constexpr float kTailLen = 7.0f;
-            const float tailX = std::clamp(anchorCenterX, winPos.x + kHalfW + 4.0f,
-                                            winPos.x + winSize.x - kHalfW - 4.0f);
-            const float baseY = popupBelow ? winPos.y : winPos.y + winSize.y;
-            const float tipY = popupBelow ? baseY - kTailLen : baseY + kTailLen;
-            ImDrawList* fg = ImGui::GetForegroundDrawList();
-            const ImU32 fillCol = ImGui::GetColorU32(ImGuiCol_PopupBg);
-            fg->AddTriangleFilled(ImVec2(tailX - kHalfW, baseY), ImVec2(tailX + kHalfW, baseY),
-                                  ImVec2(tailX, tipY), fillCol);
-            // Thin border matching the popup's own, so the tail reads as
-            // part of the same shape instead of a separate floating chip -
-            // only the two outer edges, not the base (which the popup's own
-            // top/bottom border already draws over).
-            const ImU32 borderCol = ImGui::GetColorU32(ImGuiCol_Border);
-            if (ImGui::GetStyle().PopupBorderSize > 0.0f)
-            {
-               fg->AddLine(ImVec2(tailX - kHalfW, baseY), ImVec2(tailX, tipY), borderCol, 1.0f);
-               fg->AddLine(ImVec2(tailX + kHalfW, baseY), ImVec2(tailX, tipY), borderCol, 1.0f);
-            }
-         }
          ImGui::EndPopup();
       }
 
