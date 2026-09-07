@@ -2379,11 +2379,15 @@ namespace
                     t.panelBg.b + (t.accent.b - t.panelBg.b) * amount, 1.0f);
    }
 
-   // Dark panels take a slightly stronger mix to read at the same perceived
-   // strength as light ones, since the accent is lifted out of a darker base.
-   inline ImVec4 AccentEmphasisHover() { return AccentTint(IsThemeLight() ? 0.20f : 0.26f); }
-   inline ImVec4 AccentEmphasisSelected() { return AccentTint(IsThemeLight() ? 0.34f : 0.42f); }
-   inline ImVec4 AccentEmphasisPressed() { return AccentTint(IsThemeLight() ? 0.48f : 0.58f); }
+   // One set of numbers for both polarities. The earlier light/dark split
+   // (0.34 vs 0.42 for "selected") was an attempt to equalise *perceived*
+   // strength, but it meant a selected row was a different colour depending
+   // on the theme - the exact class of drift this ladder exists to end - and
+   // both values landed too weak to read as a selection at a glance. Selected
+   // is 0.60 accent, everywhere, in every theme; hover and pressed bracket it.
+   inline ImVec4 AccentEmphasisHover() { return AccentTint(0.36f); }
+   inline ImVec4 AccentEmphasisSelected() { return AccentTint(0.60f); }
+   inline ImVec4 AccentEmphasisPressed() { return AccentTint(0.78f); }
 
    // Shared "this is the recommended action" emphasis for a modal dialog's
    // button row - the app's accent color on exactly one button, matching
@@ -2523,6 +2527,60 @@ namespace
    {
       ImGui::PopStyleVar(2);
       ImGui::PopStyleColor(2);
+   }
+
+   // ---- The one panel seam ----
+   //
+   // What separates two adjacent panes, after several rounds of getting this
+   // wrong, is the same thing AppKit uses between the panes of a split view:
+   // a single 1pt hairline in one separator colour, drawn at every boundary
+   // and nowhere else. Not a band, not a gap, not a shadow, and above all not
+   // a different treatment per boundary - the complaint that the separators
+   // "aren't uniform" was true because each dock edge was arriving at its
+   // divider by a different route (a hand-picked AddLine here, an unpainted
+   // child there, ImGui's item spacing somewhere else).
+   //
+   // The colour is derived from windowBg per polarity rather than picked, so
+   // it is a low-contrast edge in both themes by construction: light themes
+   // step windowBg down toward black, dark themes step it up toward white.
+   // It cannot come out black-on-light or white-on-dark, which is the exact
+   // failure every hand-chosen divider colour in this file has produced.
+   inline ImU32 PanelSeamColor()
+   {
+      const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
+      const bool isLight = IsThemeLight();
+      auto step = [isLight](float c) {
+         return isLight ? c * 0.86f : c + (1.0f - c) * 0.10f;
+      };
+      return ImGui::GetColorU32(ImVec4(step(t.windowBg.r), step(t.windowBg.g), step(t.windowBg.b), 1.0f));
+   }
+
+   // Draws that hairline along the just-submitted item's canvas-facing edge.
+   // Call it straight after a docked panel's resize-grip InvisibleButton: the
+   // grip always sits on the edge that faces the canvas, so the grip's own
+   // rect is already the boundary and no panel has to know its own geometry.
+   // `vertical` - the grip is a column (left/right dock) rather than a row.
+   // `facesStart` - the canvas is above / to the left, so the seam is the
+   // grip's top / left edge; otherwise its bottom / right.
+   //
+   // The 0.5 offset puts the 1px stroke inside the panel instead of straddling
+   // the boundary, so it is never half-covered by whatever is drawn next to it.
+   inline void DrawPanelSeam(bool vertical, bool facesStart)
+   {
+      const ImVec2 a = ImGui::GetItemRectMin();
+      const ImVec2 b = ImGui::GetItemRectMax();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImU32 col = PanelSeamColor();
+      if (vertical)
+      {
+         const float x = facesStart ? a.x + 0.5f : b.x - 0.5f;
+         dl->AddLine(ImVec2(x, a.y), ImVec2(x, b.y), col, 1.0f);
+      }
+      else
+      {
+         const float y = facesStart ? a.y + 0.5f : b.y - 0.5f;
+         dl->AddLine(ImVec2(a.x, y), ImVec2(b.x, y), col, 1.0f);
+      }
    }
 
    // Same pin id scheme, colours and gParamPinScreenList entry as ModSlider's
@@ -4888,6 +4946,18 @@ namespace
       // border size explicitly (PushDockedPanelStyle) and are unaffected.
       style.WindowBorderSize = 0.0f;
       style.PopupBorderSize = 0.0f;
+      // Why a *third* border size is needed to finish the job: a top-level
+      // menu popup is a Popup and takes PopupBorderSize, but a SUB-menu
+      // opened from inside one is flagged ImGuiWindowFlags_ChildWindow
+      // (imgui_widgets.cpp BeginMenuEx) and so takes ChildBorderSize instead
+      // (imgui.cpp Begin, "LOCK BORDER SIZE"). That is why Menu > "Modulation
+      // matrix" and Menu > "Performance Matrix" still drew an outline after
+      // the dialog/popup borders were removed - they were never going through
+      // PopupBorderSize at all. BeginChild zeroes ChildBorderSize itself
+      // unless ImGuiChildFlags_Border is passed, so this only reaches
+      // submenus and the handful of deliberately-bordered children, which
+      // push their own size back locally (the Field reference code boxes).
+      style.ChildBorderSize = 0.0f;
       style.Colors[ImGuiCol_TextSelectedBg] = vec(t.accent, 0.35f);
       style.Colors[ImGuiCol_DragDropTarget] = vec(t.accent);
       style.Colors[ImGuiCol_NavHighlight] = vec(t.accent);
@@ -23936,6 +24006,10 @@ namespace
          ImGui::InvisibleButton("##viewportgrip",
                                 vertical ? ImVec2(kGrip, std::max(1.0f, inner.y))
                                          : ImVec2(std::max(1.0f, inner.x), kGrip));
+         // The panel's canvas-facing boundary, and the only thing that marks
+         // it: one hairline, same colour and same 1px weight at every dock
+         // edge (see DrawPanelSeam).
+         DrawPanelSeam(vertical, gripFirst);
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             ImGui::SetMouseCursor(vertical ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);
          if (ImGui::IsItemActive())
@@ -24438,6 +24512,10 @@ namespace
          ImGui::InvisibleButton("##modmatrixgrip",
                                 vertical ? ImVec2(kGrip, std::max(1.0f, inner.y))
                                          : ImVec2(std::max(1.0f, inner.x), kGrip));
+         // The panel's canvas-facing boundary, and the only thing that marks
+         // it: one hairline, same colour and same 1px weight at every dock
+         // edge (see DrawPanelSeam).
+         DrawPanelSeam(vertical, gripFirst);
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             ImGui::SetMouseCursor(vertical ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);
          if (ImGui::IsItemActive())
@@ -24474,10 +24552,15 @@ namespace
       // stable.
       const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
       PushDockedPanelStyle(/*isChild=*/true);
+      // ChildBorderSize is 0 app-wide now (submenus need it, see ApplyTheme),
+      // and ImGui auto-zeroes a bordered child's WindowPadding whenever its
+      // resolved border size is 0 - so plain `true` here silently lost this
+      // panel's inner padding along with the border it no longer draws.
+      // AlwaysUseWindowPadding opts back into the real padding regardless.
       ImGui::BeginChild("##modmatrixpanelcontent",
                         vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
                                  : ImVec2(0, std::max(1.0f, inner.y - kGrip - gap.y)),
-                        true);
+                        ImGuiChildFlags_Border | ImGuiChildFlags_AlwaysUseWindowPadding);
       DrawModMatrixTable();
       ImGui::EndChild();
       PopDockedPanelStyle();
@@ -26642,6 +26725,10 @@ namespace
          ImGui::InvisibleButton("##perfpanelgrip",
                                 vertical ? ImVec2(kGrip, std::max(1.0f, inner.y))
                                          : ImVec2(std::max(1.0f, inner.x), kGrip));
+         // The panel's canvas-facing boundary, and the only thing that marks
+         // it: one hairline, same colour and same 1px weight at every dock
+         // edge (see DrawPanelSeam).
+         DrawPanelSeam(vertical, gripFirst);
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             ImGui::SetMouseCursor(vertical ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);
          if (ImGui::IsItemActive())
@@ -26668,10 +26755,13 @@ namespace
 
       const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
       PushDockedPanelStyle(/*isChild=*/true);
+      // Same padding-loss trap as ModMatrix's content child above - this is
+      // the exact cause of "Edit Mode / Perform" sitting flush against the
+      // panel edge with no breathing room.
       ImGui::BeginChild("##perfpanelinnercontent",
                         vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
                                  : ImVec2(0, std::max(1.0f, inner.y - kGrip - gap.y)),
-                        true);
+                        ImGuiChildFlags_Border | ImGuiChildFlags_AlwaysUseWindowPadding);
       DrawPerfPanelContent();
       ImGui::EndChild();
       PopDockedPanelStyle();
@@ -29606,6 +29696,13 @@ namespace
 
    void DrawSettingsWindow(bool* open)
    {
+      // No SetNextWindowPos meant this took ImGui's default cascade position
+      // for a first-time window, which lands high enough to crowd the menu
+      // bar it was just opened from. Centering it on first appearance - same
+      // convention as the Unsaved Changes / Recover Autosave modals below -
+      // gives it consistent breathing room on every screen size instead of a
+      // fixed offset that would be wrong on a small display.
+      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       ImGui::SetNextWindowSize(ImVec2(740, 560), ImGuiCond_FirstUseEver);
       PushElevatedPanelStyle(/*isChild=*/false);
       if (!ImGui::Begin("Settings", open, ImGuiWindowFlags_NoCollapse))
@@ -30203,7 +30300,10 @@ namespace
             }
 
             ImGui::Spacing();
-            ImGui::BeginChild("##fieldrefcontent", ImVec2(0, 0), true);
+            // See DrawModMatrixDocked's inner-content child for why
+            // AlwaysUseWindowPadding is needed alongside Border now.
+            ImGui::BeginChild("##fieldrefcontent", ImVec2(0, 0),
+                              ImGuiChildFlags_Border | ImGuiChildFlags_AlwaysUseWindowPadding);
 
             auto MatchesFilter = [](const char* text) -> bool {
                if (sFilterBuf[0] == '\0') return true;
@@ -30233,6 +30333,10 @@ namespace
                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.33f, 0.48f, 1.0f));
                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.34f, 0.40f, 0.58f, 1.0f));
                ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 4.0f);
+               // ChildBorderSize is 0 app-wide (ApplyTheme) so submenus stop
+               // drawing an outline; this box wants its explicit edge back,
+               // and asks for it locally rather than by leaving the global on.
+               ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
                const float h = ImGui::CalcTextSize(code).y + 16.0f;
                ImGui::BeginChild(copyId, ImVec2(0, h), true, ImGuiWindowFlags_NoScrollbar);
                ImGui::TextUnformatted(code);
@@ -30242,7 +30346,7 @@ namespace
                if (ImGui::SmallButton(btnLabel))
                   ImGui::SetClipboardText(code);
                ImGui::EndChild();
-               ImGui::PopStyleVar();
+               ImGui::PopStyleVar(2);
                ImGui::PopStyleColor(6);
                ImGui::Spacing();
             };
@@ -30522,11 +30626,26 @@ namespace
                   SaveDefaultExprGlobals();
                }
 
+               // The value readout is live, so its text width changes every
+               // frame ("0.5865" vs "-12.3400"), and a plain SameLine() passed
+               // that jitter straight down the row - the delete button visibly
+               // slid left and right while the globals evaluated. Both columns
+               // are pinned to fixed x instead: the number is right-aligned
+               // against a fixed edge (digits grow leftwards, the way any
+               // numeric column should) and the button sits at a constant x,
+               // so nothing downstream of a variable-width string can move.
+               const float btnW = ImGui::GetFrameHeight();
+               const float btnX = ImGui::GetWindowContentRegionMax().x - btnW;
+               const float valueRightX = btnX - ImGui::GetStyle().ItemSpacing.x;
+
+               char valueText[32];
+               snprintf(valueText, sizeof(valueText), "%.4f", g.value);
                ImGui::SameLine();
-               ImGui::TextDisabled("%.4f", g.value);
+               ImGui::SetCursorPosX(valueRightX - ImGui::CalcTextSize(valueText).x);
+               ImGui::TextDisabled("%s", valueText);
                ImGui::SameLine();
+               ImGui::SetCursorPosX(btnX);
                {
-                  const float btnW = ImGui::GetFrameHeight();
                   if (ImGui::Button("##removeexprglobal", ImVec2(btnW, 0)))
                      removeAt = (int)i;
                   ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -51605,47 +51724,45 @@ int main(int argc, char** argv)
 
             if (ImGui::BeginMenu("Modulation matrix"))
             {
-               PushCheckboxStyle();
+               // Plain themed widgets, same as "Viewport panel" above - this
+               // is menu chrome, not a node body, so it takes the app's own
+               // checkbox/slider colours (ApplyTheme) rather than the P10
+               // dark-contrast-budget style meant for controls inside a node.
+               // The two styles side by side in one menu (one purple/clean,
+               // one flat blue) is what read as inconsistent.
                ImGui::Checkbox("Show modulation matrix", &gModMatrixOpen);
-               PopCheckboxStyle();
                if (gModMatrixOpen)
                {
                   ImGui::SetNextItemWidth(150);
                   ModMatrixDockCombo();
                   ImGui::SetNextItemWidth(150);
-                  PushSliderStyle();
                   if (gModMatrixDock == 1 || gModMatrixDock == 2)
                      ImGui::SliderFloat("Width", &gModMatrixWidth,
                                         kModMatrixMinWidth, 900.0f, "%.0f px");
                   else
                      ImGui::SliderFloat("Height", &gModMatrixHeight,
                                         kModMatrixMinHeight, 800.0f, "%.0f px");
-                  PopSliderStyle();
                }
                ImGui::EndMenu();
             }
 
             if (ImGui::BeginMenu("Performance Matrix"))
             {
-               PushCheckboxStyle();
+               // Same reasoning as "Modulation matrix" above: plain themed
+               // widgets, not the node-body P10 style.
                ImGui::Checkbox("Show Performance Matrix", &gPerfPanelOpen);
-               PopCheckboxStyle();
                if (gPerfPanelOpen)
                {
                   ImGui::SetNextItemWidth(150);
                   PerfPanelDockCombo();
                   ImGui::SetNextItemWidth(150);
-                  PushSliderStyle();
                   if (gPerfPanelDock == 1 || gPerfPanelDock == 2)
                      ImGui::SliderFloat("Width", &gPerfPanelWidth,
                                         kPerfPanelMinWidth, 900.0f, "%.0f px");
                   else
                      ImGui::SliderFloat("Height", &gPerfPanelHeight,
                                         kPerfPanelMinHeight, 800.0f, "%.0f px");
-                  PopSliderStyle();
-                  PushCheckboxStyle();
                   ImGui::Checkbox("Edit Mode", &gPerfEditMode);
-                  PopCheckboxStyle();
                }
                ImGui::EndMenu();
             }
@@ -66044,7 +66161,21 @@ int main(int argc, char** argv)
       {
          ImGui::SameLine(0.0f, 0.0f);
          PushDockedPanelStyle(/*isChild=*/true);
-         ImGui::BeginChild("##nodepanel", ImVec2(kNodePanelWidth, graphHeight), true);
+         // See DrawModMatrixDocked's inner-content child for why
+         // AlwaysUseWindowPadding is needed alongside Border now.
+         ImGui::BeginChild("##nodepanel", ImVec2(kNodePanelWidth, graphHeight),
+                           ImGuiChildFlags_Border | ImGuiChildFlags_AlwaysUseWindowPadding);
+         // Same hairline as every other panel boundary. This panel has no
+         // resize grip to hang it off, so it draws the seam on its own left
+         // edge - the side that faces the canvas, since it is always the
+         // rightmost panel.
+         {
+            const ImVec2 wp = ImGui::GetWindowPos();
+            const ImVec2 ws = ImGui::GetWindowSize();
+            ImGui::GetWindowDrawList()->AddLine(ImVec2(wp.x + 0.5f, wp.y),
+                                                ImVec2(wp.x + 0.5f, wp.y + ws.y),
+                                                PanelSeamColor(), 1.0f);
+         }
 
          // Mode switcher: Modules is the original, always-present catalogue;
          // Samples and Media extend it per docs/plans/audio/README.md P3e.
