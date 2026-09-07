@@ -24128,6 +24128,20 @@ namespace
                // Unbind
                ImGui::TableNextColumn();
                {
+                  // At-rest fill is transparent rather than the theme's
+                  // opaque Button colour (t.panelBg): this button sits inside
+                  // a table with TableRowBgAlt zebra striping (added this
+                  // same HIG pass), and an opaque fill that happens to match
+                  // the base row exactly turns into a visible "chip" outline
+                  // on every alt row only, once the row bg tints away from
+                  // panelBg - the exact row-to-row inconsistency this was
+                  // reported for. Transparent means the button always reads
+                  // as a bare icon, matching the "icon-only" intent this
+                  // control was converted to, regardless of which stripe or
+                  // theme it's drawn over. Hover/active keep the theme's
+                  // usual button colours (free per P10, and how every other
+                  // icon-button in the app already behaves).
+                  ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
                   const float btnW = ImGui::GetFrameHeight();
                   if (ImGui::Button("##unbindmod", ImVec2(btnW, 0)))
                   {
@@ -24135,12 +24149,27 @@ namespace
                      mod.Unbind(dstIndex, dstParam);
                      unbound = true;
                   }
+                  ImGui::PopStyleColor();
                   ImDrawList* dl = ImGui::GetWindowDrawList();
                   const ImVec2 bmin = ImGui::GetItemRectMin();
                   const ImVec2 bmax = ImGui::GetItemRectMax();
                   const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
                   const float iconSize = (bmax.y - bmin.y) * 0.6f;
-                  const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+                  // Unhovered colour blends TextDisabled toward Text rather
+                  // than using TextDisabled at full strength: the zebra alt
+                  // row (t.text at low alpha) sits closer to TextDisabled's
+                  // own luminance than the base row does in some presets, so
+                  // a pure TextDisabled X could read fine on one stripe and
+                  // wash out on the other. The 60/40 blend keeps the same
+                  // "quiet until scanned for" budget on both.
+                  const ImVec4 disabled4 = ImGui::GetStyle().Colors[ImGuiCol_TextDisabled];
+                  const ImVec4 text4 = ImGui::GetStyle().Colors[ImGuiCol_Text];
+                  const ImU32 idleCol = IM_COL32(
+                     (int)((disabled4.x * 0.6f + text4.x * 0.4f) * 255.0f),
+                     (int)((disabled4.y * 0.6f + text4.y * 0.4f) * 255.0f),
+                     (int)((disabled4.z * 0.6f + text4.z * 0.4f) * 255.0f),
+                     255);
+                  const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255) : idleCol;
                   Tabler::DrawX(dl, center, iconSize, col);
                }
 
@@ -65233,7 +65262,7 @@ int main(int argc, char** argv)
          ImGui::EndPopup();
       }
 
-      ImGui::SetNextWindowSizeConstraints(ImVec2(300, 0), ImVec2(400, 440));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(230, 0), ImVec2(300, 440));
       if (searchPopupCentered)
       {
          const ImVec2 center = ImVec2(gGraphScreenTL.x + gGraphScreenSize.x * 0.5f,
@@ -65257,7 +65286,7 @@ int main(int argc, char** argv)
             ImGui::SetKeyboardFocusHere();
             searchJustOpened = false;
          }
-         ImGui::SetNextItemWidth(280);
+         ImGui::SetNextItemWidth(210);
          ImGui::InputTextWithHint("##q", "search nodes...", searchBuf, sizeof(searchBuf));
          ImGui::Separator();
 
@@ -66116,11 +66145,13 @@ int main(int argc, char** argv)
             ImGui::InputTextMultiline("##glsl", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 70));
 
+            PushPrimaryButtonStyle();
             if (ImGui::Button("Apply", ImVec2(120, 0)))
             {
                gFormulaEditor->formula = editBuf;
                gFormulaEditor->Apply();
             }
+            PopPrimaryButtonStyle();
             ImGui::SameLine();
             if (ImGui::Button("Revert", ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFormulaEditor->formula.c_str());
@@ -66184,12 +66215,14 @@ int main(int argc, char** argv)
             ImGui::InputTextMultiline("##fieldCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
+            PushPrimaryButtonStyle();
             if (ImGui::Button("Apply", ImVec2(120, 0)))
             {
                gFieldElementEditor->code = editBuf;
                gFieldElementEditor->Apply();
                lastKnownCode = gFieldElementEditor->code;
             }
+            PopPrimaryButtonStyle();
             ImGui::SameLine();
             if (ImGui::Button("Revert", ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldElementEditor->code.c_str());
@@ -66246,12 +66279,14 @@ int main(int argc, char** argv)
             ImGui::InputTextMultiline("##fieldPrimitiveCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
+            PushPrimaryButtonStyle();
             if (ImGui::Button("Apply", ImVec2(120, 0)))
             {
                gFieldPrimitiveEditor->code = editBuf;
                gFieldPrimitiveEditor->Apply();
                lastKnownCode = gFieldPrimitiveEditor->code;
             }
+            PopPrimaryButtonStyle();
             ImGui::SameLine();
             if (ImGui::Button("Revert", ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldPrimitiveEditor->code.c_str());
@@ -66293,12 +66328,14 @@ int main(int argc, char** argv)
             ImGui::InputTextMultiline("##fieldPixelCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
+            PushPrimaryButtonStyle();
             if (ImGui::Button("Apply", ImVec2(120, 0)))
             {
                gFieldPixelEditor->code = editBuf;
                gFieldPixelEditor->Apply();
                lastKnownCode = gFieldPixelEditor->code;
             }
+            PopPrimaryButtonStyle();
             ImGui::SameLine();
             if (ImGui::Button("Revert", ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldPixelEditor->code.c_str());
@@ -66355,12 +66392,14 @@ int main(int argc, char** argv)
             ImGui::InputTextMultiline("##fieldSampleCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
+            PushPrimaryButtonStyle();
             if (ImGui::Button("Apply", ImVec2(120, 0)))
             {
                gFieldSampleEditor->code = editBuf;
                gFieldSampleEditor->Apply();
                lastKnownCode = gFieldSampleEditor->code;
             }
+            PopPrimaryButtonStyle();
             ImGui::SameLine();
             if (ImGui::Button("Revert", ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldSampleEditor->code.c_str());
@@ -66417,12 +66456,14 @@ int main(int argc, char** argv)
             ImGui::InputTextMultiline("##fieldSynthCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
+            PushPrimaryButtonStyle();
             if (ImGui::Button("Apply", ImVec2(120, 0)))
             {
                gFieldSynthEditor->code = editBuf;
                gFieldSynthEditor->Apply();
                lastKnownCode = gFieldSynthEditor->code;
             }
+            PopPrimaryButtonStyle();
             ImGui::SameLine();
             if (ImGui::Button("Revert", ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldSynthEditor->code.c_str());
@@ -66479,6 +66520,7 @@ int main(int argc, char** argv)
             ImGui::InputTextMultiline("##fieldGraphCode", editBuf, sizeof(editBuf),
                                       ImVec2(-1, ImGui::GetContentRegionAvail().y - 35));
 
+            PushPrimaryButtonStyle();
             if (ImGui::Button("Apply", ImVec2(120, 0)))
             {
                // Compile-only (T11): never mutates the real graph on its own -
@@ -66488,6 +66530,7 @@ int main(int argc, char** argv)
                gFieldGraphEditor->Apply();
                lastKnownCode = gFieldGraphEditor->code;
             }
+            PopPrimaryButtonStyle();
             ImGui::SameLine();
             if (ImGui::Button("Revert", ImVec2(120, 0)))
                snprintf(editBuf, sizeof(editBuf), "%s", gFieldGraphEditor->code.c_str());
