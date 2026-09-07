@@ -3062,30 +3062,25 @@ namespace
       else if (hasExpr && !exprErrored)
       {
          // Driven by a typed expression, re-evaluated every frame by the
-         // apply pass in the main loop. Read-only like the modulated state,
-         // but a distinct colour and an fx badge. Double-click reopens the
-         // expression text for editing, same as any other field.
+         // apply pass in the main loop. No fx/x badge any more - the purple
+         // track/fill is the only signal, matching how the modulated (amber)
+         // and recording (red) states each get one colour and nothing else.
+         // A plain click still jumps the local `shown` copy but that's
+         // discarded and overwritten by next frame's expression re-apply, so
+         // it has no lasting effect - only once the mouse actually drags past
+         // ImGui's own click/drag threshold do we commit `shown` back into
+         // *value and clear the expression, handing the field to the normal
+         // editable-slider path below from the next frame on. That keeps a
+         // double-click's first click (which doesn't cross the drag
+         // threshold) from clearing the expression before the second click's
+         // BeginTypedEditFromCurrent gets a chance to read it.
          float shown = *value;
-         // The fx badge and the clear button are SameLine'd after the slider,
-         // so the slider has to give up their width or they hang off the right
-         // edge of the cell - outside the section panel and over the next
-         // column. Audio bodies only: a visual node's params are one wide
-         // column with room to spare, and the standing rule is not to restyle
-         // that library.
-         // The "fx" caption is dropped in audio bodies and only the clear
-         // button kept. An expression is already signalled twice over - the
-         // pin turns purple and the track fills purple - and in a half-width
-         // envelope field the caption's ~19px is the difference between the
-         // label reading "release" and reading "re".
-         const float exprSuffixW =
-            audioStyle ? ImGui::CalcTextSize("x").x + ImGui::GetStyle().FramePadding.x * 2.0f + 4.0f
-                       : 0.0f;
          if (audioStyle)
          {
             // Same muted purple as the plain-slider branch's FrameBg below.
-            AudioSliderFloat(label, &shown, minV, maxV, fmt, width - box - 4.0f - exprSuffixW,
+            AudioSliderFloat(label, &shown, minV, maxV, fmt, width - box - 4.0f,
                              isLight ? IM_COL32(224, 209, 250, 255) : IM_COL32(51, 38, 82, 255),
-                             /*readOnly=*/true, posToValue, valueToPos, /*vividState=*/true);
+                             /*readOnly=*/false, posToValue, valueToPos, /*vividState=*/true);
          }
          else
          {
@@ -3104,17 +3099,18 @@ namespace
                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.93f, 0.99f, 1.0f));
             }
             ImGui::SetNextItemWidth(width - box - 4.0f);
-            ImGui::SliderFloat(label, &shown, minV, maxV, fmt, ImGuiSliderFlags_NoInput);
+            ImGui::SliderFloat(label, &shown, minV, maxV, fmt);
             ImGui::PopStyleColor(3);
          }
-         const bool sliderHovered = ImGui::IsItemHovered();
-         bool hovered = sliderHovered;
-         if (!audioStyle)
+         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 4.0f))
          {
-            ImGui::SameLine(0.0f, 4.0f);
-            ImGui::TextColored(ImVec4(0.66f, 0.51f, 0.98f, 1.0f), "fx");
-            hovered = hovered || ImGui::IsItemHovered();
+            PushUndoCheckpoint();
+            Modulation::Instance().ClearExpression(nodeIndex, paramIndex);
+            GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
+            *value = shown;
+            changed = true;
          }
+         const bool hovered = ImGui::IsItemHovered();
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
          if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
@@ -3124,13 +3120,6 @@ namespace
          }
          if (hovered)
             HandleParamTypeHotkeys(editKey, value);
-         ImGui::SameLine(0.0f, 4.0f);
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.15f, 0.15f, 1.0f));
-         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.2f, 0.2f, 1.0f));
-         if (ImGui::SmallButton("x"))
-            Modulation::Instance().ClearExpression(nodeIndex, paramIndex);
-         ImGui::PopStyleColor(3);
       }
       else if (hasExpr) // exprErrored
       {
@@ -4127,27 +4116,23 @@ namespace
       }
       else if (hasExpr && !exprErrored)
       {
+         // No fx/x badge any more - the purple ring is the only signal. A
+         // plain click still moves the local `shown` copy but that's
+         // discarded and overwritten by next frame's expression re-apply;
+         // only once the mouse actually drags past ImGui's own drag
+         // threshold do we commit `shown` back into *value and clear the
+         // expression, same reasoning as the slider branch above.
          float shown = *value;
-         DrawWidget(&shown, IM_COL32(170, 130, 255, 255), /*readOnly=*/true);
-         const bool knobHovered = ImGui::IsItemHovered();
-         // The fx badge and its clear button are placed absolutely in the
-         // cell's top-right corner rather than chained with SameLine: a
-         // SameLine here would push the row past the body width the moment
-         // any one param got an expression bound, which is exactly the kind
-         // of "the layout is whatever it adds up to" failure v3 exists to
-         // remove.
-         const ImVec2 cursorAfterKnob = ImGui::GetCursorScreenPos();
-         ImGui::GetWindowDrawList()->AddText(ImVec2(cellOrigin.x + cell - 16.0f, cellOrigin.y),
-                                             IM_COL32(168, 130, 250, 255), "fx");
-         ImGui::SetCursorScreenPos(ImVec2(cellOrigin.x + cell - 16.0f, cellOrigin.y + 13.0f));
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.15f, 0.15f, 1.0f));
-         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.2f, 0.2f, 1.0f));
-         if (ImGui::SmallButton("x"))
+         DrawWidget(&shown, IM_COL32(170, 130, 255, 255), /*readOnly=*/false);
+         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 4.0f))
+         {
+            PushUndoCheckpoint();
             Modulation::Instance().ClearExpression(nodeIndex, paramIndex);
-         ImGui::PopStyleColor(3);
-         const bool hovered = knobHovered;
-         ImGui::SetCursorScreenPos(cursorAfterKnob);
+            GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
+            *value = shown;
+            changed = true;
+         }
+         const bool hovered = ImGui::IsItemHovered();
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
          if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
@@ -14151,7 +14136,17 @@ namespace
          const float btnW = 20.0f;
          const float rowY = ImGui::GetCursorScreenPos().y;
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - btnW, rowY));
-         if (ImGui::Button("x##clearlane", ImVec2(btnW, 0)))
+         const bool clearClicked = ImGui::Button("##clearlane", ImVec2(btnW, 0));
+         {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 bmin = ImGui::GetItemRectMin();
+            const ImVec2 bmax = ImGui::GetItemRectMax();
+            const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+            const float iconSize = (bmax.y - bmin.y) * 0.65f;
+            const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+            Tabler::DrawX(dl, center, iconSize, col);
+         }
+         if (clearClicked)
          {
             PushUndoCheckpoint();
             n->ClearLane(lane);
@@ -14855,18 +14850,13 @@ namespace
          // ImGuiHoveredFlags_ForTooltip (stationary + a short shared delay,
          // per style.HoverFlagsForTooltipMouse) rather than a bare
          // IsItemHovered(), which fired on literally the first hovered frame
-         // of every row - so a fast sweep across many rows (two-finger-
-         // scroll or a scrollbar drag with the cursor resting over the
-         // list) popped a full absolute-path tooltip per row it crossed.
-         // Also suppressed outright while a sample/media drag is in
-         // progress (gSampleDragActive, set a few lines above) so a
-         // click-drag never shows the path tooltip mid-drag.
-         if (!gSampleDragActive && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
+         // of every row. Only the decode-error tooltip is shown here - the
+         // absolute-path tooltip was removed as noise on every hover.
+         if (!gSampleDragActive && !mediaKind && gPreviewingSamplePath.empty() &&
+             gPreviewErrorPath == entry.path &&
+             ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
          {
-            if (!mediaKind && gPreviewingSamplePath.empty() && gPreviewErrorPath == entry.path)
-               ImGui::SetTooltip("%s", gPreviewErrorMessage.c_str());
-            else
-               ImGui::SetTooltip("%s", entry.path.c_str());
+            ImGui::SetTooltip("%s", gPreviewErrorMessage.c_str());
          }
 
          DrawFavoriteBadge(selMin, selMax, isFav);
@@ -23804,9 +23794,13 @@ namespace
    // zeroes FramePadding.y), so this is what the row above the render costs.
    // Card and container both size against it, or the render overflows its
    // card by a few pixels and gets clipped.
+   // Small breathing room between the title row and the render/image below
+   // it - without this the render started at the exact next-line cursor with
+   // zero gap, so it visually touched the title row.
+   constexpr float kViewportCardTitleGap = 6.0f;
    float ViewportPanelTitleHeight()
    {
-      return ImGui::GetTextLineHeight() + ImGui::GetStyle().ItemSpacing.y;
+      return ImGui::GetTextLineHeight() + ImGui::GetStyle().ItemSpacing.y + kViewportCardTitleGap;
    }
 
    void DrawViewportPanelCard(GraphNode& gn, const ImVec2& imageSize)
@@ -23818,9 +23812,22 @@ namespace
       ImGui::BeginChild(childId, ImVec2(imageSize.x, imageSize.y + titleH), false,
                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
-      const bool closeRequested = ImGui::SmallButton("X");
+      // Vector X, same as the search panel's folder-remove and the drum
+      // sequencer's per-lane clear - not ImGui's plain-text "X" button.
+      const float closeBtnW = 20.0f;
+      const bool closeRequested = ImGui::Button("##closeviewportcard", ImVec2(closeBtnW, 0));
+      {
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImVec2 bmin = ImGui::GetItemRectMin();
+         const ImVec2 bmax = ImGui::GetItemRectMax();
+         const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+         const float iconSize = (bmax.y - bmin.y) * 0.65f;
+         const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+         Tabler::DrawX(dl, center, iconSize, col);
+      }
       ImGui::SameLine();
       ImGui::TextUnformatted(NodeTitle(gn).c_str());
+      ImGui::Dummy(ImVec2(0.0f, kViewportCardTitleGap));
 
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 br(origin.x + imageSize.x, origin.y + imageSize.y);
@@ -26726,8 +26733,6 @@ namespace
          if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Add New Page");
       }
-
-      ImGui::Separator();
 
       // Calculate dynamic content bounding box on active page
       const float cellSize = (float)gPerfLayout.cellSize;
@@ -51764,8 +51769,6 @@ int main(int argc, char** argv)
                      (slash == std::string::npos) ? entry : entry.substr(slash + 1);
                   if (ImGui::MenuItem(name.c_str()))
                      GuardUnsavedChanges([entry]() { LoadPatchFrom(entry); });
-                  if (ImGui::IsItemHovered())
-                     ImGui::SetTooltip("%s", entry.c_str());
                }
                ImGui::EndMenu();
             }
@@ -52355,19 +52358,19 @@ int main(int argc, char** argv)
 
          TopBarSeparator();
 
-         // 5. Bar & Beat position
+         // 5. Bar & beat, frame cost, and the CPU meter - one left-aligned
+         // "status" cluster in the same label style/font as bar & beat,
+         // rather than bar/beat living here and fps/ms/audio being pinned to
+         // the far right in a visually different treatment.
          char barBeatBuf[64];
          snprintf(barBeatBuf, sizeof(barBeatBuf), "bar %d  beat %.2f",
                   1 + (int)transport.Bars(),
                   std::fmod(transport.Beats(), transport.BeatsPerBar()) + 1.0);
          TopBarLabel(barBeatBuf, true);
 
-         ImGui::PopStyleColor(6);
-         ImGui::PopStyleVar(4);
-
-         // Frame cost, pinned right. Measured from the swap-to-swap wall clock
-         // rather than ImGui's smoothed rate, so a heavy patch shows its real
-         // cost immediately instead of easing into it over a second.
+         // Frame cost. Measured from the swap-to-swap wall clock rather than
+         // ImGui's smoothed rate, so a heavy patch shows its real cost
+         // immediately instead of easing into it over a second.
          static double sSmoothedMs = 0.0;
          // A gentle EMA: raw frame times jitter too much to read, but the
          // window is short enough that dragging a slider shows up at once.
@@ -52377,29 +52380,15 @@ int main(int argc, char** argv)
          const double fps = sSmoothedMs > 0.0001 ? 1000.0 / sSmoothedMs : 0.0;
 
          char readout[80];
-         if (gTargetFps > 0)
-            snprintf(readout, sizeof(readout), "%.1f / %d fps   %.1f ms",
-                     fps, gTargetFps, sSmoothedMs);
-         else
-            snprintf(readout, sizeof(readout), "%.1f fps   %.1f ms", fps, sSmoothedMs);
+         snprintf(readout, sizeof(readout), "%.1f fps   %.1f ms", fps, sSmoothedMs);
 
-         // Reserve space using a worst-case template rather than the live
-         // string's width, so the search button doesn't jitter as the digit
-         // count of the fps/ms readout changes frame to frame.
-         char readoutTemplate[80];
-         if (gTargetFps > 0)
-            snprintf(readoutTemplate, sizeof(readoutTemplate), "888.8 / %d fps   888.8 ms", gTargetFps);
-         else
-            snprintf(readoutTemplate, sizeof(readoutTemplate), "888.8 fps   888.8 ms");
-         const float reservedWidth = ImGui::CalcTextSize(readoutTemplate).x;
-         const float readoutX = ImGui::GetWindowWidth() - reservedWidth - ImGui::GetStyle().WindowPadding.x * 2.0f;
+         TopBarSameLine(10.0f);
+         TopBarLabel(readout, true);
 
-         // Audio engine load, pinned left of the search button. Same
-         // green/yellow/red judgment as fps below: under 70% of the block's
-         // real-time budget is fine, past 90% is where xruns start. Distinct
-         // from the fps number - a heavy patch can pin the render loop
-         // without the audio thread being anywhere near its deadline, or
-         // vice versa, since they run on separate threads.
+         // CPU meter - the audio engine's block load, replacing the old
+         // "audio off"/"audio X%" caption. Rendered in the same dim style as
+         // bar/beat and fps/ms regardless of load or on/off state - it's a
+         // reading, not a warning light, so it doesn't get its own color.
          const bool audioEngineOn = AudioEngine::Instance().SampleRate() > 0.0;
          const double audioLoad = AudioEngine::Instance().LastBlockLoad();
          const uint64_t xruns = AudioEngine::Instance().XrunCount();
@@ -52411,38 +52400,40 @@ int main(int argc, char** argv)
          // recovering" flag means this can't drift out of sync with what
          // PollAudioRecovery actually decided.
          const bool audioDead = audioEngineOn && !AudioEngine::Instance().IsAlive();
-         char audioReadout[64];
+         char cpuReadout[32];
          if (audioDead)
-            snprintf(audioReadout, sizeof(audioReadout), "audio lost - reconnecting");
+            snprintf(cpuReadout, sizeof(cpuReadout), "cpu lost");
          else if (audioEngineOn)
-            snprintf(audioReadout, sizeof(audioReadout), "audio %.0f%%%s",
-                     audioLoad * 100.0, xruns > 0 ? " !" : "");
+            snprintf(cpuReadout, sizeof(cpuReadout), "cpu %.0f%%%s", audioLoad * 100.0, xruns > 0 ? " !" : "");
          else
-            snprintf(audioReadout, sizeof(audioReadout), "audio off");
-         const float audioWidth = ImGui::CalcTextSize("audio lost - reconnecting").x;
+            snprintf(cpuReadout, sizeof(cpuReadout), "cpu --");
+         TopBarSameLine(10.0f);
+         TopBarLabel(cpuReadout, true);
+         if (audioEngineOn && xruns > 0 && ImGui::IsItemHovered())
+            ImGui::SetTooltip("%llu buffer underrun%s detected this session",
+                              (unsigned long long)xruns, xruns == 1 ? "" : "s");
 
-         const char* searchLabel = "search";
-         const float searchWidth = ImGui::CalcTextSize(searchLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-         const float itemGap = ImGui::GetStyle().ItemSpacing.x * 4.0f;
-         const float searchX = readoutX - searchWidth - itemGap;
-         const float audioX = searchX - audioWidth - itemGap;
+         // Far right: an "Update" button (green, shown only while a newer
+         // version is actually available), then icon buttons for the
+         // Viewport panel, Modulation matrix and Performance mode, then a
+         // search icon+label - all sharing the same transparent/hover-fill
+         // button style as BPM/Key/Scale so they read as one family of
+         // controls rather than the dimmed bar/beat/fps/cpu cluster.
+         const float windowRight = ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x;
+         const float itemGap = ImGui::GetStyle().ItemSpacing.x * 3.0f;
+         float cursorX = windowRight;
 
-         // Update badge, one more link to the left of audioX in the same
-         // right-to-left chain. Rendered only when an update is actually
-         // available - the slot collapses entirely otherwise, so the common
-         // case costs nothing visually and doesn't disturb audioX/searchX/
-         // readoutX's positions.
          if (UpdateCheck::UpdateAvailable())
          {
-            const char* updateLabel = "update available";
+            const char* updateLabel = "Update";
             const float updateWidth = ImGui::CalcTextSize(updateLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-            const float updateX = audioX - updateWidth - itemGap;
+            cursorX -= updateWidth;
 
-            ImGui::SameLine(updateX);
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.95f, 0.75f, 0.35f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.82f, 0.42f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.85f, 0.65f, 0.28f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.12f, 0.10f, 0.02f, 1.0f));
+            ImGui::SameLine(cursorX);
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.62f, 0.34f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.70f, 0.40f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.52f, 0.28f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
             if (ImGui::Button(updateLabel))
                Platform::OpenExternalUrl("https://n1m21n.github.io/Infinite/#download");
             ImGui::PopStyleColor(4);
@@ -52453,42 +52444,71 @@ int main(int argc, char** argv)
             }
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
                UpdateCheck::Dismiss();
+            cursorX -= itemGap;
          }
 
          {
-            const ImVec4 audioColor = !audioEngineOn ? ImVec4(0.55f, 0.55f, 0.58f, 1.0f)
-                                     : audioDead ? ImVec4(0.95f, 0.45f, 0.4f, 1.0f)
-                                     : (audioLoad < 0.7) ? ImVec4(0.45f, 0.85f, 0.5f, 1.0f)
-                                     : (audioLoad < 0.9) ? ImVec4(0.95f, 0.75f, 0.35f, 1.0f)
-                                                          : ImVec4(0.95f, 0.45f, 0.4f, 1.0f);
-            ImGui::SameLine(audioX);
-            ImGui::GetCurrentWindow()->DC.CurrLineTextBaseOffset = ImGui::GetStyle().FramePadding.y;
-            ImGui::TextColored(audioColor, "%s", audioReadout);
-            if (audioEngineOn && xruns > 0 && ImGui::IsItemHovered())
-               ImGui::SetTooltip("%llu buffer underrun%s detected this session",
-                                  (unsigned long long)xruns, xruns == 1 ? "" : "s");
-         }
+            const char* searchLabel = "search";
+            const float iconSize = ImGui::GetFrameHeight() * 0.9f;
+            const float iconSlot = iconSize + 7.0f;
+            const float textW = ImGui::CalcTextSize(searchLabel).x;
+            const float totalW = iconSlot + textW + ImGui::GetStyle().FramePadding.x * 2.0f;
+            cursorX -= totalW;
 
-         {
-            // Sits left of the frame readout with a bit of breathing room,
-            // so it reads as its own control rather than glued to the fps text.
-            ImGui::SameLine(searchX);
-            if (ImGui::Button(searchLabel))
+            ImGui::SameLine(cursorX);
+            const ImVec2 btnStart = ImGui::GetCursorScreenPos();
+            const bool clicked = ImGui::Button("##searchhit", ImVec2(totalW, 0.0f));
+            const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const float rowH = ImGui::GetItemRectSize().y;
+            const ImVec2 iconCenter(btnStart.x + ImGui::GetStyle().FramePadding.x + iconSize * 0.5f, btnStart.y + rowH * 0.5f);
+            Tabler::DrawSearch(dl, iconCenter, iconSize, col);
+            const float textY = btnStart.y + (rowH - ImGui::GetTextLineHeight()) * 0.5f;
+            dl->AddText(ImVec2(btnStart.x + ImGui::GetStyle().FramePadding.x + iconSlot, textY), col, searchLabel);
+            if (clicked)
                gNodePanelOpen = !gNodePanelOpen;
+            cursorX -= itemGap;
          }
 
-         ImGui::SameLine(readoutX);
-         ImGui::GetCurrentWindow()->DC.CurrLineTextBaseOffset = ImGui::GetStyle().FramePadding.y;
+         // Icon-only toggle buttons for Viewport / Modulation matrix /
+         // Performance mode - a little larger than the transport play/
+         // rewind buttons (38px, icon at 88% of the row height) since these
+         // carry no text label to help them read at a glance.
+         auto TopBarIconToggle = [&](const char* id, bool isOpen, void (*draw)(ImDrawList*, ImVec2, float, ImU32, float), const char* tooltip)
+         {
+            const float btnW = 38.0f;
+            cursorX -= btnW;
+            ImGui::SameLine(cursorX);
 
-         // Judged against the target when there is one, so hitting a
-         // deliberate 30fps cap reads as green rather than as a problem.
-         // Otherwise against 50/25, where dragging a slider stops feeling live.
-         const double good = gTargetFps > 0 ? gTargetFps * 0.95 : 50.0;
-         const double poor = gTargetFps > 0 ? gTargetFps * 0.5 : 25.0;
-         const ImVec4 color = (fps >= good) ? ImVec4(0.45f, 0.85f, 0.5f, 1.0f)
-                            : (fps >= poor) ? ImVec4(0.95f, 0.75f, 0.35f, 1.0f)
-                                            : ImVec4(0.95f, 0.45f, 0.4f, 1.0f);
-         ImGui::TextColored(color, "%s", readout);
+            if (isOpen)
+               ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+            const bool clicked = ImGui::Button(id, ImVec2(btnW, 0.0f));
+            if (isOpen)
+               ImGui::PopStyleColor();
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("%s", tooltip);
+
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 bmin = ImGui::GetItemRectMin();
+            const ImVec2 bmax = ImGui::GetItemRectMax();
+            const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+            const float iconSize = (bmax.y - bmin.y) * 0.88f;
+            const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
+            draw(dl, center, iconSize, col, 0.0f);
+
+            cursorX -= itemGap;
+            return clicked;
+         };
+
+         if (TopBarIconToggle("##perfPanelToggle", gPerfPanelOpen, &Tabler::DrawDisc, "Performance mode"))
+            gPerfPanelOpen = !gPerfPanelOpen;
+         if (TopBarIconToggle("##modMatrixToggle", gModMatrixOpen, &Tabler::DrawGridDots, "Modulation matrix"))
+            gModMatrixOpen = !gModMatrixOpen;
+         if (TopBarIconToggle("##viewportPanelToggle", gViewportPanelOpen, &Tabler::DrawLayoutSidebar, "Viewport panel"))
+            gViewportPanelOpen = !gViewportPanelOpen;
+
+         ImGui::PopStyleColor(6);
+         ImGui::PopStyleVar(4);
 
          ImGui::EndMenuBar();
       }
@@ -65929,9 +65949,30 @@ int main(int argc, char** argv)
          searchRequestClose = false;
       }
 
-      ImGui::SetNextWindowSizeConstraints(ImVec2(240, 0), ImVec2(520, 480));
+      // Size the popup to its actual content rather than a fixed 240px
+      // floor - a short list like the filter-mode options ("off", "lp 12",
+      // ...) doesn't need anywhere near that width, and a fixed floor just
+      // stretches the pills into a wide, empty-feeling bar.
+      const float dropdownTextPadX = 8.0f;
+      float dropdownMaxTextW = 0.0f;
+      for (const std::string& opt : gDropdown.options)
+         dropdownMaxTextW = ImMax(dropdownMaxTextW, ImGui::CalcTextSize(opt.c_str()).x);
+      for (const std::string& cat : gDropdown.categories)
+         dropdownMaxTextW = ImMax(dropdownMaxTextW, ImGui::CalcTextSize(cat.c_str()).x);
+      const float dropdownMinWidth = ImClamp(dropdownMaxTextW + ImGui::GetStyle().WindowPadding.x * 2.0f
+                                                 + dropdownTextPadX * 2.0f
+                                                 + ImGui::GetStyle().ScrollbarSize,
+                                              120.0f, 400.0f);
+      ImGui::SetNextWindowSizeConstraints(ImVec2(dropdownMinWidth, 0), ImVec2(520, 480));
       if (ImGui::BeginPopup("##dropdown"))
       {
+         // The pill still spans the full row (NoPadWithHalfSpacing below
+         // keeps the gap between rows real, and item spacing is tightened
+         // slightly so that gap isn't oversized), but the label is drawn
+         // with its own left inset instead of starting flush with the
+         // pill's edge - otherwise the text reads as glued to the window
+         // border with no breathing room.
+         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, ImMax(2.0f, ImGui::GetStyle().ItemSpacing.y - 2.0f)));
          std::string lastCategory;
          for (int i = 0; i < (int)gDropdown.options.size(); i++)
          {
@@ -65948,7 +65989,24 @@ int main(int argc, char** argv)
                }
             }
             bool selected = (i == gDropdown.current);
-            if (ImGui::Selectable(gDropdown.options[i].c_str(), selected))
+            ImGui::PushID(i);
+            const ImVec2 rowMin = ImGui::GetCursorScreenPos();
+            const float rowWidth = ImGui::GetContentRegionAvail().x;
+            // NoPadWithHalfSpacing: Selectable pads its hit/fill rect into
+            // half of ItemSpacing on each side by default so a stack of rows
+            // reads as one continuous menu - which is exactly what erased
+            // the gap between the selected row's pill and a hovered
+            // neighbour's pill (e.g. "oct +0" selected, "oct +1" hovered).
+            // Opting out restores a real gap between rows, so the two
+            // highlight states stay visually distinct.
+            const bool clicked = ImGui::Selectable("##ddrow", selected,
+                                                    ImGuiSelectableFlags_NoPadWithHalfSpacing, ImVec2(rowWidth, 0.0f));
+            const float rowH = ImGui::GetItemRectSize().y;
+            ImGui::GetWindowDrawList()->AddText(
+               ImVec2(rowMin.x + dropdownTextPadX, rowMin.y + (rowH - ImGui::GetTextLineHeight()) * 0.5f),
+               ImGui::GetColorU32(ImGuiCol_Text), gDropdown.options[i].c_str());
+            ImGui::PopID();
+            if (clicked)
             {
                if (gDropdown.onSelect && i != gDropdown.current)
                {
@@ -65961,6 +66019,7 @@ int main(int argc, char** argv)
                ImGui::SetScrollHereY(0.5f);
          }
 
+         ImGui::PopStyleVar();
          ImGui::EndPopup();
       }
 

@@ -230,4 +230,83 @@ namespace Tabler
       }
       dl->AddPolyline(pts, 10, col, ImDrawFlags_Closed, stroke);
    }
+
+   inline void DrawLayoutSidebar(ImDrawList* dl, ImVec2 center, float size, ImU32 col, float customStroke = 0.0f)
+   {
+      const float s = size / 24.0f;
+      const float stroke = customStroke > 0.0f ? customStroke : ImMax(1.2f, 1.6f * s);
+      auto P = [&](float x, float y) { return Point24(center, size, x, y); };
+
+      const float rounding = 2.0f * s;
+      dl->AddRect(P(4, 4), P(20, 20), col, rounding, 0, stroke);
+      dl->AddLine(P(9, 4.6f), P(9, 19.4f), col, stroke);
+   }
+
+   inline void DrawGridDots(ImDrawList* dl, ImVec2 center, float size, ImU32 col, float customStroke = 0.0f)
+   {
+      const float s = size / 24.0f;
+      const float r = ImMax(1.0f, 1.3f * s);
+      auto P = [&](float x, float y) { return Point24(center, size, x, y); };
+
+      const float xs[3] = { 6.5f, 12.0f, 17.5f };
+      const float ys[3] = { 6.5f, 12.0f, 17.5f };
+      for (int yi = 0; yi < 3; ++yi)
+         for (int xi = 0; xi < 3; ++xi)
+            dl->AddCircleFilled(P(xs[xi], ys[yi]), r, col);
+   }
+
+   inline void DrawGauge(ImDrawList* dl, ImVec2 center, float size, ImU32 col, float customStroke = 0.0f)
+   {
+      const float s = size / 24.0f;
+      const float stroke = customStroke > 0.0f ? customStroke : ImMax(1.2f, 1.6f * s);
+      auto P = [&](float x, float y) { return Point24(center, size, x, y); };
+
+      const ImVec2 arcCenter = P(12, 14);
+      const float radius = 8.0f * s;
+      dl->PathArcTo(arcCenter, radius, IM_PI * 1.0f, IM_PI * 2.0f, 24);
+      dl->PathStroke(col, 0, stroke);
+
+      const ImVec2 needleTip = P(16.2f, 9.5f);
+      dl->AddLine(arcCenter, needleTip, col, stroke);
+      dl->AddCircleFilled(arcCenter, ImMax(1.4f, 1.8f * s), col);
+   }
+
+   // Arcade joystick: flat base plate, a shaft, and a filled ball top -
+   // reads clean as "gaming" at small toolbar sizes where a full
+   // controller's D-pad/button detail turns to mush.
+   inline void DrawJoystick(ImDrawList* dl, ImVec2 center, float size, ImU32 col, float customStroke = 0.0f)
+   {
+      const float s = size / 24.0f;
+      const float stroke = customStroke > 0.0f ? customStroke : ImMax(1.2f, 1.6f * s);
+      auto P = [&](float x, float y) { return Point24(center, size, x, y); };
+
+      dl->AddRect(P(5.0f, 16.5f), P(19.0f, 19.5f), col, 1.4f * s, 0, stroke);
+      dl->AddLine(P(12.0f, 16.5f), P(12.0f, 9.0f), col, stroke);
+      dl->AddCircleFilled(P(12.0f, 7.2f), ImMax(1.8f, 2.6f * s), col);
+      dl->AddCircleFilled(P(16.2f, 18.0f), ImMax(0.8f, 1.0f * s), col);
+   }
+
+   // Vinyl/CD disc: outer rim, centre spindle hole and ring, with a couple
+   // of short groove arcs in two opposite quadrants for texture - reads as
+   // a record/disc at a glance without needing fill/shading.
+   inline void DrawDisc(ImDrawList* dl, ImVec2 center, float size, ImU32 col, float customStroke = 0.0f)
+   {
+      const float s = size / 24.0f;
+      const float stroke = customStroke > 0.0f ? customStroke : ImMax(1.1f, 1.4f * s);
+      auto P = [&](float x, float y) { return Point24(center, size, x, y); };
+      const ImVec2 c = P(12.0f, 12.0f);
+
+      dl->AddCircle(c, 9.0f * s, col, 32, stroke);
+      dl->AddCircle(c, 3.0f * s, col, 20, stroke * 0.85f);
+      dl->AddCircleFilled(c, ImMax(0.9f, 1.1f * s), col);
+
+      const float grooveStroke = stroke * 0.75f;
+      for (float r : { 5.2f, 7.1f })
+      {
+         dl->PathArcTo(c, r * s, IM_PI * 1.02f, IM_PI * 1.30f, 10);
+         dl->PathStroke(col, 0, grooveStroke);
+         dl->PathArcTo(c, r * s, IM_PI * 0.02f, IM_PI * 0.30f, 10);
+         dl->PathStroke(col, 0, grooveStroke);
+      }
+   }
 }
