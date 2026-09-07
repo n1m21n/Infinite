@@ -24182,7 +24182,20 @@ namespace
       }
       else
       {
-         const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+         // Inner grid lines only - no BordersOuterH/V. This is a docked
+         // panel, not a floating dialog: DrawModMatrixDocked's own comment
+         // (below, "No divider line along the canvas-facing edge") already
+         // settled that this panel reads as separate from its opaque
+         // panelBg fill alone, no edge needed. A full ImGuiTableFlags_Borders
+         // draws the theme's full-strength border colour as a solid rule
+         // around the whole table regardless, which put exactly the heavy
+         // edge that comment argues against back at the top of the panel -
+         // the one thing here that read thicker than every other divider in
+         // the app (all of which are the single subtle PanelSeamColor
+         // hairline). The inner rules stay: this is a dense multi-column
+         // matrix and losing row/column separation would hurt readability.
+         const ImGuiTableFlags flags = ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_BordersInnerV |
+                                       ImGuiTableFlags_RowBg |
                                        ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX;
          // An explicit, fixed outer_size.y - with ScrollY and the default
          // (0,0), ImGui auto-extends the table's own height to fit its
@@ -26375,7 +26388,13 @@ namespace
       }
 
       // ---- Sticky Header Toolbar ----
-      ImGui::Spacing();
+      // No ImGui::Spacing() here: this content child now carries the real
+      // WindowPadding again (ImGuiChildFlags_AlwaysUseWindowPadding, see
+      // DrawPerfPanelDocked), so an extra Spacing() on top of that padding
+      // doubled the gap above "Edit Mode" - the Modulation Matrix panel
+      // right above this one starts its content flush against the same
+      // WindowPadding with no added Spacing(), which is the gap this now
+      // matches.
       // Mode Switch Button (Edit / Perform)
       if (gPerfEditMode)
       {
@@ -26420,7 +26439,13 @@ namespace
 
       // Page Tabs
       ImGui::SameLine();
-      ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 2.0f);
+      // No cursor-Y fudge: the page-tab and "+" buttons below now take an
+      // explicit 24px height, matching "Edit Mode"/"Perform"/"+ Add
+      // Control" exactly, so they already share the same baseline without
+      // a manual nudge (the -2.0f here was compensating for those buttons
+      // defaulting to ImGui's shorter auto-fit height, which is also why
+      // they never actually lined up against the fixed-height buttons
+      // beside them).
       const bool isLight = IsThemeLight();
 
       for (int p = 0; p < gPerfLayout.pageCount; p++)
@@ -26464,7 +26489,18 @@ namespace
                ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.35f, 0.40f, 0.50f, 1.0f) : ImVec4(0.65f, 0.70f, 0.80f, 1.0f));
             }
 
-            if (ImGui::Button(pageTitle.c_str()))
+            // Explicit height matches "Edit Mode"/"Perform"/"+ Add Control"
+            // (all 24px) - this used to auto-fit to ImGui's default frame
+            // height, a few px shorter, which is what the -2.0f cursor nudge
+            // above the loop was trying (and failing) to paper over. Width
+            // gets its own explicit floor too: a plain auto-fit button is
+            // only text-width + 2*FramePadding.x (8px total) wide, so the
+            // selected page's highlight fill hugged its own label tighter
+            // than every other chip-style control in the app (page tab or
+            // not) - moving between pages by clicking through the highlight
+            // is what made that cramped fit visible.
+            const float tabW = std::max(60.0f, ImGui::CalcTextSize(pageTitle.c_str()).x + 24.0f);
+            if (ImGui::Button(pageTitle.c_str(), ImVec2(tabW, 24)))
             {
                gPerfActivePage = p;
             }
@@ -26542,7 +26578,7 @@ namespace
       if (gPerfLayout.pageCount < 12)
       {
          ImGui::SameLine();
-         if (ImGui::Button("+##addpagebtn", ImVec2(24, 0)))
+         if (ImGui::Button("+##addpagebtn", ImVec2(24, 24)))
          {
             PushUndoCheckpoint();
             int newP = gPerfLayout.pageCount++;
@@ -27413,10 +27449,18 @@ namespace
 
    void DrawHelpWindow(bool* open)
    {
+      // Same fix as DrawShortcutsWindow: this dialog was the other one
+      // outside the PushElevatedPanelStyle treatment every other floating
+      // window (Settings, Field editor, colour picker, All Shortcuts) gets,
+      // which is why it kept rendering with the wrong backdrop/border in
+      // light mode instead of the theme's actual panel colour.
+      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       ImGui::SetNextWindowSize(ImVec2(720, 620), ImGuiCond_FirstUseEver);
+      PushElevatedPanelStyle(/*isChild=*/false);
       if (!ImGui::Begin("Infinite - help & module reference", open))
       {
          ImGui::End();
+         PopElevatedPanelStyle();
          return;
       }
 
@@ -27660,6 +27704,7 @@ namespace
       }
 
       ImGui::End();
+      PopElevatedPanelStyle();
    }
 
    void DisconnectAllTo(INode* dying)
