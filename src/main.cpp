@@ -1192,6 +1192,13 @@ namespace
    FieldGraphUnpackPhase2State gFieldGraphUnpackPhase2;
    bool gHelpOpen = false;
    bool gShortcutsOpen = false;
+   // ImGui's own inspector windows, wired in for exact-value UI review: the
+   // Metrics/Debugger's "Tools > Item Picker" reports the ImGuiCol_*/rect of
+   // whatever you click on, and the Style Editor lists every style colour
+   // and size with live values and a live preview - point at a control here
+   // instead of eyeballing a screenshot to pin down which knob to change.
+   bool gUiDebuggerOpen = false;
+   bool gUiStyleEditorOpen = false;
    bool gSettingsOpen = false;
    bool gShowUpdateCheckModal = false;
 
@@ -51816,6 +51823,16 @@ int main(int argc, char** argv)
                gShortcutsOpen = true;
             if (ImGui::MenuItem("Help / module reference"))
                gHelpOpen = true;
+            // ImGui's built-in inspectors, not a custom tool: the Debugger's
+            // Tools > Item Picker names the exact ImGuiCol_*/style var and
+            // rect behind whatever you click, and the Style Editor lists and
+            // live-previews every one of those values - the fastest way to
+            // hand back "this exact knob, this exact number" instead of a
+            // screenshot and a guess.
+            if (ImGui::MenuItem("UI Debugger / Item Picker"))
+               gUiDebuggerOpen = true;
+            if (ImGui::MenuItem("UI Style Editor"))
+               gUiStyleEditorOpen = true;
             if (ImGui::MenuItem("Check for updates"))
             {
                UpdateCheck::Start();
@@ -66462,12 +66479,26 @@ int main(int argc, char** argv)
       // canvas (and below the row above, if that one drew anything) rather
       // than same-line - see the graphHeight calc above ed::Begin(), which
       // already reserved this space.
+      //
+      // Every docked panel already zeroes its OWN trailing ItemSpacing so it
+      // doesn't leave a gap before whatever comes after it (see the
+      // "Zeroed only around EndChild" comment in DrawViewportPanelDocked/
+      // DrawModMatrixDocked) - but nothing zeroed the spacing BEFORE the
+      // first one, between ed::End()'s canvas and this row. That default
+      // ItemSpacing.y gap is charged against this shell window's own
+      // ImGuiCol_WindowBg, not any panel's panelBg fill, and on a theme
+      // where the two differ it reads as a stray bar dropped across the
+      // full width right above the first bottom-docked panel - the same
+      // "hole, not a coloured divider" bug those other comments already
+      // describe, just at the one seam that had never been patched.
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
       if (viewportBottom)
          DrawViewportPanelDocked("##viewportpanel_bottom", ImVec2(0, gViewportPanelHeight));
       if (matrixBottom)
          DrawModMatrixDocked("##modmatrix_bottom", ImVec2(0, gModMatrixHeight));
       if (perfBottom)
          DrawPerfPanelDocked("##perfpanel_bottom", ImVec2(0, gPerfPanelHeight));
+      ImGui::PopStyleVar();
 
       ImGui::End();
 
@@ -66930,6 +66961,44 @@ int main(int argc, char** argv)
 
       if (gShortcutsOpen)
          DrawShortcutsWindow(&gShortcutsOpen);
+
+      // Stock ImGui windows, deliberately left un-themed (PushElevatedPanelStyle
+      // etc. skipped on purpose) - they're a diagnostic overlay for picking
+      // apart the ACTIVE style, not app chrome, so they should look like
+      // ImGui's own default rather than inherit the thing they're inspecting.
+      if (gUiDebuggerOpen)
+         ImGui::ShowMetricsWindow(&gUiDebuggerOpen);
+      if (gUiStyleEditorOpen)
+      {
+         // ImGui::ShowStyleEditor lives in imgui_demo.cpp, which this build
+         // doesn't compile in - so this is the Colors-tab portion of it,
+         // reimplemented directly against the live ImGuiStyle: every
+         // ImGuiCol_* by name, its current RGBA, and a live ColorEdit4 to
+         // try a value before asking for the change in code.
+         if (ImGui::Begin("UI Style Editor", &gUiStyleEditorOpen))
+         {
+            ImGuiStyle& style = ImGui::GetStyle();
+            ImGui::TextDisabled("Live-editing this ImGuiStyle for inspection only - not saved.");
+            static char colorFilter[64] = "";
+            ImGui::InputTextWithHint("##colorfilter", "filter colors...", colorFilter, sizeof(colorFilter));
+            if (ImGui::BeginChild("##colorlist"))
+            {
+               for (int i = 0; i < ImGuiCol_COUNT; i++)
+               {
+                  const char* name = ImGui::GetStyleColorName((ImGuiCol)i);
+                  if (colorFilter[0] != '\0' && !strcasestr(name, colorFilter))
+                     continue;
+                  ImGui::PushID(i);
+                  ImGui::ColorEdit4("##col", (float*)&style.Colors[i], ImGuiColorEditFlags_AlphaBar);
+                  ImGui::SameLine();
+                  ImGui::TextUnformatted(name);
+                  ImGui::PopID();
+               }
+            }
+            ImGui::EndChild();
+         }
+         ImGui::End();
+      }
 
       if (gSettingsOpen)
          DrawSettingsWindow(&gSettingsOpen);
