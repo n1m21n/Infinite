@@ -2999,13 +2999,25 @@ namespace
          }
          else
          {
-            // The track background stays this fixed dark amber in both themes
-            // (it's the modulation-state color, not a theme color), so the
-            // value text drawn on top must stay fixed light too - left on the
-            // theme default it goes near-black in light mode and vanishes.
-            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.32f, 0.24f, 0.08f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.95f, 0.72f, 0.32f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.97f, 0.95f, 0.90f, 1.0f));
+            // This amber track used to stay the same fixed dark color in both
+            // themes with the value text forced light to stay readable on
+            // it - technically legible, but it fought the rest of the light
+            // theme's much paler surfaces. Track and text now both flip with
+            // the theme, same as the pin dot's own modulated color a few
+            // lines up: a light pastel amber with black text in light mode,
+            // the original dark amber with white text in dark mode.
+            if (isLight)
+            {
+               ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.98f, 0.86f, 0.58f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.80f, 0.52f, 0.10f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.05f, 0.05f, 0.05f, 1.0f));
+            }
+            else
+            {
+               ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.32f, 0.24f, 0.08f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.95f, 0.72f, 0.32f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.97f, 0.95f, 0.90f, 1.0f));
+            }
             ImGui::SetNextItemWidth(width - box - 4.0f);
             ImGui::SliderFloat(label, &shown, minV, maxV, fmt, ImGuiSliderFlags_NoInput);
             ImGui::PopStyleColor(3);
@@ -3040,11 +3052,20 @@ namespace
          }
          else
          {
-            // Same fixed-track/fixed-text pairing as the modulated (amber)
+            // Same theme-flipped track/text pairing as the modulated (amber)
             // state above - see that comment.
-            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.20f, 0.15f, 0.32f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.66f, 0.51f, 0.98f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.93f, 0.99f, 1.0f));
+            if (isLight)
+            {
+               ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.88f, 0.82f, 0.98f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.48f, 0.28f, 0.85f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.05f, 0.05f, 0.05f, 1.0f));
+            }
+            else
+            {
+               ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.20f, 0.15f, 0.32f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.66f, 0.51f, 0.98f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.93f, 0.99f, 1.0f));
+            }
             ImGui::SetNextItemWidth(width - box - 4.0f);
             ImGui::SliderFloat(label, &shown, minV, maxV, fmt, ImGuiSliderFlags_NoInput);
             ImGui::PopStyleColor(3);
@@ -3098,16 +3119,26 @@ namespace
                // Hovered/Active too, not just the base FrameBg - leaving
                // those two on the theme default meant hovering (let alone
                // dragging) a recording slider flashed back to the ordinary
-               // blue/grey the instant the mouse was over it. Text is fixed
-               // light too - the track stays this fixed dark red in both
-               // themes, so left on the theme default the value goes
-               // near-black and unreadable in light mode.
-               ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.34f, 0.10f, 0.10f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.40f, 0.12f, 0.12f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.46f, 0.14f, 0.14f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.99f, 0.93f, 0.93f, 1.0f));
+               // blue/grey the instant the mouse was over it. Track and text
+               // both flip with the theme, same as the other colored states.
+               if (isLight)
+               {
+                  ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.99f, 0.80f, 0.80f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.99f, 0.72f, 0.72f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.99f, 0.66f, 0.66f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.80f, 0.14f, 0.14f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.80f, 0.14f, 0.14f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.05f, 0.05f, 0.05f, 1.0f));
+               }
+               else
+               {
+                  ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.34f, 0.10f, 0.10f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.40f, 0.12f, 0.12f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.46f, 0.14f, 0.14f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.99f, 0.93f, 0.93f, 1.0f));
+               }
             }
             ImGui::SetNextItemWidth(width - box - 4.0f);
             changed = ImGui::SliderFloat(label, value, minV, maxV, fmt);
@@ -3148,16 +3179,26 @@ namespace
                // Hovered/Active too, not just the base FrameBg - leaving
                // those two on the theme default meant hovering (let alone
                // dragging) a recording slider flashed back to the ordinary
-               // blue/grey the instant the mouse was over it. Text is fixed
-               // light too - the track stays this fixed dark red in both
-               // themes, so left on the theme default the value goes
-               // near-black and unreadable in light mode.
-               ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.34f, 0.10f, 0.10f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.40f, 0.12f, 0.12f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.46f, 0.14f, 0.14f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
-               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.99f, 0.93f, 0.93f, 1.0f));
+               // blue/grey the instant the mouse was over it. Track and text
+               // both flip with the theme, same as the other colored states.
+               if (isLight)
+               {
+                  ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.99f, 0.80f, 0.80f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.99f, 0.72f, 0.72f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.99f, 0.66f, 0.66f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.80f, 0.14f, 0.14f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.80f, 0.14f, 0.14f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.05f, 0.05f, 0.05f, 1.0f));
+               }
+               else
+               {
+                  ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.34f, 0.10f, 0.10f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.40f, 0.12f, 0.12f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.46f, 0.14f, 0.14f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.99f, 0.93f, 0.93f, 1.0f));
+               }
             }
             ImGui::SetNextItemWidth(width - box - 4.0f);
             changed = ImGui::SliderFloat(label, value, minV, maxV, fmt);
@@ -26870,6 +26911,7 @@ namespace
 
    void DrawModulatorMeter(IModulator* mod, int nodeIndex)
    {
+      const bool isLight = IsThemeLight();
       const float value = mod->Value01();
       std::vector<float>& history = gModHistory[nodeIndex];
       history.push_back(value);
@@ -26902,7 +26944,8 @@ namespace
          float x1 = origin.x + kPreviewSize * (float)i / 160.0f;
          float y0 = origin.y + h - (history[i - 1] - lo) / range * h;
          float y1 = origin.y + h - (history[i] - lo) / range * h;
-         dl->AddLine(ImVec2(x0, y0), ImVec2(x1, y1), IM_COL32(255, 190, 90, 255), 1.6f);
+         dl->AddLine(ImVec2(x0, y0), ImVec2(x1, y1),
+                     isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(255, 190, 90, 255), 1.6f);
       }
       dl->PopClipRect();
 
@@ -26925,7 +26968,8 @@ namespace
             dl->AddLine(ImVec2(origin.x, y1line), ImVec2(origin.x + kPreviewSize, y1line), hairlineCol, 1.0f);
       }
       dl->AddRect(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
-                  outOfContract ? IM_COL32(255, 190, 90, 255) : ScopeBorderCol(), 4.0f);
+                  outOfContract ? (isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(255, 190, 90, 255))
+                                : ScopeBorderCol(), 4.0f);
       ImGui::Dummy(ImVec2(kPreviewSize, h));
       ImGui::Text("%.3f", value);
    }
@@ -66063,7 +66107,20 @@ int main(int argc, char** argv)
       // Flush against any bottom-docked panel, for the same reason as the
       // Draw*Docked EndChild calls above.
       ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+      // imgui-node-editor's own ed::End() unconditionally strokes a rect
+      // around the whole canvas using ImGuiCol_Border/BorderShadow (see
+      // "Draw border" in imgui_node_editor.cpp) - unlike every other border
+      // in this app, it isn't gated by style.WindowBorderSize/ChildBorderSize
+      // (both zeroed in ApplyTheme), so it painted a thin line around the
+      // canvas that scaled with the canvas rect itself regardless of that
+      // setting. Barely visible against the dark theme's border color, but a
+      // clearly visible dark line in light mode. Suppressed the same way the
+      // menu-bar/canvas seam was: make the two colors it reads transparent
+      // for just this call.
+      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+      ImGui::PushStyleColor(ImGuiCol_BorderShadow, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
       ed::End();
+      ImGui::PopStyleColor(2);
       ImGui::PopStyleVar();
       if (kEdPerf)
       {
