@@ -1467,6 +1467,14 @@ namespace Platform
                }
             }
          }
+
+         {
+            std::lock_guard<std::mutex> lock(h->queueMutex);
+            if (h->stopRequested && h->frameQueue.empty() && h->currentRemaining <= 0)
+            {
+               FinishWorker(h);
+            }
+         }
       }
    }
 
@@ -1513,17 +1521,18 @@ namespace Platform
 
       // Reads and appends whatever audio is needed to catch up to
       // targetSampleFrames, looping or stopping at the source's end per
-      // audioLoop. Called once per video frame, so it never has more than a
-      // fraction of a second to make up.
-      void AppendAudioUpTo(RecorderHandle* h, int64_t targetSampleFrames)
+      // audioLoop. Called with h->writerMutex held.
+      void AppendAudioUpToLocked(RecorderHandle* h, int64_t targetSampleFrames)
       {
-         if (h->audioInput == nil || h->audioExhausted)
+         if (h == nullptr || h->audioInput == nil || h->audioExhausted || h->audioFile == nil)
+            return;
+         if (h->writer.status != AVAssetWriterStatusWriting || h->audioFinished)
             return;
 
          while (h->audioFramesWritten < targetSampleFrames)
          {
             if (!h->audioInput.isReadyForMoreMediaData)
-               return; // try again on the next video frame
+               return; // try again on the next video frame or audio flush
 
             AVAudioFramePosition remaining = h->audioFile.length - h->audioFile.framePosition;
             if (remaining <= 0)
@@ -1558,10 +1567,21 @@ namespace Platform
             CMSampleBufferRef sb = PCMBufferToSampleBuffer(h->audioScratch, pts);
             if (sb != NULL)
             {
-               [h->audioInput appendSampleBuffer:sb];
+               @try
+               {
+                  if (h->audioInput.isReadyForMoreMediaData)
+                  {
+                     [h->audioInput appendSampleBuffer:sb];
+                     h->audioFramesWritten += h->audioScratch.frameLength;
+                  }
+               }
+               @catch (NSException* e)
+               {
+                  CFRelease(sb);
+                  return;
+               }
                CFRelease(sb);
             }
-            h->audioFramesWritten += h->audioScratch.frameLength;
          }
       }
 
@@ -1728,18 +1748,22 @@ namespace Platform
                      ok = NO;
                   }
                }
+               if (ok && h->audioInput != nil)
+               {
+                  if (h->audioFile != nil)
+                  {
+                     const int64_t targetFrames = (int64_t)((double)(frame + 1) /
+                                                             (double)h->fps * h->audioSampleRate);
+                     AppendAudioUpToLocked(h, targetFrames);
+                  }
+                  else
+                  {
+                     FlushPendingAudioLocked(h);
+                  }
+               }
             }
             if (ok)
                h->frameIndex.fetch_add(1, std::memory_order_relaxed);
-
-            if (ok && h->audioInput != nil && h->audioFile != nil)
-            {
-               // Catches audio up to the end of the video frame just written, so
-               // the two tracks cannot drift apart by more than one video frame.
-               const int64_t targetFrames = (int64_t)((double)(frame + (ok ? 1 : 0)) /
-                                                       (double)h->fps * h->audioSampleRate);
-               AppendAudioUpTo(h, targetFrames);
-            }
             // CVPixelBufferPoolCreatePixelBuffer follows the create rule - this
             // call owns a +1 ref regardless of append's outcome. appendPixelBuffer:
             // takes its own reference for the async encode, so releasing ours
@@ -2065,11 +2089,21 @@ namespace Platform
          [NSThread sleepForTimeInterval:0.005];
       }
 
+      if (handle->audioFile != nil)
+      {
+         std::lock_guard<std::mutex> lock(handle->writerMutex);
+         const long long frame = handle->frameIndex.load(std::memory_order_relaxed);
+         const int64_t targetFrames = (int64_t)((double)frame /
+                                                 (double)std::max(1, handle->fps) * handle->audioSampleRate);
+         AppendAudioUpToLocked(handle, targetFrames);
+      }
+
       {
          std::lock_guard<std::mutex> lock(handle->queueMutex);
          handle->stopRequested = true;
       }
       handle->queueCv.notify_one();
+      RecorderKickEncoder(handle);
 
       // Bounded, unlike the old dispatch_async worker's wait. The pump only
       // runs when AVFoundation says the input is ready, so if the writer has
@@ -2143,6 +2177,13 @@ namespace Platform
          return;
       std::lock_guard<std::mutex> lock(handle->writerMutex);
       FlushPendingAudioLocked(handle);
+      if (handle->audioFile != nil)
+      {
+         const long long frame = handle->frameIndex.load(std::memory_order_relaxed);
+         const int64_t targetFrames = (int64_t)((double)(frame + 1) /
+                                                 (double)std::max(1, handle->fps) * handle->audioSampleRate);
+         AppendAudioUpToLocked(handle, targetFrames);
+      }
    }
 
    void RecorderFinishAudioInput(RecorderHandle* handle)
@@ -2155,6 +2196,13 @@ namespace Platform
       FlushPendingAudioLocked(handle);
       if (!handle->audioBacklog.empty())
          return; // still owed a flush; try again on the next call
+      if (handle->audioFile != nil)
+      {
+         const long long frame = handle->frameIndex.load(std::memory_order_relaxed);
+         const int64_t targetFrames = (int64_t)((double)frame /
+                                                 (double)std::max(1, handle->fps) * handle->audioSampleRate);
+         AppendAudioUpToLocked(handle, targetFrames);
+      }
       [handle->audioInput markAsFinished];
       handle->audioFinished = true;
    }

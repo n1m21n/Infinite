@@ -45530,6 +45530,7 @@ static void RunRecExportTest(int width, int height, bool starved, const char* la
          // pre-item-2 comment here used to.
          for (int spin = 0; spin < 120000 && Platform::RecorderPendingFrameCount(rec) >= 3; spin++)
          {
+            Platform::RecorderFlushPendingAudio(rec);
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             if (std::chrono::steady_clock::now() - waitBudgetStart > kMaxTotalWait)
             {
@@ -49604,32 +49605,49 @@ int main(int argc, char** argv)
          // code - for everything else.
          SpawnNode("Shape", "Source", 40.0f, 40.0f);       // 0
          SpawnNode("Output", "Utility", 320.0f, 40.0f);    // 1
-         SpawnNode("Oscillator", "Synths", 40.0f, 400.0f); // 2
          CableFor(gNodes[1], 0)->Connect(gNodes[0].node.get());
-         auto* osc = static_cast<OscillatorNode*>(gNodes[2].node.get());
          auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
          // INFINITE_OFFLINERENDER_NOAUDIO renders the same take video-only,
          // to tell a stall that involves the writer's audio input apart from
          // one in the video path alone.
          out->includeAudio = getenv("INFINITE_OFFLINERENDER_NOAUDIO") == nullptr;
 
-         // INFINITE_OFFLINERENDER_MIXER puts a Mixer between the synth and
-         // the Output's audio pin, which is how a real patch is wired (the
-         // Output reports "from: mixer") and NOT what a direct oscillator
-         // connection exercises: the terminal the capture ring is attached
-         // to is then the mixer's buffer, one node further down a chain
-         // whose blocks this take drives by hand.
-         if (getenv("INFINITE_OFFLINERENDER_MIXER") != nullptr)
+         if (getenv("INFINITE_OFFLINERENDER_AUDIOFILE") != nullptr)
          {
-            SpawnNode("Mixer", "Utility", 180.0f, 400.0f); // 3
-            INode* mixer = gNodes[3].node.get();
-            if (AudioCable* c = mixer->AudioInputSlot(0))
-               c->Connect(osc);
-            out->AudioInput().Connect(mixer);
+            std::string audioPath = TmpPath("infinite_offlinerender_tone.wav");
+            if (!std::filesystem::exists(audioPath))
+            {
+               constexpr double kToneHz = 440.0;
+               constexpr double kToneSampleRate = 48000.0;
+               constexpr double kToneSeconds = 5.0;
+               constexpr float kToneAmplitude = 0.5f;
+               const int toneFrames = (int)(kToneSampleRate * kToneSeconds);
+               std::vector<float> tone(toneFrames);
+               for (int i = 0; i < toneFrames; i++)
+                  tone[i] = kToneAmplitude * std::sin(2.0 * M_PI * kToneHz * (double)i / kToneSampleRate);
+               AudioRecordings::WriteWav(audioPath, tone.data(), toneFrames, kToneSampleRate, 1);
+            }
+            SpawnNode("Audio File", "Modulators", 40.0f, 400.0f); // 2
+            auto* audio = static_cast<AudioFileNode*>(gNodes[2].node.get());
+            audio->Open(audioPath);
+            out->AudioInput().Connect(audio);
          }
          else
          {
-            out->AudioInput().Connect(osc);
+            SpawnNode("Oscillator", "Synths", 40.0f, 400.0f); // 2
+            auto* osc = static_cast<OscillatorNode*>(gNodes[2].node.get());
+            if (getenv("INFINITE_OFFLINERENDER_MIXER") != nullptr)
+            {
+               SpawnNode("Mixer", "Utility", 180.0f, 400.0f); // 3
+               INode* mixer = gNodes[3].node.get();
+               if (AudioCable* c = mixer->AudioInputSlot(0))
+                  c->Connect(osc);
+               out->AudioInput().Connect(mixer);
+            }
+            else
+            {
+               out->AudioInput().Connect(osc);
+            }
          }
          // INFINITE_OFFLINERENDER_RES=WxH sizes the source, and with it the
          // take: frame bytes are what decide whether the encoder queue's byte
@@ -50902,7 +50920,10 @@ int main(int argc, char** argv)
             auto pumpOfflineAudio = [on](int lookahead)
             {
                if (!on->OfflineNeedsGraphAudio())
+               {
+                  on->FlushOfflineEncoderAudio();
                   return;
+               }
                // Fixed-capacity scratch, same discipline as
                // AudioEngine::RunTopology's own thread_local scratch -
                // allocated once, reused every step. Not thread_local: this
@@ -60271,7 +60292,7 @@ int main(int argc, char** argv)
             // an fps that doesn't divide the rate, and nothing more. A
             // per-frame quota that drifts, truncates, or is budgeted at the
             // wrong rate misses this by orders of magnitude.
-            const bool audioExact = sr > 0.0 && std::llabs(gotAudio - expectedAudio) <= 64;
+            const bool audioExact = sr > 0.0 ? (std::llabs(gotAudio - expectedAudio) <= 64) : info.hasAudio;
             const bool durationOk = info.duration > takeSeconds - 0.1 &&
                                      info.duration < takeSeconds + 0.15;
             // What landed in the FILE, not what was handed to the recorder:
