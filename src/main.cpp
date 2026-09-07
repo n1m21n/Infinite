@@ -2425,6 +2425,41 @@ namespace
       ImGui::PopStyleColor(5);
    }
 
+   // Subtle "glass" elevation for a panel that floats above the main node
+   // canvas (Settings, Formula/Field editors, the docked Modulation and
+   // Performance matrices) - see .claude/skills/apple-design-skill's
+   // materials.md: a material establishes hierarchy by letting the panel
+   // read as a distinct raised layer, not by faking a blur ImGui can't do.
+   // The tint is the theme's own panelBg (already one step up from
+   // windowBg/canvas in every preset) at near-full alpha, plus a border
+   // that carries a faint top highlight rather than a flat, even ring - the
+   // highlight is what reads as "catching light from above" without any
+   // gradient trickery. Kept subtle in both themes per P10: this is a
+   // professional tool, not a mobile card stack.
+   // `isChild` selects ImGuiCol_ChildBg (for a BeginChild-based docked
+   // panel) vs. ImGuiCol_WindowBg (for a plain ImGui::Begin floating
+   // window); both panel families get the identical tint/border recipe so
+   // they read as one consistent elevation language app-wide.
+   inline void PushElevatedPanelStyle(bool isChild)
+   {
+      const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
+      const bool isLight = IsThemeLight();
+      const ImVec4 bg = isLight ? ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 0.99f)
+                                 : ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 0.97f);
+      ImGui::PushStyleColor(isChild ? ImGuiCol_ChildBg : ImGuiCol_WindowBg, bg);
+      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? ImVec4(1.0f, 1.0f, 1.0f, 0.55f)
+                                                     : ImVec4(1.0f, 1.0f, 1.0f, 0.05f));
+      ImGui::PushStyleColor(ImGuiCol_BorderShadow, ImVec4(0.0f, 0.0f, 0.0f, isLight ? 0.06f : 0.22f));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
+   }
+
+   inline void PopElevatedPanelStyle()
+   {
+      ImGui::PopStyleVar(2);
+      ImGui::PopStyleColor(3);
+   }
+
    // Same pin id scheme, colours and gParamPinScreenList entry as ModSlider's
    // pin - that list is what the performance matrix's "Assign Parameter" picker
    // hit-tests, so registering here is what makes a mode or a checkbox
@@ -2560,6 +2595,35 @@ namespace
    {
       ImGui::PopStyleVar(2);
       ImGui::PopStyleColor(6);
+   }
+
+   // Same P10 budget as PushCheckboxStyle/PushDropdownStyle, applied to a
+   // plain ImGui::SliderFloat/SliderInt track: the track fill is a recess
+   // within ~0.06 luminance of the node/panel body in dark, no border stroke
+   // in dark (FrameBorderSize 0), and the grab is the one element allowed to
+   // sit at accent brightness so it stays findable against a quiet track.
+   // Light keeps a hairline border, same reasoning as the dropdown/checkbox
+   // case: the panel there is bright enough that a recess needs a real edge.
+   // Never hand-roll a one-off slider colour at a call site - this is the
+   // one place it's defined (P11).
+   inline void PushSliderStyle()
+   {
+      const bool isLight = IsThemeLight();
+      ImGui::PushStyleColor(ImGuiCol_FrameBg, isLight ? ImVec4(0.86f, 0.88f, 0.94f, 1.0f) : ImVec4(0.16f, 0.18f, 0.24f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, isLight ? ImVec4(0.80f, 0.84f, 0.92f, 1.0f) : ImVec4(0.25f, 0.28f, 0.38f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_FrameBgActive, isLight ? ImVec4(0.74f, 0.78f, 0.88f, 1.0f) : ImVec4(0.32f, 0.36f, 0.48f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_SliderGrab, isLight ? ImVec4(0.20f, 0.55f, 0.95f, 1.0f) : ImVec4(0.55f, 0.82f, 1.0f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, isLight ? ImVec4(0.14f, 0.45f, 0.85f, 1.0f) : ImVec4(0.70f, 0.90f, 1.0f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? ImVec4(0.70f, 0.74f, 0.84f, 1.0f) : ImVec4(0.22f, 0.235f, 0.278f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.15f, 0.18f, 0.24f, 1.0f) : ImVec4(0.88f, 0.92f, 0.98f, 1.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, isLight ? 1.0f : 0.0f);
+   }
+
+   inline void PopSliderStyle()
+   {
+      ImGui::PopStyleVar(2);
+      ImGui::PopStyleColor(7);
    }
 
    bool ModCheckbox(const char* label, bool* value)
@@ -4702,6 +4766,16 @@ namespace
       style.Colors[ImGuiCol_TextSelectedBg] = vec(t.accent, 0.35f);
       style.Colors[ImGuiCol_DragDropTarget] = vec(t.accent);
       style.Colors[ImGuiCol_NavHighlight] = vec(t.accent);
+      // Table colors default to ImGui's built-in dark style and were never
+      // themed - harmless in the default dark "Infinite" preset but a
+      // near-black header on light presets (e.g. GitHub Light), found while
+      // verifying the Modulation Matrix table in light mode. Tie them to the
+      // theme like every other chrome color above.
+      style.Colors[ImGuiCol_TableHeaderBg] = shade(t.panelBg, 0.16f);
+      style.Colors[ImGuiCol_TableBorderStrong] = vec(t.border);
+      style.Colors[ImGuiCol_TableBorderLight] = vec(t.border, 0.5f);
+      style.Colors[ImGuiCol_TableRowBg] = vec(t.windowBg, 0.0f);
+      style.Colors[ImGuiCol_TableRowBgAlt] = vec(t.text, isLight ? 0.03f : 0.04f);
 
       // The node-graph canvas itself is drawn by imgui-node-editor from its
       // own style table, not ImGui's - Bg/Grid are the two slots visible
@@ -23857,7 +23931,9 @@ namespace
       }
       else
       {
+         PushSliderStyle();
          changed = ImGui::DragFloat(strId, value, step, minV, maxV, fmt);
+         PopSliderStyle();
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
          if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
@@ -24051,11 +24127,21 @@ namespace
 
                // Unbind
                ImGui::TableNextColumn();
-               if (ImGui::SmallButton("X"))
                {
-                  PushUndoCheckpoint();
-                  mod.Unbind(dstIndex, dstParam);
-                  unbound = true;
+                  const float btnW = ImGui::GetFrameHeight();
+                  if (ImGui::Button("##unbindmod", ImVec2(btnW, 0)))
+                  {
+                     PushUndoCheckpoint();
+                     mod.Unbind(dstIndex, dstParam);
+                     unbound = true;
+                  }
+                  ImDrawList* dl = ImGui::GetWindowDrawList();
+                  const ImVec2 bmin = ImGui::GetItemRectMin();
+                  const ImVec2 bmax = ImGui::GetItemRectMax();
+                  const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+                  const float iconSize = (bmax.y - bmin.y) * 0.6f;
+                  const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+                  Tabler::DrawX(dl, center, iconSize, col);
                }
 
                ImGui::PopID();
@@ -24198,12 +24284,14 @@ namespace
       // fixed height for both orientations keeps that loop's target
       // stable.
       const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
+      PushElevatedPanelStyle(/*isChild=*/true);
       ImGui::BeginChild("##modmatrixpanelcontent",
                         vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
                                  : ImVec2(0, std::max(1.0f, inner.y - kGrip - gap.y)),
-                        false);
+                        true);
       DrawModMatrixTable();
       ImGui::EndChild();
+      PopElevatedPanelStyle();
 
       if (!gripFirst)
       {
@@ -25400,7 +25488,9 @@ namespace
          float speed = (maxV - minV) * 0.005f;
          if (speed <= 0.0f) speed = 0.01f;
          ImGui::SetNextItemWidth(boxW);
+         PushSliderStyle();
          const bool numMoved = ImGui::DragFloat("##numbox", &v, speed, minV, maxV, (std::abs(maxV - minV) > 10.0f) ? "%.1f" : "%.3f");
+         PopSliderStyle();
          dragHold(v);
          if (numMoved)
          {
@@ -26358,12 +26448,14 @@ namespace
       }
 
       const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
+      PushElevatedPanelStyle(/*isChild=*/true);
       ImGui::BeginChild("##perfpanelinnercontent",
                         vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
                                  : ImVec2(0, std::max(1.0f, inner.y - kGrip - gap.y)),
-                        false);
+                        true);
       DrawPerfPanelContent();
       ImGui::EndChild();
+      PopElevatedPanelStyle();
 
       if (!gripFirst)
       {
@@ -29283,9 +29375,11 @@ namespace
    void DrawSettingsWindow(bool* open)
    {
       ImGui::SetNextWindowSize(ImVec2(740, 560), ImGuiCond_FirstUseEver);
+      PushElevatedPanelStyle(/*isChild=*/false);
       if (!ImGui::Begin("Settings", open, ImGuiWindowFlags_NoCollapse))
       {
          ImGui::End();
+         PopElevatedPanelStyle();
          return;
       }
 
@@ -29447,6 +29541,7 @@ namespace
             ImGui::SeparatorText("Node Card Styling");
             float opacity = CategoryColors::GetNodeOpacity();
             ImGui::SetNextItemWidth(200.0f);
+            PushSliderStyle();
             if (ImGui::SliderFloat("Node Opacity", &opacity, 0.10f, 1.00f, "%.2f"))
             {
                CategoryColors::SetNodeOpacity(opacity, isLight, false);
@@ -29461,9 +29556,11 @@ namespace
                if (ImGui::SmallButton("Reset##opacity"))
                   CategoryColors::SetNodeOpacity(-1.0f, isLight);
             }
+            PopSliderStyle();
 
             float rounding = CategoryColors::GetNodeRounding();
             ImGui::SetNextItemWidth(200.0f);
+            PushSliderStyle();
             if (ImGui::SliderFloat("Node Corner Radius", &rounding, 0.0f, 24.0f, "%.0f px"))
             {
                CategoryColors::SetNodeRounding(rounding, false);
@@ -29482,9 +29579,11 @@ namespace
                   ApplyTheme();
                }
             }
+            PopSliderStyle();
 
             float tintWeight = CategoryColors::GetTintWeight();
             ImGui::SetNextItemWidth(200.0f);
+            PushSliderStyle();
             if (ImGui::SliderFloat("Tint", &tintWeight, 0.0f, 0.50f, "%.2f"))
             {
                CategoryColors::SetTintWeight(tintWeight, isLight, false);
@@ -29499,6 +29598,7 @@ namespace
                if (ImGui::SmallButton("Reset##tint"))
                   CategoryColors::SetTintWeight(-1.0f, isLight);
             }
+            PopSliderStyle();
 
             ImGui::EndTabItem();
          }
@@ -29508,21 +29608,29 @@ namespace
          {
             ImGui::Spacing();
             ImGui::SeparatorText("Grid & Canvas");
+            PushCheckboxStyle();
             if (ImGui::Checkbox("Snap to grid", &gSnapToGrid))
                SaveWorkspaceSettings();
+            PopCheckboxStyle();
             ImGui::SetNextItemWidth(180.0f);
+            PushSliderStyle();
             ImGui::SliderFloat("Grid size", &gGridSnap, 5.0f, 100.0f, "%.0f px");
+            PopSliderStyle();
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveWorkspaceSettings();
             ImGui::SetNextItemWidth(180.0f);
+            PushSliderStyle();
             ImGui::SliderFloat("Zoom sensitivity", &gZoomSensitivity, 0.05f, 1.5f, "%.2f");
+            PopSliderStyle();
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveWorkspaceSettings();
 
             ImGui::Spacing();
             ImGui::SeparatorText("Minimap");
+            PushCheckboxStyle();
             if (ImGui::Checkbox("Show minimap", &gMinimapEnabled))
                SaveWorkspaceSettings();
+            PopCheckboxStyle();
             if (gMinimapEnabled)
             {
                static const char* kCorners[] = {
@@ -29540,11 +29648,15 @@ namespace
                   ImGui::EndCombo();
                }
                ImGui::SetNextItemWidth(180.0f);
+               PushSliderStyle();
                ImGui::SliderFloat("Size", &gMinimapSize, 120.0f, 360.0f, "%.0f px");
+               PopSliderStyle();
                if (ImGui::IsItemDeactivatedAfterEdit())
                   SaveWorkspaceSettings();
                ImGui::SetNextItemWidth(180.0f);
+               PushSliderStyle();
                ImGui::SliderFloat("Opacity", &gMinimapOpacity, 0.2f, 1.0f, "%.2f");
+               PopSliderStyle();
                if (ImGui::IsItemDeactivatedAfterEdit())
                   SaveWorkspaceSettings();
             }
@@ -29555,6 +29667,7 @@ namespace
             bool showAudNote = (gCableVisibilityMask & 0x2) != 0;
             bool showImg = (gCableVisibilityMask & 0x1) != 0;
 
+            PushCheckboxStyle();
             if (ImGui::Checkbox("Modulation cables", &showMod))
             {
                gCableVisibilityMask = (gCableVisibilityMask & ~0x4) | (showMod ? 0x4 : 0);
@@ -29570,6 +29683,7 @@ namespace
                gCableVisibilityMask = (gCableVisibilityMask & ~0x1) | (showImg ? 0x1 : 0);
                SaveWorkspaceSettings();
             }
+            PopCheckboxStyle();
 
             ImGui::TextDisabled("Note: Image & geometry toggle also covers palette cables.");
             ImGui::Spacing();
@@ -29762,12 +29876,16 @@ namespace
                                     path.empty() ? "the settings directory" : path.c_str());
                }
             }
+            PushCheckboxStyle();
             if (ImGui::Checkbox("Autosave enabled", &gAutosaveEnabled))
                SaveGeneralSettings();
+            PopCheckboxStyle();
             ImGui::SetNextItemWidth(180.0f);
             int seconds = gAutosaveSeconds;
+            PushSliderStyle();
             if (ImGui::SliderInt("Autosave interval", &seconds, 15, 300, "%d sec"))
                gAutosaveSeconds = seconds;
+            PopSliderStyle();
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveGeneralSettings();
 
@@ -29794,11 +29912,13 @@ namespace
                ImGui::EndCombo();
             }
 
+            PushCheckboxStyle();
             if (ImGui::Checkbox("Vsync", &gVsync))
             {
                glfwSwapInterval(gVsync ? 1 : 0);
                SaveGeneralSettings();
             }
+            PopCheckboxStyle();
 
             ImGui::Spacing();
             ImGui::SeparatorText("Application & Updates");
@@ -29838,8 +29958,16 @@ namespace
             if (sFilterBuf[0] != '\0')
             {
                ImGui::SameLine(0.0f, 6.0f);
-               if (ImGui::SmallButton("Clear"))
+               const float btnW = ImGui::GetFrameHeight();
+               if (ImGui::Button("##clearfieldsearch", ImVec2(btnW, 0)))
                   sFilterBuf[0] = '\0';
+               ImDrawList* dl = ImGui::GetWindowDrawList();
+               const ImVec2 bmin = ImGui::GetItemRectMin();
+               const ImVec2 bmax = ImGui::GetItemRectMax();
+               const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+               const float iconSize = (bmax.y - bmin.y) * 0.65f;
+               const ImU32 col = ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+               Tabler::DrawX(dl, center, iconSize, col);
             }
 
             ImGui::Spacing();
@@ -30153,8 +30281,18 @@ namespace
                ImGui::SameLine();
                ImGui::TextDisabled("%.4f", g.value);
                ImGui::SameLine();
-               if (ImGui::SmallButton("x"))
-                  removeAt = (int)i;
+               {
+                  const float btnW = ImGui::GetFrameHeight();
+                  if (ImGui::Button("##removeexprglobal", ImVec2(btnW, 0)))
+                     removeAt = (int)i;
+                  ImDrawList* dl = ImGui::GetWindowDrawList();
+                  const ImVec2 bmin = ImGui::GetItemRectMin();
+                  const ImVec2 bmax = ImGui::GetItemRectMax();
+                  const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+                  const float iconSize = (bmax.y - bmin.y) * 0.65f;
+                  const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+                  Tabler::DrawX(dl, center, iconSize, col);
+               }
 
                if (!g.error.empty())
                   ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.5f, 1.0f), "   %s", g.error.c_str());
@@ -30238,6 +30376,7 @@ namespace
       }
 
       ImGui::End();
+      PopElevatedPanelStyle();
    }
 
    // Rebuilds the live graph from a snapshot - shared by LoadPatchFrom (from
@@ -51214,37 +51353,47 @@ int main(int argc, char** argv)
 
             if (ImGui::BeginMenu("Modulation matrix"))
             {
+               PushCheckboxStyle();
                ImGui::Checkbox("Show modulation matrix", &gModMatrixOpen);
+               PopCheckboxStyle();
                if (gModMatrixOpen)
                {
                   ImGui::SetNextItemWidth(150);
                   ModMatrixDockCombo();
                   ImGui::SetNextItemWidth(150);
+                  PushSliderStyle();
                   if (gModMatrixDock == 1 || gModMatrixDock == 2)
                      ImGui::SliderFloat("Width", &gModMatrixWidth,
                                         kModMatrixMinWidth, 900.0f, "%.0f px");
                   else
                      ImGui::SliderFloat("Height", &gModMatrixHeight,
                                         kModMatrixMinHeight, 800.0f, "%.0f px");
+                  PopSliderStyle();
                }
                ImGui::EndMenu();
             }
 
             if (ImGui::BeginMenu("Performance Matrix"))
             {
+               PushCheckboxStyle();
                ImGui::Checkbox("Show Performance Matrix", &gPerfPanelOpen);
+               PopCheckboxStyle();
                if (gPerfPanelOpen)
                {
                   ImGui::SetNextItemWidth(150);
                   PerfPanelDockCombo();
                   ImGui::SetNextItemWidth(150);
+                  PushSliderStyle();
                   if (gPerfPanelDock == 1 || gPerfPanelDock == 2)
                      ImGui::SliderFloat("Width", &gPerfPanelWidth,
                                         kPerfPanelMinWidth, 900.0f, "%.0f px");
                   else
                      ImGui::SliderFloat("Height", &gPerfPanelHeight,
                                         kPerfPanelMinHeight, 800.0f, "%.0f px");
+                  PopSliderStyle();
+                  PushCheckboxStyle();
                   ImGui::Checkbox("Edit Mode", &gPerfEditMode);
+                  PopCheckboxStyle();
                }
                ImGui::EndMenu();
             }
@@ -65949,6 +66098,7 @@ int main(int argc, char** argv)
       if (gFormulaEditorOpen && gFormulaEditor != nullptr)
       {
          ImGui::SetNextWindowSize(ImVec2(620, 460), ImGuiCond_FirstUseEver);
+         PushElevatedPanelStyle(/*isChild=*/false);
          if (ImGui::Begin("Formula editor", &gFormulaEditorOpen))
          {
             ImGui::TextDisabled("body of  vec4 shape(vec2 uv, vec2 p, float t)");
@@ -65981,6 +66131,7 @@ int main(int argc, char** argv)
             }
          }
          ImGui::End();
+         PopElevatedPanelStyle();
       }
 
       if (gFieldElementEditorOpen && gFieldElementEditor != nullptr)
@@ -66001,6 +66152,7 @@ int main(int argc, char** argv)
       if (gFieldElementEditorOpen && gFieldElementEditor != nullptr)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         PushElevatedPanelStyle(/*isChild=*/false);
          if (ImGui::Begin("Field element editor", &gFieldElementEditorOpen))
          {
             ImGui::TextDisabled("Field element-domain kernel (per-vertex). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t");
@@ -66048,6 +66200,7 @@ int main(int argc, char** argv)
             }
          }
          ImGui::End();
+         PopElevatedPanelStyle();
       }
 
       if (gFieldPrimitiveEditorOpen && gFieldPrimitiveEditor != nullptr)
@@ -66068,6 +66221,7 @@ int main(int argc, char** argv)
       if (gFieldPrimitiveEditorOpen && gFieldPrimitiveEditor != nullptr)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         PushElevatedPanelStyle(/*isChild=*/false);
          if (ImGui::Begin("Field primitive editor", &gFieldPrimitiveEditorOpen))
          {
             ImGui::TextDisabled("Field primitive generator (from scratch). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t");
@@ -66108,11 +66262,13 @@ int main(int argc, char** argv)
             }
          }
          ImGui::End();
+         PopElevatedPanelStyle();
       }
 
       if (gFieldPixelEditorOpen && gFieldPixelEditor != nullptr)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         PushElevatedPanelStyle(/*isChild=*/false);
          if (ImGui::Begin("Field pixel editor", &gFieldPixelEditorOpen))
          {
             ImGui::TextDisabled("Field pixel-domain kernel (per-pixel fragment shader).");
@@ -66153,6 +66309,7 @@ int main(int argc, char** argv)
             }
          }
          ImGui::End();
+         PopElevatedPanelStyle();
       }
 
       if (gFieldSampleEditorOpen && gFieldSampleEditor != nullptr)
@@ -66173,6 +66330,7 @@ int main(int argc, char** argv)
       if (gFieldSampleEditorOpen && gFieldSampleEditor != nullptr)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         PushElevatedPanelStyle(/*isChild=*/false);
          if (ImGui::Begin("Field effect editor", &gFieldSampleEditorOpen))
          {
             ImGui::TextDisabled("Field effect kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, out");
@@ -66213,6 +66371,7 @@ int main(int argc, char** argv)
             }
          }
          ImGui::End();
+         PopElevatedPanelStyle();
       }
 
       if (gFieldSynthEditorOpen && gFieldSynthEditor != nullptr)
@@ -66233,6 +66392,7 @@ int main(int argc, char** argv)
       if (gFieldSynthEditorOpen && gFieldSynthEditor != nullptr)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         PushElevatedPanelStyle(/*isChild=*/false);
          if (ImGui::Begin("Field synth editor", &gFieldSynthEditorOpen))
          {
             ImGui::TextDisabled("Field polyphonic synth kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, freq, gate, out");
@@ -66273,6 +66433,7 @@ int main(int argc, char** argv)
             }
          }
          ImGui::End();
+         PopElevatedPanelStyle();
       }
 
       if (gFieldGraphEditorOpen && gFieldGraphEditor != nullptr)
@@ -66293,6 +66454,7 @@ int main(int argc, char** argv)
       if (gFieldGraphEditorOpen && gFieldGraphEditor != nullptr)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
+         PushElevatedPanelStyle(/*isChild=*/false);
          if (ImGui::Begin("Field graph editor", &gFieldGraphEditorOpen))
          {
             ImGui::TextDisabled("Field graph-domain kernel (edit-time, runs once). emit(\"Type Name\", k0, k1, ...) -> handle");
@@ -66349,6 +66511,7 @@ int main(int argc, char** argv)
             }
          }
          ImGui::End();
+         PopElevatedPanelStyle();
       }
 
       // Expression globals now live only in Settings > Expression Globals
