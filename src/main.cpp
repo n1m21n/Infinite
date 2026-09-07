@@ -2422,8 +2422,13 @@ namespace
       const ImVec4 bg = isLight ? ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 0.99f)
                                  : ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 0.97f);
       ImGui::PushStyleColor(isChild ? ImGuiCol_ChildBg : ImGuiCol_WindowBg, bg);
-      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? ImVec4(1.0f, 1.0f, 1.0f, 0.55f)
-                                                     : ImVec4(1.0f, 1.0f, 1.0f, 0.05f));
+      // No border at all, in either theme: the previous white-tinted "catching
+      // light" border was the actual source of the corner-bleed artifact users
+      // saw around Settings/search-popup/color-picker dialogs (a 1px near-white
+      // line at 0.55/0.05 alpha still rasterizes as a visible highlight on
+      // rounded corners). The BorderShadow alone gives these dialogs enough
+      // depth to read as "above" the canvas without needing an edge line.
+      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
       ImGui::PushStyleColor(ImGuiCol_BorderShadow, ImVec4(0.0f, 0.0f, 0.0f, isLight ? 0.06f : 0.22f));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
@@ -2444,6 +2449,39 @@ namespace
    {
       ImGui::PopStyleVar(3);
       ImGui::PopStyleColor(3);
+   }
+
+   // PushElevatedPanelStyle's white-tinted "catching light" border reads as
+   // a subtle accent on a small, fully-enclosed floating dialog (Settings, a
+   // color picker) - but a docked panel (node browser, viewport panel,
+   // Modulation/Performance matrices) has one long edge butting straight up
+   // against the canvas or another docked panel, where that same white tint
+   // becomes a persistent bright seam instead of a highlight, and fights the
+   // theme's own divider color used everywhere else in the app. This gives
+   // docked panels the identical opaque panelBg fill (so they never fall
+   // through to the transparent-ChildBg/backbuffer bug) but borders them
+   // with the theme's own t.border - the same color every other divider in
+   // the app uses - and skips the black BorderShadow entirely, so a docked
+   // panel's edge always reads as "a normal divider," never as a special
+   // highlighted one. Tune this and PushElevatedPanelStyle independently;
+   // do not merge them back into one function (see node-ui-pillars P10 and
+   // the "codebase-navigation" note on this split).
+   inline void PushDockedPanelStyle(bool isChild)
+   {
+      const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
+      const bool isLight = IsThemeLight();
+      const ImVec4 bg = isLight ? ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 0.99f)
+                                 : ImVec4(t.panelBg.r, t.panelBg.g, t.panelBg.b, 0.97f);
+      ImGui::PushStyleColor(isChild ? ImGuiCol_ChildBg : ImGuiCol_WindowBg, bg);
+      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(t.border.r, t.border.g, t.border.b, 1.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
+   }
+
+   inline void PopDockedPanelStyle()
+   {
+      ImGui::PopStyleVar(2);
+      ImGui::PopStyleColor(2);
    }
 
    // Same pin id scheme, colours and gParamPinScreenList entry as ModSlider's
@@ -4738,7 +4776,13 @@ namespace
       style.Colors[ImGuiCol_CheckMark] = vec(t.accent);
       style.Colors[ImGuiCol_SliderGrab] = vec(t.accent, 0.85f);
       style.Colors[ImGuiCol_SliderGrabActive] = vec(t.accent);
-      style.Colors[ImGuiCol_Button] = vec(t.panelBg);
+      // Idle Button was pinned to the exact same color as the panel it sits
+      // on (panelBg, no offset) - a button was distinguishable from plain
+      // text only once hovered, so buttons like "Show all cables" or
+      // "Add global" looked like static labels until the mouse found them.
+      // Give it the same resting recess as FrameBg (shade 0.08) so it has a
+      // visible fill at rest, a step below Hovered's 0.18.
+      style.Colors[ImGuiCol_Button] = shade(t.panelBg, 0.08f);
       style.Colors[ImGuiCol_ButtonHovered] = shade(t.panelBg, 0.18f);
       style.Colors[ImGuiCol_ButtonActive] = isLight ? shade(t.panelBg, 0.32f) : vec(t.accent, 0.65f);
       style.Colors[ImGuiCol_Header] = vec(t.accent, isLight ? 0.20f : 0.30f);
@@ -23498,7 +23542,7 @@ namespace
       const float titleH = ViewportPanelTitleHeight();
       char childId[32];
       snprintf(childId, sizeof(childId), "##viewportcard%d", gn.index);
-      PushElevatedPanelStyle(/*isChild=*/true);
+      PushDockedPanelStyle(/*isChild=*/true);
       ImGui::BeginChild(childId, ImVec2(imageSize.x, imageSize.y + titleH), false,
                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
@@ -23656,7 +23700,7 @@ namespace
 
       ImGui::Dummy(imageSize);
       ImGui::EndChild();
-      PopElevatedPanelStyle();
+      PopDockedPanelStyle();
 
       if (closeRequested)
       {
@@ -23701,7 +23745,7 @@ namespace
       const float box = horizontal ? std::max(48.0f, strip.y - bar)
                                    : std::max(48.0f, strip.x - bar);
 
-      PushElevatedPanelStyle(/*isChild=*/true);
+      PushDockedPanelStyle(/*isChild=*/true);
       ImGui::BeginChild("##viewportcards", strip, false,
                         horizontal ? ImGuiWindowFlags_HorizontalScrollbar : 0);
 
@@ -23745,7 +23789,7 @@ namespace
       }
 
       ImGui::EndChild();
-      PopElevatedPanelStyle();
+      PopDockedPanelStyle();
 
       // Right-click anywhere on the panel - empty space or a card - to
       // reposition or close it. Replaces the dock-combo/close-button header
@@ -23855,7 +23899,13 @@ namespace
 
       const ImVec2 tl = ImGui::GetItemRectMin();
       const ImVec2 br = ImGui::GetItemRectMax();
-      const ImU32 line = IM_COL32(70, 74, 90, 255);
+      // Was a fixed dark-navy constant, unwired from ApplyTheme - always
+      // near-black regardless of theme, which is invisible as a divider in
+      // dark mode's already-dark panelBg and reads as a stray dark smear in
+      // light mode. Rebase on the theme's own t.border, the same color every
+      // other divider in the app already uses.
+      const CategoryColors::UiTheme& lineTheme = CategoryColors::CurrentUiTheme();
+      const ImU32 line = ImGui::ColorConvertFloat4ToU32(ImVec4(lineTheme.border.r, lineTheme.border.g, lineTheme.border.b, 1.0f));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       switch (dock)
       {
@@ -24330,14 +24380,14 @@ namespace
       // fixed height for both orientations keeps that loop's target
       // stable.
       const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
-      PushElevatedPanelStyle(/*isChild=*/true);
+      PushDockedPanelStyle(/*isChild=*/true);
       ImGui::BeginChild("##modmatrixpanelcontent",
                         vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
                                  : ImVec2(0, std::max(1.0f, inner.y - kGrip - gap.y)),
                         true);
       DrawModMatrixTable();
       ImGui::EndChild();
-      PopElevatedPanelStyle();
+      PopDockedPanelStyle();
 
       if (!gripFirst)
       {
@@ -24349,7 +24399,13 @@ namespace
 
       const ImVec2 tl = ImGui::GetItemRectMin();
       const ImVec2 br = ImGui::GetItemRectMax();
-      const ImU32 line = IM_COL32(70, 74, 90, 255);
+      // Was a fixed dark-navy constant, unwired from ApplyTheme - always
+      // near-black regardless of theme, which is invisible as a divider in
+      // dark mode's already-dark panelBg and reads as a stray dark smear in
+      // light mode. Rebase on the theme's own t.border, the same color every
+      // other divider in the app already uses.
+      const CategoryColors::UiTheme& lineTheme = CategoryColors::CurrentUiTheme();
+      const ImU32 line = ImGui::ColorConvertFloat4ToU32(ImVec4(lineTheme.border.r, lineTheme.border.g, lineTheme.border.b, 1.0f));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       switch (dock)
       {
@@ -26510,14 +26566,14 @@ namespace
       }
 
       const ImVec2 gap = ImGui::GetStyle().ItemSpacing;
-      PushElevatedPanelStyle(/*isChild=*/true);
+      PushDockedPanelStyle(/*isChild=*/true);
       ImGui::BeginChild("##perfpanelinnercontent",
                         vertical ? ImVec2(std::max(1.0f, inner.x - kGrip - gap.x), inner.y)
                                  : ImVec2(0, std::max(1.0f, inner.y - kGrip - gap.y)),
                         true);
       DrawPerfPanelContent();
       ImGui::EndChild();
-      PopElevatedPanelStyle();
+      PopDockedPanelStyle();
 
       if (!gripFirst)
       {
@@ -26529,7 +26585,13 @@ namespace
 
       const ImVec2 tl = ImGui::GetItemRectMin();
       const ImVec2 br = ImGui::GetItemRectMax();
-      const ImU32 line = IM_COL32(70, 74, 90, 255);
+      // Was a fixed dark-navy constant, unwired from ApplyTheme - always
+      // near-black regardless of theme, which is invisible as a divider in
+      // dark mode's already-dark panelBg and reads as a stray dark smear in
+      // light mode. Rebase on the theme's own t.border, the same color every
+      // other divider in the app already uses.
+      const CategoryColors::UiTheme& lineTheme = CategoryColors::CurrentUiTheme();
+      const ImU32 line = ImGui::ColorConvertFloat4ToU32(ImVec4(lineTheme.border.r, lineTheme.border.g, lineTheme.border.b, 1.0f));
       ImDrawList* dl = ImGui::GetWindowDrawList();
       switch (dock)
       {
@@ -65864,7 +65926,7 @@ int main(int argc, char** argv)
       if (gNodePanelOpen)
       {
          ImGui::SameLine();
-         PushElevatedPanelStyle(/*isChild=*/true);
+         PushDockedPanelStyle(/*isChild=*/true);
          ImGui::BeginChild("##nodepanel", ImVec2(kNodePanelWidth, graphHeight), true);
 
          // Mode switcher: Modules is the original, always-present catalogue;
@@ -66116,7 +66178,7 @@ int main(int argc, char** argv)
          }
 
          ImGui::EndChild();
-         PopElevatedPanelStyle();
+         PopDockedPanelStyle();
       }
 
       // Bottom-docked viewport panel: a fresh, full-width row below the
