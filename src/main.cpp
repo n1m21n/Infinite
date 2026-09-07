@@ -2546,6 +2546,7 @@ namespace
       else if (ImGui::Button(caption.c_str(), ImVec2(width, 0)))
       {
          gDropdown.options = options;
+         gDropdown.categories.clear(); // this call site has no category grouping - drop whatever the last dropdown left behind
          gDropdown.onSelect = std::move(onSelect);
          gDropdown.current = safeCurrent;
          gDropdown.justOpened = true;
@@ -4764,6 +4765,13 @@ namespace
       style.Colors[ImGuiCol_TabActive] = vec(t.accent, isLight ? 0.50f : 0.60f);
       style.Colors[ImGuiCol_TabUnfocused] = vec(t.windowBg);
       style.Colors[ImGuiCol_TabUnfocusedActive] = vec(t.panelBg);
+      // ImGui's own tab bar draws a 1px full-width bar under EVERY tab strip
+      // every frame, tinted with TabActive/TabUnfocusedActive regardless of
+      // which tab is selected (imgui_widgets.cpp TabBarLayout) - it reads as
+      // a leftover underline that "never clears" when a Settings tab already
+      // opens with its own SeparatorText just below. Kill it app-wide; the
+      // tab fill colour above already carries the active/hover distinction.
+      style.TabBarBorderSize = 0.0f;
       style.Colors[ImGuiCol_TextSelectedBg] = vec(t.accent, 0.35f);
       style.Colors[ImGuiCol_DragDropTarget] = vec(t.accent);
       style.Colors[ImGuiCol_NavHighlight] = vec(t.accent);
@@ -8792,6 +8800,7 @@ namespace
                   if (ImGui::Button(caption.c_str(), ImVec2(btnW, 0)))
                   {
                      gDropdown.options = options;
+                     gDropdown.categories.clear(); // this call site has no category grouping - drop whatever the last dropdown left behind
                      gDropdown.onSelect = std::move(onSelect);
                      gDropdown.current = safe;
                      gDropdown.justOpened = true;
@@ -23489,6 +23498,7 @@ namespace
       const float titleH = ViewportPanelTitleHeight();
       char childId[32];
       snprintf(childId, sizeof(childId), "##viewportcard%d", gn.index);
+      PushElevatedPanelStyle(/*isChild=*/true);
       ImGui::BeginChild(childId, ImVec2(imageSize.x, imageSize.y + titleH), false,
                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
@@ -23646,6 +23656,7 @@ namespace
 
       ImGui::Dummy(imageSize);
       ImGui::EndChild();
+      PopElevatedPanelStyle();
 
       if (closeRequested)
       {
@@ -23690,6 +23701,7 @@ namespace
       const float box = horizontal ? std::max(48.0f, strip.y - bar)
                                    : std::max(48.0f, strip.x - bar);
 
+      PushElevatedPanelStyle(/*isChild=*/true);
       ImGui::BeginChild("##viewportcards", strip, false,
                         horizontal ? ImGuiWindowFlags_HorizontalScrollbar : 0);
 
@@ -23733,6 +23745,7 @@ namespace
       }
 
       ImGui::EndChild();
+      PopElevatedPanelStyle();
 
       // Right-click anywhere on the panel - empty space or a card - to
       // reposition or close it. Replaces the dock-combo/close-button header
@@ -27117,7 +27130,12 @@ namespace
             ImGui::TextUnformatted(s.action);
 
             ImGui::TableSetColumnIndex(1);
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.82f, 1.0f, 1.0f));
+            // Pale sky-blue reads fine on the dark table row background but
+            // washes out against light mode's light row background - branch
+            // it the same way every other themed accent-text spot in the
+            // app does rather than leave it a fixed dark-mode-only colour.
+            ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? ImVec4(0.05f, 0.35f, 0.68f, 1.0f)
+                                                                : ImVec4(0.45f, 0.82f, 1.0f, 1.0f));
             ImGui::TextUnformatted(s.key);
             ImGui::PopStyleColor();
 
@@ -30039,8 +30057,20 @@ namespace
             };
 
             auto DrawCodeBox = [](const char* code, const char* copyId) {
+               // Deliberately always a dark "code editor" box regardless of
+               // app theme (same convention as a syntax-highlighted snippet
+               // in a light-mode IDE) - the bug was that the code text and
+               // the Copy button label were left at the *ambient* themed
+               // Text colour, which is near-black in light mode and
+               // vanished against this fixed dark background. Pin both to
+               // an explicit light colour so the box is legible in either
+               // theme instead of only in dark mode by accident.
                ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.08f, 0.10f, 0.16f, 1.0f));
                ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.20f, 0.24f, 0.36f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.88f, 0.91f, 0.98f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.24f, 0.36f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f, 0.33f, 0.48f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.34f, 0.40f, 0.58f, 1.0f));
                ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 4.0f);
                const float h = ImGui::CalcTextSize(code).y + 16.0f;
                ImGui::BeginChild(copyId, ImVec2(0, h), true, ImGuiWindowFlags_NoScrollbar);
@@ -30052,7 +30082,7 @@ namespace
                   ImGui::SetClipboardText(code);
                ImGui::EndChild();
                ImGui::PopStyleVar();
-               ImGui::PopStyleColor(2);
+               ImGui::PopStyleColor(6);
                ImGui::Spacing();
             };
 
@@ -51562,9 +51592,19 @@ int main(int argc, char** argv)
          // Audio engine on/off
          {
             const bool audioOn = AudioEngine::Instance().SampleRate() > 0.0;
+            const bool audioIsLight = IsThemeLight();
+            // The "off" chip was a fixed dark gray with the ambient (themed)
+            // text colour on top - in light mode that's dark-navy text on a
+            // dark-gray fill, both dark, so the label all but disappeared.
+            // Branch the fill by theme and pin an explicit high-contrast
+            // text colour for both states rather than relying on whatever
+            // ImGuiCol_Text happens to be.
             ImGui::PushStyleColor(ImGuiCol_Button, audioOn
-                                                       ? ImVec4(0.16f, 0.52f, 0.28f, 1.0f)
-                                                       : ImVec4(0.30f, 0.30f, 0.34f, 1.0f));
+                                                       ? (audioIsLight ? ImVec4(0.20f, 0.62f, 0.34f, 1.0f) : ImVec4(0.16f, 0.52f, 0.28f, 1.0f))
+                                                       : (audioIsLight ? ImVec4(0.80f, 0.82f, 0.87f, 1.0f) : ImVec4(0.30f, 0.30f, 0.34f, 1.0f)));
+            ImGui::PushStyleColor(ImGuiCol_Text, audioOn
+                                                     ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f)
+                                                     : (audioIsLight ? ImVec4(0.12f, 0.14f, 0.20f, 1.0f) : ImVec4(0.92f, 0.94f, 0.98f, 1.0f)));
             if (ImGui::Button(audioOn ? "Stop Audio" : "Start Audio"))
             {
                if (audioOn)
@@ -51576,7 +51616,7 @@ int main(int argc, char** argv)
                      fprintf(stderr, "audio device: %s\n", gAudioStartError.c_str());
                }
             }
-            ImGui::PopStyleColor();
+            ImGui::PopStyleColor(2);
             if (!audioOn && !gAudioStartError.empty() && ImGui::IsItemHovered())
                ImGui::SetTooltip("%s", gAudioStartError.c_str());
          }
@@ -65824,6 +65864,7 @@ int main(int argc, char** argv)
       if (gNodePanelOpen)
       {
          ImGui::SameLine();
+         PushElevatedPanelStyle(/*isChild=*/true);
          ImGui::BeginChild("##nodepanel", ImVec2(kNodePanelWidth, graphHeight), true);
 
          // Mode switcher: Modules is the original, always-present catalogue;
@@ -66075,6 +66116,7 @@ int main(int argc, char** argv)
          }
 
          ImGui::EndChild();
+         PopElevatedPanelStyle();
       }
 
       // Bottom-docked viewport panel: a fresh, full-width row below the
@@ -67555,7 +67597,13 @@ int main(int argc, char** argv)
       int fbW, fbH;
       glfwGetFramebufferSize(window, &fbW, &fbH);
       glViewport(0, 0, fbW, fbH);
-      glClearColor(0.09f, 0.09f, 0.11f, 1.0f);
+      // Backs every transparent ImGui child/window (ChildBg/WindowBg alpha 0
+      // by default, see ApplyTheme) - any panel that skips
+      // PushElevatedPanelStyle shows this colour through, so it has to track
+      // the theme rather than stay a fixed dark constant or a light theme
+      // renders that gap as near-black.
+      const CategoryColors::UiTheme& clearTheme = CategoryColors::CurrentUiTheme();
+      glClearColor(clearTheme.windowBg.r, clearTheme.windowBg.g, clearTheme.windowBg.b, 1.0f);
       glClear(GL_COLOR_BUFFER_BIT);
       ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
