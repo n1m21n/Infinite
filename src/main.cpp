@@ -65874,8 +65874,22 @@ int main(int argc, char** argv)
                if (hay.find(q) == std::string::npos)
                   continue;
                ++shown;
-               std::string entry = DisplayName(t.first) + "   (" + DisplayName(t.second) + ")";
-               bool activate = ImGui::Selectable(entry.c_str());
+               const std::string title = DisplayName(t.first);
+               const std::string category = DisplayName(t.second);
+               const float rowW = ImGui::GetContentRegionAvail().x;
+               const ImVec2 posBefore = ImGui::GetCursorScreenPos();
+               bool activate = ImGui::Selectable(title.c_str(), false, 0, ImVec2(rowW, 0.0f));
+               // Draw the category as secondary/dimmed subtitle on the trailing edge of the row
+               {
+                  const float catW = ImGui::CalcTextSize(category.c_str()).x;
+                  const float catX = posBefore.x + rowW - catW - 4.0f;
+                  const float catY = posBefore.y + (ImGui::GetItemRectSize().y - ImGui::GetTextLineHeight()) * 0.5f;
+                  if (catX > posBefore.x + ImGui::CalcTextSize(title.c_str()).x + 12.0f)
+                  {
+                     const ImU32 dimCol = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+                     ImGui::GetWindowDrawList()->AddText(ImVec2(catX, catY), dimCol, category.c_str());
+                  }
+               }
                if (shown == 1 && pickFirst)
                   activate = true;
                if (activate)
