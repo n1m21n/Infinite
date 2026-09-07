@@ -28649,7 +28649,7 @@ namespace
       ImGuiIO& io = ImGui::GetIO();
       ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
                                ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-      ImGui::SetNextWindowBgAlpha(0.95f);
+      PushElevatedPanelStyle(/*isChild=*/false);
       ImGui::Begin("Offline Render", nullptr,
                     ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize |
                        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings);
@@ -28694,6 +28694,7 @@ namespace
       ImGui::EndDisabled();
 
       ImGui::End();
+      PopElevatedPanelStyle();
    }
 
    void RemoveNodeByIndex(int index)
