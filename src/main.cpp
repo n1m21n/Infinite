@@ -3023,9 +3023,14 @@ namespace
          float shown = *value;
          if (audioStyle)
          {
+            // Same muted amber as the plain-slider branch's FrameBg below
+            // (0.32,0.24,0.08 dark / 0.98,0.86,0.58 light), not the knob's
+            // full-bright ring color - the user tried the bright version
+            // here and asked for this darker tone back, same as the Color
+            // Adjustments node's params already use.
             AudioSliderFloat(label, &shown, minV, maxV, fmt, width - box - 4.0f,
-                             IM_COL32(255, 190, 90, 255), /*readOnly=*/true, posToValue, valueToPos,
-                             /*vividState=*/true);
+                             isLight ? IM_COL32(250, 219, 148, 255) : IM_COL32(82, 61, 20, 255),
+                             /*readOnly=*/true, posToValue, valueToPos, /*vividState=*/true);
          }
          else
          {
@@ -3077,9 +3082,10 @@ namespace
                        : 0.0f;
          if (audioStyle)
          {
+            // Same muted purple as the plain-slider branch's FrameBg below.
             AudioSliderFloat(label, &shown, minV, maxV, fmt, width - box - 4.0f - exprSuffixW,
-                             IM_COL32(170, 130, 255, 255), /*readOnly=*/true, posToValue, valueToPos,
-                             /*vividState=*/true);
+                             isLight ? IM_COL32(224, 209, 250, 255) : IM_COL32(51, 38, 82, 255),
+                             /*readOnly=*/true, posToValue, valueToPos, /*vividState=*/true);
          }
          else
          {
@@ -3137,7 +3143,11 @@ namespace
          // reachable to fix or clear via double-click, right-click, or
          // hovering and typing '=' - see HandleParamTypeHotkeys - same as it
          // would be if this were a fresh, non-expression param.
-         const ImU32 activeCol = recording ? IM_COL32(235, 70, 70, 255) : IM_COL32(120, 200, 255, 235);
+         // Recording uses the same muted red as the plain-slider branch's
+         // FrameBg a few lines down, not the knob's bright ring - see the
+         // modulated/expression branches above for why.
+         const ImU32 activeCol = recording ? (isLight ? IM_COL32(252, 204, 204, 255) : IM_COL32(87, 26, 26, 255))
+                                            : IM_COL32(120, 200, 255, 235);
          if (audioStyle)
          {
             changed = AudioSliderFloat(label, value, minV, maxV, fmt, width - box - 4.0f,
@@ -3198,7 +3208,11 @@ namespace
       }
       else
       {
-         const ImU32 activeCol = recording ? IM_COL32(235, 70, 70, 255) : IM_COL32(120, 200, 255, 235);
+         // Recording uses the same muted red as the plain-slider branch's
+         // FrameBg a few lines down, not the knob's bright ring - see the
+         // modulated/expression branches above for why.
+         const ImU32 activeCol = recording ? (isLight ? IM_COL32(252, 204, 204, 255) : IM_COL32(87, 26, 26, 255))
+                                            : IM_COL32(120, 200, 255, 235);
          if (audioStyle)
          {
             changed = AudioSliderFloat(label, value, minV, maxV, fmt, width - box - 4.0f,
