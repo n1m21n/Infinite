@@ -2238,15 +2238,16 @@ namespace
       ImU32 valCol, nameCol;
       if (vividState)
       {
-         // The near-opaque fill above can sit under the whole track width at
-         // t=1, so the fixed grey pair below (tuned for the old near-black/
-         // near-white track) would go low-contrast against a bright fill
-         // (amber) - picked by the fill's own luminance instead of
-         // hardcoding per-hue.
-         const int fr = (int)(fillColor & 0xFF), fg = (int)((fillColor >> 8) & 0xFF), fb = (int)((fillColor >> 16) & 0xFF);
-         const bool onDark = (0.299f * fr + 0.587f * fg + 0.114f * fb) < 150.0f;
-         valCol = onDark ? IM_COL32(245, 246, 250, 255) : IM_COL32(15, 15, 18, 255);
-         nameCol = onDark ? IM_COL32(226, 228, 236, 220) : IM_COL32(35, 35, 40, 220);
+         // The name label sits at the *unfilled* left edge until the value is
+         // high enough to cover it, so text color has to follow the track's
+         // own base (near-black dark / near-white light), not the fill's -
+         // picking by the fill's hue (tried once) put dark text over purple,
+         // which is invisible against the near-black track behind it. Same
+         // white-on-dark/black-on-light rule as every other themed text in
+         // the app, just forced to full strength since it now sits over a
+         // near-opaque accent once the fill does cover it.
+         valCol = isLight ? IM_COL32(15, 15, 18, 255) : IM_COL32(245, 246, 250, 255);
+         nameCol = isLight ? IM_COL32(35, 35, 40, 220) : IM_COL32(226, 228, 236, 220);
       }
       else
       {
