@@ -67304,7 +67304,10 @@ int main(int argc, char** argv)
 
          if (status == UpdateCheck::Status::UpdateAvailable)
          {
-            if (ImGui::Button("Download latest version"))
+            PushPrimaryButtonStyle();
+            const bool doDownload = ImGui::Button("Download latest version");
+            PopPrimaryButtonStyle();
+            if (doDownload)
                Platform::OpenExternalUrl(UpdateCheck::DownloadUrl());
             ImGui::SameLine();
             if (ImGui::Button("Later"))
@@ -67312,7 +67315,10 @@ int main(int argc, char** argv)
          }
          else if (status == UpdateCheck::Status::Failed)
          {
-            if (ImGui::Button("Retry"))
+            PushPrimaryButtonStyle();
+            const bool doRetry = ImGui::Button("Retry");
+            PopPrimaryButtonStyle();
+            if (doRetry)
                UpdateCheck::Start();
             ImGui::SameLine();
             if (ImGui::Button("Close"))
