@@ -2417,22 +2417,22 @@ namespace
    inline void PushDropdownStyle()
    {
       const bool isLight = IsThemeLight();
-      // Dark: the fill sits within ~0.06 luminance of the node body (a
+      // The fill sits within ~0.06 luminance of the node body (a
       // category-tinted mix of panelBg, see DrawNodes' NodeBg push) - a
-      // recess, not a chip. The border is dropped to a hairline no brighter
-      // than a row separator and the frame stroke is switched off entirely
-      // (FrameBorderSize 0 below) - the caption text is what carries the
-      // control's identity in dark, at near-full contrast, not the frame.
-      // Light is untouched: the panel there is bright enough that a recess
-      // still needs a real edge to read as a control at all. See P10 in
-      // .claude/skills/node-ui-pillars/SKILL.md.
+      // recess, not a chip. No frame stroke in either theme now - the
+      // caption text is what carries the control's identity, at near-full
+      // contrast, not the frame; light mode used to keep a hairline border
+      // here (P10 in .claude/skills/node-ui-pillars/SKILL.md reasoned the
+      // brighter panel needed a real edge), but that was the one dropdown
+      // border left standing after every other border in the app was
+      // deleted rather than recolored - same fix applies here.
       ImGui::PushStyleColor(ImGuiCol_Button, isLight ? ImVec4(0.86f, 0.88f, 0.94f, 1.0f) : ImVec4(0.16f, 0.18f, 0.24f, 1.0f));
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered, isLight ? ImVec4(0.80f, 0.84f, 0.92f, 1.0f) : ImVec4(0.28f, 0.31f, 0.42f, 1.0f));
       ImGui::PushStyleColor(ImGuiCol_ButtonActive, isLight ? ImVec4(0.74f, 0.78f, 0.88f, 1.0f) : ImVec4(0.35f, 0.39f, 0.52f, 1.0f));
       ImGui::PushStyleColor(ImGuiCol_Text, isLight ? ImVec4(0.15f, 0.18f, 0.24f, 1.0f) : ImVec4(0.90f, 0.93f, 0.98f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_Border, isLight ? ImVec4(0.72f, 0.76f, 0.85f, 1.0f) : ImVec4(0.22f, 0.235f, 0.278f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, isLight ? 1.0f : 0.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
    }
 
    inline void PopDropdownStyle()
@@ -27272,10 +27272,19 @@ namespace
 
    void DrawShortcutsWindow(bool* open)
    {
+      // Every other floating dialog (Settings, Field editor, colour picker)
+      // goes through PushElevatedPanelStyle - this one didn't, which is why
+      // it was the one window still carrying a different backdrop/border/
+      // rounding than the rest of the "material above the canvas" family.
+      // Centering on first appearance matches Settings for the same reason
+      // (see DrawSettingsWindow).
+      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       ImGui::SetNextWindowSize(ImVec2(680, 520), ImGuiCond_FirstUseEver);
+      PushElevatedPanelStyle(/*isChild=*/false);
       if (!ImGui::Begin("All Shortcuts", open))
       {
          ImGui::End();
+         PopElevatedPanelStyle();
          return;
       }
 
@@ -27399,6 +27408,7 @@ namespace
          ImGui::EndTable();
 
       ImGui::End();
+      PopElevatedPanelStyle();
    }
 
    void DrawHelpWindow(bool* open)
@@ -29870,7 +29880,6 @@ namespace
             ImGui::SeparatorText("Node Card Styling");
             float opacity = CategoryColors::GetNodeOpacity();
             ImGui::SetNextItemWidth(200.0f);
-            PushSliderStyle();
             if (ImGui::SliderFloat("Node Opacity", &opacity, 0.10f, 1.00f, "%.2f"))
             {
                CategoryColors::SetNodeOpacity(opacity, isLight, false);
@@ -29885,11 +29894,9 @@ namespace
                if (ImGui::SmallButton("Reset##opacity"))
                   CategoryColors::SetNodeOpacity(-1.0f, isLight);
             }
-            PopSliderStyle();
 
             float rounding = CategoryColors::GetNodeRounding();
             ImGui::SetNextItemWidth(200.0f);
-            PushSliderStyle();
             if (ImGui::SliderFloat("Node Corner Radius", &rounding, 0.0f, 24.0f, "%.0f px"))
             {
                CategoryColors::SetNodeRounding(rounding, false);
@@ -29908,11 +29915,9 @@ namespace
                   ApplyTheme();
                }
             }
-            PopSliderStyle();
 
             float tintWeight = CategoryColors::GetTintWeight();
             ImGui::SetNextItemWidth(200.0f);
-            PushSliderStyle();
             if (ImGui::SliderFloat("Tint", &tintWeight, 0.0f, 0.50f, "%.2f"))
             {
                CategoryColors::SetTintWeight(tintWeight, isLight, false);
@@ -29927,7 +29932,6 @@ namespace
                if (ImGui::SmallButton("Reset##tint"))
                   CategoryColors::SetTintWeight(-1.0f, isLight);
             }
-            PopSliderStyle();
 
             ImGui::EndTabItem();
          }
@@ -29937,29 +29941,21 @@ namespace
          {
             ImGui::Spacing();
             ImGui::SeparatorText("Grid & Canvas");
-            PushCheckboxStyle();
             if (ImGui::Checkbox("Snap to grid", &gSnapToGrid))
                SaveWorkspaceSettings();
-            PopCheckboxStyle();
             ImGui::SetNextItemWidth(180.0f);
-            PushSliderStyle();
             ImGui::SliderFloat("Grid size", &gGridSnap, 5.0f, 100.0f, "%.0f px");
-            PopSliderStyle();
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveWorkspaceSettings();
             ImGui::SetNextItemWidth(180.0f);
-            PushSliderStyle();
             ImGui::SliderFloat("Zoom sensitivity", &gZoomSensitivity, 0.05f, 1.5f, "%.2f");
-            PopSliderStyle();
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveWorkspaceSettings();
 
             ImGui::Spacing();
             ImGui::SeparatorText("Minimap");
-            PushCheckboxStyle();
             if (ImGui::Checkbox("Show minimap", &gMinimapEnabled))
                SaveWorkspaceSettings();
-            PopCheckboxStyle();
             if (gMinimapEnabled)
             {
                static const char* kCorners[] = {
@@ -29977,15 +29973,11 @@ namespace
                   ImGui::EndCombo();
                }
                ImGui::SetNextItemWidth(180.0f);
-               PushSliderStyle();
                ImGui::SliderFloat("Size", &gMinimapSize, 120.0f, 360.0f, "%.0f px");
-               PopSliderStyle();
                if (ImGui::IsItemDeactivatedAfterEdit())
                   SaveWorkspaceSettings();
                ImGui::SetNextItemWidth(180.0f);
-               PushSliderStyle();
                ImGui::SliderFloat("Opacity", &gMinimapOpacity, 0.2f, 1.0f, "%.2f");
-               PopSliderStyle();
                if (ImGui::IsItemDeactivatedAfterEdit())
                   SaveWorkspaceSettings();
             }
@@ -29996,7 +29988,6 @@ namespace
             bool showAudNote = (gCableVisibilityMask & 0x2) != 0;
             bool showImg = (gCableVisibilityMask & 0x1) != 0;
 
-            PushCheckboxStyle();
             if (ImGui::Checkbox("Modulation cables", &showMod))
             {
                gCableVisibilityMask = (gCableVisibilityMask & ~0x4) | (showMod ? 0x4 : 0);
@@ -30012,7 +30003,6 @@ namespace
                gCableVisibilityMask = (gCableVisibilityMask & ~0x1) | (showImg ? 0x1 : 0);
                SaveWorkspaceSettings();
             }
-            PopCheckboxStyle();
 
             ImGui::TextDisabled("Note: Image & geometry toggle also covers palette cables.");
             ImGui::Spacing();
@@ -30205,16 +30195,12 @@ namespace
                                     path.empty() ? "the settings directory" : path.c_str());
                }
             }
-            PushCheckboxStyle();
             if (ImGui::Checkbox("Autosave enabled", &gAutosaveEnabled))
                SaveGeneralSettings();
-            PopCheckboxStyle();
             ImGui::SetNextItemWidth(180.0f);
             int seconds = gAutosaveSeconds;
-            PushSliderStyle();
             if (ImGui::SliderInt("Autosave interval", &seconds, 15, 300, "%d sec"))
                gAutosaveSeconds = seconds;
-            PopSliderStyle();
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveGeneralSettings();
 
@@ -30241,13 +30227,11 @@ namespace
                ImGui::EndCombo();
             }
 
-            PushCheckboxStyle();
             if (ImGui::Checkbox("Vsync", &gVsync))
             {
                glfwSwapInterval(gVsync ? 1 : 0);
                SaveGeneralSettings();
             }
-            PopCheckboxStyle();
 
             ImGui::Spacing();
             ImGui::SeparatorText("Application & Updates");

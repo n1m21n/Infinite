@@ -6714,10 +6714,18 @@ bool ImGui::Selectable(const char* label, bool selected, ImGuiSelectableFlags fl
         g.LastItemData.StatusFlags |= ImGuiItemStatusFlags_ToggledSelection;
 
     // Render
+    // Infinite: stock ImGui hardcodes 0.0f here, so every Selectable-based
+    // highlight (menu items, list/table rows, dropdown popup options, the
+    // search panel's Modules/Samples/Media/Plugins tabs) was a hard rectangle
+    // no matter what FrameRounding the app set - the one place a "rounded
+    // corners everywhere" look could not reach. Selectable is the single
+    // function all of those funnel through, so rounding it here is what
+    // makes the highlight shape consistent with everything else instead of
+    // patching each call site.
     if (hovered || selected)
     {
         const ImU32 col = GetColorU32((held && hovered) ? ImGuiCol_HeaderActive : hovered ? ImGuiCol_HeaderHovered : ImGuiCol_Header);
-        RenderFrame(bb.Min, bb.Max, col, false, 0.0f);
+        RenderFrame(bb.Min, bb.Max, col, false, style.FrameRounding);
     }
     if (g.NavId == id)
         RenderNavHighlight(bb, id, ImGuiNavHighlightFlags_Compact | ImGuiNavHighlightFlags_NoRounding);
