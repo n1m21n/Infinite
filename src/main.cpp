@@ -14561,11 +14561,32 @@ namespace
 
       ImGui::PushID(idPrefix);
 
-      if (ImGui::Button("Add folder...", ImVec2(-1.0f, 0)))
       {
-         const std::string path = Platform::OpenFolderDialog();
-         if (!path.empty())
-            scanner.AddFolder(path);
+         const char* addLabel = "Add folder...";
+         const float iconSize = ImGui::GetFrameHeight() * 0.65f;
+         const float iconGap = 6.0f;
+         const ImVec2 btnPos = ImGui::GetCursorScreenPos();
+         const bool clicked = ImGui::Button("##addfolder", ImVec2(-1.0f, 0));
+         const ImVec2 bmin = ImGui::GetItemRectMin();
+         const ImVec2 bmax = ImGui::GetItemRectMax();
+         const float btnW = bmax.x - bmin.x;
+         const float btnH = bmax.y - bmin.y;
+         const float textW = ImGui::CalcTextSize(addLabel).x;
+         const float totalContentW = iconSize + iconGap + textW;
+         const float startX = bmin.x + (btnW - totalContentW) * 0.5f;
+         const float centerY = bmin.y + btnH * 0.5f;
+
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
+         Tabler::DrawPlus(dl, ImVec2(startX + iconSize * 0.5f, centerY), iconSize, col);
+         dl->AddText(ImVec2(startX + iconSize + iconGap, centerY - ImGui::GetTextLineHeight() * 0.5f), col, addLabel);
+
+         if (clicked)
+         {
+            const std::string path = Platform::OpenFolderDialog();
+            if (!path.empty())
+               scanner.AddFolder(path);
+         }
       }
 
       // Folders list, each with its own refresh and remove button. Kept
@@ -14626,7 +14647,25 @@ namespace
       {
          if (scanning)
             ImGui::BeginDisabled();
-         if (ImGui::Button("Refresh all", ImVec2(-1.0f, 0)))
+         const char* refreshLabel = "Refresh all";
+         const float iconSize = ImGui::GetFrameHeight() * 0.65f;
+         const float iconGap = 6.0f;
+         const bool clicked = ImGui::Button("##refreshall", ImVec2(-1.0f, 0));
+         const ImVec2 bmin = ImGui::GetItemRectMin();
+         const ImVec2 bmax = ImGui::GetItemRectMax();
+         const float btnW = bmax.x - bmin.x;
+         const float btnH = bmax.y - bmin.y;
+         const float textW = ImGui::CalcTextSize(refreshLabel).x;
+         const float totalContentW = iconSize + iconGap + textW;
+         const float startX = bmin.x + (btnW - totalContentW) * 0.5f;
+         const float centerY = bmin.y + btnH * 0.5f;
+
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImU32 col = ImGui::GetColorU32(scanning ? ImGuiCol_TextDisabled : ImGuiCol_Text);
+         Tabler::DrawRefresh(dl, ImVec2(startX + iconSize * 0.5f, centerY), iconSize, col);
+         dl->AddText(ImVec2(startX + iconSize + iconGap, centerY - ImGui::GetTextLineHeight() * 0.5f), col, refreshLabel);
+
+         if (clicked)
             scanAll = true;
          if (scanning)
             ImGui::EndDisabled();
