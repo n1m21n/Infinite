@@ -2536,6 +2536,68 @@ namespace
       ImGui::PopStyleColor(2);
    }
 
+   // Draws a Tabler-style X in place of ImGui's own built-in title-bar close
+   // cross, which has a visibly different stroke weight/proportion from the
+   // hand-drawn Tabler::DrawX used everywhere else in the app (Samples-panel
+   // folder remove, mod-matrix Unbind, ...) - the two icon families read as
+   // inconsistent side by side. Mirrors ImGui::CloseButton's own geometry
+   // and hit-testing (imgui_widgets.cpp) exactly, just swapping the glyph it
+   // draws: same hover-circle background, same "shrink the hit-rect when
+   // the button covers most of a tiny window" tweak, same clipped-but-still-
+   // interactable behavior that keeps Alt+Right,Activate able to close a
+   // window via keyboard nav.
+   // Call this immediately after ImGui::Begin(title, nullptr) - passing
+   // nullptr instead of &openFlag suppresses ImGui's own close button
+   // entirely (has_close_button = (p_open != NULL) in imgui.cpp Begin()),
+   // rather than leaving it there to draw over. This function sets
+   // *openFlag = false on click, so callers see identical behavior to
+   // passing p_open straight into Begin.
+   inline void DrawWindowTablerCloseButton(bool* openFlag)
+   {
+      ImGuiWindow* window = ImGui::GetCurrentWindow();
+      if (!window)
+         return;
+      ImGuiStyle& style = ImGui::GetStyle();
+      const ImRect titleBarRect = window->TitleBarRect();
+      const float buttonSz = ImGui::GetFontSize();
+      const ImVec2 pos(titleBarRect.Max.x - style.FramePadding.x - buttonSz,
+                        titleBarRect.Min.y + style.FramePadding.y);
+
+      const ImGuiID id = window->GetID("#CLOSE");
+      const ImRect bb(pos, pos + ImVec2(buttonSz, buttonSz));
+      ImRect bbInteract = bb;
+      const float areaToVisibleRatio = window->OuterRectClipped.GetArea() / bb.GetArea();
+      if (areaToVisibleRatio < 1.5f)
+         bbInteract.Expand(ImTrunc(bbInteract.GetSize() * -0.25f));
+
+      // window->ClipRect has already been narrowed to the content region by
+      // the time Begin() returns to caller code - it excludes the title bar
+      // entirely, so ItemAdd's bb.Overlaps(window->ClipRect) test (and
+      // ButtonBehavior's hover test, which clips the same way) silently
+      // fails for a bb up in the title bar and nothing gets drawn or
+      // becomes interactive. Native CloseButton never hits this because it
+      // runs from inside Begin(), before that narrowing happens. Widen back
+      // to the full window rect for just this call, then restore.
+      ImGui::PushClipRect(window->Pos, window->Pos + window->Size, false);
+      const bool isClipped = !ImGui::ItemAdd(bbInteract, id);
+      bool hovered = false, held = false;
+      const bool pressed = ImGui::ButtonBehavior(bbInteract, id, &hovered, &held);
+      if (!isClipped)
+      {
+         const ImVec2 center = bb.GetCenter();
+         if (hovered)
+         {
+            const ImU32 bgCol = ImGui::GetColorU32(held ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered);
+            window->DrawList->AddCircleFilled(center, ImMax(2.0f, buttonSz * 0.5f + 1.0f), bgCol);
+         }
+         const ImU32 crossCol = hovered ? ImGui::GetColorU32(ImGuiCol_Text) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+         Tabler::DrawX(window->DrawList, center, buttonSz * 0.72f, crossCol);
+      }
+      ImGui::PopClipRect();
+      if (pressed && openFlag)
+         *openFlag = false;
+   }
+
    // ---- The one panel seam ----
    //
    // What separates two adjacent panes, after several rounds of getting this
@@ -2999,11 +3061,16 @@ namespace
          }
          else
          {
+            // The track background stays this fixed dark amber in both themes
+            // (it's the modulation-state color, not a theme color), so the
+            // value text drawn on top must stay fixed light too - left on the
+            // theme default it goes near-black in light mode and vanishes.
             ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.32f, 0.24f, 0.08f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.95f, 0.72f, 0.32f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.97f, 0.95f, 0.90f, 1.0f));
             ImGui::SetNextItemWidth(width - box - 4.0f);
             ImGui::SliderFloat(label, &shown, minV, maxV, fmt, ImGuiSliderFlags_NoInput);
-            ImGui::PopStyleColor(2);
+            ImGui::PopStyleColor(3);
          }
          DrawModulationBindingMenu(nodeIndex, paramIndex, ImGui::IsItemHovered());
       }
@@ -3035,11 +3102,14 @@ namespace
          }
          else
          {
+            // Same fixed-track/fixed-text pairing as the modulated (amber)
+            // state above - see that comment.
             ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.20f, 0.15f, 0.32f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.66f, 0.51f, 0.98f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.93f, 0.99f, 1.0f));
             ImGui::SetNextItemWidth(width - box - 4.0f);
             ImGui::SliderFloat(label, &shown, minV, maxV, fmt, ImGuiSliderFlags_NoInput);
-            ImGui::PopStyleColor(2);
+            ImGui::PopStyleColor(3);
          }
          const bool sliderHovered = ImGui::IsItemHovered();
          bool hovered = sliderHovered;
@@ -3090,17 +3160,21 @@ namespace
                // Hovered/Active too, not just the base FrameBg - leaving
                // those two on the theme default meant hovering (let alone
                // dragging) a recording slider flashed back to the ordinary
-               // blue/grey the instant the mouse was over it.
+               // blue/grey the instant the mouse was over it. Text is fixed
+               // light too - the track stays this fixed dark red in both
+               // themes, so left on the theme default the value goes
+               // near-black and unreadable in light mode.
                ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.34f, 0.10f, 0.10f, 1.0f));
                ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.40f, 0.12f, 0.12f, 1.0f));
                ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.46f, 0.14f, 0.14f, 1.0f));
                ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
                ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.99f, 0.93f, 0.93f, 1.0f));
             }
             ImGui::SetNextItemWidth(width - box - 4.0f);
             changed = ImGui::SliderFloat(label, value, minV, maxV, fmt);
             if (recording)
-               ImGui::PopStyleColor(5);
+               ImGui::PopStyleColor(6);
          }
          const bool justActivated = ImGui::IsItemActivated();
          if (justActivated)
@@ -3136,17 +3210,21 @@ namespace
                // Hovered/Active too, not just the base FrameBg - leaving
                // those two on the theme default meant hovering (let alone
                // dragging) a recording slider flashed back to the ordinary
-               // blue/grey the instant the mouse was over it.
+               // blue/grey the instant the mouse was over it. Text is fixed
+               // light too - the track stays this fixed dark red in both
+               // themes, so left on the theme default the value goes
+               // near-black and unreadable in light mode.
                ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.34f, 0.10f, 0.10f, 1.0f));
                ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.40f, 0.12f, 0.12f, 1.0f));
                ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.46f, 0.14f, 0.14f, 1.0f));
                ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
                ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.92f, 0.30f, 0.30f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.99f, 0.93f, 0.93f, 1.0f));
             }
             ImGui::SetNextItemWidth(width - box - 4.0f);
             changed = ImGui::SliderFloat(label, value, minV, maxV, fmt);
             if (recording)
-               ImGui::PopStyleColor(5);
+               ImGui::PopStyleColor(6);
          }
          // Activation is the first frame of the drag, before that frame's own
          // delta is applied, so this is still the pre-drag value.
@@ -4893,7 +4971,16 @@ namespace
       style.Colors[ImGuiCol_TitleBg] = vec(t.windowBg);
       style.Colors[ImGuiCol_TitleBgActive] = vec(t.windowBg);
       style.Colors[ImGuiCol_TitleBgCollapsed] = vec(t.windowBg, 0.75f);
-      style.Colors[ImGuiCol_MenuBarBg] = vec(t.panelBg);
+      // Was t.panelBg, which reads as a hard horizontal seam against the
+      // node-editor canvas immediately below it: the canvas' own background
+      // (ed::StyleColor_Bg below) resolves to windowBg once its alpha is
+      // composited over this window's own WindowBg fill, so any color here
+      // other than windowBg is a visible color-boundary line under the menu
+      // bar in every theme (panelBg and windowBg are never equal - see the
+      // preset table in CategoryColors.cpp). Match windowBg so the menu bar
+      // and canvas read as one continuous surface, the same fix already
+      // applied to the seam above bottom-docked panels.
+      style.Colors[ImGuiCol_MenuBarBg] = vec(t.windowBg);
       style.Colors[ImGuiCol_ScrollbarBg] = vec(t.windowBg);
       style.Colors[ImGuiCol_ScrollbarGrab] = vec(t.border);
       style.Colors[ImGuiCol_ScrollbarGrabHovered] = shade(t.border, 0.25f);
@@ -14739,7 +14826,16 @@ namespace
             gSampleDragPath = entry.path;
             gSampleDragName = entry.fileName;
          }
-         if (ImGui::IsItemHovered())
+         // ImGuiHoveredFlags_ForTooltip (stationary + a short shared delay,
+         // per style.HoverFlagsForTooltipMouse) rather than a bare
+         // IsItemHovered(), which fired on literally the first hovered frame
+         // of every row - so a fast sweep across many rows (two-finger-
+         // scroll or a scrollbar drag with the cursor resting over the
+         // list) popped a full absolute-path tooltip per row it crossed.
+         // Also suppressed outright while a sample/media drag is in
+         // progress (gSampleDragActive, set a few lines above) so a
+         // click-drag never shows the path tooltip mid-drag.
+         if (!gSampleDragActive && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
          {
             if (!mediaKind && gPreviewingSamplePath.empty() && gPreviewErrorPath == entry.path)
                ImGui::SetTooltip("%s", gPreviewErrorMessage.c_str());
@@ -29767,12 +29863,16 @@ namespace
       ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       ImGui::SetNextWindowSize(ImVec2(740, 560), ImGuiCond_FirstUseEver);
       PushElevatedPanelStyle(/*isChild=*/false);
-      if (!ImGui::Begin("Settings", open, ImGuiWindowFlags_NoCollapse))
+      // nullptr instead of `open` suppresses ImGui's own close cross so
+      // DrawWindowTablerCloseButton can draw the Tabler-styled one used
+      // everywhere else in the app instead - see that function's comment.
+      if (!ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_NoCollapse))
       {
          ImGui::End();
          PopElevatedPanelStyle();
          return;
       }
+      DrawWindowTablerCloseButton(open);
 
       if (ImGui::BeginTabBar("SettingsTabs", ImGuiTabBarFlags_None))
       {
@@ -29876,14 +29976,6 @@ namespace
                   }
                   ImGui::SameLine(0.0f, 6.0f);
                   ImGui::TextUnformatted(cat.c_str());
-                  if (CategoryColors::HasCategoryColorOverride(cat, isLight))
-                  {
-                     ImGui::SameLine(0.0f, 8.0f);
-                     char resetId[64];
-                     snprintf(resetId, sizeof(resetId), "Reset##cat_%s", cat.c_str());
-                     if (ImGui::SmallButton(resetId))
-                        CategoryColors::ResetCategoryColor(cat, isLight);
-                  }
                }
                ImGui::EndTable();
             }
@@ -29915,14 +30007,6 @@ namespace
                   }
                   ImGui::SameLine(0.0f, 6.0f);
                   ImGui::TextUnformatted(cableNames[i].c_str());
-                  if (CategoryColors::HasCableColorOverride(type, isLight))
-                  {
-                     ImGui::SameLine(0.0f, 8.0f);
-                     char resetId[64];
-                     snprintf(resetId, sizeof(resetId), "Reset##cable_%d", i);
-                     if (ImGui::SmallButton(resetId))
-                        CategoryColors::ResetCableColor(type, isLight);
-                  }
                }
                ImGui::EndTable();
             }
@@ -29940,12 +30024,6 @@ namespace
             {
                CategoryColors::SaveAppearanceOverrides();
             }
-            if (CategoryColors::HasNodeOpacityOverride(isLight))
-            {
-               ImGui::SameLine();
-               if (ImGui::SmallButton("Reset##opacity"))
-                  CategoryColors::SetNodeOpacity(-1.0f, isLight);
-            }
 
             float rounding = CategoryColors::GetNodeRounding();
             ImGui::SetNextItemWidth(200.0f);
@@ -29958,15 +30036,6 @@ namespace
             {
                CategoryColors::SaveAppearanceOverrides();
             }
-            if (CategoryColors::HasNodeRoundingOverride())
-            {
-               ImGui::SameLine();
-               if (ImGui::SmallButton("Reset##rounding"))
-               {
-                  CategoryColors::SetNodeRounding(-1.0f);
-                  ApplyTheme();
-               }
-            }
 
             float tintWeight = CategoryColors::GetTintWeight();
             ImGui::SetNextItemWidth(200.0f);
@@ -29977,12 +30046,6 @@ namespace
             if (ImGui::IsItemDeactivatedAfterEdit())
             {
                CategoryColors::SaveAppearanceOverrides();
-            }
-            if (CategoryColors::HasTintWeightOverride(isLight))
-            {
-               ImGui::SameLine();
-               if (ImGui::SmallButton("Reset##tint"))
-                  CategoryColors::SetTintWeight(-1.0f, isLight);
             }
 
             ImGui::EndTabItem();
@@ -66232,17 +66295,21 @@ int main(int argc, char** argv)
          // kNodePanelWidth: four tabs no longer fit at 0.30 each, and deriving
          // the width means the row stays exact if a fifth mode ever lands or
          // the panel width changes.
-         const float tabGap = ImGui::GetStyle().ItemSpacing.x;
+         // A wider, explicit gap than the default ItemSpacing: at the
+         // default 6px, the selected tab's rounded highlight rect sat close
+         // enough to its neighbour's that the two read as one unbroken
+         // block with no visible seam between them when switching tabs.
+         const float tabGap = 10.0f;
          const float tabW = std::max(40.0f, (ImGui::GetContentRegionAvail().x - tabGap * 3.0f) * 0.25f);
          if (ImGui::Selectable("Modules", gSearchPanelMode == 0, 0, ImVec2(tabW, 0)))
             gSearchPanelMode = 0;
-         ImGui::SameLine();
+         ImGui::SameLine(0.0f, tabGap);
          if (ImGui::Selectable("Samples", gSearchPanelMode == 1, 0, ImVec2(tabW, 0)))
             gSearchPanelMode = 1;
-         ImGui::SameLine();
+         ImGui::SameLine(0.0f, tabGap);
          if (ImGui::Selectable("Media", gSearchPanelMode == 2, 0, ImVec2(tabW, 0)))
             gSearchPanelMode = 2;
-         ImGui::SameLine();
+         ImGui::SameLine(0.0f, tabGap);
          if (ImGui::Selectable("Plugins", gSearchPanelMode == 3, 0, ImVec2(tabW, 0)))
             gSearchPanelMode = 3;
          ImGui::Separator();
@@ -66471,7 +66538,20 @@ int main(int argc, char** argv)
             DrawPluginSearchPanel();
          }
 
+         // Same reasoning as the "Zeroed only around EndChild" comment in
+         // DrawViewportPanelDocked/DrawModMatrixDocked: ImGui bakes the gap
+         // that follows a child into that child's OWN EndChild() call (see
+         // ItemSize() in imgui.cpp, which reads style.ItemSpacing at the
+         // moment the item finishes, not when the next one starts) - so a
+         // PushStyleVar placed later, right before the bottom-docked row
+         // below, is too late to zero this gap. This panel is almost always
+         // the last item of the top row (it "always sticks to the rightmost
+         // edge"), which is exactly why the stray windowBg seam kept showing
+         // above every kind of bottom-docked panel regardless of which one -
+         // it never had anything to do with the bottom panel at all.
+         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
          ImGui::EndChild();
+         ImGui::PopStyleVar();
          PopDockedPanelStyle();
       }
 
@@ -66480,25 +66560,23 @@ int main(int argc, char** argv)
       // than same-line - see the graphHeight calc above ed::Begin(), which
       // already reserved this space.
       //
-      // Every docked panel already zeroes its OWN trailing ItemSpacing so it
-      // doesn't leave a gap before whatever comes after it (see the
-      // "Zeroed only around EndChild" comment in DrawViewportPanelDocked/
-      // DrawModMatrixDocked) - but nothing zeroed the spacing BEFORE the
-      // first one, between ed::End()'s canvas and this row. That default
-      // ItemSpacing.y gap is charged against this shell window's own
-      // ImGuiCol_WindowBg, not any panel's panelBg fill, and on a theme
-      // where the two differ it reads as a stray bar dropped across the
-      // full width right above the first bottom-docked panel - the same
-      // "hole, not a coloured divider" bug those other comments already
-      // describe, just at the one seam that had never been patched.
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+      // The seam this row sits under is handled at its SOURCE now: whatever
+      // ends up being the last item of the row above (ed::End()'s canvas, a
+      // right-docked panel's own EndChild, or the node/search panel's own
+      // EndChild) zeroes ItemSpacing tightly around just that one call - see
+      // the "Zeroed only around EndChild" comments there and in
+      // DrawViewportPanelDocked/DrawModMatrixDocked. A PushStyleVar wrapped
+      // around this whole block used to do that job instead, but it held
+      // ItemSpacing at zero for the ENTIRE draw of each bottom panel, not
+      // just its trailing gap - which also zeroed it for every popup/menu
+      // opened *inside* that panel (e.g. its right-click dock menu), and was
+      // why those popups rendered with no padding only when bottom-docked.
       if (viewportBottom)
          DrawViewportPanelDocked("##viewportpanel_bottom", ImVec2(0, gViewportPanelHeight));
       if (matrixBottom)
          DrawModMatrixDocked("##modmatrix_bottom", ImVec2(0, gModMatrixHeight));
       if (perfBottom)
          DrawPerfPanelDocked("##perfpanel_bottom", ImVec2(0, gPerfPanelHeight));
-      ImGui::PopStyleVar();
 
       ImGui::End();
 
@@ -66523,8 +66601,9 @@ int main(int argc, char** argv)
       {
          ImGui::SetNextWindowSize(ImVec2(620, 460), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Formula editor", &gFormulaEditorOpen))
+         if (ImGui::Begin("Formula editor", nullptr))
          {
+            DrawWindowTablerCloseButton(&gFormulaEditorOpen);
             ImGui::TextDisabled("body of  vec4 shape(vec2 uv, vec2 p, float t)");
             ImGui::TextDisabled("p is centred (-0.5..0.5), t is transport seconds, uA-uD are the knobs");
             ImGui::Separator();
@@ -66579,8 +66658,9 @@ int main(int argc, char** argv)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Field element editor", &gFieldElementEditorOpen))
+         if (ImGui::Begin("Field element editor", nullptr))
          {
+            DrawWindowTablerCloseButton(&gFieldElementEditorOpen);
             ImGui::TextDisabled("Field element-domain kernel (per-vertex). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t");
             ImGui::TextDisabled("User attributes: 'attrib float heat = 0'. Frame rate expressions are automatically hoisted.");
             ImGui::Separator();
@@ -66650,8 +66730,9 @@ int main(int argc, char** argv)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Field primitive editor", &gFieldPrimitiveEditorOpen))
+         if (ImGui::Begin("Field primitive editor", nullptr))
          {
+            DrawWindowTablerCloseButton(&gFieldPrimitiveEditorOpen);
             ImGui::TextDisabled("Field primitive generator (from scratch). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t");
             ImGui::TextDisabled("Pure 3D geometry generator. Frame rate expressions are automatically hoisted.");
             ImGui::Separator();
@@ -66699,8 +66780,9 @@ int main(int argc, char** argv)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Field pixel editor", &gFieldPixelEditorOpen))
+         if (ImGui::Begin("Field pixel editor", nullptr))
          {
+            DrawWindowTablerCloseButton(&gFieldPixelEditorOpen);
             ImGui::TextDisabled("Field pixel-domain kernel (per-pixel fragment shader).");
             ImGui::TextDisabled("Reserved: uv (vec2), xy (vec2), res (vec2), aspect, col (vec3), alpha, t, dt, frame");
             ImGui::Separator();
@@ -66763,8 +66845,9 @@ int main(int argc, char** argv)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Field effect editor", &gFieldSampleEditorOpen))
+         if (ImGui::Begin("Field effect editor", nullptr))
          {
+            DrawWindowTablerCloseButton(&gFieldSampleEditorOpen);
             ImGui::TextDisabled("Field effect kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, out");
             ImGui::TextDisabled("'state float x = 0' declares per-voice memory (resets on note-on/steal). 'param float p = 0..1' exposes a modulatable knob.");
             ImGui::Separator();
@@ -66827,8 +66910,9 @@ int main(int argc, char** argv)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Field synth editor", &gFieldSynthEditorOpen))
+         if (ImGui::Begin("Field synth editor", nullptr))
          {
+            DrawWindowTablerCloseButton(&gFieldSynthEditorOpen);
             ImGui::TextDisabled("Field polyphonic synth kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, freq, gate, out");
             ImGui::TextDisabled("'state float x = 0' declares per-voice memory (resets on note-on/steal). 'param float p = 0..1' exposes a modulatable knob.");
             ImGui::Separator();
@@ -66891,8 +66975,9 @@ int main(int argc, char** argv)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Field graph editor", &gFieldGraphEditorOpen))
+         if (ImGui::Begin("Field graph editor", nullptr))
          {
+            DrawWindowTablerCloseButton(&gFieldGraphEditorOpen);
             ImGui::TextDisabled("Field graph-domain kernel (edit-time, runs once). emit(\"Type Name\", k0, k1, ...) -> handle");
             ImGui::TextDisabled("connect(src, srcSlot, dst, dstSlot)   set(handle, \"paramName\", value)   place(handle, x, y)");
             ImGui::Separator();
