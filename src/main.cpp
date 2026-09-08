@@ -23189,35 +23189,31 @@ namespace
       }
 
       // Resize grip interaction (bottom-right corner)
-      const ImVec2 gripTL(br.x - 20.0f, br.y - 20.0f);
-      static CommentNode* sResizingComment = nullptr;
-      const bool inGrip = ImGui::IsMouseHoveringRect(gripTL, br);
-      if (inGrip || sResizingComment == n)
-         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNWSE);
-
-      if (inGrip && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+      const float gripSize = 20.0f;
+      ImGui::SetCursorScreenPos(ImVec2(br.x - gripSize, br.y - gripSize));
+      ImGui::InvisibleButton("##commentresizegrip", ImVec2(gripSize, gripSize));
+      const bool gripHovered = ImGui::IsItemHovered();
+      const bool gripActive = ImGui::IsItemActive();
+      if (ImGui::IsItemActivated())
       {
          PushUndoCheckpoint();
-         sResizingComment = n;
       }
-      if (sResizingComment == n)
+      if (gripHovered || gripActive)
       {
-         if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
-         {
-            const ImVec2 mouse = ImGui::GetIO().MousePos;
-            n->width = std::clamp(mouse.x - origin.x, 120.0f, 1600.0f);
-            n->height = std::clamp(mouse.y - origin.y, 60.0f, 1200.0f);
-            gPatchDirty = true;
-         }
-         else
-         {
-            sResizingComment = nullptr;
-         }
+         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNWSE);
       }
+      if (gripActive)
+      {
+         const ImVec2 mouseCanvas = ed::ScreenToCanvas(ImGui::GetIO().MousePos);
+         n->width = std::clamp(mouseCanvas.x - origin.x, 120.0f, 1600.0f);
+         n->height = std::clamp(mouseCanvas.y - origin.y, 60.0f, 1200.0f);
+         gPatchDirty = true;
+      }
+      ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + h));
 
       // Hover & typing / double-click / Enter to edit
       ImGuiIO& io = ImGui::GetIO();
-      if (hovered && !inGrip && sResizingComment == nullptr && gCommentEdit.target == nullptr && !io.WantTextInput)
+      if (hovered && !gripHovered && !gripActive && gCommentEdit.target == nullptr && !io.WantTextInput)
       {
          bool shouldOpen = ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
          if (!shouldOpen && !io.KeyCtrl && !io.KeySuper && !io.KeyAlt)
@@ -66514,7 +66510,7 @@ int main(int argc, char** argv)
          {
             CommentNode* c = gCommentEdit.target;
             gCommentEdit.framesOpen++;
-            if (gCommentEdit.framesOpen <= 4) // see CommentEditRequest::framesOpen
+            if (gCommentEdit.framesOpen <= 2) // see CommentEditRequest::framesOpen
             {
                ImGui::SetWindowFocus();
                ImGui::SetKeyboardFocusHere();
