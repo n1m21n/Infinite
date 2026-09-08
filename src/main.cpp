@@ -53244,38 +53244,50 @@ int main(int argc, char** argv)
             ImGui::SetTooltip("%llu buffer underrun%s detected this session",
                               (unsigned long long)xruns, xruns == 1 ? "" : "s");
 
+         // Left cluster's true rightmost extent (window-local X), used below
+         // to crop the right cluster instead of letting it overlap the left
+         // one when the window gets too narrow to fit both.
+         const float leftClusterEndX = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x;
+
          // Far right: an "Update" button (green, shown only while a newer
          // version is actually available), then icon buttons for the
          // Viewport panel, Modulation matrix and Performance mode, then a
          // search icon+label - all sharing the same transparent/hover-fill
          // button style as BPM/Key/Scale so they read as one family of
          // controls rather than the dimmed bar/beat/fps/cpu cluster.
+         // On a narrow window these are dropped one at a time (icon toggles
+         // first, then search, then Update) rather than drawn on top of the
+         // left cluster - the bar crops instead of clutters.
          const float windowRight = ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x;
          const float itemGap = ImGui::GetStyle().ItemSpacing.x * 3.0f;
+         const float minGap = 12.0f;
          float cursorX = windowRight;
 
          if (UpdateCheck::UpdateAvailable())
          {
             const char* updateLabel = "Update";
             const float updateWidth = ImGui::CalcTextSize(updateLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-            cursorX -= updateWidth;
-
-            ImGui::SameLine(cursorX);
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.62f, 0.34f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.70f, 0.40f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.52f, 0.28f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-            if (ImGui::Button(updateLabel))
-               Platform::OpenExternalUrl("https://n1m21n.github.io/Infinite/#download");
-            ImGui::PopStyleColor(4);
-            if (ImGui::IsItemHovered())
+            if (cursorX - updateWidth >= leftClusterEndX + minGap)
             {
-               ImGui::SetTooltip("version %s is available (you have %s) - click to download",
-                                  UpdateCheck::LatestVersion().c_str(), INFINITE_VERSION_STRING);
+               cursorX -= updateWidth;
+
+               ImGui::SameLine(cursorX);
+               ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.62f, 0.34f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.70f, 0.40f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.16f, 0.52f, 0.28f, 1.0f));
+               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+               if (ImGui::Button(updateLabel))
+                  Platform::OpenExternalUrl("https://n1m21n.github.io/Infinite/#download");
+               ImGui::PopStyleColor(4);
+               if (ImGui::IsItemHovered())
+               {
+                  ImGui::SetTooltip("version %s is available (you have %s) - click to download",
+                                     UpdateCheck::LatestVersion().c_str(), INFINITE_VERSION_STRING);
+               }
+               if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+                  UpdateCheck::Dismiss();
+               cursorX -= itemGap;
             }
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
-               UpdateCheck::Dismiss();
-            cursorX -= itemGap;
          }
 
          {
@@ -53284,30 +53296,38 @@ int main(int argc, char** argv)
             const float iconSlot = iconSize + 7.0f;
             const float textW = ImGui::CalcTextSize(searchLabel).x;
             const float totalW = iconSlot + textW + ImGui::GetStyle().FramePadding.x * 2.0f;
-            cursorX -= totalW;
+            if (cursorX - totalW >= leftClusterEndX + minGap)
+            {
+               cursorX -= totalW;
 
-            ImGui::SameLine(cursorX);
-            const ImVec2 btnStart = ImGui::GetCursorScreenPos();
-            const bool clicked = ImGui::Button("##searchhit", ImVec2(totalW, 0.0f));
-            const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
-            ImDrawList* dl = ImGui::GetWindowDrawList();
-            const float rowH = ImGui::GetItemRectSize().y;
-            const ImVec2 iconCenter(btnStart.x + ImGui::GetStyle().FramePadding.x + iconSize * 0.5f, btnStart.y + rowH * 0.5f);
-            Tabler::DrawSearch(dl, iconCenter, iconSize, col);
-            const float textY = btnStart.y + (rowH - ImGui::GetTextLineHeight()) * 0.5f;
-            dl->AddText(ImVec2(btnStart.x + ImGui::GetStyle().FramePadding.x + iconSlot, textY), col, searchLabel);
-            if (clicked)
-               gNodePanelOpen = !gNodePanelOpen;
-            cursorX -= itemGap;
+               ImGui::SameLine(cursorX);
+               const ImVec2 btnStart = ImGui::GetCursorScreenPos();
+               const bool clicked = ImGui::Button("##searchhit", ImVec2(totalW, 0.0f));
+               const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
+               ImDrawList* dl = ImGui::GetWindowDrawList();
+               const float rowH = ImGui::GetItemRectSize().y;
+               const ImVec2 iconCenter(btnStart.x + ImGui::GetStyle().FramePadding.x + iconSize * 0.5f, btnStart.y + rowH * 0.5f);
+               Tabler::DrawSearch(dl, iconCenter, iconSize, col);
+               const float textY = btnStart.y + (rowH - ImGui::GetTextLineHeight()) * 0.5f;
+               dl->AddText(ImVec2(btnStart.x + ImGui::GetStyle().FramePadding.x + iconSlot, textY), col, searchLabel);
+               if (clicked)
+                  gNodePanelOpen = !gNodePanelOpen;
+               cursorX -= itemGap;
+            }
          }
 
          // Icon-only toggle buttons for Viewport / Modulation matrix /
          // Performance mode - a little larger than the transport play/
          // rewind buttons (38px, icon at 88% of the row height) since these
          // carry no text label to help them read at a glance.
+         // Returns false without drawing anything when there isn't room -
+         // these are the first things dropped on a narrow window, since they
+         // carry no text label and are the least essential of the cluster.
          auto TopBarIconToggle = [&](const char* id, bool isOpen, void (*draw)(ImDrawList*, ImVec2, float, ImU32, float), const char* tooltip)
          {
             const float btnW = 38.0f;
+            if (cursorX - btnW < leftClusterEndX + minGap)
+               return false;
             cursorX -= btnW;
             ImGui::SameLine(cursorX);
 
@@ -67669,7 +67689,10 @@ int main(int argc, char** argv)
          // dark background.
          // Sized dynamically across the 5 browser modes (Modules, Field, Samples, Media, Plugins).
          // Styled with centered alignment and dedicated gaps so labels never collide or clip.
-         const float tabGap = 4.0f;
+         // Selectable's highlight is rounded app-wide (see the FrameRounding
+         // patch in imgui_widgets.cpp), so anything tighter than ~8px reads
+         // as one unbroken block between adjacent tabs with no visible seam.
+         const float tabGap = 8.0f;
          const float totalAvailW = ImGui::GetContentRegionAvail().x;
          const float tabW = std::max(40.0f, std::floor((totalAvailW - tabGap * 4.0f) / 5.0f));
 
