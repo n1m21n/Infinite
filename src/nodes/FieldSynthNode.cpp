@@ -588,8 +588,8 @@ const std::vector<FieldSynthNode::Preset>& FieldSynthNode::Presets()
         "white = 2.0 * (hsrc - floor(hsrc)) - 1.0\n"
         "hp = hp + 0.25 * (white - hp)\n"
         "noiseSig = (white - hp) * noiseEnv * snap\n\n"
-        "mix = body * 1.5 + noiseSig * 1.8\n"
-        "out = mix / (1.0 + abs(mix) * 0.4)\n" },
+        "mix = body * 1.3 + noiseSig * 1.0\n"
+        "out = mix / (1.0 + abs(mix) * 0.6)\n" },
       { "Trap Metallic Hi-Hat",
         "param float decay = 0.06 [0.01, 0.5]\n"
         "param float sizzle = 0.85 [0.1, 1.0]\n"
@@ -610,8 +610,8 @@ const std::vector<FieldSynthNode::Preset>& FieldSynthNode::Presets()
         "raw = noise * sizzle + ring\n"
         "hp = hp + 0.45 * (raw - hp)\n"
         "highPassed = raw - hp\n\n"
-        "sig = highPassed * env * 2.5\n"
-        "out = sig / (1.0 + abs(sig) * 0.3)\n" },
+        "sig = highPassed * env * 1.4\n"
+        "out = sig / (1.0 + abs(sig) * 0.5)\n" },
       { "White & Pink Noise Sweeper",
         "param float sweepRate = 0.2 [0.02, 2.0]\n"
         "param float minCutoff = 400.0 [100.0, 2000.0]\n"
@@ -631,11 +631,12 @@ const std::vector<FieldSynthNode::Preset>& FieldSynthNode::Presets()
         "hsrc = sin(nseed * 12.9898) * 43758.5453\n"
         "white = 2.0 * (hsrc - floor(hsrc)) - 1.0\n\n"
         "f = clamp((targetCutoff / sr) * 3.14159, 0.005, 0.85)\n"
-        "fb = lp2 * res * 2.0\n"
+        "fb = lp2 * res * 1.6\n"
         "u = white - fb\n"
         "lp1 = lp1 + f * (u - lp1)\n"
         "lp2 = lp2 + f * (lp1 - lp2)\n\n"
-        "out = lp2 * env * 1.8\n" },
+        "sig = lp2 * env * 1.2\n"
+        "out = sig / (1.0 + abs(sig) * 0.4)\n" },
       { "Acid 303 Resonance Bass",
         "param float cutoff = 650.0 [60.0, 4000.0]\n"
         "param float res = 0.88 [0.1, 0.98]\n"
@@ -770,7 +771,7 @@ const std::vector<FieldSynthNode::Preset>& FieldSynthNode::Presets()
         "nseed = (nseed + 1.0) % 9973.0\n"
         "hsrc = sin(nseed * 12.9898) * 43758.5453\n"
         "noiseWhite = (hsrc - floor(hsrc)) * 2.0 - 1.0\n"
-        "excite = strike + noiseWhite * strike * 0.5\n\n"
+        "excite = strike + noiseWhite * strike * 0.18\n\n"
         "w1 = min(6.283185 * clamp(freq, 25.0, sr * 0.42) / sr, 2.8)\n"
         "w2 = min(w1 * 2.035, 2.8)\n\n"
         "dRate = clamp(1.0 / (sr * max(decay, 0.2)), 0.00001, 0.01)\n"
@@ -780,7 +781,7 @@ const std::vector<FieldSynthNode::Preset>& FieldSynthNode::Presets()
         "sinW1 = sin(w1)\n"
         "n1 = (s1 * cosW1 - s2 * sinW1 + excite) * dCoeff\n"
         "n2 = (s1 * sinW1 + s2 * cosW1) * dCoeff\n"
-        "s1 = n1\n"
+        "s1 = n1 / (1.0 + abs(n1) * 0.15)\n"
         "s2 = n2\n\n"
         "cosW2 = cos(w2)\n"
         "sinW2 = sin(w2)\n"
