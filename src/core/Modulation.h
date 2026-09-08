@@ -147,10 +147,38 @@ public:
    // something is patched into its pin - the expression is left stored, just
    // not evaluated, so re-patching the cable away brings it straight back.
    void SetExpression(int nodeIndex, int paramIndex, const std::string& expr) { mExpressions[Key(nodeIndex, paramIndex)] = expr; }
-   void ClearExpression(int nodeIndex, int paramIndex) { mExpressions.erase(Key(nodeIndex, paramIndex)); mExpressionErrors.erase(Key(nodeIndex, paramIndex)); }
+   void ClearExpression(int nodeIndex, int paramIndex)
+   {
+      mExpressions.erase(Key(nodeIndex, paramIndex));
+      mExpressionErrors.erase(Key(nodeIndex, paramIndex));
+      mExpressionRanges.erase(Key(nodeIndex, paramIndex));
+   }
    const std::string* ExpressionFor(int nodeIndex, int paramIndex) const;
    bool HasExpression(int nodeIndex, int paramIndex) const { return ExpressionFor(nodeIndex, paramIndex) != nullptr; }
    const std::map<Key, std::string>& Expressions() const { return mExpressions; }
+
+   // Overrides what `lo`/`hi` resolve to inside a param's typed expression,
+   // AND remaps the formula's own raw result onto that same [lo, hi] - the
+   // same "Range" concept a modulator binding has (SetRange), applied to an
+   // expression instead of a modulator's 0..1 signal. A formula that
+   // explicitly uses the bind variables (e.g. `lerp(lo, hi, sin(t)*0.5+0.5)`)
+   // and one that ignores them (e.g. `sin(t)*0.5+0.5` written in the param's
+   // raw units) both get remapped identically - see the apply loop in
+   // main.cpp. Independent of the hard clamp ShapeToParam still applies
+   // against the param's own minValue/maxValue.
+   void SetExpressionRange(int nodeIndex, int paramIndex, float lo, float hi) { mExpressionRanges[Key(nodeIndex, paramIndex)] = { lo, hi }; }
+   void ClearExpressionRange(int nodeIndex, int paramIndex) { mExpressionRanges.erase(Key(nodeIndex, paramIndex)); }
+   // Returns false (leaving lo/hi untouched) if no override is set - callers
+   // should pre-seed lo/hi with the param's declared min/max as the default.
+   bool ExpressionRangeFor(int nodeIndex, int paramIndex, float& lo, float& hi) const
+   {
+      auto it = mExpressionRanges.find(Key(nodeIndex, paramIndex));
+      if (it == mExpressionRanges.end())
+         return false;
+      lo = it->second.first;
+      hi = it->second.second;
+      return true;
+   }
 
    // Set by the per-frame evaluation pass when an expression fails to parse
    // or evaluate, so the UI can surface it instead of just freezing silently.
@@ -161,7 +189,7 @@ public:
    // restart from 1 on a new patch, so a link left over from the previous one
    // does not go stale - it silently re-attaches to whichever node happens to
    // land on that index next.
-   void Clear() { mLinks.clear(); mExpressions.clear(); mExpressionErrors.clear(); mKnownParams.clear(); }
+   void Clear() { mLinks.clear(); mExpressions.clear(); mExpressionErrors.clear(); mExpressionRanges.clear(); mKnownParams.clear(); }
 
    // Parameters registered during the current frame's node drawing.
    void ClearFrameParams() { mFrameParams.clear(); }
@@ -186,6 +214,7 @@ private:
    std::map<Key, Source> mLinks;
    std::map<Key, std::string> mExpressions;
    std::map<Key, std::string> mExpressionErrors;
+   std::map<Key, std::pair<float, float>> mExpressionRanges;
    std::vector<ParamRef> mFrameParams;
    std::map<Key, ParamRef> mKnownParams;
 };
