@@ -54,10 +54,24 @@ namespace Field
          auto lhs = node->children[0];
          auto rhs = node->children[1];
 
+         // These identity folds only make sense when the literal side is a
+         // scalar. A vector literal like vec3(1.0, 0.2, 0.2) is stored as an
+         // IRKind::Literal whose `numberValue` mirrors just its first lane
+         // (see FieldIR.cpp's vector-constructor lowering), so without this
+         // guard a multiplicand whose first component happens to be 0.0 or
+         // 1.0 gets misread as the scalar identity/zero element: the whole
+         // vector is silently dropped from a `*` chain (eyes * vec3(1.0, ...)
+         // collapses to just `eyes`) while the surviving expression's cached
+         // node->type is left at the pre-fold vector rank, producing a
+         // lane-count mismatch the GLSL backend can't declare correctly.
+         auto isScalarLiteral = [](const IRNodePtr& n) {
+            return n && n->kind == IRKind::Literal && n->type.lanes == 1;
+         };
+
          // Multiplication by 0: x * 0 or 0 * x -> 0
          if (node->op == "*")
          {
-            if (lhs && lhs->kind == IRKind::Literal && lhs->numberValue == 0.0)
+            if (isScalarLiteral(lhs) && lhs->numberValue == 0.0)
             {
                auto res = std::make_shared<IRNode>(IRKind::Literal, node->span);
                res->type = node->type;
@@ -65,7 +79,7 @@ namespace Field
                res->numberValue = 0.0;
                return res;
             }
-            if (rhs && rhs->kind == IRKind::Literal && rhs->numberValue == 0.0)
+            if (isScalarLiteral(rhs) && rhs->numberValue == 0.0)
             {
                auto res = std::make_shared<IRNode>(IRKind::Literal, node->span);
                res->type = node->type;
@@ -73,11 +87,11 @@ namespace Field
                res->numberValue = 0.0;
                return res;
             }
-            if (lhs && lhs->kind == IRKind::Literal && lhs->numberValue == 1.0)
+            if (isScalarLiteral(lhs) && lhs->numberValue == 1.0)
             {
                return rhs;
             }
-            if (rhs && rhs->kind == IRKind::Literal && rhs->numberValue == 1.0)
+            if (isScalarLiteral(rhs) && rhs->numberValue == 1.0)
             {
                return lhs;
             }
@@ -86,11 +100,11 @@ namespace Field
          // Addition with 0: x + 0 or 0 + x -> x
          if (node->op == "+")
          {
-            if (lhs && lhs->kind == IRKind::Literal && lhs->numberValue == 0.0)
+            if (isScalarLiteral(lhs) && lhs->numberValue == 0.0)
             {
                return rhs;
             }
-            if (rhs && rhs->kind == IRKind::Literal && rhs->numberValue == 0.0)
+            if (isScalarLiteral(rhs) && rhs->numberValue == 0.0)
             {
                return lhs;
             }
@@ -99,14 +113,18 @@ namespace Field
          // Subtraction with 0: x - 0 -> x
          if (node->op == "-")
          {
-            if (rhs && rhs->kind == IRKind::Literal && rhs->numberValue == 0.0)
+            if (isScalarLiteral(rhs) && rhs->numberValue == 0.0)
             {
                return lhs;
             }
          }
 
-         // Both literals
-         if (lhs && rhs && lhs->kind == IRKind::Literal && rhs->kind == IRKind::Literal)
+         // Both literals. Scalar-only: this arithmetic only ever combines
+         // `numberValue` (lane 0), so folding two vector literals here would
+         // compute the right answer for lane 0 and silently leave every
+         // other lane at its default - the same first-lane-only trap the
+         // identity folds above guard against.
+         if (lhs && rhs && isScalarLiteral(lhs) && isScalarLiteral(rhs))
          {
             double a = lhs->numberValue;
             double b = rhs->numberValue;
