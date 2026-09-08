@@ -23115,7 +23115,7 @@ namespace
       const ImVec2 br(origin.x + w, origin.y + h);
 
       // Reserved first: this is what the node measures itself against and what
-      // the double-click below hit-tests, so it has to be a real item.
+      // the double-click/hover/type hit-tests.
       ImGui::Dummy(ImVec2(w, h));
       const bool hovered = ImGui::IsItemHovered();
 
@@ -23148,7 +23148,7 @@ namespace
                     (int)((n->color[1] * 0.5f + 0.5f) * 255),
                     (int)((n->color[2] * 0.5f + 0.5f) * 255), 255);
       // Clipped to the box so a note longer than its height is cut off at the
-      // edge instead of spilling over the params below it.
+      // edge instead of spilling over the card.
       dl->PushClipRect(origin, br, true);
       if (n == gCommentEdit.target)
       {
@@ -23157,13 +23157,23 @@ namespace
       else if (n->text.empty())
       {
          dl->AddText(ImVec2(origin.x + 8, origin.y + 8), isLight ? IM_COL32(140, 146, 160, 255) : IM_COL32(150, 150, 160, 255),
-                     "double-click to write");
+                     "double-click or type to write");
       }
       else
       {
          dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
                      ImVec2(origin.x + 8, origin.y + 8), textCol,
                      n->text.c_str(), nullptr, w - 16.0f);
+      }
+
+      // Draw bottom-right resize grip indicator (3 diagonal grip lines)
+      const ImU32 gripCol = isLight
+         ? IM_COL32((int)(n->color[0] * 120 + 40), (int)(n->color[1] * 120 + 40), (int)(n->color[2] * 120 + 40), 160)
+         : IM_COL32((int)(n->color[0] * 160 + 60), (int)(n->color[1] * 160 + 60), (int)(n->color[2] * 160 + 60), 160);
+      for (int i = 0; i < 3; i++)
+      {
+         const float offset = 4.0f + (float)i * 4.0f;
+         dl->AddLine(ImVec2(br.x - offset, br.y - 3.0f), ImVec2(br.x - 3.0f, br.y - offset), gripCol, 1.2f);
       }
       dl->PopClipRect();
 
@@ -23178,19 +23188,65 @@ namespace
          }
       }
 
-      if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+      // Resize grip interaction (bottom-right corner)
+      const ImVec2 gripTL(br.x - 20.0f, br.y - 20.0f);
+      static CommentNode* sResizingComment = nullptr;
+      const bool inGrip = ImGui::IsMouseHoveringRect(gripTL, br);
+      if (inGrip || sResizingComment == n)
+         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNWSE);
+
+      if (inGrip && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
       {
-         PushUndoCheckpoint(); // before the edit, so one undo restores the old note
-         gCommentEdit.target = n;
-         gCommentEdit.justOpened = true;
+         PushUndoCheckpoint();
+         sResizingComment = n;
+      }
+      if (sResizingComment == n)
+      {
+         if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
+         {
+            const ImVec2 mouse = ImGui::GetIO().MousePos;
+            n->width = std::clamp(mouse.x - origin.x, 120.0f, 1600.0f);
+            n->height = std::clamp(mouse.y - origin.y, 60.0f, 1200.0f);
+            gPatchDirty = true;
+         }
+         else
+         {
+            sResizingComment = nullptr;
+         }
+      }
+
+      // Hover & typing / double-click / Enter to edit
+      ImGuiIO& io = ImGui::GetIO();
+      if (hovered && !inGrip && sResizingComment == nullptr && gCommentEdit.target == nullptr && !io.WantTextInput)
+      {
+         bool shouldOpen = ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+         if (!shouldOpen && !io.KeyCtrl && !io.KeySuper && !io.KeyAlt)
+         {
+            if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))
+               shouldOpen = true;
+            else if (!io.InputQueueCharacters.empty())
+            {
+               for (ImWchar cChar : io.InputQueueCharacters)
+               {
+                  if (cChar >= 32 && cChar != 127)
+                  {
+                     shouldOpen = true;
+                     break;
+                  }
+               }
+            }
+         }
+         if (shouldOpen)
+         {
+            PushUndoCheckpoint();
+            gCommentEdit.target = n;
+            gCommentEdit.justOpened = true;
+         }
       }
    }
 
-   void DrawCommentParams(CommentNode* n)
+   void DrawCommentParams(CommentNode*)
    {
-      ModSlider("width", &n->width, 120.0f, 800.0f, "%.0f");
-      ModSlider("height", &n->height, 60.0f, 600.0f, "%.0f");
-      ColorSwatch("colour", n->color, n);
    }
 
    // Padding kept between a group's members and the edge of its box.
@@ -63584,7 +63640,7 @@ int main(int argc, char** argv)
          // untouched, and an empty clip rect swallows any raw draw-list work
          // the params body does around them. Gated on there being a binding at
          // all so the common collapsed node costs exactly what it did before.
-         const bool registerOnlyParams = !isAudioBody && !gn.showParams &&
+         const bool registerOnlyParams = !isAudioBody && !isComment && !gn.showParams &&
                                          (gn.hasModulatedParams || gn.hasPaletteColors ||
                                           gn.hasExpressionParams || gn.hasPerfPanelParams);
          ImGuiWindow* paramsWindow = ImGui::GetCurrentWindow();
@@ -63595,7 +63651,7 @@ int main(int argc, char** argv)
             paramsWindow->SkipItems = true;
             ImGui::GetWindowDrawList()->PushClipRect(ImVec2(0.0f, 0.0f), ImVec2(0.0f, 0.0f), false);
          }
-         if (!isAudioBody && (gn.showParams || registerOnlyParams))
+         if (!isAudioBody && !isComment && (gn.showParams || registerOnlyParams))
          {
             if (auto* n = dynamic_cast<ImageSourceNode*>(gn.node.get()))
                DrawImageSourceParams(n);
@@ -65328,7 +65384,7 @@ int main(int argc, char** argv)
                for (int i = 0; i < nodeCount; i++)
                {
                   GraphNode* sel = FindNodeByIndex((int)selNodes[i].Get() / GraphNode::kStride);
-                  if (sel == nullptr || sel->node == nullptr)
+                  if (sel == nullptr || sel->node == nullptr || dynamic_cast<CommentNode*>(sel->node.get()) != nullptr)
                      continue;
                   sel->node->bypassed = !sel->node->bypassed;
                   if (dynamic_cast<IAudioSource*>(sel->node.get()) != nullptr ||
@@ -65622,6 +65678,64 @@ int main(int argc, char** argv)
             ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.85f, 0.20f, 0.20f, 0.25f));
             ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.85f, 0.20f, 0.20f, 0.40f));
             if (ImGui::MenuItem("Delete Group", "Backspace"))
+            {
+               if (!ed::IsNodeSelected(gn->NodeId()))
+               {
+                  ed::ClearSelection();
+                  ed::SelectNode(gn->NodeId());
+               }
+               gRequestDelete = true;
+            }
+            ImGui::PopStyleColor(3);
+         }
+         else if (auto* c = dynamic_cast<CommentNode*>(gn->node.get()))
+         {
+            if (ImGui::MenuItem("Edit Note"))
+            {
+               PushUndoCheckpoint();
+               gCommentEdit.target = c;
+               gCommentEdit.justOpened = true;
+            }
+            if (ImGui::MenuItem("Change Colour..."))
+            {
+               PushUndoCheckpoint();
+               gColor.target = c->color;
+               gColor.owner = c;
+               gColor.label = "colour";
+               gColor.justOpened = true;
+            }
+            if (ImGui::MenuItem("Duplicate", MODKEY "+D"))
+            {
+               if (!ed::IsNodeSelected(gn->NodeId()))
+               {
+                  ed::ClearSelection();
+                  ed::SelectNode(gn->NodeId());
+               }
+               gRequestDuplicate = true;
+            }
+            if (GroupNode* owner = GroupOwning(gn->index))
+            {
+               if (ImGui::MenuItem("Ungroup"))
+               {
+                  PushUndoCheckpoint();
+                  gGroupMembers[owner].erase(gn->index);
+                  if (int ownerIndex = IndexOfGroupNode(owner); ownerIndex >= 0)
+                  {
+                     if (GraphNode* ownerGn = FindNodeByIndex(ownerIndex))
+                     {
+                        const ImVec2 gp = ed::GetNodePosition(ownerGn->NodeId());
+                        const ImVec2 gs = ed::GetNodeSize(ownerGn->NodeId());
+                        const ImVec2 mp = ed::GetNodePosition(gn->NodeId());
+                        ed::SetNodePosition(gn->NodeId(), ImVec2(mp.x, gp.y + gs.y + 40.0f));
+                     }
+                  }
+               }
+            }
+            ImGui::Separator();
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.35f, 0.35f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.85f, 0.20f, 0.20f, 0.25f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.85f, 0.20f, 0.20f, 0.40f));
+            if (ImGui::MenuItem("Delete Note", "Backspace"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
                {
