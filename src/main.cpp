@@ -2997,7 +2997,17 @@ namespace
                if (exprText.empty())
                   Modulation::Instance().ClearExpression(nodeIndex, paramIndex);
                else
+               {
                   Modulation::Instance().SetExpression(nodeIndex, paramIndex, exprText);
+                  // A typed expression fully replaces whatever was driving
+                  // this param before, including a looping recording - left
+                  // alive underneath, it would silently reactivate the moment
+                  // the expression was later unbound (isRecordingState only
+                  // requires !hasExpr), forcing a second Unbind to actually
+                  // remove it.
+                  GestureRecorder::Instance().CancelArm(nodeIndex, paramIndex);
+                  GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
+               }
             }
             else
             {
@@ -3072,15 +3082,11 @@ namespace
          // apply pass in the main loop. No fx/x badge any more - the purple
          // track/fill is the only signal, matching how the modulated (amber)
          // and recording (red) states each get one colour and nothing else.
-         // A plain click still jumps the local `shown` copy but that's
-         // discarded and overwritten by next frame's expression re-apply, so
-         // it has no lasting effect - only once the mouse actually drags past
-         // ImGui's own click/drag threshold do we commit `shown` back into
-         // *value and clear the expression, handing the field to the normal
-         // editable-slider path below from the next frame on. That keeps a
-         // double-click's first click (which doesn't cross the drag
-         // threshold) from clearing the expression before the second click's
-         // BeginTypedEditFromCurrent gets a chance to read it.
+         // A click/drag only ever jumps the local `shown` copy, which is
+         // discarded and overwritten by next frame's expression re-apply -
+         // dragging never clears the expression. The only way to remove it is
+         // the right-click menu's Unbind, so an accidental drag can't destroy
+         // a formula someone typed on purpose.
          float shown = *value;
          if (audioStyle)
          {
@@ -3108,14 +3114,6 @@ namespace
             ImGui::SetNextItemWidth(width - box - 4.0f);
             ImGui::SliderFloat(label, &shown, minV, maxV, fmt);
             ImGui::PopStyleColor(3);
-         }
-         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 4.0f))
-         {
-            PushUndoCheckpoint();
-            Modulation::Instance().ClearExpression(nodeIndex, paramIndex);
-            GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
-            *value = shown;
-            changed = true;
          }
          const bool hovered = ImGui::IsItemHovered();
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
@@ -3203,11 +3201,22 @@ namespace
          // modulated/expression branches above for why.
          const ImU32 activeCol = recording ? (isLight ? IM_COL32(252, 204, 204, 255) : IM_COL32(87, 26, 26, 255))
                                             : IM_COL32(120, 200, 255, 235);
+         // A finished, looping recording is locked against direct grabs, the
+         // same way modulated/expression params are - only Shift (re-record
+         // via a session) or an explicit "Record Again" arm may drive it
+         // manually; a plain click/drag just moves a discarded local copy so
+         // an accidental grab can't silently erase the loop. Right-click
+         // Unbind is the only way to remove it.
+         const bool hasPlayback = GestureRecorder::Instance().Playbacks().count(GestureRecorder::Key(nodeIndex, paramIndex)) > 0;
+         const bool locked = hasPlayback && !ImGui::GetIO().KeyShift && !GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex);
+         float shown = *value;
          if (audioStyle)
          {
-            changed = AudioSliderFloat(label, value, minV, maxV, fmt, width - box - 4.0f,
+            const bool sliderChanged = AudioSliderFloat(label, &shown, minV, maxV, fmt, width - box - 4.0f,
                                        activeCol, /*readOnly=*/false, posToValue, valueToPos,
                                        /*vividState=*/recording);
+            if (!locked)
+               changed = sliderChanged;
          }
          else
          {
@@ -3238,14 +3247,18 @@ namespace
                }
             }
             ImGui::SetNextItemWidth(width - box - 4.0f);
-            changed = ImGui::SliderFloat(label, value, minV, maxV, fmt);
+            const bool sliderChanged = ImGui::SliderFloat(label, &shown, minV, maxV, fmt);
+            if (!locked)
+               changed = sliderChanged;
             if (recording)
                ImGui::PopStyleColor(6);
          }
+         if (!locked)
+            *value = shown;
          // Activation is the first frame of the drag, before that frame's own
          // delta is applied, so this is still the pre-drag value.
          const bool justActivated = ImGui::IsItemActivated();
-         if (justActivated)
+         if (justActivated && !locked)
          {
             PushUndoCheckpoint();
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
@@ -3254,6 +3267,13 @@ namespace
             GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, ImGui::GetTime(), /*isNewGrab=*/justActivated);
          if (ImGui::IsItemDeactivated())
             GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, ImGui::GetTime());
+         // Double-click (or hovering and typing a digit/'='/etc below) still
+         // opens the typed-entry field even while locked - that's a deliberate
+         // "replace this" action, not an accidental grab, and its own commit
+         // path (above) already calls StopPlayback when a literal value wins;
+         // typing '=' hands it to an expression instead, which then takes
+         // precedence over the recording in the apply loop regardless. Only
+         // the plain click-drag above stays locked.
          if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/false);
          // Right-click opens the param's context menu (Enter Value/Enter
@@ -4088,7 +4108,17 @@ namespace
                if (exprText.empty())
                   Modulation::Instance().ClearExpression(nodeIndex, paramIndex);
                else
+               {
                   Modulation::Instance().SetExpression(nodeIndex, paramIndex, exprText);
+                  // A typed expression fully replaces whatever was driving
+                  // this param before, including a looping recording - left
+                  // alive underneath, it would silently reactivate the moment
+                  // the expression was later unbound (isRecordingState only
+                  // requires !hasExpr), forcing a second Unbind to actually
+                  // remove it.
+                  GestureRecorder::Instance().CancelArm(nodeIndex, paramIndex);
+                  GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
+               }
             }
             else
             {
@@ -4128,21 +4158,13 @@ namespace
       else if (hasExpr && !exprErrored)
       {
          // No fx/x badge any more - the purple ring is the only signal. A
-         // plain click still moves the local `shown` copy but that's
-         // discarded and overwritten by next frame's expression re-apply;
-         // only once the mouse actually drags past ImGui's own drag
-         // threshold do we commit `shown` back into *value and clear the
-         // expression, same reasoning as the slider branch above.
+         // click/drag only ever moves the local `shown` copy, discarded and
+         // overwritten by next frame's expression re-apply - dragging never
+         // clears the expression. The only way to remove it is the
+         // right-click menu's Unbind, so an accidental drag can't destroy a
+         // formula someone typed on purpose.
          float shown = *value;
          DrawWidget(&shown, IM_COL32(170, 130, 255, 255), /*readOnly=*/false);
-         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 4.0f))
-         {
-            PushUndoCheckpoint();
-            Modulation::Instance().ClearExpression(nodeIndex, paramIndex);
-            GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
-            *value = shown;
-            changed = true;
-         }
          const bool hovered = ImGui::IsItemHovered();
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
@@ -4152,10 +4174,24 @@ namespace
       }
       else // plain interactive, including a currently-errored expression
       {
-         changed = DrawWidget(value, recording ? IM_COL32(235, 70, 70, 255) : IM_COL32(120, 200, 255, 235),
+         // A finished, looping recording is locked against direct grabs, the
+         // same way modulated/expression params are - only Shift (re-record
+         // via a session) or an explicit "Record Again" arm may drive it
+         // manually; a plain click/drag just moves a discarded local copy so
+         // an accidental grab can't silently erase the loop. Right-click
+         // Unbind is the only way to remove it.
+         const bool hasPlayback = GestureRecorder::Instance().Playbacks().count(GestureRecorder::Key(nodeIndex, paramIndex)) > 0;
+         const bool locked = hasPlayback && !ImGui::GetIO().KeyShift && !GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex);
+         float shown = *value;
+         const bool widgetChanged = DrawWidget(&shown, recording ? IM_COL32(235, 70, 70, 255) : IM_COL32(120, 200, 255, 235),
                               /*readOnly=*/false, /*hasRange=*/false, 0.0f, 0.0f, /*activeTint=*/recording);
+         if (!locked)
+         {
+            changed = widgetChanged;
+            *value = shown;
+         }
          const bool justActivated = ImGui::IsItemActivated();
-         if (justActivated)
+         if (justActivated && !locked)
          {
             PushUndoCheckpoint();
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
@@ -4165,6 +4201,9 @@ namespace
          if (ImGui::IsItemDeactivated())
             GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, ImGui::GetTime());
          const bool hovered = ImGui::IsItemHovered();
+         // Double-click / hover-and-type below still opens the typed-entry
+         // field even while locked - a deliberate "replace this" action, not
+         // an accidental grab - see the matching comment in ModSlider.
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/false);
          DrawModulationBindingMenu(nodeIndex, paramIndex, hovered);
@@ -25820,15 +25859,19 @@ namespace
       }
       else
       {
+         dl->PushClipRect(ImVec2(cellPos.x + 4.0f, cellPos.y), ImVec2(cardBR.x - 4.0f, cellPos.y + 18.0f), true);
          dl->AddText(titlePos, textCol, displayLabel.c_str());
+         dl->PopClipRect();
       }
 
-      // Header double-click to rename
-      if (gPerfEditMode)
+      // Header double-click to rename & tooltip when label is truncated
+      ImVec2 headerTL = cellPos;
+      ImVec2 headerBR(cardBR.x, cellPos.y + 18.0f);
+      if (ImGui::IsMouseHoveringRect(headerTL, headerBR))
       {
-         ImVec2 headerTL = cellPos;
-         ImVec2 headerBR(cardBR.x, cellPos.y + 18.0f);
-         if (ImGui::IsMouseHoveringRect(headerTL, headerBR) && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+         if (gPerfRenamingElementIdx != (int)elemIdx && ImGui::CalcTextSize(displayLabel.c_str()).x > (cardSize.x - 12.0f))
+            ImGui::SetTooltip("%s", displayLabel.c_str());
+         if (gPerfEditMode && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
          {
             gPerfRenamingElementIdx = (int)elemIdx;
             snprintf(gPerfRenameElementBuffer, sizeof(gPerfRenameElementBuffer), "%s", displayLabel.c_str());
@@ -52962,6 +53005,17 @@ int main(int argc, char** argv)
       io.MouseWheel *= gZoomSensitivity;
       io.MouseWheelH *= gZoomSensitivity;
 
+      // Re-derive the node-editor canvas style (Bg/Grid/NodeBg/NodeBorder)
+      // from the live theme every frame, the same reason glClearColor below
+      // reads CurrentUiTheme() every frame instead of once: a preset switch
+      // only reaches ed::Style through this call, and if that one call is
+      // ever missed or lands before gEditor exists, the canvas is left
+      // showing imgui-node-editor's own hardcoded constructor default -
+      // Bg (60,60,70,200) - a flat, theme-independent grey that doesn't
+      // match either preset. Cheap (a handful of style-table writes, no
+      // allocation), so there is no reason to gate it behind the rare
+      // preset-change event instead of just always being correct.
+      ApplyTheme();
       ed::SetCurrentEditor(gEditor);
 
       // Dragging empty canvas should pan, but dragging a node should move it.
