@@ -1137,6 +1137,7 @@ namespace
    // it - the point being that typing looks like it happens straight into the
    // node's own box rather than in a separate window somewhere else on screen.
    ImVec4 gCommentEditRect(0, 0, 0, 0); // x, y, w, h
+   float gCommentEditZoom = 1.0f;
    FormulaNode* gFormulaEditor = nullptr;
    bool gFormulaEditorOpen = false;
    FieldElementNode* gFieldElementEditor = nullptr;
@@ -1192,13 +1193,17 @@ namespace
    FieldGraphUnpackPhase2State gFieldGraphUnpackPhase2;
    bool gHelpOpen = false;
    bool gShortcutsOpen = false;
+#ifndef NDEBUG
    // ImGui's own inspector windows, wired in for exact-value UI review: the
    // Metrics/Debugger's "Tools > Item Picker" reports the ImGuiCol_*/rect of
    // whatever you click on, and the Style Editor lists every style colour
    // and size with live values and a live preview - point at a control here
    // instead of eyeballing a screenshot to pin down which knob to change.
+   // Dev-only: excluded from Release builds (NDEBUG) so shipped/public
+   // builds never expose these.
    bool gUiDebuggerOpen = false;
    bool gUiStyleEditorOpen = false;
+#endif
    bool gSettingsOpen = false;
    bool gShowUpdateCheckModal = false;
 
@@ -3113,12 +3118,8 @@ namespace
          const bool hovered = ImGui::IsItemHovered();
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
-         if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
-         {
-            BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
-            gParamRightClickConsumedThisFrame = true;
-         }
-         if (hovered)
+         DrawModulationBindingMenu(nodeIndex, paramIndex, hovered);
+         if (hovered && !ImGui::IsItemActive())
             HandleParamTypeHotkeys(editKey, value);
       }
       else if (hasExpr) // exprErrored
@@ -3182,16 +3183,14 @@ namespace
             PushUndoCheckpoint();
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
          }
-         if (ImGui::IsItemActive() && ImGui::GetIO().KeyShift)
+         if (ImGui::IsItemActive() && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
             GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, ImGui::GetTime(), /*isNewGrab=*/justActivated);
+         if (ImGui::IsItemDeactivated())
+            GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, ImGui::GetTime());
          const bool hovered = ImGui::IsItemHovered();
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
-         if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
-         {
-            BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
-            gParamRightClickConsumedThisFrame = true;
-         }
+         DrawModulationBindingMenu(nodeIndex, paramIndex, hovered);
          if (hovered && !ImGui::IsItemActive())
             HandleParamTypeHotkeys(editKey, value);
       }
@@ -3249,18 +3248,18 @@ namespace
             PushUndoCheckpoint();
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
          }
-         if (ImGui::IsItemActive() && ImGui::GetIO().KeyShift)
+         if (ImGui::IsItemActive() && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
             GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, ImGui::GetTime(), /*isNewGrab=*/justActivated);
+         if (ImGui::IsItemDeactivated())
+            GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, ImGui::GetTime());
          if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/false);
-         // Right-click also jumps straight into the text field, same as
-         // double-click - and marks the click consumed so the node-level
-         // right-click context menu doesn't also try to open over it.
-         if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
-         {
-            BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/false);
-            gParamRightClickConsumedThisFrame = true;
-         }
+         // Right-click opens the param's context menu (Enter Value/Enter
+         // Expression/Start Recording, or the recording/expression-specific
+         // one - see the popup body near gOpenModBindingMenu) instead of
+         // jumping straight into typing - and marks the click consumed so the
+         // node-level right-click context menu doesn't also try to open over it.
+         DrawModulationBindingMenu(nodeIndex, paramIndex, ImGui::IsItemHovered());
          // Hovering (not dragging) and pressing a digit/'-'/'.'/'=' starts a
          // fresh typed value (or expression) immediately, without needing to
          // double-click first. IsItemActive() guards against a mouse-drag
@@ -3390,8 +3389,10 @@ namespace
             changed = true;
          }
       }
-      if (active && gestureNodeIndex >= 0 && ImGui::GetIO().KeyShift)
+      if (active && gestureNodeIndex >= 0 && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(gestureNodeIndex, gestureParamIndex)))
          GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, ImGui::GetTime(), /*isNewGrab=*/gestureJustActivated);
+      if (gestureNodeIndex >= 0 && ImGui::IsItemDeactivated())
+         GestureRecorder::Instance().MaybeFinishArmedRecording(gestureNodeIndex, gestureParamIndex, ImGui::GetTime());
       if (gestureNodeIndex >= 0 && GestureRecorder::Instance().IsRecording(gestureNodeIndex, gestureParamIndex))
          fillColor = IM_COL32(235, 70, 70, 255);
 
@@ -3442,7 +3443,10 @@ namespace
                      IM_COL32(180, 185, 200, 255), 3.0f);
          dl->AddLine(ImVec2(cx - 7.0f, capY), ImVec2(cx + 7.0f, capY),
                      readOnly ? IM_COL32(140, 145, 160, 255) : IM_COL32(40, 45, 60, 255), 1.6f);
-         if (hovered && !readOnly)
+         if (active && !readOnly)
+            dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
+                        IM_COL32(50, 110, 220, 160), 4.0f, 0, 2.0f);
+         else if (hovered && !readOnly)
             dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
                         IM_COL32(0, 0, 0, 30), 4.0f, 0, 2.0f);
       }
@@ -3483,7 +3487,10 @@ namespace
                      IM_COL32(18, 19, 25, 200), 3.0f);
          dl->AddLine(ImVec2(cx - 7.0f, capY), ImVec2(cx + 7.0f, capY),
                      readOnly ? IM_COL32(200, 202, 212, 255) : IM_COL32(238, 240, 248, 255), 1.6f);
-         if (hovered && !readOnly)
+         if (active && !readOnly)
+            dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
+                        IM_COL32(110, 180, 255, 180), 4.0f, 0, 2.0f);
+         else if (hovered && !readOnly)
             dl->AddRect(ImVec2(cx - 10.0f, capY - 7.0f), ImVec2(cx + 10.0f, capY + 7.0f),
                         IM_COL32(255, 255, 255, 60), 4.0f, 0, 2.0f);
       }
@@ -3769,8 +3776,10 @@ namespace
             changed = true;
          }
       }
-      if (active && gestureNodeIndex >= 0 && ImGui::GetIO().KeyShift)
+      if (active && gestureNodeIndex >= 0 && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(gestureNodeIndex, gestureParamIndex)))
          GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, ImGui::GetTime(), /*isNewGrab=*/gestureJustActivated);
+      if (gestureNodeIndex >= 0 && ImGui::IsItemDeactivated())
+         GestureRecorder::Instance().MaybeFinishArmedRecording(gestureNodeIndex, gestureParamIndex, ImGui::GetTime());
       if (gestureNodeIndex >= 0 && GestureRecorder::Instance().IsRecording(gestureNodeIndex, gestureParamIndex))
          fillColor = IM_COL32(235, 70, 70, 255);
 
@@ -4135,12 +4144,8 @@ namespace
          const bool hovered = ImGui::IsItemHovered();
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
-         if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
-         {
-            BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
-            gParamRightClickConsumedThisFrame = true;
-         }
-         if (hovered)
+         DrawModulationBindingMenu(nodeIndex, paramIndex, hovered);
+         if (hovered && !ImGui::IsItemActive())
             HandleParamTypeHotkeys(editKey, value);
       }
       else // plain interactive, including a currently-errored expression
@@ -4153,16 +4158,14 @@ namespace
             PushUndoCheckpoint();
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
          }
-         if (ImGui::IsItemActive() && ImGui::GetIO().KeyShift)
+         if (ImGui::IsItemActive() && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
             GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, ImGui::GetTime(), /*isNewGrab=*/justActivated);
+         if (ImGui::IsItemDeactivated())
+            GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, ImGui::GetTime());
          const bool hovered = ImGui::IsItemHovered();
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/false);
-         if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
-         {
-            BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/false);
-            gParamRightClickConsumedThisFrame = true;
-         }
+         DrawModulationBindingMenu(nodeIndex, paramIndex, hovered);
          if (hovered && !ImGui::IsItemActive())
             HandleParamTypeHotkeys(editKey, value);
       }
@@ -14561,11 +14564,32 @@ namespace
 
       ImGui::PushID(idPrefix);
 
-      if (ImGui::Button("Add folder...", ImVec2(-1.0f, 0)))
       {
-         const std::string path = Platform::OpenFolderDialog();
-         if (!path.empty())
-            scanner.AddFolder(path);
+         const char* addLabel = "Add folder...";
+         const float iconSize = ImGui::GetFrameHeight() * 0.65f;
+         const float iconGap = 6.0f;
+         const ImVec2 btnPos = ImGui::GetCursorScreenPos();
+         const bool clicked = ImGui::Button("##addfolder", ImVec2(-1.0f, 0));
+         const ImVec2 bmin = ImGui::GetItemRectMin();
+         const ImVec2 bmax = ImGui::GetItemRectMax();
+         const float btnW = bmax.x - bmin.x;
+         const float btnH = bmax.y - bmin.y;
+         const float textW = ImGui::CalcTextSize(addLabel).x;
+         const float totalContentW = iconSize + iconGap + textW;
+         const float startX = bmin.x + (btnW - totalContentW) * 0.5f;
+         const float centerY = bmin.y + btnH * 0.5f;
+
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
+         Tabler::DrawPlus(dl, ImVec2(startX + iconSize * 0.5f, centerY), iconSize, col);
+         dl->AddText(ImVec2(startX + iconSize + iconGap, centerY - ImGui::GetTextLineHeight() * 0.5f), col, addLabel);
+
+         if (clicked)
+         {
+            const std::string path = Platform::OpenFolderDialog();
+            if (!path.empty())
+               scanner.AddFolder(path);
+         }
       }
 
       // Folders list, each with its own refresh and remove button. Kept
@@ -14626,7 +14650,25 @@ namespace
       {
          if (scanning)
             ImGui::BeginDisabled();
-         if (ImGui::Button("Refresh all", ImVec2(-1.0f, 0)))
+         const char* refreshLabel = "Refresh all";
+         const float iconSize = ImGui::GetFrameHeight() * 0.65f;
+         const float iconGap = 6.0f;
+         const bool clicked = ImGui::Button("##refreshall", ImVec2(-1.0f, 0));
+         const ImVec2 bmin = ImGui::GetItemRectMin();
+         const ImVec2 bmax = ImGui::GetItemRectMax();
+         const float btnW = bmax.x - bmin.x;
+         const float btnH = bmax.y - bmin.y;
+         const float textW = ImGui::CalcTextSize(refreshLabel).x;
+         const float totalContentW = iconSize + iconGap + textW;
+         const float startX = bmin.x + (btnW - totalContentW) * 0.5f;
+         const float centerY = bmin.y + btnH * 0.5f;
+
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImU32 col = ImGui::GetColorU32(scanning ? ImGuiCol_TextDisabled : ImGuiCol_Text);
+         Tabler::DrawRefresh(dl, ImVec2(startX + iconSize * 0.5f, centerY), iconSize, col);
+         dl->AddText(ImVec2(startX + iconSize + iconGap, centerY - ImGui::GetTextLineHeight() * 0.5f), col, refreshLabel);
+
+         if (clicked)
             scanAll = true;
          if (scanning)
             ImGui::EndDisabled();
@@ -17270,6 +17312,19 @@ namespace
       // relative to the cache on the exact mouse-release frame) is the
       // source of truth for how many points are actually cached.
       const int cachedPoints = (int)cache.curveDb.size();
+      if (cachedPoints > 1)
+      {
+         const float yBottom = origin.y + h;
+         const ImU32 fillCol = isLight ? IM_COL32(30, 110, 230, 32) : IM_COL32(100, 180, 255, 36);
+         for (int i = 0; i < cachedPoints - 1; i++)
+         {
+            const float x0 = origin.x + (float)i * (w / (float)(cachedPoints - 1));
+            const float x1 = origin.x + (float)(i + 1) * (w / (float)(cachedPoints - 1));
+            const float y0 = FilterVizDbToY(cache.curveDb[i], origin.y, h);
+            const float y1 = FilterVizDbToY(cache.curveDb[i + 1], origin.y, h);
+            dl->AddQuadFilled(ImVec2(x0, y0), ImVec2(x1, y1), ImVec2(x1, yBottom), ImVec2(x0, yBottom), fillCol);
+         }
+      }
       dl->PathClear();
       for (int i = 0; i < cachedPoints; i++)
       {
@@ -18647,10 +18702,26 @@ namespace
       // original - same alpha-layering technique as DrawChorusVisualizer's
       // taps, not a second visualizer mode.
       const int kNumPoints = 96;
+      const float centerY = origin.y + 0.5f * h;
       for (int pass = 0; pass < (stereo > 0.0f ? 2 : 1); pass++)
       {
          const float tracePosition = (pass == 1) ? positionR : positionL;
          const int alpha = (stereo > 0.0f) ? (pass == 0 ? 200 : 150) : 255;
+         const ImU32 fillCol = isLight ? IM_COL32(30, 110, 230, (int)(alpha * 0.12f)) : IM_COL32(100, 180, 255, (int)(alpha * 0.14f));
+         for (int i = 0; i < kNumPoints - 1; i++)
+         {
+            const float xIn0 = -1.0f + 2.0f * (float)i / (float)(kNumPoints - 1);
+            const float xIn1 = -1.0f + 2.0f * (float)(i + 1) / (float)(kNumPoints - 1);
+            const float yOut0 =
+               std::clamp(WavetableShaperDsp::Shape(xIn0, table, tracePosition, driveDb, bias, smooth), -1.0f, 1.0f);
+            const float yOut1 =
+               std::clamp(WavetableShaperDsp::Shape(xIn1, table, tracePosition, driveDb, bias, smooth), -1.0f, 1.0f);
+            const float x0 = origin.x + (0.5f + 0.5f * xIn0) * w;
+            const float x1 = origin.x + (0.5f + 0.5f * xIn1) * w;
+            const float y0 = origin.y + (0.5f - 0.5f * yOut0) * h;
+            const float y1 = origin.y + (0.5f - 0.5f * yOut1) * h;
+            dl->AddQuadFilled(ImVec2(x0, y0), ImVec2(x1, y1), ImVec2(x1, centerY), ImVec2(x0, centerY), fillCol);
+         }
          dl->PathClear();
          for (int i = 0; i < kNumPoints; i++)
          {
@@ -23007,26 +23078,52 @@ namespace
       ImGui::Dummy(ImVec2(w, h));
       const bool hovered = ImGui::IsItemHovered();
 
-      dl->AddRectFilled(origin, br,
-                        IM_COL32((int)(n->color[0] * 40), (int)(n->color[1] * 40),
-                                 (int)(n->color[2] * 40), 255), 4.0f);
-      dl->AddRect(origin, br,
-                  IM_COL32((int)(n->color[0] * 255), (int)(n->color[1] * 255),
-                           (int)(n->color[2] * 255), 200), 4.0f, 0, 1.5f);
+      const bool isLight = IsThemeLight();
+      const ImU32 bgCol = isLight
+         ? IM_COL32((int)(224 + n->color[0] * 28),
+                    (int)(227 + n->color[1] * 25),
+                    (int)(232 + n->color[2] * 20), 245)
+         : IM_COL32((int)(16 + n->color[0] * 36),
+                    (int)(18 + n->color[1] * 36),
+                    (int)(24 + n->color[2] * 36), 235);
+      const ImU32 borderCol = isLight
+         ? IM_COL32((int)(n->color[0] * 180 + 40),
+                    (int)(n->color[1] * 180 + 40),
+                    (int)(n->color[2] * 180 + 40), 160)
+         : IM_COL32((int)(n->color[0] * 200 + 55),
+                    (int)(n->color[1] * 200 + 55),
+                    (int)(n->color[2] * 200 + 55), 180);
 
-      const ImU32 textCol = IM_COL32((int)((n->color[0] * 0.6f + 0.4f) * 255),
-                                     (int)((n->color[1] * 0.6f + 0.4f) * 255),
-                                     (int)((n->color[2] * 0.6f + 0.4f) * 255), 255);
+      dl->AddRectFilled(origin, br, bgCol, 6.0f);
+      // Header accent bar (Apple Notes / sticky card feel)
+      dl->AddRectFilled(origin, ImVec2(br.x, origin.y + 4.0f),
+                        IM_COL32((int)(n->color[0] * 255), (int)(n->color[1] * 255),
+                                 (int)(n->color[2] * 255), 220), 6.0f, ImDrawFlags_RoundCornersTop);
+      dl->AddRect(origin, br, borderCol, 6.0f, 0, 1.2f);
+
+      const ImU32 textCol = isLight
+         ? IM_COL32(30, 36, 48, 255)
+         : IM_COL32((int)((n->color[0] * 0.5f + 0.5f) * 255),
+                    (int)((n->color[1] * 0.5f + 0.5f) * 255),
+                    (int)((n->color[2] * 0.5f + 0.5f) * 255), 255);
       // Clipped to the box so a note longer than its height is cut off at the
       // edge instead of spilling over the params below it.
       dl->PushClipRect(origin, br, true);
-      if (n->text.empty())
-         dl->AddText(ImVec2(origin.x + 8, origin.y + 6), IM_COL32(150, 150, 160, 255),
+      if (n == gCommentEdit.target)
+      {
+         // Suppress preview text while actively editing in the overlay popup so they don't double-render
+      }
+      else if (n->text.empty())
+      {
+         dl->AddText(ImVec2(origin.x + 8, origin.y + 8), isLight ? IM_COL32(140, 146, 160, 255) : IM_COL32(150, 150, 160, 255),
                      "double-click to write");
+      }
       else
+      {
          dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
-                     ImVec2(origin.x + 8, origin.y + 6), textCol,
+                     ImVec2(origin.x + 8, origin.y + 8), textCol,
                      n->text.c_str(), nullptr, w - 16.0f);
+      }
       dl->PopClipRect();
 
       {
@@ -23034,7 +23131,10 @@ namespace
          const ImVec2 rb = ed::CanvasToScreen(br);
          gCommentBodyRect = ImVec4(tl.x, tl.y, rb.x - tl.x, rb.y - tl.y);
          if (n == gCommentEdit.target)
+         {
             gCommentEditRect = gCommentBodyRect;
+            gCommentEditZoom = ed::GetCurrentZoom();
+         }
       }
 
       if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
@@ -23257,12 +23357,15 @@ namespace
    {
       AutoFitGroupToMembers(gn, n);
 
+      const bool isLight = IsThemeLight();
+      const float bgAlpha = isLight ? 0.08f : 0.13f;
+      const float borderAlpha = isLight ? 0.65f : 0.80f;
       ed::PushStyleColor(ed::StyleColor_NodeBg, ImColor(0, 0, 0, 0));
       ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(0, 0, 0, 0));
       ed::PushStyleColor(ed::StyleColor_GroupBg,
-                         ImColor(n->color[0], n->color[1], n->color[2], 0.10f));
+                         ImColor(n->color[0], n->color[1], n->color[2], bgAlpha));
       ed::PushStyleColor(ed::StyleColor_GroupBorder,
-                         ImColor(n->color[0], n->color[1], n->color[2], 0.85f));
+                         ImColor(n->color[0], n->color[1], n->color[2], borderAlpha));
 
       ed::BeginNode(gn.NodeId());
       ImGui::PushID(gn.index);
@@ -23278,8 +23381,6 @@ namespace
          gColor.justOpened = true;
       }
       ImGui::SameLine();
-      const CategoryColors::UiTheme& t = CategoryColors::CurrentUiTheme();
-      const bool isLight = (0.2126f * t.windowBg.r + 0.7152f * t.windowBg.g + 0.0722f * t.windowBg.b > 0.5f);
       if (isLight)
          ImGui::PushStyleColor(ImGuiCol_Text,
                                ImVec4(n->color[0] * 0.70f, n->color[1] * 0.70f,
@@ -23418,7 +23519,7 @@ namespace
       }
 
       dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
-                  IM_COL32(70, 74, 90, 255), 4.0f);
+                  ScopeBorderCol(), 4.0f);
 
       // A Render 3D preview is a viewport, not a picture: drag to orbit, scroll
       // to zoom. An InvisibleButton is what makes this safe inside the node
@@ -24320,10 +24421,11 @@ namespace
       const ImVec2 panelOrigin = ImGui::GetCursorScreenPos();
       const ImVec2 panelSize = ImGui::GetContentRegionAvail();
 
-      if (mod.Links().empty())
+      GestureRecorder& rec = GestureRecorder::Instance();
+      if (mod.Links().empty() && mod.Expressions().empty() && rec.Playbacks().empty())
       {
          ImGui::TextDisabled("No active modulations.");
-         ImGui::TextDisabled("Patch a modulator into a parameter to see it here.");
+         ImGui::TextDisabled("Patch a modulator, type a formula, or record a gesture to see it here.");
       }
       else
       {
@@ -24558,6 +24660,217 @@ namespace
                ImGui::PopID();
 
                if (unbound)
+                  break; // just erased from the map this loop is iterating
+            }
+
+            // Expression bindings - same table, driven by a typed formula
+            // instead of a wired modulator. A param carrying both (a wired
+            // modulator always wins the apply pass - see Modulation.h) has
+            // its own row above already and is skipped here to avoid
+            // listing it twice.
+            for (const auto& exprEntry : mod.Expressions())
+            {
+               const int dstIndex = exprEntry.first.first;
+               const int dstParam = exprEntry.first.second;
+               if (mod.IsModulated(dstIndex, dstParam))
+                  continue;
+               GraphNode* dstNode = FindNodeByIndex(dstIndex);
+               if (dstNode == nullptr)
+                  continue; // stale - deleted node, undo/redo rewound past it
+
+               ImGui::PushID(dstIndex * 1000 + dstParam + 2000000);
+               ImGui::TableNextRow();
+
+               ImGui::TableNextColumn(); // enable dot - no on/off concept for an expression
+
+               ImGui::TableNextColumn();
+               ImGui::TextUnformatted("Expression");
+
+               ImGui::TableNextColumn();
+               if (ImGui::Selectable(NodeTitle(*dstNode).c_str(), false))
+                  gPendingSelect.push_back(dstNode->NodeId());
+
+               const ParamRef* known = mod.KnownParam(dstIndex, dstParam);
+               const bool isIntE = known != nullptr && known->step > 0.0f;
+               ImGui::TableNextColumn();
+               ImGui::TextUnformatted(known != nullptr ? known->name.c_str() : "?");
+
+               const ParamRef* frameRef = nullptr;
+               for (const ParamRef& r : mod.FrameParams())
+               {
+                  if (r.nodeIndex == dstIndex && r.paramIndex == dstParam)
+                  {
+                     frameRef = &r;
+                     break;
+                  }
+               }
+               ImGui::TableNextColumn();
+               if (frameRef != nullptr && frameRef->value != nullptr)
+                  ImGui::Text(isIntE ? "%.0f" : "%.3f", *frameRef->value);
+               else
+                  ImGui::TextUnformatted("--");
+
+               const float minVE = known != nullptr ? known->minValue : 0.0f;
+               const float maxVE = known != nullptr ? known->maxValue : 1.0f;
+               float loE, hiE;
+               if (!mod.ExpressionRangeFor(dstIndex, dstParam, loE, hiE))
+               {
+                  loE = minVE;
+                  hiE = maxVE;
+               }
+               const float stepE = isIntE ? 1.0f : std::max(0.0001f, (maxVE - minVE) * 0.01f);
+               bool rangeChangedE = false;
+               const std::pair<int, int> loKeyE(dstIndex, -(dstParam * 2 + 1) - 3000000);
+               const std::pair<int, int> hiKeyE(dstIndex, -(dstParam * 2 + 2) - 3000000);
+
+               ImGui::TableNextColumn();
+               ImGui::SetNextItemWidth(-FLT_MIN);
+               rangeChangedE |= TypableRangeField("##elo", loKeyE, &loE, stepE, minVE, maxVE,
+                                                  isIntE ? "%.0f" : "%.3f", /*noBorder=*/true);
+               ImGui::TableNextColumn();
+               ImGui::SetNextItemWidth(-FLT_MIN);
+               rangeChangedE |= TypableRangeField("##ehi", hiKeyE, &hiE, stepE, minVE, maxVE,
+                                                  isIntE ? "%.0f" : "%.3f", /*noBorder=*/true);
+               if (rangeChangedE)
+               {
+                  loE = std::clamp(loE, minVE, maxVE);
+                  hiE = std::clamp(hiE, minVE, maxVE);
+                  mod.SetExpressionRange(dstIndex, dstParam, loE, hiE);
+               }
+
+               ImGui::TableNextColumn(); // invert - not meaningful for an expression's range
+
+               bool unboundExpr = false;
+               ImGui::TableNextColumn();
+               {
+                  ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
+                  const float btnW = ImGui::GetFrameHeight();
+                  if (ImGui::Button("##unbindexpr", ImVec2(btnW, 0)))
+                  {
+                     PushUndoCheckpoint();
+                     mod.ClearExpression(dstIndex, dstParam);
+                     unboundExpr = true;
+                  }
+                  ImGui::PopStyleColor();
+                  ImDrawList* dl = ImGui::GetWindowDrawList();
+                  const ImVec2 bmin = ImGui::GetItemRectMin();
+                  const ImVec2 bmax = ImGui::GetItemRectMax();
+                  const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+                  const float iconSize = (bmax.y - bmin.y) * 0.6f;
+                  const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255)
+                                                            : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+                  Tabler::DrawX(dl, center, iconSize, col);
+               }
+
+               ImGui::PopID();
+               if (unboundExpr)
+                  break; // just erased from the map this loop is iterating
+            }
+
+            // Recorded (gesture-looped) bindings - a param armed via "Start
+            // Recording" or still looping a finished gesture. A param whose
+            // recording is only armed but hasn't produced a loop yet has
+            // nothing here to show a Value/Range for, so it's skipped - the
+            // param's own right-click menu already surfaces "Waiting for
+            // movement.../Cancel Recording" for that transient state.
+            for (const auto& pbEntry : rec.Playbacks())
+            {
+               const int dstIndex = pbEntry.first.first;
+               const int dstParam = pbEntry.first.second;
+               if (mod.IsModulated(dstIndex, dstParam) || mod.HasExpression(dstIndex, dstParam))
+                  continue; // one of the two above already wins the apply pass and has its own row
+               GraphNode* dstNode = FindNodeByIndex(dstIndex);
+               if (dstNode == nullptr)
+                  continue; // stale - deleted node, undo/redo rewound past it
+
+               ImGui::PushID(dstIndex * 1000 + dstParam + 4000000);
+               ImGui::TableNextRow();
+
+               ImGui::TableNextColumn(); // enable dot - no on/off concept for a recording
+
+               ImGui::TableNextColumn();
+               ImGui::TextUnformatted("Recording");
+
+               ImGui::TableNextColumn();
+               if (ImGui::Selectable(NodeTitle(*dstNode).c_str(), false))
+                  gPendingSelect.push_back(dstNode->NodeId());
+
+               const ParamRef* known = mod.KnownParam(dstIndex, dstParam);
+               const bool isIntR = known != nullptr && known->step > 0.0f;
+               ImGui::TableNextColumn();
+               ImGui::TextUnformatted(known != nullptr ? known->name.c_str() : "?");
+
+               const ParamRef* frameRef = nullptr;
+               for (const ParamRef& r : mod.FrameParams())
+               {
+                  if (r.nodeIndex == dstIndex && r.paramIndex == dstParam)
+                  {
+                     frameRef = &r;
+                     break;
+                  }
+               }
+               ImGui::TableNextColumn();
+               if (frameRef != nullptr && frameRef->value != nullptr)
+                  ImGui::Text(isIntR ? "%.0f (%.2fx)" : "%.3f (%.2fx)", *frameRef->value,
+                              rec.PlaybackSpeedFor(dstIndex, dstParam));
+               else
+                  ImGui::TextUnformatted("--");
+
+               const float minVR = known != nullptr ? known->minValue : pbEntry.second.recordedMin;
+               const float maxVR = known != nullptr ? known->maxValue : pbEntry.second.recordedMax;
+               float loR, hiR;
+               if (!rec.PlaybackRangeFor(dstIndex, dstParam, loR, hiR))
+               {
+                  loR = pbEntry.second.recordedMin;
+                  hiR = pbEntry.second.recordedMax;
+               }
+               const float stepR = isIntR ? 1.0f : std::max(0.0001f, (maxVR - minVR) * 0.01f);
+               bool rangeChangedR = false;
+               const std::pair<int, int> loKeyR(dstIndex, -(dstParam * 2 + 1) - 5000000);
+               const std::pair<int, int> hiKeyR(dstIndex, -(dstParam * 2 + 2) - 5000000);
+
+               ImGui::TableNextColumn();
+               ImGui::SetNextItemWidth(-FLT_MIN);
+               rangeChangedR |= TypableRangeField("##rlo", loKeyR, &loR, stepR, minVR, maxVR,
+                                                  isIntR ? "%.0f" : "%.3f", /*noBorder=*/true);
+               ImGui::TableNextColumn();
+               ImGui::SetNextItemWidth(-FLT_MIN);
+               rangeChangedR |= TypableRangeField("##rhi", hiKeyR, &hiR, stepR, minVR, maxVR,
+                                                  isIntR ? "%.0f" : "%.3f", /*noBorder=*/true);
+               if (rangeChangedR)
+               {
+                  loR = std::clamp(loR, minVR, maxVR);
+                  hiR = std::clamp(hiR, minVR, maxVR);
+                  rec.SetPlaybackRange(dstIndex, dstParam, loR, hiR);
+               }
+
+               ImGui::TableNextColumn();
+               if (ImGui::SmallButton("Full"))
+                  rec.ClearPlaybackRange(dstIndex, dstParam);
+
+               bool unboundRec = false;
+               ImGui::TableNextColumn();
+               {
+                  ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
+                  const float btnW = ImGui::GetFrameHeight();
+                  if (ImGui::Button("##unbindrec", ImVec2(btnW, 0)))
+                  {
+                     rec.StopPlayback(dstIndex, dstParam);
+                     unboundRec = true;
+                  }
+                  ImGui::PopStyleColor();
+                  ImDrawList* dl = ImGui::GetWindowDrawList();
+                  const ImVec2 bmin = ImGui::GetItemRectMin();
+                  const ImVec2 bmax = ImGui::GetItemRectMax();
+                  const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+                  const float iconSize = (bmax.y - bmin.y) * 0.6f;
+                  const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255)
+                                                            : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+                  Tabler::DrawX(dl, center, iconSize, col);
+               }
+
+               ImGui::PopID();
+               if (unboundRec)
                   break; // just erased from the map this loop is iterating
             }
 
@@ -28610,7 +28923,7 @@ namespace
       ImGuiIO& io = ImGui::GetIO();
       ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
                                ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-      ImGui::SetNextWindowBgAlpha(0.95f);
+      PushElevatedPanelStyle(/*isChild=*/false);
       ImGui::Begin("Offline Render", nullptr,
                     ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize |
                        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings);
@@ -28655,6 +28968,7 @@ namespace
       ImGui::EndDisabled();
 
       ImGui::End();
+      PopElevatedPanelStyle();
    }
 
    void RemoveNodeByIndex(int index)
@@ -48233,14 +48547,53 @@ void ApplyModulationAndPalette(int frameId)
       const bool hadLo = savedLo != siblings.end(), hadHi = savedHi != siblings.end();
       const float prevLo = hadLo ? savedLo->second : 0.0f;
       const float prevHi = hadHi ? savedHi->second : 0.0f;
-      siblings["lo"] = ref.minValue;
-      siblings["hi"] = ref.maxValue;
+      // "Range" from the param's right-click menu (see modulation.
+      // ExpressionRangeFor) overrides what lo/hi resolve to here; falls back
+      // to the param's own declared span when no override is set.
+      float boundLo = ref.minValue, boundHi = ref.maxValue;
+      modulation.ExpressionRangeFor(ref.nodeIndex, ref.paramIndex, boundLo, boundHi);
+      siblings["lo"] = boundLo;
+      siblings["hi"] = boundHi;
+      // Whether the formula text itself names the lo/hi bind variables (as a
+      // whole identifier, not e.g. the "lo" inside "log") - if it does, the
+      // author is already hand-placing the result inside Range via those
+      // variables (`lerp(lo, hi, ...)`), so the blanket remap below must not
+      // also run or it would double-apply Range on top of an already-ranged
+      // result.
+      const auto namesIdentifier = [](const std::string& s, const char* word) {
+         const size_t len = strlen(word);
+         size_t pos = 0;
+         while ((pos = s.find(word, pos)) != std::string::npos)
+         {
+            const bool leftOk = pos == 0 || !(isalnum((unsigned char)s[pos - 1]) || s[pos - 1] == '_');
+            const size_t after = pos + len;
+            const bool rightOk = after >= s.size() || !(isalnum((unsigned char)s[after]) || s[after] == '_');
+            if (leftOk && rightOk)
+               return true;
+            pos += len;
+         }
+         return false;
+      };
+      const bool formulaOwnsRange = namesIdentifier(*expr, "lo") || namesIdentifier(*expr, "hi");
       const bool evaluated = Expression::Evaluate(*expr, t, &siblings, &globals, result, error);
       if (hadLo) siblings["lo"] = prevLo; else siblings.erase("lo");
       if (hadHi) siblings["hi"] = prevHi; else siblings.erase("hi");
       if (evaluated)
       {
-         *ref.value = ShapeToParam(ref, result);
+         // A Range override also remaps the formula's own raw output, not just
+         // the lo/hi bind variables above - otherwise "Range" would silently do
+         // nothing for the common case of a formula that never references
+         // lo/hi (e.g. `=sin(t)*0.5+0.5`). This is an identity when no override
+         // is set, since boundLo/boundHi then equal ref.minValue/maxValue, and
+         // it's skipped entirely when the formula already used lo/hi itself
+         // (see formulaOwnsRange above).
+         float mapped = result;
+         if (!formulaOwnsRange && ref.maxValue > ref.minValue)
+         {
+            const float norm = (result - ref.minValue) / (ref.maxValue - ref.minValue);
+            mapped = boundLo + norm * (boundHi - boundLo);
+         }
+         *ref.value = ShapeToParam(ref, mapped);
          modulation.SetExpressionError(ref.nodeIndex, ref.paramIndex, std::string());
       }
       else
@@ -51944,16 +52297,19 @@ int main(int argc, char** argv)
                gShortcutsOpen = true;
             if (ImGui::MenuItem("Help / module reference"))
                gHelpOpen = true;
+#ifndef NDEBUG
             // ImGui's built-in inspectors, not a custom tool: the Debugger's
             // Tools > Item Picker names the exact ImGuiCol_*/style var and
             // rect behind whatever you click, and the Style Editor lists and
             // live-previews every one of those values - the fastest way to
             // hand back "this exact knob, this exact number" instead of a
-            // screenshot and a guess.
+            // screenshot and a guess. Dev-only: excluded from Release builds
+            // (NDEBUG) so shipped/public builds never expose these.
             if (ImGui::MenuItem("UI Debugger / Item Picker"))
                gUiDebuggerOpen = true;
             if (ImGui::MenuItem("UI Style Editor"))
                gUiStyleEditorOpen = true;
+#endif
             if (ImGui::MenuItem("Check for updates"))
             {
                UpdateCheck::Start();
@@ -51993,17 +52349,15 @@ int main(int argc, char** argv)
             else
                ImGui::TextUnformatted(text);
          };
-         auto TopBarSeparator = []() {
-            ImGui::SameLine(0.0f, 8.0f);
-            ImGui::Separator();
-            ImGui::SameLine(0.0f, 8.0f);
-         };
+         const bool isLight = IsThemeLight();
 
-         TopBarSameLine(8.0f);
-
-         // 1. Transport Play & Rewind
+         // 1. Transport (Play, Rewind, Audio On/Off)
          if (isTransportPlaying)
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.16f, 0.52f, 0.28f, 1.0f));
+         {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.16f, 0.63f, 0.31f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.70f, 0.36f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.14f, 0.55f, 0.26f, 1.0f));
+         }
          if (ImGui::Button("##transportplay", ImVec2(34, 0)))
             transport.TogglePlay();
          {
@@ -52023,9 +52377,9 @@ int main(int argc, char** argv)
          if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s (Space)", isTransportPlaying ? "Pause" : "Play");
          if (isTransportPlaying)
-            ImGui::PopStyleColor();
+            ImGui::PopStyleColor(3);
 
-         TopBarSameLine(3.0f);
+         TopBarSameLine(2.0f);
          if (ImGui::Button("##transportrewind", ImVec2(34, 0)))
             transport.Rewind();
          {
@@ -52045,13 +52399,7 @@ int main(int argc, char** argv)
          // Audio engine on/off
          {
             const bool audioOn = AudioEngine::Instance().SampleRate() > 0.0;
-            const bool audioIsLight = IsThemeLight();
-            // The "off" chip was a fixed dark gray with the ambient (themed)
-            // text colour on top - in light mode that's dark-navy text on a
-            // dark-gray fill, both dark, so the label all but disappeared.
-            // Branch the fill by theme and pin an explicit high-contrast
-            // text colour for both states rather than relying on whatever
-            // ImGuiCol_Text happens to be.
+            const bool audioIsLight = isLight;
             ImGui::PushStyleColor(ImGuiCol_Button, audioOn
                                                        ? (audioIsLight ? ImVec4(0.20f, 0.62f, 0.34f, 1.0f) : ImVec4(0.16f, 0.52f, 0.28f, 1.0f))
                                                        : (audioIsLight ? ImVec4(0.80f, 0.82f, 0.87f, 1.0f) : ImVec4(0.30f, 0.30f, 0.34f, 1.0f)));
@@ -52073,6 +52421,8 @@ int main(int argc, char** argv)
             if (!audioOn && !gAudioStartError.empty() && ImGui::IsItemHovered())
                ImGui::SetTooltip("%s", gAudioStartError.c_str());
          }
+
+         ImGui::Separator();
 
          static const int kDens[] = { 1, 2, 4, 8, 16 };
          auto SnapToValidDenominator = [](int val) -> int {
@@ -52101,9 +52451,7 @@ int main(int argc, char** argv)
          static bool sFieldJustOpened = false;
          static float sDragAccumY = 0.0f;
 
-         TopBarSeparator();
-
-         // 2. Tempo (BPM)
+         // 2. Tempo & Meter (BPM + Time Signature)
          {
             float bpm = transport.Tempo();
             TopBarLabel("BPM");
@@ -52169,9 +52517,9 @@ int main(int argc, char** argv)
             }
          }
 
-         TopBarSeparator();
+         TopBarSameLine(8.0f);
 
-         // 3. Time signature
+         // Time signature (numerator / denominator)
          {
             int tsNum = transport.TimeSigNumerator();
             const int tsDen = transport.TimeSigDenominator();
@@ -52313,88 +52661,82 @@ int main(int argc, char** argv)
             }
          }
 
-         TopBarSeparator();
+         ImGui::Separator();
 
-         // 4. Global Key and Scale
-         {
-            static const char* const kKeyNames[] = {
-               "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
-            };
-            auto FormatScaleDisplayName = [](const std::string& name) -> std::string {
-               std::string out = name;
-               bool capNext = true;
-               for (size_t i = 0; i < out.size(); i++)
+         // 3. Global Key & Scale
+         static const char* const kKeyNames[] = {
+            "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
+         };
+         auto FormatScaleDisplayName = [](const std::string& name) -> std::string {
+            std::string out = name;
+            bool capNext = true;
+            for (size_t i = 0; i < out.size(); i++)
+            {
+               if (std::isalpha((unsigned char)out[i]))
                {
-                  if (std::isalpha((unsigned char)out[i]))
+                  if (capNext)
                   {
-                     if (capNext)
-                     {
-                        out[i] = (char)std::toupper((unsigned char)out[i]);
-                        capNext = false;
-                     }
-                  }
-                  else
-                  {
-                     capNext = true;
+                     out[i] = (char)std::toupper((unsigned char)out[i]);
+                     capNext = false;
                   }
                }
-               return out;
-            };
+               else
+               {
+                  capNext = true;
+               }
+            }
+            return out;
+         };
 
-            int curKey = transport.Key();
+         int curKey = transport.Key();
+         int curScale = transport.Scale();
+         const auto& scaleList = MusicTime::ScaleTypeList();
+         const char* curScaleName = (curScale >= 0 && curScale < (int)scaleList.size()) ? scaleList[curScale].c_str() : "major";
+         const std::string capScaleName = FormatScaleDisplayName(curScaleName);
+
+         {
             TopBarLabel("Key");
             TopBarSameLine(4.0f);
 
             if (ImGui::Button(kKeyNames[std::clamp(curKey, 0, 11)]))
                ImGui::OpenPopup("##globalKeyPopup");
-            if (ImGui::BeginPopup("##globalKeyPopup"))
-            {
-               for (int i = 0; i < 12; i++)
-               {
-                  if (ImGui::Selectable(kKeyNames[i], i == curKey))
-                     transport.SetKey(i);
-               }
-               ImGui::EndPopup();
-            }
 
             TopBarSameLine(4.0f);
-            int curScale = transport.Scale();
-            const auto& scaleList = MusicTime::ScaleTypeList();
-            const char* curScaleName = (curScale >= 0 && curScale < (int)scaleList.size()) ? scaleList[curScale].c_str() : "major";
-            const std::string capScaleName = FormatScaleDisplayName(curScaleName);
 
             if (ImGui::Button(capScaleName.c_str()))
                ImGui::OpenPopup("##globalScalePopup");
-            if (ImGui::BeginPopup("##globalScalePopup"))
-            {
-               for (int i = 0; i < (int)scaleList.size(); i++)
-               {
-                  const std::string capOpt = FormatScaleDisplayName(scaleList[i]);
-                  if (ImGui::Selectable(capOpt.c_str(), i == curScale))
-                     transport.SetScale(i);
-               }
-               ImGui::EndPopup();
-            }
          }
 
-         TopBarSeparator();
+         if (ImGui::BeginPopup("##globalKeyPopup"))
+         {
+            for (int i = 0; i < 12; i++)
+            {
+               if (ImGui::Selectable(kKeyNames[i], i == curKey))
+                  transport.SetKey(i);
+            }
+            ImGui::EndPopup();
+         }
+         if (ImGui::BeginPopup("##globalScalePopup"))
+         {
+            for (int i = 0; i < (int)scaleList.size(); i++)
+            {
+               const std::string capOpt = FormatScaleDisplayName(scaleList[i]);
+               if (ImGui::Selectable(capOpt.c_str(), i == curScale))
+                  transport.SetScale(i);
+            }
+            ImGui::EndPopup();
+         }
 
-         // 5. Bar & beat, frame cost, and the CPU meter - one left-aligned
-         // "status" cluster in the same label style/font as bar & beat,
-         // rather than bar/beat living here and fps/ms/audio being pinned to
-         // the far right in a visually different treatment.
+         ImGui::Separator();
+
+         // 4. Telemetry (Bar & beat, frame cost, CPU load)
          char barBeatBuf[64];
          snprintf(barBeatBuf, sizeof(barBeatBuf), "bar %d  beat %.2f",
                   1 + (int)transport.Bars(),
                   std::fmod(transport.Beats(), transport.BeatsPerBar()) + 1.0);
-         TopBarLabel(barBeatBuf, true);
 
-         // Frame cost. Measured from the swap-to-swap wall clock rather than
-         // ImGui's smoothed rate, so a heavy patch shows its real cost
-         // immediately instead of easing into it over a second.
+         // Frame cost
          static double sSmoothedMs = 0.0;
-         // A gentle EMA: raw frame times jitter too much to read, but the
-         // window is short enough that dragging a slider shows up at once.
          sSmoothedMs = (sSmoothedMs <= 0.0)
                           ? gLastFrameMs
                           : sSmoothedMs * 0.9 + gLastFrameMs * 0.1;
@@ -52403,23 +52745,9 @@ int main(int argc, char** argv)
          char readout[80];
          snprintf(readout, sizeof(readout), "%.1f fps   %.1f ms", fps, sSmoothedMs);
 
-         TopBarSameLine(10.0f);
-         TopBarLabel(readout, true);
-
-         // CPU meter - the audio engine's block load, replacing the old
-         // "audio off"/"audio X%" caption. Rendered in the same dim style as
-         // bar/beat and fps/ms regardless of load or on/off state - it's a
-         // reading, not a warning light, so it doesn't get its own color.
          const bool audioEngineOn = AudioEngine::Instance().SampleRate() > 0.0;
          const double audioLoad = AudioEngine::Instance().LastBlockLoad();
          const uint64_t xruns = AudioEngine::Instance().XrunCount();
-         // "on but dead" is real, brief window: PollAudioRecovery polls once
-         // a frame and needs at least one attempt (rate-limited to
-         // kAudioRecoveryMinIntervalMs apart) to either recover or give up
-         // and flip audioEngineOn back to false itself - see its comment.
-         // Reading IsAlive() here rather than adding a parallel "is
-         // recovering" flag means this can't drift out of sync with what
-         // PollAudioRecovery actually decided.
          const bool audioDead = audioEngineOn && !AudioEngine::Instance().IsAlive();
          char cpuReadout[32];
          if (audioDead)
@@ -52428,8 +52756,13 @@ int main(int argc, char** argv)
             snprintf(cpuReadout, sizeof(cpuReadout), "cpu %.0f%%%s", audioLoad * 100.0, xruns > 0 ? " !" : "");
          else
             snprintf(cpuReadout, sizeof(cpuReadout), "cpu --");
-         TopBarSameLine(10.0f);
+
+         TopBarLabel(barBeatBuf, true);
+         TopBarSameLine(8.0f);
+         TopBarLabel(readout, true);
+         TopBarSameLine(8.0f);
          TopBarLabel(cpuReadout, true);
+
          if (audioEngineOn && xruns > 0 && ImGui::IsItemHovered())
             ImGui::SetTooltip("%llu buffer underrun%s detected this session",
                               (unsigned long long)xruns, xruns == 1 ? "" : "s");
@@ -52515,7 +52848,10 @@ int main(int argc, char** argv)
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
             const float iconSize = (bmax.y - bmin.y) * 0.88f;
             const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
-            draw(dl, center, iconSize, col, 0.0f);
+            if (draw != nullptr)
+               draw(dl, center, iconSize, col, 0.0f);
+            else
+               Tabler::DrawPlaceholder(dl, center, iconSize, col, 0.0f);
 
             cursorX -= itemGap;
             return clicked;
@@ -62638,13 +62974,25 @@ int main(int argc, char** argv)
          const bool isLight = CategoryColors::IsThemeLight();
          const float kTintWeight = CategoryColors::GetTintWeight();
          const float nodeAlpha = CategoryColors::GetNodeOpacity();
-         ed::PushStyleColor(ed::StyleColor_NodeBg,
-                            ImColor(t.panelBg.r * (1.0f - kTintWeight) + catColor.r * kTintWeight,
-                                    t.panelBg.g * (1.0f - kTintWeight) + catColor.g * kTintWeight,
-                                    t.panelBg.b * (1.0f - kTintWeight) + catColor.b * kTintWeight,
-                                    nodeAlpha));
-         ed::PushStyleColor(ed::StyleColor_NodeBorder,
-                            ImColor(catColor.r, catColor.g, catColor.b, isLight ? 0.75f : 0.55f));
+         const bool isComment = dynamic_cast<CommentNode*>(gn.node.get()) != nullptr;
+         if (isComment)
+         {
+            ed::PushStyleColor(ed::StyleColor_NodeBg, ImColor(0, 0, 0, 0));
+            ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(0, 0, 0, 0));
+            ed::PushStyleVar(ed::StyleVar_NodePadding, ImVec4(0, 0, 0, 0));
+            ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, 0.0f);
+            ed::PushStyleVar(ed::StyleVar_NodeRounding, 6.0f);
+         }
+         else
+         {
+            ed::PushStyleColor(ed::StyleColor_NodeBg,
+                               ImColor(t.panelBg.r * (1.0f - kTintWeight) + catColor.r * kTintWeight,
+                                       t.panelBg.g * (1.0f - kTintWeight) + catColor.g * kTintWeight,
+                                       t.panelBg.b * (1.0f - kTintWeight) + catColor.b * kTintWeight,
+                                       nodeAlpha));
+            ed::PushStyleColor(ed::StyleColor_NodeBorder,
+                               ImColor(catColor.r, catColor.g, catColor.b, isLight ? 0.75f : 0.55f));
+         }
 
          ed::BeginNode(gn.NodeId());
          gInsideNodeCanvas = true;
@@ -62654,7 +63002,6 @@ int main(int argc, char** argv)
             ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.55f);
 
          const bool isAudioBody = IsAudioBodyNode(gn.node.get());
-         const bool isComment = dynamic_cast<CommentNode*>(gn.node.get()) != nullptr;
          auto* mixerNode = dynamic_cast<MixerNode*>(gn.node.get());
 
          // --- inputs spread along the top edge ---
@@ -62725,7 +63072,9 @@ int main(int argc, char** argv)
             maxInputY = std::max(maxInputY, topRowPos.y + 18.0f);
          }
 
-         if (inputs > 0 || (isAudioBody && !isComment))
+         if (isComment)
+            ImGui::SetCursorPos(topRowPos);
+         else if (inputs > 0 || isAudioBody)
             ImGui::SetCursorPos(ImVec2(topRowPos.x, maxInputY + 4.0f));
 
          // Group the body so its measured width can right-align the out pin.
@@ -62734,17 +63083,22 @@ int main(int argc, char** argv)
          // covered the canvas and swallowed every click.
          ImGui::BeginGroup();
 
-         ImGui::TextUnformatted(NodeTitle(gn).c_str());
-         if (isLight)
-            ImGui::PushStyleColor(ImGuiCol_Text,
-                                  ImVec4(catColor.r * 0.75f, catColor.g * 0.75f,
-                                         catColor.b * 0.75f, 1.0f));
-         else
-            ImGui::PushStyleColor(ImGuiCol_Text,
-                                  ImVec4(catColor.r * 0.6f + 0.4f, catColor.g * 0.6f + 0.4f,
-                                         catColor.b * 0.6f + 0.4f, 1.0f));
-         ImGui::TextUnformatted(gn.category.c_str());
-         ImGui::PopStyleColor();
+         if (!isComment)
+         {
+            ImGui::TextUnformatted(NodeTitle(gn).c_str());
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 2.0f);
+            if (isLight)
+               ImGui::PushStyleColor(ImGuiCol_Text,
+                                     ImVec4(catColor.r * 0.75f, catColor.g * 0.75f,
+                                            catColor.b * 0.75f, 1.0f));
+            else
+               ImGui::PushStyleColor(ImGuiCol_Text,
+                                     ImVec4(catColor.r * 0.6f + 0.4f, catColor.g * 0.6f + 0.4f,
+                                            catColor.b * 0.6f + 0.4f, 1.0f));
+            ImGui::TextUnformatted(gn.category.c_str());
+            ImGui::PopStyleColor();
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 2.0f);
+         }
 
          // Moved ahead of the old call site (right before the showParams
          // dispatch below) so DrawAudioNodeBody's ModSlider calls - which
@@ -62825,8 +63179,8 @@ int main(int argc, char** argv)
             ImGui::Dummy(ImVec2(boxW, h));
             ImDrawList* dl = ImGui::GetWindowDrawList();
             ImVec2 br(origin.x + boxW, origin.y + h);
-            dl->AddRectFilled(origin, br, IM_COL32(18, 18, 24, 255), 4.0f);
-            dl->AddRect(origin, br, IM_COL32(70, 74, 90, 255), 4.0f);
+            dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+            dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
             char line[64] = "";
             if (auto* o = dynamic_cast<GeometryOpNode*>(gn.node.get()))
             {
@@ -62887,9 +63241,11 @@ int main(int argc, char** argv)
                snprintf(line, sizeof(line), "%zu points", i2p->PointCount());
             else
                snprintf(line, sizeof(line), "scene node");
-            dl->AddText(ImVec2(origin.x + 12, origin.y + 10), IM_COL32(200, 206, 226, 255),
+            dl->AddText(ImVec2(origin.x + 12, origin.y + 10),
+                        isLight ? IM_COL32(30, 36, 52, 255) : IM_COL32(200, 206, 226, 255),
                         NodeTitle(gn).c_str());
-            dl->AddText(ImVec2(origin.x + 12, origin.y + 28), IM_COL32(130, 136, 156, 255), line);
+            dl->AddText(ImVec2(origin.x + 12, origin.y + 28),
+                        isLight ? IM_COL32(95, 105, 125, 255) : IM_COL32(130, 136, 156, 255), line);
          }
          else if (dynamic_cast<GeometryNode*>(gn.node.get()) != nullptr)
          {
@@ -62900,15 +63256,18 @@ int main(int argc, char** argv)
             ImGui::Dummy(ImVec2(kPreviewSize, kPreviewSize * 0.45f));
             ImDrawList* dl = ImGui::GetWindowDrawList();
             ImVec2 br(origin.x + kPreviewSize, origin.y + kPreviewSize * 0.45f);
-            dl->AddRectFilled(origin, br, IM_COL32(18, 18, 24, 255), 4.0f);
-            dl->AddRect(origin, br, IM_COL32(70, 74, 90, 255), 4.0f);
+            dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+            dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
             const std::string& name = GeometryNode::ShapeNames()[
                std::max(0, std::min(geo->shape, (int)GeometryNode::ShapeNames().size() - 1))];
-            dl->AddText(ImVec2(origin.x + 12, origin.y + 14), IM_COL32(200, 206, 226, 255), name.c_str());
+            dl->AddText(ImVec2(origin.x + 12, origin.y + 14),
+                        isLight ? IM_COL32(30, 36, 52, 255) : IM_COL32(200, 206, 226, 255), name.c_str());
             char tris[48];
             snprintf(tris, sizeof(tris), "%zu triangles", geo->TriangleCount());
-            dl->AddText(ImVec2(origin.x + 12, origin.y + 34), IM_COL32(130, 136, 156, 255), tris);
-            dl->AddText(ImVec2(origin.x + 12, origin.y + 54), IM_COL32(130, 136, 156, 255), "geometry -> Render 3D");
+            dl->AddText(ImVec2(origin.x + 12, origin.y + 34),
+                        isLight ? IM_COL32(95, 105, 125, 255) : IM_COL32(130, 136, 156, 255), tris);
+            dl->AddText(ImVec2(origin.x + 12, origin.y + 54),
+                        isLight ? IM_COL32(95, 105, 125, 255) : IM_COL32(130, 136, 156, 255), "geometry -> Render 3D");
          }
          else if (auto* draw = dynamic_cast<DrawNode*>(gn.node.get()))
             DrawPaintablePreview(draw);
@@ -62987,6 +63346,7 @@ int main(int argc, char** argv)
          // toggle - see the comment above isAudioBody.
          if (!isAudioBody && !isComment)
          {
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 4.0f);
             const bool isWide = (dynamic_cast<Render3DNode*>(gn.node.get()) != nullptr ||
                                  dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr);
             if (isWide)
@@ -63031,16 +63391,34 @@ int main(int argc, char** argv)
                // rather than absolute (overriding it) - see 00-modulation-
                // polarity.md.
                ImGui::SameLine();
-               ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.35f, 1.0f), gn.hasBipolarParams ? "mod\xc2\xb1" : "mod");
-               modTagMin = ImGui::GetItemRectMin();
-               modTagMax = ImGui::GetItemRectMax();
+               const char* tagText = gn.hasBipolarParams ? "mod\xc2\xb1" : "mod";
+               const ImVec2 txtSz = ImGui::CalcTextSize(tagText);
+               const ImVec2 p = ImGui::GetCursorScreenPos();
+               const ImVec2 tagSz(txtSz.x + 8.0f, txtSz.y + 2.0f);
+               ImDrawList* dl = ImGui::GetWindowDrawList();
+               dl->AddRectFilled(p, ImVec2(p.x + tagSz.x, p.y + tagSz.y),
+                                 isLight ? IM_COL32(255, 235, 200, 200) : IM_COL32(70, 50, 20, 180), 3.0f);
+               dl->AddText(ImVec2(p.x + 4.0f, p.y + 1.0f),
+                           isLight ? IM_COL32(180, 100, 20, 255) : IM_COL32(255, 190, 90, 255), tagText);
+               ImGui::Dummy(tagSz);
+               modTagMin = p;
+               modTagMax = ImVec2(p.x + tagSz.x, p.y + tagSz.y);
             }
             if (palTag)
             {
                ImGui::SameLine();
-               ImGui::TextColored(ImVec4(0.5f, 0.86f, 0.74f, 1.0f), "pal");
-               palTagMin = ImGui::GetItemRectMin();
-               palTagMax = ImGui::GetItemRectMax();
+               const char* tagText = "pal";
+               const ImVec2 txtSz = ImGui::CalcTextSize(tagText);
+               const ImVec2 p = ImGui::GetCursorScreenPos();
+               const ImVec2 tagSz(txtSz.x + 8.0f, txtSz.y + 2.0f);
+               ImDrawList* dl = ImGui::GetWindowDrawList();
+               dl->AddRectFilled(p, ImVec2(p.x + tagSz.x, p.y + tagSz.y),
+                                 isLight ? IM_COL32(200, 245, 235, 200) : IM_COL32(20, 60, 50, 180), 3.0f);
+               dl->AddText(ImVec2(p.x + 4.0f, p.y + 1.0f),
+                           isLight ? IM_COL32(20, 140, 110, 255) : IM_COL32(128, 220, 190, 255), tagText);
+               ImGui::Dummy(tagSz);
+               palTagMin = p;
+               palTagMax = ImVec2(p.x + tagSz.x, p.y + tagSz.y);
             }
             // Only once the whole row is laid out: the stubs move the cursor.
             if (modTag)
@@ -63635,6 +64013,8 @@ int main(int argc, char** argv)
          gInsideNodeCanvas = false;
          ed::EndNode();
          ed::PopStyleColor(2);
+         if (isComment)
+            ed::PopStyleVar(3);
       }
 
       // ---- draw existing links ----
@@ -65090,9 +65470,33 @@ int main(int argc, char** argv)
                ed::SelectNode(gn->NodeId());
                gRequestUngroup = true;
             }
+            if (ImGui::MenuItem("Duplicate", MODKEY "+D"))
+            {
+               if (!ed::IsNodeSelected(gn->NodeId()))
+               {
+                  ed::ClearSelection();
+                  ed::SelectNode(gn->NodeId());
+               }
+               gRequestDuplicate = true;
+            }
+            ImGui::Separator();
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.35f, 0.35f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.85f, 0.20f, 0.20f, 0.25f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.85f, 0.20f, 0.20f, 0.40f));
+            if (ImGui::MenuItem("Delete Group", "Backspace"))
+            {
+               if (!ed::IsNodeSelected(gn->NodeId()))
+               {
+                  ed::ClearSelection();
+                  ed::SelectNode(gn->NodeId());
+               }
+               gRequestDelete = true;
+            }
+            ImGui::PopStyleColor(3);
          }
          else
          {
+            // Primary Actions
             const char* bypassLabel = gn->node->bypassed ? "Enable Node" : "Bypass Node";
             if (ImGui::MenuItem(bypassLabel, "B"))
             {
@@ -65104,13 +65508,17 @@ int main(int argc, char** argv)
                   RebuildAudioTopology();
                }
             }
+            if (ImGui::MenuItem("Duplicate", MODKEY "+D"))
+            {
+               if (!ed::IsNodeSelected(gn->NodeId()))
+               {
+                  ed::ClearSelection();
+                  ed::SelectNode(gn->NodeId());
+               }
+               gRequestDuplicate = true;
+            }
 
-            // Audio nodes have no hide-able params state at all any more -
-            // every param is always visible (horizontal-layout redesign,
-            // docs/plans/audio/audio-node-ui-system.md §1/§4), so they skip
-            // this menu entry entirely rather than offering a toggle that
-            // would do nothing. They still get Help/Ungroup below, same as
-            // every other node type (§4's baseline).
+            // View & Panel Actions
             if (!IsAudioBodyNode(gn->node.get()))
             {
                if (gn->showParams)
@@ -65139,9 +65547,6 @@ int main(int argc, char** argv)
             }
             if (CanShowInViewportPanel(*gn))
             {
-               // Adds a card rather than replacing whatever is already shown -
-               // the panel holds any number of nodes at once, each closable
-               // on its own. A no-op if this node already has a card open.
                if (ImGui::MenuItem("Open in viewport panel"))
                {
                   if (std::find(gViewportPanelNodes.begin(), gViewportPanelNodes.end(), gn->index) ==
@@ -65150,19 +65555,11 @@ int main(int argc, char** argv)
                   gViewportPanelOpen = true;
                }
             }
-            // Same entry point as "Open in viewport panel" above, just for a
-            // modulator source rather than an image/geometry one - opens (or
-            // just surfaces, if already open) the docked overview of every
-            // active binding, since that's the panel that shows this node's
-            // own outgoing links.
             if (dynamic_cast<IModulator*>(gn->node.get()) != nullptr)
             {
                if (ImGui::MenuItem("Show modulation matrix"))
                   gModMatrixOpen = true;
             }
-            // Same gate as "Open in viewport panel": modulators, meters,
-            // cameras/lights and comments don't produce an image, so opening
-            // one in its own window would just show a blank/garbage texture.
             ProjectorWindow* projector = FindProjectorWindow(gn->index);
             if (CanShowInViewportPanel(*gn) && projector != nullptr)
             {
@@ -65195,6 +65592,10 @@ int main(int argc, char** argv)
                if (ImGui::MenuItem("Open in new window"))
                   OpenProjectorWindow(window, *gn);
             }
+
+            ImGui::Separator();
+
+            // Information & Hierarchy
             if (ImGui::MenuItem("Help"))
             {
                gHelpPopupNodeIndex = gn->index;
@@ -65203,17 +65604,10 @@ int main(int argc, char** argv)
             }
             if (GroupNode* owner = GroupOwning(gn->index))
             {
-               // Unlike the group's own "Ungroup" (which dissolves the whole
-               // cluster), this detaches just the one node that was
-               // right-clicked - its groupmates stay put.
                if (ImGui::MenuItem("Ungroup"))
                {
                   PushUndoCheckpoint();
                   gGroupMembers[owner].erase(gn->index);
-                  // Membership here is purely geometric - anything fully
-                  // inside the group's box gets adopted right back in next
-                  // frame. Nudging the node just past the box's bottom edge
-                  // is what makes removing it actually stick.
                   if (int ownerIndex = IndexOfGroupNode(owner); ownerIndex >= 0)
                   {
                      if (GraphNode* ownerGn = FindNodeByIndex(ownerIndex))
@@ -65226,6 +65620,23 @@ int main(int argc, char** argv)
                   }
                }
             }
+
+            ImGui::Separator();
+
+            // Destructive Action: Delete Node with HIG danger hover styling
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.35f, 0.35f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.85f, 0.20f, 0.20f, 0.25f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.85f, 0.20f, 0.20f, 0.40f));
+            if (ImGui::MenuItem("Delete Node", "Backspace"))
+            {
+               if (!ed::IsNodeSelected(gn->NodeId()))
+               {
+                  ed::ClearSelection();
+                  ed::SelectNode(gn->NodeId());
+               }
+               gRequestDelete = true;
+            }
+            ImGui::PopStyleColor(3);
          }
          ImGui::EndPopup();
       }
@@ -65273,28 +65684,139 @@ int main(int argc, char** argv)
       if (ImGui::BeginPopup("##modbind"))
       {
          Modulation& mod = Modulation::Instance();
-         if (!mod.IsModulated(gModBindingMenuNode, gModBindingMenuParam))
+         GestureRecorder& rec = GestureRecorder::Instance();
+         const int nodeIndex = gModBindingMenuNode;
+         const int paramIndex = gModBindingMenuParam;
+         const bool modulated = mod.IsModulated(nodeIndex, paramIndex);
+         const bool hasExpr = !modulated && mod.HasExpression(nodeIndex, paramIndex);
+         const GestureRecorder::Key gestureKey(nodeIndex, paramIndex);
+         const bool hasPlayback = rec.Playbacks().count(gestureKey) > 0;
+         const bool isRecordingState = !modulated && !hasExpr && (rec.IsArmed(nodeIndex, paramIndex) || hasPlayback);
+
+         // The destination's own declared min/max/step, looked up the same
+         // way Bind() does - this frame's FrameParams, keyed by (nodeIndex,
+         // paramIndex). Every branch below needs it (Enter Value's seed, the
+         // modulated/expression/recording Range fields, ...), so it's looked
+         // up once here instead of once per branch.
+         const ParamRef* destRef = nullptr;
+         for (const ParamRef& r : mod.FrameParams())
          {
-            // The cable was removed (deleted node, undo, ...) while the
-            // popup sat open.
-            ImGui::CloseCurrentPopup();
-         }
-         else
-         {
-            // The destination's own declared min/max/step, looked up the same
-            // way Bind() does - this frame's FrameParams, keyed by
-            // (nodeIndex, paramIndex). Needed so the fields below can be
-            // edited (and clamped) in the parameter's own units rather than
-            // the meaningless 0..1 a modulator itself deals in.
-            const ParamRef* destRef = nullptr;
-            for (const ParamRef& r : mod.FrameParams())
+            if (r.nodeIndex == nodeIndex && r.paramIndex == paramIndex)
             {
-               if (r.nodeIndex == gModBindingMenuNode && r.paramIndex == gModBindingMenuParam)
+               destRef = &r;
+               break;
+            }
+         }
+         const bool isInt = destRef != nullptr && destRef->step > 0.0f;
+         const char* valueFmt = isInt ? "%.0f" : "%.3f";
+         const std::pair<int, int> editKey(nodeIndex, paramIndex);
+
+         // Shared hover-and-type drag field, matching the convention every
+         // other param field in this file uses (see gTypedParam/
+         // BeginTypedEditFromCurrent) instead of depending on DragFloat's own
+         // double-click/Ctrl+click text-entry, which nothing here hints
+         // exists. field 0=lo, 1=hi - the modulated/expression/recording
+         // Range editors below never appear at once for a given param, so
+         // sharing gModRangeTypedField's single slot across them is safe.
+         bool rangeChanged = false;
+         auto drawRangeField = [&](int field, const char* dragId, const char* typedId,
+                                   const char* dragFmt, float minV, float maxV, float& v,
+                                   float step = -1.0f, float width = 90.0f)
+         {
+            if (step < 0.0f)
+               step = isInt ? 1.0f : (maxV - minV) * 0.01f;
+            if (gModRangeTypedField == field)
+            {
+               ImGui::SetNextItemWidth(width);
+               if (gModRangeTypedJustOpened)
                {
-                  destRef = &r;
-                  break;
+                  ImGui::SetKeyboardFocusHere();
+                  gModRangeTypedJustOpened = false;
+               }
+               char buf[64];
+               snprintf(buf, sizeof(buf), "%s", gModRangeTypedText.c_str());
+               const bool entered = ImGui::InputText(typedId, buf, sizeof(buf),
+                                                      ImGuiInputTextFlags_EnterReturnsTrue);
+               gModRangeTypedText = buf;
+               // Same race BeginTypedEditFromCurrent's comment describes:
+               // InputText's own select-all only runs once it's confirmed
+               // active, which can land a frame after SetKeyboardFocusHere -
+               // relying on that timing instead of driving selection
+               // explicitly is what made typing over the seeded digit
+               // unreliable (append instead of replace, needing extra
+               // digits to "overwrite" it).
+               if (gModRangeTypedPendingInit && ImGui::IsItemActive())
+               {
+                  if (ImGuiInputTextState* state = ImGui::GetInputTextState(ImGui::GetItemID()))
+                  {
+                     if (gModRangeTypedNoAutoSelect)
+                     {
+                        state->Stb.cursor = state->CurLenW;
+                        state->ClearSelection();
+                     }
+                     else
+                     {
+                        state->SelectAll();
+                     }
+                  }
+                  gModRangeTypedPendingInit = false;
+               }
+               if (entered || ImGui::IsItemDeactivated())
+               {
+                  char* end = nullptr;
+                  const float parsed = strtof(gModRangeTypedText.c_str(), &end);
+                  if (end != gModRangeTypedText.c_str())
+                  {
+                     v = parsed;
+                     rangeChanged = true;
+                  }
+                  gModRangeTypedField = -1;
+                  gModRangeTypedText.clear();
+                  gModRangeTypedPendingInit = false;
+                  gModRangeTypedNoAutoSelect = false;
                }
             }
+            else
+            {
+               ImGui::SetNextItemWidth(width);
+               rangeChanged |= ImGui::DragFloat(dragId, &v, step, minV, maxV, dragFmt);
+               if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+               {
+                  char seed[64];
+                  snprintf(seed, sizeof(seed), step >= 1.0f ? "%.0f" : "%.3f", v);
+                  gModRangeTypedField = field;
+                  gModRangeTypedText = seed;
+                  gModRangeTypedJustOpened = true;
+                  gModRangeTypedPendingInit = true;
+                  gModRangeTypedNoAutoSelect = false;
+               }
+               else if (ImGui::IsItemHovered() && !ImGui::IsItemActive() && !io.KeyCtrl && !io.KeySuper)
+               {
+                  std::string seed;
+                  for (int k = 0; k < 10; k++)
+                  {
+                     if (ImGui::IsKeyPressed((ImGuiKey)(ImGuiKey_0 + k), false))
+                     {
+                        seed = std::string(1, char('0' + k));
+                        break;
+                     }
+                  }
+                  if (seed.empty() && ImGui::IsKeyPressed(ImGuiKey_Minus, false))
+                     seed = "-";
+                  if (!seed.empty())
+                  {
+                     gModRangeTypedField = field;
+                     gModRangeTypedText = seed;
+                     gModRangeTypedJustOpened = true;
+                     gModRangeTypedPendingInit = true;
+                     gModRangeTypedNoAutoSelect = true;
+                  }
+               }
+            }
+         };
+
+         if (modulated)
+         {
             if (destRef == nullptr)
             {
                // The param didn't draw this frame (e.g. a collapsed node) -
@@ -65305,124 +65827,23 @@ int main(int argc, char** argv)
             {
                const Modulation::Source src = mod.ResolvedSourceFor(*destRef);
                float lo = src.lo, hi = src.hi;
-               const bool isInt = destRef->step > 0.0f;
-               ImGui::TextUnformatted(destRef->name.c_str());
                // A bool wants a toggle and an enum wants a selector; a knob
                // is only the right default for a continuous param.
                const int perfKind = destRef->isBool ? 3 : (destRef->isEnum ? 7 : 0);
                if (ImGui::MenuItem("Add to Performance Matrix"))
-               {
-                  AddToPerformanceMatrix(gModBindingMenuNode, gModBindingMenuParam, perfKind);
-               }
+                  AddToPerformanceMatrix(nodeIndex, paramIndex, perfKind);
                ImGui::Separator();
 
-               bool changed = false;
-               // Hover-and-type: matches the convention every other param
-               // field in this file uses (see gTypedParam/
-               // BeginTypedEditFromCurrent/HandleParamTypeHotkeys) instead of
-               // depending on DragFloat's own double-click/Ctrl+click
-               // text-entry, which nothing here hints exists. field 0=lo,
-               // 1=hi. Double-clicking a field, or hovering it and typing a
+               // Double-clicking a field, or hovering it and typing a
                // digit/'-', swaps it for a focused text box seeded from
                // either the current value or the keystroke.
-               auto drawField = [&](int field, const char* dragId, const char* typedId,
-                                    const char* fmt, float& v)
-               {
-                  if (gModRangeTypedField == field)
-                  {
-                     ImGui::SetNextItemWidth(90.0f);
-                     if (gModRangeTypedJustOpened)
-                     {
-                        ImGui::SetKeyboardFocusHere();
-                        gModRangeTypedJustOpened = false;
-                     }
-                     char buf[64];
-                     snprintf(buf, sizeof(buf), "%s", gModRangeTypedText.c_str());
-                     const bool entered = ImGui::InputText(typedId, buf, sizeof(buf),
-                                                            ImGuiInputTextFlags_EnterReturnsTrue);
-                     gModRangeTypedText = buf;
-                     // Same race BeginTypedEditFromCurrent's comment
-                     // describes: InputText's own select-all only runs once
-                     // it's confirmed active, which can land a frame after
-                     // SetKeyboardFocusHere - relying on that timing instead
-                     // of driving selection explicitly is what made typing
-                     // over the seeded digit unreliable (append instead of
-                     // replace, needing extra digits to "overwrite" it).
-                     if (gModRangeTypedPendingInit && ImGui::IsItemActive())
-                     {
-                        if (ImGuiInputTextState* state = ImGui::GetInputTextState(ImGui::GetItemID()))
-                        {
-                           if (gModRangeTypedNoAutoSelect)
-                           {
-                              state->Stb.cursor = state->CurLenW;
-                              state->ClearSelection();
-                           }
-                           else
-                           {
-                              state->SelectAll();
-                           }
-                        }
-                        gModRangeTypedPendingInit = false;
-                     }
-                     if (entered || ImGui::IsItemDeactivated())
-                     {
-                        char* end = nullptr;
-                        const float parsed = strtof(gModRangeTypedText.c_str(), &end);
-                        if (end != gModRangeTypedText.c_str())
-                        {
-                           v = parsed;
-                           changed = true;
-                        }
-                        gModRangeTypedField = -1;
-                        gModRangeTypedText.clear();
-                        gModRangeTypedPendingInit = false;
-                        gModRangeTypedNoAutoSelect = false;
-                     }
-                  }
-                  else
-                  {
-                     ImGui::SetNextItemWidth(90.0f);
-                     const float step = isInt ? 1.0f : (destRef->maxValue - destRef->minValue) * 0.01f;
-                     changed |= ImGui::DragFloat(dragId, &v, step, destRef->minValue, destRef->maxValue, fmt);
-                     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-                     {
-                        char seed[64];
-                        snprintf(seed, sizeof(seed), isInt ? "%.0f" : "%.3f", v);
-                        gModRangeTypedField = field;
-                        gModRangeTypedText = seed;
-                        gModRangeTypedJustOpened = true;
-                        gModRangeTypedPendingInit = true;
-                        gModRangeTypedNoAutoSelect = false;
-                     }
-                     else if (ImGui::IsItemHovered() && !ImGui::IsItemActive() && !io.KeyCtrl && !io.KeySuper)
-                     {
-                        std::string seed;
-                        for (int k = 0; k < 10; k++)
-                        {
-                           if (ImGui::IsKeyPressed((ImGuiKey)(ImGuiKey_0 + k), false))
-                           {
-                              seed = std::string(1, char('0' + k));
-                              break;
-                           }
-                        }
-                        if (seed.empty() && ImGui::IsKeyPressed(ImGuiKey_Minus, false))
-                           seed = "-";
-                        if (!seed.empty())
-                        {
-                           gModRangeTypedField = field;
-                           gModRangeTypedText = seed;
-                           gModRangeTypedJustOpened = true;
-                           gModRangeTypedPendingInit = true;
-                           gModRangeTypedNoAutoSelect = true;
-                        }
-                     }
-                  }
-               };
-               drawField(0, "##lo", "##lotyped", isInt ? "lo %.0f" : "lo %.3f", lo);
+               drawRangeField(0, "##lo", "##lotyped", isInt ? "lo %.0f" : "lo %.3f",
+                              destRef->minValue, destRef->maxValue, lo);
                ImGui::SameLine();
-               drawField(1, "##hi", "##hityped", isInt ? "hi %.0f" : "hi %.3f", hi);
+               drawRangeField(1, "##hi", "##hityped", isInt ? "hi %.0f" : "hi %.3f",
+                              destRef->minValue, destRef->maxValue, hi);
 
-               if (changed)
+               if (rangeChanged)
                {
                   lo = std::clamp(lo, destRef->minValue, destRef->maxValue);
                   hi = std::clamp(hi, destRef->minValue, destRef->maxValue);
@@ -65431,27 +65852,149 @@ int main(int argc, char** argv)
                      lo = std::round(lo);
                      hi = std::round(hi);
                   }
-                  mod.SetRange(gModBindingMenuNode, gModBindingMenuParam, lo, hi);
+                  mod.SetRange(nodeIndex, paramIndex, lo, hi);
                }
                ImGui::Separator();
                if (ImGui::MenuItem("Full range"))
-                  mod.SetRange(gModBindingMenuNode, gModBindingMenuParam, destRef->minValue, destRef->maxValue);
+                  mod.SetRange(nodeIndex, paramIndex, destRef->minValue, destRef->maxValue);
                if (ImGui::MenuItem("Around current"))
                {
                   const float span = (destRef->maxValue - destRef->minValue) * 0.25f;
                   const float centre = destRef->value != nullptr ? *destRef->value : src.centre;
-                  mod.SetRange(gModBindingMenuNode, gModBindingMenuParam,
+                  mod.SetRange(nodeIndex, paramIndex,
                               std::clamp(centre - span, destRef->minValue, destRef->maxValue),
                               std::clamp(centre + span, destRef->minValue, destRef->maxValue));
                }
                if (ImGui::MenuItem("Invert"))
-                  mod.SetRange(gModBindingMenuNode, gModBindingMenuParam, src.hi, src.lo);
+                  mod.SetRange(nodeIndex, paramIndex, src.hi, src.lo);
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Unbind"))
             {
                PushUndoCheckpoint();
-               mod.Unbind(gModBindingMenuNode, gModBindingMenuParam);
+               mod.Unbind(nodeIndex, paramIndex);
+            }
+         }
+         else if (hasExpr)
+         {
+            if (destRef == nullptr)
+            {
+               ImGui::TextDisabled("(parameter not visible)");
+            }
+            else
+            {
+               if (ImGui::MenuItem("Edit Expression"))
+                  BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, destRef->value, valueFmt, /*hasExpr=*/true);
+               const int perfKind = destRef->isBool ? 3 : (destRef->isEnum ? 7 : 0);
+               if (ImGui::MenuItem("Add to Performance Matrix"))
+                  AddToPerformanceMatrix(nodeIndex, paramIndex, perfKind);
+               ImGui::Separator();
+               float lo, hi;
+               if (!mod.ExpressionRangeFor(nodeIndex, paramIndex, lo, hi))
+               {
+                  lo = destRef->minValue;
+                  hi = destRef->maxValue;
+               }
+               drawRangeField(0, "##elo", "##elotyped", isInt ? "lo %.0f" : "lo %.3f",
+                              destRef->minValue, destRef->maxValue, lo);
+               ImGui::SameLine();
+               drawRangeField(1, "##ehi", "##ehityped", isInt ? "hi %.0f" : "hi %.3f",
+                              destRef->minValue, destRef->maxValue, hi);
+               if (rangeChanged)
+               {
+                  lo = std::clamp(lo, destRef->minValue, destRef->maxValue);
+                  hi = std::clamp(hi, destRef->minValue, destRef->maxValue);
+                  mod.SetExpressionRange(nodeIndex, paramIndex, lo, hi);
+               }
+               ImGui::Separator();
+               if (ImGui::MenuItem("Full range"))
+                  mod.ClearExpressionRange(nodeIndex, paramIndex);
+               if (ImGui::MenuItem("Invert"))
+                  mod.SetExpressionRange(nodeIndex, paramIndex, hi, lo);
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Unbind"))
+            {
+               PushUndoCheckpoint();
+               mod.ClearExpression(nodeIndex, paramIndex);
+            }
+         }
+         else if (isRecordingState)
+         {
+            if (!hasPlayback)
+            {
+               // Armed but nothing dragged yet - nothing to configure
+               // speed/range against, only the option to back out.
+               ImGui::TextDisabled("Waiting for movement...");
+               ImGui::Separator();
+               if (ImGui::MenuItem("Cancel Recording"))
+                  rec.CancelArm(nodeIndex, paramIndex);
+            }
+            else
+            {
+               // A full-width drag field with the label baked into its own
+               // format string, matching the lo/hi fields' "lo -1.000" look,
+               // and reusing the same hover-and-type-a-digit convenience
+               // (field 3, since 0/1 are lo/hi and this popup never shows
+               // both at once with the modulated/expression Range editors).
+               float speed = rec.PlaybackSpeedFor(nodeIndex, paramIndex);
+               drawRangeField(3, "##recspeed", "##recspeedtyped", "Speed %.2fx", 0.05f, 4.0f, speed, 0.01f, -FLT_MIN);
+               if (rangeChanged)
+               {
+                  rec.SetPlaybackSpeed(nodeIndex, paramIndex, speed);
+                  rangeChanged = false;
+               }
+               ImGui::Separator();
+               const int perfKind = destRef != nullptr ? (destRef->isBool ? 3 : (destRef->isEnum ? 7 : 0)) : 0;
+               if (ImGui::MenuItem("Add to Performance Matrix"))
+                  AddToPerformanceMatrix(nodeIndex, paramIndex, perfKind);
+               ImGui::Separator();
+               const float defLo = destRef != nullptr ? destRef->minValue : 0.0f;
+               const float defHi = destRef != nullptr ? destRef->maxValue : 1.0f;
+               float lo, hi;
+               if (!rec.PlaybackRangeFor(nodeIndex, paramIndex, lo, hi))
+               {
+                  lo = defLo;
+                  hi = defHi;
+               }
+               drawRangeField(0, "##rlo", "##rlotyped", isInt ? "lo %.0f" : "lo %.3f", defLo, defHi, lo);
+               ImGui::SameLine();
+               drawRangeField(1, "##rhi", "##rhityped", isInt ? "hi %.0f" : "hi %.3f", defLo, defHi, hi);
+               if (rangeChanged)
+                  rec.SetPlaybackRange(nodeIndex, paramIndex, lo, hi);
+               ImGui::Separator();
+               if (ImGui::MenuItem("Full range"))
+                  rec.ClearPlaybackRange(nodeIndex, paramIndex);
+               if (ImGui::MenuItem("Invert"))
+                  rec.SetPlaybackRange(nodeIndex, paramIndex, hi, lo);
+               ImGui::Separator();
+               if (ImGui::MenuItem("Record Again"))
+                  rec.ArmParam(nodeIndex, paramIndex);
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Unbind"))
+            {
+               rec.CancelArm(nodeIndex, paramIndex);
+               rec.StopPlayback(nodeIndex, paramIndex);
+            }
+         }
+         else
+         {
+            if (destRef == nullptr)
+            {
+               ImGui::TextDisabled("(parameter not visible)");
+            }
+            else
+            {
+               if (ImGui::MenuItem("Enter Value"))
+                  BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, destRef->value, valueFmt, /*hasExpr=*/false);
+               if (ImGui::MenuItem("Enter Expression"))
+                  BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, destRef->value, valueFmt, /*hasExpr=*/true);
+               if (ImGui::MenuItem("Start Recording"))
+               {
+                  PushUndoCheckpoint();
+                  rec.ArmParam(nodeIndex, paramIndex);
+               }
             }
          }
          ImGui::EndPopup();
@@ -65705,17 +66248,15 @@ int main(int argc, char** argv)
          ImGui::SetNextWindowPos(ImVec2(gCommentEditRect.x, gCommentEditRect.y));
          ImGui::SetNextWindowSize(ImVec2(gCommentEditRect.z, gCommentEditRect.w));
       }
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 6));
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 4.0f);
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.5f);
-      if (gCommentEdit.target != nullptr)
-      {
-         const float* col = gCommentEdit.target->color;
-         ImGui::PushStyleColor(ImGuiCol_PopupBg,
-                               ImVec4(col[0] * 0.16f, col[1] * 0.16f, col[2] * 0.16f, 1.0f));
-         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(col[0], col[1], col[2], 0.8f));
-      }
-      if (ImGui::BeginPopup("##commentedit", ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize))
+      const float commentZoom = std::max(0.1f, gCommentEditZoom > 0.0f ? gCommentEditZoom : ed::GetCurrentZoom());
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+      ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+
+      if (ImGui::BeginPopup("##commentedit", ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+                                             ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar))
       {
          if (gCommentEdit.target != nullptr)
          {
@@ -65726,13 +66267,26 @@ int main(int argc, char** argv)
                ImGui::SetWindowFocus();
                ImGui::SetKeyboardFocusHere();
             }
-            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
+
+            const bool isLight = CategoryColors::IsThemeLight();
+            const float* col = c->color;
+            const ImVec4 textCol = isLight
+               ? ImVec4(30.0f / 255.0f, 36.0f / 255.0f, 48.0f / 255.0f, 1.0f)
+               : ImVec4(col[0] * 0.5f + 0.5f, col[1] * 0.5f + 0.5f, col[2] * 0.5f + 0.5f, 1.0f);
+
+            ImGui::PushStyleColor(ImGuiCol_Text, textCol);
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
-            // Filling the whole popup rather than a fixed size: the popup is
-            // already pinned to the node's box, so the field just fills it.
-            ImGui::InputTextMultiline("##commenttext", &c->text, ImVec2(-FLT_MIN, -FLT_MIN));
-            ImGui::PopStyleVar();
-            ImGui::PopStyleColor();
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * commentZoom, 8.0f * commentZoom));
+            ImGui::SetWindowFontScale(commentZoom);
+
+            // Filling the whole popup cleanly at 1:1 scale with the canvas card
+            ImGui::InputTextMultiline("##commenttext", &c->text, ImVec2(gCommentEditRect.z, gCommentEditRect.w));
+
+            ImGui::SetWindowFontScale(1.0f);
+            ImGui::PopStyleVar(2);
+            ImGui::PopStyleColor(2);
+
             // The checkpoint was pushed when the editor opened, so every
             // keystroke here is part of that one undo step; all that is left is
             // to keep the patch marked unsaved.
@@ -65749,8 +66303,7 @@ int main(int argc, char** argv)
          }
          ImGui::EndPopup();
       }
-      if (gCommentEdit.target != nullptr)
-         ImGui::PopStyleColor(2);
+      ImGui::PopStyleColor(2);
       ImGui::PopStyleVar(3);
       if (!ImGui::IsPopupOpen("##commentedit"))
       {
@@ -65892,8 +66445,22 @@ int main(int argc, char** argv)
                if (hay.find(q) == std::string::npos)
                   continue;
                ++shown;
-               std::string entry = DisplayName(t.first) + "   (" + DisplayName(t.second) + ")";
-               bool activate = ImGui::Selectable(entry.c_str());
+               const std::string title = DisplayName(t.first);
+               const std::string category = DisplayName(t.second);
+               const float rowW = ImGui::GetContentRegionAvail().x;
+               const ImVec2 posBefore = ImGui::GetCursorScreenPos();
+               bool activate = ImGui::Selectable(title.c_str(), false, 0, ImVec2(rowW, 0.0f));
+               // Draw the category as secondary/dimmed subtitle on the trailing edge of the row
+               {
+                  const float catW = ImGui::CalcTextSize(category.c_str()).x;
+                  const float catX = posBefore.x + rowW - catW - 4.0f;
+                  const float catY = posBefore.y + (ImGui::GetItemRectSize().y - ImGui::GetTextLineHeight()) * 0.5f;
+                  if (catX > posBefore.x + ImGui::CalcTextSize(title.c_str()).x + 12.0f)
+                  {
+                     const ImU32 dimCol = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+                     ImGui::GetWindowDrawList()->AddText(ImVec2(catX, catY), dimCol, category.c_str());
+                  }
+               }
                if (shown == 1 && pickFirst)
                   activate = true;
                if (activate)
@@ -67167,10 +67734,12 @@ int main(int argc, char** argv)
       if (gShortcutsOpen)
          DrawShortcutsWindow(&gShortcutsOpen);
 
+#ifndef NDEBUG
       // Stock ImGui windows, deliberately left un-themed (PushElevatedPanelStyle
       // etc. skipped on purpose) - they're a diagnostic overlay for picking
       // apart the ACTIVE style, not app chrome, so they should look like
       // ImGui's own default rather than inherit the thing they're inspecting.
+      // Dev-only: excluded from Release builds (see the menu item above).
       if (gUiDebuggerOpen)
          ImGui::ShowMetricsWindow(&gUiDebuggerOpen);
       if (gUiStyleEditorOpen)
@@ -67204,6 +67773,7 @@ int main(int argc, char** argv)
          }
          ImGui::End();
       }
+#endif
 
       if (gSettingsOpen)
          DrawSettingsWindow(&gSettingsOpen);
@@ -67308,7 +67878,10 @@ int main(int argc, char** argv)
 
          if (status == UpdateCheck::Status::UpdateAvailable)
          {
-            if (ImGui::Button("Download latest version"))
+            PushPrimaryButtonStyle();
+            const bool doDownload = ImGui::Button("Download latest version");
+            PopPrimaryButtonStyle();
+            if (doDownload)
                Platform::OpenExternalUrl(UpdateCheck::DownloadUrl());
             ImGui::SameLine();
             if (ImGui::Button("Later"))
@@ -67316,7 +67889,10 @@ int main(int argc, char** argv)
          }
          else if (status == UpdateCheck::Status::Failed)
          {
-            if (ImGui::Button("Retry"))
+            PushPrimaryButtonStyle();
+            const bool doRetry = ImGui::Button("Retry");
+            PopPrimaryButtonStyle();
+            if (doRetry)
                UpdateCheck::Start();
             ImGui::SameLine();
             if (ImGui::Button("Close"))
