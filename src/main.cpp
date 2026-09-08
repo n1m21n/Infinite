@@ -541,11 +541,16 @@ namespace
    {
       Sample,
       Media,
-      Plugin
+      Plugin,
+      FieldPreset
    };
    LibraryDragKind gSampleDragKind = LibraryDragKind::Sample;
    std::string gSampleDragPath; // Sample/Media only: the file being dragged
    std::string gSampleDragName;
+   std::string gFieldDragPresetName;
+   std::string gFieldDragNodeType;
+   std::string gFieldDragNodeCategory;
+   int gFieldDragIndex = -1;
 
    // Path of the sample currently auditioning from the Samples panel, or
    // empty. Only one preview plays at a time - clicking a row's play button
@@ -563,7 +568,7 @@ namespace
    SampleScanner gSampleScanner;
    SampleScanner gMediaScanner(SampleScanner::Kind::Media);
    PluginScanner gPluginScanner;
-   int gSearchPanelMode = 0; // 0 = Modules, 1 = Samples, 2 = Media, 3 = Plugins
+   int gSearchPanelMode = 0; // 0 = Modules, 1 = Samples, 2 = Media, 3 = Plugins, 4 = Field
 
    // Shared sort/filter state for the docked node-browser panel's control
    // strip (DrawBrowserFilterStrip, below DropdownButton). One instance per
@@ -585,6 +590,7 @@ namespace
    BrowserFilterState gSampleFilter;
    BrowserFilterState gMediaFilter;
    BrowserFilterState gPluginFilter;
+   BrowserFilterState gFieldFilter;
    // INFINITE_SAMPLERDRAGTEST only: the Samples panel's result row screen
    // rect, captured live each frame it's drawn so the synthetic drag driver
    // can aim at the real widget rather than a guessed position.
@@ -1028,6 +1034,8 @@ namespace
       std::function<void(int)> onSelect;
       int current = 0;
       bool justOpened = false;
+      bool focusSearch = false;
+      char filterBuf[64] = "";
    };
    DropdownRequest gDropdown;
 
@@ -1395,8 +1403,8 @@ namespace
       std::ifstream file(path);
       if (!file)
          return;
-      BrowserFilterState* states[4] = { &gModulesFilter, &gSampleFilter, &gMediaFilter, &gPluginFilter };
-      for (int i = 0; i < 4; i++)
+      BrowserFilterState* states[5] = { &gModulesFilter, &gSampleFilter, &gMediaFilter, &gPluginFilter, &gFieldFilter };
+      for (int i = 0; i < 5; i++)
       {
          int sortMode = 0, typeFilter = 0, descending = 0;
          if (!(file >> sortMode >> typeFilter >> descending))
@@ -1415,20 +1423,22 @@ namespace
       std::ofstream file(path);
       if (!file)
          return;
-      const BrowserFilterState* states[4] = { &gModulesFilter, &gSampleFilter, &gMediaFilter, &gPluginFilter };
-      for (int i = 0; i < 4; i++)
+      const BrowserFilterState* states[5] = { &gModulesFilter, &gSampleFilter, &gMediaFilter, &gPluginFilter, &gFieldFilter };
+      for (int i = 0; i < 5; i++)
          file << states[i]->sortMode << " " << states[i]->typeFilter << " " << (states[i]->descending ? 1 : 0) << "\n";
    }
 
-   // Persisted favourites for items across the four browser panel modes:
-   // modules (by name), samples (by file path), media (by file path), and
-   // plugins (by identifier). Saved to AppPaths::AppSupportDir() + "/Infinite.browserfavorites".
+   // Persisted favourites for items across the browser panel modes:
+   // modules (by name), samples (by file path), media (by file path),
+   // plugins (by identifier), and field presets (by name). Saved to
+   // AppPaths::AppSupportDir() + "/Infinite.browserfavorites".
    struct BrowserFavorites
    {
       std::unordered_set<std::string> modules;
       std::unordered_set<std::string> samples;
       std::unordered_set<std::string> media;
       std::unordered_set<std::string> plugins;
+      std::unordered_set<std::string> fieldPresets;
       uint64_t version = 1;
 
       uint64_t Version() const { return version; }
@@ -1437,6 +1447,7 @@ namespace
       bool IsFavoriteSample(const std::string& path) const { return samples.count(path) > 0; }
       bool IsFavoriteMedia(const std::string& path) const { return media.count(path) > 0; }
       bool IsFavoritePlugin(const std::string& id) const { return plugins.count(id) > 0; }
+      bool IsFavoriteFieldPreset(const std::string& name) const { return fieldPresets.count(name) > 0; }
 
       void ToggleModule(const std::string& name)
       {
@@ -1478,6 +1489,16 @@ namespace
          Save();
       }
 
+      void ToggleFieldPreset(const std::string& name)
+      {
+         if (fieldPresets.count(name))
+            fieldPresets.erase(name);
+         else
+            fieldPresets.insert(name);
+         version++;
+         Save();
+      }
+
       std::string Path() const
       {
          const std::string dir = AppPaths::AppSupportDir();
@@ -1496,6 +1517,7 @@ namespace
          samples.clear();
          media.clear();
          plugins.clear();
+         fieldPresets.clear();
          std::string line;
          std::string section;
          while (std::getline(file, line))
@@ -1517,6 +1539,8 @@ namespace
                media.insert(line);
             else if (section == "plugins")
                plugins.insert(line);
+            else if (section == "field")
+               fieldPresets.insert(line);
          }
          version++;
       }
@@ -1541,6 +1565,9 @@ namespace
          file << "[plugins]\n";
          for (const auto& p : plugins)
             file << p << "\n";
+         file << "[field]\n";
+         for (const auto& f : fieldPresets)
+            file << f << "\n";
       }
    };
    BrowserFavorites gBrowserFavorites;
@@ -6507,13 +6534,11 @@ namespace
       if (factoryNames != nullptr && n->presetIndex >= 0 && (size_t)n->presetIndex < factoryCount)
          btnLabel = (*factoryNames)[n->presetIndex];
       const std::string dropdownId = btnLabel + "##fdd_" + domain;
-      if (options.empty())
-      {
-         ImGui::BeginDisabled();
-         ImGui::Button(dropdownId.c_str(), ImVec2(kPreviewSize, 0));
-         ImGui::EndDisabled();
-      }
-      else if (ImGui::Button(dropdownId.c_str(), ImVec2(kPreviewSize, 0)))
+      const float spacing = ImGui::GetStyle().ItemSpacing.x;
+      const float searchBtnW = ImGui::GetFrameHeight();
+      const float mainBtnW = kPreviewSize - searchBtnW - spacing;
+
+      auto openDropdownAction = [=, &options, &categories, &userPaths](bool focusSearch)
       {
          gDropdown.options = options;
          gDropdown.categories = categories;
@@ -6539,10 +6564,35 @@ namespace
                n2->LoadDeviceFile(device);
          };
          gDropdown.justOpened = true;
+         gDropdown.focusSearch = focusSearch;
+         gDropdown.filterBuf[0] = '\0';
+      };
+
+      if (options.empty())
+      {
+         ImGui::BeginDisabled();
+         ImGui::Button(dropdownId.c_str(), ImVec2(mainBtnW, 0));
+         ImGui::SameLine(0.0f, spacing);
+         ImGui::Button(("##fdd_search_" + domain).c_str(), ImVec2(searchBtnW, 0));
+         ImGui::EndDisabled();
+      }
+      else
+      {
+         if (ImGui::Button(dropdownId.c_str(), ImVec2(mainBtnW, 0)))
+            openDropdownAction(false);
+         ImGui::SameLine(0.0f, spacing);
+         if (ImGui::Button(("##fdd_search_" + domain).c_str(), ImVec2(searchBtnW, 0)))
+            openDropdownAction(true);
+         const ImVec2 bmin = ImGui::GetItemRectMin();
+         const ImVec2 bmax = ImGui::GetItemRectMax();
+         const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+         const float iconSize = (bmax.y - bmin.y) * 0.65f;
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImU32 col = ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+         Tabler::DrawSearch(dl, center, iconSize, col);
       }
       PopDropdownStyle();
 
-      const float spacing = ImGui::GetStyle().ItemSpacing.x;
       const float btnW = (kPreviewSize - 2.0f * spacing) / 3.0f;
       if (ImGui::Button(("Save##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
       {
@@ -15361,6 +15411,207 @@ namespace
       }
       ImGui::EndChild();
 
+      ImGui::PopID();
+   }
+
+   struct FieldSearchEntry
+   {
+      std::string name;
+      std::string category;     // "Synth", "Effects", "Modifiers", "3D Shapes", "2D Visuals"
+      std::string nodeType;     // "Field Synth", "Field Effect", "Field Modifier", "Field Primitive", "FieldPixel"
+      std::string nodeCategory; // "Synths", "AudioEffects", "3D", "Source"
+      int presetIndex = 0;
+   };
+
+   inline const std::vector<FieldSearchEntry>& GetAllFieldLibraryEntries()
+   {
+      static std::vector<FieldSearchEntry> sEntries;
+      if (sEntries.empty())
+      {
+         const auto& synths = FieldSynthNode::Presets();
+         for (size_t i = 0; i < synths.size(); i++)
+            sEntries.push_back({ synths[i].name, "Synth", "Field Synth", "Synths", (int)i });
+
+         const auto& effects = FieldSampleNode::Presets();
+         for (size_t i = 0; i < effects.size(); i++)
+            sEntries.push_back({ effects[i].name, "Effects", "Field Effect", "AudioEffects", (int)i });
+
+         const auto& modifiers = FieldElementNode::Presets();
+         for (size_t i = 0; i < modifiers.size(); i++)
+            sEntries.push_back({ modifiers[i].name, "Modifiers", "Field Modifier", "3D", (int)i });
+
+         const auto& prims = FieldPrimitiveNode::Presets();
+         for (size_t i = 0; i < prims.size(); i++)
+            sEntries.push_back({ prims[i].name, "3D Shapes", "Field Primitive", "3D", (int)i });
+
+         const auto& pixels = FieldPixelNode::Presets();
+         for (size_t i = 0; i < pixels.size(); i++)
+            sEntries.push_back({ pixels[i].name, "2D Visuals", "FieldPixel", "Source", (int)i });
+      }
+      return sEntries;
+   }
+
+   void SpawnFieldPresetNode(const FieldSearchEntry& entry, float x, float y)
+   {
+      PushUndoCheckpoint();
+      if (GraphNode* gn = SpawnNode(entry.nodeType, entry.nodeCategory, x, y))
+      {
+         if (auto* sn = dynamic_cast<FieldSynthNode*>(gn->node.get()))
+         {
+            sn->presetIndex = entry.presetIndex;
+            sn->LoadPreset(entry.presetIndex);
+         }
+         else if (auto* fn = dynamic_cast<FieldSampleNode*>(gn->node.get()))
+         {
+            fn->presetIndex = entry.presetIndex;
+            fn->LoadPreset(entry.presetIndex);
+         }
+         else if (auto* en = dynamic_cast<FieldElementNode*>(gn->node.get()))
+         {
+            en->presetIndex = entry.presetIndex;
+            en->LoadPreset(entry.presetIndex);
+         }
+         else if (auto* pn = dynamic_cast<FieldPrimitiveNode*>(gn->node.get()))
+         {
+            pn->presetIndex = entry.presetIndex;
+            pn->LoadPreset(entry.presetIndex);
+         }
+         else if (auto* px = dynamic_cast<FieldPixelNode*>(gn->node.get()))
+         {
+            px->presetIndex = entry.presetIndex;
+            px->LoadPreset(entry.presetIndex);
+         }
+         gPatchDirty = true;
+      }
+   }
+
+   void DrawFieldSearchPanel()
+   {
+      ImGui::PushID("##field_panel");
+
+      static const std::vector<std::string> kFieldSortNames = { "Category", "Name", "Favourites" };
+      static const std::vector<std::string> kFieldCategories = { "All", "Synth", "Effects", "Modifiers", "3D Shapes", "2D Visuals" };
+
+      if (DrawBrowserFilterStrip(gFieldFilter, "search field presets...", kFieldSortNames, kFieldCategories))
+         SaveBrowserFilterPrefs();
+
+      std::string q = gFieldFilter.query;
+      std::transform(q.begin(), q.end(), q.begin(), ::tolower);
+
+      const std::string catFilter = (gFieldFilter.typeFilter > 0 && gFieldFilter.typeFilter < (int)kFieldCategories.size())
+         ? kFieldCategories[gFieldFilter.typeFilter] : std::string();
+
+      const auto& allEntries = GetAllFieldLibraryEntries();
+      std::vector<const FieldSearchEntry*> matches;
+      for (const auto& entry : allEntries)
+      {
+         if (!catFilter.empty() && entry.category != catFilter)
+            continue;
+         if (!q.empty())
+         {
+            std::string hay = entry.name + " " + entry.category;
+            std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
+            if (hay.find(q) == std::string::npos)
+               continue;
+         }
+         matches.push_back(&entry);
+      }
+
+      if (gFieldFilter.sortMode == 1) // Name
+      {
+         std::stable_sort(matches.begin(), matches.end(), [](const FieldSearchEntry* a, const FieldSearchEntry* b) {
+            return ILess(a->name, b->name);
+         });
+      }
+      else if (gFieldFilter.sortMode == 2) // Favourites
+      {
+         std::stable_sort(matches.begin(), matches.end(), [](const FieldSearchEntry* a, const FieldSearchEntry* b) {
+            const bool favA = gBrowserFavorites.IsFavoriteFieldPreset(a->name);
+            const bool favB = gBrowserFavorites.IsFavoriteFieldPreset(b->name);
+            if (favA != favB)
+               return favA > favB;
+            return ILess(a->name, b->name);
+         });
+      }
+      else // Category
+      {
+         std::stable_sort(matches.begin(), matches.end(), [](const FieldSearchEntry* a, const FieldSearchEntry* b) {
+            if (a->category != b->category)
+               return a->category < b->category;
+            return ILess(a->name, b->name);
+         });
+      }
+
+      if (gFieldFilter.descending)
+         std::reverse(matches.begin(), matches.end());
+
+      ImGui::Separator();
+      ImGui::BeginChild("##fieldpanellist", ImVec2(0, 0), false);
+
+      ImGuiListClipper clipper;
+      clipper.Begin((int)matches.size());
+      while (clipper.Step())
+      {
+         for (int rowIdx = clipper.DisplayStart; rowIdx < clipper.DisplayEnd; rowIdx++)
+         {
+            const FieldSearchEntry& entry = *matches[rowIdx];
+            ImGui::PushID(entry.name.c_str());
+
+            const bool isFav = gBrowserFavorites.IsFavoriteFieldPreset(entry.name);
+            const float availW = ImGui::GetContentRegionAvail().x;
+            const float badgeReserve = 20.0f;
+            const float catTagReserve = 70.0f;
+
+            const std::string rowLabel = TruncateWithEllipsis(entry.name, std::max(20.0f, availW - badgeReserve - catTagReserve));
+            if (ImGui::Selectable(rowLabel.c_str(), false, 0, ImVec2(availW, 0)))
+            {
+               const ImVec2 spawnPos = FindFreeSpawnPosition(gViewCenterCanvas);
+               SpawnFieldPresetNode(entry, spawnPos.x, spawnPos.y);
+            }
+
+            const ImVec2 selMin = ImGui::GetItemRectMin();
+            const ImVec2 selMax = ImGui::GetItemRectMax();
+
+            // Category badge on the right
+            const float catTextW = ImGui::CalcTextSize(entry.category.c_str()).x;
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            dl->AddText(ImVec2(selMax.x - badgeReserve - catTextW - 6.0f, selMin.y + (selMax.y - selMin.y - ImGui::GetTextLineHeight()) * 0.5f),
+                        ImGui::GetColorU32(ImGuiCol_TextDisabled), entry.category.c_str());
+
+            if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 4.0f))
+            {
+               gSampleDragActive = true;
+               gSampleDragKind = LibraryDragKind::FieldPreset;
+               gSampleDragPath.clear();
+               gSampleDragName = entry.name;
+               gFieldDragPresetName = entry.name;
+               gFieldDragNodeType = entry.nodeType;
+               gFieldDragNodeCategory = entry.nodeCategory;
+               gFieldDragIndex = entry.presetIndex;
+            }
+
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("%s\nCategory: %s (%s)", entry.name.c_str(), entry.category.c_str(), entry.nodeType.c_str());
+
+            DrawFavoriteBadge(selMin, selMax, isFav);
+
+            if (ImGui::BeginPopupContextItem("##field_ctx"))
+            {
+               if (ImGui::MenuItem(isFav ? "Remove from favourites" : "Add to favourites"))
+                  gBrowserFavorites.ToggleFieldPreset(entry.name);
+               if (ImGui::MenuItem("Add to canvas"))
+               {
+                  const ImVec2 spawnPos = FindFreeSpawnPosition(gViewCenterCanvas);
+                  SpawnFieldPresetNode(entry, spawnPos.x, spawnPos.y);
+               }
+               ImGui::EndPopup();
+            }
+
+            ImGui::PopID();
+         }
+      }
+
+      ImGui::EndChild();
       ImGui::PopID();
    }
 
@@ -66335,8 +66586,10 @@ int main(int argc, char** argv)
       if (gSampleDragActive)
       {
          const ImVec2 mp = ImGui::GetMousePos();
+         const std::string dragDisplayName = (gSampleDragKind == LibraryDragKind::FieldPreset)
+            ? gFieldDragPresetName : gSampleDragName;
          ImGui::GetForegroundDrawList()->AddText(ImVec2(mp.x + 14.0f, mp.y + 14.0f),
-                                                  IM_COL32(230, 235, 245, 255), gSampleDragName.c_str());
+                                                  IM_COL32(230, 235, 245, 255), dragDisplayName.c_str());
 
          if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
          {
@@ -66355,7 +66608,77 @@ int main(int argc, char** argv)
             const ImVec2 canvasMouse = ed::ScreenToCanvas(mp);
             const bool overCanvas = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
 
-            if (gSampleDragKind == LibraryDragKind::Plugin)
+            if (gSampleDragKind == LibraryDragKind::FieldPreset)
+            {
+               FieldSearchEntry entry;
+               entry.name = gFieldDragPresetName;
+               entry.nodeType = gFieldDragNodeType;
+               entry.nodeCategory = gFieldDragNodeCategory;
+               entry.presetIndex = gFieldDragIndex;
+
+               bool handled = false;
+               if (entry.nodeType == "Field Synth")
+               {
+                  if (FieldSynthNode* target = FindNodeUnderCanvasPoint<FieldSynthNode>(canvasMouse))
+                  {
+                     PushUndoCheckpoint();
+                     target->presetIndex = entry.presetIndex;
+                     target->LoadPreset(entry.presetIndex);
+                     gPatchDirty = true;
+                     handled = true;
+                  }
+               }
+               else if (entry.nodeType == "Field Effect")
+               {
+                  if (FieldSampleNode* target = FindNodeUnderCanvasPoint<FieldSampleNode>(canvasMouse))
+                  {
+                     PushUndoCheckpoint();
+                     target->presetIndex = entry.presetIndex;
+                     target->LoadPreset(entry.presetIndex);
+                     gPatchDirty = true;
+                     handled = true;
+                  }
+               }
+               else if (entry.nodeType == "Field Modifier")
+               {
+                  if (FieldElementNode* target = FindNodeUnderCanvasPoint<FieldElementNode>(canvasMouse))
+                  {
+                     PushUndoCheckpoint();
+                     target->presetIndex = entry.presetIndex;
+                     target->LoadPreset(entry.presetIndex);
+                     gPatchDirty = true;
+                     handled = true;
+                  }
+               }
+               else if (entry.nodeType == "Field Primitive")
+               {
+                  if (FieldPrimitiveNode* target = FindNodeUnderCanvasPoint<FieldPrimitiveNode>(canvasMouse))
+                  {
+                     PushUndoCheckpoint();
+                     target->presetIndex = entry.presetIndex;
+                     target->LoadPreset(entry.presetIndex);
+                     gPatchDirty = true;
+                     handled = true;
+                  }
+               }
+               else if (entry.nodeType == "FieldPixel")
+               {
+                  if (FieldPixelNode* target = FindNodeUnderCanvasPoint<FieldPixelNode>(canvasMouse))
+                  {
+                     PushUndoCheckpoint();
+                     target->presetIndex = entry.presetIndex;
+                     target->LoadPreset(entry.presetIndex);
+                     gPatchDirty = true;
+                     handled = true;
+                  }
+               }
+
+               if (!handled && overCanvas)
+               {
+                  SpawnFieldPresetNode(entry, canvasMouse.x, canvasMouse.y);
+               }
+            }
+            else if (gSampleDragKind == LibraryDragKind::Plugin)
             {
                // Dropped onto an existing Plugin node: swap its plugin
                // outright. Nothing is preserved - a different plugin's
@@ -66500,6 +66823,10 @@ int main(int argc, char** argv)
             gSampleDragKind = LibraryDragKind::Sample;
             gSampleDragPath.clear();
             gSampleDragName.clear();
+            gFieldDragPresetName.clear();
+            gFieldDragNodeType.clear();
+            gFieldDragNodeCategory.clear();
+            gFieldDragIndex = -1;
             gPluginDragDesc = Platform::PluginDesc();
          }
       }
@@ -66884,6 +67211,21 @@ int main(int argc, char** argv)
       ImGui::SetNextWindowSizeConstraints(ImVec2(dropdownMinWidth, 0), ImVec2(520, 480));
       if (ImGui::BeginPopup("##dropdown"))
       {
+         const bool showSearch = gDropdown.focusSearch || gDropdown.options.size() > 8;
+         if (showSearch)
+         {
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f, 3.0f));
+            if (gDropdown.focusSearch && ImGui::IsWindowAppearing())
+               ImGui::SetKeyboardFocusHere();
+            ImGui::SetNextItemWidth(-1.0f);
+            ImGui::InputTextWithHint("##ddsearch", "Search...", gDropdown.filterBuf, sizeof(gDropdown.filterBuf));
+            ImGui::PopStyleVar();
+            ImGui::Separator();
+         }
+
+         std::string q = gDropdown.filterBuf;
+         std::transform(q.begin(), q.end(), q.begin(), ::tolower);
+
          // The pill still spans the full row (NoPadWithHalfSpacing below
          // keeps the gap between rows real, and item spacing is tightened
          // slightly so that gap isn't oversized), but the label is drawn
@@ -66894,6 +67236,16 @@ int main(int argc, char** argv)
          std::string lastCategory;
          for (int i = 0; i < (int)gDropdown.options.size(); i++)
          {
+            if (!q.empty())
+            {
+               std::string hay = gDropdown.options[i];
+               if (i < (int)gDropdown.categories.size() && !gDropdown.categories[i].empty())
+                  hay += " " + gDropdown.categories[i];
+               std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
+               if (hay.find(q) == std::string::npos)
+                  continue;
+            }
+
             if (i < (int)gDropdown.categories.size() && !gDropdown.categories[i].empty())
             {
                if (gDropdown.categories[i] != lastCategory)
@@ -66933,7 +67285,7 @@ int main(int argc, char** argv)
                }
                ImGui::CloseCurrentPopup();
             }
-            if (selected && ImGui::IsWindowAppearing())
+            if (selected && ImGui::IsWindowAppearing() && !gDropdown.focusSearch)
                ImGui::SetScrollHereY(0.5f);
          }
 
@@ -67323,20 +67675,23 @@ int main(int argc, char** argv)
          // default 6px, the selected tab's rounded highlight rect sat close
          // enough to its neighbour's that the two read as one unbroken
          // block with no visible seam between them when switching tabs.
-         const float tabGap = 10.0f;
-         const float tabW = std::max(40.0f, (ImGui::GetContentRegionAvail().x - tabGap * 3.0f) * 0.25f);
-         if (ImGui::Selectable("Modules", gSearchPanelMode == 0, 0, ImVec2(tabW, 0)))
-            gSearchPanelMode = 0;
-         ImGui::SameLine(0.0f, tabGap);
-         if (ImGui::Selectable("Samples", gSearchPanelMode == 1, 0, ImVec2(tabW, 0)))
-            gSearchPanelMode = 1;
-         ImGui::SameLine(0.0f, tabGap);
-         if (ImGui::Selectable("Media", gSearchPanelMode == 2, 0, ImVec2(tabW, 0)))
-            gSearchPanelMode = 2;
-         ImGui::SameLine(0.0f, tabGap);
-         if (ImGui::Selectable("Plugins", gSearchPanelMode == 3, 0, ImVec2(tabW, 0)))
-            gSearchPanelMode = 3;
-         ImGui::Separator();
+          const float tabGap = 8.0f;
+          const float tabW = std::max(35.0f, (ImGui::GetContentRegionAvail().x - tabGap * 4.0f) * 0.20f);
+          if (ImGui::Selectable("Modules", gSearchPanelMode == 0, 0, ImVec2(tabW, 0)))
+             gSearchPanelMode = 0;
+          ImGui::SameLine(0.0f, tabGap);
+          if (ImGui::Selectable("Field", gSearchPanelMode == 4, 0, ImVec2(tabW, 0)))
+             gSearchPanelMode = 4;
+          ImGui::SameLine(0.0f, tabGap);
+          if (ImGui::Selectable("Samples", gSearchPanelMode == 1, 0, ImVec2(tabW, 0)))
+             gSearchPanelMode = 1;
+          ImGui::SameLine(0.0f, tabGap);
+          if (ImGui::Selectable("Media", gSearchPanelMode == 2, 0, ImVec2(tabW, 0)))
+             gSearchPanelMode = 2;
+          ImGui::SameLine(0.0f, tabGap);
+          if (ImGui::Selectable("Plugins", gSearchPanelMode == 3, 0, ImVec2(tabW, 0)))
+             gSearchPanelMode = 3;
+          ImGui::Separator();
 
          if (gSearchPanelMode == 0)
          {
@@ -67556,6 +67911,10 @@ int main(int argc, char** argv)
          else if (gSearchPanelMode == 2)
          {
             DrawLibrarySearchPanel(gMediaScanner, "##media", "search media...", true);
+         }
+         else if (gSearchPanelMode == 4)
+         {
+            DrawFieldSearchPanel();
          }
          else
          {

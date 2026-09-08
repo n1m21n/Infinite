@@ -416,7 +416,207 @@ const std::vector<FieldPrimitiveNode::Preset>& FieldPrimitiveNode::Presets()
         "bodyColor = mix(silverColor, engineColor, engineGlow)\n"
         "finColor = vec3(0.25, 0.25, 0.28)\n"
         "Cd = noseColor * isNose + bodyColor * isBody + finColor * isFin1 + finColor * isFin2 + finColor * isFin3\n"
-        "publish = sin(t * speed)\n" }
+        "publish = sin(t * speed)\n" },
+      { "Trefoil Torus Knot",
+        PrimitiveTopology::Torus,
+        2500,
+        "param float rMajor = 1.4 [0.5, 4.0]\n"
+        "param float tubeR = 0.15 [0.02, 0.5]\n"
+        "param float speed = 1.0 [0.0, 5.0]\n"
+        "phi = uv.x * 6.2831853\n"
+        "theta = uv.y * 6.2831853\n"
+        "tVal = phi + (t + 1.0) * speed\n"
+        "cx = sin(tVal) + 2.0 * sin(2.0 * tVal)\n"
+        "cy = cos(tVal) - 2.0 * cos(2.0 * tVal)\n"
+        "cz = -sin(3.0 * tVal)\n"
+        "center = vec3(cx, cy, cz) * (rMajor * 0.35)\n"
+        "normalX = cos(theta) * tubeR\n"
+        "normalY = sin(theta) * tubeR\n"
+        "P = center + vec3(normalX, normalY, normalX * 0.5)\n"
+        "N = normalize(P - center)\n"
+        "Cd = vec3(0.5 + 0.5 * sin(tVal * 2.0), 0.4 + 0.4 * cos(theta), 0.9)\n"
+        "publish = sin((t + 1.0) * speed)\n" },
+      { "Superquadric Squircle",
+        PrimitiveTopology::Sphere,
+        2400,
+        "param float size = 1.2 [0.2, 3.0]\n"
+        "param float squareness = 4.0 [0.5, 8.0]\n"
+        "param float speed = 1.0 [0.0, 5.0]\n"
+        "phi = uv.x * 6.2831853\n"
+        "theta = (uv.y - 0.5) * 3.14159265\n"
+        "cosP = cos(phi)\n"
+        "sinP = sin(phi)\n"
+        "cosT = cos(theta)\n"
+        "sinT = sin(theta)\n"
+        "signP = if(cosP >= 0.0, 1.0, -1.0)\n"
+        "signSP = if(sinP >= 0.0, 1.0, -1.0)\n"
+        "signT = if(cosT >= 0.0, 1.0, -1.0)\n"
+        "signST = if(sinT >= 0.0, 1.0, -1.0)\n"
+        "e = 2.0 / squareness\n"
+        "x = signT * pow(abs(cosT), e) * signP * pow(abs(cosP), e) * size\n"
+        "z = signT * pow(abs(cosT), e) * signSP * pow(abs(sinP), e) * size\n"
+        "y = signST * pow(abs(sinT), e) * size\n"
+        "P = vec3(x, y, z)\n"
+        "N = normalize(vec3(pow(abs(x), max(squareness - 1.0, 0.1)) * signP, pow(abs(y), max(squareness - 1.0, 0.1)) * signST, pow(abs(z), max(squareness - 1.0, 0.1)) * signSP))\n"
+        "Cd = vec3(0.2 + 0.6 * abs(N.x), 0.3 + 0.6 * abs(N.y), 0.8)\n"
+        "publish = sin((t + 1.0) * speed)\n" },
+      { "Chamfered Capsule",
+        PrimitiveTopology::Cylinder,
+        2400,
+        "param float radius = 0.6 [0.1, 2.0]\n"
+        "param float height = 1.8 [0.2, 4.0]\n"
+        "param float speed = 1.0 [0.0, 5.0]\n"
+        "phi = uv.x * 6.2831853\n"
+        "v = uv.y\n"
+        "isBot = if(v < 0.25, 1.0, 0.0)\n"
+        "isTop = if(v > 0.75, 1.0, 0.0)\n"
+        "isMid = (1.0 - isBot) * (1.0 - isTop)\n"
+        "theta = if(isBot > 0.5, (v / 0.25 - 1.0) * 1.5707963, if(isTop > 0.5, ((v - 0.75) / 0.25) * 1.5707963, 0.0))\n"
+        "r = if(isMid > 0.5, radius, radius * cos(theta))\n"
+        "yOff = if(isBot > 0.5, -height * 0.5 + radius * sin(theta), if(isTop > 0.5, height * 0.5 + radius * sin(theta), (v - 0.5) * 2.0 * height * 0.5))\n"
+        "x = r * cos(phi)\n"
+        "z = r * sin(phi)\n"
+        "y = yOff\n"
+        "P = vec3(x, y, z)\n"
+        "N = normalize(vec3(x, if(isMid > 0.5, 0.0, y - if(isBot > 0.5, -height * 0.5, height * 0.5)), z))\n"
+        "Cd = vec3(0.85, 0.45 + 0.4 * cos(phi), 0.2)\n"
+        "publish = sin((t + 1.0) * speed)\n" },
+      { "Quartz Crystal Cluster",
+        PrimitiveTopology::Cylinder,
+        2600,
+        "param float height = 2.4 [0.5, 5.0]\n"
+        "param float radius = 0.55 [0.1, 1.5]\n"
+        "param float speed = 1.0 [0.0, 5.0]\n"
+        "phi = uv.x * 6.2831853\n"
+        "v = uv.y\n"
+        "facetAngle = floor(phi / 1.04719755 + 0.5) * 1.04719755\n"
+        "r = radius * cos(phi - facetAngle) * 1.15\n"
+        "isCap = if(v > 0.75, (v - 0.75) / 0.25, 0.0)\n"
+        "rActual = max(r * (1.0 - isCap), 0.001)\n"
+        "y = (v - 0.5) * height\n"
+        "x = rActual * cos(phi)\n"
+        "z = rActual * sin(phi)\n"
+        "P = vec3(x, y, z)\n"
+        "N = normalize(vec3(cos(facetAngle), isCap * 1.5, sin(facetAngle)))\n"
+        "Cd = vec3(0.3 + 0.6 * isCap, 0.8, 0.95)\n"
+        "publish = sin((t + 1.0) * speed)\n" },
+      { "Greek Ionic Column",
+        PrimitiveTopology::Cylinder,
+        2600,
+        "param float height = 2.6 [1.0, 5.0]\n"
+        "param float radius = 0.5 [0.2, 1.2]\n"
+        "param float flutes = 16.0 [8.0, 32.0]\n"
+        "param float speed = 1.0 [0.0, 5.0]\n"
+        "phi = uv.x * 6.2831853\n"
+        "v = uv.y\n"
+        "isBase = if(v < 0.12, 1.0, 0.0)\n"
+        "isCapital = if(v > 0.88, 1.0, 0.0)\n"
+        "flare = 1.0 + isBase * pow((0.12 - v) / 0.12, 2.0) * 0.6 + isCapital * pow((v - 0.88) / 0.12, 2.0) * 0.7\n"
+        "fluteDip = sin(phi * flutes) * 0.03 * (1.0 - isBase) * (1.0 - isCapital)\n"
+        "r = (radius + fluteDip) * flare\n"
+        "x = r * cos(phi)\n"
+        "z = r * sin(phi)\n"
+        "y = (v - 0.5) * height\n"
+        "P = vec3(x, y, z)\n"
+        "N = normalize(vec3(cos(phi), 0.1, sin(phi)))\n"
+        "stone = 0.85 + 0.1 * sin(phi * 3.0)\n"
+        "Cd = vec3(stone, stone * 0.97, stone * 0.92)\n"
+        "publish = sin((t + 1.0) * speed)\n" },
+      { "Sci-Fi Spaceship Fighter",
+        PrimitiveTopology::Sphere,
+        2800,
+        "param float lengthHull = 2.6 [1.0, 5.0]\n"
+        "param float wingSpan = 2.0 [0.5, 4.0]\n"
+        "param float speed = 1.0 [0.0, 5.0]\n"
+        "phi = uv.x * 6.2831853\n"
+        "v = uv.y\n"
+        "u = v * 2.0 - 1.0\n"
+        "cosP = cos(phi)\n"
+        "sinP = sin(phi)\n"
+        "hullR = (1.0 - u * u) * 0.45\n"
+        "wingSpread = if(abs(u) < 0.6, (1.0 - abs(u) / 0.6) * wingSpan, 0.0)\n"
+        "r = hullR + wingSpread * pow(abs(cosP), 3.0)\n"
+        "x = r * cosP\n"
+        "y = hullR * sinP * 0.6 + if(u > 0.1 && u < 0.5 && sinP > 0.0, 0.18, 0.0)\n"
+        "z = u * (lengthHull * 0.5)\n"
+        "P = vec3(x, y, z)\n"
+        "N = normalize(vec3(cosP, sinP * 1.5, -u * 0.8))\n"
+        "isCanopy = if(u > 0.1 && u < 0.5 && sinP > 0.2, 1.0, 0.0)\n"
+        "Cd = mix(vec3(0.2, 0.25, 0.32), vec3(0.1, 0.8, 1.0), isCanopy)\n"
+        "publish = sin((t + 1.0) * speed)\n" },
+      { "Castle Turret Tower",
+        PrimitiveTopology::Cylinder,
+        2500,
+        "param float height = 2.8 [1.0, 5.0]\n"
+        "param float radius = 0.65 [0.2, 1.5]\n"
+        "param float speed = 1.0 [0.0, 5.0]\n"
+        "phi = uv.x * 6.2831853\n"
+        "v = uv.y\n"
+        "isBattlement = if(v > 0.82, 1.0, 0.0)\n"
+        "crenellation = if(v > 0.92 && sin(phi * 8.0) < 0.0, -0.3, 0.0)\n"
+        "r = (radius + isBattlement * 0.25)\n"
+        "y = (v - 0.5) * height + crenellation\n"
+        "x = r * cos(phi)\n"
+        "z = r * sin(phi)\n"
+        "P = vec3(x, y, z)\n"
+        "N = normalize(vec3(cos(phi), 0.05, sin(phi)))\n"
+        "mortar = 0.6 + 0.15 * sin(phi * 12.0) * sin(v * 40.0)\n"
+        "Cd = vec3(mortar, mortar * 0.95, mortar * 0.85)\n"
+        "publish = sin((t + 1.0) * speed)\n" },
+      { "Ceramic Amphora Vase",
+        PrimitiveTopology::Cylinder,
+        2500,
+        "param float height = 2.2 [0.8, 4.0]\n"
+        "param float bellyR = 0.85 [0.3, 2.0]\n"
+        "param float neckR = 0.28 [0.1, 1.0]\n"
+        "param float speed = 1.0 [0.0, 5.0]\n"
+        "phi = uv.x * 6.2831853\n"
+        "v = uv.y\n"
+        "profile = if(v < 0.65, 0.35 + bellyR * sin(v / 0.65 * 3.14159), if(v < 0.88, neckR, neckR + (v - 0.88) * 2.5))\n"
+        "x = profile * cos(phi)\n"
+        "z = profile * sin(phi)\n"
+        "y = (v - 0.5) * height\n"
+        "P = vec3(x, y, z)\n"
+        "N = normalize(vec3(cos(phi), 0.2, sin(phi)))\n"
+        "Cd = vec3(0.85, 0.35 + 0.3 * sin(phi * 2.0), 0.25)\n"
+        "publish = sin((t + 1.0) * speed)\n" },
+      { "Brilliant Cut Diamond",
+        PrimitiveTopology::Cylinder,
+        2400,
+        "param float radius = 1.1 [0.3, 2.5]\n"
+        "param float height = 1.6 [0.5, 3.0]\n"
+        "param float speed = 1.0 [0.0, 5.0]\n"
+        "phi = uv.x * 6.2831853\n"
+        "v = uv.y\n"
+        "facet = floor(phi / 0.785398 + 0.5) * 0.785398\n"
+        "isCrown = if(v > 0.45, 1.0, 0.0)\n"
+        "rBase = if(isCrown > 0.5, radius * (1.0 - (v - 0.45) / 0.55 * 0.5), radius * (v / 0.45))\n"
+        "r = rBase * cos(phi - facet) * 1.08\n"
+        "y = (v - 0.5) * height\n"
+        "x = r * cos(phi)\n"
+        "z = r * sin(phi)\n"
+        "P = vec3(x, y, z)\n"
+        "N = normalize(vec3(cos(facet), if(isCrown > 0.5, 0.8, -0.9), sin(facet)))\n"
+        "sparkle = abs(sin(facet * 4.0 + t * speed))\n"
+        "Cd = vec3(0.7 + 0.3 * sparkle, 0.85, 1.0)\n"
+        "publish = sin((t + 1.0) * speed)\n" },
+      { "Bonsai Foliage Canopy",
+        PrimitiveTopology::Sphere,
+        2600,
+        "param float spread = 1.6 [0.5, 3.0]\n"
+        "param float clusters = 5.0 [2.0, 10.0]\n"
+        "param float speed = 1.0 [0.0, 5.0]\n"
+        "phi = uv.x * 6.2831853\n"
+        "theta = (uv.y - 0.5) * 3.14159265\n"
+        "cloud = sin(phi * clusters) * cos(theta * clusters) * 0.35\n"
+        "r = (spread + cloud) * (1.0 + 0.15 * sin(phi * 2.0))\n"
+        "x = r * cos(theta) * cos(phi)\n"
+        "y = r * sin(theta) * 0.45 + sin(phi * 2.0) * 0.25\n"
+        "z = r * cos(theta) * sin(phi)\n"
+        "P = vec3(x, y, z)\n"
+        "N = normalize(P)\n"
+        "Cd = vec3(0.1 + 0.2 * abs(N.y), 0.55 + 0.35 * sin(phi * 3.0), 0.2)\n"
+        "publish = sin((t + 1.0) * speed)\n" }
    };
    return kPresets;
 }

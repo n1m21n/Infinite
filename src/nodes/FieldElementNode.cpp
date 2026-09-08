@@ -173,7 +173,103 @@ const std::vector<FieldElementNode::Preset>& FieldElementNode::Presets()
         "w2 = sin(d2 * freq2 + t * speed2)\n"
         "P.y += (w1 + w2) * 0.5 * amp\n"
         "Cd = vec3(0.5 + 0.5 * w1, 0.5 + 0.5 * w2, 0.8)\n"
-        "publish = sin(t * speed1)\n" }
+        "publish = sin(t * speed1)\n" },
+      { "Simple Deform: Bend",
+        "param float angle = 1.2 [-3.14, 3.14]\n"
+        "param float center = 0.0 [-2.0, 2.0]\n"
+        "py = P.y - center\n"
+        "pz = P.z\n"
+        "theta = py * angle\n"
+        "cosT = cos(theta)\n"
+        "sinT = sin(theta)\n"
+        "invA = if(abs(angle) > 0.001, 1.0 / angle, 1000.0)\n"
+        "radius = invA - pz\n"
+        "P.y = center + radius * sinT\n"
+        "P.z = invA - radius * cosT\n"
+        "Cd = vec3(0.4 + 0.4 * sin(theta), 0.6, 0.9)\n"
+        "output frame float bendMag = abs(angle)\n"
+        "publish = bendMag\n" },
+      { "Simple Deform: Taper",
+        "param float factor = 0.6 [-1.5, 2.0]\n"
+        "param float minY = -1.0 [-3.0, 1.0]\n"
+        "param float maxY = 1.0 [-1.0, 3.0]\n"
+        "h = clamp((P.y - minY) / max(maxY - minY, 0.001), 0.0, 1.0)\n"
+        "scale = max(1.0 + factor * h, 0.01)\n"
+        "P.x *= scale\n"
+        "P.z *= scale\n"
+        "Cd = vec3(0.2 + 0.8 * h, 0.5, 1.0 - 0.7 * h)\n"
+        "output frame float taperScale = reduce.mean(scale)\n"
+        "publish = taperScale\n" },
+      { "Simple Deform: Squash & Stretch",
+        "param float factor = 0.5 [-0.8, 1.5]\n"
+        "scaleY = 1.0 + factor\n"
+        "scaleXZ = if(scaleY > 0.01, 1.0 / sqrt(scaleY), 10.0)\n"
+        "P.y *= scaleY\n"
+        "P.x *= scaleXZ\n"
+        "P.z *= scaleXZ\n"
+        "Cd = vec3(0.8, 0.4 + 0.3 * factor, 0.3)\n"
+        "output frame float squash = abs(factor)\n"
+        "publish = squash\n" },
+      { "Melt & Ground Flatten",
+        "param float melt = 0.6 [0.0, 1.5]\n"
+        "param float ground = -0.5 [-2.0, 1.0]\n"
+        "py = P.y\n"
+        "dist = max(py - ground, 0.0)\n"
+        "sag = melt * exp(-dist * 1.5)\n"
+        "P.y = max(ground, py - sag)\n"
+        "spread = 1.0 + sag * 1.2\n"
+        "P.x *= spread\n"
+        "P.z *= spread\n"
+        "Cd = vec3(0.2, 0.8 - 0.4 * sag, 0.4 + 0.6 * sag)\n"
+        "output frame float maxSag = reduce.max(sag)\n"
+        "publish = maxSag\n" },
+      { "Shrinkwrap Spherical",
+        "param float radius = 1.2 [0.2, 4.0]\n"
+        "param float strength = 0.7 [0.0, 1.0]\n"
+        "d = length(P)\n"
+        "targetP = if(d > 0.001, (P / d) * radius, vec3(0.0, radius, 0.0))\n"
+        "P = mix(P, targetP, strength)\n"
+        "Cd = vec3(0.1 + 0.8 * strength, 0.7, 0.9)\n"
+        "output frame float wrapStr = strength\n"
+        "publish = wrapStr\n" },
+      { "Laplacian Mesh Smoother",
+        "param float smoothAmt = 0.5 [0.0, 1.0]\n"
+        "a = P.at(i - 1)\n"
+        "b = P.at(i + 1)\n"
+        "avgP = (a + b) * 0.5\n"
+        "P = mix(P, avgP, smoothAmt)\n"
+        "Cd = vec3(0.3, 0.8, 0.5 + 0.5 * smoothAmt)\n"
+        "output frame float smVal = smoothAmt\n"
+        "publish = smVal\n" },
+      { "Simplex Mountain Displace",
+        "param float height = 0.45 [0.0, 2.0]\n"
+        "n1 = rand(-1.0, 1.0, 1.0, i)\n"
+        "n2 = rand(-1.0, 1.0, 2.0, i)\n"
+        "disp = (n1 * 0.7 + n2 * 0.3) * height\n"
+        "P += N * disp\n"
+        "Cd = vec3(0.5 + 0.5 * disp, 0.4, 0.3)\n"
+        "output frame float peakDisp = reduce.max(disp)\n"
+        "publish = peakDisp\n" },
+      { "Directional Normal Push/Pull",
+        "param float distance = 0.25 [-1.0, 1.0]\n"
+        "param float pulseSpeed = 2.0 [0.0, 6.0]\n"
+        "dynDist = distance * (1.0 + 0.3 * sin(t * pulseSpeed))\n"
+        "P += N * dynDist\n"
+        "Cd = vec3(0.9, 0.4 + 0.4 * sin(t * pulseSpeed), 0.2)\n"
+        "output frame float pushMag = abs(dynDist)\n"
+        "publish = pushMag\n" },
+      { "Proximity Vertex Heatmap",
+        "param float range = 2.0 [0.5, 6.0]\n"
+        "param float cycleSpeed = 1.5 [0.0, 5.0]\n"
+        "d = length(P)\n"
+        "normD = clamp(d / range, 0.0, 1.0)\n"
+        "heat = (normD + sin(t * cycleSpeed) * 0.2) % 1.0\n"
+        "r = clamp(heat * 2.0, 0.0, 1.0)\n"
+        "g = clamp(2.0 - heat * 3.0, 0.0, 1.0)\n"
+        "b = clamp(1.0 - heat * 2.0, 0.0, 1.0)\n"
+        "Cd = vec3(r, g, b)\n"
+        "output frame float avgHeat = reduce.mean(normD)\n"
+        "publish = avgHeat\n" }
    };
    return kPresets;
 }
