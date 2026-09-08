@@ -501,6 +501,26 @@ if(MSVC)
     set_source_files_properties(src/main.cpp PROPERTIES COMPILE_OPTIONS "/Od")
 endif()
 
+# Dev-only tool: compiles a Field pixel/element source file through the same
+# Lex/Parse/IR/GLSL pipeline FieldPixelNode::Apply() runs at load time, so a
+# new preset can be checked (and its generated GLSL inspected) before it's
+# added to Presets() - there is otherwise no way to know a preset compiles
+# without loading it in the running app. Deliberately excludes Expression.cpp
+# and links a stub ExprGlobals (see tools/field_preset_check.cpp) to stay a
+# fast, dependency-free command-line build separate from the app target.
+add_executable(field-preset-check
+    tools/field_preset_check.cpp
+    src/core/field/FieldLex.cpp
+    src/core/field/FieldParse.cpp
+    src/core/field/FieldIR.cpp
+    src/core/field/FieldSwizzle.cpp
+    src/core/field/FieldCycles.cpp
+    src/core/field/GlslBackend.cpp
+    src/core/field/Transfer.cpp
+    src/core/field/ReduceOps.cpp
+)
+target_include_directories(field-preset-check PRIVATE src src/core)
+
 add_executable(Infinite ${COMMON_SOURCES})
 
 # Exposes INFINITE_VERSION to C++ as a string literal (UpdateCheck.cpp,
