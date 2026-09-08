@@ -15576,9 +15576,6 @@ namespace
                gFieldDragIndex = entry.presetIndex;
             }
 
-            if (ImGui::IsItemHovered())
-               ImGui::SetTooltip("%s\nCategory: %s (%s)", entry.name.c_str(), entry.category.c_str(), entry.nodeType.c_str());
-
             DrawFavoriteBadge(selMin, selMax, isFav);
 
             if (ImGui::BeginPopupContextItem("##field_ctx"))
