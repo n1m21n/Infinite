@@ -13,6 +13,7 @@
 #include "field/FieldParse.h"
 #include "field/FieldIR.h"
 #include "field/GlslBackend.h"
+#include "field/BackendRegister.h"
 
 #include <fstream>
 #include <iostream>
@@ -94,6 +95,24 @@ int main(int argc, char** argv)
       return 0;
    }
 
-   std::cerr << "unsupported domain '" << domainArg << "' (only 'pixel' is wired up so far)\n";
+   if (domainArg == "sample")
+   {
+      // The sample domain has its own direct AST-to-bytecode compiler
+      // (BackendRegister.cpp) rather than sharing the typed-IR pass the
+      // Element/Pixel backends use - see that file's header comment. `prev`
+      // is only used to transplant state-cell values across a hot-reload and
+      // is irrelevant to a plain validity check.
+      Field::SampleProgram prog;
+      if (!Field::CompileSampleProgram(code, nullptr, prog, err))
+      {
+         std::cerr << "line " << err.span.line << ", col " << err.span.col << ": " << err.message << "\n";
+         return 1;
+      }
+      std::cout << "sample program OK: " << prog.code.size() << " instructions, "
+                 << prog.state.size() << " state cell(s)\n";
+      return 0;
+   }
+
+   std::cerr << "unsupported domain '" << domainArg << "' (supported: pixel, sample)\n";
    return 2;
 }

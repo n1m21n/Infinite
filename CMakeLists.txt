@@ -518,6 +518,7 @@ add_executable(field-preset-check
     src/core/field/GlslBackend.cpp
     src/core/field/Transfer.cpp
     src/core/field/ReduceOps.cpp
+    src/core/field/BackendRegister.cpp
 )
 target_include_directories(field-preset-check PRIVATE src src/core)
 
