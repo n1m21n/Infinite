@@ -23097,6 +23097,27 @@ namespace
 
    // A comment shows its note on the face of the node, not behind the params
    // (eye) toggle - the whole point of a note is to be readable without an
+   inline float CommentFontSize(int sizeIdx, float baseFontSize)
+   {
+      switch (sizeIdx)
+      {
+         case 0: return baseFontSize * 0.82f;  // Small (~13px)
+         case 1: default: return baseFontSize; // Normal (~15px)
+         case 2: return baseFontSize * 1.35f;  // Large (~20px)
+         case 3: return baseFontSize * 1.85f;  // Extra Large (~28px)
+      }
+   }
+   inline float CommentFontScale(int sizeIdx)
+   {
+      switch (sizeIdx)
+      {
+         case 0: return 0.82f;
+         case 1: default: return 1.0f;
+         case 2: return 1.35f;
+         case 3: return 1.85f;
+      }
+   }
+
    // extra click, the same reasoning DrawNode's canvas is drawn directly
    // rather than collapsed.
    //
@@ -23150,18 +23171,21 @@ namespace
       // Clipped to the box so a note longer than its height is cut off at the
       // edge instead of spilling over the card.
       dl->PushClipRect(origin, br, true);
+      const float drawFontSize = CommentFontSize(n->fontSize, ImGui::GetFontSize());
       if (n == gCommentEdit.target)
       {
          // Suppress preview text while actively editing in the overlay popup so they don't double-render
       }
       else if (n->text.empty())
       {
-         dl->AddText(ImVec2(origin.x + 8, origin.y + 8), isLight ? IM_COL32(140, 146, 160, 255) : IM_COL32(150, 150, 160, 255),
-                     "double-click or type to write");
+         dl->AddText(ImGui::GetFont(), drawFontSize,
+                     ImVec2(origin.x + 8, origin.y + 8),
+                     isLight ? IM_COL32(140, 146, 160, 255) : IM_COL32(150, 150, 160, 255),
+                     "double-click or type to write", nullptr, w - 16.0f);
       }
       else
       {
-         dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
+         dl->AddText(ImGui::GetFont(), drawFontSize,
                      ImVec2(origin.x + 8, origin.y + 8), textCol,
                      n->text.c_str(), nullptr, w - 16.0f);
       }
@@ -23204,9 +23228,10 @@ namespace
       }
       if (gripActive)
       {
-         const ImVec2 mouseCanvas = ed::ScreenToCanvas(ImGui::GetIO().MousePos);
-         n->width = std::clamp(mouseCanvas.x - origin.x, 120.0f, 1600.0f);
-         n->height = std::clamp(mouseCanvas.y - origin.y, 60.0f, 1200.0f);
+         const float zoom = std::max(0.01f, ed::GetCurrentZoom());
+         ImGuiIO& io = ImGui::GetIO();
+         n->width = std::clamp(n->width + io.MouseDelta.x / zoom, 120.0f, 1600.0f);
+         n->height = std::clamp(n->height + io.MouseDelta.y / zoom, 60.0f, 1200.0f);
          gPatchDirty = true;
       }
       ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + h));
@@ -64730,7 +64755,7 @@ int main(int argc, char** argv)
       // it, so annotating a patch is one keystroke and then typing. Not gated on
       // Shift, so "?" does not leave a stray comment behind, and not on a
       // modifier, so Cmd-/ stays free for a binding later.
-      const bool doAddComment = gRequestAddComment || (!typing && !cmdOrCtrl && !io.KeyShift &&
+      const bool doAddComment = gRequestAddComment || (!typing && gCommentEdit.target == nullptr && !cmdOrCtrl && !io.KeyShift &&
                                                       ImGui::IsKeyPressed(ImGuiKey_Slash, false));
       gRequestAddComment = false;
       if (doAddComment)
@@ -64868,7 +64893,7 @@ int main(int argc, char** argv)
       // Safe to claim: the picker lowercases both query and candidate names,
       // so a capital letter is never needed to find a node.
       const bool doAddNode = gRequestAddNode ||
-         (!cmdOrCtrl && io.KeyShift && (!typing || searchPopupOpen) && ImGui::IsKeyPressed(ImGuiKey_N, false));
+         (!cmdOrCtrl && io.KeyShift && (!typing || searchPopupOpen) && gCommentEdit.target == nullptr && ImGui::IsKeyPressed(ImGuiKey_N, false));
       gRequestAddNode = false;
       if (doAddNode)
       {
@@ -65616,7 +65641,7 @@ int main(int argc, char** argv)
 
       // Right-click (two-finger click on a Mac trackpad) opens the same
       // type-to-filter picker as double-click, so the keyboard works either way.
-      if (ed::ShowBackgroundContextMenu())
+      if (ed::ShowBackgroundContextMenu() && gCommentEdit.target == nullptr)
       {
          gSpawnPos = ed::ScreenToCanvas(ImGui::GetMousePos());
          searchBuf[0] = '\0';
@@ -65691,6 +65716,21 @@ int main(int argc, char** argv)
                PushUndoCheckpoint();
                gCommentEdit.target = c;
                gCommentEdit.justOpened = true;
+            }
+            if (ImGui::BeginMenu("Font Size"))
+            {
+               const char* sizeLabels[] = { "Small", "Normal", "Large", "Extra Large" };
+               for (int sIdx = 0; sIdx < 4; sIdx++)
+               {
+                  const bool selected = (c->fontSize == sIdx);
+                  if (ImGui::MenuItem(sizeLabels[sIdx], nullptr, selected))
+                  {
+                     PushUndoCheckpoint();
+                     c->fontSize = sIdx;
+                     gPatchDirty = true;
+                  }
+               }
+               ImGui::EndMenu();
             }
             if (ImGui::MenuItem("Change Colour..."))
             {
@@ -66256,7 +66296,8 @@ int main(int argc, char** argv)
                              dblClickMouse.y <= gGraphScreenTL.y + gGraphScreenSize.y;
       if (overGraph &&
           ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
-          !ed::GetHoveredNode() && !ed::GetHoveredPin() && !ed::GetHoveredLink())
+          !ed::GetHoveredNode() && !ed::GetHoveredPin() && !ed::GetHoveredLink() &&
+          gCommentEdit.target == nullptr)
       {
          gSpawnPos = ed::ScreenToCanvas(dblClickMouse);
          searchBuf[0] = '\0';
@@ -66522,18 +66563,24 @@ int main(int argc, char** argv)
                ? ImVec4(30.0f / 255.0f, 36.0f / 255.0f, 48.0f / 255.0f, 1.0f)
                : ImVec4(col[0] * 0.5f + 0.5f, col[1] * 0.5f + 0.5f, col[2] * 0.5f + 0.5f, 1.0f);
 
+            const float fontScale = CommentFontScale(c->fontSize);
             ImGui::PushStyleColor(ImGuiCol_Text, textCol);
             ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+            ImGui::PushStyleColor(ImGuiCol_ScrollbarBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrab, isLight ? ImVec4(0.0f, 0.0f, 0.0f, 0.15f) : ImVec4(1.0f, 1.0f, 1.0f, 0.18f));
+            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabHovered, isLight ? ImVec4(0.0f, 0.0f, 0.0f, 0.30f) : ImVec4(1.0f, 1.0f, 1.0f, 0.35f));
+            ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabActive, isLight ? ImVec4(0.0f, 0.0f, 0.0f, 0.45f) : ImVec4(1.0f, 1.0f, 1.0f, 0.50f));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * commentZoom, 8.0f * commentZoom));
-            ImGui::SetWindowFontScale(commentZoom);
+            ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 6.0f * commentZoom);
+            ImGui::SetWindowFontScale(commentZoom * fontScale);
 
             // Filling the whole popup cleanly at 1:1 scale with the canvas card
             ImGui::InputTextMultiline("##commenttext", &c->text, ImVec2(gCommentEditRect.z, gCommentEditRect.w));
 
             ImGui::SetWindowFontScale(1.0f);
-            ImGui::PopStyleVar(2);
-            ImGui::PopStyleColor(2);
+            ImGui::PopStyleVar(3);
+            ImGui::PopStyleColor(6);
 
             // The checkpoint was pushed when the editor opened, so every
             // keystroke here is part of that one undo step; all that is left is

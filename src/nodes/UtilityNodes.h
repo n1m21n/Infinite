@@ -28,12 +28,14 @@ public:
    float width = 260.0f;
    float height = 140.0f;
    float color[3] = { 0.95f, 0.85f, 0.45f };
+   int fontSize = 1; // 0: Small, 1: Normal, 2: Large, 3: Extra Large
 
    void VisitParams(ParamVisitor& v) override
    {
       v.Text("text", text);
       v.Float("width", width); v.Float("height", height);
       v.Color("color", color);
+      v.Int("fontSize", fontSize);
    }
 };
 
