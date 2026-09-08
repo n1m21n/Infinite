@@ -1891,6 +1891,7 @@ namespace
    enum class AudioWidgetStyle
    {
       Knob,
+      KnobBipolar,
       VFader,
       // Same widget as VFader, routed through ConsoleFaderTaper - unity at
       // 75% of throw instead of a linear-in-dB mapping. Only meaningful for
@@ -3747,7 +3748,9 @@ namespace
 
    bool BipolarKnobFloat(const char* label, float* value, float minV, float maxV, const char* fmt,
                          float diameter, ImU32 fillColor, bool readOnly, float cellW = 0.0f,
-                         int gestureNodeIndex = -1, int gestureParamIndex = -1)
+                         int gestureNodeIndex = -1, int gestureParamIndex = -1,
+                         bool hasRange = false, float rangeLo = 0.0f, float rangeHi = 0.0f,
+                         bool activeTint = false, bool resetOnDoubleClick = false)
    {
       const float kTwoPi = 6.28318530717958647692f;
       const float aMin = 0.75f * kTwoPi * 0.5f; // 135 deg
@@ -3776,8 +3779,8 @@ namespace
       if (gestureNodeIndex >= 0 && gestureJustActivated)
          GestureRecorder::Instance().StopPlayback(gestureNodeIndex, gestureParamIndex);
 
-      // Double-click resets to center
-      if (hovered && !readOnly && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+      // Double-click resets to center when enabled
+      if (resetOnDoubleClick && hovered && !readOnly && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
       {
          *value = (minV + maxV) * 0.5f;
          changed = true;
@@ -3809,6 +3812,8 @@ namespace
       const float radius = diameter * 0.5f - 2.0f;
       const float t = ValueToPos01(*value);
       const float angle = aMin + t * (aMax - aMin);
+      const float angleLo = hasRange ? aMin + ValueToPos01(rangeLo) * (aMax - aMin) : 0.0f;
+      const float angleHi = hasRange ? aMin + ValueToPos01(rangeHi) * (aMax - aMin) : 0.0f;
 
       const bool isLight = IsThemeLight();
       ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -3823,7 +3828,12 @@ namespace
          dl->AddCircleFilled(center, radius, IM_COL32(220, 224, 234, 255), 32);
          dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, IM_COL32(242, 245, 250, 255), 32);
          dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
-         dl->PathStroke(IM_COL32(195, 200, 212, 255), 0, 3.0f);
+         dl->PathStroke(activeTint ? IM_COL32(220, 90, 90, 255) : IM_COL32(195, 200, 212, 255), 0, 3.0f);
+         if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
+         {
+            dl->PathArcTo(center, radius + 2.5f, std::min(angleLo, angleHi), std::max(angleLo, angleHi), 32);
+            dl->PathStroke(IM_COL32(255, 190, 90, 110), 0, 5.0f);
+         }
 
          // Center tick
          dl->AddLine(ImVec2(center.x, center.y - radius - 5.0f), ImVec2(center.x, center.y - radius), IM_COL32(150, 155, 170, 255), 1.5f);
@@ -3843,7 +3853,9 @@ namespace
          const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
          const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
          dl->AddLine(tipIn, tipOut, readOnly ? IM_COL32(140, 145, 160, 255) : IM_COL32(40, 45, 60, 255), 2.0f);
-         dl->AddCircle(center, radius, IM_COL32(175, 180, 195, 255), 32, 1.0f);
+         dl->AddCircle(center, radius, activeTint ? IM_COL32(220, 90, 90, 255) : IM_COL32(175, 180, 195, 255), 32, 1.0f);
+         if (hovered && !readOnly)
+            dl->AddCircle(center, radius + 2.5f, IM_COL32(0, 0, 0, 30), 32, 3.0f);
       }
       else
       {
@@ -3855,7 +3867,12 @@ namespace
          dl->AddCircleFilled(center, radius, IM_COL32(36, 38, 48, 255), 32);
          dl->AddCircleFilled(ImVec2(center.x, center.y - 0.5f), radius - 3.0f, IM_COL32(22, 23, 30, 255), 32);
          dl->PathArcTo(center, radius + 2.5f, aMin, aMax, 32);
-         dl->PathStroke(IM_COL32(58, 62, 76, 255), 0, 3.0f);
+         dl->PathStroke(activeTint ? IM_COL32(220, 90, 90, 255) : IM_COL32(58, 62, 76, 255), 0, 3.0f);
+         if (hasRange && std::fabs(angleHi - angleLo) > 1e-4f)
+         {
+            dl->PathArcTo(center, radius + 2.5f, std::min(angleLo, angleHi), std::max(angleLo, angleHi), 32);
+            dl->PathStroke(IM_COL32(255, 190, 90, 130), 0, 5.0f);
+         }
 
          // Center tick
          dl->AddLine(ImVec2(center.x, center.y - radius - 5.0f), ImVec2(center.x, center.y - radius), IM_COL32(100, 105, 120, 255), 1.5f);
@@ -3875,7 +3892,9 @@ namespace
          const ImVec2 tipIn(center.x + cosf(angle) * (radius * 0.35f), center.y + sinf(angle) * (radius * 0.35f));
          const ImVec2 tipOut(center.x + cosf(angle) * (radius - 3.0f), center.y + sinf(angle) * (radius - 3.0f));
          dl->AddLine(tipIn, tipOut, readOnly ? IM_COL32(120, 125, 140, 255) : IM_COL32(230, 235, 245, 255), 2.0f);
-         dl->AddCircle(center, radius, IM_COL32(75, 80, 95, 255), 32, 1.0f);
+         dl->AddCircle(center, radius, activeTint ? IM_COL32(220, 90, 90, 255) : IM_COL32(74, 78, 94, 255), 32, 1.0f);
+         if (hovered && !readOnly)
+            dl->AddCircle(center, radius + 2.5f, IM_COL32(255, 255, 255, 40), 32, 3.0f);
       }
 
       // rowH has always reserved room for a caption here; nothing ever drew
@@ -3998,11 +4017,16 @@ namespace
       auto DrawWidget = [&](float* v, ImU32 col, bool readOnly, bool hasRange = false, float rangeLo = 0.0f, float rangeHi = 0.0f, bool activeTint = false) -> bool
       {
          const bool isVFader = (style == AudioWidgetStyle::VFader || style == AudioWidgetStyle::VFaderDb);
-         return isVFader
-            ? VFaderFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
-                          p2v, v2p, hasRange, rangeLo, rangeHi)
-            : KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
-                        p2v, v2p, hasRange, rangeLo, rangeHi, activeTint);
+         const bool isBipolar = (style == AudioWidgetStyle::KnobBipolar);
+         if (isVFader)
+            return VFaderFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
+                               p2v, v2p, hasRange, rangeLo, rangeHi);
+         if (isBipolar)
+            return BipolarKnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
+                                    /*gestureNodeIndex=*/-1, /*gestureParamIndex=*/-1,
+                                    hasRange, rangeLo, rangeHi, activeTint, /*resetOnDoubleClick=*/false);
+         return KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
+                          p2v, v2p, hasRange, rangeLo, rangeHi, activeTint);
       };
       const float widgetW = (style == AudioWidgetStyle::VFader || style == AudioWidgetStyle::VFaderDb)
                                ? kFaderWidth : diameter;
@@ -7607,10 +7631,7 @@ namespace
       // was the single worst size mismatch in the family, and nothing about a
       // 0..1 macro needs that much travel.
       const std::string caption = n->label.empty() ? std::string("slider") : n->label;
-      VFaderFloat(caption.c_str(), &n->value, 0.0f, 1.0f, "%.2f", kMacroFaderH,
-                  IsThemeLight() ? IM_COL32(59, 130, 246, 255) : IM_COL32(96, 165, 250, 255),
-                  false, kMacroCell, nullptr, nullptr, false, 0.0f, 0.0f,
-                  gCurrentNodeIndex, 0);
+      ModKnob(caption.c_str(), &n->value, 0.0f, 1.0f, "%.2f", kMacroFaderH, kMacroCell, AudioWidgetStyle::VFader);
    }
 
    void DrawMacroSliderParams(MacroSliderNode* n)
@@ -7621,9 +7642,7 @@ namespace
    void DrawMacroBipolarKnobBody(MacroBipolarKnobNode* n)
    {
       const std::string caption = n->label.empty() ? std::string("bipolar") : n->label;
-      BipolarKnobFloat(caption.c_str(), &n->value, -1.0f, 1.0f, "%.2f", kKnobStd,
-                       IsThemeLight() ? IM_COL32(245, 158, 11, 255) : IM_COL32(251, 191, 36, 255),
-                       false, kMacroCell, gCurrentNodeIndex, 0);
+      ModKnob(caption.c_str(), &n->value, -1.0f, 1.0f, "%.2f", kKnobStd, kMacroCell, AudioWidgetStyle::KnobBipolar);
    }
 
    void DrawMacroBipolarKnobParams(MacroBipolarKnobNode* n)
@@ -7958,7 +7977,7 @@ namespace
       }
    }
 
-   void DrawMacroXYParams(MacroXYNode* n)
+   void DrawMacroXYBody(MacroXYNode* n)
    {
       const float size = kPreviewSize;
       ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -7994,7 +8013,10 @@ namespace
       dl->AddCircleFilled(orb, 9.0f, orbColor);
       dl->AddCircle(orb, 9.0f, isLight ? IM_COL32(240, 240, 240, 255) : IM_COL32(20, 20, 28, 255), 0, 2.0f);
       dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+   }
 
+   void DrawMacroXYParams(MacroXYNode* n)
+   {
       ImGui::TextDisabled("x %.3f   y %.3f", n->padX, n->padY);
 
       if (n->IsRecordingPath())
@@ -63328,8 +63350,7 @@ int main(int argc, char** argv)
             dynamic_cast<ImageAnalyzeNode*>(gn.node.get()) != nullptr ||
             dynamic_cast<AudioFileNode*>(gn.node.get()) != nullptr ||
             dynamic_cast<AudioAnalyzeNode*>(gn.node.get()) != nullptr ||
-            dynamic_cast<GeometryTableNode*>(gn.node.get()) != nullptr ||
-            dynamic_cast<MacroXYNode*>(gn.node.get()) != nullptr;
+            dynamic_cast<GeometryTableNode*>(gn.node.get()) != nullptr;
          IGeometrySource* geoSourceForViewport = dynamic_cast<IGeometrySource*>(gn.node.get());
          if (multiOutModulator)
             ; // these draw their own meters in the params panel
@@ -63339,6 +63360,8 @@ int main(int argc, char** argv)
             DrawMacroSliderBody(macroSlider);
          else if (auto* macroBipolar = dynamic_cast<MacroBipolarKnobNode*>(gn.node.get()))
             DrawMacroBipolarKnobBody(macroBipolar);
+         else if (auto* macroXY = dynamic_cast<MacroXYNode*>(gn.node.get()))
+            DrawMacroXYBody(macroXY);
          else if (auto* macroToggle = dynamic_cast<MacroToggleNode*>(gn.node.get()))
             DrawMacroToggleBody(macroToggle);
          else if (auto* macroTrigger = dynamic_cast<MacroTriggerNode*>(gn.node.get()))
