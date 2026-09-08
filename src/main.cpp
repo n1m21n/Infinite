@@ -6535,8 +6535,6 @@ namespace
          btnLabel = (*factoryNames)[n->presetIndex];
       const std::string dropdownId = btnLabel + "##fdd_" + domain;
       const float spacing = ImGui::GetStyle().ItemSpacing.x;
-      const float searchBtnW = ImGui::GetFrameHeight();
-      const float mainBtnW = kPreviewSize - searchBtnW - spacing;
 
       auto openDropdownAction = [=, &options, &categories, &userPaths](bool focusSearch)
       {
@@ -6571,25 +6569,13 @@ namespace
       if (options.empty())
       {
          ImGui::BeginDisabled();
-         ImGui::Button(dropdownId.c_str(), ImVec2(mainBtnW, 0));
-         ImGui::SameLine(0.0f, spacing);
-         ImGui::Button(("##fdd_search_" + domain).c_str(), ImVec2(searchBtnW, 0));
+         ImGui::Button(dropdownId.c_str(), ImVec2(kPreviewSize, 0));
          ImGui::EndDisabled();
       }
       else
       {
-         if (ImGui::Button(dropdownId.c_str(), ImVec2(mainBtnW, 0)))
+         if (ImGui::Button(dropdownId.c_str(), ImVec2(kPreviewSize, 0)))
             openDropdownAction(false);
-         ImGui::SameLine(0.0f, spacing);
-         if (ImGui::Button(("##fdd_search_" + domain).c_str(), ImVec2(searchBtnW, 0)))
-            openDropdownAction(true);
-         const ImVec2 bmin = ImGui::GetItemRectMin();
-         const ImVec2 bmax = ImGui::GetItemRectMax();
-         const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-         const float iconSize = (bmax.y - bmin.y) * 0.65f;
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         const ImU32 col = ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
-         Tabler::DrawSearch(dl, center, iconSize, col);
       }
       PopDropdownStyle();
 
