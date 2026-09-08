@@ -664,6 +664,25 @@ if(WIN32)
                     "$<TARGET_FILE_DIR:Infinite>/infinite-vst3-scanner.exe"
             COMMENT "Copying scanner helper next to Infinite.exe")
     endif()
+
+    # Bundled UI font (Inter, SIL OFL) and icon font (Lucide, ISC), mirroring
+    # the macOS MACOSX_PACKAGE_LOCATION "Resources/..." layout above: no app
+    # bundle on Windows, so BundledResourcePath() in main.cpp looks for these
+    # next to Infinite.exe under Resources\fonts and Resources\icons instead.
+    add_custom_command(TARGET Infinite POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:Infinite>/Resources/fonts"
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:Infinite>/Resources/icons"
+        COMMAND ${CMAKE_COMMAND} -E copy
+                "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-Regular.ttf"
+                "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-Medium.ttf"
+                "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-SemiBold.ttf"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/fonts/"
+        COMMAND ${CMAKE_COMMAND} -E copy
+                "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
+        COMMENT "Copying bundled fonts next to Infinite.exe")
     target_link_options(Infinite PRIVATE /ENTRY:mainCRTStartup)
 elseif(APPLE)
     target_include_directories(Infinite PRIVATE
@@ -824,4 +843,21 @@ if(APPLE)
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/InfinitePatch.icns"
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/InfiniteDevice.icns"
         PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+
+    # Bundled UI font (Inter, SIL OFL) and icon font (Lucide, ISC) - see
+    # BundledResourcePath() in main.cpp for how the running app finds these
+    # at Contents/Resources/fonts and Contents/Resources/icons regardless of
+    # launch context (Finder vs. a direct exec). MACOSX_PACKAGE_LOCATION
+    # resources are copied during the normal bundle build step, which runs
+    # before the ad-hoc codesign POST_BUILD command above, so the signature
+    # stays valid - same ordering the .icns files above already rely on.
+    set(INFINITE_FONT_FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-Regular.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-Medium.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-SemiBold.ttf")
+    set(INFINITE_ICON_FONT_FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf")
+    target_sources(Infinite PRIVATE ${INFINITE_FONT_FILES} ${INFINITE_ICON_FONT_FILES})
+    set_source_files_properties(${INFINITE_FONT_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/fonts")
+    set_source_files_properties(${INFINITE_ICON_FONT_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/icons")
 endif()

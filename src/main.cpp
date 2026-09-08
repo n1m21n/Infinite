@@ -38,6 +38,8 @@
 #include <filesystem>
 #include <sys/stat.h>
 #include "platform/AppPaths.h"
+#include "platform/Platform.h"
+#include "IconsLucide.h"
 
 #if defined(_WIN32)
 #include <fcntl.h>
@@ -48704,6 +48706,48 @@ void ApplyModulationAndPalette(int frameId)
    }
 }
 
+// Resolves a bundled asset shipped next to the app (fonts, icon fonts) from
+// the *executable's own location*, not the process's working directory.
+//
+// This matters because of two different launch contexts that disagree about
+// cwd: a Finder/LaunchServices launch on macOS leaves cwd at
+// Contents/Resources (Cocoa's doing), but the run-infinite-hygiene harness
+// (and any other direct exec, e.g. from a terminal or a debugger) invokes
+// the binary directly with whatever cwd the caller happened to have - it is
+// never Resources there. Resolving relative to argv[0]/getcwd would work by
+// accident in one context and silently fail in the other. Platform::
+// ExecutablePath() (Platform.mm's _NSGetExecutablePath /
+// PlatformWin.cpp's GetModuleFileNameW) is the one source of truth for
+// "where is my own binary" on both platforms and doesn't depend on cwd at
+// all.
+//
+// `relPath` is relative to the Resources directory: macOS ships assets at
+// Contents/Resources/<relPath> (MACOSX_PACKAGE_LOCATION "Resources/..." in
+// CMakeLists.txt, the same convention the app icons already use); Windows
+// has no bundle, so CMake's post-build step copies the same assets to
+// Resources/<relPath> next to Infinite.exe. Returns an empty string if the
+// executable path can't be resolved or the file isn't there, so callers can
+// fall through to their own fallback chain.
+static std::string BundledResourcePath(const char* relPath)
+{
+   const std::string exe = Platform::ExecutablePath();
+   if (exe.empty())
+      return {};
+   std::filesystem::path exeDir = std::filesystem::path(exe).parent_path();
+#if defined(__APPLE__)
+   // exe is at Contents/MacOS/Infinite -> Resources is a sibling of MacOS.
+   std::filesystem::path resourceDir = exeDir.parent_path() / "Resources";
+#else
+   // No bundle on Windows: Resources sits next to Infinite.exe.
+   std::filesystem::path resourceDir = exeDir / "Resources";
+#endif
+   std::filesystem::path full = resourceDir / relPath;
+   std::error_code ec;
+   if (!std::filesystem::exists(full, ec))
+      return {};
+   return full.string();
+}
+
 int main(int argc, char** argv)
 {
    // No-op on macOS (which gets a `.ips` report for free); on Windows this is
@@ -49012,23 +49056,63 @@ int main(int argc, char** argv)
 
    // A proper UI typeface instead of ImGui's bitmap default. Retina-aware:
    // load at 2x and scale down so text stays sharp on a HiDPI display.
+   //
+   // The bundled Inter Regular (external/fonts/Inter, SIL OFL - see that
+   // directory's LICENSE.txt) is tried first on *both* platforms, resolved
+   // relative to the executable's own location (BundledResourcePath, above)
+   // rather than any particular working directory or bundle-launch
+   // assumption. Before this, the candidate list below was macOS-only
+   // system paths with nothing after it - on Windows every one of these
+   // AddFontFromFileTTF calls failed silently and ImGui fell all the way
+   // back to its built-in tiny bitmap font (Proggy). The old macOS system
+   // fonts stay in the list as a fallback chain (belt-and-suspenders for a
+   // dev build missing the bundled asset), they just no longer run first.
    {
       float xscale = 1.0f, yscale = 1.0f;
       glfwGetWindowContentScale(window, &xscale, &yscale);
       const float baseSize = 15.0f;
+      const std::string bundledInter = BundledResourcePath("fonts/Inter-Regular.ttf");
       const char* candidates[] = {
+         bundledInter.c_str(),
          "/System/Library/Fonts/SFNS.ttf",
          "/System/Library/Fonts/HelveticaNeue.ttc",
          "/System/Library/Fonts/Helvetica.ttc",
          "/System/Library/Fonts/Supplemental/Arial.ttf",
       };
       ImGuiIO& io = ImGui::GetIO();
+      ImFont* uiFont = nullptr;
       for (const char* path : candidates)
       {
-         if (io.Fonts->AddFontFromFileTTF(path, baseSize * xscale) != nullptr)
+         if (path[0] == '\0')
+            continue;
+         uiFont = io.Fonts->AddFontFromFileTTF(path, baseSize * xscale);
+         if (uiFont != nullptr)
          {
             io.FontGlobalScale = 1.0f / xscale;
             break;
+         }
+      }
+
+      // Merge a small slice of the Lucide icon font (external/icons/Lucide,
+      // ISC license) into the same atlas at PUA codepoints, so icon glyphs
+      // can be dropped into ordinary ImGui::Text/Button calls alongside UI
+      // text (see IconsLucide.h). MergeMode=true means it rides the same
+      // baseline/line-height as the font just loaded rather than becoming a
+      // separate selectable font - the standard ImGui icon-font idiom.
+      // Restricted to one explicit range (currently just the "search" glyph,
+      // U+E151) rather than Lucide's full 1000+ icon set - the atlas only
+      // pays texture memory for glyphs actually in use.
+      if (uiFont != nullptr)
+      {
+         const std::string bundledLucide = BundledResourcePath("icons/lucide.ttf");
+         if (!bundledLucide.empty())
+         {
+            static const ImWchar iconRanges[] = { 0xE151, 0xE151, 0 };
+            ImFontConfig iconCfg;
+            iconCfg.MergeMode = true;
+            iconCfg.PixelSnapH = true;
+            iconCfg.GlyphMinAdvanceX = baseSize * xscale;
+            io.Fonts->AddFontFromFileTTF(bundledLucide.c_str(), baseSize * xscale, &iconCfg, iconRanges);
          }
       }
    }
@@ -66374,12 +66458,24 @@ int main(int argc, char** argv)
             searchJustOpened = false;
             ImGui::CloseCurrentPopup();
          }
+         // Search glyph from the merged Lucide icon font (see main()'s font
+         // setup / IconsLucide.h) ahead of the input box - the one obviously
+         // net-positive icon spot from the Stage 5 iconography audit: this
+         // is the app's most-used search field (Shift+N node picker), it was
+         // plain text with no visual affordance before, and a leading icon
+         // is exactly the ImGui idiom for it. SetKeyboardFocusHere() still
+         // has to land on the InputText itself, so it moves down next to it
+         // rather than firing on the icon Text widget in between.
+         const float searchIconW = ImGui::CalcTextSize(IconsLucide::Search).x;
+         ImGui::AlignTextToFramePadding();
+         ImGui::TextUnformatted(IconsLucide::Search);
+         ImGui::SameLine();
          if (searchJustOpened)
          {
             ImGui::SetKeyboardFocusHere();
             searchJustOpened = false;
          }
-         ImGui::SetNextItemWidth(210);
+         ImGui::SetNextItemWidth(280.0f - searchIconW - ImGui::GetStyle().ItemSpacing.x);
          ImGui::InputTextWithHint("##q", "search nodes...", searchBuf, sizeof(searchBuf));
          ImGui::Separator();
 
