@@ -53414,7 +53414,7 @@ int main(int argc, char** argv)
          liveCfg.NavigateButtonIndex = gPanWithLeft ? 0 : 1;
       }
 
-      const float kNodePanelWidth = 270.0f;
+      const float kNodePanelWidth = 300.0f;
       const bool viewportPanelOpen = gViewportPanelOpen;
       const bool viewportBottom = viewportPanelOpen && gViewportPanelDock == 0;
       const bool viewportRight = viewportPanelOpen && gViewportPanelDock == 1;
@@ -67667,31 +67667,29 @@ int main(int argc, char** argv)
          // Kept as plain selectable-style buttons rather than an ImGui tab
          // bar so the active mode reads clearly against the panel's own
          // dark background.
-         // Sized from the actual content region rather than a fraction of
-         // kNodePanelWidth: four tabs no longer fit at 0.30 each, and deriving
-         // the width means the row stays exact if a fifth mode ever lands or
-         // the panel width changes.
-         // A wider, explicit gap than the default ItemSpacing: at the
-         // default 6px, the selected tab's rounded highlight rect sat close
-         // enough to its neighbour's that the two read as one unbroken
-         // block with no visible seam between them when switching tabs.
-          const float tabGap = 8.0f;
-          const float tabW = std::max(35.0f, (ImGui::GetContentRegionAvail().x - tabGap * 4.0f) * 0.20f);
-          if (ImGui::Selectable("Modules", gSearchPanelMode == 0, 0, ImVec2(tabW, 0)))
-             gSearchPanelMode = 0;
-          ImGui::SameLine(0.0f, tabGap);
-          if (ImGui::Selectable("Field", gSearchPanelMode == 4, 0, ImVec2(tabW, 0)))
-             gSearchPanelMode = 4;
-          ImGui::SameLine(0.0f, tabGap);
-          if (ImGui::Selectable("Samples", gSearchPanelMode == 1, 0, ImVec2(tabW, 0)))
-             gSearchPanelMode = 1;
-          ImGui::SameLine(0.0f, tabGap);
-          if (ImGui::Selectable("Media", gSearchPanelMode == 2, 0, ImVec2(tabW, 0)))
-             gSearchPanelMode = 2;
-          ImGui::SameLine(0.0f, tabGap);
-          if (ImGui::Selectable("Plugins", gSearchPanelMode == 3, 0, ImVec2(tabW, 0)))
-             gSearchPanelMode = 3;
-          ImGui::Separator();
+         // Sized dynamically across the 5 browser modes (Modules, Field, Samples, Media, Plugins).
+         // Styled with centered alignment and dedicated gaps so labels never collide or clip.
+         const float tabGap = 4.0f;
+         const float totalAvailW = ImGui::GetContentRegionAvail().x;
+         const float tabW = std::max(40.0f, std::floor((totalAvailW - tabGap * 4.0f) / 5.0f));
+
+         ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0.5f, 0.5f));
+         if (ImGui::Selectable("Modules", gSearchPanelMode == 0, 0, ImVec2(tabW, 0)))
+            gSearchPanelMode = 0;
+         ImGui::SameLine(0.0f, tabGap);
+         if (ImGui::Selectable("Field", gSearchPanelMode == 4, 0, ImVec2(tabW, 0)))
+            gSearchPanelMode = 4;
+         ImGui::SameLine(0.0f, tabGap);
+         if (ImGui::Selectable("Samples", gSearchPanelMode == 1, 0, ImVec2(tabW, 0)))
+            gSearchPanelMode = 1;
+         ImGui::SameLine(0.0f, tabGap);
+         if (ImGui::Selectable("Media", gSearchPanelMode == 2, 0, ImVec2(tabW, 0)))
+            gSearchPanelMode = 2;
+         ImGui::SameLine(0.0f, tabGap);
+         if (ImGui::Selectable("Plugins", gSearchPanelMode == 3, 0, ImVec2(tabW, 0)))
+            gSearchPanelMode = 3;
+         ImGui::PopStyleVar();
+         ImGui::Separator();
 
          if (gSearchPanelMode == 0)
          {
