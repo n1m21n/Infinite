@@ -14,6 +14,7 @@
 #include "field/FieldIR.h"
 #include "field/GlslBackend.h"
 #include "field/BackendRegister.h"
+#include "field/ElementBackend.h"
 
 #include <fstream>
 #include <iostream>
@@ -113,6 +114,31 @@ int main(int argc, char** argv)
       return 0;
    }
 
-   std::cerr << "unsupported domain '" << domainArg << "' (supported: pixel, sample)\n";
+   if (domainArg == "element")
+   {
+      // The element domain (per-vertex, on the mesh-cook thread - the
+      // "Modifiers" category, FieldElementNode) shares FieldIR.cpp's typed
+      // IR pass with the pixel backend but lowers to its own register
+      // bytecode (ElementBackend.cpp) instead of GLSL text.
+      Field::ElementIRProgram ir;
+      if (!Field::LowerElementProgramToIR(ast, ir, err))
+      {
+         std::cerr << "line " << err.span.line << ", col " << err.span.col << ": " << err.message << "\n";
+         return 1;
+      }
+
+      Field::ElementProgram prog;
+      if (!Field::EmitElementBytecode(ir, prog, err))
+      {
+         std::cerr << "line " << err.span.line << ", col " << err.span.col << ": " << err.message << "\n";
+         return 1;
+      }
+
+      std::cout << "element program OK: " << prog.loop.code.size() << " loop instruction(s), "
+                 << prog.prologue.code.size() << " prologue instruction(s)\n";
+      return 0;
+   }
+
+   std::cerr << "unsupported domain '" << domainArg << "' (supported: pixel, sample, element)\n";
    return 2;
 }

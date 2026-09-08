@@ -519,6 +519,10 @@ add_executable(field-preset-check
     src/core/field/Transfer.cpp
     src/core/field/ReduceOps.cpp
     src/core/field/BackendRegister.cpp
+    src/core/field/ElementBackend.cpp
+    src/core/field/ElementStore.cpp
+    src/core/field/FieldRandom.cpp
+    src/core/field/FieldState.cpp
 )
 target_include_directories(field-preset-check PRIVATE src src/core)
 
