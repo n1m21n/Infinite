@@ -314,6 +314,77 @@ const std::vector<FilterDef>& GetFilterDefs()
         "}\n",
         { P("Exposure", "uExposure", T::Float, -3.0f, 3.0f, 0.0f) } },
 
+      // ---------------- Alpha / opacity operators ----------------
+      // Nothing above edits an existing alpha channel directly - chroma/luma
+      // key only produce one. "show alpha" is the debugging tool users
+      // actually reach for first (visualize the matte inline), so it's kept
+      // simplest and first in this block.
+      { "show alpha", "Compositing",
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   fragColor = vec4(vec3(c.a), 1.0);\n"
+        "}\n",
+        {} },
+
+      { "opacity", "Compositing",
+        "uniform float uOpacity;\n"
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   fragColor = vec4(c.rgb, c.a * uOpacity);\n"
+        "}\n",
+        { P("Opacity", "uOpacity", T::Float, 0.0f, 1.0f, 1.0f) } },
+
+      { "set alpha", "Compositing",
+        "uniform float uAlpha;\n"
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   fragColor = vec4(c.rgb, uAlpha);\n"
+        "}\n",
+        { P("Alpha", "uAlpha", T::Float, 0.0f, 1.0f, 1.0f) } },
+
+      { "alpha invert", "Compositing",
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   fragColor = vec4(c.rgb, 1.0 - c.a);\n"
+        "}\n",
+        {} },
+
+      { "alpha from luma", "Compositing",
+        "uniform int uInvert;\n"
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   float luma = dot(c.rgb, vec3(0.299, 0.587, 0.114));\n"
+        "   if (uInvert == 1) luma = 1.0 - luma;\n"
+        "   fragColor = vec4(c.rgb, luma);\n"
+        "}\n",
+        { E("invert", "uInvert", { "Off", "On" }, 0) } },
+
+      // Low/high/gamma remap matches the Black Point / White Point / Gamma
+      // convention used by the "color adjustments" Levels section below:
+      // clamp-normalize between the two points, then a gamma pow.
+      { "alpha levels", "Compositing",
+        "uniform float uLow;\n"
+        "uniform float uHigh;\n"
+        "uniform float uGamma;\n"
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   float a = clamp((c.a - uLow) / max(uHigh - uLow, 0.0001), 0.0, 1.0);\n"
+        "   a = pow(a, 1.0 / max(uGamma, 0.0001));\n"
+        "   fragColor = vec4(c.rgb, a);\n"
+        "}\n",
+        { P("Low", "uLow", T::Float, 0.0f, 1.0f, 0.0f),
+          P("High", "uHigh", T::Float, 0.0f, 1.0f, 1.0f),
+          P("Gamma", "uGamma", T::Float, 0.1f, 4.0f, 1.0f) } },
+
+      { "premultiply", "Compositing",
+        "uniform int uMode;\n"
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   vec3 col = (uMode == 0) ? c.rgb * c.a : c.rgb / max(c.a, 1e-4);\n"
+        "   fragColor = vec4(col, c.a);\n"
+        "}\n",
+        { E("mode", "uMode", { "Premultiply", "Unpremultiply" }, 0) } },
+
       // ---------------- Effects: bloom / glow ----------------
       { "bloom", "Effects",
         "uniform float uThreshold;\n"
