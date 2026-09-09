@@ -22414,6 +22414,13 @@ namespace
             ModSlider("scale x", &n->scaleX, 0.05f, 4.0f);
             ModSlider("scale y", &n->scaleY, 0.05f, 4.0f);
             ModSlider("scale z", &n->scaleZ, 0.05f, 4.0f);
+            // Point rotate/scale pivot about - default (0,0,0) matches the
+            // mesh's own origin, i.e. no visible change from before pivot
+            // existed. Sits after scale/before spin, same order TransformMatrix()
+            // applies move/rotate/scale/pivot in.
+            ModSlider("pivot x", &n->pivotX, -3.0f, 3.0f);
+            ModSlider("pivot y", &n->pivotY, -3.0f, 3.0f);
+            ModSlider("pivot z", &n->pivotZ, -3.0f, 3.0f);
             ModSlider("spin / beat", &n->spin, -2.0f, 2.0f);
             break;
          case GeometryOpNode::kArray:
