@@ -21,9 +21,13 @@ namespace
          + "void main() {\n"
            "   vec4 a = texture(uTexA, vUv);\n"
            "   vec4 b = texture(uTexB, vUv);\n"
-           "   if (uMode == 30) { fragColor = vec4(a.rgb, a.a * (1.0 - b.a * uMix)); return; }\n"
+           "   if (uMode == " + std::to_string(BlendModes::kEraseMode) + ") { fragColor = vec4(a.rgb, a.a * (1.0 - b.a * uMix)); return; }\n"
            "   vec3 blended = blendMode(uMode, a.rgb, b.rgb);\n"
-           "   fragColor = vec4(mix(a.rgb, blended, uMix * b.a), max(a.a, b.a));\n"
+           "   float as = b.a * uMix;\n"
+           "   vec3 cs = mix(b.rgb, blended, a.a);\n"
+           "   float ar = as + a.a * (1.0 - as);\n"
+           "   vec3 cr = (ar > 1e-5) ? (cs * as + a.rgb * a.a * (1.0 - as)) / ar : vec3(0.0);\n"
+           "   fragColor = vec4(cr, ar);\n"
            "}\n";
       return src;
    }
