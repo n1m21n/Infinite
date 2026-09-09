@@ -376,6 +376,73 @@ namespace
       DrawCheckerboardBackdrop(dl, origin, ImVec2(origin.x + size, origin.y + size), rounding);
    }
 
+   // Blender-style numpad view hotkeys for any hovered orbit-camera viewport
+   // item (mini-viewport, viewport-panel card, Render3D preview): 1/3/7 snap
+   // to front/right/top, Ctrl+1/3/7 to back/left/bottom, 0 to a default
+   // three-quarter view. Both the number row and the numeric keypad fire the
+   // same view, matching Blender's own leniency. Must be called right after
+   // the InvisibleButton/item whose hover state should gate it - like the
+   // drag/wheel handling beside every call site, it reads
+   // ImGui::IsItemHovered() for the *last* item, so no hover state needs to
+   // be threaded through. Also refuses to fire while a text field has focus,
+   // so typing "1" into a param field doesn't reframe a hovered-but-unrelated
+   // viewport behind it. Returns true if it changed azimuth/elevation. An
+   // optional onWillChange is invoked right before the write happens - the
+   // two Render3D call sites use it to PushUndoCheckpoint() while the old
+   // values are still live, matching that camera's "orbit"/"elevation"
+   // sliders; the two gNodeCameras (mini-viewport/panel) sites pass nothing,
+   // matching drag-orbit there, which also pushes no undo checkpoint.
+   bool ApplyViewHotkeys(float& azimuth, float& elevation, const std::function<void()>& onWillChange = nullptr)
+   {
+      if (!ImGui::IsItemHovered() || ImGui::GetIO().WantTextInput)
+         return false;
+
+      const bool ctrl = ImGui::GetIO().KeyCtrl;
+      // Pole clamp matches the drag-orbit elevation clamp used everywhere
+      // else in this file (DrawPreview, the Render3D "elevation" slider):
+      // exactly 90 makes the up vector parallel to the view direction and
+      // the image rolls.
+      const float kPole = 85.9437f;
+
+      auto pressed = [](ImGuiKey rowKey, ImGuiKey padKey) {
+         return ImGui::IsKeyPressed(rowKey, false) || ImGui::IsKeyPressed(padKey, false);
+      };
+
+      float newAzimuth, newElevation;
+      if (pressed(ImGuiKey_1, ImGuiKey_Keypad1))
+      {
+         newAzimuth = ctrl ? 180.0f : 0.0f;      // front / back
+         newElevation = 0.0f;
+      }
+      else if (pressed(ImGuiKey_3, ImGuiKey_Keypad3))
+      {
+         newAzimuth = ctrl ? -90.0f : 90.0f;     // right / left
+         newElevation = 0.0f;
+      }
+      else if (pressed(ImGuiKey_7, ImGuiKey_Keypad7))
+      {
+         newAzimuth = 0.0f;
+         newElevation = ctrl ? -kPole : kPole;   // top / bottom
+      }
+      else if (pressed(ImGuiKey_0, ImGuiKey_Keypad0))
+      {
+         newAzimuth = 34.3775f;                  // default three-quarter view
+         newElevation = 22.9183f;
+      }
+      else
+      {
+         return false;
+      }
+
+      // Snapshot before the write, not after - an undo checkpoint taken
+      // once the new values are already live would have nothing to restore.
+      if (onWillChange)
+         onWillChange();
+      azimuth = newAzimuth;
+      elevation = newElevation;
+      return true;
+   }
+
    // Registered node names are the patch-file keys and must not change, so
    // casing is a display concern only - lowering it here keeps saved patches
    // loading while the UI reads the way the user asked for.
@@ -23949,6 +24016,13 @@ namespace
          }
       }
 
+      // Numpad view hotkeys (1/3/7/0, Ctrl+1/3/7). Unlike drag-orbit above,
+      // a hotkey view snap on this render's own camera is treated as a
+      // deliberate edit worth undoing - PushUndoCheckpoint() before the
+      // write, the same as the "orbit"/"elevation" sliders for this same
+      // camera (main.cpp ~23053).
+      ApplyViewHotkeys(*azimuth, *elevation, []() { PushUndoCheckpoint(); });
+
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
                      IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
@@ -24176,6 +24250,10 @@ namespace
             vio.MouseWheel = 0.0f;
          }
       }
+      // Numpad view hotkeys (1/3/7/0, Ctrl+1/3/7). No undo checkpoint here,
+      // matching drag-orbit just above on this same gNodeCameras entry,
+      // which also pushes none.
+      ApplyViewHotkeys(cam.azimuth, cam.elevation);
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
                      IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
@@ -24352,6 +24430,9 @@ namespace
                vio.MouseWheel = 0.0f;
             }
          }
+         // Numpad view hotkeys (1/3/7/0, Ctrl+1/3/7). No undo checkpoint,
+         // matching drag-orbit just above on this same gNodeCameras entry.
+         ApplyViewHotkeys(cam.azimuth, cam.elevation);
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             dl->AddRect(origin, br, IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
          // Layout cursor already sits at origin+imageSize from the
@@ -24455,6 +24536,9 @@ namespace
                   vio.MouseWheel = 0.0f;
                }
             }
+            // Numpad view hotkeys (1/3/7/0, Ctrl+1/3/7) - undoable, same as
+            // this render's "orbit"/"elevation" sliders (main.cpp ~23053).
+            ApplyViewHotkeys(*azimuth, *elevation, []() { PushUndoCheckpoint(); });
             if (ImGui::IsItemHovered() || ImGui::IsItemActive())
                dl->AddRect(origin, br, IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
             ImGui::SetCursorScreenPos(origin);
