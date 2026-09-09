@@ -190,9 +190,9 @@ public:
       return &mPoints;
    }
    unsigned long long PointCloudRevision() override { return bypassed ? 0 : mRevision; }
-   // Mirrors RebuildMeshIfNeeded()'s baseHalf (GenerativeNodes.cpp) so
-   // Render3D's sprite draw and this node's own mini-viewport agree on what
-   // p.scale = 1.0 actually measures.
+   // Matches the swatch-quad sizing GetMesh() used to bake per point before
+   // the D5 fix (geometry-domains audit, Phase 4) made it honestly empty, so
+   // Render3D's sprite draw still agrees on what p.scale = 1.0 measures.
    float PointBaseSize() const override
    {
       const int n = std::max(2, std::min(density, 512));
@@ -200,9 +200,8 @@ public:
       return cell * 0.45f;
    }
 
-   // IGeometrySource: a swatch quad per point, each sampling its own texel of
-   // the downsampled source image rather than the whole image tiled per-quad
-   // (which is what MeshOps::PointsToFaces's 0..1 corner UVs would give).
+   // IGeometrySource: honestly empty (D5, geometry-domains audit Phase 4) -
+   // this node's only real geometry output is the point cloud above.
    const Mesh& GetMesh() override;
    unsigned long long MeshRevision() override;
    Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
@@ -251,7 +250,6 @@ private:
    // Resolves the source into a density x density target before reading back,
    // so the CPU never sees the full-resolution image.
    bool EnsureDownsampler(int n);
-   void RebuildMeshIfNeeded();
 
    ImageCable mInput;
    std::vector<Particle> mPoints;
@@ -268,8 +266,4 @@ private:
    unsigned int mProgram = 0;
    bool mShaderTried = false;
    int mLastCookFrame = -1;
-
-   Mesh mCookedMesh;
-   unsigned long long mCookedMeshRevision = 0;
-   unsigned long long mBuiltMeshRevision = (unsigned long long)-1;
 };

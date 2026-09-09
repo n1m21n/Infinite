@@ -852,7 +852,6 @@ public:
 private:
    void RebuildIfNeeded();
 
-   Mesh mCache;
    std::vector<Particle> mPoints;
    size_t mPointCount = 0;
    unsigned long long mMeshRevision = 0;

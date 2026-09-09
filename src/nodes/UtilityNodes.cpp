@@ -457,9 +457,8 @@ void MeshToPointsNode::RebuildIfNeeded()
 {
    if (input == nullptr)
    {
-      if (!mCache.vertices.empty() || !mPoints.empty())
+      if (!mPoints.empty())
       {
-         mCache = Mesh();
          mPoints.clear();
          mPointCount = 0;
          mMeshRevision = NextMeshRevision();
