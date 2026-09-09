@@ -22,6 +22,7 @@ namespace
            "   vec4 a = texture(uTexA, vUv);\n"
            "   vec4 b = texture(uTexB, vUv);\n"
            "   if (uMode == " + std::to_string(BlendModes::kEraseMode) + ") { fragColor = vec4(a.rgb, a.a * (1.0 - b.a * uMix)); return; }\n"
+           "   if (uMode == " + std::to_string(BlendModes::kAntiEraseMode) + ") { fragColor = vec4(a.rgb, a.a * (1.0 - (1.0 - b.a) * uMix)); return; }\n"
            "   vec3 blended = blendMode(uMode, a.rgb, b.rgb);\n"
            "   float as = b.a * uMix;\n"
            "   vec3 cs = mix(b.rgb, blended, a.a);\n"

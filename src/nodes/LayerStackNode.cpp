@@ -38,6 +38,7 @@ namespace
            "      float amt = uOpacity[i] * layer.a;\n"
            "      if (!haveBase) { acc = vec4(layer.rgb, layer.a * uOpacity[i]); haveBase = true; continue; }\n"
            "      if (uModes[i] == " + std::to_string(BlendModes::kEraseMode) + ") { acc.a *= (1.0 - amt); continue; }\n"
+           "      if (uModes[i] == " + std::to_string(BlendModes::kAntiEraseMode) + ") { acc.a *= (1.0 - (1.0 - layer.a) * uOpacity[i]); continue; }\n"
            "      vec3 blended = blendMode(uModes[i], acc.rgb, layer.rgb);\n"
            "      vec3 cs = mix(layer.rgb, blended, acc.a);\n"
            "      float ar = amt + acc.a * (1.0 - amt);\n"

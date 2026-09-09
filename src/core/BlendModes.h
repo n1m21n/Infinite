@@ -11,8 +11,10 @@ namespace BlendModes
    const std::vector<std::string>& Names();
 
    // Defines: float Lum(vec3), vec3 blendMode(int mode, vec3 base, vec3 top)
-   // Mode index 30 (Erase) is alpha-only and must be handled by the caller.
+   // Mode index 30 (Erase) and mode index 31 (Anti-Erase, the exact complement
+   // of Erase) are both alpha-only and must be handled by the caller.
    extern const char* kBlendGLSL;
 
    const int kEraseMode = 30;
+   const int kAntiEraseMode = 31;
 }
