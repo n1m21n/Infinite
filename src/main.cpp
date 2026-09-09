@@ -49660,6 +49660,21 @@ int main(int argc, char** argv)
                                        : settingsDir + "/InfiniteDragTest.json";
       remove(graphPath.c_str());
    }
+   else if (getenv("INFINITE_WTDRAGTEST") != nullptr)
+   {
+      // Same reasoning as INFINITE_DRAGTEST above: whatever pan/zoom an
+      // earlier self-test left in the shared SettingsFile gets restored
+      // here, and phase 3 of the drag below moves the mouse by a fixed
+      // *screen*-pixel delta that assumes the default 1.0 zoom. A leftover
+      // zoom from a prior run (e.g. when this runs after other UI-group
+      // tests in the same hygiene pass) shrinks that delta in canvas space
+      // enough that the filter envelope's attack handle sees no change at
+      // all - the test then fails only when run after other tests, never
+      // standalone. A throwaway path keeps this test's view state isolated.
+      graphPath = settingsDir.empty() ? std::string("InfiniteWtDragTest.json")
+                                       : settingsDir + "/InfiniteWtDragTest.json";
+      remove(graphPath.c_str());
+   }
    else if (!graphPath.empty())
    {
       if (FILE* f = fopen(graphPath.c_str(), "rb"))
