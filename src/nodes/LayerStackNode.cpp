@@ -38,6 +38,7 @@ namespace
            "      float amt = uOpacity[i] * layer.a;\n"
            "      if (!haveBase) { acc = vec4(layer.rgb, layer.a * uOpacity[i]); haveBase = true; continue; }\n"
            "      if (uModes[i] == 30) { acc.a *= (1.0 - amt); continue; }\n"
+           "      if (uModes[i] == 31) { acc.a *= (1.0 - (1.0 - layer.a) * uOpacity[i]); continue; }\n"
            "      vec3 blended = blendMode(uModes[i], acc.rgb, layer.rgb);\n"
            "      acc.rgb = mix(acc.rgb, blended, amt);\n"
            "      acc.a = max(acc.a, layer.a * uOpacity[i]);\n"

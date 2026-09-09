@@ -22,6 +22,7 @@ namespace
            "   vec4 a = texture(uTexA, vUv);\n"
            "   vec4 b = texture(uTexB, vUv);\n"
            "   if (uMode == 30) { fragColor = vec4(a.rgb, a.a * (1.0 - b.a * uMix)); return; }\n"
+           "   if (uMode == 31) { fragColor = vec4(a.rgb, a.a * (1.0 - (1.0 - b.a) * uMix)); return; }\n"
            "   vec3 blended = blendMode(uMode, a.rgb, b.rgb);\n"
            "   fragColor = vec4(mix(a.rgb, blended, uMix * b.a), max(a.a, b.a));\n"
            "}\n";
