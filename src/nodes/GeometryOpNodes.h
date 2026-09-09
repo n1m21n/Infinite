@@ -184,6 +184,11 @@ public:
    bool flatShade = false, flipNormals = false;
    float seed = 0.0f;
    int axis = 1;
+   // Explode only: 0 = Faces (push each triangle along its own normal - the
+   // original behaviour, and the default so every existing patch looks
+   // unchanged), 1 = Loose Parts (push each connected component of the mesh
+   // outward as a rigid unit - see MeshOps::Explode's looseParts branch).
+   int explodeBy = 0;
 
    // Smooth
    int iterations = 2;
@@ -255,6 +260,7 @@ public:
       v.Float("thickness", thickness); v.Bool("keepOriginal", keepOriginal);
       v.Float("inset", inset); v.Bool("flat", flatShade); v.Bool("flip", flipNormals);
       v.Float("seed", seed); v.Int("axis", axis);
+      v.Int("explodeBy", explodeBy);
       v.Int("iterations", iterations); v.Float("mirrorOffset", mirrorOffset);
       v.Bool("weldSeam", weldSeam); v.Int("screwSteps", screwSteps);
       v.Float("turns", turns); v.Float("rise", rise); v.Float("radiusOffset", radiusOffset);
@@ -278,7 +284,7 @@ public:
 private:
    struct Signature
    {
-      int op = -1, count = 0, levels = 0, axis = 0;
+      int op = -1, count = 0, levels = 0, axis = 0, explodeBy = 0;
       float a = 0, ox = 0, oy = 0, oz = 0, rs = 0, ss = 0, rad = 0;
       float sm = 0, th = 0, ins = 0, sd = 0;
       float rx = 0, ry = 0, rz = 0, sx = 0, sy = 0, sz = 0;
@@ -312,6 +318,7 @@ private:
       bool operator==(const Signature& o) const
       {
          return op == o.op && count == o.count && levels == o.levels && axis == o.axis &&
+                explodeBy == o.explodeBy &&
                 a == o.a && ox == o.ox && oy == o.oy && oz == o.oz && rs == o.rs &&
                 ss == o.ss && rad == o.rad && sm == o.sm && th == o.th && ins == o.ins &&
                 sd == o.sd && radial == o.radial && keep == o.keep && flat == o.flat &&

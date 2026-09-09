@@ -22527,9 +22527,13 @@ namespace
             ModCheckbox("flip", &n->flipNormals);
             break;
          case GeometryOpNode::kExplode:
+         {
+            static const std::vector<std::string> kExplodeByNames = { "Faces", "Loose Parts" };
+            DropdownButton("by", kExplodeByNames, n->explodeBy, [n](int i) { n->explodeBy = i; });
             ModSlider("amount", &n->amount, 0.0f, 3.0f);
             ModSlider("seed", &n->seed, 0.0f, 100.0f);
             break;
+         }
          case GeometryOpNode::kSmooth:
             ModSliderInt("pre-subdivide", &n->levels, 0, 3);
             ModSliderInt("iterations", &n->iterations, 1, 20);
