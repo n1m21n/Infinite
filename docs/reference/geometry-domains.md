@@ -39,14 +39,22 @@ actually has.
 
 ---
 
-## Node count: 28, not 29
+## Node count: 28, not 29 — resolved
 
-Grepping `class .* : public.*IGeometrySource` across `src/nodes/` yields 28
-distinct classes (listed below). The originating investigation's count of 29
-is not reproduced by this audit — no 29th implementer was found. **Open
-question for the user**, not resolved by assumption: was a class since
-removed/renamed, or was one class double-counted (e.g. `GeometryNode`
-registers many primitive shapes via `CreateFor`, but that is one C++ class)?
+Grepping `class .* : public.*IGeometrySource` across all of `src/` (not just
+`src/nodes/`) yields exactly 28 distinct node classes (listed below), plus 5
+`IGeometrySource`-implementing structs in `src/main.cpp` that are self-test
+probes/fixtures (`DummyGeo` ×2, `CloudProbe`, `TransformProbeSource`,
+`MappingProbeSource`) — not user-facing nodes, correctly excluded from the
+node catalog. No 29th user-facing implementer exists anywhere in the
+codebase. `PathNode` and `GeometryTableNode` were double-checked directly
+(`src/nodes/PathNode.h:19`, `src/nodes/GeometryTableNode.h:17`) and both
+implement `IModulator`, not `IGeometrySource` — they are geometry
+*consumers* only, as the established-findings table already had them.
+`git log --all --diff-filter=D` over `src/nodes/*.h`/`*.cpp` shows no
+deleted geometry-node file that could explain a since-removed 29th class.
+**Conclusion: the audit prompt's count of 29 was simply incorrect; 28 is the
+authoritative roster for phase 2.**
 
 ---
 
