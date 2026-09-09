@@ -475,6 +475,13 @@ namespace
       // unspaced outlier in search/spawn menus.
       if (name == "FieldPixel")
          return "field pixel";
+      // Registered type key stays "transform" (patches key off it), but the
+      // 3D geometry operator is *also* registered as "Transform" and both
+      // fall through to the same lowercased "transform" here, making them
+      // indistinguishable in search except for a dimmed category tag -
+      // give the 2D/compositing one a distinct label.
+      if (name == "transform")
+         return "2d transform";
 #if defined(_WIN32)
       // Registered type key stays "Syphon In"/"Syphon Out" (patch files key
       // off it), but the Windows implementation is backed by Spout2, not
@@ -65111,6 +65118,14 @@ int main(int argc, char** argv)
             gSpawnPos = ed::ScreenToCanvas(ImGui::GetMousePos());
             searchBuf[0] = '\0';
             searchJustOpened = true;
+            // Opening at the raw mouse/drop position (ImGui's default for a
+            // plain OpenPopup) has no on-screen clamping, so a drop near the
+            // canvas edge pins the popup flush against it and clips whatever
+            // doesn't fit - especially bad here since the Suggested list can
+            // be tall (many recommended node types) before any filtering.
+            // Shift+N already avoids this by centering; do the same here
+            // rather than trusting the drop point to have room around it.
+            searchPopupCentered = true;
             ImGui::OpenPopup("search");
          }
       }
@@ -67113,7 +67128,7 @@ int main(int argc, char** argv)
          ImGui::EndPopup();
       }
 
-      ImGui::SetNextWindowSizeConstraints(ImVec2(230, 0), ImVec2(300, 440));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(260, 0), ImVec2(320, 440));
       if (searchPopupCentered)
       {
          const ImVec2 center = ImVec2(gGraphScreenTL.x + gGraphScreenSize.x * 0.5f,
@@ -67149,7 +67164,7 @@ int main(int argc, char** argv)
             ImGui::SetKeyboardFocusHere();
             searchJustOpened = false;
          }
-         ImGui::SetNextItemWidth(280.0f - searchIconW - ImGui::GetStyle().ItemSpacing.x);
+         ImGui::SetNextItemWidth(-FLT_MIN);
          ImGui::InputTextWithHint("##q", "search nodes...", searchBuf, sizeof(searchBuf));
          ImGui::Separator();
 
@@ -67171,7 +67186,9 @@ int main(int argc, char** argv)
                for (const auto& t : gLinkDragSuggestions)
                {
                   ++shown;
-                  if (ImGui::MenuItem(DisplayName(t.first).c_str()))
+                  const std::string title = DisplayName(t.first);
+                  const std::string category = DisplayName(t.second);
+                  if (ImGui::MenuItem(title.c_str(), category.c_str()))
                   {
                      spawnName = t.first;
                      spawnCategory = t.second;
@@ -67217,20 +67234,7 @@ int main(int argc, char** argv)
                ++shown;
                const std::string title = DisplayName(t.first);
                const std::string category = DisplayName(t.second);
-               const float rowW = ImGui::GetContentRegionAvail().x;
-               const ImVec2 posBefore = ImGui::GetCursorScreenPos();
-               bool activate = ImGui::Selectable(title.c_str(), false, 0, ImVec2(rowW, 0.0f));
-               // Draw the category as secondary/dimmed subtitle on the trailing edge of the row
-               {
-                  const float catW = ImGui::CalcTextSize(category.c_str()).x;
-                  const float catX = posBefore.x + rowW - catW - 4.0f;
-                  const float catY = posBefore.y + (ImGui::GetItemRectSize().y - ImGui::GetTextLineHeight()) * 0.5f;
-                  if (catX > posBefore.x + ImGui::CalcTextSize(title.c_str()).x + 12.0f)
-                  {
-                     const ImU32 dimCol = ImGui::GetColorU32(ImGuiCol_TextDisabled);
-                     ImGui::GetWindowDrawList()->AddText(ImVec2(catX, catY), dimCol, category.c_str());
-                  }
-               }
+               bool activate = ImGui::MenuItem(title.c_str(), category.c_str());
                if (shown == 1 && pickFirst)
                   activate = true;
                if (activate)
