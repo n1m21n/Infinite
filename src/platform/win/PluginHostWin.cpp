@@ -98,13 +98,19 @@ namespace Platform
    {
       return {};
    }
+
+   std::vector<std::string> UnsupportedPluginsSeen()
+   {
+      return {};
+   }
 #endif // !INFINITE_ENABLE_VST3
 
 #if INFINITE_ENABLE_VST3
    // EnumerateVST3Plugins, DescribeVST3Bundle, CacheVST3BundlePath,
-   // SetVST3SearchFolders, VST3Blocklist, ClearVST3Blocklist, and
-   // VST3ScanFailures are all defined directly in the Platform namespace by
-   // PluginVST3Win.cpp when the flag is on - nothing to dispatch here.
+   // SetVST3SearchFolders, VST3Blocklist, ClearVST3Blocklist,
+   // VST3ScanFailures, and UnsupportedPluginsSeen are all defined directly in
+   // the Platform namespace by PluginVST3Win.cpp when the flag is on -
+   // nothing to dispatch here.
 
    PluginHandle* PluginCreate(const PluginDesc& desc, double sampleRate, int maxBlockFrames)
    {

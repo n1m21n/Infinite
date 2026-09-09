@@ -328,6 +328,7 @@ namespace
    std::mutex gVST3SafetyMutex; // guards gBlocklist and every sentinel/failure op below
    std::vector<std::string> gBlocklist;
    std::vector<std::string> gScanFailures;
+   std::vector<std::string> gUnsupportedPlugins; // guarded by gVST3SafetyMutex, see VST3ScanFailures
    bool gBlocklistLoaded = false;
 
    void LoadBlocklistLocked()
@@ -855,6 +856,12 @@ namespace Platform
       return gScanFailures;
    }
 
+   std::vector<std::string> UnsupportedPluginsSeen()
+   {
+      std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
+      return gUnsupportedPlugins;
+   }
+
    // Recursive folder walk building the batch DescribeVST3Bundle probes.
    // Unlike Mac (where only the directory-bundle form of ".vst3" exists), a
    // plain single-file "Foo.vst3" DLL is also legal and common on Windows, so
@@ -866,9 +873,11 @@ namespace Platform
       {
          std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
          gScanFailures.clear();
+         gUnsupportedPlugins.clear();
       }
 
       std::vector<std::string> bundlesToScan;
+      std::vector<std::string> unsupported;
       for (const std::string& root : folders)
       {
          if (root.empty())
@@ -902,11 +911,28 @@ namespace Platform
                {
                   bundlesToScan.push_back(entry.path().string());
                }
+               else if (!entryEc)
+               {
+                  // A top-level file that isn't a ".vst3" - never anything
+                  // living inside a ".vst3" bundle directory, since those are
+                  // never pushed onto dirStack. A ".dll" here is the classic
+                  // Windows VST2 plugin binary; ".vst" is the (rarer, legacy)
+                  // VST2 extension some hosts also accept. Filename check
+                  // only, never loaded.
+                  const std::string ext = entry.path().extension().string();
+                  if (ext == ".dll" || ext == ".vst")
+                     unsupported.push_back(entry.path().string());
+               }
                it.increment(ec);
                if (ec)
                   break;
             }
          }
+      }
+
+      {
+         std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
+         gUnsupportedPlugins = std::move(unsupported);
       }
 
       ProbeVST3BundlesBatch(std::move(bundlesToScan), out);

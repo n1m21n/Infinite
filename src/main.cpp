@@ -15284,6 +15284,19 @@ namespace
             ImGui::TreePop();
          }
       }
+
+      if (!gPluginScanner.UnsupportedPlugins().empty())
+      {
+         const std::string label = std::to_string(gPluginScanner.UnsupportedPlugins().size())
+            + " VST2 plugin" + (gPluginScanner.UnsupportedPlugins().size() == 1 ? "" : "s")
+            + " found and skipped - Infinite hosts VST3 and AU only";
+         if (ImGui::TreeNodeEx(label.c_str(), ImGuiTreeNodeFlags_None))
+         {
+            for (const std::string& path : gPluginScanner.UnsupportedPlugins())
+               ImGui::TextWrapped("%s", path.c_str());
+            ImGui::TreePop();
+         }
+      }
 #else
       ImGui::TextDisabled("VST3 support is not compiled into this build.");
 #endif

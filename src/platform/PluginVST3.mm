@@ -228,6 +228,7 @@ namespace Platform
    std::mutex gVST3SafetyMutex; // guards gBlocklist and every sentinel/failure op below
    std::vector<std::string> gBlocklist;
    std::vector<std::string> gScanFailures;
+   std::vector<std::string> gUnsupportedPlugins; // guarded by gVST3SafetyMutex, see VST3ScanFailures
    bool gBlocklistLoaded = false;
 
    void LoadBlocklistLocked()
@@ -678,6 +679,12 @@ namespace Platform
    {
       std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
       return gScanFailures;
+   }
+
+   std::vector<std::string> UnsupportedPluginsSeen()
+   {
+      std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
+      return gUnsupportedPlugins;
    }
 }
 
@@ -1817,9 +1824,11 @@ namespace Platform
       {
          std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
          gScanFailures.clear();
+         gUnsupportedPlugins.clear();
       }
 
       std::vector<std::string> bundlesToScan;
+      std::vector<std::string> unsupported;
       for (const std::string& root : folders)
       {
          if (root.empty())
@@ -1844,20 +1853,46 @@ namespace Platform
                std::error_code entryEc;
                if (entry.is_directory(entryEc) && !entryEc)
                {
-                  if (entry.path().extension() == ".vst3")
+                  const std::string ext = entry.path().extension().string();
+                  if (ext == ".vst3")
                   {
                      bundlesToScan.push_back(entry.path().string());
+                  }
+                  else if (ext == ".vst")
+                  {
+                     // A top-level ".vst" bundle directory: the macOS VST2
+                     // format. Recognized-but-unsupported - report it, don't
+                     // recurse into it (nothing inside is a supported plugin
+                     // either, and we never open/load its contents).
+                     unsupported.push_back(entry.path().string());
                   }
                   else
                   {
                      dirStack.push_back(entry.path());
                   }
                }
+               else if (!entryEc)
+               {
+                  // A top-level file (never anything living inside a ".vst3"
+                  // bundle - those directories are never pushed onto
+                  // dirStack, so their contents are never visited by this
+                  // loop). A bare ".dll" sitting directly in a scanned VST3
+                  // folder on macOS is, in practice, a Windows VST2 plugin
+                  // dropped in by mistake; filename check only, never opened.
+                  const std::string ext = entry.path().extension().string();
+                  if (ext == ".dll" || ext == ".vst")
+                     unsupported.push_back(entry.path().string());
+               }
                it.increment(ec);
                if (ec)
                   break;
             }
          }
+      }
+
+      {
+         std::lock_guard<std::mutex> lock(gVST3SafetyMutex);
+         gUnsupportedPlugins = std::move(unsupported);
       }
 
       ProbeVST3BundlesBatch(std::move(bundlesToScan), out);
