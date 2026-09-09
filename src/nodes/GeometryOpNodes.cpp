@@ -761,6 +761,7 @@ void InstanceOnPointsNode::Rebuild()
 
    const std::vector<MeshPoint> points = MeshOps::ToPoints(src, pointMode, maxPoints);
    mTransforms.reserve(points.size());
+   mColors.reserve(points.size() * 3);
 
    for (size_t i = 0; i < points.size(); i++)
    {
@@ -803,6 +804,9 @@ void InstanceOnPointsNode::Rebuild()
                                            p.py + p.ny * normalOffset,
                                            p.pz + p.nz * normalOffset), m);
       mTransforms.push_back(Mat4::Multiply(m, shapeModel));
+      mColors.push_back(p.r);
+      mColors.push_back(p.g);
+      mColors.push_back(p.b);
    }
 }
 
