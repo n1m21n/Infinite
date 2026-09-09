@@ -119,6 +119,12 @@ Mat4 GeometryOpNode::TransformMatrix() const
    m = Mat4::Multiply(Mat4::RotationZ(rotZ * d2r), m);
    m = Mat4::Multiply(Mat4::RotationY(rotY * d2r + spinPhase), m);
    m = Mat4::Multiply(Mat4::RotationX(rotX * d2r), m);
+   // Rotate/scale about pivot instead of the mesh's own origin: shift into
+   // pivot-local space before R*S, then shift back out, before the overall
+   // move (offsetX/Y/Z) is applied. At pivot == (0,0,0) both translations are
+   // identity and this is a no-op - same matrix as before pivot existed.
+   m = Mat4::Multiply(m, Mat4::Translation(-pivotX, -pivotY, -pivotZ));
+   m = Mat4::Multiply(Mat4::Translation(pivotX, pivotY, pivotZ), m);
    m = Mat4::Multiply(Mat4::Translation(offsetX, offsetY, offsetZ), m);
    return m;
 }
@@ -161,6 +167,7 @@ GeometryOpNode::Signature GeometryOpNode::CurrentSignature() const
    s.sm = smooth; s.th = thickness; s.ins = inset; s.sd = seed;
    s.rx = rotX; s.ry = rotY; s.rz = rotZ;
    s.sx = scaleX; s.sy = scaleY; s.sz = scaleZ;
+   s.px = pivotX; s.py = pivotY; s.pz = pivotZ;
    // Forces a rebuild every cook while spinning, since the baked-in rotation
    // (TransformMatrix()) would otherwise freeze at whichever beat happened to
    // be live the first time this signature matched.

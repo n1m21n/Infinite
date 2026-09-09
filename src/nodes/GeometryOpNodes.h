@@ -162,6 +162,11 @@ public:
    // are what "rot / step" and "scale / step" mean).
    float rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f;
    float scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f;
+   // Transform / Transform Selected only: point rotate and scale pivot about,
+   // instead of the mesh's own origin. TransformMatrix() shifts into
+   // pivot-local space before R*S and back out before offsetX/Y/Z - at
+   // (0,0,0) (the default) this is a no-op, identical to no pivot existing.
+   float pivotX = 0.0f, pivotY = 0.0f, pivotZ = 0.0f;
    // Transform / Transform Selected only: extra Y-axis rotation per beat, on
    // top of rotY, so a shape can spin on its own - same idea as GeometryNode's
    // spinY. TransformMatrix() bakes this into the mesh cache when not
@@ -243,6 +248,7 @@ public:
       v.Float("rotStep", rotStep); v.Float("scaleStep", scaleStep);
       v.Float("rotX", rotX); v.Float("rotY", rotY); v.Float("rotZ", rotZ);
       v.Float("scaleX", scaleX); v.Float("scaleY", scaleY); v.Float("scaleZ", scaleZ);
+      v.Float("pivotX", pivotX); v.Float("pivotY", pivotY); v.Float("pivotZ", pivotZ);
       v.Float("spin", spin);
       v.Bool("radial", radial); v.Float("radius", radius);
       v.Int("levels", levels); v.Float("smooth", smooth);
@@ -276,6 +282,7 @@ private:
       float a = 0, ox = 0, oy = 0, oz = 0, rs = 0, ss = 0, rad = 0;
       float sm = 0, th = 0, ins = 0, sd = 0;
       float rx = 0, ry = 0, rz = 0, sx = 0, sy = 0, sz = 0;
+      float px = 0, py = 0, pz = 0;
       // Only meaningful (and only ever set) while spin != 0 - see the comment
       // on GeometryOpNode::spin. Zero the rest of the time so two builds with
       // spin == 0 still compare equal regardless of when each ran.
@@ -319,7 +326,8 @@ private:
                 keepSelected == o.keepSelected &&
                 moveAlongNormals == o.moveAlongNormals &&
                 rx == o.rx && ry == o.ry && rz == o.rz &&
-                sx == o.sx && sy == o.sy && sz == o.sz && spinBeats == o.spinBeats &&
+                sx == o.sx && sy == o.sy && sz == o.sz &&
+                px == o.px && py == o.py && pz == o.pz && spinBeats == o.spinBeats &&
                 upstream == o.upstream && upstreamRevision == o.upstreamRevision &&
                 upstreamInstanceRevision == o.upstreamInstanceRevision;
       }
