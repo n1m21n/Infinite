@@ -155,6 +155,7 @@ GeometryOpNode::Signature GeometryOpNode::CurrentSignature() const
    s.count = count;
    s.levels = levels;
    s.axis = axis;
+   s.explodeBy = explodeBy;
    s.a = amount;
    s.ox = offsetX; s.oy = offsetY; s.oz = offsetZ;
    s.rs = rotStep; s.ss = scaleStep; s.rad = radius;
@@ -288,7 +289,7 @@ const Mesh& GeometryOpNode::GetMesh()
          mCache = restricted([&](const Mesh& m) { return MeshOps::RecalculateNormals(m, flatShade, flipNormals); });
          break;
       case kExplode:
-         mCache = restricted([&](const Mesh& m) { return MeshOps::Explode(m, amount * 0.3f, seed); });
+         mCache = restricted([&](const Mesh& m) { return MeshOps::Explode(m, amount * 0.3f, seed, explodeBy != 0); });
          break;
       case kSmooth:
          // Connectivity-dependent - see kSubdivide. selectionOnly hidden.

@@ -1996,21 +1996,224 @@ namespace MeshOps
       return out;
    }
 
-   Mesh Explode(const Mesh& in, float amount, float seed)
+   namespace
    {
-      Mesh out = RecalculateNormals(in, true, false);
+      // Simple array-based union-find with path compression, over weld-group
+      // representative ids rather than raw vertex indices - see the comment
+      // on the looseParts branch of Explode() for why that distinction
+      // matters (a UV seam/hard edge duplicates a vertex position into
+      // several raw indices that must still be treated as one node here).
+      struct UnionFind
+      {
+         std::vector<unsigned int> parent;
+         explicit UnionFind(size_t n) : parent(n) { for (size_t i = 0; i < n; i++) parent[i] = (unsigned int)i; }
+         unsigned int Find(unsigned int x)
+         {
+            while (parent[x] != x)
+            {
+               parent[x] = parent[parent[x]];
+               x = parent[x];
+            }
+            return x;
+         }
+         void Union(unsigned int a, unsigned int b)
+         {
+            a = Find(a); b = Find(b);
+            if (a != b) parent[a] = b;
+         }
+      };
+   }
+
+   Mesh Explode(const Mesh& in, float amount, float seed, bool looseParts)
+   {
+      if (!looseParts)
+      {
+         Mesh out = RecalculateNormals(in, true, false);
+         for (size_t t = 0; t + 2 < out.indices.size(); t += 3)
+         {
+            const int face = (int)(t / 3);
+            const Vertex& a = out.vertices[out.indices[t]];
+            const float push = amount * (0.4f + RandFrom(seed, face) * 0.6f);
+            const float nx = a.nx * push, ny = a.ny * push, nz = a.nz * push;
+            for (int k = 0; k < 3; k++)
+            {
+               Vertex& v = out.vertices[out.indices[t + k]];
+               v.px += nx; v.py += ny; v.pz += nz;
+            }
+         }
+         return out;
+      }
+
+      // Loose-parts mode explodes by connected component rather than by
+      // face, and each part must keep its original (possibly smooth)
+      // shading - so, unlike the face-explode path above, we do NOT call
+      // RecalculateNormals(in, true, false): that flat-shades and duplicates
+      // vertices at every face, which is exactly wrong here. We work on a
+      // plain copy of `in` and only ever move existing vertex positions.
+      Mesh out = in;
+      if (out.indices.size() < 3 || out.vertices.empty())
+         return out;
+
+      // Union-find over weld-group representatives, not raw vertex indices:
+      // primitives duplicate vertices at every UV seam/hard edge (a Cube(1)
+      // has 24 vertices for 8 corners), so unioning raw triangle corners
+      // would see each seam as a break and shatter one physical part into
+      // several bogus "components". BuildWeldMap collapses coincident
+      // positions to a shared representative id first.
+      const std::vector<unsigned int> weld = BuildWeldMap(out);
+      UnionFind uf(out.vertices.size());
+      const size_t triCount = out.indices.size() / 3;
       for (size_t t = 0; t + 2 < out.indices.size(); t += 3)
       {
-         const int face = (int)(t / 3);
-         const Vertex& a = out.vertices[out.indices[t]];
-         const float push = amount * (0.4f + RandFrom(seed, face) * 0.6f);
-         const float nx = a.nx * push, ny = a.ny * push, nz = a.nz * push;
-         for (int k = 0; k < 3; k++)
+         const unsigned int r0 = weld[out.indices[t + 0]];
+         const unsigned int r1 = weld[out.indices[t + 1]];
+         const unsigned int r2 = weld[out.indices[t + 2]];
+         uf.Union(r0, r1);
+         uf.Union(r1, r2);
+      }
+
+      // Map each triangle to a component id (its root, after union-find has
+      // fully settled), and remap those roots to a dense [0..componentCount)
+      // range so RandFrom(seed, componentId) below matches the "one call per
+      // logical unit" shape the face-explode path already uses.
+      std::vector<unsigned int> triComponent(triCount);
+      std::map<unsigned int, int> rootToComponent;
+      int componentCount = 0;
+      for (size_t t = 0; t + 2 < out.indices.size(); t += 3)
+      {
+         const unsigned int root = uf.Find(weld[out.indices[t]]);
+         auto it = rootToComponent.find(root);
+         int id;
+         if (it == rootToComponent.end())
          {
-            Vertex& v = out.vertices[out.indices[t + k]];
-            v.px += nx; v.py += ny; v.pz += nz;
+            id = componentCount++;
+            rootToComponent[root] = id;
+         }
+         else
+         {
+            id = it->second;
+         }
+         triComponent[t / 3] = (unsigned int)id;
+      }
+
+      // Mesh centroid: average of every vertex position.
+      double meshCx = 0.0, meshCy = 0.0, meshCz = 0.0;
+      for (const Vertex& v : out.vertices) { meshCx += v.px; meshCy += v.py; meshCz += v.pz; }
+      const double invVertCount = 1.0 / (double)out.vertices.size();
+      meshCx *= invVertCount; meshCy *= invVertCount; meshCz *= invVertCount;
+
+      // Per component: centroid of its vertices (deduped by weld group, so a
+      // seam vertex isn't counted twice), and an area-weighted average face
+      // normal as the degenerate-centroid fallback direction.
+      std::vector<double> compPosSum(componentCount * 3, 0.0);
+      std::vector<int> compVertCount(componentCount, 0);
+      std::vector<double> compNormalSum(componentCount * 3, 0.0);
+      // Marks, per weld-group representative, which component last counted
+      // it (a rep belongs to exactly one component since components
+      // partition the mesh, so this is enough to dedupe without a per-
+      // component reset). -1 = not yet counted by anything.
+      std::vector<int> vertCounted(out.vertices.size(), -1);
+
+      for (size_t t = 0; t + 2 < out.indices.size(); t += 3)
+      {
+         const unsigned int comp = triComponent[t / 3];
+         const unsigned int ia = out.indices[t + 0];
+         const unsigned int ib = out.indices[t + 1];
+         const unsigned int ic = out.indices[t + 2];
+         const Vertex& a = out.vertices[ia];
+         const Vertex& b = out.vertices[ib];
+         const Vertex& c = out.vertices[ic];
+
+         // Face normal (unnormalized cross product) weights the average by
+         // triangle area automatically.
+         const float e1x = b.px - a.px, e1y = b.py - a.py, e1z = b.pz - a.pz;
+         const float e2x = c.px - a.px, e2y = c.py - a.py, e2z = c.pz - a.pz;
+         const float fnx = e1y * e2z - e1z * e2y;
+         const float fny = e1z * e2x - e1x * e2z;
+         const float fnz = e1x * e2y - e1y * e2x;
+         compNormalSum[comp * 3 + 0] += fnx;
+         compNormalSum[comp * 3 + 1] += fny;
+         compNormalSum[comp * 3 + 2] += fnz;
+
+         for (unsigned int idx : { ia, ib, ic })
+         {
+            const unsigned int rep = weld[idx];
+            if (vertCounted[rep] == (int)comp)
+               continue; // already counted this weld group for this component
+            vertCounted[rep] = (int)comp;
+            const Vertex& v = out.vertices[idx];
+            compPosSum[comp * 3 + 0] += v.px;
+            compPosSum[comp * 3 + 1] += v.py;
+            compPosSum[comp * 3 + 2] += v.pz;
+            compVertCount[comp]++;
          }
       }
+
+      // Resolve a push direction (and whether it's usable at all) per
+      // component, once.
+      std::vector<float> compDirX(componentCount, 0.0f), compDirY(componentCount, 0.0f), compDirZ(componentCount, 0.0f);
+      std::vector<unsigned char> compHasDir(componentCount, 0);
+      const float kEpsilon = 1e-6f;
+      for (int comp = 0; comp < componentCount; comp++)
+      {
+         float dx = 0.0f, dy = 0.0f, dz = 0.0f;
+         if (compVertCount[comp] > 0)
+         {
+            const double cx = compPosSum[comp * 3 + 0] / compVertCount[comp];
+            const double cy = compPosSum[comp * 3 + 1] / compVertCount[comp];
+            const double cz = compPosSum[comp * 3 + 2] / compVertCount[comp];
+            dx = (float)(cx - meshCx);
+            dy = (float)(cy - meshCy);
+            dz = (float)(cz - meshCz);
+         }
+         float len = std::sqrt(dx * dx + dy * dy + dz * dz);
+         if (len < kEpsilon)
+         {
+            // Degenerate: component centroid coincides with the mesh
+            // centroid. Fall back to its area-weighted average face normal.
+            dx = (float)compNormalSum[comp * 3 + 0];
+            dy = (float)compNormalSum[comp * 3 + 1];
+            dz = (float)compNormalSum[comp * 3 + 2];
+            len = std::sqrt(dx * dx + dy * dy + dz * dz);
+            if (len < kEpsilon)
+            {
+               // Both directions are degenerate - leave this part in place.
+               compHasDir[comp] = 0;
+               continue;
+            }
+         }
+         compDirX[comp] = dx / len;
+         compDirY[comp] = dy / len;
+         compDirZ[comp] = dz / len;
+         compHasDir[comp] = 1;
+      }
+
+      // Displace every vertex by its triangle's component push. A vertex can
+      // belong to only one component (components partition the mesh), so
+      // each vertex is only ever pushed once even though we iterate by
+      // triangle - guard with a per-vertex visited flag to avoid double-
+      // application through its multiple incident triangles.
+      std::vector<unsigned char> vertMoved(out.vertices.size(), 0);
+      for (size_t t = 0; t + 2 < out.indices.size(); t += 3)
+      {
+         const unsigned int comp = triComponent[t / 3];
+         if (!compHasDir[comp])
+            continue;
+         const float push = amount * (0.4f + RandFrom(seed, (int)comp) * 0.6f);
+         const float ox = compDirX[comp] * push;
+         const float oy = compDirY[comp] * push;
+         const float oz = compDirZ[comp] * push;
+         for (int k = 0; k < 3; k++)
+         {
+            const unsigned int idx = out.indices[t + k];
+            if (vertMoved[idx])
+               continue;
+            vertMoved[idx] = 1;
+            Vertex& v = out.vertices[idx];
+            v.px += ox; v.py += oy; v.pz += oz;
+         }
+      }
+
       return out;
    }
 

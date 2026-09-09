@@ -460,7 +460,13 @@ namespace MeshOps
    Mesh Wireframe(const Mesh& in, float thickness);
    Mesh Triangulate(const Mesh& in, float jitter);
    Mesh RecalculateNormals(const Mesh& in, bool flat, bool flip);
-   Mesh Explode(const Mesh& in, float amount, float seed);
+   // looseParts selects which thing "explode" means: false (default) pushes
+   // each triangle outward along its own face normal, flat-shading the mesh
+   // in the process (the original behaviour). true instead finds the mesh's
+   // connected components (welded first, so a UV seam/hard edge never reads
+   // as a break) and pushes each one, as a rigid unit, away from the mesh's
+   // centroid - keeping each part's original shading intact.
+   Mesh Explode(const Mesh& in, float amount, float seed, bool looseParts = false);
    // `vertexMask`, when non-null, restricts the twist to vertices marked 1 -
    // see VertexSelectionFromFaces. Null (the default) twists every vertex,
    // unchanged from before this parameter existed.
