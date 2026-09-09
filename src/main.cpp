@@ -4918,7 +4918,7 @@ namespace
             "3D");
       }
       REGISTER_NODE(InstanceOnPointsNode, Instance on Points, "3D");
-      REGISTER_NODE(SetColorNode, Set Color, "3D");
+      REGISTER_NODE(SetColorNode, Set Vertex Color, "3D");
       REGISTER_NODE(WrapNode, Wrap, "3D");
       REGISTER_NODE(FieldElementNode, Field Modifier, "3D");
       REGISTER_NODE(FieldPrimitiveNode, Field Primitive, "3D");
@@ -21963,8 +21963,6 @@ namespace
       // picked from an input rather than authored here, since editing colour
       // and shading now lives on the dedicated Material node.
       ModSliderInt("material from input", &n->materialFrom, 0, JoinGeometryNode::kSlots - 1);
-      if (n->mode == JoinGeometryNode::kMerge)
-         ModCheckbox("keep input colours", &n->keepInputColours);
    }
 
    void DrawSwitcher3DParams(Switcher3DNode* n)
@@ -65024,14 +65022,14 @@ int main(int argc, char** argv)
                      }
                      else if (dstSetColorNode != nullptr && slot == 2)
                      {
-                        rejectReason = "Set Color palette slot only accepts a Palette node";
+                        rejectReason = "Set Vertex Color palette slot only accepts a Palette node";
                      }
                      else if (dstSetColorNode != nullptr && slot == 1)
                      {
                         if (srcGeometry != nullptr)
-                           rejectReason = "Set Color texture slot accepts a 2D image or texture map, not 3D geometry";
+                           rejectReason = "Set Vertex Color texture slot accepts a 2D image or texture map, not 3D geometry";
                         else
-                           rejectReason = "Set Color texture slot accepts a 2D image or texture map";
+                           rejectReason = "Set Vertex Color texture slot accepts a 2D image or texture map";
                      }
                      else if (dstMappingNode != nullptr)
                      {
