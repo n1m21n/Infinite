@@ -55,6 +55,12 @@ public:
    // list - is what made a damaged plugin look like a bug in this app.
    const std::vector<std::string>& FailedBundles() const { return mFailed; }
 
+   // Top-level scan entries recognized as a plugin format Infinite doesn't
+   // host (VST2), by path - see Platform::UnsupportedPluginsSeen. Surfaced in
+   // the Plugins panel for the same reason FailedBundles is: an unexplained
+   // shorter list reads as a bug in this app, not a format limitation.
+   const std::vector<std::string>& UnsupportedPlugins() const { return mUnsupported; }
+
    // Looks an identifier up in the cached index. Used by patch load and by the
    // Finder-drop path to recover a display name for an identifier without
    // instantiating anything.
@@ -72,11 +78,13 @@ private:
    std::vector<Entry> mIndex;
    uint64_t mIndexVersion { 1 };
    std::vector<std::string> mFailed;
+   std::vector<std::string> mUnsupported;
 
    std::thread mScanThread;
    std::mutex mResultMutex;
-   std::vector<Entry> mPendingResult;         // guarded by mResultMutex
-   std::vector<std::string> mPendingFailed;   // guarded by mResultMutex
+   std::vector<Entry> mPendingResult;               // guarded by mResultMutex
+   std::vector<std::string> mPendingFailed;         // guarded by mResultMutex
+   std::vector<std::string> mPendingUnsupported;    // guarded by mResultMutex
    std::atomic<bool> mResultReady { false };
    std::atomic<bool> mScanning { false };
    std::atomic<int> mFound { 0 };

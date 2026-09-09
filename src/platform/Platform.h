@@ -523,6 +523,20 @@ namespace Platform
    // reported miss, not evidence the bundle is dangerous to retry.
    std::vector<std::string> VST3ScanFailures();
 
+   // Top-level scanned entries recognized as a plugin format Infinite does not
+   // host - VST2, in practice: a ".vst" bundle (macOS) or a bare ".dll" sitting
+   // directly in a scanned VST3 folder (almost certainly a Windows VST2 binary
+   // dropped in by mistake). Filename/extension checking only - these files are
+   // never opened, loaded, or executed. Populated by the same EnumerateVST3Plugins
+   // walk that fills VST3ScanFailures, and only for entries at the top level of
+   // the walk; a ".dll"/".so"/".vst" living inside a valid ".vst3" bundle is never
+   // visited by that walk in the first place (see EnumerateVST3Plugins), so it is
+   // never flagged here. Reset at the start of every call; read immediately after
+   // it returns, same contract as VST3ScanFailures. Infinite hosts AU and VST3
+   // only - VST2 hosting is out of scope (Steinberg stopped issuing VST2 SDK
+   // licenses in Oct 2018), this exists purely to explain a shorter list.
+   std::vector<std::string> UnsupportedPluginsSeen();
+
    struct PluginHandle;
 
    enum class PluginLoadState

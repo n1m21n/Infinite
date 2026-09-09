@@ -130,11 +130,13 @@ void PluginScanner::ScanThreadMain(std::vector<std::string> vst3Folders)
    Platform::EnumerateVST3Plugins(vst3Folders, found);
    mFound.store((int)found.size(), std::memory_order_relaxed);
    std::vector<std::string> failed = Platform::VST3ScanFailures();
+   std::vector<std::string> unsupported = Platform::UnsupportedPluginsSeen();
 
    {
       std::lock_guard<std::mutex> lock(mResultMutex);
       mPendingResult = std::move(found);
       mPendingFailed = std::move(failed);
+      mPendingUnsupported = std::move(unsupported);
    }
    mResultReady.store(true, std::memory_order_release);
    mScanning.store(false, std::memory_order_relaxed);
@@ -153,6 +155,8 @@ void PluginScanner::PollResults()
    mPendingResult.clear();
    mFailed = std::move(mPendingFailed);
    mPendingFailed.clear();
+   mUnsupported = std::move(mPendingUnsupported);
+   mPendingUnsupported.clear();
    mResultReady.store(false, std::memory_order_relaxed);
    ++mIndexVersion;
    lock.unlock();
