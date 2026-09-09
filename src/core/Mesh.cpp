@@ -1650,15 +1650,30 @@ namespace MeshOps
             const float len = std::sqrt(nx*nx + ny*ny + nz*nz);
             if (len > 1e-8f) { nx /= len; ny /= len; nz /= len; }
             if (flip) { nx = -nx; ny = -ny; nz = -nz; }
-            const unsigned int srcIndex[3] = { in.indices[t], in.indices[t + 1], in.indices[t + 2] };
-            int k = 0;
-            for (const Vertex* src : { &a, &b, &c })
+            // When flipping, also reverse the triangle's winding (swap the
+            // 2nd/3rd vertex) so the geometry's orientation is genuinely
+            // inverted, not just its normal's sign. The negated normal above
+            // is exactly the normal this reversed winding would itself
+            // produce, so the two stay consistent.
+            unsigned int srcIndex[3];
+            const Vertex* order[3];
+            if (flip)
             {
-               Vertex v = *src;
+               srcIndex[0] = in.indices[t]; srcIndex[1] = in.indices[t + 2]; srcIndex[2] = in.indices[t + 1];
+               order[0] = &a; order[1] = &c; order[2] = &b;
+            }
+            else
+            {
+               srcIndex[0] = in.indices[t]; srcIndex[1] = in.indices[t + 1]; srcIndex[2] = in.indices[t + 2];
+               order[0] = &a; order[1] = &b; order[2] = &c;
+            }
+            for (int k = 0; k < 3; k++)
+            {
+               Vertex v = *order[k];
                v.nx = nx; v.ny = ny; v.nz = nz;
                expanded.vertices.push_back(v);
                expanded.indices.push_back((unsigned int)expanded.vertices.size() - 1);
-               mapping.push_back(srcIndex[k++]);
+               mapping.push_back(srcIndex[k]);
             }
          }
          expanded.vertexColor = RemapVertexColor(in.vertexColor, mapping, expanded.vertices.size());
@@ -1681,6 +1696,15 @@ namespace MeshOps
          const float len = std::sqrt(v.nx*v.nx + v.ny*v.ny + v.nz*v.nz);
          if (len > 1e-8f) { v.nx /= len; v.ny /= len; v.nz /= len; }
          if (flip) { v.nx = -v.nx; v.ny = -v.ny; v.nz = -v.nz; }
+      }
+      if (flip)
+      {
+         // Reverse each triangle's winding so the geometry's orientation is
+         // genuinely inverted (not just the normal's sign). Done after the
+         // normals above are computed from the original winding, so it
+         // doesn't affect that computation.
+         for (size_t t = 0; t + 2 < out.indices.size(); t += 3)
+            std::swap(out.indices[t + 1], out.indices[t + 2]);
       }
       return out;
    }
