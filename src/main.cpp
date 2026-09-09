@@ -21876,6 +21876,8 @@ namespace
       // picked from an input rather than authored here, since editing colour
       // and shading now lives on the dedicated Material node.
       ModSliderInt("material from input", &n->materialFrom, 0, JoinGeometryNode::kSlots - 1);
+      if (n->mode == JoinGeometryNode::kMerge)
+         ModCheckbox("keep input colours", &n->keepInputColours);
    }
 
    void DrawSwitcher3DParams(Switcher3DNode* n)
