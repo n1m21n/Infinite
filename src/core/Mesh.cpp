@@ -1665,22 +1665,45 @@ namespace MeshOps
          return expanded;
       }
 
-      for (Vertex& v : out.vertices) { v.nx = 0; v.ny = 0; v.nz = 0; }
+      // Every primitive in this codebase duplicates vertices at UV seams and
+      // hard edges (e.g. PushGrid gives Cube(1) 24 vertices for 8 corners -
+      // see the comment near BuildWeldMap's caller below). Accumulating face
+      // normals through the raw, unwelded indices means each duplicate only
+      // ever sees its own single face, so "smooth" degenerates into "flat"
+      // on every primitive and leaves a visible seam on welded-looking
+      // surfaces like UV spheres/cylinders. Route the accumulation through
+      // the weld map instead - exactly the pattern MeshOps::Smooth uses for
+      // vertex positions - so coincident duplicates share one accumulated,
+      // normalized normal. This does NOT weld the geometry itself: vertex
+      // count and positions are untouched, only the normal each of them
+      // reports is shared with its duplicates.
+      const std::vector<unsigned int> weld = BuildWeldMap(in);
+      std::vector<float> accNx(out.vertices.size(), 0.0f);
+      std::vector<float> accNy(out.vertices.size(), 0.0f);
+      std::vector<float> accNz(out.vertices.size(), 0.0f);
       for (size_t t = 0; t + 2 < out.indices.size(); t += 3)
       {
-         Vertex& a = out.vertices[out.indices[t]];
-         Vertex& b = out.vertices[out.indices[t + 1]];
-         Vertex& c = out.vertices[out.indices[t + 2]];
+         const Vertex& a = out.vertices[out.indices[t]];
+         const Vertex& b = out.vertices[out.indices[t + 1]];
+         const Vertex& c = out.vertices[out.indices[t + 2]];
          const float ux = b.px - a.px, uy = b.py - a.py, uz = b.pz - a.pz;
          const float vx = c.px - a.px, vy = c.py - a.py, vz = c.pz - a.pz;
          const float nx = uy*vz - uz*vy, ny = uz*vx - ux*vz, nz = ux*vy - uy*vx;
-         for (Vertex* v : { &a, &b, &c }) { v->nx += nx; v->ny += ny; v->nz += nz; }
+         for (unsigned int idx : { out.indices[t], out.indices[t + 1], out.indices[t + 2] })
+         {
+            const unsigned int rep = weld[idx];
+            accNx[rep] += nx; accNy[rep] += ny; accNz[rep] += nz;
+         }
       }
-      for (Vertex& v : out.vertices)
+      for (Vertex& v : out.vertices) { v.nx = 0; v.ny = 0; v.nz = 0; }
+      for (size_t i = 0; i < out.vertices.size(); i++)
       {
-         const float len = std::sqrt(v.nx*v.nx + v.ny*v.ny + v.nz*v.nz);
-         if (len > 1e-8f) { v.nx /= len; v.ny /= len; v.nz /= len; }
-         if (flip) { v.nx = -v.nx; v.ny = -v.ny; v.nz = -v.nz; }
+         const unsigned int rep = weld[i];
+         float nx = accNx[rep], ny = accNy[rep], nz = accNz[rep];
+         const float len = std::sqrt(nx*nx + ny*ny + nz*nz);
+         if (len > 1e-8f) { nx /= len; ny /= len; nz /= len; }
+         if (flip) { nx = -nx; ny = -ny; nz = -nz; }
+         out.vertices[i].nx = nx; out.vertices[i].ny = ny; out.vertices[i].nz = nz;
       }
       return out;
    }
