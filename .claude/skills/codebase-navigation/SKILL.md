@@ -182,7 +182,9 @@ entry if a refactor makes it stale.
   routed through any of them becomes invisible downstream even though each
   node's own comments describe it as a complete no-op passthrough (e.g.
   Null3D's header literally says "everything is forwarded",
-  `UtilityNodes.h:131-133`). Any new `IGeometrySource` passthrough wrapper
+  `UtilityNodes.h:131-133`). `SetColorNode` (`GeometryOpNodes.h:694-826`) has
+  the same gap for `GetCurve()` alone (it does forward `GetPointCloud()`
+  correctly). Any new `IGeometrySource` passthrough wrapper
   needs to explicitly forward these two — the base class defaults to
   `nullptr` and nothing enforces the "if you forward `PassthroughSource`,
   forward cloud/curve too" pairing. Found during the geometry domain audit

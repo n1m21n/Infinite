@@ -93,7 +93,7 @@ marked `inferred`. "Terminal" = no geometry input pin.
 | ImageToPoints | `GenerativeNodes.h:158,174-204` | `mesh:standin` **+** `cloud` | none; terminal (ImageCable input, not geometry) | verified |
 | Switcher3D | `Switcher3DNode.h:27`, `.cpp:56-119` | mesh = active input's tag — **cloud/curve NOT forwarded regardless of active slot** | 4-way input switch; only changes *which* mesh, not cloud/curve behaviour | verified |
 | FieldPrimitive | `FieldPrimitiveNode.h:16,119,122`, `.cpp:884-1119` | **mesh only, always.** `topology=Points` → `mesh:verts` (`.cpp:1105-1119`); `topology`∈{Plane,Sphere,Cylinder,Torus,Disc} → `mesh:surface` (`.cpp:884-1090`). `GetPointCloud()`/`GetCurve()` hardcoded `nullptr` unconditionally | yes — `mesh:verts` vs `mesh:surface` only | **verified — resolves the open question below** |
-| FieldElement | `FieldElementNode.h:16,146-163` | own `mOutMesh`; side channels + cloud/curve genuinely all forward from `input` | none | verified for side channels; **mesh-build relation to `input`'s mesh not independently re-read** |
+| FieldElement | `FieldElementNode.h:16,146-163`, `.cpp:535-659`, `ElementStore.cpp:93-188` | **conditional.** With `input` wired: propagates input's tag — `ElementStore::ToMesh` rebuilds `mOutMesh` from `inMesh` verbatim when `boundCount == inCount` (`ElementStore.cpp:155-160`), or safely truncates (drops any triangle referencing a cut vertex, never leaves a dangling index) when `maxElements < inCount` (`:161-187`), which can turn a `mesh:surface` input into an effectively-`mesh:verts` output if truncation removes every surviving triangle. With no `input`: **originates fresh** as a generator — `n = max(1, generateCount)` bare vertices, no indices, i.e. always `mesh:verts` (`.cpp:584-593`) | none (kernel/topology-driven, not a UI mode) | **verified** |
 
 ### FieldPrimitive — resolved
 
@@ -117,9 +117,9 @@ This closes the phase-1 exit requirement for this node.
 | InstanceOnPoints `.pointSource` | `mesh:surface`-shaped (reads `->GetMesh()`, samples via `MeshOps::ToPoints`, needs `HasGeometry()` not full topology) (`.cpp:756-770`) | — | verified |
 | InstanceOnPoints `.instanceShape` | `mesh:any` — reads `->GetMesh()`/`->GetModelMatrix()` (`.cpp:552,671,716-718,729`) | — | verified |
 | Path `.curve` | `curve` | established findings | verified (prior session) |
-| PointsToVertices `.input` | `cloud` (per class comment, `.h:131-136`) | — | **inferred** — `.cpp` `RebuildIfNeeded()` body not independently re-read this pass |
+| PointsToVertices `.input` | `cloud`, preferred, wins over mesh when present; degrades gracefully to a `mesh:verts`-shaped vertex/vertexColor copy when input has no cloud (does not require `.indices` either way) | `PointDistributionNodes.cpp:244-316` | **verified** — cloud path (`:274-289`) reads `px/py/pz`, `nx/ny/nz`, `r/g/b`, and `alive` (if `aliveOnly`); no-cloud fallback (`:297-305`) copies `input->GetMesh()`'s vertices/vertexColor only, never touches `.indices` |
 | DistributeOnFaces `.input` | `mesh:surface` — needs face topology (uses `MeshOps::DistributeOnFaces`, area-weighted) | — | verified vs. MeshToPoints' index-order method |
-| Cloth `.input` | `mesh:surface`, faces needed for PBD constraint building | — | **inferred** — constraint-building body not re-read this pass |
+| Cloth `.input` | `mesh:surface` for a physically meaningful result; degrades gracefully (no crash) on `mesh:verts` | `RebuildFromInput`, `SimulationNodes.cpp:271-402`, constraint loop `:338-356` | **verified** — one PBD distance-constraint kind only (no separate shear/bend, contra earlier phase-1 note), built by walking `src.indices` in triples; on an index-less input the loop never executes so `mConstraints` stays empty and the mesh simulates as an unconstrained particle set (gravity/wind/pin still apply) rather than refusing |
 | Displacement `.input` | `mesh:surface`, vertex-level only — does not require `->indices` beyond what `MeshOps::Displace` needs | `.cpp:561` | verified |
 | AudioDisplacement `.input` | `mesh:surface` | `.cpp:514-516` | verified |
 | Wrap `.sourceInput` | `mesh:any` — struct-copied into output, `vertexColor` rides along (`Mesh.cpp:3020`) | — | verified |
@@ -146,7 +146,7 @@ default. `n/a` = channel doesn't apply (node has no relevant input/output).
 | GeometryOp | **orig when `inheritMaterial==false`**, else fwd (`.cpp:484-511`) | implicit via `MeshOps::*`; **not individually verified per-op** (see gaps) | n/a | fwd | fwd | fwd | fwd |
 | Displacement | fwd | fwd | n/a | fwd | fwd | fwd | fwd — deliberately preserved so instancer stays visible through it (`.h:407-409`) |
 | InstanceOnPoints | fwd (from `instanceShape`, `.cpp:687-714`) | flows into D via point-sampling of upstream `vertexColor` | flows into D via cloud `p.r/g/b` | **originates** (`mColors`, `.cpp:746-748,815-817`) | fwd (from `instanceShape`, `.h:559-566`) | **drop — no override at all in the class.** Forwards A and E from the same input but not F. Flagged as an oversight, not a design choice (see anomalies) | n/a — root of the instancer chain, not a downstream consumer of selection |
-| SetColor | fwd | **orig** (`.cpp:1156-1184`) | **orig** (`.cpp:1190-1217`) | fwd | fwd | fwd | fwd |
+| SetColor | fwd | **orig** (`.cpp:1156-1184`) | **orig** (`.cpp:1190-1217`) | fwd | fwd | fwd | fwd — **but no `GetCurve()` override exists anywhere in the class (`.h:694-826`, full body scanned); a curve routed through SetColor is dropped, same defect as Null3D/Material/Mapping/Switcher3D (see anomalies)** |
 | Wrap | fwd (from `sourceInput` only) | fwd, incidental via struct copy (`Mesh.cpp:3020`) | n/a | fwd (from `sourceInput`) | fwd (from `sourceInput`) | fwd (from `sourceInput`) | fwd (from `sourceInput`) |
 | Null3D | fwd | fwd | n/a | fwd | fwd | fwd | fwd — **but `GetPointCloud()`/`GetCurve()` are not overridden at all, contradicting the class's own "everything is forwarded" comment (`.h:131-133`)** |
 | Material | **orig** (unless bypassed, `.cpp:52-91`) | fwd (mesh passthrough) | n/a | fwd | orig, per-`MaterialMap` channel (`.cpp:98-107`) — own `mMaps[map]` cable if connected, else forwards input | fwd | fwd — **same cloud/curve gap as Null3D** |
@@ -183,6 +183,7 @@ The audit prompt flagged three anomalies as needing investigation. Resolved:
 | **Null3D** | `GetPointCloud()`, `GetCurve()` | **Oversight.** Class comment states "everything is forwarded" (`.h:131-133`); false for cloud/curve. |
 | **Material** | `GetPointCloud()`, `GetCurve()` | **Oversight.** Header frames the node as "a pass-through in the geometry chain" (`.h:207-210`); true for mesh, false for cloud/curve. |
 | **Mapping** | `GetPointCloud()`, `GetCurve()` | **Oversight.** Same shape as Null3D/Material. |
+| **SetColor** | `GetCurve()` only (it does forward `GetPointCloud()`) | **Oversight.** Forwards mesh, cloud, and every side channel correctly; curve alone is dropped with no override anywhere in the class. |
 
 All four share one fix shape — this is a single sweep, not four separate
 investigations. Recommend adding to `codebase-navigation`'s living map (see
@@ -200,13 +201,14 @@ below) and fixing together in phase 4.
   exists (`Mesh.h:360`) and Wrap/Transform are confirmed to preserve colour via
   struct-copy, but not every op's `MeshOps::*` implementation in `Mesh.cpp` was
   individually traced for vertexColor correctness. Real gap for anyone
-  auditing channel B specifically.
-- `PointsToVerticesNode::RebuildIfNeeded()` body (`PointDistributionNodes.cpp`)
-  — only the header comment was checked; whether it needs `alive` filtering
-  only, or also normals/scale, is not independently confirmed.
-- `FieldElementNode.cpp`'s mesh-build logic — whether `mOutMesh` is a full
-  replace or a per-element modification of `input`'s mesh was not read; only
-  the header's side-channel accessor bodies were verified.
+  auditing channel B specifically. `kDelete` was confirmed separately (see
+  anomalies follow-up) to collapse straight to a fully-empty mesh rather than
+  ever leaving vertices with no indices — it cannot produce a `mesh:verts`
+  result by stripping indices.
+- Whether `GeometryOpNode`'s `kSubdivide`/`kSelect` ops can change a mesh's
+  emission tag (e.g. strip all indices while leaving vertices) — `kDelete` was
+  checked and cannot (`Mesh.cpp:5004-5039`, collapses to fully empty instead);
+  `kSubdivide`/`kSelect` were not independently traced this pass.
 - `InstanceColors()` (channel D) has no revision stamp and is not part of the
   `IGeometrySource` interface at all — it's a concrete accessor on
   `InstanceOnPointsNode` (`GeometryOpNodes.h:591`). Every call site does an
@@ -245,3 +247,165 @@ Recommend adding to `.claude/skills/codebase-navigation`'s living map:
 > passthrough wrapper needs to explicitly forward these two; the base class
 > defaults to `nullptr` and nothing enforces the "if you forward
 > `PassthroughSource`, forward cloud/curve too" pairing.
+
+---
+---
+
+# Phase 2 — the rule matrix
+
+Phase 2 deliverable of `docs/plans/geometry/domain-audit-prompt.md`. Builds a
+legality decision procedure on top of phase 1's data — no enforcement code,
+still no connect-time refusal (D1: cook-time only). Every illegal/legal
+verdict below is a mechanical consequence of §1 (satisfaction) + §2
+(propagation) applied to phase 1's emission/consumption tables, not a
+separately hand-written opinion — where a verdict looked wrong against what a
+Houdini/Blender user would predict, that is called out as a design finding in
+§5, not silently special-cased into the rule.
+
+A node's **tag-set** is every emission tag it simultaneously carries (a node
+can emit `mesh:standin` *and* `cloud` at once — they are read through
+different accessors, `GetMesh()` vs `GetPointCloud()`, and a pin only ever
+calls one of them). Legality is evaluated per accessor-call, not per node.
+
+## 1. Satisfaction rule
+
+Which emission tags satisfy which pin-requirement categories, derived from
+every `requires` cell in phase 1's consumer-pin table. Four requirement
+categories cover all 22 known consumer pins:
+
+| Requirement category | Example pins | Satisfied by | Reasoning |
+|---|---|---|---|
+| **`mesh:surface`** (needs real face topology) | MeshResynth.input, DistributeOnFaces.input, Wrap.targetInput, AudioDisplacement.input, MergeByDistance.input | `mesh:surface` only | The consuming code walks `.indices` (nearest-triangle search, area-weighted sampling, subdivision) — no indices, no meaningful result |
+| **`mesh:vertices`** (needs positions only, faces optional) | Displacement.input (`.cpp:561`, vertex-level only) | `mesh:surface`, `mesh:verts` | `MeshOps::Displace` never reads `.indices` |
+| **`mesh:any`** (terminal/passthrough/operator that degrades rather than refuses on bad input) | GeometryOp.input, Join ×4, Wrap.sourceInput, InstanceOnPoints.instanceShape, Cloth.input (degrades to unconstrained particles, phase 1 verified), PointsToVertices.input (degrades to vertex copy) | **meaningfully**: `mesh:surface`, `mesh:verts`. **Not meaningfully**: `mesh:standin`, `mesh:none` — the pin will not crash (every producer's `GetMesh()` is non-null by construction) but the data is fabricated, not real | This is where D5's fabrication disease actually bites: a "mesh:any" pin fed a `mesh:standin` producer *silently succeeds* today with garbage input, which is the exact shape of the reported Join bug |
+| **`cloud`** | MetaBall.cloudSource, InstanceOnPoints.cloudSource, PointsToVertices.input (preferred over mesh) | `cloud` only | Reads `GetPointCloud()` specifically; a producer's mesh-side tag is irrelevant to this call |
+| **`curve`** | Path.curve | `curve` only | Reads `GetCurve()` specifically |
+
+`mesh:none` satisfies nothing in any category, including `mesh:any` — it is
+`ParticleSystem`'s permanently-empty stub.
+
+## 2. Propagation rule
+
+For a passthrough/operator node, does its own tag-set equal its input's
+tag-set? Verified per node in phase 1; the answer is **not uniform**, which
+is the load-bearing finding of this whole audit:
+
+| Forwards mesh tag correctly | Forwards cloud tag | Forwards curve tag |
+|---|---|---|
+| GeometryOp, Displacement, AudioDisplacement, InstanceOnPoints (n/a — root, not a passthrough), SetColor, Wrap, Null3D, Material, Mapping, Join (n/a — merges, doesn't pass one input's tag through), MetaBall (n/a — originates), MergeByDistance, MeshResynth, Switcher3D (of whichever input is active), FieldElement (conditional — see phase 1 row) | GeometryOp, Displacement, AudioDisplacement, MergeByDistance, MeshResynth, SetColor, FieldElement | GeometryOp, Displacement, AudioDisplacement, MergeByDistance, MeshResynth, FieldElement |
+| **All passthrough/operator nodes forward the mesh tag correctly** — no exceptions found | **Null3D, Material, Mapping, Switcher3D drop it entirely** (no `GetPointCloud()` override at all) | **Null3D, Material, Mapping, Switcher3D, and SetColor drop it entirely** (no `GetCurve()` override) |
+
+The practical rule: **every node that forwards mesh correctly also forwards
+cloud and curve correctly, except five** — Null3D, Material, Mapping,
+Switcher3D (cloud + curve), and SetColor (curve only, its cloud forwarding is
+fine). This is not the propagation rule the audit prompt assumed ("a
+passthrough's tag is its input's tag, or the whole scheme is defeated by one
+Null3D") — that statement is **true for mesh, false for cloud/curve on 4 of
+Infinite's most commonly inserted utility nodes**. A user who threads a
+Particle System through a Null3D for cable tidiness (a completely ordinary
+thing to do) silently loses the cloud.
+
+## 3. Derived illegal list
+
+Generated by applying §1 to every producer tag-set × every consumer
+requirement category found in phase 1 — not independently re-imagined per
+pair. Because legality only depends on (tag-set, requirement category), not
+node identity, this collapses to one small decision table plus a
+name-substitution step:
+
+| Producer tag-set | → `mesh:surface` pin | → `mesh:vertices` pin | → `mesh:any` pin | → `cloud` pin | → `curve` pin |
+|---|---|---|---|---|---|
+| `mesh:surface` | legal | legal | legal | **illegal** | **illegal** |
+| `mesh:verts` | **illegal** | legal | legal (degraded — see Cloth/PointsToVertices) | **illegal** | **illegal** |
+| `mesh:standin` (+ `cloud`) | **illegal** | **illegal** | **illegal (fabrication — the reported-bug shape)** | legal (via the co-emitted `cloud` tag) | **illegal** |
+| `mesh:none` (+ `cloud`) | **illegal** | **illegal** | **illegal** | legal (via the co-emitted `cloud` tag) | **illegal** |
+| `cloud`-only accessor call | **illegal** | **illegal** | **illegal** | legal | **illegal** |
+| `curve`-only accessor call | **illegal** | **illegal** | **illegal** | **illegal** | legal |
+
+Instantiated against real node/pin pairs, the illegal connections that exist
+in the graph today (all currently silent — no cook-time error yet, per D1
+this is the backlog phase 4.4 must close):
+
+- **MeshToPoints / DistributeOnFaces / DistributeInGrid / ImageToPoints
+  (`mesh:standin`) → any `mesh:surface` pin** (MeshResynth.input,
+  DistributeOnFaces.input, Wrap.targetInput, AudioDisplacement.input,
+  MergeByDistance.input) — the fabricated billboard quads get subdivided,
+  wrapped-onto, merged, etc. as if real.
+- **MeshToPoints / DistributeOnFaces / DistributeInGrid / ImageToPoints
+  (`mesh:standin`) → any `mesh:any` pin** (GeometryOp.input, Join ×4,
+  Wrap.sourceInput, InstanceOnPoints.instanceShape) — this is the exact
+  mechanism the reported bug's fix touched: Join reading a `mesh:standin` (or
+  any mesh lacking real `HasVertexColor()`) as if it were authored geometry.
+- **ParticleSystem (`mesh:none`) → any `mesh:surface`/`mesh:any` pin** — same
+  shape, currently silent (produces an empty result rather than an error).
+- **PointsToVertices (`mesh:verts`) → any `mesh:surface` pin** (MeshResynth,
+  DistributeOnFaces, Wrap.targetInput, AudioDisplacement, MergeByDistance) —
+  these pins need `.indices`; `mesh:verts` never has any.
+- **Any mesh-only producer → MetaBall.cloudSource / InstanceOnPoints.cloudSource
+  / Path.curve** — a `mesh:surface`/`mesh:verts` producer has no cloud/curve
+  accessor to satisfy these at all (not merely fabricated data — genuinely
+  absent).
+- **Cloud/curve-through-broken-passthrough (newly found this phase, not in
+  the original illegal list, and arguably should be *legal*):**
+  `MeshToPoints → Null3D → InstanceOnPoints.cloudSource` (or `.cloudSource`
+  on MetaBall, or `.input` on PointsToVertices) currently fails — not because
+  the data is fabricated, but because `Null3D` silently drops the cloud tag
+  in transit. Unlike the fabrication cases above, this chain is **not**
+  reading garbage — the cloud data is real and just doesn't survive the
+  passthrough. This belongs on the legal list once §2's Null3D/Material/
+  Mapping/Switcher3D/SetColor gap is fixed (phase 4), not on the permanent
+  illegal list.
+
+## 4. Legal list that must not regress
+
+Chains confirmed legal by §1+§2 today, to be protected by phase 5's fuzzer
+and widened sweeps:
+
+- `MeshToPoints → Render3D` — `cloud` satisfies Render3D's `any` terminal pin
+  via the co-emitted tag; Render3D's own logic *prefers* cloud over mesh
+  (phase 1: `Geometry3DNodes.cpp:1966`), so the standin mesh is correctly
+  never drawn.
+- `MeshToPoints → InstanceOnPoints.cloudSource` — `cloud` satisfies `cloud`
+  directly, no passthrough involved.
+- `MeshToPoints → GeometryTable` — `GeometryTable.geo` accepts any of
+  mesh/cloud/curve (verified phase 1), so both the standin mesh and the real
+  cloud are visible to it; not itself a bug since GeometryTable's contract is
+  "any."
+- `PointsToVertices → GeometryOp` — `PointsToVertices` emits `mesh:verts`;
+  `GeometryOp.input` is a `mesh:any` pin, so this is legal today, though
+  degraded (ops that need faces, e.g. subdivision variants, silently produce
+  nothing changeable since there are no faces to subdivide — a `mesh:any`
+  pin accepting `mesh:verts` "legally" does not mean every operation on it
+  is meaningful; that distinction belongs to per-op contracts, out of scope
+  for this phase).
+- Every `mesh:surface → mesh:surface` passthrough chain (GeometryOp,
+  Displacement, AudioDisplacement, MergeByDistance, MeshResynth, Wrap.source,
+  Material, Mapping — mesh side only for the last two).
+- `Displacement.input` accepting `mesh:verts` — Displacement is the one
+  `mesh:surface`-labelled-in-the-original-prompt pin that actually only needs
+  `mesh:vertices` per §1's category, so `FieldPrimitive(topology=Points) →
+  Displacement` is legal and meaningful today (moves the points), which a
+  strict-`mesh:surface` reading of the original prompt's consumer table would
+  have wrongly flagged as illegal.
+
+## 5. Chain cases (minimum depth 3)
+
+| Chain | Verdict | Why |
+|---|---|---|
+| `MeshToPoints → Null3D → Cloth` (the prompt's named laundering case) | **Illegal, and correctly stays illegal** — not laundered. `Null3D` forwards the *mesh* tag faithfully (`mesh:standin` in, `mesh:standin` out); `Cloth.input` is a `mesh:any`-degrading pin per §1, but `mesh:standin` still satisfies nothing under the fabrication rule. §2 confirms Null3D does not defeat this — the mesh side of Null3D has no gap. Cloth would build zero PBD constraints from the fabricated quads (no shared topology) and simulate degenerate floating billboards. **This is the case D1's cook-time error should catch first**, since the failure mode is a silent, visually-confusing near-no-op rather than a crash. |
+| `MeshToPoints → Null3D → InstanceOnPoints.cloudSource` | **Currently illegal but shouldn't be** — see §3's newly-found gap. This is the real laundering-adjacent bug: not fabricated-data-through-a-tag-preserving-passthrough (which correctly stays blocked), but real-data-silently-dropped-by-a-tag-*breaking*-passthrough that claims to forward everything. |
+| `PointsToVertices → GeometryOp(kSubdivide) → MeshResynth.input` | **Illegal at the second hop.** `PointsToVertices` emits `mesh:verts`; `GeometryOp.input` accepts it (`mesh:any`) and forwards the mesh tag unchanged (§2) — `kSubdivide` on an index-less mesh is a no-op (confirmed phase 1: no `GeometryOpNode` op strips or adds indices to an empty index buffer in a way that would fix this). So the mesh reaching `MeshResynth.input` (`mesh:surface`-required) is still `mesh:verts` — illegal, and would currently fail silently rather than error. |
+| `DistributeOnFaces → SetColor → InstanceOnPoints.pointSource` | **Legal.** `DistributeOnFaces` emits `mesh:standin`+`cloud`; `SetColor` forwards both tags correctly (§2, cloud is fine, only curve is broken) and originates fresh colour into both; `InstanceOnPoints.pointSource` accepts `mesh:surface`-shaped input per phase 1 (`HasGeometry()`, not full topology) — `mesh:standin` does have vertices, satisfying `pointSource`'s actual (looser than `mesh:any`) requirement. This is a case where the standin mesh, despite being fabricated for *rendering*, is legitimately usable as *point positions* — the fabrication rule in §1 is about the `mesh:any`/`mesh:surface` categories specifically, not a blanket ban; `pointSource` was independently verified in phase 1 to need `HasGeometry()` only. |
+| `CurveNode → Material → Path.curve` | **Illegal at the second hop, and silently so.** `CurveNode` emits `mesh:surface` **and** `curve` simultaneously. `Material` forwards mesh correctly but has no `GetCurve()` override (§2) — so `Path.curve`, which needs `curve` specifically, sees `nullptr` even though the original `CurveNode` had a perfectly good curve two hops upstream. A user inserting a Material node to tint a curve's rendering (an entirely reasonable thing to want) silently breaks the Path chain feeding off the same curve elsewhere in the graph. |
+| `ImageToPoints → Switcher3D → MetaBall.cloudSource` | **Illegal at the second hop, silently.** Same shape as the CurveNode/Material case — `Switcher3D` forwards mesh (of whichever input is active) but never cloud, so `MetaBall.cloudSource` sees nothing regardless of which Switcher3D slot is active. |
+
+Would a Houdini/Blender user predict these verdicts? The two "correctly
+illegal" rows (Cloth-laundering, PointsToVertices-into-Subdivide) match
+expectation — cook-time error, not a dropped cable. The three
+"illegal-because-of-a-forwarding-gap" rows (Null3D/cloud, Material/curve,
+Switcher3D/cloud) would **not** be predicted by a Blender user, since
+Blender's component-passthrough model (cited in phase 1's prior-art table)
+guarantees exactly the property these five nodes violate: "a mesh-only node
+leaves other components untouched." **These five rows are design findings,
+not accepted rules** — phase 4.5 (component passthrough) is the fix, not a
+cook-time error message that would just make the silent failure loud.
