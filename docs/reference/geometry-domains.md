@@ -409,3 +409,89 @@ guarantees exactly the property these five nodes violate: "a mesh-only node
 leaves other components untouched." **These five rows are design findings,
 not accepted rules** — phase 4.5 (component passthrough) is the fix, not a
 cook-time error message that would just make the silent failure loud.
+
+---
+---
+
+# Phase 3 — the name-contract audit
+
+Phase 3 deliverable of `docs/plans/geometry/domain-audit-prompt.md`. Per
+node (and mode, where a mode changes the promise), what the name tells a
+user to expect, what the code actually does, and a verdict. Per goal 1, a
+real mismatch resolves to **rename** or **remove** — never a documentation
+note. A mismatch that is a *completeness bug* (the name is accurate, an
+implementation gap makes the behavior fall short of it) is **not** a
+naming verdict — it's tagged "name honest, code gap" and pointed at its
+phase 4 item instead, so this table doesn't relitigate phase 1/2's findings
+under a different heading.
+
+**The rule, extracted from the plan:** when a node needs a parameter to stop
+it destroying data, or a comment to explain why its output isn't what its
+name says, the name is wrong — not the docs.
+
+**Bar-setters already in the repo** (cited by the plan as the standard to
+match): `Points to Vertices` (emits a faceless mesh and its own class
+comment says so), `Distribute Points on Faces` (name matches its principal
+behavior exactly), MetaBall's `cloud` pin (labelled for what it actually
+requires, not a generic "geometry" label).
+
+## Per-node verdicts
+
+| Node (mode) | Name promises | Actual behavior | Verdict |
+|---|---|---|---|
+| Geometry | a primitive shape generator | matches | **honest** |
+| Text3D | 3D text mesh | matches | **honest** |
+| Ocean | wave-simulated surface | matches (Gerstner) | **honest** |
+| Model Source | loads an external model file | matches | **honest** |
+| Audio Ribbon | ribbon mesh driven by audio | matches | **honest** |
+| Curve | a curve | emits a **tube mesh** (`mesh:surface`) as well as `curve` — but `radius`/`sides`/`taper`/`segments` are all real, visible `VisitParams` controls (`CurveNode.h:44,52,89-95`, verified this pass), matching the standard DCC convention of a curve object with an adjustable bevel/thickness (e.g. Blender's Curve `Bevel Depth`) | **honest** — the mesh is a controllable, advertised feature, not a silent surprise |
+| GeometryOp (all 10 ops) | a generic multi-purpose mesh operator | `OpNames()` is a public accessor (`GeometryOpNodes.cpp:14,96`, verified) feeding the node body's own dropdown, so the active op's name is always visibly surfaced — "GeometryOp: Subdivide" is not the same promise as bare "GeometryOp" | **honest**, same pattern as any multi-mode utility node whose UI shows the live mode |
+| Displacement | displaces a mesh via a texture | matches | **honest** |
+| Audio Displacement | displaces a mesh via audio | matches | **honest** |
+| InstanceOnPoints | instances a shape onto points | matches for what it does; silently drops upstream Mapping from `instanceShape` (§2/phase 1) | **name honest, code gap** — phase 4 item, not a rename (the node does instance shapes onto points; it just forgets one side-channel while doing it) |
+| **Set Color** | sets "the" colour | **collides with Material**, which also claims to set "colour" (albedo) — the two combine multiplicatively (`base = uBaseColor * vInstanceColor * vVertexColor`, `Geometry3DNodes.cpp:577`) so "Set Color red + Material red = dark red," which nothing in either name warns about | **RENAME (D3, already decided).** Proposed name: **`Set Vertex Color`** — states which of the two "colour" concepts it actually writes (channel B, not channel A). Final name is an open question for the user (see below) — this is a proposal, not a decision. |
+| Wrap | wraps source mesh onto target surface | matches | **honest** |
+| Null3D | "everything is forwarded" (its own header comment, `UtilityNodes.h:131-133`) | drops `GetPointCloud()`/`GetCurve()` entirely (§2) — the comment makes an explicit false claim | **name honest ("Null" = do-nothing passthrough is a standard DCC term), comment is wrong and code has a gap** — phase 4 fix (forward cloud/curve), and delete or correct the false "everything is forwarded" comment as part of that fix, not a rename of the node |
+| Material | sets material (albedo/roughness/etc.) | matches for what it sets; **has no revision stamp on channel A** (phase 1), so a downstream cache can silently show a stale material after this node changes it — "sets material" is true the instant it runs, unreliable afterward | **name honest, code gap (phase 4.1 — add `MaterialRevision()`)**, not a rename. This is the node the plan's "an effect the graph has no channel to observe" line refers to — the missing observability is the revision stamp, not the node's name. |
+| Mapping | applies a UV/mapping transform | matches for mesh; drops cloud/curve passthrough (§2) | **name honest, code gap** — same shape as Null3D |
+| **Join** ("Join Geometry") | combines multiple geometry inputs | matches; but the `keepInputColours` parameter defaults imply a mode where merging **destroys** input colour — the existence of an opt-in "don't destroy my data" checkbox is itself the tell | **REMOVE `keepInputColours` (D4, already decided).** A merge should always preserve; no rename of "Join" needed — the node's core promise (combine geometry) is accurate, only the lossy-by-default colour param violates it. |
+| MetaBall | generates a metaball/blob surface from a point cloud | matches; pin is honestly labelled `cloud`, not generic `geometry` (bar-setter, cited above); deliberately drops mapping/texture (no meaningful UVs on marching-cubes output, phase 2 — defensible, not a naming issue) | **honest** |
+| **Mesh to Points** | converts a mesh to points | `GetPointCloud()` matches; but `GetMesh()` **also** returns a fabricated billboard-quad mesh (`mesh:standin`) that a downstream `mesh:any`/`mesh:surface` pin will silently accept as if real (the mechanism of the reported bug) | **name honest for the cloud output; the mesh output is the actual defect.** Resolution is **D5 (already decided): split the preview accessor from the data accessor** so `GetMesh()` can be honestly empty — not a rename, since "Mesh to Points" never promised to also emit a usable mesh. |
+| MergeByDistance | welds vertices within a distance threshold | matches; cleanest passthrough found in the whole audit (§side-channel table, no gaps) | **honest** |
+| Distribute Points on Faces | scatters points across a mesh's faces | matches (bar-setter, cited above); shares the identical `mesh:standin` fabrication as Mesh to Points | **name honest; shares D5's fix** — the fabrication bug is uniform across all four `mesh:standin` producers (this node, Mesh to Points, Distribute Points in Grid, Image to Points), so D5's split-accessor fix applies to all four, not just the one the plan named |
+| Points to Vertices | converts points to a faceless vertex mesh | matches, documents its own facelessness in-code (bar-setter, cited above) | **honest** |
+| Distribute Points in Grid | generates a point grid | matches; same shared `mesh:standin` fabrication as above | **name honest; shares D5's fix** |
+| Particle System | a particle simulation | `GetMesh()` returns a **permanently-empty stub** (`static Mesh empty`, phase 1, verified) rather than a fabricated standin — the most honest of the four/five cloud-emitting producers, since it doesn't fabricate anything at all | **honest — and arguably the template D5's fix should converge the other four toward** (empty, not billboard quads) |
+| Cloth | cloth simulation | matches; realizes (bakes) any upstream instancer into one concrete simulated mesh before solving (phase 2, confirmed deliberate) — the same behavior a Houdini/Blender cloth solver has on instanced geometry, not a surprise to a DCC user | **honest** — recommend an in-code comment on `RebuildFromInput` stating this is why instancing doesn't survive Cloth (a comment justified by physics, not covering for a naming gap — consistent with the plan's rule since the *reason* is legitimate, only the *documentation* of it is currently missing) |
+| Image to Points | converts image pixels to points | matches; deliberately hardcodes `GetSurfaceTexture()` to 0 specifically to avoid double-applying colour via both `r/g/b` and a texture sample — documented in-code (phase 1, `.h:198-204`) | **honest**; same shared `mesh:standin` fabrication as the other three, shares D5's fix |
+| Switcher3D | switches between geometry inputs | matches for mesh (of whichever input is active); drops cloud/curve regardless of active slot (§2) | **name honest, code gap** — same shape as Null3D/Material/Mapping, not a rename |
+| FieldPrimitive | a Field-kernel-driven primitive generator | matches — the plan's own premise that it emits cloud/curve depending on mode was the thing that turned out to be false (phase 1); the node itself never claimed that | **honest** |
+| FieldElement | a per-element Field kernel modifier of connected geometry (or a standalone generator when nothing is wired in) | matches; `maxElements` is a visible, named budget control (`FieldElementNode.h:198`) and truncation state (`mWasTruncated`) exists to be surfaced in the UI | **honest**, assuming the UI actually surfaces `mWasTruncated` — not independently re-verified this pass whether the node body draws a truncation indicator; flag as a UI-completeness check for phase 5, not a naming verdict |
+| MeshResynth | iterative mesh mutation/regeneration | clean forwarding operator (§2, no side-channel gaps found); `OpNames()` accessor mirrors GeometryOp's mode-visibility pattern (`GenerativeNodes.cpp:11,53`) | **honest** |
+
+## Summary — rename/remove list (goal 1 compliant: no documentation-only resolutions)
+
+| Node | Action | Status |
+|---|---|---|
+| Set Color | **Rename** to `Set Vertex Color` (proposed) | needs user confirmation — open question below |
+| Join — `keepInputColours` param | **Remove** the parameter; merge always preserves | decided (D4); implementation is phase 4.3 |
+| Mesh to Points / Distribute Points on Faces / Distribute Points in Grid / Image to Points | **No rename** — split `GetMesh()`'s preview accessor from its data accessor (D5) so the mesh output can be honestly empty, matching Particle System's already-honest pattern | decided (D5); implementation is phase 4.2, applies to all four producers uniformly, not just the plan's named example |
+
+Everything else audited this pass is either genuinely honest, or a
+completeness bug where the name is accurate and an implementation gap (not
+the name) is at fault — those stay on the phase 4 list built in phase 1/2,
+not this one.
+
+## Open questions carried forward
+
+1. **Set Color's new name.** `Set Vertex Color` is this pass's proposal —
+   states the channel (B) it actually writes, distinct from Material's
+   channel (A). Confirm before phase 4.3, since renaming changes what loads
+   from saved patches (`VisitParams` migration required either way, per the
+   plan's phase 4.3 note and D2: never silently drop a cable/param from
+   saved work).
+2. Everything else the plan flagged as a "known mismatch to start from" —
+   Join's `keepInputColours`, Mesh to Points' dual emission, Material's
+   missing revision stamp — resolved above without needing a new open
+   question; all three already had a decision (D3/D4/D5) that this pass
+   confirmed rather than had to invent.
