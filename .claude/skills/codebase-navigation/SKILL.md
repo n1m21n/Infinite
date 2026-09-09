@@ -172,6 +172,25 @@ entry if a refactor makes it stale.
   `i` is reserved as the element-domain per-element index in Field (see
   `field-language`) — every sibling fixture in the file already used `k`.
 
+- **`IGeometrySource` passthrough wrappers silently drop `GetPointCloud()`/
+  `GetCurve()`.** `Null3DNode`, `MaterialNode`, `MappingNode`
+  (`src/nodes/UtilityNodes.h`), and `Switcher3DNode`
+  (`src/nodes/Switcher3DNode.cpp`) all forward mesh + all 7 side-channels
+  (material, vertex/particle colour, texture, mapping transform, instance
+  colour, instance selection) + `PassthroughSource()`/instance-* correctly,
+  but none override `GetPointCloud()`/`GetCurve()` — a cloud or curve source
+  routed through any of them becomes invisible downstream even though each
+  node's own comments describe it as a complete no-op passthrough (e.g.
+  Null3D's header literally says "everything is forwarded",
+  `UtilityNodes.h:131-133`). Any new `IGeometrySource` passthrough wrapper
+  needs to explicitly forward these two — the base class defaults to
+  `nullptr` and nothing enforces the "if you forward `PassthroughSource`,
+  forward cloud/curve too" pairing. Found during the geometry domain audit
+  (`docs/reference/geometry-domains.md`); `InstanceOnPointsNode`
+  (`src/nodes/GeometryOpNodes.h`) has a related but distinct gap — it
+  forwards Material and per-map texture from its `instanceShape` input but
+  not `GetMappingTransform()`, with no comment explaining why.
+
 ## Adding to this map
 
 At the end of a task that touched `src/`, if you found a cross-file wiring
