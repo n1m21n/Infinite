@@ -117,6 +117,11 @@ Material AudioRibbonNode::GetMaterial() const
    return m;
 }
 
+unsigned long long AudioRibbonNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+}
+
 void AudioRibbonNode::RebuildRibbon()
 {
    const int segs = std::clamp(segments, 4, 2048);

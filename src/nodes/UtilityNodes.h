@@ -151,9 +151,17 @@ public:
    {
       return input ? input->GetMaterial() : Material();
    }
+   unsigned long long MaterialRevision() const override
+   {
+      return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+   }
    MappingTransform GetMappingTransform() const override
    {
       return input ? input->GetMappingTransform() : MappingTransform();
+   }
+   unsigned long long MappingRevision() const override
+   {
+      return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
    }
    unsigned int GetSurfaceTexture() override
    {
@@ -198,6 +206,10 @@ public:
 private:
    Mesh mEmpty;
    int mLastCookFrame = -1;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
+   mutable unsigned long long mMappingRevision = 0;
+   mutable size_t mLastMappingHash = 0;
 };
 
 // --- Material -----------------------------------------------------------
@@ -225,6 +237,7 @@ public:
       return input ? input->GetModelMatrix() : Mat4::Identity();
    }
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
    unsigned int GetSurfaceTexture() override;
 
    unsigned int GetMaterialTexture(int map) override;
@@ -232,6 +245,10 @@ public:
    MappingTransform GetMappingTransform() const override
    {
       return input ? input->GetMappingTransform() : MappingTransform();
+   }
+   unsigned long long MappingRevision() const override
+   {
+      return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
    }
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
@@ -335,6 +352,10 @@ private:
    ImageCable mMaps[kMapCount];
    Mesh mEmpty;
    int mLastCookFrame = -1;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
+   mutable unsigned long long mMappingRevision = 0;
+   mutable size_t mLastMappingHash = 0;
 };
 
 // --- Mapping --------------------------------------------------------------
@@ -371,6 +392,10 @@ public:
    {
       return input ? input->GetMaterial() : Material();
    }
+   unsigned long long MaterialRevision() const override
+   {
+      return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+   }
    unsigned int GetSurfaceTexture() override
    {
       return input ? input->GetSurfaceTexture() : 0;
@@ -384,6 +409,7 @@ public:
       return input ? input->SurfaceTextureRevision() : 0;
    }
    MappingTransform GetMappingTransform() const override;
+   unsigned long long MappingRevision() const override;
 
    IGeometrySource* PassthroughSource() const override { return input; }
    Mat4 GetInstanceGroupMatrix() const override
@@ -429,6 +455,10 @@ public:
 private:
    Mesh mEmpty;
    int mLastCookFrame = -1;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
+   mutable unsigned long long mMappingRevision = 0;
+   mutable size_t mLastMappingHash = 0;
 };
 
 // --- Join Geometry ------------------------------------------------------
@@ -468,9 +498,11 @@ public:
    unsigned long long MeshRevision() override;
    Mat4 GetModelMatrix() const override;
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
    unsigned int GetSurfaceTexture() override;
    unsigned long long SurfaceTextureRevision() const override;
    MappingTransform GetMappingTransform() const override;
+   unsigned long long MappingRevision() const override;
 
    INode* BypassSource() override
    {
@@ -562,6 +594,7 @@ private:
    unsigned long long mMeshRevision = 0;
    const void* mBuiltInputs[kSlots] = { nullptr, nullptr, nullptr, nullptr };
    unsigned long long mBuiltRevisions[kSlots] = { 0, 0, 0, 0 };
+   unsigned long long mBuiltMaterialRev[kSlots] = { 0, 0, 0, 0 };
    const void* mBuiltInstancers[kSlots] = { nullptr, nullptr, nullptr, nullptr };
    unsigned long long mBuiltInstRevisions[kSlots] = { 0, 0, 0, 0 };
    Mat4 mBuiltGroupMatrices[kSlots];
@@ -573,6 +606,10 @@ private:
    // the mesh stamp meant moving or scaling an input did nothing at all.
    Mat4 mBuiltMatrices[kSlots];
    int mLastCookFrame = -1;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
+   mutable unsigned long long mMappingRevision = 0;
+   mutable size_t mLastMappingHash = 0;
 };
 
 // --- Metaballs ----------------------------------------------------------
@@ -595,6 +632,7 @@ public:
    unsigned long long MeshRevision() override;
    Mat4 GetModelMatrix() const override;
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
 
    // A cloud drives the balls when patched, so particles can be surfaced.
    // Read via GetPointCloud() - a plain mesh source with no point cloud of its
@@ -679,6 +717,8 @@ private:
    const void* mBuiltCloud = nullptr;
    unsigned long long mBuiltCloudRevision = 0;
    int mLastCookFrame = -1;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
 };
 
 // --- Mesh to Points -----------------------------------------------------
@@ -725,6 +765,7 @@ public:
       return input->GetModelMatrix();
    }
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
    unsigned int GetSurfaceTexture() override;
    unsigned int GetMaterialTexture(int map) override
    {
@@ -738,12 +779,18 @@ public:
    {
       return input ? input->GetMappingTransform() : MappingTransform();
    }
+   unsigned long long MappingRevision() const override
+   {
+      return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
+   }
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    const char* InputLabel(int) const override { return "geo"; }
-   size_t TriangleCount() const { return mCache.indices.size() / 3; }
+   // Honestly 0: this node has no mesh output, only points - see the
+   // comment on GetMesh()'s definition (UtilityNodes.cpp).
+   size_t TriangleCount() const { return 0; }
    size_t PointCount() const { return mPointCount; }
 
    int mode = 0;          // vertices / edges / faces
@@ -822,5 +869,10 @@ private:
    float mBuiltDissolve = -1.0f;
    bool mBuiltInherit = true;
    float mBuiltColor[3] = { -1.0f, -1.0f, -1.0f };
+   unsigned long long mBuiltMaterialRev = 0;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
+   mutable unsigned long long mMappingRevision = 0;
+   mutable size_t mLastMappingHash = 0;
    int mLastCookFrame = -1;
 };

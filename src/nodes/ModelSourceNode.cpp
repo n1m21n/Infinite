@@ -206,6 +206,11 @@ Material ModelSourceNode::GetMaterial() const
    return m;
 }
 
+unsigned long long ModelSourceNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+}
+
 unsigned int ModelSourceNode::GetSurfaceTexture()
 {
    return mTextureInput.IsConnected() && mTextureInput.GetSource()

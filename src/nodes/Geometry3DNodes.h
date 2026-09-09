@@ -115,6 +115,31 @@ struct MappingTransform
    float triplanarBlend = 0.0f; // 0 = sharp pick, >0 = smooth blended triplanar
 };
 
+// Byte-hashes a POD value and bumps `revision` via NextMeshRevision()
+// whenever the hash changes from last call, caching the hash in `lastHash`.
+// Used to derive MaterialRevision()/MappingRevision() from the *existing*
+// GetMaterial()/GetMappingTransform() implementation of any node - including
+// passthrough nodes, since GetMaterial() already resolves passthrough
+// correctly, so hashing its result handles the "forward through every
+// passthrough" requirement for free, no per-class forwarding code needed.
+template <typename T>
+inline unsigned long long ComputeContentRevision(const T& value, unsigned long long& revision, size_t& lastHash)
+{
+   size_t h = 1469598103934665603ull; // FNV-1a offset basis
+   const unsigned char* bytes = reinterpret_cast<const unsigned char*>(&value);
+   for (size_t i = 0; i < sizeof(T); i++)
+   {
+      h ^= bytes[i];
+      h *= 1099511628211ull; // FNV-1a prime
+   }
+   if (revision == 0 || h != lastHash)
+   {
+      lastHash = h;
+      revision = NextMeshRevision();
+   }
+   return revision;
+}
+
 class IGeometrySource
 {
 public:
@@ -139,6 +164,12 @@ public:
 
    virtual Mat4 GetModelMatrix() const = 0;
    virtual Material GetMaterial() const = 0;
+   // Monotonic stamp that changes iff GetMaterial() would now return a
+   // different value than last time this was called. 0 means "never
+   // computed yet" (mirrors NextMeshRevision()'s "zero reserved" convention,
+   // src/core/Mesh.cpp:11). Base default 0 is correct for any class that
+   // doesn't override GetMaterial() at all.
+   virtual unsigned long long MaterialRevision() const { return 0; }
    // Optional texture applied to the surface (0 when none is patched in).
    virtual unsigned int GetSurfaceTexture() { return 0; }
    // Per-channel maps. Defaults to routing slot 0 to the albedo texture, so a
@@ -158,6 +189,8 @@ public:
    // How material maps are looked up on the surface. Identity/UV by default,
    // so nothing changes for a chain with no Mapping node in it.
    virtual MappingTransform GetMappingTransform() const { return MappingTransform(); }
+   // Same idea as MaterialRevision(), for GetMappingTransform().
+   virtual unsigned long long MappingRevision() const { return 0; }
 
    // The upstream source this node derives its mesh from, for nodes whose
    // GetMesh() is built by transforming a single upstream mesh (Transform,
@@ -237,6 +270,7 @@ public:
    unsigned long long MeshRevision() override;
    Mat4 GetModelMatrix() const override;
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
    unsigned int GetSurfaceTexture() override;
    unsigned long long SurfaceTextureRevision() const override { return mTextureInput.Revision(); }
 
@@ -348,6 +382,8 @@ private:
    float mBuiltN2 = -999.0f, mBuiltN3 = -999.0f, mBuiltP2 = -999.0f, mBuiltP3 = -999.0f;
    float mBuiltDiscInner = -999.0f;
    unsigned long long mMeshRevision = 0;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
 
    ImageCable mTextureInput;
    GLUtil::Fbo mPreview;
@@ -617,6 +653,7 @@ private:
       unsigned long long curveRev[kSlots] = { 0, 0, 0, 0 };
       unsigned long long surfaceTexRev[kSlots] = { 0, 0, 0, 0 };
       Material material[kSlots];
+      MappingTransform mapping[kSlots];
       Mat4 modelMatrix[kSlots];
       unsigned long long instanceRev[kSlots] = { 0, 0, 0, 0 };
       size_t instanceCount[kSlots] = { 0, 0, 0, 0 };
@@ -645,6 +682,8 @@ private:
                 instanceCount[i] != o.instanceCount[i])
                return false;
             if (hasGeom[i] && memcmp(&material[i], &o.material[i], sizeof(Material)) != 0)
+               return false;
+            if (hasGeom[i] && memcmp(&mapping[i], &o.mapping[i], sizeof(MappingTransform)) != 0)
                return false;
             if (hasGeom[i] && !(modelMatrix[i] == o.modelMatrix[i]))
                return false;

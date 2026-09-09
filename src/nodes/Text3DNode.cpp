@@ -105,6 +105,11 @@ Material Text3DNode::GetMaterial() const
    return m;
 }
 
+unsigned long long Text3DNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+}
+
 unsigned int Text3DNode::GetSurfaceTexture()
 {
    return mTextureInput.IsConnected() && mTextureInput.GetSource()

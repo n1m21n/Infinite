@@ -30,10 +30,10 @@ public:
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
 
-   // A billboard-quad mesh (MeshOps::PointsToFaces), same fallback shape as
-   // MeshToPointsNode - anything that only understands GetMesh() still sees
-   // something, and Render 3D's drawCloudSlot draws GetPointCloud() instead
-   // when the consumer understands clouds.
+   // Honestly empty - this node only ever has points to offer, see the
+   // comment on the .cpp definition (geometry-domains audit, D5). Render3D
+   // and NodeViewport read GetPointCloud() instead when they understand
+   // clouds, which they always do here.
    const Mesh& GetMesh() override;
    unsigned long long MeshRevision() override;
    const std::vector<Particle>* GetPointCloud() override { return &GetPoints(); }
@@ -48,6 +48,7 @@ public:
       return input->GetModelMatrix();
    }
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
    unsigned int GetSurfaceTexture() override { return input ? input->GetSurfaceTexture() : 0; }
    unsigned int GetMaterialTexture(int map) override
    {
@@ -60,6 +61,10 @@ public:
    MappingTransform GetMappingTransform() const override
    {
       return input ? input->GetMappingTransform() : MappingTransform();
+   }
+   unsigned long long MappingRevision() const override
+   {
+      return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
    }
 
    IGeometrySource* input = nullptr;
@@ -111,7 +116,6 @@ public:
 private:
    void RebuildIfNeeded();
 
-   Mesh mCache;
    std::vector<Particle> mPoints;
    const void* mBuiltInput = nullptr;
    unsigned long long mBuiltUpstream = 0;
@@ -125,6 +129,10 @@ private:
    bool mBuiltInherit = true;
    float mBuiltColor[3] = { -1.0f, -1.0f, -1.0f };
    unsigned long long mMeshRevision = 0;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
+   mutable unsigned long long mMappingRevision = 0;
+   mutable size_t mLastMappingHash = 0;
    int mLastCookFrame = -1;
 };
 
@@ -155,6 +163,7 @@ public:
       return input->GetModelMatrix();
    }
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
    unsigned int GetSurfaceTexture() override { return input ? input->GetSurfaceTexture() : 0; }
    unsigned int GetMaterialTexture(int map) override
    {
@@ -167,6 +176,10 @@ public:
    MappingTransform GetMappingTransform() const override
    {
       return input ? input->GetMappingTransform() : MappingTransform();
+   }
+   unsigned long long MappingRevision() const override
+   {
+      return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
    }
 
    IGeometrySource* input = nullptr;
@@ -221,6 +234,10 @@ private:
    size_t mBuiltInstanceCount = 0;
    bool mBuiltAliveOnly = true;
    unsigned long long mMeshRevision = 0;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
+   mutable unsigned long long mMappingRevision = 0;
+   mutable size_t mLastMappingHash = 0;
    int mLastCookFrame = -1;
 };
 
@@ -249,6 +266,7 @@ public:
 
    Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
    unsigned int GetSurfaceTexture() override { return 0; }
 
    IGeometrySource** GeometryInputSlot(int) override { return nullptr; }
@@ -272,12 +290,13 @@ public:
 private:
    void RebuildIfNeeded();
 
-   Mesh mCache;
    std::vector<Particle> mPoints;
    int mBuiltCountX = -1, mBuiltCountY = -1;
    float mBuiltSpacingX = -1.0f, mBuiltSpacingY = -1.0f;
    float mBuiltJitter = -1.0f, mBuiltPointSize = -1.0f, mBuiltSeed = 0.0f;
    unsigned long long mMeshRevision = 0;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
    int mLastCookFrame = -1;
 };
 
@@ -304,6 +323,10 @@ public:
       return input ? input->GetModelMatrix() : Mat4::Identity();
    }
    Material GetMaterial() const override { return input ? input->GetMaterial() : Material(); }
+   unsigned long long MaterialRevision() const override
+   {
+      return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+   }
    unsigned int GetSurfaceTexture() override { return input ? input->GetSurfaceTexture() : 0; }
    unsigned int GetMaterialTexture(int map) override
    {
@@ -316,6 +339,10 @@ public:
    MappingTransform GetMappingTransform() const override
    {
       return input ? input->GetMappingTransform() : MappingTransform();
+   }
+   unsigned long long MappingRevision() const override
+   {
+      return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
    }
    IGeometrySource* PassthroughSource() const override { return input; }
    // Forwarded alongside PassthroughSource - see MaterialNode for why the two
@@ -354,5 +381,9 @@ private:
    unsigned long long mBuiltUpstream = 0;
    float mBuiltThreshold = -1.0f;
    unsigned long long mMeshRevision = 0;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
+   mutable unsigned long long mMappingRevision = 0;
+   mutable size_t mLastMappingHash = 0;
    int mLastCookFrame = -1;
 };

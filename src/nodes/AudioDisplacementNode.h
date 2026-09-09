@@ -52,6 +52,7 @@ public:
       return input ? input->GetModelMatrix() : Mat4::Identity();
    }
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
    unsigned int GetSurfaceTexture() override;
    unsigned int GetMaterialTexture(int map) override
    {
@@ -64,6 +65,10 @@ public:
    MappingTransform GetMappingTransform() const override
    {
       return input ? input->GetMappingTransform() : MappingTransform();
+   }
+   unsigned long long MappingRevision() const override
+   {
+      return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
    }
    IGeometrySource* PassthroughSource() const override { return input; }
    Mat4 GetInstanceGroupMatrix() const override
@@ -143,6 +148,10 @@ public:
 private:
    AudioCable mAudioInput;
    std::unique_ptr<AudioDisplaceAudioSink> mAudioSink;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
+   mutable unsigned long long mMappingRevision = 0;
+   mutable size_t mLastMappingHash = 0;
 
    struct Signature
    {

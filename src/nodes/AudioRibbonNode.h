@@ -34,6 +34,7 @@ public:
    unsigned long long MeshRevision() override;
    Mat4 GetModelMatrix() const override;
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
    unsigned int GetSurfaceTexture() override { return 0; }
 
    size_t TriangleCount() const { return mMesh.indices.size() / 3; }
@@ -92,6 +93,8 @@ private:
 
    Mesh mMesh;
    unsigned long long mMeshRevision = 1;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
 
    std::vector<float> mAudioWaveform;
    std::vector<float> mSmoothedWaveform;

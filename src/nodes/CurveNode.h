@@ -29,6 +29,7 @@ public:
    unsigned long long MeshRevision() override;
    Mat4 GetModelMatrix() const override;
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
 
    const Polyline& GetPolyline();
    unsigned long long CurveRevision();
@@ -113,6 +114,8 @@ private:
    Mesh mMesh;
    Polyline mLine;
    unsigned long long mRevision = 0;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
 
    int mBuiltKind = -1, mBuiltPreset = -1, mBuiltCount = -1, mBuiltSegments = -1;
    int mBuiltSides = -1;

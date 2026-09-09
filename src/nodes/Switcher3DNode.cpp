@@ -94,10 +94,20 @@ Material Switcher3DNode::GetMaterial() const
    return active ? active->GetMaterial() : Material();
 }
 
+unsigned long long Switcher3DNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+}
+
 MappingTransform Switcher3DNode::GetMappingTransform() const
 {
    IGeometrySource* active = Active();
    return active ? active->GetMappingTransform() : MappingTransform();
+}
+
+unsigned long long Switcher3DNode::MappingRevision() const
+{
+   return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
 }
 
 unsigned int Switcher3DNode::GetSurfaceTexture()

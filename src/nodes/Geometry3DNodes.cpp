@@ -858,6 +858,11 @@ Material GeometryNode::GetMaterial() const
    return m;
 }
 
+unsigned long long GeometryNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+}
+
 unsigned int GeometryNode::GetSurfaceTexture()
 {
    return mTextureInput.IsConnected() && mTextureInput.GetSource()
@@ -1334,6 +1339,7 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
       sig.curveRev[i] = source->CurveStamp();
       sig.surfaceTexRev[i] = source->SurfaceTextureRevision();
       sig.material[i] = source->GetMaterial();
+      sig.mapping[i] = source->GetMappingTransform();
       sig.modelMatrix[i] = source->GetModelMatrix();
       if (auto* instancer = FindInstancer(source))
       {

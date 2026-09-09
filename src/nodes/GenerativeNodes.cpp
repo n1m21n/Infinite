@@ -420,6 +420,11 @@ Material ImageToPointsNode::GetMaterial() const
    return m;
 }
 
+unsigned long long ImageToPointsNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+}
+
 ImageToPointsNode::~ImageToPointsNode()
 {
    GLUtil::DestroyFbo(mSmall);

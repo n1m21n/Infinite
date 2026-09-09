@@ -510,6 +510,11 @@ Material GeometryOpNode::GetMaterial() const
    return m;
 }
 
+unsigned long long GeometryOpNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+}
+
 unsigned int GeometryOpNode::GetSurfaceTexture()
 {
    return input ? input->GetSurfaceTexture() : 0;
@@ -607,6 +612,11 @@ Material DisplacementNode::GetMaterial() const
    m.subsurfaceColor[2] = subsurfaceColor[2];
    m.subsurfaceRadius = subsurfaceRadius;
    return m;
+}
+
+unsigned long long DisplacementNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
 }
 
 unsigned int DisplacementNode::GetSurfaceTexture()
@@ -711,6 +721,11 @@ Material InstanceOnPointsNode::GetMaterial() const
    m.subsurfaceColor[2] = subsurfaceColor[2];
    m.subsurfaceRadius = subsurfaceRadius;
    return m;
+}
+
+unsigned long long InstanceOnPointsNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
 }
 
 unsigned int InstanceOnPointsNode::GetSurfaceTexture()
@@ -998,6 +1013,11 @@ Material WrapNode::GetMaterial() const
    m.subsurfaceColor[2] = subsurfaceColor[2];
    m.subsurfaceRadius = subsurfaceRadius;
    return m;
+}
+
+unsigned long long WrapNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
 }
 
 unsigned int WrapNode::GetSurfaceTexture()

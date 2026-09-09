@@ -67,6 +67,10 @@ public:
    {
       return input ? input->GetMaterial() : Material();
    }
+   unsigned long long MaterialRevision() const override
+   {
+      return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+   }
    unsigned int GetSurfaceTexture() override
    {
       return input ? input->GetSurfaceTexture() : 0;
@@ -82,6 +86,10 @@ public:
    MappingTransform GetMappingTransform() const override
    {
       return input ? input->GetMappingTransform() : MappingTransform();
+   }
+   unsigned long long MappingRevision() const override
+   {
+      return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
    }
    IGeometrySource* PassthroughSource() const override { return input; }
    Mat4 GetInstanceGroupMatrix() const override
@@ -142,6 +150,10 @@ private:
 
    Mesh mMesh;
    unsigned long long mRevision = 0;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
+   mutable unsigned long long mMappingRevision = 0;
+   mutable size_t mLastMappingHash = 0;
    int mGeneration = 0;
    int mPendingSteps = 0;
    bool mNeedsReset = true;
@@ -195,6 +207,7 @@ public:
    unsigned long long MeshRevision() override;
    Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
    // Never expose a surface texture here: CookIfNeeded (GenerativeNodes.cpp) already
    // bakes this same downsampled source image into each point's own instance color
    // (p.r/g/b) whenever useImageColor is on. Returning mSmall.tex here as well made
@@ -248,6 +261,8 @@ private:
    std::vector<std::pair<float, float>> mPointUv;
    std::vector<unsigned char> mPixels;
    unsigned long long mRevision = 0;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
 
    GLUtil::Fbo mSmall;
    unsigned int mProgram = 0;

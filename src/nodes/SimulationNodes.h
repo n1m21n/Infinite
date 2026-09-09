@@ -147,6 +147,7 @@ public:
    unsigned long long MeshRevision() override { return bypassed ? (input ? input->MeshRevision() : 0) : mRevision; }
    Mat4 GetModelMatrix() const override;
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
    unsigned int GetSurfaceTexture() override;
    unsigned long long SurfaceTextureRevision() const override
    {
@@ -155,6 +156,10 @@ public:
    MappingTransform GetMappingTransform() const override
    {
       return input ? input->GetMappingTransform() : MappingTransform();
+   }
+   unsigned long long MappingRevision() const override
+   {
+      return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
    }
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
@@ -265,6 +270,10 @@ private:
    std::vector<unsigned char> mPinned;
 
    unsigned long long mRevision = 0;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
+   mutable unsigned long long mMappingRevision = 0;
+   mutable size_t mLastMappingHash = 0;
    unsigned long long mBuiltUpstream = 0;
    const void* mBuiltInput = nullptr;
    int mBuiltPinMode = -1;
