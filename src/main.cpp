@@ -2833,6 +2833,7 @@ namespace
          gDropdown.onSelect = std::move(onSelect);
          gDropdown.current = safeCurrent;
          gDropdown.justOpened = true;
+         gDropdown.focusSearch = false;
       }
       PopDropdownStyle();
       if (!showCaption)
@@ -6650,7 +6651,7 @@ namespace
       else
       {
          if (ImGui::Button(dropdownId.c_str(), ImVec2(kPreviewSize, 0)))
-            openDropdownAction(false);
+            openDropdownAction(true);
       }
       PopDropdownStyle();
 
@@ -9186,6 +9187,7 @@ namespace
                gDropdown.onSelect = std::move(onSelect);
                gDropdown.current = safe;
                gDropdown.justOpened = true;
+               gDropdown.focusSearch = false;
             }
             if (h.registered)
                DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
@@ -9272,6 +9274,7 @@ namespace
                      gDropdown.onSelect = std::move(onSelect);
                      gDropdown.current = safe;
                      gDropdown.justOpened = true;
+                     gDropdown.focusSearch = false;
                   }
                   if (h.registered)
                      DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
@@ -11463,7 +11466,8 @@ namespace
    // button's own text is the label.
    void AudioBareDropdown(const char* id, const std::vector<std::string>& options, int current,
                           std::function<void(int)> onSelect, float width,
-                          const std::vector<std::string>& categories = {})
+                          const std::vector<std::string>& categories = {},
+                          bool focusSearch = false)
    {
       if (options.empty())
          return;
@@ -11512,6 +11516,8 @@ namespace
          gDropdown.onSelect = std::move(onSelect);
          gDropdown.current = safe;
          gDropdown.justOpened = true;
+         gDropdown.focusSearch = focusSearch;
+         gDropdown.filterBuf[0] = '\0';
       }
       if (h.registered)
          DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
@@ -11632,7 +11638,8 @@ namespace
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + onW + gap, y));
          AudioBareDropdown("wtTable", WavetableNames(), eng.table,
-                           [&eng](int i) { PushUndoCheckpoint(); eng.table = i; }, tableW);
+                           [&eng](int i) { PushUndoCheckpoint(); eng.table = i; }, tableW,
+                           /*categories=*/{}, /*focusSearch=*/true);
          if (ImGui::IsItemHovered())
             SetAudioReadout("wavetable", Wavetable::TableName(eng.table));
 
@@ -15790,6 +15797,7 @@ namespace
             };
             gDropdown.current = currentIdx;
             gDropdown.justOpened = true;
+            gDropdown.focusSearch = false;
          }
          PopDropdownStyle();
       }
@@ -68311,7 +68319,7 @@ int main(int argc, char** argv)
       ImGui::SetNextWindowSizeConstraints(ImVec2(dropdownMinWidth, 0), ImVec2(520, 480));
       if (ImGui::BeginPopup("##dropdown"))
       {
-         const bool showSearch = gDropdown.focusSearch || gDropdown.options.size() > 8;
+         const bool showSearch = gDropdown.focusSearch;
          if (showSearch)
          {
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f, 3.0f));
