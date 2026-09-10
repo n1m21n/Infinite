@@ -156,6 +156,19 @@ public:
    {
       return input ? input->GetMappingTransform() : MappingTransform();
    }
+   // Component passthrough (geometry-domains audit, Phase 4, Blender's rule):
+   // Cloth only simulates GetMesh() and has no opinion on a cloud/curve
+   // riding alongside it, so both forward untouched instead of being swallowed.
+   const std::vector<Particle>* GetPointCloud() override
+   {
+      return input ? input->GetPointCloud() : nullptr;
+   }
+   unsigned long long PointCloudRevision() override
+   {
+      return input ? input->PointCloudRevision() : 0;
+   }
+   const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
+   unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;

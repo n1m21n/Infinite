@@ -172,6 +172,20 @@ public:
    // that walk the passthrough chain, instead of collapsing the scatter to a
    // single stamp mesh.
    IGeometrySource* PassthroughSource() const override { return input; }
+   // Component passthrough (geometry-domains audit, Phase 4, Blender's rule):
+   // a no-op node has no opinion on the cloud/curve riding alongside the mesh,
+   // so both forward untouched - otherwise a Null3D silently launders them
+   // away for whatever mesh-only node comes after it.
+   const std::vector<Particle>* GetPointCloud() override
+   {
+      return input ? input->GetPointCloud() : nullptr;
+   }
+   unsigned long long PointCloudRevision() override
+   {
+      return input ? input->PointCloudRevision() : 0;
+   }
+   const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
+   unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
    Mat4 GetInstanceGroupMatrix() const override
    {
       return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
@@ -255,6 +269,18 @@ public:
    {
       return input ? input->InstanceTransformOverride() : nullptr;
    }
+   // Component passthrough (geometry-domains audit, Phase 4, Blender's rule):
+   // restyling a surface has no opinion on a cloud/curve riding alongside it.
+   const std::vector<Particle>* GetPointCloud() override
+   {
+      return input ? input->GetPointCloud() : nullptr;
+   }
+   unsigned long long PointCloudRevision() override
+   {
+      return input ? input->PointCloudRevision() : 0;
+   }
+   const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
+   unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    ImageCable& TextureInput() { return mMaps[kMapAlbedo]; }
@@ -402,6 +428,19 @@ public:
    {
       return input ? input->InstanceTransformOverride() : nullptr;
    }
+   // Component passthrough (geometry-domains audit, Phase 4, Blender's rule):
+   // a Mapping node has no opinion on a cloud/curve riding alongside the mesh
+   // whose UVs it's remapping.
+   const std::vector<Particle>* GetPointCloud() override
+   {
+      return input ? input->GetPointCloud() : nullptr;
+   }
+   unsigned long long PointCloudRevision() override
+   {
+      return input ? input->PointCloudRevision() : 0;
+   }
+   const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
+   unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;
