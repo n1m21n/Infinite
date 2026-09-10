@@ -115,7 +115,28 @@ struct MappingTransform
    float triplanarBlend = 0.0f; // 0 = sharp pick, >0 = smooth blended triplanar
 };
 
-class IGeometrySource
+// D1 (geometry-domains audit, Phase 4): cook-time error channel. A consumer
+// pin that requires one of GetMesh()/GetPointCloud()/GetCurve() but was fed a
+// source that satisfies a *different* one sets this to a message like
+// "expected a surface, got a point cloud" during its own rebuild (see
+// DescribeGeometryMismatch below); empty means no problem. Deliberately not a
+// hard connect-time refusal (per D1's decision) - the cable stays, the node
+// just reports what it actually got. Separate from IGeometrySource because a
+// few consumers (PathNode) read an IGeometrySource curve/mesh input without
+// producing geometry of their own, and still need somewhere to report a
+// mismatch; IGeometrySource inherits this rather than declaring its own copy.
+class ICookWarningSource
+{
+public:
+   virtual ~ICookWarningSource() {}
+   virtual const std::string& CookWarning() const
+   {
+      static const std::string kEmpty;
+      return kEmpty;
+   }
+};
+
+class IGeometrySource : public ICookWarningSource
 {
 public:
    virtual ~IGeometrySource() {}
@@ -206,6 +227,74 @@ public:
    virtual const Polyline* GetCurve() { return nullptr; }
    virtual unsigned long long CurveStamp() { return 0; }
 };
+
+// What a consumer pin actually needs from an upstream IGeometrySource,
+// mirroring the four requirement categories in the phase 2 rule matrix
+// (docs/reference/geometry-domains.md, "Satisfaction rule").
+enum class GeometryRequirement
+{
+   kMeshSurface,   // real face topology (GetMesh().indices non-empty)
+   kMeshVertices,  // positions only, faces optional (GetMesh() non-empty)
+   kCloud,         // GetPointCloud()
+   kCurve,         // GetCurve()
+};
+
+// Cook-time classification for D1: if `source` doesn't satisfy `requirement`,
+// returns a message describing what it offered instead; empty string means
+// the pin's requirement is satisfied and there is nothing to warn about.
+// `source` may be null (unconnected pin) - callers that treat "unconnected"
+// as its own state should check that separately, this always returns empty
+// for it since an unconnected pin isn't a *mismatched* connection.
+inline std::string DescribeGeometryMismatch(IGeometrySource* source, GeometryRequirement requirement)
+{
+   if (source == nullptr)
+      return std::string();
+
+   const bool hasSurface = !source->GetMesh().Empty() && !source->GetMesh().indices.empty();
+   const bool hasVerts = !source->GetMesh().Empty();
+   const std::vector<Particle>* cloud = source->GetPointCloud();
+   const bool hasCloud = cloud != nullptr && !cloud->empty();
+   const bool hasCurve = source->GetCurve() != nullptr;
+
+   switch (requirement)
+   {
+      case GeometryRequirement::kMeshSurface:
+         if (hasSurface)
+            return std::string();
+         if (hasCloud)
+            return "expected a surface, got a point cloud";
+         if (hasCurve)
+            return "expected a surface, got a curve";
+         if (hasVerts)
+            return "expected a surface, got vertices only (no faces)";
+         return "expected a surface, got nothing";
+      case GeometryRequirement::kMeshVertices:
+         if (hasVerts)
+            return std::string();
+         if (hasCloud)
+            return "expected mesh vertices, got a point cloud";
+         if (hasCurve)
+            return "expected mesh vertices, got a curve";
+         return "expected mesh vertices, got nothing";
+      case GeometryRequirement::kCloud:
+         if (hasCloud)
+            return std::string();
+         if (hasSurface || hasVerts)
+            return "expected a point cloud, got a mesh";
+         if (hasCurve)
+            return "expected a point cloud, got a curve";
+         return "expected a point cloud, got nothing";
+      case GeometryRequirement::kCurve:
+         if (hasCurve)
+            return std::string();
+         if (hasSurface || hasVerts)
+            return "expected a curve, got a mesh";
+         if (hasCloud)
+            return "expected a curve, got a point cloud";
+         return "expected a curve, got nothing";
+   }
+   return std::string();
+}
 
 // --- Geometry -----------------------------------------------------------
 class GeometryNode : public INode, public IGeometrySource

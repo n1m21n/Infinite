@@ -66,6 +66,7 @@ public:
       return input ? input->GetMappingTransform() : MappingTransform();
    }
    IGeometrySource* PassthroughSource() const override { return input; }
+   const std::string& CookWarning() const override { return mCookWarning; }
    Mat4 GetInstanceGroupMatrix() const override
    {
       return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
@@ -216,4 +217,5 @@ private:
    unsigned long long mBaseCachedUpstreamRevision = 0;
    int mBaseCachedSubdivide = -1;
    bool mBaseHasCache = false;
+   std::string mCookWarning;
 };

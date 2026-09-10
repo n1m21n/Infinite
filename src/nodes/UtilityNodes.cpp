@@ -648,6 +648,8 @@ void MetaBallNode::RebuildIfNeeded()
    const std::vector<Particle>* cloud = cloudSource ? cloudSource->GetPointCloud() : nullptr;
    const unsigned long long cloudRevision = cloudSource ? cloudSource->PointCloudRevision() : 0;
 
+   mCookWarning = DescribeGeometryMismatch(cloudSource, GeometryRequirement::kCloud);
+
    if (mBuiltCount == ballCount && mBuiltRes == resolution &&
        mBuiltThreshold == threshold && mBuiltBounds == bounds &&
        mBuiltRadius == radius && mBuiltSpread == spread && mBuiltMax == maxFromCloud &&

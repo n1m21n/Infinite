@@ -25,6 +25,8 @@ const std::vector<std::string>& PathNode::FollowModeNames() { return kFollowMode
 
 void PathNode::RebuildFollowIfNeeded()
 {
+   mCookWarning = DescribeGeometryMismatch(curveSource, GeometryRequirement::kCurve);
+
    if (curveSource != nullptr)
    {
       const unsigned long long stamp = curveSource->CurveStamp();

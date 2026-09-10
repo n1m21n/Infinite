@@ -63596,6 +63596,13 @@ int main(int argc, char** argv)
          const float kTintWeight = CategoryColors::GetTintWeight();
          const float nodeAlpha = CategoryColors::GetNodeOpacity();
          const bool isComment = dynamic_cast<CommentNode*>(gn.node.get()) != nullptr;
+         // D1 (geometry-domains audit, Phase 4): a node whose geometry input
+         // doesn't satisfy what it asked for (see DescribeGeometryMismatch,
+         // Geometry3DNodes.h) gets a red border instead of its usual category
+         // tint, with the message on hover - the "red node" the plan's D1
+         // decision called for, in place of a connect-time refusal.
+         const auto* warnSrc = dynamic_cast<ICookWarningSource*>(gn.node.get());
+         const bool hasCookWarning = warnSrc != nullptr && !warnSrc->CookWarning().empty();
          if (isComment)
          {
             ed::PushStyleColor(ed::StyleColor_NodeBg, ImColor(0, 0, 0, 0));
@@ -63611,8 +63618,16 @@ int main(int argc, char** argv)
                                        t.panelBg.g * (1.0f - kTintWeight) + catColor.g * kTintWeight,
                                        t.panelBg.b * (1.0f - kTintWeight) + catColor.b * kTintWeight,
                                        nodeAlpha));
-            ed::PushStyleColor(ed::StyleColor_NodeBorder,
-                               ImColor(catColor.r, catColor.g, catColor.b, isLight ? 0.75f : 0.55f));
+            if (hasCookWarning)
+            {
+               ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(0.95f, 0.25f, 0.2f, 0.9f));
+               ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, 2.5f);
+            }
+            else
+            {
+               ed::PushStyleColor(ed::StyleColor_NodeBorder,
+                                  ImColor(catColor.r, catColor.g, catColor.b, isLight ? 0.75f : 0.55f));
+            }
          }
 
          ed::BeginNode(gn.NodeId());
@@ -64634,9 +64649,13 @@ int main(int argc, char** argv)
          ImGui::PopID();
          gInsideNodeCanvas = false;
          ed::EndNode();
+         if (hasCookWarning && ed::GetHoveredNode() == ed::NodeId(gn.NodeId()))
+            ImGui::SetTooltip("%s", warnSrc->CookWarning().c_str());
          ed::PopStyleColor(2);
          if (isComment)
             ed::PopStyleVar(3);
+         else if (hasCookWarning)
+            ed::PopStyleVar();
       }
 
       // ---- draw existing links ----

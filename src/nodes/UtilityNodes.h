@@ -595,6 +595,7 @@ public:
    IGeometrySource* cloudSource = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &cloudSource : nullptr; }
    const char* InputLabel(int) const override { return "cloud"; }
+   const std::string& CookWarning() const override { return mCookWarning; }
    size_t TriangleCount() const { return mCache.indices.size() / 3; }
    size_t BallCount() const { return mBallCount; }
 
@@ -672,6 +673,7 @@ private:
    const void* mBuiltCloud = nullptr;
    unsigned long long mBuiltCloudRevision = 0;
    int mLastCookFrame = -1;
+   std::string mCookWarning;
 };
 
 // --- Mesh to Points -----------------------------------------------------

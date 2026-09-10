@@ -84,6 +84,7 @@ public:
       return input ? input->GetMappingTransform() : MappingTransform();
    }
    IGeometrySource* PassthroughSource() const override { return input; }
+   const std::string& CookWarning() const override { return mCookWarning; }
    Mat4 GetInstanceGroupMatrix() const override
    {
       return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
@@ -150,6 +151,7 @@ private:
    const void* mBuiltInput = nullptr;
    unsigned long long mBuiltInputRevision = 0;
    double mLastStepBeat = 0.0;
+   std::string mCookWarning;
 };
 
 // Turns an image into a point cloud: one particle per sampled pixel, positioned

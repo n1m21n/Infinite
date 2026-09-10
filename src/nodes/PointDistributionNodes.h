@@ -61,6 +61,7 @@ public:
    {
       return input ? input->GetMappingTransform() : MappingTransform();
    }
+   const std::string& CookWarning() const override { return mCookWarning; }
 
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
@@ -126,6 +127,7 @@ private:
    float mBuiltColor[3] = { -1.0f, -1.0f, -1.0f };
    unsigned long long mMeshRevision = 0;
    int mLastCookFrame = -1;
+   std::string mCookWarning;
 };
 
 // --- Points to Vertices -----------------------------------------------------
@@ -336,6 +338,7 @@ public:
    {
       return input ? input->InstanceTransformOverride() : nullptr;
    }
+   const std::string& CookWarning() const override { return mCookWarning; }
 
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
@@ -355,4 +358,5 @@ private:
    float mBuiltThreshold = -1.0f;
    unsigned long long mMeshRevision = 0;
    int mLastCookFrame = -1;
+   std::string mCookWarning;
 };

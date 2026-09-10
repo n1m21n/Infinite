@@ -40,8 +40,11 @@ void DistributePointsOnFacesNode::RebuildIfNeeded()
          mMeshRevision = NextMeshRevision();
       }
       mBuiltInput = nullptr;
+      mCookWarning.clear();
       return;
    }
+
+   mCookWarning = DescribeGeometryMismatch(input, GeometryRequirement::kMeshSurface);
 
    const unsigned long long upstream = input->MeshRevision();
    InstanceOnPointsNode* instancer = FindInstancer(input);
@@ -487,8 +490,11 @@ void MergeByDistanceNode::RebuildIfNeeded()
          mMeshRevision = NextMeshRevision();
       }
       mBuiltInput = nullptr;
+      mCookWarning.clear();
       return;
    }
+
+   mCookWarning = DescribeGeometryMismatch(input, GeometryRequirement::kMeshSurface);
 
    const unsigned long long upstream = input->MeshRevision();
    if (mBuiltInput == input && mBuiltUpstream == upstream && mBuiltThreshold == threshold)
