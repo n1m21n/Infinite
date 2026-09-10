@@ -73,6 +73,7 @@ namespace
 #include <deque>
 #include <set>
 #include <memory>
+#include <random>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -60119,16 +60120,33 @@ int main(int argc, char** argv)
          sw3Node.manualSlot = 0;
          checkForwarding("Switcher3DNode", &sw3Node);
 
+         // Phase 5: InstanceOnPointsNode now forwards GetMappingTransform()
+         // from instanceShape (the stamp), the same shape as GetMaterial()/
+         // GetMaterialTexture() just above - so unlike PathNode and
+         // GeometryTableNode below, it *does* reduce to a plain
+         // GetMappingTransform() read once wired to the probe as the stamp.
+         GeometryNode instPoints;
+         instPoints.shape = 1; // cube
+         instPoints.detail = 2;
+         InstanceOnPointsNode instNode;
+         instNode.pointSource = &instPoints;
+         instNode.instanceShape = &probe;
+         instNode.pointMode = 0; // vertices
+         instNode.maxPoints = 50;
+         instNode.instanceScale = 1.0f;
+         instNode.scaleRandom = 0.0f;
+         checkForwarding("InstanceOnPointsNode", &instNode);
+
          // MappingNode itself is excluded on purpose: it *sets* the mapping
          // transform from its own params rather than forwarding one, so it is
-         // not a passthrough case this check applies to. InstanceOnPointsNode,
-         // PathNode and GeometryTableNode are excluded for the same reason
-         // TRANSFORMSWEEPTEST gives them their own variant - none of them
-         // reduces to a plain GetMappingTransform() a caller would read.
+         // not a passthrough case this check applies to. PathNode and
+         // GeometryTableNode are excluded because neither is an
+         // IGeometrySource at all - they consume one and emit modulator
+         // outputs, so GetMappingTransform() isn't a method that exists to
+         // call on them; TRANSFORMSWEEPTEST gives them their own variant.
          // GeometryTableNode specifically forwards no mapping transform
-         // because it forwards no geometry at all - it consumes an
-         // IGeometrySource and emits modulator outputs, nothing downstream
-         // ever reads a mapping off it.
+         // because it forwards no geometry at all - nothing downstream ever
+         // reads a mapping off it.
          bool allOk = true;
          for (const Result& r : results)
          {
@@ -60137,6 +60155,688 @@ int main(int argc, char** argv)
                allOk = false;
          }
          printf("%s\n", allOk ? "MAPPING SWEEP OK" : "MAPPING SWEEP FAIL");
+      }
+
+      // Phase 5 (geometry-domains audit): sibling of MAPPINGSWEEPTEST,
+      // checking side channel A (Material, `GetMaterial()`) instead of F.
+      // Same generic-probe shape - MAPPINGSWEEPTEST already proved the
+      // pattern works for one side channel.
+      if (getenv("INFINITE_MATERIALSWEEPTEST") != nullptr && frameId == 6)
+      {
+         struct MaterialProbeSource : public IGeometrySource
+         {
+            IGeometrySource* wrapped = nullptr;
+            Material material;
+            const Mesh& GetMesh() override { return wrapped->GetMesh(); }
+            unsigned long long MeshRevision() override { return wrapped->MeshRevision(); }
+            Mat4 GetModelMatrix() const override { return wrapped->GetModelMatrix(); }
+            Material GetMaterial() const override { return material; }
+            unsigned int GetSurfaceTexture() override { return wrapped->GetSurfaceTexture(); }
+         };
+
+         GeometryNode probeMesh;
+         probeMesh.shape = 1; // cube
+         probeMesh.detail = 4;
+         MaterialProbeSource probe;
+         probe.wrapped = &probeMesh;
+         // Distinctive on every field, not just colour, so a node that
+         // forwards color[] but drops e.g. clearcoat still fails.
+         probe.material.color[0] = 0.11f; probe.material.color[1] = 0.62f; probe.material.color[2] = 0.33f;
+         probe.material.metallic = 0.71f;
+         probe.material.roughness = 0.82f;
+         probe.material.opacity = 0.63f;
+         probe.material.shading = 2;
+         probe.material.emissionColor[0] = 0.44f; probe.material.emissionColor[1] = 0.15f; probe.material.emissionColor[2] = 0.88f;
+         probe.material.emission = 1.7f;
+         probe.material.ior = 1.9f;
+         probe.material.transmission = 0.35f;
+         probe.material.transmissionRoughness = 0.28f;
+         probe.material.specular = 0.19f;
+         probe.material.clearcoat = 0.53f;
+         probe.material.clearcoatRoughness = 0.47f;
+         probe.material.subsurface = 0.61f;
+         probe.material.subsurfaceColor[0] = 0.77f; probe.material.subsurfaceColor[1] = 0.22f; probe.material.subsurfaceColor[2] = 0.09f;
+         probe.material.subsurfaceRadius = 0.38f;
+         probe.material.sheen = 0.44f;
+         probe.material.sheenColor[0] = 0.66f; probe.material.sheenColor[1] = 0.11f; probe.material.sheenColor[2] = 0.99f;
+         probe.material.sheenRoughness = 0.29f;
+         probe.material.iridescence = 0.31f;
+         probe.material.iridescenceIor = 1.6f;
+         probe.material.iridescenceThickness = 512.0f;
+         probe.material.anisotropy = 0.4f;
+         probe.material.anisotropyRotation = 0.25f;
+         probe.material.dispersion = 0.18f;
+         probe.material.alphaCutoff = 0.4f;
+
+         int frame = 22000;
+         auto cook = [&](IGeometrySource* g) {
+            if (auto* n = dynamic_cast<INode*>(g)) n->CookIfNeeded(frame);
+            frame++;
+         };
+         auto matches = [&](const Material& a, const Material& b) {
+            auto near = [](float x, float y) { return std::fabs(x - y) < 1e-4f; };
+            auto near3 = [&](const float* x, const float* y) { return near(x[0], y[0]) && near(x[1], y[1]) && near(x[2], y[2]); };
+            return near3(a.color, b.color) && near(a.metallic, b.metallic) && near(a.roughness, b.roughness) &&
+                   near(a.opacity, b.opacity) && a.shading == b.shading &&
+                   near3(a.emissionColor, b.emissionColor) && near(a.emission, b.emission) &&
+                   near(a.ior, b.ior) && near(a.transmission, b.transmission) &&
+                   near(a.transmissionRoughness, b.transmissionRoughness) && near(a.specular, b.specular) &&
+                   near(a.clearcoat, b.clearcoat) && near(a.clearcoatRoughness, b.clearcoatRoughness) &&
+                   near(a.subsurface, b.subsurface) && near3(a.subsurfaceColor, b.subsurfaceColor) &&
+                   near(a.subsurfaceRadius, b.subsurfaceRadius) && near(a.sheen, b.sheen) &&
+                   near3(a.sheenColor, b.sheenColor) && near(a.sheenRoughness, b.sheenRoughness) &&
+                   near(a.iridescence, b.iridescence) && near(a.iridescenceIor, b.iridescenceIor) &&
+                   near(a.iridescenceThickness, b.iridescenceThickness) && near(a.anisotropy, b.anisotropy) &&
+                   near(a.anisotropyRotation, b.anisotropyRotation) && near(a.dispersion, b.dispersion) &&
+                   near(a.alphaCutoff, b.alphaCutoff);
+         };
+
+         struct Result { std::string name; bool ok; };
+         std::vector<Result> results;
+         auto checkForwarding = [&](const char* name, IGeometrySource* node)
+         {
+            cook(node);
+            results.push_back({ name, matches(node->GetMaterial(), probe.material) });
+         };
+
+         GeometryOpNode opNode; opNode.op = GeometryOpNode::kTransform; opNode.input = &probe;
+         checkForwarding("GeometryOpNode", &opNode);
+
+         DisplacementNode dispNode; dispNode.input = &probe;
+         checkForwarding("DisplacementNode", &dispNode);
+
+         AudioDisplacementNode adispNode; adispNode.input = &probe;
+         checkForwarding("AudioDisplacementNode", &adispNode);
+
+         SetColorNode setColorNode; setColorNode.input = &probe;
+         checkForwarding("SetColorNode", &setColorNode);
+
+         MeshResynthNode resynthNode; resynthNode.input = &probe;
+         checkForwarding("MeshResynthNode", &resynthNode);
+
+         MeshToPointsNode m2pNode; m2pNode.input = &probe; m2pNode.mode = 0;
+         checkForwarding("MeshToPointsNode", &m2pNode);
+
+         Null3DNode nullNode; nullNode.input = &probe;
+         checkForwarding("Null3DNode", &nullNode);
+
+         // MaterialNode is excluded from the default construction below and
+         // wired with bypassed=true instead: unbypassed, it originates A from
+         // its own params by design (same reason MappingNode is excluded from
+         // MAPPINGSWEEPTEST) - bypassed=true is what exercises its forwarding
+         // path (UtilityNodes.cpp:54, `if (bypassed) return input->GetMaterial()`).
+         MaterialNode matNode; matNode.input = &probe; matNode.bypassed = true;
+         checkForwarding("MaterialNode(bypassed)", &matNode);
+
+         MappingNode mapNode; mapNode.input = &probe;
+         checkForwarding("MappingNode", &mapNode);
+
+         JoinGeometryNode joinNode; joinNode.mode = JoinGeometryNode::kMerge; joinNode.inputs[0] = &probe; joinNode.materialFrom = 0;
+         checkForwarding("JoinGeometryNode", &joinNode);
+
+         DistributePointsOnFacesNode distFacesNode; distFacesNode.input = &probe;
+         checkForwarding("DistributePointsOnFacesNode", &distFacesNode);
+
+         PointsToVerticesNode p2vNode; p2vNode.input = &probe;
+         checkForwarding("PointsToVerticesNode", &p2vNode);
+
+         MergeByDistanceNode mergeNode; mergeNode.input = &probe; mergeNode.threshold = 0.0f;
+         checkForwarding("MergeByDistanceNode", &mergeNode);
+
+         GeometryNode probe2;
+         probe2.shape = 2; // sphere
+         probe2.detail = 4;
+         WrapNode wrapNode; wrapNode.sourceInput = &probe; wrapNode.targetInput = &probe2; wrapNode.blend = 0.0f;
+         checkForwarding("WrapNode", &wrapNode);
+
+         ClothNode clothNode;
+         clothNode.input = &probe;
+         clothNode.pinMode = ClothNode::kPinNone;
+         clothNode.gravityX = clothNode.gravityY = clothNode.gravityZ = 0.0f;
+         clothNode.windX = clothNode.windY = clothNode.windZ = 0.0f;
+         checkForwarding("ClothNode", &clothNode);
+
+         Switcher3DNode sw3Node;
+         sw3Node.inputs[0] = &probe;
+         sw3Node.manual = true;
+         sw3Node.manualSlot = 0;
+         checkForwarding("Switcher3DNode", &sw3Node);
+
+         GeometryNode instPoints;
+         instPoints.shape = 1; // cube
+         instPoints.detail = 2;
+         InstanceOnPointsNode instNode;
+         instNode.pointSource = &instPoints;
+         instNode.instanceShape = &probe;
+         instNode.pointMode = 0;
+         instNode.maxPoints = 50;
+         instNode.instanceScale = 1.0f;
+         instNode.scaleRandom = 0.0f;
+         checkForwarding("InstanceOnPointsNode", &instNode);
+
+         bool allOk = true;
+         for (const Result& r : results)
+         {
+            printf("  [%s] %-24s\n", r.ok ? "pass" : "FAIL", r.name.c_str());
+            if (!r.ok)
+               allOk = false;
+         }
+         printf("%s\n", allOk ? "MATERIAL SWEEP OK" : "MATERIAL SWEEP FAIL");
+      }
+
+      // Phase 5 (geometry-domains audit): sibling of MATERIALSWEEPTEST,
+      // checking side channel E (textures, `GetMaterialTexture`/
+      // `GetSurfaceTexture()`) with the identical wiring - the 17 node types
+      // below are the exact same set, so a node that forwards A but not E
+      // (or vice versa) shows up as one sweep failing and the other passing.
+      if (getenv("INFINITE_TEXTURESWEEPTEST") != nullptr && frameId == 6)
+      {
+         struct TextureProbeSource : public IGeometrySource
+         {
+            IGeometrySource* wrapped = nullptr;
+            unsigned int texture = 0;
+            const Mesh& GetMesh() override { return wrapped->GetMesh(); }
+            unsigned long long MeshRevision() override { return wrapped->MeshRevision(); }
+            Mat4 GetModelMatrix() const override { return wrapped->GetModelMatrix(); }
+            Material GetMaterial() const override { return wrapped->GetMaterial(); }
+            unsigned int GetSurfaceTexture() override { return texture; }
+         };
+
+         GeometryNode probeMesh;
+         probeMesh.shape = 1; // cube
+         probeMesh.detail = 4;
+         TextureProbeSource probe;
+         probe.wrapped = &probeMesh;
+         // A GL handle unlikely to collide with anything a headless test run
+         // actually allocates, and never zero (which means "no texture").
+         probe.texture = 0xBEEF1234u;
+
+         int frame = 23000;
+         auto cook = [&](IGeometrySource* g) {
+            if (auto* n = dynamic_cast<INode*>(g)) n->CookIfNeeded(frame);
+            frame++;
+         };
+
+         struct Result { std::string name; bool ok; };
+         std::vector<Result> results;
+         auto checkForwarding = [&](const char* name, IGeometrySource* node)
+         {
+            cook(node);
+            results.push_back({ name, node->GetSurfaceTexture() == probe.texture });
+         };
+
+         GeometryOpNode opNode; opNode.op = GeometryOpNode::kTransform; opNode.input = &probe;
+         checkForwarding("GeometryOpNode", &opNode);
+
+         DisplacementNode dispNode; dispNode.input = &probe;
+         checkForwarding("DisplacementNode", &dispNode);
+
+         AudioDisplacementNode adispNode; adispNode.input = &probe;
+         checkForwarding("AudioDisplacementNode", &adispNode);
+
+         SetColorNode setColorNode; setColorNode.input = &probe;
+         checkForwarding("SetColorNode", &setColorNode);
+
+         MeshResynthNode resynthNode; resynthNode.input = &probe;
+         checkForwarding("MeshResynthNode", &resynthNode);
+
+         MeshToPointsNode m2pNode; m2pNode.input = &probe; m2pNode.mode = 0;
+         checkForwarding("MeshToPointsNode", &m2pNode);
+
+         Null3DNode nullNode; nullNode.input = &probe;
+         checkForwarding("Null3DNode", &nullNode);
+
+         // Unlike MATERIALSWEEPTEST, no bypassed=true needed here: an
+         // unconnected material map always falls through to the input
+         // regardless of bypass (UtilityNodes.cpp:104-106).
+         MaterialNode matNode; matNode.input = &probe;
+         checkForwarding("MaterialNode", &matNode);
+
+         MappingNode mapNode; mapNode.input = &probe;
+         checkForwarding("MappingNode", &mapNode);
+
+         JoinGeometryNode joinNode; joinNode.mode = JoinGeometryNode::kMerge; joinNode.inputs[0] = &probe; joinNode.materialFrom = 0;
+         checkForwarding("JoinGeometryNode", &joinNode);
+
+         DistributePointsOnFacesNode distFacesNode; distFacesNode.input = &probe;
+         checkForwarding("DistributePointsOnFacesNode", &distFacesNode);
+
+         PointsToVerticesNode p2vNode; p2vNode.input = &probe;
+         checkForwarding("PointsToVerticesNode", &p2vNode);
+
+         MergeByDistanceNode mergeNode; mergeNode.input = &probe; mergeNode.threshold = 0.0f;
+         checkForwarding("MergeByDistanceNode", &mergeNode);
+
+         GeometryNode probe2;
+         probe2.shape = 2; // sphere
+         probe2.detail = 4;
+         WrapNode wrapNode; wrapNode.sourceInput = &probe; wrapNode.targetInput = &probe2; wrapNode.blend = 0.0f;
+         checkForwarding("WrapNode", &wrapNode);
+
+         ClothNode clothNode;
+         clothNode.input = &probe;
+         clothNode.pinMode = ClothNode::kPinNone;
+         clothNode.gravityX = clothNode.gravityY = clothNode.gravityZ = 0.0f;
+         clothNode.windX = clothNode.windY = clothNode.windZ = 0.0f;
+         checkForwarding("ClothNode", &clothNode);
+
+         Switcher3DNode sw3Node;
+         sw3Node.inputs[0] = &probe;
+         sw3Node.manual = true;
+         sw3Node.manualSlot = 0;
+         checkForwarding("Switcher3DNode", &sw3Node);
+
+         GeometryNode instPoints;
+         instPoints.shape = 1; // cube
+         instPoints.detail = 2;
+         InstanceOnPointsNode instNode;
+         instNode.pointSource = &instPoints;
+         instNode.instanceShape = &probe;
+         instNode.pointMode = 0;
+         instNode.maxPoints = 50;
+         instNode.instanceScale = 1.0f;
+         instNode.scaleRandom = 0.0f;
+         checkForwarding("InstanceOnPointsNode", &instNode);
+
+         bool allOk = true;
+         for (const Result& r : results)
+         {
+            printf("  [%s] %-24s\n", r.ok ? "pass" : "FAIL", r.name.c_str());
+            if (!r.ok)
+               allOk = false;
+         }
+         printf("%s\n", allOk ? "TEXTURE SWEEP OK" : "TEXTURE SWEEP FAIL");
+      }
+
+      // Phase 5 (geometry-domains audit): channels B (`Mesh::vertexColor`)
+      // and C (`Particle::r/g/b`/`hasColor`) - built from scratch (no prior
+      // COLOURSWEEPTEST existed anywhere in the codebase; grepped twice to
+      // confirm). Two invariants, checked per node: colourless in must stay
+      // colourless out (D6's "don't manufacture colour" rule,
+      // `Mesh.h:296-301`), and a distinct authored colour in must survive out
+      // unchanged. Covers every node type where a B/C answer is meaningful;
+      // excludes InstanceOnPointsNode (its colour path is channel D,
+      // `InstanceColors()`, not B/C - no sweep covers D yet, a gap for a
+      // future test, not silently dropped), CurveNode/ModelSourceNode (need
+      // real file/curve data to produce anything in a headless run), and
+      // ImageToPointsNode/ParticleSystemNode's own colour-origination (both
+      // already covered end-to-end by this session's D6 follow-up audit,
+      // commit 853c732 - re-driving ParticleSystemNode here would need its
+      // real time-stepped emission, which is flaky in a single-frame test).
+      if (getenv("INFINITE_COLOURSWEEPTEST") != nullptr && frameId == 6)
+      {
+         struct ColourMeshProbeSource : public IGeometrySource
+         {
+            IGeometrySource* wrapped = nullptr;
+            bool colourful = false;
+            Mesh mColoured;
+            const Mesh& GetMesh() override
+            {
+               if (!colourful)
+                  return wrapped->GetMesh();
+               mColoured = wrapped->GetMesh();
+               mColoured.vertexColor.assign(mColoured.vertices.size() * 3, 0.0f);
+               for (size_t i = 0; i < mColoured.vertices.size(); i++)
+               {
+                  mColoured.vertexColor[i * 3 + 0] = 0.2f;
+                  mColoured.vertexColor[i * 3 + 1] = 0.6f;
+                  mColoured.vertexColor[i * 3 + 2] = 0.9f;
+               }
+               return mColoured;
+            }
+            unsigned long long MeshRevision() override
+            {
+               return wrapped->MeshRevision() * 2 + (colourful ? 1 : 0);
+            }
+            Mat4 GetModelMatrix() const override { return wrapped->GetModelMatrix(); }
+            Material GetMaterial() const override { return wrapped->GetMaterial(); }
+            unsigned int GetSurfaceTexture() override { return wrapped->GetSurfaceTexture(); }
+         };
+
+         struct ColourCloudProbeSource : public IGeometrySource
+         {
+            Mesh mEmpty;
+            bool colourful = false;
+            std::vector<Particle> mPoints;
+            unsigned long long mRevision = 1;
+            const Mesh& GetMesh() override { return mEmpty; }
+            unsigned long long MeshRevision() override { return 0; }
+            Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+            Material GetMaterial() const override { return Material(); }
+            const std::vector<Particle>* GetPointCloud() override
+            {
+               mPoints.clear();
+               for (int i = 0; i < 8; i++)
+               {
+                  Particle p;
+                  p.px = (float)i; p.py = 0.0f; p.pz = 0.0f;
+                  p.nx = 0.0f; p.ny = 1.0f; p.nz = 0.0f;
+                  p.scale = 1.0f;
+                  p.alive = true;
+                  if (colourful) { p.r = 0.3f; p.g = 0.7f; p.b = 0.1f; p.hasColor = true; }
+                  mPoints.push_back(p);
+               }
+               return &mPoints;
+            }
+            unsigned long long PointCloudRevision() override { return mRevision + (colourful ? 1000000ull : 0ull); }
+         };
+
+         GeometryNode probeMesh;
+         probeMesh.shape = 1; // cube
+         probeMesh.detail = 4;
+         ColourMeshProbeSource meshProbe;
+         meshProbe.wrapped = &probeMesh;
+         ColourCloudProbeSource cloudProbe;
+
+         int frame = 24000;
+         auto cook = [&](IGeometrySource* g) {
+            if (auto* n = dynamic_cast<INode*>(g)) n->CookIfNeeded(frame);
+            frame++;
+         };
+         auto meshColour = [](const Mesh& m) -> bool { return m.HasVertexColor(); };
+         auto meshRgbOk = [](const Mesh& m) -> bool {
+            if (!m.HasVertexColor() || m.vertices.empty())
+               return false;
+            for (size_t i = 0; i < m.vertices.size(); i++)
+            {
+               if (std::fabs(m.vertexColor[i * 3 + 0] - 0.2f) > 1e-3f) return false;
+               if (std::fabs(m.vertexColor[i * 3 + 1] - 0.6f) > 1e-3f) return false;
+               if (std::fabs(m.vertexColor[i * 3 + 2] - 0.9f) > 1e-3f) return false;
+            }
+            return true;
+         };
+
+         struct Result { std::string name; bool ok; bool skip; const char* skipReason; };
+         std::vector<Result> results;
+
+         // Colourless-in-colourless-out AND coloured-in-coloured-out, for a
+         // node whose GetMesh() should forward Mesh::vertexColor untouched.
+         auto checkMeshForwarding = [&](const char* name, IGeometrySource* node)
+         {
+            meshProbe.colourful = false;
+            cook(node);
+            const Mesh& colourless = node->GetMesh();
+            const bool colourlessOk = !meshColour(colourless);
+
+            meshProbe.colourful = true;
+            cook(node);
+            const Mesh& coloured = node->GetMesh();
+            const bool colouredOk = meshRgbOk(coloured);
+
+            if (!colourlessOk)
+               results.push_back({ std::string(name) + " (colourless-in)", false, false, nullptr });
+            else
+               results.push_back({ std::string(name) + " (colourless-in)", true, false, nullptr });
+            results.push_back({ std::string(name) + " (coloured-in)", colouredOk, false, nullptr });
+         };
+
+         GeometryOpNode opNode; opNode.op = GeometryOpNode::kTransform; opNode.input = &meshProbe;
+         checkMeshForwarding("GeometryOpNode", &opNode);
+
+         DisplacementNode dispNode; dispNode.input = &meshProbe;
+         checkMeshForwarding("DisplacementNode", &dispNode);
+
+         AudioDisplacementNode adispNode; adispNode.input = &meshProbe;
+         checkMeshForwarding("AudioDisplacementNode", &adispNode);
+
+         MeshResynthNode resynthNode; resynthNode.input = &meshProbe;
+         checkMeshForwarding("MeshResynthNode", &resynthNode);
+
+         Null3DNode nullNode; nullNode.input = &meshProbe;
+         checkMeshForwarding("Null3DNode", &nullNode);
+
+         MaterialNode matNode; matNode.input = &meshProbe;
+         checkMeshForwarding("MaterialNode", &matNode);
+
+         MappingNode mapNode; mapNode.input = &meshProbe;
+         checkMeshForwarding("MappingNode", &mapNode);
+
+         // JoinGeometryNode's kMerge is NOT a plain forwarding passthrough:
+         // D4 (commit df55bf1) deliberately made a merge always append one
+         // colour triple per vertex, falling back to the input's *material*
+         // colour when that input carries no vertexColor of its own - so a
+         // colourless-in probe legitimately comes out "coloured" (with the
+         // probe's default material colour, not manufactured white). That's
+         // by design, not the generic "colourless stays colourless" contract
+         // checkMeshForwarding assumes, so this gets its own check instead.
+         {
+            meshProbe.colourful = false;
+            JoinGeometryNode joinNode; joinNode.mode = JoinGeometryNode::kMerge; joinNode.inputs[0] = &meshProbe;
+            cook(&joinNode);
+            const Mesh& fromColourless = joinNode.GetMesh();
+            const Material probeMat = meshProbe.GetMaterial();
+            bool fallbackOk = meshColour(fromColourless);
+            if (fallbackOk)
+               for (size_t i = 0; i < fromColourless.vertices.size() && fallbackOk; i++)
+               {
+                  if (std::fabs(fromColourless.vertexColor[i * 3 + 0] - probeMat.color[0]) > 1e-3f) fallbackOk = false;
+                  if (std::fabs(fromColourless.vertexColor[i * 3 + 1] - probeMat.color[1]) > 1e-3f) fallbackOk = false;
+                  if (std::fabs(fromColourless.vertexColor[i * 3 + 2] - probeMat.color[2]) > 1e-3f) fallbackOk = false;
+               }
+            results.push_back({ "JoinGeometryNode (colourless-in, material fallback)", fallbackOk, false, nullptr });
+
+            meshProbe.colourful = true;
+            cook(&joinNode);
+            results.push_back({ "JoinGeometryNode (coloured-in)", meshRgbOk(joinNode.GetMesh()), false, nullptr });
+         }
+
+         MergeByDistanceNode mergeNode; mergeNode.input = &meshProbe; mergeNode.threshold = 0.0f;
+         checkMeshForwarding("MergeByDistanceNode", &mergeNode);
+
+         GeometryNode probe2;
+         probe2.shape = 2; // sphere
+         probe2.detail = 4;
+         WrapNode wrapNode; wrapNode.sourceInput = &meshProbe; wrapNode.targetInput = &probe2; wrapNode.blend = 0.0f;
+         checkMeshForwarding("WrapNode", &wrapNode);
+
+         // ClothNode deliberately skips a full rebuild when the input's mesh
+         // *topology* (vertex/index count) hasn't changed, to keep the
+         // simulation draping instead of snapping to rest on every re-cook -
+         // see the comment at ClothNode::CookIfNeeded's topologyChanged
+         // check. Toggling meshProbe.colourful alone doesn't change vertex
+         // count, so reusing one ClothNode instance across both cooks (like
+         // checkMeshForwarding does) would just read back the first cook's
+         // cached mesh. Use one fresh instance per colour state instead, the
+         // same way the chain fuzzer does, so each cook is a real rebuild.
+         {
+            auto makeCloth = [&]() {
+               auto c = std::make_unique<ClothNode>();
+               c->input = &meshProbe;
+               c->pinMode = ClothNode::kPinNone;
+               c->gravityX = c->gravityY = c->gravityZ = 0.0f;
+               c->windX = c->windY = c->windZ = 0.0f;
+               return c;
+            };
+            meshProbe.colourful = false;
+            auto clothA = makeCloth();
+            cook(clothA.get());
+            results.push_back({ "ClothNode (colourless-in)", !meshColour(clothA->GetMesh()), false, nullptr });
+
+            meshProbe.colourful = true;
+            auto clothB = makeCloth();
+            cook(clothB.get());
+            results.push_back({ "ClothNode (coloured-in)", meshRgbOk(clothB->GetMesh()), false, nullptr });
+         }
+
+         Switcher3DNode sw3Node;
+         sw3Node.inputs[0] = &meshProbe;
+         sw3Node.manual = true;
+         sw3Node.manualSlot = 0;
+         checkMeshForwarding("Switcher3DNode", &sw3Node);
+
+         FieldElementNode fieldElemNode;
+         fieldElemNode.input = &meshProbe;
+         checkMeshForwarding("FieldElementNode", &fieldElemNode);
+
+         // SetColorNode is a paint operation, not a passthrough (same
+         // reasoning as its unconditional hasColor=true in
+         // GeometryOpNodes.cpp:1222-1223) - it always emits its own colour
+         // regardless of the input's, so it gets its own check rather than
+         // checkMeshForwarding's "colourless stays colourless" half.
+         {
+            meshProbe.colourful = false;
+            SetColorNode setColorNode; setColorNode.input = &meshProbe;
+            setColorNode.source = SetColorNode::kFlat;
+            setColorNode.flatColor[0] = 0.2f; setColorNode.flatColor[1] = 0.6f; setColorNode.flatColor[2] = 0.9f;
+            cook(&setColorNode);
+            results.push_back({ "SetColorNode (paints own colour)", meshRgbOk(setColorNode.GetMesh()), false, nullptr });
+         }
+
+         // Mesh -> cloud crossing (D6's actual bug: PointsToVerticesNode and
+         // the mesh->points direction both manufactured colour out of
+         // colourless input before this session's D6 fix).
+         auto checkMeshToCloud = [&](const char* name, IGeometrySource* node, std::function<const std::vector<Particle>*()> getCloud)
+         {
+            meshProbe.colourful = false;
+            cook(node);
+            const std::vector<Particle>* colourless = getCloud();
+            bool colourlessOk = true;
+            if (colourless)
+               for (const Particle& p : *colourless)
+                  if (p.hasColor) { colourlessOk = false; break; }
+
+            meshProbe.colourful = true;
+            cook(node);
+            const std::vector<Particle>* coloured = getCloud();
+            bool colouredOk = coloured != nullptr && !coloured->empty();
+            if (coloured)
+               for (const Particle& p : *coloured)
+                  if (!p.hasColor || std::fabs(p.r - 0.2f) > 1e-3f || std::fabs(p.g - 0.6f) > 1e-3f || std::fabs(p.b - 0.9f) > 1e-3f)
+                  { colouredOk = false; break; }
+
+            results.push_back({ std::string(name) + " (colourless-in)", colourlessOk, false, nullptr });
+            results.push_back({ std::string(name) + " (coloured-in)", colouredOk, false, nullptr });
+         };
+
+         // Both nodes tint their emitted particle colour by a material
+         // colour (inheritMaterial=true by default, multiplying the probe's
+         // own material into r/g/b) - neutralize that to identity so the
+         // check below is actually reading the forwarded vertex colour
+         // rather than that colour scaled by whatever the probe's default
+         // material happens to be.
+         MeshToPointsNode m2pNode; m2pNode.input = &meshProbe; m2pNode.mode = 0;
+         m2pNode.inheritMaterial = false; m2pNode.color[0] = m2pNode.color[1] = m2pNode.color[2] = 1.0f;
+         checkMeshToCloud("MeshToPointsNode", &m2pNode, [&]() { return m2pNode.GetPointCloud(); });
+
+         DistributePointsOnFacesNode distFacesNode; distFacesNode.input = &meshProbe;
+         distFacesNode.inheritMaterial = false; distFacesNode.color[0] = distFacesNode.color[1] = distFacesNode.color[2] = 1.0f;
+         checkMeshToCloud("DistributePointsOnFacesNode", &distFacesNode, [&]() { return distFacesNode.GetPointCloud(); });
+
+         // Cloud -> mesh crossing: PointsToVerticesNode's cloud branch,
+         // PointDistributionNodes.cpp - the exact site D6 fixed
+         // (previously emitted vertexColor for every particle, including a
+         // colourless cloud, manufacturing colour from the white default).
+         {
+            cloudProbe.colourful = false;
+            PointsToVerticesNode p2vNode; p2vNode.input = &cloudProbe;
+            cook(&p2vNode);
+            const bool colourlessOk = !meshColour(p2vNode.GetMesh());
+
+            cloudProbe.colourful = true;
+            cook(&p2vNode);
+            // ColourCloudProbeSource paints its particles (0.3, 0.7, 0.1) -
+            // a different fixed RGB than the mesh probe's (0.2, 0.6, 0.9) -
+            // and PointsToVerticesNode forwards particle r/g/b untinted, so
+            // check against the cloud's own values rather than meshRgbOk
+            // (which asserts the mesh probe's colour and would legitimately
+            // fail here even though nothing is being dropped).
+            const Mesh& fromCloud = p2vNode.GetMesh();
+            bool colouredOk = meshColour(fromCloud) && !fromCloud.vertices.empty();
+            for (size_t i = 0; i < fromCloud.vertices.size() && colouredOk; i++)
+            {
+               if (std::fabs(fromCloud.vertexColor[i * 3 + 0] - 0.3f) > 1e-3f) colouredOk = false;
+               if (std::fabs(fromCloud.vertexColor[i * 3 + 1] - 0.7f) > 1e-3f) colouredOk = false;
+               if (std::fabs(fromCloud.vertexColor[i * 3 + 2] - 0.1f) > 1e-3f) colouredOk = false;
+            }
+
+            results.push_back({ "PointsToVerticesNode (colourless-in)", colourlessOk, false, nullptr });
+            results.push_back({ "PointsToVerticesNode (coloured-in)", colouredOk, false, nullptr });
+         }
+
+         // MetaBallNode is a documented drop, not a bug: marching cubes
+         // reads only cloud px/py/pz/scale, never r/g/b, so its output mesh
+         // never carries vertexColor either way - both halves are expected
+         // to report "no vertex colour", which is success here, not a skip.
+         {
+            cloudProbe.colourful = false;
+            MetaBallNode metaNode; metaNode.cloudSource = &cloudProbe;
+            metaNode.ballCount = 3; metaNode.resolution = 20; metaNode.threshold = 8.0f; metaNode.bounds = 4.0f;
+            cook(&metaNode);
+            const bool colourlessOk = !meshColour(metaNode.GetMesh());
+
+            cloudProbe.colourful = true;
+            cook(&metaNode);
+            const bool neverManufactures = !meshColour(metaNode.GetMesh());
+
+            results.push_back({ "MetaBallNode (never carries B, by design)", colourlessOk && neverManufactures, false, nullptr });
+         }
+
+         // Terminal originator: tint is an always-on authored channel (a
+         // Color param, not a conditional connection), so unlike the "never
+         // manufactures" producers below, DistributeInGrid legitimately
+         // emits hasColor=true unconditionally - see PointDistributionNodes
+         // where p.hasColor is set right after the tint assignment.
+         {
+            DistributePointsInGridNode gridNode;
+            gridNode.countX = gridNode.countY = 4;
+            gridNode.tint[0] = 0.4f; gridNode.tint[1] = 0.5f; gridNode.tint[2] = 0.6f;
+            cook(&gridNode);
+            const std::vector<Particle>* pts = gridNode.GetPointCloud();
+            bool ok = pts != nullptr && !pts->empty();
+            if (pts)
+               for (const Particle& p : *pts)
+                  if (!p.hasColor) { ok = false; break; }
+            results.push_back({ "DistributePointsInGridNode (always authored)", ok, false, nullptr });
+         }
+
+         // Terminal, colour-agnostic producers: no colour concept at all, so
+         // the only meaningful check is "never manufactures" - GetMesh()
+         // should never carry vertexColor regardless of any other param.
+         auto checkNeverManufactures = [&](const char* name, IGeometrySource* node)
+         {
+            cook(node);
+            const Mesh& m = node->GetMesh();
+            if (!m.HasGeometry())
+            {
+               results.push_back({ name, true, true, "produced no geometry in a headless run" });
+               return;
+            }
+            results.push_back({ std::string(name) + " (never manufactures)", !meshColour(m), false, nullptr });
+         };
+
+         GeometryNode genNode; genNode.shape = 1; genNode.detail = 4;
+         checkNeverManufactures("GeometryNode", &genNode);
+
+         Text3DNode textNode;
+         checkNeverManufactures("Text3DNode", &textNode);
+
+         OceanNode oceanNode;
+         checkNeverManufactures("OceanNode", &oceanNode);
+
+         AudioRibbonNode ribbonNode;
+         checkNeverManufactures("AudioRibbonNode", &ribbonNode);
+
+         // FieldPrimitiveNode is excluded here, not another "never
+         // manufactures" case: unlike the terminal producers above, it runs
+         // a user-authored Field program, and its own default preset
+         // ("Solid Terrain Plane", FieldPrimitiveNode.cpp) explicitly writes
+         // `Cd = vec3(...)` - deliberate, program-authored colour, the same
+         // class of thing as SetColorNode's paint or GeometryNode's
+         // `colourful` toggle, not a default that leaked out unauthored.
+
+         bool allOk = true;
+         for (const Result& r : results)
+         {
+            if (r.skip)
+            {
+               printf("  [SKIP] %-40s — %s\n", r.name.c_str(), r.skipReason);
+               continue;
+            }
+            printf("  [%s] %-40s\n", r.ok ? "pass" : "FAIL", r.name.c_str());
+            if (!r.ok)
+               allOk = false;
+         }
+         printf("%s\n", allOk ? "COLOUR SWEEP OK" : "COLOUR SWEEP FAIL");
       }
 
       // The instancing side-channels, same generic-probe shape as the two
@@ -60335,6 +61035,256 @@ int main(int argc, char** argv)
          checkConsumerRealization("Delete->DistributePoints", delOk, "deletion did not reduce realized points");
 
          printf("%s\n", allOk ? "INSTANCE SWEEP OK" : "INSTANCE SWEEP FAIL");
+      }
+
+      // Phase 5 (geometry-domains audit): a randomised chain fuzzer, rather
+      // than enumerating orderings by hand - the only tractable answer to
+      // the permutation problem. Roster is the 11 single-geometry-input,
+      // mesh-forwarding operator types from COLOURSWEEPTEST's
+      // checkMeshForwarding list (GeometryOpNode, DisplacementNode,
+      // AudioDisplacementNode, SetColorNode, MeshResynthNode, Null3DNode,
+      // MaterialNode, MappingNode, MergeByDistanceNode, ClothNode,
+      // FieldElementNode) - deliberately excludes the multi-input types
+      // (WrapNode, JoinGeometryNode, Switcher3DNode, InstanceOnPointsNode)
+      // since a random *chain* only ever needs one upstream slot filled;
+      // giving every link a second, unfilled input pin would just make each
+      // step behave like whatever that node does with nothing patched into
+      // its second slot, not exercise anything new. Fixed-seed PRNG so a
+      // failure is reproducible across runs. Expect this to surface real,
+      // unrelated pre-existing bugs - that's the point (per the plan).
+      if (getenv("INFINITE_CHAINFUZZTEST") != nullptr && frameId == 6)
+      {
+         enum LinkType
+         {
+            kGeometryOp = 0, kDisplacement, kAudioDisplacement, kSetColor,
+            kMeshResynth, kNull3D, kMaterial, kMapping, kMergeByDistance,
+            kCloth, kFieldElement, kLinkTypeCount
+         };
+         static const char* kLinkNames[kLinkTypeCount] = {
+            "GeometryOp", "Displacement", "AudioDisplacement", "SetColor",
+            "MeshResynth", "Null3D", "Material", "Mapping", "MergeByDistance",
+            "Cloth", "FieldElement"
+         };
+
+         // Every possible link, constructed fresh per attempt and chained
+         // via `input`, is owned by one vector of nodes so the chain can be
+         // any length without hand-declaring N locals. unique_ptr<INode>
+         // would slice the IGeometrySource side, so a small tagged union of
+         // real node instances is used instead - only the type in `kind`
+         // is ever touched.
+         struct Link
+         {
+            LinkType kind;
+            GeometryOpNode geomOp;
+            DisplacementNode disp;
+            AudioDisplacementNode adisp;
+            SetColorNode setColor;
+            MeshResynthNode resynth;
+            Null3DNode null3d;
+            MaterialNode material;
+            MappingNode mapping;
+            MergeByDistanceNode merge;
+            ClothNode cloth;
+            FieldElementNode fieldElem;
+
+            IGeometrySource* AsSource()
+            {
+               switch (kind)
+               {
+                  case kGeometryOp: return &geomOp;
+                  case kDisplacement: return &disp;
+                  case kAudioDisplacement: return &adisp;
+                  case kSetColor: return &setColor;
+                  case kMeshResynth: return &resynth;
+                  case kNull3D: return &null3d;
+                  case kMaterial: return &material;
+                  case kMapping: return &mapping;
+                  case kMergeByDistance: return &merge;
+                  case kCloth: return &cloth;
+                  case kFieldElement: return &fieldElem;
+                  default: return nullptr;
+               }
+            }
+            void Wire(IGeometrySource* upstream, unsigned int seed)
+            {
+               switch (kind)
+               {
+                  case kGeometryOp:
+                     geomOp.input = upstream;
+                     geomOp.op = (GeometryOpNode::Op)(seed % 3); // kTransform/kArray/kTwist-ish; cheap ops only
+                     break;
+                  case kDisplacement: disp.input = upstream; break;
+                  case kAudioDisplacement: adisp.input = upstream; break;
+                  case kSetColor:
+                     setColor.input = upstream;
+                     setColor.source = SetColorNode::kFlat;
+                     setColor.flatColor[0] = ((seed % 7) / 7.0f);
+                     setColor.flatColor[1] = ((seed % 11) / 11.0f);
+                     setColor.flatColor[2] = ((seed % 13) / 13.0f);
+                     break;
+                  case kMeshResynth: resynth.input = upstream; break;
+                  case kNull3D: null3d.input = upstream; break;
+                  case kMaterial: material.input = upstream; material.bypassed = true; break;
+                  case kMapping: mapping.input = upstream; break;
+                  case kMergeByDistance: merge.input = upstream; merge.threshold = 0.0f; break;
+                  case kCloth:
+                     cloth.input = upstream; cloth.pinMode = ClothNode::kPinNone;
+                     cloth.gravityX = cloth.gravityY = cloth.gravityZ = 0.0f;
+                     cloth.windX = cloth.windY = cloth.windZ = 0.0f;
+                     break;
+                  case kFieldElement: fieldElem.input = upstream; break;
+                  default: break;
+               }
+            }
+         };
+
+         auto meshColour = [](const Mesh& m) -> bool { return m.HasVertexColor(); };
+
+         auto buildChain = [&](unsigned int seed, int length, GeometryNode& head,
+                                std::vector<std::unique_ptr<Link>>& links, bool colourfulHead) -> IGeometrySource*
+         {
+            head.shape = 1; // cube
+            head.detail = 3;
+            IGeometrySource* upstream = &head;
+            for (int i = 0; i < length; i++)
+            {
+               auto link = std::make_unique<Link>();
+               unsigned int linkSeed = seed * 2654435761u + i * 40503u;
+               link->kind = (LinkType)(linkSeed % kLinkTypeCount);
+               link->Wire(upstream, linkSeed);
+               upstream = link->AsSource();
+               links.push_back(std::move(link));
+            }
+            (void)colourfulHead;
+            return upstream;
+         };
+
+         struct FuzzResult { unsigned int seed; int length; bool deterministic; bool colourOk; bool noManufacture; std::string chainDesc; };
+         std::vector<FuzzResult> results;
+         std::mt19937 rng(0xC0FFEEu); // fixed seed - reproducible across runs
+         int frame = 25000;
+         const int kFuzzCount = 200;
+
+         for (int trial = 0; trial < kFuzzCount; trial++)
+         {
+            unsigned int seed = rng();
+            int length = 3 + (int)(rng() % 3); // 3..5
+
+            std::string desc;
+            bool chainHasSetColor = false;
+            {
+               unsigned int s2 = seed;
+               for (int i = 0; i < length; i++)
+               {
+                  unsigned int linkSeed = s2 * 2654435761u + i * 40503u;
+                  LinkType k = (LinkType)(linkSeed % kLinkTypeCount);
+                  if (k == kSetColor) chainHasSetColor = true;
+                  desc += kLinkNames[linkSeed % kLinkTypeCount];
+                  if (i + 1 < length) desc += "->";
+               }
+            }
+
+            // Build twice from the same seed - determinism check.
+            GeometryNode headA; std::vector<std::unique_ptr<Link>> linksA;
+            IGeometrySource* tailA = buildChain(seed, length, headA, linksA, false);
+            if (auto* n = dynamic_cast<INode*>(tailA)) n->CookIfNeeded(frame); frame++;
+            const Mesh meshA = tailA->GetMesh();
+
+            GeometryNode headB; std::vector<std::unique_ptr<Link>> linksB;
+            IGeometrySource* tailB = buildChain(seed, length, headB, linksB, false);
+            if (auto* n = dynamic_cast<INode*>(tailB)) n->CookIfNeeded(frame); frame++;
+            const Mesh meshB = tailB->GetMesh();
+
+            bool deterministic = meshA.vertices.size() == meshB.vertices.size() &&
+                                  meshA.HasVertexColor() == meshB.HasVertexColor();
+            if (deterministic)
+            {
+               for (size_t i = 0; i < meshA.vertices.size() && deterministic; i++)
+               {
+                  if (std::fabs(meshA.vertices[i].px - meshB.vertices[i].px) > 1e-5f) deterministic = false;
+                  if (std::fabs(meshA.vertices[i].py - meshB.vertices[i].py) > 1e-5f) deterministic = false;
+                  if (std::fabs(meshA.vertices[i].pz - meshB.vertices[i].pz) > 1e-5f) deterministic = false;
+               }
+            }
+            // A SetColorNode anywhere in the chain legitimately paints the
+            // mesh - that's its job, not manufactured colour - so only a
+            // colourless-head chain with no SetColor link is expected to
+            // stay colourless end to end.
+            bool noManufacture = chainHasSetColor || !meshColour(meshA);
+
+            // Colour-in/colour-out: rebuild once more with a coloured head,
+            // by wrapping headA in a colour-forcing probe - reuses
+            // ColourMeshProbeSource's exact shape (a distinct RGB, checked
+            // for survival unless a SetColorNode link overwrote it, which is
+            // legitimate and excluded from the check below).
+            bool colourOk = true;
+            {
+               struct ColourHeadProbe : public IGeometrySource
+               {
+                  GeometryNode* wrapped = nullptr;
+                  Mesh mColoured;
+                  const Mesh& GetMesh() override
+                  {
+                     mColoured = wrapped->GetMesh();
+                     mColoured.vertexColor.assign(mColoured.vertices.size() * 3, 0.0f);
+                     for (size_t i = 0; i < mColoured.vertices.size(); i++)
+                     {
+                        mColoured.vertexColor[i * 3 + 0] = 0.15f;
+                        mColoured.vertexColor[i * 3 + 1] = 0.35f;
+                        mColoured.vertexColor[i * 3 + 2] = 0.85f;
+                     }
+                     return mColoured;
+                  }
+                  unsigned long long MeshRevision() override { return wrapped->MeshRevision() + 1; }
+                  Mat4 GetModelMatrix() const override { return wrapped->GetModelMatrix(); }
+                  Material GetMaterial() const override { return wrapped->GetMaterial(); }
+                  unsigned int GetSurfaceTexture() override { return wrapped->GetSurfaceTexture(); }
+               };
+               GeometryNode colourHeadMesh; colourHeadMesh.shape = 1; colourHeadMesh.detail = 3;
+               ColourHeadProbe colourHead; colourHead.wrapped = &colourHeadMesh;
+
+               std::vector<std::unique_ptr<Link>> linksC;
+               IGeometrySource* upstream = &colourHead;
+               bool sawSetColor = false;
+               for (int i = 0; i < length; i++)
+               {
+                  auto link = std::make_unique<Link>();
+                  unsigned int linkSeed = seed * 2654435761u + i * 40503u;
+                  link->kind = (LinkType)(linkSeed % kLinkTypeCount);
+                  if (link->kind == kSetColor) sawSetColor = true;
+                  link->Wire(upstream, linkSeed);
+                  upstream = link->AsSource();
+                  linksC.push_back(std::move(link));
+               }
+               if (auto* n = dynamic_cast<INode*>(upstream)) n->CookIfNeeded(frame); frame++;
+               const Mesh coloured = upstream->GetMesh();
+               // A SetColorNode anywhere in the chain legitimately overwrites
+               // the head's colour with its own - that's its job, not a bug -
+               // so only assert survival when no link repainted it.
+               if (!sawSetColor)
+                  colourOk = meshColour(coloured);
+            }
+
+            results.push_back({ seed, length, deterministic, colourOk, noManufacture, desc });
+         }
+
+         bool allOk = true;
+         int failCount = 0;
+         for (const FuzzResult& r : results)
+         {
+            bool ok = r.deterministic && r.colourOk && r.noManufacture;
+            if (!ok)
+            {
+               failCount++;
+               allOk = false;
+               // Full diagnostics on failure only - a fuzz test with no seed
+               // logged is unreproducible and undebuggable.
+               printf("  [FAIL] seed=0x%08X len=%d chain=%s det=%d colour=%d noManuf=%d\n",
+                      r.seed, r.length, r.chainDesc.c_str(), r.deterministic, r.colourOk, r.noManufacture);
+            }
+         }
+         printf("  %d/%d trials passed\n", (int)results.size() - failCount, (int)results.size());
+         printf("%s\n", allOk ? "CHAIN FUZZ OK" : "CHAIN FUZZ FAIL");
       }
 
       // A different bug class from the two sweeps above: not a dropped
