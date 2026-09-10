@@ -25,7 +25,7 @@ A unified node-based audiovisual modular workstation for **macOS** and **Windows
 - **Audio Synthesis & Physical Modeling**: Wavetable oscillator, modal metallic physical resonator, real-time granular engine, PaulStretch spectral stretcher, multi-sample player, and 8-track drum machine.
 - **AU & VST3 Plugin Hosting**: Host third-party **Audio Unit** (macOS) and **VST3** plugins with native GUI windows and automatable/modulatable parameter controls.
 - **Procedural 3D & Physics Solvers**: Meshes, 3D splines, point scattering, single-draw-call GPU instancing (`Instance on Points`), PBD cloth/soft-body physics, particle systems, and PBR rendering (Cook-Torrance GGX + ACES tonemapping + 32-bit HDRI).
-- **2D Shaders & Generative FX**: 31 blend modes, live GLSL editor, video & camera playback, Syphon (macOS) / Spout (Windows) zero-copy video I/O, reaction-diffusion, and on-device ML subject background removal.
+- **2D Shaders & Generative FX**: 32 blend modes, live GLSL editor, video & camera playback, Syphon (macOS) / Spout (Windows) zero-copy video I/O, reaction-diffusion, and on-device ML subject background removal.
 
 ---
 
@@ -37,10 +37,10 @@ Infinite features **140+ modular node types**:
 |---|---|
 | **2D & Video** | Image, folder Slideshow, Video (hardware-accelerated), Syphon In / Spout In, Paint/Draw canvas, GLSL Formula editor, Shapes (SDF), Noise & Gradient Ramps |
 | **2D FX & Grading** | Blur, Bloom, Glitch (6 modes), Twirl, Ripple, Displace, Halftone, Curves (RGB/Luma splines), Color Ramp, .cube LUTs, Gradient Map, Palette extraction |
-| **Compositing & Masks** | Blend (31 modes), Layer Stack, Remove Background (on-device ML segmentation), Chroma/Luma Key, Feedback loop, Reaction-Diffusion, Resynthesize |
+| **Compositing & Masks** | Blend (32 modes), Layer Stack, Remove Background (on-device ML segmentation), Chroma/Luma Key, Feedback loop, Reaction-Diffusion, Resynthesize |
 | **3D Geometry & FX** | Primitives, USD/OBJ/PLY/STL/glTF/GLB import, 3D Text, 3D Curves, Point Distribution, Mesh Deconstruction, Taubin Smooth, Array, Instancing, Metaballs |
 | **3D Scene & Render** | Camera (orbit/perspective/ortho), Lights, 32-bit HDRI Environment, PBR Materials, ACES Tonemapping, Multisampled Antialiasing |
-| **Synths & Sound** | Wavetable synth, Metallic modal resonator, Granular synth, PaulStretch, Sampler, Slicer (onset-detecting sample chopper), 8-track Drum Sequencer, Multi-waveform Oscillator |
+| **Synths & Sound** | Wavetable synth, Metallic modal resonator, Granular synth, PaulStretch, Molder / Grain Molder (spectral resynthesis), Sampler, Slicer (onset-detecting sample chopper), 8-track Drum Sequencer, Multi-waveform Oscillator |
 | **Field Language** | Field Modifier, Field Primitive, Field Effect, Field Synth, Field Pixel, Field Graph — see [below](#field-write-what-a-node-does) |
 | **Notes & MIDI** | Live MIDI input/clock, Arpeggiator, Note Sequencer, Chorder, Strum, Bouncing Balls (physics notes), Humanizer, Quantizer |
 | **Audio FX & Plugins** | **AU / VST3 Plugin Host**, Filters, EQ, Dynamics, Lookahead Limiter, Delay, Reverb, Drive/Saturation, Pitch & Frequency Shifters, Chorus, Phaser, Formant |
@@ -78,13 +78,20 @@ Any element/pixel/sample kernel can also declare **dynamic pins** right in its c
 
 ## Installation & Quick Start
 
-### Pre-built App (macOS)
-1. Download `Infinite.app` or DMG from the latest [GitHub Release](https://github.com/n1m21n/Infinite/releases).
+### Pre-built App (macOS & Windows)
+Download the latest build for your platform from [GitHub Releases](https://github.com/n1m21n/Infinite/releases): `Infinite.dmg` for macOS, or `Infinite-windows-x64.zip` / `Infinite-windows-ARM64.zip` for Windows.
+
+**macOS**
+1. Open the DMG and drag `Infinite.app` to Applications.
 2. Right-click `Infinite.app` → **Open** → Click **Open** (ad-hoc signed).
 3. If blocked by Gatekeeper quarantine, run in Terminal:
    ```bash
    xattr -dr com.apple.quarantine /Applications/Infinite.app
    ```
+
+**Windows**
+1. Unzip the `x64` or `ARM64` build for your CPU.
+2. Run `Infinite.exe`. If SmartScreen blocks it, click **More info** → **Run anyway**.
 
 ---
 
