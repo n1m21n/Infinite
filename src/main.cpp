@@ -364,12 +364,27 @@ namespace
       return IsThemeLight() ? IM_COL32(70, 78, 96, 255) : IM_COL32(120, 128, 150, 255);
    }
 
-   // Backdrop for node previews and viewports: a solid dark (or light in light
-   // theme) frame, letterboxing non-square aspect ratios cleanly like TouchDesigner.
+   // Backdrop for any node preview about to blit a texture: a flat dark rect
+   // reads as solid black wherever that texture is actually transparent, so
+   // this paints a checkerboard instead, matching image editors' convention.
    void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, ImVec2 br, float rounding = 4.0f)
    {
       const bool isLight = IsThemeLight();
       dl->AddRectFilled(origin, br, isLight ? IM_COL32(238, 240, 246, 255) : IM_COL32(18, 18, 24, 255), rounding);
+      const float cell = 12.0f;
+      const int cols = (int)std::ceil((br.x - origin.x) / cell);
+      const int rows = (int)std::ceil((br.y - origin.y) / cell);
+      for (int y = 0; y < rows; y++)
+      {
+         for (int x = 0; x < cols; x++)
+         {
+            if ((x + y) % 2)
+               continue;
+            const ImVec2 tl(origin.x + x * cell, origin.y + y * cell);
+            const ImVec2 cbr(std::min(br.x, tl.x + cell), std::min(br.y, tl.y + cell));
+            dl->AddRectFilled(tl, cbr, isLight ? IM_COL32(220, 224, 232, 255) : IM_COL32(30, 30, 38, 255));
+         }
+      }
    }
 
    void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, float size, float rounding = 4.0f)
@@ -70698,7 +70713,7 @@ int main(int argc, char** argv)
             if (dynamic_cast<ProjectionNode*>(src->node.get()) != nullptr)
                GLUtil::DrawTextureToScreen(tex, pw, ph, 0, 0, /*checkerBg=*/false);
             else
-               GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/false);
+               GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/true);
          }
          else
          {
