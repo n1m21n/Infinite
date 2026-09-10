@@ -133,6 +133,7 @@ void ParticleSystemNode::Emit(int count)
       p.age = 0.0f;
       p.scale = startSize;
       p.r = startColor[0]; p.g = startColor[1]; p.b = startColor[2];
+      p.hasColor = true;
       p.alive = true;
 
       // Reuse a dead slot before growing: at steady state the array stops

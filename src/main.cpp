@@ -54643,6 +54643,7 @@ int main(int argc, char** argv)
          {
             Particle p;
             p.px = (float)i; p.r = 0.25f * i;
+            p.hasColor = true;
             p.alive = (i != 2); // one dead particle in the middle
             cloudProbe.cloud.push_back(p);
          }
