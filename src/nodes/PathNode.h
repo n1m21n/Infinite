@@ -16,7 +16,7 @@
 // Outputs are normalised 0..1 like every other modulator, and each destination
 // maps that onto its own range. Position is therefore emitted as 0..1 across
 // the path's bounding extent, not in scene units.
-class PathNode : public INode, public IModulator
+class PathNode : public INode, public IModulator, public ICookWarningSource
 {
 public:
    enum Shape
@@ -54,6 +54,7 @@ public:
    {
       return slot == 0 ? "curve" : "geo";
    }
+   const std::string& CookWarning() const override { return mCookWarning; }
 
    int followMode = kFollowSlice;
    float slicePosition = 0.0f;
@@ -130,6 +131,7 @@ private:
    float mPoint[3] = { 0.0f, 0.0f, 0.0f };
    float mProgress = 0.0f;
    int mLastCookFrame = -1;
+   std::string mCookWarning;
 
    AxisOutput mY, mZ, mT;
    bool mOutputsBound = false;

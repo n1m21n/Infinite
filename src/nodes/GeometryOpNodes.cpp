@@ -723,6 +723,8 @@ void InstanceOnPointsNode::Rebuild()
    mTransforms.clear();
    mColors.clear();
 
+   mCookWarning = DescribeGeometryMismatch(cloudSource, GeometryRequirement::kCloud);
+
    // The stamp's own transform is baked into every instance as a baseline -
    // move/scale/rotate the shape source and all copies follow, same as
    // dragging its object-level sliders would in a single-instance graph.
@@ -926,9 +928,14 @@ float WrapNode::ResolvedRadius() const
 const Mesh& WrapNode::GetMesh()
 {
    if (sourceInput == nullptr)
+   {
+      mCookWarning.clear();
       return kEmptyMesh;
+   }
    if (bypassed)
       return sourceInput->GetMesh();
+
+   mCookWarning = DescribeGeometryMismatch(targetInput, GeometryRequirement::kMeshSurface);
 
    const Signature sig = CurrentSignature();
    if (mHasBuilt && sig == mBuilt)
@@ -1213,6 +1220,7 @@ void SetColorNode::Rebuild()
                          flatColor, rampA, rampB, seed, paletteInput, paletteOffset,
                          mTexPixels, mTexW, mTexH, rgb);
          p.r = rgb[0]; p.g = rgb[1]; p.b = rgb[2];
+         p.hasColor = true;
       }
    }
 }

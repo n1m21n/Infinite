@@ -269,6 +269,7 @@ struct Particle
    float nx = 0, ny = 1, nz = 0;  // orientation hint, e.g. a surface normal
    float scale = 1.0f;
    float r = 1.0f, g = 1.0f, b = 1.0f;
+   bool hasColor = false;         // true when r/g/b came from real authored/source colour, not the white default
    float age = 0.0f;              // seconds alive
    float life = 0.0f;             // seconds until death; <= 0 means immortal
    bool alive = true;
@@ -297,6 +298,7 @@ struct MeshPoint
    // ToPoints() fills this so a Set Color upstream of Mesh to Points survives
    // the conversion into the point domain.
    float r = 1.0f, g = 1.0f, b = 1.0f;
+   bool hasColor = false;         // true when r/g/b came from Mesh::vertexColor, not the white default
 };
 
 namespace MeshOps

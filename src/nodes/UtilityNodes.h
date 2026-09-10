@@ -172,6 +172,20 @@ public:
    // that walk the passthrough chain, instead of collapsing the scatter to a
    // single stamp mesh.
    IGeometrySource* PassthroughSource() const override { return input; }
+   // Component passthrough (geometry-domains audit, Phase 4, Blender's rule):
+   // a no-op node has no opinion on the cloud/curve riding alongside the mesh,
+   // so both forward untouched - otherwise a Null3D silently launders them
+   // away for whatever mesh-only node comes after it.
+   const std::vector<Particle>* GetPointCloud() override
+   {
+      return input ? input->GetPointCloud() : nullptr;
+   }
+   unsigned long long PointCloudRevision() override
+   {
+      return input ? input->PointCloudRevision() : 0;
+   }
+   const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
+   unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
    Mat4 GetInstanceGroupMatrix() const override
    {
       return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
@@ -255,6 +269,18 @@ public:
    {
       return input ? input->InstanceTransformOverride() : nullptr;
    }
+   // Component passthrough (geometry-domains audit, Phase 4, Blender's rule):
+   // restyling a surface has no opinion on a cloud/curve riding alongside it.
+   const std::vector<Particle>* GetPointCloud() override
+   {
+      return input ? input->GetPointCloud() : nullptr;
+   }
+   unsigned long long PointCloudRevision() override
+   {
+      return input ? input->PointCloudRevision() : 0;
+   }
+   const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
+   unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    ImageCable& TextureInput() { return mMaps[kMapAlbedo]; }
@@ -402,6 +428,19 @@ public:
    {
       return input ? input->InstanceTransformOverride() : nullptr;
    }
+   // Component passthrough (geometry-domains audit, Phase 4, Blender's rule):
+   // a Mapping node has no opinion on a cloud/curve riding alongside the mesh
+   // whose UVs it's remapping.
+   const std::vector<Particle>* GetPointCloud() override
+   {
+      return input ? input->GetPointCloud() : nullptr;
+   }
+   unsigned long long PointCloudRevision() override
+   {
+      return input ? input->PointCloudRevision() : 0;
+   }
+   const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
+   unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;
@@ -497,11 +536,6 @@ public:
    // call, so it can only have one material; this picks which.
    int materialFrom = 0;
    bool inheritMaterial = true;
-   // Merge mode only: carry each input's own colour as per-vertex colour
-   // rather than collapsing the whole merged mesh to materialFrom's colour.
-   // Default on, since "each part keeps its own colour" is what most people
-   // expect a merge to do; off reproduces the old single-material look.
-   bool keepInputColours = true;
 
    float posX = 0.0f, posY = 0.0f, posZ = 0.0f;
    float uniformScale = 1.0f;
@@ -540,7 +574,6 @@ public:
    {
       v.Int("mode", mode);
       v.Int("materialFrom", materialFrom); v.Bool("inherit", inheritMaterial);
-      v.Bool("keepInputColours", keepInputColours);
       v.Float("posX", posX); v.Float("posY", posY); v.Float("posZ", posZ);
       v.Float("scale", uniformScale);
       v.Color("color", color); v.Float("metallic", metallic);
@@ -567,7 +600,6 @@ private:
    Mat4 mBuiltGroupMatrices[kSlots];
    size_t mBuiltInstanceCounts[kSlots] = { 0, 0, 0, 0 };
    int mBuiltMode = -1;
-   bool mBuiltKeepInputColours = true;
    // The transforms are baked into the merged vertices, so a change to one has
    // to trigger a rebuild exactly like a change to a mesh would. Keying only on
    // the mesh stamp meant moving or scaling an input did nothing at all.
@@ -602,6 +634,7 @@ public:
    IGeometrySource* cloudSource = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &cloudSource : nullptr; }
    const char* InputLabel(int) const override { return "cloud"; }
+   const std::string& CookWarning() const override { return mCookWarning; }
    size_t TriangleCount() const { return mCache.indices.size() / 3; }
    size_t BallCount() const { return mBallCount; }
 
@@ -679,6 +712,7 @@ private:
    const void* mBuiltCloud = nullptr;
    unsigned long long mBuiltCloudRevision = 0;
    int mLastCookFrame = -1;
+   std::string mCookWarning;
 };
 
 // --- Mesh to Points -----------------------------------------------------

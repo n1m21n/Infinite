@@ -209,8 +209,6 @@ void JoinGeometryNode::RebuildIfNeeded()
    }
    if (mBuiltMode != mode)
       dirty = true;
-   if (mBuiltKeepInputColours != keepInputColours)
-      dirty = true;
    if (!dirty)
       return;
 
@@ -254,29 +252,29 @@ void JoinGeometryNode::RebuildIfNeeded()
          for (unsigned int idx : placed.indices)
             mCache.indices.push_back(base + idx);
 
-         if (keepInputColours)
+         // D4 (geometry-domains audit, Phase 4): a merge always preserves
+         // input colour now - always append exactly one colour triple per
+         // vertex of this input, so mCache.vertexColor stays index-aligned
+         // with mCache.vertices no matter which inputs did or didn't already
+         // carry their own vertex colour. Appending only when non-empty (the
+         // old behaviour, previously gated behind an opt-in checkbox) let a
+         // colourless input's vertices silently inherit whatever came from a
+         // different input at the same offset, or dropped colour for the
+         // whole mesh once sizes no longer lined up with
+         // Mesh::HasVertexColor() - that lossy-by-default behaviour is
+         // exactly the bug this audit was started to fix.
+         if (placed.HasVertexColor())
          {
-            // Always append exactly one colour triple per vertex of this
-            // input, so mCache.vertexColor stays index-aligned with
-            // mCache.vertices no matter which inputs did or didn't already
-            // carry their own vertex colour - appending only when non-empty
-            // (the old behaviour) let a colourless input's vertices silently
-            // inherit whatever came from a different input at the same
-            // offset, or dropped colour for the whole mesh once sizes no
-            // longer lined up with Mesh::HasVertexColor().
-            if (placed.HasVertexColor())
+            mCache.vertexColor.insert(mCache.vertexColor.end(), placed.vertexColor.begin(), placed.vertexColor.end());
+         }
+         else
+         {
+            const Material inputMat = inputs[i]->GetMaterial();
+            for (size_t vIdx = 0; vIdx < placed.vertices.size(); vIdx++)
             {
-               mCache.vertexColor.insert(mCache.vertexColor.end(), placed.vertexColor.begin(), placed.vertexColor.end());
-            }
-            else
-            {
-               const Material inputMat = inputs[i]->GetMaterial();
-               for (size_t vIdx = 0; vIdx < placed.vertices.size(); vIdx++)
-               {
-                  mCache.vertexColor.push_back(inputMat.color[0]);
-                  mCache.vertexColor.push_back(inputMat.color[1]);
-                  mCache.vertexColor.push_back(inputMat.color[2]);
-               }
+               mCache.vertexColor.push_back(inputMat.color[0]);
+               mCache.vertexColor.push_back(inputMat.color[1]);
+               mCache.vertexColor.push_back(inputMat.color[2]);
             }
          }
       }
@@ -296,7 +294,6 @@ void JoinGeometryNode::RebuildIfNeeded()
       }
    }
    mBuiltMode = mode;
-   mBuiltKeepInputColours = keepInputColours;
    mMeshRevision = NextMeshRevision();
 }
 
@@ -516,6 +513,7 @@ void MeshToPointsNode::RebuildIfNeeded()
             wp.nx = nx; wp.ny = ny; wp.nz = nz;
             wp.scale = p.scale;
             wp.r = p.r; wp.g = p.g; wp.b = p.b;
+            wp.hasColor = p.hasColor;
             allPoints.push_back(wp);
 
             Particle particle;
@@ -523,6 +521,7 @@ void MeshToPointsNode::RebuildIfNeeded()
             particle.nx = wp.nx; particle.ny = wp.ny; particle.nz = wp.nz;
             particle.scale = pointSize * 0.5f * p.scale;
             particle.r = instTint[0] * p.r; particle.g = instTint[1] * p.g; particle.b = instTint[2] * p.b;
+            particle.hasColor = p.hasColor;
             mPoints.push_back(particle);
          }
       }
@@ -543,6 +542,7 @@ void MeshToPointsNode::RebuildIfNeeded()
          particle.nx = p.nx; particle.ny = p.ny; particle.nz = p.nz;
          particle.scale = pointSize * 0.5f * p.scale;
          particle.r = tint[0] * p.r; particle.g = tint[1] * p.g; particle.b = tint[2] * p.b;
+         particle.hasColor = p.hasColor;
          mPoints.push_back(particle);
       }
    }
@@ -650,6 +650,8 @@ void MetaBallNode::RebuildIfNeeded()
    const double quantised = std::floor(beat * 60.0) / 60.0;
    const std::vector<Particle>* cloud = cloudSource ? cloudSource->GetPointCloud() : nullptr;
    const unsigned long long cloudRevision = cloudSource ? cloudSource->PointCloudRevision() : 0;
+
+   mCookWarning = DescribeGeometryMismatch(cloudSource, GeometryRequirement::kCloud);
 
    if (mBuiltCount == ballCount && mBuiltRes == resolution &&
        mBuiltThreshold == threshold && mBuiltBounds == bounds &&

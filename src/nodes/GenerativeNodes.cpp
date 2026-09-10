@@ -180,11 +180,14 @@ void MeshResynthNode::CookIfNeeded(int frameId)
          mRevision = NextMeshRevision();
       }
       mBuiltInput = nullptr;
+      mCookWarning.clear();
       return;
    }
 
    if (auto* node = dynamic_cast<INode*>(input))
       node->CookIfNeeded(frameId);
+
+   mCookWarning = DescribeGeometryMismatch(input, GeometryRequirement::kMeshSurface);
 
    const unsigned long long inputRevision = input->MeshRevision();
    // A changed source restarts the evolution rather than mutating the old
@@ -321,6 +324,7 @@ void ImageToPointsNode::CookIfNeeded(int frameId)
          p.r = useImageColor ? r * tint[0] : tint[0];
          p.g = useImageColor ? g * tint[1] : tint[1];
          p.b = useImageColor ? b * tint[2] : tint[2];
+         p.hasColor = true;
          p.life = 0.0f;
          p.alive = true;
          mPoints.push_back(p);

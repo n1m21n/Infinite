@@ -4918,7 +4918,7 @@ namespace
             "3D");
       }
       REGISTER_NODE(InstanceOnPointsNode, Instance on Points, "3D");
-      REGISTER_NODE(SetColorNode, Set Color, "3D");
+      REGISTER_NODE(SetColorNode, Set Vertex Color, "3D");
       REGISTER_NODE(WrapNode, Wrap, "3D");
       REGISTER_NODE(FieldElementNode, Field Modifier, "3D");
       REGISTER_NODE(FieldPrimitiveNode, Field Primitive, "3D");
@@ -21963,8 +21963,6 @@ namespace
       // picked from an input rather than authored here, since editing colour
       // and shading now lives on the dedicated Material node.
       ModSliderInt("material from input", &n->materialFrom, 0, JoinGeometryNode::kSlots - 1);
-      if (n->mode == JoinGeometryNode::kMerge)
-         ModCheckbox("keep input colours", &n->keepInputColours);
    }
 
    void DrawSwitcher3DParams(Switcher3DNode* n)
@@ -54645,6 +54643,7 @@ int main(int argc, char** argv)
          {
             Particle p;
             p.px = (float)i; p.r = 0.25f * i;
+            p.hasColor = true;
             p.alive = (i != 2); // one dead particle in the middle
             cloudProbe.cloud.push_back(p);
          }
@@ -63598,6 +63597,13 @@ int main(int argc, char** argv)
          const float kTintWeight = CategoryColors::GetTintWeight();
          const float nodeAlpha = CategoryColors::GetNodeOpacity();
          const bool isComment = dynamic_cast<CommentNode*>(gn.node.get()) != nullptr;
+         // D1 (geometry-domains audit, Phase 4): a node whose geometry input
+         // doesn't satisfy what it asked for (see DescribeGeometryMismatch,
+         // Geometry3DNodes.h) gets a red border instead of its usual category
+         // tint, with the message on hover - the "red node" the plan's D1
+         // decision called for, in place of a connect-time refusal.
+         const auto* warnSrc = dynamic_cast<ICookWarningSource*>(gn.node.get());
+         const bool hasCookWarning = warnSrc != nullptr && !warnSrc->CookWarning().empty();
          if (isComment)
          {
             ed::PushStyleColor(ed::StyleColor_NodeBg, ImColor(0, 0, 0, 0));
@@ -63613,8 +63619,16 @@ int main(int argc, char** argv)
                                        t.panelBg.g * (1.0f - kTintWeight) + catColor.g * kTintWeight,
                                        t.panelBg.b * (1.0f - kTintWeight) + catColor.b * kTintWeight,
                                        nodeAlpha));
-            ed::PushStyleColor(ed::StyleColor_NodeBorder,
-                               ImColor(catColor.r, catColor.g, catColor.b, isLight ? 0.75f : 0.55f));
+            if (hasCookWarning)
+            {
+               ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(0.95f, 0.25f, 0.2f, 0.9f));
+               ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, 2.5f);
+            }
+            else
+            {
+               ed::PushStyleColor(ed::StyleColor_NodeBorder,
+                                  ImColor(catColor.r, catColor.g, catColor.b, isLight ? 0.75f : 0.55f));
+            }
          }
 
          ed::BeginNode(gn.NodeId());
@@ -64636,9 +64650,13 @@ int main(int argc, char** argv)
          ImGui::PopID();
          gInsideNodeCanvas = false;
          ed::EndNode();
+         if (hasCookWarning && ed::GetHoveredNode() == ed::NodeId(gn.NodeId()))
+            ImGui::SetTooltip("%s", warnSrc->CookWarning().c_str());
          ed::PopStyleColor(2);
          if (isComment)
             ed::PopStyleVar(3);
+         else if (hasCookWarning)
+            ed::PopStyleVar();
       }
 
       // ---- draw existing links ----
@@ -65024,14 +65042,14 @@ int main(int argc, char** argv)
                      }
                      else if (dstSetColorNode != nullptr && slot == 2)
                      {
-                        rejectReason = "Set Color palette slot only accepts a Palette node";
+                        rejectReason = "Set Vertex Color palette slot only accepts a Palette node";
                      }
                      else if (dstSetColorNode != nullptr && slot == 1)
                      {
                         if (srcGeometry != nullptr)
-                           rejectReason = "Set Color texture slot accepts a 2D image or texture map, not 3D geometry";
+                           rejectReason = "Set Vertex Color texture slot accepts a 2D image or texture map, not 3D geometry";
                         else
-                           rejectReason = "Set Color texture slot accepts a 2D image or texture map";
+                           rejectReason = "Set Vertex Color texture slot accepts a 2D image or texture map";
                      }
                      else if (dstMappingNode != nullptr)
                      {

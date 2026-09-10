@@ -2421,6 +2421,7 @@ namespace MeshOps
                   MeshPoint& mp = points.back();
                   mp.r = in.vertexColor[idx * 3 + 0]; mp.g = in.vertexColor[idx * 3 + 1];
                   mp.b = in.vertexColor[idx * 3 + 2];
+                  mp.hasColor = true;
                }
             }
          }
@@ -2463,6 +2464,7 @@ namespace MeshOps
                   MeshPoint& mp = points.back();
                   mp.r = in.vertexColor[idx * 3 + 0]; mp.g = in.vertexColor[idx * 3 + 1];
                   mp.b = in.vertexColor[idx * 3 + 2];
+                  mp.hasColor = true;
                }
             }
          }
@@ -2575,6 +2577,7 @@ namespace MeshOps
                mp.r = (in.vertexColor[key.first * 3 + 0] + in.vertexColor[key.second * 3 + 0]) * 0.5f;
                mp.g = (in.vertexColor[key.first * 3 + 1] + in.vertexColor[key.second * 3 + 1]) * 0.5f;
                mp.b = (in.vertexColor[key.first * 3 + 2] + in.vertexColor[key.second * 3 + 2]) * 0.5f;
+               mp.hasColor = true;
             }
          }
       }
@@ -2615,6 +2618,7 @@ namespace MeshOps
                mp.r = (in.vertexColor[ia * 3 + 0] + in.vertexColor[ib * 3 + 0] + in.vertexColor[ic * 3 + 0]) / 3.0f;
                mp.g = (in.vertexColor[ia * 3 + 1] + in.vertexColor[ib * 3 + 1] + in.vertexColor[ic * 3 + 1]) / 3.0f;
                mp.b = (in.vertexColor[ia * 3 + 2] + in.vertexColor[ib * 3 + 2] + in.vertexColor[ic * 3 + 2]) / 3.0f;
+               mp.hasColor = true;
             }
          }
       }
@@ -2768,6 +2772,7 @@ namespace MeshOps
             p.r = wa*in.vertexColor[ia*3+0] + wb*in.vertexColor[ib*3+0] + wc*in.vertexColor[ic*3+0];
             p.g = wa*in.vertexColor[ia*3+1] + wb*in.vertexColor[ib*3+1] + wc*in.vertexColor[ic*3+1];
             p.b = wa*in.vertexColor[ia*3+2] + wb*in.vertexColor[ib*3+2] + wc*in.vertexColor[ic*3+2];
+            p.hasColor = true;
          }
          return p;
       };

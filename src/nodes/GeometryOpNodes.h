@@ -564,6 +564,7 @@ public:
    {
       return instanceShape ? instanceShape->SurfaceTextureRevision() : 0;
    }
+   const std::string& CookWarning() const override { return mCookWarning; }
 
    // Slot 0 supplies the points, slot 1 the shape stamped on them, and slot 2
    // an optional point cloud that replaces the mesh sampling entirely. A cloud
@@ -680,6 +681,7 @@ private:
    float mBuiltScale = -1, mBuiltScaleRand = -1, mBuiltRotRand = -1, mBuiltSeed = -1, mBuiltOffset = -1;
    bool mBuiltAlign = false;
    int mLastCookFrame = -1;
+   std::string mCookWarning;
 };
 
 // --- Set Color -------------------------------------------------------------
@@ -858,6 +860,7 @@ public:
    // the wrapped mesh. Never targetInput - that's the thing being wrapped onto,
    // not where this node's mesh comes from.
    IGeometrySource* PassthroughSource() const override { return sourceInput; }
+   const std::string& CookWarning() const override { return mCookWarning; }
    Mat4 GetInstanceGroupMatrix() const override
    {
       return sourceInput ? sourceInput->GetInstanceGroupMatrix() : Mat4::Identity();
@@ -997,4 +1000,5 @@ private:
    bool mHasBuilt = false;
    unsigned long long mMeshRevision = 0;
    int mLastCookFrame = -1;
+   std::string mCookWarning;
 };
