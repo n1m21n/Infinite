@@ -564,6 +564,15 @@ public:
    {
       return instanceShape ? instanceShape->SurfaceTextureRevision() : 0;
    }
+   // Phase 5 (geometry-domains audit): the stamp's own mapping, same
+   // instanceShape-forwarding shape as GetMaterial()/GetMaterialTexture()
+   // above - a Mapping node patched upstream of the stamp shape (not the
+   // scatter points) should still reach whatever samples the instanced
+   // surface's material maps.
+   MappingTransform GetMappingTransform() const override
+   {
+      return instanceShape ? instanceShape->GetMappingTransform() : MappingTransform();
+   }
    const std::string& CookWarning() const override { return mCookWarning; }
 
    // Slot 0 supplies the points, slot 1 the shape stamped on them, and slot 2
