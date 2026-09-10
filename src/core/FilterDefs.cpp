@@ -335,12 +335,16 @@ const std::vector<FilterDef>& GetFilterDefs()
         { P("Opacity", "uOpacity", T::Float, 0.0f, 1.0f, 1.0f) } },
 
       { "set alpha", "Compositing",
-        "uniform float uAlpha;\n"
+        // Second input is any grayscale/keyed/bw image (e.g. show alpha's
+        // output) whose luminance becomes the new alpha channel.
         "void main() {\n"
-        "   vec4 c = texture(uSrc, vUv);\n"
-        "   fragColor = vec4(c.rgb, uAlpha);\n"
+        "   vec4 a = texture(uSrc, vUv);\n"
+        "   if (uHasSrc2 == 0) { fragColor = vec4(a.rgb, 1.0); return; }\n"
+        "   vec3 b = texture(uSrc2, vUv).rgb;\n"
+        "   float luma = dot(b, vec3(0.299, 0.587, 0.114));\n"
+        "   fragColor = vec4(a.rgb, luma);\n"
         "}\n",
-        { P("Alpha", "uAlpha", T::Float, 0.0f, 1.0f, 1.0f) } },
+        {}, 2 },
 
       { "alpha invert", "Compositing",
         "void main() {\n"
