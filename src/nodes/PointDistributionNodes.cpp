@@ -125,6 +125,7 @@ void DistributePointsOnFacesNode::RebuildIfNeeded()
             wp.nx = nx; wp.ny = ny; wp.nz = nz;
             wp.scale = p.scale;
             wp.r = p.r; wp.g = p.g; wp.b = p.b;
+            wp.hasColor = p.hasColor;
             allPoints.push_back(wp);
 
             Particle particle;
@@ -132,6 +133,7 @@ void DistributePointsOnFacesNode::RebuildIfNeeded()
             particle.nx = wp.nx; particle.ny = wp.ny; particle.nz = wp.nz;
             particle.scale = pointSize * 0.5f * p.scale;
             particle.r = instTint[0] * p.r; particle.g = instTint[1] * p.g; particle.b = instTint[2] * p.b;
+            particle.hasColor = p.hasColor;
             mPoints.push_back(particle);
          }
       }
@@ -151,6 +153,7 @@ void DistributePointsOnFacesNode::RebuildIfNeeded()
          particle.nx = p.nx; particle.ny = p.ny; particle.nz = p.nz;
          particle.scale = pointSize * 0.5f * p.scale;
          particle.r = tint[0] * p.r; particle.g = tint[1] * p.g; particle.b = tint[2] * p.b;
+         particle.hasColor = p.hasColor;
          mPoints.push_back(particle);
       }
    }
@@ -276,8 +279,18 @@ void PointsToVerticesNode::RebuildIfNeeded()
    Mesh out;
    if (cloud != nullptr)
    {
+      // Only emit vertexColor when at least one particle actually carries real
+      // colour - otherwise every particle's white default would manufacture a
+      // "coloured" mesh out of a cloud that never had colour to begin with.
+      bool anyColor = false;
+      for (const Particle& p : *cloud)
+      {
+         if (p.hasColor) { anyColor = true; break; }
+      }
+
       out.vertices.reserve(cloud->size());
-      out.vertexColor.reserve(cloud->size() * 3);
+      if (anyColor)
+         out.vertexColor.reserve(cloud->size() * 3);
       for (const Particle& p : *cloud)
       {
          if (aliveOnly && !p.alive)
@@ -286,9 +299,12 @@ void PointsToVerticesNode::RebuildIfNeeded()
          v.px = p.px; v.py = p.py; v.pz = p.pz;
          v.nx = p.nx; v.ny = p.ny; v.nz = p.nz;
          out.vertices.push_back(v);
-         out.vertexColor.push_back(p.r);
-         out.vertexColor.push_back(p.g);
-         out.vertexColor.push_back(p.b);
+         if (anyColor)
+         {
+            out.vertexColor.push_back(p.r);
+            out.vertexColor.push_back(p.g);
+            out.vertexColor.push_back(p.b);
+         }
       }
    }
    else if (instancer != nullptr && xformsPtr != nullptr && !xformsPtr->empty())
@@ -415,6 +431,7 @@ void DistributePointsInGridNode::RebuildIfNeeded()
          // this node's own pointSize param.
          p.scale = pointSize * 0.5f;
          p.r = tint[0]; p.g = tint[1]; p.b = tint[2];
+         p.hasColor = true;
          mPoints.push_back(p);
       }
    }
@@ -422,7 +439,11 @@ void DistributePointsInGridNode::RebuildIfNeeded()
    std::vector<MeshPoint> asPoints;
    asPoints.reserve(mPoints.size());
    for (const Particle& p : mPoints)
-      asPoints.push_back({ p.px, p.py, p.pz, p.nx, p.ny, p.nz, 1.0f, 0, p.r, p.g, p.b });
+   {
+      MeshPoint mp{ p.px, p.py, p.pz, p.nx, p.ny, p.nz, 1.0f, 0, p.r, p.g, p.b };
+      mp.hasColor = p.hasColor;
+      asPoints.push_back(mp);
+   }
    mCache = MeshOps::PointsToFaces(asPoints, pointSize);
 
    mBuiltCountX = countX; mBuiltCountY = countY;

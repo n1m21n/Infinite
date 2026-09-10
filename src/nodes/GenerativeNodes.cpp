@@ -324,6 +324,7 @@ void ImageToPointsNode::CookIfNeeded(int frameId)
          p.r = useImageColor ? r * tint[0] : tint[0];
          p.g = useImageColor ? g * tint[1] : tint[1];
          p.b = useImageColor ? b * tint[2] : tint[2];
+         p.hasColor = true;
          p.life = 0.0f;
          p.alive = true;
          mPoints.push_back(p);

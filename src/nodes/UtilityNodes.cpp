@@ -513,6 +513,7 @@ void MeshToPointsNode::RebuildIfNeeded()
             wp.nx = nx; wp.ny = ny; wp.nz = nz;
             wp.scale = p.scale;
             wp.r = p.r; wp.g = p.g; wp.b = p.b;
+            wp.hasColor = p.hasColor;
             allPoints.push_back(wp);
 
             Particle particle;
@@ -520,6 +521,7 @@ void MeshToPointsNode::RebuildIfNeeded()
             particle.nx = wp.nx; particle.ny = wp.ny; particle.nz = wp.nz;
             particle.scale = pointSize * 0.5f * p.scale;
             particle.r = instTint[0] * p.r; particle.g = instTint[1] * p.g; particle.b = instTint[2] * p.b;
+            particle.hasColor = p.hasColor;
             mPoints.push_back(particle);
          }
       }
@@ -540,6 +542,7 @@ void MeshToPointsNode::RebuildIfNeeded()
          particle.nx = p.nx; particle.ny = p.ny; particle.nz = p.nz;
          particle.scale = pointSize * 0.5f * p.scale;
          particle.r = tint[0] * p.r; particle.g = tint[1] * p.g; particle.b = tint[2] * p.b;
+         particle.hasColor = p.hasColor;
          mPoints.push_back(particle);
       }
    }

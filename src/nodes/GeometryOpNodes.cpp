@@ -1220,6 +1220,7 @@ void SetColorNode::Rebuild()
                          flatColor, rampA, rampB, seed, paletteInput, paletteOffset,
                          mTexPixels, mTexW, mTexH, rgb);
          p.r = rgb[0]; p.g = rgb[1]; p.b = rgb[2];
+         p.hasColor = true;
       }
    }
 }
