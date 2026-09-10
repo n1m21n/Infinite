@@ -564,6 +564,11 @@ Material ClothNode::GetMaterial() const
    return m;
 }
 
+unsigned long long ClothNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+}
+
 unsigned int ClothNode::GetSurfaceTexture()
 {
    return input ? input->GetSurfaceTexture() : 0;

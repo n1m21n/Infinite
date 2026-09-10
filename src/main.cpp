@@ -23031,20 +23031,46 @@ namespace
          if (source == nullptr)
             continue;
          const Mesh& mesh = source->GetMesh();
-         if (mesh.Empty())
-            continue;
 
          float mlo[3] = { 1e30f, 1e30f, 1e30f };
          float mhi[3] = { -1e30f, -1e30f, -1e30f };
-         for (const Vertex& v : mesh.vertices)
+         if (!mesh.Empty())
          {
-            const float p[3] = { v.px, v.py, v.pz };
-            for (int k = 0; k < 3; k++)
+            for (const Vertex& v : mesh.vertices)
             {
-               if (!std::isfinite(p[k]))
-                  continue;
-               mlo[k] = std::min(mlo[k], p[k]);
-               mhi[k] = std::max(mhi[k], p[k]);
+               const float p[3] = { v.px, v.py, v.pz };
+               for (int k = 0; k < 3; k++)
+               {
+                  if (!std::isfinite(p[k]))
+                     continue;
+                  mlo[k] = std::min(mlo[k], p[k]);
+                  mhi[k] = std::max(mhi[k], p[k]);
+               }
+            }
+         }
+         else
+         {
+            // D5 (geometry-domains audit, Phase 4): mesh:standin producers
+            // (Mesh to Points, Distribute on Faces/in Grid, Image to Points)
+            // now return an honestly empty GetMesh() - fall back to the point
+            // cloud's own bounds so camera-fit doesn't lose them.
+            const std::vector<Particle>* cloud = source->GetPointCloud();
+            if (cloud != nullptr)
+            {
+               const float baseSize = source->PointBaseSize();
+               for (const Particle& p : *cloud)
+               {
+                  const float r = baseSize * p.scale;
+                  const float lo3[3] = { p.px - r, p.py - r, p.pz - r };
+                  const float hi3[3] = { p.px + r, p.py + r, p.pz + r };
+                  for (int k = 0; k < 3; k++)
+                  {
+                     if (!std::isfinite(lo3[k]) || !std::isfinite(hi3[k]))
+                        continue;
+                     mlo[k] = std::min(mlo[k], lo3[k]);
+                     mhi[k] = std::max(mhi[k], hi3[k]);
+                  }
+               }
             }
          }
          if (mlo[0] > mhi[0])

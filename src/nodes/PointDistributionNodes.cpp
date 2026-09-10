@@ -33,9 +33,8 @@ void DistributePointsOnFacesNode::RebuildIfNeeded()
 {
    if (input == nullptr)
    {
-      if (!mCache.vertices.empty() || !mPoints.empty())
+      if (!mPoints.empty())
       {
-         mCache = Mesh();
          mPoints.clear();
          mMeshRevision = NextMeshRevision();
       }
@@ -76,7 +75,6 @@ void DistributePointsOnFacesNode::RebuildIfNeeded()
    }
 
    mPoints.clear();
-   std::vector<MeshPoint> allPoints;
 
    if (instancer != nullptr && xformsPtr != nullptr && !xformsPtr->empty())
    {
@@ -125,8 +123,6 @@ void DistributePointsOnFacesNode::RebuildIfNeeded()
             wp.nx = nx; wp.ny = ny; wp.nz = nz;
             wp.scale = p.scale;
             wp.r = p.r; wp.g = p.g; wp.b = p.b;
-            wp.hasColor = p.hasColor;
-            allPoints.push_back(wp);
 
             Particle particle;
             particle.px = wp.px; particle.py = wp.py; particle.pz = wp.pz;
@@ -137,13 +133,11 @@ void DistributePointsOnFacesNode::RebuildIfNeeded()
             mPoints.push_back(particle);
          }
       }
-      mCache = MeshOps::PointsToFaces(allPoints, pointSize);
    }
    else
    {
       const std::vector<MeshPoint> points =
          MeshOps::DistributeOnFaces(src, density, seed, method, minDistance);
-      mCache = MeshOps::PointsToFaces(points, pointSize);
 
       mPoints.reserve(points.size());
       for (const MeshPoint& p : points)
@@ -176,10 +170,14 @@ void DistributePointsOnFacesNode::RebuildIfNeeded()
 
 const Mesh& DistributePointsOnFacesNode::GetMesh()
 {
+   // D5 (geometry-domains audit, Phase 4): no real mesh output, only points
+   // (GetPointCloud() below) - see MeshToPointsNode::GetMesh()'s comment
+   // (UtilityNodes.cpp) for why this is honestly empty rather than a
+   // fabricated billboard-quad mesh.
    if (bypassed)
       return input ? input->GetMesh() : kEmptyMesh;
    RebuildIfNeeded();
-   return mCache;
+   return kEmptyMesh;
 }
 
 unsigned long long DistributePointsOnFacesNode::MeshRevision()
@@ -233,6 +231,11 @@ Material DistributePointsOnFacesNode::GetMaterial() const
    m.subsurfaceColor[2] = subsurfaceColor[2];
    m.subsurfaceRadius = subsurfaceRadius;
    return m;
+}
+
+unsigned long long DistributePointsOnFacesNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
 }
 
 void DistributePointsOnFacesNode::CookIfNeeded(int frameId)
@@ -379,6 +382,11 @@ Material PointsToVerticesNode::GetMaterial() const
    return m;
 }
 
+unsigned long long PointsToVerticesNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+}
+
 void PointsToVerticesNode::CookIfNeeded(int frameId)
 {
    if (mLastCookFrame == frameId)
@@ -436,16 +444,6 @@ void DistributePointsInGridNode::RebuildIfNeeded()
       }
    }
 
-   std::vector<MeshPoint> asPoints;
-   asPoints.reserve(mPoints.size());
-   for (const Particle& p : mPoints)
-   {
-      MeshPoint mp{ p.px, p.py, p.pz, p.nx, p.ny, p.nz, 1.0f, 0, p.r, p.g, p.b };
-      mp.hasColor = p.hasColor;
-      asPoints.push_back(mp);
-   }
-   mCache = MeshOps::PointsToFaces(asPoints, pointSize);
-
    mBuiltCountX = countX; mBuiltCountY = countY;
    mBuiltSpacingX = spacingX; mBuiltSpacingY = spacingY;
    mBuiltJitter = jitter; mBuiltPointSize = pointSize; mBuiltSeed = seed;
@@ -454,10 +452,14 @@ void DistributePointsInGridNode::RebuildIfNeeded()
 
 const Mesh& DistributePointsInGridNode::GetMesh()
 {
+   // D5 (geometry-domains audit, Phase 4): no real mesh output, only points
+   // (GetPointCloud() below) - see MeshToPointsNode::GetMesh()'s comment
+   // (UtilityNodes.cpp) for why this is honestly empty rather than a
+   // fabricated billboard-quad mesh.
    if (bypassed)
       return kEmptyMesh;
    RebuildIfNeeded();
-   return mCache;
+   return kEmptyMesh;
 }
 
 unsigned long long DistributePointsInGridNode::MeshRevision()
@@ -489,6 +491,11 @@ Material DistributePointsInGridNode::GetMaterial() const
    Material m;
    m.color[0] = tint[0]; m.color[1] = tint[1]; m.color[2] = tint[2];
    return m;
+}
+
+unsigned long long DistributePointsInGridNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
 }
 
 void DistributePointsInGridNode::CookIfNeeded(int frameId)

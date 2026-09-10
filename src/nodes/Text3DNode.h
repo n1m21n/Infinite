@@ -26,6 +26,7 @@ public:
    unsigned long long MeshRevision() override;
    Mat4 GetModelMatrix() const override;
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
    unsigned int GetSurfaceTexture() override;
    unsigned long long SurfaceTextureRevision() const override { return mTextureInput.Revision(); }
 
@@ -101,6 +102,8 @@ private:
 
    Mesh mMesh;
    unsigned long long mMeshRevision = 0;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
    std::string mStatus = "no text";
 
    // Rebuilding runs CoreText and an ear-clip pass, which is far too expensive

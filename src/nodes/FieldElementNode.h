@@ -147,10 +147,12 @@ public:
    unsigned long long MeshRevision() override { return mMeshRevision; }
    Mat4 GetModelMatrix() const override { return input ? input->GetModelMatrix() : Mat4::Identity(); }
    Material GetMaterial() const override { return input ? input->GetMaterial() : Material(); }
+   unsigned long long MaterialRevision() const override { return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash); }
    unsigned int GetSurfaceTexture() override { return input ? input->GetSurfaceTexture() : 0; }
    unsigned int GetMaterialTexture(int map) override { return input ? input->GetMaterialTexture(map) : 0; }
    unsigned long long SurfaceTextureRevision() const override { return input ? input->SurfaceTextureRevision() : 0; }
    MappingTransform GetMappingTransform() const override { return input ? input->GetMappingTransform() : MappingTransform(); }
+   unsigned long long MappingRevision() const override { return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash); }
    IGeometrySource* PassthroughSource() const override { return input; }
    Mat4 GetInstanceGroupMatrix() const override { return input ? input->GetInstanceGroupMatrix() : Mat4::Identity(); }
    const std::vector<unsigned char>* InstanceSelection() const override { return input ? input->InstanceSelection() : nullptr; }
@@ -264,6 +266,10 @@ private:
 
    Mesh mOutMesh;
    unsigned long long mMeshRevision = 1;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
+   mutable unsigned long long mMappingRevision = 0;
+   mutable size_t mLastMappingHash = 0;
    unsigned long long mLastUpstreamRevision = 0;
    unsigned long long mLastResetEpoch = 0;
    char mCostReadout[128] = { 0 };

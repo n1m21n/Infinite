@@ -86,6 +86,7 @@ public:
       return input ? input->GetModelMatrix() : Mat4::Identity();
    }
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
    unsigned int GetSurfaceTexture() override;
    unsigned int GetMaterialTexture(int map) override
    {
@@ -98,6 +99,10 @@ public:
    MappingTransform GetMappingTransform() const override
    {
       return input ? input->GetMappingTransform() : MappingTransform();
+   }
+   unsigned long long MappingRevision() const override
+   {
+      return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
    }
    IGeometrySource* PassthroughSource() const override { return input; }
    // When this node (or the chain of GeometryOpNodes it's wired through) sits
@@ -346,6 +351,10 @@ private:
    Signature mBuilt;
    bool mHasBuilt = false;
    unsigned long long mMeshRevision = 0;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
+   mutable unsigned long long mMappingRevision = 0;
+   mutable size_t mLastMappingHash = 0;
    int mLastCookFrame = -1;
 
    // Populated by GetMesh() only for op == kSelect downstream of an
@@ -391,6 +400,7 @@ public:
       return input ? input->GetModelMatrix() : Mat4::Identity();
    }
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
    unsigned int GetSurfaceTexture() override;
    unsigned int GetMaterialTexture(int map) override
    {
@@ -403,6 +413,10 @@ public:
    MappingTransform GetMappingTransform() const override
    {
       return input ? input->GetMappingTransform() : MappingTransform();
+   }
+   unsigned long long MappingRevision() const override
+   {
+      return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
    }
    // Displacement moves the stamp's vertices, it doesn't build the mesh from
    // scratch - so an upstream InstanceOnPoints stays visible to the chain
@@ -524,6 +538,10 @@ private:
    Signature mBuilt;
    bool mHasBuilt = false;
    unsigned long long mMeshRevision = 0;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
+   mutable unsigned long long mMappingRevision = 0;
+   mutable size_t mLastMappingHash = 0;
    int mLastCookFrame = -1;
 
    ImageCable mTextureInput;
@@ -555,6 +573,7 @@ public:
    // applying the point source's transform on top would move them twice.
    Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
    unsigned int GetSurfaceTexture() override;
    unsigned int GetMaterialTexture(int map) override
    {
@@ -674,6 +693,8 @@ private:
    std::vector<Mat4> mTransforms;
    std::vector<float> mColors; // rgb triples, or empty for a uniform material
    unsigned long long mInstanceRevision = 0;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
    Mesh mEmpty;
    const void* mBuiltPointSource = nullptr;
    const void* mBuiltShape = nullptr;
@@ -728,6 +749,10 @@ public:
       return input ? input->GetModelMatrix() : Mat4::Identity();
    }
    Material GetMaterial() const override { return input ? input->GetMaterial() : Material(); }
+   unsigned long long MaterialRevision() const override
+   {
+      return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+   }
    unsigned int GetSurfaceTexture() override { return input ? input->GetSurfaceTexture() : 0; }
    unsigned int GetMaterialTexture(int map) override
    {
@@ -740,6 +765,10 @@ public:
    MappingTransform GetMappingTransform() const override
    {
       return input ? input->GetMappingTransform() : MappingTransform();
+   }
+   unsigned long long MappingRevision() const override
+   {
+      return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
    }
    IGeometrySource* PassthroughSource() const override { return input; }
    // Forwarded alongside PassthroughSource - see MaterialNode for why the two
@@ -825,6 +854,10 @@ private:
    bool mHasBuilt = false;
    unsigned long long mMeshRevision = 0;
    unsigned long long mCloudRevision = 0;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
+   mutable unsigned long long mMappingRevision = 0;
+   mutable size_t mLastMappingHash = 0;
    int mLastCookFrame = -1;
 
    ImageCable mTextureInput;
@@ -857,6 +890,7 @@ public:
    // this stays identity - same reasoning as InstanceOnPointsNode.
    Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
    unsigned int GetSurfaceTexture() override;
    unsigned int GetMaterialTexture(int map) override { return sourceInput ? sourceInput->GetMaterialTexture(map) : 0; }
    unsigned long long SurfaceTextureRevision() const override
@@ -864,6 +898,10 @@ public:
       return sourceInput ? sourceInput->SurfaceTextureRevision() : 0;
    }
    MappingTransform GetMappingTransform() const override { return sourceInput ? sourceInput->GetMappingTransform() : MappingTransform(); }
+   unsigned long long MappingRevision() const override
+   {
+      return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
+   }
    // The source mesh is the stamp; wrapping it onto the target is a stamp-level
    // op like every other one, so an upstream InstanceOnPoints keeps scattering
    // the wrapped mesh. Never targetInput - that's the thing being wrapped onto,
@@ -1008,6 +1046,10 @@ private:
    Signature mBuilt;
    bool mHasBuilt = false;
    unsigned long long mMeshRevision = 0;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
+   mutable unsigned long long mMappingRevision = 0;
+   mutable size_t mLastMappingHash = 0;
    int mLastCookFrame = -1;
    std::string mCookWarning;
 };

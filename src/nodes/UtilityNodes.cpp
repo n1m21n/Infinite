@@ -90,6 +90,11 @@ Material MaterialNode::GetMaterial() const
    return m;
 }
 
+unsigned long long MaterialNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+}
+
 unsigned int MaterialNode::GetSurfaceTexture()
 {
    return GetMaterialTexture(kMapAlbedo);
@@ -158,6 +163,11 @@ MappingTransform MappingNode::GetMappingTransform() const
    return t;
 }
 
+unsigned long long MappingNode::MappingRevision() const
+{
+   return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
+}
+
 void MappingNode::CookIfNeeded(int frameId)
 {
    if (mLastCookFrame == frameId)
@@ -200,11 +210,12 @@ void JoinGeometryNode::RebuildIfNeeded()
       const Mat4 groupMatrix = instancer ? inputs[i]->GetInstanceGroupMatrix() : Mat4::Identity();
       const std::vector<Mat4>* xformsPtr = instancer ? &ResolveInstanceTransforms(inputs[i], instancer) : nullptr;
       const size_t instCount = xformsPtr ? xformsPtr->size() : 0;
+      const unsigned long long matRev = inputs[i] ? inputs[i]->MaterialRevision() : 0;
 
       if (mBuiltInputs[i] != (const void*)inputs[i] || mBuiltRevisions[i] != rev ||
           mBuiltInstancers[i] != (const void*)instancer || mBuiltInstRevisions[i] != instRev ||
           !(mBuiltGroupMatrices[i] == groupMatrix) || mBuiltInstanceCounts[i] != instCount ||
-          !sameMatrix(mBuiltMatrices[i], matrix))
+          !sameMatrix(mBuiltMatrices[i], matrix) || mBuiltMaterialRev[i] != matRev)
          dirty = true;
    }
    if (mBuiltMode != mode)
@@ -218,6 +229,7 @@ void JoinGeometryNode::RebuildIfNeeded()
    {
       mBuiltInputs[i] = inputs[i];
       mBuiltRevisions[i] = inputs[i] ? inputs[i]->MeshRevision() : 0;
+      mBuiltMaterialRev[i] = inputs[i] ? inputs[i]->MaterialRevision() : 0;
       mBuiltMatrices[i] = inputs[i] ? inputs[i]->GetModelMatrix() : Mat4::Identity();
       InstanceOnPointsNode* instancer = inputs[i] ? FindInstancer(inputs[i]) : nullptr;
       mBuiltInstancers[i] = instancer;
@@ -377,6 +389,11 @@ Material JoinGeometryNode::GetMaterial() const
    return m;
 }
 
+unsigned long long JoinGeometryNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+}
+
 unsigned int JoinGeometryNode::GetSurfaceTexture()
 {
    const int pick = std::max(0, std::min(materialFrom, kSlots - 1));
@@ -413,6 +430,11 @@ MappingTransform JoinGeometryNode::GetMappingTransform() const
    return MappingTransform();
 }
 
+unsigned long long JoinGeometryNode::MappingRevision() const
+{
+   return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
+}
+
 void JoinGeometryNode::CookIfNeeded(int frameId)
 {
    if (mLastCookFrame == frameId)
@@ -432,9 +454,8 @@ void MeshToPointsNode::RebuildIfNeeded()
 {
    if (input == nullptr)
    {
-      if (!mCache.vertices.empty() || !mPoints.empty())
+      if (!mPoints.empty())
       {
-         mCache = Mesh();
          mPoints.clear();
          mPointCount = 0;
          mMeshRevision = NextMeshRevision();
@@ -451,12 +472,13 @@ void MeshToPointsNode::RebuildIfNeeded()
    const size_t instCount = xformsPtr ? xformsPtr->size() : 0;
 
    const bool sameColor = (mBuiltColor[0] == color[0] && mBuiltColor[1] == color[1] && mBuiltColor[2] == color[2]);
+   const unsigned long long matRev = (inheritMaterial && input) ? input->MaterialRevision() : 0;
    if (mBuiltInput == input && mBuiltUpstream == upstream &&
        mBuiltInstancer == (const void*)instancer && mBuiltInstRevision == instRev &&
        mBuiltGroupMatrix == groupMatrix && mBuiltInstanceCount == instCount &&
        mBuiltMode == mode && mBuiltMax == maxPoints && mBuiltSize == pointSize &&
        mBuiltWeld == weld && mBuiltDissolve == dissolveAngleDegrees &&
-       mBuiltInherit == inheritMaterial && sameColor)
+       mBuiltInherit == inheritMaterial && sameColor && mBuiltMaterialRev == matRev)
       return;
 
    const Mesh& src = input->GetMesh();
@@ -526,13 +548,11 @@ void MeshToPointsNode::RebuildIfNeeded()
          }
       }
       mPointCount = allPoints.size();
-      mCache = MeshOps::PointsToFaces(allPoints, pointSize);
    }
    else
    {
       const std::vector<MeshPoint> points = MeshOps::ToPoints(src, mode, maxPoints, weld, dissolveAngleDegrees);
       mPointCount = points.size();
-      mCache = MeshOps::PointsToFaces(points, pointSize);
 
       mPoints.reserve(points.size());
       for (const MeshPoint& p : points)
@@ -560,15 +580,28 @@ void MeshToPointsNode::RebuildIfNeeded()
    mBuiltDissolve = dissolveAngleDegrees;
    mBuiltInherit = inheritMaterial;
    mBuiltColor[0] = color[0]; mBuiltColor[1] = color[1]; mBuiltColor[2] = color[2];
+   mBuiltMaterialRev = matRev;
    mMeshRevision = NextMeshRevision();
 }
 
 const Mesh& MeshToPointsNode::GetMesh()
 {
+   // D5 (geometry-domains audit, Phase 4): this node has no real mesh output,
+   // only a point cloud (GetPoints()/GetPointCloud() below) - it used to fake
+   // one here as a billboard-quad mesh so a mesh:any-consuming node (Join,
+   // GeometryOp, ...) would silently see *something* rather than nothing.
+   // That fabrication is exactly the mechanism of the Join Geometry vertex-
+   // colour bug this audit was started to fix, just one hop upstream, so the
+   // honest answer - empty - is correct here even though it means a mesh:any
+   // pin fed straight from this node now gets nothing instead of garbage
+   // quads. Render3D and NodeViewport (the mini/panel/projector viewports)
+   // already fall back to GetPointCloud() whenever GetMesh() is empty, so the
+   // on-screen preview is unaffected; only feeding this into a mesh-shaped
+   // operator changes, from silently-wrong to correctly-empty.
    if (bypassed)
       return input ? input->GetMesh() : kEmptyMesh;
    RebuildIfNeeded();
-   return mCache;
+   return kEmptyMesh;
 }
 
 unsigned long long MeshToPointsNode::MeshRevision()
@@ -623,6 +656,11 @@ Material MeshToPointsNode::GetMaterial() const
    m.subsurfaceColor[2] = subsurfaceColor[2];
    m.subsurfaceRadius = subsurfaceRadius;
    return m;
+}
+
+unsigned long long MeshToPointsNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
 }
 
 unsigned int MeshToPointsNode::GetSurfaceTexture()
@@ -760,6 +798,11 @@ Material MetaBallNode::GetMaterial() const
    m.subsurfaceColor[2] = subsurfaceColor[2];
    m.subsurfaceRadius = subsurfaceRadius;
    return m;
+}
+
+unsigned long long MetaBallNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
 }
 
 void MetaBallNode::CookIfNeeded(int frameId)

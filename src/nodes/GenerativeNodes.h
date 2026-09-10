@@ -67,6 +67,10 @@ public:
    {
       return input ? input->GetMaterial() : Material();
    }
+   unsigned long long MaterialRevision() const override
+   {
+      return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+   }
    unsigned int GetSurfaceTexture() override
    {
       return input ? input->GetSurfaceTexture() : 0;
@@ -82,6 +86,10 @@ public:
    MappingTransform GetMappingTransform() const override
    {
       return input ? input->GetMappingTransform() : MappingTransform();
+   }
+   unsigned long long MappingRevision() const override
+   {
+      return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
    }
    IGeometrySource* PassthroughSource() const override { return input; }
    const std::string& CookWarning() const override { return mCookWarning; }
@@ -143,6 +151,10 @@ private:
 
    Mesh mMesh;
    unsigned long long mRevision = 0;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
+   mutable unsigned long long mMappingRevision = 0;
+   mutable size_t mLastMappingHash = 0;
    int mGeneration = 0;
    int mPendingSteps = 0;
    bool mNeedsReset = true;
@@ -180,9 +192,9 @@ public:
       return &mPoints;
    }
    unsigned long long PointCloudRevision() override { return bypassed ? 0 : mRevision; }
-   // Mirrors RebuildMeshIfNeeded()'s baseHalf (GenerativeNodes.cpp) so
-   // Render3D's sprite draw and this node's own mini-viewport agree on what
-   // p.scale = 1.0 actually measures.
+   // Matches the swatch-quad sizing GetMesh() used to bake per point before
+   // the D5 fix (geometry-domains audit, Phase 4) made it honestly empty, so
+   // Render3D's sprite draw still agrees on what p.scale = 1.0 measures.
    float PointBaseSize() const override
    {
       const int n = std::max(2, std::min(density, 512));
@@ -190,13 +202,13 @@ public:
       return cell * 0.45f;
    }
 
-   // IGeometrySource: a swatch quad per point, each sampling its own texel of
-   // the downsampled source image rather than the whole image tiled per-quad
-   // (which is what MeshOps::PointsToFaces's 0..1 corner UVs would give).
+   // IGeometrySource: honestly empty (D5, geometry-domains audit Phase 4) -
+   // this node's only real geometry output is the point cloud above.
    const Mesh& GetMesh() override;
    unsigned long long MeshRevision() override;
    Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
    // Never expose a surface texture here: CookIfNeeded (GenerativeNodes.cpp) already
    // bakes this same downsampled source image into each point's own instance color
    // (p.r/g/b) whenever useImageColor is on. Returning mSmall.tex here as well made
@@ -240,7 +252,6 @@ private:
    // Resolves the source into a density x density target before reading back,
    // so the CPU never sees the full-resolution image.
    bool EnsureDownsampler(int n);
-   void RebuildMeshIfNeeded();
 
    ImageCable mInput;
    std::vector<Particle> mPoints;
@@ -250,13 +261,11 @@ private:
    std::vector<std::pair<float, float>> mPointUv;
    std::vector<unsigned char> mPixels;
    unsigned long long mRevision = 0;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
 
    GLUtil::Fbo mSmall;
    unsigned int mProgram = 0;
    bool mShaderTried = false;
    int mLastCookFrame = -1;
-
-   Mesh mCookedMesh;
-   unsigned long long mCookedMeshRevision = 0;
-   unsigned long long mBuiltMeshRevision = (unsigned long long)-1;
 };

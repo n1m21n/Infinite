@@ -143,6 +143,11 @@ Material CurveNode::GetMaterial() const
    return m;
 }
 
+unsigned long long CurveNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+}
+
 void CurveNode::CookIfNeeded(int frameId)
 {
    if (mLastCookFrame == frameId)

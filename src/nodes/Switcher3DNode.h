@@ -41,10 +41,12 @@ public:
    unsigned long long MeshRevision() override;
    Mat4 GetModelMatrix() const override;
    Material GetMaterial() const override;
+   unsigned long long MaterialRevision() const override;
    unsigned int GetSurfaceTexture() override;
    unsigned int GetMaterialTexture(int map) override;
    unsigned long long SurfaceTextureRevision() const override;
    MappingTransform GetMappingTransform() const override;
+   unsigned long long MappingRevision() const override;
    // The active input is where the mesh actually comes from, not something
    // this node builds - same reasoning as GeometryOpNode's passthrough, so a
    // chain like InstanceOnPoints -> Switcher 3D -> Render 3D still draws
@@ -109,6 +111,10 @@ private:
    IGeometrySource* mLastActive = nullptr;
    unsigned long long mLastUpstreamRevision = 0;
    bool mHasLastUpstreamRevision = false;
+   mutable unsigned long long mMaterialRevision = 0;
+   mutable size_t mLastMaterialHash = 0;
+   mutable unsigned long long mMappingRevision = 0;
+   mutable size_t mLastMappingHash = 0;
    Mesh mEmpty;
    int mLastCookFrame = -1;
 };

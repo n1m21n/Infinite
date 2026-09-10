@@ -83,6 +83,11 @@ Material OceanNode::GetMaterial() const
    return m;
 }
 
+unsigned long long OceanNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+}
+
 unsigned int OceanNode::GetSurfaceTexture()
 {
    return mTextureInput.IsConnected() && mTextureInput.GetSource()

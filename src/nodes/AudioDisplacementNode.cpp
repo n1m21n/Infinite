@@ -516,6 +516,11 @@ Material AudioDisplacementNode::GetMaterial() const
    return m;
 }
 
+unsigned long long AudioDisplacementNode::MaterialRevision() const
+{
+   return ComputeContentRevision(GetMaterial(), mMaterialRevision, mLastMaterialHash);
+}
+
 unsigned int AudioDisplacementNode::GetSurfaceTexture()
 {
    return input ? input->GetSurfaceTexture() : 0;
