@@ -30201,6 +30201,23 @@ namespace
                                      link.second.polarity, link.second.depth, link.second.centre,
                                      link.second.lo, link.second.hi, link.second.hasRange,
                                      link.second.enabled });
+      // Shift-drag/armed recordings looping right now - previously session-
+      // only (see GestureRecorder.h), now part of the saved patch itself,
+      // same as modulation/palette bindings just above.
+      for (const auto& [key, playback] : GestureRecorder::Instance().Playbacks())
+      {
+         Patch::GestureRecord g;
+         g.dstIndex = key.first;
+         g.dstParam = key.second;
+         g.speed = playback.speed;
+         g.hasRangeOverride = playback.hasRangeOverride;
+         g.rangeLo = playback.rangeLo;
+         g.rangeHi = playback.rangeHi;
+         g.samples.reserve(playback.samples.size());
+         for (const GestureRecorder::Sample& s : playback.samples)
+            g.samples.push_back({ s.value, s.timeSec, s.startsNewGrab });
+         data.gestures.push_back(std::move(g));
+      }
       for (const auto& link : PaletteBinding::Instance().Links())
          data.palette.push_back({ link.first.first, link.first.second,
                                   link.second.nodeIndex, link.second.swatchIndex });
@@ -31869,6 +31886,37 @@ namespace
             source.enabled = m.enabled;
             Modulation::Instance().RestoreLink(dst->index, m.dstParam, source);
          }
+      }
+      // Shift-drag/armed recordings saved with the patch (see BuildPatchData
+      // above and GestureRecorder.h) - restored the same way Undo/Redo
+      // restore theirs (RemapGestures + GestureClockNow), just sourced from
+      // data.gestures instead of an UndoEntry's separate snapshot. Undo/Redo
+      // still overwrite this right after with their own (equivalent) restore
+      // - harmless, since both ultimately come from the same recorder state.
+      {
+         GestureRecorder::PlaybackMap loadedGestures;
+         for (const Patch::GestureRecord& g : data.gestures)
+         {
+            GraphNode* dst = resolve(g.dstIndex);
+            if (dst == nullptr || g.samples.size() < 2)
+               continue;
+            GestureRecorder::Playback pb;
+            pb.speed = g.speed;
+            pb.hasRangeOverride = g.hasRangeOverride;
+            pb.rangeLo = g.rangeLo;
+            pb.rangeHi = g.rangeHi;
+            pb.samples.reserve(g.samples.size());
+            for (const Patch::GestureSample& s : g.samples)
+               pb.samples.push_back({ s.value, s.timeSec, s.startsNewGrab });
+            pb.recordedMin = pb.recordedMax = pb.samples.front().value;
+            for (const GestureRecorder::Sample& s : pb.samples)
+            {
+               pb.recordedMin = std::min(pb.recordedMin, s.value);
+               pb.recordedMax = std::max(pb.recordedMax, s.value);
+            }
+            loadedGestures[GestureRecorder::Key(dst->index, g.dstParam)] = std::move(pb);
+         }
+         GestureRecorder::Instance().Restore(std::move(loadedGestures), GestureClockNow());
       }
       for (const Patch::PaletteRecord& c : data.palette)
       {
