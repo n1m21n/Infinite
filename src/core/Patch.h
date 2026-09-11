@@ -51,6 +51,12 @@ class INode;
 //   perf <kind> <dstIndex> <dstParam> <dstParam2> <cellX> <cellY> <page> <colorR> <colorG> <colorB> <value> <value2> <boolName> <label to end of line>
 //   perftarget <perfIndex> <dstIndex> <dstParam> <axis> <boolName>
 //   transport <bpm> <tsNum> <tsDen> <key> <scale>
+//   gesture <dstIndex> <dstParam> <speed> <hasRangeOverride> <rangeLo> <rangeHi> <sampleCount> <value0> <time0> <startsNewGrab0> ...
+//     One shift-drag/armed-recording loop (see core/GestureRecorder.h),
+//     trailing sample triples repeated sampleCount times. Missing entirely
+//     on any patch saved before this line existed - gestures were session-
+//     only state then and simply don't come back on load, same as any other
+//     unrecognised tag.
 //
 // Names may contain spaces, so anything free-form is always last on its line.
 namespace Patch
@@ -194,6 +200,31 @@ namespace Patch
       int scale = 0;
    };
 
+   // One sample of a recorded gesture trace - mirrors GestureRecorder::Sample
+   // field for field (see core/GestureRecorder.h).
+   struct GestureSample
+   {
+      float value = 0.0f;
+      double timeSec = 0.0;
+      bool startsNewGrab = false;
+   };
+
+   // A shift-drag/armed-recording loop, looping back into one param - mirrors
+   // GestureRecorder::Playback. Previously this lived only in
+   // GestureRecorder's in-memory singleton (and, for undo/redo, in a
+   // parallel snapshot outside Patch::Data - see UndoEntry in main.cpp);
+   // it is now also part of the saved patch, so a recording set up while
+   // working on a patch is still looping next time it's opened.
+   struct GestureRecord
+   {
+      int dstIndex = 0;
+      int dstParam = 0;
+      float speed = 1.0f;
+      bool hasRangeOverride = false;
+      float rangeLo = 0.0f, rangeHi = 0.0f;
+      std::vector<GestureSample> samples; // >= 2 entries, timeSec strictly increasing
+   };
+
    struct Data
    {
       std::vector<NodeRecord> nodes;
@@ -208,6 +239,7 @@ namespace Patch
       std::vector<PerfRecord> performance;
       PerfLayoutRecord perfLayout;
       TransportRecord transport;
+      std::vector<GestureRecord> gestures;
    };
 
    bool Write(const std::string& path, const Data& data, std::string& outError);
