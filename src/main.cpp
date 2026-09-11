@@ -26292,47 +26292,6 @@ namespace
                ImGui::EndMenu();
             }
 
-            ImGui::Separator();
-            const int selCount = (int)gPerfSelection.size();
-            const bool multi = selCount > 1 && gPerfSelection.count(elemIdx) > 0;
-            char copyLabel[48], dupLabel[48], delLabel[48];
-            snprintf(copyLabel, sizeof(copyLabel), multi ? "Copy %d Controls" : "Copy", selCount);
-            snprintf(dupLabel, sizeof(dupLabel), multi ? "Duplicate %d Controls" : "Duplicate", selCount);
-            snprintf(delLabel, sizeof(delLabel), multi ? "Delete %d Controls" : "Delete", selCount);
-
-            if (ImGui::MenuItem(copyLabel, "Cmd+C"))
-               PerfCopySelection();
-            if (ImGui::MenuItem("Paste", "Cmd+V", false, !gPerfClipboard.empty()))
-            {
-               PerfPasteRecords(gPerfClipboard);
-               ImGui::EndPopup();
-               ImGui::PopID();
-               return;
-            }
-            if (ImGui::MenuItem(dupLabel, "Shift+D"))
-            {
-               PerfDuplicateSelection();
-               ImGui::EndPopup();
-               ImGui::PopID();
-               return;
-            }
-            ImGui::Separator();
-            if (ImGui::MenuItem(delLabel, "Del"))
-            {
-               if (gPerfSelection.count(elemIdx) > 0)
-               {
-                  PerfDeleteSelection();
-               }
-               else
-               {
-                  PushUndoCheckpoint();
-                  gPerfElements.erase(gPerfElements.begin() + elemIdx);
-                  gPerfSelection.clear();
-               }
-               ImGui::EndPopup();
-               ImGui::PopID();
-               return;
-            }
             ImGui::EndPopup();
          }
       }
