@@ -367,10 +367,16 @@ namespace
    // Backdrop for any node preview about to blit a texture: a flat dark rect
    // reads as solid black wherever that texture is actually transparent, so
    // this paints a checkerboard instead, matching image editors' convention.
+   // Some users find the checker pattern distracting at small preview sizes,
+   // so it can be swapped for a flat neutral fill via Settings > Appearance.
+   bool gCheckerboardBackdrop = true;
+
    void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, ImVec2 br, float rounding = 4.0f)
    {
       const bool isLight = IsThemeLight();
       dl->AddRectFilled(origin, br, isLight ? IM_COL32(238, 240, 246, 255) : IM_COL32(18, 18, 24, 255), rounding);
+      if (!gCheckerboardBackdrop)
+         return;
       const float cell = 12.0f;
       const int cols = (int)std::ceil((br.x - origin.x) / cell);
       const int rows = (int)std::ceil((br.y - origin.y) / cell);
@@ -4783,6 +4789,7 @@ namespace
       if (auto* n = dynamic_cast<NoteStackNode*>(node)) return &n->useGlobalScale;
       if (auto* n = dynamic_cast<BouncingBallsNode*>(node)) return &n->useGlobalScale;
       if (auto* n = dynamic_cast<NoteCapturerNode*>(node)) return &n->useGlobalScale;
+      if (auto* n = dynamic_cast<KeyboardNode*>(node)) return &n->useGlobalScale;
       return nullptr;
    }
 
@@ -5060,6 +5067,9 @@ namespace
       // docs/plans/audio/P3a-notes-prompt.md; Part 2 adds Note Filter/
       // Modify/Echo/Router/Display and the Arpeggiator.
       REGISTER_NODE(MidiNotesNode, MIDI Notes, "Notes");
+      // The hardware-free note source: on-screen piano plus a QWERTY typing
+      // mapping, for playing/testing a patch with no MIDI controller at all.
+      REGISTER_NODE(KeyboardNode, Keyboard, "Notes");
       REGISTER_NODE(NoteFilterNode, Note Filter, "Notes");
       // The note-modification surface, one concern per node - see the class
       // comments on their declarations in NoteNodes.h.
@@ -16070,6 +16080,183 @@ namespace
       EndAudioBody();
    }
 
+   // Dedicated interactive piano for KeyboardNode - deliberately not shared
+   // with DrawMidiKeyboard, whose caller (DrawMidiNotesBody above) recentres
+   // lowNote from the last played note every frame. That recentering is
+   // exactly why clicking used to feel misaligned: the widget moved out from
+   // under an active click on the very next frame. This one takes a fixed
+   // lowNote and never moves, so what you see is always what you're pressing.
+   // Returns the note the mouse is currently over while the button is held
+   // (drag included), or -1 when nothing is pressed.
+   int DrawInteractiveKeyboard(const bool held[128], int lowNote, int octaves)
+   {
+      const float w = gAudioBodyW, h = 64.0f;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      static const int kWhiteOffsets[7] = { 0, 2, 4, 5, 7, 9, 11 };
+      static const int kBlackOffsets[5] = { 1, 3, 6, 8, 10 };
+      static const float kBlackSlot[5] = { 0.0f, 1.0f, 3.0f, 4.0f, 5.0f };
+
+      const int whiteCount = 7 * octaves;
+      const float keyW = (w - 4.0f) / (float)whiteCount;
+
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::InvisibleButton("##keyboardHit", ImVec2(w, h));
+      const bool active = ImGui::IsItemActive();
+      const ImVec2 mouse = ImGui::GetIO().MousePos;
+
+      int hitNote = -1;
+      if (active && mouse.x >= origin.x && mouse.x < br.x && mouse.y >= origin.y && mouse.y < br.y)
+      {
+         // Black keys sit visually on top, so test them first.
+         const float relY = mouse.y - origin.y;
+         if (relY < h * 0.62f)
+         {
+            for (int o = 0; o < octaves && hitNote < 0; o++)
+            {
+               for (int k = 0; k < 5; k++)
+               {
+                  const int note = lowNote + o * 12 + kBlackOffsets[k];
+                  const float x = origin.x + 2.0f + ((float)(o * 7) + kBlackSlot[k] + 1.0f) * keyW - keyW * 0.3f;
+                  if (mouse.x >= x && mouse.x < x + keyW * 0.6f)
+                  {
+                     hitNote = note;
+                     break;
+                  }
+               }
+            }
+         }
+         if (hitNote < 0)
+         {
+            const int col = std::clamp((int)((mouse.x - origin.x - 2.0f) / keyW), 0, whiteCount - 1);
+            hitNote = lowNote + (col / 7) * 12 + kWhiteOffsets[col % 7];
+         }
+      }
+
+      for (int o = 0; o < octaves; o++)
+      {
+         for (int k = 0; k < 7; k++)
+         {
+            const int note = lowNote + o * 12 + kWhiteOffsets[k];
+            const bool on = note >= 0 && note < 128 && held[note];
+            const float x = origin.x + 2.0f + (float)(o * 7 + k) * keyW;
+            const ImU32 whiteCol = on ? (isLight ? IM_COL32(50, 130, 245, 255) : IM_COL32(120, 200, 255, 245))
+                                      : (isLight ? IM_COL32(250, 250, 255, 255) : IM_COL32(206, 210, 222, 255));
+            dl->AddRectFilled(ImVec2(x + 0.5f, origin.y + 3.0f), ImVec2(x + keyW - 0.5f, br.y - 3.0f),
+                              whiteCol, 2.0f);
+         }
+      }
+      for (int o = 0; o < octaves; o++)
+      {
+         for (int k = 0; k < 5; k++)
+         {
+            const int note = lowNote + o * 12 + kBlackOffsets[k];
+            const bool on = note >= 0 && note < 128 && held[note];
+            const float x = origin.x + 2.0f + ((float)(o * 7) + kBlackSlot[k] + 1.0f) * keyW - keyW * 0.3f;
+            const ImU32 blackCol = on ? (isLight ? IM_COL32(30, 100, 230, 255) : IM_COL32(90, 170, 235, 255))
+                                      : (isLight ? IM_COL32(60, 65, 80, 255) : IM_COL32(26, 28, 36, 255));
+            dl->AddRectFilled(ImVec2(x, origin.y + 3.0f), ImVec2(x + keyW * 0.6f, origin.y + h * 0.62f),
+                              blackCol, 2.0f);
+         }
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      return hitNote;
+   }
+
+   struct TypingKey { ImGuiKey key; int semitone; };
+
+   // Logic Pro / GarageBand's "Musical Typing" layout - the de facto standard
+   // for playing a software instrument from a QWERTY keyboard. Two rows, each
+   // shaped like one octave of a real piano (letter row = white keys, row
+   // above = black keys sitting between the white keys they sharp), with the
+   // upper row exactly one octave above the lower.
+   static const TypingKey kTypingKeys[] = {
+      { ImGuiKey_Z, 0 }, { ImGuiKey_S, 1 }, { ImGuiKey_X, 2 }, { ImGuiKey_D, 3 },
+      { ImGuiKey_C, 4 }, { ImGuiKey_V, 5 }, { ImGuiKey_G, 6 }, { ImGuiKey_B, 7 },
+      { ImGuiKey_H, 8 }, { ImGuiKey_N, 9 }, { ImGuiKey_J, 10 }, { ImGuiKey_M, 11 },
+      { ImGuiKey_Comma, 12 }, { ImGuiKey_L, 13 }, { ImGuiKey_Period, 14 },
+      { ImGuiKey_Semicolon, 15 }, { ImGuiKey_Slash, 16 },
+      { ImGuiKey_Q, 12 }, { ImGuiKey_2, 13 }, { ImGuiKey_W, 14 }, { ImGuiKey_3, 15 },
+      { ImGuiKey_E, 16 }, { ImGuiKey_R, 17 }, { ImGuiKey_5, 18 }, { ImGuiKey_T, 19 },
+      { ImGuiKey_6, 20 }, { ImGuiKey_Y, 21 }, { ImGuiKey_7, 22 }, { ImGuiKey_U, 23 },
+      { ImGuiKey_I, 24 }, { ImGuiKey_9, 25 }, { ImGuiKey_O, 26 }, { ImGuiKey_0, 27 },
+      { ImGuiKey_P, 28 },
+   };
+
+   void DrawKeyboardBody(GraphNode& gn, KeyboardNode* n)
+   {
+      bool held[128];
+      n->HeldKeys(held);
+      const int last = n->LastNote();
+
+      static const char* kNoteNames[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+      char stat[64];
+      if (last >= 0)
+         snprintf(stat, sizeof(stat), "%s%d", kNoteNames[((last % 12) + 12) % 12], last / 12 - 1);
+      else
+         snprintf(stat, sizeof(stat), "click or type to play");
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      const int baseNote = (n->baseOctave + 1) * 12;
+      const int lowNote = std::clamp(baseNote, 0, 103);   // fixed - never recentres under an active click
+      const int hit = DrawInteractiveKeyboard(held, lowNote, 3);
+
+      if (hit != n->mMouseNote)
+      {
+         if (n->mMouseNote >= 0)
+            n->SetKeyState(n->mMouseNote, false);
+         if (hit >= 0)
+            n->SetKeyState(hit, true);
+         n->mMouseNote = hit;
+      }
+
+      const bool isHovered = ed::GetHoveredNode() == ed::NodeId(gn.NodeId());
+      for (const TypingKey& tk : kTypingKeys)
+      {
+         const int note = std::clamp(baseNote + tk.semitone, 0, 127);
+         // Release always processed, even off-hover, so a key held while the
+         // mouse leaves the node can't leave a note stuck on. Press requires
+         // hover + the toggle, so typing here doesn't hijack shortcuts
+         // elsewhere in the app.
+         if (ImGui::IsKeyReleased(tk.key))
+            n->SetKeyState(note, false);
+         else if (n->computerKeyboardEnabled && isHovered && !ImGui::GetIO().WantTextInput
+                  && ImGui::IsKeyPressed(tk.key, false))
+            n->SetKeyState(note, true);
+      }
+
+      ImGui::Dummy(ImVec2(0.0f, 5.0f));
+
+      {
+         AudioKnobRow row(3, kKnobLarge);
+         row.KnobInt("octave", &n->baseOctave, -1, 7, kKnobLarge);
+         row.KnobInt("transpose", &n->transpose, -24, 24, kKnobLarge);
+         row.Knob("velocity", &n->velocityScale, 0.0f, 2.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+      {
+         // Checkbox in the leftmost cell (P3), matching the 3-cell knob row
+         // above it (P1 corollary) with the rest deliberately skipped (P6) -
+         // the same "bottom left" shape as the other AudioEffects checkbox
+         // rows (e.g. DrawChorusBody's "analog" row).
+         AudioKnobRow row(3, 20.0f, 0.0f, false);
+         row.Checkbox("numpad##kbToggle", &n->computerKeyboardEnabled);
+         row.Skip();
+         row.Skip();
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
    const std::vector<std::string>& NoteNameList()
    {
       static std::vector<std::string> list = { "C", "C#", "D", "D#", "E", "F",
@@ -19193,7 +19380,7 @@ namespace
          row.Dropdown("table", WavetableNames(), table, [n](int i) {
             PushUndoCheckpoint();
             *n->ParamPtr("table") = (float)i;
-         }, WavetableCategories());
+         });
          row.Knob("position", n->ParamPtr("position"), 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("drive", n->ParamPtr("drive"), 0.0f, 24.0f, "%.1f dB", kKnobLarge);
          row.Knob("stereo", n->ParamPtr("stereo"), 0.0f, 1.0f, "%.2f", kKnobLarge);
@@ -21496,6 +21683,8 @@ namespace
          DrawAudioOutBody(gn, n);
       else if (auto* n = dynamic_cast<MidiNotesNode*>(gn.node.get()))
          DrawMidiNotesBody(gn, n);
+      else if (auto* n = dynamic_cast<KeyboardNode*>(gn.node.get()))
+         DrawKeyboardBody(gn, n);
       else if (auto* n = dynamic_cast<NoteFilterNode*>(gn.node.get()))
          DrawNoteFilterBody(gn, n);
       else if (auto* n = dynamic_cast<NoteTransposeNode*>(gn.node.get()))
@@ -28018,6 +28207,7 @@ namespace
          { "Cycle Shaper", "Replaces every wavecycle of the input with a clean geometric waveform (Sine, Square, Triangle) of the same period and peak amplitude. Timbre is rebuilt while pitch and rhythm survive. Latency is one wavecycle." },
          { "Spec Blur", "Streaming phase vocoder (N=2048, hop 512) that smears spectral magnitude in time. Transients dissolve into a harmonic cloud with tilt, phase diffusion and freeze. Latency is 42.7 ms (2048 samples); default mix is pinned at 1.0." },
          { "MIDI Notes", "Reads note events from a connected MIDI input device and outputs them as a note cable - the entry point for playing a synth or sampler from an external keyboard/controller." },
+         { "Keyboard", "A hardware-free note source: click-and-drag the on-screen piano, or hover the node and type on your laptop keyboard (Logic/GarageBand's Musical Typing layout - ZXCVBNM... is one octave, QWERTY... the octave above) to test a patch with no MIDI controller at all." },
          { "Note Transpose", "Shifts every incoming note's pitch by a fixed number of semitones." },
          { "Pitch Bend", "A hand-driven bend wheel, patched inline in the note chain like Note Transpose. Unlike a transpose (which can only re-pitch a note as it attacks), moving this knob slides every note currently held through it in real time - drag it while a chord rings and the chord bends, no need to route it onto a synth's own bend knob. Default range is +/-2 semitones, the standard wheel range." },
          { "Velocity Curve", "Reshapes incoming note velocity through a response curve (soft/linear/hard, or a custom curve) - the note-chain equivalent of a keybed velocity curve setting." },
@@ -28609,7 +28799,8 @@ namespace
                { "Gain, Mixer & Splitter", "Audio signal level adjustment with dB scaling, multi-channel audio mixer, and multi-channel signal splitter/router." },
             } },
             { "Notes", {
-               { "MIDI Notes", "Virtual MIDI keyboard, external hardware MIDI controller input, note record, and polyphonic voice dispatch." },
+               { "MIDI Notes", "External hardware MIDI controller input, note record, and polyphonic voice dispatch." },
+               { "Keyboard", "An interactive on-screen piano plus laptop-keyboard typing (Musical Typing layout) - the hardware-free way to play or test a patch." },
                { "Arpeggiator", "Tempo-synced arpeggiation patterns (Up, Down, Up/Down, Random, Chord, As-Played), octave span, and gate length." },
                { "Scale Notes & Quantizer", "Musical scale and mode snapping across the standard modes through Chromatic, with pitch quantizing." },
                { "Bouncing Balls", "Physics-based gravity bounce note generator (up to 12 balls, with speed, size, and range controls) creating organic rhythmic polyrhythms as balls hit walls." },
@@ -30252,6 +30443,8 @@ namespace
          gTargetFps = atoi(line.c_str());
       if (std::getline(file, line) && !line.empty())
          gVsync = (line != "0");
+      if (std::getline(file, line) && !line.empty())
+         gCheckerboardBackdrop = (line != "0");
    }
 
    void SaveGeneralSettings()
@@ -30261,7 +30454,8 @@ namespace
          return;
       std::ofstream file(path);
       file << (gAutosaveEnabled ? "1" : "0") << "\n" << gAutosaveSeconds << "\n"
-           << gTargetFps << "\n" << (gVsync ? "1" : "0") << "\n";
+           << gTargetFps << "\n" << (gVsync ? "1" : "0") << "\n"
+           << (gCheckerboardBackdrop ? "1" : "0") << "\n";
    }
 
    // One flat preference file for the Canvas & Workspace settings tab.
@@ -30920,6 +31114,19 @@ namespace
             {
                CategoryColors::SaveAppearanceOverrides();
             }
+
+            ImGui::Spacing();
+            // Transparency Backdrop
+            ImGui::SeparatorText("Transparency Backdrop");
+            static const char* kBackdropStyles[] = { "Checkerboard", "Solid Color" };
+            int backdropStyle = gCheckerboardBackdrop ? 0 : 1;
+            ImGui::SetNextItemWidth(200.0f);
+            if (ImGui::Combo("Preview Background", &backdropStyle, kBackdropStyles, IM_ARRAYSIZE(kBackdropStyles)))
+            {
+               gCheckerboardBackdrop = (backdropStyle == 0);
+               SaveGeneralSettings();
+            }
+            ImGui::TextWrapped("How node previews show transparent areas.");
 
             ImGui::EndTabItem();
          }
@@ -49924,6 +50131,7 @@ int main(int argc, char** argv)
                pluginFixture->LoadPlugin(fixturePlugin);
          }
          SpawnNode("Note Stack", "Notes", 4900.0f, 500.0f);             // 29
+         SpawnNode("Keyboard", "Notes", 5400.0f, 500.0f);               // 29b
          SpawnNode("Equation Synth", "Synths", 5400.0f, 20.0f);         // 30
          {
             // A tiny synthetic WAV, loaded immediately, so the visual smoke
@@ -67716,14 +67924,27 @@ int main(int argc, char** argv)
             }
             else
             {
-               if (ImGui::MenuItem("Enter Value"))
-                  BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, destRef->value, valueFmt, /*hasExpr=*/false);
-               if (ImGui::MenuItem("Enter Expression"))
-                  BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, destRef->value, valueFmt, /*hasExpr=*/true);
-               if (ImGui::MenuItem("Start Recording"))
+               // Enter Value/Expression and Start Recording only make sense
+               // for a continuous param being typed or dragged - a checkbox
+               // has nothing to type in or drag, so it only gets the
+               // performance-matrix entry.
+               const int perfKind = destRef->isBool ? 3 : (destRef->isEnum ? 7 : 0);
+               if (!destRef->isBool)
                {
-                  PushUndoCheckpoint();
-                  rec.ArmParam(nodeIndex, paramIndex);
+                  if (ImGui::MenuItem("Enter Value"))
+                     BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, destRef->value, valueFmt, /*hasExpr=*/false);
+               }
+               if (ImGui::MenuItem("Add to Performance Matrix"))
+                  AddToPerformanceMatrix(nodeIndex, paramIndex, perfKind);
+               if (!destRef->isBool)
+               {
+                  if (ImGui::MenuItem("Enter Expression"))
+                     BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, destRef->value, valueFmt, /*hasExpr=*/true);
+                  if (ImGui::MenuItem("Start Recording"))
+                  {
+                     PushUndoCheckpoint();
+                     rec.ArmParam(nodeIndex, paramIndex);
+                  }
                }
             }
          }

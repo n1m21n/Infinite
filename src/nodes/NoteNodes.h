@@ -33,6 +33,7 @@ class AudioNoteCapturerNode;
 class AudioBouncingBallsNode;
 class AudioStrumNode;
 class AudioNoteStackNode;
+class AudioKeyboardNode;
 
 // The system's note source: live MIDI in, turned into NoteEvents on the note
 // cable. Replaces the P3a Note Sequencer, whose fixed one-pitch step grid was
@@ -87,6 +88,65 @@ public:
 private:
    std::unique_ptr<AudioMidiNotesNode> mAudioNode;
    int mLastCookFrame = -1;
+};
+
+// A note source that needs no hardware at all: an on-screen piano you click
+// or drag, and a QWERTY typing-keyboard mapping (Logic/GarageBand's "Musical
+// Typing" layout - two keyboard rows, each shaped like an octave of a real
+// piano) for playing without a mouse. Where MIDI Notes reads Platform's
+// hardware note ring, this owns a private single-producer ring the UI thread
+// (clicks and key edges, both read on the main thread) writes and its own
+// AudioNode drains in ProcessBlock - see AudioKeyboardNode in NoteNodes.cpp.
+// Single producer by construction (only ever the main thread), so unlike
+// Platform's ring this needs no mutex.
+class KeyboardNode : public INode, public INoteSource
+{
+public:
+   static INode* Create() { return new KeyboardNode(); }
+   KeyboardNode();
+   ~KeyboardNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+   // Runs every block even unconnected, same reasoning as MidiNotesNode: the
+   // on-screen keyboard is meant to show what you just played before this
+   // node is patched into anything.
+   bool RequiresAudioProcessing() const override { return true; }
+
+   AudioNode* GetAudioNode() override;
+
+   int baseOctave = 3;               // -1..8; note/12-1 convention, so 3 = C3 under 'Z'
+   int transpose = 0;                // semitones applied to every note this node plays
+   float velocityScale = 1.0f;       // 0..2, applied to every note this node plays
+   bool computerKeyboardEnabled = true;
+   bool useGlobalScale = false;      // snap transposed output to global scale
+
+   // Main thread only: called once per frame from DrawKeyboardBody with the
+   // current physical/click state of every note this node can address, so it
+   // can diff against last frame and push exactly one on/off pair per edge
+   // into the audio node's ring.
+   void SetKeyState(int note, bool down);
+
+   // Main-thread view of what is currently held, for the inline keyboard -
+   // same shape as MidiNotesNode's, published by the audio thread as two
+   // atomics rather than 128 flags.
+   void HeldKeys(bool out[128]) const;
+   int LastNote() const;   // -1 if nothing has played yet
+
+   // Main-thread-only, owned by DrawKeyboardBody: the note currently held by
+   // mouse click/drag, -1 if none. Public because the UI needs to track it
+   // across frames the same way it owns baseOctave/computerKeyboardEnabled.
+   int mMouseNote = -1;
+
+private:
+   std::unique_ptr<AudioKeyboardNode> mAudioNode;
+   int mLastCookFrame = -1;
+   bool mKeyDown[128] = {};   // main-thread-only edge detection for SetKeyState
+   int mSoundingNote[128] = {};   // per-key: the transposed pitch its note-on used, so a
+                                  // transpose change mid-hold still note-offs the right voice
 };
 
 // Note pitch -> normalized modulation value, so a note stream can drive a

@@ -270,6 +270,157 @@ int MidiNotesNode::LastNote() const
    return mAudioNode ? mAudioNode->LastNote() : -1;
 }
 
+// ------------------------------------------------------------------ Keyboard
+class AudioKeyboardNode : public AudioNode
+{
+public:
+   void PrepareToPlay(double /*sampleRate*/, int /*maxBlockSize*/) override
+   {
+      mHeld[0].store(0, std::memory_order_relaxed);
+      mHeld[1].store(0, std::memory_order_relaxed);
+      mRingHead.store(0, std::memory_order_relaxed);
+      mRingTail.store(0, std::memory_order_relaxed);
+   }
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& /*output*/) override
+   {
+      // Single-producer (the UI thread, via PushKey) / single-consumer (this),
+      // so a plain relaxed-load/release-store pair is safe with no mutex -
+      // unlike Platform's hardware MIDI ring, nothing else ever writes here.
+      unsigned head = mRingHead.load(std::memory_order_relaxed);
+      const unsigned tail = mRingTail.load(std::memory_order_acquire);
+      while (head != tail)
+      {
+         const KeyEvent& e = mRing[head];
+         NoteEvent ev;
+         ev.note = e.note;
+         ev.velocity = e.velocity;
+         ev.isNoteOn = e.isNoteOn;
+         ev.frameOffset = 0;
+         ev.source = this;
+         if (e.isNoteOn)
+         {
+            ev.voiceId = NextVoiceId();
+            mActiveVoiceId[e.note] = ev.voiceId;
+         }
+         else
+         {
+            ev.voiceId = mActiveVoiceId[e.note];
+         }
+         mOutbox.Push(ev);
+         SetKeyBit(mHeld, e.note, e.isNoteOn);
+         if (e.isNoteOn)
+            mLastNote.store(e.note, std::memory_order_relaxed);
+         head = (head + 1) % kRingCapacity;
+      }
+      mRingHead.store(head, std::memory_order_release);
+   }
+
+   NoteEventQueue* NoteOutbox() override { return &mOutbox; }
+
+   // Main thread only (the producer side of the ring).
+   void PushKey(int note, float velocity01, bool isNoteOn)
+   {
+      const unsigned t = mRingTail.load(std::memory_order_relaxed);
+      const unsigned next = (t + 1) % kRingCapacity;
+      // Full: drop it. At most a couple of key edges per frame can ever be
+      // pending against a 128-entry ring drained every audio block.
+      if (next == mRingHead.load(std::memory_order_acquire))
+         return;
+      mRing[t] = { note, velocity01, isNoteOn };
+      mRingTail.store(next, std::memory_order_release);
+   }
+
+   uint64_t HeldWord(int w) const { return mHeld[w].load(std::memory_order_relaxed); }
+   int LastNote() const { return mLastNote.load(std::memory_order_relaxed); }
+
+private:
+   struct KeyEvent
+   {
+      int note;
+      float velocity;
+      bool isNoteOn;
+   };
+   static constexpr int kRingCapacity = 128;
+   KeyEvent mRing[kRingCapacity];
+   std::atomic<unsigned> mRingHead { 0 };   // consumer-owned (audio thread)
+   std::atomic<unsigned> mRingTail { 0 };   // producer-owned (main thread)
+
+   NoteEventQueue mOutbox;
+   int mActiveVoiceId[128] = {};
+   std::atomic<uint64_t> mHeld[2] { { 0 }, { 0 } };
+   std::atomic<int> mLastNote { -1 };
+};
+
+KeyboardNode::KeyboardNode() = default;
+KeyboardNode::~KeyboardNode() = default;
+
+void KeyboardNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioKeyboardNode>();
+}
+
+void KeyboardNode::VisitParams(ParamVisitor& v)
+{
+   v.Int("baseOctave", baseOctave);
+   v.Int("transpose", transpose);
+   v.Float("velocityScale", velocityScale);
+   v.Bool("computerKeyboardEnabled", computerKeyboardEnabled);
+   v.Bool("useGlobalScale", useGlobalScale);
+}
+
+AudioNode* KeyboardNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioKeyboardNode>();
+   return mAudioNode.get();
+}
+
+void KeyboardNode::SetKeyState(int note, bool down)
+{
+   if (note < 0 || note > 127 || mKeyDown[note] == down)
+      return;
+   mKeyDown[note] = down;
+   if (!mAudioNode)
+      return;
+   const float velocity = std::clamp(0.9f * velocityScale, 0.0f, 1.0f);
+   if (down)
+   {
+      // Transpose is captured at note-on so a knob move mid-hold can't send
+      // this key's note-off to a different pitch than the one it started.
+      int sounding = note + transpose;
+      if (useGlobalScale)
+         sounding = MusicTime::SnapToScale(sounding, Transport::Instance().Key(), Transport::Instance().Scale(), MusicTime::kSnapNearest);
+      sounding = std::clamp(sounding, 0, 127);
+      mSoundingNote[note] = sounding;
+      mAudioNode->PushKey(sounding, velocity, true);
+   }
+   else
+   {
+      mAudioNode->PushKey(mSoundingNote[note], velocity, false);
+   }
+}
+
+void KeyboardNode::HeldKeys(bool out[128]) const
+{
+   const uint64_t w0 = mAudioNode ? mAudioNode->HeldWord(0) : 0;
+   const uint64_t w1 = mAudioNode ? mAudioNode->HeldWord(1) : 0;
+   for (int i = 0; i < 64; i++)
+   {
+      out[i] = (w0 >> i) & 1ull;
+      out[i + 64] = (w1 >> i) & 1ull;
+   }
+}
+
+int KeyboardNode::LastNote() const
+{
+   return mAudioNode ? mAudioNode->LastNote() : -1;
+}
+
 // ---------------------------------------------------------------- Note to CV
 class AudioNoteToCVNode : public AudioNode
 {
