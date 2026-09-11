@@ -353,12 +353,21 @@ public:
    float anisotropyRotation = 0.0f;
    float dispersion = 0.0f;
    float alphaCutoff = 0.0f;
+   // How the albedo/roughness/metallic/normal/ao/emission/clearcoat/sheen
+   // maps sample outside 0..1 UV - 0=Clamp (smear edge pixel, matches every
+   // saved patch before this param existed), 1=Repeat, 2=Mirror.
+   int wrapMode = 0;
+   static const std::vector<std::string>& WrapModeNames()
+   {
+      static const std::vector<std::string> kNames = { "clamp", "repeat", "mirror" };
+      return kNames;
+   }
 
    void VisitParams(ParamVisitor& v) override
    {
       v.Color("color", color); v.Float("metallic", metallic);
       v.Float("roughness", roughness); v.Float("opacity", opacity);
-      v.Int("shading", shading);
+      v.Int("shading", shading); v.Int("wrapMode", wrapMode);
       v.Color("emissionColor", emissionColor); v.Float("emission", emission);
       v.Float("ior", ior); v.Float("transmission", transmission);
       v.Float("transmissionRoughness", transmissionRoughness);

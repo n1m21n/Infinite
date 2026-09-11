@@ -86,10 +86,17 @@ namespace
    // The filter is restored afterwards rather than left on: the owner keeps
    // drawing into level 0 without telling us, and leaving a mip filter on a
    // chain that is about to go stale would show up as blur in its own preview.
-   void PrepareSurfaceTexture()
+   // wrap defaults to GL_CLAMP_TO_EDGE, the FBO default every 2D node's
+   // texture is created with (GLUtil::EnsureFbo) - a MaterialNode overrides
+   // it via its wrapMode param so tiled UVs (a Mapping node's scale > 1, or
+   // a mesh authored with UVs outside 0..1) repeat/mirror instead of smearing
+   // the edge pixel.
+   void PrepareSurfaceTexture(GLenum wrap = GL_CLAMP_TO_EDGE)
    {
       glGenerateMipmap(GL_TEXTURE_2D);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap);
 
       static float sMaxAniso = -1.0f;
       if (sMaxAniso < 0.0f)
@@ -108,6 +115,23 @@ namespace
    void RestoreSurfaceTexture()
    {
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+   }
+
+   // Maps MaterialNode::wrapMode (0=Clamp, 1=Repeat, 2=Mirror) to the GL enum,
+   // falling back to Clamp when source isn't a MaterialNode (no wrap param).
+   GLenum SurfaceWrapMode(IGeometrySource* source)
+   {
+      auto* mat = dynamic_cast<MaterialNode*>(source);
+      if (!mat)
+         return GL_CLAMP_TO_EDGE;
+      switch (mat->wrapMode)
+      {
+      case 1: return GL_REPEAT;
+      case 2: return GL_MIRRORED_REPEAT;
+      default: return GL_CLAMP_TO_EDGE;
+      }
    }
 
    // Bound in place of a real surface texture when a geometry has none. Binding
@@ -1902,7 +1926,7 @@ void Render3DNode::CookIfNeeded(int frameId)
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, surface != 0 ? surface : WhiteTexture());
       if (surface != 0)
-         PrepareSurfaceTexture();
+         PrepareSurfaceTexture(SurfaceWrapMode(cloud));
       glUniform1i(glGetUniformLocation(mProgram, "uTexture"), 0);
       glUniform1i(glGetUniformLocation(mProgram, "uHasTexture"), surface != 0 ? 1 : 0);
       // Per-channel material maps (roughness/metallic/normal/ao) don't apply
@@ -2071,15 +2095,18 @@ void Render3DNode::CookIfNeeded(int frameId)
       const Material material = source->GetMaterial();
 
       const unsigned int surface = source->GetSurfaceTexture();
+      const GLenum wrapMode = SurfaceWrapMode(source);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, surface != 0 ? surface : WhiteTexture());
       if (surface != 0)
-         PrepareSurfaceTexture();
+         PrepareSurfaceTexture(wrapMode);
       glUniform1i(glGetUniformLocation(mProgram, "uTexture"), 0);
       glUniform1i(glGetUniformLocation(mProgram, "uHasTexture"), surface != 0 ? 1 : 0);
 
       // The remaining material channels. Units 0 and 1 are taken by albedo and
       // the shadow map, so these start at 2, and units 6 & 7 by env and sceneColor.
+      // Same wrap mode as albedo - a user tiling roughness/normal/etc. needs
+      // the other channels to repeat/mirror in lockstep, not just the swatch.
       {
          static const int kMapUnit[] = { 0, 2, 3, 4, 5, 8, 9, 10 };
          static const char* kMapUniform[] = { "uTexture", "uRoughnessMap", "uMetallicMap",
@@ -2094,6 +2121,11 @@ void Render3DNode::CookIfNeeded(int frameId)
             const int unit = kMapUnit[map];
             glActiveTexture(GL_TEXTURE0 + unit);
             glBindTexture(GL_TEXTURE_2D, tex != 0 ? tex : WhiteTexture());
+            if (tex != 0)
+            {
+               glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapMode);
+               glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapMode);
+            }
             glUniform1i(glGetUniformLocation(mProgram, kMapUniform[map]), unit);
             glUniform1i(glGetUniformLocation(mProgram, kHasUniform[map]), tex != 0 ? 1 : 0);
          }
@@ -2265,6 +2297,25 @@ void Render3DNode::CookIfNeeded(int frameId)
          mLastTriangles += gpu.indexCount / 3;
       }
       mLastDrawCalls++;
+
+      // Put the secondary maps' wrap mode back to the FBO default they were
+      // created with - same reasoning as RestoreSurfaceTexture below: these
+      // textures are owned by other nodes and must not be left mutated.
+      if (wrapMode != GL_CLAMP_TO_EDGE)
+      {
+         static const int kMapUnit[] = { 0, 2, 3, 4, 5, 8, 9, 10 };
+         for (int map = kMapRoughness; map < kMapCount; map++)
+         {
+            const unsigned int tex = source->GetMaterialTexture(map);
+            if (tex == 0)
+               continue;
+            glActiveTexture(GL_TEXTURE0 + kMapUnit[map]);
+            glBindTexture(GL_TEXTURE_2D, tex);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+         }
+         glActiveTexture(GL_TEXTURE0);
+      }
 
       if (surface != 0)
       {

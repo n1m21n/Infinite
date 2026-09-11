@@ -22120,6 +22120,7 @@ namespace
 
       NodeSeparator("surface", colW);
       DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; }, colW);
+      DropdownButton("wrap", MaterialNode::WrapModeNames(), n->wrapMode, [n](int i) { n->wrapMode = i; }, colW);
       ColorSwatch("colour", n->color, n);
       ModSlider("metallic", &n->metallic, 0.0f, 1.0f, "%.3f", colW);
       ModSlider("roughness", &n->roughness, 0.02f, 1.0f, "%.3f", colW);
