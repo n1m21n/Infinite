@@ -3309,9 +3309,9 @@ namespace
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
          }
          if (ImGui::IsItemActive() && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
-            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, ImGui::GetTime(), /*isNewGrab=*/justActivated);
+            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, GestureRecorder::Instance().ClockNow(), /*isNewGrab=*/justActivated);
          if (ImGui::IsItemDeactivated())
-            GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, ImGui::GetTime());
+            GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, GestureRecorder::Instance().ClockNow());
          const bool hovered = ImGui::IsItemHovered();
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
@@ -3389,9 +3389,9 @@ namespace
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
          }
          if (ImGui::IsItemActive() && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
-            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, ImGui::GetTime(), /*isNewGrab=*/justActivated);
+            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, GestureRecorder::Instance().ClockNow(), /*isNewGrab=*/justActivated);
          if (ImGui::IsItemDeactivated())
-            GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, ImGui::GetTime());
+            GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, GestureRecorder::Instance().ClockNow());
          // Double-click (or hovering and typing a digit/'='/etc below) still
          // opens the typed-entry field even while locked - that's a deliberate
          // "replace this" action, not an accidental grab, and its own commit
@@ -3537,9 +3537,9 @@ namespace
          }
       }
       if (active && gestureNodeIndex >= 0 && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(gestureNodeIndex, gestureParamIndex)))
-         GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, ImGui::GetTime(), /*isNewGrab=*/gestureJustActivated);
+         GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, GestureRecorder::Instance().ClockNow(), /*isNewGrab=*/gestureJustActivated);
       if (gestureNodeIndex >= 0 && ImGui::IsItemDeactivated())
-         GestureRecorder::Instance().MaybeFinishArmedRecording(gestureNodeIndex, gestureParamIndex, ImGui::GetTime());
+         GestureRecorder::Instance().MaybeFinishArmedRecording(gestureNodeIndex, gestureParamIndex, GestureRecorder::Instance().ClockNow());
       if (gestureNodeIndex >= 0 && GestureRecorder::Instance().IsRecording(gestureNodeIndex, gestureParamIndex))
          fillColor = IM_COL32(235, 70, 70, 255);
 
@@ -3926,9 +3926,9 @@ namespace
          }
       }
       if (active && gestureNodeIndex >= 0 && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(gestureNodeIndex, gestureParamIndex)))
-         GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, ImGui::GetTime(), /*isNewGrab=*/gestureJustActivated);
+         GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, GestureRecorder::Instance().ClockNow(), /*isNewGrab=*/gestureJustActivated);
       if (gestureNodeIndex >= 0 && ImGui::IsItemDeactivated())
-         GestureRecorder::Instance().MaybeFinishArmedRecording(gestureNodeIndex, gestureParamIndex, ImGui::GetTime());
+         GestureRecorder::Instance().MaybeFinishArmedRecording(gestureNodeIndex, gestureParamIndex, GestureRecorder::Instance().ClockNow());
       if (gestureNodeIndex >= 0 && GestureRecorder::Instance().IsRecording(gestureNodeIndex, gestureParamIndex))
          fillColor = IM_COL32(235, 70, 70, 255);
 
@@ -4345,9 +4345,9 @@ namespace
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
          }
          if (ImGui::IsItemActive() && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
-            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, ImGui::GetTime(), /*isNewGrab=*/justActivated);
+            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, GestureRecorder::Instance().ClockNow(), /*isNewGrab=*/justActivated);
          if (ImGui::IsItemDeactivated())
-            GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, ImGui::GetTime());
+            GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, GestureRecorder::Instance().ClockNow());
          const bool hovered = ImGui::IsItemHovered();
          // Double-click / hover-and-type below still opens the typed-entry
          // field even while locked - a deliberate "replace this" action, not
@@ -30836,12 +30836,14 @@ namespace
    // The clock GestureRecorder timestamps its samples with, read safely.
    // Undo/Redo are reachable before ImGui::CreateContext() - the headless
    // self-tests that exercise the undo stack (PERFMATRIXTEST) run from main()
-   // well before the context exists, and ImGui::GetTime() dereferences
-   // GImGui unconditionally. No context also means nothing can have recorded
-   // a gesture, so the value returned in that case is never actually read.
+   // well before the context exists. GestureRecorder::ClockNow() is just a
+   // stored double (see AdvanceClock) rather than ImGui::GetTime(), so it's
+   // safe to read with no context - it simply reads 0.0, and no context also
+   // means nothing can have recorded a gesture, so that value is never
+   // actually read.
    double GestureClockNow()
    {
-      return ImGui::GetCurrentContext() != nullptr ? ImGui::GetTime() : 0.0;
+      return GestureRecorder::Instance().ClockNow();
    }
 
    // Rewrites a snapshot's gesture keys from the indices that were live when
@@ -49374,11 +49376,13 @@ void ApplyModulationAndPalette(int frameId)
           modulation.HasExpression(ref.nodeIndex, ref.paramIndex))
          continue;
       float playbackValue = 0.0f;
-      // ImGui::GetTime(), not `t` above (Transport's own clock) - samples
-      // were timestamped with ImGui::GetTime() when recorded (see ModSlider/
-      // ModKnob/VFaderFloat/BipolarKnobFloat), so playback has to read the
-      // same clock back.
-      if (GestureRecorder::Instance().GetPlaybackValue(ref.nodeIndex, ref.paramIndex, ImGui::GetTime(), playbackValue))
+      // GestureRecorder's own clock, not `t` above (Transport's own clock) -
+      // samples were timestamped with GestureRecorder::ClockNow() when
+      // recorded (see ModSlider/ModKnob/VFaderFloat/BipolarKnobFloat), so
+      // playback has to read the same clock back. That clock only advances
+      // while Transport is playing (see AdvanceClock), so pausing freezes a
+      // looping recording in place instead of continuing to animate it.
+      if (GestureRecorder::Instance().GetPlaybackValue(ref.nodeIndex, ref.paramIndex, GestureRecorder::Instance().ClockNow(), playbackValue))
          *ref.value = ShapeToParam(ref, playbackValue);
    }
 
@@ -53984,7 +53988,11 @@ int main(int argc, char** argv)
       // Shift-held movement is the sole trigger for gesture recording - see
       // GestureRecorder.h. Checked once per frame here (not per-widget) so
       // every param touched while Shift stays down joins the same session.
-      GestureRecorder::Instance().BeginFrame(ImGui::GetIO().KeyShift, ImGui::GetTime());
+      // The clock itself only advances while Transport is playing, so
+      // pausing (spacebar) freezes a looping recording in place instead of
+      // letting it keep animating on wall-clock time - see AdvanceClock.
+      GestureRecorder::Instance().AdvanceClock(ImGui::GetIO().DeltaTime, Transport::Instance().IsPlaying());
+      GestureRecorder::Instance().BeginFrame(ImGui::GetIO().KeyShift, GestureRecorder::Instance().ClockNow());
       gGlobalScaleTooltipHovered = false;
 
       if (!gPendingSelect.empty())
