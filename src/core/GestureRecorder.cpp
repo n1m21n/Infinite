@@ -49,6 +49,12 @@ void GestureRecorder::BeginFrame(bool shiftHeld, double nowSec)
    }
 }
 
+void GestureRecorder::AdvanceClock(double deltaSeconds, bool playing)
+{
+   if (playing)
+      mClockSeconds += deltaSeconds;
+}
+
 void GestureRecorder::ArmParam(int nodeIndex, int paramIndex)
 {
    const Key key(nodeIndex, paramIndex);

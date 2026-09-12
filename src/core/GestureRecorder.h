@@ -33,6 +33,21 @@ public:
    // by this - they end on their own via MaybeFinishArmedRecording.
    void BeginFrame(bool shiftHeld, double nowSec);
 
+   // Advances the clock samples are timestamped with and played back
+   // against (see ClockNow) - call once per frame, right alongside
+   // BeginFrame, with the real frame delta and the global transport's play
+   // state. Only accumulates while `playing` is true, so a recording made
+   // before a pause holds still through it instead of continuing to
+   // advance on wall-clock time - the same freeze every other time-based
+   // modulator gets for free by reading Transport's own clock instead of
+   // ImGui::GetTime().
+   void AdvanceClock(double deltaSeconds, bool playing);
+
+   // The clock gesture samples are timestamped and replayed against - see
+   // AdvanceClock. Starts at 0 and never moves on its own, so it's safe to
+   // read before a frame (or an ImGui context) exists.
+   double ClockNow() const { return mClockSeconds; }
+
    // Arms exactly this one param for recording, independent of Shift. The
    // very next drag on it joins the session; releasing that drag finishes it
    // (see MaybeFinishArmedRecording) with no further action needed. Drops
@@ -181,6 +196,7 @@ private:
    // BeginFrame's Shift-release path and MaybeFinishArmedRecording.
    void FinalizeSession(const Key& key, double nowSec);
 
+   double mClockSeconds = 0.0;
    bool mShiftHeld = false;
    std::set<Key> mArmedParams;
    std::map<Key, std::vector<Sample>> mSession;
