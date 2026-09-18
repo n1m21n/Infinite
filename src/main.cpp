@@ -28501,11 +28501,19 @@ namespace
             break;
          case kArrangeDragTrimStart:
          case kArrangeDragTrimEnd:
-            Arrange::TrimEdge(gArrange, d.clipId, d.edge, value);
+            if (Arrange::TrimEdge(gArrange, d.clipId, d.edge, value) && d.edge == Arrange::kEdgeStart)
+               // A start trim moved this clip's sourceOffsetSeconds (see
+               // TrimEdge's own comment) - the same staleness Split leaves
+               // behind, so refresh the same way its call sites do.
+               ArrangeRefreshSampleStaticWave(d.clipId);
             d.appliedTick = value;
             break;
          case kArrangeDragGroupEdge:
-            Arrange::TrimGroupEdge(gArrange, d.groupId, d.edge, value);
+            if (Arrange::TrimGroupEdge(gArrange, d.groupId, d.edge, value) && d.edge == Arrange::kEdgeStart)
+               for (const Arrange::Lane& l : gArrange.lanes)
+                  for (const Arrange::Clip& c : l.clips)
+                     if (c.groupId == d.groupId)
+                        ArrangeRefreshSampleStaticWave(c.id);
             d.appliedTick = value;
             break;
          case kArrangeDragGroupScale:

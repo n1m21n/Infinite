@@ -530,6 +530,11 @@ bool TrimEdge(Model& m, uint64_t id, int edge, Tick tick)
       tick = std::clamp(tick, lo, hi);
       if (tick == c.start) return false;
       const Tick end = c.End();
+      // Audio-Sample-only: the trimmed-off portion is no longer played, so
+      // the source read-point must skip forward by the same amount, in
+      // seconds at the file's own assumed tempo (sampleBpm) - same formula
+      // Split uses for its right half (see Clip::sourceOffsetSeconds).
+      c.sourceOffsetSeconds += (float)TicksToSeconds(tick - c.start, c.sampleBpm);
       c.start = tick;
       c.length = end - tick;
    }
@@ -791,6 +796,8 @@ bool TrimGroupEdge(Model& m, uint64_t groupId, int edge, Tick tick)
             const Tick t = std::clamp(tick, lo, hi);
             if (t == c.start) continue;
             const Tick end = c.End();
+            // Same source-offset adjustment as TrimEdge's kEdgeStart branch.
+            c.sourceOffsetSeconds += (float)TicksToSeconds(t - c.start, c.sampleBpm);
             c.start = t;
             c.length = end - t;
          }
