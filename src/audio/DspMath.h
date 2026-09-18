@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 
@@ -464,4 +465,87 @@ namespace DspMath
          a2 = (float)(A2 / a0);
       }
    };
+
+   // ------------------------------------------------------------- Comb
+   // Feedback comb filter: y[n] = x[n] + g*y[n-M]. A single integer-sample
+   // delay line with feedback, tuned so the delay period M matches the
+   // comb's fundamental frequency (M = sampleRate / freq). Unlike TptSvf/
+   // Biquad this has genuine memory (up to ~50ms at 20 Hz), which is why no
+   // other filter type in this codebase needed one - LP/HP/BP/notch are all
+   // built from TptSvf, whose "state" is two single-sample integrators, not
+   // a delay buffer. Positive feedback reinforces every harmonic of the
+   // fundamental (the metallic Karplus-Strong ring); negative feedback
+   // flips alternate harmonics into cancellation, leaving only the odd
+   // ones (a hollower, clarinet-like comb).
+   struct CombFilter
+   {
+      // 20 Hz at up to 192 kHz needs 9600 samples of delay; round up with
+      // headroom so SetParams never has to clamp the low end of the shared
+      // filter cutoff range (20 Hz .. Nyquist) on any supported device rate.
+      static constexpr int kMaxDelay = 16384;
+
+      float buffer[kMaxDelay] = {};
+      int writePos = 0;
+      int delaySamples = 1;
+      float feedback = 0.0f; // signed: positive or negative polarity
+
+      void Reset()
+      {
+         std::fill(std::begin(buffer), std::end(buffer), 0.0f);
+         writePos = 0;
+      }
+
+      // freqHz sets the comb spacing (delay = 1/freqHz); feedbackAmount is
+      // 0..1 off the filter's resonance knob, clamped short of 1 so the
+      // loop can ring hard without ever diverging.
+      void SetParams(float freqHz, float feedbackAmount, bool negativePolarity, double sampleRate)
+      {
+         const float clampedFreq = std::clamp(freqHz, 20.0f, (float)(sampleRate * 0.5));
+         delaySamples = std::clamp((int)std::lround(sampleRate / clampedFreq), 1, kMaxDelay - 1);
+         const float g = std::clamp(feedbackAmount, 0.0f, 0.995f);
+         feedback = negativePolarity ? -g : g;
+      }
+
+      float Process(float in)
+      {
+         int readPos = writePos - delaySamples;
+         if (readPos < 0)
+            readPos += kMaxDelay;
+         const float delayed = buffer[readPos];
+         const float out = in + feedback * delayed;
+         buffer[writePos] = out;
+         writePos = (writePos + 1 == kMaxDelay) ? 0 : writePos + 1;
+         return out;
+      }
+   };
+
+   // Comb has no continuous-Q concept of its own, so every filter node that
+   // adds it repurposes its existing 0.1..18.0 "Q" knob as "how much ring" -
+   // the same way those knobs already repurpose "gain" as a no-op for LP/HP
+   // types. One shared mapping so every node's comb sounds the same at the
+   // same knob position.
+   inline float CombFeedbackFromQ(float q)
+   {
+      constexpr float kQMin = 0.1f, kQMax = 18.0f;
+      return std::clamp((q - kQMin) / (kQMax - kQMin), 0.0f, 1.0f) * 0.995f;
+   }
+
+   // Closed-form |H(e^jw)| of a feedback comb y[n] = x[n] + g*y[n-M], in dB:
+   // H(z) = 1 / (1 - g*z^-M), so |H(e^jw)|^2 = 1 / (1 - 2g*cos(wM) + g^2).
+   // Used by the filter-response-curve visualizers instead of rendering a
+   // settled sine through a scratch CombFilter (AudioFilterDsp::MagnitudeDb's
+   // approach for TptSvf/Biquad types) - a comb's memory is up to ~50ms, so
+   // settling one by brute force for every curve point would be far more
+   // expensive than this one-line formula.
+   inline float CombMagnitudeDb(float freqHz, float feedbackAmount, bool negativePolarity,
+                                 float evalHz, double sampleRate)
+   {
+      if (evalHz <= 0.0f || sampleRate <= 0.0 || freqHz <= 1.0f)
+         return 0.0f;
+      const float g = negativePolarity ? -feedbackAmount : feedbackAmount;
+      const int delaySamples = std::clamp((int)std::lround(sampleRate / (double)freqHz), 1, 1 << 20);
+      const double w = 2.0 * M_PI * (double)evalHz / sampleRate;
+      const double denom = 1.0 - 2.0 * (double)g * cos(w * (double)delaySamples) + (double)g * (double)g;
+      return (float)(-10.0 * log10(std::max(1e-9, denom)));
+   }
 }

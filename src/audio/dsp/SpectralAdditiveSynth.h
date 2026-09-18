@@ -45,15 +45,8 @@ namespace SpectralAdditiveDsp
       kScanCount
    };
 
-   enum FilterType
-   {
-      kFilterOff = 0,
-      kFilterLP12,
-      kFilterLP24,
-      kFilterHP12,
-      kFilterBP12,
-      kFilterCount
-   };
+   // Filter type is SynthModes::FilterType (audio/SynthModes.h) directly -
+   // see ImageSpectralSynthNode.h::filterType - not a node-local enum here.
 
    // RGBA Spectrogram Pixel Matrix
    struct SpectrogramMatrix

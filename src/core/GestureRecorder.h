@@ -33,20 +33,30 @@ public:
    // by this - they end on their own via MaybeFinishArmedRecording.
    void BeginFrame(bool shiftHeld, double nowSec);
 
-   // Advances the clock samples are timestamped with and played back
-   // against (see ClockNow) - call once per frame, right alongside
+   // Advances both gesture clocks - call once per frame, right alongside
    // BeginFrame, with the real frame delta and the global transport's play
-   // state. Only accumulates while `playing` is true, so a recording made
-   // before a pause holds still through it instead of continuing to
-   // advance on wall-clock time - the same freeze every other time-based
+   // state. ClockNow() only accumulates while `playing` is true, so a
+   // recording's playback holds still through a pause instead of continuing
+   // to advance on wall-clock time - the same freeze every other time-based
    // modulator gets for free by reading Transport's own clock instead of
-   // ImGui::GetTime().
+   // ImGui::GetTime(). RecordClockNow() always accumulates, so a fresh
+   // Shift-drag can still be captured while paused.
    void AdvanceClock(double deltaSeconds, bool playing);
 
-   // The clock gesture samples are timestamped and replayed against - see
-   // AdvanceClock. Starts at 0 and never moves on its own, so it's safe to
-   // read before a frame (or an ImGui context) exists.
+   // The clock gesture *playback* is driven against - see AdvanceClock.
+   // Starts at 0 and never moves on its own, so it's safe to read before a
+   // frame (or an ImGui context) exists.
    double ClockNow() const { return mClockSeconds; }
+
+   // The clock new gesture *samples* are timestamped with while recording -
+   // see AdvanceClock. Unlike ClockNow(), this always advances on real frame
+   // time regardless of the transport's play state: a Shift-drag has to
+   // capture the motion as it actually happens, even while paused, or every
+   // sample taken during a pause lands on the same instant and the whole
+   // drag collapses into a single frozen value with nothing to loop. Once
+   // finalized, the recorded trace replays against ClockNow() as before, so
+   // playback still freezes on pause - only the act of recording is exempt.
+   double RecordClockNow() const { return mRecordClockSeconds; }
 
    // Arms exactly this one param for recording, independent of Shift. The
    // very next drag on it joins the session; releasing that drag finishes it
@@ -196,6 +206,7 @@ private:
    void FinalizeSession(const Key& key, double nowSec);
 
    double mClockSeconds = 0.0;
+   double mRecordClockSeconds = 0.0;
    bool mShiftHeld = false;
    std::set<Key> mArmedParams;
    std::map<Key, std::vector<Sample>> mSession;

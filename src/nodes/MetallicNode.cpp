@@ -60,10 +60,11 @@ public:
    {
       mSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
       mMailbox.PrepareToPlay(mSampleRate);
-      mFilterL1.SetSampleRate(mSampleRate);
-      mFilterL2.SetSampleRate(mSampleRate);
-      mFilterR1.SetSampleRate(mSampleRate);
-      mFilterR2.SetSampleRate(mSampleRate);
+      for (int stage = 0; stage < SynthModes::kMaxFilterStages; stage++)
+      {
+         mFilterL[stage].SetSampleRate(mSampleRate);
+         mFilterR[stage].SetSampleRate(mSampleRate);
+      }
       Reset();
    }
 
@@ -71,10 +72,13 @@ public:
    {
       for (int v = 0; v < kMaxVoices; v++)
          mVoices[v].Reset();
-      mFilterL1.Reset();
-      mFilterL2.Reset();
-      mFilterR1.Reset();
-      mFilterR2.Reset();
+      for (int stage = 0; stage < SynthModes::kMaxFilterStages; stage++)
+      {
+         mFilterL[stage].Reset();
+         mFilterR[stage].Reset();
+      }
+      mCombL.Reset();
+      mCombR.Reset();
       mNextAge = 1;
       mFreeRunTriggerTimer = 0;
       mLastNoteHz = 0.0f;
@@ -261,10 +265,11 @@ public:
             const float driveAmount = mMailbox.SmoothedValue(kParamDrive);
             const float masterVol = mMailbox.SmoothedValue(kParamVolume);
 
-            mFilterL1.SetCutoff(cutoffHz, resQ);
-            mFilterL2.SetCutoff(cutoffHz, resQ);
-            mFilterR1.SetCutoff(cutoffHz, resQ);
-            mFilterR2.SetCutoff(cutoffHz, resQ);
+            for (int stage = 0; stage < SynthModes::kMaxFilterStages; stage++)
+            {
+               mFilterL[stage].SetCutoff(cutoffHz, resQ);
+               mFilterR[stage].SetCutoff(cutoffHz, resQ);
+            }
 
             float sL = 0.0f;
             float sR = 0.0f;
@@ -286,35 +291,41 @@ public:
             }
 
             // Master Shaping Filter
-            if (currentFilterType != MetallicDsp::kFilterOff)
+            const int synthFilterType = MetallicDsp::FilterModeToSynthType(currentFilterType);
+            if (SynthModes::IsCombFilter(synthFilterType))
             {
-               auto fOutL1 = mFilterL1.Process(sL);
-               auto fOutR1 = mFilterR1.Process(sR);
-
-               switch (currentFilterType)
+               // resQ above is already the SmoothedValue(kParamResonance) read
+               // for this sample, remapped 0..1 -> 0.5..10.0 Q - recovering the
+               // raw 0..1 here instead of calling SmoothedValue() again, which
+               // would double-advance that smoother's one-sample-per-call state.
+               const float rawResonance = std::clamp((resQ - 0.5f) / 8.0f, 0.0f, 1.0f);
+               const bool negative = SynthModes::CombIsNegative(synthFilterType);
+               mCombL.SetParams(cutoffHz, rawResonance, negative, mSampleRate);
+               mCombR.SetParams(cutoffHz, rawResonance, negative, mSampleRate);
+               sL = mCombL.Process(sL);
+               sR = mCombR.Process(sR);
+            }
+            const int stages = SynthModes::IsCombFilter(synthFilterType) ? 0 : SynthModes::FilterStages(synthFilterType);
+            if (stages > 0)
+            {
+               const int shape = SynthModes::FilterShapeOf(synthFilterType);
+               float* chans[2] = { &sL, &sR };
+               DspMath::TptSvf* filters[2] = { mFilterL, mFilterR };
+               for (int ch = 0; ch < 2; ch++)
                {
-               case MetallicDsp::kFilterLP12:
-                  sL = fOutL1.low;
-                  sR = fOutR1.low;
-                  break;
-               case MetallicDsp::kFilterLP24:
-               {
-                  auto fOutL2 = mFilterL2.Process(fOutL1.low);
-                  auto fOutR2 = mFilterR2.Process(fOutR1.low);
-                  sL = fOutL2.low;
-                  sR = fOutR2.low;
-                  break;
-               }
-               case MetallicDsp::kFilterHP12:
-                  sL = fOutL1.high;
-                  sR = fOutR1.high;
-                  break;
-               case MetallicDsp::kFilterBP:
-                  sL = fOutL1.band;
-                  sR = fOutR1.band;
-                  break;
-               default:
-                  break;
+                  float x = *chans[ch];
+                  for (int stage = 0; stage < stages; stage++)
+                  {
+                     const auto out = filters[ch][stage].Process(x);
+                     switch (shape)
+                     {
+                     case SynthModes::kShapeHigh:  x = out.high;  break;
+                     case SynthModes::kShapeBand:  x = out.band;  break;
+                     case SynthModes::kShapeNotch: x = out.notch; break;
+                     default:                      x = out.low;  break;
+                     }
+                  }
+                  *chans[ch] = x;
                }
             }
 
@@ -385,10 +396,10 @@ private:
    int mNoteCursor = -1;
    MeterRing mScopeRing;
 
-   DspMath::TptSvf mFilterL1;
-   DspMath::TptSvf mFilterL2;
-   DspMath::TptSvf mFilterR1;
-   DspMath::TptSvf mFilterR2;
+   DspMath::TptSvf mFilterL[SynthModes::kMaxFilterStages];
+   DspMath::TptSvf mFilterR[SynthModes::kMaxFilterStages];
+   DspMath::CombFilter mCombL;
+   DspMath::CombFilter mCombR;
 
    std::atomic<int> mMaterial{ MetallicDsp::kSteel };
    std::atomic<int> mOctave{ 0 };

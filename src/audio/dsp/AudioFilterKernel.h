@@ -30,6 +30,7 @@ namespace AudioFilterDsp
       kLP12 = 0, kLP24, kLP36,
       kHP12, kHP24, kHP36,
       kBP, kNotch, kLowShelf, kHighShelf, kPeak, kAllpass,
+      kCombPos, kCombNeg,
       kNumFilterTypes
    };
 
@@ -38,7 +39,8 @@ namespace AudioFilterDsp
       static const char* const kNames[kNumFilterTypes] = {
          "lp 12", "lp 24", "lp 36",
          "hp 12", "hp 24", "hp 36",
-         "bp", "notch", "low shelf", "high shelf", "peak", "all-pass"
+         "bp", "notch", "low shelf", "high shelf", "peak", "all-pass",
+         "comb +", "comb -"
       };
       return kNames;
    }
@@ -74,6 +76,8 @@ namespace AudioFilterDsp
    inline bool IsSvf(int type) { return SvfStageCount(type) > 0; }
    inline bool IsHighpass(int type) { return type == kHP12 || type == kHP24 || type == kHP36; }
    inline bool UsesGain(int type) { return type == kLowShelf || type == kHighShelf || type == kPeak; }
+   inline bool IsComb(int type) { return type == kCombPos || type == kCombNeg; }
+   inline bool CombIsNegative(int type) { return type == kCombNeg; }
 
    // Configures a scratch Biquad for one of the non-SVF types. Shared by the
    // kernel's main-thread coefficient push and by MagnitudeDb below, so the
@@ -104,6 +108,12 @@ namespace AudioFilterDsp
    {
       if (evalHz <= 0.0f || sampleRate <= 0.0)
          return 0.0f;
+
+      if (IsComb(type))
+      {
+         return DspMath::CombMagnitudeDb(freqHz, DspMath::CombFeedbackFromQ(q), CombIsNegative(type),
+                                          evalHz, sampleRate);
+      }
 
       const double periodSamples = std::max(4.0, sampleRate / (double)evalHz);
       // Settling time depends on the *filter's* cutoff/Q, not on evalHz - a
@@ -215,6 +225,8 @@ public:
             svf.Reset();
       for (auto& bq : mBiquad)
          bq.Reset();
+      for (auto& comb : mComb)
+         comb.Reset();
       mLfoPhase = 0.0;
       mBiquadFreqSlew = 1000.0f;
    }
@@ -255,6 +267,31 @@ public:
             mLfoPhase -= floor(mLfoPhase);
          const float lfoOut = sinf(2.0f * (float)M_PI * (float)mLfoPhase);
          lastLfoOut = lfoOut;
+
+         // Comb has no biquad/SVF coefficients to precompute - it's a delay
+         // line with feedback, so it always reads its raw freq/Q slots
+         // itself and skips the coeffs block below entirely.
+         if (AudioFilterDsp::IsComb(type))
+         {
+            const float freq = mMailbox.SmoothedValue(kFreqSlot);
+            const float q = mMailbox.SmoothedValue(kQSlot);
+            float freqMod = freq;
+            if (envActive)
+            {
+               const float totalOctaves = envAmount * lfoOut * 4.0f;
+               freqMod = std::clamp(freq * powf(2.0f, totalOctaves), 20.0f, (float)mSampleRate * 0.45f);
+            }
+            const bool negative = AudioFilterDsp::CombIsNegative(type);
+            const float fbAmount = DspMath::CombFeedbackFromQ(q);
+            const float outputGain = DspMath::DbToLinear(mMailbox.SmoothedValue(kOutputGainSlot));
+            for (int ch = 0; ch < numChannels; ch++)
+            {
+               mComb[ch].SetParams(freqMod, fbAmount, negative, mSampleRate);
+               const float s = in.channels[ch][i] + 1.0e-20f;
+               out.channels[ch][i] = mComb[ch].Process(s) * outputGain;
+            }
+            continue;
+         }
 
          float coeffs[kStages][kCoeffsPerStage];
          if (!envActive)
@@ -397,6 +434,7 @@ private:
 
    DspMath::TptSvf mSvf[kStages][kMaxChannels];
    DspMath::Biquad mBiquad[kMaxChannels];
+   DspMath::CombFilter mComb[kMaxChannels];
    // Free-running sweep LFO phase, 0..1 - see the `envAmount`/kRateSlot
    // comments above.
    double mLfoPhase = 0.0;

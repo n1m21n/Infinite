@@ -53,6 +53,7 @@ void GestureRecorder::AdvanceClock(double deltaSeconds, bool playing)
 {
    if (playing)
       mClockSeconds += deltaSeconds;
+   mRecordClockSeconds += deltaSeconds;
 }
 
 void GestureRecorder::ArmParam(int nodeIndex, int paramIndex)

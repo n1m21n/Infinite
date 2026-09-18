@@ -40,15 +40,12 @@ namespace
       "64 Partials", "128 Partials", "256 Partials"
    };
 
-   // Index order is fixed by filterType's serialization (0..4 == Off, LP12,
-   // LP24, HP12, BP12, matching SpectralAdditiveDsp::FilterType) - see
-   // ImageSpectralSynthNode.h. Only the strings come from the canonical list
-   // (SynthModes::FilterNames), and only via this subset call, so this can't
-   // drift from the app-wide spelling again.
-   const std::vector<std::string> kFilterNames = SynthModes::FilterTypeSubset({
-      SynthModes::kFilterOff, SynthModes::kFilterLP12, SynthModes::kFilterLP24,
-      SynthModes::kFilterHP12, SynthModes::kFilterBP12
-   });
+   // filterType is stored as SynthModes::FilterType directly (same
+   // convention as WavetableNode/OscillatorNode's engine.filterType) rather
+   // than SpectralAdditiveDsp's old node-local subset, so this synth gets
+   // every slope/shape the app defines - LP/HP at 12/24/36 dB, BP12/24,
+   // notch12/24 - not just the five that used to be hand-picked here.
+   const std::vector<std::string>& kFilterNames = SynthModes::FilterTypeList();
 
    inline float MidiNoteToHz(int midiNote)
    {
@@ -194,13 +191,15 @@ public:
       {
          mVoices[v].ampEnv.SetSampleRate(mSampleRate);
       }
-      for (int stage = 0; stage < 2; stage++)
+      for (int stage = 0; stage < SynthModes::kMaxFilterStages; stage++)
       {
          mFilterL[stage].SetSampleRate(mSampleRate);
          mFilterL[stage].Reset();
          mFilterR[stage].SetSampleRate(mSampleRate);
          mFilterR[stage].Reset();
       }
+      mCombL.Reset();
+      mCombR.Reset();
 
       const int allocSize = std::max(maxBlockSize, 4096);
       mBlockL.resize(allocSize, 0.0f);
@@ -680,15 +679,21 @@ public:
       float panL = 1.0f, panR = 1.0f;
       DspMath::EqualPowerPan(pan, panL, panR);
 
-      if (filterType != SpectralAdditiveDsp::kFilterOff)
+      const bool isComb = SynthModes::IsCombFilter(filterType);
+      const int filterStages = isComb ? 0 : SynthModes::FilterStages(filterType);
+      const int filterShape = SynthModes::FilterShapeOf(filterType);
+      if (isComb)
+      {
+         mCombL.SetParams(cutoff, resonance, SynthModes::CombIsNegative(filterType), mSampleRate);
+         mCombR.SetParams(cutoff, resonance, SynthModes::CombIsNegative(filterType), mSampleRate);
+      }
+      else if (filterStages > 0)
       {
          const float q = 0.5f + resonance * 9.5f;
-         mFilterL[0].SetCutoff(cutoff, q);
-         mFilterR[0].SetCutoff(cutoff, q);
-         if (filterType == SpectralAdditiveDsp::kFilterLP24)
+         for (int s = 0; s < filterStages; s++)
          {
-            mFilterL[1].SetCutoff(cutoff, q);
-            mFilterR[1].SetCutoff(cutoff, q);
+            mFilterL[s].SetCutoff(cutoff, q);
+            mFilterR[s].SetCutoff(cutoff, q);
          }
       }
 
@@ -709,34 +714,24 @@ public:
          }
 
          // Filter
-         if (filterType != SpectralAdditiveDsp::kFilterOff)
+         if (isComb)
          {
-            auto outFltL = mFilterL[0].Process(sL);
-            auto outFltR = mFilterR[0].Process(sR);
-
-            switch (filterType)
+            sL = mCombL.Process(sL);
+            sR = mCombR.Process(sR);
+         }
+         else if (filterStages > 0)
+         {
+            for (int s = 0; s < filterStages; s++)
             {
-               case SpectralAdditiveDsp::kFilterLP12:
-                  sL = outFltL.low;
-                  sR = outFltR.low;
-                  break;
-               case SpectralAdditiveDsp::kFilterLP24:
+               const auto outFltL = mFilterL[s].Process(sL);
+               const auto outFltR = mFilterR[s].Process(sR);
+               switch (filterShape)
                {
-                  auto outFltL2 = mFilterL[1].Process(outFltL.low);
-                  auto outFltR2 = mFilterR[1].Process(outFltR.low);
-                  sL = outFltL2.low;
-                  sR = outFltR2.low;
-                  break;
+                  case SynthModes::kShapeHigh:  sL = outFltL.high;  sR = outFltR.high;  break;
+                  case SynthModes::kShapeBand:  sL = outFltL.band;  sR = outFltR.band;  break;
+                  case SynthModes::kShapeNotch: sL = outFltL.notch; sR = outFltR.notch; break;
+                  default:                      sL = outFltL.low;  sR = outFltR.low;   break;
                }
-               case SpectralAdditiveDsp::kFilterHP12:
-                  sL = outFltL.high;
-                  sR = outFltR.high;
-                  break;
-               case SpectralAdditiveDsp::kFilterBP12:
-                  sL = outFltL.band;
-                  sR = outFltR.band;
-                  break;
-               default: break;
             }
          }
 
@@ -818,7 +813,7 @@ private:
    std::atomic<int> mSemi { 0 };
    std::atomic<int> mUnison { 1 };
    std::atomic<float> mDetune { 8.0f };
-   std::atomic<int> mFilterType { SpectralAdditiveDsp::kFilterLP12 };
+   std::atomic<int> mFilterType { SynthModes::kFilterLP12 };
    std::atomic<bool> mTriggerScan { false };
    std::atomic<bool> mPerVoiceScan { false };
    int mLastTriggeredVoice = -1;
@@ -835,8 +830,10 @@ private:
    uint64_t mAgeCounter = 0;
    std::atomic<int> mActiveVoices { 0 };
 
-   DspMath::TptSvf mFilterL[2];
-   DspMath::TptSvf mFilterR[2];
+   DspMath::TptSvf mFilterL[SynthModes::kMaxFilterStages];
+   DspMath::TptSvf mFilterR[SynthModes::kMaxFilterStages];
+   DspMath::CombFilter mCombL;
+   DspMath::CombFilter mCombR;
 
    std::vector<float> mBlockL;
    std::vector<float> mBlockR;

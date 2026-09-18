@@ -62,6 +62,16 @@ namespace MetallicDsp
       return list;
    }
 
+   // The first five values (LP12, LP24, HP12, BP, Off) are what filterType
+   // has always been serialized as (see MetallicNode.h::filterType) and
+   // can't be reordered or reused without silently rewriting every saved
+   // patch's filter mode. The other synths' filter menus (Wavetable,
+   // Oscillator, EquationNode, ImageSpectralSynthNode, WaveTerrainNode) all
+   // expose the full LP/HP-12/24/36, BP12/24, notch12/24 set from
+   // SynthModes; Metallic only had 4 of those 10 shapes plus off. The
+   // remaining six are appended after kFilterOff instead of interleaved, so
+   // every existing saved int keeps its old meaning and only brand-new
+   // selections can produce the new values.
    enum FilterMode
    {
       kFilterLP12 = 0,
@@ -69,37 +79,74 @@ namespace MetallicDsp
       kFilterHP12,
       kFilterBP,
       kFilterOff,
+      kFilterLP36,
+      kFilterHP24,
+      kFilterHP36,
+      kFilterBP24,
+      kFilterNotch12,
+      kFilterNotch24,
+      kFilterCombPos,
+      kFilterCombNeg,
       kNumFilterModes
    };
 
-   // Index order here is FilterMode's own enum order (LP12, LP24, HP12, BP,
-   // Off) - not the canonical list's order (Off first) - because filterType
-   // is serialized as this enum's int value directly (see
-   // MetallicNode.h::filterType) and reordering would silently rewrite every
-   // saved patch's filter mode. Only the spellings are migrated, one-to-one
-   // with SynthModes::FilterName, to the app-wide canonical strings.
-   inline const char* const* FilterModeNames()
+   // FilterModeDisplayList() is the canonical off-first order and canonical
+   // spelling shared with every other synth's filter dropdown
+   // (SynthModes::FilterTypeList()); the two Translate functions below
+   // convert to and from the untouched, historically-ordered storage enum
+   // above so the UI can read the canonical order without migrating
+   // anything on disk.
+   inline const std::vector<std::string>& FilterModeDisplayList()
    {
-      static const char* const kNames[kNumFilterModes] = {
-         SynthModes::FilterName(SynthModes::kFilterLP12),
-         SynthModes::FilterName(SynthModes::kFilterLP24),
-         SynthModes::FilterName(SynthModes::kFilterHP12),
-         SynthModes::FilterName(SynthModes::kFilterBP12),
-         SynthModes::FilterName(SynthModes::kFilterOff)
-      };
-      return kNames;
+      return SynthModes::FilterTypeList();
    }
 
-   inline const std::vector<std::string>& FilterModeList()
+   inline int FilterModeToDisplayIndex(int stored)
    {
-      static std::vector<std::string> list;
-      if (list.empty())
+      switch (stored)
       {
-         for (int i = 0; i < kNumFilterModes; i++)
-            list.push_back(FilterModeNames()[i]);
+      case kFilterOff:     return SynthModes::kFilterOff;
+      case kFilterLP12:    return SynthModes::kFilterLP12;
+      case kFilterLP24:    return SynthModes::kFilterLP24;
+      case kFilterLP36:    return SynthModes::kFilterLP36;
+      case kFilterHP12:    return SynthModes::kFilterHP12;
+      case kFilterHP24:    return SynthModes::kFilterHP24;
+      case kFilterHP36:    return SynthModes::kFilterHP36;
+      case kFilterBP:      return SynthModes::kFilterBP12;
+      case kFilterBP24:    return SynthModes::kFilterBP24;
+      case kFilterNotch12: return SynthModes::kFilterNotch12;
+      case kFilterNotch24: return SynthModes::kFilterNotch24;
+      case kFilterCombPos: return SynthModes::kFilterCombPos;
+      case kFilterCombNeg: return SynthModes::kFilterCombNeg;
+      default:             return SynthModes::kFilterOff;
       }
-      return list;
    }
+
+   inline int DisplayIndexToFilterMode(int display)
+   {
+      switch (display)
+      {
+      case SynthModes::kFilterLP12:    return kFilterLP12;
+      case SynthModes::kFilterLP24:    return kFilterLP24;
+      case SynthModes::kFilterLP36:    return kFilterLP36;
+      case SynthModes::kFilterHP12:    return kFilterHP12;
+      case SynthModes::kFilterHP24:    return kFilterHP24;
+      case SynthModes::kFilterHP36:    return kFilterHP36;
+      case SynthModes::kFilterBP12:    return kFilterBP;
+      case SynthModes::kFilterBP24:    return kFilterBP24;
+      case SynthModes::kFilterNotch12: return kFilterNotch12;
+      case SynthModes::kFilterNotch24: return kFilterNotch24;
+      case SynthModes::kFilterCombPos: return kFilterCombPos;
+      case SynthModes::kFilterCombNeg: return kFilterCombNeg;
+      default:                         return kFilterOff;
+      }
+   }
+
+   // Storage enum -> canonical SynthModes::FilterType, for DSP code that
+   // wants to drive the shared FilterStages()/FilterShapeOf() cascade logic
+   // instead of hand-rolling its own per-mode switch (see
+   // AudioMetallicNode::ProcessBlock in MetallicNode.cpp).
+   inline int FilterModeToSynthType(int stored) { return FilterModeToDisplayIndex(stored); }
 
    constexpr int kNumModes = 12;
    constexpr int kMaxDelaySamples = 4096;
@@ -349,7 +396,26 @@ namespace MetallicDsp
 
          targetA1 = 2.0f * r * cosf(w);
          targetA2 = -r * r;
-         targetGain = inBand ? (1.0f - r) * amplitude : 0.0f;
+         // This is an all-pole resonator (H(z) = gain / (1 - a1 z^-1 - a2
+         // z^-2), no zero) struck once by the mallet's impulse-like burst,
+         // not a peak/EQ filter fed a continuous tone - so it must be
+         // normalized for its *impulse-response peak*, not for unity
+         // steady-state gain. The closed-form impulse response is
+         // h[n] = gain * r^n * sin((n+1)w) / sin(w), which peaks near
+         // gain / sin(w) whenever the ring time is long next to one cycle
+         // (true here down to the shortest decay/highest mode this bank
+         // reaches). `gain = (1 - r) * amplitude` was the continuous-input
+         // normalization instead: it collapses toward zero as r -> 1 (long
+         // decay), so every mode got quieter the longer it was told to
+         // ring, and low modes - whose small `w` shrinks sin(w) - lost the
+         // most. That produced both reported symptoms at once: overall
+         // level well under the other synth/note nodes, and a "6 s decay"
+         // that reads as silence long before 6 s because the strike never
+         // had enough amplitude to stay above the noise floor for it.
+         // `gain = amplitude * sin(w)` cancels the peak's own 1/sin(w) and
+         // is independent of r, matching a struck material where a longer
+         // natural ring isn't a quieter strike.
+         targetGain = inBand ? amplitude * sinf(w) : 0.0f;
 
          DspMath::EqualPowerPan(pan, targetPanL, targetPanR);
       }

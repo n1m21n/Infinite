@@ -3748,7 +3748,7 @@ namespace
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
          }
          if (ImGui::IsItemActive() && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
-            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, GestureRecorder::Instance().ClockNow(), /*isNewGrab=*/justActivated);
+            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, GestureRecorder::Instance().RecordClockNow(), /*isNewGrab=*/justActivated);
          if (ImGui::IsItemDeactivated())
             GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, GestureRecorder::Instance().ClockNow());
          const bool hovered = ImGui::IsItemHovered();
@@ -3828,7 +3828,7 @@ namespace
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
          }
          if (ImGui::IsItemActive() && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
-            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, GestureRecorder::Instance().ClockNow(), /*isNewGrab=*/justActivated);
+            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, GestureRecorder::Instance().RecordClockNow(), /*isNewGrab=*/justActivated);
          if (ImGui::IsItemDeactivated())
             GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, GestureRecorder::Instance().ClockNow());
          // Double-click (or hovering and typing a digit/'='/etc below) still
@@ -3986,7 +3986,7 @@ namespace
          }
       }
       if (active && gestureNodeIndex >= 0 && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(gestureNodeIndex, gestureParamIndex)))
-         GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, GestureRecorder::Instance().ClockNow(), /*isNewGrab=*/gestureJustActivated);
+         GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, GestureRecorder::Instance().RecordClockNow(), /*isNewGrab=*/gestureJustActivated);
       if (gestureNodeIndex >= 0 && ImGui::IsItemDeactivated())
          GestureRecorder::Instance().MaybeFinishArmedRecording(gestureNodeIndex, gestureParamIndex, GestureRecorder::Instance().ClockNow());
       if (gestureNodeIndex >= 0 && GestureRecorder::Instance().IsRecording(gestureNodeIndex, gestureParamIndex))
@@ -4375,7 +4375,7 @@ namespace
          }
       }
       if (active && gestureNodeIndex >= 0 && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(gestureNodeIndex, gestureParamIndex)))
-         GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, GestureRecorder::Instance().ClockNow(), /*isNewGrab=*/gestureJustActivated);
+         GestureRecorder::Instance().NotifyMovement(gestureNodeIndex, gestureParamIndex, *value, GestureRecorder::Instance().RecordClockNow(), /*isNewGrab=*/gestureJustActivated);
       if (gestureNodeIndex >= 0 && ImGui::IsItemDeactivated())
          GestureRecorder::Instance().MaybeFinishArmedRecording(gestureNodeIndex, gestureParamIndex, GestureRecorder::Instance().ClockNow());
       if (gestureNodeIndex >= 0 && GestureRecorder::Instance().IsRecording(gestureNodeIndex, gestureParamIndex))
@@ -4794,7 +4794,7 @@ namespace
             GestureRecorder::Instance().StopPlayback(nodeIndex, paramIndex);
          }
          if (ImGui::IsItemActive() && (ImGui::GetIO().KeyShift || GestureRecorder::Instance().IsArmed(nodeIndex, paramIndex)))
-            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, GestureRecorder::Instance().ClockNow(), /*isNewGrab=*/justActivated);
+            GestureRecorder::Instance().NotifyMovement(nodeIndex, paramIndex, *value, GestureRecorder::Instance().RecordClockNow(), /*isNewGrab=*/justActivated);
          if (ImGui::IsItemDeactivated())
             GestureRecorder::Instance().MaybeFinishArmedRecording(nodeIndex, paramIndex, GestureRecorder::Instance().ClockNow());
          const bool hovered = ImGui::IsItemHovered();
@@ -13311,8 +13311,9 @@ namespace
          const bool filterOff = (n->filterType == MetallicDsp::kFilterOff);
          AudioKnobRow row(4, kKnobLarge, ImGui::GetFrameHeight() + 5.0f);
 
-         row.DropdownKnob("metalFilter", MetallicDsp::FilterModeList(), n->filterType,
-                          [n](int i) { PushUndoCheckpoint(); n->filterType = i; },
+         row.DropdownKnob("metalFilter", MetallicDsp::FilterModeDisplayList(),
+                          MetallicDsp::FilterModeToDisplayIndex(n->filterType),
+                          [n](int displayIdx) { PushUndoCheckpoint(); n->filterType = MetallicDsp::DisplayIndexToFilterMode(displayIdx); },
                           "filter", &n->filterCutoff, 20.0f, 18000.0f, "%.0f Hz", filterOff);
          row.Knob("reso", &n->filterResonance, 0.0f, 1.0f, "%.2f");
          row.Knob("drive", &n->drive, 0.0f, 1.0f, "%.2f");
@@ -50794,7 +50795,7 @@ static bool RunImageSpectralSynthFixture()
 
    // 6. Test LP24 vs LP12 Filter Steeper Roll-off
    specNode.unison = 1;
-   specNode.filterType = SpectralAdditiveDsp::kFilterLP12;
+   specNode.filterType = SynthModes::kFilterLP12;
    specNode.cutoff = 400.0f;
    specNode.resonance = 0.0f;
    specNode.PushParams();
@@ -50807,7 +50808,7 @@ static bool RunImageSpectralSynthFixture()
          rmsLP12 += bufL[i] * bufL[i];
    }
 
-   specNode.filterType = SpectralAdditiveDsp::kFilterLP24;
+   specNode.filterType = SynthModes::kFilterLP24;
    specNode.PushParams();
 
    float rmsLP24 = 0.0f;
@@ -50906,7 +50907,7 @@ static bool RunImageSpectralSynthFixture()
       paramNode.scanMode = SpectralAdditiveDsp::kScanManual;
       paramNode.position = 0.5f; // frozen scan position - only `pan` changes below
       paramNode.volume = 0.6f;
-      paramNode.filterType = SpectralAdditiveDsp::kFilterOff;
+      paramNode.filterType = SynthModes::kFilterOff;
       paramNode.stereoWidth = 0.0f; // no inherent L/R phase decorrelation - isolate pan alone
       paramNode.pan = 0.0f; // centered
       paramNode.PushParams(); // the constructor pushed the pre-assignment defaults; push again now that the fields above are set

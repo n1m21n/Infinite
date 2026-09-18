@@ -1,5 +1,69 @@
 [
   {
+    "hash": "60a7bbef3f3be56df98d7b4189ce8ec652b42e87",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 17 15:59:03 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "field-pixel",
+      "title": "feat(field-pixel): add spiral illusion, bouncing-boxes, and organic liquid presets",
+      "description": "add spiral illusion, bouncing-boxes, and organic liquid presets",
+      "bullets": [],
+      "body": "Three new FieldPixelNode presets built this session: a black/white spiral\nfeedback illusion (state offset-read along the spiral arm), a 9-box\ncollision sim (1 stateful physics box + 8 analytic Lissajous boxes, within\nthe 4-scalar-float pixel state budget), and a triple domain-warp organic\nliquid effect with an IQ cosine palette. Also records the pixel-state\nscalar-only limitation and the image-input fixed-uv sampling gap found\nwhile debugging these in field-pixel-presets/SKILL.md.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "feat(field-pixel): add spiral illusion, bouncing-boxes, and organic liquid presets\n\nThree new FieldPixelNode presets built this session: a black/white spiral\nfeedback illusion (state offset-read along the spiral arm), a 9-box\ncollision sim (1 stateful physics box + 8 analytic Lissajous boxes, within\nthe 4-scalar-float pixel state budget), and a triple domain-warp organic\nliquid effect with an IQ cosine palette. Also records the pixel-state\nscalar-only limitation and the image-input fixed-uv sampling gap found\nwhile debugging these in field-pixel-presets/SKILL.md.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".claude/skills/field-pixel-presets/SKILL.md |  94 +++++++++++++++++++++++-\n src/nodes/FieldPixelNode.cpp                | 106 +++++++++++++++++++++++++++-\n 2 files changed, 198 insertions(+), 2 deletions(-)"
+  },
+  {
+    "hash": "14c647c0cd1d609828fdcd9f00c30ec3e42609ed",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 17 14:22:54 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "ui",
+      "title": "Merge branch 'bugfix/viewport-panel-persistence'",
+      "description": "Merge branch 'bugfix/viewport-panel-persistence'",
+      "bullets": [],
+      "body": "# Conflicts:\n#\ttools/semi-brain/1_extractors/output/git_commits_corpus.json\n#\ttools/semi-brain/1_extractors/output/recovered_docs_corpus.json\n#\ttools/semi-brain/3_datasets/train_sft_alpaca.jsonl\n#\ttools/semi-brain/3_datasets/train_sft_sharegpt.jsonl",
+      "raw": "Merge branch 'bugfix/viewport-panel-persistence'\n\n# Conflicts:\n#\ttools/semi-brain/1_extractors/output/git_commits_corpus.json\n#\ttools/semi-brain/1_extractors/output/recovered_docs_corpus.json\n#\ttools/semi-brain/3_datasets/train_sft_alpaca.jsonl\n#\ttools/semi-brain/3_datasets/train_sft_sharegpt.jsonl"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "286c9c4f8e076249d845d6a13e55104693ecfb40",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 17 14:22:39 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "semi-brain",
+      "title": "chore(semi-brain): refresh extracted corpora and training datasets",
+      "description": "refresh extracted corpora and training datasets",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "chore(semi-brain): refresh extracted corpora and training datasets\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".../1_extractors/output/git_commits_corpus.json    | 3280 ++++++++++++++------\n .../1_extractors/output/recovered_docs_corpus.json |  464 +--\n .../output/skills_and_invariants_corpus.json       |    4 +-\n .../3_datasets/train_dpo_preference.jsonl          |    7 +\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl |  174 +-\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl |  174 +-\n 6 files changed, 2708 insertions(+), 1395 deletions(-)"
+  },
+  {
+    "hash": "1d05bf1a882648f133093a2032a8ffe1d5d067c9",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 17 14:22:27 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "panels",
+      "title": "feat(panels): viewport panel persistence, patch/gesture updates, semi-brain refresh",
+      "description": "viewport panel persistence, patch/gesture updates, semi-brain refresh",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "feat(panels): viewport panel persistence, patch/gesture updates, semi-brain refresh\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".claude/skills/panels-sweep/SKILL.md               |    8 +-\n release-assets/ffmpeg-1005b294ff-src.tar.gz        |  Bin 0 -> 16905580 bytes\n release-assets/x264-0480cb05-src.tar.gz            |  Bin 0 -> 1040667 bytes\n src/core/GestureRecorder.h                         |    3 +-\n src/core/Patch.cpp                                 |   28 +\n src/core/Patch.h                                   |   11 +\n src/core/PatchJson.cpp                             |    8 +\n src/core/TablerIcons.h                             |  244 +-\n src/main.cpp                                       |  990 ++++--\n .../1_extractors/output/git_commits_corpus.json    | 3248 ++++++++++++++------\n .../1_extractors/output/recovered_docs_corpus.json |  464 +--\n .../output/skills_and_invariants_corpus.json       |    4 +-\n .../3_datasets/train_dpo_preference.jsonl          |    7 +\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl |  178 +-\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl |  178 +-\n tools/semi-brain/4_engine/brain_core.py            |  327 +-\n tools/semi-brain/4_engine/semi_brain_cli.py        |   27 +-\n tools/semi-brain/5_evals/benchmark_suite.json      |    7 +\n tools/semi-brain/5_evals/run_evals.py              |   38 +-\n tools/semi-brain/PROMPT_recursive_choice_tree.md   |  118 +\n website/assets/Infinite.dmg                        |  Bin 12176525 -> 12204208 bytes\n 21 files changed, 4186 insertions(+), 1702 deletions(-)\n create mode 100644 release-assets/ffmpeg-1005b294ff-src.tar.gz\n create mode 100644 release-assets/x264-0480cb05-src.tar.gz\n create mode 100644 tools/semi-brain/PROMPT_recursive_choice_tree.md"
+  },
+  {
     "hash": "444e7714283428f8a7f23f95063cb5e839fb743d",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",

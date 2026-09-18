@@ -21,6 +21,7 @@ namespace EqDsp
       kHp12, kHp24, kHp36,
       kLp12, kLp24, kLp36,
       kBP, kNotch, kAllpass,
+      kCombPos, kCombNeg,
       kNumBandTypes
    };
 
@@ -30,7 +31,8 @@ namespace EqDsp
          "low shelf", "peak", "high shelf",
          "hp 12", "hp 24", "hp 36",
          "lp 12", "lp 24", "lp 36",
-         "bp", "notch", "all-pass"
+         "bp", "notch", "all-pass",
+         "comb +", "comb -"
       };
       return kNames;
    }
@@ -55,11 +57,14 @@ namespace EqDsp
       {
          case kHp24: case kLp24: return 2;
          case kHp36: case kLp36: return 3;
+         case kCombPos: case kCombNeg: return 0; // not a biquad cascade - see IsComb
          default: return 1;
       }
    }
 
    inline bool UsesGain(int type) { return type == kLowShelf || type == kPeak || type == kHighShelf; }
+   inline bool IsComb(int type) { return type == kCombPos || type == kCombNeg; }
+   inline bool CombIsNegative(int type) { return type == kCombNeg; }
 
    // Configures a scratch Biquad for one band type. Shared by PushParams and
    // the visualizer/tests, so the picture, the running filter and the DSP
@@ -118,6 +123,11 @@ namespace EqDsp
    {
       if (!enabled)
          return 0.0f;
+      if (IsComb(type))
+      {
+         return DspMath::CombMagnitudeDb(freq, DspMath::CombFeedbackFromQ(q), CombIsNegative(type),
+                                          evalHz, sampleRate);
+      }
       DspMath::Biquad bq;
       ConfigureBiquad(bq, type, freq, q, gainDb, sampleRate);
       return BiquadMagnitudeDb(bq, evalHz, sampleRate) * (float)StageCount(type);
@@ -139,6 +149,13 @@ public:
    static constexpr int kCoeffsPerStage = 5; // b0,b1,b2,a1,a2
    static constexpr int kCoeffsPerBand = kMaxStagesPerBand * kCoeffsPerStage;
    static constexpr int kOutputGainSlot = kNumBands * kCoeffsPerBand;
+   // Raw freq/Q per band, pushed alongside the precomputed biquad coeffs
+   // above - comb bands (see EqDsp::IsComb) have no biquad coefficients at
+   // all, so ProcessBlock reads these instead for those bands, the same
+   // freq/Q-not-coeffs split AudioFilterKernel uses for its env-modulated
+   // cutoff.
+   static constexpr int kBandFreqSlot0 = kOutputGainSlot + 1;
+   static constexpr int kBandQSlot0 = kBandFreqSlot0 + kNumBands;
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
    {
@@ -153,6 +170,9 @@ public:
          for (auto& stage : band)
             for (auto& bq : stage)
                bq.Reset();
+      for (auto& band : mComb)
+         for (auto& comb : band)
+            comb.Reset();
    }
 
    void PushParams(const AudioEffectNode& node, double sampleRate) override;
@@ -161,6 +181,18 @@ public:
    {
       const int numChannels = std::min({ in.numChannels, out.numChannels, kMaxChannels });
 
+      // Loaded once per block, not per sample: which bands are comb this
+      // block (already folded together with the band's own on/off state -
+      // see PushParams) and their polarity. A comb band has no biquad
+      // coefficients to read below; it takes the delay-line path instead.
+      bool bandIsComb[kNumBands];
+      bool bandCombNegative[kNumBands];
+      for (int b = 0; b < kNumBands; b++)
+      {
+         bandIsComb[b] = mBandIsComb[b].load(std::memory_order_relaxed);
+         bandCombNegative[b] = mBandCombNegative[b].load(std::memory_order_relaxed);
+      }
+
       for (int i = 0; i < out.numFrames; i++)
       {
          float coeffs[kNumBands][kMaxStagesPerBand][kCoeffsPerStage];
@@ -168,6 +200,13 @@ public:
             for (int s = 0; s < kMaxStagesPerBand; s++)
                for (int c = 0; c < kCoeffsPerStage; c++)
                   coeffs[b][s][c] = mMailbox.SmoothedValue((b * kMaxStagesPerBand + s) * kCoeffsPerStage + c);
+
+         float bandFreq[kNumBands], bandQ[kNumBands];
+         for (int b = 0; b < kNumBands; b++)
+         {
+            bandFreq[b] = mMailbox.SmoothedValue(kBandFreqSlot0 + b);
+            bandQ[b] = mMailbox.SmoothedValue(kBandQSlot0 + b);
+         }
 
          // Output gain hardcoded to unity (0 dB) - the "output" section
          // (output gain + mix) was removed from DrawEqBody entirely, so this
@@ -187,6 +226,15 @@ public:
 
             for (int b = 0; b < kNumBands; b++)
             {
+               if (bandIsComb[b])
+               {
+                  DspMath::CombFilter& comb = mComb[b][ch];
+                  comb.SetParams(bandFreq[b], DspMath::CombFeedbackFromQ(bandQ[b]), bandCombNegative[b],
+                                 mSampleRate);
+                  s = comb.Process(s);
+                  continue;
+               }
+
                for (int st = 0; st < kMaxStagesPerBand; st++)
                {
                   DspMath::Biquad& bq = mBiquad[b][st][ch];
@@ -210,4 +258,7 @@ private:
    ParamMailbox mMailbox;
    double mSampleRate = 44100.0;
    DspMath::Biquad mBiquad[kNumBands][kMaxStagesPerBand][kMaxChannels];
+   DspMath::CombFilter mComb[kNumBands][kMaxChannels];
+   std::atomic<bool> mBandIsComb[kNumBands] {};
+   std::atomic<bool> mBandCombNegative[kNumBands] {};
 };

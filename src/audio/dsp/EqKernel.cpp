@@ -47,6 +47,17 @@ void EqKernel::PushParams(const AudioEffectNode& node, double sampleRate)
          mMailbox.Push(slot + 3, bq.a1);
          mMailbox.Push(slot + 4, bq.a2);
       }
+
+      // Comb bands have no biquad coefficients (see StageCount/ConfigureBiquad
+      // above, which already treat them as an all-bypass cascade) - they read
+      // these raw freq/Q slots directly in ProcessBlock instead. "on" is
+      // folded into mBandIsComb here so a disabled comb band silently falls
+      // through to the (bypassed) biquad path rather than needing its own
+      // enable check on the audio thread.
+      mMailbox.Push(EqKernel::kBandFreqSlot0 + b, freq);
+      mMailbox.Push(EqKernel::kBandQSlot0 + b, q);
+      mBandIsComb[b].store(on && EqDsp::IsComb(type), std::memory_order_relaxed);
+      mBandCombNegative[b].store(EqDsp::CombIsNegative(type), std::memory_order_relaxed);
    }
 
    // EQ's "output" section (output gain + mix) was removed from the body

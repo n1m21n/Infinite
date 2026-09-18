@@ -123,6 +123,14 @@ namespace SynthModes
       kShapeNotch
    };
 
+   // Comb + / Comb - are not built from TptSvf like everything above - they
+   // are a delay line with feedback (DspMath::CombFilter), the one filter
+   // family here with genuine memory rather than single-sample integrator
+   // state. FilterStages()/FilterShapeOf() below deliberately don't cover
+   // them (a comb has no cascade depth or low/high/band/notch shape); call
+   // sites test IsCombFilter()/CombIsNegative() instead and drive a
+   // DspMath::CombFilter directly. Appended last so existing saved
+   // filterType ints keep their meaning.
    enum FilterType
    {
       kFilterOff = 0,
@@ -130,6 +138,7 @@ namespace SynthModes
       kFilterHP12, kFilterHP24, kFilterHP36,
       kFilterBP12, kFilterBP24,
       kFilterNotch12, kFilterNotch24,
+      kFilterCombPos, kFilterCombNeg,
       kNumFilterTypes
    };
 
@@ -140,7 +149,8 @@ namespace SynthModes
          "lp 12", "lp 24", "lp 36",
          "hp 12", "hp 24", "hp 36",
          "bp 12", "bp 24",
-         "notch 12", "notch 24"
+         "notch 12", "notch 24",
+         "comb +", "comb -"
       };
       return kNames;
    }
@@ -174,6 +184,16 @@ namespace SynthModes
          case kFilterNotch12: case kFilterNotch24: return kShapeNotch;
          default: return kShapeLow;
       }
+   }
+
+   inline bool IsCombFilter(int type)
+   {
+      return type == kFilterCombPos || type == kFilterCombNeg;
+   }
+
+   inline bool CombIsNegative(int type)
+   {
+      return type == kFilterCombNeg;
    }
 
    // Maximum cascade depth any type asks for - the per-voice, per-engine,
