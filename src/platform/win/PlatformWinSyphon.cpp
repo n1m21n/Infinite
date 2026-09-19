@@ -51,15 +51,24 @@ namespace Platform
 
    namespace
    {
-      // Forces "GPU-interop-only" mode: Send/Receive calls fail closed
-      // (return false) instead of silently falling back to a slower
-      // DirectX-CPU-copy path when WGL_NV_DX_interop2 isn't available,
-      // matching the spec's "fail softly, don't crash" requirement without
-      // hand-rolling WGL extension detection ourselves.
-      void ForceGpuInteropOnly(Spout& spout)
+      // Prefers GPU (WGL_NV_DX_interop2) sharing and lets Spout fall back to
+      // its DirectX CPU-copy path when the machine can't do GL/DX interop
+      // (hybrid laptops where GL runs on the iGPU, AMD/Intel without the NV
+      // extension, Windows on ARM). The earlier "fail closed" version turned
+      // the fallback off, but Spout doesn't fail closed: with neither share
+      // path available ReceiveTexture() still returns true and copies
+      // nothing, so the node reported "Receiving WxH" over an empty texture.
+      void ConfigureSharing(Spout& spout)
       {
-         spout.SetAutoShare(false);
-         spout.SetCPUshare(false);
+         spout.SetAutoShare(true);
+      }
+
+      // True when Spout has a working way to move pixels (GPU interop or the
+      // CPU fallback). Only meaningful after OpenSpout has run, i.e. after
+      // the first Send/ReceiveTexture call on a GL context.
+      bool CanShare(Spout& spout)
+      {
+         return spout.IsGLDXready() || spout.GetCPUshare();
       }
    }
 
@@ -67,7 +76,7 @@ namespace Platform
    {
       auto* handle = new SyphonServerHandle();
       handle->name = serverName.empty() ? "Spout" : serverName;
-      ForceGpuInteropOnly(handle->spout);
+      ConfigureSharing(handle->spout);
       handle->spout.SetSenderName(handle->name.c_str());
       return handle;
    }
@@ -148,7 +157,7 @@ namespace Platform
          return false;
       }
 
-      ForceGpuInteropOnly(handle->spout);
+      ConfigureSharing(handle->spout);
       handle->spout.SetReceiverName(serverName.empty() ? nullptr : serverName.c_str());
       return true;
    }
@@ -174,6 +183,11 @@ namespace Platform
          SpoutGLBridge::EnsureReceiveTexture(handle->recvTex2D, handle->recvW, handle->recvH, 1, 1);
 
       if (!handle->spout.ReceiveTexture(handle->recvTex2D, GL_TEXTURE_2D))
+         return 0;
+
+      // Connected but no way to copy pixels: report no frame rather than
+      // handing back the uninitialised (black, alpha 0) receive texture.
+      if (!CanShare(handle->spout))
          return 0;
 
       if (handle->spout.IsUpdated())
