@@ -1526,6 +1526,10 @@ namespace
    ImVec2 gDragTestNodeScreen(0.0f, 0.0f);
    ImVec2 gDragTestNodePos(0.0f, 0.0f);
    ImVec2 gTestMouse(0.0f, 0.0f);
+   ImVec4 gPredTestSliderScreen(0, 0, 0, 0);
+   ImVec4 gPredTestSliderCanvas(0, 0, 0, 0); // canvas space, captured while the slider draws
+   int gPredTestNodeIndex = -1;
+   int gPredTestSizeXParam = -1; // INFINITE_PREDBINDTEST: the Shape "size x" param the mouse is aimed at
    // Screen rects of the Wavetable node's draggable visualizers, republished
    // every frame the node draws: (frames, amp, pitch, filter) per engine, in
    // column order. Only INFINITE_WTDRAGTEST reads them - it is the one thing
@@ -3360,6 +3364,136 @@ namespace
       ImGui::PopStyleColor(7);
    }
 
+   // ---- prediction (green) bindings ------------------------------------------
+   // A binding whose source node is an IPredictor. The apply loop writes it in fader space, and a
+   // Shift-grab on the widget (only Shift: a plain click keeps the lock every other cable follows)
+   // suspends that write for as long as the hand holds the control. State is per frame and cleared
+   // beside ClearFrameParams(); `Prev` is last frame's set, which is how a widget knows a drag that
+   // began under Shift may continue after Shift is released.
+   std::set<ParamKey> gPredictorGrabs;
+   std::set<ParamKey> gPredictorGrabsPrev;
+
+   uint64_t UidForIndex(int nodeIndex)
+   {
+      GraphNode* gn = FindNodeByIndex(nodeIndex);
+      return gn != nullptr ? gn->uid : 0;
+   }
+
+   IPredictor* PredictorForParam(int nodeIndex, int paramIndex)
+   {
+      const Modulation::Source s = Modulation::Instance().ModulatorFor(nodeIndex, paramIndex);
+      if (s.nodeIndex < 0)
+         return nullptr;
+      GraphNode* gn = FindNodeByIndex(s.nodeIndex);
+      return (gn != nullptr && gn->node != nullptr) ? dynamic_cast<IPredictor*>(gn->node.get()) : nullptr;
+   }
+
+   // Why a predictor (green) source may not be bound to this destination, or nullptr if it may.
+   // Every user-facing bind path calls this; patch load / paste / undo cannot (the destination has
+   // not registered yet), so they rely on the apply loop's own discrete guard instead.
+   const char* PredictorBindRefusal(INode* srcNode, int dstNodeIndex, int dstParamIndex)
+   {
+      if (srcNode == nullptr || dynamic_cast<IPredictor*>(srcNode) == nullptr)
+         return nullptr;
+      const ParamRef* known = Modulation::Instance().KnownParam(dstNodeIndex, dstParamIndex);
+      if (known != nullptr && (known->isEnum || known->isBool))
+         return "A predictor drives continuous parameters only, not switches or menus";
+      return nullptr;
+   }
+
+   // A predictor bound to a discrete param is inert: the apply loop never writes it.
+   bool IsInertPredictorBinding(int dstNodeIndex, int dstParamIndex)
+   {
+      return PredictorForParam(dstNodeIndex, dstParamIndex) != nullptr &&
+             PredictorBindRefusal(FindNodeByIndex(Modulation::Instance().ModulatorFor(dstNodeIndex, dstParamIndex).nodeIndex)->node.get(),
+                                  dstNodeIndex, dstParamIndex) != nullptr;
+   }
+
+   // Fader position (0..1) <-> parameter value, honouring the widget's own taper when it has one.
+   float ParamToPos(const ParamRef& r, float v)
+   {
+      if (r.valueToPos != nullptr)
+         return std::clamp(r.valueToPos(v, r.minValue, r.maxValue), 0.0f, 1.0f);
+      const float span = r.maxValue - r.minValue;
+      return span != 0.0f ? std::clamp((v - r.minValue) / span, 0.0f, 1.0f) : 0.0f;
+   }
+   float PosToParam(const ParamRef& r, float pos)
+   {
+      if (r.posToValue != nullptr)
+         return r.posToValue(pos, r.minValue, r.maxValue);
+      return r.minValue + (r.maxValue - r.minValue) * pos;
+   }
+
+   struct PredictorGrabCtx
+   {
+      IPredictor* pred = nullptr;
+      ParamKey key;
+      bool editable = false; // draw the editable path instead of the read-only one
+   };
+
+   PredictorGrabCtx BeginPredictorGrab(const ParamRef& ref)
+   {
+      PredictorGrabCtx c;
+      c.pred = PredictorForParam(ref.nodeIndex, ref.paramIndex);
+      if (c.pred == nullptr)
+         return c;
+      c.key = ParamKey{ UidForIndex(ref.nodeIndex), ref.paramIndex };
+      c.editable = ImGui::GetIO().KeyShift || gPredictorGrabsPrev.count(c.key) > 0;
+      return c;
+   }
+
+   // Call right after the widget's item is drawn (so the IsItem* queries refer to it).
+   void EndPredictorGrab(const PredictorGrabCtx& c, const ParamRef& ref)
+   {
+      if (c.pred == nullptr || !c.editable)
+         return;
+      // Release velocity from the last <=100 ms of this grab, in fader space. Computed here rather
+      // than read from MovementStats: that engine lives on the log worker thread and sees the
+      // release late, while OnRelease needs the number on the frame the hand lets go.
+      struct Track { double t[8]; float pos[8]; int n = 0; };
+      static std::map<ParamKey, Track> sTracks;
+      Track& tr = sTracks[c.key];
+      const double now = ImGui::GetTime();
+      if (ImGui::IsItemActivated())
+      {
+         PushUndoCheckpoint();
+         tr.n = 0;
+         c.pred->OnGrab(c.key);
+      }
+      if (ImGui::IsItemActive())
+      {
+         gPredictorGrabs.insert(c.key);
+         const float pos = ParamToPos(ref, *ref.value);
+         if (tr.n == 8)
+         {
+            std::copy(tr.t + 1, tr.t + 8, tr.t);
+            std::copy(tr.pos + 1, tr.pos + 8, tr.pos);
+            tr.n = 7;
+         }
+         tr.t[tr.n] = now;
+         tr.pos[tr.n] = pos;
+         ++tr.n;
+      }
+      if (ImGui::IsItemDeactivated())
+      {
+         float vel = 0.0f;
+         if (tr.n >= 2)
+         {
+            int i0 = tr.n - 1;
+            while (i0 > 0 && tr.t[tr.n - 1] - tr.t[i0 - 1] <= 0.1)
+               --i0;
+            const double span = tr.t[tr.n - 1] - tr.t[i0];
+            if (i0 < tr.n - 1 && span > 1e-3)
+               vel = (float)((tr.pos[tr.n - 1] - tr.pos[i0]) / span);
+         }
+         c.pred->OnRelease(c.key, ParamToPos(ref, *ref.value), vel);
+         tr.n = 0;
+      }
+   }
+
+   // Prediction green: pin ring, and the track/fill colours of a green-bound slider.
+   constexpr ImU32 kPredictionPinCol = IM_COL32(110, 215, 140, 255);
+
    bool ModCheckbox(const char* label, bool* value)
    {
       if (value == nullptr)
@@ -3478,7 +3612,10 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
       const bool isLight = IsThemeLight();
-      const ImU32 pinColor = modulated
+      const bool predicted = modulated && PredictorForParam(nodeIndex, paramIndex) != nullptr;
+      const ImU32 pinColor = predicted
+         ? (isLight ? IM_COL32(30, 150, 70, 255) : kPredictionPinCol)
+         : modulated
          ? (isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255))
          : hasExpr && !exprErrored
             ? (isLight ? IM_COL32(130, 80, 230, 255) : IM_COL32(170, 130, 255, 255))
@@ -3491,6 +3628,8 @@ namespace
       // itself - see the matching comment on DrawDiscreteParamPin's push.
       gParamPinScreenList.push_back({ nodeIndex, paramIndex, curGn ? curGn->typeName : "", label ? label : "", c,
                                       ImVec2(p.x + box + 4.0f, p.y), ImVec2(p.x + width, p.y + box + 4.0f) });
+      if (paramIndex == gPredTestSizeXParam && nodeIndex == gPredTestNodeIndex)
+         gPredTestSliderCanvas = ImVec4(p.x + box + 4.0f, p.y, p.x + width, p.y + box + 4.0f);
       ImGui::SetCursorScreenPos(ImVec2(origin.x + box + 4.0f, origin.y));
 
       // Double-clicking swaps the slider for a text field so an exact value
@@ -3606,6 +3745,13 @@ namespace
          // value is driven externally; show it read-only so it is obvious why
          // dragging does nothing
          float shown = *value;
+         // A green (prediction) binding is read-only like any other, except under Shift: then the
+         // editable path is drawn, the hand wins, and the predictor is told about the grab.
+         ParamRef gref;
+         gref.nodeIndex = nodeIndex; gref.paramIndex = paramIndex; gref.value = value;
+         gref.minValue = minV; gref.maxValue = maxV; gref.posToValue = posToValue; gref.valueToPos = valueToPos;
+         const PredictorGrabCtx grab = BeginPredictorGrab(gref);
+         const bool ro = !grab.editable;
          if (audioStyle)
          {
             // Same muted amber as the plain-slider branch's FrameBg below
@@ -3613,9 +3759,15 @@ namespace
             // full-bright ring color - the user tried the bright version
             // here and asked for this darker tone back, same as the Color
             // Adjustments node's params already use.
-            AudioSliderFloat(label, &shown, minV, maxV, fmt, width - box - 4.0f,
-                             isLight ? IM_COL32(250, 219, 148, 255) : IM_COL32(82, 61, 20, 255),
-                             /*readOnly=*/true, posToValue, valueToPos, /*vividState=*/true);
+            const ImU32 trackCol = predicted ? (isLight ? IM_COL32(176, 232, 194, 255) : IM_COL32(20, 74, 40, 255))
+                                             : (isLight ? IM_COL32(250, 219, 148, 255) : IM_COL32(82, 61, 20, 255));
+            const bool moved = AudioSliderFloat(label, &shown, minV, maxV, fmt, width - box - 4.0f,
+                             trackCol, /*readOnly=*/ro, posToValue, valueToPos, /*vividState=*/true);
+            if (grab.editable && moved)
+            {
+               *value = shown;
+               changed = true;
+            }
          }
          else
          {
@@ -3626,7 +3778,22 @@ namespace
             // the theme, same as the pin dot's own modulated color a few
             // lines up: a light pastel amber with black text in light mode,
             // the original dark amber with white text in dark mode.
-            if (isLight)
+            if (predicted)
+            {
+               if (isLight)
+               {
+                  ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.69f, 0.91f, 0.76f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.10f, 0.55f, 0.25f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.05f, 0.05f, 0.05f, 1.0f));
+               }
+               else
+               {
+                  ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.08f, 0.29f, 0.16f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.35f, 0.85f, 0.50f, 1.0f));
+                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.98f, 0.94f, 1.0f));
+               }
+            }
+            else if (isLight)
             {
                ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.98f, 0.86f, 0.58f, 1.0f));
                ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.80f, 0.52f, 0.10f, 1.0f));
@@ -3639,9 +3806,16 @@ namespace
                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.97f, 0.95f, 0.90f, 1.0f));
             }
             ImGui::SetNextItemWidth(width - box - 4.0f);
-            ImGui::SliderFloat(label, &shown, minV, maxV, fmt, ImGuiSliderFlags_NoInput);
+            const bool moved = ImGui::SliderFloat(label, &shown, minV, maxV, fmt,
+                                                  ro ? ImGuiSliderFlags_NoInput : ImGuiSliderFlags_None);
             ImGui::PopStyleColor(3);
+            if (grab.editable && moved)
+            {
+               *value = shown;
+               changed = true;
+            }
          }
+         EndPredictorGrab(grab, gref);
          DrawModulationBindingMenu(nodeIndex, paramIndex, ImGui::IsItemHovered());
       }
       else if (hasExpr && !exprErrored)
@@ -4650,7 +4824,8 @@ namespace
       // margin afterwards, so it costs no row width at all.
       const ImVec2 cellOrigin = ImGui::GetCursorScreenPos();
       const float cell = cellW > 0.0f ? cellW : diameter;
-      const ImU32 pinColor = modulated              ? IM_COL32(255, 190, 90, 255)
+      const ImU32 pinColor = modulated && PredictorForParam(nodeIndex, paramIndex) != nullptr ? kPredictionPinCol
+                            : modulated              ? IM_COL32(255, 190, 90, 255)
                             : hasExpr && !exprErrored ? IM_COL32(170, 130, 255, 255)
                                                       : IM_COL32(130, 138, 162, 255);
 
@@ -4753,7 +4928,16 @@ namespace
       {
          float shown = *value;
          const Modulation::Source src = Modulation::Instance().ResolvedSourceFor(ref);
-         DrawWidget(&shown, IM_COL32(255, 190, 90, 255), /*readOnly=*/true, /*hasRange=*/true, src.lo, src.hi);
+         // Green (prediction) binding: read-only unless Shift is held - see BeginPredictorGrab.
+         const PredictorGrabCtx grab = BeginPredictorGrab(ref);
+         const bool moved = DrawWidget(&shown, grab.pred != nullptr ? pinColor : IM_COL32(255, 190, 90, 255),
+                                       /*readOnly=*/!grab.editable, /*hasRange=*/true, src.lo, src.hi);
+         if (grab.editable && moved)
+         {
+            *value = shown;
+            changed = true;
+         }
+         EndPredictorGrab(grab, ref);
          DrawModulationBindingMenu(nodeIndex, paramIndex, ImGui::IsItemHovered());
       }
       else if (hasExpr && !exprErrored)
@@ -5316,8 +5500,41 @@ namespace
       ed::EndPin();
    }
 
+#ifndef NDEBUG
+   // Test-only predictor for INFINITE_PREDBINDTEST. Never registered in a release build, and in a
+   // debug build only when that fixture asks for it, so ROUNDTRIPTEST's every-type sweep never
+   // meets it. Returns a settable fixed position, and records how it was driven.
+   class StubPredictorNode : public INode, public IModulator, public IPredictor
+   {
+   public:
+      static INode* Create() { return new StubPredictorNode(); }
+      unsigned int GetOutputTexture() override { return 0; }
+      int GetOutputWidth() const override { return 0; }
+      int GetOutputHeight() const override { return 0; }
+      void CookIfNeeded(int) override {}
+      float Value01() override { return pos; }
+
+      void Tick(int, double) override { ++tickCount; }
+      float ValuePos01For(const ParamKey& k, float) override { readKeys.insert(k); return pos; }
+      void OnGrab(const ParamKey& k) override { ++grabCount; lastGrab = k; }
+      void OnRelease(const ParamKey& k, float p, float v) override { ++releaseCount; lastRelease = k; releasePos = p; releaseVel = v; }
+
+      void VisitParams(ParamVisitor& v) override { v.Float("pos", pos); }
+
+      float pos = 0.5f;
+      int tickCount = 0, grabCount = 0, releaseCount = 0;
+      ParamKey lastGrab, lastRelease;
+      float releasePos = -1.0f, releaseVel = 0.0f;
+      std::set<ParamKey> readKeys;
+   };
+#endif
+
    void RegisterNodes()
    {
+#ifndef NDEBUG
+      if (getenv("INFINITE_PREDBINDTEST") != nullptr)
+         REGISTER_NODE(StubPredictorNode, Stub Predictor, "Modulators");
+#endif
       REGISTER_NODE(ImageSourceNode, Image Source, "Source");
       REGISTER_NODE(SlideshowNode, Slideshow, "Source");
       REGISTER_NODE(ShapeNode, Shape, "Source");
@@ -26754,8 +26971,11 @@ namespace
 
                // Enable toggle
                ImGui::TableNextColumn();
-               const ImU32 dotColour = src.enabled ? IM_COL32(120, 220, 140, 255)
-                                                   : IM_COL32(110, 110, 120, 255);
+               // A predictor bound to a discrete param (only reachable via a patch file, paste or
+               // undo - the cable drop refuses it) is inert: the apply loop never writes it.
+               const bool inert = IsInertPredictorBinding(dstIndex, dstParam);
+               const ImU32 dotColour = (src.enabled && !inert) ? IM_COL32(120, 220, 140, 255)
+                                                               : IM_COL32(110, 110, 120, 255);
                const ImVec2 dotCursor = ImGui::GetCursorScreenPos();
                const float dotH = ImGui::GetTextLineHeight();
                ImGui::Dummy(ImVec2(dotH, dotH));
@@ -26766,8 +26986,10 @@ namespace
                }
                ImGui::GetWindowDrawList()->AddCircleFilled(
                   ImVec2(dotCursor.x + dotH * 0.5f, dotCursor.y + dotH * 0.5f), dotH * 0.35f, dotColour);
+               if (inert && ImGui::IsItemHovered())
+                  ImGui::SetTooltip("A predictor drives continuous parameters only - this binding is inactive.");
 
-               const ImVec4 textColour = src.enabled ? ImGui::GetStyle().Colors[ImGuiCol_Text]
+               const ImVec4 textColour = (src.enabled && !inert) ? ImGui::GetStyle().Colors[ImGuiCol_Text]
                                                      : ImGui::GetStyle().Colors[ImGuiCol_TextDisabled];
                ImGui::PushStyleColor(ImGuiCol_Text, textColour);
 
@@ -61467,6 +61689,20 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false)
       }
    }
 
+   // Advance every predictor exactly once, before any binding reads it (idempotency: a predictor
+   // driving N params must not run N times as fast). A bypassed predictor is not ticked, so it
+   // freezes rather than advancing unseen and jumping on un-bypass.
+   {
+      static double sLastTickTime = -1.0;
+      const double nowWall = glfwGetTime();
+      const double tickDt = sLastTickTime < 0.0 ? 0.0 : std::clamp(nowWall - sLastTickTime, 0.0, 0.25);
+      sLastTickTime = nowWall;
+      for (GraphNode& gn : gNodes)
+         if (gn.node != nullptr && !gn.node->bypassed)
+            if (auto* pred = dynamic_cast<IPredictor*>(gn.node.get()))
+               pred->Tick(frameId, tickDt);
+   }
+
    const double t = Transport::Instance().Seconds();
    // Patch-wide named values, evaluated once before any parameter reads
    // them so every expression in the frame sees the same globals - see
@@ -61500,6 +61736,26 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false)
          // clamping v01 here means it can no longer reach past
          // src.lo/src.hi into a destination param, which is a hard
          // contract (see ShapeToParam).
+         // A predictor (green) writes in the destination's fader space, per destination, so a log
+         // knob is not crowded at its top end. It never drives a discrete param, and a Shift-grab
+         // suspends it for as long as the hand holds the control.
+         if (auto* pred = dynamic_cast<IPredictor*>(modNode->node.get()))
+         {
+            if (ref.isEnum || ref.isBool)
+               continue;
+            const ParamKey pk{ UidForIndex(ref.nodeIndex), ref.paramIndex };
+            if (gPredictorGrabs.count(pk) > 0)
+            {
+               MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Hand);
+               continue;
+            }
+            const float cur = ParamToPos(ref, *ref.value);
+            const float p = ApplyModulationCurve(std::clamp(pred->ValuePos01For(pk, cur), 0.0f, 1.0f), src.curve);
+            const float posLo = ParamToPos(ref, src.lo), posHi = ParamToPos(ref, src.hi);
+            *ref.value = ShapeToParam(ref, PosToParam(ref, posLo + (posHi - posLo) * p));
+            MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Prediction);
+            continue;
+         }
          // A macro number box is the one modulator that speaks in the
          // destination's own units rather than 0..1: the point of
          // typing "440" into it is that the destination becomes 440,
@@ -62574,6 +62830,7 @@ int main(int argc, char** argv)
          getenv("INFINITE_MODBOUNDSTEST") != nullptr || getenv("INFINITE_MODMATRIXTEST") != nullptr ||
          getenv("INFINITE_MODCURVETEST") != nullptr ||
          getenv("INFINITE_GESTUREUNDOTEST") != nullptr ||
+         getenv("INFINITE_PREDBINDTEST") != nullptr ||
          getenv("INFINITE_MODMATRIXGEOM") != nullptr;
 
       if (getenv("INFINITE_AUDIOUITEST") != nullptr)
@@ -64514,6 +64771,15 @@ int main(int argc, char** argv)
             SpawnNode("Range to Range", "Modulators", 60.0f, 500.0f);
             gNodes[0].showParams = true; // params must be drawn for them to register
          }
+#ifndef NDEBUG
+         if (getenv("INFINITE_PREDBINDTEST") != nullptr)
+         {
+            SpawnNode("Stub Predictor", "Modulators", 60.0f, 500.0f);         // gNodes[2]
+            SpawnNode("Mixer", "Utility", 300.0f, 500.0f);                    // gNodes[3]: a tapered knob
+            gNodes[0].showParams = true;
+            gNodes[3].showParams = true;
+         }
+#endif
          if (getenv("INFINITE_MODMATRIXGEOM") != nullptr)
          {
             // A bound link is required: DrawModMatrixTable shows "No active
@@ -65186,6 +65452,49 @@ int main(int argc, char** argv)
             glfwSetCursorPos(window, (double)gTestMouse.x, (double)gTestMouse.y);
          }
       }
+
+#ifndef NDEBUG
+      // INFINITE_PREDBINDTEST: synthetic plain-drag then Shift-drag on the Shape's "size x" slider,
+      // which a stub predictor drives. Aimed from the slider's rect as drawn last frame.
+      if (getenv("INFINITE_PREDBINDTEST") != nullptr && frameId >= 50 && gNodes.size() > 3)
+      {
+         ImGuiIO& tio = ImGui::GetIO();
+         tio.ConfigInputTrickleEventQueue = false;
+         tio.AddFocusEvent(true);
+         static bool sFocused = false;
+         if (!sFocused) { glfwFocusWindow(window); sFocused = true; }
+         ImVec2 rmin(0, 0), rmax(0, 0);
+         rmin = ImVec2(gPredTestSliderScreen.x, gPredTestSliderScreen.y);
+         rmax = ImVec2(gPredTestSliderScreen.z, gPredTestSliderScreen.w);
+         const float cy = (rmin.y + rmax.y) * 0.5f;
+         const float x30 = rmin.x + (rmax.x - rmin.x) * 0.3f, x70 = rmin.x + (rmax.x - rmin.x) * 0.7f;
+         auto btn = [&tio](bool down) { tio.AddMouseButtonEvent(0, down); };
+         switch (frameId)
+         {
+            case 60: gTestMouse = ImVec2(x30, cy); break;
+            case 62: btn(true); break;
+            case 64: gTestMouse = ImVec2(x70, cy); break;
+            case 66: btn(false); break;
+            case 72: gTestMouse = ImVec2(x30, cy); break;
+            case 74: btn(true); break;
+            case 76: gTestMouse = ImVec2(x70, cy); break;
+            case 80: btn(false); break;
+            default: break;
+         }
+         if (frameId == 70)
+         {
+            tio.AddKeyEvent(ImGuiKey_LeftShift, true);
+            tio.AddKeyEvent(ImGuiMod_Shift, true);
+         }
+         if (frameId == 86)
+         {
+            tio.AddKeyEvent(ImGuiKey_LeftShift, false);
+            tio.AddKeyEvent(ImGuiMod_Shift, false);
+         }
+         tio.AddMousePosEvent(gTestMouse.x, gTestMouse.y);
+         glfwSetCursorPos(window, (double)gTestMouse.x, (double)gTestMouse.y);
+      }
+#endif
 
       if (getenv("INFINITE_DRAGTEST") != nullptr)
       {
@@ -66691,6 +67000,9 @@ int main(int argc, char** argv)
       // every frame. A right/bottom-docked matrix draws after the graph and
       // is unaffected either way, since by then this frame's params are in.
       Modulation::Instance().ClearFrameParams();
+      // The grab set is per frame too: a stale entry would freeze a param forever.
+      gPredictorGrabsPrev.swap(gPredictorGrabs);
+      gPredictorGrabs.clear();
 
       // One combined reservation for every right-docked panel, computed
       // together so ImGui's SameLine() chaining after ed::End() lays them out
@@ -81300,6 +81612,15 @@ int main(int argc, char** argv)
          }
       }
 
+#ifndef NDEBUG
+      if (getenv("INFINITE_PREDBINDTEST") != nullptr)
+      {
+         // gParamPinScreenList is canvas space; the synthetic mouse needs real pixels.
+         const ImVec2 mn = ed::CanvasToScreen(ImVec2(gPredTestSliderCanvas.x, gPredTestSliderCanvas.y));
+         const ImVec2 mx = ed::CanvasToScreen(ImVec2(gPredTestSliderCanvas.z, gPredTestSliderCanvas.w));
+         gPredTestSliderScreen = ImVec4(mn.x, mn.y, mx.x, mx.y);
+      }
+#endif
       if (getenv("INFINITE_EQDRAGTEST") != nullptr)
       {
          static bool sUnbuffered = false;
@@ -82873,6 +83194,14 @@ int main(int argc, char** argv)
                      {
                         valid = false;
                         rejectReason = "Cannot modulate a parameter driven by a Field Graph kernel";
+                     }
+                     if (valid)
+                     {
+                        if (const char* why = PredictorBindRefusal(srcNode->node.get(), dstNode->index, GraphNode::ParamIndexFromPin(b)))
+                        {
+                           valid = false;
+                           rejectReason = why;
+                        }
                      }
                   }
                   else if (GraphNode::IsColorPin(b))
@@ -85531,7 +85860,8 @@ int main(int argc, char** argv)
       }
       if (getenv("INFINITE_HIDETEST") != nullptr && frameId == 3)
          gRequestFitView = true; // dev screenshot: frame the whole fixture
-      if ((getenv("INFINITE_WTDRAGTEST") != nullptr || getenv("INFINITE_EQDRAGTEST") != nullptr) && frameId == 3)
+      if ((getenv("INFINITE_WTDRAGTEST") != nullptr || getenv("INFINITE_EQDRAGTEST") != nullptr ||
+          getenv("INFINITE_PREDBINDTEST") != nullptr) && frameId == 3)
          gRequestFitView = true;
 
       if (gPerfAssigningElemIdx >= 0 && gPerfAssigningElemIdx < (int)gPerfElements.size())
@@ -87402,6 +87732,193 @@ int main(int argc, char** argv)
             printf("%s\n", ok ? "GESTURE UNDO OK" : "GESTURE UNDO FAIL");
          }
       }
+
+#ifndef NDEBUG
+      if (getenv("INFINITE_PREDBINDTEST") != nullptr)
+      {
+         static int sizeYParam = -1, rotParam = -1, freqParam = -1, discParam = -1;
+         static int filterIdx = -1;
+         static ParamRef sizeXRef, freqRef;
+         static bool ok[8] = {};
+         static uint64_t stubUid = 0;
+         static int lastTicks = 0, tickCalls = 0, tickBad = 0;
+         static float posAtHold = -1.0f, discBefore = 0.0f, holdBefore = 0.0f;
+         static int ticksAtBypass = 0;
+         Modulation& mod = Modulation::Instance();
+         auto stubNode = [&]() -> StubPredictorNode* {
+            for (GraphNode& gn : gNodes)
+               if (auto* st = dynamic_cast<StubPredictorNode*>(gn.node.get())) return st;
+            return nullptr;
+         };
+         auto frameRefFor = [&](int nodeIdx, int param) -> const ParamRef* {
+            for (const ParamRef& r : mod.FrameParams())
+               if (r.nodeIndex == nodeIdx && r.paramIndex == param) return &r;
+            return nullptr;
+         };
+         auto sizeXPos = [&]() -> float {
+            const ParamRef* r = frameRefFor(gNodes[0].index, gPredTestSizeXParam);
+            return r != nullptr ? ParamToPos(*r, *r->value) : -1.0f;
+         };
+         StubPredictorNode* stub = stubNode();
+
+         if (frameId == 1)
+         {
+            for (const ParamRef& r : mod.FrameParams())
+            {
+               if (r.nodeIndex == gNodes[0].index)
+               {
+                  if (r.name == "size x") { gPredTestSizeXParam = r.paramIndex; gPredTestNodeIndex = gNodes[0].index; sizeXRef = r; }
+                  if (r.name == "size y") sizeYParam = r.paramIndex;
+                  if (r.name == "rotation") rotParam = r.paramIndex;
+                  if ((r.isEnum || r.isBool) && discParam < 0) discParam = r.paramIndex;
+               }
+               if (r.nodeIndex == gNodes[3].index && r.posToValue != nullptr && freqParam < 0)
+               {
+                  freqParam = r.paramIndex; filterIdx = r.nodeIndex; freqRef = r;
+               }
+            }
+            printf("predbind: sizeX=%d sizeY=%d rot=%d discrete=%d filterFreq=%d\n", gPredTestSizeXParam, sizeYParam,
+                   rotParam, discParam, freqParam);
+            if (stub == nullptr || gPredTestSizeXParam < 0 || sizeYParam < 0 || rotParam < 0 || discParam < 0 || freqParam < 0)
+            {
+               printf("PREDBINDTEST FAIL (fixture: could not resolve params)\n");
+               glfwSetWindowShouldClose(window, GLFW_TRUE);
+               return 1;
+            }
+            stubUid = UidForIndex(gNodes[2].index);
+            stub->pos = 0.5f;
+            mod.Bind(gNodes[0].index, gPredTestSizeXParam, gNodes[2].index);
+            mod.Bind(gNodes[0].index, sizeYParam, gNodes[2].index);
+            mod.Bind(gNodes[0].index, rotParam, gNodes[2].index);
+            mod.Bind(filterIdx, freqParam, gNodes[2].index);
+         }
+         // 1. one stub drives four params: Tick runs once per frame
+         if (frameId >= 3 && frameId <= 8 && stub != nullptr)
+         {
+            if (frameId > 3) { ++tickCalls; if (stub->tickCount - lastTicks != 1) ++tickBad; }
+            lastTicks = stub->tickCount;
+            if (frameId == 8)
+            {
+               ok[1] = tickCalls == 5 && tickBad == 0;
+               printf("test1 (idempotent Tick, 4 bindings) frames=%d bad=%d  %s\n", tickCalls, tickBad, ok[1] ? "OK" : "- BUG");
+               // 2. fader space: p = 0.5 on a log-tapered param lands at posToValue(0.5), not the linear midpoint
+               const ParamRef* fr = frameRefFor(filterIdx, freqParam);
+               if (fr != nullptr)
+               {
+                  const float expect = std::clamp(fr->posToValue(0.5f, fr->minValue, fr->maxValue), fr->minValue, fr->maxValue);
+                  const float linMid = 0.5f * (fr->minValue + fr->maxValue);
+                  ok[2] = std::fabs(*fr->value - expect) <= 1e-3f * std::max(1.0f, std::fabs(expect)) &&
+                          std::fabs(expect - linMid) > 0.01f * (fr->maxValue - fr->minValue);
+                  printf("test2 (fader-space map) value=%.3f expect=%.3f linearMid=%.3f  %s\n", *fr->value, expect, linMid,
+                         ok[2] ? "OK" : "- BUG");
+               }
+            }
+         }
+         // 3a. plain grab: no Shift, so nothing changes
+         if (frameId == 69 && stub != nullptr)
+         {
+            const float pos = sizeXPos();
+            ok[3] = stub->grabCount == 0 && stub->releaseCount == 0 && std::fabs(pos - 0.5f) < 0.02f;
+            printf("test3a (plain grab ignored) grabs=%d pos=%.3f  %s\n", stub->grabCount, pos, ok[3] ? "OK" : "- BUG");
+         }
+         // 3b. Shift-grab: held by hand mid-drag, OnRelease gets the new pos, then the predictor resumes
+         if (frameId == 79 && stub != nullptr)
+         {
+            posAtHold = sizeXPos();
+            holdBefore = posAtHold;
+            ok[4] = stub->grabCount == 1 && posAtHold > 0.6f;
+            printf("test3b (shift-grab holds) grabs=%d pos=%.3f  %s\n", stub->grabCount, posAtHold, ok[4] ? "OK" : "- BUG");
+         }
+         if (frameId == 85 && stub != nullptr)
+         {
+            const float pos = sizeXPos();
+            ok[5] = stub->releaseCount == 1 && stub->releasePos > 0.6f && std::fabs(stub->releasePos - holdBefore) < 0.05f &&
+                    stub->lastRelease.uid == UidForIndex(gNodes[0].index) && std::fabs(pos - 0.5f) < 0.02f;
+            printf("test3c (release + resume) releases=%d releasePos=%.3f vel=%.2f resumedPos=%.3f  %s\n",
+                   stub->releaseCount, stub->releasePos, stub->releaseVel, pos, ok[5] ? "OK" : "- BUG");
+         }
+         if (frameId == 90)
+         {
+            const bool clear = gPredictorGrabs.empty() && gPredictorGrabsPrev.empty();
+            printf("test3d (grab set cleared) %s\n", clear ? "OK" : "- BUG");
+            ok[5] = ok[5] && clear;
+            // 4. undo keeps the slot key: unbind, undo, the binding is back and keyed by the same uid
+            PushUndoCheckpoint();
+            mod.Unbind(gNodes[0].index, sizeYParam);
+            Undo();
+         }
+         if (frameId == 91)
+         {
+            stub = stubNode();
+            if (stub != nullptr)
+               stub->pos = 0.25f;
+         }
+         if (frameId == 94)
+         {
+            const Modulation::Source s = mod.ModulatorFor(gNodes[0].index, sizeYParam);
+            const ParamRef* yr = frameRefFor(gNodes[0].index, sizeYParam);
+            const float yPos = yr != nullptr ? ParamToPos(*yr, *yr->value) : -1.0f;
+            ok[6] = stub != nullptr && s.nodeIndex >= 0 && UidForIndex(s.nodeIndex) == stubUid && std::fabs(yPos - 0.25f) < 0.02f &&
+                    stub->readKeys.count(ParamKey{ UidForIndex(gNodes[0].index), sizeYParam }) > 0;
+            printf("test4 (undo keeps uid key) bound=%d uidSame=%d yPos=%.3f  %s\n", (int)(s.nodeIndex >= 0),
+                   (int)(s.nodeIndex >= 0 && UidForIndex(s.nodeIndex) == stubUid), yPos, ok[6] ? "OK" : "- BUG");
+         }
+         // 5. green never binds to a discrete param: refused at the cable drop, inert when it arrives via a patch
+         if (frameId == 96 && stub != nullptr)
+         {
+            const ParamRef* dr = frameRefFor(gNodes[0].index, discParam);
+            discBefore = dr != nullptr ? *dr->value : 0.0f;
+            const bool refused = PredictorBindRefusal(stub, gNodes[0].index, discParam) != nullptr;
+            const bool contRefused = PredictorBindRefusal(stub, gNodes[0].index, sizeYParam) != nullptr;
+            Modulation::Source src;
+            src.nodeIndex = gNodes[2].index; src.lo = 0.0f; src.hi = 1.0f; src.hasRange = true;
+            mod.RestoreLink(gNodes[0].index, discParam, src); // what a hand-edited patch file would do
+            ok[7] = refused && !contRefused;
+            printf("test5a (cable drop refuses discrete) refused=%d continuousRefused=%d  %s\n", (int)refused, (int)contRefused,
+                   ok[7] ? "OK" : "- BUG");
+            stub->pos = 0.9f;
+            stub->readKeys.clear();
+         }
+         if (frameId == 100 && stub != nullptr)
+         {
+            const ParamRef* dr = frameRefFor(gNodes[0].index, discParam);
+            const bool held = dr != nullptr && *dr->value == discBefore;
+            const bool neverRead = stub->readKeys.count(ParamKey{ UidForIndex(gNodes[0].index), discParam }) == 0;
+            const bool inert = IsInertPredictorBinding(gNodes[0].index, discParam);
+            const bool good = held && neverRead && inert;
+            printf("test5b (loaded discrete binding inert) held=%d neverRead=%d matrixInert=%d  %s\n", (int)held, (int)neverRead,
+                   (int)inert, good ? "OK" : "- BUG");
+            ok[7] = ok[7] && good;
+            mod.Unbind(gNodes[0].index, discParam);
+         }
+         // 6. bypass: Tick stops and the param holds; un-bypass resumes
+         static float xAtBypass = -1.0f;
+         if (frameId == 102 && stub != nullptr)
+         {
+            xAtBypass = sizeXPos();
+            ticksAtBypass = stub->tickCount;
+            stub->pos = 0.1f;
+            gNodes[2].node->bypassed = true;
+         }
+         if (frameId == 106 && stub != nullptr)
+         {
+            const bool frozen = stub->tickCount == ticksAtBypass && std::fabs(sizeXPos() - xAtBypass) < 0.02f;
+            gNodes[2].node->bypassed = false;
+            ok[0] = frozen;
+            printf("test6a (bypass freezes) ticks=%d/%d pos=%.3f held=%.3f  %s\n", stub->tickCount, ticksAtBypass, sizeXPos(),
+                   xAtBypass, frozen ? "OK" : "- BUG");
+         }
+         if (frameId == 110 && stub != nullptr)
+         {
+            const bool resumed = stub->tickCount > ticksAtBypass && std::fabs(sizeXPos() - 0.1f) < 0.02f;
+            ok[0] = ok[0] && resumed;
+            printf("test6b (un-bypass resumes) ticks=%d pos=%.3f  %s\n", stub->tickCount, sizeXPos(), resumed ? "OK" : "- BUG");
+            const bool all = ok[0] && ok[1] && ok[2] && ok[3] && ok[4] && ok[5] && ok[6] && ok[7];
+            printf("%s\n", all ? "PREDBINDTEST OK" : "PREDBINDTEST FAIL");
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+#endif
 
       if (getenv("INFINITE_MODMATRIXTEST") != nullptr)
       {

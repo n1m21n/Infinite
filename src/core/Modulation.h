@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cstdint>
 #include <map>
 #include <string>
 #include <utility>
@@ -19,6 +20,35 @@ public:
 
    // Current value, normalised 0..1. The binding maps it onto the parameter's range.
    virtual float Value01() = 0;
+};
+
+// Stable address of one destination parameter. The uid (not the node index) is what survives
+// undo/redo renumbering, so predictor state keyed by this outlives a respawn.
+struct ParamKey
+{
+   uint64_t uid = 0;
+   int paramIndex = 0;
+   bool operator<(const ParamKey& o) const { return uid != o.uid ? uid < o.uid : paramIndex < o.paramIndex; }
+   bool operator==(const ParamKey& o) const { return uid == o.uid && paramIndex == o.paramIndex; }
+};
+
+// Side interface for a modulator that predicts where the user would move each destination, rather
+// than emitting one shared value. A node that implements this ALSO implements IModulator (the apply
+// loop reaches it through ModulatorForOutput); the apply loop prefers this path and writes each
+// destination in its own fader space (the position the user sees), so log knobs are not crowded.
+class IPredictor
+{
+public:
+   virtual ~IPredictor() {}
+
+   // Advance every slot exactly once per frame. Never advance inside ValuePos01For: one predictor
+   // can drive many params and a read-side step would run N times as fast.
+   virtual void Tick(int frameId, double dt) = 0;
+   // Pure read, 0..1 fader position. curPos lets a new slot start where the param already is.
+   virtual float ValuePos01For(const ParamKey& k, float curPos) = 0;
+   // Shift-grab began / ended on a bound param. pos and velPerSec are fader-space.
+   virtual void OnGrab(const ParamKey& k) = 0;
+   virtual void OnRelease(const ParamKey& k, float pos, float velPerSec) = 0;
 };
 
 using FaderPosToValueFn = float (*)(float pos01, float minV, float maxV);
