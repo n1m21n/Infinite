@@ -45,6 +45,7 @@ namespace MovementLog
 
    struct KeyRecord
    {
+      uint32_t dt_ms = 0;
       uint32_t id = 0;
       uint64_t uid = 0;
       int32_t paramIndex = 0;
@@ -69,6 +70,7 @@ namespace MovementLog
 
    struct BindRecord
    {
+      uint32_t dt_ms = 0;
       uint32_t id = 0;
       BindingEvent event = BindingEvent::Bind;
       uint64_t modNodeUid = 0;
@@ -123,6 +125,9 @@ namespace MovementLog
    uint64_t GetLogFolderSizeBytes();
    std::string GetLogDirectory();
    uint64_t DroppedCount();
+   // Deletes the oldest closed session files while the folder is over its cap, but never a file newer
+   // than stats.bin's lastConsumed (its rows have not reached the statistics yet). Public for tests.
+   void EnforceRetention(const std::string& dir);
 
    // Main thread logging hooks
    void NoteWriter(int nodeIndex, int paramIndex, Source s, uint8_t flags = 0);

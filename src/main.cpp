@@ -106,6 +106,7 @@ namespace
 #include "core/AudioTopologyRequest.h"
 #include "core/Modulation.h"
 #include "core/MovementLog.h"
+#include "core/MovementStats.h"
 #include "core/GestureRecorder.h"
 #include "core/Expression.h"
 #include "core/field/FieldTypes.h"
@@ -62067,6 +62068,9 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_MOVELOGTEST") != nullptr || getenv("INFINITE_MOVEMENTLOGTEST") != nullptr)
       return MovementLog::RunMovementLogTest() ? 0 : 1;
+
+   if (getenv("INFINITE_MOVESTATSTEST") != nullptr)
+      return MovementStats::RunMovementStatsTest() ? 0 : 1;
 
    if (argc >= 3 && std::strcmp(argv[1], "--dump-movement-log") == 0)
    {

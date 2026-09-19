@@ -1,4 +1,5 @@
 #include "MovementLog.h"
+#include "MovementStats.h"
 #include "Modulation.h"
 #include "Transport.h"
 #include "../platform/AppPaths.h"
@@ -203,6 +204,16 @@ static std::string sCurrentSessionFileName;
 static uint32_t sSessionStartEpochMs = 0;
 static uint32_t sLastEventTimeMs = 0;
 
+// stats.bin hand-off: the main thread serializes a snapshot, the writer thread puts it on disk.
+static std::mutex sStatsMutex;
+static std::vector<uint8_t> sPendingStats;
+static std::atomic<bool> sStatsPending{false};
+static std::string sLastConsumed;            // newest session stem whose rows are inside the statistics
+static bool sBacklogRemains = false;          // startup replay hit its time budget
+static double sLastStatsSnapT = -1.0;
+constexpr double kStatsSnapshotIntervalSec = 60.0;
+constexpr double kCatchUpBudgetSec = 1.5;    // startup replay of unconsumed session files
+
 static std::atomic<uint64_t> sRetentionCapBytes{1024ULL * 1024ULL * 1024ULL}; // Default 1 GB
 
 static std::function<uint64_t(int nodeIndex)> sNodeUidLookup;
@@ -344,17 +355,28 @@ uint64_t DroppedCount()
    return sRing.Dropped();
 }
 
-static void EnforceRetention(const std::string& dir)
+// "20260101-000000.mlog.z" -> "20260101-000000". Names are timestamps, so they sort chronologically.
+static std::string SessionStem(const std::string& filename)
+{
+   const size_t dot = filename.find(".mlog");
+   return dot == std::string::npos ? filename : filename.substr(0, dot);
+}
+
+void EnforceRetention(const std::string& dir)
 {
    uint64_t cap = sRetentionCapBytes.load(std::memory_order_relaxed);
    if (cap == 0 || dir.empty() || !AppPaths::DirExists(dir))
       return;
 
+   // A file is only deletable once its rows are inside stats.bin. No readable stats.bin means nothing
+   // has been consumed, so nothing may go (a deleted file is unrecoverable; a big folder is not).
+   const std::string lastConsumed = MovementStats::ReadLastConsumed(MovementStats::StatsPath(dir));
+
    std::error_code ec;
    struct FileInfo
    {
       std::filesystem::path path;
-      std::filesystem::file_time_type time;
+      std::string stem;
       uint64_t size = 0;
    };
 
@@ -367,30 +389,33 @@ static void EnforceRetention(const std::string& dir)
          continue;
 
       const std::string filename = entry.path().filename().string();
-      // Never delete stats.bin
+      // stats.bin is never pruned and never a candidate
       if (filename == "stats.bin")
+      {
+         totalSize += entry.file_size(ec);
          continue;
+      }
 
       const uint64_t sz = entry.file_size(ec);
       totalSize += sz;
 
       // Only prune completed compressed files (.mlog.z)
-      if (entry.path().extension() == ".z" || filename.find(".mlog.z") != std::string::npos)
-      {
-         compressedFiles.push_back({entry.path(), entry.last_write_time(ec), sz});
-      }
+      if (filename.find(".mlog.z") != std::string::npos)
+         compressedFiles.push_back({entry.path(), SessionStem(filename), sz});
    }
 
    if (totalSize <= cap)
       return;
 
    std::sort(compressedFiles.begin(), compressedFiles.end(),
-             [](const FileInfo& a, const FileInfo& b) { return a.time < b.time; });
+             [](const FileInfo& a, const FileInfo& b) { return a.stem < b.stem; });
 
    for (const auto& fi : compressedFiles)
    {
       if (totalSize <= cap)
          break;
+      if (lastConsumed.empty() || fi.stem > lastConsumed)
+         break; // sorted, so everything after this is newer still
       std::filesystem::remove(fi.path, ec);
       if (!ec)
       {
@@ -455,6 +480,8 @@ static void SerializeEvent(std::vector<uint8_t>& buf, const RingEvent& ev, uint3
    {
    case Record::Type::Key:
    {
+      // Every record carries dt so a reader's clock never loses the gap before a KEY/BIND.
+      EncodeVarint(buf, dt_ms);
       EncodeVarint(buf, ev.keyId);
       EncodeVarint(buf, ev.uid);
       EncodeVarint(buf, static_cast<uint32_t>(ev.paramIndex));
@@ -490,6 +517,7 @@ static void SerializeEvent(std::vector<uint8_t>& buf, const RingEvent& ev, uint3
    }
    case Record::Type::Bind:
    {
+      EncodeVarint(buf, dt_ms);
       EncodeVarint(buf, ev.keyId);
       buf.push_back(static_cast<uint8_t>(ev.bindEvent));
       EncodeVarint(buf, ev.modUid);
@@ -541,10 +569,47 @@ static void CompressStaleSessions(const std::string& dir, const std::string& cur
    }
 }
 
+static void PostStatsSnapshot(const std::string& lastConsumed)
+{
+   std::vector<uint8_t> blob = MovementStats::Live().Serialize(lastConsumed);
+   {
+      std::lock_guard<std::mutex> lock(sStatsMutex);
+      sPendingStats = std::move(blob);
+   }
+   sStatsPending.store(true, std::memory_order_release);
+   sWriterCv.notify_all();
+}
+
+// Atomic replace, so a crash mid-write never leaves a half-written stats.bin.
+static void WritePendingStats(const std::string& logDir)
+{
+   if (!sStatsPending.exchange(false, std::memory_order_acq_rel))
+      return;
+   std::vector<uint8_t> blob;
+   {
+      std::lock_guard<std::mutex> lock(sStatsMutex);
+      blob.swap(sPendingStats);
+   }
+   if (blob.empty())
+      return;
+   const std::string path = MovementStats::StatsPath(logDir);
+   const std::string tmp = path + ".tmp";
+   {
+      std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
+      if (!out)
+         return;
+      out.write(reinterpret_cast<const char*>(blob.data()), static_cast<std::streamsize>(blob.size()));
+      if (!out)
+         return;
+   }
+   std::error_code ec;
+   std::filesystem::rename(tmp, path, ec);
+   if (ec)
+      std::filesystem::remove(tmp, ec);
+}
+
 static void WriterThreadFunc(const std::string& logDir, const std::string& filePath)
 {
-   CompressStaleSessions(logDir, filePath);
-
    std::ofstream file(filePath, std::ios::binary | std::ios::app);
    if (!file)
       return;
@@ -565,7 +630,8 @@ static void WriterThreadFunc(const std::string& logDir, const std::string& fileP
       {
          std::unique_lock<std::mutex> lock(sWriterMutex);
          sWriterCv.wait_for(lock, std::chrono::seconds(2), [] {
-            return !sRunning.load(std::memory_order_relaxed) || sRing.Size() >= 128;
+            return !sRunning.load(std::memory_order_relaxed) || sRing.Size() >= 128 ||
+                   sStatsPending.load(std::memory_order_relaxed);
          });
       }
 
@@ -584,6 +650,7 @@ static void WriterThreadFunc(const std::string& logDir, const std::string& fileP
          file.write(reinterpret_cast<const char*>(writeBuf.data()), writeBuf.size());
          file.flush();
       }
+      WritePendingStats(logDir);
    }
 
    // Drain any remaining items after stop
@@ -599,6 +666,10 @@ static void WriterThreadFunc(const std::string& logDir, const std::string& fileP
       file.flush();
    }
    file.close();
+
+   // The final snapshot (posted by Stop) lands before retention runs, so this session's file is
+   // already "consumed" when EnforceRetention looks at it.
+   WritePendingStats(logDir);
 
    // Compress to .mlog.z
    std::string compPath = filePath + ".z";
@@ -710,6 +781,46 @@ void Start(const std::string& customDir)
    if (!AcquireFolderLock(dir))
       return; // another instance owns the log folder
 
+   // A crash leaves the previous session open; close it before it is counted as a candidate.
+   CompressStaleSessions(dir, sCurrentFilePath);
+
+   // Learned statistics: stats.bin, then whatever closed sessions it has not absorbed yet.
+   {
+      MovementStats::Engine& live = MovementStats::Live();
+      std::string lastConsumed;
+      if (!MovementStats::LoadStatsFile(MovementStats::StatsPath(dir), live, lastConsumed))
+      {
+         live.Reset(); // absent or corrupt: start empty, rebuild from the session files below
+         lastConsumed.clear();
+      }
+      std::vector<std::filesystem::path> pending;
+      std::error_code ec;
+      for (const auto& entry : std::filesystem::directory_iterator(dir, ec))
+      {
+         const std::string name = entry.path().filename().string();
+         if (entry.is_regular_file(ec) && name.size() > 7 && name.compare(name.size() - 7, 7, ".mlog.z") == 0 &&
+             SessionStem(name) > lastConsumed)
+            pending.push_back(entry.path());
+      }
+      std::sort(pending.begin(), pending.end());
+      const auto deadline = std::chrono::steady_clock::now() + std::chrono::duration<double>(kCatchUpBudgetSec);
+      sBacklogRemains = false;
+      for (const auto& path : pending)
+      {
+         if (std::chrono::steady_clock::now() > deadline)
+         {
+            sBacklogRemains = true; // the rest continue next launch; lastConsumed only advances in order
+            break;
+         }
+         live.ReplayFile(path.string()); // an unreadable file is skipped, not retried forever
+         lastConsumed = SessionStem(path.filename().string());
+      }
+      sLastConsumed = lastConsumed;
+      live.BeginSession();
+      sLastStatsSnapT = -1.0;
+      PostStatsSnapshot(sLastConsumed);
+   }
+
    sWasAnyItemActive = false;
    sParamStates.clear();
    sNextKeyId = 1;
@@ -743,6 +854,14 @@ void Stop()
       ev.dropped = sRing.Dropped();
       sRing.Push(ev);
    }
+
+   // Everything this session produced is in the statistics, so its file may now be pruned. Not while
+   // older files are still waiting for replay: lastConsumed is one name and only advances in order, so
+   // marking this file would strand them (they would be deletable without ever being learned from).
+   // The cost is that this session is replayed once more next launch.
+   if (!sBacklogRemains)
+      sLastConsumed = SessionStem(sCurrentSessionFileName);
+   PostStatsSnapshot(sLastConsumed);
 
    sRunning.store(false, std::memory_order_release);
    sWriterCv.notify_all();
@@ -804,12 +923,16 @@ void Capture(double t, bool isNormalFrame)
 
    const uint32_t t_ms = static_cast<uint32_t>(t * 1000.0);
    sLastEventTimeMs = t_ms;
+   MovementStats::Engine& stats = MovementStats::Live();
 
    // 1. Process pending marks
    if (!sPendingMarks.empty())
    {
       for (Mark m : sPendingMarks)
       {
+         // Values that jump because of these are not moves; the epoch check below re-baselines them.
+         if (m == Mark::PatchLoaded || m == Mark::PatchNew || m == Mark::Undo || m == Mark::Redo)
+            stats.NoteJump();
          RingEvent ev;
          ev.type = Record::Type::Mark;
          ev.t_ms = t_ms;
@@ -826,6 +949,7 @@ void Capture(double t, bool isNormalFrame)
    double beats = transport.Beats();
    int32_t beatsPerBar = transport.BeatsPerBar();
    int32_t currentBar = (beatsPerBar > 0) ? static_cast<int32_t>(beats / beatsPerBar) : 0;
+   stats.SetPlaying(isPlaying);
 
    if (isPlaying != sLastIsPlaying || std::abs(bpm - sLastBpm) > 0.01f || (isPlaying && currentBar != sLastBar))
    {
@@ -895,6 +1019,10 @@ void Capture(double t, bool isNormalFrame)
             pos0 = (*ref.value - ref.minValue) / (ref.maxValue - ref.minValue);
          it->second.lastQ = static_cast<uint16_t>(std::lround(std::clamp(pos0, 0.0f, 1.0f) * 65535.0f));
          it->second.hasLastQ = true;
+
+         const MovementStats::KeyId statsKey{uid, ref.paramIndex};
+         stats.RegisterKey(statsKey, keyEv.typeName, keyEv.paramName, !(ref.isEnum || ref.isBool));
+         stats.Baseline(statsKey, t, it->second.lastQ / 65535.0f);
          continue;
       }
 
@@ -919,6 +1047,7 @@ void Capture(double t, bool isNormalFrame)
          state.lastEpoch = sCurrentEpoch;
          state.lastQ = q;
          state.hasLastQ = true;
+         stats.Baseline(MovementStats::KeyId{uid, ref.paramIndex}, t, q / 65535.0f);
          continue;
       }
 
@@ -961,9 +1090,21 @@ void Capture(double t, bool isNormalFrame)
       valEv.source = src;
       valEv.flags = flags;
       sRing.Push(valEv);
+
+      // Same quantised position the log holds, so live statistics and a replay of the file agree.
+      stats.Observe(MovementStats::KeyId{uid, ref.paramIndex}, t, q / 65535.0f, src, flags);
    }
 
    sPendingWriters.clear();
+
+   stats.Advance(t);
+   if (sLastStatsSnapT < 0.0)
+      sLastStatsSnapT = t;
+   else if (t - sLastStatsSnapT >= kStatsSnapshotIntervalSec)
+   {
+      sLastStatsSnapT = t;
+      PostStatsSnapshot(sLastConsumed);
+   }
 }
 
 // -----------------------------------------------------------------------------
@@ -1048,6 +1189,8 @@ bool ReadFile(const std::string& path, const std::function<bool(const Record&)>&
       {
          uint64_t v = 0;
          if (!DecodeVarint(ptr, end, v)) return false;
+         rec.key.dt_ms = static_cast<uint32_t>(v);
+         if (!DecodeVarint(ptr, end, v)) return false;
          rec.key.id = static_cast<uint32_t>(v);
          if (!DecodeVarint(ptr, end, v)) return false;
          rec.key.uid = v;
@@ -1093,6 +1236,8 @@ bool ReadFile(const std::string& path, const std::function<bool(const Record&)>&
       case Record::Type::Bind:
       {
          uint64_t v = 0;
+         if (!DecodeVarint(ptr, end, v)) return false;
+         rec.bind.dt_ms = static_cast<uint32_t>(v);
          if (!DecodeVarint(ptr, end, v)) return false;
          rec.bind.id = static_cast<uint32_t>(v);
          if (ptr >= end) return false;
@@ -1158,8 +1303,9 @@ void DumpLog(const std::string& path, std::ostream& out)
       switch (rec.type)
       {
       case Record::Type::Key:
+         curTimeMs += rec.key.dt_ms;
          keyMap[rec.key.id] = rec.key;
-         out << "[KEY] id=" << rec.key.id << " uid=" << rec.key.uid
+         out << "[KEY] t=" << curTimeMs << "ms id=" << rec.key.id << " uid=" << rec.key.uid
              << " param=" << rec.key.paramIndex << " type=" << rec.key.typeName
              << " name=" << rec.key.name << " min=" << rec.key.minValue
              << " max=" << rec.key.maxValue << " enum=" << rec.key.isEnum
@@ -1192,7 +1338,8 @@ void DumpLog(const std::string& path, std::ostream& out)
          break;
       }
       case Record::Type::Bind:
-         out << "[BIND] id=" << rec.bind.id << " event=" << (int)rec.bind.event
+         curTimeMs += rec.bind.dt_ms;
+         out << "[BIND] t=" << curTimeMs << "ms id=" << rec.bind.id << " event=" << (int)rec.bind.event
              << " modUid=" << rec.bind.modNodeUid << " out=" << rec.bind.modOutputIndex
              << " lo=" << rec.bind.lo << " hi=" << rec.bind.hi << "\n";
          break;
@@ -1429,8 +1576,17 @@ bool RunMovementLogTest()
    int readRedoMarkCount = 0;
    std::unordered_map<uint32_t, KeyRecord> keys;
    int readSessionEnd = 0;
+   uint64_t readTotalMs = 0; // every record carries its dt, so this must equal the session length
 
    bool readOk = ReadFile(zPath, [&](const Record& r) {
+      switch (r.type)
+      {
+      case Record::Type::Key: readTotalMs += r.key.dt_ms; break;
+      case Record::Type::Val: readTotalMs += r.val.dt_ms; break;
+      case Record::Type::Bind: readTotalMs += r.bind.dt_ms; break;
+      case Record::Type::Transport: readTotalMs += r.transport.dt_ms; break;
+      case Record::Type::Mark: readTotalMs += r.mark.dt_ms; break;
+      }
       if (r.type == Record::Type::Key)
       {
          keys[r.key.id] = r.key;
@@ -1459,6 +1615,28 @@ bool RunMovementLogTest()
       printf("[FAIL] Failed to read back compressed log file: %s\n", zPath.c_str());
       std::filesystem::remove_all(testDir, ec);
       return false;
+   }
+
+   // 119 frames at 60 fps = 1983 ms. Before KEY/BIND carried dt the reader's clock fell short by the
+   // gap in front of each of them.
+   if (readTotalMs < 1980 || readTotalMs > 1986)
+   {
+      printf("[FAIL] Summed record dt is %llu ms (expected ~1983)\n", static_cast<unsigned long long>(readTotalMs));
+      std::filesystem::remove_all(testDir, ec);
+      return false;
+   }
+
+   // Replaying the file into the statistics engine learns from the hand and modulator rows.
+   {
+      MovementStats::Engine replay;
+      if (!replay.ReplayFile(zPath) || replay.KeyCount() != 4 ||
+          replay.Find(MovementStats::KeyId{nodeUid1, 0}) == nullptr ||
+          replay.Find(MovementStats::KeyId{nodeUid1, 1}) == nullptr)
+      {
+         printf("[FAIL] ReplayFile did not populate statistics (keys=%zu)\n", replay.KeyCount());
+         std::filesystem::remove_all(testDir, ec);
+         return false;
+      }
    }
 
    // Verify Modulator was decimated to <= 10 Hz (at 2 sec = 120 frames at 60fps, ~20 records, not 120)

@@ -375,6 +375,7 @@ set(COMMON_SOURCES
     src/core/Transport.cpp
     src/core/Modulation.cpp
     src/core/MovementLog.cpp
+    src/core/MovementStats.cpp
     src/core/GestureRecorder.cpp
     src/core/Expression.cpp
     src/core/SysInfo.cpp
