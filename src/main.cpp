@@ -189,6 +189,7 @@ namespace
 #include "nodes/Switcher3DNode.h"
 #include "nodes/ModulatorNodes.h"
 #include "nodes/PredictionNodes.h"
+#include "nodes/PredictiveNotesNode.h"
 #include "nodes/OscNodes.h"
 #include "nodes/MidiNodes.h"
 #include "nodes/OutputNode.h"
@@ -5802,6 +5803,7 @@ namespace
       REGISTER_NODE(GlideNode, Glide, "Notes");
       REGISTER_NODE(VibratoNode, Vibrato, "Modulators");
       REGISTER_NODE(NoteEchoNode, Note Echo, "Notes");
+      REGISTER_NODE(PredictiveNotesNode, Predictive Notes, "Notes");
       REGISTER_NODE(NoteRouterNode, Note Router, "Notes");
       REGISTER_NODE(NoteMergeNode, Note Merge, "Notes");
       REGISTER_NODE(NoteSwitcherNode, Note Switcher, "Notes");
@@ -18101,6 +18103,70 @@ namespace
       EndAudioBody();
    }
 
+   void DrawPredictiveNotesBody(GraphNode& gn, PredictiveNotesNode* n)
+   {
+      char stat[64];
+      if (n->IsLearning())
+         snprintf(stat, sizeof(stat), "learning  -  %d notes, %d bars", n->NotesCaptured(), n->BarsCaptured());
+      else if (n->Building())
+         snprintf(stat, sizeof(stat), "building model...");
+      else if (n->LearnedNotes() > 0)
+         snprintf(stat, sizeof(stat), "%d notes learned", n->LearnedNotes());
+      else
+         snprintf(stat, sizeof(stat), "wire notes in, press Learn");
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      {
+         const float w = gAudioContentW;
+         const float h = ImGui::GetFrameHeight();
+         const bool learning = n->IsLearning();
+         if (ImGui::Button(learning ? "Stop##predLearn" : "Learn##predLearn", ImVec2(w * 0.3f, h)))
+         {
+            PushUndoCheckpoint();
+            n->SetLearning(!learning);
+         }
+         ImGui::SameLine();
+         // Learning meter: how much the model beats a memoryless one, per captured bar.
+         const ImVec2 p0 = ImGui::GetCursorScreenPos();
+         const float mw = w - w * 0.3f - ImGui::GetStyle().ItemSpacing.x;
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddRectFilled(p0, ImVec2(p0.x + mw, p0.y + h), IM_COL32(255, 255, 255, 14), 3.0f);
+         const auto& c = n->Curve();
+         if (c.size() >= 2)
+         {
+            float hi = 0.1f;
+            for (float v : c)
+               hi = std::max(hi, v);
+            for (size_t i = 1; i < c.size(); i++)
+            {
+               const float x0 = p0.x + mw * (float)(i - 1) / (float)(c.size() - 1);
+               const float x1 = p0.x + mw * (float)i / (float)(c.size() - 1);
+               const float y0 = p0.y + h - 3.0f - (h - 6.0f) * std::clamp(c[i - 1] / hi, 0.0f, 1.0f);
+               const float y1 = p0.y + h - 3.0f - (h - 6.0f) * std::clamp(c[i] / hi, 0.0f, 1.0f);
+               dl->AddLine(ImVec2(x0, y0), ImVec2(x1, y1), IM_COL32(120, 200, 140, 230), 1.5f);
+            }
+         }
+         ImGui::Dummy(ImVec2(mw, h));
+      }
+      {
+         AudioKnobRow row(4);
+         row.Knob("stray", &n->stray, 0.0f, 1.0f, "%.2f", kKnobSmall);
+         row.KnobInt("memory", &n->memory, 0, 8);
+         row.Knob("length", &n->lengthSpread, 0.0f, 1.0f, "%.2f", kKnobSmall);
+         row.Knob("velocity", &n->velocitySpread, 0.0f, 1.0f, "%.2f", kKnobSmall);
+         row.End();
+      }
+      {
+         AudioKnobRow row(4);
+         row.KnobInt("low", &n->rangeLow, 0, 127);
+         row.KnobInt("high", &n->rangeHigh, 0, 127);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
    void DrawNoteMergeBody(GraphNode& gn, NoteMergeNode* n)
    {
       int active = 0;
@@ -18727,8 +18793,15 @@ namespace
                       [n](int i) { PushUndoCheckpoint(); n->root = i; });
          if (n->useGlobalScale)
             ImGui::EndDisabled();
+         // Chord rate is a step of the global rhythmic table (MusicTime::RateDivisionList: 4 bars ..
+         // 1/64, dotted and triplet), not a free beats knob. rateBeats stays the saved float.
+         int div = NearestRateDivision(n->rateBeats);
+         row.Dropdown("rate", MusicTime::RateDivisionList(), div, [n](int i) {
+            PushUndoCheckpoint();
+            n->rateBeats = (float)MusicTime::BeatsFor(
+               (MusicTime::RateDivision)std::clamp(i, 0, (int)MusicTime::kNumRateDivisions - 1));
+         });
          row.KnobInt("chord", &n->chordSize, 2, 6);
-         row.Knob("rate", &n->rateBeats, 0.0625f, 4.0f, "%.3f beats", kKnobSmall);
          row.End();
       }
       {
@@ -23254,6 +23327,8 @@ namespace
          DrawVibratoBody(gn, n);
       else if (auto* n = dynamic_cast<NoteEchoNode*>(gn.node.get()))
          DrawNoteEchoBody(gn, n);
+      else if (auto* n = dynamic_cast<PredictiveNotesNode*>(gn.node.get()))
+         DrawPredictiveNotesBody(gn, n);
       else if (auto* n = dynamic_cast<NoteRouterNode*>(gn.node.get()))
          DrawNoteRouterBody(gn, n);
       else if (auto* n = dynamic_cast<NoteMergeNode*>(gn.node.get()))
@@ -37671,6 +37746,7 @@ namespace
          { "Glide", "Plays a fast chromatic run between a note and the next one as an approximation of portamento (NoteEvent has no continuous pitch, so this is a glissando, not a true pitch ramp)." },
          { "Vibrato", "An LFO wired straight to pitch. It is a modulator, not a note-chain node - it has no note input on purpose, because a free-running wobble has no single note to attach to. Patch its output onto a synth's pitch/bend mod dot (e.g. Wavetable's 'bend' knob)." },
          { "Note Filter", "A gate on a note's pitch: scale snaps it to the nearest degree of the chosen scale/root, range drops anything outside lo..hi, and chance randomly drops the rest. A note that gets dropped has its note-off dropped with it, so nothing hangs." },
+         { "Predictive Notes", "Wire a note chain in and press Learn: it listens (passing the notes through), learns the pitches, rhythm, lengths and velocities as a variable-order Markov model, then plays on its own in that style. Stray at the bottom replays the phrase, the middle plays in character, the top ignores the model and picks freely in range. The learned notes are saved with the patch." },
          { "Note Echo", "Repeats every incoming note event, delay ms apart, with velocity decaying and pitch shifting per repeat - a delay line for notes rather than audio. The original note always passes through first; the repeats are on top of it, not instead of it." },
          { "Note Router", "The system's only note fan-out point: one input, four distinct outputs. Round Robin cycles through them, Random picks one per note, Chain advances only when the pitch changes (a held note stays put), and Probability rolls each output independently - a note can end up on several outputs at once, or (rarely) none, in which case it falls back to output 1. A note's whole lifetime (on through off) always stays on the output(s) it started on." },
          { "Note Merge", "The system's only note fan-in point: up to four note inputs merged into one output stream, in timestamp order. Each input's notes stay independent voices matched by voice id, not pitch - so two inputs playing the same note at the same time sound as two overlapping voices, not a collision." },
@@ -62404,6 +62480,8 @@ int main(int argc, char** argv)
    if (getenv("INFINITE_MOVESTATSTEST") != nullptr)
       return MovementStats::RunMovementStatsTest() ? 0 : 1;
 
+   if (getenv("INFINITE_PREDMIDITEST") != nullptr)
+      return PredictiveNotes::RunPredMidiTest() ? 0 : 1;
    if (getenv("INFINITE_DRIFTTEST") != nullptr)
       return PredictionNodes::RunDriftTest() ? 0 : 1;
    if (getenv("INFINITE_PREDFEEDBACKTEST") != nullptr)

@@ -105,3 +105,20 @@ loaded patch plays without re-learning.
 
 `PREDMIDITEST` passes; `audio-node-sweep` (`AUDIOPARAMSWEEPTEST`, `AUDIOTEARDOWNSWEEPTEST`) passes;
 the `new-audio-node` exit criterion is met.
+
+## Shipped (deviations from the plan above)
+
+- **Pitch is the absolute note**, not interval + register: a learned scale stays inside its scale
+  when the walk continues. **No bend viewpoint** was learned.
+- **Onset spacing is on a 1/24-beat grid**; spacing 0 means "same onset", which is how chords are learned.
+- **The patch saves the training events** (`model`, versioned base64), not the raw tables. Tables are a
+  pure function of the events, so a loaded patch rebuilds identical tables and plays without re-learning.
+- **Table builds use `std::async`** - no shared worker thread exists yet.
+- **Controls**: Learn/Stop button with a held-out gain meter, stray, memory, length, velocity, low, high.
+- **Test**: `INFINITE_PREDMIDITEST` (exact replay, in-key sampling, stray extremes, table swap under a live
+  audio thread, save/load determinism, the Learn path, plus the improved Random Note / Chorder theory).
+- **Add-ons shipped with this step**: Random Note Generator now uses a constrained melodic walk and the
+  Chorder uses functional-harmony transitions with minimum-movement voicing (`audio/NoteTheory.h`);
+  the Chorder `rate` is a `MusicTime::RateDivisionList()` dropdown (1 bar ... 1/64, dotted, triplet).
+  Caveat: swapping the Chorder's rate knob for a dropdown may reorder its param ordinals for existing
+  modulation cables.
