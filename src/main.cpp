@@ -188,6 +188,7 @@ namespace
 #include "nodes/SwitcherNode.h"
 #include "nodes/Switcher3DNode.h"
 #include "nodes/ModulatorNodes.h"
+#include "nodes/PredictionNodes.h"
 #include "nodes/OscNodes.h"
 #include "nodes/MidiNodes.h"
 #include "nodes/OutputNode.h"
@@ -3442,6 +3443,46 @@ namespace
       return c;
    }
 
+   // Drift decoration on a driven widget: a confidence dot (colour = how much history backs the
+   // model) and the ghost line, the likely next 2 s drawn as fading dots along a thin lane. The lane
+   // is [laneMin, laneMax] on screen at laneY. The ghost comes from a copy of the slot state, so
+   // drawing it never changes the take; it steps at a fixed dt, so it is the likely path, not the exact one.
+   void DrawPredictorDecor(const ParamRef& ref, float laneMin, float laneMax, float laneY)
+   {
+      auto* drift = dynamic_cast<DriftNode*>(PredictorForParam(ref.nodeIndex, ref.paramIndex));
+      if (drift == nullptr || ImGui::GetCurrentWindow() == nullptr)
+         return;
+      const ParamKey key{ UidForIndex(ref.nodeIndex), ref.paramIndex };
+      const bool light = IsThemeLight();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      // Ghost line.
+      float pts[DriftNode::kGhostPoints];
+      const int n = drift->Ghost(key, pts, DriftNode::kGhostPoints);
+      if (n > 0 && laneMax > laneMin)
+      {
+         const Modulation::Source src = Modulation::Instance().ResolvedSourceFor(ref);
+         const float posLo = ParamToPos(ref, src.lo), posHi = ParamToPos(ref, src.hi);
+         for (int i = 0; i < n; i++)
+         {
+            const float frac = std::clamp(posLo + (posHi - posLo) * pts[i], 0.0f, 1.0f);
+            const int a = (int)(150.0f * (1.0f - (float)i / (float)n)) + 20;
+            dl->AddCircleFilled(ImVec2(laneMin + frac * (laneMax - laneMin), laneY), 1.4f,
+                                light ? IM_COL32(30, 150, 70, a) : IM_COL32(110, 215, 140, a));
+         }
+      }
+
+      // Confidence dot, top-right of the item.
+      const int rung = drift->ConfidenceRung(key);
+      static const ImU32 kDark[4] = { IM_COL32(110, 115, 130, 200), IM_COL32(230, 170, 70, 255),
+                                      IM_COL32(150, 215, 110, 255), IM_COL32(110, 235, 150, 255) };
+      static const ImU32 kLight[4] = { IM_COL32(150, 155, 170, 220), IM_COL32(200, 120, 20, 255),
+                                       IM_COL32(70, 150, 40, 255), IM_COL32(20, 140, 60, 255) };
+      const ImVec2 rmax = ImGui::GetItemRectMax(), rmin = ImGui::GetItemRectMin();
+      dl->AddCircleFilled(ImVec2(std::min(rmax.x, laneMax) - 5.0f, rmin.y + 5.0f), 2.5f,
+                          (light ? kLight : kDark)[std::clamp(rung, 0, 3)]);
+   }
+
    // Call right after the widget's item is drawn (so the IsItem* queries refer to it).
    void EndPredictorGrab(const PredictorGrabCtx& c, const ParamRef& ref)
    {
@@ -3816,6 +3857,10 @@ namespace
             }
          }
          EndPredictorGrab(grab, gref);
+         {
+            const ImVec2 imin = ImGui::GetItemRectMin(), imax = ImGui::GetItemRectMax();
+            DrawPredictorDecor(gref, imin.x, std::min(imax.x, imin.x + width - box - 4.0f), imax.y - 3.0f);
+         }
          DrawModulationBindingMenu(nodeIndex, paramIndex, ImGui::IsItemHovered());
       }
       else if (hasExpr && !exprErrored)
@@ -4938,6 +4983,7 @@ namespace
             changed = true;
          }
          EndPredictorGrab(grab, ref);
+         DrawPredictorDecor(ref, ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().y + 2.0f);
          DrawModulationBindingMenu(nodeIndex, paramIndex, ImGui::IsItemHovered());
       }
       else if (hasExpr && !exprErrored)
@@ -5665,6 +5711,7 @@ namespace
       REGISTER_NODE(InvertNode, Invert, "Modulators");
       REGISTER_NODE(ModDepthNode, Mod Depth, "Modulators");
       REGISTER_NODE(ModCurveNode, Mod Curve, "Modulators");
+      REGISTER_NODE(DriftNode, Drift, "Modulators");
       REGISTER_NODE(CVToPitchNode, CV to Pitch, "Modulators");
       REGISTER_NODE(MacroKnobNode, Macro Knob, "Macros");
       REGISTER_NODE(MacroSliderNode, Macro Slider, "Macros");
@@ -10820,6 +10867,32 @@ namespace
       // downstream (AudioKnobRow, ModKnob) already no-op before using it.
       gAudioBodyX = gAudioContentX = gParamRegisterOnly ? 0.0f : ImGui::GetCursorScreenPos().x;
       gAudioBodyW = gAudioContentW = kPreviewSize;
+   }
+
+   // Drift (prediction) node body. Four knobs on one row, freeze + seed on a second, and a readout
+   // strip that is never empty. The confidence dot and ghost marks live on the *driven* widgets
+   // (DrawPredictorDecor), not here: they belong to the param they describe.
+   void DrawDriftParams(DriftNode* n)
+   {
+      BeginFieldKnobGrid();
+      {
+         AudioKnobRow row(4);
+         row.Knob("speed", &n->speed, 0.1f, 4.0f, "%.2fx");
+         row.Knob("stray", &n->stray, 0.25f, 4.0f, "%.2fx", kKnobSmall, false, false, AudioWidgetStyle::KnobLog);
+         row.Knob("momentum", &n->momentum, 0.0f, 4.0f, "%.2f s");
+         row.Knob("link", &n->link, 0.0f, 2.0f, "%.2f");
+         row.End();
+      }
+      {
+         AudioKnobRow row(2);
+         row.Checkbox("freeze", &n->frozen);
+         row.KnobInt("seed", &n->seed, 0, 9999);
+         row.End();
+      }
+      if (n->SlotCount() == 0)
+         ImGui::TextDisabled("drag onto a knob to drive it");
+      else
+         ImGui::TextDisabled("%d driven%s", n->SlotCount(), n->frozen ? "  |  frozen" : "");
    }
 
    // Field-declared params (`param float ...`) get explicit pin indices from
@@ -37540,6 +37613,7 @@ namespace
          { "Smoothing", "An exponential moving average over another modulator, to damp jittery or steppy sources like Random or Pattern." },
          { "Envelope", "Applies an ADSR contour to an incoming modulator instead of generating its own trigger: rising above threshold starts attack/decay/sustain, falling back below it starts release. Patch an LFO in and its swing gets shaped by the ADSR, retriggering once per LFO cycle. Output collapses toward 0.5 as the envelope level falls - at level 0 the input has no say, at level 1 it passes through unchanged - so with nothing patched in, 'in' holds steady at its own constant value." },
          { "Mod Curve", "Remaps a modulator through a draggable transfer curve - click empty space to add a point, drag to move it, right-click to remove it (or right-click empty space to reset to a straight line). The gridline marks 0.5, where a bipolar binding's 'no modulation' point lives, and the moving dot shows where the input currently sits on the curve. mix blends between the raw input and the curved output, so 0 is a true bypass." },
+         { "Drift", "Learns where you leave each knob and how fast you move it, then keeps the knob going after you let go, settles it into your usual places and wanders between them at your pace. Speed scales the learned pace, Stray widens or narrows the wandering, Momentum is how long a release carries on, Link lets your live hand activity stir it (not active yet). Shift-drag a driven knob to take over; the dot on the knob shows how much history backs it and the faint marks show where it is likely to go next. Freeze stores the learned profile in the patch." },
          { "CV to Pitch", "Quantizes a modulator to semitone steps over range low..high, shown as a large +/-N st readout. Still outputs 0..1 like any modulator - it just restricts where in 0..1 the value can land, so the span maps onto whole semitones. Scale/root snap to scale degrees instead of every semitone (chromatic = off); glide adds portamento between steps, passing through unquantized values in transit on purpose." },
          { "Macro Knob", "A single named slider (0-1, with a response curve and invert) meant to be patched out to several other sliders at once - one control that fans out to many parameters." },
          { "Macro XY", "A 2D pad exposing X and Y as two separate modulator outputs from one drag. The pad's path can be recorded, looped and replayed in time, like Resynthesize's orb." },
@@ -38327,6 +38401,7 @@ namespace
                { "Envelope", "Shapes an incoming modulator with an ADSR contour, gated by it crossing threshold, instead of generating its own trigger." },
                { "Invert", "Mirrors a modulator around a low/high pivot. Defaults to 0..1 for a classic 1-v flip; set low/high to match an unclamped source to mirror it correctly." },
                { "Mod Curve", "Remaps a modulator through a draggable transfer curve - an S-curve, staircase, or exponential response, all things a slider can't express." },
+               { "Drift", "Learns where you leave a knob and how you move it, then continues, settles and wanders like you. Shift-drag a driven knob to correct it." },
             } },
             { "Macros", {
                { "Macro Controls", "Macro Knob, Macro Slider, Macro Bipolar Knob, Macro XY, Macro Toggle, Macro Trigger, Macro NumBox, Macro Radio Selector, and Macro Step Gate - unified live performance controls surfaced in the Performance Matrix." },
@@ -62328,6 +62403,9 @@ int main(int argc, char** argv)
    if (getenv("INFINITE_MOVESTATSTEST") != nullptr)
       return MovementStats::RunMovementStatsTest() ? 0 : 1;
 
+   if (getenv("INFINITE_DRIFTTEST") != nullptr)
+      return PredictionNodes::RunDriftTest() ? 0 : 1;
+
    if (argc >= 3 && std::strcmp(argv[1], "--dump-movement-log") == 0)
    {
       MovementLog::DumpLog(argv[2], std::cout);
@@ -82366,6 +82444,8 @@ int main(int argc, char** argv)
                DrawLFOParams(n);
             else if (auto* n = dynamic_cast<RandomNode*>(gn.node.get()))
                DrawRandomParams(n);
+            else if (auto* n = dynamic_cast<DriftNode*>(gn.node.get()))
+               DrawDriftParams(n);
             else if (auto* n = dynamic_cast<PatternNode*>(gn.node.get()))
                DrawPatternParams(n);
             else if (auto* n = dynamic_cast<MathNode*>(gn.node.get()))
