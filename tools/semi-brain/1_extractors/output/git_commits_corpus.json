@@ -1,5 +1,149 @@
 [
   {
+    "hash": "a9e73fcfee3a7f126b80c58efd11b12e8c4e9c01",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 19 11:54:35 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "prediction",
+      "title": "feat(prediction): step 5 cold start, role/family/you stats, source weights, collapse monitor",
+      "description": "step 5 cold start, role/family/you stats, source weights, collapse monitor",
+      "bullets": [],
+      "body": "Blended fallback ladder (key, profile, role, family, you, anchor) replaces the\nhard cold switch; role histograms pool in physical units and rebin through the\ntarget's own range; hand energy drives Drift's Link; one constexpr source-weight\ntable; per-key collapse monitor auto-cuts prediction learning and queues a MARK;\nconfidence dot maps w1. INFINITE_PREDFEEDBACKTEST passes (9 cases + cut + persistence).\nDeviations: anchor sd 0.04 (0.05 gave 94.6% within +-0.1, test needs 95%); size and\nxf.pos pool in fader position, not canvas fraction; you-stats omit release tau and\nlog-theta variance; family range unused. Readiness on real sessions (README s6) was\nnot measured: no owner sessions were available to this run.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "feat(prediction): step 5 cold start, role/family/you stats, source weights, collapse monitor\n\nBlended fallback ladder (key, profile, role, family, you, anchor) replaces the\nhard cold switch; role histograms pool in physical units and rebin through the\ntarget's own range; hand energy drives Drift's Link; one constexpr source-weight\ntable; per-key collapse monitor auto-cuts prediction learning and queues a MARK;\nconfidence dot maps w1. INFINITE_PREDFEEDBACKTEST passes (9 cases + cut + persistence).\n\nDeviations: anchor sd 0.04 (0.05 gave 94.6% within +-0.1, test needs 95%); size and\nxf.pos pool in fader position, not canvas fraction; you-stats omit release tau and\nlog-theta variance; family range unused. Readiness on real sessions (README s6) was\nnot measured: no owner sessions were available to this run.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "src/core/MovementLog.cpp      |  16 +-\n src/core/MovementLog.h        |   3 +-\n src/core/MovementStats.cpp    | 613 +++++++++++++++++++++++++++++++++++++++---\n src/core/MovementStats.h      | 104 ++++++-\n src/core/NodeFactory.cpp      |   6 +\n src/core/NodeFactory.h        |   2 +\n src/core/ParamRoles.h         | 192 +++++++++++++\n src/main.cpp                  |  15 +-\n src/nodes/PredictionNodes.cpp | 557 ++++++++++++++++++++++++++++++++++----\n src/nodes/PredictionNodes.h   |  10 +-\n 10 files changed, 1413 insertions(+), 105 deletions(-)\n create mode 100644 src/core/ParamRoles.h"
+  },
+  {
+    "hash": "742b022e876eccc3b5c1761a775917dd2b495422",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 19 11:16:06 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "prediction",
+      "title": "feat(prediction): step 4 Drift node",
+      "description": "step 4 Drift node",
+      "bullets": [],
+      "body": "DriftNode (INode + IModulator + IPredictor): per-key Langevin slots on the\nlearned dwell landscape with release momentum, Stray as exact temperature,\nFreeze into the patch, anchors, confidence dot and non-mutating ghost line\non driven widgets, help/browser entries, INFINITE_DRIFTTEST.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "feat(prediction): step 4 Drift node\n\nDriftNode (INode + IModulator + IPredictor): per-key Langevin slots on the\nlearned dwell landscape with release momentum, Stray as exact temperature,\nFreeze into the patch, anchors, confidence dot and non-mutating ghost line\non driven widgets, help/browser entries, INFINITE_DRIFTTEST.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".claude/skills/run-infinite-hygiene/driver.sh |   1 +\n CMakeLists.txt                                |   1 +\n src/main.cpp                                  |  80 ++++\n src/nodes/PredictionNodes.cpp                 | 659 ++++++++++++++++++++++++++\n src/nodes/PredictionNodes.h                   | 130 +++++\n 5 files changed, 871 insertions(+)\n create mode 100644 src/nodes/PredictionNodes.cpp\n create mode 100644 src/nodes/PredictionNodes.h"
+  },
+  {
+    "hash": "46f97caf2d3a7f11ed7df329e3a334c660c48ee6",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 19 10:28:25 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "prediction",
+      "title": "feat(prediction): step 3 IPredictor binding path",
+      "description": "step 3 IPredictor binding path",
+      "bullets": [],
+      "body": "IPredictor side interface, fader-space apply-loop branch (one Tick per\nframe, bypassed predictors skipped), Shift-grab override in ModSlider/\nModKnob, green-to-discrete refusal on cable drop plus inert guard for\nloaded bindings, debug-only stub predictor and INFINITE_PREDBINDTEST.\nAlso fixes RegisterParam dropping posToValue/valueToPos (tapers).\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "feat(prediction): step 3 IPredictor binding path\n\nIPredictor side interface, fader-space apply-loop branch (one Tick per\nframe, bypassed predictors skipped), Shift-grab override in ModSlider/\nModKnob, green-to-discrete refusal on cable drop plus inert guard for\nloaded bindings, debug-only stub predictor and INFINITE_PREDBINDTEST.\nAlso fixes RegisterParam dropping posToValue/valueToPos (tapers).\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".claude/skills/run-infinite-hygiene/driver.sh |   1 +\n src/core/Modulation.cpp                       |   6 +\n src/core/Modulation.h                         |  30 ++\n src/main.cpp                                  | 541 +++++++++++++++++++++++++-\n 4 files changed, 566 insertions(+), 12 deletions(-)"
+  },
+  {
+    "hash": "73be96578e06acf2a93bf62e7f3f41ae18d26a89",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 19 08:37:03 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "prediction",
+      "title": "feat(prediction): step 2 online param statistics, retention gate, offline eval",
+      "description": "step 2 online param statistics, retention gate, offline eval",
+      "bullets": [],
+      "body": "MovementStats: per-key AR(1)/dwell/release-velocity stats on a 100 ms active-time grid with lazy\nforgetting, stats.bin persistence with lastConsumed gating EnforceRetention, startup catch-up replay.\nKEY/BIND records now carry dt (step-1 timing fix). tools/prediction/eval.py scores hold/range/Drift NLL.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "feat(prediction): step 2 online param statistics, retention gate, offline eval\n\nMovementStats: per-key AR(1)/dwell/release-velocity stats on a 100 ms active-time grid with lazy\nforgetting, stats.bin persistence with lastConsumed gating EnforceRetention, startup catch-up replay.\nKEY/BIND records now carry dt (step-1 timing fix). tools/prediction/eval.py scores hold/range/Drift NLL.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".claude/skills/run-infinite-hygiene/driver.sh |   2 +\n CMakeLists.txt                                |   1 +\n src/core/MovementLog.cpp                      | 204 +++++-\n src/core/MovementLog.h                        |   5 +\n src/core/MovementStats.cpp                    | 995 ++++++++++++++++++++++++++\n src/core/MovementStats.h                      | 181 +++++\n src/main.cpp                                  |   4 +\n tools/prediction/eval.py                      | 626 ++++++++++++++++\n 8 files changed, 2005 insertions(+), 13 deletions(-)\n create mode 100644 src/core/MovementStats.cpp\n create mode 100644 src/core/MovementStats.h\n create mode 100644 tools/prediction/eval.py"
+  },
+  {
+    "hash": "b6e9f5d934a0ae391c9ee0e089fdcfb8cac94976",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 19 08:20:38 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "prediction",
+      "title": "feat(prediction): step 1 movement log (param movement recorder)",
+      "description": "step 1 movement log (param movement recorder)",
+      "bullets": [],
+      "body": "Always-on, change-based log of param movement: KEY/VAL/BIND/TRANSPORT/MARK\nrecords, source-tagged (hand/perf/modulator/expression/gesture/other), varint\nencoded, SPSC ring + writer thread, miniz-compressed closed files, retention\ncap, --dump-movement-log reader, Settings toggle. Undo/redo/load re-baseline\nvia a mark epoch; first sighting is a baseline; INFINITE_* runs never log\nunless INFINITE_MOVELOG_DIR is set; a lock file keeps one writer per folder;\ncrash-left sessions are compressed on next launch. SessionEnd carries the\ndropped count. Adds the prediction plan and step docs under docs/plans/prediction.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "feat(prediction): step 1 movement log (param movement recorder)\n\nAlways-on, change-based log of param movement: KEY/VAL/BIND/TRANSPORT/MARK\nrecords, source-tagged (hand/perf/modulator/expression/gesture/other), varint\nencoded, SPSC ring + writer thread, miniz-compressed closed files, retention\ncap, --dump-movement-log reader, Settings toggle. Undo/redo/load re-baseline\nvia a mark epoch; first sighting is a baseline; INFINITE_* runs never log\nunless INFINITE_MOVELOG_DIR is set; a lock file keeps one writer per folder;\ncrash-left sessions are compressed on next launch. SessionEnd carries the\ndropped count. Adds the prediction plan and step docs under docs/plans/prediction.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "CMakeLists.txt                                     |    2 +\n docs/plans/prediction/README.md                    |  523 +++++++\n docs/plans/prediction/step-01-movement-log.md      |  169 +++\n .../prediction/step-02-online-stats-and-eval.md    |  107 ++\n docs/plans/prediction/step-03-predictor-binding.md |  144 ++\n docs/plans/prediction/step-04-drift-node.md        |  116 ++\n .../prediction/step-05-cold-start-and-feedback.md  |  139 ++\n docs/plans/prediction/step-06-predictive-midi.md   |  107 ++\n docs/plans/prediction/step-07-v2-modes.md          |   28 +\n src/core/Modulation.cpp                            |   10 +\n src/core/Modulation.h                              |    4 +\n src/core/MovementLog.cpp                           | 1590 ++++++++++++++++++++\n src/core/MovementLog.h                             |  145 ++\n src/main.cpp                                       |   87 +-\n 14 files changed, 3169 insertions(+), 2 deletions(-)\n create mode 100644 docs/plans/prediction/README.md\n create mode 100644 docs/plans/prediction/step-01-movement-log.md\n create mode 100644 docs/plans/prediction/step-02-online-stats-and-eval.md\n create mode 100644 docs/plans/prediction/step-03-predictor-binding.md\n create mode 100644 docs/plans/prediction/step-04-drift-node.md\n create mode 100644 docs/plans/prediction/step-05-cold-start-and-feedback.md\n create mode 100644 docs/plans/prediction/step-06-predictive-midi.md\n create mode 100644 docs/plans/prediction/step-07-v2-modes.md\n create mode 100644 src/core/MovementLog.cpp\n create mode 100644 src/core/MovementLog.h"
+  },
+  {
+    "hash": "35221c1b2e9371d7ff10edcace564453146c3353",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 18 20:23:37 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "skills",
+      "title": "chore(skills): remove release-notes-draft skill",
+      "description": "remove release-notes-draft skill",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "chore(skills): remove release-notes-draft skill\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".claude/skills/release-notes-audit/SKILL.md |   2 +-\n .claude/skills/release-notes-draft/SKILL.md | 158 ----------------------------\n 2 files changed, 1 insertion(+), 159 deletions(-)\n delete mode 100644 .claude/skills/release-notes-draft/SKILL.md"
+  },
+  {
+    "hash": "f3e5d32f6a2dd0f005435fe904eb6f550a4dabc2",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 18 20:14:48 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "ui",
+      "title": "Release: rebuild DMG for v0.4.1",
+      "description": "Release: rebuild DMG for v0.4.1",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Release: rebuild DMG for v0.4.1\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "website/assets/Infinite.dmg | Bin 12204208 -> 12294217 bytes\n 1 file changed, 0 insertions(+), 0 deletions(-)"
+  },
+  {
+    "hash": "a127d8260ff7727f954c6e1c20eb0e30b21fc8a7",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 18 19:21:06 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "test",
+      "title": "fix(test): drop MATERIALSWEEPTEST's dead MaterialNode(bypassed) forwarding check",
+      "description": "drop MATERIALSWEEPTEST's dead MaterialNode(bypassed) forwarding check",
+      "bullets": [],
+      "body": "140221d removed MaterialNode::GetMaterial()'s bypass-forwarding branch as\nunreachable: MaterialNode has a mesh input plus per-map texture pins, so\nit fails CanBypass()'s one-input rule and can never actually be bypassed\nin the live graph (stale bypassed=true gets force-cleared on load). The\npre-existing MATERIALSWEEPTEST still force-set bypassed=true on a\nstandalone MaterialNode to exercise that now-removed path, so it started\nfailing CI. There's no reachable state left where this node forwards its\ninput's material, so there's nothing to sweep for it.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "fix(test): drop MATERIALSWEEPTEST's dead MaterialNode(bypassed) forwarding check\n\n140221d removed MaterialNode::GetMaterial()'s bypass-forwarding branch as\nunreachable: MaterialNode has a mesh input plus per-map texture pins, so\nit fails CanBypass()'s one-input rule and can never actually be bypassed\nin the live graph (stale bypassed=true gets force-cleared on load). The\npre-existing MATERIALSWEEPTEST still force-set bypassed=true on a\nstandalone MaterialNode to exercise that now-removed path, so it started\nfailing CI. There's no reachable state left where this node forwards its\ninput's material, so there's nothing to sweep for it.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "src/main.cpp | 16 +++++++++-------\n 1 file changed, 9 insertions(+), 7 deletions(-)"
+  },
+  {
+    "hash": "7416f6b87eb018385a262f2b3dc82246e0e2cb0a",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 18 18:22:28 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "build",
+      "title": "fix(build): missing <algorithm> include and structured-binding lambda capture breaking Linux/Windows CI",
+      "description": "missing <algorithm> include and structured-binding lambda capture breaking Linux/Windows CI",
+      "bullets": [],
+      "body": "Modulation.h used std::clamp without including <algorithm> - macOS's\nlibc++ pulls it in transitively via <map>/<vector>, Linux's libstdc++\ndoes not, so it only failed on Linux/Windows CI.\nINFINITE_BYPASSSWEEPTEST's fail() lambda captured a structured binding\n(category/name from `for (const auto& [category, name] : types)`) by\nreference - invalid before C++20, silently accepted as an extension by\nApple Clang but correctly rejected by Linux Clang/GCC and MSVC. Replaced\nwith named locals bound from a plain pair reference.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "fix(build): missing <algorithm> include and structured-binding lambda capture breaking Linux/Windows CI\n\nModulation.h used std::clamp without including <algorithm> - macOS's\nlibc++ pulls it in transitively via <map>/<vector>, Linux's libstdc++\ndoes not, so it only failed on Linux/Windows CI.\n\nINFINITE_BYPASSSWEEPTEST's fail() lambda captured a structured binding\n(category/name from `for (const auto& [category, name] : types)`) by\nreference - invalid before C++20, silently accepted as an extension by\nApple Clang but correctly rejected by Linux Clang/GCC and MSVC. Replaced\nwith named locals bound from a plain pair reference.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "src/core/Modulation.h                              |   1 +\n src/main.cpp                                       |   4 +-\n .../1_extractors/output/git_commits_corpus.json    |  16 +\n .../1_extractors/output/recovered_docs_corpus.json | 472 ++++++++++-----------\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl | 151 +++----\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl | 151 +++----\n 6 files changed, 408 insertions(+), 387 deletions(-)"
+  },
+  {
     "hash": "54494fceb1199c1fd716a9d7fac6f61ca651de25",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
