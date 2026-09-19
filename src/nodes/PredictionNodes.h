@@ -50,17 +50,28 @@ public:
    std::string frozenProfile; // one entry per key: uid:paramIndex:base64(64 x u8, theta, sigma, lo, hi)
    std::string anchors;       // uid:paramIndex=pos;...   the last hand-set place of each key
 
+   // --- v2 Step 7 Params ---
+   bool follow = false;       // 7a Follow leader mode
+   int leaderNodeIndex = -1;
+   int leaderParamIndex = 0;
+   bool sectionConditioned = false; // 7e Section-conditioned dwell landscape
+   int recallBar = -1;        // 7b Recall jump trigger
+
    void VisitParams(ParamVisitor& v) override
    {
       v.Float("speed", speed); v.Float("stray", stray); v.Float("momentum", momentum);
       v.Float("link", link); v.Int("seed", seed); v.Bool("frozen", frozen);
       v.Text("frozenProfile", frozenProfile); v.Text("anchors", anchors);
+      v.Bool("follow", follow); v.Int("leaderNodeIndex", leaderNodeIndex);
+      v.Int("leaderParamIndex", leaderParamIndex);
+      v.Bool("sectionConditioned", sectionConditioned); v.Int("recallBar", recallBar);
    }
 
    // --- UI / test helpers (main thread) ---
    // 0 = grey (defaults, w1 < 0.2), 1 = dim green (your style from other patches, w1 < 0.6), 2 = full
    // green (this knob). Frozen reads 2.
    int ConfidenceRung(const ParamKey& k) const;
+   float Confidence01(const ParamKey& k) const override;
    // The likely next 2 s (kGhostPoints samples) from a COPY of the slot's x, v and RNG state, at a
    // fixed dt. Never advances or reseeds the real slot. Cached per slot per frame. Returns the
    // number of points written (0 when the slot is absent or paused under a hand grab).
@@ -81,6 +92,7 @@ public:
       float theta = 0.5f, sigma = 0.1f, lo = 0.0f, hi = 1.0f;
       double nEff = 0.0;   // the key's own n_eff
       float w1 = 0.0f;     // weight of the key's own data in the blend (drives the confidence dot)
+      float w2 = 0.0f, w2b = 0.0f, w2d = 0.0f, w3 = 0.0f;
       bool cold = true;
    };
    struct Slot
@@ -126,6 +138,63 @@ private:
    const MovementStats::Engine* mStats = nullptr;
 };
 
+// 7d Your Moves Faders node (Prediction Step 7d)
+// Macro faders driving multi-parameter offsets via PCA on deltas (p = p_now + W * delta_h)
+class MovesNode : public INode, public IModulator, public IPredictor
+{
+public:
+   static INode* Create() { return new MovesNode(); }
+   MovesNode();
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+
+   float Value01() override;
+
+   // IPredictor
+   void Tick(int frameId, double dt) override;
+   float ValuePos01For(const ParamKey& k, float curPos) override;
+   void OnGrab(const ParamKey& k) override;
+   void OnRelease(const ParamKey& k, float pos, float velPerSec) override;
+
+   // Saved params. Names are patch keys.
+   float gesture = 0.0f; // -1 .. +1 (primary unified gesture macro)
+   float amount = 1.0f;  // 0 .. 2 (depth scale)
+   float fader1 = 0.0f;  // legacy compatibility
+   float fader2 = 0.0f;
+   float fader3 = 0.0f;
+   float fader4 = 0.0f;
+   std::string weightsData;
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Float("gesture", gesture);
+      v.Float("amount", amount);
+      v.Float("fader1", fader1);
+      v.Float("fader2", fader2);
+      v.Float("fader3", fader3);
+      v.Float("fader4", fader4);
+      v.Text("weightsData", weightsData);
+   }
+
+   void RefreshPCA(const MovementStats::Engine* engine = nullptr);
+   int SlotCount() const { return (int)mBasePos.size(); }
+   float ExplainedVariance(int comp) const
+   {
+      return (comp >= 0 && comp < (int)mPCA.explainedVarianceRatio.size()) ? mPCA.explainedVarianceRatio[comp] : 0.0f;
+   }
+   void SetStatsSource(const MovementStats::Engine* e) { mStats = e; }
+   float Confidence01(const ParamKey& k) const override;
+
+private:
+   std::map<ParamKey, float> mBasePos;
+   std::map<ParamKey, float> mOutputPos;
+   MovementStats::MovesPCA mPCA;
+   const MovementStats::Engine* mStats = nullptr;
+};
+
 namespace PredictionNodes
 {
    // INFINITE_DRIFTTEST, headless: dynamics, release carry, determinism, save/load, ghost isolation.
@@ -133,4 +202,7 @@ namespace PredictionNodes
    // INFINITE_PREDFEEDBACKTEST, headless: cold start, blending, role pooling, your style, energy link,
    // anchors and the collapse monitor (docs/plans/prediction/step-05).
    bool RunPredFeedbackTest();
+   // INFINITE_PREDV2TEST, headless: Follow, Recall, Session Map, Your Moves, Section-Conditioned Drift,
+   // and Play Like Me (DMD).
+   bool RunPredV2Test();
 }

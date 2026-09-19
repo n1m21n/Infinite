@@ -309,13 +309,14 @@ void DriftNode::RefreshModel(const ParamKey& k, Slot& s)
    // and the anchor. No rung ever switches on or off; each carries a weight that grows with its data.
    MovementStats::Blend b;
    const MovementStats::KeyId id{ k.uid, k.paramIndex };
+   const int secId = (sectionConditioned && mStats != nullptr) ? mStats->CurrentSectionId() : -1;
    if (mStats != nullptr)
-      mStats->ComputeBlend(id, AnchorFor(k), b);
+      mStats->ComputeBlend(id, AnchorFor(k), b, secId);
    else
    {
       // No stats at all: a peak at the anchor and the default speed.
       static const MovementStats::Engine sNone;
-      sNone.ComputeBlend(id, AnchorFor(k), b);
+      sNone.ComputeBlend(id, AnchorFor(k), b, secId);
    }
    std::memcpy(m.p, b.p, sizeof(m.p));
    m.theta = std::clamp(b.theta, 0.05f, 20.0f);
@@ -323,6 +324,10 @@ void DriftNode::RefreshModel(const ParamKey& k, Slot& s)
    m.lo = b.lo; m.hi = b.hi;
    m.nEff = b.nKey;
    m.w1 = (float)b.w1;
+   m.w2 = (float)b.w2;
+   m.w2b = (float)b.w2b;
+   m.w2d = (float)b.w2d;
+   m.w3 = (float)b.w3;
    m.cold = b.w1 < 0.2;
    s.model = m;
    s.modelFrame = mFrame;
@@ -350,6 +355,22 @@ void DriftNode::Tick(int frameId, double dt)
          RefreshModel(it->first, s);
       if (!s.paused && dt > 0.0)
          Step(s.x, s.v, s.rng, s.model, pr, EnergyFor(it->first), dt);
+
+      if (follow && mStats != nullptr && leaderNodeIndex >= 0)
+      {
+         uint64_t leadUid = (uint64_t)leaderNodeIndex;
+         MovementStats::KeyId leadKey{ leadUid, leaderParamIndex };
+         MovementStats::KeyId followKey{ it->first.uid, it->first.paramIndex };
+         auto fit = mStats->FitFollow(followKey, leadKey);
+         if (fit.valid)
+         {
+            const auto* leadStats = mStats->Find(leadKey);
+            float leadPos = leadStats && leadStats->W > 0.0 ? (float)(leadStats->Sx / leadStats->W) : 0.5f;
+            float target = std::clamp(fit.beta * leadPos + fit.c, 0.0f, 1.0f);
+            s.x += (target - s.x) * std::clamp((float)dt * 5.0f, 0.0f, 1.0f);
+         }
+      }
+
       ++it;
    }
 }
@@ -397,6 +418,18 @@ int DriftNode::ConfidenceRung(const ParamKey& k) const
    // carried over from other patches and knobs, full green = this knob.
    const float w1 = it->second.model.w1;
    return w1 < 0.2f ? 0 : (w1 < 0.6f ? 1 : 2);
+}
+
+float DriftNode::Confidence01(const ParamKey& k) const
+{
+   if (frozen)
+      return 1.0f;
+   auto it = mSlots.find(k);
+   if (it == mSlots.end())
+      return 0.5f;
+   const auto& m = it->second.model;
+   float c = m.w1 * 1.0f + m.w2 * 0.75f + m.w2b * 0.65f + m.w2d * 0.45f + m.w3 * 0.35f + (m.cold ? 0.05f : 0.2f);
+   return std::clamp(c, 0.05f, 1.0f);
 }
 
 float DriftNode::EnergyFor(const ParamKey& k) const
@@ -1096,5 +1129,395 @@ bool RunPredFeedbackTest()
 
    std::printf("%s\n", gFbFail == 0 ? "PREDFEEDBACKTEST OK" : "PREDFEEDBACKTEST FAIL");
    return gFbFail == 0;
+}
+} // namespace PredictionNodes
+
+// -----------------------------------------------------------------------------
+// MovesNode (Prediction Step 7d)
+// -----------------------------------------------------------------------------
+
+MovesNode::MovesNode()
+{
+   mStats = &MovementStats::Live();
+}
+
+float MovesNode::Value01()
+{
+   const float g = (gesture != 0.0f) ? gesture : fader1;
+   return std::clamp(0.5f + 0.5f * g, 0.0f, 1.0f);
+}
+
+void MovesNode::Tick(int, double)
+{
+   if (mStats == nullptr)
+      mStats = &MovementStats::Live();
+
+   if (!mPCA.valid || mBasePos.size() > mPCA.keys.size())
+      RefreshPCA(mStats);
+
+   const float g = (gesture != 0.0f) ? gesture : fader1;
+   for (auto& [k, base] : mBasePos)
+   {
+      float offset = 0.0f;
+      if (mPCA.valid && !mPCA.W.empty())
+      {
+         for (size_t keyIdx = 0; keyIdx < mPCA.keys.size(); keyIdx++)
+         {
+            if (mPCA.keys[keyIdx].uid == k.uid && mPCA.keys[keyIdx].paramIndex == k.paramIndex)
+            {
+               float wComb = 0.0f;
+               for (size_t comp = 0; comp < mPCA.W.size() && comp < mPCA.explainedVarianceRatio.size(); comp++)
+               {
+                  float varR = mPCA.explainedVarianceRatio[comp];
+                  wComb += mPCA.W[comp][keyIdx] * varR;
+               }
+               float sign = (wComb >= 0.0f) ? 1.0f : -1.0f;
+               float mag = std::abs(wComb);
+               float wFocused = (mag > 0.05f) ? sign * std::pow(mag, 1.4f) : 0.0f;
+               float legacy = fader2 * (mPCA.W.size() > 1 ? mPCA.W[1][keyIdx] : 0.0f) +
+                              fader3 * (mPCA.W.size() > 2 ? mPCA.W[2][keyIdx] : 0.0f) +
+                              fader4 * (mPCA.W.size() > 3 ? mPCA.W[3][keyIdx] : 0.0f);
+               offset = wFocused * g + legacy;
+               break;
+            }
+         }
+      }
+      else
+      {
+         offset = g * 0.5f;
+      }
+      mOutputPos[k] = std::clamp(base + amount * offset, 0.0f, 1.0f);
+   }
+}
+
+float MovesNode::ValuePos01For(const ParamKey& k, float curPos)
+{
+   if (mBasePos.find(k) == mBasePos.end())
+      mBasePos[k] = std::clamp(curPos, 0.0f, 1.0f);
+
+   auto it = mOutputPos.find(k);
+   if (it != mOutputPos.end())
+      return it->second;
+
+   float base = mBasePos[k];
+   const float g = (gesture != 0.0f) ? gesture : fader1;
+   float offset = 0.0f;
+   if (mPCA.valid && !mPCA.W.empty())
+   {
+      for (size_t keyIdx = 0; keyIdx < mPCA.keys.size(); keyIdx++)
+      {
+         if (mPCA.keys[keyIdx].uid == k.uid && mPCA.keys[keyIdx].paramIndex == k.paramIndex)
+         {
+            float wComb = 0.0f;
+            for (size_t comp = 0; comp < mPCA.W.size() && comp < mPCA.explainedVarianceRatio.size(); comp++)
+            {
+               float varR = mPCA.explainedVarianceRatio[comp];
+               wComb += mPCA.W[comp][keyIdx] * varR;
+            }
+            float sign = (wComb >= 0.0f) ? 1.0f : -1.0f;
+            float mag = std::abs(wComb);
+            float wFocused = (mag > 0.05f) ? sign * std::pow(mag, 1.4f) : 0.0f;
+            float legacy = fader2 * (mPCA.W.size() > 1 ? mPCA.W[1][keyIdx] : 0.0f) +
+                           fader3 * (mPCA.W.size() > 2 ? mPCA.W[2][keyIdx] : 0.0f) +
+                           fader4 * (mPCA.W.size() > 3 ? mPCA.W[3][keyIdx] : 0.0f);
+            offset = wFocused * g + legacy;
+            break;
+         }
+      }
+   }
+   else
+   {
+      offset = g * 0.5f;
+   }
+   float out = std::clamp(base + amount * offset, 0.0f, 1.0f);
+   mOutputPos[k] = out;
+   return out;
+}
+
+void MovesNode::OnGrab(const ParamKey&)
+{
+}
+
+void MovesNode::OnRelease(const ParamKey& k, float pos, float)
+{
+   mBasePos[k] = std::clamp(pos, 0.0f, 1.0f);
+}
+
+void MovesNode::RefreshPCA(const MovementStats::Engine* engine)
+{
+   const auto* e = engine ? engine : mStats;
+   if (e != nullptr)
+   {
+      mPCA = e->ComputeDeltaPCA(4);
+      for (const auto& k : mPCA.keys)
+      {
+         ParamKey pk{ k.uid, k.paramIndex };
+         if (mBasePos.find(pk) == mBasePos.end())
+            mBasePos[pk] = 0.5f;
+      }
+   }
+}
+
+float MovesNode::Confidence01(const ParamKey&) const
+{
+   if (mPCA.valid && !mPCA.explainedVarianceRatio.empty())
+   {
+      float v = 0.0f;
+      for (float r : mPCA.explainedVarianceRatio) v += r;
+      return std::clamp(v, 0.5f, 1.0f);
+   }
+   return 0.85f;
+}
+
+// -----------------------------------------------------------------------------
+// INFINITE_PREDV2TEST (Prediction Step 7)
+// -----------------------------------------------------------------------------
+
+namespace PredictionNodes
+{
+int gV2Fail = 0;
+#define V2_CHECK(cond, fmt, ...)                                                        \
+   do                                                                                    \
+   {                                                                                     \
+      if (!(cond))                                                                       \
+      {                                                                                  \
+         std::printf("[PREDV2 FAIL] line %d: " fmt "\n", __LINE__, ##__VA_ARGS__);        \
+         gV2Fail++;                                                                      \
+         return false;                                                                   \
+      }                                                                                  \
+   } while (0)
+
+bool RunPredV2Test()
+{
+   gV2Fail = 0;
+   std::printf("[PREDV2TEST] Starting v2 prediction modes test...\n");
+
+   using MovementLog::Source;
+   using MovementStats::Engine;
+   using MovementStats::KeyId;
+
+   // 1. 7a Follow: Cross-correlation on velocities with lag tau >= 0 and ridge regression
+   {
+      Engine e;
+      const KeyId kLead{ 10, 0 }, kFollow{ 11, 0 };
+      e.RegisterKey(kLead, "Filter", "cutoff", true);
+      e.RegisterKey(kFollow, "Filter", "resonance", true);
+      e.SetPlaying(true);
+
+      double t = 0.0;
+      uint64_t rng = 42;
+      std::vector<float> leadPath;
+      float xLead = 0.5f;
+      for (int i = 0; i < 200; i++)
+      {
+         xLead = std::clamp(xLead + 0.03f * Gauss(rng), 0.1f, 0.9f);
+         leadPath.push_back(xLead);
+      }
+
+      for (int i = 0; i < 150; i++, t += MovementStats::kGridDt)
+      {
+         float pLead = leadPath[i];
+         float pFollow = (i >= 3) ? std::clamp(0.8f * leadPath[i - 3] + 0.1f + 0.005f * Gauss(rng), 0.0f, 1.0f) : 0.5f;
+
+         e.Observe(kLead, t, pLead, Source::Hand, 0);
+         e.Observe(kFollow, t, pFollow, Source::Hand, 0);
+         e.Advance(t);
+      }
+
+      auto fit = e.FitFollow(kFollow, kLead);
+      std::printf("[V2] Follow fit: valid=%d tauTicks=%d (want 3) beta=%.3f (want ~0.8) r2=%.3f corrVel=%.3f\n",
+                  fit.valid, fit.tauTicks, fit.beta, fit.r2, fit.corrVel);
+      V2_CHECK(fit.valid, "FitFollow returned invalid");
+      V2_CHECK(fit.tauTicks == 3, "FitFollow tauTicks=%d, expected 3", fit.tauTicks);
+      V2_CHECK(fit.beta > 0.6f && fit.beta < 1.0f, "FitFollow beta=%.3f outside [0.6, 1.0]", fit.beta);
+      V2_CHECK(fit.r2 > 0.7f, "FitFollow held-out R2=%.3f < 0.7", fit.r2);
+      V2_CHECK(fit.corrVel > 0.5f, "FitFollow corrVel=%.3f < 0.5", fit.corrVel);
+   }
+
+   // 2. 7b Recall: 1-bar summary index and nearest-segment retrieval
+   {
+      Engine e;
+      const KeyId k1{ 20, 0 };
+      e.RegisterKey(k1, "Filter", "cutoff", true);
+      e.SetPlaying(true);
+
+      double t = 0.0;
+      for (int bar = 0; bar < 16; bar++)
+      {
+         float barBase = (bar == 5) ? 0.85f : (float)bar * 0.04f + 0.1f;
+         for (int tick = 0; tick < 10; tick++, t += MovementStats::kGridDt)
+         {
+            float pos = barBase + 0.01f * (float)tick;
+            e.Observe(k1, t, pos, Source::Hand, 0);
+            e.Advance(t);
+         }
+         e.RecordBarSummary(bar, bar * 4.0);
+      }
+
+      MovementStats::BarSummary::KeySummary q;
+      q.id = k1;
+      q.meanPos = 0.895f;
+      q.slopePos = 0.009f;
+      auto match = e.SearchRecallIndex({ q });
+      std::printf("[V2] Recall search: found=%d matchedBar=%d (want 5) similarity=%.3f\n",
+                  match.found, match.matchedBar, match.similarity);
+      V2_CHECK(match.found && match.matchedBar == 5, "Recall failed to match target bar 5");
+      V2_CHECK(match.similarity > 0.8f, "Recall similarity=%.3f < 0.8", match.similarity);
+   }
+
+   // 3. 7c Session Map: Cosine similarity matrix and Foote novelty segmentation
+   {
+      Engine e;
+      const KeyId k1{ 30, 0 }, k2{ 30, 1 };
+      e.RegisterKey(k1, "Synth", "pitch", true);
+      e.RegisterKey(k2, "Synth", "filter", true);
+      e.SetPlaying(true);
+
+      double t = 0.0;
+      for (int bar = 0; bar < 32; bar++)
+      {
+         float p1 = 0.2f, p2 = 0.2f;
+         if (bar >= 8 && bar < 16) { p1 = 0.8f; p2 = 0.3f; }
+         else if (bar >= 16 && bar < 24) { p1 = 0.22f; p2 = 0.21f; }
+         else if (bar >= 24) { p1 = 0.5f; p2 = 0.9f; }
+
+         for (int tick = 0; tick < 10; tick++, t += MovementStats::kGridDt)
+         {
+            e.Observe(k1, t, p1, Source::Hand, 0);
+            e.Observe(k2, t, p2, Source::Hand, 0);
+            e.Advance(t);
+         }
+         e.RecordBarSummary(bar, bar * 4.0);
+      }
+
+      MovementStats::SessionMap smap;
+      e.ComputeSessionMap(smap, 3);
+      std::printf("[V2] Session Map: numBars=%d sections=%zu\n", smap.numBars, smap.sections.size());
+      V2_CHECK(smap.numBars == 32, "SessionMap numBars=%d != 32", smap.numBars);
+      V2_CHECK(smap.sections.size() >= 3, "SessionMap detected %zu sections, want >= 3", smap.sections.size());
+      float simAA = smap.similarityMatrix[2 * 32 + 18];
+      float simAB = smap.similarityMatrix[2 * 32 + 10];
+      std::printf("[V2] Similarity A-A': %.3f, Similarity A-B: %.3f\n", simAA, simAB);
+      V2_CHECK(simAA > 0.95f, "A-A' similarity %.3f <= 0.95", simAA);
+   }
+
+   // 4. 7d Your Moves: Delta PCA explaining >= 60% of hand-move variance
+   {
+      Engine e;
+      const KeyId kA{ 40, 0 }, kB{ 40, 1 }, kC{ 40, 2 };
+      e.RegisterKey(kA, "Mixer", "fader1", true);
+      e.RegisterKey(kB, "Mixer", "fader2", true);
+      e.RegisterKey(kC, "Mixer", "fader3", true);
+      e.SetPlaying(true);
+
+      double t = 0.0;
+      uint64_t rng = 101;
+      float pA = 0.5f, pB = 0.5f, pC = 0.5f;
+      for (int i = 0; i < 120; i++, t += MovementStats::kGridDt)
+      {
+         float d1 = 0.04f * Gauss(rng);
+         float d2 = 0.02f * Gauss(rng);
+         pA = std::clamp(pA + d1 + 0.5f * d2, 0.0f, 1.0f);
+         pB = std::clamp(pB - d1 + 0.3f * d2, 0.0f, 1.0f);
+         pC = std::clamp(pC + 0.8f * d1 - d2, 0.0f, 1.0f);
+
+         e.Observe(kA, t, pA, Source::Hand, 0);
+         e.Observe(kB, t, pB, Source::Hand, 0);
+         e.Observe(kC, t, pC, Source::Hand, 0);
+         e.Advance(t);
+      }
+
+      auto pca = e.ComputeDeltaPCA(3);
+      float top2Var = (pca.explainedVarianceRatio.size() >= 2) ? (pca.explainedVarianceRatio[0] + pca.explainedVarianceRatio[1]) : 0.0f;
+      std::printf("[V2] Delta PCA: valid=%d components=%d top-2 variance=%.1f%% (want >= 60%%)\n",
+                  pca.valid, pca.numComponents, top2Var * 100.0f);
+      V2_CHECK(pca.valid, "Delta PCA computation failed");
+      V2_CHECK(top2Var >= 0.60f, "Top-2 components explained %.1f%% < 60%%", top2Var * 100.0f);
+
+      MovesNode moves;
+      moves.SetStatsSource(&e);
+      moves.RefreshPCA(&e);
+      moves.fader1 = 0.5f;
+      moves.Tick(1, 0.1);
+      const ParamKey pkA{ 40, 0 };
+      float outA = moves.ValuePos01For(pkA, 0.5f);
+      V2_CHECK(outA != 0.5f, "MovesNode fader displacement produced no parameter offset");
+   }
+
+   // 5. 7e Section-Conditioned Drift
+   {
+      Engine e;
+      const KeyId k1{ 50, 0 };
+      e.RegisterKey(k1, "Filter", "cutoff", true);
+      e.SetPlaying(true);
+
+      double t = 0.0;
+      uint64_t rng = 77;
+      e.SetCurrentSectionId(0);
+      for (int i = 0; i < 100; i++, t += MovementStats::kGridDt)
+      {
+         e.Observe(k1, t, std::clamp(0.2f + 0.02f * Gauss(rng), 0.0f, 1.0f), Source::Hand, 0);
+         e.Advance(t);
+      }
+      e.SetCurrentSectionId(1);
+      for (int i = 0; i < 100; i++, t += MovementStats::kGridDt)
+      {
+         e.Observe(k1, t, std::clamp(0.8f + 0.02f * Gauss(rng), 0.0f, 1.0f), Source::Hand, 0);
+         e.Advance(t);
+      }
+
+      MovementStats::Blend b0, b1;
+      e.ComputeBlend(k1, 0.5f, b0, 0);
+      e.ComputeBlend(k1, 0.5f, b1, 1);
+
+      int peakBin0 = 0, peakBin1 = 0;
+      for (int i = 0; i < MovementStats::kBins; i++)
+      {
+         if (b0.p[i] > b0.p[peakBin0]) peakBin0 = i;
+         if (b1.p[i] > b1.p[peakBin1]) peakBin1 = i;
+      }
+      std::printf("[V2] Section Drift: Sec 0 peak bin=%d (~13 for 0.2), Sec 1 peak bin=%d (~51 for 0.8)\n", peakBin0, peakBin1);
+      V2_CHECK(peakBin0 < 25, "Section 0 peak bin %d >= 25", peakBin0);
+      V2_CHECK(peakBin1 > 38, "Section 1 peak bin %d <= 38", peakBin1);
+   }
+
+   // 6. 7g Play Like Me: Dynamic Mode Decomposition (DMD) with spectral radius <= 1.0
+   {
+      Engine e;
+      const KeyId k1{ 60, 0 }, k2{ 60, 1 };
+      e.RegisterKey(k1, "Osc", "f1", true);
+      e.RegisterKey(k2, "Osc", "f2", true);
+      e.SetPlaying(true);
+
+      double t = 0.0;
+      float x1 = 0.6f, x2 = 0.4f;
+      for (int i = 0; i < 100; i++, t += MovementStats::kGridDt)
+      {
+         float x1_next = std::clamp(0.95f * x1 - 0.05f * x2 + 0.05f, 0.0f, 1.0f);
+         float x2_next = std::clamp(0.05f * x1 + 0.95f * x2 + 0.02f, 0.0f, 1.0f);
+         x1 = x1_next;
+         x2 = x2_next;
+         e.Observe(k1, t, x1, Source::Hand, 0);
+         e.Observe(k2, t, x2, Source::Hand, 0);
+         e.Advance(t);
+      }
+
+      auto dmd = e.FitDMD(2);
+      std::printf("[V2] DMD: valid=%d rank=%d spectralRadius=%.4f (want <= 1.0)\n",
+                  dmd.valid, dmd.rank, dmd.spectralRadius);
+      V2_CHECK(dmd.valid, "DMD fit failed");
+      V2_CHECK(dmd.spectralRadius <= 1.0001f, "DMD spectral radius %.4f > 1.0", dmd.spectralRadius);
+
+      std::vector<float> state = { 0.5f, 0.5f };
+      for (int step = 0; step < 50; step++)
+      {
+         dmd.Step(state);
+         V2_CHECK(state[0] >= 0.0f && state[0] <= 1.0f && state[1] >= 0.0f && state[1] <= 1.0f,
+                  "DMD step %d diverged: [%.3f, %.3f]", step, state[0], state[1]);
+      }
+   }
+
+   std::printf("[PREDV2TEST] ALL V2 MODES PASS\n");
+   return true;
 }
 }

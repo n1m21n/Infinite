@@ -128,6 +128,83 @@ namespace MovementStats
       }
    };
 
+   // --- Step 7: v2 Prediction Modes & Modeling ---
+
+   // 7a Follow: Lagged ridge regression over velocities (Delta x).
+   struct FollowFit
+   {
+      bool valid = false;
+      int tauTicks = 0;          // lag in 100 ms grid ticks (tau >= 0)
+      float tauSec = 0.0f;       // tau in seconds
+      float beta = 0.0f;         // regression coefficient
+      float c = 0.0f;            // offset
+      float r2 = 0.0f;           // held-out R^2 / goodness of fit
+      float corrVel = 0.0f;      // velocity cross-correlation at best lag
+   };
+
+   // 7b Recall: Per-bar summary index and nearest segment retrieval.
+   struct BarSummary
+   {
+      int barIndex = 0;
+      double beat = 0.0;
+      struct KeySummary
+      {
+         KeyId id;
+         float meanPos = 0.5f;
+         float slopePos = 0.0f;
+      };
+      std::vector<KeySummary> keys;
+   };
+
+   struct RecallMatch
+   {
+      bool found = false;
+      int matchedBar = -1;
+      float similarity = 0.0f;
+   };
+
+   // 7c Session Map: Cosine similarity and Foote novelty segmentation.
+   struct SessionSection
+   {
+      int startBar = 0;
+      int endBar = 0;
+      std::string label;         // "A", "B", "A'", "C", etc.
+      int sectionId = 0;
+   };
+
+   struct SessionMap
+   {
+      static constexpr size_t kMaxColumns = 2048;
+      int numBars = 0;
+      int downsampleFactor = 1;
+      std::vector<std::vector<float>> columns; // L2-normalized parameter vectors
+      std::vector<float> similarityMatrix;     // flattened numBars x numBars cosine similarity
+      std::vector<float> noveltyCurve;         // Foote novelty curve
+      std::vector<SessionSection> sections;
+   };
+
+   // 7d Your Moves: PCA on signed deltas (Delta M).
+   struct MovesPCA
+   {
+      bool valid = false;
+      int numComponents = 0;
+      std::vector<KeyId> keys;
+      std::vector<std::vector<float>> W;        // [component][key]
+      std::vector<float> explainedVarianceRatio;
+      float totalVariance = 0.0f;
+   };
+
+   // 7g Play Like Me: Dynamic Mode Decomposition (DMD) with spectral radius <= 1.
+   struct DMDFit
+   {
+      bool valid = false;
+      int rank = 0;
+      std::vector<KeyId> keys;
+      std::vector<float> A;                      // rank x rank transition matrix (row-major)
+      float spectralRadius = 1.0f;
+      void Step(std::vector<float>& x) const;
+   };
+
    // The statistics engine. Instantiable so tests and offline replay can run one in isolation;
    // the live app uses Live().
    class Engine
@@ -159,7 +236,8 @@ namespace MovementStats
       void Advance(double t);
 
       // The blended model of a key. `anchor` < 0 means the key has none (a flat fallback).
-      void ComputeBlend(const KeyId& id, float anchor, Blend& out) const;
+      // If `sectionId` >= 0, incorporates section-conditioned dwell landscape (7e).
+      void ComputeBlend(const KeyId& id, float anchor, Blend& out, int sectionId = -1) const;
       // How actively the hand is moving right now, in [0,1] (README §6): 0.7 role + 0.3 everything.
       // O(1); only Hand and Perf writes count, so predictions can never excite themselves.
       float HandEnergy(const KeyId& id) const;
@@ -180,6 +258,22 @@ namespace MovementStats
       double ActiveClock() const { return mActiveClock; }
       size_t KeyCount() const { return mKeys.size(); }
       size_t ProfileCount() const { return mProfiles.size(); }
+
+      // --- v2 Mode Fits & Queries ---
+      // 7a Follow fit between leader and follower
+      FollowFit FitFollow(const KeyId& follower, const KeyId& leader, int maxLagTicks = 20, float ridgeLambda = 1e-4f) const;
+      // 7b Recall index lookup
+      void RecordBarSummary(int barIndex, double beat);
+      RecallMatch SearchRecallIndex(const std::vector<BarSummary::KeySummary>& query, int queryBars = 1) const;
+      const std::vector<BarSummary>& GetBarSummaries() const { return mBarSummaries; }
+      // 7c Session Map computation
+      void ComputeSessionMap(SessionMap& out, int noveltyKernelHalfSize = 4) const;
+      int CurrentSectionId() const { return mCurrentSectionId; }
+      void SetCurrentSectionId(int secId) { mCurrentSectionId = secId; }
+      // 7d Delta PCA
+      MovesPCA ComputeDeltaPCA(int maxComponents = 4) const;
+      // 7g Dynamic Mode Decomposition
+      DMDFit FitDMD(int maxRank = 4) const;
 
       // Persistence. Load returns false (leaving the engine empty) on any corruption.
       std::vector<uint8_t> Serialize(const std::string& lastConsumed) const;
@@ -226,6 +320,13 @@ namespace MovementStats
          double handT[8] = {};
          float handPos[8] = {};
          int handN = 0;
+
+         // --- v2 Runtime History & Section Accumulators ---
+         static constexpr size_t kHistoryCap = 512; // ~51.2 s of 100 ms ticks
+         std::vector<float> posHistory;
+         std::vector<float> deltaHistory;
+         std::unordered_map<int, std::vector<float>> sectionHist; // 64 bins per section
+         std::unordered_map<int, double> sectionNEff;
       };
 
       void Tick(double tickTime);
@@ -266,6 +367,10 @@ namespace MovementStats
       double mLastHandMoveT = -1e18;
       bool mPlaying = false;
       bool mWasActive = false;
+
+      // --- v2 Storage ---
+      std::vector<BarSummary> mBarSummaries;
+      int mCurrentSectionId = 0;
    };
 
    Engine& Live();

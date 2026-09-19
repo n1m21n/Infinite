@@ -40,6 +40,7 @@ public:
    AudioNode* GetAudioNode() override;
 
    // Saved params. Names are patch keys.
+   int sourceMode = 0;        // 0 = Notes (Source A), 1 = Movement (Source B)
    float stray = 0.5f;        // 0 replay .. 0.5 faithful .. 1 uniform in range
    int memory = 4;            // max context order 0..8
    float lengthSpread = 0.25f;
@@ -47,6 +48,7 @@ public:
    int rangeLow = 36;
    int rangeHigh = 96;
    int seed = 1;
+   bool useGlobalScale = false; // snap generated notes to Transport's key/scale
    std::string model;         // NoteModel::EncodeEvents of the learned notes
 
    NoteCable noteInput;
@@ -68,6 +70,7 @@ public:
    // Bits per event that the full blend beats the order-0 baseline by, one point per captured bar.
    const std::vector<float>& Curve() const { return mCurve; }
    int LastNote() const;
+   float Confidence01() const;
 
    AudioPredictiveNotesNode* Audio() { return mAudioNode.get(); }
    // Blocks until any table build has finished and been swapped in (tests, save).

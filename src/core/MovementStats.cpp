@@ -184,6 +184,8 @@ void Engine::Reset()
    mLastHandMoveT = -1e18;
    mPlaying = false;
    mWasActive = false;
+   mBarSummaries.clear();
+   mCurrentSectionId = 0;
 }
 
 void Engine::RegisterKey(const KeyId& id, const std::string& nodeType, const std::string& name, bool continuous,
@@ -611,6 +613,23 @@ void Engine::Tick(double tickTime)
             r.cut = false; // the next hand move lifts an auto-cut
          }
       }
+      float delta = r.prevValid ? (r.holdPos - r.prevPos) : 0.0f;
+      r.posHistory.push_back(r.holdPos);
+      r.deltaHistory.push_back(delta);
+      if (r.posHistory.size() > Runtime::kHistoryCap)
+      {
+         r.posHistory.erase(r.posHistory.begin());
+         r.deltaHistory.erase(r.deltaHistory.begin());
+      }
+      if (mCurrentSectionId >= 0 && w > 0.0)
+      {
+         auto& sHist = r.sectionHist[mCurrentSectionId];
+         if (sHist.size() < kBins)
+            sHist.resize(kBins, 0.0f);
+         const int bin = PosBin(r.holdPos);
+         sHist[bin] += (float)w;
+         r.sectionNEff[mCurrentSectionId] += w;
+      }
       r.prevPos = r.holdPos;
       r.prevValid = true;
       RunMonitor(id, r);
@@ -702,7 +721,7 @@ Chain MakeChain(const double n[4], double nYou)
 }
 } // namespace
 
-void Engine::ComputeBlend(const KeyId& id, float anchor, Blend& out) const
+void Engine::ComputeBlend(const KeyId& id, float anchor, Blend& out, int sectionId) const
 {
    const Runtime* r = FindRuntime(id);
    const double now = mActiveClock;
@@ -795,6 +814,31 @@ void Engine::ComputeBlend(const KeyId& id, float anchor, Blend& out) const
    }
    for (float& v : out.p)
       v = sum > 0.0 ? static_cast<float>(v / sum) : 1.0f / kBins;
+
+   // 7e Section-conditioned landscape blending: if sectionId >= 0, blend section histogram by its nEff
+   if (r != nullptr && sectionId >= 0)
+   {
+      auto itNEff = r->sectionNEff.find(sectionId);
+      auto itHist = r->sectionHist.find(sectionId);
+      if (itNEff != r->sectionNEff.end() && itHist != r->sectionHist.end() && itNEff->second > 0.0)
+      {
+         float sSmoothed[kBins] = {};
+         SmoothBins(itHist->second.data(), sSmoothed, false);
+         const double nSec = itNEff->second;
+         const double wSec = nSec / (nSec + kN0);
+         double secSum = 0.0;
+         for (int i = 0; i < kBins; i++)
+         {
+            out.p[i] = static_cast<float>(wSec * sSmoothed[i] + (1.0 - wSec) * out.p[i]);
+            secSum += out.p[i];
+         }
+         if (secSum > 0.0)
+         {
+            for (int i = 0; i < kBins; i++)
+               out.p[i] = static_cast<float>(out.p[i] / secSum);
+         }
+      }
+   }
 
    // Speed chain (theta, sigma): the same weights, with rung 2c before the default.
    double nT[4];
@@ -1096,6 +1140,532 @@ bool Engine::Deserialize(const uint8_t* data, size_t size, std::string& lastCons
    mActiveClock = clock;
    lastConsumedOut = std::move(lastConsumed);
    return true;
+}
+
+// -----------------------------------------------------------------------------
+// Step 7: v2 Prediction Modes Implementations
+// -----------------------------------------------------------------------------
+
+FollowFit Engine::FitFollow(const KeyId& follower, const KeyId& leader, int maxLagTicks, float ridgeLambda) const
+{
+   FollowFit res;
+   const Runtime* rFollow = FindRuntime(follower);
+   const Runtime* rLead = FindRuntime(leader);
+   if (!rFollow || !rLead)
+      return res;
+
+   const size_t nF = rFollow->deltaHistory.size();
+   const size_t nL = rLead->deltaHistory.size();
+   const size_t n = std::min(nF, nL);
+   if (n < 20)
+      return res;
+
+   // 1. Cross-correlate VELOCITIES (Delta x) across lag tau >= 0 (up to maxLagTicks)
+   float bestCorr = -1e9f;
+   int bestLag = 0;
+
+   for (int tau = 0; tau <= maxLagTicks && (size_t)tau + 10 < n; tau++)
+   {
+      double sumF = 0, sumL = 0, sumF2 = 0, sumL2 = 0, sumFL = 0;
+      size_t count = 0;
+      for (size_t i = tau; i < n; i++)
+      {
+         float dF = rFollow->deltaHistory[i];
+         float dL = rLead->deltaHistory[i - tau];
+         sumF += dF; sumL += dL;
+         sumF2 += dF * dF; sumL2 += dL * dL;
+         sumFL += dF * dL;
+         count++;
+      }
+      if (count < 10)
+         continue;
+      double mF = sumF / count;
+      double mL = sumL / count;
+      double varF = std::max(0.0, sumF2 / count - mF * mF);
+      double varL = std::max(0.0, sumL2 / count - mL * mL);
+      if (varF > 1e-9 && varL > 1e-9)
+      {
+         double cov = sumFL / count - mF * mL;
+         double corr = std::abs(cov) / std::sqrt(varF * varL);
+         if (corr > bestCorr)
+         {
+            bestCorr = (float)corr;
+            bestLag = tau;
+         }
+      }
+   }
+
+   if (bestCorr < 0.0f)
+      return res;
+
+   // 2. Ridge regression on levels with lag bestLag: x_B(t) = beta * x_A(t - bestLag) + c
+   // Split 80% train / 20% test for holdout validation
+   const size_t nPos = std::min(rFollow->posHistory.size(), rLead->posHistory.size());
+   if (nPos <= (size_t)bestLag + 10)
+      return res;
+
+   const size_t totalPairs = nPos - bestLag;
+   const size_t trainPairs = (totalPairs * 4) / 5;
+   const size_t testPairs = totalPairs - trainPairs;
+   if (trainPairs < 10 || testPairs < 4)
+      return res;
+
+   double sL = 0, sF = 0, sL2 = 0, sLF = 0;
+   for (size_t i = 0; i < trainPairs; i++)
+   {
+      float pF = rFollow->posHistory[bestLag + i];
+      float pL = rLead->posHistory[i];
+      sL += pL; sF += pF;
+      sL2 += pL * pL; sLF += pL * pF;
+   }
+   double mL = sL / trainPairs;
+   double mF = sF / trainPairs;
+   double varL = sL2 / trainPairs - mL * mL;
+   double covLF = sLF / trainPairs - mL * mF;
+
+   // Ridge beta = covLF / (varL + lambda)
+   float beta = (float)(covLF / (varL + (double)ridgeLambda));
+   float c = (float)(mF - beta * mL);
+
+   // Evaluate R^2 on test split
+   double testSSE = 0, testSST = 0;
+   double testMF = 0;
+   for (size_t i = trainPairs; i < totalPairs; i++)
+      testMF += rFollow->posHistory[bestLag + i];
+   testMF /= testPairs;
+
+   for (size_t i = trainPairs; i < totalPairs; i++)
+   {
+      float actual = rFollow->posHistory[bestLag + i];
+      float pred = beta * rLead->posHistory[i] + c;
+      testSSE += (actual - pred) * (actual - pred);
+      testSST += (actual - testMF) * (actual - testMF);
+   }
+
+   float r2 = testSST > 1e-6 ? (float)(1.0 - testSSE / testSST) : 0.0f;
+
+   res.valid = true;
+   res.tauTicks = bestLag;
+   res.tauSec = bestLag * (float)kGridDt;
+   res.beta = beta;
+   res.c = c;
+   res.r2 = r2;
+   res.corrVel = bestCorr;
+   return res;
+}
+
+void Engine::RecordBarSummary(int barIndex, double beat)
+{
+   BarSummary bs;
+   bs.barIndex = barIndex;
+   bs.beat = beat;
+
+   for (const auto& [id, r] : mKeys)
+   {
+      if (!r.continuous || r.posHistory.empty())
+         continue;
+
+      size_t samples = std::min((size_t)10, r.posHistory.size());
+      float mean = 0.0f;
+      for (size_t i = r.posHistory.size() - samples; i < r.posHistory.size(); i++)
+         mean += r.posHistory[i];
+      mean /= samples;
+
+      float slope = (r.posHistory.back() - r.posHistory[r.posHistory.size() - samples]) / (float)samples;
+
+      BarSummary::KeySummary ks;
+      ks.id = id;
+      ks.meanPos = mean;
+      ks.slopePos = slope;
+      bs.keys.push_back(ks);
+   }
+
+   mBarSummaries.push_back(bs);
+   if (mBarSummaries.size() > SessionMap::kMaxColumns)
+      mBarSummaries.erase(mBarSummaries.begin());
+}
+
+RecallMatch Engine::SearchRecallIndex(const std::vector<BarSummary::KeySummary>& query, int queryBars) const
+{
+   RecallMatch match;
+   if (mBarSummaries.size() < 2 || query.empty())
+      return match;
+
+   float bestDist = 1e9f;
+   int bestBar = -1;
+
+   int searchLimit = std::max(0, (int)mBarSummaries.size() - queryBars - 1);
+   for (int b = 0; b < searchLimit; b++)
+   {
+      const auto& candidate = mBarSummaries[b];
+      float totalDist = 0.0f;
+      int matchedKeys = 0;
+
+      for (const auto& qk : query)
+      {
+         for (const auto& ck : candidate.keys)
+         {
+            if (qk.id == ck.id)
+            {
+               float dm = qk.meanPos - ck.meanPos;
+               float ds = qk.slopePos - ck.slopePos;
+               totalDist += dm * dm + 0.5f * ds * ds;
+               matchedKeys++;
+               break;
+            }
+         }
+      }
+
+      if (matchedKeys > 0)
+      {
+         float avgDist = totalDist / matchedKeys;
+         if (avgDist < bestDist)
+         {
+            bestDist = avgDist;
+            bestBar = candidate.barIndex;
+         }
+      }
+   }
+
+   if (bestBar >= 0)
+   {
+      match.found = true;
+      match.matchedBar = bestBar;
+      match.similarity = 1.0f / (1.0f + bestDist);
+   }
+   return match;
+}
+
+void Engine::ComputeSessionMap(SessionMap& out, int noveltyKernelHalfSize) const
+{
+   out.numBars = (int)mBarSummaries.size();
+   if (out.numBars == 0)
+      return;
+
+   // 1. L2-normalized column vector per bar
+   out.columns.resize(out.numBars);
+   for (int b = 0; b < out.numBars; b++)
+   {
+      const auto& bs = mBarSummaries[b];
+      std::vector<float> col;
+      col.reserve(bs.keys.size());
+      double normSq = 0.0;
+      for (const auto& k : bs.keys)
+      {
+         col.push_back(k.meanPos);
+         normSq += k.meanPos * k.meanPos;
+      }
+      double norm = std::sqrt(normSq);
+      if (norm > 1e-6)
+      {
+         for (auto& v : col)
+            v = (float)(v / norm);
+      }
+      out.columns[b] = std::move(col);
+   }
+
+   // 2. Pairwise cosine similarity matrix S (numBars x numBars)
+   out.similarityMatrix.resize(out.numBars * out.numBars, 0.0f);
+   for (int i = 0; i < out.numBars; i++)
+   {
+      out.similarityMatrix[i * out.numBars + i] = 1.0f;
+      for (int j = i + 1; j < out.numBars; j++)
+      {
+         const auto& ci = out.columns[i];
+         const auto& cj = out.columns[j];
+         size_t len = std::min(ci.size(), cj.size());
+         float dot = 0.0f;
+         for (size_t k = 0; k < len; k++)
+            dot += ci[k] * cj[k];
+         dot = std::clamp(dot, -1.0f, 1.0f);
+         out.similarityMatrix[i * out.numBars + j] = dot;
+         out.similarityMatrix[j * out.numBars + i] = dot;
+      }
+   }
+
+   // 3. Foote novelty curve along diagonal
+   out.noveltyCurve.resize(out.numBars, 0.0f);
+   const int L = std::max(1, noveltyKernelHalfSize);
+   for (int i = L; i < out.numBars - L; i++)
+   {
+      float score = 0.0f;
+      for (int a = -L; a < L; a++)
+      {
+         for (int b = -L; b < L; b++)
+         {
+            float sign = ((a < 0 && b < 0) || (a >= 0 && b >= 0)) ? 1.0f : -1.0f;
+            int r = i + a;
+            int c = i + b;
+            score += sign * out.similarityMatrix[r * out.numBars + c];
+         }
+      }
+      out.noveltyCurve[i] = std::max(0.0f, score / (2.0f * L * L));
+   }
+
+   // 4. Section segmentation from peaks in novelty curve
+   float maxNov = 0.0f;
+   for (float v : out.noveltyCurve)
+      maxNov = std::max(maxNov, v);
+   float threshold = std::max(0.02f, 0.35f * maxNov);
+
+   std::vector<int> boundaries = { 0 };
+   for (int i = L; i < out.numBars - L; i++)
+   {
+      if (out.noveltyCurve[i] >= threshold &&
+          (i == 0 || out.noveltyCurve[i] >= out.noveltyCurve[i - 1]) &&
+          (i + 1 >= out.numBars || out.noveltyCurve[i] >= out.noveltyCurve[i + 1]))
+      {
+         boundaries.push_back(i);
+         i += L;
+      }
+   }
+   boundaries.push_back(out.numBars);
+
+   out.sections.clear();
+   const char labels[] = "ABCDEFGH";
+   for (size_t s = 0; s + 1 < boundaries.size(); s++)
+   {
+      SessionSection sec;
+      sec.startBar = boundaries[s];
+      sec.endBar = boundaries[s + 1];
+      sec.sectionId = (int)s;
+      char base = labels[std::min((size_t)s, sizeof(labels) - 2)];
+      sec.label = std::string(1, base);
+      out.sections.push_back(sec);
+   }
+}
+
+MovesPCA Engine::ComputeDeltaPCA(int maxComponents) const
+{
+   MovesPCA res;
+   std::vector<KeyId> validKeys;
+   for (const auto& [id, r] : mKeys)
+   {
+      if (r.continuous && r.deltaHistory.size() >= 20)
+         validKeys.push_back(id);
+   }
+
+   if (validKeys.size() < 2)
+      return res;
+
+   const size_t P = validKeys.size();
+   size_t N = 10000;
+   for (const auto& k : validKeys)
+   {
+      const auto* r = FindRuntime(k);
+      if (r)
+         N = std::min(N, r->deltaHistory.size());
+   }
+
+   if (N < 20)
+      return res;
+
+   std::vector<double> means(P, 0.0);
+   for (size_t j = 0; j < P; j++)
+   {
+      const auto* r = FindRuntime(validKeys[j]);
+      double sum = 0;
+      for (size_t i = 0; i < N; i++)
+         sum += r->deltaHistory[i];
+      means[j] = sum / N;
+   }
+
+   std::vector<double> C(P * P, 0.0);
+   for (size_t j1 = 0; j1 < P; j1++)
+   {
+      const auto* r1 = FindRuntime(validKeys[j1]);
+      for (size_t j2 = j1; j2 < P; j2++)
+      {
+         const auto* r2 = FindRuntime(validKeys[j2]);
+         double cov = 0;
+         for (size_t i = 0; i < N; i++)
+            cov += (r1->deltaHistory[i] - means[j1]) * (r2->deltaHistory[i] - means[j2]);
+         cov /= (N - 1);
+         C[j1 * P + j2] = cov;
+         C[j2 * P + j1] = cov;
+      }
+   }
+
+   int kMax = std::min((int)P, maxComponents);
+   res.numComponents = kMax;
+   res.keys = validKeys;
+   res.W.resize(kMax, std::vector<float>(P, 0.0f));
+   res.explainedVarianceRatio.resize(kMax, 0.0f);
+
+   double totalVar = 0.0;
+   for (size_t j = 0; j < P; j++)
+      totalVar += C[j * P + j];
+   res.totalVariance = (float)totalVar;
+
+   std::vector<double> C_def = C;
+   for (int comp = 0; comp < kMax; comp++)
+   {
+      std::vector<double> v(P, 1.0 / std::sqrt((double)P));
+      double lambda = 0.0;
+      for (int iter = 0; iter < 100; iter++)
+      {
+         std::vector<double> v_next(P, 0.0);
+         for (size_t r = 0; r < P; r++)
+            for (size_t c = 0; c < P; c++)
+               v_next[r] += C_def[r * P + c] * v[c];
+
+         double norm = 0.0;
+         for (size_t r = 0; r < P; r++)
+            norm += v_next[r] * v_next[r];
+         norm = std::sqrt(norm);
+         if (norm < 1e-12)
+            break;
+         for (size_t r = 0; r < P; r++)
+            v[r] = v_next[r] / norm;
+         lambda = norm;
+      }
+
+      for (size_t j = 0; j < P; j++)
+         res.W[comp][j] = (float)v[j];
+
+      res.explainedVarianceRatio[comp] = totalVar > 1e-9 ? (float)(lambda / totalVar) : 0.0f;
+
+      for (size_t r = 0; r < P; r++)
+         for (size_t c = 0; c < P; c++)
+            C_def[r * P + c] -= lambda * v[r] * v[c];
+   }
+
+   res.valid = true;
+   return res;
+}
+
+DMDFit Engine::FitDMD(int maxRank) const
+{
+   DMDFit res;
+   std::vector<KeyId> validKeys;
+   for (const auto& [id, r] : mKeys)
+   {
+      if (r.continuous && r.posHistory.size() >= 20)
+         validKeys.push_back(id);
+   }
+   if (validKeys.size() < 2)
+      return res;
+
+   const size_t P = validKeys.size();
+   size_t N = 10000;
+   for (const auto& k : validKeys)
+   {
+      const auto* r = FindRuntime(k);
+      if (r)
+         N = std::min(N, r->posHistory.size());
+   }
+   if (N < 20)
+      return res;
+
+   int rank = std::min((int)P, maxRank);
+   res.rank = rank;
+   res.keys = validKeys;
+   res.A.resize(rank * rank, 0.0f);
+
+   std::vector<double> H1H1T(rank * rank, 0.0);
+   std::vector<double> H2H1T(rank * rank, 0.0);
+
+   for (size_t t = 0; t + 1 < N; t++)
+   {
+      for (int i = 0; i < rank; i++)
+      {
+         const auto* ri = FindRuntime(validKeys[i]);
+         double x1_i = ri ? ri->posHistory[t] : 0.0;
+         double x2_i = ri ? ri->posHistory[t + 1] : 0.0;
+         for (int j = 0; j < rank; j++)
+         {
+            const auto* rj = FindRuntime(validKeys[j]);
+            double x1_j = rj ? rj->posHistory[t] : 0.0;
+            H1H1T[i * rank + j] += x1_i * x1_j;
+            H2H1T[i * rank + j] += x2_i * x1_j;
+         }
+      }
+   }
+
+   for (int i = 0; i < rank; i++)
+      H1H1T[i * rank + i] += 1e-4;
+
+   std::vector<double> invH1H1T(rank * rank, 0.0);
+   for (int i = 0; i < rank; i++)
+      invH1H1T[i * rank + i] = 1.0;
+
+   std::vector<double> M = H1H1T;
+   for (int i = 0; i < rank; i++)
+   {
+      double pivot = M[i * rank + i];
+      if (std::abs(pivot) < 1e-9)
+         pivot = 1e-9;
+      for (int j = 0; j < rank; j++)
+      {
+         M[i * rank + j] /= pivot;
+         invH1H1T[i * rank + j] /= pivot;
+      }
+      for (int r = 0; r < rank; r++)
+      {
+         if (r == i)
+            continue;
+         double factor = M[r * rank + i];
+         for (int j = 0; j < rank; j++)
+         {
+            M[r * rank + j] -= factor * M[i * rank + j];
+            invH1H1T[r * rank + j] -= factor * invH1H1T[i * rank + j];
+         }
+      }
+   }
+
+   std::vector<double> A_mat(rank * rank, 0.0);
+   for (int i = 0; i < rank; i++)
+   {
+      for (int j = 0; j < rank; j++)
+      {
+         double sum = 0.0;
+         for (int k = 0; k < rank; k++)
+            sum += H2H1T[i * rank + k] * invH1H1T[k * rank + j];
+         A_mat[i * rank + j] = sum;
+      }
+   }
+
+   std::vector<double> v(rank, 1.0 / std::sqrt((double)rank));
+   double rho = 1.0;
+   for (int iter = 0; iter < 50; iter++)
+   {
+      std::vector<double> v_next(rank, 0.0);
+      for (int r = 0; r < rank; r++)
+         for (int c = 0; c < rank; c++)
+            v_next[r] += A_mat[r * rank + c] * v[c];
+      double norm = 0.0;
+      for (int r = 0; r < rank; r++)
+         norm += v_next[r] * v_next[r];
+      norm = std::sqrt(norm);
+      if (norm < 1e-12)
+         break;
+      for (int r = 0; r < rank; r++)
+         v[r] = v_next[r] / norm;
+      rho = norm;
+   }
+
+   double scale = rho > 1.0 ? 1.0 / rho : 1.0;
+   for (int i = 0; i < rank * rank; i++)
+      res.A[i] = (float)(A_mat[i] * scale);
+
+   res.spectralRadius = (float)(rho * scale);
+   res.valid = true;
+   return res;
+}
+
+void DMDFit::Step(std::vector<float>& x) const
+{
+   if (!valid || (int)x.size() < rank)
+      return;
+   std::vector<float> x_next(rank, 0.0f);
+   for (int i = 0; i < rank; i++)
+   {
+      for (int j = 0; j < rank; j++)
+         x_next[i] += A[i * rank + j] * x[j];
+      x_next[i] = std::clamp(x_next[i], 0.0f, 1.0f);
+   }
+   for (int i = 0; i < rank; i++)
+      x[i] = x_next[i];
 }
 
 std::string StatsPath(const std::string& logDir)

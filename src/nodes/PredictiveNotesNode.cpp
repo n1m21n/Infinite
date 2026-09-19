@@ -66,7 +66,55 @@ public:
       }
       mLastBeatsStart = beatsStart;
 
-      if (learning)
+      const int srcMode = mSourceMode.load(std::memory_order_relaxed);
+      if (srcMode == 1)
+      {
+         // Source B: deterministic mapping from movement / transport
+         const int lo = mLo.load(std::memory_order_relaxed);
+         const int hi = std::max(lo, mHi.load(std::memory_order_relaxed));
+         const bool useGlobal = mUseGlobalScale.load(std::memory_order_relaxed);
+         const int root = useGlobal ? Transport::Instance().Key() : 0;
+         const int scale = useGlobal ? Transport::Instance().Scale() : 0;
+         int scaleNotes[NoteTheory::kMaxScaleNotes];
+         int nScale = NoteTheory::CollectScaleNotes(root, scale, lo, hi, scaleNotes, NoteTheory::kMaxScaleNotes);
+         if (nScale > 0)
+         {
+            const double stepBeats = 0.5; // 8th note grid
+            double nextStep = std::floor(beatsStart / stepBeats) * stepBeats;
+            while (nextStep < beatsStart)
+               nextStep += stepBeats;
+            while (nextStep < end && nOut < kMaxBlockEvents - 2)
+            {
+               int noteIdx = (int)std::floor((std::sin(nextStep * 1.5) * 0.5 + 0.5) * (nScale - 1));
+               noteIdx = std::clamp(noteIdx, 0, nScale - 1);
+               int note = scaleNotes[noteIdx];
+               float vel = std::clamp(0.6f + 0.3f * (float)std::cos(nextStep * 2.0), 0.1f, 1.0f);
+
+               NoteEvent on;
+               on.note = note;
+               on.velocity = vel;
+               on.isNoteOn = true;
+               on.frameOffset = std::clamp((int)((nextStep - beatsStart) / bps), 0, numFrames - 1);
+               on.source = this;
+               on.voiceId = NextVoiceId();
+               out[nOut++] = on;
+
+               NoteEvent off;
+               off.note = note;
+               off.velocity = 0.0f;
+               off.isNoteOn = false;
+               double offBeat = nextStep + stepBeats * 0.8;
+               off.frameOffset = std::clamp((int)((offBeat - beatsStart) / bps), on.frameOffset + 1, numFrames - 1);
+               off.source = this;
+               off.voiceId = on.voiceId;
+               out[nOut++] = off;
+
+               mLastNote.store(note, std::memory_order_relaxed);
+               nextStep += stepBeats;
+            }
+         }
+      }
+      else if (learning)
       {
          for (int i = 0; i < nIn; i++)
          {
@@ -128,8 +176,13 @@ public:
                   }
                if (slot != nullptr)
                {
+                  const bool useGlobal = mUseGlobalScale.load(std::memory_order_relaxed);
+                  int outNote = mNext.note;
+                  if (useGlobal)
+                     outNote = MusicTime::SnapToScaleInRange(outNote, Transport::Instance().Key(), Transport::Instance().Scale(), mParams.lowNote, mParams.highNote);
+
                   NoteEvent on;
-                  on.note = mNext.note;
+                  on.note = outNote;
                   on.velocity = mNext.velocity;
                   on.isNoteOn = true;
                   on.frameOffset = std::clamp((int)((mNext.onsetBeats - beatsStart) / bps), 0, numFrames - 1);
@@ -137,10 +190,10 @@ public:
                   on.voiceId = NextVoiceId();
                   out[nOut++] = on;
                   slot->active = true;
-                  slot->note = mNext.note;
+                  slot->note = outNote;
                   slot->voiceId = on.voiceId;
                   slot->offBeat = mNext.onsetBeats + mNext.durBeats;
-                  mLastNote.store(mNext.note, std::memory_order_relaxed);
+                  mLastNote.store(outNote, std::memory_order_relaxed);
                }
                mPrevOnset = mNext.onsetBeats;
                mPlayer.Next(*T, mParams, mPrevOnset, bpb, mNext);
@@ -179,6 +232,7 @@ public:
    // ---- main thread ----
    void PushParams(const PredictiveNotesNode& n, bool learning)
    {
+      mSourceMode.store(n.sourceMode, std::memory_order_relaxed);
       mStray.store(n.stray, std::memory_order_relaxed);
       mMemory.store(n.memory, std::memory_order_relaxed);
       mLenSpread.store(n.lengthSpread, std::memory_order_relaxed);
@@ -186,6 +240,7 @@ public:
       mLo.store(n.rangeLow, std::memory_order_relaxed);
       mHi.store(n.rangeHigh, std::memory_order_relaxed);
       mSeed.store(n.seed, std::memory_order_relaxed);
+      mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
       mLearning.store(learning, std::memory_order_relaxed);
    }
 
@@ -298,6 +353,8 @@ private:
 
    std::atomic<float> mStray { 0.5f }, mLenSpread { 0.25f }, mVelSpread { 0.25f };
    std::atomic<int> mMemory { 4 }, mLo { 36 }, mHi { 96 }, mSeed { 1 };
+   std::atomic<int> mSourceMode { 0 };
+   std::atomic<bool> mUseGlobalScale { false };
    std::atomic<bool> mLearning { false };
    std::atomic<int> mLastNote { -1 };
 };
@@ -377,6 +434,7 @@ AudioNode* PredictiveNotesNode::GetAudioNode()
 
 void PredictiveNotesNode::VisitParams(ParamVisitor& v)
 {
+   v.Int("sourceMode", sourceMode);
    v.Float("stray", stray);
    v.Int("memory", memory);
    v.Float("lengthSpread", lengthSpread);
@@ -384,7 +442,22 @@ void PredictiveNotesNode::VisitParams(ParamVisitor& v)
    v.Int("rangeLow", rangeLow);
    v.Int("rangeHigh", rangeHigh);
    v.Int("seed", seed);
+   v.Bool("useGlobalScale", useGlobalScale);
    v.Text("model", model);
+}
+
+float PredictiveNotesNode::Confidence01() const
+{
+   if (sourceMode == 1)
+      return 0.85f;
+   if (mLearning)
+      return std::clamp((float)mNotesCaptured / 32.0f, 0.1f, 0.85f);
+   if (mLearned == 0)
+      return 0.0f;
+   float conf = 0.40f + 0.50f * (1.0f - std::exp(-(float)mLearned / 20.0f));
+   if (!mCurve.empty() && mCurve.back() > 0.0f)
+      conf += std::clamp(mCurve.back() * 0.05f, 0.0f, 0.08f);
+   return std::clamp(conf, 0.1f, 0.98f);
 }
 
 int PredictiveNotesNode::LastNote() const { return mAudioNode ? mAudioNode->LastNote() : -1; }
