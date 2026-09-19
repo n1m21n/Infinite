@@ -131,6 +131,9 @@ public:
    void SetEnabled(int nodeIndex, int paramIndex, bool on);
    void Unbind(int nodeIndex, int paramIndex);
    void UnbindAllFor(int nodeIndex); // node deleted: drop it as target and as source
+   enum class BindingEvent { Bind = 1, Unbind, UnbindAll, SetRange };
+   using BindingCallback = void (*)(int nodeIndex, int paramIndex, BindingEvent evt, int modNodeIndex, float lo, float hi);
+   void SetBindingCallback(BindingCallback cb) { mBindingCallback = cb; }
 
    // nodeIndex is -1 when the parameter is not modulated.
    Source ModulatorFor(int nodeIndex, int paramIndex) const;
@@ -236,4 +239,5 @@ private:
    std::map<Key, float> mExpressionCurves;
    std::vector<ParamRef> mFrameParams;
    std::map<Key, ParamRef> mKnownParams;
+   BindingCallback mBindingCallback = nullptr;
 };

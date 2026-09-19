@@ -374,6 +374,7 @@ set(COMMON_SOURCES
     src/core/NodeViewport.cpp
     src/core/Transport.cpp
     src/core/Modulation.cpp
+    src/core/MovementLog.cpp
     src/core/GestureRecorder.cpp
     src/core/Expression.cpp
     src/core/SysInfo.cpp
@@ -415,6 +416,7 @@ set(COMMON_SOURCES
     src/audio/ParamMailbox.cpp
     src/audio/MeterRing.cpp
     src/audio/AudioCaptureRing.cpp
+    external/miniz.c
     external/shine/shine_mp3.c
     src/audio/AudioVoice.cpp
     src/audio/Wavetable.cpp

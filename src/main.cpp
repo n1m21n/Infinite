@@ -105,6 +105,7 @@ namespace
 #include "core/Transport.h"
 #include "core/AudioTopologyRequest.h"
 #include "core/Modulation.h"
+#include "core/MovementLog.h"
 #include "core/GestureRecorder.h"
 #include "core/Expression.h"
 #include "core/field/FieldTypes.h"
@@ -42065,6 +42066,7 @@ namespace
 
    void NewPatch()
    {
+      MovementLog::NoteMark(MovementLog::Mark::PatchNew);
       // Retire rather than destroy outright: NewPatch can run mid-frame (it's
       // the first step of ApplyPatchData, which Undo/Redo call), after this
       // frame's ImGui draw list has already queued AddImage() calls
@@ -42688,6 +42690,47 @@ namespace
             {
                glfwSwapInterval(gVsync ? 1 : 0);
                SaveGeneralSettings();
+            }
+
+            ImGui::Spacing();
+            ImGui::Spacing();
+            ImGui::SeparatorText("Movement Log");
+            bool moveLogEnabled = MovementLog::IsEnabled();
+            if (ImGui::Checkbox("Record movement log", &moveLogEnabled))
+            {
+               MovementLog::SetEnabled(moveLogEnabled);
+            }
+            if (ImGui::Button("Open log folder"))
+            {
+               std::string dir = MovementLog::GetLogDirectory();
+               if (!dir.empty())
+                  Platform::RevealInFileManager(dir);
+            }
+            ImGui::SameLine();
+            const uint64_t folderBytes = MovementLog::GetLogFolderSizeBytes();
+            const float folderMB = (float)folderBytes / (1024.0f * 1024.0f);
+            ImGui::Text("(%.1f MB used)", folderMB);
+
+            static const char* kCapLabels[] = { "256 MB", "1 GB", "4 GB" };
+            static const uint64_t kCapValues[] = { 256ULL * 1024 * 1024, 1024ULL * 1024 * 1024, 4096ULL * 1024 * 1024 };
+            uint64_t curCap = MovementLog::GetRetentionCapBytes();
+            int capIdx = 1;
+            for (int i = 0; i < 3; i++)
+            {
+               if (curCap == kCapValues[i])
+                  capIdx = i;
+            }
+            ImGui::SetNextItemWidth(180.0f);
+            if (ImGui::BeginCombo("Retention cap", kCapLabels[capIdx]))
+            {
+               for (int i = 0; i < 3; i++)
+               {
+                  if (ImGui::Selectable(kCapLabels[i], capIdx == i))
+                  {
+                     MovementLog::SetRetentionCapBytes(kCapValues[i]);
+                  }
+               }
+               ImGui::EndCombo();
             }
 
             ImGui::Spacing();
@@ -43528,6 +43571,7 @@ namespace
          return false;
       }
 
+      MovementLog::NoteMark(MovementLog::Mark::PatchLoaded);
       ApplyPatchData(data);
       // New document: drop the old one's clip clipboard and selection.
       gArrangePatchGeneration++;
@@ -44201,6 +44245,7 @@ namespace
          gPatchStatus = "Undo";
          return;
       }
+      MovementLog::NoteMark(MovementLog::Mark::Undo);
       gRedoStack.push_back({ BuildPatchData(), GestureRecorder::Instance().Playbacks() });
       UndoEntry prev = std::move(gUndoStack.back());
       gUndoStack.pop_back();
@@ -44232,6 +44277,7 @@ namespace
          gPatchStatus = "Redo";
          return;
       }
+      MovementLog::NoteMark(MovementLog::Mark::Redo);
       gUndoStack.push_back({ BuildPatchData(), GestureRecorder::Instance().Playbacks() });
       UndoEntry next = std::move(gRedoStack.back());
       gRedoStack.pop_back();
@@ -61359,7 +61405,7 @@ static bool RunPerfPanelSelfTest()
    return true;
 }
 
-void ApplyModulationAndPalette(int frameId)
+void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false)
 {
    UpdatePerformanceMatrixMIDI();
 
@@ -61370,7 +61416,10 @@ void ApplyModulationAndPalette(int frameId)
       if (ref.value == nullptr) continue;
       auto it = gPerfPendingWrites.find({ref.nodeIndex, ref.paramIndex});
       if (it != gPerfPendingWrites.end())
+      {
          *ref.value = ShapeToParam(ref, it->second);
+         MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Perf);
+      }
    }
    gPerfPendingWrites.clear();
 
@@ -61460,6 +61509,7 @@ void ApplyModulationAndPalette(int frameId)
          if (auto* numBox = dynamic_cast<MacroNumBoxNode*>(modNode->node.get()))
          {
             *ref.value = ShapeToParam(ref, numBox->value);
+            MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Modulator);
             continue;
          }
          if (auto* trigNode = dynamic_cast<MacroTriggerNode*>(modNode->node.get()))
@@ -61473,11 +61523,13 @@ void ApplyModulationAndPalette(int frameId)
                   if (ref.isBool || span == 1)
                   {
                      *ref.value = (*ref.value > ref.minValue + 0.5f) ? ref.minValue : ref.maxValue;
+                     MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Modulator);
                   }
                   else if (span >= 1)
                   {
                      const int curIdx = std::clamp((int)std::lround(*ref.value - ref.minValue), 0, span);
                      *ref.value = ref.minValue + (float)((curIdx + 1) % (span + 1));
+                     MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Modulator);
                   }
                }
                continue;
@@ -61486,6 +61538,7 @@ void ApplyModulationAndPalette(int frameId)
          const float rawV01 = std::clamp(modulator->Value01(), 0.0f, 1.0f);
          const float v01 = ApplyModulationCurve(rawV01, src.curve);
          *ref.value = ShapeToParam(ref, src.lo + (src.hi - src.lo) * v01);
+         MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Modulator);
          continue;
       }
       const std::string* expr = modulation.ExpressionFor(ref.nodeIndex, ref.paramIndex);
@@ -61561,6 +61614,7 @@ void ApplyModulationAndPalette(int frameId)
             mapped = boundLo + norm * (boundHi - boundLo);
          }
          *ref.value = ShapeToParam(ref, mapped);
+         MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Expression);
          modulation.SetExpressionError(ref.nodeIndex, ref.paramIndex, std::string());
       }
       else
@@ -61590,7 +61644,10 @@ void ApplyModulationAndPalette(int frameId)
       // while Transport is playing (see AdvanceClock), so pausing freezes a
       // looping recording in place instead of continuing to animate it.
       if (GestureRecorder::Instance().GetPlaybackValue(ref.nodeIndex, ref.paramIndex, GestureRecorder::Instance().ClockNow(), playbackValue))
+      {
          *ref.value = ShapeToParam(ref, playbackValue);
+         MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Gesture);
+      }
    }
 
    for (GraphNode& gn : gNodes)
@@ -61672,6 +61729,10 @@ void ApplyModulationAndPalette(int frameId)
          continue;
       source->GetSwatch(src.swatchIndex, ref.value);
    }
+
+   // Wall clock, not the transport: the transport freezes while paused, which
+   // would stamp every hand move made with playback stopped at one instant.
+   MovementLog::Capture(ImGui::GetTime(), isNormalFrame);
 }
 
 // ===================================================== INFINITE_CAMERACONVTEST
@@ -62003,6 +62064,15 @@ int main(int argc, char** argv)
    if (getenv("INFINITE_CAMERACONVTEST") != nullptr)
       return RunCameraConvTest();
 #endif
+
+   if (getenv("INFINITE_MOVELOGTEST") != nullptr || getenv("INFINITE_MOVEMENTLOGTEST") != nullptr)
+      return MovementLog::RunMovementLogTest() ? 0 : 1;
+
+   if (argc >= 3 && std::strcmp(argv[1], "--dump-movement-log") == 0)
+   {
+      MovementLog::DumpLog(argv[2], std::cout);
+      return 0;
+   }
 
    // Out-of-process half of the plugin scan: describe ONE bundle and exit. The
    // parent (Platform::EnumerateVST3Plugins) re-execs us once per bundle so
@@ -62411,6 +62481,17 @@ int main(int argc, char** argv)
    ed::SetCurrentEditor(gEditor); // ed::GetStyle() below needs a current editor
 
    RegisterNodes();
+   MovementLog::SetNodeUidLookup([](int idx) -> uint64_t {
+      if (GraphNode* gn = FindNodeByIndex(idx))
+         return gn->uid;
+      return 0;
+   });
+   MovementLog::SetNodeTypeLookup([](int idx) -> std::string {
+      if (GraphNode* gn = FindNodeByIndex(idx))
+         return gn->typeName;
+      return std::string();
+   });
+   MovementLog::Start();
    ApplyTheme();
 
    // Skipped under the dev-test harness (INFINITE_EXITAFTER) so that running
@@ -62477,6 +62558,7 @@ int main(int argc, char** argv)
       // The canvas starts empty; the dev test modes below need a fixture graph,
       // but a normal launch gives the user a blank patch.
       const bool wantsFixture =
+         getenv("INFINITE_MOVELOGTEST") != nullptr ||
          getenv("INFINITE_RESYNTHTEST") != nullptr ||
          getenv("INFINITE_HIDETEST") != nullptr ||
          getenv("INFINITE_MACROTEST") != nullptr ||
@@ -86845,7 +86927,7 @@ int main(int argc, char** argv)
             RebuildAudioTopology();
       }
 
-      ApplyModulationAndPalette(frameId);
+      ApplyModulationAndPalette(frameId, true);
 
       for (GraphNode& gn : gNodes)
       {
@@ -88053,6 +88135,7 @@ int main(int argc, char** argv)
    CloseAllProjectorWindows();
    AudioEngine::Instance().Stop();
    UpdateCheck::Shutdown(); // joins the worker thread so the process doesn't exit mid-request
+   MovementLog::Stop();
    gNodes.clear();
    if (getenv("INFINITE_RECTEARDOWNTEST") != nullptr && std::string(getenv("INFINITE_RECTEARDOWNTEST")) == "quit")
       printf("quit-mid-record: survived  OK\n");
