@@ -9,10 +9,6 @@
 
 namespace
 {
-   constexpr double kColdNEff = 30.0;     // below this the landscape is a peak at the anchor (README §6 rung 4)
-   constexpr float kColdSigma = 0.10f;    // cold-start OU sigma and theta: a slow, small reflected walk
-   constexpr float kColdTheta = 0.5f;
-   constexpr float kColdWidth = 0.10f;    // sd of the anchor peak
    constexpr float kDriftCap = 0.05f;     // max |eta U' dt| per step
    constexpr float kEps = 1e-3f;          // log floor, in density units
    constexpr int kModelRefreshFrames = 30;
@@ -297,7 +293,7 @@ void DriftNode::RefreshModel(const ParamKey& k, Slot& s)
          m.theta = std::clamp(it->second.theta, 0.05f, 20.0f);
          m.sigma = std::clamp(it->second.sigma, 0.005f, 1.0f);
          m.lo = it->second.lo; m.hi = it->second.hi;
-         m.nEff = 1e9; m.cold = false;
+         m.nEff = 1e9; m.w1 = 1.0f; m.cold = false;
          s.model = m;
          s.modelFrame = mFrame;
          return;
@@ -309,60 +305,30 @@ void DriftNode::RefreshModel(const ParamKey& k, Slot& s)
       return;
    }
 
-   const MovementStats::ParamStats* st =
-      mStats != nullptr ? mStats->Find(MovementStats::KeyId{ k.uid, k.paramIndex }) : nullptr;
-   const double nEff = st != nullptr && mStats != nullptr ? MovementStats::EffectiveN(*st, mStats->ActiveClock()) : 0.0;
-   m.nEff = nEff;
-   if (st != nullptr && nEff >= kColdNEff)
+   // The fallback ladder, blended (README §6): this key, its profile, its role, its family, your style,
+   // and the anchor. No rung ever switches on or off; each carries a weight that grows with its data.
+   MovementStats::Blend b;
+   const MovementStats::KeyId id{ k.uid, k.paramIndex };
+   if (mStats != nullptr)
+      mStats->ComputeBlend(id, AnchorFor(k), b);
+   else
    {
-      float p[kBins];
-      MovementStats::SmoothedHist(*st, p);
-      float sum = 0.0f;
-      for (float v : p) sum += v;
-      if (sum > 0.0f)
-      {
-         for (int i = 0; i < kBins; i++) m.p[i] = p[i] / sum;
-         const MovementStats::Derived d = MovementStats::Derive(*st);
-         if (d.valid)
-         {
-            m.theta = (float)d.theta;
-            m.sigma = (float)std::max(d.sigma, 0.005);
-         }
-         m.lo = (float)d.rangeLo; m.hi = (float)d.rangeHi;
-         if (m.hi - m.lo < 0.05f)
-         {
-            const float c = 0.5f * (m.lo + m.hi);
-            m.lo = std::max(0.0f, c - 0.025f); m.hi = std::min(1.0f, c + 0.025f);
-         }
-         m.cold = false;
-         s.model = m;
-         s.modelFrame = mFrame;
-         return;
-      }
+      // No stats at all: a peak at the anchor and the default speed.
+      static const MovementStats::Engine sNone;
+      sNone.ComputeBlend(id, AnchorFor(k), b);
    }
-   // Cold start: a narrow peak at the anchor, slow and small, over the whole fader.
-   const float a = AnchorFor(k);
-   float sum = 0.0f;
-   for (int i = 0; i < kBins; i++)
-   {
-      const float d = ((i + 0.5f) / kBins - a) / kColdWidth;
-      m.p[i] = std::exp(-0.5f * d * d) + 1e-4f;
-      sum += m.p[i];
-   }
-   for (float& v : m.p) v /= sum;
-   m.theta = kColdTheta; m.sigma = kColdSigma; m.lo = 0.0f; m.hi = 1.0f; m.cold = true;
+   std::memcpy(m.p, b.p, sizeof(m.p));
+   m.theta = std::clamp(b.theta, 0.05f, 20.0f);
+   m.sigma = std::clamp(b.sigma, 0.005f, 1.0f);
+   m.lo = b.lo; m.hi = b.hi;
+   m.nEff = b.nKey;
+   m.w1 = (float)b.w1;
+   m.cold = b.w1 < 0.2;
    s.model = m;
    s.modelFrame = mFrame;
 }
 
 // ---- IPredictor -----------------------------------------------------------------------------
-
-namespace
-{
-   // The energy link (README §6): how actively the hand is moving right now. MovementStats does not
-   // track it yet, so Link is wired and inert until step 5 supplies the live value.
-   float HandEnergy(const ParamKey&) { return 0.0f; }
-}
 
 void DriftNode::Tick(int frameId, double dt)
 {
@@ -383,7 +349,7 @@ void DriftNode::Tick(int frameId, double dt)
       if (frameId - s.modelFrame >= kModelRefreshFrames || s.modelFrame < 0)
          RefreshModel(it->first, s);
       if (!s.paused && dt > 0.0)
-         Step(s.x, s.v, s.rng, s.model, pr, HandEnergy(it->first), dt);
+         Step(s.x, s.v, s.rng, s.model, pr, EnergyFor(it->first), dt);
       ++it;
    }
 }
@@ -423,12 +389,19 @@ float DriftNode::SlotPos(const ParamKey& k) const
 int DriftNode::ConfidenceRung(const ParamKey& k) const
 {
    if (frozen)
-      return 3;
+      return 2;
    auto it = mSlots.find(k);
-   if (it == mSlots.end() || it->second.model.cold)
+   if (it == mSlots.end())
       return 0;
-   const double n = it->second.model.nEff;
-   return n < 100.0 ? 1 : (n < 1000.0 ? 2 : 3);
+   // README §6.5: how much of the model is this knob's own data. Grey = defaults, dim green = your style
+   // carried over from other patches and knobs, full green = this knob.
+   const float w1 = it->second.model.w1;
+   return w1 < 0.2f ? 0 : (w1 < 0.6f ? 1 : 2);
+}
+
+float DriftNode::EnergyFor(const ParamKey& k) const
+{
+   return mStats != nullptr ? mStats->HandEnergy(MovementStats::KeyId{ k.uid, k.paramIndex }) : 0.0f;
 }
 
 int DriftNode::Ghost(const ParamKey& k, float* out, int maxPoints)
@@ -447,7 +420,7 @@ int DriftNode::Ghost(const ParamKey& k, float* out, int maxPoints)
                        std::clamp(link, 0.0f, 2.0f) };
       for (int i = 0; i < kGhostPoints; i++)
       {
-         Step(x, v, rng, s.model, pr, HandEnergy(k), kGhostDt);
+         Step(x, v, rng, s.model, pr, EnergyFor(k), kGhostDt);
          s.ghost[i] = x;
       }
       s.ghostN = kGhostPoints;
@@ -655,5 +628,473 @@ bool RunDriftTest()
 
    std::printf("%s\n", gFail == 0 ? "DRIFTTEST OK" : "DRIFTTEST FAIL");
    return gFail == 0;
+}
+}
+
+// ---- self test (INFINITE_PREDFEEDBACKTEST) -----------------------------------------------------
+// Step 5: cold start, the blended ladder, role pooling, your style, the energy link, anchors and the
+// collapse monitor. Everything runs headless against private MovementStats::Engine instances.
+
+namespace PredictionNodes
+{
+namespace
+{
+   using MovementStats::Blend;
+   using MovementStats::Engine;
+   using MovementStats::KeyId;
+   using MovementStats::KeyMeta;
+   using MovementLog::Source;
+
+   int gFbFail = 0;
+#define FB_CHECK(cond, ...) \
+   do { if (!(cond)) { std::printf("PREDFEEDBACKTEST FAIL: "); std::printf(__VA_ARGS__); std::printf("\n"); gFbFail++; } } while (0)
+
+   float LogP2V(float p, float mn, float mx) { return mn * std::pow(mx / mn, p); }
+   float LogV2P(float v, float mn, float mx) { return std::log(v / mn) / std::log(mx / mn); }
+
+   KeyMeta Meta(const char* cat, float mn, float mx, bool logCurve)
+   {
+      KeyMeta m;
+      m.category = cat; m.minValue = mn; m.maxValue = mx;
+      if (logCurve) { m.posToValue = LogP2V; m.valueToPos = LogV2P; m.hasCurve = true; }
+      return m;
+   }
+   void Reg(Engine& e, KeyId id, const char* type, const char* name, const KeyMeta& m) { e.RegisterKey(id, type, name, true, m); }
+   ParamKey PK(KeyId k) { return ParamKey{ k.uid, k.paramIndex }; }
+
+   // n grid rows of a hand dwelling at `center`.
+   void Dwell(Engine& e, KeyId id, double& t, int rows, float center, float jitter, uint64_t& rng, Source src = Source::Hand)
+   {
+      for (int i = 0; i < rows; i++)
+      {
+         e.Observe(id, t, std::clamp(center + jitter * Gauss(rng), 0.0f, 1.0f), src, 0);
+         e.Advance(t);
+         t += MovementStats::kGridDt;
+      }
+   }
+
+   int Argmax(const float* p)
+   {
+      int b = 0;
+      for (int i = 1; i < MovementStats::kBins; i++) if (p[i] > p[b]) b = i;
+      return b;
+   }
+   float Mass(const float* p, float lo, float hi)
+   {
+      float m = 0.0f;
+      for (int i = 0; i < MovementStats::kBins; i++)
+      {
+         const float c = (i + 0.5f) / MovementStats::kBins;
+         if (c >= lo && c <= hi) m += p[i];
+      }
+      return m;
+   }
+   int BinOf(float pos) { return std::clamp((int)(pos * MovementStats::kBins), 0, MovementStats::kBins - 1); }
+
+   // An Ornstein-Uhlenbeck hand, exact step, on the 10 Hz grid.
+   void OuHand(Engine& e, KeyId id, double& t, double seconds, double theta, double mu, double sigma, uint64_t& rng, double& x)
+   {
+      const double dt = MovementStats::kGridDt, a = std::exp(-theta * dt);
+      const double sd = sigma * std::sqrt((1.0 - a * a) / (2.0 * theta));
+      const int rows = (int)(seconds / dt);
+      for (int i = 0; i < rows; i++)
+      {
+         x = mu + (x - mu) * a + sd * Gauss(rng);
+         e.Observe(id, t, std::clamp((float)x, 0.0f, 1.0f), Source::Hand, 0);
+         e.Advance(t);
+         t += dt;
+      }
+   }
+
+   struct CollapseResult { double h0 = 0, hEnd = 0, predShare = 0; int cuts = 0; bool cutEnd = false; };
+
+   // A Drift node feeding only itself: its output is logged as Prediction and nothing else ever arrives.
+   CollapseResult RunCollapse(float predWeight, float stray, double hours)
+   {
+      CollapseResult r;
+      Engine e;
+      e.SetPredictionWeight(predWeight);
+      int cuts = 0;
+      e.SetAutoCutCallback([&](const KeyId&) { cuts++; });
+      const KeyId id{ kKey.uid, kKey.paramIndex };
+      TrainTwoPeak(e);
+      MovementStats::Monitor mon;
+      e.GetMonitor(id, mon);
+      r.h0 = mon.entropy;
+      e.SetPlaying(true);
+
+      DriftNode n;
+      n.SetStatsSource(&e);
+      n.seed = 21; n.stray = stray; n.momentum = 0.0f;
+      const double dt = 1.0 / 30.0;
+      double t = 600.0;
+      n.Tick(1, dt);
+      float x = n.ValuePos01For(kKey, 0.25f);
+      uint16_t lastQ = 0xFFFF;
+      const long frames = (long)(hours * 3600.0 / dt);
+      for (long f = 0; f < frames; f++, t += dt)
+      {
+         n.Tick((int)(f + 2), dt);
+         x = n.ValuePos01For(kKey, 0.25f);
+         const uint16_t q = (uint16_t)std::lround(std::clamp(x, 0.0f, 1.0f) * 65535.0f);
+         if (q != lastQ) { e.Observe(id, t, q / 65535.0f, Source::Prediction, 0); lastQ = q; }
+         e.Advance(t);
+      }
+      e.GetMonitor(id, mon);
+      r.hEnd = mon.entropy; r.predShare = mon.predShare; r.cutEnd = mon.cut; r.cuts = cuts;
+      return r;
+   }
+}
+
+bool RunPredFeedbackTest()
+{
+   gFbFail = 0;
+   const double dt = 1.0 / 60.0;
+   const int kB = MovementStats::kBins;
+
+   // 1. Cold: a fresh key with no profile, role or family data is a narrow peak at its anchor (flat only
+   //    with no anchor), and the value never leaves the declared range.
+   {
+      Engine e;
+      Reg(e, KeyId{ 1, 0 }, "Cold", "thing", Meta("", 0.0f, 1.0f, false));
+      Blend b;
+      e.ComputeBlend(KeyId{ 1, 0 }, 0.3f, b);
+      const int pk = Argmax(b.p);
+      FB_CHECK(std::abs(pk - BinOf(0.3f)) <= 1, "cold peak at bin %d, anchor bin %d", pk, BinOf(0.3f));
+      FB_CHECK(Mass(b.p, 0.2f, 0.4f) > 0.6f, "cold mass near the anchor %.2f", Mass(b.p, 0.2f, 0.4f));
+      FB_CHECK(b.w4 > 0.999 && b.w1 == 0.0 && b.w2 == 0.0 && b.w2b == 0.0 && b.w2d == 0.0, "cold weights not all on the anchor");
+      FB_CHECK(b.lo == 0.0f && b.hi == 1.0f, "cold range [%.2f, %.2f] is not the declared one", b.lo, b.hi);
+      e.ComputeBlend(KeyId{ 1, 0 }, -1.0f, b);
+      float mn = 1.0f, mx = 0.0f;
+      for (float v : b.p) { mn = std::min(mn, v); mx = std::max(mx, v); }
+      FB_CHECK(mx - mn < 1e-5f, "no anchor should be flat (%.6f .. %.6f)", mn, mx);
+
+      DriftNode n;
+      n.SetStatsSource(&e);
+      n.seed = 3;
+      n.Tick(1, dt);
+      n.ValuePos01For(PK(KeyId{ 1, 0 }), 0.3f);
+      float lo = 1.0f, hi = 0.0f;
+      for (int f = 0; f < 3600; f++)
+      {
+         n.Tick(2 + f, dt);
+         const float x = n.ValuePos01For(PK(KeyId{ 1, 0 }), 0.3f);
+         lo = std::min(lo, x); hi = std::max(hi, x);
+      }
+      FB_CHECK(lo >= 0.0f && hi <= 1.0f, "cold value left the range [%.3f, %.3f]", lo, hi);
+      std::printf("[FB] cold: peak bin %d, walked %.3f..%.3f\n", pk, lo, hi);
+   }
+
+   // 2. Warm profile: node type A trained in "patch 1"; a fresh A node starts warm.
+   {
+      Engine e;
+      const KeyMeta m = Meta("", 0.0f, 1.0f, false);
+      Reg(e, KeyId{ 10, 3 }, "TypeA", "foo", m);
+      Reg(e, KeyId{ 11, 3 }, "TypeA", "foo", m);
+      uint64_t rng = 5;
+      double t = 0.0;
+      for (int rep = 0; rep < 10; rep++)
+      {
+         Dwell(e, KeyId{ 10, 3 }, t, 200, 0.25f, 0.04f, rng);
+         Dwell(e, KeyId{ 10, 3 }, t, 200, 0.75f, 0.04f, rng);
+      }
+      Blend b;
+      e.ComputeBlend(KeyId{ 11, 3 }, -1.0f, b);
+      std::printf("[FB] warm profile: w1 %.2f  w2 %.2f  w4 %.2f\n", b.w1, b.w2, b.w4);
+      FB_CHECK(b.w1 == 0.0 && b.w2 > 0.5, "profile weight %.2f (want > 0.5)", b.w2);
+      FB_CHECK(b.p[BinOf(0.25f)] > 3.0f * b.p[BinOf(0.5f)] && b.p[BinOf(0.75f)] > 3.0f * b.p[BinOf(0.5f)],
+               "fresh node does not carry the profile's two peaks");
+   }
+
+   // 3. Role pooling: "cutoff is cutoff", in physical units; family pooling; unknown names get no role.
+   {
+      Engine e;
+      Reg(e, KeyId{ 20, 0 }, "Filter", "cutoff", Meta("AudioEffects", 20.0f, 20000.0f, true));
+      Reg(e, KeyId{ 21, 0 }, "Wavetable", "cutoff", Meta("Synths", 50.0f, 5000.0f, true));
+      Reg(e, KeyId{ 22, 0 }, "Wavetable", "wobble", Meta("Synths", 50.0f, 5000.0f, true));
+      uint64_t rng = 8;
+      double t = 0.0;
+      const float pos1kFilter = LogV2P(1000.0f, 20.0f, 20000.0f), pos1kWave = LogV2P(1000.0f, 50.0f, 5000.0f);
+      Dwell(e, KeyId{ 20, 0 }, t, 6000, pos1kFilter, 0.01f, rng);
+      Blend b, bu;
+      e.ComputeBlend(KeyId{ 21, 0 }, pos1kWave, b);
+      // Compare without the anchor's help: anchor deliberately somewhere else.
+      e.ComputeBlend(KeyId{ 21, 0 }, 0.05f, b);
+      const int pk = Argmax(b.p);
+      std::printf("[FB] role: w2b %.2f  peak bin %d (own 1 kHz = %d, filter's = %d)\n", b.w2b, pk, BinOf(pos1kWave), BinOf(pos1kFilter));
+      FB_CHECK(b.w2b > 0.5, "role weight %.2f", b.w2b);
+      FB_CHECK(std::abs(pk - BinOf(pos1kWave)) <= 2, "peak bin %d, expected the wavetable's own 1 kHz at %d", pk, BinOf(pos1kWave));
+      FB_CHECK(std::abs(pk - BinOf(pos1kFilter)) > 3, "peak bin %d sits at the filter's fader position", pk);
+      e.ComputeBlend(KeyId{ 22, 0 }, 0.5f, bu);
+      FB_CHECK(bu.w2b == 0.0 && bu.w2d == 0.0, "an unknown name got a role weight (%.2f / %.2f)", bu.w2b, bu.w2d);
+
+      // Family: `width` trains size.extent; `radius` is size.radius, same family, same unit: no role, some family weight.
+      Reg(e, KeyId{ 23, 0 }, "Shape", "width", Meta("Source", 0.0f, 1.0f, false));
+      Reg(e, KeyId{ 24, 0 }, "Circle", "radius", Meta("Source", 0.0f, 1.0f, false));
+      double t2 = 0.0;
+      uint64_t r2 = 4;
+      OuHand(e, KeyId{ 23, 0 }, t2, 1800.0, 1.0, 0.6, 0.15, r2, *std::make_unique<double>(0.6));
+      Blend bf;
+      e.ComputeBlend(KeyId{ 24, 0 }, 0.5f, bf);
+      std::printf("[FB] family: w2b %.2f  w2d %.2f\n", bf.w2b, bf.w2d);
+      FB_CHECK(bf.w2b == 0.0 && bf.w2d > 0.2, "family weight %.2f (role %.2f)", bf.w2d, bf.w2b);
+   }
+
+   // 4. Your style: one busy knob for a simulated hour warms every other knob's speed, never its place.
+   {
+      Engine e;
+      const KeyId busy{ 30, 0 }, quiet{ 31, 0 };
+      Reg(e, busy, "Busy", "wobble", Meta("", 0.0f, 1.0f, false));
+      Reg(e, quiet, "Quiet", "still", Meta("", 0.0f, 1.0f, false));
+      uint64_t rng = 12;
+      double t = 0.0, x = 0.5;
+      OuHand(e, busy, t, 3600.0, 1.0, 0.5, 0.15, rng, x);
+      const MovementStats::ParamStats* bs = e.Find(busy);
+      FB_CHECK(bs != nullptr, "busy knob has no stats");
+      const double busyTheta = bs != nullptr ? MovementStats::Derive(*bs).theta : 1.0;
+      Blend b;
+      e.ComputeBlend(quiet, 0.8f, b);
+      const int pk = Argmax(b.p);
+      std::printf("[FB] your style: quiet theta %.3f vs busy %.3f  wYou %.2f  peak bin %d (anchor %d)\n", b.theta, busyTheta, b.wYou, pk, BinOf(0.8f));
+      FB_CHECK(std::abs(b.theta - busyTheta) <= 0.3 * busyTheta, "theta %.3f not within 30%% of %.3f", b.theta, busyTheta);
+      FB_CHECK(std::abs(pk - BinOf(0.8f)) <= 1, "quiet knob's peak at bin %d, anchor at %d", pk, BinOf(0.8f));
+
+      DriftNode n;
+      n.SetStatsSource(&e);
+      n.seed = 17; n.stray = 1.0f; n.momentum = 0.0f;
+      n.Tick(1, dt);
+      n.ValuePos01For(PK(quiet), 0.8f);
+      int inside = 0;
+      const int frames = 36000; // 10 simulated minutes
+      for (int f = 0; f < frames; f++)
+      {
+         n.Tick(2 + f, dt);
+         if (std::abs(n.ValuePos01For(PK(quiet), 0.8f) - 0.8f) <= 0.1f) inside++;
+      }
+      const double frac = (double)inside / frames;
+      std::printf("[FB] your style: quiet knob within +-0.1 of its anchor %.1f%% of the time\n", 100.0 * frac);
+      FB_CHECK(frac >= 0.95, "only %.1f%% within +-0.1 of the anchor", 100.0 * frac);
+   }
+
+   // 5. Energy link. Same role for the busy and the quiet knobs, a narrow landscape so the only thing
+   //    that can widen the walk is T_eff = Stray (1 + Link E).
+   {
+      Engine e;
+      const KeyId busy{ 40, 0 };
+      const int kQ = 8;
+      Reg(e, busy, "Comp", "opacity", Meta("Compositing", 0.0f, 1.0f, false));
+      for (int i = 0; i < kQ; i++) Reg(e, KeyId{ (uint64_t)(50 + i), 0 }, "Comp", "opacity", Meta("Compositing", 0.0f, 1.0f, false));
+      double t = 0.0;
+      auto handAt = [&](double tt) { return 0.5f + 0.02f * (float)std::sin(6.2831853 * 1.5 * tt); };
+      for (; t < 120.0; t += dt) { e.Observe(busy, t, handAt(t), Source::Hand, 0); e.Advance(t); }
+
+      DriftNode n;
+      n.SetStatsSource(&e);
+      n.seed = 4; n.stray = 1.0f; n.momentum = 0.0f; n.link = 1.0f;
+      int frame = 1;
+      n.Tick(frame++, dt);
+      for (int i = 0; i < kQ; i++) n.ValuePos01For(PK(KeyId{ (uint64_t)(50 + i), 0 }), 0.5f);
+
+      auto run = [&](double seconds, bool hand, bool measure) {
+         double acc = 0.0; long cnt = 0;
+         const long frames = (long)(seconds / dt);
+         for (long f = 0; f < frames; f++, t += dt)
+         {
+            if (hand) e.Observe(busy, t, handAt(t), Source::Hand, 0);
+            e.Advance(t);
+            n.Tick(frame++, dt);
+            for (int i = 0; i < kQ; i++)
+            {
+               const float x = n.ValuePos01For(PK(KeyId{ (uint64_t)(50 + i), 0 }), 0.5f);
+               if (measure) { acc += (x - 0.5f) * (x - 0.5f); cnt++; }
+            }
+         }
+         return cnt > 0 ? acc / cnt : 0.0;
+      };
+      run(5.0, true, false);
+      const double eHand = e.HandEnergy(KeyId{ 50, 0 });
+      const double varHand = run(10.0, true, true);
+      run(8.0, false, false);
+      const double eQuiet = e.HandEnergy(KeyId{ 50, 0 });
+      const double varQuiet = run(10.0, false, true);
+      std::printf("[FB] energy: E %.2f -> %.3f   variance %.5f -> %.5f  (x%.2f)\n", eHand, eQuiet, varQuiet, varHand, varHand / std::max(varQuiet, 1e-12));
+      FB_CHECK(eHand > 0.9 && eQuiet < 0.05, "energy %.2f while playing, %.3f after", eHand, eQuiet);
+      // E is clamped to [0,1] and Link = 1, so T_eff can at most double: the ratio has 2 as its ceiling.
+      FB_CHECK(varHand >= 1.8 * varQuiet, "variance x%.2f (want >= 1.8, ceiling 2)", varHand / std::max(varQuiet, 1e-12));
+   }
+
+   // 5b. No self-excitation: Drift driving five knobs with no hand input leaves HandEnergy at zero.
+   {
+      Engine e;
+      DriftNode n;
+      n.SetStatsSource(&e);
+      n.seed = 6; n.stray = 4.0f; n.link = 2.0f;
+      KeyId ids[5];
+      for (int i = 0; i < 5; i++)
+      {
+         ids[i] = KeyId{ (uint64_t)(70 + i), 0 };
+         Reg(e, ids[i], "Comp", "opacity", Meta("Compositing", 0.0f, 1.0f, false));
+      }
+      e.SetPlaying(true);
+      uint16_t last[5] = {};
+      float maxE = 0.0f;
+      double t = 0.0;
+      n.Tick(1, dt);
+      for (int i = 0; i < 5; i++) n.ValuePos01For(PK(ids[i]), 0.5f);
+      for (int f = 0; f < 3600; f++, t += dt)
+      {
+         n.Tick(2 + f, dt);
+         for (int i = 0; i < 5; i++)
+         {
+            const uint16_t q = (uint16_t)std::lround(n.ValuePos01For(PK(ids[i]), 0.5f) * 65535.0f);
+            if (q != last[i]) { e.Observe(ids[i], t, q / 65535.0f, Source::Prediction, 0); last[i] = q; }
+         }
+         e.Advance(t);
+         for (int i = 0; i < 5; i++) maxE = std::max(maxE, e.HandEnergy(ids[i]));
+      }
+      FB_CHECK(maxE == 0.0f, "Drift excited itself: energy reached %.4f", maxE);
+   }
+
+   // 6. Role energy: an opacity moved by hand wakes the other opacities far more than an unrelated gain.
+   {
+      Engine e;
+      const KeyId o1{ 80, 0 }, o2{ 81, 0 }, g{ 82, 0 };
+      Reg(e, o1, "Comp", "opacity", Meta("Compositing", 0.0f, 1.0f, false));
+      Reg(e, o2, "Comp", "opacity", Meta("Compositing", 0.0f, 1.0f, false));
+      Reg(e, g, "Osc", "gain", Meta("Synths", 0.0f, 1.0f, false));
+      double t = 0.0;
+      for (; t < 5.0; t += dt)
+      {
+         e.Observe(o1, t, 0.5f + 0.2f * (float)std::sin(6.2831853 * t), Source::Hand, 0);
+         e.Advance(t);
+      }
+      const float e2 = e.HandEnergy(o2), eg = e.HandEnergy(g);
+      std::printf("[FB] role energy: other opacity %.3f  unrelated gain %.3f\n", e2, eg);
+      FB_CHECK(e2 >= 2.0f * eg && eg > 0.0f, "opacity %.3f vs gain %.3f", e2, eg);
+   }
+
+   // 7. Role keying, and a fine tune pooled in cents across synths with different ranges.
+   {
+      FB_CHECK(std::string(ParamRoles::RoleFor("AudioEffects", "freq").role ? ParamRoles::RoleFor("AudioEffects", "freq").role : "") == "filter.cutoff", "freq on an audio effect is not filter.cutoff");
+      FB_CHECK(std::string(ParamRoles::RoleFor("Synths", "Freq").role ? ParamRoles::RoleFor("Synths", "Freq").role : "") == "pitch.freq", "freq on a synth is not pitch.freq");
+      FB_CHECK(!ParamRoles::RoleFor("Source", "amount").any() && !ParamRoles::RoleFor("3D", "amount").any(), "amount on a 2D/3D node has a role");
+      FB_CHECK(ParamRoles::RoleFor("AudioEffects", "amount").any(), "amount on an audio effect has no role");
+      FB_CHECK(!ParamRoles::RoleFor("", "cutoff").any() && !ParamRoles::RoleFor("Nonsense", "cutoff").any(), "unknown category got a role");
+
+      Engine e;
+      Reg(e, KeyId{ 90, 0 }, "SynthA", "fine", Meta("Synths", -50.0f, 50.0f, false));
+      Reg(e, KeyId{ 91, 0 }, "SynthB", "fine tune", Meta("Synths", -10.0f, 10.0f, false));
+      uint64_t rng = 2;
+      double t = 0.0;
+      Dwell(e, KeyId{ 90, 0 }, t, 6000, (3.0f + 50.0f) / 100.0f, 0.004f, rng);
+      Blend b;
+      e.ComputeBlend(KeyId{ 91, 0 }, 0.05f, b);
+      const int want = BinOf((3.0f + 10.0f) / 20.0f), pk = Argmax(b.p);
+      std::printf("[FB] fine tune: peak bin %d, +3 cents on the new range is bin %d  (w2b %.2f w2d %.2f w4 %.2f)\n", pk, want, b.w2b, b.w2d, b.w4);
+      // The source landscape has 3.1 cents per bin, so its 3-cent dwell is only known to +-1.6 cents (5 target bins).
+      FB_CHECK(std::abs(pk - want) <= 5 && pk > 34, "peak bin %d, +3 cents is bin %d", pk, want);
+   }
+
+   // 8. Anchors do not creep: predictions never move them, and they survive save and load.
+   {
+      MapVisitor mv;
+      DriftNode a;
+      a.seed = 12;
+      a.Tick(1, 1.0 / 60.0);
+      const ParamKey k1{ 100, 0 }, k2{ 101, 2 };
+      a.ValuePos01For(k1, 0.31f);
+      a.ValuePos01For(k2, 0.77f);
+      const std::string before = a.anchors;
+      for (int f = 0; f < 36000; f++) // 10 minutes of Drift
+      {
+         a.Tick(2 + f, 1.0 / 60.0);
+         a.ValuePos01For(k1, 0.31f);
+         a.ValuePos01For(k2, 0.77f);
+      }
+      FB_CHECK(a.anchors == before, "anchors crept: '%s' -> '%s'", before.c_str(), a.anchors.c_str());
+      mv.writing = true; a.VisitParams(mv);
+      DriftNode b;
+      mv.writing = false; b.VisitParams(mv);
+      for (int f = 0; f < 36000; f++)
+      {
+         b.Tick(1 + f, 1.0 / 60.0);
+         b.ValuePos01For(k1, 0.5f);
+         b.ValuePos01For(k2, 0.5f);
+      }
+      FB_CHECK(b.anchors == before, "anchors changed across save/load + 10 min: '%s'", b.anchors.c_str());
+      b.OnRelease(k1, 0.9f, 0.0f);
+      FB_CHECK(b.anchors != before, "a hand release did not move the anchor");
+   }
+
+   // 9. Collapse. Drift feeding only itself for 20 simulated hours.
+   {
+      struct Case { float weight, stray; };
+      const Case cases[3] = { { 0.1f, 1.0f }, { 1.0f, 1.0f }, { 1.0f, 0.5f } };
+      for (const Case& c : cases)
+      {
+         const CollapseResult r = RunCollapse(c.weight, c.stray, 20.0);
+         std::printf("[FB] collapse w=%.1f stray=%.2f: entropy %.3f -> %.3f (%.0f%%)  pred share %.2f  cuts %d\n",
+                     c.weight, c.stray, r.h0, r.hEnd, 100.0 * r.hEnd / std::max(r.h0, 1e-9), r.predShare, r.cuts);
+         FB_CHECK(r.hEnd >= 0.75 * r.h0 || r.cuts > 0, "w=%.1f stray=%.2f: entropy fell to %.0f%% and nothing cut", c.weight, c.stray,
+                  100.0 * r.hEnd / std::max(r.h0, 1e-9));
+      }
+   }
+
+   // 9b. The cut itself: prediction rows that sharpen the landscape trip it after 2 h of active time, it
+   //     stops the key learning from itself, and the next hand move lifts it.
+   {
+      Engine e;
+      e.SetPredictionWeight(1.0f);
+      int cuts = 0;
+      e.SetAutoCutCallback([&](const KeyId&) { cuts++; });
+      const KeyId id{ kKey.uid, kKey.paramIndex };
+      TrainTwoPeak(e);
+      e.SetPlaying(true);
+      double t = 600.0;
+      uint64_t rng = 3;
+      // Hold the key on one spot as a prediction: the landscape collapses onto it.
+      double cutAt = -1.0;
+      double predAtCut = 0.0;
+      for (int i = 0; i < 36000 * 6; i++, t += MovementStats::kGridDt)
+      {
+         e.Observe(id, t, std::clamp(0.25f + 0.005f * Gauss(rng), 0.0f, 1.0f), Source::Prediction, 0);
+         e.Advance(t);
+         MovementStats::Monitor m;
+         if (cutAt < 0.0 && e.GetMonitor(id, m) && m.cut)
+         {
+            cutAt = t - 600.0;
+            const MovementStats::ParamStats* s = e.Find(id);
+            predAtCut = s != nullptr ? s->nPred : 0.0;
+         }
+      }
+      const MovementStats::ParamStats* s = e.Find(id);
+      std::printf("[FB] cut: fired at %.0f s of active time, cuts %d\n", cutAt, cuts);
+      FB_CHECK(cuts == 1 && cutAt >= 7200.0, "cut fired %d times, first at %.0f s (want once, >= 7200 s)", cuts, cutAt);
+      FB_CHECK(s != nullptr && s->nPred <= predAtCut * 1.001 + 1e-6 + 1.0, "key kept learning from itself after the cut (%.1f -> %.1f)", predAtCut, s ? s->nPred : 0.0);
+      e.Observe(id, t, 0.6f, Source::Hand, 0);
+      e.Advance(t + 0.2);
+      MovementStats::Monitor m;
+      FB_CHECK(e.GetMonitor(id, m) && !m.cut, "a hand move did not lift the cut");
+   }
+
+   // 10. Persistence keeps the new levels.
+   {
+      Engine e;
+      Reg(e, KeyId{ 200, 0 }, "Filter", "cutoff", Meta("AudioEffects", 20.0f, 20000.0f, true));
+      uint64_t rng = 1;
+      double t = 0.0;
+      Dwell(e, KeyId{ 200, 0 }, t, 3000, 0.5f, 0.02f, rng);
+      const std::vector<uint8_t> blob = e.Serialize("x");
+      Engine back;
+      std::string last;
+      FB_CHECK(back.Deserialize(blob.data(), blob.size(), last), "round trip failed");
+      FB_CHECK(back.FindRole("filter.cutoff") != nullptr && back.FindFamily("filter") != nullptr && back.YouN() > 0.0,
+               "role, family or you stats lost in the round trip");
+      const std::vector<uint8_t> again = back.Serialize("x");
+      FB_CHECK(again.size() == blob.size(), "re-serialised blob differs in size (%zu vs %zu)", again.size(), blob.size());
+   }
+
+   std::printf("%s\n", gFbFail == 0 ? "PREDFEEDBACKTEST OK" : "PREDFEEDBACKTEST FAIL");
+   return gFbFail == 0;
 }
 }

@@ -1,5 +1,6 @@
 #include "MovementStats.h"
 #include "../platform/AppPaths.h"
+#include "NodeFactory.h"
 
 #include <miniz.h>
 
@@ -21,24 +22,36 @@ using MovementLog::Source;
 // Pure functions
 // -----------------------------------------------------------------------------
 
+namespace
+{
+// README §5, the one edit point. The raw log keeps every tag, so any of these can change later.
+enum WeightSlot { kWHand, kWPerf, kWCorrection, kWGesture, kWModulator, kWExpression, kWPrediction,
+                  kWPredictionUntouched, kWOther, kWSlots };
+constexpr float kSourceWeights[kWSlots] = {
+   1.0f,  // hand
+   1.0f,  // perf matrix
+   3.0f,  // hand or perf + correction (grabbed a green param): the expert corrected the learner
+   0.2f,  // gesture playback: a replay of a take already logged at 1.0
+   0.1f,  // modulator
+   0.1f,  // expression
+   0.1f,  // prediction that moved (own output, owner's call: keep the data rich)
+   0.0f,  // prediction left untouched: "acceptance" is mostly inattention, and weighting it closes the loop
+   0.0f,  // other (preset, randomize, reset: a jump with no widget)
+};
+} // namespace
+
 float SourceWeight(Source src, uint8_t flags, bool changedThisTick)
 {
    switch (src)
    {
    case Source::Hand:
    case Source::Perf:
-      return (flags & MovementLog::kCorrection) ? 3.0f : 1.0f;
-   case Source::Gesture:
-      return 0.2f;
-   case Source::Modulator:
-   case Source::Expression:
-      return 0.1f;
-   case Source::Prediction:
-      // Own output counts a little when it moved; a prediction left sitting is "acceptance", which
-      // is mostly absent attention and would close the feedback loop (README §5).
-      return changedThisTick ? 0.1f : 0.0f;
-   case Source::Other:
-      return 0.0f;
+      return kSourceWeights[(flags & MovementLog::kCorrection) ? kWCorrection : (src == Source::Hand ? kWHand : kWPerf)];
+   case Source::Gesture: return kSourceWeights[kWGesture];
+   case Source::Modulator: return kSourceWeights[kWModulator];
+   case Source::Expression: return kSourceWeights[kWExpression];
+   case Source::Prediction: return kSourceWeights[changedThisTick ? kWPrediction : kWPredictionUntouched];
+   case Source::Other: return kSourceWeights[kWOther];
    }
    return 0.0f;
 }
@@ -55,7 +68,7 @@ double EffectiveN(const ParamStats& s, double nowActive)
    return s.nEff * DecayFactor(s.activeSeconds, nowActive);
 }
 
-void SmoothedHist(const ParamStats& s, float out[kBins])
+void SmoothBins(const float* h, float out[kBins], bool wrap)
 {
    constexpr int kRadius = 6;
    constexpr double kSigma = 2.0;
@@ -71,18 +84,24 @@ void SmoothedHist(const ParamStats& s, float out[kBins])
       for (int k = -kRadius; k <= kRadius; k++)
       {
          int j = i + k;
-         // Reflect at the walls: knobs are often parked at 0 or 1, and truncating would thin them.
-         if (j < 0)
-            j = -j - 1;
+         if (wrap)
+            j = (j % kBins + kBins) % kBins; // hue: the ends are neighbours
+         else if (j < 0)
+            j = -j - 1; // reflect at the walls: knobs are often parked at 0 or 1, and truncating would thin them
          else if (j >= kBins)
             j = 2 * kBins - j - 1;
-         acc += kernel[k + kRadius] * s.hist[j];
+         acc += kernel[k + kRadius] * h[j];
       }
       tmp[i] = acc;
       total += acc;
    }
    for (int i = 0; i < kBins; i++)
       out[i] = total > 0.0 ? static_cast<float>(tmp[i] / total) : 0.0f;
+}
+
+void SmoothedHist(const ParamStats& s, float out[kBins])
+{
+   SmoothBins(s.hist, out, false);
 }
 
 Derived Derive(const ParamStats& s, double dt)
@@ -152,6 +171,12 @@ void Engine::Reset()
 {
    mKeys.clear();
    mProfiles.clear();
+   mRoles.clear();
+   mFamilies.clear();
+   mYou = You();
+   mEnergyAll = Energy();
+   mEnergyRole.clear();
+   mLastEnergyT = -1e18;
    mGridStarted = false;
    mNextGrid = 0;
    mTime = 0;
@@ -161,7 +186,8 @@ void Engine::Reset()
    mWasActive = false;
 }
 
-void Engine::RegisterKey(const KeyId& id, const std::string& nodeType, const std::string& name, bool continuous)
+void Engine::RegisterKey(const KeyId& id, const std::string& nodeType, const std::string& name, bool continuous,
+                         const KeyMeta& metaIn)
 {
    Runtime& r = mKeys[id];
    r.continuous = continuous;
@@ -170,6 +196,29 @@ void Engine::RegisterKey(const KeyId& id, const std::string& nodeType, const std
    r.profile.paramIndex = id.paramIndex;
    r.profile.name = name;
    r.profStats = nullptr;
+
+   // A replay re-registers keys the live session may already know with their curve functions: keep them.
+   KeyMeta meta = metaIn;
+   if (meta.posToValue == nullptr && meta.valueToPos == nullptr)
+   {
+      meta.posToValue = r.meta.posToValue;
+      meta.valueToPos = r.meta.valueToPos;
+   }
+   if (meta.category.empty())
+      meta.category = !r.meta.category.empty() ? r.meta.category : NodeFactory::Instance().CategoryOf(nodeType);
+   r.meta = meta;
+
+   r.role = continuous ? ParamRoles::RoleFor(meta.category, name) : ParamRoles::Role();
+   r.roleStats = nullptr;
+   r.famStats = nullptr;
+   r.centsPerUnit = 1.0f;
+   if (r.role.any())
+   {
+      r.famUnit = ParamRoles::FamilyUnit(r.role.family, r.famShared);
+      const std::string n = ParamRoles::Normalise(name);
+      if (r.role.unit == ParamRoles::Unit::Cents && (n == "coarse" || n == "pitch" || n == "transpose"))
+         r.centsPerUnit = 100.0f; // a semitone knob
+   }
 }
 
 void Engine::BeginSession()
@@ -184,6 +233,7 @@ void Engine::BeginSession()
       r.prevValid = false;
       r.changedSinceTick = false;
       r.lastHandT = -1e18;
+      r.lastObsHandT = -1e18;
       r.handN = 0;
    }
 }
@@ -224,6 +274,27 @@ void Engine::Observe(const KeyId& id, double t, float pos, Source src, uint8_t f
 
    if (src == Source::Hand || src == Source::Perf)
    {
+      const float w = SourceWeight(src, flags, true);
+      // Hand energy and your move speed: a position change between two writes of one grab. Only Hand
+      // and Perf get here, so a prediction can never raise it.
+      if (t > r.lastObsHandT && t - r.lastObsHandT <= 0.25)
+      {
+         const float d = std::abs(pos - r.lastObsHandPos);
+         mEnergyAll.acc += d;
+         if (r.role.any())
+            mEnergyRole[r.role.role].acc += d;
+         if (d > 1e-4f)
+         {
+            mYou.speedSum += w * std::min(d / std::max(t - r.lastObsHandT, 1e-3), 5.0);
+            mYou.speedW += w;
+         }
+      }
+      r.lastObsHandPos = pos;
+      r.lastObsHandT = t;
+      // Pause between hand writes anywhere, log-spaced from 0.15 s.
+      const double gap = t - mLastHandMoveT;
+      if (gap >= 0.15 && gap < 300.0)
+         mYou.pauses[std::clamp(static_cast<int>(std::log2(gap / 0.15)), 0, 11)] += w;
       mLastHandMoveT = t;
       // A gap over 100 ms means a fresh grab: velocity starts from zero.
       if (t - r.lastHandT > 0.1)
@@ -270,6 +341,7 @@ void Engine::Decay(ParamStats& s) const
       s.Sxy *= f;
       s.Syy *= f;
       s.nEff *= f;
+      s.nPred *= f;
       const float ff = static_cast<float>(f);
       for (float& h : s.hist)
          h *= ff;
@@ -277,7 +349,7 @@ void Engine::Decay(ParamStats& s) const
    s.activeSeconds = mActiveClock;
 }
 
-void Engine::AddSample(ParamStats& s, float x, float y, bool hasPair, double w)
+void Engine::AddSample(ParamStats& s, float x, float y, bool hasPair, double w, int bin, double wPred)
 {
    Decay(s);
    if (hasPair)
@@ -289,10 +361,201 @@ void Engine::AddSample(ParamStats& s, float x, float y, bool hasPair, double w)
       s.Sxy += w * x * y;
       s.Syy += w * y * y;
    }
-   int bin = static_cast<int>(y * kBins);
-   bin = std::clamp(bin, 0, kBins - 1);
-   s.hist[bin] += static_cast<float>(w);
+   s.hist[std::clamp(bin, 0, kBins - 1)] += static_cast<float>(w);
    s.nEff += w;
+   s.nPred += wPred;
+}
+
+namespace
+{
+int PosBin(float pos) { return std::clamp(static_cast<int>(pos * kBins), 0, kBins - 1); }
+int UnitBin(ParamRoles::Unit u, float value)
+{
+   const ParamRoles::Range rg = ParamRoles::UnitRange(u);
+   return std::clamp(static_cast<int>((value - rg.lo) / (rg.hi - rg.lo) * kBins), 0, kBins - 1);
+}
+bool IsLogUnit(ParamRoles::Unit u)
+{
+   return u == ParamRoles::Unit::Log2Hz || u == ParamRoles::Unit::LogSec || u == ParamRoles::Unit::Log2Val;
+}
+double Entropy(const float* p)
+{
+   double h = 0.0;
+   for (int i = 0; i < kBins; i++)
+      if (p[i] > 1e-9f)
+         h -= p[i] * std::log(static_cast<double>(p[i]));
+   return h;
+}
+} // namespace
+
+float Engine::ToUnit(const Runtime& r, float pos, ParamRoles::Unit u) const
+{
+   if (u == ParamRoles::Unit::Pos || u == ParamRoles::Unit::Hue)
+      return pos;
+   const KeyMeta& m = r.meta;
+   float v;
+   if (m.posToValue != nullptr)
+      v = m.posToValue(pos, m.minValue, m.maxValue);
+   else if (m.hasCurve && m.minValue > 0.0f && IsLogUnit(u))
+      v = m.minValue * std::pow(m.maxValue / m.minValue, pos); // curve function unknown (replay): assume a log taper
+   else
+      v = m.minValue + pos * (m.maxValue - m.minValue);
+   switch (u)
+   {
+   case ParamRoles::Unit::Log2Hz: return std::log2(std::max(v, 1e-3f));
+   case ParamRoles::Unit::Db: return m.minValue < 0.0f ? v : 20.0f * std::log10(std::max(v, 1e-4f));
+   case ParamRoles::Unit::Cents:
+   case ParamRoles::Unit::CentsFine: return v * r.centsPerUnit;
+   case ParamRoles::Unit::LogSec: return std::log2(std::max(v, 1e-4f));
+   case ParamRoles::Unit::Log2Val: return std::log2(std::max(std::abs(v), 1e-4f));
+   default: return pos;
+   }
+}
+
+double Engine::RebinToTarget(const float* hist, ParamRoles::Unit u, const Runtime& target, float* out) const
+{
+   double total = 0.0;
+   for (int i = 0; i < kBins; i++)
+      total += hist[i];
+   if (total <= 0.0)
+   {
+      std::fill(out, out + kBins, 0.0f);
+      return 0.0;
+   }
+   if (u == ParamRoles::Unit::Pos || u == ParamRoles::Unit::Hue)
+   {
+      std::copy(hist, hist + kBins, out);
+      return 1.0;
+   }
+
+   const KeyMeta& m = target.meta;
+   const ParamRoles::Range rg = ParamRoles::UnitRange(u);
+   float acc[kBins] = {};
+   double kept = 0.0;
+   constexpr int kSub = 4; // sub-points per source bin, so a stretched axis leaves no gaps
+   for (int i = 0; i < kBins; i++)
+   {
+      if (hist[i] <= 0.0f)
+         continue;
+      for (int s = 0; s < kSub; s++)
+      {
+         const float un = rg.lo + (i + (s + 0.5f) / kSub) / kBins * (rg.hi - rg.lo);
+         float v;
+         switch (u)
+         {
+         case ParamRoles::Unit::Db: v = m.minValue < 0.0f ? un : std::pow(10.0f, un / 20.0f); break;
+         case ParamRoles::Unit::Cents:
+         case ParamRoles::Unit::CentsFine: v = un / target.centsPerUnit; break;
+         default: v = std::exp2(un); break; // Log2Hz, LogSec, Log2Val
+         }
+         float pos;
+         if (m.valueToPos != nullptr)
+            pos = m.valueToPos(v, m.minValue, m.maxValue);
+         else if (m.hasCurve && m.minValue > 0.0f && IsLogUnit(u))
+            pos = std::log(v / m.minValue) / std::log(m.maxValue / m.minValue);
+         else
+            pos = m.maxValue > m.minValue ? (v - m.minValue) / (m.maxValue - m.minValue) : 0.0f;
+         if (!std::isfinite(pos) || pos < -0.001f || pos > 1.001f)
+            continue; // outside the target's range: dropped, and renormalised away below
+         acc[PosBin(std::clamp(pos, 0.0f, 1.0f))] += hist[i] / kSub;
+         kept += hist[i] / kSub;
+      }
+   }
+   std::copy(acc, acc + kBins, out);
+   return kept / total;
+}
+
+void Engine::UpdateEnergy(double t)
+{
+   if (mLastEnergyT < -1e17)
+   {
+      mLastEnergyT = t;
+      return;
+   }
+   const double dt = std::clamp(t - mLastEnergyT, 1e-3, 0.5);
+   mLastEnergyT = t;
+   const double alpha = 1.0 - std::exp(-dt / 1.0); // tau ~ 1 s
+   auto step = [&](Energy& e) {
+      e.ema += alpha * (e.acc / dt - e.ema);
+      e.acc = 0.0;
+   };
+   step(mEnergyAll);
+   for (auto& [role, e] : mEnergyRole)
+      step(e);
+}
+
+float Engine::HandEnergy(const KeyId& id) const
+{
+   const Runtime* r = FindRuntime(id);
+   const double typical = mYou.speedW >= 1.0 ? std::max(mYou.speedSum / mYou.speedW, 0.05) : 0.3;
+   const double eAll = std::clamp(mEnergyAll.ema / typical, 0.0, 1.0);
+   double eRole = 0.0;
+   if (r != nullptr && r->role.any())
+   {
+      auto it = mEnergyRole.find(r->role.role);
+      if (it != mEnergyRole.end())
+         eRole = std::clamp(it->second.ema / typical, 0.0, 1.0);
+   }
+   return static_cast<float>(0.7 * eRole + 0.3 * eAll);
+}
+
+void Engine::RunMonitor(const KeyId& id, Runtime& r)
+{
+   if (mActiveClock < r.nextCheck)
+      return;
+   r.nextCheck = mActiveClock + kMonitorPeriodSec;
+   if (r.stats.nEff <= 0.0)
+      return;
+   float p[kBins];
+   SmoothedHist(r.stats, p);
+   const double h = Entropy(p);
+   if (!r.refValid || r.handSinceRef)
+   {
+      // A hand move re-anchors the reference: the model just learned something from you.
+      r.refEntropy = h;
+      r.refClock = mActiveClock;
+      r.refValid = true;
+      r.handSinceRef = false;
+      return;
+   }
+   if (!r.cut && mActiveClock - r.refClock >= kAutoCutWindowSec && h < (1.0 - kAutoCutDrop) * r.refEntropy)
+   {
+      r.cut = true;
+      if (mOnAutoCut)
+         mOnAutoCut(id);
+   }
+}
+
+bool Engine::GetMonitor(const KeyId& id, Monitor& out) const
+{
+   const Runtime* r = FindRuntime(id);
+   if (r == nullptr || r->stats.nEff <= 0.0)
+      return false;
+   float p[kBins];
+   SmoothedHist(r->stats, p);
+   out.entropy = Entropy(p);
+   out.sigma = Derive(r->stats).sigma;
+   out.predShare = r->stats.nEff > 0.0 ? r->stats.nPred / r->stats.nEff : 0.0;
+   out.cut = r->cut;
+   return true;
+}
+
+const Engine::Runtime* Engine::FindRuntime(const KeyId& id) const
+{
+   auto it = mKeys.find(id);
+   return it != mKeys.end() ? &it->second : nullptr;
+}
+
+const ParamStats* Engine::FindRole(const std::string& role) const
+{
+   auto it = mRoles.find(role);
+   return it != mRoles.end() ? &it->second : nullptr;
+}
+
+const ParamStats* Engine::FindFamily(const std::string& family) const
+{
+   auto it = mFamilies.find(family);
+   return it != mFamilies.end() ? &it->second : nullptr;
 }
 
 void Engine::Tick(double tickTime)
@@ -314,26 +577,50 @@ void Engine::Tick(double tickTime)
       if (!r.continuous || !r.holdValid)
          continue;
 
-      const double w = SourceWeight(r.holdSrc, r.holdFlags, r.changedSinceTick);
+      const bool isPred = r.holdSrc == Source::Prediction;
+      const bool isHand = r.holdSrc == Source::Hand || r.holdSrc == Source::Perf;
+      double w = SourceWeight(r.holdSrc, r.holdFlags, r.changedSinceTick);
+      if (isPred)
+         w = (r.changedSinceTick && !r.cut) ? mPredWeight : 0.0; // an auto-cut key stops learning from itself
       r.changedSinceTick = false;
       if (w > 0.0)
       {
-         AddSample(r.stats, r.prevPos, r.holdPos, r.prevValid, w);
+         const double wPred = isPred ? w : 0.0;
+         const int bin = PosBin(r.holdPos);
+         AddSample(r.stats, r.prevPos, r.holdPos, r.prevValid, w, bin, wPred);
          if (r.hasProfile)
          {
             if (r.profStats == nullptr)
                r.profStats = &mProfiles[r.profile];
-            AddSample(*r.profStats, r.prevPos, r.holdPos, r.prevValid, w);
+            AddSample(*r.profStats, r.prevPos, r.holdPos, r.prevValid, w, bin, wPred);
+         }
+         if (r.role.any())
+         {
+            if (r.roleStats == nullptr)
+               r.roleStats = &mRoles[r.role.role];
+            AddSample(*r.roleStats, r.prevPos, r.holdPos, r.prevValid, w, UnitBin(r.role.unit, ToUnit(r, r.holdPos, r.role.unit)), wPred);
+            if (r.famStats == nullptr)
+               r.famStats = &mFamilies[r.role.family];
+            const ParamRoles::Unit fu = r.famShared ? r.famUnit : ParamRoles::Unit::Pos;
+            AddSample(*r.famStats, r.prevPos, r.holdPos, r.prevValid, w, UnitBin(fu, ToUnit(r, r.holdPos, fu)), wPred);
+         }
+         if (isHand)
+         {
+            AddSample(mYou.ar, r.prevPos, r.holdPos, r.prevValid, w, PosBin(r.holdPos)); // how, never where
+            r.handSinceRef = true;
+            r.cut = false; // the next hand move lifts an auto-cut
          }
       }
       r.prevPos = r.holdPos;
       r.prevValid = true;
+      RunMonitor(id, r);
    }
 }
 
 void Engine::Advance(double t)
 {
    mTime = t;
+   UpdateEnergy(t);
    if (!mGridStarted)
    {
       mGridStarted = true;
@@ -366,13 +653,198 @@ const ParamStats* Engine::FindProfile(const ProfileKey& k) const
 }
 
 // -----------------------------------------------------------------------------
+// The fallback ladder, blended (README §5.2 / §6)
+// -----------------------------------------------------------------------------
+
+namespace
+{
+constexpr double kDefaultTheta = 0.5, kDefaultSigma = 0.1;
+
+// Independent samples in a level: n_eff rows on a 10 Hz grid are strongly autocorrelated, and one row is
+// far from one sample. n(1-phi)/(1+phi) (README §6).
+double IndependentN(const ParamStats& s, double nowActive)
+{
+   const double n = EffectiveN(s, nowActive);
+   if (n <= 0.0)
+      return 0.0;
+   double phi = 0.9;
+   if (s.W > 0.0)
+   {
+      const double mx = s.Sx / s.W;
+      const double vx = std::max(0.0, s.Sxx / s.W - mx * mx);
+      phi = vx < 1e-8 ? kPhiMax : std::clamp((s.Sxy / s.W - mx * (s.Sy / s.W)) / vx, kPhiMin, kPhiMax);
+   }
+   return n * (1.0 - phi) / (1.0 + phi);
+}
+
+// Levels are (key, profile, role, family); rung 2c "you" joins the theta chain only. A level with
+// n = 0 gets no weight and leaves its share to the levels below it.
+struct Chain
+{
+   double w[4] = {};
+   double wYou = 0, rest = 1;
+};
+
+Chain MakeChain(const double n[4], double nYou)
+{
+   using namespace MovementStats;
+   const double n0[4] = { kN0, kN0, kN0 * kRoleN0Mult, kN0 * kFamilyN0Mult };
+   Chain c;
+   double rem = 1.0;
+   for (int i = 0; i < 4; i++)
+   {
+      c.w[i] = n[i] > 0.0 ? n[i] / (n[i] + n0[i]) * rem : 0.0;
+      rem -= c.w[i];
+   }
+   c.wYou = nYou > 0.0 ? nYou / (nYou + kN0) * rem : 0.0;
+   c.rest = rem - c.wYou;
+   return c;
+}
+} // namespace
+
+void Engine::ComputeBlend(const KeyId& id, float anchor, Blend& out) const
+{
+   const Runtime* r = FindRuntime(id);
+   const double now = mActiveClock;
+
+   const ParamStats* lv[4] = {};
+   ParamRoles::Unit roleUnit = ParamRoles::Unit::Pos;
+   ParamRoles::Unit famUnit = ParamRoles::Unit::Pos;
+   bool famLandscape = false;
+   if (r != nullptr && r->continuous)
+   {
+      if (r->stats.nEff > 0.0)
+         lv[0] = &r->stats;
+      auto pit = mProfiles.find(r->profile);
+      if (r->hasProfile && pit != mProfiles.end())
+         lv[1] = &pit->second;
+      if (r->role.any())
+      {
+         auto rit = mRoles.find(r->role.role);
+         if (rit != mRoles.end())
+            lv[2] = &rit->second;
+         auto fit = mFamilies.find(r->role.family);
+         if (fit != mFamilies.end())
+            lv[3] = &fit->second;
+         roleUnit = r->role.unit;
+         famUnit = r->famShared ? r->famUnit : ParamRoles::Unit::Pos;
+         famLandscape = r->famShared;
+      }
+   }
+
+   // Each level's landscape in the target's fader space, and its OU fit.
+   float lp[4][kBins] = {};
+   bool usableP[4] = {};
+   Derived d[4];
+   bool usableT[4] = {};
+   double nInd[4] = {};
+   for (int i = 0; i < 4; i++)
+   {
+      if (lv[i] == nullptr)
+         continue;
+      nInd[i] = IndependentN(*lv[i], now);
+      d[i] = Derive(*lv[i]);
+      usableT[i] = d[i].valid && d[i].sigma > 0.0;
+      if (i == 3 && !famLandscape)
+         continue; // a mixed-unit family shares speed, never a landscape
+      float raw[kBins];
+      double kept;
+      if (i < 2)
+      {
+         std::copy(lv[i]->hist, lv[i]->hist + kBins, raw);
+         kept = 1.0;
+      }
+      else
+         kept = RebinToTarget(lv[i]->hist, i == 2 ? roleUnit : famUnit, *r, raw);
+      if (kept >= 0.1)
+      {
+         SmoothBins(raw, lp[i], r != nullptr && r->role.unit == ParamRoles::Unit::Hue && i >= 2);
+         usableP[i] = true;
+      }
+   }
+   const double nYou = mYou.ar.nEff > 0.0 ? IndependentN(mYou.ar, now) : 0.0;
+   const Derived dYou = mYou.ar.nEff > 0.0 ? Derive(mYou.ar) : Derived();
+
+   // Landscape chain.
+   double nP[4];
+   for (int i = 0; i < 4; i++)
+      nP[i] = usableP[i] ? nInd[i] : 0.0;
+   const Chain cp = MakeChain(nP, 0.0);
+
+   float fb[kBins];
+   double fbSum = 0.0;
+   for (int i = 0; i < kBins; i++)
+   {
+      if (anchor >= 0.0f)
+      {
+         const float z = ((i + 0.5f) / kBins - anchor) / kAnchorWidth;
+         fb[i] = std::exp(-0.5f * z * z) + 1e-4f;
+      }
+      else
+         fb[i] = 1.0f;
+      fbSum += fb[i];
+   }
+   double sum = 0.0;
+   for (int i = 0; i < kBins; i++)
+   {
+      double v = cp.rest * fb[i] / fbSum; // rung 3 (community prior) would take a slot here: w3 = 0
+      for (int k = 0; k < 4; k++)
+         v += cp.w[k] * lp[k][i];
+      out.p[i] = static_cast<float>(v);
+      sum += v;
+   }
+   for (float& v : out.p)
+      v = sum > 0.0 ? static_cast<float>(v / sum) : 1.0f / kBins;
+
+   // Speed chain (theta, sigma): the same weights, with rung 2c before the default.
+   double nT[4];
+   for (int i = 0; i < 4; i++)
+      nT[i] = usableT[i] ? nInd[i] : 0.0;
+   const bool youOk = dYou.valid && dYou.sigma > 0.0;
+   const Chain ct = MakeChain(nT, youOk ? nYou : 0.0);
+   double lnTheta = ct.rest * std::log(kDefaultTheta), lnSigma = ct.rest * std::log(kDefaultSigma);
+   for (int k = 0; k < 4; k++)
+      if (ct.w[k] > 0.0)
+      {
+         lnTheta += ct.w[k] * std::log(d[k].theta);
+         lnSigma += ct.w[k] * std::log(std::max(d[k].sigma, 1e-3));
+      }
+   if (ct.wYou > 0.0)
+   {
+      lnTheta += ct.wYou * std::log(dYou.theta);
+      lnSigma += ct.wYou * std::log(std::max(dYou.sigma, 1e-3));
+   }
+   out.theta = static_cast<float>(std::exp(lnTheta));
+   out.sigma = static_cast<float>(std::exp(lnSigma));
+
+   out.w1 = cp.w[0]; out.w2 = cp.w[1]; out.w2b = cp.w[2]; out.w2d = cp.w[3];
+   out.w3 = 0.0; out.wYou = ct.wYou; out.w4 = cp.rest;
+   out.nKey = lv[0] != nullptr ? EffectiveN(*lv[0], now) : 0.0;
+
+   // Range: declared min/max (the whole fader) until the key's own data carries real weight.
+   out.lo = 0.0f;
+   out.hi = 1.0f;
+   if (out.w1 > 0.2 && lv[0] != nullptr)
+   {
+      out.lo = static_cast<float>(d[0].rangeLo);
+      out.hi = static_cast<float>(d[0].rangeHi);
+      if (out.hi - out.lo < 0.05f)
+      {
+         const float c = 0.5f * (out.lo + out.hi);
+         out.lo = std::max(0.0f, c - 0.025f);
+         out.hi = std::min(1.0f, c + 0.025f);
+      }
+   }
+}
+
+// -----------------------------------------------------------------------------
 // Persistence
 // -----------------------------------------------------------------------------
 
 namespace
 {
 constexpr char kMagic[6] = {'I', 'M', 'S', 'T', 'A', 'T'};
-constexpr uint16_t kVersion = 1;
+constexpr uint16_t kVersion = 2;
 constexpr uint32_t kMaxEntries = 4u * 1024u * 1024u;
 constexpr uint32_t kMaxString = 4096;
 
@@ -394,7 +866,7 @@ struct Writer
       put(s.W); put(s.Sx); put(s.Sy); put(s.Sxx); put(s.Sxy); put(s.Syy);
       buf.insert(buf.end(), reinterpret_cast<const uint8_t*>(s.hist),
                  reinterpret_cast<const uint8_t*>(s.hist) + sizeof(s.hist));
-      put(s.releaseVel); put(s.nEff); put(s.activeSeconds);
+      put(s.releaseVel); put(s.nEff); put(s.nPred); put(s.activeSeconds);
    }
 };
 
@@ -439,18 +911,18 @@ struct Reader
       }
       std::memcpy(s.hist, p, sizeof(s.hist));
       p += sizeof(s.hist);
-      s.releaseVel = get<float>(); s.nEff = get<double>(); s.activeSeconds = get<double>();
+      s.releaseVel = get<float>(); s.nEff = get<double>(); s.nPred = get<double>(); s.activeSeconds = get<double>();
       return s;
    }
 };
 
 bool StatsSane(const ParamStats& s)
 {
-   const double v[] = {s.W, s.Sx, s.Sy, s.Sxx, s.Sxy, s.Syy, s.nEff, s.activeSeconds, s.releaseVel};
+   const double v[] = {s.W, s.Sx, s.Sy, s.Sxx, s.Sxy, s.Syy, s.nEff, s.nPred, s.activeSeconds, s.releaseVel};
    for (double x : v)
       if (!std::isfinite(x))
          return false;
-   if (s.W < 0.0 || s.nEff < 0.0 || s.activeSeconds < 0.0)
+   if (s.W < 0.0 || s.nEff < 0.0 || s.nPred < 0.0 || s.activeSeconds < 0.0)
       return false;
    for (float h : s.hist)
       if (!std::isfinite(h) || h < 0.0f)
@@ -496,6 +968,10 @@ std::vector<uint8_t> Engine::Serialize(const std::string& lastConsumed) const
       w.put(id.uid);
       w.put(id.paramIndex);
       w.putStats(r.stats);
+      w.put(static_cast<uint8_t>(r.cut ? 1 : 0));
+      w.put(static_cast<uint8_t>(r.refValid ? 1 : 0));
+      w.put(r.refEntropy);
+      w.put(r.refClock);
    }
 
    w.put(static_cast<uint32_t>(mProfiles.size()));
@@ -506,6 +982,28 @@ std::vector<uint8_t> Engine::Serialize(const std::string& lastConsumed) const
       w.putString(k.name);
       w.putStats(s);
    }
+
+   auto putMap = [&](const std::unordered_map<std::string, ParamStats>& m) {
+      uint32_t n = 0;
+      for (const auto& [name, st] : m)
+         if (st.nEff > 0.0)
+            n++;
+      w.put(n);
+      for (const auto& [name, st] : m)
+      {
+         if (st.nEff <= 0.0)
+            continue;
+         w.putString(name);
+         w.putStats(st);
+      }
+   };
+   putMap(mRoles);
+   putMap(mFamilies);
+   w.putStats(mYou.ar);
+   w.put(mYou.speedSum);
+   w.put(mYou.speedW);
+   for (float p : mYou.pauses)
+      w.put(p);
 
    const uint32_t crc = static_cast<uint32_t>(mz_crc32(0, w.buf.data(), w.buf.size()));
    w.put(crc);
@@ -532,9 +1030,15 @@ bool Engine::Deserialize(const uint8_t* data, size_t size, std::string& lastCons
       id.uid = r.get<uint64_t>();
       id.paramIndex = r.get<int32_t>();
       ParamStats s = r.getStats();
-      if (!r.ok || !StatsSane(s) || s.activeSeconds > clock + 1e-6)
+      Runtime& rt = keys[id];
+      rt.cut = r.get<uint8_t>() != 0;
+      rt.refValid = r.get<uint8_t>() != 0;
+      rt.refEntropy = r.get<double>();
+      rt.refClock = r.get<double>();
+      if (!r.ok || !StatsSane(s) || s.activeSeconds > clock + 1e-6 || !std::isfinite(rt.refEntropy) ||
+          !std::isfinite(rt.refClock))
          return false;
-      keys[id].stats = s;
+      rt.stats = s;
    }
 
    const uint32_t nProf = r.get<uint32_t>();
@@ -552,11 +1056,43 @@ bool Engine::Deserialize(const uint8_t* data, size_t size, std::string& lastCons
          return false;
       profiles[k] = s;
    }
-   if (!r.ok || r.p != r.end)
+   auto getMap = [&](std::unordered_map<std::string, ParamStats>& m) {
+      const uint32_t n = r.get<uint32_t>();
+      if (!r.ok || n > kMaxEntries)
+         return false;
+      for (uint32_t i = 0; i < n && r.ok; i++)
+      {
+         std::string name = r.getString();
+         ParamStats st = r.getStats();
+         if (!r.ok || !StatsSane(st) || st.activeSeconds > clock + 1e-6)
+            return false;
+         m[std::move(name)] = st;
+      }
+      return r.ok;
+   };
+   std::unordered_map<std::string, ParamStats> roles, families;
+   if (!getMap(roles) || !getMap(families))
+      return false;
+   You you;
+   you.ar = r.getStats();
+   you.speedSum = r.get<double>();
+   you.speedW = r.get<double>();
+   for (float& p : you.pauses)
+      p = r.get<float>();
+   if (!r.ok || !StatsSane(you.ar) || you.ar.activeSeconds > clock + 1e-6 || !std::isfinite(you.speedSum) ||
+       !std::isfinite(you.speedW) || you.speedSum < 0.0 || you.speedW < 0.0)
+      return false;
+   for (float p : you.pauses)
+      if (!std::isfinite(p) || p < 0.0f)
+         return false;
+   if (r.p != r.end)
       return false;
 
    mKeys = std::move(keys);
    mProfiles = std::move(profiles);
+   mRoles = std::move(roles);
+   mFamilies = std::move(families);
+   mYou = you;
    mActiveClock = clock;
    lastConsumedOut = std::move(lastConsumed);
    return true;
@@ -633,7 +1169,13 @@ bool Engine::ReplayFile(const std::string& path)
          step(rec.key.dt_ms);
          const KeyId id{rec.key.uid, rec.key.paramIndex};
          ids[rec.key.id] = id;
-         RegisterKey(id, rec.key.typeName, rec.key.name, !(rec.key.isEnum || rec.key.isBool));
+         {
+            KeyMeta meta;
+            meta.minValue = rec.key.minValue;
+            meta.maxValue = rec.key.maxValue;
+            meta.hasCurve = rec.key.hasCurve;
+            RegisterKey(id, rec.key.typeName, rec.key.name, !(rec.key.isEnum || rec.key.isBool), meta);
+         }
          break;
       }
       case Record::Type::Val:
@@ -665,6 +1207,7 @@ bool Engine::ReplayFile(const std::string& path)
             SetPlaying(false);
             break;
          case MovementLog::Mark::SessionStart:
+         case MovementLog::Mark::AutoCut:
             break;
          }
          break;
@@ -705,7 +1248,7 @@ namespace
 bool NearlyEqual(const ParamStats& a, const ParamStats& b)
 {
    if (a.W != b.W || a.Sx != b.Sx || a.Sy != b.Sy || a.Sxx != b.Sxx || a.Sxy != b.Sxy ||
-       a.Syy != b.Syy || a.nEff != b.nEff || a.activeSeconds != b.activeSeconds ||
+       a.Syy != b.Syy || a.nEff != b.nEff || a.nPred != b.nPred || a.activeSeconds != b.activeSeconds ||
        a.releaseVel != b.releaseVel)
       return false;
    return std::memcmp(a.hist, b.hist, sizeof(a.hist)) == 0;

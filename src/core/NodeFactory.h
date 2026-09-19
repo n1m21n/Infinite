@@ -29,6 +29,8 @@ public:
 
    void Register(const std::string& name, CreateNodeFn createFn, const std::string& category);
    INode* MakeNode(const std::string& name);
+   // The category a node type was registered under, or "" when the name is unknown.
+   std::string CategoryOf(const std::string& name) const;
 
    // category -> ordered list of node names, in registration order (used to
    // build the spawn menu grouped Source/Effects/Compositing/Text/Output).

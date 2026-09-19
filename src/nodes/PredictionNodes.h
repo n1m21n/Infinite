@@ -58,7 +58,8 @@ public:
    }
 
    // --- UI / test helpers (main thread) ---
-   // 0 = no data (cold start around the anchor), 1 = little, 2 = some, 3 = plenty. Frozen reads 3.
+   // 0 = grey (defaults, w1 < 0.2), 1 = dim green (your style from other patches, w1 < 0.6), 2 = full
+   // green (this knob). Frozen reads 2.
    int ConfidenceRung(const ParamKey& k) const;
    // The likely next 2 s (kGhostPoints samples) from a COPY of the slot's x, v and RNG state, at a
    // fixed dt. Never advances or reseeds the real slot. Cached per slot per frame. Returns the
@@ -78,7 +79,8 @@ public:
    {
       float p[kBins] = {}; // normalised so the bins sum to 1
       float theta = 0.5f, sigma = 0.1f, lo = 0.0f, hi = 1.0f;
-      double nEff = 0.0;
+      double nEff = 0.0;   // the key's own n_eff
+      float w1 = 0.0f;     // weight of the key's own data in the blend (drives the confidence dot)
       bool cold = true;
    };
    struct Slot
@@ -105,6 +107,7 @@ private:
       float theta = 0.5f, sigma = 0.1f, lo = 0.0f, hi = 1.0f;
    };
 
+   float EnergyFor(const ParamKey& k) const;
    Slot& SlotFor(const ParamKey& k, float curPos);
    void RefreshModel(const ParamKey& k, Slot& s);
    float AnchorFor(const ParamKey& k) const;
@@ -127,4 +130,7 @@ namespace PredictionNodes
 {
    // INFINITE_DRIFTTEST, headless: dynamics, release carry, determinism, save/load, ghost isolation.
    bool RunDriftTest();
+   // INFINITE_PREDFEEDBACKTEST, headless: cold start, blending, role pooling, your style, energy link,
+   // anchors and the collapse monitor (docs/plans/prediction/step-05).
+   bool RunPredFeedbackTest();
 }

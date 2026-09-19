@@ -3474,13 +3474,14 @@ namespace
 
       // Confidence dot, top-right of the item.
       const int rung = drift->ConfidenceRung(key);
-      static const ImU32 kDark[4] = { IM_COL32(110, 115, 130, 200), IM_COL32(230, 170, 70, 255),
-                                      IM_COL32(150, 215, 110, 255), IM_COL32(110, 235, 150, 255) };
-      static const ImU32 kLight[4] = { IM_COL32(150, 155, 170, 220), IM_COL32(200, 120, 20, 255),
-                                       IM_COL32(70, 150, 40, 255), IM_COL32(20, 140, 60, 255) };
+      // grey = defaults, dim green = your style from other patches and knobs, full green = this knob
+      static const ImU32 kDark[3] = { IM_COL32(110, 115, 130, 200), IM_COL32(95, 150, 115, 255),
+                                      IM_COL32(110, 235, 150, 255) };
+      static const ImU32 kLight[3] = { IM_COL32(150, 155, 170, 220), IM_COL32(110, 150, 120, 255),
+                                       IM_COL32(20, 140, 60, 255) };
       const ImVec2 rmax = ImGui::GetItemRectMax(), rmin = ImGui::GetItemRectMin();
       dl->AddCircleFilled(ImVec2(std::min(rmax.x, laneMax) - 5.0f, rmin.y + 5.0f), 2.5f,
-                          (light ? kLight : kDark)[std::clamp(rung, 0, 3)]);
+                          (light ? kLight : kDark)[std::clamp(rung, 0, 2)]);
    }
 
    // Call right after the widget's item is drawn (so the IsItem* queries refer to it).
@@ -37613,7 +37614,7 @@ namespace
          { "Smoothing", "An exponential moving average over another modulator, to damp jittery or steppy sources like Random or Pattern." },
          { "Envelope", "Applies an ADSR contour to an incoming modulator instead of generating its own trigger: rising above threshold starts attack/decay/sustain, falling back below it starts release. Patch an LFO in and its swing gets shaped by the ADSR, retriggering once per LFO cycle. Output collapses toward 0.5 as the envelope level falls - at level 0 the input has no say, at level 1 it passes through unchanged - so with nothing patched in, 'in' holds steady at its own constant value." },
          { "Mod Curve", "Remaps a modulator through a draggable transfer curve - click empty space to add a point, drag to move it, right-click to remove it (or right-click empty space to reset to a straight line). The gridline marks 0.5, where a bipolar binding's 'no modulation' point lives, and the moving dot shows where the input currently sits on the curve. mix blends between the raw input and the curved output, so 0 is a true bypass." },
-         { "Drift", "Learns where you leave each knob and how fast you move it, then keeps the knob going after you let go, settles it into your usual places and wanders between them at your pace. Speed scales the learned pace, Stray widens or narrows the wandering, Momentum is how long a release carries on, Link lets your live hand activity stir it (not active yet). Shift-drag a driven knob to take over; the dot on the knob shows how much history backs it and the faint marks show where it is likely to go next. Freeze stores the learned profile in the patch." },
+         { "Drift", "Learns where you leave each knob and how fast you move it, then keeps the knob going after you let go, settles it into your usual places and wanders between them at your pace. Speed scales the learned pace, Stray widens or narrows the wandering, Momentum is how long a release carries on, Link lets your live hand activity stir it: quiet knobs wake up while you play and settle when you stop. Shift-drag a driven knob to take over; the dot on the knob shows how much history backs it and the faint marks show where it is likely to go next. Freeze stores the learned profile in the patch." },
          { "CV to Pitch", "Quantizes a modulator to semitone steps over range low..high, shown as a large +/-N st readout. Still outputs 0..1 like any modulator - it just restricts where in 0..1 the value can land, so the span maps onto whole semitones. Scale/root snap to scale degrees instead of every semitone (chromatic = off); glide adds portamento between steps, passing through unquantized values in transit on purpose." },
          { "Macro Knob", "A single named slider (0-1, with a response curve and invert) meant to be patched out to several other sliders at once - one control that fans out to many parameters." },
          { "Macro XY", "A 2D pad exposing X and Y as two separate modulator outputs from one drag. The pad's path can be recorded, looped and replayed in time, like Resynthesize's orb." },
@@ -62405,6 +62406,8 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_DRIFTTEST") != nullptr)
       return PredictionNodes::RunDriftTest() ? 0 : 1;
+   if (getenv("INFINITE_PREDFEEDBACKTEST") != nullptr)
+      return PredictionNodes::RunPredFeedbackTest() ? 0 : 1;
 
    if (argc >= 3 && std::strcmp(argv[1], "--dump-movement-log") == 0)
    {

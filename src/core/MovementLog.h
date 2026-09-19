@@ -32,7 +32,8 @@ namespace MovementLog
       PatchLoaded,
       PatchNew,
       Undo,
-      Redo
+      Redo,
+      AutoCut   // a key's prediction weight was cut to 0 by the collapse monitor (README §5)
    };
 
    enum class BindingEvent : uint8_t

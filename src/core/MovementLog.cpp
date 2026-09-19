@@ -836,6 +836,13 @@ void Start(const std::string& customDir)
       ModulationBindingCallback(nodeIndex, paramIndex, static_cast<int>(evt), modNodeIndex, lo, hi);
    });
 
+   // A collapse cut is worth a line in the log: it explains why a key stopped learning from itself.
+   MovementStats::Live().SetAutoCutCallback([](const MovementStats::KeyId&) {
+      // Not NoteMark(): that bumps the epoch, which re-baselines every key. A cut is no jump.
+      if (sEnabled.load(std::memory_order_relaxed))
+         sPendingMarks.push_back(Mark::AutoCut);
+   });
+
    NoteMark(Mark::SessionStart);
 }
 
@@ -1021,7 +1028,13 @@ void Capture(double t, bool isNormalFrame)
          it->second.hasLastQ = true;
 
          const MovementStats::KeyId statsKey{uid, ref.paramIndex};
-         stats.RegisterKey(statsKey, keyEv.typeName, keyEv.paramName, !(ref.isEnum || ref.isBool));
+         MovementStats::KeyMeta meta;
+         meta.minValue = ref.minValue;
+         meta.maxValue = ref.maxValue;
+         meta.posToValue = ref.posToValue;
+         meta.valueToPos = ref.valueToPos;
+         meta.hasCurve = ref.valueToPos != nullptr;
+         stats.RegisterKey(statsKey, keyEv.typeName, keyEv.paramName, !(ref.isEnum || ref.isBool), meta);
          stats.Baseline(statsKey, t, it->second.lastQ / 65535.0f);
          continue;
       }
@@ -1361,6 +1374,7 @@ void DumpLog(const std::string& path, std::ostream& out)
          case Mark::PatchNew: mStr = "PatchNew"; break;
          case Mark::Undo: mStr = "Undo"; break;
          case Mark::Redo: mStr = "Redo"; break;
+         case Mark::AutoCut: mStr = "AutoCut"; break;
          }
          out << "[MARK] t=" << curTimeMs << "ms mark=" << mStr;
          if (rec.mark.mark == Mark::SessionEnd)

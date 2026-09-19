@@ -36,6 +36,12 @@ INode* NodeFactory::MakeNode(const std::string& name)
    return nullptr;
 }
 
+std::string NodeFactory::CategoryOf(const std::string& name) const
+{
+   auto it = mFactoryMap.find(name);
+   return it != mFactoryMap.end() ? it->second.category : std::string();
+}
+
 const std::vector<std::string>& NodeFactory::GetNodesInCategory(const std::string& category) const
 {
    static const std::vector<std::string> kEmpty;
