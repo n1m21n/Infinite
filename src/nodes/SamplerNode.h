@@ -150,6 +150,12 @@ public:
    float position = 0.0f; // 0..1, playback start position clamped within [start, end]
    float decay = 2.0f;    // seconds, voice envelope decay & release length
    float volume = 0.8f;   // 0..1
+   // Loop crossfade length in milliseconds. Non-zero by default because the
+   // seam click it removes is not a stylistic choice - a hard jump between
+   // two unrelated sample values is a step discontinuity, audible on almost
+   // any material. 8 ms is short enough not to smear a drum loop's downbeat
+   // and long enough to cover the step; 0 restores the old hard wrap.
+   float xfade = 8.0f;    // 0..250 ms, wrapping loop only (not ping-pong)
    bool loop = false;
    bool reverse = false;  // plays start<-end instead of start->end
    bool pingpong = false; // with loop on, bounces direction at each edge instead of wrapping
