@@ -25,13 +25,19 @@ Checks:
   4. reports which nodes are special-cased in IsInputSlotCompatible and
      WireInputSlot, for review - absence there is legitimate (both end in
      generic fallbacks), so it is informational, not a failure
+  5. every refusal message the UI can show is documented in
+     docs/reference/connection-rules.md, and every message quoted in that
+     document still exists in the code - the doc is the only place the accept
+     chain and the wording for each refusal are written down together, and a
+     rule added without its row there goes unexplained to the user
 
-Exit code 0 if checks 1-3 are clean.
+Exit code 0 if checks 1-3 and 5 are clean.
 """
 import os, re, sys, glob
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 MAIN = os.path.join(ROOT, "src", "main.cpp")
+RULES_DOC = os.path.join(ROOT, "docs", "reference", "connection-rules.md")
 
 # Classes whose image input is resolved through a base class already listed in
 # CableFor. Each entry asserts "the dynamic_cast in CableFor matches this type
@@ -127,6 +133,44 @@ def main():
         print(b)
     print("  (none)" if not bad else "")
     failures += len(bad)
+
+    # --- 5 ------------------------------------------------------------------
+    # The verdict lives in IsInputSlotCompatible; the wording lives 78k lines
+    # away in the ed::QueryNewLink handler. Nothing structural ties them
+    # together, so the doc is what ties them - and this is what keeps the doc
+    # true. Messages are matched verbatim, so rewording one in the code
+    # without rewording it in the doc is a failure, not a silent drift.
+    print("=== refusal messages missing from docs/reference/connection-rules.md ===")
+    main_src = open(MAIN, encoding="utf-8", errors="replace").read()
+    # Grab the whole assignment, not just a literal after the `=`, so the
+    # ternary forms ("modulator into an audio pin" vs. the general one) are
+    # both picked up rather than only the first branch.
+    messages = set()
+    for expr in re.findall(r'rejectReason\s*=\s*([^;]+);', main_src):
+        messages.update(re.findall(r'"([^"]+)"', expr))
+    messages |= set(re.findall(r'return "(A predictor drives[^"]+)"', main_src))
+    doc_missing, doc_stale = [], []
+    if not os.path.exists(RULES_DOC):
+        doc_missing = sorted(messages)
+        print(f"  {RULES_DOC} does not exist - every message below is undocumented")
+    else:
+        doc = open(RULES_DOC, encoding="utf-8", errors="replace").read()
+        doc_missing = sorted(m for m in messages if m not in doc)
+        # ...and the other direction: a message quoted in the doc that no
+        # longer exists in the code is a rule someone removed without saying so.
+        for quoted in re.findall(r'\| `([^`]{15,})` \|', doc):
+            # Backticked cells also carry code identifiers (`ConnectNodes`,
+            # `RecommendedNodeTypesForOutput`); a refusal message is a
+            # sentence, so it always has a space in it.
+            if " " in quoted and quoted not in messages:
+                doc_stale.append(quoted)
+    for m in doc_missing:
+        print(f"  in code, not in the doc: {m}")
+    for m in sorted(doc_stale):
+        print(f"  in the doc, not in the code: {m}")
+    if not doc_missing and not doc_stale:
+        print(f"  (none) - {len(messages)} messages, all documented")
+    failures += len(doc_missing) + len(doc_stale)
 
     # --- 4 (informational) ---------------------------------------------------
     print("=== special-cased in IsInputSlotCompatible (everything else falls "
