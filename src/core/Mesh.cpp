@@ -1262,6 +1262,38 @@ namespace MeshOps
          }
       }
 
+      // True proper crossing only - a bridge is allowed to touch a ring
+      // exactly at the vertex it targets, just not cut through an edge.
+      bool SegmentsCross(const P2& p1, const P2& p2, const P2& p3, const P2& p4)
+      {
+         auto cross = [](const P2& o, const P2& a, const P2& b) {
+            return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+         };
+         const float d1 = cross(p3, p4, p1);
+         const float d2 = cross(p3, p4, p2);
+         const float d3 = cross(p1, p2, p3);
+         const float d4 = cross(p1, p2, p4);
+         return ((d1 > 0.0f) != (d2 > 0.0f)) && d1 != 0.0f && d2 != 0.0f &&
+                ((d3 > 0.0f) != (d4 > 0.0f)) && d3 != 0.0f && d4 != 0.0f;
+      }
+
+      // A candidate bridge is blocked if it cuts through any edge of a ring
+      // other than at the vertex it is bridging to.
+      bool BridgeBlocked(const P2& from, const P2& to, const std::vector<P2>& ring)
+      {
+         const size_t n = ring.size();
+         for (size_t i = 0; i < n; i++)
+         {
+            const P2& e0 = ring[i];
+            const P2& e1 = ring[(i + 1) % n];
+            if ((e0.x == to.x && e0.y == to.y) || (e1.x == to.x && e1.y == to.y))
+               continue;
+            if (SegmentsCross(from, to, e0, e1))
+               return true;
+         }
+         return false;
+      }
+
       // Cuts each hole into the outline with a bridge, producing one simple
       // polygon that ear clipping can handle. The bridge runs from the hole's
       // rightmost vertex to a visible outline vertex, and both endpoints are
@@ -1270,8 +1302,9 @@ namespace MeshOps
                                      const std::vector<std::vector<P2>>& holes)
       {
          std::vector<size_t> dummy;
-         for (const std::vector<P2>& hole : holes)
+         for (size_t hi = 0; hi < holes.size(); hi++)
          {
+            const std::vector<P2>& hole = holes[hi];
             if (hole.size() < 3)
                continue;
 
@@ -1279,36 +1312,43 @@ namespace MeshOps
             for (size_t i = 1; i < hole.size(); i++)
                if (hole[i].x > hole[holeStart].x)
                   holeStart = i;
+            const P2& from = hole[holeStart];
 
-            // Nearest outline vertex to the right of the hole. Not a full
-            // visibility test, but glyph counters are convex enough that the
-            // closest candidate is reliably reachable.
-            size_t bridge = 0;
-            float best = 1e30f;
-            bool found = false;
+            // Candidates ranked by distance; the closest one whose bridge
+            // doesn't cut through the outline (already-merged holes included)
+            // or any hole still waiting to be merged wins. Proximity alone
+            // can pick a vertex on the far side of the glyph, producing a
+            // bridge that slices back across the counter and leaves ear
+            // clipping to triangulate a self-intersecting polygon - the
+            // jagged shard that showed up through round counters like 'O'.
+            std::vector<size_t> order(poly.size());
             for (size_t i = 0; i < poly.size(); i++)
+               order[i] = i;
+            std::sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+               const float da = (poly[a].x - from.x) * (poly[a].x - from.x) +
+                                (poly[a].y - from.y) * (poly[a].y - from.y);
+               const float db = (poly[b].x - from.x) * (poly[b].x - from.x) +
+                                (poly[b].y - from.y) * (poly[b].y - from.y);
+               return da < db;
+            });
+
+            size_t bridge = order.empty() ? 0 : order[0];
+            for (size_t idx : order)
             {
-               if (poly[i].x < hole[holeStart].x)
+               const P2& to = poly[idx];
+               if (BridgeBlocked(from, to, poly))
                   continue;
-               const float dx = poly[i].x - hole[holeStart].x;
-               const float dy = poly[i].y - hole[holeStart].y;
-               const float d = dx * dx + dy * dy;
-               if (d < best)
+               bool blockedByOtherHole = false;
+               for (size_t oh = 0; oh < holes.size() && !blockedByOtherHole; oh++)
                {
-                  best = d;
-                  bridge = i;
-                  found = true;
+                  if (oh == hi || holes[oh].size() < 3)
+                     continue;
+                  blockedByOtherHole = BridgeBlocked(from, to, holes[oh]);
                }
-            }
-            if (!found)
-            {
-               for (size_t i = 0; i < poly.size(); i++)
-               {
-                  const float dx = poly[i].x - hole[holeStart].x;
-                  const float dy = poly[i].y - hole[holeStart].y;
-                  const float d = dx * dx + dy * dy;
-                  if (d < best) { best = d; bridge = i; }
-               }
+               if (blockedByOtherHole)
+                  continue;
+               bridge = idx;
+               break;
             }
 
             std::vector<P2> merged;
