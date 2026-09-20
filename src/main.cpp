@@ -2438,6 +2438,12 @@ namespace
    void HandleParamTypeHotkeys(const std::pair<int, int>& editKey, float* value)
    {
       ImGuiIO& io = ImGui::GetIO();
+      // A typed-entry field is already open (double-click) - every digit
+      // belongs to it. Without this, a mouse resting over a different param
+      // treated the same keystrokes as its own hover-to-type, stole the
+      // focus, and the field the user actually double-clicked closed empty.
+      if (!gTypedParam.empty() || io.WantTextInput)
+         return;
       for (int i = 0; i < io.InputQueueCharacters.Size; ++i)
       {
          ImWchar ch = io.InputQueueCharacters[i];
