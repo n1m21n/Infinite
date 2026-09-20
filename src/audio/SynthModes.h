@@ -196,6 +196,17 @@ namespace SynthModes
       return type == kFilterCombNeg;
    }
 
+   // Whether this type has a cutoff control at all. Not the same question as
+   // FilterStages() > 0: a comb reads the cutoff knob (as its tooth spacing)
+   // while having no cascade depth, so UI that greys the knob out must ask
+   // this rather than counting stages. Anything unrecognised reports false,
+   // which keeps an out-of-range saved index reading as a bypass - the same
+   // degradation FilterStages() was written to give the render path.
+   inline bool FilterUsesCutoff(int type)
+   {
+      return IsCombFilter(type) || FilterStages(type) > 0;
+   }
+
    // Maximum cascade depth any type asks for - the per-voice, per-engine,
    // per-channel filter state is sized from this.
    constexpr int kMaxFilterStages = 3;

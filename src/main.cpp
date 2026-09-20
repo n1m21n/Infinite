@@ -13393,7 +13393,7 @@ namespace
          row.End();
       }
       {
-         const bool filterOff = SynthModes::FilterStages(eng.filterType) == 0;
+         const bool filterOff = !SynthModes::FilterUsesCutoff(eng.filterType);
          const bool warpOff = eng.warpMode == SynthModes::kWarpOff;
          AudioKnobRow row(4, kKnobLarge, ImGui::GetFrameHeight() + 5.0f);
 
@@ -13700,7 +13700,7 @@ namespace
          row.End();
       }
       {
-         const bool filterOff = SynthModes::FilterStages(eng.filterType) == 0;
+         const bool filterOff = !SynthModes::FilterUsesCutoff(eng.filterType);
          AudioKnobRow row(4, kKnobLarge, ImGui::GetFrameHeight() + 5.0f);
 
          row.DropdownKnob("oscFilter", SynthModes::FilterTypeList(), eng.filterType,
