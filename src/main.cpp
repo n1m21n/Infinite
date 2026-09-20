@@ -27140,6 +27140,58 @@ namespace
       return changed;
    }
 
+   struct SparklineHistory
+   {
+      static constexpr int kCap = 32;
+      float samples[kCap] = {};
+      int head = 0;
+      int count = 0;
+      void Push(float val)
+      {
+         samples[head] = val;
+         head = (head + 1) % kCap;
+         if (count < kCap) count++;
+      }
+   };
+   static std::map<std::pair<int, int>, SparklineHistory> gModMatrixSparklines;
+
+   void DrawSparklineMiniGraph(const char* strId, const SparklineHistory& hist, ImU32 lineCol, float width, float height)
+   {
+      const ImVec2 pos = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const bool isLight = IsThemeLight();
+      const ImU32 bgCol = isLight ? IM_COL32(235, 238, 246, 200) : IM_COL32(20, 22, 28, 200);
+      const ImU32 borderCol = isLight ? IM_COL32(200, 205, 215, 255) : IM_COL32(40, 44, 56, 255);
+      dl->AddRectFilled(pos, ImVec2(pos.x + width, pos.y + height), bgCol, 2.0f);
+      dl->AddRect(pos, ImVec2(pos.x + width, pos.y + height), borderCol, 2.0f);
+
+      if (hist.count >= 2)
+      {
+         const float padX = 2.0f;
+         const float padY = 2.0f;
+         const float plotW = width - padX * 2.0f;
+         const float plotH = height - padY * 2.0f;
+
+         const int N = hist.count;
+         const int start = (hist.head - N + SparklineHistory::kCap) % SparklineHistory::kCap;
+
+         ImVec2 prevPt;
+         for (int i = 0; i < N; i++)
+         {
+            int idx = (start + i) % SparklineHistory::kCap;
+            float val = std::clamp(hist.samples[idx], 0.0f, 1.0f);
+            float x = pos.x + padX + ((float)i / (float)(N - 1)) * plotW;
+            float y = pos.y + padY + (1.0f - val) * plotH;
+            ImVec2 pt(x, y);
+            if (i > 0)
+               dl->AddLine(prevPt, pt, lineCol, 1.5f);
+            prevPt = pt;
+         }
+         dl->AddCircleFilled(prevPt, 2.0f, lineCol);
+      }
+      ImGui::Dummy(ImVec2(width, height));
+   }
+
    void DrawModMatrixTable()
    {
       Modulation& mod = Modulation::Instance();
@@ -27180,7 +27232,7 @@ namespace
          // for it, so the loop's own target kept receding. Pinning the
          // height to this panel's available height (captured above, before
          // the table exists) gives the loop a stable target to fill to.
-         if (ImGui::BeginTable("##modmatrixtable", 11, flags, ImVec2(0.0f, panelSize.y)))
+         if (ImGui::BeginTable("##modmatrixtable", 12, flags, ImVec2(0.0f, panelSize.y)))
          {
             // Fixed, non-resizable widths rather than the stretch/drag
             // behaviour ImGui tables default to - dragging columns around
@@ -27209,6 +27261,7 @@ namespace
             ImGui::TableSetupColumn("Hi", ImGuiTableColumnFlags_WidthFixed, wCol);
             ImGui::TableSetupColumn("##inv", ImGuiTableColumnFlags_WidthFixed, 30.0f);
             ImGui::TableSetupColumn("Curve", ImGuiTableColumnFlags_WidthFixed, wCurve);
+            ImGui::TableSetupColumn("Signal", ImGuiTableColumnFlags_WidthFixed, vertical ? 42.0f : 55.0f);
             ImGui::TableSetupColumn("##unbind", ImGuiTableColumnFlags_WidthFixed, 20.0f);
             ImGui::TableHeadersRow();
 
@@ -27258,8 +27311,11 @@ namespace
                // A predictor bound to a discrete param (only reachable via a patch file, paste or
                // undo - the cable drop refuses it) is inert: the apply loop never writes it.
                const bool inert = IsInertPredictorBinding(dstIndex, dstParam);
-               const ImU32 dotColour = (src.enabled && !inert) ? IM_COL32(120, 220, 140, 255)
-                                                               : IM_COL32(110, 110, 120, 255);
+               const bool isPred = srcNode != nullptr && srcNode->node != nullptr &&
+                                   dynamic_cast<IPredictor*>(srcNode->node.get()) != nullptr;
+               const ImU32 dotColour = (src.enabled && !inert)
+                                          ? (isPred ? IM_COL32(34, 197, 94, 255) : IM_COL32(234, 179, 8, 255))
+                                          : IM_COL32(110, 110, 120, 255);
                const ImVec2 dotCursor = ImGui::GetCursorScreenPos();
                const float dotH = ImGui::GetTextLineHeight();
                ImGui::Dummy(ImVec2(dotH, dotH));
@@ -27377,6 +27433,16 @@ namespace
                if (DrawMiniCurveWidget("##modcurve", &curveVal, liveIn01, wCurve))
                   mod.SetCurve(dstIndex, dstParam, curveVal);
 
+               // Real-time Sparkline
+               ImGui::TableNextColumn();
+               float liveSig01 = (liveIn01 >= 0.0f) ? liveIn01 : 0.5f;
+               if (liveIn01 < 0.0f && frameRef != nullptr && frameRef->value != nullptr && hi != lo)
+                  liveSig01 = std::clamp((*frameRef->value - lo) / (hi - lo), 0.0f, 1.0f);
+               auto& hist = gModMatrixSparklines[{dstIndex, dstParam}];
+               hist.Push(liveSig01);
+               DrawSparklineMiniGraph("##sigspark", hist, isPred ? IM_COL32(34, 197, 94, 255) : IM_COL32(234, 179, 8, 255),
+                                      vertical ? 42.0f : 55.0f, ImGui::GetFrameHeight());
+
                // Unbind
                ImGui::TableNextColumn();
                {
@@ -27449,7 +27515,13 @@ namespace
                ImGui::PushID(dstIndex * 1000 + dstParam + 2000000);
                ImGui::TableNextRow();
 
-               ImGui::TableNextColumn(); // enable dot - no on/off concept for an expression
+               // Enable dot: purple for expression
+               ImGui::TableNextColumn();
+               const ImVec2 dotCursor = ImGui::GetCursorScreenPos();
+               const float dotH = ImGui::GetTextLineHeight();
+               ImGui::Dummy(ImVec2(dotH, dotH));
+               ImGui::GetWindowDrawList()->AddCircleFilled(
+                  ImVec2(dotCursor.x + dotH * 0.5f, dotCursor.y + dotH * 0.5f), dotH * 0.35f, IM_COL32(168, 85, 247, 255));
 
                ImGui::TableNextColumn();
                ImGui::TextUnformatted("Expression");
@@ -27520,6 +27592,14 @@ namespace
                if (DrawMiniCurveWidget("##exprcurve", &exprCurveVal, liveExpr01, wCurve))
                   mod.SetExpressionCurve(dstIndex, dstParam, exprCurveVal);
 
+               // Real-time Sparkline
+               ImGui::TableNextColumn();
+               float liveExprSig01 = (liveExpr01 >= 0.0f) ? liveExpr01 : 0.5f;
+               auto& histE = gModMatrixSparklines[{dstIndex, dstParam + 2000000}];
+               histE.Push(liveExprSig01);
+               DrawSparklineMiniGraph("##exprspark", histE, IM_COL32(168, 85, 247, 255),
+                                      vertical ? 42.0f : 55.0f, ImGui::GetFrameHeight());
+
                bool unboundExpr = false;
                ImGui::TableNextColumn();
                {
@@ -27566,7 +27646,13 @@ namespace
                ImGui::PushID(dstIndex * 1000 + dstParam + 4000000);
                ImGui::TableNextRow();
 
-               ImGui::TableNextColumn(); // enable dot - no on/off concept for a recording
+               // Enable dot: red for recording
+               ImGui::TableNextColumn();
+               const ImVec2 dotCursor = ImGui::GetCursorScreenPos();
+               const float dotH = ImGui::GetTextLineHeight();
+               ImGui::Dummy(ImVec2(dotH, dotH));
+               ImGui::GetWindowDrawList()->AddCircleFilled(
+                  ImVec2(dotCursor.x + dotH * 0.5f, dotCursor.y + dotH * 0.5f), dotH * 0.35f, IM_COL32(239, 68, 68, 255));
 
                ImGui::TableNextColumn();
                ImGui::TextUnformatted("Recording");
@@ -27640,6 +27726,14 @@ namespace
                if (DrawMiniCurveWidget("##reccurve", &recCurveVal, liveRec01, wCurve))
                   rec.SetPlaybackCurve(dstIndex, dstParam, recCurveVal);
 
+               // Real-time Sparkline
+               ImGui::TableNextColumn();
+               float liveRecSig01 = (liveRec01 >= 0.0f) ? liveRec01 : 0.5f;
+               auto& histR = gModMatrixSparklines[{dstIndex, dstParam + 4000000}];
+               histR.Push(liveRecSig01);
+               DrawSparklineMiniGraph("##recspark", histR, IM_COL32(239, 68, 68, 255),
+                                      vertical ? 42.0f : 55.0f, ImGui::GetFrameHeight());
+
                bool unboundRec = false;
                ImGui::TableNextColumn();
                {
@@ -27697,7 +27791,7 @@ namespace
             {
                const float before = ImGui::GetCursorPosY();
                ImGui::TableNextRow();
-               for (int col = 0; col < 11; ++col)
+               for (int col = 0; col < 12; ++col)
                {
                   ImGui::TableNextColumn();
                   ImGui::Dummy(ImVec2(1.0f, ImGui::GetTextLineHeight()));
@@ -43216,6 +43310,13 @@ namespace
                if (kFpsValues[i] == gTargetFps)
                   current = i;
 
+            // Vsync's own present-time wait already paces the frame; layering
+            // the sleep-based cap on top of it fights the driver's vsync
+            // quantization (frame times land on multiples of the display's
+            // real refresh interval, not the requested budget), producing
+            // uneven pacing instead of a clean cap. So the two are mutually
+            // exclusive rather than combined - matches how most games do it.
+            ImGui::BeginDisabled(gVsync);
             ImGui::SetNextItemWidth(180.0f);
             if (ImGui::BeginCombo("Target FPS", kFpsLabels[current]))
             {
@@ -43229,6 +43330,9 @@ namespace
                }
                ImGui::EndCombo();
             }
+            ImGui::EndDisabled();
+            if (gVsync && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+               ImGui::SetTooltip("Disabled while Vsync is on - Vsync alone paces the frame.\nTurn Vsync off to use a manual FPS cap.");
 
             if (ImGui::Checkbox("Vsync", &gVsync))
             {
@@ -88991,7 +89095,12 @@ int main(int argc, char** argv)
       // Frame limiter. Sleeping most of the way there and spinning the last
       // sliver keeps the cap accurate without burning a core: sleep_for is only
       // accurate to a millisecond or two, which at 120fps is most of the budget.
-      if (gTargetFps > 0)
+      // Skipped entirely when Vsync is on: glfwSwapBuffers above already paced
+      // this frame to the display's refresh, and topping that up against a
+      // second, unrelated budget just fights the vsync quantization instead of
+      // capping anything more precisely (the Target FPS control is disabled in
+      // the UI whenever Vsync is on, for the same reason).
+      if (gTargetFps > 0 && !gVsync)
       {
          const double budget = 1.0 / (double)gTargetFps;
          const double deadline = gFrameStart + budget;
