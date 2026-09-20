@@ -413,7 +413,6 @@ set(COMMON_SOURCES
     src/core/UpdateCheck.cpp
     src/core/AudioDecodeCache.cpp
     src/core/GltfImport.cpp
-    src/core/SplatIO.cpp
     src/audio/AudioEngine.cpp
     src/audio/ParamMailbox.cpp
     src/audio/MeterRing.cpp
@@ -478,7 +477,6 @@ set(COMMON_SOURCES
     src/nodes/Geometry3DNodes.cpp
     src/nodes/EnvironmentNode.cpp
     src/nodes/ModelSourceNode.cpp
-    src/nodes/SplatSourceNode.cpp
     src/nodes/Text3DNode.cpp
     src/nodes/UtilityNodes.cpp
     src/nodes/PathNode.cpp
