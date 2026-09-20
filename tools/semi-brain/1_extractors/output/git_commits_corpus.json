@@ -1,5 +1,21 @@
 [
   {
+    "hash": "abad9394ec3718204252fee9b654b81031d91905",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 07:56:50 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "prediction",
+      "title": "feat(prediction): step 8 Predictive Modulator node (DMD delay-embedding)",
+      "description": "step 8 Predictive Modulator node (DMD delay-embedding)",
+      "bullets": [],
+      "body": "Adds PredictiveModulatorNode: a single-slot IModulator that learns a\nshort DMD model of whatever's patched into it via a Takens delay\nembedding, then free-runs the fitted model once Learn stops. Uses a\nprivate MovementStats::Engine rather than the shared Live() instance.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "feat(prediction): step 8 Predictive Modulator node (DMD delay-embedding)\n\nAdds PredictiveModulatorNode: a single-slot IModulator that learns a\nshort DMD model of whatever's patched into it via a Takens delay\nembedding, then free-runs the fitted model once Learn stops. Uses a\nprivate MovementStats::Engine rather than the shared Live() instance.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "CMakeLists.txt                                     |   1 +\n src/core/Base64.h                                  |  55 +++\n src/core/MovementLog.cpp                           |  32 ++\n src/core/MovementStats.cpp                         | 150 +++++--\n src/core/MovementStats.h                           |  22 +-\n src/main.cpp                                       | 249 ++++++++++-\n src/nodes/PredictionNodes.cpp                      | 309 +++++++++++---\n src/nodes/PredictionNodes.h                        |  70 +++-\n src/nodes/PredictiveModulatorNode.cpp              | 218 ++++++++++\n src/nodes/PredictiveModulatorNode.h                |  95 +++++\n .../1_extractors/output/git_commits_corpus.json    |  48 +++\n .../1_extractors/output/recovered_docs_corpus.json | 460 ++++++++++-----------\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl | 155 +++----\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl | 155 +++----\n 14 files changed, 1502 insertions(+), 517 deletions(-)\n create mode 100644 src/core/Base64.h\n create mode 100644 src/nodes/PredictiveModulatorNode.cpp\n create mode 100644 src/nodes/PredictiveModulatorNode.h"
+  },
+  {
     "hash": "da291baef13d6cdb1fb6e9d7ea4a66066c54fb40",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
