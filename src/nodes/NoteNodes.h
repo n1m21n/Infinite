@@ -189,6 +189,43 @@ private:
    int mLastCookFrame = -1;
 };
 
+class AudioVelocityToCVNode;
+
+// Note velocity -> normalized modulation value, so how hard a note is played
+// (0..1, straight from the note-on's velocity) can drive any synth param.
+// The sibling of Note to CV, which tracks pitch instead. With `hold` on, the
+// CV keeps the last note's velocity through release; off, it falls to 0 when
+// that note ends (a per-note "how loud was this" gate * velocity).
+class VelocityToCVNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new VelocityToCVNode(); }
+   VelocityToCVNode();
+   ~VelocityToCVNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+
+   NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
+   AudioNode* AudioNodeForNotePorts() override;
+
+   float Value01() override;
+
+   bool hold = true;      // keep the last velocity after the note ends
+   float glideMs = 20.0f; // one-pole smoothing toward each new velocity
+   NoteCable noteInput;
+
+   float LastVelocity() const; // 0 if nothing has played yet
+
+private:
+   std::unique_ptr<AudioVelocityToCVNode> mAudioNode;
+   int mLastCookFrame = -1;
+};
+
 // A gate on a note's pitch: snap-to-scale, pass-if-in-range, pass-if-lucky -
 // see README.md §3's Notes table ("All four are gates on a note's pitch").
 // Forwards note-on/off pairs it lets through unchanged in timing; a note-on

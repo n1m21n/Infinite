@@ -523,6 +523,106 @@ int NoteToCVNode::LastNote() const
    return mAudioNode ? mAudioNode->LastNote() : -1;
 }
 
+// ---------------------------------------------------------------- Velocity to CV
+class AudioVelocityToCVNode : public AudioNode
+{
+public:
+   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override { mSampleRate = sampleRate; }
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
+   {
+      const int numFrames = output.numFrames;
+      NoteEvent evts[64];
+      const int n = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, evts, 64) : 0;
+      float target = mTarget.load(std::memory_order_relaxed);
+      int held = mHeldNote.load(std::memory_order_relaxed);
+      const bool hold = mHold.load(std::memory_order_relaxed);
+      for (int i = 0; i < n; i++)
+      {
+         if (evts[i].bendUpdate)
+            continue;
+         if (evts[i].isNoteOn)
+         {
+            target = std::clamp(evts[i].velocity, 0.0f, 1.0f);
+            held = evts[i].note;
+         }
+         else if (!hold && evts[i].note == held)
+         {
+            // Only the note that set the target may clear it, so releasing an
+            // older overlapping note doesn't drop a velocity still sounding.
+            target = 0.0f;
+            held = -1;
+         }
+      }
+      mTarget.store(target, std::memory_order_relaxed);
+      mHeldNote.store(held, std::memory_order_relaxed);
+
+      const float glideMs = std::max(0.0f, mGlideMs.load(std::memory_order_relaxed));
+      const float coef = glideMs > 0.0f ? expf(-1.0f / (float)(mSampleRate * 0.001 * glideMs)) : 0.0f;
+      float level = mLevel.load(std::memory_order_relaxed);
+      for (int i = 0; i < numFrames; i++)
+         level = target + coef * (level - target);
+      mLevel.store(level, std::memory_order_relaxed);
+   }
+
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
+
+   // Main thread only.
+   void PushParams(const VelocityToCVNode& n)
+   {
+      mHold.store(n.hold, std::memory_order_relaxed);
+      mGlideMs.store(n.glideMs, std::memory_order_relaxed);
+   }
+
+   float Level() const { return mLevel.load(std::memory_order_relaxed); }
+
+private:
+   NoteEventQueue* mInbox = nullptr;
+   int mNoteCursor = -1;
+   double mSampleRate = 44100.0;
+   std::atomic<float> mLevel { 0.0f };
+   std::atomic<float> mTarget { 0.0f };
+   std::atomic<int> mHeldNote { -1 };
+   std::atomic<bool> mHold { true };
+   std::atomic<float> mGlideMs { 20.0f };
+};
+
+VelocityToCVNode::VelocityToCVNode() = default;
+VelocityToCVNode::~VelocityToCVNode() = default;
+
+void VelocityToCVNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioVelocityToCVNode>();
+   mAudioNode->PushParams(*this);
+}
+
+void VelocityToCVNode::VisitParams(ParamVisitor& v)
+{
+   v.Bool("hold", hold);
+   v.Float("glideMs", glideMs);
+}
+
+AudioNode* VelocityToCVNode::AudioNodeForNotePorts()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioVelocityToCVNode>();
+   return mAudioNode.get();
+}
+
+float VelocityToCVNode::Value01()
+{
+   return LastVelocity();
+}
+
+float VelocityToCVNode::LastVelocity() const
+{
+   return mAudioNode ? std::clamp(mAudioNode->Level(), 0.0f, 1.0f) : 0.0f;
+}
+
 // ---------------------------------------------------------------- Note Filter
 class AudioNoteFilterNode : public AudioNode
 {

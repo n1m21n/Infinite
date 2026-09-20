@@ -295,6 +295,70 @@ private:
    double mLastBeats = -1.0; // beat at which mLast was last updated
 };
 
+// Records whatever modulator is patched into "in" (or its own `in` knob when
+// nothing is), then plays it back on a loop at an adjustable speed. Record
+// samples the input against the transport's beat clock, so a take is a
+// fixed-length gesture in beats: it retimes with global BPM, pauses with the
+// transport, and `speed` scales the playback rate (1 = as recorded, 2 = twice
+// as fast). Stopping a take starts playback straight away. While recording,
+// the live input passes through so you can hear what you are capturing.
+class CVRecorderNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new CVRecorderNode(); }
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+   const char* InputLabel(int) const override { return "in"; }
+
+   float Value01() override;
+
+   INode* BypassSource() override { return dynamic_cast<INode*>(input); }
+   IModulator* input = nullptr;
+   IModulator** ModulatorInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
+   int ModulatorInputCount() const override { return 1; }
+
+   float constantIn = 0.5f; // recorded when nothing is patched into "in"
+   float speed = 1.0f;      // playback rate multiplier
+   bool loop = true;        // off: play once and hold the last value
+   bool playing = false;
+
+   static constexpr int kSamplesPerBeat = 16;
+   static constexpr int kMaxSamples = 1024; // 64 beats
+
+   void VisitParams(ParamVisitor& v) override;
+
+   // Main-thread controls (the UI buttons).
+   void StartRecording();
+   void StopRecording();
+   void StartPlayback();
+   void StopPlayback();
+   void Clear();
+
+   bool IsRecording() const { return mRecording; }
+   int SampleCount() const { return (int)mData.size(); }
+   const std::vector<unsigned char>& Samples() const { return mData; }
+   double LengthBeats() const { return (double)mData.size() / kSamplesPerBeat; }
+   // 0..1 position within the take (for the playhead), -1 when not playing.
+   float PlayheadNorm() const { return mPlaying() ? mPlayNorm : -1.0f; }
+
+private:
+   bool mPlaying() const { return playing && !mRecording && !mData.empty(); }
+   float Sample(double pos) const;
+
+   std::vector<unsigned char> mData;
+   bool mRecording = false;
+   double mRecStart = 0.0;
+   double mAnchor = 0.0; // beat at which the current playback pass started
+   bool mAnchorSet = false;
+   double mLastBeats = -1.0;
+   float mLastOut = 0.0f;
+   float mPlayNorm = 0.0f;
+   std::string mEncoded; // last string handed to / read from the patch
+};
+
 // Scales how much of a modulator's swing reaches its destination, without
 // needing to know the destination's own range or resting value: a modulation
 // binding always overrides the destination outright (see Modulation.h), so
