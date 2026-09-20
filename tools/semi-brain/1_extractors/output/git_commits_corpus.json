@@ -1,5 +1,21 @@
 [
   {
+    "hash": "1efb58982f9040acdb3c6b067b8b2192918df237",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 10:58:47 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "build",
+      "title": "fix(build): restore newline lost resolving GestureRecorder.h merge conflict",
+      "description": "restore newline lost resolving GestureRecorder.h merge conflict",
+      "bullets": [],
+      "body": "The comb-filter branch merge's conflict resolution accidentally joined a\ncomment line with the following declaration, commenting out RecordClockNow()\nand breaking the build.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "fix(build): restore newline lost resolving GestureRecorder.h merge conflict\n\nThe comb-filter branch merge's conflict resolution accidentally joined a\ncomment line with the following declaration, commenting out RecordClockNow()\nand breaking the build.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "src/core/GestureRecorder.h | 6 ++++--\n 1 file changed, 4 insertions(+), 2 deletions(-)"
+  },
+  {
     "hash": "78ef5713a980a7580869d9397b002425b748920f",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
