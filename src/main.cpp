@@ -18013,47 +18013,34 @@ namespace
 
    void DrawCVRecorderParams(CVRecorderNode* n)
    {
+      // One button: rec -> stop, and stopping starts the loop immediately.
+      // Fixed width (the preview's), never derived from
+      // GetContentRegionAvail: inside an auto-sizing node that feeds back on
+      // itself and collapsed the old three buttons into slivers.
       const bool recording = n->IsRecording();
-      const bool playing = n->playing && !recording && n->SampleCount() > 0;
+      char label[48];
       if (recording)
-         ImGui::TextDisabled("status: REC (%.1f beats)", n->LengthBeats());
-      else if (n->SampleCount() == 0)
-         ImGui::TextDisabled("status: empty");
+         snprintf(label, sizeof(label), "stop  (%.1f beats)###cvRec", n->LengthBeats());
       else
-         ImGui::TextDisabled("status: %s (%.1f beats)", playing ? "playing" : "stopped", n->LengthBeats());
-
-      const float btnW = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
+         snprintf(label, sizeof(label), "record###cvRec");
       if (recording)
          ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
-      if (ImGui::Button(recording ? "Stop Rec##cvRec" : "Rec##cvRec", ImVec2(btnW, 0)))
+      if (ImGui::Button(label, ImVec2(kPreviewSize, 0)))
       {
-         if (recording) n->StopRecording();
-         else n->StartRecording();
+         if (recording)
+            n->StopRecording();
+         else
+         {
+            PushUndoCheckpoint();
+            // Recording runs on the beat clock; a stopped transport would
+            // capture a single sample.
+            if (!Transport::Instance().IsPlaying())
+               Transport::Instance().SetPlaying(true);
+            n->StartRecording();
+         }
       }
       if (recording)
          ImGui::PopStyleColor();
-      ImGui::SameLine();
-
-      if (playing)
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.5f, 0.2f, 1.0f));
-      ImGui::BeginDisabled(n->SampleCount() == 0 || recording);
-      if (ImGui::Button(playing ? "Stop##cvPlay" : "Play##cvPlay", ImVec2(btnW, 0)))
-      {
-         if (playing) n->StopPlayback();
-         else n->StartPlayback();
-      }
-      ImGui::EndDisabled();
-      if (playing)
-         ImGui::PopStyleColor();
-      ImGui::SameLine();
-
-      ImGui::BeginDisabled(n->SampleCount() == 0 && !recording);
-      if (ImGui::Button("Clear##cvClear", ImVec2(btnW, 0)))
-      {
-         PushUndoCheckpoint();
-         n->Clear();
-      }
-      ImGui::EndDisabled();
 
       ImGui::BeginDisabled(n->input != nullptr);
       ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
@@ -38411,14 +38398,15 @@ namespace
       if (history.size() > 160)
          history.erase(history.begin());
 
-      // Autoscale to the window's actual range rather than assuming 0..1: an
-      // unclamped Math node can sit at 60 or -12, and a fixed 0..1 mapping
-      // either pins the line off the box (if clipped) or off the visible edge
-      // (if just clamped) - neither shows the wiggle the meter exists to show.
-      float lo = history.empty() ? 0.0f : history[0];
-      float hi = lo;
+      // Fixed 0..1 axis: the box's bottom is 0 and its top is 1, always, so
+      // a flat 0.5 sits mid-box and a line touching the bottom means the
+      // value is really 0. (This used to autoscale to the visible min/max,
+      // which drew any constant - 0.5 included - flat on the floor.) Only when
+      // a modulator leaves 0..1 (Invert / Range-to-Range unclamped) does the
+      // axis widen, and then the 0 and 1 hairlines below say where they fall.
+      float lo = 0.0f, hi = 1.0f;
       for (float v : history) { lo = std::min(lo, v); hi = std::max(hi, v); }
-      const float range = std::max(1e-4f, hi - lo); // epsilon floor: flat signal shouldn't divide by ~0
+      const float range = hi - lo;
 
       ImVec2 origin = ImGui::GetCursorScreenPos();
       const float h = 90.0f;
@@ -38454,6 +38442,21 @@ namespace
       // so flag it: an amber border, plus hairlines marking where 0 and 1
       // actually fall on the autoscaled box.
       const bool outOfContract = lo < -1e-4f || hi > 1.0f + 1e-4f;
+      {
+         // faint quarter guides so the axis reads as a scale, not a blank box
+         for (int q = 1; q < 4; q++)
+         {
+            const float gy = origin.y + h - ((q * 0.25f) - lo) / range * h;
+            dl->AddLine(ImVec2(origin.x, gy), ImVec2(origin.x + kPreviewSize, gy),
+                        ScopeMidLineCol(), q == 2 ? 1.0f : 0.5f);
+         }
+         if (!history.empty())
+         {
+            const float cy = origin.y + h - (history.back() - lo) / range * h;
+            dl->AddCircleFilled(ImVec2(origin.x + kPreviewSize * (float)(history.size() - 1) / 160.0f, cy),
+                                3.0f, lineCol);
+         }
+      }
       if (outOfContract)
       {
          const float y0line = origin.y + h - (0.0f - lo) / range * h;
@@ -60215,17 +60218,17 @@ static int RunCVRecorderTest()
    check(rec.playing, "playback starts after stop");
 
    auto at = [&](double beats) { tp.SeekBeats(beats); return rec.Value01(); };
-   at(10.0); // anchors playback here
+   at(10.0); // playback starts from the top of the take here
    check(std::fabs(at(10.0 + 2.0) - 0.5f) < 0.03f, "midpoint at speed 1");
    rec.speed = 2.0f;
-   check(std::fabs(at(10.0 + 1.0) - 0.5f) < 0.03f, "midpoint at speed 2");
+   check(std::fabs(at(10.0 + 2.5) - 0.75f) < 0.03f, "speed change continues from the playhead, no jump");
    check(rec.Value01() == rec.Value01(), "idempotent playback");
    rec.speed = 1.0f;
-   const float wrapped = at(10.0 + 4.0 + 1.0); // one beat into second pass
-   check(std::fabs(wrapped - 0.25f) < 0.05f, "loop wraps");
+   check(std::fabs(at(13.5) - 1.0f) < 0.03f, "reaches the end of the take");
+   check(std::fabs(at(14.0) - 7.0f / 64.0f) < 0.03f, "loop wraps");
    rec.low = 0.5f;
    rec.high = 1.0f;
-   check(std::fabs(at(10.0 + 4.0 + 2.0) - 0.75f) < 0.05f, "low/high maps the range");
+   check(std::fabs(at(15.0) - (0.5f + 0.5f * 23.0f / 64.0f)) < 0.03f, "low/high maps the range");
    rec.low = 0.0f;
    rec.high = 1.0f;
 
