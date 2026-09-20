@@ -113,6 +113,19 @@ public:
    {
       return input ? input->GetSplatCloud() : nullptr;
    }
+   // Curve is forwarded unchanged for every operator - no GeometryOpNode
+   // operation is defined on a polyline, so "pass it through untouched" is
+   // both correct and what lets a curve survive a Transform on its way to
+   // Render 3D.
+   const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
+   unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
+   // Point cloud forwards unchanged for every op except kTransform, which
+   // applies TransformMatrix() to each particle. Deliberately NOT applied for
+   // kArray: array's semantics on a point cloud (replicate the whole cloud N
+   // times? offset each copy?) are ambiguous and nobody has asked for it, so
+   // it passes the cloud through untouched rather than guessing.
+   const std::vector<Particle>* GetPointCloud() override;
+   unsigned long long PointCloudRevision() override;
    unsigned long long SplatCloudRevision() override
    {
       return input ? input->SplatCloudRevision() : 0;
@@ -366,6 +379,14 @@ private:
 
    Signature CurrentSignature() const;
 
+   // kTransform's point-cloud cache - see GetPointCloud(). Every other op
+   // forwards input's cloud directly with no caching needed.
+   std::vector<Particle> mPointCloudCache;
+   bool mHasPointCloudCache = false;
+   const void* mPointCloudBuiltUpstream = nullptr;
+   unsigned long long mPointCloudBuiltUpstreamRevision = 0;
+   Mat4 mPointCloudBuiltMatrix;
+   unsigned long long mPointCloudRevision = 0;
    Mesh mCache;
    Signature mBuilt;
    bool mHasBuilt = false;

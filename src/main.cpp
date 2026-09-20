@@ -79514,6 +79514,85 @@ int main(int argc, char** argv)
          printf("%s\n", allOk ? "TEXTURE SWEEP OK" : "TEXTURE SWEEP FAIL");
       }
 
+      // GeometryOpNode used to drop point clouds and curves (its GetPointCloud/
+      // GetCurve fell through to IGeometrySource's nullptr defaults), so
+      // Mesh to Points -> Transform -> Render 3D drew nothing. Checks, without
+      // a GL context: a cloud/curve survives every op, kTransform moves the
+      // cloud by exactly the offset and rotates nothing it shouldn't, and
+      // PointCloudRevision only moves when the points actually changed.
+      if (getenv("INFINITE_POINTCLOUDSWEEPTEST") != nullptr && frameId == 6)
+      {
+         struct CurveProbe : public IGeometrySource
+         {
+            Polyline line;
+            const Mesh& GetMesh() override { static Mesh empty; return empty; }
+            unsigned long long MeshRevision() override { return 0; }
+            Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+            Material GetMaterial() const override { return Material(); }
+            const Polyline* GetCurve() override { return &line; }
+            unsigned long long CurveStamp() override { return 7; }
+         };
+
+         GeometryNode cube;
+         cube.shape = 1;
+         cube.detail = 2;
+         MeshToPointsNode pts;
+         pts.input = &cube;
+         pts.mode = 0;
+         pts.CookIfNeeded(24000);
+
+         GeometryOpNode xf;
+         xf.op = GeometryOpNode::kTransform;
+         xf.input = &pts;
+         xf.offsetX = 0.0f;
+
+         bool allOk = true;
+         auto report = [&](const char* name, bool ok) {
+            printf("  [%s] %s\n", ok ? "pass" : "FAIL", name);
+            if (!ok) allOk = false;
+         };
+
+         const std::vector<Particle>* src = pts.GetPointCloud();
+         const std::vector<Particle> before = xf.GetPointCloud() ? *xf.GetPointCloud() : std::vector<Particle>();
+         report("cloud reaches Transform's output", src != nullptr && !src->empty() && before.size() == src->size());
+
+         const unsigned long long rev1 = xf.PointCloudRevision();
+         const unsigned long long rev2 = xf.PointCloudRevision();
+         report("revision stable while nothing changes", rev1 == rev2);
+
+         xf.offsetX = 4.0f;
+         const std::vector<Particle>* movedPtr = xf.GetPointCloud();
+         bool exact = movedPtr != nullptr && movedPtr->size() == before.size() && !before.empty();
+         for (size_t i = 0; exact && i < before.size(); i++)
+            exact = std::fabs(((*movedPtr)[i].px - before[i].px) - 4.0f) < 1e-4f &&
+                    std::fabs((*movedPtr)[i].py - before[i].py) < 1e-4f &&
+                    std::fabs((*movedPtr)[i].pz - before[i].pz) < 1e-4f;
+         report("kTransform moves every point by exactly the offset", exact);
+         report("revision moves when the offset changes", xf.PointCloudRevision() != rev1);
+
+         xf.bypassed = true;
+         const std::vector<Particle>* bypassedPtr = xf.GetPointCloud();
+         report("bypassed Transform passes the input cloud through untouched", bypassedPtr == src);
+         xf.bypassed = false;
+
+         GeometryOpNode arr;
+         arr.op = GeometryOpNode::kArray;
+         arr.input = &pts;
+         report("non-Transform op forwards the cloud unchanged", arr.GetPointCloud() == src);
+
+         CurveProbe curve;
+         curve.line.points = { 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f };
+         GeometryOpNode curveXf;
+         curveXf.op = GeometryOpNode::kTransform;
+         curveXf.input = &curve;
+         report("curve survives Transform", curveXf.GetCurve() == &curve.line && curveXf.CurveStamp() == 7);
+
+         GeometryOpNode bare;
+         report("no input -> no cloud, no curve", bare.GetPointCloud() == nullptr && bare.GetCurve() == nullptr);
+
+         printf("%s\n", allOk ? "POINTCLOUD SWEEP OK" : "POINTCLOUD SWEEP FAIL");
+      }
+
       // Phase 5 (geometry-domains audit): channels B (`Mesh::vertexColor`)
       // and C (`Particle::r/g/b`/`hasColor`) - built from scratch (no prior
       // COLOURSWEEPTEST existed anywhere in the codebase; grepped twice to
