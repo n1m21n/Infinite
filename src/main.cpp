@@ -10914,6 +10914,13 @@ namespace
    // honest readout, per knob, of how much real data is actually behind it.
    void DrawDriftParams(GraphNode&, DriftNode* n)
    {
+      ModSlider("speed", &n->speed, 0.1f, 4.0f, "%.2fx");
+      ModSlider("low", &n->rangeLo, 0.0f, 1.0f, "%.2f");
+      ModSlider("high", &n->rangeHi, 0.0f, 1.0f, "%.2f");
+      ModSlider("stray", &n->stray, 0.25f, 4.0f, "%.2f");
+      ModSlider("momentum", &n->momentum, 0.0f, 4.0f, "%.2fs");
+      n->rangeOverride = (n->rangeLo != 0.0f || n->rangeHi != 1.0f);
+
       const int count = n->SlotCount();
       if (count == 0)
       {
