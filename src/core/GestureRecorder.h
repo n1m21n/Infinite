@@ -49,15 +49,13 @@ public:
    //    play back as a static value.
    void AdvanceClock(double deltaSeconds, bool playing);
 
-   // The clock a looping recording is replayed against - see AdvanceClock.
-   // Starts at 0 and never moves on its own, so it's safe to read before a
+   // The clock a looping recording is replayed against - see AdvanceClock.   // Starts at 0 and never moves on its own, so it's safe to read before a
    // frame (or an ImGui context) exists.
    double ClockNow() const { return mClockSeconds; }
 
    // The clock new gesture samples are timestamped with - see AdvanceClock.
    // Unlike ClockNow, this never freezes, so recording works the same
-   // whether the transport is playing or paused.
-   double RecordClockNow() const { return mRecordClockSeconds; }
+   // whether the transport is playing or paused.   double RecordClockNow() const { return mRecordClockSeconds; }
 
    // Arms exactly this one param for recording, independent of Shift. The
    // very next drag on it joins the session; releasing that drag finishes it

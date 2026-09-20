@@ -102,7 +102,7 @@ public:
    float ampRelease = 200.0f;  // ms
 
    // Filter & Envelope
-   int filterType = 1;         // 0: Off, 1: LP12, 2: LP24, 3: HP12, 4: BP
+   int filterType = 1;         // SynthModes::FilterType (Off, LP/HP 12/24/36, BP12/24, notch12/24)
    float cutoff = 10000.0f;    // Hz
    float resonance = 0.2f;     // 0..1
    float filterAmount = 0.0f;  // -8..8 octaves

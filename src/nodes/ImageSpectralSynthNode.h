@@ -113,7 +113,7 @@ public:
    float detune = 8.0f;        // cents
 
    // Analog Filter
-   int filterType = 1;         // 0: Off, 1: LP12, 2: LP24, 3: HP12, 4: BP12
+   int filterType = 1;         // SynthModes::FilterType (Off, LP/HP 12/24/36, BP12/24, notch12/24)
    float cutoff = 18000.0f;    // Hz
    float resonance = 0.15f;    // 0..1
    float drive = 0.0f;         // 0..1
