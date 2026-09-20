@@ -829,7 +829,8 @@ private:
          float* chans[2] = { &sumL, &sumR };
          for (int ch = 0; ch < 2; ch++)
          {
-            st.comb[ch].SetParams(hz, se.resonance, eb.filterCombNegative, mSampleRate);
+            st.comb[ch].SetParams(hz, DspMath::CombFeedbackFromResonance(se.resonance),
+                                  eb.filterCombNegative, mSampleRate);
             *chans[ch] = st.comb[ch].Process(*chans[ch]);
          }
       }
