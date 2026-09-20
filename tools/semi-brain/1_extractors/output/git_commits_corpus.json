@@ -1,5 +1,37 @@
 [
   {
+    "hash": "b07b49c69cfb2614d4cf8da29785fd6a5b2979d6",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 07:58:17 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge branch 'feature/prediction-step-08-refinement'",
+      "description": "Merge branch 'feature/prediction-step-08-refinement'",
+      "bullets": [],
+      "body": "Prediction steps 7-8: v2 modes (Follow, Recall, Session Map, DMD\ngroundwork) and the Predictive Modulator node (DMD delay-embedding).\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\n# Conflicts:\n#\ttools/semi-brain/1_extractors/output/git_commits_corpus.json\n#\ttools/semi-brain/1_extractors/output/recovered_docs_corpus.json\n#\ttools/semi-brain/3_datasets/train_sft_alpaca.jsonl\n#\ttools/semi-brain/3_datasets/train_sft_sharegpt.jsonl",
+      "raw": "Merge branch 'feature/prediction-step-08-refinement'\n\nPrediction steps 7-8: v2 modes (Follow, Recall, Session Map, DMD\ngroundwork) and the Predictive Modulator node (DMD delay-embedding).\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\n\n# Conflicts:\n#\ttools/semi-brain/1_extractors/output/git_commits_corpus.json\n#\ttools/semi-brain/1_extractors/output/recovered_docs_corpus.json\n#\ttools/semi-brain/3_datasets/train_sft_alpaca.jsonl\n#\ttools/semi-brain/3_datasets/train_sft_sharegpt.jsonl"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "6e3205203dea6c0ff85351732530111d97856f87",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 07:58:00 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "semi-brain",
+      "title": "chore(semi-brain): refresh extracted corpora and datasets",
+      "description": "refresh extracted corpora and datasets",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "chore(semi-brain): refresh extracted corpora and datasets\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".../1_extractors/output/git_commits_corpus.json    |  80 ++++\n .../1_extractors/output/recovered_docs_corpus.json | 468 ++++++++++-----------\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl | 161 +++----\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl | 161 +++----\n 4 files changed, 480 insertions(+), 390 deletions(-)"
+  },
+  {
     "hash": "bb8c25f53bc0fa6585a6e878dc863eff56ddc646",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
