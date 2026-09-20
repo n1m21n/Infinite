@@ -5856,6 +5856,8 @@ namespace
       REGISTER_NODE(NoteStrumNode, Note Strum, "Notes");
       REGISTER_NODE(EnvelopeNode, Envelope, "Modulators");
       REGISTER_NODE(NoteToCVNode, Note to CV, "Modulators");
+      REGISTER_NODE(VelocityToCVNode, Velocity to CV, "Modulators");
+      REGISTER_NODE(CVRecorderNode, CV Recorder, "Modulators");
       REGISTER_NODE(AudioToCVNode, Audio to CV, "Modulators");
 
       // P3c effects - one AudioEffectNode class serves every EffectDef table
@@ -19399,6 +19401,130 @@ namespace
       EndAudioBody();
    }
 
+   // ---- Velocity to CV -----------------------------------------------
+   void DrawVelocityToCVBody(GraphNode& gn, VelocityToCVNode* n)
+   {
+      char stat[64];
+      snprintf(stat, sizeof(stat), "velocity %.2f", n->Value01());
+
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+
+      AudioKnobRow row(2);
+      row.Checkbox("hold##velHold", &n->hold);
+      row.Knob("glide", &n->glideMs, 0.0f, 500.0f, "%.0f ms", kKnobLarge, false, false, AudioWidgetStyle::KnobSkewGlide100);
+      row.End();
+
+      EndAudioBody();
+   }
+
+   // ---- CV Recorder --------------------------------------------------
+   void DrawCVRecorderBody(GraphNode& gn, CVRecorderNode* n)
+   {
+      const bool recording = n->IsRecording();
+      const bool playing = n->playing && !recording && n->SampleCount() > 0;
+      char stat[64];
+      if (recording)
+         snprintf(stat, sizeof(stat), "REC  %.1f beats", n->LengthBeats());
+      else if (n->SampleCount() == 0)
+         snprintf(stat, sizeof(stat), "empty  -  out %.2f", n->Value01());
+      else
+         snprintf(stat, sizeof(stat), "%s  %.1f beats  -  out %.2f", playing ? "playing" : "stopped",
+                  n->LengthBeats(), n->Value01());
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      {
+         const float w = AudioFullWidth();
+         const float h = 46.0f;
+         const ImVec2 p0 = ImGui::GetCursorScreenPos();
+         const ImVec2 p1(p0.x + w, p0.y + h);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddRectFilled(p0, p1, IM_COL32(0, 0, 0, 70), 3.0f);
+         const ImU32 col = recording ? IM_COL32(235, 90, 90, 255) : IM_COL32(150, 214, 255, 245);
+         const auto& d = n->Samples();
+         const int cnt = (int)d.size();
+         if (cnt > 1)
+         {
+            // Recording shows the take so far filling in from the left over a
+            // 64-beat-wide strip only when it is long; otherwise stretch to fit.
+            const int cols = std::max(2, std::min((int)w, cnt));
+            float px = 0.0f, py = 0.0f;
+            for (int c = 0; c < cols; c++)
+            {
+               const int i = (int)((int64_t)c * (cnt - 1) / (cols - 1));
+               const float x = p0.x + 2.0f + (w - 4.0f) * (float)c / (float)(cols - 1);
+               const float y = p1.y - 3.0f - (h - 6.0f) * (d[i] * (1.0f / 255.0f));
+               if (c > 0)
+                  dl->AddLine(ImVec2(px, py), ImVec2(x, y), col, 1.5f);
+               px = x;
+               py = y;
+            }
+            const float ph = n->PlayheadNorm();
+            if (ph >= 0.0f)
+            {
+               const float x = p0.x + 2.0f + (w - 4.0f) * std::clamp(ph, 0.0f, 1.0f);
+               dl->AddLine(ImVec2(x, p0.y + 2.0f), ImVec2(x, p1.y - 2.0f), IM_COL32(255, 255, 255, 200), 1.0f);
+            }
+         }
+         else
+         {
+            const char* hint = recording ? "recording..." : "press Rec";
+            const ImVec2 ts = ImGui::CalcTextSize(hint);
+            dl->AddText(ImVec2(p0.x + (w - ts.x) * 0.5f, p0.y + (h - ts.y) * 0.5f), IM_COL32(180, 180, 180, 140), hint);
+         }
+         ImGui::Dummy(ImVec2(w, h));
+      }
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      const float btnW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
+      if (recording)
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
+      if (ImGui::Button("Rec##cvRec", ImVec2(btnW, 0)))
+      {
+         if (recording) n->StopRecording();
+         else n->StartRecording();
+      }
+      if (recording)
+         ImGui::PopStyleColor();
+      ImGui::SameLine();
+
+      if (playing)
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.5f, 0.2f, 1.0f));
+      ImGui::BeginDisabled(n->SampleCount() == 0 || recording);
+      if (ImGui::Button(playing ? "Stop##cvPlay" : "Play##cvPlay", ImVec2(btnW, 0)))
+      {
+         if (playing) n->StopPlayback();
+         else n->StartPlayback();
+      }
+      ImGui::EndDisabled();
+      if (playing)
+         ImGui::PopStyleColor();
+      ImGui::SameLine();
+
+      ImGui::BeginDisabled(n->SampleCount() == 0 && !recording);
+      if (ImGui::Button("Clear##cvClear", ImVec2(btnW, 0)))
+      {
+         PushUndoCheckpoint();
+         n->Clear();
+      }
+      ImGui::EndDisabled();
+
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      {
+         AudioKnobRow row(3);
+         row.Checkbox("loop##cvLoop", &n->loop);
+         // Always drawn (float params are addressed by draw order); dimmed
+         // while a cable supplies the input instead.
+         ImGui::BeginDisabled(n->input != nullptr);
+         row.Knob("in", &n->constantIn, 0.0f, 1.0f, "%.2f", kKnobSmall);
+         ImGui::EndDisabled();
+         row.Knob("speed", &n->speed, 0.05f, 4.0f, "%.2fx", kKnobSmall);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
    // ---- Audio Filter -----------------------------------------------------
    // Cached per-node response curve: the underlying MagnitudeDb sweep is a
    // settled-sine measurement (AudioFilterKernel.h) that runs an actual
@@ -23614,6 +23740,10 @@ namespace
          DrawEnvelopeBody(gn, n);
       else if (auto* n = dynamic_cast<NoteToCVNode*>(gn.node.get()))
          DrawNoteToCVBody(gn, n);
+      else if (auto* n = dynamic_cast<VelocityToCVNode*>(gn.node.get()))
+         DrawVelocityToCVBody(gn, n);
+      else if (auto* n = dynamic_cast<CVRecorderNode*>(gn.node.get()))
+         DrawCVRecorderBody(gn, n);
       else if (auto* n = dynamic_cast<AudioEffectNode*>(gn.node.get()))
       {
          // Every EffectDefs.cpp entry shares this one C++ class (§0.4), so
@@ -38727,6 +38857,8 @@ namespace
          { "MIDI CC", "Binds one physical control on a MIDI controller - a knob, fader or pad - and reports its position as a modulator. Press Learn and move the control; the node remembers that channel + controller number and polls only that binding. low/high remap the output range and invert flips it. Works with any class-compliant USB MIDI controller, since it only ever reads generic Control Change / Note On messages." },
          { "MIDI Trigger", "The pad counterpart of MIDI CC: it fires a decaying 0..1 pulse whenever one specific MIDI note is hit, then sits at 0. A pad hit is an event rather than a position, so this spikes and decays over 'hold' seconds the way Audio Analyze's onset output does, instead of holding a live value. Velocity sensitivity scales the spike by how hard the pad was struck." },
          { "Note to CV", "Converts a note stream's pitch into a modulator, so which note is playing can drive any parameter - a filter cutoff, a warp amount, pan. It is a pitch tracker, not an envelope: it holds the last note's pitch on release rather than falling back toward 0 (that's Envelope's job). rangeLow/High set which note range maps onto the full 0..1 span, glide smooths the jump between notes." },
+         { "Velocity to CV", "Converts how hard each note is played into a modulator (its 0..1 velocity), so touch can drive any parameter - brightness, pan, a filter opening on accents. With hold on it keeps the last note's velocity through release; off, it drops to 0 when the note ends. glide smooths the jump between velocities. The pitch counterpart is Note to CV." },
+         { "CV Recorder", "Records any modulator patched into its input and plays it back. Press Rec to capture (live input passes through while recording), press Rec again to stop and it starts looping straight away. speed is the playback rate - 2x plays the take twice as fast - and loop off plays it once and holds the last value. Takes are timed in beats, so they follow the tempo and pause with the transport (up to 64 beats), and they are saved with the patch. With nothing patched in, it records its own in knob, so you can perform a gesture by hand." },
          { "Audio to CV", "Converts audio into a modulator through an amplitude follower - Peak or RMS detection with its own attack and release. The lightweight, single-output counterpart of Audio Analyze: reach for this when all you want is 'this parameter follows how loud that is', and for Audio Analyze when you want bands, onsets and a passthrough." },
          { "Invert", "Mirrors a modulator around the midpoint of a low/high window, so what was at the top of the range lands at the bottom. Deliberately not a flat 1-v, which is why it still does the right thing when fed something already outside 0..1 - an unclamped Math output, for instance." },
          { "Mod Depth", "Scales how much of a modulator's swing reaches its destination, without having to know anything about the destination. Because a modulation binding overrides the knob outright, 'depth' collapses the signal toward 0.5 rather than adding a fraction on top: at 0 the destination sits at its own mid-range and the modulator has no say, at 1 the source passes through unchanged. Negative depth inverts, so one knob covers how much and which direction." },
@@ -39324,6 +39456,8 @@ namespace
                { "Compare", "Outputs 1 when the comparison holds, 0 otherwise." },
                { "Range to Range", "Remaps one modulator's input range onto a different output range." },
                { "Smoothing", "An exponential moving average over another modulator, to damp jitter." },
+               { "CV Recorder", "Records any patched modulator - hit Rec, then it loops the take back with an adjustable playback speed." },
+               { "Velocity to CV", "Turns note velocity into a 0..1 modulator, holding or releasing with the note." },
                { "Envelope", "Shapes an incoming modulator with an ADSR contour, gated by it crossing threshold, instead of generating its own trigger." },
                { "Invert", "Mirrors a modulator around a low/high pivot. Defaults to 0..1 for a classic 1-v flip; set low/high to match an unclamped source to mirror it correctly." },
                { "Mod Curve", "Remaps a modulator through a draggable transfer curve - an S-curve, staircase, or exponential response, all things a slider can't express." },
@@ -60123,6 +60257,79 @@ static int RunMidiParseTest()
 }
 #endif
 
+// ======================================================= INFINITE_CVRECTEST
+// CV Recorder: record a ramp against the beat clock, replay it, check speed,
+// loop/hold, and the save/load round trip.
+static int RunCVRecorderTest()
+{
+   bool ok = true;
+   auto check = [&](bool c, const char* what) {
+      if (!c) { printf("CVRECTEST FAIL: %s\n", what); ok = false; }
+   };
+   Transport& tp = Transport::Instance();
+   ConstantNode src;
+   CVRecorderNode rec;
+   rec.input = &src;
+
+   tp.SeekBeats(0.0);
+   rec.StartRecording();
+   for (int i = 0; i <= 64; i++) // 4 beats, 16 samples/beat, input ramps 0..1
+   {
+      tp.SeekBeats(i / 16.0);
+      src.value = i / 64.0f;
+      rec.Value01();
+      rec.Value01(); // idempotent within a tick
+   }
+   rec.StopRecording();
+   check(rec.SampleCount() == 65, "sample count");
+   check(rec.playing, "playback starts after stop");
+
+   auto at = [&](double beats) { tp.SeekBeats(beats); return rec.Value01(); };
+   at(10.0); // anchors playback here
+   check(std::fabs(at(10.0 + 2.0) - 0.5f) < 0.03f, "midpoint at speed 1");
+   rec.speed = 2.0f;
+   check(std::fabs(at(10.0 + 1.0) - 0.5f) < 0.03f, "midpoint at speed 2");
+   check(rec.Value01() == rec.Value01(), "idempotent playback");
+   rec.speed = 1.0f;
+   const float wrapped = at(10.0 + 4.0 + 1.0); // one beat into second pass
+   check(std::fabs(wrapped - 0.25f) < 0.05f, "loop wraps");
+   rec.loop = false;
+   check(at(10.0 + 40.0) > 0.97f, "non-loop holds the end");
+   rec.loop = true;
+
+   {
+      // round trip through the ParamVisitor text path
+      CVRecorderNode copy;
+      struct Grab : ParamVisitor
+      {
+         std::string got;
+         void Float(const char*, float&) override {}
+         void Int(const char*, int&) override {}
+         void Bool(const char*, bool&) override {}
+         void Text(const char* n, std::string& v) override { if (std::string(n) == "data") got = v; }
+         void Color(const char*, float*) override {}
+      } grab;
+      rec.VisitParams(grab);
+      struct Put : ParamVisitor
+      {
+         std::string put;
+         void Float(const char*, float&) override {}
+         void Int(const char*, int&) override {}
+         void Bool(const char*, bool&) override {}
+         void Text(const char* n, std::string& v) override { if (std::string(n) == "data") v = put; }
+         void Color(const char*, float*) override {}
+      } putv;
+      putv.put = grab.got;
+      copy.VisitParams(putv);
+      check(copy.SampleCount() == rec.SampleCount() && copy.Samples() == rec.Samples(), "save/load round trip");
+   }
+   rec.Clear();
+   check(rec.SampleCount() == 0 && !rec.playing, "clear");
+
+   printf("%s\n", ok ? "CVRECTEST OK" : "CVRECTEST FAIL");
+   return ok ? 0 : 1;
+}
+
 // ======================================================= INFINITE_MIDICC14TEST
 // Pure header test (platform/common/MidiCC14.h): a Pioneer-style 14-bit
 // knob (coarse CC n, fine CC n+32) must publish one smooth value under the
@@ -63577,6 +63784,8 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_MIDICC14TEST") != nullptr)
       return RunMidiCC14Test();
+   if (getenv("INFINITE_CVRECTEST") != nullptr)
+      return RunCVRecorderTest();
 
 #if defined(__linux__)
    if (getenv("INFINITE_MIDIPARSETEST") != nullptr)
