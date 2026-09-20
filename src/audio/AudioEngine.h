@@ -37,6 +37,10 @@ struct AudioTopologyEntry
    int outputBufferIndices[kAudioMaxNodeOutputs] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
    int numOutputs = 1;
    int outputBufferIndex = -1; // primary output buffer (mirrors outputBufferIndices[0] for backwards compatibility)
+   // A note producer/processor/consumer that needs no device to do its job
+   // (Random Note, Sequencer, Note to CV, ...). PumpNoteNodesWithoutDevice runs
+   // just these while no audio device is open.
+   bool noteOnly = false;
 
    // Plugin/effect delay compensation (PDC): per input pin, the pin's source
    // branch needs a CompensationDelay so every pin merging into this node
@@ -284,6 +288,14 @@ public:
    // CookIfNeeded) is P3's job; the DSPTEST harness calls it directly.
    void PumpMainThread();
 
+   // Main thread, once a frame. While no audio device is open (Start Audio is
+   // off) nothing calls ProcessBlock, so note generators and note-driven
+   // modulators would sit frozen. This runs only the topology's note-only
+   // nodes, in order, in small blocks against the wall-clock-driven transport,
+   // so notes and the CV they drive behave the same with audio off. A no-op
+   // whenever a device (or an offline render) owns the graph.
+   void PumpNoteNodesWithoutDevice();
+
    // Headless entry point for INFINITE_DSPTEST: runs the current topology
    // over a caller-owned scratch buffer without touching the real device.
    void ProcessOffline(AudioBuffer& buffer);
@@ -364,6 +376,8 @@ private:
    // DrainRetired(). Main thread only.
    std::vector<ProcessList*> mRetiring;
    std::atomic<bool> mDeviceOpen { false };
+   double mPumpFrames = 0.0;   // main thread: fractional frames owed to the device-less note pump
+   double mPumpLastMs = -1.0;
    void DrainRetired();
 
    // Bumped once per SetTopology() call (main thread only) - see

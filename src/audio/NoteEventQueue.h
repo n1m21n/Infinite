@@ -118,6 +118,23 @@ public:
       return n;
    }
 
+   // Main thread only, and only while no audio callback can run (the engine's
+   // device-less note pump). A consumer that is never drained there - a synth
+   // that only runs with a device - would otherwise sit on a growing backlog
+   // and eventually stall the ring for every consumer that IS being drained.
+   // Any cursor more than `maxBacklog` events behind is moved to the tail.
+   void TrimLaggingConsumers(size_t maxBacklog)
+   {
+      const size_t tail = mTail.load(std::memory_order_acquire);
+      for (int i = 0; i < mNumCursors; i++)
+      {
+         const size_t head = mCursorHeads[i].load(std::memory_order_relaxed);
+         const size_t backlog = (tail + kCapacity - head) % kCapacity;
+         if (backlog > maxBacklog)
+            mCursorHeads[i].store(tail, std::memory_order_release);
+      }
+   }
+
    uint64_t OverflowCount() const { return mOverflowCount.load(std::memory_order_relaxed); }
 
 private:

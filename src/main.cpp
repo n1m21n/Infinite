@@ -39695,6 +39695,7 @@ namespace
          if (!node->bypassed)
          {
             entry.node = audioNode;
+            entry.noteOnly = dynamic_cast<INoteSource*>(node) != nullptr || node->AudioNodeForNotePorts() != nullptr;
             const int numOuts = std::clamp(audioNode->AudioOutputCount(), 1, kAudioMaxNodeOutputs);
             entry.numOutputs = numOuts;
             entry.outputBufferIndex = nextBufferIndex;
@@ -66576,6 +66577,9 @@ int main(int argc, char** argv)
       // freeing sample-preview buffers the audio thread has retired) - see
       // AudioEngine::PumpMainThread.
       AudioEngine::Instance().PumpMainThread();
+      // With Start Audio off nothing runs the graph, so note generators and the
+      // CV they drive would freeze; this keeps just the note nodes going.
+      AudioEngine::Instance().PumpNoteNodesWithoutDevice();
 
       // Projector windows are ordinary decorated windows - closing one via the
       // OS's own close button only sets its should-close flag, it doesn't
@@ -81657,6 +81661,45 @@ int main(int argc, char** argv)
       // builder's ResetConsumers()/RegisterConsumer() wiring itself, not the
       // queue's own Push/Pop (already covered by NoteEventQueue's unit-level
       // use in the other fixtures above).
+      // Note generators must run with no audio device: Random Note Generator
+      // -> Note to CV should light up without Start Audio (the device-less
+      // note pump in AudioEngine::PumpNoteNodesWithoutDevice).
+      if (getenv("INFINITE_NOTEPUMPTEST") != nullptr)
+      {
+         static int sGen = -1, sCv = -1;
+         static double sStart = 0.0;
+         if (frameId == 4)
+         {
+            GraphNode* spawnedGen = SpawnNode("Random Note Generator", "Notes", 40.0f, 40.0f);
+            sGen = spawnedGen ? spawnedGen->index : -1;
+            GraphNode* spawnedCv = SpawnNode("Note to CV", "Modulators", 320.0f, 40.0f);
+            sCv = spawnedCv ? spawnedCv->index : -1;
+            // Spawning can reallocate the node list; re-fetch both.
+            GraphNode* gen = FindNodeByIndex(sGen);
+            GraphNode* cv = FindNodeByIndex(sCv);
+            if (gen && cv)
+            {
+               cv->node->NoteInputSlot(0)->Connect(gen->node.get());
+            }
+            Transport::Instance().SetPlaying(true);
+            RebuildAudioTopology();
+            sStart = glfwGetTime();
+            printf("NOTEPUMPTEST setup gen=%d cv=%d deviceOpen=%d\n", sGen, sCv,
+                   (int)(AudioEngine::Instance().SampleRate() > 0));
+            fflush(stdout);
+         }
+         else if (frameId > 4 && glfwGetTime() - sStart > 4.0)
+         {
+            GraphNode* cv = FindNodeByIndex(sCv);
+            NoteToCVNode* n = cv ? dynamic_cast<NoteToCVNode*>(cv->node.get()) : nullptr;
+            const int last = n ? n->LastNote() : -1;
+            const bool ok = n != nullptr && last >= 0;
+            printf("NOTEPUMPTEST lastNote=%d %s\n", last, ok ? "OK" : "FAIL");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
       if (getenv("INFINITE_NOTEFANOUTTEST") != nullptr && frameId == 4)
       {
          auto SpawnIndex = [&](const std::string& name, const std::string& category, float x, float y) -> int
