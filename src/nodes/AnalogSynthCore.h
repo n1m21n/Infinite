@@ -112,6 +112,11 @@ public:
 
       DspMath::PolyBlepOsc osc1[AnalogSynthCore::kMaxUnison];
       DspMath::PolyBlepOsc osc2;
+      // Sub osc: its own accumulator, run at half osc1's frequency. It cannot
+      // read osc1's phase scaled by 0.5 - scaling a phase compresses its
+      // range, it does not halve its rate, so such a "sub" never crosses its
+      // own comparison threshold and emits constant DC instead of a tone.
+      DspMath::PolyBlepOsc sub;
       DspMath::WhiteNoise noise;
       DspMath::OnePole glide;
 
@@ -131,6 +136,8 @@ public:
          }
          osc2.phase = 0.0;
          osc2.phaseInc = 0.0;
+         sub.phase = 0.0;
+         sub.phaseInc = 0.0;
          ladder.Reset();
          for (int s = 0; s < SynthModes::kMaxFilterStages; ++s)
          {
@@ -174,6 +181,8 @@ public:
       }
       mFreeOsc2.phase = 0.0;
       mFreeOsc2.phaseInc = 0.0;
+      mFreeSub.phase = 0.0;
+      mFreeSub.phaseInc = 0.0;
    }
 
    void SetNoteInbox(NoteEventQueue* inbox, int cursor) override
@@ -351,9 +360,14 @@ public:
             if (sync && osc1Wrapped)
                mFreeOsc2.phase = 0.0;
 
-            // Sub osc (osc1[0] phase / 2)
-            const float subPhase = (float)(mFreeOsc1[0].phase * 0.5);
-            const float subSample = (subPhase < 0.5f) ? 1.0f : -1.0f;
+            // Sub osc: one octave below osc1, tracking osc1's post-FM pitch
+            // but not its unison detune - a detuned sub beats against itself
+            // in the register where beating is least wanted. Symmetric square
+            // (pw fixed at 0.5), BLEP'd like every other osc here.
+            const float subHz = std::clamp(osc1ModHz * 0.5f, 5.0f, (float)mSampleRate * 0.45f);
+            mFreeSub.SetFrequency(subHz, mSampleRate);
+            const float subSample = mFreeSub.Generate(DspMath::kWaveSquare, 0.5f);
+            mFreeSub.Advance();
 
             // Noise
             const float noiseSample = mFreeNoise.Next();
@@ -470,9 +484,12 @@ public:
                if (sync && osc1Wrapped)
                   v.osc2.phase = 0.0;
 
-               // Sub osc (osc1[0] phase / 2)
-               const float subPhase = (float)(v.osc1[0].phase * 0.5);
-               const float subSample = (subPhase < 0.5f) ? 1.0f : -1.0f;
+               // Sub osc: see the free-running path - own accumulator at half
+               // osc1's post-FM pitch, unaffected by unison detune.
+               const float subHz = std::clamp(osc1ModHz * 0.5f, 5.0f, (float)mSampleRate * 0.45f);
+               v.sub.SetFrequency(subHz, mSampleRate);
+               const float subSample = v.sub.Generate(DspMath::kWaveSquare, 0.5f);
+               v.sub.Advance();
 
                // Noise
                const float noiseSample = v.noise.Next();
@@ -686,6 +703,7 @@ private:
    DspMath::OnePole mFreeGlide;
    DspMath::PolyBlepOsc mFreeOsc1[AnalogSynthCore::kMaxUnison];
    DspMath::PolyBlepOsc mFreeOsc2;
+   DspMath::PolyBlepOsc mFreeSub;
    DspMath::WhiteNoise mFreeNoise;
    ZdfLadderFilter::State mFreeLadder;
    DspMath::TptSvf mFreeSvf[SynthModes::kMaxFilterStages];
