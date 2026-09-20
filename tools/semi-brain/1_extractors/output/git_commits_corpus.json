@@ -1,5 +1,69 @@
 [
   {
+    "hash": "78ef5713a980a7580869d9397b002425b748920f",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 10:53:28 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge claude/gaussian-splatting-research-2de9e3 into main",
+      "description": "Merge claude/gaussian-splatting-research-2de9e3 into main",
+      "bullets": [],
+      "body": "Adds Motion Track node (normalized cross-correlation + pyramidal Lucas-Kanade\noptical flow, modulator category) and browser panel favourites/context menus.\nResolved main.cpp help-text conflict by keeping both entries; regenerated\ndocs/node_param_audit.md via scripts/audit_node_params.py after the merge.",
+      "raw": "Merge claude/gaussian-splatting-research-2de9e3 into main\n\nAdds Motion Track node (normalized cross-correlation + pyramidal Lucas-Kanade\noptical flow, modulator category) and browser panel favourites/context menus.\nResolved main.cpp help-text conflict by keeping both entries; regenerated\ndocs/node_param_audit.md via scripts/audit_node_params.py after the merge."
+    },
+    "stat": ""
+  },
+  {
+    "hash": "0a6e011f8f504fa2a36030d8e5224c6dca26420b",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 10:52:25 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/splat-node into main",
+      "description": "Merge feature/splat-node into main",
+      "bullets": [],
+      "body": "Includes splat-loader and splat-render (both ancestors of splat-node): headless\nGaussian splat .ply/.splat loader, GPU splat rendering in Render3DNode, and the\nSplatSourceNode palette node. Resolved IGeometrySource conflicts by keeping\nboth sides (independent additive virtuals: CookWarning/point-cloud passthrough\nfrom main, Splat* passthrough from this branch).",
+      "raw": "Merge feature/splat-node into main\n\nIncludes splat-loader and splat-render (both ancestors of splat-node): headless\nGaussian splat .ply/.splat loader, GPU splat rendering in Render3DNode, and the\nSplatSourceNode palette node. Resolved IGeometrySource conflicts by keeping\nboth sides (independent additive virtuals: CookWarning/point-cloud passthrough\nfrom main, Splat* passthrough from this branch)."
+    },
+    "stat": ""
+  },
+  {
+    "hash": "68b7e9ffda8f54619cab7c51dca932b3d8837bf8",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 10:51:20 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "field",
+      "title": "Merge feature/field-pixel-illusion-presets into main",
+      "description": "Merge feature/field-pixel-illusion-presets into main",
+      "bullets": [],
+      "body": "Adds shared CombFilter type. Kept HEAD's comment wording in GestureRecorder.h (identical signatures); semi-brain corpora resolved to HEAD, hook will regenerate.",
+      "raw": "Merge feature/field-pixel-illusion-presets into main\n\nAdds shared CombFilter type. Kept HEAD's comment wording in GestureRecorder.h (identical signatures); semi-brain corpora resolved to HEAD, hook will regenerate."
+    },
+    "stat": ""
+  },
+  {
+    "hash": "e51f42aa5e8a0ab874b1eb8ba68286823a2623d2",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 10:50:42 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "semi-brain",
+      "title": "chore(semi-brain): refresh corpora after branch merges",
+      "description": "refresh corpora after branch merges",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "chore(semi-brain): refresh corpora after branch merges\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".../1_extractors/output/git_commits_corpus.json    | 256 +++++++++++\n .../1_extractors/output/recovered_docs_corpus.json | 480 ++++++++++-----------\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl | 170 ++++----\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl | 170 ++++----\n 4 files changed, 682 insertions(+), 394 deletions(-)"
+  },
+  {
     "hash": "3322a0def96089ad7fffd837ec2a6103c9496c61",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
@@ -917,6 +981,22 @@
       "raw": "feat(synth): add Analog virtual-analog polyphonic synthesizer node"
     },
     "stat": "ARCHITECTURE.md                 |   6 +\n CMakeLists.txt                  |   1 +\n src/audio/dsp/ZdfLadderFilter.h | 106 +++++++\n src/main.cpp                    | 227 +++++++++++++-\n src/nodes/AnalogNode.cpp        |  97 ++++++\n src/nodes/AnalogNode.h          | 145 +++++++++\n src/nodes/AnalogSynthCore.h     | 634 ++++++++++++++++++++++++++++++++++++++++\n 7 files changed, 1215 insertions(+), 1 deletion(-)\n create mode 100644 src/audio/dsp/ZdfLadderFilter.h\n create mode 100644 src/nodes/AnalogNode.cpp\n create mode 100644 src/nodes/AnalogNode.h\n create mode 100644 src/nodes/AnalogSynthCore.h"
+  },
+  {
+    "hash": "40a39c371ba9f3c64cb68aa5d67a0e6067c71855",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 18 12:20:59 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "dsp",
+      "title": "feat(dsp): add comb filter type shared across synth/generator nodes",
+      "description": "add comb filter type shared across synth/generator nodes",
+      "bullets": [],
+      "body": "Introduces DspMath::CombFilter (feedback delay line, positive/negative\npolarity) and wires it into SynthModes as kFilterCombPos/Neg, then adopts\nit in WavetableSynthCore, EquationNode, WaveTerrainNode, MetallicNode,\nImageSpectralSynthNode, and the EQ kernel so every filter-driving node\ngets the same comb option through the shared filter-type list. Also\nrefreshes the semi-brain extracted corpora/training sets.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "feat(dsp): add comb filter type shared across synth/generator nodes\n\nIntroduces DspMath::CombFilter (feedback delay line, positive/negative\npolarity) and wires it into SynthModes as kFilterCombPos/Neg, then adopts\nit in WavetableSynthCore, EquationNode, WaveTerrainNode, MetallicNode,\nImageSpectralSynthNode, and the EQ kernel so every filter-driving node\ngets the same comb option through the shared filter-type list. Also\nrefreshes the semi-brain extracted corpora/training sets.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "src/audio/DspMath.h                                |  84 ++++\n src/audio/SynthModes.h                             |  22 +-\n src/audio/dsp/AudioFilterKernel.h                  |  40 +-\n src/audio/dsp/EqKernel.cpp                         |  11 +\n src/audio/dsp/EqKernel.h                           |  53 ++-\n src/audio/dsp/MetallicResonator.h                  | 110 ++++-\n src/audio/dsp/SpectralAdditiveSynth.h              |  11 +-\n src/core/GestureRecorder.cpp                       |   1 +\n src/core/GestureRecorder.h                         |  29 +-\n src/main.cpp                                       |  21 +-\n src/nodes/EquationNode.cpp                         |  92 ++---\n src/nodes/EquationNode.h                           |   2 +-\n src/nodes/ImageSpectralSynthNode.cpp               |  83 ++--\n src/nodes/ImageSpectralSynthNode.h                 |   2 +-\n src/nodes/MetallicNode.cpp                         |  97 +++--\n src/nodes/WaveTerrainNode.cpp                      |  95 ++---\n src/nodes/WaveTerrainNode.h                        |   2 +-\n src/nodes/WavetableSynthCore.h                     |  20 +-\n .../1_extractors/output/git_commits_corpus.json    |  64 +++\n .../1_extractors/output/recovered_docs_corpus.json | 460 ++++++++++-----------\n .../output/skills_and_invariants_corpus.json       |   4 +-\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl | 162 ++++----\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl | 162 ++++----\n 23 files changed, 997 insertions(+), 630 deletions(-)"
   },
   {
     "hash": "9db3840e22457d93fad771561b04869c87f5a6b6",
@@ -6828,6 +6908,26 @@
     "stat": ""
   },
   {
+    "hash": "958bcfd2401b2346b6940ae1b769af43150b0248",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Mon Sep 7 00:45:25 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Splat loader: degrade gracefully for plain colored point cloud .ply",
+      "description": "Splat loader: degrade gracefully for plain colored point cloud .ply",
+      "bullets": [
+        "color: f_dc_0/1/2 missing -> red/green/blue (0-255) directly, no SH_C0",
+        "opacity: opacity missing -> alpha (0-255) directly (not sigmoid'd); fully",
+        "scale: scale_0/1/2 missing -> a radius estimated from the cloud's own"
+      ],
+      "body": "Real-world .ply files people download (Sketchfab, photogrammetry scans,\nCloudCompare/MeshLab exports) are almost never trained 3DGS output - they're\nplain x,y,z,red,green,blue point clouds. LoadSplatPly was silently applying\nthe trained-3DGS field-present-but-zero defaults to these (SH-DC-missing ->\nflat 0.5 gray, opacity-missing -> sigmoid(0)=0.5, scale-missing -> exp(0)=1.0\nworld-unit radius), which rendered as one solid semi-transparent gray blob\nonce thousands of 1-unit splats overlapped.\nLoadSplatPly now falls back per field when the trained property is absent:\nconversion; falls through to flat gray only if neither is present.\nopaque (1.0) if neither is present, instead of the old 0.5.\npoint density (bounding-box diagonal / cbrt(splat count)) in a second\npass after UpdateBounds(), instead of a fixed 1.0-world-unit radius.\nSplatCloud::hadTrainedFields is set false whenever any of the above fired,\nand SplatSourceNode's status string now appends \"(no scale/opacity/color\ndata - auto-estimated)\" so a degraded load isn't mistaken for a real one.\nAll three fallbacks are gated on property presence in the header, decided\nonce before the vertex loop, so a real 3DGS export (INFINITE_SPLATIOTEST's\nfixture, all fields present) takes the exact same code path as before -\nverified unchanged. Extended that fixture with a new bare-color-cloud .ply\ncovering the fallback path, and added an end-to-end check through the real\nSplatSourceNode + Render3DNode (INFINITE_SPLATNODETEST) confirming real red\npixels render (not flat gray) at a sane, non-1.0 splat size.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Splat loader: degrade gracefully for plain colored point cloud .ply\n\nReal-world .ply files people download (Sketchfab, photogrammetry scans,\nCloudCompare/MeshLab exports) are almost never trained 3DGS output - they're\nplain x,y,z,red,green,blue point clouds. LoadSplatPly was silently applying\nthe trained-3DGS field-present-but-zero defaults to these (SH-DC-missing ->\nflat 0.5 gray, opacity-missing -> sigmoid(0)=0.5, scale-missing -> exp(0)=1.0\nworld-unit radius), which rendered as one solid semi-transparent gray blob\nonce thousands of 1-unit splats overlapped.\n\nLoadSplatPly now falls back per field when the trained property is absent:\n  - color: f_dc_0/1/2 missing -> red/green/blue (0-255) directly, no SH_C0\n    conversion; falls through to flat gray only if neither is present.\n  - opacity: opacity missing -> alpha (0-255) directly (not sigmoid'd); fully\n    opaque (1.0) if neither is present, instead of the old 0.5.\n  - scale: scale_0/1/2 missing -> a radius estimated from the cloud's own\n    point density (bounding-box diagonal / cbrt(splat count)) in a second\n    pass after UpdateBounds(), instead of a fixed 1.0-world-unit radius.\nSplatCloud::hadTrainedFields is set false whenever any of the above fired,\nand SplatSourceNode's status string now appends \"(no scale/opacity/color\ndata - auto-estimated)\" so a degraded load isn't mistaken for a real one.\n\nAll three fallbacks are gated on property presence in the header, decided\nonce before the vertex loop, so a real 3DGS export (INFINITE_SPLATIOTEST's\nfixture, all fields present) takes the exact same code path as before -\nverified unchanged. Extended that fixture with a new bare-color-cloud .ply\ncovering the fallback path, and added an end-to-end check through the real\nSplatSourceNode + Render3DNode (INFINITE_SPLATNODETEST) confirming real red\npixels render (not flat gray) at a sane, non-1.0 splat size.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "src/core/SplatIO.cpp          |  88 +++++++++++++--\n src/core/SplatIO.h            |  27 +++++\n src/main.cpp                  | 245 +++++++++++++++++++++++++++++++++++++++++-\n src/nodes/SplatSourceNode.cpp |   2 +\n 4 files changed, 351 insertions(+), 11 deletions(-)"
+  },
+  {
     "hash": "709c185f42a02332d762d1f8ae33b20bece0d108",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
@@ -6876,6 +6976,108 @@
     "stat": "src/core/field/GlslBackend.cpp | 31 +++++++++++++++++++++++++++++++\n src/nodes/FieldPixelNode.cpp   | 21 ++++++++++++++++++---\n 2 files changed, 49 insertions(+), 3 deletions(-)"
   },
   {
+    "hash": "cb396a93a735c0b5275e292b25093357e40ba505",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 6 19:15:28 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "global",
+      "title": "docs: add SplatSourceNode to ARCHITECTURE.md's node class table",
+      "description": "add SplatSourceNode to ARCHITECTURE.md's node class table",
+      "bullets": [],
+      "body": "Follow-up to the Phase 3 Gaussian Splat node commit - new-geometry-node\nSKILL.md's exit criterion #8 asks for the architecture doc to reflect a\nnew node class.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "docs: add SplatSourceNode to ARCHITECTURE.md's node class table\n\nFollow-up to the Phase 3 Gaussian Splat node commit - new-geometry-node\nSKILL.md's exit criterion #8 asks for the architecture doc to reflect a\nnew node class.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "ARCHITECTURE.md | 1 +\n 1 file changed, 1 insertion(+)"
+  },
+  {
+    "hash": "2183345fd004ad043c895f3c9a3bcac2f879c721",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 6 19:15:10 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Phase 3: SplatSourceNode - Gaussian Splat node in the palette",
+      "description": "Phase 3: SplatSourceNode - Gaussian Splat node in the palette",
+      "bullets": [
+        "IGeometrySource::SplatSizeMultiplier/SplatOpacityMultiplier/GetSplatTint,",
+        "EnsureSplatShader/drawSplatSlot: uSizeMult scales Sigma (not just the",
+        "Render3DNode::SceneSignature gained splatSizeMult/splatOpacityMult/",
+        "NodeViewport gained a hasSplat preview branch, reusing the existing",
+        "Platform::OpenSplatDialog on both macOS (Platform.mm) and Windows"
+      ],
+      "body": "Adds SplatSourceNode (src/nodes/SplatSourceNode.h/.cpp), a terminal\nIGeometrySource that loads a .ply/.splat Gaussian splat cloud (file picker\nor drop) and feeds Render3D's Phase 2 EWA-splatting pass end to end.\nControls (7, mirroring ModelSourceNode's file-node conventions): file\npicker+drop, point size (modulatable), opacity (modulatable), tint\n(colour), crop (radius from centroid), max splats (opacity*scale budget).\nNo SH-mode control: SplatIO already collapses SH down to a single flat\nlinear colour at load time, so there is nothing left for a mode dropdown\nto switch between.\nCrop/max-splats are edit-time reductions baked into a derived cloud\n(SplatSourceNode::RebuildDerivedCloud, gated by its own cache signature\nof load-revision+crop+maxSplats per new-geometry-node SKILL.md S4); point\nsize/opacity/tint are live per-frame multipliers so they can be modulated\nwithout re-cooking the GPU data texture (design doc S8).\nRequired minimal additions to the Phase 2 render path to support the live\nmultipliers (not a refactor):\nwith forwarding implementations added to every wrapper/passthrough node\n(AudioDisplacementNode, FieldElementNode, GenerativeNodes, GeometryOpNodes,\nPointDistributionNodes, UtilityNodes, Switcher3DNode) per the\nnew-geometry-node passthrough-forwarding rule.\nquad radius, so the EWA falloff shape grows with it), uOpacityMult and\nuTint multiply into vColor.\nsplatTint fields - without this the new live uniforms would silently\nfreeze under modulation, since CookIfNeeded's cache gate only compared\nthe existing signature fields.\nGL_POINTS point-cloud path as a cheap splat-cloud approximation (per\ndesign doc's explicit allowance).\n(PlatformWin.cpp).\nWiring: CMakeLists.txt, main.cpp include/REGISTER_NODE(\"Gaussian Splat\",\n\"3D\")/help text/DrawSplatSourceParams+dispatch entry, and a drop-handler\nbranch. \".ply\" is ambiguous with ModelSourceNode's existing mesh-import\nextension, so a bare .ply drop is unchanged (still spawns Model 3D) unless\ndropped directly onto an existing Gaussian Splat node; \".splat\" is never\nambiguous and always targets the splat node.\nVerified (INFINITE_SPLATNODETEST, new self-test in main.cpp): loads a real\n.splat fixture through SplatSourceNode::Load (not SplatIO directly), crop\ndrops a symmetric far-outlier pair while bumping SplatCloudRevision,\nmax-splats budgets to the top-K by opacity*scale, the node patched into a\nreal Render3DNode produces actual EWA-splat pixels via glGetTexImage\nreadback, a live pointSize change (no reload/crop/budget change) still\ninvalidates Render3D's cache, and NodeViewport::Render returns a non-blank\npreview texture for the node. Also verified: builds clean (no new\nwarnings), 271/271 registered node types (including this one) round-trip\nsave/load and copy/paste (INFINITE_ROUNDTRIPTEST), PINDUPTEST draws all\n277 nodes' expanded params with 0 duplicate pin ids, and\nrun-infinite-hygiene's 3d group (14/14) plus --fast tier (21/21) are green.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Phase 3: SplatSourceNode - Gaussian Splat node in the palette\n\nAdds SplatSourceNode (src/nodes/SplatSourceNode.h/.cpp), a terminal\nIGeometrySource that loads a .ply/.splat Gaussian splat cloud (file picker\nor drop) and feeds Render3D's Phase 2 EWA-splatting pass end to end.\n\nControls (7, mirroring ModelSourceNode's file-node conventions): file\npicker+drop, point size (modulatable), opacity (modulatable), tint\n(colour), crop (radius from centroid), max splats (opacity*scale budget).\nNo SH-mode control: SplatIO already collapses SH down to a single flat\nlinear colour at load time, so there is nothing left for a mode dropdown\nto switch between.\n\nCrop/max-splats are edit-time reductions baked into a derived cloud\n(SplatSourceNode::RebuildDerivedCloud, gated by its own cache signature\nof load-revision+crop+maxSplats per new-geometry-node SKILL.md S4); point\nsize/opacity/tint are live per-frame multipliers so they can be modulated\nwithout re-cooking the GPU data texture (design doc S8).\n\nRequired minimal additions to the Phase 2 render path to support the live\nmultipliers (not a refactor):\n- IGeometrySource::SplatSizeMultiplier/SplatOpacityMultiplier/GetSplatTint,\n  with forwarding implementations added to every wrapper/passthrough node\n  (AudioDisplacementNode, FieldElementNode, GenerativeNodes, GeometryOpNodes,\n  PointDistributionNodes, UtilityNodes, Switcher3DNode) per the\n  new-geometry-node passthrough-forwarding rule.\n- EnsureSplatShader/drawSplatSlot: uSizeMult scales Sigma (not just the\n  quad radius, so the EWA falloff shape grows with it), uOpacityMult and\n  uTint multiply into vColor.\n- Render3DNode::SceneSignature gained splatSizeMult/splatOpacityMult/\n  splatTint fields - without this the new live uniforms would silently\n  freeze under modulation, since CookIfNeeded's cache gate only compared\n  the existing signature fields.\n- NodeViewport gained a hasSplat preview branch, reusing the existing\n  GL_POINTS point-cloud path as a cheap splat-cloud approximation (per\n  design doc's explicit allowance).\n- Platform::OpenSplatDialog on both macOS (Platform.mm) and Windows\n  (PlatformWin.cpp).\n\nWiring: CMakeLists.txt, main.cpp include/REGISTER_NODE(\"Gaussian Splat\",\n\"3D\")/help text/DrawSplatSourceParams+dispatch entry, and a drop-handler\nbranch. \".ply\" is ambiguous with ModelSourceNode's existing mesh-import\nextension, so a bare .ply drop is unchanged (still spawns Model 3D) unless\ndropped directly onto an existing Gaussian Splat node; \".splat\" is never\nambiguous and always targets the splat node.\n\nVerified (INFINITE_SPLATNODETEST, new self-test in main.cpp): loads a real\n.splat fixture through SplatSourceNode::Load (not SplatIO directly), crop\ndrops a symmetric far-outlier pair while bumping SplatCloudRevision,\nmax-splats budgets to the top-K by opacity*scale, the node patched into a\nreal Render3DNode produces actual EWA-splat pixels via glGetTexImage\nreadback, a live pointSize change (no reload/crop/budget change) still\ninvalidates Render3D's cache, and NodeViewport::Render returns a non-blank\npreview texture for the node. Also verified: builds clean (no new\nwarnings), 271/271 registered node types (including this one) round-trip\nsave/load and copy/paste (INFINITE_ROUNDTRIPTEST), PINDUPTEST draws all\n277 nodes' expanded params with 0 duplicate pin ids, and\nrun-infinite-hygiene's 3d group (14/14) plus --fast tier (21/21) are green.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "CMakeLists.txt                     |   1 +\n src/core/NodeViewport.cpp          |  37 ++++++-\n src/main.cpp                       | 214 +++++++++++++++++++++++++++++++++++++\n src/nodes/AudioDisplacementNode.h  |   7 ++\n src/nodes/FieldElementNode.h       |   7 ++\n src/nodes/GenerativeNodes.h        |   7 ++\n src/nodes/Geometry3DNodes.cpp      |  25 ++++-\n src/nodes/Geometry3DNodes.h        |  27 +++++\n src/nodes/GeometryOpNodes.h        |  28 +++++\n src/nodes/PointDistributionNodes.h |   7 ++\n src/nodes/SplatSourceNode.cpp      | 173 ++++++++++++++++++++++++++++++\n src/nodes/SplatSourceNode.h        | 127 ++++++++++++++++++++++\n src/nodes/Switcher3DNode.cpp       |  19 ++++\n src/nodes/Switcher3DNode.h         |   3 +\n src/nodes/UtilityNodes.h           |  21 ++++\n src/platform/Platform.h            |   8 ++\n src/platform/Platform.mm           |  32 ++++++\n src/platform/win/PlatformWin.cpp   |  12 +++\n 18 files changed, 748 insertions(+), 7 deletions(-)\n create mode 100644 src/nodes/SplatSourceNode.cpp\n create mode 100644 src/nodes/SplatSourceNode.h"
+  },
+  {
+    "hash": "8426f5aeabddd1adc77438f0323e8e37e1760a60",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 6 18:47:03 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "field",
+      "title": "codebase-navigation: add living-map entry for IGeometrySource splat fields",
+      "description": "codebase-navigation: add living-map entry for IGeometrySource splat fields",
+      "bullets": [],
+      "body": "Documents the passthrough-forwarding wiring point for GetSplatCloud()/\nSplatCloudRevision() added in the previous commit, plus the\nRender3DNode splat GPU-state/sort-thread cross-file shape, per this\nskill's own self-maintenance instruction.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "codebase-navigation: add living-map entry for IGeometrySource splat fields\n\nDocuments the passthrough-forwarding wiring point for GetSplatCloud()/\nSplatCloudRevision() added in the previous commit, plus the\nRender3DNode splat GPU-state/sort-thread cross-file shape, per this\nskill's own self-maintenance instruction.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".claude/skills/codebase-navigation/SKILL.md | 31 +++++++++++++++++++++++++++++\n 1 file changed, 31 insertions(+)"
+  },
+  {
+    "hash": "f14b6b2b9f796d6d56baf5a82262fe64eb38c82b",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 6 18:46:28 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "Add GPU Gaussian splat rendering to Render3DNode (Phase 2)",
+      "description": "Add GPU Gaussian splat rendering to Render3DNode (Phase 2)",
+      "bullets": [],
+      "body": "IGeometrySource gets GetSplatCloud()/SplatCloudRevision() (nullptr/0\ndefault), forwarded through every passthrough wrapper (GeometryOpNode,\nDisplacementNode, SetColorNode, WrapNode, MergeByDistanceNode,\nNull3DNode, MaterialNode, MappingNode, AudioDisplacementNode,\nMeshResynthNode, FieldElementNode, Switcher3DNode) so a splat cloud\nsurvives every existing node chain instead of silently vanishing.\nRender3DNode draws splats in a second pass after opaque geometry:\ndepth test on/write off, premultiplied additive-over blending,\nback-to-front order. GPU state per slot (GpuSplat) uploads splat data\ninto a static GL_RGBA32F texture (4 texels/splat: pos+opacity,\ncov0-2, cov3-5, rgb) only when SplatCloudRevision() changes; per-frame\ncost is just a GL_R32UI index VBO (glVertexAttribDivisor=1) driving\nglDrawArraysInstanced. A persistent background thread (SplatSorter)\ncomputes back-to-front order via a 16-bit-quantized O(N) counting\nsort and hands the render thread a completed index buffer\nnon-blockingly, skipping the sort entirely when the camera hasn't\nmoved enough. The vertex shader (GLSL 150) projects the 3D covariance\nto 2D via the EWA Jacobian, eigendecomposes it for a 3-sigma quad, and\nculls behind the near plane; the fragment shader computes Gaussian\nfalloff from the conic and discards below 1/255 alpha. A VRAM/\nfill-rate budget guard mirrors the existing sprite guard.\nVerified against all 4 stated exit criteria with real compiled-binary\ntest runs (INFINITE_SPLATRENDERTEST, INFINITE_SPLATORBITTEST,\nINFINITE_SPLATCACHETEST, all ad hoc fixtures gated behind getenv, not\nwired into run-infinite-hygiene). GROUP_3D and the fast tier of\nrun-infinite-hygiene both pass with no regressions; clean build with\nno new compiler warnings in any touched file.\nNode UI, SplatSourceNode, and Field processing of splats are\nexplicitly out of scope for this phase (see docs/plans/\ngaussian-splat-node.md).\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Add GPU Gaussian splat rendering to Render3DNode (Phase 2)\n\nIGeometrySource gets GetSplatCloud()/SplatCloudRevision() (nullptr/0\ndefault), forwarded through every passthrough wrapper (GeometryOpNode,\nDisplacementNode, SetColorNode, WrapNode, MergeByDistanceNode,\nNull3DNode, MaterialNode, MappingNode, AudioDisplacementNode,\nMeshResynthNode, FieldElementNode, Switcher3DNode) so a splat cloud\nsurvives every existing node chain instead of silently vanishing.\n\nRender3DNode draws splats in a second pass after opaque geometry:\ndepth test on/write off, premultiplied additive-over blending,\nback-to-front order. GPU state per slot (GpuSplat) uploads splat data\ninto a static GL_RGBA32F texture (4 texels/splat: pos+opacity,\ncov0-2, cov3-5, rgb) only when SplatCloudRevision() changes; per-frame\ncost is just a GL_R32UI index VBO (glVertexAttribDivisor=1) driving\nglDrawArraysInstanced. A persistent background thread (SplatSorter)\ncomputes back-to-front order via a 16-bit-quantized O(N) counting\nsort and hands the render thread a completed index buffer\nnon-blockingly, skipping the sort entirely when the camera hasn't\nmoved enough. The vertex shader (GLSL 150) projects the 3D covariance\nto 2D via the EWA Jacobian, eigendecomposes it for a 3-sigma quad, and\nculls behind the near plane; the fragment shader computes Gaussian\nfalloff from the conic and discards below 1/255 alpha. A VRAM/\nfill-rate budget guard mirrors the existing sprite guard.\n\nVerified against all 4 stated exit criteria with real compiled-binary\ntest runs (INFINITE_SPLATRENDERTEST, INFINITE_SPLATORBITTEST,\nINFINITE_SPLATCACHETEST, all ad hoc fixtures gated behind getenv, not\nwired into run-infinite-hygiene). GROUP_3D and the fast tier of\nrun-infinite-hygiene both pass with no regressions; clean build with\nno new compiler warnings in any touched file.\n\nNode UI, SplatSourceNode, and Field processing of splats are\nexplicitly out of scope for this phase (see docs/plans/\ngaussian-splat-node.md).\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "src/main.cpp                       | 383 ++++++++++++++++++++++++\n src/nodes/AudioDisplacementNode.h  |  10 +\n src/nodes/FieldElementNode.h       |   8 +\n src/nodes/GenerativeNodes.h        |  10 +\n src/nodes/Geometry3DNodes.cpp      | 599 ++++++++++++++++++++++++++++++++++++-\n src/nodes/Geometry3DNodes.h        | 106 +++++++\n src/nodes/GeometryOpNodes.h        |  43 +++\n src/nodes/PointDistributionNodes.h |  10 +\n src/nodes/Switcher3DNode.cpp       |  12 +\n src/nodes/Switcher3DNode.h         |   5 +\n src/nodes/UtilityNodes.h           |  30 ++\n 11 files changed, 1214 insertions(+), 2 deletions(-)"
+  },
+  {
+    "hash": "41edbc362011bdd1f9077180596e3d90d58da09f",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 6 18:09:15 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Phase 1: headless Gaussian splat .ply/.splat loader (SplatIO)",
+      "description": "Phase 1: headless Gaussian splat .ply/.splat loader (SplatIO)",
+      "bullets": [],
+      "body": "SplatCloud/Splat struct plus LoadSplatPly (property->offset map, handles\nPostshot/Nerfstudio/INRIA field-order differences) and LoadSplatFile (the\nantimatter15 32-byte format). Opacity/scale/rotation are converted on load\n(sigmoid/exp/normalize) and covariance is precomputed once, per\ndocs/plans/gaussian-splat-node.md. No GL, no node yet - that's phases 2/3.\nINFINITE_SPLATIOTEST fixture writes a .ply with a scrambled property order\nplus an unused normal block, and asserts splat count, position bounds, the\nopacity=0/scale=0 default conversions, and that cov rebuilt from the\nretained scale/rot matches the stored cov bit-for-bit.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Phase 1: headless Gaussian splat .ply/.splat loader (SplatIO)\n\nSplatCloud/Splat struct plus LoadSplatPly (property->offset map, handles\nPostshot/Nerfstudio/INRIA field-order differences) and LoadSplatFile (the\nantimatter15 32-byte format). Opacity/scale/rotation are converted on load\n(sigmoid/exp/normalize) and covariance is precomputed once, per\ndocs/plans/gaussian-splat-node.md. No GL, no node yet - that's phases 2/3.\n\nINFINITE_SPLATIOTEST fixture writes a .ply with a scrambled property order\nplus an unused normal block, and asserts splat count, position bounds, the\nopacity=0/scale=0 default conversions, and that cov rebuilt from the\nretained scale/rot matches the stored cov bit-for-bit.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "CMakeLists.txt       |   1 +\n src/core/SplatIO.cpp | 399 +++++++++++++++++++++++++++++++++++++++++++++++++++\n src/core/SplatIO.h   |  53 +++++++\n src/main.cpp         | 168 ++++++++++++++++++++++\n 4 files changed, 621 insertions(+)\n create mode 100644 src/core/SplatIO.cpp\n create mode 100644 src/core/SplatIO.h"
+  },
+  {
+    "hash": "f85301fadff15fadaec5902814fef298cd856481",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 6 18:02:40 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "ui",
+      "title": "Add Gaussian splatting research and build plan docs",
+      "description": "Add Gaussian splatting research and build plan docs",
+      "bullets": [],
+      "body": "Carried over from claude/gaussian-splatting-research-2de9e3 to kick off\nthe feature/splat-loader implementation branch.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Add Gaussian splatting research and build plan docs\n\nCarried over from claude/gaussian-splatting-research-2de9e3 to kick off\nthe feature/splat-loader implementation branch.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/plans/gaussian-splat-node.md   | 365 ++++++++++++++++++++++++++++++++++++\n docs/plans/gaussian-splat-prompt.md | 178 ++++++++++++++++++\n 2 files changed, 543 insertions(+)\n create mode 100644 docs/plans/gaussian-splat-node.md\n create mode 100644 docs/plans/gaussian-splat-prompt.md"
+  },
+  {
     "hash": "9114419c21596d1615f7e01cb2c34446203ab61f",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
@@ -6890,6 +7092,41 @@
       "raw": "Add browser panel right-click favorites/context menus\n\nAdds non-interactive favorite badges, right-click context menus (favourite\ntoggle + add to canvas) across Modules/Samples/Media/Plugins browser panels,\nname truncation with ellipsis for long entries, and removes the redundant\nFavourites option from type filter dropdowns.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
     },
     "stat": "docs/node_param_audit.md |  94 +++++++++++---\n src/main.cpp             | 309 ++++++++++++++++++++++++++++-------------------\n 2 files changed, 261 insertions(+), 142 deletions(-)"
+  },
+  {
+    "hash": "2693b4ca0878feed58a4bb9a2702ea9a9ce1ef1a",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 6 16:09:37 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Add Gaussian splatting research, design plan, and implementation prompt",
+      "description": "Add Gaussian splatting research, design plan, and implementation prompt",
+      "bullets": [
+        "GL 3.3 core with #version 150 shaders (main.cpp:47889) rules out compute",
+        "Render3D's existing instanced billboard path for point clouds"
+      ],
+      "body": "Research doc covering the algorithm, 2026 format/tooling standards, the\noffline-conversion decision, macOS/Windows parity, and reference repos \u2014\nplus a four-phase build plan and a copy-paste prompt scoped to phases 1-2.\nTwo constraints read out of this tree drove the whole design:\nshaders and GPU sorting, so the WebGL2-class architecture (static data\ntexture + CPU sort + small per-frame index buffer) is the port target.\n(Geometry3DNodes.cpp:1732) is what the splat pass extends.\nAlso assessed whether Field has a place here. It does not belong in the hot\npath \u2014 the sort is not expressible and the element backend is a CPU\ninterpreter \u2014 but a one-shot conditioning pass at edit time is worth having.\nThat changes a phase-1 decision: the loader now retains de-log'd scale and\nthe normalised quaternion on the CPU struct (28 B/splat, never uploaded) so a\nlater Field pass does not need a per-splat eigendecomposition.\nNo code yet; docs only.\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>",
+      "raw": "Add Gaussian splatting research, design plan, and implementation prompt\n\nResearch doc covering the algorithm, 2026 format/tooling standards, the\noffline-conversion decision, macOS/Windows parity, and reference repos \u2014\nplus a four-phase build plan and a copy-paste prompt scoped to phases 1-2.\n\nTwo constraints read out of this tree drove the whole design:\n- GL 3.3 core with #version 150 shaders (main.cpp:47889) rules out compute\n  shaders and GPU sorting, so the WebGL2-class architecture (static data\n  texture + CPU sort + small per-frame index buffer) is the port target.\n- Render3D's existing instanced billboard path for point clouds\n  (Geometry3DNodes.cpp:1732) is what the splat pass extends.\n\nAlso assessed whether Field has a place here. It does not belong in the hot\npath \u2014 the sort is not expressible and the element backend is a CPU\ninterpreter \u2014 but a one-shot conditioning pass at edit time is worth having.\nThat changes a phase-1 decision: the loader now retains de-log'd scale and\nthe normalised quaternion on the CPU struct (28 B/splat, never uploaded) so a\nlater Field pass does not need a per-splat eigendecomposition.\n\nNo code yet; docs only.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/plans/gaussian-splat-node.md   | 365 ++++++++++++++++++++++++++++++++++++\n docs/plans/gaussian-splat-prompt.md | 178 ++++++++++++++++++\n 2 files changed, 543 insertions(+)\n create mode 100644 docs/plans/gaussian-splat-node.md\n create mode 100644 docs/plans/gaussian-splat-prompt.md"
+  },
+  {
+    "hash": "c54eaf2830f40a02d0bf1764b544d8e6a8d0d245",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 6 15:38:43 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "ui",
+      "title": "Add browser panel right-click favorites/context menus and motion-track-node scaffold",
+      "description": "Add browser panel right-click favorites/context menus and motion-track-node scaffold",
+      "bullets": [],
+      "body": "Adds non-interactive favorite badges, right-click context menus (favourite\ntoggle + add to canvas) across Modules/Samples/Media/Plugins browser panels,\nname truncation with ellipsis for long entries, and removes the redundant\nFavourites option from type filter dropdowns. Also includes in-progress\nmotion-track-node scaffolding (CMakeLists, node stub, planning doc).\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Add browser panel right-click favorites/context menus and motion-track-node scaffold\n\nAdds non-interactive favorite badges, right-click context menus (favourite\ntoggle + add to canvas) across Modules/Samples/Media/Plugins browser panels,\nname truncation with ellipsis for long entries, and removes the redundant\nFavourites option from type filter dropdowns. Also includes in-progress\nmotion-track-node scaffolding (CMakeLists, node stub, planning doc).\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "CMakeLists.txt                  |    1 +\n docs/node_param_audit.md        |  139 +++-\n docs/plans/motion-track-node.md |  187 ++++++\n src/main.cpp                    |  401 +++++++----\n src/nodes/MotionTrackNode.cpp   | 1399 +++++++++++++++++++++++++++++++++++++++\n src/nodes/MotionTrackNode.h     |  189 ++++++\n 6 files changed, 2173 insertions(+), 143 deletions(-)\n create mode 100644 docs/plans/motion-track-node.md\n create mode 100644 src/nodes/MotionTrackNode.cpp\n create mode 100644 src/nodes/MotionTrackNode.h"
   },
   {
     "hash": "0e351429685678fbe97fdfa899281b0e6c074ced",
