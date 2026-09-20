@@ -698,19 +698,53 @@ namespace MetallicDsp
          // meant 2.7s on Ceramic and 18s on Gong.
          const float effectiveDecay = std::clamp(decaySec, 0.02f, 20.0f);
 
+         // Mode frequencies first, because the bank's gain normalisation below
+         // needs to know which of them Setup() will actually sound.
+         float modeFreq[kNumModes];
          for (int m = 0; m < kNumModes; m++)
          {
             const float inharm = sqrtf(1.0f + effectiveStiffness * (float)(m * m));
             const float beat = 1.0f + (m % 2 == 1 ? mat.nonLinearBeating : -mat.nonLinearBeating) * (float)m;
-            const float modeFreq = freqHz * mat.modeRatios[m] * inharm * beat;
+            modeFreq[m] = freqHz * mat.modeRatios[m] * inharm * beat;
+         }
 
+         // Setup() normalises each mode so that mode's *own* impulse peak
+         // equals its amplitude, independent of ring time - which is right per
+         // mode and wrong for the bank, because a single mallet impulse starts
+         // all twelve modes in phase at n = 0. Their peaks coincide at the
+         // strike, so the voice's onset peak is the *sum* of the amplitudes,
+         // not the largest of them: +11.1 dB on Steel, +14.6 dB on Gong, only
+         // +7.0 dB on Vibraphone. That is both a blanket ~12 dB of headroom
+         // eaten before the volume knob is touched, and a material-to-material
+         // level jump of ~7.6 dB at identical settings.
+         //
+         // Dividing by that sum puts the bank's onset peak at `velocity` for
+         // every material. It leaves the per-mode normalisation that Setup()
+         // documents untouched - in particular it is still independent of the
+         // pole radius, so the "longer decay must not mean a quieter strike"
+         // property that motivated amplitude * sin(w) still holds.
+         //
+         // Only in-band modes are counted, matching Setup()'s own 0.45 * SR
+         // mute: several materials put most of their ratios above Nyquist at
+         // normal fundamentals (Vibraphone's ratio 150, Titanium's 74), and
+         // dividing by amplitudes that were then silenced would make exactly
+         // those patches far too quiet.
+         const float bandLimitHz = (float)sampleRate * 0.45f;
+         float ampSum = 0.0f;
+         for (int m = 0; m < kNumModes; m++)
+            if (modeFreq[m] <= bandLimitHz)
+               ampSum += mat.modeAmplitudes[m];
+         const float bankNorm = (ampSum > 1e-4f) ? (1.0f / ampSum) : 0.0f;
+
+         for (int m = 0; m < kNumModes; m++)
+         {
             const float lossScale = 1.0f / (1.0f + 0.15f * effectiveDecay);
             const float modeLoss = expf(-mat.highFreqLoss * (float)m * 0.4f * lossScale);
             const float modeDecay = effectiveDecay * modeLoss;
-            const float amp = mat.modeAmplitudes[m] * (velocity > 0.0f ? velocity : 0.8f);
+            const float amp = mat.modeAmplitudes[m] * bankNorm * (velocity > 0.0f ? velocity : 0.8f);
             const float modePan = (m == 0) ? 0.0f : ((m % 2 == 1 ? 1.0f : -1.0f) * stereoSpread * (0.3f + 0.7f * ((float)m / (float)kNumModes)));
 
-            modes[m].Setup(modeFreq, modeDecay, amp, modePan, sampleRate);
+            modes[m].Setup(modeFreq[m], modeDecay, amp, modePan, sampleRate);
             if (immediate)
                modes[m].SnapToTargets();
          }
