@@ -161,7 +161,6 @@ namespace
 #include "nodes/ColorRampNode.h"
 #include "nodes/PaletteNode.h"
 #include "nodes/AnalyzeNodes.h"
-#include "nodes/MotionTrackNode.h"
 #include "nodes/Geometry3DNodes.h"
 #include "nodes/GeometryOpNodes.h"
 #include "nodes/FieldElementNode.h"
@@ -173,9 +172,7 @@ namespace
 #include "nodes/SceneNodes.h"
 #include "nodes/EnvironmentNode.h"
 #include "nodes/ModelSourceNode.h"
-#include "nodes/SplatSourceNode.h"
 #include "GltfImport.h"
-#include "SplatIO.h"
 #include "nodes/Text3DNode.h"
 #include "nodes/UtilityNodes.h"
 #include "nodes/PointDistributionNodes.h"
@@ -5613,7 +5610,6 @@ namespace
             [i]() -> INode* { return GeometryNode::CreateFor(i); }, "3D");
       }
       REGISTER_NODE(ModelSourceNode, Model 3D, "3D");
-      REGISTER_NODE(SplatSourceNode, Gaussian Splat, "3D");
       REGISTER_NODE(Text3DNode, Text 3D, "3D");
       REGISTER_NODE(Null3DNode, Null 3D, "3D");
       REGISTER_NODE(OceanNode, Ocean, "3D");
@@ -5734,7 +5730,6 @@ namespace
       REGISTER_NODE(ConstantNode, Constant, "Modulators");
       REGISTER_NODE(NullModulatorNode, Null Modulator, "Modulators");
       REGISTER_NODE(ImageAnalyzeNode, Image Analyze, "Modulators");
-      REGISTER_NODE(MotionTrackNode, Motion Track, "Modulators");
       REGISTER_NODE(PaletteNode, Palette, "Modulators");
       REGISTER_NODE(AudioFileNode, Audio File, "Modulators");
       REGISTER_NODE(AudioAnalyzeNode, Audio Analyze, "Modulators");
@@ -6761,8 +6756,6 @@ namespace
          return 1;
       if (dynamic_cast<ImageAnalyzeNode*>(gn.node.get()) != nullptr)
          return 1;
-      if (dynamic_cast<MotionTrackNode*>(gn.node.get()) != nullptr)
-         return 1;
       if (dynamic_cast<PaletteNode*>(gn.node.get()) != nullptr)
          return 1; // the reference image, when it comes from the graph
       if (auto* fp = dynamic_cast<FieldPixelNode*>(gn.node.get()))
@@ -6932,8 +6925,6 @@ namespace
          return slot == 0 ? &draw->Input() : nullptr;
       if (auto* an = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()))
          return slot == 0 ? &an->Input() : nullptr;
-      if (auto* mt = dynamic_cast<MotionTrackNode*>(gn.node.get()))
-         return slot == 0 ? &mt->Input() : nullptr;
       if (auto* pal = dynamic_cast<PaletteNode*>(gn.node.get()))
          return slot == 0 ? &pal->Input() : nullptr;
       if (auto* fp = dynamic_cast<FieldPixelNode*>(gn.node.get()))
@@ -10285,65 +10276,6 @@ namespace
       {
          ImGui::TextDisabled("driven by input modulator");
       }
-   }
-
-   void DrawMotionTrackParams(MotionTrackNode* n)
-   {
-      const float w = kPreviewSize;
-
-      // Analyze button / progress bar
-      if (n->IsAnalyzing())
-      {
-         char barText[64];
-         snprintf(barText, sizeof(barText), "Analyzing... %d%% (Cancel)", (int)(n->Progress() * 100.0f));
-         if (ImGui::Button(barText, ImVec2(w, 0)))
-         {
-            n->CancelAnalysis();
-         }
-         ImGui::ProgressBar(n->Progress(), ImVec2(w, 4.0f), "");
-      }
-      else
-      {
-         const char* btnLabel = n->IsStale() ? "Re-analyze" : (n->HasTrack() ? "Re-analyze" : "Analyze");
-         if (ImGui::Button(btnLabel, ImVec2(w, 0)))
-         {
-            n->StartAnalysis();
-         }
-      }
-
-      // Status readout
-      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + w);
-      ImGui::TextDisabled("%s", n->Status().c_str());
-      ImGui::PopTextWrapPos();
-
-      NodeSeparator("settings", w);
-      DropdownButton("init", MotionTrackNode::InitModeNames(), n->initMode,
-                     [n](int i) { PushUndoCheckpoint(); n->initMode = i; n->MarkStale(); }, w);
-      DropdownButton("model", MotionTrackNode::MotionModelNames(), n->motionModel,
-                     [n](int i) { PushUndoCheckpoint(); n->motionModel = i; n->MarkStale(); }, w);
-
-      ImGui::BeginDisabled(n->initMode != MotionTrackNode::kManualBox);
-      ModSlider("box X", &n->manualBoxX, 0.0f, 1.0f);
-      ModSlider("box Y", &n->manualBoxY, 0.0f, 1.0f);
-      ModSlider("box W", &n->manualBoxW, 0.05f, 1.0f);
-      ModSlider("box H", &n->manualBoxH, 0.05f, 1.0f);
-      ImGui::EndDisabled();
-
-      ModSlider("search", &n->searchScale, 1.2f, 6.0f);
-      ModSliderInt("features", &n->featureCount, 8, 200);
-      ModSlider("confidence", &n->minConfidence, 0.1f, 0.99f);
-      ModSlider("adapt", &n->adapt, 0.0f, 1.0f);
-      ModSlider("smooth", &n->smooth, 0.0f, 20.0f);
-      ModSlider("fps", &n->sampleFps, 1.0f, 120.0f);
-
-      NodeSeparator("overlay", w);
-      ModCheckbox("show overlay", &n->showOverlay);
-      DropdownButton("style", MotionTrackNode::OverlayStyleNames(), n->overlayStyle,
-                     [n](int i) { PushUndoCheckpoint(); n->overlayStyle = i; }, w);
-      ColorSwatch("color", n->overlayColor, n);
-      ModSlider("size", &n->overlaySize, 0.1f, 5.0f);
-      ModSlider("offset X", &n->offsetX, -1.0f, 1.0f);
-      ModSlider("offset Y", &n->offsetY, -1.0f, 1.0f);
    }
 
    // ======================================================================
@@ -24466,36 +24398,6 @@ namespace
       }
    }
 
-   // No SH-mode control: SplatIO already collapses every spherical-harmonic
-   // band down to a single flat (DC-only) linear colour at load time (see
-   // SplatIO.h's Splat::r/g/b comment - "linear color, opacity already
-   // sigmoid'd"), so there is no higher-order SH data left on the node for a
-   // mode dropdown to switch between - a control here would just be a
-   // no-op. If a future phase decodes and keeps the higher SH bands, add the
-   // dropdown then.
-   void DrawSplatSourceParams(SplatSourceNode* n)
-   {
-      if (ImGui::Button("Open splat...", ImVec2(kParamWidth, 0)))
-      {
-         const std::string path = Platform::OpenSplatDialog();
-         if (!path.empty())
-            n->Load(path);
-      }
-      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-      ImGui::TextUnformatted(n->Status().c_str());
-      ImGui::PopTextWrapPos();
-
-      NodeSeparator("render");
-      ModSlider("point size", &n->pointSize, 0.05f, 5.0f);
-      ModSlider("opacity", &n->opacity, 0.0f, 1.0f);
-      ColorSwatch("tint", n->tint, n);
-
-      NodeSeparator("budget");
-      ModSlider("crop", &n->crop, 0.0f, 10.0f);
-      ModSliderInt("max splats", &n->maxSplats, 0, 4000000);
-      ImGui::TextDisabled("%zu / %zu splats", n->SplatCount(), n->RawSplatCount());
-   }
-
    void DrawGeometryParams(GeometryNode* n)
    {
       DropdownButton("shape", GeometryNode::ShapeNames(), n->shape,
@@ -26205,32 +26107,6 @@ namespace
       // to zoom. An InvisibleButton is what makes this safe inside the node
       // editor - while it is active the editor leaves the drag alone, which is
       // the same mechanism the in-node sliders already rely on.
-      if (auto* mt = dynamic_cast<MotionTrackNode*>(node))
-      {
-         if (mt->initMode == MotionTrackNode::kManualBox)
-         {
-            ImGui::SetCursorScreenPos(origin);
-            ImGui::InvisibleButton("##manualBoxDrag", ImVec2(size, size));
-            if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
-            {
-               ImVec2 mousePos = ImGui::GetMousePos();
-               float normX = std::clamp((mousePos.x - origin.x) / size, 0.0f, 1.0f);
-               float normY = std::clamp(1.0f - (mousePos.y - origin.y) / size, 0.0f, 1.0f);
-               mt->manualBoxX = normX;
-               mt->manualBoxY = normY;
-               mt->MarkStale();
-            }
-            float boxScreenX = origin.x + mt->manualBoxX * size;
-            float boxScreenY = origin.y + (1.0f - mt->manualBoxY) * size;
-            float boxScreenW = mt->manualBoxW * size;
-            float boxScreenH = mt->manualBoxH * size;
-            dl->AddRect(ImVec2(boxScreenX - boxScreenW * 0.5f, boxScreenY - boxScreenH * 0.5f),
-                        ImVec2(boxScreenX + boxScreenW * 0.5f, boxScreenY + boxScreenH * 0.5f),
-                        IM_COL32(255, 220, 50, 230), 2.0f, 0, 1.5f);
-            return;
-         }
-      }
-
       if (render == nullptr)
       {
          ImGui::Dummy(ImVec2(size, size));
@@ -38581,7 +38457,6 @@ namespace
          { "Palette", "Samples colours from a reference image, loaded here or patched in - a patched cable overrides the loaded file, but the file is kept so unplugging falls back to it. Drag its 'out' onto the square dot beside any colour swatch to bind it - each new cable takes the next swatch, and clicking a bound swatch steps it. Its image output is a gradient of the palette." },
          { "Audio File", "Loads an audio file for playback and Audio Analyze to read. Keeps analysing even while muted - the 'audible' checkbox only controls monitoring." },
          { "Image Analyze", "Turns an image or video into control values and modulation channels. Supports UV point probes, ROI boxes, 22 math/color operations, custom algebraic formulas, and multiple modulation output taps." },
-         { "Motion Track", "Tracks the dominant moving object in a video clip using normalized cross-correlation and pyramidal Lucas-Kanade. Emits x, y, scale, rotation, and confidence as modulation signals with an in-frame visual tracking overlay." },
           { "Audio Analyze", "Extracts level, band and onset values from audio for modulation - patch any audio source into it (Audio In, Audio File, a Filter, a Mixer, an Oscillator) and every output can drive any slider in the graph. With nothing patched in it falls back to its own Start listening button, a live tap on the system's default input device. It passes its input straight through, so it can sit inline in a chain as well as hang off one as a tap. Outputs: level, low/mid/high, onset, and b1-b8, eight raw frequency bands running low to high." },
          { "Plugin", "Hosts a third-party Audio Unit effect. Drag one in from the Plugins panel (Rescan there indexes what is installed; the list is cached, so launching never rescans), or drop a .component bundle from Finder. \"open\" shows the plugin's own editor in a separate window. The sliders on the body are plugin parameters you chose to expose: turn \"configure\" on and touch a control in the plugin's own window and it appears here as a mapped row - or pick one from the dropdown, since not every plugin's editor tells the host what was touched. Each mapped row is a real param with its own modulation pin, so a Ramp or Envelope can drive it. Right-click a row to unmap it. With nothing loaded, or bypassed, audio passes through unchanged." },
          { "Oscillator", "A synth oscillator with four classic waveforms (sine, triangle, saw, square), interactive amp envelope, unison, filter, hard sync, and fine/coarse tuning. With no note cable connected, it free-runs at a set frequency; connect a note cable and it becomes polyphonic and envelope-gated." },
@@ -38692,7 +38567,6 @@ namespace
          { "HDRI", "Loads an equirectangular .hdr or .exr image and patches into Render 3D's env input, replacing the fixed sky gradient with a real image for the background and for reflections/ambient light. Rotation turns the image around Y; intensity scales it independently of Render 3D's own env intensity. Reflections use the image's own mip chain scaled by roughness as a cheap stand-in for a proper blurred prefilter - very glossy metal will read a little softer than a full IBL renderer would give it. Use this node rather than Image Source for HDRIs - Image Source clamps to 8-bit sRGB, which throws away exactly the above-1.0 highlight range an HDRI needs." },
          { "Render 3D", "Rasterizes the geometry/camera/light/material graph into an image. Antialiasing is reduced automatically at large output sizes to stay within GPU limits. Scenes over ~2 million triangles get noticeably heavier to render. An HDRI node patched into the env input replaces the procedural sky gradient for background, reflections and ambient light." },
          { "Model 3D", "Loads a 3D model file - obj, ply, stl, usd or usdz." },
-         { "Gaussian Splat", "Loads a Gaussian splat point cloud (.ply from a 3DGS trainer, or antimatter15's compact .splat) and renders it through Render 3D's dedicated EWA-splatting pass - not as a triangle mesh. 'crop' and 'max splats' cull floaters/decimate at load time; 'point size', 'opacity' and 'tint' are live render multipliers." },
          { "Null 3D", "A pass-through node for geometry: its output is exactly its input mesh, unchanged. Useful as a stable junction point to branch geometry to several destinations." },
          { "Switcher 3D", "Cycles between up to four connected geometry inputs every N beats or seconds, forwarding whichever one is active. Can be pinned to one input with 'manual'. Unlike the 2D Switcher, there is no crossfade - it always hard-cuts, since interpolating between two arbitrary meshes' topology isn't generally well-defined." },
 
@@ -49985,340 +49859,6 @@ static bool RunCycleShaperFixture()
 }
 
 // ==================================================== INFINITE_SPECBLURTEST
-// ============================================================ INFINITE_SPLATIOTEST
-//
-// Headless test for src/core/SplatIO.{h,cpp} (Gaussian splat .ply/.splat
-// loading). No GL, no node, no window - see docs/plans/gaussian-splat-node.md
-// and docs/plans/gaussian-splat-prompt.md (phase 1 exit criterion).
-//
-// Writes a small binary_little_endian .ply fixture with a deliberately
-// non-standard property order (opacity and rotation before position, plus an
-// unrelated nx/ny/nz normal block) to prove the loader builds a real
-// property->offset map instead of assuming field order, then asserts:
-//  - splat count and position bounds match what was written
-//  - a splat with stored opacity=0 comes back with a ~= 0.5 (sigmoid(0))
-//  - a splat with stored scale=0 comes back with radius 1.0 (exp(0))
-//  - re-deriving cov from the retained scale/rot reproduces splat.cov
-//    bit-for-bit, proving the retained CPU-only fields are actually usable
-//    by a later Field pass rather than having silently diverged from what
-//    the GPU texture would be built from
-static bool WriteSplatPlyFixture(const char* path)
-{
-   FILE* f = std::fopen(path, "wb");
-   if (!f)
-      return false;
-
-   // Deliberately scrambled vs. the INRIA reference order, plus an unused
-   // normal block, to exercise the offset map rather than assumed layout.
-   std::fprintf(f,
-                "ply\n"
-                "format binary_little_endian 1.0\n"
-                "element vertex 2\n"
-                "property float opacity\n"
-                "property float rot_0\n"
-                "property float rot_1\n"
-                "property float rot_2\n"
-                "property float rot_3\n"
-                "property float nx\n"
-                "property float ny\n"
-                "property float nz\n"
-                "property float x\n"
-                "property float y\n"
-                "property float z\n"
-                "property float scale_0\n"
-                "property float scale_1\n"
-                "property float scale_2\n"
-                "property float f_dc_0\n"
-                "property float f_dc_1\n"
-                "property float f_dc_2\n"
-                "end_header\n");
-
-   auto writeRecord = [&](float opacity, float rw, float rx, float ry, float rz, float x, float y, float z,
-                          float s0, float s1, float s2, float dc0, float dc1, float dc2) {
-      const float vals[] = {opacity, rw, rx, ry, rz, 0.0f, 0.0f, 0.0f, x, y, z, s0, s1, s2, dc0, dc1, dc2};
-      std::fwrite(vals, sizeof(float), sizeof(vals) / sizeof(vals[0]), f);
-   };
-
-   // Splat 0: all-default-triggering (opacity 0, scale 0, identity quat via
-   // 1,0,0,0) so the sigmoid(0)=0.5 / exp(0)=1.0 conversions are exercised.
-   writeRecord(0.0f, 1.0f, 0.0f, 0.0f, 0.0f, -2.0f, 0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
-   // Splat 1: non-trivial rotation/scale/opacity/color to exercise the real
-   // covariance math and SH-DC-to-color conversion.
-   writeRecord(1.2f, 0.9238795f, 0.3826834f, 0.0f, 0.0f, 3.0f, -1.0f, 4.0f, 0.4f, -0.7f, 0.1f, 0.3f, -0.2f, 0.6f);
-
-   std::fclose(f);
-   return true;
-}
-
-// Writes a plain colored point cloud .ply - only x,y,z,red,green,blue
-// (uchar), nothing else - exactly what a Sketchfab/photogrammetry/
-// CloudCompare export looks like, and specifically NOT a trained 3DGS
-// export (no f_dc_*/opacity/scale_*/rot_*). Points form a regular grid with
-// known spacing so the auto-estimated radius can be checked for being in
-// the right ballpark rather than the broken fixed-1.0-world-unit default.
-static bool WriteBareColorCloudPlyFixture(const char* path, float spacing, int perAxis)
-{
-   FILE* f = std::fopen(path, "wb");
-   if (!f)
-      return false;
-
-   const int n = perAxis * perAxis * perAxis;
-   std::fprintf(f,
-                "ply\n"
-                "format binary_little_endian 1.0\n"
-                "element vertex %d\n"
-                "property float x\n"
-                "property float y\n"
-                "property float z\n"
-                "property uchar red\n"
-                "property uchar green\n"
-                "property uchar blue\n"
-                "end_header\n",
-                n);
-
-   for (int xi = 0; xi < perAxis; ++xi)
-      for (int yi = 0; yi < perAxis; ++yi)
-         for (int zi = 0; zi < perAxis; ++zi)
-         {
-            const float pos[3] = { xi * spacing, yi * spacing, zi * spacing };
-            std::fwrite(pos, sizeof(float), 3, f);
-            const unsigned char rgb[3] = {
-               (unsigned char)(xi * 40 + 20),
-               (unsigned char)(yi * 40 + 20),
-               (unsigned char)(zi * 40 + 20)
-            };
-            std::fwrite(rgb, 1, 3, f);
-         }
-
-   std::fclose(f);
-   return true;
-}
-
-// Phase-3-follow-up fixture: a real-world .ply lacking every trained-3DGS
-// property should degrade gracefully rather than render as a solid gray
-// blob - see the graceful-degradation comment in SplatIO.h. Asserts:
-//  - color comes back matching the stored red/green/blue bytes, not gray
-//  - opacity comes back as 1.0 (fully opaque), not sigmoid(0)=0.5
-//  - the auto-estimated scale is a sane, non-1.0-world-unit value
-//    proportional to the fixture's known point spacing
-//  - hadTrainedFields is false
-static bool RunBareColorCloudFixture()
-{
-   bool ok = true;
-   const char* path = "/tmp/infinite_splatio_barecloud_test.ply";
-   const float spacing = 0.2f;
-   const int perAxis = 3;
-
-   if (!WriteBareColorCloudPlyFixture(path, spacing, perAxis))
-   {
-      printf("SPLATIOTEST (bare color cloud) could not write fixture FAIL\n");
-      return false;
-   }
-
-   SplatIO::SplatCloud cloud;
-   std::string err;
-   if (!SplatIO::LoadSplatPly(path, cloud, err))
-   {
-      printf("SPLATIOTEST (bare color cloud) LoadSplatPly failed: %s FAIL\n", err.c_str());
-      std::remove(path);
-      return false;
-   }
-
-   const int expectedCount = perAxis * perAxis * perAxis;
-   if ((int)cloud.splats.size() != expectedCount)
-   {
-      printf("SPLATIOTEST (bare color cloud) expected %d splats, got %zu FAIL\n", expectedCount, cloud.splats.size());
-      ok = false;
-   }
-
-   if (cloud.hadTrainedFields)
-   {
-      printf("SPLATIOTEST (bare color cloud) hadTrainedFields should be false FAIL\n");
-      ok = false;
-   }
-
-   if (!cloud.splats.empty())
-   {
-      // Vertex 0 is (xi=0,yi=0,zi=0) -> rgb (20,20,20).
-      const SplatIO::Splat& s0 = cloud.splats[0];
-      const float expectR = 20.0f / 255.0f, expectG = 20.0f / 255.0f, expectB = 20.0f / 255.0f;
-      if (std::fabs(s0.r - expectR) > 1e-5f || std::fabs(s0.g - expectG) > 1e-5f || std::fabs(s0.b - expectB) > 1e-5f)
-      {
-         printf("SPLATIOTEST (bare color cloud) color mismatch: got (%f %f %f) want (%f %f %f) FAIL\n",
-                s0.r, s0.g, s0.b, expectR, expectG, expectB);
-         ok = false;
-      }
-
-      // Last vertex is (xi=yi=zi=perAxis-1) -> rgb (100,100,100) for perAxis=3.
-      const SplatIO::Splat& sLast = cloud.splats.back();
-      const int lastChan = (perAxis - 1) * 40 + 20;
-      const float expectLast = lastChan / 255.0f;
-      if (std::fabs(sLast.r - expectLast) > 1e-5f || std::fabs(sLast.g - expectLast) > 1e-5f ||
-          std::fabs(sLast.b - expectLast) > 1e-5f)
-      {
-         printf("SPLATIOTEST (bare color cloud) last-vertex color mismatch: got (%f %f %f) want %f FAIL\n",
-                sLast.r, sLast.g, sLast.b, expectLast);
-         ok = false;
-      }
-
-      for (const SplatIO::Splat& s : cloud.splats)
-      {
-         if (std::fabs(s.a - 1.0f) > 1e-5f)
-         {
-            printf("SPLATIOTEST (bare color cloud) opacity should be 1.0 (fully opaque), got %f FAIL\n", s.a);
-            ok = false;
-            break;
-         }
-      }
-
-      // Density-estimated radius should be a small fraction of the grid
-      // spacing's order of magnitude, not the old fixed 1.0 world-unit
-      // default - and definitely not exactly 1.0.
-      const float gotRadius = cloud.splats[0].sx;
-      if (std::fabs(gotRadius - 1.0f) < 1e-5f)
-      {
-         printf("SPLATIOTEST (bare color cloud) scale fell back to broken fixed 1.0, got %f FAIL\n", gotRadius);
-         ok = false;
-      }
-      else if (gotRadius < spacing * 0.05f || gotRadius > spacing * 5.0f)
-      {
-         printf("SPLATIOTEST (bare color cloud) auto-estimated radius %f not in ballpark of spacing %f FAIL\n",
-                gotRadius, spacing);
-         ok = false;
-      }
-      else
-      {
-         printf("SPLATIOTEST (bare color cloud) auto-estimated radius=%f (spacing=%f) OK\n", gotRadius, spacing);
-      }
-
-      // Every splat should share the same auto-estimated radius (uniform
-      // density heuristic, not per-splat).
-      for (const SplatIO::Splat& s : cloud.splats)
-      {
-         if (std::fabs(s.sx - gotRadius) > 1e-5f || std::fabs(s.sy - gotRadius) > 1e-5f ||
-             std::fabs(s.sz - gotRadius) > 1e-5f)
-         {
-            printf("SPLATIOTEST (bare color cloud) non-uniform auto radius FAIL\n");
-            ok = false;
-            break;
-         }
-      }
-   }
-
-   std::remove(path);
-   printf("%s\n", ok ? "SPLATIOTEST (bare color cloud) OK" : "SPLATIOTEST (bare color cloud) SUSPECT");
-   return ok;
-}
-
-static bool RunSplatIOFixture()
-{
-   bool ok = true;
-   const char* path = "/tmp/infinite_splatio_test.ply";
-
-   if (!WriteSplatPlyFixture(path))
-   {
-      printf("SPLATIOTEST could not write fixture FAIL\n");
-      return false;
-   }
-
-   SplatIO::SplatCloud cloud;
-   std::string err;
-   if (!SplatIO::LoadSplatPly(path, cloud, err))
-   {
-      printf("SPLATIOTEST LoadSplatPly failed: %s FAIL\n", err.c_str());
-      return false;
-   }
-
-   if (cloud.splats.size() != 2)
-   {
-      printf("SPLATIOTEST expected 2 splats, got %zu FAIL\n", cloud.splats.size());
-      ok = false;
-   }
-
-   if (cloud.splats.size() >= 2)
-   {
-      const SplatIO::Splat& s0 = cloud.splats[0];
-      const SplatIO::Splat& s1 = cloud.splats[1];
-
-      if (std::fabs(s0.a - 0.5f) > 1e-5f)
-      {
-         printf("SPLATIOTEST opacity=0 should decode to a~=0.5, got %f FAIL\n", s0.a);
-         ok = false;
-      }
-      if (std::fabs(s0.sx - 1.0f) > 1e-5f || std::fabs(s0.sy - 1.0f) > 1e-5f || std::fabs(s0.sz - 1.0f) > 1e-5f)
-      {
-         printf("SPLATIOTEST scale=0 should decode to radius 1.0, got (%f %f %f) FAIL\n", s0.sx, s0.sy, s0.sz);
-         ok = false;
-      }
-      if (std::fabs(s0.px - (-2.0f)) > 1e-5f || std::fabs(s0.py - 0.5f) > 1e-5f || std::fabs(s0.pz - 1.0f) > 1e-5f)
-      {
-         printf("SPLATIOTEST splat 0 position mismatch: (%f %f %f) FAIL\n", s0.px, s0.py, s0.pz);
-         ok = false;
-      }
-
-      const float expectMinX = std::min(s0.px, s1.px), expectMaxX = std::max(s0.px, s1.px);
-      const float expectMinY = std::min(s0.py, s1.py), expectMaxY = std::max(s0.py, s1.py);
-      const float expectMinZ = std::min(s0.pz, s1.pz), expectMaxZ = std::max(s0.pz, s1.pz);
-      if (std::fabs(cloud.boundsMin[0] - expectMinX) > 1e-5f || std::fabs(cloud.boundsMax[0] - expectMaxX) > 1e-5f ||
-          std::fabs(cloud.boundsMin[1] - expectMinY) > 1e-5f || std::fabs(cloud.boundsMax[1] - expectMaxY) > 1e-5f ||
-          std::fabs(cloud.boundsMin[2] - expectMinZ) > 1e-5f || std::fabs(cloud.boundsMax[2] - expectMaxZ) > 1e-5f)
-      {
-         printf("SPLATIOTEST bounds mismatch FAIL\n");
-         ok = false;
-      }
-
-      // Rebuild cov from the retained scale/rot on splat 1 (the non-trivial
-      // one) and confirm it reproduces the stored cov bit-for-bit - proving
-      // the retained fields are not a lossy afterthought.
-      float rebuilt[6];
-      {
-         const float qw = s1.qw, qx = s1.qx, qy = s1.qy, qz = s1.qz;
-         const float sx = s1.sx, sy = s1.sy, sz = s1.sz;
-         const float r00 = 1.0f - 2.0f * (qy * qy + qz * qz);
-         const float r01 = 2.0f * (qx * qy - qw * qz);
-         const float r02 = 2.0f * (qx * qz + qw * qy);
-         const float r10 = 2.0f * (qx * qy + qw * qz);
-         const float r11 = 1.0f - 2.0f * (qx * qx + qz * qz);
-         const float r12 = 2.0f * (qy * qz - qw * qx);
-         const float r20 = 2.0f * (qx * qz - qw * qy);
-         const float r21 = 2.0f * (qy * qz + qw * qx);
-         const float r22 = 1.0f - 2.0f * (qx * qx + qy * qy);
-         const float m00 = r00 * sx, m01 = r01 * sy, m02 = r02 * sz;
-         const float m10 = r10 * sx, m11 = r11 * sy, m12 = r12 * sz;
-         const float m20 = r20 * sx, m21 = r21 * sy, m22 = r22 * sz;
-         rebuilt[0] = m00 * m00 + m01 * m01 + m02 * m02;
-         rebuilt[1] = m00 * m10 + m01 * m11 + m02 * m12;
-         rebuilt[2] = m00 * m20 + m01 * m21 + m02 * m22;
-         rebuilt[3] = m10 * m10 + m11 * m11 + m12 * m12;
-         rebuilt[4] = m10 * m20 + m11 * m21 + m12 * m22;
-         rebuilt[5] = m20 * m20 + m21 * m21 + m22 * m22;
-      }
-      for (int k = 0; k < 6; ++k)
-      {
-         if (std::memcmp(&rebuilt[k], &s1.cov[k], sizeof(float)) != 0)
-         {
-            printf("SPLATIOTEST cov[%d] not bit-identical to rebuild: stored %f rebuilt %f FAIL\n", k, s1.cov[k],
-                   rebuilt[k]);
-            ok = false;
-         }
-      }
-   }
-
-   // All trained-3DGS properties are present in this fixture, so the
-   // graceful-degradation fallbacks must never fire for it.
-   if (!cloud.hadTrainedFields)
-   {
-      printf("SPLATIOTEST hadTrainedFields should stay true when all fields are present FAIL\n");
-      ok = false;
-   }
-
-   std::remove(path);
-   printf("%s\n", ok ? "SPLATIOTEST OK" : "SPLATIOTEST SUSPECT");
-
-   const bool bareOk = RunBareColorCloudFixture();
-   return ok && bareOk;
-}
-
 static bool RunSpecBlurFixture()
 {
    bool ok = true;
@@ -63804,9 +63344,6 @@ int main(int argc, char** argv)
    if (getenv("INFINITE_SPECBLURTEST") != nullptr)
       return RunSpecBlurFixture() ? 0 : 1;
 
-   if (getenv("INFINITE_SPLATIOTEST") != nullptr)
-      return RunSplatIOFixture() ? 0 : 1;
-
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return RunDspTest();
 
@@ -68658,15 +68195,6 @@ int main(int argc, char** argv)
          static const std::vector<std::string> kModelExt = {
             "obj", "ply", "stl", "usd", "usda", "usdc", "usdz", "abc"
          };
-         // Gaussian splat interchange formats. ".ply" overlaps kModelExt on
-         // purpose - it's the universal 3DGS convention too (see SplatIO.h) -
-         // so a bare .ply dropped on empty canvas still spawns Model 3D
-         // (unchanged, existing behaviour) unless a Gaussian Splat node
-         // already sits under the drop point, in which case the drop is
-         // unambiguous and reloads it as a splat cloud instead. ".splat" is
-         // never ambiguous and always spawns/loads the splat node.
-         static const std::vector<std::string> kSplatExt = { "ply", "splat" };
-         static const std::vector<std::string> kSplatOnlyExt = { "splat" };
          // glTF/GLB are handled by their own branch (below, checked before
          // kModelExt) rather than folded into it: on a fresh drop they
          // auto-spawn a whole Material + Image Source rig, not just a bare
@@ -68693,7 +68221,6 @@ int main(int argc, char** argv)
          AudioFileNode* dropTargetAudioFile = FindNodeUnderCanvasPoint<AudioFileNode>(canvasPos);
          AudioPluginNode* dropTargetPlugin = FindNodeUnderCanvasPoint<AudioPluginNode>(canvasPos);
          ModelSourceNode* dropTargetModel = FindNodeUnderCanvasPoint<ModelSourceNode>(canvasPos);
-         SplatSourceNode* dropTargetSplat = FindNodeUnderCanvasPoint<SplatSourceNode>(canvasPos);
          VideoSourceNode* dropTargetVideo = FindNodeUnderCanvasPoint<VideoSourceNode>(canvasPos);
          ImageSourceNode* dropTargetImage = FindNodeUnderCanvasPoint<ImageSourceNode>(canvasPos);
          FieldElementNode* dropTargetFieldElement = FindNodeUnderCanvasPoint<FieldElementNode>(canvasPos);
@@ -69052,20 +68579,6 @@ int main(int argc, char** argv)
                gPatchDirty = true;
                offset += 240.0f;
                continue;
-            }
-            else if (dropTargetSplat != nullptr && HasExtension(path, kSplatExt))
-            {
-               ensureDroppedCheckpoint();
-               dropTargetSplat->Load(path);
-               dropTargetSplat = nullptr;
-               gPatchDirty = true;
-               continue;
-            }
-            else if (HasExtension(path, kSplatOnlyExt))
-            {
-               spawned = SpawnNode("Gaussian Splat", "3D", canvasPos.x + offset, canvasPos.y);
-               if (spawned != nullptr)
-                  static_cast<SplatSourceNode*>(spawned->node.get())->Load(path);
             }
             else if (HasExtension(path, kModelExt))
             {
@@ -80841,616 +80354,6 @@ int main(int argc, char** argv)
          }
       }
 
-      // Phase 2 Gaussian Splat render exit criterion #1 (docs/plans/
-      // gaussian-splat-node.md / gaussian-splat-prompt.md): a hardcoded
-      // 3-splat cloud - one wide+flat, one tall+thin, one rotated 45 deg -
-      // must render as three correctly oriented, correctly sized ellipses.
-      // Verified with a real glGetTexImage pixel readback, not just a
-      // revision-counter check: each splat is given a unique, saturated,
-      // otherwise-unused color so its footprint can be picked out of the
-      // framebuffer by color match alone, then the footprint's own pixel
-      // coordinates (not an assumed screen mapping) are used to measure its
-      // width/height and, for the rotated one, its covariance - so the test
-      // is checking the actual rendered shape, not just "something drew".
-      if (getenv("INFINITE_SPLATRENDERTEST") != nullptr && frameId == 6)
-      {
-         struct TestSplatSource : public IGeometrySource
-         {
-            SplatIO::SplatCloud cloud;
-            const Mesh& GetMesh() override { static Mesh empty; return empty; }
-            unsigned long long MeshRevision() override { return 0; }
-            Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
-            Material GetMaterial() const override { return Material(); }
-            const SplatIO::SplatCloud* GetSplatCloud() override { return &cloud; }
-            unsigned long long SplatCloudRevision() override { return 1; }
-         };
-
-         TestSplatSource source;
-         source.cloud.splats.resize(3);
-
-         // Wide+flat: large variance along world X, tiny along Y/Z. At this
-         // camera (looking down -Z, +X world = screen right, +Y world =
-         // screen up - see the LookAt derivation this mirrors) this should
-         // project as an ellipse elongated horizontally.
-         SplatIO::Splat& wide = source.cloud.splats[0];
-         wide.px = -2.0f; wide.py = 0.0f; wide.pz = 0.0f;
-         wide.cov[0] = 1.0f; wide.cov[1] = 0.0f; wide.cov[2] = 0.0f;
-         wide.cov[3] = 0.02f; wide.cov[4] = 0.0f; wide.cov[5] = 0.02f;
-         wide.r = 1.0f; wide.g = 0.0f; wide.b = 0.0f; wide.a = 1.0f;
-
-         // Tall+thin: the transpose case - large variance along Y, tiny
-         // along X/Z - should project elongated vertically.
-         SplatIO::Splat& tall = source.cloud.splats[1];
-         tall.px = 0.0f; tall.py = 0.0f; tall.pz = 0.0f;
-         tall.cov[0] = 0.02f; tall.cov[1] = 0.0f; tall.cov[2] = 0.0f;
-         tall.cov[3] = 1.0f; tall.cov[4] = 0.0f; tall.cov[5] = 0.02f;
-         tall.r = 0.0f; tall.g = 1.0f; tall.b = 0.0f; tall.a = 1.0f;
-
-         // Rotated 45 deg: diag(1.0, 0.02) rotated 45 deg about Z gives
-         // xx=yy=0.51, xy=0.49 (see R*diag*R^T at theta=45: xx'=yy'=(a+b)/2,
-         // xy'=(a-b)/2) - an ellipse elongated along the +x/+y diagonal, with
-         // no elongation left along the pure X or Y axis.
-         SplatIO::Splat& rot45 = source.cloud.splats[2];
-         rot45.px = 2.0f; rot45.py = 0.0f; rot45.pz = 0.0f;
-         rot45.cov[0] = 0.51f; rot45.cov[1] = 0.49f; rot45.cov[2] = 0.0f;
-         rot45.cov[3] = 0.51f; rot45.cov[4] = 0.0f; rot45.cov[5] = 0.02f;
-         rot45.r = 0.0f; rot45.g = 0.0f; rot45.b = 1.0f; rot45.a = 1.0f;
-
-         Render3DNode render;
-         render.geometry[0] = &source;
-         render.width = 256.0f;
-         render.height = 256.0f;
-         render.samples = 0; // no MSAA - simplifies the readback below
-         render.camAzimuth = 90.0f;   // eye on +Z looking down -Z, +X world = screen right
-         render.camElevation = 0.0f;
-         render.camDistance = 8.0f;
-         render.fov = 50.0f;
-         render.targetX = 0.0f; render.targetY = 0.0f; render.targetZ = 0.0f;
-
-         render.CookIfNeeded(50000);
-
-         const int texW = 256, texH = 256;
-         std::vector<unsigned char> pixels((size_t)texW * texH * 4, 0);
-         glBindTexture(GL_TEXTURE_2D, render.GetOutputTexture());
-         glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
-         glBindTexture(GL_TEXTURE_2D, 0);
-
-         // Pick out every pixel where one channel clearly dominates the
-         // other two (the splat's own color, alpha-blended over the dark
-         // bgColor clear) - collects that splat's on-screen footprint
-         // without assuming any particular projection math.
-         auto collectFootprint = [&](int channel) {
-            std::vector<std::pair<int,int>> pts;
-            for (int y = 0; y < texH; y++)
-            {
-               for (int x = 0; x < texW; x++)
-               {
-                  const unsigned char* p = &pixels[((size_t)y * texW + x) * 4];
-                  const int c = p[channel];
-                  const int o1 = p[(channel + 1) % 3];
-                  const int o2 = p[(channel + 2) % 3];
-                  if (c > 40 && c > o1 * 2 && c > o2 * 2)
-                     pts.push_back({ x, y });
-               }
-            }
-            return pts;
-         };
-
-         auto extent = [](const std::vector<std::pair<int,int>>& pts, float& outW, float& outH,
-                          float& outCovXY, float& outCovXX, float& outCovYY) {
-            if (pts.empty()) { outW = outH = outCovXY = outCovXX = outCovYY = 0.0f; return; }
-            double sx = 0, sy = 0;
-            int minX = 1 << 30, maxX = -(1 << 30), minY = 1 << 30, maxY = -(1 << 30);
-            for (auto& p : pts)
-            {
-               sx += p.first; sy += p.second;
-               minX = std::min(minX, p.first); maxX = std::max(maxX, p.first);
-               minY = std::min(minY, p.second); maxY = std::max(maxY, p.second);
-            }
-            const double cx = sx / pts.size(), cy = sy / pts.size();
-            double cxx = 0, cyy = 0, cxy = 0;
-            for (auto& p : pts)
-            {
-               const double dx = p.first - cx, dy = p.second - cy;
-               cxx += dx * dx; cyy += dy * dy; cxy += dx * dy;
-            }
-            cxx /= pts.size(); cyy /= pts.size(); cxy /= pts.size();
-            outW = (float)(maxX - minX);
-            outH = (float)(maxY - minY);
-            outCovXX = (float)cxx; outCovYY = (float)cyy; outCovXY = (float)cxy;
-         };
-
-         const auto redPts = collectFootprint(0);
-         const auto greenPts = collectFootprint(1);
-         const auto bluePts = collectFootprint(2);
-
-         float redW, redH, redCxy, redCxx, redCyy;
-         float greenW, greenH, greenCxy, greenCxx, greenCyy;
-         float blueW, blueH, blueCxy, blueCxx, blueCyy;
-         extent(redPts, redW, redH, redCxy, redCxx, redCyy);
-         extent(greenPts, greenW, greenH, greenCxy, greenCxx, greenCyy);
-         extent(bluePts, blueW, blueH, blueCxy, blueCxx, blueCyy);
-
-         const bool redFound = redPts.size() > 20;
-         const bool greenFound = greenPts.size() > 20;
-         const bool blueFound = bluePts.size() > 20;
-         // "Wide+flat" -> footprint noticeably wider than tall (allow some
-         // slack for the shader's dilation term and discard threshold).
-         const bool redShape = redFound && redW > redH * 1.5f;
-         // "Tall+thin" -> the transpose.
-         const bool greenShape = greenFound && greenH > greenW * 1.5f;
-         // "Rotated 45" -> comparable width/height (not axis-elongated) but
-         // a strong positive xy covariance, i.e. the pixel cloud actually
-         // leans along the diagonal rather than sitting axis-aligned.
-         const bool blueShape = blueFound && std::fabs(blueW - blueH) < std::max(blueW, blueH) * 0.5f &&
-                                blueCxy > 0.3f * std::sqrt(std::max(1.0f, blueCxx * blueCyy));
-
-         printf("  [%s] %-32s (found=%d w=%.1f h=%.1f)\n", redFound ? "pass" : "FAIL",
-                "SplatRender(wide+flat found)", (int)redFound, redW, redH);
-         printf("  [%s] %-32s\n", redShape ? "pass" : "FAIL", "SplatRender(wide+flat is wider than tall)");
-         printf("  [%s] %-32s (found=%d w=%.1f h=%.1f)\n", greenFound ? "pass" : "FAIL",
-                "SplatRender(tall+thin found)", (int)greenFound, greenW, greenH);
-         printf("  [%s] %-32s\n", greenShape ? "pass" : "FAIL", "SplatRender(tall+thin is taller than wide)");
-         printf("  [%s] %-32s (found=%d w=%.1f h=%.1f cxy=%.1f)\n", blueFound ? "pass" : "FAIL",
-                "SplatRender(rotated45 found)", (int)blueFound, blueW, blueH, blueCxy);
-         printf("  [%s] %-32s\n", blueShape ? "pass" : "FAIL", "SplatRender(rotated45 leans on diagonal)");
-         const bool allOk = redFound && greenFound && blueFound && redShape && greenShape && blueShape;
-         printf("%s\n", allOk ? "SPLAT RENDER TEST OK" : "SPLAT RENDER TEST FAIL");
-      }
-
-      // Exit criterion #2 for the splat-render phase: a large(r) synthetic
-      // cloud renders recognizably, back-to-front blending picks the correct
-      // front color as the camera orbits, and a full smooth orbit never
-      // produces a blank/crashed frame (a crude but real proxy for
-      // "no popping"). Two overlapping jittered blobs (red centered at
-      // +X, blue at -X) are used instead of a bundled .ply fixture - no
-      // sample .ply ships in this repo, and SplatIO::LoadSplatPly (Phase 1,
-      // already tested) is exercised on its own by INFINITE_SPLATIOTEST, so
-      // re-driving the parser here would not add coverage this test needs.
-      //
-      // The offset axis (world X) is chosen so that at camAzimuth=0 (eye on
-      // +X, looking down -X) and camAzimuth=180 (eye on -X) the two blobs
-      // are laterally aligned (offset is along the view axis) and so
-      // maximally overlap on screen while also being maximally separated in
-      // depth - exactly the configuration that makes the front/back choice
-      // both meaningful and checkable. At az=0 red (+X) is nearer the eye;
-      // at az=180 blue (-X) is nearer.
-      if (getenv("INFINITE_SPLATORBITTEST") != nullptr && frameId == 6)
-      {
-         struct TestSplatSource : public IGeometrySource
-         {
-            SplatIO::SplatCloud cloud;
-            const Mesh& GetMesh() override { static Mesh empty; return empty; }
-            unsigned long long MeshRevision() override { return 0; }
-            Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
-            Material GetMaterial() const override { return Material(); }
-            const SplatIO::SplatCloud* GetSplatCloud() override { return &cloud; }
-            unsigned long long SplatCloudRevision() override { return 1; }
-         };
-
-         TestSplatSource source;
-         const int kPerBlob = 700;
-         source.cloud.splats.resize(kPerBlob * 2);
-
-         std::mt19937 rng(12345);
-         std::uniform_real_distribution<float> jitter(-0.15f, 0.15f);
-         auto fillBlob = [&](int startIdx, float cx, float r, float g, float b) {
-            for (int i = 0; i < kPerBlob; i++)
-            {
-               SplatIO::Splat& s = source.cloud.splats[startIdx + i];
-               s.px = cx + jitter(rng);
-               s.py = jitter(rng);
-               s.pz = jitter(rng);
-               s.cov[0] = 0.02f; s.cov[1] = 0.0f; s.cov[2] = 0.0f;
-               s.cov[3] = 0.02f; s.cov[4] = 0.0f; s.cov[5] = 0.02f;
-               s.r = r; s.g = g; s.b = b; s.a = 0.9f;
-            }
-         };
-         fillBlob(0, 0.35f, 1.0f, 0.0f, 0.0f);         // red, +X (front at az=0)
-         fillBlob(kPerBlob, -0.35f, 0.0f, 0.0f, 1.0f); // blue, -X (front at az=180)
-
-         Render3DNode render;
-         render.geometry[0] = &source;
-         render.width = 256.0f;
-         render.height = 256.0f;
-         render.samples = 0;
-         render.camElevation = 0.0f;
-         render.camDistance = 6.0f;
-         render.fov = 50.0f;
-         render.targetX = 0.0f; render.targetY = 0.0f; render.targetZ = 0.0f;
-
-         const int texW = 256, texH = 256;
-         std::vector<unsigned char> pixels((size_t)texW * texH * 4, 0);
-         int frame = 60000;
-
-         auto countColors = [&](int& redCount, int& blueCount, bool centralOnly) {
-            redCount = 0; blueCount = 0;
-            const int lo = centralOnly ? texW / 2 - 40 : 0;
-            const int hi = centralOnly ? texW / 2 + 40 : texW;
-            for (int y = lo; y < hi; y++)
-            {
-               for (int x = lo; x < hi; x++)
-               {
-                  const unsigned char* p = &pixels[((size_t)y * texW + x) * 4];
-                  if (p[0] > 40 && p[0] > p[2] * 2) redCount++;
-                  else if (p[2] > 40 && p[2] > p[0] * 2) blueCount++;
-               }
-            }
-         };
-
-         auto renderAt = [&](float azimuth) {
-            render.camAzimuth = azimuth;
-            render.CookIfNeeded(frame++);
-            glBindTexture(GL_TEXTURE_2D, render.GetOutputTexture());
-            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
-            glBindTexture(GL_TEXTURE_2D, 0);
-         };
-
-         // Approach each checked azimuth via two close-by steps first (with a
-         // short sleep after each) so the background sorter's async result
-         // has real wall-clock time to complete for a very similar camera
-         // position before the pixel readback that's actually checked - the
-         // render thread itself never blocks on this, same as production.
-         auto settleAndRead = [&](float azimuth, int& redCount, int& blueCount, bool centralOnly) {
-            renderAt(azimuth - 2.0f);
-            std::this_thread::sleep_for(std::chrono::milliseconds(15));
-            renderAt(azimuth - 1.0f);
-            std::this_thread::sleep_for(std::chrono::milliseconds(15));
-            renderAt(azimuth);
-            countColors(redCount, blueCount, centralOnly);
-         };
-
-         int redAt0, blueAt0, redAt180, blueAt180;
-         settleAndRead(0.0f, redAt0, blueAt0, /*centralOnly=*/true);
-         settleAndRead(180.0f, redAt180, blueAt180, /*centralOnly=*/true);
-
-         const bool frontAt0Ok = redAt0 > blueAt0 && redAt0 > 20;
-         const bool frontAt180Ok = blueAt180 > redAt180 && blueAt180 > 20;
-
-         printf("  [%s] %-40s (red=%d blue=%d)\n", frontAt0Ok ? "pass" : "FAIL",
-                "SplatOrbit(az=0 red-front dominates overlap)", redAt0, blueAt0);
-         printf("  [%s] %-40s (red=%d blue=%d)\n", frontAt180Ok ? "pass" : "FAIL",
-                "SplatOrbit(az=180 blue-front dominates overlap)", redAt180, blueAt180);
-
-         // Full smooth orbit, 36 steps of 10 degrees - crude but real
-         // "no popping" proxy: every single step must still produce a
-         // populated, sane frame (neither blank nor over-saturated), with no
-         // crash and no exception across a full 360-degree sweep.
-         bool orbitOk = true;
-         int minTotal = 1 << 30, maxTotal = 0;
-         for (int step = 0; step < 36; step++)
-         {
-            renderAt((float)step * 10.0f);
-            std::this_thread::sleep_for(std::chrono::milliseconds(8));
-            int r, b;
-            countColors(r, b, /*centralOnly=*/false);
-            const int total = r + b;
-            minTotal = std::min(minTotal, total);
-            maxTotal = std::max(maxTotal, total);
-            if (total < 20 || total > texW * texH - 100)
-               orbitOk = false;
-         }
-         printf("  [%s] %-40s (minTotal=%d maxTotal=%d)\n", orbitOk ? "pass" : "FAIL",
-                "SplatOrbit(36-step orbit stays populated & sane)", minTotal, maxTotal);
-
-         const bool allOk = frontAt0Ok && frontAt180Ok && orbitOk;
-         printf("%s\n", allOk ? "SPLAT ORBIT TEST OK" : "SPLAT ORBIT TEST FAIL");
-      }
-
-      // Exit criterion #4: frame time with a static camera is unchanged from
-      // an empty scene. Render3DNode::CookIfNeeded's SceneSignature
-      // early-return (BuildSceneSignature() compares to the last cook and
-      // returns immediately when nothing that could affect pixels changed -
-      // see Geometry3DNodes.cpp) is what's supposed to make this true "for
-      // free" once splatRev[i] is folded into the signature: a static camera
-      // over a splat cloud should cost the same per-frame as a static camera
-      // over nothing at all, because neither one re-enters the draw/sort/
-      // upload path after the first cook. This is measured directly with
-      // wall-clock timing, not asserted - the whole point is to catch a
-      // regression where the early-return is accidentally bypassed (e.g. a
-      // per-frame poll of the splat sorter that isn't actually gated by it).
-      if (getenv("INFINITE_SPLATCACHETEST") != nullptr && frameId == 6)
-      {
-         struct TestSplatSource : public IGeometrySource
-         {
-            SplatIO::SplatCloud cloud;
-            const Mesh& GetMesh() override { static Mesh empty; return empty; }
-            unsigned long long MeshRevision() override { return 0; }
-            Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
-            Material GetMaterial() const override { return Material(); }
-            const SplatIO::SplatCloud* GetSplatCloud() override { return &cloud; }
-            unsigned long long SplatCloudRevision() override { return 1; }
-         };
-
-         TestSplatSource source;
-         const int kCount = 20000;
-         source.cloud.splats.resize(kCount);
-         std::mt19937 rng(999);
-         std::uniform_real_distribution<float> pos(-2.0f, 2.0f);
-         for (int i = 0; i < kCount; i++)
-         {
-            SplatIO::Splat& s = source.cloud.splats[i];
-            s.px = pos(rng); s.py = pos(rng); s.pz = pos(rng);
-            s.cov[0] = 0.02f; s.cov[1] = 0.0f; s.cov[2] = 0.0f;
-            s.cov[3] = 0.02f; s.cov[4] = 0.0f; s.cov[5] = 0.02f;
-            s.r = 1.0f; s.g = 1.0f; s.b = 1.0f; s.a = 0.8f;
-         }
-
-         auto configureCamera = [](Render3DNode& r) {
-            r.width = 256.0f; r.height = 256.0f; r.samples = 0;
-            r.camAzimuth = 45.0f; r.camElevation = 20.0f; r.camDistance = 6.0f;
-            r.fov = 50.0f;
-            r.targetX = 0.0f; r.targetY = 0.0f; r.targetZ = 0.0f;
-         };
-
-         Render3DNode emptyRender;
-         configureCamera(emptyRender);
-         Render3DNode splatRender;
-         configureCamera(splatRender);
-         splatRender.geometry[0] = &source;
-
-         int frame = 70000;
-         // Warm-up cooks: real work happens here (shader compile, texture
-         // upload, first sort request) for both, so it's excluded from the
-         // timed loop below - what's timed is only the steady-state,
-         // nothing-changed cost.
-         emptyRender.CookIfNeeded(frame);
-         splatRender.CookIfNeeded(frame);
-         frame++;
-         std::this_thread::sleep_for(std::chrono::milliseconds(50)); // let the first splat sort finish
-
-         const int kIters = 300;
-         const auto t0 = std::chrono::high_resolution_clock::now();
-         for (int i = 0; i < kIters; i++)
-            emptyRender.CookIfNeeded(frame++);
-         const auto t1 = std::chrono::high_resolution_clock::now();
-         for (int i = 0; i < kIters; i++)
-            splatRender.CookIfNeeded(frame++);
-         const auto t2 = std::chrono::high_resolution_clock::now();
-
-         const double emptyMs = std::chrono::duration<double, std::milli>(t1 - t0).count() / kIters;
-         const double splatMs = std::chrono::duration<double, std::milli>(t2 - t1).count() / kIters;
-         const double deltaMs = splatMs - emptyMs;
-
-         // Generous absolute threshold (0.25ms/call) - this is checking that
-         // the early-return path was actually taken (sub-microsecond
-         // per-call cost expected on any real machine), not trying to be a
-         // tight perf regression gate.
-         const bool ok = deltaMs < 0.25;
-         printf("  [%s] %-40s (empty=%.4fms splat(%d)=%.4fms delta=%.4fms)\n",
-                ok ? "pass" : "FAIL", "SplatCache(static-camera cost matches empty scene)",
-                emptyMs, kCount, splatMs, deltaMs);
-         printf("%s\n", ok ? "SPLAT CACHE TEST OK" : "SPLAT CACHE TEST FAIL");
-      }
-
-      // Phase 3 (Gaussian Splat node, docs/plans/gaussian-splat-node.md S7)
-      // exit criteria, end to end through the real SplatSourceNode - not the
-      // hand-rolled TestSplatSource used by the tests above. Writes a real
-      // .splat fixture to disk, loads it through SplatSourceNode::Load (the
-      // same path the file-picker/drop-handler use), patches the node into a
-      // real Render3DNode, and reads back actual rendered pixels - so this
-      // is checking the node, not bypassing it to call SplatIO directly.
-      if (getenv("INFINITE_SPLATNODETEST") != nullptr && frameId == 6)
-      {
-         // 32-byte .splat record layout (SplatIO.h/.cpp): pos(3xf32),
-         // scale(3xf32, linear), rgba(4xu8), rot(4xu8 quantized wxyz).
-         auto writeSplatRecord = [](std::vector<unsigned char>& buf, float x, float y, float z,
-                                     float sx, float sy, float sz, unsigned char r, unsigned char g,
-                                     unsigned char b, unsigned char a) {
-            const float pos[3] = { x, y, z };
-            const float scale[3] = { sx, sy, sz };
-            const unsigned char color[4] = { r, g, b, a };
-            const unsigned char rot[4] = { 255, 128, 128, 128 }; // identity quaternion (w=1,x=y=z=0)
-            const size_t base = buf.size();
-            buf.resize(base + 32);
-            std::memcpy(buf.data() + base, pos, 12);
-            std::memcpy(buf.data() + base + 12, scale, 12);
-            std::memcpy(buf.data() + base + 24, color, 4);
-            std::memcpy(buf.data() + base + 28, rot, 4);
-         };
-
-         std::vector<unsigned char> fixture;
-         // Two bright red splats near the origin (one clearly more
-         // opaque/larger than the other) plus two faint, tiny outliers
-         // placed symmetrically on either side (+20/-20 on X) - symmetric so
-         // they cancel out in the raw cloud's mean-position centroid
-         // (leaving it near the origin cluster, not dragged off toward one
-         // side), which is what crop's "radius from centroid" is measured
-         // against. `crop` should keep the two near-origin splats and
-         // exclude both outliers; `maxSplats` should then keep only the
-         // brighter/larger of the two survivors.
-         writeSplatRecord(fixture, 0.0f, 0.0f, 0.0f, 0.15f, 0.15f, 0.15f, 255, 20, 20, 255);
-         writeSplatRecord(fixture, 0.05f, 0.0f, 0.0f, 0.1f, 0.1f, 0.1f, 255, 20, 20, 220);
-         writeSplatRecord(fixture, 20.0f, 0.0f, 0.0f, 0.01f, 0.01f, 0.01f, 10, 10, 200, 20);
-         writeSplatRecord(fixture, -20.0f, 0.0f, 0.0f, 0.01f, 0.01f, 0.01f, 10, 10, 200, 20);
-
-         const std::string fixturePath = "/tmp/infinite_splatnodetest_fixture.splat";
-         {
-            FILE* f = std::fopen(fixturePath.c_str(), "wb");
-            const bool wrote = (f != nullptr) && (std::fwrite(fixture.data(), 1, fixture.size(), f) == fixture.size());
-            if (f) std::fclose(f);
-            printf("  [%s] %-40s\n", wrote ? "pass" : "FAIL", "SplatNode(fixture .splat written)");
-         }
-
-         SplatSourceNode node;
-         const bool loaded = node.Load(fixturePath);
-         const size_t rawCountAfterLoad = node.RawSplatCount();
-         printf("  [%s] %-40s (raw=%zu)\n", (loaded && rawCountAfterLoad == 4) ? "pass" : "FAIL",
-                "SplatNode(Load() parses the real fixture)", rawCountAfterLoad);
-
-         node.CookIfNeeded(80000);
-         const unsigned long long revAfterLoad = node.SplatCloudRevision();
-         const size_t derivedAfterLoad = node.SplatCount();
-         printf("  [%s] %-40s (derived=%zu rev=%llu)\n",
-                (derivedAfterLoad == 4 && revAfterLoad != 0) ? "pass" : "FAIL",
-                "SplatNode(uncropped derived cloud == raw cloud)", derivedAfterLoad, revAfterLoad);
-
-         // Crop to a radius that keeps the two near-origin splats and drops
-         // the far outlier - exit criterion #5 (crop actually reduces the
-         // derived cloud and bumps SplatCloudRevision so Render3D re-cooks).
-         node.crop = 1.0f;
-         node.CookIfNeeded(80001);
-         const size_t derivedAfterCrop = node.SplatCount();
-         const unsigned long long revAfterCrop = node.SplatCloudRevision();
-         printf("  [%s] %-40s (derived=%zu rev changed=%d)\n",
-                (derivedAfterCrop == 2 && revAfterCrop != revAfterLoad) ? "pass" : "FAIL",
-                "SplatNode(crop drops the far outlier + bumps revision)", derivedAfterCrop,
-                (int)(revAfterCrop != revAfterLoad));
-
-         // max splats further budgets down to 1 - should keep the more
-         // opaque/larger of the two remaining splats (first record: a=255,
-         // scale=0.15 > second record: a=220, scale=0.1).
-         node.maxSplats = 1;
-         node.CookIfNeeded(80002);
-         const size_t derivedAfterBudget = node.SplatCount();
-         const unsigned long long revAfterBudget = node.SplatCloudRevision();
-         bool keptBrightest = false;
-         if (const SplatIO::SplatCloud* cloud = node.GetSplatCloud())
-            keptBrightest = !cloud->splats.empty() && cloud->splats[0].a > 0.9f && cloud->splats[0].px == 0.0f;
-         printf("  [%s] %-40s (derived=%zu rev changed=%d kept-brightest=%d)\n",
-                (derivedAfterBudget == 1 && revAfterBudget != revAfterCrop && keptBrightest) ? "pass" : "FAIL",
-                "SplatNode(max splats budgets to top-K by opacity*scale)", derivedAfterBudget,
-                (int)(revAfterBudget != revAfterCrop), (int)keptBrightest);
-
-         // Reset crop/budget so the full cloud reaches Render3D for the
-         // pixel-readback check below.
-         node.crop = 0.0f;
-         node.maxSplats = 0;
-         node.CookIfNeeded(80003);
-
-         Render3DNode render;
-         render.geometry[0] = &node;
-         render.width = 128.0f;
-         render.height = 128.0f;
-         render.samples = 0;
-         render.camAzimuth = 90.0f;
-         render.camElevation = 0.0f;
-         render.camDistance = 6.0f;
-         render.fov = 50.0f;
-         render.targetX = 0.0f; render.targetY = 0.0f; render.targetZ = 0.0f;
-         render.CookIfNeeded(80004);
-
-         const int texW = 128, texH = 128;
-         std::vector<unsigned char> pixels((size_t)texW * texH * 4, 0);
-         glBindTexture(GL_TEXTURE_2D, render.GetOutputTexture());
-         glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
-         glBindTexture(GL_TEXTURE_2D, 0);
-
-         int redPixels = 0;
-         for (size_t i = 0; i < pixels.size(); i += 4)
-         {
-            if (pixels[i] > 40 && pixels[i] > pixels[i + 2] * 2)
-               redPixels++;
-         }
-         printf("  [%s] %-40s (redPixels=%d)\n", redPixels > 10 ? "pass" : "FAIL",
-                "SplatNode(patched into Render3D -> real EWA-splat pixels)", redPixels);
-
-         // Live per-frame multiplier check: point size/opacity/tint are read
-         // straight off the node every cook (not baked into the derived
-         // cloud), and SceneSignature was extended to fold them in - so
-         // changing pointSize alone (no reload, no crop/budget change) must
-         // still bump Render3D's own TextureRevision on the next cook, or
-         // modulating this knob would silently freeze the render.
-         const unsigned long long texRevBefore = render.TextureRevision();
-         node.pointSize = 2.5f;
-         render.CookIfNeeded(80005);
-         const unsigned long long texRevAfter = render.TextureRevision();
-         printf("  [%s] %-40s\n", (texRevAfter != texRevBefore) ? "pass" : "FAIL",
-                "SplatNode(live pointSize change invalidates Render3D cache)");
-
-         // Exit criterion #2's "non-blank viewport preview": NodeViewport is
-         // the generic per-node inline preview every IGeometrySource node
-         // gets (see NodeViewport.cpp's hasSplat branch, added in this same
-         // phase) - Render() returns 0 if geo's mesh/cloud/splat-cloud is
-         // empty, so a non-zero return with the reloaded (uncropped) cloud
-         // confirms the splat-cloud-as-points preview path is actually wired
-         // up for this node, not falling through to the blank placeholder.
-         NodeViewport viewport;
-         SharedViewportCamera cam;
-         const unsigned int previewTex = viewport.Render(&node, cam, 96, 96);
-         printf("  [%s] %-40s (tex=%u)\n", previewTex != 0 ? "pass" : "FAIL",
-                "SplatNode(NodeViewport preview is non-blank)", previewTex);
-
-         const bool allOk = loaded && rawCountAfterLoad == 4 && derivedAfterLoad == 4 &&
-                             derivedAfterCrop == 2 && revAfterCrop != revAfterLoad &&
-                             derivedAfterBudget == 1 && revAfterBudget != revAfterCrop && keptBrightest &&
-                             redPixels > 10 && texRevAfter != texRevBefore && previewTex != 0;
-         printf("%s\n", allOk ? "SPLAT NODE TEST OK" : "SPLAT NODE TEST FAIL");
-
-         // Follow-up (graceful degradation for bare colored-point-cloud
-         // .ply, no trained 3DGS fields): end-to-end through the real
-         // SplatSourceNode, not just SplatIO. Vividly red points with no
-         // f_dc/opacity/scale properties should render as actual red pixels
-         // at a sane splat size, not the old solid gray blob.
-         {
-            const std::string plyPath = "/tmp/infinite_splatnodetest_barecloud.ply";
-            {
-               FILE* pf = std::fopen(plyPath.c_str(), "wb");
-               const int n = 64; // 4x4x4 grid
-               std::fprintf(pf,
-                            "ply\nformat binary_little_endian 1.0\nelement vertex %d\n"
-                            "property float x\nproperty float y\nproperty float z\n"
-                            "property uchar red\nproperty uchar green\nproperty uchar blue\n"
-                            "end_header\n", n);
-               std::mt19937 gridRng(123);
-               std::uniform_real_distribution<float> jitter(-0.01f, 0.01f);
-               for (int xi = 0; xi < 4; xi++)
-                  for (int yi = 0; yi < 4; yi++)
-                     for (int zi = 0; zi < 4; zi++)
-                     {
-                        const float pos[3] = { (xi - 1.5f) * 0.15f + jitter(gridRng),
-                                                (yi - 1.5f) * 0.15f + jitter(gridRng),
-                                                (zi - 1.5f) * 0.15f + jitter(gridRng) };
-                        std::fwrite(pos, sizeof(float), 3, pf);
-                        const unsigned char rgb[3] = { 230, 15, 15 }; // vivid red, uniform
-                        std::fwrite(rgb, 1, 3, pf);
-                     }
-               std::fclose(pf);
-            }
-
-            SplatSourceNode bareNode;
-            const bool bareLoaded = bareNode.Load(plyPath);
-            const bool statusFlagged = bareNode.Status().find("auto-estimated") != std::string::npos;
-            printf("  [%s] %-40s (status=\"%s\")\n", (bareLoaded && statusFlagged) ? "pass" : "FAIL",
-                   "SplatNode(bare colored .ply loads + status flags degraded mode)", bareNode.Status().c_str());
-
-            bareNode.CookIfNeeded(80010);
-            Render3DNode bareRender;
-            bareRender.geometry[0] = &bareNode;
-            bareRender.width = 128.0f; bareRender.height = 128.0f; bareRender.samples = 0;
-            bareRender.camAzimuth = 90.0f; bareRender.camElevation = 0.0f; bareRender.camDistance = 3.0f;
-            bareRender.fov = 50.0f;
-            bareRender.targetX = 0.0f; bareRender.targetY = 0.0f; bareRender.targetZ = 0.0f;
-            bareRender.CookIfNeeded(80011);
-
-            std::vector<unsigned char> barePixels((size_t)128 * 128 * 4, 0);
-            glBindTexture(GL_TEXTURE_2D, bareRender.GetOutputTexture());
-            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, barePixels.data());
-            glBindTexture(GL_TEXTURE_2D, 0);
-
-            // Same predicate the passing .splat-format SplatNode render
-            // check above uses ("patched into Render3D -> real EWA-splat
-            // pixels", redPixels>10) - a splat cloud whose color decoded to
-            // flat 0.5 gray (the old bug) could never trip r > b*2, so this
-            // is a direct end-to-end check that the red/green/blue bytes
-            // actually reached the rendered pixels, not the SH-DC gray
-            // default.
-            int redCount = 0;
-            for (size_t i = 0; i < barePixels.size(); i += 4)
-            {
-               const int r = barePixels[i], b = barePixels[i + 2];
-               if (r > 40 && r > b * 2)
-                  redCount++;
-            }
-            const bool colorOk = redCount > 10;
-            printf("  [%s] %-40s (redPixels=%d)\n",
-                   colorOk ? "pass" : "FAIL",
-                   "SplatNode(bare colored .ply renders real red, not gray blob)", redCount);
-
-            std::remove(plyPath.c_str());
-         }
-      }
-
       // A different bug class from RENDER3DLIVETEST above: not a live-updating
       // source with no revision bump of its own, but the opposite direction -
       // a real upstream mesh/cloud/curve change that DOES bump a revision,
@@ -85026,8 +83929,6 @@ int main(int argc, char** argv)
                DrawGeometryParams(n);
             else if (auto* n = dynamic_cast<ModelSourceNode*>(gn.node.get()))
                DrawModelParams(n);
-            else if (auto* n = dynamic_cast<SplatSourceNode*>(gn.node.get()))
-               DrawSplatSourceParams(n);
             else if (auto* n = dynamic_cast<Text3DNode*>(gn.node.get()))
                DrawText3DParams(n);
             else if (auto* n = dynamic_cast<MeshToPointsNode*>(gn.node.get()))
@@ -85107,8 +84008,6 @@ int main(int argc, char** argv)
                DrawRender3DParams(n);
             else if (auto* n = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()))
                DrawImageAnalyzeParams(n);
-            else if (auto* n = dynamic_cast<MotionTrackNode*>(gn.node.get()))
-               DrawMotionTrackParams(n);
             else if (auto* n = dynamic_cast<NullModulatorNode*>(gn.node.get()))
                DrawNullModulatorParams(n);
             else if (auto* n = dynamic_cast<AudioFileNode*>(gn.node.get()))

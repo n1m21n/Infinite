@@ -1,5 +1,101 @@
 [
   {
+    "hash": "a764094f6ab61fe64da8e2d1aab10203b3c7edbe",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 17:14:25 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Revert \"Merge feature/splat-node into main\"",
+      "description": "Revert \"Merge feature/splat-node into main\"",
+      "bullets": [],
+      "body": "This reverts commit 0a6e011f8f504fa2a36030d8e5224c6dca26420b, reversing\nchanges made to 68b7e9ffda8f54619cab7c51dca932b3d8837bf8.",
+      "raw": "Revert \"Merge feature/splat-node into main\"\n\nThis reverts commit 0a6e011f8f504fa2a36030d8e5224c6dca26420b, reversing\nchanges made to 68b7e9ffda8f54619cab7c51dca932b3d8837bf8."
+    },
+    "stat": ".claude/skills/codebase-navigation/SKILL.md |   30 -\n ARCHITECTURE.md                             |    1 -\n CMakeLists.txt                              |    2 -\n docs/plans/gaussian-splat-node.md           |  365 ----------\n docs/plans/gaussian-splat-prompt.md         |  178 -----\n src/core/NodeViewport.cpp                   |   37 +-\n src/core/SplatIO.cpp                        |  467 -------------\n src/core/SplatIO.h                          |   80 ---\n src/main.cpp                                | 1007 ---------------------------\n src/nodes/AudioDisplacementNode.h           |   17 -\n src/nodes/FieldElementNode.h                |   15 -\n src/nodes/GenerativeNodes.h                 |   17 -\n src/nodes/Geometry3DNodes.cpp               |  620 +----------------\n src/nodes/Geometry3DNodes.h                 |  133 ----\n src/nodes/GeometryOpNodes.h                 |   71 --\n src/nodes/PointDistributionNodes.h          |   17 -\n src/nodes/SplatSourceNode.cpp               |  175 -----\n src/nodes/SplatSourceNode.h                 |  127 ----\n src/nodes/Switcher3DNode.cpp                |   31 -\n src/nodes/Switcher3DNode.h                  |    8 -\n src/nodes/UtilityNodes.h                    |   51 --\n src/platform/Platform.h                     |    8 -\n src/platform/Platform.mm                    |   32 -\n src/platform/win/PlatformWin.cpp            |   12 -\n 24 files changed, 7 insertions(+), 3494 deletions(-)\n delete mode 100644 docs/plans/gaussian-splat-node.md\n delete mode 100644 docs/plans/gaussian-splat-prompt.md\n delete mode 100644 src/core/SplatIO.cpp\n delete mode 100644 src/core/SplatIO.h\n delete mode 100644 src/nodes/SplatSourceNode.cpp\n delete mode 100644 src/nodes/SplatSourceNode.h"
+  },
+  {
+    "hash": "7a0ac644c29c85c3c73782ccf28e98821d9e41da",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 17:13:47 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Revert \"Merge claude/gaussian-splatting-research-2de9e3 into main\"",
+      "description": "Revert \"Merge claude/gaussian-splatting-research-2de9e3 into main\"",
+      "bullets": [],
+      "body": "This reverts commit 78ef5713a980a7580869d9397b002425b748920f, reversing\nchanges made to 0a6e011f8f504fa2a36030d8e5224c6dca26420b.",
+      "raw": "Revert \"Merge claude/gaussian-splatting-research-2de9e3 into main\"\n\nThis reverts commit 78ef5713a980a7580869d9397b002425b748920f, reversing\nchanges made to 0a6e011f8f504fa2a36030d8e5224c6dca26420b."
+    },
+    "stat": "CMakeLists.txt                  |    1 -\n docs/node_param_audit.md        |  362 ++--------\n docs/plans/motion-track-node.md |  187 ------\n src/main.cpp                    |   94 ---\n src/nodes/MotionTrackNode.cpp   | 1399 ---------------------------------------\n src/nodes/MotionTrackNode.h     |  189 ------\n 6 files changed, 47 insertions(+), 2185 deletions(-)\n delete mode 100644 docs/plans/motion-track-node.md\n delete mode 100644 src/nodes/MotionTrackNode.cpp\n delete mode 100644 src/nodes/MotionTrackNode.h"
+  },
+  {
+    "hash": "89b7f501cc14e1564eee361e5be30bc905a11b8f",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 16:59:54 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "render3d",
+      "title": "Merge bugfix/geometry-op-forward-points-curves into main",
+      "description": "Merge bugfix/geometry-op-forward-points-curves into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge bugfix/geometry-op-forward-points-curves into main"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "6603284f2d7b19b4cdc89eed18dbb591289d5b91",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 16:59:53 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "geometry",
+      "title": "fix(geometry): Transform and the other GeometryOpNode ops no longer drop point clouds and curves",
+      "description": "Transform and the other GeometryOpNode ops no longer drop point clouds and curves",
+      "bullets": [],
+      "body": "GeometryOpNode forwarded mesh, material, matrix and splats but not\nGetPointCloud/GetCurve, so Mesh to Points -> Transform -> Render 3D drew\nnothing. kTransform now moves the cloud (cached, revision only moves on a\nreal change); every other op and every curve passes through untouched.\nAdds POINTCLOUDSWEEPTEST.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "fix(geometry): Transform and the other GeometryOpNode ops no longer drop point clouds and curves\n\nGeometryOpNode forwarded mesh, material, matrix and splats but not\nGetPointCloud/GetCurve, so Mesh to Points -> Transform -> Render 3D drew\nnothing. kTransform now moves the cloud (cached, revision only moves on a\nreal change); every other op and every curve passes through untouched.\nAdds POINTCLOUDSWEEPTEST.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".claude/skills/run-infinite-hygiene/driver.sh |  1 +\n src/main.cpp                                  | 79 +++++++++++++++++++++++++++\n src/nodes/GeometryOpNodes.cpp                 | 56 +++++++++++++++++++\n src/nodes/GeometryOpNodes.h                   | 21 +++++++\n 4 files changed, 157 insertions(+)"
+  },
+  {
+    "hash": "49de4207cffdd50b9e29eb283b758ffc2f40e364",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 16:38:49 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "arrange",
+      "title": "Merge feature/clip-modulation-bypass into main",
+      "description": "Merge feature/clip-modulation-bypass into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/clip-modulation-bypass into main"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "640fdb62c9d12939743f6e09295b2eb81b26c9f4",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 16:38:48 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "semi-brain",
+      "title": "chore(semi-brain): refresh corpora and training datasets",
+      "description": "refresh corpora and training datasets",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "chore(semi-brain): refresh corpora and training datasets\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".../1_extractors/output/git_commits_corpus.json    | 124 ++++++\n .../1_extractors/output/recovered_docs_corpus.json | 472 ++++++++++-----------\n .../3_datasets/train_dpo_preference.jsonl          |   3 +\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl | 163 +++----\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl | 163 +++----\n 5 files changed, 533 insertions(+), 392 deletions(-)"
+  },
+  {
     "hash": "149e8807b4cabd706fab104ff4f4349449ac52d3",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
