@@ -1,5 +1,37 @@
 [
   {
+    "hash": "f2bd1fca40d503b80a61ae6662c1d82cbb79a79f",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 12:01:20 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "prediction",
+      "title": "feat(prediction): emergent user profiles, measured not declared",
+      "description": "emergent user profiles, measured not declared",
+      "bullets": [],
+      "body": "Per-sample weights cannot express shares, because time is unbounded. An\neight-hour overnight LFO out-samples a thirty-second performance about a\nhundred to one, and the 0.1 modulator discount loses that fight badly. The\nmodel was being authored by whatever was left running, not by the person.\nFour source pools now accumulate separately - deliberate, exploratory,\nautomation, replay - and their shares are graded rather than declared. Each\npool is scored prequentially on how well it predicts where the hand actually\ngoes next, before the sample is absorbed, with exponential forgetting in\nactive time. A pool's share is its skill times its maturity, times a\ncold-start prior it leaves behind as soon as it has evidence. 60/25/15 is now\nonly where a new user starts, not what anyone is told the answer is.\nTime symmetry comes from a presence gate: machines can run for days, people\nfor hours, so a machine source only accumulates while a human was here within\nthe last thirty minutes. Transport running is not presence.\nThe gate holds at every rung, not just at a key's own pools. The\nprofile/role/family tables are what a young key falls back to, so letting an\nunattended run flood them would have reintroduced the same skew one rung\nhigher, where it is much harder to see.\nAlso fixes a 10x underweight of human input that predates this work: all six\nperformance surfaces - MIDI CC, MIDI trigger, macro knob, XY pad, trigger,\nnumber box - were logged as automation. A surface is now attributed as\nperformance unless something else was driving it last frame.\nMeasured, not asserted: 300 hand samples against 28,559 automation samples\nresolve to a 0.91 human share. Test 14 pins the invariant directly - 1.5 vs 8\nwindows of unattended runtime must teach an untouched sibling the same thing\n(L1 0.0006 with the gate, 0.0526 without).\nTwo harness fixes found on the way: PREDBINDTEST was given 40 frames against a\nverdict that prints at frame 110, and is compiled out entirely by NDEBUG in\nthis Release tree - corrected and baselined with that reason. DRAGTEST's stale\nbaseline entry deleted.\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>",
+      "raw": "feat(prediction): emergent user profiles, measured not declared\n\nPer-sample weights cannot express shares, because time is unbounded. An\neight-hour overnight LFO out-samples a thirty-second performance about a\nhundred to one, and the 0.1 modulator discount loses that fight badly. The\nmodel was being authored by whatever was left running, not by the person.\n\nFour source pools now accumulate separately - deliberate, exploratory,\nautomation, replay - and their shares are graded rather than declared. Each\npool is scored prequentially on how well it predicts where the hand actually\ngoes next, before the sample is absorbed, with exponential forgetting in\nactive time. A pool's share is its skill times its maturity, times a\ncold-start prior it leaves behind as soon as it has evidence. 60/25/15 is now\nonly where a new user starts, not what anyone is told the answer is.\n\nTime symmetry comes from a presence gate: machines can run for days, people\nfor hours, so a machine source only accumulates while a human was here within\nthe last thirty minutes. Transport running is not presence.\n\nThe gate holds at every rung, not just at a key's own pools. The\nprofile/role/family tables are what a young key falls back to, so letting an\nunattended run flood them would have reintroduced the same skew one rung\nhigher, where it is much harder to see.\n\nAlso fixes a 10x underweight of human input that predates this work: all six\nperformance surfaces - MIDI CC, MIDI trigger, macro knob, XY pad, trigger,\nnumber box - were logged as automation. A surface is now attributed as\nperformance unless something else was driving it last frame.\n\nMeasured, not asserted: 300 hand samples against 28,559 automation samples\nresolve to a 0.91 human share. Test 14 pins the invariant directly - 1.5 vs 8\nwindows of unattended runtime must teach an untouched sibling the same thing\n(L1 0.0006 with the gate, 0.0526 without).\n\nTwo harness fixes found on the way: PREDBINDTEST was given 40 frames against a\nverdict that prints at frame 110, and is compiled out entirely by NDEBUG in\nthis Release tree - corrected and baselined with that reason. DRAGTEST's stale\nbaseline entry deleted.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+    },
+    "stat": ".claude/skills/run-infinite-hygiene/driver.sh      |   2 +-\n .../run-infinite-hygiene/known-test-failures.txt   |   3 +-\n src/core/MovementStats.cpp                         | 451 +++++++++++++++++++--\n src/core/MovementStats.h                           |  77 +++-\n src/main.cpp                                       |  63 ++-\n 5 files changed, 564 insertions(+), 32 deletions(-)"
+  },
+  {
+    "hash": "814dbabefc534e44fe71436d673506afd3e2ddea",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 10:59:25 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "semi-brain",
+      "title": "chore(semi-brain): refresh corpora",
+      "description": "refresh corpora",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "chore(semi-brain): refresh corpora\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".../1_extractors/output/git_commits_corpus.json    |  16 +\n .../1_extractors/output/recovered_docs_corpus.json | 468 ++++++++++-----------\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl | 153 +++----\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl | 153 +++----\n 4 files changed, 404 insertions(+), 386 deletions(-)"
+  },
+  {
     "hash": "66ee5cc27c0e910d948e2d5c482d0034b1acfc32",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
