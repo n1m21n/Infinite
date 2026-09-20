@@ -50,6 +50,8 @@ Infinite features **140+ modular node types**:
 
 The full catalogue, including every node's pins and parameters, is in the [Node Reference Manual](Infinite_Node_Reference_Manual.pdf).
 
+![Infinite Modular Node Graph](docs/nodegraph.png)
+
 ---
 
 ## Field: write what a node does
