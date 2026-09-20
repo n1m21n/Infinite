@@ -10345,19 +10345,43 @@ namespace
       dl->AddRectFilled(p, ImVec2(p.x + width, p.y + h),
                         isLight ? IM_COL32(0, 0, 0, 12) : IM_COL32(255, 255, 255, 10), 3.0f);
       const float textY = p.y + 3.0f;
-      if (idleStat != nullptr && idleStat[0] != '\0')
-         dl->AddText(ImVec2(p.x + 7.0f, textY),
-                     isLight ? IM_COL32(80, 88, 108, 255) : IM_COL32(132, 138, 158, 255),
-                     idleStat);
+      // Both texts are fitted to the strip: a long status string (a device
+      // error, a file name) used to run out past the node's right edge. The
+      // hovered-param readout wins its side; the idle stat gets what's left
+      // and is ellipsised rather than clipped mid-glyph.
+      auto fitText = [](const char* text, float maxW) {
+         std::string out = text;
+         if (maxW <= 0.0f)
+            return std::string();
+         if (ImGui::CalcTextSize(out.c_str()).x <= maxW)
+            return out;
+         while (!out.empty() && ImGui::CalcTextSize((out + "...").c_str()).x > maxW)
+         {
+            // Drop whole UTF-8 sequences, not bytes.
+            do { out.pop_back(); } while (!out.empty() && (out.back() & 0xC0) == 0x80);
+         }
+         return out + "...";
+      };
+      float readoutW = 0.0f;
+      std::string readoutFit;
       if (!readout.empty())
       {
-         const ImVec2 sz = ImGui::CalcTextSize(readout.c_str());
-         dl->PushClipRect(p, ImVec2(p.x + width, p.y + h), true);
-         dl->AddText(ImVec2(p.x + width - 8.0f - sz.x, textY),
-                     isLight ? IM_COL32(30, 36, 52, 255) : IM_COL32(226, 232, 244, 255),
-                     readout.c_str());
-         dl->PopClipRect();
+         readoutFit = fitText(readout.c_str(), width - 16.0f);
+         readoutW = ImGui::CalcTextSize(readoutFit.c_str()).x;
       }
+      if (idleStat != nullptr && idleStat[0] != '\0')
+      {
+         const float idleMax = width - 14.0f - (readoutW > 0.0f ? readoutW + 14.0f : 0.0f);
+         const std::string idleFit = fitText(idleStat, idleMax);
+         if (!idleFit.empty())
+            dl->AddText(ImVec2(p.x + 7.0f, textY),
+                        isLight ? IM_COL32(80, 88, 108, 255) : IM_COL32(132, 138, 158, 255),
+                        idleFit.c_str());
+      }
+      if (!readoutFit.empty())
+         dl->AddText(ImVec2(p.x + width - 8.0f - readoutW, textY),
+                     isLight ? IM_COL32(30, 36, 52, 255) : IM_COL32(226, 232, 244, 255),
+                     readoutFit.c_str());
       ImGui::Dummy(ImVec2(width, h));
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
    }
