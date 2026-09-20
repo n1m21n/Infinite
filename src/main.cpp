@@ -40885,6 +40885,75 @@ namespace
             // created - repointing or clearing that would defeat the whole
             // point of a sample (see sampleDropped's doc comment in
             // ArrangeModel.h). Only Audio/Video Clip can be reassigned.
+            // --- per-clip modulation bypass -----------------------------
+            // Every modulation currently bound to this clip's source node,
+            // each with a checkbox saying whether THIS clip wants it. The
+            // node keeps the binding either way - it is the clip that opts
+            // out, so the same node still arrives modulated under a clip
+            // that leaves the box ticked.
+            //
+            // Only this node's OWN bindings are listed. A modulator sitting
+            // on something upstream shapes what this node is fed, and that
+            // feed is shared with every other consumer of the upstream node,
+            // so a single clip cannot opt out of it without duplicating the
+            // whole chain. Deliberately out of scope.
+            {
+               const Modulation& mod = Modulation::Instance();
+               std::vector<std::pair<int, std::string>> bound; // paramIndex, label
+               for (const auto& kv : mod.Links())
+               {
+                  if (kv.first.first != srcNode->index)
+                     continue;
+                  if (kv.second.nodeIndex < 0)
+                     continue;
+                  const int paramIndex = kv.first.second;
+                  // KnownParam is the sticky record, so this still reads
+                  // correctly on a frame where the source node did not draw
+                  // (scrolled off canvas, or the panel drawing before it).
+                  const ParamRef* known = mod.KnownParam(srcNode->index, paramIndex);
+                  const GraphNode* modNode = FindNodeByIndex(kv.second.nodeIndex);
+                  std::string label = known != nullptr ? StripParamLabel(known->name.c_str())
+                                                       : ("param " + std::to_string(paramIndex));
+                  if (modNode != nullptr)
+                     label += "  <-  " + NodeTitle(*modNode);
+                  bound.emplace_back(paramIndex, label);
+               }
+
+               if (!bound.empty())
+               {
+                  ImGui::Spacing();
+                  ImGui::Separator();
+                  ImGui::TextDisabled("Modulations");
+                  PushCheckboxStyle();
+                  for (const auto& entry : bound)
+                  {
+                     const int paramIndex = entry.first;
+                     // Ticked = this clip hears the modulation, which is the
+                     // default and reads the right way round: an untouched
+                     // clip shows every box ticked.
+                     bool active = !clip->IsModBypassed(paramIndex);
+                     ImGui::PushID(paramIndex);
+                     if (ImGui::Checkbox(entry.second.c_str(), &active))
+                     {
+                        ArrangeEdit([&]() {
+                           if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
+                           {
+                              c->SetModBypassed(paramIndex, !active);
+                              gArrange.revision++;
+                           }
+                        });
+                     }
+                     ImGui::PopID();
+                  }
+                  PopCheckboxStyle();
+                  // A bypassed param falls back to the value its knob held
+                  // when the modulator was patched in - say so, because
+                  // "off" could otherwise be read as "frozen where it was".
+                  if (!clip->bypassedModParams.empty())
+                     ImGui::TextDisabled("Unticked params hold their pre-modulation value.");
+               }
+            }
+
             if (!isSample)
             {
                if (ImGui::Button("Assign Different Node...", ImVec2(-FLT_MIN, 0)))
@@ -62564,9 +62633,89 @@ static MovementLog::Source ModulatorLogSource(INode* n, int modNodeIndex)
                                                              : MovementLog::Source::Perf;
 }
 
+// ---- per-clip modulation bypass (Arrange::Clip::bypassedModParams) -------
+//
+// A clip can ask for some of its source node's modulations not to be
+// applied while that clip is the one playing, so the same oscillator can
+// sound modulated under one clip and static under another. Rebuilt once
+// per frame, immediately before the apply loop reads it, because the
+// answer changes with the playhead.
+//
+// Keyed by node index rather than uid so the apply loop's test is a plain
+// lookup on the ParamRef it already has.
+//
+// Only the clip under the playhead counts. Two clips on different lanes
+// sharing one source and disagreeing about a param cannot both be honoured
+// - there is one param float - so the first lane wins here; giving such a
+// clip its own private shadow instance is what actually resolves that, and
+// is deliberately a separate step.
+std::unordered_map<int, const std::vector<int>*> gArrangeActiveClipModBypass;
+
+void ArrangeRefreshActiveClipModBypass()
+{
+   gArrangeActiveClipModBypass.clear();
+   // Canvas mode: no clip is playing anything, so no clip gets a say over
+   // the canvas's own modulation.
+   if (!ArrangeTimelineRoutingActive())
+      return;
+
+   const double beat = Transport::Instance().Beats();
+   for (const Arrange::Lane& lane : gArrange.lanes)
+   {
+      if (!Arrange::LaneEffectivelyEnabled(gArrange, lane))
+         continue;
+      for (const Arrange::Clip& c : lane.clips)
+      {
+         // Clips are sorted by start and never overlap within a lane, so
+         // the first one that starts after `beat` ends the search.
+         if (Arrange::TicksToBeats(c.start) > beat)
+            break;
+         if (!(beat < Arrange::TicksToBeats(c.End())))
+            continue;
+         if (c.enabled && c.srcUid != 0 && !c.bypassedModParams.empty())
+         {
+            const GraphNode* gn = FindNodeByUid(c.srcUid);
+            if (gn != nullptr)
+               gArrangeActiveClipModBypass.emplace(gn->index, &c.bypassedModParams);
+         }
+         break; // this lane's only candidate, usable or not
+      }
+   }
+}
+
+bool ArrangeClipBypassesMod(int nodeIndex, int paramIndex)
+{
+   if (gArrangeActiveClipModBypass.empty())
+      return false;
+   auto it = gArrangeActiveClipModBypass.find(nodeIndex);
+   if (it == gArrangeActiveClipModBypass.end() || it->second == nullptr)
+      return false;
+   return std::binary_search(it->second->begin(), it->second->end(), paramIndex);
+}
+
+// What a bypassed param sits at. Modulation::Source::centre is the
+// destination's value at the instant the binding was made - the knob
+// position the modulator took over from - which is precisely "what this
+// would read with the modulator unplugged". Clamped to the param's own
+// declared range because a binding restored from a patch line that predates
+// the centre token decodes it as 0, which is out of range for plenty of
+// params (a cutoff in Hz, say) and must not be written raw.
+//
+// Writing this every frame, rather than skipping the write, is the point:
+// leaving the param alone would freeze it at whatever the modulator last
+// pushed, so a bypassed LFO would strand the knob mid-sweep instead of
+// releasing it.
+float ArrangeClipBypassBaseValue(const ParamRef& ref, const Modulation::Source& src)
+{
+   return ShapeToParam(ref, std::clamp(src.centre, ref.minValue, ref.maxValue));
+}
+
 void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false)
 {
    UpdatePerformanceMatrixMIDI();
+   // Before any binding is read: which clip is under the playhead decides
+   // which modulations are bypassed this frame.
+   ArrangeRefreshActiveClipModBypass();
 
    Modulation& modulation = Modulation::Instance();
    // Apply deferred writes from the performance matrix before snapshot and modulators
@@ -62658,6 +62807,15 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false)
       {
          if (!src.enabled)
             continue;   // binding intact, just not written this frame
+         // The clip currently playing this node asked for this particular
+         // modulation not to be applied. Sits above every modulator kind
+         // below (predictor, macro box, trigger, ordinary) deliberately -
+         // one gate, so no modulator type can quietly escape it.
+         if (ArrangeClipBypassesMod(ref.nodeIndex, ref.paramIndex))
+         {
+            *ref.value = ArrangeClipBypassBaseValue(ref, src);
+            continue;
+         }
          // A wired modulator always wins over a typed expression - see
          // Modulation::SetExpression.
          GraphNode* modNode = FindNodeByIndex(src.nodeIndex);
