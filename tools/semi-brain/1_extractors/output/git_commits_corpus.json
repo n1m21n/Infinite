@@ -1,5 +1,21 @@
 [
   {
+    "hash": "66ee5cc27c0e910d948e2d5c482d0034b1acfc32",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 10:59:12 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "semi-brain",
+      "title": "chore(semi-brain): refresh corpora",
+      "description": "refresh corpora",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "chore(semi-brain): refresh corpora\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".../1_extractors/output/git_commits_corpus.json    |  32 ++\n .../1_extractors/output/recovered_docs_corpus.json | 464 ++++++++++-----------\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl | 156 +++----\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl | 156 +++----\n 4 files changed, 422 insertions(+), 386 deletions(-)"
+  },
+  {
     "hash": "4bfd751c435734d220c20e25a2883450ea6a0cc9",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
