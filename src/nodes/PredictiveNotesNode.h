@@ -33,6 +33,8 @@ public:
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
    void VisitParams(ParamVisitor& v) override;
+   void SweepPrepare() override;
+   bool SweepNeedsClock() const override { return true; }
 
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "notes" : nullptr; }
