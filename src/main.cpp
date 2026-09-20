@@ -23393,6 +23393,10 @@ namespace
          return v;
       }();
       auto tuningHeader = [&](const char* idBase, int& wave, float& fine, float& semi, float& oct) {
+         // Discrete pins are keyed by these id strings, not the ImGui ID
+         // stack, so each oscillator needs its own.
+         const std::string waveId = std::string("wave") + idBase, octId = std::string("oct") + idBase,
+                           semiId = std::string("semi") + idBase;
          const float w = gAudioContentW;
          const float x0 = gAudioContentX;
          const float y = ImGui::GetCursorScreenPos().y;
@@ -23401,22 +23405,22 @@ namespace
          const float waveW = std::max(70.0f, w - octW - semiW - fineW - gap * 3.0f);
          ImGui::PushID(idBase);
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
-         AudioBareDropdown("wave", waveList, wave, [&wave](int i) { PushUndoCheckpoint(); wave = i; }, waveW);
+         AudioBareDropdown(waveId.c_str(), waveList, wave, [&wave](int i) { PushUndoCheckpoint(); wave = i; }, waveW);
          ImGui::SetCursorScreenPos(ImVec2(x0 + waveW + gap, y));
          AudioSlider("fine", &fine, -50.0f, 50.0f, "%.1f c", fineW);
          ImGui::SetCursorScreenPos(ImVec2(x0 + w - octW - semiW - gap, y));
-         AudioBareDropdown("oct", OctaveNames(), std::clamp((int)std::lround(oct), -4, 4) + 4,
+         AudioBareDropdown(octId.c_str(), OctaveNames(), std::clamp((int)std::lround(oct), -4, 4) + 4,
                            [&oct](int i) { PushUndoCheckpoint(); oct = (float)(i - 4); }, octW);
          ImGui::SetCursorScreenPos(ImVec2(x0 + w - semiW, y));
-         AudioBareDropdown("semi", semiNames24, std::clamp((int)std::lround(semi), -24, 24) + 24,
+         AudioBareDropdown(semiId.c_str(), semiNames24, std::clamp((int)std::lround(semi), -24, 24) + 24,
                            [&semi](int i) { PushUndoCheckpoint(); semi = (float)(i - 24); }, semiW);
          ImGui::PopID();
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
          ImGui::Dummy(ImVec2(0.0f, 4.0f));
       };
-      tuningHeader("osc1", n->wave1, n->fine1, n->semi1, n->oct1);
-      tuningHeader("osc2", n->wave2, n->fine2, n->semi2, n->oct2);
+      tuningHeader("1", n->wave1, n->fine1, n->semi1, n->oct1);
+      tuningHeader("2", n->wave2, n->fine2, n->semi2, n->oct2);
       {
          // Row 3: Osc 1 Vol, Osc 2 Vol, Sync & Analog switches
          AudioKnobRow row(4);
