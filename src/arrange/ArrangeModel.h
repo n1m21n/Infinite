@@ -18,6 +18,7 @@
 // compare equal. A tempo change therefore keeps every clip on its bar/beat and
 // only changes what those ticks mean in seconds.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <string>
@@ -150,6 +151,42 @@ namespace Arrange
       // (imports resolve in well under a save's timeframe), so it never
       // round-trips and needs no persistence format of its own.
       bool     importPending = false;
+
+      // Per-clip modulation bypass. Each entry is a paramIndex on the source
+      // node (srcUid) whose modulation this clip does NOT want applied - the
+      // param sits at its own base value for as long as this clip is the one
+      // playing, while every other clip on the same source still hears the
+      // modulator. Empty on every clip that predates this field, which is
+      // exactly today's behaviour (nothing bypassed).
+      //
+      // paramIndex is the same positional index Modulation binds on
+      // (src/core/Modulation.h's ParamKey) - it only exists once the node has
+      // drawn a frame, and it shifts if a node's param layout changes between
+      // versions. That is the identical contract modulation bindings already
+      // live under, deliberately: a clip's bypass list is only ever meaningful
+      // alongside the binding it refers to, so if one goes stale the other
+      // does too and they stay consistent with each other.
+      //
+      // Sorted and deduplicated by SetModBypassed so equality (the undo
+      // comparator in main.cpp) is a plain vector compare and the patch line
+      // is stable across saves.
+      std::vector<int> bypassedModParams;
+
+      bool IsModBypassed(int paramIndex) const
+      {
+         return std::find(bypassedModParams.begin(), bypassedModParams.end(), paramIndex) !=
+                bypassedModParams.end();
+      }
+
+      void SetModBypassed(int paramIndex, bool on)
+      {
+         auto it = std::lower_bound(bypassedModParams.begin(), bypassedModParams.end(), paramIndex);
+         const bool present = (it != bypassedModParams.end() && *it == paramIndex);
+         if (on && !present)
+            bypassedModParams.insert(it, paramIndex);
+         else if (!on && present)
+            bypassedModParams.erase(it);
+      }
 
       Tick End() const { return start + length; }
    };

@@ -77,6 +77,13 @@ class INode;
 //   clipgrade <streamIndex> <clipId> <brightness> <contrast> <saturation>
 //     Sample-dropped video/image clip basic color grade, only written when
 //     any differs from default (brightness 0, contrast 0, saturation 1).
+//   clipmodbypass <streamIndex> <clipId> <paramIndex> [<paramIndex> ...]
+//     Which of the source node's modulated params this clip does NOT want
+//     modulated (Arrange::Clip::bypassedModParams). Variable length, to end
+//     of line, so it is the last thing on its own line like `cliptick`'s
+//     name. Only written when the list is non-empty; a patch without it
+//     loads with nothing bypassed, i.e. exactly the behaviour that predates
+//     the field.
 //   marker <id> <posTick> <colorRGBA8> <name to end of line>
 //   arrange <nextId> <timeDisplay> <snap> <triplet> <zoom> <scroll> <loopOn>
 //           <loopStart> <loopEnd> <dock> <w> <h> <fps> <sr> <format>
@@ -330,6 +337,11 @@ namespace Patch
       // loads with every Sample reading from the file's own beginning,
       // exactly like it always has.
       float  sourceOffsetSeconds   = 0.0f;
+      // Per-clip modulation bypass (see Arrange::Clip::bypassedModParams).
+      // Sorted, deduplicated paramIndices on the clip's source node. Empty
+      // on every clip saved before this field existed, which is the same as
+      // "nothing bypassed" - so an old patch loads identically.
+      std::vector<int> bypassedModParams;
    };
 
    struct StreamRecord

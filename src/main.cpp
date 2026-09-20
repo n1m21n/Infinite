@@ -631,6 +631,10 @@ namespace
    // ModSlider and friends (the widgets that call it) are among the first
    // functions in the file.
    void PushUndoCheckpoint();
+   // Defined beside the undo stack below; declared here because
+   // ArrangeMakeClipSourceUnique (also far above it) has to hold a
+   // suppression region open across a spawn.
+   extern bool gSuppressUndoCheckpoints;
    // Timeline-only undo entry: see UndoEntry::arrangeOnly. Declared here
    // because the arrangement panel (far above the undo machinery in file
    // order) is its only caller.
@@ -656,6 +660,11 @@ namespace
    void DrawOfflineRenderProgressWindow();
    void DrawArrangeWavRenderProgressWindow();
    void DrawArrangeClipSettingsChild(float panelW);
+   // Defined beside the modulation apply loop below (the other caller), and
+   // forward-declared here because the Clip Settings panel above builds its
+   // Modulations list from it.
+   void ArrangeCollectClipModBindings(const GraphNode& node,
+                                      std::vector<std::pair<int, std::string>>& out);
    bool StartAudioEngine(std::string& outError);
 
    std::vector<GraphNode> gNodes;
@@ -6192,7 +6201,12 @@ namespace
                 ca.sampleDropped != cb.sampleDropped || ca.syncToTempo != cb.syncToTempo ||
                 ca.sampleBpm != cb.sampleBpm || ca.origBpm != cb.origBpm ||
                 ca.sourceDurationSeconds != cb.sourceDurationSeconds ||
-                ca.sourceOffsetSeconds != cb.sourceOffsetSeconds)
+                ca.sourceOffsetSeconds != cb.sourceOffsetSeconds ||
+                // Per-clip modulation bypass: without this a bypass toggle
+                // compares equal and ArrangeGestureEnd drops it as "no
+                // change", so it would never reach the undo stack - the same
+                // trap the Sample BPM fields above fell into.
+                ca.bypassedModParams != cb.bypassedModParams)
                return false;
          }
       }
@@ -6525,6 +6539,7 @@ namespace
             r.origBpm = c.origBpm;
             r.sourceDurationSeconds = c.sourceDurationSeconds;
             r.sourceOffsetSeconds = c.sourceOffsetSeconds;
+            r.bypassedModParams = c.bypassedModParams;
             s.clips.push_back(std::move(r));
          }
          data.streams.push_back(std::move(s));
@@ -6647,6 +6662,7 @@ namespace
             clip.origBpm = (c.origBpm > 0.0f) ? c.origBpm : 0.0f;
             clip.sourceDurationSeconds = c.sourceDurationSeconds;
             clip.sourceOffsetSeconds = c.sourceOffsetSeconds;
+            clip.bypassedModParams = c.bypassedModParams;
             lane.clips.push_back(std::move(clip));
          }
          m.lanes.push_back(std::move(lane));
@@ -30193,6 +30209,166 @@ namespace
       return std::clamp<Arrange::Tick>(t, 0, Arrange::kMaxTick);
    }
 
+
+   // Parses a LENGTH typed in the chosen unit. Same shape as ArrangeParsePos
+   // above but 0-indexed, matching ArrangeFormatBBTLength: a one-bar clip
+   // reads and is typed as "1.0.0", where a clip starting at bar one reads
+   // and is typed as "1.1.1". -1 when it does not parse.
+   Arrange::Tick ArrangeParseLen(const char* buf)
+   {
+      if (gArrange.settings.timeDisplay == 1)
+      {
+         char* end = nullptr;
+         const double sec = strtod(buf, &end);
+         if (end == buf || sec < 0.0) return -1;
+         return Arrange::SecondsToTicks(sec, std::max(1.0, (double)Transport::Instance().Tempo()));
+      }
+      long long bar = 0, beat = 0, six = 0;
+      const int n = sscanf(buf, "%lld.%lld.%lld", &bar, &beat, &six);
+      if (n < 1 || bar < 0 || beat < 0 || six < 0) return -1;
+      const Arrange::Tick perBar =
+         std::max<Arrange::Tick>(1, Arrange::BeatsToTicks(std::max(1.0, Transport::Instance().BeatsPerBar())));
+      const Arrange::Tick t = (Arrange::Tick)bar * perBar + (Arrange::Tick)beat * Arrange::kPPQ +
+                              (Arrange::Tick)six * (Arrange::kPPQ / 4);
+      return std::clamp<Arrange::Tick>(t, 0, Arrange::kMaxTick);
+   }
+
+   // ---- inspector typed-value editing --------------------------------------
+   // The canvas param widgets have had hover-and-type for a long time
+   // (HandleParamTypeHotkeys / gTypedParam*): hover a slider, press a digit,
+   // and you are typing, with that digit already in the box. The Arrange
+   // inspector's fields did not behave the same way, and the difference was
+   // the complaint - ImGui's own TempInput path opens the box on the OLD
+   // text, and whether the keystroke that opened it replaces that text or
+   // lands beside it depends on frame ordering, which is why typing "0.3"
+   // over "0.80" needed a backspace first.
+   //
+   // So: same approach as the canvas. Seed the box with exactly the typed
+   // character and put the cursor after it. One edit can be open at a time,
+   // which is true of an inspector by construction.
+   struct ArrangeTypedEditState
+   {
+      ImGuiID id = 0;
+      std::string text;
+      bool justOpened = false;
+      bool pendingInit = false;
+      bool noAutoSelect = false;
+   };
+   ArrangeTypedEditState gArrangeTypedEdit;
+
+   // The last frame on which an inspector value field was hovered or open for
+   // typing. The timeline's single-key shortcuts (0 bypasses the selection,
+   // M drops a marker, A/T/R/B/Z/H pick a tool) are handled in
+   // DrawArrangePanelContent, and ImGui's WantTextInput is still false on the
+   // frame a hover+type OPENS a field - so typing "0.3" into Pan bypassed the
+   // clip on the '0' before it ever reached the box. Recorded as a frame
+   // number and compared with a one-frame slack so it holds whichever order
+   // the panel and the inspector happen to draw in.
+   int gArrangeFieldHotFrame = -1000;
+   void ArrangeMarkFieldHot() { gArrangeFieldHotFrame = ImGui::GetFrameCount(); }
+   bool ArrangeFieldHot() { return (ImGui::GetFrameCount() - gArrangeFieldHotFrame) <= 1; }
+
+   void ArrangeTypedEditOpen(ImGuiID id, const std::string& seed, bool selectAll)
+   {
+      gArrangeTypedEdit.id = id;
+      gArrangeTypedEdit.text = seed;
+      gArrangeTypedEdit.justOpened = true;
+      gArrangeTypedEdit.pendingInit = true;
+      gArrangeTypedEdit.noAutoSelect = !selectAll;
+   }
+   void ArrangeTypedEditClose() { gArrangeTypedEdit = ArrangeTypedEditState(); }
+
+   // Hover + a digit / '-' / '.' / ':' opens the editor seeded with that one
+   // character. ':' is here for the Time display mode, where a position is
+   // typed "0:12.80". The character is deliberately NOT consumed from the
+   // input queue: the field it opens is not drawn until the next frame (the
+   // caller has already committed to drawing the slider this frame), by
+   // which point the queue is empty anyway - exactly how the canvas path
+   // behaves.
+   bool ArrangeTypedEditHoverHotkey(ImGuiID id)
+   {
+      ImGuiContext& g = *GImGui;
+      // Never while another widget holds the keyboard: hovering a slider must
+      // not steal keystrokes from the name box being typed into above it.
+      if (g.ActiveId != 0)
+         return false;
+      for (int i = 0; i < g.IO.InputQueueCharacters.Size; ++i)
+      {
+         const ImWchar ch = g.IO.InputQueueCharacters[i];
+         if ((ch >= '0' && ch <= '9') || ch == '-' || ch == '.' || ch == ':')
+         {
+            ArrangeTypedEditOpen(id, std::string(1, (char)ch), /*selectAll=*/false);
+            return true;
+         }
+      }
+      return false;
+   }
+
+   // Draws the open editor in place of its value widget. Returns true on the
+   // frame the user commits (Enter, or clicking away); `out` then holds the
+   // raw text for the caller to parse in whatever unit it speaks.
+   bool ArrangeTypedEditDraw(ImGuiID id, const char* strId, float width, const char* label,
+                             std::string& out)
+   {
+      if (gArrangeTypedEdit.id != id)
+         return false;
+      ArrangeMarkFieldHot();
+      ImGui::SetNextItemWidth(width);
+      if (gArrangeTypedEdit.justOpened)
+      {
+         ImGui::SetKeyboardFocusHere();
+         gArrangeTypedEdit.justOpened = false;
+      }
+      char buf[128];
+      snprintf(buf, sizeof(buf), "%s", gArrangeTypedEdit.text.c_str());
+      const bool entered = ImGui::InputText(strId, buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue);
+      gArrangeTypedEdit.text = buf;
+      // Selection is driven explicitly rather than by a flag, for the reason
+      // spelled out at the canvas equivalent: focus arrives through
+      // SetKeyboardFocusHere, so ImGui runs its own select-all the moment the
+      // field goes active - possibly a frame later - whatever flags say. That
+      // select-all is right for a double-click (replace the whole value) and
+      // wrong for hover+type (it would eat the digit just seeded).
+      if (gArrangeTypedEdit.pendingInit && ImGui::IsItemActive())
+      {
+         if (ImGuiInputTextState* st = ImGui::GetInputTextState(ImGui::GetItemID()))
+         {
+            if (gArrangeTypedEdit.noAutoSelect)
+            {
+               st->Stb.cursor = st->CurLenW;
+               st->ClearSelection();
+            }
+            else
+               st->SelectAll();
+         }
+         gArrangeTypedEdit.pendingInit = false;
+      }
+      // The caption the slider would have drawn to the right of its frame,
+      // so the row does not visibly reflow the moment it becomes editable.
+      if (label != nullptr)
+      {
+         const char* visible = label;
+         const char* hash = strstr(label, "##");
+         if (hash == label)
+            visible = nullptr;
+         if (visible != nullptr)
+         {
+            ImGui::SameLine(0.0f, GImGui->Style.ItemInnerSpacing.x);
+            if (hash != nullptr)
+               ImGui::TextUnformatted(visible, hash);
+            else
+               ImGui::TextUnformatted(visible);
+         }
+      }
+      if (entered || ImGui::IsItemDeactivated())
+      {
+         out = gArrangeTypedEdit.text;
+         ArrangeTypedEditClose();
+         return true;
+      }
+      return false;
+   }
+
    // Arrangement slider with smooth dragging, double-click to edit text,
    // hover-to-type (starts editing immediately upon typing any number/sign/dot),
    // and standard Ctrl+Click.
@@ -30226,6 +30402,29 @@ namespace
       const ImGuiID id = window->GetID(label);
       const float w = ImGui::CalcItemWidth();
 
+      // Typed edit open on this field: it replaces the slider entirely for as
+      // long as it is open. Parsed with strtof rather than through ImGui's
+      // format string, so "0.3" typed over "0.80 " is just 0.3 - the trailing
+      // unit in formats like "%.1f dB" / "%.1f st" never has to be retyped.
+      if (gArrangeTypedEdit.id == id)
+      {
+         std::string typed;
+         if (!ArrangeTypedEditDraw(id, "##arrtypedval", w, label, typed))
+            return false;
+         const std::string trimmed = TrimCopy(typed);
+         if (trimmed.empty())
+            return false;
+         char* end = nullptr;
+         const float parsed = strtof(trimmed.c_str(), &end);
+         if (end == trimmed.c_str())
+            return false;
+         const float clamped = std::clamp(parsed, std::min(v_min, v_max), std::max(v_min, v_max));
+         if (clamped == *v)
+            return false;
+         *v = clamped;
+         return true;
+      }
+
       const ImVec2 label_size = ImGui::CalcTextSize(label, NULL, true);
       const ImRect frame_bb(window->DC.CursorPos, window->DC.CursorPos + ImVec2(w, label_size.y + style.FramePadding.y * 2.0f));
       const ImRect total_bb(frame_bb.Min, frame_bb.Max + ImVec2(label_size.x > 0.0f ? style.ItemInnerSpacing.x + label_size.x : 0.0f, 0.0f));
@@ -30239,60 +30438,38 @@ namespace
          format = "%.3f";
 
       const bool hovered = ImGui::ItemHoverable(frame_bb, id, g.LastItemData.InFlags);
-      bool temp_input_is_active = temp_input_allowed && ImGui::TempInputIsActive(id);
-      if (!temp_input_is_active)
+      if (hovered)
+         ArrangeMarkFieldHot();
       {
          ArrangeSliderPendingClick& pending = sArrangeSliderPending[id];
 
          const bool doubleClicked = hovered && ImGui::IsMouseDoubleClicked(0);
          const bool freshClick = hovered && !doubleClicked && ImGui::IsMouseClicked(0, ImGuiInputFlags_None, id);
 
-         // Only fires when NO widget anywhere holds ActiveId, so hovering a
-         // slider can never steal keystrokes from another field being typed
-         // into (e.g. a name box in the same panel).
-         bool keyPressedOnHover = false;
-         if (hovered && temp_input_allowed && g.ActiveId == 0)
-         {
-            for (int n = 0; n < g.IO.InputQueueCharacters.Size; n++)
-            {
-               const ImWchar c = g.IO.InputQueueCharacters[n];
-               if ((c >= '0' && c <= '9') || c == '-' || c == '+' || c == '.')
-               {
-                  keyPressedOnHover = true;
-                  break;
-               }
-            }
-         }
+         // Hover + a digit opens the typed editor NEXT frame, seeded with that
+         // digit (ArrangeTypedEditHoverHotkey). Double-click and Ctrl+click
+         // open it on the current value, selected, because there the intent is
+         // "replace this whole number" rather than "start typing a new one".
+         bool openTyped = false;
+         bool openSelected = false;
+         if (hovered && temp_input_allowed)
+            openTyped = ArrangeTypedEditHoverHotkey(id);
 
          bool activateDrag = false;
-         if (doubleClicked)
+         if (doubleClicked && temp_input_allowed)
          {
             pending.waiting = false;
             ImGui::SetKeyOwner(ImGuiKey_MouseLeft, id);
-            temp_input_is_active = true;
+            openTyped = true;
+            openSelected = true;
          }
-         else if (keyPressedOnHover || (g.NavActivateId == id && (g.NavActivateFlags & ImGuiActivateFlags_PreferInput)))
-         {
-            pending.waiting = false;
-            // InputTextEx only claims ActiveId when it sees a real mouse click
-            // or NavActivateId==id+PreferInput this frame - hovering and typing
-            // has neither, so without this TempInputText's "we expect it to
-            // take the active id" assert aborts the app (crash report
-            // 2026-09-15 084740/084805/084826). Fake the nav-activation request
-            // so InputTextEx's init_make_active sees it exactly like a real one.
-            if (keyPressedOnHover)
-            {
-               g.NavActivateId = id;
-               g.NavActivateFlags = ImGuiActivateFlags_PreferInput;
-            }
-            temp_input_is_active = true;
-         }
-         else if (freshClick && g.IO.KeyCtrl)
+         else if (freshClick && g.IO.KeyCtrl && temp_input_allowed)
          {
             // Ctrl+Click is unambiguous - no need to wait out the double-click window.
             pending.waiting = false;
             ImGui::SetKeyOwner(ImGuiKey_MouseLeft, id);
-            temp_input_is_active = true;
+            openTyped = true;
+            openSelected = true;
          }
          else if (freshClick)
          {
@@ -30318,20 +30495,25 @@ namespace
             activateDrag = true;
          }
 
-         if (activateDrag && !temp_input_is_active)
+         if (openSelected)
+         {
+            char seed[64];
+            ImGui::DataTypeFormatString(seed, IM_ARRAYSIZE(seed), ImGuiDataType_Float, v, format);
+            ArrangeTypedEditOpen(id, TrimCopy(seed), /*selectAll=*/true);
+         }
+         if (openTyped)
+         {
+            ImGui::ClearActiveID();
+            return false; // the editor draws in this field's place next frame
+         }
+
+         if (activateDrag)
          {
             ImGui::SetActiveID(id, window);
             ImGui::SetFocusID(id, window);
             ImGui::FocusWindow(window);
             g.ActiveIdUsingNavDirMask |= (1 << ImGuiDir_Left) | (1 << ImGuiDir_Right);
          }
-      }
-
-      if (temp_input_is_active)
-      {
-         const bool is_clamp_input = (flags & ImGuiSliderFlags_AlwaysClamp) != 0;
-         return ImGui::TempInputScalar(frame_bb, id, label, ImGuiDataType_Float, v, format,
-                                       is_clamp_input ? &v_min : NULL, is_clamp_input ? &v_max : NULL);
       }
 
       // Draw frame
@@ -30360,6 +30542,193 @@ namespace
          ImGui::RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, frame_bb.Min.y + style.FramePadding.y), label);
 
       return value_changed;
+   }
+
+
+   // A clip tick value, in whichever unit that value is actually spoken in.
+   //
+   //   Position / Length  follow Settings::timeDisplay - bar.beat.sixteenth
+   //                      ("9.3.3" for a position, "1.0.0" for a length) in
+   //                      Bars, seconds in Time.
+   //   FadeMs             is always milliseconds, whatever the display mode.
+   //                      A fade is an envelope, not a place in the song: it
+   //                      is chosen by ear in the tens of milliseconds, and
+   //                      "0.0.0" gave no way to say 20 of them.
+   //
+   // Dragging, double-clicking and hover-and-type all work in that same unit,
+   // and the typed text is parsed in it - so "9.3.3" in the Start box means
+   // bar 9, beat 3, sixteenth 3, and "20" in a Fade box means 20 ms.
+   enum class ArrangeTickUnit { Position, Length, FadeMs };
+
+   bool ArrangeTickField(const char* label, Arrange::Tick cur, Arrange::Tick lo, Arrange::Tick hi,
+                         ArrangeTickUnit unit, float width, Arrange::Tick* out)
+   {
+      ImGuiWindow* window = ImGui::GetCurrentWindow();
+      if (window->SkipItems)
+         return false;
+      const ImGuiID id = window->GetID(label);
+      const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
+      const bool bars = gArrange.settings.timeDisplay == 0 && unit != ArrangeTickUnit::FadeMs;
+
+      auto toTicks = [&](double shown) -> Arrange::Tick
+      {
+         if (unit == ArrangeTickUnit::FadeMs)
+            return Arrange::SecondsToTicks(shown / 1000.0, bpm);
+         return bars ? Arrange::BeatsToTicks(shown) : Arrange::SecondsToTicks(shown, bpm);
+      };
+      auto fromTicks = [&](Arrange::Tick t) -> float
+      {
+         if (unit == ArrangeTickUnit::FadeMs)
+            return (float)(Arrange::TicksToSeconds(t, bpm) * 1000.0);
+         return bars ? (float)Arrange::TicksToBeats(t) : (float)Arrange::TicksToSeconds(t, bpm);
+      };
+
+      // Typed edit open on this field - it replaces the drag entirely.
+      if (gArrangeTypedEdit.id == id)
+      {
+         std::string typed;
+         if (!ArrangeTypedEditDraw(id, "##arrtypedtick", width, label, typed))
+            return false;
+         const std::string trimmed = TrimCopy(typed);
+         if (trimmed.empty())
+            return false;
+         Arrange::Tick parsed = -1;
+         if (unit == ArrangeTickUnit::FadeMs)
+         {
+            char* end = nullptr;
+            const double ms = strtod(trimmed.c_str(), &end);
+            if (end != trimmed.c_str() && ms >= 0.0)
+               parsed = Arrange::SecondsToTicks(ms / 1000.0, bpm);
+         }
+         else if (unit == ArrangeTickUnit::Length)
+            parsed = ArrangeParseLen(trimmed.c_str());
+         else
+            parsed = ArrangeParsePos(trimmed.c_str());
+         if (parsed < 0)
+            return false;
+         *out = std::clamp<Arrange::Tick>(parsed, lo, hi);
+         return *out != cur;
+      }
+
+      const float v0 = fromTicks(cur);
+      float v = v0;
+      const float vlo = fromTicks(lo);
+      const float vhi = hi >= Arrange::kMaxTick ? FLT_MAX : fromTicks(hi);
+      const float speed = (unit == ArrangeTickUnit::FadeMs) ? 1.0f : (bars ? 0.0625f : 0.01f);
+      // The bar/beat text is a literal rather than a printf of the dragged
+      // float, so ImGui's own ctrl+click text entry is switched off here and
+      // the typed path above is the only way in - it is the one that knows
+      // how to read "9.3.3" back.
+      std::string shown;
+      if (unit == ArrangeTickUnit::FadeMs)
+         shown = "%.0f ms";
+      else if (bars)
+         shown = (unit == ArrangeTickUnit::Length) ? ArrangeFormatBBTLength(cur) : ArrangeFormatBBT(cur);
+      else
+         shown = "%.2fs";
+
+      ImGui::SetNextItemWidth(width);
+      const bool dragged = ImGui::DragFloat(label, &v, speed, vlo, vhi, shown.c_str(),
+                                            ImGuiSliderFlags_NoInput);
+
+      if (ImGui::IsItemHovered())
+      {
+         ArrangeMarkFieldHot();
+         if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+         {
+            std::string seed;
+            if (unit == ArrangeTickUnit::FadeMs)
+            {
+               char buf[32];
+               snprintf(buf, sizeof(buf), "%.0f", v0);
+               seed = buf;
+            }
+            else if (bars)
+               seed = (unit == ArrangeTickUnit::Length) ? ArrangeFormatBBTLength(cur) : ArrangeFormatBBT(cur);
+            else
+            {
+               char buf[32];
+               snprintf(buf, sizeof(buf), "%.2f", v0);
+               seed = buf;
+            }
+            ArrangeTypedEditOpen(id, seed, /*selectAll=*/true);
+            ImGui::ClearActiveID();
+            return false;
+         }
+         if (ArrangeTypedEditHoverHotkey(id))
+         {
+            ImGui::ClearActiveID();
+            return false;
+         }
+      }
+
+      if (!dragged)
+         return false;
+      if (unit == ArrangeTickUnit::FadeMs)
+         *out = std::clamp<Arrange::Tick>(toTicks(v), lo, hi);
+      else if (bars)
+      {
+         const Arrange::Tick q = Arrange::kPPQ / 4;
+         *out = std::clamp<Arrange::Tick>(Arrange::SnapToGrid(Arrange::BeatsToTicks(v), q), lo, hi);
+      }
+      else
+         *out = std::clamp<Arrange::Tick>(toTicks(v), lo, hi);
+      return *out != cur;
+   }
+
+   // A plain drag field with the same typing behaviour as the sliders beside
+   // it. ImGui::DragFloat's own ctrl+click entry exists but opens on the old
+   // text and does not hover-and-type, which is the inconsistency this whole
+   // pass is removing - so Sample BPM goes through here rather than being the
+   // one field in the inspector that still behaves differently.
+   bool ArrangeDragFloat(const char* label, float* v, float speed, float v_min, float v_max,
+                         const char* format, float width)
+   {
+      ImGuiWindow* window = ImGui::GetCurrentWindow();
+      if (window->SkipItems)
+         return false;
+      const ImGuiID id = window->GetID(label);
+
+      if (gArrangeTypedEdit.id == id)
+      {
+         std::string typed;
+         if (!ArrangeTypedEditDraw(id, "##arrtypeddrag", width, label, typed))
+            return false;
+         const std::string trimmed = TrimCopy(typed);
+         if (trimmed.empty())
+            return false;
+         char* end = nullptr;
+         const float parsed = strtof(trimmed.c_str(), &end);
+         if (end == trimmed.c_str())
+            return false;
+         const float clamped = std::clamp(parsed, std::min(v_min, v_max), std::max(v_min, v_max));
+         if (clamped == *v)
+            return false;
+         *v = clamped;
+         return true;
+      }
+
+      ImGui::SetNextItemWidth(width);
+      const bool dragged = ImGui::DragFloat(label, v, speed, v_min, v_max, format,
+                                            ImGuiSliderFlags_NoInput);
+      if (ImGui::IsItemHovered())
+      {
+         ArrangeMarkFieldHot();
+         if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+         {
+            char seed[64];
+            ImGui::DataTypeFormatString(seed, IM_ARRAYSIZE(seed), ImGuiDataType_Float, v, format);
+            ArrangeTypedEditOpen(id, TrimCopy(seed), /*selectAll=*/true);
+            ImGui::ClearActiveID();
+            return false;
+         }
+         if (ArrangeTypedEditHoverHotkey(id))
+         {
+            ImGui::ClearActiveID();
+            return false;
+         }
+      }
+      return dragged;
    }
 
    // ---- render-range and render-target helpers (WP7) ------------------------
@@ -30915,6 +31284,129 @@ namespace
       gArrangePendingImports.push_back(pending);
    }
 
+   // Hover detail for the shared-source warning. The warning itself is one
+   // line by design - the explanation is real but nobody needs it on every
+   // frame they have that clip selected, so it lives here, behind a hover,
+   // for the moment they want to know why.
+   void ArrangeSharedSourceTooltip(const char* body)
+   {
+      if (!ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+         return;
+      ImGui::BeginTooltip();
+      ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);
+      ImGui::TextUnformatted(body);
+      ImGui::PopTextWrapPos();
+      ImGui::EndTooltip();
+   }
+
+   // "Make Unique": gives this clip its own copy of its source node, so two
+   // clips sharing one node stop fighting over the node's single playback
+   // position (the conflict the inspector warns about).
+   //
+   // A dropped Sample already has a purpose-built path for this - its node
+   // owns a decoded file and a stretcher, which must be re-decoded rather
+   // than parameter-copied - so that case defers to ArrangeRespawnCloneNode.
+   // Everything else is an ordinary graph node and is cloned the same way
+   // Shift+D clones one: same type, same params, and every link *landing on*
+   // it re-established onto the copy via the cluster clipboard, so the copy
+   // arrives fed by the same upstream and carrying the same modulations
+   // rather than as a bare default node.
+   //
+   // The copy is a normal visible canvas node, not hidden: a hidden node's
+   // param pins never re-register for modulation, which would leave the
+   // clip's own Modulations list permanently empty - the opposite of what
+   // someone pressing this button wants.
+   //
+   // The clip's bypass list survives untouched: it stores paramIndex values,
+   // and the copy is the same node type, so index N is the same parameter on
+   // the copy as it was on the original.
+   bool ArrangeMakeClipSourceUnique(uint64_t clipId)
+   {
+      Arrange::Clip* c = Arrange::FindClip(gArrange, clipId);
+      if (c == nullptr)
+         return false;
+
+      // One FULL checkpoint for the whole button press, not ArrangeEdit's
+      // arrange-only snapshot: this changes the graph (a node appears) and
+      // the timeline (srcUid moves) together, and an arrange-only undo would
+      // put srcUid back while leaving the copy stranded on the canvas.
+      // Suppressing for the duration also stops SpawnNode pushing a second
+      // checkpoint of its own, which would make one button two undos.
+      const bool wasSuppressed = gSuppressUndoCheckpoints;
+      PushUndoCheckpoint();
+      gSuppressUndoCheckpoints = true;
+      struct Restore
+      {
+         bool prev;
+         ~Restore() { gSuppressUndoCheckpoints = prev; }
+      } restore{ wasSuppressed };
+
+      if (c->sampleDropped)
+      {
+         ArrangeRespawnCloneNode(clipId);
+         ArrangeCommitEdit();
+         return true;
+      }
+
+      GraphNode* srcNode = FindNodeByUid(c->srcUid);
+      if (srcNode == nullptr)
+         return false;
+
+      // Resolved before SpawnNode, which can reallocate gNodes and invalidate
+      // every GraphNode* taken above.
+      const int origIndex = srcNode->index;
+      const std::string typeName = srcNode->typeName;
+      const std::string category = srcNode->category;
+      const bool showParams = srcNode->showParams;
+      const bool showMiniViewport = srcNode->showMiniViewport;
+      const bool showAdvancedParams = srcNode->showAdvancedParams;
+      INode* srcImpl = srcNode->node.get();
+
+      ClusterClipboard cluster;
+      CaptureClusterLinks({ origIndex }, cluster);
+
+      ed::EditorContext* prevEditor = ed::GetCurrentEditor();
+      ed::SetCurrentEditor(gEditor);
+      const ImVec2 origPos = ed::GetNodePosition(srcNode->NodeId());
+      ed::SetCurrentEditor(prevEditor);
+      const ImVec2 pos = FindFreeSpawnPosition(ImVec2(origPos.x + 60.0f, origPos.y + 60.0f));
+
+      GraphNode* copy = SpawnNode(typeName, category, pos.x, pos.y);
+      if (copy == nullptr)
+         return false;
+
+      CopyParams(copy->node.get(), srcImpl);
+      // Same identity divergence Shift+D applies: a copy that kept the
+      // original's seed/ownership map would not be an independent voice, it
+      // would be the original running twice.
+      if (auto* rn = dynamic_cast<RandomNode*>(copy->node.get()))
+         rn->seed = RandomNode::NextSeed();
+      if (auto* fgn = dynamic_cast<FieldGraphNode*>(copy->node.get()))
+      {
+         fgn->SetUid(FieldGraphNode::NewUid());
+         fgn->Ownership() = Field::GraphOwnershipMap();
+         fgn->ownershipText.clear();
+      }
+      copy->showParams = showParams;
+      copy->showMiniViewport = showMiniViewport;
+      copy->showAdvancedParams = showAdvancedParams;
+
+      std::map<int, GraphNode*> newByOrig;
+      newByOrig[origIndex] = copy;
+      ApplyClusterLinks(newByOrig, cluster);
+
+      // Re-found: ApplyClusterLinks spawns nothing, but FindClip's pointer
+      // predates SpawnNode's possible reallocation of unrelated storage, and
+      // re-finding is cheaper than reasoning about which containers moved.
+      if (Arrange::Clip* live = Arrange::FindClip(gArrange, clipId))
+      {
+         live->srcUid = copy->uid;
+         gArrange.revision++;
+      }
+      ArrangeCommitEdit();
+      return true;
+   }
+
    // Main thread, once per frame (called from DrawArrangePanelContent - the
    // Arrange panel is the only consumer of import results, same as
    // SampleScanner/PluginScanner only ever poll from the panel that shows
@@ -31299,7 +31791,15 @@ namespace
       // click-catcher, but keys reach here regardless of what floats on top,
       // and an edit landing mid-render would change the model the compositor
       // is reading frame by frame.
-      if (gArrangeFocused && !ImGui::GetIO().WantTextInput && !scrubEscaped && !ArrangeRenderBusy() &&
+      // !ArrangeFieldHot(): hovering an inspector value field arms
+      // hover-and-type, and the digit that opens the field arrives a frame
+      // BEFORE WantTextInput goes true - so without this, typing "0.3" into
+      // Pan ran the '0' through ArrangeToggleEnabledSelection and bypassed
+      // the clip. Suppressing every single-key shortcut while the pointer is
+      // over a field is deliberate: the pointer being there is exactly the
+      // statement that the next keystroke is a value, not a command.
+      if (gArrangeFocused && !ImGui::GetIO().WantTextInput && !ArrangeFieldHot() &&
+          !scrubEscaped && !ArrangeRenderBusy() &&
           gArrangeDrag.mode == kArrangeDragNone && !gArrangeGestureOpen && !gArrangeScrubbing &&
           gArrangeMarkerDragId == 0)
       {
@@ -34790,33 +35290,13 @@ namespace
                if (ImGui::IsItemDeactivated())
                   ArrangeGestureEnd();
             };
-            // A tick field in the chosen unit (WP6). Bars: dragged in beats,
-            // shown as bar.beat.sixteenth, stepping by sixteenths (the text is
-            // a literal, so typing is off - drag only). Time: seconds, as
-            // before, typing allowed. Storage stays ticks either way.
+            // Same fields, same units, same typing as the docked inspector -
+            // one shared widget rather than a second copy here, which is how
+            // the two drifted apart in the first place.
             auto tickField = [&](const char* label, Arrange::Tick cur, Arrange::Tick lo, Arrange::Tick hi,
-                                 bool isLength, Arrange::Tick* out) -> bool
+                                 ArrangeTickUnit unit, Arrange::Tick* out) -> bool
             {
-               ImGui::SetNextItemWidth(160.0f);
-               if (gArrange.settings.timeDisplay == 1)
-               {
-                  float v = (float)Arrange::TicksToSeconds(cur, arrBpm);
-                  const float vlo = (float)Arrange::TicksToSeconds(lo, arrBpm);
-                  const float vhi = hi >= Arrange::kMaxTick ? FLT_MAX : (float)Arrange::TicksToSeconds(hi, arrBpm);
-                  if (!ImGui::DragFloat(label, &v, 0.01f, vlo, vhi, "%.2fs"))
-                     return false;
-                  *out = std::clamp<Arrange::Tick>(Arrange::SecondsToTicks(v, arrBpm), lo, hi);
-                  return true;
-               }
-               float v = (float)Arrange::TicksToBeats(cur);
-               const float vlo = (float)Arrange::TicksToBeats(lo);
-               const float vhi = hi >= Arrange::kMaxTick ? FLT_MAX : (float)Arrange::TicksToBeats(hi);
-               const std::string shown = isLength ? ArrangeFormatBBTLength(cur) : ArrangeFormatBBT(cur);
-               if (!ImGui::DragFloat(label, &v, 0.0625f, vlo, vhi, shown.c_str(), ImGuiSliderFlags_NoInput))
-                  return false;
-               const Arrange::Tick q = Arrange::kPPQ / 4;
-               *out = std::clamp<Arrange::Tick>(Arrange::SnapToGrid(Arrange::BeatsToTicks(v), q), lo, hi);
-               return *out != cur;
+               return ArrangeTickField(label, cur, lo, hi, unit, 160.0f, out);
             };
             // Per clip-type settings only. Position and length are the
             // mouse's (drag, trim handles, blade); clip gain and pan are
@@ -34824,7 +35304,7 @@ namespace
             if (ctxSelectionSingleType && ctxLaneType == Arrange::kLaneAudio)
             {
                Arrange::Tick nt = 0;
-               if (tickField("Fade In", cp->fadeIn, 0, cp->length, true, &nt))
+               if (tickField("Fade In", cp->fadeIn, 0, cp->length, ArrangeTickUnit::FadeMs, &nt))
                {
                   fieldGesture(true);
                   cp = Arrange::FindClip(gArrange, cid);
@@ -34833,7 +35313,7 @@ namespace
                }
                fieldGestureEnd();
                cp = Arrange::FindClip(gArrange, cid);
-               if (tickField("Fade Out", cp->fadeOut, 0, cp->length, true, &nt))
+               if (tickField("Fade Out", cp->fadeOut, 0, cp->length, ArrangeTickUnit::FadeMs, &nt))
                {
                   fieldGesture(true);
                   cp = Arrange::FindClip(gArrange, cid);
@@ -34900,8 +35380,7 @@ namespace
                   cp = Arrange::FindClip(gArrange, cid);
                   float sampleBpm = cp->sampleBpm;
                   ImGui::BeginDisabled(!cp->syncToTempo);
-                  ImGui::SetNextItemWidth(160.0f);
-                  if (ImGui::DragFloat("Sample BPM", &sampleBpm, 0.1f, 20.0f, 999.0f, "%.2f"))
+                  if (ArrangeDragFloat("Sample BPM", &sampleBpm, 0.1f, 20.0f, 999.0f, "%.2f", 160.0f))
                   {
                      fieldGesture(true);
                      ArrangeSetSampleBpm(cid, sampleBpm);
@@ -34926,7 +35405,7 @@ namespace
             else if (ctxSelectionSingleType && ctxLaneType == Arrange::kLaneVideo)
             {
                Arrange::Tick nt = 0;
-               if (tickField("Fade In", cp->fadeIn, 0, cp->length, true, &nt))
+               if (tickField("Fade In", cp->fadeIn, 0, cp->length, ArrangeTickUnit::FadeMs, &nt))
                {
                   fieldGesture(true);
                   cp = Arrange::FindClip(gArrange, cid);
@@ -34935,7 +35414,7 @@ namespace
                }
                fieldGestureEnd();
                cp = Arrange::FindClip(gArrange, cid);
-               if (tickField("Fade Out", cp->fadeOut, 0, cp->length, true, &nt))
+               if (tickField("Fade Out", cp->fadeOut, 0, cp->length, ArrangeTickUnit::FadeMs, &nt))
                {
                   fieldGesture(true);
                   cp = Arrange::FindClip(gArrange, cid);
@@ -38756,7 +39235,8 @@ namespace
          ImGui::TextWrapped(
             "Two clips on different tracks should not share one source node: there is one "
             "playback position per node, so they cannot be retriggered independently. The "
-            "inspector warns you when that happens - duplicate the source node instead.");
+            "inspector warns you when that happens, with a Make Unique button that gives the "
+            "clip its own copy of the node - same inputs, same modulations, its own position.");
          ImGui::Spacing();
          ImGui::TextWrapped(
             "Right-click a track or group header to render or export just that track or "
@@ -39390,6 +39870,35 @@ namespace
    // Timeline routing: the arrangement's audio clips feed the device and
    // every canvas Audio Out is bypassed. The mode, plus an arrangement-driven
    // offline render, which is Timeline by definition.
+   // Every modulation bound to `node`, as (paramIndex, display label). Shared by
+   // the Clip Settings list and its self-test, so what the test proves is what
+   // the panel actually shows.
+   //
+   // Reads Modulation::KnownParam, the sticky record, rather than this frame's
+   // FrameParams: the inspector can draw on a frame where the source node did
+   // not (scrolled off canvas, or a top-docked panel drawing before the canvas
+   // registers anything). A param with no sticky record yet still gets listed,
+   // under its index, rather than silently vanishing from the list.
+   void ArrangeCollectClipModBindings(const GraphNode& node,
+                                      std::vector<std::pair<int, std::string>>& out)
+   {
+      out.clear();
+      const Modulation& mod = Modulation::Instance();
+      for (const auto& kv : mod.Links())
+      {
+         if (kv.first.first != node.index || kv.second.nodeIndex < 0)
+            continue;
+         const int paramIndex = kv.first.second;
+         const ParamRef* known = mod.KnownParam(node.index, paramIndex);
+         const GraphNode* modNode = FindNodeByIndex(kv.second.nodeIndex);
+         std::string label = known != nullptr ? StripParamLabel(known->name.c_str())
+                                              : ("param " + std::to_string(paramIndex));
+         if (modNode != nullptr)
+            label += "  <-  " + NodeTitle(*modNode);
+         out.emplace_back(paramIndex, label);
+      }
+   }
+
    bool ArrangeTimelineRoutingActive()
    {
       return gAudioMode == AudioMode::Timeline ||
@@ -40527,29 +41036,9 @@ namespace
       const float fieldW = std::max(70.0f, availW - 65.0f);
 
       auto tickField = [&](const char* label, Arrange::Tick cur, Arrange::Tick lo, Arrange::Tick hi,
-                           bool isLength, Arrange::Tick* out) -> bool
+                           ArrangeTickUnit unit, Arrange::Tick* out) -> bool
       {
-         const double arrBpm = std::max(1.0, (double)Transport::Instance().Tempo());
-         ImGui::SetNextItemWidth(fieldW);
-         if (gArrange.settings.timeDisplay == 1)
-         {
-            float v = (float)Arrange::TicksToSeconds(cur, arrBpm);
-            const float vlo = (float)Arrange::TicksToSeconds(lo, arrBpm);
-            const float vhi = hi >= Arrange::kMaxTick ? FLT_MAX : (float)Arrange::TicksToSeconds(hi, arrBpm);
-            if (!ImGui::DragFloat(label, &v, 0.01f, vlo, vhi, "%.2fs"))
-               return false;
-            *out = std::clamp<Arrange::Tick>(Arrange::SecondsToTicks(v, arrBpm), lo, hi);
-            return true;
-         }
-         float v = (float)Arrange::TicksToBeats(cur);
-         const float vlo = (float)Arrange::TicksToBeats(lo);
-         const float vhi = hi >= Arrange::kMaxTick ? FLT_MAX : (float)Arrange::TicksToBeats(hi);
-         const std::string shown = isLength ? ArrangeFormatBBTLength(cur) : ArrangeFormatBBT(cur);
-         if (!ImGui::DragFloat(label, &v, 0.0625f, vlo, vhi, shown.c_str(), ImGuiSliderFlags_NoInput))
-            return false;
-         const Arrange::Tick q = Arrange::kPPQ / 4;
-         *out = std::clamp<Arrange::Tick>(Arrange::SnapToGrid(Arrange::BeatsToTicks(v), q), lo, hi);
-         return *out != cur;
+         return ArrangeTickField(label, cur, lo, hi, unit, fieldW, out);
       };
 
       auto drawPaletteSwatches = [&](const std::function<void(uint32_t)>& onSelect)
@@ -40615,7 +41104,7 @@ namespace
          ImGui::Spacing();
          ImGui::TextDisabled("Timing & Position");
          Arrange::Tick newTick = 0;
-         if (tickField("Start##clipstart", clip->start, 0, Arrange::kMaxTick, false, &newTick))
+         if (tickField("Start##clipstart", clip->start, 0, Arrange::kMaxTick, ArrangeTickUnit::Position, &newTick))
          {
             ArrangeEdit([&]() {
                if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -40625,7 +41114,7 @@ namespace
                }
             });
          }
-         if (tickField("Length##cliplength", clip->length, Arrange::kPPQ / 16, Arrange::kMaxTick, true, &newTick))
+         if (tickField("Length##cliplength", clip->length, Arrange::kPPQ / 16, Arrange::kMaxTick, ArrangeTickUnit::Length, &newTick))
          {
             ArrangeEdit([&]() {
                if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -40635,7 +41124,7 @@ namespace
                }
             });
          }
-         if (tickField("Fade In##clipfadein", clip->fadeIn, 0, clip->length, true, &newTick))
+         if (tickField("Fade In##clipfadein", clip->fadeIn, 0, clip->length, ArrangeTickUnit::FadeMs, &newTick))
          {
             ArrangeEdit([&]() {
                if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -40645,7 +41134,7 @@ namespace
                }
             });
          }
-         if (tickField("Fade Out##clipfadeout", clip->fadeOut, 0, clip->length, true, &newTick))
+         if (tickField("Fade Out##clipfadeout", clip->fadeOut, 0, clip->length, ArrangeTickUnit::FadeMs, &newTick))
          {
             ArrangeEdit([&]() {
                if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
@@ -40660,14 +41149,17 @@ namespace
          {
             ImGui::Spacing();
             ImGui::TextDisabled("Source");
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + fieldW);
-            ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.2f, 1.0f),
-               "This clip's source is also used on another video track. A video clip does not "
-               "hold its own playback position - the source reads the global transport - so both "
-               "clips show the same frame, and wherever they overlap the upper track hides this "
-               "one's blend mode, opacity and grade. Give it its own node (Duplicate) unless the "
-               "double composite is deliberate.");
-            ImGui::PopTextWrapPos();
+            // One line, not a paragraph: the button beside it is the whole
+            // fix, and the reasoning belongs in a tooltip the user opens
+            // when they want it rather than in permanent panel text.
+            ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.2f, 1.0f), "Shared with another video track.");
+            ArrangeSharedSourceTooltip(
+               "Both clips show the same frame - a video source reads the global transport, not "
+               "the clip - and where they overlap the upper track hides this one's blend mode, "
+               "opacity and grade.\n\nMake Unique gives this clip its own copy of the node, fed "
+               "by the same inputs and carrying the same modulations.");
+            if (ImGui::Button("Make Unique##clipuniquevideo", ImVec2(-FLT_MIN, 0)))
+               ArrangeMakeClipSourceUnique(clipId); // takes its own full checkpoint
          }
 
          // Every audio clip position-locks its source now (see RunTopology's
@@ -40678,13 +41170,14 @@ namespace
          {
             ImGui::Spacing();
             ImGui::TextDisabled("Playback & Trigger");
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + fieldW);
-            ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.2f, 1.0f),
-               "This clip's source is also used on another track. The node holds one playback "
-               "position and both tracks set it every block, so whichever is summed last wins and "
-               "this clip can end up playing the other one's position. Give it its own node "
-               "(Duplicate).");
-            ImGui::PopTextWrapPos();
+            ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.2f, 1.0f), "Shared with another track.");
+            ArrangeSharedSourceTooltip(
+               "The node holds one playback position and both tracks set it every block, so "
+               "whichever is summed last wins and this clip can end up playing the other one's "
+               "position.\n\nMake Unique gives this clip its own copy of the node, fed by the "
+               "same inputs and carrying the same modulations.");
+            if (ImGui::Button("Make Unique##clipuniqueaudio", ImVec2(-FLT_MIN, 0)))
+               ArrangeMakeClipSourceUnique(clipId); // takes its own full checkpoint
          }
 
          ImGui::Spacing();
@@ -40834,8 +41327,7 @@ namespace
                   const bool locked = !ci->syncToTempo;
                   ImGui::BeginDisabled(locked);
                   float sampleBpm = ci->sampleBpm;
-                  ImGui::SetNextItemWidth(fieldW);
-                  if (ImGui::DragFloat("Sample BPM##clipbpm", &sampleBpm, 0.1f, 20.0f, 999.0f, "%.2f"))
+                  if (ArrangeDragFloat("Sample BPM##clipbpm", &sampleBpm, 0.1f, 20.0f, 999.0f, "%.2f", fieldW))
                      ArrangeEdit([&]() { ArrangeSetSampleBpm(clipId, sampleBpm); });
                   if (const Arrange::Clip* cr = Arrange::FindClip(gArrange, clipId))
                      if (cr->origBpm > 0.0f && cr->origBpm != cr->sampleBpm &&
@@ -40874,6 +41366,52 @@ namespace
          {
             ImGui::Text("Node: %s", NodeTitle(*srcNode).c_str());
             ImGui::TextDisabled("Type: %s", srcNode->typeName.c_str());
+            // --- per-clip modulation bypass -----------------------------
+            // Every modulation currently bound to this clip's source node,
+            // each with a checkbox saying whether THIS clip wants it. The
+            // node keeps the binding either way - it is the clip that opts
+            // out, so the same node still arrives modulated under a clip
+            // that leaves the box ticked.
+            //
+            // Only this node's OWN bindings are listed. A modulator sitting
+            // on something upstream shapes what this node is fed, and that
+            // feed is shared with every other consumer of the upstream node,
+            // so a single clip cannot opt out of it without duplicating the
+            // whole chain. Deliberately out of scope.
+            {
+               std::vector<std::pair<int, std::string>> bound; // paramIndex, label
+               ArrangeCollectClipModBindings(*srcNode, bound);
+
+               if (!bound.empty())
+               {
+                  ImGui::Spacing();
+                  ImGui::Separator();
+                  ImGui::TextDisabled("Modulations");
+                  PushCheckboxStyle();
+                  for (const auto& entry : bound)
+                  {
+                     const int paramIndex = entry.first;
+                     // Ticked = this clip hears the modulation, which is the
+                     // default and reads the right way round: an untouched
+                     // clip shows every box ticked.
+                     bool active = !clip->IsModBypassed(paramIndex);
+                     ImGui::PushID(paramIndex);
+                     if (ImGui::Checkbox(entry.second.c_str(), &active))
+                     {
+                        ArrangeEdit([&]() {
+                           if (Arrange::Clip* c = Arrange::FindClip(gArrange, clipId))
+                           {
+                              c->SetModBypassed(paramIndex, !active);
+                              gArrange.revision++;
+                           }
+                        });
+                     }
+                     ImGui::PopID();
+                  }
+                  PopCheckboxStyle();
+               }
+            }
+
             // A Sample owns the private node its own drag-drop import
             // created - repointing or clearing that would defeat the whole
             // point of a sample (see sampleDropped's doc comment in
@@ -62557,9 +63095,89 @@ static MovementLog::Source ModulatorLogSource(INode* n, int modNodeIndex)
                                                              : MovementLog::Source::Perf;
 }
 
+// ---- per-clip modulation bypass (Arrange::Clip::bypassedModParams) -------
+//
+// A clip can ask for some of its source node's modulations not to be
+// applied while that clip is the one playing, so the same oscillator can
+// sound modulated under one clip and static under another. Rebuilt once
+// per frame, immediately before the apply loop reads it, because the
+// answer changes with the playhead.
+//
+// Keyed by node index rather than uid so the apply loop's test is a plain
+// lookup on the ParamRef it already has.
+//
+// Only the clip under the playhead counts. Two clips on different lanes
+// sharing one source and disagreeing about a param cannot both be honoured
+// - there is one param float - so the first lane wins here; giving such a
+// clip its own private shadow instance is what actually resolves that, and
+// is deliberately a separate step.
+std::unordered_map<int, const std::vector<int>*> gArrangeActiveClipModBypass;
+
+void ArrangeRefreshActiveClipModBypass()
+{
+   gArrangeActiveClipModBypass.clear();
+   // Canvas mode: no clip is playing anything, so no clip gets a say over
+   // the canvas's own modulation.
+   if (!ArrangeTimelineRoutingActive())
+      return;
+
+   const double beat = Transport::Instance().Beats();
+   for (const Arrange::Lane& lane : gArrange.lanes)
+   {
+      if (!Arrange::LaneEffectivelyEnabled(gArrange, lane))
+         continue;
+      for (const Arrange::Clip& c : lane.clips)
+      {
+         // Clips are sorted by start and never overlap within a lane, so
+         // the first one that starts after `beat` ends the search.
+         if (Arrange::TicksToBeats(c.start) > beat)
+            break;
+         if (!(beat < Arrange::TicksToBeats(c.End())))
+            continue;
+         if (c.enabled && c.srcUid != 0 && !c.bypassedModParams.empty())
+         {
+            const GraphNode* gn = FindNodeByUid(c.srcUid);
+            if (gn != nullptr)
+               gArrangeActiveClipModBypass.emplace(gn->index, &c.bypassedModParams);
+         }
+         break; // this lane's only candidate, usable or not
+      }
+   }
+}
+
+bool ArrangeClipBypassesMod(int nodeIndex, int paramIndex)
+{
+   if (gArrangeActiveClipModBypass.empty())
+      return false;
+   auto it = gArrangeActiveClipModBypass.find(nodeIndex);
+   if (it == gArrangeActiveClipModBypass.end() || it->second == nullptr)
+      return false;
+   return std::binary_search(it->second->begin(), it->second->end(), paramIndex);
+}
+
+// What a bypassed param sits at. Modulation::Source::centre is the
+// destination's value at the instant the binding was made - the knob
+// position the modulator took over from - which is precisely "what this
+// would read with the modulator unplugged". Clamped to the param's own
+// declared range because a binding restored from a patch line that predates
+// the centre token decodes it as 0, which is out of range for plenty of
+// params (a cutoff in Hz, say) and must not be written raw.
+//
+// Writing this every frame, rather than skipping the write, is the point:
+// leaving the param alone would freeze it at whatever the modulator last
+// pushed, so a bypassed LFO would strand the knob mid-sweep instead of
+// releasing it.
+float ArrangeClipBypassBaseValue(const ParamRef& ref, const Modulation::Source& src)
+{
+   return ShapeToParam(ref, std::clamp(src.centre, ref.minValue, ref.maxValue));
+}
+
 void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false)
 {
    UpdatePerformanceMatrixMIDI();
+   // Before any binding is read: which clip is under the playhead decides
+   // which modulations are bypassed this frame.
+   ArrangeRefreshActiveClipModBypass();
 
    Modulation& modulation = Modulation::Instance();
    // Apply deferred writes from the performance matrix before snapshot and modulators
@@ -62651,6 +63269,15 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false)
       {
          if (!src.enabled)
             continue;   // binding intact, just not written this frame
+         // The clip currently playing this node asked for this particular
+         // modulation not to be applied. Sits above every modulator kind
+         // below (predictor, macro box, trigger, ordinary) deliberately -
+         // one gate, so no modulator type can quietly escape it.
+         if (ArrangeClipBypassesMod(ref.nodeIndex, ref.paramIndex))
+         {
+            *ref.value = ArrangeClipBypassBaseValue(ref, src);
+            continue;
+         }
          // A wired modulator always wins over a typed expression - see
          // Modulation::SetExpression.
          GraphNode* modNode = FindNodeByIndex(src.nodeIndex);
@@ -73081,6 +73708,315 @@ int main(int argc, char** argv)
          printf("arrange wave cleared on new patch: %s\n", cleared ? "OK" : "FAIL");
          allOk = allOk && cleared;
          printf("arrange wave test: all  %s\n", allOk ? "OK" : "FAIL");
+      }
+
+      // Per-clip modulation bypass (Arrange::Clip::bypassedModParams): the
+      // list the Clip Settings panel builds, and the playhead-driven gate the
+      // modulation apply loop reads. Both go through the same two functions
+      // the app itself calls, so a green run here means the panel really does
+      // list that binding and the gate really does fire on that beat.
+      if (getenv("INFINITE_CLIPMODBYPASSTEST") != nullptr && frameId == 4)
+      {
+         NewPatch();
+         bool allOk = true;
+
+         // uid read right after each spawn - SpawnNode push_backs onto gNodes,
+         // which can reallocate every GraphNode* taken before it.
+         GraphNode* oscGn = SpawnNode("Oscillator", "Synthesizers", 200.0f, 0.0f);
+         const uint64_t oscUid = oscGn != nullptr ? oscGn->uid : 0;
+         const int oscIndex = oscGn != nullptr ? oscGn->index : -1;
+         GraphNode* lfoGn = SpawnNode("LFO", "Modulators", 0.0f, 0.0f);
+         const int lfoIndex = lfoGn != nullptr ? lfoGn->index : -1;
+         const bool spawned = oscUid != 0 && oscIndex >= 0 && lfoIndex >= 0;
+         printf("clip mod bypass spawn: %s\n", spawned ? "OK" : "FAIL");
+         allOk = allOk && spawned;
+
+         if (spawned)
+         {
+            // Bind exactly as the cable-drop path does (main.cpp's
+            // ed::AcceptNewItem branch) - same call, same key space.
+            const int kParam = 0, kOtherParam = 1;
+            Modulation::Instance().Bind(oscIndex, kParam, lfoIndex, 0);
+
+            // --- A. the panel's own list -------------------------------
+            // The bug this guards: an enumeration keyed on the wrong index
+            // space finds nothing, and the Modulations section silently
+            // never appears rather than failing loudly.
+            {
+               std::vector<std::pair<int, std::string>> bound;
+               ArrangeCollectClipModBindings(*FindNodeByUid(oscUid), bound);
+               const bool aOk = bound.size() == 1 && bound[0].first == kParam &&
+                                !bound[0].second.empty();
+               printf("clip mod bypass list: %s (%d binding(s))\n", aOk ? "OK" : "FAIL",
+                      (int)bound.size());
+               allOk = allOk && aOk;
+            }
+
+            // --- B. the model's own set ops ----------------------------
+            {
+               Arrange::Clip c;
+               c.SetModBypassed(kOtherParam, true);
+               c.SetModBypassed(kParam, true);
+               c.SetModBypassed(kParam, true);           // idempotent
+               const bool sorted = c.bypassedModParams.size() == 2 &&
+                                   c.bypassedModParams[0] == kParam &&
+                                   c.bypassedModParams[1] == kOtherParam;
+               c.SetModBypassed(kOtherParam, false);
+               c.SetModBypassed(kOtherParam, false);     // idempotent
+               const bool bOk = sorted && c.bypassedModParams.size() == 1 &&
+                                c.IsModBypassed(kParam) && !c.IsModBypassed(kOtherParam);
+               printf("clip mod bypass set ops: %s\n", bOk ? "OK" : "FAIL");
+               allOk = allOk && bOk;
+            }
+
+            // --- C. the playhead gate ----------------------------------
+            // Two clips on one lane, same source: the first bypasses the
+            // binding, the second does not. The gate must follow the
+            // playhead from one to the other - that IS the feature.
+            {
+               gArrange = Arrange::Model();
+               const uint64_t laneId = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
+               auto place = [&](Arrange::Tick start, Arrange::Tick len) {
+                  Arrange::Clip c;
+                  c.start = start;
+                  c.length = len;
+                  c.srcUid = oscUid;
+                  uint64_t id = 0;
+                  Arrange::PlaceOverwrite(gArrange, laneId, c, &id);
+                  return id;
+               };
+               const uint64_t clipA = place(0, Arrange::kPPQ * 4);
+               const uint64_t clipB = place(Arrange::kPPQ * 4, Arrange::kPPQ * 4);
+               bool wired = clipA != 0 && clipB != 0;
+               if (Arrange::Clip* a = Arrange::FindClip(gArrange, clipA))
+                  a->SetModBypassed(kParam, true);
+               else
+                  wired = false;
+
+               const AudioMode wasMode = gAudioMode;
+               gAudioMode = AudioMode::Timeline; // the gate is inert in Canvas mode
+
+               Transport::Instance().SeekBeats(1.0);      // inside clip A
+               ArrangeRefreshActiveClipModBypass();
+               const bool inA = ArrangeClipBypassesMod(oscIndex, kParam);
+               const bool otherUntouchedInA = !ArrangeClipBypassesMod(oscIndex, kOtherParam);
+
+               Transport::Instance().SeekBeats(5.0);      // inside clip B
+               ArrangeRefreshActiveClipModBypass();
+               const bool inB = ArrangeClipBypassesMod(oscIndex, kParam);
+
+               Transport::Instance().SeekBeats(20.0);     // past every clip
+               ArrangeRefreshActiveClipModBypass();
+               const bool pastEnd = ArrangeClipBypassesMod(oscIndex, kParam);
+
+               // Canvas mode: no clip is playing, so no clip gets a say.
+               gAudioMode = AudioMode::Canvas;
+               Transport::Instance().SeekBeats(1.0);
+               ArrangeRefreshActiveClipModBypass();
+               const bool inCanvas = ArrangeClipBypassesMod(oscIndex, kParam);
+               gAudioMode = wasMode;
+
+               const bool cOk = wired && inA && otherUntouchedInA && !inB && !pastEnd && !inCanvas;
+               printf("clip mod bypass gate: %s (A=%d B=%d past=%d canvas=%d)\n",
+                      cOk ? "OK" : "FAIL", inA ? 1 : 0, inB ? 1 : 0, pastEnd ? 1 : 0,
+                      inCanvas ? 1 : 0);
+               allOk = allOk && cOk;
+            }
+
+            // --- D. the value a bypassed param lands on ----------------
+            // Must be the pre-modulation knob value, clamped into the
+            // param's own declared range - never left frozen wherever the
+            // modulator last pushed it, and never a raw 0 from a binding
+            // restored out of an old patch line that predates `centre`.
+            {
+               ParamRef ref;
+               ref.nodeIndex = oscIndex;
+               ref.paramIndex = kParam;
+               ref.minValue = 20.0f;
+               ref.maxValue = 20000.0f;
+               Modulation::Source src;
+               src.centre = 440.0f;
+               const float inRange = ArrangeClipBypassBaseValue(ref, src);
+               src.centre = 0.0f; // the old-patch case
+               const float clamped = ArrangeClipBypassBaseValue(ref, src);
+               const bool dOk = std::abs(inRange - 440.0f) < 0.001f &&
+                                std::abs(clamped - 20.0f) < 0.001f;
+               printf("clip mod bypass base value: %s (%.1f, clamped %.1f)\n",
+                      dOk ? "OK" : "FAIL", inRange, clamped);
+               allOk = allOk && dOk;
+            }
+            // --- E. Make Unique ----------------------------------------
+            // The escape hatch offered beside the shared-source warning.
+            // It has to leave the clip on a DIFFERENT node that is
+            // nonetheless still modulated (the copy is rewired through the
+            // cluster clipboard, not spawned bare) and still carrying this
+            // clip's own bypass list, which is keyed by paramIndex and so
+            // survives the swap only because the copy is the same type.
+            {
+               gArrange = Arrange::Model();
+               const uint64_t laneId = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
+               Arrange::Clip c;
+               c.start = 0;
+               c.length = Arrange::kPPQ * 4;
+               c.srcUid = oscUid;
+               uint64_t clipId = 0;
+               Arrange::PlaceOverwrite(gArrange, laneId, c, &clipId);
+               if (Arrange::Clip* live = Arrange::FindClip(gArrange, clipId))
+                  live->SetModBypassed(kParam, true);
+
+               const size_t nodesBefore = gNodes.size();
+               const size_t undoBefore = gUndoStack.size();
+               const bool made = clipId != 0 && ArrangeMakeClipSourceUnique(clipId);
+
+               // One press must be one undo, and it must be a FULL entry:
+               // this moves the graph and the timeline together, and an
+               // arrangeOnly entry would restore srcUid while leaving the
+               // copy stranded on the canvas.
+               const bool oneUndo = gUndoStack.size() == undoBefore + 1 &&
+                                    !gUndoStack.back().arrangeOnly;
+
+               const Arrange::Clip* after = Arrange::FindClip(gArrange, clipId);
+               const bool repointed = after != nullptr && after->srcUid != oscUid &&
+                                      after->srcUid != 0;
+               const bool bypassKept = after != nullptr && after->IsModBypassed(kParam);
+               GraphNode* copy = (after != nullptr) ? FindNodeByUid(after->srcUid) : nullptr;
+               const bool sameType = copy != nullptr && copy->typeName == "Oscillator";
+               const bool visible = copy != nullptr && !copy->hiddenFromCanvas;
+
+               // The whole point: the copy must arrive modulated, so the
+               // clip's own Modulations list is not empty the moment the
+               // user presses the button.
+               std::vector<std::pair<int, std::string>> copyBound;
+               if (copy != nullptr)
+                  ArrangeCollectClipModBindings(*copy, copyBound);
+               const bool modCarried = copyBound.size() == 1;
+               // ...and the original must keep its own binding, not lose it.
+               std::vector<std::pair<int, std::string>> origBound;
+               if (GraphNode* orig = FindNodeByUid(oscUid))
+                  ArrangeCollectClipModBindings(*orig, origBound);
+               const bool origKept = origBound.size() == 1;
+               const bool spawnedOne = gNodes.size() == nodesBefore + 1;
+
+               const bool eOk = made && repointed && bypassKept && sameType && visible &&
+                                modCarried && origKept && spawnedOne && oneUndo;
+               printf("clip mod bypass make unique: %s (repoint=%d type=%d vis=%d copyMods=%d origMods=%d +%d node, undo=%d full)\n",
+                      eOk ? "OK" : "FAIL", repointed ? 1 : 0, sameType ? 1 : 0, visible ? 1 : 0,
+                      (int)copyBound.size(), (int)origBound.size(),
+                      (int)(gNodes.size() - nodesBefore),
+                      (int)(gUndoStack.size() - undoBefore));
+               allOk = allOk && eOk;
+            }
+         }
+
+         printf("clip mod bypass test: all  %s\n", allOk ? "OK" : "FAIL");
+      }
+
+
+      // Clip inspector field units and parsing. The widgets themselves need a
+      // mouse, but everything that decides what a typed string MEANS is pure
+      // and is exactly where this went wrong before: Start/Length read and
+      // write bar.beat.sixteenth, fades read and write milliseconds, and the
+      // shortcut suppression has to be armed by a hover a frame before the
+      // digit that opens the field arrives.
+      if (getenv("INFINITE_CLIPFIELDTEST") != nullptr && frameId == 4)
+      {
+         bool allOk = true;
+         Transport::Instance().SetTempo(120.0f);
+         Transport::Instance().SetTimeSignature(4, 4);
+         const int savedDisplay = gArrange.settings.timeDisplay;
+         gArrange.settings.timeDisplay = 0; // Bars
+
+         // A. positions round-trip through the text the field shows.
+         {
+            const Arrange::Tick t = ArrangeParsePos("9.3.3");
+            const bool shape = t == (Arrange::Tick)8 * Arrange::BeatsToTicks(4.0) +
+                                    (Arrange::Tick)2 * Arrange::kPPQ +
+                                    (Arrange::Tick)2 * (Arrange::kPPQ / 4);
+            const bool trip = ArrangeFormatBBT(t) == "9.3.3";
+            // Partial forms: a bar alone, and a bar.beat.
+            const bool bar = ArrangeFormatBBT(ArrangeParsePos("9")) == "9.1.1";
+            const bool barBeat = ArrangeFormatBBT(ArrangeParsePos("9.3")) == "9.3.1";
+            // 0-indexed input is not a position - bar 0 does not exist.
+            const bool rejects = ArrangeParsePos("0.1.1") < 0 && ArrangeParsePos("banana") < 0;
+            const bool ok = shape && trip && bar && barBeat && rejects;
+            printf("clip field position: %s (9.3.3 -> %lld -> %s)\n", ok ? "OK" : "FAIL",
+                   (long long)t, ArrangeFormatBBT(t).c_str());
+            allOk = allOk && ok;
+         }
+
+         // B. lengths are the SAME text one index lower - "1.0.0" is one bar,
+         //    not bar one. Reading a length with the position parser (or the
+         //    other way round) is a whole bar out, which is why they are two
+         //    functions and not one.
+         {
+            const Arrange::Tick oneBar = Arrange::BeatsToTicks(4.0);
+            const bool shape = ArrangeParseLen("1.0.0") == oneBar;
+            const bool trip = ArrangeFormatBBTLength(ArrangeParseLen("2.1.2")) == "2.1.2";
+            const bool zero = ArrangeParseLen("0.0.0") == 0; // legal for a length
+            const bool differs = ArrangeParseLen("1.0.0") != ArrangeParsePos("1.0.0");
+            const bool ok = shape && trip && zero && differs;
+            printf("clip field length: %s (1.0.0 -> %lld ticks, one bar = %lld)\n",
+                   ok ? "OK" : "FAIL", (long long)ArrangeParseLen("1.0.0"), (long long)oneBar);
+            allOk = allOk && ok;
+         }
+
+         // C. fades are milliseconds in BOTH display modes - a fade is an
+         //    envelope, not a place in the song, so it must not follow the
+         //    Bars/Time toggle the way Start and Length do.
+         {
+            const double bpm = 120.0;
+            auto msToTicks = [&](double ms) { return Arrange::SecondsToTicks(ms / 1000.0, bpm); };
+            auto ticksToMs = [&](Arrange::Tick t) { return Arrange::TicksToSeconds(t, bpm) * 1000.0; };
+            const Arrange::Tick t20 = msToTicks(20.0);
+            const bool round = std::abs(ticksToMs(t20) - 20.0) < 1.0;
+            // 20 ms at 120 BPM is well under a sixteenth (125 ms) - the value
+            // the old bar.beat.sixteenth field could not express at all.
+            const bool subSixteenth = t20 > 0 && t20 < Arrange::kPPQ / 4;
+            const bool ok = round && subSixteenth;
+            printf("clip field fade ms: %s (20ms -> %lld ticks -> %.1fms, sixteenth = %lld)\n",
+                   ok ? "OK" : "FAIL", (long long)t20, ticksToMs(t20), (long long)(Arrange::kPPQ / 4));
+            allOk = allOk && ok;
+         }
+
+         // D. the shortcut suppression. '0' toggles the selection's bypass,
+         //    and it used to fire on the way into a Pan field because
+         //    WantTextInput is still false on the frame hover+type opens the
+         //    box. Hovering arms the flag; it has to survive one frame, since
+         //    the panel's key handling and the inspector draw in that order.
+         {
+            gArrangeFieldHotFrame = -1000;
+            const bool coldBefore = !ArrangeFieldHot();
+            ArrangeMarkFieldHot();
+            const bool hotNow = ArrangeFieldHot();
+            gArrangeFieldHotFrame = ImGui::GetFrameCount() - 1;
+            const bool hotNextFrame = ArrangeFieldHot();
+            gArrangeFieldHotFrame = ImGui::GetFrameCount() - 2;
+            const bool coldAfter = !ArrangeFieldHot();
+            gArrangeFieldHotFrame = -1000;
+            const bool ok = coldBefore && hotNow && hotNextFrame && coldAfter;
+            printf("clip field hotkey guard: %s (cold=%d hot=%d carries=%d expires=%d)\n",
+                   ok ? "OK" : "FAIL", coldBefore ? 1 : 0, hotNow ? 1 : 0,
+                   hotNextFrame ? 1 : 0, coldAfter ? 1 : 0);
+            allOk = allOk && ok;
+         }
+
+         // E. Time display mode: Start/Length switch to seconds, fades do not.
+         {
+            gArrange.settings.timeDisplay = 1;
+            const Arrange::Tick fromClock = ArrangeParsePos("0:02.00");
+            const Arrange::Tick fromBare = ArrangeParsePos("2");
+            const bool agree = fromClock == fromBare;
+            const bool twoSeconds = std::abs(Arrange::TicksToSeconds(fromClock, 120.0) - 2.0) < 0.01;
+            const bool lenSeconds = std::abs(Arrange::TicksToSeconds(ArrangeParseLen("1.5"), 120.0) - 1.5) < 0.01;
+            gArrange.settings.timeDisplay = 0;
+            const bool ok = agree && twoSeconds && lenSeconds;
+            printf("clip field time mode: %s (0:02.00 == 2 -> %.2fs)\n", ok ? "OK" : "FAIL",
+                   Arrange::TicksToSeconds(fromClock, 120.0));
+            allOk = allOk && ok;
+         }
+
+         gArrange.settings.timeDisplay = savedDisplay;
+         printf("clip field test: all  %s\n", allOk ? "OK" : "FAIL");
       }
 
       if (getenv("INFINITE_UNDOPERFTEST") != nullptr && frameId == 4)

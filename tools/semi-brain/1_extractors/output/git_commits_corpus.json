@@ -1,5 +1,129 @@
 [
   {
+    "hash": "149e8807b4cabd706fab104ff4f4349449ac52d3",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 15:26:46 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "arrange",
+      "title": "fix(arrange): inspector fields type like the canvas ones, in their own units",
+      "description": "inspector fields type like the canvas ones, in their own units",
+      "bullets": [],
+      "body": "Four complaints, one cause: the Arrange inspector grew its own field\nwidgets instead of reusing the behaviour the canvas params already had.\n1. Typing needed a backspace first. ImGui's TempInput path opens the box\non the OLD text, and whether the keystroke that opened it replaces\nthat text or lands beside it depends on frame ordering - so \"0.3\"\nover \"0.80\" came out wrong. The canvas has not had this problem since\nHandleParamTypeHotkeys: it seeds the box with exactly the typed\ncharacter and puts the cursor after it. Same approach here, in one\nshared ArrangeTypedEdit used by every inspector field, with\ndouble-click and Ctrl+click still opening on the current value\nselected (there the intent is \"replace all of it\").\n2. Typing '0' bypassed the clip. '0' is ArrangeToggleEnabledSelection,\nand the shortcut block's only guard was WantTextInput - which is\nstill false on the frame a hover+type OPENS a field. Hovering a value\nfield now arms ArrangeFieldHot() and suppresses every single-key\ntimeline shortcut for that frame and the next, since the panel's key\nhandling and the inspector draw in that order. The pointer sitting on\na field is the statement that the next keystroke is a value.\n3. Start/Length could not be typed at all - the bar.beat.sixteenth text\nis a literal, so the field carried ImGuiSliderFlags_NoInput and\nctrl+click did nothing. They now accept \"9.3.3\", \"9.3\" or \"9\"\nthrough ArrangeParsePos, and lengths through a new ArrangeParseLen -\nthe same text one index lower, because \"1.0.0\" is one bar where\n\"1.1.1\" is bar one. Two parsers, deliberately: reading a length with\nthe position parser is a whole bar out.\n4. Fades are milliseconds now, in both display modes. A fade is an\nenvelope, not a place in the song; at 120 BPM a 20 ms fade is a sixth\nof a sixteenth, which the old bar.beat.sixteenth field could not\nexpress at all.\nBoth copies of these fields - the docked inspector and the right-click\nmenu - now call the same ArrangeTickField / ArrangeSliderFloat /\nArrangeDragFloat, rather than the menu keeping a second lambda that had\nalready drifted. Sample BPM was the last raw ImGui::DragFloat and goes\nthrough ArrangeDragFloat too.\nINFINITE_CLIPFIELDTEST covers the pure half: position round-trips\nthrough the text the field shows, lengths differ from positions by\nexactly one index, 20 ms lands under a sixteenth, the shortcut guard\narms and expires on the right frames, and Time mode moves Start/Length\nto seconds while leaving fades in ms.\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>",
+      "raw": "fix(arrange): inspector fields type like the canvas ones, in their own units\n\nFour complaints, one cause: the Arrange inspector grew its own field\nwidgets instead of reusing the behaviour the canvas params already had.\n\n1. Typing needed a backspace first. ImGui's TempInput path opens the box\n   on the OLD text, and whether the keystroke that opened it replaces\n   that text or lands beside it depends on frame ordering - so \"0.3\"\n   over \"0.80\" came out wrong. The canvas has not had this problem since\n   HandleParamTypeHotkeys: it seeds the box with exactly the typed\n   character and puts the cursor after it. Same approach here, in one\n   shared ArrangeTypedEdit used by every inspector field, with\n   double-click and Ctrl+click still opening on the current value\n   selected (there the intent is \"replace all of it\").\n\n2. Typing '0' bypassed the clip. '0' is ArrangeToggleEnabledSelection,\n   and the shortcut block's only guard was WantTextInput - which is\n   still false on the frame a hover+type OPENS a field. Hovering a value\n   field now arms ArrangeFieldHot() and suppresses every single-key\n   timeline shortcut for that frame and the next, since the panel's key\n   handling and the inspector draw in that order. The pointer sitting on\n   a field is the statement that the next keystroke is a value.\n\n3. Start/Length could not be typed at all - the bar.beat.sixteenth text\n   is a literal, so the field carried ImGuiSliderFlags_NoInput and\n   ctrl+click did nothing. They now accept \"9.3.3\", \"9.3\" or \"9\"\n   through ArrangeParsePos, and lengths through a new ArrangeParseLen -\n   the same text one index lower, because \"1.0.0\" is one bar where\n   \"1.1.1\" is bar one. Two parsers, deliberately: reading a length with\n   the position parser is a whole bar out.\n\n4. Fades are milliseconds now, in both display modes. A fade is an\n   envelope, not a place in the song; at 120 BPM a 20 ms fade is a sixth\n   of a sixteenth, which the old bar.beat.sixteenth field could not\n   express at all.\n\nBoth copies of these fields - the docked inspector and the right-click\nmenu - now call the same ArrangeTickField / ArrangeSliderFloat /\nArrangeDragFloat, rather than the menu keeping a second lambda that had\nalready drifted. Sample BPM was the last raw ImGui::DragFloat and goes\nthrough ArrangeDragFloat too.\n\nINFINITE_CLIPFIELDTEST covers the pure half: position round-trips\nthrough the text the field shows, lengths differ from positions by\nexactly one index, 20 ms lands under a sixteenth, the shortcut guard\narms and expires on the right frames, and Time mode moves Start/Length\nto seconds while leaving fades in ms.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+    },
+    "stat": ".claude/skills/run-infinite-hygiene/driver.sh |   3 +\n src/main.cpp                                  | 639 +++++++++++++++++++++-----\n 2 files changed, 536 insertions(+), 106 deletions(-)"
+  },
+  {
+    "hash": "62755b3817a821d833b4b9052a6241cde64590cd",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 15:04:34 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "arrange",
+      "title": "feat(arrange): Make Unique, and cut the shared-source warning to one line",
+      "description": "Make Unique, and cut the shared-source warning to one line",
+      "bullets": [
+        "hide the copy. A hidden node's param pins never re-register for",
+        "go through ArrangeEdit. This moves the graph and the timeline"
+      ],
+      "body": "The shared-source warning was a five-line paragraph that ended by telling\nthe user to go duplicate the node themselves. Both halves were wrong for\nan inspector: the explanation was permanent panel text nobody needs on\nevery frame that clip is selected, and the fix was manual.\nNow the warning is one line (\"Shared with another track.\") with the\nreasoning moved to a hover tooltip, and a Make Unique button that does\nthe fix.\nMake Unique clones the clip's source the same way Shift+D clones a node -\nsame type, same params, and every link LANDING ON it re-established onto\nthe copy through the cluster clipboard - so the copy arrives fed by the\nsame upstream and carrying the same modulations rather than as a bare\ndefault. A dropped Sample defers to ArrangeRespawnCloneNode instead,\nsince its node owns a decoded file and a stretcher that must be\nre-decoded, not parameter-copied.\nTwo things it deliberately does NOT do:\nmodulation, so a hidden copy would leave the clip's own Modulations\nlist permanently empty - the opposite of what someone pressing this\nbutton wants.\ntogether, and an arrangeOnly undo entry would restore srcUid while\nleaving the copy stranded on the canvas. One full checkpoint is\ntaken up front with checkpoints suppressed for the duration, so\nSpawnNode cannot push a second one and make one button two undos.\nThe fixture asserts exactly that: undo=1, full.\nThe clip's modulation bypass list survives the swap untouched - it stores\nparamIndex values, and the copy is the same node type.\nAlso drops the \"Unticked params hold their pre-modulation value\" line\nunder Modulations, same reason as the warning paragraph.\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>",
+      "raw": "feat(arrange): Make Unique, and cut the shared-source warning to one line\n\nThe shared-source warning was a five-line paragraph that ended by telling\nthe user to go duplicate the node themselves. Both halves were wrong for\nan inspector: the explanation was permanent panel text nobody needs on\nevery frame that clip is selected, and the fix was manual.\n\nNow the warning is one line (\"Shared with another track.\") with the\nreasoning moved to a hover tooltip, and a Make Unique button that does\nthe fix.\n\nMake Unique clones the clip's source the same way Shift+D clones a node -\nsame type, same params, and every link LANDING ON it re-established onto\nthe copy through the cluster clipboard - so the copy arrives fed by the\nsame upstream and carrying the same modulations rather than as a bare\ndefault. A dropped Sample defers to ArrangeRespawnCloneNode instead,\nsince its node owns a decoded file and a stretcher that must be\nre-decoded, not parameter-copied.\n\nTwo things it deliberately does NOT do:\n\n  - hide the copy. A hidden node's param pins never re-register for\n    modulation, so a hidden copy would leave the clip's own Modulations\n    list permanently empty - the opposite of what someone pressing this\n    button wants.\n  - go through ArrangeEdit. This moves the graph and the timeline\n    together, and an arrangeOnly undo entry would restore srcUid while\n    leaving the copy stranded on the canvas. One full checkpoint is\n    taken up front with checkpoints suppressed for the duration, so\n    SpawnNode cannot push a second one and make one button two undos.\n    The fixture asserts exactly that: undo=1, full.\n\nThe clip's modulation bypass list survives the swap untouched - it stores\nparamIndex values, and the copy is the same node type.\n\nAlso drops the \"Unticked params hold their pre-modulation value\" line\nunder Modulations, same reason as the warning paragraph.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+    },
+    "stat": "src/main.cpp | 230 +++++++++++++++++++++++++++++++++++++++++++++++++++++------\n 1 file changed, 209 insertions(+), 21 deletions(-)"
+  },
+  {
+    "hash": "be04a7df9e5079bfb784912ca6a3157b4270fe1d",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 14:40:28 2026 +0530",
+    "parsed_message": {
+      "type": "test",
+      "scope": "arrange",
+      "title": "test(arrange): self-test for per-clip modulation bypass",
+      "description": "self-test for per-clip modulation bypass",
+      "bullets": [],
+      "body": "Extracts the Clip Settings modulation enumeration into a shared\nArrangeCollectClipModBindings() so the UI list and the fixture read the\nsame code path, and adds INFINITE_CLIPMODBYPASSTEST covering the four\nthings that can silently break:\nA. the binding list finds the source node's modulations at all\n(it is keyed by GraphNode::index, the same space Modulation::Bind\nwrites - a mismatch there would render an empty list, not an error)\nB. SetModBypassed/IsModBypassed stay sorted and idempotent\nC. the gate follows the playhead: clip A bypassed, clip B not, past\nthe last clip not, Canvas mode not\nD. a bypassed param lands on Source::centre clamped to the param's\ndeclared range, so it cannot strand mid-sweep\nRegistered in the hygiene driver's Tier 1 and UI group.\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>",
+      "raw": "test(arrange): self-test for per-clip modulation bypass\n\nExtracts the Clip Settings modulation enumeration into a shared\nArrangeCollectClipModBindings() so the UI list and the fixture read the\nsame code path, and adds INFINITE_CLIPMODBYPASSTEST covering the four\nthings that can silently break:\n\n  A. the binding list finds the source node's modulations at all\n     (it is keyed by GraphNode::index, the same space Modulation::Bind\n     writes - a mismatch there would render an empty list, not an error)\n  B. SetModBypassed/IsModBypassed stay sorted and idempotent\n  C. the gate follows the playhead: clip A bypassed, clip B not, past\n     the last clip not, Canvas mode not\n  D. a bypassed param lands on Source::centre clamped to the param's\n     declared range, so it cannot strand mid-sweep\n\nRegistered in the hygiene driver's Tier 1 and UI group.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+    },
+    "stat": ".claude/skills/run-infinite-hygiene/driver.sh |   3 +\n src/main.cpp                                  | 202 +++++++++++++++++++++++---\n 2 files changed, 182 insertions(+), 23 deletions(-)"
+  },
+  {
+    "hash": "8574a663fb2d954a714905438c85edb7dd2df302",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 14:18:59 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "arrange",
+      "title": "feat(arrange): honour per-clip modulation bypass, and expose it in Clip Settings",
+      "description": "honour per-clip modulation bypass, and expose it in Clip Settings",
+      "bullets": [
+        "ArrangeRefreshActiveClipModBypass() rebuilds, once per frame ahead of the",
+        "The gate sits directly under the `!src.enabled` early-out in",
+        "A bypassed param is WRITTEN to Source::centre (the destination's value at",
+        "Clip Settings lists the source node's bindings with a checkbox each,"
+      ],
+      "body": "The clip under the playhead can now suppress individual modulations on its\nsource node, so the same oscillator reads modulated under one clip and\nstatic under another.\napply loop, which node/param pairs the currently-playing clips opt out of.\nOnly while the timeline is routing: in Canvas mode no clip is playing, so\nno clip gets a say over the canvas.\nApplyModulationAndPalette, above every modulator kind (predictor, macro\nbox, macro trigger, ordinary) on purpose - one gate, so no modulator type\ncan quietly escape it.\nthe instant the binding was made, clamped to its declared range), not\nleft alone. Skipping the write would freeze the knob wherever the\nmodulator last pushed it, stranding a bypassed LFO mid-sweep instead of\nreleasing it.\nticked = this clip hears it, so an untouched clip shows every box ticked.\nRead through Modulation::KnownParam, the sticky record, so the list is\nstill right on a frame where the source node did not draw.\nScope: a node's OWN bindings only. A modulator upstream shapes a feed that\nis shared with every other consumer of that upstream node, so one clip\ncannot opt out of it without duplicating the chain.\nTwo clips on different lanes sharing one source and disagreeing still\ncannot both be honoured - there is one param float - and the first lane\nwins for now. The private shadow instance that actually resolves that is\nthe next step.\nrun-infinite-hygiene --fast and --group modulation: all green.\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>",
+      "raw": "feat(arrange): honour per-clip modulation bypass, and expose it in Clip Settings\n\nThe clip under the playhead can now suppress individual modulations on its\nsource node, so the same oscillator reads modulated under one clip and\nstatic under another.\n\n- ArrangeRefreshActiveClipModBypass() rebuilds, once per frame ahead of the\n  apply loop, which node/param pairs the currently-playing clips opt out of.\n  Only while the timeline is routing: in Canvas mode no clip is playing, so\n  no clip gets a say over the canvas.\n- The gate sits directly under the `!src.enabled` early-out in\n  ApplyModulationAndPalette, above every modulator kind (predictor, macro\n  box, macro trigger, ordinary) on purpose - one gate, so no modulator type\n  can quietly escape it.\n- A bypassed param is WRITTEN to Source::centre (the destination's value at\n  the instant the binding was made, clamped to its declared range), not\n  left alone. Skipping the write would freeze the knob wherever the\n  modulator last pushed it, stranding a bypassed LFO mid-sweep instead of\n  releasing it.\n- Clip Settings lists the source node's bindings with a checkbox each,\n  ticked = this clip hears it, so an untouched clip shows every box ticked.\n  Read through Modulation::KnownParam, the sticky record, so the list is\n  still right on a frame where the source node did not draw.\n\nScope: a node's OWN bindings only. A modulator upstream shapes a feed that\nis shared with every other consumer of that upstream node, so one clip\ncannot opt out of it without duplicating the chain.\n\nTwo clips on different lanes sharing one source and disagreeing still\ncannot both be honoured - there is one param float - and the first lane\nwins for now. The private shadow instance that actually resolves that is\nthe next step.\n\nrun-infinite-hygiene --fast and --group modulation: all green.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+    },
+    "stat": "src/main.cpp | 158 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n 1 file changed, 158 insertions(+)"
+  },
+  {
+    "hash": "e4a4c6cf78a84197548f5390c1590984642fd3ce",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 13:59:07 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "arrange",
+      "title": "feat(arrange): per-clip modulation bypass list (model + persistence)",
+      "description": "per-clip modulation bypass list (model + persistence)",
+      "bullets": [
+        "Clip::IsModBypassed / SetModBypassed keep the vector sorted and",
+        "New `clipmodbypass` patch line, variable length to end of line,",
+        "Added to the arrangement equality comparator. Without it a bypass"
+      ],
+      "body": "Adds Clip::bypassedModParams - the paramIndices on a clip's source node\nwhose modulation that clip does not want applied. Nothing reads it yet;\nthis is the data layer only.\nKeyed on paramIndex, the same positional index Modulation already binds\non, deliberately: a clip's bypass entry is only meaningful next to the\nbinding it refers to, so the two stay stale or valid together.\ndeduplicated, so equality is a plain compare and the patch line is\nstable across saves.\nwritten only when non-empty. An old patch loads with nothing\nbypassed, which is exactly today's behaviour.\ntoggle compares equal and ArrangeGestureEnd drops it as \"no change\"\nbefore it reaches the undo stack - the trap the Sample BPM fields\nalready fell into once.\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>",
+      "raw": "feat(arrange): per-clip modulation bypass list (model + persistence)\n\nAdds Clip::bypassedModParams - the paramIndices on a clip's source node\nwhose modulation that clip does not want applied. Nothing reads it yet;\nthis is the data layer only.\n\nKeyed on paramIndex, the same positional index Modulation already binds\non, deliberately: a clip's bypass entry is only meaningful next to the\nbinding it refers to, so the two stay stale or valid together.\n\n- Clip::IsModBypassed / SetModBypassed keep the vector sorted and\n  deduplicated, so equality is a plain compare and the patch line is\n  stable across saves.\n- New `clipmodbypass` patch line, variable length to end of line,\n  written only when non-empty. An old patch loads with nothing\n  bypassed, which is exactly today's behaviour.\n- Added to the arrangement equality comparator. Without it a bypass\n  toggle compares equal and ArrangeGestureEnd drops it as \"no change\"\n  before it reaches the undo stack - the trap the Sample BPM fields\n  already fell into once.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+    },
+    "stat": "src/arrange/ArrangeModel.h | 37 +++++++++++++++++++++++++++++++++++++\n src/core/Patch.cpp         | 32 ++++++++++++++++++++++++++++++++\n src/core/Patch.h           | 12 ++++++++++++\n src/core/PatchJson.cpp     |  3 ++-\n src/main.cpp               |  9 ++++++++-\n 5 files changed, 91 insertions(+), 2 deletions(-)"
+  },
+  {
+    "hash": "55b47736ad2539fdaa5a4af1bfb6ce355909741b",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 12:05:36 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/prediction-user-profiles into main",
+      "description": "Merge feature/prediction-user-profiles into main",
+      "bullets": [],
+      "body": "Emergent user profiles for the prediction engine: four graded source pools,\na presence gate that holds at every rung of the ladder, and the performance\nsurface attribution fix.\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>",
+      "raw": "Merge feature/prediction-user-profiles into main\n\nEmergent user profiles for the prediction engine: four graded source pools,\na presence gate that holds at every rung of the ladder, and the performance\nsurface attribution fix.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "3ad75620f05e615a0957677ce058c76e19a6db86",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 12:05:33 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "semi-brain",
+      "title": "chore(semi-brain): refresh corpora",
+      "description": "refresh corpora",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>",
+      "raw": "chore(semi-brain): refresh corpora\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+    },
+    "stat": ".../1_extractors/output/git_commits_corpus.json    |  32 ++\n .../1_extractors/output/recovered_docs_corpus.json | 476 ++++++++++-----------\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl | 159 +++----\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl | 159 +++----\n 4 files changed, 432 insertions(+), 394 deletions(-)"
+  },
+  {
     "hash": "f2bd1fca40d503b80a61ae6662c1d82cbb79a79f",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",

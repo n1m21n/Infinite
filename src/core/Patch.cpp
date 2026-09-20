@@ -368,6 +368,16 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
       for (const ClipRecord& c : s.clips)
          if (c.opacity != 1.0f)
             file << "clipopacity " << i << " " << c.id << " " << FloatToString(c.opacity) << "\n";
+      // Variable-length, so it runs to end of line and nothing may be
+      // appended after it - see the format comment in Patch.h.
+      for (const ClipRecord& c : s.clips)
+         if (!c.bypassedModParams.empty())
+         {
+            file << "clipmodbypass " << i << " " << c.id;
+            for (int paramIndex : c.bypassedModParams)
+               file << " " << paramIndex;
+            file << "\n";
+         }
       for (const ClipRecord& c : s.clips)
          if (!c.retrigger)
             file << "clipretrigger " << i << " " << c.id << " 0\n";
@@ -927,6 +937,28 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
                   c.colorContrast = std::clamp(contrast, -1.0f, 1.0f);
                   c.colorSaturation = std::clamp(saturation, 0.0f, 2.0f);
                }
+         }
+      }
+      else if (tag == "clipmodbypass")
+      {
+         int streamIdx = -1;
+         uint64_t clipId = 0;
+         if (in >> streamIdx >> clipId && streamIdx >= 0 &&
+             streamIdx < (int)outData.streams.size() && clipId != 0)
+         {
+            // Read to end of line. A negative index is not a param index
+            // Modulation could ever have bound, so drop it rather than
+            // carrying a value no lookup can match.
+            std::vector<int> params;
+            for (int paramIndex = 0; in >> paramIndex; )
+               if (paramIndex >= 0)
+                  params.push_back(paramIndex);
+            std::sort(params.begin(), params.end());
+            params.erase(std::unique(params.begin(), params.end()), params.end());
+            if (!params.empty())
+               for (ClipRecord& c : outData.streams[streamIdx].clips)
+                  if (c.id == clipId)
+                     c.bypassedModParams = params;
          }
       }
       else if (tag == "clipopacity")
