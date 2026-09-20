@@ -520,6 +520,62 @@ unsigned int GeometryOpNode::GetSurfaceTexture()
    return input ? input->GetSurfaceTexture() : 0;
 }
 
+const std::vector<Particle>* GeometryOpNode::GetPointCloud()
+{
+   if (input == nullptr)
+      return nullptr;
+   if (bypassed)
+      return input->GetPointCloud();
+
+   const std::vector<Particle>* src = input->GetPointCloud();
+   if (src == nullptr)
+      return nullptr;
+   if (op != kTransform)
+      return src;
+
+   const unsigned long long upstreamRev = input->PointCloudRevision();
+   const Mat4 m = TransformMatrix();
+   if (mHasPointCloudCache && mPointCloudBuiltUpstream == input &&
+       mPointCloudBuiltUpstreamRevision == upstreamRev && mPointCloudBuiltMatrix == m)
+      return &mPointCloudCache;
+
+   float normalMatrix[9];
+   m.NormalMatrix(normalMatrix);
+   mPointCloudCache = *src;
+   for (Particle& p : mPointCloudCache)
+   {
+      const float px = m.m[0]*p.px + m.m[4]*p.py + m.m[8]*p.pz + m.m[12];
+      const float py = m.m[1]*p.px + m.m[5]*p.py + m.m[9]*p.pz + m.m[13];
+      const float pz = m.m[2]*p.px + m.m[6]*p.py + m.m[10]*p.pz + m.m[14];
+      p.px = px; p.py = py; p.pz = pz;
+
+      const float nx = normalMatrix[0]*p.nx + normalMatrix[3]*p.ny + normalMatrix[6]*p.nz;
+      const float ny = normalMatrix[1]*p.nx + normalMatrix[4]*p.ny + normalMatrix[7]*p.nz;
+      const float nz = normalMatrix[2]*p.nx + normalMatrix[5]*p.ny + normalMatrix[8]*p.nz;
+      const float len = std::sqrt(nx*nx + ny*ny + nz*nz);
+      if (len > 1e-6f) { p.nx = nx/len; p.ny = ny/len; p.nz = nz/len; }
+   }
+
+   mHasPointCloudCache = true;
+   mPointCloudBuiltUpstream = input;
+   mPointCloudBuiltUpstreamRevision = upstreamRev;
+   mPointCloudBuiltMatrix = m;
+   mPointCloudRevision = NextMeshRevision();
+   return &mPointCloudCache;
+}
+
+unsigned long long GeometryOpNode::PointCloudRevision()
+{
+   if (input == nullptr)
+      return 0;
+   if (bypassed)
+      return input->PointCloudRevision();
+   if (op != kTransform)
+      return input->PointCloudRevision();
+   GetPointCloud();
+   return mPointCloudRevision;
+}
+
 void GeometryOpNode::CookIfNeeded(int frameId)
 {
    if (mLastCookFrame == frameId)
