@@ -118,6 +118,8 @@ void PredictiveModulatorNode::FinishLearn()
       // the same most-recent-first order the lag keys were registered in.
       mFreeState = mDelayLine;
       mFreeState.resize(mFit.rank, 0.5f);
+      mPrevValue = mFreeState[0];
+      mTargetValue = mFreeState[0];
    }
    else
    {
@@ -177,6 +179,8 @@ void PredictiveModulatorNode::LoadFitFromSaved()
       mFit.keys.push_back(LagKey(i));
    mFit.valid = true;
    mFreeState.assign(rankLE, 0.5f);
+   mPrevValue = 0.5f;
+   mTargetValue = 0.5f;
 }
 
 float PredictiveModulatorNode::Value01()
@@ -196,25 +200,35 @@ float PredictiveModulatorNode::Value01()
    if (!mFit.valid || mFreeState.empty())
       return low + (high - low) * raw; // no fit yet: behave like a plain pass-through/constant
 
-   // Free-run, open-loop: step the learned model's own state at the configured speed cadence.
-   // Real seconds, not Beats(), so it keeps playing at the same rate regardless of tempo
-   // and even while the transport is stopped.
+   // Free-run, open-loop: step the learned model's own state at the configured speed cadence,
+   // smoothly interpolating between 10 Hz discrete steps so the output renders as silky curves.
    const double seconds = Transport::Instance().Seconds();
    const float effSpeed = std::clamp(speed, 0.05f, 20.0f);
    const double stepDt = 0.1 / (double)effSpeed;
    if (mLastStepSeconds < 0.0)
    {
       mLastStepSeconds = seconds;
+      mPrevValue = mFreeState[0];
+      mFit.Step(mFreeState, &mFreeRng);
+      mTargetValue = mFreeState[0];
    }
    else if (seconds >= mLastStepSeconds + stepDt || seconds < mLastStepSeconds)
    {
       int steps = (int)((seconds - mLastStepSeconds) / stepDt);
       steps = std::clamp(steps, 1, 4);
       for (int s = 0; s < steps; ++s)
+      {
+         mPrevValue = mTargetValue;
          mFit.Step(mFreeState, &mFreeRng);
+         mTargetValue = mFreeState[0];
+      }
       mLastStepSeconds = seconds;
    }
-   const float normalized = std::clamp(mFreeState[0], 0.0f, 1.0f);
+
+   const float alpha = (stepDt > 0.0) ? (float)std::clamp((seconds - mLastStepSeconds) / stepDt, 0.0, 1.0) : 1.0f;
+   const float smoothAlpha = alpha * alpha * (3.0f - 2.0f * alpha);
+   const float interpolated = mPrevValue + (mTargetValue - mPrevValue) * smoothAlpha;
+   const float normalized = std::clamp(interpolated, 0.0f, 1.0f);
    return low + (high - low) * normalized;
 }
 

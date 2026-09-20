@@ -94,6 +94,8 @@ private:
    MovementStats::Engine mEngine; // private: only this node's own input ever feeds it
    MovementStats::DMDFit mFit;
    std::vector<float> mFreeState; // current free-run state vector, size == mFit.rank
+   float mPrevValue = 0.5f;
+   float mTargetValue = 0.5f;
    double mLastStepSeconds = -1.0;
    uint64_t mFreeRng = 0x9E3779B97F4A7C15ull; // free-run noise seed - see DMDFit::Step
    std::string mAppliedFitData; // last fitData string actually parsed into mFit
