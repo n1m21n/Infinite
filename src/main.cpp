@@ -10996,6 +10996,22 @@ namespace
          return;
       }
       ImGui::TextDisabled("%d knob%s analyzed", count, count == 1 ? "" : "s");
+      // Who is actually authoring the model right now. This is measured, not asserted: each
+      // source pool is graded on how well it predicts where the hand goes next (prequentially,
+      // before the sample is absorbed), and the share is that skill times the pool's maturity.
+      // It replaces the old hand-waved "about two thirds real data" claim with a real number.
+      {
+         MovementStats::PoolShares prof;
+         MovementStats::Live().GetGlobalPoolShares(prof);
+         const float human = (prof.share[MovementStats::kPoolDeliberate] +
+                              prof.share[MovementStats::kPoolExploratory]) * 100.0f;
+         const float autoPct = prof.share[MovementStats::kPoolAuto] * 100.0f;
+         const float replay = prof.share[MovementStats::kPoolReplay] * 100.0f;
+         if (prof.valid)
+            ImGui::TextDisabled("profile: %.0f%% you, %.0f%% automation, %.0f%% replay", human, autoPct, replay);
+         else
+            ImGui::TextDisabled("profile: no data yet - perform a knob to teach it");
+      }
       DrawDriftHistogram(n);
       for (int i = 0; i < count; i++)
       {
@@ -62514,6 +62530,33 @@ static bool RunPerfPanelSelfTest()
    return true;
 }
 
+// --- Who actually authored a modulator write (MovementStats::ClassifyPool) ------------------
+// Every performance surface in Infinite - the macro knob, XY pad, number box, trigger button,
+// and both MIDI nodes - is an IModulator, so the modulation apply loop used to log all six as
+// Source::Modulator: a hand on a hardware controller was recorded as automation at a tenth of
+// the weight of the same hand on a mouse. They are hand-operated controls and log as Perf.
+//
+// The exception is a surface that is itself being driven - an LFO wired into a macro knob. That
+// is a machine with a hand-shaped control in front of it, and it can run all night, so it must
+// not enter a human pool. gMachineDrivenModNodes records the modulator nodes a machine source
+// wrote during the previous frame; one frame of latency is nothing against a 10 Hz grid.
+static std::unordered_set<int> gMachineDrivenModNodes;
+static std::unordered_set<int> gMachineDrivenModNodesPrev;
+
+static MovementLog::Source ModulatorLogSource(INode* n, int modNodeIndex)
+{
+   const bool isSurface = dynamic_cast<MidiCCNode*>(n) != nullptr ||
+                          dynamic_cast<MidiTriggerNode*>(n) != nullptr ||
+                          dynamic_cast<MacroKnobNode*>(n) != nullptr ||
+                          dynamic_cast<MacroXYNode*>(n) != nullptr ||
+                          dynamic_cast<MacroTriggerNode*>(n) != nullptr ||
+                          dynamic_cast<MacroNumBoxNode*>(n) != nullptr;
+   if (!isSurface)
+      return MovementLog::Source::Modulator;
+   return gMachineDrivenModNodesPrev.count(modNodeIndex) > 0 ? MovementLog::Source::Modulator
+                                                             : MovementLog::Source::Perf;
+}
+
 void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false)
 {
    UpdatePerformanceMatrixMIDI();
@@ -62593,6 +62636,10 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false)
    // Patch-wide named values, evaluated once before any parameter reads
    // them so every expression in the frame sees the same globals - see
    // core/ExprGlobals.h.
+   // Which modulator nodes were themselves written by a machine last frame (see
+   // gMachineDrivenModNodes below): a macro knob with an LFO wired into it is not a hand.
+   gMachineDrivenModNodesPrev.swap(gMachineDrivenModNodes);
+   gMachineDrivenModNodes.clear();
    ExprGlobals::EvaluateAll(t);
    const std::map<std::string, float>& globals = ExprGlobals::Values();
    for (const ParamRef& ref : modulation.FrameParams())
@@ -62639,6 +62686,7 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false)
             const float p = ApplyModulationCurve(std::clamp(pred->ValuePos01For(pk, cur), 0.0f, 1.0f), src.curve);
             const float posLo = ParamToPos(ref, src.lo), posHi = ParamToPos(ref, src.hi);
             *ref.value = ShapeToParam(ref, PosToParam(ref, posLo + (posHi - posLo) * p));
+            gMachineDrivenModNodes.insert(ref.nodeIndex);
             MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Prediction);
             continue;
          }
@@ -62652,7 +62700,8 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false)
          if (auto* numBox = dynamic_cast<MacroNumBoxNode*>(modNode->node.get()))
          {
             *ref.value = ShapeToParam(ref, numBox->value);
-            MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Modulator);
+            MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex,
+                                    ModulatorLogSource(modNode->node.get(), src.nodeIndex));
             continue;
          }
          if (auto* trigNode = dynamic_cast<MacroTriggerNode*>(modNode->node.get()))
@@ -62666,13 +62715,15 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false)
                   if (ref.isBool || span == 1)
                   {
                      *ref.value = (*ref.value > ref.minValue + 0.5f) ? ref.minValue : ref.maxValue;
-                     MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Modulator);
+                     MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex,
+                                             ModulatorLogSource(modNode->node.get(), src.nodeIndex));
                   }
                   else if (span >= 1)
                   {
                      const int curIdx = std::clamp((int)std::lround(*ref.value - ref.minValue), 0, span);
                      *ref.value = ref.minValue + (float)((curIdx + 1) % (span + 1));
-                     MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Modulator);
+                     MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex,
+                                             ModulatorLogSource(modNode->node.get(), src.nodeIndex));
                   }
                }
                continue;
@@ -62681,7 +62732,10 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false)
          const float rawV01 = std::clamp(modulator->Value01(), 0.0f, 1.0f);
          const float v01 = ApplyModulationCurve(rawV01, src.curve);
          *ref.value = ShapeToParam(ref, src.lo + (src.hi - src.lo) * v01);
-         MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Modulator);
+         const MovementLog::Source modSrc = ModulatorLogSource(modNode->node.get(), src.nodeIndex);
+         if (modSrc == MovementLog::Source::Modulator)
+            gMachineDrivenModNodes.insert(ref.nodeIndex);
+         MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, modSrc);
          continue;
       }
       const std::string* expr = modulation.ExpressionFor(ref.nodeIndex, ref.paramIndex);
@@ -62757,6 +62811,7 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false)
             mapped = boundLo + norm * (boundHi - boundLo);
          }
          *ref.value = ShapeToParam(ref, mapped);
+         gMachineDrivenModNodes.insert(ref.nodeIndex);
          MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Expression);
          modulation.SetExpressionError(ref.nodeIndex, ref.paramIndex, std::string());
       }

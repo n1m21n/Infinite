@@ -21,6 +21,60 @@ namespace MovementStats
    constexpr double kPhiMin = 0.5;
    constexpr double kPhiMax = 0.999;
 
+   // --- Source pools (user profile) ---------------------------------------------------------
+   // The four kinds of evidence a parameter's landscape can be built from, partitioned by *who
+   // authored the motion and when*, not by which code path wrote the value:
+   //
+   //   DELIBERATE  a human, now, making a decision   - release points, held positions, typed
+   //               numbers, Shift-grab corrections, a hand on a MIDI controller
+   //   EXPLORATORY a human, now, still searching     - transit motion inside a drag
+   //   AUTO        a rule the human set earlier      - LFO, expression, envelope, arpeggiator
+   //   REPLAY      a recording of the human's past   - gesture playback, clip automation
+   //
+   // The split exists because a pool's influence must not be a function of how long it ran: a
+   // patch left running overnight accumulates ~100x the samples of a real performance, so a
+   // single summed pool is authored by whichever source had the most wall time. Each pool
+   // normalises to itself and the *mix* between them is decided by predictive skill - see
+   // PoolShares.
+   enum Pool
+   {
+      kPoolDeliberate = 0,
+      kPoolExploratory,
+      kPoolAuto,
+      kPoolReplay,
+      kNumPools
+   };
+
+   // Where a fresh user starts, before any evidence exists to move the shares (README §6's
+   // cold-start ladder applied to the profile itself). HUMAN 60 / AUTO 25 / REPLAY 15, with the
+   // human half split 2:1 toward decisions over searching.
+   constexpr double kPoolPrior[kNumPools] = { 0.40, 0.20, 0.25, 0.15 };
+   // Softmax temperature over mean log-loss. 1.0 in nats is exact Bayesian model averaging;
+   // larger flattens the mix, smaller makes it winner-take-all.
+   constexpr double kPoolTau = 1.0;
+   // Prequential score forgetting, in active seconds. Much shorter than kHalfLifeActiveSec: the
+   // shares are meant to track how you are playing lately, not average over a fortnight.
+   constexpr double kScoreHalfLifeSec = 4.0 * 3600.0;
+   // A machine source may only accumulate while a human is demonstrably present. Transport
+   // running is not presence - that is exactly the "left it going overnight" case. Human
+   // sources are never gated (they cannot happen without a human by definition).
+   constexpr double kPresenceWindowSec = 30.0 * 60.0;
+
+   // Which pool a logged sample belongs to. `changed` is Runtime::changedSinceTick: a hand
+   // sample that did NOT move this tick is a held position, i.e. a decision to leave it there,
+   // which is the single most informative thing the landscape ever sees.
+   Pool ClassifyPool(MovementLog::Source src, uint8_t flags, bool changed);
+   bool PoolIsHuman(Pool p);
+
+   // The emergent mix for one key: how much of its model each pool currently authors.
+   struct PoolShares
+   {
+      float share[kNumPools] = {};   // sums to 1
+      float maturity[kNumPools] = {};// n/(n+kN0) per pool, what gates a thin pool's claim
+      double n[kNumPools] = {};      // raw n_eff per pool
+      bool valid = false;            // false when the key has no data in any pool
+   };
+
    struct ParamStats
    {
       // AR(1) sufficient statistics on the 10 Hz grid (x = x_t, y = x_{t+1}), exponentially forgotten.
@@ -252,6 +306,12 @@ namespace MovementStats
       float HandEnergy(const KeyId& id) const;
       // Collapse monitors. Returns false for an unknown key.
       bool GetMonitor(const KeyId& id, Monitor& out) const;
+      // The emergent source mix for a key (the "user profile" at that knob). Returns false for an
+      // unknown key; `out.valid` is false when the key exists but no pool has data yet.
+      bool GetPoolShares(const KeyId& id, PoolShares& out) const;
+      // The same mix pooled over every key - the profile readout the node shows. Always succeeds;
+      // falls back to kPoolPrior when nothing has been learned.
+      void GetGlobalPoolShares(PoolShares& out) const;
       // Called (main thread) when a key's prediction weight is auto-cut.
       void SetAutoCutCallback(std::function<void(const KeyId&)> cb) { mOnAutoCut = std::move(cb); }
       // Training weight of a prediction row that moved (README §5: 0.1 by default; tests raise it).
@@ -303,7 +363,15 @@ namespace MovementStats
    private:
       struct Runtime
       {
-         ParamStats stats;
+         ParamStats stats;         // legacy combined pool: still what rungs 2/2b/2d and the
+                                   // collapse monitor read, and what n_eff/confidence reports
+         ParamStats pools[kNumPools];  // the same evidence, partitioned by author (see Pool)
+         // Prequential log-loss per pool, scored against hand samples *before* they are absorbed,
+         // so a pool is never graded on data it has already seen. Exponentially forgotten at
+         // kScoreHalfLifeSec; scoreW is the matching weight so the mean stays well-defined.
+         double scoreSum[kNumPools] = {};
+         double scoreW = 0;
+         double scoreClock = 0;    // active-clock stamp for lazy forgetting of the scores
          ProfileKey profile;
          bool hasProfile = false;
          ParamStats* profStats = nullptr; // cached slot in mProfiles (node-based, so stable)
@@ -349,6 +417,11 @@ namespace MovementStats
 
       void Tick(double tickTime);
       void BreakChains();
+      // Grade every pool on `bin` using only what it already holds, then forget a little.
+      void ScorePools(Runtime& r, int bin);
+      // Rung 1 of the ladder, assembled from the pools at their emergent shares: the landscape is
+      // the share-weighted mix, the AR cadence comes from the human pools alone.
+      void MixPools(const Runtime& r, ParamStats& out) const;
       void Decay(ParamStats& s) const;
       void AddSample(ParamStats& s, float x, float y, bool hasPair, double w, int bin, double wPred = 0.0);
       void UpdateEnergy(double t);
@@ -383,6 +456,8 @@ namespace MovementStats
       double mTime = 0;
       double mActiveClock = 0;     // seconds of active time absorbed so far
       double mLastHandMoveT = -1e18;
+      // Wall of the last *human* sample, in active time: what kPresenceWindowSec is measured from.
+      double mLastPresenceActive = -1e18;
       bool mPlaying = false;
       bool mWasActive = false;
 

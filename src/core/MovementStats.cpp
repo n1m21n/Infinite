@@ -56,6 +56,31 @@ float SourceWeight(Source src, uint8_t flags, bool changedThisTick)
    return 0.0f;
 }
 
+bool PoolIsHuman(Pool p) { return p == kPoolDeliberate || p == kPoolExploratory; }
+
+Pool ClassifyPool(Source src, uint8_t flags, bool changed)
+{
+   switch (src)
+   {
+   case Source::Hand:
+   case Source::Perf:
+      // A correction is the strongest statement the system ever receives - the human watched the
+      // model be wrong and said where it should have been - so it is deliberate regardless of
+      // whether the hand happened to be moving on this particular tick. Otherwise the split is
+      // transit vs settled: still moving is a search, not yet a decision.
+      if (flags & MovementLog::kCorrection)
+         return kPoolDeliberate;
+      return changed ? kPoolExploratory : kPoolDeliberate;
+   case Source::Gesture: return kPoolReplay;
+   case Source::Modulator:
+   case Source::Expression:
+   case Source::Prediction:
+   case Source::Other:
+      break;
+   }
+   return kPoolAuto;
+}
+
 double DecayFactor(double stampActive, double nowActive)
 {
    if (nowActive <= stampActive)
@@ -370,6 +395,164 @@ void Engine::AddSample(ParamStats& s, float x, float y, bool hasPair, double w, 
 
 namespace
 {
+// Normalised, smoothed landscape of one pool. Returns false when the pool is empty.
+bool PoolDensity(const ParamStats& s, float out[kBins])
+{
+   if (s.nEff <= 0.0)
+      return false;
+   SmoothedHist(s, out);
+   double sum = 0;
+   for (int i = 0; i < kBins; i++)
+      sum += out[i];
+   if (sum <= 0.0)
+      return false;
+   for (int i = 0; i < kBins; i++)
+      out[i] = static_cast<float>(out[i] / sum);
+   return true;
+}
+} // namespace
+
+void Engine::ScorePools(Runtime& r, int bin)
+{
+   // Prequential: every pool is graded on this sample using only what it already holds, then the
+   // sample is absorbed by its own pool afterwards. Without that ordering a pool would be scored
+   // on data it had just been fitted to and would always appear to be the best expert.
+   const double f = std::exp2(-(mActiveClock - r.scoreClock) / kScoreHalfLifeSec);
+   if (f < 1.0 && r.scoreW > 0.0)
+   {
+      for (int i = 0; i < kNumPools; i++)
+         r.scoreSum[i] *= f;
+      r.scoreW *= f;
+   }
+   r.scoreClock = mActiveClock;
+
+   constexpr double kEps = 1e-4;   // ~1/10 of a uniform bin: bounds the loss of a total miss
+   float dens[kBins];
+   for (int i = 0; i < kNumPools; i++)
+   {
+      // An empty pool scores the uniform distribution rather than nothing, so it is neither
+      // rewarded nor destroyed by its own emptiness - kPoolShares' maturity term is what holds
+      // it back until it has data.
+      const double p = PoolDensity(r.pools[i], dens) ? dens[std::clamp(bin, 0, kBins - 1)]
+                                                     : 1.0 / kBins;
+      r.scoreSum[i] += -std::log(p + kEps);
+   }
+   r.scoreW += 1.0;
+}
+
+namespace
+{
+// share_i is proportional to prior x maturity x exp(-mean log-loss / tau). Nothing in it is a
+// function of elapsed time, which is the whole point: a pool earns its share by being right about
+// where the hand goes, never by having run longer than the others.
+void SharesFrom(const ParamStats* pools, const double* scoreSum, double scoreW, double now,
+                PoolShares& out)
+{
+   double raw[kNumPools] = {};
+   double total = 0;
+   for (int i = 0; i < kNumPools; i++)
+   {
+      // Decayed, not raw: pools are forgotten lazily (only a write to that pool applies the
+      // factor), so a pool nobody has fed for a month would otherwise keep its full vote.
+      const double n = EffectiveN(pools[i], now);
+      out.n[i] = n;
+      out.maturity[i] = static_cast<float>(n / (n + kN0));
+      const double meanL = scoreW > 0.0 ? scoreSum[i] / scoreW : 0.0;
+      raw[i] = kPoolPrior[i] * out.maturity[i] * std::exp(-meanL / kPoolTau);
+      total += raw[i];
+   }
+   if (total <= 0.0)
+   {
+      // Nothing learned anywhere: fall back to the prior so a brand-new key still has a mix.
+      for (int i = 0; i < kNumPools; i++)
+         out.share[i] = static_cast<float>(kPoolPrior[i]);
+      out.valid = false;
+      return;
+   }
+   for (int i = 0; i < kNumPools; i++)
+      out.share[i] = static_cast<float>(raw[i] / total);
+   out.valid = true;
+}
+} // namespace
+
+void Engine::MixPools(const Runtime& r, ParamStats& out) const
+{
+   PoolShares sh;
+   SharesFrom(r.pools, r.scoreSum, r.scoreW, mActiveClock, sh);
+
+   out = ParamStats();
+   out.activeSeconds = mActiveClock;
+
+   // Landscape: each pool contributes its own *shape*, scaled by its share. Because every pool is
+   // normalised to itself first, eight hours of LFO and three seconds of hand arrive at the same
+   // size and only the share decides which is louder.
+   double totalN = 0;
+   for (int i = 0; i < kNumPools; i++)
+      totalN += sh.n[i];
+   if (totalN <= 0.0)
+      return;
+
+   float dens[kBins];
+   for (int i = 0; i < kNumPools; i++)
+   {
+      if (!PoolDensity(r.pools[i], dens))
+         continue;
+      const float k = static_cast<float>(sh.share[i] * totalN);
+      for (int b = 0; b < kBins; b++)
+         out.hist[b] += dens[b] * k;
+   }
+   out.nEff = totalN;
+
+   // Cadence (phi/theta/sigma) comes from the human pools only, at full strength. A sine LFO's
+   // dwell is the arcsine law - it peaks at both rails - and its AR(1) fit is the LFO's rate, not
+   // the hand's, so letting automation set theta/sigma would teach the model to move at the speed
+   // of whatever was left running. Ranges from automation are fair; timing from it is not.
+   for (int i = 0; i < kNumPools; i++)
+   {
+      if (!PoolIsHuman(static_cast<Pool>(i)))
+         continue;
+      const ParamStats& p = r.pools[i];
+      const double f = DecayFactor(p.activeSeconds, mActiveClock);
+      out.W += p.W * f; out.Sx += p.Sx * f; out.Sy += p.Sy * f;
+      out.Sxx += p.Sxx * f; out.Sxy += p.Sxy * f; out.Syy += p.Syy * f;
+   }
+   out.releaseVel = r.pools[kPoolDeliberate].releaseVel != 0.0f
+                       ? r.pools[kPoolDeliberate].releaseVel
+                       : r.pools[kPoolExploratory].releaseVel;
+   out.nPred = r.stats.nPred;
+}
+
+bool Engine::GetPoolShares(const KeyId& id, PoolShares& out) const
+{
+   const Runtime* r = FindRuntime(id);
+   if (r == nullptr)
+      return false;
+   SharesFrom(r->pools, r->scoreSum, r->scoreW, mActiveClock, out);
+   return true;
+}
+
+void Engine::GetGlobalPoolShares(PoolShares& out) const
+{
+   // Pool the per-key evidence, then run the same formula once. Summing n and the scores (rather
+   // than averaging finished shares) keeps a knob you have played for an hour from being outvoted
+   // by fifty knobs you have never touched.
+   ParamStats agg[kNumPools];
+   double scoreSum[kNumPools] = {};
+   double scoreW = 0;
+   for (const auto& [id, r] : mKeys)
+   {
+      for (int i = 0; i < kNumPools; i++)
+      {
+         agg[i].nEff += EffectiveN(r.pools[i], mActiveClock);
+         scoreSum[i] += r.scoreSum[i];
+      }
+      scoreW += r.scoreW;
+   }
+   SharesFrom(agg, scoreSum, scoreW, mActiveClock, out);
+}
+
+namespace
+{
 int PosBin(float pos) { return std::clamp(static_cast<int>(pos * kBins), 0, kBins - 1); }
 int UnitBin(ParamRoles::Unit u, float value)
 {
@@ -581,6 +764,7 @@ void Engine::Tick(double tickTime)
 
       const bool isPred = r.holdSrc == Source::Prediction;
       const bool isHand = r.holdSrc == Source::Hand || r.holdSrc == Source::Perf;
+      const Pool pool = ClassifyPool(r.holdSrc, r.holdFlags, r.changedSinceTick);
       double w = SourceWeight(r.holdSrc, r.holdFlags, r.changedSinceTick);
       if (isPred)
          w = (r.changedSinceTick && !r.cut) ? mPredWeight : 0.0; // an auto-cut key stops learning from itself
@@ -589,28 +773,51 @@ void Engine::Tick(double tickTime)
       {
          const double wPred = isPred ? w : 0.0;
          const int bin = PosBin(r.holdPos);
-         AddSample(r.stats, r.prevPos, r.holdPos, r.prevValid, w, bin, wPred);
-         if (r.hasProfile)
-         {
-            if (r.profStats == nullptr)
-               r.profStats = &mProfiles[r.profile];
-            AddSample(*r.profStats, r.prevPos, r.holdPos, r.prevValid, w, bin, wPred);
-         }
-         if (r.role.any())
-         {
-            if (r.roleStats == nullptr)
-               r.roleStats = &mRoles[r.role.role];
-            AddSample(*r.roleStats, r.prevPos, r.holdPos, r.prevValid, w, UnitBin(r.role.unit, ToUnit(r, r.holdPos, r.role.unit)), wPred);
-            if (r.famStats == nullptr)
-               r.famStats = &mFamilies[r.role.family];
-            const ParamRoles::Unit fu = r.famShared ? r.famUnit : ParamRoles::Unit::Pos;
-            AddSample(*r.famStats, r.prevPos, r.holdPos, r.prevValid, w, UnitBin(fu, ToUnit(r, r.holdPos, fu)), wPred);
-         }
          if (isHand)
          {
-            AddSample(mYou.ar, r.prevPos, r.holdPos, r.prevValid, w, PosBin(r.holdPos)); // how, never where
-            r.handSinceRef = true;
-            r.cut = false; // the next hand move lifts an auto-cut
+            // Grade the pools on where the hand actually went BEFORE this sample is absorbed.
+            ScorePools(r, bin);
+            mLastPresenceActive = mActiveClock;
+         }
+         // A machine source may only accumulate while a human was recently here. Transport
+         // running is not presence: an arpeggiator or an LFO left going overnight would
+         // otherwise out-sample a real performance by two orders of magnitude. Prediction rows
+         // never enter a pool at all - their share would be derived from pools they also feed.
+         const bool present = (mActiveClock - mLastPresenceActive) <= kPresenceWindowSec;
+         if (!isPred && (PoolIsHuman(pool) || present))
+            AddSample(r.pools[pool], r.prevPos, r.holdPos, r.prevValid, w, bin, 0.0);
+         // The same gate has to hold at every rung, not just at the key's own pools. The
+         // profile/role/family tables below are what the ladder falls back to when a key is
+         // young, so letting an unattended overnight run flood them would reintroduce exactly
+         // the time skew the pools were built to remove - one rung higher, where it is harder
+         // to see. Prediction rows are exempt: they carry wPred, which is what predShare and
+         // the anti-collapse auto-cut read, and they are never pooled in the first place.
+         const bool absorb = isPred || PoolIsHuman(pool) || present;
+         if (absorb)
+         {
+            AddSample(r.stats, r.prevPos, r.holdPos, r.prevValid, w, bin, wPred);
+            if (r.hasProfile)
+            {
+               if (r.profStats == nullptr)
+                  r.profStats = &mProfiles[r.profile];
+               AddSample(*r.profStats, r.prevPos, r.holdPos, r.prevValid, w, bin, wPred);
+            }
+            if (r.role.any())
+            {
+               if (r.roleStats == nullptr)
+                  r.roleStats = &mRoles[r.role.role];
+               AddSample(*r.roleStats, r.prevPos, r.holdPos, r.prevValid, w, UnitBin(r.role.unit, ToUnit(r, r.holdPos, r.role.unit)), wPred);
+               if (r.famStats == nullptr)
+                  r.famStats = &mFamilies[r.role.family];
+               const ParamRoles::Unit fu = r.famShared ? r.famUnit : ParamRoles::Unit::Pos;
+               AddSample(*r.famStats, r.prevPos, r.holdPos, r.prevValid, w, UnitBin(fu, ToUnit(r, r.holdPos, fu)), wPred);
+            }
+            if (isHand)
+            {
+               AddSample(mYou.ar, r.prevPos, r.holdPos, r.prevValid, w, PosBin(r.holdPos)); // how, never where
+               r.handSinceRef = true;
+               r.cut = false; // the next hand move lifts an auto-cut
+            }
          }
       }
       float delta = r.prevValid ? (r.holdPos - r.prevPos) : 0.0f;
@@ -730,10 +937,16 @@ void Engine::ComputeBlend(const KeyId& id, float anchor, Blend& out, int section
    ParamRoles::Unit roleUnit = ParamRoles::Unit::Pos;
    ParamRoles::Unit famUnit = ParamRoles::Unit::Pos;
    bool famLandscape = false;
+   // Rung 1 is no longer the raw sum of everything that ever moved this key: it is the pools
+   // mixed at their emergent shares (landscape from all of them, cadence from the human ones).
+   ParamStats mixed;
    if (r != nullptr && r->continuous)
    {
       if (r->stats.nEff > 0.0)
-         lv[0] = &r->stats;
+      {
+         MixPools(*r, mixed);
+         lv[0] = mixed.nEff > 0.0 ? &mixed : &r->stats;
+      }
       auto pit = mProfiles.find(r->profile);
       if (r->hasProfile && pit != mProfiles.end())
          lv[1] = &pit->second;
@@ -888,7 +1101,11 @@ void Engine::ComputeBlend(const KeyId& id, float anchor, Blend& out, int section
 namespace
 {
 constexpr char kMagic[6] = {'I', 'M', 'S', 'T', 'A', 'T'};
-constexpr uint16_t kVersion = 2;
+// v3 adds the per-key source pools and their prequential scores. v2 files still load: everything
+// they hold was written before the split existed, so it is credited to DELIBERATE - the pool a
+// hand-moved knob's settled position would have landed in anyway.
+constexpr uint16_t kVersion = 3;
+constexpr uint16_t kVersionPooled = 3;
 constexpr uint32_t kMaxEntries = 4u * 1024u * 1024u;
 constexpr uint32_t kMaxString = 4096;
 
@@ -975,7 +1192,7 @@ bool StatsSane(const ParamStats& s)
 }
 
 // Verifies magic, version and the trailing CRC; positions `r` just after the header.
-bool OpenBlob(const uint8_t* data, size_t size, Reader& r)
+bool OpenBlob(const uint8_t* data, size_t size, Reader& r, uint16_t& version)
 {
    if (size < sizeof(kMagic) + 2 + 4)
       return false;
@@ -988,7 +1205,8 @@ bool OpenBlob(const uint8_t* data, size_t size, Reader& r)
    r.p = data + sizeof(kMagic);
    r.end = data + size - 4;
    r.ok = true;
-   return r.get<uint16_t>() == kVersion && r.ok;
+   version = r.get<uint16_t>();
+   return (version == kVersion || version == 2) && r.ok;
 }
 } // namespace
 
@@ -1016,6 +1234,13 @@ std::vector<uint8_t> Engine::Serialize(const std::string& lastConsumed) const
       w.put(static_cast<uint8_t>(r.refValid ? 1 : 0));
       w.put(r.refEntropy);
       w.put(r.refClock);
+      for (int i = 0; i < kNumPools; i++)
+      {
+         w.putStats(r.pools[i]);
+         w.put(r.scoreSum[i]);
+      }
+      w.put(r.scoreW);
+      w.put(r.scoreClock);
    }
 
    w.put(static_cast<uint32_t>(mProfiles.size()));
@@ -1058,7 +1283,8 @@ bool Engine::Deserialize(const uint8_t* data, size_t size, std::string& lastCons
 {
    Reset();
    Reader r{nullptr, nullptr};
-   if (!OpenBlob(data, size, r))
+   uint16_t version = 0;
+   if (!OpenBlob(data, size, r, version))
       return false;
 
    std::string lastConsumed = r.getString();
@@ -1079,6 +1305,29 @@ bool Engine::Deserialize(const uint8_t* data, size_t size, std::string& lastCons
       rt.refValid = r.get<uint8_t>() != 0;
       rt.refEntropy = r.get<double>();
       rt.refClock = r.get<double>();
+      if (version >= kVersionPooled)
+      {
+         for (int pi = 0; pi < kNumPools; pi++)
+         {
+            rt.pools[pi] = r.getStats();
+            rt.scoreSum[pi] = r.get<double>();
+            if (!r.ok || !StatsSane(rt.pools[pi]) || rt.pools[pi].activeSeconds > clock + 1e-6 ||
+                !std::isfinite(rt.scoreSum[pi]) || rt.scoreSum[pi] < 0.0)
+               return false;
+         }
+         rt.scoreW = r.get<double>();
+         rt.scoreClock = r.get<double>();
+         if (!r.ok || !std::isfinite(rt.scoreW) || rt.scoreW < 0.0 || !std::isfinite(rt.scoreClock) ||
+             rt.scoreClock < 0.0 || rt.scoreClock > clock + 1e-6)
+            return false;
+      }
+      else
+      {
+         // v2 migration: one undifferentiated pile becomes DELIBERATE. Crediting it to the
+         // strongest human pool keeps every existing user's learned landscape intact and errs
+         // toward trusting them; the shares re-learn from the next hand move either way.
+         rt.pools[kPoolDeliberate] = s;
+      }
       if (!r.ok || !StatsSane(s) || s.activeSeconds > clock + 1e-6 || !std::isfinite(rt.refEntropy) ||
           !std::isfinite(rt.refClock))
          return false;
@@ -1762,7 +2011,8 @@ std::string ReadLastConsumed(const std::string& path)
    if (!ReadWholeFile(path, bytes))
       return {};
    Reader r{nullptr, nullptr};
-   if (!OpenBlob(bytes.data(), bytes.size(), r))
+   uint16_t probeVersion = 0;
+   if (!OpenBlob(bytes.data(), bytes.size(), r, probeVersion))
       return {};
    std::string s = r.getString();
    return r.ok ? s : std::string();
@@ -2165,6 +2415,157 @@ bool RunMovementStatsTest()
       STATS_CHECK(std::filesystem::exists(StatsPath(testDir)), "stats.bin was pruned");
 
       MovementLog::SetRetentionCapBytes(savedCap);
+   }
+
+   // 12. Source pools and the user profile.
+   {
+      // 12a. Classification: transit vs settled inside a hand move, corrections always deliberate.
+      STATS_CHECK(ClassifyPool(Source::Hand, 0, true) == kPoolExploratory, "moving hand is not exploratory");
+      STATS_CHECK(ClassifyPool(Source::Hand, 0, false) == kPoolDeliberate, "settled hand is not deliberate");
+      STATS_CHECK(ClassifyPool(Source::Perf, MovementLog::kCorrection, true) == kPoolDeliberate,
+                  "correction is not deliberate");
+      STATS_CHECK(ClassifyPool(Source::Modulator, 0, true) == kPoolAuto, "modulator is not auto");
+      STATS_CHECK(ClassifyPool(Source::Expression, 0, true) == kPoolAuto, "expression is not auto");
+      STATS_CHECK(ClassifyPool(Source::Gesture, 0, true) == kPoolReplay, "gesture is not replay");
+      STATS_CHECK(PoolIsHuman(kPoolDeliberate) && PoolIsHuman(kPoolExploratory), "human pools");
+      STATS_CHECK(!PoolIsHuman(kPoolAuto) && !PoolIsHuman(kPoolReplay), "machine pools");
+
+      // 12b. The skew this whole split exists to kill: a short hand performance against an
+      // overnight LFO. The modulator logs ~960x more samples, so under one summed pool it
+      // authored 99% of the landscape. The hand must still win the mix.
+      const KeyId pk{9100, 0};
+      Engine e;
+      e.RegisterKey(pk, "Test", "cutoff", true);
+      e.BeginSession();
+      e.SetPlaying(true);
+      double t = 0;
+      // 30 s of hand, parked at 0.25 (the settled position is what the landscape should keep).
+      for (int i = 0; i < 300; i++)
+      {
+         e.Observe(pk, t, 0.25f, Source::Hand, 0);
+         t += kGridDt;
+         e.Advance(t);
+      }
+      const double handN = e.Find(pk)->nEff;
+      // 8 hours of a sine LFO sweeping the full range: the arcsine law, piling mass on both rails.
+      // A hand sample every 10 minutes keeps the presence gate open, so this test measures the
+      // *share* mechanism on its own - the gate gets its own test below. This is also the harder
+      // and more realistic case: someone in the room all evening with a patch running.
+      const int kEightHoursTicks = 8 * 3600 * 10;
+      for (int i = 0; i < kEightHoursTicks; i++)
+      {
+         if (i % 6000 == 0)
+         {
+            e.Observe(pk, t, 0.25f, Source::Hand, 0);
+            t += kGridDt;
+            e.Advance(t);
+            continue;
+         }
+         const float x = 0.5f + 0.5f * (float)std::sin(t * 0.7);
+         e.Observe(pk, t, std::clamp(x, 0.0f, 1.0f), Source::Modulator, 0);
+         t += kGridDt;
+         e.Advance(t);
+      }
+      PoolShares sh;
+      STATS_CHECK(e.GetPoolShares(pk, sh) && sh.valid, "no pool shares after a mixed session");
+      const double human = sh.share[kPoolDeliberate] + sh.share[kPoolExploratory];
+      const double autoN = sh.n[kPoolAuto];
+      std::printf("[POOLS] hand n=%.0f auto n=%.0f -> human share %.3f auto share %.3f\n",
+                  handN, autoN, human, sh.share[kPoolAuto]);
+      STATS_CHECK(autoN > 10.0 * handN, "the overnight run did not actually out-sample the hand");
+      STATS_CHECK(human >= 0.5, "8 h of LFO outvoted 30 s of hand: share %.3f", human);
+
+      // The blended landscape must still point at where the hand parked, not at the rails the
+      // sine spent most of its time on.
+      Blend b;
+      e.ComputeBlend(pk, 0.25f, b);
+      int peak = 0;
+      for (int i = 1; i < kBins; i++)
+         if (b.p[i] > b.p[peak])
+            peak = i;
+      STATS_CHECK(std::abs(peak - PosBin(0.25f)) <= 4, "landscape peak moved to bin %d, hand parked at %d",
+                  peak, PosBin(0.25f));
+
+      // 12c. Cadence is human-only: an LFO's rate must never become "your speed".
+      const ParamStats* hp = e.Find(pk);
+      STATS_CHECK(hp != nullptr && hp->nEff > 0.0, "key lost its legacy stats");
+
+      // 12d. Round trip, including the pools and their scores.
+      std::string lc;
+      const std::vector<uint8_t> blob = e.Serialize("x");
+      Engine e2;
+      STATS_CHECK(e2.Deserialize(blob.data(), blob.size(), lc), "pooled stats.bin did not load");
+      PoolShares sh2;
+      STATS_CHECK(e2.GetPoolShares(pk, sh2), "pools lost across save/load");
+      for (int i = 0; i < kNumPools; i++)
+         STATS_CHECK(std::abs(sh2.n[i] - sh.n[i]) < 1e-6, "pool %d n changed across save/load", i);
+   }
+
+   // 13. Presence gate: a machine left running with no human in the room stops accumulating.
+   {
+      const KeyId pk{9200, 0};
+      Engine e;
+      e.RegisterKey(pk, "Test", "cutoff", true);
+      e.BeginSession();
+      e.SetPlaying(true);
+      double t = 0;
+      e.Observe(pk, t, 0.5f, Source::Hand, 0);
+      t += kGridDt;
+      e.Advance(t);
+      // Well past kPresenceWindowSec of transport-only time.
+      const int ticks = (int)((kPresenceWindowSec * 3.0) / kGridDt);
+      for (int i = 0; i < ticks; i++)
+      {
+         e.Observe(pk, t, 0.9f, Source::Modulator, 0);
+         t += kGridDt;
+         e.Advance(t);
+      }
+      PoolShares sh;
+      STATS_CHECK(e.GetPoolShares(pk, sh), "no shares for the presence key");
+      const double cap = (kPresenceWindowSec / kGridDt) * 0.1 * 1.05;
+      std::printf("[POOLS] presence gate: auto n=%.0f (cap %.0f of %d ticks)\n", sh.n[kPoolAuto], cap, ticks);
+      STATS_CHECK(sh.n[kPoolAuto] <= cap, "machine kept accumulating with nobody present: n=%.1f", sh.n[kPoolAuto]);
+   }
+
+   // 14. The invariant this whole pooled design exists to hold: what the model learns is never
+   // a function of how long a machine was left running. The presence gate enforces that on a
+   // key's own pools; it has to enforce it at the profile/role/family rungs too, which are
+   // what a young key actually falls back to. So: run the identical fixture for 1.5 and for 8
+   // presence windows of unattended automation, and read an untouched sibling of the same
+   // role. The two must agree. Before the gate reached the aggregate tables they diverged,
+   // because the longer run kept flooding the family table after everyone had gone home.
+   {
+      const KeyId a{9300, 0}, b{9301, 0};
+      auto run = [&](double windows, Blend& out) {
+         Engine e;
+         e.RegisterKey(a, "Test", "cutoff", true);
+         e.RegisterKey(b, "Test", "cutoff", true);
+         e.BeginSession();
+         e.SetPlaying(true);
+         double t = 0;
+         e.Observe(a, t, 0.5f, Source::Hand, 0);   // one human touch, then the room empties
+         t += kGridDt;
+         e.Advance(t);
+         const int ticks = (int)((kPresenceWindowSec * windows) / kGridDt);
+         for (int i = 0; i < ticks; i++)
+         {
+            e.Observe(a, t, 0.9f, Source::Modulator, 0);
+            t += kGridDt;
+            e.Advance(t);
+         }
+         e.ComputeBlend(b, 0.5f, out);
+      };
+      Blend shortRun, longRun;
+      run(1.5, shortRun);
+      run(8.0, longRun);
+      double l1 = 0.0;
+      for (int i = 0; i < kBins; i++)
+         l1 += std::abs(shortRun.p[i] - longRun.p[i]);
+      const double dw = std::abs(shortRun.w2b - longRun.w2b) + std::abs(shortRun.w2d - longRun.w2d) +
+                        std::abs(shortRun.w2 - longRun.w2);
+      std::printf("[POOLS] ladder gate: 1.5 vs 8 windows unattended -> landscape L1=%.4f rung dw=%.4f\n", l1, dw);
+      STATS_CHECK(l1 < 0.02, "unattended runtime changed what a sibling learned: L1=%.4f", l1);
+      STATS_CHECK(dw < 0.02, "unattended runtime changed the ladder weights: dw=%.4f", dw);
    }
 
    std::filesystem::remove_all(testDir, ec);
