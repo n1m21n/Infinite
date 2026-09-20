@@ -527,42 +527,28 @@ int NoteToCVNode::LastNote() const
 class AudioVelocityToCVNode : public AudioNode
 {
 public:
-   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override { mSampleRate = sampleRate; }
+   void PrepareToPlay(double /*sampleRate*/, int /*maxBlockSize*/) override {}
 
-   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& /*output*/) override
    {
-      const int numFrames = output.numFrames;
       NoteEvent evts[64];
       const int n = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, evts, 64) : 0;
       float target = mTarget.load(std::memory_order_relaxed);
-      int held = mHeldNote.load(std::memory_order_relaxed);
-      const bool hold = mHold.load(std::memory_order_relaxed);
+      const float rLow = mRangeLow.load(std::memory_order_relaxed);
+      const float rHigh = mRangeHigh.load(std::memory_order_relaxed);
+      const float span = rHigh - rLow;
       for (int i = 0; i < n; i++)
       {
          if (evts[i].bendUpdate)
             continue;
          if (evts[i].isNoteOn)
          {
-            target = std::clamp(evts[i].velocity, 0.0f, 1.0f);
-            held = evts[i].note;
-         }
-         else if (!hold && evts[i].note == held)
-         {
-            // Only the note that set the target may clear it, so releasing an
-            // older overlapping note doesn't drop a velocity still sounding.
-            target = 0.0f;
-            held = -1;
+            const float rawVel = std::clamp(evts[i].velocity, 0.0f, 1.0f);
+            target = (std::fabs(span) > 1e-4f) ? std::clamp((rawVel - rLow) / span, 0.0f, 1.0f) : 0.0f;
          }
       }
       mTarget.store(target, std::memory_order_relaxed);
-      mHeldNote.store(held, std::memory_order_relaxed);
-
-      const float glideMs = std::max(0.0f, mGlideMs.load(std::memory_order_relaxed));
-      const float coef = glideMs > 0.0f ? expf(-1.0f / (float)(mSampleRate * 0.001 * glideMs)) : 0.0f;
-      float level = mLevel.load(std::memory_order_relaxed);
-      for (int i = 0; i < numFrames; i++)
-         level = target + coef * (level - target);
-      mLevel.store(level, std::memory_order_relaxed);
+      mLevel.store(target, std::memory_order_relaxed);
    }
 
    void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
@@ -570,8 +556,8 @@ public:
    // Main thread only.
    void PushParams(const VelocityToCVNode& n)
    {
-      mHold.store(n.hold, std::memory_order_relaxed);
-      mGlideMs.store(n.glideMs, std::memory_order_relaxed);
+      mRangeLow.store(n.rangeLow, std::memory_order_relaxed);
+      mRangeHigh.store(n.rangeHigh, std::memory_order_relaxed);
    }
 
    float Level() const { return mLevel.load(std::memory_order_relaxed); }
@@ -579,12 +565,10 @@ public:
 private:
    NoteEventQueue* mInbox = nullptr;
    int mNoteCursor = -1;
-   double mSampleRate = 44100.0;
    std::atomic<float> mLevel { 0.0f };
    std::atomic<float> mTarget { 0.0f };
-   std::atomic<int> mHeldNote { -1 };
-   std::atomic<bool> mHold { true };
-   std::atomic<float> mGlideMs { 20.0f };
+   std::atomic<float> mRangeLow { 0.0f };
+   std::atomic<float> mRangeHigh { 1.0f };
 };
 
 VelocityToCVNode::VelocityToCVNode() = default;
@@ -602,8 +586,8 @@ void VelocityToCVNode::CookIfNeeded(int frameId)
 
 void VelocityToCVNode::VisitParams(ParamVisitor& v)
 {
-   v.Bool("hold", hold);
-   v.Float("glideMs", glideMs);
+   v.Float("rangeLow", rangeLow);
+   v.Float("rangeHigh", rangeHigh);
 }
 
 AudioNode* VelocityToCVNode::AudioNodeForNotePorts()

@@ -11290,7 +11290,10 @@ namespace
           dynamic_cast<AudioColorRampNode*>(node) != nullptr ||
           dynamic_cast<AudioAnalyzeNode*>(node) != nullptr || dynamic_cast<VideoSourceNode*>(node) != nullptr ||
           dynamic_cast<FieldSampleNode*>(node) != nullptr ||
-          dynamic_cast<FieldSynthNode*>(node) != nullptr)
+          dynamic_cast<FieldSynthNode*>(node) != nullptr ||
+          dynamic_cast<NoteToCVNode*>(node) != nullptr ||
+          dynamic_cast<VelocityToCVNode*>(node) != nullptr ||
+          dynamic_cast<CVRecorderNode*>(node) != nullptr)
          return false;
       return dynamic_cast<IAudioSource*>(node) != nullptr || node->AudioInputSlot(0) != nullptr ||
              dynamic_cast<INoteSource*>(node) != nullptr || node->NoteInputSlot(0) != nullptr ||
@@ -17985,6 +17988,82 @@ namespace
       ModSlider("glide (ms)", &n->glideMs, 0.0f, 2000.0f);
    }
 
+   void DrawNoteToCVParams(NoteToCVNode* n)
+   {
+      const int last = n->LastNote();
+      if (last >= 0)
+         ImGui::TextDisabled("last: %s%d (MIDI %d)", NoteNameList()[last % 12].c_str(), last / 12 - 1, last);
+      else
+         ImGui::TextDisabled("last: none");
+
+      if (ModSliderInt("range low", &n->rangeLow, 0, 126))
+         n->rangeHigh = std::max(n->rangeHigh, n->rangeLow + 1);
+      if (ModSliderInt("range high", &n->rangeHigh, 1, 127))
+         n->rangeLow = std::min(n->rangeLow, n->rangeHigh - 1);
+
+      ModSlider("glide (ms)", &n->glideMs, 0.0f, 500.0f);
+   }
+
+   void DrawVelocityToCVParams(VelocityToCVNode* n)
+   {
+      ImGui::TextDisabled("velocity: %.2f", n->Value01());
+      ModSlider("range low", &n->rangeLow, 0.0f, 1.0f);
+      ModSlider("range high", &n->rangeHigh, 0.0f, 1.0f);
+   }
+
+   void DrawCVRecorderParams(CVRecorderNode* n)
+   {
+      const bool recording = n->IsRecording();
+      const bool playing = n->playing && !recording && n->SampleCount() > 0;
+      if (recording)
+         ImGui::TextDisabled("status: REC (%.1f beats)", n->LengthBeats());
+      else if (n->SampleCount() == 0)
+         ImGui::TextDisabled("status: empty");
+      else
+         ImGui::TextDisabled("status: %s (%.1f beats)", playing ? "playing" : "stopped", n->LengthBeats());
+
+      const float btnW = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
+      if (recording)
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
+      if (ImGui::Button(recording ? "Stop Rec##cvRec" : "Rec##cvRec", ImVec2(btnW, 0)))
+      {
+         if (recording) n->StopRecording();
+         else n->StartRecording();
+      }
+      if (recording)
+         ImGui::PopStyleColor();
+      ImGui::SameLine();
+
+      if (playing)
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.5f, 0.2f, 1.0f));
+      ImGui::BeginDisabled(n->SampleCount() == 0 || recording);
+      if (ImGui::Button(playing ? "Stop##cvPlay" : "Play##cvPlay", ImVec2(btnW, 0)))
+      {
+         if (playing) n->StopPlayback();
+         else n->StartPlayback();
+      }
+      ImGui::EndDisabled();
+      if (playing)
+         ImGui::PopStyleColor();
+      ImGui::SameLine();
+
+      ImGui::BeginDisabled(n->SampleCount() == 0 && !recording);
+      if (ImGui::Button("Clear##cvClear", ImVec2(btnW, 0)))
+      {
+         PushUndoCheckpoint();
+         n->Clear();
+      }
+      ImGui::EndDisabled();
+
+      ImGui::BeginDisabled(n->input != nullptr);
+      ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
+      ImGui::EndDisabled();
+
+      ModSlider("speed", &n->speed, 0.05f, 4.0f);
+      ModSlider("low", &n->low, 0.0f, 1.0f);
+      ModSlider("high", &n->high, 0.0f, 1.0f);
+   }
+
    // Effective scale/root - the values AudioNoteFilterNode::ProcessBlock
    // (NoteNodes.cpp) actually gates against. When useGlobalScale is on, the
    // node's own scale/root fields are disabled in the UI and ignored on the
@@ -19375,152 +19454,6 @@ namespace
       row2.Knob("in", &n->constantIn, 0.0f, 1.0f, "%.2f", kKnobSmall);
       row2.Knob("threshold", &n->threshold, 0.0f, 1.0f, "%.2f", kKnobSmall);
       row2.End();
-
-      EndAudioBody();
-   }
-
-   // ---- Note to CV ---------------------------------------------------
-   void DrawNoteToCVBody(GraphNode& gn, NoteToCVNode* n)
-   {
-      char stat[64];
-      const int last = n->LastNote();
-      if (last < 0)
-         snprintf(stat, sizeof(stat), "%d..%d -> 0..1", n->rangeLow, n->rangeHigh);
-      else
-         snprintf(stat, sizeof(stat), "last: %s%d -> %.2f", NoteNameList()[last % 12].c_str(), last / 12 - 1,
-                  n->Value01());
-
-      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
-
-      AudioKnobRow row(3);
-      row.KnobInt("range lo", &n->rangeLow, 0, 126);
-      row.KnobInt("range hi", &n->rangeHigh, 1, 127);
-      row.Knob("glide", &n->glideMs, 0.0f, 500.0f, "%.0f ms", kKnobLarge, false, false, AudioWidgetStyle::KnobSkewGlide100);
-      row.End();
-
-      EndAudioBody();
-   }
-
-   // ---- Velocity to CV -----------------------------------------------
-   void DrawVelocityToCVBody(GraphNode& gn, VelocityToCVNode* n)
-   {
-      char stat[64];
-      snprintf(stat, sizeof(stat), "velocity %.2f", n->Value01());
-
-      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
-
-      AudioKnobRow row(2);
-      row.Checkbox("hold##velHold", &n->hold);
-      row.Knob("glide", &n->glideMs, 0.0f, 500.0f, "%.0f ms", kKnobLarge, false, false, AudioWidgetStyle::KnobSkewGlide100);
-      row.End();
-
-      EndAudioBody();
-   }
-
-   // ---- CV Recorder --------------------------------------------------
-   void DrawCVRecorderBody(GraphNode& gn, CVRecorderNode* n)
-   {
-      const bool recording = n->IsRecording();
-      const bool playing = n->playing && !recording && n->SampleCount() > 0;
-      char stat[64];
-      if (recording)
-         snprintf(stat, sizeof(stat), "REC  %.1f beats", n->LengthBeats());
-      else if (n->SampleCount() == 0)
-         snprintf(stat, sizeof(stat), "empty  -  out %.2f", n->Value01());
-      else
-         snprintf(stat, sizeof(stat), "%s  %.1f beats  -  out %.2f", playing ? "playing" : "stopped",
-                  n->LengthBeats(), n->Value01());
-
-      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
-
-      {
-         const float w = AudioFullWidth();
-         const float h = 46.0f;
-         const ImVec2 p0 = ImGui::GetCursorScreenPos();
-         const ImVec2 p1(p0.x + w, p0.y + h);
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         dl->AddRectFilled(p0, p1, IM_COL32(0, 0, 0, 70), 3.0f);
-         const ImU32 col = recording ? IM_COL32(235, 90, 90, 255) : IM_COL32(150, 214, 255, 245);
-         const auto& d = n->Samples();
-         const int cnt = (int)d.size();
-         if (cnt > 1)
-         {
-            // Recording shows the take so far filling in from the left over a
-            // 64-beat-wide strip only when it is long; otherwise stretch to fit.
-            const int cols = std::max(2, std::min((int)w, cnt));
-            float px = 0.0f, py = 0.0f;
-            for (int c = 0; c < cols; c++)
-            {
-               const int i = (int)((int64_t)c * (cnt - 1) / (cols - 1));
-               const float x = p0.x + 2.0f + (w - 4.0f) * (float)c / (float)(cols - 1);
-               const float y = p1.y - 3.0f - (h - 6.0f) * (d[i] * (1.0f / 255.0f));
-               if (c > 0)
-                  dl->AddLine(ImVec2(px, py), ImVec2(x, y), col, 1.5f);
-               px = x;
-               py = y;
-            }
-            const float ph = n->PlayheadNorm();
-            if (ph >= 0.0f)
-            {
-               const float x = p0.x + 2.0f + (w - 4.0f) * std::clamp(ph, 0.0f, 1.0f);
-               dl->AddLine(ImVec2(x, p0.y + 2.0f), ImVec2(x, p1.y - 2.0f), IM_COL32(255, 255, 255, 200), 1.0f);
-            }
-         }
-         else
-         {
-            const char* hint = recording ? "recording..." : "press Rec";
-            const ImVec2 ts = ImGui::CalcTextSize(hint);
-            dl->AddText(ImVec2(p0.x + (w - ts.x) * 0.5f, p0.y + (h - ts.y) * 0.5f), IM_COL32(180, 180, 180, 140), hint);
-         }
-         ImGui::Dummy(ImVec2(w, h));
-      }
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
-
-      const float btnW = (AudioFullWidth() - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
-      if (recording)
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
-      if (ImGui::Button("Rec##cvRec", ImVec2(btnW, 0)))
-      {
-         if (recording) n->StopRecording();
-         else n->StartRecording();
-      }
-      if (recording)
-         ImGui::PopStyleColor();
-      ImGui::SameLine();
-
-      if (playing)
-         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.5f, 0.2f, 1.0f));
-      ImGui::BeginDisabled(n->SampleCount() == 0 || recording);
-      if (ImGui::Button(playing ? "Stop##cvPlay" : "Play##cvPlay", ImVec2(btnW, 0)))
-      {
-         if (playing) n->StopPlayback();
-         else n->StartPlayback();
-      }
-      ImGui::EndDisabled();
-      if (playing)
-         ImGui::PopStyleColor();
-      ImGui::SameLine();
-
-      ImGui::BeginDisabled(n->SampleCount() == 0 && !recording);
-      if (ImGui::Button("Clear##cvClear", ImVec2(btnW, 0)))
-      {
-         PushUndoCheckpoint();
-         n->Clear();
-      }
-      ImGui::EndDisabled();
-
-      ImGui::Dummy(ImVec2(0.0f, 2.0f));
-      {
-         AudioKnobRow row(3);
-         row.Checkbox("loop##cvLoop", &n->loop);
-         // Always drawn (float params are addressed by draw order); dimmed
-         // while a cable supplies the input instead.
-         ImGui::BeginDisabled(n->input != nullptr);
-         row.Knob("in", &n->constantIn, 0.0f, 1.0f, "%.2f", kKnobSmall);
-         ImGui::EndDisabled();
-         row.Knob("speed", &n->speed, 0.05f, 4.0f, "%.2fx", kKnobSmall);
-         row.End();
-      }
 
       EndAudioBody();
    }
@@ -23738,12 +23671,6 @@ namespace
          DrawAudioToCVBody(gn, n);
       else if (auto* n = dynamic_cast<EnvelopeNode*>(gn.node.get()))
          DrawEnvelopeBody(gn, n);
-      else if (auto* n = dynamic_cast<NoteToCVNode*>(gn.node.get()))
-         DrawNoteToCVBody(gn, n);
-      else if (auto* n = dynamic_cast<VelocityToCVNode*>(gn.node.get()))
-         DrawVelocityToCVBody(gn, n);
-      else if (auto* n = dynamic_cast<CVRecorderNode*>(gn.node.get()))
-         DrawCVRecorderBody(gn, n);
       else if (auto* n = dynamic_cast<AudioEffectNode*>(gn.node.get()))
       {
          // Every EffectDefs.cpp entry shares this one C++ class (§0.4), so
@@ -38857,8 +38784,8 @@ namespace
          { "MIDI CC", "Binds one physical control on a MIDI controller - a knob, fader or pad - and reports its position as a modulator. Press Learn and move the control; the node remembers that channel + controller number and polls only that binding. low/high remap the output range and invert flips it. Works with any class-compliant USB MIDI controller, since it only ever reads generic Control Change / Note On messages." },
          { "MIDI Trigger", "The pad counterpart of MIDI CC: it fires a decaying 0..1 pulse whenever one specific MIDI note is hit, then sits at 0. A pad hit is an event rather than a position, so this spikes and decays over 'hold' seconds the way Audio Analyze's onset output does, instead of holding a live value. Velocity sensitivity scales the spike by how hard the pad was struck." },
          { "Note to CV", "Converts a note stream's pitch into a modulator, so which note is playing can drive any parameter - a filter cutoff, a warp amount, pan. It is a pitch tracker, not an envelope: it holds the last note's pitch on release rather than falling back toward 0 (that's Envelope's job). rangeLow/High set which note range maps onto the full 0..1 span, glide smooths the jump between notes." },
-         { "Velocity to CV", "Converts how hard each note is played into a modulator (its 0..1 velocity), so touch can drive any parameter - brightness, pan, a filter opening on accents. With hold on it keeps the last note's velocity through release; off, it drops to 0 when the note ends. glide smooths the jump between velocities. The pitch counterpart is Note to CV." },
-         { "CV Recorder", "Records any modulator patched into its input and plays it back. Press Rec to capture (live input passes through while recording), press Rec again to stop and it starts looping straight away. speed is the playback rate - 2x plays the take twice as fast - and loop off plays it once and holds the last value. Takes are timed in beats, so they follow the tempo and pause with the transport (up to 64 beats), and they are saved with the patch. With nothing patched in, it records its own in knob, so you can perform a gesture by hand." },
+         { "Velocity to CV", "Converts how hard each note is played into a modulator (its 0..1 velocity), so touch can drive any parameter - brightness, pan, a filter opening on accents. It holds the last note's velocity through release. range low/high pick which velocities map onto the full 0..1 span (swap them to invert). The pitch counterpart is Note to CV." },
+         { "CV Recorder", "Records any modulator patched into its input and plays it back. Press Rec to capture (live input passes through while recording), press Rec again to stop and it starts looping straight away. speed is the playback rate - 2x plays the take twice as fast - and low/high map the take onto an output range. Takes are timed in beats, so they follow the tempo and pause with the transport (up to 64 beats), and they are saved with the patch. With nothing patched in, it records its own in knob, so you can perform a gesture by hand." },
          { "Audio to CV", "Converts audio into a modulator through an amplitude follower - Peak or RMS detection with its own attack and release. The lightweight, single-output counterpart of Audio Analyze: reach for this when all you want is 'this parameter follows how loud that is', and for Audio Analyze when you want bands, onsets and a passthrough." },
          { "Invert", "Mirrors a modulator around the midpoint of a low/high window, so what was at the top of the range lands at the bottom. Deliberately not a flat 1-v, which is why it still does the right thing when fed something already outside 0..1 - an unclamped Math output, for instance." },
          { "Mod Depth", "Scales how much of a modulator's swing reaches its destination, without having to know anything about the destination. Because a modulation binding overrides the knob outright, 'depth' collapses the signal toward 0.5 rather than adding a fraction on top: at 0 the destination sits at its own mid-range and the modulator has no say, at 1 the source passes through unchanged. Negative depth inverts, so one knob covers how much and which direction." },
@@ -39456,8 +39383,8 @@ namespace
                { "Compare", "Outputs 1 when the comparison holds, 0 otherwise." },
                { "Range to Range", "Remaps one modulator's input range onto a different output range." },
                { "Smoothing", "An exponential moving average over another modulator, to damp jitter." },
-               { "CV Recorder", "Records any patched modulator - hit Rec, then it loops the take back with an adjustable playback speed." },
-               { "Velocity to CV", "Turns note velocity into a 0..1 modulator, holding or releasing with the note." },
+               { "CV Recorder", "Records any patched modulator - hit Rec, then it loops the take back with adjustable speed and low/high range." },
+               { "Velocity to CV", "Turns note velocity into a 0..1 modulator with an adjustable velocity range." },
                { "Envelope", "Shapes an incoming modulator with an ADSR contour, gated by it crossing threshold, instead of generating its own trigger." },
                { "Invert", "Mirrors a modulator around a low/high pivot. Defaults to 0..1 for a classic 1-v flip; set low/high to match an unclamped source to mirror it correctly." },
                { "Mod Curve", "Remaps a modulator through a draggable transfer curve - an S-curve, staircase, or exponential response, all things a slider can't express." },
@@ -40272,31 +40199,33 @@ namespace
          terminals.push_back(term);
       }
 
-      // Note-only chains that never reach an Audio Out at all - an Envelope
-      // driving a visual param through Modulation::Bind has no audio cable
-      // anywhere in its chain, so the walk above never finds it (and never
-      // will: its output is a modulator value, not an audio buffer). Seed
-      // separately from every node with a connected note input; visited
-      // dedupes anything the Audio Out walk already picked up (e.g. an
-      // Oscillator's own note-source chain).
+      // Note nodes and note-only chains that never reach an Audio Out at all —
+      // an Envelope driving a visual param through Modulation::Bind, or standalone
+      // note generators/sequencers/processors (Note Sequencer, MIDI Notes, Random Note,
+      // Chorder, Arpeggiator, etc.) that have no audio cable or Audio Out anywhere in
+      // their chain. Seed separately from every node that produces or processes notes,
+      // or has a connected note input; visited dedupes anything the Audio Out walk
+      // already picked up.
       for (GraphNode& gn : gNodes)
       {
-         for (int slot = 0; slot < kMaxNoteSlots; slot++)
+         bool isNoteNode = (dynamic_cast<INoteSource*>(gn.node.get()) != nullptr ||
+                            gn.node->AudioNodeForNotePorts() != nullptr ||
+                            gn.category == "Notes");
+         if (!isNoteNode)
          {
-            NoteCable* cable = gn.node->NoteInputSlot(slot);
-            if (cable != nullptr && cable->IsConnected())
+            for (int slot = 0; slot < kMaxNoteSlots; slot++)
             {
-               // Seed with the CONSUMER, not with cable->GetSource(): the
-               // consumer is the node this loop exists to reach (an Envelope
-               // driving a visual param has no audio cable anywhere, so the
-               // Audio Out walk above never finds it), and CollectAudioChain
-               // already walks its inputs first. Seeding with the source
-               // instead would collect the producer and silently drop the
-               // consumer's own entry. Bypass needs no handling here -
-               // CollectAudioChain resolves each input through
-               // ResolvedAudioSource and skips adding a bypassed node itself.
-               CollectAudioChain(gn.node.get(), visited, order, bufferIndexOf, nextBufferIndex);
+               NoteCable* cable = gn.node->NoteInputSlot(slot);
+               if (cable != nullptr && cable->IsConnected())
+               {
+                  isNoteNode = true;
+                  break;
+               }
             }
+         }
+         if (isNoteNode)
+         {
+            CollectAudioChain(gn.node.get(), visited, order, bufferIndexOf, nextBufferIndex);
          }
       }
 
@@ -60293,9 +60222,11 @@ static int RunCVRecorderTest()
    rec.speed = 1.0f;
    const float wrapped = at(10.0 + 4.0 + 1.0); // one beat into second pass
    check(std::fabs(wrapped - 0.25f) < 0.05f, "loop wraps");
-   rec.loop = false;
-   check(at(10.0 + 40.0) > 0.97f, "non-loop holds the end");
-   rec.loop = true;
+   rec.low = 0.5f;
+   rec.high = 1.0f;
+   check(std::fabs(at(10.0 + 4.0 + 2.0) - 0.75f) < 0.05f, "low/high maps the range");
+   rec.low = 0.0f;
+   rec.high = 1.0f;
 
    {
       // round trip through the ParamVisitor text path
@@ -84265,6 +84196,12 @@ int main(int argc, char** argv)
                DrawModCurveParams(n);
             else if (auto* n = dynamic_cast<CVToPitchNode*>(gn.node.get()))
                DrawCVToPitchParams(n);
+            else if (auto* n = dynamic_cast<NoteToCVNode*>(gn.node.get()))
+               DrawNoteToCVParams(n);
+            else if (auto* n = dynamic_cast<VelocityToCVNode*>(gn.node.get()))
+               DrawVelocityToCVParams(n);
+            else if (auto* n = dynamic_cast<CVRecorderNode*>(gn.node.get()))
+               DrawCVRecorderParams(n);
             else if (auto* n = dynamic_cast<MacroKnobNode*>(gn.node.get()))
                DrawMacroKnobParams(n);
             else if (auto* n = dynamic_cast<MacroSliderNode*>(gn.node.get()))
