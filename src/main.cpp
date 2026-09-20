@@ -23353,24 +23353,46 @@ namespace
 
       // Oscillator section
       BeginAudioSection("oscillator");
-      {
-         // Row 1: Oscillator 1 (Selection, Fine Tune, Semitones, Octave)
-         AudioKnobRow row(4);
-         row.Dropdown("wave 1", waveList, n->wave1, [n](int i) { PushUndoCheckpoint(); n->wave1 = i; });
-         row.Knob("fine", &n->fine1, -50.0f, 50.0f, "%.1f c", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr, nullptr, -1, "fine1");
-         row.Knob("semi", &n->semi1, -24.0f, 24.0f, "%.0f st", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr, nullptr, -1, "semi1");
-         row.Knob("oct", &n->oct1, -3.0f, 3.0f, "%+.0f oct", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr, nullptr, -1, "oct1");
-         row.End();
-      }
-      {
-         // Row 2: Oscillator 2 (Selection, Fine Tune, Semitones, Octave)
-         AudioKnobRow row(4);
-         row.Dropdown("wave 2", waveList, n->wave2, [n](int i) { PushUndoCheckpoint(); n->wave2 = i; });
-         row.Knob("fine", &n->fine2, -50.0f, 50.0f, "%.1f c", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr, nullptr, -1, "fine2");
-         row.Knob("semi", &n->semi2, -24.0f, 24.0f, "%.0f st", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr, nullptr, -1, "semi2");
-         row.Knob("oct", &n->oct2, -3.0f, 3.0f, "%+.0f oct", kKnobSmall, false, false, AudioWidgetStyle::Knob, nullptr, nullptr, -1, "oct2");
-         row.End();
-      }
+      // Tuning header per oscillator, laid out like the Oscillator/Wavetable
+      // header: wave dropdown, fine slider, octave and semitone dropdowns.
+      // oct/semi stay floats in the node (saved patches, modulation, DSP), so
+      // the dropdowns round on write; the semi list spans the full stored
+      // -24..+24 so no saved value falls off the end of it.
+      static const std::vector<std::string> semiNames24 = [] {
+         std::vector<std::string> v;
+         for (int i = -24; i <= 24; i++)
+         {
+            char b[16];
+            snprintf(b, sizeof(b), "semi %+d", i);
+            v.push_back(b);
+         }
+         return v;
+      }();
+      auto tuningHeader = [&](const char* idBase, int& wave, float& fine, float& semi, float& oct) {
+         const float w = gAudioContentW;
+         const float x0 = gAudioContentX;
+         const float y = ImGui::GetCursorScreenPos().y;
+         const float gap = 5.0f;
+         const float octW = 74.0f, semiW = 82.0f, fineW = 104.0f;
+         const float waveW = std::max(70.0f, w - octW - semiW - fineW - gap * 3.0f);
+         ImGui::PushID(idBase);
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         AudioBareDropdown("wave", waveList, wave, [&wave](int i) { PushUndoCheckpoint(); wave = i; }, waveW);
+         ImGui::SetCursorScreenPos(ImVec2(x0 + waveW + gap, y));
+         AudioSlider("fine", &fine, -50.0f, 50.0f, "%.1f c", fineW);
+         ImGui::SetCursorScreenPos(ImVec2(x0 + w - octW - semiW - gap, y));
+         AudioBareDropdown("oct", OctaveNames(), std::clamp((int)std::lround(oct), -4, 4) + 4,
+                           [&oct](int i) { PushUndoCheckpoint(); oct = (float)(i - 4); }, octW);
+         ImGui::SetCursorScreenPos(ImVec2(x0 + w - semiW, y));
+         AudioBareDropdown("semi", semiNames24, std::clamp((int)std::lround(semi), -24, 24) + 24,
+                           [&semi](int i) { PushUndoCheckpoint(); semi = (float)(i - 24); }, semiW);
+         ImGui::PopID();
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
+         ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      };
+      tuningHeader("osc1", n->wave1, n->fine1, n->semi1, n->oct1);
+      tuningHeader("osc2", n->wave2, n->fine2, n->semi2, n->oct2);
       {
          // Row 3: Osc 1 Vol, Osc 2 Vol, Sync & Analog switches
          AudioKnobRow row(4);
