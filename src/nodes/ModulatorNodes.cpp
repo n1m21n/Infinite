@@ -297,6 +297,7 @@ void CVRecorderNode::StopRecording()
    playing = !mData.empty();
    mAnchorSet = false; // playback restarts from the top of the take
    mLastBeats = -1.0;
+   mPhase = 0.0;
 }
 
 void CVRecorderNode::StartPlayback()
@@ -304,6 +305,7 @@ void CVRecorderNode::StartPlayback()
    playing = true;
    mAnchorSet = false;
    mLastBeats = -1.0;
+   mPhase = 0.0;
 }
 
 void CVRecorderNode::StopPlayback()
@@ -370,16 +372,23 @@ float CVRecorderNode::Value01()
       return mData.empty() ? in : mLastOut;
    if (beats == mLastBeats)
       return mLastOut; // already resolved this tick
+
+   // Integrate the playhead instead of deriving it from (beats - anchor) *
+   // speed: that form jumps the loop position every time `speed` is dragged.
+   // A rewind or first tick only re-seeds mLastBeats, keeping the phase.
+   if (!mAnchorSet || mLastBeats < 0.0 || beats < mLastBeats)
+   {
+      mAnchorSet = true;
+      if (mLastBeats < 0.0)
+         mPhase = 0.0; // fresh pass starts from the top of the take
+   }
+   else
+      mPhase += (beats - mLastBeats) * std::max(0.0f, speed) * kSamplesPerBeat;
    mLastBeats = beats;
 
-   if (!mAnchorSet || beats < mAnchor)
-   {
-      mAnchor = beats;
-      mAnchorSet = true;
-   }
    const double n = (double)mData.size();
-   double pos = (beats - mAnchor) * std::max(0.0f, speed) * kSamplesPerBeat;
-   pos = std::fmod(pos, n);
+   mPhase = std::fmod(mPhase, n);
+   const double pos = mPhase;
    mPlayNorm = (float)(pos / n);
    mLastOut = std::clamp(low + (high - low) * Sample(pos), 0.0f, 1.0f);
    return mLastOut;

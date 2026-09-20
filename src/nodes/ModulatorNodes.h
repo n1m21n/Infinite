@@ -353,7 +353,7 @@ private:
    std::vector<unsigned char> mData;
    bool mRecording = false;
    double mRecStart = 0.0;
-   double mAnchor = 0.0; // beat at which the current playback pass started
+   double mPhase = 0.0;  // playhead in take samples, integrated per tick
    bool mAnchorSet = false;
    double mLastBeats = -1.0;
    float mLastOut = 0.0f;
