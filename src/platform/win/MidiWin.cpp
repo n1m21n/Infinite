@@ -18,6 +18,7 @@
 #include "../Platform.h"
 
 #include "WinCommon.h"
+#include "../common/MidiCC14.h"
 
 #include <mmsystem.h>
 
@@ -81,6 +82,7 @@ namespace
       std::map<CcKey, float> values;
       std::map<CcKey, unsigned int> noteHits;
       std::map<ChannelKey, Platform::MidiLastNote> channelLast;
+      MidiCC14::Tracker cc14;
       Platform::MidiCCValue lastTouched;
       bool lastTouchedPending = false;
       std::vector<std::string> deviceNames;
@@ -269,12 +271,13 @@ namespace
          }
          case 0xB0: // Control Change
          {
-            const float value01 = (float)d2 / 127.0f;
             std::lock_guard<std::mutex> lock(gState.mutex);
-            gState.values[{ dev, channel, d1, false }] = value01;
+            const MidiCC14::Event ev = gState.cc14.OnCC(dev, channel, d1, d2, MidiCC14::NowMs());
+            const float value01 = ev.value01;
+            gState.values[{ dev, channel, ev.controller, false }] = value01;
             gState.lastTouched.device = dev;
             gState.lastTouched.channel = channel;
-            gState.lastTouched.controller = d1;
+            gState.lastTouched.controller = ev.controller;
             gState.lastTouched.isNote = false;
             gState.lastTouched.value01 = value01;
             gState.lastTouchedPending = true;
@@ -392,6 +395,8 @@ namespace Platform
    bool MidiRead(MidiDeviceId device, int channel, int controller, bool isNote, float& outValue01)
    {
       std::lock_guard<std::mutex> lock(gState.mutex);
+      if (!isNote)
+         controller = gState.cc14.Resolve(device, channel, controller);
       const auto it = gState.values.find({ device, channel, controller, isNote });
       if (it == gState.values.end())
          return false;

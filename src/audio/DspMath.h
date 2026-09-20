@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <iterator>
 
 // Header-only DSP building blocks shared by every audio node. Each piece is
 // implemented directly from its primary reference (cited per-function below)
