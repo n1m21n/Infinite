@@ -1,5 +1,37 @@
 [
   {
+    "hash": "4bfd751c435734d220c20e25a2883450ea6a0cc9",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 10:59:02 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "semi-brain",
+      "title": "chore(semi-brain): refresh git commits corpus",
+      "description": "refresh git commits corpus",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "chore(semi-brain): refresh git commits corpus\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".../1_extractors/output/git_commits_corpus.json          | 16 ++++++++++++++++\n 1 file changed, 16 insertions(+)"
+  },
+  {
+    "hash": "339a481ad47cef935ac486af50406d88f87d629c",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 10:58:56 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "semi-brain",
+      "title": "chore(semi-brain): refresh corpora after build fix",
+      "description": "refresh corpora after build fix",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "chore(semi-brain): refresh corpora after build fix\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".../1_extractors/output/git_commits_corpus.json    | 237 ++++++++++\n .../1_extractors/output/recovered_docs_corpus.json | 480 ++++++++++-----------\n .../output/skills_and_invariants_corpus.json       |   2 +-\n .../3_datasets/train_dpo_preference.jsonl          |   3 +\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl | 166 +++----\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl | 166 +++----\n 6 files changed, 661 insertions(+), 393 deletions(-)"
+  },
+  {
     "hash": "1efb58982f9040acdb3c6b067b8b2192918df237",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
