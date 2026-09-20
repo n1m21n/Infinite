@@ -197,6 +197,81 @@ void AudioEngine::PumpMainThread()
    DrainRetired();
 }
 
+void AudioEngine::PumpNoteNodesWithoutDevice()
+{
+   const double nowMs = NowMs();
+   const double lastMs = mPumpLastMs;
+   mPumpLastMs = nowMs;
+   if (mDeviceOpen.load(std::memory_order_acquire) || Transport::Instance().IsOfflineMode())
+   {
+      mPumpFrames = 0.0;
+      return;
+   }
+   ProcessList* list = mCurrent.load(std::memory_order_acquire);
+   if (list == nullptr || lastMs < 0.0)
+      return;
+
+   // No device means no callback thread, so this thread owns the list and its
+   // pooled buffers outright for the duration of the call.
+   constexpr double kPumpRate = 48000.0;
+   constexpr int kPumpBlock = 256;
+   const double dtSeconds = std::min(0.1, std::max(0.0, (nowMs - lastMs) * 0.001));
+   mPumpFrames += dtSeconds * kPumpRate;
+   const int blocks = std::min(32, (int)(mPumpFrames / kPumpBlock));
+   mPumpFrames -= (double)blocks * kPumpBlock;
+   if (blocks <= 0)
+      return;
+
+   bool prepared = false;
+   for (AudioTopologyEntry& entry : list->topology.order)
+   {
+      if (!entry.noteOnly || entry.node->preparedForSampleRate == kPumpRate)
+         continue;
+      entry.node->PrepareToPlay(kPumpRate, kPumpBlock);
+      entry.node->preparedForSampleRate = kPumpRate;
+      prepared = true;
+   }
+   (void)prepared;
+
+   for (int b = 0; b < blocks; b++)
+   {
+      for (AudioTopologyEntry& entry : list->topology.order)
+      {
+         if (!entry.noteOnly)
+            continue;
+         const AudioBuffer* inputPtrs[kAudioMaxNodeInputs] = {};
+         const int numOuts = std::clamp(entry.numOutputs, 1, kAudioMaxNodeOutputs);
+         AudioBuffer outputViews[kAudioMaxNodeOutputs];
+         AudioBuffer* outputPtrs[kAudioMaxNodeOutputs];
+         for (int o = 0; o < numOuts; o++)
+         {
+            int outIdx = entry.outputBufferIndices[o];
+            if (outIdx < 0 && o == 0 && entry.outputBufferIndex >= 0)
+               outIdx = entry.outputBufferIndex;
+            if (outIdx >= 0 && outIdx < list->topology.numBuffers)
+            {
+               outputViews[o] = list->buffers[outIdx].View(kPumpBlock, 2);
+               outputPtrs[o] = &outputViews[o];
+            }
+            else
+               outputPtrs[o] = nullptr;
+         }
+         entry.node->ProcessBlockMulti(inputPtrs, std::min(entry.numInputs, kAudioMaxNodeInputs), outputPtrs, numOuts);
+      }
+   }
+
+   // Consumers that need a device (synths) never drain their cursors here;
+   // don't let them back the ring up for the ones that do.
+   for (AudioTopologyEntry& entry : list->topology.order)
+   {
+      if (!entry.noteOnly)
+         continue;
+      for (int slot = 0; slot < 8; slot++)
+         if (NoteEventQueue* q = entry.node->NoteOutbox(slot))
+            q->TrimLaggingConsumers(NoteEventQueue::kCapacity / 2);
+   }
+}
+
 void AudioEngine::ProcessOffline(AudioBuffer& buffer)
 {
    Transport::Instance().BeginOfflineAudioBlock(buffer.numFrames);

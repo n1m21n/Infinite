@@ -215,8 +215,8 @@ public:
 
    float Value01() override;
 
-   bool hold = true;      // keep the last velocity after the note ends
-   float glideMs = 20.0f; // one-pole smoothing toward each new velocity
+   float rangeLow = 0.0f;  // velocity mapped to output 0.0
+   float rangeHigh = 1.0f; // velocity mapped to output 1.0
    NoteCable noteInput;
 
    float LastVelocity() const; // 0 if nothing has played yet

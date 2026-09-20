@@ -300,7 +300,8 @@ private:
 // samples the input against the transport's beat clock, so a take is a
 // fixed-length gesture in beats: it retimes with global BPM, pauses with the
 // transport, and `speed` scales the playback rate (1 = as recorded, 2 = twice
-// as fast). Stopping a take starts playback straight away. While recording,
+// as fast). Stopping a take starts it looping straight away; low/high map the
+// take onto an output range. While recording,
 // the live input passes through so you can hear what you are capturing.
 class CVRecorderNode : public INode, public IModulator
 {
@@ -322,7 +323,8 @@ public:
 
    float constantIn = 0.5f; // recorded when nothing is patched into "in"
    float speed = 1.0f;      // playback rate multiplier
-   bool loop = true;        // off: play once and hold the last value
+   float low = 0.0f;        // output range the recorded 0..1 is mapped onto
+   float high = 1.0f;
    bool playing = false;
 
    static constexpr int kSamplesPerBeat = 16;

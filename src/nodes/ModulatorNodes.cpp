@@ -256,7 +256,8 @@ void CVRecorderNode::VisitParams(ParamVisitor& v)
 {
    v.Float("constantIn", constantIn);
    v.Float("speed", speed);
-   v.Bool("loop", loop);
+   v.Float("low", low);
+   v.Float("high", high);
    v.Bool("playing", playing);
 
    std::string enc;
@@ -326,17 +327,8 @@ float CVRecorderNode::Sample(double pos) const
       pos = 0.0;
    int i0 = (int)pos;
    const float f = (float)(pos - i0);
-   int i1 = i0 + 1;
-   if (loop)
-   {
-      i0 %= n;
-      i1 %= n;
-   }
-   else
-   {
-      i0 = std::min(i0, n - 1);
-      i1 = std::min(i1, n - 1);
-   }
+   i0 %= n;
+   const int i1 = (i0 + 1) % n;
    return (mData[i0] + (mData[i1] - mData[i0]) * f) * (1.0f / 255.0f);
 }
 
@@ -387,12 +379,9 @@ float CVRecorderNode::Value01()
    }
    const double n = (double)mData.size();
    double pos = (beats - mAnchor) * std::max(0.0f, speed) * kSamplesPerBeat;
-   if (loop)
-      pos = std::fmod(pos, n);
-   else
-      pos = std::min(pos, n - 1.0);
+   pos = std::fmod(pos, n);
    mPlayNorm = (float)(pos / n);
-   mLastOut = std::clamp(Sample(pos), 0.0f, 1.0f);
+   mLastOut = std::clamp(low + (high - low) * Sample(pos), 0.0f, 1.0f);
    return mLastOut;
 }
 
