@@ -667,6 +667,42 @@ namespace
 
    std::vector<GraphNode> gNodes;
 
+   // Disambiguates nodes that share a title (e.g. three "predictive lfo"
+   // nodes) so the Modulation Matrix and canvas headers can point at the
+   // same node unambiguously. Ranked by `index` (monotonic spawn order,
+   // never reused - see GraphNode.h) rather than gNodes' vector position,
+   // so the numbering a user has already memorized doesn't shuffle when an
+   // unrelated node elsewhere in the graph is deleted or undone.
+   int GetNodeInstanceIndex(const GraphNode& targetNode, int* outTotalCount = nullptr)
+   {
+      const std::string title = NodeTitle(targetNode);
+      int rank = 0;
+      int total = 0;
+      for (const GraphNode& gn : gNodes)
+      {
+         if (NodeTitle(gn) != title)
+            continue;
+         ++total;
+         if (gn.index <= targetNode.index)
+            ++rank;
+      }
+      if (outTotalCount != nullptr)
+         *outTotalCount = total;
+      return rank;
+   }
+
+   // NodeTitle() plus a " #N" suffix when another node on the canvas shares
+   // the same title - omitted entirely for a node that is currently unique,
+   // so the common case (one of each type) reads exactly as it always has.
+   std::string NodeTitleWithInstance(const GraphNode& gn)
+   {
+      int total = 0;
+      const int inst = GetNodeInstanceIndex(gn, &total);
+      if (total <= 1)
+         return NodeTitle(gn);
+      return NodeTitle(gn) + " #" + std::to_string(inst);
+   }
+
    // Which node indices each Group considers its own, once-in-always-in. Kept
    // outside GroupNode because it is keyed by GraphNode::index, not anything
    // the node itself knows about. Membership only grows (see DrawGroupNode) -
@@ -11037,7 +11073,7 @@ namespace
          const float confidence = std::clamp(n->Confidence01(key), 0.0f, 1.0f) * 100.0f;
          const double samples = n->SamplesAnalyzedForUI(i);
          ImGui::TextDisabled("%s: %.0f samples, %.0f%% confidence",
-                              owner != nullptr ? NodeTitle(*owner).c_str() : "knob", samples, confidence);
+                              owner != nullptr ? NodeTitleWithInstance(*owner).c_str() : "knob", samples, confidence);
       }
    }
 
@@ -26673,7 +26709,7 @@ namespace
          Tabler::DrawX(dl, center, iconSize, col);
       }
       ImGui::SameLine();
-      ImGui::TextUnformatted(NodeTitle(gn).c_str());
+      ImGui::TextUnformatted(NodeTitleWithInstance(gn).c_str());
       ImGui::Dummy(ImVec2(0.0f, kViewportCardTitleGap));
 
       const ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -27520,12 +27556,12 @@ namespace
 
                // Source
                ImGui::TableNextColumn();
-               if (ImGui::Selectable(NodeTitle(*srcNode).c_str(), false))
+               if (ImGui::Selectable(NodeTitleWithInstance(*srcNode).c_str(), false))
                   gPendingSelect.push_back(srcNode->NodeId());
 
                // Destination
                ImGui::TableNextColumn();
-               if (ImGui::Selectable(NodeTitle(*dstNode).c_str(), false))
+               if (ImGui::Selectable(NodeTitleWithInstance(*dstNode).c_str(), false))
                   gPendingSelect.push_back(dstNode->NodeId());
 
                // Parameter
@@ -27712,7 +27748,7 @@ namespace
                ImGui::TextUnformatted("Expression");
 
                ImGui::TableNextColumn();
-               if (ImGui::Selectable(NodeTitle(*dstNode).c_str(), false))
+               if (ImGui::Selectable(NodeTitleWithInstance(*dstNode).c_str(), false))
                   gPendingSelect.push_back(dstNode->NodeId());
 
                const ParamRef* known = mod.KnownParam(dstIndex, dstParam);
@@ -27843,7 +27879,7 @@ namespace
                ImGui::TextUnformatted("Recording");
 
                ImGui::TableNextColumn();
-               if (ImGui::Selectable(NodeTitle(*dstNode).c_str(), false))
+               if (ImGui::Selectable(NodeTitleWithInstance(*dstNode).c_str(), false))
                   gPendingSelect.push_back(dstNode->NodeId());
 
                const ParamRef* known = mod.KnownParam(dstIndex, dstParam);
@@ -39942,7 +39978,7 @@ namespace
          std::string label = known != nullptr ? StripParamLabel(known->name.c_str())
                                               : ("param " + std::to_string(paramIndex));
          if (modNode != nullptr)
-            label += "  <-  " + NodeTitle(*modNode);
+            label += "  <-  " + NodeTitleWithInstance(*modNode);
          out.emplace_back(paramIndex, label);
       }
    }
@@ -41414,7 +41450,7 @@ namespace
          GraphNode* srcNode = FindNodeByUid(clip->srcUid);
          if (srcNode != nullptr)
          {
-            ImGui::Text("Node: %s", NodeTitle(*srcNode).c_str());
+            ImGui::Text("Node: %s", NodeTitleWithInstance(*srcNode).c_str());
             ImGui::TextDisabled("Type: %s", srcNode->typeName.c_str());
             // --- per-clip modulation bypass -----------------------------
             // Every modulation currently bound to this clip's source node,
@@ -46753,7 +46789,7 @@ namespace
       // an earlier window that went fullscreen (which sets FLOATING TRUE)
       // would leak that attribute into every later window created.
       glfwWindowHint(GLFW_FLOATING, GLFW_FALSE);
-      GLFWwindow* projWindow = glfwCreateWindow(w, h, NodeTitle(gn).c_str(), nullptr, mainWindow);
+      GLFWwindow* projWindow = glfwCreateWindow(w, h, NodeTitleWithInstance(gn).c_str(), nullptr, mainWindow);
       if (projWindow == nullptr)
       {
          glfwMakeContextCurrent(mainWindow);
@@ -83857,6 +83893,13 @@ int main(int argc, char** argv)
          if (!isComment)
          {
             ImGui::TextUnformatted(NodeTitle(gn).c_str());
+            int instanceTotal = 0;
+            const int instanceIdx = GetNodeInstanceIndex(gn, &instanceTotal);
+            if (instanceTotal > 1)
+            {
+               ImGui::SameLine(0.0f, 4.0f);
+               ImGui::TextDisabled("#%d", instanceIdx);
+            }
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 2.0f);
             if (isLight)
                ImGui::PushStyleColor(ImGuiCol_Text,
@@ -84023,7 +84066,7 @@ int main(int argc, char** argv)
                snprintf(line, sizeof(line), "scene node");
             dl->AddText(ImVec2(origin.x + 12, origin.y + 10),
                         isLight ? IM_COL32(30, 36, 52, 255) : IM_COL32(200, 206, 226, 255),
-                        NodeTitle(gn).c_str());
+                        NodeTitleWithInstance(gn).c_str());
             dl->AddText(ImVec2(origin.x + 12, origin.y + 28),
                         isLight ? IM_COL32(95, 105, 125, 255) : IM_COL32(130, 136, 156, 255), line);
          }
@@ -84605,7 +84648,7 @@ int main(int argc, char** argv)
                      {
                         if (srcGn.node.get() == src)
                         {
-                           srcName = NodeTitle(srcGn);
+                           srcName = NodeTitleWithInstance(srcGn);
                            break;
                         }
                      }
@@ -88006,7 +88049,7 @@ int main(int argc, char** argv)
 
             ed::Suspend();
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-            ImGui::SetTooltip("Assign clip source -> %s", NodeTitle(*hoveredCompatible).c_str());
+            ImGui::SetTooltip("Assign clip source -> %s", NodeTitleWithInstance(*hoveredCompatible).c_str());
             ed::Resume();
 
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
