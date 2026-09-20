@@ -1,5 +1,213 @@
 [
   {
+    "hash": "3322a0def96089ad7fffd837ec2a6103c9496c61",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 10:50:16 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge claude/incomplete-task-d9cd8e into main",
+      "description": "Merge claude/incomplete-task-d9cd8e into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge claude/incomplete-task-d9cd8e into main"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "b1b3a543f71a032b310f8d303cece6df90ac65c3",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 10:50:12 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/depth-mapping-node into main",
+      "description": "Merge feature/depth-mapping-node into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/depth-mapping-node into main"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "e124967fa4ea49da3caac2fee99bf644ef67b111",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 10:50:09 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge worktree-trim-source-offset into main",
+      "description": "Merge worktree-trim-source-offset into main",
+      "bullets": [],
+      "body": "Superseded by the already-merged SampleSourceBpm-aware trim fix; kept HEAD's version in both conflict hunks.",
+      "raw": "Merge worktree-trim-source-offset into main\n\nSuperseded by the already-merged SampleSourceBpm-aware trim fix; kept HEAD's version in both conflict hunks."
+    },
+    "stat": ""
+  },
+  {
+    "hash": "f08e58bb0390ccd89d59d6255f9e250d18341e64",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 10:49:00 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Merge bugfix/spout-cpu-fallback into main",
+      "description": "Merge bugfix/spout-cpu-fallback into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge bugfix/spout-cpu-fallback into main"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "c5b2227edd6834a34e0d2b43707432f2828e0b54",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 10:48:54 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "semi-brain",
+      "title": "chore(semi-brain): refresh extracted corpora and training datasets",
+      "description": "refresh extracted corpora and training datasets",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "chore(semi-brain): refresh extracted corpora and training datasets\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".../1_extractors/output/git_commits_corpus.json    |  16 +\n .../1_extractors/output/recovered_docs_corpus.json | 464 ++++++++++-----------\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl | 153 +++----\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl | 153 +++----\n 4 files changed, 402 insertions(+), 384 deletions(-)"
+  },
+  {
+    "hash": "5b139e7dbbadd5b9bc6cae5d7bead552abfc58e1",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 10:43:19 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "field",
+      "title": "Add Field Pixel Editor screenshot to README.md",
+      "description": "Add Field Pixel Editor screenshot to README.md",
+      "bullets": [],
+      "body": "",
+      "raw": "Add Field Pixel Editor screenshot to README.md"
+    },
+    "stat": "README.md                             |   4 ++++\n docs/field_pixel_editor.png           | Bin 0 -> 428575 bytes\n website/assets/field_pixel_editor.png | Bin 0 -> 428575 bytes\n 3 files changed, 4 insertions(+)\n create mode 100644 docs/field_pixel_editor.png\n create mode 100644 website/assets/field_pixel_editor.png"
+  },
+  {
+    "hash": "2a073c0aa0b5994fa916a45825715a0f9d0f4152",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 10:35:22 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Point top screenshot to website/assets/screenshot.png",
+      "description": "Point top screenshot to website/assets/screenshot.png",
+      "bullets": [],
+      "body": "",
+      "raw": "Point top screenshot to website/assets/screenshot.png"
+    },
+    "stat": "README.md | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
+  },
+  {
+    "hash": "083b1608005caa2ff807e7052965c7ee0947bbc4",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 10:31:56 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Update README.md with workspace screenshot and full modular node graph",
+      "description": "Update README.md with workspace screenshot and full modular node graph",
+      "bullets": [],
+      "body": "",
+      "raw": "Update README.md with workspace screenshot and full modular node graph"
+    },
+    "stat": "README.md                     |   2 ++\n docs/nodegraph.png            | Bin 0 -> 572844 bytes\n docs/screenshot.png           | Bin 1650624 -> 529395 bytes\n website/assets/nodegraph.png  | Bin 0 -> 572844 bytes\n website/assets/screenshot.png | Bin 1650624 -> 529395 bytes\n 5 files changed, 2 insertions(+)\n create mode 100644 docs/nodegraph.png\n create mode 100644 website/assets/nodegraph.png"
+  },
+  {
+    "hash": "ad362c27a63ed2663c60e42849f7e5a28ee70836",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 10:16:01 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Update Modulation Matrix with color-coded category dots and real-time sparklines",
+      "description": "Update Modulation Matrix with color-coded category dots and real-time sparklines",
+      "bullets": [],
+      "body": "",
+      "raw": "Update Modulation Matrix with color-coded category dots and real-time sparklines"
+    },
+    "stat": "src/main.cpp | 123 +++++++++++++++++++++++++++++++++++++++++++++++++++++++----\n 1 file changed, 116 insertions(+), 7 deletions(-)"
+  },
+  {
+    "hash": "d8182dccd694245b086caa06cbda6b9ae1fb0926",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 09:39:30 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Fix blocky staircase waveform in PredictiveModulatorNode using cubic Hermite interpolation",
+      "description": "Fix blocky staircase waveform in PredictiveModulatorNode using cubic Hermite interpolation",
+      "bullets": [],
+      "body": "",
+      "raw": "Fix blocky staircase waveform in PredictiveModulatorNode using cubic Hermite interpolation"
+    },
+    "stat": "src/nodes/PredictiveModulatorNode.cpp | 22 ++++++++++++++++++----\n src/nodes/PredictiveModulatorNode.h   |  2 ++\n 2 files changed, 20 insertions(+), 4 deletions(-)"
+  },
+  {
+    "hash": "ca93b776073de42ed151463b5962498d7c23a81f",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 09:31:16 2026 +0530",
+    "parsed_message": {
+      "type": "perf",
+      "scope": "core",
+      "title": "Expose speed, low, high, stray, and momentum controls on predictive lfo (DriftNode)",
+      "description": "Expose speed, low, high, stray, and momentum controls on predictive lfo (DriftNode)",
+      "bullets": [],
+      "body": "",
+      "raw": "Expose speed, low, high, stray, and momentum controls on predictive lfo (DriftNode)"
+    },
+    "stat": "docs/PREDICTIVE_ENGINE_GUIDE.md | 193 ++++++++++++++++++++++++++++++++++++++++\n src/main.cpp                    |   7 ++\n 2 files changed, 200 insertions(+)\n create mode 100644 docs/PREDICTIVE_ENGINE_GUIDE.md"
+  },
+  {
+    "hash": "e39f402a7604fa5a20766db47f17581797b34ba0",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 09:19:45 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Add speed, low, and high output range parameters to PredictiveModulatorNode",
+      "description": "Add speed, low, and high output range parameters to PredictiveModulatorNode",
+      "bullets": [],
+      "body": "",
+      "raw": "Add speed, low, and high output range parameters to PredictiveModulatorNode"
+    },
+    "stat": "src/main.cpp                          |  7 +++++--\n src/nodes/PredictiveModulatorNode.cpp | 29 +++++++++++++++++++----------\n src/nodes/PredictiveModulatorNode.h   |  6 ++++++\n 3 files changed, 30 insertions(+), 12 deletions(-)"
+  },
+  {
+    "hash": "ae54f034cd48f0cc95d6260473c0b000b37e472f",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 09:18:38 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "text3d",
+      "title": "fix(text3d): stop hole bridges self-intersecting glyph counters",
+      "description": "stop hole bridges self-intersecting glyph counters",
+      "bullets": [],
+      "body": "MergeHoles picked the bridge from a hole (e.g. an 'O' counter) to the\noutline by nearest distance alone, with no check that the segment\navoided cutting back through the glyph. A wrong-side pick produced a\nself-intersecting polygon, which ear clipping triangulated into a\njagged shard visible through round counters.\nBridge candidates are now ranked by distance and validated with a real\nsegment-crossing test against the outline and every other hole in the\nglyph, taking the first candidate that doesn't cross anything.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "fix(text3d): stop hole bridges self-intersecting glyph counters\n\nMergeHoles picked the bridge from a hole (e.g. an 'O' counter) to the\noutline by nearest distance alone, with no check that the segment\navoided cutting back through the glyph. A wrong-side pick produced a\nself-intersecting polygon, which ear clipping triangulated into a\njagged shard visible through round counters.\n\nBridge candidates are now ranked by distance and validated with a real\nsegment-crossing test against the outline and every other hole in the\nglyph, taking the first candidate that doesn't cross anything.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "src/core/Mesh.cpp | 92 +++++++++++++++++++++++++++++++++++++++----------------\n 1 file changed, 66 insertions(+), 26 deletions(-)"
+  },
+  {
     "hash": "c72acda77f6606ffb9fbbccac06682e31a781df6",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
@@ -174,6 +382,22 @@
       "raw": "feat(prediction): step 3 IPredictor binding path\n\nIPredictor side interface, fader-space apply-loop branch (one Tick per\nframe, bypassed predictors skipped), Shift-grab override in ModSlider/\nModKnob, green-to-discrete refusal on cable drop plus inert guard for\nloaded bindings, debug-only stub predictor and INFINITE_PREDBINDTEST.\nAlso fixes RegisterParam dropping posToValue/valueToPos (tapers).\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
     },
     "stat": ".claude/skills/run-infinite-hygiene/driver.sh |   1 +\n src/core/Modulation.cpp                       |   6 +\n src/core/Modulation.h                         |  30 ++\n src/main.cpp                                  | 541 +++++++++++++++++++++++++-\n 4 files changed, 566 insertions(+), 12 deletions(-)"
+  },
+  {
+    "hash": "b464d8f23b0595735771ace33ef8d08a901e8a50",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 19 09:36:56 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "spout",
+      "title": "fix(spout): restore CPU fallback so Spout receive isn't black on non-interop GPUs",
+      "description": "restore CPU fallback so Spout receive isn't black on non-interop GPUs",
+      "bullets": [],
+      "body": "ForceGpuInteropOnly disabled Spout's auto/CPU share, assuming ReceiveTexture\nwould then fail. It doesn't: with neither share path available it returns true\nand copies nothing, so the node reported 'Receiving WxH' over an empty texture.\nEnable auto share (GPU interop with CPU fallback) and return no frame when\nSpout has no working copy path.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "fix(spout): restore CPU fallback so Spout receive isn't black on non-interop GPUs\n\nForceGpuInteropOnly disabled Spout's auto/CPU share, assuming ReceiveTexture\nwould then fail. It doesn't: with neither share path available it returns true\nand copies nothing, so the node reported 'Receiving WxH' over an empty texture.\n\nEnable auto share (GPU interop with CPU fallback) and return no frame when\nSpout has no working copy path.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "src/platform/win/PlatformWinSyphon.cpp | 34 ++++++++++++++++++++++++----------\n 1 file changed, 24 insertions(+), 10 deletions(-)"
   },
   {
     "hash": "73be96578e06acf2a93bf62e7f3f41ae18d26a89",
@@ -512,6 +736,22 @@
     "stat": "src/core/GestureRecorder.cpp |  36 +++-\n src/core/GestureRecorder.h   |   4 +\n src/core/Modulation.cpp      |  28 ++++\n src/core/Modulation.h        |  20 ++-\n src/core/Patch.cpp           |  51 +++++-\n src/core/Patch.h             |   3 +\n src/core/PatchJson.cpp       |   5 +-\n src/main.cpp                 | 388 ++++++++++++++++++++++++++++++++++++++++++-\n 8 files changed, 517 insertions(+), 18 deletions(-)"
   },
   {
+    "hash": "d90fb934c6fb5b169b7045e794e819e470fba6c4",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 18 14:29:23 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "global",
+      "title": "docs: add monocular depth node prior art doc",
+      "description": "add monocular depth node prior art doc",
+      "bullets": [],
+      "body": "",
+      "raw": "docs: add monocular depth node prior art doc"
+    },
+    "stat": "docs/prior-art/2026-09-18-monocular-depth-node.md | 39 +++++++++++++++++++++++\n 1 file changed, 39 insertions(+)\n create mode 100644 docs/prior-art/2026-09-18-monocular-depth-node.md"
+  },
+  {
     "hash": "6e4fa0b6faf39975e9328f46c08e35022b37abe7",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
@@ -590,6 +830,22 @@
       "raw": "Merge branch 'feature/lush-reverb-redesign': FDN redesign for Valhalla Vintage Verb-grade lushness\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
     },
     "stat": ""
+  },
+  {
+    "hash": "15d205221f3437e687ea04657a2fc487bb5d4f99",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 18 13:33:11 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "arrange",
+      "title": "fix(arrange): keep source offset in sync when trimming a clip's start edge",
+      "description": "keep source offset in sync when trimming a clip's start edge",
+      "bullets": [],
+      "body": "Trimming the start edge (single clip or grouped) advanced c.start without\nadvancing sourceOffsetSeconds, so Audio-Sample clips would replay from the\nwrong point in the source file after a trim. Apply the same offset math\nSplit already uses, and refresh the cached waveform the same way Split's\ncall sites do.",
+      "raw": "fix(arrange): keep source offset in sync when trimming a clip's start edge\n\nTrimming the start edge (single clip or grouped) advanced c.start without\nadvancing sourceOffsetSeconds, so Audio-Sample clips would replay from the\nwrong point in the source file after a trim. Apply the same offset math\nSplit already uses, and refresh the cached waveform the same way Split's\ncall sites do."
+    },
+    "stat": "src/arrange/ArrangeModel.cpp |  7 +++++++\n src/main.cpp                 | 12 ++++++++++--\n 2 files changed, 17 insertions(+), 2 deletions(-)"
   },
   {
     "hash": "647eaa1bc3e465739a5cff00e6d1694490993242",
