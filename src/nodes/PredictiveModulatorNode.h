@@ -47,12 +47,18 @@ public:
    float constantIn = 0.5f; // used when nothing is patched - during Learn and as the pre-fit fallback
    int rank = 3;             // delay-embedding dimension / DMD rank: 2, 3, 4 or 8
    std::string fitData;      // base64: the fitted DMDFit (rank, spectral radius, A matrix)
+   float speed = 1.0f;       // playback rate multiplier (0.1x .. 10.0x)
+   float low = 0.0f;         // output low bound
+   float high = 1.0f;        // output high bound
 
    void VisitParams(ParamVisitor& v) override
    {
       v.Float("constantIn", constantIn);
       v.Int("rank", rank);
       v.Text("fitData", fitData);
+      v.Float("speed", speed);
+      v.Float("low", low);
+      v.Float("high", high);
    }
 
    // --- UI / main-thread helpers ---

@@ -185,28 +185,37 @@ float PredictiveModulatorNode::Value01()
 
    const float raw = std::clamp(input ? input->Value01() : constantIn, 0.0f, 1.0f);
    if (bypassed)
-      return raw;
+      return low + (high - low) * raw;
 
    if (mLearning)
    {
       CaptureTick(); // pass-through while learning - never drives the destination blind
-      return raw;
+      return low + (high - low) * raw;
    }
 
    if (!mFit.valid || mFreeState.empty())
-      return raw; // no fit yet: behave like a plain pass-through/constant
+      return low + (high - low) * raw; // no fit yet: behave like a plain pass-through/constant
 
-   // Free-run, open-loop: step the learned model's own state once per tick, decoupled from the
-   // live cable entirely, per the design (a modulator that plays back a learned pattern, not
-   // one that keeps listening once it knows the shape). Real seconds, not Beats(), so it keeps
-   // playing at the same rate regardless of tempo and even while the transport is stopped.
+   // Free-run, open-loop: step the learned model's own state at the configured speed cadence.
+   // Real seconds, not Beats(), so it keeps playing at the same rate regardless of tempo
+   // and even while the transport is stopped.
    const double seconds = Transport::Instance().Seconds();
-   if (mLastStepSeconds < 0.0 || seconds != mLastStepSeconds)
+   const float effSpeed = std::clamp(speed, 0.05f, 20.0f);
+   const double stepDt = 0.1 / (double)effSpeed;
+   if (mLastStepSeconds < 0.0)
    {
-      mFit.Step(mFreeState, &mFreeRng);
       mLastStepSeconds = seconds;
    }
-   return std::clamp(mFreeState[0], 0.0f, 1.0f);
+   else if (seconds >= mLastStepSeconds + stepDt || seconds < mLastStepSeconds)
+   {
+      int steps = (int)((seconds - mLastStepSeconds) / stepDt);
+      steps = std::clamp(steps, 1, 4);
+      for (int s = 0; s < steps; ++s)
+         mFit.Step(mFreeState, &mFreeRng);
+      mLastStepSeconds = seconds;
+   }
+   const float normalized = std::clamp(mFreeState[0], 0.0f, 1.0f);
+   return low + (high - low) * normalized;
 }
 
 int PredictiveModulatorNode::LearningPercent() const

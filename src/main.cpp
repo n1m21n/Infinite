@@ -536,9 +536,9 @@ namespace
       // off them), but both read as generic node names next to the rest of the Prediction category -
       // give them the descriptive names the design settled on without touching the saved token.
       if (name == "Drift")
-         return "predictive drift";
+         return "predictive lfo";
       if (name == "Moves")
-         return "predictive motion";
+         return "predictive macro";
 #if defined(_WIN32)
       // Registered type key stays "Syphon In"/"Syphon Out" (patch files key
       // off it), but the Windows implementation is backed by Spout2, not
@@ -10998,6 +10998,9 @@ namespace
       // (how many lagged copies of the one input signal DMD gets to fit a transition matrix
       // against), an implementation detail of "how", not a UI/UX decision - it stays fixed at
       // n->rank's own default from here on, the same "no params" treatment Drift got.
+      ModSlider("speed", &n->speed, 0.1f, 10.0f, "%.2fx");
+      ModSlider("low", &n->low, 0.0f, 1.0f, "%.2f");
+      ModSlider("high", &n->high, 0.0f, 1.0f, "%.2f");
       if (n->input == nullptr)
          ModSlider("constantIn", &n->constantIn, 0.0f, 1.0f, "%.2f");
    }
