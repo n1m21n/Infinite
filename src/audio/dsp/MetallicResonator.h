@@ -572,6 +572,11 @@ namespace MetallicDsp
       // ~5 ms coefficient slew, recomputed with the sample rate.
       float coefSlew = 0.02f;
 
+      // Gain that makes this strike's modal onset peak equal its velocity.
+      // Measured once per Trigger() by CalibrateBurstGain(); UpdateAcoustics()
+      // folds it into every mode amplitude. 1 until a strike has calibrated it.
+      float burstGain = 1.0f;
+
       // Last inputs UpdateAcoustics() was called with, so a settled patch is
       // completely static instead of rewriting 12 biquads every control block.
       int cachedMaterial = -1;
@@ -630,7 +635,9 @@ namespace MetallicDsp
          const float effectiveHardness = std::clamp(transient * mat.strikeHardness, 0.1f, 2.5f);
 
          exciter.Trigger(vel, effectiveHardness, initPitch, sampleRate);
+         burstGain = 1.0f;
          UpdateAcoustics(initPitch, decaySec, stiffness, materialPreset, stereoSpread, sampleRate, true);
+         CalibrateBurstGain(initPitch, sampleRate);
          ampDecay = ComputeAmpDecay(decaySec, sampleRate);
       }
 
@@ -653,6 +660,52 @@ namespace MetallicDsp
          const float effectiveDecay = std::clamp(decaySec, 0.02f, 20.0f);
          const float totalDecaySamples = effectiveDecay * 8.0f * (float)sampleRate;
          return expf(-9.2103f / std::max(64.0f, totalDecaySamples));
+      }
+
+      // Level-calibrates the strike the way a sampler/physical-model plugin
+      // does: play it once offline and normalise to the measured peak. The
+      // bank's per-mode normalisation and the bankNorm sum both assume an
+      // impulse, but the mallet is a 4-14 ms burst, so each mode keeps
+      // integrating for hundreds of samples and the true onset peak depends on
+      // pitch, material and decay (+0.1..+10.6 dBFS across materials, +12.4
+      // dBFS at 55 Hz down to +1.8 at 1760 Hz, before this). No closed form
+      // covers the noise component, so measure it instead.
+      //
+      // The rehearsal runs a copy of the exciter (identical noise state, so it
+      // sees exactly the strike the voice is about to play) through a copy of
+      // the just-snapped modes, and rescales every mode by velocity / peak.
+      // Because the measured peak already includes ring time, a longer decay
+      // is still not a quieter strike - the property 6b3ae42 protects.
+      void CalibrateBurstGain(float freqHz, double sampleRate)
+      {
+         if (sampleRate <= 0.0) return;
+         const float target = (velocity > 0.0f ? velocity : 0.8f);
+
+         ResonantMode probe[kNumModes];
+         for (int m = 0; m < kNumModes; m++)
+            probe[m] = modes[m];
+         MalletExciter ex = exciter;
+
+         // Burst length is unbounded in principle, but the exciter deactivates
+         // itself; past that the bank only rings down, so one more fundamental
+         // period (plus margin) covers the last possible peak.
+         const int tail = (int)(1.5 * sampleRate / std::max(20.0f, freqHz));
+         const int limit = (int)(0.15 * sampleRate);
+         float peak = 0.0f;
+         int after = 0;
+         for (int i = 0; i < limit && after < tail; i++)
+         {
+            const float strike = ex.Process();
+            if (!ex.active) after++;
+            float l = 0.0f, r = 0.0f;
+            for (int m = 0; m < kNumModes; m++)
+               probe[m].Process(strike, coefSlew, l, r);
+            peak = std::max(peak, std::max(std::fabs(l), std::fabs(r)));
+         }
+         if (peak < 1e-6f) return;
+
+         burstGain = target / peak;
+         UpdateAcoustics(freqHz, cachedDecay, cachedStiffness, cachedMaterial, cachedSpread, sampleRate, true);
       }
 
       // Advances the per-voice glide by one control block of `blockSamples` and
@@ -741,7 +794,7 @@ namespace MetallicDsp
             const float lossScale = 1.0f / (1.0f + 0.15f * effectiveDecay);
             const float modeLoss = expf(-mat.highFreqLoss * (float)m * 0.4f * lossScale);
             const float modeDecay = effectiveDecay * modeLoss;
-            const float amp = mat.modeAmplitudes[m] * bankNorm * (velocity > 0.0f ? velocity : 0.8f);
+            const float amp = mat.modeAmplitudes[m] * bankNorm * burstGain * (velocity > 0.0f ? velocity : 0.8f);
             const float modePan = (m == 0) ? 0.0f : ((m % 2 == 1 ? 1.0f : -1.0f) * stereoSpread * (0.3f + 0.7f * ((float)m / (float)kNumModes)));
 
             modes[m].Setup(modeFreq[m], modeDecay, amp, modePan, sampleRate);
