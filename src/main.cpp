@@ -60477,6 +60477,10 @@ namespace AudioParamSweep
    // the node consumes notes, every audio input slot fed the same shared
    // excitation tone (AudioNode::ProcessBlock never mutates an input buffer,
    // so aliasing every slot to one source buffer is safe).
+   // Seconds of transport time one block advances a SweepNeedsClock rig. 16x real time, so the
+   // 12-block probe window spans several beats (a real one is a quarter of a beat: no onset in it).
+   inline float SweepClockDt(int numFrames) { return 16.0f * (float)numFrames / 48000.0f; }
+
    struct Rig
    {
       std::unique_ptr<INode> node;
@@ -60487,6 +60491,7 @@ namespace AudioParamSweep
       AudioBuffer drive[kAudioMaxNodeInputs];
       int numInputs = 0;
       ReadMode mode = ReadMode::kUnobservable;
+      bool advanceClock = false; // INode::SweepNeedsClock: tick the transport before every block
       float driveL[512] = {};
       float driveR[512] = {};
       float scratchL[512] = {};
@@ -60555,6 +60560,14 @@ namespace AudioParamSweep
       rig.audio = asrc ? asrc->GetAudioNode() : (notePorts ? notePorts : (nsrc ? nsrc->GetAudioNode() : nullptr));
       if (!rig.audio)
          return false;
+      n->SweepPrepare();
+      rig.advanceClock = n->SweepNeedsClock();
+      {
+         // Every rig starts from beat 0, so a control rig and an altered rig see identical clocks.
+         Transport& tr = Transport::Instance();
+         tr.SetPlaying(rig.advanceClock);
+         tr.Seek(0.0);
+      }
       rig.mode = ModeFor(n, cand.shape);
 
       FillDriveTone(rig.driveL, rig.driveR, blockSize, sampleRate);
@@ -60594,6 +60607,8 @@ namespace AudioParamSweep
       out.channels = outChans;
       out.numChannels = 2;
       out.numFrames = numFrames;
+      if (rig.advanceClock)
+         Transport::Instance().Tick(SweepClockDt(numFrames)); // headless: no audio clock, Tick moves Beats()
       rig.audio->ProcessBlock(rig.numInputs > 0 ? rig.driveInputs : nullptr, rig.numInputs, out);
 
       switch (rig.mode)
@@ -60656,6 +60671,8 @@ namespace AudioParamSweep
       int totalCount = 0;
       for (int b = 0; b < numBlocks; b++)
       {
+         if (rig.advanceClock)
+            Transport::Instance().Tick(SweepClockDt(blockSize));
          rig.audio->ProcessBlock(rig.numInputs > 0 ? rig.driveInputs : nullptr, rig.numInputs, out);
          NoteEventQueue* outbox = rig.audio->NoteOutbox();
          if (outbox == nullptr)
@@ -60822,10 +60839,22 @@ namespace AudioParamSweep
       Rig rigControl;
       if (!warmUpAndAlter(rigControl, false))
          return { false, true };
+      // Both retriggered rigs are measured at the same beat (12 warm-up blocks in), not one after the other.
+      auto rewindToMeasurePoint = [&](const Rig& rig)
+      {
+         if (!rig.advanceClock)
+            return;
+         Transport& tr = Transport::Instance();
+         tr.Seek(0.0);
+         for (int b = 0; b < 12; b++)
+            tr.Tick(SweepClockDt(blockSize));
+      };
       PushHeldNoteOn(rigControl);
+      rewindToMeasurePoint(rigControl);
       const Signature control = measure(rigControl);
 
       PushHeldNoteOn(rigAfter);
+      rewindToMeasurePoint(rigAfter);
       const Signature altered = measure(rigAfter);
 
       return { altered.DiffersFrom(control), false };

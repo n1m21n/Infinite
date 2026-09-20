@@ -235,4 +235,12 @@ public:
       float value = 0.0f;
    };
    virtual std::vector<SweepParamPrereq> SweepPrerequisitesFor(const std::string& /*paramName*/) const { return {}; }
+
+   // AUDIOPARAMSWEEPTEST: called once on each freshly built rig, before any param is probed. A node
+   // whose audio side is silent until it holds state that is not a param (a learned model, a loaded
+   // sample) seeds that state here, so the sweep can observe its params at all.
+   virtual void SweepPrepare() {}
+   // True when the node only acts as the transport clock advances (a step/onset scheduler). The
+   // sweep then runs the transport from beat 0 for that rig, so probes see more than the first block.
+   virtual bool SweepNeedsClock() const { return false; }
 };

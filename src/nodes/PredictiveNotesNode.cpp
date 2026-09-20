@@ -671,6 +671,14 @@ namespace
    }
 }
 
+void PredictiveNotesNode::SweepPrepare()
+{
+   // Notes mode plays nothing until a model is learned; give it one so every param is audible.
+   model = NoteModel::EncodeEvents(LoopEvents(2));
+   CookIfNeeded(0);
+   WaitForBuild();
+}
+
 namespace PredictiveNotes
 {
    bool RunPredMidiTest()
