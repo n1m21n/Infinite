@@ -161,7 +161,6 @@ namespace
 #include "nodes/ColorRampNode.h"
 #include "nodes/PaletteNode.h"
 #include "nodes/AnalyzeNodes.h"
-#include "nodes/MotionTrackNode.h"
 #include "nodes/Geometry3DNodes.h"
 #include "nodes/GeometryOpNodes.h"
 #include "nodes/FieldElementNode.h"
@@ -5734,7 +5733,6 @@ namespace
       REGISTER_NODE(ConstantNode, Constant, "Modulators");
       REGISTER_NODE(NullModulatorNode, Null Modulator, "Modulators");
       REGISTER_NODE(ImageAnalyzeNode, Image Analyze, "Modulators");
-      REGISTER_NODE(MotionTrackNode, Motion Track, "Modulators");
       REGISTER_NODE(PaletteNode, Palette, "Modulators");
       REGISTER_NODE(AudioFileNode, Audio File, "Modulators");
       REGISTER_NODE(AudioAnalyzeNode, Audio Analyze, "Modulators");
@@ -6761,8 +6759,6 @@ namespace
          return 1;
       if (dynamic_cast<ImageAnalyzeNode*>(gn.node.get()) != nullptr)
          return 1;
-      if (dynamic_cast<MotionTrackNode*>(gn.node.get()) != nullptr)
-         return 1;
       if (dynamic_cast<PaletteNode*>(gn.node.get()) != nullptr)
          return 1; // the reference image, when it comes from the graph
       if (auto* fp = dynamic_cast<FieldPixelNode*>(gn.node.get()))
@@ -6932,8 +6928,6 @@ namespace
          return slot == 0 ? &draw->Input() : nullptr;
       if (auto* an = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()))
          return slot == 0 ? &an->Input() : nullptr;
-      if (auto* mt = dynamic_cast<MotionTrackNode*>(gn.node.get()))
-         return slot == 0 ? &mt->Input() : nullptr;
       if (auto* pal = dynamic_cast<PaletteNode*>(gn.node.get()))
          return slot == 0 ? &pal->Input() : nullptr;
       if (auto* fp = dynamic_cast<FieldPixelNode*>(gn.node.get()))
@@ -10285,65 +10279,6 @@ namespace
       {
          ImGui::TextDisabled("driven by input modulator");
       }
-   }
-
-   void DrawMotionTrackParams(MotionTrackNode* n)
-   {
-      const float w = kPreviewSize;
-
-      // Analyze button / progress bar
-      if (n->IsAnalyzing())
-      {
-         char barText[64];
-         snprintf(barText, sizeof(barText), "Analyzing... %d%% (Cancel)", (int)(n->Progress() * 100.0f));
-         if (ImGui::Button(barText, ImVec2(w, 0)))
-         {
-            n->CancelAnalysis();
-         }
-         ImGui::ProgressBar(n->Progress(), ImVec2(w, 4.0f), "");
-      }
-      else
-      {
-         const char* btnLabel = n->IsStale() ? "Re-analyze" : (n->HasTrack() ? "Re-analyze" : "Analyze");
-         if (ImGui::Button(btnLabel, ImVec2(w, 0)))
-         {
-            n->StartAnalysis();
-         }
-      }
-
-      // Status readout
-      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + w);
-      ImGui::TextDisabled("%s", n->Status().c_str());
-      ImGui::PopTextWrapPos();
-
-      NodeSeparator("settings", w);
-      DropdownButton("init", MotionTrackNode::InitModeNames(), n->initMode,
-                     [n](int i) { PushUndoCheckpoint(); n->initMode = i; n->MarkStale(); }, w);
-      DropdownButton("model", MotionTrackNode::MotionModelNames(), n->motionModel,
-                     [n](int i) { PushUndoCheckpoint(); n->motionModel = i; n->MarkStale(); }, w);
-
-      ImGui::BeginDisabled(n->initMode != MotionTrackNode::kManualBox);
-      ModSlider("box X", &n->manualBoxX, 0.0f, 1.0f);
-      ModSlider("box Y", &n->manualBoxY, 0.0f, 1.0f);
-      ModSlider("box W", &n->manualBoxW, 0.05f, 1.0f);
-      ModSlider("box H", &n->manualBoxH, 0.05f, 1.0f);
-      ImGui::EndDisabled();
-
-      ModSlider("search", &n->searchScale, 1.2f, 6.0f);
-      ModSliderInt("features", &n->featureCount, 8, 200);
-      ModSlider("confidence", &n->minConfidence, 0.1f, 0.99f);
-      ModSlider("adapt", &n->adapt, 0.0f, 1.0f);
-      ModSlider("smooth", &n->smooth, 0.0f, 20.0f);
-      ModSlider("fps", &n->sampleFps, 1.0f, 120.0f);
-
-      NodeSeparator("overlay", w);
-      ModCheckbox("show overlay", &n->showOverlay);
-      DropdownButton("style", MotionTrackNode::OverlayStyleNames(), n->overlayStyle,
-                     [n](int i) { PushUndoCheckpoint(); n->overlayStyle = i; }, w);
-      ColorSwatch("color", n->overlayColor, n);
-      ModSlider("size", &n->overlaySize, 0.1f, 5.0f);
-      ModSlider("offset X", &n->offsetX, -1.0f, 1.0f);
-      ModSlider("offset Y", &n->offsetY, -1.0f, 1.0f);
    }
 
    // ======================================================================
@@ -26205,32 +26140,6 @@ namespace
       // to zoom. An InvisibleButton is what makes this safe inside the node
       // editor - while it is active the editor leaves the drag alone, which is
       // the same mechanism the in-node sliders already rely on.
-      if (auto* mt = dynamic_cast<MotionTrackNode*>(node))
-      {
-         if (mt->initMode == MotionTrackNode::kManualBox)
-         {
-            ImGui::SetCursorScreenPos(origin);
-            ImGui::InvisibleButton("##manualBoxDrag", ImVec2(size, size));
-            if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
-            {
-               ImVec2 mousePos = ImGui::GetMousePos();
-               float normX = std::clamp((mousePos.x - origin.x) / size, 0.0f, 1.0f);
-               float normY = std::clamp(1.0f - (mousePos.y - origin.y) / size, 0.0f, 1.0f);
-               mt->manualBoxX = normX;
-               mt->manualBoxY = normY;
-               mt->MarkStale();
-            }
-            float boxScreenX = origin.x + mt->manualBoxX * size;
-            float boxScreenY = origin.y + (1.0f - mt->manualBoxY) * size;
-            float boxScreenW = mt->manualBoxW * size;
-            float boxScreenH = mt->manualBoxH * size;
-            dl->AddRect(ImVec2(boxScreenX - boxScreenW * 0.5f, boxScreenY - boxScreenH * 0.5f),
-                        ImVec2(boxScreenX + boxScreenW * 0.5f, boxScreenY + boxScreenH * 0.5f),
-                        IM_COL32(255, 220, 50, 230), 2.0f, 0, 1.5f);
-            return;
-         }
-      }
-
       if (render == nullptr)
       {
          ImGui::Dummy(ImVec2(size, size));
@@ -38581,7 +38490,6 @@ namespace
          { "Palette", "Samples colours from a reference image, loaded here or patched in - a patched cable overrides the loaded file, but the file is kept so unplugging falls back to it. Drag its 'out' onto the square dot beside any colour swatch to bind it - each new cable takes the next swatch, and clicking a bound swatch steps it. Its image output is a gradient of the palette." },
          { "Audio File", "Loads an audio file for playback and Audio Analyze to read. Keeps analysing even while muted - the 'audible' checkbox only controls monitoring." },
          { "Image Analyze", "Turns an image or video into control values and modulation channels. Supports UV point probes, ROI boxes, 22 math/color operations, custom algebraic formulas, and multiple modulation output taps." },
-         { "Motion Track", "Tracks the dominant moving object in a video clip using normalized cross-correlation and pyramidal Lucas-Kanade. Emits x, y, scale, rotation, and confidence as modulation signals with an in-frame visual tracking overlay." },
           { "Audio Analyze", "Extracts level, band and onset values from audio for modulation - patch any audio source into it (Audio In, Audio File, a Filter, a Mixer, an Oscillator) and every output can drive any slider in the graph. With nothing patched in it falls back to its own Start listening button, a live tap on the system's default input device. It passes its input straight through, so it can sit inline in a chain as well as hang off one as a tap. Outputs: level, low/mid/high, onset, and b1-b8, eight raw frequency bands running low to high." },
          { "Plugin", "Hosts a third-party Audio Unit effect. Drag one in from the Plugins panel (Rescan there indexes what is installed; the list is cached, so launching never rescans), or drop a .component bundle from Finder. \"open\" shows the plugin's own editor in a separate window. The sliders on the body are plugin parameters you chose to expose: turn \"configure\" on and touch a control in the plugin's own window and it appears here as a mapped row - or pick one from the dropdown, since not every plugin's editor tells the host what was touched. Each mapped row is a real param with its own modulation pin, so a Ramp or Envelope can drive it. Right-click a row to unmap it. With nothing loaded, or bypassed, audio passes through unchanged." },
          { "Oscillator", "A synth oscillator with four classic waveforms (sine, triangle, saw, square), interactive amp envelope, unison, filter, hard sync, and fine/coarse tuning. With no note cable connected, it free-runs at a set frequency; connect a note cable and it becomes polyphonic and envelope-gated." },
@@ -85107,8 +85015,6 @@ int main(int argc, char** argv)
                DrawRender3DParams(n);
             else if (auto* n = dynamic_cast<ImageAnalyzeNode*>(gn.node.get()))
                DrawImageAnalyzeParams(n);
-            else if (auto* n = dynamic_cast<MotionTrackNode*>(gn.node.get()))
-               DrawMotionTrackParams(n);
             else if (auto* n = dynamic_cast<NullModulatorNode*>(gn.node.get()))
                DrawNullModulatorParams(n);
             else if (auto* n = dynamic_cast<AudioFileNode*>(gn.node.get()))
