@@ -2331,6 +2331,21 @@ namespace
    // Params whose InputFloat selection/cursor state still needs to be forced
    // once the field is confirmed active (see the comment at its use site).
    std::set<std::pair<int, int>> gTypedParamPendingInit;
+   // The exact text a double-click opened the field with. If the field closes
+   // still holding it, nothing was typed, so the value must stay untouched:
+   // the seed is the value rounded to the display format ("%.0f" turns 0.4
+   // into "0"), and re-parsing it on close snapped the param to that rounded
+   // number - most visibly to 0 - whenever the field lost focus straight away
+   // (a stray click, or the second click of the double-click landing on it).
+   std::map<std::pair<int, int>, std::string> gTypedParamSeed;
+   std::string TrimCopy(const std::string& s);
+   bool TypedTextIsUntouchedSeed(const std::pair<int, int>& key, const std::string& trimmed)
+   {
+      auto it = gTypedParamSeed.find(key);
+      const bool untouched = it != gTypedParamSeed.end() && TrimCopy(it->second) == trimmed;
+      gTypedParamSeed.erase(key);
+      return untouched;
+   }
    // Live text for the field currently being typed into. A plain number
    // commits as a value and clears any expression; text starting with '='
    // commits as an expression (see ModSlider) - the same field doubles as
@@ -2407,6 +2422,7 @@ namespace
          char seed[64];
          snprintf(seed, sizeof(seed), fmt, *value);
          gTypedParamText[editKey] = seed;
+         gTypedParamSeed[editKey] = seed;
       }
       gTypedParam.insert(editKey);
       gTypedParamJustOpened = editKey;
@@ -3750,7 +3766,7 @@ namespace
             else
             {
                Modulation::Instance().ClearExpression(nodeIndex, paramIndex);
-               if (!trimmed.empty())
+               if (!trimmed.empty() && !TypedTextIsUntouchedSeed(editKey, trimmed))
                {
                   char* end = nullptr;
                   float parsed = strtof(trimmed.c_str(), &end);
@@ -3767,6 +3783,7 @@ namespace
             }
             gTypedParam.erase(editKey);
             gTypedParamText.erase(editKey);
+            gTypedParamSeed.erase(editKey);
             gTypedParamNoAutoSelect.erase(editKey);
             gTypedParamPendingInit.erase(editKey);
          }
@@ -4938,7 +4955,7 @@ namespace
             else
             {
                Modulation::Instance().ClearExpression(nodeIndex, paramIndex);
-               if (!trimmed.empty())
+               if (!trimmed.empty() && !TypedTextIsUntouchedSeed(editKey, trimmed))
                {
                   char* end = nullptr;
                   float parsed = strtof(trimmed.c_str(), &end);
@@ -4955,6 +4972,7 @@ namespace
             }
             gTypedParam.erase(editKey);
             gTypedParamText.erase(editKey);
+            gTypedParamSeed.erase(editKey);
             gTypedParamNoAutoSelect.erase(editKey);
             gTypedParamPendingInit.erase(editKey);
          }
@@ -27024,7 +27042,7 @@ namespace
          if (entered || ImGui::IsItemDeactivated())
          {
             const std::string trimmed = TrimCopy(gTypedParamText[editKey]);
-            if (!trimmed.empty())
+            if (!trimmed.empty() && !TypedTextIsUntouchedSeed(editKey, trimmed))
             {
                char* end = nullptr;
                float parsed = strtof(trimmed.c_str(), &end);
@@ -27036,6 +27054,7 @@ namespace
             }
             gTypedParam.erase(editKey);
             gTypedParamText.erase(editKey);
+            gTypedParamSeed.erase(editKey);
             gTypedParamNoAutoSelect.erase(editKey);
             gTypedParamPendingInit.erase(editKey);
          }
