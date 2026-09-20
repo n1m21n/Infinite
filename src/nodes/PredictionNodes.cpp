@@ -1,10 +1,15 @@
 #include "nodes/PredictionNodes.h"
 
+#include "audio/MusicTime.h"
+#include "core/Transport.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <iterator>
+#include <limits>
 #include <vector>
 
 namespace
@@ -54,6 +59,50 @@ namespace
       return (p[i] * (1.0f - a) + p[i + 1] * a) * (float)DriftNode::kBins;
    }
    float Potential(const float* p, float x) { return -std::log(Density(p, x) + kEps); }
+
+   // Step 8 C/A: quantize sample-and-hold followed by an EMA low-pass, shared verbatim by
+   // Tick() (the real slot) and Ghost() (a forked copy) so the preview can never show an
+   // unsmoothed/unquantized path against a shaped real output - see DriftNode::Ghost's
+   // header comment on why that mismatch would be a dishonesty bug, not just polish.
+   // `beats` is the transport beat position the sample lands on: the real transport now for
+   // Tick, a projected future beat for Ghost.
+   void ApplyShaping(float rawX, double beats, int quantizeRate, float smoothness, float& heldX,
+                      long long& heldGridIdx, float& smoothedX)
+   {
+      float target = rawX;
+      if (quantizeRate > 0 && quantizeRate <= MusicTime::kNumRateDivisions)
+      {
+         const double gridBeats = MusicTime::BeatsFor((MusicTime::RateDivision)(quantizeRate - 1));
+         if (gridBeats > 1e-6)
+         {
+            const long long idx = (long long)std::floor(beats / gridBeats);
+            if (idx != heldGridIdx)
+            {
+               heldX = rawX;
+               heldGridIdx = idx;
+            }
+            target = heldX;
+         }
+      }
+      const float k = std::clamp(smoothness, 0.0f, 0.95f);
+      smoothedX = smoothedX * k + target * (1.0f - k);
+   }
+
+   // E: explicit range override. Applied uniformly to every RefreshModel path (frozen-hit,
+   // frozen-miss and the live blend) rather than once at the call site, so a future fourth
+   // path can't forget it. Guards against rangeLo > rangeHi by sorting rather than refusing -
+   // a UI drag that briefly crosses the sliders should never leave the model in a broken
+   // inverted-range state for one frame.
+   void ApplyRangeOverride(bool rangeOverride, float rangeLo, float rangeHi, DriftNode::Model& m)
+   {
+      if (!rangeOverride)
+         return;
+      float lo = std::clamp(rangeLo, 0.0f, 1.0f), hi = std::clamp(rangeHi, 0.0f, 1.0f);
+      if (lo > hi)
+         std::swap(lo, hi);
+      m.lo = lo;
+      m.hi = hi;
+   }
 
    // ---- base64 (frozen profile text) ----
    const char* kB64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -112,6 +161,13 @@ DriftNode::DriftNode()
    static int sSpawn = 0;
    seed = 1000 + (++sSpawn) * 7919;
    mStats = &MovementStats::Live();
+   // Smoothing is no longer a user-facing knob (Step 8 refinement round 2: "the drift cannot
+   // have any params") - it was the actual fix for the jittery-output complaint, so it stays
+   // permanently on at a fixed, light setting instead of disappearing. Quantize is left off:
+   // it holds the output at whatever value it had when a beat-grid line was last crossed, which
+   // freezes solid whenever the transport isn't advancing (headless tests, a stopped transport) -
+   // exactly the "static" complaint this whole redesign started from.
+   smoothness = 0.2f;
 }
 
 // ---- the dynamics --------------------------------------------------------------------------
@@ -151,6 +207,8 @@ DriftNode::Slot& DriftNode::SlotFor(const ParamKey& k, float curPos)
    {
       Slot s;
       s.x = std::clamp(curPos, 0.0f, 1.0f);
+      s.smoothedX = s.x;
+      s.heldX = s.x;
       s.rng = SeedFor(seed, k);
       it = mSlots.emplace(k, s).first;
       if (mAnchors.find(k) == mAnchors.end())
@@ -294,12 +352,14 @@ void DriftNode::RefreshModel(const ParamKey& k, Slot& s)
          m.sigma = std::clamp(it->second.sigma, 0.005f, 1.0f);
          m.lo = it->second.lo; m.hi = it->second.hi;
          m.nEff = 1e9; m.w1 = 1.0f; m.cold = false;
+         ApplyRangeOverride(rangeOverride, rangeLo, rangeHi, m);
          s.model = m;
          s.modelFrame = mFrame;
          return;
       }
       // A key bound after the freeze has no profile: a flat, deterministic walk.
       for (int i = 0; i < kBins; i++) m.p[i] = 1.0f / kBins;
+      ApplyRangeOverride(rangeOverride, rangeLo, rangeHi, m);
       s.model = m;
       s.modelFrame = mFrame;
       return;
@@ -329,6 +389,7 @@ void DriftNode::RefreshModel(const ParamKey& k, Slot& s)
    m.w2d = (float)b.w2d;
    m.w3 = (float)b.w3;
    m.cold = b.w1 < 0.2;
+   ApplyRangeOverride(rangeOverride, rangeLo, rangeHi, m);
    s.model = m;
    s.modelFrame = mFrame;
 }
@@ -338,6 +399,16 @@ void DriftNode::RefreshModel(const ParamKey& k, Slot& s)
 void DriftNode::Tick(int frameId, double dt)
 {
    mFrame = frameId;
+   // One-time reconciliation for patches saved before the `mode` dropdown existed: their
+   // `follow` bool loads as true with `mode` defaulting to 0 (Wander), which would silently
+   // keep running Follow logic while the UI shows "Wander" and hides the leader picker. Bring
+   // `mode` in line with the loaded `follow` value exactly once, then let the UI's own
+   // `mode -> follow` write (DrawDriftParams) be the single source of truth from here on.
+   if (!mModeReconciled)
+   {
+      if (follow && mode == 0) mode = 1;
+      mModeReconciled = true;
+   }
    SyncAnchors();
    SyncFrozen(frameId);
 
@@ -356,10 +427,14 @@ void DriftNode::Tick(int frameId, double dt)
       if (!s.paused && dt > 0.0)
          Step(s.x, s.v, s.rng, s.model, pr, EnergyFor(it->first), dt);
 
-      if (follow && mStats != nullptr && leaderNodeIndex >= 0)
+      // D: mode==1 (Follow). leaderNodeIndex already stores the leader's uid directly (see
+      // the header comment on that field) - no index-to-uid conversion belongs here.
+      // Gated on mode, not the legacy `follow` bool directly, so a patch saved before the
+      // mode dropdown existed (follow=true, mode defaults to 0) still runs Follow after
+      // VisitParams reconciles mode from follow - see the reconciliation below.
+      if (mode == 1 && mStats != nullptr && leaderNodeIndex >= 0)
       {
-         uint64_t leadUid = (uint64_t)leaderNodeIndex;
-         MovementStats::KeyId leadKey{ leadUid, leaderParamIndex };
+         MovementStats::KeyId leadKey{ (uint64_t)leaderNodeIndex, leaderParamIndex };
          MovementStats::KeyId followKey{ it->first.uid, it->first.paramIndex };
          auto fit = mStats->FitFollow(followKey, leadKey);
          if (fit.valid)
@@ -370,6 +445,49 @@ void DriftNode::Tick(int frameId, double dt)
             s.x += (target - s.x) * std::clamp((float)dt * 5.0f, 0.0f, 1.0f);
          }
       }
+      // D: mode==2 (Recall). recallBar < 0 finds the nearest-matching bar via the slot's own
+      // current position/velocity as a 1-key query (mirrors RunPredV2Test's query shape);
+      // recallBar >= 0 is a user-picked bar from the UI stepper and skips the search.
+      else if (mode == 2 && mStats != nullptr && dt > 0.0)
+      {
+         const auto& bars = mStats->GetBarSummaries();
+         if (!bars.empty())
+         {
+            const MovementStats::KeyId selfKey{ it->first.uid, it->first.paramIndex };
+            int targetBar = -1;
+            if (recallBar >= 0)
+            {
+               for (const auto& bs : bars)
+                  if (bs.barIndex == recallBar) { targetBar = bs.barIndex; break; }
+            }
+            else
+            {
+               MovementStats::BarSummary::KeySummary q;
+               q.id = selfKey; q.meanPos = s.x; q.slopePos = s.v;
+               const auto match = mStats->SearchRecallIndex({ q });
+               if (match.found) targetBar = match.matchedBar;
+            }
+            for (const auto& bs : bars)
+            {
+               if (bs.barIndex != targetBar)
+                  continue;
+               for (const auto& ks : bs.keys)
+               {
+                  if (!(ks.id == selfKey))
+                     continue;
+                  const float target = std::clamp(ks.meanPos, 0.0f, 1.0f);
+                  s.x += (target - s.x) * std::clamp((float)dt * 3.0f, 0.0f, 1.0f);
+                  break;
+               }
+               break;
+            }
+         }
+      }
+
+      // A/C: quantize sample-and-hold + smoothing, applied after the dynamics/mode step so
+      // Follow/Recall's target-seeking writes to s.x are shaped exactly like Wander's.
+      ApplyShaping(s.x, Transport::Instance().Beats(), quantizeRate, smoothness, s.heldX, s.heldGridIdx,
+                   s.smoothedX);
 
       ++it;
    }
@@ -377,7 +495,7 @@ void DriftNode::Tick(int frameId, double dt)
 
 float DriftNode::ValuePos01For(const ParamKey& k, float curPos)
 {
-   return std::clamp(SlotFor(k, curPos).x, 0.0f, 1.0f);
+   return std::clamp(SlotFor(k, curPos).smoothedX, 0.0f, 1.0f);
 }
 
 void DriftNode::OnGrab(const ParamKey& k)
@@ -393,18 +511,44 @@ void DriftNode::OnRelease(const ParamKey& k, float pos, float velPerSec)
    s.x = std::clamp(pos, 0.0f, 1.0f);
    s.v = velPerSec;
    s.paused = false;
+   // A hand release is a fresh starting point for the shaping pipeline too - snap smoothedX/
+   // heldX to it and force a new hold sample next tick, rather than let the output visibly
+   // glide from wherever it was quantized/smoothed to before the hand grabbed the knob.
+   s.smoothedX = s.x;
+   s.heldX = s.x;
+   s.heldGridIdx = std::numeric_limits<long long>::min();
    SetAnchor(k, s.x); // only a hand write ever moves an anchor, never Drift's own output
 }
 
 float DriftNode::Value01()
 {
-   return mSlots.empty() ? 0.5f : std::clamp(mSlots.begin()->second.x, 0.0f, 1.0f);
+   return mSlots.empty() ? 0.5f : std::clamp(mSlots.begin()->second.smoothedX, 0.0f, 1.0f);
 }
 
 float DriftNode::SlotPos(const ParamKey& k) const
 {
    auto it = mSlots.find(k);
    return it != mSlots.end() ? it->second.x : -1.0f;
+}
+
+bool DriftNode::ReadHistogramForUI(int slotOrdinal, float outHist[kBins], ParamKey& outKey) const
+{
+   if (slotOrdinal < 0 || slotOrdinal >= (int)mSlots.size())
+      return false;
+   auto it = mSlots.begin();
+   std::advance(it, slotOrdinal);
+   std::memcpy(outHist, it->second.model.p, sizeof(float) * kBins);
+   outKey = it->first;
+   return true;
+}
+
+double DriftNode::SamplesAnalyzedForUI(int slotOrdinal) const
+{
+   if (slotOrdinal < 0 || slotOrdinal >= (int)mSlots.size())
+      return 0.0;
+   auto it = mSlots.begin();
+   std::advance(it, slotOrdinal);
+   return it->second.model.nEff;
 }
 
 int DriftNode::ConfidenceRung(const ParamKey& k) const
@@ -451,10 +595,24 @@ int DriftNode::Ghost(const ParamKey& k, float* out, int maxPoints)
       uint64_t rng = s.rng;
       const Params pr{ std::clamp(speed, 0.1f, 4.0f), std::clamp(stray, 0.25f, 4.0f), std::clamp(momentum, 0.0f, 4.0f),
                        std::clamp(link, 0.0f, 2.0f) };
+      // Fork the shaping state too, and run the SAME ApplyShaping pipeline on the forecast
+      // that Tick() runs on the real output - otherwise the ghost preview would show the raw
+      // OU path while the real knob only ever moves in quantized/smoothed steps, which is a
+      // correctness bug (the preview lies about what will actually be heard/seen), not a
+      // cosmetic gap. beatsPerGhostStep projects the transport forward at the current tempo;
+      // Ghost is already a "if playback continues" forecast, so this is consistent with the
+      // rest of its assumptions.
+      float ghHeldX = s.heldX;
+      long long ghHeldGridIdx = s.heldGridIdx;
+      float ghSmoothedX = s.smoothedX;
+      const double nowBeats = Transport::Instance().Beats();
+      const double beatsPerSec = Transport::Instance().Tempo() / 60.0;
       for (int i = 0; i < kGhostPoints; i++)
       {
          Step(x, v, rng, s.model, pr, EnergyFor(k), kGhostDt);
-         s.ghost[i] = x;
+         const double futureBeats = nowBeats + (double)(i + 1) * kGhostDt * beatsPerSec;
+         ApplyShaping(x, futureBeats, quantizeRate, smoothness, ghHeldX, ghHeldGridIdx, ghSmoothedX);
+         s.ghost[i] = ghSmoothedX;
       }
       s.ghostN = kGhostPoints;
       s.ghostFrame = mFrame;
@@ -1139,6 +1297,9 @@ bool RunPredFeedbackTest()
 MovesNode::MovesNode()
 {
    mStats = &MovementStats::Live();
+   static int sSpawn = 0;
+   mGestureRng = 1000 + (++sSpawn) * 7919; // two Motions must not wander in lockstep (Drift's own lesson)
+   mGestureX = gesture;
 }
 
 float MovesNode::Value01()
@@ -1147,7 +1308,47 @@ float MovesNode::Value01()
    return std::clamp(0.5f + 0.5f * g, 0.0f, 1.0f);
 }
 
-void MovesNode::Tick(int, double)
+// Step 8 item 4: the one PCA-projection loop Tick() and ValuePos01For() both used to carry
+// separately. `g` is the resolved gesture value (gesture, falling back to fader1) since both
+// callers need it anyway before calling in.
+float MovesNode::ProjectOffsetFor(const ParamKey& k, float g) const
+{
+   if (!mPCA.valid || mPCA.W.empty())
+      return g * 0.5f;
+
+   for (size_t keyIdx = 0; keyIdx < mPCA.keys.size(); keyIdx++)
+   {
+      if (mPCA.keys[keyIdx].uid == k.uid && mPCA.keys[keyIdx].paramIndex == k.paramIndex)
+      {
+         float wComb = 0.0f;
+         for (size_t comp = 0; comp < mPCA.W.size() && comp < mPCA.explainedVarianceRatio.size(); comp++)
+         {
+            float varR = mPCA.explainedVarianceRatio[comp];
+            wComb += mPCA.W[comp][keyIdx] * varR;
+         }
+         float sign = (wComb >= 0.0f) ? 1.0f : -1.0f;
+         float mag = std::abs(wComb);
+         float wFocused = (mag > 0.05f) ? sign * std::pow(mag, 1.4f) : 0.0f;
+         float legacy = fader2 * (mPCA.W.size() > 1 ? mPCA.W[1][keyIdx] : 0.0f) +
+                        fader3 * (mPCA.W.size() > 2 ? mPCA.W[2][keyIdx] : 0.0f) +
+                        fader4 * (mPCA.W.size() > 3 ? mPCA.W[3][keyIdx] : 0.0f);
+         // A destination the PCA knows about but that loads near-zero on the learned pattern
+         // (mag <= 0.05 - e.g. it was only ever cabled here, never actually part of whatever
+         // motion got recorded) must not go silently dead just because it isn't correlated. Add
+         // the same g*0.5 floor the "no data at all" branch above uses, so "coupled but
+         // uncorrelated" always still visibly moves, on top of whatever real correlation adds.
+         return g * 0.5f + wFocused * g + legacy;
+      }
+   }
+   // This destination is coupled (dragged onto Motion's output) but has no delta history of its
+   // own to place it in the PCA - e.g. it was only ever driven by a cable, never hand-moved. That
+   // must not silently mean "never move it": fall back to the same naive gesture-only offset used
+   // before any PCA exists at all, so newly-coupled knobs move immediately instead of staying
+   // dead until someone happens to hand-drag them 20+ times first.
+   return g * 0.5f;
+}
+
+void MovesNode::Tick(int, double dt)
 {
    if (mStats == nullptr)
       mStats = &MovementStats::Live();
@@ -1155,39 +1356,39 @@ void MovesNode::Tick(int, double)
    if (!mPCA.valid || mBasePos.size() > mPCA.keys.size())
       RefreshPCA(mStats);
 
+   // Autonomous idle wander on the gesture value itself - Step 8 refinement round 3 removed the
+   // manual gesture slider entirely, so this always runs (nothing can hold/override it anymore).
+   // There's no real per-instance history of "where does this gesture like to sit" the way a
+   // real knob has, so the walk itself is a flat, generic OU wander rather than one shaped by a
+   // learned density - but its amplitude scales with Confidence01 (the PCA's own explained
+   // variance), so a strongly-learned combo move roams further than a weak/no-data one. The
+   // floor (conf == 0, i.e. a fresh patch with no recorded moves yet - the common first-plug
+   // case) used to be small enough to be visually indistinguishable from static; raised so the
+   // node is audibly/visibly alive from the moment it's patched in, not only once it has data.
+   if (dt > 0.0)
+   {
+      DriftNode::Model m;
+      for (float& p : m.p) p = 1.0f / DriftNode::kBins;
+      const float conf = std::clamp(Confidence01(ParamKey{}), 0.0f, 1.0f);
+      m.theta = 0.6f;
+      m.sigma = 0.12f + 0.18f * conf;
+      m.lo = 0.0f;
+      m.hi = 1.0f;
+      const DriftNode::Params pr{ 1.0f, 1.0f, 1.0f, 0.0f };
+      float g01 = std::clamp((mGestureX + 1.0f) * 0.5f, 0.0f, 1.0f);
+      DriftNode::Step(g01, mGestureV, mGestureRng, m, pr, 0.0f, dt);
+      mGestureX = g01 * 2.0f - 1.0f;
+      gesture = mGestureX;
+   }
+   else
+   {
+      mGestureX = gesture;
+      mGestureV = 0.0f;
+   }
+
    const float g = (gesture != 0.0f) ? gesture : fader1;
    for (auto& [k, base] : mBasePos)
-   {
-      float offset = 0.0f;
-      if (mPCA.valid && !mPCA.W.empty())
-      {
-         for (size_t keyIdx = 0; keyIdx < mPCA.keys.size(); keyIdx++)
-         {
-            if (mPCA.keys[keyIdx].uid == k.uid && mPCA.keys[keyIdx].paramIndex == k.paramIndex)
-            {
-               float wComb = 0.0f;
-               for (size_t comp = 0; comp < mPCA.W.size() && comp < mPCA.explainedVarianceRatio.size(); comp++)
-               {
-                  float varR = mPCA.explainedVarianceRatio[comp];
-                  wComb += mPCA.W[comp][keyIdx] * varR;
-               }
-               float sign = (wComb >= 0.0f) ? 1.0f : -1.0f;
-               float mag = std::abs(wComb);
-               float wFocused = (mag > 0.05f) ? sign * std::pow(mag, 1.4f) : 0.0f;
-               float legacy = fader2 * (mPCA.W.size() > 1 ? mPCA.W[1][keyIdx] : 0.0f) +
-                              fader3 * (mPCA.W.size() > 2 ? mPCA.W[2][keyIdx] : 0.0f) +
-                              fader4 * (mPCA.W.size() > 3 ? mPCA.W[3][keyIdx] : 0.0f);
-               offset = wFocused * g + legacy;
-               break;
-            }
-         }
-      }
-      else
-      {
-         offset = g * 0.5f;
-      }
-      mOutputPos[k] = std::clamp(base + amount * offset, 0.0f, 1.0f);
-   }
+      mOutputPos[k] = std::clamp(base + amount * ProjectOffsetFor(k, g), 0.0f, 1.0f);
 }
 
 float MovesNode::ValuePos01For(const ParamKey& k, float curPos)
@@ -1199,37 +1400,9 @@ float MovesNode::ValuePos01For(const ParamKey& k, float curPos)
    if (it != mOutputPos.end())
       return it->second;
 
-   float base = mBasePos[k];
+   const float base = mBasePos[k];
    const float g = (gesture != 0.0f) ? gesture : fader1;
-   float offset = 0.0f;
-   if (mPCA.valid && !mPCA.W.empty())
-   {
-      for (size_t keyIdx = 0; keyIdx < mPCA.keys.size(); keyIdx++)
-      {
-         if (mPCA.keys[keyIdx].uid == k.uid && mPCA.keys[keyIdx].paramIndex == k.paramIndex)
-         {
-            float wComb = 0.0f;
-            for (size_t comp = 0; comp < mPCA.W.size() && comp < mPCA.explainedVarianceRatio.size(); comp++)
-            {
-               float varR = mPCA.explainedVarianceRatio[comp];
-               wComb += mPCA.W[comp][keyIdx] * varR;
-            }
-            float sign = (wComb >= 0.0f) ? 1.0f : -1.0f;
-            float mag = std::abs(wComb);
-            float wFocused = (mag > 0.05f) ? sign * std::pow(mag, 1.4f) : 0.0f;
-            float legacy = fader2 * (mPCA.W.size() > 1 ? mPCA.W[1][keyIdx] : 0.0f) +
-                           fader3 * (mPCA.W.size() > 2 ? mPCA.W[2][keyIdx] : 0.0f) +
-                           fader4 * (mPCA.W.size() > 3 ? mPCA.W[3][keyIdx] : 0.0f);
-            offset = wFocused * g + legacy;
-            break;
-         }
-      }
-   }
-   else
-   {
-      offset = g * 0.5f;
-   }
-   float out = std::clamp(base + amount * offset, 0.0f, 1.0f);
+   const float out = std::clamp(base + amount * ProjectOffsetFor(k, g), 0.0f, 1.0f);
    mOutputPos[k] = out;
    return out;
 }

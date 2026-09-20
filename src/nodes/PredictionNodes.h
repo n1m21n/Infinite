@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <limits>
 #include <map>
 #include <string>
 
@@ -52,10 +53,34 @@ public:
 
    // --- v2 Step 7 Params ---
    bool follow = false;       // 7a Follow leader mode
+   // Despite the name (kept for save-format compatibility), this stores the leader
+   // GraphNode's *uid*, not its index - see the Follow leader picker in main.cpp
+   // (gDriftFollowPickingUid) for how it's resolved. A plain node index is reused by
+   // RemoveNodeByIndex and would silently repoint Follow at whatever node ends up at
+   // that slot after an unrelated delete/undo; the uid survives both (Modulation.h's
+   // ParamRef::uid stability rule).
    int leaderNodeIndex = -1;
    int leaderParamIndex = 0;
    bool sectionConditioned = false; // 7e Section-conditioned dwell landscape
-   int recallBar = -1;        // 7b Recall jump trigger
+   int recallBar = -1;        // 7b Recall jump trigger: -1 = auto (nearest match), else a
+                              // user-picked bar index into mStats->GetBarSummaries().
+
+   // --- Step 8 redesign ---
+   // A: rate/time-signature quantize. 0 = Off, else an index into
+   // MusicTime::QuantizeGridList() (index - 1 is the RateDivision) - the same convention
+   // NoteFilterNode::div / NoteCapturerNode::quantizeDiv already use; not the "-1 = Off"
+   // shape this field's own design note briefly floated, since that would have been a
+   // second, incompatible sentinel convention living right next to the established one.
+   int quantizeRate = 0;
+   // C: post-quantize EMA low-pass. 0 = no smoothing, 0.95 = heavy.
+   float smoothness = 0.0f;
+   // D: 0 = Wander (unchanged Step() path), 1 = Follow, 2 = Recall. Setting this from the
+   // UI also sets `follow` so VisitParams' saved key/shape doesn't change.
+   int mode = 0;
+   // E: explicit range override for RefreshModel's blend-derived lo/hi.
+   bool rangeOverride = false;
+   float rangeLo = 0.0f;
+   float rangeHi = 1.0f;
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -65,6 +90,8 @@ public:
       v.Bool("follow", follow); v.Int("leaderNodeIndex", leaderNodeIndex);
       v.Int("leaderParamIndex", leaderParamIndex);
       v.Bool("sectionConditioned", sectionConditioned); v.Int("recallBar", recallBar);
+      v.Int("quantizeRate", quantizeRate); v.Float("smoothness", smoothness); v.Int("mode", mode);
+      v.Bool("rangeOverride", rangeOverride); v.Float("rangeLo", rangeLo); v.Float("rangeHi", rangeHi);
    }
 
    // --- UI / test helpers (main thread) ---
@@ -80,6 +107,21 @@ public:
    int Ghost(const ParamKey& k, float* out, int maxPoints);
    // The slot's current position, or -1.
    float SlotPos(const ParamKey& k) const;
+   // B: the currently-bound slot's real 64-bin dwell histogram, for the learned-gesture
+   // readout meter. Returns false (leaving outHist untouched) when there is no bound slot -
+   // the UI must fall back to the existing "drag onto a knob" text rather than draw a fake
+   // or empty histogram. `slotOrdinal` selects among multiple bound slots by insertion
+   // order (0 = first); outKey receives that slot's ParamKey so the caller can label it.
+   bool ReadHistogramForUI(int slotOrdinal, float outHist[MovementStats::kBins], ParamKey& outKey) const;
+   // How much real data backs this slot's model: the key's own effective sample count
+   // (Model::nEff, README §6's n_eff) - the number the confidence percentage is actually
+   // derived from, surfaced as its own number per the "show numbers, not a graphic" UI
+   // decision (Step 8 refinement round 2).
+   double SamplesAnalyzedForUI(int slotOrdinal) const;
+   // D (Recall UI): how many bars mStats has recorded, so the recallBar stepper can stay
+   // disabled ("no bar history yet") until there's something to pick from, without exposing
+   // mStats itself.
+   int RecallBarCount() const { return mStats != nullptr ? (int)mStats->GetBarSummaries().size() : 0; }
    // Point the node at another stats engine (tests); default is MovementStats::Live().
    void SetStatsSource(const MovementStats::Engine* e) { mStats = e; }
    int SlotCount() const { return (int)mSlots.size(); }
@@ -107,6 +149,15 @@ public:
       int ghostFrame = -1;
       int ghostN = 0;
       float ghost[kGhostPoints] = {};
+      // C: quantize sample-and-hold + EMA smoothing state, applied after Step() each Tick.
+      // ValuePos01For reads smoothedX, never x directly, once either quantizeRate or
+      // smoothness is non-default - see ApplyShaping in PredictionNodes.cpp.
+      float smoothedX = 0.5f;
+      float heldX = 0.5f;
+      // A sentinel guaranteed not to equal any real floor(beats/gridBeats) (which is >= 0
+      // for the transport's non-negative beat position), so the first Tick after a slot is
+      // (re)created or released always takes a fresh sample rather than reading a stale hold.
+      long long heldGridIdx = std::numeric_limits<long long>::min();
    };
    struct Params { float speed, stray, momentum, link; };
    // One step of the dynamics on (x, v, rng). handEnergy in [0,1].
@@ -134,6 +185,7 @@ private:
    std::map<ParamKey, Frozen> mFrozen;
    std::string mParsedAnchors, mParsedFrozen;
    bool mFrozenApplied = false;
+   bool mModeReconciled = false; // one-time follow->mode migration on first Tick(), see Tick()
    int mFrame = 0;
    const MovementStats::Engine* mStats = nullptr;
 };
@@ -166,7 +218,6 @@ public:
    float fader2 = 0.0f;
    float fader3 = 0.0f;
    float fader4 = 0.0f;
-   std::string weightsData;
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -176,11 +227,15 @@ public:
       v.Float("fader2", fader2);
       v.Float("fader3", fader3);
       v.Float("fader4", fader4);
-      v.Text("weightsData", weightsData);
    }
 
    void RefreshPCA(const MovementStats::Engine* engine = nullptr);
    int SlotCount() const { return (int)mBasePos.size(); }
+   // Step 8 refinement round 2/3: Motion used to only move when a human pushed `gesture` by
+   // hand, which read as "static" - it's now permanently autonomous, wandering `gesture` itself
+   // with the exact same OU walk DriftNode::Step already implements (reused directly, in a
+   // 0..1-remapped copy of the -1..1 gesture range). Round 3 removed the manual slider that used
+   // to pause this, so there is nothing left to hold it anymore.
    float ExplainedVariance(int comp) const
    {
       return (comp >= 0 && comp < (int)mPCA.explainedVarianceRatio.size()) ? mPCA.explainedVarianceRatio[comp] : 0.0f;
@@ -189,10 +244,19 @@ public:
    float Confidence01(const ParamKey& k) const override;
 
 private:
+   // Shared by Tick() and ValuePos01For(), which used to carry two copies of this same
+   // PCA-projection loop that had to be kept in sync by hand (Step 8 item 4). `g` is the
+   // resolved gesture value (gesture, falling back to fader1) so callers only compute it
+   // once.
+   float ProjectOffsetFor(const ParamKey& k, float g) const;
+
    std::map<ParamKey, float> mBasePos;
    std::map<ParamKey, float> mOutputPos;
    MovementStats::MovesPCA mPCA;
    const MovementStats::Engine* mStats = nullptr;
+
+   float mGestureX = 0.0f, mGestureV = 0.0f;
+   uint64_t mGestureRng = 1;
 };
 
 namespace PredictionNodes

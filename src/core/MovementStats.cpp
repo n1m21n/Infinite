@@ -1558,73 +1558,87 @@ DMDFit Engine::FitDMD(int maxRank) const
       return res;
 
    int rank = std::min((int)P, maxRank);
+   const int D = rank + 1; // augmented with one constant feature, for the affine fit below
    res.rank = rank;
    res.keys = validKeys;
-   res.A.resize(rank * rank, 0.0f);
+   res.A.resize((size_t)rank * D, 0.0f);
+   res.noiseStd.assign(rank, 0.0f);
 
-   std::vector<double> H1H1T(rank * rank, 0.0);
-   std::vector<double> H2H1T(rank * rank, 0.0);
+   // Affine fit: x2 = Asub*x1 + bias, not the purely homogeneous x2 = A*x1 this used to solve.
+   // A homogeneous map can only ever settle to the fixed point at the origin, so any real,
+   // off-centre signal (almost everything patched into Predictive Modulator) free-ran straight
+   // to 0 and sat there - "learned it, then went static" - regardless of how good the fit was.
+   // The constant feature (x1_aug[rank] == 1 below) lets the model land on the actual observed
+   // operating point instead.
+   std::vector<double> H1H1T((size_t)D * D, 0.0);
+   std::vector<double> H2H1T((size_t)rank * D, 0.0);
 
+   std::vector<double> x1(D);
    for (size_t t = 0; t + 1 < N; t++)
    {
       for (int i = 0; i < rank; i++)
       {
          const auto* ri = FindRuntime(validKeys[i]);
-         double x1_i = ri ? ri->posHistory[t] : 0.0;
+         x1[i] = ri ? ri->posHistory[t] : 0.0;
+      }
+      x1[rank] = 1.0;
+      for (int i = 0; i < D; i++)
+         for (int j = 0; j < D; j++)
+            H1H1T[i * D + j] += x1[i] * x1[j];
+      for (int i = 0; i < rank; i++)
+      {
+         const auto* ri = FindRuntime(validKeys[i]);
          double x2_i = ri ? ri->posHistory[t + 1] : 0.0;
-         for (int j = 0; j < rank; j++)
-         {
-            const auto* rj = FindRuntime(validKeys[j]);
-            double x1_j = rj ? rj->posHistory[t] : 0.0;
-            H1H1T[i * rank + j] += x1_i * x1_j;
-            H2H1T[i * rank + j] += x2_i * x1_j;
-         }
+         for (int j = 0; j < D; j++)
+            H2H1T[i * D + j] += x2_i * x1[j];
       }
    }
 
-   for (int i = 0; i < rank; i++)
-      H1H1T[i * rank + i] += 1e-4;
+   for (int i = 0; i < D; i++)
+      H1H1T[i * D + i] += 1e-4;
 
-   std::vector<double> invH1H1T(rank * rank, 0.0);
-   for (int i = 0; i < rank; i++)
-      invH1H1T[i * rank + i] = 1.0;
+   std::vector<double> invH1H1T((size_t)D * D, 0.0);
+   for (int i = 0; i < D; i++)
+      invH1H1T[i * D + i] = 1.0;
 
    std::vector<double> M = H1H1T;
-   for (int i = 0; i < rank; i++)
+   for (int i = 0; i < D; i++)
    {
-      double pivot = M[i * rank + i];
+      double pivot = M[i * D + i];
       if (std::abs(pivot) < 1e-9)
          pivot = 1e-9;
-      for (int j = 0; j < rank; j++)
+      for (int j = 0; j < D; j++)
       {
-         M[i * rank + j] /= pivot;
-         invH1H1T[i * rank + j] /= pivot;
+         M[i * D + j] /= pivot;
+         invH1H1T[i * D + j] /= pivot;
       }
-      for (int r = 0; r < rank; r++)
+      for (int r = 0; r < D; r++)
       {
          if (r == i)
             continue;
-         double factor = M[r * rank + i];
-         for (int j = 0; j < rank; j++)
+         double factor = M[r * D + i];
+         for (int j = 0; j < D; j++)
          {
-            M[r * rank + j] -= factor * M[i * rank + j];
-            invH1H1T[r * rank + j] -= factor * invH1H1T[i * rank + j];
+            M[r * D + j] -= factor * M[i * D + j];
+            invH1H1T[r * D + j] -= factor * invH1H1T[i * D + j];
          }
       }
    }
 
-   std::vector<double> A_mat(rank * rank, 0.0);
+   std::vector<double> A_aug((size_t)rank * D, 0.0);
    for (int i = 0; i < rank; i++)
    {
-      for (int j = 0; j < rank; j++)
+      for (int j = 0; j < D; j++)
       {
          double sum = 0.0;
-         for (int k = 0; k < rank; k++)
-            sum += H2H1T[i * rank + k] * invH1H1T[k * rank + j];
-         A_mat[i * rank + j] = sum;
+         for (int k = 0; k < D; k++)
+            sum += H2H1T[i * D + k] * invH1H1T[k * D + j];
+         A_aug[i * D + j] = sum;
       }
    }
 
+   // Stability (spectral radius) is a property of the linear part alone - the bias column just
+   // translates the fixed point, it can't make the homogeneous part unstable or not.
    std::vector<double> v(rank, 1.0 / std::sqrt((double)rank));
    double rho = 1.0;
    for (int iter = 0; iter < 50; iter++)
@@ -1632,7 +1646,7 @@ DMDFit Engine::FitDMD(int maxRank) const
       std::vector<double> v_next(rank, 0.0);
       for (int r = 0; r < rank; r++)
          for (int c = 0; c < rank; c++)
-            v_next[r] += A_mat[r * rank + c] * v[c];
+            v_next[r] += A_aug[r * D + c] * v[c];
       double norm = 0.0;
       for (int r = 0; r < rank; r++)
          norm += v_next[r] * v_next[r];
@@ -1644,24 +1658,78 @@ DMDFit Engine::FitDMD(int maxRank) const
       rho = norm;
    }
 
-   double scale = rho > 1.0 ? 1.0 / rho : 1.0;
-   for (int i = 0; i < rank * rank; i++)
-      res.A[i] = (float)(A_mat[i] * scale);
-
+   // Only the linear columns get the stability scale-down; the bias column is left alone so the
+   // model still settles near the signal's real operating point rather than shrinking toward 0.
+   const double scale = rho > 1.0 ? 1.0 / rho : 1.0;
+   for (int i = 0; i < rank; i++)
+   {
+      for (int j = 0; j < rank; j++)
+         res.A[i * D + j] = (float)(A_aug[i * D + j] * scale);
+      res.A[i * D + rank] = (float)A_aug[i * D + rank];
+   }
    res.spectralRadius = (float)(rho * scale);
+
+   // Residual std of the (scaled) one-step fit, per output dimension - the honest measure of
+   // how much the training data actually wandered around what the affine map predicts. Free-run
+   // adds noise at this scale so a finished model keeps generating a sequence instead of
+   // decaying onto a single, silent fixed point once Learn stops.
+   std::vector<double> sqErr(rank, 0.0);
+   std::vector<double> x1raw(rank);
+   for (size_t t = 0; t + 1 < N; t++)
+   {
+      for (int i = 0; i < rank; i++)
+      {
+         const auto* ri = FindRuntime(validKeys[i]);
+         x1raw[i] = ri ? ri->posHistory[t] : 0.0;
+      }
+      for (int i = 0; i < rank; i++)
+      {
+         const auto* ri = FindRuntime(validKeys[i]);
+         double x2_i = ri ? ri->posHistory[t + 1] : 0.0;
+         double pred = res.A[i * D + rank];
+         for (int j = 0; j < rank; j++)
+            pred += res.A[i * D + j] * x1raw[j];
+         const double e = x2_i - pred;
+         sqErr[i] += e * e;
+      }
+   }
+   for (int i = 0; i < rank; i++)
+      res.noiseStd[i] = (float)std::sqrt(sqErr[i] / (double)std::max((size_t)1, N - 1));
+
    res.valid = true;
    return res;
 }
 
-void DMDFit::Step(std::vector<float>& x) const
+namespace
 {
-   if (!valid || (int)x.size() < rank)
+   // xorshift64* - local to this Step(), only needs to keep a free-run playhead wandering, not
+   // match any other RNG's statistics.
+   uint64_t DMDNextRaw(uint64_t& s)
+   {
+      s ^= s >> 12; s ^= s << 25; s ^= s >> 27;
+      return s * 0x2545F4914F6CDD1Dull;
+   }
+   float DMDGauss(uint64_t& s)
+   {
+      const float u1 = ((float)(DMDNextRaw(s) >> 40) + 0.5f) * (1.0f / 16777216.0f);
+      const float u2 = ((float)(DMDNextRaw(s) >> 40) + 0.5f) * (1.0f / 16777216.0f);
+      return std::sqrt(-2.0f * std::log(u1)) * std::cos(6.2831853f * u2);
+   }
+}
+
+void DMDFit::Step(std::vector<float>& x, uint64_t* rngState) const
+{
+   const int D = rank + 1;
+   if (!valid || (int)x.size() < rank || (int)A.size() < rank * D)
       return;
    std::vector<float> x_next(rank, 0.0f);
    for (int i = 0; i < rank; i++)
    {
+      x_next[i] = A[i * D + rank]; // bias/equilibrium term
       for (int j = 0; j < rank; j++)
-         x_next[i] += A[i * rank + j] * x[j];
+         x_next[i] += A[i * D + j] * x[j];
+      if (rngState != nullptr && i < (int)noiseStd.size() && noiseStd[i] > 0.0f)
+         x_next[i] += DMDGauss(*rngState) * noiseStd[i];
       x_next[i] = std::clamp(x_next[i], 0.0f, 1.0f);
    }
    for (int i = 0; i < rank; i++)

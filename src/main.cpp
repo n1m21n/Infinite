@@ -190,6 +190,7 @@ namespace
 #include "nodes/ModulatorNodes.h"
 #include "nodes/PredictionNodes.h"
 #include "nodes/PredictiveNotesNode.h"
+#include "nodes/PredictiveModulatorNode.h"
 #include "nodes/OscNodes.h"
 #include "nodes/MidiNodes.h"
 #include "nodes/OutputNode.h"
@@ -531,6 +532,13 @@ namespace
       // give the 2D/compositing one a distinct label.
       if (name == "transform")
          return "2d transform";
+      // Registered type keys stay "Drift"/"Moves" (patches/undo/copy-paste/help-table lookups all key
+      // off them), but both read as generic node names next to the rest of the Prediction category -
+      // give them the descriptive names the design settled on without touching the saved token.
+      if (name == "Drift")
+         return "predictive drift";
+      if (name == "Moves")
+         return "predictive motion";
 #if defined(_WIN32)
       // Registered type key stays "Syphon In"/"Syphon Out" (patch files key
       // off it), but the Windows implementation is backed by Spout2, not
@@ -1265,6 +1273,11 @@ namespace
    char  gPerfRenamePageBuffer[64] = "";
    int   gPerfAssigningElemIdx = -1;
    int   gPerfAssigningAxis = 0; // 0 = X or primary, 1 = Y
+   // Predictive Drift's "Pick Leader" (Follow mode): the uid of the Drift node currently
+   // armed to bind its leader from a canvas click, or 0 when nothing is picking. Keyed by
+   // uid rather than node index so it survives a delete/undo elsewhere on the canvas while
+   // the picker is still armed. Same click-to-assign UX as gPerfAssigningElemIdx below.
+   uint64_t gDriftFollowPickingUid = 0;
    int   gPerfMidiLearnIdx = -1;
    int   gPerfMidiLearnAxis = 0; // 0 = X or primary, 1 = Y
    struct PerfMidiRuntimeState
@@ -5690,6 +5703,7 @@ namespace
       REGISTER_NODE(ModCurveNode, Mod Curve, "Modulators");
       REGISTER_NODE(DriftNode, Drift, "Prediction");
       REGISTER_NODE(MovesNode, Moves, "Prediction");
+      REGISTER_NODE(PredictiveModulatorNode, Predictive Modulator, "Prediction");
       REGISTER_NODE(CVToPitchNode, CV to Pitch, "Modulators");
       REGISTER_NODE(MacroKnobNode, Macro Knob, "Macros");
       REGISTER_NODE(MacroSliderNode, Macro Slider, "Macros");
@@ -5779,7 +5793,7 @@ namespace
       REGISTER_NODE(GlideNode, Glide, "Notes");
       REGISTER_NODE(VibratoNode, Vibrato, "Modulators");
       REGISTER_NODE(NoteEchoNode, Note Echo, "Notes");
-      REGISTER_NODE(PredictiveNotesNode, Predictive Notes, "Notes");
+      REGISTER_NODE(PredictiveNotesNode, Predictive Notes, "Prediction");
       REGISTER_NODE(NoteRouterNode, Note Router, "Notes");
       REGISTER_NODE(NoteMergeNode, Note Merge, "Notes");
       REGISTER_NODE(NoteSwitcherNode, Note Switcher, "Notes");
@@ -10848,33 +10862,144 @@ namespace
       gAudioBodyW = gAudioContentW = kPreviewSize;
    }
 
-   // Drift (prediction) node body: horizontal sliders for speed, stray, momentum, link, seed, and freeze.
-   void DrawDriftParams(DriftNode* n)
+   // B: the learned-gesture readout - the currently-bound slot's real 64-bin dwell histogram,
+   // drawn at a smaller scale than DrawPatternStepGrid's bar chart (main.cpp ~8576) since this
+   // is a read-only meter, not an editable grid. Overlaid gridlines are a visual echo of the
+   // chosen quantize rate only - the histogram's x-axis is fader position, not time, so they
+   // don't correspond to literal beat boundaries, just a hint at how coarse the walk's steps
+   // will read once quantized.
+   void DrawDriftHistogram(DriftNode* n)
    {
-      ModSlider("speed", &n->speed, 0.1f, 4.0f, "%.2fx");
-      ModSlider("stray", &n->stray, 0.25f, 4.0f, "%.2fx");
-      ModSlider("momentum", &n->momentum, 0.0f, 4.0f, "%.2f s");
-      ModSlider("link", &n->link, 0.0f, 2.0f, "%.2f");
-      float seedF = (float)n->seed;
-      if (ModSlider("seed", &seedF, 0.0f, 9999.0f, "%.0f", kParamWidth, false, 1.0f))
-         n->seed = (int)seedF;
-      ModCheckbox("freeze", &n->frozen);
-      if (n->SlotCount() == 0)
-         ImGui::TextDisabled("drag onto a knob to drive it");
-      else
-         ImGui::TextDisabled("%d driven%s", n->SlotCount(), n->frozen ? "  |  frozen" : "");
+      float hist[DriftNode::kBins];
+      ParamKey key;
+      if (!n->ReadHistogramForUI(0, hist, key))
+         return; // no bound slot yet - caller already shows the "drag onto a knob" fallback
+
+      const float w = kPreviewSize;
+      const float h = 28.0f;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddRectFilled(origin, ImVec2(origin.x + w, origin.y + h), IM_COL32(255, 255, 255, 12), 2.0f);
+
+      float hi = 1e-6f;
+      for (float v : hist) hi = std::max(hi, v);
+      const float barW = w / (float)DriftNode::kBins;
+      for (int i = 0; i < DriftNode::kBins; i++)
+      {
+         const float bh = std::clamp(hist[i] / hi, 0.0f, 1.0f) * (h - 3.0f);
+         const float x0 = origin.x + (float)i * barW;
+         dl->AddRectFilled(ImVec2(x0, origin.y + h - bh), ImVec2(x0 + std::max(1.0f, barW - 0.5f), origin.y + h),
+                           IM_COL32(34, 197, 94, 200));
+      }
+      if (n->quantizeRate > 0)
+      {
+         // Purely decorative: more, finer gridlines for a shorter (faster) grid division,
+         // clamped to a legible range. Not a literal mapping of beats onto fader position.
+         const double gridBeats =
+            std::max(0.0625, MusicTime::BeatsFor((MusicTime::RateDivision)(n->quantizeRate - 1)));
+         const int divisions = std::clamp((int)std::round(4.0 / gridBeats), 2, 16);
+         for (int i = 1; i < divisions; i++)
+         {
+            const float x = origin.x + w * (float)i / (float)divisions;
+            dl->AddLine(ImVec2(x, origin.y), ImVec2(x, origin.y + h), IM_COL32(255, 255, 255, 40));
+         }
+      }
+      ImGui::Dummy(ImVec2(w, h));
    }
 
-   // Gesture (Prediction) node body: single unified macro slider driving learned multi-parameter PCA axes.
+   // Drift (prediction) node body - Step 8 refinement round 2: no modes, no dials. Drag it onto
+   // any number of knobs; each one gets its own independent slot that wanders inside that knob's
+   // own real, learned dwell history (quantize+smoothness are always on, tuned fixed constants
+   // set once in the constructor - see feedback_audio_node_minimalism). The only UI left is an
+   // honest readout, per knob, of how much real data is actually behind it.
+   void DrawDriftParams(GraphNode&, DriftNode* n)
+   {
+      const int count = n->SlotCount();
+      if (count == 0)
+      {
+         ImGui::TextDisabled("drag onto a knob to drive it");
+         return;
+      }
+      ImGui::TextDisabled("%d knob%s analyzed", count, count == 1 ? "" : "s");
+      DrawDriftHistogram(n);
+      for (int i = 0; i < count; i++)
+      {
+         float hist[DriftNode::kBins];
+         ParamKey key;
+         if (!n->ReadHistogramForUI(i, hist, key))
+            continue;
+         GraphNode* owner = FindNodeByUid(key.uid);
+         const float confidence = std::clamp(n->Confidence01(key), 0.0f, 1.0f) * 100.0f;
+         const double samples = n->SamplesAnalyzedForUI(i);
+         ImGui::TextDisabled("%s: %.0f samples, %.0f%% confidence",
+                              owner != nullptr ? NodeTitle(*owner).c_str() : "knob", samples, confidence);
+      }
+   }
+
+   // Motion (Prediction) node body - Step 8 refinement round 3: no params, same as Drift. It
+   // rides the strongest learned move across every knob it's coupled to and wanders on its own
+   // via the same OU walk DriftNode uses; `gesture`/`amount`/the extra PCA-axis faders are all
+   // fixed, tuned constants now (see feedback_audio_node_minimalism) rather than user-facing
+   // knobs, so this is a read-only readout, matching DrawDriftParams.
    void DrawMovesParams(MovesNode* n)
    {
-      ModSlider("gesture", &n->gesture, -1.0f, 1.0f, "%.2f");
-      ModSlider("amount", &n->amount, 0.0f, 2.0f, "%.2fx");
       if (n->SlotCount() == 0)
+      {
          ImGui::TextDisabled("drag onto knobs to drive gesture");
-      else
-         ImGui::TextDisabled("%d coupled  |  Focus: %.0f%% energy", n->SlotCount(),
-                             std::clamp(n->ExplainedVariance(0) * 100.0f, 10.0f, 99.0f));
+         return;
+      }
+      ImGui::TextDisabled("gesture %.2f", n->gesture);
+      ImGui::TextDisabled("%d coupled  |  Focus: %.0f%% energy", n->SlotCount(),
+                          std::clamp(n->ExplainedVariance(0) * 100.0f, 10.0f, 99.0f));
+   }
+
+   // Predictive Modulator node body (Step 8 item 5): Learn/Stop + a progress meter, rank
+   // dropdown, an honest read-only spectral-radius readout, and the constantIn fallback shown
+   // only when nothing is patched in (mirrors SmoothNode/RangeToRangeNode's own "(no cable)"
+   // convention rather than inventing a new one).
+   void DrawPredictiveModulatorParams(PredictiveModulatorNode* n)
+   {
+      const bool learning = n->IsLearning();
+      const float w = kPreviewSize;
+      const float h = ImGui::GetFrameHeight();
+      if (ImGui::Button(learning ? "Stop##predModLearn" : "Learn##predModLearn", ImVec2(w * 0.3f, h)))
+      {
+         PushUndoCheckpoint();
+         n->SetLearning(!learning);
+      }
+      ImGui::SameLine();
+      {
+         // Progress meter: a real Learning % while learning (or still short of a fit), driven
+         // by the engine's own history length - what FitDMD actually requires - not a counter
+         // that can look "done" while the fit is still rejected. Once a fit exists, show its
+         // spectral radius instead, since "how close to unstable" is the one number worth
+         // surfacing about a finished fit.
+         const ImVec2 p0 = ImGui::GetCursorScreenPos();
+         const float mw = w - w * 0.3f - ImGui::GetStyle().ItemSpacing.x;
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddRectFilled(p0, ImVec2(p0.x + mw, p0.y + h), IM_COL32(255, 255, 255, 14), 3.0f);
+         char label[64];
+         if (learning || (n->HasLearnAttempt() && !n->HasFit()))
+            snprintf(label, sizeof(label), "learning - %d%%", n->LearningPercent());
+         else if (n->HasFit())
+            snprintf(label, sizeof(label), "fit - radius %.2f", n->SpectralRadius());
+         else
+            snprintf(label, sizeof(label), "wire input in, press Learn");
+         // Clip to the meter's own box - AddText doesn't wrap or clip on its own, so a longer
+         // label would otherwise draw straight past the node's edge instead of just past mw.
+         dl->PushClipRect(p0, ImVec2(p0.x + mw, p0.y + h), true);
+         const ImVec2 lsz = ImGui::CalcTextSize(label);
+         dl->AddText(ImVec2(p0.x + 6.0f, p0.y + (h - lsz.y) * 0.5f), IM_COL32(200, 200, 200, 200), label);
+         dl->PopClipRect();
+         ImGui::Dummy(ImVec2(mw, h));
+      }
+
+      // No rank dropdown - Step 8 refinement round 3: rank was the delay-embedding dimension
+      // (how many lagged copies of the one input signal DMD gets to fit a transition matrix
+      // against), an implementation detail of "how", not a UI/UX decision - it stays fixed at
+      // n->rank's own default from here on, the same "no params" treatment Drift got.
+      if (n->input == nullptr)
+         ModSlider("constantIn", &n->constantIn, 0.0f, 1.0f, "%.2f");
    }
 
    // Field-declared params (`param float ...`) get explicit pin indices from
@@ -37721,6 +37846,7 @@ namespace
          { "Mod Curve", "Remaps a modulator through a draggable transfer curve - click empty space to add a point, drag to move it, right-click to remove it (or right-click empty space to reset to a straight line). The gridline marks 0.5, where a bipolar binding's 'no modulation' point lives, and the moving dot shows where the input currently sits on the curve. mix blends between the raw input and the curved output, so 0 is a true bypass." },
          { "Drift", "Learns where you leave each knob and how fast you move it, then keeps the knob going after you let go, settles it into your usual places and wanders between them at your pace. Speed scales the learned pace, Stray widens or narrows the wandering, Momentum is how long a release carries on, Link lets your live hand activity stir it: quiet knobs wake up while you play and settle when you stop. Shift-drag a driven knob to take over; the dot on the knob shows how much history backs it and the faint marks show where it is likely to go next. Freeze stores the learned profile in the patch." },
          { "Moves", "Your Moves macro faders: extracts the principal axes of your multi-knob gestures using PCA on deltas, letting a few macro faders drive many coupled parameters together in your style." },
+         { "Predictive Modulator", "Wire a modulator in and press Learn: it passes the signal through while it listens, fits a small dynamical model (Dynamic Mode Decomposition) of its shape, then on Stop free-runs that model on its own - decoupled from the live cable - instead of replaying the exact recording. Rank sets how many delayed copies of the signal the fit is built from (2, 3, 4 or 8); the readout shows the fit's spectral radius, how close the learned pattern sits to the edge of instability." },
          { "CV to Pitch", "Quantizes a modulator to semitone steps over range low..high, shown as a large +/-N st readout. Still outputs 0..1 like any modulator - it just restricts where in 0..1 the value can land, so the span maps onto whole semitones. Scale/root snap to scale degrees instead of every semitone (chromatic = off); glide adds portamento between steps, passing through unquantized values in transit on purpose." },
          { "Macro Knob", "A single named slider (0-1, with a response curve and invert) meant to be patched out to several other sliders at once - one control that fans out to many parameters." },
          { "Macro XY", "A 2D pad exposing X and Y as two separate modulator outputs from one drag. The pad's path can be recorded, looped and replayed in time, like Resynthesize's orb." },
@@ -38511,6 +38637,7 @@ namespace
                { "Mod Curve", "Remaps a modulator through a draggable transfer curve - an S-curve, staircase, or exponential response, all things a slider can't express." },
                { "Drift", "Learns where you leave a knob and how you move it, then continues, settles and wanders like you. Shift-drag a driven knob to correct it." },
                { "Moves", "Your Moves macro faders: few faders drive many parameters based on learned co-movement PCA." },
+               { "Predictive Modulator", "Learns a small dynamical model of a single patched-in modulator, then free-runs it on its own once Learn stops." },
             } },
             { "Macros", {
                { "Macro Controls", "Macro Knob, Macro Slider, Macro Bipolar Knob, Macro XY, Macro Toggle, Macro Trigger, Macro NumBox, Macro Radio Selector, and Macro Step Gate - unified live performance controls surfaced in the Performance Matrix." },
@@ -82560,9 +82687,11 @@ int main(int argc, char** argv)
             else if (auto* n = dynamic_cast<RandomNode*>(gn.node.get()))
                DrawRandomParams(n);
             else if (auto* n = dynamic_cast<DriftNode*>(gn.node.get()))
-               DrawDriftParams(n);
+               DrawDriftParams(gn, n);
             else if (auto* n = dynamic_cast<MovesNode*>(gn.node.get()))
                DrawMovesParams(n);
+            else if (auto* n = dynamic_cast<PredictiveModulatorNode*>(gn.node.get()))
+               DrawPredictiveModulatorParams(n);
             else if (auto* n = dynamic_cast<PatternNode*>(gn.node.get()))
                DrawPatternParams(n);
             else if (auto* n = dynamic_cast<MathNode*>(gn.node.get()))
@@ -86162,6 +86291,84 @@ int main(int argc, char** argv)
          if (ImGui::IsKeyPressed(ImGuiKey_Escape) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
          {
             gPerfAssigningElemIdx = -1;
+         }
+      }
+
+      // Predictive Drift Follow leader picker - identical click-to-assign UX to the
+      // performance-matrix picker just above, but resolves to a DriftNode's leaderNodeIndex/
+      // leaderParamIndex instead of a perf element target. Deliberately stores the target's
+      // *uid* (gNodes[nodeIndex].uid), not its index - an index is reused by
+      // RemoveNodeByIndex and would silently repoint Follow at a different node after an
+      // unrelated delete/undo, exactly the stability trap Modulation.h's own uid comment
+      // (ParamRef::uid) warns about.
+      if (gDriftFollowPickingUid != 0)
+      {
+         GraphNode* pickingGn = FindNodeByUid(gDriftFollowPickingUid);
+         DriftNode* pickingDrift = pickingGn != nullptr ? dynamic_cast<DriftNode*>(pickingGn->node.get()) : nullptr;
+         if (pickingDrift == nullptr)
+         {
+            gDriftFollowPickingUid = 0; // the node was deleted while picking
+         }
+         else
+         {
+            const ImVec2 mp = ImGui::GetMousePos();
+            int hoveredPinIdx = -1;
+            const ImVec2 graphTL = ed::ScreenToCanvas(gGraphScreenTL);
+            const ImVec2 graphBR = ed::ScreenToCanvas(
+               ImVec2(gGraphScreenTL.x + gGraphScreenSize.x, gGraphScreenTL.y + gGraphScreenSize.y));
+            const bool mouseOverGraph = (mp.x >= graphTL.x && mp.x <= graphBR.x &&
+                                         mp.y >= graphTL.y && mp.y <= graphBR.y);
+            if (mouseOverGraph)
+            {
+               for (size_t pi = 0; pi < gParamPinScreenList.size(); pi++)
+               {
+                  const auto& pInfo = gParamPinScreenList[pi];
+                  // Can't follow yourself - a self-target would drive the same slot
+                  // it's reading, an infinite feedback loop with no way to break it.
+                  if (pInfo.nodeIndex >= 0 && pInfo.nodeIndex < (int)gNodes.size() &&
+                      gNodes[pInfo.nodeIndex].uid == gDriftFollowPickingUid)
+                     continue;
+                  const bool inBounds = (mp.x >= pInfo.rowMin.x && mp.x <= pInfo.rowMax.x &&
+                                         mp.y >= pInfo.rowMin.y && mp.y <= pInfo.rowMax.y);
+                  const float dx = mp.x - pInfo.screenPos.x;
+                  const float dy = mp.y - pInfo.screenPos.y;
+                  if (inBounds || (dx * dx + dy * dy < 20.0f * 20.0f))
+                     hoveredPinIdx = (int)pi;
+               }
+            }
+            if (hoveredPinIdx >= 0)
+            {
+               const auto& pInfo = gParamPinScreenList[hoveredPinIdx];
+               {
+                  ImDrawList* hoverDl = ImGui::GetWindowDrawList();
+                  const ImU32 glowCol = IM_COL32(120, 200, 255, 28);
+                  const ImU32 ringCol = IM_COL32(120, 200, 255, 170);
+                  if (pInfo.isCircle)
+                  {
+                     hoverDl->AddCircleFilled(pInfo.shapeCenter, pInfo.shapeRadius, glowCol, 24);
+                     hoverDl->AddCircle(pInfo.shapeCenter, pInfo.shapeRadius, ringCol, 24, 1.0f);
+                  }
+                  else
+                  {
+                     hoverDl->AddRectFilled(pInfo.rowMin, pInfo.rowMax, glowCol, 4.0f);
+                     hoverDl->AddRect(pInfo.rowMin, pInfo.rowMax, ringCol, 4.0f, 0, 1.0f);
+                  }
+               }
+               ed::Suspend();
+               ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+               ImGui::SetTooltip("Follow leader -> %s: %s", pInfo.nodeTitle.c_str(), pInfo.paramName.c_str());
+               ed::Resume();
+               if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && pInfo.nodeIndex >= 0 &&
+                   pInfo.nodeIndex < (int)gNodes.size())
+               {
+                  PushUndoCheckpoint();
+                  pickingDrift->leaderNodeIndex = (int)gNodes[pInfo.nodeIndex].uid;
+                  pickingDrift->leaderParamIndex = pInfo.paramIndex;
+                  gDriftFollowPickingUid = 0;
+               }
+            }
+            if (ImGui::IsKeyPressed(ImGuiKey_Escape) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+               gDriftFollowPickingUid = 0;
          }
       }
 

@@ -200,9 +200,18 @@ namespace MovementStats
       bool valid = false;
       int rank = 0;
       std::vector<KeyId> keys;
-      std::vector<float> A;                      // rank x rank transition matrix (row-major)
+      // Affine transition: x2 = A[:, 0:rank] * x1 + A[:, rank] (row-major, rank rows x (rank+1)
+      // columns - the last column is the learned bias/equilibrium term, not part of the linear
+      // map, so it isn't touched by the stability scale-down FitDMD applies to the rest).
+      std::vector<float> A;
       float spectralRadius = 1.0f;
-      void Step(std::vector<float>& x) const;
+      // Per-dimension one-step residual std from the training fit - how much real data wandered
+      // around what the affine map alone predicts. Step() uses this to keep free-run alive
+      // instead of settling onto a silent fixed point once the deterministic part decays.
+      std::vector<float> noiseStd;
+      // rngState: pass a persistent seed (e.g. one field owned by the caller) to keep adding
+      // residual-scale noise across calls; pass nullptr for the old deterministic-only behavior.
+      void Step(std::vector<float>& x, uint64_t* rngState = nullptr) const;
    };
 
    // The statistics engine. Instantiable so tests and offline replay can run one in isolation;
@@ -255,6 +264,15 @@ namespace MovementStats
       // Lookup for readers. nullptr when the key has no stats.
       const ParamStats* Find(const KeyId& id) const;
       const ParamStats* FindProfile(const ProfileKey& k) const;
+      // How many grid samples this key has actually accumulated - what FitDMD's own N < 20
+      // rejection (see FitDMD) checks. A private, per-node Engine (Predictive Modulator) uses
+      // this to report real learning progress instead of a counter that isn't the number
+      // FitDMD actually looks at.
+      size_t HistoryLengthFor(const KeyId& id) const
+      {
+         const Runtime* r = FindRuntime(id);
+         return r != nullptr ? r->posHistory.size() : 0;
+      }
       double ActiveClock() const { return mActiveClock; }
       size_t KeyCount() const { return mKeys.size(); }
       size_t ProfileCount() const { return mProfiles.size(); }
