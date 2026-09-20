@@ -3456,6 +3456,21 @@ namespace
                                   dstNodeIndex, dstParamIndex) != nullptr;
    }
 
+   // Anything from the Prediction category that drives a parameter reads as "predicted"
+   // (green): Predictive LFO / Macro (IPredictor) and Predictive Modulator alike. Only the
+   // IPredictor ones also get the grab/ghost machinery above.
+   bool IsPredictionSourceNode(const GraphNode* gn)
+   {
+      return gn != nullptr && gn->node != nullptr &&
+             (gn->category == "Prediction" || dynamic_cast<IPredictor*>(gn->node.get()) != nullptr);
+   }
+
+   bool IsPredictionBinding(int nodeIndex, int paramIndex)
+   {
+      const Modulation::Source s = Modulation::Instance().ModulatorFor(nodeIndex, paramIndex);
+      return s.nodeIndex >= 0 && IsPredictionSourceNode(FindNodeByIndex(s.nodeIndex));
+   }
+
    // Fader position (0..1) <-> parameter value, honouring the widget's own taper when it has one.
    float ParamToPos(const ParamRef& r, float v)
    {
@@ -3665,7 +3680,7 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
       ImVec2 c(p.x + box * 0.5f, p.y + box * 0.5f);
       const bool isLight = IsThemeLight();
-      const bool predicted = modulated && PredictorForParam(nodeIndex, paramIndex) != nullptr;
+      const bool predicted = modulated && IsPredictionBinding(nodeIndex, paramIndex);
       const ImU32 pinColor = predicted
          ? (isLight ? IM_COL32(30, 150, 70, 255) : kPredictionPinCol)
          : modulated
@@ -4886,7 +4901,7 @@ namespace
       // margin afterwards, so it costs no row width at all.
       const ImVec2 cellOrigin = ImGui::GetCursorScreenPos();
       const float cell = cellW > 0.0f ? cellW : diameter;
-      const ImU32 pinColor = modulated && PredictorForParam(nodeIndex, paramIndex) != nullptr ? kPredictionPinCol
+      const ImU32 pinColor = modulated && IsPredictionBinding(nodeIndex, paramIndex) ? kPredictionPinCol
                             : modulated              ? IM_COL32(255, 190, 90, 255)
                             : hasExpr && !exprErrored ? IM_COL32(170, 130, 255, 255)
                                                       : IM_COL32(130, 138, 162, 255);
@@ -27420,8 +27435,7 @@ namespace
                // A predictor bound to a discrete param (only reachable via a patch file, paste or
                // undo - the cable drop refuses it) is inert: the apply loop never writes it.
                const bool inert = IsInertPredictorBinding(dstIndex, dstParam);
-               const bool isPred = srcNode != nullptr && srcNode->node != nullptr &&
-                                   dynamic_cast<IPredictor*>(srcNode->node.get()) != nullptr;
+               const bool isPred = IsPredictionSourceNode(srcNode);
                const ImU32 dotColour = (src.enabled && !inert)
                                           ? (isPred ? IM_COL32(34, 197, 94, 255) : IM_COL32(234, 179, 8, 255))
                                           : IM_COL32(110, 110, 120, 255);
@@ -38359,7 +38373,8 @@ namespace
       dl->AddRectFilled(origin, ImVec2(origin.x + kPreviewSize, origin.y + h),
                         ScopeBgCol(), 4.0f);
 
-      const bool isPredictor = dynamic_cast<IPredictor*>(mod) != nullptr;
+      const bool isPredictor = dynamic_cast<IPredictor*>(mod) != nullptr ||
+                               dynamic_cast<PredictiveModulatorNode*>(mod) != nullptr;
       const ImU32 lineCol = isPredictor ? IM_COL32(34, 197, 94, 255)
                                         : (isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(255, 190, 90, 255));
 
@@ -84875,6 +84890,13 @@ int main(int argc, char** argv)
                                                     srcIsModulator, srcPalette, srcGeometry, srcCamera,
                                                     srcLight, srcIsEnvironment,
                                                     srcIsAudioNode, srcIsNoteSource);
+                     // Predictive LFO / Macro write straight into parameters they are bound to; they
+                     // have no signal to hand on, so Smooth/Math/etc. would just read a dead value.
+                     if (valid && dynamic_cast<IPredictor*>(srcNode->node.get()) != nullptr)
+                     {
+                        valid = false;
+                        rejectReason = "Predictive LFO / Macro can only drive a parameter, knob or slider - not another node";
+                     }
                      if (valid && srcIsAudioNode &&
                          WouldCreateAudioCycle(srcNode->node.get(), dstNode->node.get()))
                      {
