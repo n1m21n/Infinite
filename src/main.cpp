@@ -6192,7 +6192,12 @@ namespace
                 ca.sampleDropped != cb.sampleDropped || ca.syncToTempo != cb.syncToTempo ||
                 ca.sampleBpm != cb.sampleBpm || ca.origBpm != cb.origBpm ||
                 ca.sourceDurationSeconds != cb.sourceDurationSeconds ||
-                ca.sourceOffsetSeconds != cb.sourceOffsetSeconds)
+                ca.sourceOffsetSeconds != cb.sourceOffsetSeconds ||
+                // Per-clip modulation bypass: without this a bypass toggle
+                // compares equal and ArrangeGestureEnd drops it as "no
+                // change", so it would never reach the undo stack - the same
+                // trap the Sample BPM fields above fell into.
+                ca.bypassedModParams != cb.bypassedModParams)
                return false;
          }
       }
@@ -6525,6 +6530,7 @@ namespace
             r.origBpm = c.origBpm;
             r.sourceDurationSeconds = c.sourceDurationSeconds;
             r.sourceOffsetSeconds = c.sourceOffsetSeconds;
+            r.bypassedModParams = c.bypassedModParams;
             s.clips.push_back(std::move(r));
          }
          data.streams.push_back(std::move(s));
@@ -6647,6 +6653,7 @@ namespace
             clip.origBpm = (c.origBpm > 0.0f) ? c.origBpm : 0.0f;
             clip.sourceDurationSeconds = c.sourceDurationSeconds;
             clip.sourceOffsetSeconds = c.sourceOffsetSeconds;
+            clip.bypassedModParams = c.bypassedModParams;
             lane.clips.push_back(std::move(clip));
          }
          m.lanes.push_back(std::move(lane));
