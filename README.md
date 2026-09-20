@@ -77,6 +77,10 @@ That's the one idea underneath the whole language: a **kernel**, run once per el
 
 Any element/pixel/sample kernel can also declare **dynamic pins** right in its code, adding real, cable-wireable, save/load-safe I/O to the node without touching C++. Finished devices — kernel plus params plus presets — save, load, export and import as portable `.field` files, so a Field patch is shareable like an audio plugin preset. The full language reference — syntax, domain-transfer operators, reserved words, and the complete node/format reference — is in the [Field Language Manual](Field_Language_Manual.pdf).
 
+<p align="center">
+  <img src="website/assets/field_pixel_editor.png" alt="Field Pixel Editor" width="550">
+</p>
+
 ---
 
 ## Installation & Quick Start
