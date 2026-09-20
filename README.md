@@ -7,7 +7,7 @@
 
 A unified node-based audiovisual modular workstation for **macOS**, **Windows**, and **Linux**. Real-time GPU image/video compositing, procedural 3D geometry and physics, and a full modular synthesizer rack with native AU and VST3 plugin hosting — all interconnected through a universal modulation graph. Most nodes do one fixed thing; **Field**, Infinite's embedded programming language, lets you write what a node does instead.
 
-![Infinite Screenshot](docs/screenshot.png)
+![Infinite Screenshot](website/assets/screenshot.png)
 
 ---
 
