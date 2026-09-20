@@ -631,6 +631,10 @@ namespace
    // ModSlider and friends (the widgets that call it) are among the first
    // functions in the file.
    void PushUndoCheckpoint();
+   // Defined beside the undo stack below; declared here because
+   // ArrangeMakeClipSourceUnique (also far above it) has to hold a
+   // suppression region open across a spawn.
+   extern bool gSuppressUndoCheckpoints;
    // Timeline-only undo entry: see UndoEntry::arrangeOnly. Declared here
    // because the arrangement panel (far above the undo machinery in file
    // order) is its only caller.
@@ -30927,6 +30931,129 @@ namespace
       gArrangePendingImports.push_back(pending);
    }
 
+   // Hover detail for the shared-source warning. The warning itself is one
+   // line by design - the explanation is real but nobody needs it on every
+   // frame they have that clip selected, so it lives here, behind a hover,
+   // for the moment they want to know why.
+   void ArrangeSharedSourceTooltip(const char* body)
+   {
+      if (!ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+         return;
+      ImGui::BeginTooltip();
+      ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);
+      ImGui::TextUnformatted(body);
+      ImGui::PopTextWrapPos();
+      ImGui::EndTooltip();
+   }
+
+   // "Make Unique": gives this clip its own copy of its source node, so two
+   // clips sharing one node stop fighting over the node's single playback
+   // position (the conflict the inspector warns about).
+   //
+   // A dropped Sample already has a purpose-built path for this - its node
+   // owns a decoded file and a stretcher, which must be re-decoded rather
+   // than parameter-copied - so that case defers to ArrangeRespawnCloneNode.
+   // Everything else is an ordinary graph node and is cloned the same way
+   // Shift+D clones one: same type, same params, and every link *landing on*
+   // it re-established onto the copy via the cluster clipboard, so the copy
+   // arrives fed by the same upstream and carrying the same modulations
+   // rather than as a bare default node.
+   //
+   // The copy is a normal visible canvas node, not hidden: a hidden node's
+   // param pins never re-register for modulation, which would leave the
+   // clip's own Modulations list permanently empty - the opposite of what
+   // someone pressing this button wants.
+   //
+   // The clip's bypass list survives untouched: it stores paramIndex values,
+   // and the copy is the same node type, so index N is the same parameter on
+   // the copy as it was on the original.
+   bool ArrangeMakeClipSourceUnique(uint64_t clipId)
+   {
+      Arrange::Clip* c = Arrange::FindClip(gArrange, clipId);
+      if (c == nullptr)
+         return false;
+
+      // One FULL checkpoint for the whole button press, not ArrangeEdit's
+      // arrange-only snapshot: this changes the graph (a node appears) and
+      // the timeline (srcUid moves) together, and an arrange-only undo would
+      // put srcUid back while leaving the copy stranded on the canvas.
+      // Suppressing for the duration also stops SpawnNode pushing a second
+      // checkpoint of its own, which would make one button two undos.
+      const bool wasSuppressed = gSuppressUndoCheckpoints;
+      PushUndoCheckpoint();
+      gSuppressUndoCheckpoints = true;
+      struct Restore
+      {
+         bool prev;
+         ~Restore() { gSuppressUndoCheckpoints = prev; }
+      } restore{ wasSuppressed };
+
+      if (c->sampleDropped)
+      {
+         ArrangeRespawnCloneNode(clipId);
+         ArrangeCommitEdit();
+         return true;
+      }
+
+      GraphNode* srcNode = FindNodeByUid(c->srcUid);
+      if (srcNode == nullptr)
+         return false;
+
+      // Resolved before SpawnNode, which can reallocate gNodes and invalidate
+      // every GraphNode* taken above.
+      const int origIndex = srcNode->index;
+      const std::string typeName = srcNode->typeName;
+      const std::string category = srcNode->category;
+      const bool showParams = srcNode->showParams;
+      const bool showMiniViewport = srcNode->showMiniViewport;
+      const bool showAdvancedParams = srcNode->showAdvancedParams;
+      INode* srcImpl = srcNode->node.get();
+
+      ClusterClipboard cluster;
+      CaptureClusterLinks({ origIndex }, cluster);
+
+      ed::EditorContext* prevEditor = ed::GetCurrentEditor();
+      ed::SetCurrentEditor(gEditor);
+      const ImVec2 origPos = ed::GetNodePosition(srcNode->NodeId());
+      ed::SetCurrentEditor(prevEditor);
+      const ImVec2 pos = FindFreeSpawnPosition(ImVec2(origPos.x + 60.0f, origPos.y + 60.0f));
+
+      GraphNode* copy = SpawnNode(typeName, category, pos.x, pos.y);
+      if (copy == nullptr)
+         return false;
+
+      CopyParams(copy->node.get(), srcImpl);
+      // Same identity divergence Shift+D applies: a copy that kept the
+      // original's seed/ownership map would not be an independent voice, it
+      // would be the original running twice.
+      if (auto* rn = dynamic_cast<RandomNode*>(copy->node.get()))
+         rn->seed = RandomNode::NextSeed();
+      if (auto* fgn = dynamic_cast<FieldGraphNode*>(copy->node.get()))
+      {
+         fgn->SetUid(FieldGraphNode::NewUid());
+         fgn->Ownership() = Field::GraphOwnershipMap();
+         fgn->ownershipText.clear();
+      }
+      copy->showParams = showParams;
+      copy->showMiniViewport = showMiniViewport;
+      copy->showAdvancedParams = showAdvancedParams;
+
+      std::map<int, GraphNode*> newByOrig;
+      newByOrig[origIndex] = copy;
+      ApplyClusterLinks(newByOrig, cluster);
+
+      // Re-found: ApplyClusterLinks spawns nothing, but FindClip's pointer
+      // predates SpawnNode's possible reallocation of unrelated storage, and
+      // re-finding is cheaper than reasoning about which containers moved.
+      if (Arrange::Clip* live = Arrange::FindClip(gArrange, clipId))
+      {
+         live->srcUid = copy->uid;
+         gArrange.revision++;
+      }
+      ArrangeCommitEdit();
+      return true;
+   }
+
    // Main thread, once per frame (called from DrawArrangePanelContent - the
    // Arrange panel is the only consumer of import results, same as
    // SampleScanner/PluginScanner only ever poll from the panel that shows
@@ -38768,7 +38895,8 @@ namespace
          ImGui::TextWrapped(
             "Two clips on different tracks should not share one source node: there is one "
             "playback position per node, so they cannot be retriggered independently. The "
-            "inspector warns you when that happens - duplicate the source node instead.");
+            "inspector warns you when that happens, with a Make Unique button that gives the "
+            "clip its own copy of the node - same inputs, same modulations, its own position.");
          ImGui::Spacing();
          ImGui::TextWrapped(
             "Right-click a track or group header to render or export just that track or "
@@ -40701,14 +40829,17 @@ namespace
          {
             ImGui::Spacing();
             ImGui::TextDisabled("Source");
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + fieldW);
-            ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.2f, 1.0f),
-               "This clip's source is also used on another video track. A video clip does not "
-               "hold its own playback position - the source reads the global transport - so both "
-               "clips show the same frame, and wherever they overlap the upper track hides this "
-               "one's blend mode, opacity and grade. Give it its own node (Duplicate) unless the "
-               "double composite is deliberate.");
-            ImGui::PopTextWrapPos();
+            // One line, not a paragraph: the button beside it is the whole
+            // fix, and the reasoning belongs in a tooltip the user opens
+            // when they want it rather than in permanent panel text.
+            ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.2f, 1.0f), "Shared with another video track.");
+            ArrangeSharedSourceTooltip(
+               "Both clips show the same frame - a video source reads the global transport, not "
+               "the clip - and where they overlap the upper track hides this one's blend mode, "
+               "opacity and grade.\n\nMake Unique gives this clip its own copy of the node, fed "
+               "by the same inputs and carrying the same modulations.");
+            if (ImGui::Button("Make Unique##clipuniquevideo", ImVec2(-FLT_MIN, 0)))
+               ArrangeMakeClipSourceUnique(clipId); // takes its own full checkpoint
          }
 
          // Every audio clip position-locks its source now (see RunTopology's
@@ -40719,13 +40850,14 @@ namespace
          {
             ImGui::Spacing();
             ImGui::TextDisabled("Playback & Trigger");
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + fieldW);
-            ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.2f, 1.0f),
-               "This clip's source is also used on another track. The node holds one playback "
-               "position and both tracks set it every block, so whichever is summed last wins and "
-               "this clip can end up playing the other one's position. Give it its own node "
-               "(Duplicate).");
-            ImGui::PopTextWrapPos();
+            ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.2f, 1.0f), "Shared with another track.");
+            ArrangeSharedSourceTooltip(
+               "The node holds one playback position and both tracks set it every block, so "
+               "whichever is summed last wins and this clip can end up playing the other one's "
+               "position.\n\nMake Unique gives this clip its own copy of the node, fed by the "
+               "same inputs and carrying the same modulations.");
+            if (ImGui::Button("Make Unique##clipuniqueaudio", ImVec2(-FLT_MIN, 0)))
+               ArrangeMakeClipSourceUnique(clipId); // takes its own full checkpoint
          }
 
          ImGui::Spacing();
@@ -40958,11 +41090,6 @@ namespace
                      ImGui::PopID();
                   }
                   PopCheckboxStyle();
-                  // A bypassed param falls back to the value its knob held
-                  // when the modulator was patched in - say so, because
-                  // "off" could otherwise be read as "frozen where it was".
-                  if (!clip->bypassedModParams.empty())
-                     ImGui::TextDisabled("Unticked params hold their pre-modulation value.");
                }
             }
 
@@ -73398,6 +73525,67 @@ int main(int argc, char** argv)
                printf("clip mod bypass base value: %s (%.1f, clamped %.1f)\n",
                       dOk ? "OK" : "FAIL", inRange, clamped);
                allOk = allOk && dOk;
+            }
+            // --- E. Make Unique ----------------------------------------
+            // The escape hatch offered beside the shared-source warning.
+            // It has to leave the clip on a DIFFERENT node that is
+            // nonetheless still modulated (the copy is rewired through the
+            // cluster clipboard, not spawned bare) and still carrying this
+            // clip's own bypass list, which is keyed by paramIndex and so
+            // survives the swap only because the copy is the same type.
+            {
+               gArrange = Arrange::Model();
+               const uint64_t laneId = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
+               Arrange::Clip c;
+               c.start = 0;
+               c.length = Arrange::kPPQ * 4;
+               c.srcUid = oscUid;
+               uint64_t clipId = 0;
+               Arrange::PlaceOverwrite(gArrange, laneId, c, &clipId);
+               if (Arrange::Clip* live = Arrange::FindClip(gArrange, clipId))
+                  live->SetModBypassed(kParam, true);
+
+               const size_t nodesBefore = gNodes.size();
+               const size_t undoBefore = gUndoStack.size();
+               const bool made = clipId != 0 && ArrangeMakeClipSourceUnique(clipId);
+
+               // One press must be one undo, and it must be a FULL entry:
+               // this moves the graph and the timeline together, and an
+               // arrangeOnly entry would restore srcUid while leaving the
+               // copy stranded on the canvas.
+               const bool oneUndo = gUndoStack.size() == undoBefore + 1 &&
+                                    !gUndoStack.back().arrangeOnly;
+
+               const Arrange::Clip* after = Arrange::FindClip(gArrange, clipId);
+               const bool repointed = after != nullptr && after->srcUid != oscUid &&
+                                      after->srcUid != 0;
+               const bool bypassKept = after != nullptr && after->IsModBypassed(kParam);
+               GraphNode* copy = (after != nullptr) ? FindNodeByUid(after->srcUid) : nullptr;
+               const bool sameType = copy != nullptr && copy->typeName == "Oscillator";
+               const bool visible = copy != nullptr && !copy->hiddenFromCanvas;
+
+               // The whole point: the copy must arrive modulated, so the
+               // clip's own Modulations list is not empty the moment the
+               // user presses the button.
+               std::vector<std::pair<int, std::string>> copyBound;
+               if (copy != nullptr)
+                  ArrangeCollectClipModBindings(*copy, copyBound);
+               const bool modCarried = copyBound.size() == 1;
+               // ...and the original must keep its own binding, not lose it.
+               std::vector<std::pair<int, std::string>> origBound;
+               if (GraphNode* orig = FindNodeByUid(oscUid))
+                  ArrangeCollectClipModBindings(*orig, origBound);
+               const bool origKept = origBound.size() == 1;
+               const bool spawnedOne = gNodes.size() == nodesBefore + 1;
+
+               const bool eOk = made && repointed && bypassKept && sameType && visible &&
+                                modCarried && origKept && spawnedOne && oneUndo;
+               printf("clip mod bypass make unique: %s (repoint=%d type=%d vis=%d copyMods=%d origMods=%d +%d node, undo=%d full)\n",
+                      eOk ? "OK" : "FAIL", repointed ? 1 : 0, sameType ? 1 : 0, visible ? 1 : 0,
+                      (int)copyBound.size(), (int)origBound.size(),
+                      (int)(gNodes.size() - nodesBefore),
+                      (int)(gUndoStack.size() - undoBefore));
+               allOk = allOk && eOk;
             }
          }
 
