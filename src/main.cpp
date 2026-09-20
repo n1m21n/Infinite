@@ -62375,7 +62375,7 @@ int RunNetworkTest()
    std::string body;
    std::string error;
    const std::string url = "https://api.github.com/repos/n1m21n/Infinite/releases/latest";
-   const std::string ua = "Infinite-CI-SelfTest/0.4.0";
+   const std::string ua = "Infinite-CI-SelfTest/0.4.2";
    printf("Testing HttpGet against %s...\n", url.c_str());
    bool ok = Platform::HttpGet(url, ua, body, error, /*timeoutSeconds=*/15);
    if (!ok)
