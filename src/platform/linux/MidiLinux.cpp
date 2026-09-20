@@ -50,6 +50,7 @@
 // events with no real /dev/snd/seq, and does so on every CI job.
 
 #include "../Platform.h"
+#include "../common/MidiCC14.h"
 
 #include <alsa/asoundlib.h>
 
@@ -112,6 +113,7 @@ namespace
       std::map<CcKey, float> values;
       std::map<CcKey, unsigned int> noteHits;
       std::map<ChannelKey, Platform::MidiLastNote> channelLast;
+      MidiCC14::Tracker cc14;
       Platform::MidiCCValue lastTouched;
       bool lastTouchedPending = false;
 
@@ -292,12 +294,14 @@ namespace
          {
             const int channel = ev.data.control.channel;
             const int controller = ev.data.control.param;
-            const float value01 = std::clamp((float)ev.data.control.value / 127.0f, 0.0f, 1.0f);
             std::lock_guard<std::mutex> lock(gState.mutex);
-            gState.values[{ dev, channel, controller, false }] = value01;
+            const MidiCC14::Event cc = gState.cc14.OnCC(dev, channel, controller,
+                                                        std::clamp((int)ev.data.control.value, 0, 127), MidiCC14::NowMs());
+            const float value01 = cc.value01;
+            gState.values[{ dev, channel, cc.controller, false }] = value01;
             gState.lastTouched.device = dev;
             gState.lastTouched.channel = channel;
-            gState.lastTouched.controller = controller;
+            gState.lastTouched.controller = cc.controller;
             gState.lastTouched.isNote = false;
             gState.lastTouched.value01 = value01;
             gState.lastTouchedPending = true;
@@ -605,6 +609,8 @@ namespace Platform
    bool MidiRead(MidiDeviceId device, int channel, int controller, bool isNote, float& outValue01)
    {
       std::lock_guard<std::mutex> lock(gState.mutex);
+      if (!isNote)
+         controller = gState.cc14.Resolve(device, channel, controller);
       const auto it = gState.values.find({ device, channel, controller, isNote });
       if (it == gState.values.end())
       {
@@ -700,6 +706,7 @@ namespace PlatformLinuxTestHooks
    {
       std::lock_guard<std::mutex> lock(gState.mutex);
       gState.values.clear();
+      gState.cc14.Clear();
       gState.noteHits.clear();
       gState.channelLast.clear();
       gState.lastTouched = Platform::MidiCCValue{};

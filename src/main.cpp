@@ -12,6 +12,7 @@
 #endif
 
 #include "imgui.h"
+#include "platform/common/MidiCC14.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_node_editor.h"
@@ -60032,6 +60033,73 @@ static int RunMidiParseTest()
 }
 #endif
 
+// ======================================================= INFINITE_MIDICC14TEST
+// Pure header test (platform/common/MidiCC14.h): a Pioneer-style 14-bit
+// knob (coarse CC n, fine CC n+32) must publish one smooth value under the
+// coarse controller and never as a separate 0..1 sweep on the fine one.
+static int RunMidiCC14Test()
+{
+   bool ok = true;
+   auto check = [&](bool cond, const char* what) {
+      if (!cond)
+      {
+         printf("MIDICC14TEST FAIL: %s\n", what);
+         ok = false;
+      }
+   };
+   auto near = [](float a, float b) { return std::fabs(a - b) < 1e-4f; };
+
+   MidiCC14::Tracker t;
+   // Coarse then fine within a millisecond, CC 1 / CC 33.
+   MidiCC14::Event e = t.OnCC(1, 0, 1, 64, 1000);
+   check(e.controller == 1 && near(e.value01, 64.0f / 127.0f), "lone coarse byte publishes 7-bit value");
+   e = t.OnCC(1, 0, 33, 100, 1001);
+   check(e.controller == 1, "fine byte folds into the coarse controller");
+   check(near(e.value01, (float)((64 << 7) | 100) / 16383.0f), "coarse+fine combine to 14 bits");
+   check(t.Resolve(1, 0, 33) == 1, "fine controller resolves to coarse once paired");
+
+   // Slow knob: every coarse step comes with fine bytes sweeping 0..127. The
+   // published stream must be monotonic - the bug was a sawtooth.
+   int64_t now = 2000;
+   t.OnCC(1, 0, 1, 62, now);
+   e = t.OnCC(1, 0, 33, 0, now + 1);
+   float prev = e.value01;
+   bool monotonic = true;
+   for (int v14 = 8000; v14 < 8600; ++v14)
+   {
+      const int msb = v14 >> 7, lsb = v14 & 0x7F;
+      e = t.OnCC(1, 0, 1, msb, now);
+      float out = e.value01;
+      if (out < prev - 1e-6f) monotonic = false;
+      prev = out;
+      e = t.OnCC(1, 0, 33, lsb, now + 1);
+      if (e.value01 < prev - 1e-6f) monotonic = false;
+      prev = e.value01;
+      now += 5;
+   }
+   check(monotonic, "slow 14-bit sweep publishes a monotonic stream");
+
+   // A plain 7-bit fine-range CC with no coarse partner stays untouched.
+   MidiCC14::Tracker u;
+   e = u.OnCC(1, 0, 40, 90, 5000);
+   check(e.controller == 40 && near(e.value01, 90.0f / 127.0f), "unpaired CC 40 stays a plain CC");
+   check(u.Resolve(1, 0, 40) == 40, "unpaired CC 40 does not remap");
+
+   // A stale coarse byte (outside the pairing window) does not claim the CC.
+   u.OnCC(1, 0, 8, 10, 6000);
+   e = u.OnCC(1, 0, 40, 5, 6500);
+   check(e.controller == 40, "fine byte long after coarse is not paired");
+
+   // Channel / device isolation.
+   e = t.OnCC(2, 0, 33, 7, 9000);
+   check(e.controller == 33, "pairing is per device");
+   e = t.OnCC(1, 1, 33, 7, 9000);
+   check(e.controller == 33, "pairing is per channel");
+
+   printf("%s\n", ok ? "MIDICC14TEST OK" : "MIDICC14TEST FAIL");
+   return ok ? 0 : 1;
+}
+
 // ===================================================== INFINITE_AUDIOPARAMSWEEPTEST
 //
 // Generic sweep, not a fixture per node (docs/plans/audio/README.md §4/§7):
@@ -63416,6 +63484,9 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_AUDIOPCMTEST") != nullptr)
       return Platform::AudioPcmConversionSelfTest() ? 0 : 1;
+
+   if (getenv("INFINITE_MIDICC14TEST") != nullptr)
+      return RunMidiCC14Test();
 
 #if defined(__linux__)
    if (getenv("INFINITE_MIDIPARSETEST") != nullptr)

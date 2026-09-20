@@ -1,5 +1,6 @@
 #include "Platform.h"
 #include "PluginVST3.h"
+#include "common/MidiCC14.h"
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
@@ -4348,6 +4349,7 @@ namespace Platform
          std::unordered_map<MidiKey, unsigned int, MidiKeyHash> noteHitCounts;
          std::unordered_map<MidiDeviceChannelKey, MidiLastNote, MidiDeviceChannelKeyHash> lastNotePerChannel;
          std::unordered_map<MidiDeviceId, std::string> deviceNames;
+         MidiCC14::Tracker cc14;
          MidiCCValue lastTouched;
          bool lastTouchedPending = false;
       };
@@ -4430,11 +4432,12 @@ namespace Platform
          if (hiNibble == 0xB0 && len >= 3)
          {
             // Control Change
-            MidiKey key{ device, channel, (int)data[1], false };
-            const float v = (float)data[2] / 127.0f;
             std::lock_guard<std::mutex> lock(gMidiState.mutex);
+            const MidiCC14::Event ev = gMidiState.cc14.OnCC(device, channel, (int)data[1], (int)data[2], MidiCC14::NowMs());
+            MidiKey key{ device, channel, ev.controller, false };
+            const float v = ev.value01;
             gMidiState.values[key] = v;
-            gMidiState.lastTouched = MidiCCValue{ device, channel, (int)data[1], false, v };
+            gMidiState.lastTouched = MidiCCValue{ device, channel, ev.controller, false, v };
             gMidiState.lastTouchedPending = true;
          }
          else if (hiNibble == 0x80 && len >= 3)
@@ -4602,6 +4605,7 @@ namespace Platform
       {
          std::lock_guard<std::mutex> lock(gMidiState.mutex);
          gMidiState.values.clear();
+         gMidiState.cc14.Clear();
          gMidiState.noteHitCounts.clear();
          gMidiState.lastNotePerChannel.clear();
          gMidiState.deviceNames.clear();
@@ -4631,8 +4635,10 @@ namespace Platform
          outValue01 = 0.0f;
          return false;
       }
-      MidiKey key{ device, channel, controller, isNote };
       std::lock_guard<std::mutex> lock(gMidiState.mutex);
+      if (!isNote)
+         controller = gMidiState.cc14.Resolve(device, channel, controller);
+      MidiKey key{ device, channel, controller, isNote };
       auto it = gMidiState.values.find(key);
       if (it == gMidiState.values.end())
       {
