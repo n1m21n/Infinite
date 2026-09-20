@@ -19998,7 +19998,7 @@ namespace
    {
       for (int b = 0; b < 5; b++)
       {
-         bands[b].type = std::clamp((int)(n->Param(kEqTypeParam[b]) + 0.5f), 0, EqDsp::kNumBandTypes - 1);
+         bands[b].type = EqDsp::SanitizeType(n->Param(kEqTypeParam[b]));
          bands[b].freq = n->Param(kEqFreqParam[b]);
          bands[b].q = n->Param(kEqQParam[b]);
          bands[b].gain = n->Param(kEqGainParam[b]);
