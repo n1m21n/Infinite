@@ -1216,6 +1216,13 @@ namespace Platform
                if (ConfigureCameraFormat(reader, (CameraResolution)wanted, nw, nh, nstride, err))
                {
                   applied = (CameraResolution)wanted;
+                  // w/h must move with the stride. They used to keep the old
+                  // frame size, so the first sample after a switch (say
+                  // 1600x1200 -> 1080p) was converted using the old height
+                  // against a smaller buffer - an out-of-bounds read that
+                  // killed the app the moment a fixed resolution was chosen.
+                  w = nw;
+                  h = nh;
                   stride = nstride;
                   std::lock_guard<std::mutex> lock(cam->frameMutex);
                   cam->width = (int)nw;
@@ -1240,7 +1247,15 @@ namespace Platform
             if (SUCCEEDED(sample->ConvertToContiguousBuffer(&buffer)))
             {
                BYTE* data = nullptr;
-               if (SUCCEEDED(buffer->Lock(&data, nullptr, nullptr)))
+               DWORD curLen = 0;
+               if (SUCCEEDED(buffer->Lock(&data, nullptr, &curLen)) &&
+                   (size_t)curLen < (size_t)std::abs(stride != 0 ? stride : (LONG)(w * 4)) * (size_t)h)
+               {
+                  // Buffer is smaller than the size we think it is (a format
+                  // change in flight): drop the frame rather than read past it.
+                  buffer->Unlock();
+               }
+               else if (data != nullptr)
                {
                   // Negotiated stride, never an assumed width * 4. A negative
                   // value means bottom-up, which is RGB32's default and what
