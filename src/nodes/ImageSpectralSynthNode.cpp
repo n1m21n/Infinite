@@ -684,8 +684,9 @@ public:
       const int filterShape = SynthModes::FilterShapeOf(filterType);
       if (isComb)
       {
-         mCombL.SetParams(cutoff, resonance, SynthModes::CombIsNegative(filterType), mSampleRate);
-         mCombR.SetParams(cutoff, resonance, SynthModes::CombIsNegative(filterType), mSampleRate);
+         const float combFb = DspMath::CombFeedbackFromResonance(resonance);
+         mCombL.SetParams(cutoff, combFb, SynthModes::CombIsNegative(filterType), mSampleRate);
+         mCombR.SetParams(cutoff, combFb, SynthModes::CombIsNegative(filterType), mSampleRate);
       }
       else if (filterStages > 0)
       {

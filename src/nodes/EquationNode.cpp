@@ -481,7 +481,7 @@ private:
          float in[2] = { sumL, sumR };
          for (int c = 0; c < 2; c++)
          {
-            v.comb[c].SetParams(clampedHz, resonance, negative, mSampleRate);
+            v.comb[c].SetParams(clampedHz, DspMath::CombFeedbackFromResonance(resonance), negative, mSampleRate);
             *chans[c] = v.comb[c].Process(in[c]);
          }
          return;

@@ -300,8 +300,9 @@ public:
                // would double-advance that smoother's one-sample-per-call state.
                const float rawResonance = std::clamp((resQ - 0.5f) / 8.0f, 0.0f, 1.0f);
                const bool negative = SynthModes::CombIsNegative(synthFilterType);
-               mCombL.SetParams(cutoffHz, rawResonance, negative, mSampleRate);
-               mCombR.SetParams(cutoffHz, rawResonance, negative, mSampleRate);
+               const float combFb = DspMath::CombFeedbackFromResonance(rawResonance);
+               mCombL.SetParams(cutoffHz, combFb, negative, mSampleRate);
+               mCombR.SetParams(cutoffHz, combFb, negative, mSampleRate);
                sL = mCombL.Process(sL);
                sR = mCombR.Process(sR);
             }

@@ -545,15 +545,43 @@ namespace DspMath
       }
    };
 
+   // Knob position (0..1) -> comb feedback. Both families of comb call site
+   // land here so one knob position means one sound everywhere.
+   //
+   // Not the identity map it used to be. A feedback comb's tooth depth is a
+   // brutally non-linear function of g: the ripple between a peak and a
+   // notch is 0.9 dB at g = 0.05, 2.6 dB at 0.15, 9.5 dB at 0.5 and 52 dB at
+   // 0.995. Feeding a 0..1 knob in raw therefore spends its entire lower half
+   // on differences no one can hear - and puts g = 0 at "exactly a wire",
+   // since y[n] = x[n] + g*y[n-M] with g = 0 is the input unchanged. Selecting
+   // "comb +" at any ordinary resonance setting did nothing audible, and the
+   // cutoff knob it greyed out (see SynthModes::FilterUsesCutoff) had nothing
+   // to control.
+   //
+   // Instead the knob is linear in the comb's *peak gain in dB*, which is
+   // roughly how the depth is heard: 4 dB at zero, 40 dB at full. Zero is a
+   // shallow comb rather than a bypass, because for a comb the resonance is
+   // not an optional extra on top of a filter - it IS the filter, and the
+   // choice of "comb" in the type dropdown is the request for one.
+   inline float CombFeedbackFromResonance(float resonance01)
+   {
+      constexpr float kPeakDbMin = 4.0f, kPeakDbMax = 40.0f;
+      const float r = std::clamp(resonance01, 0.0f, 1.0f);
+      const float peakDb = kPeakDbMin + (kPeakDbMax - kPeakDbMin) * r;
+      const float g = 1.0f - powf(10.0f, -peakDb / 20.0f);
+      return std::clamp(g, 0.0f, 0.995f);
+   }
+
    // Comb has no continuous-Q concept of its own, so every filter node that
    // adds it repurposes its existing 0.1..18.0 "Q" knob as "how much ring" -
    // the same way those knobs already repurpose "gain" as a no-op for LP/HP
-   // types. One shared mapping so every node's comb sounds the same at the
-   // same knob position.
+   // types. Normalises to 0..1 and defers to the shared law above rather than
+   // carrying a second one; before that it was a bare linear map into g, so
+   // the Filter node's comb at its default Q of 1.0 was a 0.9 dB ripple.
    inline float CombFeedbackFromQ(float q)
    {
       constexpr float kQMin = 0.1f, kQMax = 18.0f;
-      return std::clamp((q - kQMin) / (kQMax - kQMin), 0.0f, 1.0f) * 0.995f;
+      return CombFeedbackFromResonance((q - kQMin) / (kQMax - kQMin));
    }
 
    // Closed-form |H(e^jw)| of a feedback comb y[n] = x[n] + g*y[n-M], in dB:
