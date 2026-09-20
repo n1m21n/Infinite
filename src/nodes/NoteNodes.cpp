@@ -11,6 +11,7 @@
 #include "audio/AudioVoice.h"
 #include "audio/DspMath.h"
 #include "audio/MusicTime.h"
+#include "audio/NoteTheory.h"
 #include "audio/NoteEventQueue.h"
 #include "core/Transport.h"
 #include "platform/Platform.h"
@@ -3006,6 +3007,7 @@ public:
       mCurrentOutVoiceId = 0;
       mPendingOffActive = false;
       mPrevNote = -1;
+      mMelody = NoteTheory::MelodyState();
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
@@ -3045,10 +3047,17 @@ public:
       {
          mLastStep = step;
 
-         const int base = (mPrevNote >= 0) ? mPrevNote : (rangeLow + rangeHigh) / 2;
-         const int delta = (int)std::lround(mRng.Next() * (float)maxStep);
-         const int raw = std::clamp(base + delta, 0, 127);
-         const int note = MusicTime::SnapToScaleInRange(raw, root, scale, rangeLow, rangeHigh);
+         // Constrained melodic walk (proximity, gap fill, tonal stability, centre pull, phrase
+         // cadence) over the in-scale notes of the range - see NoteTheory::PickMelodyNote.
+         int scaleNotes[NoteTheory::kMaxScaleNotes];
+         const int nScaleNotes = NoteTheory::CollectScaleNotes(root, scale, rangeLow, rangeHigh, scaleNotes,
+                                                               NoteTheory::kMaxScaleNotes);
+         const double stepBeatPos = (double)step * rateBeats;
+         const float metric = NoteTheory::MetricStrength(stepBeatPos, Transport::Instance().BeatsPerBar());
+         const float u01 = mRng.Next() * 0.5f + 0.5f;
+         int note = NoteTheory::PickMelodyNote(mMelody, scaleNotes, nScaleNotes, root, maxStep, metric, u01);
+         if (note < 0)
+            note = MusicTime::SnapToScaleInRange((rangeLow + rangeHigh) / 2, root, scale, rangeLow, rangeHigh);
          mPrevNote = note;
          mLastNoteReadout.store(note, std::memory_order_relaxed);
 
@@ -3083,7 +3092,8 @@ public:
 
          NoteEvent on;
          on.note = note;
-         on.velocity = 0.6f + (mRng.Next() * 0.5f + 0.5f) * 0.3f;
+         // Accent the bar line and the beat, keep a little random spread on top.
+         on.velocity = std::clamp(0.55f + 0.25f * metric + (mRng.Next() * 0.5f + 0.5f) * 0.15f, 0.05f, 1.0f);
          on.isNoteOn = true;
          on.frameOffset = swingFrame;
          on.source = this;
@@ -3134,6 +3144,7 @@ private:
    int mCurrentOutNote = -1;
    int mCurrentOutVoiceId = 0;
    int mPrevNote = -1;
+   NoteTheory::MelodyState mMelody;
    bool mPendingOffActive = false;
    uint64_t mPendingOffSample = 0;
 
@@ -3201,6 +3212,9 @@ public:
       mSampleRate = sampleRate;
       mSamplePos = 0;
       mLastStep = -1;
+      mPrevDegree = 0;
+      mPrevVoicingN = 0;
+      mStrumDown = true;
       for (int i = 0; i < kMaxPending; i++)
          mPending[i].active = false;
    }
@@ -3225,30 +3239,45 @@ public:
          mLastStep = step;
 
          const int degreeCount = std::max(1, MusicTime::ScaleTable(scale).count);
-         const int startDegree = (int)((mRng.Next() * 0.5f + 0.5f) * (float)degreeCount);
+         // Root by functional-harmony transition (I->IV/V, V->I ...), not a uniform draw.
+         const int rootDegree =
+            NoteTheory::NextChordDegree(mPrevDegree, degreeCount, mRng.Next() * 0.5f + 0.5f);
+         mPrevDegree = rootDegree;
          const double bpm = (double)Transport::Instance().Tempo();
          const double samplesPerBeat = mSampleRate * 60.0 / std::max(1.0, bpm);
          const double strumSamples = strumMs * 0.001 * mSampleRate;
-         const double gateSamples = (double)rateBeats * samplesPerBeat * 0.6; // fixed 60% gate
+         const double gateSamples = (double)rateBeats * samplesPerBeat * 0.85; // held, then a clean release
 
+         // Voice-led: the inversion and octave nearest the previous chord, so the top line moves
+         // by step instead of jumping to a new root position every time.
          int notes[kMaxChordNotes];
-         int n = 0;
-         for (int i = 0; i < chordSize && n < kMaxChordNotes; i++)
-         {
-            notes[n++] = std::clamp(MusicTime::DegreeToNote(startDegree + i * 2, 4, root, scale), 0, 127);
-         }
+         int n = NoteTheory::VoiceChord(rootDegree, chordSize, root, scale, mPrevVoicing, mPrevVoicingN, notes);
+         for (int i = 0; i < n; i++)
+            mPrevVoicing[i] = notes[i];
+         mPrevVoicingN = n;
          if (n < kMaxChordNotes && (mRng.Next() * 0.5f + 0.5f) * 100.0f < upperHarmonics)
          {
-            const int pick = notes[(int)((mRng.Next() * 0.5f + 0.5f) * (float)n) % std::max(1, n)];
-            notes[n++] = std::clamp(pick + 12, 0, 127);
+            // Double a chord tone an octave above the top note's reach, never a duplicate pitch.
+            const int pick = notes[(int)((mRng.Next() * 0.5f + 0.5f) * (float)n) % std::max(1, n)] + 12;
+            bool dup = pick > 127;
+            for (int i = 0; i < n; i++)
+               dup = dup || notes[i] == pick;
+            if (!dup)
+               notes[n++] = pick;
          }
+         std::sort(notes, notes + n);
          mLastChordSizeReadout.store(n, std::memory_order_relaxed);
+
+         // Alternate down- and up-strums, like a hand on a guitar or keys.
+         const bool down = mStrumDown;
+         mStrumDown = !mStrumDown;
 
          for (int i = 0; i < n; i++)
          {
             const double jitter = humanizeMs > 0.0f ? (double)(mRng.Next() * humanizeMs * 0.001 * mSampleRate) : 0.0;
-            const uint64_t onset = mSamplePos + (uint64_t)std::max(0.0, (double)i * strumSamples + jitter);
-            float vel = 0.75f;
+            const int order = down ? i : n - 1 - i;
+            const uint64_t onset = mSamplePos + (uint64_t)std::max(0.0, (double)order * strumSamples + jitter);
+            float vel = (i == n - 1) ? 0.8f : 0.72f; // the top voice sings slightly
             if (humanizeVel > 0.0f)
                vel = std::clamp(vel + mRng.Next() * (humanizeVel / 100.0f) * 0.5f, 0.05f, 1.0f);
 
@@ -3339,6 +3368,10 @@ private:
    DspMath::WhiteNoise mRng;
    long long mLastStep = -1;
    Pending mPending[kMaxPending];
+   int mPrevDegree = 0;
+   int mPrevVoicing[NoteTheory::kMaxVoicing] = {};
+   int mPrevVoicingN = 0;
+   bool mStrumDown = true;
 
    std::atomic<int> mScale { 0 };
    std::atomic<int> mRoot { 0 };

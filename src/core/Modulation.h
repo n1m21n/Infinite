@@ -49,6 +49,7 @@ public:
    // Shift-grab began / ended on a bound param. pos and velPerSec are fader-space.
    virtual void OnGrab(const ParamKey& k) = 0;
    virtual void OnRelease(const ParamKey& k, float pos, float velPerSec) = 0;
+   virtual float Confidence01(const ParamKey& k) const { (void)k; return -1.0f; }
 };
 
 using FaderPosToValueFn = float (*)(float pos01, float minV, float maxV);

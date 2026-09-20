@@ -458,6 +458,9 @@ set(COMMON_SOURCES
     src/nodes/VideoInNode.cpp
     src/nodes/ModulatorNodes.cpp
     src/nodes/PredictionNodes.cpp
+    src/nodes/PredictiveNotesNode.cpp
+    src/nodes/PredictiveModulatorNode.cpp
+    src/audio/NoteModel.cpp
     src/nodes/OscNodes.cpp
     src/nodes/NoiseNode.cpp
     src/nodes/TextureNode.cpp

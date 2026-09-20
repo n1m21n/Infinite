@@ -960,6 +960,38 @@ void Capture(double t, bool isNormalFrame)
 
    if (isPlaying != sLastIsPlaying || std::abs(bpm - sLastBpm) > 0.01f || (isPlaying && currentBar != sLastBar))
    {
+      // Step 8 D: the only live caller of RecordBarSummary. Runs unconditionally whenever a
+      // bar completes during playback - not gated on any Predictive Drift/Recall node
+      // existing, matching how every other MovementStats accumulation already works (a
+      // Recall/Session Map query needs bar history to already exist by the time something
+      // asks for it, not built lazily on first use). Guards against a backward jump (loop
+      // restart, seek) with currentBar > sLastBar, and walks any gap so a stalled frame that
+      // skips several bars still gets one summary per bar rather than losing the skipped ones.
+      if (isPlaying && sLastIsPlaying && currentBar > sLastBar)
+      {
+         for (int32_t completedBar = sLastBar; completedBar < currentBar; completedBar++)
+            stats.RecordBarSummary(completedBar, (double)completedBar * (double)beatsPerBar);
+
+         // 7e minimal live section tracker: refresh the session map and current section every
+         // 8 bars, piggybacked on this same bar-boundary hook rather than a new per-frame
+         // poll. ComputeSessionMap/FitDMD-scale work is confirmed cheap (<1ms) at this cadence.
+         if (currentBar % 8 == 0)
+         {
+            MovementStats::SessionMap smap;
+            stats.ComputeSessionMap(smap);
+            int sectionId = 0;
+            for (const auto& section : smap.sections)
+            {
+               if (currentBar >= section.startBar && currentBar <= section.endBar)
+               {
+                  sectionId = section.sectionId;
+                  break;
+               }
+            }
+            stats.SetCurrentSectionId(sectionId);
+         }
+      }
+
       sLastIsPlaying = isPlaying;
       sLastBpm = bpm;
       sLastBar = currentBar;

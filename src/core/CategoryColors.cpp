@@ -31,6 +31,7 @@ const std::vector<Preset>& Presets()
          { "Compositing",  { 0.506f, 0.549f, 0.973f } }, // #818CF8
          { "Effects",      { 0.980f, 0.800f, 0.082f } }, // #FACC15
          { "Modulators",   { 0.639f, 0.902f, 0.208f } }, // #A3E635
+         { "Prediction",   { 0.133f, 0.827f, 0.533f } }, // #22C55E vivid emerald green
          { "Macros",       { 0.988f, 0.588f, 0.235f } }, // #FC963C orange/amber
          { "Utility",      { 0.639f, 0.663f, 0.729f } }, // #A3A9BA muted grey-blue
          { "Notes",        { 0.298f, 0.851f, 0.392f } }, // #4CD964 green
@@ -50,6 +51,7 @@ const std::vector<Preset>& Presets()
          { "Compositing",  { 0.506f, 0.631f, 0.757f } }, // #81A1C1
          { "Effects",      { 0.922f, 0.796f, 0.545f } }, // #EBCB8B
          { "Modulators",   { 0.369f, 0.506f, 0.675f } }, // #5E81AC
+         { "Prediction",   { 0.557f, 0.773f, 0.627f } }, // #8FBCBB nord green
          { "Macros",       { 0.816f, 0.529f, 0.439f } }, // #D08770 nord12 orange
          { "Utility",      { 0.369f, 0.506f, 0.675f } }, // #5E81AC (reuses Modulators)
          { "Notes",        { 0.639f, 0.745f, 0.549f } }, // #A3BE8C (reuses Source)
@@ -76,6 +78,7 @@ const std::vector<Preset>& Presets()
          { "Compositing",  { 0.741f, 0.576f, 0.976f } }, // #BD93F9
          { "Effects",      { 0.945f, 0.980f, 0.549f } }, // #F1FA8C
          { "Modulators",   { 0.384f, 0.447f, 0.643f } }, // #6272A4 (reuses 3D)
+         { "Prediction",   { 0.314f, 0.980f, 0.482f } }, // #50FA7B green
          { "Macros",       { 1.000f, 0.722f, 0.424f } }, // #FFB86C orange
          { "Utility",      { 0.384f, 0.447f, 0.643f } }, // #6272A4 (reuses 3D/Modulators)
          { "Notes",        { 0.314f, 0.980f, 0.482f } }, // #50FA7B (reuses Source)
@@ -95,6 +98,7 @@ const std::vector<Preset>& Presets()
          { "Compositing",  { 0.537f, 0.706f, 0.980f } }, // #89B4FA
          { "Effects",      { 0.976f, 0.886f, 0.686f } }, // #F9E2AF
          { "Modulators",   { 0.455f, 0.780f, 0.925f } }, // #74C7EC
+         { "Prediction",   { 0.651f, 0.890f, 0.631f } }, // #A6E3A1 green
          { "Macros",       { 0.980f, 0.702f, 0.529f } }, // #FAB387 peach
          { "Utility",      { 0.455f, 0.780f, 0.925f } }, // #74C7EC (reuses Modulators)
          { "Notes",        { 0.651f, 0.890f, 0.631f } }, // #A6E3A1 (reuses Source)
@@ -114,6 +118,7 @@ const std::vector<Preset>& Presets()
          { "Compositing",  { 0.663f, 0.694f, 0.839f } }, // #A9B1D6
          { "Effects",      { 0.051f, 0.725f, 0.843f } }, // #0DB9D7
          { "Modulators",   { 0.267f, 0.616f, 0.671f } }, // #449DAB
+         { "Prediction",   { 0.455f, 0.824f, 0.541f } }, // #73DACA teal-green
          { "Macros",       { 1.000f, 0.612f, 0.380f } }, // #FF9E64 orange
          { "Utility",      { 0.267f, 0.616f, 0.671f } }, // #449DAB (reuses Modulators)
          { "Notes",        { 0.620f, 0.808f, 0.416f } }, // #9ECE6A (reuses Source)
@@ -133,6 +138,7 @@ const std::vector<Preset>& Presets()
          { "Compositing",  { 0.118f, 0.400f, 0.961f } }, // Blue    #1E66F5
          { "Effects",      { 0.875f, 0.557f, 0.114f } }, // Yellow  #DF8E1D
          { "Modulators",   { 0.125f, 0.624f, 0.710f } }, // Sapphire #209FB5
+         { "Prediction",   { 0.251f, 0.627f, 0.169f } }, // Green   #40A02B
          { "Macros",       { 0.996f, 0.549f, 0.365f } }, // Peach   #FE640B
          { "Utility",      { 0.125f, 0.624f, 0.710f } }, // Sapphire (reuses Modulators)
          { "Notes",        { 0.251f, 0.627f, 0.169f } }, // Green
@@ -152,6 +158,7 @@ const std::vector<Preset>& Presets()
          { "Compositing",  { 0.510f, 0.314f, 0.875f } }, // Purple #8250DF
          { "Effects",      { 0.604f, 0.404f, 0.000f } }, // Gold   #9A6700
          { "Modulators",   { 0.067f, 0.388f, 0.161f } }, // Forest #116329
+         { "Prediction",   { 0.102f, 0.498f, 0.216f } }, // Green  #1A7F37
          { "Macros",       { 0.855f, 0.388f, 0.051f } }, // Orange #DA620D
          { "Utility",      { 0.396f, 0.427f, 0.463f } }, // #656D76
          { "Notes",        { 0.102f, 0.498f, 0.216f } },
@@ -171,6 +178,7 @@ const std::vector<Preset>& Presets()
          { "Compositing",  { 0.424f, 0.443f, 0.769f } }, // Violet  #6C71C4
          { "Effects",      { 0.710f, 0.537f, 0.000f } }, // Yellow  #B58900
          { "Modulators",   { 0.165f, 0.631f, 0.596f } }, // Cyan
+         { "Prediction",   { 0.165f, 0.631f, 0.596f } }, // Cyan/Green
          { "Macros",       { 0.796f, 0.294f, 0.086f } }, // Orange  #CB4B16
          { "Utility",      { 0.576f, 0.631f, 0.631f } }, // Base1   #93A1A1
          { "Notes",        { 0.522f, 0.600f, 0.000f } },
@@ -190,6 +198,7 @@ const std::vector<Preset>& Presets()
          { "Compositing",  { 0.231f, 0.357f, 0.518f } }, // nord9  #3B5B84
          { "Effects",      { 0.494f, 0.388f, 0.145f } }, // nord13 #7E6325
          { "Modulators",   { 0.212f, 0.325f, 0.467f } },
+         { "Prediction",   { 0.310f, 0.494f, 0.224f } },
          { "Macros",       { 0.749f, 0.380f, 0.286f } }, // nord12 #D08770
          { "Utility",      { 0.298f, 0.337f, 0.416f } }, // nord3  #4C566A
          { "Notes",        { 0.310f, 0.494f, 0.224f } },
@@ -209,6 +218,7 @@ const std::vector<Preset>& Presets()
          { "Compositing",  { 0.196f, 0.322f, 0.482f } }, // Indigo Pine   #32527B
          { "Effects",      { 0.690f, 0.396f, 0.000f } }, // Autumn Gold    #B06500
          { "Modulators",   { 0.275f, 0.471f, 0.047f } }, // Olive Moss     #46780C
+         { "Prediction",   { 0.102f, 0.431f, 0.231f } }, // Forest Emerald  #1A6E3B
          { "Macros",       { 0.729f, 0.235f, 0.024f } }, // Warm Cedar     #BA3C06
          { "Utility",      { 0.251f, 0.345f, 0.298f } }, // Slate Lichen   #40584C
          { "Notes",        { 0.071f, 0.478f, 0.204f } }, // Meadow Fern    #127A34
@@ -221,7 +231,7 @@ const std::vector<Preset>& Presets()
         { 0.239f, 0.353f, 0.259f },  // textDim Slate Moss      #3D5A42
         { 0.706f, 0.773f, 0.682f },  // border  Sage Lichen     #B4C5AE
         { 0.102f, 0.431f, 0.231f } } // accent  Forest Emerald  #1A6E3B
-      },
+      }
    };
    return presets;
 }
@@ -405,7 +415,7 @@ bool IsThemeLight()
 const std::vector<std::string>& CategoryNames()
 {
    static const std::vector<std::string> kCategories = {
-      "Source", "3D", "Compositing", "Effects", "Modulators",
+      "Source", "3D", "Compositing", "Effects", "Modulators", "Prediction",
       "Macros", "Utility", "Notes", "Synths", "AudioEffects"
    };
    return kCategories;
@@ -715,12 +725,12 @@ void SaveAppearanceOverrides()
 
 int SemanticRank(const std::string& category)
 {
-   // 2D/video, then 3D, then audio, then modulators & macros, then utility
+   // 2D/video, then 3D, then audio, then modulators, prediction & macros, then utility
    static const std::vector<std::string> kOrder = {
       "Source", "Compositing", "Effects",
       "3D",
       "Notes", "Synths", "AudioEffects",
-      "Modulators", "Macros", "Utility",
+      "Modulators", "Prediction", "Macros", "Utility",
    };
    for (size_t i = 0; i < kOrder.size(); i++)
       if (kOrder[i] == category)
