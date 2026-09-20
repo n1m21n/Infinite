@@ -656,6 +656,11 @@ namespace
    void DrawOfflineRenderProgressWindow();
    void DrawArrangeWavRenderProgressWindow();
    void DrawArrangeClipSettingsChild(float panelW);
+   // Defined beside the modulation apply loop below (the other caller), and
+   // forward-declared here because the Clip Settings panel above builds its
+   // Modulations list from it.
+   void ArrangeCollectClipModBindings(const GraphNode& node,
+                                      std::vector<std::pair<int, std::string>>& out);
    bool StartAudioEngine(std::string& outError);
 
    std::vector<GraphNode> gNodes;
@@ -39397,6 +39402,35 @@ namespace
    // Timeline routing: the arrangement's audio clips feed the device and
    // every canvas Audio Out is bypassed. The mode, plus an arrangement-driven
    // offline render, which is Timeline by definition.
+   // Every modulation bound to `node`, as (paramIndex, display label). Shared by
+   // the Clip Settings list and its self-test, so what the test proves is what
+   // the panel actually shows.
+   //
+   // Reads Modulation::KnownParam, the sticky record, rather than this frame's
+   // FrameParams: the inspector can draw on a frame where the source node did
+   // not (scrolled off canvas, or a top-docked panel drawing before the canvas
+   // registers anything). A param with no sticky record yet still gets listed,
+   // under its index, rather than silently vanishing from the list.
+   void ArrangeCollectClipModBindings(const GraphNode& node,
+                                      std::vector<std::pair<int, std::string>>& out)
+   {
+      out.clear();
+      const Modulation& mod = Modulation::Instance();
+      for (const auto& kv : mod.Links())
+      {
+         if (kv.first.first != node.index || kv.second.nodeIndex < 0)
+            continue;
+         const int paramIndex = kv.first.second;
+         const ParamRef* known = mod.KnownParam(node.index, paramIndex);
+         const GraphNode* modNode = FindNodeByIndex(kv.second.nodeIndex);
+         std::string label = known != nullptr ? StripParamLabel(known->name.c_str())
+                                              : ("param " + std::to_string(paramIndex));
+         if (modNode != nullptr)
+            label += "  <-  " + NodeTitle(*modNode);
+         out.emplace_back(paramIndex, label);
+      }
+   }
+
    bool ArrangeTimelineRoutingActive()
    {
       return gAudioMode == AudioMode::Timeline ||
@@ -40881,10 +40915,6 @@ namespace
          {
             ImGui::Text("Node: %s", NodeTitle(*srcNode).c_str());
             ImGui::TextDisabled("Type: %s", srcNode->typeName.c_str());
-            // A Sample owns the private node its own drag-drop import
-            // created - repointing or clearing that would defeat the whole
-            // point of a sample (see sampleDropped's doc comment in
-            // ArrangeModel.h). Only Audio/Video Clip can be reassigned.
             // --- per-clip modulation bypass -----------------------------
             // Every modulation currently bound to this clip's source node,
             // each with a checkbox saying whether THIS clip wants it. The
@@ -40898,26 +40928,8 @@ namespace
             // so a single clip cannot opt out of it without duplicating the
             // whole chain. Deliberately out of scope.
             {
-               const Modulation& mod = Modulation::Instance();
                std::vector<std::pair<int, std::string>> bound; // paramIndex, label
-               for (const auto& kv : mod.Links())
-               {
-                  if (kv.first.first != srcNode->index)
-                     continue;
-                  if (kv.second.nodeIndex < 0)
-                     continue;
-                  const int paramIndex = kv.first.second;
-                  // KnownParam is the sticky record, so this still reads
-                  // correctly on a frame where the source node did not draw
-                  // (scrolled off canvas, or the panel drawing before it).
-                  const ParamRef* known = mod.KnownParam(srcNode->index, paramIndex);
-                  const GraphNode* modNode = FindNodeByIndex(kv.second.nodeIndex);
-                  std::string label = known != nullptr ? StripParamLabel(known->name.c_str())
-                                                       : ("param " + std::to_string(paramIndex));
-                  if (modNode != nullptr)
-                     label += "  <-  " + NodeTitle(*modNode);
-                  bound.emplace_back(paramIndex, label);
-               }
+               ArrangeCollectClipModBindings(*srcNode, bound);
 
                if (!bound.empty())
                {
@@ -40954,6 +40966,10 @@ namespace
                }
             }
 
+            // A Sample owns the private node its own drag-drop import
+            // created - repointing or clearing that would defeat the whole
+            // point of a sample (see sampleDropped's doc comment in
+            // ArrangeModel.h). Only Audio/Video Clip can be reassigned.
             if (!isSample)
             {
                if (ImGui::Button("Assign Different Node...", ImVec2(-FLT_MIN, 0)))
@@ -73246,6 +73262,146 @@ int main(int argc, char** argv)
          printf("arrange wave cleared on new patch: %s\n", cleared ? "OK" : "FAIL");
          allOk = allOk && cleared;
          printf("arrange wave test: all  %s\n", allOk ? "OK" : "FAIL");
+      }
+
+      // Per-clip modulation bypass (Arrange::Clip::bypassedModParams): the
+      // list the Clip Settings panel builds, and the playhead-driven gate the
+      // modulation apply loop reads. Both go through the same two functions
+      // the app itself calls, so a green run here means the panel really does
+      // list that binding and the gate really does fire on that beat.
+      if (getenv("INFINITE_CLIPMODBYPASSTEST") != nullptr && frameId == 4)
+      {
+         NewPatch();
+         bool allOk = true;
+
+         // uid read right after each spawn - SpawnNode push_backs onto gNodes,
+         // which can reallocate every GraphNode* taken before it.
+         GraphNode* oscGn = SpawnNode("Oscillator", "Synthesizers", 200.0f, 0.0f);
+         const uint64_t oscUid = oscGn != nullptr ? oscGn->uid : 0;
+         const int oscIndex = oscGn != nullptr ? oscGn->index : -1;
+         GraphNode* lfoGn = SpawnNode("LFO", "Modulators", 0.0f, 0.0f);
+         const int lfoIndex = lfoGn != nullptr ? lfoGn->index : -1;
+         const bool spawned = oscUid != 0 && oscIndex >= 0 && lfoIndex >= 0;
+         printf("clip mod bypass spawn: %s\n", spawned ? "OK" : "FAIL");
+         allOk = allOk && spawned;
+
+         if (spawned)
+         {
+            // Bind exactly as the cable-drop path does (main.cpp's
+            // ed::AcceptNewItem branch) - same call, same key space.
+            const int kParam = 0, kOtherParam = 1;
+            Modulation::Instance().Bind(oscIndex, kParam, lfoIndex, 0);
+
+            // --- A. the panel's own list -------------------------------
+            // The bug this guards: an enumeration keyed on the wrong index
+            // space finds nothing, and the Modulations section silently
+            // never appears rather than failing loudly.
+            {
+               std::vector<std::pair<int, std::string>> bound;
+               ArrangeCollectClipModBindings(*FindNodeByUid(oscUid), bound);
+               const bool aOk = bound.size() == 1 && bound[0].first == kParam &&
+                                !bound[0].second.empty();
+               printf("clip mod bypass list: %s (%d binding(s))\n", aOk ? "OK" : "FAIL",
+                      (int)bound.size());
+               allOk = allOk && aOk;
+            }
+
+            // --- B. the model's own set ops ----------------------------
+            {
+               Arrange::Clip c;
+               c.SetModBypassed(kOtherParam, true);
+               c.SetModBypassed(kParam, true);
+               c.SetModBypassed(kParam, true);           // idempotent
+               const bool sorted = c.bypassedModParams.size() == 2 &&
+                                   c.bypassedModParams[0] == kParam &&
+                                   c.bypassedModParams[1] == kOtherParam;
+               c.SetModBypassed(kOtherParam, false);
+               c.SetModBypassed(kOtherParam, false);     // idempotent
+               const bool bOk = sorted && c.bypassedModParams.size() == 1 &&
+                                c.IsModBypassed(kParam) && !c.IsModBypassed(kOtherParam);
+               printf("clip mod bypass set ops: %s\n", bOk ? "OK" : "FAIL");
+               allOk = allOk && bOk;
+            }
+
+            // --- C. the playhead gate ----------------------------------
+            // Two clips on one lane, same source: the first bypasses the
+            // binding, the second does not. The gate must follow the
+            // playhead from one to the other - that IS the feature.
+            {
+               gArrange = Arrange::Model();
+               const uint64_t laneId = Arrange::AddLane(gArrange, Arrange::kLaneAudio);
+               auto place = [&](Arrange::Tick start, Arrange::Tick len) {
+                  Arrange::Clip c;
+                  c.start = start;
+                  c.length = len;
+                  c.srcUid = oscUid;
+                  uint64_t id = 0;
+                  Arrange::PlaceOverwrite(gArrange, laneId, c, &id);
+                  return id;
+               };
+               const uint64_t clipA = place(0, Arrange::kPPQ * 4);
+               const uint64_t clipB = place(Arrange::kPPQ * 4, Arrange::kPPQ * 4);
+               bool wired = clipA != 0 && clipB != 0;
+               if (Arrange::Clip* a = Arrange::FindClip(gArrange, clipA))
+                  a->SetModBypassed(kParam, true);
+               else
+                  wired = false;
+
+               const AudioMode wasMode = gAudioMode;
+               gAudioMode = AudioMode::Timeline; // the gate is inert in Canvas mode
+
+               Transport::Instance().SeekBeats(1.0);      // inside clip A
+               ArrangeRefreshActiveClipModBypass();
+               const bool inA = ArrangeClipBypassesMod(oscIndex, kParam);
+               const bool otherUntouchedInA = !ArrangeClipBypassesMod(oscIndex, kOtherParam);
+
+               Transport::Instance().SeekBeats(5.0);      // inside clip B
+               ArrangeRefreshActiveClipModBypass();
+               const bool inB = ArrangeClipBypassesMod(oscIndex, kParam);
+
+               Transport::Instance().SeekBeats(20.0);     // past every clip
+               ArrangeRefreshActiveClipModBypass();
+               const bool pastEnd = ArrangeClipBypassesMod(oscIndex, kParam);
+
+               // Canvas mode: no clip is playing, so no clip gets a say.
+               gAudioMode = AudioMode::Canvas;
+               Transport::Instance().SeekBeats(1.0);
+               ArrangeRefreshActiveClipModBypass();
+               const bool inCanvas = ArrangeClipBypassesMod(oscIndex, kParam);
+               gAudioMode = wasMode;
+
+               const bool cOk = wired && inA && otherUntouchedInA && !inB && !pastEnd && !inCanvas;
+               printf("clip mod bypass gate: %s (A=%d B=%d past=%d canvas=%d)\n",
+                      cOk ? "OK" : "FAIL", inA ? 1 : 0, inB ? 1 : 0, pastEnd ? 1 : 0,
+                      inCanvas ? 1 : 0);
+               allOk = allOk && cOk;
+            }
+
+            // --- D. the value a bypassed param lands on ----------------
+            // Must be the pre-modulation knob value, clamped into the
+            // param's own declared range - never left frozen wherever the
+            // modulator last pushed it, and never a raw 0 from a binding
+            // restored out of an old patch line that predates `centre`.
+            {
+               ParamRef ref;
+               ref.nodeIndex = oscIndex;
+               ref.paramIndex = kParam;
+               ref.minValue = 20.0f;
+               ref.maxValue = 20000.0f;
+               Modulation::Source src;
+               src.centre = 440.0f;
+               const float inRange = ArrangeClipBypassBaseValue(ref, src);
+               src.centre = 0.0f; // the old-patch case
+               const float clamped = ArrangeClipBypassBaseValue(ref, src);
+               const bool dOk = std::abs(inRange - 440.0f) < 0.001f &&
+                                std::abs(clamped - 20.0f) < 0.001f;
+               printf("clip mod bypass base value: %s (%.1f, clamped %.1f)\n",
+                      dOk ? "OK" : "FAIL", inRange, clamped);
+               allOk = allOk && dOk;
+            }
+         }
+
+         printf("clip mod bypass test: all  %s\n", allOk ? "OK" : "FAIL");
       }
 
       if (getenv("INFINITE_UNDOPERFTEST") != nullptr && frameId == 4)
