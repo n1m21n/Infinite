@@ -105,6 +105,25 @@ public:
       return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
    }
    IGeometrySource* PassthroughSource() const override { return input; }
+   // None of these operators act on splats (mesh-only ops), so a splat cloud
+   // upstream of any of them just needs to keep flowing through untouched -
+   // same forwarding rule as GetPointCloud() would need if this node ever
+   // grew one.
+   const SplatIO::SplatCloud* GetSplatCloud() override
+   {
+      return input ? input->GetSplatCloud() : nullptr;
+   }
+   unsigned long long SplatCloudRevision() override
+   {
+      return input ? input->SplatCloudRevision() : 0;
+   }
+   float SplatSizeMultiplier() const override { return input ? input->SplatSizeMultiplier() : 1.0f; }
+   float SplatOpacityMultiplier() const override { return input ? input->SplatOpacityMultiplier() : 1.0f; }
+   void GetSplatTint(float outRgb[3]) const override
+   {
+      if (input) input->GetSplatTint(outRgb);
+      else outRgb[0] = outRgb[1] = outRgb[2] = 1.0f;
+   }
    // When this node (or the chain of GeometryOpNodes it's wired through) sits
    // downstream of an InstanceOnPoints and op is kTransform, GetMesh() leaves
    // the stamp mesh alone and this returns the move/rotate/scale as a matrix
@@ -421,6 +440,23 @@ public:
    // scratch - so an upstream InstanceOnPoints stays visible to the chain
    // walk (displace the stamp, then scatter it), group matrix included.
    IGeometrySource* PassthroughSource() const override { return input; }
+   // Displacement only moves mesh vertices; a splat cloud upstream has
+   // nothing to displace, so it just passes through untouched.
+   const SplatIO::SplatCloud* GetSplatCloud() override
+   {
+      return input ? input->GetSplatCloud() : nullptr;
+   }
+   unsigned long long SplatCloudRevision() override
+   {
+      return input ? input->SplatCloudRevision() : 0;
+   }
+   float SplatSizeMultiplier() const override { return input ? input->SplatSizeMultiplier() : 1.0f; }
+   float SplatOpacityMultiplier() const override { return input ? input->SplatOpacityMultiplier() : 1.0f; }
+   void GetSplatTint(float outRgb[3]) const override
+   {
+      if (input) input->GetSplatTint(outRgb);
+      else outRgb[0] = outRgb[1] = outRgb[2] = 1.0f;
+   }
    Mat4 GetInstanceGroupMatrix() const override
    {
       return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
@@ -741,6 +777,24 @@ public:
    unsigned long long MeshRevision() override;
    const std::vector<Particle>* GetPointCloud() override;
    unsigned long long PointCloudRevision() override;
+   // SetColor writes Mesh::vertexColor / Particle::r,g,b - it has no notion
+   // of a splat's color yet, so a splat cloud upstream just forwards
+   // untouched rather than vanishing.
+   const SplatIO::SplatCloud* GetSplatCloud() override
+   {
+      return input ? input->GetSplatCloud() : nullptr;
+   }
+   unsigned long long SplatCloudRevision() override
+   {
+      return input ? input->SplatCloudRevision() : 0;
+   }
+   float SplatSizeMultiplier() const override { return input ? input->SplatSizeMultiplier() : 1.0f; }
+   float SplatOpacityMultiplier() const override { return input ? input->SplatOpacityMultiplier() : 1.0f; }
+   void GetSplatTint(float outRgb[3]) const override
+   {
+      if (input) input->GetSplatTint(outRgb);
+      else outRgb[0] = outRgb[1] = outRgb[2] = 1.0f;
+   }
    // Forwarded, not identity - see DisplacementNode for why.
    Mat4 GetModelMatrix() const override
    {
@@ -905,6 +959,23 @@ public:
    // not where this node's mesh comes from.
    IGeometrySource* PassthroughSource() const override { return sourceInput; }
    const std::string& CookWarning() const override { return mCookWarning; }
+   // Wrap only conforms mesh vertices onto a target surface - a splat cloud
+   // has none, so it forwards untouched rather than disappearing.
+   const SplatIO::SplatCloud* GetSplatCloud() override
+   {
+      return sourceInput ? sourceInput->GetSplatCloud() : nullptr;
+   }
+   unsigned long long SplatCloudRevision() override
+   {
+      return sourceInput ? sourceInput->SplatCloudRevision() : 0;
+   }
+   float SplatSizeMultiplier() const override { return sourceInput ? sourceInput->SplatSizeMultiplier() : 1.0f; }
+   float SplatOpacityMultiplier() const override { return sourceInput ? sourceInput->SplatOpacityMultiplier() : 1.0f; }
+   void GetSplatTint(float outRgb[3]) const override
+   {
+      if (sourceInput) sourceInput->GetSplatTint(outRgb);
+      else outRgb[0] = outRgb[1] = outRgb[2] = 1.0f;
+   }
    Mat4 GetInstanceGroupMatrix() const override
    {
       return sourceInput ? sourceInput->GetInstanceGroupMatrix() : Mat4::Identity();

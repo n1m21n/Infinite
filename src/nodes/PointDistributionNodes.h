@@ -347,6 +347,23 @@ public:
       return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
    }
    IGeometrySource* PassthroughSource() const override { return input; }
+   // Merge by Distance welds mesh vertices only - a splat cloud has none, so
+   // it forwards untouched rather than disappearing.
+   const SplatIO::SplatCloud* GetSplatCloud() override
+   {
+      return input ? input->GetSplatCloud() : nullptr;
+   }
+   unsigned long long SplatCloudRevision() override
+   {
+      return input ? input->SplatCloudRevision() : 0;
+   }
+   float SplatSizeMultiplier() const override { return input ? input->SplatSizeMultiplier() : 1.0f; }
+   float SplatOpacityMultiplier() const override { return input ? input->SplatOpacityMultiplier() : 1.0f; }
+   void GetSplatTint(float outRgb[3]) const override
+   {
+      if (input) input->GetSplatTint(outRgb);
+      else outRgb[0] = outRgb[1] = outRgb[2] = 1.0f;
+   }
    // Forwarded alongside PassthroughSource - see MaterialNode for why the two
    // have to travel together.
    Mat4 GetInstanceGroupMatrix() const override
