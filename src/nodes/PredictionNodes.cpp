@@ -352,7 +352,7 @@ void DriftNode::RefreshModel(const ParamKey& k, Slot& s)
          m.theta = std::clamp(it->second.theta, 0.05f, 20.0f);
          m.sigma = std::clamp(it->second.sigma, 0.005f, 1.0f);
          m.lo = it->second.lo; m.hi = it->second.hi;
-         m.nEff = 1e9; m.w1 = 1.0f; m.cold = false;
+         m.nEff = 1e9; m.nEffIndependent = 1e9; m.w1 = 1.0f; m.cold = false;
          ApplyRangeOverride(rangeOverride, rangeLo, rangeHi, m);
          s.model = m;
          s.modelFrame = mFrame;
@@ -384,6 +384,7 @@ void DriftNode::RefreshModel(const ParamKey& k, Slot& s)
    m.sigma = std::clamp(b.sigma, 0.005f, 1.0f);
    m.lo = b.lo; m.hi = b.hi;
    m.nEff = b.nKey;
+   m.nEffIndependent = b.nKeyIndependent;
    m.w1 = (float)b.w1;
    m.w2 = (float)b.w2;
    m.w2b = (float)b.w2b;
@@ -552,6 +553,28 @@ double DriftNode::SamplesAnalyzedForUI(int slotOrdinal) const
    return it->second.model.nEff;
 }
 
+double DriftNode::IndependentSamplesForUI(int slotOrdinal) const
+{
+   if (slotOrdinal < 0 || slotOrdinal >= (int)mSlots.size())
+      return 0.0;
+   auto it = mSlots.begin();
+   std::advance(it, slotOrdinal);
+   return it->second.model.nEffIndependent;
+}
+
+bool DriftNode::ReadSlotForUI(int slotOrdinal, float& outPos, ParamKey& outKey) const
+{
+   if (slotOrdinal < 0 || slotOrdinal >= (int)mSlots.size())
+      return false;
+   auto it = mSlots.begin();
+   std::advance(it, slotOrdinal);
+   // What the destination is actually being written this frame, i.e. what ValuePos01For returns -
+   // never the raw pre-quantize/pre-smoothing x, or the trace would disagree with the knob.
+   outPos = std::clamp(it->second.smoothedX, 0.0f, 1.0f);
+   outKey = it->first;
+   return true;
+}
+
 int DriftNode::ConfidenceRung(const ParamKey& k) const
 {
    if (frozen)
@@ -571,10 +594,22 @@ float DriftNode::Confidence01(const ParamKey& k) const
       return 1.0f;
    auto it = mSlots.find(k);
    if (it == mSlots.end())
-      return 0.5f;
+      return 0.0f; // nothing bound here: no opinion, and 50% was never an honest stand-in
    const auto& m = it->second.model;
-   float c = m.w1 * 1.0f + m.w2 * 0.75f + m.w2b * 0.65f + m.w2d * 0.45f + m.w3 * 0.35f + (m.cold ? 0.05f : 0.2f);
-   return std::clamp(c, 0.05f, 1.0f);
+   // The ladder weights are a partition: w1 + w2 + w2b + w2d + rest == 1 by construction
+   // (MovementStats' MakeChain). The old formula scored the fallback rungs at 0.75/0.65/0.45 and
+   // then added a flat +0.2 "not cold" bonus on top, so it read
+   //    c = 1 - rest - 0.25*w2 - 0.35*w2b - 0.55*w2d + 0.2
+   // and saturated at 100% for any key whose own weight was merely around half - or even one
+   // whose model came almost entirely from *other* knobs of the same role. "12 samples, 100%
+   // confidence" was the visible symptom.
+   //
+   // Now: strictly convex, coefficients descending down the ladder and summing to less than 1, so
+   //  - 100% requires this knob's own data to explain essentially the whole model (w1 -> 1),
+   //  - a cold key (everything on the anchor rung) reads 0%, which is the truth,
+   //  - and the number can only ever move monotonically with real evidence.
+   const float c = m.w1 * 1.0f + m.w2 * 0.5f + m.w2b * 0.3f + m.w2d * 0.15f + m.w3 * 0.1f;
+   return std::clamp(c, 0.0f, 1.0f);
 }
 
 float DriftNode::EnergyFor(const ParamKey& k) const
@@ -1434,13 +1469,18 @@ void MovesNode::RefreshPCA(const MovementStats::Engine* engine)
 
 float MovesNode::Confidence01(const ParamKey&) const
 {
-   if (mPCA.valid && !mPCA.explainedVarianceRatio.empty())
-   {
-      float v = 0.0f;
-      for (float r : mPCA.explainedVarianceRatio) v += r;
-      return std::clamp(v, 0.5f, 1.0f);
-   }
-   return 0.85f;
+   // This used to return 0.85 with no PCA at all, and otherwise the SUM of every component's
+   // explained-variance ratio clamped to [0.5, 1]. That sum is ~1 by construction whenever the
+   // component count reaches the key count, so the mod matrix showed this node at ~100%
+   // confidence on a patch where nothing had ever been moved.
+   //
+   // What the node actually rides is the FIRST component - the single axis ProjectOffsetFor
+   // projects onto. So the honest number is that component's share of the total movement
+   // variance: "this much of how you move these knobs together is the one move I am playing".
+   // No data -> 0, and no floor.
+   if (!mPCA.valid || mPCA.explainedVarianceRatio.empty())
+      return 0.0f;
+   return std::clamp(mPCA.explainedVarianceRatio[0], 0.0f, 1.0f);
 }
 
 // -----------------------------------------------------------------------------

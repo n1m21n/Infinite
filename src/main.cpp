@@ -10980,64 +10980,182 @@ namespace
       gAudioBodyW = gAudioContentW = kPreviewSize;
    }
 
-   // B: the learned-gesture readout - the currently-bound slot's real 64-bin dwell histogram,
-   // drawn at a smaller scale than DrawPatternStepGrid's bar chart (main.cpp ~8576) since this
-   // is a read-only meter, not an editable grid. Overlaid gridlines are a visual echo of the
-   // chosen quantize rate only - the histogram's x-axis is fader position, not time, so they
-   // don't correspond to literal beat boundaries, just a hint at how coarse the walk's steps
-   // will read once quantized.
-   void DrawDriftHistogram(DriftNode* n)
+   // The multi-destination trace. A Drift node writes a DIFFERENT value into every knob it is
+   // dragged onto - independent slots, independent learned landscapes - so the old single
+   // 64-bin histogram of slot 0, drawn as if it were "the node's" output, was showing one
+   // destination's shape and implying it was all of them. One graph, one line per destination,
+   // each line labelled and carrying its own live value; there is deliberately no aggregate
+   // number anywhere, because no such number exists for this node.
+   //
+   // History lives here rather than in DriftNode because it is pure presentation: nothing in the
+   // dynamics reads it, it must not be saved, and a node that is never drawn should not pay for
+   // it. Keyed by (source node UID, destination) so two Drift nodes on the same knob stay
+   // separate - uid, not index, because RemoveNodeByIndex reuses indices and a new node would
+   // otherwise inherit a deleted one's trace (Modulation.h's uid stability rule).
+   constexpr int kDriftTraceLen = 128;
+   struct DriftTrace
    {
-      float hist[DriftNode::kBins];
-      ParamKey key;
-      if (!n->ReadHistogramForUI(0, hist, key))
-         return; // no bound slot yet - caller already shows the "drag onto a knob" fallback
+      float v[kDriftTraceLen] = {};
+      int head = 0;
+      int filled = 0;
+      int lastFrame = -1;
+   };
+   std::map<std::pair<uint64_t, ParamKey>, DriftTrace> gDriftTraces;
+
+   // Per-line colour. Distinct hues rather than shades of the prediction green: the point of the
+   // graph is telling the lines apart, and the node's category tint already says "prediction".
+   ImU32 DriftLineColor(int i, int alpha)
+   {
+      static const ImU32 kRGB[] = {
+         IM_COL32(52, 211, 153, 0),  // green
+         IM_COL32(96, 165, 250, 0),  // blue
+         IM_COL32(251, 191, 36, 0),  // amber
+         IM_COL32(244, 114, 182, 0), // pink
+         IM_COL32(167, 139, 250, 0), // violet
+         IM_COL32(45, 212, 191, 0),  // teal
+         IM_COL32(248, 113, 113, 0), // red
+         IM_COL32(163, 230, 53, 0),  // lime
+      };
+      const ImU32 c = kRGB[i % (int)(sizeof(kRGB) / sizeof(kRGB[0]))];
+      return (c & 0x00FFFFFFu) | ((ImU32)std::clamp(alpha, 0, 255) << IM_COL32_A_SHIFT);
+   }
+
+   // "Filter 2 - cutoff", falling back to whatever is knowable. Short, because it is drawn at the
+   // width of a node body next to a number.
+   std::string DriftDestinationLabel(const ParamKey& key)
+   {
+      GraphNode* owner = FindNodeByUid(key.uid);
+      if (owner == nullptr)
+         return "(deleted)";
+      std::string out = NodeTitleWithInstance(*owner);
+      const ParamRef* known = Modulation::Instance().KnownParam(owner->index, key.paramIndex);
+      if (known != nullptr && !known->name.empty())
+         out += " - " + known->name;
+      return out;
+   }
+
+   void DrawDriftTraces(DriftNode* n, uint64_t sourceUid)
+   {
+      const int count = n->SlotCount();
+      if (count == 0)
+         return;
+
+      // Sample once per frame per destination, even if the body is drawn twice (node body and
+      // params panel), so the trace scrolls at a rate the user can read rather than at draw rate.
+      const int frame = ImGui::GetFrameCount();
+      std::vector<std::pair<ParamKey, float>> live;
+      live.reserve((size_t)count);
+      for (int i = 0; i < count; i++)
+      {
+         float pos = 0.0f;
+         ParamKey key;
+         if (!n->ReadSlotForUI(i, pos, key))
+            continue;
+         DriftTrace& tr = gDriftTraces[{sourceUid, key}];
+         if (tr.lastFrame != frame)
+         {
+            tr.lastFrame = frame;
+            tr.v[tr.head] = pos;
+            tr.head = (tr.head + 1) % kDriftTraceLen;
+            tr.filled = std::min(tr.filled + 1, kDriftTraceLen);
+         }
+         live.emplace_back(key, pos);
+      }
+      if (live.empty())
+         return;
+
+      // Drop traces for destinations (and nodes) that stopped being drawn. Without this the map
+      // only ever grows over a session, one entry per knob a Drift was ever dragged onto.
+      for (auto it = gDriftTraces.begin(); it != gDriftTraces.end();)
+         it = (frame - it->second.lastFrame > 600) ? gDriftTraces.erase(it) : std::next(it);
 
       const float w = kPreviewSize;
-      const float h = 28.0f;
+      const float h = 56.0f;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(origin, ImVec2(origin.x + w, origin.y + h), IM_COL32(255, 255, 255, 12), 2.0f);
-
-      float hi = 1e-6f;
-      for (float v : hist) hi = std::max(hi, v);
-      const float barW = w / (float)DriftNode::kBins;
-      for (int i = 0; i < DriftNode::kBins; i++)
+      // Mid-scale hairline: the y axis is fader position 0..1 for every line, which is the only
+      // thing that makes overlaid destinations comparable at all.
+      dl->AddLine(ImVec2(origin.x, origin.y + h * 0.5f), ImVec2(origin.x + w, origin.y + h * 0.5f),
+                  IM_COL32(255, 255, 255, 18));
+      dl->PushClipRect(origin, ImVec2(origin.x + w, origin.y + h), true);
+      for (size_t li = 0; li < live.size(); li++)
       {
-         const float bh = std::clamp(hist[i] / hi, 0.0f, 1.0f) * (h - 3.0f);
-         const float x0 = origin.x + (float)i * barW;
-         dl->AddRectFilled(ImVec2(x0, origin.y + h - bh), ImVec2(x0 + std::max(1.0f, barW - 0.5f), origin.y + h),
-                           IM_COL32(34, 197, 94, 200));
-      }
-      if (n->quantizeRate > 0)
-      {
-         // Purely decorative: more, finer gridlines for a shorter (faster) grid division,
-         // clamped to a legible range. Not a literal mapping of beats onto fader position.
-         const double gridBeats =
-            std::max(0.0625, MusicTime::BeatsFor((MusicTime::RateDivision)(n->quantizeRate - 1)));
-         const int divisions = std::clamp((int)std::round(4.0 / gridBeats), 2, 16);
-         for (int i = 1; i < divisions; i++)
+         const DriftTrace& tr = gDriftTraces[{sourceUid, live[li].first}];
+         if (tr.filled < 2)
+            continue;
+         const ImU32 col = DriftLineColor((int)li, 210);
+         ImVec2 prev;
+         for (int i = 0; i < tr.filled; i++)
          {
-            const float x = origin.x + w * (float)i / (float)divisions;
-            dl->AddLine(ImVec2(x, origin.y), ImVec2(x, origin.y + h), IM_COL32(255, 255, 255, 40));
+            // Oldest first: head is the next write slot, so the ring starts `filled` behind it.
+            const int idx = (tr.head - tr.filled + i + kDriftTraceLen * 2) % kDriftTraceLen;
+            const float x = origin.x + w * (float)i / (float)(kDriftTraceLen - 1);
+            const float y = origin.y + h - 2.0f - std::clamp(tr.v[idx], 0.0f, 1.0f) * (h - 4.0f);
+            const ImVec2 p(x, y);
+            if (i > 0)
+               dl->AddLine(prev, p, col, 1.4f);
+            prev = p;
          }
+         dl->AddCircleFilled(prev, 2.0f, col);
       }
+      dl->PopClipRect();
       ImGui::Dummy(ImVec2(w, h));
    }
 
-   // Drift (prediction) node body - Step 8 refinement round 2: no modes, no dials. Drag it onto
-   // any number of knobs; each one gets its own independent slot that wanders inside that knob's
-   // own real, learned dwell history (quantize+smoothness are always on, tuned fixed constants
-   // set once in the constructor - see feedback_audio_node_minimalism). The only UI left is an
-   // honest readout, per knob, of how much real data is actually behind it.
-   void DrawDriftParams(GraphNode&, DriftNode* n)
+   // Legend: one row per line, the destination it drives and that destination's own live value.
+   // Deliberately no aggregate - no overall value, no min/max - because this node has no single
+   // output for one to describe.
+   void DrawDriftLegend(DriftNode* n)
+   {
+      const float w = kPreviewSize;
+      for (int i = 0; i < n->SlotCount(); i++)
+      {
+         float pos = 0.0f;
+         ParamKey key;
+         if (!n->ReadSlotForUI(i, pos, key))
+            continue;
+         char value[16];
+         snprintf(value, sizeof(value), "%.2f", pos);
+         const float valueW = ImGui::CalcTextSize(value).x;
+         const float lh = ImGui::GetTextLineHeight();
+         const ImVec2 p = ImGui::GetCursorScreenPos();
+         ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(p.x, p.y + lh * 0.5f - 1.5f),
+                                                   ImVec2(p.x + 8.0f, p.y + lh * 0.5f + 1.5f),
+                                                   DriftLineColor(i, 230), 1.0f);
+         ImGui::Dummy(ImVec2(11.0f, lh));
+         ImGui::SameLine(0.0f, 0.0f);
+         // Truncate the name by hand rather than clipping or wrapping: a wrapped label would
+         // push the value onto its own line and desync the swatch column from the row it names.
+         std::string label = DriftDestinationLabel(key);
+         const float avail = w - 11.0f - valueW - 6.0f;
+         if (ImGui::CalcTextSize(label.c_str()).x > avail)
+         {
+            while (label.size() > 1 && ImGui::CalcTextSize((label + "..").c_str()).x > avail)
+               label.pop_back();
+            label += "..";
+         }
+         ImGui::TextDisabled("%s", label.c_str());
+         ImGui::SameLine(0.0f, 0.0f);
+         ImGui::SetCursorScreenPos(ImVec2(p.x + w - valueW, p.y));
+         ImGui::TextDisabled("%s", value);
+      }
+   }
+
+   void DrawDriftParams(GraphNode& gn, DriftNode* n)
    {
       ModSlider("speed", &n->speed, 0.1f, 4.0f, "%.2fx");
-      ModSlider("low", &n->rangeLo, 0.0f, 1.0f, "%.2f");
-      ModSlider("high", &n->rangeHi, 0.0f, 1.0f, "%.2f");
       ModSlider("stray", &n->stray, 0.25f, 4.0f, "%.2f");
       ModSlider("momentum", &n->momentum, 0.0f, 4.0f, "%.2fs");
-      n->rangeOverride = (n->rangeLo != 0.0f || n->rangeHi != 1.0f);
+      // `low`/`high` used to sit here, writing rangeLo/rangeHi/rangeOverride: ONE range clamped
+      // onto every destination at once. That is meaningless on this node - each destination has
+      // its own slot and its own learned range, so a single pair of sliders either did nothing or
+      // squashed every knob into the same window. Retired: the save keys stay in VisitParams so
+      // older patches still load, but the override is forced off rather than left silently
+      // active with no UI to see or undo it.
+      n->rangeOverride = false;
+      n->rangeLo = 0.0f;
+      n->rangeHi = 1.0f;
 
       const int count = n->SlotCount();
       if (count == 0)
@@ -11045,11 +11163,9 @@ namespace
          ImGui::TextDisabled("drag onto a knob to drive it");
          return;
       }
-      ImGui::TextDisabled("%d knob%s analyzed", count, count == 1 ? "" : "s");
       // Who is actually authoring the model right now. This is measured, not asserted: each
       // source pool is graded on how well it predicts where the hand goes next (prequentially,
       // before the sample is absorbed), and the share is that skill times the pool's maturity.
-      // It replaces the old hand-waved "about two thirds real data" claim with a real number.
       {
          MovementStats::PoolShares prof;
          MovementStats::Live().GetGlobalPoolShares(prof);
@@ -11062,18 +11178,21 @@ namespace
          else
             ImGui::TextDisabled("profile: no data yet - perform a knob to teach it");
       }
-      DrawDriftHistogram(n);
+      DrawDriftTraces(n, UidForIndex(gn.index));
+      DrawDriftLegend(n);
       for (int i = 0; i < count; i++)
       {
-         float hist[DriftNode::kBins];
+         float pos = 0.0f;
          ParamKey key;
-         if (!n->ReadHistogramForUI(i, hist, key))
+         if (!n->ReadSlotForUI(i, pos, key))
             continue;
-         GraphNode* owner = FindNodeByUid(key.uid);
          const float confidence = std::clamp(n->Confidence01(key), 0.0f, 1.0f) * 100.0f;
-         const double samples = n->SamplesAnalyzedForUI(i);
-         ImGui::TextDisabled("%s: %.0f samples, %.0f%% confidence",
-                              owner != nullptr ? NodeTitleWithInstance(*owner).c_str() : "knob", samples, confidence);
+         // The INDEPENDENT move count, not raw n_eff. Raw n_eff counts every 10 Hz dwell sample,
+         // so a knob that was merely left alone while the transport ran reported thousands of
+         // "samples" beside a confidence percentage derived from almost none of them.
+         const double moves = n->IndependentSamplesForUI(i);
+         ImGui::TextDisabled("%s: %.0f moves, %.0f%% learned", DriftDestinationLabel(key).c_str(), moves,
+                             confidence);
       }
    }
 
@@ -11090,8 +11209,11 @@ namespace
          return;
       }
       ImGui::TextDisabled("gesture %.2f", n->gesture);
+      // Real explained variance of the axis this node rides, floor to ceiling. The old
+      // clamp(.., 10, 99) invented a 10% floor for a patch with no recorded movement at all,
+      // which read as "it knows something" when it knew nothing.
       ImGui::TextDisabled("%d coupled  |  Focus: %.0f%% energy", n->SlotCount(),
-                          std::clamp(n->ExplainedVariance(0) * 100.0f, 10.0f, 99.0f));
+                          std::clamp(n->ExplainedVariance(0), 0.0f, 1.0f) * 100.0f);
    }
 
    // Predictive Modulator node body (Step 8 item 5): Learn/Stop + a progress meter, rank
@@ -11120,8 +11242,19 @@ namespace
          ImDrawList* dl = ImGui::GetWindowDrawList();
          dl->AddRectFilled(p0, ImVec2(p0.x + mw, p0.y + h), IM_COL32(255, 255, 255, 14), 3.0f);
          char label[64];
-         if (learning || (n->HasLearnAttempt() && !n->HasFit()))
-            snprintf(label, sizeof(label), "learning - %d%%", n->LearningPercent());
+         const int pct = n->LearningPercent();
+         if (learning)
+            snprintf(label, sizeof(label), "learning - %d%%", pct);
+         else if (n->HasLearnAttempt() && !n->HasFit())
+         {
+            // Stopped, enough history, and FitDMD still rejected it. Showing "learning - 100%"
+            // here (which is what the single combined branch did) claims a finished model that
+            // does not exist; say what actually happened and what to do about it.
+            if (pct >= 100)
+               snprintf(label, sizeof(label), "no usable fit - play more, Learn again");
+            else
+               snprintf(label, sizeof(label), "stopped early - %d%%, Learn again", pct);
+         }
          else if (n->HasFit())
             snprintf(label, sizeof(label), "fit - radius %.2f", n->SpectralRadius());
          else
@@ -27594,7 +27727,14 @@ namespace
                }
                if (conf >= 0.0f)
                {
-                  ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(34, 197, 94, 255));
+                  // Tint by the value, not a flat green. Since the predictors stopped inventing
+                  // floors, 0% is a real and common answer ("this key has no data of its own"),
+                  // and a confident-looking green 0% is exactly the misread this column is for.
+                  const float t = std::clamp(conf, 0.0f, 1.0f);
+                  const ImU32 col = IM_COL32((int)std::round(148.0f + (34.0f - 148.0f) * t),
+                                             (int)std::round(163.0f + (197.0f - 163.0f) * t),
+                                             (int)std::round(184.0f + (94.0f - 184.0f) * t), 255);
+                  ImGui::PushStyleColor(ImGuiCol_Text, col);
                   ImGui::Text("%d%%", (int)std::round(conf * 100.0f));
                   ImGui::PopStyleColor();
                }

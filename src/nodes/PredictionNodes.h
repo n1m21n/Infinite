@@ -107,17 +107,24 @@ public:
    int Ghost(const ParamKey& k, float* out, int maxPoints);
    // The slot's current position, or -1.
    float SlotPos(const ParamKey& k) const;
-   // B: the currently-bound slot's real 64-bin dwell histogram, for the learned-gesture
-   // readout meter. Returns false (leaving outHist untouched) when there is no bound slot -
-   // the UI must fall back to the existing "drag onto a knob" text rather than draw a fake
-   // or empty histogram. `slotOrdinal` selects among multiple bound slots by insertion
-   // order (0 = first); outKey receives that slot's ParamKey so the caller can label it.
+   // A slot's real 64-bin dwell landscape. No longer drawn in the node body - a single
+   // histogram of slot 0 was being presented as if it described the whole node, when each
+   // destination has its own - but kept as the diagnostic read of what a key actually learned
+   // (tests, and any future per-destination inspector). Returns false, leaving outHist
+   // untouched, past the last slot; `slotOrdinal` is insertion order, outKey names the slot.
    bool ReadHistogramForUI(int slotOrdinal, float outHist[MovementStats::kBins], ParamKey& outKey) const;
    // How much real data backs this slot's model: the key's own effective sample count
    // (Model::nEff, README §6's n_eff) - the number the confidence percentage is actually
    // derived from, surfaced as its own number per the "show numbers, not a graphic" UI
    // decision (Step 8 refinement round 2).
    double SamplesAnalyzedForUI(int slotOrdinal) const;
+   // The same slot's *independent* move count (Model::nEffIndependent). This is the number the
+   // confidence percentage is derived from; SamplesAnalyzedForUI's raw n_eff counts every 10 Hz
+   // dwell sample and runs into the thousands on a knob that was merely left alone.
+   double IndependentSamplesForUI(int slotOrdinal) const;
+   // Live position of a slot by insertion order, for the multi-destination visualiser, plus the
+   // key so the caller can name the destination. Returns false past the last slot.
+   bool ReadSlotForUI(int slotOrdinal, float& outPos, ParamKey& outKey) const;
    // D (Recall UI): how many bars mStats has recorded, so the recallBar stepper can stay
    // disabled ("no bar history yet") until there's something to pick from, without exposing
    // mStats itself.
@@ -133,6 +140,9 @@ public:
       float p[kBins] = {}; // normalised so the bins sum to 1
       float theta = 0.5f, sigma = 0.1f, lo = 0.0f, hi = 1.0f;
       double nEff = 0.0;   // the key's own n_eff
+      // The key's own n_eff after the AR(1) independence deflation - the count w1 is actually
+      // computed from, and the only one it is honest to print next to a confidence percentage.
+      double nEffIndependent = 0.0;
       float w1 = 0.0f;     // weight of the key's own data in the blend (drives the confidence dot)
       float w2 = 0.0f, w2b = 0.0f, w2d = 0.0f, w3 = 0.0f;
       bool cold = true;
