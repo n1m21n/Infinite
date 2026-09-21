@@ -11034,75 +11034,6 @@ namespace
       return out;
    }
 
-   void DrawDriftTraces(DriftNode* n, uint64_t sourceUid)
-   {
-      const int count = n->SlotCount();
-      if (count == 0)
-         return;
-
-      // Sample once per frame per destination, even if the body is drawn twice (node body and
-      // params panel), so the trace scrolls at a rate the user can read rather than at draw rate.
-      const int frame = ImGui::GetFrameCount();
-      std::vector<std::pair<ParamKey, float>> live;
-      live.reserve((size_t)count);
-      for (int i = 0; i < count; i++)
-      {
-         float pos = 0.0f;
-         ParamKey key;
-         if (!n->ReadSlotForUI(i, pos, key))
-            continue;
-         DriftTrace& tr = gDriftTraces[{sourceUid, key}];
-         if (tr.lastFrame != frame)
-         {
-            tr.lastFrame = frame;
-            tr.v[tr.head] = pos;
-            tr.head = (tr.head + 1) % kDriftTraceLen;
-            tr.filled = std::min(tr.filled + 1, kDriftTraceLen);
-         }
-         live.emplace_back(key, pos);
-      }
-      if (live.empty())
-         return;
-
-      // Drop traces for destinations (and nodes) that stopped being drawn. Without this the map
-      // only ever grows over a session, one entry per knob a Drift was ever dragged onto.
-      for (auto it = gDriftTraces.begin(); it != gDriftTraces.end();)
-         it = (frame - it->second.lastFrame > 600) ? gDriftTraces.erase(it) : std::next(it);
-
-      const float w = kPreviewSize;
-      const float h = 56.0f;
-      const ImVec2 origin = ImGui::GetCursorScreenPos();
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      dl->AddRectFilled(origin, ImVec2(origin.x + w, origin.y + h), IM_COL32(255, 255, 255, 12), 2.0f);
-      // Mid-scale hairline: the y axis is fader position 0..1 for every line, which is the only
-      // thing that makes overlaid destinations comparable at all.
-      dl->AddLine(ImVec2(origin.x, origin.y + h * 0.5f), ImVec2(origin.x + w, origin.y + h * 0.5f),
-                  IM_COL32(255, 255, 255, 18));
-      dl->PushClipRect(origin, ImVec2(origin.x + w, origin.y + h), true);
-      for (size_t li = 0; li < live.size(); li++)
-      {
-         const DriftTrace& tr = gDriftTraces[{sourceUid, live[li].first}];
-         if (tr.filled < 2)
-            continue;
-         const ImU32 col = DriftLineColor((int)li, 210);
-         ImVec2 prev;
-         for (int i = 0; i < tr.filled; i++)
-         {
-            // Oldest first: head is the next write slot, so the ring starts `filled` behind it.
-            const int idx = (tr.head - tr.filled + i + kDriftTraceLen * 2) % kDriftTraceLen;
-            const float x = origin.x + w * (float)i / (float)(kDriftTraceLen - 1);
-            const float y = origin.y + h - 2.0f - std::clamp(tr.v[idx], 0.0f, 1.0f) * (h - 4.0f);
-            const ImVec2 p(x, y);
-            if (i > 0)
-               dl->AddLine(prev, p, col, 1.4f);
-            prev = p;
-         }
-         dl->AddCircleFilled(prev, 2.0f, col);
-      }
-      dl->PopClipRect();
-      ImGui::Dummy(ImVec2(w, h));
-   }
-
    // Legend: one row per line, the destination it drives and that destination's own live value.
    // Deliberately no aggregate - no overall value, no min/max - because this node has no single
    // output for one to describe.
@@ -11142,6 +11073,94 @@ namespace
       }
    }
 
+   // The node's main meter, in place of DrawModulatorMeter. Same box, same geometry, same 0..1
+   // axis as every other modulator's preview - but N lines instead of one, because this node has
+   // no single output: each destination gets its own slot and its own value, so the one number
+   // DrawModulatorMeter prints under the box does not exist here and is not drawn.
+   void DrawDriftMeter(DriftNode* n, int nodeIndex)
+   {
+      const float w = kPreviewSize;
+      const float h = 90.0f; // same as DrawModulatorMeter, so the node header keeps its height
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddRectFilled(origin, ImVec2(origin.x + w, origin.y + h), ScopeBgCol(), 4.0f);
+      // Fixed 0..1 axis with quarter guides, exactly as the generic meter draws them: overlaid
+      // destinations are only comparable at all because they share one scale.
+      for (int q = 1; q < 4; q++)
+      {
+         const float gy = origin.y + h - (q * 0.25f) * h;
+         dl->AddLine(ImVec2(origin.x, gy), ImVec2(origin.x + w, gy), ScopeMidLineCol(), q == 2 ? 1.0f : 0.5f);
+      }
+
+      const uint64_t sourceUid = UidForIndex(nodeIndex);
+      const int count = n->SlotCount();
+      if (count == 0)
+      {
+         dl->AddRect(origin, ImVec2(origin.x + w, origin.y + h), ScopeBorderCol(), 4.0f);
+         ImGui::Dummy(ImVec2(w, h));
+         return;
+      }
+
+      // Sample once per frame per destination, even if the body is drawn twice (node body and
+      // params panel), so the trace scrolls at a rate the user can read rather than at draw rate.
+      const int frame = ImGui::GetFrameCount();
+      std::vector<std::pair<ParamKey, float>> live;
+      live.reserve((size_t)count);
+      for (int i = 0; i < count; i++)
+      {
+         float pos = 0.0f;
+         ParamKey key;
+         if (!n->ReadSlotForUI(i, pos, key))
+            continue;
+         DriftTrace& tr = gDriftTraces[{sourceUid, key}];
+         if (tr.lastFrame != frame)
+         {
+            tr.lastFrame = frame;
+            tr.v[tr.head] = pos;
+            tr.head = (tr.head + 1) % kDriftTraceLen;
+            tr.filled = std::min(tr.filled + 1, kDriftTraceLen);
+         }
+         live.emplace_back(key, pos);
+      }
+      if (live.empty())
+      {
+         dl->AddRect(origin, ImVec2(origin.x + w, origin.y + h), ScopeBorderCol(), 4.0f);
+         ImGui::Dummy(ImVec2(w, h));
+         return;
+      }
+
+      // Drop traces for destinations (and nodes) that stopped being drawn. Without this the map
+      // only ever grows over a session, one entry per knob a Drift was ever dragged onto.
+      for (auto it = gDriftTraces.begin(); it != gDriftTraces.end();)
+         it = (frame - it->second.lastFrame > 600) ? gDriftTraces.erase(it) : std::next(it);
+
+      dl->PushClipRect(origin, ImVec2(origin.x + w, origin.y + h), true);
+      for (size_t li = 0; li < live.size(); li++)
+      {
+         const DriftTrace& tr = gDriftTraces[{sourceUid, live[li].first}];
+         if (tr.filled < 2)
+            continue;
+         const ImU32 col = DriftLineColor((int)li, 210);
+         ImVec2 prev;
+         for (int i = 0; i < tr.filled; i++)
+         {
+            // Oldest first: head is the next write slot, so the ring starts `filled` behind it.
+            const int idx = (tr.head - tr.filled + i + kDriftTraceLen * 2) % kDriftTraceLen;
+            const float x = origin.x + w * (float)i / (float)(kDriftTraceLen - 1);
+            const float y = origin.y + h - 2.0f - std::clamp(tr.v[idx], 0.0f, 1.0f) * (h - 4.0f);
+            const ImVec2 p(x, y);
+            if (i > 0)
+               dl->AddLine(prev, p, col, 1.4f);
+            prev = p;
+         }
+         dl->AddCircleFilled(prev, 2.0f, col);
+      }
+      dl->PopClipRect();
+      dl->AddRect(origin, ImVec2(origin.x + w, origin.y + h), ScopeBorderCol(), 4.0f);
+      ImGui::Dummy(ImVec2(w, h));
+      DrawDriftLegend(n);
+   }
+
    void DrawDriftParams(GraphNode& gn, DriftNode* n)
    {
       ModSlider("speed", &n->speed, 0.1f, 4.0f, "%.2fx");
@@ -11178,8 +11197,9 @@ namespace
          else
             ImGui::TextDisabled("profile: no data yet - perform a knob to teach it");
       }
-      DrawDriftTraces(n, UidForIndex(gn.index));
-      DrawDriftLegend(n);
+      // No graph here: the traces and their legend ARE the node's main meter now, drawn once in
+      // the header by DrawDriftMeter. A second copy down here was the duplicate the graph was
+      // supposed to replace.
       for (int i = 0; i < count; i++)
       {
          float pos = 0.0f;
@@ -84089,6 +84109,13 @@ int main(int argc, char** argv)
             DrawMacroRadioSelectorBody(macroRadio);
          else if (auto* macroStepGate = dynamic_cast<MacroStepGateNode*>(gn.node.get()))
             DrawMacroStepGateBody(macroStepGate);
+         else if (!isAudioBody && dynamic_cast<DriftNode*>(gn.node.get()) != nullptr)
+         {
+            // Ahead of the generic IModulator branch: Drift drives one independent value per
+            // destination, so the single-history meter below would have to pick one and present
+            // it as the node's output. DrawDriftMeter draws the same box with every line in it.
+            DrawDriftMeter(dynamic_cast<DriftNode*>(gn.node.get()), gn.index);
+         }
          else if (!isAudioBody && dynamic_cast<IModulator*>(gn.node.get()) != nullptr)
          {
             // Audio/note nodes are excluded here even when they implement
