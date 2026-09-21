@@ -113,6 +113,14 @@ namespace MovementStats
    constexpr double kRoleN0Mult = 3.0;       // role prior is weaker: larger N0
    constexpr double kFamilyN0Mult = 6.0;
    constexpr float kAnchorWidth = 0.04f;     // sd of the anchor peak, fader space
+   // Dwell budget. A hold is not cleared when the hand lets go (there is no release event at the
+   // stats layer), so Tick keeps re-absorbing the *same* resting position at full hand weight for
+   // as long as the transport runs. Unbounded, that makes "where I parked it and walked away" the
+   // dominant fact about every knob and buries the gesture you actually performed. Full weight for
+   // the first kDwellFullTicks, then an exponential fade, so settling still counts - it just cannot
+   // count forever.
+   constexpr int kDwellFullTicks = 40;        // 4 s at kGridDt
+   constexpr double kDwellDecayTicks = 100.0; // e-fold of the fade after that
    constexpr double kAutoCutWindowSec = 2.0 * 3600.0;   // active time
    constexpr double kAutoCutDrop = 0.25;                // relative entropy loss that trips the cut
    constexpr double kMonitorPeriodSec = 10.0;           // active time between monitor checks
@@ -137,6 +145,13 @@ namespace MovementStats
       float lo = 0.0f, hi = 1.0f;
       double w1 = 0, w2 = 0, w2b = 0, w2d = 0, w3 = 0, wYou = 0, w4 = 1;
       double nKey = 0;           // raw n_eff of the key itself
+      // The same count after the AR(1) independence deflation - i.e. how many *independent*
+      // moves this key really contributes, which is what w1 (and therefore every confidence
+      // readout) is actually computed from. nKey alone is dwell-inflated: a knob left parked
+      // while the transport runs accrues thousands of identical samples that carry almost no
+      // information, and showing that number next to a confidence percentage was the headline
+      // dishonesty in the Drift node's readout.
+      double nKeyIndependent = 0;
    };
 
    struct Monitor
@@ -398,6 +413,10 @@ namespace MovementStats
          MovementLog::Source holdSrc = MovementLog::Source::Hand;
          uint8_t holdFlags = 0;
          bool changedSinceTick = false;
+         // Ticks this hold has been re-absorbed without the value changing - what the dwell
+         // budget above is spent against. Reset on every real Observe, so each fresh visit to a
+         // resting position gets its own full budget.
+         int holdTicks = 0;
          // AR chain.
          bool prevValid = false;
          float prevPos = 0;

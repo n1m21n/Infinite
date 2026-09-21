@@ -56,6 +56,16 @@ float SourceWeight(Source src, uint8_t flags, bool changedThisTick)
    return 0.0f;
 }
 
+// How much a sample is still worth after the hold has sat unchanged for `holdTicks` ticks.
+// See kDwellFullTicks in the header for why this exists. Prediction and other machine sources
+// are budgeted too: an LFO parked at a rail is the same failure mode with a different author.
+double DwellWeight(int holdTicks)
+{
+   if (holdTicks <= kDwellFullTicks)
+      return 1.0;
+   return std::exp(-(double)(holdTicks - kDwellFullTicks) / kDwellDecayTicks);
+}
+
 bool PoolIsHuman(Pool p) { return p == kPoolDeliberate || p == kPoolExploratory; }
 
 Pool ClassifyPool(Source src, uint8_t flags, bool changed)
@@ -259,6 +269,7 @@ void Engine::BeginSession()
       r.holdValid = false;
       r.prevValid = false;
       r.changedSinceTick = false;
+      r.holdTicks = 0;
       r.lastHandT = -1e18;
       r.lastObsHandT = -1e18;
       r.handN = 0;
@@ -354,6 +365,7 @@ void Engine::Observe(const KeyId& id, double t, float pos, Source src, uint8_t f
    r.holdSrc = src;
    r.holdFlags = flags;
    r.changedSinceTick = true;
+   r.holdTicks = 0;
 }
 
 void Engine::Decay(ParamStats& s) const
@@ -768,15 +780,29 @@ void Engine::Tick(double tickTime)
       double w = SourceWeight(r.holdSrc, r.holdFlags, r.changedSinceTick);
       if (isPred)
          w = (r.changedSinceTick && !r.cut) ? mPredWeight : 0.0; // an auto-cut key stops learning from itself
+      // The hold only ever changes through Observe, which is only called when the value changes,
+      // so an untouched knob re-absorbs its resting position on every tick for the rest of the
+      // session. Charge that against the dwell budget.
+      r.holdTicks = r.changedSinceTick ? 0 : (r.holdTicks + 1);
+      w *= DwellWeight(r.holdTicks);
       r.changedSinceTick = false;
       if (w > 0.0)
       {
          const double wPred = isPred ? w : 0.0;
          const int bin = PosBin(r.holdPos);
-         if (isHand)
+         if (isHand && r.holdTicks == 0)
          {
-            // Grade the pools on where the hand actually went BEFORE this sample is absorbed.
+            // Grade the pools on where the hand actually went BEFORE this sample is absorbed -
+            // and only on a sample the hand actually produced. A stale hold re-scores the same
+            // bin on every tick, which hands a runaway win to whichever pool already peaks
+            // there: the same unbounded-repetition problem the dwell budget fixes for the
+            // landscape, one layer up in the grader that decides which pool is trusted.
             ScorePools(r, bin);
+            // Presence is "a human is in the room", and the only evidence of that is a value
+            // that actually moved - which is why this sits inside the holdTicks == 0 branch. A
+            // stale Hand hold is re-read forever, so crediting presence for it left the gate
+            // permanently open after the first knob move of the session, which is exactly the
+            // overnight-automation flood the gate exists to stop.
             mLastPresenceActive = mActiveClock;
          }
          // A machine source may only accumulate while a human was recently here. Transport
@@ -1077,6 +1103,7 @@ void Engine::ComputeBlend(const KeyId& id, float anchor, Blend& out, int section
    out.w1 = cp.w[0]; out.w2 = cp.w[1]; out.w2b = cp.w[2]; out.w2d = cp.w[3];
    out.w3 = 0.0; out.wYou = ct.wYou; out.w4 = cp.rest;
    out.nKey = lv[0] != nullptr ? EffectiveN(*lv[0], now) : 0.0;
+   out.nKeyIndependent = nP[0] > 0.0 ? nP[0] : nInd[0];
 
    // Range: declared min/max (the whole fader) until the key's own data carries real weight.
    out.lo = 0.0f;

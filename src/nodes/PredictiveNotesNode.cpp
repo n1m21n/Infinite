@@ -448,16 +448,22 @@ void PredictiveNotesNode::VisitParams(ParamVisitor& v)
 
 float PredictiveNotesNode::Confidence01() const
 {
-   if (sourceMode == 1)
-      return 0.85f;
-   if (mLearning)
-      return std::clamp((float)mNotesCaptured / 32.0f, 0.1f, 0.85f);
-   if (mLearned == 0)
+   // This used to be a shape, not a measurement: a fixed 0.85 for Movement source, a
+   // notes-captured ramp while learning, and 0.40 + 0.50*(1 - exp(-learned/20)) afterwards - so a
+   // model that predicted nothing still displayed ~90% conf once enough notes had gone past it.
+   //
+   // The node already computes the only honest number available: mCurve holds the held-out
+   // cross-entropy gain in bits per event over an order-0 baseline (UpdateMeter, via
+   // NoteModel::HeldOutCrossEntropy). Report that, mapped through 1 - 2^-gain, which is the
+   // fraction of the baseline's uncertainty the model actually removes: 0 bits -> 0%, 1 bit ->
+   // 50%, 2 bits -> 75%. No floor, because "I have learned nothing yet" is a real answer and the
+   // status line next to this badge already says what it is doing instead.
+   if (mCurve.empty())
       return 0.0f;
-   float conf = 0.40f + 0.50f * (1.0f - std::exp(-(float)mLearned / 20.0f));
-   if (!mCurve.empty() && mCurve.back() > 0.0f)
-      conf += std::clamp(mCurve.back() * 0.05f, 0.0f, 0.08f);
-   return std::clamp(conf, 0.1f, 0.98f);
+   const float gain = mCurve.back();
+   if (!(gain > 0.0f))
+      return 0.0f;
+   return std::clamp(1.0f - std::exp2(-gain), 0.0f, 1.0f);
 }
 
 int PredictiveNotesNode::LastNote() const { return mAudioNode ? mAudioNode->LastNote() : -1; }
@@ -599,11 +605,20 @@ void PredictiveNotesNode::CookIfNeeded(int frameId)
       if (NoteModel::DecodeEvents(model, ev) && ev.size() >= 2)
       {
          mLearned = (int)ev.size();
+         // Re-measure the model that just came off disk. Confidence01 reports the held-out gain
+         // in mCurve, which is runtime-only state - without this a patch-loaded model would read
+         // 0% forever even though the same events measured fine in the session that learned
+         // them. Cheap: the same call UpdateMeter already makes once per captured bar.
+         mCurve.clear();
+         float ceModel = 0.0f, ceBase = 0.0f;
+         if (NoteModel::HeldOutCrossEntropy(ev, std::clamp(memory, 0, NoteModel::kMaxOrder), ceModel, ceBase))
+            mCurve.push_back(ceBase - ceModel);
          StartBuild(ev);
       }
       else
       {
          mLearned = 0;
+         mCurve.clear();
          SwapIn(nullptr);
       }
    }
