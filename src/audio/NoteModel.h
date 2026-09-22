@@ -30,19 +30,32 @@ namespace NoteModel
    constexpr int kVelBins = 8;
    constexpr int kMaxAlphabet = kMaxIoiTicks + 1;
 
-   enum Viewpoint { kPitch = 0, kIoi, kDur, kVel, kNumViewpoints };
+   // Root-relative pitch (Predictive Bassline, step-11): the key-fold this file's own comment above
+   // says a non-absolute pitch model needs. Signed semitone interval from whatever root was active
+   // at learn time, clamped to +-kRelPitchRange and stored as an offset symbol 0..kRelPitchAlphabet-1
+   // so it fits the same CtxSlot/PairSlot machinery every other viewpoint uses.
+   constexpr int kRelPitchRange = 24; // +-2 octaves; a bass mostly stays much closer than this
+   constexpr int kRelPitchAlphabet = kRelPitchRange * 2 + 1;
+
+   enum Viewpoint { kPitch = 0, kIoi, kDur, kVel, kPitchRel, kNumViewpoints };
 
    // One learned note. `ioiTicks` is the spacing from the previous event's onset (0 = same onset,
    // 0 for the first event); `metric` is the sixteenth within the bar of this event's own onset.
+   // `relPitch` is only populated by learners that track a live root (Predictive Bassline); every
+   // other producer leaves it at 0, which folds harmlessly into kPitchRel's "root" symbol.
    struct Event
    {
       uint8_t note = 60;
       uint8_t vel = 90;    // 0..127
       uint8_t metric = 0;  // 0..15
-      uint8_t pad = 0;
+      int8_t relPitch = 0; // signed semitones from the root active when this note was learned
       uint16_t ioiTicks = 0;
       uint16_t durTicks = 0;
    };
+
+   // Clamp + symbol conversion for relPitch <-> kPitchRel's alphabet.
+   int RelPitchSymbol(int semitones);
+   int SymbolToRelPitch(int symbol);
 
    struct CtxSlot
    {
@@ -123,6 +136,11 @@ namespace NoteModel
       void Reset(const Tables* t, uint32_t seed);
       // Next event after an onset at `prevOnsetBeats`.
       void Next(const Tables& t, const Params& p, double prevOnsetBeats, double beatsPerBar, Out& o);
+      // Predictive Bassline (step-11): samples rhythm/duration/velocity exactly like Next(), but
+      // samples pitch from kPitchRel instead of kPitch and resolves it against `liveRootNote` - the
+      // root sampled at learn time is irrelevant, only the root sounding right now matters.
+      void NextBassline(const Tables& t, const Params& p, double prevOnsetBeats, double beatsPerBar,
+                         int liveRootNote, Out& o);
       const Tables* Bound() const { return mBound; }
 
    private:

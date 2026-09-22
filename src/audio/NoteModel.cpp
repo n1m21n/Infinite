@@ -9,7 +9,7 @@ namespace NoteModel
 {
    namespace
    {
-      constexpr int kAlphabet[kNumViewpoints] = { 128, kMaxAlphabet, kDurBins, kVelBins };
+      constexpr int kAlphabet[kNumViewpoints] = { 128, kMaxAlphabet, kDurBins, kVelBins, kRelPitchAlphabet };
 
       uint64_t Mix(uint64_t h, uint64_t v)
       {
@@ -92,7 +92,7 @@ namespace NoteModel
       {
          std::vector<uint16_t> sym[kNumViewpoints];
          std::vector<uint8_t> metricCtx[kNumViewpoints];
-         int first[kNumViewpoints] = { 0, 1, 0, 0 }; // spacing of event 0 is undefined
+         int first[kNumViewpoints] = { 0, 1, 0, 0, 0 }; // spacing of event 0 is undefined
       };
       Seq MakeSeq(const std::vector<Event>& ev)
       {
@@ -109,10 +109,12 @@ namespace NoteModel
             q.sym[kIoi][t] = (uint16_t)std::min<int>(ev[t].ioiTicks, kMaxIoiTicks);
             q.sym[kDur][t] = (uint16_t)DurBin(ev[t].durTicks);
             q.sym[kVel][t] = (uint16_t)VelBin(ev[t].vel);
+            q.sym[kPitchRel][t] = (uint16_t)RelPitchSymbol(ev[t].relPitch);
             q.metricCtx[kPitch][t] = 0;
             q.metricCtx[kIoi][t] = t > 0 ? ev[t - 1].metric : 0;
             q.metricCtx[kDur][t] = ev[t].metric;
             q.metricCtx[kVel][t] = ev[t].metric;
+            q.metricCtx[kPitchRel][t] = 0;
          }
          return q;
       }
@@ -233,6 +235,8 @@ namespace NoteModel
       return std::clamp((int)std::lround(2.0 * std::log2(t / 2.0)), 0, kDurBins - 1);
    }
    int VelBin(int vel127) { return std::clamp(vel127 * kVelBins / 128, 0, kVelBins - 1); }
+   int RelPitchSymbol(int semitones) { return std::clamp(semitones, -kRelPitchRange, kRelPitchRange) + kRelPitchRange; }
+   int SymbolToRelPitch(int symbol) { return std::clamp(symbol, 0, kRelPitchAlphabet - 1) - kRelPitchRange; }
    int MetricOf(double beatInBar) { return std::clamp((int)std::floor(beatInBar * 4.0 + 1e-6), 0, 15); }
    int SnapTicks(double beats) { return (int)std::lround(beats * (double)kTicksPerBeat); }
 
@@ -309,7 +313,7 @@ namespace NoteModel
          b.push_back(e.note);
          b.push_back(e.vel);
          b.push_back(e.metric);
-         b.push_back(0);
+         b.push_back((uint8_t)e.relPitch); // was always-zero pad; old files decode this as relPitch 0
          b.push_back((uint8_t)(e.ioiTicks & 0xFF));
          b.push_back((uint8_t)(e.ioiTicks >> 8));
          b.push_back((uint8_t)(e.durTicks & 0xFF));
@@ -337,6 +341,7 @@ namespace NoteModel
          e.note = std::min<uint8_t>(p[0], 127);
          e.vel = std::min<uint8_t>(p[1], 127);
          e.metric = std::min<uint8_t>(p[2], 15);
+         e.relPitch = (int8_t)p[3];
          e.ioiTicks = (uint16_t)std::min<int>(p[4] | (p[5] << 8), kMaxIoiTicks);
          e.durTicks = (uint16_t)std::min<int>(p[6] | (p[7] << 8), kMaxIoiTicks);
       }
@@ -538,6 +543,57 @@ namespace NoteModel
 
       const float uLen = Rand01(), uVel = Rand01();
       o.note = pitch;
+      double ticks = t.durMeanTicks[dur];
+      ticks *= std::exp((double)p.lengthSpread * (2.0 * uLen - 1.0) * 0.9);
+      o.durBeats = std::clamp(ticks / (double)kTicksPerBeat, 1.0 / 48.0, 8.0);
+      float v01 = t.velMean[vel] / 127.0f + (2.0f * uVel - 1.0f) * p.velSpread * 0.3f;
+      o.velocity = std::clamp(v01, 0.05f, 1.0f);
+   }
+
+   void Player::NextBassline(const Tables& t, const Params& p, double prevOnsetBeats, double beatsPerBar,
+                              int liveRootNote, Out& o)
+   {
+      const float stray = std::clamp(p.stray, 0.0f, 1.0f);
+      const bool replay = stray < 0.05f;
+      const int order = std::clamp(p.memory, 0, kMaxOrder);
+      const double bpb = std::max(1.0, beatsPerBar);
+      auto metricAt = [bpb](double beats) {
+         double b = std::fmod(beats, bpb);
+         if (b < 0.0)
+            b += bpb;
+         return MetricOf(b);
+      };
+
+      int ioi = SampleView(t, kIoi, order, metricAt(prevOnsetBeats), stray, replay, p);
+      if (ioi < 0)
+         ioi = kTicksPerBeat / 4;
+      o.ioiTicks = ioi;
+      o.onsetBeats = prevOnsetBeats + (double)ioi / (double)kTicksPerBeat;
+      const int metric = metricAt(o.onsetBeats);
+
+      int relSym = SampleView(t, kPitchRel, order, 0, stray, replay, p);
+      int dur = SampleView(t, kDur, order, metric, stray, replay, p);
+      int vel = SampleView(t, kVel, order, metric, stray, replay, p);
+      if (relSym < 0)
+         relSym = RelPitchSymbol(0);
+      if (dur < 0)
+         dur = 4;
+      if (vel < 0)
+         vel = kVelBins / 2;
+
+      const int viewpoints[4] = { (int)kIoi, (int)kDur, (int)kVel, (int)kPitchRel };
+      const int symbols[4] = { ioi, dur, vel, relSym };
+      for (int i = 0; i < 4; i++)
+      {
+         const int v = viewpoints[i];
+         for (int k = kMaxOrder - 1; k > 0; k--)
+            mHist[v][k] = mHist[v][k - 1];
+         mHist[v][0] = (uint16_t)symbols[i];
+         mHistLen[v] = std::min(kMaxOrder, mHistLen[v] + 1);
+      }
+
+      const float uLen = Rand01(), uVel = Rand01();
+      o.note = std::clamp(liveRootNote + SymbolToRelPitch(relSym), 0, 127);
       double ticks = t.durMeanTicks[dur];
       ticks *= std::exp((double)p.lengthSpread * (2.0 * uLen - 1.0) * 0.9);
       o.durBeats = std::clamp(ticks / (double)kTicksPerBeat, 1.0 / 48.0, 8.0);
