@@ -1,5 +1,58 @@
 [
   {
+    "hash": "0368fedc326b712db3242084ec1294fe75d39149",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Tue Sep 22 19:57:38 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/connection-rules-doc-and-hardening into main",
+      "description": "Merge feature/connection-rules-doc-and-hardening into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/connection-rules-doc-and-hardening into main"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "1c47326ce40646e929bb82c87b5b8c1aac40ac78",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Tue Sep 22 19:57:37 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/predictive-coloring-instance-weighted-confidence into main",
+      "description": "Merge feature/predictive-coloring-instance-weighted-confidence into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/predictive-coloring-instance-weighted-confidence into main"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "b4526db77a29355b550590cafba5dac299689ea4",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Tue Sep 22 19:57:33 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Predictive Coloring badge fix, duplicate-reset guard, and shared 80/20 engines for Notes/Rhythm",
+      "description": "Predictive Coloring badge fix, duplicate-reset guard, and shared 80/20 engines for Notes/Rhythm",
+      "bullets": [
+        "Predictive Coloring: badge shows this take's own local progress while",
+        "CopyParams (main.cpp) resets learned state on duplicate/copy-paste for",
+        "Predictive Notes/Rhythm: new cross-session \"house style\" shared",
+        "Update semi-brain extracted corpora and training datasets."
+      ],
+      "body": "learning is active instead of the mostly-static blended confidence;\nflip confidence blend to 80% local / 20% shared.\nall four Learn-button Predictive nodes so a copy starts at \"press\nLearn\" instead of inheriting the source's exact trained model.\nengines (GlobalEngine, persisted to notes_style.bin/rhythm_style.bin),\nblended into Confidence01() at 80% local / 20% shared, cached against\nthe shared pool's version to avoid a per-frame held-out cross-entropy\npass. Predictive Modulator intentionally has no shared engine - its\nDMD fit is per-instance-signal-specific.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Predictive Coloring badge fix, duplicate-reset guard, and shared 80/20 engines for Notes/Rhythm\n\n- Predictive Coloring: badge shows this take's own local progress while\n  learning is active instead of the mostly-static blended confidence;\n  flip confidence blend to 80% local / 20% shared.\n- CopyParams (main.cpp) resets learned state on duplicate/copy-paste for\n  all four Learn-button Predictive nodes so a copy starts at \"press\n  Learn\" instead of inheriting the source's exact trained model.\n- Predictive Notes/Rhythm: new cross-session \"house style\" shared\n  engines (GlobalEngine, persisted to notes_style.bin/rhythm_style.bin),\n  blended into Confidence01() at 80% local / 20% shared, cached against\n  the shared pool's version to avoid a per-frame held-out cross-entropy\n  pass. Predictive Modulator intentionally has no shared engine - its\n  DMD fit is per-instance-signal-specific.\n- Update semi-brain extracted corpora and training datasets.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "src/main.cpp                                       |  36 +-\n src/nodes/PredictiveColoringNode.cpp               |  17 +-\n src/nodes/PredictiveColoringNode.h                 |   5 +\n src/nodes/PredictiveModulatorNode.cpp              |  14 +\n src/nodes/PredictiveModulatorNode.h                |   4 +\n src/nodes/PredictiveNotesNode.cpp                  | 136 +++++-\n src/nodes/PredictiveNotesNode.h                    |  16 +\n src/nodes/PredictiveRhythmNode.cpp                 | 132 +++++-\n src/nodes/PredictiveRhythmNode.h                   |  15 +\n .../1_extractors/output/git_commits_corpus.json    |  32 ++\n .../1_extractors/output/recovered_docs_corpus.json | 496 ++++++++++-----------\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl | 162 +++----\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl | 162 +++----\n 13 files changed, 806 insertions(+), 421 deletions(-)"
+  },
+  {
     "hash": "6e2cc2006daca0f4f465203713fb555ebd09667f",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
@@ -849,6 +902,22 @@
       "raw": "Make Predictive Notes observable to the audio param sweep\n\nThe 8 params were pushed to the audio thread all along (PushParams stores every\none on each cook). The sweep rig could not see them: Notes mode plays nothing\nuntil a model is learned, and the headless transport clock never moves, so the\nscheduler never reached a second onset.\n\nAdd INode::SweepPrepare (seed non-param state) and INode::SweepNeedsClock (run\nthe transport from beat 0 for that rig, 16x real time). Predictive Notes\nimplements both. All 9 params now pass; nothing is baselined.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
     },
     "stat": "src/core/INode.h                  |  8 ++++++++\n src/main.cpp                      | 29 +++++++++++++++++++++++++++++\n src/nodes/PredictiveNotesNode.cpp |  8 ++++++++\n src/nodes/PredictiveNotesNode.h   |  2 ++\n 4 files changed, 47 insertions(+)"
+  },
+  {
+    "hash": "a8fbab9427f8bf4cbc445146b76bef15ab9f92dd",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sun Sep 20 22:45:12 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Document the connection rules, and put the predictor rule where all four paths see it",
+      "description": "Document the connection rules, and put the predictor rule where all four paths see it",
+      "bullets": [],
+      "body": "Four paths can make a connection - the live drag, ConnectNodes (the\nRemoteControl `connect` RPC, auto_wire_inputs, and cluster copy/paste), the\ndrag-to-empty-canvas auto-wire, and the node suggestions that drop offers.\nOnly one of them knew that a Predictive LFO / Macro cannot drive another\nnode: the refusal sat in the ed::QueryNewLink handler, after\nIsInputSlotCompatible had already said yes. So the RPC would wire a\npredictor into a Smooth or a Math, paste would carry such a link, and\ndropping a predictor's cable on blank canvas would suggest nodes it then\nauto-wired to a permanently dead value.\nMove the rule into IsInputSlotCompatible, as a required `srcIsPredictor`\nparameter rather than a defaulted one, so a future call site cannot quietly\nreopen the hole - the compiler names it instead. All three WireInputSlot\ncallers now go through that check.\nTwo refused drags also used to leave the cable red with no tooltip, because\nthe reason chain was gated on `differentNodes`: connecting a node to itself,\nand dragging output-to-output or input-to-input. Both now say why.\ndocs/reference/connection-rules.md writes down the accept chain and all 38\nrefusal messages in one place for the first time - the verdict lives in\nIsInputSlotCompatible and the wording lives 78k lines away, with nothing\nstructural tying them together. check.py now fails if a message exists in\nthe code but not the doc, or in the doc but not the code, matched verbatim,\nso the two cannot drift the way the predictor rule already had.\nAlso raise NOTEFANOUTTEST's frame budget from 4 to 12: it fires at frame 4\nand never had the headroom to print its verdict, so the sweep read it as a\nfailure.\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>",
+      "raw": "Document the connection rules, and put the predictor rule where all four paths see it\n\nFour paths can make a connection - the live drag, ConnectNodes (the\nRemoteControl `connect` RPC, auto_wire_inputs, and cluster copy/paste), the\ndrag-to-empty-canvas auto-wire, and the node suggestions that drop offers.\nOnly one of them knew that a Predictive LFO / Macro cannot drive another\nnode: the refusal sat in the ed::QueryNewLink handler, after\nIsInputSlotCompatible had already said yes. So the RPC would wire a\npredictor into a Smooth or a Math, paste would carry such a link, and\ndropping a predictor's cable on blank canvas would suggest nodes it then\nauto-wired to a permanently dead value.\n\nMove the rule into IsInputSlotCompatible, as a required `srcIsPredictor`\nparameter rather than a defaulted one, so a future call site cannot quietly\nreopen the hole - the compiler names it instead. All three WireInputSlot\ncallers now go through that check.\n\nTwo refused drags also used to leave the cable red with no tooltip, because\nthe reason chain was gated on `differentNodes`: connecting a node to itself,\nand dragging output-to-output or input-to-input. Both now say why.\n\ndocs/reference/connection-rules.md writes down the accept chain and all 38\nrefusal messages in one place for the first time - the verdict lives in\nIsInputSlotCompatible and the wording lives 78k lines away, with nothing\nstructural tying them together. check.py now fails if a message exists in\nthe code but not the doc, or in the doc but not the code, matched verbatim,\nso the two cannot drift the way the predictor rule already had.\n\nAlso raise NOTEFANOUTTEST's frame budget from 4 to 12: it fires at frame 4\nand never had the headroom to print its verdict, so the sweep read it as a\nfailure.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+    },
+    "stat": ".claude/skills/cable-logic-sweep/check.py  |  46 ++++++-\n .claude/skills/cable-logic-sweep/driver.sh |   2 +-\n docs/reference/connection-rules.md         | 187 +++++++++++++++++++++++++++++\n src/main.cpp                               |  79 +++++++++---\n 4 files changed, 296 insertions(+), 18 deletions(-)\n create mode 100644 docs/reference/connection-rules.md"
   },
   {
     "hash": "70faad15f51fc55f03796e8e95e257911b6bb313",
@@ -9663,57 +9732,71 @@
   },
   {
     "hash": "3587e2e9226a4ada9b6e466a6662b69f696a50d7",
-    "author_name": "n1m21n",
-    "author_email": "namansoniii21@gmail.com",
-    "author_date": "Fri Sep 4 20:34:22 2026 +0530",
-    "parsed_message": {
-      "type": "feat",
-      "scope": "core",
-      "title": "Merge branch 'claude/node-reference-manual-update-fb24b9'",
-      "description": "Merge branch 'claude/node-reference-manual-update-fb24b9'",
-      "bullets": [],
-      "body": "Updates the Node Reference Manual with nodes added since it was last\ngenerated.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
-      "raw": "Merge branch 'claude/node-reference-manual-update-fb24b9'\n\nUpdates the Node Reference Manual with nodes added since it was last\ngenerated.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
-    },
-    "stat": ""
+ "src/main.cpp                   | 58 +++++++++++++++++++++++++++++-------------\n src/nodes/FieldElementNode.cpp | 11 +++++++-\n src/nodes/FieldSampleNode.cpp  | 11 ++++++++\n src/nodes/FieldSynthNode.cpp   | 46 ---------------------------------\n 4 files changed, 61 insertions(+), 65 deletions(-)"
   },
   {
-    "hash": "2c1256282b252bf071cadcc7117e86571b5d510d",
+    "hash": "906b8bad98b64d8accecb6f15fe8f2bc5e090206",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
-    "author_date": "Fri Sep 4 20:34:15 2026 +0530",
-    "parsed_message": {
-      "type": "feat",
-      "scope": "core",
-      "title": "Update Node Reference Manual with nodes added since last revision",
-      "description": "Update Node Reference Manual with nodes added since last revision",
-      "bullets": [],
-      "body": "Adds a new Field Language chapter (FieldPixel, Field Modifier, Field\nPrimitive, Field Synth, Field Effect) and cards for 22 other nodes\nadded since the manual was last generated: Video In, Equation Synth,\nSlicer, Molder, Grain Molder, Audio Color Ramp, Note Merge, Note\nSwitcher, Geometry Table, OSC Receive, OSC Send, and 7 Macro control\nnodes. Counts updated throughout (142 node types, 196 spawnable, 20\nchapters). Regenerated via headless Chrome from a hand-authored HTML\nsource matching the original's visual design.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
-      "raw": "Update Node Reference Manual with nodes added since last revision\n\nAdds a new Field Language chapter (FieldPixel, Field Modifier, Field\nPrimitive, Field Synth, Field Effect) and cards for 22 other nodes\nadded since the manual was last generated: Video In, Equation Synth,\nSlicer, Molder, Grain Molder, Audio Color Ramp, Note Merge, Note\nSwitcher, Geometry Table, OSC Receive, OSC Send, and 7 Macro control\nnodes. Counts updated throughout (142 node types, 196 spawnable, 20\nchapters). Regenerated via headless Chrome from a hand-authored HTML\nsource matching the original's visual design.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
-    },
-    "stat": "Infinite_Node_Reference_Manual.pdf                | Bin 3731958 -> 1607699 bytes\n website/assets/Infinite_Node_Reference_Manual.pdf | Bin 3731958 -> 1607699 bytes\n 2 files changed, 0 insertions(+), 0 deletions(-)"
-  },
-  {
-    "hash": "f7c9903607b3a287beab0e0d5db6f7cbb392758e",
-    "author_name": "n1m21n",
-    "author_email": "namansoniii21@gmail.com",
-    "author_date": "Fri Sep 4 20:07:24 2026 +0530",
+    "author_date": "Fri Sep 4 20:06:27 2026 +0530",
     "parsed_message": {
       "type": "fix",
-      "scope": "field",
-      "title": "Fix topbar transport drag/alignment, Field Effect/Modifier first-spawn params, presets",
-      "description": "Fix topbar transport drag/alignment, Field Effect/Modifier first-spawn params, presets",
-      "bullets": [
-        "Stabilize BPM/time-signature drag widget IDs with \"###\" suffixes so",
-        "Widen the transport row's FramePadding/ItemSpacing style scope to",
-        "Seed FieldSampleNode and FieldElementNode from their first factory",
-        "Remove \"Polyphonic FM Bell\" and \"Acid Square Bass\" from Field Synth",
-        "Rename \"FieldPixel\" to display as \"field pixel\" in search/spawn"
-      ],
-      "body": "a fast drag no longer loses ActiveId to the node-editor canvas pan.\ncover Stop/Start Audio through the bar/beat readout, fixing baseline\nmisalignment across the row.\npreset in the constructor (matching their sibling Field nodes) so\nparams are visible on first spawn instead of only after switching\npresets once.\nfactory presets.\nmenus, matching its Field* siblings (registered type key unchanged).\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
-      "raw": "Fix topbar transport drag/alignment, Field Effect/Modifier first-spawn params, presets\n\n- Stabilize BPM/time-signature drag widget IDs with \"###\" suffixes so\n  a fast drag no longer loses ActiveId to the node-editor canvas pan.\n- Widen the transport row's FramePadding/ItemSpacing style scope to\n  cover Stop/Start Audio through the bar/beat readout, fixing baseline\n  misalignment across the row.\n- Seed FieldSampleNode and FieldElementNode from their first factory\n  preset in the constructor (matching their sibling Field nodes) so\n  params are visible on first spawn instead of only after switching\n  presets once.\n- Remove \"Polyphonic FM Bell\" and \"Acid Square Bass\" from Field Synth\n  factory presets.\n- Rename \"FieldPixel\" to display as \"field pixel\" in search/spawn\n  menus, matching its Field* siblings (registered type key unchanged).\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+      "scope": "ui",
+      "title": "Fix 2px dropdown misalignment vs slider/knob pin offset",
+      "description": "Fix 2px dropdown misalignment vs slider/knob pin offset",
+      "bullets": [],
+      "body": "DropdownButton subtracted 18px (a 14px pin box + 4px gap) from its\nbutton width to make room for the modulation pin, but\nDrawDiscreteParamPin actually draws a 12px box - the convention used\neverywhere else (e.g. AudioKnobRow's Dropdown, pinW = 16.0f). The\nmismatch shifted every dropdown button 2px left of the slider/knob\nrows stacked above it.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Fix 2px dropdown misalignment vs slider/knob pin offset\n\nDropdownButton subtracted 18px (a 14px pin box + 4px gap) from its\nbutton width to make room for the modulation pin, but\nDrawDiscreteParamPin actually draws a 12px box - the convention used\neverywhere else (e.g. AudioKnobRow's Dropdown, pinW = 16.0f). The\nmismatch shifted every dropdown button 2px left of the slider/knob\nrows stacked above it.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
     },
-    "stat": "src/main.cpp                   | 58 +++++++++++++++++++++++++++++-------------\n src/nodes/FieldElementNode.cpp | 11 +++++++-\n src/nodes/FieldSampleNode.cpp  | 11 ++++++++\n src/nodes/FieldSynthNode.cpp   | 46 ---------------------------------\n 4 files changed, 61 insertions(+), 65 deletions(-)"
+    "stat": "src/main.cpp | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
+  },
+  {
+    "hash": "6a7969b95005e87d30a0addecc81ef2068e2e42c",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 4 19:10:41 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Remove graphify agent rules/workflow files",
+      "description": "Remove graphify agent rules/workflow files",
+      "bullets": [],
+      "body": "Part of uninstalling graphify from this repo.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Remove graphify agent rules/workflow files\n\nPart of uninstalling graphify from this repo.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".agents/rules/graphify.md     | 14 --------------\n .agents/workflows/graphify.md | 10 ----------\n 2 files changed, 24 deletions(-)\n delete mode 100644 .agents/rules/graphify.md\n delete mode 100644 .agents/workflows/graphify.md"
+  },
+  {
+    "hash": "4b7688afd4109a882f4ce3b16e16a3f82ce46135",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 4 19:07:54 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Gitignore graphify-out/",
+      "description": "Gitignore graphify-out/",
+      "bullets": [],
+      "body": "It was never actually excluded - the prior cleanup only removed already-tracked files. Adding the real ignore entry so it can't get committed or show up as untracked noise again.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Gitignore graphify-out/\n\nIt was never actually excluded - the prior cleanup only removed already-tracked files. Adding the real ignore entry so it can't get committed or show up as untracked noise again.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".gitignore | 3 +++\n 1 file changed, 3 insertions(+)"
+  },
+  {
+    "hash": "c493eaeb62ae71f2ae6035dce8ceb868ea2f0900",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 4 19:01:47 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Remove graphify-out/ from version control",
+      "description": "Remove graphify-out/ from version control",
+      "bullets": [],
+      "body": "It's a local codebase analysis cache (2000+ generated JSON files, ~4.3M lines) that got committed before .gitignore excluded it. Regenerated on demand, doesn't belong in the repo.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Remove graphify-out/ from version control\n\nIt's a local codebase analysis cache (2000+ generated JSON files, ~4.3M lines) that got committed before .gitignore excluded it. Regenerated on demand, doesn't belong in the repo.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "graphify-out/.graphify_labels.json                 |    4253 -\n graphify-out/.graphify_labels.json.sig             |       1 -\n graphify-out/.graphify_root                        |       1 -\n graphify-out/2026-09-04/.graphify_labels.json      |    4267 -\n graphify-out/2026-09-04/GRAPH_REPORT.md            |    7589 -\n graphify-out/2026-09-04/graph.json                 | 2066097 ----------------\n graphify-out/2026-09-04/manifest"src/main.cpp                   | 58 +++++++++++++++++++++++++++++-------------\n src/nodes/FieldElementNode.cpp | 11 +++++++-\n src/nodes/FieldSampleNode.cpp  | 11 ++++++++\n src/nodes/FieldSynthNode.cpp   | 46 ---------------------------------\n 4 files changed, 61 insertions(+), 65 deletions(-)"
   },
   {
     "hash": "906b8bad98b64d8accecb6f15fe8f2bc5e090206",
