@@ -69,6 +69,9 @@ public:
    int LearnedNotes() const { return mLearned; }
    int BarsCaptured() const { return mBars; }
    bool Building() const { return mBuild.valid(); }
+   // True right after a Stop that captured fewer than 2 notes: the old model (if any) is still
+   // playing untouched, and nothing in the UI said so before this flag existed.
+   bool LastLearnTooShort() const { return mLastLearnTooShort; }
    // Bits per event that the full blend beats the order-0 baseline by, one point per captured bar.
    const std::vector<float>& Curve() const { return mCurve; }
    int LastNote() const;
@@ -94,6 +97,7 @@ private:
    bool mLearning = false;
    std::vector<Cap> mCaps;
    int mNotesCaptured = 0, mBars = 0, mLearned = 0;
+   bool mLastLearnTooShort = false;
    double mBeatsPerBar = 4.0;
    std::vector<float> mCurve;
 

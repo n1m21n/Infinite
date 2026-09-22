@@ -458,6 +458,11 @@ float PredictiveNotesNode::Confidence01() const
    // fraction of the baseline's uncertainty the model actually removes: 0 bits -> 0%, 1 bit ->
    // 50%, 2 bits -> 75%. No floor, because "I have learned nothing yet" is a real answer and the
    // status line next to this badge already says what it is doing instead.
+   // Source B (Movement) never learns anything - it's a deterministic scale walk driven by
+   // Transport, not the Markov model mCurve was measured against. Reporting mCurve's last
+   // Markov gain here would show a stale, irrelevant number while Movement is actually playing.
+   if (sourceMode != 0)
+      return 0.0f;
    if (mCurve.empty())
       return 0.0f;
    const float gain = mCurve.back();
@@ -488,6 +493,7 @@ void PredictiveNotesNode::SetLearning(bool on)
    mCurve.clear();
    mNotesCaptured = 0;
    mBars = 0;
+   mLastLearnTooShort = false;
    mBeatsPerBar = Transport::Instance().BeatsPerBar();
    mLearning = true;
 }
@@ -541,6 +547,7 @@ void PredictiveNotesNode::FinishLearn()
    mAudioNode->PushParams(*this, false);
    const std::vector<Event> ev = Assemble(mCaps, mBeatsPerBar);
    mCaps.clear();
+   mLastLearnTooShort = ev.size() < 2;
    if (ev.size() >= 2)
    {
       model = NoteModel::EncodeEvents(ev);
@@ -548,6 +555,8 @@ void PredictiveNotesNode::FinishLearn()
       mLearned = (int)ev.size();
       StartBuild(ev);
    }
+   // else: too little captured to replace anything - the previous model/tables (if any) are
+   // left exactly as they were, and mLastLearnTooShort tells the status line why.
 }
 
 void PredictiveNotesNode::StartBuild(const std::vector<Event>& events)
