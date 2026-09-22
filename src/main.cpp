@@ -226,6 +226,7 @@ namespace
 #include "nodes/GrainMolderNode.h"
 #include "nodes/GranularNode.h"
 #include "nodes/DrumSequencerNode.h"
+#include "nodes/BeatArrangerNode.h"
 #include "nodes/AudioPluginNode.h"
 #include "audio/SampleScanner.h"
 #include "audio/PluginScanner.h"
@@ -1928,6 +1929,24 @@ namespace
             return lane;
       }
       return DrumSequencerLaneForCanvasY(n, canvasY);
+   }
+
+   int BeatArrangerLaneForCanvasPos(BeatArrangerNode* n, float canvasX, float canvasY)
+   {
+      if (n == nullptr)
+         return -1;
+      for (int lane = 0; lane < BeatArrangerNode::kNumStrips; lane++)
+      {
+         if (canvasX >= n->stripCardCanvasX0[lane] && canvasX <= n->stripCardCanvasX1[lane] &&
+             canvasY >= n->stripCardCanvasY0[lane] && canvasY <= n->stripCardCanvasY1[lane])
+            return lane;
+      }
+      for (int lane = 0; lane < BeatArrangerNode::kNumStrips; lane++)
+      {
+         if (n->FileName(lane).empty())
+            return lane;
+      }
+      return 0;
    }
 
    void OnFilesDropped(GLFWwindow* window, int count, const char** paths)
@@ -5877,6 +5896,7 @@ namespace
       // longer be newly created, per the device-catalog simplification.
       REGISTER_NODE(FieldGraphNode, Field Graph, "Utility");
       REGISTER_NODE(DrumSequencerNode, Drum Sequencer, "Synths");
+      REGISTER_NODE(BeatArrangerNode, Beat Arranger, "Synths");
       // Third-party plugin hosting (Audio Units). Its params reach the plugin
       // directly rather than through ParamMailbox - see AudioPluginNode.h.
       REGISTER_NODE(AudioPluginNode, Plugin, "AudioEffects");
@@ -7923,6 +7943,8 @@ namespace
          gran->ReloadFromPath();
       if (auto* drum = dynamic_cast<DrumSequencerNode*>(node))
          drum->ReloadFromPaths();
+      if (auto* beat = dynamic_cast<BeatArrangerNode*>(node))
+         beat->ReloadFromPaths();
       if (auto* video = dynamic_cast<VideoSourceNode*>(node))
          video->ReloadFromPath();
       if (auto* palette = dynamic_cast<PaletteNode*>(node))
@@ -10830,6 +10852,24 @@ namespace
          index++;
       }
 
+      bool Button(const char* label)
+      {
+         if (gParamRegisterOnly)
+         {
+            index++;
+            return false;
+         }
+         const float cellX0 = x0 + (float)index * cellW;
+         const float btnH = ImGui::GetFrameHeight();
+         const float btnY = y0 + headerH + (maxDia - btnH) * 0.5f;
+         const float btnW = std::min(cellW - 8.0f, 96.0f);
+         const float btnX = cellX0 + (cellW - btnW) * 0.5f;
+         ImGui::SetCursorScreenPos(ImVec2(btnX, btnY));
+         const bool clicked = ImGui::Button(label, ImVec2(btnW, 0));
+         index++;
+         return clicked;
+      }
+
       // A vertical fader occupying one cell of the same row. `height` plays
       // the role `dia` does for a knob, so a row of faders bottom-aligns with
       // a row of knobs on the same caption baseline. `dbTaper` opts into the
@@ -11645,7 +11685,8 @@ namespace
       if (auto* mixer = dynamic_cast<MixerNode*>(node))
          return std::max(280.0f, (float)mixer->numChannels * 80.0f);
       if (dynamic_cast<WavetableNode*>(node) != nullptr ||
-          dynamic_cast<DrumSequencerNode*>(node) != nullptr)
+          dynamic_cast<DrumSequencerNode*>(node) != nullptr ||
+          dynamic_cast<BeatArrangerNode*>(node) != nullptr)
          return kAudioWideWidth;
       if (dynamic_cast<GainNode*>(node) != nullptr ||
           dynamic_cast<BlendAudioNode*>(node) != nullptr ||
@@ -14458,6 +14499,402 @@ namespace
 
        EndAudioBody();
     }
+
+   void DrawBeatArrangerStripWaveform(BeatArrangerNode* n, int strip, float h)
+   {
+      const float w = gAudioContentW;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      const bool hasSample = n->stripWaveCount[strip] > 0;
+
+      ImGui::SetNextItemAllowOverlap();
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::InvisibleButton("##beatstripwavebody", ImVec2(w, h));
+      if (!hasSample && ImGui::IsItemActivated())
+      {
+         PushUndoCheckpoint();
+         const std::string path = Platform::OpenAudioDialog();
+         if (!path.empty())
+            n->LoadFileToStrip(strip, path);
+      }
+
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+
+      if (hasSample)
+      {
+         const int count = n->stripWaveCount[strip];
+         for (int i = 0; i < count; i++)
+         {
+            const float x = origin.x + w * (float)i / (float)count;
+            const float barW = std::max(1.0f, w / (float)count);
+            const float top = midY - n->stripWaveMax[strip][i] * h * 0.45f;
+            const float bottom = midY - n->stripWaveMin[strip][i] * h * 0.45f;
+            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
+                              isLight ? IM_COL32(30, 110, 230, 210) : IM_COL32(150, 214, 255, 200));
+         }
+
+         const auto& onsets = n->stripOnsets[strip];
+         const int numOnsets = (int)onsets.size();
+         const double lenSec = n->stripSampleLenSec[strip];
+         if (numOnsets > 1 && lenSec > 0.0)
+         {
+            const int lastOnset = onsets.back();
+            const float maxFrame = (float)(lastOnset > 0 ? (lastOnset * 1.15f) : 1.0f);
+            for (int i = 0; i < numOnsets; i++)
+            {
+               const float normPos = std::clamp((float)onsets[i] / maxFrame, 0.0f, 1.0f);
+               const float sx = origin.x + w * normPos;
+               dl->AddLine(ImVec2(sx, origin.y), ImVec2(sx, br.y),
+                           isLight ? IM_COL32(230, 120, 20, 180) : IM_COL32(255, 170, 50, 180), 1.0f);
+            }
+         }
+
+         const auto& snapshot = n->VisualSnapshot();
+         for (int v = 0; v < snapshot.voiceCount; v++)
+         {
+            if (snapshot.voices[v].sample == strip && snapshot.voices[v].amp > 0.01f)
+            {
+               const float vx = origin.x + w * std::clamp(snapshot.voices[v].position, 0.0f, 1.0f);
+               const ImU32 vCol = IM_COL32(255, 240, 120, (int)(255 * snapshot.voices[v].amp));
+               dl->AddLine(ImVec2(vx, origin.y), ImVec2(vx, br.y), vCol, 2.0f);
+            }
+         }
+      }
+      else
+      {
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "drop sample / click to load");
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawBeatArrangerStripCard(BeatArrangerNode* n, int strip)
+   {
+      ImGui::PushID(strip);
+      const ImVec2 cardTop = ImGui::GetCursorScreenPos();
+      n->stripCardCanvasX0[strip] = cardTop.x;
+      n->stripCardCanvasY0[strip] = cardTop.y;
+      n->stripCardCanvasX1[strip] = cardTop.x + gAudioContentW;
+
+      char header[64];
+      const std::string& fn = n->FileName(strip);
+      if (fn.empty())
+         snprintf(header, sizeof(header), "strip %d", strip + 1);
+      else
+      {
+         std::string trimmed = fn.size() > 20 ? fn.substr(0, 19) + "." : fn;
+         snprintf(header, sizeof(header), "strip %d - %s", strip + 1, trimmed.c_str());
+      }
+      BeginAudioSection(header);
+
+      {
+         const float btnW = 20.0f;
+         const float rowY = ImGui::GetCursorScreenPos().y;
+         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - btnW, rowY));
+         const bool clearClicked = ImGui::Button("##clearstrip", ImVec2(btnW, 0));
+         {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 bmin = ImGui::GetItemRectMin();
+            const ImVec2 bmax = ImGui::GetItemRectMax();
+            const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
+            const float iconSize = (bmax.y - bmin.y) * 0.65f;
+            const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+            Tabler::DrawX(dl, center, iconSize, col);
+         }
+         if (clearClicked)
+         {
+            PushUndoCheckpoint();
+            n->ClearStrip(strip);
+         }
+
+         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, rowY));
+         bool muteBool = n->stripMute[strip];
+         if (AudioMuteButton("M##mute", &muteBool, btnW, 0.0f))
+         {
+            PushUndoCheckpoint();
+            n->stripMute[strip] = muteBool;
+         }
+         ImGui::SameLine(0.0f, 2.0f);
+         bool soloBool = n->stripSolo[strip];
+         if (AudioSoloButton("S##solo", &soloBool, btnW, 0.0f))
+         {
+            PushUndoCheckpoint();
+            n->stripSolo[strip] = soloBool;
+         }
+         ImGui::SameLine(0.0f, 6.0f);
+
+         static const char* kClassItems[] = {
+            "Auto", "Kick", "Bass", "Snare", "Clap", "Hat Cl", "Hat Op", "Perc"
+         };
+         ImGui::SetNextItemWidth(88.0f);
+         int currentClass = std::clamp(n->stripClassOverride[strip], 0, 7);
+         if (ImGui::Combo("##classoverride", &currentClass, kClassItems, IM_ARRAYSIZE(kClassItems)))
+         {
+            PushUndoCheckpoint();
+            n->stripClassOverride[strip] = currentClass;
+         }
+
+         const std::string& st = n->StripStatus(strip);
+         if (!st.empty())
+         {
+            ImGui::SameLine(0.0f, 8.0f);
+            ImGui::TextDisabled("%s", st.c_str());
+         }
+
+         ImGui::Dummy(ImVec2(gAudioContentW, ImGui::GetFrameHeight()));
+      }
+
+      DrawBeatArrangerStripWaveform(n, strip, 68.0f);
+      ImGui::Dummy(ImVec2(0.0f, 3.0f));
+
+      {
+         const float half = AudioHalfWidth();
+         AudioSlider("transient", &n->stripTransient[strip], -1.0f, 1.0f, "%.2f", half);
+         ImGui::SameLine();
+         AudioSlider("decay", &n->stripDecay[strip], -1.0f, 1.0f, "%.2f", half);
+         AudioSlider("pitch", &n->stripPitch[strip], -24.0f, 24.0f, "%.1f st", half);
+         ImGui::SameLine();
+         AudioSlider("fine tune", &n->stripFineTune[strip], -50.0f, 50.0f, "%.0f c", half);
+         AudioSlider("speed", &n->stripSpeed[strip], 0.25f, 4.0f, "%.2fx", half);
+         ImGui::SameLine();
+         AudioSlider("pan", &n->stripPan[strip], -1.0f, 1.0f, "%.2f", half);
+         AudioSlider("volume", &n->stripVolume[strip], 0.0f, 1.0f, "%.2f", AudioFullWidth());
+      }
+
+      EndAudioSection();
+      n->stripCardCanvasY1[strip] = ImGui::GetCursorScreenPos().y;
+      ImGui::PopID();
+   }
+
+   void DrawBeatArrangerTimeline(GraphNode& gn, BeatArrangerNode* n)
+   {
+      const int bars = std::clamp(n->bars, 1, 4);
+      const int steps = 16 * bars;
+      const float gutterW = 64.0f;
+      const float rightGutterW = 32.0f;
+      const float rowH = 22.0f;
+      const float rowGap = 2.0f;
+      const float cellGap = 1.0f;
+      const float stepsW = gAudioBodyW - gutterW - rightGutterW;
+      const float cellW = (stepsW - cellGap * (float)(steps - 1)) / (float)steps;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      n->timelineCanvasX0 = origin.x;
+      n->timelineCanvasY0 = origin.y;
+      n->timelineCanvasX1 = origin.x + gAudioBodyW;
+      n->timelineCanvasY1 = origin.y + (float)BeatArrangerNode::kNumStrips * (rowH + rowGap);
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const bool isLight = IsThemeLight();
+      const auto& snapshot = n->VisualSnapshot();
+      const float playheadStep = snapshot.playheadStep;
+
+      for (int s = 0; s < BeatArrangerNode::kNumStrips; s++)
+      {
+         const float y0 = origin.y + (float)s * (rowH + rowGap);
+         ImGui::PushID(s);
+
+         // ---- Left gutter: strip label & mute status ----
+         ImGui::SetCursorScreenPos(ImVec2(origin.x, y0 + 2.0f));
+         char lbl[16];
+         snprintf(lbl, sizeof(lbl), "S%d", s + 1);
+         const bool isMuted = n->stripMute[s];
+         ImU32 textCol = isMuted ? ImGui::GetColorU32(ImGuiCol_TextDisabled)
+                                 : (isLight ? IM_COL32(30, 35, 45, 255) : IM_COL32(220, 225, 235, 255));
+         dl->AddText(ImVec2(origin.x + 4.0f, y0 + 3.0f), textCol, lbl);
+
+         const char* clsName = "";
+         if (n->stripClassOverride[s] > 0)
+            clsName = DrumClassifier::ClassName((DrumClassifier::DrumClass)(n->stripClassOverride[s] - 1));
+         else if (!n->stripSlices[s].empty())
+            clsName = DrumClassifier::ClassName(n->stripSlices[s][0].cls);
+         if (clsName && clsName[0])
+         {
+            dl->AddText(ImVec2(origin.x + 24.0f, y0 + 3.0f),
+                        isLight ? IM_COL32(110, 115, 130, 255) : IM_COL32(150, 155, 170, 255),
+                        clsName);
+         }
+
+         // ---- Step cells ----
+         for (int st = 0; st < steps; st++)
+         {
+            const float x0 = origin.x + gutterW + (float)st * (cellW + cellGap);
+            const bool isBar = (st % 16) == 0;
+            const bool isBeat = (st % 4) == 0;
+            const ImU32 frameCol = isLight
+               ? (isBar ? IM_COL32(205, 210, 222, 255) : (isBeat ? IM_COL32(218, 222, 232, 255) : IM_COL32(230, 233, 240, 255)))
+               : (isBar ? IM_COL32(65, 70, 84, 255) : (isBeat ? IM_COL32(50, 54, 66, 255) : IM_COL32(38, 41, 50, 255)));
+            dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x0 + cellW, y0 + rowH), frameCol, 2.0f);
+         }
+
+         // ---- Draw arranged hits for this strip ----
+         for (const auto& hit : n->mArrangedHits)
+         {
+            if (hit.sample == s && hit.step >= 0 && hit.step < steps)
+            {
+               const float x0 = origin.x + gutterW + (float)hit.step * (cellW + cellGap);
+               const float hitH = std::max(4.0f, rowH * std::clamp(hit.velocity, 0.2f, 1.0f));
+               const float hitY0 = y0 + rowH - hitH;
+
+               DrumClassifier::DrumClass cls = DrumClassifier::DrumClass::Perc;
+               if (n->stripClassOverride[s] > 0)
+                  cls = (DrumClassifier::DrumClass)(n->stripClassOverride[s] - 1);
+               else if (hit.slice >= 0 && hit.slice < (int)n->stripSlices[s].size())
+                  cls = n->stripSlices[s][hit.slice].cls;
+
+               ImU32 hitCol;
+               switch (cls)
+               {
+                  case DrumClassifier::DrumClass::Kick:      hitCol = IM_COL32(235, 75, 55, 230); break;
+                  case DrumClassifier::DrumClass::Bass:      hitCol = IM_COL32(180, 60, 220, 230); break;
+                  case DrumClassifier::DrumClass::Snare:     hitCol = IM_COL32(40, 160, 240, 230); break;
+                  case DrumClassifier::DrumClass::Clap:      hitCol = IM_COL32(245, 180, 40, 230); break;
+                  case DrumClassifier::DrumClass::HatClosed: hitCol = IM_COL32(60, 200, 120, 230); break;
+                  case DrumClassifier::DrumClass::HatOpen:   hitCol = IM_COL32(30, 210, 210, 230); break;
+                  default:                                   hitCol = IM_COL32(220, 110, 180, 230); break;
+               }
+
+               dl->AddRectFilled(ImVec2(x0, hitY0), ImVec2(x0 + cellW, y0 + rowH), hitCol, 2.0f);
+            }
+         }
+
+         // ---- Strip output pin: right gutter ----
+         const float pinX = origin.x + gutterW + stepsW + rightGutterW * 0.5f;
+         const float pinY = y0 + rowH * 0.5f;
+         const int pinId = gn.OutputPinId(1 + s);
+
+         ed::BeginPin(pinId, ed::PinKind::Output);
+         ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+         const ImVec2 pinCenter(pinX, pinY);
+         const ImVec2 pinMin(pinCenter.x - kPinHit * 0.5f, pinCenter.y - kPinHit * 0.5f);
+         const ImVec2 pinMax(pinCenter.x + kPinHit * 0.5f, pinCenter.y + kPinHit * 0.5f);
+         ed::PinRect(pinMin, pinMax);
+
+         dl->AddCircleFilled(pinCenter, kPinRadius, isLight ? IM_COL32(50, 120, 240, 255) : IM_COL32(150, 190, 255, 255));
+         dl->AddCircle(pinCenter, kPinRadius, isLight ? IM_COL32(40, 48, 65, 255) : IM_COL32(20, 22, 30, 255), 0, 1.5f);
+         ed::EndPin();
+
+         ImGui::PopID();
+      }
+
+      // ---- Playhead cursor overlay ----
+      if (steps > 0 && n->HasGroove())
+      {
+         const float phNorm = std::fmod(playheadStep, (float)steps) / (float)steps;
+         const float phX = origin.x + gutterW + phNorm * stepsW;
+         const float totalH = (float)BeatArrangerNode::kNumStrips * (rowH + rowGap);
+         dl->AddLine(ImVec2(phX, origin.y), ImVec2(phX, origin.y + totalH),
+                     IM_COL32(255, 220, 60, 230), 2.0f);
+      }
+
+      ImGui::SetCursorScreenPos(
+         ImVec2(origin.x, origin.y + (float)BeatArrangerNode::kNumStrips * (rowH + rowGap) + 4.0f));
+      ImGui::Dummy(ImVec2(gAudioBodyW, 1.0f));
+   }
+
+   void DrawBeatArrangerBody(GraphNode& gn, BeatArrangerNode* n)
+   {
+      char stat[80];
+      const int loaded = n->LoadedStripCount();
+      const int numHits = (int)n->mArrangedHits.size();
+      if (loaded > 0)
+         snprintf(stat, sizeof(stat), "%d sample%s - %d hits - %d bars - %s",
+                  loaded, loaded > 1 ? "s" : "", numHits, n->bars, MusicTime::RateDivisionName(n->rate));
+      else
+         snprintf(stat, sizeof(stat), "empty - drop samples");
+
+      BeginAudioBody(gn.index, gn.category, kAudioWideWidth, stat);
+
+      // ---- 8 Strip cards (4 rows x 2 columns) ----
+      {
+         BeginAudioColumns(2);
+         BeginAudioColumn(0);
+         for (int strip = 0; strip < 4; strip++)
+         {
+            DrawBeatArrangerStripCard(n, strip);
+            ImGui::Dummy(ImVec2(0.0f, 4.0f));
+         }
+         EndAudioColumn();
+         BeginAudioColumn(1);
+         for (int strip = 4; strip < BeatArrangerNode::kNumStrips; strip++)
+         {
+            DrawBeatArrangerStripCard(n, strip);
+            ImGui::Dummy(ImVec2(0.0f, 4.0f));
+         }
+         EndAudioColumn();
+         EndAudioColumns();
+      }
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+
+      // ---- Groove Arrangement Timeline & Visualizer ----
+      DrawBeatArrangerTimeline(gn, n);
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+
+      // ---- Global controls: Rate + Bars + Seed + Swing + Rand Pitch ----
+      {
+         AudioKnobRow row(5);
+         row.Dropdown("rate", MusicTime::RateDivisionList(), n->rate,
+                      [n](int i) { PushUndoCheckpoint(); n->rate = i; });
+         static const std::vector<std::string> kBarOptions = { "1 bar", "2 bars", "4 bars" };
+         int barIdx = (n->bars == 4 ? 2 : (n->bars == 1 ? 0 : 1));
+         row.Dropdown("bars", kBarOptions, barIdx,
+                      [n](int i) { PushUndoCheckpoint(); n->bars = (i == 0 ? 1 : (i == 2 ? 4 : 2)); });
+         row.KnobInt("seed", &n->seed, 0, 9999);
+         row.Knob("swing", &n->swing, 0.0f, 1.0f, "%.2f");
+         row.Knob("rand pitch", &n->randPitch, 0.0f, 1.0f, "%.2f");
+         row.End();
+      }
+      {
+         AudioKnobRow row(5);
+         row.Knob("speed", &n->globalSpeed, 0.25f, 4.0f, "%.2fx");
+         row.Knob("transient", &n->globalTransient, -1.0f, 1.0f, "%.2f");
+         row.Knob("decay", &n->globalDecay, -1.0f, 1.0f, "%.2f");
+         if (row.Button("Roll"))
+         {
+            PushUndoCheckpoint();
+            n->ReArrange();
+         }
+         row.Knob("output", &n->volume, 0.0f, 1.0f, "%.2f");
+         row.End();
+      }
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+
+      // ---- Action Buttons Strip ----
+      {
+         const float gap = ImGui::GetStyle().ItemSpacing.x;
+         const float btnW = (AudioFullWidth() - gap * 2.0f) / 3.0f;
+         char arrangeLabel[32];
+         snprintf(arrangeLabel, sizeof(arrangeLabel), "Arrange (%d)", n->seed);
+         if (ImGui::Button(arrangeLabel, ImVec2(btnW, 0)))
+         {
+            PushUndoCheckpoint();
+            n->Arrange();
+         }
+         ImGui::SameLine();
+         if (ImGui::Button("Re-Arrange", ImVec2(btnW, 0)))
+         {
+            PushUndoCheckpoint();
+            n->ReArrange();
+         }
+         ImGui::SameLine();
+         if (ImGui::Button("Clear Groove", ImVec2(btnW, 0)))
+         {
+            PushUndoCheckpoint();
+            n->ClearGroove();
+         }
+      }
+
+      EndAudioBody();
+   }
 
    void DrawEquationVisualizer(EquationNode* n, float h, float width)
    {
@@ -24093,6 +24530,8 @@ namespace
          DrawGranularBody(gn, n);
       else if (auto* n = dynamic_cast<DrumSequencerNode*>(gn.node.get()))
          DrawDrumSequencerBody(gn, n);
+      else if (auto* n = dynamic_cast<BeatArrangerNode*>(gn.node.get()))
+         DrawBeatArrangerBody(gn, n);
       else if (auto* n = dynamic_cast<GainNode*>(gn.node.get()))
          DrawGainBody(gn, n);
       else if (auto* n = dynamic_cast<MixerNode*>(gn.node.get()))
@@ -39145,6 +39584,7 @@ namespace
          { "Molder", "Analysis/genome resynthesis: decomposes a loaded or recorded sample into tracked harmonic partials plus a real residual waveform, then Roll mutates a parameter genome and re-renders a new sample from it - each roll walks further from the last, not from the original. Iterate feeds the last render back in as the new source and re-analyses it (progressively eating the sound); Reset returns fully to the originally loaded/recorded sample - generation 0 and the six shaping knobs (tone/air/snap/stretch/time/pitch) back to neutral, and the analysis itself restored, undoing any Iterate. chaos sets how far the next roll jumps; pitch offsets on top of the genome's own pitch walk; tone balances partials against residual; air/snap are the residual's steady-hiss and transient-attack levels; stretch scales inharmonicity together with harmonic spacing; time warps the attack/decay timing without changing the sample's length. This is a sound designer, not a playable instrument - it takes no note input, only a single self-triggered voice with start/end range, loop, reverse and ping-pong, the same transport as Sampler. Analysis and rendering both run on a background thread, so rolling never stalls the UI. seed/gen/f0/harm in the readout are the exact genome (seed + generation count) and the analysed pitch - two integers are enough to reproduce any rolled sound exactly on reload." },
          { "Grain Molder", "Slices audio into overlapping grains, calculates per-grain metrics (Level, Brightness, Random), and rearranges them based on a continuous blend between original temporal position and metric rank. At amount 0 it is the clean identity passthrough; at 1 it is fully sorted into a swell or brightness contour. Rendering runs asynchronously on a worker thread." },
          { "Drum Sequencer", "An 8-lane, 8-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8x8 step grid. Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
+         { "Beat Arranger", "A multi-sample breakbeat arranger: chops up to 8 samples at transients, classifies slices by drum type, and generates algorithmic breakbeat grooves. Features pattern length (bars), swing, random pitch, global transient/decay/speed, and per-strip tuning, volume, pan, mute, and solo." },
          { "Audio In", "Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch. The capture runs on its own engine bound to the system default input, independently of whichever output device is selected, and the header line says why it isn't live when it isn't." },
          { "Audio Filter", "One filter, one of 12 types (LP/HP at 12/24/36 dB, BP, notch, shelves, peak, all-pass). Drag the handle on the response curve to set frequency and gain, Shift-drag to set Q - the picture is the control." },
          { "Audio Color Ramp", "Splits incoming audio into up to 8 frequency bands - drag the dividers right on the spectrum display to resize them - and assigns each one a colour, VIBGYOR by default from low to high. With no image patched in it outputs the resulting gradient standalone; patch one into its optional image input and it grades that image by luminance through the same audio-reactive palette instead." },
@@ -39968,6 +40408,7 @@ namespace
                { "Analog", "Virtual-analog polyphonic synth with dual oscillators, unevenly detuned unison stacking, osc hard sync, sub-oscillator, noise, pre-filter drive, nonlinear ZDF Moog ladder and SVF filters, dual-path stereo spread, and amp ADSR." },
                { "Sampler", "High-resolution multi-sample player with pitch tracking, root note detection, start/end trimming, loop crossfades, and one-shot playback." },
                { "Drum Sequencer", "8-lane pattern drum sequencer with individual sample slots, per-step velocity, swing, choke groups, per-lane mute/solo, and decay envelopes." },
+               { "Beat Arranger", "8-sample transient-slicing breakbeat arranger that classifies drum slices and composes algorithmic grooves locked to the transport." },
                { "Slicer", "Transient- or grid-sliced sample playback: chops a loaded sample into up to 64 slices and maps them chromatically from MIDI note 36, with draggable slice markers, a per-slice attack/decay pair, and a crossthrough toggle that lets a slice run past its own boundary." },
                { "Equation Synth", "Real-time bytebeat and mathematical expression synthesis evaluating user formulas with dynamic variables (t, x, y, inputs)." },
                { "Wave Terrain", "2D terrain trajectory orbital synthesis - a moving point traces a path across a height-mapped surface to generate a waveform." },
@@ -52540,6 +52981,184 @@ static bool RunDrumSequencerFixture()
    return ok;
 }
 
+namespace BeatArrangerTest
+{
+   std::vector<float> Render(BeatArrangerNode& node, int totalFrames, int blockSize, int sampleRate)
+   {
+      node.CookIfNeeded(1);
+      AudioNode* an = node.GetAudioNode();
+      an->PrepareToPlay((double)sampleRate, blockSize);
+      node.CookIfNeeded(2);
+
+      std::vector<float> out;
+      out.reserve(totalFrames);
+      int rendered = 0;
+      while (rendered < totalFrames)
+      {
+         const int n = std::min(blockSize, totalFrames - rendered);
+         Transport::Instance().AdvanceAudioClock(n);
+         std::vector<float> l(n, 0.0f), r(n, 0.0f);
+         float* chans[2] = { l.data(), r.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 2;
+         buf.numFrames = n;
+         AudioBuffer* outPtrs[1] = { &buf };
+         an->ProcessBlockMulti(nullptr, 0, outPtrs, 1);
+         out.insert(out.end(), l.begin(), l.end());
+         rendered += n;
+      }
+      return out;
+   }
+}
+
+static bool RunBeatArrangerFixture()
+{
+   bool ok = true;
+
+   // 1. DrumClassifier tests
+   {
+      const int N = 2048;
+      const double sr = 44100.0;
+      std::vector<float> sub(N);
+      for (int i = 0; i < N; i++)
+         sub[i] = std::sin(2.0 * M_PI * 55.0 * (double)i / sr) * std::exp(-4.0 * (double)i / sr);
+      auto cSub = DrumClassifier::Classify(sub.data(), N, sr, nullptr);
+      const bool subOk = (cSub.cls == DrumClassifier::DrumClass::Kick || cSub.cls == DrumClassifier::DrumClass::Bass);
+      printf("BEATARRANGERTEST DrumClassifier sub -> %s (%s)\n",
+             DrumClassifier::ClassName(cSub.cls), subOk ? "OK" : "FAIL");
+      ok &= subOk;
+
+      auto cHint = DrumClassifier::Classify(sub.data(), N, sr, "kick_punch.wav");
+      const bool hintOk = (cHint.cls == DrumClassifier::DrumClass::Kick);
+      printf("BEATARRANGERTEST DrumClassifier hint 'kick' -> %s (%s)\n",
+             DrumClassifier::ClassName(cHint.cls), hintOk ? "OK" : "FAIL");
+      ok &= hintOk;
+   }
+
+   // 2. BeatArranger arrangement & serialization tests
+   {
+      std::vector<BeatArranger::SliceInfo> pool;
+      BeatArranger::SliceInfo kickSlice;
+      kickSlice.sample = 0;
+      kickSlice.slice = 0;
+      kickSlice.cls = DrumClassifier::DrumClass::Kick;
+      kickSlice.confidence = 0.95f;
+      kickSlice.lenSec = 0.5f;
+      pool.push_back(kickSlice);
+
+      BeatArranger::SliceInfo snareSlice;
+      snareSlice.sample = 1;
+      snareSlice.slice = 0;
+      snareSlice.cls = DrumClassifier::DrumClass::Snare;
+      snareSlice.confidence = 0.9f;
+      snareSlice.lenSec = 0.3f;
+      pool.push_back(snareSlice);
+
+      BeatArranger::SliceInfo hatSlice;
+      hatSlice.sample = 2;
+      hatSlice.slice = 0;
+      hatSlice.cls = DrumClassifier::DrumClass::HatClosed;
+      hatSlice.confidence = 0.85f;
+      hatSlice.lenSec = 0.1f;
+      pool.push_back(hatSlice);
+
+      BeatArranger::ArrangeParams p;
+      p.bars = 2;
+      p.randPitch = 0.0f;
+      p.swing = 0.0f;
+
+      auto hits1 = BeatArranger::Arrange(pool, p, 42);
+      auto hits2 = BeatArranger::Arrange(pool, p, 42);
+      auto hitsDiff = BeatArranger::Arrange(pool, p, 43);
+
+      const bool nonZeroHits = !hits1.empty();
+      const bool deterministic = (hits1.size() == hits2.size());
+      bool diffOk = (hits1.size() != hitsDiff.size());
+      if (!diffOk && !hits1.empty() && !hitsDiff.empty())
+      {
+         for (size_t i = 0; i < hits1.size(); i++)
+         {
+            if (hits1[i].step != hitsDiff[i].step || hits1[i].sample != hitsDiff[i].sample ||
+                hits1[i].velocity != hitsDiff[i].velocity)
+            {
+               diffOk = true;
+               break;
+            }
+         }
+      }
+
+      printf("BEATARRANGERTEST arrange hits=%zu deterministic=%d diffSeed=%d (%s)\n",
+             hits1.size(), deterministic, diffOk,
+             (nonZeroHits && deterministic && diffOk) ? "OK" : "FAIL");
+      ok &= (nonZeroHits && deterministic && diffOk);
+
+      // Hit serialization round-trip
+      std::string blob = BeatArranger::SerializeHits(hits1);
+      auto deser = BeatArranger::DeserializeHits(blob);
+      const bool deserOk = (hits1.size() == deser.size());
+      printf("BEATARRANGERTEST serialization round-trip hits=%zu (%s)\n",
+             deser.size(), deserOk ? "OK" : "FAIL");
+      ok &= deserOk;
+   }
+
+   // 3. Audio rendering & strip muting
+   {
+      const int sampleRate = 48000;
+      const int blockSize = 256;
+      Transport& transport = Transport::Instance();
+      const float savedBpm = transport.Tempo();
+      const bool savedPlaying = transport.IsPlaying();
+
+      transport.SetTempo(120.0f);
+      transport.SetTimeSignature(4, 4);
+      transport.SetPlaying(true);
+      transport.Rewind();
+      transport.NotifyAudioEngineStarted((double)sampleRate);
+
+      const std::string clickPath = DrumSeqTest::WriteClickWav(TmpPath("infinite_beat_test.wav"), 4000, sampleRate);
+
+      auto node = std::make_unique<BeatArrangerNode>();
+      node->rate = MusicTime::kSixteenth;
+      node->bars = 1;
+      node->LoadFileToStrip(0, clickPath);
+      node->stripClassOverride[0] = (int)DrumClassifier::DrumClass::Kick + 1;
+
+      node->CookIfNeeded(1);
+      node->Arrange();
+      node->CookIfNeeded(2);
+
+      auto buf = BeatArrangerTest::Render(*node, sampleRate, blockSize, sampleRate);
+      float peak = 0.0f;
+      for (float s : buf)
+         peak = std::max(peak, std::fabs(s));
+
+      const bool soundProduced = (peak > 0.01f);
+      printf("BEATARRANGERTEST render peak=%.4f (%s)\n", peak, soundProduced ? "OK" : "FAIL");
+      ok &= soundProduced;
+
+      // Test strip mute
+      node->stripMute[0] = true;
+      node->CookIfNeeded(3);
+      auto mutedBuf = BeatArrangerTest::Render(*node, sampleRate, blockSize, sampleRate);
+      float mutedPeak = 0.0f;
+      for (float s : mutedBuf)
+         mutedPeak = std::max(mutedPeak, std::fabs(s));
+      const bool muteOk = (mutedPeak < 1e-4f);
+      printf("BEATARRANGERTEST strip mute peak=%.5f (%s)\n", mutedPeak, muteOk ? "OK" : "FAIL");
+      ok &= muteOk;
+
+      remove(clickPath.c_str());
+
+      transport.SetTempo(savedBpm);
+      transport.SetPlaying(savedPlaying);
+      transport.NotifyAudioEngineStopped();
+   }
+
+   printf("%s\n", ok ? "BEATARRANGERTEST OK" : "BEATARRANGERTEST FAIL");
+   return ok;
+}
+
 // EQ's DSP fixture (new-audio-node/SKILL.md §5), following RunWavetableShaperFixture's
 // shape: render the real node -> AudioEngine chain and assert against an
 // analytic expectation. Does NOT touch AudioFilterKernel/AudioFilterDsp -
@@ -54145,6 +54764,7 @@ static int RunDspTest()
    const bool paulStretchOk = RunPaulStretchFixture();
    const bool granularOk = RunGranularFixture();
    const bool drumSeqOk = RunDrumSequencerFixture();
+   const bool beatArrangerOk = RunBeatArrangerFixture();
    const bool wavetableShaperOk = RunWavetableShaperFixture();
    const bool eqOk = RunEqFixture();
    const bool noteStackOk = RunNoteStackFixture();
@@ -54155,7 +54775,7 @@ static int RunDspTest()
    const bool audioDisplacementOk = RunAudioDisplacementFixture();
    const bool all = gainOk && filterOk && oscWaveformOk && noteSchedulingOk && envelopeOk && voiceStealOk &&
                     musicTimeOk && audioFilterOk && dynamicsOk && delayOk && reverbOk && samplerOk && slicerOk &&
-                    paulStretchOk && granularOk && drumSeqOk && wavetableShaperOk && eqOk && noteStackOk &&
+                    paulStretchOk && granularOk && drumSeqOk && beatArrangerOk && wavetableShaperOk && eqOk && noteStackOk &&
                     freqShifterOk && spectralSynthOk && waveTerrainOk && equationOk && audioDisplacementOk &&
                     portableFftOk;
    printf("%s\n", all ? "DSPTEST OK" : "DSPTEST SUSPECT");
@@ -69153,6 +69773,9 @@ int main(int argc, char** argv)
          DrumSequencerNode* dropTargetDrum = FindNodeUnderCanvasPoint<DrumSequencerNode>(canvasPos);
          int dropTargetLane =
             dropTargetDrum != nullptr ? DrumSequencerLaneForCanvasPos(dropTargetDrum, canvasPos.x, canvasPos.y) : 0;
+         BeatArrangerNode* dropTargetBeat = FindNodeUnderCanvasPoint<BeatArrangerNode>(canvasPos);
+         int dropTargetBeatStrip =
+            dropTargetBeat != nullptr ? BeatArrangerLaneForCanvasPos(dropTargetBeat, canvasPos.x, canvasPos.y) : 0;
          SamplerNode* dropTargetSampler = FindNodeUnderCanvasPoint<SamplerNode>(canvasPos);
          SlicerNode* dropTargetSlicer = FindNodeUnderCanvasPoint<SlicerNode>(canvasPos);
          PaulStretchNode* dropTargetPaul = FindNodeUnderCanvasPoint<PaulStretchNode>(canvasPos);
@@ -69302,6 +69925,14 @@ int main(int argc, char** argv)
 
             if (HasExtension(path, kAudioExt))
             {
+               if (dropTargetBeat != nullptr)
+               {
+                  ensureDroppedCheckpoint();
+                  dropTargetBeat->LoadFileToStrip(dropTargetBeatStrip, path);
+                  dropTargetBeatStrip = (dropTargetBeatStrip + 1) % BeatArrangerNode::kNumStrips;
+                  gPatchDirty = true;
+                  continue;
+               }
                if (dropTargetDrum != nullptr)
                {
                   ensureDroppedCheckpoint();
@@ -85562,7 +86193,8 @@ int main(int argc, char** argv)
             // frame is not something imgui-node-editor supports.
             auto* geoTable = dynamic_cast<GeometryTableNode*>(gn.node.get());
             auto* drumSeq = dynamic_cast<DrumSequencerNode*>(gn.node.get());
-            const int outputs = geoTable != nullptr ? 4 : (drumSeq != nullptr ? 1 : std::max(1, gn.node->OutputCount()));
+            auto* beatArr = dynamic_cast<BeatArrangerNode*>(gn.node.get());
+            const int outputs = geoTable != nullptr ? 4 : ((drumSeq != nullptr || beatArr != nullptr) ? 1 : std::max(1, gn.node->OutputCount()));
             std::vector<float> pinW(outputs);
             float itemW = 0.0f;
             for (int o = 0; o < outputs; o++)
