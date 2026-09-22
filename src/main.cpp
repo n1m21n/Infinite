@@ -832,6 +832,18 @@ namespace
    int gLinkDragSourcePin = -1;
    std::vector<std::pair<std::string, std::string>> gLinkDragSuggestions;
 
+   // Drop-target picker for audio samples dropped on empty canvas (from OS or
+   // sample browser). Instead of auto-spawning one hardcoded node, prompts the
+   // user with a context menu of all sample-accepting nodes.
+   struct AudioDropPickerState
+   {
+      bool justOpened = false;
+      ImVec2 canvasPos{ 0.0f, 0.0f };
+      ImVec2 screenPos{ 0.0f, 0.0f };
+      std::vector<std::string> paths;
+   };
+   AudioDropPickerState gAudioDropPicker;
+
    struct LinkInfo
    {
       int id = 0;
@@ -1918,9 +1930,20 @@ namespace
       return DrumSequencerLaneForCanvasY(n, canvasY);
    }
 
-   void OnFilesDropped(GLFWwindow*, int count, const char** paths)
+   void OnFilesDropped(GLFWwindow* window, int count, const char** paths)
    {
-      gDropPos = ImGui::GetMousePos();
+      double xpos = 0.0, ypos = 0.0;
+      if (window != nullptr)
+      {
+         glfwGetCursorPos(window, &xpos, &ypos);
+         gDropPos = ImVec2((float)xpos, (float)ypos);
+         ImGuiIO& io = ImGui::GetIO();
+         io.MousePos = gDropPos;
+      }
+      else
+      {
+         gDropPos = ImGui::GetMousePos();
+      }
       for (int i = 0; i < count; i++)
          gDroppedFiles.push_back(paths[i]);
    }
@@ -69149,6 +69172,7 @@ int main(int argc, char** argv)
          FieldGraphNode* dropTargetFieldGraph = FindNodeUnderCanvasPoint<FieldGraphNode>(canvasPos);
          FormulaNode* dropTargetFormula = FindNodeUnderCanvasPoint<FormulaNode>(canvasPos);
          float offset = 0.0f;
+         std::vector<std::string> pendingAudioDropPaths;
          bool droppedCheckpointPushed = false;
          auto ensureDroppedCheckpoint = [&]()
          {
@@ -69343,13 +69367,7 @@ int main(int argc, char** argv)
                   continue;
                }
 
-               GraphNode* spawned = SpawnNode("Audio File", "Modulators", canvasPos.x + offset, canvasPos.y);
-               if (spawned != nullptr)
-               {
-                  static_cast<AudioFileNode*>(spawned->node.get())->Open(path);
-                  spawned->showParams = true;
-               }
-               offset += 240.0f;
+               pendingAudioDropPaths.push_back(path);
                continue;
             }
 
@@ -69543,6 +69561,13 @@ int main(int argc, char** argv)
             if (spawned != nullptr)
                spawned->showParams = true;
             offset += 240.0f;
+         }
+         if (!pendingAudioDropPaths.empty())
+         {
+            gAudioDropPicker.justOpened = true;
+            gAudioDropPicker.canvasPos = canvasPos;
+            gAudioDropPicker.screenPos = gDropPos;
+            gAudioDropPicker.paths = std::move(pendingAudioDropPaths);
          }
          gDroppedFiles.clear();
       }
@@ -87796,7 +87821,9 @@ int main(int argc, char** argv)
             // each node's own bounds sidesteps that ImGui active-item gate
             // entirely.
             const ImVec2 canvasMouse = ed::ScreenToCanvas(mp);
-            const bool overCanvas = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+            const bool overCanvas = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) ||
+               (mp.x >= gGraphScreenTL.x && mp.y >= gGraphScreenTL.y &&
+                mp.x <= gGraphScreenTL.x + gGraphScreenSize.x && mp.y <= gGraphScreenTL.y + gGraphScreenSize.y);
 
             // Released over the Arrange panel instead of the canvas: route
             // to the timeline-drop import path (stashed for
@@ -87977,17 +88004,12 @@ int main(int argc, char** argv)
                }
                else if (overCanvas)
                {
-                  // No Sampler under the cursor but still over the canvas:
-                  // spawn a loaded one there, same "click happened over the
-                  // canvas" position rule the double-click search popup above
-                  // uses.
-                  GraphNode* spawned = SpawnNode("Sampler", "Synths", canvasMouse.x, canvasMouse.y);
-                  if (spawned != nullptr)
-                  {
-                     if (auto* sampler = dynamic_cast<SamplerNode*>(spawned->node.get()))
-                        sampler->LoadFile(gSampleDragPath);
-                     gPatchDirty = true;
-                  }
+                  // Released on empty canvas: prompt the user with a choice of
+                  // node to spawn and load the sample into.
+                  gAudioDropPicker.justOpened = true;
+                  gAudioDropPicker.canvasPos = canvasMouse;
+                  gAudioDropPicker.screenPos = mp;
+                  gAudioDropPicker.paths = { gSampleDragPath };
                }
             }
             else if (HasExtension(gSampleDragPath, kVideoExt))
@@ -88529,6 +88551,134 @@ int main(int argc, char** argv)
             ImGui::CloseCurrentPopup();
          }
          ImGui::EndPopup();
+      }
+
+      if (gAudioDropPicker.justOpened)
+      {
+         ImGui::OpenPopup("##audiodroppicker");
+         gAudioDropPicker.justOpened = false;
+         const ImVec2 popupPos = (gAudioDropPicker.screenPos.x != 0.0f || gAudioDropPicker.screenPos.y != 0.0f)
+            ? gAudioDropPicker.screenPos
+            : ed::CanvasToScreen(gAudioDropPicker.canvasPos);
+         ImGui::SetNextWindowPos(popupPos, ImGuiCond_Always);
+      }
+      else
+      {
+         const ImVec2 popupPos = (gAudioDropPicker.screenPos.x != 0.0f || gAudioDropPicker.screenPos.y != 0.0f)
+            ? gAudioDropPicker.screenPos
+            : ed::CanvasToScreen(gAudioDropPicker.canvasPos);
+         ImGui::SetNextWindowPos(popupPos, ImGuiCond_Appearing);
+      }
+      ImGui::SetNextWindowSizeConstraints(ImVec2(240, 0), ImVec2(360, 480));
+      if (ImGui::BeginPopup("##audiodroppicker"))
+      {
+         if (gAudioDropPicker.paths.empty())
+         {
+            ImGui::CloseCurrentPopup();
+         }
+         else
+         {
+            if (gAudioDropPicker.paths.size() == 1)
+            {
+               std::string filename = gAudioDropPicker.paths[0];
+               const size_t lastSlash = filename.find_last_of("/\\");
+               if (lastSlash != std::string::npos)
+                  filename = filename.substr(lastSlash + 1);
+               ImGui::TextDisabled("Load %s into:", filename.c_str());
+            }
+            else
+            {
+               ImGui::TextDisabled("Load %d samples into:", (int)gAudioDropPicker.paths.size());
+            }
+            ImGui::Separator();
+
+            struct PickerOption
+            {
+               const char* name;
+               const char* category;
+               const char* desc;
+            };
+            static const PickerOption kOptions[] = {
+               { "Sampler",        "Synths",     "Sample playback with pitch & envelope" },
+               { "Audio File",     "Modulators", "Streaming playback & follower" },
+               { "Slicer",         "Synths",     "Beat/transient slicer" },
+               { "Drum Sequencer", "Synths",     "Step sequencer & drum kit" },
+               { "PaulStretch",    "Synths",     "Extreme time-stretch & wash" },
+               { "Granular",       "Synths",     "Granular cloud synthesis" },
+               { "Grain Molder",   "Synths",     "Granular morph & shape" },
+               { "Molder",         "Synths",     "Spectral cross-synthesis" },
+            };
+
+            for (const auto& opt : kOptions)
+            {
+               if (ImGui::MenuItem(opt.name, opt.category))
+               {
+                  if (std::string(opt.name) == "Drum Sequencer")
+                  {
+                     GraphNode* spawned = SpawnNode(opt.name, opt.category,
+                                                    gAudioDropPicker.canvasPos.x,
+                                                    gAudioDropPicker.canvasPos.y);
+                     if (spawned != nullptr)
+                     {
+                        auto* drum = dynamic_cast<DrumSequencerNode*>(spawned->node.get());
+                        if (drum != nullptr)
+                        {
+                           for (int i = 0; i < (int)gAudioDropPicker.paths.size() && i < DrumSequencerNode::kNumLanes; ++i)
+                              drum->LoadFileToLane(i, gAudioDropPicker.paths[i]);
+                        }
+                        spawned->showParams = true;
+                        gPatchDirty = true;
+                        RebuildAudioTopology();
+                     }
+                  }
+                  else
+                  {
+                     float offset = 0.0f;
+                     for (const std::string& path : gAudioDropPicker.paths)
+                     {
+                        GraphNode* spawned = SpawnNode(opt.name, opt.category,
+                                                       gAudioDropPicker.canvasPos.x + offset,
+                                                       gAudioDropPicker.canvasPos.y);
+                        if (spawned != nullptr)
+                        {
+                           if (auto* s = dynamic_cast<SamplerNode*>(spawned->node.get()))
+                              s->LoadFile(path);
+                           else if (auto* af = dynamic_cast<AudioFileNode*>(spawned->node.get()))
+                              af->Open(path);
+                           else if (auto* sl = dynamic_cast<SlicerNode*>(spawned->node.get()))
+                              sl->LoadFile(path);
+                           else if (auto* ps = dynamic_cast<PaulStretchNode*>(spawned->node.get()))
+                              ps->LoadFile(path);
+                           else if (auto* gran = dynamic_cast<GranularNode*>(spawned->node.get()))
+                              gran->LoadFile(path);
+                           else if (auto* gm = dynamic_cast<GrainMolderNode*>(spawned->node.get()))
+                              gm->LoadFile(path);
+                           else if (auto* mol = dynamic_cast<MolderNode*>(spawned->node.get()))
+                              mol->LoadFile(path);
+
+                           spawned->showParams = true;
+                           gPatchDirty = true;
+                           RebuildAudioTopology();
+                        }
+                        offset += 240.0f;
+                     }
+                  }
+                  gAudioDropPicker.paths.clear();
+                  ImGui::CloseCurrentPopup();
+                  break;
+               }
+               if (ImGui::IsItemHovered() && opt.desc != nullptr && opt.desc[0] != '\0')
+               {
+                  ImGui::SetTooltip("%s", opt.desc);
+               }
+            }
+         }
+         ImGui::EndPopup();
+      }
+      else
+      {
+         if (!gAudioDropPicker.paths.empty() && !gAudioDropPicker.justOpened)
+            gAudioDropPicker.paths.clear();
       }
 
       gHoveringItem = ed::GetHoveredNode() || ed::GetHoveredPin() || ed::GetHoveredLink();
