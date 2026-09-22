@@ -237,6 +237,7 @@ void PredictiveColoringNode::SetLearning(bool on)
 void PredictiveColoringNode::ResetProfile()
 {
    mProfile = ColorStats::Engine::Instance().GlobalProfile();
+   mLocalProfile = ColorStats::Profile();
    // Zero the wander's actual state, not just mCurrentParams: RecomputeFit/StepWander both run
    // unconditionally on the next CookIfNeeded and would otherwise smooth mFitEquilibrium in from
    // its stale pre-reset value and carry the old mWanderOffset forward, silently undoing this
@@ -248,12 +249,22 @@ void PredictiveColoringNode::ResetProfile()
 
 float PredictiveColoringNode::Confidence01() const
 {
-   return mProfile.Confidence01();
+   // Per instance: mostly trust the cross-session shared house style, but weight in what this
+   // specific instance has actually seen so a brand-new node isn't shown as if it personally
+   // already learned someone else's footage.
+   constexpr float kLocalWeight = 0.2f;
+   constexpr float kSharedWeight = 0.8f;
+   const float localConf = mLocalProfile.Confidence01();
+   const float sharedConf = ColorStats::Engine::Instance().GlobalProfile().Confidence01();
+   return kLocalWeight * localConf + kSharedWeight * sharedConf;
 }
 
 uint64_t PredictiveColoringNode::TotalSamples() const
 {
-   return mProfile.TotalSamples();
+   // Local-only: this is what the "Learn"/"Learn Again" label and "target profile active" status
+   // key off (DrawPredictiveColoringParams), so it must reflect what THIS instance has learned,
+   // not the always-nonzero shared engine it was seeded from.
+   return mLocalProfile.TotalSamples();
 }
 
 void PredictiveColoringNode::VisitParams(ParamVisitor& v)
@@ -274,6 +285,18 @@ void PredictiveColoringNode::VisitParams(ParamVisitor& v)
    {
       auto bytes = HexToBytes(profileHex);
       mProfile.Deserialize(bytes.data(), bytes.size());
+   }
+
+   std::string localProfileHex;
+   if (mLocalProfile.TotalSamples() > 0)
+   {
+      localProfileHex = BytesToHex(mLocalProfile.Serialize());
+   }
+   v.Text("localProfile", localProfileHex);
+   if (!localProfileHex.empty())
+   {
+      auto bytes = HexToBytes(localProfileHex);
+      mLocalProfile.Deserialize(bytes.data(), bytes.size());
    }
 }
 
@@ -346,6 +369,7 @@ void PredictiveColoringNode::AnalyzeInput(unsigned int srcTex, double t)
       double dt = (mLastSampleSeconds >= 0.0) ? (t - mLastSampleSeconds) : 0.033;
       dt = std::clamp(dt, 0.001, 0.5);
       mProfile.Accumulate(mLiveHist, dt);
+      mLocalProfile.Accumulate(mLiveHist, dt);
       ColorStats::Engine::Instance().Accumulate(mLiveHist, dt);
    }
    mLastSampleSeconds = t;
