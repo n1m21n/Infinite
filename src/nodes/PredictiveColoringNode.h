@@ -38,6 +38,11 @@ public:
    void ResetProfile();
 
    float Confidence01() const;
+   // This instance's own progress only, ignoring the shared engine entirely - what the UI shows
+   // as "learning - N%" while mLearning is true, distinct from the blended Confidence01() shown
+   // once stopped (step-10 review: the badge must move as THIS take learns, not just report the
+   // mostly-static shared confidence).
+   float LocalConfidence01() const;
    uint64_t TotalSamples() const;
 
    const ColorStats::HistogramSet& LiveHistogram() const { return mLiveHist; }
@@ -83,6 +88,10 @@ private:
 
    ColorStats::HistogramSet mLiveHist;
    ColorStats::Profile mProfile;
+   // This instance's own accumulated samples only (never seeded from the shared engine). Drives
+   // TotalSamples()/hasLearned so a freshly-added node shows "press Learn", not "Learn Again" with
+   // someone else's confidence — see Confidence01()'s local/shared blend.
+   ColorStats::Profile mLocalProfile;
    ColorStats::ColorGradeParams mTargetParams;    // this tick's raw Fit() output
    ColorStats::ColorGradeParams mFitEquilibrium;  // jitter-smoothed mTargetParams - the wander's home
    ColorStats::ColorGradeParams mCurrentParams;   // mFitEquilibrium + wander offset, clamped: what's actually applied

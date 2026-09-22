@@ -7,6 +7,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <thread>
 
 #include "audio/AudioBuffer.h"
@@ -355,6 +357,97 @@ namespace
          }
       return best >= 0 ? best : 60;
    }
+
+   // Cross-session "house rhythm style" pool - every Predictive Rhythm instance that finishes a
+   // Learn contributes its captured events here, and every instance's Confidence01() reads a
+   // small weight from it (same shape as PredictiveNotesNode's GlobalEngine). A rolling window of
+   // raw training events, most-recent kept.
+   class GlobalEngine
+   {
+   public:
+      static GlobalEngine& Instance()
+      {
+         static GlobalEngine e;
+         return e;
+      }
+
+      void AddEvents(const std::vector<Event>& events)
+      {
+         if (events.empty())
+            return;
+         mEvents.insert(mEvents.end(), events.begin(), events.end());
+         if (mEvents.size() > kMaxSharedEvents)
+            mEvents.erase(mEvents.begin(), mEvents.begin() + (long)(mEvents.size() - kMaxSharedEvents));
+         mVersion++;
+      }
+
+      const std::vector<Event>& Events() const { return mEvents; }
+      bool HasLearnedData() const { return mEvents.size() >= 2; }
+      uint64_t Version() const { return mVersion; }
+
+      // Held-out cross-entropy over the shared pool, cached and only recomputed when the pool
+      // actually changes - every Predictive Rhythm instance in the patch calls this every frame.
+      float Confidence01() const
+      {
+         if (mConfVersion != mVersion)
+         {
+            mConfVersion = mVersion;
+            float ceModel = 0.0f, ceBase = 0.0f;
+            if (mEvents.size() >= 2 && NoteModel::HeldOutCrossEntropy(mEvents, NoteModel::kMaxOrder, ceModel, ceBase))
+            {
+               const float gain = ceBase - ceModel;
+               mConfCache = (gain > 0.0f) ? std::clamp(1.0f - std::exp2(-gain), 0.0f, 1.0f) : 0.0f;
+            }
+            else
+            {
+               mConfCache = 0.0f;
+            }
+         }
+         return mConfCache;
+      }
+
+      bool Load(const std::string& directory)
+      {
+         std::ifstream f(Path(directory), std::ios::binary | std::ios::ate);
+         if (!f.is_open())
+            return false;
+         const size_t sz = (size_t)f.tellg();
+         f.seekg(0, std::ios::beg);
+         std::string text(sz, '\0');
+         f.read(text.data(), (std::streamsize)sz);
+         std::vector<Event> loaded;
+         if (!NoteModel::DecodeEvents(text, loaded))
+            return false;
+         mEvents = std::move(loaded);
+         mVersion++;
+         return true;
+      }
+
+      bool Save(const std::string& directory) const
+      {
+         std::error_code ec;
+         std::filesystem::create_directories(directory, ec);
+         std::ofstream f(Path(directory), std::ios::binary | std::ios::trunc);
+         if (!f.is_open())
+            return false;
+         const std::string text = NoteModel::EncodeEvents(mEvents);
+         f.write(text.data(), (std::streamsize)text.size());
+         return true;
+      }
+
+   private:
+      static std::string Path(const std::string& dir)
+      {
+         std::filesystem::path p(dir);
+         return (p / "rhythm_style.bin").string();
+      }
+
+      static constexpr size_t kMaxSharedEvents = 4000;
+      std::vector<Event> mEvents;
+      uint64_t mVersion = 0;
+      mutable uint64_t mConfVersion = ~0ull;
+      mutable float mConfCache = 0.0f;
+   };
 }
 
 PredictiveRhythmNode::PredictiveRhythmNode() = default;
@@ -402,6 +495,22 @@ void PredictiveRhythmNode::SetLearning(bool on)
    mLearning = true;
 }
 
+void PredictiveRhythmNode::ResetLearnedState()
+{
+   if (mLearning)
+      mLearning = false; // no FinishLearn(): this is a discard, not a capture to keep
+   if (mAudioNode)
+      mAudioNode->Retire(mAudioNode->SwapTables(nullptr));
+   mCaps.clear();
+   mCurve.clear();
+   mNotesCaptured = 0;
+   mMeterBars = 0;
+   mLearned = 0;
+   mLastLearnTooShort = false;
+   model.clear();
+   mAppliedModel.clear();
+}
+
 void PredictiveRhythmNode::DrainCaptures()
 {
    Cap c;
@@ -437,9 +546,17 @@ float PredictiveRhythmNode::Confidence01() const
    if (mCurve.empty())
       return 0.0f;
    const float gain = mCurve.back();
-   if (!(gain > 0.0f))
-      return 0.0f;
-   return std::clamp(1.0f - std::exp2(-gain), 0.0f, 1.0f);
+   float localConf = 0.0f;
+   if (gain > 0.0f)
+      localConf = std::clamp(1.0f - std::exp2(-gain), 0.0f, 1.0f);
+
+   // Blend in the cross-session "house rhythm style" pool other Predictive Rhythm instances
+   // have contributed, minority-weighted (80% local / 20% shared, same split as Predictive
+   // Coloring and Predictive Notes - step-10 review).
+   constexpr float kLocalWeight = 0.8f;
+   constexpr float kSharedWeight = 0.2f;
+   const float sharedConf = GlobalEngine::Instance().Confidence01();
+   return std::clamp(kLocalWeight * localConf + kSharedWeight * sharedConf, 0.0f, 1.0f);
 }
 
 int PredictiveRhythmNode::Dropped() const
@@ -466,6 +583,8 @@ void PredictiveRhythmNode::FinishLearn()
          mAppliedModel = model;
          mLearned = (int)ev.size();
          StartBuild(ev);
+         // Contribute this take's captured events to the cross-session house rhythm pool.
+         GlobalEngine::Instance().AddEvents(ev);
       }
    }
    mCaps.clear();
@@ -591,6 +710,13 @@ void PredictiveRhythmNode::SweepPrepare()
    root = 60;
    CookIfNeeded(0);
    WaitForBuild();
+}
+
+namespace PredictiveRhythmStyle
+{
+   bool Load(const std::string& directory) { return GlobalEngine::Instance().Load(directory); }
+   bool Save(const std::string& directory) { return GlobalEngine::Instance().Save(directory); }
+   bool HasLearnedData() { return GlobalEngine::Instance().HasLearnedData(); }
 }
 
 namespace PredictiveRhythm

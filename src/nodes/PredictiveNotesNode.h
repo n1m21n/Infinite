@@ -65,6 +65,12 @@ public:
    };
    bool IsLearning() const { return mLearning; }
    void SetLearning(bool on);
+   // Clears this instance's own learned material back to "press Learn" - used when a node is
+   // duplicated/copy-pasted so the copy starts fresh instead of inheriting the source's exact
+   // learned model (CopyParams round-trips `model` like any other param; this undoes that for the
+   // learned field specifically). Does not touch the cross-session shared pool - the source
+   // instance's contribution to house style stays.
+   void ResetLearnedState();
    int NotesCaptured() const { return mNotesCaptured; }
    int LearnedNotes() const { return mLearned; }
    int BarsCaptured() const { return mBars; }
@@ -107,6 +113,16 @@ private:
    std::vector<NoteModel::Event> mQueuedEvents;
    std::string mAppliedModel;
 };
+
+// The cross-session "house style" pool. Every Predictive Notes instance, in every patch, feeds
+// and reads this same rolling window of captured events - same shape as PredictiveVelocityProfile
+// (PredictiveVelocityNode.h) and ColorStats::Engine (src/core/ColorStats.h).
+namespace PredictiveNotesStyle
+{
+   bool Load(const std::string& directory);
+   bool Save(const std::string& directory);
+   bool HasLearnedData();
+}
 
 namespace PredictiveNotes
 {

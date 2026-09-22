@@ -1,5 +1,37 @@
 [
   {
+    "hash": "6e2cc2006daca0f4f465203713fb555ebd09667f",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Tue Sep 22 18:29:03 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Weight Predictive Coloring confidence: 20% this instance, 80% shared",
+      "description": "Weight Predictive Coloring confidence: 20% this instance, 80% shared",
+      "bullets": [],
+      "body": "Every instance's mProfile was copy-seeded from the shared ColorStats::Engine\nsingleton at construction, so a brand-new node showed \"Learn Again\" and the\nshared model's confidence before it had ever seen a frame itself.\nAdd a local-only Profile (mLocalProfile) that starts blank per instance and\nonly accumulates this instance's own samples. TotalSamples()/hasLearned now\nread from it, so a fresh instance correctly shows \"press Learn\" instead of\ninheriting another instance's learned state. Confidence01() blends\n0.2 * local confidence + 0.8 * shared engine confidence, and mLocalProfile is\npersisted alongside the existing shared-profile snapshot in VisitParams.\nGrading itself (Fit/StepWander) still uses mProfile, which continues to track\nthe shared house-style profile, unchanged.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Weight Predictive Coloring confidence: 20% this instance, 80% shared\n\nEvery instance's mProfile was copy-seeded from the shared ColorStats::Engine\nsingleton at construction, so a brand-new node showed \"Learn Again\" and the\nshared model's confidence before it had ever seen a frame itself.\n\nAdd a local-only Profile (mLocalProfile) that starts blank per instance and\nonly accumulates this instance's own samples. TotalSamples()/hasLearned now\nread from it, so a fresh instance correctly shows \"press Learn\" instead of\ninheriting another instance's learned state. Confidence01() blends\n0.2 * local confidence + 0.8 * shared engine confidence, and mLocalProfile is\npersisted alongside the existing shared-profile snapshot in VisitParams.\n\nGrading itself (Fit/StepWander) still uses mProfile, which continues to track\nthe shared house-style profile, unchanged.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "src/nodes/PredictiveColoringNode.cpp | 28 ++++++++++++++++++++++++++--\n src/nodes/PredictiveColoringNode.h   |  4 ++++\n 2 files changed, 30 insertions(+), 2 deletions(-)"
+  },
+  {
+    "hash": "ef697d5ac9bd89eb43d18ced987239f5964c386f",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Tue Sep 22 18:12:32 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Update semi-brain extracted corpora and training datasets",
+      "description": "Update semi-brain extracted corpora and training datasets",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Update semi-brain extracted corpora and training datasets\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".../1_extractors/output/git_commits_corpus.json    | 5251 +++++++++++++-------\n .../1_extractors/output/recovered_docs_corpus.json |  484 +-\n .../output/skills_and_invariants_corpus.json       |    2 +-\n .../3_datasets/train_dpo_preference.jsonl          |    5 +\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl |  223 +-\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl |  223 +-\n 6 files changed, 4115 insertions(+), 2073 deletions(-)"
+  },
+  {
     "hash": "802d66921879ae5d55e32783b1a3ddfc96f3d4a6",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",

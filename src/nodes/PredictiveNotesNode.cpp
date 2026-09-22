@@ -6,6 +6,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <thread>
 
 #include "audio/AudioBuffer.h"
@@ -415,6 +417,100 @@ namespace
       }
       return ev;
    }
+
+   // Cross-session "house style" pool - every Predictive Notes instance that finishes a Learn
+   // contributes its captured events here, and every instance's Confidence01() reads a small
+   // weight from it (same shape as ColorStats::Engine backing Predictive Coloring). A rolling
+   // window of raw training events, most-recent kept, so the pool tracks how the user currently
+   // plays rather than growing without bound or getting stuck on an old style.
+   class GlobalEngine
+   {
+   public:
+      static GlobalEngine& Instance()
+      {
+         static GlobalEngine e;
+         return e;
+      }
+
+      void AddEvents(const std::vector<Event>& events)
+      {
+         if (events.empty())
+            return;
+         mEvents.insert(mEvents.end(), events.begin(), events.end());
+         if (mEvents.size() > kMaxSharedEvents)
+            mEvents.erase(mEvents.begin(), mEvents.begin() + (long)(mEvents.size() - kMaxSharedEvents));
+         mVersion++;
+      }
+
+      const std::vector<Event>& Events() const { return mEvents; }
+      bool HasLearnedData() const { return mEvents.size() >= 2; }
+      uint64_t Version() const { return mVersion; }
+
+      // Held-out cross-entropy over the shared pool, same honest measurement Confidence01() uses
+      // locally - cached and only recomputed when the pool actually changes, since every
+      // Predictive Notes instance in the patch calls this every frame and HeldOutCrossEntropy is
+      // a real train/test pass, not free.
+      float Confidence01() const
+      {
+         if (mConfVersion != mVersion)
+         {
+            mConfVersion = mVersion;
+            float ceModel = 0.0f, ceBase = 0.0f;
+            if (mEvents.size() >= 2 && NoteModel::HeldOutCrossEntropy(mEvents, NoteModel::kMaxOrder, ceModel, ceBase))
+            {
+               const float gain = ceBase - ceModel;
+               mConfCache = (gain > 0.0f) ? std::clamp(1.0f - std::exp2(-gain), 0.0f, 1.0f) : 0.0f;
+            }
+            else
+            {
+               mConfCache = 0.0f;
+            }
+         }
+         return mConfCache;
+      }
+
+      bool Load(const std::string& directory)
+      {
+         std::ifstream f(Path(directory), std::ios::binary | std::ios::ate);
+         if (!f.is_open())
+            return false;
+         const size_t sz = (size_t)f.tellg();
+         f.seekg(0, std::ios::beg);
+         std::string text(sz, '\0');
+         f.read(text.data(), (std::streamsize)sz);
+         std::vector<Event> loaded;
+         if (!NoteModel::DecodeEvents(text, loaded))
+            return false;
+         mEvents = std::move(loaded);
+         mVersion++;
+         return true;
+      }
+
+      bool Save(const std::string& directory) const
+      {
+         std::error_code ec;
+         std::filesystem::create_directories(directory, ec);
+         std::ofstream f(Path(directory), std::ios::binary | std::ios::trunc);
+         if (!f.is_open())
+            return false;
+         const std::string text = NoteModel::EncodeEvents(mEvents);
+         f.write(text.data(), (std::streamsize)text.size());
+         return true;
+      }
+
+   private:
+      static std::string Path(const std::string& dir)
+      {
+         std::filesystem::path p(dir);
+         return (p / "notes_style.bin").string();
+      }
+
+      static constexpr size_t kMaxSharedEvents = 4000;
+      std::vector<Event> mEvents;
+      uint64_t mVersion = 0;
+      mutable uint64_t mConfVersion = ~0ull;
+      mutable float mConfCache = 0.0f;
+   };
 }
 
 PredictiveNotesNode::PredictiveNotesNode() = default;
@@ -466,9 +562,17 @@ float PredictiveNotesNode::Confidence01() const
    if (mCurve.empty())
       return 0.0f;
    const float gain = mCurve.back();
-   if (!(gain > 0.0f))
-      return 0.0f;
-   return std::clamp(1.0f - std::exp2(-gain), 0.0f, 1.0f);
+   float localConf = 0.0f;
+   if (gain > 0.0f)
+      localConf = std::clamp(1.0f - std::exp2(-gain), 0.0f, 1.0f);
+
+   // Blend in the cross-session "house style" pool other Predictive Notes instances have
+   // contributed, minority-weighted so the badge still mostly reads as this take's own honest
+   // progress (step-10 review: 80% local / 20% shared, same split as Predictive Coloring).
+   constexpr float kLocalWeight = 0.8f;
+   constexpr float kSharedWeight = 0.2f;
+   const float sharedConf = GlobalEngine::Instance().Confidence01();
+   return std::clamp(kLocalWeight * localConf + kSharedWeight * sharedConf, 0.0f, 1.0f);
 }
 
 int PredictiveNotesNode::LastNote() const { return mAudioNode ? mAudioNode->LastNote() : -1; }
@@ -497,6 +601,22 @@ void PredictiveNotesNode::SetLearning(bool on)
    mLastLearnTooShort = false;
    mBeatsPerBar = Transport::Instance().BeatsPerBar();
    mLearning = true;
+}
+
+void PredictiveNotesNode::ResetLearnedState()
+{
+   if (mLearning)
+      mLearning = false; // no FinishLearn(): this is a discard, not a capture to keep
+   if (mAudioNode)
+      mAudioNode->Retire(mAudioNode->SwapTables(nullptr));
+   mCaps.clear();
+   mCurve.clear();
+   mNotesCaptured = 0;
+   mBars = 0;
+   mLearned = 0;
+   mLastLearnTooShort = false;
+   model.clear();
+   mAppliedModel.clear();
 }
 
 void PredictiveNotesNode::DrainCaptures()
@@ -555,6 +675,9 @@ void PredictiveNotesNode::FinishLearn()
       mAppliedModel = model;
       mLearned = (int)ev.size();
       StartBuild(ev);
+      // Contribute this take's captured events to the cross-session house style pool - every
+      // other Predictive Notes instance's Confidence01() reads a minority weight from it.
+      GlobalEngine::Instance().AddEvents(ev);
    }
    // else: too little captured to replace anything - the previous model/tables (if any) are
    // left exactly as they were, and mLastLearnTooShort tells the status line why.
@@ -702,6 +825,13 @@ void PredictiveNotesNode::SweepPrepare()
    model = NoteModel::EncodeEvents(LoopEvents(2));
    CookIfNeeded(0);
    WaitForBuild();
+}
+
+namespace PredictiveNotesStyle
+{
+   bool Load(const std::string& directory) { return GlobalEngine::Instance().Load(directory); }
+   bool Save(const std::string& directory) { return GlobalEngine::Instance().Save(directory); }
+   bool HasLearnedData() { return GlobalEngine::Instance().HasLearnedData(); }
 }
 
 namespace PredictiveNotes
