@@ -194,6 +194,7 @@ namespace
 #include "nodes/PredictiveNotesNode.h"
 #include "nodes/PredictiveModulatorNode.h"
 #include "nodes/PredictiveColoringNode.h"
+#include "nodes/PredictiveQuantizeNode.h"
 #include "nodes/OscNodes.h"
 #include "nodes/MidiNodes.h"
 #include "nodes/OutputNode.h"
@@ -5892,6 +5893,7 @@ namespace
       REGISTER_NODE(VibratoNode, Vibrato, "Modulators");
       REGISTER_NODE(NoteEchoNode, Note Echo, "Notes");
       REGISTER_NODE(PredictiveNotesNode, Predictive Notes, "Prediction");
+      REGISTER_NODE(PredictiveQuantizeNode, Predictive Quantize, "Prediction");
       REGISTER_NODE(NoteRouterNode, Note Router, "Notes");
       REGISTER_NODE(NoteMergeNode, Note Merge, "Notes");
       REGISTER_NODE(NoteSwitcherNode, Note Switcher, "Notes");
@@ -11603,6 +11605,7 @@ namespace
           dynamic_cast<VelocityCurveNode*>(node) != nullptr ||
           dynamic_cast<HumanizerNode*>(node) != nullptr ||
           dynamic_cast<QuantizerNode*>(node) != nullptr ||
+          dynamic_cast<PredictiveQuantizeNode*>(node) != nullptr ||
           dynamic_cast<NoteEchoNode*>(node) != nullptr ||
           dynamic_cast<NoteMergeNode*>(node) != nullptr ||
           dynamic_cast<NoteSwitcherNode*>(node) != nullptr ||
@@ -18654,6 +18657,37 @@ namespace
       EndAudioBody();
    }
 
+   void DrawPredictiveQuantizeBody(GraphNode& gn, PredictiveQuantizeNode* n)
+   {
+      char stat[64];
+      if (n->IsLearning())
+         snprintf(stat, sizeof(stat), "learning  -  %d onsets", n->OnsetsCaptured());
+      else if (n->ModeCount() > 0)
+         snprintf(stat, sizeof(stat), "%d spacings learned", n->ModeCount());
+      else
+         snprintf(stat, sizeof(stat), "wire notes in, press Learn");
+
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+
+      {
+         const float w = gAudioContentW;
+         const float h = ImGui::GetFrameHeight();
+         const bool learning = n->IsLearning();
+         if (ImGui::Button(learning ? "Stop##pqLearn" : "Learn##pqLearn", ImVec2(w, h)))
+         {
+            PushUndoCheckpoint();
+            n->SetLearning(!learning);
+         }
+      }
+      {
+         AudioKnobRow row(1);
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
    void DrawNoteEchoBody(GraphNode& gn, NoteEchoNode* n)
    {
       char stat[64];
@@ -23932,6 +23966,8 @@ namespace
          DrawNoteEchoBody(gn, n);
       else if (auto* n = dynamic_cast<PredictiveNotesNode*>(gn.node.get()))
          DrawPredictiveNotesBody(gn, n);
+      else if (auto* n = dynamic_cast<PredictiveQuantizeNode*>(gn.node.get()))
+         DrawPredictiveQuantizeBody(gn, n);
       else if (auto* n = dynamic_cast<NoteRouterNode*>(gn.node.get()))
          DrawNoteRouterBody(gn, n);
       else if (auto* n = dynamic_cast<NoteMergeNode*>(gn.node.get()))
@@ -38976,6 +39012,7 @@ namespace
          { "Vibrato", "An LFO wired straight to pitch. It is a modulator, not a note-chain node - it has no note input on purpose, because a free-running wobble has no single note to attach to. Patch its output onto a synth's pitch/bend mod dot (e.g. Wavetable's 'bend' knob)." },
          { "Note Filter", "A gate on a note's pitch: scale snaps it to the nearest degree of the chosen scale/root, range drops anything outside lo..hi, and chance randomly drops the rest. A note that gets dropped has its note-off dropped with it, so nothing hangs." },
          { "Predictive Notes", "Wire a note chain in and press Learn: it listens (passing the notes through), learns the pitches, rhythm, lengths and velocities as a variable-order Markov model, then plays on its own in that style. Stray at the bottom replays the phrase, the middle plays in character, the top ignores the model and picks freely in range. The learned notes are saved with the patch." },
+         { "Predictive Quantize", "A groove quantizer, not a grid one: wire a note chain in and press Learn, and it listens to the actual spacing between your onsets (passing them through while it listens) instead of assuming a fixed division. Stop, and it pulls future note-on timing toward the spacings it actually heard - mix at 0 is untouched, mix at 1 snaps fully onto the nearest learned spacing. Unlike Quantizer's fixed grid, this follows however you actually played it, including swing or a template that isn't on a clean subdivision." },
          { "Note Echo", "Repeats every incoming note event, delay ms apart, with velocity decaying and pitch shifting per repeat - a delay line for notes rather than audio. The original note always passes through first; the repeats are on top of it, not instead of it." },
          { "Note Router", "The system's only note fan-out point: one input, four distinct outputs. Round Robin cycles through them, Random picks one per note, Chain advances only when the pitch changes (a held note stays put), and Probability rolls each output independently - a note can end up on several outputs at once, or (rarely) none, in which case it falls back to output 1. A note's whole lifetime (on through off) always stays on the output(s) it started on." },
          { "Note Merge", "The system's only note fan-in point: up to four note inputs merged into one output stream, in timestamp order. Each input's notes stay independent voices matched by voice id, not pitch - so two inputs playing the same note at the same time sound as two overlapping voices, not a collision." },
@@ -39751,6 +39788,7 @@ namespace
                { "Bouncing Balls", "Physics-based gravity bounce note generator (up to 12 balls, with speed, size, and range controls) creating organic rhythmic polyrhythms as balls hit walls." },
                { "Note Transpose, Pitch Bend, Velocity Curve", "Pitch shifting, interval offset, pitch wheel modulation, and non-linear velocity mapping curves." },
                { "Gate, Humanizer, Glide", "Note gate length shaping, timing/velocity jitter humanization, and portamento glide." },
+               { "Predictive Notes, Predictive Quantize", "Predictive Notes learns a played phrase as a Markov model and plays on in that style. Predictive Quantize learns the actual spacing between your onsets and pulls future timing toward it - a groove template, not Quantizer's fixed grid." },
                { "Note Stack", "Polyphonic chord generator, harmony generator, and interval stacking." },
             } },
             { "Synths", {
@@ -64116,6 +64154,8 @@ int main(int argc, char** argv)
       return PredictiveNotes::RunPredMidiTest() ? 0 : 1;
    if (getenv("INFINITE_PREDCOLORTEST") != nullptr)
       return PredictiveColoring::RunPredColorTest() ? 0 : 1;
+   if (getenv("INFINITE_PREDQUANTIZETEST") != nullptr)
+      return PredictiveQuantize::RunPredQuantizeTest() ? 0 : 1;
    if (getenv("INFINITE_DRIFTTEST") != nullptr)
       return PredictionNodes::RunDriftTest() ? 0 : 1;
    if (getenv("INFINITE_PREDFEEDBACKTEST") != nullptr)

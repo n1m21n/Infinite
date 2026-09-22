@@ -376,6 +376,7 @@ set(COMMON_SOURCES
     src/core/Modulation.cpp
     src/core/MovementLog.cpp
     src/core/MovementStats.cpp
+    src/core/ColorStats.cpp
     src/core/GestureRecorder.cpp
     src/core/Expression.cpp
     src/core/SysInfo.cpp
@@ -459,6 +460,8 @@ set(COMMON_SOURCES
     src/nodes/ModulatorNodes.cpp
     src/nodes/PredictionNodes.cpp
     src/nodes/PredictiveNotesNode.cpp
+    src/nodes/PredictiveColoringNode.cpp
+    src/nodes/PredictiveQuantizeNode.cpp
     src/nodes/PredictiveModulatorNode.cpp
     src/audio/NoteModel.cpp
     src/nodes/OscNodes.cpp
