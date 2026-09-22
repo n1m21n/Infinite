@@ -18726,6 +18726,10 @@ namespace
          snprintf(stat, sizeof(stat), "learning  -  %d notes, %d bars", n->NotesCaptured(), n->BarsCaptured());
       else if (n->Building())
          snprintf(stat, sizeof(stat), "building model...");
+      else if (n->LastLearnTooShort() && n->LearnedNotes() > 0)
+         snprintf(stat, sizeof(stat), "too short, kept %d notes learned", n->LearnedNotes());
+      else if (n->LastLearnTooShort())
+         snprintf(stat, sizeof(stat), "too short to learn, wire more notes in");
       else if (n->LearnedNotes() > 0)
          snprintf(stat, sizeof(stat), "%d notes learned", n->LearnedNotes());
       else
