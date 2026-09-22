@@ -1191,6 +1191,16 @@ namespace
    // above - not serialized to patch data or tracked by undo.
    bool  gModMatrixOpen = false;
    int   gModMatrixDock = 0;              // 0 = bottom, 1 = right, 2 = left, 3 = top
+   // "View in Modulation Matrix" (the param right-click menu): which row to scroll to and
+   // flash when the matrix next draws. gModMatrixScrollPending is one-shot - the row loop
+   // clears it the first time it finds the match, so re-opening/scrolling the panel by hand
+   // afterward doesn't keep snapping back. The highlight itself lingers a little longer
+   // (gModMatrixHighlightUntil, an ImGui::GetTime() deadline) so the row is still findable by
+   // eye a moment after the one-shot scroll already landed on it.
+   int    gModMatrixHighlightNode = -1;
+   int    gModMatrixHighlightParam = -1;
+   double gModMatrixHighlightUntil = 0.0;
+   bool   gModMatrixScrollPending = false;
    int   gModMatrixFillRows = -1;         // INFINITE_MODMATRIXGEOM probe only
    float gModMatrixScrollMax = -1.0f;     // INFINITE_MODMATRIXGEOM probe only
    float gModMatrixWidth = 420.0f;
@@ -7172,9 +7182,26 @@ namespace
                                bool srcIsModulator, IPaletteSource* srcPalette,
                                IGeometrySource* srcGeometry, CameraNode* srcCamera,
                                LightNode* srcLight,
-                               bool srcIsEnvironment, bool srcIsAudioNode, bool srcIsNoteSource)
+                               bool srcIsEnvironment, bool srcIsAudioNode, bool srcIsNoteSource,
+                               bool srcIsPredictor)
    {
       if (dstNode == nullptr || dstNode->node == nullptr)
+         return false;
+
+      // A Predictive LFO / Macro (IPredictor) writes straight into the
+      // parameters it is bound to - it publishes no signal on its output for
+      // another node to read, so a cable from one into any input slot would
+      // feed a permanently dead value. Param pins never reach this function
+      // (the UI binds those through Modulation), so refusing every input slot
+      // here is exactly the UI's rule and nothing more.
+      //
+      // This lived only in the ed::QueryNewLink handler until now, which meant
+      // ConnectNodes() (the RemoteControl `connect` RPC and cluster paste),
+      // the drag-to-empty-canvas auto-wire, and RecommendedNodeTypesForOutput
+      // all happily made a link the UI refuses. `srcIsPredictor` is a required
+      // parameter rather than a defaulted one precisely so a new call site
+      // cannot silently reopen that hole - the compiler names it instead.
+      if (srcIsPredictor)
          return false;
 
       auto* dstRender = dynamic_cast<Render3DNode*>(dstNode->node.get());
@@ -7426,10 +7453,16 @@ namespace
       const bool srcIsAudioNode = srcAudioSource != nullptr && srcAudioSource->IsAudioOutputIndex(srcOutputIndex);
       const bool srcIsNoteSource = dynamic_cast<INoteSource*>(srcNode->node.get()) != nullptr;
 
+      const bool srcIsPredictor = dynamic_cast<IPredictor*>(srcNode->node.get()) != nullptr;
       if (!IsInputSlotCompatible(dstNode, dstSlot, srcIsModulator, srcPalette, srcGeometry, srcCamera,
-                                  srcLight, srcIsEnvironment, srcIsAudioNode, srcIsNoteSource))
+                                  srcLight, srcIsEnvironment, srcIsAudioNode, srcIsNoteSource,
+                                  srcIsPredictor))
       {
-         outError = "incompatible source/destination for this slot";
+         // Same verdict either way; only the wording differs, so the RPC
+         // caller learns which rule refused it rather than a generic "no".
+         outError = srcIsPredictor
+            ? "a Predictive LFO / Macro can only drive a parameter, not another node"
+            : "incompatible source/destination for this slot";
          return false;
       }
       if (srcIsAudioNode && WouldCreateAudioCycle(srcNode->node.get(), dstNode->node.get()))
@@ -7674,6 +7707,10 @@ namespace
       auto* srcAudioSource = dynamic_cast<IAudioSource*>(srcNode->node.get());
       const bool srcIsAudioNode = srcAudioSource != nullptr && srcAudioSource->IsAudioOutputIndex(srcOutputIndex);
       const bool srcIsNoteSource = dynamic_cast<INoteSource*>(srcNode->node.get()) != nullptr;
+      // A Predictive LFO / Macro drives parameters only, so nothing in the
+      // catalogue is a legal drop target for it - suggesting anything here
+      // would offer a link IsInputSlotCompatible then refuses.
+      const bool srcIsPredictor = dynamic_cast<IPredictor*>(srcNode->node.get()) != nullptr;
 
       for (const std::string& category : NodeFactory::Instance().GetCategories())
       {
@@ -7693,7 +7730,7 @@ namespace
             {
                if (IsInputSlotCompatible(&probe, slot, srcIsModulator, srcPalette, srcGeometry,
                                           srcCamera, srcLight, srcIsEnvironment,
-                                          srcIsAudioNode, srcIsNoteSource))
+                                          srcIsAudioNode, srcIsNoteSource, srcIsPredictor))
                {
                   compatible = true;
                   break;
@@ -11166,6 +11203,8 @@ namespace
       ModSlider("speed", &n->speed, 0.1f, 4.0f, "%.2fx");
       ModSlider("stray", &n->stray, 0.25f, 4.0f, "%.2f");
       ModSlider("momentum", &n->momentum, 0.0f, 4.0f, "%.2fs");
+      ModSlider("smoothing", &n->smoothness, 0.0f, 0.95f, "%.2f");
+      ModSlider("depth", &n->depth, 0.0f, 1.0f, "%.2f");
       // `low`/`high` used to sit here, writing rangeLo/rangeHi/rangeOverride: ONE range clamped
       // onto every destination at once. That is meaningless on this node - each destination has
       // its own slot and its own learned range, so a single pair of sliders either did nothing or
@@ -19483,9 +19522,7 @@ namespace
          // plus a caption-line reservation.
          AudioKnobRow row(4, 20.0f, 8.0f, false);
          row.Checkbox("loop##capturerLoop", &n->loop);
-         row.Dropdown("grid", MusicTime::QuantizeGridList(),
-                      std::clamp(n->quantizeDiv, 0, (int)MusicTime::QuantizeGridList().size() - 1),
-                      [n](int i) { PushUndoCheckpoint(); n->quantizeDiv = i; });
+         row.Skip();
          row.Skip();
          row.Skip();
          row.End();
@@ -27656,6 +27693,19 @@ namespace
 
                ImGui::PushID(dstIndex * 1000 + dstParam);
                ImGui::TableNextRow();
+
+               // "View in Modulation Matrix" landed here: scroll it into view once, and flash
+               // its row for a moment so it's findable by eye even after the scroll already
+               // happened.
+               const bool isHighlightTarget =
+                  dstIndex == gModMatrixHighlightNode && dstParam == gModMatrixHighlightParam;
+               if (isHighlightTarget && gModMatrixScrollPending)
+               {
+                  ImGui::SetScrollHereY(0.35f);
+                  gModMatrixScrollPending = false;
+               }
+               if (isHighlightTarget && ImGui::GetTime() < gModMatrixHighlightUntil)
+                  ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, IM_COL32(234, 179, 8, 60));
 
                // Resolve against this frame's ParamRef when the destination
                // drew this frame (the same lazy legacy-conversion pass the
@@ -85307,6 +85357,8 @@ int main(int argc, char** argv)
                                             srcAudioSource->IsAudioOutputIndex(srcOutputIndex);
                 const bool srcIsNoteSource = srcNode != nullptr &&
                                              dynamic_cast<INoteSource*>(srcNode->node.get()) != nullptr;
+                const bool srcIsPredictor = srcNode != nullptr &&
+                                            dynamic_cast<IPredictor*>(srcNode->node.get()) != nullptr;
 
                bool valid = false;
                const char* rejectReason = nullptr;
@@ -85335,17 +85387,14 @@ int main(int argc, char** argv)
                      valid = srcPalette != nullptr;
                   else if (GraphNode::IsInputPin(b))
                   {
+                     // The Predictive LFO / Macro refusal lives inside
+                     // IsInputSlotCompatible now (it used to sit out here, where
+                     // only this one path saw it); the wording for it is picked
+                     // up by the reason chain below.
                      valid = IsInputSlotCompatible(dstNode, GraphNode::InputSlotFromPin(b),
                                                     srcIsModulator, srcPalette, srcGeometry, srcCamera,
                                                     srcLight, srcIsEnvironment,
-                                                    srcIsAudioNode, srcIsNoteSource);
-                     // Predictive LFO / Macro write straight into parameters they are bound to; they
-                     // have no signal to hand on, so Smooth/Math/etc. would just read a dead value.
-                     if (valid && dynamic_cast<IPredictor*>(srcNode->node.get()) != nullptr)
-                     {
-                        valid = false;
-                        rejectReason = "Predictive LFO / Macro can only drive a parameter, knob or slider - not another node";
-                     }
+                                                    srcIsAudioNode, srcIsNoteSource, srcIsPredictor);
                      if (valid && srcIsAudioNode &&
                          WouldCreateAudioCycle(srcNode->node.get(), dstNode->node.get()))
                      {
@@ -85363,9 +85412,21 @@ int main(int argc, char** argv)
 
                // Why a refused drag was refused, surfaced as a tooltip below
                // (audio-node-ui-system §6a, extended across all 3D/image/signal pins).
-               if (!valid && rejectReason == nullptr && dstNode != nullptr && differentNodes)
+               if (!valid && rejectReason == nullptr && dstNode != nullptr)
                {
-                  if (GraphNode::IsColorPin(b))
+                  // These two used to fall through the whole chain below and
+                  // leave the cable red with no tooltip at all, which reads as
+                  // a bug rather than a rule. ConnectNodes() has always had
+                  // wording for the self-connection case; the UI now says it too.
+                  if (!differentNodes)
+                  {
+                     rejectReason = "A node can't be connected to itself";
+                  }
+                  else if (!GraphNode::IsOutputPin(a) || GraphNode::IsOutputPin(b))
+                  {
+                     rejectReason = "Drag from an output pin on the right of a node to an input pin on the left of another";
+                  }
+                  else if (GraphNode::IsColorPin(b))
                   {
                      rejectReason = "This color slot only accepts a Palette node";
                   }
@@ -85377,6 +85438,13 @@ int main(int argc, char** argv)
                         rejectReason = "3D objects cannot drive a parameter pin - only a modulator can";
                      else if (!srcIsModulator)
                         rejectReason = "Only modulator nodes (LFO, Envelope, Formula, etc.) can drive a parameter pin";
+                  }
+                  else if (srcIsPredictor && GraphNode::IsInputPin(b))
+                  {
+                     // Source-driven refusal: it applies to every slot on every
+                     // node, so it is read before any of the destination-shaped
+                     // messages in the branch below.
+                     rejectReason = "Predictive LFO / Macro can only drive a parameter, knob or slider - not another node";
                   }
                   else if (GraphNode::IsInputPin(b))
                   {
@@ -86981,6 +87049,14 @@ int main(int argc, char** argv)
                const int perfKind = destRef->isBool ? 3 : (destRef->isEnum ? 7 : 0);
                if (ImGui::MenuItem("Add to Performance Matrix"))
                   AddToPerformanceMatrix(nodeIndex, paramIndex, perfKind);
+               if (ImGui::MenuItem("View in Modulation Matrix"))
+               {
+                  gModMatrixOpen = true;
+                  gModMatrixHighlightNode = nodeIndex;
+                  gModMatrixHighlightParam = paramIndex;
+                  gModMatrixHighlightUntil = ImGui::GetTime() + 1.5;
+                  gModMatrixScrollPending = true;
+               }
                ImGui::Separator();
 
                // Double-clicking a field, or hovering it and typing a
@@ -87765,13 +87841,15 @@ int main(int argc, char** argv)
                      srcAudioSource != nullptr && srcAudioSource->IsAudioOutputIndex(dragOutputSlot);
                   const bool srcIsNoteSource =
                      dynamic_cast<INoteSource*>(dragSrcNode->node.get()) != nullptr;
+                  const bool srcIsPredictor =
+                     dynamic_cast<IPredictor*>(dragSrcNode->node.get()) != nullptr;
 
                   const int slotCount = InputCountFor(*spawned);
                   for (int slot = 0; slot < slotCount; ++slot)
                   {
                      if (IsInputSlotCompatible(spawned, slot, srcIsModulator, srcPalette, srcGeometry,
                                                 srcCamera, srcLight, srcIsEnvironment,
-                                                srcIsAudioNode, srcIsNoteSource))
+                                                srcIsAudioNode, srcIsNoteSource, srcIsPredictor))
                      {
                         // No PushUndoCheckpoint() here: SpawnNode() above already
                         // pushed one capturing the state before the node existed,

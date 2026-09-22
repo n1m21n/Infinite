@@ -162,12 +162,11 @@ DriftNode::DriftNode()
    static int sSpawn = 0;
    seed = 1000 + (++sSpawn) * 7919;
    mStats = &MovementStats::Live();
-   // Smoothing is no longer a user-facing knob (Step 8 refinement round 2: "the drift cannot
-   // have any params") - it was the actual fix for the jittery-output complaint, so it stays
-   // permanently on at a fixed, light setting instead of disappearing. Quantize is left off:
-   // it holds the output at whatever value it had when a beat-grid line was last crossed, which
-   // freezes solid whenever the transport isn't advancing (headless tests, a stopped transport) -
-   // exactly the "static" complaint this whole redesign started from.
+   // Smoothing starts at the light setting that fixed the original jittery-output complaint
+   // (Step 8 round 2); it's a user-facing slider again, this is just its default. Quantize is
+   // left off: it holds the output at whatever value it had when a beat-grid line was last
+   // crossed, which freezes solid whenever the transport isn't advancing (headless tests, a
+   // stopped transport) - exactly the "static" complaint this whole redesign started from.
    smoothness = 0.2f;
 }
 
@@ -497,7 +496,8 @@ void DriftNode::Tick(int frameId, double dt)
 
 float DriftNode::ValuePos01For(const ParamKey& k, float curPos)
 {
-   return std::clamp(SlotFor(k, curPos).smoothedX, 0.0f, 1.0f);
+   const float raw = std::clamp(SlotFor(k, curPos).smoothedX, 0.0f, 1.0f);
+   return std::clamp(0.5f + (raw - 0.5f) * std::clamp(depth, 0.0f, 1.0f), 0.0f, 1.0f);
 }
 
 void DriftNode::OnGrab(const ParamKey& k)
@@ -524,7 +524,10 @@ void DriftNode::OnRelease(const ParamKey& k, float pos, float velPerSec)
 
 float DriftNode::Value01()
 {
-   return mSlots.empty() ? 0.5f : std::clamp(mSlots.begin()->second.smoothedX, 0.0f, 1.0f);
+   if (mSlots.empty())
+      return 0.5f;
+   const float raw = std::clamp(mSlots.begin()->second.smoothedX, 0.0f, 1.0f);
+   return std::clamp(0.5f + (raw - 0.5f) * std::clamp(depth, 0.0f, 1.0f), 0.0f, 1.0f);
 }
 
 float DriftNode::SlotPos(const ParamKey& k) const
@@ -648,7 +651,10 @@ int DriftNode::Ghost(const ParamKey& k, float* out, int maxPoints)
          Step(x, v, rng, s.model, pr, EnergyFor(k), kGhostDt);
          const double futureBeats = nowBeats + (double)(i + 1) * kGhostDt * beatsPerSec;
          ApplyShaping(x, futureBeats, quantizeRate, smoothness, ghHeldX, ghHeldGridIdx, ghSmoothedX);
-         s.ghost[i] = ghSmoothedX;
+         // Same depth scaling ValuePos01For applies to the real output - otherwise the ghost
+         // preview would forecast a wider swing than the knob will actually make.
+         s.ghost[i] = std::clamp(0.5f + (std::clamp(ghSmoothedX, 0.0f, 1.0f) - 0.5f) *
+                                  std::clamp(depth, 0.0f, 1.0f), 0.0f, 1.0f);
       }
       s.ghostN = kGhostPoints;
       s.ghostFrame = mFrame;

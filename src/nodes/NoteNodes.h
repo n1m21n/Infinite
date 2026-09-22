@@ -994,7 +994,6 @@ public:
    AudioNode* GetAudioNode() override;
 
    bool loop = true;
-   int quantizeDiv = 0; // 0 = off, else index into MusicTime::QuantizeGridList() - snaps recorded onsets on StopRecording
    bool useGlobalScale = false; // snaps replayed notes to Transport key/scale on playback only - recording is unaffected
    NoteCable noteInput;
 
