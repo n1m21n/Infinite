@@ -13,7 +13,7 @@ ASSERT=(
   "PINDUPTEST:10"           # no node hands two controls the same pin id
   "DELETECRASHTEST:8"       # deleting a wired node leaves no dangling image cable
   "AUDIOTEARDOWNSWEEPTEST:10" # ...the same for every audio/note node type
-  "NOTEFANOUTTEST:4"        # one note source into several consumers
+  "NOTEFANOUTTEST:12"       # one note source into several consumers (fires at frame 4; needs headroom to print)
 )
 OBSERVE=()
 
