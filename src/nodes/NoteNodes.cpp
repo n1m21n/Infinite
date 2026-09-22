@@ -3940,18 +3940,9 @@ public:
          mRecordStartBeat = beats;
          break;
       case kStopRecord:
-      {
          mRecording = false;
          mRecordedLengthBeats = std::max(0.03125, beats - mRecordStartBeat);
-         const int quantizeDiv = mQuantizeDiv.load(std::memory_order_relaxed);
-         if (quantizeDiv > 0 && quantizeDiv <= (int)MusicTime::kNumRateDivisions)
-         {
-            const double gridBeats = MusicTime::QuantizeGridBeats(quantizeDiv);
-            for (int i = 0; i < mRecordedCount; i++)
-               mRecorded[i].beat = std::max(0.0, std::round(mRecorded[i].beat / gridBeats) * gridBeats);
-         }
          break;
-      }
       case kStartPlay:
          if (mRecordedCount > 0)
          {
@@ -4071,7 +4062,6 @@ public:
    void PushParams(const NoteCapturerNode& n)
    {
       mLoop.store(n.loop, std::memory_order_relaxed);
-      mQuantizeDiv.store(n.quantizeDiv, std::memory_order_relaxed);
       mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
    }
    void SendCommand(Command c) { mCommand.store(c, std::memory_order_relaxed); }
@@ -4143,7 +4133,6 @@ private:
 
    std::atomic<int> mCommand { kNone };
    std::atomic<bool> mLoop { true };
-   std::atomic<int> mQuantizeDiv { 0 };
    std::atomic<bool> mUseGlobalScale { false };
    std::atomic<bool> mRecordingReadout { false };
    std::atomic<bool> mPlayingReadout { false };
@@ -4171,7 +4160,6 @@ void NoteCapturerNode::CookIfNeeded(int frameId)
 void NoteCapturerNode::VisitParams(ParamVisitor& v)
 {
    v.Bool("loop", loop);
-   v.Int("quantizeDiv", quantizeDiv);
    v.Bool("useGlobalScale", useGlobalScale);
 }
 

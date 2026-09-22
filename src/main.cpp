@@ -19483,9 +19483,7 @@ namespace
          // plus a caption-line reservation.
          AudioKnobRow row(4, 20.0f, 8.0f, false);
          row.Checkbox("loop##capturerLoop", &n->loop);
-         row.Dropdown("grid", MusicTime::QuantizeGridList(),
-                      std::clamp(n->quantizeDiv, 0, (int)MusicTime::QuantizeGridList().size() - 1),
-                      [n](int i) { PushUndoCheckpoint(); n->quantizeDiv = i; });
+         row.Skip();
          row.Skip();
          row.Skip();
          row.End();
