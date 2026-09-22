@@ -1191,6 +1191,16 @@ namespace
    // above - not serialized to patch data or tracked by undo.
    bool  gModMatrixOpen = false;
    int   gModMatrixDock = 0;              // 0 = bottom, 1 = right, 2 = left, 3 = top
+   // "View in Modulation Matrix" (the param right-click menu): which row to scroll to and
+   // flash when the matrix next draws. gModMatrixScrollPending is one-shot - the row loop
+   // clears it the first time it finds the match, so re-opening/scrolling the panel by hand
+   // afterward doesn't keep snapping back. The highlight itself lingers a little longer
+   // (gModMatrixHighlightUntil, an ImGui::GetTime() deadline) so the row is still findable by
+   // eye a moment after the one-shot scroll already landed on it.
+   int    gModMatrixHighlightNode = -1;
+   int    gModMatrixHighlightParam = -1;
+   double gModMatrixHighlightUntil = 0.0;
+   bool   gModMatrixScrollPending = false;
    int   gModMatrixFillRows = -1;         // INFINITE_MODMATRIXGEOM probe only
    float gModMatrixScrollMax = -1.0f;     // INFINITE_MODMATRIXGEOM probe only
    float gModMatrixWidth = 420.0f;
@@ -27683,6 +27693,19 @@ namespace
 
                ImGui::PushID(dstIndex * 1000 + dstParam);
                ImGui::TableNextRow();
+
+               // "View in Modulation Matrix" landed here: scroll it into view once, and flash
+               // its row for a moment so it's findable by eye even after the scroll already
+               // happened.
+               const bool isHighlightTarget =
+                  dstIndex == gModMatrixHighlightNode && dstParam == gModMatrixHighlightParam;
+               if (isHighlightTarget && gModMatrixScrollPending)
+               {
+                  ImGui::SetScrollHereY(0.35f);
+                  gModMatrixScrollPending = false;
+               }
+               if (isHighlightTarget && ImGui::GetTime() < gModMatrixHighlightUntil)
+                  ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, IM_COL32(234, 179, 8, 60));
 
                // Resolve against this frame's ParamRef when the destination
                // drew this frame (the same lazy legacy-conversion pass the
@@ -87026,6 +87049,14 @@ int main(int argc, char** argv)
                const int perfKind = destRef->isBool ? 3 : (destRef->isEnum ? 7 : 0);
                if (ImGui::MenuItem("Add to Performance Matrix"))
                   AddToPerformanceMatrix(nodeIndex, paramIndex, perfKind);
+               if (ImGui::MenuItem("View in Modulation Matrix"))
+               {
+                  gModMatrixOpen = true;
+                  gModMatrixHighlightNode = nodeIndex;
+                  gModMatrixHighlightParam = paramIndex;
+                  gModMatrixHighlightUntil = ImGui::GetTime() + 1.5;
+                  gModMatrixScrollPending = true;
+               }
                ImGui::Separator();
 
                // Double-clicking a field, or hovering it and typing a
