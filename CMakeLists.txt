@@ -462,6 +462,7 @@ set(COMMON_SOURCES
     src/nodes/PredictiveNotesNode.cpp
     src/nodes/PredictiveColoringNode.cpp
     src/nodes/PredictiveQuantizeNode.cpp
+    src/nodes/PredictiveVelocityNode.cpp
     src/nodes/PredictiveModulatorNode.cpp
     src/audio/NoteModel.cpp
     src/nodes/OscNodes.cpp
