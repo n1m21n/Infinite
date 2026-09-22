@@ -72,7 +72,8 @@ public:
    // shape this field's own design note briefly floated, since that would have been a
    // second, incompatible sentinel convention living right next to the established one.
    int quantizeRate = 0;
-   // C: post-quantize EMA low-pass. 0 = no smoothing, 0.95 = heavy.
+   // C: post-quantize EMA low-pass. 0 = no smoothing, 0.95 = heavy. User-facing again as
+   // "smoothing" (Step 8 round 2 made it a fixed internal constant; re-exposed by request).
    float smoothness = 0.0f;
    // D: 0 = Wander (unchanged Step() path), 1 = Follow, 2 = Recall. Setting this from the
    // UI also sets `follow` so VisitParams' saved key/shape doesn't change.
@@ -81,6 +82,12 @@ public:
    bool rangeOverride = false;
    float rangeLo = 0.0f;
    float rangeHi = 1.0f;
+   // F: output depth. Scales the shaped value's deviation from 0.5 before it reaches
+   // ValuePos01For/Value01 - 1 = the learned swing unchanged, 0 = pinned dead centre. Exists
+   // because the learned range (m.lo/m.hi from RefreshModel) can end up sitting entirely in the
+   // top of 0..1 for a destination whose history skews high; depth is the user's own knob to
+   // pull that swing back in, independent of what the model happens to have learned.
+   float depth = 1.0f;
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -92,6 +99,7 @@ public:
       v.Bool("sectionConditioned", sectionConditioned); v.Int("recallBar", recallBar);
       v.Int("quantizeRate", quantizeRate); v.Float("smoothness", smoothness); v.Int("mode", mode);
       v.Bool("rangeOverride", rangeOverride); v.Float("rangeLo", rangeLo); v.Float("rangeHi", rangeHi);
+      v.Float("depth", depth);
    }
 
    // --- UI / test helpers (main thread) ---

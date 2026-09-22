@@ -11193,6 +11193,8 @@ namespace
       ModSlider("speed", &n->speed, 0.1f, 4.0f, "%.2fx");
       ModSlider("stray", &n->stray, 0.25f, 4.0f, "%.2f");
       ModSlider("momentum", &n->momentum, 0.0f, 4.0f, "%.2fs");
+      ModSlider("smoothing", &n->smoothness, 0.0f, 0.95f, "%.2f");
+      ModSlider("depth", &n->depth, 0.0f, 1.0f, "%.2f");
       // `low`/`high` used to sit here, writing rangeLo/rangeHi/rangeOverride: ONE range clamped
       // onto every destination at once. That is meaningless on this node - each destination has
       // its own slot and its own learned range, so a single pair of sliders either did nothing or
