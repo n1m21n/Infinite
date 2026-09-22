@@ -68,7 +68,7 @@ public:
    // --- Step 8 redesign ---
    // A: rate/time-signature quantize. 0 = Off, else an index into
    // MusicTime::QuantizeGridList() (index - 1 is the RateDivision) - the same convention
-   // NoteFilterNode::div / NoteCapturerNode::quantizeDiv already use; not the "-1 = Off"
+   // NoteFilterNode::div already uses; not the "-1 = Off"
    // shape this field's own design note briefly floated, since that would have been a
    // second, incompatible sentinel convention living right next to the established one.
    int quantizeRate = 0;
