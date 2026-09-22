@@ -26,6 +26,9 @@ ASSERT=(
   "AUDIOTEARDOWNSWEEPTEST:10" # delete each audio node type mid-playback, cables cleared
   "NOTEFANOUTTEST:8"       # one note source into several consumers; delete a consumer
                            # mid-playback; modulated filter cutoff torn down
+  "NOTEREWIRESTRESSTEST:10" # Note Sequencer fanned to two synths, topology
+                           # rebuilt every block for ~2s of notes: zero stuck
+                           # voices, zero ring overflow (bugfix/audio-rt-note-wiring)
   "TRANSPORTCLOCKTEST:32"  # Transport::Seconds() advances off the audio sample
                            # counter and freezes when paused
 )

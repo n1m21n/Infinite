@@ -202,4 +202,41 @@ public:
       (void)inputSlot;
       SetNoteInbox(inbox, cursor);
    }
+
+   // Upper bound on how many note-input slots any AudioNode exposes - mirrors
+   // main.cpp's own kMaxNoteSlots (NoteMergeNode's 4-way fan-in is the
+   // widest today). Defined here, not in main.cpp, so appliedInbox/
+   // appliedCursor below can be fixed-size arrays and AudioEngine's
+   // note-wiring apply pass can size against the same constant without a
+   // main.cpp include; main.cpp's own kMaxNoteSlots is just this value.
+   static constexpr int kMaxNoteSlots = 4;
+
+   // Owning-thread-only (see AudioEngine::ApplyNoteWiringIfNew): the wiring
+   // this node is ACTUALLY running right now, as of the last ApplyNoteInbox()
+   // call - as opposed to what RebuildAudioTopology last *described* into
+   // AudioTopology::noteWires, which can be a generation or more ahead of
+   // what the audio thread has caught up to applying. ApplyNoteWiringIfNew
+   // reads this to decide whether a rewired consumer should carry its read
+   // cursor over (same producer/slot, just a new cursor id) or start fresh
+   // at the producer's current tail (nothing here yet, or a different
+   // producer). nullptr/-1 = "nothing applied to this slot yet", matching an
+   // unconnected pin.
+   NoteEventQueue* appliedInbox[kMaxNoteSlots] = {};
+   int appliedCursor[kMaxNoteSlots] = { -1, -1, -1, -1 };
+
+   // Owning-thread-only (same rule as appliedInbox above - called only from
+   // AudioEngine::ApplyNoteWiringIfNew, never from RebuildAudioTopology
+   // directly any more). Records the wiring this node is now running, then
+   // forwards to the ordinary slot-aware virtual so subclasses get the exact
+   // same SetNoteInbox(slot, inbox, cursor) callback they always have -
+   // ApplyNoteInbox is purely the bookkeeping RebuildAudioTopology's direct
+   // mutation used to skip.
+   void ApplyNoteInbox(int slot, NoteEventQueue* inbox, int cursor)
+   {
+      if (slot < 0 || slot >= kMaxNoteSlots)
+         return;
+      appliedInbox[slot] = inbox;
+      appliedCursor[slot] = cursor;
+      SetNoteInbox(slot, inbox, cursor);
+   }
 };

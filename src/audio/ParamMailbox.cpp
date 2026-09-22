@@ -1,5 +1,9 @@
 #include "ParamMailbox.h"
 
+// <cassert>'s assert() is itself a no-op when NDEBUG is defined, so this is
+// always included; nothing here needs its own #ifndef NDEBUG.
+#include <cassert>
+
 void ParamMailbox::PrepareToPlay(double sampleRate)
 {
    mSampleRate = sampleRate;
@@ -9,6 +13,10 @@ void ParamMailbox::PrepareToPlay(double sampleRate)
 
 void ParamMailbox::Push(int paramId, float value)
 {
+   // A node that outgrows kMaxParams silently drops the param in release -
+   // fail loudly in development instead, since a dropped param otherwise
+   // looks identical to "the knob just doesn't do anything yet".
+   assert(paramId >= 0 && paramId < kMaxParams);
    if (paramId < 0 || paramId >= kMaxParams)
       return;
    mTarget[paramId].store(value, std::memory_order_release);
@@ -24,6 +32,7 @@ float ParamMailbox::SmoothedValue(int paramId)
 
 void ParamMailbox::SetImmediate(int paramId, float value)
 {
+   assert(paramId >= 0 && paramId < kMaxParams);
    if (paramId < 0 || paramId >= kMaxParams)
       return;
    mTarget[paramId].store(value, std::memory_order_release);

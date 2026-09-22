@@ -7110,7 +7110,12 @@ namespace
    // wiring pass turned into a real loop; see its comment. NoteMergeNode's
    // 4-way fan-in (mirroring NoteRouterNode's 4-way fan-out) needed this
    // bumped again to 4.
-   const int kMaxNoteSlots = 4;
+   //
+   // Mirrors AudioNode::kMaxNoteSlots (src/audio/AudioNode.h), which needs
+   // the same bound for its fixed appliedInbox/appliedCursor arrays - kept
+   // as a separate local alias rather than replacing every call site below
+   // with the qualified name.
+   const int kMaxNoteSlots = AudioNode::kMaxNoteSlots;
 
    // Defined near DisconnectAllTo/RemoveNodeByIndex, below; forward-declared
    // here since DisconnectLinkById (earlier in the file) needs to call it too.
@@ -40747,11 +40752,24 @@ namespace
             CollectAudioChain(gn.node.get(), visited, order, bufferIndexOf, nextBufferIndex);
       }
 
-      // Wire each note-consuming node's inbox to its producer's outbox, now
-      // that every relevant node has an `order` entry. NoteEventQueue needs
-      // no PrepareToPlay (a fixed-size member, allocated with the AudioNode
-      // itself), so this can run before or after the PrepareToPlay loop
-      // below without ordering consequences.
+      // Describe each note-consuming node's inbox wiring to its producer's
+      // outbox, now that every relevant node has an `order` entry. This used
+      // to mutate the live AudioNode/NoteEventQueue objects directly here on
+      // the main thread (ResetConsumers/RegisterConsumer/SetNoteInbox) - but
+      // the audio thread can still be mid-ProcessList over those same
+      // objects for the *previous* generation when RebuildAudioTopology
+      // runs, which raced cursor resets and inbox pointer writes against
+      // concurrent Pop() (stuck notes - a lost note-off - and torn
+      // inbox/cursor reads). Now this only builds a description
+      // (topology.noteOutboxes/noteWires below); AudioEngine::
+      // ApplyNoteWiringIfNew applies it, once per generation, on whichever
+      // thread actually owns that generation's ProcessList (the audio
+      // thread during RunTopology, or the main thread via
+      // ApplyNoteWiringIfNoDevice/PumpNoteNodesWithoutDevice when no device
+      // is open) - the only thread that can safely touch those objects.
+      // NoteEventQueue needs no PrepareToPlay (a fixed-size member,
+      // allocated with the AudioNode itself), so this can run before or
+      // after the PrepareToPlay loop below without ordering consequences.
       //
       // A real loop over every unified slot, not just 0: every note-consuming
       // node before AudioPluginNode put its one note pin at slot 0, but
@@ -40761,63 +40779,57 @@ namespace
       // A producer's outbox can fan out to more than one consumer (two
       // synths off one Note Sequencer, an FM patch, etc) - each consumer
       // needs its own read cursor so draining events in one doesn't starve
-      // another (see NoteEventQueue's multi-consumer contract). Reset every
-      // outbox that's in play this generation before handing out fresh
-      // cursor ids, so ids never leak across rebuilds.
+      // another (see NoteEventQueue's multi-consumer contract). Cursor ids
+      // are handed out 0..n-1 per outbox in the same walk order as the old
+      // Reset+Register pass, capped at NoteEventQueue::kMaxConsumers -
+      // exactly RegisterConsumer's own cap, so an outbox that would have
+      // overflowed still overflows the same way (cursor -1, inbox pointer
+      // still recorded - matching what SetNoteInbox used to be called with).
+      std::vector<NoteOutboxPlan> noteOutboxes;
+      std::vector<NoteWire> noteWires;
       {
-         std::set<NoteEventQueue*> resetOutboxes;
+         std::unordered_map<NoteEventQueue*, int> consumerCounts;
          for (GraphNode& gn : gNodes)
          {
-            // Visit every slot the node exposes, not just the first - a
-            // multi-input consumer (Note Merge) can have several connected
-            // note pins whose producers all need their outbox reset.
+            AudioNode* consumer = AudioNodeOfAny(gn.node.get());
+            if (consumer == nullptr)
+               continue;
+            // Every slot the node actually exposes gets a wire this
+            // generation - including unconnected ones, described as
+            // nullptr/-1 - so a slot that was wired last generation and got
+            // disconnected doesn't leave a stale producer pointer applied on
+            // the audio node.
             for (int slot = 0; slot < kMaxNoteSlots; slot++)
             {
                NoteCable* cable = gn.node->NoteInputSlot(slot);
-               if (cable == nullptr || !cable->IsConnected())
+               if (cable == nullptr)
                   continue;
-               INode* resolved = ResolvedAudioSource(cable->GetSource());
-               if (AudioNode* producer = AudioNodeOfAny(resolved))
+               NoteEventQueue* inbox = nullptr;
+               int cursor = -1;
+               if (cable->IsConnected())
                {
-                  if (NoteEventQueue* outbox = producer->NoteOutbox(cable->GetOutputSlot()))
+                  INode* resolved = ResolvedAudioSource(cable->GetSource());
+                  if (AudioNode* producer = AudioNodeOfAny(resolved))
                   {
-                     if (resetOutboxes.insert(outbox).second)
-                        outbox->ResetConsumers();
+                     inbox = producer->NoteOutbox(cable->GetOutputSlot());
+                     if (inbox != nullptr)
+                     {
+                        int& count = consumerCounts[inbox];
+                        if (count < NoteEventQueue::kMaxConsumers)
+                           cursor = count++;
+                        // else: cursor stays -1 (overflow), matching
+                        // RegisterConsumer's own -1 return; inbox stays set
+                        // on the wire (matching the old SetNoteInbox call)
+                        // but is never adopted since cursor < 0.
+                     }
                   }
                }
+               noteWires.push_back(NoteWire{ consumer, slot, inbox, cursor });
             }
          }
-      }
-      for (GraphNode& gn : gNodes)
-      {
-         AudioNode* consumer = AudioNodeOfAny(gn.node.get());
-         if (consumer == nullptr)
-            continue;
-         // Same "every slot, not just the first" widening as the reset pass
-         // above. Every slot the node actually exposes gets a fresh call
-         // this generation - including unconnected ones, set to
-         // nullptr/-1 - so a slot that was wired last generation and got
-         // disconnected doesn't leave a stale producer pointer behind on
-         // the audio node.
-         for (int slot = 0; slot < kMaxNoteSlots; slot++)
-         {
-            NoteCable* cable = gn.node->NoteInputSlot(slot);
-            if (cable == nullptr)
-               continue;
-            NoteEventQueue* inbox = nullptr;
-            int cursor = -1;
-            if (cable->IsConnected())
-            {
-               INode* resolved = ResolvedAudioSource(cable->GetSource());
-               if (AudioNode* producer = AudioNodeOfAny(resolved))
-               {
-                  inbox = producer->NoteOutbox(cable->GetOutputSlot());
-                  if (inbox != nullptr)
-                     cursor = inbox->RegisterConsumer();
-               }
-            }
-            consumer->SetNoteInbox(slot, inbox, cursor);
-         }
+         noteOutboxes.reserve(consumerCounts.size());
+         for (const auto& [queue, count] : consumerCounts)
+            noteOutboxes.push_back(NoteOutboxPlan{ queue, count });
       }
 
       const double sampleRate = AudioEngine::Instance().SampleRate() > 0.0
@@ -40962,7 +40974,18 @@ namespace
       topology.terminalBufferIndices = std::move(terminals);
       topology.clipWindows = std::move(clipWindows);
       topology.numBuffers = nextBufferIndex;
+      topology.noteOutboxes = std::move(noteOutboxes);
+      topology.noteWires = std::move(noteWires);
       AudioEngine::Instance().SetTopology(std::move(topology));
+      // No device running means no audio callback thread will ever apply
+      // this generation's note wiring via RunTopology - and a number of
+      // self-test fixtures call RebuildAudioTopology() synchronously with no
+      // device open and then immediately drive nodes via direct
+      // ProcessBlock() calls, expecting the wiring to already be live. Apply
+      // it here, synchronously, in that case; it's safe specifically because
+      // no device is open, so nothing else can be concurrently touching
+      // these objects.
+      AudioEngine::Instance().ApplyNoteWiringIfNoDevice();
       // The topology just published describes this revision and this
       // routing, so ArrangeAudioRebuildIfStale stays quiet until one moves -
       // whichever of the ~40 graph-edit call sites got here first.
@@ -82574,6 +82597,201 @@ int main(int argc, char** argv)
          }
 
          printf("%s\n", overallOk ? "NOTE FANOUT TEST OK" : "NOTE FANOUT TEST FAIL");
+      }
+
+      // Regression test for the stuck-note race fixed by AudioEngine::
+      // ApplyNoteWiringIfNew (bugfix/audio-rt-note-wiring): a Note Sequencer
+      // fanned out to two synths, with RebuildAudioTopology() forced every
+      // single block for ~2 seconds' worth of blocks while notes are
+      // flowing through it. Before the fix, RebuildAudioTopology mutated the
+      // live AudioNode/NoteEventQueue cursors directly on the main thread
+      // (ResetConsumers/RegisterConsumer/SetNoteInbox) - here that means
+      // every one of these per-block rebuilds re-registering both synths'
+      // read cursors while a note could be in flight, which used to be able
+      // to skip or duplicate events (worst case: a lost note-off, a
+      // permanently stuck voice). Now the rebuild only *describes* the
+      // wiring (AudioTopology::noteOutboxes/noteWires) and
+      // ApplyNoteWiringIfNoDevice applies it - carrying each cursor's old
+      // read position forward via AudioNode::appliedInbox/appliedCursor - so
+      // repeated rewiring mid-stream must not drop a single event.
+      // Note events are pushed directly into the sequencer's own outbox
+      // (AudioNode::NoteOutbox(), a fixed member - present whether or not
+      // the sequencer is actually playing) rather than relying on real
+      // tempo-driven playback, so the fixture is deterministic and doesn't
+      // need to wait on wall-clock time.
+      if (getenv("INFINITE_NOTEREWIRESTRESSTEST") != nullptr && frameId == 4)
+      {
+         auto SpawnIndex = [&](const std::string& name, const std::string& category, float x, float y) -> int
+         {
+            GraphNode* gn = SpawnNode(name, category, x, y);
+            return gn ? gn->index : -1;
+         };
+
+         const int seqIdx = SpawnIndex("Note Sequencer", "Notes", 40.0f, 40.0f);
+         const int osc1Idx = SpawnIndex("Oscillator", "Synths", 320.0f, 20.0f);
+         const int osc2Idx = SpawnIndex("Oscillator", "Synths", 320.0f, 100.0f);
+         GraphNode* seq = FindNodeByIndex(seqIdx);
+         GraphNode* osc1 = FindNodeByIndex(osc1Idx);
+         GraphNode* osc2 = FindNodeByIndex(osc2Idx);
+         bool wired = seq && osc1 && osc2;
+         if (wired)
+         {
+            osc1->node->NoteInputSlot(0)->Connect(seq->node.get());
+            osc2->node->NoteInputSlot(0)->Connect(seq->node.get());
+            osc1->node->CookIfNeeded(1);
+            osc2->node->CookIfNeeded(1);
+            seq->node->CookIfNeeded(1);
+         }
+
+         bool ok = wired;
+         int notesOn = 0, notesOff = 0;
+         int voices1 = -1, voices2 = -1;
+         uint64_t overflow = 1;
+
+         if (ok)
+         {
+            const int numFrames = 512;
+            std::vector<float> sL(numFrames), sR(numFrames);
+            float* sChans[2] = { sL.data(), sR.data() };
+            AudioBuffer sBuf;
+            sBuf.channels = sChans;
+            sBuf.numChannels = 2;
+            sBuf.numFrames = numFrames;
+            std::vector<float> o1L(numFrames), o1R(numFrames);
+            float* o1Chans[2] = { o1L.data(), o1R.data() };
+            AudioBuffer o1Buf;
+            o1Buf.channels = o1Chans;
+            o1Buf.numChannels = 2;
+            o1Buf.numFrames = numFrames;
+            std::vector<float> o2L(numFrames), o2R(numFrames);
+            float* o2Chans[2] = { o2L.data(), o2R.data() };
+            AudioBuffer o2Buf;
+            o2Buf.channels = o2Chans;
+            o2Buf.numChannels = 2;
+            o2Buf.numFrames = numFrames;
+
+            // ~2s at 48kHz / 512-frame blocks (48000/512 ~= 93.75 blocks/s).
+            const int kBlocks = 188;
+            bool noteCurrentlyOn = false;
+            int currentVoiceId = 0;
+            AudioNode* seqAudio = nullptr;
+            AudioNode* osc1Audio = nullptr;
+            AudioNode* osc2Audio = nullptr;
+
+            for (int block = 0; block < kBlocks && ok; block++)
+            {
+               // The stress under test: force a full topology rebuild every
+               // block, not just on real cable edits.
+               RebuildAudioTopology();
+               seqAudio = AudioNodeOfAny(seq->node.get());
+               osc1Audio = AudioNodeOfAny(osc1->node.get());
+               osc2Audio = AudioNodeOfAny(osc2->node.get());
+
+               NoteEventQueue* outbox = seqAudio ? seqAudio->NoteOutbox(0) : nullptr;
+               if (seqAudio == nullptr || osc1Audio == nullptr || osc2Audio == nullptr || outbox == nullptr)
+               {
+                  ok = false;
+                  break;
+               }
+
+               // A short note every 8 blocks: on, then off 3 blocks later -
+               // never more than one voice in flight, so a stuck voice at
+               // the end can only mean a lost note-off, not "still playing".
+               if (!noteCurrentlyOn && (block % 8) == 0)
+               {
+                  NoteEvent on;
+                  on.note = 60 + (block % 12);
+                  on.velocity = 0.8f;
+                  on.isNoteOn = true;
+                  currentVoiceId = NextVoiceId();
+                  on.voiceId = currentVoiceId;
+                  outbox->Push(on);
+                  notesOn++;
+                  noteCurrentlyOn = true;
+               }
+               else if (noteCurrentlyOn && (block % 8) == 3)
+               {
+                  NoteEvent off;
+                  off.note = 60 + ((block - 3) % 12);
+                  off.velocity = 0.0f;
+                  off.isNoteOn = false;
+                  off.voiceId = currentVoiceId;
+                  outbox->Push(off);
+                  notesOff++;
+                  noteCurrentlyOn = false;
+               }
+
+               seqAudio->ProcessBlock(nullptr, 0, sBuf);
+               osc1Audio->ProcessBlock(nullptr, 0, o1Buf);
+               osc2Audio->ProcessBlock(nullptr, 0, o2Buf);
+            }
+
+            // Flush any note still open at the end (kBlocks isn't
+            // necessarily a multiple of 8) so a genuinely stuck voice isn't
+            // masked by "the fixture just never sent the off".
+            if (ok && noteCurrentlyOn)
+            {
+               NoteEventQueue* outbox = seqAudio ? seqAudio->NoteOutbox(0) : nullptr;
+               if (outbox != nullptr)
+               {
+                  NoteEvent off;
+                  off.note = 60;
+                  off.velocity = 0.0f;
+                  off.isNoteOn = false;
+                  off.voiceId = currentVoiceId;
+                  outbox->Push(off);
+                  notesOff++;
+                  seqAudio->ProcessBlock(nullptr, 0, sBuf);
+                  osc1Audio->ProcessBlock(nullptr, 0, o1Buf);
+                  osc2Audio->ProcessBlock(nullptr, 0, o2Buf);
+               }
+            }
+
+            // Drain the release tail: every note-on got its matching
+            // note-off above, but ActiveVoices() legitimately stays > 0
+            // through the amp envelope's release phase (~260ms default for
+            // Wavetable) - that's normal decay, not a stuck voice. Keep
+            // rebuilding + rendering silence (no new notes) until both
+            // synths report zero, or give up after a budget generous enough
+            // to cover any release time this fixture could plausibly hit; a
+            // real stuck voice (the bug this fixture exists to catch) never
+            // reaches zero and this loop exhausts its budget instead.
+            if (ok)
+            {
+               const int kDrainBlocks = 80; // ~80 * (512/48000)s ~= 0.85s
+               for (int i = 0; i < kDrainBlocks; i++)
+               {
+                  RebuildAudioTopology();
+                  seqAudio = AudioNodeOfAny(seq->node.get());
+                  osc1Audio = AudioNodeOfAny(osc1->node.get());
+                  osc2Audio = AudioNodeOfAny(osc2->node.get());
+                  if (osc1Audio != nullptr)
+                     osc1Audio->ProcessBlock(nullptr, 0, o1Buf);
+                  if (osc2Audio != nullptr)
+                     osc2Audio->ProcessBlock(nullptr, 0, o2Buf);
+
+                  voices1 = osc1Audio != nullptr ? static_cast<OscillatorNode*>(osc1->node.get())->ActiveVoices() : -1;
+                  voices2 = osc2Audio != nullptr ? static_cast<OscillatorNode*>(osc2->node.get())->ActiveVoices() : -1;
+                  if (voices1 == 0 && voices2 == 0)
+                     break;
+               }
+               NoteEventQueue* finalOutbox = seqAudio ? seqAudio->NoteOutbox(0) : nullptr;
+               overflow = finalOutbox ? finalOutbox->OverflowCount() : 1;
+            }
+
+            ok = ok && notesOn == notesOff && voices1 == 0 && voices2 == 0 && overflow == 0;
+         }
+
+         printf("  notesOn=%d notesOff=%d voices1=%d voices2=%d overflow=%llu\n",
+                notesOn, notesOff, voices1, voices2, (unsigned long long)overflow);
+         printf("%s\n", ok ? "NOTE REWIRE STRESS TEST OK" : "NOTE REWIRE STRESS TEST FAIL");
+         fflush(stdout);
+
+         for (int idx : { seqIdx, osc1Idx, osc2Idx })
+            if (idx >= 0)
+               RemoveNodeByIndex(idx);
+
+         glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
 
       // Audio Filter's "cutoff mod" sidechain input (slot 1) was removed as

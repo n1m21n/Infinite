@@ -49,16 +49,23 @@ public:
    static constexpr int kCapacity = 256;
    static constexpr int kMaxConsumers = 8;
 
-   // Topology-rebuild thread only, never concurrent with Push/Pop. Drops
-   // every registered cursor so ids don't leak across rebuild generations;
-   // call once per producer at the start of each rebuild, before any
-   // RegisterConsumer() calls for that generation.
+   // No-device-running use only (a single-threaded test fixture, or the
+   // owning thread when no audio callback can ever race it), never
+   // concurrent with Push/Pop. RebuildAudioTopology's real topology-builder
+   // pass no longer calls this directly - it only *describes* the wiring
+   // (AudioTopology::noteOutboxes/noteWires); AudioEngine::ApplyNoteWiringIfNew
+   // applies it via AdoptConsumers() below, on whichever thread actually owns
+   // the ProcessList, so cursors are never reset out from under the audio
+   // thread mid-block. Drops every registered cursor so ids don't leak
+   // across rebuild generations; call once per producer at the start of each
+   // rebuild, before any RegisterConsumer() calls for that generation.
    void ResetConsumers() { mNumCursors = 0; }
 
-   // Topology-rebuild thread only. Registers a new reader and returns its
-   // cursor id, or -1 if kMaxConsumers is already registered. The cursor
-   // starts at the current tail, so a newly wired consumer only sees events
-   // pushed after it was wired.
+   // No-device-running use only - see ResetConsumers' comment; the real
+   // topology-rebuild path goes through AdoptConsumers() instead. Registers a
+   // new reader and returns its cursor id, or -1 if kMaxConsumers is already
+   // registered. The cursor starts at the current tail, so a newly wired
+   // consumer only sees events pushed after it was wired.
    int RegisterConsumer()
    {
       const int n = mNumCursors;
@@ -69,14 +76,51 @@ public:
       return n;
    }
 
+   // Owning-thread-only (the thread currently running the ProcessList this
+   // queue's generation belongs to - the audio thread during a device
+   // callback, or the main thread while no device is open and it owns the
+   // list outright), never concurrent with Push/Pop since that thread IS the
+   // one calling Push/Pop. The real replacement for a ResetConsumers() +
+   // `count` x RegisterConsumer() sequence: sets every head first, the count
+   // second, so a Pop() that (on this same thread, strictly after this call
+   // returns) reads mNumCursors never sees a partially-adopted head array.
+   // Called by AudioEngine::ApplyNoteWiringIfNew once per outbox per
+   // generation - see its comment for how `heads` is computed (carried over
+   // from what each consumer last actually applied, or the current tail for
+   // a freshly wired one).
+   void AdoptConsumers(int count, const size_t heads[kMaxConsumers])
+   {
+      for (int i = 0; i < count; i++)
+         mCursorHeads[i].store(heads[i], std::memory_order_relaxed);
+      mNumCursors = count;
+   }
+
+   // Owning-thread-only (same rule as AdoptConsumers). The current tail, so
+   // a caller computing a freshly-wired consumer's starting head doesn't need
+   // its own separate accessor for "current tail".
+   size_t Tail() const { return mTail.load(std::memory_order_relaxed); }
+
+   // Owning-thread-only (same rule as AdoptConsumers). The raw ring index a
+   // still-registered cursor currently sits at - used by
+   // AudioEngine::ApplyNoteWiringIfNew to read a consumer's OLD read
+   // position, under its OLD cursor id, before AdoptConsumers() overwrites
+   // this queue's cursor table with the new generation's ids. Returns the
+   // current tail for an out-of-range cursor (nothing to carry over).
+   size_t CursorHead(int cursor) const
+   {
+      if (cursor < 0 || cursor >= mNumCursors)
+         return mTail.load(std::memory_order_relaxed);
+      return mCursorHeads[cursor].load(std::memory_order_relaxed);
+   }
+
    // Audio thread only (the producer side).
    void Push(const NoteEvent& e)
    {
       size_t tail = mTail.load(std::memory_order_relaxed);
       const size_t next = (tail + 1) % kCapacity;
-      const size_t minHead = MinCursorHead();
+      const size_t worstHead = WorstBacklogHead(tail);
 
-      if (next == minHead)
+      if (next == worstHead)
       {
          // Full (relative to the slowest cursor). A note-off must still get
          // through - force it into the slot the slowest consumer hasn't
@@ -85,8 +129,13 @@ public:
          if (!e.isNoteOn)
          {
             mEntries[tail] = e;
-            mTail.store(next, std::memory_order_relaxed);
-            AdvanceCursorsPast(minHead);
+            // release, matching the normal-path store below: a future MIDI-In
+            // producer thread's Push here must be as visible to consumers as
+            // any other Push, and this is the one path that used to differ
+            // (see the header comment on the multi-producer plan this queue
+            // already carries a cursor contract for).
+            mTail.store(next, std::memory_order_release);
+            AdvanceCursorsPast(worstHead);
          }
          mOverflowCount.fetch_add(1, std::memory_order_relaxed);
          return;
@@ -138,17 +187,34 @@ public:
    uint64_t OverflowCount() const { return mOverflowCount.load(std::memory_order_relaxed); }
 
 private:
-   // With no consumers registered, behave like the old single-stuck-head
-   // ring: nothing is reading, so the floor never advances and the queue
-   // eventually overflows exactly as before.
-   size_t MinCursorHead() const
+   // The cursor blocking the ring the most: the one with the largest backlog
+   // `(tail + kCapacity - head) % kCapacity`, not the numerically smallest
+   // raw ring index. Picking the smallest index used to pick the wrong
+   // cursor across a wrap - a lagging cursor sitting at 250 lost to a fast
+   // one at 5 even though 250 is barely behind (its backlog is small) and 5
+   // could be nearly a full lap behind (huge backlog), which let Push's
+   // "full" check misfire exactly on the overflow path that exists to
+   // protect note-offs. With no consumers registered, behave like the old
+   // single-stuck-head ring: nothing is reading, so the floor never advances
+   // and the queue eventually overflows exactly as before (head 0 has
+   // backlog `tail`, the whole ring - always the worst possible answer).
+   size_t WorstBacklogHead(size_t tail) const
    {
       if (mNumCursors == 0)
          return 0;
-      size_t minHead = mCursorHeads[0].load(std::memory_order_acquire);
+      size_t worstHead = mCursorHeads[0].load(std::memory_order_acquire);
+      size_t worstBacklog = (tail + kCapacity - worstHead) % kCapacity;
       for (int i = 1; i < mNumCursors; i++)
-         minHead = std::min(minHead, mCursorHeads[i].load(std::memory_order_acquire));
-      return minHead;
+      {
+         const size_t head = mCursorHeads[i].load(std::memory_order_acquire);
+         const size_t backlog = (tail + kCapacity - head) % kCapacity;
+         if (backlog > worstBacklog)
+         {
+            worstBacklog = backlog;
+            worstHead = head;
+         }
+      }
+      return worstHead;
    }
 
    void AdvanceCursorsPast(size_t overwrittenSlot)
