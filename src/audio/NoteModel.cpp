@@ -550,8 +550,8 @@ namespace NoteModel
       o.velocity = std::clamp(v01, 0.05f, 1.0f);
    }
 
-   void Player::NextBassline(const Tables& t, const Params& p, double prevOnsetBeats, double beatsPerBar,
-                              int liveRootNote, Out& o)
+   void Player::NextRhythm(const Tables& t, const Params& p, double prevOnsetBeats, double beatsPerBar,
+                            int rootNote, Out& o)
    {
       const float stray = std::clamp(p.stray, 0.0f, 1.0f);
       const bool replay = stray < 0.05f;
@@ -593,7 +593,7 @@ namespace NoteModel
       }
 
       const float uLen = Rand01(), uVel = Rand01();
-      o.note = std::clamp(liveRootNote + SymbolToRelPitch(relSym), 0, 127);
+      o.note = std::clamp(rootNote + SymbolToRelPitch(relSym), 0, 127);
       double ticks = t.durMeanTicks[dur];
       ticks *= std::exp((double)p.lengthSpread * (2.0 * uLen - 1.0) * 0.9);
       o.durBeats = std::clamp(ticks / (double)kTicksPerBeat, 1.0 / 48.0, 8.0);
