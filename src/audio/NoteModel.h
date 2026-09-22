@@ -30,18 +30,18 @@ namespace NoteModel
    constexpr int kVelBins = 8;
    constexpr int kMaxAlphabet = kMaxIoiTicks + 1;
 
-   // Root-relative pitch (Predictive Bassline, step-11): the key-fold this file's own comment above
-   // says a non-absolute pitch model needs. Signed semitone interval from whatever root was active
-   // at learn time, clamped to +-kRelPitchRange and stored as an offset symbol 0..kRelPitchAlphabet-1
-   // so it fits the same CtxSlot/PairSlot machinery every other viewpoint uses.
-   constexpr int kRelPitchRange = 24; // +-2 octaves; a bass mostly stays much closer than this
+   // Root-relative pitch (Predictive Rhythm, step-11): the key-fold this file's own comment above
+   // says a non-absolute pitch model needs. Signed semitone interval from whatever root note was
+   // selected at learn time, clamped to +-kRelPitchRange and stored as an offset symbol
+   // 0..kRelPitchAlphabet-1 so it fits the same CtxSlot/PairSlot machinery every other viewpoint uses.
+   constexpr int kRelPitchRange = 24; // +-2 octaves
    constexpr int kRelPitchAlphabet = kRelPitchRange * 2 + 1;
 
    enum Viewpoint { kPitch = 0, kIoi, kDur, kVel, kPitchRel, kNumViewpoints };
 
    // One learned note. `ioiTicks` is the spacing from the previous event's onset (0 = same onset,
    // 0 for the first event); `metric` is the sixteenth within the bar of this event's own onset.
-   // `relPitch` is only populated by learners that track a live root (Predictive Bassline); every
+   // `relPitch` is only populated by learners that key off a selected root (Predictive Rhythm); every
    // other producer leaves it at 0, which folds harmlessly into kPitchRel's "root" symbol.
    struct Event
    {
@@ -136,11 +136,12 @@ namespace NoteModel
       void Reset(const Tables* t, uint32_t seed);
       // Next event after an onset at `prevOnsetBeats`.
       void Next(const Tables& t, const Params& p, double prevOnsetBeats, double beatsPerBar, Out& o);
-      // Predictive Bassline (step-11): samples rhythm/duration/velocity exactly like Next(), but
-      // samples pitch from kPitchRel instead of kPitch and resolves it against `liveRootNote` - the
-      // root sampled at learn time is irrelevant, only the root sounding right now matters.
-      void NextBassline(const Tables& t, const Params& p, double prevOnsetBeats, double beatsPerBar,
-                         int liveRootNote, Out& o);
+      // Predictive Rhythm (step-11): samples rhythm/duration/velocity exactly like Next(), but
+      // samples pitch from kPitchRel instead of kPitch and resolves it against `rootNote` - the
+      // node's currently-selected root, which may differ from the root the pattern was learned
+      // against (changing it transposes playback without relearning).
+      void NextRhythm(const Tables& t, const Params& p, double prevOnsetBeats, double beatsPerBar,
+                       int rootNote, Out& o);
       const Tables* Bound() const { return mBound; }
 
    private:

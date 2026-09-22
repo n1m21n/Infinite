@@ -196,7 +196,7 @@ namespace
 #include "nodes/PredictiveColoringNode.h"
 #include "nodes/PredictiveQuantizeNode.h"
 #include "nodes/PredictiveVelocityNode.h"
-#include "nodes/PredictiveBasslineNode.h"
+#include "nodes/PredictiveRhythmNode.h"
 #include "nodes/OscNodes.h"
 #include "nodes/MidiNodes.h"
 #include "nodes/OutputNode.h"
@@ -5897,7 +5897,7 @@ namespace
       REGISTER_NODE(PredictiveNotesNode, Predictive Notes, "Prediction");
       REGISTER_NODE(PredictiveQuantizeNode, Predictive Quantize, "Prediction");
       REGISTER_NODE(PredictiveVelocityNode, Predictive Velocity, "Prediction");
-      REGISTER_NODE(PredictiveBasslineNode, Predictive Bassline, "Prediction");
+      REGISTER_NODE(PredictiveRhythmNode, Predictive Rhythm, "Prediction");
       REGISTER_NODE(NoteRouterNode, Note Router, "Notes");
       REGISTER_NODE(NoteMergeNode, Note Merge, "Notes");
       REGISTER_NODE(NoteSwitcherNode, Note Switcher, "Notes");
@@ -11611,7 +11611,7 @@ namespace
           dynamic_cast<QuantizerNode*>(node) != nullptr ||
           dynamic_cast<PredictiveQuantizeNode*>(node) != nullptr ||
           dynamic_cast<PredictiveVelocityNode*>(node) != nullptr ||
-          dynamic_cast<PredictiveBasslineNode*>(node) != nullptr ||
+          dynamic_cast<PredictiveRhythmNode*>(node) != nullptr ||
           dynamic_cast<NoteEchoNode*>(node) != nullptr ||
           dynamic_cast<NoteMergeNode*>(node) != nullptr ||
           dynamic_cast<NoteSwitcherNode*>(node) != nullptr ||
@@ -18271,6 +18271,21 @@ namespace
       return list;
    }
 
+   // Full MIDI note range (0..127) as "C-1".."G9", for a dropdown that picks one specific note
+   // rather than just a pitch class - same naming convention as the "%s%d" readouts elsewhere
+   // (NoteNameList()[n % 12], n / 12 - 1).
+   const std::vector<std::string>& MidiNoteNameList()
+   {
+      static std::vector<std::string> list = [] {
+         std::vector<std::string> l;
+         l.reserve(128);
+         for (int n = 0; n < 128; n++)
+            l.push_back(NoteNameList()[n % 12] + std::to_string(n / 12 - 1));
+         return l;
+      }();
+      return list;
+   }
+
    void DrawCVToPitchParams(CVToPitchNode* n)
    {
       // The semitone readout is the point of this node - make it the
@@ -18729,10 +18744,10 @@ namespace
       EndAudioBody();
    }
 
-   void DrawPredictiveBasslineBody(GraphNode& gn, PredictiveBasslineNode* n)
+   void DrawPredictiveRhythmBody(GraphNode& gn, PredictiveRhythmNode* n)
    {
       char stat[64];
-      const int root = n->LiveRoot();
+      const std::string rootName = MidiNoteNameList()[std::clamp(n->root, 0, 127)];
       if (n->IsLearning())
          snprintf(stat, sizeof(stat), "learning  -  %d notes", n->NotesCaptured());
       else if (n->Building())
@@ -18740,13 +18755,11 @@ namespace
       else if (n->LastLearnTooShort() && n->LearnedNotes() > 0)
          snprintf(stat, sizeof(stat), "too short, kept %d notes learned", n->LearnedNotes());
       else if (n->LastLearnTooShort())
-         snprintf(stat, sizeof(stat), "too short to learn, wire more notes in");
-      else if (n->LearnedNotes() > 0 && root >= 0)
-         snprintf(stat, sizeof(stat), "%d notes learned, root %d", n->LearnedNotes(), root);
+         snprintf(stat, sizeof(stat), "too short to learn, wire notes in");
       else if (n->LearnedNotes() > 0)
-         snprintf(stat, sizeof(stat), "%d notes learned, no harmony wired", n->LearnedNotes());
+         snprintf(stat, sizeof(stat), "%d notes learned, root %s", n->LearnedNotes(), rootName.c_str());
       else
-         snprintf(stat, sizeof(stat), "wire harmony + learn from, press Learn");
+         snprintf(stat, sizeof(stat), "wire notes in, press Learn");
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
 
@@ -18754,14 +18767,15 @@ namespace
          const float w = gAudioContentW;
          const float h = ImGui::GetFrameHeight();
          const bool learning = n->IsLearning();
-         if (ImGui::Button(learning ? "Stop##pbLearn" : "Learn##pbLearn", ImVec2(w, h)))
+         if (ImGui::Button(learning ? "Stop##prLearn" : "Learn##prLearn", ImVec2(w, h)))
          {
             PushUndoCheckpoint();
             n->SetLearning(!learning);
          }
       }
       {
-         AudioKnobRow row(1);
+         AudioKnobRow row(2);
+         row.Dropdown("root", MidiNoteNameList(), n->root, [n](int i) { n->root = i; });
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
       }
@@ -24055,8 +24069,8 @@ namespace
          DrawPredictiveQuantizeBody(gn, n);
       else if (auto* n = dynamic_cast<PredictiveVelocityNode*>(gn.node.get()))
          DrawPredictiveVelocityBody(gn, n);
-      else if (auto* n = dynamic_cast<PredictiveBasslineNode*>(gn.node.get()))
-         DrawPredictiveBasslineBody(gn, n);
+      else if (auto* n = dynamic_cast<PredictiveRhythmNode*>(gn.node.get()))
+         DrawPredictiveRhythmBody(gn, n);
       else if (auto* n = dynamic_cast<NoteRouterNode*>(gn.node.get()))
          DrawNoteRouterBody(gn, n);
       else if (auto* n = dynamic_cast<NoteMergeNode*>(gn.node.get()))
@@ -39103,7 +39117,7 @@ namespace
          { "Predictive Notes", "Wire a note chain in and press Learn: it listens (passing the notes through), learns the pitches, rhythm, lengths and velocities as a variable-order Markov model, then plays on its own in that style. Stray at the bottom replays the phrase, the middle plays in character, the top ignores the model and picks freely in range. The learned notes are saved with the patch." },
          { "Predictive Quantize", "A groove quantizer, not a grid one: wire a note chain in and press Learn, and it listens to the actual spacing between your onsets (passing them through while it listens) instead of assuming a fixed division. Stop, and it pulls future note-on timing toward the spacings it actually heard - mix at 0 is untouched, mix at 1 snaps fully onto the nearest learned spacing. Unlike Quantizer's fixed grid, this follows however you actually played it, including swing or a template that isn't on a clean subdivision." },
          { "Predictive Velocity", "A learned dynamics curve, not a hand-picked one: wire a note chain in and press Learn, and it listens to the actual velocities you play (passing them through while it listens) instead of assuming a fixed exponent. Stop, and it remaps future note-on velocities from the nominal range onto the dynamic range you actually played - mix at 0 is untouched, mix at 1 snaps fully onto the learned range, so your loudest playing maps to your own real loudest instead of a theoretical 127. Unlike Velocity Curve's one fixed shape, this follows your own dynamics." },
-         { "Predictive Bassline", "Plays a bass part the way a real bass player would. Two note inputs: wire a chord/harmony source into 'harmony' and an example bass line into 'learn from' (the same wire in the simple case), press Learn. It learns the example's rhythm, note lengths and velocity as its own habit, and its pitch as an interval from whichever note was lowest on the harmony input at that moment - not as fixed absolute notes. At play time it plays on its own learned rhythm (deliberately not re-triggered by harmony changes) and resolves each note's pitch against whatever the harmony input's lowest held note is right now, so it follows chord changes it was never trained on. Root-tracking is just lowest-held-note, not real chord-quality detection - it doesn't know a 7th from a triad, it just follows the bottom." },
+         { "Predictive Rhythm", "Wire any note source in and press Learn, same as Predictive Notes. It learns the rhythm, note lengths and velocity as its own habit, but learns pitch as an interval from a 'root' note instead of an absolute pitch - so what comes back out reads as a repeating pattern anchored on one note with occasional deviation (think C2 C2 C2 D3 C2 C2 C2), not a free melody. Root auto-detects to the most common note you played when Learn finishes; change it afterward with the dropdown to transpose the whole learned pattern without relearning." },
          { "Note Echo", "Repeats every incoming note event, delay ms apart, with velocity decaying and pitch shifting per repeat - a delay line for notes rather than audio. The original note always passes through first; the repeats are on top of it, not instead of it." },
          { "Note Router", "The system's only note fan-out point: one input, four distinct outputs. Round Robin cycles through them, Random picks one per note, Chain advances only when the pitch changes (a held note stays put), and Probability rolls each output independently - a note can end up on several outputs at once, or (rarely) none, in which case it falls back to output 1. A note's whole lifetime (on through off) always stays on the output(s) it started on." },
          { "Note Merge", "The system's only note fan-in point: up to four note inputs merged into one output stream, in timestamp order. Each input's notes stay independent voices matched by voice id, not pitch - so two inputs playing the same note at the same time sound as two overlapping voices, not a collision." },
@@ -39880,7 +39894,7 @@ namespace
                { "Note Transpose, Pitch Bend, Velocity Curve", "Pitch shifting, interval offset, pitch wheel modulation, and non-linear velocity mapping curves." },
                { "Gate, Humanizer, Glide", "Note gate length shaping, timing/velocity jitter humanization, and portamento glide." },
                { "Predictive Notes, Predictive Quantize, Predictive Velocity", "Predictive Notes learns a played phrase as a Markov model and plays on in that style. Predictive Quantize learns the actual spacing between your onsets and pulls future timing toward it - a groove template, not Quantizer's fixed grid. Predictive Velocity learns the shape of your own dynamic range and remaps future velocities onto it, instead of Velocity Curve's one fixed exponent." },
-               { "Predictive Bassline", "Learns a bass part's rhythm/duration/velocity as its own habit (like Predictive Notes) but learns pitch as an interval from the harmony input's lowest held note, not an absolute pitch - so it re-expresses that habit correctly against harmony it never saw during Learn. Two note inputs: 'harmony' (read live, never captured) and 'learn from' (captured only while learning). Onset timing is its own, never re-triggered by a harmony change." },
+               { "Predictive Rhythm", "Single note input, same shape as Predictive Notes, but pitch is learned as an interval from a 'root' note rather than an absolute pitch. Root auto-detects to the most common learned note and is then a plain param - the pattern's relPitch is fixed by what was learned, but changing root after the fact transposes playback live without relearning, since resolution happens at play time against whatever root is currently selected." },
                { "Note Stack", "Polyphonic chord generator, harmony generator, and interval stacking." },
             } },
             { "Synths", {
@@ -64250,8 +64264,8 @@ int main(int argc, char** argv)
       return PredictiveQuantize::RunPredQuantizeTest() ? 0 : 1;
    if (getenv("INFINITE_PREDVELOCITYTEST") != nullptr)
       return PredictiveVelocity::RunPredVelocityTest() ? 0 : 1;
-   if (getenv("INFINITE_PREDBASSLINETEST") != nullptr)
-      return PredictiveBassline::RunPredBasslineTest() ? 0 : 1;
+   if (getenv("INFINITE_PREDRHYTHMTEST") != nullptr)
+      return PredictiveRhythm::RunPredRhythmTest() ? 0 : 1;
    if (getenv("INFINITE_DRIFTTEST") != nullptr)
       return PredictionNodes::RunDriftTest() ? 0 : 1;
    if (getenv("INFINITE_PREDFEEDBACKTEST") != nullptr)
