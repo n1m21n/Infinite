@@ -18682,14 +18682,12 @@ namespace
    {
       const float conf = n->Confidence01();
       char stat[64];
-      if (n->IsLearning() && n->Dropped() > 0)
-         snprintf(stat, sizeof(stat), "learning  -  %d onsets (%d dropped)", n->OnsetsCaptured(), n->Dropped());
-      else if (n->IsLearning())
-         snprintf(stat, sizeof(stat), "learning  -  %d onsets", n->OnsetsCaptured());
-      else if (n->ModeCount() > 0)
-         snprintf(stat, sizeof(stat), "%d spacings learned", n->ModeCount());
+      if (n->ModeCount() > 0)
+         snprintf(stat, sizeof(stat), "%d spacings  -  %d onsets total", n->ModeCount(), n->TotalCaptured());
+      else if (n->TotalCaptured() > 0)
+         snprintf(stat, sizeof(stat), "listening  -  %d onsets", n->TotalCaptured());
       else
-         snprintf(stat, sizeof(stat), "wire notes in, press Learn");
+         snprintf(stat, sizeof(stat), "wire notes in - always adapting");
 
       const ImVec2 statusPos = ImGui::GetCursorScreenPos();
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
@@ -18704,16 +18702,6 @@ namespace
                      IM_COL32(34, 197, 94, 255), confBadge);
       }
 
-      {
-         const float w = gAudioContentW;
-         const float h = ImGui::GetFrameHeight();
-         const bool learning = n->IsLearning();
-         if (ImGui::Button(learning ? "Stop##pqLearn" : "Learn##pqLearn", ImVec2(w, h)))
-         {
-            PushUndoCheckpoint();
-            n->SetLearning(!learning);
-         }
-      }
       {
          AudioKnobRow row(1);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
@@ -18727,18 +18715,12 @@ namespace
    {
       const float conf = n->Confidence01();
       char stat[64];
-      if (n->IsLearning() && n->Dropped() > 0)
-         snprintf(stat, sizeof(stat), "learning  -  %d notes (%d dropped)", n->NotesCaptured(), n->Dropped());
-      else if (n->IsLearning())
-         snprintf(stat, sizeof(stat), "learning  -  %d notes", n->NotesCaptured());
-      else if (n->LastLearnTooShort() && n->HasCurve())
-         snprintf(stat, sizeof(stat), "too short, kept learned range");
-      else if (n->LastLearnTooShort())
-         snprintf(stat, sizeof(stat), "too short to learn, wire more notes in");
-      else if (n->HasCurve())
-         snprintf(stat, sizeof(stat), "dynamic range learned");
+      if (n->HasCurve())
+         snprintf(stat, sizeof(stat), "dynamic range learned  -  %d notes total", n->TotalCaptured());
+      else if (n->TotalCaptured() > 0)
+         snprintf(stat, sizeof(stat), "listening  -  %d notes", n->TotalCaptured());
       else
-         snprintf(stat, sizeof(stat), "wire notes in, press Learn");
+         snprintf(stat, sizeof(stat), "wire notes in - always adapting");
 
       const ImVec2 statusPos = ImGui::GetCursorScreenPos();
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
@@ -18753,16 +18735,6 @@ namespace
                      IM_COL32(34, 197, 94, 255), confBadge);
       }
 
-      {
-         const float w = gAudioContentW;
-         const float h = ImGui::GetFrameHeight();
-         const bool learning = n->IsLearning();
-         if (ImGui::Button(learning ? "Stop##pvLearn" : "Learn##pvLearn", ImVec2(w, h)))
-         {
-            PushUndoCheckpoint();
-            n->SetLearning(!learning);
-         }
-      }
       {
          AudioKnobRow row(1);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
@@ -39159,8 +39131,8 @@ namespace
          { "Vibrato", "An LFO wired straight to pitch. It is a modulator, not a note-chain node - it has no note input on purpose, because a free-running wobble has no single note to attach to. Patch its output onto a synth's pitch/bend mod dot (e.g. Wavetable's 'bend' knob)." },
          { "Note Filter", "A gate on a note's pitch: scale snaps it to the nearest degree of the chosen scale/root, range drops anything outside lo..hi, and chance randomly drops the rest. A note that gets dropped has its note-off dropped with it, so nothing hangs." },
          { "Predictive Notes", "Wire a note chain in and press Learn: it listens (passing the notes through), learns the pitches, rhythm, lengths and velocities as a variable-order Markov model, then plays on its own in that style. Stray at the bottom replays the phrase, the middle plays in character, the top ignores the model and picks freely in range. The learned notes are saved with the patch." },
-         { "Predictive Quantize", "A groove quantizer, not a grid one: wire a note chain in and press Learn, and it listens to the actual spacing between your onsets (passing them through while it listens) instead of assuming a fixed division. Stop, and it pulls future note-on timing toward the spacings it actually heard - mix at 0 is untouched, mix at 1 snaps fully onto the nearest learned spacing. Unlike Quantizer's fixed grid, this follows however you actually played it, including swing or a template that isn't on a clean subdivision." },
-         { "Predictive Velocity", "A learned dynamics curve, not a hand-picked one: wire a note chain in and press Learn, and it listens to the actual velocities you play (passing them through while it listens) instead of assuming a fixed exponent. Stop, and it remaps future note-on velocities from the nominal range onto the dynamic range you actually played - mix at 0 is untouched, mix at 1 snaps fully onto the learned range, so your loudest playing maps to your own real loudest instead of a theoretical 127. Unlike Velocity Curve's one fixed shape, this follows your own dynamics." },
+         { "Predictive Quantize", "A groove quantizer, not a grid one: wire a note chain in and it always listens to the actual spacing between your onsets while also correcting them in the same pass - no Learn/Stop, it just keeps adapting the more you play. The learned spacing profile is global: shared by every Predictive Quantize in every patch, and it keeps only your most recent onsets, so it tracks how you're playing now rather than an ever-growing history. Mix at 0 is untouched, mix at 1 snaps fully onto the nearest learned spacing. Unlike Quantizer's fixed grid, this follows however you actually played it, including swing or a template that isn't on a clean subdivision." },
+         { "Predictive Velocity", "A learned dynamics curve, not a hand-picked one: wire a note chain in and it always listens to the velocities you play while also remapping them in the same pass - no Learn/Stop, it just keeps adapting the more you play. The learned curve is global: shared by every Predictive Velocity in every patch, and it keeps only your most recent notes, so it tracks how you're playing now rather than an ever-growing history. Mix at 0 is untouched, mix at 1 snaps fully onto the learned range, so your loudest playing maps to your own real loudest instead of a theoretical 127. Unlike Velocity Curve's one fixed shape, this follows your own dynamics." },
          { "Predictive Rhythm", "Wire any note source in and press Learn, same as Predictive Notes. It learns the rhythm, note lengths and velocity as its own habit, but learns pitch as an interval from a 'root' note instead of an absolute pitch - so what comes back out reads as a repeating pattern anchored on one note with occasional deviation (think C2 C2 C2 D3 C2 C2 C2), not a free melody. Root auto-detects to the most common note you played when Learn finishes; change it afterward with the dropdown to transpose the whole learned pattern without relearning." },
          { "Note Echo", "Repeats every incoming note event, delay ms apart, with velocity decaying and pitch shifting per repeat - a delay line for notes rather than audio. The original note always passes through first; the repeats are on top of it, not instead of it." },
          { "Note Router", "The system's only note fan-out point: one input, four distinct outputs. Round Robin cycles through them, Random picks one per note, Chain advances only when the pitch changes (a held note stays put), and Probability rolls each output independently - a note can end up on several outputs at once, or (rarely) none, in which case it falls back to output 1. A note's whole lifetime (on through off) always stays on the output(s) it started on." },
@@ -43730,6 +43702,7 @@ namespace
    // create their undo checkpoint only at gesture end, so a crash mid-gesture
    // must still recover the values the user was actually seeing and hearing.
    void PollColorStatsAutosave(double now);
+   void PollPredictionProfilesAutosave(double now);
 
    void PollAutosave()
    {
@@ -43754,6 +43727,7 @@ namespace
          gAutosaveFailureLogged = false;
 
       PollColorStatsAutosave(now);
+      PollPredictionProfilesAutosave(now);
    }
 
    // Predictive Coloring's global learned profile used to be saved only on
@@ -43770,6 +43744,21 @@ namespace
       sLastSave = now;
       if (ColorStats::Engine::Instance().HasLearnedData())
          ColorStats::Engine::Instance().Save(AppPaths::AppSupportDir() + "/prediction");
+   }
+
+   // Predictive Quantize/Velocity have no Learn/Stop anymore - they are always capturing and
+   // always adapting - so there is no "Stop" moment to hang a save off of at all. Same cadence and
+   // shutdown-path pairing as PollColorStatsAutosave above.
+   void PollPredictionProfilesAutosave(double now)
+   {
+      static double sLastSave = 0.0;
+      if (sLastSave > 0.0 && now - sLastSave < (double)gAutosaveSeconds)
+         return;
+      sLastSave = now;
+      if (PredictiveQuantizeProfile::HasLearnedData())
+         PredictiveQuantizeProfile::Save(AppPaths::AppSupportDir() + "/prediction");
+      if (PredictiveVelocityProfile::HasLearnedData())
+         PredictiveVelocityProfile::Save(AppPaths::AppSupportDir() + "/prediction");
    }
 
    // Called once at startup, after the graph and GL are initialised but
@@ -64742,6 +64731,8 @@ int main(int argc, char** argv)
    });
    MovementLog::Start();
    ColorStats::Engine::Instance().Load(AppPaths::AppSupportDir() + "/prediction");
+   PredictiveQuantizeProfile::Load(AppPaths::AppSupportDir() + "/prediction");
+   PredictiveVelocityProfile::Load(AppPaths::AppSupportDir() + "/prediction");
    ApplyTheme();
 
    // Skipped under the dev-test harness (INFINITE_EXITAFTER) so that running
@@ -91231,6 +91222,10 @@ int main(int argc, char** argv)
    MovementLog::Stop();
    if (ColorStats::Engine::Instance().HasLearnedData())
       ColorStats::Engine::Instance().Save(AppPaths::AppSupportDir() + "/prediction");
+   if (PredictiveQuantizeProfile::HasLearnedData())
+      PredictiveQuantizeProfile::Save(AppPaths::AppSupportDir() + "/prediction");
+   if (PredictiveVelocityProfile::HasLearnedData())
+      PredictiveVelocityProfile::Save(AppPaths::AppSupportDir() + "/prediction");
    gNodes.clear();
    if (getenv("INFINITE_RECTEARDOWNTEST") != nullptr && std::string(getenv("INFINITE_RECTEARDOWNTEST")) == "quit")
       printf("quit-mid-record: survived  OK\n");
