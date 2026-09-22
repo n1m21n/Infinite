@@ -472,6 +472,7 @@ float PredictiveNotesNode::Confidence01() const
 }
 
 int PredictiveNotesNode::LastNote() const { return mAudioNode ? mAudioNode->LastNote() : -1; }
+int PredictiveNotesNode::Dropped() const { return mAudioNode ? mAudioNode->Dropped() : 0; }
 
 void PredictiveNotesNode::SetLearning(bool on)
 {

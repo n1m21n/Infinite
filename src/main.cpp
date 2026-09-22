@@ -18680,15 +18680,29 @@ namespace
 
    void DrawPredictiveQuantizeBody(GraphNode& gn, PredictiveQuantizeNode* n)
    {
+      const float conf = n->Confidence01();
       char stat[64];
-      if (n->IsLearning())
+      if (n->IsLearning() && n->Dropped() > 0)
+         snprintf(stat, sizeof(stat), "learning  -  %d onsets (%d dropped)", n->OnsetsCaptured(), n->Dropped());
+      else if (n->IsLearning())
          snprintf(stat, sizeof(stat), "learning  -  %d onsets", n->OnsetsCaptured());
       else if (n->ModeCount() > 0)
          snprintf(stat, sizeof(stat), "%d spacings learned", n->ModeCount());
       else
          snprintf(stat, sizeof(stat), "wire notes in, press Learn");
 
+      const ImVec2 statusPos = ImGui::GetCursorScreenPos();
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+
+      if (conf > 0.0f && gAudioReadout.find(gn.index) == gAudioReadout.end())
+      {
+         char confBadge[32];
+         snprintf(confBadge, sizeof(confBadge), "%d%% conf", (int)std::round(conf * 100.0f));
+         const ImVec2 bsz = ImGui::CalcTextSize(confBadge);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddText(ImVec2(statusPos.x + kAudioNarrowWidth - bsz.x - 7.0f, statusPos.y + 3.0f),
+                     IM_COL32(34, 197, 94, 255), confBadge);
+      }
 
       {
          const float w = gAudioContentW;
@@ -18711,8 +18725,11 @@ namespace
 
    void DrawPredictiveVelocityBody(GraphNode& gn, PredictiveVelocityNode* n)
    {
+      const float conf = n->Confidence01();
       char stat[64];
-      if (n->IsLearning())
+      if (n->IsLearning() && n->Dropped() > 0)
+         snprintf(stat, sizeof(stat), "learning  -  %d notes (%d dropped)", n->NotesCaptured(), n->Dropped());
+      else if (n->IsLearning())
          snprintf(stat, sizeof(stat), "learning  -  %d notes", n->NotesCaptured());
       else if (n->LastLearnTooShort() && n->HasCurve())
          snprintf(stat, sizeof(stat), "too short, kept learned range");
@@ -18723,7 +18740,18 @@ namespace
       else
          snprintf(stat, sizeof(stat), "wire notes in, press Learn");
 
+      const ImVec2 statusPos = ImGui::GetCursorScreenPos();
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+
+      if (conf > 0.0f && gAudioReadout.find(gn.index) == gAudioReadout.end())
+      {
+         char confBadge[32];
+         snprintf(confBadge, sizeof(confBadge), "%d%% conf", (int)std::round(conf * 100.0f));
+         const ImVec2 bsz = ImGui::CalcTextSize(confBadge);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddText(ImVec2(statusPos.x + kAudioNarrowWidth - bsz.x - 7.0f, statusPos.y + 3.0f),
+                     IM_COL32(34, 197, 94, 255), confBadge);
+      }
 
       {
          const float w = gAudioContentW;
@@ -18746,9 +18774,12 @@ namespace
 
    void DrawPredictiveRhythmBody(GraphNode& gn, PredictiveRhythmNode* n)
    {
+      const float conf = n->Confidence01();
       char stat[64];
       const std::string rootName = MidiNoteNameList()[std::clamp(n->root, 0, 127)];
-      if (n->IsLearning())
+      if (n->IsLearning() && n->Dropped() > 0)
+         snprintf(stat, sizeof(stat), "learning  -  %d notes (%d dropped)", n->NotesCaptured(), n->Dropped());
+      else if (n->IsLearning())
          snprintf(stat, sizeof(stat), "learning  -  %d notes", n->NotesCaptured());
       else if (n->Building())
          snprintf(stat, sizeof(stat), "building model...");
@@ -18761,7 +18792,18 @@ namespace
       else
          snprintf(stat, sizeof(stat), "wire notes in, press Learn");
 
+      const ImVec2 statusPos = ImGui::GetCursorScreenPos();
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+
+      if (conf > 0.0f && gAudioReadout.find(gn.index) == gAudioReadout.end())
+      {
+         char confBadge[32];
+         snprintf(confBadge, sizeof(confBadge), "%d%% conf", (int)std::round(conf * 100.0f));
+         const ImVec2 bsz = ImGui::CalcTextSize(confBadge);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddText(ImVec2(statusPos.x + kAudioNarrowWidth - bsz.x - 7.0f, statusPos.y + 3.0f),
+                     IM_COL32(34, 197, 94, 255), confBadge);
+      }
 
       {
          const float w = gAudioContentW;
@@ -18817,7 +18859,9 @@ namespace
    {
       const float conf = n->Confidence01();
       char stat[64];
-      if (n->IsLearning())
+      if (n->IsLearning() && n->Dropped() > 0)
+         snprintf(stat, sizeof(stat), "learning  -  %d notes, %d bars (%d dropped)", n->NotesCaptured(), n->BarsCaptured(), n->Dropped());
+      else if (n->IsLearning())
          snprintf(stat, sizeof(stat), "learning  -  %d notes, %d bars", n->NotesCaptured(), n->BarsCaptured());
       else if (n->Building())
          snprintf(stat, sizeof(stat), "building model...");

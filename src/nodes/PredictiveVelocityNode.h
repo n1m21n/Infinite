@@ -56,6 +56,8 @@ public:
    int NotesCaptured() const { return mNotesCaptured; }
    bool HasCurve() const;
    bool LastLearnTooShort() const { return mLastLearnTooShort; }
+   float Confidence01() const;
+   int Dropped() const;
 
    AudioPredictiveVelocityNode* Audio() { return mAudioNode.get(); }
    // Tests: install a curve through the same swap path a finished Learn uses.
@@ -72,6 +74,7 @@ private:
    bool mLearning = false;
    std::vector<int> mCapturedVel127;
    int mNotesCaptured = 0;
+   int mBinsCovered = 0; // how many of the 8 velocity bins the last fit actually saw data for
    bool mLastLearnTooShort = false;
    std::string mAppliedCurve;
 };

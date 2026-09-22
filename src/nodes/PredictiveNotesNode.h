@@ -76,6 +76,7 @@ public:
    const std::vector<float>& Curve() const { return mCurve; }
    int LastNote() const;
    float Confidence01() const;
+   int Dropped() const;
 
    AudioPredictiveNotesNode* Audio() { return mAudioNode.get(); }
    // Blocks until any table build has finished and been swapped in (tests, save).

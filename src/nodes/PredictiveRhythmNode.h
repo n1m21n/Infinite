@@ -67,6 +67,10 @@ public:
    int LearnedNotes() const { return mLearned; }
    bool Building() const { return mBuild.valid(); }
    bool LastLearnTooShort() const { return mLastLearnTooShort; }
+   // Bits per event that the full blend beats the order-0 baseline by, one point per captured bar.
+   const std::vector<float>& Curve() const { return mCurve; }
+   float Confidence01() const;
+   int Dropped() const;
 
    AudioPredictiveRhythmNode* Audio() { return mAudioNode.get(); }
    void WaitForBuild();
@@ -74,6 +78,7 @@ public:
 
 private:
    void DrainCaptures();
+   void UpdateMeter(bool force);
    void FinishLearn();
    void StartBuild(const std::vector<NoteModel::Event>& events);
    void PollBuild();
@@ -84,9 +89,10 @@ private:
 
    bool mLearning = false;
    std::vector<Cap> mCaps;
-   int mNotesCaptured = 0, mLearned = 0;
+   int mNotesCaptured = 0, mLearned = 0, mMeterBars = 0;
    bool mLastLearnTooShort = false;
    double mBeatsPerBar = 4.0;
+   std::vector<float> mCurve; // held-out cross-entropy gain, one point per captured bar (meter only)
 
    std::future<NoteModel::Tables*> mBuild;
    bool mQueued = false;

@@ -395,6 +395,8 @@ void PredictiveRhythmNode::SetLearning(bool on)
    while (mAudioNode->PopCapture(stale)) { }
    mCaps.clear();
    mNotesCaptured = 0;
+   mMeterBars = 0;
+   mCurve.clear();
    mLastLearnTooShort = false;
    mBeatsPerBar = Transport::Instance().BeatsPerBar();
    mLearning = true;
@@ -410,6 +412,39 @@ void PredictiveRhythmNode::DrainCaptures()
       if (c.on)
          mNotesCaptured++;
    }
+}
+
+void PredictiveRhythmNode::UpdateMeter(bool force)
+{
+   if (mCaps.empty())
+      return;
+   const double first = mCaps.front().beat, last = mCaps.back().beat;
+   const int bars = (int)(std::floor(last / mBeatsPerBar) - std::floor(first / mBeatsPerBar));
+   if (!force && bars <= mMeterBars)
+      return;
+   mMeterBars = bars;
+   // Root isn't re-detected here - only FinishLearn overwrites the saved `root` param - but the
+   // meter still needs *a* root to fold pitch against, so it uses the same detector locally without
+   // mutating the field the user might have already hand-picked mid-take.
+   const std::vector<Event> ev = Assemble(mCaps, mBeatsPerBar, DetectRoot(mCaps));
+   float ceModel = 0.0f, ceBase = 0.0f;
+   if (NoteModel::HeldOutCrossEntropy(ev, std::clamp(memory, 0, NoteModel::kMaxOrder), ceModel, ceBase))
+      mCurve.push_back(ceBase - ceModel);
+}
+
+float PredictiveRhythmNode::Confidence01() const
+{
+   if (mCurve.empty())
+      return 0.0f;
+   const float gain = mCurve.back();
+   if (!(gain > 0.0f))
+      return 0.0f;
+   return std::clamp(1.0f - std::exp2(-gain), 0.0f, 1.0f);
+}
+
+int PredictiveRhythmNode::Dropped() const
+{
+   return mAudioNode ? mAudioNode->Dropped() : 0;
 }
 
 void PredictiveRhythmNode::FinishLearn()
@@ -490,11 +525,18 @@ void PredictiveRhythmNode::CookIfNeeded(int frameId)
       if (NoteModel::DecodeEvents(model, ev) && ev.size() >= 2)
       {
          mLearned = (int)ev.size();
+         // Re-measure the model that just came off disk, same reasoning as PredictiveNotesNode:
+         // Confidence01 reads mCurve, which is runtime-only and would otherwise read 0% forever.
+         mCurve.clear();
+         float ceModel = 0.0f, ceBase = 0.0f;
+         if (NoteModel::HeldOutCrossEntropy(ev, std::clamp(memory, 0, NoteModel::kMaxOrder), ceModel, ceBase))
+            mCurve.push_back(ceBase - ceModel);
          StartBuild(ev);
       }
       else
       {
          mLearned = 0;
+         mCurve.clear();
          SwapIn(nullptr);
       }
    }
@@ -502,7 +544,10 @@ void PredictiveRhythmNode::CookIfNeeded(int frameId)
    mAudioNode->PushParams(*this, mLearning);
    mAudioNode->CollectRetired();
    if (mLearning)
+   {
       DrainCaptures();
+      UpdateMeter(false);
+   }
 }
 
 // ------------------------------------------------------------------ tests
