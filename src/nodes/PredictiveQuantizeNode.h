@@ -9,16 +9,17 @@
 
 class AudioPredictiveQuantizeNode;
 
-// Predictive Quantize (docs/plans/prediction/step-09). Wire a note chain in and press Learn: it
-// captures incoming note onsets, passing them through untouched while it listens, and builds a
-// small histogram of inter-onset spacings. Stop learning and it corrects future note-on timing by
-// pulling each onset's spacing toward the nearest spacing it actually heard - a groove/template
+// Predictive Quantize (docs/plans/prediction/step-09, revised to a global adaptive profile - see
+// PredictiveQuantizeProfile below). Wire a note chain in: it always captures incoming note onsets,
+// passing them through while also correcting them in the same pass, and continuously refits a small
+// histogram of inter-onset spacings. There is no Learn/Stop - the correction is live from the first
+// onset it has enough data to trust, and keeps adapting as you keep playing. A groove/template
 // quantizer, not the fixed-grid QuantizerNode (NoteNodes.h) sitting next to it in the palette.
 //
-// Two objects, matching PredictiveNotesNode's split: this INode owns Learn state and the
-// histogram/mode fit (synchronous - small enough it needs no worker thread); the audio object
-// captures onsets and applies the correction. The learned mode set crosses to the audio thread by
-// atomic pointer swap, freed on the main thread once the audio thread has moved past it.
+// Two objects, matching PredictiveNotesNode's split: this INode drains captures and feeds/refits the
+// shared global profile (synchronous - small enough it needs no worker thread); the audio object
+// captures onsets and applies the correction every block. The learned mode set crosses to the audio
+// thread by atomic pointer swap, freed on the main thread once the audio thread has moved past it.
 class PredictiveQuantizeNode : public INode, public INoteSource
 {
 public:
@@ -39,9 +40,10 @@ public:
    INode* BypassSource() override { return noteInput.GetSource(); }
    AudioNode* GetAudioNode() override;
 
-   // Saved params. Names are patch keys.
-   float mix = 0.75f;      // 0 = untouched pass-through, 1 = fully snapped to the nearest learned spacing
-   std::string modeSet;    // encoded learned spacings: "tick:weight;tick:weight;..." (step-09 §4)
+   // Saved params. Names are patch keys. The learned spacing profile itself is NOT a patch param -
+   // it lives in the global PredictiveQuantizeProfile, shared by every instance of this node in
+   // every patch (see PredictiveQuantizeProfile below).
+   float mix = 0.75f; // 0 = untouched pass-through, 1 = fully snapped to the nearest learned spacing
 
    NoteCable noteInput;
 
@@ -51,35 +53,44 @@ public:
    {
       double beat;
    };
-   bool IsLearning() const { return mLearning; }
-   void SetLearning(bool on);
-   int OnsetsCaptured() const { return mOnsetsCaptured; }
    int ModeCount() const;
    float Confidence01() const;
    int Dropped() const;
+   // Total onsets ever folded into the global profile's current rolling window (across all patches
+   // and sessions) - what the status line reports instead of a per-Learn-take count.
+   int TotalCaptured() const;
 
    AudioPredictiveQuantizeNode* Audio() { return mAudioNode.get(); }
-   // Tests: install a mode set through the same swap path a finished Learn uses.
-   void TestSwapModes(const std::string& encoded);
 
 private:
    void DrainCaptures();
-   void FinishLearn();
-   void FitModes();
+   void RefitIfDirty();
 
    std::unique_ptr<AudioPredictiveQuantizeNode> mAudioNode;
    int mLastCookFrame = -1;
-
-   bool mLearning = false;
-   std::vector<double> mCapturedBeats;
-   int mOnsetsCaptured = 0;
-   std::string mAppliedModeSet;
+   bool mHaveLastBeat = false;
+   double mLastCapturedBeat = 0.0;
+   uint64_t mAppliedProfileVersion = 0;
+   int mCachedModeCount = 0;
+   float mCachedWeightSum = 0.0f;
 };
+
+// The global, cross-patch, cross-session learned spacing profile. Every Predictive Quantize
+// instance, in every patch, feeds and reads this same rolling window - same shape as
+// ColorStats::Engine (src/core/ColorStats.h), minus the time-decay (a bounded sample count instead:
+// the profile tracks the player's *current* feel by forgetting the oldest captures once the window
+// is full, rather than decaying old evidence by active time).
+namespace PredictiveQuantizeProfile
+{
+   bool Load(const std::string& directory);
+   bool Save(const std::string& directory);
+   bool HasLearnedData();
+}
 
 namespace PredictiveQuantize
 {
    // INFINITE_PREDQUANTIZETEST, headless: identity at mix=0, exact snap to a learned mode at
-   // mix=1, chord grouping doesn't arpeggiate, cold start passes input through unchanged, save/load
-   // round-trips the encoded mode set.
+   // mix=1, chord grouping doesn't arpeggiate, cold start passes input through unchanged, the global
+   // profile's rolling window and refit behave correctly.
    bool RunPredQuantizeTest();
 }

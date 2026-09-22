@@ -5,6 +5,9 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <deque>
+#include <filesystem>
+#include <fstream>
 #include <vector>
 
 #include "audio/AudioBuffer.h"
@@ -86,39 +89,6 @@ namespace
       return out;
    }
 
-   std::string EncodeModeSet(const ModeSet& m)
-   {
-      std::string s;
-      char buf[64];
-      for (int i = 0; i < m.count; i++)
-      {
-         std::snprintf(buf, sizeof(buf), "%s%.2f:%.4f", i ? ";" : "", (double)m.tick[i], (double)m.weight[i]);
-         s += buf;
-      }
-      return s;
-   }
-
-   bool DecodeModeSet(const std::string& s, ModeSet& out)
-   {
-      out = ModeSet();
-      size_t pos = 0;
-      while (pos < s.size() && out.count < kMaxModes)
-      {
-         const size_t semi = s.find(';', pos);
-         const std::string tok = s.substr(pos, semi == std::string::npos ? std::string::npos : semi - pos);
-         const size_t colon = tok.find(':');
-         if (colon == std::string::npos)
-            return out.count > 0;
-         out.tick[out.count] = std::strtof(tok.substr(0, colon).c_str(), nullptr);
-         out.weight[out.count] = std::strtof(tok.substr(colon + 1).c_str(), nullptr);
-         out.count++;
-         if (semi == std::string::npos)
-            break;
-         pos = semi + 1;
-      }
-      return out.count > 0;
-   }
-
    // Nearest learned tick to a raw inter-onset spacing, or the raw spacing itself (identity) when
    // nothing has been learned yet - the node's cold-start behavior falls straight out of this rather
    // than a separate gate.
@@ -139,6 +109,106 @@ namespace
       }
       return nearest;
    }
+
+   // The global, cross-patch, cross-session learned spacing profile (PredictiveQuantizeProfile in
+   // the header is the public face of this). A rolling window of the most recent captured IOIs -
+   // oldest dropped once full - rather than an ever-growing history, so the profile tracks the
+   // player's *current* feel. Refit is a full histogram pass over the window; at kMaxWindowSamples
+   // that's a few thousand int comparisons, cheap enough to redo on every CookIfNeeded that finds
+   // new data rather than maintaining an incremental histogram.
+   constexpr size_t kMaxWindowSamples = 4000;
+
+   class GlobalEngine
+   {
+   public:
+      static GlobalEngine& Instance()
+      {
+         static GlobalEngine e;
+         return e;
+      }
+
+      void AddSample(int ioiTicks)
+      {
+         mSamples.push_back(std::clamp(ioiTicks, 0, NoteModel::kMaxIoiTicks));
+         if (mSamples.size() > kMaxWindowSamples)
+            mSamples.pop_front();
+         mVersion++;
+      }
+
+      uint64_t Version() const { return mVersion; }
+      int TotalSamples() const { return (int)mSamples.size(); }
+
+      ModeSet Refit() const
+      {
+         std::vector<uint32_t> hist(kHistBins, 0);
+         for (int t : mSamples)
+            hist[(size_t)t]++;
+         return FindModes(hist.data(), (uint32_t)mSamples.size());
+      }
+
+      bool Load(const std::string& directory)
+      {
+         std::ifstream f(Path(directory), std::ios::binary | std::ios::ate);
+         if (!f.is_open())
+            return false;
+         const size_t sz = (size_t)f.tellg();
+         f.seekg(0, std::ios::beg);
+         if (sz < sizeof(uint32_t))
+            return false;
+         uint32_t count = 0;
+         f.read(reinterpret_cast<char*>(&count), sizeof(count));
+         if (sz != sizeof(uint32_t) + (size_t)count * sizeof(int32_t))
+            return false; // corrupt/foreign file: leave the engine as it was rather than guess
+         std::deque<int> loaded;
+         for (uint32_t i = 0; i < count; i++)
+         {
+            int32_t v = 0;
+            f.read(reinterpret_cast<char*>(&v), sizeof(v));
+            loaded.push_back(v);
+         }
+         mSamples = std::move(loaded);
+         mVersion++;
+         return true;
+      }
+
+      bool Save(const std::string& directory) const
+      {
+         std::error_code ec;
+         std::filesystem::create_directories(directory, ec);
+         std::ofstream f(Path(directory), std::ios::binary | std::ios::trunc);
+         if (!f.is_open())
+            return false;
+         const uint32_t count = (uint32_t)mSamples.size();
+         f.write(reinterpret_cast<const char*>(&count), sizeof(count));
+         for (int v : mSamples)
+         {
+            const int32_t v32 = v;
+            f.write(reinterpret_cast<const char*>(&v32), sizeof(v32));
+         }
+         return true;
+      }
+
+      bool HasLearnedData() const { return !mSamples.empty(); }
+
+      // Test-only: INFINITE_PREDQUANTIZETEST runs in the same process as a possibly-already-loaded
+      // real profile, so each test that wants a clean window must reset first and must not leave
+      // synthetic data behind for whatever runs after it.
+      void ResetForTest()
+      {
+         mSamples.clear();
+         mVersion++;
+      }
+
+   private:
+      static std::string Path(const std::string& dir)
+      {
+         std::filesystem::path p(dir);
+         return (p / "quantize_profile.bin").string();
+      }
+
+      std::deque<int> mSamples;
+      uint64_t mVersion = 0;
+   };
 }
 
 // ------------------------------------------------------------------ audio object
@@ -172,7 +242,9 @@ public:
       Render(output.numFrames, tr.Beats(), (double)tr.Tempo());
    }
 
-   // The whole block, with the clock passed in so a test can drive it without a transport.
+   // The whole block, with the clock passed in so a test can drive it without a transport. Every
+   // onset is captured (for the global profile) and corrected (against the currently-live one) in
+   // the same pass - there is no learning/not-learning split anymore.
    void Render(int numFrames, double beatsStart, double bpm)
    {
       NoteEvent in[64];
@@ -181,26 +253,24 @@ public:
       int nOut = 0;
       const double bps = std::max(1.0, bpm) / 60.0 / mSampleRate; // beats per sample
       const double blockEndBeat = beatsStart + (double)numFrames * bps;
-      const bool learning = mLearning.load(std::memory_order_relaxed);
-      const float mix = learning ? 0.0f : std::clamp(mMix.load(std::memory_order_relaxed), 0.0f, 1.0f);
-      const ModeSet* modes = learning ? nullptr : mLive.load(std::memory_order_acquire);
+      const float mix = std::clamp(mMix.load(std::memory_order_relaxed), 0.0f, 1.0f);
+      const ModeSet* modes = mLive.load(std::memory_order_acquire);
 
       for (int i = 0; i < nIn; i++)
       {
          const NoteEvent& e = in[i];
 
-         if (learning && !e.bendUpdate && e.isNoteOn && e.note >= 0 && e.note <= 127)
+         if (!e.bendUpdate && e.isNoteOn && e.note >= 0 && e.note <= 127)
          {
             Cap c;
             c.beat = beatsStart + (double)e.frameOffset * bps;
             PushCapture(c);
          }
 
-         if (learning || e.bendUpdate || !e.isNoteOn)
+         if (e.bendUpdate || !e.isNoteOn)
          {
-            // Learning: pass through unmodified so you keep hearing what you play while it listens.
-            // Otherwise: bend updates and note-offs are never individually re-timed - they carry
-            // their note-on's own voiceId, so they land correctly without this node tracking them.
+            // Bend updates and note-offs are never individually re-timed - they carry their
+            // note-on's own voiceId, so they land correctly without this node tracking them.
             if (nOut < kMaxBlockEvents)
                out[nOut++] = e;
             continue;
@@ -268,11 +338,7 @@ public:
    void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
 
    // ---- main thread ----
-   void PushParams(float mixVal, bool learning)
-   {
-      mMix.store(mixVal, std::memory_order_relaxed);
-      mLearning.store(learning, std::memory_order_relaxed);
-   }
+   void PushParams(float mixVal) { mMix.store(mixVal, std::memory_order_relaxed); }
 
    bool PopCapture(Cap& c)
    {
@@ -394,7 +460,6 @@ private:
    std::atomic<int> mDropped { 0 };
 
    std::atomic<float> mMix { 0.75f };
-   std::atomic<bool> mLearning { false };
 };
 
 PredictiveQuantizeNode::PredictiveQuantizeNode() = default;
@@ -410,28 +475,22 @@ AudioNode* PredictiveQuantizeNode::GetAudioNode()
 void PredictiveQuantizeNode::VisitParams(ParamVisitor& v)
 {
    v.Float("mix", mix);
-   v.Text("modeSet", modeSet);
 }
 
 int PredictiveQuantizeNode::ModeCount() const
 {
-   ModeSet m;
-   return DecodeModeSet(modeSet, m) ? m.count : 0;
+   return mCachedModeCount;
 }
 
 float PredictiveQuantizeNode::Confidence01() const
 {
-   ModeSet m;
-   if (!DecodeModeSet(modeSet, m) || m.count == 0)
+   if (mCachedModeCount == 0)
       return 0.0f;
    // Honest, not decorative: adequacy (have we actually captured enough to trust a histogram) times
    // concentration (how much of the captured mass the learned modes actually explain, vs. spread
    // thin across many spacings that never solidified into a real peak).
-   const float adequacy = std::clamp((float)mOnsetsCaptured / 32.0f, 0.0f, 1.0f);
-   float concentration = 0.0f;
-   for (int i = 0; i < m.count; i++)
-      concentration += m.weight[i];
-   return std::clamp(adequacy * std::clamp(concentration, 0.0f, 1.0f), 0.0f, 1.0f);
+   const float adequacy = std::clamp((float)GlobalEngine::Instance().TotalSamples() / 32.0f, 0.0f, 1.0f);
+   return std::clamp(adequacy * std::clamp(mCachedWeightSum, 0.0f, 1.0f), 0.0f, 1.0f);
 }
 
 int PredictiveQuantizeNode::Dropped() const
@@ -439,23 +498,9 @@ int PredictiveQuantizeNode::Dropped() const
    return mAudioNode ? mAudioNode->Dropped() : 0;
 }
 
-void PredictiveQuantizeNode::SetLearning(bool on)
+int PredictiveQuantizeNode::TotalCaptured() const
 {
-   if (on == mLearning)
-      return;
-   if (!on)
-   {
-      FinishLearn();
-      return;
-   }
-   GetAudioNode();
-   Cap stale;
-   while (mAudioNode->PopCapture(stale))
-   {
-   }
-   mCapturedBeats.clear();
-   mOnsetsCaptured = 0;
-   mLearning = true;
+   return GlobalEngine::Instance().TotalSamples();
 }
 
 void PredictiveQuantizeNode::DrainCaptures()
@@ -463,52 +508,32 @@ void PredictiveQuantizeNode::DrainCaptures()
    Cap c;
    while (mAudioNode->PopCapture(c))
    {
-      if (mCapturedBeats.size() < 16384)
-         mCapturedBeats.push_back(c.beat);
-      mOnsetsCaptured++;
+      if (mHaveLastBeat)
+      {
+         const int prevTick = NoteModel::SnapTicks(mLastCapturedBeat);
+         const int tick = NoteModel::SnapTicks(c.beat);
+         const int ioi = std::clamp(tick - prevTick, 0, NoteModel::kMaxIoiTicks);
+         GlobalEngine::Instance().AddSample(ioi);
+      }
+      mLastCapturedBeat = c.beat;
+      mHaveLastBeat = true;
    }
 }
 
-void PredictiveQuantizeNode::FitModes()
+void PredictiveQuantizeNode::RefitIfDirty()
 {
-   std::vector<uint32_t> hist(kHistBins, 0);
-   uint32_t total = 0;
-   for (size_t i = 1; i < mCapturedBeats.size(); i++)
-   {
-      const int prevTick = NoteModel::SnapTicks(mCapturedBeats[i - 1]);
-      const int tick = NoteModel::SnapTicks(mCapturedBeats[i]);
-      const int ioi = std::clamp(tick - prevTick, 0, NoteModel::kMaxIoiTicks);
-      hist[(size_t)ioi]++;
-      total++;
-   }
-   const ModeSet fit = FindModes(hist.data(), total);
-   modeSet = EncodeModeSet(fit);
-}
-
-void PredictiveQuantizeNode::FinishLearn()
-{
-   if (!mLearning)
+   GlobalEngine& engine = GlobalEngine::Instance();
+   if (engine.Version() == mAppliedProfileVersion)
       return;
-   DrainCaptures();
-   mLearning = false;
-   if (mCapturedBeats.size() >= 3) // need at least 2 spacings to say anything about a template
-      FitModes();
-   // else: too little captured to replace anything - the previous mode set (if any) is left as-is.
-   mCapturedBeats.clear();
-   mAppliedModeSet = modeSet;
+   mAppliedProfileVersion = engine.Version();
 
-   ModeSet* fresh = new ModeSet();
-   DecodeModeSet(modeSet, *fresh);
-   GetAudioNode();
-   mAudioNode->Retire(mAudioNode->SwapModes(fresh));
-}
+   const ModeSet fit = engine.Refit();
+   mCachedModeCount = fit.count;
+   mCachedWeightSum = 0.0f;
+   for (int i = 0; i < fit.count; i++)
+      mCachedWeightSum += fit.weight[i];
 
-void PredictiveQuantizeNode::TestSwapModes(const std::string& encoded)
-{
-   modeSet = encoded;
-   mAppliedModeSet = encoded;
-   ModeSet* fresh = new ModeSet();
-   DecodeModeSet(modeSet, *fresh);
+   ModeSet* fresh = new ModeSet(fit);
    GetAudioNode();
    mAudioNode->Retire(mAudioNode->SwapModes(fresh));
 }
@@ -520,37 +545,37 @@ void PredictiveQuantizeNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    GetAudioNode();
 
-   // The saved mode-set text changed (patch load, undo): install it without going through Learn.
-   if (modeSet != mAppliedModeSet)
-   {
-      mAppliedModeSet = modeSet;
-      ModeSet* fresh = new ModeSet();
-      DecodeModeSet(modeSet, *fresh);
-      mAudioNode->Retire(mAudioNode->SwapModes(fresh));
-   }
-
-   mAudioNode->PushParams(mix, mLearning);
+   DrainCaptures();
+   RefitIfDirty();
+   mAudioNode->PushParams(mix);
    mAudioNode->CollectRetired();
-   if (mLearning)
-      DrainCaptures();
 }
 
 void PredictiveQuantizeNode::SweepPrepare()
 {
    // Plays nothing observably-different from pass-through until a mode set exists; give it one so
-   // mix's effect is audible/testable (matches PredictiveNotesNode::SweepPrepare's reasoning).
+   // mix's effect is audible/testable (matches PredictiveNotesNode::SweepPrepare's reasoning). This
+   // seeds the per-instance audio object directly rather than the global profile, so a hygiene sweep
+   // never pollutes real learned data.
    ModeSet seed;
    seed.count = 2;
    seed.tick[0] = 12.0f; // an eighth note at 24 ticks/beat
    seed.weight[0] = 0.6f;
    seed.tick[1] = 24.0f; // a quarter note
    seed.weight[1] = 0.4f;
-   modeSet = EncodeModeSet(seed);
-   mAppliedModeSet = modeSet;
+   mCachedModeCount = seed.count;
+   mCachedWeightSum = seed.weight[0] + seed.weight[1];
+
    GetAudioNode();
-   ModeSet* fresh = new ModeSet();
-   DecodeModeSet(modeSet, *fresh);
+   ModeSet* fresh = new ModeSet(seed);
    mAudioNode->Retire(mAudioNode->SwapModes(fresh));
+}
+
+namespace PredictiveQuantizeProfile
+{
+   bool Load(const std::string& directory) { return GlobalEngine::Instance().Load(directory); }
+   bool Save(const std::string& directory) { return GlobalEngine::Instance().Save(directory); }
+   bool HasLearnedData() { return GlobalEngine::Instance().HasLearnedData(); }
 }
 
 // ------------------------------------------------------------------ tests
@@ -585,7 +610,7 @@ namespace PredictiveQuantize
          m->tick[0] = 12.0f;
          m->weight[0] = 1.0f;
          node.Retire(node.SwapModes(m));
-         node.PushParams(0.0f, false);
+         node.PushParams(0.0f);
 
          NoteEventQueue inbox;
          const int cursor = inbox.RegisterConsumer();
@@ -617,7 +642,7 @@ namespace PredictiveQuantize
          m->tick[0] = 12.0f; // an eighth note at 24 ticks/beat
          m->weight[0] = 1.0f;
          node.Retire(node.SwapModes(m));
-         node.PushParams(1.0f, false);
+         node.PushParams(1.0f);
 
          NoteEventQueue inbox;
          const int cursor = inbox.RegisterConsumer();
@@ -672,7 +697,7 @@ namespace PredictiveQuantize
          m->tick[0] = 12.0f;
          m->weight[0] = 1.0f;
          node.Retire(node.SwapModes(m));
-         node.PushParams(1.0f, false);
+         node.PushParams(1.0f);
 
          NoteEventQueue inbox;
          const int cursor = inbox.RegisterConsumer();
@@ -709,7 +734,7 @@ namespace PredictiveQuantize
       {
          AudioPredictiveQuantizeNode node;
          node.PrepareToPlay(48000.0, 512);
-         node.PushParams(1.0f, false); // mix maxed, but no mode set was ever swapped in
+         node.PushParams(1.0f); // mix maxed, but no mode set was ever swapped in
 
          NoteEventQueue inbox;
          const int cursor = inbox.RegisterConsumer();
@@ -731,23 +756,36 @@ namespace PredictiveQuantize
          PQ_CHECK(n == 1 && evts[0].frameOffset == 77, "cold start must be identity (got n=%d, frameOffset=%d)", n, n > 0 ? evts[0].frameOffset : -1);
       }
 
-      // 5. Save/load round-trip: encode then decode a mode set and confirm the values survive.
+      // 5. The global profile's rolling window: a dominant early spacing is forgotten once enough
+      // later samples of a different spacing push it out of the window, and a save/load round trip
+      // preserves whatever the window currently holds.
       {
-         ModeSet m;
-         m.count = 2;
-         m.tick[0] = 12.0f;
-         m.weight[0] = 0.6f;
-         m.tick[1] = 24.0f;
-         m.weight[1] = 0.4f;
-         const std::string encoded = EncodeModeSet(m);
-         ModeSet decoded;
-         const bool ok = DecodeModeSet(encoded, decoded);
-         PQ_CHECK(ok && decoded.count == 2, "round-trip must decode 2 modes (ok=%d, count=%d)", ok, decoded.count);
-         if (ok && decoded.count == 2)
-         {
-            PQ_CHECK(std::abs(decoded.tick[0] - 12.0f) < 0.01f && std::abs(decoded.weight[0] - 0.6f) < 0.001f, "mode 0 mismatch: tick=%.4f weight=%.4f", decoded.tick[0], decoded.weight[0]);
-            PQ_CHECK(std::abs(decoded.tick[1] - 24.0f) < 0.01f && std::abs(decoded.weight[1] - 0.4f) < 0.001f, "mode 1 mismatch: tick=%.4f weight=%.4f", decoded.tick[1], decoded.weight[1]);
-         }
+         GlobalEngine& engine = GlobalEngine::Instance();
+         engine.ResetForTest();
+
+         for (int i = 0; i < 50; i++)
+            engine.AddSample(12); // an eighth note, heavily dominant at first
+         ModeSet early = engine.Refit();
+         PQ_CHECK(early.count >= 1 && std::abs(early.tick[0] - 12.0f) < 0.5f, "early window should learn the 12-tick mode (count=%d)", early.count);
+
+         for (size_t i = 0; i < kMaxWindowSamples; i++)
+            engine.AddSample(24); // a quarter note, enough to fully evict the 12s from a 4000-sample window
+         ModeSet late = engine.Refit();
+         PQ_CHECK(late.count >= 1 && std::abs(late.tick[0] - 24.0f) < 0.5f, "rolling window should forget the 12-tick mode once evicted (count=%d, tick0=%.2f)", late.count, late.count > 0 ? late.tick[0] : -1.0f);
+         PQ_CHECK(engine.TotalSamples() == (int)kMaxWindowSamples, "window should be capped at kMaxWindowSamples (got %d)", engine.TotalSamples());
+
+         const std::string tmpDir = (std::filesystem::temp_directory_path() / "infinite_predquantize_test").string();
+         PQ_CHECK(engine.Save(tmpDir), "save must succeed");
+         engine.ResetForTest();
+         PQ_CHECK(engine.TotalSamples() == 0, "reset must clear the window");
+         PQ_CHECK(engine.Load(tmpDir), "load must succeed");
+         PQ_CHECK(engine.TotalSamples() == (int)kMaxWindowSamples, "load must restore the full window (got %d)", engine.TotalSamples());
+         ModeSet reloaded = engine.Refit();
+         PQ_CHECK(reloaded.count >= 1 && std::abs(reloaded.tick[0] - 24.0f) < 0.5f, "reloaded window should still show the 24-tick mode (count=%d)", reloaded.count);
+
+         std::error_code ec;
+         std::filesystem::remove_all(tmpDir, ec);
+         engine.ResetForTest(); // leave no synthetic data behind for the running app or later tests
       }
 
       if (gFail == 0)

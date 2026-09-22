@@ -5,6 +5,9 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <deque>
+#include <filesystem>
+#include <fstream>
 #include <vector>
 
 #include "audio/AudioBuffer.h"
@@ -40,35 +43,140 @@ namespace
       return c.binMean[i0] + frac * (c.binMean[i0 + 1] - c.binMean[i0]);
    }
 
-   std::string EncodeCurve(const Curve& c)
+   // Fits an 8-bin mean-velocity curve from raw captured vel127 samples, with nearest-neighbor
+   // gap-fill for bins the player never reached and a monotonicity pass (real playing is noisy
+   // enough that two adjacent bins can invert by a hair).
+   Curve FitCurve(const std::deque<int>& samples)
    {
-      std::string s;
-      char buf[32];
-      for (int i = 0; i < NoteModel::kVelBins; i++)
+      double sum[NoteModel::kVelBins] = {};
+      int count[NoteModel::kVelBins] = {};
+      for (int v127 : samples)
       {
-         std::snprintf(buf, sizeof(buf), "%s%.2f", i ? ";" : "", (double)c.binMean[i]);
-         s += buf;
+         const int b = NoteModel::VelBin(v127);
+         sum[b] += (double)v127;
+         count[b]++;
       }
-      return s;
+
+      Curve fit;
+      for (int i = 0; i < NoteModel::kVelBins; i++)
+         fit.binMean[i] = count[i] > 0 ? (float)(sum[i] / (double)count[i]) : -1.0f; // -1 = not yet filled
+
+      for (int i = 1; i < NoteModel::kVelBins; i++)
+         if (fit.binMean[i] < 0.0f)
+            fit.binMean[i] = fit.binMean[i - 1];
+      for (int i = NoteModel::kVelBins - 2; i >= 0; i--)
+         if (fit.binMean[i] < 0.0f)
+            fit.binMean[i] = fit.binMean[i + 1];
+
+      for (int i = 1; i < NoteModel::kVelBins; i++)
+         fit.binMean[i] = std::max(fit.binMean[i], fit.binMean[i - 1]);
+
+      return fit;
    }
 
-   bool DecodeCurve(const std::string& s, Curve& out)
+   int CoveredBins(const std::deque<int>& samples)
    {
+      bool seen[NoteModel::kVelBins] = {};
+      for (int v127 : samples)
+         seen[NoteModel::VelBin(v127)] = true;
       int n = 0;
-      size_t pos = 0;
-      while (pos <= s.size() && n < NoteModel::kVelBins)
-      {
-         const size_t semi = s.find(';', pos);
-         const std::string tok = s.substr(pos, semi == std::string::npos ? std::string::npos : semi - pos);
-         if (tok.empty())
-            break;
-         out.binMean[n++] = std::strtof(tok.c_str(), nullptr);
-         if (semi == std::string::npos)
-            break;
-         pos = semi + 1;
-      }
-      return n == NoteModel::kVelBins;
+      for (bool b : seen)
+         if (b)
+            n++;
+      return n;
    }
+
+   // The global, cross-patch, cross-session learned dynamics profile (PredictiveVelocityProfile in
+   // the header is the public face of this). Rolling window of the most recent captured velocities -
+   // same shape and window size as PredictiveQuantizeNode's GlobalEngine.
+   constexpr size_t kMaxWindowSamples = 4000;
+
+   class GlobalEngine
+   {
+   public:
+      static GlobalEngine& Instance()
+      {
+         static GlobalEngine e;
+         return e;
+      }
+
+      void AddSample(int v127)
+      {
+         mSamples.push_back(std::clamp(v127, 0, 127));
+         if (mSamples.size() > kMaxWindowSamples)
+            mSamples.pop_front();
+         mVersion++;
+      }
+
+      uint64_t Version() const { return mVersion; }
+      int TotalSamples() const { return (int)mSamples.size(); }
+      int CoveredBins() const { return ::CoveredBins(mSamples); }
+
+      Curve Refit() const { return FitCurve(mSamples); }
+
+      bool Load(const std::string& directory)
+      {
+         std::ifstream f(Path(directory), std::ios::binary | std::ios::ate);
+         if (!f.is_open())
+            return false;
+         const size_t sz = (size_t)f.tellg();
+         f.seekg(0, std::ios::beg);
+         if (sz < sizeof(uint32_t))
+            return false;
+         uint32_t count = 0;
+         f.read(reinterpret_cast<char*>(&count), sizeof(count));
+         if (sz != sizeof(uint32_t) + (size_t)count * sizeof(int32_t))
+            return false; // corrupt/foreign file: leave the engine as it was rather than guess
+         std::deque<int> loaded;
+         for (uint32_t i = 0; i < count; i++)
+         {
+            int32_t v = 0;
+            f.read(reinterpret_cast<char*>(&v), sizeof(v));
+            loaded.push_back(v);
+         }
+         mSamples = std::move(loaded);
+         mVersion++;
+         return true;
+      }
+
+      bool Save(const std::string& directory) const
+      {
+         std::error_code ec;
+         std::filesystem::create_directories(directory, ec);
+         std::ofstream f(Path(directory), std::ios::binary | std::ios::trunc);
+         if (!f.is_open())
+            return false;
+         const uint32_t count = (uint32_t)mSamples.size();
+         f.write(reinterpret_cast<const char*>(&count), sizeof(count));
+         for (int v : mSamples)
+         {
+            const int32_t v32 = v;
+            f.write(reinterpret_cast<const char*>(&v32), sizeof(v32));
+         }
+         return true;
+      }
+
+      bool HasLearnedData() const { return !mSamples.empty(); }
+
+      // Test-only: INFINITE_PREDVELOCITYTEST runs in the same process as a possibly-already-loaded
+      // real profile, so each test that wants a clean window must reset first and must not leave
+      // synthetic data behind for whatever runs after it.
+      void ResetForTest()
+      {
+         mSamples.clear();
+         mVersion++;
+      }
+
+   private:
+      static std::string Path(const std::string& dir)
+      {
+         std::filesystem::path p(dir);
+         return (p / "velocity_profile.bin").string();
+      }
+
+      std::deque<int> mSamples;
+      uint64_t mVersion = 0;
+   };
 }
 
 // ------------------------------------------------------------------ audio object
@@ -92,9 +200,8 @@ public:
    {
       NoteEvent evts[64];
       const int n = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, evts, 64) : 0;
-      const bool learning = mLearning.load(std::memory_order_relaxed);
-      const float mix = learning ? 0.0f : std::clamp(mMix.load(std::memory_order_relaxed), 0.0f, 1.0f);
-      const Curve* curve = learning ? nullptr : mLive.load(std::memory_order_acquire);
+      const float mix = std::clamp(mMix.load(std::memory_order_relaxed), 0.0f, 1.0f);
+      const Curve* curve = mLive.load(std::memory_order_acquire);
 
       for (int i = 0; i < n; i++)
       {
@@ -104,9 +211,8 @@ public:
          if (out.isNoteOn && !out.bendUpdate)
          {
             const int v127 = std::clamp((int)std::lround(std::clamp(out.velocity, 0.0f, 1.0f) * 127.0f), 0, 127);
-            if (learning)
-               PushCapture(v127);
-            else if (curve != nullptr)
+            PushCapture(v127);
+            if (curve != nullptr)
             {
                const float remapped = std::clamp(EvalCurve(*curve, (float)v127) / 127.0f, 0.0f, 1.0f);
                out.velocity = std::clamp(out.velocity + mix * (remapped - out.velocity), 0.0f, 1.0f);
@@ -124,11 +230,7 @@ public:
    void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
 
    // ---- main thread ----
-   void PushParams(float mixVal, bool learning)
-   {
-      mMix.store(mixVal, std::memory_order_relaxed);
-      mLearning.store(learning, std::memory_order_relaxed);
-   }
+   void PushParams(float mixVal) { mMix.store(mixVal, std::memory_order_relaxed); }
 
    bool PopCapture(int& v127)
    {
@@ -199,7 +301,6 @@ private:
    std::atomic<int> mDropped { 0 };
 
    std::atomic<float> mMix { 0.75f };
-   std::atomic<bool> mLearning { false };
 };
 
 PredictiveVelocityNode::PredictiveVelocityNode() = default;
@@ -215,24 +316,22 @@ AudioNode* PredictiveVelocityNode::GetAudioNode()
 void PredictiveVelocityNode::VisitParams(ParamVisitor& v)
 {
    v.Float("mix", mix);
-   v.Text("velCurve", velCurve);
 }
 
 bool PredictiveVelocityNode::HasCurve() const
 {
-   Curve c;
-   return DecodeCurve(velCurve, c);
+   return mCachedHasCurve;
 }
 
 float PredictiveVelocityNode::Confidence01() const
 {
-   if (!HasCurve())
+   if (!mCachedHasCurve)
       return 0.0f;
    // Same shape as PredictiveQuantizeNode::Confidence01: adequacy (captured enough notes to trust
    // the fit) times coverage (how many of the 8 velocity bins actually saw a played note, vs. how
    // many were only filled in by FitCurve's nearest-neighbor propagation).
-   const float adequacy = std::clamp((float)mNotesCaptured / 32.0f, 0.0f, 1.0f);
-   const float coverage = std::clamp((float)mBinsCovered / (float)NoteModel::kVelBins, 0.0f, 1.0f);
+   const float adequacy = std::clamp((float)GlobalEngine::Instance().TotalSamples() / 32.0f, 0.0f, 1.0f);
+   const float coverage = std::clamp((float)mCachedBinsCovered / (float)NoteModel::kVelBins, 0.0f, 1.0f);
    return std::clamp(adequacy * coverage, 0.0f, 1.0f);
 }
 
@@ -241,109 +340,37 @@ int PredictiveVelocityNode::Dropped() const
    return mAudioNode ? mAudioNode->Dropped() : 0;
 }
 
-void PredictiveVelocityNode::SetLearning(bool on)
+int PredictiveVelocityNode::TotalCaptured() const
 {
-   if (on == mLearning)
-      return;
-   if (!on)
-   {
-      FinishLearn();
-      return;
-   }
-   GetAudioNode();
-   int stale;
-   while (mAudioNode->PopCapture(stale))
-   {
-   }
-   mCapturedVel127.clear();
-   mNotesCaptured = 0;
-   mLastLearnTooShort = false;
-   mLearning = true;
+   return GlobalEngine::Instance().TotalSamples();
 }
 
 void PredictiveVelocityNode::DrainCaptures()
 {
    int v;
    while (mAudioNode->PopCapture(v))
-   {
-      if (mCapturedVel127.size() < 16384)
-         mCapturedVel127.push_back(v);
-      mNotesCaptured++;
-   }
+      GlobalEngine::Instance().AddSample(v);
 }
 
-void PredictiveVelocityNode::FitCurve()
+void PredictiveVelocityNode::RefitIfDirty()
 {
-   double sum[NoteModel::kVelBins] = {};
-   int count[NoteModel::kVelBins] = {};
-   for (int v127 : mCapturedVel127)
-   {
-      const int b = NoteModel::VelBin(v127);
-      sum[b] += (double)v127;
-      count[b]++;
-   }
-
-   Curve fit;
-   mBinsCovered = 0;
-   for (int i = 0; i < NoteModel::kVelBins; i++)
-   {
-      fit.binMean[i] = count[i] > 0 ? (float)(sum[i] / (double)count[i]) : -1.0f; // -1 = not yet filled
-      if (count[i] > 0)
-         mBinsCovered++;
-   }
-
-   // A nominal bin the player never actually reached (e.g. never plays above 110) has no data to
-   // average - fill it from the nearest bin that does, so the curve stays defined across the whole
-   // range instead of leaving a hole. This is what turns "never plays below 40 or above 110" into
-   // "the curve compresses onto that learned band" (step-10-predictive-velocity.md §2-3) rather
-   // than a fit failure - the overall too-little-data case is gated on total count below, not on
-   // making every one of 8 bins individually well-populated.
-   for (int i = 1; i < NoteModel::kVelBins; i++)
-      if (fit.binMean[i] < 0.0f)
-         fit.binMean[i] = fit.binMean[i - 1];
-   for (int i = NoteModel::kVelBins - 2; i >= 0; i--)
-      if (fit.binMean[i] < 0.0f)
-         fit.binMean[i] = fit.binMean[i + 1];
-
-   // Enforce monotonicity: real playing is noisy enough that two adjacent bins can invert by a
-   // hair, which would make EvalCurve locally non-monotonic (a louder nominal input mapping quieter
-   // than a softer one) - a running max keeps the curve honest as "louder nominal -> louder or
-   // equal output".
-   for (int i = 1; i < NoteModel::kVelBins; i++)
-      fit.binMean[i] = std::max(fit.binMean[i], fit.binMean[i - 1]);
-
-   velCurve = EncodeCurve(fit);
-}
-
-void PredictiveVelocityNode::FinishLearn()
-{
-   if (!mLearning)
+   GlobalEngine& engine = GlobalEngine::Instance();
+   if (engine.Version() == mAppliedProfileVersion)
       return;
-   DrainCaptures();
-   mLearning = false;
+   mAppliedProfileVersion = engine.Version();
 
    // Needs real coverage across the range to fit meaningfully, not just replay 2-3 samples as if
    // they were the whole distribution (step-10-predictive-velocity.md §4 "fitting from too little
-   // data"). Below the floor, the previous curve (if any) is left exactly as it was.
-   constexpr size_t kMinNotes = 16;
-   mLastLearnTooShort = mCapturedVel127.size() < kMinNotes;
-   if (!mLastLearnTooShort)
-      FitCurve();
-   mCapturedVel127.clear();
-   mAppliedCurve = velCurve;
+   // data"). Below the floor, whatever curve is already live is left exactly as it was.
+   constexpr int kMinNotes = 16;
+   if (engine.TotalSamples() < kMinNotes)
+      return;
 
-   Curve* fresh = new Curve();
-   DecodeCurve(velCurve, *fresh);
-   GetAudioNode();
-   mAudioNode->Retire(mAudioNode->SwapCurve(fresh));
-}
+   const Curve fit = engine.Refit();
+   mCachedHasCurve = true;
+   mCachedBinsCovered = engine.CoveredBins();
 
-void PredictiveVelocityNode::TestSwapCurve(const std::string& encoded)
-{
-   velCurve = encoded;
-   mAppliedCurve = encoded;
-   Curve* fresh = new Curve();
-   DecodeCurve(velCurve, *fresh);
+   Curve* fresh = new Curve(fit);
    GetAudioNode();
    mAudioNode->Retire(mAudioNode->SwapCurve(fresh));
 }
@@ -355,37 +382,36 @@ void PredictiveVelocityNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    GetAudioNode();
 
-   // The saved curve text changed (patch load, undo): install it without going through Learn.
-   if (velCurve != mAppliedCurve)
-   {
-      mAppliedCurve = velCurve;
-      Curve* fresh = new Curve();
-      DecodeCurve(velCurve, *fresh);
-      mAudioNode->Retire(mAudioNode->SwapCurve(fresh));
-   }
-
-   mAudioNode->PushParams(mix, mLearning);
+   DrainCaptures();
+   RefitIfDirty();
+   mAudioNode->PushParams(mix);
    mAudioNode->CollectRetired();
-   if (mLearning)
-      DrainCaptures();
 }
 
 void PredictiveVelocityNode::SweepPrepare()
 {
    // Plays nothing observably different from pass-through until a curve exists; give it one, well
    // away from identity, so mix's effect is audible/testable (matches PredictiveQuantizeNode's
-   // SweepPrepare reasoning). Unlike Predictive Quantize's timing correction, a velocity remap
-   // applies at the very note-on the generic sweep rig already drives, so no second onset is needed
-   // for this to be observable.
+   // SweepPrepare reasoning). This seeds the per-instance audio object directly rather than the
+   // global profile, so a hygiene sweep never pollutes real learned data. Unlike Predictive
+   // Quantize's timing correction, a velocity remap applies at the very note-on the generic sweep
+   // rig already drives, so no second onset is needed for this to be observable.
    Curve seed;
    for (int i = 0; i < NoteModel::kVelBins; i++)
       seed.binMean[i] = BinCenter(i) * 0.5f; // compresses everything toward the bottom half
-   velCurve = EncodeCurve(seed);
-   mAppliedCurve = velCurve;
+   mCachedHasCurve = true;
+   mCachedBinsCovered = NoteModel::kVelBins;
+
    GetAudioNode();
-   Curve* fresh = new Curve();
-   DecodeCurve(velCurve, *fresh);
+   Curve* fresh = new Curve(seed);
    mAudioNode->Retire(mAudioNode->SwapCurve(fresh));
+}
+
+namespace PredictiveVelocityProfile
+{
+   bool Load(const std::string& directory) { return GlobalEngine::Instance().Load(directory); }
+   bool Save(const std::string& directory) { return GlobalEngine::Instance().Save(directory); }
+   bool HasLearnedData() { return GlobalEngine::Instance().HasLearnedData(); }
 }
 
 // ------------------------------------------------------------------ tests
@@ -418,7 +444,7 @@ namespace PredictiveVelocity
          for (int i = 0; i < NoteModel::kVelBins; i++)
             c->binMean[i] = 20.0f; // maximally different from identity
          node.Retire(node.SwapCurve(c));
-         node.PushParams(0.0f, false);
+         node.PushParams(0.0f);
 
          NoteEventQueue inbox;
          const int cursor = inbox.RegisterConsumer();
@@ -452,7 +478,7 @@ namespace PredictiveVelocity
          for (int i = 0; i < NoteModel::kVelBins; i++)
             c->binMean[i] = 40.0f; // every input collapses onto 40/127 regardless of bin
          node.Retire(node.SwapCurve(c));
-         node.PushParams(1.0f, false);
+         node.PushParams(1.0f);
 
          NoteEventQueue inbox;
          const int cursor = inbox.RegisterConsumer();
@@ -479,24 +505,27 @@ namespace PredictiveVelocity
          PV_CHECK(n == 1 && std::abs(evts[0].velocity - expected) < 0.01f, "mix=1 must land on the learned curve (got n=%d, vel=%.4f, want %.4f)", n, n > 0 ? evts[0].velocity : -1.0f, expected);
       }
 
-      // 3. Too-few-notes: FinishLearn falls back to identity (no curve installed) rather than
-      // overfitting to a couple of samples.
+      // 3. Too-few-notes: the global profile's refit is gated on a minimum sample count, so a
+      // handful of captures must not install a curve.
       {
+         GlobalEngine& engine = GlobalEngine::Instance();
+         engine.ResetForTest();
+
          PredictiveVelocityNode node;
-         node.SetLearning(true);
          node.GetAudioNode();
          for (int i = 0; i < 3; i++)
             node.Audio()->PushCapture(90);
-         node.SetLearning(false); // FinishLearn
-         PV_CHECK(node.LastLearnTooShort(), "3 captured notes should be reported as too short");
-         PV_CHECK(!node.HasCurve(), "too-short learn must not install a curve");
+         node.CookIfNeeded(1); // drains captures into the global profile and attempts a refit
+         PV_CHECK(!node.HasCurve(), "3 captured notes must not install a curve");
+
+         engine.ResetForTest();
       }
 
       // 4. Cold start: no curve learned yet -> identity, regardless of mix.
       {
          AudioPredictiveVelocityNode node;
          node.PrepareToPlay(48000.0, 512);
-         node.PushParams(1.0f, false); // mix maxed, but no curve was ever swapped in
+         node.PushParams(1.0f); // mix maxed, but no curve was ever swapped in
 
          NoteEventQueue inbox;
          const int cursor = inbox.RegisterConsumer();
@@ -522,7 +551,7 @@ namespace PredictiveVelocity
          PV_CHECK(n == 1 && std::abs(evts[0].velocity - 0.42f) < 1e-6f, "cold start must be identity (got n=%d, vel=%.4f)", n, n > 0 ? evts[0].velocity : -1.0f);
       }
 
-      // 5. Note-off events are never remapped, even mid-Learn or with mix=1.
+      // 5. Note-off events are never remapped, even with mix=1.
       {
          AudioPredictiveVelocityNode node;
          node.PrepareToPlay(48000.0, 512);
@@ -530,7 +559,7 @@ namespace PredictiveVelocity
          for (int i = 0; i < NoteModel::kVelBins; i++)
             c->binMean[i] = 10.0f;
          node.Retire(node.SwapCurve(c));
-         node.PushParams(1.0f, false);
+         node.PushParams(1.0f);
 
          NoteEventQueue inbox;
          const int cursor = inbox.RegisterConsumer();
@@ -556,18 +585,34 @@ namespace PredictiveVelocity
          PV_CHECK(n == 1 && std::abs(evts[0].velocity - 0.6f) < 1e-6f, "note-off velocity must pass through untouched (got n=%d, vel=%.4f)", n, n > 0 ? evts[0].velocity : -1.0f);
       }
 
-      // 6. Save/load round-trip: encode then decode a curve and confirm the values survive.
+      // 6. The global profile's rolling window forgets old samples once evicted, and a save/load
+      // round trip preserves whatever the window currently holds - same coverage as
+      // PredictiveQuantize's window test.
       {
-         Curve c;
-         for (int i = 0; i < NoteModel::kVelBins; i++)
-            c.binMean[i] = 10.0f + (float)i * 12.5f;
-         const std::string encoded = EncodeCurve(c);
-         Curve decoded;
-         const bool ok = DecodeCurve(encoded, decoded);
-         PV_CHECK(ok, "round-trip must decode all %d bins", NoteModel::kVelBins);
-         if (ok)
-            for (int i = 0; i < NoteModel::kVelBins; i++)
-               PV_CHECK(std::abs(decoded.binMean[i] - c.binMean[i]) < 0.01f, "bin %d mismatch: got %.4f want %.4f", i, decoded.binMean[i], c.binMean[i]);
+         GlobalEngine& engine = GlobalEngine::Instance();
+         engine.ResetForTest();
+
+         for (int i = 0; i < 50; i++)
+            engine.AddSample(20); // soft, dominant at first
+         Curve early = engine.Refit();
+         PV_CHECK(early.binMean[0] < 30.0f, "early window should reflect soft playing (bin0=%.2f)", early.binMean[0]);
+
+         for (size_t i = 0; i < kMaxWindowSamples; i++)
+            engine.AddSample(110); // loud, enough to fully evict the soft samples from the window
+         Curve late = engine.Refit();
+         PV_CHECK(late.binMean[NoteModel::kVelBins - 1] > 90.0f, "rolling window should forget soft playing once evicted (top bin=%.2f)", late.binMean[NoteModel::kVelBins - 1]);
+         PV_CHECK(engine.TotalSamples() == (int)kMaxWindowSamples, "window should be capped at kMaxWindowSamples (got %d)", engine.TotalSamples());
+
+         const std::string tmpDir = (std::filesystem::temp_directory_path() / "infinite_predvelocity_test").string();
+         PV_CHECK(engine.Save(tmpDir), "save must succeed");
+         engine.ResetForTest();
+         PV_CHECK(engine.TotalSamples() == 0, "reset must clear the window");
+         PV_CHECK(engine.Load(tmpDir), "load must succeed");
+         PV_CHECK(engine.TotalSamples() == (int)kMaxWindowSamples, "load must restore the full window (got %d)", engine.TotalSamples());
+
+         std::error_code ec;
+         std::filesystem::remove_all(tmpDir, ec);
+         engine.ResetForTest(); // leave no synthetic data behind for the running app or later tests
       }
 
       if (gFail == 0)
