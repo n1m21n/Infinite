@@ -482,7 +482,9 @@ Each step is its own branch (`git-branch-workflow`) with a self-test (`run-infin
 Each has a self-contained execution brief with code references: [step-01](step-01-movement-log.md),
 [step-02](step-02-online-stats-and-eval.md), [step-03](step-03-predictor-binding.md),
 [step-04](step-04-drift-node.md), [step-05](step-05-cold-start-and-feedback.md),
-[step-06](step-06-predictive-midi.md), [step-07](step-07-v2-modes.md).
+[step-06](step-06-predictive-midi.md), [step-07](step-07-v2-modes.md),
+[step-08](step-08-predictive-coloring.md), [step-09](step-09-predictive-quantize.md),
+[step-10](step-10-predictive-velocity.md), [step-11](step-11-predictive-bassline.md).
 
 | Step | Scope | Exit criterion |
 |---|---|---|
@@ -492,7 +494,17 @@ Each has a self-contained execution brief with code references: [step-01](step-0
 | 4 | Green node: Drift, 5 controls + Freeze, confidence dot, ghost line | `new-modulator-node` exit criterion; `node-ui-pillars` checklist |
 | 5 | Cold-start rungs 2 and 4, feedback weights, monitors | Rung blending shows no jumps; the auto-cut triggers in a synthetic test |
 | 6 | Predictive MIDI node (source A) | Held-out meter works; no allocation on the audio thread |
-| 7 | v2: Follow, Recall, session map, moves faders, section-conditioned Drift | each passes the §4.3 gate |
+| 7 | v2: Follow, Recall, session map, moves faders, section-conditioned Drift | each passes the §4.3 gate — **note:** `DriftNode` (`src/nodes/PredictionNodes.h`) has since grown a `follow`/`mode`/`recallBar`/`quantizeRate` "Step 8 redesign" beyond what this outline describes; re-read the current header before treating this table as the live state of 7a/7b |
+| 8 | Predictive Coloring: a learned color-grade (exposure/contrast/tone-zones/HSV) blended by one Mix knob | `PREDCOLORTEST`; owner confirms Learn + Mix on a real image |
+| 9 | Predictive Quantize: learned onset-spacing modes instead of a fixed grid, blended by one Mix knob | `PREDQUANTIZETEST`; owner confirms it live |
+| 10 | Predictive Velocity: learned dynamic-range remap, blended by one Mix knob | `PREDVELOCITYTEST`; owner confirms it live |
+| 11 | Predictive Bassline: rhythm/duration/velocity self-continuation + root-relative pitch tracking a live harmony input | `PREDBASSLINETEST`; owner confirms it tracks a real progression |
+
+**Out of scope for this document:** a classical-ornamentation note generator was floated in the same
+discussion that produced steps 8–11, but it is explicitly **not** a predictor — it generates from a
+researched style corpus, not from the owner's own played/graded history the way every node above
+does. It needs its own research pass (ornamentation conventions, source corpus) before it can be
+scoped as a node at all, and belongs in its own category, not this roadmap.
 
 ## 12. Questions for reviewers
 

@@ -230,6 +230,18 @@ measurement window further:
   whether the flag is true or false. This is a property of the fixed test
   input, not the wiring - every occurrence stores straight into its own
   atomic in `PushParams`/`CookIfNeeded` exactly like its sibling params.
+- **Predictive Quantize's `mix` needs a second, chronologically distinct
+  onset.** `AudioPredictiveQuantizeNode::Render` corrects a note-on's timing
+  by blending toward a learned spacing only from the *second* onset in a
+  group chain onward - the first onset always establishes the group as an
+  identity (`if (!mHaveGroup) { correctedTicks = rawTicks; ... }`), by
+  design: there is no prior onset to measure a spacing from. `PushHeldNoteOn`
+  fires the 60/64/67 chord at the same `frameOffset` and nothing afterward,
+  so every note in the probe falls inside `kChordEpsilonTicks` of the first
+  and reuses that first group's (identity) correction - `mix` never gets a
+  second onset to bend. Confirmed by hand with `INFINITE_PREDQUANTIZETEST`
+  (`src/nodes/PredictiveQuantizeNode.cpp`), which drives two onsets spaced
+  apart in time and shows `mix` moving the second onset's timing correctly.
 
 ## Manually trying combinations these sweeps do not cover
 

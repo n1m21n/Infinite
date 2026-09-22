@@ -1131,8 +1131,13 @@ constexpr char kMagic[6] = {'I', 'M', 'S', 'T', 'A', 'T'};
 // v3 adds the per-key source pools and their prequential scores. v2 files still load: everything
 // they hold was written before the split existed, so it is credited to DELIBERATE - the pool a
 // hand-moved knob's settled position would have landed in anyway.
-constexpr uint16_t kVersion = 3;
+// v4 adds each key's posHistory/deltaHistory (the rolling window Moves/predictive-macro's PCA is
+// fit from). Before v4 this was never persisted, so the PCA went cold on every app restart and
+// had to reaccumulate ~51 s of ticks from scratch; v2/v3 files still load fine, just starting
+// that one key with no history, exactly like today.
+constexpr uint16_t kVersion = 4;
 constexpr uint16_t kVersionPooled = 3;
+constexpr uint16_t kVersionHistory = 4;
 constexpr uint32_t kMaxEntries = 4u * 1024u * 1024u;
 constexpr uint32_t kMaxString = 4096;
 
@@ -1233,7 +1238,7 @@ bool OpenBlob(const uint8_t* data, size_t size, Reader& r, uint16_t& version)
    r.end = data + size - 4;
    r.ok = true;
    version = r.get<uint16_t>();
-   return (version == kVersion || version == 2) && r.ok;
+   return (version == kVersion || version == 3 || version == 2) && r.ok;
 }
 } // namespace
 
@@ -1268,6 +1273,15 @@ std::vector<uint8_t> Engine::Serialize(const std::string& lastConsumed) const
       }
       w.put(r.scoreW);
       w.put(r.scoreClock);
+
+      const uint32_t nPos = static_cast<uint32_t>(std::min(r.posHistory.size(), Runtime::kHistoryCap));
+      w.put(nPos);
+      for (uint32_t hi = 0; hi < nPos; hi++)
+         w.put(r.posHistory[hi]);
+      const uint32_t nDelta = static_cast<uint32_t>(std::min(r.deltaHistory.size(), Runtime::kHistoryCap));
+      w.put(nDelta);
+      for (uint32_t hi = 0; hi < nDelta; hi++)
+         w.put(r.deltaHistory[hi]);
    }
 
    w.put(static_cast<uint32_t>(mProfiles.size()));
@@ -1359,6 +1373,32 @@ bool Engine::Deserialize(const uint8_t* data, size_t size, std::string& lastCons
           !std::isfinite(rt.refClock))
          return false;
       rt.stats = s;
+
+      if (version >= kVersionHistory)
+      {
+         const uint32_t nPos = r.get<uint32_t>();
+         if (!r.ok || nPos > Runtime::kHistoryCap)
+            return false;
+         rt.posHistory.resize(nPos);
+         for (uint32_t hi = 0; hi < nPos && r.ok; hi++)
+            rt.posHistory[hi] = r.get<float>();
+         const uint32_t nDelta = r.get<uint32_t>();
+         if (!r.ok || nDelta > Runtime::kHistoryCap)
+            return false;
+         rt.deltaHistory.resize(nDelta);
+         for (uint32_t hi = 0; hi < nDelta && r.ok; hi++)
+            rt.deltaHistory[hi] = r.get<float>();
+         if (!r.ok)
+            return false;
+         for (float v : rt.posHistory)
+            if (!std::isfinite(v))
+               return false;
+         for (float v : rt.deltaHistory)
+            if (!std::isfinite(v))
+               return false;
+      }
+      // else (v2/v3 file): posHistory/deltaHistory stay empty, same as a freshly-registered key -
+      // Moves/predictive-macro's PCA simply starts cold for that one and reaccumulates live.
    }
 
    const uint32_t nProf = r.get<uint32_t>();

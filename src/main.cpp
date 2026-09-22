@@ -108,6 +108,7 @@ namespace
 #include "core/Modulation.h"
 #include "core/MovementLog.h"
 #include "core/MovementStats.h"
+#include "core/ColorStats.h"
 #include "core/GestureRecorder.h"
 #include "core/Expression.h"
 #include "core/field/FieldTypes.h"
@@ -192,6 +193,8 @@ namespace
 #include "nodes/PredictionNodes.h"
 #include "nodes/PredictiveNotesNode.h"
 #include "nodes/PredictiveModulatorNode.h"
+#include "nodes/PredictiveColoringNode.h"
+#include "nodes/PredictiveQuantizeNode.h"
 #include "nodes/OscNodes.h"
 #include "nodes/MidiNodes.h"
 #include "nodes/OutputNode.h"
@@ -5799,6 +5802,7 @@ namespace
       REGISTER_NODE(DriftNode, Drift, "Prediction");
       REGISTER_NODE(MovesNode, Moves, "Prediction");
       REGISTER_NODE(PredictiveModulatorNode, Predictive Modulator, "Prediction");
+      REGISTER_NODE(PredictiveColoringNode, Predictive Coloring, "Prediction");
       REGISTER_NODE(CVToPitchNode, CV to Pitch, "Modulators");
       REGISTER_NODE(MacroKnobNode, Macro Knob, "Macros");
       REGISTER_NODE(MacroSliderNode, Macro Slider, "Macros");
@@ -5889,6 +5893,7 @@ namespace
       REGISTER_NODE(VibratoNode, Vibrato, "Modulators");
       REGISTER_NODE(NoteEchoNode, Note Echo, "Notes");
       REGISTER_NODE(PredictiveNotesNode, Predictive Notes, "Prediction");
+      REGISTER_NODE(PredictiveQuantizeNode, Predictive Quantize, "Prediction");
       REGISTER_NODE(NoteRouterNode, Note Router, "Notes");
       REGISTER_NODE(NoteMergeNode, Note Merge, "Notes");
       REGISTER_NODE(NoteSwitcherNode, Note Switcher, "Notes");
@@ -6834,6 +6839,8 @@ namespace
          return 1;
       if (dynamic_cast<CurvesNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<PredictiveColoringNode*>(gn.node.get()) != nullptr)
+         return 1;
       if (dynamic_cast<ColorRampNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<AudioColorRampNode*>(gn.node.get()) != nullptr)
@@ -7003,6 +7010,8 @@ namespace
          return (slot == 0) ? &dp->DepthInput() : ((slot == 1) ? &dp->ColorInput() : nullptr);
       if (auto* curves = dynamic_cast<CurvesNode*>(gn.node.get()))
          return slot == 0 ? &curves->Input() : nullptr;
+      if (auto* pc = dynamic_cast<PredictiveColoringNode*>(gn.node.get()))
+         return slot == 0 ? &pc->Input() : nullptr;
       if (auto* cramp = dynamic_cast<ColorRampNode*>(gn.node.get()))
          return slot == 0 ? &cramp->Input() : nullptr;
       if (auto* acr = dynamic_cast<AudioColorRampNode*>(gn.node.get()))
@@ -9898,6 +9907,55 @@ namespace
       ModSlider("mix", &n->mix, 0.0f, 1.0f);
    }
 
+   void DrawPredictiveColoringParams(PredictiveColoringNode* n)
+   {
+      ImGui::PushID(n);
+      const bool isLight = IsThemeLight();
+      const bool learning = n->IsLearning();
+      const float conf = n->Confidence01();
+      const bool hasLearned = n->TotalSamples() > 0;
+
+      char statusBuf[64];
+      if (learning)
+         snprintf(statusBuf, sizeof(statusBuf), "learning active footage...");
+      else if (hasLearned)
+         snprintf(statusBuf, sizeof(statusBuf), "target profile active");
+      else
+         snprintf(statusBuf, sizeof(statusBuf), "press Learn to profile footage");
+
+      ImGui::TextDisabled("%s", statusBuf);
+
+      const char* learnLabel = learning ? "Stop Learning" : (hasLearned ? "Learn Again" : "Learn");
+      if (ImGui::Button(learnLabel, ImVec2(hasLearned && !learning ? 95 : 120, 0)))
+      {
+         PushUndoCheckpoint();
+         n->SetLearning(!learning);
+      }
+      if (hasLearned && !learning)
+      {
+         ImGui::SameLine();
+         if (ImGui::Button("Reset", ImVec2(50, 0)))
+         {
+            PushUndoCheckpoint();
+            n->ResetProfile();
+         }
+      }
+      ImGui::SameLine();
+      char confText[32];
+      snprintf(confText, sizeof(confText), "%d%% conf", (int)std::round(conf * 100.0f));
+      ImGui::TextColored(conf > 0.6f ? (isLight ? ImVec4(0.1f, 0.6f, 0.2f, 1.0f) : ImVec4(0.2f, 0.85f, 0.35f, 1.0f))
+                                    : (isLight ? ImVec4(0.7f, 0.4f, 0.1f, 1.0f) : ImVec4(0.9f, 0.7f, 0.2f, 1.0f)),
+                         "%s", confText);
+
+      PushCheckboxStyle();
+      ModCheckbox("self normalize", &n->selfNormalize);
+      PopCheckboxStyle();
+
+      ModSlider("wander", &n->wander, 0.0f, 1.0f);
+      ModSlider("mix", &n->mix, 0.0f, 1.0f);
+      ImGui::PopID();
+   }
+
    void DrawModCurveParams(ModCurveNode* n)
    {
       const bool isLight = IsThemeLight();
@@ -11547,6 +11605,7 @@ namespace
           dynamic_cast<VelocityCurveNode*>(node) != nullptr ||
           dynamic_cast<HumanizerNode*>(node) != nullptr ||
           dynamic_cast<QuantizerNode*>(node) != nullptr ||
+          dynamic_cast<PredictiveQuantizeNode*>(node) != nullptr ||
           dynamic_cast<NoteEchoNode*>(node) != nullptr ||
           dynamic_cast<NoteMergeNode*>(node) != nullptr ||
           dynamic_cast<NoteSwitcherNode*>(node) != nullptr ||
@@ -18598,6 +18657,37 @@ namespace
       EndAudioBody();
    }
 
+   void DrawPredictiveQuantizeBody(GraphNode& gn, PredictiveQuantizeNode* n)
+   {
+      char stat[64];
+      if (n->IsLearning())
+         snprintf(stat, sizeof(stat), "learning  -  %d onsets", n->OnsetsCaptured());
+      else if (n->ModeCount() > 0)
+         snprintf(stat, sizeof(stat), "%d spacings learned", n->ModeCount());
+      else
+         snprintf(stat, sizeof(stat), "wire notes in, press Learn");
+
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+
+      {
+         const float w = gAudioContentW;
+         const float h = ImGui::GetFrameHeight();
+         const bool learning = n->IsLearning();
+         if (ImGui::Button(learning ? "Stop##pqLearn" : "Learn##pqLearn", ImVec2(w, h)))
+         {
+            PushUndoCheckpoint();
+            n->SetLearning(!learning);
+         }
+      }
+      {
+         AudioKnobRow row(1);
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
    void DrawNoteEchoBody(GraphNode& gn, NoteEchoNode* n)
    {
       char stat[64];
@@ -18636,6 +18726,10 @@ namespace
          snprintf(stat, sizeof(stat), "learning  -  %d notes, %d bars", n->NotesCaptured(), n->BarsCaptured());
       else if (n->Building())
          snprintf(stat, sizeof(stat), "building model...");
+      else if (n->LastLearnTooShort() && n->LearnedNotes() > 0)
+         snprintf(stat, sizeof(stat), "too short, kept %d notes learned", n->LearnedNotes());
+      else if (n->LastLearnTooShort())
+         snprintf(stat, sizeof(stat), "too short to learn, wire more notes in");
       else if (n->LearnedNotes() > 0)
          snprintf(stat, sizeof(stat), "%d notes learned", n->LearnedNotes());
       else
@@ -23876,6 +23970,8 @@ namespace
          DrawNoteEchoBody(gn, n);
       else if (auto* n = dynamic_cast<PredictiveNotesNode*>(gn.node.get()))
          DrawPredictiveNotesBody(gn, n);
+      else if (auto* n = dynamic_cast<PredictiveQuantizeNode*>(gn.node.get()))
+         DrawPredictiveQuantizeBody(gn, n);
       else if (auto* n = dynamic_cast<NoteRouterNode*>(gn.node.get()))
          DrawNoteRouterBody(gn, n);
       else if (auto* n = dynamic_cast<NoteMergeNode*>(gn.node.get()))
@@ -38838,6 +38934,7 @@ namespace
 
          // ---------------- Color ----------------
          { "Color Ramp", "Recolors any 0-1 grayscale input through user-authored stops, up to 32 of them, with linear or constant interpolation. Unlike Gradient Map, it has no shape of its own - the shape comes from upstream." },
+         { "Predictive Coloring", "Learns what 'graded' footage looks like for you and grades incoming frames toward it. Press Learn on already-graded footage to build a target profile (or leave self normalize on to auto-level/contrast without one); mix blends the grade in. Wander makes the grade gently drift among looks the profile has actually seen instead of solving to the exact same answer every frame - 0 is the old fixed behavior, higher wanders more, scaled down automatically for a thin or low-confidence profile." },
 
          // ---------------- Compositing ----------------
          { "Blend", "Two inputs and 32 blend modes - the full Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity set, plus Erase." },
@@ -38919,6 +39016,7 @@ namespace
          { "Vibrato", "An LFO wired straight to pitch. It is a modulator, not a note-chain node - it has no note input on purpose, because a free-running wobble has no single note to attach to. Patch its output onto a synth's pitch/bend mod dot (e.g. Wavetable's 'bend' knob)." },
          { "Note Filter", "A gate on a note's pitch: scale snaps it to the nearest degree of the chosen scale/root, range drops anything outside lo..hi, and chance randomly drops the rest. A note that gets dropped has its note-off dropped with it, so nothing hangs." },
          { "Predictive Notes", "Wire a note chain in and press Learn: it listens (passing the notes through), learns the pitches, rhythm, lengths and velocities as a variable-order Markov model, then plays on its own in that style. Stray at the bottom replays the phrase, the middle plays in character, the top ignores the model and picks freely in range. The learned notes are saved with the patch." },
+         { "Predictive Quantize", "A groove quantizer, not a grid one: wire a note chain in and press Learn, and it listens to the actual spacing between your onsets (passing them through while it listens) instead of assuming a fixed division. Stop, and it pulls future note-on timing toward the spacings it actually heard - mix at 0 is untouched, mix at 1 snaps fully onto the nearest learned spacing. Unlike Quantizer's fixed grid, this follows however you actually played it, including swing or a template that isn't on a clean subdivision." },
          { "Note Echo", "Repeats every incoming note event, delay ms apart, with velocity decaying and pitch shifting per repeat - a delay line for notes rather than audio. The original note always passes through first; the repeats are on top of it, not instead of it." },
          { "Note Router", "The system's only note fan-out point: one input, four distinct outputs. Round Robin cycles through them, Random picks one per note, Chain advances only when the pitch changes (a held note stays put), and Probability rolls each output independently - a note can end up on several outputs at once, or (rarely) none, in which case it falls back to output 1. A note's whole lifetime (on through off) always stays on the output(s) it started on." },
          { "Note Merge", "The system's only note fan-in point: up to four note inputs merged into one output stream, in timestamp order. Each input's notes stay independent voices matched by voice id, not pitch - so two inputs playing the same note at the same time sound as two overlapping voices, not a collision." },
@@ -39620,6 +39718,7 @@ namespace
                { "Gradient Map", "Remaps luminance onto a two-colour gradient." },
                { "Color Adjustments", "All-in-one grading chain - brightness/contrast, levels, colour balance, HSL, vibrance, tone shaper, channel mixer and an optional black & white stage - so a common grade doesn't need eight nodes wired in series." },
                { "Color Ramp", "Recolors any 0-1 grayscale input through user-authored stops, up to 32 of them, with linear or constant interpolation. Unlike Gradient Map, it has no shape of its own - the shape comes from upstream." },
+               { "Predictive Coloring", "Learns what 'graded' footage looks like for you and grades incoming frames toward it. Press Learn on already-graded footage to build a target profile (or leave self normalize on to auto-level/contrast without one); mix blends the grade in. Wander makes the grade gently drift among looks the profile has actually seen instead of solving to the exact same answer every frame." },
 #if defined(_WIN32)
                { "Remove Background", "On-device segmentation with no network access and no API key: Windows has no Vision equivalent, so a small model (u2netp) ships with the build and runs through ONNX Runtime on the DirectML GPU provider, falling back to CPU when DirectML does not register - the node's header line says which. Both Subject and Person modes use the same model. Segmentation is expensive, so the mask is computed on this interval rather than every frame." },
 #elif defined(__linux__)
@@ -39693,6 +39792,7 @@ namespace
                { "Bouncing Balls", "Physics-based gravity bounce note generator (up to 12 balls, with speed, size, and range controls) creating organic rhythmic polyrhythms as balls hit walls." },
                { "Note Transpose, Pitch Bend, Velocity Curve", "Pitch shifting, interval offset, pitch wheel modulation, and non-linear velocity mapping curves." },
                { "Gate, Humanizer, Glide", "Note gate length shaping, timing/velocity jitter humanization, and portamento glide." },
+               { "Predictive Notes, Predictive Quantize", "Predictive Notes learns a played phrase as a Markov model and plays on in that style. Predictive Quantize learns the actual spacing between your onsets and pulls future timing toward it - a groove template, not Quantizer's fixed grid." },
                { "Note Stack", "Polyphonic chord generator, harmony generator, and interval stacking." },
             } },
             { "Synths", {
@@ -43483,6 +43583,8 @@ namespace
    // gPatchDirty. Several continuous controls update live while dragged and
    // create their undo checkpoint only at gesture end, so a crash mid-gesture
    // must still recover the values the user was actually seeing and hearing.
+   void PollColorStatsAutosave(double now);
+
    void PollAutosave()
    {
       if (!gAutosaveEnabled || gNodes.empty())
@@ -43504,6 +43606,24 @@ namespace
       }
       if (wrote)
          gAutosaveFailureLogged = false;
+
+      PollColorStatsAutosave(now);
+   }
+
+   // Predictive Coloring's global learned profile used to be saved only on
+   // Stop-Learning, so a crash mid-session (or simply never pressing Stop)
+   // lost that session's colour learning entirely. Piggyback on the same
+   // gAutosaveSeconds cadence (independent of gAutosaveEnabled - this is
+   // learned-data persistence, not patch-file autosave) and on the shutdown
+   // path below.
+   void PollColorStatsAutosave(double now)
+   {
+      static double sLastSave = 0.0;
+      if (sLastSave > 0.0 && now - sLastSave < (double)gAutosaveSeconds)
+         return;
+      sLastSave = now;
+      if (ColorStats::Engine::Instance().HasLearnedData())
+         ColorStats::Engine::Instance().Save(AppPaths::AppSupportDir() + "/prediction");
    }
 
    // Called once at startup, after the graph and GL are initialised but
@@ -64036,6 +64156,10 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_PREDMIDITEST") != nullptr)
       return PredictiveNotes::RunPredMidiTest() ? 0 : 1;
+   if (getenv("INFINITE_PREDCOLORTEST") != nullptr)
+      return PredictiveColoring::RunPredColorTest() ? 0 : 1;
+   if (getenv("INFINITE_PREDQUANTIZETEST") != nullptr)
+      return PredictiveQuantize::RunPredQuantizeTest() ? 0 : 1;
    if (getenv("INFINITE_DRIFTTEST") != nullptr)
       return PredictionNodes::RunDriftTest() ? 0 : 1;
    if (getenv("INFINITE_PREDFEEDBACKTEST") != nullptr)
@@ -64467,6 +64591,7 @@ int main(int argc, char** argv)
       return std::string();
    });
    MovementLog::Start();
+   ColorStats::Engine::Instance().Load(AppPaths::AppSupportDir() + "/prediction");
    ApplyTheme();
 
    // Skipped under the dev-test harness (INFINITE_EXITAFTER) so that running
@@ -84678,6 +84803,8 @@ int main(int argc, char** argv)
                DrawResynthParams(n);
             else if (auto* n = dynamic_cast<CurvesNode*>(gn.node.get()))
                DrawCurvesParams(n);
+            else if (auto* n = dynamic_cast<PredictiveColoringNode*>(gn.node.get()))
+               DrawPredictiveColoringParams(n);
             else if (auto* n = dynamic_cast<ColorRampNode*>(gn.node.get()))
                DrawColorRampParams(n);
             else if (auto* n = dynamic_cast<RemoveBgNode*>(gn.node.get()))
@@ -90952,6 +91079,8 @@ int main(int argc, char** argv)
    AudioEngine::Instance().Stop();
    UpdateCheck::Shutdown(); // joins the worker thread so the process doesn't exit mid-request
    MovementLog::Stop();
+   if (ColorStats::Engine::Instance().HasLearnedData())
+      ColorStats::Engine::Instance().Save(AppPaths::AppSupportDir() + "/prediction");
    gNodes.clear();
    if (getenv("INFINITE_RECTEARDOWNTEST") != nullptr && std::string(getenv("INFINITE_RECTEARDOWNTEST")) == "quit")
       printf("quit-mid-record: survived  OK\n");
