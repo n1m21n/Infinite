@@ -48,6 +48,19 @@ AudioEngine& AudioEngine::Instance()
    return sInstance;
 }
 
+AudioEngine::AudioEngine()
+{
+   // One-time wiring of the scratch channel-pointer tables into the scratch
+   // storage arrays - see AudioEngine.h's comment on why these are plain
+   // members now instead of `static thread_local` locals lazily inited on
+   // first RunTopology call.
+   for (int i = 0; i < kAudioMaxNodeInputs; i++)
+      for (int ch = 0; ch < kAudioMaxChannels; ch++)
+         mCompScratchChannels[i][ch] = mCompScratch[i][ch];
+   for (int ch = 0; ch < kAudioMaxChannels; ch++)
+      mTerminalScratchChannels[ch] = mTerminalScratch[ch];
+}
+
 bool AudioEngine::Start(std::string& outError)
 {
    double sampleRate = 0.0;
@@ -212,7 +225,12 @@ void AudioEngine::PumpNoteNodesWithoutDevice()
       return;
 
    // No device means no callback thread, so this thread owns the list and its
-   // pooled buffers outright for the duration of the call.
+   // pooled buffers outright for the duration of the call - including this
+   // generation's note wiring, which RebuildAudioTopology only described.
+   // Idempotent per generation (see ApplyNoteWiringIfNew's guard), so this
+   // costs nothing on the ticks that aren't the first one after a rebuild.
+   ApplyNoteWiringIfNew(list);
+
    constexpr double kPumpRate = 48000.0;
    constexpr int kPumpBlock = 256;
    const double dtSeconds = std::min(0.1, std::max(0.0, (nowMs - lastMs) * 0.001));
@@ -272,6 +290,77 @@ void AudioEngine::PumpNoteNodesWithoutDevice()
    }
 }
 
+void AudioEngine::ApplyNoteWiringIfNew(ProcessList* list)
+{
+   if (list == nullptr)
+      return;
+   if (mAppliedNoteGeneration.load(std::memory_order_relaxed) == list->generation)
+      return;
+
+   AudioTopology& topo = list->topology;
+
+   // One pass per outbox: decide every one of this generation's cursors'
+   // starting heads, THEN adopt them all in a single AdoptConsumers() call -
+   // never interleaved, since AdoptConsumers overwrites the very cursor
+   // table the carry-over reads below depend on.
+   for (const NoteOutboxPlan& plan : topo.noteOutboxes)
+   {
+      NoteEventQueue* queue = plan.queue;
+      if (queue == nullptr)
+         continue;
+      const int count = std::min(plan.consumerCount, NoteEventQueue::kMaxConsumers);
+      const size_t tail = queue->Tail();
+
+      size_t heads[NoteEventQueue::kMaxConsumers];
+      for (int i = 0; i < count; i++)
+         heads[i] = tail; // default: a freshly wired consumer sees only new events
+
+      for (const NoteWire& wire : topo.noteWires)
+      {
+         if (wire.inbox != queue || wire.cursor < 0 || wire.cursor >= count)
+            continue;
+         AudioNode* consumer = wire.consumer;
+         if (consumer == nullptr || wire.slot < 0 || wire.slot >= AudioNode::kMaxNoteSlots)
+            continue;
+         // Carry over only if this consumer's slot is ALREADY running this
+         // exact producer - keyed on what it last actually applied
+         // (AudioNode::appliedInbox/appliedCursor), not on the previous
+         // topology's described wiring, so a skipped generation (two
+         // SetTopology publishes inside one block) still carries over
+         // correctly.
+         if (consumer->appliedInbox[wire.slot] == wire.inbox && consumer->appliedCursor[wire.slot] >= 0)
+            heads[wire.cursor] = queue->CursorHead(consumer->appliedCursor[wire.slot]);
+      }
+
+      queue->AdoptConsumers(count, heads);
+   }
+
+   // Every wire, including unconnected ones (inbox == nullptr, cursor == -1)
+   // - ApplyNoteInbox forwards those through exactly like a connected one, so
+   // a slot disconnected this generation gets cleared rather than left
+   // holding a stale pointer from a producer that may no longer even be in
+   // `order`.
+   for (const NoteWire& wire : topo.noteWires)
+   {
+      if (wire.consumer != nullptr)
+         wire.consumer->ApplyNoteInbox(wire.slot, wire.inbox, wire.cursor);
+   }
+
+   mAppliedNoteGeneration.store(list->generation, std::memory_order_relaxed);
+}
+
+void AudioEngine::ApplyNoteWiringIfNoDevice()
+{
+   // With a device open, the audio thread applies its own generation's
+   // wiring from inside RunTopology - calling this here too would race it
+   // for nothing (ApplyNoteWiringIfNew's generation guard makes a second
+   // call harmless, but there is no reason to pay for it, and the whole
+   // point of this function is to be safe ONLY in the no-device case).
+   if (mDeviceOpen.load(std::memory_order_acquire))
+      return;
+   ApplyNoteWiringIfNew(mCurrent.load(std::memory_order_acquire));
+}
+
 void AudioEngine::ProcessOffline(AudioBuffer& buffer)
 {
    Transport::Instance().BeginOfflineAudioBlock(buffer.numFrames);
@@ -282,6 +371,13 @@ void AudioEngine::ProcessOffline(AudioBuffer& buffer)
 
 void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
 {
+   // Apply this generation's note wiring, on THIS thread, before anything
+   // below cooks a single node - covers both the real device callback and
+   // ProcessOffline. See ApplyNoteWiringIfNew's comment for why this,
+   // rather than RebuildAudioTopology, is what actually mutates cursors/
+   // inboxes now.
+   ApplyNoteWiringIfNew(list);
+
    // Truncate to the pool's fixed capacity rather than overrun a pooled
    // buffer - see the kAudioMax* comment in AudioEngine.h. Silences the
    // buffer in full first so a truncated tail never carries stale/garbage
@@ -443,22 +539,11 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
    // PDC scratch: a delayed-copy landing spot per input pin, reused node to
    // node (only one node's inputs are ever "in flight" at a time - the
    // buffer a pin's CompensationDelay writes into is fully consumed by
-   // entry.node->ProcessBlock before the next entry runs). thread_local so
-   // it's allocated once per real-time thread, never per block or per node -
-   // same discipline as sInterleaveScratch below. Only touched for a pin
-   // whose CompensationDelay::IsActive() is true; the common all-zero-
-   // latency topology never writes to this at all.
-   static thread_local float sCompScratch[kAudioMaxNodeInputs][kAudioMaxChannels][kAudioMaxBlockFrames];
-   static thread_local float* sCompScratchChannels[kAudioMaxNodeInputs][kAudioMaxChannels];
-   static thread_local bool sCompScratchInited = false;
-   if (!sCompScratchInited)
-   {
-      for (int i = 0; i < kAudioMaxNodeInputs; i++)
-         for (int ch = 0; ch < kAudioMaxChannels; ch++)
-            sCompScratchChannels[i][ch] = sCompScratch[i][ch];
-      sCompScratchInited = true;
-   }
-
+   // entry.node->ProcessBlock before the next entry runs). mCompScratch/
+   // mCompScratchChannels are plain AudioEngine members (see AudioEngine.h),
+   // wired up once in the constructor rather than lazily per-thread here.
+   // Only touched for a pin whose CompensationDelay::IsActive() is true; the
+   // common all-zero-latency topology never writes to this at all.
    for (AudioTopologyEntry& entry : list->topology.order)
    {
       AudioBuffer inputViews[kAudioMaxNodeInputs];
@@ -474,7 +559,7 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
          {
             AudioBuffer src = list->buffers[idx].View(numFrames, numChannels);
             AudioBuffer delayed;
-            delayed.channels = sCompScratchChannels[i];
+            delayed.channels = mCompScratchChannels[i];
             delayed.numChannels = numChannels;
             delayed.numFrames = numFrames;
             entry.node->inputCompensation[i].ProcessBlock(src, delayed);
@@ -508,25 +593,13 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
       entry.node->ProcessBlockMulti(inputPtrs, entry.numInputs, outputPtrs, numOuts);
    }
 
-   // Scratch interleave buffer for capture rings - thread_local so it's
-   // allocated once per real-time thread rather than per block, and never
-   // touched off the audio thread.
-   static thread_local std::vector<float> sInterleaveScratch;
-
-   // Terminal-summation PDC scratch: one shared landing spot, reused
-   // terminal to terminal since each is summed into deviceBuffer (and
-   // captured) immediately, before the next terminal's turn - never two
-   // terminals' delayed copies needed live at once.
-   static thread_local float sTerminalScratch[kAudioMaxChannels][kAudioMaxBlockFrames];
-   static thread_local float* sTerminalScratchChannels[kAudioMaxChannels];
-   static thread_local bool sTerminalScratchInited = false;
-   if (!sTerminalScratchInited)
-   {
-      for (int ch = 0; ch < kAudioMaxChannels; ch++)
-         sTerminalScratchChannels[ch] = sTerminalScratch[ch];
-      sTerminalScratchInited = true;
-   }
-
+   // Scratch interleave buffer for capture rings, and the terminal-summation
+   // PDC scratch (one shared landing spot, reused terminal to terminal since
+   // each is summed into deviceBuffer - and captured - immediately, before
+   // the next terminal's turn - never two terminals' delayed copies needed
+   // live at once): mInterleaveScratch/mTerminalScratch/
+   // mTerminalScratchChannels are plain AudioEngine members now, wired up
+   // once in the constructor - see the PDC scratch comment above.
    for (AudioTerminal& terminal : list->topology.terminalBufferIndices)
    {
       AudioBuffer src = list->buffers[terminal.bufferIndex].View(numFrames, numChannels);
@@ -542,7 +615,7 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
       if (terminalComp.IsActive())
       {
          AudioBuffer delayed;
-         delayed.channels = sTerminalScratchChannels;
+         delayed.channels = mTerminalScratchChannels;
          delayed.numChannels = numChannels;
          delayed.numFrames = numFrames;
          terminalComp.ProcessBlock(src, delayed);
@@ -560,14 +633,15 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
       // per sample: AdvanceAudioClock(numFrames) runs before RunTopology in
       // the same callback, so Beats() is already the position at the END of
       // this block and the block started numFrames earlier.
-      static thread_local float sEnvScratch[kAudioMaxBlockFrames];
+      // mEnvScratch is a plain AudioEngine member (see the PDC scratch
+      // comment above) - was `static thread_local` here.
+      //
       // Per-frame clip pan (see ClipWindow::panL/R): varies with which
       // window is under the playhead, unlike the terminal's own lane pan,
       // which is flat across the whole block - so it needs its own
-      // per-frame scratch alongside sEnvScratch rather than folding into
-      // the constant chGain the no-window path below still uses.
-      static thread_local float sPanLScratch[kAudioMaxBlockFrames];
-      static thread_local float sPanRScratch[kAudioMaxBlockFrames];
+      // per-frame scratch (mPanLScratch/mPanRScratch, also plain members)
+      // alongside mEnvScratch rather than folding into the constant chGain
+      // the no-window path below still uses.
       double runSampleRate = mSampleRate.load(std::memory_order_relaxed);
       if (runSampleRate <= 0.0 && Transport::Instance().IsOfflineMode())
          runSampleRate = Transport::Instance().AudioSampleRate();
@@ -620,9 +694,9 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
             const ClipWindow& w = windows[cursor];
             if (!playing || beat < w.startBeat || beat >= w.endBeat)
             {
-               sEnvScratch[i] = 0.0f;
-               sPanLScratch[i] = 1.0f;
-               sPanRScratch[i] = 1.0f;
+               mEnvScratch[i] = 0.0f;
+               mPanLScratch[i] = 1.0f;
+               mPanRScratch[i] = 1.0f;
                // A playing head that has left every window has also left the
                // bucket in progress - flush it here, or a clip followed by a
                // gap never publishes its last bucket and keeps a flat notch
@@ -652,9 +726,9 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
                if (!w.abutsNext && untilEnd < declickBeats)
                   env *= untilEnd / declickBeats;
             }
-            sEnvScratch[i] = (float)(env < 0.0 ? 0.0 : env);
-            sPanLScratch[i] = w.panL;
-            sPanRScratch[i] = w.panR;
+            mEnvScratch[i] = (float)(env < 0.0 ? 0.0 : env);
+            mPanLScratch[i] = w.panL;
+            mPanRScratch[i] = w.panR;
 
             // Live waveform bucket (WP8). Measured on the clip's own
             // material BEFORE the envelope and both gains, so editing a
@@ -689,11 +763,11 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
          {
             for (int i = 0; i < numFrames; i++)
             {
-               const float env = sEnvScratch[i];
+               const float env = mEnvScratch[i];
                if (env <= 0.0f)
                   continue;
-               const float pL = sPanLScratch[i];
-               const float pR = sPanRScratch[i];
+               const float pL = mPanLScratch[i];
+               const float pR = mPanRScratch[i];
                const float inL = src.channels[0][i];
                const float inR = src.channels[1][i];
 
@@ -716,7 +790,7 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
             for (int ch = 2; ch < numChannels; ch++)
             {
                for (int i = 0; i < numFrames; i++)
-                  deviceBuffer.channels[ch][i] += src.channels[ch][i] * gain * sEnvScratch[i];
+                  deviceBuffer.channels[ch][i] += src.channels[ch][i] * gain * mEnvScratch[i];
             }
          }
          else
@@ -724,7 +798,7 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
             for (int ch = 0; ch < numChannels; ch++)
             {
                for (int i = 0; i < numFrames; i++)
-                  deviceBuffer.channels[ch][i] += src.channels[ch][i] * gain * sEnvScratch[i];
+                  deviceBuffer.channels[ch][i] += src.channels[ch][i] * gain * mEnvScratch[i];
             }
          }
       }
@@ -749,16 +823,19 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
          // Always interleaved stereo for the WAV writer, regardless of the
          // topology's actual channel count - mono sources duplicate to both
          // channels, anything wider than stereo is summed down to it.
-         sInterleaveScratch.resize((size_t)numFrames * 2);
+         // mInterleaveScratch is a fixed kAudioMaxBlockFrames*2 member (see
+         // the PDC scratch comment above) - numFrames is already clamped to
+         // kAudioMaxBlockFrames at the top of this function, so it always
+         // fits; no resize() (the allocation this replaced) needed.
          for (int i = 0; i < numFrames; i++)
          {
-            const float env = isTimelineClip ? sEnvScratch[i] : 1.0f;
+            const float env = isTimelineClip ? mEnvScratch[i] : 1.0f;
             const float l = src.channels[0][i] * gain * env;
             const float r = numChannels > 1 ? src.channels[1][i] * gain * env : l;
-            sInterleaveScratch[(size_t)i * 2 + 0] = l;
-            sInterleaveScratch[(size_t)i * 2 + 1] = r;
+            mInterleaveScratch[(size_t)i * 2 + 0] = l;
+            mInterleaveScratch[(size_t)i * 2 + 1] = r;
          }
-         terminal.capture->Write(sInterleaveScratch.data(), numFrames * 2);
+         terminal.capture->Write(mInterleaveScratch, numFrames * 2);
       }
    }
 }

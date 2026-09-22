@@ -36,7 +36,8 @@ public:
    void Push(int paramId, float value);
 
    // Audio thread only: advance smoothing by one sample and return the
-   // current (smoothed) value for paramId.
+   // current (smoothed) value for paramId. Call at most once per sample per
+   // paramId - each call advances the smoother.
    float SmoothedValue(int paramId);
 
    // Audio thread only: initialize both current and target without ramping

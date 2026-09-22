@@ -212,6 +212,34 @@ struct AudioTerminal
 // block (one per connected Audio Out node). Built on the main thread by
 // walking the editor graph's audio cables; consumed only by
 // AudioEngine::Process/ProcessOffline via RunTopology.
+// One note producer's outbox as this generation's topology sees it: how many
+// consumers are wired to it, so AudioEngine::ApplyNoteWiringIfNew knows how
+// many cursor ids to adopt on it. Described by RebuildAudioTopology (main.cpp),
+// applied by AudioEngine on whichever thread owns the ProcessList - see
+// NoteWire below and AudioNode::ApplyNoteInbox's comment for why this is a
+// description, not a mutation, at build time.
+struct NoteOutboxPlan
+{
+   NoteEventQueue* queue = nullptr;
+   int consumerCount = 0;
+};
+
+// One note-consuming slot's wiring, as described by RebuildAudioTopology:
+// `consumer` should end up with `inbox`/`cursor` applied to `slot` once
+// AudioEngine::ApplyNoteWiringIfNew runs. inbox == nullptr / cursor == -1
+// means an unconnected slot - main.cpp pushes one of these for EVERY slot a
+// node exposes, connected or not, so a slot that was wired last generation
+// and got disconnected still gets a call this generation that clears it;
+// see RebuildAudioTopology's note-pass comment for the stale-pointer bug
+// that rule prevents.
+struct NoteWire
+{
+   AudioNode* consumer = nullptr;
+   int slot = 0;
+   NoteEventQueue* inbox = nullptr;
+   int cursor = -1;
+};
+
 struct AudioTopology
 {
    std::vector<AudioTopologyEntry> order;
@@ -223,6 +251,19 @@ struct AudioTopology
    // still being filled would not).
    std::vector<ClipWindow> clipWindows;
    int numBuffers = 0; // buffer indices used across `order` span [0, numBuffers)
+
+   // Note-port wiring, DESCRIBED here by RebuildAudioTopology (main.cpp) and
+   // APPLIED by AudioEngine::ApplyNoteWiringIfNew - never mutated directly by
+   // the topology builder any more. See "Note cursors are rewired on live
+   // nodes while the audio thread runs them" (the stuck-note race this
+   // replaced): RebuildAudioTopology runs on the main thread while the audio
+   // callback can still be executing the PREVIOUS ProcessList over the SAME
+   // AudioNode objects, so main.cpp must never call ResetConsumers/
+   // RegisterConsumer/SetNoteInbox on a live node directly - only whichever
+   // thread actually owns a given ProcessList generation may mutate the
+   // nodes (and the NoteEventQueues) that generation reaches.
+   std::vector<NoteOutboxPlan> noteOutboxes;
+   std::vector<NoteWire> noteWires;
 };
 
 // Owns the audio device connection and runs a DAG of AudioNodes, each over
@@ -296,6 +337,23 @@ public:
    // whenever a device (or an offline render) owns the graph.
    void PumpNoteNodesWithoutDevice();
 
+   // Main thread only, and only meaningful while no audio device is open
+   // (mDeviceOpen false): applies the note wiring the topology just
+   // published to the actual AudioNode objects immediately, on this thread,
+   // rather than waiting for the next PumpNoteNodesWithoutDevice() tick or a
+   // device callback that will never come. Safe specifically BECAUSE no
+   // device is open - with nothing else able to touch these nodes or their
+   // NoteEventQueues, the main thread owns the current ProcessList outright,
+   // same as PumpNoteNodesWithoutDevice's own note-pump loop already
+   // assumes. A no-op while a device IS open: that path's whole point is to
+   // let the audio thread apply its own wiring inside RunTopology instead of
+   // racing it from here - see ApplyNoteWiringIfNew's comment. Called from
+   // RebuildAudioTopology (main.cpp) right after SetTopology(), so a
+   // device-less caller that immediately drives a just-wired node's
+   // ProcessBlock by hand (several self-test fixtures do exactly this) sees
+   // the same synchronous wiring the old direct-mutation code gave them.
+   void ApplyNoteWiringIfNoDevice();
+
    // Headless entry point for INFINITE_DSPTEST: runs the current topology
    // over a caller-owned scratch buffer without touching the real device.
    void ProcessOffline(AudioBuffer& buffer);
@@ -333,7 +391,9 @@ public:
    uint64_t CompletedGeneration() const { return mCompletedGeneration.load(std::memory_order_relaxed); }
 
 private:
-   AudioEngine() = default;
+   // Definition (initializing mCompScratchChannels/mTerminalScratchChannels)
+   // is at the bottom of this class, next to the scratch members it wires up.
+   AudioEngine();
 
    static void RenderThunk(float** buffers, int numChannels, int numFrames, void* userData);
    void Process(float** buffers, int numChannels, int numFrames);
@@ -395,6 +455,43 @@ private:
    // no terminals (no audio reaches an Audio Out) just silences deviceBuffer.
    void RunTopology(ProcessList* list, AudioBuffer& deviceBuffer);
 
+   // Applies `list`'s note wiring (AudioTopology::noteOutboxes/noteWires) to
+   // the actual AudioNode/NoteEventQueue objects it reaches, once per
+   // generation - the real fix for the stuck-note race described on
+   // AudioTopology::noteOutboxes: RebuildAudioTopology (main.cpp) only ever
+   // DESCRIBES this generation's wiring into the topology; this is what
+   // actually mutates cursors/inboxes, and it only ever runs on whichever
+   // thread currently owns `list` (called from the top of RunTopology - so
+   // the real audio callback thread and ProcessOffline's caller thread both
+   // apply their own generation's wiring themselves - and from
+   // PumpNoteNodesWithoutDevice, which owns `list` just as exclusively while
+   // no device is open).
+   //
+   // mAppliedNoteGeneration is the guard: `list->generation` is compared
+   // against it up front, and nothing here runs again for a generation
+   // already applied - so calling this every block (RunTopology does) costs
+   // one atomic load per block, not a bookkeeping pass per block.
+   //
+   // Per outbox: read every OLD head from what each consumer last actually
+   // applied (AudioNode::appliedInbox/appliedCursor, not the previous
+   // topology's wiring - two SetTopology publishes inside one block period
+   // skip a generation entirely, and the carry-over must still be correct)
+   // BEFORE calling NoteEventQueue::AdoptConsumers on that queue, since
+   // AdoptConsumers overwrites the very cursor table those old heads are
+   // read from. A consumer whose applied inbox/slot doesn't match the new
+   // wire (never wired, or wired to a different producer) starts fresh at
+   // the queue's current tail - a freshly wired consumer seeing only new
+   // events, same as RegisterConsumer() always gave it.
+   void ApplyNoteWiringIfNew(ProcessList* list);
+
+   // Main thread (ApplyNoteWiringIfNoDevice) or the single thread that owns
+   // the current ProcessList (ApplyNoteWiringIfNew's callers) - never both at
+   // once, since ApplyNoteWiringIfNoDevice only runs while mDeviceOpen is
+   // false and ApplyNoteWiringIfNew's audio-thread callers only run while it
+   // is true. The generation last fully applied - see ApplyNoteWiringIfNew's
+   // comment.
+   std::atomic<uint64_t> mAppliedNoteGeneration { 0 };
+
    // Audio-thread-only (RunTopology never runs concurrently with itself):
    // the beat the previous block ended on, so this block can tell a genuine
    // discontinuity (a timeline scrub/seek, a loop wrap, a fresh Play landing
@@ -420,4 +517,44 @@ private:
    ClipPeakRing mClipPeaks;
 
    SamplePreviewPlayer mPreviewPlayer;
+
+   // RunTopology scratch, all fixed-size and all plain AudioEngine members
+   // rather than `static thread_local` locals - see the "Allocation on the
+   // audio thread" fix this replaced. A `thread_local` here is allocated
+   // lazily by dyld on first access PER THREAD, so the first callback on
+   // every new CoreAudio IO thread (i.e. every device open/reopen) malloced
+   // ~1.7 MB on the real-time thread the moment it touched these. As plain
+   // members they're allocated once, with the AudioEngine singleton itself,
+   // long before any callback exists. Safe as ordinary (non-thread_local,
+   // non-atomic) members because RunTopology never runs concurrently with
+   // itself (same comment as mLastBlockEndBeat above) - exactly the property
+   // thread_local was leaning on already, just without the per-thread
+   // lazy-init cost.
+   //
+   // PDC scratch: a delayed-copy landing spot per input pin, reused node to
+   // node - see RunTopology's own comment at its point of use.
+   float mCompScratch[kAudioMaxNodeInputs][kAudioMaxChannels][kAudioMaxBlockFrames];
+   float* mCompScratchChannels[kAudioMaxNodeInputs][kAudioMaxChannels];
+   // Terminal-summation PDC scratch: one shared landing spot, reused terminal
+   // to terminal.
+   float mTerminalScratch[kAudioMaxChannels][kAudioMaxBlockFrames];
+   float* mTerminalScratchChannels[kAudioMaxChannels];
+   // Arrangement Timeline per-sample envelope/pan scratch - see RunTopology's
+   // own comment at its point of use.
+   float mEnvScratch[kAudioMaxBlockFrames];
+   float mPanLScratch[kAudioMaxBlockFrames];
+   float mPanRScratch[kAudioMaxBlockFrames];
+   // Interleaved-stereo landing spot for AudioCaptureRing::Write() - fixed at
+   // the block-frame cap x 2 channels rather than a std::vector that used to
+   // get resize()d inside RunTopology the first time a capture ring was
+   // enabled and whenever the block size grew, which is exactly the
+   // allocate-on-the-audio-thread bug this replaces.
+   float mInterleaveScratch[kAudioMaxBlockFrames * 2];
+
+   // mCompScratchChannels/mTerminalScratchChannels point into the arrays
+   // above - set up once, in the constructor (declared at the top of this
+   // private section), rather than through the old
+   // `static thread_local ... Inited` lazy-init flags (which existed only to
+   // solve the per-thread-lazy-allocation problem these members no longer
+   // have).
 };
