@@ -7933,6 +7933,21 @@ namespace
       Patch::SaveParams(srcNode, params);
       Patch::LoadParams(dstNode, params);
       ReloadDerivedState(dstNode);
+
+      // A copy/duplicate/paste of a Predictive node must not inherit the source's exact learned
+      // model verbatim - VisitParams round-trips the learned blob (profile/model/fitData) like
+      // any other param, so without this a "duplicate" opens already showing "Learn Again" with
+      // someone else's confidence instead of "press Learn" (bug-blast-radius review, step-10).
+      // Only the per-instance learned state resets; each node's own shared cross-session
+      // contribution (if any) is untouched - the source instance's material stays in house style.
+      if (auto* cn = dynamic_cast<PredictiveColoringNode*>(dstNode))
+         cn->ResetProfile();
+      else if (auto* nn = dynamic_cast<PredictiveNotesNode*>(dstNode))
+         nn->ResetLearnedState();
+      else if (auto* mn = dynamic_cast<PredictiveModulatorNode*>(dstNode))
+         mn->ResetLearnedState();
+      else if (auto* rn = dynamic_cast<PredictiveRhythmNode*>(dstNode))
+         rn->ResetLearnedState();
    }
 
    // ---------------- per-node parameter UI ----------------
@@ -9946,8 +9961,15 @@ namespace
       }
       ImGui::SameLine();
       char confText[32];
-      snprintf(confText, sizeof(confText), "%d%% conf", (int)std::round(conf * 100.0f));
-      ImGui::TextColored(conf > 0.6f ? (isLight ? ImVec4(0.1f, 0.6f, 0.2f, 1.0f) : ImVec4(0.2f, 0.85f, 0.35f, 1.0f))
+      // While learning, show THIS take's own local progress - not the blended confidence, which
+      // is mostly settled shared/house-style weight and barely moves as this instance learns.
+      // Once stopped, show the blended confidence that actually governs the applied grade.
+      const float badgeVal = learning ? n->LocalConfidence01() : conf;
+      if (learning)
+         snprintf(confText, sizeof(confText), "learning - %d%%", (int)std::round(badgeVal * 100.0f));
+      else
+         snprintf(confText, sizeof(confText), "%d%% conf", (int)std::round(badgeVal * 100.0f));
+      ImGui::TextColored(badgeVal > 0.6f ? (isLight ? ImVec4(0.1f, 0.6f, 0.2f, 1.0f) : ImVec4(0.2f, 0.85f, 0.35f, 1.0f))
                                     : (isLight ? ImVec4(0.7f, 0.4f, 0.1f, 1.0f) : ImVec4(0.9f, 0.7f, 0.2f, 1.0f)),
                          "%s", confText);
 
@@ -43759,6 +43781,10 @@ namespace
          PredictiveQuantizeProfile::Save(AppPaths::AppSupportDir() + "/prediction");
       if (PredictiveVelocityProfile::HasLearnedData())
          PredictiveVelocityProfile::Save(AppPaths::AppSupportDir() + "/prediction");
+      if (PredictiveNotesStyle::HasLearnedData())
+         PredictiveNotesStyle::Save(AppPaths::AppSupportDir() + "/prediction");
+      if (PredictiveRhythmStyle::HasLearnedData())
+         PredictiveRhythmStyle::Save(AppPaths::AppSupportDir() + "/prediction");
    }
 
    // Called once at startup, after the graph and GL are initialised but
@@ -64733,6 +64759,8 @@ int main(int argc, char** argv)
    ColorStats::Engine::Instance().Load(AppPaths::AppSupportDir() + "/prediction");
    PredictiveQuantizeProfile::Load(AppPaths::AppSupportDir() + "/prediction");
    PredictiveVelocityProfile::Load(AppPaths::AppSupportDir() + "/prediction");
+   PredictiveNotesStyle::Load(AppPaths::AppSupportDir() + "/prediction");
+   PredictiveRhythmStyle::Load(AppPaths::AppSupportDir() + "/prediction");
    ApplyTheme();
 
    // Skipped under the dev-test harness (INFINITE_EXITAFTER) so that running
@@ -91226,6 +91254,10 @@ int main(int argc, char** argv)
       PredictiveQuantizeProfile::Save(AppPaths::AppSupportDir() + "/prediction");
    if (PredictiveVelocityProfile::HasLearnedData())
       PredictiveVelocityProfile::Save(AppPaths::AppSupportDir() + "/prediction");
+   if (PredictiveNotesStyle::HasLearnedData())
+      PredictiveNotesStyle::Save(AppPaths::AppSupportDir() + "/prediction");
+   if (PredictiveRhythmStyle::HasLearnedData())
+      PredictiveRhythmStyle::Save(AppPaths::AppSupportDir() + "/prediction");
    gNodes.clear();
    if (getenv("INFINITE_RECTEARDOWNTEST") != nullptr && std::string(getenv("INFINITE_RECTEARDOWNTEST")) == "quit")
       printf("quit-mid-record: survived  OK\n");

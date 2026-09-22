@@ -38,6 +38,11 @@ public:
    void ResetProfile();
 
    float Confidence01() const;
+   // This instance's own progress only, ignoring the shared engine entirely - what the UI shows
+   // as "learning - N%" while mLearning is true, distinct from the blended Confidence01() shown
+   // once stopped (step-10 review: the badge must move as THIS take learns, not just report the
+   // mostly-static shared confidence).
+   float LocalConfidence01() const;
    uint64_t TotalSamples() const;
 
    const ColorStats::HistogramSet& LiveHistogram() const { return mLiveHist; }

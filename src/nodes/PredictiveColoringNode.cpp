@@ -249,14 +249,21 @@ void PredictiveColoringNode::ResetProfile()
 
 float PredictiveColoringNode::Confidence01() const
 {
-   // Per instance: mostly trust the cross-session shared house style, but weight in what this
-   // specific instance has actually seen so a brand-new node isn't shown as if it personally
-   // already learned someone else's footage.
-   constexpr float kLocalWeight = 0.2f;
-   constexpr float kSharedWeight = 0.8f;
+   // Per instance: mostly trust what THIS instance has actually seen, with a minority weight
+   // toward the cross-session shared house style so a brand-new node still starts from something
+   // rather than absolute zero. Local-dominant (not the reverse) so the badge reads as an honest
+   // measure of this take's own learning instead of mostly reporting the shared engine's
+   // already-established confidence regardless of what this instance has done (step-10 review).
+   constexpr float kLocalWeight = 0.8f;
+   constexpr float kSharedWeight = 0.2f;
    const float localConf = mLocalProfile.Confidence01();
    const float sharedConf = ColorStats::Engine::Instance().GlobalProfile().Confidence01();
    return kLocalWeight * localConf + kSharedWeight * sharedConf;
+}
+
+float PredictiveColoringNode::LocalConfidence01() const
+{
+   return mLocalProfile.Confidence01();
 }
 
 uint64_t PredictiveColoringNode::TotalSamples() const

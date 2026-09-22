@@ -83,6 +83,20 @@ void PredictiveModulatorNode::CaptureTick()
    mLastCaptureSeconds = seconds;
 }
 
+void PredictiveModulatorNode::ResetLearnedState()
+{
+   mLearning = false; // discard, not a capture to keep - no FinishLearn()
+   mEngine.Reset();
+   mDelayLine.clear();
+   mSamplesCaptured = 0;
+   mLastCaptureSeconds = -1.0;
+   mFit = MovementStats::DMDFit();
+   mFreeState.clear();
+   mHasLearnAttempt = false;
+   fitData.clear();
+   mAppliedFitData.clear();
+}
+
 void PredictiveModulatorNode::FinishLearn()
 {
    const int r = std::clamp(rank, 2, kMaxRank);

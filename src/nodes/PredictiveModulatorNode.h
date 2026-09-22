@@ -64,6 +64,10 @@ public:
    // --- UI / main-thread helpers ---
    bool IsLearning() const { return mLearning; }
    void SetLearning(bool on);
+   // Clears this instance's own fitted model back to "press Learn" - used when a node is
+   // duplicated/copy-pasted so the copy starts fresh instead of inheriting the source's exact
+   // fitted DMD model (CopyParams round-trips `fitData` like any other param; this undoes that).
+   void ResetLearnedState();
    int SamplesCaptured() const { return mSamplesCaptured; }
    bool HasFit() const { return mFit.valid; }
    // Mirrors Engine::FitDMD's own N < 20 rejection (MovementStats.cpp) so the UI can tell
