@@ -143,10 +143,15 @@ public:
    {
       const size_t tail = mTail.load(std::memory_order_relaxed);
       if (tail - mHead.load(std::memory_order_acquire) >= (size_t)kRing)
+      {
+         mDropped.fetch_add(1, std::memory_order_relaxed);
          return; // ring full: drop rather than block the audio thread
+      }
       mRing[tail % kRing] = v127;
       mTail.store(tail + 1, std::memory_order_release);
    }
+
+   int Dropped() const { return mDropped.load(std::memory_order_relaxed); }
 
    Curve* SwapCurve(Curve* next) { return mLive.exchange(next, std::memory_order_acq_rel); }
    void Retire(Curve* old)
@@ -191,6 +196,7 @@ private:
 
    int mRing[kRing] = {};
    std::atomic<size_t> mHead { 0 }, mTail { 0 };
+   std::atomic<int> mDropped { 0 };
 
    std::atomic<float> mMix { 0.75f };
    std::atomic<bool> mLearning { false };
@@ -216,6 +222,23 @@ bool PredictiveVelocityNode::HasCurve() const
 {
    Curve c;
    return DecodeCurve(velCurve, c);
+}
+
+float PredictiveVelocityNode::Confidence01() const
+{
+   if (!HasCurve())
+      return 0.0f;
+   // Same shape as PredictiveQuantizeNode::Confidence01: adequacy (captured enough notes to trust
+   // the fit) times coverage (how many of the 8 velocity bins actually saw a played note, vs. how
+   // many were only filled in by FitCurve's nearest-neighbor propagation).
+   const float adequacy = std::clamp((float)mNotesCaptured / 32.0f, 0.0f, 1.0f);
+   const float coverage = std::clamp((float)mBinsCovered / (float)NoteModel::kVelBins, 0.0f, 1.0f);
+   return std::clamp(adequacy * coverage, 0.0f, 1.0f);
+}
+
+int PredictiveVelocityNode::Dropped() const
+{
+   return mAudioNode ? mAudioNode->Dropped() : 0;
 }
 
 void PredictiveVelocityNode::SetLearning(bool on)
@@ -261,8 +284,13 @@ void PredictiveVelocityNode::FitCurve()
    }
 
    Curve fit;
+   mBinsCovered = 0;
    for (int i = 0; i < NoteModel::kVelBins; i++)
+   {
       fit.binMean[i] = count[i] > 0 ? (float)(sum[i] / (double)count[i]) : -1.0f; // -1 = not yet filled
+      if (count[i] > 0)
+         mBinsCovered++;
+   }
 
    // A nominal bin the player never actually reached (e.g. never plays above 110) has no data to
    // average - fill it from the nearest bin that does, so the curve stays defined across the whole

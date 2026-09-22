@@ -56,6 +56,7 @@ public:
    int OnsetsCaptured() const { return mOnsetsCaptured; }
    int ModeCount() const;
    float Confidence01() const;
+   int Dropped() const;
 
    AudioPredictiveQuantizeNode* Audio() { return mAudioNode.get(); }
    // Tests: install a mode set through the same swap path a finished Learn uses.

@@ -287,10 +287,15 @@ public:
    {
       const size_t tail = mTail.load(std::memory_order_relaxed);
       if (tail - mHead.load(std::memory_order_acquire) >= (size_t)kRing)
+      {
+         mDropped.fetch_add(1, std::memory_order_relaxed);
          return; // ring full: drop rather than block the audio thread
+      }
       mRing[tail % kRing] = c;
       mTail.store(tail + 1, std::memory_order_release);
    }
+
+   int Dropped() const { return mDropped.load(std::memory_order_relaxed); }
 
    ModeSet* SwapModes(ModeSet* next) { return mLive.exchange(next, std::memory_order_acq_rel); }
    void Retire(ModeSet* old)
@@ -386,6 +391,7 @@ private:
 
    Cap mRing[kRing];
    std::atomic<size_t> mHead { 0 }, mTail { 0 };
+   std::atomic<int> mDropped { 0 };
 
    std::atomic<float> mMix { 0.75f };
    std::atomic<bool> mLearning { false };
@@ -426,6 +432,11 @@ float PredictiveQuantizeNode::Confidence01() const
    for (int i = 0; i < m.count; i++)
       concentration += m.weight[i];
    return std::clamp(adequacy * std::clamp(concentration, 0.0f, 1.0f), 0.0f, 1.0f);
+}
+
+int PredictiveQuantizeNode::Dropped() const
+{
+   return mAudioNode ? mAudioNode->Dropped() : 0;
 }
 
 void PredictiveQuantizeNode::SetLearning(bool on)
