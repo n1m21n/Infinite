@@ -266,6 +266,7 @@ namespace
 #include "audio/dsp/CycleShaperKernel.h"
 #include "audio/dsp/SpecBlurKernel.h"
 #include "audio/dsp/SlicerDsp.h"
+#include "audio/dsp/ReverbKernel.h"
 
 namespace ed = ax::NodeEditor;
 
@@ -49468,6 +49469,119 @@ static bool RunReverbFixture()
       all &= tailOk;
    }
 
+   // 6) SIMD vs Scalar A/B numerical equivalence: test across multiple configurations
+   //    (digital default, analog lush, small room mono) with impulse, sine tone, and noise.
+   {
+      bool simdEquivOk = true;
+      float maxDiff = 0.0f;
+      const int testFrames = 2048;
+      const int blockSize = 256;
+
+      const EffectDef* reverbDef = nullptr;
+      for (const EffectDef& d : GetEffectDefs())
+         if (d.name == "Reverb")
+            reverbDef = &d;
+
+      struct TestConfig {
+         float size;
+         float decay;
+         float damping;
+         float predelay;
+         float width;
+         float analog;
+      };
+
+      const TestConfig configs[] = {
+         { 0.5f, 1.5f, 0.2f, 10.0f, 0.8f, 0.0f },
+         { 0.8f, 2.5f, 0.6f, 25.0f, 1.0f, 1.0f },
+         { 0.2f, 0.5f, 0.9f, 0.0f, 0.0f, 0.0f },
+      };
+
+      for (const auto& cfg : configs)
+      {
+         if (!reverbDef) break;
+
+         AudioEffectNode nodeSimd(*reverbDef);
+         *nodeSimd.ParamPtr("size") = cfg.size;
+         *nodeSimd.ParamPtr("decay") = cfg.decay;
+         *nodeSimd.ParamPtr("damping") = cfg.damping;
+         *nodeSimd.ParamPtr("predelay") = cfg.predelay;
+         *nodeSimd.ParamPtr("width") = cfg.width;
+         *nodeSimd.ParamPtr("analog") = cfg.analog;
+
+         AudioEffectNode nodeScalar(*reverbDef);
+         *nodeScalar.ParamPtr("size") = cfg.size;
+         *nodeScalar.ParamPtr("decay") = cfg.decay;
+         *nodeScalar.ParamPtr("damping") = cfg.damping;
+         *nodeScalar.ParamPtr("predelay") = cfg.predelay;
+         *nodeScalar.ParamPtr("width") = cfg.width;
+         *nodeScalar.ParamPtr("analog") = cfg.analog;
+
+         ReverbKernel rkSimd, rkScalar;
+         rkSimd.PrepareToPlay(sampleRate, blockSize);
+         rkScalar.PrepareToPlay(sampleRate, blockSize);
+         rkSimd.PushParams(nodeSimd, sampleRate);
+         rkScalar.PushParams(nodeScalar, sampleRate);
+
+         std::vector<float> inL(testFrames), inR(testFrames);
+         for (int i = 0; i < testFrames; i++)
+         {
+            float s = (i == 0) ? 1.0f : 0.0f;
+            s += 0.3f * std::sin(2.0f * (float)M_PI * 440.0f * (float)i / (float)sampleRate);
+            s += 0.05f * ((float)(i % 17) / 17.0f - 0.5f);
+            inL[i] = s;
+            inR[i] = s * 0.9f;
+         }
+
+         float inChL[blockSize], inChR[blockSize];
+         float* inChannels[2] = { inChL, inChR };
+         AudioBuffer inBuf;
+         inBuf.channels = inChannels;
+         inBuf.numChannels = 2;
+         inBuf.numFrames = blockSize;
+
+         float outSimdL[blockSize], outSimdR[blockSize];
+         float* outSimdChannels[2] = { outSimdL, outSimdR };
+         AudioBuffer outSimdBuf;
+         outSimdBuf.channels = outSimdChannels;
+         outSimdBuf.numChannels = 2;
+         outSimdBuf.numFrames = blockSize;
+
+         float outScalarL[blockSize], outScalarR[blockSize];
+         float* outScalarChannels[2] = { outScalarL, outScalarR };
+         AudioBuffer outScalarBuf;
+         outScalarBuf.channels = outScalarChannels;
+         outScalarBuf.numChannels = 2;
+         outScalarBuf.numFrames = blockSize;
+
+         for (int offset = 0; offset < testFrames; offset += blockSize)
+         {
+            for (int k = 0; k < blockSize; k++)
+            {
+               inChL[k] = inL[offset + k];
+               inChR[k] = inR[offset + k];
+            }
+
+            rkSimd.ProcessBlockSimd(inBuf, nullptr, outSimdBuf);
+            rkScalar.ProcessBlockScalar(inBuf, nullptr, outScalarBuf);
+
+            for (int ch = 0; ch < 2; ch++)
+            {
+               for (int k = 0; k < blockSize; k++)
+               {
+                  const float diff = std::fabs(outSimdBuf.channels[ch][k] - outScalarBuf.channels[ch][k]);
+                  maxDiff = std::max(maxDiff, diff);
+                  if (diff > 1.0e-5f)
+                     simdEquivOk = false;
+               }
+            }
+         }
+      }
+      printf("DSPTEST reverb SIMD vs Scalar A/B: max diff %.2e (tol 1.0e-5)  %s\n",
+             maxDiff, simdEquivOk ? "OK" : "FAIL");
+      all &= simdEquivOk;
+   }
+
    return all;
 }
 
@@ -66999,6 +67113,45 @@ int main(int argc, char** argv)
          for (GraphNode& gn : gNodes)
             gn.showParams = true;
       }
+      else if (const char* bench5fArg = getenv("INFINITE_BENCH_B5LOADSAVE"))
+      {
+         // B5(f) patch load/save time fixture (benchmark-suite.md §4). Same
+         // mixed-node grid as B5(b)/B5(c) so the three are directly
+         // comparable by node count. INFINITE_BENCH_B5LOADSAVE=<n>.
+         long n = atol(bench5fArg);
+         if (n <= 1) n = 100;
+         static const char* kTypes[] = { "Shape", "Noise", "invert", "gaussianblur", "LFO" };
+         static const char* kCats[]  = { "Source", "Source", "Compositing", "Effects", "Modulators" };
+         const int cols = 12;
+         for (long i = 0; i < n; i++)
+         {
+            const int t = (int)(i % 5);
+            const float x = (float)(i % cols) * 260.0f;
+            const float y = (float)(i / cols) * 200.0f;
+            SpawnNode(kTypes[t], kCats[t], x, y);
+         }
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+      }
+      else if (const char* bench5gArg = getenv("INFINITE_BENCH_B5UNDO"))
+      {
+         // B5(g) undo-snapshot time fixture (benchmark-suite.md §4). Same
+         // mixed-node grid as B5(b)/B5(c)/B5(f). INFINITE_BENCH_B5UNDO=<n>.
+         long n = atol(bench5gArg);
+         if (n <= 1) n = 100;
+         static const char* kTypes[] = { "Shape", "Noise", "invert", "gaussianblur", "LFO" };
+         static const char* kCats[]  = { "Source", "Source", "Compositing", "Effects", "Modulators" };
+         const int cols = 12;
+         for (long i = 0; i < n; i++)
+         {
+            const int t = (int)(i % 5);
+            const float x = (float)(i % cols) * 260.0f;
+            const float y = (float)(i / cols) * 200.0f;
+            SpawnNode(kTypes[t], kCats[t], x, y);
+         }
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+      }
       else if (const char* bench1Arg = getenv("INFINITE_BENCH_B1VOICES"))
       {
          // B1 Heavy audio fixture (docs/plans/perf/benchmark-suite.md §4).
@@ -84161,6 +84314,74 @@ int main(int argc, char** argv)
          }
       }
 
+      // B5(f) patch load/save time fixture (benchmark-suite.md §4). Fires
+      // once the mixed-node grid (INFINITE_BENCH_B5LOADSAVE's setup above)
+      // has had a few frames to settle - same frameId margin B5(b)/B5(c)'s
+      // sample windows use before trusting node/editor state. Times
+      // SavePatchTo and LoadPatchFrom back to back on the real patch I/O
+      // path (not a synthetic serialize-only call), so this includes
+      // whatever ApplyPatchData/RemapFieldGraphOwnership does on load too.
+      if (getenv("INFINITE_BENCH_B5LOADSAVE") != nullptr)
+      {
+         if (frameId == 32)
+         {
+            const std::string path = TmpPath("infinite_bench_b5loadsave.inf");
+            const double tSaveStart = Bench::ScopedStageTimer::NowMs();
+            const bool saved = SavePatchTo(path);
+            const double tSaveEnd = Bench::ScopedStageTimer::NowMs();
+            const bool loaded = saved && LoadPatchFrom(path);
+            const double tLoadEnd = Bench::ScopedStageTimer::NowMs();
+
+            Bench::BenchReport report;
+            report.bench = "B5_fundamentals_loadsave";
+            report.variant = getenv("INFINITE_BENCH_B5LOADSAVE") ? getenv("INFINITE_BENCH_B5LOADSAVE") : "";
+            report.frames = 1;
+            report.nodes = (int)gNodes.size();
+            report.stagesCpuMs = {
+               { "save", tSaveEnd - tSaveStart },
+               { "load", tLoadEnd - tSaveEnd },
+            };
+            report.memRssEndMb = Bench::ProcessRssMb();
+            report.Emit();
+            printf("B5LOADSAVE %s DONE\n", (saved && loaded) ? "OK" : "FAIL");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // B5(g) undo-snapshot time fixture (benchmark-suite.md §4). Same
+      // settle margin as B5(f). Times PushUndoCheckpoint (BuildPatchData +
+      // push) and Undo (BuildPatchData for the redo entry + ApplyPatchData)
+      // back to back on the real undo path, not a synthetic snapshot.
+      if (getenv("INFINITE_BENCH_B5UNDO") != nullptr)
+      {
+         if (frameId == 32)
+         {
+            const size_t nodesBefore = gNodes.size();
+            const double tPushStart = Bench::ScopedStageTimer::NowMs();
+            PushUndoCheckpoint();
+            const double tPushEnd = Bench::ScopedStageTimer::NowMs();
+            Undo();
+            const double tUndoEnd = Bench::ScopedStageTimer::NowMs();
+            const bool restored = gNodes.size() == nodesBefore;
+
+            Bench::BenchReport report;
+            report.bench = "B5_fundamentals_undo";
+            report.variant = getenv("INFINITE_BENCH_B5UNDO") ? getenv("INFINITE_BENCH_B5UNDO") : "";
+            report.frames = 1;
+            report.nodes = (int)nodesBefore;
+            report.stagesCpuMs = {
+               { "push_checkpoint", tPushEnd - tPushStart },
+               { "undo_restore", tUndoEnd - tPushEnd },
+            };
+            report.memRssEndMb = Bench::ProcessRssMb();
+            report.Emit();
+            printf("B5UNDO %s DONE\n", restored ? "OK" : "FAIL");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
       // B1 Heavy audio fixture, measurement half - see
       // INFINITE_BENCH_B1VOICES's setup above. Windowed on wall-clock
       // (glfwGetTime), not frameId, because the real device callback thread
@@ -84183,7 +84404,7 @@ int main(int argc, char** argv)
          static double sRssStartMb = -1.0;
          const double nowS = glfwGetTime();
          const double windowS = getenv("INFINITE_BENCH_B1SECONDS") ? atof(getenv("INFINITE_BENCH_B1SECONDS")) : 60.0;
-         if (sStartTimeS < 0.0 && nowS > 1.0)
+         if (sStartTimeS < 0.0 && nowS > 1.5)
          {
             sStartTimeS = nowS;
             sXrunBaseline = AudioEngine::Instance().XrunCount();

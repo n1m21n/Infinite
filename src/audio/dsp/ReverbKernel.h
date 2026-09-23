@@ -237,6 +237,8 @@ public:
    void PushParams(const AudioEffectNode& node, double sampleRate) override;
 
    void ProcessBlock(const AudioBuffer& in, const AudioBuffer* sidechain, AudioBuffer& out) override;
+   void ProcessBlockScalar(const AudioBuffer& in, const AudioBuffer* sidechain, AudioBuffer& out);
+   void ProcessBlockSimd(const AudioBuffer& in, const AudioBuffer* sidechain, AudioBuffer& out);
 
    int LatencySamples() const override { return 0; }
    MeterRing* ExtraMeter() override { return &mLevelMeter; }
