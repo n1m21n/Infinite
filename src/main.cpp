@@ -1670,6 +1670,39 @@ namespace
    };
    DropdownRequest gDropdown;
 
+   // A user picked row `i` in the dropdown popup. One click is one undo entry
+   // holding the pre-click state, and this is it. The onSelect lambdas are
+   // shared with the modulation-driven path (which suppresses checkpoints),
+   // so most of them open with their own PushUndoCheckpoint() - suppressed
+   // here too, or every pick left a second, identical entry and the next
+   // Undo did nothing. Split out of the popup so INFINITE_MODDROPDOWNUNDOTEST
+   // can commit a pick through exactly the code a click runs.
+   void CommitDropdownPick(int i)
+   {
+      if (!gDropdown.onSelect || i == gDropdown.current)
+         return;
+      PushUndoCheckpoint();
+      const bool wasSuppressed = gSuppressUndoCheckpoints;
+      gSuppressUndoCheckpoints = true;
+      gDropdown.onSelect(i);
+      gSuppressUndoCheckpoints = wasSuppressed;
+   }
+
+   // Self-test hook (INFINITE_MODDROPDOWNUNDOTEST only): the (node, discrete
+   // param) whose dropdown should act as if its button were clicked on the
+   // next draw, so the test gets the caller's real onSelect lambda into
+   // gDropdown without aiming a synthetic mouse through the canvas transform.
+   // Consumed on first match; {-1, -1} (the default) never matches.
+   std::pair<int, int> gDropdownTestOpenKey(-1, -1);
+   bool DropdownTestWantsOpen(bool registered, int nodeIndex, int paramIndex)
+   {
+      if (!registered || gDropdownTestOpenKey.first < 0 ||
+          gDropdownTestOpenKey != std::pair<int, int>(nodeIndex, paramIndex))
+         return false;
+      gDropdownTestOpenKey = std::pair<int, int>(-1, -1);
+      return true;
+   }
+
    // True only between ed::BeginNode/ed::EndNode for the node currently being
    // drawn - i.e. while ImGui coordinates are in the node editor's local
    // canvas space and need ed::CanvasToScreen() to become real screen pixels.
@@ -8704,10 +8737,17 @@ namespace
       DropdownButton("pattern", ProjectionNode::PatternNames(), n->patternMode,
                      [n](int i) { PushUndoCheckpoint(); n->patternMode = i; }, colW);
 
+      // Through a temporary so the checkpoint is taken before the node
+      // changes: ModCheckbox flips its bool in place, and checkpointing after
+      // it made Undo restore the already-flipped value.
+      bool matchInput = n->matchInput;
       bool matchInputUserChanged = false;
-      ModCheckbox("match input res", &n->matchInput, &matchInputUserChanged);
-      if (matchInputUserChanged)
-         PushUndoCheckpoint();
+      if (ModCheckbox("match input res", &matchInput, &matchInputUserChanged))
+      {
+         if (matchInputUserChanged) // a cable flip writes the value but never checkpoints
+            PushUndoCheckpoint();
+         n->matchInput = matchInput;
+      }
 
       if (!n->matchInput)
       {
@@ -8717,16 +8757,18 @@ namespace
 
       if (n->mode == 1) // Mesh Grid
       {
+         // No checkpoint here: ModSlider already pushes one on activation,
+         // before the drag changes anything. The IsItemDeactivatedAfterEdit
+         // checkpoint that used to follow each slider captured the grid AFTER
+         // the drag, so the first Undo restored the edited size (a no-op).
          int gw = n->gridW;
          if (ModSliderInt("grid X", &gw, 2, 8, 100.0f))
             n->SetGridSize(gw, n->gridH);
-         if (ImGui::IsItemDeactivatedAfterEdit()) PushUndoCheckpoint();
 
          ImGui::SameLine(0.0f, 16.0f);
          int gh = n->gridH;
          if (ModSliderInt("grid Y", &gh, 2, 8, 100.0f))
             n->SetGridSize(n->gridW, gh);
-         if (ImGui::IsItemDeactivatedAfterEdit()) PushUndoCheckpoint();
       }
 
       const float btnW = (colW - 12.0f) * 0.25f;
@@ -10959,7 +11001,8 @@ namespace
          }
          else
          {
-            if (ImGui::Button(caption.c_str(), ImVec2(btnW, 0)))
+            if (ImGui::Button(caption.c_str(), ImVec2(btnW, 0)) ||
+                DropdownTestWantsOpen(h.registered, h.nodeIndex, h.paramIndex))
             {
                gDropdown.options = options;
                gDropdown.categories = categories;
@@ -11081,8 +11124,15 @@ namespace
          index++;
       }
 
-      bool Checkbox(const char* label, bool* value)
+      // Same contract as ModCheckbox: the return value reports a click OR a
+      // cable-driven flip (callers copy it into node state), and the optional
+      // outUserChanged is set only by a real click. A caller that pushes an
+      // undo checkpoint must key it on outUserChanged, so modulation never
+      // creates an undo entry or dirties the patch.
+      bool Checkbox(const char* label, bool* value, bool* outUserChanged = nullptr)
       {
+         if (outUserChanged)
+            *outUserChanged = false;
          if (value == nullptr)
          {
             index++;
@@ -11142,7 +11192,10 @@ namespace
          }
          else
          {
-            changed = ImGui::Checkbox(label, value) || changed;
+            const bool clicked = ImGui::Checkbox(label, value);
+            if (outUserChanged)
+               *outUserChanged = clicked;
+            changed = clicked || changed;
             if (h.registered)
                DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
          }
@@ -21129,21 +21182,27 @@ namespace
       {
          AudioKnobRow row(3, 20.0f, 0.0f, false);
          bool rms = n->Param("detectorRms") != 0.0f;
-         if (row.Checkbox("RMS##dynRms", &rms))
+         bool rmsUserChanged = false;
+         if (row.Checkbox("RMS##dynRms", &rms, &rmsUserChanged))
          {
-            PushUndoCheckpoint();
+            if (rmsUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             *n->ParamPtr("detectorRms") = rms ? 1.0f : 0.0f;
          }
          bool external = n->Param("sidechainExternal") != 0.0f;
-         if (row.Checkbox("sidechain##dynSidechain", &external))
+         bool externalUserChanged = false;
+         if (row.Checkbox("sidechain##dynSidechain", &external, &externalUserChanged))
          {
-            PushUndoCheckpoint();
+            if (externalUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             *n->ParamPtr("sidechainExternal") = external ? 1.0f : 0.0f;
          }
          bool analogBool = analog;
-         if (row.Checkbox("analog##dynAnalog", &analogBool))
+         bool analogBoolUserChanged = false;
+         if (row.Checkbox("analog##dynAnalog", &analogBool, &analogBoolUserChanged))
          {
-            PushUndoCheckpoint();
+            if (analogBoolUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
          }
          row.End();
@@ -21361,21 +21420,27 @@ namespace
          // analog rows.
          AudioKnobRow row(3, 20.0f, 8.0f, false);
          bool syncBool = sync;
-         if (row.Checkbox("sync to tempo##delaySync", &syncBool))
+         bool syncBoolUserChanged = false;
+         if (row.Checkbox("sync to tempo##delaySync", &syncBool, &syncBoolUserChanged))
          {
-            PushUndoCheckpoint();
+            if (syncBoolUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             *n->ParamPtr("sync") = syncBool ? 1.0f : 0.0f;
          }
          bool bounceBool = bounce;
-         if (row.Checkbox("bounce##delayBounce", &bounceBool))
+         bool bounceBoolUserChanged = false;
+         if (row.Checkbox("bounce##delayBounce", &bounceBool, &bounceBoolUserChanged))
          {
-            PushUndoCheckpoint();
+            if (bounceBoolUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             *n->ParamPtr("bounce") = bounceBool ? 1.0f : 0.0f;
          }
          bool analogBool = analog;
-         if (row.Checkbox("analog##delayAnalog", &analogBool))
+         bool analogBoolUserChanged = false;
+         if (row.Checkbox("analog##delayAnalog", &analogBool, &analogBoolUserChanged))
          {
-            PushUndoCheckpoint();
+            if (analogBoolUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
          }
          row.End();
@@ -21496,9 +21561,11 @@ namespace
          // analog rows.
          AudioKnobRow row(3, 20.0f, 8.0f, false);
          bool analogBool = analog;
-         if (row.Checkbox("analog##reverbAnalog", &analogBool))
+         bool analogBoolUserChanged = false;
+         if (row.Checkbox("analog##reverbAnalog", &analogBool, &analogBoolUserChanged))
          {
-            PushUndoCheckpoint();
+            if (analogBoolUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
          }
          row.Skip();
@@ -21929,9 +21996,11 @@ namespace
          // trailing checkbox rows.
          AudioKnobRow row(3, 20.0f, 8.0f, false);
          bool analogBool = analog;
-         if (row.Checkbox("analog##pitchShiftAnalog", &analogBool))
+         bool analogBoolUserChanged = false;
+         if (row.Checkbox("analog##pitchShiftAnalog", &analogBool, &analogBoolUserChanged))
          {
-            PushUndoCheckpoint();
+            if (analogBoolUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
          }
          row.Skip();
@@ -22142,15 +22211,19 @@ namespace
             *n->ParamPtr("sync") = (i == 0) ? 1.0f : 0.0f;
          });
          bool taps3 = n->Param("taps") >= 2.5f;
-         if (row.Checkbox("3 taps##chorusTaps", &taps3))
+         bool taps3UserChanged = false;
+         if (row.Checkbox("3 taps##chorusTaps", &taps3, &taps3UserChanged))
          {
-            PushUndoCheckpoint();
+            if (taps3UserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             *n->ParamPtr("taps") = taps3 ? 3.0f : 2.0f;
          }
          bool analogBool = analog;
-         if (row.Checkbox("analog##chorusAnalog", &analogBool))
+         bool analogBoolUserChanged = false;
+         if (row.Checkbox("analog##chorusAnalog", &analogBool, &analogBoolUserChanged))
          {
-            PushUndoCheckpoint();
+            if (analogBoolUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
          }
          row.End();
@@ -22288,9 +22361,11 @@ namespace
             *n->ParamPtr("sync") = (i == 0) ? 1.0f : 0.0f;
          });
          bool analogBool = analog;
-         if (row.Checkbox("analog##flangerAnalog", &analogBool))
+         bool analogBoolUserChanged = false;
+         if (row.Checkbox("analog##flangerAnalog", &analogBool, &analogBoolUserChanged))
          {
-            PushUndoCheckpoint();
+            if (analogBoolUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
          }
          row.Skip();
@@ -22441,9 +22516,11 @@ namespace
             *n->ParamPtr("sync") = (i == 0) ? 1.0f : 0.0f;
          });
          bool analogBool = analog;
-         if (row.Checkbox("analog##phaserAnalog", &analogBool))
+         bool analogBoolUserChanged = false;
+         if (row.Checkbox("analog##phaserAnalog", &analogBool, &analogBoolUserChanged))
          {
-            PushUndoCheckpoint();
+            if (analogBoolUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
          }
          row.Skip();
@@ -22545,9 +22622,11 @@ namespace
       {
          AudioKnobRow row(3, 20.0f, 8.0f, false);
          bool analogBool = analog;
-         if (row.Checkbox("analog##bitcrushAnalog", &analogBool))
+         bool analogBoolUserChanged = false;
+         if (row.Checkbox("analog##bitcrushAnalog", &analogBool, &analogBoolUserChanged))
          {
-            PushUndoCheckpoint();
+            if (analogBoolUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
          }
          row.Skip();
@@ -22848,9 +22927,11 @@ namespace
          // inline rather than underneath it.
          AudioKnobRow row(3, 20.0f, 8.0f, false);
          bool analogBool = analog;
-         if (row.Checkbox("analog##ringModAnalog", &analogBool))
+         bool analogBoolUserChanged = false;
+         if (row.Checkbox("analog##ringModAnalog", &analogBool, &analogBoolUserChanged))
          {
-            PushUndoCheckpoint();
+            if (analogBoolUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
          }
          row.Skip();
@@ -23013,9 +23094,11 @@ namespace
       {
          AudioKnobRow row(4, 20.0f, 8.0f, false);
          bool analogBool = analog;
-         if (row.Checkbox("analog##freqShiftAnalog", &analogBool))
+         bool analogBoolUserChanged = false;
+         if (row.Checkbox("analog##freqShiftAnalog", &analogBool, &analogBoolUserChanged))
          {
-            PushUndoCheckpoint();
+            if (analogBoolUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
          }
          row.Skip();
@@ -23379,9 +23462,11 @@ namespace
       {
          AudioKnobRow row(4, 20.0f, 8.0f, false);
          bool analogBool = analog;
-         if (row.Checkbox("analog##resonatorAnalog", &analogBool))
+         bool analogBoolUserChanged = false;
+         if (row.Checkbox("analog##resonatorAnalog", &analogBool, &analogBoolUserChanged))
          {
-            PushUndoCheckpoint();
+            if (analogBoolUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
          }
          row.Skip();
@@ -23493,9 +23578,11 @@ namespace
       {
          AudioKnobRow row(4, 20.0f, 8.0f, false);
          bool analogBool = analog;
-         if (row.Checkbox("analog##cycleShaperAnalog", &analogBool))
+         bool analogBoolUserChanged = false;
+         if (row.Checkbox("analog##cycleShaperAnalog", &analogBool, &analogBoolUserChanged))
          {
-            PushUndoCheckpoint();
+            if (analogBoolUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
          }
          row.Skip();
@@ -23646,15 +23733,19 @@ namespace
       {
          AudioKnobRow row(4, 20.0f, 0.0f, false);
          bool freezeBool = freeze;
-         if (row.Checkbox("freeze##specBlurFreeze", &freezeBool))
+         bool freezeBoolUserChanged = false;
+         if (row.Checkbox("freeze##specBlurFreeze", &freezeBool, &freezeBoolUserChanged))
          {
-            PushUndoCheckpoint();
+            if (freezeBoolUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             *n->ParamPtr("freeze") = freezeBool ? 1.0f : 0.0f;
          }
          bool analogBool = analog;
-         if (row.Checkbox("analog##specBlurAnalog", &analogBool))
+         bool analogBoolUserChanged = false;
+         if (row.Checkbox("analog##specBlurAnalog", &analogBool, &analogBoolUserChanged))
          {
-            PushUndoCheckpoint();
+            if (analogBoolUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
          }
          row.End();
@@ -70693,26 +70784,44 @@ int main(int argc, char** argv)
          printf("%s\n", ok ? "UNDO REDO OK" : "SUSPECT");
       }
 
-      // Modulation never creates an undo entry or dirties the patch
-      // (regression, docs/fix-briefs/modulated-dropdown-undo-spam.md). A
-      // cable-driven dropdown writes its value back through the caller's
-      // onSelect lambda, and most of those lambdas open with
-      // PushUndoCheckpoint() for the user-click path - so every index
-      // boundary a modulator crossed used to serialize the whole patch onto
-      // gUndoStack and set gPatchDirty. The existing UNDOTEST never binds a
-      // modulator to anything, which is why this shipped. Drives two of the
-      // four widget shapes over real drawn frames: AudioKnobRow::Dropdown
-      // (Audio Filter "type") and AudioBareDropdown (Oscillator "oscWave"),
-      // each from its own Constant swept 0..1..0 several times.
+      // Modulation never creates an undo entry or dirties the patch, and one
+      // user dropdown pick is exactly one undo entry holding the pre-pick
+      // state (regression, docs/fix-briefs/modulated-dropdown-undo-spam.md).
+      // A cable-driven discrete control writes its value back through the
+      // caller's onSelect lambda / returns "changed" to the caller, and most
+      // of those callers open with PushUndoCheckpoint() for the user-click
+      // path - so every index boundary a modulator crossed used to serialize
+      // the whole patch onto gUndoStack and set gPatchDirty. The existing
+      // UNDOTEST never binds a modulator to anything, which is why this
+      // shipped. Drives all five widget shapes over real drawn frames:
+      //   AudioKnobRow::Dropdown      Audio Filter "type"
+      //   AudioBareDropdown           Oscillator "oscWave"
+      //   AudioKnobRow::DropdownKnob  Oscillator "oscFmMode"
+      //   DropdownButton              Audio Color Ramp "mode"
+      //   AudioKnobRow::Checkbox      Delay "sync to tempo"
+      // from two Constants swept 0..1..0 several times. Then a second, unbound
+      // Audio Filter's "type" dropdown is opened with its real onSelect lambda
+      // and a row is committed through CommitDropdownPick - the code the popup
+      // click runs - to prove the pick pushes one entry and Undo restores it.
       if (getenv("INFINITE_MODDROPDOWNUNDOTEST") != nullptr)
       {
          static int sFilterIdx = -1, sOscIdx = -1, sConstAIdx = -1, sConstBIdx = -1;
-         static int sTypeParam = -1, sWaveParam = -1;
+         static int sDelayIdx = -1, sRampIdx = -1, sPickFilterIdx = -1;
+         static int sTypeParam = -1, sWaveParam = -1, sFmModeParam = -1, sSyncParam = -1,
+                    sRampModeParam = -1, sPickTypeParam = -1;
          static size_t sUndoBefore = 0, sRedoBefore = 0;
-         static std::set<int> sTypesSeen, sWavesSeen;
-         constexpr int kBindFrame = 8, kSweepStart = 10, kSweepFrames = 48, kCheckFrame = 62;
+         static std::set<int> sTypesSeen, sWavesSeen, sFmModesSeen, sSyncsSeen, sRampModesSeen;
+         static bool sDrivenOk = false;
+         static int sPickBefore = -1;
+         constexpr int kBindFrame = 8, kSweepStart = 10, kSweepFrames = 48, kCheckFrame = 62,
+                       kPickFrame = 64;
 
          auto findIdx = [](int idx) -> GraphNode* { return FindNodeByIndex(idx); };
+         auto filterType = [](int idx) -> int
+         {
+            GraphNode* f = FindNodeByIndex(idx);
+            return f != nullptr ? (int)(static_cast<AudioEffectNode*>(f->node.get())->Param("type") + 0.5f) : -1;
+         };
 
          if (frameId == 4)
          {
@@ -70727,26 +70836,51 @@ int main(int argc, char** argv)
             sConstAIdx = gn != nullptr ? gn->index : -1;
             gn = SpawnNode("Constant", "Modulators", 700.0f, 420.0f);
             sConstBIdx = gn != nullptr ? gn->index : -1;
+            gn = SpawnNode("Delay", "AudioEffects", 1100.0f, 0.0f);
+            sDelayIdx = gn != nullptr ? gn->index : -1;
+            gn = SpawnNode("Audio Color Ramp", "Compositing", 1100.0f, 420.0f);
+            sRampIdx = gn != nullptr ? gn->index : -1;
+            // DropdownButton lives in a Draw*Params panel, which is only drawn
+            // (and so only registers its discrete slot) while expanded.
+            if (gn != nullptr)
+               gn->showParams = true;
+            gn = SpawnNode("Audio Filter", "AudioEffects", 1500.0f, 0.0f);
+            sPickFilterIdx = gn != nullptr ? gn->index : -1;
          }
          if (frameId == kBindFrame)
          {
-            // The bodies have drawn by now, so both dropdowns have registered
-            // their discrete slots. Resolved by label through the same
-            // DiscreteParamSlot the widgets use, then confirmed as registered.
-            if (sFilterIdx >= 0 && sOscIdx >= 0 && sConstAIdx >= 0 && sConstBIdx >= 0)
+            // The bodies have drawn by now, so every control has registered
+            // its discrete slot. Resolved by label through the same
+            // DiscreteParamSlot the widgets use, then confirmed as registered
+            // with the right kind (enum for a dropdown, bool for a checkbox).
+            auto resolve = [](int nodeIdx, const char* label, bool wantBool) -> int
             {
-               sTypeParam = DiscreteParamSlot(sFilterIdx, "type");
-               sWaveParam = DiscreteParamSlot(sOscIdx, "oscWave");
-               const ParamRef* typeRef = Modulation::Instance().KnownParam(sFilterIdx, sTypeParam);
-               const ParamRef* waveRef = Modulation::Instance().KnownParam(sOscIdx, sWaveParam);
-               if (typeRef == nullptr || !typeRef->isEnum)
-                  sTypeParam = -1;
-               if (waveRef == nullptr || !waveRef->isEnum)
-                  sWaveParam = -1;
+               if (nodeIdx < 0)
+                  return -1;
+               const int slot = DiscreteParamSlot(nodeIdx, label);
+               const ParamRef* ref = Modulation::Instance().KnownParam(nodeIdx, slot);
+               if (ref == nullptr || (wantBool ? !ref->isBool : !ref->isEnum))
+                  return -1;
+               return slot;
+            };
+            sTypeParam = resolve(sFilterIdx, "type", false);
+            sWaveParam = resolve(sOscIdx, "oscWave", false);
+            sFmModeParam = resolve(sOscIdx, "oscFmMode", false);
+            sSyncParam = resolve(sDelayIdx, "sync to tempo##delaySync", true);
+            sRampModeParam = resolve(sRampIdx, "mode", false);
+            sPickTypeParam = resolve(sPickFilterIdx, "type", false);
+            if (sConstAIdx >= 0 && sConstBIdx >= 0)
+            {
                if (sTypeParam >= 0)
                   Modulation::Instance().Bind(sFilterIdx, sTypeParam, sConstAIdx, 0);
                if (sWaveParam >= 0)
                   Modulation::Instance().Bind(sOscIdx, sWaveParam, sConstBIdx, 0);
+               if (sFmModeParam >= 0)
+                  Modulation::Instance().Bind(sOscIdx, sFmModeParam, sConstAIdx, 0);
+               if (sSyncParam >= 0)
+                  Modulation::Instance().Bind(sDelayIdx, sSyncParam, sConstBIdx, 0);
+               if (sRampModeParam >= 0)
+                  Modulation::Instance().Bind(sRampIdx, sRampModeParam, sConstAIdx, 0);
             }
             // Baseline taken after the bind: binding is a user edit of its
             // own, and this check is only about what the cable does after.
@@ -70757,36 +70891,87 @@ int main(int argc, char** argv)
          if (frameId >= kSweepStart && frameId < kSweepStart + kSweepFrames)
          {
             // Triangle 0..1..0 with a 16-frame period: three full sweeps,
-            // each crossing every index boundary of both dropdowns twice.
+            // each crossing every index boundary of every control twice.
             const int t = (frameId - kSweepStart) % 16;
             const float v = (t < 8 ? (float)t : (float)(16 - t)) / 8.0f;
             if (GraphNode* a = findIdx(sConstAIdx))
                static_cast<ConstantNode*>(a->node.get())->value = v;
             if (GraphNode* b = findIdx(sConstBIdx))
                static_cast<ConstantNode*>(b->node.get())->value = 1.0f - v;
-            if (GraphNode* f = findIdx(sFilterIdx))
-               sTypesSeen.insert((int)(static_cast<AudioEffectNode*>(f->node.get())->Param("type") + 0.5f));
+            sTypesSeen.insert(filterType(sFilterIdx));
             if (GraphNode* o = findIdx(sOscIdx))
+            {
                sWavesSeen.insert(static_cast<OscillatorNode*>(o->node.get())->waveform);
+               sFmModesSeen.insert(static_cast<OscillatorNode*>(o->node.get())->fmMode);
+            }
+            if (GraphNode* d = findIdx(sDelayIdx))
+               sSyncsSeen.insert((int)(static_cast<AudioEffectNode*>(d->node.get())->Param("sync") + 0.5f));
+            if (GraphNode* r = findIdx(sRampIdx))
+               sRampModesSeen.insert(static_cast<AudioColorRampNode*>(r->node.get())->mode);
          }
          if (frameId == kCheckFrame)
          {
-            const bool bound = sTypeParam >= 0 && sWaveParam >= 0;
-            // Proves the driven path actually ran (onSelect still writes the
-            // param) - without this the stack check below passes vacuously.
-            const bool typeDriven = sTypesSeen.size() >= 3;
-            const bool waveDriven = sWavesSeen.size() >= 3;
-            printf("modulated dropdowns bound: type param=%d, oscWave param=%d  %s\n",
-                   sTypeParam, sWaveParam, bound ? "OK" : "FAIL");
-            printf("modulated dropdowns follow the cable: filter type took %zu values, osc wave took %zu  %s\n",
-                   sTypesSeen.size(), sWavesSeen.size(), (typeDriven && waveDriven) ? "OK" : "FAIL");
+            const bool bound = sTypeParam >= 0 && sWaveParam >= 0 && sFmModeParam >= 0 &&
+                               sSyncParam >= 0 && sRampModeParam >= 0 && sPickTypeParam >= 0;
+            // Proves each driven path actually ran (onSelect / the caller's
+            // setter still writes the param) - without this the stack check
+            // below passes vacuously.
+            const bool driven = sTypesSeen.size() >= 3 && sWavesSeen.size() >= 3 &&
+                                sFmModesSeen.size() >= 2 && sSyncsSeen.size() >= 2 &&
+                                sRampModesSeen.size() >= 3;
+            printf("modulated controls bound: filter type=%d, oscWave=%d, oscFmMode=%d, delay sync=%d, "
+                   "ramp mode=%d, pick filter type=%d  %s\n",
+                   sTypeParam, sWaveParam, sFmModeParam, sSyncParam, sRampModeParam, sPickTypeParam,
+                   bound ? "OK" : "FAIL");
+            printf("modulated controls follow the cable: filter type (Dropdown) %zu values, osc wave "
+                   "(BareDropdown) %zu, osc fm mode (DropdownKnob) %zu, ramp mode (DropdownButton) %zu, "
+                   "delay sync (row Checkbox) %zu  %s\n",
+                   sTypesSeen.size(), sWavesSeen.size(), sFmModesSeen.size(), sRampModesSeen.size(),
+                   sSyncsSeen.size(), driven ? "OK" : "FAIL");
             const bool undoUnchanged = gUndoStack.size() == sUndoBefore && gRedoStack.size() == sRedoBefore;
-            printf("modulated dropdowns push no undo entries: undo %zu -> %zu, redo %zu -> %zu  %s\n",
+            printf("modulated controls push no undo entries: undo %zu -> %zu, redo %zu -> %zu  %s\n",
                    sUndoBefore, gUndoStack.size(), sRedoBefore, gRedoStack.size(),
                    undoUnchanged ? "OK" : "FAIL");
-            printf("modulated dropdowns leave the patch clean: dirty=%d  %s\n", (int)gPatchDirty,
+            printf("modulated controls leave the patch clean: dirty=%d  %s\n", (int)gPatchDirty,
                    !gPatchDirty ? "OK" : "FAIL");
-            const bool ok = bound && typeDriven && waveDriven && undoUnchanged && !gPatchDirty;
+            sDrivenOk = bound && driven && undoUnchanged && !gPatchDirty;
+
+            // Ask the unbound filter's "type" dropdown to act as if clicked on
+            // its next draw, so gDropdown ends up holding its real lambda.
+            sPickBefore = filterType(sPickFilterIdx);
+            gDropdown.onSelect = nullptr;
+            if (sPickTypeParam >= 0)
+               gDropdownTestOpenKey = std::pair<int, int>(sPickFilterIdx, sPickTypeParam);
+         }
+         if (frameId == kPickFrame)
+         {
+            const bool opened = gDropdownTestOpenKey.first < 0 && gDropdown.onSelect != nullptr &&
+                                gDropdown.current == sPickBefore && sPickBefore >= 0;
+            const int optionCount = (int)AudioFilterDsp::TypeList().size();
+            const int target = optionCount > 1 ? (sPickBefore + 1) % optionCount : sPickBefore;
+            const size_t undoBefore = gUndoStack.size();
+            gPatchDirty = false;
+            if (opened)
+               CommitDropdownPick(target);
+            const size_t undoAfter = gUndoStack.size();
+            const int picked = filterType(sPickFilterIdx);
+            const bool dirtyAfterPick = gPatchDirty;
+            // Close the popup ImGui opened for the forced click; nothing else
+            // in this fixture draws after this frame.
+            gDropdown.onSelect = nullptr;
+            Undo();
+            const int undone = filterType(sPickFilterIdx);
+            printf("user dropdown pick: opened with the real onSelect=%d, type %d -> %d (want %d)  %s\n",
+                   (int)opened, sPickBefore, picked, target,
+                   (opened && picked == target && target != sPickBefore) ? "OK" : "FAIL");
+            const bool oneEntry = undoAfter == undoBefore + 1;
+            printf("user dropdown pick pushes exactly one undo entry: undo %zu -> %zu, dirty=%d  %s\n",
+                   undoBefore, undoAfter, (int)dirtyAfterPick, (oneEntry && dirtyAfterPick) ? "OK" : "FAIL");
+            const bool undoRestores = undone == sPickBefore;
+            printf("one Undo restores the pre-pick value: type %d (want %d)  %s\n", undone, sPickBefore,
+                   undoRestores ? "OK" : "FAIL");
+            const bool ok = sDrivenOk && opened && picked == target && target != sPickBefore && oneEntry &&
+                            dirtyAfterPick && undoRestores;
             printf("%s\n", ok ? "MOD DROPDOWN UNDO OK" : "SUSPECT");
          }
       }
@@ -88688,11 +88873,7 @@ int main(int argc, char** argv)
             ImGui::PopID();
             if (clicked)
             {
-               if (gDropdown.onSelect && i != gDropdown.current)
-               {
-                  PushUndoCheckpoint();
-                  gDropdown.onSelect(i);
-               }
+               CommitDropdownPick(i); // one click, one undo entry
                ImGui::CloseCurrentPopup();
             }
             if (selected && ImGui::IsWindowAppearing() && !gDropdown.focusSearch)
