@@ -14,6 +14,13 @@ Builds a high-speed SQLite Hybrid Search Index (FTS5 BM25 + FastEmbed Dense Vect
 8. Dev Trajectory - session turns classified against this repo's own Conventional Commit
    type/scope vocabulary and its node-category taxonomy, with weekly trend slopes
    (from dev_trajectory_corpus.json, produced by classify_dev_trajectory.py)
+
+Written as two databases with the same schema:
+- knowledge_index.db          - sources 1-5 (code, commits, docs, skills, blueprints).
+                                 Built only from what is already public in this repo; tracked in git.
+- knowledge_index_private.db  - sources 6-8, derived from local chat/session transcripts.
+                                 Never committed or pushed (see tools/semi-brain/.gitignore).
+retriever.py searches both.
 """
 
 import sqlite3
@@ -26,20 +33,22 @@ from fastembed import TextEmbedding
 
 EXTRACTORS_OUT = Path(__file__).resolve().parent / "output"
 DB_FILE = EXTRACTORS_OUT / "knowledge_index.db"
+PRIVATE_DB_FILE = EXTRACTORS_OUT / "knowledge_index_private.db"
+# Categories built from local chat/session transcripts - these go to PRIVATE_DB_FILE only.
+PRIVATE_CATEGORIES = {"session_history", "session_insight", "dev_trajectory"}
 
 def serialize_vector(vec: np.ndarray) -> bytes:
     """Pack float32 vector into binary bytes."""
     return struct.pack(f"{len(vec)}f", *vec)
 
-def build_hybrid_index():
-    EXTRACTORS_OUT.mkdir(parents=True, exist_ok=True)
-    if DB_FILE.exists():
-        DB_FILE.unlink()
-        
-    print(f"Initializing SQLite database at: {DB_FILE}")
-    conn = sqlite3.connect(DB_FILE)
+def write_index(db_file, documents, embed_model):
+    if db_file.exists():
+        db_file.unlink()
+
+    print(f"Initializing SQLite database at: {db_file}")
+    conn = sqlite3.connect(db_file)
     cur = conn.cursor()
-    
+
     # 1. Create FTS5 table for BM25 keyword search
     cur.execute("""
         CREATE VIRTUAL TABLE fts_documents USING fts5(
@@ -50,7 +59,7 @@ def build_hybrid_index():
             filepath UNINDEXED
         );
     """)
-    
+
     # 2. Create Dense Embeddings table
     cur.execute("""
         CREATE TABLE vector_documents (
@@ -62,7 +71,41 @@ def build_hybrid_index():
             embedding BLOB
         );
     """)
-    
+
+    print(f"Populating FTS5 BM25 index ({len(documents)} documents)...")
+    for doc_id, category, title, content, snippet, filepath in documents:
+        cur.execute(
+            "INSERT INTO fts_documents (doc_id, category, title, content, filepath) VALUES (?, ?, ?, ?, ?)",
+            (doc_id, category, title, content, filepath)
+        )
+    conn.commit()
+
+    # Batch embedding for speed
+    batch_size = 256
+    all_texts = [d[2] + " " + d[4] for d in documents] # Embed title + snippet
+
+    embedded_count = 0
+    for i in range(0, len(all_texts), batch_size):
+        batch_texts = all_texts[i:i+batch_size]
+        batch_docs = documents[i:i+batch_size]
+
+        vectors = list(embed_model.embed(batch_texts))
+        for doc_tuple, vec in zip(batch_docs, vectors):
+            doc_id, category, title, content, snippet, filepath = doc_tuple
+            cur.execute(
+                "INSERT INTO vector_documents (doc_id, category, title, snippet, filepath, embedding) VALUES (?, ?, ?, ?, ?, ?)",
+                (doc_id, category, title, snippet, filepath, serialize_vector(vec))
+            )
+        embedded_count += len(batch_docs)
+        print(f"Embedded {embedded_count}/{len(documents)} documents...")
+
+    conn.commit()
+    conn.close()
+    print(f"✅ SQLite Hybrid Knowledge Index built successfully at: {db_file}")
+
+def build_hybrid_index():
+    EXTRACTORS_OUT.mkdir(parents=True, exist_ok=True)
+
     print("Loading extracted corpora...")
     commits = []
     if (EXTRACTORS_OUT / "git_commits_corpus.json").exists():
@@ -222,42 +265,14 @@ def build_hybrid_index():
         documents.append((doc_id, "dev_trajectory", title, content, content[:300], ""))
 
     print(f"Total documents prepared for hybrid index: {len(documents)}")
-    
-    # 1. Insert FTS BM25 data
-    print("Populating FTS5 BM25 index...")
-    for doc_id, category, title, content, snippet, filepath in documents:
-        cur.execute(
-            "INSERT INTO fts_documents (doc_id, category, title, content, filepath) VALUES (?, ?, ?, ?, ?)",
-            (doc_id, category, title, content, filepath)
-        )
-    conn.commit()
-    
-    # 2. Compute Dense Embeddings using FastEmbed
+
+    public_docs = [d for d in documents if d[1] not in PRIVATE_CATEGORIES]
+    private_docs = [d for d in documents if d[1] in PRIVATE_CATEGORIES]
+
     print("Computing FastEmbed dense embeddings (CPU ONNX)...")
     embed_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
-
-    # Batch embedding for speed
-    batch_size = 256
-    all_texts = [d[2] + " " + d[4] for d in documents] # Embed title + snippet
-    
-    embedded_count = 0
-    for i in range(0, len(all_texts), batch_size):
-        batch_texts = all_texts[i:i+batch_size]
-        batch_docs = documents[i:i+batch_size]
-        
-        vectors = list(embed_model.embed(batch_texts))
-        for doc_tuple, vec in zip(batch_docs, vectors):
-            doc_id, category, title, content, snippet, filepath = doc_tuple
-            cur.execute(
-                "INSERT INTO vector_documents (doc_id, category, title, snippet, filepath, embedding) VALUES (?, ?, ?, ?, ?, ?)",
-                (doc_id, category, title, snippet, filepath, serialize_vector(vec))
-            )
-        embedded_count += len(batch_docs)
-        print(f"Embedded {embedded_count}/{len(documents)} documents...")
-        
-    conn.commit()
-    conn.close()
-    print(f"✅ SQLite Hybrid Knowledge Index built successfully at: {DB_FILE}")
+    write_index(DB_FILE, public_docs, embed_model)
+    write_index(PRIVATE_DB_FILE, private_docs, embed_model)
 
 if __name__ == "__main__":
     build_hybrid_index()

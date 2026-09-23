@@ -10,6 +10,7 @@ Automated incremental synchronization and learning flywheel for the Semi-Brain:
 import sys
 import json
 import argparse
+import fcntl
 import subprocess
 from pathlib import Path
 
@@ -93,6 +94,16 @@ def main():
     if args.feedback and args.task and args.chosen and args.rejected:
         record_feedback(args.task, args.chosen, args.rejected, args.reason)
     else:
+        # post-commit and post-merge both fire this in the background, so a commit followed
+        # by a merge used to run two syncs at once and interleave writes into the same corpus
+        # files (git_commits_corpus.json came out as invalid JSON). One sync at a time; a
+        # second one arriving mid-run skips; the next sync catches up on anything it missed.
+        lock_file = open(SEMI_BRAIN_DIR / "1_extractors" / "output" / ".sync.lock", "w")
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print("Another Semi-Brain sync is already running - skipping.")
+            return
         run_extraction_pipeline()
 
 if __name__ == "__main__":

@@ -1,0 +1,10 @@
+# Chat/session-history-derived data stays on this machine - never commit or push it.
+# Everything else in the brain (code/commit/doc/skill corpora, the public index,
+# training datasets, router adapter) is built from what is already public in this repo.
+1_extractors/output/session_history_corpus.json
+1_extractors/output/antigravity_history_corpus.json
+1_extractors/output/session_analysis_corpus.json
+1_extractors/output/session_embeddings_cache.npy
+1_extractors/output/dev_trajectory_corpus.json
+1_extractors/output/knowledge_index_private.db
+1_extractors/output/.sync.lock
