@@ -87,7 +87,13 @@ skip "B4_complex_3d"
 echo "B5 Fundamentals"
 run_fixture "B5_fundamentals_empty" 200 INFINITE_BENCH_B5EMPTY=1
 for n in 50 100 200 400; do
-   run_fixture "B5_fundamentals_nodecount n=$n" 152 INFINITE_BENCH_B5NODES="$n"
+   # 152 is the fixture's own sample-window boundary (main.cpp, frameId==152).
+   # EXITAFTER must be strictly greater: frameId increments at the bottom of
+   # the main loop, after the fixture's own frameId==152 check runs near the
+   # top, so EXITAFTER=152 closes the window one iteration before that check
+   # ever fires and no BENCH_JSON line is ever printed. Confirmed by direct
+   # reproduction: EXITAFTER=152 fails every time, 153+ passes every time.
+   run_fixture "B5_fundamentals_nodecount n=$n" 160 INFINITE_BENCH_B5NODES="$n"
 done
 B5D_SECONDS="${B5D_SECONDS:-30}"
 for buf in 64 128 256 512; do
