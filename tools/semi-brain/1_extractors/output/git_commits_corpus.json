@@ -1,5 +1,97 @@
 [
   {
+    "hash": "9082ece157cc6e00cadeac0e91dc91a1d647b4f1",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 15:46:32 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Merge bugfix/drumseq-uaf-and-midi-device-ids into main",
+      "description": "Merge bugfix/drumseq-uaf-and-midi-device-ids into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge bugfix/drumseq-uaf-and-midi-device-ids into main"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "f648e5c85493bd5def4326a790a141bbe3f8aa17",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 15:46:32 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Fix Drum Sequencer use-after-free and persist macOS MIDI device ids",
+      "description": "Fix Drum Sequencer use-after-free and persist macOS MIDI device ids",
+      "bullets": [],
+      "body": "Drum Sequencer: voices cached a raw pointer to their lane's sample buffer;\nswapping a lane's buffer retired the old one, the main thread freed it,\nand still-sounding voices read freed memory (SIGSEGV on the audio thread).\nVoices not reading the lane's new buffer are now dropped at swap time.\nMIDI: macOS used the per-process MIDIEndpointRef as MidiDeviceId, so every\nsaved binding (performance matrix, MIDI CC, MIDI Trigger) was orphaned on\nrelaunch, including crash-recovered sessions. Now uses the persistent\nkMIDIPropertyUniqueID. New Platform::MidiRebindStaleDevice (mac/win/linux)\nreattaches bindings whose device isn't connected to the connected device\nsending the same control, healing patches saved with the old ids.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Fix Drum Sequencer use-after-free and persist macOS MIDI device ids\n\nDrum Sequencer: voices cached a raw pointer to their lane's sample buffer;\nswapping a lane's buffer retired the old one, the main thread freed it,\nand still-sounding voices read freed memory (SIGSEGV on the audio thread).\nVoices not reading the lane's new buffer are now dropped at swap time.\n\nMIDI: macOS used the per-process MIDIEndpointRef as MidiDeviceId, so every\nsaved binding (performance matrix, MIDI CC, MIDI Trigger) was orphaned on\nrelaunch, including crash-recovered sessions. Now uses the persistent\nkMIDIPropertyUniqueID. New Platform::MidiRebindStaleDevice (mac/win/linux)\nreattaches bindings whose device isn't connected to the connected device\nsending the same control, healing patches saved with the old ids.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "src/main.cpp                     | 18 +++++++++++++++++\n src/nodes/DrumSequencerNode.cpp  | 22 ++++++++++++++++++--\n src/nodes/MidiNodes.cpp          | 13 ++++++++++++\n src/platform/Platform.h          |  8 ++++++++\n src/platform/Platform.mm         | 43 +++++++++++++++++++++++++++++++++++-----\n src/platform/linux/MidiLinux.cpp | 20 +++++++++++++++++++\n src/platform/win/MidiWin.cpp     | 21 ++++++++++++++++++++\n 7 files changed, 138 insertions(+), 7 deletions(-)"
+  },
+  {
+    "hash": "db1fabaedd8f2fb2f07960207fbe3b82a6714c61",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 13:55:32 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "arrange",
+      "title": "Remove Beat Arranger node entirely",
+      "description": "Remove Beat Arranger node entirely",
+      "bullets": [],
+      "body": "Drops the node's DSP (BeatArranger/DrumClassifier), its INode wrapper,\nnode-body UI, registration, drag/drop wiring, help-table entries, its\nDSP test fixture, the CMake sources, and the design docs.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Remove Beat Arranger node entirely\n\nDrops the node's DSP (BeatArranger/DrumClassifier), its INode wrapper,\nnode-body UI, registration, drag/drop wiring, help-table entries, its\nDSP test fixture, the CMake sources, and the design docs.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".../audio-param-sweep-expected.txt                 |    9 -\n CMakeLists.txt                                     |    3 -\n docs/plans/audio/beat-arranger-prompt.md           |  171 ---\n docs/plans/audio/beat-arranger-v2-prompt.md        |  245 -----\n src/audio/dsp/BeatArranger.cpp                     |  381 -------\n src/audio/dsp/BeatArranger.h                       |   73 --\n src/audio/dsp/DrumClassifier.cpp                   |  877 ----------------\n src/audio/dsp/DrumClassifier.h                     |  117 ---\n src/main.cpp                                       | 1084 +-------------------\n src/nodes/BeatArrangerNode.cpp                     |  874 ----------------\n src/nodes/BeatArrangerNode.h                       |  169 ---\n 11 files changed, 5 insertions(+), 3998 deletions(-)\n delete mode 100644 docs/plans/audio/beat-arranger-prompt.md\n delete mode 100644 docs/plans/audio/beat-arranger-v2-prompt.md\n delete mode 100644 src/audio/dsp/BeatArranger.cpp\n delete mode 100644 src/audio/dsp/BeatArranger.h\n delete mode 100644 src/audio/dsp/DrumClassifier.cpp\n delete mode 100644 src/audio/dsp/DrumClassifier.h\n delete mode 100644 src/nodes/BeatArrangerNode.cpp\n delete mode 100644 src/nodes/BeatArrangerNode.h"
+  },
+  {
+    "hash": "58e2897cc5d470c327f2005b61bee87c97030227",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 12:29:27 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "arrange",
+      "title": "Merge feature/beat-arranger-v2 into main",
+      "description": "Merge feature/beat-arranger-v2 into main",
+      "bullets": [
+        "Single-source breakbeat arranger v2 redesign replacing 8-strip architecture",
+        "Rule-based DrumClassifier with extended taxonomy (Synth, Piano, Tonal), energy-weighted frame centroid, harmonic gating, decay linearity, and whole-token filename priors",
+        "KHS-clean 7-slider modulation model (timeSig, swing, randPitch, speed, transient, decay, output)",
+        "Tonal-role Euclidean groove arranging with meter support (4/4, 3/4, 6/8, 5/4, 7/8)",
+        "Interactive waveform + slice view with right-click class override",
+        "Comprehensive DSP and hygiene test suites verified across all sample rates"
+      ],
+      "body": "",
+      "raw": "Merge feature/beat-arranger-v2 into main\n\n- Single-source breakbeat arranger v2 redesign replacing 8-strip architecture\n- Rule-based DrumClassifier with extended taxonomy (Synth, Piano, Tonal), energy-weighted frame centroid, harmonic gating, decay linearity, and whole-token filename priors\n- KHS-clean 7-slider modulation model (timeSig, swing, randPitch, speed, transient, decay, output)\n- Tonal-role Euclidean groove arranging with meter support (4/4, 3/4, 6/8, 5/4, 7/8)\n- Interactive waveform + slice view with right-click class override\n- Comprehensive DSP and hygiene test suites verified across all sample rates"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "c96cefad0174c7b29c87f9079add6eb267b5e45f",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 12:29:18 2026 +0530",
+    "parsed_message": {
+      "type": "refactor",
+      "scope": "arrange",
+      "title": "Complete Beat Arranger v2 redesign and comprehensive DSP/hygiene tests",
+      "description": "Complete Beat Arranger v2 redesign and comprehensive DSP/hygiene tests",
+      "bullets": [
+        "Refine DrumClassifier acoustic rules: energy-weighted frame centroid, harmonic gating for pitched classes, sustain plateau heuristic, and kick promotion role protection",
+        "Expand BEATARRANGERTEST in src/main.cpp: test all 8 classes across 44.1k/48k/96k sample rates, filename prior tokenization ('OHH_01', 'Kick 01', 'subtle_pad', 'what_a_tune'), short slice edge lengths, multi-meter arrangements (3/4, 7/8), and live parameter audibility",
+        "Update audio-param-sweep-expected.txt with the 7 v2 sliders (timeSig, swing, randPitch, speed, transient, decay, output) replacing old 8-strip params",
+        "Verify full DSP test suite (DSPTEST OK, BEATARRANGERTEST OK) and hygiene auto test matrix (54 passed, 0 failed)"
+      ],
+      "body": "",
+      "raw": "Complete Beat Arranger v2 redesign and comprehensive DSP/hygiene tests\n\n- Refine DrumClassifier acoustic rules: energy-weighted frame centroid, harmonic gating for pitched classes, sustain plateau heuristic, and kick promotion role protection\n- Expand BEATARRANGERTEST in src/main.cpp: test all 8 classes across 44.1k/48k/96k sample rates, filename prior tokenization ('OHH_01', 'Kick 01', 'subtle_pad', 'what_a_tune'), short slice edge lengths, multi-meter arrangements (3/4, 7/8), and live parameter audibility\n- Update audio-param-sweep-expected.txt with the 7 v2 sliders (timeSig, swing, randPitch, speed, transient, decay, output) replacing old 8-strip params\n- Verify full DSP test suite (DSPTEST OK, BEATARRANGERTEST OK) and hygiene auto test matrix (54 passed, 0 failed)"
+    },
+    "stat": ".../audio-param-sweep-expected.txt                 |     98 +-\n docs/plans/audio/beat-arranger-v2-prompt.md        |    245 +\n src/audio/dsp/BeatArranger.cpp                     |      2 +\n src/audio/dsp/DrumClassifier.cpp                   |     33 +-\n src/main.cpp                                       |    273 +-\n .../1_extractors/analyze_session_linguistics.py    |    380 +\n .../1_extractors/classify_dev_trajectory.py        |    343 +\n tools/semi-brain/1_extractors/index_codebase.py    |     97 +-\n .../1_extractors/mine_antigravity_history.py       |    148 +\n .../1_extractors/mine_session_history.py           |    146 +\n .../output/antigravity_history_corpus.json         |   8786 ++\n .../1_extractors/output/dev_trajectory_corpus.json |  41996 ++++++\n .../1_extractors/output/git_commits_corpus.json    |    168 +-\n .../1_extractors/output/knowledge_index.db         |    Bin 24518656 -> 55287808 bytes\n .../1_extractors/output/recovered_docs_corpus.json |    496 +-\n .../output/session_analysis_corpus.json            | 120556 ++++++++++++++++++\n .../output/session_embeddings_cache.npy            |    Bin 0 -> 5798528 bytes\n .../output/session_history_corpus.json             |  22394 ++++\n .../3_datasets/train_dpo_preference.jsonl          |      1 +\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl |    172 +-\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl |    172 +-\n tools/semi-brain/4_engine/sync_brain.py            |     27 +-\n 22 files changed, 195837 insertions(+), 696 deletions(-)\n create mode 100644 docs/plans/audio/beat-arranger-v2-prompt.md\n create mode 100644 tools/semi-brain/1_extractors/analyze_session_linguistics.py\n create mode 100644 tools/semi-brain/1_extractors/classify_dev_trajectory.py\n create mode 100644 tools/semi-brain/1_extractors/mine_antigravity_history.py\n create mode 100644 tools/semi-brain/1_extractors/mine_session_history.py\n create mode 100644 tools/semi-brain/1_extractors/output/antigravity_history_corpus.json\n create mode 100644 tools/semi-brain/1_extractors/output/dev_trajectory_corpus.json\n create mode 100644 tools/semi-brain/1_extractors/output/session_analysis_corpus.json\n create mode 100644 tools/semi-brain/1_extractors/output/session_embeddings_cache.npy\n create mode 100644 tools/semi-brain/1_extractors/output/session_history_corpus.json"
+  },
+  {
     "hash": "db101b9ebd8ef3679d97ef43a6fbb2da39bf7b4f",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",

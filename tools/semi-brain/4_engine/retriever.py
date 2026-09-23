@@ -14,10 +14,13 @@ from fastembed import TextEmbedding
 
 SEMI_BRAIN_DIR = Path(__file__).resolve().parents[1]
 DB_FILE = SEMI_BRAIN_DIR / "1_extractors" / "output" / "knowledge_index.db"
+# Local-only index of chat/session-derived documents (see index_codebase.py). Absent on a fresh
+# clone - the retriever then answers from the public index alone.
+PRIVATE_DB_FILE = SEMI_BRAIN_DIR / "1_extractors" / "output" / "knowledge_index_private.db"
 
 class HybridRetriever:
     def __init__(self):
-        self.db_path = DB_FILE
+        self.db_paths = [DB_FILE, PRIVATE_DB_FILE]
         self._embed_model = None
         
     @property
@@ -32,54 +35,53 @@ class HybridRetriever:
 
     def bm25_search(self, query: str, limit: int = 15) -> List[Dict[str, Any]]:
         """Run BM25 search against SQLite FTS5."""
-        if not self.db_path.exists():
-            return []
-            
-        conn = sqlite3.connect(self.db_path)
-        cur = conn.cursor()
-        
         # Clean query for FTS5 (escape quotes and special operators)
         clean_q = " OR ".join([f'"{w}"' for w in query.replace('"', '').split() if len(w) > 2])
         if not clean_q:
             clean_q = f'"{query}"'
-            
+
+        sql = """
+            SELECT doc_id, category, title, content, filepath, rank
+            FROM fts_documents
+            WHERE fts_documents MATCH ?
+            ORDER BY rank
+            LIMIT ?
+        """
         results = []
-        try:
-            sql = """
-                SELECT doc_id, category, title, content, filepath, rank
-                FROM fts_documents
-                WHERE fts_documents MATCH ?
-                ORDER BY rank
-                LIMIT ?
-            """
-            for row in cur.execute(sql, (clean_q, limit)):
-                results.append({
-                    "doc_id": row[0],
-                    "category": row[1],
-                    "title": row[2],
-                    "snippet": row[3][:300],
-                    "filepath": row[4],
-                    "bm25_rank": row[5]
-                })
-        except sqlite3.OperationalError:
-            pass
-        finally:
-            conn.close()
-            
-        return results
+        for db_path in self.db_paths:
+            if not db_path.exists():
+                continue
+            conn = sqlite3.connect(db_path)
+            try:
+                for row in conn.execute(sql, (clean_q, limit)):
+                    results.append({
+                        "doc_id": row[0],
+                        "category": row[1],
+                        "title": row[2],
+                        "snippet": row[3][:300],
+                        "filepath": row[4],
+                        "bm25_rank": row[5]
+                    })
+            except sqlite3.OperationalError:
+                pass
+            finally:
+                conn.close()
+
+        # FTS5 rank is negative BM25 (lower = better), comparable across DBs built the same way.
+        results.sort(key=lambda r: r["bm25_rank"])
+        return results[:limit]
 
     def _load_vector_cache(self):
         if hasattr(self, "_vector_cache") and self._vector_cache is not None:
             return
-        if not self.db_path.exists():
-            self._vector_cache = None
-            return
-            
-        conn = sqlite3.connect(self.db_path)
-        cur = conn.cursor()
-        cur.execute("SELECT doc_id, category, title, snippet, filepath, embedding FROM vector_documents")
-        rows = cur.fetchall()
-        conn.close()
+        rows = []
+        for db_path in self.db_paths:
+            if not db_path.exists():
+                continue
+            conn = sqlite3.connect(db_path)
+            rows.extend(conn.execute(
+                "SELECT doc_id, category, title, snippet, filepath, embedding FROM vector_documents").fetchall())
+            conn.close()
         
         self._doc_meta = []
         vecs = []
