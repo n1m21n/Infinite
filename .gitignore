@@ -30,3 +30,4 @@ mcp-server/
 # graphify skill output - regenerated on demand, never meant to be tracked
 graphify-out/
 artifacts-linux/
+bench/results/
