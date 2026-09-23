@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <string>
 #include <vector>
 #include <climits>
@@ -111,6 +112,39 @@ namespace Platform
    {
       // GLFW does not expose trackpad magnification gestures on X11/Wayland.
       return 0.0;
+   }
+
+   double ProcessRssMb()
+   {
+      // /proc/self/status's VmRSS line is already in kB and needs no root
+      // access, unlike /proc/self/smaps_rollup on some hardened kernels.
+      std::ifstream in("/proc/self/status");
+      if (!in.is_open())
+         return -1.0;
+      std::string line;
+      while (std::getline(in, line))
+      {
+         if (line.rfind("VmRSS:", 0) != 0)
+            continue;
+         const long kb = std::strtol(line.c_str() + 6, nullptr, 10);
+         return kb > 0 ? (double)kb / 1024.0 : -1.0;
+      }
+      return -1.0;
+   }
+
+   std::string HwModelString()
+   {
+      // Populated by firmware/DMI on most desktops and laptops; world-
+      // readable, no root needed. Absent in some VMs/containers, hence the
+      // fallback rather than treating a miss as an error.
+      std::ifstream in("/sys/devices/virtual/dmi/id/product_name");
+      if (!in.is_open())
+         return "unknown";
+      std::string model;
+      std::getline(in, model);
+      while (!model.empty() && (model.back() == '\n' || model.back() == '\r' || model.back() == ' '))
+         model.pop_back();
+      return model.empty() ? "unknown" : model;
    }
 
    void AppendLogLine(const std::string& line)

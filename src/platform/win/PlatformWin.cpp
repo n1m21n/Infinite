@@ -20,6 +20,8 @@
 #include <shellapi.h>
 #include <shlobj.h>
 #include <winhttp.h>
+#include <psapi.h>
+#pragma comment(lib, "psapi.lib")
 #include <wrl/client.h>
 
 #include <onnxruntime_cxx_api.h>
@@ -244,6 +246,35 @@ namespace Platform
       // macOS-only gesture (NSMagnificationGestureRecognizer). Windows
       // precision touchpads have no equivalent pinch API exposed to GLFW.
       return 0.0;
+   }
+
+   double ProcessRssMb()
+   {
+      PROCESS_MEMORY_COUNTERS counters = {};
+      counters.cb = sizeof(counters);
+      if (!GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters)))
+         return -1.0;
+      return (double)counters.WorkingSetSize / (1024.0 * 1024.0);
+   }
+
+   std::string HwModelString()
+   {
+      // SystemProductName under this registry key is the standard place OEMs
+      // publish the model string (what msinfo32/dxdiag show) - no WMI COM
+      // round trip needed for a diagnostic-only label.
+      HKEY key = nullptr;
+      if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"HARDWARE\\DESCRIPTION\\System\\BIOS", 0,
+                        KEY_READ, &key) != ERROR_SUCCESS)
+         return "unknown";
+      wchar_t value[256] = {};
+      DWORD size = sizeof(value);
+      DWORD type = 0;
+      std::string result = "unknown";
+      if (RegQueryValueExW(key, L"SystemProductName", nullptr, &type, (LPBYTE)value, &size) == ERROR_SUCCESS &&
+          type == REG_SZ)
+         result = WinCommon::WideToUtf8(value);
+      RegCloseKey(key);
+      return result;
    }
 
    std::string OpenImageDialog()

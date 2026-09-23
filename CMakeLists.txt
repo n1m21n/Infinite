@@ -380,6 +380,7 @@ set(COMMON_SOURCES
     src/core/GestureRecorder.cpp
     src/core/Expression.cpp
     src/core/SysInfo.cpp
+    src/core/BenchReport.cpp
     src/core/field/FieldLex.cpp
     src/core/field/FieldParse.cpp
     src/core/field/FieldIR.cpp
@@ -792,6 +793,9 @@ if(WIN32)
     target_link_libraries(Infinite PRIVATE
         opengl32 winmm ole32 shell32 gdi32 user32 advapi32
         gdiplus dwmapi
+        # Platform::ProcessRssMb() (GetProcessMemoryInfo), for the
+        # INFINITE_BENCH suite's mem.rss_mb field.
+        psapi
         # avrt carries MMCSS (AvSetMmThreadCharacteristics), which the WASAPI
         # render thread needs to be scheduled against its buffer deadline
         # rather than as an ordinary thread.

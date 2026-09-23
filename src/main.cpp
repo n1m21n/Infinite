@@ -43,6 +43,7 @@
 #include "platform/Platform.h"
 #include "IconsLucide.h"
 #include "core/SysInfo.h"
+#include "core/BenchReport.h"
 
 #if defined(_WIN32)
 #include <fcntl.h>
@@ -66867,6 +66868,199 @@ int main(int argc, char** argv)
          for (GraphNode& gn : gNodes)
             gn.showParams = true;
       }
+      else if (const char* bench5Arg = getenv("INFINITE_BENCH_B5NODES"))
+      {
+         // B5(b) node-count scaling fixture (docs/plans/perf/benchmark-suite.md
+         // §4). Spawns a mixed set of representative node types laid out on a
+         // grid - not stacked at the origin like INFINITE_MIXEDSTRESSTEST,
+         // which is a known flaw of that fixture (benchmark-suite.md §2) -
+         // and leaves them unconnected: the thing this isolates is per-node,
+         // per-frame UI/bookkeeping overhead (header title building via
+         // GetNodeInstanceIndex, param drawing) as node COUNT grows, not
+         // cook-graph cost. INFINITE_BENCH_B5NODES=<n>.
+         const long n = std::max(1L, atol(bench5Arg));
+         static const char* kTypes[] = { "Shape", "Noise", "invert", "gaussianblur", "LFO" };
+         static const char* kCats[]  = { "Source", "Source", "Compositing", "Effects", "Modulators" };
+         const int cols = 12;
+         for (long i = 0; i < n; i++)
+         {
+            const int t = (int)(i % 5);
+            const float x = (float)(i % cols) * 260.0f;
+            const float y = (float)(i / cols) * 200.0f;
+            SpawnNode(kTypes[t], kCats[t], x, y);
+         }
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+      }
+      else if (const char* bench1Arg = getenv("INFINITE_BENCH_B1VOICES"))
+      {
+         // B1 Heavy audio fixture (docs/plans/perf/benchmark-suite.md §4).
+         // N voices, each Sampler/Wavetable/Oscillator (cycled) through a
+         // per-voice chain: Audio Filter -> Wavetable Shaper (the closest
+         // registered node to the doc's illustrative "Drive" - there is no
+         // node literally named Drive) -> Delay -> Reverb -> Dynamics, summed
+         // through a tree of Mixers (MixerNode::kMaxSlots=12, so >12 voices
+         // needs a second level) into one Audio Out. One shared LFO is bound
+         // to every voice's Filter `mix` (AudioEffectNode::VisitParams always
+         // puts `mix` at param index 0 - see AudioEffectNode.cpp - so this is
+         // safe without knowing any effect-specific param layout) as the
+         // "modulated params" load case the doc asks for: worst case is every
+         // voice's modulation evaluated every block, not just one.
+         //
+         // Real per-voice source/effect indices are captured as ints and
+         // re-resolved through FindNodeByIndex() rather than held as
+         // GraphNode* across later SpawnNode calls, and rather than indexed
+         // directly into gNodes[] - GraphNode::index is a stable id, not a
+         // vector slot, so gNodes[idx] silently breaks the moment any
+         // earlier node in the session was removed. See codebase-
+         // navigation's note on SpawnNode's dangling-prone GraphNode*.
+         const long numVoices = std::max(1L, std::min(64L, atol(bench1Arg)));
+         static const char* kVoiceTypes[] = { "Sampler", "Wavetable", "Oscillator" };
+         const std::string samplerWav = TmpPath("infinite_bench_b1_voice.wav");
+         {
+            const int fixtureFrames = 2205;
+            std::vector<int16_t> fixturePcm(fixtureFrames);
+            for (int i = 0; i < fixtureFrames; i++)
+            {
+               const float t = (float)i / (float)(fixtureFrames - 1);
+               fixturePcm[i] = (int16_t)(sinf(t * 30.0f) * 30000.0f);
+            }
+            std::ofstream f(samplerWav, std::ios::binary);
+            auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
+            auto writeU16 = [&](uint16_t v) { f.write((const char*)&v, 2); };
+            const uint32_t dataSize = (uint32_t)(fixturePcm.size() * sizeof(int16_t));
+            f.write("RIFF", 4); writeU32(36 + dataSize); f.write("WAVE", 4);
+            f.write("fmt ", 4); writeU32(16); writeU16(1); writeU16(1);
+            writeU32(44100); writeU32(44100 * 2); writeU16(2); writeU16(16);
+            f.write("data", 4); writeU32(dataSize);
+            f.write((const char*)fixturePcm.data(), dataSize);
+         }
+
+         GraphNode* lfoGn = SpawnNode("LFO", "Modulators", -260.0f, 0.0f);
+         const int lfoIdx = lfoGn->index;
+
+         std::vector<int> voiceOutIdx;
+         voiceOutIdx.reserve(numVoices);
+         const int perRow = 6;
+         for (long v = 0; v < numVoices; v++)
+         {
+            const float x = (float)(v % perRow) * 260.0f;
+            const float y = (float)(v / perRow) * 900.0f;
+            const int srcType = (int)(v % 3);
+            const int srcIdx = SpawnNode(kVoiceTypes[srcType], "Synths", x, y)->index;
+            if (srcType == 0)
+            {
+               if (auto* sampler = dynamic_cast<SamplerNode*>(FindNodeByIndex(srcIdx)->node.get()))
+                  sampler->LoadFile(samplerWav);
+            }
+            const int filterIdx = SpawnNode("Audio Filter", "AudioEffects", x, y + 150.0f)->index;
+            const int shaperIdx = SpawnNode("Wavetable Shaper", "AudioEffects", x, y + 300.0f)->index;
+            const int delayIdx  = SpawnNode("Delay", "AudioEffects", x, y + 450.0f)->index;
+            const int reverbIdx = SpawnNode("Reverb", "AudioEffects", x, y + 600.0f)->index;
+            const int dynIdx    = SpawnNode("Dynamics", "AudioEffects", x, y + 750.0f)->index;
+
+            // Re-resolved through FindNodeByIndex rather than gNodes[idx] -
+            // GraphNode::index is a stable id from a monotonically increasing
+            // counter, not a vector slot, so gNodes[idx] is an out-of-bounds/
+            // wrong-node read the moment any earlier node in the session was
+            // removed (see codebase-navigation's SpawnNode note, and the
+            // working precedent at main.cpp:66029).
+            static_cast<AudioEffectNode*>(FindNodeByIndex(filterIdx)->node.get())->input.Connect(FindNodeByIndex(srcIdx)->node.get());
+            static_cast<AudioEffectNode*>(FindNodeByIndex(shaperIdx)->node.get())->input.Connect(FindNodeByIndex(filterIdx)->node.get());
+            static_cast<AudioEffectNode*>(FindNodeByIndex(delayIdx)->node.get())->input.Connect(FindNodeByIndex(shaperIdx)->node.get());
+            static_cast<AudioEffectNode*>(FindNodeByIndex(reverbIdx)->node.get())->input.Connect(FindNodeByIndex(delayIdx)->node.get());
+            static_cast<AudioEffectNode*>(FindNodeByIndex(dynIdx)->node.get())->input.Connect(FindNodeByIndex(reverbIdx)->node.get());
+
+            Modulation::Instance().Bind(filterIdx, /*paramIndex=mix*/ 0, lfoIdx, /*outputIndex=*/ 0);
+
+            voiceOutIdx.push_back(dynIdx);
+         }
+
+         // Sum voices through a tree of Mixers - MixerNode::kMaxSlots is 12,
+         // so more than 12 voices needs a second level rather than one Mixer
+         // whose numChannels exceeds what it actually exposes pins for.
+         std::vector<int> mixerOutIdx;
+         for (size_t base = 0; base < voiceOutIdx.size(); base += 12)
+         {
+            const size_t chunk = std::min((size_t)12, voiceOutIdx.size() - base);
+            const int mixIdx = SpawnNode("Mixer", "Utility", 2400.0f, (float)(base / 12) * 900.0f)->index;
+            auto* mix = static_cast<MixerNode*>(FindNodeByIndex(mixIdx)->node.get());
+            mix->numChannels = (int)chunk;
+            for (size_t s = 0; s < chunk; s++)
+               mix->AudioInputSlot((int)s)->Connect(FindNodeByIndex(voiceOutIdx[base + s])->node.get());
+            mixerOutIdx.push_back(mixIdx);
+         }
+
+         int finalOutSrcIdx;
+         if (mixerOutIdx.size() == 1)
+         {
+            finalOutSrcIdx = mixerOutIdx[0];
+         }
+         else
+         {
+            const int finalMixIdx = SpawnNode("Mixer", "Utility", 2700.0f, 0.0f)->index;
+            auto* finalMix = static_cast<MixerNode*>(FindNodeByIndex(finalMixIdx)->node.get());
+            finalMix->numChannels = (int)mixerOutIdx.size();
+            for (size_t s = 0; s < mixerOutIdx.size(); s++)
+               finalMix->AudioInputSlot((int)s)->Connect(FindNodeByIndex(mixerOutIdx[s])->node.get());
+            finalOutSrcIdx = finalMixIdx;
+         }
+
+         const int audioOutIdx = SpawnNode("Audio Out", "Utility", 3000.0f, 0.0f)->index;
+         static_cast<AudioOutputNode*>(FindNodeByIndex(audioOutIdx)->node.get())->input.Connect(FindNodeByIndex(finalOutSrcIdx)->node.get());
+
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+
+         // Reopen the device at the requested buffer size (64/128/256/512 -
+         // benchmark-suite.md §4's sweep), same pattern as
+         // INFINITE_OFFLINERENDER_BUFFER above, then actually start the
+         // engine - RunTopology's real callback thread is what B1 measures,
+         // so (unlike AUDIOGRAPHTEST) this fixture needs a live device, not
+         // just a built topology.
+         if (const char* bufEnv = getenv("INFINITE_BENCH_B1BUFFER"))
+         {
+            if (AudioEngine::Instance().SampleRate() > 0.0)
+               AudioEngine::Instance().Stop();
+            AudioEngine::Instance().SetRequestedBufferFrames(atoi(bufEnv));
+         }
+         if (AudioEngine::Instance().SampleRate() <= 0.0)
+            StartAudioEngine(gAudioStartError);
+         RebuildAudioTopology();
+      }
+      else if (getenv("INFINITE_BENCH_B5EMPTY") != nullptr)
+      {
+         // B5(a) empty-patch fixture (benchmark-suite.md §4): the floor -
+         // frame cost with zero nodes, nothing to cook, nothing to draw.
+         // Intentionally spawns nothing; the measurement half below is what
+         // does the work.
+      }
+      else if (const char* audioAloneArg = getenv("INFINITE_BENCH_B5AUDIOALONE"))
+      {
+         // B5(d) audio-thread-alone fixture (benchmark-suite.md §4): the
+         // audio callback's own per-block cost in isolation, at one buffer
+         // size, with nothing else in the graph competing for the CPU -
+         // one Oscillator straight into Audio Out, no effects chain (that's
+         // what B1 stresses). INFINITE_BENCH_B5AUDIOALONE=<buffer frames>.
+         const int oscIdx = SpawnNode("Oscillator", "Synths", 0.0f, 0.0f)->index;
+         const int outIdx = SpawnNode("Audio Out", "Utility", 260.0f, 0.0f)->index;
+         // Re-resolve by index rather than treating oscIdx/outIdx as gNodes[]
+         // positions - GraphNode::index is a stable id from a monotonically
+         // increasing counter, not a vector slot, and diverges from position
+         // the moment any earlier node in the session was removed. Same
+         // pattern as the Wavetable/Audio Out spawn above (main.cpp:66029).
+         GraphNode* oscGn = FindNodeByIndex(oscIdx);
+         GraphNode* outGn = FindNodeByIndex(outIdx);
+         static_cast<AudioOutputNode*>(outGn->node.get())->input.Connect(oscGn->node.get());
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+
+         if (AudioEngine::Instance().SampleRate() > 0.0)
+            AudioEngine::Instance().Stop();
+         AudioEngine::Instance().SetRequestedBufferFrames(atoi(audioAloneArg));
+         StartAudioEngine(gAudioStartError);
+         RebuildAudioTopology();
+      }
       else if (const char* loadPatchPath = getenv("INFINITE_LOADPATCH"))
       {
          LoadPatchFrom(loadPatchPath);
@@ -83737,6 +83931,160 @@ int main(int argc, char** argv)
             printf("GEOMDENSITYTEST tris=%zu avg=%.3fms min=%.3fms max=%.3fms fps=%.2f\n",
                    render->LastTriangleCount(), avg, sMin, sMax, fps);
             printf("%s\n", sSampleCount > 0 ? "GEOMDENSITYTEST DONE" : "GEOMDENSITYTEST FAIL (no samples)");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // B5(b) node-count scaling fixture, measurement half - see
+      // INFINITE_BENCH_B5NODES's setup above. Same warmup/sample window as
+      // the other perf fixtures in this file (32 warmup, 120 sampled,
+      // uncapped/vsync off) so results are comparable. Uses the shared
+      // Bench::BenchReport/PercentileRing infra (src/core/BenchReport.h)
+      // rather than this file's older avg/min/max-only pattern, per
+      // benchmark-suite.md §3 (p50/p95/p99 matter more than average for live
+      // work) and §5 (one BENCH_JSON line, not printf-formatted text).
+      if (getenv("INFINITE_BENCH_B5NODES") != nullptr)
+      {
+         static Bench::PercentileRing sFrameMs;
+         static double sRssStartMb = -1.0;
+         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; sRssStartMb = Bench::ProcessRssMb(); }
+         if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
+            sFrameMs.Push(gLastFrameMs);
+         if (frameId == 152)
+         {
+            Bench::BenchReport report;
+            report.bench = "B5_fundamentals_nodecount";
+            report.variant = getenv("INFINITE_BENCH_B5NODES") ? getenv("INFINITE_BENCH_B5NODES") : "";
+            report.frames = 152;
+            report.nodes = (int)gNodes.size();
+            report.frameMs = sFrameMs;
+            report.memRssStartMb = sRssStartMb;
+            report.memRssEndMb = Bench::ProcessRssMb();
+            report.Emit();
+            printf("B5NODES DONE\n");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // B1 Heavy audio fixture, measurement half - see
+      // INFINITE_BENCH_B1VOICES's setup above. Windowed on wall-clock
+      // (glfwGetTime), not frameId, because the real device callback thread
+      // this benchmark exists to measure runs independently of the main
+      // loop's frame pacing - a frameId-gated window would conflate video
+      // frame rate with audio callback rate. 1s warmup lets the just-opened
+      // device settle before sampling; default window is 60s
+      // (INFINITE_BENCH_B1SECONDS overrides, for fast iteration while
+      // building/debugging this fixture - the doc's own number is 60s).
+      // cb_load is drained from AudioEngine::RawLoadHistory() (raw per-block
+      // samples - see AudioEngine.h's comment on why LastBlockLoad()'s
+      // smoothing is wrong for a percentile) and xruns from XrunCount(),
+      // baselined at the start of the measurement window so device-open
+      // settling doesn't count against this run.
+      if (getenv("INFINITE_BENCH_B1VOICES") != nullptr)
+      {
+         static double sStartTimeS = -1.0;
+         static uint64_t sXrunBaseline = 0;
+         static Bench::PercentileRing sFrameMs;
+         static double sRssStartMb = -1.0;
+         const double nowS = glfwGetTime();
+         const double windowS = getenv("INFINITE_BENCH_B1SECONDS") ? atof(getenv("INFINITE_BENCH_B1SECONDS")) : 60.0;
+         if (sStartTimeS < 0.0 && nowS > 1.0)
+         {
+            sStartTimeS = nowS;
+            sXrunBaseline = AudioEngine::Instance().XrunCount();
+            AudioEngine::Instance().RawLoadHistory().Reset();
+            sRssStartMb = Bench::ProcessRssMb();
+         }
+         if (sStartTimeS >= 0.0 && gLastFrameMs > 0.0)
+            sFrameMs.Push(gLastFrameMs);
+         if (sStartTimeS >= 0.0 && nowS - sStartTimeS >= windowS)
+         {
+            Bench::BenchReport report;
+            report.bench = "B1_heavy_audio";
+            const char* vArg = getenv("INFINITE_BENCH_B1VOICES");
+            const char* bufArg = getenv("INFINITE_BENCH_B1BUFFER");
+            report.variant = std::string("voices=") + (vArg ? vArg : "?") +
+                              ",buffer=" + (bufArg ? bufArg : "default");
+            report.frames = (int)sFrameMs.Count();
+            report.nodes = (int)gNodes.size();
+            report.frameMs = sFrameMs;
+            report.audioMeasured = true;
+            report.audioBuffer = bufArg ? atoi(bufArg) : 0;
+            report.audioSampleRate = AudioEngine::Instance().SampleRate();
+            report.audioLoad = AudioEngine::Instance().RawLoadHistory().Drain();
+            report.audioXruns = AudioEngine::Instance().XrunCount() - sXrunBaseline;
+            report.memRssStartMb = sRssStartMb;
+            report.memRssEndMb = Bench::ProcessRssMb();
+            report.Emit();
+            printf("B1VOICES DONE\n");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // B5(a) empty-patch fixture, measurement half - see
+      // INFINITE_BENCH_B5EMPTY's setup above. Same warmup/sample window as
+      // B5(b) (INFINITE_BENCH_B5NODES) so the two are directly comparable -
+      // this run's frame_ms percentiles are the floor B5(b)'s node-count
+      // sweep is measured against.
+      if (getenv("INFINITE_BENCH_B5EMPTY") != nullptr)
+      {
+         static Bench::PercentileRing sFrameMs;
+         static double sRssStartMb = -1.0;
+         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; sRssStartMb = Bench::ProcessRssMb(); }
+         if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
+            sFrameMs.Push(gLastFrameMs);
+         if (frameId == 152)
+         {
+            Bench::BenchReport report;
+            report.bench = "B5_fundamentals_empty";
+            report.frames = 152;
+            report.nodes = (int)gNodes.size();
+            report.frameMs = sFrameMs;
+            report.memRssStartMb = sRssStartMb;
+            report.memRssEndMb = Bench::ProcessRssMb();
+            report.Emit();
+            printf("B5EMPTY DONE\n");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // B5(d) audio-thread-alone fixture, measurement half - see
+      // INFINITE_BENCH_B5AUDIOALONE's setup above. Same wall-clock-window
+      // reasoning as B1's measurement half (the audio callback runs
+      // independently of frameId) but no effects chain and no per-voice
+      // sweep - this isolates the callback's fixed per-block overhead at one
+      // buffer size from B1's DSP-graph cost.
+      if (getenv("INFINITE_BENCH_B5AUDIOALONE") != nullptr)
+      {
+         static double sStartTimeS = -1.0;
+         static uint64_t sXrunBaseline = 0;
+         const double nowS = glfwGetTime();
+         const double windowS = getenv("INFINITE_BENCH_B5AUDIOALONE_SECONDS")
+                                    ? atof(getenv("INFINITE_BENCH_B5AUDIOALONE_SECONDS")) : 30.0;
+         if (sStartTimeS < 0.0 && nowS > 1.0)
+         {
+            sStartTimeS = nowS;
+            sXrunBaseline = AudioEngine::Instance().XrunCount();
+            AudioEngine::Instance().RawLoadHistory().Reset();
+         }
+         if (sStartTimeS >= 0.0 && nowS - sStartTimeS >= windowS)
+         {
+            Bench::BenchReport report;
+            report.bench = "B5_fundamentals_audioalone";
+            const char* bufArg = getenv("INFINITE_BENCH_B5AUDIOALONE");
+            report.variant = std::string("buffer=") + bufArg;
+            report.nodes = (int)gNodes.size();
+            report.audioMeasured = true;
+            report.audioBuffer = atoi(bufArg);
+            report.audioSampleRate = AudioEngine::Instance().SampleRate();
+            report.audioLoad = AudioEngine::Instance().RawLoadHistory().Drain();
+            report.audioXruns = AudioEngine::Instance().XrunCount() - sXrunBaseline;
+            report.Emit();
+            printf("B5AUDIOALONE DONE\n");
             fflush(stdout);
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }

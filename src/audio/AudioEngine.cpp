@@ -897,5 +897,6 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
       const double instantLoad = expectedGapMs > 0.0 ? topologyMs / expectedGapMs : 0.0;
       const double prevLoad = mLastBlockLoad.load(std::memory_order_relaxed);
       mLastBlockLoad.store(prevLoad + kLoadSmoothing * (instantLoad - prevLoad), std::memory_order_relaxed);
+      mRawLoadHistory.Push((float)instantLoad);
    }
 }

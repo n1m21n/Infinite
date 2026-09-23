@@ -11,6 +11,7 @@
 #include "AudioNode.h"
 #include "CompensationDelay.h"
 #include "SamplePreviewPlayer.h"
+#include "../core/BenchReport.h"
 
 // Ceilings shared by the topology builder (main.cpp's RebuildAudioTopology)
 // and the engine's buffer pool. kAudioMaxNodeInputs is Mixer's 8-in ceiling
@@ -323,6 +324,16 @@ public:
    // main-thread HUD reads a stable number rather than a spiky per-block one.
    double LastBlockLoad() const;
 
+   // Raw (unsmoothed) per-block load-fraction history, for the INFINITE_BENCH
+   // suite's cb_load p50/p99/max (see BenchReport.h) - LastBlockLoad()'s
+   // one-pole smoothing is right for a HUD readout but hides exactly the
+   // spikes a percentile is meant to catch. Always collecting (every
+   // Process() call pushes one atomic store) rather than gated behind a
+   // bench flag - the cost is one relaxed atomic store per block, same order
+   // as the existing xrun/load-fraction bookkeeping right next to it, so
+   // there is nothing to save by making it conditional.
+   Bench::AudioLoadRing& RawLoadHistory() { return mRawLoadHistory; }
+
    // Main thread only: drains MeterRing, pushes any pending ParamMailbox
    // writes queued by node UI this frame. Does no DSP - see the two-object
    // rule in the plan doc. Real INode integration (calling this from
@@ -505,6 +516,7 @@ private:
    std::atomic<uint64_t> mXrunCount { 0 };
    std::atomic<double> mLastCallbackMs { -1.0 };
    std::atomic<double> mLastBlockLoad { 0.0 };
+   Bench::AudioLoadRing mRawLoadHistory;
    // Set in Start(), read by IsAlive() as the "no callback yet" baseline -
    // without this, an engine that fails to ever produce a first callback
    // (mLastCallbackMs staying at its -1.0 sentinel forever) would read as
