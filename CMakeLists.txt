@@ -523,8 +523,6 @@ set(COMMON_SOURCES
     src/audio/dsp/MolderDsp.cpp
     src/audio/dsp/GrainMolderDsp.cpp
     src/audio/dsp/SlicerDsp.cpp
-    src/audio/dsp/DrumClassifier.cpp
-    src/audio/dsp/BeatArranger.cpp
     src/nodes/OscillatorNode.cpp
     src/nodes/MetallicNode.cpp
     src/nodes/AudioEffectNode.cpp
@@ -535,7 +533,6 @@ set(COMMON_SOURCES
     src/nodes/GrainMolderNode.cpp
     src/nodes/GranularNode.cpp
     src/nodes/DrumSequencerNode.cpp
-    src/nodes/BeatArrangerNode.cpp
     src/nodes/AudioPluginNode.cpp
     src/audio/SampleScanner.cpp
     src/audio/PluginScanner.cpp
