@@ -7,6 +7,13 @@ Builds a high-speed SQLite Hybrid Search Index (FTS5 BM25 + FastEmbed Dense Vect
 3. Recovered Historical Design Plans & Prompts (from recovered_docs_corpus.json)
 4. Specialized Invariant Skills (from skills_and_invariants_corpus.json)
 5. From-Scratch Blueprints (from build_your_own_x_corpus.json)
+6. Real Session History - human<->assistant decision turns, from Claude Code
+   (session_history_corpus.json) and Antigravity/Gemini (antigravity_history_corpus.json)
+7. Session Insights - topic clusters, problem->solution pairs, category stats
+   (from session_analysis_corpus.json, produced by analyze_session_linguistics.py)
+8. Dev Trajectory - session turns classified against this repo's own Conventional Commit
+   type/scope vocabulary and its node-category taxonomy, with weekly trend slopes
+   (from dev_trajectory_corpus.json, produced by classify_dev_trajectory.py)
 """
 
 import sqlite3
@@ -81,7 +88,26 @@ def build_hybrid_index():
     if (EXTRACTORS_OUT / "build_your_own_x_corpus.json").exists():
         with open(EXTRACTORS_OUT / "build_your_own_x_corpus.json", "r", encoding="utf-8") as f:
             byox = json.load(f)
-            
+
+    sessions = []
+    if (EXTRACTORS_OUT / "session_history_corpus.json").exists():
+        with open(EXTRACTORS_OUT / "session_history_corpus.json", "r", encoding="utf-8") as f:
+            sessions = json.load(f)
+
+    if (EXTRACTORS_OUT / "antigravity_history_corpus.json").exists():
+        with open(EXTRACTORS_OUT / "antigravity_history_corpus.json", "r", encoding="utf-8") as f:
+            sessions.extend(json.load(f))
+
+    session_analysis = {}
+    if (EXTRACTORS_OUT / "session_analysis_corpus.json").exists():
+        with open(EXTRACTORS_OUT / "session_analysis_corpus.json", "r", encoding="utf-8") as f:
+            session_analysis = json.load(f)
+
+    dev_trajectory = {}
+    if (EXTRACTORS_OUT / "dev_trajectory_corpus.json").exists():
+        with open(EXTRACTORS_OUT / "dev_trajectory_corpus.json", "r", encoding="utf-8") as f:
+            dev_trajectory = json.load(f)
+
     # Prepare documents for indexing
     documents = [] # list of (doc_id, category, title, content, snippet, filepath)
     
@@ -127,7 +153,74 @@ def build_hybrid_index():
             doc_id = f"byox::{t['title']}"
             text = f"First Principles {cat}: {t['title']} in {t['language']}"
             documents.append((doc_id, "byox_blueprint", f"Blueprint: {t['title']}", text, text, t.get("url", "")))
-            
+
+    # F. Real Session History (what was asked, decided, and why - across every local session,
+    # from both Claude Code and Antigravity/Gemini transcripts)
+    for idx, turn in enumerate(sessions):
+        session_id = turn.get("session_id", "")
+        user_text = turn.get("user_text", "")
+        assistant_text = turn.get("assistant_text", "")
+        if not user_text.strip():
+            continue
+        source_tool = turn.get("source_tool", "claude_code")
+        doc_id = f"session::{source_tool}::{session_id}::{idx}"
+        title = f"Session [{source_tool}] {session_id[:8]}: {user_text[:60]}"
+        content = f"{user_text}\n\n{assistant_text}"
+        documents.append((doc_id, "session_history", title, content, content[:300], turn.get("cwd", "")))
+
+    # G. Session Insights - topic clusters and problem->solution pairs distilled across every
+    # session (memory_category taxonomy: episodic/semantic/procedural/problem_solution). Indexed
+    # as their own category so a query can surface "how we usually solve X" / "what this project's
+    # sessions are mostly about", not just individual raw turns.
+    global_analysis = session_analysis.get("global", {})
+    for cluster in global_analysis.get("cluster_summaries", []):
+        cluster_id = cluster.get("cluster_id")
+        terms = ", ".join(cluster.get("top_terms", []))
+        examples = " | ".join(cluster.get("example_turns", []))
+        doc_id = f"topic::{cluster_id}"
+        title = f"Session Topic Cluster {cluster_id}: {terms}"
+        content = (
+            f"Topic cluster of {cluster.get('size', 0)} session turns, mostly "
+            f"{cluster.get('dominant_category', '')}. Key terms: {terms}. Example turns: {examples}"
+        )
+        documents.append((doc_id, "session_insight", title, content, content[:300], ""))
+
+    for idx, pair in enumerate(global_analysis.get("problem_solution_pairs", [])):
+        doc_id = f"problem_solution::{pair.get('session_id', '')}::{idx}"
+        title = f"Problem -> Solution: {pair.get('problem_summary', '')[:60]}"
+        content = f"Problem: {pair.get('problem_summary', '')}\n\nSolution: {pair.get('solution_summary', '')}"
+        documents.append((doc_id, "session_insight", title, content, content[:300], ""))
+
+    # H. Dev Trajectory - per-scope/work_type/node_category summaries with weekly trend slopes,
+    # so a query like "is Field work trending up" or "what kind of work is arrange scope" can be
+    # answered from this repo's own commit-style taxonomy rather than a generic topic cluster.
+    def _trend_sentence(kind, label, info):
+        slope = info.get("slope", 0)
+        direction = "rising" if slope > 0.3 else "falling" if slope < -0.3 else "flat"
+        counts = info.get("weekly_counts", [])
+        return (
+            f"{kind} '{label}' is {direction} over the last {len(counts)} weeks "
+            f"(slope {slope}, weekly turn counts: {counts})."
+        )
+
+    for scope, info in dev_trajectory.get("scope_trends", {}).items():
+        doc_id = f"trajectory::scope::{scope}"
+        title = f"Dev Trajectory - scope: {scope}"
+        content = _trend_sentence("Scope", scope, info)
+        documents.append((doc_id, "dev_trajectory", title, content, content[:300], ""))
+
+    for wt, info in dev_trajectory.get("work_type_trends", {}).items():
+        doc_id = f"trajectory::work_type::{wt}"
+        title = f"Dev Trajectory - work type: {wt}"
+        content = _trend_sentence("Work type", wt, info)
+        documents.append((doc_id, "dev_trajectory", title, content, content[:300], ""))
+
+    for nc, info in dev_trajectory.get("node_category_trends", {}).items():
+        doc_id = f"trajectory::node_category::{nc}"
+        title = f"Dev Trajectory - node category: {nc}"
+        content = _trend_sentence("Node category", nc, info)
+        documents.append((doc_id, "dev_trajectory", title, content, content[:300], ""))
+
     print(f"Total documents prepared for hybrid index: {len(documents)}")
     
     # 1. Insert FTS BM25 data

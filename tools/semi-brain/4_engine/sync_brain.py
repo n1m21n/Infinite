@@ -32,10 +32,31 @@ def run_extraction_pipeline():
     
     # 4. Ingest BYOX blueprints
     subprocess.run(["python3", str(EXTRACTORS_DIR / "ingest_build_your_own_x.py")], check=True)
-    
-    # 5. Compile datasets
+
+    # 5. Mine real Claude Code session history (every local transcript for this project)
+    subprocess.run(["python3", str(EXTRACTORS_DIR / "mine_session_history.py")], check=True)
+
+    # 5b. Mine Antigravity/Gemini agent transcripts for this project too, so the brain isn't
+    # blind to work done outside Claude Code.
+    subprocess.run(["python3", str(EXTRACTORS_DIR / "mine_antigravity_history.py")], check=True)
+
+    # 6. Categorize session history (episodic/semantic/procedural/problem_solution), cluster into
+    # topics, and pair problems with their solutions. Reuses cached embeddings when the turn count
+    # hasn't changed, so this is cheap on every sync after the first.
+    subprocess.run(["python3", str(EXTRACTORS_DIR / "analyze_session_linguistics.py")], check=True)
+
+    # 6b. Classify session history against THIS repo's own taxonomy instead of a generic one:
+    # Conventional Commit type/scope vocabulary (feat/fix/refactor/..., arrange/audio/field/...)
+    # and node categories derived from src/nodes/*.{h,cpp} via ast_symbol_graph.json. Also buckets
+    # turns by ISO week to track which scopes/work types/node categories are trending.
+    subprocess.run(["python3", str(EXTRACTORS_DIR / "classify_dev_trajectory.py")], check=True)
+
+    # 7. Compile datasets
     subprocess.run(["python3", str(DATASETS_DIR / "compile_training_data.py")], check=True)
-    
+
+    # 8. Rebuild the hybrid (FTS5 + dense vector) retrieval index from all corpora above
+    subprocess.run(["python3", str(EXTRACTORS_DIR / "index_codebase.py")], check=True)
+
     print("✅ Semi-Brain successfully synchronized and datasets updated!")
 
 def record_feedback(task: str, chosen_fix: str, rejected_fix: str, reason: str):

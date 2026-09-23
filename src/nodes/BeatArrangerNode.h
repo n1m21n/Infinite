@@ -17,39 +17,45 @@ namespace Platform
    struct SampleBuffer;
 }
 
-// Visual snapshot of the arranger's active playhead and sounding voices,
-// for the main arrangement view and strip waveforms. Published by the
-// audio thread into a triple buffer and read once per CookIfNeeded.
+// Visual snapshot of the arranger's active playhead and sounding voices, for
+// the waveform view. Published by the audio thread into a triple buffer and
+// read once per CookIfNeeded.
 struct BeatArrangerVisualSnapshot
 {
-   static constexpr int kMaxVisualVoices = 16;
+   static constexpr int kMaxVisualVoices = 8;
    struct Voice
    {
-      int sample = 0;        // 0..7 strip index
-      int slice = 0;         // slice index
-      float position = 0.0f; // 0..1 position in sample buffer
+      int slice = 0;
+      float position = 0.0f; // 0..1 position in the source buffer
       float amp = 0.0f;      // 0..1 current amplitude
    };
    Voice voices[kMaxVisualVoices];
    int voiceCount = 0;
-   float playheadStep = 0.0f; // fractional step in current pattern
-   int totalSteps = 32;       // 16 * bars
+   float playheadStep = 0.0f; // fractional step in the current pattern
+   int totalSteps = 32;
 };
 
-// Beat Arranger node:
-// Drop up to 8 samples, the node chops them at transients using SlicerDsp,
-// classifies every slice (kick / bass / snare / clap / closed hat / open hat / perc)
-// using pure-DSP DrumClassifier, and lays the slices out as a groove.
-// `arrange` builds it, `re-arrange` rolls a new one (seed + 1).
+// Beat Arranger v2: single-source-file model. Drop ONE sample, the node
+// chops it at transients (SlicerDsp), classifies every slice into one of
+// DrumClassifier's 10 classes, and "Generate" lays the slices out as a
+// seeded groove (BeatArranger namespace) that plays free-running from
+// Transport. Dropping a second file replaces the first; a multi-file drop
+// loads only the first ("1 of N loaded").
 class BeatArrangerNode : public INode, public IAudioSource
 {
 public:
-   static constexpr int kNumStrips = 8;
-   static constexpr int kWaveCache = 128;
-
    static INode* Create() { return new BeatArrangerNode(); }
    BeatArrangerNode();
    ~BeatArrangerNode() override;
+
+   static constexpr int kMaxSlices = 64;
+   static constexpr int kWaveCache = 256;
+
+   // timeSig dropdown: index 0 = "transport" (Transport's own numerator/
+   // denominator), 1..5 = fixed 4/4, 3/4, 6/8, 5/4, 7/8. Append-only - the
+   // index is a saved param.
+   static constexpr int kNumTimeSigs = 6;
+   static const char* const kTimeSigNames[kNumTimeSigs];
 
    unsigned int GetOutputTexture() override { return 0; }
    int GetOutputWidth() const override { return 0; }
@@ -58,128 +64,105 @@ public:
    void VisitParams(ParamVisitor& v) override;
    AudioNode* GetAudioNode() override;
 
-   // 1 main stereo mix + 8 per-sample individual stereo outs (matching DrumSequencer)
-   int OutputCount() const override { return 1 + kNumStrips; }
-   const char* OutputLabel(int index) const override
-   {
-      static const char* kLabels[1 + kNumStrips] = {
-         "out", "1", "2", "3", "4", "5", "6", "7", "8"
-      };
-      return (index >= 0 && index < 1 + kNumStrips) ? kLabels[index] : nullptr;
-   }
-   int AudioOutputSlotForPin(int pinIndex) const override { return pinIndex; }
+   int OutputCount() const override { return 1; }
+   const char* OutputLabel(int index) const override { return index == 0 ? "out" : nullptr; }
 
-   // No note or audio inputs - free-running from Transport
+   // Free-running from Transport - no note or audio inputs.
    NoteCable* NoteInputSlot(int) override { return nullptr; }
    AudioCable* AudioInputSlot(int) override { return nullptr; }
    const char* InputLabel(int) const override { return nullptr; }
 
-   bool LoadFileToStrip(int strip, const std::string& path);
-   void ReloadFromPaths();
-   void ClearStrip(int strip);
+   bool LoadFile(const std::string& path);
+   void ReloadFromPath();
 
-   void Arrange();
-   void ReArrange();
-   void ClearGroove();
+   // Re-runs the seeded groove generator ("Generate" button). A no-op with
+   // nothing loaded or nothing classified yet.
+   void Generate();
+   bool HasBeat() const { return !mArrangedHits.empty(); }
+   int HitCount() const { return (int)mArrangedHits.size(); }
+   const std::vector<BeatArranger::ArrangedHit>& ArrangedHits() const { return mArrangedHits; }
+   bool IsAnalyzing() const { return mWorking.load(std::memory_order_relaxed); }
 
-   bool HasGroove() const { return !mArrangedHits.empty(); }
-   int LoadedStripCount() const;
-   const std::string& FilePath(int strip) const { return stripFilePath[ClampStrip(strip)]; }
-   const std::string& FileName(int strip) const { return stripFileName[ClampStrip(strip)]; }
-   const std::string& StripStatus(int strip) const { return stripStatus[ClampStrip(strip)]; }
+   const std::string& FilePath() const { return mFilePath; }
+   const std::string& FileName() const { return mFileName; }
+   const std::string& Status() const { return mStatus; }
 
-   // Main thread visual snapshot accessor
+   const std::vector<BeatArranger::SliceInfo>& Slices() const { return mSlices; }
+   int SliceCount() const { return (int)mSlices.size(); }
+   // Right-click override of a slice's detected class (main thread only,
+   // pushed to the audio thread and included in the next Generate()).
+   void SetSliceClassOverride(int slice, DrumClassifier::DrumClass cls);
+
    const BeatArrangerVisualSnapshot& VisualSnapshot() const { return mVisualSnapshot; }
 
-   // ---- Global parameters -----------------------------------------------
-   int seed = 42;             // 0..9999
-   float randPitch = 0.0f;    // 0..1
-   float globalTransient = 0.0f; // -1..1
-   float globalDecay = 0.0f;     // -1..1
-   float globalSpeed = 1.0f;     // 0.25..4
-   int bars = 2;              // 1, 2, or 4
-   int rate = 12;             // MusicTime::kSixteenth (12)
-   float swing = 0.0f;        // 0..1
-   float volume = 0.8f;       // 0..1
+   static constexpr int kWaveformCacheSize = 256;
+   float waveformMin[kWaveformCacheSize] = {};
+   float waveformMax[kWaveformCacheSize] = {};
+   int waveformCacheCount = 0;
 
-   // ---- Per-strip parameters (8 strips) ---------------------------------
-   float stripVolume[kNumStrips];
-   float stripPan[kNumStrips];
-   float stripPitch[kNumStrips];
-   float stripFineTune[kNumStrips]; // cents +/-50
-   float stripSpeed[kNumStrips];    // 0.25..4
-   float stripTransient[kNumStrips]; // -1..1
-   float stripDecay[kNumStrips];     // -1..1
-   bool stripMute[kNumStrips];
-   bool stripSolo[kNumStrips];
-   int stripClassOverride[kNumStrips]; // 0 = Auto, 1 = Kick, 2 = Bass, ...
+   // ---- Params (7 sliders, KHS-simple; matches DrawBeatArrangerBody's draw
+   // order = modulation pin order) ----
+   int timeSig = 1;          // index into kTimeSigNames, default "4/4"
+   float swing = 0.0f;       // 0..1, audio-thread scheduling param
+   float randPitch = 0.0f;   // 0..1
+   float speed = 1.0f;       // 0.25..4
+   float transient = 0.5f;   // 0..1
+   float decay = 0.5f;       // 0..1
+   float output = 0.8f;      // 0..1
 
-   // Waveform thumbnail cache per strip
-   float stripWaveMin[kNumStrips][kWaveCache] = {};
-   float stripWaveMax[kNumStrips][kWaveCache] = {};
-   int stripWaveCount[kNumStrips] = {};
+   uint32_t seed = 42;
 
-   // Slice information per strip
-   std::vector<int> stripOnsets[kNumStrips];
-   std::vector<DrumClassifier::Result> stripSlices[kNumStrips];
-   double stripSampleLenSec[kNumStrips] = {};
-
-   // Arranged hits and serialized blob
-   std::vector<BeatArranger::ArrangedHit> mArrangedHits;
-   std::string mHitBlob;
-
-   // Cached canvas-space bounding boxes for drag & drop hit testing
-   float stripCardCanvasX0[kNumStrips] = {};
-   float stripCardCanvasY0[kNumStrips] = {};
-   float stripCardCanvasX1[kNumStrips] = {};
-   float stripCardCanvasY1[kNumStrips] = {};
-
-   float timelineCanvasX0 = 0.0f;
-   float timelineCanvasY0 = 0.0f;
-   float timelineCanvasX1 = 0.0f;
-   float timelineCanvasY1 = 0.0f;
-
-   // Thread management for background transient/classifier analysis
-   void JoinWorkerIfDone(int strip);
+   void JoinWorkerIfDone();
 
 private:
-   static int ClampStrip(int strip) { return std::clamp(strip, 0, kNumStrips - 1); }
-   void FinishStripBuffer(int strip, Platform::SampleBuffer* buf);
+   void FinishBuffer(Platform::SampleBuffer* decoded, const std::string& fileName,
+                     const std::string& filePath, const std::string& status);
+   void LaunchAnalysis();
+   void PushSlicesToAudio();
+   void PushHitsToAudio();
+   std::string SerializeSlices() const;
+   void DeserializeSlices(const std::string& blob);
 
    std::unique_ptr<AudioBeatArrangerNode> mAudioNode;
+   int mLastCookFrame = -1;
 
-   std::string stripFilePath[kNumStrips];
-   std::string stripFileName[kNumStrips];
-   std::string stripStatus[kNumStrips];
-   Platform::SampleBuffer* mLoadedBuffers[kNumStrips] = {};
+   std::string mFilePath;
+   std::string mFileName;
+   std::string mStatus = "no sample loaded";
+   std::string mSliceBlob;  // persisted per-slice class/bounds - see VisitParams
+   std::string mHitBlob;    // persisted arranged hits
 
-   // Worker thread state per strip
-   std::unique_ptr<std::thread> mWorkerThreads[kNumStrips];
-   std::atomic<bool> mWorkerAbort[kNumStrips] { false, false, false, false, false, false, false, false };
-   std::atomic<bool> mWorkerDone[kNumStrips] { false, false, false, false, false, false, false, false };
+   std::vector<BeatArranger::SliceInfo> mSlices;
+   std::vector<BeatArranger::ArrangedHit> mArrangedHits;
 
-   struct WorkerResult
+   // Main-thread-only mono copy for (re-)analysis, kept separate from the
+   // audio thread's own buffer copy so a re-classify never touches it.
+   std::vector<float> mSourceMono;
+   double mSourceSR = 44100.0;
+   int mSourceFrames = 0;
+
+   std::thread mWorkerThread;
+   std::atomic<bool> mWorking { false };
+   std::atomic<bool> mAbort { false };
+   std::atomic<bool> mResultReady { false };
+
+   struct PendingResult
    {
-      std::vector<int> onsets;
-      std::vector<DrumClassifier::Result> slices;
+      std::vector<int> onsetFrames;
+      std::vector<DrumClassifier::Result> classified;
    };
-   WorkerResult mWorkerResults[kNumStrips];
+   PendingResult mPendingResult;
 
-   // Dirty tracking shadows
-   float mLastStripVolume[kNumStrips] = {};
-   float mLastStripPan[kNumStrips] = {};
-   float mLastStripPitch[kNumStrips] = {};
-   float mLastStripFineTune[kNumStrips] = {};
-   float mLastStripSpeed[kNumStrips] = {};
-   float mLastStripTransient[kNumStrips] = {};
-   float mLastStripDecay[kNumStrips] = {};
-   float mLastGlobalTransient = 0.0f;
-   float mLastGlobalDecay = 0.0f;
-   float mLastGlobalSpeed = 1.0f;
-   float mLastVolume = 0.8f;
-   int mLastRate = 12;
-   int mLastBars = 2;
-   float mLastSwing = 0.0f;
+   // Dirty-tracking shadows: compared BEFORE being updated, every cook (fix
+   // Section7#1 - a shadow updated before the comparison silences the param
+   // forever).
+   float mLastSwing = -1.0f;
+   float mLastRandPitch = -1.0f;
+   float mLastSpeed = -1.0f;
+   float mLastTransient = -1.0f;
+   float mLastDecay = -1.0f;
+   float mLastOutput = -1.0f;
+   int mLastTimeSig = -1;
    bool mFirstCook = true;
 
    BeatArrangerVisualSnapshot mVisualSnapshot;

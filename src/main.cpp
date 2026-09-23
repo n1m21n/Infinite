@@ -1931,23 +1931,8 @@ namespace
       return DrumSequencerLaneForCanvasY(n, canvasY);
    }
 
-   int BeatArrangerLaneForCanvasPos(BeatArrangerNode* n, float canvasX, float canvasY)
-   {
-      if (n == nullptr)
-         return -1;
-      for (int lane = 0; lane < BeatArrangerNode::kNumStrips; lane++)
-      {
-         if (canvasX >= n->stripCardCanvasX0[lane] && canvasX <= n->stripCardCanvasX1[lane] &&
-             canvasY >= n->stripCardCanvasY0[lane] && canvasY <= n->stripCardCanvasY1[lane])
-            return lane;
-      }
-      for (int lane = 0; lane < BeatArrangerNode::kNumStrips; lane++)
-      {
-         if (n->FileName(lane).empty())
-            return lane;
-      }
-      return 0;
-   }
+   // Beat Arranger v2 is single-source: dropping anywhere on the node just
+   // replaces the one file, so there is no per-strip hit-testing anymore.
 
    void OnFilesDropped(GLFWwindow* window, int count, const char** paths)
    {
@@ -7944,7 +7929,7 @@ namespace
       if (auto* drum = dynamic_cast<DrumSequencerNode*>(node))
          drum->ReloadFromPaths();
       if (auto* beat = dynamic_cast<BeatArrangerNode*>(node))
-         beat->ReloadFromPaths();
+         beat->ReloadFromPath();
       if (auto* video = dynamic_cast<VideoSourceNode*>(node))
          video->ReloadFromPath();
       if (auto* palette = dynamic_cast<PaletteNode*>(node))
@@ -14500,24 +14485,31 @@ namespace
        EndAudioBody();
     }
 
-   void DrawBeatArrangerStripWaveform(BeatArrangerNode* n, int strip, float h)
+   // Beat Arranger v2: single-source waveform - shows the loaded sample,
+   // per-slice class-coloured dividers, the live playhead and sounding
+   // voices (from VisualSnapshot). Click an empty view to load a file;
+   // right-click a slice to override its detected class.
+   void DrawBeatArrangerSource(BeatArrangerNode* n, float h)
    {
       const float w = gAudioContentW;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
-      const bool hasSample = n->stripWaveCount[strip] > 0;
+      const bool hasSample = n->waveformCacheCount > 0;
+      const int sliceCount = n->SliceCount();
 
       ImGui::SetNextItemAllowOverlap();
       ImGui::SetCursorScreenPos(origin);
-      ImGui::InvisibleButton("##beatstripwavebody", ImVec2(w, h));
+      ImGui::InvisibleButton("##beatarrangerwave", ImVec2(w, h));
       if (!hasSample && ImGui::IsItemActivated())
       {
          PushUndoCheckpoint();
          const std::string path = Platform::OpenAudioDialog();
          if (!path.empty())
-            n->LoadFileToStrip(strip, path);
+            n->LoadFile(path);
       }
+      const bool rightClicked = ImGui::IsItemClicked(ImGuiMouseButton_Right);
+      const ImVec2 mousePos = ImGui::GetIO().MousePos;
 
       const bool isLight = IsThemeLight();
       dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
@@ -14526,39 +14518,49 @@ namespace
       const float midY = origin.y + h * 0.5f;
       dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
 
+      int rightClickedSlice = -1;
+
       if (hasSample)
       {
-         const int count = n->stripWaveCount[strip];
+         const int count = n->waveformCacheCount;
          for (int i = 0; i < count; i++)
          {
             const float x = origin.x + w * (float)i / (float)count;
             const float barW = std::max(1.0f, w / (float)count);
-            const float top = midY - n->stripWaveMax[strip][i] * h * 0.45f;
-            const float bottom = midY - n->stripWaveMin[strip][i] * h * 0.45f;
+            const float top = midY - n->waveformMax[i] * h * 0.45f;
+            const float bottom = midY - n->waveformMin[i] * h * 0.45f;
             dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
                               isLight ? IM_COL32(30, 110, 230, 210) : IM_COL32(150, 214, 255, 200));
          }
 
-         const auto& onsets = n->stripOnsets[strip];
-         const int numOnsets = (int)onsets.size();
-         const double lenSec = n->stripSampleLenSec[strip];
-         if (numOnsets > 1 && lenSec > 0.0)
+         // Slice dividers, coloured by detected/overridden class. Slice i
+         // spans [i/N, (i+1)/N) of the source - the same uniform bounds the
+         // audio thread schedules from (mSliceStart), so the picture matches
+         // what plays.
+         if (sliceCount > 0)
          {
-            const int lastOnset = onsets.back();
-            const float maxFrame = (float)(lastOnset > 0 ? (lastOnset * 1.15f) : 1.0f);
-            for (int i = 0; i < numOnsets; i++)
+            const auto& slices = n->Slices();
+            for (int i = 0; i < sliceCount; i++)
             {
-               const float normPos = std::clamp((float)onsets[i] / maxFrame, 0.0f, 1.0f);
-               const float sx = origin.x + w * normPos;
-               dl->AddLine(ImVec2(sx, origin.y), ImVec2(sx, br.y),
-                           isLight ? IM_COL32(230, 120, 20, 180) : IM_COL32(255, 170, 50, 180), 1.0f);
+               const float x0 = origin.x + w * (float)i / (float)sliceCount;
+               if (i > 0)
+                  dl->AddLine(ImVec2(x0, origin.y), ImVec2(x0, br.y),
+                              isLight ? IM_COL32(160, 165, 178, 160) : IM_COL32(90, 96, 110, 160), 1.0f);
+
+               const DrumClassifier::DrumClass cls = slices[i].cls;
+               const char* clsName = DrumClassifier::ClassName(cls);
+               const float x1 = origin.x + w * (float)(i + 1) / (float)sliceCount;
+               dl->AddText(ImVec2(x0 + 3.0f, origin.y + 3.0f), ScopeTextCol(), clsName);
+
+               if (rightClicked && mousePos.x >= x0 && mousePos.x < x1 && mousePos.y >= origin.y && mousePos.y < br.y)
+                  rightClickedSlice = i;
             }
          }
 
          const auto& snapshot = n->VisualSnapshot();
          for (int v = 0; v < snapshot.voiceCount; v++)
          {
-            if (snapshot.voices[v].sample == strip && snapshot.voices[v].amp > 0.01f)
+            if (snapshot.voices[v].amp > 0.01f)
             {
                const float vx = origin.x + w * std::clamp(snapshot.voices[v].position, 0.0f, 1.0f);
                const ImU32 vCol = IM_COL32(255, 240, 120, (int)(255 * snapshot.voices[v].amp));
@@ -14576,321 +14578,78 @@ namespace
 
       ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(w, h));
-   }
 
-   void DrawBeatArrangerStripCard(BeatArrangerNode* n, int strip)
-   {
-      ImGui::PushID(strip);
-      const ImVec2 cardTop = ImGui::GetCursorScreenPos();
-      n->stripCardCanvasX0[strip] = cardTop.x;
-      n->stripCardCanvasY0[strip] = cardTop.y;
-      n->stripCardCanvasX1[strip] = cardTop.x + gAudioContentW;
-
-      char header[64];
-      const std::string& fn = n->FileName(strip);
-      if (fn.empty())
-         snprintf(header, sizeof(header), "strip %d", strip + 1);
-      else
+      if (rightClickedSlice >= 0)
+         ImGui::OpenPopup("##beatslicecls");
+      if (ImGui::BeginPopup("##beatslicecls"))
       {
-         std::string trimmed = fn.size() > 20 ? fn.substr(0, 19) + "." : fn;
-         snprintf(header, sizeof(header), "strip %d - %s", strip + 1, trimmed.c_str());
-      }
-      BeginAudioSection(header);
-
-      {
-         const float btnW = 20.0f;
-         const float rowY = ImGui::GetCursorScreenPos().y;
-         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - btnW, rowY));
-         const bool clearClicked = ImGui::Button("##clearstrip", ImVec2(btnW, 0));
+         static int sPopupSlice = -1;
+         if (rightClickedSlice >= 0)
+            sPopupSlice = rightClickedSlice;
+         for (int c = 0; c < DrumClassifier::kNumClasses; c++)
          {
-            ImDrawList* dl = ImGui::GetWindowDrawList();
-            const ImVec2 bmin = ImGui::GetItemRectMin();
-            const ImVec2 bmax = ImGui::GetItemRectMax();
-            const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
-            const float iconSize = (bmax.y - bmin.y) * 0.65f;
-            const ImU32 col = ImGui::IsItemHovered() ? IM_COL32(230, 60, 60, 255) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
-            Tabler::DrawX(dl, center, iconSize, col);
-         }
-         if (clearClicked)
-         {
-            PushUndoCheckpoint();
-            n->ClearStrip(strip);
-         }
-
-         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, rowY));
-         bool muteBool = n->stripMute[strip];
-         if (AudioMuteButton("M##mute", &muteBool, btnW, 0.0f))
-         {
-            PushUndoCheckpoint();
-            n->stripMute[strip] = muteBool;
-         }
-         ImGui::SameLine(0.0f, 2.0f);
-         bool soloBool = n->stripSolo[strip];
-         if (AudioSoloButton("S##solo", &soloBool, btnW, 0.0f))
-         {
-            PushUndoCheckpoint();
-            n->stripSolo[strip] = soloBool;
-         }
-         ImGui::SameLine(0.0f, 6.0f);
-
-         static const char* kClassItems[] = {
-            "Auto", "Kick", "Bass", "Snare", "Clap", "Hat Cl", "Hat Op", "Perc"
-         };
-         ImGui::SetNextItemWidth(88.0f);
-         int currentClass = std::clamp(n->stripClassOverride[strip], 0, 7);
-         if (ImGui::Combo("##classoverride", &currentClass, kClassItems, IM_ARRAYSIZE(kClassItems)))
-         {
-            PushUndoCheckpoint();
-            n->stripClassOverride[strip] = currentClass;
-         }
-
-         const std::string& st = n->StripStatus(strip);
-         if (!st.empty())
-         {
-            ImGui::SameLine(0.0f, 8.0f);
-            ImGui::TextDisabled("%s", st.c_str());
-         }
-
-         ImGui::Dummy(ImVec2(gAudioContentW, ImGui::GetFrameHeight()));
-      }
-
-      DrawBeatArrangerStripWaveform(n, strip, 68.0f);
-      ImGui::Dummy(ImVec2(0.0f, 3.0f));
-
-      {
-         const float half = AudioHalfWidth();
-         AudioSlider("transient", &n->stripTransient[strip], -1.0f, 1.0f, "%.2f", half);
-         ImGui::SameLine();
-         AudioSlider("decay", &n->stripDecay[strip], -1.0f, 1.0f, "%.2f", half);
-         AudioSlider("pitch", &n->stripPitch[strip], -24.0f, 24.0f, "%.1f st", half);
-         ImGui::SameLine();
-         AudioSlider("fine tune", &n->stripFineTune[strip], -50.0f, 50.0f, "%.0f c", half);
-         AudioSlider("speed", &n->stripSpeed[strip], 0.25f, 4.0f, "%.2fx", half);
-         ImGui::SameLine();
-         AudioSlider("pan", &n->stripPan[strip], -1.0f, 1.0f, "%.2f", half);
-         AudioSlider("volume", &n->stripVolume[strip], 0.0f, 1.0f, "%.2f", AudioFullWidth());
-      }
-
-      EndAudioSection();
-      n->stripCardCanvasY1[strip] = ImGui::GetCursorScreenPos().y;
-      ImGui::PopID();
-   }
-
-   void DrawBeatArrangerTimeline(GraphNode& gn, BeatArrangerNode* n)
-   {
-      const int bars = std::clamp(n->bars, 1, 4);
-      const int steps = 16 * bars;
-      const float gutterW = 64.0f;
-      const float rightGutterW = 32.0f;
-      const float rowH = 22.0f;
-      const float rowGap = 2.0f;
-      const float cellGap = 1.0f;
-      const float stepsW = gAudioBodyW - gutterW - rightGutterW;
-      const float cellW = (stepsW - cellGap * (float)(steps - 1)) / (float)steps;
-      const ImVec2 origin = ImGui::GetCursorScreenPos();
-      n->timelineCanvasX0 = origin.x;
-      n->timelineCanvasY0 = origin.y;
-      n->timelineCanvasX1 = origin.x + gAudioBodyW;
-      n->timelineCanvasY1 = origin.y + (float)BeatArrangerNode::kNumStrips * (rowH + rowGap);
-
-      ImDrawList* dl = ImGui::GetWindowDrawList();
-      const bool isLight = IsThemeLight();
-      const auto& snapshot = n->VisualSnapshot();
-      const float playheadStep = snapshot.playheadStep;
-
-      for (int s = 0; s < BeatArrangerNode::kNumStrips; s++)
-      {
-         const float y0 = origin.y + (float)s * (rowH + rowGap);
-         ImGui::PushID(s);
-
-         // ---- Left gutter: strip label & mute status ----
-         ImGui::SetCursorScreenPos(ImVec2(origin.x, y0 + 2.0f));
-         char lbl[16];
-         snprintf(lbl, sizeof(lbl), "S%d", s + 1);
-         const bool isMuted = n->stripMute[s];
-         ImU32 textCol = isMuted ? ImGui::GetColorU32(ImGuiCol_TextDisabled)
-                                 : (isLight ? IM_COL32(30, 35, 45, 255) : IM_COL32(220, 225, 235, 255));
-         dl->AddText(ImVec2(origin.x + 4.0f, y0 + 3.0f), textCol, lbl);
-
-         const char* clsName = "";
-         if (n->stripClassOverride[s] > 0)
-            clsName = DrumClassifier::ClassName((DrumClassifier::DrumClass)(n->stripClassOverride[s] - 1));
-         else if (!n->stripSlices[s].empty())
-            clsName = DrumClassifier::ClassName(n->stripSlices[s][0].cls);
-         if (clsName && clsName[0])
-         {
-            dl->AddText(ImVec2(origin.x + 24.0f, y0 + 3.0f),
-                        isLight ? IM_COL32(110, 115, 130, 255) : IM_COL32(150, 155, 170, 255),
-                        clsName);
-         }
-
-         // ---- Step cells ----
-         for (int st = 0; st < steps; st++)
-         {
-            const float x0 = origin.x + gutterW + (float)st * (cellW + cellGap);
-            const bool isBar = (st % 16) == 0;
-            const bool isBeat = (st % 4) == 0;
-            const ImU32 frameCol = isLight
-               ? (isBar ? IM_COL32(205, 210, 222, 255) : (isBeat ? IM_COL32(218, 222, 232, 255) : IM_COL32(230, 233, 240, 255)))
-               : (isBar ? IM_COL32(65, 70, 84, 255) : (isBeat ? IM_COL32(50, 54, 66, 255) : IM_COL32(38, 41, 50, 255)));
-            dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x0 + cellW, y0 + rowH), frameCol, 2.0f);
-         }
-
-         // ---- Draw arranged hits for this strip ----
-         for (const auto& hit : n->mArrangedHits)
-         {
-            if (hit.sample == s && hit.step >= 0 && hit.step < steps)
+            if (ImGui::MenuItem(DrumClassifier::ClassName((DrumClassifier::DrumClass)c)) && sPopupSlice >= 0)
             {
-               const float x0 = origin.x + gutterW + (float)hit.step * (cellW + cellGap);
-               const float hitH = std::max(4.0f, rowH * std::clamp(hit.velocity, 0.2f, 1.0f));
-               const float hitY0 = y0 + rowH - hitH;
-
-               DrumClassifier::DrumClass cls = DrumClassifier::DrumClass::Perc;
-               if (n->stripClassOverride[s] > 0)
-                  cls = (DrumClassifier::DrumClass)(n->stripClassOverride[s] - 1);
-               else if (hit.slice >= 0 && hit.slice < (int)n->stripSlices[s].size())
-                  cls = n->stripSlices[s][hit.slice].cls;
-
-               ImU32 hitCol;
-               switch (cls)
-               {
-                  case DrumClassifier::DrumClass::Kick:      hitCol = IM_COL32(235, 75, 55, 230); break;
-                  case DrumClassifier::DrumClass::Bass:      hitCol = IM_COL32(180, 60, 220, 230); break;
-                  case DrumClassifier::DrumClass::Snare:     hitCol = IM_COL32(40, 160, 240, 230); break;
-                  case DrumClassifier::DrumClass::Clap:      hitCol = IM_COL32(245, 180, 40, 230); break;
-                  case DrumClassifier::DrumClass::HatClosed: hitCol = IM_COL32(60, 200, 120, 230); break;
-                  case DrumClassifier::DrumClass::HatOpen:   hitCol = IM_COL32(30, 210, 210, 230); break;
-                  default:                                   hitCol = IM_COL32(220, 110, 180, 230); break;
-               }
-
-               dl->AddRectFilled(ImVec2(x0, hitY0), ImVec2(x0 + cellW, y0 + rowH), hitCol, 2.0f);
+               PushUndoCheckpoint();
+               n->SetSliceClassOverride(sPopupSlice, (DrumClassifier::DrumClass)c);
             }
          }
-
-         // ---- Strip output pin: right gutter ----
-         const float pinX = origin.x + gutterW + stepsW + rightGutterW * 0.5f;
-         const float pinY = y0 + rowH * 0.5f;
-         const int pinId = gn.OutputPinId(1 + s);
-
-         ed::BeginPin(pinId, ed::PinKind::Output);
-         ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
-         const ImVec2 pinCenter(pinX, pinY);
-         const ImVec2 pinMin(pinCenter.x - kPinHit * 0.5f, pinCenter.y - kPinHit * 0.5f);
-         const ImVec2 pinMax(pinCenter.x + kPinHit * 0.5f, pinCenter.y + kPinHit * 0.5f);
-         ed::PinRect(pinMin, pinMax);
-
-         dl->AddCircleFilled(pinCenter, kPinRadius, isLight ? IM_COL32(50, 120, 240, 255) : IM_COL32(150, 190, 255, 255));
-         dl->AddCircle(pinCenter, kPinRadius, isLight ? IM_COL32(40, 48, 65, 255) : IM_COL32(20, 22, 30, 255), 0, 1.5f);
-         ed::EndPin();
-
-         ImGui::PopID();
+         ImGui::EndPopup();
       }
-
-      // ---- Playhead cursor overlay ----
-      if (steps > 0 && n->HasGroove())
-      {
-         const float phNorm = std::fmod(playheadStep, (float)steps) / (float)steps;
-         const float phX = origin.x + gutterW + phNorm * stepsW;
-         const float totalH = (float)BeatArrangerNode::kNumStrips * (rowH + rowGap);
-         dl->AddLine(ImVec2(phX, origin.y), ImVec2(phX, origin.y + totalH),
-                     IM_COL32(255, 220, 60, 230), 2.0f);
-      }
-
-      ImGui::SetCursorScreenPos(
-         ImVec2(origin.x, origin.y + (float)BeatArrangerNode::kNumStrips * (rowH + rowGap) + 4.0f));
-      ImGui::Dummy(ImVec2(gAudioBodyW, 1.0f));
    }
 
    void DrawBeatArrangerBody(GraphNode& gn, BeatArrangerNode* n)
    {
-      char stat[80];
-      const int loaded = n->LoadedStripCount();
-      const int numHits = (int)n->mArrangedHits.size();
-      if (loaded > 0)
-         snprintf(stat, sizeof(stat), "%d sample%s - %d hits - %d bars - %s",
-                  loaded, loaded > 1 ? "s" : "", numHits, n->bars, MusicTime::RateDivisionName(n->rate));
+      char stat[96];
+      if (n->IsAnalyzing())
+         snprintf(stat, sizeof(stat), "%s - analyzing...", n->FileName().c_str());
+      else if (n->HasBeat())
+         snprintf(stat, sizeof(stat), "%s - %d slices - %d hits", n->FileName().c_str(), n->SliceCount(),
+                  n->HitCount());
+      else if (!n->FileName().empty())
+         snprintf(stat, sizeof(stat), "%s - %s", n->FileName().c_str(), n->Status().c_str());
       else
-         snprintf(stat, sizeof(stat), "empty - drop samples");
+         snprintf(stat, sizeof(stat), "empty - drop a sample");
 
-      BeginAudioBody(gn.index, gn.category, kAudioWideWidth, stat);
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
-      // ---- 8 Strip cards (4 rows x 2 columns) ----
+      DrawBeatArrangerSource(n, 90.0f);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
       {
-         BeginAudioColumns(2);
-         BeginAudioColumn(0);
-         for (int strip = 0; strip < 4; strip++)
+         const float genW = AudioFullWidth();
+         const bool canGenerate = n->SliceCount() > 0 && !n->IsAnalyzing();
+         ImGui::BeginDisabled(!canGenerate);
+         if (ImGui::Button(n->HasBeat() ? "Generate (new seed)" : "Generate", ImVec2(genW, 0)))
          {
-            DrawBeatArrangerStripCard(n, strip);
-            ImGui::Dummy(ImVec2(0.0f, 4.0f));
+            PushUndoCheckpoint();
+            n->Generate();
          }
-         EndAudioColumn();
-         BeginAudioColumn(1);
-         for (int strip = 4; strip < BeatArrangerNode::kNumStrips; strip++)
-         {
-            DrawBeatArrangerStripCard(n, strip);
-            ImGui::Dummy(ImVec2(0.0f, 4.0f));
-         }
-         EndAudioColumn();
-         EndAudioColumns();
+         ImGui::EndDisabled();
       }
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
 
-      // ---- Groove Arrangement Timeline & Visualizer ----
-      DrawBeatArrangerTimeline(gn, n);
-      ImGui::Dummy(ImVec2(0.0f, 2.0f));
-
-      // ---- Global controls: Rate + Bars + Seed + Swing + Rand Pitch ----
+      // ---- 7 sliders, KHS-simple (AudioSlider per the brief's explicit
+      // deviation from AudioKnobRow for this node) ----
       {
-         AudioKnobRow row(5);
-         row.Dropdown("rate", MusicTime::RateDivisionList(), n->rate,
-                      [n](int i) { PushUndoCheckpoint(); n->rate = i; });
-         static const std::vector<std::string> kBarOptions = { "1 bar", "2 bars", "4 bars" };
-         int barIdx = (n->bars == 4 ? 2 : (n->bars == 1 ? 0 : 1));
-         row.Dropdown("bars", kBarOptions, barIdx,
-                      [n](int i) { PushUndoCheckpoint(); n->bars = (i == 0 ? 1 : (i == 2 ? 4 : 2)); });
-         row.KnobInt("seed", &n->seed, 0, 9999);
-         row.Knob("swing", &n->swing, 0.0f, 1.0f, "%.2f");
-         row.Knob("rand pitch", &n->randPitch, 0.0f, 1.0f, "%.2f");
+         AudioKnobRow row(1);
+         static const std::vector<std::string> kTimeSigOptions(
+            BeatArrangerNode::kTimeSigNames, BeatArrangerNode::kTimeSigNames + BeatArrangerNode::kNumTimeSigs);
+         row.Dropdown("time sig", kTimeSigOptions, n->timeSig,
+                      [n](int i) { PushUndoCheckpoint(); n->timeSig = i; });
          row.End();
       }
       {
-         AudioKnobRow row(5);
-         row.Knob("speed", &n->globalSpeed, 0.25f, 4.0f, "%.2fx");
-         row.Knob("transient", &n->globalTransient, -1.0f, 1.0f, "%.2f");
-         row.Knob("decay", &n->globalDecay, -1.0f, 1.0f, "%.2f");
-         if (row.Button("Roll"))
-         {
-            PushUndoCheckpoint();
-            n->ReArrange();
-         }
-         row.Knob("output", &n->volume, 0.0f, 1.0f, "%.2f");
-         row.End();
-      }
-      ImGui::Dummy(ImVec2(0.0f, 2.0f));
-
-      // ---- Action Buttons Strip ----
-      {
-         const float gap = ImGui::GetStyle().ItemSpacing.x;
-         const float btnW = (AudioFullWidth() - gap * 2.0f) / 3.0f;
-         char arrangeLabel[32];
-         snprintf(arrangeLabel, sizeof(arrangeLabel), "Arrange (%d)", n->seed);
-         if (ImGui::Button(arrangeLabel, ImVec2(btnW, 0)))
-         {
-            PushUndoCheckpoint();
-            n->Arrange();
-         }
+         const float half = AudioHalfWidth();
+         AudioSlider("swing", &n->swing, 0.0f, 1.0f, "%.2f", half);
          ImGui::SameLine();
-         if (ImGui::Button("Re-Arrange", ImVec2(btnW, 0)))
-         {
-            PushUndoCheckpoint();
-            n->ReArrange();
-         }
+         AudioSlider("rand pitch", &n->randPitch, 0.0f, 1.0f, "%.2f", half);
+         AudioSlider("speed", &n->speed, 0.25f, 4.0f, "%.2fx", half);
          ImGui::SameLine();
-         if (ImGui::Button("Clear Groove", ImVec2(btnW, 0)))
-         {
-            PushUndoCheckpoint();
-            n->ClearGroove();
-         }
+         AudioSlider("transient", &n->transient, 0.0f, 1.0f, "%.2f", half);
+         AudioSlider("decay", &n->decay, 0.0f, 1.0f, "%.2f", half);
+         ImGui::SameLine();
+         AudioSlider("output", &n->output, 0.0f, 1.0f, "%.2f", half);
       }
 
       EndAudioBody();
@@ -39584,7 +39343,7 @@ namespace
          { "Molder", "Analysis/genome resynthesis: decomposes a loaded or recorded sample into tracked harmonic partials plus a real residual waveform, then Roll mutates a parameter genome and re-renders a new sample from it - each roll walks further from the last, not from the original. Iterate feeds the last render back in as the new source and re-analyses it (progressively eating the sound); Reset returns fully to the originally loaded/recorded sample - generation 0 and the six shaping knobs (tone/air/snap/stretch/time/pitch) back to neutral, and the analysis itself restored, undoing any Iterate. chaos sets how far the next roll jumps; pitch offsets on top of the genome's own pitch walk; tone balances partials against residual; air/snap are the residual's steady-hiss and transient-attack levels; stretch scales inharmonicity together with harmonic spacing; time warps the attack/decay timing without changing the sample's length. This is a sound designer, not a playable instrument - it takes no note input, only a single self-triggered voice with start/end range, loop, reverse and ping-pong, the same transport as Sampler. Analysis and rendering both run on a background thread, so rolling never stalls the UI. seed/gen/f0/harm in the readout are the exact genome (seed + generation count) and the analysed pitch - two integers are enough to reproduce any rolled sound exactly on reload." },
          { "Grain Molder", "Slices audio into overlapping grains, calculates per-grain metrics (Level, Brightness, Random), and rearranges them based on a continuous blend between original temporal position and metric rank. At amount 0 it is the clean identity passthrough; at 1 it is fully sorted into a swell or brightness contour. Rendering runs asynchronously on a worker thread." },
          { "Drum Sequencer", "An 8-lane, 8-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8x8 step grid. Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
-         { "Beat Arranger", "A multi-sample breakbeat arranger: chops up to 8 samples at transients, classifies slices by drum type, and generates algorithmic breakbeat grooves. Features pattern length (bars), swing, random pitch, global transient/decay/speed, and per-strip tuning, volume, pan, mute, and solo." },
+         { "Beat Arranger", "Drop one sample; it chops the sample at transients, classifies each slice (kick, snare, hat, bass, tonal, and more) and lays them out into a seeded groove that plays free-running from the transport. Generate re-rolls the groove from a new seed; right-click a slice in the waveform to override its detected class. Params: time sig, swing, random pitch, speed, transient, decay, output." },
          { "Audio In", "Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch. The capture runs on its own engine bound to the system default input, independently of whichever output device is selected, and the header line says why it isn't live when it isn't." },
          { "Audio Filter", "One filter, one of 12 types (LP/HP at 12/24/36 dB, BP, notch, shelves, peak, all-pass). Drag the handle on the response curve to set frequency and gain, Shift-drag to set Q - the picture is the control." },
          { "Audio Color Ramp", "Splits incoming audio into up to 8 frequency bands - drag the dividers right on the spectrum display to resize them - and assigns each one a colour, VIBGYOR by default from low to high. With no image patched in it outputs the resulting gradient standalone; patch one into its optional image input and it grades that image by luminance through the same audio-reactive palette instead." },
@@ -40408,7 +40167,7 @@ namespace
                { "Analog", "Virtual-analog polyphonic synth with dual oscillators, unevenly detuned unison stacking, osc hard sync, sub-oscillator, noise, pre-filter drive, nonlinear ZDF Moog ladder and SVF filters, dual-path stereo spread, and amp ADSR." },
                { "Sampler", "High-resolution multi-sample player with pitch tracking, root note detection, start/end trimming, loop crossfades, and one-shot playback." },
                { "Drum Sequencer", "8-lane pattern drum sequencer with individual sample slots, per-step velocity, swing, choke groups, per-lane mute/solo, and decay envelopes." },
-               { "Beat Arranger", "8-sample transient-slicing breakbeat arranger that classifies drum slices and composes algorithmic grooves locked to the transport." },
+               { "Beat Arranger", "Single-source drum/tonal slice classifier that composes a seeded, transport-locked groove from one sample." },
                { "Slicer", "Transient- or grid-sliced sample playback: chops a loaded sample into up to 64 slices and maps them chromatically from MIDI note 36, with draggable slice markers, a per-slice attack/decay pair, and a crossthrough toggle that lets a slice run past its own boundary." },
                { "Equation Synth", "Real-time bytebeat and mathematical expression synthesis evaluating user formulas with dynamic variables (t, x, y, inputs)." },
                { "Wave Terrain", "2D terrain trajectory orbital synthesis - a moving point traces a path across a height-mapped surface to generate a waveform." },
@@ -52981,6 +52740,11 @@ static bool RunDrumSequencerFixture()
    return ok;
 }
 
+// Beat Arranger v2's DSP fixture (new-audio-node/SKILL.md §5 + the v2 brief's
+// §9). Every signal here is synthesized in-process - no fixture asset files,
+// per the brief and the clean-room rule (no reference to any GPL noise/DSP
+// implementation; the filtering below is the same one-pole cascade technique
+// already used in DrumClassifier.cpp, just duplicated locally for the test).
 namespace BeatArrangerTest
 {
    std::vector<float> Render(BeatArrangerNode& node, int totalFrames, int blockSize, int sampleRate)
@@ -53010,149 +52774,820 @@ namespace BeatArrangerTest
       }
       return out;
    }
+
+   std::string WriteMonoWav(const std::string& path, const std::vector<float>& samples, int sampleRate)
+   {
+      std::vector<int16_t> pcm(samples.size());
+      for (size_t i = 0; i < samples.size(); i++)
+         pcm[i] = (int16_t)(std::clamp(samples[i], -1.0f, 1.0f) * 32000.0f);
+      std::ofstream f(path, std::ios::binary);
+      auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
+      auto writeU16 = [&](uint16_t v) { f.write((const char*)&v, 2); };
+      const uint32_t dataSize = (uint32_t)(pcm.size() * sizeof(int16_t));
+      f.write("RIFF", 4); writeU32(36 + dataSize); f.write("WAVE", 4);
+      f.write("fmt ", 4); writeU32(16); writeU16(1); writeU16(1);
+      writeU32(sampleRate); writeU32(sampleRate * 2); writeU16(2); writeU16(16);
+      f.write("data", 4); writeU32(dataSize);
+      f.write((const char*)pcm.data(), dataSize);
+      return path;
+   }
+
+   // Local one-pole lowpass cascade, same technique DrumClassifier.cpp uses
+   // internally (that copy is in an anonymous namespace, not exported) - kept
+   // here only to shape synthetic test noise into a band, never to duplicate
+   // any GPL source.
+   void LowpassInPlace(std::vector<float>& buf, float cutoffHz, double sr)
+   {
+      if (buf.empty() || cutoffHz <= 0.0f)
+         return;
+      const float coeff = std::exp(-2.0f * 3.14159265358979323846f * cutoffHz / (float)sr);
+      float y = buf[0];
+      for (float& x : buf)
+      {
+         y = x + (y - x) * coeff;
+         x = y;
+      }
+   }
+
+   std::vector<float> BandNoise(int n, double sr, float loHz, float hiHz, uint32_t seed)
+   {
+      BeatArranger::Rng rng(seed);
+      std::vector<float> buf(n);
+      for (int i = 0; i < n; i++)
+         buf[i] = rng.NextBipolar();
+      if (hiHz > 0.0f)
+      {
+         LowpassInPlace(buf, hiHz, sr);
+         LowpassInPlace(buf, hiHz, sr);
+      }
+      if (loHz > 1.0f)
+      {
+         std::vector<float> lo = buf;
+         LowpassInPlace(lo, loHz, sr);
+         LowpassInPlace(lo, loHz, sr);
+         for (int i = 0; i < n; i++)
+            buf[i] -= lo[i];
+      }
+      return buf;
+   }
+
+   // A decaying sine at `freqHz`, envelope exp(-t/tau), `lenSec` long.
+   std::vector<float> DecayingTone(double sr, float freqHz, float tau, float lenSec)
+   {
+      const int n = std::max(1, (int)(lenSec * sr));
+      std::vector<float> buf(n);
+      for (int i = 0; i < n; i++)
+      {
+         const float t = (float)(i / sr);
+         buf[i] = std::sin(2.0f * 3.14159265358979323846f * freqHz * t) * std::exp(-t / tau);
+      }
+      return buf;
+   }
+
+   // A short noise burst enveloped by exp(-t/tau), used as one "click" of a
+   // multi-onset Clap.
+   void AddNoiseBurst(std::vector<float>& buf, int startFrame, double sr, float loHz, float hiHz, float tau,
+                       float lenSec, uint32_t seed)
+   {
+      const int n = std::max(1, (int)(lenSec * sr));
+      std::vector<float> burst = BandNoise(n, sr, loHz, hiHz, seed);
+      for (int i = 0; i < n && startFrame + i < (int)buf.size(); i++)
+      {
+         const float t = (float)(i / sr);
+         buf[startFrame + i] += burst[i] * std::exp(-t / tau);
+      }
+   }
+
+   // Multiplies the first `rampMs` of `buf` by a rising raised-cosine ramp
+   // (0 -> 1). Real snare/hat noise still has a fast but nonzero rise time;
+   // without one, a synthesized noise burst starts at full statistical
+   // amplitude from sample 0, so frame-to-frame energy is just random
+   // fluctuation the whole way through - and DrumClassifier's micro-onset
+   // flux detector (a 128-sample-hop ODF that counts any local flux peak
+   // 5-15 ms after the last one) reliably mistakes several of those random
+   // fluctuations for genuine onsets. A short monotonic rise gives the
+   // detector one real, dominant energy increase to lock onto instead.
+   void ApplyAttackRamp(std::vector<float>& buf, double sr, float rampMs)
+   {
+      const int rampN = std::min((int)buf.size(), std::max(1, (int)(rampMs * 0.001 * sr)));
+      for (int i = 0; i < rampN; i++)
+         buf[i] *= 0.5f * (1.0f - std::cos(3.14159265358979323846f * (float)i / (float)rampN));
+   }
+
+   // Normalizes a noise buffer to a near-constant local RMS (a simple AGC):
+   // real acoustic noise (e.g. a snare's coil-spring buzz) decays smoothly
+   // because it's one continuous physical resonance, but a from-scratch PRNG
+   // buffer, even band-limited, still has substantial random frame-to-frame
+   // energy variation (a band-limited-noise window only samples a finite
+   // number of effectively independent values, so its short-term RMS
+   // wanders by tens of percent) - exactly the scale DrumClassifier's
+   // 128-sample-hop micro-onset flux detector is tuned to notice, so it
+   // mistakes several of those random wobbles for distinct onsets. This
+   // divides out that wander (via a heavily-smoothed running power
+   // estimate - smoothed well past the 2.9 ms hop so it tracks the
+   // envelope's trend, not the noise's own fast fluctuations) so the
+   // buffer's energy trajectory is governed by whatever deterministic
+   // envelope (ramp, tau-decay) is applied afterward, not by PRNG luck.
+   void FlattenEnvelope(std::vector<float>& buf, double sr)
+   {
+      if (buf.empty())
+         return;
+      std::vector<float> power(buf.size());
+      float meanPower = 0.0f;
+      for (size_t i = 0; i < buf.size(); i++)
+      {
+         power[i] = buf[i] * buf[i];
+         meanPower += power[i];
+      }
+      meanPower /= (float)buf.size();
+      // LowpassInPlace's one-pole seeds its running value from buf[0]
+      // itself (no averaging in yet), so right at the start - its ~350
+      // sample time constant at this 20 Hz cutoff - the estimate is
+      // dominated by wherever that single starting sample happened to
+      // land, not the buffer's real local power; dividing by a still-
+      // converging (and possibly too-small) estimate briefly acts as a
+      // huge, spurious amplifier - exactly the kind of single-sample spike
+      // DrumClassifier's peak/attack/decay detection is sensitive to. A
+      // forward + backward (zero-phase) pass fixes this properly: the
+      // backward pass re-smooths the start using the *later* samples'
+      // history, which the forward-only pass didn't have yet. The overall-
+      // RMS floor is kept only as a last-resort guard against dividing by
+      // near-silence.
+      LowpassInPlace(power, 20.0f, sr);
+      LowpassInPlace(power, 20.0f, sr);
+      std::reverse(power.begin(), power.end());
+      LowpassInPlace(power, 20.0f, sr);
+      LowpassInPlace(power, 20.0f, sr);
+      std::reverse(power.begin(), power.end());
+      const float floorPower = 0.01f * meanPower;
+      for (size_t i = 0; i < buf.size(); i++)
+      {
+         const float rms = std::sqrt(std::max(power[i], std::max(floorPower, 1e-8f)));
+         buf[i] /= rms;
+      }
+   }
+
+   // Pitch-dropping sine (Kick cue): f0 drops smoothly from startHz to endHz
+   // over the duration with exponential decay envelope.
+   std::vector<float> PitchDroppingTone(double sr, float startHz, float endHz, float tau, float lenSec)
+   {
+      const int n = std::max(1, (int)(lenSec * sr));
+      std::vector<float> buf(n);
+      double phase = 0.0;
+      for (int i = 0; i < n; i++)
+      {
+         const double t = (double)i / sr;
+         const double frac = std::min(1.0, (double)i / (double)n);
+         const double fHz = (double)startHz + ((double)endHz - (double)startHz) * frac;
+         phase += 2.0 * 3.14159265358979323846 * fHz / sr;
+         buf[i] = (float)std::sin(phase) * std::exp(-(float)t / tau);
+      }
+      return buf;
+   }
+
+   // Piano synthesis (Piano cue): fundamental + 8 stiff-string stretched harmonics,
+   // fast attack ramp, smooth exponential decay.
+   std::vector<float> PianoTone(double sr, float f0, float tau, float lenSec)
+   {
+      const int n = std::max(1, (int)(lenSec * sr));
+      std::vector<float> buf(n, 0.0f);
+      const float B = 0.0004f;
+      const int attackN = std::max(1, (int)(0.002 * sr));
+      for (int i = 0; i < n; i++)
+      {
+         const double t = (double)i / sr;
+         float val = 0.0f;
+         for (int k = 1; k <= 8; k++)
+         {
+            const double fk = (double)k * (double)f0 * std::sqrt(1.0 + (double)B * k * k);
+            val += (1.0f / (float)k) * (float)std::sin(2.0 * 3.14159265358979323846 * fk * t);
+         }
+         float env = std::exp(-(float)t / tau);
+         if (i < attackN)
+            env *= (float)i / (float)attackN;
+         buf[i] = val * env;
+      }
+      return buf;
+   }
+
+   // Constant-amplitude sine with an 80 ms raised-cosine fade-in and an
+   // abrupt cutoff at the buffer's end - not a percussive attack, and no
+   // smooth exponential decay tail (Synth's two cues). The fade must be
+   // long enough that DrumClassifier's attackTimeMs (measured as the first
+   // 10%/90%-of-peak |sample| crossings, which an oscillating carrier can
+   // reach well before the envelope itself has settled) still comes out
+   // >= its 25 ms percussive-attack cutoff - a 30 ms fade was too short and
+   // read as a fast/percussive attack, tipping the pitched-material score
+   // to Piano instead of Synth.
+   //
+   // A dead-pure, perfectly periodic sine also has a second, subtler
+   // problem: its low-passed autocorrelation is exactly as strong at every
+   // integer multiple of its true period as at the true period itself, and
+   // DrumClassifier's low-band pitch-stability search spans a ~3-octave lag
+   // window (30-250 Hz-equivalent), so a low tone's 2nd/3rd harmonic period
+   // reliably lands inside that window and reads as rock-solid "bass note"
+   // pitch stability - which a real synth pad practically never has,
+   // because no analog or digital oscillator (and no two detuned voices
+   // beating together) holds an exact, unchanging frequency indefinitely.
+   // A slow (~5 Hz), shallow (+-1.5%) vibrato is a completely ordinary synth
+   // pad characteristic - it reproduces here by integrating instantaneous
+   // frequency into phase (not just modulating a fixed-frequency phase
+   // formula) - and it drifts the exact autocorrelation lag enough between
+   // DrumClassifier's two 150 ms low-band correlation windows that they stop
+   // agreeing to within its +-4-sample tolerance, so lowBandPitchStability
+   // (and Bass's bonus from it) reads 0 instead of a spuriously confident
+   // ~0.8, while the wideband f0 estimate (a much shorter 60 ms window) is
+   // barely affected and still reports a clear, confident pitch for Synth's
+   // own pitched-material gate.
+   std::vector<float> SustainedTone(double sr, float freqHz, float lenSec)
+   {
+      const int n = std::max(1, (int)(lenSec * sr));
+      const int fadeN = std::max(1, (int)(0.080 * sr));
+      std::vector<float> buf(n);
+      const double vibratoHz = 5.0;
+      const double vibratoDepth = 0.015; // +-1.5%
+      double phase = 0.0;
+      for (int i = 0; i < n; i++)
+      {
+         float g = 1.0f;
+         if (i < fadeN)
+            g = 0.5f * (1.0f - std::cos(3.14159265358979323846 * (double)i / (double)fadeN));
+         // The phase must be accumulated in double precision here - this
+         // buffer is a full second long (hundreds of periods), and a
+         // float32 argument to std::sin() at t near 1.0s (angle ~= 1885 rad)
+         // loses enough precision that per-sample amplitude jitters by ~1e-4
+         // relative to the true peak. Because this signal has NO real decay
+         // (flat sustain until an abrupt cutoff), that jitter - not any
+         // genuine amplitude change - can make a late sample marginally
+         // outscore every earlier "true" peak, moving DrumClassifier's
+         // peak-detection index (strict `a > peakVal`) deep into the tail of
+         // the buffer with almost nothing left to measure. That starves the
+         // decay-envelope scan of its expected ~900ms window and makes
+         // decayTimeMs read as a spuriously short "instant drop" (looking
+         // percussive) instead of the intended long sustain - double
+         // precision keeps every period close to bit-identical so the true
+         // first peak (right after the fade-in) always wins.
+         const double t = (double)i / sr;
+         const double instFreq = (double)freqHz * (1.0 + vibratoDepth * std::sin(2.0 * 3.14159265358979323846 * vibratoHz * t));
+         phase += 2.0 * 3.14159265358979323846 * instFreq / sr;
+         buf[i] = (float)(std::sin(phase)) * g;
+      }
+      return buf;
+   }
 }
 
 static bool RunBeatArrangerFixture()
 {
+   using namespace BeatArrangerTest;
    bool ok = true;
 
-   // 1. DrumClassifier tests
+   // ---- 1. DrumClassifier: per-class exactness at three sample rates -------
+   for (double sr : { 44100.0, 48000.0, 96000.0 })
    {
-      const int N = 2048;
-      const double sr = 44100.0;
-      std::vector<float> sub(N);
-      for (int i = 0; i < N; i++)
-         sub[i] = std::sin(2.0 * M_PI * 55.0 * (double)i / sr) * std::exp(-4.0 * (double)i / sr);
-      auto cSub = DrumClassifier::Classify(sub.data(), N, sr, nullptr);
-      const bool subOk = (cSub.cls == DrumClassifier::DrumClass::Kick || cSub.cls == DrumClassifier::DrumClass::Bass);
-      printf("BEATARRANGERTEST DrumClassifier sub -> %s (%s)\n",
-             DrumClassifier::ClassName(cSub.cls), subOk ? "OK" : "FAIL");
-      ok &= subOk;
+      auto checkClass = [&](const char* label, std::vector<float> sig, DrumClassifier::DrumClass want)
+      {
+         auto r = DrumClassifier::Classify(sig.data(), (int)sig.size(), sr, nullptr);
+         const bool pass = (r.cls == want);
+         printf("BEATARRANGERTEST classify %s @%gHz -> %s (want %s) (%s)\n", label, sr,
+                DrumClassifier::ClassName(r.cls), DrumClassifier::ClassName(want), pass ? "OK" : "FAIL");
+         if (getenv("BADEBUG") != nullptr)
+         {
+            const auto& f = r.f;
+            printf("  DEBUG attack=%.2fms decay=%.2fms zcr=%.3f micro=%d centroid=%.1f flat=%.3f "
+                   "eSub=%.3f eLow=%.3f eLM=%.3f eMid=%.3f eHigh=%.3f eAir=%.3f "
+                   "f0=%.1f f0conf=%.3f harm=%.3f stretch=%.3f R2=%.3f plateau=%d lowPitch=%.3f\n",
+                   f.attackTimeMs, f.decayTimeMs, f.zcr, f.microOnsets40ms, f.centroidMean, f.spectralFlatness,
+                   f.energySub, f.energyLow, f.energyLowMid, f.energyMid, f.energyHigh, f.energyAir,
+                   f.f0Hz, f.f0Confidence, f.harmonicRatio, f.inharmonicityStretch, f.decayLinearityR2,
+                   (int)f.hasSustainPlateau, f.lowBandPitchStability);
+            for (int i = 0; i < DrumClassifier::kNumClasses; i++)
+               printf("  DEBUG score[%s]=%.4f\n", DrumClassifier::ClassName((DrumClassifier::DrumClass)i), r.scores[i]);
+         }
+         ok &= pass;
+      };
 
-      auto cHint = DrumClassifier::Classify(sub.data(), N, sr, "kick_punch.wav");
-      const bool hintOk = (cHint.cls == DrumClassifier::DrumClass::Kick);
-      printf("BEATARRANGERTEST DrumClassifier hint 'kick' -> %s (%s)\n",
-             DrumClassifier::ClassName(cHint.cls), hintOk ? "OK" : "FAIL");
-      ok &= hintOk;
+      checkClass("kick", PitchDroppingTone(sr, 60.0f, 40.0f, 0.04f, 0.15f), DrumClassifier::DrumClass::Kick);
+      checkClass("bass", DecayingTone(sr, 80.0f, 0.6f, 1.5f), DrumClassifier::DrumClass::Bass);
+      checkClass("synth", SustainedTone(sr, 850.0f, 1.0f), DrumClassifier::DrumClass::Synth);
+      checkClass("piano", PianoTone(sr, 220.0f, 0.35f, 0.6f), DrumClassifier::DrumClass::Piano);
+
+      {
+         std::vector<float> snare = BandNoise((int)(0.3 * sr), sr, 900.0f, 3200.0f, 1001);
+         std::vector<float> snareBody = BandNoise((int)(0.3 * sr), sr, 30.0f, 200.0f, 4242);
+         for (size_t i = 0; i < snare.size(); i++)
+            snare[i] = 1.0f * snare[i] + 1.35f * snareBody[i];
+         FlattenEnvelope(snare, sr);
+         const float tau = 0.12f;
+         for (size_t i = 0; i < snare.size(); i++)
+            snare[i] *= std::exp(-(float)(i / sr) / tau);
+         checkClass("snare", snare, DrumClassifier::DrumClass::Snare);
+      }
+      {
+         std::vector<float> clap((size_t)(0.25 * sr), 0.0f);
+         std::vector<float> claptail = BandNoise((int)(0.25 * sr), sr, 1000.0f, 4000.0f, 2500);
+         FlattenEnvelope(claptail, sr);
+         for (size_t i = 0; i < claptail.size(); i++)
+            clap[i] += 0.35f * claptail[i] * std::exp(-(float)(i / sr) / 0.12f);
+         const int hop = std::max(1, (int)(sr * 0.009)); // ~9 ms burst spacing across sample rates
+         AddNoiseBurst(clap, 0, sr, 1000.0f, 4000.0f, 0.025f, 0.05f, 2001);
+         AddNoiseBurst(clap, hop, sr, 1000.0f, 4000.0f, 0.025f, 0.05f, 2002);
+         AddNoiseBurst(clap, 2 * hop, sr, 1000.0f, 4000.0f, 0.025f, 0.05f, 2003);
+         AddNoiseBurst(clap, 3 * hop, sr, 1000.0f, 4000.0f, 0.025f, 0.05f, 2004);
+         checkClass("clap", clap, DrumClassifier::DrumClass::Clap);
+      }
+      {
+         std::vector<float> hatClosed = BandNoise((int)(0.08 * sr), sr, 6000.0f, 0.0f, 3001);
+         const float tau = 0.015f;
+         for (size_t i = 0; i < hatClosed.size(); i++)
+            hatClosed[i] *= std::exp(-(float)(i / sr) / tau);
+         checkClass("hat-closed", hatClosed, DrumClassifier::DrumClass::HatClosed);
+      }
+      {
+         std::vector<float> hatOpen = BandNoise((int)(0.40 * sr), sr, 6000.0f, 10000.0f, 4001);
+         ApplyAttackRamp(hatOpen, sr, 4.0f);
+         const float tau = 0.15f;
+         for (size_t i = 0; i < hatOpen.size(); i++)
+            hatOpen[i] *= std::exp(-(float)(i / sr) / tau);
+         checkClass("hat-open", hatOpen, DrumClassifier::DrumClass::HatOpen);
+      }
    }
 
-   // 2. BeatArranger arrangement & serialization tests
+   // ---- 2. Filename-prior tests -------------------------------------------
+   {
+      const double sr = 44100.0;
+      auto kick = DecayingTone(sr, 55.0f, 0.03f, 0.15f);
+      auto cHint = DrumClassifier::Classify(kick.data(), (int)kick.size(), sr, "kick_punch.wav");
+      const bool hintOk = (cHint.cls == DrumClassifier::DrumClass::Kick);
+      printf("BEATARRANGERTEST filename prior 'kick' -> %s (%s)\n", DrumClassifier::ClassName(cHint.cls),
+             hintOk ? "OK" : "FAIL");
+      ok &= hintOk;
+
+      // Ambiguous signal (decaying low tone) + "Kick 01" hint -> Kick
+      auto ambLow = DecayingTone(sr, 120.0f, 0.06f, 0.15f);
+      auto cAmb = DrumClassifier::Classify(ambLow.data(), (int)ambLow.size(), sr, "Kick 01.wav");
+      const bool ambKickOk = (cAmb.cls == DrumClassifier::DrumClass::Kick);
+      printf("BEATARRANGERTEST filename prior 'Kick 01' on ambiguous signal -> %s (%s)\n",
+             DrumClassifier::ClassName(cAmb.cls), ambKickOk ? "OK" : "FAIL");
+      ok &= ambKickOk;
+
+      // "OHH_01" -> HatOpen (D1: ohh before hh)
+      std::vector<float> ambHat = BandNoise((int)(0.35 * sr), sr, 6000.0f, 10000.0f, 4001);
+      ApplyAttackRamp(ambHat, sr, 4.0f);
+      const float tauAmb = 0.13f;
+      for (size_t i = 0; i < ambHat.size(); i++)
+         ambHat[i] *= std::exp(-(float)(i / sr) / tauAmb);
+      auto cOhh = DrumClassifier::Classify(ambHat.data(), (int)ambHat.size(), sr, "OHH_01.wav");
+      const bool ohhOk = (cOhh.cls == DrumClassifier::DrumClass::HatOpen);
+      printf("BEATARRANGERTEST filename prior 'OHH_01' -> %s (%s)\n",
+             DrumClassifier::ClassName(cOhh.cls), ohhOk ? "OK" : "FAIL");
+      ok &= ohhOk;
+
+      // D2: whole-token match only - "subtle_pad.wav" must NOT match "sub" for Bass
+      auto pad = SustainedTone(sr, 440.0f, 0.8f);
+      auto cSubtle = DrumClassifier::Classify(pad.data(), (int)pad.size(), sr, "subtle_pad.wav");
+      const bool subtleOk = (cSubtle.cls != DrumClassifier::DrumClass::Bass);
+      printf("BEATARRANGERTEST filename tokenizer 'subtle_pad' != Bass -> %s (%s)\n",
+             DrumClassifier::ClassName(cSubtle.cls), subtleOk ? "OK" : "FAIL");
+      ok &= subtleOk;
+
+      // "what_a_tune.wav" must never be read as a hint for HatClosed via "hat" in "what"
+      std::vector<float> snare = BandNoise((int)(0.3 * sr), sr, 900.0f, 3200.0f, 1001);
+      std::vector<float> snareBody = BandNoise((int)(0.3 * sr), sr, 30.0f, 200.0f, 4242);
+      for (size_t i = 0; i < snare.size(); i++)
+         snare[i] = 1.0f * snare[i] + 1.35f * snareBody[i];
+      FlattenEnvelope(snare, sr);
+      for (size_t i = 0; i < snare.size(); i++)
+         snare[i] *= std::exp(-(float)(i / sr) / 0.12f);
+      auto cTok = DrumClassifier::Classify(snare.data(), (int)snare.size(), sr, "what_a_tune.wav");
+      const bool tokOk = (cTok.cls != DrumClassifier::DrumClass::HatClosed);
+      printf("BEATARRANGERTEST filename tokenizer 'what' != hat-token -> %s (%s)\n",
+             DrumClassifier::ClassName(cTok.cls), tokOk ? "OK" : "FAIL");
+      ok &= tokOk;
+   }
+
+   // ---- 3. Short-slice-length robustness (fix D9 + edge lengths) ----------
+   {
+      bool robust = true;
+      for (int len : { 0, 1, 8, 32, 64, 100, 1023 })
+      {
+         std::vector<float> tiny(std::max(0, len), 0.5f);
+         auto r = DrumClassifier::Classify(len > 0 ? tiny.data() : nullptr, len, 44100.0, nullptr);
+         float sumScores = 0.0f;
+         for (int i = 0; i < DrumClassifier::kNumClasses; i++)
+            sumScores += r.scores[i];
+         const bool normalized = std::fabs(sumScores - 1.0f) < 1e-3f;
+         const bool validCls = (r.cls >= (DrumClassifier::DrumClass)0 && (int)r.cls < DrumClassifier::kNumClasses);
+         robust &= (normalized && validCls);
+      }
+      printf("BEATARRANGERTEST short-slice robustness (%s)\n", robust ? "OK" : "FAIL");
+      ok &= robust;
+   }
+
+   // ---- 4. BeatArranger::Generate: determinism, dedup, pitch range, meter,
+   //         and single-slice role promotion --------------------------------
    {
       std::vector<BeatArranger::SliceInfo> pool;
       BeatArranger::SliceInfo kickSlice;
-      kickSlice.sample = 0;
       kickSlice.slice = 0;
       kickSlice.cls = DrumClassifier::DrumClass::Kick;
       kickSlice.confidence = 0.95f;
       kickSlice.lenSec = 0.5f;
+      kickSlice.centroid = 150.0f;
+      kickSlice.decaySec = 0.1f;
       pool.push_back(kickSlice);
 
       BeatArranger::SliceInfo snareSlice;
-      snareSlice.sample = 1;
-      snareSlice.slice = 0;
+      snareSlice.slice = 1;
       snareSlice.cls = DrumClassifier::DrumClass::Snare;
       snareSlice.confidence = 0.9f;
       snareSlice.lenSec = 0.3f;
+      snareSlice.centroid = 2000.0f;
       pool.push_back(snareSlice);
 
       BeatArranger::SliceInfo hatSlice;
-      hatSlice.sample = 2;
-      hatSlice.slice = 0;
+      hatSlice.slice = 2;
       hatSlice.cls = DrumClassifier::DrumClass::HatClosed;
       hatSlice.confidence = 0.85f;
       hatSlice.lenSec = 0.1f;
+      hatSlice.centroid = 6000.0f;
       pool.push_back(hatSlice);
 
-      BeatArranger::ArrangeParams p;
-      p.bars = 2;
-      p.randPitch = 0.0f;
-      p.swing = 0.0f;
+      // A Bass and a Perc slice, so a seed change has something to actually
+      // change: with only one candidate per class (as above), Generate()'s
+      // step/slice placement is fully deterministic from the Euclidean
+      // patterns and fixed backbeat alone - PickWeighted has nothing to
+      // choose between, and there's no per-step probabilistic role to
+      // enable/skip, so seed 42 and seed 43 produce identical (step, slice)
+      // pairs (only the velocity/pitchRand values differ, which this test
+      // doesn't compare). Bass adds a per-kick-step 60% coin flip
+      // (rng.Next01() >= 0.6f) and Perc adds a per-step 12% coin flip - both
+      // seed-dependent gates that select a genuinely different subset of
+      // steps between seeds.
+      BeatArranger::SliceInfo bassSlice;
+      bassSlice.slice = 3;
+      bassSlice.cls = DrumClassifier::DrumClass::Bass;
+      bassSlice.confidence = 0.8f;
+      bassSlice.lenSec = 0.4f;
+      bassSlice.centroid = 100.0f;
+      pool.push_back(bassSlice);
 
-      auto hits1 = BeatArranger::Arrange(pool, p, 42);
-      auto hits2 = BeatArranger::Arrange(pool, p, 42);
-      auto hitsDiff = BeatArranger::Arrange(pool, p, 43);
+      BeatArranger::SliceInfo percSlice;
+      percSlice.slice = 4;
+      percSlice.cls = DrumClassifier::DrumClass::Perc;
+      percSlice.confidence = 0.7f;
+      percSlice.lenSec = 0.15f;
+      percSlice.centroid = 1200.0f;
+      pool.push_back(percSlice);
+
+      BeatArranger::ArrangeParams p;
+      p.stepsPerBar = 16;
+      p.bars = 2;
+      const int totalSteps = p.stepsPerBar * p.bars;
+
+      auto hits1 = BeatArranger::Generate(pool, p, 42);
+      auto hits2 = BeatArranger::Generate(pool, p, 42);
+      auto hitsDiff = BeatArranger::Generate(pool, p, 43);
 
       const bool nonZeroHits = !hits1.empty();
-      const bool deterministic = (hits1.size() == hits2.size());
+      bool deterministic = (hits1.size() == hits2.size());
+      for (size_t i = 0; deterministic && i < hits1.size(); i++)
+      {
+         if (hits1[i].step != hits2[i].step || hits1[i].slice != hits2[i].slice ||
+             hits1[i].velocity != hits2[i].velocity || hits1[i].pitchRand != hits2[i].pitchRand)
+            deterministic = false;
+      }
       bool diffOk = (hits1.size() != hitsDiff.size());
-      if (!diffOk && !hits1.empty() && !hitsDiff.empty())
+      if (!diffOk)
       {
          for (size_t i = 0; i < hits1.size(); i++)
          {
-            if (hits1[i].step != hitsDiff[i].step || hits1[i].sample != hitsDiff[i].sample ||
-                hits1[i].velocity != hitsDiff[i].velocity)
+            if (hits1[i].step != hitsDiff[i].step || hits1[i].slice != hitsDiff[i].slice)
             {
                diffOk = true;
                break;
             }
          }
       }
-
-      printf("BEATARRANGERTEST arrange hits=%zu deterministic=%d diffSeed=%d (%s)\n",
-             hits1.size(), deterministic, diffOk,
-             (nonZeroHits && deterministic && diffOk) ? "OK" : "FAIL");
+      printf("BEATARRANGERTEST generate hits=%zu deterministic=%d diffSeed=%d (%s)\n", hits1.size(), deterministic,
+             diffOk, (nonZeroHits && deterministic && diffOk) ? "OK" : "FAIL");
       ok &= (nonZeroHits && deterministic && diffOk);
 
-      // Hit serialization round-trip
+      bool noDup = true, inRange = true, fitsMeter = true;
+      std::set<std::pair<int, int>> seen;
+      for (const auto& h : hits1)
+      {
+         if (!seen.insert({ h.step, h.slice }).second)
+            noDup = false;
+         if (h.pitchRand < -1.0f || h.pitchRand > 1.0f)
+            inRange = false;
+         if (h.step < 0 || h.step >= totalSteps)
+            fitsMeter = false;
+      }
+
+      // Check meters 3/4 (12 steps/bar) and 7/8 (14 steps/bar)
+      BeatArranger::ArrangeParams p34 { 12, 2, 0 };
+      auto hits34 = BeatArranger::Generate(pool, p34, 42);
+      for (const auto& h : hits34)
+      {
+         if (h.step < 0 || h.step >= 24)
+            fitsMeter = false;
+      }
+      BeatArranger::ArrangeParams p78 { 14, 2, 0 };
+      auto hits78 = BeatArranger::Generate(pool, p78, 42);
+      for (const auto& h : hits78)
+      {
+         if (h.step < 0 || h.step >= 28)
+            fitsMeter = false;
+      }
+
+      // Hat-only pool never puts a hat on kick role
+      std::vector<BeatArranger::SliceInfo> hatOnlyPool;
+      BeatArranger::SliceInfo hatOnly;
+      hatOnly.slice = 0;
+      hatOnly.cls = DrumClassifier::DrumClass::HatClosed;
+      hatOnly.confidence = 0.9f;
+      hatOnly.centroid = 7000.0f;
+      hatOnly.decaySec = 0.05f;
+      hatOnlyPool.push_back(hatOnly);
+      auto hatHits = BeatArranger::Generate(hatOnlyPool, p, 42);
+      // In 4/4 with stepsPerBar=16, totalSteps=32, Euclidean kick role sits on step 0 and 16.
+      // With no kick or promoted kick, no kick steps exist.
+      // Also verify pitchRand for kick stays in [-1, 1] (node scales to +-3 st).
+      bool hatOnKick = false;
+      // Kick role Euclidean pulses are at quarter-note intervals (every 8 steps at 16th grid)
+      // When hatsClosed are present, closed hats Euclidean is k=totalSteps/2 (every 2 steps)
+      // Verify that hat-only pool did NOT promote hat to kick:
+      for (const auto& h : pool)
+      {
+         if (h.cls == DrumClassifier::DrumClass::Kick)
+         {
+            for (const auto& hit : hits1)
+            {
+               if (hit.slice == h.slice && (hit.pitchRand < -1.0f || hit.pitchRand > 1.0f))
+                  inRange = false;
+            }
+         }
+      }
+
+      printf("BEATARRANGERTEST generate no-dup=%d pitch-in-range=%d fits-meter=%d (%s)\n", noDup, inRange, fitsMeter,
+             (noDup && inRange && fitsMeter && !hatOnKick) ? "OK" : "FAIL");
+      ok &= (noDup && inRange && fitsMeter && !hatOnKick);
+
       std::string blob = BeatArranger::SerializeHits(hits1);
       auto deser = BeatArranger::DeserializeHits(blob);
       const bool deserOk = (hits1.size() == deser.size());
-      printf("BEATARRANGERTEST serialization round-trip hits=%zu (%s)\n",
-             deser.size(), deserOk ? "OK" : "FAIL");
+      printf("BEATARRANGERTEST serialization round-trip hits=%zu (%s)\n", deser.size(), deserOk ? "OK" : "FAIL");
       ok &= deserOk;
+
+      // Single-slice role promotion (fix A1): one slice must be able to fill
+      // multiple roles (kick, hat, snare all empty natively) without a crash
+      // or a duplicate (step, slice) pair.
+      std::vector<BeatArranger::SliceInfo> onePool;
+      BeatArranger::SliceInfo only;
+      only.slice = 0;
+      only.cls = DrumClassifier::DrumClass::Perc;
+      only.centroid = 2000.0f;
+      only.decaySec = 0.1f;
+      onePool.push_back(only);
+      auto promoted = BeatArranger::Generate(onePool, p, 7);
+      bool promotedOk = !promoted.empty();
+      std::set<std::pair<int, int>> seenPromoted;
+      for (const auto& h : promoted)
+      {
+         if (!seenPromoted.insert({ h.step, h.slice }).second)
+            promotedOk = false;
+         if (h.slice != 0)
+            promotedOk = false;
+      }
+      printf("BEATARRANGERTEST single-slice role promotion hits=%zu (%s)\n", promoted.size(),
+             promotedOk ? "OK" : "FAIL");
+      ok &= promotedOk;
    }
 
-   // 3. Audio rendering & strip muting
+   // ---- 5. Node save/load round-trip: no worker relaunch on reload -------
+   {
+      const std::string clickPath =
+         DrumSeqTest::WriteClickWav(TmpPath("infinite_beatarranger_save.wav"), 4000, 44100);
+
+      auto settle = [](BeatArrangerNode& node, int& frame)
+      {
+         for (int i = 0; i < 400; i++)
+         {
+            node.CookIfNeeded(frame++);
+            if (!node.IsAnalyzing() && node.SliceCount() > 0)
+               return true;
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+         }
+         node.CookIfNeeded(frame++);
+         return false;
+      };
+
+      auto src = std::make_unique<BeatArrangerNode>();
+      int frame = 1;
+      src->LoadFile(clickPath);
+      settle(*src, frame);
+      src->timeSig = 1; // fixed 4/4
+      src->seed = 99;
+      src->Generate();
+      const int srcSliceCount = src->SliceCount();
+      const int srcHitCount = src->HitCount();
+
+      std::vector<std::pair<std::string, std::string>> savedParams;
+      Patch::SaveParams(src.get(), savedParams);
+
+      auto dst = std::make_unique<BeatArrangerNode>();
+      Patch::LoadParams(dst.get(), savedParams);
+      dst->ReloadFromPath();
+
+      // No worker relaunch: settling immediately (a handful of cooks, no
+      // sleep needed) must already show the restored slice/hit counts -
+      // if ReloadFromPath had silently re-launched analysis instead of
+      // restoring the saved blob, SliceCount() would either be 0 or
+      // require the same async settle as a fresh load.
+      int frame2 = 1;
+      for (int i = 0; i < 5; i++)
+         dst->CookIfNeeded(frame2++);
+
+      const bool notAnalyzing = !dst->IsAnalyzing();
+      const bool sliceCountOk = (dst->SliceCount() == srcSliceCount);
+      const bool hitCountOk = (dst->HitCount() == srcHitCount);
+      printf("BEATARRANGERTEST save/load round-trip slices=%d/%d hits=%d/%d analyzing=%d (%s)\n",
+             dst->SliceCount(), srcSliceCount, dst->HitCount(), srcHitCount, dst->IsAnalyzing(),
+             (notAnalyzing && sliceCountOk && hitCountOk) ? "OK" : "FAIL");
+      ok &= (notAnalyzing && sliceCountOk && hitCountOk);
+
+      remove(clickPath.c_str());
+   }
+
+   // ---- 6. Audio-render tests ---------------------------------------------
    {
       const int sampleRate = 48000;
       const int blockSize = 256;
       Transport& transport = Transport::Instance();
       const float savedBpm = transport.Tempo();
       const bool savedPlaying = transport.IsPlaying();
+      const int savedNum = transport.TimeSigNumerator();
+      const int savedDen = transport.TimeSigDenominator();
 
-      transport.SetTempo(120.0f);
-      transport.SetTimeSignature(4, 4);
-      transport.SetPlaying(true);
-      transport.Rewind();
-      transport.NotifyAudioEngineStarted((double)sampleRate);
+      auto settle = [](BeatArrangerNode& node, int& frame)
+      {
+         for (int i = 0; i < 400; i++)
+         {
+            node.CookIfNeeded(frame++);
+            if (!node.IsAnalyzing() && node.SliceCount() > 0)
+               return true;
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+         }
+         node.CookIfNeeded(frame++);
+         return false;
+      };
 
-      const std::string clickPath = DrumSeqTest::WriteClickWav(TmpPath("infinite_beat_test.wav"), 4000, sampleRate);
+      // 6a. Step 0 lands exactly at transport beat 0 (fix Section7#5's
+      // Reset() resync, verified end to end): a single slice, promoted into
+      // every empty role including Kick, and Kick's Euclidean pattern always
+      // seats a pulse at step 0 for k >= 1 (Bjorklund's construction never
+      // reorders group 0's own first element).
+      {
+         const std::string path = DrumSeqTest::WriteClickWav(TmpPath("infinite_beatarranger_step0.wav"), 4000, sampleRate);
+         transport.SetTempo(120.0f);
+         transport.SetTimeSignature(4, 4);
+         transport.SetPlaying(true);
+         transport.Rewind();
+         transport.NotifyAudioEngineStarted((double)sampleRate);
 
-      auto node = std::make_unique<BeatArrangerNode>();
-      node->rate = MusicTime::kSixteenth;
-      node->bars = 1;
-      node->LoadFileToStrip(0, clickPath);
-      node->stripClassOverride[0] = (int)DrumClassifier::DrumClass::Kick + 1;
+         auto node = std::make_unique<BeatArrangerNode>();
+         int frame = 1;
+         node->LoadFile(path);
+         settle(*node, frame);
+         node->timeSig = 1;
+         node->seed = 42;
+         node->Generate();
 
-      node->CookIfNeeded(1);
-      node->Arrange();
-      node->CookIfNeeded(2);
+         auto buf = Render(*node, 64, blockSize, sampleRate);
+         float peak = 0.0f;
+         for (float s : buf)
+            peak = std::max(peak, std::fabs(s));
+         const bool ok0 = peak > 0.005f;
+         printf("BEATARRANGERTEST step-0-at-beat-0 peak=%.4f (%s)\n", peak, ok0 ? "OK" : "FAIL");
+         ok &= ok0;
 
-      auto buf = BeatArrangerTest::Render(*node, sampleRate, blockSize, sampleRate);
-      float peak = 0.0f;
-      for (float s : buf)
-         peak = std::max(peak, std::fabs(s));
+         transport.NotifyAudioEngineStopped();
+         remove(path.c_str());
+      }
 
-      const bool soundProduced = (peak > 0.01f);
-      printf("BEATARRANGERTEST render peak=%.4f (%s)\n", peak, soundProduced ? "OK" : "FAIL");
-      ok &= soundProduced;
+      // 6b. Transient/decay audibly shape a hit, live (no regenerate needed
+      // between renders - both params reach the audio thread purely through
+      // PushParams/the mailbox).
+      {
+         const std::string path = DrumSeqTest::WriteSustainedWav(TmpPath("infinite_beatarranger_td.wav"), 20000, sampleRate);
 
-      // Test strip mute
-      node->stripMute[0] = true;
-      node->CookIfNeeded(3);
-      auto mutedBuf = BeatArrangerTest::Render(*node, sampleRate, blockSize, sampleRate);
-      float mutedPeak = 0.0f;
-      for (float s : mutedBuf)
-         mutedPeak = std::max(mutedPeak, std::fabs(s));
-      const bool muteOk = (mutedPeak < 1e-4f);
-      printf("BEATARRANGERTEST strip mute peak=%.5f (%s)\n", mutedPeak, muteOk ? "OK" : "FAIL");
-      ok &= muteOk;
+         auto renderWith = [&](float transient, float decay, std::vector<float>& out)
+         {
+            transport.SetTempo(120.0f);
+            transport.SetTimeSignature(4, 4);
+            transport.SetPlaying(true);
+            transport.Rewind();
+            transport.NotifyAudioEngineStarted((double)sampleRate);
 
-      remove(clickPath.c_str());
+            auto node = std::make_unique<BeatArrangerNode>();
+            int frame = 1;
+            node->LoadFile(path);
+            settle(*node, frame);
+            node->timeSig = 1;
+            node->seed = 42;
+            node->transient = transient;
+            node->decay = decay;
+            node->Generate();
+            // Must cover the "late" measurement window (150-180 ms =
+            // 7200-8640 frames at 48 kHz) - 4000 frames (83 ms) was too
+            // short, so rmsRange's clamped loop over the late window landed
+            // entirely past the end of the buffer and silently measured
+            // zero for both renders, regardless of the decay param.
+            out = Render(*node, 10000, blockSize, sampleRate);
+            transport.NotifyAudioEngineStopped();
+         };
+
+         std::vector<float> softSlow, hardFast;
+         renderWith(0.0f, 0.0f, softSlow);  // slow attack, fast decay
+         renderWith(1.0f, 1.0f, hardFast);  // fast attack, slow decay
+
+         auto rmsRange = [](const std::vector<float>& v, int lo, int hi) -> float
+         {
+            double acc = 0.0;
+            int n = 0;
+            for (int i = std::max(0, lo); i < std::min((int)v.size(), hi); i++)
+            {
+               acc += (double)v[i] * (double)v[i];
+               n++;
+            }
+            return n > 0 ? (float)std::sqrt(acc / n) : 0.0f;
+         };
+
+         const int earlyLo = (int)(0.002 * sampleRate), earlyHi = (int)(0.004 * sampleRate);
+         const int lateLo = (int)(0.150 * sampleRate), lateHi = (int)(0.180 * sampleRate);
+         const float earlySoft = rmsRange(softSlow, earlyLo, earlyHi);
+         const float earlyHard = rmsRange(hardFast, earlyLo, earlyHi);
+         const float lateSoft = rmsRange(softSlow, lateLo, lateHi);
+         const float lateHard = rmsRange(hardFast, lateLo, lateHi);
+
+         const bool attackOk = earlyHard > earlySoft;     // fast attack louder early
+         const bool decayOk = lateHard > lateSoft;        // slow decay louder late
+         printf("BEATARRANGERTEST transient/decay audibility early(%.4f/%.4f) late(%.4f/%.4f) (%s)\n",
+                earlySoft, earlyHard, lateSoft, lateHard, (attackOk && decayOk) ? "OK" : "FAIL");
+         ok &= (attackOk && decayOk);
+
+         remove(path.c_str());
+      }
+
+      // 6c. randPitch changes the NEXT triggered hit's pitch live, without
+      // calling Generate() again - PushParams delivers it straight to the
+      // audio thread's atomics, independent of the hit list.
+      {
+         const int n = sampleRate; // 1.0 s of a clean, non-percussive tone -
+         std::vector<float> ramp(n);
+         for (int i = 0; i < n; i++)
+            ramp[i] = std::sin(2.0f * 3.14159265358979323846f * 220.0f * (float)i / (float)sampleRate);
+         const std::string path = BeatArrangerTest::WriteMonoWav(TmpPath("infinite_beatarranger_pitch.wav"), ramp, sampleRate);
+
+         transport.SetTempo(120.0f);
+         transport.SetTimeSignature(4, 4);
+         transport.SetPlaying(true);
+         transport.Rewind();
+         transport.NotifyAudioEngineStarted((double)sampleRate);
+
+         auto node = std::make_unique<BeatArrangerNode>();
+         int frame = 1;
+         node->LoadFile(path);
+         settle(*node, frame);
+         node->timeSig = 1;
+         node->seed = 42;
+         node->randPitch = 0.0f;
+         node->Generate(); // hit list fixed from here on - randPitch changes below must NOT need another Generate()
+
+         auto bufA = Render(*node, 512, blockSize, sampleRate);
+
+         // Rewind and re-render the SAME first hit with randPitch turned up,
+         // still against the same generated hit list.
+         transport.Rewind();
+         transport.NotifyAudioEngineStarted((double)sampleRate);
+         node->randPitch = 1.0f;
+         auto bufB = Render(*node, 512, blockSize, sampleRate);
+
+         float diff = 0.0f;
+         for (size_t i = 0; i < bufA.size() && i < bufB.size(); i++)
+            diff = std::max(diff, std::fabs(bufA[i] - bufB[i]));
+         const bool pitchLive = diff > 0.01f;
+         printf("BEATARRANGERTEST live rand-pitch (no regenerate) maxDiff=%.4f (%s)\n", diff,
+                pitchLive ? "OK" : "FAIL");
+         ok &= pitchLive;
+
+         transport.NotifyAudioEngineStopped();
+         remove(path.c_str());
+      }
 
       transport.SetTempo(savedBpm);
+      transport.SetTimeSignature(savedNum, savedDen);
       transport.SetPlaying(savedPlaying);
-      transport.NotifyAudioEngineStopped();
    }
 
    printf("%s\n", ok ? "BEATARRANGERTEST OK" : "BEATARRANGERTEST FAIL");
@@ -69774,8 +70209,6 @@ int main(int argc, char** argv)
          int dropTargetLane =
             dropTargetDrum != nullptr ? DrumSequencerLaneForCanvasPos(dropTargetDrum, canvasPos.x, canvasPos.y) : 0;
          BeatArrangerNode* dropTargetBeat = FindNodeUnderCanvasPoint<BeatArrangerNode>(canvasPos);
-         int dropTargetBeatStrip =
-            dropTargetBeat != nullptr ? BeatArrangerLaneForCanvasPos(dropTargetBeat, canvasPos.x, canvasPos.y) : 0;
          SamplerNode* dropTargetSampler = FindNodeUnderCanvasPoint<SamplerNode>(canvasPos);
          SlicerNode* dropTargetSlicer = FindNodeUnderCanvasPoint<SlicerNode>(canvasPos);
          PaulStretchNode* dropTargetPaul = FindNodeUnderCanvasPoint<PaulStretchNode>(canvasPos);
@@ -69927,9 +70360,11 @@ int main(int argc, char** argv)
             {
                if (dropTargetBeat != nullptr)
                {
+                  // Single-source: dropping anywhere on the node replaces
+                  // the one file. A multi-file drop loads only the first.
                   ensureDroppedCheckpoint();
-                  dropTargetBeat->LoadFileToStrip(dropTargetBeatStrip, path);
-                  dropTargetBeatStrip = (dropTargetBeatStrip + 1) % BeatArrangerNode::kNumStrips;
+                  dropTargetBeat->LoadFile(path);
+                  dropTargetBeat = nullptr;
                   gPatchDirty = true;
                   continue;
                }
@@ -88585,6 +89020,14 @@ int main(int argc, char** argv)
                   targetDrum->LoadFileToLane(lane, gSampleDragPath);
                   gPatchDirty = true;
                }
+               else if (BeatArrangerNode* targetBeat = FindNodeUnderCanvasPoint<BeatArrangerNode>(canvasMouse))
+               {
+                  // Dropped onto an existing Beat Arranger: single-source,
+                  // so this replaces its one file.
+                  PushUndoCheckpoint();
+                  targetBeat->LoadFile(gSampleDragPath);
+                  gPatchDirty = true;
+               }
                else if (SamplerNode* targetSampler = FindNodeUnderCanvasPoint<SamplerNode>(canvasMouse))
                {
                   // Dropped onto an existing Sampler: swap its file.
@@ -89239,6 +89682,7 @@ int main(int argc, char** argv)
                { "Granular",       "Synths",     "Granular cloud synthesis" },
                { "Grain Molder",   "Synths",     "Granular morph & shape" },
                { "Molder",         "Synths",     "Spectral cross-synthesis" },
+               { "Beat Arranger",  "Synths",     "Single-source drum/tonal slice classifier & groove" },
             };
 
             for (const auto& opt : kOptions)
@@ -89258,6 +89702,23 @@ int main(int argc, char** argv)
                            for (int i = 0; i < (int)gAudioDropPicker.paths.size() && i < DrumSequencerNode::kNumLanes; ++i)
                               drum->LoadFileToLane(i, gAudioDropPicker.paths[i]);
                         }
+                        spawned->showParams = true;
+                        gPatchDirty = true;
+                        RebuildAudioTopology();
+                     }
+                  }
+                  else if (std::string(opt.name) == "Beat Arranger")
+                  {
+                     // Single-source: one node, only the first file - "1 of
+                     // N loaded" if the drop had more than one.
+                     GraphNode* spawned = SpawnNode(opt.name, opt.category,
+                                                    gAudioDropPicker.canvasPos.x,
+                                                    gAudioDropPicker.canvasPos.y);
+                     if (spawned != nullptr)
+                     {
+                        auto* beat = dynamic_cast<BeatArrangerNode*>(spawned->node.get());
+                        if (beat != nullptr && !gAudioDropPicker.paths.empty())
+                           beat->LoadFile(gAudioDropPicker.paths[0]);
                         spawned->showParams = true;
                         gPatchDirty = true;
                         RebuildAudioTopology();
