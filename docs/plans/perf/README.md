@@ -43,7 +43,7 @@ frame count (B5).
 | B2 Heavy visuals | Geometry→Render3D→10-30 compositing nodes→Output, static+animated | No | Needs the GPU timer query ring (§below) for `stages_gpu_ms` - not built this session. |
 | B3 Live performance | B1-lite+B2-lite+projector+MIDI+macros+Prediction; missed vsyncs, input-to-photon | No | Depends on B1+B2 fixtures existing first, plus a projector-window self-test fixture (none exists today). |
 | B4 Complex 3D scenes | many objects/instancing/lights/shadows/materials/HDRI/ocean | No | Same GPU-timer dependency as B2. |
-| B5 Fundamentals | (a) empty patch, **(b) node-count scaling**, **(c) per-stage CPU+GPU split**, **(d) audio-thread-alone**, **(e) startup time**, (f) load/save time, (g) undo-snapshot time | **(a)/(b)/(c)/(d)/(e)** (`INFINITE_BENCH_B5EMPTY`, `INFINITE_BENCH_B5NODES`, `INFINITE_BENCH_B5STAGES`, `INFINITE_BENCH_B5AUDIOALONE`, `INFINITE_BENCH_B5STARTUP`) | (a) zero-node floor, frame_ms percentiles + RSS, same 120-frame sampled window as (b) so the two are directly comparable. (b) 50/100/200/400 mixed nodes laid out on a grid (not stacked at origin - the flaw called out in benchmark-suite.md §2 against MIXEDSTRESSTEST/GEOMDENSITYTEST). Reports frame_ms percentiles + RSS. (c) same mixed-node grid as (b), wraps seven main-loop stages (`modulation`, `cook`, `node_bodies`, `editor_end`, `imgui_render`, `projectors`, `swap`) in `ConditionalStageTimer`s sampled over the same frame window, reports p50 CPU ms per stage into `stages_cpu_ms` (`stages_gpu_ms` still empty - blocked on the GPU timer ring below). (d) one Oscillator straight into Audio Out, no effects chain, buffer sweep 64/128/256/512 - isolates the audio callback's fixed per-block cost from B1's DSP-graph cost; reuses B1's wall-clock-window + `AudioLoadRing` pattern. (e) startup milestone timings from entry through first frame swap (`pre_window`, `window_gl`, `imgui_fonts`, `scanners_load`, `first_frame_render`, `total_to_first_frame`). (f)/(g) not started. |
+| B5 Fundamentals | (a) empty patch, **(b) node-count scaling**, **(c) per-stage CPU+GPU split**, **(d) audio-thread-alone**, **(e) startup time**, **(f) load/save time**, **(g) undo-snapshot time** | **All of (a)-(g)** (`INFINITE_BENCH_B5EMPTY`, `INFINITE_BENCH_B5NODES`, `INFINITE_BENCH_B5STAGES`, `INFINITE_BENCH_B5AUDIOALONE`, `INFINITE_BENCH_B5STARTUP`, `INFINITE_BENCH_B5LOADSAVE`, `INFINITE_BENCH_B5UNDO`) | (a) zero-node floor, frame_ms percentiles + RSS, same 120-frame sampled window as (b) so the two are directly comparable. (b) 50/100/200/400 mixed nodes laid out on a grid (not stacked at origin - the flaw called out in benchmark-suite.md §2 against MIXEDSTRESSTEST/GEOMDENSITYTEST). Reports frame_ms percentiles + RSS. (c) same mixed-node grid as (b), wraps seven main-loop stages (`modulation`, `cook`, `node_bodies`, `editor_end`, `imgui_render`, `projectors`, `swap`) in `ConditionalStageTimer`s sampled over the same frame window, reports p50 CPU ms per stage into `stages_cpu_ms` (`stages_gpu_ms` still empty - blocked on the GPU timer ring below). (d) one Oscillator straight into Audio Out, no effects chain, buffer sweep 64/128/256/512 - isolates the audio callback's fixed per-block cost from B1's DSP-graph cost; reuses B1's wall-clock-window + `AudioLoadRing` pattern. (e) startup milestone timings from entry through first frame swap (`pre_window`, `window_gl`, `imgui_fonts`, `scanners_load`, `first_frame_render`, `total_to_first_frame`). (f)/(g) reuse (b)/(c)'s mixed-node grid (`INFINITE_BENCH_B5LOADSAVE=<n>`/`INFINITE_BENCH_B5UNDO=<n>`), fire once at `frameId==32`, and time the real patch I/O and undo paths back to back (`SavePatchTo`→`LoadPatchFrom`; `PushUndoCheckpoint`→`Undo`) via `Bench::ScopedStageTimer::NowMs()` - not synthetic serialize-only calls, so (f) includes whatever `ApplyPatchData`/field-graph remap does on load, and (g) includes the real `BuildPatchData`/`ApplyPatchData` round trip Undo takes. `stages_cpu_ms: {save, load}` / `{push_checkpoint, undo_restore}`. |
 | B6 Canvas navigation | programmatic pan/zoom/drag, never OS-level UI scripting | No | "Missing today" per the doc; not started. |
 | B7 Soak/thermal | 30min B3, long variant only | No | Depends on B3. |
 | B8 Media I/O | video/camera/projector/Syphon-Spout | No | "Missing today" per the doc; not started. |
@@ -95,12 +95,13 @@ Projector/Output > Canvas > Previews):
 
 1. **B1(stages)** - per-DSP-stage audio callback breakdown. **Built** (`INFINITE_BENCH_B1VOICES`).
    Attributes B1 callback load across stages (`synths`, `filter`, `shaper`, `delay`, `reverb`, `dynamics`, `mixer`).
-2. **B5(f)/(g)** - load/save time, undo-snapshot time. Small, independent,
-   no new infra needed.
+2. **B5(f)/(g)** - load/save time, undo-snapshot time. **Built**
+   (`INFINITE_BENCH_B5LOADSAVE`, `INFINITE_BENCH_B5UNDO`).
 3. **GPU timer query ring** (`GL_TIME_ELAPSED`, read back N frames later,
    guarded for GL 4.1 support - macOS has it, confirm before assuming
    Windows/Linux llvmpipe does). Blocks B2, B4, B9's GPU numbers, and B3's.
-   Not started.
+   Not started. This is the next item on the list - everything else buildable
+   without it is now built.
 - **B5(c)** is now built (`INFINITE_BENCH_B5STAGES`); `stages_gpu_ms` stays
   empty until the GPU timer ring above exists.
 - **B6 canvas navigation**: needs a programmatic pan/zoom/drag entry point
@@ -149,6 +150,14 @@ windows throughout (60s B1 per buffer size, 30s B5d per buffer size).
     - **`delay`** (Delay): **2.87%** callback load (4.9% of total).
     - **`mixer`** (Mixer tree): **0.56%** callback load (1.0% of total).
   - **Actionable Takeaway**: Future DSP SIMD/threading or algorithmic optimization should prioritize `ReverbNode` (68% of compute) before any other audio node.
+  - **Acted on**: `ReverbKernel`'s 16-line FDN is now vectorized (NEON on
+    arm64, SSE2 on x86_64, portable scalar fallback) - `feature/reverb-
+    simd-vectorization`, commit `a518103`. Out of scope for this
+    measure-only suite to build, but tracked here since it's the direct
+    output of this benchmark's B1(stages) finding. DSPTEST's SIMD-vs-scalar
+    numerical-equivalence check passed (max diff 2.98e-08, tol 1e-5).
+    Re-run B1(stages) against this branch to get the before/after cb_load
+    delta - not yet done.
 - **B5(b)** (node-count scaling): near-linear from 50 to 200 nodes (4.4ms to
   14.7ms, roughly 3.3x for 4x the nodes), then super-linear at 400 (28.6ms
   p50, 39.9ms p99 - the p95/p99 spread widens sharply too, 37.5/39.9 vs a
@@ -156,6 +165,11 @@ windows throughout (60s B1 per buffer size, 30s B5d per buffer size).
 - **B5(d)** (audio-thread-alone, one Oscillator, no effects): cb_load is
   under 3% at every buffer size, confirming B1's ~57-60% load is almost
   entirely the 24-voice effects chain, not fixed per-callback overhead.
+- **B5(f)/(g)** (load/save, undo, n=100 mixed-node grid): save 4.12ms /
+  load 3.47ms; undo checkpoint push 0.34ms / restore 0.68ms. All four well
+  under a single frame budget even at 60fps (16.7ms) - not a UX-perceptible
+  cost at this node count. Not yet swept across n=50/100/200/400 to check
+  for the same super-linear knee B5(b) hits at n=400.
 
 ## Found while measuring
 

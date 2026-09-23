@@ -104,7 +104,12 @@ for n in 50 100 200 400; do
    run_fixture "B5_fundamentals_stages n=$n" 160 INFINITE_BENCH_B5STAGES="$n"
 done
 run_fixture "B5_fundamentals_startup" 20 INFINITE_BENCH_B5STARTUP=1
-skip "B5_fundamentals (f/g sub-benchmarks - load/save time, undo-snapshot time)"
+for n in 50 100 200 400; do
+   run_fixture "B5_fundamentals_loadsave n=$n" 60 INFINITE_BENCH_B5LOADSAVE="$n"
+done
+for n in 50 100 200 400; do
+   run_fixture "B5_fundamentals_undo n=$n" 60 INFINITE_BENCH_B5UNDO="$n"
+done
 
 echo "B6 Canvas navigation"
 skip "B6_canvas_navigation"
