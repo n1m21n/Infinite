@@ -124,20 +124,72 @@ namespace EqDsp
    // (AudioFilterDsp::MagnitudeDb's approach) - affordable at 5 bands x 160
    // points recomputed on every frame of a handle drag, where the
    // render-a-sine approach (~8000 samples/point) would not be.
-   inline float BiquadMagnitudeDb(const DspMath::Biquad& bq, float evalHz, double sampleRate)
+   //
+   // Split in two so a curve sweep can pay for the trig once per point
+   // (EvalTrigFor) and the band's coefficients once per band (BandEval),
+   // instead of once per band per point - BiquadMagnitudeDb/BandMagnitudeDb
+   // below are the same arithmetic, so both paths give identical floats.
+   struct EvalTrig
    {
-      if (evalHz <= 0.0f || sampleRate <= 0.0)
-         return 0.0f;
+      bool valid = false; // false where BiquadMagnitudeDb returns 0
+      double c1 = 0.0, s1 = 0.0, c2 = 0.0, s2 = 0.0;
+   };
 
+   inline EvalTrig EvalTrigFor(float evalHz, double sampleRate)
+   {
+      EvalTrig t;
+      if (evalHz <= 0.0f || sampleRate <= 0.0)
+         return t;
       const double w = 2.0 * M_PI * (double)evalHz / sampleRate;
-      const double c1 = cos(w), s1 = sin(w);
-      const double c2 = cos(2.0 * w), s2 = sin(2.0 * w);
-      const double nRe = bq.b0 + bq.b1 * c1 + bq.b2 * c2;
-      const double nIm = -(bq.b1 * s1 + bq.b2 * s2);
-      const double dRe = 1.0 + bq.a1 * c1 + bq.a2 * c2;
-      const double dIm = -(bq.a1 * s1 + bq.a2 * s2);
+      t.valid = true;
+      t.c1 = cos(w);
+      t.s1 = sin(w);
+      t.c2 = cos(2.0 * w);
+      t.s2 = sin(2.0 * w);
+      return t;
+   }
+
+   inline float BiquadMagnitudeDbAt(const DspMath::Biquad& bq, const EvalTrig& t)
+   {
+      if (!t.valid)
+         return 0.0f;
+      const double nRe = bq.b0 + bq.b1 * t.c1 + bq.b2 * t.c2;
+      const double nIm = -(bq.b1 * t.s1 + bq.b2 * t.s2);
+      const double dRe = 1.0 + bq.a1 * t.c1 + bq.a2 * t.c2;
+      const double dIm = -(bq.a1 * t.s1 + bq.a2 * t.s2);
       const double mag2 = (nRe * nRe + nIm * nIm) / std::max(1e-20, dRe * dRe + dIm * dIm);
       return (float)(10.0 * log10(std::max(1e-20, mag2)));
+   }
+
+   inline float BiquadMagnitudeDb(const DspMath::Biquad& bq, float evalHz, double sampleRate)
+   {
+      return BiquadMagnitudeDbAt(bq, EvalTrigFor(evalHz, sampleRate));
+   }
+
+   // One band's coefficients, configured once for a whole sweep.
+   struct BandEval
+   {
+      DspMath::Biquad bq;
+      float stages = 1.0f;
+      bool enabled = false;
+   };
+
+   inline BandEval PrepareBand(int type, float freq, float q, float gainDb, bool enabled, double sampleRate)
+   {
+      BandEval b;
+      b.enabled = enabled;
+      if (!enabled)
+         return b;
+      ConfigureBiquad(b.bq, type, freq, q, gainDb, sampleRate);
+      b.stages = (float)StageCount(type);
+      return b;
+   }
+
+   inline float BandMagnitudeDbAt(const BandEval& b, const EvalTrig& t)
+   {
+      if (!b.enabled)
+         return 0.0f;
+      return BiquadMagnitudeDbAt(b.bq, t) * b.stages;
    }
 
    // Convenience: magnitude of one band directly from type/freq/q/gain,
@@ -145,11 +197,8 @@ namespace EqDsp
    inline float BandMagnitudeDb(int type, float freq, float q, float gainDb, bool enabled,
                                  float evalHz, double sampleRate)
    {
-      if (!enabled)
-         return 0.0f;
-      DspMath::Biquad bq;
-      ConfigureBiquad(bq, type, freq, q, gainDb, sampleRate);
-      return BiquadMagnitudeDb(bq, evalHz, sampleRate) * (float)StageCount(type);
+      return BandMagnitudeDbAt(PrepareBand(type, freq, q, gainDb, enabled, sampleRate),
+                               EvalTrigFor(evalHz, sampleRate));
    }
 }
 

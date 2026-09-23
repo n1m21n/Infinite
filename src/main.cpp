@@ -678,7 +678,13 @@ namespace
    // never reused - see GraphNode.h) rather than gNodes' vector position,
    // so the numbering a user has already memorized doesn't shuffle when an
    // unrelated node elsewhere in the graph is deleted or undone.
-   int GetNodeInstanceIndex(const GraphNode& targetNode, int* outTotalCount = nullptr)
+   //
+   // The reference definition is the linear scan below (kept, and used as the
+   // fallback for a GraphNode that does not live in gNodes). Every drawn node
+   // header asks for its own rank, so calling the scan directly made the
+   // canvas O(N^2) NodeTitle() calls a frame - ~15% of the main thread on a
+   // 289-node patch. GetNodeInstanceIndex answers from a cache instead.
+   int GetNodeInstanceIndexScan(const GraphNode& targetNode, int* outTotalCount)
    {
       const std::string title = NodeTitle(targetNode);
       int rank = 0;
@@ -694,6 +700,136 @@ namespace
       if (outTotalCount != nullptr)
          *outTotalCount = total;
       return rank;
+   }
+
+   // The one live field a node's title can follow after spawn (see
+   // NodeTitle: GeometryOpNode::op, GeometryNode::shape, ShapeNode::shapeType)
+   // or nullptr when the title is fixed by typeName for the node's lifetime.
+   // Must name the same fields NodeTitle reads, in the same order.
+   const int* NodeTitleLiveField(const GraphNode& gn)
+   {
+      if (auto* opNode = dynamic_cast<GeometryOpNode*>(gn.node.get()))
+         return &opNode->op;
+      if (auto* geoNode = dynamic_cast<GeometryNode*>(gn.node.get()))
+         return &geoNode->shape;
+      if (auto* shapeNode = dynamic_cast<ShapeNode*>(gn.node.get()))
+         return &shapeNode->shapeType;
+      return nullptr;
+   }
+
+   // Cache behind GetNodeInstanceIndex: one entry per gNodes slot, holding the
+   // rank/total the scan above would return for that node. Kept exact, not
+   // just per-frame, because some callers run outside the canvas draw (the
+   // projector window title, the clip inspector, tooltips) right after a
+   // spawn/delete/load:
+   //  - Rebuilt when gNodes' storage or size moved, when InvalidateNodeByUid
+   //    fires (every erase/clear site, patch load, and once per frame from
+   //    the main loop), or when a lookup's own slot no longer matches.
+   //  - Every node whose title follows a live field (NodeTitleLiveField) is
+   //    re-checked on every lookup - a dropdown or modulation changing a
+   //    Geometry node's shape mid-frame renames it, which can change the
+   //    rank of every other node sharing either the old or the new title.
+   //    That check is a few loads per such node, not a NodeTitle() call.
+   // typeName is the only other title input and is written once, at spawn.
+   struct NodeTitleInstanceEntry
+   {
+      const INode* node = nullptr;
+      uint64_t uid = 0;
+      int index = 0;
+      const int* liveField = nullptr;
+      int liveValue = 0;
+      int rank = 0;
+      int total = 0;
+   };
+   std::vector<NodeTitleInstanceEntry> gTitleInstance;
+   std::vector<size_t> gTitleInstanceLive; // slots whose title follows a live field
+   bool gTitleInstanceDirty = true;
+   const GraphNode* gTitleInstanceData = nullptr;
+   size_t gTitleInstanceSize = 0;
+   int gTitleInstanceRebuilds = 0; // self-test visibility only
+
+   void InvalidateNodeTitleInstances()
+   {
+      gTitleInstanceDirty = true;
+   }
+
+   void RebuildNodeTitleInstances()
+   {
+      const size_t n = gNodes.size();
+      gTitleInstance.assign(n, NodeTitleInstanceEntry{});
+      gTitleInstanceLive.clear();
+      std::unordered_map<std::string, std::vector<size_t>> byTitle;
+      byTitle.reserve(n);
+      for (size_t i = 0; i < n; i++)
+      {
+         const GraphNode& gn = gNodes[i];
+         NodeTitleInstanceEntry& e = gTitleInstance[i];
+         e.node = gn.node.get();
+         e.uid = gn.uid;
+         e.index = gn.index;
+         e.liveField = NodeTitleLiveField(gn);
+         if (e.liveField != nullptr)
+         {
+            e.liveValue = *e.liveField;
+            gTitleInstanceLive.push_back(i);
+         }
+         byTitle[NodeTitle(gn)].push_back(i);
+      }
+      std::vector<int> sortedIdx;
+      for (auto& kv : byTitle)
+      {
+         const std::vector<size_t>& slots = kv.second;
+         sortedIdx.clear();
+         for (size_t s : slots)
+            sortedIdx.push_back(gTitleInstance[s].index);
+         std::sort(sortedIdx.begin(), sortedIdx.end());
+         const int total = (int)slots.size();
+         for (size_t s : slots)
+         {
+            // rank = how many same-titled nodes have index <= this one's -
+            // the scan's exact definition, duplicates included.
+            NodeTitleInstanceEntry& e = gTitleInstance[s];
+            e.rank = (int)(std::upper_bound(sortedIdx.begin(), sortedIdx.end(), e.index) - sortedIdx.begin());
+            e.total = total;
+         }
+      }
+      gTitleInstanceData = gNodes.data();
+      gTitleInstanceSize = n;
+      gTitleInstanceDirty = false;
+      ++gTitleInstanceRebuilds;
+   }
+
+   bool NodeTitleInstanceSlotValid(size_t slot)
+   {
+      const NodeTitleInstanceEntry& e = gTitleInstance[slot];
+      const GraphNode& gn = gNodes[slot];
+      return gn.node.get() == e.node && gn.uid == e.uid && gn.index == e.index &&
+             (e.liveField == nullptr || *e.liveField == e.liveValue);
+   }
+
+   bool NodeTitleInstancesValid()
+   {
+      if (gTitleInstanceDirty || gNodes.data() != gTitleInstanceData || gNodes.size() != gTitleInstanceSize)
+         return false;
+      for (size_t slot : gTitleInstanceLive)
+         if (!NodeTitleInstanceSlotValid(slot))
+            return false;
+      return true;
+   }
+
+   int GetNodeInstanceIndex(const GraphNode& targetNode, int* outTotalCount = nullptr)
+   {
+      const GraphNode* base = gNodes.data();
+      const size_t count = gNodes.size();
+      if (count == 0 || &targetNode < base || &targetNode >= base + count)
+         return GetNodeInstanceIndexScan(targetNode, outTotalCount);
+      const size_t slot = (size_t)(&targetNode - base);
+      if (!NodeTitleInstancesValid() || !NodeTitleInstanceSlotValid(slot))
+         RebuildNodeTitleInstances();
+      const NodeTitleInstanceEntry& e = gTitleInstance[slot];
+      if (outTotalCount != nullptr)
+         *outTotalCount = e.total;
+      return e.rank;
    }
 
    // NodeTitle() plus a " #N" suffix when another node on the canvas shares
@@ -6196,6 +6332,10 @@ namespace
    void InvalidateNodeByUid()
    {
       gNodeByUidDirty = true;
+      // Every gNodes erase/clear/reload site already reports here, and so
+      // does the main loop once a frame - the title-instance cache
+      // (GetNodeInstanceIndex) wants exactly the same notifications.
+      InvalidateNodeTitleInstances();
    }
 
    void RebuildNodeByUid()
@@ -20032,15 +20172,46 @@ namespace
    // changes the signature without the button held, and gets an immediate,
    // un-throttled, full-resolution recompute - so the *final* curve after
    // any change, drag or not, is always full 160-point resolution).
+   //
+   // Continuous motion that is NOT a drag - an LFO, expression, macro or
+   // Drift moving freq/Q/gain every frame - used to fall through to the
+   // un-throttled full recompute on every frame, for every modulated filter
+   // on the canvas (~31% of the main thread with 72 modulated filters). A
+   // signature that changes on two frames in a row is now "in motion": the
+   // first change of a streak still recomputes at once (so a typed edit or a
+   // single stepped-modulator jump is exact immediately), later ones are
+   // capped per node to kFilterCurveMotionSec and staggered by node index
+   // (FilterCurvePhase) so the filters on a canvas don't all land on one
+   // frame. The first frame the signature holds still, the curve is
+   // recomputed at full resolution - including after a drag or motion
+   // streak whose last recompute was a coarse one (FilterCurveCache::coarse).
    struct FilterCurveCache
    {
       std::vector<float> curveDb; // one entry per x pixel column sampled
       std::vector<float> signature;    // signature that produced curveDb
       std::vector<float> lastSeenSignature; // signature observed last frame
       double lastRecomputeTime = -1.0;
+      double nextDue = -1.0;          // earliest time a recompute during a motion streak may run
+      bool changedLastFrame = false;  // signature also changed on the previous drawn frame
+      bool coarse = false;            // curveDb holds a reduced-resolution recompute
+      float lastOriginX = 0.0f;       // x origin / width curveDb was sampled at
+      float lastWidth = 0.0f;
       bool dragIsQ = false; // which handle the current drag (if any) is grabbing
    };
    std::map<int, FilterCurveCache> gFilterCurveCache;
+   int gFilterCurveRecomputes = 0; // self-test visibility only
+   const double kFilterCurveMotionSec = 0.05; // ~20 Hz cap per node while modulation moves the curve
+
+   // Per-node offset in [0, 1) of a throttle interval, from the golden-ratio
+   // sequence over the node index - spreads nodes that start moving on the
+   // same frame (one LFO driving many filters, transport start) across the
+   // interval instead of recomputing them all together.
+   double FilterCurvePhase(int nodeIndex)
+   {
+      const double v = (double)(unsigned)nodeIndex * 0.6180339887498949;
+      return v - std::floor(v);
+   }
+
    // Throttling *how often* the recompute fires (below) caps it at ~12.5Hz,
    // but that alone isn't enough: a full 160-point AudioFilterDsp::MagnitudeDb
    // sweep is a real settle-then-measure simulation per point (up to ~8000
@@ -20181,12 +20352,19 @@ namespace
             std::copy(tempBuf, tempBuf + readCount, st.window.begin() + keep);
          }
       }
+      // Hann window, built once with the exact expression it used to be
+      // evaluated with per sample, per node, per frame (1024 cosf each).
+      static const std::vector<float> sHann = [] {
+         std::vector<float> w(1024);
+         for (int i = 0; i < 1024; i++)
+            w[i] = 0.5f * (1.0f - cosf(2.0f * 3.14159265358979323846f * (float)i / (float)(1024 - 1)));
+         return w;
+      }();
       float re[1024];
       float im[1024];
       for (int i = 0; i < winSize; i++)
       {
-         const float wnd = 0.5f * (1.0f - cosf(2.0f * 3.14159265358979323846f * (float)i / (float)(winSize - 1)));
-         re[i] = st.window[i] * wnd;
+         re[i] = st.window[i] * sHann[i];
          im[i] = 0.0f;
       }
       WaveTerrainDsp::Radix2FFT::Instance().Forward(re, im);
@@ -20222,6 +20400,20 @@ namespace
          prevY = y;
       }
       dl->PathStroke(lineCol, 0, 1.2f);
+   }
+
+   // Full-resolution response curve, exactly as the visualizer computes it -
+   // the one definition both the cache and FILTERCURVECACHETEST use.
+   void ComputeFilterCurve(std::vector<float>& out, int numPoints, int type, float freq, float q, float gain,
+                           double sampleRate, float originX, float w)
+   {
+      out.resize(numPoints);
+      for (int i = 0; i < numPoints; i++)
+      {
+         const float x = originX + (float)i * (w / (float)(numPoints - 1));
+         const float f = FilterVizXToFreq(x, originX, w);
+         out[i] = AudioFilterDsp::MagnitudeDb(type, freq, q, gain, f, sampleRate);
+      }
    }
 
    // Full-width log-frequency response curve with a draggable handle per
@@ -20273,23 +20465,41 @@ namespace
       const bool sigChanged = (cache.lastSeenSignature != sig);
       cache.lastSeenSignature = sig;
       const bool dragging = sigChanged && ImGui::IsMouseDown(ImGuiMouseButton_Left);
+      // A modulation/expression/macro streak: changing again, with no drag.
+      const bool inMotion = sigChanged && !dragging && cache.changedLastFrame;
+      cache.changedLastFrame = sigChanged;
       const double now = ImGui::GetTime();
       const bool throttled = dragging && cache.lastRecomputeTime >= 0.0 &&
                              (now - cache.lastRecomputeTime) < kFilterCurveThrottleSec;
-      // Coarser while a drag is live (see kFilterCurveDragPoints comment
-      // above); the mouse-up frame has dragging=false, so it always recomputes
-      // at full resolution the instant the drag ends.
-      const int kNumPoints = dragging ? kFilterCurveDragPoints : kFilterCurveFullPoints;
-      if (cache.signature != sig && !throttled)
+      const bool motionThrottled = inMotion && now < cache.nextDue;
+      // Coarser while a drag or a motion streak is live (see
+      // kFilterCurveDragPoints comment above). The first frame the signature
+      // holds still has neither, so it recomputes at full resolution - also
+      // when the streak's last recompute already used the final signature
+      // but only at the coarse point count (`cache.coarse`).
+      const bool coarseNow = dragging || inMotion;
+      const int kNumPoints = coarseNow ? kFilterCurveDragPoints : kFilterCurveFullPoints;
+      const bool stale = cache.signature != sig || (cache.coarse && !coarseNow);
+      if (stale && !throttled && !motionThrottled)
       {
          cache.signature = sig;
          cache.lastRecomputeTime = now;
-         cache.curveDb.resize(kNumPoints);
-         for (int i = 0; i < kNumPoints; i++)
+         cache.coarse = coarseNow;
+         cache.lastOriginX = origin.x;
+         cache.lastWidth = w;
+         ComputeFilterCurve(cache.curveDb, kNumPoints, (int)(type + 0.5f), freq, q, gain, sampleRate, origin.x, w);
+         ++gFilterCurveRecomputes;
+         // Next slot this node may recompute in during a motion streak: on a
+         // fixed kFilterCurveMotionSec grid whose phase is set per node when
+         // the streak starts, so staggered nodes stay staggered.
+         if (inMotion)
          {
-            const float x = origin.x + (float)i * (w / (float)(kNumPoints - 1));
-            const float f = FilterVizXToFreq(x, origin.x, w);
-            cache.curveDb[i] = AudioFilterDsp::MagnitudeDb((int)(type + 0.5f), freq, q, gain, f, sampleRate);
+            const double behind = now - cache.nextDue;
+            cache.nextDue += kFilterCurveMotionSec * (std::floor(behind / kFilterCurveMotionSec) + 1.0);
+         }
+         else
+         {
+            cache.nextDue = now + kFilterCurveMotionSec * FilterCurvePhase(gCurrentNodeIndex);
          }
       }
 
@@ -20605,16 +20815,22 @@ namespace
          cache.curveDb.resize(kNumPoints);
          for (int b = 0; b < 5; b++)
             cache.bandCurveDb[b].resize(kNumPoints);
+         // Coefficients once per band and trig once per point - the same
+         // floats EqDsp::BandMagnitudeDb gives per call (see EqKernel.h),
+         // without re-configuring five biquads at every one of 160 points.
+         EqDsp::BandEval evals[5];
+         for (int b = 0; b < 5; b++)
+            evals[b] = EqDsp::PrepareBand(bands[b].type, bands[b].freq, bands[b].q, bands[b].gain,
+                                          bands[b].on, sampleRate);
          for (int i = 0; i < kNumPoints; i++)
          {
             const float x = origin.x + (float)i * (w / (float)(kNumPoints - 1));
             const float f = FilterVizXToFreq(x, origin.x, w);
+            const EqDsp::EvalTrig trig = EqDsp::EvalTrigFor(f, sampleRate);
             float composite = 0.0f;
             for (int b = 0; b < 5; b++)
             {
-               const float bandDb =
-                  EqDsp::BandMagnitudeDb(bands[b].type, bands[b].freq, bands[b].q, bands[b].gain,
-                                          bands[b].on, f, sampleRate);
+               const float bandDb = EqDsp::BandMagnitudeDbAt(evals[b], trig);
                cache.bandCurveDb[b][i] = bandDb;
                composite += bandDb;
             }
@@ -20879,14 +21095,20 @@ namespace
                                       : 44100.0;
          const int kScanPoints = 48;
          float bestAbs = -1.0f;
+         // Runs every drawn frame, so configure each band once rather than
+         // once per scan point (same floats - see EqDsp::BandEval).
+         EqDsp::BandEval evals[5];
+         for (int b = 0; b < 5; b++)
+            evals[b] = EqDsp::PrepareBand(bands[b].type, bands[b].freq, bands[b].q, bands[b].gain,
+                                          bands[b].on, sampleRate);
          for (int i = 0; i < kScanPoints; i++)
          {
             const float t = (float)i / (float)(kScanPoints - 1);
             const float f = kFilterVizMinHz * powf(kFilterVizMaxHz / kFilterVizMinHz, t);
+            const EqDsp::EvalTrig trig = EqDsp::EvalTrigFor(f, sampleRate);
             float composite = 0.0f;
             for (int b = 0; b < 5; b++)
-               composite += EqDsp::BandMagnitudeDb(bands[b].type, bands[b].freq, bands[b].q, bands[b].gain,
-                                                    bands[b].on, f, sampleRate);
+               composite += EqDsp::BandMagnitudeDbAt(evals[b], trig);
             if (std::fabs(composite) > bestAbs)
             {
                bestAbs = std::fabs(composite);
@@ -78115,6 +78337,199 @@ int main(int argc, char** argv)
 
          NewPatch();
          printf("%s\n", allOk ? "FIELDPINNODE OK" : "SUSPECT");
+      }
+
+      // GetNodeInstanceIndex answers from a cache (see NodeTitleInstanceEntry).
+      // Every node's "#N" title must match the reference linear scan, with no
+      // frame boundary in between, after each kind of change the cache has to
+      // notice: spawn, delete, a live shape change, and back to unique.
+      if (getenv("INFINITE_NODETITLETEST") != nullptr && frameId == 4)
+      {
+         bool ok = true;
+         int step = 0;
+         auto checkAll = [&](const char* what) {
+            ++step;
+            for (const GraphNode& gn : gNodes)
+            {
+               int refTotal = 0;
+               const int refRank = GetNodeInstanceIndexScan(gn, &refTotal);
+               const std::string refTitle =
+                  refTotal <= 1 ? NodeTitle(gn) : NodeTitle(gn) + " #" + std::to_string(refRank);
+               int total = 0;
+               const int rank = GetNodeInstanceIndex(gn, &total);
+               const std::string title = NodeTitleWithInstance(gn);
+               if (rank != refRank || total != refTotal || title != refTitle)
+               {
+                  printf("NODETITLE step %d (%s) node %d: got '%s' %d/%d, want '%s' %d/%d  FAIL\n", step, what,
+                         gn.index, title.c_str(), rank, total, refTitle.c_str(), refRank, refTotal);
+                  ok = false;
+               }
+            }
+         };
+         auto titleOf = [](const GraphNode* gn) { return gn != nullptr ? NodeTitleWithInstance(*gn) : std::string("?"); };
+         auto expect = [&](const char* what, const std::string& got, const std::string& want) {
+            const bool pass = got == want;
+            printf("NODETITLE %s: '%s' (want '%s')  %s\n", what, got.c_str(), want.c_str(), pass ? "OK" : "FAIL");
+            ok = ok && pass;
+         };
+
+         const int oscIdx = SpawnNode("Oscillator", "Synths", 0.0f, 0.0f)->index;
+         const int lfo1 = SpawnNode("LFO", "Modulators", 0.0f, 0.0f)->index;
+         const int lfo2 = SpawnNode("LFO", "Modulators", 0.0f, 0.0f)->index;
+         const int lfo3 = SpawnNode("LFO", "Modulators", 0.0f, 0.0f)->index;
+         const int sphereIdx = SpawnNode("Sphere", "3D", 0.0f, 0.0f)->index;
+         const int cubeIdx = SpawnNode("Cube", "3D", 0.0f, 0.0f)->index;
+         checkAll("spawned");
+         expect("unique oscillator", titleOf(FindNodeByIndex(oscIdx)), NodeTitle(*FindNodeByIndex(oscIdx)));
+         expect("lfo 2 of 3", titleOf(FindNodeByIndex(lfo2)), NodeTitle(*FindNodeByIndex(lfo2)) + " #2");
+         expect("unique sphere", titleOf(FindNodeByIndex(sphereIdx)), NodeTitle(*FindNodeByIndex(sphereIdx)));
+
+         RemoveNodeByIndex(lfo2);
+         checkAll("deleted lfo 2");
+         expect("lfo 3 after delete", titleOf(FindNodeByIndex(lfo3)), NodeTitle(*FindNodeByIndex(lfo3)) + " #2");
+
+         // A live title change with no invalidation at all: turn the sphere
+         // into a second cube through its shape field, as its dropdown or a
+         // modulator would.
+         {
+            auto* sphere = dynamic_cast<GeometryNode*>(FindNodeByIndex(sphereIdx)->node.get());
+            auto* cube = dynamic_cast<GeometryNode*>(FindNodeByIndex(cubeIdx)->node.get());
+            if (sphere == nullptr || cube == nullptr)
+            {
+               printf("NODETITLE could not spawn Sphere/Cube  FAIL\n");
+               ok = false;
+            }
+            else
+            {
+               sphere->shape = cube->shape;
+               checkAll("sphere became cube");
+               expect("former sphere", titleOf(FindNodeByIndex(sphereIdx)),
+                      NodeTitle(*FindNodeByIndex(cubeIdx)) + " #1");
+               expect("cube", titleOf(FindNodeByIndex(cubeIdx)), NodeTitle(*FindNodeByIndex(cubeIdx)) + " #2");
+            }
+         }
+
+         const int osc2 = SpawnNode("Oscillator", "Synths", 0.0f, 0.0f)->index;
+         checkAll("second oscillator");
+         expect("oscillator 2 of 2", titleOf(FindNodeByIndex(osc2)), NodeTitle(*FindNodeByIndex(osc2)) + " #2");
+
+         RemoveNodeByIndex(lfo1);
+         checkAll("back to one lfo");
+         expect("last lfo unique", titleOf(FindNodeByIndex(lfo3)), NodeTitle(*FindNodeByIndex(lfo3)));
+
+         // A GraphNode that is not in gNodes still gets the scan's answer.
+         {
+            GraphNode stray;
+            stray.node.reset(NodeFactory::Instance().MakeNode("Oscillator"));
+            stray.typeName = "Oscillator";
+            stray.index = 1 << 20;
+            int total = 0;
+            const int rank = GetNodeInstanceIndex(stray, &total);
+            const bool pass = rank == 2 && total == 2;
+            printf("NODETITLE stray node rank %d/%d (want 2/2)  %s\n", rank, total, pass ? "OK" : "FAIL");
+            ok = ok && pass;
+         }
+
+         // Repeated lookups with nothing changed must not rebuild.
+         {
+            GetNodeInstanceIndex(gNodes.front());
+            const int before = gTitleInstanceRebuilds;
+            for (int r = 0; r < 10; r++)
+               for (const GraphNode& gn : gNodes)
+                  GetNodeInstanceIndex(gn);
+            const bool pass = gTitleInstanceRebuilds == before;
+            printf("NODETITLE steady-state rebuilds %d (want 0)  %s\n", gTitleInstanceRebuilds - before,
+                   pass ? "OK" : "FAIL");
+            ok = ok && pass;
+         }
+
+         printf("NODETITLE %s\n", ok ? "PASS" : "FAIL");
+         glfwSetWindowShouldClose(window, GLFW_TRUE);
+      }
+
+      // Audio Filter's response-curve cache (FilterCurveCache): a settled
+      // curve is bit-identical to a direct full recompute, a single step is
+      // exact at once, and a modulation-style streak is throttled - then
+      // back to the exact full-resolution curve as soon as it stops.
+      if (const char* fcTest = getenv("INFINITE_FILTERCURVECACHETEST"); fcTest != nullptr)
+      {
+         static int sIdx = -1;
+         static bool sOk = true;
+         static int sRecomputesAtStart = 0;
+         static double sMotionStart = 0.0;
+         static bool sSawCoarse = false;
+         auto node = [&]() -> AudioEffectNode* {
+            GraphNode* gn = FindNodeByIndex(sIdx);
+            return gn != nullptr ? dynamic_cast<AudioEffectNode*>(gn->node.get()) : nullptr;
+         };
+         auto checkExact = [&](const char* what) {
+            AudioEffectNode* n = node();
+            auto it = gFilterCurveCache.find(sIdx);
+            if (n == nullptr || it == gFilterCurveCache.end())
+            {
+               printf("FILTERCURVECACHE %s: no node/cache  FAIL\n", what);
+               sOk = false;
+               return;
+            }
+            const FilterCurveCache& c = it->second;
+            const float type = n->Param("type"), freq = n->Param("freq"), q = n->Param("q"), gain = n->Param("gain");
+            std::vector<float> ref;
+            const double sr = c.signature.empty() ? 0.0 : (double)c.signature[0];
+            ComputeFilterCurve(ref, kFilterCurveFullPoints, (int)(type + 0.5f), freq, q, gain, sr, c.lastOriginX,
+                               c.lastWidth);
+            const bool sigOk = c.signature.size() == 5 && c.signature[1] == type && c.signature[2] == freq &&
+                               c.signature[3] == q && c.signature[4] == gain;
+            const bool bitOk = c.curveDb.size() == ref.size() &&
+                               std::memcmp(c.curveDb.data(), ref.data(), ref.size() * sizeof(float)) == 0;
+            const bool pass = sigOk && bitOk && !c.coarse;
+            printf("FILTERCURVECACHE %s: points=%zu coarse=%d signature=%s bit-identical=%s  %s\n", what,
+                   c.curveDb.size(), c.coarse ? 1 : 0, sigOk ? "current" : "STALE", bitOk ? "yes" : "no",
+                   pass ? "OK" : "FAIL");
+            sOk = sOk && pass;
+         };
+
+         if (frameId == 2)
+         {
+            GraphNode* gn = SpawnNode("Audio Filter", "AudioEffects", 0.0f, 0.0f);
+            sIdx = gn->index;
+            *static_cast<AudioEffectNode*>(gn->node.get())->ParamPtr("freq") = 1000.0f;
+         }
+         if (frameId == 10)
+            checkExact("static");
+         if (frameId == 12)
+            *node()->ParamPtr("freq") = 2500.0f; // one step, then still
+         if (frameId == 15)
+            checkExact("single step");
+         // Frames 20..99: freq moves every frame, like an LFO.
+         if (frameId >= 20 && frameId < 100)
+         {
+            if (frameId == 22)
+            {
+               sRecomputesAtStart = gFilterCurveRecomputes;
+               sMotionStart = ImGui::GetTime();
+            }
+            *node()->ParamPtr("freq") = 400.0f * powf(2.0f, 3.0f * (0.5f + 0.5f * sinf((float)frameId * 0.21f)));
+            auto it = gFilterCurveCache.find(sIdx);
+            if (frameId > 24 && it != gFilterCurveCache.end() && it->second.coarse)
+               sSawCoarse = true;
+         }
+         if (frameId == 99)
+         {
+            const int recomputes = gFilterCurveRecomputes - sRecomputesAtStart;
+            const double elapsed = ImGui::GetTime() - sMotionStart;
+            const int bound = (int)std::floor(elapsed / kFilterCurveMotionSec) + 2;
+            const bool pass = recomputes <= bound && recomputes > 0 && sSawCoarse;
+            printf("FILTERCURVECACHE motion: %d recomputes over %d frames / %.3fs (cap %d), coarse seen=%d  %s\n",
+                   recomputes, 99 - 22, elapsed, bound, sSawCoarse ? 1 : 0, pass ? "OK" : "FAIL");
+            sOk = sOk && pass;
+         }
+         if (frameId == 103)
+            checkExact("settled after motion");
+         if (frameId == 104)
+         {
+            printf("FILTERCURVECACHE %s\n", sOk ? "PASS" : "FAIL");
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
       }
 
       if (getenv("INFINITE_BYPASSRULETEST") != nullptr && frameId == 4)
