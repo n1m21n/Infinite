@@ -3388,7 +3388,15 @@ namespace
          {
             const int drivenIdx = std::clamp((int)lroundf(h.value), 0, lastIndex);
             if (drivenIdx != current && onSelect)
+            {
+               // Modulation never creates an undo entry or dirties the patch:
+               // most onSelect lambdas open with PushUndoCheckpoint() for the
+               // user-click path, so suppress it here. The param write still runs.
+               const bool wasSuppressed = gSuppressUndoCheckpoints;
+               gSuppressUndoCheckpoints = true;
                onSelect(drivenIdx);
+               gSuppressUndoCheckpoints = wasSuppressed;
+            }
             safeCurrent = drivenIdx;
          }
          if (!h.draw)
@@ -3636,8 +3644,15 @@ namespace
    // Prediction green: pin ring, and the track/fill colours of a green-bound slider.
    constexpr ImU32 kPredictionPinCol = IM_COL32(110, 215, 140, 255);
 
-   bool ModCheckbox(const char* label, bool* value)
+   // outUserChanged (optional) is set true only when a real ImGui click flipped
+   // the box - never for a cable-driven change. The return value still reports
+   // both, because setter-style callers need it; a caller that pushes an undo
+   // checkpoint must key it on outUserChanged instead, so modulation never
+   // creates an undo entry or dirties the patch.
+   bool ModCheckbox(const char* label, bool* value, bool* outUserChanged = nullptr)
    {
+      if (outUserChanged)
+         *outUserChanged = false;
       if (value == nullptr)
          return false;
 
@@ -3648,6 +3663,8 @@ namespace
          PushCheckboxStyle();
          bool changed = ImGui::Checkbox(label, value);
          PopCheckboxStyle();
+         if (outUserChanged)
+            *outUserChanged = changed;
          return changed;
       }
 
@@ -3683,7 +3700,10 @@ namespace
       }
       else
       {
-         changed = ImGui::Checkbox(label, value) || changed;
+         const bool clicked = ImGui::Checkbox(label, value);
+         if (outUserChanged)
+            *outUserChanged = clicked;
+         changed = clicked || changed;
          DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
       }
       PopCheckboxStyle();
@@ -8684,7 +8704,9 @@ namespace
       DropdownButton("pattern", ProjectionNode::PatternNames(), n->patternMode,
                      [n](int i) { PushUndoCheckpoint(); n->patternMode = i; }, colW);
 
-      if (ModCheckbox("match input res", &n->matchInput))
+      bool matchInputUserChanged = false;
+      ModCheckbox("match input res", &n->matchInput, &matchInputUserChanged);
+      if (matchInputUserChanged)
          PushUndoCheckpoint();
 
       if (!n->matchInput)
@@ -10896,7 +10918,15 @@ namespace
             {
                const int drivenIdx = std::clamp((int)lroundf(h.value), 0, lastIndex);
                if (drivenIdx != current && onSelect)
+               {
+                  // Modulation never creates an undo entry or dirties the patch:
+                  // most onSelect lambdas open with PushUndoCheckpoint() for the
+                  // user-click path, so suppress it here. The param write still runs.
+                  const bool wasSuppressed = gSuppressUndoCheckpoints;
+                  gSuppressUndoCheckpoints = true;
                   onSelect(drivenIdx);
+                  gSuppressUndoCheckpoints = wasSuppressed;
+               }
                safe = drivenIdx;
             }
             if (!h.draw)
@@ -10976,7 +11006,15 @@ namespace
                {
                   const int drivenIdx = std::clamp((int)lroundf(h.value), 0, lastIndex);
                   if (drivenIdx != current && onSelect)
+                  {
+                     // Modulation never creates an undo entry or dirties the patch:
+                     // most onSelect lambdas open with PushUndoCheckpoint() for the
+                     // user-click path, so suppress it here. The param write still runs.
+                     const bool wasSuppressed = gSuppressUndoCheckpoints;
+                     gSuppressUndoCheckpoints = true;
                      onSelect(drivenIdx);
+                     gSuppressUndoCheckpoints = wasSuppressed;
+                  }
                   safe = drivenIdx;
                }
                drawIt = h.draw;
@@ -13562,7 +13600,15 @@ namespace
          {
             const int drivenIdx = std::clamp((int)lroundf(h.value), 0, lastIndex);
             if (drivenIdx != current && onSelect)
+            {
+               // Modulation never creates an undo entry or dirties the patch:
+               // most onSelect lambdas open with PushUndoCheckpoint() for the
+               // user-click path, so suppress it here. The param write still runs.
+               const bool wasSuppressed = gSuppressUndoCheckpoints;
+               gSuppressUndoCheckpoints = true;
                onSelect(drivenIdx);
+               gSuppressUndoCheckpoints = wasSuppressed;
+            }
             safe = drivenIdx;
          }
          if (!h.draw)
@@ -13704,9 +13750,11 @@ namespace
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          bool on = eng.on;
-         if (ModCheckbox("##wtOn", &on))
+         bool onUserChanged = false;
+         if (ModCheckbox("##wtOn", &on, &onUserChanged))
          {
-            PushUndoCheckpoint();
+            if (onUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             eng.on = on;
          }
          if (ImGui::IsItemHovered())
@@ -15453,9 +15501,11 @@ namespace
          const float y = ImGui::GetCursorScreenPos().y;
          ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, y));
          bool cross = n->crossthrough;
-         if (ModCheckbox("crossthrough##slicerCrossthrough", &cross))
+         bool crossUserChanged = false;
+         if (ModCheckbox("crossthrough##slicerCrossthrough", &cross, &crossUserChanged))
          {
-            PushUndoCheckpoint();
+            if (crossUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
             n->crossthrough = cross;
          }
          if (ImGui::IsItemHovered())
@@ -70641,6 +70691,104 @@ int main(int argc, char** argv)
          ok = ok && loadClearsUndo;
 
          printf("%s\n", ok ? "UNDO REDO OK" : "SUSPECT");
+      }
+
+      // Modulation never creates an undo entry or dirties the patch
+      // (regression, docs/fix-briefs/modulated-dropdown-undo-spam.md). A
+      // cable-driven dropdown writes its value back through the caller's
+      // onSelect lambda, and most of those lambdas open with
+      // PushUndoCheckpoint() for the user-click path - so every index
+      // boundary a modulator crossed used to serialize the whole patch onto
+      // gUndoStack and set gPatchDirty. The existing UNDOTEST never binds a
+      // modulator to anything, which is why this shipped. Drives two of the
+      // four widget shapes over real drawn frames: AudioKnobRow::Dropdown
+      // (Audio Filter "type") and AudioBareDropdown (Oscillator "oscWave"),
+      // each from its own Constant swept 0..1..0 several times.
+      if (getenv("INFINITE_MODDROPDOWNUNDOTEST") != nullptr)
+      {
+         static int sFilterIdx = -1, sOscIdx = -1, sConstAIdx = -1, sConstBIdx = -1;
+         static int sTypeParam = -1, sWaveParam = -1;
+         static size_t sUndoBefore = 0, sRedoBefore = 0;
+         static std::set<int> sTypesSeen, sWavesSeen;
+         constexpr int kBindFrame = 8, kSweepStart = 10, kSweepFrames = 48, kCheckFrame = 62;
+
+         auto findIdx = [](int idx) -> GraphNode* { return FindNodeByIndex(idx); };
+
+         if (frameId == 4)
+         {
+            NewPatch();
+            // Indices read right after each spawn - SpawnNode push_backs onto
+            // gNodes, which can reallocate every GraphNode* taken before it.
+            GraphNode* gn = SpawnNode("Audio Filter", "AudioEffects", 0.0f, 0.0f);
+            sFilterIdx = gn != nullptr ? gn->index : -1;
+            gn = SpawnNode("Oscillator", "Synthesizers", 0.0f, 420.0f);
+            sOscIdx = gn != nullptr ? gn->index : -1;
+            gn = SpawnNode("Constant", "Modulators", 700.0f, 0.0f);
+            sConstAIdx = gn != nullptr ? gn->index : -1;
+            gn = SpawnNode("Constant", "Modulators", 700.0f, 420.0f);
+            sConstBIdx = gn != nullptr ? gn->index : -1;
+         }
+         if (frameId == kBindFrame)
+         {
+            // The bodies have drawn by now, so both dropdowns have registered
+            // their discrete slots. Resolved by label through the same
+            // DiscreteParamSlot the widgets use, then confirmed as registered.
+            if (sFilterIdx >= 0 && sOscIdx >= 0 && sConstAIdx >= 0 && sConstBIdx >= 0)
+            {
+               sTypeParam = DiscreteParamSlot(sFilterIdx, "type");
+               sWaveParam = DiscreteParamSlot(sOscIdx, "oscWave");
+               const ParamRef* typeRef = Modulation::Instance().KnownParam(sFilterIdx, sTypeParam);
+               const ParamRef* waveRef = Modulation::Instance().KnownParam(sOscIdx, sWaveParam);
+               if (typeRef == nullptr || !typeRef->isEnum)
+                  sTypeParam = -1;
+               if (waveRef == nullptr || !waveRef->isEnum)
+                  sWaveParam = -1;
+               if (sTypeParam >= 0)
+                  Modulation::Instance().Bind(sFilterIdx, sTypeParam, sConstAIdx, 0);
+               if (sWaveParam >= 0)
+                  Modulation::Instance().Bind(sOscIdx, sWaveParam, sConstBIdx, 0);
+            }
+            // Baseline taken after the bind: binding is a user edit of its
+            // own, and this check is only about what the cable does after.
+            sUndoBefore = gUndoStack.size();
+            sRedoBefore = gRedoStack.size();
+            gPatchDirty = false;
+         }
+         if (frameId >= kSweepStart && frameId < kSweepStart + kSweepFrames)
+         {
+            // Triangle 0..1..0 with a 16-frame period: three full sweeps,
+            // each crossing every index boundary of both dropdowns twice.
+            const int t = (frameId - kSweepStart) % 16;
+            const float v = (t < 8 ? (float)t : (float)(16 - t)) / 8.0f;
+            if (GraphNode* a = findIdx(sConstAIdx))
+               static_cast<ConstantNode*>(a->node.get())->value = v;
+            if (GraphNode* b = findIdx(sConstBIdx))
+               static_cast<ConstantNode*>(b->node.get())->value = 1.0f - v;
+            if (GraphNode* f = findIdx(sFilterIdx))
+               sTypesSeen.insert((int)(static_cast<AudioEffectNode*>(f->node.get())->Param("type") + 0.5f));
+            if (GraphNode* o = findIdx(sOscIdx))
+               sWavesSeen.insert(static_cast<OscillatorNode*>(o->node.get())->waveform);
+         }
+         if (frameId == kCheckFrame)
+         {
+            const bool bound = sTypeParam >= 0 && sWaveParam >= 0;
+            // Proves the driven path actually ran (onSelect still writes the
+            // param) - without this the stack check below passes vacuously.
+            const bool typeDriven = sTypesSeen.size() >= 3;
+            const bool waveDriven = sWavesSeen.size() >= 3;
+            printf("modulated dropdowns bound: type param=%d, oscWave param=%d  %s\n",
+                   sTypeParam, sWaveParam, bound ? "OK" : "FAIL");
+            printf("modulated dropdowns follow the cable: filter type took %zu values, osc wave took %zu  %s\n",
+                   sTypesSeen.size(), sWavesSeen.size(), (typeDriven && waveDriven) ? "OK" : "FAIL");
+            const bool undoUnchanged = gUndoStack.size() == sUndoBefore && gRedoStack.size() == sRedoBefore;
+            printf("modulated dropdowns push no undo entries: undo %zu -> %zu, redo %zu -> %zu  %s\n",
+                   sUndoBefore, gUndoStack.size(), sRedoBefore, gRedoStack.size(),
+                   undoUnchanged ? "OK" : "FAIL");
+            printf("modulated dropdowns leave the patch clean: dirty=%d  %s\n", (int)gPatchDirty,
+                   !gPatchDirty ? "OK" : "FAIL");
+            const bool ok = bound && typeDriven && waveDriven && undoUnchanged && !gPatchDirty;
+            printf("%s\n", ok ? "MOD DROPDOWN UNDO OK" : "SUSPECT");
+         }
       }
 
       if (getenv("INFINITE_ARRANGETEST") != nullptr && frameId == 4)
