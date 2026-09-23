@@ -1,162 +1,181 @@
 #include "BeatArrangerNode.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
-#include <cstring>
+#include <cstdio>
+#include <cstdlib>
+#include <sstream>
 
 #include "audio/AudioBuffer.h"
 #include "audio/AudioNode.h"
 #include "audio/DspMath.h"
-#include "audio/MusicTime.h"
+#include "audio/MeterRing.h"
 #include "audio/ParamMailbox.h"
 #include "audio/SampleSlot.h"
-#include "core/Transport.h"
 #include "audio/dsp/SlicerDsp.h"
-#include "platform/Platform.h"
 #include "core/AudioDecodeCache.h"
+#include "core/AudioTopologyRequest.h"
+#include "core/Transport.h"
+#include "platform/Platform.h"
 
 namespace
 {
-   enum ArrangerMailboxParams
+   // Mailbox params: continuous, audibly-live knobs only. swing is a
+   // scheduling-time decision (affects WHEN a step lands, not a per-sample
+   // signal), and transient/decay are captured once per hit at trigger time
+   // (see TriggerStep) from plain atomics - stepping those doesn't need a
+   // click-free ramp since it only shapes *new* hits, matching
+   // DrumSequencerNode's decay/transient convention.
+   constexpr int kSpeedParam = 0;
+   constexpr int kOutputParam = 1;
+   constexpr int kRandPitchParam = 2;
+
+   constexpr float kFadeInMs = 2.0f;
+   constexpr float kFadeOutMs = 3.0f;
+   constexpr float kStealFadeMs = 2.0f;
+   constexpr int kNumVoices = 8; // KHS-simple polyphony, steal oldest
+   constexpr int kNumGhosts = 4;
+   constexpr int kMaxHits = 512;
+
+   inline float RaisedCosine(float x01)
    {
-      kMasterVolParam = 0,
-      kGlobalTransientParam,
-      kGlobalDecayParam,
-      kGlobalSpeedParam,
+      const float x = std::clamp(x01, 0.0f, 1.0f);
+      return 0.5f * (1.0f - std::cos(3.14159265358979323846f * x));
+   }
 
-      // Per-strip params: 8 strips x 4 params = 32
-      kStripVolBase = 10,
-      kStripPanBase = 20,
-      kStripPitchBase = 30,
-      kStripSpeedBase = 40,
-   };
-
-   inline int VolParam(int s) { return kStripVolBase + s; }
-   inline int PanParam(int s) { return kStripPanBase + s; }
-   inline int PitchParam(int s) { return kStripPitchBase + s; }
-   inline int SpeedParam(int s) { return kStripSpeedBase + s; }
-
-   struct ArrangedHitList
+   // Fix A3: pitch range keyed on the SLICE's own class, never the role it
+   // was placed into.
+   float PitchRangeSemisFor(DrumClassifier::DrumClass c)
    {
-      std::vector<BeatArranger::ArrangedHit> hits;
-   };
+      return (c == DrumClassifier::DrumClass::Kick || c == DrumClassifier::DrumClass::Bass) ? 3.0f : 12.0f;
+   }
 }
 
-class AudioBeatArrangerNode : public AudioNode
-{
-public:
-   static constexpr int kMaxVoices = 32;
-   static constexpr int kMaxSlicesPerStrip = 64;
+const char* const BeatArrangerNode::kTimeSigNames[BeatArrangerNode::kNumTimeSigs] = {
+   "transport", "4/4", "3/4", "6/8", "5/4", "7/8"
+};
 
-   AudioBeatArrangerNode()
+namespace
+{
+   void TimeSigFor(int index, int& outNum, int& outDen)
    {
-      for (int s = 0; s < BeatArrangerNode::kNumStrips; s++)
+      switch (index)
       {
-         mStripMute[s].store(false, std::memory_order_relaxed);
-         mStripSolo[s].store(false, std::memory_order_relaxed);
-         mStripSliceCount[s].store(0, std::memory_order_relaxed);
-         mStripSampleRate[s].store(44100.0, std::memory_order_relaxed);
-         mStripDecayCoeff[s].store(1.0f, std::memory_order_relaxed);
-         mStripAttackInc[s].store(1.0f, std::memory_order_relaxed);
-         mStripAttackSamples[s].store(1, std::memory_order_relaxed);
-         mStripBoostPeak[s].store(1.0f, std::memory_order_relaxed);
-         mStripBoostDecayCoeff[s].store(0.0f, std::memory_order_relaxed);
+         case 0: outNum = Transport::Instance().TimeSigNumerator(); outDen = Transport::Instance().TimeSigDenominator(); return;
+         case 1: outNum = 4; outDen = 4; return;
+         case 2: outNum = 3; outDen = 4; return;
+         case 3: outNum = 6; outDen = 8; return;
+         case 4: outNum = 5; outDen = 4; return;
+         case 5: outNum = 7; outDen = 8; return;
+         default: outNum = 4; outDen = 4; return;
       }
    }
 
-   ~AudioBeatArrangerNode() override
+   // Steps per bar at a 1/16-note grid resolution.
+   int StepsPerBarFor(int num, int den)
    {
-      mHitSlot.DrainRetired();
-      delete mHitSlot.Active();
+      const double steps = (double)num * (16.0 / (double)std::max(1, den));
+      return std::clamp((int)std::lround(steps), 1, 64);
+   }
+}
+
+// ------------------------------------------------------------- audio thread
+class AudioBeatArrangerNode : public AudioNode
+{
+public:
+   AudioBeatArrangerNode()
+   {
+      for (int i = 0; i <= BeatArrangerNode::kMaxSlices; i++)
+         mSliceStart[i].store(i == 0 ? 0.0f : 1.0f, std::memory_order_relaxed);
+      mSliceCount.store(0, std::memory_order_relaxed);
+      for (int i = 0; i < BeatArrangerNode::kMaxSlices; i++)
+         mSliceClass[i].store((int)DrumClassifier::DrumClass::Perc, std::memory_order_relaxed);
    }
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
    {
       mSampleRate = sampleRate;
       mMailbox.PrepareToPlay(sampleRate);
-
-      mMailbox.SetImmediate(kMasterVolParam, 0.8f);
-      mMailbox.SetImmediate(kGlobalTransientParam, 0.0f);
-      mMailbox.SetImmediate(kGlobalDecayParam, 0.0f);
-      mMailbox.SetImmediate(kGlobalSpeedParam, 1.0f);
-
-      for (int s = 0; s < BeatArrangerNode::kNumStrips; s++)
-      {
-         mMailbox.SetImmediate(VolParam(s), 0.8f);
-         mMailbox.SetImmediate(PanParam(s), 0.0f);
-         mMailbox.SetImmediate(PitchParam(s), 0.0f);
-         mMailbox.SetImmediate(SpeedParam(s), 1.0f);
-      }
+      // Fix Section7#4: seed from the atomics (last main-thread-pushed
+      // value), never a hardcoded default - PrepareToPlay can land between
+      // two cooks (device change, sample-rate change) and must not forget
+      // whatever the user last set.
+      mMailbox.SetImmediate(kSpeedParam, mSpeed.load(std::memory_order_relaxed));
+      mMailbox.SetImmediate(kOutputParam, mOutput.load(std::memory_order_relaxed));
+      mMailbox.SetImmediate(kRandPitchParam, mRandPitch.load(std::memory_order_relaxed));
+      Reset();
    }
 
-   // Main thread calls:
-   void PushBuffer(int strip, Platform::SampleBuffer* buf)
+   // Fix Section7#5: resyncs scheduling to Transport's CURRENT position
+   // rather than wherever ProcessBlock next happens to look, and clears
+   // playing voices - otherwise a rewire/undo replays every hit since
+   // whatever mPrevStepPos was left at.
+   void Reset() override
    {
-      if (strip >= 0 && strip < BeatArrangerNode::kNumStrips)
-      {
-         if (buf != nullptr && buf->sampleRate > 1000.0)
-            mStripSampleRate[strip].store(buf->sampleRate, std::memory_order_relaxed);
-         mSampleSlots[strip].Push(buf);
-      }
+      for (auto& v : mVoices)
+         v = Voice();
+      for (auto& g : mGhosts)
+         g = Ghost();
+      const double stepBeats = std::max(1e-6, (double)mStepBeats.load(std::memory_order_relaxed));
+      mPrevStepPos = Transport::Instance().Beats() / stepBeats - 1e-6;
    }
 
-   void DrainRetired()
+   void PushBuffer(Platform::SampleBuffer* buf) { mSampleSlot.Push(buf); }
+   void DrainRetired() { mSampleSlot.DrainRetired(); }
+
+   void PushParams(float speed, float output, float randPitch, float swing, float transient, float decay)
    {
-      for (int s = 0; s < BeatArrangerNode::kNumStrips; s++)
-         mSampleSlots[s].DrainRetired();
-      mHitSlot.DrainRetired();
+      mSpeed.store(speed, std::memory_order_relaxed);
+      mOutput.store(output, std::memory_order_relaxed);
+      mRandPitch.store(randPitch, std::memory_order_relaxed);
+      mSwing.store(swing, std::memory_order_relaxed);
+      mTransient.store(transient, std::memory_order_relaxed);
+      mDecay.store(decay, std::memory_order_relaxed);
+      mMailbox.Push(kSpeedParam, speed);
+      mMailbox.Push(kOutputParam, output);
+      mMailbox.Push(kRandPitchParam, randPitch);
    }
 
-   void PushHitList(ArrangedHitList* list)
+   // Main thread. Fix Section7#7: called every time a fresh analysis lands,
+   // BEFORE PushHits, so a stale slice list never outlives its hit list by
+   // even one block.
+   void PushSlices(const float* starts, int count, const int* classes)
    {
-      mHitSlot.Push(list);
-   }
-
-   void PushStripSlices(int strip, const int* starts, const int* ends, int count)
-   {
-      if (strip < 0 || strip >= BeatArrangerNode::kNumStrips)
-         return;
-      const int n = std::clamp(count, 0, kMaxSlicesPerStrip);
+      const int n = std::clamp(count, 0, BeatArrangerNode::kMaxSlices);
       for (int i = 0; i < n; i++)
       {
-         mSliceStart[strip][i].store(starts[i], std::memory_order_relaxed);
-         mSliceEnd[strip][i].store(ends[i], std::memory_order_relaxed);
+         mSliceStart[i].store(std::clamp(starts[i], 0.0f, 1.0f), std::memory_order_relaxed);
+         mSliceClass[i].store(classes[i], std::memory_order_relaxed);
       }
-      mStripSliceCount[strip].store(n, std::memory_order_release);
+      mSliceStart[n].store(1.0f, std::memory_order_relaxed);
+      mSliceCount.store(n, std::memory_order_release);
    }
 
-   void PushStripEnvelope(int strip, float decayCoeff, float attackInc, int attackSamples,
-                          float boostPeak, float boostDecayCoeff)
+   struct HitPod
    {
-      if (strip < 0 || strip >= BeatArrangerNode::kNumStrips)
-         return;
-      mStripDecayCoeff[strip].store(decayCoeff, std::memory_order_relaxed);
-      mStripAttackInc[strip].store(attackInc, std::memory_order_relaxed);
-      mStripAttackSamples[strip].store(attackSamples, std::memory_order_relaxed);
-      mStripBoostPeak[strip].store(boostPeak, std::memory_order_relaxed);
-      mStripBoostDecayCoeff[strip].store(boostDecayCoeff, std::memory_order_relaxed);
-   }
+      int step = 0;
+      int slice = 0;
+      float velocity = 0.0f;
+      float pitchRand = 0.0f;
+   };
 
-   void SetStripMute(int strip, bool m) { mStripMute[strip].store(m, std::memory_order_relaxed); }
-   void SetStripSolo(int strip, bool s) { mStripSolo[strip].store(s, std::memory_order_relaxed); }
-   void SetRate(int r) { mRate.store(r, std::memory_order_relaxed); }
-   void SetBars(int b) { mBars.store(b, std::memory_order_relaxed); }
-   void SetSwing(float sw) { mSwing.store(sw, std::memory_order_relaxed); }
-
-   void PushGlobalParams(float masterVol, float transient, float decay, float speed)
+   // Main thread. `stepBeats`/`totalSteps` describe the pattern these hits
+   // were generated against; published alongside so a change to timeSig
+   // between Generate() calls can never desync the audio thread's scan.
+   void PushHits(const HitPod* hits, int count, double stepBeats, int totalSteps)
    {
-      mMailbox.Push(kMasterVolParam, masterVol);
-      mMailbox.Push(kGlobalTransientParam, transient);
-      mMailbox.Push(kGlobalDecayParam, decay);
-      mMailbox.Push(kGlobalSpeedParam, speed);
-   }
-
-   void PushStripParams(int strip, float vol, float pan, float pitch, float speed)
-   {
-      mMailbox.Push(VolParam(strip), vol);
-      mMailbox.Push(PanParam(strip), pan);
-      mMailbox.Push(PitchParam(strip), pitch);
-      mMailbox.Push(SpeedParam(strip), speed);
+      const int n = std::clamp(count, 0, kMaxHits);
+      for (int i = 0; i < n; i++)
+      {
+         mHits[i].step.store(hits[i].step, std::memory_order_relaxed);
+         mHits[i].slice.store(hits[i].slice, std::memory_order_relaxed);
+         mHits[i].velocity.store(hits[i].velocity, std::memory_order_relaxed);
+         mHits[i].pitchRand.store(hits[i].pitchRand, std::memory_order_relaxed);
+      }
+      mStepBeats.store((float)stepBeats, std::memory_order_relaxed);
+      mTotalSteps.store(totalSteps, std::memory_order_relaxed);
+      mHitCount.store(n, std::memory_order_release);
    }
 
    void GetVisualSnapshot(BeatArrangerVisualSnapshot& out)
@@ -165,236 +184,155 @@ public:
       out = mVisualSnapshots[rIdx];
    }
 
-   void ProcessBlock(const AudioBuffer* const*, int, AudioBuffer& buffer) override
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& buffer) override
    {
-      AudioBuffer* outputs[1 + BeatArrangerNode::kNumStrips] = {};
-      outputs[0] = &buffer;
-      ProcessBlockMulti(nullptr, 0, outputs, 1);
-   }
-
-   void ProcessBlockMulti(const AudioBuffer* const* inputs, int numInputs,
-                          AudioBuffer* const* outputs, int numOutputs) override
-   {
-      // 1. Swap in buffers and hit list
-      for (int s = 0; s < BeatArrangerNode::kNumStrips; s++)
+      // Adopt a newly loaded buffer only at the top of the block.
+      if (mSampleSlot.SwapIn())
       {
-         if (mSampleSlots[s].SwapIn())
-         {
-            // Reset active voices playing this strip
-            for (int v = 0; v < kMaxVoices; v++)
-            {
-               if (mVoices[v].active && mVoices[v].sample == s)
-                  mVoices[v].active = false;
-            }
-         }
+         mActiveBuffer = mSampleSlot.Active();
+         for (auto& v : mVoices)
+            v.active = false;
+         for (auto& g : mGhosts)
+            g.active = false;
       }
 
-      if (mHitSlot.SwapIn())
-      {
-         mActiveHitList = mHitSlot.Active();
-      }
+      for (int ch = 0; ch < buffer.numChannels; ch++)
+         std::fill(buffer.channels[ch], buffer.channels[ch] + buffer.numFrames, 0.0f);
 
-      const int numFrames = outputs[0] ? outputs[0]->numFrames : 0;
-      if (numFrames <= 0)
+      const int hitCount = mHitCount.load(std::memory_order_acquire);
+      const int totalSteps = std::max(1, mTotalSteps.load(std::memory_order_relaxed));
+      const double stepBeats = std::max(1e-6, (double)mStepBeats.load(std::memory_order_relaxed));
+
+      if (mActiveBuffer == nullptr || mActiveBuffer->numFrames <= 0 || hitCount <= 0)
+      {
+         PublishSnapshot(totalSteps, 0.0f);
          return;
-
-      for (int o = 0; o < numOutputs; o++)
-      {
-         if (outputs[o] == nullptr)
-            continue;
-         for (int ch = 0; ch < outputs[o]->numChannels; ch++)
-            std::fill(outputs[o]->channels[ch], outputs[o]->channels[ch] + outputs[o]->numFrames, 0.0f);
       }
 
-      // Step advancement from Transport
-      const int rateDiv = mRate.load(std::memory_order_relaxed);
-      const double beatsPerStep = std::max(1e-6, MusicTime::BeatsFor((MusicTime::RateDivision)rateDiv));
-      const int bars = std::clamp(mBars.load(std::memory_order_relaxed), 1, 4);
-      const int totalSteps = bars * 16;
-      const float swing = std::clamp(mSwing.load(std::memory_order_relaxed), 0.0f, 1.0f);
+      const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
+      const float swing = mSwing.load(std::memory_order_relaxed);
+      const int numFrames = mActiveBuffer->numFrames;
+      const double srRatio = (mActiveBuffer->sampleRate > 0.0) ? (mActiveBuffer->sampleRate / mSampleRate) : 1.0;
 
-      const double rawPosNow = Transport::Instance().Beats() / beatsPerStep;
+      // Envelope shaping keyed off the slice's OWN measured length at
+      // trigger time (fix Section7#2), never a hardcoded 0/0.05s fallback.
+      const float transient = mTransient.load(std::memory_order_relaxed);
+      const float decayParam = mDecay.load(std::memory_order_relaxed);
 
-      struct FireEvent
+      for (int i = 0; i < buffer.numFrames; i++)
       {
-         int frameOffset;
-         BeatArranger::ArrangedHit hit;
-      };
-      FireEvent stepEvts[64];
-      int numStepEvts = 0;
+         const double curBeats = Transport::Instance().BlockStartBeats() + (double)i / mSampleRate * (bpm / 60.0);
+         const double curStepPos = curBeats / stepBeats;
 
-      if (rawPosNow < mPrevRawPos)
-      {
-         mPrevRawPos = rawPosNow;
-      }
-      else
-      {
-         const double span = rawPosNow - mPrevRawPos;
-         const int kStart = (int)std::floor(mPrevRawPos - 0.5);
-         const int kEnd = (int)std::ceil(rawPosNow);
-
-         if (mActiveHitList != nullptr && !mActiveHitList->hits.empty())
+         // Sweep every step landmark strictly between the previous scan
+         // position and now, honouring swing's delay on odd (off-beat)
+         // steps so a hit isn't missed when swing pushes it later than a
+         // naive single-landmark check would find.
+         while (true)
          {
-            for (int k = kStart; k <= kEnd && numStepEvts < 64; k++)
-            {
-               const int stepIndex = ((k % totalSteps) + totalSteps) % totalSteps;
-               const bool odd = (stepIndex % 2) == 1;
-               const double landmark = (double)k + (odd ? (double)swing * 0.5 : 0.0);
-               if (landmark > mPrevRawPos && landmark <= rawPosNow)
-               {
-                  const double frac = span > 1e-9 ? (landmark - mPrevRawPos) / span : 0.0;
-                  const int frameOffset = std::clamp((int)(frac * numFrames), 0, std::max(0, numFrames - 1));
+            const double nextLandmark = std::floor(mPrevStepPos) + 1.0;
+            if (nextLandmark > curStepPos)
+               break;
+            const int stepIdx = ((int)std::llround(nextLandmark)) % totalSteps;
+            const bool odd = (stepIdx % 2) != 0;
+            const double swungLandmark = odd ? (nextLandmark + swing * 0.33) : nextLandmark;
+            if (swungLandmark <= curStepPos)
+               TriggerStep(stepIdx, hitCount, transient, decayParam);
+            mPrevStepPos = nextLandmark;
+         }
 
-                  for (const auto& hit : mActiveHitList->hits)
-                  {
-                     if (hit.step == stepIndex && numStepEvts < 64)
-                     {
-                        stepEvts[numStepEvts++] = { frameOffset, hit };
-                     }
-                  }
+         const float speed = mMailbox.SmoothedValue(kSpeedParam);
+         const float output = mMailbox.SmoothedValue(kOutputParam);
+         const double rate = (double)speed * srRatio;
+
+         float sample = 0.0f;
+         for (auto& vo : mVoices)
+         {
+            if (!vo.active)
+               continue;
+            float g = vo.velocity;
+            if (vo.fadeInLeft > 0)
+            {
+               g *= RaisedCosine(1.0f - (float)vo.fadeInLeft / (float)vo.fadeInTotal);
+               vo.fadeInLeft--;
+            }
+            g *= std::exp(-(float)vo.elapsed / vo.tau);
+            if (vo.fadeOutLeft >= 0)
+            {
+               g *= RaisedCosine((float)vo.fadeOutLeft / (float)vo.fadeOutTotal);
+               vo.fadeOutLeft--;
+               if (vo.fadeOutLeft < 0)
+               {
+                  vo.active = false;
+                  continue;
                }
             }
-         }
-         mPrevRawPos = rawPosNow;
-      }
 
-      std::sort(stepEvts, stepEvts + numStepEvts,
-                [](const FireEvent& a, const FireEvent& b) { return a.frameOffset < b.frameOffset; });
+            sample += ReadSample(*mActiveBuffer, vo.pos) * g;
+            vo.lastGain = g;
+            vo.pos += rate * vo.pitchRate;
+            vo.elapsed += 1.0f / (float)mSampleRate;
 
-      // Mute / Solo resolution
-      bool anySolo = false;
-      bool stripAudible[BeatArrangerNode::kNumStrips];
-      for (int s = 0; s < BeatArrangerNode::kNumStrips; s++)
-      {
-         if (mStripSolo[s].load(std::memory_order_relaxed))
-            anySolo = true;
-      }
-      for (int s = 0; s < BeatArrangerNode::kNumStrips; s++)
-      {
-         const bool solo = mStripSolo[s].load(std::memory_order_relaxed);
-         const bool mute = mStripMute[s].load(std::memory_order_relaxed);
-         stripAudible[s] = anySolo ? solo : !mute;
-      }
-
-      int stepIdx = 0;
-      for (int i = 0; i < numFrames; i++)
-      {
-         float stripVolNow[BeatArrangerNode::kNumStrips];
-         float stripPanNow[BeatArrangerNode::kNumStrips];
-         float stripPitchNow[BeatArrangerNode::kNumStrips];
-         float stripSpeedNow[BeatArrangerNode::kNumStrips];
-
-         for (int s = 0; s < BeatArrangerNode::kNumStrips; s++)
-         {
-            stripVolNow[s] = mMailbox.SmoothedValue(VolParam(s));
-            stripPanNow[s] = mMailbox.SmoothedValue(PanParam(s));
-            stripPitchNow[s] = mMailbox.SmoothedValue(PitchParam(s));
-            stripSpeedNow[s] = mMailbox.SmoothedValue(SpeedParam(s));
+            if (vo.fadeOutLeft < 0 &&
+                (vo.pos >= vo.endPos || std::exp(-(float)vo.elapsed / vo.tau) < 1.0e-4f))
+               BeginFadeOut(vo);
          }
 
-         const float masterVolNow = mMailbox.SmoothedValue(kMasterVolParam);
-         const float globalSpeedNow = mMailbox.SmoothedValue(kGlobalSpeedParam);
-
-         while (stepIdx < numStepEvts && stepEvts[stepIdx].frameOffset <= i)
+         for (auto& gh : mGhosts)
          {
-            TriggerHit(stepEvts[stepIdx].hit, stripVolNow, stripPanNow, stripPitchNow,
-                       stripSpeedNow, globalSpeedNow);
-            stepIdx++;
-         }
-
-         float sampleL = 0.0f, sampleR = 0.0f;
-         float stripL[BeatArrangerNode::kNumStrips] = {};
-         float stripR[BeatArrangerNode::kNumStrips] = {};
-
-         for (int v = 0; v < kMaxVoices; v++)
-         {
-            Voice& voice = mVoices[v];
-            if (!voice.active)
+            if (!gh.active)
                continue;
-
-            const int strip = voice.sample;
-            if (voice.buffer == nullptr || !stripAudible[strip])
-            {
-               voice.active = false;
-               continue;
-            }
-
-            float ampAttack = 1.0f;
-            if (voice.attackRemaining > 0)
-            {
-               voice.attackLevel += voice.attackInc;
-               voice.attackRemaining--;
-               ampAttack = std::min(1.0f, voice.attackLevel);
-            }
-
-            voice.boostEnv = 1.0f + (voice.boostEnv - 1.0f) * voice.boostDecayCoeff;
-            voice.decayAmp *= voice.decayCoeff;
-
-            const float totalAmp = ampAttack * voice.boostEnv * voice.decayAmp * voice.velocity;
-            const float s = ReadSample(*voice.buffer, voice.readPos) * totalAmp;
-            const float vL = s * voice.panL;
-            const float vR = s * voice.panR;
-
-            sampleL += vL;
-            sampleR += vR;
-            stripL[strip] += vL;
-            stripR[strip] += vR;
-
-            voice.readPos += voice.rate;
-            if (voice.readPos >= voice.endFrame - 1.0 || (voice.decayCoeff < 1.0f && totalAmp < 1e-4f))
-            {
-               voice.active = false;
-            }
+            const float g = gh.gain * RaisedCosine((float)gh.left / (float)gh.total);
+            sample += ReadSample(*mActiveBuffer, gh.pos) * g;
+            gh.pos += rate * gh.pitchRate;
+            gh.left--;
+            if (gh.left <= 0 || gh.pos < 0.0 || gh.pos >= (double)numFrames)
+               gh.active = false;
          }
 
-         if (outputs[0] != nullptr)
-         {
-            if (outputs[0]->numChannels > 0)
-               outputs[0]->channels[0][i] = sampleL * masterVolNow;
-            if (outputs[0]->numChannels > 1)
-               outputs[0]->channels[1][i] = sampleR * masterVolNow;
-         }
-
-         for (int s = 0; s < BeatArrangerNode::kNumStrips; s++)
-         {
-            const int outIdx = 1 + s;
-            if (outIdx < numOutputs && outputs[outIdx] != nullptr)
-            {
-               if (outputs[outIdx]->numChannels > 0)
-                  outputs[outIdx]->channels[0][i] = stripL[s];
-               if (outputs[outIdx]->numChannels > 1)
-                  outputs[outIdx]->channels[1][i] = stripR[s];
-            }
-         }
+         const float out = sample * output;
+         for (int ch = 0; ch < buffer.numChannels; ch++)
+            buffer.channels[ch][i] = out;
       }
 
-      // Publish visual snapshot
-      PublishVisualSnapshot(rawPosNow, totalSteps);
+      PublishSnapshot(totalSteps, (float)std::fmod(mPrevStepPos, (double)totalSteps));
    }
-
-   double mSampleRate = 44100.0;
 
 private:
    struct Voice
    {
-      const Platform::SampleBuffer* buffer = nullptr;
-      int sample = 0;
-      int slice = 0;
-      double readPos = 0.0;
-      double startFrame = 0.0;
-      double endFrame = 0.0;
-      float rate = 1.0f;
-      float velocity = 0.0f;
-      float panL = 1.0f, panR = 1.0f;
-      float attackLevel = 0.0f;
-      float attackInc = 1.0f;
-      int attackRemaining = 0;
-      float boostEnv = 1.0f;
-      float boostDecayCoeff = 0.0f;
-      float decayAmp = 1.0f;
-      float decayCoeff = 1.0f;
       bool active = false;
-      bool isClosedHat = false;
+      int slice = 0;
+      double pos = 0.0;
+      double endPos = 0.0;
+      double pitchRate = 1.0;
+      float velocity = 1.0f;
+      float elapsed = 0.0f;
+      float tau = 1.0f;
+      int fadeInLeft = 0;
+      int fadeInTotal = 1;
+      int fadeOutLeft = -1;
+      int fadeOutTotal = 1;
+      float lastGain = 0.0f;
+      unsigned long long order = 0;
+   };
+
+   struct Ghost
+   {
+      bool active = false;
+      double pos = 0.0;
+      double pitchRate = 1.0;
+      float gain = 0.0f;
+      int left = 0;
+      int total = 1;
+   };
+
+   struct AtomicHit
+   {
+      std::atomic<int> step { 0 };
+      std::atomic<int> slice { 0 };
+      std::atomic<float> velocity { 0.0f };
+      std::atomic<float> pitchRand { 0.0f };
    };
 
    static float ReadSample(const Platform::SampleBuffer& buf, double pos)
@@ -408,590 +346,529 @@ private:
       return a + (b - a) * frac;
    }
 
-   void TriggerHit(const BeatArranger::ArrangedHit& hit,
-                   const float* stripVolNow, const float* stripPanNow,
-                   const float* stripPitchNow, const float* stripSpeedNow,
-                   float globalSpeedNow)
+   void BeginFadeOut(Voice& v)
    {
-      const int strip = std::clamp(hit.sample, 0, BeatArrangerNode::kNumStrips - 1);
-      const Platform::SampleBuffer* buf = mSampleSlots[strip].Active();
-      if (buf == nullptr || buf->numFrames <= 0)
+      if (!v.active || v.fadeOutLeft >= 0)
          return;
-
-      // Choke closed hats if triggering open hat
-      const int sliceCount = mStripSliceCount[strip].load(std::memory_order_acquire);
-      int startFrame = 0;
-      int endFrame = buf->numFrames;
-      if (sliceCount > 0 && hit.slice >= 0 && hit.slice < sliceCount)
-      {
-         startFrame = mSliceStart[strip][hit.slice].load(std::memory_order_relaxed);
-         endFrame = mSliceEnd[strip][hit.slice].load(std::memory_order_relaxed);
-      }
-      startFrame = std::clamp(startFrame, 0, buf->numFrames - 1);
-      endFrame = std::clamp(endFrame, startFrame + 1, buf->numFrames);
-
-      // Voice allocation: find inactive or oldest voice
-      int bestVoice = -1;
-      for (int v = 0; v < kMaxVoices; v++)
-      {
-         if (!mVoices[v].active)
-         {
-            bestVoice = v;
-            break;
-         }
-      }
-      if (bestVoice < 0)
-      {
-         bestVoice = mVoiceCursor;
-         mVoiceCursor = (mVoiceCursor + 1) % kMaxVoices;
-      }
-
-      Voice& v = mVoices[bestVoice];
-      v.buffer = buf;
-      v.sample = strip;
-      v.slice = hit.slice;
-      v.startFrame = (double)startFrame;
-      v.endFrame = (double)endFrame;
-      v.readPos = (double)startFrame;
-
-      const float totalPitch = stripPitchNow[strip] + hit.pitchOffsetSemis;
-      const float sampleRateRatio = (float)(mStripSampleRate[strip].load(std::memory_order_relaxed) / mSampleRate);
-      const float effSpeed = std::clamp(stripSpeedNow[strip] * globalSpeedNow, 0.1f, 8.0f);
-      v.rate = std::pow(2.0f, totalPitch / 12.0f) * effSpeed * sampleRateRatio;
-      v.velocity = hit.velocity * stripVolNow[strip];
-      DspMath::EqualPowerPan(stripPanNow[strip], v.panL, v.panR);
-
-      v.attackLevel = 0.0f;
-      v.attackInc = mStripAttackInc[strip].load(std::memory_order_relaxed);
-      v.attackRemaining = mStripAttackSamples[strip].load(std::memory_order_relaxed);
-      v.boostEnv = mStripBoostPeak[strip].load(std::memory_order_relaxed);
-      v.boostDecayCoeff = mStripBoostDecayCoeff[strip].load(std::memory_order_relaxed);
-      v.decayAmp = 1.0f;
-      v.decayCoeff = mStripDecayCoeff[strip].load(std::memory_order_relaxed);
-      v.active = true;
+      v.fadeOutTotal = std::max(1, (int)(kFadeOutMs * 0.001f * (float)mSampleRate));
+      v.fadeOutLeft = v.fadeOutTotal;
    }
 
-   void PublishVisualSnapshot(double rawPosNow, int totalSteps)
+   void SpawnGhost(const Voice& v)
    {
+      for (auto& gh : mGhosts)
+      {
+         if (gh.active)
+            continue;
+         gh.active = true;
+         gh.pos = v.pos;
+         gh.pitchRate = v.pitchRate;
+         gh.gain = v.lastGain;
+         gh.total = std::max(1, (int)(kStealFadeMs * 0.001f * (float)mSampleRate));
+         gh.left = gh.total;
+         return;
+      }
+      // All ghost slots busy: the steal simply cuts - inaudible at 2ms.
+   }
+
+   void TriggerStep(int stepIdx, int hitCount, float transient, float decayParam)
+   {
+      const int count = mSliceCount.load(std::memory_order_acquire);
+      if (count <= 0 || mActiveBuffer == nullptr)
+         return;
+
+      for (int h = 0; h < hitCount; h++)
+      {
+         if (mHits[h].step.load(std::memory_order_relaxed) != stepIdx)
+            continue;
+
+         const int slice = std::clamp(mHits[h].slice.load(std::memory_order_relaxed), 0, count - 1);
+         const float velocity = mHits[h].velocity.load(std::memory_order_relaxed);
+         const float pitchRand = mHits[h].pitchRand.load(std::memory_order_relaxed);
+         const int cls = mSliceClass[slice].load(std::memory_order_relaxed);
+
+         const float startFrac = mSliceStart[slice].load(std::memory_order_relaxed);
+         const float endFrac = (slice + 1 < count) ? mSliceStart[slice + 1].load(std::memory_order_relaxed) : 1.0f;
+         const int numFrames = mActiveBuffer->numFrames;
+
+         // Fix Section7#2: length comes from THIS slice's own bounds, right
+         // now - never a fallback constant.
+         const float sliceLenSec = (float)((double)(endFrac - startFrac) * numFrames / mActiveBuffer->sampleRate);
+
+         Voice* target = nullptr;
+         for (auto& vo : mVoices)
+         {
+            if (!vo.active)
+            {
+               target = &vo;
+               break;
+            }
+         }
+         if (target == nullptr)
+         {
+            // Fix Section7#10: steal the OLDEST voice, not voice 0 / a
+            // rotating cursor, with a short crossfade into a ghost tail.
+            unsigned long long oldest = ~0ull;
+            for (auto& vo : mVoices)
+            {
+               if (vo.order < oldest)
+               {
+                  oldest = vo.order;
+                  target = &vo;
+               }
+            }
+         }
+         if (target == nullptr)
+            continue;
+
+         if (target->active)
+            SpawnGhost(*target);
+
+         // Live rand-pitch: pitchRand was seeded at Generate() time, but the
+         // randPitch AMOUNT and the class-keyed range are read live here, so
+         // dragging the randPitch knob audibly changes the next hit with no
+         // regenerate needed.
+         const float randAmt = mRandPitch.load(std::memory_order_relaxed);
+         const float rangeSemis = PitchRangeSemisFor((DrumClassifier::DrumClass)cls);
+         const float semis = pitchRand * randAmt * rangeSemis;
+
+         target->active = true;
+         target->slice = slice;
+         target->pos = (double)startFrac * numFrames;
+         target->endPos = (double)std::max(startFrac, endFrac) * numFrames;
+         target->pitchRate = std::pow(2.0, (double)semis / 12.0);
+         target->velocity = std::clamp(velocity, 0.0f, 1.0f);
+         target->elapsed = 0.0f;
+         // transient (0..1) shapes attack punch: low = softer/slower attack
+         // (30ms), high = snappy (1ms). decay (0..1) maps to a tau derived
+         // from THIS slice's own length - at decay=0.5 the natural slice
+         // length is used; below/above that shortens/lengthens it.
+         const float attackMs = 1.0f + (1.0f - transient) * 29.0f;
+         const float decayScale = std::pow(2.0f, (decayParam - 0.5f) * 4.0f); // 0.25x..4x
+         target->tau = std::max(1.0e-4f, std::max(0.02f, sliceLenSec) * decayScale / 4.6f);
+         target->fadeInTotal = std::max(1, (int)(std::max(kFadeInMs, attackMs) * 0.001f * (float)mSampleRate));
+         target->fadeInLeft = target->fadeInTotal;
+         target->fadeOutLeft = -1;
+         target->lastGain = 0.0f;
+         target->order = ++mVoiceOrder;
+         return; // at most one voice per step landmark this scan pass
+      }
+   }
+
+   void PublishSnapshot(int totalSteps, float playheadStep)
+   {
+      const int frames = (mActiveBuffer != nullptr) ? std::max(1, mActiveBuffer->numFrames) : 1;
       const int wIdx = (mVisualWriteIdx.load(std::memory_order_relaxed) + 1) % 3;
       BeatArrangerVisualSnapshot& snap = mVisualSnapshots[wIdx];
-
-      const double posInPattern = std::fmod(std::fmod(rawPosNow, (double)totalSteps) + (double)totalSteps, (double)totalSteps);
-      snap.playheadStep = (float)posInPattern;
-      snap.totalSteps = totalSteps;
-
-      int count = 0;
-      for (int v = 0; v < kMaxVoices && count < BeatArrangerVisualSnapshot::kMaxVisualVoices; v++)
+      int n = 0;
+      for (auto& vo : mVoices)
       {
-         if (mVoices[v].active && mVoices[v].buffer != nullptr && mVoices[v].buffer->numFrames > 0)
-         {
-            snap.voices[count].sample = mVoices[v].sample;
-            snap.voices[count].slice = mVoices[v].slice;
-            snap.voices[count].position = (float)(mVoices[v].readPos / (double)mVoices[v].buffer->numFrames);
-            snap.voices[count].amp = mVoices[v].decayAmp * mVoices[v].velocity;
-            count++;
-         }
+         if (!vo.active || n >= BeatArrangerVisualSnapshot::kMaxVisualVoices)
+            continue;
+         snap.voices[n].slice = vo.slice;
+         snap.voices[n].position = (float)(vo.pos / (double)frames);
+         snap.voices[n].amp = std::clamp(vo.lastGain, 0.0f, 1.0f);
+         n++;
       }
-      snap.voiceCount = count;
-
+      snap.voiceCount = n;
+      snap.totalSteps = totalSteps;
+      snap.playheadStep = playheadStep;
       mVisualWriteIdx.store(wIdx, std::memory_order_release);
       mVisualReadIdx.store(wIdx, std::memory_order_release);
    }
 
+   double mSampleRate = 44100.0;
    ParamMailbox mMailbox;
-   SampleSlot mSampleSlots[BeatArrangerNode::kNumStrips];
-   SampleSlotT<ArrangedHitList> mHitSlot;
-   ArrangedHitList* mActiveHitList = nullptr;
 
-   Voice mVoices[kMaxVoices];
-   int mVoiceCursor = 0;
-   double mPrevRawPos = 0.0;
+   Voice mVoices[kNumVoices];
+   Ghost mGhosts[kNumGhosts];
+   unsigned long long mVoiceOrder = 0;
 
-   std::atomic<int> mRate { 12 };
-   std::atomic<int> mBars { 2 };
+   Platform::SampleBuffer* mActiveBuffer = nullptr;
+   SampleSlot mSampleSlot;
+
+   std::atomic<float> mSliceStart[BeatArrangerNode::kMaxSlices + 1];
+   std::atomic<int> mSliceClass[BeatArrangerNode::kMaxSlices];
+   std::atomic<int> mSliceCount { 0 };
+
+   AtomicHit mHits[kMaxHits];
+   std::atomic<int> mHitCount { 0 };
+   std::atomic<float> mStepBeats { 0.25f };
+   std::atomic<int> mTotalSteps { 32 };
+   double mPrevStepPos = 0.0;
+
+   std::atomic<float> mSpeed { 1.0f };
+   std::atomic<float> mOutput { 0.8f };
+   std::atomic<float> mRandPitch { 0.0f };
    std::atomic<float> mSwing { 0.0f };
-
-   std::atomic<bool> mStripMute[BeatArrangerNode::kNumStrips];
-   std::atomic<bool> mStripSolo[BeatArrangerNode::kNumStrips];
-   std::atomic<int> mStripSliceCount[BeatArrangerNode::kNumStrips];
-   std::atomic<double> mStripSampleRate[BeatArrangerNode::kNumStrips];
-
-   std::atomic<int> mSliceStart[BeatArrangerNode::kNumStrips][kMaxSlicesPerStrip];
-   std::atomic<int> mSliceEnd[BeatArrangerNode::kNumStrips][kMaxSlicesPerStrip];
-
-   std::atomic<float> mStripDecayCoeff[BeatArrangerNode::kNumStrips];
-   std::atomic<float> mStripAttackInc[BeatArrangerNode::kNumStrips];
-   std::atomic<int> mStripAttackSamples[BeatArrangerNode::kNumStrips];
-   std::atomic<float> mStripBoostPeak[BeatArrangerNode::kNumStrips];
-   std::atomic<float> mStripBoostDecayCoeff[BeatArrangerNode::kNumStrips];
+   std::atomic<float> mTransient { 0.5f };
+   std::atomic<float> mDecay { 0.5f };
 
    BeatArrangerVisualSnapshot mVisualSnapshots[3];
    std::atomic<int> mVisualWriteIdx { 0 };
    std::atomic<int> mVisualReadIdx { 0 };
 };
 
-// =========================================================================
-// BeatArrangerNode Implementation
-// =========================================================================
-
-BeatArrangerNode::BeatArrangerNode()
-   : mAudioNode(std::make_unique<AudioBeatArrangerNode>())
-{
-   for (int s = 0; s < kNumStrips; s++)
-   {
-      stripVolume[s] = 0.8f;
-      stripPan[s] = 0.0f;
-      stripPitch[s] = 0.0f;
-      stripFineTune[s] = 0.0f;
-      stripSpeed[s] = 1.0f;
-      stripTransient[s] = 0.0f;
-      stripDecay[s] = 0.0f;
-      stripMute[s] = false;
-      stripSolo[s] = false;
-      stripClassOverride[s] = 0; // Auto
-
-      mLastStripVolume[s] = -999.0f;
-      mLastStripPan[s] = -999.0f;
-      mLastStripPitch[s] = -999.0f;
-      mLastStripFineTune[s] = -999.0f;
-      mLastStripSpeed[s] = -999.0f;
-      mLastStripTransient[s] = -999.0f;
-      mLastStripDecay[s] = -999.0f;
-   }
-}
+// -------------------------------------------------------------- main thread
+BeatArrangerNode::BeatArrangerNode() = default;
 
 BeatArrangerNode::~BeatArrangerNode()
 {
-   for (int s = 0; s < kNumStrips; s++)
-   {
-      mWorkerAbort[s].store(true, std::memory_order_relaxed);
-      if (mWorkerThreads[s] && mWorkerThreads[s]->joinable())
-         mWorkerThreads[s]->join();
-      delete mLoadedBuffers[s];
-      mLoadedBuffers[s] = nullptr;
-   }
+   mAbort.store(true, std::memory_order_release);
+   if (mWorkerThread.joinable())
+      mWorkerThread.join();
 }
 
 AudioNode* BeatArrangerNode::GetAudioNode()
 {
-   return mAudioNode.get();
-}
-
-int BeatArrangerNode::LoadedStripCount() const
-{
-   int count = 0;
-   for (int s = 0; s < kNumStrips; s++)
-   {
-      if (!stripFileName[s].empty())
-         count++;
-   }
-   return count;
-}
-
-void BeatArrangerNode::JoinWorkerIfDone(int strip)
-{
-   if (strip < 0 || strip >= kNumStrips)
-      return;
-   if (mWorkerThreads[strip] && mWorkerDone[strip].load(std::memory_order_acquire))
-   {
-      if (mWorkerThreads[strip]->joinable())
-         mWorkerThreads[strip]->join();
-      mWorkerThreads[strip].reset();
-
-      // Adopt worker results
-      stripOnsets[strip] = std::move(mWorkerResults[strip].onsets);
-      stripSlices[strip] = std::move(mWorkerResults[strip].slices);
-
-      // Push slice ranges to audio node
-      if (mAudioNode && !stripOnsets[strip].empty() && mLoadedBuffers[strip])
-      {
-         const int count = (int)stripOnsets[strip].size();
-         const int totalFrames = mLoadedBuffers[strip]->numFrames;
-         std::vector<int> starts(count), ends(count);
-         for (int i = 0; i < count; i++)
-         {
-            starts[i] = stripOnsets[strip][i];
-            ends[i] = (i + 1 < count) ? stripOnsets[strip][i + 1] : totalFrames;
-         }
-         mAudioNode->PushStripSlices(strip, starts.data(), ends.data(), count);
-      }
-
-      // Format status line
-      const int numSlices = (int)stripSlices[strip].size();
-      if (numSlices > 0)
-      {
-         const char* topCls = DrumClassifier::ClassName(stripSlices[strip][0].cls);
-         char buf[64];
-         snprintf(buf, sizeof(buf), "%d slice%s (%s)", numSlices, numSlices > 1 ? "s" : "", topCls);
-         stripStatus[strip] = buf;
-      }
-      else
-      {
-         stripStatus[strip] = "ready";
-      }
-
-      mWorkerDone[strip].store(false, std::memory_order_relaxed);
-   }
-}
-
-void BeatArrangerNode::FinishStripBuffer(int strip, Platform::SampleBuffer* buf)
-{
-   if (strip < 0 || strip >= kNumStrips || buf == nullptr)
-      return;
-
-   // Compute waveform cache for thumbnail
-   const int numFrames = buf->numFrames;
-   stripWaveCount[strip] = kWaveCache;
-   const int step = std::max(1, numFrames / kWaveCache);
-   for (int i = 0; i < kWaveCache; i++)
-   {
-      const int start = i * step;
-      const int end = std::min(numFrames, start + step);
-      float minVal = 0.0f, maxVal = 0.0f;
-      for (int j = start; j < end; j++)
-      {
-         const float s = buf->channelData[j];
-         minVal = std::min(minVal, s);
-         maxVal = std::max(maxVal, s);
-      }
-      stripWaveMin[strip][i] = minVal;
-      stripWaveMax[strip][i] = maxVal;
-   }
-   stripSampleLenSec[strip] = (double)numFrames / std::max(1.0, buf->sampleRate);
-}
-
-bool BeatArrangerNode::LoadFileToStrip(int strip, const std::string& path)
-{
-   strip = ClampStrip(strip);
-   if (path.empty())
-      return false;
-
-   // Wait for any existing worker on this strip
-   mWorkerAbort[strip].store(true, std::memory_order_relaxed);
-   if (mWorkerThreads[strip] && mWorkerThreads[strip]->joinable())
-      mWorkerThreads[strip]->join();
-   mWorkerThreads[strip].reset();
-   mWorkerAbort[strip].store(false, std::memory_order_relaxed);
-   mWorkerDone[strip].store(false, std::memory_order_relaxed);
-
-   auto* decoded = new Platform::SampleBuffer();
-   std::string decodeErr;
-   if (!AudioDecodeCache::DecodeCached(path, *decoded, decodeErr) || decoded->numFrames <= 0)
-   {
-      delete decoded;
-      stripStatus[strip] = decodeErr.empty() ? "decode failed" : decodeErr;
-      return false;
-   }
-
-   delete mLoadedBuffers[strip];
-   mLoadedBuffers[strip] = decoded;
-   stripFilePath[strip] = path;
-
-   // Extract filename
-   const size_t slash = path.find_last_of("/\\");
-   stripFileName[strip] = (slash == std::string::npos) ? path : path.substr(slash + 1);
-   stripStatus[strip] = "analyzing...";
-
-   FinishStripBuffer(strip, decoded);
-
-   // Pass duplicate buffer to audio node
-   if (mAudioNode)
-   {
-      auto* audioCopy = new Platform::SampleBuffer();
-      audioCopy->numFrames = decoded->numFrames;
-      audioCopy->sampleRate = decoded->sampleRate;
-      audioCopy->channelData.resize(decoded->channelData.size());
-      std::memcpy(audioCopy->channelData.data(), decoded->channelData.data(),
-                  decoded->channelData.size() * sizeof(float));
-      mAudioNode->PushBuffer(strip, audioCopy);
-   }
-
-   // Launch worker thread for transient detection & slice classification
-   const std::string fnHint = stripFileName[strip];
-   mWorkerThreads[strip] = std::make_unique<std::thread>([this, strip, decoded, fnHint]() {
-      WorkerResult res;
-      SlicerDsp::Params sp;
-      sp.sensitivity = 65.0f;
-      sp.minIoiSeconds = 0.028;
-      sp.silenceGateDb = -65.0f;
-
-      std::vector<float> strengths;
-      SlicerDsp::Detect(decoded->channelData.data(), decoded->numFrames, decoded->sampleRate,
-                        sp, res.onsets, strengths, &mWorkerAbort[strip]);
-
-      if (res.onsets.empty())
-         res.onsets.push_back(0);
-
-      const int numOnsets = (int)res.onsets.size();
-      res.slices.resize(numOnsets);
-
-      for (int i = 0; i < numOnsets; i++)
-      {
-         if (mWorkerAbort[strip].load(std::memory_order_relaxed))
-            return;
-
-         const int start = res.onsets[i];
-         const int end = (i + 1 < numOnsets) ? res.onsets[i + 1] : decoded->numFrames;
-         const int sliceLen = std::max(1, end - start);
-         const float* sliceData = decoded->channelData.data() + start;
-
-         // Filename prior applies only if sample yields 1 slice (prompt §2a)
-         const char* hint = (numOnsets == 1) ? fnHint.c_str() : nullptr;
-         res.slices[i] = DrumClassifier::Classify(sliceData, sliceLen, decoded->sampleRate, hint);
-      }
-
-      mWorkerResults[strip] = std::move(res);
-      mWorkerDone[strip].store(true, std::memory_order_release);
-   });
-
-   return true;
-}
-
-void BeatArrangerNode::ReloadFromPaths()
-{
-   for (int s = 0; s < kNumStrips; s++)
-   {
-      if (!stripFilePath[s].empty())
-         LoadFileToStrip(s, stripFilePath[s]);
-   }
-}
-
-void BeatArrangerNode::ClearStrip(int strip)
-{
-   strip = ClampStrip(strip);
-   mWorkerAbort[strip].store(true, std::memory_order_relaxed);
-   if (mWorkerThreads[strip] && mWorkerThreads[strip]->joinable())
-      mWorkerThreads[strip]->join();
-   mWorkerThreads[strip].reset();
-
-   delete mLoadedBuffers[strip];
-   mLoadedBuffers[strip] = nullptr;
-   stripFilePath[strip].clear();
-   stripFileName[strip].clear();
-   stripStatus[strip].clear();
-   stripOnsets[strip].clear();
-   stripSlices[strip].clear();
-   stripWaveCount[strip] = 0;
-
-   if (mAudioNode)
-      mAudioNode->PushBuffer(strip, nullptr);
-}
-
-void BeatArrangerNode::Arrange()
-{
-   std::vector<BeatArranger::SliceInfo> pool;
-   for (int s = 0; s < kNumStrips; s++)
-   {
-      if (mLoadedBuffers[s] == nullptr)
-         continue;
-
-      const int numSlices = (int)stripSlices[s].size();
-      if (numSlices == 0)
-      {
-         // Sample without slices: treat whole buffer as 1 slice
-         BeatArranger::SliceInfo info;
-         info.sample = s;
-         info.slice = 0;
-         info.cls = (stripClassOverride[s] > 0)
-            ? (DrumClassifier::DrumClass)(stripClassOverride[s] - 1)
-            : DrumClassifier::DrumClass::Perc;
-         info.confidence = 1.0f;
-         info.lenSec = (float)stripSampleLenSec[s];
-         pool.push_back(info);
-      }
-      else
-      {
-         for (int i = 0; i < numSlices; i++)
-         {
-            BeatArranger::SliceInfo info;
-            info.sample = s;
-            info.slice = i;
-            info.cls = (stripClassOverride[s] > 0)
-               ? (DrumClassifier::DrumClass)(stripClassOverride[s] - 1)
-               : stripSlices[s][i].cls;
-            info.confidence = stripSlices[s][i].confidence;
-            const int start = stripOnsets[s][i];
-            const int end = (i + 1 < numSlices) ? stripOnsets[s][i + 1] : mLoadedBuffers[s]->numFrames;
-            info.lenSec = (float)(end - start) / (float)std::max(1.0, mLoadedBuffers[s]->sampleRate);
-            pool.push_back(info);
-         }
-      }
-   }
-
-   BeatArranger::ArrangeParams params;
-   params.bars = (bars == 1 || bars == 4) ? bars : 2;
-   params.randPitch = randPitch;
-   params.swing = swing;
-
-   mArrangedHits = BeatArranger::Arrange(pool, params, (uint32_t)seed);
-   mHitBlob = BeatArranger::SerializeHits(mArrangedHits);
-
-   // Hand over hits to audio thread
-   if (mAudioNode)
-   {
-      auto* hitList = new ArrangedHitList();
-      hitList->hits = mArrangedHits;
-      mAudioNode->PushHitList(hitList);
-   }
-}
-
-void BeatArrangerNode::ReArrange()
-{
-   seed = (seed + 1) % 10000;
-   Arrange();
-}
-
-void BeatArrangerNode::ClearGroove()
-{
-   mArrangedHits.clear();
-   mHitBlob.clear();
-   if (mAudioNode)
-   {
-      auto* hitList = new ArrangedHitList();
-      mAudioNode->PushHitList(hitList);
-   }
-}
-
-void BeatArrangerNode::CookIfNeeded(int /*frameId*/)
-{
-   // Check background worker threads
-   for (int s = 0; s < kNumStrips; s++)
-      JoinWorkerIfDone(s);
-
    if (!mAudioNode)
-      return;
-
-   mAudioNode->DrainRetired();
-
-   // Push global continuous params
-   if (mFirstCook || volume != mLastVolume || globalTransient != mLastGlobalTransient ||
-       globalDecay != mLastGlobalDecay || globalSpeed != mLastGlobalSpeed)
-   {
-      mAudioNode->PushGlobalParams(volume, globalTransient, globalDecay, globalSpeed);
-      mLastVolume = volume;
-      mLastGlobalTransient = globalTransient;
-      mLastGlobalDecay = globalDecay;
-      mLastGlobalSpeed = globalSpeed;
-   }
-
-   if (mFirstCook || rate != mLastRate)
-   {
-      mAudioNode->SetRate(rate);
-      mLastRate = rate;
-   }
-   if (mFirstCook || bars != mLastBars)
-   {
-      mAudioNode->SetBars(bars);
-      mLastBars = bars;
-   }
-   if (mFirstCook || swing != mLastSwing)
-   {
-      mAudioNode->SetSwing(swing);
-      mLastSwing = swing;
-   }
-
-   // Push per-strip params and envelope calculations
-   for (int s = 0; s < kNumStrips; s++)
-   {
-      if (mFirstCook || stripVolume[s] != mLastStripVolume[s] || stripPan[s] != mLastStripPan[s] ||
-          stripPitch[s] != mLastStripPitch[s] || stripFineTune[s] != mLastStripFineTune[s] ||
-          stripSpeed[s] != mLastStripSpeed[s])
-      {
-         const float pitchTotal = stripPitch[s] + stripFineTune[s] * 0.01f;
-         mAudioNode->PushStripParams(s, stripVolume[s], stripPan[s], pitchTotal, stripSpeed[s]);
-         mLastStripVolume[s] = stripVolume[s];
-         mLastStripPan[s] = stripPan[s];
-         mLastStripPitch[s] = stripPitch[s];
-         mLastStripFineTune[s] = stripFineTune[s];
-         mLastStripSpeed[s] = stripSpeed[s];
-      }
-
-      if (mFirstCook || stripTransient[s] != mLastStripTransient[s] || stripDecay[s] != mLastStripDecay[s] ||
-          globalTransient != mLastGlobalTransient || globalDecay != mLastGlobalDecay)
-      {
-         const float effDecay = std::clamp(stripDecay[s] + globalDecay, -1.0f, 1.0f);
-         const float effTransient = std::clamp(stripTransient[s] + globalTransient, -1.0f, 1.0f);
-
-         float decayCoeff = 1.0f;
-         if (effDecay < 0.999f)
-         {
-            const double decayNorm = (double)(effDecay * 0.5f + 0.5f); // 0..1 throw
-            const double lenSec = std::max(0.05, stripSampleLenSec[s]);
-            const double timeConstSec = std::max(0.005, decayNorm * lenSec);
-            decayCoeff = std::exp((float)(-1.0 / (timeConstSec * mAudioNode->mSampleRate)));
-         }
-
-         const float attackMs = effTransient >= 0.0f ? (3.0f + (0.5f - 3.0f) * effTransient)
-                                                     : (3.0f + (40.0f - 3.0f) * -effTransient);
-         const double sr = mAudioNode->mSampleRate;
-         const int attackSamples = std::max(1, (int)(attackMs * 0.001 * sr));
-         const float attackInc = 1.0f / (float)attackSamples;
-         const float boostDb = effTransient > 0.0f ? effTransient * 4.0f : 0.0f;
-         const float boostPeak = DspMath::DbToLinear(boostDb);
-         const double boostDecaySec = 0.015;
-         const float boostDecayCoeff = std::exp((float)(-1.0 / (boostDecaySec * sr)));
-
-         mAudioNode->PushStripEnvelope(s, decayCoeff, attackInc, attackSamples, boostPeak, boostDecayCoeff);
-         mLastStripTransient[s] = stripTransient[s];
-         mLastStripDecay[s] = stripDecay[s];
-      }
-
-      mAudioNode->SetStripMute(s, stripMute[s]);
-      mAudioNode->SetStripSolo(s, stripSolo[s]);
-   }
-
-   mFirstCook = false;
-   mAudioNode->GetVisualSnapshot(mVisualSnapshot);
+      mAudioNode = std::make_unique<AudioBeatArrangerNode>();
+   return mAudioNode.get();
 }
 
 void BeatArrangerNode::VisitParams(ParamVisitor& v)
 {
-   v.Int("seed", seed);
-   v.Float("randPitch", randPitch);
-   v.Float("globalTransient", globalTransient);
-   v.Float("globalDecay", globalDecay);
-   v.Float("globalSpeed", globalSpeed);
-   v.Int("bars", bars);
-   v.Int("rate", rate);
+   v.Text("path", mFilePath);
+   v.Int("timeSig", timeSig);
    v.Float("swing", swing);
-   v.Float("volume", volume);
+   v.Float("randPitch", randPitch);
+   v.Float("speed", speed);
+   v.Float("transient", transient);
+   v.Float("decay", decay);
+   v.Float("output", output);
+   // Fix Section7#8: the saved beat must be preserved verbatim across
+   // save/load, never re-detected or re-arranged - mirrors SlicerNode's
+   // markers blob.
+   v.Text("slices", mSliceBlob);
+   v.Text("hits", mHitBlob);
+}
 
-   char name[64];
-   for (int s = 0; s < kNumStrips; s++)
+void BeatArrangerNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioBeatArrangerNode>();
+
+   timeSig = std::clamp(timeSig, 0, kNumTimeSigs - 1);
+
+   // Fix Section7#1: compare against the shadow BEFORE overwriting it. Doing
+   // it the other way around (update the shadow, THEN compare) makes every
+   // comparison trivially equal and the param goes permanently dead.
+   const bool changed = mFirstCook ||
+                        swing != mLastSwing || randPitch != mLastRandPitch || speed != mLastSpeed ||
+                        transient != mLastTransient || decay != mLastDecay || output != mLastOutput;
+   mLastSwing = swing;
+   mLastRandPitch = randPitch;
+   mLastSpeed = speed;
+   mLastTransient = transient;
+   mLastDecay = decay;
+   mLastOutput = output;
+   mLastTimeSig = timeSig;
+   mFirstCook = false;
+
+   if (changed)
+      mAudioNode->PushParams(speed, output, randPitch, swing, transient, decay);
+   mAudioNode->DrainRetired();
+
+   if (mResultReady.load(std::memory_order_acquire))
    {
-      snprintf(name, sizeof(name), "strip%d_path", s + 1);
-      v.Text(name, stripFilePath[s]);
-      snprintf(name, sizeof(name), "strip%d_volume", s + 1);
-      v.Float(name, stripVolume[s]);
-      snprintf(name, sizeof(name), "strip%d_pan", s + 1);
-      v.Float(name, stripPan[s]);
-      snprintf(name, sizeof(name), "strip%d_pitch", s + 1);
-      v.Float(name, stripPitch[s]);
-      snprintf(name, sizeof(name), "strip%d_fine", s + 1);
-      v.Float(name, stripFineTune[s]);
-      snprintf(name, sizeof(name), "strip%d_speed", s + 1);
-      v.Float(name, stripSpeed[s]);
-      snprintf(name, sizeof(name), "strip%d_transient", s + 1);
-      v.Float(name, stripTransient[s]);
-      snprintf(name, sizeof(name), "strip%d_decay", s + 1);
-      v.Float(name, stripDecay[s]);
-      snprintf(name, sizeof(name), "strip%d_mute", s + 1);
-      v.Bool(name, stripMute[s]);
-      snprintf(name, sizeof(name), "strip%d_solo", s + 1);
-      v.Bool(name, stripSolo[s]);
-      snprintf(name, sizeof(name), "strip%d_class", s + 1);
-      v.Int(name, stripClassOverride[s]);
+      JoinWorkerIfDone();
+      mResultReady.store(false, std::memory_order_relaxed);
+
+      mSlices.clear();
+      for (const auto& r : mPendingResult.classified)
+      {
+         BeatArranger::SliceInfo info;
+         info.slice = (int)mSlices.size();
+         info.cls = r.cls;
+         info.confidence = r.confidence;
+         info.lenSec = 0.0f;
+         info.centroid = r.f.centroidMean;
+         info.decaySec = r.f.decayTimeMs * 0.001f;
+         info.f0 = r.f.f0Hz;
+         mSlices.push_back(info);
+      }
+      mPendingResult.classified.clear();
+      mPendingResult.onsetFrames.clear();
+
+      mSliceBlob = SerializeSlices();
+      PushSlicesToAudio();
+      mStatus = mSlices.empty() ? "no transients found" : "analyzed";
    }
 
-   v.Text("hitBlob", mHitBlob);
-   if (!mHitBlob.empty() && mArrangedHits.empty())
+   mAudioNode->GetVisualSnapshot(mVisualSnapshot);
+}
+
+void BeatArrangerNode::Generate()
+{
+   if (mSlices.empty())
+      return;
+   int num = 4, den = 4;
+   TimeSigFor(timeSig, num, den);
+   BeatArranger::ArrangeParams params;
+   params.stepsPerBar = StepsPerBarFor(num, den);
+   params.bars = 2;
+   mArrangedHits = BeatArranger::Generate(mSlices, params, seed);
+   mHitBlob = BeatArranger::SerializeHits(mArrangedHits);
+   PushHitsToAudio();
+}
+
+void BeatArrangerNode::PushHitsToAudio()
+{
+   if (!mAudioNode)
+      return;
+   int num = 4, den = 4;
+   TimeSigFor(timeSig, num, den);
+   const int stepsPerBar = StepsPerBarFor(num, den);
+   const int totalSteps = stepsPerBar * 2;
+   const double stepBeats = 4.0 / 16.0; // one 1/16 note in quarter-note beats
+
+   std::vector<AudioBeatArrangerNode::HitPod> pods;
+   pods.reserve(mArrangedHits.size());
+   for (const auto& h : mArrangedHits)
+      pods.push_back({ h.step, h.slice, h.velocity, h.pitchRand });
+   mAudioNode->PushHits(pods.data(), (int)pods.size(), stepBeats, totalSteps);
+}
+
+void BeatArrangerNode::PushSlicesToAudio()
+{
+   if (!mAudioNode)
+      return;
+   std::vector<float> starts;
+   std::vector<int> classes;
+   starts.reserve(mSlices.size());
+   classes.reserve(mSlices.size());
+   for (size_t i = 0; i < mSlices.size(); i++)
    {
-      mArrangedHits = BeatArranger::DeserializeHits(mHitBlob);
-      if (mAudioNode && !mArrangedHits.empty())
+      starts.push_back((float)i / std::max<size_t>(1, mSlices.size()));
+      classes.push_back((int)mSlices[i].cls);
+   }
+   mAudioNode->PushSlices(starts.empty() ? nullptr : starts.data(), (int)starts.size(),
+                          classes.empty() ? nullptr : classes.data());
+}
+
+void BeatArrangerNode::SetSliceClassOverride(int slice, DrumClassifier::DrumClass cls)
+{
+   if (slice < 0 || slice >= (int)mSlices.size())
+      return;
+   mSlices[slice].cls = cls;
+   mSliceBlob = SerializeSlices();
+   PushSlicesToAudio();
+}
+
+std::string BeatArrangerNode::SerializeSlices() const
+{
+   std::ostringstream os;
+   for (size_t i = 0; i < mSlices.size(); i++)
+   {
+      if (i > 0)
+         os << ' ';
+      const auto& s = mSlices[i];
+      char buf[160];
+      snprintf(buf, sizeof(buf), "%.9g:%s:%.9g:%.9g:%.9g:%.9g", (float)i / std::max<size_t>(1, mSlices.size()),
+               DrumClassifier::ClassName(s.cls), s.confidence, s.centroid, s.decaySec, s.f0);
+      os << buf;
+   }
+   return os.str();
+}
+
+void BeatArrangerNode::DeserializeSlices(const std::string& blob)
+{
+   mSlices.clear();
+   std::istringstream is(blob);
+   std::string token;
+   while (is >> token)
+   {
+      float confidence = 0.0f, centroid = 0.0f, decaySec = 0.0f, f0 = 0.0f;
+      char clsName[64] = {};
+      size_t p1 = token.find(':');
+      if (p1 == std::string::npos)
+         continue;
+      size_t p2 = token.find(':', p1 + 1);
+      const std::string namePart = (p2 == std::string::npos) ? token.substr(p1 + 1) : token.substr(p1 + 1, p2 - p1 - 1);
+      snprintf(clsName, sizeof(clsName), "%s", namePart.c_str());
+      if (p2 != std::string::npos)
+         sscanf(token.c_str() + p2 + 1, "%f:%f:%f:%f", &confidence, &centroid, &decaySec, &f0);
+
+      BeatArranger::SliceInfo info;
+      info.slice = (int)mSlices.size();
+      info.cls = DrumClassifier::ClassFromName(clsName);
+      info.confidence = confidence;
+      info.centroid = centroid;
+      info.decaySec = decaySec;
+      info.f0 = f0;
+      mSlices.push_back(info);
+   }
+}
+
+bool BeatArrangerNode::LoadFile(const std::string& path)
+{
+   auto* decoded = new Platform::SampleBuffer();
+   std::string error;
+   if (!AudioDecodeCache::DecodeCached(path, *decoded, error))
+   {
+      delete decoded;
+      mStatus = error.empty() ? "failed to load" : error;
+      return false;
+   }
+
+   const size_t slash = path.find_last_of('/');
+   const std::string fileName = (slash == std::string::npos) ? path : path.substr(slash + 1);
+   FinishBuffer(decoded, fileName, path, "loaded");
+   return true;
+}
+
+void BeatArrangerNode::FinishBuffer(Platform::SampleBuffer* decoded, const std::string& fileName,
+                                    const std::string& filePath, const std::string& status)
+{
+   waveformCacheCount = std::min(kWaveformCacheSize, decoded->numFrames);
+   if (waveformCacheCount > 0)
+   {
+      const int framesPerBucket = std::max(1, decoded->numFrames / waveformCacheCount);
+      for (int b = 0; b < waveformCacheCount; b++)
       {
-         auto* hitList = new ArrangedHitList();
-         hitList->hits = mArrangedHits;
-         mAudioNode->PushHitList(hitList);
+         float mn = 0.0f, mx = 0.0f;
+         const int bucketStart = b * framesPerBucket;
+         const int bucketEnd = std::min(decoded->numFrames, bucketStart + framesPerBucket);
+         for (int i = bucketStart; i < bucketEnd; i++)
+         {
+            mn = std::min(mn, decoded->channelData[i]);
+            mx = std::max(mx, decoded->channelData[i]);
+         }
+         waveformMin[b] = mn;
+         waveformMax[b] = mx;
       }
+   }
+
+   mSourceFrames = decoded->numFrames;
+   mSourceSR = decoded->sampleRate > 0.0 ? decoded->sampleRate : 44100.0;
+   mSourceMono.assign(decoded->channelData.begin(), decoded->channelData.begin() + decoded->numFrames);
+
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioBeatArrangerNode>();
+   mAudioNode->PushBuffer(decoded);
+
+   mFilePath = filePath;
+   mFileName = fileName;
+   mStatus = status;
+
+   // Fix Section7#7: clear old slices/hits before the new analysis lands,
+   // so nothing stale is ever pushed to the audio thread mid-analysis.
+   mSlices.clear();
+   mArrangedHits.clear();
+   mSliceBlob.clear();
+   mHitBlob.clear();
+   PushSlicesToAudio();
+   PushHitsToAudio();
+
+   LaunchAnalysis();
+}
+
+void BeatArrangerNode::LaunchAnalysis()
+{
+   if (mWorkerThread.joinable())
+   {
+      mAbort.store(true, std::memory_order_release);
+      mWorkerThread.join();
+   }
+   if (mSourceMono.empty())
+      return;
+
+   mWorking.store(true, std::memory_order_release);
+   mAbort.store(false, std::memory_order_release);
+   mResultReady.store(false, std::memory_order_relaxed);
+   mStatus = "analyzing...";
+
+   SlicerDsp::Params params;
+   params.maxSlices = kMaxSlices;
+
+   const std::vector<float> monoCopy = mSourceMono;
+   const double sr = mSourceSR;
+   const std::string fileNameHint = mFileName;
+
+   mWorkerThread = std::thread([this, monoCopy, sr, params, fileNameHint]()
+   {
+      std::vector<int> onsetFrames;
+      std::vector<float> strengths;
+      SlicerDsp::Detect(monoCopy.data(), (int)monoCopy.size(), sr, params, onsetFrames, strengths, &mAbort);
+
+      if (!mAbort.load(std::memory_order_relaxed))
+      {
+         PendingResult res;
+         res.onsetFrames = onsetFrames;
+         const int n = (int)onsetFrames.size();
+         for (int i = 0; i < n && !mAbort.load(std::memory_order_relaxed); i++)
+         {
+            const int start = onsetFrames[i];
+            const int end = (i + 1 < n) ? onsetFrames[i + 1] : (int)monoCopy.size();
+            const int len = std::max(0, end - start);
+            const char* hint = (n == 1) ? fileNameHint.c_str() : nullptr;
+            res.classified.push_back(DrumClassifier::Classify(monoCopy.data() + start, len, sr, hint));
+         }
+         if (!mAbort.load(std::memory_order_relaxed))
+         {
+            mPendingResult = std::move(res);
+            mResultReady.store(true, std::memory_order_release);
+         }
+      }
+      mWorking.store(false, std::memory_order_release);
+   });
+}
+
+void BeatArrangerNode::JoinWorkerIfDone()
+{
+   if (mWorkerThread.joinable() && !mWorking.load(std::memory_order_acquire))
+      mWorkerThread.join();
+}
+
+void BeatArrangerNode::ReloadFromPath()
+{
+   if (mFilePath.empty())
+      return;
+
+   // Fix Section7#8: save/restore-and-abort-job dance (SlicerNode's
+   // ReloadFromPath pattern) - FinishBuffer resets the blobs and relaunches
+   // analysis; every one of these is restored verbatim afterwards, and if a
+   // beat was already saved we abandon the freshly launched analysis job
+   // entirely rather than let it silently re-detect/re-arrange on load.
+   const std::string savedSliceBlob = mSliceBlob;
+   const std::string savedHitBlob = mHitBlob;
+   const int savedTimeSig = timeSig;
+   const float savedSwing = swing;
+   const float savedRandPitch = randPitch;
+   const float savedSpeed = speed;
+   const float savedTransient = transient;
+   const float savedDecay = decay;
+   const float savedOutput = output;
+
+   LoadFile(mFilePath);
+
+   timeSig = savedTimeSig;
+   swing = savedSwing;
+   randPitch = savedRandPitch;
+   speed = savedSpeed;
+   transient = savedTransient;
+   decay = savedDecay;
+   output = savedOutput;
+
+   if (!savedSliceBlob.empty())
+   {
+      mAbort.store(true, std::memory_order_release);
+      if (mWorkerThread.joinable())
+         mWorkerThread.join();
+      mWorking.store(false, std::memory_order_release);
+      mResultReady.store(false, std::memory_order_release);
+
+      mSliceBlob = savedSliceBlob;
+      DeserializeSlices(savedSliceBlob);
+      PushSlicesToAudio();
+
+      mHitBlob = savedHitBlob;
+      mArrangedHits = BeatArranger::DeserializeHits(savedHitBlob);
+      PushHitsToAudio();
+
+      mStatus = "loaded (saved beat)";
    }
 }

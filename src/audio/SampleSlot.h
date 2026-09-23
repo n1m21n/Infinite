@@ -78,6 +78,31 @@ template <typename T>
 class SampleSlotT
 {
 public:
+   SampleSlotT() = default;
+
+   // Not copyable/movable: owns raw T* with a delete-on-destruct contract
+   // below, and the retire ring is not safe to duplicate.
+   SampleSlotT(const SampleSlotT&) = delete;
+   SampleSlotT& operator=(const SampleSlotT&) = delete;
+
+   // Frees whatever this slot still owns: the active buffer, any buffer
+   // still sitting pending (never swapped in), and anything left in the
+   // retire ring that the main thread never got around to draining. Safe to
+   // call from the main thread only (same thread that owns Push/DrainRetired) -
+   // by the time a SampleSlotT is destroyed, the audio thread that would call
+   // SwapIn()/Active() must already be torn down. Fixes a real leak: every
+   // Push() of a new buffer, and every audio-thread SwapIn() retiring the
+   // previous one, relied on someone eventually calling DrainRetired() and on
+   // the node's destructor cleaning up mActiveBuffer/mPendingBuffer - neither
+   // of which this class ever did itself.
+   ~SampleSlotT()
+   {
+      delete mActiveBuffer;
+      T* pending = mPendingBuffer.exchange(nullptr, std::memory_order_acq_rel);
+      delete pending;
+      DrainRetired();
+   }
+
    // Main thread only. Hands over ownership of a freshly built T*; the
    // previously *pending* one (if any - two loads in a row before the audio
    // thread got to the first) is deleted here since the audio thread never

@@ -3,353 +3,376 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
-#include <sstream>
+#include <cstdlib>
+#include <cstring>
 
 namespace BeatArranger
 {
-   struct Rng
+   using DrumClassifier::DrumClass;
+
+   namespace
    {
-      uint32_t state;
-      explicit Rng(uint32_t s) : state(s == 0 ? 0x9e3779b9u : s) {}
-
-      uint32_t Next()
+      // Bjorklund's algorithm (Toussaint, BRIDGES 2005): distributes k pulses
+      // as evenly as possible across n steps.
+      std::vector<bool> Euclidean(int k, int n)
       {
-         state ^= state << 13;
-         state ^= state >> 17;
-         state ^= state << 5;
-         return state;
+         std::vector<bool> out(std::max(0, n), false);
+         if (n <= 0)
+            return out;
+         k = std::clamp(k, 0, n);
+         if (k == 0)
+            return out;
+
+         std::vector<std::vector<bool>> groups;
+         for (int i = 0; i < k; i++)
+            groups.push_back({ true });
+         std::vector<std::vector<bool>> remainder;
+         for (int i = 0; i < n - k; i++)
+            remainder.push_back({ false });
+
+         while (remainder.size() > 1)
+         {
+            const size_t pairs = std::min(groups.size(), remainder.size());
+            std::vector<std::vector<bool>> newGroups;
+            for (size_t i = 0; i < pairs; i++)
+            {
+               std::vector<bool> merged = groups[i];
+               merged.insert(merged.end(), remainder[i].begin(), remainder[i].end());
+               newGroups.push_back(merged);
+            }
+            std::vector<std::vector<bool>> newRemainder;
+            for (size_t i = pairs; i < groups.size(); i++)
+               newRemainder.push_back(groups[i]);
+            for (size_t i = pairs; i < remainder.size(); i++)
+               newRemainder.push_back(remainder[i]);
+
+            groups = newGroups;
+            remainder = newRemainder;
+            if (remainder.size() <= 1)
+               break;
+         }
+
+         out.clear();
+         for (auto& g : groups)
+            out.insert(out.end(), g.begin(), g.end());
+         for (auto& r : remainder)
+            out.insert(out.end(), r.begin(), r.end());
+         if ((int)out.size() != n)
+            out.resize(n, false);
+         return out;
       }
 
-      float Float01()
+      // Fix A3: pitch range is keyed on the SLICE's own class, never the
+      // role it was placed/promoted into - a kick slice promoted into a hat
+      // role must still get the narrow kick-like range.
+      bool IsLowRangeClass(DrumClass c) { return c == DrumClass::Kick || c == DrumClass::Bass; }
+
+      bool IsTonalClass(DrumClass c)
       {
-         return (Next() & 0x00ffffff) * (1.0f / 16777216.0f);
+         return c == DrumClass::Synth || c == DrumClass::Piano || c == DrumClass::Tonal;
       }
 
-      float Range(float a, float b)
+      float PitchRandFor(DrumClass cls, Rng& rng)
       {
-         return a + Float01() * (b - a);
+         if (IsTonalClass(cls))
+         {
+            // Musical-interval-snapped, packed as a fraction of a ±12
+            // semitone max range (the node applies the class range at play
+            // time, so this value is already normalised to that range).
+            static const float kSnapSemis[] = { 0.0f, 3.0f, 5.0f, 7.0f, 12.0f, -3.0f, -5.0f, -7.0f, -12.0f };
+            const int idx = std::min(8, (int)(rng.Next01() * 9.0f));
+            return kSnapSemis[idx] / 12.0f;
+         }
+         // Drums: continuous -1..1, node scales by ±3 (kick/bass) or ±12
+         // (everything else) semitones per IsLowRangeClass.
+         return rng.NextBipolar();
       }
 
-      int Int(int a, int b) // inclusive [a, b]
+      const SliceInfo* PickWeighted(const std::vector<const SliceInfo*>& v, Rng& rng)
       {
-         if (b <= a)
-            return a;
-         return a + (int)(Next() % (uint32_t)(b - a + 1));
+         if (v.empty())
+            return nullptr;
+         float total = 0.0f;
+         for (auto* s : v)
+            total += std::max(0.05f, s->confidence);
+         float r = rng.Next01() * total;
+         for (auto* s : v)
+         {
+            const float w = std::max(0.05f, s->confidence);
+            if (r < w)
+               return s;
+            r -= w;
+         }
+         return v.back();
       }
+   } // namespace
 
-      bool Chance(float prob)
-      {
-         return Float01() < prob;
-      }
-   };
-
-   static std::vector<bool> EuclideanRhythm(int k, int n, int rotation = 0)
-   {
-      std::vector<bool> pattern(n, false);
-      if (k <= 0 || n <= 0)
-         return pattern;
-      if (k >= n)
-      {
-         std::fill(pattern.begin(), pattern.end(), true);
-         return pattern;
-      }
-      for (int i = 0; i < k; i++)
-      {
-         const int step = (i * n) / k;
-         int rotated = (step + rotation) % n;
-         if (rotated < 0)
-            rotated += n;
-         pattern[rotated] = true;
-      }
-      return pattern;
-   }
-
-   static const SliceInfo* PickSlice(const std::vector<SliceInfo>& list, Rng& rng)
-   {
-      if (list.empty())
-         return nullptr;
-      if (list.size() == 1)
-         return &list[0];
-
-      // Confidence-weighted selection so higher-confidence slices repeat more
-      float sumWeight = 0.0f;
-      for (const auto& s : list)
-         sumWeight += std::max(0.1f, s.confidence);
-
-      const float r = rng.Range(0.0f, sumWeight);
-      float accum = 0.0f;
-      for (const auto& s : list)
-      {
-         accum += std::max(0.1f, s.confidence);
-         if (accum >= r)
-            return &s;
-      }
-      return &list.back();
-   }
-
-   std::vector<ArrangedHit> Arrange(const std::vector<SliceInfo>& pool,
-                                    const ArrangeParams& p,
-                                    uint32_t seed)
+   std::vector<ArrangedHit> Generate(const std::vector<SliceInfo>& slices, const ArrangeParams& params, uint32_t seed)
    {
       std::vector<ArrangedHit> hits;
-      if (pool.empty())
+      const int totalSteps = std::max(1, params.stepsPerBar * std::max(1, params.bars));
+      if (slices.empty())
          return hits;
 
       Rng rng(seed);
 
-      const int bars = (p.bars == 1 || p.bars == 4) ? p.bars : 2;
-      const int totalSteps = bars * 16;
-
-      // Group pool by drum class
-      std::vector<SliceInfo> byClass[DrumClassifier::kNumClasses];
-      for (const auto& s : pool)
+      auto bucket = [&](DrumClass c)
       {
-         const int idx = std::clamp((int)s.cls, 0, DrumClassifier::kNumClasses - 1);
-         byClass[idx].push_back(s);
-      }
-
-      // Missing-role promotion:
-      // Always ensure the essential drum roles have candidate slices
-      auto promoteBest = [&](const std::vector<DrumClassifier::DrumClass>& fallbackClasses,
-                             DrumClassifier::DrumClass targetClass)
-      {
-         if (!byClass[(int)targetClass].empty())
-            return;
-         for (auto fb : fallbackClasses)
-         {
-            if (!byClass[(int)fb].empty())
-            {
-               byClass[(int)targetClass] = byClass[(int)fb];
-               return;
-            }
-         }
-         // Last resort: use entire pool
-         byClass[(int)targetClass] = pool;
+         std::vector<const SliceInfo*> v;
+         for (auto& s : slices)
+            if (s.cls == c)
+               v.push_back(&s);
+         return v;
       };
 
-      // Kick fallback: Bass -> Perc -> any
-      promoteBest({ DrumClassifier::DrumClass::Bass, DrumClassifier::DrumClass::Perc },
-                  DrumClassifier::DrumClass::Kick);
-      // Snare fallback: Clap -> Perc -> any
-      promoteBest({ DrumClassifier::DrumClass::Clap, DrumClassifier::DrumClass::Perc },
-                  DrumClassifier::DrumClass::Snare);
-      // Clap fallback: Snare -> Perc -> any
-      promoteBest({ DrumClassifier::DrumClass::Snare, DrumClassifier::DrumClass::Perc },
-                  DrumClassifier::DrumClass::Clap);
-      // HatClosed fallback: HatOpen -> Perc -> any
-      promoteBest({ DrumClassifier::DrumClass::HatOpen, DrumClassifier::DrumClass::Perc },
-                  DrumClassifier::DrumClass::HatClosed);
-      // HatOpen fallback: HatClosed -> Perc -> any
-      promoteBest({ DrumClassifier::DrumClass::HatClosed, DrumClassifier::DrumClass::Perc },
-                  DrumClassifier::DrumClass::HatOpen);
-      // Bass fallback: Kick -> Perc -> any
-      promoteBest({ DrumClassifier::DrumClass::Kick, DrumClassifier::DrumClass::Perc },
-                  DrumClassifier::DrumClass::Bass);
-      // Perc fallback: Snare -> any
-      promoteBest({ DrumClassifier::DrumClass::Snare },
-                  DrumClassifier::DrumClass::Perc);
+      auto kicks = bucket(DrumClass::Kick);
+      auto basses = bucket(DrumClass::Bass);
+      auto snares = bucket(DrumClass::Snare);
+      auto claps = bucket(DrumClass::Clap);
+      auto hatsClosed = bucket(DrumClass::HatClosed);
+      auto hatsOpen = bucket(DrumClass::HatOpen);
+      auto percs = bucket(DrumClass::Perc);
+      auto synths = bucket(DrumClass::Synth);
+      auto pianos = bucket(DrumClass::Piano);
+      auto tonals = bucket(DrumClass::Tonal);
 
-      auto addHit = [&](int step, DrumClassifier::DrumClass cls, float vel)
+      // ---- Fix A1: feature-based single-slice promotion for missing
+      // essential roles. No copying an entire fallback class's slice list -
+      // if there's no good candidate, the role stays empty. ----
+      const SliceInfo* promotedKick = nullptr;
+      const SliceInfo* promotedHat = nullptr;
+      const SliceInfo* promotedSnare = nullptr;
+
+      if (kicks.empty())
       {
-         const SliceInfo* slice = PickSlice(byClass[(int)cls], rng);
-         if (slice == nullptr)
-            return;
-
-         ArrangedHit hit;
-         hit.step = step;
-         hit.sample = slice->sample;
-         hit.slice = slice->slice;
-         hit.velocity = std::clamp(vel, 0.05f, 1.0f);
-
-         const float u = rng.Range(-1.0f, 1.0f);
-         if (cls == DrumClassifier::DrumClass::Kick || cls == DrumClassifier::DrumClass::Bass)
-            hit.pitchOffsetSemis = p.randPitch * (u * 3.0f); // Low end stays in tune
-         else
-            hit.pitchOffsetSemis = p.randPitch * (u * 12.0f);
-
-         hits.push_back(hit);
-      };
-
-      // 1. Kick template: anchored on step 0 of each bar + seeded syncopations
-      for (int b = 0; b < bars; b++)
-      {
-         const int base = b * 16;
-         // Step 0 anchor: always present
-         addHit(base + 0, DrumClassifier::DrumClass::Kick, 1.0f);
-
-         // Syncopation variations
-         if (rng.Chance(0.70f))
-            addHit(base + 10, DrumClassifier::DrumClass::Kick, rng.Range(0.85f, 0.95f)); // beat 3&
-         if (rng.Chance(0.40f))
-            addHit(base + 6, DrumClassifier::DrumClass::Kick, rng.Range(0.75f, 0.90f));  // beat 2&
-         if (rng.Chance(0.50f))
-            addHit(base + 8, DrumClassifier::DrumClass::Kick, rng.Range(0.80f, 0.95f));  // beat 3
-         if (rng.Chance(0.35f))
-            addHit(base + 14, DrumClassifier::DrumClass::Kick, rng.Range(0.70f, 0.85f)); // beat 4&
+         float bestScore = 1e18f;
+         for (auto& s : slices)
+         {
+            const float score = s.centroid + s.decaySec * 20000.0f; // lowest centroid + shortest decay
+            if (score < bestScore)
+            {
+               bestScore = score;
+               promotedKick = &s;
+            }
+         }
       }
-
-      // 2. Snare / Clap template: on the backbeat (steps 4 and 12)
-      const bool hasDistinctClap = !byClass[(int)DrumClassifier::DrumClass::Clap].empty();
-      const bool hasDistinctSnare = !byClass[(int)DrumClassifier::DrumClass::Snare].empty();
-
-      for (int b = 0; b < bars; b++)
+      if (hatsClosed.empty() && hatsOpen.empty())
       {
-         const int base = b * 16;
-         const int s1 = base + 4;
-         const int s2 = base + 12;
-
-         if (hasDistinctSnare && hasDistinctClap)
+         float bestC = -1.0f;
+         for (auto& s : slices)
          {
-            const int mode = rng.Int(0, 2);
-            if (mode == 0) // Snare on 4 & 12, clap layers on 12
+            if (s.centroid > bestC)
             {
-               addHit(s1, DrumClassifier::DrumClass::Snare, 0.95f);
-               addHit(s2, DrumClassifier::DrumClass::Snare, 1.0f);
-               addHit(s2, DrumClassifier::DrumClass::Clap, 0.70f);
-            }
-            else if (mode == 1) // Snare on 4, clap on 12
-            {
-               addHit(s1, DrumClassifier::DrumClass::Snare, 0.95f);
-               addHit(s2, DrumClassifier::DrumClass::Clap, 0.95f);
-            }
-            else // Both layered
-            {
-               addHit(s1, DrumClassifier::DrumClass::Snare, 0.90f);
-               addHit(s1, DrumClassifier::DrumClass::Clap, 0.65f);
-               addHit(s2, DrumClassifier::DrumClass::Snare, 0.95f);
-               addHit(s2, DrumClassifier::DrumClass::Clap, 0.75f);
+               bestC = s.centroid;
+               promotedHat = &s;
             }
          }
-         else if (hasDistinctSnare)
-         {
-            addHit(s1, DrumClassifier::DrumClass::Snare, 0.95f);
-            addHit(s2, DrumClassifier::DrumClass::Snare, 1.0f);
-         }
-         else
-         {
-            addHit(s1, DrumClassifier::DrumClass::Clap, 0.95f);
-            addHit(s2, DrumClassifier::DrumClass::Clap, 1.0f);
-         }
-
-         // Occasional ghost note on step 15 or 11
-         if (rng.Chance(0.30f))
-            addHit(base + (rng.Chance(0.5f) ? 15 : 11), DrumClassifier::DrumClass::Snare, 0.35f);
       }
-
-      // 3. HatClosed & HatOpen templates:
-      // HatOpen on off-beats, choking HatClosed on those steps
-      std::vector<bool> hatOpenSteps(totalSteps, false);
-      for (int b = 0; b < bars; b++)
+      if (snares.empty() && claps.empty())
       {
-         const int base = b * 16;
-         // Off-beat candidate steps: 2, 6, 10, 14
-         static const int kOffbeats[4] = { 2, 6, 10, 14 };
-         for (int ob : kOffbeats)
+         float bestScore = 1e18f;
+         for (auto& s : slices)
          {
-            if (rng.Chance(0.28f))
+            const float score = std::fabs(s.centroid - 2000.0f); // mid-centroid
+            if (score < bestScore)
             {
-               const int step = base + ob;
-               hatOpenSteps[step] = true;
-               addHit(step, DrumClassifier::DrumClass::HatOpen, rng.Range(0.70f, 0.85f));
+               bestScore = score;
+               promotedSnare = &s;
             }
          }
       }
 
-      // HatClosed as Euclidean E(k, 16) with k in 6..12
-      const int kClosed = rng.Int(6, 12);
-      const int rotClosed = rng.Int(0, 3);
-      for (int b = 0; b < bars; b++)
+      // ---- Kick: Euclidean, ~1 pulse per 8 steps (quarter notes at 1/16 grid) ----
+      std::vector<int> kickSteps;
+      if (!kicks.empty() || promotedKick != nullptr)
       {
-         const int base = b * 16;
-         const auto euc = EuclideanRhythm(kClosed, 16, rotClosed);
-         for (int s = 0; s < 16; s++)
+         const int k = std::max(1, totalSteps / 8);
+         const auto pattern = Euclidean(k, totalSteps);
+         for (int s = 0; s < totalSteps; s++)
          {
-            const int step = base + s;
-            if (euc[s] && !hatOpenSteps[step])
+            if (!pattern[s])
+               continue;
+            const SliceInfo* pick = kicks.empty() ? promotedKick : PickWeighted(kicks, rng);
+            if (pick == nullptr)
+               continue;
+            kickSteps.push_back(s);
+            hits.push_back({ s, pick->slice, 0.85f + rng.Next01() * 0.15f, PitchRandFor(pick->cls, rng) });
+         }
+      }
+
+      // ---- Bass: offsets derived from THIS generation's actual kick steps
+      // (fix A4), not a hardcoded step list. ----
+      if (!basses.empty() && !kickSteps.empty())
+      {
+         for (int ks : kickSteps)
+         {
+            if (rng.Next01() >= 0.6f)
+               continue;
+            const int offset = (rng.Next01() < 0.5f) ? 0 : std::max(1, totalSteps / 8);
+            const int step = (ks + offset) % totalSteps;
+            const SliceInfo* pick = PickWeighted(basses, rng);
+            if (pick != nullptr)
+               hits.push_back({ step, pick->slice, 0.75f + rng.Next01() * 0.2f, PitchRandFor(pick->cls, rng) });
+         }
+      }
+
+      // ---- Snare/Clap: backbeat, one per half-bar. Fix A2: no
+      // hasDistinctClap/hasDistinctSnare branch tangle, just one dedup pass
+      // at the end. ----
+      {
+         const std::vector<const SliceInfo*>* group = nullptr;
+         std::vector<const SliceInfo*> promotedGroup;
+         if (!snares.empty())
+            group = &snares;
+         else if (!claps.empty())
+            group = &claps;
+         else if (promotedSnare != nullptr)
+         {
+            promotedGroup.push_back(promotedSnare);
+            group = &promotedGroup;
+         }
+
+         if (group != nullptr)
+         {
+            for (int bar = 0; bar < params.bars; bar++)
             {
-               const bool downbeat = (s % 4 == 0);
-               const float vel = downbeat ? rng.Range(0.80f, 0.95f) : rng.Range(0.50f, 0.70f);
-               addHit(step, DrumClassifier::DrumClass::HatClosed, vel);
+               const int step = bar * params.stepsPerBar + params.stepsPerBar / 2;
+               if (step >= totalSteps)
+                  continue;
+               const SliceInfo* pick = PickWeighted(*group, rng);
+               if (pick != nullptr)
+                  hits.push_back({ step, pick->slice, 0.9f, PitchRandFor(pick->cls, rng) });
             }
          }
       }
 
-      // 4. Bass template: follows kick with offsets, never on snare step (4, 12)
-      for (int b = 0; b < bars; b++)
+      // ---- Closed hats: dense Euclidean fill ----
+      if (!hatsClosed.empty() || promotedHat != nullptr)
       {
-         const int base = b * 16;
-         for (int s = 0; s < 16; s++)
+         const int k = std::max(2, totalSteps / 2);
+         const auto pattern = Euclidean(k, totalSteps);
+         for (int s = 0; s < totalSteps; s++)
          {
-            if (s == 4 || s == 12)
-               continue; // never on snare step
+            if (!pattern[s])
+               continue;
+            const SliceInfo* pick = hatsClosed.empty() ? promotedHat : PickWeighted(hatsClosed, rng);
+            if (pick != nullptr)
+               hits.push_back({ s, pick->slice, 0.55f + rng.Next01() * 0.2f, PitchRandFor(pick->cls, rng) });
+         }
+      }
 
-            // Bass note chances on step 2, 7, 10, 14
-            if ((s == 2 && rng.Chance(0.6f)) ||
-                (s == 7 && rng.Chance(0.4f)) ||
-                (s == 10 && rng.Chance(0.5f)) ||
-                (s == 14 && rng.Chance(0.5f)))
+      // ---- Open hats: sparse ----
+      if (!hatsOpen.empty())
+      {
+         const int k = std::max(1, totalSteps / 8);
+         const auto pattern = Euclidean(k, totalSteps);
+         for (int s = 0; s < totalSteps; s++)
+         {
+            if (!pattern[s])
+               continue;
+            const SliceInfo* pick = PickWeighted(hatsOpen, rng);
+            if (pick != nullptr)
+               hits.push_back({ s, pick->slice, 0.7f, PitchRandFor(pick->cls, rng) });
+         }
+      }
+
+      // ---- Perc: fills gaps, sparse ----
+      if (!percs.empty())
+      {
+         std::vector<bool> used(totalSteps, false);
+         for (auto& h : hits)
+            used[h.step] = true;
+         for (int s = 0; s < totalSteps; s++)
+         {
+            if (used[s] || rng.Next01() >= 0.12f)
+               continue;
+            const SliceInfo* pick = PickWeighted(percs, rng);
+            if (pick != nullptr)
             {
-               addHit(base + s, DrumClassifier::DrumClass::Bass, rng.Range(0.80f, 0.95f));
+               hits.push_back({ s, pick->slice, 0.6f + rng.Next01() * 0.2f, PitchRandFor(pick->cls, rng) });
+               used[s] = true;
             }
          }
       }
 
-      // 5. Perc template: sparse Euclidean filling gaps
-      const int kPerc = rng.Int(3, 5);
-      const int rotPerc = rng.Int(0, 15);
-      for (int b = 0; b < bars; b++)
+      // ---- Tonal roles: sparse 1-4 stabs per bar, musical-interval pitch ----
       {
-         const int base = b * 16;
-         const auto euc = EuclideanRhythm(kPerc, 16, rotPerc);
-         for (int s = 0; s < 16; s++)
+         std::vector<const SliceInfo*> tonalPool;
+         for (auto* s : synths)
+            tonalPool.push_back(s);
+         for (auto* s : pianos)
+            tonalPool.push_back(s);
+         for (auto* s : tonals)
+            tonalPool.push_back(s);
+
+         if (!tonalPool.empty())
          {
-            if (euc[s] && s != 4 && s != 12)
+            for (int bar = 0; bar < params.bars; bar++)
             {
-               addHit(base + s, DrumClassifier::DrumClass::Perc, rng.Range(0.55f, 0.80f));
+               const int perBar = 1 + (int)(rng.Next01() * 3.999f);
+               for (int i = 0; i < perBar; i++)
+               {
+                  const int step = bar * params.stepsPerBar + (int)(rng.Next01() * params.stepsPerBar);
+                  const SliceInfo* pick = PickWeighted(tonalPool, rng);
+                  if (pick != nullptr)
+                     hits.push_back({ step, pick->slice, 0.65f + rng.Next01() * 0.25f, PitchRandFor(pick->cls, rng) });
+               }
             }
          }
       }
 
-      // Sort hits chronologically by step
-      std::sort(hits.begin(), hits.end(), [](const ArrangedHit& a, const ArrangedHit& b) {
+      // ---- Dedup: at most one hit per (step, slice) - fix A2 ----
+      std::sort(hits.begin(), hits.end(), [](const ArrangedHit& a, const ArrangedHit& b)
+      {
          if (a.step != b.step)
             return a.step < b.step;
-         return a.sample < b.sample;
+         return a.slice < b.slice;
+      });
+      hits.erase(std::unique(hits.begin(), hits.end(), [](const ArrangedHit& a, const ArrangedHit& b)
+      {
+         return a.step == b.step && a.slice == b.slice;
+      }),
+                 hits.end());
+
+      // ---- Fix A5: final ordering is (step, slice), no `sample` field exists anymore ----
+      std::stable_sort(hits.begin(), hits.end(), [](const ArrangedHit& a, const ArrangedHit& b)
+      {
+         if (a.step != b.step)
+            return a.step < b.step;
+         return a.slice < b.slice;
       });
 
       return hits;
    }
 
+   // Fix A6: drop the old `sample` field, use %.9g for exact float round-trip.
    std::string SerializeHits(const std::vector<ArrangedHit>& hits)
    {
-      std::ostringstream os;
-      for (size_t i = 0; i < hits.size(); i++)
+      std::string out;
+      char buf[128];
+      for (const auto& h : hits)
       {
-         if (i > 0)
-            os << ' ';
-         char buf[64];
-         snprintf(buf, sizeof(buf), "%d:%d:%d:%.3f:%.2f",
-                  hits[i].step, hits[i].sample, hits[i].slice,
-                  hits[i].velocity, hits[i].pitchOffsetSemis);
-         os << buf;
+         snprintf(buf, sizeof(buf), "%d:%d:%.9g:%.9g;", h.step, h.slice, h.velocity, h.pitchRand);
+         out += buf;
       }
-      return os.str();
+      return out;
    }
 
    std::vector<ArrangedHit> DeserializeHits(const std::string& blob)
    {
       std::vector<ArrangedHit> hits;
-      std::istringstream is(blob);
-      std::string token;
-      while (is >> token)
+      size_t pos = 0;
+      while (pos < blob.size())
       {
-         ArrangedHit hit;
-         if (sscanf(token.c_str(), "%d:%d:%d:%f:%f",
-                    &hit.step, &hit.sample, &hit.slice,
-                    &hit.velocity, &hit.pitchOffsetSemis) == 5)
-         {
-            hits.push_back(hit);
-         }
+         const size_t end = blob.find(';', pos);
+         if (end == std::string::npos)
+            break;
+         const std::string token = blob.substr(pos, end - pos);
+         pos = end + 1;
+
+         ArrangedHit h;
+         if (sscanf(token.c_str(), "%d:%d:%f:%f", &h.step, &h.slice, &h.velocity, &h.pitchRand) == 4)
+            hits.push_back(h);
       }
       return hits;
    }
