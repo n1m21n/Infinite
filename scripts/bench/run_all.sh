@@ -100,7 +100,11 @@ for buf in 64 128 256 512; do
    run_fixture "B5_fundamentals_audioalone buffer=$buf" 20000 \
       INFINITE_BENCH_B5AUDIOALONE="$buf" INFINITE_BENCH_B5AUDIOALONE_SECONDS="$B5D_SECONDS"
 done
-skip "B5_fundamentals (c/e/f/g sub-benchmarks - per-stage CPU+GPU split, startup time, load/save time, undo-snapshot time)"
+for n in 50 100 200 400; do
+   run_fixture "B5_fundamentals_stages n=$n" 160 INFINITE_BENCH_B5STAGES="$n"
+done
+run_fixture "B5_fundamentals_startup" 20 INFINITE_BENCH_B5STARTUP=1
+skip "B5_fundamentals (f/g sub-benchmarks - load/save time, undo-snapshot time)"
 
 echo "B6 Canvas navigation"
 skip "B6_canvas_navigation"

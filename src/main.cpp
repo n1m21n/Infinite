@@ -673,6 +673,45 @@ namespace
 
    std::vector<GraphNode> gNodes;
 
+   struct NodeInstanceData
+   {
+      int rank = 1;
+      int total = 1;
+   };
+   static std::unordered_map<int, NodeInstanceData> sNodeInstanceMap;
+   static uint64_t sNodeInstanceMapRevision = 0;
+
+   void InvalidateNodeInstanceCache()
+   {
+      sNodeInstanceMapRevision++;
+   }
+
+   void RefreshNodeInstanceMapIfNeeded()
+   {
+      static uint64_t sLastBuiltRevision = (uint64_t)-1;
+      static size_t sLastNodeCount = (size_t)-1;
+      if (sLastBuiltRevision == sNodeInstanceMapRevision && sLastNodeCount == gNodes.size())
+         return;
+
+      sLastBuiltRevision = sNodeInstanceMapRevision;
+      sLastNodeCount = gNodes.size();
+      sNodeInstanceMap.clear();
+
+      std::unordered_map<std::string, int> totalByTitle;
+      totalByTitle.reserve(gNodes.size());
+      for (const GraphNode& gn : gNodes)
+         totalByTitle[NodeTitle(gn)]++;
+
+      std::unordered_map<std::string, int> rankByTitle;
+      rankByTitle.reserve(totalByTitle.size());
+      for (const GraphNode& gn : gNodes)
+      {
+         const std::string title = NodeTitle(gn);
+         const int rank = ++rankByTitle[title];
+         sNodeInstanceMap[gn.index] = { rank, totalByTitle[title] };
+      }
+   }
+
    // Disambiguates nodes that share a title (e.g. three "predictive lfo"
    // nodes) so the Modulation Matrix and canvas headers can point at the
    // same node unambiguously. Ranked by `index` (monotonic spawn order,
@@ -681,20 +720,17 @@ namespace
    // unrelated node elsewhere in the graph is deleted or undone.
    int GetNodeInstanceIndex(const GraphNode& targetNode, int* outTotalCount = nullptr)
    {
-      const std::string title = NodeTitle(targetNode);
-      int rank = 0;
-      int total = 0;
-      for (const GraphNode& gn : gNodes)
+      RefreshNodeInstanceMapIfNeeded();
+      auto it = sNodeInstanceMap.find(targetNode.index);
+      if (it != sNodeInstanceMap.end())
       {
-         if (NodeTitle(gn) != title)
-            continue;
-         ++total;
-         if (gn.index <= targetNode.index)
-            ++rank;
+         if (outTotalCount != nullptr)
+            *outTotalCount = it->second.total;
+         return it->second.rank;
       }
       if (outTotalCount != nullptr)
-         *outTotalCount = total;
-      return rank;
+         *outTotalCount = 1;
+      return 1;
    }
 
    // NodeTitle() plus a " #N" suffix when another node on the canvas shares
@@ -20266,21 +20302,20 @@ namespace
       std::vector<float> sig{ (float)sampleRate, type, freq, q, gain };
       FilterCurveCache& cache = gFilterCurveCache[gCurrentNodeIndex];
 
-      // Throttle the full recompute while a drag is actively changing the
+      // Throttle the recompute while a drag or modulation is actively changing the
       // signature every frame - see the FilterCurveCache comment above for
-      // the full reasoning. `sigChanged` catches the drag case;
+      // the full reasoning. `sigChanged` catches continuous changes;
       // `cache.signature != sig` is what actually needs a recompute (true
-      // the first frame after any change, drag or not).
+      // the first frame after any change, drag or modulation).
       const bool sigChanged = (cache.lastSeenSignature != sig);
       cache.lastSeenSignature = sig;
-      const bool dragging = sigChanged && ImGui::IsMouseDown(ImGuiMouseButton_Left);
+      const bool continuousChange = sigChanged;
       const double now = ImGui::GetTime();
-      const bool throttled = dragging && cache.lastRecomputeTime >= 0.0 &&
+      const bool throttled = continuousChange && cache.lastRecomputeTime >= 0.0 &&
                              (now - cache.lastRecomputeTime) < kFilterCurveThrottleSec;
-      // Coarser while a drag is live (see kFilterCurveDragPoints comment
-      // above); the mouse-up frame has dragging=false, so it always recomputes
-      // at full resolution the instant the drag ends.
-      const int kNumPoints = dragging ? kFilterCurveDragPoints : kFilterCurveFullPoints;
+      // Coarser while changing continuously (see kFilterCurveDragPoints comment
+      // above); when stable, it recomputes at full resolution (kFilterCurveFullPoints).
+      const int kNumPoints = continuousChange ? kFilterCurveDragPoints : kFilterCurveFullPoints;
       if (cache.signature != sig && !throttled)
       {
          cache.signature = sig;
@@ -40318,6 +40353,28 @@ namespace
          {
             entry.node = audioNode;
             entry.noteOnly = dynamic_cast<INoteSource*>(node) != nullptr || node->AudioNodeForNotePorts() != nullptr;
+            if (auto* aen = dynamic_cast<AudioEffectNode*>(node))
+            {
+               const std::string& name = aen->Def().name;
+               if (name == "Audio Filter") entry.stageId = kAudioStageFilter;
+               else if (name == "Wavetable Shaper" || name == "Drive" || name == "Bitcrush" || name == "Cycle Shaper" || name == "Transient Shaper") entry.stageId = kAudioStageShaper;
+               else if (name == "Delay") entry.stageId = kAudioStageDelay;
+               else if (name == "Reverb") entry.stageId = kAudioStageReverb;
+               else if (name == "Dynamics") entry.stageId = kAudioStageDynamics;
+               else entry.stageId = kAudioStageOther;
+            }
+            else if (dynamic_cast<SamplerNode*>(node) || dynamic_cast<WavetableNode*>(node) || dynamic_cast<OscillatorNode*>(node))
+            {
+               entry.stageId = kAudioStageSynths;
+            }
+            else if (dynamic_cast<MixerNode*>(node))
+            {
+               entry.stageId = kAudioStageMixer;
+            }
+            else
+            {
+               entry.stageId = kAudioStageOther;
+            }
             const int numOuts = std::clamp(audioNode->AudioOutputCount(), 1, kAudioMaxNodeOutputs);
             entry.numOutputs = numOuts;
             entry.outputBufferIndex = nextBufferIndex;
@@ -40376,6 +40433,29 @@ namespace
                std::chrono::steady_clock::now() - start).count();
             fprintf(stderr, "[perf] %s: %.3f ms\n", label, ms);
          }
+      }
+   };
+
+   struct ConditionalStageTimer
+   {
+      Bench::PercentileRing* mSink;
+      double mStart;
+      bool mStopped = false;
+      explicit ConditionalStageTimer(Bench::PercentileRing* sink)
+         : mSink(sink), mStart(sink ? Bench::ScopedStageTimer::NowMs() : 0.0)
+      {
+      }
+      void Stop()
+      {
+         if (mSink && !mStopped)
+         {
+            mSink->Push(Bench::ScopedStageTimer::NowMs() - mStart);
+            mStopped = true;
+         }
+      }
+      ~ConditionalStageTimer()
+      {
+         Stop();
       }
    };
 
@@ -64265,6 +64345,9 @@ int RunSyphonPatchTest()
 
 int main(int argc, char** argv)
 {
+   const double sMainStartMs = Bench::ScopedStageTimer::NowMs();
+   const double sMainRssStartMb = Bench::ProcessRssMb();
+
    // No-op on macOS (which gets a `.ips` report for free); on Windows this is
    // the only thing standing between a crash and a completely silent exit,
    // since main.cpp links WIN32_EXECUTABLE (no console, stderr goes nowhere).
@@ -64556,6 +64639,7 @@ int main(int argc, char** argv)
    }
 #endif
 
+   const double tPreWindow = Bench::ScopedStageTimer::NowMs();
    Platform::InitDocumentHandlingPreGlfw();
    if (!glfwInit())
    {
@@ -64642,6 +64726,7 @@ int main(int argc, char** argv)
    // as the window's own close button, so one callback gates both.
    glfwSetWindowCloseCallback(window, [](GLFWwindow* w) { RequestClose(w); });
 
+   const double tWindowGl = Bench::ScopedStageTimer::NowMs();
    IMGUI_CHECKVERSION();
    ImGui::CreateContext();
    ImGui::StyleColorsDark();
@@ -64762,6 +64847,7 @@ int main(int argc, char** argv)
    // Installed after the backend so it chains rather than replacing ImGui's.
    glfwSetDropCallback(window, OnFilesDropped);
    ImGui_ImplOpenGL3_Init("#version 150");
+   const double tImGuiFonts = Bench::ScopedStageTimer::NowMs();
 
    // Keep all mutable state (settings, indexes, imgui.ini) in the per-user
    // application-data directory rather than next to the executable.
@@ -64774,6 +64860,7 @@ int main(int argc, char** argv)
    // the cached index is shown instantly and rebuilding it is the user's
    // explicit Rescan.
    gPluginScanner.LoadFromDisk();
+   const double tScanners = Bench::ScopedStageTimer::NowMs();
 
    // One GitHub Releases request, once per launch - see src/core/UpdateCheck.h.
    // No-ops under the self-test env vars, so headless/CI runs never touch
@@ -66892,6 +66979,26 @@ int main(int argc, char** argv)
          for (GraphNode& gn : gNodes)
             gn.showParams = true;
       }
+      else if (const char* bench5cArg = (getenv("INFINITE_BENCH_B5STAGES") ? getenv("INFINITE_BENCH_B5STAGES") : getenv("INFINITE_BENCH_B5C")))
+      {
+         // B5(c) per-stage CPU timing fixture (docs/plans/perf/benchmark-suite.md §4).
+         // Spawns a mixed set of nodes on a grid (same shape as B5(b)) and
+         // records per-stage CPU times across the sampled window.
+         long n = atol(bench5cArg);
+         if (n <= 1) n = 100;
+         static const char* kTypes[] = { "Shape", "Noise", "invert", "gaussianblur", "LFO" };
+         static const char* kCats[]  = { "Source", "Source", "Compositing", "Effects", "Modulators" };
+         const int cols = 12;
+         for (long i = 0; i < n; i++)
+         {
+            const int t = (int)(i % 5);
+            const float x = (float)(i % cols) * 260.0f;
+            const float y = (float)(i / cols) * 200.0f;
+            SpawnNode(kTypes[t], kCats[t], x, y);
+         }
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+      }
       else if (const char* bench1Arg = getenv("INFINITE_BENCH_B1VOICES"))
       {
          // B1 Heavy audio fixture (docs/plans/perf/benchmark-suite.md §4).
@@ -67032,6 +67139,13 @@ int main(int argc, char** argv)
       {
          // B5(a) empty-patch fixture (benchmark-suite.md §4): the floor -
          // frame cost with zero nodes, nothing to cook, nothing to draw.
+         // Intentionally spawns nothing; the measurement half below is what
+         // does the work.
+      }
+      else if (getenv("INFINITE_BENCH_B5STARTUP") != nullptr)
+      {
+         // B5(e) startup-breakdown fixture (benchmark-suite.md §4): measures
+         // milestone timings from main entry to first frame completion.
          // Intentionally spawns nothing; the measurement half below is what
          // does the work.
       }
@@ -67203,10 +67317,25 @@ int main(int argc, char** argv)
    // Connections landing on the copied cluster, captured at Cmd+C time since
    // the graph can change before Cmd+V runs (see ApplyClusterLinks).
    ClusterClipboard clipboardCluster;
+   const double tSettingsInit = Bench::ScopedStageTimer::NowMs();
+   double sFirstFrameEndMs = 0.0;
    int frameId = 0;
 
    while (!glfwWindowShouldClose(window))
    {
+      static Bench::PercentileRing sStageModulation;
+      static Bench::PercentileRing sStageCook;
+      static Bench::PercentileRing sStageNodeBodies;
+      static Bench::PercentileRing sStageEditorEnd;
+      static Bench::PercentileRing sStageImGuiRender;
+      static Bench::PercentileRing sStageProjectors;
+      static Bench::PercentileRing sStageSwap;
+      static Bench::PercentileRing sBenchB5cFrameMs;
+      static double sBenchB5cRssStartMb = -1.0;
+
+      const bool isBenchB5c = (getenv("INFINITE_BENCH_B5STAGES") != nullptr || getenv("INFINITE_BENCH_B5C") != nullptr);
+      const bool benchStagesSample = isBenchB5c && (frameId >= 32 && frameId < 152);
+
       gFrameStart = glfwGetTime();
       glfwPollEvents();
 
@@ -83968,6 +84097,70 @@ int main(int argc, char** argv)
          }
       }
 
+      // B5(c) per-stage CPU timing fixture, measurement half - see
+      // INFINITE_BENCH_B5STAGES setup above. Same warmup/sample window as
+      // B5(a)/B5(b). Uses ScopedStageTimer/ConditionalStageTimer wired into
+      // each main-loop stage to report median ms per stage in stagesCpuMs.
+      if (isBenchB5c)
+      {
+         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; sBenchB5cRssStartMb = Bench::ProcessRssMb(); }
+         if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
+            sBenchB5cFrameMs.Push(gLastFrameMs);
+         if (frameId == 152)
+         {
+            Bench::BenchReport report;
+            report.bench = "B5_fundamentals_stages";
+            const char* bArg = getenv("INFINITE_BENCH_B5STAGES") ? getenv("INFINITE_BENCH_B5STAGES") : getenv("INFINITE_BENCH_B5C");
+            report.variant = (bArg && *bArg && atol(bArg) > 1) ? (std::string("n=") + bArg) : "n=100";
+            report.frames = 152;
+            report.nodes = (int)gNodes.size();
+            report.frameMs = sBenchB5cFrameMs;
+            report.stagesCpuMs = {
+               { "modulation", sStageModulation.Percentile(50) },
+               { "cook", sStageCook.Percentile(50) },
+               { "node_bodies", sStageNodeBodies.Percentile(50) },
+               { "editor_end", sStageEditorEnd.Percentile(50) },
+               { "imgui_render", sStageImGuiRender.Percentile(50) },
+               { "projectors", sStageProjectors.Percentile(50) },
+               { "swap", sStageSwap.Percentile(50) },
+            };
+            report.memRssStartMb = sBenchB5cRssStartMb;
+            report.memRssEndMb = Bench::ProcessRssMb();
+            report.Emit();
+            printf("B5STAGES DONE\n");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // B5(e) startup-breakdown fixture (benchmark-suite.md §4): measures
+      // time spent across startup milestones (pre_window, window_gl, imgui_fonts,
+      // scanners_load, settings_init, first_frame_render, total_to_first_frame).
+      if (getenv("INFINITE_BENCH_B5STARTUP") != nullptr)
+      {
+         if (frameId == 1)
+         {
+            Bench::BenchReport report;
+            report.bench = "B5_fundamentals_startup";
+            report.frames = 1;
+            report.nodes = (int)gNodes.size();
+            report.frameMs.Push(sFirstFrameEndMs - tPreWindow);
+            report.stagesCpuMs = {
+               { "pre_window", tWindowGl - tPreWindow },
+               { "window_gl", tImGuiFonts - tWindowGl },
+               { "imgui_fonts", tScanners - tImGuiFonts },
+               { "scanners_load", tSettingsInit - tScanners },
+               { "first_frame_render", sFirstFrameEndMs - tSettingsInit },
+               { "total_to_first_frame", sFirstFrameEndMs - tPreWindow },
+            };
+            report.memRssEndMb = Bench::ProcessRssMb();
+            report.Emit();
+            printf("B5STARTUP DONE\n");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
       // B1 Heavy audio fixture, measurement half - see
       // INFINITE_BENCH_B1VOICES's setup above. Windowed on wall-clock
       // (glfwGetTime), not frameId, because the real device callback thread
@@ -83995,6 +84188,7 @@ int main(int argc, char** argv)
             sStartTimeS = nowS;
             sXrunBaseline = AudioEngine::Instance().XrunCount();
             AudioEngine::Instance().RawLoadHistory().Reset();
+            AudioEngine::Instance().ResetStageLoadHistory();
             sRssStartMb = Bench::ProcessRssMb();
          }
          if (sStartTimeS >= 0.0 && gLastFrameMs > 0.0)
@@ -84017,6 +84211,12 @@ int main(int argc, char** argv)
             report.audioXruns = AudioEngine::Instance().XrunCount() - sXrunBaseline;
             report.memRssStartMb = sRssStartMb;
             report.memRssEndMb = Bench::ProcessRssMb();
+            for (int s = 0; s < kAudioStageCount; s++)
+            {
+               auto drained = AudioEngine::Instance().StageLoadHistory(s).Drain();
+               if (!drained.Empty())
+                  report.stagesCpuMs[AudioStageName(s)] = drained.Percentile(50);
+            }
             report.Emit();
             printf("B1VOICES DONE\n");
             fflush(stdout);
@@ -84982,6 +85182,7 @@ int main(int argc, char** argv)
          }
       }
 
+      ConditionalStageTimer timerNodeBodies(benchStagesSample ? &sStageNodeBodies : nullptr);
       PruneDeadGroups();
 
       for (GraphNode& gn : gNodes)
@@ -89514,6 +89715,8 @@ int main(int argc, char** argv)
          }
       }
 
+      timerNodeBodies.Stop();
+
       // [edperf] BuildControl's per-frame hit-test walk is the one part of the
       // editor whose cost scales with patch size; a spindump that lands here
       // is indistinguishable from a freeze, so keep it measurable.
@@ -89521,24 +89724,27 @@ int main(int argc, char** argv)
                                   getenv("INFINITE_EDPERFTEST") != nullptr;
       const auto edEndStart = kEdPerf ? std::chrono::steady_clock::now()
                                       : std::chrono::steady_clock::time_point{};
-      // Flush against any bottom-docked panel, for the same reason as the
-      // Draw*Docked EndChild calls above.
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
-      // imgui-node-editor's own ed::End() unconditionally strokes a rect
-      // around the whole canvas using ImGuiCol_Border/BorderShadow (see
-      // "Draw border" in imgui_node_editor.cpp) - unlike every other border
-      // in this app, it isn't gated by style.WindowBorderSize/ChildBorderSize
-      // (both zeroed in ApplyTheme), so it painted a thin line around the
-      // canvas that scaled with the canvas rect itself regardless of that
-      // setting. Barely visible against the dark theme's border color, but a
-      // clearly visible dark line in light mode. Suppressed the same way the
-      // menu-bar/canvas seam was: make the two colors it reads transparent
-      // for just this call.
-      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-      ImGui::PushStyleColor(ImGuiCol_BorderShadow, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-      ed::End();
-      ImGui::PopStyleColor(2);
-      ImGui::PopStyleVar();
+      {
+         ConditionalStageTimer timerEditorEnd(benchStagesSample ? &sStageEditorEnd : nullptr);
+         // Flush against any bottom-docked panel, for the same reason as the
+         // Draw*Docked EndChild calls above.
+         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+         // imgui-node-editor's own ed::End() unconditionally strokes a rect
+         // around the whole canvas using ImGuiCol_Border/BorderShadow (see
+         // "Draw border" in imgui_node_editor.cpp) - unlike every other border
+         // in this app, it isn't gated by style.WindowBorderSize/ChildBorderSize
+         // (both zeroed in ApplyTheme), so it painted a thin line around the
+         // canvas that scaled with the canvas rect itself regardless of that
+         // setting. Barely visible against the dark theme's border color, but a
+         // clearly visible dark line in light mode. Suppressed the same way the
+         // menu-bar/canvas seam was: make the two colors it reads transparent
+         // for just this call.
+         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+         ImGui::PushStyleColor(ImGuiCol_BorderShadow, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+         ed::End();
+         ImGui::PopStyleColor(2);
+         ImGui::PopStyleVar();
+      }
       if (kEdPerf)
       {
          const double ms = std::chrono::duration<double, std::milli>(
@@ -90748,20 +90954,26 @@ int main(int argc, char** argv)
             RebuildAudioTopology();
       }
 
-      ApplyModulationAndPalette(frameId, true);
-
-      for (GraphNode& gn : gNodes)
       {
-         if (gn.node->bypassed)
+         ConditionalStageTimer timerModulation(benchStagesSample ? &sStageModulation : nullptr);
+         ApplyModulationAndPalette(frameId, true);
+      }
+
+      {
+         ConditionalStageTimer timerCook(benchStagesSample ? &sStageCook : nullptr);
+         for (GraphNode& gn : gNodes)
          {
-            if (auto* syphonOut = dynamic_cast<SyphonOutNode*>(gn.node.get()))
-               syphonOut->Withdraw();
-            continue;
+            if (gn.node->bypassed)
+            {
+               if (auto* syphonOut = dynamic_cast<SyphonOutNode*>(gn.node.get()))
+                  syphonOut->Withdraw();
+               continue;
+            }
+            if (dynamic_cast<OutputNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<SyphonOutNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<OscSendNode*>(gn.node.get()) != nullptr)
+               gn.node->CookIfNeeded(frameId);
          }
-         if (dynamic_cast<OutputNode*>(gn.node.get()) != nullptr ||
-             dynamic_cast<SyphonOutNode*>(gn.node.get()) != nullptr ||
-             dynamic_cast<OscSendNode*>(gn.node.get()) != nullptr)
-            gn.node->CookIfNeeded(frameId);
       }
       if (getenv("INFINITE_SHOWCASE") != nullptr && frameId == 1)
       {
@@ -91910,19 +92122,22 @@ int main(int argc, char** argv)
          DrawOfflineRenderProgressWindow();
       DrawArrangeWavRenderProgressWindow();
 
-      ImGui::Render();
       int fbW, fbH;
       glfwGetFramebufferSize(window, &fbW, &fbH);
-      glViewport(0, 0, fbW, fbH);
-      // Backs every transparent ImGui child/window (ChildBg/WindowBg alpha 0
-      // by default, see ApplyTheme) - any panel that skips
-      // PushElevatedPanelStyle shows this colour through, so it has to track
-      // the theme rather than stay a fixed dark constant or a light theme
-      // renders that gap as near-black.
-      const CategoryColors::UiTheme& clearTheme = CategoryColors::CurrentUiTheme();
-      glClearColor(clearTheme.windowBg.r, clearTheme.windowBg.g, clearTheme.windowBg.b, 1.0f);
-      glClear(GL_COLOR_BUFFER_BIT);
-      ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+      {
+         ConditionalStageTimer timerImGuiRender(benchStagesSample ? &sStageImGuiRender : nullptr);
+         ImGui::Render();
+         glViewport(0, 0, fbW, fbH);
+         // Backs every transparent ImGui child/window (ChildBg/WindowBg alpha 0
+         // by default, see ApplyTheme) - any panel that skips
+         // PushElevatedPanelStyle shows this colour through, so it has to track
+         // the theme rather than stay a fixed dark constant or a light theme
+         // renders that gap as near-black.
+         const CategoryColors::UiTheme& clearTheme = CategoryColors::CurrentUiTheme();
+         glClearColor(clearTheme.windowBg.r, clearTheme.windowBg.g, clearTheme.windowBg.b, 1.0f);
+         glClear(GL_COLOR_BUFFER_BIT);
+         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+      }
 
       if (const char* shotPath = getenv("IMAGERESYNTH_SCREENSHOT"))
       {
@@ -91946,7 +92161,12 @@ int main(int argc, char** argv)
          }
       }
 
-      glfwSwapBuffers(window);
+      {
+         ConditionalStageTimer timerSwap(benchStagesSample ? &sStageSwap : nullptr);
+         glfwSwapBuffers(window);
+      }
+      if (frameId == 0)
+         sFirstFrameEndMs = Bench::ScopedStageTimer::NowMs();
 
       // glfwSwapBuffers blocks on vsync - dead time for AppKit to service a
       // hosted plugin's editor window. See local-prompts/02-plugin-editor-lag.md.
@@ -91967,66 +92187,69 @@ int main(int argc, char** argv)
       static double sLastTopmostRefresh = 0.0;
       const double now = glfwGetTime();
       const bool refreshTopmost = now - sLastTopmostRefresh >= 0.5;
-      for (size_t i = gProjectorWindows.size(); i-- > 0; )
       {
-         GraphNode* src = FindNodeByIndex(gProjectorWindows[i].nodeIndex);
-         if (src == nullptr)
+         ConditionalStageTimer timerProjectors(benchStagesSample ? &sStageProjectors : nullptr);
+         for (size_t i = gProjectorWindows.size(); i-- > 0; )
          {
-            // Its node was deleted out from under it - close rather than sit
-            // there showing a permanently blank window.
-            CloseProjectorWindow(i);
-            continue;
-         }
+            GraphNode* src = FindNodeByIndex(gProjectorWindows[i].nodeIndex);
+            if (src == nullptr)
+            {
+               // Its node was deleted out from under it - close rather than sit
+               // there showing a permanently blank window.
+               CloseProjectorWindow(i);
+               continue;
+            }
 
-         GLFWwindow* projWindow = gProjectorWindows[i].window;
+            GLFWwindow* projWindow = gProjectorWindows[i].window;
 #if defined(_WIN32)
-         if (gProjectorWindows[i].fullscreen && refreshTopmost)
-            Platform::ReassertOutputWindowTopmost(projWindow);
+            if (gProjectorWindows[i].fullscreen && refreshTopmost)
+               Platform::ReassertOutputWindowTopmost(projWindow);
 #endif
-         glfwMakeContextCurrent(projWindow);
-         int pw, ph;
-         glfwGetFramebufferSize(projWindow, &pw, &ph);
+            glfwMakeContextCurrent(projWindow);
+            int pw, ph;
+            glfwGetFramebufferSize(projWindow, &pw, &ph);
 
-         // A geometry node's own GetOutputTexture() isn't a real preview (it
-         // produces a mesh, not pixels) - render it the same way its
-         // mini-viewport/viewport-panel card does instead, sharing that
-         // node's own orbit camera so all three agree on framing.
-         unsigned int tex = 0;
-         int texW = 0, texH = 0;
-         if (auto* geo = dynamic_cast<IGeometrySource*>(src->node.get()))
-         {
-            NodeViewport& viewport = gProjectorViewports[src->index];
-            SharedViewportCamera& cam = gNodeCameras[src->index];
-            tex = viewport.Render(dynamic_cast<IGeometrySource*>(DisplayNode(src->node.get())), cam, pw, ph);
-         }
-         else if (INode* shown = DisplayNode(src->node.get()))
-         {
-            // A bypassed node projects what passes through it, and a bypassed
-            // source projects nothing (the clear below), never a frozen frame.
-            tex = shown->GetOutputTexture();
-            texW = shown->GetOutputWidth();
-            texH = shown->GetOutputHeight();
-         }
+            // A geometry node's own GetOutputTexture() isn't a real preview (it
+            // produces a mesh, not pixels) - render it the same way its
+            // mini-viewport/viewport-panel card does instead, sharing that
+            // node's own orbit camera so all three agree on framing.
+            unsigned int tex = 0;
+            int texW = 0, texH = 0;
+            if (auto* geo = dynamic_cast<IGeometrySource*>(src->node.get()))
+            {
+               NodeViewport& viewport = gProjectorViewports[src->index];
+               SharedViewportCamera& cam = gNodeCameras[src->index];
+               tex = viewport.Render(dynamic_cast<IGeometrySource*>(DisplayNode(src->node.get())), cam, pw, ph);
+            }
+            else if (INode* shown = DisplayNode(src->node.get()))
+            {
+               // A bypassed node projects what passes through it, and a bypassed
+               // source projects nothing (the clear below), never a frozen frame.
+               tex = shown->GetOutputTexture();
+               texW = shown->GetOutputWidth();
+               texH = shown->GetOutputHeight();
+            }
 
-         if (tex != 0)
-         {
-            if (dynamic_cast<ProjectionNode*>(DisplayNode(src->node.get())) != nullptr)
-               GLUtil::DrawTextureToScreen(tex, pw, ph, 0, 0, /*checkerBg=*/false);
+            if (tex != 0)
+            {
+               if (dynamic_cast<ProjectionNode*>(DisplayNode(src->node.get())) != nullptr)
+                  GLUtil::DrawTextureToScreen(tex, pw, ph, 0, 0, /*checkerBg=*/false);
+               else
+                  GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/true);
+            }
             else
-               GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/true);
+            {
+               glViewport(0, 0, pw, ph);
+               glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+               glClear(GL_COLOR_BUFFER_BIT);
+            }
+            glfwSwapBuffers(projWindow);
          }
-         else
-         {
-            glViewport(0, 0, pw, ph);
-            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT);
-         }
-         glfwSwapBuffers(projWindow);
+         if (refreshTopmost && !gProjectorWindows.empty())
+            sLastTopmostRefresh = now;
+         if (!gProjectorWindows.empty())
+            glfwMakeContextCurrent(window);
       }
-      if (refreshTopmost && !gProjectorWindows.empty())
-         sLastTopmostRefresh = now;
-      if (!gProjectorWindows.empty())
-         glfwMakeContextCurrent(window);
 
       ++frameId;
       // The uid map is rebuilt at most once a frame on first use (WP5b), so a

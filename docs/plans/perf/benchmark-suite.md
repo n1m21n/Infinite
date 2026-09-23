@@ -117,7 +117,7 @@ Report both.
 
 | ID | Benchmark | Fixture shape | Primary metrics |
 |---|---|---|---|
-| **B1** | Heavy audio | 12-32 voices mixing Sampler/Wavetable/Oscillator; per-voice chains Filter→Drive→Delay→Reverb→Dynamics; Mixer; modulated params. Sweep buffer 64/128/256/512 | cb_load p99, xruns over 60 s, main fps alongside |
+| **B1** | Heavy audio | 12-32 voices mixing Sampler/Wavetable/Oscillator; per-voice chains Filter→Drive→Delay→Reverb→Dynamics; Mixer; modulated params. Sweep buffer 64/128/256/512. **(stages)** sub-benchmark: same voice chain, wraps each of the five per-voice DSP stages (Filter, Drive, Delay, Reverb, Dynamics) in an audio-thread stage timer to attribute `cb_load` per stage | cb_load p99, xruns over 60 s, main fps alongside. (stages): cb_load p50 per DSP stage |
 | **B2** | Heavy visuals | Geometry (high-detail primitives, point clouds, deform/displace driven per frame) → Render 3D 1080p → 10-30 compositing/effect nodes (blur, blend, colour, feedback) → Output. Static and animated variants | frame p50/p99, GPU stage ms, cook vs body split |
 | **B3** | Live performance | B1-lite + B2-lite + one open **projector window** + simulated MIDI notes/CC injected into the note queue + macro/gesture playback + Prediction modulators running | **projector p99**, missed vsyncs, audio xruns, and input-to-photon: frames from an injected param change until the Output texture revision changes |
 | **B4** | Complex 3D scenes | Many objects, instancing, several lights, shadows, materials, HDRI, ocean; animated camera. Sweep object count and shadow quality | frame p99, GPU ms, tris, draw calls |

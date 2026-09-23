@@ -1,6 +1,106 @@
 [
   {
-    "hash": "9082ece157cc6e00cadeac0e91dc91a1d647b4f1",
+    "hash": "d8cec963bf4db78bc73fabbaaf4ad654be38cc05",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 20:50:05 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Fix B5(b) EXITAFTER fencepost bug, record m2-8gb baseline",
+      "description": "Fix B5(b) EXITAFTER fencepost bug, record m2-8gb baseline",
+      "bullets": [],
+      "body": "run_all.sh's node-count sweep used INFINITE_EXITAFTER=152, exactly matching\nthe fixture's own internal frameId==152 sample-window boundary. frameId\nincrements at the bottom of the main loop, after the fixture's check runs\nnear the top, so EXITAFTER=152 closed the window one iteration before the\nfixture ever got to print - every node count failed with \"no BENCH_JSON\nline\". Bumped to 160, matching the margin every other fixture already\ncarries; confirmed all four node counts now pass.\nRecords bench/baselines/m2-8gb.jsonl from the resulting clean run_all.sh\nrun (13 BENCH_JSON lines, zero FAILs, zero xruns) and fills in the README's\nbaseline table and top-costs section with the real numbers.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Fix B5(b) EXITAFTER fencepost bug, record m2-8gb baseline\n\nrun_all.sh's node-count sweep used INFINITE_EXITAFTER=152, exactly matching\nthe fixture's own internal frameId==152 sample-window boundary. frameId\nincrements at the bottom of the main loop, after the fixture's check runs\nnear the top, so EXITAFTER=152 closed the window one iteration before the\nfixture ever got to print - every node count failed with \"no BENCH_JSON\nline\". Bumped to 160, matching the margin every other fixture already\ncarries; confirmed all four node counts now pass.\n\nRecords bench/baselines/m2-8gb.jsonl from the resulting clean run_all.sh\nrun (13 BENCH_JSON lines, zero FAILs, zero xruns) and fills in the README's\nbaseline table and top-costs section with the real numbers.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "bench/baselines/m2-8gb.jsonl | 13 ++++++++\n docs/plans/perf/README.md    | 74 +++++++++++++++++++++++++++++++++++---------\n scripts/bench/run_all.sh     |  8 ++++-\n 3 files changed, 80 insertions(+), 15 deletions(-)\n create mode 100644 bench/baselines/m2-8gb.jsonl"
+  },
+  {
+    "hash": "9326563aeef4c5bd3a1cc1654412e64044b1afa3",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 20:27:29 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "ui",
+      "title": "Add performance benchmark suite: shared instrumentation, B1/B5a/B5b/B5d fixtures",
+      "description": "Add performance benchmark suite: shared instrumentation, B1/B5a/B5b/B5d fixtures",
+      "bullets": [],
+      "body": "Implements docs/plans/perf/benchmark-suite.md end to end for the fixtures\nbuilt so far: BenchReport/PercentileRing/AudioLoadRing instrumentation,\nPlatform::ProcessRssMb/HwModelString on macOS/Windows/Linux, run_all.sh,\ncompare.py, and four working self-test fixtures (B1 heavy audio, B5a empty\npatch, B5b node-count scaling, B5d audio-thread-alone).\nB1 and B5d both hit the same real bug while being built: their setup code\nindexed gNodes[idx] using GraphNode::index as if it were a vector position.\nindex is a stable id from a monotonically increasing counter, not a slot -\nit only coincides with position when no node was ever removed earlier in\nthe session. The out-of-bounds read returned a zero-initialized GraphNode\nwith a null node pointer, so the following Connect() call wrote through a\nnull this and crashed (confirmed via lldb: x10 == 0x0 at the faulting str).\nFixed by re-resolving every captured index through FindNodeByIndex() rather\nthan gNodes[idx], matching the working pattern already used elsewhere in\nmain.cpp. Both fixtures now run clean end to end, including B1's two-level\nMixer-tree path for >12 voices.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Add performance benchmark suite: shared instrumentation, B1/B5a/B5b/B5d fixtures\n\nImplements docs/plans/perf/benchmark-suite.md end to end for the fixtures\nbuilt so far: BenchReport/PercentileRing/AudioLoadRing instrumentation,\nPlatform::ProcessRssMb/HwModelString on macOS/Windows/Linux, run_all.sh,\ncompare.py, and four working self-test fixtures (B1 heavy audio, B5a empty\npatch, B5b node-count scaling, B5d audio-thread-alone).\n\nB1 and B5d both hit the same real bug while being built: their setup code\nindexed gNodes[idx] using GraphNode::index as if it were a vector position.\nindex is a stable id from a monotonically increasing counter, not a slot -\nit only coincides with position when no node was ever removed earlier in\nthe session. The out-of-bounds read returned a zero-initialized GraphNode\nwith a null node pointer, so the following Connect() call wrote through a\nnull this and crashed (confirmed via lldb: x10 == 0x0 at the faulting str).\nFixed by re-resolving every captured index through FindNodeByIndex() rather\nthan gNodes[idx], matching the working pattern already used elsewhere in\nmain.cpp. Both fixtures now run clean end to end, including B1's two-level\nMixer-tree path for >12 voices.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "CMakeLists.txt                       |   4 +\n docs/plans/perf/README.md            | 131 +++++++++++++\n docs/plans/perf/benchmark-suite.md   | 213 +++++++++++++++++++++\n scripts/bench/compare.py             | 121 ++++++++++++\n scripts/bench/run_all.sh             | 119 ++++++++++++\n src/audio/AudioEngine.cpp            |   1 +\n src/audio/AudioEngine.h              |  12 ++\n src/core/BenchReport.cpp             | 128 +++++++++++++\n src/core/BenchReport.h               | 237 ++++++++++++++++++++++++\n src/main.cpp                         | 348 +++++++++++++++++++++++++++++++++++\n src/platform/Platform.h              |  12 ++\n src/platform/Platform.mm             |  22 +++\n src/platform/linux/PlatformLinux.cpp |  34 ++++\n src/platform/win/PlatformWin.cpp     |  31 ++++\n 14 files changed, 1413 insertions(+)\n create mode 100644 docs/plans/perf/README.md\n create mode 100644 docs/plans/perf/benchmark-suite.md\n create mode 100755 scripts/bench/compare.py\n create mode 100755 scripts/bench/run_all.sh\n create mode 100644 src/core/BenchReport.cpp\n create mode 100644 src/core/BenchReport.h"
+  },
+  {
+    "hash": "4d621402f67b4771e2743b73d52e3cc4abd16fa8",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 18:51:28 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Merge bugfix/modulated-dropdown-undo-spam into main",
+      "description": "Merge bugfix/modulated-dropdown-undo-spam into main",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Merge bugfix/modulated-dropdown-undo-spam into main\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "2c9271561f56cea22140971951df5eac01cdcc7e",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 18:45:41 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Stop modulated dropdowns and checkboxes from pushing undo entries",
+      "description": "Stop modulated dropdowns and checkboxes from pushing undo entries",
+      "bullets": [
+        "DropdownButton, AudioKnobRow::Dropdown, AudioKnobRow::DropdownKnob and",
+        "ModCheckbox: new optional outUserChanged out-param, set only by a real",
+        "INFINITE_MODDROPDOWNUNDOTEST: binds Constant modulators to an Audio"
+      ],
+      "body": "A modulation cable driving a discrete param wrote its value back through\nthe caller's onSelect lambda, and most of those lambdas open with\nPushUndoCheckpoint() for the user-click path. Every index boundary a\nmodulator crossed therefore serialized the whole patch onto gUndoStack,\ncleared redo, and set gPatchDirty - ~25% of main-thread time under\nINFINITE_MIXEDSTRESSTEST=3.\nAudioBareDropdown: wrap only the driven-path onSelect call in a\nsave/set/restore of gSuppressUndoCheckpoints. onSelect still runs, so\nthe param still follows the cable; the popup-click path is unchanged.\nImGui::Checkbox click. Return value is unchanged for setter-style\ncallers. The three callers that checkpoint (Projection \"match input\nres\", Wavetable engine on, Slicer crossthrough) now checkpoint only on\na user change.\nFilter \"type\" and an Oscillator \"oscWave\" dropdown, sweeps them over\n48 drawn frames, and asserts both params followed the cable while the\nundo/redo stacks stayed the same size and the patch stayed clean.\nFails on the unfixed code (undo 4 -> 72, dirty=1).\nMIXEDSTRESSTEST=3 on this M2: avgMs 53.8-54.5 -> 40.4-44.6.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Stop modulated dropdowns and checkboxes from pushing undo entries\n\nA modulation cable driving a discrete param wrote its value back through\nthe caller's onSelect lambda, and most of those lambdas open with\nPushUndoCheckpoint() for the user-click path. Every index boundary a\nmodulator crossed therefore serialized the whole patch onto gUndoStack,\ncleared redo, and set gPatchDirty - ~25% of main-thread time under\nINFINITE_MIXEDSTRESSTEST=3.\n\n- DropdownButton, AudioKnobRow::Dropdown, AudioKnobRow::DropdownKnob and\n  AudioBareDropdown: wrap only the driven-path onSelect call in a\n  save/set/restore of gSuppressUndoCheckpoints. onSelect still runs, so\n  the param still follows the cable; the popup-click path is unchanged.\n- ModCheckbox: new optional outUserChanged out-param, set only by a real\n  ImGui::Checkbox click. Return value is unchanged for setter-style\n  callers. The three callers that checkpoint (Projection \"match input\n  res\", Wavetable engine on, Slicer crossthrough) now checkpoint only on\n  a user change.\n- INFINITE_MODDROPDOWNUNDOTEST: binds Constant modulators to an Audio\n  Filter \"type\" and an Oscillator \"oscWave\" dropdown, sweeps them over\n  48 drawn frames, and asserts both params followed the cable while the\n  undo/redo stacks stayed the same size and the patch stayed clean.\n  Fails on the unfixed code (undo 4 -> 72, dirty=1).\n\nMIXEDSTRESSTEST=3 on this M2: avgMs 53.8-54.5 -> 40.4-44.6.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/fix-briefs/modulated-dropdown-undo-spam.md | 189 ++++++++++++++++++++++++\n src/main.cpp                                    | 162 +++++++++++++++++++-\n 2 files changed, 344 insertions(+), 7 deletions(-)\n create mode 100644 docs/fix-briefs/modulated-dropdown-undo-spam.md"
+  },
+  {
+    "hash": "c42e467915c8e539a0b4ac6187fdfaa519c45a88",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 16:35:10 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/semi-brain-private-split into main",
+      "description": "Merge feature/semi-brain-private-split into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/semi-brain-private-split into main"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "e16801d46bbc2fd01f9eb28ced92436ac2bbc106",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 16:35:08 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Keep chat-derived brain data local: split private index, untrack session corpora",
+      "description": "Keep chat-derived brain data local: split private index, untrack session corpora",
+      "bullets": [],
+      "body": "Session/antigravity/trajectory corpora and their embeddings are gitignored and\nuntracked; index_codebase.py writes those categories to a separate, ignored\nknowledge_index_private.db and the retriever queries both. sync_brain.py takes\na lock so the post-commit and post-merge hooks can't run two syncs at once.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Keep chat-derived brain data local: split private index, untrack session corpora\n\nSession/antigravity/trajectory corpora and their embeddings are gitignored and\nuntracked; index_codebase.py writes those categories to a separate, ignored\nknowledge_index_private.db and the retriever queries both. sync_brain.py takes\na lock so the post-commit and post-merge hooks can't run two syncs at once.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "tools/semi-brain/.gitignore                        |  10 +\n tools/semi-brain/1_extractors/index_codebase.py    | 103 +++--\n .../1_extractors/output/git_commits_corpus.json    |  92 ++++\n .../1_extractors/output/knowledge_index.db         | Bin 24518656 -> 25559040 bytes\n .../1_extractors/output/recovered_docs_corpus.json | 500 +++++++++++----------\n .../3_datasets/train_dpo_preference.jsonl          |   2 +\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl | 161 +++----\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl | 161 +++----\n tools/semi-brain/4_engine/retriever.py             |  82 ++--\n tools/semi-brain/4_engine/sync_brain.py            |  11 +\n 10 files changed, 638 insertions(+), 484 deletions(-)\n create mode 100644 tools/semi-brain/.gitignore"
+  },
+  {
+    "hash": "0d5cdbebfff69dda4b0c04a1fdd964c896c3c85d",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
     "author_date": "Wed Sep 23 15:46:32 2026 +0530",
@@ -16,7 +116,7 @@
     "stat": ""
   },
   {
-    "hash": "f648e5c85493bd5def4326a790a141bbe3f8aa17",
+    "hash": "88a127aa066b6320e3b237b9ee439cbea16d9097",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
     "author_date": "Wed Sep 23 15:46:32 2026 +0530",
@@ -32,7 +132,7 @@
     "stat": "src/main.cpp                     | 18 +++++++++++++++++\n src/nodes/DrumSequencerNode.cpp  | 22 ++++++++++++++++++--\n src/nodes/MidiNodes.cpp          | 13 ++++++++++++\n src/platform/Platform.h          |  8 ++++++++\n src/platform/Platform.mm         | 43 +++++++++++++++++++++++++++++++++++-----\n src/platform/linux/MidiLinux.cpp | 20 +++++++++++++++++++\n src/platform/win/MidiWin.cpp     | 21 ++++++++++++++++++++\n 7 files changed, 138 insertions(+), 7 deletions(-)"
   },
   {
-    "hash": "db1fabaedd8f2fb2f07960207fbe3b82a6714c61",
+    "hash": "b4164c2bc0c653c371f5d7bc42972c8af7bee6b8",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
     "author_date": "Wed Sep 23 13:55:32 2026 +0530",
@@ -48,7 +148,7 @@
     "stat": ".../audio-param-sweep-expected.txt                 |    9 -\n CMakeLists.txt                                     |    3 -\n docs/plans/audio/beat-arranger-prompt.md           |  171 ---\n docs/plans/audio/beat-arranger-v2-prompt.md        |  245 -----\n src/audio/dsp/BeatArranger.cpp                     |  381 -------\n src/audio/dsp/BeatArranger.h                       |   73 --\n src/audio/dsp/DrumClassifier.cpp                   |  877 ----------------\n src/audio/dsp/DrumClassifier.h                     |  117 ---\n src/main.cpp                                       | 1084 +-------------------\n src/nodes/BeatArrangerNode.cpp                     |  874 ----------------\n src/nodes/BeatArrangerNode.h                       |  169 ---\n 11 files changed, 5 insertions(+), 3998 deletions(-)\n delete mode 100644 docs/plans/audio/beat-arranger-prompt.md\n delete mode 100644 docs/plans/audio/beat-arranger-v2-prompt.md\n delete mode 100644 src/audio/dsp/BeatArranger.cpp\n delete mode 100644 src/audio/dsp/BeatArranger.h\n delete mode 100644 src/audio/dsp/DrumClassifier.cpp\n delete mode 100644 src/audio/dsp/DrumClassifier.h\n delete mode 100644 src/nodes/BeatArrangerNode.cpp\n delete mode 100644 src/nodes/BeatArrangerNode.h"
   },
   {
-    "hash": "58e2897cc5d470c327f2005b61bee87c97030227",
+    "hash": "a2e714d188e2ceecce0096753ed48bd9f54c6f51",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
     "author_date": "Wed Sep 23 12:29:27 2026 +0530",
@@ -71,7 +171,7 @@
     "stat": ""
   },
   {
-    "hash": "c96cefad0174c7b29c87f9079add6eb267b5e45f",
+    "hash": "8a4c7d39a07ec42e2a9c9b0be0e15e0b23096ab0",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
     "author_date": "Wed Sep 23 12:29:18 2026 +0530",
@@ -89,7 +189,7 @@
       "body": "",
       "raw": "Complete Beat Arranger v2 redesign and comprehensive DSP/hygiene tests\n\n- Refine DrumClassifier acoustic rules: energy-weighted frame centroid, harmonic gating for pitched classes, sustain plateau heuristic, and kick promotion role protection\n- Expand BEATARRANGERTEST in src/main.cpp: test all 8 classes across 44.1k/48k/96k sample rates, filename prior tokenization ('OHH_01', 'Kick 01', 'subtle_pad', 'what_a_tune'), short slice edge lengths, multi-meter arrangements (3/4, 7/8), and live parameter audibility\n- Update audio-param-sweep-expected.txt with the 7 v2 sliders (timeSig, swing, randPitch, speed, transient, decay, output) replacing old 8-strip params\n- Verify full DSP test suite (DSPTEST OK, BEATARRANGERTEST OK) and hygiene auto test matrix (54 passed, 0 failed)"
     },
-    "stat": ".../audio-param-sweep-expected.txt                 |     98 +-\n docs/plans/audio/beat-arranger-v2-prompt.md        |    245 +\n src/audio/dsp/BeatArranger.cpp                     |      2 +\n src/audio/dsp/DrumClassifier.cpp                   |     33 +-\n src/main.cpp                                       |    273 +-\n .../1_extractors/analyze_session_linguistics.py    |    380 +\n .../1_extractors/classify_dev_trajectory.py        |    343 +\n tools/semi-brain/1_extractors/index_codebase.py    |     97 +-\n .../1_extractors/mine_antigravity_history.py       |    148 +\n .../1_extractors/mine_session_history.py           |    146 +\n .../output/antigravity_history_corpus.json         |   8786 ++\n .../1_extractors/output/dev_trajectory_corpus.json |  41996 ++++++\n .../1_extractors/output/git_commits_corpus.json    |    168 +-\n .../1_extractors/output/knowledge_index.db         |    Bin 24518656 -> 55287808 bytes\n .../1_extractors/output/recovered_docs_corpus.json |    496 +-\n .../output/session_analysis_corpus.json            | 120556 ++++++++++++++++++\n .../output/session_embeddings_cache.npy            |    Bin 0 -> 5798528 bytes\n .../output/session_history_corpus.json             |  22394 ++++\n .../3_datasets/train_dpo_preference.jsonl          |      1 +\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl |    172 +-\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl |    172 +-\n tools/semi-brain/4_engine/sync_brain.py            |     27 +-\n 22 files changed, 195837 insertions(+), 696 deletions(-)\n create mode 100644 docs/plans/audio/beat-arranger-v2-prompt.md\n create mode 100644 tools/semi-brain/1_extractors/analyze_session_linguistics.py\n create mode 100644 tools/semi-brain/1_extractors/classify_dev_trajectory.py\n create mode 100644 tools/semi-brain/1_extractors/mine_antigravity_history.py\n create mode 100644 tools/semi-brain/1_extractors/mine_session_history.py\n create mode 100644 tools/semi-brain/1_extractors/output/antigravity_history_corpus.json\n create mode 100644 tools/semi-brain/1_extractors/output/dev_trajectory_corpus.json\n create mode 100644 tools/semi-brain/1_extractors/output/session_analysis_corpus.json\n create mode 100644 tools/semi-brain/1_extractors/output/session_embeddings_cache.npy\n create mode 100644 tools/semi-brain/1_extractors/output/session_history_corpus.json"
+    "stat": ".../audio-param-sweep-expected.txt                 |  98 +---\n docs/plans/audio/beat-arranger-v2-prompt.md        | 245 ++++++++++\n src/audio/dsp/BeatArranger.cpp                     |   2 +\n src/audio/dsp/DrumClassifier.cpp                   |  33 +-\n src/main.cpp                                       | 273 ++++++------\n .../1_extractors/analyze_session_linguistics.py    | 380 ++++++++++++++++\n .../1_extractors/classify_dev_trajectory.py        | 343 ++++++++++++++\n tools/semi-brain/1_extractors/index_codebase.py    |  97 +++-\n .../1_extractors/mine_antigravity_history.py       | 148 ++++++\n .../1_extractors/mine_session_history.py           | 146 ++++++\n .../1_extractors/output/git_commits_corpus.json    | 168 +++++--\n .../1_extractors/output/recovered_docs_corpus.json | 496 ++++++++++-----------\n .../3_datasets/train_dpo_preference.jsonl          |   1 +\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl | 172 +++----\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl | 172 +++----\n tools/semi-brain/4_engine/sync_brain.py            |  27 +-\n 16 files changed, 2105 insertions(+), 696 deletions(-)\n create mode 100644 docs/plans/audio/beat-arranger-v2-prompt.md\n create mode 100644 tools/semi-brain/1_extractors/analyze_session_linguistics.py\n create mode 100644 tools/semi-brain/1_extractors/classify_dev_trajectory.py\n create mode 100644 tools/semi-brain/1_extractors/mine_antigravity_history.py\n create mode 100644 tools/semi-brain/1_extractors/mine_session_history.py"
   },
   {
     "hash": "db101b9ebd8ef3679d97ef43a6fbb2da39bf7b4f",

@@ -39,10 +39,11 @@ frame count (B5).
 | Bench | Spec'd in §4 | Built this session | Notes |
 |---|---|---|---|
 | B1 Heavy audio | 12-32 voices, buffer sweep 64/128/256/512, cb_load p99/xruns | **Yes** (`INFINITE_BENCH_B1VOICES`) | 1-64 voices, Sampler/Wavetable/Oscillator cycled through Audio Filter→Wavetable Shaper→Delay→Reverb→Dynamics, summed through a Mixer tree, one shared LFO modulating every voice's Filter `mix`. Reports cb_load percentiles (raw, from the new `AudioLoadRing`) + xruns + main fps + RSS. |
+| B1(stages) Per-DSP-stage audio breakdown | Not in original §4 - added to attribute B1's ~56-60% cb_load across its five per-voice stages (Filter/Drive/Delay/Reverb/Dynamics), needed before any SIMD/threading optimization decision | **Yes** (`INFINITE_BENCH_B1VOICES` stages breakdown) | Built into `AudioEngine::Process` via `AudioLoadRing mStageLoadHistory[kAudioStageCount]`. Measures per-stage CPU time without locks or allocations on the audio callback thread. Reports p50 callback load fraction per stage into `stages_cpu_ms`. |
 | B2 Heavy visuals | Geometry→Render3D→10-30 compositing nodes→Output, static+animated | No | Needs the GPU timer query ring (§below) for `stages_gpu_ms` - not built this session. |
 | B3 Live performance | B1-lite+B2-lite+projector+MIDI+macros+Prediction; missed vsyncs, input-to-photon | No | Depends on B1+B2 fixtures existing first, plus a projector-window self-test fixture (none exists today). |
 | B4 Complex 3D scenes | many objects/instancing/lights/shadows/materials/HDRI/ocean | No | Same GPU-timer dependency as B2. |
-| B5 Fundamentals | (a) empty patch, **(b) node-count scaling**, (c) per-stage CPU+GPU split, **(d) audio-thread-alone**, (e) startup time, (f) load/save time, (g) undo-snapshot time | **(a)/(b)/(d)** (`INFINITE_BENCH_B5EMPTY`, `INFINITE_BENCH_B5NODES`, `INFINITE_BENCH_B5AUDIOALONE`) | (a) zero-node floor, frame_ms percentiles + RSS, same 120-frame sampled window as (b) so the two are directly comparable. (b) 50/100/200/400 mixed nodes laid out on a grid (not stacked at origin - the flaw called out in benchmark-suite.md §2 against MIXEDSTRESSTEST/GEOMDENSITYTEST). Reports frame_ms percentiles + RSS. (d) one Oscillator straight into Audio Out, no effects chain, buffer sweep 64/128/256/512 - isolates the audio callback's fixed per-block cost from B1's DSP-graph cost; reuses B1's wall-clock-window + `AudioLoadRing` pattern. (c)/(e)/(f)/(g) not started. |
+| B5 Fundamentals | (a) empty patch, **(b) node-count scaling**, **(c) per-stage CPU+GPU split**, **(d) audio-thread-alone**, **(e) startup time**, (f) load/save time, (g) undo-snapshot time | **(a)/(b)/(c)/(d)/(e)** (`INFINITE_BENCH_B5EMPTY`, `INFINITE_BENCH_B5NODES`, `INFINITE_BENCH_B5STAGES`, `INFINITE_BENCH_B5AUDIOALONE`, `INFINITE_BENCH_B5STARTUP`) | (a) zero-node floor, frame_ms percentiles + RSS, same 120-frame sampled window as (b) so the two are directly comparable. (b) 50/100/200/400 mixed nodes laid out on a grid (not stacked at origin - the flaw called out in benchmark-suite.md §2 against MIXEDSTRESSTEST/GEOMDENSITYTEST). Reports frame_ms percentiles + RSS. (c) same mixed-node grid as (b), wraps seven main-loop stages (`modulation`, `cook`, `node_bodies`, `editor_end`, `imgui_render`, `projectors`, `swap`) in `ConditionalStageTimer`s sampled over the same frame window, reports p50 CPU ms per stage into `stages_cpu_ms` (`stages_gpu_ms` still empty - blocked on the GPU timer ring below). (d) one Oscillator straight into Audio Out, no effects chain, buffer sweep 64/128/256/512 - isolates the audio callback's fixed per-block cost from B1's DSP-graph cost; reuses B1's wall-clock-window + `AudioLoadRing` pattern. (e) startup milestone timings from entry through first frame swap (`pre_window`, `window_gl`, `imgui_fonts`, `scanners_load`, `first_frame_render`, `total_to_first_frame`). (f)/(g) not started. |
 | B6 Canvas navigation | programmatic pan/zoom/drag, never OS-level UI scripting | No | "Missing today" per the doc; not started. |
 | B7 Soak/thermal | 30min B3, long variant only | No | Depends on B3. |
 | B8 Media I/O | video/camera/projector/Syphon-Spout | No | "Missing today" per the doc; not started. |
@@ -89,11 +90,19 @@ have.
 
 ## What still needs building, and what it needs first
 
-- **GPU timer query ring** (`GL_TIME_ELAPSED`, read back N frames later,
-  guarded for GL 4.1 support - macOS has it, confirm before assuming Windows/
-  Linux llvmpipe does). Blocks B2, B3, B4, B9's GPU numbers. Not started.
-- **B5(c)/(e)/(f)/(g)**: each is small and independent of the above - next
-  lowest-effort work here.
+Build order (audio tier first, per the suite's standing priority - Audio >
+Projector/Output > Canvas > Previews):
+
+1. **B1(stages)** - per-DSP-stage audio callback breakdown. **Built** (`INFINITE_BENCH_B1VOICES`).
+   Attributes B1 callback load across stages (`synths`, `filter`, `shaper`, `delay`, `reverb`, `dynamics`, `mixer`).
+2. **B5(f)/(g)** - load/save time, undo-snapshot time. Small, independent,
+   no new infra needed.
+3. **GPU timer query ring** (`GL_TIME_ELAPSED`, read back N frames later,
+   guarded for GL 4.1 support - macOS has it, confirm before assuming
+   Windows/Linux llvmpipe does). Blocks B2, B4, B9's GPU numbers, and B3's.
+   Not started.
+- **B5(c)** is now built (`INFINITE_BENCH_B5STAGES`); `stages_gpu_ms` stays
+  empty until the GPU timer ring above exists.
 - **B6 canvas navigation**: needs a programmatic pan/zoom/drag entry point
   into the node editor (`ed::` calls) exposed to a self-test fixture - none
   exists today. `main.cpp`'s existing `gDroppedFiles`/`gDropPos` self-test
@@ -113,10 +122,10 @@ windows throughout (60s B1 per buffer size, 30s B5d per buffer size).
 
 | Bench | Variant | frame_ms p50/p95/p99 (ms) | audio cb_load p50/p99 (%) | xruns | nodes | RSS (MB) |
 |---|---|---|---|---|---|---|
-| B1_heavy_audio | 24 voices, buf=64 | 75.1 / 98.0 / 216.3 | 57.4 / 66.0 | 0 | 149 | 301.6 |
-| B1_heavy_audio | 24 voices, buf=128 | 74.6 / 97.8 / 215.6 | 56.8 / 62.7 | 0 | 149 | 329.6 |
-| B1_heavy_audio | 24 voices, buf=256 | 74.7 / 99.8 / 214.2 | 56.5 / 59.8 | 0 | 149 | 343.8 |
-| B1_heavy_audio | 24 voices, buf=512 | 74.0 / 101.3 / 213.5 | 56.3 / 59.5 | 0 | 149 | 289.2 |
+| B1_heavy_audio | 24 voices, buf=64 | 16.7 / 31.2 / 47.2 | 59.3 / 69.4 | 0 | 149 | 398.8 |
+| B1_heavy_audio | 24 voices, buf=128 | 16.7 / 33.7 / 38.4 | 58.2 / 65.0 | 0 | 149 | 369.5 |
+| B1_heavy_audio | 24 voices, buf=256 | 16.7 / 32.5 / 59.9 | 58.0 / 62.3 | 0 | 149 | 330.5 |
+| B1_heavy_audio | 24 voices, buf=512 | 16.7 / 32.5 / 75.3 | 57.1 / 60.3 | 0 | 149 | 370.1 |
 | B5_fundamentals_empty | - | 1.00 / 1.61 / 1.67 | n/a | - | 0 | 256.8 |
 | B5_fundamentals_nodecount | n=50 | 4.42 / 4.53 / 4.58 | n/a | - | 50 | 287.1 |
 | B5_fundamentals_nodecount | n=100 | 7.86 / 8.07 / 8.13 | n/a | - | 100 | 342.0 |
@@ -129,27 +138,23 @@ windows throughout (60s B1 per buffer size, 30s B5d per buffer size).
 
 ## Top costs per benchmark
 
-Per-stage CPU/GPU breakdown (`stages_cpu_ms`/`stages_gpu_ms`) is not yet
-measured for any benchmark - that requires `ScopedStageTimer` wired into the
-main loop's cook/draw/composite stages, which no fixture built this session
-actually calls. B5(c) is specifically the sub-benchmark meant to produce this
-breakdown; it isn't built yet. What the baseline above does show without that
-instrumentation:
-
-- **B1** (24-voice heavy audio): frame_ms p99 (~214-216ms) is roughly 3x p50
-  (~74-75ms) at every buffer size - a heavy tail, likely UI/editor cost
-  spiking independently of the audio thread, since `cb_load` (the audio
-  callback's own load) stays flat and low (56-66%) and barely moves across
-  the buffer sweep. Buffer size has almost no effect on either frame_ms or
-  cb_load here - the DSP graph's per-block cost dominates over per-block
-  overhead at every size tested.
+- **B1** (24-voice heavy audio):
+  - **Frame time**: Post-UI optimization, locked at 16.67ms (60 FPS vs previous 74.7ms / 13 FPS).
+  - **Audio callback per-DSP-stage breakdown (B1 stages)**:
+    - **`reverb`**: **39.42%** callback load (**67.9%** of entire DSP work). With 24 voices each having an inline Reverb instance, reverb dominates the audio thread cycles.
+    - **`synths`** (Sampler / Wavetable / Oscillator): **5.07%** callback load (8.7% of total).
+    - **`shaper`** (Wavetable Shaper / Drive / Bitcrush): **3.80%** callback load (6.5% of total).
+    - **`filter`** (Audio Filter): **3.38%** callback load (5.8% of total).
+    - **`dynamics`** (Compressor / Limiter): **2.96%** callback load (5.1% of total).
+    - **`delay`** (Delay): **2.87%** callback load (4.9% of total).
+    - **`mixer`** (Mixer tree): **0.56%** callback load (1.0% of total).
+  - **Actionable Takeaway**: Future DSP SIMD/threading or algorithmic optimization should prioritize `ReverbNode` (68% of compute) before any other audio node.
 - **B5(b)** (node-count scaling): near-linear from 50 to 200 nodes (4.4ms to
   14.7ms, roughly 3.3x for 4x the nodes), then super-linear at 400 (28.6ms
   p50, 39.9ms p99 - the p95/p99 spread widens sharply too, 37.5/39.9 vs a
-  tight 15.3/15.5 at n=200). Worth a closer look once B5(c) exists to say
-  which stage stops scaling linearly past ~200 nodes.
+  tight 15.3/15.5 at n=200).
 - **B5(d)** (audio-thread-alone, one Oscillator, no effects): cb_load is
-  under 3% at every buffer size, confirming B1's ~57-66% load is almost
+  under 3% at every buffer size, confirming B1's ~57-60% load is almost
   entirely the 24-voice effects chain, not fixed per-callback overhead.
 
 ## Found while measuring

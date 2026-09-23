@@ -26,6 +26,36 @@ constexpr int kAudioMaxNodeOutputs = 12;
 constexpr int kAudioMaxBlockFrames = 4096;
 constexpr int kAudioMaxChannels = 8;
 
+enum AudioStageId : int
+{
+   kAudioStageSynths = 0,
+   kAudioStageFilter,
+   kAudioStageShaper,
+   kAudioStageDelay,
+   kAudioStageReverb,
+   kAudioStageDynamics,
+   kAudioStageMixer,
+   kAudioStageOther,
+   kAudioStageCount
+};
+
+inline const char* AudioStageName(int stageId)
+{
+   static const char* kNames[] = {
+      "synths",
+      "filter",
+      "shaper",
+      "delay",
+      "reverb",
+      "dynamics",
+      "mixer",
+      "other"
+   };
+   if (stageId >= 0 && stageId < kAudioStageCount)
+      return kNames[stageId];
+   return "other";
+}
+
 // One node's place in a topological ordering: which pooled buffer(s) it
 // reads (by index into the owning AudioTopology's buffer pool; -1 = that pin
 // is unconnected, read as silence) and which pooled buffer it writes its own
@@ -42,6 +72,7 @@ struct AudioTopologyEntry
    // (Random Note, Sequencer, Note to CV, ...). PumpNoteNodesWithoutDevice runs
    // just these while no audio device is open.
    bool noteOnly = false;
+   int stageId = kAudioStageOther;
 
    // Plugin/effect delay compensation (PDC): per input pin, the pin's source
    // branch needs a CompensationDelay so every pin merging into this node
@@ -333,6 +364,17 @@ public:
    // as the existing xrun/load-fraction bookkeeping right next to it, so
    // there is nothing to save by making it conditional.
    Bench::AudioLoadRing& RawLoadHistory() { return mRawLoadHistory; }
+   Bench::AudioLoadRing& StageLoadHistory(int stageId)
+   {
+      if (stageId >= 0 && stageId < kAudioStageCount)
+         return mStageLoadHistory[stageId];
+      return mStageLoadHistory[kAudioStageOther];
+   }
+   void ResetStageLoadHistory()
+   {
+      for (auto& r : mStageLoadHistory)
+         r.Reset();
+   }
 
    // Main thread only: drains MeterRing, pushes any pending ParamMailbox
    // writes queued by node UI this frame. Does no DSP - see the two-object
@@ -464,7 +506,7 @@ private:
    // buffers and its own output buffer, then sums the terminal buffers into
    // `deviceBuffer`. A null `list` (nothing published yet) or a topology with
    // no terminals (no audio reaches an Audio Out) just silences deviceBuffer.
-   void RunTopology(ProcessList* list, AudioBuffer& deviceBuffer);
+   void RunTopology(ProcessList* list, AudioBuffer& deviceBuffer, double* outStageMs = nullptr);
 
    // Applies `list`'s note wiring (AudioTopology::noteOutboxes/noteWires) to
    // the actual AudioNode/NoteEventQueue objects it reaches, once per
@@ -517,6 +559,7 @@ private:
    std::atomic<double> mLastCallbackMs { -1.0 };
    std::atomic<double> mLastBlockLoad { 0.0 };
    Bench::AudioLoadRing mRawLoadHistory;
+   std::array<Bench::AudioLoadRing, kAudioStageCount> mStageLoadHistory;
    // Set in Start(), read by IsAlive() as the "no callback yet" baseline -
    // without this, an engine that fails to ever produce a first callback
    // (mLastCallbackMs staying at its -1.0 sentinel forever) would read as
