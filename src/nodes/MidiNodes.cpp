@@ -12,6 +12,16 @@ namespace
    {
       return low + (high - low) * std::min(1.0f, std::max(0.0f, v01));
    }
+
+   // See Platform::MidiRebindStaleDevice - reattaches a binding saved with a
+   // device id that isn't connected (older macOS builds saved a per-launch
+   // handle) to the connected device sending the same control.
+   void RebindStaleDevice(int& device, int channel, int controller, bool isNote)
+   {
+      Platform::MidiDeviceId id = (Platform::MidiDeviceId)device;
+      if (Platform::MidiRebindStaleDevice(id, channel, controller, isNote))
+         device = (int)id;
+   }
 }
 
 MidiCCNode::~MidiCCNode()
@@ -76,6 +86,7 @@ void MidiCCNode::CookIfNeeded(int frameId)
 
    if (IsBound())
    {
+      RebindStaleDevice(device, channel, controller, isNote);
       float raw = 0.0f;
       if (Platform::MidiRead((Platform::MidiDeviceId)device, channel, controller, isNote, raw))
       {
@@ -170,6 +181,8 @@ void MidiTriggerNode::CookIfNeeded(int frameId)
 
    if (!IsBound())
       return;
+
+   RebindStaleDevice(device, channel, mode == kKeyboard ? -1 : note, true);
 
    if (mode == kKeyboard)
    {

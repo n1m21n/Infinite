@@ -4520,6 +4520,14 @@ namespace Platform
          return result;
       }
 
+      MidiDeviceId SourceDeviceId(MIDIEndpointRef source)
+      {
+         SInt32 uid = 0;
+         if (MIDIObjectGetIntegerProperty(source, kMIDIPropertyUniqueID, &uid) == noErr && uid != 0)
+            return (MidiDeviceId)uid;
+         return (MidiDeviceId)source; // 0 is reserved for "unbound"; refs are never 0 here
+      }
+
       void ConnectAllSources()
       {
          std::vector<std::string> names;
@@ -4530,12 +4538,17 @@ namespace Platform
             MIDIEndpointRef source = MIDIGetSource(i);
             if (source == 0)
                continue;
-            // The endpoint ref itself, passed back as connRefCon on every packet
-            // from this source, is what lets HandleMidiBytes tell two connected
-            // controllers apart even when both broadcast on the same channel.
-            MIDIPortConnectSource(gMidiInPort, source, (void*)(uintptr_t)source);
+            // The source's id, passed back as connRefCon on every packet, is
+            // what lets HandleMidiBytes tell two connected controllers apart
+            // even when both broadcast on the same channel. It is saved into
+            // patches by every MIDI binding, so it must survive a relaunch:
+            // kMIDIPropertyUniqueID does, the MIDIEndpointRef (used here
+            // before) is a per-process handle and silently orphaned every
+            // saved binding - including crash-recovered ones.
+            const MidiDeviceId id = SourceDeviceId(source);
+            MIDIPortConnectSource(gMidiInPort, source, (void*)(uintptr_t)id);
             std::string name = SourceDisplayName(source);
-            deviceNames[(MidiDeviceId)source] = name;
+            deviceNames[id] = name;
             names.push_back(name);
          }
          std::string summary;
@@ -4647,6 +4660,26 @@ namespace Platform
       }
       outValue01 = it->second;
       return true;
+   }
+
+   bool MidiRebindStaleDevice(MidiDeviceId& device, int channel, int controller, bool isNote)
+   {
+      if (device == 0 || !gMidiRunning)
+         return false;
+      std::lock_guard<std::mutex> lock(gMidiState.mutex);
+      if (gMidiState.deviceNames.count(device) != 0)
+         return false;
+      for (const auto& kv : gMidiState.values)
+      {
+         const MidiKey& k = kv.first;
+         if (k.channel != channel || k.isNote != isNote || (controller >= 0 && k.controller != controller))
+            continue;
+         if (gMidiState.deviceNames.count(k.device) == 0)
+            continue;
+         device = k.device;
+         return true;
+      }
+      return false;
    }
 
    bool MidiPollLastTouched(MidiCCValue& outLast)

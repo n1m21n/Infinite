@@ -743,6 +743,14 @@ namespace Platform
    // Returns false (value left at 0) if that binding has never been seen.
    bool MidiRead(MidiDeviceId device, int channel, int controller, bool isNote, float& outValue01);
 
+   // Re-points a saved binding whose device is not connected at a connected
+   // device that has sent the same (channel, controller/note, isNote) this
+   // session. Lets bindings saved with a device id that no longer exists
+   // (pre-0.4.4 macOS saved a per-launch handle) reattach on first touch
+   // instead of needing a re-learn. controller < 0 matches any note on the
+   // channel (keyboard-mode bindings). Returns true if `device` changed.
+   bool MidiRebindStaleDevice(MidiDeviceId& device, int channel, int controller, bool isNote);
+
    // The most recent CC/note touched on ANY connected source since the last
    // call — this is what a node in "Learn" mode polls each frame. Returns false
    // if nothing has moved since the last poll (consumed on read, like a queue

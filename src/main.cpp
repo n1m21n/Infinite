@@ -38169,6 +38169,24 @@ namespace
 
          PerfMidiRuntimeState& st = gPerfMidiRuntimeStates[i];
 
+         // A binding saved with a device id that isn't connected (older
+         // macOS builds saved a per-launch handle, so every reopened or
+         // crash-recovered patch lost its MIDI mappings) reattaches to the
+         // connected device that sends the same control.
+         auto rebind = [](int& dev, int ch, int ctrl, bool note)
+         {
+            if (dev == 0)
+               return;
+            Platform::MidiDeviceId id = (Platform::MidiDeviceId)dev;
+            if (Platform::MidiRebindStaleDevice(id, ch, ctrl, note))
+            {
+               dev = (int)id;
+               gPatchDirty = true;
+            }
+         };
+         rebind(elem.midiDevice, elem.midiChannel, elem.midiController, elem.midiIsNote);
+         rebind(elem.midiDeviceY, elem.midiChannelY, elem.midiControllerY, elem.midiIsNoteY);
+
          // Handle primary / X axis
          if (elem.midiDevice != 0)
          {
