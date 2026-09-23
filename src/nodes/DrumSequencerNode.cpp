@@ -148,8 +148,26 @@ public:
    void ProcessBlockMulti(const AudioBuffer* const* /*inputs*/, int /*numInputs*/,
                           AudioBuffer* const* outputs, int numOutputs) override
    {
-      for (auto& slot : mSampleSlots)
-         slot.SwapIn();
+      // A swap retires the lane's previous buffer, which the main thread
+      // frees on its next DrainRetired(). Any voice still pointing at it
+      // would read freed memory (crash report 2026-09-23: SIGSEGV in
+      // ReadSample after a lane's sample was replaced mid-playback), so
+      // drop every voice that isn't reading the lane's new buffer.
+      for (int lane = 0; lane < kNumLanes; lane++)
+      {
+         if (!mSampleSlots[lane].SwapIn())
+            continue;
+         const Platform::SampleBuffer* fresh = mSampleSlots[lane].Active();
+         for (int slot = 0; slot < kVoicesPerLane; slot++)
+         {
+            Voice& v = mVoices[lane * kVoicesPerLane + slot];
+            if (v.buffer != fresh)
+            {
+               v.active = false;
+               v.buffer = nullptr;
+            }
+         }
+      }
 
       for (int o = 0; o < numOutputs; o++)
       {

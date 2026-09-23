@@ -404,6 +404,27 @@ namespace Platform
       return true;
    }
 
+   bool MidiRebindStaleDevice(MidiDeviceId& device, int channel, int controller, bool isNote)
+   {
+      if (device == 0)
+         return false;
+      std::lock_guard<std::mutex> lock(gState.mutex);
+      const size_t connected = gState.deviceNames.size();
+      if (device <= connected)
+         return false;
+      for (const auto& kv : gState.values)
+      {
+         const CcKey& k = kv.first;
+         if (k.channel != channel || k.isNote != isNote || (controller >= 0 && k.controller != controller))
+            continue;
+         if (k.device == 0 || k.device > connected)
+            continue;
+         device = k.device;
+         return true;
+      }
+      return false;
+   }
+
    bool MidiPollLastTouched(MidiCCValue& outLast)
    {
       std::lock_guard<std::mutex> lock(gState.mutex);
