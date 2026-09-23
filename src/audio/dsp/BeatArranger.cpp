@@ -148,6 +148,8 @@ namespace BeatArranger
          float bestScore = 1e18f;
          for (auto& s : slices)
          {
+            if (s.cls == DrumClass::HatClosed || s.cls == DrumClass::HatOpen)
+               continue;
             const float score = s.centroid + s.decaySec * 20000.0f; // lowest centroid + shortest decay
             if (score < bestScore)
             {

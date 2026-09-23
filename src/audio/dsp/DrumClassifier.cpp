@@ -326,7 +326,7 @@ namespace DrumClassifier
                   var += (envelope[i] - mean) * (envelope[i] - mean);
                var /= (double)(midEnd - midStart);
                const double relStd = mean > 1e-9 ? std::sqrt(var) / mean : 1.0;
-               f.hasSustainPlateau = mean > 0.15 * peakVal && relStd < 0.25;
+               f.hasSustainPlateau = (f.decayLinearityR2 < 0.60f) && (mean > 0.15 * peakVal) && (relStd < 0.20);
             }
          }
       }
@@ -482,7 +482,7 @@ namespace DrumClassifier
 
          float totalEnergy = 0.0f;
          float centroidSum = 0.0f;
-         int centroidFrames = 0;
+         float totalDenC = 0.0f;
 
          for (int n = 0; n < numFrames; n++)
          {
@@ -517,13 +517,13 @@ namespace DrumClassifier
             centroids[n] = c;
             if (denC > 1e-6f)
             {
-               centroidSum += c;
-               centroidFrames++;
+               centroidSum += c * denC;
+               totalDenC += denC;
             }
          }
 
-         if (centroidFrames > 0)
-            f.centroidMean = centroidSum / (float)centroidFrames;
+         if (totalDenC > 1e-6f)
+            f.centroidMean = centroidSum / totalDenC;
 
          const int frames50ms = std::min(numFrames, std::max(1, (int)(sr * 0.050 / kHop)));
          if (frames50ms >= 3)
@@ -668,7 +668,7 @@ namespace DrumClassifier
       else if (f.decayTimeMs > 250.0f)
          sBass += 1.5f;
 
-      if (f.lowBandPitchStability > 0.5f)
+      if (f.lowBandPitchStability > 0.5f && (f.f0Hz < 120.0f || f.f0Hz > 2000.0f || f.centroidMean < 400.0f))
          sBass += f.lowBandPitchStability * 3.0f;
 
       if (f.spectralFlatness < 0.08f)
@@ -688,7 +688,7 @@ namespace DrumClassifier
          sSnare += 1.5f;
       if (f.microOnsets40ms <= 1)
          sSnare += 1.5f;
-      else
+      else if (f.microOnsets40ms >= 3)
          sSnare -= 2.0f;
 
       // ---- Clap rules ----
@@ -697,7 +697,7 @@ namespace DrumClassifier
          if (f.microOnsets40ms >= 3)
             sClap += 5.5f;
          else if (f.microOnsets40ms == 2)
-            sClap += 2.5f;
+            sClap += 1.0f;
 
          sClap += (f.energyMid + f.energyHigh) * 2.0f;
          if (f.spectralFlatness > 0.15f)
@@ -741,8 +741,9 @@ namespace DrumClassifier
          sPerc += 1.5f;
 
       // ---- Piano / Synth / Tonal rules (new, pitched material) ----
-      // Gated on a real pitch estimate so unpitched drums never compete here.
-      const bool pitched = f.f0Hz > 60.0f && (f.f0Confidence > 0.35f || f.harmonicRatio > 0.30f);
+      // Gated on a real pitch estimate with harmonic structure so unpitched drums never compete here.
+      const bool hasHarmonics = (f.harmonicRatio > 0.15f) || (f.f0Confidence > 0.60f && f.spectralFlatness < 0.08f);
+      const bool pitched = f.f0Hz > 60.0f && hasHarmonics;
       if (pitched)
       {
          const float pitchStrength = std::max(f.f0Confidence, f.harmonicRatio);
@@ -750,20 +751,20 @@ namespace DrumClassifier
          sTonal += 1.5f + pitchStrength * 1.5f; // honest fallback baseline
 
          // Piano: fast attack, smooth exponential decay, stretched partials.
-         sPiano += pitchStrength * 2.0f;
+         sPiano += pitchStrength * 2.5f;
          if (f.attackTimeMs < 25.0f)
-            sPiano += 2.0f;
+            sPiano += 2.5f;
          if (f.decayLinearityR2 > 0.7f)
-            sPiano += 3.0f;
+            sPiano += 3.5f;
          sPiano += f.inharmonicityStretch * 4.0f;
          if (f.hasSustainPlateau)
             sPiano -= 2.5f; // a real plateau argues Synth, not Piano
 
          // Synth: attack not percussive, or a flat sustain plateau, stable
          // partials (low stretch).
-         sSynth += pitchStrength * 1.5f;
+         sSynth += pitchStrength * 2.0f;
          if (f.attackTimeMs >= 25.0f)
-            sSynth += 2.0f;
+            sSynth += 2.5f;
          if (f.hasSustainPlateau)
             sSynth += 3.5f;
          if (f.inharmonicityStretch < 0.15f)

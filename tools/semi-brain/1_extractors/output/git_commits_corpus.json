@@ -1,5 +1,101 @@
 [
   {
+    "hash": "db101b9ebd8ef3679d97ef43a6fbb2da39bf7b4f",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 12:05:38 2026 +0530",
+    "parsed_message": {
+      "type": "refactor",
+      "scope": "arrange",
+      "title": "WIP: Beat Arranger v2 redesign (single-source, rule-based classifier)",
+      "description": "WIP: Beat Arranger v2 redesign (single-source, rule-based classifier)",
+      "bullets": [],
+      "body": "Rewrites BeatArrangerNode/BeatArranger/DrumClassifier per\ndocs/plans/audio/beat-arranger-v2-prompt.md: single source-file model\nreplacing the 8-strip design, sliders-only param set, extended\nDrumClass taxonomy (Synth/Piano/Tonal), classifier fixes D1-D9, new\nwaveform+slice view, tonal-role arranging, and main.cpp wiring\nupdates. Build compiles clean (arm64+x86_64); DSP test suite run was\nin progress when this WIP was checkpointed for handoff.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "WIP: Beat Arranger v2 redesign (single-source, rule-based classifier)\n\nRewrites BeatArrangerNode/BeatArranger/DrumClassifier per\ndocs/plans/audio/beat-arranger-v2-prompt.md: single source-file model\nreplacing the 8-strip design, sliders-only param set, extended\nDrumClass taxonomy (Synth/Piano/Tonal), classifier fixes D1-D9, new\nwaveform+slice view, tonal-role arranging, and main.cpp wiring\nupdates. Build compiles clean (arm64+x86_64); DSP test suite run was\nin progress when this WIP was checkpointed for handoff.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "src/audio/SampleSlot.h           |   25 +\n src/audio/dsp/BeatArranger.cpp   |  541 +++++++-------\n src/audio/dsp/BeatArranger.h     |   72 +-\n src/audio/dsp/DrumClassifier.cpp |  682 +++++++++++++-----\n src/audio/dsp/DrumClassifier.h   |   48 +-\n src/main.cpp                     | 1256 ++++++++++++++++++++++-----------\n src/nodes/BeatArrangerNode.cpp   | 1443 +++++++++++++++++---------------------\n src/nodes/BeatArrangerNode.h     |  219 +++---\n 8 files changed, 2501 insertions(+), 1785 deletions(-)"
+  },
+  {
+    "hash": "bdde1e160dfc0a7d0d2daa195dddb9f4d5282707",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 04:55:51 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "arrange",
+      "title": "Implement Beat Arranger audio/synth node with drum slice classification and groove sequencing",
+      "description": "Implement Beat Arranger audio/synth node with drum slice classification and groove sequencing",
+      "bullets": [],
+      "body": "",
+      "raw": "Implement Beat Arranger audio/synth node with drum slice classification and groove sequencing"
+    },
+    "stat": ".../audio-param-sweep-expected.txt                 |  91 ++\n CMakeLists.txt                                     |   3 +\n docs/plans/audio/beat-arranger-prompt.md           | 171 ++++\n src/audio/dsp/BeatArranger.cpp                     | 356 ++++++++\n src/audio/dsp/BeatArranger.h                       |  57 ++\n src/audio/dsp/DrumClassifier.cpp                   | 564 ++++++++++++\n src/audio/dsp/DrumClassifier.h                     |  89 ++\n src/main.cpp                                       | 638 ++++++++++++-\n src/nodes/BeatArrangerNode.cpp                     | 997 +++++++++++++++++++++\n src/nodes/BeatArrangerNode.h                       | 186 ++++\n 10 files changed, 3149 insertions(+), 3 deletions(-)\n create mode 100644 docs/plans/audio/beat-arranger-prompt.md\n create mode 100644 src/audio/dsp/BeatArranger.cpp\n create mode 100644 src/audio/dsp/BeatArranger.h\n create mode 100644 src/audio/dsp/DrumClassifier.cpp\n create mode 100644 src/audio/dsp/DrumClassifier.h\n create mode 100644 src/nodes/BeatArrangerNode.cpp\n create mode 100644 src/nodes/BeatArrangerNode.h"
+  },
+  {
+    "hash": "ca0dce135b3e5df417742bc58383aba9910b7379",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 04:28:46 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "audio",
+      "title": "Support audio drop target picker for empty canvas drops",
+      "description": "Support audio drop target picker for empty canvas drops",
+      "bullets": [],
+      "body": "",
+      "raw": "Support audio drop target picker for empty canvas drops"
+    },
+    "stat": ".../run-infinite-hygiene/known-test-failures.txt   |   1 +\n src/main.cpp                                       | 192 ++++++++++++++++++---\n 2 files changed, 172 insertions(+), 21 deletions(-)"
+  },
+  {
+    "hash": "0791922b4cfb76b54e3d60cb995b9a45424b4278",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 02:26:09 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "audio",
+      "title": "Merge bugfix/audio-rt-note-wiring into main",
+      "description": "Merge bugfix/audio-rt-note-wiring into main",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Merge bugfix/audio-rt-note-wiring into main\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "ef952e1f78f8d42f72becf1fb72d4c6440703631",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 02:26:03 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "audio",
+      "title": "Fix note-wiring stuck-note race, cursor wrap-around, and audio-thread allocations",
+      "description": "Fix note-wiring stuck-note race, cursor wrap-around, and audio-thread allocations",
+      "bullets": [],
+      "body": "RebuildAudioTopology() used to mutate live AudioNode/NoteEventQueue cursors\ndirectly on the main thread while the audio thread could still be running the\nprevious ProcessList over the same objects - a race that could skip or\nduplicate note events, including lost note-offs (stuck notes). It now only\ndescribes the wiring (AudioTopology::noteOutboxes/noteWires);\nAudioEngine::ApplyNoteWiringIfNew applies it once per generation on whichever\nthread actually owns that ProcessList, carrying cursor positions forward from\nwhat each consumer last applied.\nAlso: NoteEventQueue's overflow-protection cursor pick now weighs backlog\ninstead of raw ring index (fixed a wrap-around bug), the overflow tail\npublish is memory_order_release to match the normal path, several\naudio-thread scratch buffers move from static thread_local (lazily allocated\nper CoreAudio IO thread on macOS) to plain AudioEngine members, and\nParamMailbox asserts on an out-of-range paramId in debug builds instead of\nsilently dropping it.\nAdds NOTEREWIRESTRESSTEST: a Note Sequencer fanned to two synths with the\ntopology forced to rebuild every block for ~2s of notes, asserting zero\nstuck voices and zero ring overflow.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Fix note-wiring stuck-note race, cursor wrap-around, and audio-thread allocations\n\nRebuildAudioTopology() used to mutate live AudioNode/NoteEventQueue cursors\ndirectly on the main thread while the audio thread could still be running the\nprevious ProcessList over the same objects - a race that could skip or\nduplicate note events, including lost note-offs (stuck notes). It now only\ndescribes the wiring (AudioTopology::noteOutboxes/noteWires);\nAudioEngine::ApplyNoteWiringIfNew applies it once per generation on whichever\nthread actually owns that ProcessList, carrying cursor positions forward from\nwhat each consumer last applied.\n\nAlso: NoteEventQueue's overflow-protection cursor pick now weighs backlog\ninstead of raw ring index (fixed a wrap-around bug), the overflow tail\npublish is memory_order_release to match the normal path, several\naudio-thread scratch buffers move from static thread_local (lazily allocated\nper CoreAudio IO thread on macOS) to plain AudioEngine members, and\nParamMailbox asserts on an out-of-range paramId in debug builds instead of\nsilently dropping it.\n\nAdds NOTEREWIRESTRESSTEST: a Note Sequencer fanned to two synths with the\ntopology forced to rebuild every block for ~2s of notes, asserting zero\nstuck voices and zero ring overflow.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".claude/skills/audio-pipeline-sweep/driver.sh |   3 +\n src/audio/AudioEngine.cpp                     | 195 +++++++++++-----\n src/audio/AudioEngine.h                       | 139 ++++++++++-\n src/audio/AudioNode.h                         |  37 +++\n src/audio/NoteEventQueue.h                    | 104 +++++++--\n src/audio/ParamMailbox.cpp                    |   9 +\n src/audio/ParamMailbox.h                      |   3 +-\n src/main.cpp                                  | 320 ++++++++++++++++++++++----\n 8 files changed, 679 insertions(+), 131 deletions(-)"
+  },
+  {
+    "hash": "2bd0803ff5f3d35a3059fb24132f27156a266f43",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Tue Sep 22 20:01:02 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Update semi-brain extracted corpora after merge (post-merge hook)",
+      "description": "Update semi-brain extracted corpora after merge (post-merge hook)",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Update semi-brain extracted corpora after merge (post-merge hook)\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ".../1_extractors/output/git_commits_corpus.json    | 141 ++++--\n .../1_extractors/output/recovered_docs_corpus.json | 524 ++++++++++-----------\n 2 files changed, 374 insertions(+), 291 deletions(-)"
+  },
+  {
     "hash": "0368fedc326b712db3242084ec1294fe75d39149",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
@@ -9732,71 +9828,57 @@
   },
   {
     "hash": "3587e2e9226a4ada9b6e466a6662b69f696a50d7",
- "src/main.cpp                   | 58 +++++++++++++++++++++++++++++-------------\n src/nodes/FieldElementNode.cpp | 11 +++++++-\n src/nodes/FieldSampleNode.cpp  | 11 ++++++++\n src/nodes/FieldSynthNode.cpp   | 46 ---------------------------------\n 4 files changed, 61 insertions(+), 65 deletions(-)"
-  },
-  {
-    "hash": "906b8bad98b64d8accecb6f15fe8f2bc5e090206",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
-    "author_date": "Fri Sep 4 20:06:27 2026 +0530",
+    "author_date": "Fri Sep 4 20:34:22 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge branch 'claude/node-reference-manual-update-fb24b9'",
+      "description": "Merge branch 'claude/node-reference-manual-update-fb24b9'",
+      "bullets": [],
+      "body": "Updates the Node Reference Manual with nodes added since it was last\ngenerated.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Merge branch 'claude/node-reference-manual-update-fb24b9'\n\nUpdates the Node Reference Manual with nodes added since it was last\ngenerated.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "2c1256282b252bf071cadcc7117e86571b5d510d",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 4 20:34:15 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Update Node Reference Manual with nodes added since last revision",
+      "description": "Update Node Reference Manual with nodes added since last revision",
+      "bullets": [],
+      "body": "Adds a new Field Language chapter (FieldPixel, Field Modifier, Field\nPrimitive, Field Synth, Field Effect) and cards for 22 other nodes\nadded since the manual was last generated: Video In, Equation Synth,\nSlicer, Molder, Grain Molder, Audio Color Ramp, Note Merge, Note\nSwitcher, Geometry Table, OSC Receive, OSC Send, and 7 Macro control\nnodes. Counts updated throughout (142 node types, 196 spawnable, 20\nchapters). Regenerated via headless Chrome from a hand-authored HTML\nsource matching the original's visual design.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Update Node Reference Manual with nodes added since last revision\n\nAdds a new Field Language chapter (FieldPixel, Field Modifier, Field\nPrimitive, Field Synth, Field Effect) and cards for 22 other nodes\nadded since the manual was last generated: Video In, Equation Synth,\nSlicer, Molder, Grain Molder, Audio Color Ramp, Note Merge, Note\nSwitcher, Geometry Table, OSC Receive, OSC Send, and 7 Macro control\nnodes. Counts updated throughout (142 node types, 196 spawnable, 20\nchapters). Regenerated via headless Chrome from a hand-authored HTML\nsource matching the original's visual design.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "Infinite_Node_Reference_Manual.pdf                | Bin 3731958 -> 1607699 bytes\n website/assets/Infinite_Node_Reference_Manual.pdf | Bin 3731958 -> 1607699 bytes\n 2 files changed, 0 insertions(+), 0 deletions(-)"
+  },
+  {
+    "hash": "f7c9903607b3a287beab0e0d5db6f7cbb392758e",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 4 20:07:24 2026 +0530",
     "parsed_message": {
       "type": "fix",
-      "scope": "ui",
-      "title": "Fix 2px dropdown misalignment vs slider/knob pin offset",
-      "description": "Fix 2px dropdown misalignment vs slider/knob pin offset",
-      "bullets": [],
-      "body": "DropdownButton subtracted 18px (a 14px pin box + 4px gap) from its\nbutton width to make room for the modulation pin, but\nDrawDiscreteParamPin actually draws a 12px box - the convention used\neverywhere else (e.g. AudioKnobRow's Dropdown, pinW = 16.0f). The\nmismatch shifted every dropdown button 2px left of the slider/knob\nrows stacked above it.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
-      "raw": "Fix 2px dropdown misalignment vs slider/knob pin offset\n\nDropdownButton subtracted 18px (a 14px pin box + 4px gap) from its\nbutton width to make room for the modulation pin, but\nDrawDiscreteParamPin actually draws a 12px box - the convention used\neverywhere else (e.g. AudioKnobRow's Dropdown, pinW = 16.0f). The\nmismatch shifted every dropdown button 2px left of the slider/knob\nrows stacked above it.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+      "scope": "field",
+      "title": "Fix topbar transport drag/alignment, Field Effect/Modifier first-spawn params, presets",
+      "description": "Fix topbar transport drag/alignment, Field Effect/Modifier first-spawn params, presets",
+      "bullets": [
+        "Stabilize BPM/time-signature drag widget IDs with \"###\" suffixes so",
+        "Widen the transport row's FramePadding/ItemSpacing style scope to",
+        "Seed FieldSampleNode and FieldElementNode from their first factory",
+        "Remove \"Polyphonic FM Bell\" and \"Acid Square Bass\" from Field Synth",
+        "Rename \"FieldPixel\" to display as \"field pixel\" in search/spawn"
+      ],
+      "body": "a fast drag no longer loses ActiveId to the node-editor canvas pan.\ncover Stop/Start Audio through the bar/beat readout, fixing baseline\nmisalignment across the row.\npreset in the constructor (matching their sibling Field nodes) so\nparams are visible on first spawn instead of only after switching\npresets once.\nfactory presets.\nmenus, matching its Field* siblings (registered type key unchanged).\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Fix topbar transport drag/alignment, Field Effect/Modifier first-spawn params, presets\n\n- Stabilize BPM/time-signature drag widget IDs with \"###\" suffixes so\n  a fast drag no longer loses ActiveId to the node-editor canvas pan.\n- Widen the transport row's FramePadding/ItemSpacing style scope to\n  cover Stop/Start Audio through the bar/beat readout, fixing baseline\n  misalignment across the row.\n- Seed FieldSampleNode and FieldElementNode from their first factory\n  preset in the constructor (matching their sibling Field nodes) so\n  params are visible on first spawn instead of only after switching\n  presets once.\n- Remove \"Polyphonic FM Bell\" and \"Acid Square Bass\" from Field Synth\n  factory presets.\n- Rename \"FieldPixel\" to display as \"field pixel\" in search/spawn\n  menus, matching its Field* siblings (registered type key unchanged).\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
     },
-    "stat": "src/main.cpp | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
-  },
-  {
-    "hash": "6a7969b95005e87d30a0addecc81ef2068e2e42c",
-    "author_name": "n1m21n",
-    "author_email": "namansoniii21@gmail.com",
-    "author_date": "Fri Sep 4 19:10:41 2026 +0530",
-    "parsed_message": {
-      "type": "feat",
-      "scope": "core",
-      "title": "Remove graphify agent rules/workflow files",
-      "description": "Remove graphify agent rules/workflow files",
-      "bullets": [],
-      "body": "Part of uninstalling graphify from this repo.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
-      "raw": "Remove graphify agent rules/workflow files\n\nPart of uninstalling graphify from this repo.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
-    },
-    "stat": ".agents/rules/graphify.md     | 14 --------------\n .agents/workflows/graphify.md | 10 ----------\n 2 files changed, 24 deletions(-)\n delete mode 100644 .agents/rules/graphify.md\n delete mode 100644 .agents/workflows/graphify.md"
-  },
-  {
-    "hash": "4b7688afd4109a882f4ce3b16e16a3f82ce46135",
-    "author_name": "n1m21n",
-    "author_email": "namansoniii21@gmail.com",
-    "author_date": "Fri Sep 4 19:07:54 2026 +0530",
-    "parsed_message": {
-      "type": "feat",
-      "scope": "core",
-      "title": "Gitignore graphify-out/",
-      "description": "Gitignore graphify-out/",
-      "bullets": [],
-      "body": "It was never actually excluded - the prior cleanup only removed already-tracked files. Adding the real ignore entry so it can't get committed or show up as untracked noise again.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
-      "raw": "Gitignore graphify-out/\n\nIt was never actually excluded - the prior cleanup only removed already-tracked files. Adding the real ignore entry so it can't get committed or show up as untracked noise again.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
-    },
-    "stat": ".gitignore | 3 +++\n 1 file changed, 3 insertions(+)"
-  },
-  {
-    "hash": "c493eaeb62ae71f2ae6035dce8ceb868ea2f0900",
-    "author_name": "n1m21n",
-    "author_email": "namansoniii21@gmail.com",
-    "author_date": "Fri Sep 4 19:01:47 2026 +0530",
-    "parsed_message": {
-      "type": "feat",
-      "scope": "core",
-      "title": "Remove graphify-out/ from version control",
-      "description": "Remove graphify-out/ from version control",
-      "bullets": [],
-      "body": "It's a local codebase analysis cache (2000+ generated JSON files, ~4.3M lines) that got committed before .gitignore excluded it. Regenerated on demand, doesn't belong in the repo.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
-      "raw": "Remove graphify-out/ from version control\n\nIt's a local codebase analysis cache (2000+ generated JSON files, ~4.3M lines) that got committed before .gitignore excluded it. Regenerated on demand, doesn't belong in the repo.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
-    },
-    "stat": "graphify-out/.graphify_labels.json                 |    4253 -\n graphify-out/.graphify_labels.json.sig             |       1 -\n graphify-out/.graphify_root                        |       1 -\n graphify-out/2026-09-04/.graphify_labels.json      |    4267 -\n graphify-out/2026-09-04/GRAPH_REPORT.md            |    7589 -\n graphify-out/2026-09-04/graph.json                 | 2066097 ----------------\n graphify-out/2026-09-04/manifest"src/main.cpp                   | 58 +++++++++++++++++++++++++++++-------------\n src/nodes/FieldElementNode.cpp | 11 +++++++-\n src/nodes/FieldSampleNode.cpp  | 11 ++++++++\n src/nodes/FieldSynthNode.cpp   | 46 ---------------------------------\n 4 files changed, 61 insertions(+), 65 deletions(-)"
+    "stat": "src/main.cpp                   | 58 +++++++++++++++++++++++++++++-------------\n src/nodes/FieldElementNode.cpp | 11 +++++++-\n src/nodes/FieldSampleNode.cpp  | 11 ++++++++\n src/nodes/FieldSynthNode.cpp   | 46 ---------------------------------\n 4 files changed, 61 insertions(+), 65 deletions(-)"
   },
   {
     "hash": "906b8bad98b64d8accecb6f15fe8f2bc5e090206",
