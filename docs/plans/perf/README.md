@@ -177,12 +177,20 @@ re-record the baseline with `run_all.sh` before comparing against it):
     measure-only suite to build, but tracked here since it's the direct
     output of this benchmark's B1(stages) finding. DSPTEST's SIMD-vs-scalar
     numerical-equivalence check passed (max diff 2.98e-08, tol 1e-5).
-    Re-run on 2026-09-24 (buf=256, 24 voices), **provisional**: reverb
-    39.4% to 33.4% of the callback, total cb_load p50 58.0% to 53.3%. Every
-    re-run overlapped a `tools/semi-brain` indexer using ~3.7 cores (load
-    average 6-7), and those runs showed 8-68 xruns against the baseline's 0.
-    Neither the delta nor the xruns count until B1 is re-run on an idle
-    machine.
+    Clean re-run on 2026-09-24 (`20260924-064959-e04b7a6`, no indexer
+    running, load average 3.4-4.9 from other apps):
+
+    | buffer | cb_load p50 baseline | cb_load p50 now | reverb share now | xruns |
+    |---|---|---|---|---|
+    | 64 | 57.4% | 51.4% | 31.8% | 0 |
+    | 128 | 56.8% | 50.1% | 31.4% | 0 |
+    | 256 | 56.5% | 50.2% | 31.7% | 2 |
+    | 512 | 56.3% | 49.0% | 31.2% | 0 |
+
+    Reverb fell from 39.4% to ~31.5% of the callback. The earlier 8-68
+    xruns came from the indexer; 2 xruns remain at buf=256 on a busy but
+    indexer-free machine, so that row stays under watch. B1's UI frame p50
+    also fell from ~75 ms to ~17 ms, from `1d19afa`'s UI hot-spot work.
 - **B2** (heavy visuals, animated): GPU-bound at every scale. GPU `cook`
   (all node renders) is 12.7 / 24.4 / 36.0 ms at s / m / l, and the CPU
   `swap` stage roughly equals it, because swap is where the CPU waits for
@@ -221,14 +229,31 @@ re-record the baseline with `run_all.sh` before comparing against it):
   14.7ms, roughly 3.3x for 4x the nodes), then super-linear at 400 (28.6ms
   p50, 39.9ms p99 - the p95/p99 spread widens sharply too, 37.5/39.9 vs a
   tight 15.3/15.5 at n=200).
+  The clean 2026-09-24 run reads 4.6 / 8.2 / 15.7 / 33.9 ms p50, so n=400 is
+  +18% against the baseline and `compare.py` flags all four p99s. It is
+  **not** from `e04b7a6`: alternating runs of that build and its parent
+  `c3e5a6c` at n=400 give 33.2-35.5 against 33.4-33.8 ms. The fixture's
+  Gaussian Blur nodes are unconnected, so the two-pass change never runs.
+  The gap is either machine load (3-5 now, idle at baseline) or an earlier
+  commit (`1d19afa`, `a518103`, `0aa8d46`). Settle it with an idle-machine
+  bisect before re-recording `m2-8gb.jsonl`.
 - **B5(d)** (audio-thread-alone, one Oscillator, no effects): cb_load is
   under 3% at every buffer size, confirming B1's ~57-60% load is almost
   entirely the 24-voice effects chain, not fixed per-callback overhead.
-- **B5(f)/(g)** (load/save, undo, n=100 mixed-node grid): save 4.12ms /
-  load 3.47ms; undo checkpoint push 0.34ms / restore 0.68ms. All four well
-  under a single frame budget even at 60fps (16.7ms) - not a UX-perceptible
-  cost at this node count. Not yet swept across n=50/100/200/400 to check
-  for the same super-linear knee B5(b) hits at n=400.
+- **B5(f)/(g)** (load/save, undo), swept on the clean run, ms:
+
+  | n | save | load | undo push | undo restore |
+  |---|---|---|---|---|
+  | 50 | 3.14 | 1.93 | 0.35 | 0.77 |
+  | 100 | 1.32 | 1.60 | 0.45 | 0.89 |
+  | 200 | 1.44 | 3.14 | 0.51 | 1.02 |
+  | 400 | 2.19 | 10.22 | 0.90 | 1.76 |
+
+  Save and undo scale about linearly and stay far under a frame. **Load is
+  super-linear**: 3.3x going from 200 to 400 nodes, the same knee B5(b)
+  hits at n=400. At 400 nodes 10 ms is still invisible to a user, but the
+  curve points at an O(n²) step in load (likely a per-node lookup across
+  all nodes). Single samples only; n=50's save is a cold-start outlier.
 
 ## Found while measuring
 
@@ -252,6 +277,11 @@ a fixture goes here, not into a code change.
   8 GB machine (for example B2 s-anim 208 to 52 MB). macOS compresses and
   pages out memory under pressure, so RSS is not a reliable footprint number
   here. B9 will need `phys_footprint` (`task_vm_info`) instead.
+- `.git/hooks/post-commit` starts `tools/semi-brain/4_engine/sync_brain.py
+  --sync` in the background after every commit. It uses ~4 cores for ~5
+  minutes, and B1 runs during it showed 8-68 xruns instead of 0-2. Never run
+  `run_all.sh` right after a commit: check that no `sync_brain` process is
+  running first.
 
 ## Windows/Linux
 
