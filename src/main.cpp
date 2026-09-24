@@ -64464,6 +64464,8 @@ int main(int argc, char** argv)
    static int sBenchB2Render3DIdx = -1;
    static int sBenchB2OutputIdx = -1;
    static std::string sBenchB2Variant;
+   static int sBenchB4CamIdx = -1;
+   static int sBenchB4LfoIdx = -1;
 
    // No-op on macOS (which gets a `.ips` report for free); on Windows this is
    // the only thing standing between a crash and a completely silent exit,
@@ -67155,6 +67157,198 @@ int main(int argc, char** argv)
          for (GraphNode& gn : gNodes)
             gn.showParams = true;
       }
+      else if (const char* bench4Arg = getenv("INFINITE_BENCH_B4SCALE"))
+      {
+         // B4 Complex 3D fixture (docs/plans/perf/benchmark-suite.md §4). One
+         // Render 3D at 1080p, 4x MSAA, ACES, with all four geometry slots
+         // busy and nothing 2D after it except Output, so the frame is the 3D
+         // renderer's cost alone:
+         //   geo A  Ocean (resolution by scale)
+         //   geo B  Instance on Points - cubes on a sphere's faces (1k/5k/20k)
+         //   geo C  Torus -> Array (radial, 8/24/64 copies) -> metal Material
+         //   geo D  Sphere -> glass Material (transmission, so the snapshot +
+         //          transmissive pass runs)
+         // Sun + point + spot light, a synthetic equirect HDRI, and shadows
+         // from the sun at INFINITE_BENCH_B4SHADOW = off/1024/2048/4096.
+         // anim=1 (default) plays the transport (the ocean moves) and an LFO
+         // orbits the camera; anim=0 leaves both still, so the scene caches
+         // after the first cook and output_hash is stable run to run.
+         // INFINITE_BENCH_B4PASSES=1 splits Render 3D's GPU time into
+         // r3d_shadow / r3d_opaque / r3d_transmissive / r3d_resolve.
+         std::string scaleStr = bench4Arg;
+         int instances = 1000, arrayCount = 8, oceanRes = 96, shellDetail = 60;
+         if (scaleStr == "m") { instances = 5000; arrayCount = 24; oceanRes = 160; shellDetail = 80; }
+         else if (scaleStr == "l") { instances = 20000; arrayCount = 64; oceanRes = 256; shellDetail = 120; }
+         else scaleStr = "s";
+
+         std::string shadowStr = getenv("INFINITE_BENCH_B4SHADOW") ? getenv("INFINITE_BENCH_B4SHADOW") : "2048";
+         int shadowQ = 1;
+         bool shadowOn = true;
+         if (shadowStr == "off" || shadowStr == "0") { shadowOn = false; shadowStr = "off"; }
+         else if (shadowStr == "1024") shadowQ = 0;
+         else if (shadowStr == "4096") shadowQ = 2;
+         else shadowStr = "2048";
+
+         const char* animEnv = getenv("INFINITE_BENCH_B4ANIM");
+         const bool isAnim = !(animEnv && (strcmp(animEnv, "0") == 0 || strcmp(animEnv, "static") == 0));
+         const bool passSplit = getenv("INFINITE_BENCH_B4PASSES") != nullptr;
+         Bench::Render3DPassSplit() = passSplit;
+
+         sBenchB2Variant = "scale=" + scaleStr + ",shadow=" + shadowStr + ",anim=" + (isAnim ? "1" : "0");
+         if (passSplit)
+            sBenchB2Variant += ",passes=1";
+         if (const char* t = getenv("INFINITE_BENCH_GPUTIMERS"); t && strcmp(t, "0") == 0)
+            sBenchB2Variant += ",gputimers=0";
+
+         // Synthetic equirect HDRI: sky-to-ground gradient plus one hot sun
+         // texel block, written as a real .hdr so the stb decode, 16F upload
+         // and mip chain all run exactly as for a user's file.
+         const int ew = 1024, eh = 512;
+         std::vector<float> envPixels((size_t)ew * eh * 3);
+         for (int y = 0; y < eh; y++)
+         {
+            const float v = (float)y / (float)(eh - 1); // 0 = top
+            for (int x = 0; x < ew; x++)
+            {
+               float* px = &envPixels[((size_t)y * ew + x) * 3];
+               const float sky = std::max(0.0f, 1.0f - 2.0f * v);
+               const float ground = std::max(0.0f, 2.0f * v - 1.0f);
+               px[0] = 0.10f + 0.15f * sky - 0.06f * ground;
+               px[1] = 0.12f + 0.25f * sky - 0.07f * ground;
+               px[2] = 0.15f + 0.45f * sky - 0.10f * ground;
+               const int dx = x - ew / 3, dy = y - eh / 5;
+               if (dx * dx + dy * dy < 36)
+                  px[0] = px[1] = px[2] = 60.0f;
+            }
+         }
+         const std::string envPath = TmpPath("infinite_bench_b4_env.hdr");
+         stbi_write_hdr(envPath.c_str(), ew, eh, 3, envPixels.data());
+
+         // Indices are captured as ints and re-resolved through
+         // FindNodeByIndex, never held as GraphNode* across SpawnNode.
+         auto nodeAt = [](int idx) { return FindNodeByIndex(idx)->node.get(); };
+
+         const int oceanIdx = SpawnNode("Ocean", "3D", 0.0f, 0.0f)->index;
+         auto* ocean = static_cast<OceanNode*>(nodeAt(oceanIdx));
+         ocean->resolution = oceanRes;
+         ocean->uniformScale = 3.0f;
+         ocean->posY = -0.6f;
+
+         const int shellIdx = SpawnNode("Sphere", "3D", 0.0f, 260.0f)->index;
+         auto* shell = static_cast<GeometryNode*>(nodeAt(shellIdx));
+         shell->sides = shellDetail;
+         shell->detail = shellDetail;
+         shell->uniformScale = 1.4f;
+         shell->posY = 0.9f;
+         const int cubeIdx = SpawnNode("Cube", "3D", 0.0f, 520.0f)->index;
+         const int instIdx = SpawnNode("Instance on Points", "3D", 260.0f, 260.0f)->index;
+         auto* inst = static_cast<InstanceOnPointsNode*>(nodeAt(instIdx));
+         inst->pointSource = static_cast<GeometryNode*>(nodeAt(shellIdx));
+         inst->instanceShape = static_cast<GeometryNode*>(nodeAt(cubeIdx));
+         inst->pointMode = 2; // faces
+         inst->maxPoints = instances;
+         inst->instanceScale = (scaleStr == "l") ? 0.035f : (scaleStr == "m" ? 0.05f : 0.08f);
+         inst->inheritMaterial = false;
+         inst->metallic = 0.3f;
+         inst->roughness = 0.35f;
+
+         const int torusIdx = SpawnNode("Torus", "3D", 0.0f, 780.0f)->index;
+         auto* torus = static_cast<GeometryNode*>(nodeAt(torusIdx));
+         torus->sides = 24;
+         torus->detail = 32;
+         torus->uniformScale = 0.35f;
+         const int arrIdx = SpawnNode("Array", "3D", 260.0f, 780.0f)->index;
+         auto* arr = static_cast<GeometryOpNode*>(nodeAt(arrIdx));
+         arr->input = torus;
+         arr->op = GeometryOpNode::kArray;
+         arr->count = arrayCount;
+         arr->radial = true;
+         arr->radius = 2.6f;
+         const int metalIdx = SpawnNode("Material", "3D", 520.0f, 780.0f)->index;
+         auto* metal = static_cast<MaterialNode*>(nodeAt(metalIdx));
+         metal->input = arr;
+         metal->metallic = 1.0f;
+         metal->roughness = 0.18f;
+         metal->color[0] = 0.95f; metal->color[1] = 0.78f; metal->color[2] = 0.45f;
+
+         const int glassGeoIdx = SpawnNode("Sphere", "3D", 0.0f, 1040.0f)->index;
+         auto* glassGeo = static_cast<GeometryNode*>(nodeAt(glassGeoIdx));
+         glassGeo->sides = 48;
+         glassGeo->detail = 48;
+         glassGeo->uniformScale = 0.7f;
+         glassGeo->posX = -2.2f;
+         glassGeo->posY = 0.5f;
+         glassGeo->posZ = 1.2f;
+         const int glassIdx = SpawnNode("Material", "3D", 260.0f, 1040.0f)->index;
+         auto* glass = static_cast<MaterialNode*>(nodeAt(glassIdx));
+         glass->input = glassGeo;
+         glass->transmission = 0.95f;
+         glass->roughness = 0.05f;
+         glass->transmissionRoughness = 0.1f;
+
+         const int camIdx = SpawnNode("Camera", "3D", 520.0f, 0.0f)->index;
+         auto* cam = static_cast<CameraNode*>(nodeAt(camIdx));
+         cam->distance = 7.0f;
+         cam->elevation = 24.0f;
+         cam->azimuth = 30.0f;
+         cam->targetY = 0.5f;
+
+         static const int kLightTypes[] = { 2 /*sun*/, 1 /*point*/, 4 /*spot*/ };
+         int lightIdx[3];
+         for (int l = 0; l < 3; l++)
+         {
+            lightIdx[l] = SpawnNode("Light", "3D", 520.0f, 260.0f + 260.0f * l)->index;
+            auto* light = static_cast<LightNode*>(nodeAt(lightIdx[l]));
+            light->type = kLightTypes[l];
+            light->azimuth = 40.0f + 110.0f * l;
+            light->elevation = 55.0f - 10.0f * l;
+            light->intensity = (l == 0) ? 2.0f : 1.2f;
+         }
+
+         const int envIdx = SpawnNode("HDRI", "3D", 520.0f, 1040.0f)->index;
+         static_cast<EnvironmentNode*>(nodeAt(envIdx))->Load(envPath);
+
+         const int renderIdx = SpawnNode("Render 3D", "3D", 780.0f, 0.0f)->index;
+         auto* render = static_cast<Render3DNode*>(nodeAt(renderIdx));
+         render->geometry[0] = static_cast<OceanNode*>(nodeAt(oceanIdx));
+         render->geometry[1] = static_cast<InstanceOnPointsNode*>(nodeAt(instIdx));
+         render->geometry[2] = static_cast<MaterialNode*>(nodeAt(metalIdx));
+         render->geometry[3] = static_cast<MaterialNode*>(nodeAt(glassIdx));
+         render->camera = static_cast<CameraNode*>(nodeAt(camIdx));
+         for (int l = 0; l < 3; l++)
+            render->lights[l] = static_cast<LightNode*>(nodeAt(lightIdx[l]));
+         render->envInput.Connect(nodeAt(envIdx));
+         render->width = 1920.0f;
+         render->height = 1080.0f;
+         render->samples = 2; // 4x
+         render->tonemap = 1; // ACES
+         render->shadowsEnabled = shadowOn;
+         render->shadowQuality = shadowQ;
+         sBenchB2Render3DIdx = renderIdx;
+
+         const int outIdx = SpawnNode("Output", "Utility", 1040.0f, 0.0f)->index;
+         if (ImageCable* in = CableFor(*FindNodeByIndex(outIdx), 0))
+            in->Connect(nodeAt(renderIdx));
+         sBenchB2OutputIdx = outIdx;
+
+         if (isAnim)
+         {
+            // The LFO is bound to the camera's "orbit" slider at frame 4, once
+            // the UI has registered it (see the ClearFrameParams call site).
+            sBenchB4CamIdx = camIdx;
+            sBenchB4LfoIdx = SpawnNode("LFO", "Modulators", 520.0f, -260.0f)->index;
+            Transport::Instance().SetPlaying(true);
+         }
+         else
+         {
+            // The transport runs from startup; static must stop it or the
+            // Ocean (driven by Transport::Beats) rebuilds every frame.
+            Transport::Instance().SetPlaying(false);
+         }
+
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+      }
       else if (getenv("INFINITE_BENCH_B2") != nullptr ||
                getenv("INFINITE_BENCH_B2VISUALS") != nullptr ||
                getenv("INFINITE_BENCH_B2SCALE") != nullptr)
@@ -67194,6 +67388,8 @@ int main(int argc, char** argv)
          sBenchB2Variant = std::string("scale=") + scaleStr + ",anim=" + (isAnim ? "1" : "0");
          if (getenv("INFINITE_BENCH_B2GPUNODES") != nullptr)
             sBenchB2Variant += ",gpunodes=1";
+         if (const char* t = getenv("INFINITE_BENCH_GPUTIMERS"); t && strcmp(t, "0") == 0)
+            sBenchB2Variant += ",gputimers=0";
 
          const float xBase = 0.0f;
          const float yBase = 0.0f;
@@ -67673,12 +67869,14 @@ int main(int argc, char** argv)
 
       const bool isBenchB5c = (getenv("INFINITE_BENCH_B5STAGES") != nullptr || getenv("INFINITE_BENCH_B5C") != nullptr);
       const bool isBenchB2 = (getenv("INFINITE_BENCH_B2") != nullptr || getenv("INFINITE_BENCH_B2VISUALS") != nullptr || getenv("INFINITE_BENCH_B2SCALE") != nullptr);
-      const bool benchStagesSample = (isBenchB5c || isBenchB2) && (frameId >= 32 && frameId < 152);
+      const bool isBenchB4 = getenv("INFINITE_BENCH_B4SCALE") != nullptr;
+      const bool benchStagesSample = (isBenchB5c || isBenchB2 || isBenchB4) && (frameId >= 32 && frameId < 152);
       // B2 per-node GPU split: time each Render 3D / filter draw by node type
       // instead of the enclosing "cook" stage (GL timer queries cannot nest).
-      const bool benchGpuPerNode = isBenchB2 && getenv("INFINITE_BENCH_B2GPUNODES") != nullptr;
+      const bool benchGpuPerNode = (isBenchB2 && getenv("INFINITE_BENCH_B2GPUNODES") != nullptr) ||
+                                   (isBenchB4 && getenv("INFINITE_BENCH_B4PASSES") != nullptr);
 
-      if (isBenchB5c || isBenchB2)
+      if (isBenchB5c || isBenchB2 || isBenchB4)
          sGpuTimerRing.Poll(frameId);
 
       gFrameStart = glfwGetTime();
@@ -69812,6 +70010,24 @@ int main(int argc, char** argv)
       // lets that panel show a real (one-frame-stale) Value instead of "--"
       // every frame. A right/bottom-docked matrix draws after the graph and
       // is unaffected either way, since by then this frame's params are in.
+      // B4 fixture: bind the LFO to the camera's "orbit" slider by name, from
+      // last frame's registrations, just before they are cleared. Bind()
+      // takes the UI's param index, which is draw order, not VisitParams order.
+      if (frameId == 4 && sBenchB4LfoIdx >= 0)
+      {
+         bool bound = false;
+         for (const ParamRef& ref : Modulation::Instance().FrameParams())
+         {
+            if (ref.nodeIndex == sBenchB4CamIdx && ref.name == "orbit")
+            {
+               Modulation::Instance().Bind(sBenchB4CamIdx, ref.paramIndex, sBenchB4LfoIdx, 0);
+               bound = true;
+               break;
+            }
+         }
+         if (!bound)
+            fprintf(stderr, "B4: camera orbit param not registered, camera will not move\n");
+      }
       Modulation::Instance().ClearFrameParams();
       // The grab set is per frame too: a stale entry would freeze a param forever.
       gPredictorGrabsPrev.swap(gPredictorGrabs);
@@ -84484,7 +84700,7 @@ int main(int argc, char** argv)
       // Same warmup/sample window as B5(b)/B5(c) (frameId 32 to 152 = 120 frames).
       // Reports frame_ms percentiles, tris count, GPU and CPU stage breakdowns,
       // RSS memory, and output_hash quality guard.
-      if (isBenchB2)
+      if (isBenchB2 || isBenchB4)
       {
          if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; sBenchB2RssStartMb = Bench::ProcessRssMb(); }
          if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
@@ -84492,7 +84708,7 @@ int main(int argc, char** argv)
          if (frameId == 152)
          {
             Bench::BenchReport report;
-            report.bench = "B2_heavy_visuals";
+            report.bench = isBenchB4 ? "B4_complex_3d" : "B2_heavy_visuals";
             report.variant = sBenchB2Variant;
             report.frames = 152;
             report.nodes = (int)gNodes.size();
@@ -84517,13 +84733,20 @@ int main(int argc, char** argv)
                {
                   if (auto* r = dynamic_cast<Render3DNode*>(gn->node.get()))
                   {
-                     for (int s = 0; s < Render3DNode::kSlots; s++)
+                     // B2 keeps its original per-slot mesh count so its
+                     // baseline stays comparable; B4 reports what was drawn,
+                     // instances included.
+                     if (isBenchB4)
+                        report.tris = (int)r->LastTriangleCount();
+                     else
                      {
-                        if (r->geometry[s])
+                        for (int s = 0; s < Render3DNode::kSlots; s++)
                         {
-                           report.tris += (int)r->geometry[s]->GetMesh().FaceCount();
+                           if (r->geometry[s])
+                              report.tris += (int)r->geometry[s]->GetMesh().FaceCount();
                         }
                      }
+                     report.drawCalls = (int)r->LastDrawCalls();
                   }
                }
             }
@@ -84542,7 +84765,7 @@ int main(int argc, char** argv)
             }
 
             report.Emit();
-            printf("B2VISUALS DONE\n");
+            printf(isBenchB4 ? "B4COMPLEX3D DONE\n" : "B2VISUALS DONE\n");
             fflush(stdout);
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }

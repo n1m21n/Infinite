@@ -28,6 +28,8 @@ INFINITE_BENCH_B5AUDIOALONE=256 INFINITE_BENCH_B5AUDIOALONE_SECONDS=10 \
    INFINITE_EXITAFTER=2000 ./build/Infinite.app/Contents/MacOS/Infinite
 INFINITE_BENCH_B2SCALE=l INFINITE_BENCH_B2ANIM=1 INFINITE_BENCH_B2GPUNODES=1 \
    INFINITE_EXITAFTER=160 ./build/Infinite.app/Contents/MacOS/Infinite
+INFINITE_BENCH_B4SCALE=l INFINITE_BENCH_B4SHADOW=2048 INFINITE_BENCH_GPUTIMERS=0 \
+   INFINITE_EXITAFTER=160 ./build/Infinite.app/Contents/MacOS/Infinite
 ```
 
 Every fixture prints exactly one `BENCH_JSON {...}` line (schema in
@@ -44,7 +46,7 @@ frame count (B5).
 | B1(stages) Per-DSP-stage audio breakdown | Not in original §4 - added to attribute B1's ~56-60% cb_load across its five per-voice stages (Filter/Drive/Delay/Reverb/Dynamics), needed before any SIMD/threading optimization decision | **Yes** (`INFINITE_BENCH_B1VOICES` stages breakdown) | Built into `AudioEngine::Process` via `AudioLoadRing mStageLoadHistory[kAudioStageCount]`. Measures per-stage CPU time without locks or allocations on the audio callback thread. Reports p50 callback load fraction per stage into `stages_cpu_ms`. |
 | B2 Heavy visuals | Geometry→Render3D→10-30 compositing nodes→Output, static+animated | **Yes** (`INFINITE_BENCH_B2SCALE`, `INFINITE_BENCH_B2ANIM`) | Scales s (10 effects, 1.8k tris), m (20 effects, 7.3k tris + instanced points), l (30 effects, 12.4k tris + 8k instances). Measures frame_ms percentiles, tris count, CPU stage breakdown + GPU stage breakdown (from the GPU timer ring), memory RSS, and output RGBA8 hash. `anim=1` binds an LFO to the Twist, Camera and every effect, so the whole chain recooks each frame. `anim=0` swaps the one time-driven effect (Glitch reads `uTime`) for Emboss, so the chain caches after the first cook and `output_hash` is identical run to run. It measures the idle cost of a cached heavy patch, not render cost. `INFINITE_BENCH_B2GPUNODES=1` replaces the GPU `cook` stage with one GPU stage per node type (`render3d`, `bloom`, `gaussianblur`, ...), each the per-frame total over every instance of that type. |
 | B3 Live performance | B1-lite+B2-lite+projector+MIDI+macros+Prediction; missed vsyncs, input-to-photon | No | Depends on B1+B2 fixtures existing first, plus a projector-window self-test fixture (none exists today). |
-| B4 Complex 3D scenes | many objects/instancing/lights/shadows/materials/HDRI/ocean | No | Same GPU-timer dependency as B2. |
+| B4 Complex 3D scenes | many objects/instancing/lights/shadows/materials/HDRI/ocean | **Yes** (`INFINITE_BENCH_B4SCALE`, `INFINITE_BENCH_B4SHADOW`, `INFINITE_BENCH_B4ANIM`, `INFINITE_BENCH_B4PASSES`) | One Render 3D at 1080p, 4x MSAA, ACES, straight into Output, with all four geometry slots busy: Ocean (resolution 96/160/256), cubes instanced on a sphere's faces (1k/5k/20k), a radial Array of metal tori (8/24/64), and a glass sphere (so the transmissive pass runs). Sun + point + spot light, a synthetic 1024x512 `.hdr` through the HDRI node, sun shadows at `off`/1024/2048/4096. `anim=1` plays the transport (the Ocean moves) and an LFO orbits the camera, bound by the slider's name at frame 4 because `Modulation::Bind` takes the UI's draw-order index. `anim=0` stops the transport, which otherwise runs from startup, so the scene caches and `output_hash` is stable. Reports `tris` as drawn (instances included) and `draw_calls`. `passes=1` splits Render 3D's GPU time into `r3d_shadow`/`r3d_opaque`/`r3d_transmissive`/`r3d_resolve`. |
 | B5 Fundamentals | (a) empty patch, **(b) node-count scaling**, **(c) per-stage CPU+GPU split**, **(d) audio-thread-alone**, **(e) startup time**, **(f) load/save time**, **(g) undo-snapshot time** | **All of (a)-(g)** (`INFINITE_BENCH_B5EMPTY`, `INFINITE_BENCH_B5NODES`, `INFINITE_BENCH_B5STAGES`, `INFINITE_BENCH_B5AUDIOALONE`, `INFINITE_BENCH_B5STARTUP`, `INFINITE_BENCH_B5LOADSAVE`, `INFINITE_BENCH_B5UNDO`) | (a) zero-node floor, frame_ms percentiles + RSS, same 120-frame sampled window as (b) so the two are directly comparable. (b) 50/100/200/400 mixed nodes laid out on a grid (not stacked at origin - the flaw called out in benchmark-suite.md §2 against MIXEDSTRESSTEST/GEOMDENSITYTEST). Reports frame_ms percentiles + RSS. (c) same mixed-node grid as (b), wraps seven main-loop stages (`modulation`, `cook`, `node_bodies`, `editor_end`, `imgui_render`, `projectors`, `swap`) in `ConditionalStageTimer`s sampled over the same frame window, reports p50 CPU ms per stage into `stages_cpu_ms` (`stages_gpu_ms` still empty - blocked on the GPU timer ring below). (d) one Oscillator straight into Audio Out, no effects chain, buffer sweep 64/128/256/512 - isolates the audio callback's fixed per-block cost from B1's DSP-graph cost; reuses B1's wall-clock-window + `AudioLoadRing` pattern. (e) startup milestone timings from entry through first frame swap (`pre_window`, `window_gl`, `imgui_fonts`, `scanners_load`, `first_frame_render`, `total_to_first_frame`). (f)/(g) reuse (b)/(c)'s mixed-node grid (`INFINITE_BENCH_B5LOADSAVE=<n>`/`INFINITE_BENCH_B5UNDO=<n>`), fire once at `frameId==32`, and time the real patch I/O and undo paths back to back (`SavePatchTo`→`LoadPatchFrom`; `PushUndoCheckpoint`→`Undo`) via `Bench::ScopedStageTimer::NowMs()` - not synthetic serialize-only calls, so (f) includes whatever `ApplyPatchData`/field-graph remap does on load, and (g) includes the real `BuildPatchData`/`ApplyPatchData` round trip Undo takes. `stages_cpu_ms: {save, load}` / `{push_checkpoint, undo_restore}`. |
 | B6 Canvas navigation | programmatic pan/zoom/drag, never OS-level UI scripting | No | "Missing today" per the doc; not started. |
 | B7 Soak/thermal | 30min B3, long variant only | No | Depends on B3. |
@@ -255,6 +257,32 @@ re-record the baseline with `run_all.sh` before comparing against it):
   curve points at an O(n²) step in load (likely a per-node lookup across
   all nodes). Single samples only; n=50's save is a cold-start outlier.
 
+- **B4** (complex 3D), M2, `gputimers=0` except the `passes=1` rows:
+
+  | Variant | tris | frame p50 | frame p99 | CPU `node_bodies` |
+  |---|---|---|---|---|
+  | s, shadow 2048 | 144k | 4.0 | 9.1 | 3.0 |
+  | m, shadow 2048 | 540k | 9.2 | 14.1 | 8.2 |
+  | l, shadow 2048 | 1.57M | 22.4 | 26.7 | 21.2 |
+  | m, shadow off / 1024 / 4096 | 540k | 9.1 / 9.2 / 9.3 | 13.5 / 13.5 / 15.9 | 8.1-8.2 |
+  | l, static (cached) | 1.57M | 1.3 | 6.1 | 0.4 |
+
+  GPU split (`passes=1`, ms/frame): s opaque 2.2, shadow 0.6, glass 0.16;
+  l opaque 10.7, shadow 1.5, glass 0.14. MSAA resolve is under 0.05.
+  Every scale is **CPU-bound, not GPU-bound**: at l the GPU needs ~12.5 ms
+  but the frame takes 22.4, and `node_bodies` (21 ms) is almost all of it.
+  A `sample` profile puts the bulk of it in
+  `OceanNode::RebuildIfNeeded` → `MeshOps::Ocean` → `RecalculateNormals` →
+  `BuildWeldMap`, a `std::map` keyed on quantized positions, rebuilt every
+  frame while the transport plays. The ocean is one shared grid with no
+  seams, so the weld finds nothing to merge. Summing face normals straight
+  over the index buffer would give the same result without the map. It
+  runs from Ocean's mini-viewport preview only because that is the first
+  caller each frame. Shadow quality costs almost nothing (1.5 ms GPU at
+  4096, hidden behind the CPU), and so do 20k instances (one instanced
+  draw). Draw calls stay at 4 because Render 3D has four slots and every
+  slot is one draw.
+
 ## Found while measuring
 
 Per §8: this suite measures, it does not fix. Anything found while building
@@ -277,6 +305,29 @@ a fixture goes here, not into a code change.
   8 GB machine (for example B2 s-anim 208 to 52 MB). macOS compresses and
   pages out memory under pressure, so RSS is not a reliable footprint number
   here. B9 will need `phys_footprint` (`task_vm_info`) instead.
+- **GPU timer queries distort `frame_ms` on macOS.** Apple's Metal-backed GL
+  makes `glEndQuery(GL_TIME_ELAPSED)` flush the context and block until the
+  GPU catches up (`sample`: `glEndQuery_Exec` → `flushContext` →
+  `semaphore_wait`). That removes CPU/GPU overlap. B4 l-anim runs at 43 ms
+  p50 with timers and 23-25 ms without, and the CPU `swap`/`imgui_render`
+  stages shrink from 15/2.4 ms to 0.5/0.07. Every B2 `frame_ms` above was
+  recorded with timers on, so B2's absolute frame times are inflated. Its
+  before/after comparisons still hold, because both sides were timed the
+  same way. `INFINITE_BENCH_GPUTIMERS=0` now turns the queries off and adds
+  `gputimers=0` to the variant. B4's sweeps use it, and only the `passes=1`
+  run keeps timers on. B2's runs still time the GPU; a timers-off B2 sweep
+  is needed before its frame numbers go in a new baseline.
+- **HDRI background seam** (visual bug, not perf): Render 3D's env-background
+  shader samples the equirect map with `texture()`, so at the `atan` wrap,
+  where u jumps from 1 to 0, the implicit derivatives select the smallest mip
+  and draw a one-pixel line of the image's average colour straight up the
+  sky. It showed in B4's first render. The fix is to take the u derivative
+  from whichever of `fract(u)` and `fract(u + 0.5)` is continuous at that
+  pixel (`textureGrad`), or `textureLod` at 0 for the background. The
+  reflection path already uses `textureLod`.
+- The transport starts playing at launch, so any fixture that wants a still
+  frame has to stop it. B2's static variant does not, which is harmless only
+  because Emboss replaced Glitch and nothing else in B2 reads time.
 - `.git/hooks/post-commit` starts `tools/semi-brain/4_engine/sync_brain.py
   --sync` in the background after every commit. It uses ~4 cores for ~5
   minutes, and B1 runs during it showed 8-68 xruns instead of 0-2. Never run

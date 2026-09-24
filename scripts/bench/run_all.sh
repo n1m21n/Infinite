@@ -91,7 +91,22 @@ echo "B3 Live performance"
 skip "B3_live"
 
 echo "B4 Complex 3D scenes"
-skip "B4_complex_3d"
+# GL timer queries stall the CPU on macOS (glEndQuery flushes and waits), so
+# the sweeps run with them off and report honest frame_ms. One timed run at
+# l splits Render 3D's GPU time by pass. Object-count sweep at the default
+# 2048 shadow map, shadow-quality sweep at m, then the cached (static) cost.
+for scale in s m l; do
+   run_fixture "B4_complex_3d scale=$scale,shadow=2048,anim=1,gputimers=0" 160 \
+      INFINITE_BENCH_B4SCALE="$scale" INFINITE_BENCH_B4SHADOW=2048 INFINITE_BENCH_GPUTIMERS=0
+done
+for shadow in off 1024 4096; do
+   run_fixture "B4_complex_3d scale=m,shadow=$shadow,anim=1,gputimers=0" 160 \
+      INFINITE_BENCH_B4SCALE=m INFINITE_BENCH_B4SHADOW="$shadow" INFINITE_BENCH_GPUTIMERS=0
+done
+run_fixture "B4_complex_3d scale=l,shadow=2048,anim=0,gputimers=0" 160 \
+   INFINITE_BENCH_B4SCALE=l INFINITE_BENCH_B4ANIM=0 INFINITE_BENCH_GPUTIMERS=0
+run_fixture "B4_complex_3d scale=l,shadow=2048,anim=1,passes=1" 160 \
+   INFINITE_BENCH_B4SCALE=l INFINITE_BENCH_B4PASSES=1
 
 echo "B5 Fundamentals"
 run_fixture "B5_fundamentals_empty" 200 INFINITE_BENCH_B5EMPTY=1

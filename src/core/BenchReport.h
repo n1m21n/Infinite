@@ -298,6 +298,15 @@ namespace Bench
       return ring;
    }
 
+   // B4 with INFINITE_BENCH_B4PASSES: Render 3D times its shadow, opaque,
+   // transmissive and MSAA-resolve passes into NodeGpuRing() separately
+   // instead of one "render3d" interval (which would nest around them).
+   inline bool& Render3DPassSplit()
+   {
+      static bool split = false;
+      return split;
+   }
+
    // FNV-1a 64-bit over raw bytes - used for output_hash (a hash of the
    // Output texture's readback pixels). Not cryptographic; it only needs to
    // change when the rendered image changes, which is the quality-guard
@@ -331,6 +340,7 @@ namespace Bench
       int frames = 0;
       int nodes = 0;
       int tris = 0;
+      int drawCalls = -1; // Render 3D draw calls last frame; -1 = not measured (null)
       std::string outputHash;
 
       PercentileRing frameMs;

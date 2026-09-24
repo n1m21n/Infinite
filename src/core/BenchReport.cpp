@@ -1,5 +1,7 @@
 #include "BenchReport.h"
 
+#include <cstring>
+
 #include "gl3.h"
 #include "../platform/Platform.h"
 
@@ -28,6 +30,16 @@ namespace Bench
          return;
       mInitialized = true;
       mSupported = false;
+
+      // On macOS's Metal-backed GL, glEndQuery(GL_TIME_ELAPSED) flushes the
+      // context and blocks until the GPU catches up, so timing stalls the
+      // CPU and can inflate frame_ms. INFINITE_BENCH_GPUTIMERS=0 turns the
+      // queries off (stages_gpu_ms comes out empty) for an unperturbed run.
+      if (const char* env = std::getenv("INFINITE_BENCH_GPUTIMERS"))
+      {
+         if (std::strcmp(env, "0") == 0)
+            return;
+      }
 
 #if !defined(__APPLE__)
       if (!glad_glGenQueries || !glad_glDeleteQueries || !glad_glBeginQuery ||
@@ -336,6 +348,7 @@ namespace Bench
 
       j["nodes"] = nodes;
       j["tris"] = tris;
+      j["draw_calls"] = drawCalls < 0 ? nlohmann::json(nullptr) : nlohmann::json(drawCalls);
       j["output_hash"] = outputHash.empty() ? "n/a" : outputHash;
 
       std::printf("BENCH_JSON %s\n", j.dump().c_str());

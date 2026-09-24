@@ -1485,7 +1485,8 @@ void Render3DNode::CookIfNeeded(int frameId)
    mSceneBuilt = sceneSig;
    mHasSceneBuilt = true;
    NodeWorkCounter()++;
-   Bench::ConditionalGpuStageTimer benchGpu(Bench::NodeGpuRing(), "render3d", frameId);
+   Bench::GpuTimerRing* benchPassRing = Bench::Render3DPassSplit() ? Bench::NodeGpuRing() : nullptr;
+   Bench::ConditionalGpuStageTimer benchGpu(benchPassRing ? nullptr : Bench::NodeGpuRing(), "render3d", frameId);
 
    const float aspect = (float)w / (float)h;
 
@@ -1569,6 +1570,7 @@ void Render3DNode::CookIfNeeded(int frameId)
       float sceneLo[3], sceneHi[3];
       if (EnsureShadowResources(wantSize) && SceneBounds(sceneLo, sceneHi))
       {
+         Bench::ConditionalGpuStageTimer benchShadow(benchPassRing, "r3d_shadow", frameId);
          const float centre[3] = { (sceneLo[0]+sceneHi[0])*0.5f,
                                    (sceneLo[1]+sceneHi[1])*0.5f,
                                    (sceneLo[2]+sceneHi[2])*0.5f };
@@ -1654,6 +1656,7 @@ void Render3DNode::CookIfNeeded(int frameId)
    }
 
    // --- save the GL state the 2D pipeline relies on -------------------
+   Bench::ConditionalGpuStageTimer benchOpaque(benchPassRing, "r3d_opaque", frameId);
    GLint prevFbo = 0, prevViewport[4];
    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
    glGetIntegerv(GL_VIEWPORT, prevViewport);
@@ -2390,9 +2393,11 @@ void Render3DNode::CookIfNeeded(int frameId)
          continue;
       drawSlot(i);
    }
+   benchOpaque.Stop();
 
    if (anyTransmissive)
    {
+      Bench::ConditionalGpuStageTimer benchTransmissive(benchPassRing, "r3d_transmissive", frameId);
       // Snapshot what's been drawn so far into a mipmapped, non-multisampled
       // texture: transmissionRoughness picks a mip the same way sampleEnv()
       // does for reflections, and a multisampled renderbuffer can't be
@@ -2438,6 +2443,7 @@ void Render3DNode::CookIfNeeded(int frameId)
    // Scissor is already off, which matters here: a blit is clipped by it too.
    if (multisampling)
    {
+      Bench::ConditionalGpuStageTimer benchResolve(benchPassRing, "r3d_resolve", frameId);
       glBindFramebuffer(GL_READ_FRAMEBUFFER, mMsFbo);
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mFbo);
       glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
