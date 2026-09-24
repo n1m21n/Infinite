@@ -95593,6 +95593,7 @@ int main(int argc, char** argv)
             glfwMakeContextCurrent(window);
       }
 
+      GLUtil::EndFrameScratchFbos();
       ++frameId;
       // The uid map is rebuilt at most once a frame on first use (WP5b), so a
       // gNodes mutation that did not report in is stale for one frame at most
