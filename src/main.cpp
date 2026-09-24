@@ -60584,11 +60584,10 @@ static void RunAudioRingTest()
 // An offline render must show EVERY source frame exactly - no skipping ahead
 // to catch up, no stale repeat - even though realtime playback is allowed to
 // drop frames to keep up with the clock. This records a clip whose frame i is
-// a flat grey unique to i, then steps Platform::VideoFrameAt through it the
-// way an export does (Transport in offline mode, no waiting between calls -
-// VideoSourceNode never waits) at 30, 60 and 24 fps, plus a few backward and
-// forward seeks, and checks every request shows exactly the source frame that
-// covers its time.
+// a flat grey unique to i, then steps it the way an export does
+// (Platform::VideoFrameAtExact, which VideoSourceNode uses in offline mode)
+// at 30, 60 and 24 fps, plus a few backward and forward seeks, and checks
+// every request shows exactly the source frame that covers its time.
 static void RunVideoExactTest()
 {
    constexpr int kW = 320;
@@ -60660,7 +60659,7 @@ static void RunVideoExactTest()
       for (int k = 0; (double)k / rate < (double)kFrames / kFps - 1e-6; k++)
       {
          const double t = (double)k / rate;
-         Platform::VideoFrameAt(vid, t, px);
+         Platform::VideoFrameAtExact(vid, t, px);
          const int want = (int)std::floor(t * kFps + 1e-6);
          const int got = frameIndexOf(px);
          steps++;
@@ -60685,7 +60684,7 @@ static void RunVideoExactTest()
       int seekWrong = 0;
       for (int f : seekTo)
       {
-         Platform::VideoFrameAt(vid, (f + 0.5) / kFps, px);
+         Platform::VideoFrameAtExact(vid, (f + 0.5) / kFps, px);
          const int got = frameIndexOf(px);
          if (got != f)
          {
@@ -60709,7 +60708,7 @@ static void RunVideoExactTest()
       const int n = vid ? (int)std::lround(Platform::VideoDuration(vid) * 30.0) : 0;
       for (int i = 0; i < n; i++)
       {
-         Platform::VideoFrameAt(vid, (i + 0.5) / 30.0, px);
+         Platform::VideoFrameAtExact(vid, (i + 0.5) / 30.0, px);
          uint64_t h = 1469598103934665603ull;
          for (unsigned char c : px)
          {

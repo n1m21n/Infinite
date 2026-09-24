@@ -457,6 +457,11 @@ namespace Platform
    // for, and they are still there when asked.
    constexpr double kReverseLookbackSeconds = 0.5;
 
+   // Realtime decode budget per VideoFrameAt call (see step 4 there). About
+   // two 4K frames on an M2; one clip can then still gain two source frames
+   // per cook while it catches up, and four clips stay inside a 60 Hz frame.
+   constexpr double kRealtimeDecodeBudgetMs = 6.0;
+
    struct CachedVideoFrame
    {
       double pts = 0.0;
@@ -480,12 +485,17 @@ namespace Platform
       double currentPts = -1.0;
       double readerPts = -1.0;   // presentation time the reader last decoded
       double nextPts = -1.0;     // pts of the decoded-but-not-yet-current frame
-      std::vector<unsigned char> current; // the frame at currentPts, until it is handed over
       // pts of the last frame VideoFrameAt returned true for. A request that
       // lands on the same frame again returns false and leaves the caller's
       // pixels alone, so the caller skips the upload (Platform.h contract).
       double deliveredPts = -1.0;
-      std::vector<unsigned char> pending; // that frame's pixels
+      // That frame, still in decoder memory (retained). Conversion to RGBA
+      // waits until the frame is actually chosen for display, so frames that
+      // are decoded only to be skipped over never pay for it.
+      CMSampleBufferRef nextSample = nullptr;
+      // Realtime only: the last VideoFrameAt ran out of its decode budget
+      // before reaching the requested time (see VideoDecodeIsCatchingUp).
+      bool behind = false;
       bool finished = false;
 
       // Multi-region LRU frame cache across seek/scrub points. The byte
@@ -528,15 +538,24 @@ namespace Platform
    // calling thread does not own, and video decoding is not single-threaded -
    // ArrangeMediaImport opens a dropped clip and pulls its first frame on a
    // worker while VideoSourceNode is cooking other clips on the main thread.
-   // Per-handle state that eviction never touches (reader, pending, the pts
+   // Per-handle state that eviction never touches (reader, nextSample, the pts
    // fields) stays unguarded, as it was: one handle is still only ever
    // decoded from one thread at a time.
    std::mutex gVideoCacheMutex;
 
    namespace
    {
+      void ReleaseNextSample(VideoHandle* h)
+      {
+         if (h->nextSample != nullptr)
+            CFRelease(h->nextSample);
+         h->nextSample = nullptr;
+         h->nextPts = -1.0;
+      }
+
       bool StartReader(VideoHandle* h, double fromSeconds, std::string& outError)
       {
+         ReleaseNextSample(h);
          NSError* err = nil;
          h->reader = [[AVAssetReader alloc] initWithAsset:h->asset error:&err];
          if (h->reader == nil)
@@ -574,7 +593,8 @@ namespace Platform
          return true;
       }
 
-      // Pulls exactly one frame into h->pending / h->nextPts.
+      // Pulls exactly one frame into h->nextSample / h->nextPts, still
+      // undecorated decoder output - see ConvertSample.
       bool DecodeNext(VideoHandle* h)
       {
          if (h->reader == nil || h->finished)
@@ -586,16 +606,23 @@ namespace Platform
             h->finished = true;
             return false;
          }
-
-         CMTime pts = CMSampleBufferGetPresentationTimeStamp(sample);
-         h->nextPts = CMTimeGetSeconds(pts);
-
-         CVImageBufferRef pixelBuffer = CMSampleBufferGetImageBuffer(sample);
-         if (pixelBuffer == NULL)
+         if (CMSampleBufferGetImageBuffer(sample) == NULL)
          {
             CFRelease(sample);
             return false;
          }
+         h->nextSample = sample;
+         h->nextPts = CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(sample));
+         return true;
+      }
+
+      // Decoder BGRA -> the Platform.h contract (RGBA8, bottom-up, tightly
+      // packed) into `dst`, reusing its storage.
+      bool ConvertSample(VideoHandle* h, CMSampleBufferRef sample, std::vector<unsigned char>& dst)
+      {
+         CVImageBufferRef pixelBuffer = CMSampleBufferGetImageBuffer(sample);
+         if (pixelBuffer == NULL)
+            return false;
 
          CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
          const int w = (int)CVPixelBufferGetWidth(pixelBuffer);
@@ -605,7 +632,7 @@ namespace Platform
 
          h->width = w;
          h->height = h_;
-         h->pending.resize((size_t)w * h_ * 4); // same size every frame: no realloc, no clear
+         dst.resize((size_t)w * h_ * 4); // same size every frame: no realloc, no clear
 
          // BGRA -> RGBA, and flip rows for GL's bottom-up textures (the
          // Platform.h contract). AVAssetReader cannot hand out RGBA itself
@@ -616,12 +643,11 @@ namespace Platform
          for (int y = 0; y < h_; y++)
          {
             vImage_Buffer srcRow = { (void*)(src + (size_t)y * srcStride), 1, (vImagePixelCount)w, srcStride };
-            vImage_Buffer dstRow = { h->pending.data() + (size_t)(h_ - 1 - y) * w * 4, 1, (vImagePixelCount)w, (size_t)w * 4 };
+            vImage_Buffer dstRow = { dst.data() + (size_t)(h_ - 1 - y) * w * 4, 1, (vImagePixelCount)w, (size_t)w * 4 };
             vImagePermuteChannels_ARGB8888(&srcRow, &dstRow, kBgraToRgba, kvImageDoNotTile);
          }
 
          CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
-         CFRelease(sample);
          return true;
       }
 
@@ -682,42 +708,42 @@ namespace Platform
          }
       }
 
-      // Appends a decoded frame to the LRU cache, evicting the least-recently
+      // Converts a decoded frame into the LRU cache, evicting the least-recently
       // used frames - anywhere in the app - to stay inside the shared budget.
-      void PushCacheFrame(VideoHandle* h, double pts, const std::vector<unsigned char>& pixels)
+      // The conversion runs outside the lock, into a pooled buffer.
+      void PushCacheFrame(VideoHandle* h, double pts, CMSampleBufferRef sample)
       {
+         std::vector<unsigned char> pixels;
+         {
+            std::lock_guard<std::mutex> lock(gVideoCacheMutex);
+            for (auto& f : h->frameCache)
+            {
+               if (std::abs(f.pts - pts) < 0.001)
+               {
+                  f.lastAccess = ++gVideoCacheClock;
+                  return;
+               }
+            }
+            if (!gVideoFramePool.empty())
+            {
+               pixels.swap(gVideoFramePool.back());
+               gVideoFramePool.pop_back();
+            }
+         }
+         if (!ConvertSample(h, sample, pixels))
+            return;
          const size_t frameBytes = pixels.size();
          if (frameBytes == 0 || frameBytes > kMaxVideoCacheBytes)
             return;
 
          std::lock_guard<std::mutex> lock(gVideoCacheMutex);
-         const uint64_t stamp = ++gVideoCacheClock;
-
-         for (auto& f : h->frameCache)
-         {
-            if (std::abs(f.pts - pts) < 0.001)
-            {
-               f.lastAccess = stamp;
-               return;
-            }
-         }
-
          while (h->frameCache.size() >= kMaxVideoCacheFramesPerHandle)
             DropHandleLru(h);
 
          CachedVideoFrame entry;
          entry.pts = pts;
-         entry.lastAccess = stamp;
-         for (size_t i = 0; i < gVideoFramePool.size(); i++)
-         {
-            if (gVideoFramePool[i].size() == frameBytes)
-            {
-               entry.pixels.swap(gVideoFramePool[i]);
-               gVideoFramePool.erase(gVideoFramePool.begin() + (long)i);
-               break;
-            }
-         }
-         entry.pixels.assign(pixels.begin(), pixels.end()); // reuses a pooled buffer's storage
+         entry.lastAccess = ++gVideoCacheClock;
+         entry.pixels = std::move(pixels);
          h->frameCache.push_back(std::move(entry));
          h->cacheBytes += frameBytes;
          gVideoCacheBytes += frameBytes;
@@ -1525,6 +1551,7 @@ namespace Platform
          return;
       @autoreleasepool
       {
+         ReleaseNextSample(handle);
          if (handle->reader != nil)
             [handle->reader cancelReading];
          handle->reader = nil;
@@ -1548,9 +1575,10 @@ namespace Platform
    int VideoHeight(VideoHandle* handle) { return handle ? handle->height : 0; }
    double VideoDuration(VideoHandle* handle) { return handle ? handle->duration : 0.0; }
 
-   // Decoding here is synchronous: when VideoFrameAt returns, it has already
-   // done whatever work the requested position needed. Nothing to wait for.
-   bool VideoDecodeIsCatchingUp(VideoHandle*) { return false; }
+   // Decoding here is synchronous but budgeted per call: true when the last
+   // VideoFrameAt stopped at its budget short of the requested time, so a
+   // caller that needs that exact frame calls again (VideoFrameAtExact).
+   bool VideoDecodeIsCatchingUp(VideoHandle* handle) { return handle != nullptr && handle->behind; }
 
    Bench::MediaDecodeStats* VideoBenchStats(VideoHandle* handle) { return handle ? handle->bench.get() : nullptr; }
 
@@ -1559,9 +1587,10 @@ namespace Platform
       if (handle == nullptr || seconds < 0.0)
          return false;
       const bool callerHasFrame = !outPixels.empty();
+      handle->behind = false;
 
       Bench::MediaDecodeStats* bench = handle->bench.get();
-      const double benchCallStartMs = bench ? Bench::MediaNowMs() : 0.0;
+      const double callStartMs = Bench::MediaNowMs();
 
       @autoreleasepool
       {
@@ -1571,7 +1600,7 @@ namespace Platform
          {
             if (bench)
             {
-               bench->cacheHitMs.Push(Bench::MediaNowMs() - benchCallStartMs);
+               bench->cacheHitMs.Push(Bench::MediaNowMs() - callStartMs);
                bench->cacheHits.fetch_add(1, std::memory_order_relaxed);
             }
             if (cached == CacheResult::Same)
@@ -1640,52 +1669,92 @@ namespace Platform
          }
 
          // 4. Decode forward until the frame covering `seconds` is reached.
-         //    Frames rotate through two buffers (pending = being decoded,
-         //    current = accepted) and the winner is swapped out to the caller:
-         //    no per-frame allocation, no copy on hand-over.
-         bool produced = false;
+         //    Frames stay in decoder memory until one is chosen; only that
+         //    one is converted, straight into the caller's buffer. Frames
+         //    passed over on the way (catching up after a slow frame) cost
+         //    their decode and nothing else.
+         //
+         //    Each call also stops at a decode budget: a clip that fell
+         //    behind shows the newest frame it reached and continues next
+         //    cook, instead of decoding every frame in between in one cook -
+         //    which made that cook slow, which put the clip further behind
+         //    (B8 finding 8, the 4x2160 spiral). VideoDecodeIsCatchingUp then
+         //    reports true, and an offline render, which must land on the
+         //    exact frame, keeps calling until it does (VideoFrameAtExact).
+         //    A backward rebuild is exempt: its frames go to the cache for the
+         //    reverse steps that follow.
+         const bool budgeted = !cacheDecoded;
+         CMSampleBufferRef chosen = nullptr;
+         double chosenDecodeMs = 0.0;
          for (int guard = 0; guard < 240; guard++)
          {
-            if (handle->nextPts < 0.0)
+            double pullMs = 0.0;
+            if (handle->nextSample == nullptr)
             {
                const double benchDecodeStartMs = bench ? Bench::MediaNowMs() : 0.0;
                if (!DecodeNext(handle))
                   break;
                if (bench)
                {
-                  bench->decodeMs.Push(Bench::MediaNowMs() - benchDecodeStartMs);
+                  pullMs = Bench::MediaNowMs() - benchDecodeStartMs;
                   bench->decoded.fetch_add(1, std::memory_order_relaxed);
                }
             }
-            if (handle->nextPts > seconds && produced)
+            if (handle->nextPts > seconds && chosen != nullptr)
                break;
 
-            // A frame this same call already produced is being replaced
-            // before anyone showed it.
-            if (bench && produced)
-               bench->dropped.fetch_add(1, std::memory_order_relaxed);
-            handle->current.swap(handle->pending);
+            // A frame this same call already chose is being replaced before
+            // anyone showed it - and was never converted.
+            if (chosen != nullptr)
+            {
+               CFRelease(chosen);
+               if (bench)
+               {
+                  bench->dropped.fetch_add(1, std::memory_order_relaxed);
+                  bench->decodeMs.Push(chosenDecodeMs);
+               }
+            }
+            chosen = handle->nextSample;
+            chosenDecodeMs = pullMs;
+            handle->nextSample = nullptr;
             handle->currentPts = handle->nextPts;
             handle->readerPts = handle->nextPts;
             handle->nextPts = -1.0;
-            produced = true;
 
             if (cacheDecoded)
-               PushCacheFrame(handle, handle->currentPts, handle->current);
+               PushCacheFrame(handle, handle->currentPts, chosen);
 
             if (handle->currentPts >= seconds - 0.001)
                break;
+            if (budgeted && Bench::MediaNowMs() - callStartMs > kRealtimeDecodeBudgetMs)
+            {
+               handle->behind = true;
+               break;
+            }
          }
 
          if (bench && !canResumeForward)
-            bench->loopDecodeMs.Push(Bench::MediaNowMs() - benchCallStartMs);
+            bench->loopDecodeMs.Push(Bench::MediaNowMs() - callStartMs);
          // Nothing new decoded (end of file, or a sample with no image
          // buffer), or it landed back on the frame the caller already shows:
          // the caller keeps what it has. readerPts stays where the reader
          // actually is.
-         if (!produced || (callerHasFrame && SameFrame(handle->currentPts, handle->deliveredPts)))
+         bool delivered = false;
+         if (chosen != nullptr && !(callerHasFrame && SameFrame(handle->currentPts, handle->deliveredPts)))
+         {
+            const double convertStartMs = bench ? Bench::MediaNowMs() : 0.0;
+            delivered = ConvertSample(handle, chosen, outPixels);
+            if (bench)
+               chosenDecodeMs += Bench::MediaNowMs() - convertStartMs;
+         }
+         if (chosen != nullptr)
+         {
+            CFRelease(chosen);
+            if (bench)
+               bench->decodeMs.Push(chosenDecodeMs);
+         }
+         if (!delivered)
             return false;
-         outPixels.swap(handle->current);
          handle->deliveredPts = handle->currentPts;
          if (bench)
             bench->deliveredPts = handle->currentPts;
