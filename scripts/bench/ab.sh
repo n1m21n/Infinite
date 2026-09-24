@@ -4,13 +4,19 @@
 # prints a median table with change %. Interleaving spreads machine drift
 # (thermals, swap, background load) over both sides instead of one.
 #
-# Usage: scripts/bench/ab.sh <baseApp> <branchApp> <rounds> -- ENV=VAL [ENV=VAL ...]
+# Usage: scripts/bench/ab.sh <baseApp> <branchApp> <rounds|auto> -- ENV=VAL [ENV=VAL ...]
+#   <baseApp>: normally the persistent base build, see scripts/bench/base.sh
+#   <rounds>: a number, or `auto` - one base/branch pair; if AB_KEY (default
+#     frame_ms.p50) moved >= 30% that is the answer, otherwise pairs continue
+#     up to 3, and a final |change| < 5% is reported as noise, not a result.
 #   <baseApp>/<branchApp>: path to Infinite.app (or its Contents/MacOS/Infinite)
 #   env: the fixture's INFINITE_BENCH_* variables, e.g.
 #     scripts/bench/ab.sh ../infinte-base/build/Infinite.app build/Infinite.app 2 -- \
 #        INFINITE_BENCH_B6NODES=300 INFINITE_BENCH_B6MODE=all INFINITE_BENCH_GPUTIMERS=0
 #
 # Knobs: EXITAFTER (default 650, frames), AB_TIMEOUT (default 240 s watchdog),
+# AB_KEY (metric auto mode decides on), AB_SYNC_WAIT (default 900 s: how long
+# to wait for a running sync_brain before starting anyway, flagged noisy),
 # AB_OUT (directory for the raw BENCH_JSON lines, default a mktemp dir).
 # Every launch passes -ApplePersistenceIgnoreState YES so a crashed run can't
 # leave macOS's reopen-windows dialog hanging the next one.
@@ -34,8 +40,15 @@ AB_TIMEOUT="${AB_TIMEOUT:-240}"
 OUT="${AB_OUT:-$(mktemp -d)}"
 mkdir -p "$OUT"
 
-if pgrep -f sync_brain > /dev/null; then
-   echo "warning: sync_brain is running - numbers will be noisy" >&2
+AB_KEY="${AB_KEY:-frame_ms.p50}"
+AB_SYNC_WAIT="${AB_SYNC_WAIT:-900}"
+waited=0
+while pgrep -f sync_brain.py > /dev/null && (( waited < AB_SYNC_WAIT )); do
+   (( waited == 0 )) && echo "ab.sh: waiting for sync_brain to finish (max ${AB_SYNC_WAIT}s)..."
+   sleep 5; (( waited += 5 ))
+done
+if pgrep -f sync_brain.py > /dev/null; then
+   echo "warning: sync_brain still running after ${AB_SYNC_WAIT}s - numbers will be noisy" >&2
 fi
 echo "ab.sh: $ROUNDS rounds, env: ${ENVS[*]}"
 echo "swap: $(sysctl -n vm.swapusage 2>/dev/null)"
@@ -56,10 +69,45 @@ run_one() { # run_one <label> <binary> <round>
    fi
 }
 
-for ((r = 1; r <= ROUNDS; r++)); do
-   run_one base "$BASE" "$r"
-   run_one branch "$BRANCH" "$r"
-done
+# Median of AB_KEY over the runs so far, as a signed % change; empty if missing.
+key_change() {
+   python3 - "$OUT" "$AB_KEY" <<'PY'
+import json, sys, glob, os, statistics
+out, key = sys.argv[1], sys.argv[2]
+def val(f):
+    d = json.loads(open(f).readline())
+    for part in key.split("."):
+        d = d.get(part) if isinstance(d, dict) else None
+    return d
+def med(side):
+    v = [x for x in (val(f) for f in glob.glob(os.path.join(out, side + "-*.json"))) if isinstance(x, (int, float))]
+    return statistics.median(v) if v else None
+b, a = med("base"), med("branch")
+print("" if not b or a is None else "%.1f" % ((a - b) / abs(b) * 100))
+PY
+}
+
+if [[ "$ROUNDS" == "auto" ]]; then
+   for ((r = 1; r <= 3; r++)); do
+      run_one base "$BASE" "$r"
+      run_one branch "$BRANCH" "$r"
+      ch="$(key_change)"
+      [[ -z "$ch" ]] && continue
+      echo "  after $r pair(s): $AB_KEY ${ch}%"
+      if python3 -c "import sys; sys.exit(0 if abs($ch) >= 30 else 1)"; then
+         echo "  >= 30%: clear result after $r pair(s)"; break
+      fi
+   done
+   ch="$(key_change)"
+   if [[ -n "$ch" ]] && python3 -c "import sys; sys.exit(0 if abs($ch) < 5 else 1)"; then
+      echo "  $AB_KEY ${ch}% is under 5%: noise, claim no change"
+   fi
+else
+   for ((r = 1; r <= ROUNDS; r++)); do
+      run_one base "$BASE" "$r"
+      run_one branch "$BRANCH" "$r"
+   done
+fi
 
 python3 - "$OUT" <<'EOF'
 import json, sys, glob, os, statistics

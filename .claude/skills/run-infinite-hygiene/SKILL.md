@@ -134,6 +134,21 @@ If you catch yourself about to re-run a suite and the actual justification is
 signal to stop — you're re-deriving a fact instead of trusting evidence
 you already have.
 
+## Efficient routes (shorter, same guarantee)
+
+Shorter is not weaker: each route below keeps the guarantee of the long
+route it replaces. If a route would drop a guarantee, take the long one.
+
+| Situation | Route | Guarantee kept |
+|---|---|---|
+| Need a `main` build to A/B against | `scripts/bench/base.sh [ref]` — reuses the persistent `../infinte-base` worktree, incremental build, prints the app path. Never delete `../infinte-base`. | Same base binary, no stash/rebuild of the working tree |
+| A/B benchmark | `scripts/bench/ab.sh <variant> auto` — interleaved pairs; stops after 1 pair when \|Δ\| ≥ 30 %, else up to 3; under 5 % is reported as noise ("claim no change"). Waits for `sync_brain.py` to finish first. | Interleaving + median; small effects still get 3 pairs |
+| Which variants to run | Only variants whose code path the diff touches (e.g. projector fix → B4/B5, not B1–B3). | Unaffected paths cannot have moved |
+| Tests per fix | `driver.sh --group <area>` for the area touched (`--fast` for a pure smoke); `--group ui` runs in the pre-push hook. `--full` only before a release. | Shared-code rule above still applies |
+| Test list | Trust `driver.sh`'s registry and the known-failures files; don't hand-enumerate or re-verify tests one at a time. | Same list, one source of truth |
+| Before push | `.git/hooks/pre-push` (local): blocks private semi-brain corpora / session categories in `knowledge_index.db`, then runs `--group ui` on the pushed sha in `../infinte-base`. Skip tests only with `INFINITE_SKIP_PREPUSH_TESTS=1`. | Privacy rule + UI smoke on exactly what is pushed |
+| semi-brain sync | post-commit/post-merge call `.git/hooks/sync-brain-bg`: one background run at `nice 19` / background QoS, extra triggers coalesce. | Brain still syncs every commit, without stealing bench CPU |
+
 ## Backgrounded tests: waiting means waiting
 
 If a test (or `driver.sh` itself) is launched as a background command, a
