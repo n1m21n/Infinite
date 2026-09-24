@@ -282,6 +282,23 @@ re-record the baseline with `run_all.sh` before comparing against it):
   4096, hidden behind the CPU), and so do 20k instances (one instanced
   draw). Draw calls stay at 4 because Render 3D has four slots and every
   slot is one draw.
+  **Acted on** (`feature/ocean-normals-no-weld`): `MeshOps::Ocean` now
+  accumulates face normals directly across the index buffer and normalizes
+  per vertex without calling `RecalculateNormals` / `BuildWeldMap`. Since
+  the ocean is a single continuous indexed grid with no coincident duplicate
+  vertices or hard seams, the output normals are mathematically equivalent
+  (max diff 0.00e+00, verified in `INFINITE_PATHOCEANTEST` across resolutions
+  16/96/256 and chop 0..1.2) while eliminating the O(V log V) `std::map` allocations.
+  At scale `l` (256 res, 1.57M tris drawn), CPU `node_bodies` drops from
+  ~39.6 ms to ~3.5 ms (~11x speedup), and frame p50 drops from ~43.7 ms to
+  ~13.4 ms on Apple M2 (`INFINITE_BENCH_B4SCALE=l INFINITE_BENCH_B4SHADOW=2048 INFINITE_BENCH_GPUTIMERS=0`):
+
+  | Run | frame p50 before | frame p50 after | frame p99 before | frame p99 after | node_bodies before | node_bodies after |
+  |---|---|---|---|---|---|---|
+  | 1 | 42.2 ms | 12.8 ms | 98.9 ms | 20.3 ms | 38.6 ms | 3.7 ms |
+  | 2 | 40.6 ms | 12.9 ms | 135.7 ms | 25.4 ms | 36.8 ms | 3.8 ms |
+  | 3 | 48.4 ms | 14.6 ms | 105.9 ms | 28.5 ms | 43.4 ms | 3.1 ms |
+  | **Avg** | **43.7 ms** | **13.4 ms** | **113.5 ms** | **24.7 ms** | **39.6 ms** | **3.5 ms** |
 
 ## Found while measuring
 
