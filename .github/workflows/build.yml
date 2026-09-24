@@ -110,7 +110,10 @@ jobs:
           submodules: recursive
 
       - name: Configure
-        run: cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.arch }}
+        # No -G: CMake takes the newest Visual Studio on the runner. The
+        # windows-11-arm image moved past VS 2022 on 2026-09-22 and a pinned
+        # "Visual Studio 17 2022" stopped configuring there.
+        run: cmake -S . -B build -A ${{ matrix.arch }}
 
       # MSBuild's default verbosity does not echo compiler flags, so a failing
       # build gives no way to confirm that a per-source workaround actually
