@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <vector>
+
 #include "INode.h"
 #include "ImageCable.h"
 #include "GLUtil.h"
@@ -37,6 +39,10 @@ public:
    // so a receiver sees the source go away rather than a frozen last frame;
    // the next cook after un-bypassing publishes it again.
    void Withdraw();
+   // B8 bench only: CPU ms of each SyphonServerPublish / Spout SendTexture
+   // call, recorded while Bench::MediaIoEnabled(). Empty otherwise.
+   const std::vector<double>& BenchPublishMs() const { return mBenchPublishMs; }
+   bool BenchServerCreated() const { return mServer != nullptr; }
    int PublishedWidth() const { return mOut.w; }
    int PublishedHeight() const { return mOut.h; }
 
@@ -57,4 +63,5 @@ private:
    Platform::SyphonServerHandle* mServer = nullptr;
    std::string mServerName = "Infinite Output";
    int mLastCookFrame = -1;
+   std::vector<double> mBenchPublishMs;
 };

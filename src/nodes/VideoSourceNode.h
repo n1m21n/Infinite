@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "BenchMediaIo.h"
 #include "INode.h"
 #include "Platform.h"
 #include "Transport.h"
@@ -103,6 +104,10 @@ public:
    // frame didn't" (a real freeze) apart from "position legitimately didn't
    // move" (e.g. paused).
    int FrameUpdateCount() const { return mFrameUpdateCount; }
+   // B8 bench only: nullptr unless Bench::MediaIoEnabled() was on when this
+   // node first cooked with a clip loaded.
+   const Bench::MediaClipCounters* BenchCounters() const { return mBench.get(); }
+   Platform::VideoHandle* BenchVideoHandle() const { return mVideo; }
 
    bool HasAudio() const { return mAudioLoaded; }
    const std::string& AudioError() const { return mAudioError; }
@@ -152,6 +157,7 @@ private:
    std::string mLastError;
    int mLastCookFrame = -1;
    int mFrameUpdateCount = 0;
+   std::unique_ptr<Bench::MediaClipCounters> mBench;
 
    std::unique_ptr<VideoAudioNode> mAudioNode;
    bool mAudioLoaded = false;

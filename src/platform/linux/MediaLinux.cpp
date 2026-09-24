@@ -24,6 +24,7 @@
 // FFmpeg's own headers are C; wrap every include in extern "C".
 
 #include "../Platform.h"
+#include "BenchMediaIo.h"
 #include "../common/FfmpegAudioDecodeHook.h"
 #include "tinyfiledialogs.h"
 
@@ -46,6 +47,7 @@ extern "C"
 #include <cstdlib>
 #include <cstring>
 #include <deque>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -164,6 +166,10 @@ namespace Platform
 
       std::mutex mutex;
       std::condition_variable cv;
+
+      // B8 bench only (nullptr otherwise). Created before the decode thread
+      // starts, which is the only writer of its decode-side fields.
+      std::unique_ptr<Bench::MediaDecodeStats> bench;
 
       ~VideoHandle()
       {
@@ -300,6 +306,8 @@ namespace Platform
                         AV_PIX_FMT_RGBA, 1);
 
          double lastDeliveredSeconds = -1.0;
+         if (h->bench)
+            h->bench->nominalFps = av_q2d(stream->avg_frame_rate);
          h->running.store(true);
 
          auto ptsToSeconds = [&](int64_t pts) -> double {
@@ -403,6 +411,11 @@ namespace Platform
                   ? std::max(0.0, target - kReverseLookbackSeconds)
                   : target;
                const int64_t seekTarget = (int64_t)(seekSeconds / av_q2d(stream->time_base));
+               if (h->bench)
+               {
+                  h->bench->readerRestarts.fetch_add(1, std::memory_order_relaxed);
+                  h->bench->restartStartMs = Bench::MediaNowMs();
+               }
                av_seek_frame(fmt, streamIndex, seekTarget, AVSEEK_FLAG_BACKWARD);
                avcodec_flush_buffers(codecCtx);
                h->endOfStream.store(false);
@@ -429,7 +442,20 @@ namespace Platform
                }
             }
 
-            if (!decodeOneFrame(slot))
+            const double benchDecodeStartMs = h->bench ? Bench::MediaNowMs() : 0.0;
+            const bool decodedOne = decodeOneFrame(slot);
+            if (h->bench && decodedOne)
+            {
+               const double endMs = Bench::MediaNowMs();
+               h->bench->decodeMs.Push(endMs - benchDecodeStartMs);
+               h->bench->decoded.fetch_add(1, std::memory_order_relaxed);
+               if (h->bench->restartStartMs >= 0.0)
+               {
+                  h->bench->loopDecodeMs.Push(endMs - h->bench->restartStartMs);
+                  h->bench->restartStartMs = -1.0;
+               }
+            }
+            if (!decodedOne)
             {
                // Frame's buffer, if reused from the recycle pool, goes back
                // untouched - nothing decoded this iteration.
@@ -489,6 +515,8 @@ namespace Platform
    {
       VideoHandle* h = new VideoHandle();
       h->path = path;
+      if (Bench::MediaIoEnabled().load(std::memory_order_relaxed))
+         h->bench = std::make_unique<Bench::MediaDecodeStats>();
       h->thread = std::thread(VideoThreadMain, h);
 
       // Poll up to 4s for the thread to either start running or fail -
@@ -539,8 +567,10 @@ namespace Platform
       handle->targetSeconds.store(seconds);
 
       bool produced = false;
+      Bench::MediaDecodeStats* bench = handle->bench.get();
       {
          std::lock_guard<std::mutex> lock(handle->mutex);
+         uint32_t benchPopped = 0;
          // Pick the newest queued frame at or before target+epsilon;
          // recycle every older one (including a previously-picked one that
          // an even newer frame this call supersedes) into the pool instead
@@ -559,7 +589,10 @@ namespace Platform
             PushCacheFrameLocked(handle, frame.pts, outPixels);
             handle->recycle.push_back(std::move(frame)); // now holds the previous outPixels contents (if any)
             produced = true;
+            benchPopped++;
          }
+         if (bench && benchPopped > 1)
+            bench->dropped.fetch_add(benchPopped - 1, std::memory_order_relaxed);
 
          // Nothing newly ready (decode is monotonically forward, so a
          // backward step's target is almost never in `ready`) - try the
@@ -569,15 +602,28 @@ namespace Platform
          if (!produced)
          {
             double cachedPts = 0.0;
+            const double benchCacheStartMs = bench ? Bench::MediaNowMs() : 0.0;
             if (TryUseCacheLocked(handle, seconds, outPixels, cachedPts))
             {
                handle->deliveredSeconds = cachedPts;
                produced = true;
+               if (bench)
+               {
+                  bench->cacheHitMs.Push(Bench::MediaNowMs() - benchCacheStartMs);
+                  bench->cacheHits.fetch_add(1, std::memory_order_relaxed);
+               }
             }
          }
+         if (bench && produced)
+            bench->deliveredPts = handle->deliveredSeconds.load();
       }
       handle->cv.notify_all();
       return produced;
+   }
+
+   Bench::MediaDecodeStats* VideoBenchStats(VideoHandle* handle)
+   {
+      return handle ? handle->bench.get() : nullptr;
    }
 
    bool VideoDecodeIsCatchingUp(VideoHandle* handle)

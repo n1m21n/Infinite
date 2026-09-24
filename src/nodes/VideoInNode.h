@@ -1,8 +1,10 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
+#include "BenchMediaIo.h"
 #include "INode.h"
 #include "Platform.h"
 
@@ -35,6 +37,9 @@ public:
    }
 
    const std::string& LastError() const { return mLastError; }
+   // B8 bench only: nullptr unless Bench::MediaIoEnabled() was on when this
+   // node first cooked.
+   const Bench::MediaCameraCounters* BenchCounters() const { return mBench.get(); }
    bool IsRunning() const;
 
    void RefreshDevices();
@@ -57,6 +62,7 @@ private:
    std::vector<Platform::CameraDeviceInfo> mCachedDevices;
    std::string mLastError;
    int mLastCookFrame = -1;
+   std::unique_ptr<Bench::MediaCameraCounters> mBench;
 
    bool mLastActive = false;
    std::string mLastDeviceId;

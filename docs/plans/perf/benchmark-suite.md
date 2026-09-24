@@ -124,7 +124,7 @@ Report both.
 | **B5** | Fundamentals | (a) empty patch; (b) node-count scaling 50/100/200/400 of a mixed set, to catch O(N²); (c) per-stage CPU+GPU split; (d) audio thread alone at each buffer size; (e) startup time; (f) patch load/save time; (g) undo snapshot time vs patch size | Growth curve per stage; flag any stage growing faster than linear |
 | **B6** | Canvas navigation *(missing today)* | Large patch (200-400 nodes spread out). **Programmatic** pan/zoom through the node-editor API, programmatic node drag, dropdown open. Never OS-level UI scripting | Canvas frame p50/p95 while moving; time spent on off-screen node bodies |
 | **B7** | Soak and thermal *(missing)* | B3 for 30 min (a `long` variant, not part of the default run) | fps vs time curve (fanless Air throttling), RSS growth, xrun total |
-| **B8** | Media I/O *(missing)* | 2-4 video clips 1080p/4K playing, camera in, 2-3 projector windows, Syphon/Spout out | Decode ms, upload ms, per-window present ms |
+| **B8** | Media I/O *(built, see README)* | 2-4 video clips 1080p/4K playing, camera in, 2-3 projector windows, Syphon/Spout out | Decode ms, upload ms, per-window present ms |
 | **B9** | Memory footprint | B2/B4 at l scale | RSS progression, linear regression slope (MB/100f), peak RSS, estimated GPU memory breakdown (textures, render targets, shadow maps, mesh buffers, instance buffers) |
 | **B10** | Offline render and A/V sync *(missing)* | Arrangement render of B3 for 30 s | Realtime factor, A/V drift (reuse `av-sync-sweep`'s checks) |
 

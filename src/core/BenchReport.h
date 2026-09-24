@@ -430,6 +430,10 @@ namespace Bench
       int dropdownOpenFrames = 0;     // proves the popup actually opened
       double onVsyncFrac = 0.0;       // share of frame intervals on a refresh boundary
 
+      // Media I/O (B8): per-clip decode/upload, per-window present, Syphon/
+      // Spout publish, camera. Built by the fixture; null = not measured.
+      nlohmann::json mediaIo = nullptr;
+
       nlohmann::json stagesCpuMs = nlohmann::json::object();
       nlohmann::json stagesGpuMs = nlohmann::json::object();
 

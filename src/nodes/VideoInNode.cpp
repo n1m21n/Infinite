@@ -1,6 +1,7 @@
 #include "VideoInNode.h"
 
 #include "gl3.h"
+#include "BenchReport.h"
 #include <algorithm>
 
 const std::vector<std::string>& VideoInNode::ResolutionNames()
@@ -187,6 +188,9 @@ void VideoInNode::CookIfNeeded(int frameId)
 
    if (mCamera != nullptr)
    {
+      if (!mBench && Bench::MediaIoEnabled().load(std::memory_order_relaxed))
+         mBench = std::make_unique<Bench::MediaCameraCounters>();
+      const double benchReadStartMs = mBench ? Bench::MediaNowMs() : 0.0;
       int w = 0;
       int h = 0;
       unsigned long long frameSeq = 0;
@@ -194,10 +198,26 @@ void VideoInNode::CookIfNeeded(int frameId)
       {
          if (w > 0 && h > 0)
          {
+            // Non-null only inside the B8 fixture's cook stage, whose own GPU
+            // query is off while it is set.
+            Bench::ConditionalGpuStageTimer benchGpu(mBench ? Bench::NodeGpuRing() : nullptr, "camera_upload", frameId);
             glBindTexture(GL_TEXTURE_2D, mTex);
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, mFrame.data());
             glBindTexture(GL_TEXTURE_2D, 0);
+            benchGpu.Stop();
+            if (mBench && frameSeq != mBench->lastSeq)
+            {
+               const double nowMs = Bench::MediaNowMs();
+               mBench->readUploadMs.push_back(nowMs - benchReadStartMs);
+               if (mBench->lastFrameMs >= 0.0)
+                  mBench->intervalMs.push_back(nowMs - mBench->lastFrameMs);
+               else
+                  mBench->firstFrameMs = nowMs;
+               mBench->lastFrameMs = nowMs;
+               mBench->lastSeq = frameSeq;
+               mBench->frames++;
+            }
 
             mWidth = w;
             mHeight = h;

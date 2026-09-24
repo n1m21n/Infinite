@@ -6,6 +6,7 @@
 #include <atomic>
 #include <cmath>
 
+#include "BenchReport.h"
 #include "Transport.h"
 #include "audio/AudioBuffer.h"
 #include "audio/AudioNode.h"
@@ -396,13 +397,42 @@ void VideoSourceNode::CookIfNeeded(int frameId)
    if (mAudioNode)
       mAudioNode->PublishPosition(mPosition);
 
-   if (glfwGetCurrentContext() != nullptr &&
-       Platform::VideoFrameAt(mVideo, mPosition, mFrame) && !mFrame.empty())
+   if (!mBench && Bench::MediaIoEnabled().load(std::memory_order_relaxed))
+      mBench = std::make_unique<Bench::MediaClipCounters>();
+   Bench::MediaDecodeStats* benchDecode = mBench ? Platform::VideoBenchStats(mVideo) : nullptr;
+   if (mBench)
+   {
+      // What the clip itself asks for at this position: a request whose
+      // position is still inside the previous request's source frame is an
+      // expected repeat (a 30 fps clip on a 60 Hz loop repeats every other
+      // request by design), so only repeats beyond these count against it.
+      const double fps = (benchDecode && benchDecode->nominalFps > 0.0) ? benchDecode->nominalFps : 30.0;
+      const long long expectedIndex = (long long)std::floor(mPosition * fps + 1e-6);
+      if (expectedIndex != mBench->lastExpectedIndex)
+         mBench->expectedNew++;
+      else
+         mBench->expectedRepeats++;
+      mBench->lastExpectedIndex = expectedIndex;
+      mBench->requests++;
+   }
+
+   const bool gotFrame = glfwGetCurrentContext() != nullptr &&
+                         Platform::VideoFrameAt(mVideo, mPosition, mFrame) && !mFrame.empty();
+   if (mBench && !gotFrame)
+   {
+      mBench->failed++;
+      mBench->repeats++;
+   }
+   if (gotFrame)
    {
       const int w = Platform::VideoWidth(mVideo);
       const int h = Platform::VideoHeight(mVideo);
       if (w > 0 && h > 0)
       {
+         const double benchUploadStartMs = mBench ? Bench::MediaNowMs() : 0.0;
+         // Only ever non-null inside the fixture's cook stage, whose own GPU
+         // query is off while it is set (timer queries cannot nest).
+         Bench::ConditionalGpuStageTimer benchGpu(mBench ? Bench::NodeGpuRing() : nullptr, "media_upload", frameId);
          glBindTexture(GL_TEXTURE_2D, mTex);
          glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
          if (mTexWidth != w || mTexHeight != h || mHasPlaceholder)
@@ -416,10 +446,38 @@ void VideoSourceNode::CookIfNeeded(int frameId)
             glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, mFrame.data());
          }
          glBindTexture(GL_TEXTURE_2D, 0);
+         benchGpu.Stop();
          mWidth = w;
          mHeight = h;
          mHasPlaceholder = false;
          mFrameUpdateCount++;
+
+         if (mBench)
+         {
+            mBench->uploadCpuMs.push_back(Bench::MediaNowMs() - benchUploadStartMs);
+            mBench->uploads++;
+            const double pts = benchDecode ? benchDecode->deliveredPts : -1.0;
+            if (pts >= 0.0 && mBench->lastPts >= 0.0 && std::fabs(pts - mBench->lastPts) < 1e-4)
+            {
+               // Same frame handed back again and uploaded again.
+               mBench->repeats++;
+               mBench->reuploads++;
+            }
+            else
+            {
+               mBench->newFrames++;
+               if (pts >= 0.0 && mBench->lastPts >= 0.0)
+               {
+                  const double fps = (benchDecode->nominalFps > 0.0) ? benchDecode->nominalFps : 30.0;
+                  const long long step = (long long)std::llround((pts - mBench->lastPts) * fps);
+                  if (step < 0)
+                     mBench->loopWraps++;
+                  else if (step > 1)
+                     mBench->skipped += (int)(step - 1);
+               }
+            }
+            mBench->lastPts = pts;
+         }
       }
    }
 }

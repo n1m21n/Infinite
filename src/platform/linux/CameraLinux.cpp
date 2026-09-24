@@ -314,6 +314,13 @@ namespace Platform
       }
    }
 
+   // V4L2 has no per-app consent prompt; a device the user cannot open
+   // fails in CameraOpen instead.
+   CameraAuthorization CameraAuthorizationStatus()
+   {
+      return CameraAuthorization::Authorized;
+   }
+
    std::vector<CameraDeviceInfo> CameraListDevices()
    {
       std::vector<CameraDeviceInfo> devices;

@@ -26,6 +26,7 @@
 // video/camera/recorder surfaces is safe.
 
 #include "../Platform.h"
+#include "BenchMediaIo.h"
 
 #include "WinCommon.h"
 
@@ -37,6 +38,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <memory>
 #include <chrono>
 #include <cmath>
 #include <condition_variable>
@@ -336,6 +338,10 @@ namespace
       std::atomic<bool> endOfStream{ false };
       // Written by the decode thread before threadDone's release store.
       std::string error;
+
+      // B8 bench only (nullptr otherwise). Created before the decode thread
+      // starts, which is the only writer of its decode-side fields.
+      std::unique_ptr<Bench::MediaDecodeStats> bench;
 
       ~VideoHandleMf()
       {
@@ -644,6 +650,11 @@ namespace
                break;
             video->decodeHeadHns.store(-1, std::memory_order_release);
             video->endOfStream.store(false, std::memory_order_release);
+            if (video->bench)
+            {
+               video->bench->readerRestarts.fetch_add(1, std::memory_order_relaxed);
+               video->bench->restartStartMs = Bench::MediaNowMs();
+            }
          }
 
          if (video->endOfStream.load(std::memory_order_acquire) ||
@@ -671,7 +682,19 @@ namespace
 
          LONGLONG timeHns = 0;
          std::string error;
+         const double benchDecodeStartMs = video->bench ? Bench::MediaNowMs() : 0.0;
          const int got = ReadNextVideoFrame(video, frame.pixels, timeHns, error);
+         if (video->bench && got > 0)
+         {
+            const double endMs = Bench::MediaNowMs();
+            video->bench->decodeMs.Push(endMs - benchDecodeStartMs);
+            video->bench->decoded.fetch_add(1, std::memory_order_relaxed);
+            if (video->bench->restartStartMs >= 0.0)
+            {
+               video->bench->loopDecodeMs.Push(endMs - video->bench->restartStartMs);
+               video->bench->restartStartMs = -1.0;
+            }
+         }
          if (got <= 0)
          {
             // Clean end of stream, or a decode error mid-stream: stop pulling
@@ -715,6 +738,8 @@ namespace Platform
 
       auto* video = new VideoHandleMf();
       video->widePath = WinCommon::Utf8ToWide(path);
+      if (Bench::MediaIoEnabled().load(std::memory_order_relaxed))
+         video->bench = std::make_unique<Bench::MediaDecodeStats>(); // nominalFps stays 0: MF is not asked
 
       try
       {
@@ -813,6 +838,11 @@ namespace Platform
                video->recycle.push_back(std::move(video->ready[i]));
             video->ready[pick].pixels.swap(outPixels);
             video->deliveredHns = video->ready[pick].timeHns;
+            if (video->bench)
+            {
+               video->bench->dropped.fetch_add((uint32_t)pick, std::memory_order_relaxed);
+               video->bench->deliveredPts = (double)video->deliveredHns / 10000000.0;
+            }
             video->recycle.push_back(std::move(video->ready[pick]));
             video->ready.erase(video->ready.begin(),
                                video->ready.begin() + (std::ptrdiff_t)pick + 1);
@@ -824,6 +854,12 @@ namespace Platform
       // decode thread has work to do.
       video->cv.notify_one();
       return produced;
+   }
+
+   Bench::MediaDecodeStats* VideoBenchStats(VideoHandle* handle)
+   {
+      auto* video = reinterpret_cast<VideoHandleMf*>(handle);
+      return video != nullptr ? video->bench.get() : nullptr;
    }
 
    bool VideoDecodeIsCatchingUp(VideoHandle* handle)
@@ -1299,6 +1335,13 @@ namespace Platform
          source->Shutdown();
          SafeRelease(&source);
       }
+   }
+
+   // Media Foundation capture has no per-app consent prompt to trigger; a
+   // camera blocked in Windows privacy settings fails in CameraOpen instead.
+   CameraAuthorization CameraAuthorizationStatus()
+   {
+      return CameraAuthorization::Authorized;
    }
 
    std::vector<CameraDeviceInfo> CameraListDevices()

@@ -30,6 +30,7 @@
 #include "stb_image.h"
 
 #include <algorithm>
+#include <array>
 #include <cfloat>
 #include <cmath>
 #include <cstdio>
@@ -65254,6 +65255,82 @@ static void BuildBenchB6Scene(int n, bool collapsed, float& outMaxX, float& outM
    Transport::Instance().SetPlaying(false);
 }
 
+// B8 Media I/O scene (docs/plans/perf/benchmark-suite.md §4): `clips` Video
+// nodes, each on its own Output; optionally a Syphon Out (Spout on Windows)
+// fed by clip 0 and a Video In camera on its own Output. Indices, not
+// GraphNode*s, come back - SpawnNode push_backs onto gNodes, so any pointer
+// taken before a later spawn dangles.
+static bool BuildBenchB8Scene(const std::vector<std::string>& clipPaths, bool withSyphon, bool withCamera, int windows,
+                              std::vector<int>& outClipIdx, std::vector<int>& outOutputIdx,
+                              int& outSyphonIdx, int& outCameraIdx, std::string& outError)
+{
+   outClipIdx.clear();
+   outOutputIdx.clear();
+   outSyphonIdx = -1;
+   outCameraIdx = -1;
+
+   for (size_t i = 0; i < clipPaths.size(); i++)
+   {
+      const float y = (float)i * 220.0f;
+      GraphNode* vidGn = SpawnNode("Video", "Source", 0.0f, y);
+      if (vidGn == nullptr)
+      {
+         outError = "could not spawn Video node";
+         return false;
+      }
+      const int vidIdx = vidGn->index;
+      auto* vid = static_cast<VideoSourceNode*>(vidGn->node.get());
+      vid->loop = true;
+      if (!vid->Open(clipPaths[i]))
+      {
+         outError = "could not open " + clipPaths[i] + ": " + vid->LastError();
+         return false;
+      }
+      const int outIdx = SpawnNode("Output", "Utility", 320.0f, y)->index;
+      if (GraphNode* outGn = FindNodeByIndex(outIdx))
+         if (GraphNode* src = FindNodeByIndex(vidIdx))
+            WireInputSlot(*src, *outGn, 0, 0);
+      outClipIdx.push_back(vidIdx);
+      outOutputIdx.push_back(outIdx);
+   }
+
+   // One projector window per Output node (OpenProjectorWindow refuses a
+   // second window on the same node), so windows beyond the clip count get
+   // extra Outputs on clips 0, 1, ... - the same texture shown twice.
+   for (int w = (int)outClipIdx.size(); w < windows && !outClipIdx.empty(); w++)
+   {
+      const int srcIdx = outClipIdx[(size_t)w % outClipIdx.size()];
+      const int outIdx = SpawnNode("Output", "Utility", 320.0f, (float)w * 220.0f + 110.0f)->index;
+      if (GraphNode* outGn = FindNodeByIndex(outIdx))
+         if (GraphNode* src = FindNodeByIndex(srcIdx))
+            WireInputSlot(*src, *outGn, 0, 0);
+      outOutputIdx.push_back(outIdx);
+   }
+
+   if (withSyphon && !outClipIdx.empty())
+   {
+      outSyphonIdx = SpawnNode("Syphon Out", "Utility", 640.0f, 0.0f)->index;
+      if (GraphNode* syGn = FindNodeByIndex(outSyphonIdx))
+         if (GraphNode* src = FindNodeByIndex(outClipIdx[0]))
+            WireInputSlot(*src, *syGn, 0, 0);
+   }
+
+   if (withCamera)
+   {
+      const float y = (float)clipPaths.size() * 220.0f;
+      outCameraIdx = SpawnNode("Video In", "Source", 0.0f, y)->index;
+      const int camOutIdx = SpawnNode("Output", "Utility", 320.0f, y)->index;
+      if (GraphNode* outGn = FindNodeByIndex(camOutIdx))
+         if (GraphNode* src = FindNodeByIndex(outCameraIdx))
+            WireInputSlot(*src, *outGn, 0, 0);
+   }
+
+   for (GraphNode& gn : gNodes)
+      gn.showParams = true;
+   Transport::Instance().SetPlaying(true);
+   return true;
+}
+
 int main(int argc, char** argv)
 {
    const double sMainStartMs = Bench::ScopedStageTimer::NowMs();
@@ -65302,6 +65379,41 @@ int main(int argc, char** argv)
    static double sBenchB3RssPeakMb = -1.0;
    static double sBenchB3FootStartMb = -1.0;
    static double sBenchB3FootPeakMb = -1.0;
+
+   // B8 Media I/O fixture state (docs/plans/perf/benchmark-suite.md §4)
+   static std::string sBenchB8Variant;
+   static std::string sBenchB8SetupError;
+   static int sBenchB8TotalFrames = 600;
+   static int sBenchB8Clips = 2;
+   static int sBenchB8Res = 1080;
+   static int sBenchB8Windows = 0;
+   static bool sBenchB8WantCamera = false;
+   static bool sBenchB8WantSyphon = false;
+   static std::string sBenchB8CameraSkipReason; // non-empty = "camera":"skipped"
+   static std::vector<int> sBenchB8ClipIdx;
+   static std::vector<int> sBenchB8OutputIdx;
+   static int sBenchB8SyphonIdx = -1;
+   static int sBenchB8CameraIdx = -1;
+   static bool sBenchB8Unfocused = false;
+   static bool sBenchB8Overlap = false;
+   static double sBenchB8RefreshMs = 1000.0 / 60.0;
+   static int sBenchB8OnVsyncFrames = 0;
+   static int sBenchB8IntervalFrames = 0;
+   static double sBenchB8FootStartMb = -1.0;
+   static double sBenchB8FootPeakMb = -1.0;
+   static double sBenchB8RssStartMb = -1.0;
+   static Bench::PercentileRing sBenchB8FrameMs;
+   // Per projector window, indexed like gProjectorWindows (none close mid-run).
+   struct BenchB8Window
+   {
+      Bench::PercentileRing presentMs;
+      Bench::PercentileRing intervalMs;
+      double lastSwapMs = -1.0;
+      int refreshHz = 0;
+      int monitorIndex = -1;
+   };
+   static std::vector<BenchB8Window> sBenchB8Win;
+   static bool sBenchB8Sampling = false;
 
    // B6 Canvas navigation fixture state (docs/plans/perf/benchmark-suite.md §4)
    static std::string sBenchB6Variant;
@@ -68182,6 +68294,79 @@ int main(int argc, char** argv)
          sBenchB3RssPeakMb = sBenchB3RssStartMb;
          sBenchB3FootPeakMb = sBenchB3FootStartMb;
       }
+      else if (getenv("INFINITE_BENCH_B8") != nullptr)
+      {
+         // B8 Media I/O fixture (docs/plans/perf/benchmark-suite.md §4).
+         auto envInt = [](const char* name, int fallback) {
+            const char* v = getenv(name);
+            return (v != nullptr && *v != '\0') ? std::atoi(v) : fallback;
+         };
+         auto envOn = [](const char* name) {
+            const char* v = getenv(name);
+            return v != nullptr && *v != '\0' && strcmp(v, "0") != 0;
+         };
+         sBenchB8Clips = std::clamp(envInt("INFINITE_BENCH_B8CLIPS", 2), 1, 4);
+         sBenchB8Res = envInt("INFINITE_BENCH_B8RES", 1080) >= 2160 ? 2160 : 1080;
+         sBenchB8Windows = std::clamp(envInt("INFINITE_BENCH_B8WINDOWS", 0), 0, 3);
+         sBenchB8WantCamera = envOn("INFINITE_BENCH_B8CAMERA");
+         sBenchB8WantSyphon = envOn("INFINITE_BENCH_B8SYPHON");
+         sBenchB8TotalFrames = std::max(60, envInt("INFINITE_BENCH_B8FRAMES", 600));
+
+         sBenchB8Variant = "clips=" + std::to_string(sBenchB8Clips) + ",res=" + std::to_string(sBenchB8Res) +
+                           ",windows=" + std::to_string(sBenchB8Windows) +
+                           ",camera=" + (sBenchB8WantCamera ? "1" : "0") +
+                           ",syphon=" + (sBenchB8WantSyphon ? "1" : "0");
+         // GPU timer queries stall the CPU on macOS (README "Found while
+         // measuring"), so B8 times the GPU only when asked for with
+         // INFINITE_BENCH_GPUTIMERS=1. The ring reads the env lazily on its
+         // first use, which is after this.
+         if (envOn("INFINITE_BENCH_GPUTIMERS"))
+            sBenchB8Variant += ",gputimers=1";
+         else
+         {
+#if defined(_WIN32)
+            _putenv_s("INFINITE_BENCH_GPUTIMERS", "0");
+#else
+            setenv("INFINITE_BENCH_GPUTIMERS", "0", 1);
+#endif
+         }
+
+         // Never raise the OS permission dialog: only an already-granted
+         // camera is opened (CameraOpen itself asks when NotDetermined).
+         bool withCamera = false;
+         if (sBenchB8WantCamera)
+         {
+            switch (Platform::CameraAuthorizationStatus())
+            {
+               case Platform::CameraAuthorization::Denied: sBenchB8CameraSkipReason = "denied"; break;
+               case Platform::CameraAuthorization::Restricted: sBenchB8CameraSkipReason = "restricted"; break;
+               case Platform::CameraAuthorization::NotDetermined: sBenchB8CameraSkipReason = "not_determined"; break;
+               case Platform::CameraAuthorization::Authorized:
+                  if (Platform::CameraListDevices().empty())
+                     sBenchB8CameraSkipReason = "no_device";
+                  else
+                     withCamera = true;
+                  break;
+            }
+         }
+
+         const char* mediaEnv = getenv("INFINITE_BENCH_B8MEDIA");
+         const std::string mediaDir = (mediaEnv != nullptr && *mediaEnv != '\0') ? mediaEnv : "bench/media";
+         std::vector<std::string> clipPaths;
+         for (int i = 0; i < sBenchB8Clips; i++)
+            clipPaths.push_back(mediaDir + "/b8_" + std::to_string(sBenchB8Res) + "p30_" + std::to_string(i) + ".mp4");
+
+         // Before any clip opens: handles only grow stats if this is on.
+         Bench::MediaIoEnabled().store(true);
+         if (!BuildBenchB8Scene(clipPaths, sBenchB8WantSyphon, withCamera, sBenchB8Windows, sBenchB8ClipIdx, sBenchB8OutputIdx,
+                                sBenchB8SyphonIdx, sBenchB8CameraIdx, sBenchB8SetupError))
+            fprintf(stderr, "[bench B8] setup failed: %s (generate clips with scripts/bench/b8_make_clips.sh)\n",
+                    sBenchB8SetupError.c_str());
+
+         sBenchB8RssStartMb = sMainRssStartMb;
+         sBenchB8FootStartMb = sMainFootStartMb;
+         sBenchB8FootPeakMb = sBenchB8FootStartMb;
+      }
       else if (getenv("INFINITE_BENCH_B6") != nullptr ||
                getenv("INFINITE_BENCH_B6NODES") != nullptr ||
                getenv("INFINITE_BENCH_B6MODE") != nullptr ||
@@ -68440,16 +68625,27 @@ int main(int argc, char** argv)
       const bool isBenchB4 = getenv("INFINITE_BENCH_B4SCALE") != nullptr;
       const bool isBenchB6 = (getenv("INFINITE_BENCH_B6") != nullptr || getenv("INFINITE_BENCH_B6NODES") != nullptr || getenv("INFINITE_BENCH_B6MODE") != nullptr || getenv("INFINITE_BENCH_B6COLLAPSED") != nullptr);
       const bool isBenchB9 = (getenv("INFINITE_BENCH_B9SCENE") != nullptr || getenv("INFINITE_BENCH_B9") != nullptr || getenv("INFINITE_BENCH_B9MEMORY") != nullptr);
+      const bool isBenchB8 = getenv("INFINITE_BENCH_B8") != nullptr;
+      // B8 samples the same span as B6 and uses B6's stage split (links and
+      // cook_all get their own stages).
+      const bool benchB6Stages = isBenchB6 || isBenchB8;
+      sBenchB8Sampling = isBenchB8 && frameId >= 32 && frameId < sBenchB8TotalFrames;
       const bool benchStagesSample = ((isBenchB5c || isBenchB2 || isBenchB4) && (frameId >= 32 && frameId < 152)) ||
-                                     (isBenchB6 && (frameId >= 32 && frameId < sBenchB6TotalFrames));
+                                     (isBenchB6 && (frameId >= 32 && frameId < sBenchB6TotalFrames)) ||
+                                     sBenchB8Sampling;
       const bool benchStagesCpuSample = ((isBenchB5c || isBenchB2 || isBenchB4 || isBenchB9 || isBenchB3) && (frameId >= 32 && frameId < 152)) ||
-                                        (isBenchB6 && (frameId >= 32 && frameId < sBenchB6TotalFrames));
+                                        (isBenchB6 && (frameId >= 32 && frameId < sBenchB6TotalFrames)) ||
+                                        sBenchB8Sampling;
       // B2 per-node GPU split: time each Render 3D / filter draw by node type
       // instead of the enclosing "cook" stage (GL timer queries cannot nest).
+      // B8 always splits: the clip and camera uploads run inside Output's
+      // pull, i.e. inside the cook stage, so "media_upload"/"camera_upload"
+      // can only be timed with the cook-stage query off.
       const bool benchGpuPerNode = (isBenchB2 && getenv("INFINITE_BENCH_B2GPUNODES") != nullptr) ||
-                                   (isBenchB4 && getenv("INFINITE_BENCH_B4PASSES") != nullptr);
+                                   (isBenchB4 && getenv("INFINITE_BENCH_B4PASSES") != nullptr) ||
+                                   isBenchB8;
 
-      if (isBenchB5c || isBenchB2 || isBenchB4 || isBenchB6)
+      if (isBenchB5c || isBenchB2 || isBenchB4 || isBenchB6 || isBenchB8)
          sGpuTimerRing.Poll(frameId);
 
       gFrameStart = glfwGetTime();
@@ -86197,6 +86393,448 @@ int main(int argc, char** argv)
          }
       }
 
+      // B8 Media I/O fixture (benchmark-suite.md §4): clips playing and
+      // looping into Outputs, optional projector windows, Syphon/Spout Out and
+      // camera. Measures decode/upload per clip, present per window, publish
+      // and camera cost. Setup is in the INFINITE_BENCH_B8 branch before the loop.
+      if (isBenchB8)
+      {
+         struct B8ClipStart
+         {
+            Bench::MediaClipCounters counters;
+            size_t uploadSamples = 0;
+            uint64_t decodeSamples = 0, cacheSamples = 0, loopSamples = 0;
+            uint32_t decoded = 0, cacheHits = 0, dropped = 0, restarts = 0;
+         };
+         static std::vector<B8ClipStart> sClipStart;
+         static Bench::MediaCameraCounters sCamStart;
+         static size_t sSyphonStart = 0;
+         static double sSampleStartMs = -1.0;
+         const int b8Total = sBenchB8TotalFrames;
+
+         if (!sBenchB8SetupError.empty())
+         {
+            if (frameId == 2)
+            {
+               printf("B8MEDIAIO FAIL setup: %s\n", sBenchB8SetupError.c_str());
+               fflush(stdout);
+               glfwSetWindowShouldClose(window, GLFW_TRUE);
+            }
+         }
+         else
+         {
+            if (frameId == 2)
+            {
+               gVsync = true;
+               glfwSwapInterval(1);
+               gTargetFps = 0;
+
+               for (int w = 0; w < sBenchB8Windows && w < (int)sBenchB8OutputIdx.size(); w++)
+                  if (GraphNode* outGn = FindNodeByIndex(sBenchB8OutputIdx[(size_t)w]))
+                     OpenProjectorWindow(window, *outGn);
+
+               // Canvas at the top-left of the primary display, projectors in
+               // a column right of it. Sizes are kept modest (the canvas at
+               // most 1280x800, projectors 480x270) so a bench run does not
+               // cover the whole screen. The canvas must stay unoccluded:
+               // projectors present at swap interval 0 and the whole loop is
+               // paced by the canvas's vsync, which macOS stops blocking on an
+               // occluded window (B3 lesson).
+               if (GLFWmonitor* mon = glfwGetPrimaryMonitor(); mon && !gProjectorWindows.empty())
+               {
+                  int wx = 0, wy = 0, ww = 0, wh = 0;
+                  glfwGetMonitorWorkarea(mon, &wx, &wy, &ww, &wh);
+                  if (ww > 0 && wh > 0)
+                  {
+                     const int pw = 480, ph = 270;
+                     const int cw = std::min(1280, ww - pw - 16);
+                     const int ch = std::min(800, wh - 32);
+                     glfwRestoreWindow(window);
+                     glfwSetWindowPos(window, wx, wy + 32);
+                     glfwSetWindowSize(window, cw, ch);
+                     for (size_t k = 0; k < gProjectorWindows.size(); k++)
+                     {
+                        GLFWwindow* pwin = gProjectorWindows[k].window;
+                        glfwSetWindowPos(pwin, wx + cw + 16, wy + 32 + (int)k * (ph + 40));
+                        glfwSetWindowSize(pwin, pw, ph);
+                     }
+                  }
+               }
+
+               // Where the windows actually ended up (title bars, minimum sizes,
+               // the OS can move them): any overlap is flagged, not trusted.
+               std::vector<std::array<int, 4>> rects;
+               auto frameRect = [&](GLFWwindow* w) {
+                  int x = 0, y = 0, cw = 0, ch = 0, l = 0, t = 0, r = 0, b = 0;
+                  glfwGetWindowPos(w, &x, &y);
+                  glfwGetWindowSize(w, &cw, &ch);
+                  glfwGetWindowFrameSize(w, &l, &t, &r, &b);
+                  rects.push_back({ x - l, y - t, x + cw + r, y + ch + b });
+               };
+               frameRect(window);
+               for (const ProjectorWindow& pwin : gProjectorWindows)
+                  frameRect(pwin.window);
+               for (size_t a = 0; a < rects.size(); a++)
+                  for (size_t b = a + 1; b < rects.size(); b++)
+                     if (rects[a][0] < rects[b][2] && rects[b][0] < rects[a][2] &&
+                         rects[a][1] < rects[b][3] && rects[b][1] < rects[a][3])
+                        sBenchB8Overlap = true;
+               if (sBenchB8Overlap)
+               {
+                  sBenchB8Variant += ",overlap=1";
+                  fprintf(stderr, "[bench B8] windows overlap on this display -> overlap=1\n");
+               }
+
+               glfwFocusWindow(window);
+               if (GLFWmonitor* mon = glfwGetPrimaryMonitor())
+                  if (const GLFWvidmode* mode = glfwGetVideoMode(mon); mode && mode->refreshRate > 0)
+                     sBenchB8RefreshMs = 1000.0 / (double)mode->refreshRate;
+
+               sBenchB8Win.assign(gProjectorWindows.size(), BenchB8Window{});
+               int monCount = 0;
+               GLFWmonitor** monitors = glfwGetMonitors(&monCount);
+               for (size_t k = 0; k < gProjectorWindows.size(); k++)
+               {
+                  const int monIdx = ProjectorMonitorIndex(gProjectorWindows[k].window);
+                  sBenchB8Win[k].monitorIndex = monIdx;
+                  if (monIdx >= 0 && monIdx < monCount)
+                     if (const GLFWvidmode* mode = glfwGetVideoMode(monitors[monIdx]); mode && mode->refreshRate > 0)
+                        sBenchB8Win[k].refreshHz = mode->refreshRate;
+               }
+            }
+
+            if (frameId >= 2 && frameId < b8Total)
+            {
+               // Focus is only checked over the sampled span: the window is
+               // moved, resized and refocused at frame 2 and macOS reports the
+               // new focus a few frames later.
+               if (sBenchB8Sampling && glfwGetWindowAttrib(window, GLFW_FOCUSED) == 0 && !sBenchB8Unfocused)
+               {
+                  sBenchB8Unfocused = true;
+                  sBenchB8Variant += ",unfocused=1";
+                  fprintf(stderr, "[bench B8] window lost focus at frame %d -> unfocused=1\n", frameId);
+               }
+               const double curFoot = Bench::ProcessFootprintMb();
+               if (curFoot > sBenchB8FootPeakMb)
+                  sBenchB8FootPeakMb = curFoot;
+            }
+
+            // Everything a clip counted before the sampled span (open, first
+            // decode, warm-up) is subtracted out at the end.
+            if (frameId == 32)
+            {
+               sSampleStartMs = Bench::ScopedStageTimer::NowMs();
+               sClipStart.assign(sBenchB8ClipIdx.size(), B8ClipStart{});
+               for (size_t c = 0; c < sBenchB8ClipIdx.size(); c++)
+               {
+                  GraphNode* gn = FindNodeByIndex(sBenchB8ClipIdx[c]);
+                  auto* vid = gn ? dynamic_cast<VideoSourceNode*>(gn->node.get()) : nullptr;
+                  if (vid == nullptr)
+                     continue;
+                  B8ClipStart& st = sClipStart[c];
+                  if (const Bench::MediaClipCounters* cc = vid->BenchCounters())
+                  {
+                     st.counters = *cc;
+                     st.uploadSamples = cc->uploadCpuMs.size();
+                  }
+                  if (Bench::MediaDecodeStats* ds = Platform::VideoBenchStats(vid->BenchVideoHandle()))
+                  {
+                     st.decodeSamples = ds->decodeMs.Count();
+                     st.cacheSamples = ds->cacheHitMs.Count();
+                     st.loopSamples = ds->loopDecodeMs.Count();
+                     st.decoded = ds->decoded.load();
+                     st.cacheHits = ds->cacheHits.load();
+                     st.dropped = ds->dropped.load();
+                     st.restarts = ds->readerRestarts.load();
+                  }
+               }
+               if (GraphNode* camGn = FindNodeByIndex(sBenchB8CameraIdx))
+                  if (auto* cam = dynamic_cast<VideoInNode*>(camGn->node.get()))
+                     if (const Bench::MediaCameraCounters* cc = cam->BenchCounters())
+                        sCamStart = *cc;
+               if (GraphNode* syGn = FindNodeByIndex(sBenchB8SyphonIdx))
+                  if (auto* sy = dynamic_cast<SyphonOutNode*>(syGn->node.get()))
+                     sSyphonStart = sy->BenchPublishMs().size();
+            }
+
+            if (sBenchB8Sampling && frameId > 32 && gLastFrameMs > 0.0)
+            {
+               // Same pacing test as B6: a paced frame lands on a whole number
+               // of refresh periods of the canvas's display.
+               const double periods = gLastFrameMs / sBenchB8RefreshMs;
+               const double k = std::max(1.0, std::round(periods));
+               if (std::fabs(gLastFrameMs - k * sBenchB8RefreshMs) <= 1.5)
+                  sBenchB8OnVsyncFrames++;
+               sBenchB8IntervalFrames++;
+               sBenchB8FrameMs.Push(gLastFrameMs);
+            }
+
+            if (frameId == b8Total)
+            {
+               const double sampleSec = std::max(1e-3, (Bench::ScopedStageTimer::NowMs() - sSampleStartMs) / 1000.0);
+               auto ringOf = [](const std::vector<double>& v, size_t from = 0) {
+                  Bench::PercentileRing r;
+                  for (size_t i = from; i < v.size(); i++)
+                     r.Push(v[i]);
+                  return r;
+               };
+               auto p5099max = [](const Bench::PercentileRing& r) -> nlohmann::json {
+                  if (r.Empty())
+                     return nullptr;
+                  return { { "p50", r.Percentile(50) }, { "p99", r.Percentile(99) }, { "max", r.Max() }, { "n", (int)r.Count() } };
+               };
+
+               Bench::BenchReport report;
+               report.bench = "B8_media_io";
+               report.frames = b8Total;
+               report.nodes = (int)gNodes.size();
+               report.frameMs = sBenchB8FrameMs;
+
+               report.stagesCpuMs = {
+                  { "modulation", sStageModulation.Percentile(50) },
+                  { "cook", sStageCook.Percentile(50) },
+                  { "node_bodies", sStageNodeBodies.Percentile(50) },
+                  { "links", sStageLinks.Percentile(50) },
+                  { "cook_all", sStageCookAll.Percentile(50) },
+                  { "editor_end", sStageEditorEnd.Percentile(50) },
+                  { "imgui_render", sStageImGuiRender.Percentile(50) },
+                  { "swap", sStageSwap.Percentile(50) },
+                  { "projectors", sStageProjectors.Percentile(50) },
+               };
+               sGpuTimerRing.Finish();
+               report.stagesGpuMs = sGpuTimerRing.ToJsonP50();
+
+               report.memRssStartMb = sBenchB8RssStartMb;
+               report.memRssEndMb = Bench::ProcessRssMb();
+               report.memFootStartMb = sBenchB8FootStartMb;
+               report.memFootEndMb = Bench::ProcessFootprintMb();
+               if (report.memFootEndMb > sBenchB8FootPeakMb)
+                  sBenchB8FootPeakMb = report.memFootEndMb;
+               report.memFootPeakMb = sBenchB8FootPeakMb;
+
+               const double onVsyncFrac = (sBenchB8IntervalFrames > 0)
+                  ? (double)sBenchB8OnVsyncFrames / (double)sBenchB8IntervalFrames : 0.0;
+               const bool unpaced = onVsyncFrac < 0.80;
+               if (unpaced)
+               {
+                  sBenchB8Variant += ",unpaced=1";
+                  fprintf(stderr, "[bench B8] only %.0f%% of frames on a refresh boundary -> unpaced=1\n", onVsyncFrac * 100.0);
+               }
+               report.variant = sBenchB8Variant;
+               const bool trusted = !sBenchB8Unfocused && !unpaced && !sBenchB8Overlap;
+               // Proposed targets (README): a miss is a real FAIL in any run,
+               // a pass only counts in a trusted one.
+               auto verdict = [&](const std::string& key, bool measurable, bool pass) {
+                  if (!measurable)
+                     report.targetsPass[key] = nullptr;
+                  else if (!pass || trusted)
+                     report.targetsPass[key] = pass;
+                  else
+                     report.targetsPass[key] = nullptr;
+               };
+
+               nlohmann::json media = nlohmann::json::object();
+               nlohmann::json clips = nlohmann::json::array();
+               Bench::PercentileRing allUploadCpu;
+               for (size_t c = 0; c < sBenchB8ClipIdx.size(); c++)
+               {
+                  GraphNode* gn = FindNodeByIndex(sBenchB8ClipIdx[c]);
+                  auto* vid = gn ? dynamic_cast<VideoSourceNode*>(gn->node.get()) : nullptr;
+                  const Bench::MediaClipCounters* cc = vid ? vid->BenchCounters() : nullptr;
+                  Bench::MediaDecodeStats* ds = vid ? Platform::VideoBenchStats(vid->BenchVideoHandle()) : nullptr;
+                  if (cc == nullptr || c >= sClipStart.size())
+                  {
+                     clips.push_back(nullptr);
+                     continue;
+                  }
+                  const B8ClipStart& st = sClipStart[c];
+                  const Bench::MediaClipCounters& s0 = st.counters;
+                  const double fps = (ds && ds->nominalFps > 0.0) ? ds->nominalFps : 30.0;
+                  const int requests = cc->requests - s0.requests;
+                  const int newFrames = cc->newFrames - s0.newFrames;
+                  const int repeats = cc->repeats - s0.repeats;
+                  const int expectedRepeats = cc->expectedRepeats - s0.expectedRepeats;
+                  const int skipped = cc->skipped - s0.skipped;
+                  const Bench::PercentileRing uploadCpu = ringOf(cc->uploadCpuMs, st.uploadSamples);
+                  for (double v : uploadCpu.Samples())
+                     allUploadCpu.Push(v);
+
+                  nlohmann::json cj = {
+                     { "path", vid->LoadedPath() },
+                     { "width", vid->GetOutputWidth() },
+                     { "height", vid->GetOutputHeight() },
+                     { "fps", fps },
+                     { "requests", requests },
+                     { "uploads", cc->uploads - s0.uploads },
+                     { "new_frames", newFrames },
+                     { "repeated", repeats },
+                     { "expected_repeats", expectedRepeats },
+                     { "extra_repeats", repeats - expectedRepeats },
+                     { "reuploads", cc->reuploads - s0.reuploads },
+                     { "failed", cc->failed - s0.failed },
+                     { "skipped", skipped },
+                     { "loop_wraps", cc->loopWraps - s0.loopWraps },
+                     { "shown_fps", (double)newFrames / sampleSec },
+                     { "upload_cpu_ms", p5099max(uploadCpu) },
+                  };
+                  int dropped = 0;
+                  double decodedFps = 0.0;
+                  if (ds != nullptr)
+                  {
+                     const int decoded = (int)(ds->decoded.load() - st.decoded);
+                     dropped = (int)(ds->dropped.load() - st.dropped);
+                     decodedFps = (double)decoded / sampleSec;
+                     Bench::PercentileRing dec, hit, loopRing;
+                     for (double v : ds->decodeMs.SnapshotSince(st.decodeSamples)) dec.Push(v);
+                     for (double v : ds->cacheHitMs.SnapshotSince(st.cacheSamples)) hit.Push(v);
+                     for (double v : ds->loopDecodeMs.SnapshotSince(st.loopSamples)) loopRing.Push(v);
+                     cj["decode_ms"] = p5099max(dec);
+                     cj["cache_hit_ms"] = p5099max(hit);
+                     cj["loop_decode_ms"] = p5099max(loopRing);
+                     cj["decoded"] = decoded;
+                     cj["cache_hits"] = (int)(ds->cacheHits.load() - st.cacheHits);
+                     cj["dropped"] = dropped;
+                     cj["reader_restarts"] = (int)(ds->readerRestarts.load() - st.restarts);
+                     cj["decoded_fps"] = decodedFps;
+                  }
+                  else
+                  {
+                     cj["decode_ms"] = nullptr;
+                     cj["decoded"] = nullptr;
+                     cj["dropped"] = nullptr;
+                  }
+                  clips.push_back(cj);
+
+                  // Real-time decode: the decoder keeps up with the clip (the
+                  // +1 absorbs a frame straddling the window edge), nothing is
+                  // dropped or skipped, and no repeat beyond the clip's own.
+                  const bool realtime = ds != nullptr &&
+                                        ((double)(ds->decoded.load() - st.decoded) + 1.0) / sampleSec >= fps &&
+                                        dropped == 0 && skipped == 0 && repeats - expectedRepeats <= 0;
+                  verdict("clip" + std::to_string(c) + "_decode_realtime", ds != nullptr && requests > 0, realtime);
+               }
+               media["clips"] = clips;
+
+               // A query that bracketed every upload yet never saw a nanosecond
+               // did not measure the upload: Apple's GL copies the pixels on the
+               // CPU and runs the blit later, outside the query. Null, not 0.
+               auto gpuStage = [&](const char* name, const char*& note) -> nlohmann::json {
+                  const Bench::PercentileRing* r = sGpuTimerRing.GetStage(name);
+                  note = nullptr;
+                  if (r == nullptr || r->Empty())
+                  {
+                     note = "gpu timers off (INFINITE_BENCH_GPUTIMERS=1 to time)";
+                     return nullptr;
+                  }
+                  if (r->Max() <= 0.0)
+                  {
+                     note = "timer query read 0 ms on every frame: the driver defers the upload blit";
+                     return nullptr;
+                  }
+                  return p5099max(*r);
+               };
+               const char* uploadGpuNote = nullptr;
+               media["upload_ms"] = {
+                  { "cpu", p5099max(allUploadCpu) },
+                  { "gpu_per_frame", gpuStage("media_upload", uploadGpuNote) },
+               };
+               if (uploadGpuNote != nullptr)
+                  media["upload_ms"]["gpu_note"] = uploadGpuNote;
+
+               nlohmann::json wins = nlohmann::json::array();
+               const int mainHz = (int)std::lround(1000.0 / sBenchB8RefreshMs);
+               for (size_t k = 0; k < sBenchB8Win.size(); k++)
+               {
+                  const BenchB8Window& bw = sBenchB8Win[k];
+                  const int hz = bw.refreshHz > 0 ? bw.refreshHz : mainHz;
+                  // Projectors present at swap interval 0 and are paced by the
+                  // canvas loop, so the rate they can hold is the canvas's.
+                  const double periodMs = 1000.0 / (double)std::max(1, mainHz);
+                  const size_t missed = bw.intervalMs.CountOver(1.5 * periodMs);
+                  const double missedFrac = bw.intervalMs.Empty() ? 0.0 : (double)missed / (double)bw.intervalMs.Count();
+                  wins.push_back({
+                     { "refresh_hz", hz },
+                     { "monitor", bw.monitorIndex },
+                     { "presents", (int)bw.presentMs.Count() },
+                     { "present_ms", p5099max(bw.presentMs) },
+                     { "interval_ms", p5099max(bw.intervalMs) },
+                     { "jitter_stddev_ms", bw.intervalMs.StdDev() },
+                     { "missed_vsync_frac", missedFrac },
+                     { "on_vsync_frac", nullptr }, // swap interval 0: not vsync-locked by construction
+                  });
+                  const std::string key = "window" + std::to_string(k);
+                  verdict(key + "_interval_p99_locked", !bw.intervalMs.Empty(),
+                          bw.intervalMs.Percentile(99) <= 1.10 * periodMs);
+                  verdict(key + "_missed_vsync_lt_half_pct", !bw.intervalMs.Empty(), missedFrac < 0.005);
+               }
+               media["windows"] = wins;
+               media["main_window"] = { { "refresh_hz", mainHz }, { "on_vsync_frac", onVsyncFrac } };
+               media["overlap"] = sBenchB8Overlap;
+
+               if (!sBenchB8WantSyphon)
+                  media["syphon"] = nullptr;
+               else
+               {
+                  GraphNode* syGn = FindNodeByIndex(sBenchB8SyphonIdx);
+                  auto* sy = syGn ? dynamic_cast<SyphonOutNode*>(syGn->node.get()) : nullptr;
+                  if (sy == nullptr || !sy->BenchServerCreated())
+                     media["syphon"] = "n/a"; // Linux, or the server could not be created
+                  else
+                  {
+                     const Bench::PercentileRing pub = ringOf(sy->BenchPublishMs(), sSyphonStart);
+                     nlohmann::json syj = { { "publish_ms", p5099max(pub) }, { "publishes", (int)pub.Count() } };
+#if defined(__APPLE__)
+                     syj["has_clients"] = sy->HasClients();
+#else
+                     syj["has_clients"] = nullptr; // Spout cannot say whether anyone is receiving
+#endif
+                     media["syphon"] = syj;
+                  }
+               }
+
+               if (!sBenchB8WantCamera)
+                  media["camera"] = nullptr;
+               else
+               {
+                  GraphNode* camGn = FindNodeByIndex(sBenchB8CameraIdx);
+                  auto* cam = camGn ? dynamic_cast<VideoInNode*>(camGn->node.get()) : nullptr;
+                  const Bench::MediaCameraCounters* cc = cam ? cam->BenchCounters() : nullptr;
+                  const int frames = cc ? cc->frames - sCamStart.frames : 0;
+                  if (!sBenchB8CameraSkipReason.empty() || cc == nullptr || frames <= 0)
+                  {
+                     media["camera"] = "skipped";
+                     media["camera_skip_reason"] = !sBenchB8CameraSkipReason.empty() ? sBenchB8CameraSkipReason
+                                                   : (cam && !cam->LastError().empty()) ? cam->LastError()
+                                                   : std::string("no_frames");
+                  }
+                  else
+                  {
+                     const Bench::PercentileRing interval = ringOf(cc->intervalMs, sCamStart.intervalMs.size());
+                     const Bench::PercentileRing readUpload = ringOf(cc->readUploadMs, sCamStart.readUploadMs.size());
+                     const char* camGpuNote = nullptr;
+                     const nlohmann::json camGpu = gpuStage("camera_upload", camGpuNote);
+                     media["camera"] = {
+                        { "frames", frames },
+                        { "fps", (double)frames / sampleSec },
+                        { "frame_interval_ms", p5099max(interval) },
+                        { "read_upload_cpu_ms", p5099max(readUpload) },
+                        { "upload_gpu_per_frame", camGpu },
+                     };
+                     if (camGpuNote != nullptr)
+                        media["camera"]["upload_gpu_note"] = camGpuNote;
+                  }
+               }
+               media["sample_seconds"] = sampleSec;
+               report.mediaIo = media;
+
+               report.Emit();
+               printf("B8MEDIAIO DONE\n");
+               fflush(stdout);
+               glfwSetWindowShouldClose(window, GLFW_TRUE);
+            }
+         }
+      }
+
       // B9 Memory footprint fixture (benchmark-suite.md §4).
       // Measures RSS and Physical Footprint growth rate (slope MB/100f), peak footprint,
       // startup/built/f32/f152 memory, and estimated GPU memory breakdown.
@@ -88645,7 +89283,7 @@ int main(int argc, char** argv)
       // fixtures keep the old span (bodies through the arrange overlay) so
       // their recorded baselines stay comparable; a GL timer query can't
       // nest, so the links GPU timer must not start inside that span either.
-      if (isBenchB6)
+      if (benchB6Stages)
       {
          timerNodeBodies.Stop();
          timerNodeBodiesGpu.Stop();
@@ -88658,8 +89296,8 @@ int main(int argc, char** argv)
          sBenchB6SampledFrames++;
       }
 
-      ConditionalStageTimer timerLinks((isBenchB6 && benchStagesCpuSample) ? &sStageLinks : nullptr);
-      Bench::ConditionalGpuStageTimer timerLinksGpu((isBenchB6 && benchStagesSample) ? &sGpuTimerRing : nullptr, "links", frameId);
+      ConditionalStageTimer timerLinks((benchB6Stages && benchStagesCpuSample) ? &sStageLinks : nullptr);
+      Bench::ConditionalGpuStageTimer timerLinksGpu((benchB6Stages && benchStagesSample) ? &sGpuTimerRing : nullptr, "links", frameId);
 
       // ---- draw existing links ----
       // Link ids are derived from the destination pin id (kLinkIdBase +
@@ -94274,7 +94912,7 @@ int main(int argc, char** argv)
       {
          // B6 only: the whole-graph cook is outside every other stage, so
          // without this the canvas bench cannot tell cook time from UI time.
-         ConditionalStageTimer timerCookAll((isBenchB6 && benchStagesCpuSample) ? &sStageCookAll : nullptr);
+         ConditionalStageTimer timerCookAll((benchB6Stages && benchStagesCpuSample) ? &sStageCookAll : nullptr);
          for (GraphNode& gn : gNodes)
             if (!gn.node->bypassed)
                gn.node->CookIfNeeded(frameId);
@@ -94584,7 +95222,20 @@ int main(int argc, char** argv)
                glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
                glClear(GL_COLOR_BUFFER_BIT);
             }
+            // B8: present cost and swap-to-swap interval per window. CPU only -
+            // a GL timer query must never span this context switch.
+            const double benchB8SwapStartMs = (sBenchB8Sampling && i < sBenchB8Win.size())
+                                                 ? Bench::ScopedStageTimer::NowMs() : -1.0;
             glfwSwapBuffers(projWindow);
+            if (benchB8SwapStartMs >= 0.0)
+            {
+               const double endMs = Bench::ScopedStageTimer::NowMs();
+               BenchB8Window& bw = sBenchB8Win[i];
+               bw.presentMs.Push(endMs - benchB8SwapStartMs);
+               if (bw.lastSwapMs >= 0.0)
+                  bw.intervalMs.Push(endMs - bw.lastSwapMs);
+               bw.lastSwapMs = endMs;
+            }
             if (isBenchB3 && frameId >= 32)
             {
                const double nowSwapMs = Bench::ScopedStageTimer::NowMs();

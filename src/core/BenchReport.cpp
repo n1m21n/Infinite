@@ -569,6 +569,9 @@ namespace Bench
          };
       }
 
+      if (!mediaIo.is_null())
+         j["media_io"] = mediaIo;
+
       if (audioMeasured)
       {
          j["audio"] = {
