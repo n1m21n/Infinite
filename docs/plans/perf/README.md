@@ -18,7 +18,7 @@ variants from 1 run (the 3-run 1080 set could not be paced: screen locked).
 | Time-filter caching | `e04b7a6` | B2 l-static | frame ms | 28 | 4.5 | -84% |
 | Dropdown undo | `2c92715` / `2910b2a` | - | - | not re-measured | - | - |
 | Blur split (two-pass) | `e04b7a6` | - | - | not re-measured | - | - |
-| **Regression**, cause unsettled (see B5(b)) | - | B5b n=400 | frame p50 ms | 28.6 | 33.9 | **+18%** |
+| Regression closed by the canvas fixes (cause never bisected; see B5(b)) | `0d92e85` | B5b n=400 | frame p50 ms | 28.6 (baseline), 33.9 (regressed) | 24.7 (2 runs, sync_brain running) | -14% vs baseline |
 | Video: upload only new frames | `8d29baa` | B8 2x1080 / 4x1080 / 2x2160 / 4x2160 | uploads per 268 cooks | 268 / 268 / 268 / 268 | 70 / 68 / 69 / 123 | -74% / -75% / -74% / -54% |
 | Video: no per-frame copy + vImage swizzle | `5d9cbf0`, `8a93b8d` | B8 2x1080 / 4x1080 / 2x2160 / 4x2160 | cook ms | 4.2 / 8.4 / 7.7 / 30.2 | 0.1 / 0.1 / 0.1 / 0.2 | -98% / -99% / -99% / -99% |
 | Video: bounded catch-up | `93e184d` | B8 2x1080 / 4x1080 / 2x2160 / 4x2160 | dropped per clip | 1 / 8 / 4 / 80 | 2 / 0 / 0 / 22 | +1 frame / -100% / -100% / -73% |
