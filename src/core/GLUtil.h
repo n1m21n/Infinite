@@ -24,8 +24,27 @@ namespace GLUtil
    // Lazily (re)allocates the FBO's color texture to the requested size and
    // internal format (default GL_RGBA8, matching prior behavior). Pass
    // GL_RGBA16F for nodes that need HDR range or unclamped simulation state.
-   bool EnsureFbo(Fbo& fbo, int w, int h, unsigned int internalFormat = GL_RGBA8);
+   // `label` is the Bench::GpuMem tag B9 groups render targets by.
+   bool EnsureFbo(Fbo& fbo, int w, int h, unsigned int internalFormat = GL_RGBA8,
+                  const char* label = "Fbo");
    void DestroyFbo(Fbo& fbo);
+
+   // Shared scratch render target, one per (w, h, internalFormat), for an
+   // intermediate that is written and read inside a single cook and never
+   // published (FilterNode's two-pass pre-pass). Nine blur-family filters in
+   // a chain then hold one buffer between them instead of nine.
+   //
+   // The contents are valid ONLY until the next AcquireScratchFbo call, from
+   // any caller: write it and consume it straight away, with no Pull, cook or
+   // other acquire in between. Main GL context only - every image cook runs
+   // there (projector contexts only blit), and FBO names are per context.
+   // Returns nullptr if the allocation fails.
+   Fbo* AcquireScratchFbo(int w, int h, unsigned int internalFormat);
+
+   // Call once per main-loop frame: frees scratch targets that have gone
+   // unused for 300 frames (a resized or deleted filter's old
+   // size ages out here; no per-node refcount to leak on delete or undo).
+   void EndFrameScratchFbos();
 
    // Process-wide count of render-target (re)allocations: every time
    // EnsureFbo actually creates a texture+FBO, plus any other owner of a
