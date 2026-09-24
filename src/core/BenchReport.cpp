@@ -271,6 +271,7 @@ namespace Bench
    }
 
    double ProcessRssMb() { return Platform::ProcessRssMb(); }
+   double ProcessPhysFootprintMb() { return Platform::ProcessPhysFootprintMb(); }
    std::string HwModelString() { return Platform::HwModelString(); }
 
    std::string GlRendererString()
@@ -543,16 +544,32 @@ namespace Bench
          { "rss_mb", memRssEndMb },
          { "rss_mb_start", memRssStartMb },
       };
+      if (memPhysEndMb >= 0.0)
+         memObj["phys_mb"] = memPhysEndMb;
+      if (memPhysStartMb >= 0.0)
+         memObj["phys_mb_start"] = memPhysStartMb;
       if (memRssBuiltMb >= 0.0)
          memObj["rss_built_mb"] = memRssBuiltMb;
+      if (memPhysBuiltMb >= 0.0)
+         memObj["phys_built_mb"] = memPhysBuiltMb;
       if (memRssF32Mb >= 0.0)
          memObj["rss_f32_mb"] = memRssF32Mb;
+      if (memPhysF32Mb >= 0.0)
+         memObj["phys_f32_mb"] = memPhysF32Mb;
       if (memRssF152Mb >= 0.0)
          memObj["rss_f152_mb"] = memRssF152Mb;
+      if (memPhysF152Mb >= 0.0)
+         memObj["phys_f152_mb"] = memPhysF152Mb;
       if (memRssPeakMb >= 0.0)
          memObj["rss_peak_mb"] = memRssPeakMb;
+      if (memPhysPeakMb >= 0.0)
+         memObj["phys_peak_mb"] = memPhysPeakMb;
       if (memDetailed)
+      {
          memObj["rss_slope_mb_per_100f"] = memRssSlopeMbPer100f;
+         memObj["phys_slope_mb_per_100f"] = memPhysSlopeMbPer100f;
+         memObj["slope_mb_per_100f"] = memPhysSlopeMbPer100f;
+      }
       if (memGpuEstMb >= 0.0)
       {
          memObj["gpu_est_mb"] = memGpuEstMb;

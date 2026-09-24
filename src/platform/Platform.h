@@ -27,6 +27,12 @@ namespace Platform
    // Returns -1.0 if the platform has no cheap way to read it yet.
    double ProcessRssMb();
 
+   // Current process physical footprint in MB (task_vm_info.phys_footprint on macOS).
+   // Unlike RSS, this includes compressed memory pages and accurately reflects
+   // memory pressure on Apple Silicon / macOS.
+   // Returns -1.0 if the platform has no way to read it.
+   double ProcessPhysFootprintMb();
+
    // Best-effort hardware model string ("MacBookPro18,3", a Windows
    // WMI/registry product name, or a Linux DMI string) for BENCH_JSON's
    // "machine" field. Returns "unknown" rather than failing - this is

@@ -257,6 +257,15 @@ namespace Platform
       return (double)counters.WorkingSetSize / (1024.0 * 1024.0);
    }
 
+   double ProcessPhysFootprintMb()
+   {
+      PROCESS_MEMORY_COUNTERS_EX counters = {};
+      counters.cb = sizeof(counters);
+      if (!GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&counters, sizeof(counters)))
+         return -1.0;
+      return (double)counters.PrivateUsage / (1024.0 * 1024.0);
+   }
+
    std::string HwModelString()
    {
       // SystemProductName under this registry key is the standard place OEMs

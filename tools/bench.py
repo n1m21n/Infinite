@@ -74,21 +74,23 @@ def print_b9_report(r):
         print(f"  Draw Calls:  {draw_calls}")
     print(f"  Output Hash: {hash_val}")
 
-    print("\n[Host Memory Progression (RSS)]")
-    print(f"  Start (f2):        {mem.get('rss_mb_start', -1):.2f} MB")
-    if 'rss_built_mb' in mem:
-        print(f"  Post-Build:        {mem.get('rss_built_mb', -1):.2f} MB")
-    if 'rss_f32_mb' in mem:
-        print(f"  Frame 32 (warmup): {mem.get('rss_f32_mb', -1):.2f} MB")
-    if 'rss_f152_mb' in mem:
-        print(f"  Frame 152:         {mem.get('rss_f152_mb', -1):.2f} MB")
-    print(f"  End (f{frames}):       {mem.get('rss_mb', -1):.2f} MB")
-    if 'rss_peak_mb' in mem:
-        print(f"  Peak RSS:          {mem.get('rss_peak_mb', -1):.2f} MB")
-    if 'rss_slope_mb_per_100f' in mem:
-        slope = mem.get('rss_slope_mb_per_100f', 0.0)
-        status = "OK (stable)" if abs(slope) < 0.5 else ("WARN (growing)" if slope > 0 else "DECREASING")
-        print(f"  Growth Slope:      {slope:+.4f} MB / 100 frames  [{status}]")
+    print("\n[Host Memory Progression]")
+    print(f"  Start (f2):        RSS {mem.get('rss_mb_start', -1):.2f} MB | Phys {mem.get('phys_mb_start', -1):.2f} MB")
+    if 'rss_built_mb' in mem or 'phys_built_mb' in mem:
+        print(f"  Post-Build:        RSS {mem.get('rss_built_mb', -1):.2f} MB | Phys {mem.get('phys_built_mb', -1):.2f} MB")
+    if 'rss_f32_mb' in mem or 'phys_f32_mb' in mem:
+        print(f"  Frame 32 (warmup): RSS {mem.get('rss_f32_mb', -1):.2f} MB | Phys {mem.get('phys_f32_mb', -1):.2f} MB")
+    if 'rss_f152_mb' in mem or 'phys_f152_mb' in mem:
+        print(f"  Frame 152:         RSS {mem.get('rss_f152_mb', -1):.2f} MB | Phys {mem.get('phys_f152_mb', -1):.2f} MB")
+    print(f"  End (f{frames}):       RSS {mem.get('rss_mb', -1):.2f} MB | Phys {mem.get('phys_mb', -1):.2f} MB")
+    if 'rss_peak_mb' in mem or 'phys_peak_mb' in mem:
+        print(f"  Peak Footprint:    RSS {mem.get('rss_peak_mb', -1):.2f} MB | Phys {mem.get('phys_peak_mb', -1):.2f} MB")
+    if 'phys_slope_mb_per_100f' in mem or 'rss_slope_mb_per_100f' in mem:
+        p_slope = mem.get('phys_slope_mb_per_100f', 0.0)
+        r_slope = mem.get('rss_slope_mb_per_100f', 0.0)
+        p_status = "OK (stable)" if abs(p_slope) < 0.5 else ("WARN (growing)" if p_slope > 0 else "DECREASING")
+        print(f"  Phys Growth Slope: {p_slope:+.4f} MB / 100 frames  [{p_status}]")
+        print(f"  RSS Growth Slope:  {r_slope:+.4f} MB / 100 frames")
 
     if 'gpu_est_mb' in mem:
         print("\n[Estimated GPU Memory Breakdown]")

@@ -374,12 +374,13 @@ namespace Bench
    // glReadPixels is a pipeline stall, never do this per-frame.
    std::string HashFramebufferRGBA8(int width, int height);
 
-   // Process RSS in MB "now", and the GL_RENDERER string of the current GL
-   // context. Both go through Platform:: so every OS has a real
+   // Process RSS in MB "now", Process Physical Footprint in MB "now", and the GL_RENDERER string
+   // of the current GL context. All go through Platform:: so every OS has a real
    // implementation (or an honest "n/a" on platforms where reading it isn't
    // worth the plumbing yet) - see windows-parity/linux-parity's three-sided
    // obligation.
    double ProcessRssMb();
+   double ProcessPhysFootprintMb();
    std::string GlRendererString();
    std::string HwModelString();
    std::string GitCommitShaShort();
@@ -417,6 +418,15 @@ namespace Bench
       double memRssEndMb = -1.0;
       double memRssPeakMb = -1.0;
       double memRssSlopeMbPer100f = 0.0;
+
+      double memPhysStartMb = -1.0;
+      double memPhysBuiltMb = -1.0;
+      double memPhysF32Mb = -1.0;
+      double memPhysF152Mb = -1.0;
+      double memPhysEndMb = -1.0;
+      double memPhysPeakMb = -1.0;
+      double memPhysSlopeMbPer100f = 0.0;
+
       bool memDetailed = false;
 
       double memGpuEstMb = -1.0;
