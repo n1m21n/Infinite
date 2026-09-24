@@ -30,6 +30,8 @@ INFINITE_BENCH_B2SCALE=l INFINITE_BENCH_B2ANIM=1 INFINITE_BENCH_B2GPUNODES=1 \
    INFINITE_EXITAFTER=160 ./build/Infinite.app/Contents/MacOS/Infinite
 INFINITE_BENCH_B4SCALE=l INFINITE_BENCH_B4SHADOW=2048 INFINITE_BENCH_GPUTIMERS=0 \
    INFINITE_EXITAFTER=160 ./build/Infinite.app/Contents/MacOS/Infinite
+INFINITE_BENCH_B9SCENE=b2 INFINITE_BENCH_B9FRAMES=600 \
+   INFINITE_EXITAFTER=660 ./build/Infinite.app/Contents/MacOS/Infinite
 ```
 
 Every fixture prints exactly one `BENCH_JSON {...}` line (schema in
@@ -51,7 +53,7 @@ frame count (B5).
 | B6 Canvas navigation | programmatic pan/zoom/drag, never OS-level UI scripting | No | "Missing today" per the doc; not started. |
 | B7 Soak/thermal | 30min B3, long variant only | No | Depends on B3. |
 | B8 Media I/O | video/camera/projector/Syphon-Spout | No | "Missing today" per the doc; not started. |
-| B9 Memory footprint | B2/B4 at `l` scale | No | Depends on B2/B4. |
+| B9 Memory footprint | B2/B4 at `l` scale | **Yes** (`INFINITE_BENCH_B9SCENE=b2\|b4`, `INFINITE_BENCH_B9FRAMES`, default 600) | Builds the B2 or B4 scene at scale l, animated, GPU timers off. Reports RSS and OS footprint (`phys_footprint` on macOS, `PrivateUsage` on Windows, VmRSS + VmSwap on Linux) at launch, after the build, at frames 32 and 152, and at the end. Also reports the peak over the whole run and a least-squares slope per 100 frames from frame 32. `gpu_est_mb` sums every texture, renderbuffer and buffer the GL wrappers allocated, split into textures, render targets, shadow maps, mesh buffers and instance buffers. Use footprint, not RSS, for leaks and headroom (see "Found while measuring"). |
 | B10 Offline render/AV sync | Arrangement render of B3, realtime factor + drift | No | Depends on B3. |
 
 **Bottom line: this session delivered the shared instrumentation (`BenchReport`/
@@ -300,6 +302,33 @@ re-record the baseline with `run_all.sh` before comparing against it):
   | 3 | 48.4 ms | 14.6 ms | 105.9 ms | 28.5 ms | 43.4 ms | 3.1 ms |
   | **Avg** | **43.7 ms** | **13.4 ms** | **113.5 ms** | **24.7 ms** | **39.6 ms** | **3.5 ms** |
 
+  The "before" column looks inflated. The clean B4 run before this change
+  read 22.4 ms p50 and 21.2 ms `node_bodies` at the same settings, so the
+  realistic gain is ~22 to ~13-14 ms p50 and ~21 to ~3.5 ms `node_bodies`.
+- **B9** (memory footprint, scale l, animated, 600 frames, M2 8 GB). First run,
+  RSS only, before `footprint_*` existed:
+
+  | Scene | tris | draw calls | RSS start (frame 2) | RSS built | RSS end | RSS slope /100f | GPU est. | frame p50/p99 |
+  |---|---|---|---|---|---|---|---|---|
+  | b2 | 12,396 | 2 | 148.5 MB | 280.8 MB | 74.2 MB | -20.3 MB | 471.7 MB (render targets 469.6, mesh 2.1) | 20.6 / 29.3 ms |
+  | b4 | 1.57M | 4 | 362.7 MB | 313.3 MB | 133.6 MB | -4.0 MB | 125.3 MB (render targets 90.9, mesh 16.7, shadow 12.0, textures 4.0, instances 1.6) | 17.3 / 27.0 ms |
+
+  That run reported a peak below the built reading (b2: 155 < 281), because
+  the peak started at frame 2 and never saw the build. Fixed: `start` is now
+  process launch and the peak covers launch, build and every frame. The
+  follow-up check (200 frames, indexer running, so only a sanity check)
+  shows why footprint had to replace RSS:
+
+  | Scene | RSS built | RSS end | footprint built | footprint end | footprint slope /100f |
+  |---|---|---|---|---|---|
+  | b2 | 271 MB | 62 MB | 245 MB | 901 MB | +3.5 MB |
+  | b4 | 279 MB | 100 MB | 287 MB | 704 MB | +5.0 MB |
+
+  Footprint is 0.7-0.9 GB and includes GPU allocations, which share memory
+  with the CPU on Apple silicon. That is ~9-11% of an 8 GB machine for one
+  heavy patch. The small positive slope needs a clean 600-frame run on an
+  idle machine before calling it a leak.
+
 ## Found while measuring
 
 Per §8: this suite measures, it does not fix. Anything found while building
@@ -321,7 +350,13 @@ a fixture goes here, not into a code change.
 - `mem.rss_mb` at the end of a run is often *lower* than at the start on this
   8 GB machine (for example B2 s-anim 208 to 52 MB). macOS compresses and
   pages out memory under pressure, so RSS is not a reliable footprint number
-  here. B9 will need `phys_footprint` (`task_vm_info`) instead.
+  here. B9 now reports `phys_footprint` (`task_vm_info`) as `footprint_*`. At
+  B2 l, RSS reads 62 MB while the OS charges the app 901 MB.
+- **B2's render targets take 470 MB** (B9, scale l): about 28 full 1080p
+  16-bit buffers, roughly one per effect, plus the two-pass blur
+  intermediates. Effects keep their own full-size output buffers and don't
+  share or reuse them, so memory grows linearly with chain length. That
+  matters most on the 8 GB machines. Not fixed (measure only).
 - **GPU timer queries distort `frame_ms` on macOS.** Apple's Metal-backed GL
   makes `glEndQuery(GL_TIME_ELAPSED)` flush the context and block until the
   GPU catches up (`sample`: `glEndQuery_Exec` → `flushContext` →

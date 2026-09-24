@@ -271,6 +271,7 @@ namespace Bench
    }
 
    double ProcessRssMb() { return Platform::ProcessRssMb(); }
+   double ProcessFootprintMb() { return Platform::ProcessFootprintMb(); }
    std::string HwModelString() { return Platform::HwModelString(); }
 
    std::string GlRendererString()
@@ -553,6 +554,21 @@ namespace Bench
          memObj["rss_peak_mb"] = memRssPeakMb;
       if (memDetailed)
          memObj["rss_slope_mb_per_100f"] = memRssSlopeMbPer100f;
+      if (memFootEndMb >= 0.0)
+      {
+         memObj["footprint_mb"] = memFootEndMb;
+         memObj["footprint_start_mb"] = memFootStartMb;
+         if (memFootBuiltMb >= 0.0)
+            memObj["footprint_built_mb"] = memFootBuiltMb;
+         if (memFootF32Mb >= 0.0)
+            memObj["footprint_f32_mb"] = memFootF32Mb;
+         if (memFootF152Mb >= 0.0)
+            memObj["footprint_f152_mb"] = memFootF152Mb;
+         if (memFootPeakMb >= 0.0)
+            memObj["footprint_peak_mb"] = memFootPeakMb;
+         if (memDetailed)
+            memObj["footprint_slope_mb_per_100f"] = memFootSlopeMbPer100f;
+      }
       if (memGpuEstMb >= 0.0)
       {
          memObj["gpu_est_mb"] = memGpuEstMb;

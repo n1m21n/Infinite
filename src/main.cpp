@@ -65081,6 +65081,7 @@ int main(int argc, char** argv)
 {
    const double sMainStartMs = Bench::ScopedStageTimer::NowMs();
    const double sMainRssStartMb = Bench::ProcessRssMb();
+   const double sMainFootStartMb = Bench::ProcessFootprintMb();
    static int sBenchB2Render3DIdx = -1;
    static int sBenchB2OutputIdx = -1;
    static std::string sBenchB2Variant;
@@ -65095,6 +65096,11 @@ int main(int argc, char** argv)
    static double sBenchB9RssPeakMb = -1.0;
    static Bench::PercentileRing sBenchB9FrameMs;
    static std::vector<std::pair<int, double>> sBenchB9RssSamples;
+   static double sBenchB9FootBuiltMb = -1.0;
+   static double sBenchB9FootF32Mb = -1.0;
+   static double sBenchB9FootF152Mb = -1.0;
+   static double sBenchB9FootPeakMb = -1.0;
+   static std::vector<std::pair<int, double>> sBenchB9FootSamples;
 
    // No-op on macOS (which gets a `.ips` report for free); on Windows this is
    // the only thing standing between a crash and a completely silent exit,
@@ -67854,6 +67860,7 @@ int main(int argc, char** argv)
          }
 
          sBenchB9RssBuiltMb = Bench::ProcessRssMb();
+         sBenchB9FootBuiltMb = Bench::ProcessFootprintMb();
       }
       else if (const char* bench1Arg = getenv("INFINITE_BENCH_B1VOICES"))
       {
@@ -85440,21 +85447,36 @@ int main(int argc, char** argv)
             gVsync = false;
             glfwSwapInterval(0);
             gTargetFps = 0;
-            sBenchB9RssStartMb = Bench::ProcessRssMb();
-            sBenchB9RssPeakMb = sBenchB9RssStartMb;
+            // "start" is process launch, not frame 2: by frame 2 the scene
+            // is already built, and the peak has to include launch and the
+            // build or it can come out below rss_built_mb.
+            sBenchB9RssStartMb = sMainRssStartMb;
+            sBenchB9RssPeakMb = std::max({ sMainRssStartMb, sBenchB9RssBuiltMb });
+            sBenchB9FootPeakMb = std::max({ sMainFootStartMb, sBenchB9FootBuiltMb });
          }
-         if (frameId >= 32 && frameId <= b9TotalFrames)
+         if (frameId >= 2 && frameId <= b9TotalFrames)
          {
-            if (gLastFrameMs > 0.0)
-               sBenchB9FrameMs.Push(gLastFrameMs);
             const double currentRss = Bench::ProcessRssMb();
-            if (sBenchB9RssPeakMb < 0.0 || currentRss > sBenchB9RssPeakMb)
-               sBenchB9RssPeakMb = currentRss;
-            if (frameId == 32)
-               sBenchB9RssF32Mb = currentRss;
-            if (frameId == 152)
-               sBenchB9RssF152Mb = currentRss;
-            sBenchB9RssSamples.push_back({ frameId, currentRss });
+            const double currentFoot = Bench::ProcessFootprintMb();
+            sBenchB9RssPeakMb = std::max(sBenchB9RssPeakMb, currentRss);
+            sBenchB9FootPeakMb = std::max(sBenchB9FootPeakMb, currentFoot);
+            if (frameId >= 32)
+            {
+               if (gLastFrameMs > 0.0)
+                  sBenchB9FrameMs.Push(gLastFrameMs);
+               if (frameId == 32)
+               {
+                  sBenchB9RssF32Mb = currentRss;
+                  sBenchB9FootF32Mb = currentFoot;
+               }
+               if (frameId == 152)
+               {
+                  sBenchB9RssF152Mb = currentRss;
+                  sBenchB9FootF152Mb = currentFoot;
+               }
+               sBenchB9RssSamples.push_back({ frameId, currentRss });
+               sBenchB9FootSamples.push_back({ frameId, currentFoot });
+            }
          }
          if (frameId == b9TotalFrames)
          {
@@ -85484,6 +85506,13 @@ int main(int argc, char** argv)
                sBenchB9RssPeakMb = report.memRssEndMb;
             report.memRssPeakMb = sBenchB9RssPeakMb;
             report.memRssSlopeMbPer100f = Bench::CalculateRssSlopeMbPer100f(sBenchB9RssSamples);
+            report.memFootStartMb = sMainFootStartMb;
+            report.memFootBuiltMb = sBenchB9FootBuiltMb;
+            report.memFootF32Mb = sBenchB9FootF32Mb;
+            report.memFootF152Mb = sBenchB9FootF152Mb;
+            report.memFootEndMb = Bench::ProcessFootprintMb();
+            report.memFootPeakMb = std::max(sBenchB9FootPeakMb, report.memFootEndMb);
+            report.memFootSlopeMbPer100f = Bench::CalculateRssSlopeMbPer100f(sBenchB9FootSamples);
             report.memDetailed = true;
 
             const Bench::GpuMemBreakdown gpuBd = Bench::GpuMem::GetBreakdown();

@@ -257,6 +257,17 @@ namespace Platform
       return (double)counters.WorkingSetSize / (1024.0 * 1024.0);
    }
 
+   double ProcessFootprintMb()
+   {
+      // PrivateUsage is the commit charge: private bytes whether resident or
+      // paged out, so trimming the working set does not hide them.
+      PROCESS_MEMORY_COUNTERS_EX counters = {};
+      counters.cb = sizeof(counters);
+      if (!GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&counters, sizeof(counters)))
+         return -1.0;
+      return (double)counters.PrivateUsage / (1024.0 * 1024.0);
+   }
+
    std::string HwModelString()
    {
       // SystemProductName under this registry key is the standard place OEMs

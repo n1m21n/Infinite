@@ -380,6 +380,7 @@ namespace Bench
    // worth the plumbing yet) - see windows-parity/linux-parity's three-sided
    // obligation.
    double ProcessRssMb();
+   double ProcessFootprintMb();
    std::string GlRendererString();
    std::string HwModelString();
    std::string GitCommitShaShort();
@@ -418,6 +419,16 @@ namespace Bench
       double memRssPeakMb = -1.0;
       double memRssSlopeMbPer100f = 0.0;
       bool memDetailed = false;
+
+      // OS-charged footprint (Platform::ProcessFootprintMb), same points as
+      // the RSS fields. -1 = not measured, left out of the JSON.
+      double memFootStartMb = -1.0;
+      double memFootBuiltMb = -1.0;
+      double memFootF32Mb = -1.0;
+      double memFootF152Mb = -1.0;
+      double memFootEndMb = -1.0;
+      double memFootPeakMb = -1.0;
+      double memFootSlopeMbPer100f = 0.0;
 
       double memGpuEstMb = -1.0;
       nlohmann::json memGpuEstBreakdown = nlohmann::json::object();

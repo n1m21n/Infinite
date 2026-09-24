@@ -132,6 +132,26 @@ namespace Platform
       return -1.0;
    }
 
+   double ProcessFootprintMb()
+   {
+      // Resident plus swapped out, so pages pushed to swap under pressure
+      // still count. Both lines are in kB in /proc/self/status.
+      std::ifstream in("/proc/self/status");
+      if (!in.is_open())
+         return -1.0;
+      long rssKb = -1;
+      long swapKb = 0;
+      std::string line;
+      while (std::getline(in, line))
+      {
+         if (line.rfind("VmRSS:", 0) == 0)
+            rssKb = std::strtol(line.c_str() + 6, nullptr, 10);
+         else if (line.rfind("VmSwap:", 0) == 0)
+            swapKb = std::strtol(line.c_str() + 7, nullptr, 10);
+      }
+      return rssKb > 0 ? (double)(rssKb + swapKb) / 1024.0 : -1.0;
+   }
+
    std::string HwModelString()
    {
       // Populated by firmware/DMI on most desktops and laptops; world-
