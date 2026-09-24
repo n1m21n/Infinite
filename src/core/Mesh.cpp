@@ -1578,7 +1578,7 @@ namespace MeshOps
             vert.px = px + dispX;
             vert.py = dispY;
             vert.pz = pz + dispZ;
-            vert.nx = 0; vert.ny = 1; vert.nz = 0;
+            vert.nx = 0.0f; vert.ny = 0.0f; vert.nz = 0.0f;
             vert.u = u;
             vert.v = v;
             out.vertices.push_back(vert);
@@ -1602,7 +1602,35 @@ namespace MeshOps
       // Normals are derived from the displaced mesh rather than analytically:
       // the horizontal displacement moves vertices sideways, so the analytic
       // gradient of the height field alone would light the crests wrongly.
-      return RecalculateNormals(out, false, false);
+      // Ocean is a single shared, seamless, indexed grid with no coincident duplicate
+      // vertices, so accumulating face normals directly over the index buffer yields
+      // the exact smooth normals without the O(V log V) BuildWeldMap tree overhead.
+      for (size_t t = 0; t + 2 < out.indices.size(); t += 3)
+      {
+         const unsigned int ia = out.indices[t];
+         const unsigned int ib = out.indices[t + 1];
+         const unsigned int ic = out.indices[t + 2];
+         const Vertex& a = out.vertices[ia];
+         const Vertex& b = out.vertices[ib];
+         const Vertex& c = out.vertices[ic];
+         const float ux = b.px - a.px, uy = b.py - a.py, uz = b.pz - a.pz;
+         const float vx = c.px - a.px, vy = c.py - a.py, vz = c.pz - a.pz;
+         const float nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+         out.vertices[ia].nx += nx; out.vertices[ia].ny += ny; out.vertices[ia].nz += nz;
+         out.vertices[ib].nx += nx; out.vertices[ib].ny += ny; out.vertices[ib].nz += nz;
+         out.vertices[ic].nx += nx; out.vertices[ic].ny += ny; out.vertices[ic].nz += nz;
+      }
+      for (Vertex& v : out.vertices)
+      {
+         const float len = std::sqrt(v.nx * v.nx + v.ny * v.ny + v.nz * v.nz);
+         if (len > 1e-8f)
+         {
+            v.nx /= len;
+            v.ny /= len;
+            v.nz /= len;
+         }
+      }
+      return out;
    }
 
    Mesh Bevel(const Mesh& in, float amount, int segments)

@@ -84748,7 +84748,51 @@ int main(int argc, char** argv)
 
          printf("ocean: %zu tris, wave relief %.3f, finite=%d, animates=%d\n",
                 tris, relief, finite, stampAfter != stampBefore);
-         printf("%s\n", (tris > 100 && finite && relief > 0.02f && stampAfter != stampBefore)
+
+         bool oceanNormalsMatch = true;
+         float maxNormDiff = 0.0f;
+         for (int res : { 16, 96, 256 })
+         {
+            for (float chop : { 0.0f, 0.5f, 1.2f })
+            {
+               Mesh mesh = MeshOps::Ocean(res, 50.0f, 1.5f, 12.0f, 0.8f, 0.785f, chop, 4, 1.234f);
+               Mesh ref = MeshOps::RecalculateNormals(mesh, false, false);
+               if (mesh.vertices.size() != ref.vertices.size() || mesh.indices.size() != ref.indices.size())
+               {
+                  oceanNormalsMatch = false;
+                  break;
+               }
+               for (size_t i = 0; i < mesh.vertices.size(); i++)
+               {
+                  const float dnx = std::abs(mesh.vertices[i].nx - ref.vertices[i].nx);
+                  const float dny = std::abs(mesh.vertices[i].ny - ref.vertices[i].ny);
+                  const float dnz = std::abs(mesh.vertices[i].nz - ref.vertices[i].nz);
+                  const float diff = std::max({ dnx, dny, dnz });
+                  maxNormDiff = std::max(maxNormDiff, diff);
+                  if (diff > 1e-4f)
+                  {
+                     oceanNormalsMatch = false;
+                  }
+                  if (std::abs(mesh.vertices[i].u - ref.vertices[i].u) > 1e-6f ||
+                      std::abs(mesh.vertices[i].v - ref.vertices[i].v) > 1e-6f ||
+                      std::abs(mesh.vertices[i].px - ref.vertices[i].px) > 1e-6f ||
+                      std::abs(mesh.vertices[i].py - ref.vertices[i].py) > 1e-6f ||
+                      std::abs(mesh.vertices[i].pz - ref.vertices[i].pz) > 1e-6f)
+                  {
+                     oceanNormalsMatch = false;
+                  }
+               }
+               if (mesh.vertexColor.size() != ref.vertexColor.size() ||
+                   mesh.faceMask.size() != ref.faceMask.size() ||
+                   mesh.selectionGroup.size() != ref.selectionGroup.size())
+               {
+                  oceanNormalsMatch = false;
+               }
+            }
+         }
+         printf("ocean normals direct vs weld: maxDiff=%.2e match=%d\n", maxNormDiff, oceanNormalsMatch);
+
+         printf("%s\n", (tris > 100 && finite && relief > 0.02f && stampAfter != stampBefore && oceanNormalsMatch)
                            ? "OCEAN OK" : "SUSPECT");
       }
 
