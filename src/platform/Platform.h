@@ -199,8 +199,9 @@ namespace Platform
                   std::vector<unsigned int>& outIndices, std::string& outError);
 
    // ---- video decoding ----------------------------------------------------
-   // Opaque handle around an AVAssetReader that decodes frames in order.
-   // Frames are delivered as RGBA8, already row-flipped for OpenGL.
+   // Opaque handle around a platform decoder (AVAssetReader, Media Foundation,
+   // FFmpeg) that decodes ahead on its own thread. Frames are delivered as
+   // RGBA8, tightly packed, already row-flipped for OpenGL.
    struct VideoHandle;
 
    std::string OpenVideoDialog();
@@ -211,9 +212,11 @@ namespace Platform
    int VideoHeight(VideoHandle* handle);
    double VideoDuration(VideoHandle* handle);
 
-   // Decodes forward until the frame covering `seconds` is current. Returns true
-   // when a new frame was produced (so the caller can skip re-uploading).
-   // Seeking backwards restarts the reader, which is how looping works.
+   // Hands back the newest decoded frame covering `seconds`. Returns true only
+   // when that is a new frame (so the caller can skip re-uploading); false
+   // leaves outPixels as they were. A jump (backward, or well ahead) asks the
+   // decode thread to seek, which is how looping works; until it has the new
+   // position the caller keeps its previous frame.
    bool VideoFrameAt(VideoHandle* handle, double seconds, std::vector<unsigned char>& outPixels);
 
    // True while the decoder has not yet read as far as the position last asked
@@ -221,11 +224,9 @@ namespace Platform
    // "not yet", not "never". Once it goes false the answer is settled and
    // waiting longer cannot change it, so it is safe to loop on.
    //
-   // On Windows and Linux decoding runs on its own thread; on macOS each
-   // VideoFrameAt call gets a small decode budget and stops short when a clip
-   // has fallen behind. Either way a caller stepping faster than real time (an
-   // offline render, a self-test) has to wait for the decoder instead of
-   // racing past it - see VideoFrameAtExact. Realtime playback must NOT wait
+   // Decoding runs on its own thread on every platform, so a caller stepping
+   // faster than real time (an offline render, a self-test) has to wait for
+   // the decoder instead of racing past it - see VideoFrameAtExact. Realtime playback must NOT wait
    // on this - holding the previous frame is the whole point.
    bool VideoDecodeIsCatchingUp(VideoHandle* handle);
 
