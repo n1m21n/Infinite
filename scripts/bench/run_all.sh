@@ -46,7 +46,7 @@ run_fixture() {
    echo "  -> $label"
    local log
    log="$(mktemp)"
-   if env "$@" INFINITE_EXITAFTER="$exitafter" "$APP" > "$log" 2>&1; then
+   if env "$@" INFINITE_EXITAFTER="$exitafter" "$APP" -ApplePersistenceIgnoreState YES > "$log" 2>&1; then
       :
    fi
    local n
@@ -141,7 +141,23 @@ for n in 50 100 200 400; do
 done
 
 echo "B6 Canvas navigation"
-skip "B6_canvas_navigation"
+# B6 Canvas navigation per benchmark-suite.md §4: programmatic pan/zoom/drag/
+# dropdown over a wired grid, never OS-level UI scripting. Leave Infinite in
+# front: `unfocused=1` or `unpaced=1` in the variant means the run is not a
+# baseline and its targets report null. B6_FRAMES can be lowered for quick runs.
+B6_FRAMES="${B6_FRAMES:-600}"
+B6_EXIT=$((B6_FRAMES + 50))
+run_fixture "B6_canvas_nav n=300,mode=all" "$B6_EXIT" \
+   INFINITE_BENCH_B6NODES=300 INFINITE_BENCH_B6MODE=all INFINITE_BENCH_B6FRAMES="$B6_FRAMES" INFINITE_BENCH_GPUTIMERS=0
+run_fixture "B6_canvas_nav n=300,mode=all,collapsed=1" "$B6_EXIT" \
+   INFINITE_BENCH_B6NODES=300 INFINITE_BENCH_B6MODE=all INFINITE_BENCH_B6COLLAPSED=1 INFINITE_BENCH_B6FRAMES="$B6_FRAMES" INFINITE_BENCH_GPUTIMERS=0
+for n in 200 400; do
+   run_fixture "B6_canvas_nav n=$n,mode=pan" "$B6_EXIT" \
+      INFINITE_BENCH_B6NODES="$n" INFINITE_BENCH_B6MODE=pan INFINITE_BENCH_B6FRAMES="$B6_FRAMES" INFINITE_BENCH_GPUTIMERS=0
+done
+# Unpaced ceiling: vsync off, so frame_ms is pure work. Targets report null.
+run_fixture "B6_canvas_nav n=300,mode=pan,vsync=0" "$B6_EXIT" \
+   INFINITE_BENCH_B6NODES=300 INFINITE_BENCH_B6MODE=pan INFINITE_BENCH_B6VSYNC=0 INFINITE_BENCH_B6FRAMES="$B6_FRAMES" INFINITE_BENCH_GPUTIMERS=0
 
 if [[ "$SOAK" -eq 1 ]]; then
    echo "B7 Soak and thermal (--soak)"

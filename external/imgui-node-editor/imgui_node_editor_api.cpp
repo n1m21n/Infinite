@@ -576,6 +576,32 @@ void ax::NodeEditor::NavigateToSelection(bool zoomIn, float duration)
     s_Editor->NavigateTo(s_Editor->GetSelectionBounds(), zoomIn, duration);
 }
 
+void ax::NodeEditor::SetViewScroll(const ImVec2& scroll)
+{
+    if (s_Editor)
+        s_Editor->SetViewScroll(scroll);
+}
+
+ImVec2 ax::NodeEditor::GetViewScroll()
+{
+    if (s_Editor)
+        return s_Editor->GetViewScroll();
+    return ImVec2(0.0f, 0.0f);
+}
+
+void ax::NodeEditor::SetViewZoom(float zoom)
+{
+    if (s_Editor)
+        s_Editor->SetViewZoom(zoom);
+}
+
+float ax::NodeEditor::GetViewZoom()
+{
+    if (s_Editor)
+        return s_Editor->GetViewZoom();
+    return 1.0f;
+}
+
 bool ax::NodeEditor::ShowNodeContextMenu(NodeId* nodeId)
 {
     return s_Editor->GetContextMenu().ShowNodeContextMenu(nodeId);

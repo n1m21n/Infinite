@@ -1445,6 +1445,34 @@ struct EditorContext
         m_NavigateAction.NavigateTo(bounds, zoomMode, duration);
     }
 
+    void SetViewScroll(const ImVec2& scroll)
+    {
+        m_NavigateAction.StopNavigation();
+        m_NavigateAction.m_Scroll = scroll;
+        if (m_IsCanvasVisible)
+            m_Canvas.SetView(m_NavigateAction.GetView());
+        MakeDirty(SaveReasonFlags::Navigation);
+    }
+
+    ImVec2 GetViewScroll() const
+    {
+        return m_NavigateAction.m_Scroll;
+    }
+
+    void SetViewZoom(float zoom)
+    {
+        m_NavigateAction.StopNavigation();
+        m_NavigateAction.m_Zoom = zoom;
+        if (m_IsCanvasVisible)
+            m_Canvas.SetView(m_NavigateAction.GetView());
+        MakeDirty(SaveReasonFlags::Navigation);
+    }
+
+    float GetViewZoom() const
+    {
+        return m_NavigateAction.m_Zoom;
+    }
+
     void RegisterAnimation(Animation* animation);
     void UnregisterAnimation(Animation* animation);
 
