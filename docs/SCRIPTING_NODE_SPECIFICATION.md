@@ -1,6 +1,6 @@
 # Scripting Node — Architecture & Technical Specification
 
-> **System Target**: Audiovisual Modular Node Graph Engine (Infinite / Bespoke DAG Architecture)  
+> **System Target**: Audiovisual Modular Node Graph Engine (Infinite DAG Architecture)  
 > **Author / Project**: Technical Architecture Document  
 > **Date**: August 2026  
 > **Status**: Proposed / Specification Draft  
