@@ -28,6 +28,7 @@ public:
    int GetOutputWidth() const override { return mOut.w; }
    int GetOutputHeight() const override { return mOut.h; }
    void CookIfNeeded(int frameId) override;
+   unsigned long long TextureRevision() const override { return mRevision; }
 
    // Public so the ImGui params panel can bind widgets straight to them.
    int shapeType = 0; // index into ShapeNames()
@@ -73,4 +74,9 @@ private:
    unsigned int mProgram = 0;
    bool mShaderTried = false;
    int mLastCookFrame = -1;
+
+   // Skip-if-unchanged state, see NoiseNode.h.
+   bool mHasBuilt = false;
+   ParamSnapshot mBuiltParams;
+   unsigned long long mRevision = 0;
 };

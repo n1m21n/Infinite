@@ -134,7 +134,14 @@ void NoiseNode::CookIfNeeded(int frameId)
    if (!GLUtil::EnsureFbo(mOut, w, h))
       return;
 
-   GLUtil::RunShaderPass(mOut, mProgram, [this]()
+   ParamSnapshot params;
+   VisitParams(params);
+   const float time = (float)Transport::Instance().Seconds() * speed;
+   if (mHasBuilt && params == mBuiltParams && time == mBuiltTime)
+      return; // nothing changed since the last cook - reuse mOut as-is
+
+   NodeWorkCounter()++;
+   GLUtil::RunShaderPass(mOut, mProgram, [this, time]()
    {
       glUniform1i(glGetUniformLocation(mProgram, "uType"), noiseType);
       glUniform1f(glGetUniformLocation(mProgram, "uScale"), scale);
@@ -142,7 +149,7 @@ void NoiseNode::CookIfNeeded(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uLacunarity"), lacunarity);
       glUniform1f(glGetUniformLocation(mProgram, "uGain"), gain);
       glUniform1f(glGetUniformLocation(mProgram, "uWarp"), warp);
-      glUniform1f(glGetUniformLocation(mProgram, "uTime"), (float)Transport::Instance().Seconds() * speed);
+      glUniform1f(glGetUniformLocation(mProgram, "uTime"), time);
       glUniform1f(glGetUniformLocation(mProgram, "uContrast"), contrast);
       glUniform1f(glGetUniformLocation(mProgram, "uBrightness"), brightness);
       glUniform1f(glGetUniformLocation(mProgram, "uSeed"), seed);
@@ -151,4 +158,8 @@ void NoiseNode::CookIfNeeded(int frameId)
       glUniform3f(glGetUniformLocation(mProgram, "uHighColor"), highColor[0], highColor[1], highColor[2]);
       glUniform1f(glGetUniformLocation(mProgram, "uAspect"), (float)mOut.w / (float)mOut.h);
    });
+   mBuiltParams = std::move(params);
+   mBuiltTime = time;
+   mHasBuilt = true;
+   mRevision = NextTextureRevision();
 }

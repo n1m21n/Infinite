@@ -110,6 +110,28 @@ inline unsigned long long& NodeWorkCounter()
    return counter;
 }
 
+// Flattens everything a node's VisitParams exposes into one comparable list,
+// for source nodes that skip a cook when nothing changed (NoiseNode,
+// ShapeNode - the FilterNode::Signature idea without a hand-kept field list).
+// Modulation writes straight into the same fields before the cook loop, so a
+// modulated param reads as changed here. Floats compare with ==, so a NaN
+// never matches and just keeps the node cooking.
+class ParamSnapshot : public ParamVisitor
+{
+public:
+   std::vector<float> values;
+   std::vector<std::string> texts;
+
+   void Float(const char*, float& v) override { values.push_back(v); }
+   void Int(const char*, int& v) override { values.push_back((float)v); }
+   void Bool(const char*, bool& v) override { values.push_back(v ? 1.0f : 0.0f); }
+   void Text(const char*, std::string& v) override { texts.push_back(v); }
+   void Color(const char*, float rgb[3]) override { values.insert(values.end(), rgb, rgb + 3); }
+
+   bool operator==(const ParamSnapshot& o) const { return values == o.values && texts == o.texts; }
+   bool operator!=(const ParamSnapshot& o) const { return !(*this == o); }
+};
+
 class INode
 {
 public:
