@@ -480,6 +480,7 @@ namespace Platform
       double currentPts = -1.0;
       double readerPts = -1.0;   // presentation time the reader last decoded
       double nextPts = -1.0;     // pts of the decoded-but-not-yet-current frame
+      std::vector<unsigned char> current; // the frame at currentPts, until it is handed over
       // pts of the last frame VideoFrameAt returned true for. A request that
       // lands on the same frame again returns false and leaves the caller's
       // pixels alone, so the caller skips the upload (Platform.h contract).
@@ -517,6 +518,10 @@ namespace Platform
    // Monotonic access stamp, global so LRU is comparable across handles.
    uint64_t gVideoCacheClock = 0;
    std::vector<VideoHandle*> gVideoHandles;
+   // Pixel buffers of evicted cache frames, reused by the next cache push so
+   // reverse playback does not allocate a fresh frame per cached frame.
+   std::vector<std::vector<unsigned char>> gVideoFramePool;
+   constexpr size_t kMaxVideoFramePool = 8;
 
    // Guards every touch of the three above AND of any handle's frameCache.
    // Needed because the budget is shared: eviction reaches into a handle the
@@ -600,7 +605,7 @@ namespace Platform
 
          h->width = w;
          h->height = h_;
-         h->pending.assign((size_t)w * h_ * 4, 0);
+         h->pending.resize((size_t)w * h_ * 4); // same size every frame: no realloc, no clear
 
          // BGRA -> RGBA, and flip rows for GL's bottom-up textures
          for (int y = 0; y < h_; y++)
@@ -628,6 +633,8 @@ namespace Platform
          const size_t bytes = h->frameCache[idx].pixels.size();
          h->cacheBytes -= bytes;
          gVideoCacheBytes -= bytes;
+         if (gVideoFramePool.size() < kMaxVideoFramePool)
+            gVideoFramePool.push_back(std::move(h->frameCache[idx].pixels));
          h->frameCache.erase(h->frameCache.begin() + (long)idx);
       }
 
@@ -699,7 +706,20 @@ namespace Platform
          while (h->frameCache.size() >= kMaxVideoCacheFramesPerHandle)
             DropHandleLru(h);
 
-         h->frameCache.push_back({ pts, pixels, stamp });
+         CachedVideoFrame entry;
+         entry.pts = pts;
+         entry.lastAccess = stamp;
+         for (size_t i = 0; i < gVideoFramePool.size(); i++)
+         {
+            if (gVideoFramePool[i].size() == frameBytes)
+            {
+               entry.pixels.swap(gVideoFramePool[i]);
+               gVideoFramePool.erase(gVideoFramePool.begin() + (long)i);
+               break;
+            }
+         }
+         entry.pixels.assign(pixels.begin(), pixels.end()); // reuses a pooled buffer's storage
+         h->frameCache.push_back(std::move(entry));
          h->cacheBytes += frameBytes;
          gVideoCacheBytes += frameBytes;
 
@@ -718,45 +738,23 @@ namespace Platform
          if (h->frameCache.empty())
             return CacheResult::Miss;
 
+         // The frame that covers `seconds`: the latest one at or before it,
+         // and only if `seconds` is still inside that frame's duration. A
+         // looser window served frame N for a request inside frame N+1
+         // whenever N+1 itself was not cached.
          const double frameDur = (h->nominalFps > 0.0) ? (1.0 / h->nominalFps) : 0.0333;
          const CachedVideoFrame* best = nullptr;
          double minDiff = 1e9;
          size_t bestIdx = 0;
-
          for (size_t i = 0; i < h->frameCache.size(); i++)
          {
             const auto& f = h->frameCache[i];
             const double diff = seconds - f.pts;
-            if (diff >= -0.002 && diff < (frameDur * 1.25 + 0.01))
+            if (diff >= -0.002 && diff < frameDur - 0.001 && diff < minDiff)
             {
-               if (diff < minDiff)
-               {
-                  minDiff = diff;
-                  best = &f;
-                  bestIdx = i;
-               }
-            }
-         }
-
-         if (best == nullptr)
-         {
-            // Nearest-frame fallback. Asymmetric on purpose: serving a frame
-            // slightly BEHIND the request is just a held frame, but serving
-            // one AHEAD shows the future, so the forward side is held to half
-            // a frame rather than the 25 ms the backward side gets.
-            const double aheadTol = std::min(0.025, frameDur * 0.5);
-            for (size_t i = 0; i < h->frameCache.size(); i++)
-            {
-               const auto& f = h->frameCache[i];
-               const double delta = seconds - f.pts;   // < 0 means f is ahead
-               const double absDiff = std::abs(delta);
-               const double tol = (delta >= 0.0) ? 0.025 : aheadTol;
-               if (absDiff < tol && absDiff < minDiff)
-               {
-                  minDiff = absDiff;
-                  best = &f;
-                  bestIdx = i;
-               }
+               minDiff = diff;
+               best = &f;
+               bestIdx = i;
             }
          }
 
@@ -1585,7 +1583,27 @@ namespace Platform
             return true;
          }
 
-         // 2. Cache miss: check if existing reader can legitimately decode forward to `seconds`.
+         // 2. Still inside the frame already delivered (paused, or a 60 Hz
+         //    loop asking twice per 30 fps frame): nothing to do. Without this
+         //    the forward resume below would decode the NEXT frame and show
+         //    it early.
+         const double frameDur = (handle->nominalFps > 0.0) ? (1.0 / handle->nominalFps) : (1.0 / 30.0);
+         // Only when the delivered frame is the reader's own (a cache hit
+         // moves currentPts without moving the reader, so nextPts would not
+         // be its successor).
+         if (callerHasFrame && SameFrame(handle->currentPts, handle->deliveredPts) &&
+             SameFrame(handle->currentPts, handle->readerPts))
+         {
+            const double frameEnd = (handle->nextPts >= 0.0) ? handle->nextPts : handle->currentPts + frameDur;
+            if (seconds >= handle->currentPts - 0.001 && seconds < frameEnd - 0.001)
+               return false;
+            // Reader already at end of file and the request is past its last
+            // frame: hold that frame instead of rebuilding the reader every cook.
+            if (handle->finished && seconds >= handle->currentPts)
+               return false;
+         }
+
+         // 3. Cache miss: check if existing reader can legitimately decode forward to `seconds`.
          // The reader is only valid for forward decoding if it exists, is not finished,
          // is positioned at or before `seconds`, and is within 1.0s forward.
          const bool canResumeForward = (handle->reader != nil) &&
@@ -1594,6 +1612,11 @@ namespace Platform
                                        (handle->readerPts <= seconds) &&
                                        (seconds <= handle->readerPts + 1.0);
 
+         // Only a backward rebuild fills the cache: its lookback span is exactly
+         // what the next reverse steps will ask for. Forward playback never
+         // revisits a frame, so caching it was a 33 MB copy per 4K frame for
+         // nothing (B8 finding 3).
+         bool cacheDecoded = false;
          if (!canResumeForward)
          {
             std::string err;
@@ -1605,8 +1628,11 @@ namespace Platform
 
             // Look back slightly when moving backward to populate upcoming reverse frames.
             double startFrom = seconds;
-            if (handle->readerPts < 0.0 || seconds < handle->readerPts)
+            if (handle->readerPts >= 0.0 && seconds < handle->readerPts)
+            {
                startFrom = std::max(0.0, seconds - kReverseLookbackSeconds);
+               cacheDecoded = true;
+            }
 
             if (bench)
                bench->readerRestarts.fetch_add(1, std::memory_order_relaxed);
@@ -1614,7 +1640,10 @@ namespace Platform
                return false;
          }
 
-         // 3. Decode forward until the frame covering `seconds` is reached
+         // 4. Decode forward until the frame covering `seconds` is reached.
+         //    Frames rotate through two buffers (pending = being decoded,
+         //    current = accepted) and the winner is swapped out to the caller:
+         //    no per-frame allocation, no copy on hand-over.
          bool produced = false;
          for (int guard = 0; guard < 240; guard++)
          {
@@ -1636,46 +1665,32 @@ namespace Platform
             // before anyone showed it.
             if (bench && produced)
                bench->dropped.fetch_add(1, std::memory_order_relaxed);
-            outPixels = handle->pending;
+            handle->current.swap(handle->pending);
             handle->currentPts = handle->nextPts;
             handle->readerPts = handle->nextPts;
             handle->nextPts = -1.0;
             produced = true;
 
-            // Cache every decoded frame into the persistent LRU cache
-            PushCacheFrame(handle, handle->currentPts, outPixels);
+            if (cacheDecoded)
+               PushCacheFrame(handle, handle->currentPts, handle->current);
 
             if (handle->currentPts >= seconds - 0.001)
                break;
          }
 
-         if (!produced && !handle->pending.empty())
-         {
-            // The reader gave us nothing new (end of file, or a sample with no
-            // image buffer). Hand back the last frame we do have, but leave
-            // readerPts alone: the reader head did not move, and recording it
-            // at `seconds` would make the next call resume forward decoding
-            // from a position the reader is not actually at, handing out past
-            // frames as current ones.
-            outPixels = handle->pending;
-            if (handle->nextPts >= 0.0)
-               handle->currentPts = handle->nextPts;
-            produced = true;
-         }
-
          if (bench && !canResumeForward)
             bench->loopDecodeMs.Push(Bench::MediaNowMs() - benchCallStartMs);
-         // Decoding landed back on the frame the caller already shows (end of
-         // file, or a restart that re-decoded it): not a new frame.
-         if (produced && callerHasFrame && SameFrame(handle->currentPts, handle->deliveredPts))
-            produced = false;
-         if (produced)
-         {
-            handle->deliveredPts = handle->currentPts;
-            if (bench)
-               bench->deliveredPts = handle->currentPts;
-         }
-         return produced;
+         // Nothing new decoded (end of file, or a sample with no image
+         // buffer), or it landed back on the frame the caller already shows:
+         // the caller keeps what it has. readerPts stays where the reader
+         // actually is.
+         if (!produced || (callerHasFrame && SameFrame(handle->currentPts, handle->deliveredPts)))
+            return false;
+         outPixels.swap(handle->current);
+         handle->deliveredPts = handle->currentPts;
+         if (bench)
+            bench->deliveredPts = handle->currentPts;
+         return true;
       }
    }
 

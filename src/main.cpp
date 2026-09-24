@@ -60580,6 +60580,129 @@ static void RunAudioRingTest()
    printf("AUDIO RING %s\n", failures == 0 ? "OK" : "FAIL");
 }
 
+// ===================================================== INFINITE_VIDEOEXACTTEST
+// An offline render must show EVERY source frame exactly - no skipping ahead
+// to catch up, no stale repeat - even though realtime playback is allowed to
+// drop frames to keep up with the clock. This records a clip whose frame i is
+// a flat grey unique to i, then steps Platform::VideoFrameAt through it the
+// way an export does (Transport in offline mode, no waiting between calls -
+// VideoSourceNode never waits) at 30, 60 and 24 fps, plus a few backward and
+// forward seeks, and checks every request shows exactly the source frame that
+// covers its time.
+static void RunVideoExactTest()
+{
+   constexpr int kW = 320;
+   constexpr int kH = 240;
+   constexpr int kFps = 30;
+   constexpr int kFrames = 60;
+   auto levelOf = [](int i) { return 16 + i * 3; }; // 16..193, 3 apart survives H.264
+   int failures = 0;
+
+   const std::string path = TmpPath("infinite_videoexacttest.mp4");
+   std::remove(path.c_str());
+   std::string error;
+   Platform::RecorderHandle* rec = Platform::RecorderStart(path, kW, kH, kFps, error);
+   if (rec == nullptr)
+   {
+      printf("  [FAIL] could not start recorder: %s\nVIDEOEXACTTEST FAIL - BUG\n", error.c_str());
+      return;
+   }
+   for (int i = 0; i < kFrames; i++)
+   {
+      for (int spin = 0; spin < 20000 && Platform::RecorderPendingFrameCount(rec) >= 3; spin++)
+         std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::vector<unsigned char> px = Platform::RecorderAcquireFrameBuffer(rec);
+      px.assign((size_t)kW * kH * 4, (unsigned char)levelOf(i));
+      for (size_t k = 3; k < px.size(); k += 4)
+         px[k] = 255;
+      if (!Platform::RecorderAppend(rec, std::move(px), 1))
+         failures++;
+   }
+   int wrote = 0;
+   if (!Platform::RecorderStop(rec, error, &wrote, nullptr) || wrote != kFrames || failures > 0)
+   {
+      printf("  [FAIL] recorder wrote %d of %d frames (%s)\nVIDEOEXACTTEST FAIL - BUG\n",
+             wrote, kFrames, error.c_str());
+      return;
+   }
+
+   // Which source frame a delivered picture is, from its centre grey.
+   auto frameIndexOf = [&](const std::vector<unsigned char>& px) -> int
+   {
+      if ((int)px.size() < kW * kH * 4)
+         return -1;
+      double sum = 0.0;
+      int count = 0;
+      for (int y = kH / 4; y < kH * 3 / 4; y += 4)
+      {
+         for (int x = kW / 4; x < kW * 3 / 4; x += 4)
+         {
+            sum += px[((size_t)y * kW + x) * 4 + 1];
+            count++;
+         }
+      }
+      return (int)std::lround((sum / std::max(1, count) - 16.0) / 3.0);
+   };
+
+   Transport::Instance().SetOfflineMode(true, 48000.0);
+   const double exportRates[] = { 30.0, 60.0, 24.0 };
+   for (double rate : exportRates)
+   {
+      Platform::VideoHandle* vid = Platform::VideoOpen(path, error);
+      if (vid == nullptr)
+      {
+         printf("  [FAIL] could not open the clip: %s\n", error.c_str());
+         failures++;
+         break;
+      }
+      std::vector<unsigned char> px;
+      int steps = 0, wrong = 0, firstWrongStep = -1, firstWrongGot = -1, firstWrongWant = -1;
+      for (int k = 0; (double)k / rate < (double)kFrames / kFps - 1e-6; k++)
+      {
+         const double t = (double)k / rate;
+         Platform::VideoFrameAt(vid, t, px);
+         const int want = (int)std::floor(t * kFps + 1e-6);
+         const int got = frameIndexOf(px);
+         steps++;
+         if (got != want)
+         {
+            if (wrong++ == 0)
+            {
+               firstWrongStep = k;
+               firstWrongGot = got;
+               firstWrongWant = want;
+            }
+         }
+      }
+      printf("  export @ %.0f fps: %d steps, %d wrong frames", rate, steps, wrong);
+      if (wrong > 0)
+         printf(" (first at step %d: got frame %d, wanted %d)", firstWrongStep, firstWrongGot, firstWrongWant);
+      printf("\n");
+      failures += wrong;
+
+      // Seeks, as a scrub or an arrangement jump would do mid-export.
+      const int seekTo[] = { 40, 10, 11, 50, 5, 59, 0 };
+      int seekWrong = 0;
+      for (int f : seekTo)
+      {
+         Platform::VideoFrameAt(vid, (f + 0.5) / kFps, px);
+         const int got = frameIndexOf(px);
+         if (got != f)
+         {
+            printf("  seek to frame %d showed frame %d\n", f, got);
+            seekWrong++;
+         }
+      }
+      if (seekWrong > 0)
+         printf("  [FAIL] %d of %d seeks landed on the wrong frame\n", seekWrong, (int)(sizeof(seekTo) / sizeof(seekTo[0])));
+      failures += seekWrong;
+      Platform::VideoClose(vid);
+   }
+   Transport::Instance().SetOfflineMode(false);
+   std::remove(path.c_str());
+   printf("%s\n", failures == 0 ? "VIDEOEXACTTEST OK" : "VIDEOEXACTTEST FAIL - BUG");
+}
+
 // ===================================================== INFINITE_RECEXPORTTEST
 // End-to-end A/V sync measurement on a real written movie, as opposed to
 // RECSYNCTEST above, which only exercises the pacing arithmetic in isolation.
@@ -65578,6 +65701,12 @@ int main(int argc, char** argv)
          RunRecExportTest(1280, 720, false, "720p");
       else
          RunRecExportTest(320, 240, false, "default");
+      return 0; // verdict is the printf line, not $?
+   }
+
+   if (getenv("INFINITE_VIDEOEXACTTEST") != nullptr)
+   {
+      RunVideoExactTest();
       return 0; // verdict is the printf line, not $?
    }
 
