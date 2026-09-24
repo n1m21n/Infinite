@@ -1,7 +1,11 @@
 ---
 name: new-modulator-node
-description: The standard procedure for adding a Modulators/Macros node to Infinite - the IModulator contract, the idempotency rule that makes Value01() safe to call many times per frame, multi-output modulators, mod-matrix/performance-matrix visibility, unbinding on delete, and the machine-checkable exit criterion. Use when implementing an LFO/random/pattern/math/shaper/macro-control node, when writing the prompt for a fresh session that will implement one, or when a modulator node's value freezes, runs at the wrong speed, jitters differently depending on how many params it drives, or vanishes from the modulation matrix.
+description: "Procedure for adding a Modulators/Macros node: IModulator contract, Value01() idempotency, multi-output, mod/performance-matrix visibility, unbind on delete, exit criterion. Use when implementing an LFO/random/pattern/macro node, or when a modulator freezes, runs at the wrong speed, jitters with fan-out, or leaves the matrix."
 ---
+
+## When to use (full scope)
+
+The standard procedure for adding a Modulators/Macros node to Infinite - the IModulator contract, the idempotency rule that makes Value01() safe to call many times per frame, multi-output modulators, mod-matrix/performance-matrix visibility, unbinding on delete, and the machine-checkable exit criterion. Use when implementing an LFO/random/pattern/math/shaper/macro-control node, when writing the prompt for a fresh session that will implement one, or when a modulator node's value freezes, runs at the wrong speed, jitters differently depending on how many params it drives, or vanishes from the modulation matrix.
 
 Paths are relative to the repo root (`/Users/namansoni/infinte`).
 
@@ -189,7 +193,7 @@ modulatable.
 ## 7. Exit criterion - state it machine-checkably in every prompt
 
 > The node is done when: `.claude/skills/run-infinite-hygiene/driver.sh`
-> passes with the node registered (which round-trips all ~167 node types
+> passes with the node registered (which round-trips every registered node type
 > through save/load and spawns each one with its params open);
 > `.claude/skills/modulation-sweep/driver.sh` passes; the node's row in
 > `docs/node_param_audit.md` shows no non-text gaps; and driving one

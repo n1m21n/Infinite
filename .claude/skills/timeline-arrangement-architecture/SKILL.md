@@ -1,7 +1,11 @@
 ---
 name: timeline-arrangement-architecture
-description: Map of how Infinite's Timeline/Arrangement system actually works today - the single Clip/Lane/TrackGroup data model, how clips are drawn and composited, what settings each selection kind exposes, real vs. informal type distinctions (sample vs clip), grouping/nesting, the playback/playhead call paths for audio and video, retriggering, per-sample stretch/BPM, signal application order, and why the waveform is always live-drawn rather than cached from disk. Use before planning or reviewing any change to src/arrange/ or the Arrange panel in main.cpp, when asked "how does the timeline work", "what does a clip/track/group actually store", "does X exist for the timeline yet", or when deciding where a new timeline feature belongs.
+description: "Map of the Timeline/Arrangement system: Clip/Lane/TrackGroup model, drawing/compositing, selection settings, sample vs clip, grouping, audio/video playback paths, retrigger, stretch/BPM, live-drawn waveform. Use before planning/reviewing src/arrange/ or the Arrange panel, or for \"how does the timeline work\"."
 ---
+
+## When to use (full scope)
+
+Map of how Infinite's Timeline/Arrangement system actually works today - the single Clip/Lane/TrackGroup data model, how clips are drawn and composited, what settings each selection kind exposes, real vs. informal type distinctions (sample vs clip), grouping/nesting, the playback/playhead call paths for audio and video, retriggering, per-sample stretch/BPM, signal application order, and why the waveform is always live-drawn rather than cached from disk. Use before planning or reviewing any change to src/arrange/ or the Arrange panel in main.cpp, when asked "how does the timeline work", "what does a clip/track/group actually store", "does X exist for the timeline yet", or when deciding where a new timeline feature belongs.
 
 Paths below are relative to the repo root (`/Users/namansoni/infinte`). Everything here was
 verified against code (file:line) as of commit `83fd442` (post "Arrangement overhaul",
@@ -155,6 +159,18 @@ audio lane). Same for video. Build any future UI/feature language around **lane 
 not a nonexistent sample/clip split — unless you're deliberately introducing that split, in
 which case this is the place it needs to land.
 
+**Rule: never gate clip *behaviour* on `sampleDropped`.** It only means "was created by a
+file drop". Gating on it made the hand-assigned-source path a second, untested path: until
+v0.4 such clips skipped the position lock and the retrigger, and Sampler-sourced clips got
+no pitch at all. Gate on what the source node can do instead. Every audio clip now
+position-locks. The engine offers both `SetClipSamplePosition` and `SetClipPitchOverride`,
+because it can't tell which one a node consumes (`SamplerNode`/`WavetableSynthCore`
+implement only the pitch override). Only the source-time *mapping* (`sampleBpm`,
+`syncToTempo`) is Sample-specific. Cross-lane conflicts are recorded for audio and video
+(`ArrangeVideoSourceConflictClips()`), warned in the inspector, never suppressed.
+`INFINITE_ARRANGESAMPLETEST=<dir>` and `INFINITE_ARRANGESAMPLEEXPORTTEST=<dir>` cover this
+(both in the hygiene driver).
+
 ## 3. Per-selection-kind settings
 
 All defined in one function, branching on selection kind:
@@ -307,6 +323,10 @@ available ahead of the playhead), or add a second, source-agnostic "has cached p
 that live-fills only fall back to when no cache exists.
 
 ## Known gaps (not bugs, but real holes worth flagging before building on top)
+
+**Open test failure (unverified since 2026-09-14):** `INFINITE_ARRANGEWAVETEST`'s "filled by
+playback" check failed 0/32 buckets the first time an audio device opened on this Mac, and
+it isn't in `known-test-failures.txt`. Re-run it before trusting the live waveform fill.
 
 0. **Clip-source routing is NOT gated by node type — confirmed, not a gap.** An audit of the
    full pipeline (compatibility gates `IsNodeAudioCompatible`/`IsNodeVideoCompatible`, manual +

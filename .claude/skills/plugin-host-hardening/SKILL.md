@@ -1,7 +1,11 @@
 ---
 name: plugin-host-hardening
-description: The strategy and diagnostic method for stopping third-party VST3/AU plugins from crashing Infinite. Use whenever a user reports that a specific plugin crashes/hangs/silences the app (Serum, Pigments, ZENOLOGY, Massive X, FabFilter, EZkeys and friends), whenever they paste a macOS crash report (.ips / "Translated Report") naming Infinite, when asked "why does this plugin crash", "why does AU work but VST3 doesn't", "why is this plugin silent", "can we make plugin hosting bulletproof", or before touching anything in PluginVST3.mm / Platform.mm's plugin paths. Explains what is already fixed, what is deliberately not guarded, and why "zero crashes" is an architecture decision rather than a patch.
+description: "Strategy and diagnosis for third-party VST3/AU plugins crashing, hanging or silencing Infinite. Use when a user names a crashing plugin (Serum, Pigments, ...), pastes a macOS .ips crash report, asks \"why does AU work but VST3 doesn't\", or before touching PluginVST3.mm or Platform.mm plugin paths."
 ---
+
+## When to use (full scope)
+
+The strategy and diagnostic method for stopping third-party VST3/AU plugins from crashing Infinite. Use whenever a user reports that a specific plugin crashes/hangs/silences the app (Serum, Pigments, ZENOLOGY, Massive X, FabFilter, EZkeys and friends), whenever they paste a macOS crash report (.ips / "Translated Report") naming Infinite, when asked "why does this plugin crash", "why does AU work but VST3 doesn't", "why is this plugin silent", "can we make plugin hosting bulletproof", or before touching anything in PluginVST3.mm / Platform.mm's plugin paths. Explains what is already fixed, what is deliberately not guarded, and why "zero crashes" is an architecture decision rather than a patch.
 
 Paths below are relative to the repo root (`/Users/namansoni/infinite`),
 not this skill directory.

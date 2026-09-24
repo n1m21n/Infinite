@@ -1,7 +1,11 @@
 ---
 name: run-infinite-hygiene
-description: Build, launch, and drive Infinite (the macOS node compositor) through its built-in self-test harness before committing/pushing — checks undo/redo, patch save/load, node groups, comments, color picker, macros, palette, bypass, geometry ops, 3D shading, materials, ocean/path, selection UI, audio param/teardown sweeps, and a full 167-node-type round trip. Use when asked to "run the tests", "hygiene check", "pre-commit check", "sanity check before pushing", or "verify the build" for this project.
+description: "Build, launch and drive Infinite's self-test harness on macOS before commit/push (undo, save/load, groups, macros, bypass, geometry, shading, audio sweeps, ROUNDTRIPTEST of every node), plus the efficient A/B and gate routes. Use for \"run the tests\", \"hygiene check\", \"pre-commit check\", \"verify the build\"."
 ---
+
+## When to use (full scope)
+
+Build, launch, and drive Infinite (the node-based AV instrument, on macOS) through its built-in self-test harness before committing/pushing — checks undo/redo, patch save/load, node groups, comments, color picker, macros, palette, bypass, geometry ops, 3D shading, materials, ocean/path, selection UI, audio param/teardown sweeps, and a round trip of every registered node type (ROUNDTRIPTEST). Use when asked to "run the tests", "hygiene check", "pre-commit check", "sanity check before pushing", or "verify the build" for this project.
 
 Paths below are relative to the repo root (`/Users/namansoni/infinite`), not
 this skill directory.

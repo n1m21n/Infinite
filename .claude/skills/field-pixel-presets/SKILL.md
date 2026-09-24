@@ -1,7 +1,11 @@
 ---
 name: field-pixel-presets
-description: How to write a new Field Pixel preset (FieldPixelNode::Presets(), src/nodes/FieldPixelNode.cpp) that actually looks right the first time - reserved names, aspect correction, the metaball/SDF falloff trap, and the shapes that are and aren't buildable in this backend. Use BEFORE adding, editing, or debugging any Field Pixel preset string, and when a preset looks stretched, flat, or "just a circle/blob that won't blend".
+description: "Writing Field Pixel presets (FieldPixelNode::Presets()): reserved names, aspect correction, the metaball/SDF falloff trap, buildable shapes. Use BEFORE adding/editing/debugging a Field Pixel preset, or when one looks stretched, flat, or like a blob that won't blend."
 ---
+
+## When to use (full scope)
+
+How to write a new Field Pixel preset (FieldPixelNode::Presets(), src/nodes/FieldPixelNode.cpp) that actually looks right the first time - reserved names, aspect correction, the metaball/SDF falloff trap, and the shapes that are and aren't buildable in this backend. Use BEFORE adding, editing, or debugging any Field Pixel preset string, and when a preset looks stretched, flat, or "just a circle/blob that won't blend".
 
 Paths are relative to the repo root (`/Users/namansoni/infinte`).
 

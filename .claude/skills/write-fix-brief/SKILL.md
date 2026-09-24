@@ -1,7 +1,11 @@
 ---
 name: write-fix-brief
-description: Turn a raw bug report, a pasted list of code-review findings, a screenshot of broken UI, or a vague "we should add a node for X" idea into a verified, technically-precise implementation prompt for a fresh Claude Code session on Infinite. Investigates the actual codebase first (grep/read main.cpp, ARCHITECTURE.md, src/nodes/, src/core/) to confirm every claim is real and pin down exact files/lines/functions before writing anything — never restates the input at face value. Use whenever asked "is this a real bug", "are these fixes needed", "write me a prompt for this", "make a prompt for a new session", "should I fix this", "critically evaluate this", or when the user describes a UI glitch, pastes review findings, or floats a new node idea for Infinite and wants it turned into something actionable, even if they don't use the word "prompt" or "skill" explicitly.
+description: "Turn a bug report, review findings, broken-UI screenshot or new-node idea into a verified, file/line-precise implementation prompt after checking the real code. Use for \"is this a real bug\", \"are these fixes needed\", \"write me a prompt for this\", \"critically evaluate this\", or any UI glitch/idea to make actionable."
 ---
+
+## When to use (full scope)
+
+Turn a raw bug report, a pasted list of code-review findings, a screenshot of broken UI, or a vague "we should add a node for X" idea into a verified, technically-precise implementation prompt for a fresh Claude Code session on Infinite. Investigates the actual codebase first (grep/read main.cpp, ARCHITECTURE.md, src/nodes/, src/core/) to confirm every claim is real and pin down exact files/lines/functions before writing anything — never restates the input at face value. Use whenever asked "is this a real bug", "are these fixes needed", "write me a prompt for this", "make a prompt for a new session", "should I fix this", "critically evaluate this", or when the user describes a UI glitch, pastes review findings, or floats a new node idea for Infinite and wants it turned into something actionable, even if they don't use the word "prompt" or "skill" explicitly.
 
 Paths below are relative to the repo root (`/Users/namansoni/infinite`), not
 this skill directory.

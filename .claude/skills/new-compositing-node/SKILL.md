@@ -1,7 +1,11 @@
 ---
 name: new-compositing-node
-description: The standard procedure for adding a Compositing node to Infinite - an image node with more than one input, or with state that persists across frames (Blend, Layer Stack, Switcher, Feedback, Trails, Reaction Diffusion, Curves, Color Ramp, Fit, Null, Viewport). Covers the four hand-maintained wiring chains an image-input node must be added to, the BypassSource rule, ping-pong/persistent-state cooking, and the machine-checkable exit criterion. Use when implementing a multi-input image operator or a frame-persistent effect, when writing the prompt for a fresh session that will implement one, or when a new image node draws no input pins, ignores a connected cable, or breaks when bypassed.
+description: "Procedure for adding a Compositing node (multi-input or frame-persistent image node: Blend, Layer Stack, Feedback, Trails, ...): the four wiring chains, BypassSource rule, ping-pong cooking, exit criterion. Use when implementing one, or when a new image node has no input pins, ignores a cable, or breaks when bypassed."
 ---
+
+## When to use (full scope)
+
+The standard procedure for adding a Compositing node to Infinite - an image node with more than one input, or with state that persists across frames (Blend, Layer Stack, Switcher, Feedback, Trails, Reaction Diffusion, Curves, Color Ramp, Fit, Null, Viewport). Covers the four hand-maintained wiring chains an image-input node must be added to, the BypassSource rule, ping-pong/persistent-state cooking, and the machine-checkable exit criterion. Use when implementing a multi-input image operator or a frame-persistent effect, when writing the prompt for a fresh session that will implement one, or when a new image node draws no input pins, ignores a connected cable, or breaks when bypassed.
 
 Paths are relative to the repo root (`/Users/namansoni/infinte`).
 

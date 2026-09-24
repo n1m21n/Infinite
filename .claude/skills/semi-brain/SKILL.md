@@ -1,7 +1,6 @@
 ---
 name: semi-brain
-description: The Cognitive Twin and Invariant Reasoning Engine for Infinite. Use at the start of ANY task (bug fix, feature implementation, refactoring, code review) to frame the problem through System 1 intuition, System 2 9-question blast radius, and Choice Tree MCTS rollouts. Also use after completing a task to record newly discovered invariants or user corrections into the self-improving training dataset.
-category: Core
+description: Infinite's distilled-brain CLI (tools/semi-brain). Query it before a non-trivial architecture decision - fix-in-place vs rewrite/refactor, a new invariant, a choice between designs - and fold its Branch A/B/C scores and invariant checklist into the recommendation. Also use after a user correction to log a DPO preference, or to add a newly confirmed bug pattern to 2_distilled_brain/.
 ---
 
 # Semi-Brain: Cognitive Twin & Invariant Engine
@@ -12,10 +11,13 @@ The Semi-Brain encodes Infinite's core engineering reflexes: System 1 (Intuitive
 
 ## 1. When to Consult the Semi-Brain
 
-You must consult the Semi-Brain:
-1. **At the start of any non-trivial task**: Before proposing or modifying code, run the engine or inspect the distilled schemas in `tools/semi-brain/2_distilled_brain/`.
-2. **When framing a bug or feature**: To evaluate the 9-question blast radius, platform parity risks, and realtime thread constraints.
-3. **When evaluating multiple design approaches**: To simulate forward rollouts across teardown, fanout, save/load identity, and transport clocks.
+- **Before a non-trivial architecture decision**: fix-in-place vs rewrite,
+  a new invariant, a choice between designs. Not for routine bug fixes or
+  one-file edits.
+- **Not a replacement for other skills**: the 9-question bug analysis is
+  owned by `bug-blast-radius`, the sibling-undo check by
+  `invariant-interaction-audit`. The brain scores options; those skills do
+  the analysis.
 
 ---
 
@@ -39,19 +41,30 @@ python3 tools/semi-brain/5_evals/run_evals.py
 
 ## 3. How to Update & Improve the Brain After Completing Work
 
-Whenever you complete a task or the user provides a correction:
-1. **Sync with latest commits and plans**:
-   ```bash
-   python3 tools/semi-brain/4_engine/sync_brain.py --sync
-   ```
-2. **Log user corrections or negative lessons learned into the DPO preference dataset**:
+Syncing with commits is automatic: `.git/hooks/post-commit` runs
+`sync_brain.py --sync` in the background (see `run-infinite-hygiene`
+"Efficient routes"). Don't run it by hand, and never `git commit -am`
+afterwards, or the regenerated corpora get swept into your commit.
+
+What *is* manual:
+1. **Log a user correction** into the DPO preference dataset:
    ```bash
    python3 tools/semi-brain/4_engine/sync_brain.py --feedback \
      --task "<task description>" \
      --chosen "<what was the correct invariant-safe fix>" \
      --rejected "<what was the flawed/naive approach>" \
-     --reason "<why chosen was necessary (e.g. avoided audio xruns, preserved UID monotonicity)>"
+     --reason "<why chosen was necessary>"
    ```
+2. **Grow the brain**: when a session confirms a bug pattern that
+   `2_distilled_brain/` doesn't have, propose adding it there.
+
+**Privacy**: chat/session-derived corpora (`session_history_corpus.json`,
+`antigravity_history_corpus.json`, `session_analysis_corpus.json`,
+`session_embeddings_cache.npy`, `dev_trajectory_corpus.json`,
+`knowledge_index_private.db`) never leave this machine. They are gitignored,
+and `.git/hooks/pre-push` blocks them. The rest of the brain (code, public
+`knowledge_index.db`, `3_datasets/*.jsonl`) may be committed, in its own
+commit, not inside a feature commit.
 
 ---
 

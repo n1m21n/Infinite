@@ -1,7 +1,11 @@
 ---
 name: render-pipeline-sweep
-description: Sweeps Infinite's 3D pipeline as a pipeline rather than node by node - source mesh, operators, instancing, materials and mapping, lights and environment, simulation, and finally whether Render 3D's cached scene actually reflects any of it. Runs the generic geometry sweeps plus the per-stage fixtures. Use when asked "check the rendering", "is the 3D pipeline right", "why did my instances disappear", "why doesn't moving this change the render", "did the viewport freeze", or after touching anything between a geometry source and Render 3D.
+description: "3D pipeline sweep as a whole: source mesh, operators, instancing, materials/mapping, lights/environment, simulation, Render 3D's cached scene. Use for \"check the rendering\", \"why did my instances disappear\", \"did the viewport freeze\", or after touching anything between a geometry source and Render 3D."
 ---
+
+## When to use (full scope)
+
+Sweeps Infinite's 3D pipeline as a pipeline rather than node by node - source mesh, operators, instancing, materials and mapping, lights and environment, simulation, and finally whether Render 3D's cached scene actually reflects any of it. Runs the generic geometry sweeps plus the per-stage fixtures. Use when asked "check the rendering", "is the 3D pipeline right", "why did my instances disappear", "why doesn't moving this change the render", "did the viewport freeze", or after touching anything between a geometry source and Render 3D.
 
 Paths below are relative to the repo root (`/Users/namansoni/infinte`).
 

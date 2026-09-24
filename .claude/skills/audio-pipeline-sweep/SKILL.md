@@ -1,7 +1,11 @@
 ---
 name: audio-pipeline-sweep
-description: Sweep Infinite's audio pipeline for bugs on both macOS and Windows - DSP correctness, whether every audio parameter actually reaches the audio thread, note fan-out to several consumers, plugin delay compensation, device loss and recovery, deleting an audio node mid-playback without a crash or a dangling cable, PCM conversion, and the transport clock running off the audio sample counter. Use after adding or changing any audio or note node, when sound is silent, distorted, clicking, stuck or one block late, when a knob does nothing audible, when deleting a node while it plays crashes or leaves a cable behind, when a plugin chain sounds phasey, or before a release as an audio regression gate.
+description: "Audio pipeline regression sweep: DSP correctness, param delivery to the audio thread, note fan-out, PDC, device loss, teardown mid-playback, PCM conversion, transport clock. Use after audio/note node changes, when sound is silent/clicking/late or a knob does nothing audible, or before a release."
 ---
+
+## When to use (full scope)
+
+Sweep Infinite's audio pipeline for bugs on both macOS and Windows - DSP correctness, whether every audio parameter actually reaches the audio thread, note fan-out to several consumers, plugin delay compensation, device loss and recovery, deleting an audio node mid-playback without a crash or a dangling cable, PCM conversion, and the transport clock running off the audio sample counter. Use after adding or changing any audio or note node, when sound is silent, distorted, clicking, stuck or one block late, when a knob does nothing audible, when deleting a node while it plays crashes or leaves a cable behind, when a plugin chain sounds phasey, or before a release as an audio regression gate.
 
 Paths below are relative to the repo root (`/Users/namansoni/infinte`).
 

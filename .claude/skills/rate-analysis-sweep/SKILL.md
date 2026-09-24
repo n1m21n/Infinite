@@ -1,7 +1,11 @@
 ---
 name: rate-analysis-sweep
-description: Measure and gate Infinite's frame rate and audio rate behaviour on both macOS and Windows - the frame limiter hitting its target, idle-frame caching so a static patch stops re-cooking, the editor's per-frame hit-test cost as node count grows, audio callback jitter and xruns, and whether starting audio costs frame time. Use when the app feels slow or stutters, when a big patch freezes the editor, when the fps cap is ignored or overshoots, when audio clicks under load, when a static patch still burns full frame time, after touching the render loop, the frame limiter, cook caching, or the audio callback, or before a release as a performance regression gate.
+description: "Measure and gate frame and audio rate: frame limiter, idle-frame caching, editor hit-test cost vs node count, callback jitter/xruns, audio start cost. Use when the app is slow or stutters, fps cap is ignored, audio clicks under load, after touching the render loop, limiter, cook caching or audio callback, or before a release."
 ---
+
+## When to use (full scope)
+
+Measure and gate Infinite's frame rate and audio rate behaviour on both macOS and Windows - the frame limiter hitting its target, idle-frame caching so a static patch stops re-cooking, the editor's per-frame hit-test cost as node count grows, audio callback jitter and xruns, and whether starting audio costs frame time. Use when the app feels slow or stutters, when a big patch freezes the editor, when the fps cap is ignored or overshoots, when audio clicks under load, when a static patch still burns full frame time, after touching the render loop, the frame limiter, cook caching, or the audio callback, or before a release as a performance regression gate.
 
 Paths below are relative to the repo root (`/Users/namansoni/infinte`).
 

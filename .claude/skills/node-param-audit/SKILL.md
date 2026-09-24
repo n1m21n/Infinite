@@ -1,7 +1,11 @@
 ---
 name: node-param-audit
-description: Inventory every Infinite node's on-screen controls and which of them a modulation cable can reach. Regenerates docs/node_param_audit.md from src/main.cpp - a per-node table of every knob, slider, checkbox, dropdown and colour swatch, marked modulatable (registers a ParamRef, so it draws a pin, takes a cable, and appears in the performance matrix's Assign Parameter picker) or not. Use when asked "can this param be modulated", "which controls are still not modulatable", "what params does node X have", after adding or changing any Draw*Body / Draw*Params function, or before claiming that everything is modulatable.
+description: "Regenerate docs/node_param_audit.md: every node's on-screen controls and whether each is modulatable (registers a ParamRef). Use for \"can this param be modulated\", \"what params does node X have\", after changing any Draw*Body/Draw*Params, or before claiming everything is modulatable."
 ---
+
+## When to use (full scope)
+
+Inventory every Infinite node's on-screen controls and which of them a modulation cable can reach. Regenerates docs/node_param_audit.md from src/main.cpp - a per-node table of every knob, slider, checkbox, dropdown and colour swatch, marked modulatable (registers a ParamRef, so it draws a pin, takes a cable, and appears in the performance matrix's Assign Parameter picker) or not. Use when asked "can this param be modulated", "which controls are still not modulatable", "what params does node X have", after adding or changing any Draw*Body / Draw*Params function, or before claiming that everything is modulatable.
 
 Paths below are relative to the repo root (`/Users/namansoni/infinte`).
 
@@ -12,8 +16,8 @@ python3 scripts/audit_node_params.py --out docs/node_param_audit.md
 ```
 
 It prints a one-line summary and writes the full report. It reads source only -
-it does not build, launch, or drive the app, which is the point: spawning all
-~135 node types by hand and eyeballing each control is exactly what this
+it does not build, launch, or drive the app, which is the point: spawning
+every node type by hand and eyeballing each control is exactly what this
 replaces.
 
 ## What "modulatable" means here

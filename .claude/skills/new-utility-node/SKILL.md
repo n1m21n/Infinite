@@ -1,7 +1,11 @@
 ---
 name: new-utility-node
-description: The standard procedure for adding a Utility/IO node to Infinite - a node whose job is to move data in or out of the patch (Output/record/export, Syphon In/Out, Projection, OSC Send/Receive, Video In) rather than to make an image. Covers the terminal-node identity-pass pattern, the Platform:: one-abstraction rule that keeps it building on Windows, resource ownership across GL contexts, external side effects and how to gate them, and the machine-checkable exit criterion. Use when implementing an export/broadcast/receive/protocol node, when writing the prompt for a fresh session that will implement one, or when an IO node leaks a handle, crashes on delete, works on macOS but not Windows, or fires its side effect when it shouldn't.
+description: "Procedure for adding a Utility/IO node (Output/export, Syphon/Spout, Projection, OSC, Video In): terminal identity-pass, three-sided Platform:: rule, cross-context resources, gated side effects, exit criterion. Use when implementing one, or when an IO node leaks, crashes on delete, or works on only one OS."
 ---
+
+## When to use (full scope)
+
+The standard procedure for adding a Utility/IO node to Infinite - a node whose job is to move data in or out of the patch (Output/record/export, Syphon In/Out, Projection, OSC Send/Receive, Video In) rather than to make an image. Covers the terminal-node identity-pass pattern, the Platform:: one-abstraction rule that keeps it building on Windows, resource ownership across GL contexts, external side effects and how to gate them, and the machine-checkable exit criterion. Use when implementing an export/broadcast/receive/protocol node, when writing the prompt for a fresh session that will implement one, or when an IO node leaks a handle, crashes on delete, works on macOS but not Windows, or fires its side effect when it shouldn't.
 
 Paths are relative to the repo root (`/Users/namansoni/infinte`).
 
@@ -38,20 +42,22 @@ Also declare `InputLabel()`. IO nodes usually have heterogeneous slots
 ## 1. The one-abstraction rule (read `windows-parity` before writing code)
 
 **No `#ifdef _WIN32` in the node layer, ever.** Every platform difference
-lives behind a `Platform::` function with a real implementation on both
-sides. `SyphonOutNode` is the model: it holds a
+lives behind a `Platform::` function with a real implementation on every
+side (macOS, Windows, Linux). `SyphonOutNode` is the model: it holds a
 `Platform::SyphonServerHandle*` and never mentions Syphon or Spout in its own
 code - the macOS side is IOSurface, the Windows side is Spout2
 (`src/platform/win/PlatformWinSyphon.cpp`), and the node is identical.
 
-Every `Platform::` function you add carries a two-sided obligation: **write
-both implementations in the same commit**, even when the Windows one is a
-stub that fails soft. A missing Windows implementation is not a compile error
-in a macOS-only build - it is a Windows build break someone else discovers.
+Every `Platform::` function you add carries a three-sided obligation: **write
+the macOS, Windows and Linux implementations in the same commit**, even when
+one is a stub that fails soft. A missing Windows or Linux implementation is not
+a compile error in a macOS-only build - it is a build break someone else
+discovers.
 
 `.claude/skills/windows-parity/SKILL.md` has the per-subsystem trap catalogue
 (WASAPI teardown, WinMM status bytes, Media Foundation stride, wide paths,
-GLSL 330 strictness). Read it before touching anything device- or file-backed.
+GLSL 330 strictness), and `linux-parity` the Linux one. Read both before touching
+anything device- or file-backed.
 
 ---
 

@@ -1,7 +1,11 @@
 ---
 name: field-realtime
-description: Field's real-time safety constraints as a checklist you can run against a diff — no heap allocation, no recursion, no unbounded loops, no strings/pointers/dynamic arrays/structs in v1, every value's size known at compile time, element and voice counts bounded and declared up front — plus the per-domain branching cost model including GPU predication and divergence. Use when reviewing any Field compiler diff, when generated code will run on the audio thread or in a fragment shader, when someone proposes a language feature that allocates or recurses, when a Field kernel causes an xrun or a frame-time spike, or when deciding whether a branch is affordable in a given domain.
+description: "Field real-time safety checklist (no heap, recursion, unbounded loops or dynamic types; bounded counts) plus the per-domain branching/GPU divergence cost model. Use when reviewing Field compiler diffs, code bound for the audio thread or shaders, proposed allocating features, or a Field xrun/frame spike."
 ---
+
+## When to use (full scope)
+
+Field's real-time safety constraints as a checklist you can run against a diff — no heap allocation, no recursion, no unbounded loops, no strings/pointers/dynamic arrays/structs in v1, every value's size known at compile time, element and voice counts bounded and declared up front — plus the per-domain branching cost model including GPU predication and divergence. Use when reviewing any Field compiler diff, when generated code will run on the audio thread or in a fragment shader, when someone proposes a language feature that allocates or recurses, when a Field kernel causes an xrun or a frame-time spike, or when deciding whether a branch is affordable in a given domain.
 
 Paths are relative to the repo root (`/Users/namansoni/infinte`).
 
