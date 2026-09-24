@@ -188,7 +188,7 @@ Contributions, bug reports, and node ideas are welcome!
 
 ## Prior Art & Acknowledgements
 
-Infinite is written from scratch, but its ideas stand on a long line of tools that came before it. We want to name them plainly.
+Infinite is its own codebase, but its ideas stand on a long line of tools that came before it. We want to name them plainly.
 
 **Node-based audio and visual environments.** Patching signal through a graph of modules is the tradition of [Max/MSP and Jitter](https://cycling74.com/), [Pure Data](https://puredata.info/), [Reaktor](https://www.native-instruments.com/en/products/komplete/synths/reaktor-6/), [Bitwig's The Grid](https://www.bitwig.com/the-grid/), [VCV Rack](https://vcvrack.com/) and [BespokeSynth](https://www.bespokesynth.com/). Mixing audio, video and 3D in one graph is the territory of [TouchDesigner](https://derivative.ca/), Max/Jitter and [Houdini](https://www.sidefx.com/). Infinite's first building blocks (the node registry, the base node interface, pull-based per-frame cooking, the OpenGL render-pass helpers and a single node shell that hosts many effect types) were written with BespokeSynth's source open as a design reference, under an explicit instruction not to copy its code. The node registry and shader compiler have since been rewritten from scratch, and the rest has grown far past those first versions.
 
