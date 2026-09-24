@@ -32,6 +32,12 @@ variants from 1 run (the 3-run 1080 set could not be paced: screen locked).
 | | | B8 4x2160 | dropped per clip | 22 | 0 | -100% |
 | | | B8 2x2160 | frame p50 / p99 ms | 8.4 / 16.8 | 9.5 / 16.7 | +13% / -1% |
 | | | B8 2x2160 / 4x2160 | footprint peak MB | 633 / 1139 | 662 / 1160 | +5% / +2% |
+| Canvas: re-cook skip (Noise, Shape; Filters now hit their cache) | `bd38a27` | B6 n=300 all / n=400 pan | cook_all ms | 8.96 / 17.25 | 0.09 / 0.10 | -99% / -99% |
+| Canvas: off-screen body culling | `94023d5` | B6 n=300 all / n=400 pan | node_bodies ms | 21.52 / 36.53 | 3.23 / 3.08 | -85% / -92% |
+| | | B6 n=300 all / n=400 pan | offscreen_bodies ms | 20.71 / 31.86 | 3.43 / 1.27 | -83% / -96% |
+| Canvas: both | `bd38a27`, `94023d5` | B6 n=300 all | frame p50 / p95 ms | 45.98 / 82.93 | 9.48 / 35.58 | -79% / -57% |
+| | | B6 n=400 pan | frame p50 / p95 ms | 79.39 / 104.06 | 8.65 / 13.47 | -89% / -87% |
+| | | B6 n=300 all / n=400 pan | footprint peak MB | 1215 / 1512 | 1146 / 1443 | -6% / -5% |
 
 Keep-or-revert gate for the decode thread: B8, 3 runs each, interleaved
 against a `93e184d` build. The first rule (branch >= base on every metric,
@@ -650,7 +656,7 @@ a fixture goes here, not into a code change.
 - The transport starts playing at launch, so any fixture that wants a still
   frame has to stop it. B2's static variant does not, which is harmless only
   because Emboss replaced Glitch and nothing else in B2 reads time.
-- **B6: every node re-cooks every frame even when nothing changes**. The
+- **Fixed (`bd38a27`). B6: every node re-cooks every frame even when nothing changes**. The
   whole-graph cook loop in the main loop (`for (GraphNode& gn : gNodes) ...
   CookIfNeeded(frameId)`) sat outside every stage timer, which hid ~9 ms of a
   22.6 ms frame at 300 nodes with the transport stopped. `CookIfNeeded` only
@@ -660,7 +666,7 @@ a fixture goes here, not into a code change.
   were ~20% of main-thread samples. B6 now times the loop as `cook_all`
   (B6 only, so older benches keep their stage meanings). This is the biggest
   single lever for large patches.
-- **B6: off-screen node bodies are drawn in full**. With ~23 of 300 nodes on
+- **Fixed (`94023d5`). B6: off-screen node bodies are drawn in full**. With ~23 of 300 nodes on
   screen, ~6.4 of 7.4 ms of `node_bodies` goes to nodes nobody can see. Cost
   grows ~0.07 ms per node, whatever is on screen.
 - **B6: collapsing params barely helps**. `B6COLLAPSED=1` saves only ~1.4 ms
