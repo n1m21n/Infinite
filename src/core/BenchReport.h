@@ -18,7 +18,9 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -179,6 +181,97 @@ namespace Bench
    private:
       PercentileRing& mSink;
       double mStart;
+   };
+
+   // Pipelined GPU timer query ring (GL_TIME_ELAPSED).
+   // Manages an N-frame in-flight query ring per stage so reading back elapsed
+   // GPU nanoseconds never causes synchronous CPU/GPU pipeline stalls.
+   // Query objects are per-context and are not shared: never let a stage span
+   // a glfwMakeContextCurrent (the projector loop does), or Begin and End land
+   // in different contexts. Stages cannot nest either.
+   class GpuTimerRing
+   {
+   public:
+      static constexpr int kRingDepth = 4;
+
+      GpuTimerRing();
+      ~GpuTimerRing();
+
+      GpuTimerRing(const GpuTimerRing&) = delete;
+      GpuTimerRing& operator=(const GpuTimerRing&) = delete;
+
+      // Returns true if GL timer queries are supported and available
+      bool IsSupported();
+
+      // Begin/End GPU timing for a named stage in the given frame
+      void BeginStage(const std::string& stageName, int frameId);
+      void EndStage(const std::string& stageName);
+
+      // Poll completed query results from previous frames (non-blocking)
+      void Poll(int currentFrameId);
+
+      // Flush remaining in-flight queries (e.g. at end of benchmark before reporting)
+      void Finish();
+
+      // Clear all queries and percentiles
+      void Reset();
+
+      // Returns p50 ms per stage as a JSON object: {"cook": 0.12, ...}
+      nlohmann::json ToJsonP50() const;
+
+      const PercentileRing* GetStage(const std::string& stageName) const;
+
+   private:
+      struct QuerySlot
+      {
+         unsigned int queryId = 0;
+         int frameId = -1;
+         bool inFlight = false;
+      };
+
+      struct StageRing
+      {
+         std::array<QuerySlot, kRingDepth> slots {};
+         PercentileRing samples;
+         bool active = false;
+         int activeSlot = -1;
+      };
+
+      void EnsureInitialized();
+
+      bool mInitialized = false;
+      bool mSupported = false;
+      std::string mCurrentActiveStage;
+      std::map<std::string, StageRing> mStages;
+   };
+
+   // RAII helper for GPU stage timing
+   struct ConditionalGpuStageTimer
+   {
+      GpuTimerRing* mRing = nullptr;
+      std::string mStageName;
+      bool mStopped = false;
+
+      ConditionalGpuStageTimer(GpuTimerRing* ring, const char* stageName, int frameId)
+         : mRing(ring), mStageName(stageName ? stageName : "")
+      {
+         if (mRing && !mStageName.empty())
+            mRing->BeginStage(mStageName, frameId);
+      }
+
+      void Stop()
+      {
+         if (mRing && !mStopped && !mStageName.empty())
+         {
+            mRing->EndStage(mStageName);
+            mStopped = true;
+         }
+      }
+
+      ~ConditionalGpuStageTimer()
+      {
+         Stop();
+      }
    };
 
    // FNV-1a 64-bit over raw bytes - used for output_hash (a hash of the

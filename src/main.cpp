@@ -64461,6 +64461,9 @@ int main(int argc, char** argv)
 {
    const double sMainStartMs = Bench::ScopedStageTimer::NowMs();
    const double sMainRssStartMb = Bench::ProcessRssMb();
+   static int sBenchB2Render3DIdx = -1;
+   static int sBenchB2OutputIdx = -1;
+   static std::string sBenchB2Variant;
 
    // No-op on macOS (which gets a `.ips` report for free); on Windows this is
    // the only thing standing between a crash and a completely silent exit,
@@ -67152,6 +67155,183 @@ int main(int argc, char** argv)
          for (GraphNode& gn : gNodes)
             gn.showParams = true;
       }
+      else if (getenv("INFINITE_BENCH_B2") != nullptr ||
+               getenv("INFINITE_BENCH_B2VISUALS") != nullptr ||
+               getenv("INFINITE_BENCH_B2SCALE") != nullptr)
+      {
+         // B2 Heavy visuals fixture (docs/plans/perf/benchmark-suite.md §4).
+         // Geometry (Torus / Sphere / Point Cloud) -> Render 3D 1080p -> 10-30
+         // compositing/effect nodes in series -> Output.
+         // Static (anim=0) and animated (anim=1, default) variants.
+         std::string scaleStr = "s";
+         int effectCount = 10;
+         int triDetail = 30;
+         bool isAnim = true;
+
+         const char* bench2Arg = getenv("INFINITE_BENCH_B2SCALE");
+         if (!bench2Arg) bench2Arg = getenv("INFINITE_BENCH_B2VISUALS");
+         if (!bench2Arg) bench2Arg = getenv("INFINITE_BENCH_B2");
+
+         std::string arg(bench2Arg ? bench2Arg : "s");
+         if (arg == "s" || arg == "small" || arg == "10") { scaleStr = "s"; effectCount = 10; triDetail = 30; }
+         else if (arg == "m" || arg == "medium" || arg == "20") { scaleStr = "m"; effectCount = 20; triDetail = 60; }
+         else if (arg == "l" || arg == "large" || arg == "30") { scaleStr = "l"; effectCount = 30; triDetail = 120; }
+         else if (atoi(arg.c_str()) > 1) {
+            effectCount = atoi(arg.c_str());
+            if (effectCount <= 10) { scaleStr = "s"; triDetail = 30; }
+            else if (effectCount <= 20) { scaleStr = "m"; triDetail = 60; }
+            else { scaleStr = "l"; triDetail = 120; }
+         }
+
+         if (const char* animEnv = getenv("INFINITE_BENCH_B2ANIM"))
+         {
+            if (strcmp(animEnv, "0") == 0 || strcmp(animEnv, "false") == 0 || strcmp(animEnv, "static") == 0)
+               isAnim = false;
+            else
+               isAnim = true;
+         }
+
+         sBenchB2Variant = std::string("scale=") + scaleStr + ",anim=" + (isAnim ? "1" : "0");
+
+         const float xBase = 0.0f;
+         const float yBase = 0.0f;
+
+         int torusIdx = SpawnNode("Torus", "3D", xBase, yBase)->index;
+         auto* torus = static_cast<GeometryNode*>(FindNodeByIndex(torusIdx)->node.get());
+         torus->sides = triDetail;
+         torus->detail = triDetail;
+
+         int opIdx = SpawnNode("Twist", "3D", xBase + 260.0f, yBase)->index;
+         auto* op = static_cast<GeometryOpNode*>(FindNodeByIndex(opIdx)->node.get());
+         op->input = torus;
+         op->op = GeometryOpNode::kTwist;
+         op->amount = 1.5f;
+
+         int matIdx = SpawnNode("Material", "3D", xBase + 520.0f, yBase)->index;
+         auto* mat = static_cast<MaterialNode*>(FindNodeByIndex(matIdx)->node.get());
+         mat->input = op;
+         mat->roughness = 0.35f;
+         mat->metallic = 0.65f;
+         mat->color[0] = 0.85f;
+         mat->color[1] = 0.45f;
+         mat->color[2] = 0.20f;
+
+         int camIdx = SpawnNode("Camera", "3D", xBase + 520.0f, yBase + 260.0f)->index;
+         auto* cam = static_cast<CameraNode*>(FindNodeByIndex(camIdx)->node.get());
+         cam->distance = 4.2f;
+         cam->elevation = 20.0f;
+         cam->azimuth = 45.0f;
+
+         int lightIdx = SpawnNode("Light", "3D", xBase + 520.0f, yBase + 520.0f)->index;
+         auto* light = static_cast<LightNode*>(FindNodeByIndex(lightIdx)->node.get());
+         light->intensity = 1.8f;
+
+         int renderIdx = SpawnNode("Render 3D", "3D", xBase + 780.0f, yBase)->index;
+         auto* render = static_cast<Render3DNode*>(FindNodeByIndex(renderIdx)->node.get());
+         render->geometry[0] = mat;
+         render->camera = cam;
+         render->lights[0] = light;
+         render->width = 1920.0f;
+         render->height = 1080.0f;
+         sBenchB2Render3DIdx = renderIdx;
+
+         if (scaleStr == "m" || scaleStr == "l")
+         {
+            int sphereIdx = SpawnNode("Sphere", "3D", xBase, yBase + 260.0f)->index;
+            auto* sphere = static_cast<GeometryNode*>(FindNodeByIndex(sphereIdx)->node.get());
+            sphere->sides = triDetail;
+            sphere->detail = triDetail;
+
+            int ptsIdx = SpawnNode("Mesh to Points", "3D", xBase + 260.0f, yBase + 260.0f)->index;
+            auto* pts = static_cast<MeshToPointsNode*>(FindNodeByIndex(ptsIdx)->node.get());
+            pts->input = sphere;
+
+            int cubeIdx = SpawnNode("Cube", "3D", xBase + 260.0f, yBase + 520.0f)->index;
+            auto* cube = static_cast<GeometryNode*>(FindNodeByIndex(cubeIdx)->node.get());
+
+            int instIdx = SpawnNode("Instance on Points", "3D", xBase + 520.0f, yBase + 780.0f)->index;
+            auto* inst = static_cast<InstanceOnPointsNode*>(FindNodeByIndex(instIdx)->node.get());
+            inst->pointSource = pts;
+            inst->instanceShape = cube;
+            inst->instanceScale = 0.05f;
+            inst->maxPoints = (scaleStr == "l") ? 8000 : 2000;
+            render->geometry[1] = inst;
+         }
+
+         struct EffectDef {
+            const char* name;
+            const char* cat;
+         };
+         static const EffectDef kEffectDefs[] = {
+            { "gaussianblur", "Effects" },
+            { "color adjustments", "Compositing" },
+            { "bloom", "Effects" },
+            { "vignette", "Effects" },
+            { "diffuseglow", "Effects" },
+            { "glitch", "Effects" },
+            { "lensdistortion", "Effects" },
+            { "pixelate", "Effects" },
+            { "twirl", "Effects" },
+            { "invert", "Compositing" },
+            { "posterize", "Compositing" },
+            { "threshold", "Compositing" },
+         };
+         const int kNumEffectTypes = sizeof(kEffectDefs) / sizeof(kEffectDefs[0]);
+
+         int prevNodeIdx = renderIdx;
+         float curX = xBase + 1040.0f;
+         float curY = yBase;
+
+         int lfoIdx = -1;
+         if (isAnim)
+         {
+            lfoIdx = SpawnNode("LFO", "Modulators", xBase - 260.0f, yBase)->index;
+            Modulation::Instance().Bind(opIdx, 0, lfoIdx, 0);
+            Modulation::Instance().Bind(camIdx, 0, lfoIdx, 0);
+         }
+
+         for (int i = 0; i < effectCount; i++)
+         {
+            const EffectDef& eff = kEffectDefs[i % kNumEffectTypes];
+            // Glitch reads Transport::Seconds() (uTime), which would make the
+            // static variant's output_hash differ run to run and defeat the
+            // quality guard. Emboss is a time-free single-pass stand-in.
+            const char* effName = (!isAnim && strcmp(eff.name, "glitch") == 0) ? "emboss" : eff.name;
+            const float nodeX = curX + (float)(i % 8) * 260.0f;
+            const float nodeY = curY + (float)(i / 8) * 200.0f;
+
+            int effIdx = SpawnNode(effName, eff.cat, nodeX, nodeY)->index;
+            if (GraphNode* curGn = FindNodeByIndex(effIdx))
+            {
+               if (GraphNode* prevGn = FindNodeByIndex(prevNodeIdx))
+               {
+                  if (ImageCable* in = CableFor(*curGn, 0))
+                     in->Connect(prevGn->node.get());
+               }
+            }
+
+            if (isAnim && lfoIdx >= 0)
+               Modulation::Instance().Bind(effIdx, 0, lfoIdx, 0);
+
+            prevNodeIdx = effIdx;
+         }
+
+         const float outX = curX + (float)(effectCount % 8) * 260.0f + 260.0f;
+         const float outY = curY + (float)(effectCount / 8) * 200.0f;
+         int outIdx = SpawnNode("Output", "Utility", outX, outY)->index;
+         if (GraphNode* outGn = FindNodeByIndex(outIdx))
+         {
+            if (GraphNode* prevGn = FindNodeByIndex(prevNodeIdx))
+            {
+               if (ImageCable* in = CableFor(*outGn, 0))
+                  in->Connect(prevGn->node.get());
+            }
+         }
+         sBenchB2OutputIdx = outIdx;
+
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+      }
       else if (const char* bench1Arg = getenv("INFINITE_BENCH_B1VOICES"))
       {
          // B1 Heavy audio fixture (docs/plans/perf/benchmark-suite.md §4).
@@ -67483,11 +67663,18 @@ int main(int argc, char** argv)
       static Bench::PercentileRing sStageImGuiRender;
       static Bench::PercentileRing sStageProjectors;
       static Bench::PercentileRing sStageSwap;
+      static Bench::GpuTimerRing sGpuTimerRing;
       static Bench::PercentileRing sBenchB5cFrameMs;
       static double sBenchB5cRssStartMb = -1.0;
+      static Bench::PercentileRing sBenchB2FrameMs;
+      static double sBenchB2RssStartMb = -1.0;
 
       const bool isBenchB5c = (getenv("INFINITE_BENCH_B5STAGES") != nullptr || getenv("INFINITE_BENCH_B5C") != nullptr);
-      const bool benchStagesSample = isBenchB5c && (frameId >= 32 && frameId < 152);
+      const bool isBenchB2 = (getenv("INFINITE_BENCH_B2") != nullptr || getenv("INFINITE_BENCH_B2VISUALS") != nullptr || getenv("INFINITE_BENCH_B2SCALE") != nullptr);
+      const bool benchStagesSample = (isBenchB5c || isBenchB2) && (frameId >= 32 && frameId < 152);
+
+      if (isBenchB5c || isBenchB2)
+         sGpuTimerRing.Poll(frameId);
 
       gFrameStart = glfwGetTime();
       glfwPollEvents();
@@ -84277,10 +84464,80 @@ int main(int argc, char** argv)
                { "projectors", sStageProjectors.Percentile(50) },
                { "swap", sStageSwap.Percentile(50) },
             };
+            sGpuTimerRing.Finish();
+            report.stagesGpuMs = sGpuTimerRing.ToJsonP50();
             report.memRssStartMb = sBenchB5cRssStartMb;
             report.memRssEndMb = Bench::ProcessRssMb();
             report.Emit();
             printf("B5STAGES DONE\n");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // B2 Heavy visuals fixture, measurement half (benchmark-suite.md §4).
+      // Same warmup/sample window as B5(b)/B5(c) (frameId 32 to 152 = 120 frames).
+      // Reports frame_ms percentiles, tris count, GPU and CPU stage breakdowns,
+      // RSS memory, and output_hash quality guard.
+      if (isBenchB2)
+      {
+         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; sBenchB2RssStartMb = Bench::ProcessRssMb(); }
+         if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
+            sBenchB2FrameMs.Push(gLastFrameMs);
+         if (frameId == 152)
+         {
+            Bench::BenchReport report;
+            report.bench = "B2_heavy_visuals";
+            report.variant = sBenchB2Variant;
+            report.frames = 152;
+            report.nodes = (int)gNodes.size();
+            report.frameMs = sBenchB2FrameMs;
+            report.stagesCpuMs = {
+               { "modulation", sStageModulation.Percentile(50) },
+               { "cook", sStageCook.Percentile(50) },
+               { "node_bodies", sStageNodeBodies.Percentile(50) },
+               { "editor_end", sStageEditorEnd.Percentile(50) },
+               { "imgui_render", sStageImGuiRender.Percentile(50) },
+               { "projectors", sStageProjectors.Percentile(50) },
+               { "swap", sStageSwap.Percentile(50) },
+            };
+            sGpuTimerRing.Finish();
+            report.stagesGpuMs = sGpuTimerRing.ToJsonP50();
+            report.memRssStartMb = sBenchB2RssStartMb;
+            report.memRssEndMb = Bench::ProcessRssMb();
+
+            if (sBenchB2Render3DIdx >= 0)
+            {
+               if (auto* gn = FindNodeByIndex(sBenchB2Render3DIdx))
+               {
+                  if (auto* r = dynamic_cast<Render3DNode*>(gn->node.get()))
+                  {
+                     for (int s = 0; s < Render3DNode::kSlots; s++)
+                     {
+                        if (r->geometry[s])
+                        {
+                           report.tris += (int)r->geometry[s]->GetMesh().FaceCount();
+                        }
+                     }
+                  }
+               }
+            }
+
+            if (sBenchB2OutputIdx >= 0)
+            {
+               if (auto* outGn = FindNodeByIndex(sBenchB2OutputIdx))
+               {
+                  if (auto* outNode = dynamic_cast<OutputNode*>(outGn->node.get()))
+                  {
+                     glBindFramebuffer(GL_READ_FRAMEBUFFER, outNode->GetFbo().fbo);
+                     report.outputHash = Bench::HashFramebufferRGBA8(outNode->GetOutputWidth(), outNode->GetOutputHeight());
+                     glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+                  }
+               }
+            }
+
+            report.Emit();
+            printf("B2VISUALS DONE\n");
             fflush(stdout);
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
@@ -85404,6 +85661,7 @@ int main(int argc, char** argv)
       }
 
       ConditionalStageTimer timerNodeBodies(benchStagesSample ? &sStageNodeBodies : nullptr);
+      Bench::ConditionalGpuStageTimer timerNodeBodiesGpu(benchStagesSample ? &sGpuTimerRing : nullptr, "node_bodies", frameId);
       PruneDeadGroups();
 
       for (GraphNode& gn : gNodes)
@@ -89937,6 +90195,7 @@ int main(int argc, char** argv)
       }
 
       timerNodeBodies.Stop();
+      timerNodeBodiesGpu.Stop();
 
       // [edperf] BuildControl's per-frame hit-test walk is the one part of the
       // editor whose cost scales with patch size; a spindump that lands here
@@ -89947,6 +90206,7 @@ int main(int argc, char** argv)
                                       : std::chrono::steady_clock::time_point{};
       {
          ConditionalStageTimer timerEditorEnd(benchStagesSample ? &sStageEditorEnd : nullptr);
+         Bench::ConditionalGpuStageTimer timerEditorEndGpu(benchStagesSample ? &sGpuTimerRing : nullptr, "editor_end", frameId);
          // Flush against any bottom-docked panel, for the same reason as the
          // Draw*Docked EndChild calls above.
          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
@@ -91177,11 +91437,13 @@ int main(int argc, char** argv)
 
       {
          ConditionalStageTimer timerModulation(benchStagesSample ? &sStageModulation : nullptr);
+         Bench::ConditionalGpuStageTimer timerModulationGpu(benchStagesSample ? &sGpuTimerRing : nullptr, "modulation", frameId);
          ApplyModulationAndPalette(frameId, true);
       }
 
       {
          ConditionalStageTimer timerCook(benchStagesSample ? &sStageCook : nullptr);
+         Bench::ConditionalGpuStageTimer timerCookGpu(benchStagesSample ? &sGpuTimerRing : nullptr, "cook", frameId);
          for (GraphNode& gn : gNodes)
          {
             if (gn.node->bypassed)
@@ -92347,6 +92609,7 @@ int main(int argc, char** argv)
       glfwGetFramebufferSize(window, &fbW, &fbH);
       {
          ConditionalStageTimer timerImGuiRender(benchStagesSample ? &sStageImGuiRender : nullptr);
+         Bench::ConditionalGpuStageTimer timerImGuiRenderGpu(benchStagesSample ? &sGpuTimerRing : nullptr, "imgui_render", frameId);
          ImGui::Render();
          glViewport(0, 0, fbW, fbH);
          // Backs every transparent ImGui child/window (ChildBg/WindowBg alpha 0

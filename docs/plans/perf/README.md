@@ -40,7 +40,7 @@ frame count (B5).
 |---|---|---|---|
 | B1 Heavy audio | 12-32 voices, buffer sweep 64/128/256/512, cb_load p99/xruns | **Yes** (`INFINITE_BENCH_B1VOICES`) | 1-64 voices, Sampler/Wavetable/Oscillator cycled through Audio Filter→Wavetable Shaper→Delay→Reverb→Dynamics, summed through a Mixer tree, one shared LFO modulating every voice's Filter `mix`. Reports cb_load percentiles (raw, from the new `AudioLoadRing`) + xruns + main fps + RSS. |
 | B1(stages) Per-DSP-stage audio breakdown | Not in original §4 - added to attribute B1's ~56-60% cb_load across its five per-voice stages (Filter/Drive/Delay/Reverb/Dynamics), needed before any SIMD/threading optimization decision | **Yes** (`INFINITE_BENCH_B1VOICES` stages breakdown) | Built into `AudioEngine::Process` via `AudioLoadRing mStageLoadHistory[kAudioStageCount]`. Measures per-stage CPU time without locks or allocations on the audio callback thread. Reports p50 callback load fraction per stage into `stages_cpu_ms`. |
-| B2 Heavy visuals | Geometry→Render3D→10-30 compositing nodes→Output, static+animated | No | Needs the GPU timer query ring (§below) for `stages_gpu_ms` - not built this session. |
+| B2 Heavy visuals | Geometry→Render3D→10-30 compositing nodes→Output, static+animated | **Yes** (`INFINITE_BENCH_B2SCALE`, `INFINITE_BENCH_B2ANIM`) | Scales s (10 effects, 1.8k tris), m (20 effects, 7.3k tris + instanced points), l (30 effects, 12.4k tris + 8k instances). Measures frame_ms percentiles, tris count, CPU stage breakdown + GPU stage breakdown (from the GPU timer ring), memory RSS, and output RGBA8 hash. `anim=1` binds an LFO to the Twist, Camera and every effect, so the whole chain recooks each frame. `anim=0` swaps the one time-driven effect (Glitch reads `uTime`) for Emboss, so the chain caches after the first cook and `output_hash` is identical run to run. It measures the idle cost of a cached heavy patch, not render cost. |
 | B3 Live performance | B1-lite+B2-lite+projector+MIDI+macros+Prediction; missed vsyncs, input-to-photon | No | Depends on B1+B2 fixtures existing first, plus a projector-window self-test fixture (none exists today). |
 | B4 Complex 3D scenes | many objects/instancing/lights/shadows/materials/HDRI/ocean | No | Same GPU-timer dependency as B2. |
 | B5 Fundamentals | (a) empty patch, **(b) node-count scaling**, **(c) per-stage CPU+GPU split**, **(d) audio-thread-alone**, **(e) startup time**, **(f) load/save time**, **(g) undo-snapshot time** | **All of (a)-(g)** (`INFINITE_BENCH_B5EMPTY`, `INFINITE_BENCH_B5NODES`, `INFINITE_BENCH_B5STAGES`, `INFINITE_BENCH_B5AUDIOALONE`, `INFINITE_BENCH_B5STARTUP`, `INFINITE_BENCH_B5LOADSAVE`, `INFINITE_BENCH_B5UNDO`) | (a) zero-node floor, frame_ms percentiles + RSS, same 120-frame sampled window as (b) so the two are directly comparable. (b) 50/100/200/400 mixed nodes laid out on a grid (not stacked at origin - the flaw called out in benchmark-suite.md §2 against MIXEDSTRESSTEST/GEOMDENSITYTEST). Reports frame_ms percentiles + RSS. (c) same mixed-node grid as (b), wraps seven main-loop stages (`modulation`, `cook`, `node_bodies`, `editor_end`, `imgui_render`, `projectors`, `swap`) in `ConditionalStageTimer`s sampled over the same frame window, reports p50 CPU ms per stage into `stages_cpu_ms` (`stages_gpu_ms` still empty - blocked on the GPU timer ring below). (d) one Oscillator straight into Audio Out, no effects chain, buffer sweep 64/128/256/512 - isolates the audio callback's fixed per-block cost from B1's DSP-graph cost; reuses B1's wall-clock-window + `AudioLoadRing` pattern. (e) startup milestone timings from entry through first frame swap (`pre_window`, `window_gl`, `imgui_fonts`, `scanners_load`, `first_frame_render`, `total_to_first_frame`). (f)/(g) reuse (b)/(c)'s mixed-node grid (`INFINITE_BENCH_B5LOADSAVE=<n>`/`INFINITE_BENCH_B5UNDO=<n>`), fire once at `frameId==32`, and time the real patch I/O and undo paths back to back (`SavePatchTo`→`LoadPatchFrom`; `PushUndoCheckpoint`→`Undo`) via `Bench::ScopedStageTimer::NowMs()` - not synthetic serialize-only calls, so (f) includes whatever `ApplyPatchData`/field-graph remap does on load, and (g) includes the real `BuildPatchData`/`ApplyPatchData` round trip Undo takes. `stages_cpu_ms: {save, load}` / `{push_checkpoint, undo_restore}`. |
@@ -80,13 +80,11 @@ the top, so `EXITAFTER=152` closes the window one iteration before that check
 ever fires - no `BENCH_JSON` line, ever, at any node count. Confirmed by
 direct reproduction (`EXITAFTER=152` failed 3/3 runs, `153+` passed every
 time). Fixed by bumping `run_all.sh`'s `EXITAFTER` for this sweep to 160,
-matching the margin every other fixture in the script already carries. The
-remaining benchmarks
-(B2/B3/B4/B6/B7/B8/B9/B10, and B5's c/e/f/g sub-benchmarks) are not yet built -
-each is its own multi-hour session given the platform work some of them need
-(GPU timers, a canvas-automation entry point, projector/MIDI harnesses,
-offline-render integration). Nothing below claims coverage this suite doesn't
-have.
+matching the margin every other fixture in the script already carries. Since then B1(stages), B2, all of B5 and the GPU timer ring have been
+built (see the table above). B3/B4/B6/B7/B8/B9/B10 are not built yet. Each
+needs its own platform work first (a canvas-automation entry point,
+projector/MIDI harnesses, offline-render integration). Nothing below claims
+coverage this suite doesn't have.
 
 ## What still needs building, and what it needs first
 
@@ -97,13 +95,17 @@ Projector/Output > Canvas > Previews):
    Attributes B1 callback load across stages (`synths`, `filter`, `shaper`, `delay`, `reverb`, `dynamics`, `mixer`).
 2. **B5(f)/(g)** - load/save time, undo-snapshot time. **Built**
    (`INFINITE_BENCH_B5LOADSAVE`, `INFINITE_BENCH_B5UNDO`).
-3. **GPU timer query ring** (`GL_TIME_ELAPSED`, read back N frames later,
-   guarded for GL 4.1 support - macOS has it, confirm before assuming
-   Windows/Linux llvmpipe does). Blocks B2, B4, B9's GPU numbers, and B3's.
-   Not started. This is the next item on the list - everything else buildable
-   without it is now built.
-- **B5(c)** is now built (`INFINITE_BENCH_B5STAGES`); `stages_gpu_ms` stays
-  empty until the GPU timer ring above exists.
+3. **GPU timer query ring**. **Built** (`Bench::GpuTimerRing` in
+   `BenchReport.h`). `GL_TIME_ELAPSED`, a 4-deep query ring per stage, polled
+   without blocking at the top of each frame, drained with one `glFinish` when
+   the report is written. It probes support once and reports nothing if timer
+   queries are missing, so Windows/Linux llvmpipe CI degrades to an empty
+   `stages_gpu_ms` rather than failing. It wraps `modulation`, `cook`,
+   `node_bodies`, `editor_end` and `imgui_render` only. `projectors` is left
+   out because the projector loop calls `glfwMakeContextCurrent`, and query
+   objects are per-context. `swap` is left out because it submits no GPU work
+   of its own. Feeds B2 and B5(c).
+4. **B2 heavy visuals**. **Built** (see table and baseline).
 - **B6 canvas navigation**: needs a programmatic pan/zoom/drag entry point
   into the node editor (`ed::` calls) exposed to a self-test fixture - none
   exists today. `main.cpp`'s existing `gDroppedFiles`/`gDropPos` self-test
@@ -137,6 +139,19 @@ windows throughout (60s B1 per buffer size, 30s B5d per buffer size).
 | B5_fundamentals_audioalone | buf=256 | n/a | 0.85 / 1.11 | 0 | 2 | n/a |
 | B5_fundamentals_audioalone | buf=512 | n/a | 2.44 / 2.72 | 0 | 2 | n/a |
 
+B2 rows, recorded 2026-09-24 on the same machine from a direct fixture run on
+`feature/gpu-timer-query-ring` (not yet in `bench/baselines/m2-8gb.jsonl`;
+re-record the baseline with `run_all.sh` before comparing against it):
+
+| Bench | Variant | frame_ms p50/p95/p99 (ms) | GPU `cook` p50 (ms) | CPU `swap` p50 (ms) | tris | nodes |
+|---|---|---|---|---|---|---|
+| B2_heavy_visuals | s, anim | 16.7 / 25.5 / 59.6 | 12.7 | 10.8 | 1800 | 18 |
+| B2_heavy_visuals | m, anim | 32.9 / 34.8 / 35.8 | 24.4 | 23.4 | 7308 | 32 |
+| B2_heavy_visuals | l, anim | 46.8 / 50.2 / 51.6 | 36.0 | 33.7 | 12396 | 42 |
+| B2_heavy_visuals | s, static | 4.0 / 5.7 / 7.6 | 0.16 | 2.2 | 1800 | 17 |
+| B2_heavy_visuals | m, static | 4.1 / 7.1 / 7.7 | 0.14 | 2.3 | 7308 | 31 |
+| B2_heavy_visuals | l, static | 4.5 / 7.0 / 7.6 | 0.13 | 2.4 | 12396 | 41 |
+
 ## Top costs per benchmark
 
 - **B1** (24-voice heavy audio):
@@ -158,6 +173,13 @@ windows throughout (60s B1 per buffer size, 30s B5d per buffer size).
     numerical-equivalence check passed (max diff 2.98e-08, tol 1e-5).
     Re-run B1(stages) against this branch to get the before/after cb_load
     delta - not yet done.
+- **B2** (heavy visuals, animated): GPU-bound at every scale. GPU `cook`
+  (all node renders) is 12.7 / 24.4 / 36.0 ms at s / m / l, and the CPU
+  `swap` stage roughly equals it, because swap is where the CPU waits for
+  the GPU. CPU `cook` stays at 0.7-5.4 ms. The m and l scales cannot hold
+  60 fps on a base M2. The next measurement is to split GPU `cook` per node,
+  to find out whether the 1080p Render 3D or the 10-30 full-res effect passes
+  dominate.
 - **B5(b)** (node-count scaling): near-linear from 50 to 200 nodes (4.4ms to
   14.7ms, roughly 3.3x for 4x the nodes), then super-linear at 400 (28.6ms
   p50, 39.9ms p99 - the p95/p99 spread widens sharply too, 37.5/39.9 vs a
@@ -176,11 +198,21 @@ windows throughout (60s B1 per buffer size, 30s B5d per buffer size).
 Per §8: this suite measures, it does not fix. Anything found while building
 a fixture goes here, not into a code change.
 
-- (none recorded yet against the *app* - the only two issues found this
-  session were both in this suite's own harness code: a null-`this` crash in
-  the B1/B5d fixture setup, and an `EXITAFTER` fencepost bug in `run_all.sh`'s
-  B5(b) sweep, both described above and both fixed as this session's own
-  deliverable, not app bugs)
+- Harness bugs, fixed as part of this suite: a null-`this` crash in the
+  B1/B5d fixture setup, and an `EXITAFTER` fencepost bug in `run_all.sh`'s
+  B5(b) sweep (both described above). B2's first version had a static variant
+  whose `output_hash` changed every run because Glitch reads `uTime`. Fixed
+  by swapping Glitch for Emboss in the static variant.
+- App behaviour, not fixed: one time-driven filter (`FilterNode::mUsesTime`,
+  so Glitch, Add Noise, Displace or Liquify) anywhere in a chain turns off
+  caching for every node below it. The whole downstream chain recooks every
+  frame even when nothing else changes. B2 l-static went from 28 ms to 4.5 ms
+  p50 when its three Glitch nodes were replaced. Users can hit this without
+  knowing.
+- `mem.rss_mb` at the end of a run is often *lower* than at the start on this
+  8 GB machine (for example B2 s-anim 208 to 52 MB). macOS compresses and
+  pages out memory under pressure, so RSS is not a reliable footprint number
+  here. B9 will need `phys_footprint` (`task_vm_info`) instead.
 
 ## Windows/Linux
 

@@ -14,6 +14,225 @@ namespace Bench
       return duration<double, std::milli>(steady_clock::now().time_since_epoch()).count();
    }
 
+   GpuTimerRing::GpuTimerRing() = default;
+
+   // Deliberately no GL calls here: the fixture's ring is a function-local
+   // static, destroyed after the GL context is gone, and query objects die
+   // with their context anyway.
+   GpuTimerRing::~GpuTimerRing() = default;
+
+   void GpuTimerRing::EnsureInitialized()
+   {
+      if (mInitialized)
+         return;
+      mInitialized = true;
+      mSupported = false;
+
+#if !defined(__APPLE__)
+      if (!glad_glGenQueries || !glad_glDeleteQueries || !glad_glBeginQuery ||
+          !glad_glEndQuery || !glad_glGetQueryObjectuiv || !glad_glGetQueryObjectui64v)
+      {
+         return;
+      }
+#endif
+
+      // Clear any pending GL error state
+      for (int i = 0; i < 16 && glGetError() != GL_NO_ERROR; ++i) {}
+
+      GLuint probe = 0;
+      glGenQueries(1, &probe);
+      if (glGetError() != GL_NO_ERROR || probe == 0)
+         return;
+
+      glBeginQuery(GL_TIME_ELAPSED, probe);
+      GLenum errBegin = glGetError();
+      glEndQuery(GL_TIME_ELAPSED);
+      GLenum errEnd = glGetError();
+      glDeleteQueries(1, &probe);
+
+      if (errBegin == GL_NO_ERROR && errEnd == GL_NO_ERROR)
+      {
+         mSupported = true;
+      }
+   }
+
+   bool GpuTimerRing::IsSupported()
+   {
+      EnsureInitialized();
+      return mSupported;
+   }
+
+   void GpuTimerRing::BeginStage(const std::string& stageName, int frameId)
+   {
+      EnsureInitialized();
+      if (!mSupported || stageName.empty())
+         return;
+
+      // GL_TIME_ELAPSED queries cannot be nested
+      if (!mCurrentActiveStage.empty())
+         return;
+
+      auto& ring = mStages[stageName];
+      if (ring.active)
+         return;
+
+      // Lazy allocate queries for this stage
+      if (ring.slots[0].queryId == 0)
+      {
+         GLuint ids[kRingDepth] = {};
+         glGenQueries(kRingDepth, ids);
+         if (glGetError() != GL_NO_ERROR)
+            return;
+         for (int i = 0; i < kRingDepth; ++i)
+         {
+            ring.slots[i].queryId = ids[i];
+            ring.slots[i].frameId = -1;
+            ring.slots[i].inFlight = false;
+         }
+      }
+
+      int slotIdx = (frameId >= 0 ? frameId : 0) % kRingDepth;
+      auto& slot = ring.slots[slotIdx];
+
+      // If slot is still in-flight from kRingDepth frames ago, poll non-blocking
+      if (slot.inFlight)
+      {
+         GLuint available = 0;
+         glGetQueryObjectuiv(slot.queryId, GL_QUERY_RESULT_AVAILABLE, &available);
+         if (available)
+         {
+            GLuint64 timeNs = 0;
+            glGetQueryObjectui64v(slot.queryId, GL_QUERY_RESULT, &timeNs);
+            ring.samples.Push((double)timeNs * 1e-6);
+            slot.inFlight = false;
+         }
+         else
+         {
+            // Still busy after kRingDepth frames; skip this query to avoid corrupting active query
+            return;
+         }
+      }
+
+      glBeginQuery(GL_TIME_ELAPSED, slot.queryId);
+      if (glGetError() == GL_NO_ERROR)
+      {
+         slot.frameId = frameId;
+         slot.inFlight = true;
+         ring.active = true;
+         ring.activeSlot = slotIdx;
+         mCurrentActiveStage = stageName;
+      }
+   }
+
+   void GpuTimerRing::EndStage(const std::string& stageName)
+   {
+      if (!mSupported || stageName.empty())
+         return;
+
+      auto it = mStages.find(stageName);
+      if (it == mStages.end() || !it->second.active)
+         return;
+
+      glEndQuery(GL_TIME_ELAPSED);
+      it->second.active = false;
+      it->second.activeSlot = -1;
+      if (mCurrentActiveStage == stageName)
+         mCurrentActiveStage.clear();
+   }
+
+   void GpuTimerRing::Poll(int currentFrameId)
+   {
+      if (!mSupported)
+         return;
+
+      for (auto& [name, ring] : mStages)
+      {
+         for (int i = 0; i < kRingDepth; ++i)
+         {
+            auto& slot = ring.slots[i];
+            // Only poll queries from prior frames so we never stall the pipeline on the current frame
+            if (slot.inFlight && slot.frameId < currentFrameId)
+            {
+               GLuint available = 0;
+               glGetQueryObjectuiv(slot.queryId, GL_QUERY_RESULT_AVAILABLE, &available);
+               if (available)
+               {
+                  GLuint64 timeNs = 0;
+                  glGetQueryObjectui64v(slot.queryId, GL_QUERY_RESULT, &timeNs);
+                  ring.samples.Push((double)timeNs * 1e-6);
+                  slot.inFlight = false;
+               }
+            }
+         }
+      }
+   }
+
+   void GpuTimerRing::Finish()
+   {
+      if (!mSupported)
+         return;
+
+      if (!mCurrentActiveStage.empty())
+      {
+         EndStage(mCurrentActiveStage);
+      }
+
+      // Final pipeline drain at the end of the benchmark run
+      glFinish();
+
+      for (auto& [name, ring] : mStages)
+      {
+         for (int i = 0; i < kRingDepth; ++i)
+         {
+            auto& slot = ring.slots[i];
+            if (slot.inFlight && slot.queryId != 0)
+            {
+               GLuint64 timeNs = 0;
+               glGetQueryObjectui64v(slot.queryId, GL_QUERY_RESULT, &timeNs);
+               ring.samples.Push((double)timeNs * 1e-6);
+               slot.inFlight = false;
+            }
+         }
+      }
+   }
+
+   void GpuTimerRing::Reset()
+   {
+      for (auto& [name, ring] : mStages)
+      {
+         if (ring.slots[0].queryId != 0)
+         {
+            GLuint ids[kRingDepth] = {};
+            for (int i = 0; i < kRingDepth; ++i)
+               ids[i] = ring.slots[i].queryId;
+            glDeleteQueries(kRingDepth, ids);
+            for (int i = 0; i < kRingDepth; ++i)
+               ring.slots[i].queryId = 0;
+         }
+      }
+      mStages.clear();
+      mCurrentActiveStage.clear();
+      mInitialized = false;
+      mSupported = false;
+   }
+
+   nlohmann::json GpuTimerRing::ToJsonP50() const
+   {
+      nlohmann::json j = nlohmann::json::object();
+      for (const auto& [name, ring] : mStages)
+      {
+         if (!ring.samples.Empty())
+            j[name] = ring.samples.Percentile(50);
+      }
+      return j;
+   }
+
+   const PercentileRing* GpuTimerRing::GetStage(const std::string& stageName) const
+   {
+      auto it = mStages.find(stageName);
+      return (it != mStages.end()) ? &it->second.samples : nullptr;
+   }
+
    uint64_t Fnv1a64(const void* data, size_t len)
    {
       const auto* bytes = static_cast<const unsigned char*>(data);

@@ -76,7 +76,13 @@ for buf in 64 128 256 512; do
 done
 
 echo "B2 Heavy visuals"
-skip "B2_heavy_visuals"
+# B2 Heavy visuals sweep per benchmark-suite.md §4 (scales s/m/l, static and animated variants).
+for scale in s m l; do
+   run_fixture "B2_heavy_visuals scale=$scale,anim=1" 160 \
+      INFINITE_BENCH_B2SCALE="$scale" INFINITE_BENCH_B2ANIM=1
+   run_fixture "B2_heavy_visuals scale=$scale,anim=0" 160 \
+      INFINITE_BENCH_B2SCALE="$scale" INFINITE_BENCH_B2ANIM=0
+done
 
 echo "B3 Live performance"
 skip "B3_live"
