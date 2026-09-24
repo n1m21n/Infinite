@@ -60580,6 +60580,150 @@ static void RunAudioRingTest()
    printf("AUDIO RING %s\n", failures == 0 ? "OK" : "FAIL");
 }
 
+// ===================================================== INFINITE_VIDEOEXACTTEST
+// An offline render must show EVERY source frame exactly - no skipping ahead
+// to catch up, no stale repeat - even though realtime playback is allowed to
+// drop frames to keep up with the clock. This records a clip whose frame i is
+// a flat grey unique to i, then steps it the way an export does
+// (Platform::VideoFrameAtExact, which VideoSourceNode uses in offline mode)
+// at 30, 60 and 24 fps, plus a few backward and forward seeks, and checks
+// every request shows exactly the source frame that covers its time.
+static void RunVideoExactTest()
+{
+   constexpr int kW = 320;
+   constexpr int kH = 240;
+   constexpr int kFps = 30;
+   constexpr int kFrames = 60;
+   auto levelOf = [](int i) { return 16 + i * 3; }; // 16..193, 3 apart survives H.264
+   int failures = 0;
+
+   const std::string path = TmpPath("infinite_videoexacttest.mp4");
+   std::remove(path.c_str());
+   std::string error;
+   Platform::RecorderHandle* rec = Platform::RecorderStart(path, kW, kH, kFps, error);
+   if (rec == nullptr)
+   {
+      printf("  [FAIL] could not start recorder: %s\nVIDEOEXACTTEST FAIL - BUG\n", error.c_str());
+      return;
+   }
+   for (int i = 0; i < kFrames; i++)
+   {
+      for (int spin = 0; spin < 20000 && Platform::RecorderPendingFrameCount(rec) >= 3; spin++)
+         std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::vector<unsigned char> px = Platform::RecorderAcquireFrameBuffer(rec);
+      px.assign((size_t)kW * kH * 4, (unsigned char)levelOf(i));
+      for (size_t k = 3; k < px.size(); k += 4)
+         px[k] = 255;
+      if (!Platform::RecorderAppend(rec, std::move(px), 1))
+         failures++;
+   }
+   int wrote = 0;
+   if (!Platform::RecorderStop(rec, error, &wrote, nullptr) || wrote != kFrames || failures > 0)
+   {
+      printf("  [FAIL] recorder wrote %d of %d frames (%s)\nVIDEOEXACTTEST FAIL - BUG\n",
+             wrote, kFrames, error.c_str());
+      return;
+   }
+
+   // Which source frame a delivered picture is, from its centre grey.
+   auto frameIndexOf = [&](const std::vector<unsigned char>& px) -> int
+   {
+      if ((int)px.size() < kW * kH * 4)
+         return -1;
+      double sum = 0.0;
+      int count = 0;
+      for (int y = kH / 4; y < kH * 3 / 4; y += 4)
+      {
+         for (int x = kW / 4; x < kW * 3 / 4; x += 4)
+         {
+            sum += px[((size_t)y * kW + x) * 4 + 1];
+            count++;
+         }
+      }
+      return (int)std::lround((sum / std::max(1, count) - 16.0) / 3.0);
+   };
+
+   Transport::Instance().SetOfflineMode(true, 48000.0);
+   const double exportRates[] = { 30.0, 60.0, 24.0 };
+   for (double rate : exportRates)
+   {
+      Platform::VideoHandle* vid = Platform::VideoOpen(path, error);
+      if (vid == nullptr)
+      {
+         printf("  [FAIL] could not open the clip: %s\n", error.c_str());
+         failures++;
+         break;
+      }
+      std::vector<unsigned char> px;
+      int steps = 0, wrong = 0, firstWrongStep = -1, firstWrongGot = -1, firstWrongWant = -1;
+      for (int k = 0; (double)k / rate < (double)kFrames / kFps - 1e-6; k++)
+      {
+         const double t = (double)k / rate;
+         Platform::VideoFrameAtExact(vid, t, px);
+         const int want = (int)std::floor(t * kFps + 1e-6);
+         const int got = frameIndexOf(px);
+         steps++;
+         if (got != want)
+         {
+            if (wrong++ == 0)
+            {
+               firstWrongStep = k;
+               firstWrongGot = got;
+               firstWrongWant = want;
+            }
+         }
+      }
+      printf("  export @ %.0f fps: %d steps, %d wrong frames", rate, steps, wrong);
+      if (wrong > 0)
+         printf(" (first at step %d: got frame %d, wanted %d)", firstWrongStep, firstWrongGot, firstWrongWant);
+      printf("\n");
+      failures += wrong;
+
+      // Seeks, as a scrub or an arrangement jump would do mid-export.
+      const int seekTo[] = { 40, 10, 11, 50, 5, 59, 0 };
+      int seekWrong = 0;
+      for (int f : seekTo)
+      {
+         Platform::VideoFrameAtExact(vid, (f + 0.5) / kFps, px);
+         const int got = frameIndexOf(px);
+         if (got != f)
+         {
+            printf("  seek to frame %d showed frame %d\n", f, got);
+            seekWrong++;
+         }
+      }
+      if (seekWrong > 0)
+         printf("  [FAIL] %d of %d seeks landed on the wrong frame\n", seekWrong, (int)(sizeof(seekTo) / sizeof(seekTo[0])));
+      failures += seekWrong;
+      Platform::VideoClose(vid);
+   }
+   // INFINITE_VIDEOEXACTTEST=<movie>: also print an FNV-1a hash of every
+   // frame of that movie as delivered (RGBA, bottom-up), so a decoder change
+   // can be diffed pixel-for-pixel against a reference decode of the same file.
+   const char* hashClip = getenv("INFINITE_VIDEOEXACTTEST");
+   if (hashClip != nullptr && std::strcmp(hashClip, "1") != 0)
+   {
+      Platform::VideoHandle* vid = Platform::VideoOpen(hashClip, error);
+      std::vector<unsigned char> px;
+      const int n = vid ? (int)std::lround(Platform::VideoDuration(vid) * 30.0) : 0;
+      for (int i = 0; i < n; i++)
+      {
+         Platform::VideoFrameAtExact(vid, (i + 0.5) / 30.0, px);
+         uint64_t h = 1469598103934665603ull;
+         for (unsigned char c : px)
+         {
+            h ^= c;
+            h *= 1099511628211ull;
+         }
+         printf("  hash %d %016llx\n", i, (unsigned long long)h);
+      }
+      Platform::VideoClose(vid);
+   }
+   Transport::Instance().SetOfflineMode(false);
+   std::remove(path.c_str());
+   printf("%s\n", failures == 0 ? "VIDEOEXACTTEST OK" : "VIDEOEXACTTEST FAIL - BUG");
+}
+
 // ===================================================== INFINITE_RECEXPORTTEST
 // End-to-end A/V sync measurement on a real written movie, as opposed to
 // RECSYNCTEST above, which only exercises the pacing arithmetic in isolation.
@@ -65578,6 +65722,12 @@ int main(int argc, char** argv)
          RunRecExportTest(1280, 720, false, "720p");
       else
          RunRecExportTest(320, 240, false, "default");
+      return 0; // verdict is the printf line, not $?
+   }
+
+   if (getenv("INFINITE_VIDEOEXACTTEST") != nullptr)
+   {
+      RunVideoExactTest();
       return 0; // verdict is the printf line, not $?
    }
 
@@ -83837,6 +83987,8 @@ int main(int argc, char** argv)
          // (bumped only when Platform::VideoFrameAt actually produces a new
          // displayed frame) keeps climbing throughout each phase - a stall
          // there is a real visual freeze even if Position() keeps advancing.
+         // A repeat of the same source frame is not an update, so each phase
+         // is held to the source frames it actually crossed, not to 60.
          auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
          if (frameId == 2)
          {
@@ -83850,6 +84002,13 @@ int main(int argc, char** argv)
          static VideoSourceNode* sVideo = nullptr;
          static int sReverseStartUpdates = 0, sForwardStartUpdates = 0;
          static double sReverseStartPos = 0.0, sForwardStartPos = 0.0;
+         static double sReverseStartT = 0.0, sForwardStartT = 0.0, sReverseExpected = 0.0;
+         // Source frames a phase crosses: elapsed transport time x |speed| x
+         // the clip's rate, capped at one per rendered frame.
+         auto expectedUpdates = [&](double startT, double absSpeed) {
+            const double crossed = (Transport::Instance().Seconds() - startT) * absSpeed * (double)out->recordFps;
+            return std::min(60.0, crossed);
+         };
          if (frameId == 64)
          {
             SpawnNode("Video", "Source", 600.0f, 40.0f); // 3
@@ -83860,31 +84019,35 @@ int main(int argc, char** argv)
             sVideo->speed = -1.0f;
             sReverseStartUpdates = sVideo->FrameUpdateCount();
             sReverseStartPos = sVideo->Position();
+            sReverseStartT = Transport::Instance().Seconds();
          }
          if (frameId == 124 && sVideo != nullptr)
          {
             const int reverseUpdates = sVideo->FrameUpdateCount() - sReverseStartUpdates;
             const double reverseMoved = sVideo->Position() - sReverseStartPos;
-            printf("reverse (60 frames @ speed -1): updates=%d posDelta=%.3f (from %.3f to %.3f)\n",
-                   reverseUpdates, reverseMoved, sReverseStartPos, sVideo->Position());
+            sReverseExpected = expectedUpdates(sReverseStartT, 1.0);
+            printf("reverse (60 frames @ speed -1): updates=%d expected=%.0f posDelta=%.3f (from %.3f to %.3f)\n",
+                   reverseUpdates, sReverseExpected, reverseMoved, sReverseStartPos, sVideo->Position());
 
             sVideo->speed = 4.0f;
             sForwardStartUpdates = sVideo->FrameUpdateCount();
             sForwardStartPos = sVideo->Position();
+            sForwardStartT = Transport::Instance().Seconds();
          }
          if (frameId == 184 && sVideo != nullptr)
          {
             const int reverseUpdates = sVideo->FrameUpdateCount() - sReverseStartUpdates; // recompute isn't needed, kept for symmetry
             const int forwardUpdates = sVideo->FrameUpdateCount() - sForwardStartUpdates;
-            printf("forward (60 frames @ speed +4): updates=%d (from %.3f to %.3f)\n",
-                   forwardUpdates, sForwardStartPos, sVideo->Position());
+            const double forwardExpected = expectedUpdates(sForwardStartT, 4.0);
+            printf("forward (60 frames @ speed +4): updates=%d expected=%.0f (from %.3f to %.3f)\n",
+                   forwardUpdates, forwardExpected, sForwardStartPos, sVideo->Position());
 
-            // A healthy run should produce a fresh displayed frame on most of
-            // the 60 real frames in each phase - a handful of misses to
-            // decode hiccups is fine, a near-zero count is the freeze.
-            const bool reverseOk = (sVideo->FrameUpdateCount() - sReverseStartUpdates) > 30;
-            const bool forwardOk = forwardUpdates > 30;
-            (void)reverseUpdates;
+            // A healthy run shows most of the source frames each phase
+            // crossed - a handful of misses to decode hiccups is fine, a
+            // near-zero count is the freeze.
+            const int reversePhaseUpdates = reverseUpdates - forwardUpdates;
+            const bool reverseOk = reversePhaseUpdates >= 10 && reversePhaseUpdates > sReverseExpected * 0.5;
+            const bool forwardOk = forwardUpdates >= 10 && forwardUpdates > forwardExpected * 0.5;
             printf("%s\n", (reverseOk && forwardOk) ? "VIDEOSPEEDTEST OK" : "VIDEOSPEEDTEST FAIL - BUG");
 
             // Separate, additive check for the "loops once then freezes on

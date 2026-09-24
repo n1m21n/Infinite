@@ -416,8 +416,14 @@ void VideoSourceNode::CookIfNeeded(int frameId)
       mBench->requests++;
    }
 
+   // An offline render (movie export) must show the exact frame for this
+   // position, so it waits for the decoder; realtime playback never does -
+   // holding the previous frame is how it keeps up.
+   const bool offline = Transport::Instance().IsOfflineMode();
    const bool gotFrame = glfwGetCurrentContext() != nullptr &&
-                         Platform::VideoFrameAt(mVideo, mPosition, mFrame) && !mFrame.empty();
+                         (offline ? Platform::VideoFrameAtExact(mVideo, mPosition, mFrame)
+                                  : Platform::VideoFrameAt(mVideo, mPosition, mFrame)) &&
+                         !mFrame.empty();
    if (mBench && !gotFrame)
    {
       mBench->failed++;

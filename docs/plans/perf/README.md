@@ -1,5 +1,61 @@
 # Performance benchmark suite
 
+## Scoreboard
+
+One row per measured win (or loss). Medians on the M2 8 GB machine; change %
+is (after - before) / before. Video rows are B8, 300 frames, `bench/media`
+clips. BEFORE is `3626c3d` (`main` at the branch point), 3 runs per variant.
+AFTER is `93e184d` (= `bugfix/macos-video-decode` after the revert in
+`1b7364e`): 2160 variants from 3 runs interleaved with the gate below, 1080
+variants from 1 run (the 3-run 1080 set could not be paced: screen locked).
+
+| fix | commit | benchmark / variant | metric | before | after | change % |
+|---|---|---|---|---|---|---|
+| UI frame cost | `1d19afa` | B1 | UI frame ms | 75 | 16.7 | -78% |
+| Reverb SIMD | `a518103` | B1 | cb_load % | 57.4 | 51.4 | -10% |
+| Ocean node | `47c46ad` | Ocean scene | node_bodies ms | ~21 | 3.5 | -83% |
+| Ocean node | `47c46ad` | Ocean scene | frame ms | ~22 | 13.4 | -39% |
+| Time-filter caching | `e04b7a6` | B2 l-static | frame ms | 28 | 4.5 | -84% |
+| Dropdown undo | `2c92715` / `2910b2a` | - | - | not re-measured | - | - |
+| Blur split (two-pass) | `e04b7a6` | - | - | not re-measured | - | - |
+| **Regression**, cause unsettled (see B5(b)) | - | B5b n=400 | frame p50 ms | 28.6 | 33.9 | **+18%** |
+| Video: upload only new frames | `8d29baa` | B8 2x1080 / 4x1080 / 2x2160 / 4x2160 | uploads per 268 cooks | 268 / 268 / 268 / 268 | 70 / 68 / 69 / 123 | -74% / -75% / -74% / -54% |
+| Video: no per-frame copy + vImage swizzle | `5d9cbf0`, `8a93b8d` | B8 2x1080 / 4x1080 / 2x2160 / 4x2160 | cook ms | 4.2 / 8.4 / 7.7 / 30.2 | 0.1 / 0.1 / 0.1 / 0.2 | -98% / -99% / -99% / -99% |
+| Video: bounded catch-up | `93e184d` | B8 2x1080 / 4x1080 / 2x2160 / 4x2160 | dropped per clip | 1 / 8 / 4 / 80 | 2 / 0 / 0 / 22 | +1 frame / -100% / -100% / -73% |
+| Video: all four | `8d29baa`..`93e184d` | B8 2x1080 | frame p50 / p99 ms | 8.7 / 21.0 | 8.5 / 20.5 | -2% / -2% |
+| | | B8 4x1080 | frame p50 / p99 ms | 11.7 / 26.3 | 9.9 / 17.8 | -15% / -32% |
+| | | B8 2x2160 | frame p50 / p99 ms | 11.2 / 32.4 | 8.4 / 16.8 | -25% / -48% |
+| | | B8 4x2160 | frame p50 / p99 ms | 32.9 / 83.8 | 13.9 / 112.2 | -58% / **+34%** |
+| | | B8 2x1080 / 4x1080 / 2x2160 / 4x2160 | loop-boundary max ms | 13.7 / 14.8 / 34.8 / 186.2 | 12.2 / 11.7 / 29.9 / 223.3 | -11% / -21% / -14% / **+20%** |
+| | | B8 4x2160 | decoded fps | 30.0 | 29.7 | -1% |
+| Video: decode thread per clip | `b4a1454`, `8a6648a` | reverted in `1b7364e` | - | - | - | see the gate below |
+
+Keep-or-revert gate for the decode thread: B8, 3 runs each, interleaved
+against a `93e184d` build. The rule was: keep only if the branch is >= base on
+every metric and its footprint is not higher. It failed on 2x2160 p50 and on
+footprint, so it was reverted.
+
+| variant | metric | base `93e184d` | thread `8a6648a` |
+|---|---|---|---|
+| 2x2160 | frame p50 / p99 ms | 8.4 / 16.8 | 9.5 / 16.7 |
+| 2x2160 | dropped per clip | 0 | 0 |
+| 2x2160 | loop-boundary max ms | 29.9 | 0.0 |
+| 2x2160 | footprint peak MB | 633 | 662 |
+| 4x2160 | frame p50 / p99 ms | 13.9 / 112.2 | 9.2 / 23.1 |
+| 4x2160 | dropped per clip | 22 | 0 |
+| 4x2160 | loop-boundary max ms | 223.3 | 150.1 |
+| 4x2160 | footprint peak MB | 1139 | 1160 |
+
+What did not improve, and why:
+
+| metric | before | after | why |
+|---|---|---|---|
+| 4x2160 frame p99 | 83.8 ms | 112.2 ms (+34%) | Every loop wrap still rebuilds the `AVAssetReader` on the main thread (finding 1 is still open). At 4K that is 100-220 ms, and with four clips at a 1.1-1.2 GB footprint on 8 GB the machine pages. Before, the spiral kept every frame slow (p50 32.9), so p99 was a smaller multiple of it. |
+| 4x2160 loop-boundary max | 186.2 ms | 223.3 ms (+20%) | Same cause. One run in three reads 223 ms on clip 0; the other clips read 26-43 ms. |
+| 4x2160 dropped | 80 per clip | 22 per clip | Two runs out of three drop 20-34 per clip, all around the wraps; the third drops 0. The thread removed this but failed the gate. |
+| 2x1080 dropped | 1 | 2 | Single run, around one wrap; within noise. |
+| 1080 loop-boundary max | 13.7 / 14.8 ms | 12.2 / 11.7 ms | Under 16.7 ms, but only 11-21% better: the reader rebuild at a wrap is still synchronous. |
+
 Governing spec: [`benchmark-suite.md`](benchmark-suite.md) (§1-§8). This
 document is the living status: what's built, how to run it, the baseline
 table, and bugs found while measuring (not fixed - this suite's rule is
@@ -608,16 +664,22 @@ a fixture goes here, not into a code change.
   can't see that. B6 counts frame intervals within 1.5 ms of a whole number
   of refresh periods. Below 80% it tags the run `unpaced=1`. B3 has the
   same exposure.
-- **B8 media I/O** (measured, not fixed; numbers in the B8 section above):
-  1. *macOS decodes on the main thread, inside cook.* `VideoFrameAt` runs
+- **B8 media I/O** (numbers in the B8 section above; 2, 3 and 8 are fixed
+  on `bugfix/macos-video-decode`, see the Scoreboard):
+  1. **Open.** A decode thread per clip (`b4a1454` + `8a6648a`) fixed it,
+     but failed the keep-or-revert gate and was reverted in `1b7364e` (see
+     the Scoreboard). *macOS decodes on the main thread, inside cook.* `VideoFrameAt` runs
      `AVAssetReader` synchronously from `VideoSourceNode::CookIfNeeded`. At
      2x1080 `cook` is 4.2 of an 8.7 ms frame, and every loop wrap stalls
      the frame for 12-16 ms (1080) or 29-31 ms (2160).
-  2. *An unchanged frame is uploaded again.* `TryUseCache` hands back the
+  2. **Fixed** in `8d29baa` (`VideoFrameAt` returns true only for a new
+     frame). *An unchanged frame is uploaded again.* `TryUseCache` hands back the
      same frame, and `VideoSourceNode` uploads it again. At 2x1080: 268
      uploads for 68 new frames, so 200 (75%) re-upload unchanged pixels at
      ~1.5 ms CPU each. At a paced 60 Hz this would be about 50%.
-  3. *`PushCacheFrame` copies every decoded frame.* It allocates and
+  3. **Fixed** in `5d9cbf0` (no per-frame copy or cache entry during
+     playback), swizzle cost cut in `8a93b8d` (vImage).
+     *`PushCacheFrame` copies every decoded frame.* It allocates and
      `memcpy`s a full frame into the LRU under `gVideoCacheMutex`, even when
      it will never be read again: 47% of main-thread time in the heaviest run.
   4. *Linux copies every delivered frame into `frameCache`, and its cache
@@ -632,7 +694,9 @@ a fixture goes here, not into a code change.
      interval is unchanged.
   7. *Spout `HasClients` only reports `IsInitialized`.* Windows reports
      `has_clients: null` rather than a wrong `true`.
-  8. *New: macOS catch-up spiral.* `VideoFrameAt` decodes every frame
+  8. **Fixed** in `93e184d` (bounded catch-up per cook, exact frames
+     offline).
+     *New: macOS catch-up spiral.* `VideoFrameAt` decodes every frame
      between the reader head and the requested time. It never skips ahead
      to a keyframe, and there is no deadline. Once one frame runs long, for
      example on a 4K loop-boundary restart of 100-190 ms, the next call has
@@ -641,6 +705,28 @@ a fixture goes here, not into a code change.
      1600 of 1900 decodes per clip dropped, 0 cache hits, playback at
      about 3.5 fps. 2x2160 stays just short of it, with 5-7 drops per clip
      around the wraps.
+- **Found while fixing B8** (recorded, not fixed here):
+  - `main`'s macOS offline export repeated every other video frame. Fixed
+    as a side effect of `5d9cbf0` / `93e184d`: offline cooks now use
+    `VideoFrameAtExact`, and `INFINITE_VIDEOEXACTTEST` checks it.
+  - Windows/Linux offline export never waited for the exact frame either.
+    `VideoFrameAtExact` is shared code, so this is fixed there too, but only
+    CI can confirm it.
+  - `ArrangeMediaImport`'s `videoFirstFrame` is computed and never used.
+  - 4x2160 is memory-bound on an 8 GB M2 (1.0-1.2 GB footprint). With
+    other apps open it pages, and loop stalls reach 150-540 ms whichever
+    decode path is used.
+  - A loop-point reader can be rewound in place (`supportsRandomAccess` +
+    `resetForReadingTimeRanges`): 20-60 ms at 4x2160 against 40-180 ms for a
+    new reader, and no second decoder session. It only shipped with the
+    thread, so it went out with the revert. It is worth trying on its own
+    on the main-thread path.
+  - B8 needs the screen unlocked and awake. On a locked screen GL vsync
+    stops blocking, and frames run at about 1 ms with 10-18 new video frames
+    per run: invalid data that only a low `new_frames` count gives away.
+  - Benchmarks are contaminated by the post-commit `sync_brain` (below) and
+    by other apps. Compare builds interleaved, not at different times.
+  - Linux finding 4 above is still open.
 - **B8 harness notes.** On Apple's GL a `GL_TIME_ELAPSED` query around
   `glTexSubImage2D` reads 0 ms: the driver copies on the CPU and runs the
   blit later, outside the query. So B8 turns GPU timers on only with
@@ -677,3 +763,11 @@ decoded frame. Windows has no frame cache (`cache_hit_ms` stays empty) and
 no clip frame rate (`fps` falls back to 30). The camera always reads as
 authorized there. Linux reports Syphon as `"n/a"`, and Windows reports
 `has_clients: null`. Only compiled and run on macOS so far.
+
+The macOS video fixes (`bugfix/macos-video-decode`) touch shared files that
+only CI can verify on Windows/Linux: `src/platform/Platform.h` (comments,
+plus the inline `VideoFrameAtExact`), `src/nodes/VideoSourceNode.cpp`
+(offline cooks call `VideoFrameAtExact`) and `src/main.cpp`
+(`INFINITE_VIDEOEXACTTEST`, which uses the Recorder APIs every platform
+has). `VideoFrameAtExact` loops on
+`VideoDecodeIsCatchingUp`, which MediaWin/MediaLinux already implement.

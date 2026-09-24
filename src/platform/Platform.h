@@ -1,7 +1,9 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace Bench
@@ -219,13 +221,34 @@ namespace Platform
    // "not yet", not "never". Once it goes false the answer is settled and
    // waiting longer cannot change it, so it is safe to loop on.
    //
-   // Always false on macOS, where VideoFrameAt decodes synchronously and has
-   // therefore always caught up by the time it returns. On Windows decoding
-   // runs on its own thread, so a caller stepping faster than real time (a
-   // self-test or an offline analysis pass, never the render thread) has to
-   // wait for the decoder instead of racing past it. The render thread must
-   // NOT wait on this - holding the previous frame is the whole point.
+   // On Windows and Linux decoding runs on its own thread; on macOS each
+   // VideoFrameAt call gets a small decode budget and stops short when a clip
+   // has fallen behind. Either way a caller stepping faster than real time (an
+   // offline render, a self-test) has to wait for the decoder instead of
+   // racing past it - see VideoFrameAtExact. Realtime playback must NOT wait
+   // on this - holding the previous frame is the whole point.
    bool VideoDecodeIsCatchingUp(VideoHandle* handle);
+
+   // VideoFrameAt for offline renders, which must show the exact frame covering
+   // `seconds` rather than whatever the decoder has reached: keeps asking until
+   // the decoder has caught up (bounded, so a dead decoder cannot hang a render),
+   // then asks once more so a frame that landed during the last wait is picked
+   // up. Returns true if any call produced a new frame.
+   inline bool VideoFrameAtExact(VideoHandle* handle, double seconds, std::vector<unsigned char>& outPixels)
+   {
+      bool produced = VideoFrameAt(handle, seconds, outPixels);
+      if (!VideoDecodeIsCatchingUp(handle))
+         return produced;
+      const auto giveUp = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+      while (VideoDecodeIsCatchingUp(handle) && std::chrono::steady_clock::now() < giveUp)
+      {
+         if (VideoFrameAt(handle, seconds, outPixels))
+            produced = true;
+         else
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      }
+      return VideoFrameAt(handle, seconds, outPixels) || produced;
+   }
 
    // B8 bench only: the decode stats this handle has been recording since
    // VideoOpen, or nullptr when Bench::MediaIoEnabled() was off at open (every
