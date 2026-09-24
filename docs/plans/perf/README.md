@@ -389,16 +389,20 @@ a fixture goes here, not into a code change.
   loop and the projector run unpaced: ~10 ms frames on a 60 Hz panel, with
   tearing and wasted GPU. This is a live-performance risk on single-display
   setups. Not fixed here.
-- **A stale saved output device silences audio (product).**
+- **A stale saved output device silenced audio (product). Fixed.**
   `Infinite.audio-settings` stores the device as a raw CoreAudio
   `AudioObjectID`. Those IDs are reassigned when a device is replugged (the
-  headphones here went from 108 to 117). `AudioDeviceOpen`'s comment says an
-  invalid ID "simply fails ... and the output AudioUnit is left on ... the
-  system default". In fact `startAndReturnError` fails with
-  `kAudioUnitErr_FailedInitialization` (-10875), and the engine does not
-  start at all. The user gets no audio after replugging headphones until they
-  re-pick the device. The bench now forces device 0 (system default) without
-  touching the saved setting. Not fixed here.
+  headphones here went from 108 to 117), and a reassigned ID can end up
+  naming an unrelated, possibly input-only, device. `AudioDeviceOpen` now
+  checks that the requested device still resolves to a live output before
+  handing it to the output AudioUnit, and falls back to the system default
+  output otherwise, instead of leaving `startAndReturnError` to fail with
+  `kAudioUnitErr_FailedInitialization` (-10875) and the engine never
+  starting. The user's saved choice is left untouched, so the picker still
+  shows it and the same device is retried on the next launch/replug. Same
+  stale-index hazard fixed on Windows (`AudioDeviceWin.cpp`) and Linux
+  (`AudioDeviceLinux.cpp`), and on macOS's audio-input capture path
+  (`AudioInputCapturePump`).
 - **Windows MIDI Injection Audit**: `Platform::MidiInjectBytes` in `src/platform/win/MidiWin.cpp`
   packs `data[0] | (data[1]<<8) | (data[2]<<16)` into `DWORD_PTR param1`, exactly matching
   WinMM's `MIM_DATA` callback structure. All message routing goes through `HandleShortMessage`
