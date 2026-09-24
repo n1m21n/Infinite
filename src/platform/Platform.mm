@@ -77,6 +77,39 @@ static std::atomic<double> gPendingTrackpadMagnification{0.0};
 }
 @end
 
+namespace
+{
+   // One display's refresh clock for projector pacing (see
+   // Platform::WaitForDisplayRefresh). The CVDisplayLink callback runs on its
+   // own high-priority thread once per refresh of `display` and only bumps
+   // `ticks`; the main thread sleeps on `cv` until the tick it wants.
+   // CVDisplayLink is deprecated from macOS 15 in favour of
+   // NSScreen.displayLink, which needs macOS 14 - the deployment target is 11.
+   struct DisplayRefreshClock
+   {
+      CVDisplayLinkRef link = nullptr;
+      CGDirectDisplayID display = kCGNullDirectDisplay;
+      std::mutex mutex;
+      std::condition_variable cv;
+      uint64_t ticks = 0;      // guarded by mutex
+      uint64_t lastReturn = 0; // main thread only
+      bool haveLast = false;   // main thread only
+   };
+   DisplayRefreshClock gRefreshClock;
+
+   CVReturn DisplayRefreshTick(CVDisplayLinkRef, const CVTimeStamp*, const CVTimeStamp*,
+                               CVOptionFlags, CVOptionFlags*, void* context)
+   {
+      auto* clock = static_cast<DisplayRefreshClock*>(context);
+      {
+         std::lock_guard<std::mutex> lock(clock->mutex);
+         clock->ticks++;
+      }
+      clock->cv.notify_all();
+      return kCVReturnSuccess;
+   }
+}
+
 namespace Platform
 {
    void PreventAppNap()
@@ -91,6 +124,72 @@ namespace Platform
          beginActivityWithOptions:(NSActivityUserInitiated | NSActivityLatencyCritical)
                             reason:@"continuous node-graph rendering"];
    }
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+   bool WaitForDisplayRefresh(int x, int y, double refreshHz, int intervals)
+   {
+      if (refreshHz <= 0.0 || intervals < 1)
+         return false;
+      // GLFW's Cocoa monitor positions are CGDisplayBounds, the same global
+      // top-left-origin space CGGetDisplaysWithPoint takes.
+      CGDirectDisplayID display = kCGNullDirectDisplay;
+      uint32_t found = 0;
+      if (CGGetDisplaysWithPoint(CGPointMake(x + 1, y + 1), 1, &display, &found) != kCGErrorSuccess || found == 0)
+         return false;
+
+      DisplayRefreshClock& clock = gRefreshClock;
+      if (clock.link == nullptr)
+      {
+         if (CVDisplayLinkCreateWithCGDisplay(display, &clock.link) != kCVReturnSuccess || clock.link == nullptr)
+         {
+            clock.link = nullptr;
+            return false;
+         }
+         CVDisplayLinkSetOutputCallback(clock.link, DisplayRefreshTick, &clock);
+         clock.display = display;
+         clock.haveLast = false;
+      }
+      else if (clock.display != display)
+      {
+         // The primary Output moved displays: follow its refresh, new phase.
+         CVDisplayLinkSetCurrentCGDisplay(clock.link, display);
+         clock.display = display;
+         clock.haveLast = false;
+      }
+      if (!CVDisplayLinkIsRunning(clock.link))
+      {
+         CVDisplayLinkStart(clock.link);
+         clock.haveLast = false;
+      }
+
+      std::unique_lock<std::mutex> lock(clock.mutex);
+      uint64_t target = clock.haveLast ? clock.lastReturn + (uint64_t)intervals : clock.ticks + 1;
+      if (clock.ticks >= target)
+         target = clock.ticks + 1; // late for that refresh: take the next, never mid-scanout
+      // A stalled link (display asleep or unplugged) must not hang the app:
+      // give up after a few periods and let this frame go unpaced.
+      const auto timeout = std::chrono::duration<double>(((double)intervals + 3.0) / refreshHz + 0.05);
+      const bool ok = clock.cv.wait_for(lock, timeout, [&] { return clock.ticks >= target; });
+      clock.lastReturn = clock.ticks;
+      clock.haveLast = ok;
+      return ok;
+   }
+
+   void StopDisplayRefreshClock()
+   {
+      DisplayRefreshClock& clock = gRefreshClock;
+      if (clock.link == nullptr)
+         return;
+      // Not under the mutex: CVDisplayLinkStop waits for an in-flight
+      // callback, which takes that mutex.
+      CVDisplayLinkStop(clock.link);
+      CVDisplayLinkRelease(clock.link);
+      clock.link = nullptr;
+      clock.display = kCGNullDirectDisplay;
+      clock.haveLast = false;
+   }
+#pragma clang diagnostic pop
 
    double ProcessRssMb()
    {
