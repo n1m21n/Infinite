@@ -396,6 +396,7 @@ namespace Bench
       int nodes = 0;
       int tris = 0;
       int drawCalls = -1; // Render 3D draw calls last frame; -1 = not measured (null)
+      long long fboAllocsSteady = -1; // GLUtil::FboAllocationCount delta over the sample window; -1 = not measured (null)
       std::string outputHash;
 
       PercentileRing frameMs;
