@@ -66,3 +66,4 @@ PLUGINSCANTEST|not a Linux gap - AU-only test (Platform::EnumerateAudioUnits), a
 
 # Other pre-existing test quirks shared with macOS
 GROUPTEST|"after ungroup: ... member freed" sub-check fails — pre-existing and unrelated to Linux port
+ROUNDTRIPTEST|same as macOS (known-test-failures.txt): copy/paste dropped values on Predictive Modulator, Predictive Notes, and Predictive Rhythm — pre-existing and intentional per commit b4526db: CopyParams explicitly resets learned state on duplicate/copy-paste for Learn-button Predictive nodes (ResetLearnedState) so a copy starts fresh rather than inheriting the source's exact learned model. Save/load round-trips 287/287 cleanly (OK).
