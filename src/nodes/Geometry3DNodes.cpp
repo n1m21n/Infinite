@@ -243,13 +243,33 @@ namespace
       // for "look up" and sky for "look down". Flipping v corrects it.
       "   return vec2(phi / 6.28318530718 + 0.5, 1.0 - theta / 3.14159265359);\n"
       "}\n"
+      // A plain texture() at the u=0/u=1 wrap uses screen-space ddx/ddy of u
+      // to pick a mip - and right at the wrap, adjacent fragments see u flip
+      // from ~1 to ~0, so the implicit derivative is huge and the GPU always
+      // picks the smallest mip. That paints a seam of the image's average
+      // colour up the sky. Fix: derive u twice, once as-is and once shifted
+      // half a turn (so ITS wrap lands a quarter-sphere away from this
+      // fragment), and feed textureGrad() whichever pair of derivatives is
+      // small - one of the two is always seam-free at any given fragment.
+      // uEnvMap is only ever bound here when EnvironmentNode::Upload() has
+      // run (see hasEnvMap in DrawScene), which always calls
+      // glGenerateMipmap, so a non-mipmapped fallback can't be reached.
+      "vec3 sampleEquirectSeamSafe(sampler2D tex, vec2 uv) {\n"
+      "   vec2 uvA = fract(uv);\n"
+      "   vec2 uvB = fract(uv + vec2(0.5, 0.0));\n"
+      "   vec2 dxA = dFdx(uvA), dyA = dFdy(uvA);\n"
+      "   vec2 dxB = dFdx(uvB), dyB = dFdy(uvB);\n"
+      "   vec2 dx = (abs(dxA.x) < abs(dxB.x)) ? dxA : dxB;\n"
+      "   vec2 dy = (abs(dyA.x) < abs(dyB.x)) ? dyA : dyB;\n"
+      "   return textureGrad(tex, uvA, dx, dy).rgb;\n"
+      "}\n"
       "void main() {\n"
       "   vec4 worldH = uInvViewProj * vec4(vNdc, 1.0, 1.0);\n"
       "   vec3 worldPos = worldH.xyz / worldH.w;\n"
       "   vec3 dir = normalize(worldPos - uCamPos);\n"
       "   vec3 col;\n"
       "   if (uHasEnvMap == 1) {\n"
-      "      col = texture(uEnvMap, dirToEquirect(dir, uEnvRotation)).rgb * uEnvIntensity;\n"
+      "      col = sampleEquirectSeamSafe(uEnvMap, dirToEquirect(dir, uEnvRotation)) * uEnvIntensity;\n"
       "   } else {\n"
       "      float t = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);\n"
       "      vec3 lower = mix(toLinear(uEnvGround), toLinear(uEnvHorizon), smoothstep(0.0, 0.5, t));\n"
