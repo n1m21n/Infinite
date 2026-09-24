@@ -64863,14 +64863,18 @@ static void BuildBenchB1Audio(long numVoices, int bufferFrames = 256, float yOff
    for (GraphNode& gn : gNodes)
       gn.showParams = true;
 
+   // Always the system default output, never the persisted device choice:
+   // a saved AudioObjectID goes stale when the device is replugged, and
+   // AudioDeviceOpen then fails outright (-10875) instead of falling back -
+   // see perf README "Found while measuring". Engine-only; the saved
+   // gAudioOutputDeviceId is left alone so nothing is written back.
+   if (AudioEngine::Instance().SampleRate() > 0.0)
+      AudioEngine::Instance().Stop();
+   AudioEngine::Instance().SetRequestedDevice(0);
    if (bufferFrames > 0)
-   {
-      if (AudioEngine::Instance().SampleRate() > 0.0)
-         AudioEngine::Instance().Stop();
       AudioEngine::Instance().SetRequestedBufferFrames(bufferFrames);
-   }
-   if (AudioEngine::Instance().SampleRate() <= 0.0)
-      StartAudioEngine(gAudioStartError);
+   if (AudioEngine::Instance().SampleRate() <= 0.0 && !StartAudioEngine(gAudioStartError))
+      fprintf(stderr, "BENCH: audio engine did not start: %s\n", gAudioStartError.c_str());
    RebuildAudioTopology();
 }
 
@@ -65215,6 +65219,7 @@ int main(int argc, char** argv)
    static int sBenchB3CamIdx = -1;
    static std::string sBenchB3Variant;
    static int sBenchB3MonitorRefreshHz = 60;
+   static bool sBenchB3Unfocused = false;
    static int sBenchB3TargetRateHz = 60;
    static Bench::PercentileRing sBenchB3FrameMs;
    static Bench::PercentileRing sBenchB3ProjIntervalRing;
@@ -68123,8 +68128,10 @@ int main(int argc, char** argv)
 
          if (AudioEngine::Instance().SampleRate() > 0.0)
             AudioEngine::Instance().Stop();
+         AudioEngine::Instance().SetRequestedDevice(0); // system default - see BuildBenchB1Audio
          AudioEngine::Instance().SetRequestedBufferFrames(atoi(audioAloneArg));
-         StartAudioEngine(gAudioStartError);
+         if (!StartAudioEngine(gAudioStartError))
+            fprintf(stderr, "BENCH: audio engine did not start: %s\n", gAudioStartError.c_str());
          RebuildAudioTopology();
       }
       else if (const char* loadPatchPath = getenv("INFINITE_LOADPATCH"))
@@ -85556,6 +85563,34 @@ int main(int argc, char** argv)
                   OpenProjectorWindow(window, *outGn);
             }
 
+            // Side by side, never overlapping: the projector context presents
+            // with swap interval 0 and relies on the main window's vsync to
+            // pace the loop, and macOS stops vsync-blocking a swap on an
+            // occluded window. Opened at main-window pos + 60, the projector
+            // covered the canvas and the whole loop ran unpaced (~8.6 ms).
+            if (!gProjectorWindows.empty())
+            {
+               if (GLFWmonitor* mon = glfwGetPrimaryMonitor())
+               {
+                  int wx = 0, wy = 0, ww = 0, wh = 0;
+                  glfwGetMonitorWorkarea(mon, &wx, &wy, &ww, &wh);
+                  if (ww > 0 && wh > 0)
+                  {
+                     const int half = ww / 2;
+                     glfwRestoreWindow(window);
+                     glfwSetWindowPos(window, wx, wy);
+                     glfwSetWindowSize(window, half, wh);
+                     GLFWwindow* pw = gProjectorWindows[0].window;
+                     glfwSetWindowPos(pw, wx + half, wy);
+                     glfwSetWindowSize(pw, ww - half, std::min(wh, (ww - half) * 9 / 16));
+                  }
+               }
+            }
+            // Behind another app counts as occluded too, so raise the canvas.
+            // macOS may refuse activation to a background launch; the run
+            // then gets flagged ",unfocused=1" below rather than trusted.
+            glfwFocusWindow(window);
+
             int refreshHz = 60;
             if (!gProjectorWindows.empty())
             {
@@ -85589,6 +85624,15 @@ int main(int argc, char** argv)
             sBenchB3XrunBaseline = AudioEngine::Instance().XrunCount();
             AudioEngine::Instance().RawLoadHistory().Reset();
             AudioEngine::Instance().ResetStageLoadHistory();
+         }
+
+         // A frame measured while the canvas wasn't the key window may be
+         // unpaced (see the side-by-side layout above); taint the variant.
+         if (frameId > 2 && !sBenchB3Unfocused && glfwGetWindowAttrib(window, GLFW_FOCUSED) == 0)
+         {
+            sBenchB3Unfocused = true;
+            sBenchB3Variant += ",unfocused=1";
+            fprintf(stderr, "BENCH: B3 main window lost focus at frame %d - frame/projector pacing is not trustworthy\n", frameId);
          }
 
          // MIDI injection every frame (if enabled)
@@ -85684,11 +85728,12 @@ int main(int argc, char** argv)
                   ? ((double)sBenchB3MissedVsyncCount / (double)sBenchB3TotalVsyncCount * 100.0)
                   : 0.0;
 
-               report.inputToPhotonMeasured = true;
+               // Zero samples is "not measured" (null), never a latency of 0.
+               report.inputToPhotonMeasured = sBenchB3InputToPhotonFrames.Count() > 0;
                report.inputToPhotonFrames = sBenchB3InputToPhotonFrames;
             }
 
-            report.audioMeasured = true;
+            report.audioMeasured = AudioEngine::Instance().SampleRate() > 0.0;
             const char* bufEnv = getenv("INFINITE_BENCH_B3BUFFER");
             report.audioBuffer = bufEnv ? atoi(bufEnv) : 256;
             report.audioSampleRate = AudioEngine::Instance().SampleRate();
@@ -85706,15 +85751,25 @@ int main(int argc, char** argv)
             report.memFootPeakMb = sBenchB3FootPeakMb;
 
             // §6 Target evaluations
-            report.targetsPass["audio_xruns_zero"] = (report.audioXruns == 0);
-            report.targetsPass["audio_cb_load_p99_le_50"] = (report.audioLoad.Percentile(99) <= 0.50);
+            // No engine, no audio verdict: a stopped engine has 0 xruns and
+            // 0 load, which would read as a vacuous PASS.
+            if (report.audioMeasured)
+            {
+               report.targetsPass["audio_xruns_zero"] = (report.audioXruns == 0);
+               report.targetsPass["audio_cb_load_p99_le_50"] = (report.audioLoad.Percentile(99) <= 0.50);
+            }
             if (b3EnableVisuals)
             {
                report.targetsPass["projector_missed_vsync_lt_half_pct"] = (report.projectorMissedVsyncPct < 0.5);
                report.targetsPass["projector_locked_rate"] = (report.projectorPresentMs.Percentile(99) <= 1.10 * (1000.0 / (double)std::max(1, report.projectorTargetRateHz)));
-               report.targetsPass["input_to_photon_le_2_frames"] = sBenchB3I2PDryRun
-                  ? (sBenchB3InputToPhotonFrames.Count() == 0)
-                  : (sBenchB3InputToPhotonFrames.Count() >= 20 && sBenchB3InputToPhotonFrames.Percentile(50) <= 2.0);
+               // The dry run (no param change) checks the probe itself: any
+               // sample there is a false positive. It is not a latency result,
+               // so it gets its own key rather than a PASS on the i2p target.
+               if (sBenchB3I2PDryRun)
+                  report.targetsPass["i2p_dryrun_no_false_samples"] = (sBenchB3InputToPhotonFrames.Count() == 0);
+               else
+                  report.targetsPass["input_to_photon_le_2_frames"] =
+                     (sBenchB3InputToPhotonFrames.Count() >= 20 && sBenchB3InputToPhotonFrames.Max() <= 2.0);
             }
 
             if (sBenchB3Render3DIdx >= 0)
@@ -86016,7 +86071,7 @@ int main(int argc, char** argv)
             report.frames = (int)sFrameMs.Count();
             report.nodes = (int)gNodes.size();
             report.frameMs = sFrameMs;
-            report.audioMeasured = true;
+            report.audioMeasured = AudioEngine::Instance().SampleRate() > 0.0;
             report.audioBuffer = bufArg ? atoi(bufArg) : 0;
             report.audioSampleRate = AudioEngine::Instance().SampleRate();
             report.audioLoad = AudioEngine::Instance().RawLoadHistory().Drain();
@@ -86090,7 +86145,7 @@ int main(int argc, char** argv)
             const char* bufArg = getenv("INFINITE_BENCH_B5AUDIOALONE");
             report.variant = std::string("buffer=") + bufArg;
             report.nodes = (int)gNodes.size();
-            report.audioMeasured = true;
+            report.audioMeasured = AudioEngine::Instance().SampleRate() > 0.0;
             report.audioBuffer = atoi(bufArg);
             report.audioSampleRate = AudioEngine::Instance().SampleRate();
             report.audioLoad = AudioEngine::Instance().RawLoadHistory().Drain();

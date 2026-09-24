@@ -30,6 +30,7 @@ INFINITE_BENCH_B2SCALE=l INFINITE_BENCH_B2ANIM=1 INFINITE_BENCH_B2GPUNODES=1 \
    INFINITE_EXITAFTER=160 ./build/Infinite.app/Contents/MacOS/Infinite
 INFINITE_BENCH_B4SCALE=l INFINITE_BENCH_B4SHADOW=2048 INFINITE_BENCH_GPUTIMERS=0 \
    INFINITE_EXITAFTER=160 ./build/Infinite.app/Contents/MacOS/Infinite
+# B3: leave Infinite in front for the whole run; `unfocused=1` in variant = discard
 INFINITE_BENCH_B3=1 INFINITE_BENCH_B3BUFFER=256 INFINITE_BENCH_B3FRAMES=600 \
    INFINITE_EXITAFTER=620 ./build/Infinite.app/Contents/MacOS/Infinite
 INFINITE_BENCH_B9SCENE=b2 INFINITE_BENCH_B9FRAMES=600 \
@@ -331,37 +332,37 @@ re-record the baseline with `run_all.sh` before comparing against it):
   Footprint is 0.7-0.9 GB and includes GPU allocations, which share memory
   with the CPU on Apple silicon. That is ~9-11% of an 8 GB machine for one
   heavy patch. The small positive slope needs a clean 600-frame run on an
-- **B3** (Live performance fixture, B1-lite 8 voices + B2-lite 10 effects + Projector Window + MIDI + Gesture/Macro + 3x Prediction modulators, buffer 256, 600 frames, Apple M2):
+- **B3** (Live performance fixture: B1-lite 8 voices + B2-lite 10 effects +
+  projector window + MIDI + gesture/macro + 3 Prediction modulators, buffer 256).
 
-  Target evaluations (§6):
-  | Target Metric | Spec Target | Measured | Result |
-  |---|---|---|---|
-  | Audio callback xruns | `audio_xruns == 0` | 0 | **PASS** |
-  | Audio callback load p99 | `<= 50%` | 0.0% (sr=0.0 headless) | **PASS** |
-  | Input-to-photon latency p50 | `<= 2.0 frames` | 1.0 frames (28 samples) | **PASS** |
-  | Projector locked rate | p99 interval `<= 1.10 * (1000 / refreshHz)` | 143.6 - 336.1 ms | FAIL (macOS windowed composition) |
-  | Projector missed vsync | `< 0.5%` | ~56-69% missed | FAIL (macOS windowed composition) |
+  **The first recorded B3 baseline and audio ladder are void.** Three fixture
+  faults made every number meaningless:
 
-  Baseline measurements (3 runs, scale `s`, buffer 256, 600 frames, indexer idle):
-  | Run | frame p50 / p95 / p99 (ms) | Projector present p50 / p99 (ms) | Projector missed vsync (%) | Input-to-photon p50 / max (frames) | Samples | Footprint peak (MB) |
-  |---|---|---|---|---|---|---|
-  | 1 | 26.5 / 128.8 / 143.5 | 26.6 / 143.6 | 56.1% | 1.0 / 1.0 | 28 | 840.1 |
-  | 2 | 52.0 / 163.2 / 335.1 | 52.0 / 336.1 | 69.5% | 1.0 / 1.0 | 28 | 840.6 |
-  | 3 | 54.0 / 167.2 / 318.4 | 53.7 / 318.6 | 67.7% | 1.0 / 1.0 | 28 | 839.9 |
-  | **Avg** | **44.2 / 153.1 / 265.7** | **44.1 / 266.1** | **64.4%** | **1.0 / 1.0** | **28** | **840.2** |
+  | Fault | Effect on the old numbers | Fix |
+  |---|---|---|
+  | Audio engine never started (stale saved output device, -10875) | Every audio row read 0 xruns / 0.00% load, a vacuous PASS; the whole ladder is empty | Bench forces the system default device; a stopped engine now emits `audio: null` and no audio targets |
+  | Projector opened on top of the canvas | Canvas occluded, so its vsync stopped pacing the loop; frame and projector numbers are unpaced | Canvas and projector are laid out side by side on the primary display, and the canvas is focused |
+  | Canvas behind another app | Same as above | The run is tagged `,unfocused=1` in `variant` (with a stderr line) if the canvas ever loses focus |
 
-  Dry-run check (`INFINITE_BENCH_B3I2PDRYRUN=1`):
-  - Injected 0 parameter changes; Output revision remained unchanged. Reported `samples: 0`, `p50: 0.0`, `max: 0.0` (never false-positive 2.0).
+  Target changes: `input_to_photon_le_2_frames` now needs ≥20 samples and
+  **max** ≤2 frames (was p50). Zero samples is `input_to_photon_frames: null`,
+  never 0. The dry run reports `i2p_dryrun_no_false_samples` in place of the
+  latency target, so a probe self-check can no longer read as a latency PASS.
 
-  Audio Ladder (300 frames, buffer 256, 2 runs each per rung):
-  | Rung | Description | Switches | cb_load p50 / p99 (%) | xruns |
-  |---|---|---|---|---|
-  | 1 | Audio only | `VISUALS=0 MIDI=0 PRED=0 GESTURE=0` | 0.00% / 0.00% | 0 |
-  | 2 | + Visuals | `MIDI=0 PRED=0 GESTURE=0` | 0.00% / 0.00% | 0 |
-  | 3 | + MIDI | `PRED=0 GESTURE=0` | 0.00% / 0.00% | 0 |
-  | 4 | + Prediction | `GESTURE=0` | 0.00% / 0.00% | 0 |
-  | 5 | + Gesture (Full B3) | Default B3 scene | 0.00% / 0.00% | 0 |
-  | 6 | Full B3 + Background Load | Full B3 scene with active background CPU load | 0.00% / 0.00% | 0 |
+  Verification runs after the fix (300 frames, scale s, load avg 5.5, **not a
+  baseline**):
+
+  | Run | variant | frame p50 | swap stage p50 | audio p99 / xruns | i2p p50 / max (n) |
+  |---|---|---|---|---|---|
+  | canvas focused for frames 2-205 | `scale=s,unfocused=1` | 15.9 ms | 2.0 ms | 37% / 0 | 1.0 / 1.0 (13) |
+  | canvas behind Safari throughout | `scale=s` (before the flag existed) | 10.6 ms | 1.7 ms | 37% / 0 | 1.0 / 1.0 (13) |
+  | dry run | `scale=s,i2pdryrun=1` | 10.1 ms | - | 37% / 0 | null, dry-run check PASS |
+
+  With the canvas in front, the loop paces at 60 Hz (15.9 ms). Behind another
+  app it runs free at ~10.5 ms. 300 frames give only 13 i2p samples, so the
+  i2p target needs the default 600 frames. Still to do: record the baseline
+  and re-run the ladder with 600 frames, on an idle machine, with Infinite
+  left in front for the whole run.
 
 ## Found while measuring
 
@@ -378,13 +379,26 @@ a fixture goes here, not into a code change.
   revision on every single frame, making any probe appear immediately acknowledged on
   the next frame. Fixed by pausing LFO/Prediction/Gesture drivers around each probe
   and swapping time-driven Glitch for Emboss in B3 visuals. Dry run
-  (`INFINITE_BENCH_B3I2PDRYRUN=1`) verified 0 false detections (`samples: 0`), and
-  normal runs verified 1.0 frame latency with 28 samples.
-- **Projector Vsync and Presentation Jitter**: B3 enforces vsync ON (`glfwSwapInterval(1)`)
-  and dynamically queries projector display refresh rate via `ProjectorMonitorIndex`.
-  On macOS windowed GL with an auxiliary projector window, OS window composition causes
-  frame interval jitter and missed intervals (>1.5x nominal refresh), failing locked-rate
-  targets unless run in dedicated full-screen display mode.
+  (`INFINITE_BENCH_B3I2PDRYRUN=1`) verified 0 false detections.
+- **Projector presents are unpaced (product).** `OpenProjectorWindow` sets
+  the projector context to swap interval 0 ("the main window owns vsync"), so
+  the only thing pacing projector output is the canvas window's own vsync.
+  macOS stops vsync-blocking a swap on an occluded window. So when the canvas
+  is covered (by the projector itself on a single display, which is where it
+  opens by default at main-window pos + 60, or by any other app), the whole
+  loop and the projector run unpaced: ~10 ms frames on a 60 Hz panel, with
+  tearing and wasted GPU. This is a live-performance risk on single-display
+  setups. Not fixed here.
+- **A stale saved output device silences audio (product).**
+  `Infinite.audio-settings` stores the device as a raw CoreAudio
+  `AudioObjectID`. Those IDs are reassigned when a device is replugged (the
+  headphones here went from 108 to 117). `AudioDeviceOpen`'s comment says an
+  invalid ID "simply fails ... and the output AudioUnit is left on ... the
+  system default". In fact `startAndReturnError` fails with
+  `kAudioUnitErr_FailedInitialization` (-10875), and the engine does not
+  start at all. The user gets no audio after replugging headphones until they
+  re-pick the device. The bench now forces device 0 (system default) without
+  touching the saved setting. Not fixed here.
 - **Windows MIDI Injection Audit**: `Platform::MidiInjectBytes` in `src/platform/win/MidiWin.cpp`
   packs `data[0] | (data[1]<<8) | (data[2]<<16)` into `DWORD_PTR param1`, exactly matching
   WinMM's `MIM_DATA` callback structure. All message routing goes through `HandleShortMessage`
