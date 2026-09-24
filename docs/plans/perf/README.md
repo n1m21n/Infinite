@@ -38,6 +38,22 @@ variants from 1 run (the 3-run 1080 set could not be paced: screen locked).
 | Canvas: both | `bd38a27`, `94023d5` | B6 n=300 all | frame p50 / p95 ms | 45.98 / 82.93 | 9.48 / 35.58 | -79% / -57% |
 | | | B6 n=400 pan | frame p50 / p95 ms | 79.39 / 104.06 | 8.65 / 13.47 | -89% / -87% |
 | | | B6 n=300 all / n=400 pan | footprint peak MB | 1215 / 1512 | 1146 / 1443 | -6% / -5% |
+| Projector pacing (primary Output's display refresh) | `7afde11` | B8 2x1080 W2 / W3 / overlap | projector interval p50 ms | 8.0 / 8.2 / 8.0 (unpaced, tearing) | 16.66 / 16.67 / 16.67 | locked to R=60 |
+| | | B8 2x1080 W2 / W3 / overlap | interval p99 ms (target <= 20.8) | 16.4 / 17.5 / 17.4 | 20.0 / 18.0 / 18.0 | met on medians; worst run 24.2 (W2) |
+| | | B8 2x1080 W2 / W3 / overlap | jitter stddev ms (target <= 1) | 4.4 / 8.2 / 4.5 | 2.2 / 1.8 / 2.2 (+1 run at 18.4, one 317 ms whole-app stall) | -50% / -79% / -51%; **target not met** |
+| | | B8 2x1080 W2 / W3 / overlap | missed vsync (target < 1%) | 0 / 0.4 / 0.4% (period never waited for) | 0.75 / 0.56 / 0.37% | met on medians; worst run 1.1% (W2) |
+| | | B8 2x1080 W2 / W3 / overlap | projector `on_vsync_frac` | null (canvas 0.14-0.19) | 0.97 / 0.99 / 0.99 | new metric |
+| | | B8 2x1080 W2 / W3 / overlap | canvas frame p50 ms | 7.6 / 7.7 / 7.3 | 16.66 / 16.66 / 16.67 | = one refresh by design (base ran unpaced) |
+
+Projector pacing (2 rounds interleaved vs `f2b0c1b`, unfocused, swapping; judge by change).
+Pacing source: the refresh clock of the **primary Output's display** (the first fullscreen projector, else the first opened),
+waited on just before projectors present, with every context at swap interval 0 while a projector is open.
+Why: macOS never vsync-blocks an occluded or hidden window, so the canvas's vsync can't pace anything once it is covered.
+Same display as the canvas: one clock paces both. Two displays with different R: the primary sets the rate and the others follow it.
+Rate: `floor(R/60)` refreshes per frame on 120/144 Hz; native R only while work p95 < 55% of a refresh.
+macOS: CVDisplayLink. Windows: DXGI `WaitForVBlank`. Linux: steady timer at R. All sit behind `Platform::WaitForDisplayRefresh`.
+Offline export and arrange-WAV render switch pacing off; their swap-interval restores are unchanged.
+Canvas p50 now equals one refresh by design. Work stages rose 0.2 -> 3.7 ms because paced cooks upload a new 30 fps frame about half the time (the 4.2 ms paced `cook` above).
 
 Keep-or-revert gate for the decode thread: B8, 3 runs each, interleaved
 against a `93e184d` build. The first rule (branch >= base on every metric,
@@ -595,7 +611,8 @@ a fixture goes here, not into a code change.
   opens by default at main-window pos + 60, or by any other app), the whole
   loop and the projector run unpaced: ~10 ms frames on a 60 Hz panel, with
   tearing and wasted GPU. This is a live-performance risk on single-display
-  setups. Not fixed here.
+  setups. **Fixed** in `7afde11`: projectors are paced to the primary Output's
+  display refresh (see the Scoreboard).
 - **A stale saved output device silenced audio (product). Fixed.**
   `Infinite.audio-settings` stores the device as a raw CoreAudio
   `AudioObjectID`. Those IDs are reassigned when a device is replugged (the
@@ -710,7 +727,9 @@ a fixture goes here, not into a code change.
   5. *`VideoInNode` calls `glTexImage2D` (a reallocation) on every camera
      frame.* Code-read only. The camera was not measured (permission never
      granted).
-  6. *Projectors present one after another at swap interval 0.* They have
+  6. **Fixed** in `7afde11` (paced to the primary Output's display refresh,
+     B8 now reports projector `on_vsync_frac`).
+     *Projectors present one after another at swap interval 0.* They have
      no vsync of their own, and their frame intervals just follow the
      canvas. `on_vsync_frac` is null for them by design, and the swap
      interval is unchanged.
@@ -727,6 +746,22 @@ a fixture goes here, not into a code change.
      1600 of 1900 decodes per clip dropped, 0 cache hits, playback at
      about 3.5 fps. 2x2160 stays just short of it, with 5-7 drops per clip
      around the wraps.
+- **Found while pacing projectors** (`bugfix/projector-pacing`, not fixed):
+  - Jitter stays at 1.2-3.0 ms against the 1 ms target. A paced 60 Hz
+    stream has 1-3 intervals per 300 frames that double. Those are frames
+    where a decode spike (up to 14 ms) plus the texture upload overrun the
+    period. Canvas draw is ~0.2 ms, so throttling the canvas cannot win
+    them back. The fix is to move the upload off the paced path (PBO /
+    IOSurface-backed texture) or to present the last ready frame on a
+    deadline. Each W2 run's worst p99 (24.2 ms) and miss (1.1%) come from the
+    same frames.
+  - A bench run cannot measure plain swap-interval-1 pacing. B8 windows are
+    hidden (`GLFW_VISIBLE` false under `EXITAFTER`), and macOS never
+    vsync-blocks a hidden window. That is one more reason the clock is
+    explicit rather than a swap interval.
+  - One overlap run had a single 317 ms whole-app stall (frame max equals
+    projector max), probably from swap on 8 GB. It alone drove that run's
+    jitter to 18.4 ms.
 - **Found while fixing B8** (recorded, not fixed here):
   - `main`'s macOS offline export repeated every other video frame. Fixed
     as a side effect of `5d9cbf0` / `93e184d`: offline cooks now use
