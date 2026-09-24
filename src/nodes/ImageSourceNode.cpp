@@ -27,10 +27,15 @@ namespace
    }
 }
 
+#include "core/BenchReport.h"
+
 ImageSourceNode::~ImageSourceNode()
 {
    if (mTex != 0)
+   {
+      Bench::GpuMem::ReleaseTexture(mTex);
       glDeleteTextures(1, &mTex);
+   }
 }
 
 void ImageSourceNode::EnsurePlaceholder()
@@ -62,6 +67,8 @@ void ImageSourceNode::EnsurePlaceholder()
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
    glBindTexture(GL_TEXTURE_2D, 0);
+
+   Bench::GpuMem::RecordTexture(mTex, Bench::GpuMemCategory::Textures, kSize, kSize, GL_RGBA8, false, "ImageSource_Placeholder");
 
    mWidth = kSize;
    mHeight = kSize;
@@ -115,6 +122,8 @@ void ImageSourceNode::UploadPixels(const std::vector<unsigned char>& pixels, int
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
    glBindTexture(GL_TEXTURE_2D, 0);
+
+   Bench::GpuMem::RecordTexture(mTex, Bench::GpuMemCategory::Textures, w, h, GL_RGBA8, false, "ImageSource");
 
    mWidth = w;
    mHeight = h;

@@ -964,7 +964,7 @@ const std::vector<std::string>& Render3DNode::SpriteSizeModeNames() { return kSp
 
 void Render3DNode::ReleaseShadowTargets()
 {
-   if (mShadowTex != 0) { glDeleteTextures(1, &mShadowTex); mShadowTex = 0; }
+   if (mShadowTex != 0) { Bench::GpuMem::ReleaseTexture(mShadowTex); glDeleteTextures(1, &mShadowTex); mShadowTex = 0; }
    if (mShadowFbo != 0) { glDeleteFramebuffers(1, &mShadowFbo); mShadowFbo = 0; }
    mShadowSize = 0;
 }
@@ -1043,6 +1043,7 @@ bool Render3DNode::EnsureShadowResources(int size)
    // instruction instead of a fetch and a branch.
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+   Bench::GpuMem::RecordTexture(mShadowTex, Bench::GpuMemCategory::ShadowMaps, size, size, GL_DEPTH_COMPONENT24, false, "Render3D_Shadow");
 
    glGenFramebuffers(1, &mShadowFbo);
    glBindFramebuffer(GL_FRAMEBUFFER, mShadowFbo);
@@ -1156,13 +1157,13 @@ bool Render3DNode::SceneBounds(float outLo[3], float outHi[3])
 
 void Render3DNode::ReleaseTargets()
 {
-   if (mSceneColorTex != 0) { glDeleteTextures(1, &mSceneColorTex); mSceneColorTex = 0; }
+   if (mSceneColorTex != 0) { Bench::GpuMem::ReleaseTexture(mSceneColorTex); glDeleteTextures(1, &mSceneColorTex); mSceneColorTex = 0; }
    if (mSceneColorFbo != 0) { glDeleteFramebuffers(1, &mSceneColorFbo); mSceneColorFbo = 0; }
-   if (mColorTex != 0) { glDeleteTextures(1, &mColorTex); mColorTex = 0; }
-   if (mDepthBuffer != 0) { glDeleteRenderbuffers(1, &mDepthBuffer); mDepthBuffer = 0; }
+   if (mColorTex != 0) { Bench::GpuMem::ReleaseTexture(mColorTex); glDeleteTextures(1, &mColorTex); mColorTex = 0; }
+   if (mDepthBuffer != 0) { Bench::GpuMem::ReleaseRenderbuffer(mDepthBuffer); glDeleteRenderbuffers(1, &mDepthBuffer); mDepthBuffer = 0; }
    if (mFbo != 0) { glDeleteFramebuffers(1, &mFbo); mFbo = 0; }
-   if (mMsColor != 0) { glDeleteRenderbuffers(1, &mMsColor); mMsColor = 0; }
-   if (mMsDepth != 0) { glDeleteRenderbuffers(1, &mMsDepth); mMsDepth = 0; }
+   if (mMsColor != 0) { Bench::GpuMem::ReleaseRenderbuffer(mMsColor); glDeleteRenderbuffers(1, &mMsColor); mMsColor = 0; }
+   if (mMsDepth != 0) { Bench::GpuMem::ReleaseRenderbuffer(mMsDepth); glDeleteRenderbuffers(1, &mMsDepth); mMsDepth = 0; }
    if (mMsFbo != 0) { glDeleteFramebuffers(1, &mMsFbo); mMsFbo = 0; }
 }
 
@@ -1180,12 +1181,12 @@ Render3DNode::~Render3DNode()
 
 void Render3DNode::ReleaseGpuMesh(GpuMesh& gpu)
 {
-   if (gpu.vbo != 0) glDeleteBuffers(1, &gpu.vbo);
-   if (gpu.ibo != 0) glDeleteBuffers(1, &gpu.ibo);
-   if (gpu.instanceVbo != 0) glDeleteBuffers(1, &gpu.instanceVbo);
-   if (gpu.instanceColorVbo != 0) glDeleteBuffers(1, &gpu.instanceColorVbo);
-   if (gpu.vertexColorVbo != 0) glDeleteBuffers(1, &gpu.vertexColorVbo);
-   if (gpu.vao != 0) glDeleteVertexArrays(1, &gpu.vao);
+   if (gpu.vbo != 0) { Bench::GpuMem::ReleaseBuffer(gpu.vbo); glDeleteBuffers(1, &gpu.vbo); gpu.vbo = 0; }
+   if (gpu.ibo != 0) { Bench::GpuMem::ReleaseBuffer(gpu.ibo); glDeleteBuffers(1, &gpu.ibo); gpu.ibo = 0; }
+   if (gpu.instanceVbo != 0) { Bench::GpuMem::ReleaseBuffer(gpu.instanceVbo); glDeleteBuffers(1, &gpu.instanceVbo); gpu.instanceVbo = 0; }
+   if (gpu.instanceColorVbo != 0) { Bench::GpuMem::ReleaseBuffer(gpu.instanceColorVbo); glDeleteBuffers(1, &gpu.instanceColorVbo); gpu.instanceColorVbo = 0; }
+   if (gpu.vertexColorVbo != 0) { Bench::GpuMem::ReleaseBuffer(gpu.vertexColorVbo); glDeleteBuffers(1, &gpu.vertexColorVbo); gpu.vertexColorVbo = 0; }
+   if (gpu.vao != 0) { glDeleteVertexArrays(1, &gpu.vao); gpu.vao = 0; }
    gpu = GpuMesh();
 }
 
@@ -1259,12 +1260,14 @@ bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+   Bench::GpuMem::RecordTexture(mColorTex, Bench::GpuMemCategory::RenderTargets, w, h, GL_RGBA8, false, "Render3D");
 
    // A depth renderbuffer is the piece the 2D pipeline never needed: without it
    // triangles composite in draw order instead of by distance.
    glGenRenderbuffers(1, &mDepthBuffer);
    glBindRenderbuffer(GL_RENDERBUFFER, mDepthBuffer);
    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, w, h);
+   Bench::GpuMem::RecordRenderbuffer(mDepthBuffer, Bench::GpuMemCategory::RenderTargets, w, h, GL_DEPTH_COMPONENT24, 1, "Render3D");
 
    glGenFramebuffers(1, &mFbo);
    glBindFramebuffer(GL_FRAMEBUFFER, mFbo);
@@ -1309,10 +1312,12 @@ bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
       glGenRenderbuffers(1, &mMsColor);
       glBindRenderbuffer(GL_RENDERBUFFER, mMsColor);
       glRenderbufferStorageMultisample(GL_RENDERBUFFER, resolved, GL_RGBA8, w, h);
+      Bench::GpuMem::RecordRenderbuffer(mMsColor, Bench::GpuMemCategory::RenderTargets, w, h, GL_RGBA8, resolved, "Render3D_MSAA");
 
       glGenRenderbuffers(1, &mMsDepth);
       glBindRenderbuffer(GL_RENDERBUFFER, mMsDepth);
       glRenderbufferStorageMultisample(GL_RENDERBUFFER, resolved, GL_DEPTH_COMPONENT24, w, h);
+      Bench::GpuMem::RecordRenderbuffer(mMsDepth, Bench::GpuMemCategory::RenderTargets, w, h, GL_DEPTH_COMPONENT24, resolved, "Render3D_MSAA");
 
       glGenFramebuffers(1, &mMsFbo);
       glBindFramebuffer(GL_FRAMEBUFFER, mMsFbo);
@@ -1328,8 +1333,8 @@ bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
          // Fall back to drawing straight into the resolve target rather than
          // failing the whole render: aliased output beats no output.
          fprintf(stderr, "Render3D multisample framebuffer incomplete: 0x%x, falling back\n", status);
-         if (mMsColor != 0) { glDeleteRenderbuffers(1, &mMsColor); mMsColor = 0; }
-         if (mMsDepth != 0) { glDeleteRenderbuffers(1, &mMsDepth); mMsDepth = 0; }
+         if (mMsColor != 0) { Bench::GpuMem::ReleaseRenderbuffer(mMsColor); glDeleteRenderbuffers(1, &mMsColor); mMsColor = 0; }
+         if (mMsDepth != 0) { Bench::GpuMem::ReleaseRenderbuffer(mMsDepth); glDeleteRenderbuffers(1, &mMsDepth); mMsDepth = 0; }
          if (mMsFbo != 0) { glDeleteFramebuffers(1, &mMsFbo); mMsFbo = 0; }
          resolved = 0;
       }
@@ -1349,6 +1354,7 @@ bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
    glGenerateMipmap(GL_TEXTURE_2D);
+   Bench::GpuMem::RecordTexture(mSceneColorTex, Bench::GpuMemCategory::RenderTargets, w, h, GL_RGBA8, true, "Render3D_SceneColor");
 
    glGenFramebuffers(1, &mSceneColorFbo);
    glBindFramebuffer(GL_FRAMEBUFFER, mSceneColorFbo);
@@ -1857,8 +1863,10 @@ void Render3DNode::CookIfNeeded(int frameId)
          static const unsigned int kQuadIdx[6] = { 0, 1, 2, 0, 2, 3 };
          glBindBuffer(GL_ARRAY_BUFFER, gpu.vbo);
          glBufferData(GL_ARRAY_BUFFER, sizeof(kQuad), kQuad, GL_STATIC_DRAW);
+         Bench::GpuMem::RecordBuffer(gpu.vbo, Bench::GpuMemCategory::MeshBuffers, sizeof(kQuad), "CloudQuadVbo");
          glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gpu.ibo);
          glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(kQuadIdx), kQuadIdx, GL_STATIC_DRAW);
+         Bench::GpuMem::RecordBuffer(gpu.ibo, Bench::GpuMemCategory::MeshBuffers, sizeof(kQuadIdx), "CloudQuadIbo");
          glEnableVertexAttribArray(0);
          glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(SpriteVertex), (void*)0);
          glEnableVertexAttribArray(1);
@@ -1941,6 +1949,7 @@ void Render3DNode::CookIfNeeded(int frameId)
             glGenBuffers(1, &gpu.instanceVbo);
          glBindBuffer(GL_ARRAY_BUFFER, gpu.instanceVbo);
          glBufferData(GL_ARRAY_BUFFER, xforms.size() * sizeof(Mat4), xforms.data(), GL_DYNAMIC_DRAW);
+         Bench::GpuMem::RecordBuffer(gpu.instanceVbo, Bench::GpuMemCategory::InstanceBuffers, xforms.size() * sizeof(Mat4), "CloudInstanceVbo");
          for (int col = 0; col < 4; col++)
          {
             const unsigned int loc = 3 + col;
@@ -1953,6 +1962,7 @@ void Render3DNode::CookIfNeeded(int frameId)
             glGenBuffers(1, &gpu.instanceColorVbo);
          glBindBuffer(GL_ARRAY_BUFFER, gpu.instanceColorVbo);
          glBufferData(GL_ARRAY_BUFFER, colors.size() * sizeof(float), colors.data(), GL_DYNAMIC_DRAW);
+         Bench::GpuMem::RecordBuffer(gpu.instanceColorVbo, Bench::GpuMemCategory::InstanceBuffers, colors.size() * sizeof(float), "CloudInstanceColor");
          glEnableVertexAttribArray(7);
          glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
          glVertexAttribDivisor(7, 1);
@@ -2094,10 +2104,12 @@ void Render3DNode::CookIfNeeded(int frameId)
          glBindBuffer(GL_ARRAY_BUFFER, gpu.vbo);
          glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(Vertex),
                       mesh.vertices.data(), GL_STATIC_DRAW);
+         Bench::GpuMem::RecordBuffer(gpu.vbo, Bench::GpuMemCategory::MeshBuffers, mesh.vertices.size() * sizeof(Vertex), "Render3D_MeshVbo");
          // The element binding is captured by the VAO, so it survives the frame.
          glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gpu.ibo);
          glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(unsigned int),
                       mesh.indices.data(), GL_STATIC_DRAW);
+         Bench::GpuMem::RecordBuffer(gpu.ibo, Bench::GpuMemCategory::MeshBuffers, mesh.indices.size() * sizeof(unsigned int), "Render3D_MeshIbo");
 
          glEnableVertexAttribArray(0);
          glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
@@ -2118,6 +2130,7 @@ void Render3DNode::CookIfNeeded(int frameId)
             glBindBuffer(GL_ARRAY_BUFFER, gpu.vertexColorVbo);
             glBufferData(GL_ARRAY_BUFFER, mesh.vertexColor.size() * sizeof(float),
                          mesh.vertexColor.data(), GL_STATIC_DRAW);
+            Bench::GpuMem::RecordBuffer(gpu.vertexColorVbo, Bench::GpuMemCategory::MeshBuffers, mesh.vertexColor.size() * sizeof(float), "Render3D_VertexColor");
             glEnableVertexAttribArray(8);
             glVertexAttribPointer(8, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
          }
@@ -2247,6 +2260,7 @@ void Render3DNode::CookIfNeeded(int frameId)
             glBindBuffer(GL_ARRAY_BUFFER, gpu.instanceVbo);
             glBufferData(GL_ARRAY_BUFFER, uploadXforms->size() * sizeof(Mat4), uploadXforms->data(),
                          GL_STATIC_DRAW);
+            Bench::GpuMem::RecordBuffer(gpu.instanceVbo, Bench::GpuMemCategory::InstanceBuffers, uploadXforms->size() * sizeof(Mat4), "Render3D_InstanceVbo");
             // a mat4 attribute is four consecutive vec4 slots
             for (int col = 0; col < 4; col++)
             {
@@ -2267,6 +2281,7 @@ void Render3DNode::CookIfNeeded(int frameId)
                glBindBuffer(GL_ARRAY_BUFFER, gpu.instanceColorVbo);
                glBufferData(GL_ARRAY_BUFFER, colors.size() * sizeof(float), colors.data(),
                             GL_STATIC_DRAW);
+               Bench::GpuMem::RecordBuffer(gpu.instanceColorVbo, Bench::GpuMemCategory::InstanceBuffers, colors.size() * sizeof(float), "Render3D_InstanceColor");
                glEnableVertexAttribArray(7);
                glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
                glVertexAttribDivisor(7, 1);

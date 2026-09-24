@@ -40,6 +40,10 @@ namespace Bench
          if (std::strcmp(env, "0") == 0)
             return;
       }
+      if (std::getenv("INFINITE_BENCH_B9SCENE") || std::getenv("INFINITE_BENCH_B9") || std::getenv("INFINITE_BENCH_B9MEMORY"))
+      {
+         return;
+      }
 
 #if !defined(__APPLE__)
       if (!glad_glGenQueries || !glad_glDeleteQueries || !glad_glBeginQuery ||
@@ -267,6 +271,7 @@ namespace Bench
    }
 
    double ProcessRssMb() { return Platform::ProcessRssMb(); }
+   double ProcessFootprintMb() { return Platform::ProcessFootprintMb(); }
    std::string HwModelString() { return Platform::HwModelString(); }
 
    std::string GlRendererString()
@@ -300,6 +305,200 @@ namespace Bench
       while (!sha.empty() && (sha.back() == '\n' || sha.back() == '\r'))
          sha.pop_back();
       return sha.empty() ? "unknown" : sha;
+   }
+
+   namespace GpuMem
+   {
+      struct AllocationEntry
+      {
+         GpuMemCategory category;
+         size_t bytes = 0;
+         std::string nodeType;
+      };
+
+      static std::map<unsigned int, AllocationEntry> sTextures;
+      static std::map<unsigned int, AllocationEntry> sRenderbuffers;
+      static std::map<unsigned int, AllocationEntry> sBuffers;
+
+      static size_t BytesPerPixel(unsigned int internalFormat)
+      {
+         switch (internalFormat)
+         {
+            case GL_RGBA32F:
+               return 16;
+            case GL_RGBA16F:
+               return 8;
+            case GL_RGB16F:
+               return 6;
+            case GL_RGBA8:
+            case GL_RGBA:
+            case GL_UNSIGNED_INT:
+               return 4;
+            case GL_RGB8:
+            case GL_RGB:
+               return 3;
+            case GL_RG8:
+            case GL_RG16:
+            case GL_RG:
+               return 2;
+            case GL_R8:
+            case GL_RED:
+            case GL_R8UI:
+               return 1;
+            case GL_DEPTH_COMPONENT24:
+               return 3;
+            case GL_DEPTH_COMPONENT32:
+            case GL_DEPTH_COMPONENT32F:
+            case GL_DEPTH24_STENCIL8:
+               return 4;
+            case GL_DEPTH_COMPONENT16:
+               return 2;
+            default:
+               return 4;
+         }
+      }
+
+      static size_t CalcTextureBytes(int w, int h, unsigned int internalFormat, bool mipmapped)
+      {
+         if (w <= 0 || h <= 0)
+            return 0;
+         const size_t bpp = BytesPerPixel(internalFormat);
+         if (!mipmapped)
+            return (size_t)w * (size_t)h * bpp;
+
+         size_t total = 0;
+         int curW = w;
+         int curH = h;
+         while (true)
+         {
+            int mw = std::max(1, curW);
+            int mh = std::max(1, curH);
+            total += (size_t)mw * (size_t)mh * bpp;
+            if (curW <= 1 && curH <= 1)
+               break;
+            curW /= 2;
+            curH /= 2;
+         }
+         return total;
+      }
+
+      static size_t CalcRenderbufferBytes(int w, int h, unsigned int internalFormat, int samples)
+      {
+         if (w <= 0 || h <= 0)
+            return 0;
+         const size_t bpp = BytesPerPixel(internalFormat);
+         const size_t s = (size_t)std::max(1, samples);
+         return (size_t)w * (size_t)h * bpp * s;
+      }
+
+      void RecordTexture(unsigned int id, GpuMemCategory cat, int w, int h, unsigned int internalFormat, bool mipmapped, const char* nodeType)
+      {
+         if (id == 0)
+            return;
+         size_t bytes = CalcTextureBytes(w, h, internalFormat, mipmapped);
+         sTextures[id] = AllocationEntry{ cat, bytes, nodeType ? nodeType : "" };
+      }
+
+      void ReleaseTexture(unsigned int id)
+      {
+         if (id == 0)
+            return;
+         sTextures.erase(id);
+      }
+
+      void RecordRenderbuffer(unsigned int id, GpuMemCategory cat, int w, int h, unsigned int internalFormat, int samples, const char* nodeType)
+      {
+         if (id == 0)
+            return;
+         size_t bytes = CalcRenderbufferBytes(w, h, internalFormat, samples);
+         sRenderbuffers[id] = AllocationEntry{ cat, bytes, nodeType ? nodeType : "" };
+      }
+
+      void ReleaseRenderbuffer(unsigned int id)
+      {
+         if (id == 0)
+            return;
+         sRenderbuffers.erase(id);
+      }
+
+      void RecordBuffer(unsigned int id, GpuMemCategory cat, size_t bytes, const char* nodeType)
+      {
+         if (id == 0)
+            return;
+         sBuffers[id] = AllocationEntry{ cat, bytes, nodeType ? nodeType : "" };
+      }
+
+      void ReleaseBuffer(unsigned int id)
+      {
+         if (id == 0)
+            return;
+         sBuffers.erase(id);
+      }
+
+      GpuMemBreakdown GetBreakdown()
+      {
+         GpuMemBreakdown bd;
+         auto addBytes = [&bd](GpuMemCategory cat, size_t bytes)
+         {
+            const double mb = (double)bytes / (1024.0 * 1024.0);
+            switch (cat)
+            {
+               case GpuMemCategory::Textures: bd.texturesMb += mb; break;
+               case GpuMemCategory::RenderTargets: bd.renderTargetsMb += mb; break;
+               case GpuMemCategory::ShadowMaps: bd.shadowMapsMb += mb; break;
+               case GpuMemCategory::MeshBuffers: bd.meshBuffersMb += mb; break;
+               case GpuMemCategory::InstanceBuffers: bd.instanceBuffersMb += mb; break;
+            }
+         };
+
+         for (const auto& [id, entry] : sTextures)
+            addBytes(entry.category, entry.bytes);
+         for (const auto& [id, entry] : sRenderbuffers)
+            addBytes(entry.category, entry.bytes);
+         for (const auto& [id, entry] : sBuffers)
+            addBytes(entry.category, entry.bytes);
+
+         return bd;
+      }
+
+      double GetTotalMb()
+      {
+         return GetBreakdown().TotalMb();
+      }
+
+      void Reset()
+      {
+         sTextures.clear();
+         sRenderbuffers.clear();
+         sBuffers.clear();
+      }
+   }
+
+   double CalculateRssSlopeMbPer100f(const std::vector<std::pair<int, double>>& samples)
+   {
+      if (samples.size() < 2)
+         return 0.0;
+      double sumX = 0.0, sumY = 0.0;
+      for (const auto& [x, y] : samples)
+      {
+         sumX += x;
+         sumY += y;
+      }
+      const double meanX = sumX / (double)samples.size();
+      const double meanY = sumY / (double)samples.size();
+
+      double num = 0.0, den = 0.0;
+      for (const auto& [x, y] : samples)
+      {
+         const double dx = (double)x - meanX;
+         const double dy = y - meanY;
+         num += dx * dy;
+         den += dx * dx;
+      }
+      if (den == 0.0)
+         return 0.0;
+      const double slopePerFrame = num / den;
+      return slopePerFrame * 100.0;
    }
 
    void BenchReport::Emit() const
@@ -341,10 +540,42 @@ namespace Bench
          j["audio"] = nullptr;
       }
 
-      j["mem"] = {
+      nlohmann::json memObj = {
          { "rss_mb", memRssEndMb },
          { "rss_mb_start", memRssStartMb },
       };
+      if (memRssBuiltMb >= 0.0)
+         memObj["rss_built_mb"] = memRssBuiltMb;
+      if (memRssF32Mb >= 0.0)
+         memObj["rss_f32_mb"] = memRssF32Mb;
+      if (memRssF152Mb >= 0.0)
+         memObj["rss_f152_mb"] = memRssF152Mb;
+      if (memRssPeakMb >= 0.0)
+         memObj["rss_peak_mb"] = memRssPeakMb;
+      if (memDetailed)
+         memObj["rss_slope_mb_per_100f"] = memRssSlopeMbPer100f;
+      if (memFootEndMb >= 0.0)
+      {
+         memObj["footprint_mb"] = memFootEndMb;
+         memObj["footprint_start_mb"] = memFootStartMb;
+         if (memFootBuiltMb >= 0.0)
+            memObj["footprint_built_mb"] = memFootBuiltMb;
+         if (memFootF32Mb >= 0.0)
+            memObj["footprint_f32_mb"] = memFootF32Mb;
+         if (memFootF152Mb >= 0.0)
+            memObj["footprint_f152_mb"] = memFootF152Mb;
+         if (memFootPeakMb >= 0.0)
+            memObj["footprint_peak_mb"] = memFootPeakMb;
+         if (memDetailed)
+            memObj["footprint_slope_mb_per_100f"] = memFootSlopeMbPer100f;
+      }
+      if (memGpuEstMb >= 0.0)
+      {
+         memObj["gpu_est_mb"] = memGpuEstMb;
+         memObj["gl_tex_mb_est"] = memGpuEstMb;
+         memObj["gpu_est_breakdown"] = memGpuEstBreakdown;
+      }
+      j["mem"] = memObj;
 
       j["nodes"] = nodes;
       j["tris"] = tris;

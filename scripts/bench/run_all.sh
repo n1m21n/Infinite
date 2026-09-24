@@ -149,7 +149,14 @@ echo "B8 Media I/O"
 skip "B8_media_io"
 
 echo "B9 Memory footprint"
-skip "B9_memory_footprint"
+# B9 Memory footprint per benchmark-suite.md §4 (B2 and B4 scenes at scale l, animated).
+# B9_FRAMES defaults to 600 frames per the plan; can be overridden via B9_FRAMES for quick runs.
+B9_FRAMES="${B9_FRAMES:-600}"
+B9_EXIT=$((B9_FRAMES + 50))
+run_fixture "B9_memory_footprint scene=b2,scale=l,anim=1" "$B9_EXIT" \
+   INFINITE_BENCH_B9SCENE=b2 INFINITE_BENCH_B9FRAMES="$B9_FRAMES"
+run_fixture "B9_memory_footprint scene=b4,scale=l,anim=1" "$B9_EXIT" \
+   INFINITE_BENCH_B9SCENE=b4 INFINITE_BENCH_B9FRAMES="$B9_FRAMES"
 
 echo "B10 Offline render and A/V sync"
 skip "B10_offline_av_sync"
