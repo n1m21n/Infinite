@@ -675,45 +675,6 @@ namespace
 
    std::vector<GraphNode> gNodes;
 
-   struct NodeInstanceData
-   {
-      int rank = 1;
-      int total = 1;
-   };
-   static std::unordered_map<int, NodeInstanceData> sNodeInstanceMap;
-   static uint64_t sNodeInstanceMapRevision = 0;
-
-   void InvalidateNodeInstanceCache()
-   {
-      sNodeInstanceMapRevision++;
-   }
-
-   void RefreshNodeInstanceMapIfNeeded()
-   {
-      static uint64_t sLastBuiltRevision = (uint64_t)-1;
-      static size_t sLastNodeCount = (size_t)-1;
-      if (sLastBuiltRevision == sNodeInstanceMapRevision && sLastNodeCount == gNodes.size())
-         return;
-
-      sLastBuiltRevision = sNodeInstanceMapRevision;
-      sLastNodeCount = gNodes.size();
-      sNodeInstanceMap.clear();
-
-      std::unordered_map<std::string, int> totalByTitle;
-      totalByTitle.reserve(gNodes.size());
-      for (const GraphNode& gn : gNodes)
-         totalByTitle[NodeTitle(gn)]++;
-
-      std::unordered_map<std::string, int> rankByTitle;
-      rankByTitle.reserve(totalByTitle.size());
-      for (const GraphNode& gn : gNodes)
-      {
-         const std::string title = NodeTitle(gn);
-         const int rank = ++rankByTitle[title];
-         sNodeInstanceMap[gn.index] = { rank, totalByTitle[title] };
-      }
-   }
-
    // Disambiguates nodes that share a title (e.g. three "predictive lfo"
    // nodes) so the Modulation Matrix and canvas headers can point at the
    // same node unambiguously. Ranked by `index` (monotonic spawn order,
@@ -728,17 +689,20 @@ namespace
    // 289-node patch. GetNodeInstanceIndex answers from a cache instead.
    int GetNodeInstanceIndexScan(const GraphNode& targetNode, int* outTotalCount)
    {
-      RefreshNodeInstanceMapIfNeeded();
-      auto it = sNodeInstanceMap.find(targetNode.index);
-      if (it != sNodeInstanceMap.end())
+      const std::string title = NodeTitle(targetNode);
+      int rank = 0;
+      int total = 0;
+      for (const GraphNode& gn : gNodes)
       {
-         if (outTotalCount != nullptr)
-            *outTotalCount = it->second.total;
-         return it->second.rank;
+         if (NodeTitle(gn) != title)
+            continue;
+         ++total;
+         if (gn.index <= targetNode.index)
+            ++rank;
       }
       if (outTotalCount != nullptr)
-         *outTotalCount = 1;
-      return 1;
+         *outTotalCount = total;
+      return rank;
    }
 
    // The one live field a node's title can follow after spawn (see
