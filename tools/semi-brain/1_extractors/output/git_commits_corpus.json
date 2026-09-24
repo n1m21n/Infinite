@@ -1,5 +1,588 @@
 [
   {
+    "hash": "3563c7280b573b5eb796332e654b2c03b4de64de",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 16:39:34 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Rewrite provenance comments and add prior-art acknowledgements",
+      "description": "Rewrite provenance comments and add prior-art acknowledgements",
+      "bullets": [
+        "NodeFactory: fresh implementation behind the unchanged public API",
+        "GLUtil::CompileProgram: rewritten around CompileStage/InfoLog helpers;",
+        "INode, ImageCable, FilterDefs, GLUtil: header comments describe the",
+        "README: new Prior Art & Acknowledgements section naming the tools",
+        "SCRIPTING_NODE_SPECIFICATION: drop \"Bespoke DAG Architecture\"."
+      ],
+      "body": "Five core headers described themselves as \"ported from BespokeSynth\" or\ncontrasted themselves against it. Their actual code is Infinite's own; what\nwas borrowed was architecture (a name-keyed node registry, pull-based\nper-frame cooking, one node shell hosting many effect types). Say that\naccurately instead:\n(unordered_map entries; first registration still wins; duplicates still\nrecorded).\ndriver logs are now read at full length instead of truncated at 1 KB,\nwhich FormulaNode shows to the user verbatim. Error prefixes unchanged.\ndesign on its own terms.\nInfinite's ideas come from, what Field specifically adds, and that the\nproject is built with AI coding assistance.\nVerified: builds (VST3 off in this worktree), ROUNDTRIPTEST save/load\n287/287 (copy/paste 284/287 is the known Predictive-node reset), PATCHTEST.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Rewrite provenance comments and add prior-art acknowledgements\n\nFive core headers described themselves as \"ported from BespokeSynth\" or\ncontrasted themselves against it. Their actual code is Infinite's own; what\nwas borrowed was architecture (a name-keyed node registry, pull-based\nper-frame cooking, one node shell hosting many effect types). Say that\naccurately instead:\n\n- NodeFactory: fresh implementation behind the unchanged public API\n  (unordered_map entries; first registration still wins; duplicates still\n  recorded).\n- GLUtil::CompileProgram: rewritten around CompileStage/InfoLog helpers;\n  driver logs are now read at full length instead of truncated at 1 KB,\n  which FormulaNode shows to the user verbatim. Error prefixes unchanged.\n- INode, ImageCable, FilterDefs, GLUtil: header comments describe the\n  design on its own terms.\n- README: new Prior Art & Acknowledgements section naming the tools\n  Infinite's ideas come from, what Field specifically adds, and that the\n  project is built with AI coding assistance.\n- SCRIPTING_NODE_SPECIFICATION: drop \"Bespoke DAG Architecture\".\n\nVerified: builds (VST3 off in this worktree), ROUNDTRIPTEST save/load\n287/287 (copy/paste 284/287 is the known Predictive-node reset), PATCHTEST.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "README.md                            |  22 ++++++++\n docs/SCRIPTING_NODE_SPECIFICATION.md |   2 +-\n src/core/FilterDefs.h                |   5 +-\n src/core/GLUtil.cpp                  | 100 ++++++++++++++++++++++-------------\n src/core/GLUtil.h                    |   8 +--\n src/core/INode.h                     |   9 ++--\n src/core/ImageCable.h                |   8 ++-\n src/core/NodeFactory.cpp             |  34 ++++++------\n src/core/NodeFactory.h               |  49 ++++++++++-------\n 9 files changed, 146 insertions(+), 91 deletions(-)"
+  },
+  {
+    "hash": "3626c3d172e94a262633be26e370e676a364f279",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 15:50:59 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge branch 'feature/b8-media-io' into main",
+      "description": "Merge branch 'feature/b8-media-io' into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge branch 'feature/b8-media-io' into main"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "1986db064002f0adde07bd2372a3b7f6b30052f6",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 15:50:59 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "bench",
+      "title": "feat(bench): B8 media I/O fixture",
+      "description": "B8 media I/O fixture",
+      "bullets": [],
+      "body": "INFINITE_BENCH_B8: 1-4 looping H.264 clips (1080p30/2160p30, generated\ninto gitignored bench/media/ by scripts/bench/b8_make_clips.sh) into\nOutputs, 0-3 projector windows, optional camera and Syphon/Spout Out.\nBENCH_JSON \"media_io\" reports per-clip decode vs cache-hit ms, loop-\nboundary decode, decoded/dropped/skipped, repeats vs expected repeats,\nuploads vs new frames, reader restarts; per-window present/interval/\njitter/missed vsync; Syphon publish ms; camera fps or \"skipped\".\nInstrumentation is inert unless the fixture sets Bench::MediaIoEnabled():\nPlatform::VideoBenchStats on all three platforms (lock-free SPSC ring for\nthe Win/Linux decode threads), read-only CameraAuthorizationStatus on all\nthree platforms (never prompts). GPU upload timing only with\nINFINITE_BENCH_GPUTIMERS=1, via the per-node ring with the cook query off.\nrun_all.sh runs the 9-variant ladder (B8_FRAMES, default 300) under a new\nopt-in FIXTURE_TIMEOUT watchdog. README records verification numbers (not\na baseline: unfocused/unpaced) and findings 1-8, measured, not fixed.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "feat(bench): B8 media I/O fixture\n\nINFINITE_BENCH_B8: 1-4 looping H.264 clips (1080p30/2160p30, generated\ninto gitignored bench/media/ by scripts/bench/b8_make_clips.sh) into\nOutputs, 0-3 projector windows, optional camera and Syphon/Spout Out.\nBENCH_JSON \"media_io\" reports per-clip decode vs cache-hit ms, loop-\nboundary decode, decoded/dropped/skipped, repeats vs expected repeats,\nuploads vs new frames, reader restarts; per-window present/interval/\njitter/missed vsync; Syphon publish ms; camera fps or \"skipped\".\n\nInstrumentation is inert unless the fixture sets Bench::MediaIoEnabled():\nPlatform::VideoBenchStats on all three platforms (lock-free SPSC ring for\nthe Win/Linux decode threads), read-only CameraAuthorizationStatus on all\nthree platforms (never prompts). GPU upload timing only with\nINFINITE_BENCH_GPUTIMERS=1, via the per-node ring with the cook query off.\n\nrun_all.sh runs the 9-variant ladder (B8_FRAMES, default 300) under a new\nopt-in FIXTURE_TIMEOUT watchdog. README records verification numbers (not\na baseline: unfocused/unpaced) and findings 1-8, measured, not fixed.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": ".gitignore                         |   1 +\n docs/plans/perf/README.md          | 152 ++++++++-\n docs/plans/perf/benchmark-suite.md |   2 +-\n scripts/bench/b8_make_clips.sh     |  54 +++\n scripts/bench/run_all.sh           |  43 ++-\n src/core/BenchMediaIo.h            | 132 ++++++++\n src/core/BenchReport.cpp           |   3 +\n src/core/BenchReport.h             |   4 +\n src/main.cpp                       | 667 ++++++++++++++++++++++++++++++++++++-\n src/nodes/SyphonOutNode.cpp        |   5 +\n src/nodes/SyphonOutNode.h          |   7 +\n src/nodes/VideoInNode.cpp          |  20 ++\n src/nodes/VideoInNode.h            |   6 +\n src/nodes/VideoSourceNode.cpp      |  62 +++-\n src/nodes/VideoSourceNode.h        |   6 +\n src/platform/Platform.h            |  24 ++\n src/platform/Platform.mm           |  56 ++++\n src/platform/linux/CameraLinux.cpp |   7 +\n src/platform/linux/MediaLinux.cpp  |  48 ++-\n src/platform/win/MediaWin.cpp      |  43 +++\n 20 files changed, 1323 insertions(+), 19 deletions(-)\n create mode 100755 scripts/bench/b8_make_clips.sh\n create mode 100644 src/core/BenchMediaIo.h"
+  },
+  {
+    "hash": "356546bd9aeb4f00e297d5d0aaed6a2519bedf27",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 14:50:33 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Merge branch 'feature/b6-canvas-nav-fixture' into main",
+      "description": "Merge branch 'feature/b6-canvas-nav-fixture' into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge branch 'feature/b6-canvas-nav-fixture' into main"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "ef58a66cff3e080deb7594ad00fd96d3d3f6a46a",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 14:50:29 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "bench",
+      "title": "feat(bench): B6 canvas navigation fixture",
+      "description": "B6 canvas navigation fixture",
+      "bullets": [
+        "ApplePersistenceIgnoreState so a crashed fixture can't hang later launches."
+      ],
+      "body": "Programmatic pan/zoom/drag/dropdown over a wired 300-node grid through new\ned::SetViewScroll/SetViewZoom calls, no OS-level UI scripting. Reports\nvisible vs drawn bodies, off-screen body cost, per-phase frame times,\non-vsync fraction (unpaced runs are tagged and their targets go null unless a\nlower bound already fails), and a B6-only cook_all stage for the untimed\nwhole-graph cook loop. run_all.sh runs B6 and passes\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "feat(bench): B6 canvas navigation fixture\n\nProgrammatic pan/zoom/drag/dropdown over a wired 300-node grid through new\ned::SetViewScroll/SetViewZoom calls, no OS-level UI scripting. Reports\nvisible vs drawn bodies, off-screen body cost, per-phase frame times,\non-vsync fraction (unpaced runs are tagged and their targets go null unless a\nlower bound already fails), and a B6-only cook_all stage for the untimed\nwhole-graph cook loop. run_all.sh runs B6 and passes\n-ApplePersistenceIgnoreState so a crashed fixture can't hang later launches.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/plans/perf/README.md                          |  80 +++-\n external/imgui-node-editor/imgui_node_editor.h     |   4 +\n .../imgui-node-editor/imgui_node_editor_api.cpp    |  26 ++\n .../imgui-node-editor/imgui_node_editor_internal.h |  28 ++\n scripts/bench/run_all.sh                           |  20 +-\n src/core/BenchReport.cpp                           |  16 +\n src/core/BenchReport.h                             |  17 +-\n src/main.cpp                                       | 459 ++++++++++++++++++++-\n 8 files changed, 633 insertions(+), 17 deletions(-)"
+  },
+  {
+    "hash": "82cfb1be883cdc81ab718384c89efdb5e14e21c6",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 13:30:21 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "audio",
+      "title": "Merge branch 'fix/audio-stale-device' into main",
+      "description": "Merge branch 'fix/audio-stale-device' into main",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Merge branch 'fix/audio-stale-device' into main\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "884e2236436a8bc52cf5b2b696b7d5e5743aca63",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 13:28:35 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "perf",
+      "title": "docs(perf): mark stale saved output device bullet as fixed",
+      "description": "mark stale saved output device bullet as fixed",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "docs(perf): mark stale saved output device bullet as fixed\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/plans/perf/README.md | 20 ++++++++++++--------\n 1 file changed, 12 insertions(+), 8 deletions(-)"
+  },
+  {
+    "hash": "9a164d38693f1d6cc30063fb6e46bc30d19b5b9b",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 13:26:29 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "audio",
+      "title": "fix(audio): fallback to default device when saved device id is stale or invalid",
+      "description": "fallback to default device when saved device id is stale or invalid",
+      "bullets": [],
+      "body": "",
+      "raw": "fix(audio): fallback to default device when saved device id is stale or invalid"
+    },
+    "stat": "src/platform/Platform.mm                | 60 +++++++++++++++++++++++----------\n src/platform/linux/AudioDeviceLinux.cpp | 28 ++++++++++-----\n src/platform/win/AudioDeviceWin.cpp     | 35 +++++++++++++------\n 3 files changed, 87 insertions(+), 36 deletions(-)"
+  },
+  {
+    "hash": "b493ab90e28cfada889e3fa4a076c9f981105e7f",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 13:13:26 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "audio",
+      "title": "Merge branch 'fix/bench-b3-audio-vsync' into main",
+      "description": "Merge branch 'fix/bench-b3-audio-vsync' into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge branch 'fix/bench-b3-audio-vsync' into main"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "dfd7434df88546fb3215278e94e95c2900f3413c",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 13:13:14 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "bench",
+      "title": "fix(bench): make B3 audio, projector pacing and i2p results real",
+      "description": "make B3 audio, projector pacing and i2p results real",
+      "bullets": [
+        "B1/B3/B5d force the system default output device. A stale saved",
+        "audio is reported as not measured (null, no audio targets) when the",
+        "B3 lays the canvas and projector side by side and focuses the canvas,",
+        "i2p: zero samples is null; the target needs >=20 samples and max <=2.",
+        "README: void the first B3 baseline and ladder; record the unpaced"
+      ],
+      "body": "AudioObjectID made the engine fail (-10875), so every audio row was 0.\nengine is not running.\nso the canvas vsync paces the loop. Runs where the canvas lost focus\nare tagged ,unfocused=1.\nThe dry run reports i2p_dryrun_no_false_samples instead.\nprojector and stale-device findings.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "fix(bench): make B3 audio, projector pacing and i2p results real\n\n- B1/B3/B5d force the system default output device. A stale saved\n  AudioObjectID made the engine fail (-10875), so every audio row was 0.\n- audio is reported as not measured (null, no audio targets) when the\n  engine is not running.\n- B3 lays the canvas and projector side by side and focuses the canvas,\n  so the canvas vsync paces the loop. Runs where the canvas lost focus\n  are tagged ,unfocused=1.\n- i2p: zero samples is null; the target needs >=20 samples and max <=2.\n  The dry run reports i2p_dryrun_no_false_samples instead.\n- README: void the first B3 baseline and ladder; record the unpaced\n  projector and stale-device findings.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/plans/perf/README.md | 86 ++++++++++++++++++++++++++--------------------\n src/main.cpp              | 87 ++++++++++++++++++++++++++++++++++++++---------\n 2 files changed, 121 insertions(+), 52 deletions(-)"
+  },
+  {
+    "hash": "46f4d2a978d03730aae66a9ee529b4aa355dfbb8",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 12:53:16 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Merge branch 'fix/bench-b3-measurement' into main",
+      "description": "Merge branch 'fix/bench-b3-measurement' into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge branch 'fix/bench-b3-measurement' into main"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "a89e3b5d2e9d4871fc565d2b94837d9215557742",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 12:53:08 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "bench",
+      "title": "fix(bench): fix B3 input-to-photon latency probe and projector measurement",
+      "description": "fix B3 input-to-photon latency probe and projector measurement",
+      "bullets": [],
+      "body": "",
+      "raw": "fix(bench): fix B3 input-to-photon latency probe and projector measurement"
+    },
+    "stat": "docs/plans/perf/README.md |  63 +++++++++++--\n src/main.cpp              | 230 +++++++++++++++++++++++++++++++---------------\n 2 files changed, 212 insertions(+), 81 deletions(-)"
+  },
+  {
+    "hash": "7f8d873990229b5c4f4302b4c7c3ad19d9f86ce3",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 11:48:30 2026 +0530",
+    "parsed_message": {
+      "type": "perf",
+      "scope": "core",
+      "title": "bench: add B3 live performance to run_all.sh and perf README",
+      "description": "bench: add B3 live performance to run_all.sh and perf README",
+      "bullets": [],
+      "body": "",
+      "raw": "bench: add B3 live performance to run_all.sh and perf README"
+    },
+    "stat": "docs/plans/perf/README.md | 2 +-\n scripts/bench/run_all.sh  | 7 ++++++-\n 2 files changed, 7 insertions(+), 2 deletions(-)"
+  },
+  {
+    "hash": "18caec83b0b636749b2652845aa9b16435c01a27",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 11:32:18 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge branch 'main' into feature/bench-b3-live-performance",
+      "description": "Merge branch 'main' into feature/bench-b3-live-performance",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge branch 'main' into feature/bench-b3-live-performance"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "0720f3f9b610452f7e8796f57d09a38da9485211",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 09:54:57 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Implement Benchmark B3 (Live Performance Under Load)",
+      "description": "Implement Benchmark B3 (Live Performance Under Load)",
+      "bullets": [
+        "Live scenario combining B1-lite (8/16 voices at configurable buffer), B2-lite (scale s visual scene, animated), open projector window, simulated MIDI note/CC input stream, gesture playback on Material metallic, and 3 Prediction modulators (Drift, Moves, Predictive Modulator) driving visual params.",
+        "Measures projector presentation interval p99, stddev jitter, missed vsync pct against monitor refresh rate, canvas frame p50/p99, audio callback load p99 & xruns, input-to-photon latency (parameter change to output texture revision change), and memory footprint.",
+        "Evaluates \u00a76 benchmark targets in BenchReport JSON emission.",
+        "Cross-platform MIDI injection support (macOS CoreMIDI, Linux ALSA, Windows WinMM)."
+      ],
+      "body": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Implement Benchmark B3 (Live Performance Under Load)\n\n- Live scenario combining B1-lite (8/16 voices at configurable buffer), B2-lite (scale s visual scene, animated), open projector window, simulated MIDI note/CC input stream, gesture playback on Material metallic, and 3 Prediction modulators (Drift, Moves, Predictive Modulator) driving visual params.\n- Measures projector presentation interval p99, stddev jitter, missed vsync pct against monitor refresh rate, canvas frame p50/p99, audio callback load p99 & xruns, input-to-photon latency (parameter change to output texture revision change), and memory footprint.\n- Evaluates \u00a76 benchmark targets in BenchReport JSON emission.\n- Cross-platform MIDI injection support (macOS CoreMIDI, Linux ALSA, Windows WinMM).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "src/core/BenchReport.cpp         |  51 +++-\n src/core/BenchReport.h           |  16 ++\n src/main.cpp                     | 519 +++++++++++++++++++++++++++++----------\n src/platform/Platform.h          |   4 +\n src/platform/Platform.mm         |  10 +\n src/platform/linux/MidiLinux.cpp |  39 +++\n src/platform/win/MidiWin.cpp     |  10 +\n 7 files changed, 518 insertions(+), 131 deletions(-)"
+  },
+  {
+    "hash": "8fb7a41281118251dfae6d308f4db3fe52b7dafc",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 09:35:38 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Fix B9 peak RSS coverage and add phys_footprint memory tracking",
+      "description": "Fix B9 peak RSS coverage and add phys_footprint memory tracking",
+      "bullets": [
+        "Track peak RSS across the entire run including post-build and frame 2",
+        "Add Platform::ProcessPhysFootprintMb (task_vm_info.phys_footprint on macOS, PrivateUsage on Windows, RssAnon on Linux)",
+        "Calculate memory growth slope from physical footprint next to RSS"
+      ],
+      "body": "",
+      "raw": "Fix B9 peak RSS coverage and add phys_footprint memory tracking\n\n- Track peak RSS across the entire run including post-build and frame 2\n- Add Platform::ProcessPhysFootprintMb (task_vm_info.phys_footprint on macOS, PrivateUsage on Windows, RssAnon on Linux)\n- Calculate memory growth slope from physical footprint next to RSS"
+    },
+    "stat": "src/core/BenchReport.cpp             | 17 ++++++++++++++\n src/core/BenchReport.h               | 14 ++++++++++--\n src/main.cpp                         | 44 ++++++++++++++++++++++++++++++++----\n src/platform/Platform.h              |  6 +++++\n src/platform/Platform.mm             | 11 +++++++++\n src/platform/linux/PlatformLinux.cpp | 22 ++++++++++++++++++\n src/platform/win/PlatformWin.cpp     |  9 ++++++++\n tools/bench.py                       | 32 ++++++++++++++------------\n 8 files changed, 134 insertions(+), 21 deletions(-)"
+  },
+  {
+    "hash": "694898577c18f52c5a25e26b89237ce64e278df2",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 09:26:38 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/bench-b9-memory into main",
+      "description": "Merge feature/bench-b9-memory into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/bench-b9-memory into main"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "e4088a55a4187f75c7166f92e27973fa4f29c844",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 09:26:30 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Fix B9 peak and report OS memory footprint alongside RSS",
+      "description": "Fix B9 peak and report OS memory footprint alongside RSS",
+      "bullets": [],
+      "body": "B9's peak started at frame 2, after the scene was built, so it could come\nout below rss_built_mb (b2: 155 < 281). Start is now process launch, and\nthe peak covers launch, build and every frame to the end.\nRSS falls under memory pressure because macOS compresses pages, so it\nreads as the app freeing memory it still holds. Platform::ProcessFootprintMb\nadds the OS-charged number on each platform: phys_footprint on macOS,\nPrivateUsage on Windows, VmRSS + VmSwap on Linux. B9 reports it at the same\npoints as RSS, with its own peak and slope. README records the first B9\nresults, the footprint check and the 470 MB of B2 render targets.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Fix B9 peak and report OS memory footprint alongside RSS\n\nB9's peak started at frame 2, after the scene was built, so it could come\nout below rss_built_mb (b2: 155 < 281). Start is now process launch, and\nthe peak covers launch, build and every frame to the end.\n\nRSS falls under memory pressure because macOS compresses pages, so it\nreads as the app freeing memory it still holds. Platform::ProcessFootprintMb\nadds the OS-charged number on each platform: phys_footprint on macOS,\nPrivateUsage on Windows, VmRSS + VmSwap on Linux. B9 reports it at the same\npoints as RSS, with its own peak and slope. README records the first B9\nresults, the footprint check and the 470 MB of B2 render targets.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/plans/perf/README.md            | 39 ++++++++++++++++++++++++--\n src/core/BenchReport.cpp             | 16 +++++++++++\n src/core/BenchReport.h               | 11 ++++++++\n src/main.cpp                         | 53 ++++++++++++++++++++++++++++--------\n src/platform/Platform.h              |  9 ++++++\n src/platform/Platform.mm             | 11 ++++++++\n src/platform/linux/PlatformLinux.cpp | 20 ++++++++++++++\n src/platform/win/PlatformWin.cpp     | 11 ++++++++\n 8 files changed, 156 insertions(+), 14 deletions(-)"
+  },
+  {
+    "hash": "318998b766d16e30d7b6369ac53fec294eb4280b",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 09:20:57 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Add B9 memory-footprint benchmark and GPU memory estimate",
+      "description": "Add B9 memory-footprint benchmark and GPU memory estimate",
+      "bullets": [],
+      "body": "INFINITE_BENCH_B9SCENE=b2|b4 runs the B2 or B4 scene at scale l, animated.\nIt reports RSS at start, after building, at frames 32 and 152, and at the\nend, plus the peak and the slope per 100 frames. It also estimates GPU\nmemory, split into textures, render targets, shadow maps, mesh buffers and\ninstance buffers, by summing every allocation the GL wrappers can see.\nThe B2/B4 scene builders move into functions so B9 can reuse them.\ntools/bench.py wraps the fixtures in one CLI.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Add B9 memory-footprint benchmark and GPU memory estimate\n\nINFINITE_BENCH_B9SCENE=b2|b4 runs the B2 or B4 scene at scale l, animated.\nIt reports RSS at start, after building, at frames 32 and 152, and at the\nend, plus the peak and the slope per 100 frames. It also estimates GPU\nmemory, split into textures, render targets, shadow maps, mesh buffers and\ninstance buffers, by summing every allocation the GL wrappers can see.\nThe B2/B4 scene builders move into functions so B9 can reuse them.\ntools/bench.py wraps the fixtures in one CLI.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/plans/perf/benchmark-suite.md |   2 +-\n scripts/bench/compare.py           |  35 +-\n scripts/bench/run_all.sh           |   9 +-\n src/core/BenchReport.cpp           | 217 +++++++++-\n src/core/BenchReport.h             |  63 +++\n src/core/GLUtil.cpp                |   6 +\n src/core/NodeViewport.cpp          |  28 +-\n src/main.cpp                       | 782 +++++++++++++++++++++----------------\n src/nodes/EnvironmentNode.cpp      |   6 +\n src/nodes/Geometry3DNodes.cpp      |  43 +-\n src/nodes/ImageSourceNode.cpp      |   9 +\n tools/bench.py                     | 184 +++++++++\n 12 files changed, 1017 insertions(+), 367 deletions(-)\n create mode 100644 tools/bench.py"
+  },
+  {
+    "hash": "9eb3e05abc58d3b8161149bf8cd444574cb92b62",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 08:38:34 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Merge fix/hdri-background-seam into main",
+      "description": "Merge fix/hdri-background-seam into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge fix/hdri-background-seam into main"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "2d522251ede92b0cd2996007def0a0f11e2d03de",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 08:38:34 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/ocean-normals-no-weld into main",
+      "description": "Merge feature/ocean-normals-no-weld into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/ocean-normals-no-weld into main"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "e4350a690949918db04b85b46c8f5f849caf93f1",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 08:38:34 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Restore node-instance cache dropped by the Ocean normals commit",
+      "description": "Restore node-instance cache dropped by the Ocean normals commit",
+      "bullets": [],
+      "body": "47c46ad replaced src/main.cpp with an older copy. That removed the\ncached GetNodeInstanceIndexScan from 1d19afa and brought back the\nper-call scan over every node's title. This commit restores it and\nkeeps the Ocean self-test that 47c46ad added.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Restore node-instance cache dropped by the Ocean normals commit\n\n47c46ad replaced src/main.cpp with an older copy. That removed the\ncached GetNodeInstanceIndexScan from 1d19afa and brought back the\nper-call scan over every node's title. This commit restores it and\nkeeps the Ocean self-test that 47c46ad added.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "src/main.cpp | 58 +++++++++++++++++++++++++++++++++++++++++++++++-----------\n 1 file changed, 47 insertions(+), 11 deletions(-)"
+  },
+  {
+    "hash": "47c46adfd59e5e2b67a9d278e52d3d2b7dfcaf17",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 08:24:05 2026 +0530",
+    "parsed_message": {
+      "type": "perf",
+      "scope": "render3d",
+      "title": "Optimize MeshOps::Ocean normals via direct index buffer accumulation without weld map",
+      "description": "Optimize MeshOps::Ocean normals via direct index buffer accumulation without weld map",
+      "bullets": [],
+      "body": "",
+      "raw": "Optimize MeshOps::Ocean normals via direct index buffer accumulation without weld map"
+    },
+    "stat": "docs/plans/perf/README.md |  17 ++++++++\n src/core/Mesh.cpp         |  32 +++++++++++++-\n src/main.cpp              | 104 +++++++++++++++++++++++++---------------------\n 3 files changed, 103 insertions(+), 50 deletions(-)"
+  },
+  {
+    "hash": "f897274495643140d5559b2377aac65d0f12de78",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 08:21:42 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Fix HDRI background seam with seam-safe textureGrad sampling",
+      "description": "Fix HDRI background seam with seam-safe textureGrad sampling",
+      "bullets": [],
+      "body": "texture() at the equirect u=0/1 wrap relied on implicit screen-space\nderivatives, which blow up right at the wrap (u jumps ~1 to ~0 between\nadjacent fragments) and force the smallest mip - a thin vertical line\nof the image's average colour up the sky. Sample twice, once as-is and\nonce shifted half a turn so its own wrap lands away from this\nfragment, and feed textureGrad() whichever pair of derivatives is\nsmall. The reflection path (sampleEnv, textureLod) was already correct\nand is untouched; dirToEquirect has only these two call sites in the\ncodebase.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Fix HDRI background seam with seam-safe textureGrad sampling\n\ntexture() at the equirect u=0/1 wrap relied on implicit screen-space\nderivatives, which blow up right at the wrap (u jumps ~1 to ~0 between\nadjacent fragments) and force the smallest mip - a thin vertical line\nof the image's average colour up the sky. Sample twice, once as-is and\nonce shifted half a turn so its own wrap lands away from this\nfragment, and feed textureGrad() whichever pair of derivatives is\nsmall. The reflection path (sampleEnv, textureLod) was already correct\nand is untouched; dirToEquirect has only these two call sites in the\ncodebase.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "src/nodes/Geometry3DNodes.cpp | 22 +++++++++++++++++++++-\n 1 file changed, 21 insertions(+), 1 deletion(-)"
+  },
+  {
+    "hash": "0972dd64c7b916502f284daa1cca7208f6428129",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 07:54:20 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "Merge feature/bench-b4-complex-3d into main",
+      "description": "Merge feature/bench-b4-complex-3d into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/bench-b4-complex-3d into main"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "c1b568db5488fddc998d241dd2c510af5cccfe94",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 07:51:13 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "Add B4 complex-3D benchmark and a switch to turn GPU timers off",
+      "description": "Add B4 complex-3D benchmark and a switch to turn GPU timers off",
+      "bullets": [],
+      "body": "B4 renders one 1080p Render 3D scene with an ocean, 1k-20k instanced\ncubes, a torus array, a glass sphere, three lights, sun shadows and an\nHDRI. It sweeps scale and shadow resolution and reports drawn tris and\ndraw calls. INFINITE_BENCH_B4PASSES times the shadow, opaque,\ntransmissive and resolve passes separately.\nINFINITE_BENCH_GPUTIMERS=0 turns off the GL timer queries.\nglEndQuery(GL_TIME_ELAPSED) stalls the CPU on macOS and roughly\ndoubles frame_ms.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Add B4 complex-3D benchmark and a switch to turn GPU timers off\n\nB4 renders one 1080p Render 3D scene with an ocean, 1k-20k instanced\ncubes, a torus array, a glass sphere, three lights, sun shadows and an\nHDRI. It sweeps scale and shadow resolution and reports drawn tris and\ndraw calls. INFINITE_BENCH_B4PASSES times the shadow, opaque,\ntransmissive and resolve passes separately.\n\nINFINITE_BENCH_GPUTIMERS=0 turns off the GL timer queries.\nglEndQuery(GL_TIME_ELAPSED) stalls the CPU on macOS and roughly\ndoubles frame_ms.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/plans/perf/README.md     |  53 +++++++++-\n scripts/bench/run_all.sh      |  17 ++-\n src/core/BenchReport.cpp      |  13 +++\n src/core/BenchReport.h        |  10 ++\n src/main.cpp                  | 241 ++++++++++++++++++++++++++++++++++++++++--\n src/nodes/Geometry3DNodes.cpp |   8 +-\n 6 files changed, 330 insertions(+), 12 deletions(-)"
+  },
+  {
+    "hash": "299e97f6d86ec15c3306e9ddc99cf368446d8808",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 07:15:13 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "perf",
+      "title": "docs(perf): record clean B1 SIMD, B5(f/g) sweep and B5(b) A/B results",
+      "description": "record clean B1 SIMD, B5(f/g) sweep and B5(b) A/B results",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "docs(perf): record clean B1 SIMD, B5(f/g) sweep and B5(b) A/B results\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/plans/perf/README.md | 52 +++++++++++++++++++++++++++++++++++++----------\n 1 file changed, 41 insertions(+), 11 deletions(-)"
+  },
+  {
+    "hash": "dba9c4084cff44c17d04df3151db58b6f94098b0",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 07:14:32 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Add Trendshift badge to README",
+      "description": "Add Trendshift badge to README",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "Add Trendshift badge to README\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "README.md | 1 +\n 1 file changed, 1 insertion(+)"
+  },
+  {
+    "hash": "e04b7a69bae775445ffb2f1507fe8e7ba0e5b067",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 06:39:00 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Split blur-family filters into two passes; cache time filters while stopped",
+      "description": "Split blur-family filters into two passes; cache time filters while stopped",
+      "bullets": [],
+      "body": "FilterDef gains an optional prePassBody. FilterNode runs it into an RGBA16F\nintermediate bound as uPass, then runs the main body. Gaussian Blur, Box\nBlur, Bloom and Diffuse Glow now use a horizontal pass and a vertical pass,\nso they read 2N texels per pixel instead of N\u00b2. In B2 on an M2, effect GPU\ntime drops from 32.7 to 8.6 ms/frame at scale l and frame p50 drops from\n49.7 to 21.4 ms. Outputs match within 16F rounding, checked with the new\nINFINITE_BENCH_DUMPRGBA dump and scripts/bench/rgbadiff.py.\nThe uploaded uTime value is now part of FilterNode::Signature. A\ntime-driven filter caches while the transport is stopped, where it used\nto re-render every frame and recook everything downstream.\nHygiene: 87 passed, 0 failed.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Split blur-family filters into two passes; cache time filters while stopped\n\nFilterDef gains an optional prePassBody. FilterNode runs it into an RGBA16F\nintermediate bound as uPass, then runs the main body. Gaussian Blur, Box\nBlur, Bloom and Diffuse Glow now use a horizontal pass and a vertical pass,\nso they read 2N texels per pixel instead of N\u00b2. In B2 on an M2, effect GPU\ntime drops from 32.7 to 8.6 ms/frame at scale l and frame p50 drops from\n49.7 to 21.4 ms. Outputs match within 16F rounding, checked with the new\nINFINITE_BENCH_DUMPRGBA dump and scripts/bench/rgbadiff.py.\n\nThe uploaded uTime value is now part of FilterNode::Signature. A\ntime-driven filter caches while the transport is stopped, where it used\nto re-render every frame and recook everything downstream.\n\nHygiene: 87 passed, 0 failed.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": ".claude/skills/new-effect-node/SKILL.md |  20 +++--\n docs/plans/perf/README.md               |  36 ++++++--\n scripts/bench/rgbadiff.py               |  17 ++++\n src/core/BenchReport.cpp                |  11 +++\n src/core/FilterDefs.cpp                 |  84 ++++++++++++------\n src/core/FilterDefs.h                   |   7 ++\n src/nodes/FilterNode.cpp                | 148 +++++++++++++++++++++-----------\n src/nodes/FilterNode.h                  |  47 ++++++----\n 8 files changed, 265 insertions(+), 105 deletions(-)\n create mode 100755 scripts/bench/rgbadiff.py"
+  },
+  {
+    "hash": "c3e5a6c00b9731d58ac607df720e67ac335ad1f5",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 06:26:36 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Add per-node GPU split to B2 and sum per-frame intervals in the GPU ring",
+      "description": "Add per-node GPU split to B2 and sum per-frame intervals in the GPU ring",
+      "bullets": [],
+      "body": "GpuTimerRing now sums every interval a stage records in one frame, so one\nstage can cover every instance of a node type. With\nINFINITE_BENCH_B2GPUNODES, FilterNode and Render3DNode time their own draw\nthrough Bench::NodeGpuRing() in place of the enclosing cook stage. On an M2,\nBloom, Gaussian Blur and Diffuse Glow account for ~92% of B2's GPU time,\nwhile Render 3D costs ~1 ms.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Add per-node GPU split to B2 and sum per-frame intervals in the GPU ring\n\nGpuTimerRing now sums every interval a stage records in one frame, so one\nstage can cover every instance of a node type. With\nINFINITE_BENCH_B2GPUNODES, FilterNode and Render3DNode time their own draw\nthrough Bench::NodeGpuRing() in place of the enclosing cook stage. On an M2,\nBloom, Gaussian Blur and Diffuse Glow account for ~92% of B2's GPU time,\nwhile Render 3D costs ~1 ms.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/plans/perf/README.md     |  33 +++++++---\n scripts/bench/run_all.sh      |   3 +\n src/core/BenchReport.cpp      | 142 +++++++++++++++++++-----------------------\n src/core/BenchReport.h        |  36 +++++++++--\n src/main.cpp                  |   9 ++-\n src/nodes/FilterNode.cpp      |   2 +\n src/nodes/Geometry3DNodes.cpp |   2 +\n 7 files changed, 135 insertions(+), 92 deletions(-)"
+  },
+  {
+    "hash": "0aa8d464b57775a3bd0b3d6916b0204eab2d6bad",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 06:17:45 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Add GPU timer query ring and B2 heavy-visuals benchmark",
+      "description": "Add GPU timer query ring and B2 heavy-visuals benchmark",
+      "bullets": [],
+      "body": "Bench::GpuTimerRing times main-loop stages with GL_TIME_ELAPSED through a\n4-deep per-stage ring that it polls without blocking. It feeds\nstages_gpu_ms for B2 and B5(c). It does not wrap the projectors stage\nbecause query objects are per-context, and it does not wrap swap. Its\ndestructor makes no GL calls because the ring outlives the context.\nThe B2 fixture chains Geometry -> Render 3D 1080p -> 10/20/30 effects ->\nOutput at scales s/m/l, with animated and static variants. The static\nvariant swaps Glitch (uTime) for Emboss so output_hash is deterministic.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Add GPU timer query ring and B2 heavy-visuals benchmark\n\nBench::GpuTimerRing times main-loop stages with GL_TIME_ELAPSED through a\n4-deep per-stage ring that it polls without blocking. It feeds\nstages_gpu_ms for B2 and B5(c). It does not wrap the projectors stage\nbecause query objects are per-context, and it does not wrap swap. Its\ndestructor makes no GL calls because the ring outlives the context.\n\nThe B2 fixture chains Geometry -> Render 3D 1080p -> 10/20/30 effects ->\nOutput at scales s/m/l, with animated and static variants. The static\nvariant swaps Glitch (uTime) for Emboss so output_hash is deterministic.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/plans/perf/README.md |  72 +++++++++----\n scripts/bench/run_all.sh  |   8 +-\n src/core/BenchReport.cpp  | 219 ++++++++++++++++++++++++++++++++++++++\n src/core/BenchReport.h    |  93 ++++++++++++++++\n src/main.cpp              | 265 +++++++++++++++++++++++++++++++++++++++++++++-\n 5 files changed, 635 insertions(+), 22 deletions(-)"
+  },
+  {
+    "hash": "a1c04532d030ad40c4920d74e34f0a3981e3196a",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 22:36:01 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "bench",
+      "title": "docs(bench): record B5(f/g) load/save & undo benchmarks in plan and runner",
+      "description": "record B5(f/g) load/save & undo benchmarks in plan and runner",
+      "bullets": [],
+      "body": "",
+      "raw": "docs(bench): record B5(f/g) load/save & undo benchmarks in plan and runner"
+    },
+    "stat": "docs/plans/perf/README.md | 22 ++++++++++++++++++----\n scripts/bench/run_all.sh  |  7 ++++++-\n 2 files changed, 24 insertions(+), 5 deletions(-)"
+  },
+  {
+    "hash": "0ddc8af5d70f0d8a0376d82b389b54c3b27e57c5",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 22:30:33 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Add bench/results/ to .gitignore",
+      "description": "Add bench/results/ to .gitignore",
+      "bullets": [],
+      "body": "",
+      "raw": "Add bench/results/ to .gitignore"
+    },
+    "stat": ".gitignore | 1 +\n 1 file changed, 1 insertion(+)"
+  },
+  {
+    "hash": "a518103984199d7ae125b02a9ea31a16433fb10c",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 22:25:32 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Vectorize ReverbKernel 16-line FDN processing via SIMD (NEON, SSE, portable fallback)",
+      "description": "Vectorize ReverbKernel 16-line FDN processing via SIMD (NEON, SSE, portable fallback)",
+      "bullets": [],
+      "body": "",
+      "raw": "Vectorize ReverbKernel 16-line FDN processing via SIMD (NEON, SSE, portable fallback)"
+    },
+    "stat": "src/audio/dsp/ReverbKernel.cpp | 582 +++++++++++++++++++++++++++++++++++++++--\n src/audio/dsp/ReverbKernel.h   |   2 +\n src/main.cpp                   | 223 +++++++++++++++-\n 3 files changed, 791 insertions(+), 16 deletions(-)"
+  },
+  {
+    "hash": "1d19afae477b87a977ffdabd3ead678110d004d7",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 22:10:13 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "audio",
+      "title": "Add B1(stages) DSP callback timing breakdown, B5(e) startup benchmark, and optimize UI hot spots",
+      "description": "Add B1(stages) DSP callback timing breakdown, B5(e) startup benchmark, and optimize UI hot spots",
+      "bullets": [],
+      "body": "",
+      "raw": "Add B1(stages) DSP callback timing breakdown, B5(e) startup benchmark, and optimize UI hot spots"
+    },
+    "stat": "docs/plans/perf/README.md                          |  59 +--\n docs/plans/perf/benchmark-suite.md                 |   2 +-\n scripts/bench/run_all.sh                           |   6 +-\n src/audio/AudioEngine.cpp                          |  28 +-\n src/audio/AudioEngine.h                            |  45 +-\n src/main.cpp                                       | 445 +++++++++++++-----\n .../1_extractors/output/git_commits_corpus.json    | 112 ++++-\n .../1_extractors/output/knowledge_index.db         | Bin 25559040 -> 25616384 bytes\n .../1_extractors/output/recovered_docs_corpus.json | 516 ++++++++++-----------\n .../3_datasets/train_dpo_preference.jsonl          |   1 +\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl | 180 +++----\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl | 180 +++----\n 12 files changed, 994 insertions(+), 580 deletions(-)"
+  },
+  {
     "hash": "d8cec963bf4db78bc73fabbaaf4ad654be38cc05",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
@@ -30,6 +613,79 @@
       "raw": "Add performance benchmark suite: shared instrumentation, B1/B5a/B5b/B5d fixtures\n\nImplements docs/plans/perf/benchmark-suite.md end to end for the fixtures\nbuilt so far: BenchReport/PercentileRing/AudioLoadRing instrumentation,\nPlatform::ProcessRssMb/HwModelString on macOS/Windows/Linux, run_all.sh,\ncompare.py, and four working self-test fixtures (B1 heavy audio, B5a empty\npatch, B5b node-count scaling, B5d audio-thread-alone).\n\nB1 and B5d both hit the same real bug while being built: their setup code\nindexed gNodes[idx] using GraphNode::index as if it were a vector position.\nindex is a stable id from a monotonically increasing counter, not a slot -\nit only coincides with position when no node was ever removed earlier in\nthe session. The out-of-bounds read returned a zero-initialized GraphNode\nwith a null node pointer, so the following Connect() call wrote through a\nnull this and crashed (confirmed via lldb: x10 == 0x0 at the faulting str).\nFixed by re-resolving every captured index through FindNodeByIndex() rather\nthan gNodes[idx], matching the working pattern already used elsewhere in\nmain.cpp. Both fixtures now run clean end to end, including B1's two-level\nMixer-tree path for >12 voices.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
     },
     "stat": "CMakeLists.txt                       |   4 +\n docs/plans/perf/README.md            | 131 +++++++++++++\n docs/plans/perf/benchmark-suite.md   | 213 +++++++++++++++++++++\n scripts/bench/compare.py             | 121 ++++++++++++\n scripts/bench/run_all.sh             | 119 ++++++++++++\n src/audio/AudioEngine.cpp            |   1 +\n src/audio/AudioEngine.h              |  12 ++\n src/core/BenchReport.cpp             | 128 +++++++++++++\n src/core/BenchReport.h               | 237 ++++++++++++++++++++++++\n src/main.cpp                         | 348 +++++++++++++++++++++++++++++++++++\n src/platform/Platform.h              |  12 ++\n src/platform/Platform.mm             |  22 +++\n src/platform/linux/PlatformLinux.cpp |  34 ++++\n src/platform/win/PlatformWin.cpp     |  31 ++++\n 14 files changed, 1413 insertions(+)\n create mode 100644 docs/plans/perf/README.md\n create mode 100644 docs/plans/perf/benchmark-suite.md\n create mode 100755 scripts/bench/compare.py\n create mode 100755 scripts/bench/run_all.sh\n create mode 100644 src/core/BenchReport.cpp\n create mode 100644 src/core/BenchReport.h"
+  },
+  {
+    "hash": "404d3f95ee746c2d45f94d31fa026644ef8717b0",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 19:36:28 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "ui",
+      "title": "Merge bugfix/canvas-ui-hotspots into main",
+      "description": "Merge bugfix/canvas-ui-hotspots into main",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Merge bugfix/canvas-ui-hotspots into main\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "e3df9823cc17a137e04be802fc02e88845c50ca2",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 19:36:28 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Merge bugfix/modulated-undo-followups into main",
+      "description": "Merge bugfix/modulated-undo-followups into main",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Merge bugfix/modulated-undo-followups into main\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": ""
+  },
+  {
+    "hash": "f3b1424553b504aa0323fdaf917132ed51133653",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 19:22:18 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Cut per-frame canvas cost of modulated filter curves and node titles",
+      "description": "Cut per-frame canvas cost of modulated filter curves and node titles",
+      "bullets": [
+        "NodeTitleWithInstance / GetNodeInstanceIndex rescanned every node (with",
+        "The Audio Filter response curve was recomputed at full 160 points every",
+        "EQ curve and peak scan hoist band coefficients and per-point trig out of"
+      ],
+      "body": "Two measured main-thread hot spots under INFINITE_MIXEDSTRESSTEST:\n3 dynamic_casts + DisplayName each) for every title drawn - O(N^2) per\nframe. It now reads a rank/total cache built once per gNodes shape,\ninvalidated alongside the FindNodeByUid cache (erase/clear/load and once\nper frame), and re-validated per lookup against slot pointer/uid/index\nplus the live shape/op field of every dynamically-titled node, so callers\noutside the per-frame draw can never see a stale \"#N\". Nodes not stored\nin gNodes fall back to the original scan. Output is unchanged.\nframe while an LFO moved it. Modulation-driven change (signature changing\non consecutive frames with no drag) now recomputes at the 48-point drag\nresolution, capped at 20 Hz per node on a per-node phase grid so nodes\ndon't all land on the same frame. The first change and the settled curve\nare always full resolution and bit-identical to a direct recompute; a\nuser drag keeps its existing path. Also fixes a curve left at 48 points\nafter a drag whose last recompute was coarse.\nthe band x point loop (identical arithmetic); the spectrum Hann window\ncomes from a static table built with the same expression.\nAdds INFINITE_NODETITLETEST and INFINITE_FILTERCURVECACHETEST and wires\nthem into the hygiene driver.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Cut per-frame canvas cost of modulated filter curves and node titles\n\nTwo measured main-thread hot spots under INFINITE_MIXEDSTRESSTEST:\n\n- NodeTitleWithInstance / GetNodeInstanceIndex rescanned every node (with\n  3 dynamic_casts + DisplayName each) for every title drawn - O(N^2) per\n  frame. It now reads a rank/total cache built once per gNodes shape,\n  invalidated alongside the FindNodeByUid cache (erase/clear/load and once\n  per frame), and re-validated per lookup against slot pointer/uid/index\n  plus the live shape/op field of every dynamically-titled node, so callers\n  outside the per-frame draw can never see a stale \"#N\". Nodes not stored\n  in gNodes fall back to the original scan. Output is unchanged.\n\n- The Audio Filter response curve was recomputed at full 160 points every\n  frame while an LFO moved it. Modulation-driven change (signature changing\n  on consecutive frames with no drag) now recomputes at the 48-point drag\n  resolution, capped at 20 Hz per node on a per-node phase grid so nodes\n  don't all land on the same frame. The first change and the settled curve\n  are always full resolution and bit-identical to a direct recompute; a\n  user drag keeps its existing path. Also fixes a curve left at 48 points\n  after a drag whose last recompute was coarse.\n\n- EQ curve and peak scan hoist band coefficients and per-point trig out of\n  the band x point loop (identical arithmetic); the spectrum Hann window\n  comes from a static table built with the same expression.\n\nAdds INFINITE_NODETITLETEST and INFINITE_FILTERCURVECACHETEST and wires\nthem into the hygiene driver.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": ".claude/skills/run-infinite-hygiene/driver.sh |   4 +\n src/audio/dsp/EqKernel.h                      |  77 ++++-\n src/main.cpp                                  | 451 +++++++++++++++++++++++++-\n 3 files changed, 500 insertions(+), 32 deletions(-)"
+  },
+  {
+    "hash": "2910b2a80b9e8efc91059798958771afe72e7464",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 23 19:08:41 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Close the remaining modulated-control and dropdown undo leaks",
+      "description": "Close the remaining modulated-control and dropdown undo leaks",
+      "bullets": [
+        "AudioKnobRow::Checkbox gains the ModCheckbox outUserChanged out-param",
+        "One dropdown pick pushed two entries (popup + the onSelect lambda's",
+        "Projection \"match input res\" checkpointed after writing the node;",
+        "MODDROPDOWNUNDOTEST now also drives a row Checkbox (Delay sync),"
+      ],
+      "body": "Follow-up to 2c92715. Invariant: modulation never creates an undo entry\nor dirties the patch; each real user edit creates exactly one undo entry\nholding the pre-edit state.\n(return value unchanged). The 19 callers that checkpointed on any\nchange now checkpoint only on a user click, so a cable flipping an\n\"analog\"/\"sync\"/\"freeze\"/... toggle no longer serializes the patch.\nown checkpoint). The popup now commits through CommitDropdownPick,\nwhich checkpoints once and suppresses the lambda's.\nit now edits a temporary so the entry holds the pre-change state.\nGrid X/Y dropped a post-drag checkpoint that stacked on ModSlider's\nown pre-drag one.\nDropdownButton (Audio Color Ramp mode) and DropdownKnob (Osc FM mode),\nand commits a real user pick through CommitDropdownPick, asserting one\nentry and a correct Undo. Added to GROUP_MODULATION and FULL_TESTS.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Close the remaining modulated-control and dropdown undo leaks\n\nFollow-up to 2c92715. Invariant: modulation never creates an undo entry\nor dirties the patch; each real user edit creates exactly one undo entry\nholding the pre-edit state.\n\n- AudioKnobRow::Checkbox gains the ModCheckbox outUserChanged out-param\n  (return value unchanged). The 19 callers that checkpointed on any\n  change now checkpoint only on a user click, so a cable flipping an\n  \"analog\"/\"sync\"/\"freeze\"/... toggle no longer serializes the patch.\n- One dropdown pick pushed two entries (popup + the onSelect lambda's\n  own checkpoint). The popup now commits through CommitDropdownPick,\n  which checkpoints once and suppresses the lambda's.\n- Projection \"match input res\" checkpointed after writing the node;\n  it now edits a temporary so the entry holds the pre-change state.\n  Grid X/Y dropped a post-drag checkpoint that stacked on ModSlider's\n  own pre-drag one.\n- MODDROPDOWNUNDOTEST now also drives a row Checkbox (Delay sync),\n  DropdownButton (Audio Color Ramp mode) and DropdownKnob (Osc FM mode),\n  and commits a real user pick through CommitDropdownPick, asserting one\n  entry and a correct Undo. Added to GROUP_MODULATION and FULL_TESTS.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": ".claude/skills/run-infinite-hygiene/driver.sh |   2 +\n src/main.cpp                                  | 367 +++++++++++++++++++-------\n 2 files changed, 276 insertions(+), 93 deletions(-)"
   },
   {
     "hash": "4d621402f67b4771e2743b73d52e3cc4abd16fa8",
