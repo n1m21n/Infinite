@@ -307,6 +307,60 @@ namespace Bench
       return split;
    }
 
+   // GPU memory breakdown categories
+   enum class GpuMemCategory
+   {
+      Textures,
+      RenderTargets,
+      ShadowMaps,
+      MeshBuffers,
+      InstanceBuffers,
+   };
+
+   struct GpuMemBreakdown
+   {
+      double texturesMb = 0.0;
+      double renderTargetsMb = 0.0;
+      double shadowMapsMb = 0.0;
+      double meshBuffersMb = 0.0;
+      double instanceBuffersMb = 0.0;
+
+      double TotalMb() const
+      {
+         return texturesMb + renderTargetsMb + shadowMapsMb + meshBuffersMb + instanceBuffersMb;
+      }
+
+      nlohmann::json ToJson() const
+      {
+         return nlohmann::json{
+            { "textures_mb", texturesMb },
+            { "render_targets_mb", renderTargetsMb },
+            { "shadow_maps_mb", shadowMapsMb },
+            { "mesh_buffers_mb", meshBuffersMb },
+            { "instance_buffers_mb", instanceBuffersMb }
+         };
+      }
+   };
+
+   namespace GpuMem
+   {
+      void RecordTexture(unsigned int id, GpuMemCategory cat, int w, int h, unsigned int internalFormat, bool mipmapped = false, const char* nodeType = nullptr);
+      void ReleaseTexture(unsigned int id);
+
+      void RecordRenderbuffer(unsigned int id, GpuMemCategory cat, int w, int h, unsigned int internalFormat, int samples = 1, const char* nodeType = nullptr);
+      void ReleaseRenderbuffer(unsigned int id);
+
+      void RecordBuffer(unsigned int id, GpuMemCategory cat, size_t bytes, const char* nodeType = nullptr);
+      void ReleaseBuffer(unsigned int id);
+
+      GpuMemBreakdown GetBreakdown();
+      double GetTotalMb();
+      void Reset();
+   }
+
+   // Linear regression slope in MB per 100 frames over (frameId, rssMb) samples
+   double CalculateRssSlopeMbPer100f(const std::vector<std::pair<int, double>>& samples);
+
    // FNV-1a 64-bit over raw bytes - used for output_hash (a hash of the
    // Output texture's readback pixels). Not cryptographic; it only needs to
    // change when the rendered image changes, which is the quality-guard
@@ -357,7 +411,16 @@ namespace Bench
       uint64_t audioXruns = 0;
 
       double memRssStartMb = -1.0;
+      double memRssBuiltMb = -1.0;
+      double memRssF32Mb = -1.0;
+      double memRssF152Mb = -1.0;
       double memRssEndMb = -1.0;
+      double memRssPeakMb = -1.0;
+      double memRssSlopeMbPer100f = 0.0;
+      bool memDetailed = false;
+
+      double memGpuEstMb = -1.0;
+      nlohmann::json memGpuEstBreakdown = nlohmann::json::object();
 
       void Emit() const;
    };

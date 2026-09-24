@@ -1,6 +1,7 @@
 #include "EnvironmentNode.h"
 
 #include "gl3.h"
+#include "BenchReport.h"
 #include <algorithm>
 #include <cmath>
 #include <vector>
@@ -57,7 +58,10 @@ namespace
 EnvironmentNode::~EnvironmentNode()
 {
    if (mTex != 0)
+   {
+      Bench::GpuMem::ReleaseTexture(mTex);
       glDeleteTextures(1, &mTex);
+   }
 }
 
 void EnvironmentNode::EnsurePlaceholder()
@@ -91,6 +95,7 @@ void EnvironmentNode::EnsurePlaceholder()
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
    glBindTexture(GL_TEXTURE_2D, 0);
+   Bench::GpuMem::RecordTexture(mTex, Bench::GpuMemCategory::Textures, kSize, kSize, GL_RGBA8, false, "EnvironmentNode");
 
    mWidth = kSize;
    mHeight = kSize;
@@ -135,6 +140,7 @@ void EnvironmentNode::Upload(const float* pixels, int w, int h)
    glBindTexture(GL_TEXTURE_2D, mTex);
    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, w, h, 0, GL_RGB, GL_FLOAT, sanitized.data());
    glGenerateMipmap(GL_TEXTURE_2D);
+   Bench::GpuMem::RecordTexture(mTex, Bench::GpuMemCategory::Textures, w, h, GL_RGB16F, true, "EnvironmentNode");
    const GLenum err = glGetError();
    if (err != GL_NO_ERROR)
       fprintf(stderr, "EnvironmentNode::Upload: GL error 0x%x uploading %dx%d HDRI\n", err, w, h);

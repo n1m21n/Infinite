@@ -44,6 +44,16 @@ def xruns(j):
     return (j.get("audio") or {}).get("xruns")
 
 
+def rss_peak(j):
+    mem = j.get("mem") or {}
+    return mem.get("rss_peak_mb", mem.get("rss_mb"))
+
+
+def rss_slope(j):
+    mem = j.get("mem") or {}
+    return mem.get("rss_slope_mb_per_100f")
+
+
 def fmt(v):
     return "n/a" if v is None else f"{v:.3f}"
 
@@ -57,8 +67,8 @@ def main():
     new = load(sys.argv[2])
 
     flagged = False
-    print(f"{'bench':<32} {'variant':<8} {'frame p99 (base->new)':<26} {'audio p99':<20} {'xruns':<12} {'hash':<8}")
-    print("-" * 110)
+    print(f"{'bench':<28} {'variant':<32} {'frame p99 (base->new)':<24} {'audio p99':<16} {'xruns':<8} {'hash':<8} {'rss peak':<16}")
+    print("-" * 135)
 
     all_keys = list(baseline.keys())
     for k in new.keys():
@@ -69,11 +79,13 @@ def main():
         b = baseline.get(key)
         n = new.get(key)
         bench, variant = key
+        bench_str = str(bench or "")
+        var_str = str(variant or "")
         if b is None:
-            print(f"{bench:<32} {str(variant):<8} (new benchmark, no baseline)")
+            print(f"{bench_str:<28} {var_str:<32} (new benchmark, no baseline)")
             continue
         if n is None:
-            print(f"{bench:<32} {str(variant):<8} (missing from new run)")
+            print(f"{bench_str:<28} {var_str:<32} (missing from new run)")
             continue
 
         row_flag = ""
@@ -81,14 +93,14 @@ def main():
         bp99, np99 = p99_frame(b), p99_frame(n)
         frame_str = f"{fmt(bp99)} -> {fmt(np99)}"
         if bp99 is not None and np99 is not None and bp99 > 0 and np99 > bp99 * (1 + REGRESSION_THRESHOLD):
-            frame_str += " REGRESSION"
+            frame_str += " REG"
             row_flag = "FLAG"
             flagged = True
 
         bap99, nap99 = p99_audio(b), p99_audio(n)
         audio_str = f"{fmt(bap99)} -> {fmt(nap99)}"
         if bap99 is not None and nap99 is not None and bap99 > 0 and nap99 > bap99 * (1 + REGRESSION_THRESHOLD):
-            audio_str += " REGRESSION"
+            audio_str += " REG"
             row_flag = "FLAG"
             flagged = True
 
@@ -102,12 +114,19 @@ def main():
         bh, nh = b.get("output_hash"), n.get("output_hash")
         hash_str = "same"
         if bh and nh and bh != "n/a" and nh != "n/a" and bh != nh:
-            hash_str = "CHANGED"
+            hash_str = "DIFF"
+            row_flag = "FLAG"
+            flagged = True
+
+        brss, nrss = rss_peak(b), rss_peak(n)
+        rss_str = f"{fmt(brss)}->{fmt(nrss)}" if brss is not None and nrss is not None else "n/a"
+        if brss is not None and nrss is not None and brss > 0 and nrss > brss * (1 + REGRESSION_THRESHOLD * 2):
+            rss_str += " REG"
             row_flag = "FLAG"
             flagged = True
 
         marker = f" [{row_flag}]" if row_flag else ""
-        print(f"{bench:<32} {str(variant):<8} {frame_str:<26} {audio_str:<20} {xrun_str:<12} {hash_str:<8}{marker}")
+        print(f"{bench_str:<28} {var_str:<32} {frame_str:<24} {audio_str:<16} {xrun_str:<8} {hash_str:<8} {rss_str:<16}{marker}")
 
     print()
     if flagged:

@@ -1,6 +1,7 @@
 #include "GLUtil.h"
 
 #include "gl3.h"
+#include "BenchReport.h"
 
 // GLFW_INCLUDE_NONE: glfw3.h pulls in the legacy <GL/gl.h> unless told not to,
 // and gl3.h above has already provided the 3.x core header (glad on non-Apple).
@@ -69,6 +70,7 @@ namespace GLUtil
          glGenBuffers(1, &sQuadVbo);
          glBindBuffer(GL_ARRAY_BUFFER, sQuadVbo);
          glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
+         Bench::GpuMem::RecordBuffer(sQuadVbo, Bench::GpuMemCategory::MeshBuffers, sizeof(verts), "QuadVbo");
       }
 
       unsigned int vao = 0;
@@ -130,6 +132,7 @@ namespace GLUtil
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      Bench::GpuMem::RecordTexture(fbo.tex, Bench::GpuMemCategory::RenderTargets, w, h, internalFormat, false, "Fbo");
 
       glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo);
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fbo.tex, 0);
@@ -158,7 +161,10 @@ namespace GLUtil
    void DestroyFbo(Fbo& fbo)
    {
       if (fbo.tex != 0)
+      {
+         Bench::GpuMem::ReleaseTexture(fbo.tex);
          glDeleteTextures(1, &fbo.tex);
+      }
       if (fbo.fbo != 0)
          glDeleteFramebuffers(1, &fbo.fbo);
       fbo = Fbo();

@@ -1,6 +1,7 @@
 #include "NodeViewport.h"
 
 #include "gl3.h"
+#include "BenchReport.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -264,15 +265,16 @@ namespace
 NodeViewport::~NodeViewport()
 {
    ReleaseFbo();
-   if (mVbo != 0) glDeleteBuffers(1, &mVbo);
-   if (mIbo != 0) glDeleteBuffers(1, &mIbo);
+   if (mVbo != 0) { Bench::GpuMem::ReleaseBuffer(mVbo); glDeleteBuffers(1, &mVbo); }
+   if (mIbo != 0) { Bench::GpuMem::ReleaseBuffer(mIbo); glDeleteBuffers(1, &mIbo); }
    if (mVao != 0) glDeleteVertexArrays(1, &mVao);
-   if (mSelIbo != 0) glDeleteBuffers(1, &mSelIbo);
+   if (mSelIbo != 0) { Bench::GpuMem::ReleaseBuffer(mSelIbo); glDeleteBuffers(1, &mSelIbo); }
    if (mSelVao != 0) glDeleteVertexArrays(1, &mSelVao);
-   if (mInstanceVbo != 0) glDeleteBuffers(1, &mInstanceVbo);
-   if (mVertexColorVbo != 0) glDeleteBuffers(1, &mVertexColorVbo);
-   if (mPointVbo != 0) glDeleteBuffers(1, &mPointVbo);
+   if (mInstanceVbo != 0) { Bench::GpuMem::ReleaseBuffer(mInstanceVbo); glDeleteBuffers(1, &mInstanceVbo); }
+   if (mVertexColorVbo != 0) { Bench::GpuMem::ReleaseBuffer(mVertexColorVbo); glDeleteBuffers(1, &mVertexColorVbo); }
+   if (mPointVbo != 0) { Bench::GpuMem::ReleaseBuffer(mPointVbo); glDeleteBuffers(1, &mPointVbo); }
    if (mPointVao != 0) glDeleteVertexArrays(1, &mPointVao);
+   if (mSelInstanceOverrideVbo != 0) { Bench::GpuMem::ReleaseBuffer(mSelInstanceOverrideVbo); glDeleteBuffers(1, &mSelInstanceOverrideVbo); }
 }
 
 bool NodeViewport::EnsureFbo(int w, int h)
@@ -290,10 +292,12 @@ bool NodeViewport::EnsureFbo(int w, int h)
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+   Bench::GpuMem::RecordTexture(mColorTex, Bench::GpuMemCategory::RenderTargets, w, h, GL_RGBA8, false, "NodeViewport");
 
    glGenRenderbuffers(1, &mDepthBuffer);
    glBindRenderbuffer(GL_RENDERBUFFER, mDepthBuffer);
    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, w, h);
+   Bench::GpuMem::RecordRenderbuffer(mDepthBuffer, Bench::GpuMemCategory::RenderTargets, w, h, GL_DEPTH_COMPONENT24, 1, "NodeViewport");
 
    glGenFramebuffers(1, &mFbo);
    glBindFramebuffer(GL_FRAMEBUFFER, mFbo);
@@ -319,8 +323,8 @@ bool NodeViewport::EnsureFbo(int w, int h)
 
 void NodeViewport::ReleaseFbo()
 {
-   if (mColorTex != 0) { glDeleteTextures(1, &mColorTex); mColorTex = 0; }
-   if (mDepthBuffer != 0) { glDeleteRenderbuffers(1, &mDepthBuffer); mDepthBuffer = 0; }
+   if (mColorTex != 0) { Bench::GpuMem::ReleaseTexture(mColorTex); glDeleteTextures(1, &mColorTex); mColorTex = 0; }
+   if (mDepthBuffer != 0) { Bench::GpuMem::ReleaseRenderbuffer(mDepthBuffer); glDeleteRenderbuffers(1, &mDepthBuffer); mDepthBuffer = 0; }
    if (mFbo != 0) { glDeleteFramebuffers(1, &mFbo); mFbo = 0; }
    mWidth = mHeight = 0;
 }
@@ -341,9 +345,11 @@ void NodeViewport::UploadMesh(const Mesh& mesh, unsigned long long revision)
    glBindBuffer(GL_ARRAY_BUFFER, mVbo);
    glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(Vertex),
                 mesh.vertices.data(), GL_STATIC_DRAW);
+   Bench::GpuMem::RecordBuffer(mVbo, Bench::GpuMemCategory::MeshBuffers, mesh.vertices.size() * sizeof(Vertex), "NodeViewport_Vbo");
    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIbo);
    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(unsigned int),
                 mesh.indices.data(), GL_STATIC_DRAW);
+   Bench::GpuMem::RecordBuffer(mIbo, Bench::GpuMemCategory::MeshBuffers, mesh.indices.size() * sizeof(unsigned int), "NodeViewport_Ibo");
 
    glEnableVertexAttribArray(0);
    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
@@ -360,6 +366,7 @@ void NodeViewport::UploadMesh(const Mesh& mesh, unsigned long long revision)
       glBindBuffer(GL_ARRAY_BUFFER, mVertexColorVbo);
       glBufferData(GL_ARRAY_BUFFER, mesh.vertexColor.size() * sizeof(float),
                    mesh.vertexColor.data(), GL_STATIC_DRAW);
+      Bench::GpuMem::RecordBuffer(mVertexColorVbo, Bench::GpuMemCategory::MeshBuffers, mesh.vertexColor.size() * sizeof(float), "NodeViewport_VertexColor");
       glEnableVertexAttribArray(7);
       glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
    }
@@ -425,6 +432,7 @@ void NodeViewport::UploadPoints(const std::vector<Particle>& points, unsigned lo
    glBindVertexArray(mPointVao);
    glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
    glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(PointVertex), verts.data(), GL_DYNAMIC_DRAW);
+   Bench::GpuMem::RecordBuffer(mPointVbo, Bench::GpuMemCategory::MeshBuffers, verts.size() * sizeof(PointVertex), "NodeViewport_PointVbo");
    glEnableVertexAttribArray(0);
    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(PointVertex), (void*)0);
    glEnableVertexAttribArray(1);
@@ -473,6 +481,7 @@ void NodeViewport::UpdateSelectionBuffer(const Mesh& mesh, unsigned long long re
    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mSelIbo);
    glBufferData(GL_ELEMENT_ARRAY_BUFFER, selected.size() * sizeof(unsigned int),
                 selected.data(), GL_STATIC_DRAW);
+   Bench::GpuMem::RecordBuffer(mSelIbo, Bench::GpuMemCategory::MeshBuffers, selected.size() * sizeof(unsigned int), "NodeViewport_SelIbo");
    glBindVertexArray(0);
 
    mSelIndexCount = (int)selected.size();
@@ -757,6 +766,7 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
          glBindBuffer(GL_ARRAY_BUFFER, mInstanceVbo);
          glBufferData(GL_ARRAY_BUFFER, uploadXforms->size() * sizeof(Mat4), uploadXforms->data(),
                       GL_STATIC_DRAW);
+         Bench::GpuMem::RecordBuffer(mInstanceVbo, Bench::GpuMemCategory::InstanceBuffers, uploadXforms->size() * sizeof(Mat4), "NodeViewport_InstanceVbo");
          for (int col = 0; col < 4; col++)
          {
             const unsigned int loc = 2 + col;
@@ -830,6 +840,7 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
          glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mSelIbo);
          glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(unsigned int),
                       mesh.indices.data(), GL_STATIC_DRAW);
+         Bench::GpuMem::RecordBuffer(mSelIbo, Bench::GpuMemCategory::MeshBuffers, mesh.indices.size() * sizeof(unsigned int), "NodeViewport_SelIbo");
          glBindVertexArray(0);
          mSelIndexCount = (int)mesh.indices.size();
       }
@@ -872,6 +883,7 @@ unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCame
                glGenBuffers(1, &mSelInstanceOverrideVbo);
             glBindBuffer(GL_ARRAY_BUFFER, mSelInstanceOverrideVbo);
             glBufferData(GL_ARRAY_BUFFER, filtered.size() * sizeof(Mat4), filtered.data(), GL_STATIC_DRAW);
+            Bench::GpuMem::RecordBuffer(mSelInstanceOverrideVbo, Bench::GpuMemCategory::InstanceBuffers, filtered.size() * sizeof(Mat4), "NodeViewport_SelInstanceOverrideVbo");
             for (int col = 0; col < 4; col++)
             {
                const unsigned int loc = 2 + col;
