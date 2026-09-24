@@ -39,13 +39,17 @@ variants from 1 run (the 3-run 1080 set could not be paced: screen locked).
 | | | B6 n=400 pan | frame p50 / p95 ms | 79.39 / 104.06 | 8.65 / 13.47 | -89% / -87% |
 | | | B6 n=300 all / n=400 pan | footprint peak MB | 1215 / 1512 | 1146 / 1443 | -6% / -5% |
 | Projector pacing (primary Output's display refresh) | `7afde11` | B8 2x1080 W2 / W3 / overlap | projector interval p50 ms | 8.0 / 8.2 / 8.0 (unpaced, tearing) | 16.66 / 16.67 / 16.67 | locked to R=60 |
-| | | B8 2x1080 W2 / W3 / overlap | interval p99 ms (target <= 20.8) | 16.4 / 17.5 / 17.4 | 20.0 / 18.0 / 18.0 | met on medians; worst run 24.2 (W2) |
-| | | B8 2x1080 W2 / W3 / overlap | jitter stddev ms (target <= 1) | 4.4 / 8.2 / 4.5 | 2.2 / 1.8 / 2.2 (+1 run at 18.4, one 317 ms whole-app stall) | -50% / -79% / -51%; **target not met** |
-| | | B8 2x1080 W2 / W3 / overlap | missed vsync (target < 1%) | 0 / 0.4 / 0.4% (period never waited for) | 0.75 / 0.56 / 0.37% | met on medians; worst run 1.1% (W2) |
+| | | B8 2x1080 W2 / W3 / overlap | interval p99 ms (spec: <= 1.1 x period = 18.3) | 16.4 / 17.5 / 17.4 | 20.0 / 18.0 / 18.0; re-measure W2 / W3: 17.8 / 17.8 | met in all 6 re-measure runs (worst 18.0) |
+| | | B8 2x1080 W2 / W3 / overlap | jitter stddev ms (reported; no spec target) | 4.4 / 8.2 / 4.5 | 2.2 / 1.8 / 2.2; re-measure W2 / W3: 0.93 / 0.50 | -79% / -94% vs before on the re-measure |
+| | | B8 2x1080 W2 / W3 / overlap | missed vsync (spec: < 0.5%) | 0 / 0.4 / 0.4% (period never waited for) | 0.75 / 0.56 / 0.37%; re-measure W2 / W3: 0.37 / 0% | met in all 6 re-measure runs (at most 1 doubled interval per run) |
 | | | B8 2x1080 W2 / W3 / overlap | projector `on_vsync_frac` | null (canvas 0.14-0.19) | 0.97 / 0.99 / 0.99 | new metric |
 | | | B8 2x1080 W2 / W3 / overlap | canvas frame p50 ms | 7.6 / 7.7 / 7.3 | 16.66 / 16.66 / 16.67 | = one refresh by design (base ran unpaced) |
 
 Projector pacing (2 rounds interleaved vs `f2b0c1b`, unfocused, swapping; judge by change).
+Re-measure 2026-09-25 against the spec targets (benchmark-suite.md §6 and the fixture's own verdicts): `main` `2297371`, 3 runs each of W2 and W3,
+unfocused, sync_brain running throughout, swap 1.4 -> 2.6 GB. Every run passes: missed vsync <= 0.37% (1 doubled interval in 270), p99 <= 18.0 ms.
+The first session's misses (0.75 / 0.56%) were the same doubled frames on a more loaded machine; the targets it quoted (p99 <= 20.8, missed < 1%, jitter <= 1 ms) were looser than the spec and are replaced above.
+Margin is thin: 2 doubled intervals in a 300-frame run is 0.74% and fails, so a run that fails on a loaded machine is not by itself a regression.
 Pacing source: the refresh clock of the **primary Output's display** (the first fullscreen projector, else the first opened),
 waited on just before projectors present, with every context at swap interval 0 while a projector is open.
 Why: macOS never vsync-blocks an occluded or hidden window, so the canvas's vsync can't pace anything once it is covered.
@@ -746,8 +750,8 @@ a fixture goes here, not into a code change.
      1600 of 1900 decodes per clip dropped, 0 cache hits, playback at
      about 3.5 fps. 2x2160 stays just short of it, with 5-7 drops per clip
      around the wraps.
-- **Found while pacing projectors** (`bugfix/projector-pacing`, not fixed):
-  - Jitter stays at 1.2-3.0 ms against the 1 ms target. A paced 60 Hz
+- **Found while pacing projectors** (`bugfix/projector-pacing`; the spec targets are met on re-measure, this stays open as headroom only):
+  - Jitter was 1.2-3.0 ms on the first, heavily loaded runs (0.4-1.1 ms on the re-measure). A paced 60 Hz
     stream has 1-3 intervals per 300 frames that double. Those are frames
     where a decode spike (up to 14 ms) plus the texture upload overrun the
     period. Canvas draw is ~0.2 ms, so throttling the canvas cannot win
