@@ -83837,6 +83837,8 @@ int main(int argc, char** argv)
          // (bumped only when Platform::VideoFrameAt actually produces a new
          // displayed frame) keeps climbing throughout each phase - a stall
          // there is a real visual freeze even if Position() keeps advancing.
+         // A repeat of the same source frame is not an update, so each phase
+         // is held to the source frames it actually crossed, not to 60.
          auto* out = static_cast<OutputNode*>(gNodes[1].node.get());
          if (frameId == 2)
          {
@@ -83850,6 +83852,13 @@ int main(int argc, char** argv)
          static VideoSourceNode* sVideo = nullptr;
          static int sReverseStartUpdates = 0, sForwardStartUpdates = 0;
          static double sReverseStartPos = 0.0, sForwardStartPos = 0.0;
+         static double sReverseStartT = 0.0, sForwardStartT = 0.0, sReverseExpected = 0.0;
+         // Source frames a phase crosses: elapsed transport time x |speed| x
+         // the clip's rate, capped at one per rendered frame.
+         auto expectedUpdates = [&](double startT, double absSpeed) {
+            const double crossed = (Transport::Instance().Seconds() - startT) * absSpeed * (double)out->recordFps;
+            return std::min(60.0, crossed);
+         };
          if (frameId == 64)
          {
             SpawnNode("Video", "Source", 600.0f, 40.0f); // 3
@@ -83860,31 +83869,35 @@ int main(int argc, char** argv)
             sVideo->speed = -1.0f;
             sReverseStartUpdates = sVideo->FrameUpdateCount();
             sReverseStartPos = sVideo->Position();
+            sReverseStartT = Transport::Instance().Seconds();
          }
          if (frameId == 124 && sVideo != nullptr)
          {
             const int reverseUpdates = sVideo->FrameUpdateCount() - sReverseStartUpdates;
             const double reverseMoved = sVideo->Position() - sReverseStartPos;
-            printf("reverse (60 frames @ speed -1): updates=%d posDelta=%.3f (from %.3f to %.3f)\n",
-                   reverseUpdates, reverseMoved, sReverseStartPos, sVideo->Position());
+            sReverseExpected = expectedUpdates(sReverseStartT, 1.0);
+            printf("reverse (60 frames @ speed -1): updates=%d expected=%.0f posDelta=%.3f (from %.3f to %.3f)\n",
+                   reverseUpdates, sReverseExpected, reverseMoved, sReverseStartPos, sVideo->Position());
 
             sVideo->speed = 4.0f;
             sForwardStartUpdates = sVideo->FrameUpdateCount();
             sForwardStartPos = sVideo->Position();
+            sForwardStartT = Transport::Instance().Seconds();
          }
          if (frameId == 184 && sVideo != nullptr)
          {
             const int reverseUpdates = sVideo->FrameUpdateCount() - sReverseStartUpdates; // recompute isn't needed, kept for symmetry
             const int forwardUpdates = sVideo->FrameUpdateCount() - sForwardStartUpdates;
-            printf("forward (60 frames @ speed +4): updates=%d (from %.3f to %.3f)\n",
-                   forwardUpdates, sForwardStartPos, sVideo->Position());
+            const double forwardExpected = expectedUpdates(sForwardStartT, 4.0);
+            printf("forward (60 frames @ speed +4): updates=%d expected=%.0f (from %.3f to %.3f)\n",
+                   forwardUpdates, forwardExpected, sForwardStartPos, sVideo->Position());
 
-            // A healthy run should produce a fresh displayed frame on most of
-            // the 60 real frames in each phase - a handful of misses to
-            // decode hiccups is fine, a near-zero count is the freeze.
-            const bool reverseOk = (sVideo->FrameUpdateCount() - sReverseStartUpdates) > 30;
-            const bool forwardOk = forwardUpdates > 30;
-            (void)reverseUpdates;
+            // A healthy run shows most of the source frames each phase
+            // crossed - a handful of misses to decode hiccups is fine, a
+            // near-zero count is the freeze.
+            const int reversePhaseUpdates = reverseUpdates - forwardUpdates;
+            const bool reverseOk = reversePhaseUpdates >= 10 && reversePhaseUpdates > sReverseExpected * 0.5;
+            const bool forwardOk = forwardUpdates >= 10 && forwardUpdates > forwardExpected * 0.5;
             printf("%s\n", (reverseOk && forwardOk) ? "VIDEOSPEEDTEST OK" : "VIDEOSPEEDTEST FAIL - BUG");
 
             // Separate, additive check for the "loops once then freezes on

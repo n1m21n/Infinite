@@ -480,6 +480,10 @@ namespace Platform
       double currentPts = -1.0;
       double readerPts = -1.0;   // presentation time the reader last decoded
       double nextPts = -1.0;     // pts of the decoded-but-not-yet-current frame
+      // pts of the last frame VideoFrameAt returned true for. A request that
+      // lands on the same frame again returns false and leaves the caller's
+      // pixels alone, so the caller skips the upload (Platform.h contract).
+      double deliveredPts = -1.0;
       std::vector<unsigned char> pending; // that frame's pixels
       bool finished = false;
 
@@ -702,12 +706,17 @@ namespace Platform
          EvictVideoCacheToBudget();
       }
 
-      // Serves a request directly from the LRU cache when possible.
-      bool TryUseCache(VideoHandle* h, double seconds, std::vector<unsigned char>& outPixels)
+      bool SameFrame(double a, double b) { return a >= 0.0 && b >= 0.0 && std::abs(a - b) < 1e-4; }
+
+      enum class CacheResult { Miss, Same, New };
+
+      // Serves a request directly from the LRU cache when possible. Same means
+      // the hit is the frame the caller already holds: nothing is copied.
+      CacheResult TryUseCache(VideoHandle* h, double seconds, std::vector<unsigned char>& outPixels)
       {
          std::lock_guard<std::mutex> lock(gVideoCacheMutex);
          if (h->frameCache.empty())
-            return false;
+            return CacheResult::Miss;
 
          const double frameDur = (h->nominalFps > 0.0) ? (1.0 / h->nominalFps) : 0.0333;
          const CachedVideoFrame* best = nullptr;
@@ -752,12 +761,14 @@ namespace Platform
          }
 
          if (best == nullptr)
-            return false;
+            return CacheResult::Miss;
 
          h->frameCache[bestIdx].lastAccess = ++gVideoCacheClock;
-         outPixels = best->pixels;
          h->currentPts = best->pts;
-         return true;
+         if (!outPixels.empty() && SameFrame(best->pts, h->deliveredPts))
+            return CacheResult::Same;
+         outPixels = best->pixels;
+         return CacheResult::New;
       }
    }
 
@@ -1550,6 +1561,7 @@ namespace Platform
    {
       if (handle == nullptr || seconds < 0.0)
          return false;
+      const bool callerHasFrame = !outPixels.empty();
 
       Bench::MediaDecodeStats* bench = handle->bench.get();
       const double benchCallStartMs = bench ? Bench::MediaNowMs() : 0.0;
@@ -1557,14 +1569,19 @@ namespace Platform
       @autoreleasepool
       {
          // 1. If the target frame is in the LRU cache (from recent playback or scrubbing), serve immediately!
-         if (TryUseCache(handle, seconds, outPixels))
+         const CacheResult cached = TryUseCache(handle, seconds, outPixels);
+         if (cached != CacheResult::Miss)
          {
             if (bench)
             {
                bench->cacheHitMs.Push(Bench::MediaNowMs() - benchCallStartMs);
                bench->cacheHits.fetch_add(1, std::memory_order_relaxed);
-               bench->deliveredPts = handle->currentPts;
             }
+            if (cached == CacheResult::Same)
+               return false;
+            handle->deliveredPts = handle->currentPts;
+            if (bench)
+               bench->deliveredPts = handle->currentPts;
             return true;
          }
 
@@ -1646,11 +1663,16 @@ namespace Platform
             produced = true;
          }
 
-         if (bench)
+         if (bench && !canResumeForward)
+            bench->loopDecodeMs.Push(Bench::MediaNowMs() - benchCallStartMs);
+         // Decoding landed back on the frame the caller already shows (end of
+         // file, or a restart that re-decoded it): not a new frame.
+         if (produced && callerHasFrame && SameFrame(handle->currentPts, handle->deliveredPts))
+            produced = false;
+         if (produced)
          {
-            if (!canResumeForward)
-               bench->loopDecodeMs.Push(Bench::MediaNowMs() - benchCallStartMs);
-            if (produced)
+            handle->deliveredPts = handle->currentPts;
+            if (bench)
                bench->deliveredPts = handle->currentPts;
          }
          return produced;
