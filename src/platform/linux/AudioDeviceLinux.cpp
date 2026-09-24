@@ -191,14 +191,19 @@ namespace
 
    // Same 1-based combined index space as AudioDeviceWin.cpp's
    // ResolveEndpoint: 0 = default, 1..N = gDevices in enumeration order
-   // (playback entries first, then capture).
-   bool ResolveDevice(uint32_t deviceId, ma_device_id& outId, std::string& outName)
+   // (playback entries first, then capture). outIsInput, when given, lets a
+   // caller reject a stale index that now resolves to the wrong device kind
+   // (see AudioDeviceOpen's fallback-to-default comment) without a second,
+   // deadlocking lock of gDevicesMutex.
+   bool ResolveDevice(uint32_t deviceId, ma_device_id& outId, std::string& outName, bool* outIsInput = nullptr)
    {
       std::lock_guard<std::mutex> lock(gDevicesMutex);
       if (deviceId == 0 || deviceId > gDevices.size())
          return false;
       outId = gDevices[deviceId - 1].id;
       outName = gDevices[deviceId - 1].name;
+      if (outIsInput != nullptr)
+         *outIsInput = gDevices[deviceId - 1].isInput;
       return true;
    }
 
@@ -515,17 +520,24 @@ namespace Platform
       }
       RefreshDeviceList();
 
+      // requestedDeviceId is the same 1-based combined-index scheme as
+      // Windows's ResolveEndpoint (see ResolveDevice's comment above) -
+      // persisted verbatim in Infinite.audio-settings, so it goes stale the
+      // moment the device list reorders (unplug/replug, or any device
+      // added/removed shifts every index after it), same hazard as macOS's
+      // stale AudioObjectID. An out-of-range index, or one that now
+      // resolves to a capture-only device, falls back to miniaudio's
+      // default playback device (pDevId left null) rather than failing the
+      // whole engine start - requestedDeviceId itself (main.cpp's
+      // gAudioOutputDeviceId) is left untouched, same as macOS/Windows.
       ma_device_id devId{};
       ma_device_id* pDevId = nullptr;
       if (requestedDeviceId != 0)
       {
          std::string name;
-         if (!ResolveDevice(requestedDeviceId, devId, name))
-         {
-            outError = "audio device not found";
-            return false;
-         }
-         pDevId = &devId;
+         bool isInput = false;
+         if (ResolveDevice(requestedDeviceId, devId, name, &isInput) && !isInput)
+            pDevId = &devId;
       }
 
       gRender.callback = callback;
