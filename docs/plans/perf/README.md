@@ -26,6 +26,8 @@ INFINITE_BENCH_B1VOICES=24 INFINITE_BENCH_B1BUFFER=256 INFINITE_BENCH_B1SECONDS=
    INFINITE_EXITAFTER=2000 ./build/Infinite.app/Contents/MacOS/Infinite
 INFINITE_BENCH_B5AUDIOALONE=256 INFINITE_BENCH_B5AUDIOALONE_SECONDS=10 \
    INFINITE_EXITAFTER=2000 ./build/Infinite.app/Contents/MacOS/Infinite
+INFINITE_BENCH_B2SCALE=l INFINITE_BENCH_B2ANIM=1 INFINITE_BENCH_B2GPUNODES=1 \
+   INFINITE_EXITAFTER=160 ./build/Infinite.app/Contents/MacOS/Infinite
 ```
 
 Every fixture prints exactly one `BENCH_JSON {...}` line (schema in
@@ -40,7 +42,7 @@ frame count (B5).
 |---|---|---|---|
 | B1 Heavy audio | 12-32 voices, buffer sweep 64/128/256/512, cb_load p99/xruns | **Yes** (`INFINITE_BENCH_B1VOICES`) | 1-64 voices, Sampler/Wavetable/Oscillator cycled through Audio Filter→Wavetable Shaper→Delay→Reverb→Dynamics, summed through a Mixer tree, one shared LFO modulating every voice's Filter `mix`. Reports cb_load percentiles (raw, from the new `AudioLoadRing`) + xruns + main fps + RSS. |
 | B1(stages) Per-DSP-stage audio breakdown | Not in original §4 - added to attribute B1's ~56-60% cb_load across its five per-voice stages (Filter/Drive/Delay/Reverb/Dynamics), needed before any SIMD/threading optimization decision | **Yes** (`INFINITE_BENCH_B1VOICES` stages breakdown) | Built into `AudioEngine::Process` via `AudioLoadRing mStageLoadHistory[kAudioStageCount]`. Measures per-stage CPU time without locks or allocations on the audio callback thread. Reports p50 callback load fraction per stage into `stages_cpu_ms`. |
-| B2 Heavy visuals | Geometry→Render3D→10-30 compositing nodes→Output, static+animated | **Yes** (`INFINITE_BENCH_B2SCALE`, `INFINITE_BENCH_B2ANIM`) | Scales s (10 effects, 1.8k tris), m (20 effects, 7.3k tris + instanced points), l (30 effects, 12.4k tris + 8k instances). Measures frame_ms percentiles, tris count, CPU stage breakdown + GPU stage breakdown (from the GPU timer ring), memory RSS, and output RGBA8 hash. `anim=1` binds an LFO to the Twist, Camera and every effect, so the whole chain recooks each frame. `anim=0` swaps the one time-driven effect (Glitch reads `uTime`) for Emboss, so the chain caches after the first cook and `output_hash` is identical run to run. It measures the idle cost of a cached heavy patch, not render cost. |
+| B2 Heavy visuals | Geometry→Render3D→10-30 compositing nodes→Output, static+animated | **Yes** (`INFINITE_BENCH_B2SCALE`, `INFINITE_BENCH_B2ANIM`) | Scales s (10 effects, 1.8k tris), m (20 effects, 7.3k tris + instanced points), l (30 effects, 12.4k tris + 8k instances). Measures frame_ms percentiles, tris count, CPU stage breakdown + GPU stage breakdown (from the GPU timer ring), memory RSS, and output RGBA8 hash. `anim=1` binds an LFO to the Twist, Camera and every effect, so the whole chain recooks each frame. `anim=0` swaps the one time-driven effect (Glitch reads `uTime`) for Emboss, so the chain caches after the first cook and `output_hash` is identical run to run. It measures the idle cost of a cached heavy patch, not render cost. `INFINITE_BENCH_B2GPUNODES=1` replaces the GPU `cook` stage with one GPU stage per node type (`render3d`, `bloom`, `gaussianblur`, ...), each the per-frame total over every instance of that type. |
 | B3 Live performance | B1-lite+B2-lite+projector+MIDI+macros+Prediction; missed vsyncs, input-to-photon | No | Depends on B1+B2 fixtures existing first, plus a projector-window self-test fixture (none exists today). |
 | B4 Complex 3D scenes | many objects/instancing/lights/shadows/materials/HDRI/ocean | No | Same GPU-timer dependency as B2. |
 | B5 Fundamentals | (a) empty patch, **(b) node-count scaling**, **(c) per-stage CPU+GPU split**, **(d) audio-thread-alone**, **(e) startup time**, **(f) load/save time**, **(g) undo-snapshot time** | **All of (a)-(g)** (`INFINITE_BENCH_B5EMPTY`, `INFINITE_BENCH_B5NODES`, `INFINITE_BENCH_B5STAGES`, `INFINITE_BENCH_B5AUDIOALONE`, `INFINITE_BENCH_B5STARTUP`, `INFINITE_BENCH_B5LOADSAVE`, `INFINITE_BENCH_B5UNDO`) | (a) zero-node floor, frame_ms percentiles + RSS, same 120-frame sampled window as (b) so the two are directly comparable. (b) 50/100/200/400 mixed nodes laid out on a grid (not stacked at origin - the flaw called out in benchmark-suite.md §2 against MIXEDSTRESSTEST/GEOMDENSITYTEST). Reports frame_ms percentiles + RSS. (c) same mixed-node grid as (b), wraps seven main-loop stages (`modulation`, `cook`, `node_bodies`, `editor_end`, `imgui_render`, `projectors`, `swap`) in `ConditionalStageTimer`s sampled over the same frame window, reports p50 CPU ms per stage into `stages_cpu_ms` (`stages_gpu_ms` still empty - blocked on the GPU timer ring below). (d) one Oscillator straight into Audio Out, no effects chain, buffer sweep 64/128/256/512 - isolates the audio callback's fixed per-block cost from B1's DSP-graph cost; reuses B1's wall-clock-window + `AudioLoadRing` pattern. (e) startup milestone timings from entry through first frame swap (`pre_window`, `window_gl`, `imgui_fonts`, `scanners_load`, `first_frame_render`, `total_to_first_frame`). (f)/(g) reuse (b)/(c)'s mixed-node grid (`INFINITE_BENCH_B5LOADSAVE=<n>`/`INFINITE_BENCH_B5UNDO=<n>`), fire once at `frameId==32`, and time the real patch I/O and undo paths back to back (`SavePatchTo`→`LoadPatchFrom`; `PushUndoCheckpoint`→`Undo`) via `Bench::ScopedStageTimer::NowMs()` - not synthetic serialize-only calls, so (f) includes whatever `ApplyPatchData`/field-graph remap does on load, and (g) includes the real `BuildPatchData`/`ApplyPatchData` round trip Undo takes. `stages_cpu_ms: {save, load}` / `{push_checkpoint, undo_restore}`. |
@@ -104,7 +106,11 @@ Projector/Output > Canvas > Previews):
    `node_bodies`, `editor_end` and `imgui_render` only. `projectors` is left
    out because the projector loop calls `glfwMakeContextCurrent`, and query
    objects are per-context. `swap` is left out because it submits no GPU work
-   of its own. Feeds B2 and B5(c).
+   of its own. Feeds B2 and B5(c). Each ring entry sums every interval a
+   stage records in one frame, so the same ring also does per-node timing:
+   `Bench::NodeGpuRing()` is non-null only while B2 runs with
+   `INFINITE_BENCH_B2GPUNODES`, and `FilterNode`/`Render3DNode` wrap their
+   own draw after pulling inputs, so the intervals never nest.
 4. **B2 heavy visuals**. **Built** (see table and baseline).
 - **B6 canvas navigation**: needs a programmatic pan/zoom/drag entry point
   into the node editor (`ed::` calls) exposed to a self-test fixture - none
@@ -171,15 +177,28 @@ re-record the baseline with `run_all.sh` before comparing against it):
     measure-only suite to build, but tracked here since it's the direct
     output of this benchmark's B1(stages) finding. DSPTEST's SIMD-vs-scalar
     numerical-equivalence check passed (max diff 2.98e-08, tol 1e-5).
-    Re-run B1(stages) against this branch to get the before/after cb_load
-    delta - not yet done.
+    Re-run on 2026-09-24 (buf=256, 24 voices), **provisional**: reverb
+    39.4% to 33.4% of the callback, total cb_load p50 58.0% to 53.3%. Every
+    re-run overlapped a `tools/semi-brain` indexer using ~3.7 cores (load
+    average 6-7), and those runs showed 8-68 xruns against the baseline's 0.
+    Neither the delta nor the xruns count until B1 is re-run on an idle
+    machine.
 - **B2** (heavy visuals, animated): GPU-bound at every scale. GPU `cook`
   (all node renders) is 12.7 / 24.4 / 36.0 ms at s / m / l, and the CPU
   `swap` stage roughly equals it, because swap is where the CPU waits for
   the GPU. CPU `cook` stays at 0.7-5.4 ms. The m and l scales cannot hold
-  60 fps on a base M2. The next measurement is to split GPU `cook` per node,
-  to find out whether the 1080p Render 3D or the 10-30 full-res effect passes
-  dominate.
+  60 fps on a base M2. The per-node split (`gpunodes=1`) answers where it
+  goes. At l-anim, of 33.8 ms: `bloom` 14.8, `gaussianblur` 7.8,
+  `diffuseglow` 7.6 (three instances each), every other effect 0.1-0.5, and
+  `render3d` only 1.0 (12.4k tris + 8k instances). **Bloom, Gaussian Blur and
+  Diffuse Glow are ~92% of B2's GPU time** at s and l alike. All three are
+  single-pass 2D kernels at full resolution: Bloom 11x11 = 121 texture
+  reads/pixel, Blur and Glow 9x9 = 81. Their weights are
+  `exp(-(x²+y²)/k)`, which splits exactly into two 1D passes (22 and 18
+  reads). Bloom's bright-pass runs per sample before weighting, so it
+  splits too. That needs multi-pass support in `FilterNode` and a 16F
+  intermediate so `output_hash` only moves by float rounding. It is a
+  separate optimisation branch, not part of this suite.
 - **B5(b)** (node-count scaling): near-linear from 50 to 200 nodes (4.4ms to
   14.7ms, roughly 3.3x for 4x the nodes), then super-linear at 400 (28.6ms
   p50, 39.9ms p99 - the p95/p99 spread widens sharply too, 37.5/39.9 vs a

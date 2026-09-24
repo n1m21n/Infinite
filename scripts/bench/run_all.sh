@@ -83,6 +83,9 @@ for scale in s m l; do
    run_fixture "B2_heavy_visuals scale=$scale,anim=0" 160 \
       INFINITE_BENCH_B2SCALE="$scale" INFINITE_BENCH_B2ANIM=0
 done
+# Per-node GPU split (Render 3D vs each effect type) at the heaviest scale.
+run_fixture "B2_heavy_visuals scale=l,anim=1,gpunodes=1" 160 \
+   INFINITE_BENCH_B2SCALE=l INFINITE_BENCH_B2ANIM=1 INFINITE_BENCH_B2GPUNODES=1
 
 echo "B3 Live performance"
 skip "B3_live"

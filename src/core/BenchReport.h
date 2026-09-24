@@ -222,22 +222,29 @@ namespace Bench
       const PercentileRing* GetStage(const std::string& stageName) const;
 
    private:
-      struct QuerySlot
+      // One ring entry holds every Begin/End interval a stage recorded in
+      // one frame. The entry's per-frame total is pushed as one sample, so a
+      // stage timed once per frame and a stage timed once per node instance
+      // (NodeGpuRing below) both report "GPU ms per frame".
+      struct FrameSlot
       {
-         unsigned int queryId = 0;
+         std::vector<unsigned int> queries; // grown on demand, reused
+         int used = 0;
          int frameId = -1;
          bool inFlight = false;
+         bool skipped = false; // an older frame still owned this entry
       };
 
       struct StageRing
       {
-         std::array<QuerySlot, kRingDepth> slots {};
+         std::array<FrameSlot, kRingDepth> slots {};
          PercentileRing samples;
          bool active = false;
-         int activeSlot = -1;
       };
 
       void EnsureInitialized();
+      // Returns true and pushes the frame total if every query is ready.
+      static bool Harvest(FrameSlot& slot, PercentileRing& samples, bool wait);
 
       bool mInitialized = false;
       bool mSupported = false;
@@ -253,10 +260,15 @@ namespace Bench
       bool mStopped = false;
 
       ConditionalGpuStageTimer(GpuTimerRing* ring, const char* stageName, int frameId)
-         : mRing(ring), mStageName(stageName ? stageName : "")
+         : mRing(ring)
       {
-         if (mRing && !mStageName.empty())
+         // Name copied only when timing, so a disabled timer on a hot path
+         // (every node cook) costs a null check and nothing else.
+         if (mRing && stageName && *stageName)
+         {
+            mStageName = stageName;
             mRing->BeginStage(mStageName, frameId);
+         }
       }
 
       void Stop()
@@ -273,6 +285,18 @@ namespace Bench
          Stop();
       }
    };
+
+   // Per-node GPU attribution. nullptr except while a fixture that asked for
+   // it (B2 with INFINITE_BENCH_B2GPUNODES) is sampling the cook stage. Nodes
+   // that do real GPU work wrap their own draw, keyed by node type, after
+   // they have pulled their inputs, so these intervals run one after another
+   // and never nest. The fixture stops timing the enclosing "cook" stage
+   // while this is set.
+   inline GpuTimerRing*& NodeGpuRing()
+   {
+      static GpuTimerRing* ring = nullptr;
+      return ring;
+   }
 
    // FNV-1a 64-bit over raw bytes - used for output_hash (a hash of the
    // Output texture's readback pixels). Not cryptographic; it only needs to

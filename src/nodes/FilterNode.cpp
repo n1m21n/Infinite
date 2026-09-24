@@ -6,6 +6,7 @@
 #include <string>
 
 #include "Transport.h"
+#include "BenchReport.h"
 
 namespace
 {
@@ -96,6 +97,7 @@ void FilterNode::CookIfNeeded(int frameId)
       return; // nothing changed since the last cook - reuse mOut as-is
 
    NodeWorkCounter()++;
+   Bench::ConditionalGpuStageTimer benchGpu(Bench::NodeGpuRing(), mDef.name.c_str(), frameId);
    GLUtil::RunShaderPass(mOut, mProgram, [this, srcTex, srcTex2]()
    {
       glActiveTexture(GL_TEXTURE0);

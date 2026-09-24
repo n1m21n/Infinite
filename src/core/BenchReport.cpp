@@ -62,6 +62,34 @@ namespace Bench
       return mSupported;
    }
 
+   bool GpuTimerRing::Harvest(FrameSlot& slot, PercentileRing& samples, bool wait)
+   {
+      if (!slot.inFlight)
+         return true;
+      if (slot.used > 0 && !wait)
+      {
+         // Queries complete in submission order: the last one ready means
+         // all of them are.
+         GLuint available = 0;
+         glGetQueryObjectuiv(slot.queries[slot.used - 1], GL_QUERY_RESULT_AVAILABLE, &available);
+         if (!available)
+            return false;
+      }
+      GLuint64 totalNs = 0;
+      for (int i = 0; i < slot.used; ++i)
+      {
+         GLuint64 ns = 0;
+         glGetQueryObjectui64v(slot.queries[i], GL_QUERY_RESULT, &ns);
+         totalNs += ns;
+      }
+      if (!slot.skipped && slot.used > 0)
+         samples.Push((double)totalNs * 1e-6);
+      slot.inFlight = false;
+      slot.used = 0;
+      slot.skipped = false;
+      return true;
+   }
+
    void GpuTimerRing::BeginStage(const std::string& stageName, int frameId)
    {
       EnsureInitialized();
@@ -76,52 +104,41 @@ namespace Bench
       if (ring.active)
          return;
 
-      // Lazy allocate queries for this stage
-      if (ring.slots[0].queryId == 0)
-      {
-         GLuint ids[kRingDepth] = {};
-         glGenQueries(kRingDepth, ids);
-         if (glGetError() != GL_NO_ERROR)
-            return;
-         for (int i = 0; i < kRingDepth; ++i)
-         {
-            ring.slots[i].queryId = ids[i];
-            ring.slots[i].frameId = -1;
-            ring.slots[i].inFlight = false;
-         }
-      }
+      const int fid = frameId >= 0 ? frameId : 0;
+      auto& slot = ring.slots[fid % kRingDepth];
 
-      int slotIdx = (frameId >= 0 ? frameId : 0) % kRingDepth;
-      auto& slot = ring.slots[slotIdx];
-
-      // If slot is still in-flight from kRingDepth frames ago, poll non-blocking
-      if (slot.inFlight)
+      if (slot.frameId != fid)
       {
-         GLuint available = 0;
-         glGetQueryObjectuiv(slot.queryId, GL_QUERY_RESULT_AVAILABLE, &available);
-         if (available)
+         // First interval of this stage this frame. The entry still holds a
+         // frame kRingDepth frames old; take its result without blocking, or
+         // give up on timing this stage for the whole frame - a partial
+         // per-frame total would read as a fast frame.
+         if (!Harvest(slot, ring.samples, false))
          {
-            GLuint64 timeNs = 0;
-            glGetQueryObjectui64v(slot.queryId, GL_QUERY_RESULT, &timeNs);
-            ring.samples.Push((double)timeNs * 1e-6);
-            slot.inFlight = false;
-         }
-         else
-         {
-            // Still busy after kRingDepth frames; skip this query to avoid corrupting active query
+            slot.frameId = fid;
+            slot.skipped = true;
+            slot.inFlight = true; // keep the old queries until they land
             return;
          }
+         slot.frameId = fid;
+      }
+      if (slot.skipped)
+         return;
+
+      if (slot.used == (int)slot.queries.size())
+      {
+         GLuint id = 0;
+         glGenQueries(1, &id);
+         if (id == 0)
+            return;
+         slot.queries.push_back(id);
       }
 
-      glBeginQuery(GL_TIME_ELAPSED, slot.queryId);
-      if (glGetError() == GL_NO_ERROR)
-      {
-         slot.frameId = frameId;
-         slot.inFlight = true;
-         ring.active = true;
-         ring.activeSlot = slotIdx;
-         mCurrentActiveStage = stageName;
-      }
+      glBeginQuery(GL_TIME_ELAPSED, slot.queries[slot.used]);
+      slot.used++;
+      slot.inFlight = true;
+      ring.active = true;
+      mCurrentActiveStage = stageName;
    }
 
    void GpuTimerRing::EndStage(const std::string& stageName)
@@ -135,7 +152,6 @@ namespace Bench
 
       glEndQuery(GL_TIME_ELAPSED);
       it->second.active = false;
-      it->second.activeSlot = -1;
       if (mCurrentActiveStage == stageName)
          mCurrentActiveStage.clear();
    }
@@ -145,26 +161,12 @@ namespace Bench
       if (!mSupported)
          return;
 
+      // Only frames before the current one, so the pipeline is never stalled
+      // on work just submitted.
       for (auto& [name, ring] : mStages)
-      {
-         for (int i = 0; i < kRingDepth; ++i)
-         {
-            auto& slot = ring.slots[i];
-            // Only poll queries from prior frames so we never stall the pipeline on the current frame
+         for (auto& slot : ring.slots)
             if (slot.inFlight && slot.frameId < currentFrameId)
-            {
-               GLuint available = 0;
-               glGetQueryObjectuiv(slot.queryId, GL_QUERY_RESULT_AVAILABLE, &available);
-               if (available)
-               {
-                  GLuint64 timeNs = 0;
-                  glGetQueryObjectui64v(slot.queryId, GL_QUERY_RESULT, &timeNs);
-                  ring.samples.Push((double)timeNs * 1e-6);
-                  slot.inFlight = false;
-               }
-            }
-         }
-      }
+               Harvest(slot, ring.samples, false);
    }
 
    void GpuTimerRing::Finish()
@@ -173,41 +175,25 @@ namespace Bench
          return;
 
       if (!mCurrentActiveStage.empty())
-      {
          EndStage(mCurrentActiveStage);
-      }
 
       // Final pipeline drain at the end of the benchmark run
       glFinish();
 
       for (auto& [name, ring] : mStages)
-      {
-         for (int i = 0; i < kRingDepth; ++i)
-         {
-            auto& slot = ring.slots[i];
-            if (slot.inFlight && slot.queryId != 0)
-            {
-               GLuint64 timeNs = 0;
-               glGetQueryObjectui64v(slot.queryId, GL_QUERY_RESULT, &timeNs);
-               ring.samples.Push((double)timeNs * 1e-6);
-               slot.inFlight = false;
-            }
-         }
-      }
+         for (auto& slot : ring.slots)
+            Harvest(slot, ring.samples, true);
    }
 
    void GpuTimerRing::Reset()
    {
       for (auto& [name, ring] : mStages)
       {
-         if (ring.slots[0].queryId != 0)
+         for (auto& slot : ring.slots)
          {
-            GLuint ids[kRingDepth] = {};
-            for (int i = 0; i < kRingDepth; ++i)
-               ids[i] = ring.slots[i].queryId;
-            glDeleteQueries(kRingDepth, ids);
-            for (int i = 0; i < kRingDepth; ++i)
-               ring.slots[i].queryId = 0;
+            if (!slot.queries.empty())
+               glDeleteQueries((GLsizei)slot.queries.size(), slot.queries.data());
+            slot.queries.clear();
          }
       }
       mStages.clear();

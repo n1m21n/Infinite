@@ -6,6 +6,7 @@
 #include <cmath>
 
 #include "Transport.h"
+#include "BenchReport.h"
 #include "SceneNodes.h"
 #include "GeometryOpNodes.h"
 #include "UtilityNodes.h"
@@ -1484,6 +1485,7 @@ void Render3DNode::CookIfNeeded(int frameId)
    mSceneBuilt = sceneSig;
    mHasSceneBuilt = true;
    NodeWorkCounter()++;
+   Bench::ConditionalGpuStageTimer benchGpu(Bench::NodeGpuRing(), "render3d", frameId);
 
    const float aspect = (float)w / (float)h;
 

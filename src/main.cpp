@@ -67192,6 +67192,8 @@ int main(int argc, char** argv)
          }
 
          sBenchB2Variant = std::string("scale=") + scaleStr + ",anim=" + (isAnim ? "1" : "0");
+         if (getenv("INFINITE_BENCH_B2GPUNODES") != nullptr)
+            sBenchB2Variant += ",gpunodes=1";
 
          const float xBase = 0.0f;
          const float yBase = 0.0f;
@@ -67672,6 +67674,9 @@ int main(int argc, char** argv)
       const bool isBenchB5c = (getenv("INFINITE_BENCH_B5STAGES") != nullptr || getenv("INFINITE_BENCH_B5C") != nullptr);
       const bool isBenchB2 = (getenv("INFINITE_BENCH_B2") != nullptr || getenv("INFINITE_BENCH_B2VISUALS") != nullptr || getenv("INFINITE_BENCH_B2SCALE") != nullptr);
       const bool benchStagesSample = (isBenchB5c || isBenchB2) && (frameId >= 32 && frameId < 152);
+      // B2 per-node GPU split: time each Render 3D / filter draw by node type
+      // instead of the enclosing "cook" stage (GL timer queries cannot nest).
+      const bool benchGpuPerNode = isBenchB2 && getenv("INFINITE_BENCH_B2GPUNODES") != nullptr;
 
       if (isBenchB5c || isBenchB2)
          sGpuTimerRing.Poll(frameId);
@@ -91443,7 +91448,8 @@ int main(int argc, char** argv)
 
       {
          ConditionalStageTimer timerCook(benchStagesSample ? &sStageCook : nullptr);
-         Bench::ConditionalGpuStageTimer timerCookGpu(benchStagesSample ? &sGpuTimerRing : nullptr, "cook", frameId);
+         Bench::ConditionalGpuStageTimer timerCookGpu(benchStagesSample && !benchGpuPerNode ? &sGpuTimerRing : nullptr, "cook", frameId);
+         Bench::NodeGpuRing() = benchStagesSample && benchGpuPerNode ? &sGpuTimerRing : nullptr;
          for (GraphNode& gn : gNodes)
          {
             if (gn.node->bypassed)
@@ -91457,6 +91463,7 @@ int main(int argc, char** argv)
                 dynamic_cast<OscSendNode*>(gn.node.get()) != nullptr)
                gn.node->CookIfNeeded(frameId);
          }
+         Bench::NodeGpuRing() = nullptr;
       }
       if (getenv("INFINITE_SHOWCASE") != nullptr && frameId == 1)
       {
