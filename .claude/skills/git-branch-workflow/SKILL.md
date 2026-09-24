@@ -1,9 +1,9 @@
 ---
 name: git-branch-workflow
-description: The standard branching workflow for this repo — every feature or bug fix request gets its own branch off main (feature/<slug> or bugfix/<slug>), work happens there, and it merges directly back into main (no PR, solo repo) once done. Replaces the old repo-privacy-split system. Use whenever the user asks for a new feature, a bug fix, or says "start work on X" — before writing any code — and when a piece of work is done and ready to land on main.
+description: The standard branching workflow for this repo — every feature or bug fix request gets its own branch off main (feature/<slug> or bugfix/<slug>), work happens there, and it merges directly back into main (no PR, solo repo) once done. Use whenever the user asks for a new feature, a bug fix, or says "start work on X" — before writing any code — and when a piece of work is done and ready to land on main.
 ---
 
-Paths below are relative to the repo root (`/Users/namansoni/infinite`),
+Paths below are relative to the repo root (`/Users/namansoni/infinte`),
 not this skill directory.
 
 ## The rule
@@ -52,12 +52,15 @@ branch.
   sitting on `main` for what looks like a distinct feature/fix, move them to
   a properly named branch before continuing (`git checkout -b <name>` carries
   uncommitted changes with it), rather than committing them straight to `main`.
-- This replaces the old `repo-privacy-split` skill/system (public/private
-  repo split via `osc-feature` + `infinite-private`). That system is gone —
-  don't push to the `private` remote as part of this workflow. (One
-  unrelated exception still exists: the `build/vst3-latest` branch used by
-  `plugin-host-hardening`, which simply hasn't been merged to `main` yet —
-  unrelated to this workflow.)
+- Push only to `origin` (public). The old `private` remote is gone; `rp` is
+  a contributor's fork, fetch-only in practice.
+- **Multi-step plans:** one branch per user-facing block of work (not per
+  sub-step), but commit each step separately inside it so a regression can
+  be bisected to the step that caused it.
+- **Staging:** always `git add <explicit paths>`, never `git commit -am` —
+  the post-commit hook rewrites semi-brain files in the background, and `-a`
+  sweeps them into unrelated commits. Before any push, check
+  `git log origin/<b>..<b> --name-only --format=` shows only intended files.
 - Follow the existing repo-wide git safety rules: only push when the user
   explicitly asks, never force-push/rebase published history, create NEW
   commits rather than amending.

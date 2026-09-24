@@ -37,7 +37,12 @@ report as a gap — don't silently skip it, and don't silently invent a mapping.
 | Panel/dock layout, macro elements, mod-matrix rows | `panels-sweep` |
 | Render loop, frame limiter, cook caching, audio callback | `rate-analysis-sweep` |
 | Keybinding handler code | `shortcuts-sweep` |
-| Anything under `src/platform/` | `windows-parity` |
+| Anything under `src/platform/`, or a `Platform.h` signature change | `windows-parity`, `linux-parity` (grep each used `Platform::` function against `src/platform/linux/*.cpp`) |
+| New/changed node param, `std::clamp` on a mailbox value, `BeginDisabled` gate | `param-truth-audit` |
+| `src/core/field/`, Field node sources | `field-testing`, `field-realtime` |
+| Field preset strings (`FieldPixelNode.cpp` / `FieldElementNode.cpp` `Presets()`) | `field-pixel-presets` / `field-modifier-presets` |
+| `src/arrange/`, Arrange panel code | `timeline-arrangement-architecture` (check the change against its data model) |
+| New node registered, or a filter def added | help coverage: every `REGISTER_NODE` name has a `SpecificNodeHelpText` row, every `FilterDefs.cpp` name a `FilterHelpText` row, and back again; OS-dependent nodes branched per OS |
 
 A diff can match several rows — invoke every skill that applies, not just the first
 match.
@@ -48,7 +53,9 @@ Regardless of what's touched:
 
 - `infinite-code-review` — the four-standards qualitative review (accuracy,
   experimentality, design, quality). It delegates to `run-infinite-hygiene` itself for
-  the build-and-self-test pass, so you don't need to run that separately.
+  the build-and-self-test pass, so you don't need to run that separately. Use the
+  hygiene skill's "Efficient routes": `driver.sh --group <area>` for the touched
+  areas, not `--full` (that is for release only).
 - `invariant-interaction-audit` — if `git diff` shows any clamp/normalize/snap/bounds/
   budget-cap logic added or touched (grep the diff for these shapes first). If genuinely
   none is present, say so and skip it rather than running it pro forma.

@@ -43,7 +43,7 @@ https://n1m21n.github.io/Infinite/. There is no separate "upload" step:
 
 Delegates to the existing [run-infinite-hygiene](../run-infinite-hygiene/SKILL.md)
 skill — builds the app and runs its self-test suite (undo/redo, patch
-save/load, audio param/teardown sweeps, the 167-node-type round trip, etc.).
+save/load, audio param/teardown sweeps, the all-node-types round trip, etc.).
 Don't skip this before committing. See that skill for what it actually
 checks and how to read a failure.
 

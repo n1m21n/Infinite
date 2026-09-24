@@ -12,8 +12,8 @@ python3 scripts/audit_node_params.py --out docs/node_param_audit.md
 ```
 
 It prints a one-line summary and writes the full report. It reads source only -
-it does not build, launch, or drive the app, which is the point: spawning all
-~135 node types by hand and eyeballing each control is exactly what this
+it does not build, launch, or drive the app, which is the point: spawning
+every node type by hand and eyeballing each control is exactly what this
 replaces.
 
 ## What "modulatable" means here

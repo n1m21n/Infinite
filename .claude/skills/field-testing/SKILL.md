@@ -1,6 +1,6 @@
 ---
 name: field-testing
-description: How to prove a Field change did not regress Infinite — building the step-1 regression corpus out of the `=` expressions saved patches already contain (and authoring it, because it does not exist yet), the golden-value harness as an INFINITE_* fixture, per-domain conformance cases for frame/element/pixel/sample, how to re-baseline across the deliberate randomness break, and the machine-checkable exit criterion for each of the 10 build steps. Use before and after any Field compiler or language change, when adding a backend, when asked "did this break saved patches", "how do I test the language", "what proves step N is done", or when writing the prompt for a session that will implement any build step.
+description: How to prove a Field change did not regress Infinite — extending the regression corpus at tests/field/corpus.txt without baking new behaviour into golden values, the golden-value harness as an INFINITE_* fixture, per-domain conformance cases for frame/element/pixel/sample, how to re-baseline across the deliberate randomness break, and the machine-checkable exit criterion for each of the 10 build steps. Use before and after any Field compiler or language change, when adding a backend, when asked "did this break saved patches", "how do I test the language", "what proves step N is done", or when writing the prompt for a session that will implement any build step.
 ---
 
 Paths are relative to the repo root (`/Users/namansoni/infinte`).
@@ -48,20 +48,12 @@ language test.
 
 ## 2. The step-1 regression corpus
 
-> **Finding: the corpus does not exist yet. It has to be authored.**
->
-> - There is **no `INFINITE_EXPRTEST`** or any fixture covering
->   `Expression::Evaluate` — `grep -o 'INFINITE_[A-Z0-9]*' src/main.cpp` has no
->   expression, formula, equation or modulation-expression entry. The language
->   layer has **zero** automated coverage today.
-> - The one shipped example patch, `assets/examples/patch_1.inf` (687 lines),
->   contains **zero `expr` and zero `glob` lines**.
->
-> So "the existing `=` expressions in saved patches are the regression corpus"
-> is a statement of *intent*. **Step 1's first task is to write the corpus, and
-> to write it against the current binary before touching `Expression.cpp`** —
-> otherwise the golden values encode the new implementation's behaviour, and the
-> test proves nothing.
+> **Status (2026-09): the corpus exists.** It is `tests/field/corpus.txt`
+> (record shape in §2.2), read by `RunFieldTest()` in `src/main.cpp`
+> (`INFINITE_FIELDTEST`). Extend that file; don't start a second corpus.
+> §2.1 is how it was built, and how to add to it without encoding new
+> behaviour as golden: capture expected values from the binary *before* the
+> change.
 
 ### 2.1 Building it
 

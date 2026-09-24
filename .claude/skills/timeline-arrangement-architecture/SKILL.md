@@ -155,6 +155,18 @@ audio lane). Same for video. Build any future UI/feature language around **lane 
 not a nonexistent sample/clip split — unless you're deliberately introducing that split, in
 which case this is the place it needs to land.
 
+**Rule: never gate clip *behaviour* on `sampleDropped`.** It only means "was created by a
+file drop". Gating on it made the hand-assigned-source path a second, untested path: until
+v0.4 such clips skipped the position lock and the retrigger, and Sampler-sourced clips got
+no pitch at all. Gate on what the source node can do instead. Every audio clip now
+position-locks. The engine offers both `SetClipSamplePosition` and `SetClipPitchOverride`,
+because it can't tell which one a node consumes (`SamplerNode`/`WavetableSynthCore`
+implement only the pitch override). Only the source-time *mapping* (`sampleBpm`,
+`syncToTempo`) is Sample-specific. Cross-lane conflicts are recorded for audio and video
+(`ArrangeVideoSourceConflictClips()`), warned in the inspector, never suppressed.
+`INFINITE_ARRANGESAMPLETEST=<dir>` and `INFINITE_ARRANGESAMPLEEXPORTTEST=<dir>` cover this
+(both in the hygiene driver).
+
 ## 3. Per-selection-kind settings
 
 All defined in one function, branching on selection kind:
@@ -307,6 +319,10 @@ available ahead of the playhead), or add a second, source-agnostic "has cached p
 that live-fills only fall back to when no cache exists.
 
 ## Known gaps (not bugs, but real holes worth flagging before building on top)
+
+**Open test failure (unverified since 2026-09-14):** `INFINITE_ARRANGEWAVETEST`'s "filled by
+playback" check failed 0/32 buckets the first time an audio device opened on this Mac, and
+it isn't in `known-test-failures.txt`. Re-run it before trusting the live waveform fill.
 
 0. **Clip-source routing is NOT gated by node type — confirmed, not a gap.** An audit of the
    full pipeline (compatibility gates `IsNodeAudioCompatible`/`IsNodeVideoCompatible`, manual +

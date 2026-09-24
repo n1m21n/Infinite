@@ -63,6 +63,13 @@ A fresh session cannot infer them, and each has already cost real time here.
    codebase's actual bar — implement the smaller node and update the doc to
    match, don't implement the doc as written.
 
+   **Exception - a deliberate quality pass (owner, 2026-09-18).** When the owner
+   asks for a specific node's *sound* to be upgraded (Reverb was the first:
+   denser diffusion, always-on modulation, larger FDN, decorrelated stereo),
+   that node may grow past the KHS card if the sound genuinely needs it. This
+   loosens the ceiling only for a node under an explicit quality pass; it is
+   not licence to widen any other node's existing surface unasked.
+
 ---
 
 ## 1. Read these before writing code

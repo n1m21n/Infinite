@@ -1,6 +1,6 @@
 ---
 name: bug-blast-radius
-description: The standard nine-question impact analysis to run on ANY bug reported for Infinite before proposing or writing a fix — which node owns it, which logic is actually at fault, who else calls that logic, which other nodes it silently degrades, whether it is one node or a repeated pattern across the codebase, whether it behaves the same on macOS and Windows, and whether the obvious fix opens a loophole or breaks a documented invariant, when it was introduced and what bad state it leaves behind, and why the self-test harness never caught it. Use EVERY time the user shows a bug — a screenshot, a "my FPS drops", "this looks wrong", "this crashes", "this node is broken", a pasted stack trace, or a described misbehaviour — before writing any code or any fix prompt. Also use for "investigate this bug", "how bad is this", "what else does this affect", "is this everywhere".
+description: The standard nine-question impact analysis to run on ANY bug reported for Infinite before proposing or writing a fix — which node owns it, which logic is actually at fault, who else calls that logic, which other nodes it silently degrades, whether it is one node or a repeated pattern across the codebase, whether it behaves the same on macOS, Windows and Linux, and whether the obvious fix opens a loophole or breaks a documented invariant, when it was introduced and what bad state it leaves behind, and why the self-test harness never caught it. Use EVERY time the user shows a bug — a screenshot, a "my FPS drops", "this looks wrong", "this crashes", "this node is broken", a pasted stack trace, or a described misbehaviour — before writing any code or any fix prompt. Also use for "investigate this bug", "how bad is this", "what else does this affect", "is this everywhere".
 ---
 
 Repo root is `/Users/namansoni/infinte` (note the spelling — the directory
@@ -108,22 +108,23 @@ Then report one of: **isolated** (one call site, evidence given),
 idiom copied across the node layer — this changes the fix from a patch to a
 refactor, and the user needs to know that before approving).
 
-### 6. Does it behave the same on macOS and Windows
+### 6. Does it behave the same on macOS, Windows and Linux
 
 Decide from the code, not from a build:
 
 - Is the faulty code under `src/platform/`, or does it contain `_WIN32`?
-  Then it is **platform-divergent by construction** — read both sides and
-  apply the two-sided obligation from the `windows-parity` skill.
+  Then it is **platform-divergent by construction** — read all three sides
+  and apply the three-sided obligation from `windows-parity` / `linux-parity`.
 - Is it portable C++/GLSL in `src/core/` or `src/nodes/`? Then it is
-  **present on both platforms**, and say so. Do not stop there: name the
+  **present on all three platforms**, and say so. Do not stop there: name the
   *magnitude* difference where one exists — MSVC's `std::unordered_map` and
   `std::map` are materially slower than libc++'s, MSVC's float codegen
   differs, GLSL 330 is stricter on Windows drivers, and Windows machines in
   this project's audience skew toward weaker GPUs. A shared bug is often
   **worse** on Windows even when the code is identical.
 
-Since only macOS can be built and run here, mark each platform's status as
+macOS runs natively and Linux runs in the container rig (`tools/linux/local.sh`,
+see `linux-parity`); Windows can only be read. Mark each platform's status as
 **verified** (you ran it) or **inferred from source** (you read it). Never
 present the second as the first.
 

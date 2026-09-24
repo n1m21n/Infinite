@@ -6,9 +6,11 @@ description says *when* to load it, not what it contains.
 
 ## Field — the embedded language
 
-Field is a new embedded programming language being designed for Infinite. It is
-**not implemented yet**; these skills were written before the code so that
-implementation sessions have a contract instead of a blank page.
+Field is Infinite's embedded language. It is **built and shipped** (sources in
+`src/core/field/`; nodes Field Modifier, Field Effect, FieldPixel, Field
+Primitive, Field Synth, Field Graph). These skills were written as the contract
+before the code; where a skill and the code disagree, the code is the truth and
+the skill should be fixed.
 
 Read them in this order:
 
@@ -23,7 +25,7 @@ Read them in this order:
 | 7 | [`field-testing`](field-testing/SKILL.md) | the regression corpus, the golden-value harness, per-domain conformance, exit criteria for each of the 10 build steps |
 
 1–2 are the core pair. 3–7 are subsets that deepen independently as the language
-grows.
+grows. For preset strings, use `field-pixel-presets` / `field-modifier-presets`.
 
 **Two rules that apply to every one of them:**
 
@@ -38,27 +40,5 @@ owner; do not resolve them silently in code.
 
 ## Everything else
 
-The remaining skills cover the shipped app and are selected by their own
-descriptions. Broadly:
-
-- **Adding a node** — `new-audio-node`, `new-source-node`, `new-effect-node`,
-  `new-geometry-node`, `new-compositing-node`, `new-modulator-node`,
-  `new-utility-node`
-- **Node appearance** — `node-ui-pillars` (the regression contract),
-  `audio-node-ui` (the layout grammar)
-- **Sweeps and audits** — `audio-node-sweep`, `audio-pipeline-sweep`,
-  `av-sync-sweep`, `cable-logic-sweep`, `compositing-pipeline-sweep`,
-  `data-accuracy-sweep`, `geometry-transform-sweep`, `modulation-sweep`,
-  `node-param-audit`, `node-ui-sweep`, `output-projection-sweep`,
-  `panels-sweep`, `pillar-parity-audit`, `rate-analysis-sweep`,
-  `render-pipeline-sweep`, `shortcuts-sweep`
-- **Understanding a request** — `codebase-lenses` splits any change or deep
-  dive into seven concern lenses (Structure, Execution, Data & State, UI/UX,
-  Platform, Performance, Correctness), each with numbered sub-lenses and the
-  skills that own them; `codebase-navigation` is how to search once you know
-  which lenses matter
-- **Process** — `bug-blast-radius`, `invariant-interaction-audit`,
-  `codebase-navigation`, `git-branch-workflow`, `prior-art-scout`,
-  `infinite-code-review`, `write-fix-brief`, `run-infinite-hygiene`,
-  `ship-infinite`, `release-notes-audit`, `windows-parity`, `linux-parity`,
-  `plugin-host-hardening`
+The full catalog (one line per skill, plus the agents) is in the repo-root
+`AGENTS.md`. Keep that table as the only list, so the two never drift apart.

@@ -166,7 +166,7 @@ node layer must contain no `_WIN32`.
 .claude/skills/run-infinite-hygiene/driver.sh         # full gate before committing
 ```
 
-The 167-node round trip in the hygiene suite covers save/load and spawn for
+The all-node-types round trip (ROUNDTRIPTEST) in the hygiene suite covers save/load and spawn for
 the new type automatically once it is registered. Add a node-specific fixture
 only for behaviour those cannot know (an analytic gradient value, a known
 pixel at a known coordinate).

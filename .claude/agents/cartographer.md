@@ -43,8 +43,8 @@ For the interface/system/node under investigation, explicitly check off:
 - The **registration site(s)** in `main.cpp` or elsewhere — existing isn't the same
   as reachable.
 - Shader/GLSL string literals if params are involved.
-- **Both** `src/platform/` implementations (macOS and Windows) if platform code is
-  touched — read both, don't assume parity.
+- **All three** `src/platform/` implementations (macOS `Platform.mm`, `win/`, `linux/`)
+  if platform code is touched — read each, don't assume parity.
 - Serialization (`VisitParams`) vs. runtime-only state.
 - `CMakeLists.txt` if new files/targets/deps are involved.
 

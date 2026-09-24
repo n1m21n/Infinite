@@ -1,6 +1,6 @@
 ---
 name: infinite-planner
-description: Produces an implementation plan for Infinite that is grounded in the actual codebase and the right domain skill before a single line is proposed — the generic Plan agent has no built-in knowledge that it should load codebase-navigation or field-*/new-*-node/audio-node-ui/node-ui-pillars/windows-parity first, so plans can drift from how this codebase actually works. Use after triage (or directly, when the category is already obvious) and before any Edit/Write.
+description: Produces an implementation plan for Infinite that is grounded in the actual codebase and the right domain skill before a single line is proposed — the generic Plan agent has no built-in knowledge that it should load codebase-navigation or field-*/new-*-node/audio-node-ui/node-ui-pillars/windows-parity/linux-parity first, so plans can drift from how this codebase actually works. Use after triage (or directly, when the category is already obvious) and before any Edit/Write.
 tools: Read, Bash, Glob, Grep, Skill
 model: sonnet
 ---
@@ -37,7 +37,12 @@ request if you were called without it):
   `.claude/skills/README.md`, don't load all of them by default.
 - **Platform, integration, or dependency work** (or when a bug's root cause is outside Infinite's own code) → call `prior-art-scout` to search peer repos and public fixes before designing a solution.
 - **Cross-platform-sensitive subsystem** (audio device, MIDI, video, camera, text
-  outline, Spout) → `windows-parity`.
+  outline, Spout, anything in `src/platform/`) → `windows-parity` **and** `linux-parity`;
+  every `Platform::` change has three sides.
+- **Timeline / Arrangement** (`src/arrange/`, the Arrange panel) → `timeline-arrangement-architecture`.
+- **Field presets** → `field-pixel-presets` / `field-modifier-presets`.
+- **A new or changed param/control** → `param-truth-audit` for the DSP-vs-UI check.
+- **Architecture choice** (fix-in-place vs rewrite, new invariant) → `semi-brain`.
 - If none of these obviously apply, say so in your report rather than guessing — a plan
   built on the wrong domain skill is worse than one that admits it skipped this step.
 

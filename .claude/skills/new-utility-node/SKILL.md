@@ -38,20 +38,22 @@ Also declare `InputLabel()`. IO nodes usually have heterogeneous slots
 ## 1. The one-abstraction rule (read `windows-parity` before writing code)
 
 **No `#ifdef _WIN32` in the node layer, ever.** Every platform difference
-lives behind a `Platform::` function with a real implementation on both
-sides. `SyphonOutNode` is the model: it holds a
+lives behind a `Platform::` function with a real implementation on every
+side (macOS, Windows, Linux). `SyphonOutNode` is the model: it holds a
 `Platform::SyphonServerHandle*` and never mentions Syphon or Spout in its own
 code - the macOS side is IOSurface, the Windows side is Spout2
 (`src/platform/win/PlatformWinSyphon.cpp`), and the node is identical.
 
-Every `Platform::` function you add carries a two-sided obligation: **write
-both implementations in the same commit**, even when the Windows one is a
-stub that fails soft. A missing Windows implementation is not a compile error
-in a macOS-only build - it is a Windows build break someone else discovers.
+Every `Platform::` function you add carries a three-sided obligation: **write
+the macOS, Windows and Linux implementations in the same commit**, even when
+one is a stub that fails soft. A missing Windows or Linux implementation is not
+a compile error in a macOS-only build - it is a build break someone else
+discovers.
 
 `.claude/skills/windows-parity/SKILL.md` has the per-subsystem trap catalogue
 (WASAPI teardown, WinMM status bytes, Media Foundation stride, wide paths,
-GLSL 330 strictness). Read it before touching anything device- or file-backed.
+GLSL 330 strictness), and `linux-parity` the Linux one. Read both before touching
+anything device- or file-backed.
 
 ---
 

@@ -140,7 +140,7 @@ the same buffer through a `CGBitmapContext` with
 `TextLinux.cpp`'s blend is `dst*(1-a) + src*a` with **no divide by alpha**.
 
 This reads exactly like the straight-vs-premultiplied blending mistake this
-codebase has made before (see `project_recurring_bug_patterns`), and a reviewer
+codebase has made before (see `compositing-pipeline-sweep` check 4), and a reviewer
 has already flagged it once. It is correct. There is a comment saying so at the
 lambda — leave it there.
 

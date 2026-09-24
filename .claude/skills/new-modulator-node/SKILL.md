@@ -189,7 +189,7 @@ modulatable.
 ## 7. Exit criterion - state it machine-checkably in every prompt
 
 > The node is done when: `.claude/skills/run-infinite-hygiene/driver.sh`
-> passes with the node registered (which round-trips all ~167 node types
+> passes with the node registered (which round-trips every registered node type
 > through save/load and spawns each one with its params open);
 > `.claude/skills/modulation-sweep/driver.sh` passes; the node's row in
 > `docs/node_param_audit.md` shows no non-text gaps; and driving one

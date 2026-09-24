@@ -1,6 +1,6 @@
 ---
 name: windows-parity
-description: How to write code for Infinite that works on Windows when you can only build and run it on macOS — the one-abstraction rule that keeps `_WIN32` out of the node layer, the two-sided obligation every `Platform::` function carries, and the per-subsystem trap catalogue (WASAPI teardown, WinMM status bytes, GDI glyph outlines, Media Foundation stride, wide paths, static CRT, GLSL 330 strictness) drawn from bugs that actually shipped in this repo. Use before adding or changing anything in `src/platform/`, before adding a `Platform::` function, when touching audio device / MIDI / video / camera / text-outline / Spout code, when reviewing or fixing a Windows-only defect, or when a user reports something that works on macOS and not on Windows. Not for macOS-only work, and not a substitute for `run-infinite-hygiene`.
+description: How to write code for Infinite that works on Windows when you can only build and run it on macOS — the one-abstraction rule that keeps `_WIN32` out of the node layer, the three-sided (macOS/Windows/Linux) obligation every `Platform::` function carries, and the per-subsystem trap catalogue (WASAPI teardown, WinMM status bytes, GDI glyph outlines, Media Foundation stride, wide paths, static CRT, GLSL 330 strictness) drawn from bugs that actually shipped in this repo. Use before adding or changing anything in `src/platform/`, before adding a `Platform::` function, when touching audio device / MIDI / video / camera / text-outline / Spout code, when reviewing or fixing a Windows-only defect, or when a user reports something that works on macOS and not on Windows. Not for macOS-only work, and not a substitute for `run-infinite-hygiene`.
 ---
 
 Paths are relative to the repo root.
@@ -32,7 +32,7 @@ src/platform/win/*.cpp        Windows implementation
 
 `Platform.h` (829 lines) is a pure C++ declaration surface — no Objective-C,
 no `windows.h`, no COM. Two implementations sit behind it and `CMakeLists.txt`
-picks one. That is how 167 node types stay buildable on both platforms.
+picks one. That is how every node type stays buildable on all three platforms.
 
 The node layer is not conditional-free, but the conditionals it has all take
 the same shape, and the shape is the rule:
@@ -340,10 +340,8 @@ relevant one **and** §2 here. `infinite-code-review` should apply §3 as a
 checklist whenever a diff touches `src/platform/`.
 
 `linux-parity` is the third implementation behind the same `Platform.h` and
-builds directly on this skill — read this one first, then that one. Two
-consequences for the text above: §2's "two-sided obligation" is now
-**three**-sided (a Linux definition too, and `LINUX_SOURCES` at
-`CMakeLists.txt:508`), and `src/platform/common/` now exists for code Windows
+builds directly on this skill — read this one first, then that one. §2 is three-sided because of it (a Linux definition too, plus its
+`LINUX_SOURCES` entry in `CMakeLists.txt`), and `src/platform/common/` now exists for code Windows
 and Linux genuinely share — prefer moving a portable function there over
 copying it. Unlike Windows, Linux **can** be executed locally via
 `tools/linux/local.sh`, so Linux claims should be run, not reasoned about.
