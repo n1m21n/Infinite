@@ -4,6 +4,7 @@
 [![YouTube Tutorial](https://img.shields.io/badge/YouTube-Watch%20Tutorial-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=vXRjrDhSq24&t=1421s)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)](https://github.com/n1m21n/Infinite)
 [![License](https://img.shields.io/badge/License-MIT%20%2F%20GPLv3-green)](LICENSE)
+[<img src="https://trendshift.io/api/badge/trendshift/repositories/187223/daily?language=C%2B%2B" alt="n1m21n%2FInfinite | Trendshift" width="250" height="55"/>](https://trendshift.io/repositories/187223?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-187223)
 
 A unified node-based audiovisual modular workstation for **macOS**, **Windows**, and **Linux**. Real-time GPU image/video compositing, procedural 3D geometry and physics, and a full modular synthesizer rack with native AU and VST3 plugin hosting — all interconnected through a universal modulation graph. Most nodes do one fixed thing; **Field**, Infinite's embedded programming language, lets you write what a node does instead.
 
