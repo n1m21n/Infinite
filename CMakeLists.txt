@@ -342,13 +342,34 @@ if(INFINITE_ENABLE_VST3 AND NOT APPLE AND NOT WIN32)
 endif()
 
 if(INFINITE_ENABLE_VST3)
-    set(VST3_SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/vst3sdk")
-    if(NOT EXISTS "${VST3_SDK_DIR}/pluginterfaces/vst/ivstaudioprocessor.h")
-        message(FATAL_ERROR "INFINITE_ENABLE_VST3 is ON, but Steinberg VST3 SDK was not found in external/vst3sdk.\n"
-                            "Please initialize submodules with:\n"
-                            "  git submodule update --init --recursive external/vst3sdk\n"
-                            "or clone the VST3 SDK into external/vst3sdk.")
+    # A git worktree has an empty external/vst3sdk (submodules are per
+    # checkout), so fall back to the main checkout's copy instead of cloning
+    # the SDK again for every worktree. -DVST3_SDK_DIR=<path> overrides both.
+    set(VST3_SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/vst3sdk" CACHE PATH "Steinberg VST3 SDK root")
+    set(_vst3_probe "pluginterfaces/vst/ivstaudioprocessor.h")
+    if(NOT EXISTS "${VST3_SDK_DIR}/${_vst3_probe}")
+        execute_process(
+            COMMAND git rev-parse --path-format=absolute --git-common-dir
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            OUTPUT_VARIABLE _git_common_dir
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET)
+        if(_git_common_dir)
+            get_filename_component(_main_checkout "${_git_common_dir}" DIRECTORY)
+            if(EXISTS "${_main_checkout}/external/vst3sdk/${_vst3_probe}")
+                set(VST3_SDK_DIR "${_main_checkout}/external/vst3sdk" CACHE PATH "Steinberg VST3 SDK root" FORCE)
+            endif()
+        endif()
     endif()
+    if(NOT EXISTS "${VST3_SDK_DIR}/${_vst3_probe}")
+        # Only pluginterfaces and public.sdk are used; never --recursive
+        # (it also clones vstgui4, doc and tutorials).
+        message(FATAL_ERROR "INFINITE_ENABLE_VST3 is ON, but the Steinberg VST3 SDK was not found.\n"
+                            "Point at an existing copy with -DVST3_SDK_DIR=<path>, or fetch only what the build uses:\n"
+                            "  git submodule update --init external/vst3sdk\n"
+                            "  git -C external/vst3sdk submodule update --init pluginterfaces public.sdk")
+    endif()
+    message(STATUS "VST3 SDK: ${VST3_SDK_DIR}")
 endif()
 
 # ---- per-platform sources ---------------------------------------------------
