@@ -27,11 +27,14 @@ namespace Platform
    // Returns -1.0 if the platform has no cheap way to read it yet.
    double ProcessRssMb();
 
-   // Current process physical footprint in MB (task_vm_info.phys_footprint on macOS).
-   // Unlike RSS, this includes compressed memory pages and accurately reflects
-   // memory pressure on Apple Silicon / macOS.
-   // Returns -1.0 if the platform has no way to read it.
-   double ProcessPhysFootprintMb();
+   // Memory the OS charges to this process, in MB, including pages it has
+   // compressed or swapped out. RSS falls when macOS compresses memory under
+   // pressure, so on an 8 GB machine it reads as the app freeing memory it
+   // still holds. This is the number that tracks real usage and leaks:
+   // phys_footprint on macOS (what Activity Monitor's "Memory" column shows),
+   // PrivateUsage (commit charge) on Windows, VmRSS + VmSwap on Linux.
+   // Returns -1.0 if it cannot be read.
+   double ProcessFootprintMb();
 
    // Best-effort hardware model string ("MacBookPro18,3", a Windows
    // WMI/registry product name, or a Linux DMI string) for BENCH_JSON's

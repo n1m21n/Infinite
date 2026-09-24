@@ -101,15 +101,15 @@ namespace Platform
       return (double)info.resident_size / (1024.0 * 1024.0);
    }
 
-   double ProcessPhysFootprintMb()
+   double ProcessFootprintMb()
    {
-      task_vm_info_data_t vmInfo;
+      task_vm_info_data_t info;
       mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
       const kern_return_t kr = task_info(mach_task_self(), TASK_VM_INFO,
-                                          (task_info_t)&vmInfo, &count);
+                                          (task_info_t)&info, &count);
       if (kr != KERN_SUCCESS)
          return -1.0;
-      return (double)vmInfo.phys_footprint / (1024.0 * 1024.0);
+      return (double)info.phys_footprint / (1024.0 * 1024.0);
    }
 
    std::string HwModelString()

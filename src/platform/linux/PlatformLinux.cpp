@@ -132,26 +132,24 @@ namespace Platform
       return -1.0;
    }
 
-   double ProcessPhysFootprintMb()
+   double ProcessFootprintMb()
    {
+      // Resident plus swapped out, so pages pushed to swap under pressure
+      // still count. Both lines are in kB in /proc/self/status.
       std::ifstream in("/proc/self/status");
       if (!in.is_open())
          return -1.0;
+      long rssKb = -1;
+      long swapKb = 0;
       std::string line;
-      long rssAnonKb = -1;
-      long vmRssKb = -1;
       while (std::getline(in, line))
       {
-         if (line.rfind("RssAnon:", 0) == 0)
-            rssAnonKb = std::strtol(line.c_str() + 8, nullptr, 10);
-         else if (line.rfind("VmRSS:", 0) == 0)
-            vmRssKb = std::strtol(line.c_str() + 6, nullptr, 10);
+         if (line.rfind("VmRSS:", 0) == 0)
+            rssKb = std::strtol(line.c_str() + 6, nullptr, 10);
+         else if (line.rfind("VmSwap:", 0) == 0)
+            swapKb = std::strtol(line.c_str() + 7, nullptr, 10);
       }
-      if (rssAnonKb > 0)
-         return (double)rssAnonKb / 1024.0;
-      if (vmRssKb > 0)
-         return (double)vmRssKb / 1024.0;
-      return -1.0;
+      return rssKb > 0 ? (double)(rssKb + swapKb) / 1024.0 : -1.0;
    }
 
    std::string HwModelString()
