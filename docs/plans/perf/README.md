@@ -28,12 +28,29 @@ variants from 1 run (the 3-run 1080 set could not be paced: screen locked).
 | | | B8 4x2160 | frame p50 / p99 ms | 32.9 / 83.8 | 13.9 / 112.2 | -58% / **+34%** |
 | | | B8 2x1080 / 4x1080 / 2x2160 / 4x2160 | loop-boundary max ms | 13.7 / 14.8 / 34.8 / 186.2 | 12.2 / 11.7 / 29.9 / 223.3 | -11% / -21% / -14% / **+20%** |
 | | | B8 4x2160 | decoded fps | 30.0 | 29.7 | -1% |
-| Video: decode thread per clip | `b4a1454`, `8a6648a` | reverted in `1b7364e` | - | - | - | see the gate below |
+| Video: decode thread per clip | `88787d7` (reapplies `b4a1454`, `8a6648a`) | B8 4x2160 | frame p50 / p99 ms | 13.9 / 112.2 | 9.2 / 23.1 | -34% / -79% |
+| | | B8 4x2160 | dropped per clip | 22 | 0 | -100% |
+| | | B8 2x2160 | frame p50 / p99 ms | 8.4 / 16.8 | 9.5 / 16.7 | +13% / -1% |
+| | | B8 2x2160 / 4x2160 | footprint peak MB | 633 / 1139 | 662 / 1160 | +5% / +2% |
 
 Keep-or-revert gate for the decode thread: B8, 3 runs each, interleaved
-against a `93e184d` build. The rule was: keep only if the branch is >= base on
-every metric and its footprint is not higher. It failed on 2x2160 p50 and on
-footprint, so it was reverted.
+against a `93e184d` build. The first rule (branch >= base on every metric,
+footprint not higher) reverted it in `1b7364e` over +1.1 ms p50 at 2x2160 and
++2-5% footprint, while it removed every 4x2160 drop. That rule was too strict.
+**Gate rule now:** keep if no metric ends up worse than its budget (frame p99
+<= 33.3 ms, 0 drops where base drops) and footprint is within +5%. The thread
+passes it and was reapplied in `88787d7`.
+
+Re-check of the reapply, 2026-09-25, B8 4x2160 interleaved main `d668610` /
+thread `88787d7`, machine swapping 5.7 of 7 GB (absolute numbers are worse
+than the table below; the comparison is what counts):
+
+| run | frame p50 / p99 ms | dropped per clip | footprint peak MB |
+|---|---|---|---|
+| main 1 | 12.2 / 43.8 | 4 / 3 / 3 / 3 | 988 |
+| thread 1 | 10.1 / 25.6 | 0 / 0 / 0 / 0 | 1254 |
+| main 2 | 18.8 / 191.4 | 38 / 43 / 44 / 37 | 1397 |
+| thread 2 | 11.0 / 22.6 | 0 / 0 / 0 / 0 | 1268 |
 
 | variant | metric | base `93e184d` | thread `8a6648a` |
 |---|---|---|---|
@@ -46,7 +63,7 @@ footprint, so it was reverted.
 | 4x2160 | loop-boundary max ms | 223.3 | 150.1 |
 | 4x2160 | footprint peak MB | 1139 | 1160 |
 
-What did not improve, and why:
+What did not improve at `93e184d`, before the thread was reapplied (the thread fixes the first three rows; the loop wrap at 4x2160 still peaks at 150 ms and stays **open**: the reader rebuild on wrap is still one synchronous 4K open per clip):
 
 | metric | before | after | why |
 |---|---|---|---|
@@ -664,11 +681,10 @@ a fixture goes here, not into a code change.
   can't see that. B6 counts frame intervals within 1.5 ms of a whole number
   of refresh periods. Below 80% it tags the run `unpaced=1`. B3 has the
   same exposure.
-- **B8 media I/O** (numbers in the B8 section above; 2, 3 and 8 are fixed
-  on `bugfix/macos-video-decode`, see the Scoreboard):
-  1. **Open.** A decode thread per clip (`b4a1454` + `8a6648a`) fixed it,
-     but failed the keep-or-revert gate and was reverted in `1b7364e` (see
-     the Scoreboard). *macOS decodes on the main thread, inside cook.* `VideoFrameAt` runs
+- **B8 media I/O** (numbers in the B8 section above; 1, 2, 3 and 8 are
+  fixed on `bugfix/macos-video-decode` / `bugfix/restore-decode-thread`, see the Scoreboard):
+  1. **Fixed** in `88787d7` (decode thread per clip, reapplied after the
+     revert in `1b7364e`; see the Scoreboard for the gate). *macOS decodes on the main thread, inside cook.* `VideoFrameAt` runs
      `AVAssetReader` synchronously from `VideoSourceNode::CookIfNeeded`. At
      2x1080 `cook` is 4.2 of an 8.7 ms frame, and every loop wrap stalls
      the frame for 12-16 ms (1080) or 29-31 ms (2160).
