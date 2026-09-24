@@ -240,13 +240,19 @@ namespace
       gDevices = std::move(list);
    }
 
-   bool ResolveEndpoint(uint32_t deviceId, std::wstring& outEndpointId, std::string& outName)
+   // outIsInput, when given, lets a caller reject a stale index that now
+   // resolves to the wrong device kind (see AudioDeviceOpen's
+   // fallback-to-default comment) without a second lock of gDevicesMutex.
+   bool ResolveEndpoint(uint32_t deviceId, std::wstring& outEndpointId, std::string& outName,
+                        bool* outIsInput = nullptr)
    {
       std::lock_guard<std::mutex> lock(gDevicesMutex);
       if (deviceId == 0 || deviceId > gDevices.size())
          return false;
       outEndpointId = gDevices[deviceId - 1].endpointId;
       outName = gDevices[deviceId - 1].name;
+      if (outIsInput != nullptr)
+         *outIsInput = gDevices[deviceId - 1].isInput;
       return true;
    }
 
@@ -579,18 +585,27 @@ namespace Platform
       }
 
       // Resolve which endpoint to run. 0 = system default render device.
+      // requestedDeviceId is a 1-based index into gDevices as RefreshDeviceList
+      // last built it, persisted verbatim in Infinite.audio-settings - it has
+      // no relation to any stable OS identifier, so it goes stale the moment
+      // the device list reorders (a device unplugged/replugged, or any device
+      // added/removed changes every index after it), same hazard as macOS's
+      // stale AudioObjectID (see Platform.mm's AudioDeviceOpen). An
+      // out-of-range index, or one that now resolves to a capture-only
+      // device, falls back to the system default output rather than failing
+      // the whole engine start - requestedDeviceId itself (main.cpp's
+      // gAudioOutputDeviceId) is left untouched, same as macOS.
       std::wstring endpointId;
       std::string endpointName;
-      if (requestedDeviceId != 0)
+      bool isInput = false;
+      bool useRequestedDevice = requestedDeviceId != 0 &&
+                                ResolveEndpoint(requestedDeviceId, endpointId, endpointName, &isInput) &&
+                                !isInput;
+      if (!useRequestedDevice)
       {
-         if (!ResolveEndpoint(requestedDeviceId, endpointId, endpointName))
-         {
-            outError = "audio device not found";
-            return false;
-         }
-      }
-      else
-      {
+         endpointId.clear();
+         endpointName.clear();
+
          ComScope com;
          IMMDeviceEnumerator* enumerator = nullptr;
          if (!com.ok ||

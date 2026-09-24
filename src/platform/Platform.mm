@@ -3698,9 +3698,18 @@ namespace Platform
          AudioObjectID targetDevice = (AudioObjectID)reqDevice;
          if (targetDevice != 0)
          {
-            AudioUnit inputUnit = input.audioUnit;
-            AudioUnitSetProperty(inputUnit, kAudioOutputUnitProperty_CurrentDevice,
-                                 kAudioUnitScope_Global, 0, &targetDevice, sizeof(targetDevice));
+            // Same stale-AudioObjectID hazard as AudioDeviceOpen's output
+            // path (a replug can reassign this ID to a different, possibly
+            // output-only, device) - verify it still names a live input
+            // device before handing it to the unit, otherwise fall back to
+            // whatever the input unit already defaults to.
+            uint32_t inChannels = 0;
+            if (DeviceHasScope(targetDevice, kAudioObjectPropertyScopeInput, inChannels))
+            {
+               AudioUnit inputUnit = input.audioUnit;
+               AudioUnitSetProperty(inputUnit, kAudioOutputUnitProperty_CurrentDevice,
+                                    kAudioUnitScope_Global, 0, &targetDevice, sizeof(targetDevice));
+            }
          }
 
          AVAudioFormat* format = [input inputFormatForBus:0];
@@ -3838,27 +3847,42 @@ namespace Platform
          // AudioObjectID, so they must happen before the engine (and its
          // output AudioUnit) starts pulling format info from it.
          // Policy for a user-selected requestedDeviceId that no longer
-         // exists (unplugged since it was chosen): AudioUnitSetProperty
-         // below simply fails for an invalid AudioObjectID, its result is
-         // not checked, and the output AudioUnit is left on whatever it
-         // already defaults to - the system default output. This is a
-         // silent fallback, not a silent *ignore* of the user's choice: the
-         // request itself (gAudioOutputDeviceId in main.cpp) is untouched,
-         // so the device picker still shows what the user picked, and the
-         // next PollAudioRecovery-driven restart tries that same
-         // requestedDeviceId again rather than having quietly forgotten it.
-         // Deliberately not surfacing a dedicated "your device vanished,
-         // using default" message here - see
+         // resolves to a live output device (unplugged, or - as happens on
+         // every replug - reassigned by the HAL to a different device,
+         // possibly an input-only one): fall back to the system default
+         // output rather than handing AudioUnitSetProperty an ID that
+         // either fails outright or silently succeeds against the wrong
+         // device and leaves [engine startAndReturnError:] failing with
+         // kAudioUnitErr_FailedInitialization (-10875), i.e. no audio at
+         // all. This is a silent fallback, not a silent *ignore* of the
+         // user's choice: the request itself (gAudioOutputDeviceId in
+         // main.cpp) is untouched, so the device picker still shows what
+         // the user picked, and the next PollAudioRecovery-driven restart
+         // tries that same requestedDeviceId again rather than having
+         // quietly forgotten it. Deliberately not surfacing a dedicated
+         // "your device vanished, using default" message here - see
          // docs/plans/optimization/prompts/02-device-change-and-wake-recovery.md
          // rule 4.
          AudioObjectID targetDevice = (AudioObjectID)requestedDeviceId;
          if (targetDevice != 0)
          {
-            AudioUnit outputUnit = h->engine.outputNode.audioUnit;
-            AudioUnitSetProperty(outputUnit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
-                                 &targetDevice, sizeof(targetDevice));
+            uint32_t outChannels = 0;
+            const bool stillValidOutput = DeviceHasScope(targetDevice, kAudioObjectPropertyScopeOutput, outChannels);
+            if (stillValidOutput)
+            {
+               AudioUnit outputUnit = h->engine.outputNode.audioUnit;
+               const OSStatus setStatus = AudioUnitSetProperty(outputUnit, kAudioOutputUnitProperty_CurrentDevice,
+                                                                kAudioUnitScope_Global, 0, &targetDevice,
+                                                                sizeof(targetDevice));
+               if (setStatus != noErr)
+                  targetDevice = 0;
+            }
+            else
+            {
+               targetDevice = 0;
+            }
          }
-         else
+         if (targetDevice == 0)
          {
             AudioObjectPropertyAddress defaultAddr {
                kAudioHardwarePropertyDefaultOutputDevice, kAudioObjectPropertyScopeGlobal,
