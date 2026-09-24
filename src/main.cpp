@@ -43,6 +43,7 @@
 #include "platform/Platform.h"
 #include "IconsLucide.h"
 #include "core/SysInfo.h"
+#include "core/BenchReport.h"
 
 #if defined(_WIN32)
 #include <fcntl.h>
@@ -265,6 +266,7 @@ namespace
 #include "audio/dsp/CycleShaperKernel.h"
 #include "audio/dsp/SpecBlurKernel.h"
 #include "audio/dsp/SlicerDsp.h"
+#include "audio/dsp/ReverbKernel.h"
 
 namespace ed = ax::NodeEditor;
 
@@ -672,6 +674,45 @@ namespace
 
    std::vector<GraphNode> gNodes;
 
+   struct NodeInstanceData
+   {
+      int rank = 1;
+      int total = 1;
+   };
+   static std::unordered_map<int, NodeInstanceData> sNodeInstanceMap;
+   static uint64_t sNodeInstanceMapRevision = 0;
+
+   void InvalidateNodeInstanceCache()
+   {
+      sNodeInstanceMapRevision++;
+   }
+
+   void RefreshNodeInstanceMapIfNeeded()
+   {
+      static uint64_t sLastBuiltRevision = (uint64_t)-1;
+      static size_t sLastNodeCount = (size_t)-1;
+      if (sLastBuiltRevision == sNodeInstanceMapRevision && sLastNodeCount == gNodes.size())
+         return;
+
+      sLastBuiltRevision = sNodeInstanceMapRevision;
+      sLastNodeCount = gNodes.size();
+      sNodeInstanceMap.clear();
+
+      std::unordered_map<std::string, int> totalByTitle;
+      totalByTitle.reserve(gNodes.size());
+      for (const GraphNode& gn : gNodes)
+         totalByTitle[NodeTitle(gn)]++;
+
+      std::unordered_map<std::string, int> rankByTitle;
+      rankByTitle.reserve(totalByTitle.size());
+      for (const GraphNode& gn : gNodes)
+      {
+         const std::string title = NodeTitle(gn);
+         const int rank = ++rankByTitle[title];
+         sNodeInstanceMap[gn.index] = { rank, totalByTitle[title] };
+      }
+   }
+
    // Disambiguates nodes that share a title (e.g. three "predictive lfo"
    // nodes) so the Modulation Matrix and canvas headers can point at the
    // same node unambiguously. Ranked by `index` (monotonic spawn order,
@@ -686,20 +727,17 @@ namespace
    // 289-node patch. GetNodeInstanceIndex answers from a cache instead.
    int GetNodeInstanceIndexScan(const GraphNode& targetNode, int* outTotalCount)
    {
-      const std::string title = NodeTitle(targetNode);
-      int rank = 0;
-      int total = 0;
-      for (const GraphNode& gn : gNodes)
+      RefreshNodeInstanceMapIfNeeded();
+      auto it = sNodeInstanceMap.find(targetNode.index);
+      if (it != sNodeInstanceMap.end())
       {
-         if (NodeTitle(gn) != title)
-            continue;
-         ++total;
-         if (gn.index <= targetNode.index)
-            ++rank;
+         if (outTotalCount != nullptr)
+            *outTotalCount = it->second.total;
+         return it->second.rank;
       }
       if (outTotalCount != nullptr)
-         *outTotalCount = total;
-      return rank;
+         *outTotalCount = 1;
+      return 1;
    }
 
    // The one live field a node's title can follow after spawn (see
@@ -20510,19 +20548,20 @@ namespace
       std::vector<float> sig{ (float)sampleRate, type, freq, q, gain };
       FilterCurveCache& cache = gFilterCurveCache[gCurrentNodeIndex];
 
-      // Throttle the full recompute while a drag is actively changing the
+      // Throttle the recompute while a drag or modulation is actively changing the
       // signature every frame - see the FilterCurveCache comment above for
-      // the full reasoning. `sigChanged` catches the drag case;
+      // the full reasoning. `sigChanged` catches continuous changes;
       // `cache.signature != sig` is what actually needs a recompute (true
-      // the first frame after any change, drag or not).
+      // the first frame after any change, drag or modulation).
       const bool sigChanged = (cache.lastSeenSignature != sig);
       cache.lastSeenSignature = sig;
       const bool dragging = sigChanged && ImGui::IsMouseDown(ImGuiMouseButton_Left);
       // A modulation/expression/macro streak: changing again, with no drag.
       const bool inMotion = sigChanged && !dragging && cache.changedLastFrame;
       cache.changedLastFrame = sigChanged;
+      const bool continuousChange = dragging || inMotion;
       const double now = ImGui::GetTime();
-      const bool throttled = dragging && cache.lastRecomputeTime >= 0.0 &&
+      const bool throttled = continuousChange && cache.lastRecomputeTime >= 0.0 &&
                              (now - cache.lastRecomputeTime) < kFilterCurveThrottleSec;
       const bool motionThrottled = inMotion && now < cache.nextDue;
       // Coarser while a drag or a motion streak is live (see
@@ -40630,6 +40669,28 @@ namespace
          {
             entry.node = audioNode;
             entry.noteOnly = dynamic_cast<INoteSource*>(node) != nullptr || node->AudioNodeForNotePorts() != nullptr;
+            if (auto* aen = dynamic_cast<AudioEffectNode*>(node))
+            {
+               const std::string& name = aen->Def().name;
+               if (name == "Audio Filter") entry.stageId = kAudioStageFilter;
+               else if (name == "Wavetable Shaper" || name == "Drive" || name == "Bitcrush" || name == "Cycle Shaper" || name == "Transient Shaper") entry.stageId = kAudioStageShaper;
+               else if (name == "Delay") entry.stageId = kAudioStageDelay;
+               else if (name == "Reverb") entry.stageId = kAudioStageReverb;
+               else if (name == "Dynamics") entry.stageId = kAudioStageDynamics;
+               else entry.stageId = kAudioStageOther;
+            }
+            else if (dynamic_cast<SamplerNode*>(node) || dynamic_cast<WavetableNode*>(node) || dynamic_cast<OscillatorNode*>(node))
+            {
+               entry.stageId = kAudioStageSynths;
+            }
+            else if (dynamic_cast<MixerNode*>(node))
+            {
+               entry.stageId = kAudioStageMixer;
+            }
+            else
+            {
+               entry.stageId = kAudioStageOther;
+            }
             const int numOuts = std::clamp(audioNode->AudioOutputCount(), 1, kAudioMaxNodeOutputs);
             entry.numOutputs = numOuts;
             entry.outputBufferIndex = nextBufferIndex;
@@ -40688,6 +40749,29 @@ namespace
                std::chrono::steady_clock::now() - start).count();
             fprintf(stderr, "[perf] %s: %.3f ms\n", label, ms);
          }
+      }
+   };
+
+   struct ConditionalStageTimer
+   {
+      Bench::PercentileRing* mSink;
+      double mStart;
+      bool mStopped = false;
+      explicit ConditionalStageTimer(Bench::PercentileRing* sink)
+         : mSink(sink), mStart(sink ? Bench::ScopedStageTimer::NowMs() : 0.0)
+      {
+      }
+      void Stop()
+      {
+         if (mSink && !mStopped)
+         {
+            mSink->Push(Bench::ScopedStageTimer::NowMs() - mStart);
+            mStopped = true;
+         }
+      }
+      ~ConditionalStageTimer()
+      {
+         Stop();
       }
    };
 
@@ -49698,6 +49782,119 @@ static bool RunReverbFixture()
       printf("DSPTEST reverb long tail: finite %s, flushed to zero by end %s  %s\n", finiteOk ? "yes" : "no",
              flushedOk ? "yes" : "no", tailOk ? "OK" : "FAIL");
       all &= tailOk;
+   }
+
+   // 6) SIMD vs Scalar A/B numerical equivalence: test across multiple configurations
+   //    (digital default, analog lush, small room mono) with impulse, sine tone, and noise.
+   {
+      bool simdEquivOk = true;
+      float maxDiff = 0.0f;
+      const int testFrames = 2048;
+      const int blockSize = 256;
+
+      const EffectDef* reverbDef = nullptr;
+      for (const EffectDef& d : GetEffectDefs())
+         if (d.name == "Reverb")
+            reverbDef = &d;
+
+      struct TestConfig {
+         float size;
+         float decay;
+         float damping;
+         float predelay;
+         float width;
+         float analog;
+      };
+
+      const TestConfig configs[] = {
+         { 0.5f, 1.5f, 0.2f, 10.0f, 0.8f, 0.0f },
+         { 0.8f, 2.5f, 0.6f, 25.0f, 1.0f, 1.0f },
+         { 0.2f, 0.5f, 0.9f, 0.0f, 0.0f, 0.0f },
+      };
+
+      for (const auto& cfg : configs)
+      {
+         if (!reverbDef) break;
+
+         AudioEffectNode nodeSimd(*reverbDef);
+         *nodeSimd.ParamPtr("size") = cfg.size;
+         *nodeSimd.ParamPtr("decay") = cfg.decay;
+         *nodeSimd.ParamPtr("damping") = cfg.damping;
+         *nodeSimd.ParamPtr("predelay") = cfg.predelay;
+         *nodeSimd.ParamPtr("width") = cfg.width;
+         *nodeSimd.ParamPtr("analog") = cfg.analog;
+
+         AudioEffectNode nodeScalar(*reverbDef);
+         *nodeScalar.ParamPtr("size") = cfg.size;
+         *nodeScalar.ParamPtr("decay") = cfg.decay;
+         *nodeScalar.ParamPtr("damping") = cfg.damping;
+         *nodeScalar.ParamPtr("predelay") = cfg.predelay;
+         *nodeScalar.ParamPtr("width") = cfg.width;
+         *nodeScalar.ParamPtr("analog") = cfg.analog;
+
+         ReverbKernel rkSimd, rkScalar;
+         rkSimd.PrepareToPlay(sampleRate, blockSize);
+         rkScalar.PrepareToPlay(sampleRate, blockSize);
+         rkSimd.PushParams(nodeSimd, sampleRate);
+         rkScalar.PushParams(nodeScalar, sampleRate);
+
+         std::vector<float> inL(testFrames), inR(testFrames);
+         for (int i = 0; i < testFrames; i++)
+         {
+            float s = (i == 0) ? 1.0f : 0.0f;
+            s += 0.3f * std::sin(2.0f * (float)M_PI * 440.0f * (float)i / (float)sampleRate);
+            s += 0.05f * ((float)(i % 17) / 17.0f - 0.5f);
+            inL[i] = s;
+            inR[i] = s * 0.9f;
+         }
+
+         float inChL[blockSize], inChR[blockSize];
+         float* inChannels[2] = { inChL, inChR };
+         AudioBuffer inBuf;
+         inBuf.channels = inChannels;
+         inBuf.numChannels = 2;
+         inBuf.numFrames = blockSize;
+
+         float outSimdL[blockSize], outSimdR[blockSize];
+         float* outSimdChannels[2] = { outSimdL, outSimdR };
+         AudioBuffer outSimdBuf;
+         outSimdBuf.channels = outSimdChannels;
+         outSimdBuf.numChannels = 2;
+         outSimdBuf.numFrames = blockSize;
+
+         float outScalarL[blockSize], outScalarR[blockSize];
+         float* outScalarChannels[2] = { outScalarL, outScalarR };
+         AudioBuffer outScalarBuf;
+         outScalarBuf.channels = outScalarChannels;
+         outScalarBuf.numChannels = 2;
+         outScalarBuf.numFrames = blockSize;
+
+         for (int offset = 0; offset < testFrames; offset += blockSize)
+         {
+            for (int k = 0; k < blockSize; k++)
+            {
+               inChL[k] = inL[offset + k];
+               inChR[k] = inR[offset + k];
+            }
+
+            rkSimd.ProcessBlockSimd(inBuf, nullptr, outSimdBuf);
+            rkScalar.ProcessBlockScalar(inBuf, nullptr, outScalarBuf);
+
+            for (int ch = 0; ch < 2; ch++)
+            {
+               for (int k = 0; k < blockSize; k++)
+               {
+                  const float diff = std::fabs(outSimdBuf.channels[ch][k] - outScalarBuf.channels[ch][k]);
+                  maxDiff = std::max(maxDiff, diff);
+                  if (diff > 1.0e-5f)
+                     simdEquivOk = false;
+               }
+            }
+         }
+      }
+      printf("DSPTEST reverb SIMD vs Scalar A/B: max diff %.2e (tol 1.0e-5)  %s\n",
+             maxDiff, simdEquivOk ? "OK" : "FAIL");
+      all &= simdEquivOk;
    }
 
    return all;
@@ -64577,6 +64774,14 @@ int RunSyphonPatchTest()
 
 int main(int argc, char** argv)
 {
+   const double sMainStartMs = Bench::ScopedStageTimer::NowMs();
+   const double sMainRssStartMb = Bench::ProcessRssMb();
+   static int sBenchB2Render3DIdx = -1;
+   static int sBenchB2OutputIdx = -1;
+   static std::string sBenchB2Variant;
+   static int sBenchB4CamIdx = -1;
+   static int sBenchB4LfoIdx = -1;
+
    // No-op on macOS (which gets a `.ips` report for free); on Windows this is
    // the only thing standing between a crash and a completely silent exit,
    // since main.cpp links WIN32_EXECUTABLE (no console, stderr goes nowhere).
@@ -64868,6 +65073,7 @@ int main(int argc, char** argv)
    }
 #endif
 
+   const double tPreWindow = Bench::ScopedStageTimer::NowMs();
    Platform::InitDocumentHandlingPreGlfw();
    if (!glfwInit())
    {
@@ -64954,6 +65160,7 @@ int main(int argc, char** argv)
    // as the window's own close button, so one callback gates both.
    glfwSetWindowCloseCallback(window, [](GLFWwindow* w) { RequestClose(w); });
 
+   const double tWindowGl = Bench::ScopedStageTimer::NowMs();
    IMGUI_CHECKVERSION();
    ImGui::CreateContext();
    ImGui::StyleColorsDark();
@@ -65074,6 +65281,7 @@ int main(int argc, char** argv)
    // Installed after the backend so it chains rather than replacing ImGui's.
    glfwSetDropCallback(window, OnFilesDropped);
    ImGui_ImplOpenGL3_Init("#version 150");
+   const double tImGuiFonts = Bench::ScopedStageTimer::NowMs();
 
    // Keep all mutable state (settings, indexes, imgui.ini) in the per-user
    // application-data directory rather than next to the executable.
@@ -65086,6 +65294,7 @@ int main(int argc, char** argv)
    // the cached index is shown instantly and rebuilding it is the user's
    // explicit Rescan.
    gPluginScanner.LoadFromDisk();
+   const double tScanners = Bench::ScopedStageTimer::NowMs();
 
    // One GitHub Releases request, once per launch - see src/core/UpdateCheck.h.
    // No-ops under the self-test env vars, so headless/CI runs never touch
@@ -67180,6 +67389,638 @@ int main(int argc, char** argv)
          for (GraphNode& gn : gNodes)
             gn.showParams = true;
       }
+      else if (const char* bench5Arg = getenv("INFINITE_BENCH_B5NODES"))
+      {
+         // B5(b) node-count scaling fixture (docs/plans/perf/benchmark-suite.md
+         // §4). Spawns a mixed set of representative node types laid out on a
+         // grid - not stacked at the origin like INFINITE_MIXEDSTRESSTEST,
+         // which is a known flaw of that fixture (benchmark-suite.md §2) -
+         // and leaves them unconnected: the thing this isolates is per-node,
+         // per-frame UI/bookkeeping overhead (header title building via
+         // GetNodeInstanceIndex, param drawing) as node COUNT grows, not
+         // cook-graph cost. INFINITE_BENCH_B5NODES=<n>.
+         const long n = std::max(1L, atol(bench5Arg));
+         static const char* kTypes[] = { "Shape", "Noise", "invert", "gaussianblur", "LFO" };
+         static const char* kCats[]  = { "Source", "Source", "Compositing", "Effects", "Modulators" };
+         const int cols = 12;
+         for (long i = 0; i < n; i++)
+         {
+            const int t = (int)(i % 5);
+            const float x = (float)(i % cols) * 260.0f;
+            const float y = (float)(i / cols) * 200.0f;
+            SpawnNode(kTypes[t], kCats[t], x, y);
+         }
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+      }
+      else if (const char* bench5cArg = (getenv("INFINITE_BENCH_B5STAGES") ? getenv("INFINITE_BENCH_B5STAGES") : getenv("INFINITE_BENCH_B5C")))
+      {
+         // B5(c) per-stage CPU timing fixture (docs/plans/perf/benchmark-suite.md §4).
+         // Spawns a mixed set of nodes on a grid (same shape as B5(b)) and
+         // records per-stage CPU times across the sampled window.
+         long n = atol(bench5cArg);
+         if (n <= 1) n = 100;
+         static const char* kTypes[] = { "Shape", "Noise", "invert", "gaussianblur", "LFO" };
+         static const char* kCats[]  = { "Source", "Source", "Compositing", "Effects", "Modulators" };
+         const int cols = 12;
+         for (long i = 0; i < n; i++)
+         {
+            const int t = (int)(i % 5);
+            const float x = (float)(i % cols) * 260.0f;
+            const float y = (float)(i / cols) * 200.0f;
+            SpawnNode(kTypes[t], kCats[t], x, y);
+         }
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+      }
+      else if (const char* bench5fArg = getenv("INFINITE_BENCH_B5LOADSAVE"))
+      {
+         // B5(f) patch load/save time fixture (benchmark-suite.md §4). Same
+         // mixed-node grid as B5(b)/B5(c) so the three are directly
+         // comparable by node count. INFINITE_BENCH_B5LOADSAVE=<n>.
+         long n = atol(bench5fArg);
+         if (n <= 1) n = 100;
+         static const char* kTypes[] = { "Shape", "Noise", "invert", "gaussianblur", "LFO" };
+         static const char* kCats[]  = { "Source", "Source", "Compositing", "Effects", "Modulators" };
+         const int cols = 12;
+         for (long i = 0; i < n; i++)
+         {
+            const int t = (int)(i % 5);
+            const float x = (float)(i % cols) * 260.0f;
+            const float y = (float)(i / cols) * 200.0f;
+            SpawnNode(kTypes[t], kCats[t], x, y);
+         }
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+      }
+      else if (const char* bench5gArg = getenv("INFINITE_BENCH_B5UNDO"))
+      {
+         // B5(g) undo-snapshot time fixture (benchmark-suite.md §4). Same
+         // mixed-node grid as B5(b)/B5(c)/B5(f). INFINITE_BENCH_B5UNDO=<n>.
+         long n = atol(bench5gArg);
+         if (n <= 1) n = 100;
+         static const char* kTypes[] = { "Shape", "Noise", "invert", "gaussianblur", "LFO" };
+         static const char* kCats[]  = { "Source", "Source", "Compositing", "Effects", "Modulators" };
+         const int cols = 12;
+         for (long i = 0; i < n; i++)
+         {
+            const int t = (int)(i % 5);
+            const float x = (float)(i % cols) * 260.0f;
+            const float y = (float)(i / cols) * 200.0f;
+            SpawnNode(kTypes[t], kCats[t], x, y);
+         }
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+      }
+      else if (const char* bench4Arg = getenv("INFINITE_BENCH_B4SCALE"))
+      {
+         // B4 Complex 3D fixture (docs/plans/perf/benchmark-suite.md §4). One
+         // Render 3D at 1080p, 4x MSAA, ACES, with all four geometry slots
+         // busy and nothing 2D after it except Output, so the frame is the 3D
+         // renderer's cost alone:
+         //   geo A  Ocean (resolution by scale)
+         //   geo B  Instance on Points - cubes on a sphere's faces (1k/5k/20k)
+         //   geo C  Torus -> Array (radial, 8/24/64 copies) -> metal Material
+         //   geo D  Sphere -> glass Material (transmission, so the snapshot +
+         //          transmissive pass runs)
+         // Sun + point + spot light, a synthetic equirect HDRI, and shadows
+         // from the sun at INFINITE_BENCH_B4SHADOW = off/1024/2048/4096.
+         // anim=1 (default) plays the transport (the ocean moves) and an LFO
+         // orbits the camera; anim=0 leaves both still, so the scene caches
+         // after the first cook and output_hash is stable run to run.
+         // INFINITE_BENCH_B4PASSES=1 splits Render 3D's GPU time into
+         // r3d_shadow / r3d_opaque / r3d_transmissive / r3d_resolve.
+         std::string scaleStr = bench4Arg;
+         int instances = 1000, arrayCount = 8, oceanRes = 96, shellDetail = 60;
+         if (scaleStr == "m") { instances = 5000; arrayCount = 24; oceanRes = 160; shellDetail = 80; }
+         else if (scaleStr == "l") { instances = 20000; arrayCount = 64; oceanRes = 256; shellDetail = 120; }
+         else scaleStr = "s";
+
+         std::string shadowStr = getenv("INFINITE_BENCH_B4SHADOW") ? getenv("INFINITE_BENCH_B4SHADOW") : "2048";
+         int shadowQ = 1;
+         bool shadowOn = true;
+         if (shadowStr == "off" || shadowStr == "0") { shadowOn = false; shadowStr = "off"; }
+         else if (shadowStr == "1024") shadowQ = 0;
+         else if (shadowStr == "4096") shadowQ = 2;
+         else shadowStr = "2048";
+
+         const char* animEnv = getenv("INFINITE_BENCH_B4ANIM");
+         const bool isAnim = !(animEnv && (strcmp(animEnv, "0") == 0 || strcmp(animEnv, "static") == 0));
+         const bool passSplit = getenv("INFINITE_BENCH_B4PASSES") != nullptr;
+         Bench::Render3DPassSplit() = passSplit;
+
+         sBenchB2Variant = "scale=" + scaleStr + ",shadow=" + shadowStr + ",anim=" + (isAnim ? "1" : "0");
+         if (passSplit)
+            sBenchB2Variant += ",passes=1";
+         if (const char* t = getenv("INFINITE_BENCH_GPUTIMERS"); t && strcmp(t, "0") == 0)
+            sBenchB2Variant += ",gputimers=0";
+
+         // Synthetic equirect HDRI: sky-to-ground gradient plus one hot sun
+         // texel block, written as a real .hdr so the stb decode, 16F upload
+         // and mip chain all run exactly as for a user's file.
+         const int ew = 1024, eh = 512;
+         std::vector<float> envPixels((size_t)ew * eh * 3);
+         for (int y = 0; y < eh; y++)
+         {
+            const float v = (float)y / (float)(eh - 1); // 0 = top
+            for (int x = 0; x < ew; x++)
+            {
+               float* px = &envPixels[((size_t)y * ew + x) * 3];
+               const float sky = std::max(0.0f, 1.0f - 2.0f * v);
+               const float ground = std::max(0.0f, 2.0f * v - 1.0f);
+               px[0] = 0.10f + 0.15f * sky - 0.06f * ground;
+               px[1] = 0.12f + 0.25f * sky - 0.07f * ground;
+               px[2] = 0.15f + 0.45f * sky - 0.10f * ground;
+               const int dx = x - ew / 3, dy = y - eh / 5;
+               if (dx * dx + dy * dy < 36)
+                  px[0] = px[1] = px[2] = 60.0f;
+            }
+         }
+         const std::string envPath = TmpPath("infinite_bench_b4_env.hdr");
+         stbi_write_hdr(envPath.c_str(), ew, eh, 3, envPixels.data());
+
+         // Indices are captured as ints and re-resolved through
+         // FindNodeByIndex, never held as GraphNode* across SpawnNode.
+         auto nodeAt = [](int idx) { return FindNodeByIndex(idx)->node.get(); };
+
+         const int oceanIdx = SpawnNode("Ocean", "3D", 0.0f, 0.0f)->index;
+         auto* ocean = static_cast<OceanNode*>(nodeAt(oceanIdx));
+         ocean->resolution = oceanRes;
+         ocean->uniformScale = 3.0f;
+         ocean->posY = -0.6f;
+
+         const int shellIdx = SpawnNode("Sphere", "3D", 0.0f, 260.0f)->index;
+         auto* shell = static_cast<GeometryNode*>(nodeAt(shellIdx));
+         shell->sides = shellDetail;
+         shell->detail = shellDetail;
+         shell->uniformScale = 1.4f;
+         shell->posY = 0.9f;
+         const int cubeIdx = SpawnNode("Cube", "3D", 0.0f, 520.0f)->index;
+         const int instIdx = SpawnNode("Instance on Points", "3D", 260.0f, 260.0f)->index;
+         auto* inst = static_cast<InstanceOnPointsNode*>(nodeAt(instIdx));
+         inst->pointSource = static_cast<GeometryNode*>(nodeAt(shellIdx));
+         inst->instanceShape = static_cast<GeometryNode*>(nodeAt(cubeIdx));
+         inst->pointMode = 2; // faces
+         inst->maxPoints = instances;
+         inst->instanceScale = (scaleStr == "l") ? 0.035f : (scaleStr == "m" ? 0.05f : 0.08f);
+         inst->inheritMaterial = false;
+         inst->metallic = 0.3f;
+         inst->roughness = 0.35f;
+
+         const int torusIdx = SpawnNode("Torus", "3D", 0.0f, 780.0f)->index;
+         auto* torus = static_cast<GeometryNode*>(nodeAt(torusIdx));
+         torus->sides = 24;
+         torus->detail = 32;
+         torus->uniformScale = 0.35f;
+         const int arrIdx = SpawnNode("Array", "3D", 260.0f, 780.0f)->index;
+         auto* arr = static_cast<GeometryOpNode*>(nodeAt(arrIdx));
+         arr->input = torus;
+         arr->op = GeometryOpNode::kArray;
+         arr->count = arrayCount;
+         arr->radial = true;
+         arr->radius = 2.6f;
+         const int metalIdx = SpawnNode("Material", "3D", 520.0f, 780.0f)->index;
+         auto* metal = static_cast<MaterialNode*>(nodeAt(metalIdx));
+         metal->input = arr;
+         metal->metallic = 1.0f;
+         metal->roughness = 0.18f;
+         metal->color[0] = 0.95f; metal->color[1] = 0.78f; metal->color[2] = 0.45f;
+
+         const int glassGeoIdx = SpawnNode("Sphere", "3D", 0.0f, 1040.0f)->index;
+         auto* glassGeo = static_cast<GeometryNode*>(nodeAt(glassGeoIdx));
+         glassGeo->sides = 48;
+         glassGeo->detail = 48;
+         glassGeo->uniformScale = 0.7f;
+         glassGeo->posX = -2.2f;
+         glassGeo->posY = 0.5f;
+         glassGeo->posZ = 1.2f;
+         const int glassIdx = SpawnNode("Material", "3D", 260.0f, 1040.0f)->index;
+         auto* glass = static_cast<MaterialNode*>(nodeAt(glassIdx));
+         glass->input = glassGeo;
+         glass->transmission = 0.95f;
+         glass->roughness = 0.05f;
+         glass->transmissionRoughness = 0.1f;
+
+         const int camIdx = SpawnNode("Camera", "3D", 520.0f, 0.0f)->index;
+         auto* cam = static_cast<CameraNode*>(nodeAt(camIdx));
+         cam->distance = 7.0f;
+         cam->elevation = 24.0f;
+         cam->azimuth = 30.0f;
+         cam->targetY = 0.5f;
+
+         static const int kLightTypes[] = { 2 /*sun*/, 1 /*point*/, 4 /*spot*/ };
+         int lightIdx[3];
+         for (int l = 0; l < 3; l++)
+         {
+            lightIdx[l] = SpawnNode("Light", "3D", 520.0f, 260.0f + 260.0f * l)->index;
+            auto* light = static_cast<LightNode*>(nodeAt(lightIdx[l]));
+            light->type = kLightTypes[l];
+            light->azimuth = 40.0f + 110.0f * l;
+            light->elevation = 55.0f - 10.0f * l;
+            light->intensity = (l == 0) ? 2.0f : 1.2f;
+         }
+
+         const int envIdx = SpawnNode("HDRI", "3D", 520.0f, 1040.0f)->index;
+         static_cast<EnvironmentNode*>(nodeAt(envIdx))->Load(envPath);
+
+         const int renderIdx = SpawnNode("Render 3D", "3D", 780.0f, 0.0f)->index;
+         auto* render = static_cast<Render3DNode*>(nodeAt(renderIdx));
+         render->geometry[0] = static_cast<OceanNode*>(nodeAt(oceanIdx));
+         render->geometry[1] = static_cast<InstanceOnPointsNode*>(nodeAt(instIdx));
+         render->geometry[2] = static_cast<MaterialNode*>(nodeAt(metalIdx));
+         render->geometry[3] = static_cast<MaterialNode*>(nodeAt(glassIdx));
+         render->camera = static_cast<CameraNode*>(nodeAt(camIdx));
+         for (int l = 0; l < 3; l++)
+            render->lights[l] = static_cast<LightNode*>(nodeAt(lightIdx[l]));
+         render->envInput.Connect(nodeAt(envIdx));
+         render->width = 1920.0f;
+         render->height = 1080.0f;
+         render->samples = 2; // 4x
+         render->tonemap = 1; // ACES
+         render->shadowsEnabled = shadowOn;
+         render->shadowQuality = shadowQ;
+         sBenchB2Render3DIdx = renderIdx;
+
+         const int outIdx = SpawnNode("Output", "Utility", 1040.0f, 0.0f)->index;
+         if (ImageCable* in = CableFor(*FindNodeByIndex(outIdx), 0))
+            in->Connect(nodeAt(renderIdx));
+         sBenchB2OutputIdx = outIdx;
+
+         if (isAnim)
+         {
+            // The LFO is bound to the camera's "orbit" slider at frame 4, once
+            // the UI has registered it (see the ClearFrameParams call site).
+            sBenchB4CamIdx = camIdx;
+            sBenchB4LfoIdx = SpawnNode("LFO", "Modulators", 520.0f, -260.0f)->index;
+            Transport::Instance().SetPlaying(true);
+         }
+         else
+         {
+            // The transport runs from startup; static must stop it or the
+            // Ocean (driven by Transport::Beats) rebuilds every frame.
+            Transport::Instance().SetPlaying(false);
+         }
+
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+      }
+      else if (getenv("INFINITE_BENCH_B2") != nullptr ||
+               getenv("INFINITE_BENCH_B2VISUALS") != nullptr ||
+               getenv("INFINITE_BENCH_B2SCALE") != nullptr)
+      {
+         // B2 Heavy visuals fixture (docs/plans/perf/benchmark-suite.md §4).
+         // Geometry (Torus / Sphere / Point Cloud) -> Render 3D 1080p -> 10-30
+         // compositing/effect nodes in series -> Output.
+         // Static (anim=0) and animated (anim=1, default) variants.
+         std::string scaleStr = "s";
+         int effectCount = 10;
+         int triDetail = 30;
+         bool isAnim = true;
+
+         const char* bench2Arg = getenv("INFINITE_BENCH_B2SCALE");
+         if (!bench2Arg) bench2Arg = getenv("INFINITE_BENCH_B2VISUALS");
+         if (!bench2Arg) bench2Arg = getenv("INFINITE_BENCH_B2");
+
+         std::string arg(bench2Arg ? bench2Arg : "s");
+         if (arg == "s" || arg == "small" || arg == "10") { scaleStr = "s"; effectCount = 10; triDetail = 30; }
+         else if (arg == "m" || arg == "medium" || arg == "20") { scaleStr = "m"; effectCount = 20; triDetail = 60; }
+         else if (arg == "l" || arg == "large" || arg == "30") { scaleStr = "l"; effectCount = 30; triDetail = 120; }
+         else if (atoi(arg.c_str()) > 1) {
+            effectCount = atoi(arg.c_str());
+            if (effectCount <= 10) { scaleStr = "s"; triDetail = 30; }
+            else if (effectCount <= 20) { scaleStr = "m"; triDetail = 60; }
+            else { scaleStr = "l"; triDetail = 120; }
+         }
+
+         if (const char* animEnv = getenv("INFINITE_BENCH_B2ANIM"))
+         {
+            if (strcmp(animEnv, "0") == 0 || strcmp(animEnv, "false") == 0 || strcmp(animEnv, "static") == 0)
+               isAnim = false;
+            else
+               isAnim = true;
+         }
+
+         sBenchB2Variant = std::string("scale=") + scaleStr + ",anim=" + (isAnim ? "1" : "0");
+         if (getenv("INFINITE_BENCH_B2GPUNODES") != nullptr)
+            sBenchB2Variant += ",gpunodes=1";
+         if (const char* t = getenv("INFINITE_BENCH_GPUTIMERS"); t && strcmp(t, "0") == 0)
+            sBenchB2Variant += ",gputimers=0";
+
+         const float xBase = 0.0f;
+         const float yBase = 0.0f;
+
+         int torusIdx = SpawnNode("Torus", "3D", xBase, yBase)->index;
+         auto* torus = static_cast<GeometryNode*>(FindNodeByIndex(torusIdx)->node.get());
+         torus->sides = triDetail;
+         torus->detail = triDetail;
+
+         int opIdx = SpawnNode("Twist", "3D", xBase + 260.0f, yBase)->index;
+         auto* op = static_cast<GeometryOpNode*>(FindNodeByIndex(opIdx)->node.get());
+         op->input = torus;
+         op->op = GeometryOpNode::kTwist;
+         op->amount = 1.5f;
+
+         int matIdx = SpawnNode("Material", "3D", xBase + 520.0f, yBase)->index;
+         auto* mat = static_cast<MaterialNode*>(FindNodeByIndex(matIdx)->node.get());
+         mat->input = op;
+         mat->roughness = 0.35f;
+         mat->metallic = 0.65f;
+         mat->color[0] = 0.85f;
+         mat->color[1] = 0.45f;
+         mat->color[2] = 0.20f;
+
+         int camIdx = SpawnNode("Camera", "3D", xBase + 520.0f, yBase + 260.0f)->index;
+         auto* cam = static_cast<CameraNode*>(FindNodeByIndex(camIdx)->node.get());
+         cam->distance = 4.2f;
+         cam->elevation = 20.0f;
+         cam->azimuth = 45.0f;
+
+         int lightIdx = SpawnNode("Light", "3D", xBase + 520.0f, yBase + 520.0f)->index;
+         auto* light = static_cast<LightNode*>(FindNodeByIndex(lightIdx)->node.get());
+         light->intensity = 1.8f;
+
+         int renderIdx = SpawnNode("Render 3D", "3D", xBase + 780.0f, yBase)->index;
+         auto* render = static_cast<Render3DNode*>(FindNodeByIndex(renderIdx)->node.get());
+         render->geometry[0] = mat;
+         render->camera = cam;
+         render->lights[0] = light;
+         render->width = 1920.0f;
+         render->height = 1080.0f;
+         sBenchB2Render3DIdx = renderIdx;
+
+         if (scaleStr == "m" || scaleStr == "l")
+         {
+            int sphereIdx = SpawnNode("Sphere", "3D", xBase, yBase + 260.0f)->index;
+            auto* sphere = static_cast<GeometryNode*>(FindNodeByIndex(sphereIdx)->node.get());
+            sphere->sides = triDetail;
+            sphere->detail = triDetail;
+
+            int ptsIdx = SpawnNode("Mesh to Points", "3D", xBase + 260.0f, yBase + 260.0f)->index;
+            auto* pts = static_cast<MeshToPointsNode*>(FindNodeByIndex(ptsIdx)->node.get());
+            pts->input = sphere;
+
+            int cubeIdx = SpawnNode("Cube", "3D", xBase + 260.0f, yBase + 520.0f)->index;
+            auto* cube = static_cast<GeometryNode*>(FindNodeByIndex(cubeIdx)->node.get());
+
+            int instIdx = SpawnNode("Instance on Points", "3D", xBase + 520.0f, yBase + 780.0f)->index;
+            auto* inst = static_cast<InstanceOnPointsNode*>(FindNodeByIndex(instIdx)->node.get());
+            inst->pointSource = pts;
+            inst->instanceShape = cube;
+            inst->instanceScale = 0.05f;
+            inst->maxPoints = (scaleStr == "l") ? 8000 : 2000;
+            render->geometry[1] = inst;
+         }
+
+         struct EffectDef {
+            const char* name;
+            const char* cat;
+         };
+         static const EffectDef kEffectDefs[] = {
+            { "gaussianblur", "Effects" },
+            { "color adjustments", "Compositing" },
+            { "bloom", "Effects" },
+            { "vignette", "Effects" },
+            { "diffuseglow", "Effects" },
+            { "glitch", "Effects" },
+            { "lensdistortion", "Effects" },
+            { "pixelate", "Effects" },
+            { "twirl", "Effects" },
+            { "invert", "Compositing" },
+            { "posterize", "Compositing" },
+            { "threshold", "Compositing" },
+         };
+         const int kNumEffectTypes = sizeof(kEffectDefs) / sizeof(kEffectDefs[0]);
+
+         int prevNodeIdx = renderIdx;
+         float curX = xBase + 1040.0f;
+         float curY = yBase;
+
+         int lfoIdx = -1;
+         if (isAnim)
+         {
+            lfoIdx = SpawnNode("LFO", "Modulators", xBase - 260.0f, yBase)->index;
+            Modulation::Instance().Bind(opIdx, 0, lfoIdx, 0);
+            Modulation::Instance().Bind(camIdx, 0, lfoIdx, 0);
+         }
+
+         for (int i = 0; i < effectCount; i++)
+         {
+            const EffectDef& eff = kEffectDefs[i % kNumEffectTypes];
+            // Glitch reads Transport::Seconds() (uTime), which would make the
+            // static variant's output_hash differ run to run and defeat the
+            // quality guard. Emboss is a time-free single-pass stand-in.
+            const char* effName = (!isAnim && strcmp(eff.name, "glitch") == 0) ? "emboss" : eff.name;
+            const float nodeX = curX + (float)(i % 8) * 260.0f;
+            const float nodeY = curY + (float)(i / 8) * 200.0f;
+
+            int effIdx = SpawnNode(effName, eff.cat, nodeX, nodeY)->index;
+            if (GraphNode* curGn = FindNodeByIndex(effIdx))
+            {
+               if (GraphNode* prevGn = FindNodeByIndex(prevNodeIdx))
+               {
+                  if (ImageCable* in = CableFor(*curGn, 0))
+                     in->Connect(prevGn->node.get());
+               }
+            }
+
+            if (isAnim && lfoIdx >= 0)
+               Modulation::Instance().Bind(effIdx, 0, lfoIdx, 0);
+
+            prevNodeIdx = effIdx;
+         }
+
+         const float outX = curX + (float)(effectCount % 8) * 260.0f + 260.0f;
+         const float outY = curY + (float)(effectCount / 8) * 200.0f;
+         int outIdx = SpawnNode("Output", "Utility", outX, outY)->index;
+         if (GraphNode* outGn = FindNodeByIndex(outIdx))
+         {
+            if (GraphNode* prevGn = FindNodeByIndex(prevNodeIdx))
+            {
+               if (ImageCable* in = CableFor(*outGn, 0))
+                  in->Connect(prevGn->node.get());
+            }
+         }
+         sBenchB2OutputIdx = outIdx;
+
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+      }
+      else if (const char* bench1Arg = getenv("INFINITE_BENCH_B1VOICES"))
+      {
+         // B1 Heavy audio fixture (docs/plans/perf/benchmark-suite.md §4).
+         // N voices, each Sampler/Wavetable/Oscillator (cycled) through a
+         // per-voice chain: Audio Filter -> Wavetable Shaper (the closest
+         // registered node to the doc's illustrative "Drive" - there is no
+         // node literally named Drive) -> Delay -> Reverb -> Dynamics, summed
+         // through a tree of Mixers (MixerNode::kMaxSlots=12, so >12 voices
+         // needs a second level) into one Audio Out. One shared LFO is bound
+         // to every voice's Filter `mix` (AudioEffectNode::VisitParams always
+         // puts `mix` at param index 0 - see AudioEffectNode.cpp - so this is
+         // safe without knowing any effect-specific param layout) as the
+         // "modulated params" load case the doc asks for: worst case is every
+         // voice's modulation evaluated every block, not just one.
+         //
+         // Real per-voice source/effect indices are captured as ints and
+         // re-resolved through FindNodeByIndex() rather than held as
+         // GraphNode* across later SpawnNode calls, and rather than indexed
+         // directly into gNodes[] - GraphNode::index is a stable id, not a
+         // vector slot, so gNodes[idx] silently breaks the moment any
+         // earlier node in the session was removed. See codebase-
+         // navigation's note on SpawnNode's dangling-prone GraphNode*.
+         const long numVoices = std::max(1L, std::min(64L, atol(bench1Arg)));
+         static const char* kVoiceTypes[] = { "Sampler", "Wavetable", "Oscillator" };
+         const std::string samplerWav = TmpPath("infinite_bench_b1_voice.wav");
+         {
+            const int fixtureFrames = 2205;
+            std::vector<int16_t> fixturePcm(fixtureFrames);
+            for (int i = 0; i < fixtureFrames; i++)
+            {
+               const float t = (float)i / (float)(fixtureFrames - 1);
+               fixturePcm[i] = (int16_t)(sinf(t * 30.0f) * 30000.0f);
+            }
+            std::ofstream f(samplerWav, std::ios::binary);
+            auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
+            auto writeU16 = [&](uint16_t v) { f.write((const char*)&v, 2); };
+            const uint32_t dataSize = (uint32_t)(fixturePcm.size() * sizeof(int16_t));
+            f.write("RIFF", 4); writeU32(36 + dataSize); f.write("WAVE", 4);
+            f.write("fmt ", 4); writeU32(16); writeU16(1); writeU16(1);
+            writeU32(44100); writeU32(44100 * 2); writeU16(2); writeU16(16);
+            f.write("data", 4); writeU32(dataSize);
+            f.write((const char*)fixturePcm.data(), dataSize);
+         }
+
+         GraphNode* lfoGn = SpawnNode("LFO", "Modulators", -260.0f, 0.0f);
+         const int lfoIdx = lfoGn->index;
+
+         std::vector<int> voiceOutIdx;
+         voiceOutIdx.reserve(numVoices);
+         const int perRow = 6;
+         for (long v = 0; v < numVoices; v++)
+         {
+            const float x = (float)(v % perRow) * 260.0f;
+            const float y = (float)(v / perRow) * 900.0f;
+            const int srcType = (int)(v % 3);
+            const int srcIdx = SpawnNode(kVoiceTypes[srcType], "Synths", x, y)->index;
+            if (srcType == 0)
+            {
+               if (auto* sampler = dynamic_cast<SamplerNode*>(FindNodeByIndex(srcIdx)->node.get()))
+                  sampler->LoadFile(samplerWav);
+            }
+            const int filterIdx = SpawnNode("Audio Filter", "AudioEffects", x, y + 150.0f)->index;
+            const int shaperIdx = SpawnNode("Wavetable Shaper", "AudioEffects", x, y + 300.0f)->index;
+            const int delayIdx  = SpawnNode("Delay", "AudioEffects", x, y + 450.0f)->index;
+            const int reverbIdx = SpawnNode("Reverb", "AudioEffects", x, y + 600.0f)->index;
+            const int dynIdx    = SpawnNode("Dynamics", "AudioEffects", x, y + 750.0f)->index;
+
+            // Re-resolved through FindNodeByIndex rather than gNodes[idx] -
+            // GraphNode::index is a stable id from a monotonically increasing
+            // counter, not a vector slot, so gNodes[idx] is an out-of-bounds/
+            // wrong-node read the moment any earlier node in the session was
+            // removed (see codebase-navigation's SpawnNode note, and the
+            // working precedent at main.cpp:66029).
+            static_cast<AudioEffectNode*>(FindNodeByIndex(filterIdx)->node.get())->input.Connect(FindNodeByIndex(srcIdx)->node.get());
+            static_cast<AudioEffectNode*>(FindNodeByIndex(shaperIdx)->node.get())->input.Connect(FindNodeByIndex(filterIdx)->node.get());
+            static_cast<AudioEffectNode*>(FindNodeByIndex(delayIdx)->node.get())->input.Connect(FindNodeByIndex(shaperIdx)->node.get());
+            static_cast<AudioEffectNode*>(FindNodeByIndex(reverbIdx)->node.get())->input.Connect(FindNodeByIndex(delayIdx)->node.get());
+            static_cast<AudioEffectNode*>(FindNodeByIndex(dynIdx)->node.get())->input.Connect(FindNodeByIndex(reverbIdx)->node.get());
+
+            Modulation::Instance().Bind(filterIdx, /*paramIndex=mix*/ 0, lfoIdx, /*outputIndex=*/ 0);
+
+            voiceOutIdx.push_back(dynIdx);
+         }
+
+         // Sum voices through a tree of Mixers - MixerNode::kMaxSlots is 12,
+         // so more than 12 voices needs a second level rather than one Mixer
+         // whose numChannels exceeds what it actually exposes pins for.
+         std::vector<int> mixerOutIdx;
+         for (size_t base = 0; base < voiceOutIdx.size(); base += 12)
+         {
+            const size_t chunk = std::min((size_t)12, voiceOutIdx.size() - base);
+            const int mixIdx = SpawnNode("Mixer", "Utility", 2400.0f, (float)(base / 12) * 900.0f)->index;
+            auto* mix = static_cast<MixerNode*>(FindNodeByIndex(mixIdx)->node.get());
+            mix->numChannels = (int)chunk;
+            for (size_t s = 0; s < chunk; s++)
+               mix->AudioInputSlot((int)s)->Connect(FindNodeByIndex(voiceOutIdx[base + s])->node.get());
+            mixerOutIdx.push_back(mixIdx);
+         }
+
+         int finalOutSrcIdx;
+         if (mixerOutIdx.size() == 1)
+         {
+            finalOutSrcIdx = mixerOutIdx[0];
+         }
+         else
+         {
+            const int finalMixIdx = SpawnNode("Mixer", "Utility", 2700.0f, 0.0f)->index;
+            auto* finalMix = static_cast<MixerNode*>(FindNodeByIndex(finalMixIdx)->node.get());
+            finalMix->numChannels = (int)mixerOutIdx.size();
+            for (size_t s = 0; s < mixerOutIdx.size(); s++)
+               finalMix->AudioInputSlot((int)s)->Connect(FindNodeByIndex(mixerOutIdx[s])->node.get());
+            finalOutSrcIdx = finalMixIdx;
+         }
+
+         const int audioOutIdx = SpawnNode("Audio Out", "Utility", 3000.0f, 0.0f)->index;
+         static_cast<AudioOutputNode*>(FindNodeByIndex(audioOutIdx)->node.get())->input.Connect(FindNodeByIndex(finalOutSrcIdx)->node.get());
+
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+
+         // Reopen the device at the requested buffer size (64/128/256/512 -
+         // benchmark-suite.md §4's sweep), same pattern as
+         // INFINITE_OFFLINERENDER_BUFFER above, then actually start the
+         // engine - RunTopology's real callback thread is what B1 measures,
+         // so (unlike AUDIOGRAPHTEST) this fixture needs a live device, not
+         // just a built topology.
+         if (const char* bufEnv = getenv("INFINITE_BENCH_B1BUFFER"))
+         {
+            if (AudioEngine::Instance().SampleRate() > 0.0)
+               AudioEngine::Instance().Stop();
+            AudioEngine::Instance().SetRequestedBufferFrames(atoi(bufEnv));
+         }
+         if (AudioEngine::Instance().SampleRate() <= 0.0)
+            StartAudioEngine(gAudioStartError);
+         RebuildAudioTopology();
+      }
+      else if (getenv("INFINITE_BENCH_B5EMPTY") != nullptr)
+      {
+         // B5(a) empty-patch fixture (benchmark-suite.md §4): the floor -
+         // frame cost with zero nodes, nothing to cook, nothing to draw.
+         // Intentionally spawns nothing; the measurement half below is what
+         // does the work.
+      }
+      else if (getenv("INFINITE_BENCH_B5STARTUP") != nullptr)
+      {
+         // B5(e) startup-breakdown fixture (benchmark-suite.md §4): measures
+         // milestone timings from main entry to first frame completion.
+         // Intentionally spawns nothing; the measurement half below is what
+         // does the work.
+      }
+      else if (const char* audioAloneArg = getenv("INFINITE_BENCH_B5AUDIOALONE"))
+      {
+         // B5(d) audio-thread-alone fixture (benchmark-suite.md §4): the
+         // audio callback's own per-block cost in isolation, at one buffer
+         // size, with nothing else in the graph competing for the CPU -
+         // one Oscillator straight into Audio Out, no effects chain (that's
+         // what B1 stresses). INFINITE_BENCH_B5AUDIOALONE=<buffer frames>.
+         const int oscIdx = SpawnNode("Oscillator", "Synths", 0.0f, 0.0f)->index;
+         const int outIdx = SpawnNode("Audio Out", "Utility", 260.0f, 0.0f)->index;
+         // Re-resolve by index rather than treating oscIdx/outIdx as gNodes[]
+         // positions - GraphNode::index is a stable id from a monotonically
+         // increasing counter, not a vector slot, and diverges from position
+         // the moment any earlier node in the session was removed. Same
+         // pattern as the Wavetable/Audio Out spawn above (main.cpp:66029).
+         GraphNode* oscGn = FindNodeByIndex(oscIdx);
+         GraphNode* outGn = FindNodeByIndex(outIdx);
+         static_cast<AudioOutputNode*>(outGn->node.get())->input.Connect(oscGn->node.get());
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
+
+         if (AudioEngine::Instance().SampleRate() > 0.0)
+            AudioEngine::Instance().Stop();
+         AudioEngine::Instance().SetRequestedBufferFrames(atoi(audioAloneArg));
+         StartAudioEngine(gAudioStartError);
+         RebuildAudioTopology();
+      }
       else if (const char* loadPatchPath = getenv("INFINITE_LOADPATCH"))
       {
          LoadPatchFrom(loadPatchPath);
@@ -67322,10 +68163,37 @@ int main(int argc, char** argv)
    // Connections landing on the copied cluster, captured at Cmd+C time since
    // the graph can change before Cmd+V runs (see ApplyClusterLinks).
    ClusterClipboard clipboardCluster;
+   const double tSettingsInit = Bench::ScopedStageTimer::NowMs();
+   double sFirstFrameEndMs = 0.0;
    int frameId = 0;
 
    while (!glfwWindowShouldClose(window))
    {
+      static Bench::PercentileRing sStageModulation;
+      static Bench::PercentileRing sStageCook;
+      static Bench::PercentileRing sStageNodeBodies;
+      static Bench::PercentileRing sStageEditorEnd;
+      static Bench::PercentileRing sStageImGuiRender;
+      static Bench::PercentileRing sStageProjectors;
+      static Bench::PercentileRing sStageSwap;
+      static Bench::GpuTimerRing sGpuTimerRing;
+      static Bench::PercentileRing sBenchB5cFrameMs;
+      static double sBenchB5cRssStartMb = -1.0;
+      static Bench::PercentileRing sBenchB2FrameMs;
+      static double sBenchB2RssStartMb = -1.0;
+
+      const bool isBenchB5c = (getenv("INFINITE_BENCH_B5STAGES") != nullptr || getenv("INFINITE_BENCH_B5C") != nullptr);
+      const bool isBenchB2 = (getenv("INFINITE_BENCH_B2") != nullptr || getenv("INFINITE_BENCH_B2VISUALS") != nullptr || getenv("INFINITE_BENCH_B2SCALE") != nullptr);
+      const bool isBenchB4 = getenv("INFINITE_BENCH_B4SCALE") != nullptr;
+      const bool benchStagesSample = (isBenchB5c || isBenchB2 || isBenchB4) && (frameId >= 32 && frameId < 152);
+      // B2 per-node GPU split: time each Render 3D / filter draw by node type
+      // instead of the enclosing "cook" stage (GL timer queries cannot nest).
+      const bool benchGpuPerNode = (isBenchB2 && getenv("INFINITE_BENCH_B2GPUNODES") != nullptr) ||
+                                   (isBenchB4 && getenv("INFINITE_BENCH_B4PASSES") != nullptr);
+
+      if (isBenchB5c || isBenchB2 || isBenchB4)
+         sGpuTimerRing.Poll(frameId);
+
       gFrameStart = glfwGetTime();
       glfwPollEvents();
 
@@ -69457,6 +70325,24 @@ int main(int argc, char** argv)
       // lets that panel show a real (one-frame-stale) Value instead of "--"
       // every frame. A right/bottom-docked matrix draws after the graph and
       // is unaffected either way, since by then this frame's params are in.
+      // B4 fixture: bind the LFO to the camera's "orbit" slider by name, from
+      // last frame's registrations, just before they are cleared. Bind()
+      // takes the UI's param index, which is draw order, not VisitParams order.
+      if (frameId == 4 && sBenchB4LfoIdx >= 0)
+      {
+         bool bound = false;
+         for (const ParamRef& ref : Modulation::Instance().FrameParams())
+         {
+            if (ref.nodeIndex == sBenchB4CamIdx && ref.name == "orbit")
+            {
+               Modulation::Instance().Bind(sBenchB4CamIdx, ref.paramIndex, sBenchB4LfoIdx, 0);
+               bound = true;
+               break;
+            }
+         }
+         if (!bound)
+            fprintf(stderr, "B4: camera orbit param not registered, camera will not move\n");
+      }
       Modulation::Instance().ClearFrameParams();
       // The grab set is per frame too: a stale entry would freeze a param forever.
       gPredictorGrabsPrev.swap(gPredictorGrabs);
@@ -84342,6 +85228,376 @@ int main(int argc, char** argv)
          }
       }
 
+      // B5(b) node-count scaling fixture, measurement half - see
+      // INFINITE_BENCH_B5NODES's setup above. Same warmup/sample window as
+      // the other perf fixtures in this file (32 warmup, 120 sampled,
+      // uncapped/vsync off) so results are comparable. Uses the shared
+      // Bench::BenchReport/PercentileRing infra (src/core/BenchReport.h)
+      // rather than this file's older avg/min/max-only pattern, per
+      // benchmark-suite.md §3 (p50/p95/p99 matter more than average for live
+      // work) and §5 (one BENCH_JSON line, not printf-formatted text).
+      if (getenv("INFINITE_BENCH_B5NODES") != nullptr)
+      {
+         static Bench::PercentileRing sFrameMs;
+         static double sRssStartMb = -1.0;
+         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; sRssStartMb = Bench::ProcessRssMb(); }
+         if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
+            sFrameMs.Push(gLastFrameMs);
+         if (frameId == 152)
+         {
+            Bench::BenchReport report;
+            report.bench = "B5_fundamentals_nodecount";
+            report.variant = getenv("INFINITE_BENCH_B5NODES") ? getenv("INFINITE_BENCH_B5NODES") : "";
+            report.frames = 152;
+            report.nodes = (int)gNodes.size();
+            report.frameMs = sFrameMs;
+            report.memRssStartMb = sRssStartMb;
+            report.memRssEndMb = Bench::ProcessRssMb();
+            report.Emit();
+            printf("B5NODES DONE\n");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // B5(c) per-stage CPU timing fixture, measurement half - see
+      // INFINITE_BENCH_B5STAGES setup above. Same warmup/sample window as
+      // B5(a)/B5(b). Uses ScopedStageTimer/ConditionalStageTimer wired into
+      // each main-loop stage to report median ms per stage in stagesCpuMs.
+      if (isBenchB5c)
+      {
+         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; sBenchB5cRssStartMb = Bench::ProcessRssMb(); }
+         if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
+            sBenchB5cFrameMs.Push(gLastFrameMs);
+         if (frameId == 152)
+         {
+            Bench::BenchReport report;
+            report.bench = "B5_fundamentals_stages";
+            const char* bArg = getenv("INFINITE_BENCH_B5STAGES") ? getenv("INFINITE_BENCH_B5STAGES") : getenv("INFINITE_BENCH_B5C");
+            report.variant = (bArg && *bArg && atol(bArg) > 1) ? (std::string("n=") + bArg) : "n=100";
+            report.frames = 152;
+            report.nodes = (int)gNodes.size();
+            report.frameMs = sBenchB5cFrameMs;
+            report.stagesCpuMs = {
+               { "modulation", sStageModulation.Percentile(50) },
+               { "cook", sStageCook.Percentile(50) },
+               { "node_bodies", sStageNodeBodies.Percentile(50) },
+               { "editor_end", sStageEditorEnd.Percentile(50) },
+               { "imgui_render", sStageImGuiRender.Percentile(50) },
+               { "projectors", sStageProjectors.Percentile(50) },
+               { "swap", sStageSwap.Percentile(50) },
+            };
+            sGpuTimerRing.Finish();
+            report.stagesGpuMs = sGpuTimerRing.ToJsonP50();
+            report.memRssStartMb = sBenchB5cRssStartMb;
+            report.memRssEndMb = Bench::ProcessRssMb();
+            report.Emit();
+            printf("B5STAGES DONE\n");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // B2 Heavy visuals fixture, measurement half (benchmark-suite.md §4).
+      // Same warmup/sample window as B5(b)/B5(c) (frameId 32 to 152 = 120 frames).
+      // Reports frame_ms percentiles, tris count, GPU and CPU stage breakdowns,
+      // RSS memory, and output_hash quality guard.
+      if (isBenchB2 || isBenchB4)
+      {
+         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; sBenchB2RssStartMb = Bench::ProcessRssMb(); }
+         if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
+            sBenchB2FrameMs.Push(gLastFrameMs);
+         if (frameId == 152)
+         {
+            Bench::BenchReport report;
+            report.bench = isBenchB4 ? "B4_complex_3d" : "B2_heavy_visuals";
+            report.variant = sBenchB2Variant;
+            report.frames = 152;
+            report.nodes = (int)gNodes.size();
+            report.frameMs = sBenchB2FrameMs;
+            report.stagesCpuMs = {
+               { "modulation", sStageModulation.Percentile(50) },
+               { "cook", sStageCook.Percentile(50) },
+               { "node_bodies", sStageNodeBodies.Percentile(50) },
+               { "editor_end", sStageEditorEnd.Percentile(50) },
+               { "imgui_render", sStageImGuiRender.Percentile(50) },
+               { "projectors", sStageProjectors.Percentile(50) },
+               { "swap", sStageSwap.Percentile(50) },
+            };
+            sGpuTimerRing.Finish();
+            report.stagesGpuMs = sGpuTimerRing.ToJsonP50();
+            report.memRssStartMb = sBenchB2RssStartMb;
+            report.memRssEndMb = Bench::ProcessRssMb();
+
+            if (sBenchB2Render3DIdx >= 0)
+            {
+               if (auto* gn = FindNodeByIndex(sBenchB2Render3DIdx))
+               {
+                  if (auto* r = dynamic_cast<Render3DNode*>(gn->node.get()))
+                  {
+                     // B2 keeps its original per-slot mesh count so its
+                     // baseline stays comparable; B4 reports what was drawn,
+                     // instances included.
+                     if (isBenchB4)
+                        report.tris = (int)r->LastTriangleCount();
+                     else
+                     {
+                        for (int s = 0; s < Render3DNode::kSlots; s++)
+                        {
+                           if (r->geometry[s])
+                              report.tris += (int)r->geometry[s]->GetMesh().FaceCount();
+                        }
+                     }
+                     report.drawCalls = (int)r->LastDrawCalls();
+                  }
+               }
+            }
+
+            if (sBenchB2OutputIdx >= 0)
+            {
+               if (auto* outGn = FindNodeByIndex(sBenchB2OutputIdx))
+               {
+                  if (auto* outNode = dynamic_cast<OutputNode*>(outGn->node.get()))
+                  {
+                     glBindFramebuffer(GL_READ_FRAMEBUFFER, outNode->GetFbo().fbo);
+                     report.outputHash = Bench::HashFramebufferRGBA8(outNode->GetOutputWidth(), outNode->GetOutputHeight());
+                     glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+                  }
+               }
+            }
+
+            report.Emit();
+            printf(isBenchB4 ? "B4COMPLEX3D DONE\n" : "B2VISUALS DONE\n");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // B5(e) startup-breakdown fixture (benchmark-suite.md §4): measures
+      // time spent across startup milestones (pre_window, window_gl, imgui_fonts,
+      // scanners_load, settings_init, first_frame_render, total_to_first_frame).
+      if (getenv("INFINITE_BENCH_B5STARTUP") != nullptr)
+      {
+         if (frameId == 1)
+         {
+            Bench::BenchReport report;
+            report.bench = "B5_fundamentals_startup";
+            report.frames = 1;
+            report.nodes = (int)gNodes.size();
+            report.frameMs.Push(sFirstFrameEndMs - tPreWindow);
+            report.stagesCpuMs = {
+               { "pre_window", tWindowGl - tPreWindow },
+               { "window_gl", tImGuiFonts - tWindowGl },
+               { "imgui_fonts", tScanners - tImGuiFonts },
+               { "scanners_load", tSettingsInit - tScanners },
+               { "first_frame_render", sFirstFrameEndMs - tSettingsInit },
+               { "total_to_first_frame", sFirstFrameEndMs - tPreWindow },
+            };
+            report.memRssEndMb = Bench::ProcessRssMb();
+            report.Emit();
+            printf("B5STARTUP DONE\n");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // B5(f) patch load/save time fixture (benchmark-suite.md §4). Fires
+      // once the mixed-node grid (INFINITE_BENCH_B5LOADSAVE's setup above)
+      // has had a few frames to settle - same frameId margin B5(b)/B5(c)'s
+      // sample windows use before trusting node/editor state. Times
+      // SavePatchTo and LoadPatchFrom back to back on the real patch I/O
+      // path (not a synthetic serialize-only call), so this includes
+      // whatever ApplyPatchData/RemapFieldGraphOwnership does on load too.
+      if (getenv("INFINITE_BENCH_B5LOADSAVE") != nullptr)
+      {
+         if (frameId == 32)
+         {
+            const std::string path = TmpPath("infinite_bench_b5loadsave.inf");
+            const double tSaveStart = Bench::ScopedStageTimer::NowMs();
+            const bool saved = SavePatchTo(path);
+            const double tSaveEnd = Bench::ScopedStageTimer::NowMs();
+            const bool loaded = saved && LoadPatchFrom(path);
+            const double tLoadEnd = Bench::ScopedStageTimer::NowMs();
+
+            Bench::BenchReport report;
+            report.bench = "B5_fundamentals_loadsave";
+            report.variant = getenv("INFINITE_BENCH_B5LOADSAVE") ? getenv("INFINITE_BENCH_B5LOADSAVE") : "";
+            report.frames = 1;
+            report.nodes = (int)gNodes.size();
+            report.stagesCpuMs = {
+               { "save", tSaveEnd - tSaveStart },
+               { "load", tLoadEnd - tSaveEnd },
+            };
+            report.memRssEndMb = Bench::ProcessRssMb();
+            report.Emit();
+            printf("B5LOADSAVE %s DONE\n", (saved && loaded) ? "OK" : "FAIL");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // B5(g) undo-snapshot time fixture (benchmark-suite.md §4). Same
+      // settle margin as B5(f). Times PushUndoCheckpoint (BuildPatchData +
+      // push) and Undo (BuildPatchData for the redo entry + ApplyPatchData)
+      // back to back on the real undo path, not a synthetic snapshot.
+      if (getenv("INFINITE_BENCH_B5UNDO") != nullptr)
+      {
+         if (frameId == 32)
+         {
+            const size_t nodesBefore = gNodes.size();
+            const double tPushStart = Bench::ScopedStageTimer::NowMs();
+            PushUndoCheckpoint();
+            const double tPushEnd = Bench::ScopedStageTimer::NowMs();
+            Undo();
+            const double tUndoEnd = Bench::ScopedStageTimer::NowMs();
+            const bool restored = gNodes.size() == nodesBefore;
+
+            Bench::BenchReport report;
+            report.bench = "B5_fundamentals_undo";
+            report.variant = getenv("INFINITE_BENCH_B5UNDO") ? getenv("INFINITE_BENCH_B5UNDO") : "";
+            report.frames = 1;
+            report.nodes = (int)nodesBefore;
+            report.stagesCpuMs = {
+               { "push_checkpoint", tPushEnd - tPushStart },
+               { "undo_restore", tUndoEnd - tPushEnd },
+            };
+            report.memRssEndMb = Bench::ProcessRssMb();
+            report.Emit();
+            printf("B5UNDO %s DONE\n", restored ? "OK" : "FAIL");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // B1 Heavy audio fixture, measurement half - see
+      // INFINITE_BENCH_B1VOICES's setup above. Windowed on wall-clock
+      // (glfwGetTime), not frameId, because the real device callback thread
+      // this benchmark exists to measure runs independently of the main
+      // loop's frame pacing - a frameId-gated window would conflate video
+      // frame rate with audio callback rate. 1s warmup lets the just-opened
+      // device settle before sampling; default window is 60s
+      // (INFINITE_BENCH_B1SECONDS overrides, for fast iteration while
+      // building/debugging this fixture - the doc's own number is 60s).
+      // cb_load is drained from AudioEngine::RawLoadHistory() (raw per-block
+      // samples - see AudioEngine.h's comment on why LastBlockLoad()'s
+      // smoothing is wrong for a percentile) and xruns from XrunCount(),
+      // baselined at the start of the measurement window so device-open
+      // settling doesn't count against this run.
+      if (getenv("INFINITE_BENCH_B1VOICES") != nullptr)
+      {
+         static double sStartTimeS = -1.0;
+         static uint64_t sXrunBaseline = 0;
+         static Bench::PercentileRing sFrameMs;
+         static double sRssStartMb = -1.0;
+         const double nowS = glfwGetTime();
+         const double windowS = getenv("INFINITE_BENCH_B1SECONDS") ? atof(getenv("INFINITE_BENCH_B1SECONDS")) : 60.0;
+         if (sStartTimeS < 0.0 && nowS > 1.5)
+         {
+            sStartTimeS = nowS;
+            sXrunBaseline = AudioEngine::Instance().XrunCount();
+            AudioEngine::Instance().RawLoadHistory().Reset();
+            AudioEngine::Instance().ResetStageLoadHistory();
+            sRssStartMb = Bench::ProcessRssMb();
+         }
+         if (sStartTimeS >= 0.0 && gLastFrameMs > 0.0)
+            sFrameMs.Push(gLastFrameMs);
+         if (sStartTimeS >= 0.0 && nowS - sStartTimeS >= windowS)
+         {
+            Bench::BenchReport report;
+            report.bench = "B1_heavy_audio";
+            const char* vArg = getenv("INFINITE_BENCH_B1VOICES");
+            const char* bufArg = getenv("INFINITE_BENCH_B1BUFFER");
+            report.variant = std::string("voices=") + (vArg ? vArg : "?") +
+                              ",buffer=" + (bufArg ? bufArg : "default");
+            report.frames = (int)sFrameMs.Count();
+            report.nodes = (int)gNodes.size();
+            report.frameMs = sFrameMs;
+            report.audioMeasured = true;
+            report.audioBuffer = bufArg ? atoi(bufArg) : 0;
+            report.audioSampleRate = AudioEngine::Instance().SampleRate();
+            report.audioLoad = AudioEngine::Instance().RawLoadHistory().Drain();
+            report.audioXruns = AudioEngine::Instance().XrunCount() - sXrunBaseline;
+            report.memRssStartMb = sRssStartMb;
+            report.memRssEndMb = Bench::ProcessRssMb();
+            for (int s = 0; s < kAudioStageCount; s++)
+            {
+               auto drained = AudioEngine::Instance().StageLoadHistory(s).Drain();
+               if (!drained.Empty())
+                  report.stagesCpuMs[AudioStageName(s)] = drained.Percentile(50);
+            }
+            report.Emit();
+            printf("B1VOICES DONE\n");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // B5(a) empty-patch fixture, measurement half - see
+      // INFINITE_BENCH_B5EMPTY's setup above. Same warmup/sample window as
+      // B5(b) (INFINITE_BENCH_B5NODES) so the two are directly comparable -
+      // this run's frame_ms percentiles are the floor B5(b)'s node-count
+      // sweep is measured against.
+      if (getenv("INFINITE_BENCH_B5EMPTY") != nullptr)
+      {
+         static Bench::PercentileRing sFrameMs;
+         static double sRssStartMb = -1.0;
+         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; sRssStartMb = Bench::ProcessRssMb(); }
+         if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
+            sFrameMs.Push(gLastFrameMs);
+         if (frameId == 152)
+         {
+            Bench::BenchReport report;
+            report.bench = "B5_fundamentals_empty";
+            report.frames = 152;
+            report.nodes = (int)gNodes.size();
+            report.frameMs = sFrameMs;
+            report.memRssStartMb = sRssStartMb;
+            report.memRssEndMb = Bench::ProcessRssMb();
+            report.Emit();
+            printf("B5EMPTY DONE\n");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // B5(d) audio-thread-alone fixture, measurement half - see
+      // INFINITE_BENCH_B5AUDIOALONE's setup above. Same wall-clock-window
+      // reasoning as B1's measurement half (the audio callback runs
+      // independently of frameId) but no effects chain and no per-voice
+      // sweep - this isolates the callback's fixed per-block overhead at one
+      // buffer size from B1's DSP-graph cost.
+      if (getenv("INFINITE_BENCH_B5AUDIOALONE") != nullptr)
+      {
+         static double sStartTimeS = -1.0;
+         static uint64_t sXrunBaseline = 0;
+         const double nowS = glfwGetTime();
+         const double windowS = getenv("INFINITE_BENCH_B5AUDIOALONE_SECONDS")
+                                    ? atof(getenv("INFINITE_BENCH_B5AUDIOALONE_SECONDS")) : 30.0;
+         if (sStartTimeS < 0.0 && nowS > 1.0)
+         {
+            sStartTimeS = nowS;
+            sXrunBaseline = AudioEngine::Instance().XrunCount();
+            AudioEngine::Instance().RawLoadHistory().Reset();
+         }
+         if (sStartTimeS >= 0.0 && nowS - sStartTimeS >= windowS)
+         {
+            Bench::BenchReport report;
+            report.bench = "B5_fundamentals_audioalone";
+            const char* bufArg = getenv("INFINITE_BENCH_B5AUDIOALONE");
+            report.variant = std::string("buffer=") + bufArg;
+            report.nodes = (int)gNodes.size();
+            report.audioMeasured = true;
+            report.audioBuffer = atoi(bufArg);
+            report.audioSampleRate = AudioEngine::Instance().SampleRate();
+            report.audioLoad = AudioEngine::Instance().RawLoadHistory().Drain();
+            report.audioXruns = AudioEngine::Instance().XrunCount() - sXrunBaseline;
+            report.Emit();
+            printf("B5AUDIOALONE DONE\n");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
       // Node-chain cook-recursion stress fixture, measurement half - see
       // INFINITE_NODECHAINPERFTEST's setup above. The chain's Output node is
       // already cooked every frame by the ordinary per-frame cook pass above
@@ -85234,6 +86490,8 @@ int main(int argc, char** argv)
          }
       }
 
+      ConditionalStageTimer timerNodeBodies(benchStagesSample ? &sStageNodeBodies : nullptr);
+      Bench::ConditionalGpuStageTimer timerNodeBodiesGpu(benchStagesSample ? &sGpuTimerRing : nullptr, "node_bodies", frameId);
       PruneDeadGroups();
 
       for (GraphNode& gn : gNodes)
@@ -89762,6 +91020,9 @@ int main(int argc, char** argv)
          }
       }
 
+      timerNodeBodies.Stop();
+      timerNodeBodiesGpu.Stop();
+
       // [edperf] BuildControl's per-frame hit-test walk is the one part of the
       // editor whose cost scales with patch size; a spindump that lands here
       // is indistinguishable from a freeze, so keep it measurable.
@@ -89769,24 +91030,28 @@ int main(int argc, char** argv)
                                   getenv("INFINITE_EDPERFTEST") != nullptr;
       const auto edEndStart = kEdPerf ? std::chrono::steady_clock::now()
                                       : std::chrono::steady_clock::time_point{};
-      // Flush against any bottom-docked panel, for the same reason as the
-      // Draw*Docked EndChild calls above.
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
-      // imgui-node-editor's own ed::End() unconditionally strokes a rect
-      // around the whole canvas using ImGuiCol_Border/BorderShadow (see
-      // "Draw border" in imgui_node_editor.cpp) - unlike every other border
-      // in this app, it isn't gated by style.WindowBorderSize/ChildBorderSize
-      // (both zeroed in ApplyTheme), so it painted a thin line around the
-      // canvas that scaled with the canvas rect itself regardless of that
-      // setting. Barely visible against the dark theme's border color, but a
-      // clearly visible dark line in light mode. Suppressed the same way the
-      // menu-bar/canvas seam was: make the two colors it reads transparent
-      // for just this call.
-      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-      ImGui::PushStyleColor(ImGuiCol_BorderShadow, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-      ed::End();
-      ImGui::PopStyleColor(2);
-      ImGui::PopStyleVar();
+      {
+         ConditionalStageTimer timerEditorEnd(benchStagesSample ? &sStageEditorEnd : nullptr);
+         Bench::ConditionalGpuStageTimer timerEditorEndGpu(benchStagesSample ? &sGpuTimerRing : nullptr, "editor_end", frameId);
+         // Flush against any bottom-docked panel, for the same reason as the
+         // Draw*Docked EndChild calls above.
+         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+         // imgui-node-editor's own ed::End() unconditionally strokes a rect
+         // around the whole canvas using ImGuiCol_Border/BorderShadow (see
+         // "Draw border" in imgui_node_editor.cpp) - unlike every other border
+         // in this app, it isn't gated by style.WindowBorderSize/ChildBorderSize
+         // (both zeroed in ApplyTheme), so it painted a thin line around the
+         // canvas that scaled with the canvas rect itself regardless of that
+         // setting. Barely visible against the dark theme's border color, but a
+         // clearly visible dark line in light mode. Suppressed the same way the
+         // menu-bar/canvas seam was: make the two colors it reads transparent
+         // for just this call.
+         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+         ImGui::PushStyleColor(ImGuiCol_BorderShadow, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+         ed::End();
+         ImGui::PopStyleColor(2);
+         ImGui::PopStyleVar();
+      }
       if (kEdPerf)
       {
          const double ms = std::chrono::duration<double, std::milli>(
@@ -90996,20 +92261,30 @@ int main(int argc, char** argv)
             RebuildAudioTopology();
       }
 
-      ApplyModulationAndPalette(frameId, true);
-
-      for (GraphNode& gn : gNodes)
       {
-         if (gn.node->bypassed)
+         ConditionalStageTimer timerModulation(benchStagesSample ? &sStageModulation : nullptr);
+         Bench::ConditionalGpuStageTimer timerModulationGpu(benchStagesSample ? &sGpuTimerRing : nullptr, "modulation", frameId);
+         ApplyModulationAndPalette(frameId, true);
+      }
+
+      {
+         ConditionalStageTimer timerCook(benchStagesSample ? &sStageCook : nullptr);
+         Bench::ConditionalGpuStageTimer timerCookGpu(benchStagesSample && !benchGpuPerNode ? &sGpuTimerRing : nullptr, "cook", frameId);
+         Bench::NodeGpuRing() = benchStagesSample && benchGpuPerNode ? &sGpuTimerRing : nullptr;
+         for (GraphNode& gn : gNodes)
          {
-            if (auto* syphonOut = dynamic_cast<SyphonOutNode*>(gn.node.get()))
-               syphonOut->Withdraw();
-            continue;
+            if (gn.node->bypassed)
+            {
+               if (auto* syphonOut = dynamic_cast<SyphonOutNode*>(gn.node.get()))
+                  syphonOut->Withdraw();
+               continue;
+            }
+            if (dynamic_cast<OutputNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<SyphonOutNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<OscSendNode*>(gn.node.get()) != nullptr)
+               gn.node->CookIfNeeded(frameId);
          }
-         if (dynamic_cast<OutputNode*>(gn.node.get()) != nullptr ||
-             dynamic_cast<SyphonOutNode*>(gn.node.get()) != nullptr ||
-             dynamic_cast<OscSendNode*>(gn.node.get()) != nullptr)
-            gn.node->CookIfNeeded(frameId);
+         Bench::NodeGpuRing() = nullptr;
       }
       if (getenv("INFINITE_SHOWCASE") != nullptr && frameId == 1)
       {
@@ -92158,19 +93433,23 @@ int main(int argc, char** argv)
          DrawOfflineRenderProgressWindow();
       DrawArrangeWavRenderProgressWindow();
 
-      ImGui::Render();
       int fbW, fbH;
       glfwGetFramebufferSize(window, &fbW, &fbH);
-      glViewport(0, 0, fbW, fbH);
-      // Backs every transparent ImGui child/window (ChildBg/WindowBg alpha 0
-      // by default, see ApplyTheme) - any panel that skips
-      // PushElevatedPanelStyle shows this colour through, so it has to track
-      // the theme rather than stay a fixed dark constant or a light theme
-      // renders that gap as near-black.
-      const CategoryColors::UiTheme& clearTheme = CategoryColors::CurrentUiTheme();
-      glClearColor(clearTheme.windowBg.r, clearTheme.windowBg.g, clearTheme.windowBg.b, 1.0f);
-      glClear(GL_COLOR_BUFFER_BIT);
-      ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+      {
+         ConditionalStageTimer timerImGuiRender(benchStagesSample ? &sStageImGuiRender : nullptr);
+         Bench::ConditionalGpuStageTimer timerImGuiRenderGpu(benchStagesSample ? &sGpuTimerRing : nullptr, "imgui_render", frameId);
+         ImGui::Render();
+         glViewport(0, 0, fbW, fbH);
+         // Backs every transparent ImGui child/window (ChildBg/WindowBg alpha 0
+         // by default, see ApplyTheme) - any panel that skips
+         // PushElevatedPanelStyle shows this colour through, so it has to track
+         // the theme rather than stay a fixed dark constant or a light theme
+         // renders that gap as near-black.
+         const CategoryColors::UiTheme& clearTheme = CategoryColors::CurrentUiTheme();
+         glClearColor(clearTheme.windowBg.r, clearTheme.windowBg.g, clearTheme.windowBg.b, 1.0f);
+         glClear(GL_COLOR_BUFFER_BIT);
+         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+      }
 
       if (const char* shotPath = getenv("IMAGERESYNTH_SCREENSHOT"))
       {
@@ -92194,7 +93473,12 @@ int main(int argc, char** argv)
          }
       }
 
-      glfwSwapBuffers(window);
+      {
+         ConditionalStageTimer timerSwap(benchStagesSample ? &sStageSwap : nullptr);
+         glfwSwapBuffers(window);
+      }
+      if (frameId == 0)
+         sFirstFrameEndMs = Bench::ScopedStageTimer::NowMs();
 
       // glfwSwapBuffers blocks on vsync - dead time for AppKit to service a
       // hosted plugin's editor window. See local-prompts/02-plugin-editor-lag.md.
@@ -92215,66 +93499,69 @@ int main(int argc, char** argv)
       static double sLastTopmostRefresh = 0.0;
       const double now = glfwGetTime();
       const bool refreshTopmost = now - sLastTopmostRefresh >= 0.5;
-      for (size_t i = gProjectorWindows.size(); i-- > 0; )
       {
-         GraphNode* src = FindNodeByIndex(gProjectorWindows[i].nodeIndex);
-         if (src == nullptr)
+         ConditionalStageTimer timerProjectors(benchStagesSample ? &sStageProjectors : nullptr);
+         for (size_t i = gProjectorWindows.size(); i-- > 0; )
          {
-            // Its node was deleted out from under it - close rather than sit
-            // there showing a permanently blank window.
-            CloseProjectorWindow(i);
-            continue;
-         }
+            GraphNode* src = FindNodeByIndex(gProjectorWindows[i].nodeIndex);
+            if (src == nullptr)
+            {
+               // Its node was deleted out from under it - close rather than sit
+               // there showing a permanently blank window.
+               CloseProjectorWindow(i);
+               continue;
+            }
 
-         GLFWwindow* projWindow = gProjectorWindows[i].window;
+            GLFWwindow* projWindow = gProjectorWindows[i].window;
 #if defined(_WIN32)
-         if (gProjectorWindows[i].fullscreen && refreshTopmost)
-            Platform::ReassertOutputWindowTopmost(projWindow);
+            if (gProjectorWindows[i].fullscreen && refreshTopmost)
+               Platform::ReassertOutputWindowTopmost(projWindow);
 #endif
-         glfwMakeContextCurrent(projWindow);
-         int pw, ph;
-         glfwGetFramebufferSize(projWindow, &pw, &ph);
+            glfwMakeContextCurrent(projWindow);
+            int pw, ph;
+            glfwGetFramebufferSize(projWindow, &pw, &ph);
 
-         // A geometry node's own GetOutputTexture() isn't a real preview (it
-         // produces a mesh, not pixels) - render it the same way its
-         // mini-viewport/viewport-panel card does instead, sharing that
-         // node's own orbit camera so all three agree on framing.
-         unsigned int tex = 0;
-         int texW = 0, texH = 0;
-         if (auto* geo = dynamic_cast<IGeometrySource*>(src->node.get()))
-         {
-            NodeViewport& viewport = gProjectorViewports[src->index];
-            SharedViewportCamera& cam = gNodeCameras[src->index];
-            tex = viewport.Render(dynamic_cast<IGeometrySource*>(DisplayNode(src->node.get())), cam, pw, ph);
-         }
-         else if (INode* shown = DisplayNode(src->node.get()))
-         {
-            // A bypassed node projects what passes through it, and a bypassed
-            // source projects nothing (the clear below), never a frozen frame.
-            tex = shown->GetOutputTexture();
-            texW = shown->GetOutputWidth();
-            texH = shown->GetOutputHeight();
-         }
+            // A geometry node's own GetOutputTexture() isn't a real preview (it
+            // produces a mesh, not pixels) - render it the same way its
+            // mini-viewport/viewport-panel card does instead, sharing that
+            // node's own orbit camera so all three agree on framing.
+            unsigned int tex = 0;
+            int texW = 0, texH = 0;
+            if (auto* geo = dynamic_cast<IGeometrySource*>(src->node.get()))
+            {
+               NodeViewport& viewport = gProjectorViewports[src->index];
+               SharedViewportCamera& cam = gNodeCameras[src->index];
+               tex = viewport.Render(dynamic_cast<IGeometrySource*>(DisplayNode(src->node.get())), cam, pw, ph);
+            }
+            else if (INode* shown = DisplayNode(src->node.get()))
+            {
+               // A bypassed node projects what passes through it, and a bypassed
+               // source projects nothing (the clear below), never a frozen frame.
+               tex = shown->GetOutputTexture();
+               texW = shown->GetOutputWidth();
+               texH = shown->GetOutputHeight();
+            }
 
-         if (tex != 0)
-         {
-            if (dynamic_cast<ProjectionNode*>(DisplayNode(src->node.get())) != nullptr)
-               GLUtil::DrawTextureToScreen(tex, pw, ph, 0, 0, /*checkerBg=*/false);
+            if (tex != 0)
+            {
+               if (dynamic_cast<ProjectionNode*>(DisplayNode(src->node.get())) != nullptr)
+                  GLUtil::DrawTextureToScreen(tex, pw, ph, 0, 0, /*checkerBg=*/false);
+               else
+                  GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/true);
+            }
             else
-               GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/true);
+            {
+               glViewport(0, 0, pw, ph);
+               glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+               glClear(GL_COLOR_BUFFER_BIT);
+            }
+            glfwSwapBuffers(projWindow);
          }
-         else
-         {
-            glViewport(0, 0, pw, ph);
-            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT);
-         }
-         glfwSwapBuffers(projWindow);
+         if (refreshTopmost && !gProjectorWindows.empty())
+            sLastTopmostRefresh = now;
+         if (!gProjectorWindows.empty())
+            glfwMakeContextCurrent(window);
       }
-      if (refreshTopmost && !gProjectorWindows.empty())
-         sLastTopmostRefresh = now;
-      if (!gProjectorWindows.empty())
-         glfwMakeContextCurrent(window);
 
       ++frameId;
       // The uid map is rebuilt at most once a frame on first use (WP5b), so a

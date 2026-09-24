@@ -31,7 +31,7 @@ for (const FilterDef& def : GetFilterDefs())
 **Only reach for a hand-written class** (like `Blend`, `LayerStack`,
 `Switcher`, `RemoveBackground`, `Feedback`, `Draw`) when the effect
 genuinely cannot be one fragment-shader pass over one or two input textures
-— e.g. it needs multiple render targets, ping-pong feedback across frames,
+(plus an optional separable `prePassBody`) — e.g. it needs multiple render targets, ping-pong feedback across frames,
 CPU-side work (Vision segmentation), or persistent state beyond "the current
 param values." Check `src/nodes/FilterDefs.cpp`'s ~90 entries first; the
 overwhelming majority of effect ideas fit the table. If you're not sure
@@ -84,8 +84,16 @@ Your `fragmentBody` is just extra uniform declarations (one per
   effect use this.
 - **`uTime`.** Only reference it if the effect genuinely animates on its
   own (a procedural noise field, a scanline sweep). `FilterNode` detects
-  `"uTime"` in your fragment body text at construction and skips the
-  per-frame cache short-circuit when present — see the bug trap below.
+  `"uTime"` in your shader text at construction and folds the uploaded time
+  value into its cache `Signature`. So the node re-renders every frame while
+  the transport plays and caches while it is stopped. See the bug trap below.
+- **Separable kernels use `prePassBody`, never nested 2D loops.** A blur
+  written as `for x … for y …` reads N² texels per pixel at full resolution.
+  B2 measured the old 11×11 Bloom at ~5 ms of GPU per 1080p instance on an
+  M2. Give the `FilterDef` a `prePassBody` (the horizontal 1D pass, reading
+  `uSrc`) and make `fragmentBody` the vertical pass reading `uPass`. That
+  costs 2N reads. `gaussianblur`, `boxblur`, `bloom` and `diffuseglow` are
+  the reference entries.
 
 ---
 
@@ -106,9 +114,9 @@ those were read as raw uniforms outside the revision-tracked path — see
 add a fragment-body uniform driven by something other than a declared param
 or `uSrc`/`uSrc2` (a global, a second node's field read directly), it must
 be folded into `Signature` or the effect will appear to work once and then
-stop updating. The `uTime` special-case in `FilterNode` is the one
-sanctioned exception, and it exists specifically because "always time" is a
-declared, detectable escape hatch — don't invent a second one.
+stop updating. `uTime` is the one global `FilterNode` reads, and it is in
+`Signature` for exactly this reason. Don't add a second global without
+adding it there too.
 
 ---
 

@@ -21,6 +21,18 @@ namespace Platform
    // Call once at startup and keep the app running for the token to matter.
    void PreventAppNap();
 
+   // Current process resident set size in MB. Used by the INFINITE_BENCH
+   // suite (docs/plans/perf/benchmark-suite.md) for the mem.rss_mb field -
+   // not called anywhere on the hot path, so a syscall per call is fine.
+   // Returns -1.0 if the platform has no cheap way to read it yet.
+   double ProcessRssMb();
+
+   // Best-effort hardware model string ("MacBookPro18,3", a Windows
+   // WMI/registry product name, or a Linux DMI string) for BENCH_JSON's
+   // "machine" field. Returns "unknown" rather than failing - this is
+   // diagnostic labelling only, never branched on.
+   std::string HwModelString();
+
    // Trackpad pinch (macOS "magnify" gesture), drained as an incremental
    // delta since the last call - e.g. +0.02 for a small pinch-open, negative
    // for pinch-close. GLFW's Cocoa backend only forwards scrollWheel: (see

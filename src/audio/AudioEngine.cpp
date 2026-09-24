@@ -369,8 +369,13 @@ void AudioEngine::ProcessOffline(AudioBuffer& buffer)
    Transport::Instance().EndOfflineAudioBlock();
 }
 
-void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
+void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer, double* outStageMs)
 {
+   if (outStageMs != nullptr)
+   {
+      for (int s = 0; s < kAudioStageCount; s++)
+         outStageMs[s] = 0.0;
+   }
    // Apply this generation's note wiring, on THIS thread, before anything
    // below cooks a single node - covers both the real device callback and
    // ProcessOffline. See ApplyNoteWiringIfNew's comment for why this,
@@ -590,7 +595,18 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
             outputPtrs[o] = nullptr;
          }
       }
-      entry.node->ProcessBlockMulti(inputPtrs, entry.numInputs, outputPtrs, numOuts);
+      if (outStageMs != nullptr)
+      {
+         const double t0 = NowMs();
+         entry.node->ProcessBlockMulti(inputPtrs, entry.numInputs, outputPtrs, numOuts);
+         const double t1 = NowMs();
+         const int sId = (entry.stageId >= 0 && entry.stageId < kAudioStageCount) ? entry.stageId : (int)kAudioStageOther;
+         outStageMs[sId] += (t1 - t0);
+      }
+      else
+      {
+         entry.node->ProcessBlockMulti(inputPtrs, entry.numInputs, outputPtrs, numOuts);
+      }
    }
 
    // Scratch interleave buffer for capture rings, and the terminal-summation
@@ -875,9 +891,10 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
    buffer.numChannels = numChannels;
    buffer.numFrames = numFrames;
 
+   double stageMs[kAudioStageCount] = { 0.0 };
    const double topologyStartMs = NowMs();
    ProcessList* list = mCurrent.load(std::memory_order_acquire);
-   RunTopology(list, buffer);
+   RunTopology(list, buffer, stageMs);
    // Published after RunTopology fully returns, so a main-thread reader never
    // observes this generation as "completed" while entry.node->ProcessBlock
    // calls against `list`'s (possibly about-to-be-retired) nodes are still
@@ -897,5 +914,11 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
       const double instantLoad = expectedGapMs > 0.0 ? topologyMs / expectedGapMs : 0.0;
       const double prevLoad = mLastBlockLoad.load(std::memory_order_relaxed);
       mLastBlockLoad.store(prevLoad + kLoadSmoothing * (instantLoad - prevLoad), std::memory_order_relaxed);
+      mRawLoadHistory.Push((float)instantLoad);
+      if (expectedGapMs > 0.0)
+      {
+         for (int s = 0; s < kAudioStageCount; s++)
+            mStageLoadHistory[s].Push((float)(stageMs[s] / expectedGapMs));
+      }
    }
 }

@@ -55,7 +55,25 @@ public:
    }
 
 private:
+   // Uniform locations are fixed for the life of a linked program, so they're
+   // looked up once in EnsureShader() rather than every cook - glGetUniformLocation
+   // is a name-hash lookup into the driver, not free, and every FilterNode pays it
+   // every uncached cook otherwise.
+   struct PassLocs
+   {
+      GLint src = -1;
+      GLint src2 = -1;
+      GLint hasSrc2 = -1;
+      GLint pass = -1;
+      GLint texel = -1;
+      GLint time = -1;
+      std::vector<GLint> params;
+   };
+
    bool EnsureShader();
+   void LookupLocs(unsigned int program, PassLocs& locs) const;
+   void BindUniforms(const PassLocs& locs, unsigned int srcTex, unsigned int srcTex2,
+                     unsigned int passTex, float time) const;
 
    // Everything the shader pass's output depends on. Reusing mOut's contents
    // is only safe when all of this is identical to the last time it ran -
@@ -67,11 +85,17 @@ private:
       int width = 0;
       int height = 0;
       std::vector<std::array<float, 3>> params;
+      // The exact uTime value uploaded, 0 for filters that don't read it.
+      // Transport time only advances while playing, so a time-driven filter
+      // on a stopped transport caches like any other instead of re-rendering
+      // an identical image and forcing everything downstream to recook.
+      float time = 0.0f;
 
       bool operator==(const Signature& o) const
       {
          return upstreamRev == o.upstreamRev && upstreamRev2 == o.upstreamRev2 &&
-                width == o.width && height == o.height && params == o.params;
+                width == o.width && height == o.height && params == o.params &&
+                time == o.time;
       }
    };
 
@@ -81,24 +105,17 @@ private:
    ImageCable mInput;
    ImageCable mInput2; // only used when Def().inputs == 2
    GLUtil::Fbo mOut;
+   GLUtil::Fbo mMid; // prePassBody's output; empty for single-pass filters
    unsigned int mProgram = 0;
+   unsigned int mPreProgram = 0;
    bool mShaderTried = false;
    int mLastCookFrame = -1;
 
-   // Uniform locations are fixed for the life of a linked program, so they're
-   // looked up once in EnsureShader() rather than every cook - glGetUniformLocation
-   // is a name-hash lookup into the driver, not free, and every FilterNode pays it
-   // every uncached cook otherwise.
-   GLint mLocSrc = -1;
-   GLint mLocSrc2 = -1;
-   GLint mLocHasSrc2 = -1;
-   GLint mLocTexel = -1;
-   GLint mLocTime = -1;
-   std::vector<GLint> mParamLocs;
+   PassLocs mMainLocs;
+   PassLocs mPreLocs;
 
-   // Filters whose shader reads uTime are inherently animated - caching them
-   // on a param/upstream signature alone would freeze the animation, so they
-   // always re-render (same as the pre-caching behavior).
+   // Filters whose shader reads uTime are inherently animated, so the
+   // uploaded time value is part of Signature.
    bool mUsesTime = false;
    bool mHasBuilt = false;
    Signature mBuilt;

@@ -35,6 +35,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <mach-o/dyld.h> // _NSGetExecutablePath, for ExecutablePath()
+#include <mach/mach.h> // task_info, for Platform::ProcessRssMb()
+#include <sys/sysctl.h> // sysctlbyname, for Platform::HwModelString()
 #include <cmath>
 #include <algorithm>
 #include <chrono>
@@ -86,6 +88,26 @@ namespace Platform
       sActivityToken = [[NSProcessInfo processInfo]
          beginActivityWithOptions:(NSActivityUserInitiated | NSActivityLatencyCritical)
                             reason:@"continuous node-graph rendering"];
+   }
+
+   double ProcessRssMb()
+   {
+      mach_task_basic_info_data_t info;
+      mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+      const kern_return_t kr = task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
+                                          (task_info_t)&info, &count);
+      if (kr != KERN_SUCCESS)
+         return -1.0;
+      return (double)info.resident_size / (1024.0 * 1024.0);
+   }
+
+   std::string HwModelString()
+   {
+      char model[256] = {0};
+      size_t size = sizeof(model);
+      if (sysctlbyname("hw.model", model, &size, nullptr, 0) != 0)
+         return "unknown";
+      return std::string(model);
    }
 
    double PollTrackpadMagnificationDelta()
