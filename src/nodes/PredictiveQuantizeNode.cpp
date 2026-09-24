@@ -789,7 +789,7 @@ namespace PredictiveQuantize
       }
 
       if (gFail == 0)
-         std::printf("[PREDQUANTIZETEST] All checks passed.\n");
+         std::printf("[PREDQUANTIZETEST] All checks passed  OK\n");
       return gFail == 0;
    }
 }

@@ -616,7 +616,7 @@ namespace PredictiveVelocity
       }
 
       if (gFail == 0)
-         std::printf("[PREDVELOCITYTEST] All checks passed.\n");
+         std::printf("[PREDVELOCITYTEST] All checks passed  OK\n");
       return gFail == 0;
    }
 }
