@@ -1,7 +1,11 @@
 ---
 name: modulation-sweep
-description: Sweeps Infinite's modulation system end to end - every modulation source (LFO, Random, Pattern, Envelope, macros, MIDI CC, analyzers), every destination (any control that registers a ParamRef), and the binding in between (range, polarity, enable, save/load, unbind on delete). Combines the runtime fixtures with the source-only param audit. Use when asked "check the modulators", "does modulation still work", "why doesn't this cable move the knob", "which params can't be modulated", after adding a modulator or any node control, or when a patch loads with its modulation missing or pointing at the wrong knob.
+description: "End-to-end modulation sweep: every source (LFO, Random, Pattern, Envelope, macros, MIDI CC, analyzers), every ParamRef destination, and bindings (range, polarity, save/load, unbind on delete). Use for \"does modulation still work\", \"why doesn't this cable move the knob\", after adding a modulator or control."
 ---
+
+## When to use (full scope)
+
+Sweeps Infinite's modulation system end to end - every modulation source (LFO, Random, Pattern, Envelope, macros, MIDI CC, analyzers), every destination (any control that registers a ParamRef), and the binding in between (range, polarity, enable, save/load, unbind on delete). Combines the runtime fixtures with the source-only param audit. Use when asked "check the modulators", "does modulation still work", "why doesn't this cable move the knob", "which params can't be modulated", after adding a modulator or any node control, or when a patch loads with its modulation missing or pointing at the wrong knob.
 
 Paths below are relative to the repo root (`/Users/namansoni/infinte`).
 

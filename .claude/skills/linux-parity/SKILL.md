@@ -1,7 +1,11 @@
 ---
 name: linux-parity
-description: How to write code for Infinite that works on Linux — the three-sided obligation every `Platform::` function now carries, the container+Xvfb rig that lets you actually execute Linux code instead of only reading it, what llvmpipe rendering does and does not prove, and the per-subsystem trap catalogue (fontconfig/FreeType cost, no HarfBuzz, dlopen-don't-link, XDG paths, no bundle chdir, ALSA/PipeWire choice, AppImage glibc floor). Use before adding or changing anything in `src/platform/`, before adding a `Platform::` function, when touching audio device / MIDI / video / camera / text / dialog / crash-handler code, when working through a phase in `docs/plans/linux/`, when reviewing or fixing a Linux-only defect, or when a user reports something that works on macOS and not on Linux. Not for macOS-only work, and not a substitute for `run-infinite-hygiene`.
+description: "Writing Linux-safe Infinite code: three-sided Platform:: obligation, the container+Xvfb rig, what llvmpipe proves, Linux trap catalogue (fontconfig, dlopen, XDG, ALSA/PipeWire, AppImage glibc). Use before changing src/platform/ or adding a Platform:: function, on docs/plans/linux/ phases, or a works-on-macOS-not-Linux bug."
 ---
+
+## When to use (full scope)
+
+How to write code for Infinite that works on Linux — the three-sided obligation every `Platform::` function now carries, the container+Xvfb rig that lets you actually execute Linux code instead of only reading it, what llvmpipe rendering does and does not prove, and the per-subsystem trap catalogue (fontconfig/FreeType cost, no HarfBuzz, dlopen-don't-link, XDG paths, no bundle chdir, ALSA/PipeWire choice, AppImage glibc floor). Use before adding or changing anything in `src/platform/`, before adding a `Platform::` function, when touching audio device / MIDI / video / camera / text / dialog / crash-handler code, when working through a phase in `docs/plans/linux/`, when reviewing or fixing a Linux-only defect, or when a user reports something that works on macOS and not on Linux. Not for macOS-only work, and not a substitute for `run-infinite-hygiene`.
 
 Paths are relative to the repo root.
 

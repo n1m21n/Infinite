@@ -1,7 +1,11 @@
 ---
 name: release-notes-audit
-description: Audit Infinite's GitHub release notes (v0.1, v0.2-preview, v0.2.1, and any future tag) against what the code actually contained at that exact tag commit — catches features credited to the wrong release, and specific technical claims in a bullet ("samples vertices and normals", "configurable depth and bipolar ranges") that don't match the real implementation. Use when asked to "vet the release", "review the release notes", "check if the changelog is accurate", "audit past releases", "sweep the commits against the releases", or before/after editing any published release's body. Not the same as verifying a release's build artifacts (DMG/zip integrity, CI status, version strings) — this skill is specifically about whether the prose is true.
+description: "Audit GitHub release notes against the code at each tag: features credited to the wrong release, technical claims that don't match the implementation. Use for \"vet the release\", \"is the changelog accurate\", \"audit past releases\", or before/after editing a published release body. Not artifact verification."
 ---
+
+## When to use (full scope)
+
+Audit Infinite's GitHub release notes (v0.1, v0.2-preview, v0.2.1, and any future tag) against what the code actually contained at that exact tag commit — catches features credited to the wrong release, and specific technical claims in a bullet ("samples vertices and normals", "configurable depth and bipolar ranges") that don't match the real implementation. Use when asked to "vet the release", "review the release notes", "check if the changelog is accurate", "audit past releases", "sweep the commits against the releases", or before/after editing any published release's body. Not the same as verifying a release's build artifacts (DMG/zip integrity, CI status, version strings) — this skill is specifically about whether the prose is true.
 
 Paths below are relative to the repo root (`/Users/namansoni/infinte`), not
 this skill directory.

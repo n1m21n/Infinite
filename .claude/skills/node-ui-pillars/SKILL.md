@@ -1,7 +1,11 @@
 ---
 name: node-ui-pillars
-description: The non-negotiable symmetry, alignment and theming pillars for every Infinite node body — knob-row grid discipline, where a dropdown/checkbox/mod-dot is allowed to sit, the standard bottom-right `mix` slot, filter-mode naming, and the light/dark contrast budget for checkboxes and dropdowns. Use BEFORE editing any Draw*Body / Draw*Params function, before adding a knob, dropdown, checkbox or toggle to a node, before changing PushCheckboxStyle / PushDropdownStyle / DrawDiscreteParamPin / AudioKnobRow, and as the acceptance checklist after any node UI change. Complements audio-node-ui (which covers layout grammar and widget choice); this one is the regression contract that must survive every future edit.
+description: "Non-negotiable node-body UI rules: knob-row grid, where dropdown/checkbox/mod-dot may sit, bottom-right `mix` slot, filter-mode naming, light/dark contrast. Use BEFORE editing any Draw*Body/Draw*Params or the style helpers, and as the acceptance checklist after any node UI change."
 ---
+
+## When to use (full scope)
+
+The non-negotiable symmetry, alignment and theming pillars for every Infinite node body — knob-row grid discipline, where a dropdown/checkbox/mod-dot is allowed to sit, the standard bottom-right `mix` slot, filter-mode naming, and the light/dark contrast budget for checkboxes and dropdowns. Use BEFORE editing any Draw*Body / Draw*Params function, before adding a knob, dropdown, checkbox or toggle to a node, before changing PushCheckboxStyle / PushDropdownStyle / DrawDiscreteParamPin / AudioKnobRow, and as the acceptance checklist after any node UI change. Complements audio-node-ui (which covers layout grammar and widget choice); this one is the regression contract that must survive every future edit.
 
 Paths are relative to the repo root (`/Users/namansoni/infinte`).
 

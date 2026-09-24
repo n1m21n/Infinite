@@ -1,7 +1,11 @@
 ---
 name: output-projection-sweep
-description: Sweep everything that leaves Infinite's own window for bugs on both macOS and Windows - Syphon (macOS) and Spout (Windows) publishing and receiving, the Projection node, Output/Viewport terminal nodes, and "open in new window" projector windows including their per-context GL resource lifetime. Use after changing SyphonOutNode, SyphonInNode, ProjectionNode, OutputNode, the projector window code, or anything under src/platform/ that touches windows or texture sharing; when a receiving app sees a black, flipped, or stale frame, when the projector window is the wrong size or not borderless, when closing a projector window corrupts nodes on the canvas, or before a release that ships output.
+description: "Sweep everything leaving Infinite's window: Syphon/Spout send/receive, Projection, Output/Viewport, projector windows and their per-context GL lifetime. Use after changing those nodes, projector code or src/platform/ windowing/sharing; when a receiver sees black/flipped/stale frames or a projector misbehaves; before a release."
 ---
+
+## When to use (full scope)
+
+Sweep everything that leaves Infinite's own window for bugs on both macOS and Windows - Syphon (macOS) and Spout (Windows) publishing and receiving, the Projection node, Output/Viewport terminal nodes, and "open in new window" projector windows including their per-context GL resource lifetime. Use after changing SyphonOutNode, SyphonInNode, ProjectionNode, OutputNode, the projector window code, or anything under src/platform/ that touches windows or texture sharing; when a receiving app sees a black, flipped, or stale frame, when the projector window is the wrong size or not borderless, when closing a projector window corrupts nodes on the canvas, or before a release that ships output.
 
 Paths below are relative to the repo root (`/Users/namansoni/infinte`).
 

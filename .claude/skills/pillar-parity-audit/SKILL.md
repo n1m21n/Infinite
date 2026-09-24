@@ -1,7 +1,11 @@
 ---
 name: pillar-parity-audit
-description: Audit Infinite pillar by pillar — nodes, shortcuts, settings, rendering, panels, modulation, audio/video/geometry, I/O, performance, save/recovery, plus the platform-contract, dual-path-numerics, typography and distribution pillars — and report for each one what evidence exists that it works, on WHICH platform (macOS vs Windows), produced by a machine rather than by a claim. Use when asked "does X work on both versions", "is everything still working", "what's actually verified on Windows", "audit the whole app", "what are we not testing", or before a release when the question is coverage rather than a single failing area. Not a replacement for run-infinite-hygiene (that's the pre-commit gate); this is the map of what that gate does and does not prove.
+description: "Pillar-by-pillar coverage audit (nodes, shortcuts, settings, rendering, panels, modulation, AV/geometry, I/O, perf, save/recovery, platform contract, ...) reporting machine evidence per platform. Use for \"does X work on every OS\", \"what are we not testing\", \"audit the whole app\", or before a release."
 ---
+
+## When to use (full scope)
+
+Audit Infinite pillar by pillar — nodes, shortcuts, settings, rendering, panels, modulation, audio/video/geometry, I/O, performance, save/recovery, plus the platform-contract, dual-path-numerics, typography and distribution pillars — and report for each one what evidence exists that it works, on WHICH platform (macOS vs Windows), produced by a machine rather than by a claim. Use when asked "does X work on both versions", "is everything still working", "what's actually verified on Windows", "audit the whole app", "what are we not testing", or before a release when the question is coverage rather than a single failing area. Not a replacement for run-infinite-hygiene (that's the pre-commit gate); this is the map of what that gate does and does not prove.
 
 Paths are relative to the repo root (`/Users/namansoni/infinite`).
 

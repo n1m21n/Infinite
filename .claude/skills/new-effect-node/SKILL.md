@@ -1,7 +1,11 @@
 ---
 name: new-effect-node
-description: The standard procedure for adding a new Effects/Color/Compositing node to Infinite — the FilterDef table pattern, when it's a table entry vs a real C++ class, the shared GLSL preamble, the caching bug trap that has already happened here, and the machine-checkable exit criterion. Use when implementing a new image effect, color-grading module, or compositing operator; when writing the prompt for a fresh session that will implement one; or when a filter node produces a black/frozen/wrong-looking image, doesn't animate, or its params don't reach the shader.
+description: "Procedure for adding an Effects/Color node: FilterDef table entry vs C++ class, shared GLSL preamble, the caching trap, exit criterion. Use when implementing an image effect or colour-grading module, writing a prompt for one, or when a filter is black/frozen/doesn't animate or params don't reach the shader."
 ---
+
+## When to use (full scope)
+
+The standard procedure for adding a new Effects/Color/Compositing node to Infinite — the FilterDef table pattern, when it's a table entry vs a real C++ class, the shared GLSL preamble, the caching bug trap that has already happened here, and the machine-checkable exit criterion. Use when implementing a new image effect, color-grading module, or compositing operator; when writing the prompt for a fresh session that will implement one; or when a filter node produces a black/frozen/wrong-looking image, doesn't animate, or its params don't reach the shader.
 
 Paths are relative to the repo root (`/Users/namansoni/infinite`).
 

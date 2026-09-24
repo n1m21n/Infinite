@@ -1,7 +1,11 @@
 ---
 name: param-truth-audit
-description: Checks that a node's DSP does what its knob/slider/checkbox tells the user it does - numeric range agreement between a control's declared bounds and the DSP clamp/formula that actually consumes it, whether a control that looks gated (BeginDisabled) matches what the DSP actually short-circuits, and whether a param that's pushed into the mailbox is actually read by every code path its UI implies it reaches. Use after adding or changing any node param, any std::clamp on a mailbox value, any BeginDisabled/EndDisabled gate on a control, before claiming "the knob does X", or when asked "does the UI match the DSP", "is this knob's range right", "check the params against the math".
+description: "Check that DSP does what the control says: declared range vs DSP clamp/formula, BeginDisabled gates vs real short-circuits, mailbox params actually read on every implied path. Use after adding/changing a node param, clamp or disabled gate, before claiming \"the knob does X\", or for \"does the UI match the DSP\"."
 ---
+
+## When to use (full scope)
+
+Checks that a node's DSP does what its knob/slider/checkbox tells the user it does - numeric range agreement between a control's declared bounds and the DSP clamp/formula that actually consumes it, whether a control that looks gated (BeginDisabled) matches what the DSP actually short-circuits, and whether a param that's pushed into the mailbox is actually read by every code path its UI implies it reaches. Use after adding or changing any node param, any std::clamp on a mailbox value, any BeginDisabled/EndDisabled gate on a control, before claiming "the knob does X", or when asked "does the UI match the DSP", "is this knob's range right", "check the params against the math".
 
 Paths below are relative to the repo root (`/Users/namansoni/infinte`).
 

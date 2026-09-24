@@ -1,7 +1,11 @@
 ---
 name: timeline-arrangement-architecture
-description: Map of how Infinite's Timeline/Arrangement system actually works today - the single Clip/Lane/TrackGroup data model, how clips are drawn and composited, what settings each selection kind exposes, real vs. informal type distinctions (sample vs clip), grouping/nesting, the playback/playhead call paths for audio and video, retriggering, per-sample stretch/BPM, signal application order, and why the waveform is always live-drawn rather than cached from disk. Use before planning or reviewing any change to src/arrange/ or the Arrange panel in main.cpp, when asked "how does the timeline work", "what does a clip/track/group actually store", "does X exist for the timeline yet", or when deciding where a new timeline feature belongs.
+description: "Map of the Timeline/Arrangement system: Clip/Lane/TrackGroup model, drawing/compositing, selection settings, sample vs clip, grouping, audio/video playback paths, retrigger, stretch/BPM, live-drawn waveform. Use before planning/reviewing src/arrange/ or the Arrange panel, or for \"how does the timeline work\"."
 ---
+
+## When to use (full scope)
+
+Map of how Infinite's Timeline/Arrangement system actually works today - the single Clip/Lane/TrackGroup data model, how clips are drawn and composited, what settings each selection kind exposes, real vs. informal type distinctions (sample vs clip), grouping/nesting, the playback/playhead call paths for audio and video, retriggering, per-sample stretch/BPM, signal application order, and why the waveform is always live-drawn rather than cached from disk. Use before planning or reviewing any change to src/arrange/ or the Arrange panel in main.cpp, when asked "how does the timeline work", "what does a clip/track/group actually store", "does X exist for the timeline yet", or when deciding where a new timeline feature belongs.
 
 Paths below are relative to the repo root (`/Users/namansoni/infinte`). Everything here was
 verified against code (file:line) as of commit `83fd442` (post "Arrangement overhaul",

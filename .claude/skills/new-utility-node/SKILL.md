@@ -1,7 +1,11 @@
 ---
 name: new-utility-node
-description: The standard procedure for adding a Utility/IO node to Infinite - a node whose job is to move data in or out of the patch (Output/record/export, Syphon In/Out, Projection, OSC Send/Receive, Video In) rather than to make an image. Covers the terminal-node identity-pass pattern, the Platform:: one-abstraction rule that keeps it building on Windows, resource ownership across GL contexts, external side effects and how to gate them, and the machine-checkable exit criterion. Use when implementing an export/broadcast/receive/protocol node, when writing the prompt for a fresh session that will implement one, or when an IO node leaks a handle, crashes on delete, works on macOS but not Windows, or fires its side effect when it shouldn't.
+description: "Procedure for adding a Utility/IO node (Output/export, Syphon/Spout, Projection, OSC, Video In): terminal identity-pass, three-sided Platform:: rule, cross-context resources, gated side effects, exit criterion. Use when implementing one, or when an IO node leaks, crashes on delete, or works on only one OS."
 ---
+
+## When to use (full scope)
+
+The standard procedure for adding a Utility/IO node to Infinite - a node whose job is to move data in or out of the patch (Output/record/export, Syphon In/Out, Projection, OSC Send/Receive, Video In) rather than to make an image. Covers the terminal-node identity-pass pattern, the Platform:: one-abstraction rule that keeps it building on Windows, resource ownership across GL contexts, external side effects and how to gate them, and the machine-checkable exit criterion. Use when implementing an export/broadcast/receive/protocol node, when writing the prompt for a fresh session that will implement one, or when an IO node leaks a handle, crashes on delete, works on macOS but not Windows, or fires its side effect when it shouldn't.
 
 Paths are relative to the repo root (`/Users/namansoni/infinte`).
 

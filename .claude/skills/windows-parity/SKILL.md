@@ -1,7 +1,11 @@
 ---
 name: windows-parity
-description: How to write code for Infinite that works on Windows when you can only build and run it on macOS — the one-abstraction rule that keeps `_WIN32` out of the node layer, the three-sided (macOS/Windows/Linux) obligation every `Platform::` function carries, and the per-subsystem trap catalogue (WASAPI teardown, WinMM status bytes, GDI glyph outlines, Media Foundation stride, wide paths, static CRT, GLSL 330 strictness) drawn from bugs that actually shipped in this repo. Use before adding or changing anything in `src/platform/`, before adding a `Platform::` function, when touching audio device / MIDI / video / camera / text-outline / Spout code, when reviewing or fixing a Windows-only defect, or when a user reports something that works on macOS and not on Windows. Not for macOS-only work, and not a substitute for `run-infinite-hygiene`.
+description: "Writing Windows-safe Infinite code from macOS: keep `_WIN32` out of nodes, three-sided Platform:: obligation, Windows trap catalogue (WASAPI, WinMM, GDI glyphs, Media Foundation stride, wide paths, static CRT, GLSL 330). Use before changing src/platform/ or adding a Platform:: function, or on a works-on-macOS-not-Windows bug."
 ---
+
+## When to use (full scope)
+
+How to write code for Infinite that works on Windows when you can only build and run it on macOS — the one-abstraction rule that keeps `_WIN32` out of the node layer, the three-sided (macOS/Windows/Linux) obligation every `Platform::` function carries, and the per-subsystem trap catalogue (WASAPI teardown, WinMM status bytes, GDI glyph outlines, Media Foundation stride, wide paths, static CRT, GLSL 330 strictness) drawn from bugs that actually shipped in this repo. Use before adding or changing anything in `src/platform/`, before adding a `Platform::` function, when touching audio device / MIDI / video / camera / text-outline / Spout code, when reviewing or fixing a Windows-only defect, or when a user reports something that works on macOS and not on Windows. Not for macOS-only work, and not a substitute for `run-infinite-hygiene`.
 
 Paths are relative to the repo root.
 

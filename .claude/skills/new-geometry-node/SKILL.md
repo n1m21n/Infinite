@@ -1,7 +1,11 @@
 ---
 name: new-geometry-node
-description: The standard procedure for adding a new 3D node (geometry source, mesh operator, or anything else that implements IGeometrySource) to Infinite — the IGeometrySource contract, the passthrough-field forwarding trap that has already caused a real bug (env light cache invalidation), mesh caching/revision rules, and the machine-checkable exit criterion. Use when implementing a new geometry primitive, mesh operator, or 3D utility node; when writing the prompt for a fresh session that will implement one; or when a 3D node's material/texture/mapping silently doesn't pass through a chain, its render freezes when an upstream param changes, or moving/transforming an upstream source has no visible effect downstream.
+description: "Procedure for adding a 3D node (IGeometrySource): the contract, passthrough-field forwarding trap, mesh caching/revision rules, exit criterion. Use when implementing a geometry primitive/operator/3D utility, or when material/mapping doesn't pass through, the render freezes, or upstream transforms have no effect."
 ---
+
+## When to use (full scope)
+
+The standard procedure for adding a new 3D node (geometry source, mesh operator, or anything else that implements IGeometrySource) to Infinite — the IGeometrySource contract, the passthrough-field forwarding trap that has already caused a real bug (env light cache invalidation), mesh caching/revision rules, and the machine-checkable exit criterion. Use when implementing a new geometry primitive, mesh operator, or 3D utility node; when writing the prompt for a fresh session that will implement one; or when a 3D node's material/texture/mapping silently doesn't pass through a chain, its render freezes when an upstream param changes, or moving/transforming an upstream source has no visible effect downstream.
 
 Paths are relative to the repo root (`/Users/namansoni/infinite`).
 

@@ -1,7 +1,11 @@
 ---
 name: field-modifier-presets
-description: How to write a new Field Modifier preset (FieldElementNode::Presets(), src/nodes/FieldElementNode.cpp) - reserved element-domain names (P/N/Cd), the self-mutation ordering bug, declared outputs (output frame float) vs the legacy publish variable, and what makes a modifier preset actually look good on a mesh. Use BEFORE adding, editing, or debugging any Field Modifier preset string, and when a preset does nothing, mutates wrong, or a declared/publish output reads a frozen value.
+description: "Writing Field Modifier presets (FieldElementNode::Presets()): reserved P/N/Cd, self-mutation ordering bug, declared outputs vs legacy publish. Use BEFORE adding/editing/debugging a Field Modifier preset, or when one does nothing, mutates wrong, or an output reads frozen."
 ---
+
+## When to use (full scope)
+
+How to write a new Field Modifier preset (FieldElementNode::Presets(), src/nodes/FieldElementNode.cpp) - reserved element-domain names (P/N/Cd), the self-mutation ordering bug, declared outputs (output frame float) vs the legacy publish variable, and what makes a modifier preset actually look good on a mesh. Use BEFORE adding, editing, or debugging any Field Modifier preset string, and when a preset does nothing, mutates wrong, or a declared/publish output reads a frozen value.
 
 Paths are relative to the repo root (`/Users/namansoni/infinte`).
 

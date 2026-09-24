@@ -1,7 +1,11 @@
 ---
 name: field-compiler
-description: How Field source text becomes running code in Infinite — the lexer/AST/typed-IR pipeline, the token grammar, the AST node set, what the typed IR carries (type AND domain per node), domain inference as a dataflow fixpoint, the three backends (bytecode VM for frame/element, GLSL text for pixel, register machine for sample), error reporting modelled on FormulaNode's keep-last-working-program behaviour, and how the IR stays retargetable to C++ and WASM. Use when implementing or reviewing any part of the Field compiler, when restructuring src/core/Expression.cpp behind its existing API (build step 1), when adding a backend, when a Field program types or infers the wrong domain, when deciding what the IR must carry, or when writing the prompt for a session that will build any compiler stage.
+description: "How Field source becomes running code: lexer/AST/typed IR (type + domain), domain inference, the three backends (VM, GLSL, sample register machine), error keep-last-working. Use when building/reviewing any compiler stage or backend, when a program infers the wrong domain, or when writing a prompt for compiler work."
 ---
+
+## When to use (full scope)
+
+How Field source text becomes running code in Infinite — the lexer/AST/typed-IR pipeline, the token grammar, the AST node set, what the typed IR carries (type AND domain per node), domain inference as a dataflow fixpoint, the three backends (bytecode VM for frame/element, GLSL text for pixel, register machine for sample), error reporting modelled on FormulaNode's keep-last-working-program behaviour, and how the IR stays retargetable to C++ and WASM. Use when implementing or reviewing any part of the Field compiler, when restructuring src/core/Expression.cpp behind its existing API (build step 1), when adding a backend, when a Field program types or infers the wrong domain, when deciding what the IR must carry, or when writing the prompt for a session that will build any compiler stage.
 
 Paths are relative to the repo root (`/Users/namansoni/infinte`).
 

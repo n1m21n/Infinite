@@ -4,6 +4,12 @@ Project skills for Infinite (`/Users/namansoni/infinte`). Each directory holds a
 `SKILL.md`; Claude Code selects one by its frontmatter `description`, so the
 description says *when* to load it, not what it contains.
 
+Keep each `description` to about 330 characters: one line on what it covers,
+then its main trigger phrases. Long descriptions get truncated in the skill
+listing, and a truncated skill is rarely selected. The full scope, including
+every trigger phrase and edge case, goes in the body's first section,
+`## When to use (full scope)`. Add new use cases there, not to the frontmatter.
+
 ## Field — the embedded language
 
 Field is Infinite's embedded language. It is **built and shipped** (sources in

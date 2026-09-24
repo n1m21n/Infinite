@@ -1,7 +1,11 @@
 ---
 name: new-audio-node
-description: The standard procedure for adding any audio, note, or synth node to Infinite — the two-object rule, the exact wiring sites in main.cpp/CMakeLists, the bug traps each rule exists to prevent, and the machine-checkable exit criterion. Use whenever implementing a node from docs/plans/audio/README.md §3 (Oscillator, Audio Filter, Delay, Reverb, Dynamics, Drive, Stereo, Pitch Time, Sampler, Drum Sequencer, Resonator, Scope, Audio In, Recorder, Note Filter/Modify/Echo/Router/Display, Arpeggiator, Note Sequencer, Shaper, Macro, Mod Recorder), when writing the prompt for a fresh session that will implement one, or when a newly added audio node has no pins / no body / doesn't save / crashes on delete.
+description: "Procedure for adding an audio, note or synth node: two-object rule, main.cpp/CMake wiring sites, bug traps, exit criterion. Use when implementing a node from docs/plans/audio/README.md §3, writing a prompt for one, or when a new audio node has no pins/body, doesn't save, or crashes on delete."
 ---
+
+## When to use (full scope)
+
+The standard procedure for adding any audio, note, or synth node to Infinite — the two-object rule, the exact wiring sites in main.cpp/CMakeLists, the bug traps each rule exists to prevent, and the machine-checkable exit criterion. Use whenever implementing a node from docs/plans/audio/README.md §3 (Oscillator, Audio Filter, Delay, Reverb, Dynamics, Drive, Stereo, Pitch Time, Sampler, Drum Sequencer, Resonator, Scope, Audio In, Recorder, Note Filter/Modify/Echo/Router/Display, Arpeggiator, Note Sequencer, Shaper, Macro, Mod Recorder), when writing the prompt for a fresh session that will implement one, or when a newly added audio node has no pins / no body / doesn't save / crashes on delete.
 
 Paths are relative to the repo root (`/Users/namansoni/infinte`).
 

@@ -1,9 +1,13 @@
 ---
 name: prior-art-scout
-description: Finds publicly documented solutions to bugs, platform quirks, dependency gotchas, or architectural patterns across curated peer repositories (and global GitHub/web). Use before implementing Linux/platform features, VST3/audio hosting, packaging, or whenever a bug's root cause is outside Infinite's own codebase.
+description: "Find publicly documented solutions (peer repos, GitHub, forums) to bugs, platform quirks, dependency gotchas or architectural patterns, respecting the copyleft discussions-only rule. Use before Linux/platform, VST3/audio-hosting or packaging work, or when a bug's root cause is outside Infinite's code."
 ---
 
 # Prior Art Scout
+
+## When to use (full scope)
+
+Finds publicly documented solutions to bugs, platform quirks, dependency gotchas, or architectural patterns across curated peer repositories (and global GitHub/web). Use before implementing Linux/platform features, VST3/audio hosting, packaging, or whenever a bug's root cause is outside Infinite's own codebase.
 
 Given a problem statement (a bug, a planned feature, or an architecture question), find **publicly documented cases where someone else hit the same problem, and how they solved it**, across GitHub issues, PRs, commits, code, and developer forums. Then map those solutions onto Infinite's code.
 

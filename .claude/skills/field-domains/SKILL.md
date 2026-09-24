@@ -1,7 +1,11 @@
 ---
 name: field-domains
-description: Field's domain transfer operators — `reduce` (many to one), `map` (one per element), `broadcast` (one to many, implicit and never written), `resample` (read domain A while standing in domain B) and `downsample` (run at a fraction of the ambient rate) — when each is legal, what each costs per crossing, and worked examples taking audio into geometry and geometry into pixels. Use when a Field kernel needs data from a different rate, when audio must drive geometry or geometry must drive pixels, when the compiler reports an incomparable-domain join, when deciding whether a value should be computed per-frame or per-element, or when reviewing any use of reduce/map/resample/downsample.
+description: "Field's domain transfer operators (reduce, map, implicit broadcast, resample, downsample): legality, cost, audio→geometry→pixel examples. Use when a kernel needs data from another rate, on an incomparable-domain join error, or when reviewing any reduce/map/resample/downsample."
 ---
+
+## When to use (full scope)
+
+Field's domain transfer operators — `reduce` (many to one), `map` (one per element), `broadcast` (one to many, implicit and never written), `resample` (read domain A while standing in domain B) and `downsample` (run at a fraction of the ambient rate) — when each is legal, what each costs per crossing, and worked examples taking audio into geometry and geometry into pixels. Use when a Field kernel needs data from a different rate, when audio must drive geometry or geometry must drive pixels, when the compiler reports an incomparable-domain join, when deciding whether a value should be computed per-frame or per-element, or when reviewing any use of reduce/map/resample/downsample.
 
 Paths are relative to the repo root (`/Users/namansoni/infinte`).
 

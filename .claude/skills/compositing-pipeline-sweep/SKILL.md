@@ -1,7 +1,11 @@
 ---
 name: compositing-pipeline-sweep
-description: Sweep Infinite's 2D / compositing image pipeline for bugs on both macOS and Windows - every node cooking a real texture, bypass passing through untouched, cook memoization holding under fan-out, ImageCable pulls carrying the right frame id, colour/palette extraction, correct source-over alpha compositing, and idle-frame caching. Use when a 2D node was added or changed (Blend, Layer Stack, Switcher, Filter, Curves, Feedback, Trails, Reaction Diffusion, Resynth, Fit, Ramp, Palette, Remove Background), when an image comes out black, stale, doubled or wrong-sized, when bypass leaves a node's effect on, when the same patch looks different depending on how many cables leave a node, when transparent edges fringe black/dark or stacked semi-transparent layers don't add up correctly, or before a release as a 2D-pipeline regression gate.
+description: "2D/compositing pipeline regression sweep: real textures, bypass pass-through, cook memo under fan-out, frame ids, palette, source-over alpha, idle caching. Use after changing a 2D node, when an image is black/stale/doubled/wrong-sized, alpha fringes dark, bypass leaks, or before a release."
 ---
+
+## When to use (full scope)
+
+Sweep Infinite's 2D / compositing image pipeline for bugs on both macOS and Windows - every node cooking a real texture, bypass passing through untouched, cook memoization holding under fan-out, ImageCable pulls carrying the right frame id, colour/palette extraction, correct source-over alpha compositing, and idle-frame caching. Use when a 2D node was added or changed (Blend, Layer Stack, Switcher, Filter, Curves, Feedback, Trails, Reaction Diffusion, Resynth, Fit, Ramp, Palette, Remove Background), when an image comes out black, stale, doubled or wrong-sized, when bypass leaves a node's effect on, when the same patch looks different depending on how many cables leave a node, when transparent edges fringe black/dark or stacked semi-transparent layers don't add up correctly, or before a release as a 2D-pipeline regression gate.
 
 Paths below are relative to the repo root (`/Users/namansoni/infinte`).
 

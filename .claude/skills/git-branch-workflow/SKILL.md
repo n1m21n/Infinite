@@ -1,7 +1,11 @@
 ---
 name: git-branch-workflow
-description: The standard branching workflow for this repo — every feature or bug fix request gets its own branch off main (feature/<slug> or bugfix/<slug>), work happens there, and it merges directly back into main (no PR, solo repo) once done. Use whenever the user asks for a new feature, a bug fix, or says "start work on X" — before writing any code — and when a piece of work is done and ready to land on main.
+description: "Branch-per-feature workflow: feature/<slug> or bugfix/<slug> off main, commit per step with explicit git add, merge straight back to main (no PR). Use whenever a feature or fix starts (\"start work on X\") before writing code, and when work is ready to land."
 ---
+
+## When to use (full scope)
+
+The standard branching workflow for this repo — every feature or bug fix request gets its own branch off main (feature/<slug> or bugfix/<slug>), work happens there, and it merges directly back into main (no PR, solo repo) once done. Use whenever the user asks for a new feature, a bug fix, or says "start work on X" — before writing any code — and when a piece of work is done and ready to land on main.
 
 Paths below are relative to the repo root (`/Users/namansoni/infinte`),
 not this skill directory.

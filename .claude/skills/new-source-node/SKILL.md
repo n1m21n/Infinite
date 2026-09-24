@@ -1,7 +1,11 @@
 ---
 name: new-source-node
-description: The standard procedure for adding a Source node to Infinite - a node that generates an image from nothing (procedural, file-backed, or live-device) rather than transforming one. Covers the INode/GLUtil::Fbo pattern, the per-frame cook memo, resolution ownership, the Transport clock rule for anything animated, TextureRevision and what it costs to skip it, and the machine-checkable exit criterion. Use when implementing a generator/loader/capture node (noise, gradient, text, shape, video, camera, file image), when writing the prompt for a fresh session that will implement one, or when a source node renders black, never animates, animates while paused, or forces everything downstream to re-render every frame.
+description: "Procedure for adding a Source node (image from nothing: procedural, file, live device): INode/GLUtil::Fbo pattern, per-frame cook memo, resolution, Transport clock, TextureRevision, exit criterion. Use when implementing a generator/loader/capture node, or when one renders black, won't animate, animates while paused, or re-renders every frame."
 ---
+
+## When to use (full scope)
+
+The standard procedure for adding a Source node to Infinite - a node that generates an image from nothing (procedural, file-backed, or live-device) rather than transforming one. Covers the INode/GLUtil::Fbo pattern, the per-frame cook memo, resolution ownership, the Transport clock rule for anything animated, TextureRevision and what it costs to skip it, and the machine-checkable exit criterion. Use when implementing a generator/loader/capture node (noise, gradient, text, shape, video, camera, file image), when writing the prompt for a fresh session that will implement one, or when a source node renders black, never animates, animates while paused, or forces everything downstream to re-render every frame.
 
 Paths are relative to the repo root (`/Users/namansoni/infinte`).
 

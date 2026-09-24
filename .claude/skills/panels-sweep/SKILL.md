@@ -1,7 +1,11 @@
 ---
 name: panels-sweep
-description: Sweep Infinite's docked panels for bugs on both macOS and Windows - the modulation matrix (rows, collapsed-node params, disabled rows, scroll/fill geometry in all four dock orientations, patch round trip), the performance matrix (macro elements, assignment, persistence), the node browser's sort and filter strip, and node viewport cards. Use after changing any panel, the dock layout, the browser sort/filter controls, the macro element types, or modulation row rendering; when a panel's rows are blank, misaligned, or wrong while scrolling, when a sort or filter control does nothing, when a panel breaks in one dock position only, or before a release as a panel regression gate.
+description: "Docked-panel regression sweep: modulation matrix (rows, scroll, all four docks, round trip), performance matrix, browser sort/filter, viewport cards. Use after changing any panel, dock layout, browser controls or macro types; when rows are blank/misaligned or a panel breaks in one dock; before a release."
 ---
+
+## When to use (full scope)
+
+Sweep Infinite's docked panels for bugs on both macOS and Windows - the modulation matrix (rows, collapsed-node params, disabled rows, scroll/fill geometry in all four dock orientations, patch round trip), the performance matrix (macro elements, assignment, persistence), the node browser's sort and filter strip, and node viewport cards. Use after changing any panel, the dock layout, the browser sort/filter controls, the macro element types, or modulation row rendering; when a panel's rows are blank, misaligned, or wrong while scrolling, when a sort or filter control does nothing, when a panel breaks in one dock position only, or before a release as a panel regression gate.
 
 Paths below are relative to the repo root (`/Users/namansoni/infinte`).
 

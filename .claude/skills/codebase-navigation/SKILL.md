@@ -1,7 +1,11 @@
 ---
 name: codebase-navigation
-description: How to search Infinite's codebase efficiently and completely — trace an interface to every implementer and every hand-maintained registration site, not just the first grep hit; check both platform paths; check the living map of known connective-tissue hotspots below. Use at the start of ANY investigation, sweep, or plan-writing task that touches src/ — before reporting "the code does X" or handing findings to a planning/implementation agent. This skill accumulates a growing map of the codebase's cross-cutting wiring points; add to it whenever a task turns up a new one.
+description: "How to search Infinite completely: trace an interface to every implementer and hand-maintained registration site, check every platform path, use the hotspot map. Use at the start of ANY investigation, sweep or plan touching src/, before claiming \"the code does X\". Add new wiring hotspots to it."
 ---
+
+## When to use (full scope)
+
+How to search Infinite's codebase efficiently and completely — trace an interface to every implementer and every hand-maintained registration site, not just the first grep hit; check both platform paths; check the living map of known connective-tissue hotspots below. Use at the start of ANY investigation, sweep, or plan-writing task that touches src/ — before reporting "the code does X" or handing findings to a planning/implementation agent. This skill accumulates a growing map of the codebase's cross-cutting wiring points; add to it whenever a task turns up a new one.
 
 Paths are relative to the repo root (`/Users/namansoni/infinte`).
 

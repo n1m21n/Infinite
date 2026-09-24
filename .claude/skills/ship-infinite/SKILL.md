@@ -1,7 +1,11 @@
 ---
 name: ship-infinite
-description: Verify, review, commit, and push uncommitted Infinite changes, cut a versioned GitHub Release tag with curated "What's new" notes, build the distributable macOS DMG, pull the CI-built Windows x64/ARM64 zips and the CI-built Linux AppImage, and publish all of it via the GitHub Pages website (n1m21n.github.io/Infinite) and that Release — plus flag node-catalog changes that need the Node Reference Manual updated, and clean up junk/duplicate tracked files. Use when asked to "ship this", "release Infinite", "cut a release", "build and publish the DMG", "push and deploy", or "clean up the repo before release".
+description: "Full release: verify, commit, push, tag with curated notes, build the macOS DMG, pull CI Windows zips and Linux AppImage, publish to the Release and GitHub Pages site, flag Node Reference Manual updates, clean junk files. Use for \"ship this\", \"cut a release\", \"build and publish the DMG\", \"push and deploy\"."
 ---
+
+## When to use (full scope)
+
+Verify, review, commit, and push uncommitted Infinite changes, cut a versioned GitHub Release tag with curated "What's new" notes, build the distributable macOS DMG, pull the CI-built Windows x64/ARM64 zips and the CI-built Linux AppImage, and publish all of it via the GitHub Pages website (n1m21n.github.io/Infinite) and that Release — plus flag node-catalog changes that need the Node Reference Manual updated, and clean up junk/duplicate tracked files. Use when asked to "ship this", "release Infinite", "cut a release", "build and publish the DMG", "push and deploy", or "clean up the repo before release".
 
 Paths below are relative to the repo root (`/Users/namansoni/infinte`), not
 this skill directory.
