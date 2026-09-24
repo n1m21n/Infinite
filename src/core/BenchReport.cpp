@@ -5,6 +5,7 @@
 
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 
 namespace Bench
 {
@@ -237,6 +238,16 @@ namespace Bench
          return "n/a";
       std::vector<unsigned char> pixels((size_t)width * (size_t)height * 4);
       glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+      // When the hash moves, the raw pixels say by how much:
+      // INFINITE_BENCH_DUMPRGBA=<file> writes them for scripts/bench/rgbadiff.py.
+      if (const char* dumpPath = std::getenv("INFINITE_BENCH_DUMPRGBA"))
+      {
+         if (FILE* f = std::fopen(dumpPath, "wb"))
+         {
+            std::fwrite(pixels.data(), 1, pixels.size(), f);
+            std::fclose(f);
+         }
+      }
       char hex[17];
       std::snprintf(hex, sizeof(hex), "%016llx",
                     (unsigned long long)Fnv1a64(pixels.data(), pixels.size()));

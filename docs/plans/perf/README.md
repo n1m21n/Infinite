@@ -197,8 +197,26 @@ re-record the baseline with `run_all.sh` before comparing against it):
   `exp(-(x²+y²)/k)`, which splits exactly into two 1D passes (22 and 18
   reads). Bloom's bright-pass runs per sample before weighting, so it
   splits too. That needs multi-pass support in `FilterNode` and a 16F
-  intermediate so `output_hash` only moves by float rounding. It is a
-  separate optimisation branch, not part of this suite.
+  intermediate so `output_hash` only moves by float rounding.
+  **Acted on** (`feature/filter-gpu-easy-wins`): `FilterDef::prePassBody`
+  adds an optional horizontal pass into an RGBA16F intermediate (`uPass`), and
+  all four blur-family defs (`gaussianblur`, `boxblur`, `bloom`,
+  `diffuseglow`) now use it. B2 with `gpunodes=1`, GPU ms/frame, M2:
+
+  | Scale (anim) | effects before | effects after | frame p50 before | frame p50 after |
+  |---|---|---|---|---|
+  | s | 10.8 | 2.8 | 19.7 | 9.8 |
+  | l | 32.7 | 8.6 | 49.7 | 21.4 |
+
+  Output check (`INFINITE_BENCH_DUMPRGBA` + `scripts/bench/rgbadiff.py`,
+  static variants against the pre-change build): s differs in 0.3% of bytes,
+  all by 1 step of 8 bits. m/l differ by up to 177 steps in 5-8% of bytes,
+  but only because Threshold and Posterize sit downstream and turn a 1-step
+  rounding change at their cut-off into a full jump. A 32-bit intermediate
+  (tried and reverted) makes s bit-identical and m differ in 64 bytes by 1,
+  which proves the two-pass math is exact. It costs 12.7 ms instead of 8.6 at
+  l, so 16-bit was kept. The FilterNode refactor on its own (same defs, new
+  code path) reproduced all three old static hashes exactly.
 - **B5(b)** (node-count scaling): near-linear from 50 to 200 nodes (4.4ms to
   14.7ms, roughly 3.3x for 4x the nodes), then super-linear at 400 (28.6ms
   p50, 39.9ms p99 - the p95/p99 spread widens sharply too, 37.5/39.9 vs a
@@ -222,12 +240,14 @@ a fixture goes here, not into a code change.
   B5(b) sweep (both described above). B2's first version had a static variant
   whose `output_hash` changed every run because Glitch reads `uTime`. Fixed
   by swapping Glitch for Emboss in the static variant.
-- App behaviour, not fixed: one time-driven filter (`FilterNode::mUsesTime`,
-  so Glitch, Add Noise, Displace or Liquify) anywhere in a chain turns off
-  caching for every node below it. The whole downstream chain recooks every
-  frame even when nothing else changes. B2 l-static went from 28 ms to 4.5 ms
-  p50 when its three Glitch nodes were replaced. Users can hit this without
-  knowing.
+- A time-driven filter (Glitch, Add Noise, Displace, Liquify) recooks every
+  node below it every frame. B2 l-static went from 28 ms to 4.5 ms p50 when
+  its three Glitch nodes were replaced. While the transport plays that is
+  correct, because the image really changes. While it is stopped it was
+  waste: `FilterNode` skipped its cache for any `uTime` filter, even though
+  transport time only advances while playing. **Fixed** on
+  `feature/filter-gpu-easy-wins`: the uploaded time value is now part of
+  `FilterNode::Signature`, so a stopped transport caches like any other patch.
 - `mem.rss_mb` at the end of a run is often *lower* than at the start on this
   8 GB machine (for example B2 s-anim 208 to 52 MB). macOS compresses and
   pages out memory under pressure, so RSS is not a reliable footprint number
