@@ -3,10 +3,11 @@
 #include <string>
 #include <vector>
 
-// Mix-in interface for image-graph nodes, ported from BespokeSynth's IVisualNode.
-// A node renders its output into a GL texture; downstream nodes pull that texture
-// via GetOutputTexture(). Cooking is pull-based and memoized per frame so a node
-// feeding several consumers only renders once.
+// The base interface every Infinite node implements. An image node renders into
+// a GL texture that downstream nodes read through GetOutputTexture(); audio,
+// note, geometry and modulator capabilities are layered on through the mix-ins
+// and slot accessors below. Cooking is pull-based and memoized per frame, so a
+// node feeding several consumers renders once per frame, not once per consumer.
 class IModulator;
 class IGeometrySource;
 class AudioNode;

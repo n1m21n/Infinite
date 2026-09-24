@@ -164,67 +164,93 @@ namespace GLUtil
       fbo = Fbo();
    }
 
+   // The driver's info log for a shader or program, at its full length. A
+   // fixed-size buffer would cut a long GLSL error list off mid-line, and
+   // FormulaNode shows this text to the user verbatim.
+   static std::string InfoLog(unsigned int object, bool isProgram)
+   {
+      GLint length = 0;
+      if (isProgram)
+         glGetProgramiv(object, GL_INFO_LOG_LENGTH, &length);
+      else
+         glGetShaderiv(object, GL_INFO_LOG_LENGTH, &length);
+      if (length <= 1)
+         return std::string();
+
+      std::string log((size_t)length, '\0');
+      if (isProgram)
+         glGetProgramInfoLog(object, length, nullptr, &log[0]);
+      else
+         glGetShaderInfoLog(object, length, nullptr, &log[0]);
+      const size_t terminator = log.find('\0');
+      if (terminator != std::string::npos)
+         log.resize(terminator);
+      return log;
+   }
+
+   // One compiled stage, or 0 with `log` holding the driver's reason.
+   static unsigned int CompileStage(GLenum stage, const char* src, std::string& log)
+   {
+      const unsigned int shader = glCreateShader(stage);
+      glShaderSource(shader, 1, &src, nullptr);
+      glCompileShader(shader);
+
+      GLint compiled = 0;
+      glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+      if (compiled)
+         return shader;
+
+      log = InfoLog(shader, false);
+      glDeleteShader(shader);
+      return 0;
+   }
+
    unsigned int CompileProgram(const char* fragSrc, std::string* outError)
    {
-      auto report = [outError](const char* prefix, const char* log)
+      auto fail = [outError](const char* stage, const std::string& log) -> unsigned int
       {
          if (outError != nullptr)
-            *outError = std::string(prefix) + log;
+            *outError = std::string(stage) + log;
          else
-            fprintf(stderr, "GLUtil::CompileProgram %s%s\n", prefix, log);
-      };
-
-      auto compile = [&report](GLenum type, const char* src) -> unsigned int
-      {
-         unsigned int shader = glCreateShader(type);
-         glShaderSource(shader, 1, &src, nullptr);
-         glCompileShader(shader);
-         GLint ok = 0;
-         glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
-         if (!ok)
-         {
-            char log[1024];
-            glGetShaderInfoLog(shader, sizeof(log), nullptr, log);
-            report("shader error: ", log);
-            glDeleteShader(shader);
-            return 0u;
-         }
-         return shader;
-      };
-
-      unsigned int vert = compile(GL_VERTEX_SHADER, kVertSrc);
-      unsigned int frag = compile(GL_FRAGMENT_SHADER, fragSrc);
-      if (vert == 0 || frag == 0)
-      {
-         if (vert)
-            glDeleteShader(vert);
-         if (frag)
-            glDeleteShader(frag);
+            fprintf(stderr, "GLUtil::CompileProgram %s%s\n", stage, log.c_str());
          return 0;
+      };
+
+      std::string log;
+      const unsigned int vert = CompileStage(GL_VERTEX_SHADER, kVertSrc, log);
+      if (vert == 0)
+         return fail("shader error: ", log);
+
+      const unsigned int frag = CompileStage(GL_FRAGMENT_SHADER, fragSrc, log);
+      if (frag == 0)
+      {
+         glDeleteShader(vert);
+         return fail("shader error: ", log);
       }
 
-      unsigned int program = glCreateProgram();
+      // Attribute slots are fixed before linking so the shared quad's VAO
+      // layout (EnsureQuad) matches every program without a lookup.
+      const unsigned int program = glCreateProgram();
       glBindAttribLocation(program, 0, "aPos");
       glBindAttribLocation(program, 1, "aUv");
       glAttachShader(program, vert);
       glAttachShader(program, frag);
       glLinkProgram(program);
 
-      GLint linked = 0;
-      glGetProgramiv(program, GL_LINK_STATUS, &linked);
-
+      // The linked program keeps its own copy; the stage objects are done.
+      glDetachShader(program, vert);
+      glDetachShader(program, frag);
       glDeleteShader(vert);
       glDeleteShader(frag);
 
+      GLint linked = 0;
+      glGetProgramiv(program, GL_LINK_STATUS, &linked);
       if (!linked)
       {
-         char log[1024];
-         glGetProgramInfoLog(program, sizeof(log), nullptr, log);
-         report("link error: ", log);
+         log = InfoLog(program, true);
          glDeleteProgram(program);
-         return 0;
+         return fail("link error: ", log);
       }
-
       return program;
    }
 

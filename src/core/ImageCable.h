@@ -4,11 +4,9 @@
 
 // Typed patch cable carrying a texture handle between two nodes.
 //
-// BespokeSynth's visual nodes connect via a generic PatchCableSource
-// (kConnectionType_Special) and recover the real type with dynamic_cast<IVisualNode*>
-// at cook time. This project's research doc (image-resynth-research.md §8.1/§8.3)
-// flags that as worth upgrading for a new project, so ImageCable is a typed
-// connection from the start: it only ever holds an INode*.
+// The cable is typed at compile time: it only ever holds an INode*, so an
+// image input can never be handed an audio or geometry source, and a consumer
+// never has to discover what it is connected to by casting at cook time.
 class ImageCable
 {
 public:

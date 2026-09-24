@@ -5,9 +5,8 @@
 
 // Declarative description of one filter-node "type". FilterNode (one C++ class)
 // is instantiated once per FilterDef, so adding a new effect/color-adjustment
-// module is a table entry, not a new class - this is what makes "give every
-// Affinity effect its own module with its own params" tractable, mirroring how
-// Bespoke's EffectChain hosts many effect kinds behind one module shell.
+// node is a table entry, not a new class - which is what keeps a large library
+// of single-purpose effect nodes, each with its own params, maintainable.
 struct FilterParamDef
 {
    enum class Type
