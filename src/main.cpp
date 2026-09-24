@@ -88320,6 +88320,35 @@ int main(int argc, char** argv)
             continue;
          }
 
+         // Off-screen culling: a node well outside the view keeps the box and
+         // pins it had last time it was laid out (so cables to it still land,
+         // see KeepOffscreenNodeAlive) and skips its body. Same gate as the
+         // collapsed node's register-only pass below: a parameter only exists
+         // for modulation, palette, expressions and the performance panel in
+         // the frames it draws, so a node with any of those bound is always
+         // drawn. So is anything while a popup is open (its contents are
+         // submitted from the body), and every node once per kCullRefresh
+         // frames, staggered, so size or pin changes made while it is away
+         // (a new param, an input count) show up within half a second.
+         {
+            constexpr int kCullRefresh = 30;
+            constexpr float kCullMargin = 64.0f;
+            const bool mustDraw = gn.hasModulatedParams || gn.hasPaletteColors ||
+                                  gn.hasExpressionParams || gn.hasPerfPanelParams ||
+                                  ImGui::GetCurrentContext()->OpenPopupStack.Size > 0 ||
+                                  ((frameId + gn.index) % kCullRefresh) == 0;
+            if (!mustDraw && ed::KeepOffscreenNodeAlive(gn.NodeId(), kCullMargin))
+            {
+               if (b6TrackVis)
+               {
+                  b6FrameBodiesDrawnCount--;
+                  if (!b6NodeIsVisible)
+                     b6FrameOffscreenMs += (Bench::ScopedStageTimer::NowMs() - b6NodeDrawStartMs);
+               }
+               continue;
+            }
+         }
+
          // Category tint: same idea as DrawGroupNode's stored colour, but from
          // the static per-category table since categories are a fixed
          // vocabulary, not something a user repicks per node. Blended into the
