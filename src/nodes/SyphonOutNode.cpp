@@ -1,6 +1,7 @@
 #include "SyphonOutNode.h"
 
 #include "gl3.h"
+#include "BenchMediaIo.h"
 
 namespace
 {
@@ -102,6 +103,10 @@ void SyphonOutNode::CookIfNeeded(int frameId)
    EnsureServer();
    if (mServer != nullptr)
    {
+      const bool bench = Bench::MediaIoEnabled().load(std::memory_order_relaxed);
+      const double benchStartMs = bench ? Bench::MediaNowMs() : 0.0;
       Platform::SyphonServerPublish(mServer, GLUtil::FboTexture(mOut), mOut.w, mOut.h, false);
+      if (bench)
+         mBenchPublishMs.push_back(Bench::MediaNowMs() - benchStartMs);
    }
 }

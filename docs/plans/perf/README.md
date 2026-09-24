@@ -38,6 +38,13 @@ INFINITE_BENCH_B9SCENE=b2 INFINITE_BENCH_B9FRAMES=600 \
 # B6: leave Infinite in front; `unfocused=1` or `unpaced=1` in variant = discard
 INFINITE_BENCH_B6NODES=300 INFINITE_BENCH_B6MODE=all INFINITE_BENCH_GPUTIMERS=0 \
    INFINITE_EXITAFTER=650 ./build/Infinite.app/Contents/MacOS/Infinite -ApplePersistenceIgnoreState YES
+# B8: clips first (ffmpeg, into gitignored bench/media/), then one variant.
+# Leave Infinite in front; `unfocused=1`/`unpaced=1`/`overlap=1` = discard
+scripts/bench/b8_make_clips.sh
+INFINITE_BENCH_B8=1 INFINITE_BENCH_B8MEDIA="$PWD/bench/media" INFINITE_BENCH_B8CLIPS=4 \
+   INFINITE_BENCH_B8RES=2160 INFINITE_BENCH_B8WINDOWS=3 INFINITE_BENCH_B8CAMERA=1 INFINITE_BENCH_B8SYPHON=1 \
+   INFINITE_BENCH_B8FRAMES=300 INFINITE_EXITAFTER=350 \
+   ./build/Infinite.app/Contents/MacOS/Infinite -ApplePersistenceIgnoreState YES
 ```
 
 `-ApplePersistenceIgnoreState YES` stops macOS from showing its "reopen
@@ -62,7 +69,7 @@ frame count (B5).
 | B5 Fundamentals | (a) empty patch, **(b) node-count scaling**, **(c) per-stage CPU+GPU split**, **(d) audio-thread-alone**, **(e) startup time**, **(f) load/save time**, **(g) undo-snapshot time** | **All of (a)-(g)** (`INFINITE_BENCH_B5EMPTY`, `INFINITE_BENCH_B5NODES`, `INFINITE_BENCH_B5STAGES`, `INFINITE_BENCH_B5AUDIOALONE`, `INFINITE_BENCH_B5STARTUP`, `INFINITE_BENCH_B5LOADSAVE`, `INFINITE_BENCH_B5UNDO`) | (a) zero-node floor, frame_ms percentiles + RSS, same 120-frame sampled window as (b) so the two are directly comparable. (b) 50/100/200/400 mixed nodes laid out on a grid (not stacked at origin - the flaw called out in benchmark-suite.md §2 against MIXEDSTRESSTEST/GEOMDENSITYTEST). Reports frame_ms percentiles + RSS. (c) same mixed-node grid as (b), wraps seven main-loop stages (`modulation`, `cook`, `node_bodies`, `editor_end`, `imgui_render`, `projectors`, `swap`) in `ConditionalStageTimer`s sampled over the same frame window, reports p50 CPU ms per stage into `stages_cpu_ms` (`stages_gpu_ms` still empty - blocked on the GPU timer ring below). (d) one Oscillator straight into Audio Out, no effects chain, buffer sweep 64/128/256/512 - isolates the audio callback's fixed per-block cost from B1's DSP-graph cost; reuses B1's wall-clock-window + `AudioLoadRing` pattern. (e) startup milestone timings from entry through first frame swap (`pre_window`, `window_gl`, `imgui_fonts`, `scanners_load`, `first_frame_render`, `total_to_first_frame`). (f)/(g) reuse (b)/(c)'s mixed-node grid (`INFINITE_BENCH_B5LOADSAVE=<n>`/`INFINITE_BENCH_B5UNDO=<n>`), fire once at `frameId==32`, and time the real patch I/O and undo paths back to back (`SavePatchTo`→`LoadPatchFrom`; `PushUndoCheckpoint`→`Undo`) via `Bench::ScopedStageTimer::NowMs()` - not synthetic serialize-only calls, so (f) includes whatever `ApplyPatchData`/field-graph remap does on load, and (g) includes the real `BuildPatchData`/`ApplyPatchData` round trip Undo takes. `stages_cpu_ms: {save, load}` / `{push_checkpoint, undo_restore}`. |
 | B6 Canvas navigation | programmatic pan/zoom/drag, never OS-level UI scripting | **Yes** (`INFINITE_BENCH_B6NODES`, `B6MODE=pan\|zoom\|drag\|dropdown\|all`, `B6COLLAPSED`, `B6VSYNC`, `B6FRAMES`, default 300 nodes / 600 frames) | Builds a wired grid of 12 cycled node types (image, audio, modulator, utility) and drives the view through new `ed::SetViewScroll`/`SetViewZoom` calls. Pan sweeps the whole grid and back. Zoom goes 0.25 to 2 and back. Drag moves one node in a circle through the `needsPosition` path. Dropdown opens and closes Math's op list every 30 frames. `all` splits the window into those four phases. Reports frame_ms plus per-phase p50/p99/max, and `canvas_nav` has visible vs drawn node bodies, the ms spent on off-screen bodies, drag distance, dropdown-open frames and `on_vsync_frac`. `stages_cpu_ms` adds `links` and `cook_all` (B6 only, see "Found while measuring"). |
 | B7 Soak/thermal | 30min B3, long variant only | No | Depends on B3. |
-| B8 Media I/O | video/camera/projector/Syphon-Spout | No | "Missing today" per the doc; not started. |
+| B8 Media I/O | video/camera/projector/Syphon-Spout | **Built** (`INFINITE_BENCH_B8`, `B8CLIPS=1-4`, `B8RES=1080\|2160`, `B8WINDOWS=0-3`, `B8CAMERA`, `B8SYPHON`, `B8FRAMES` default 600, `B8MEDIA`, `GPUTIMERS=1`) | 1-4 looping Video Source clips (synthetic H.264 1080p30/2160p30 from `scripts/bench/b8_make_clips.sh`, `-g 30 -pix_fmt yuv420p`, 2.0-2.75 s so every run crosses the loop boundary), each into its own Output. Projector windows are opened on Outputs from code and placed beside the canvas (`overlap=1` if the OS stacks them). The camera is opened only if permission is already granted: `CameraAuthorizationStatus()` is read-only on all three platforms, so a run never raises the dialog and reports `"camera":"skipped"` with the reason. Syphon/Spout Out only publishes, and `has_clients` says whether anyone received (null on Windows, `"n/a"` on Linux). `media_io` reports per clip: real decodes (`decode_ms`) split from cache hits (`cache_hit_ms`), the loop-boundary decode (`loop_decode_ms`), decoded/dropped/skipped, `repeated` next to `expected_repeats` (a 30 fps clip on a 60 Hz loop repeats about half its frames by design), `reuploads`, `reader_restarts`, `uploads` vs `new_frames`, and `upload_cpu_ms`. Per window it reports present ms, frame intervals, jitter, R and missed vsync, with `on_vsync_frac` null (projectors run at swap interval 0). Also Syphon publish ms and camera fps/interval. `stages_cpu_ms` uses the B6 names plus `projectors`. GPU upload time comes only with `INFINITE_BENCH_GPUTIMERS=1`, via the per-node ring with the `cook` query off, and reads null on macOS (see "Found while measuring"). |
 | B9 Memory footprint | B2/B4 at `l` scale | **Yes** (`INFINITE_BENCH_B9SCENE=b2\|b4`, `INFINITE_BENCH_B9FRAMES`, default 600) | Builds the B2 or B4 scene at scale l, animated, GPU timers off. Reports RSS and OS footprint (`phys_footprint` on macOS, `PrivateUsage` on Windows, VmRSS + VmSwap on Linux) at launch, after the build, at frames 32 and 152, and at the end. Also reports the peak over the whole run and a least-squares slope per 100 frames from frame 32. `gpu_est_mb` sums every texture, renderbuffer and buffer the GL wrappers allocated, split into textures, render targets, shadow maps, mesh buffers and instance buffers. Use footprint, not RSS, for leaks and headroom (see "Found while measuring"). |
 | B10 Offline render/AV sync | Arrangement render of B3, realtime factor + drift | No | Depends on B3. |
 
@@ -97,7 +104,7 @@ ever fires - no `BENCH_JSON` line, ever, at any node count. Confirmed by
 direct reproduction (`EXITAFTER=152` failed 3/3 runs, `153+` passed every
 time). Fixed by bumping `run_all.sh`'s `EXITAFTER` for this sweep to 160,
 matching the margin every other fixture in the script already carries. Since then B1(stages), B2, B3, B4, all of B5, and B9 have been
-built (see the table above), and B6 after them. B7/B8/B10 are not built yet. Each
+built (see the table above), then B6 and B8. B7/B10 are not built yet. Each
 needs its own platform work first (a canvas-automation entry point,
 soak automation, offline-render integration). Nothing below claims
 coverage this suite doesn't have.
@@ -130,8 +137,12 @@ Projector/Output > Canvas > Previews):
 6. **B9 memory footprint**. **Built** (`INFINITE_BENCH_B9SCENE=b2|b4`, `INFINITE_BENCH_B9FRAMES`).
 7. **B3 live performance**. **Built** (`INFINITE_BENCH_B3`, `INFINITE_BENCH_B3LIVE`, `INFINITE_BENCH_B3SCALE`).
 8. **B6 canvas navigation**. **Built** (`INFINITE_BENCH_B6NODES`, `INFINITE_BENCH_B6MODE`, `INFINITE_BENCH_B6COLLAPSED`, `INFINITE_BENCH_B6VSYNC`).
-- **B8 media I/O**: needs decode/upload/present timing hooks in the video and
-  camera paths, plus a way to open 2-3 real projector windows headlessly.
+9. **B8 media I/O**. **Built** (`INFINITE_BENCH_B8*`, see the table). Decode
+   timing lives in each platform's video layer (`Bench::MediaDecodeStats` in
+   `src/core/BenchMediaIo.h`, a lock-free single-producer ring because Windows
+   and Linux decode on their own threads). Upload, camera and publish timing
+   live in the nodes, and present timing in the projector loop. All of it is
+   inert unless the fixture sets `Bench::MediaIoEnabled()`.
 - **B7/B10**: each composes B1+B2/B3 (+ soak duration for B7, + offline render for B10).
 
 ## Baseline
@@ -201,6 +212,88 @@ on that lower bound alone.
 
 Still to do: 3 full `run_all.sh` passes on an idle machine with Infinite in
 front the whole time, then add the B6 rows to the baseline.
+
+### B8 media I/O: verification runs, not a baseline
+
+Recorded 2026-09-24 on the M2 (Mac14,7, 60 Hz), 300 frames per variant,
+GPU timers off. Someone was using the machine, so every run is `unfocused=1`
+and `unpaced=1` (0-27% of frames on a refresh boundary). Frame numbers show
+work per frame, not an on-screen rate. The counts (decodes, drops, repeats,
+uploads) don't depend on pacing and hold as measured.
+
+**Clips** (per clip, ranges across the clips of a run; ms):
+
+| Variant | frame p50 / p99 | `cook` | decode p50 / p99 / max | cache hit p50 | loop boundary max | decoded fps | dropped | repeated / expected | uploads / new frames | upload CPU p50 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2x1080 | 8.7 / 12.3 | 4.2 | 0.7 / 4.6 / 11.0 | 0.2-0.5 | 14-16 | 30.0 | 0 | 200 / 200 | 268 / 68 | 1.5 |
+| 4x1080 | 10.9 / 23.8 | 8.2 | 0.7-1.3 / 1.9-2.5 / 7.8-9.9 | 0.2-0.3 | 13-15 | 30.1 | 0-1 | 172-173 / 172 | 268 / 95-96 | 1.5-1.7 |
+| 2x2160 | 11.3 / 29.4 | 7.0 | 2.4 / 5.7-20.0 / 19-20 | 1.0-2.6 | 29-31 | 30.0 | 5-7 | 175-177 / 170 | 268 / 91-93 | 1.0-1.3 |
+| 4x2160 | **295 / 765** | **290** | 3.2 / 20-22 / 29-54 | no hits | 100-189 | 22.5-23.3 | **~1600** | 0 / 0 | 268 / 268 | 1.3 |
+| 4x2160 + 3 windows + camera + Syphon | **284 / 366** | **279** | 3.1-3.2 / 20-21 / 26-45 | no hits | 120-143 | 24.6-25.4 | **~1600** | 0 / 0 | 268 / 268 | 1.3 |
+
+`reader_restarts` equals `loop_wraps` in every run (1-2 per clip at 1080 and
+2x2160, 24-34 at 4x2160, where the clock ran on for 80+ s). `skipped` tracks
+`dropped`. Footprint: 875 MB (2x1080), 1.17 GB (2x2160), 1.50-1.68 GB peak
+(4x2160).
+
+**Projector windows** (2x1080, swap interval 0, R = 60 Hz):
+
+| Variant | window | present p50 / p99 | interval p50 / p99 | jitter stddev | missed vsync | `projectors` stage |
+|---|---|---|---|---|---|---|
+| 2 windows | 0 / 1 | 0.22 / 6.0, 0.22 / 0.46 | 10.3 / 29.0, 9.3 / 24.5 | 5.5, 3.7 | 3.7%, 0.4% | 0.54 |
+| 3 windows | 0 / 1 / 2 | 0.18-0.22 / 0.39-6.0 | 9.7-10.6 / 21.9-27.3 | 3.5-5.2 | 6.4%, 6.0%, 0% | 0.80 |
+| heavy | 0 / 1 / 2 | 0.29-0.36 / 7.0-7.8 | 284 / 362-366 | 33 | 100% | 1.37 |
+
+Window intervals follow the canvas frame. Projectors have no pacing of their
+own (finding 6), so a missed vsync here is the canvas's.
+
+**Syphon Out** (publish only, no client connected, `has_clients: false`):
+p50 0.07 / p99 0.16 ms at 1080, 0.18 / 0.42 ms in the heavy run.
+
+**Camera**: `"skipped"`, `camera_skip_reason: "not_determined"`. Infinite
+has never been granted camera access on this machine, and the fixture never
+asks. Camera numbers need a run after access has been granted once, by hand.
+
+**GPU upload**: with `INFINITE_BENCH_GPUTIMERS=1` (2x2160), `media_upload`
+read exactly 0.0 ms on all 268 frames, while `imgui_render` read 1.07 ms in
+the same run. The query measured nothing (see "Found while measuring"), so
+the fixture reports `gpu_per_frame: null` with a `gpu_note` on macOS.
+
+**Profile, heaviest variant** (`sample`, 10 s, 5455 main-thread samples):
+96% under `cook` → `OutputNode::CookIfNeeded` → `VideoSourceNode::CookIfNeeded`
+→ `Platform::VideoFrameAt`. Named stages add up to 282 of the 284 ms p50
+frame, so nothing is unnamed. `cook_all` is 0.0 because every node in the
+B8 graph is pulled by an Output inside `cook`. Inside `VideoFrameAt`,
+attributed by disassembly (the build has no line info):
+
+| Where | Samples | Share |
+|---|---|---|
+| `PushCacheFrame`: `operator new` + `memcpy` of a fresh 33 MB cache entry | 2552 | 47% |
+| `DecodeNext` BGRA→RGBA swizzle + row flip loop | 1304 | 24% |
+| `outPixels = handle->pending` (copy assign) | 760 | 14% |
+| `pending.assign(..., 0)` zero-fill (`bzero`) | 263 | 5% |
+| `AVAssetReaderTrackOutput copyNextSampleBuffer` | 257 | 5% |
+
+**Proposed targets** (proposed, not agreed; the fixture reports them in
+`targets_pass`). A miss is always reported `false`. A pass is `true` only in a
+trusted run (focused, paced, no overlap), otherwise `null`:
+
+- `clipN_decode_realtime`: (decoded + 1) / seconds ≥ the clip's fps, 0
+  dropped, 0 skipped, and `repeated - expected_repeats` ≤ 0. Repeats the clip
+  rate forces don't count against it, only extra ones.
+- `windowN_interval_p99_locked`: frame interval p99 ≤ 1.10 × the refresh
+  period. That is §6's "locked 60 fps, p99 ≤ 16.7 ms", with B3's 10%
+  tolerance so vsync timestamp jitter alone can't fail it.
+- `windowN_missed_vsync_lt_half_pct`: intervals > 1.5 periods < 0.5%.
+
+Measured: at 2x2160 and above, decode fails outright (drops, and at 4x2160
+decoded fps < 30). At 1080 a single loop-boundary drop is enough to fail
+some clips. Projector windows fail both window targets in every run so far.
+All of this is from untrusted runs, so only the failures count.
+
+Still to do: one trusted pass (idle machine, Infinite in front, camera
+access granted once by hand), then the Windows/Linux numbers from CI or a
+tester.
 
 ## Top costs per benchmark
 
@@ -515,6 +608,47 @@ a fixture goes here, not into a code change.
   can't see that. B6 counts frame intervals within 1.5 ms of a whole number
   of refresh periods. Below 80% it tags the run `unpaced=1`. B3 has the
   same exposure.
+- **B8 media I/O** (measured, not fixed; numbers in the B8 section above):
+  1. *macOS decodes on the main thread, inside cook.* `VideoFrameAt` runs
+     `AVAssetReader` synchronously from `VideoSourceNode::CookIfNeeded`. At
+     2x1080 `cook` is 4.2 of an 8.7 ms frame, and every loop wrap stalls
+     the frame for 12-16 ms (1080) or 29-31 ms (2160).
+  2. *An unchanged frame is uploaded again.* `TryUseCache` hands back the
+     same frame, and `VideoSourceNode` uploads it again. At 2x1080: 268
+     uploads for 68 new frames, so 200 (75%) re-upload unchanged pixels at
+     ~1.5 ms CPU each. At a paced 60 Hz this would be about 50%.
+  3. *`PushCacheFrame` copies every decoded frame.* It allocates and
+     `memcpy`s a full frame into the LRU under `gVideoCacheMutex`, even when
+     it will never be read again: 47% of main-thread time in the heaviest run.
+  4. *Linux copies every delivered frame into `frameCache`, and its cache
+     fallback also hands repeats back.* Code-read only, not measured
+     (no Linux machine). `cache_hit_ms` and `reuploads` will show it on CI.
+  5. *`VideoInNode` calls `glTexImage2D` (a reallocation) on every camera
+     frame.* Code-read only. The camera was not measured (permission never
+     granted).
+  6. *Projectors present one after another at swap interval 0.* They have
+     no vsync of their own, and their frame intervals just follow the
+     canvas. `on_vsync_frac` is null for them by design, and the swap
+     interval is unchanged.
+  7. *Spout `HasClients` only reports `IsInitialized`.* Windows reports
+     `has_clients: null` rather than a wrong `true`.
+  8. *New: macOS catch-up spiral.* `VideoFrameAt` decodes every frame
+     between the reader head and the requested time. It never skips ahead
+     to a keyframe, and there is no deadline. Once one frame runs long, for
+     example on a 4K loop-boundary restart of 100-190 ms, the next call has
+     more frames to decode, so it runs longer still. At 4x2160 the frame
+     never recovers: 290 ms `cook`, about 7 decodes per shown frame, about
+     1600 of 1900 decodes per clip dropped, 0 cache hits, playback at
+     about 3.5 fps. 2x2160 stays just short of it, with 5-7 drops per clip
+     around the wraps.
+- **B8 harness notes.** On Apple's GL a `GL_TIME_ELAPSED` query around
+  `glTexSubImage2D` reads 0 ms: the driver copies on the CPU and runs the
+  blit later, outside the query. So B8 turns GPU timers on only with
+  `INFINITE_BENCH_GPUTIMERS=1`, and reports an all-zero stage as null.
+  macOS won't give focus to an app launched from a background shell, even
+  with `open`, so unattended runs come out `unfocused=1`. A fixture window
+  closed by hand ends the run with no `BENCH_JSON`. `run_all.sh` now has an
+  opt-in `FIXTURE_TIMEOUT` watchdog, and B8 uses it.
 - `.git/hooks/post-commit` starts `tools/semi-brain/4_engine/sync_brain.py
   --sync` in the background after every commit. It uses ~4 cores for ~5
   minutes, and B1 runs during it showed 8-68 xruns instead of 0-2. Never run
@@ -533,3 +667,13 @@ run as of this writing - the fixtures were only run on this macOS machine.
 GPU-timer numbers, once the query ring exists, should be marked "not
 meaningful" on Windows/Linux CI per benchmark-suite.md §5.6 (no real GPU
 there).
+
+B8: `Platform::VideoBenchStats` and `Platform::CameraAuthorizationStatus` are
+defined in `Platform.mm`, `win/MediaWin.cpp` and `linux/MediaLinux.cpp` /
+`linux/CameraLinux.cpp`. Windows and Linux decode on a worker thread, so
+`decode_ms` there is the thread's `ReadSample`/`avcodec` time. `dropped`
+counts frames the pick skipped, and the loop boundary is seek to first
+decoded frame. Windows has no frame cache (`cache_hit_ms` stays empty) and
+no clip frame rate (`fps` falls back to 30). The camera always reads as
+authorized there. Linux reports Syphon as `"n/a"`, and Windows reports
+`has_clients: null`. Only compiled and run on macOS so far.

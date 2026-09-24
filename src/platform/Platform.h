@@ -4,6 +4,11 @@
 #include <string>
 #include <vector>
 
+namespace Bench
+{
+   struct MediaDecodeStats; // core/BenchMediaIo.h
+}
+
 // Opaque forward declaration - avoids pulling GLFW's headers into every TU
 // that includes this facade just for the Windows-only output-window entry
 // points below.
@@ -221,6 +226,12 @@ namespace Platform
    // wait for the decoder instead of racing past it. The render thread must
    // NOT wait on this - holding the previous frame is the whole point.
    bool VideoDecodeIsCatchingUp(VideoHandle* handle);
+
+   // B8 bench only: the decode stats this handle has been recording since
+   // VideoOpen, or nullptr when Bench::MediaIoEnabled() was off at open (every
+   // handle outside INFINITE_BENCH_B8). See core/BenchMediaIo.h for who writes
+   // which field on which thread.
+   Bench::MediaDecodeStats* VideoBenchStats(VideoHandle* handle);
 
    // Decodes a video container's audio track into the same planar-float
    // SampleBuffer (defined below) the audio-file path already produces.
@@ -1048,6 +1059,19 @@ namespace Platform
    };
 
    struct CameraHandle;
+
+   // Camera permission as the OS reports it right now. Read-only: never
+   // raises a permission prompt (CameraOpen is what asks, on macOS). Windows
+   // and Linux have no per-app prompt on this path, so they always answer
+   // Authorized and a missing/blocked device surfaces from CameraOpen instead.
+   enum class CameraAuthorization
+   {
+      Authorized,
+      Denied,
+      Restricted,
+      NotDetermined,
+   };
+   CameraAuthorization CameraAuthorizationStatus();
 
    std::vector<CameraDeviceInfo> CameraListDevices();
    CameraHandle* CameraOpen(const std::string& deviceId, CameraResolution res, bool mirrorX, std::string& outError);

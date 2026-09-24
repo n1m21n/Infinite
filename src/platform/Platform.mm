@@ -1,8 +1,10 @@
 #include "Platform.h"
+#include "BenchMediaIo.h"
 #include "PluginVST3.h"
 #include "common/MidiCC14.h"
 #include <algorithm>
 #include <atomic>
+#include <memory>
 #include <cstdint>
 #include <filesystem>
 #include <mutex>
@@ -486,6 +488,9 @@ namespace Platform
       // is this handle's share of it, tracked so VideoClose can give it back.
       std::vector<CachedVideoFrame> frameCache;
       size_t cacheBytes = 0;
+
+      // B8 bench only (nullptr otherwise) - see Platform::VideoBenchStats.
+      std::unique_ptr<Bench::MediaDecodeStats> bench;
    };
 
    // ---- decode cache budget, shared by every open video ---------------------
@@ -1487,6 +1492,11 @@ namespace Platform
          h->nominalFps = [h->track nominalFrameRate];
          if (h->nominalFps <= 0.0)
             h->nominalFps = 30.0;
+         if (Bench::MediaIoEnabled().load(std::memory_order_relaxed))
+         {
+            h->bench = std::make_unique<Bench::MediaDecodeStats>();
+            h->bench->nominalFps = h->nominalFps;
+         }
 
          if (!StartReader(h, 0.0, outError))
          {
@@ -1534,16 +1544,29 @@ namespace Platform
    // done whatever work the requested position needed. Nothing to wait for.
    bool VideoDecodeIsCatchingUp(VideoHandle*) { return false; }
 
+   Bench::MediaDecodeStats* VideoBenchStats(VideoHandle* handle) { return handle ? handle->bench.get() : nullptr; }
+
    bool VideoFrameAt(VideoHandle* handle, double seconds, std::vector<unsigned char>& outPixels)
    {
       if (handle == nullptr || seconds < 0.0)
          return false;
 
+      Bench::MediaDecodeStats* bench = handle->bench.get();
+      const double benchCallStartMs = bench ? Bench::MediaNowMs() : 0.0;
+
       @autoreleasepool
       {
          // 1. If the target frame is in the LRU cache (from recent playback or scrubbing), serve immediately!
          if (TryUseCache(handle, seconds, outPixels))
+         {
+            if (bench)
+            {
+               bench->cacheHitMs.Push(Bench::MediaNowMs() - benchCallStartMs);
+               bench->cacheHits.fetch_add(1, std::memory_order_relaxed);
+               bench->deliveredPts = handle->currentPts;
+            }
             return true;
+         }
 
          // 2. Cache miss: check if existing reader can legitimately decode forward to `seconds`.
          // The reader is only valid for forward decoding if it exists, is not finished,
@@ -1568,6 +1591,8 @@ namespace Platform
             if (handle->readerPts < 0.0 || seconds < handle->readerPts)
                startFrom = std::max(0.0, seconds - kReverseLookbackSeconds);
 
+            if (bench)
+               bench->readerRestarts.fetch_add(1, std::memory_order_relaxed);
             if (!StartReader(handle, startFrom, err))
                return false;
          }
@@ -1578,12 +1603,22 @@ namespace Platform
          {
             if (handle->nextPts < 0.0)
             {
+               const double benchDecodeStartMs = bench ? Bench::MediaNowMs() : 0.0;
                if (!DecodeNext(handle))
                   break;
+               if (bench)
+               {
+                  bench->decodeMs.Push(Bench::MediaNowMs() - benchDecodeStartMs);
+                  bench->decoded.fetch_add(1, std::memory_order_relaxed);
+               }
             }
             if (handle->nextPts > seconds && produced)
                break;
 
+            // A frame this same call already produced is being replaced
+            // before anyone showed it.
+            if (bench && produced)
+               bench->dropped.fetch_add(1, std::memory_order_relaxed);
             outPixels = handle->pending;
             handle->currentPts = handle->nextPts;
             handle->readerPts = handle->nextPts;
@@ -1611,6 +1646,13 @@ namespace Platform
             produced = true;
          }
 
+         if (bench)
+         {
+            if (!canResumeForward)
+               bench->loopDecodeMs.Push(Bench::MediaNowMs() - benchCallStartMs);
+            if (produced)
+               bench->deliveredPts = handle->currentPts;
+         }
          return produced;
       }
    }
@@ -6777,6 +6819,20 @@ namespace Platform
          }
       }
       return result;
+   }
+
+   CameraAuthorization CameraAuthorizationStatus()
+   {
+      // authorizationStatusForMediaType only reads the TCC state; it is
+      // requestAccessForMediaType (CameraOpen, NotDetermined) that prompts.
+      switch ([AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo])
+      {
+         case AVAuthorizationStatusAuthorized: return CameraAuthorization::Authorized;
+         case AVAuthorizationStatusDenied: return CameraAuthorization::Denied;
+         case AVAuthorizationStatusRestricted: return CameraAuthorization::Restricted;
+         case AVAuthorizationStatusNotDetermined:
+         default: return CameraAuthorization::NotDetermined;
+      }
    }
 
    CameraHandle* CameraOpen(const std::string& deviceId, CameraResolution res, bool mirrorX, std::string& outError)

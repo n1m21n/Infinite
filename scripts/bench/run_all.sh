@@ -41,13 +41,23 @@ OUT_FILE="$OUT_DIR/$DATE-$SHA.jsonl"
 echo "run_all.sh: machine=$MACHINE sha=$SHA -> $OUT_FILE"
 
 # run_fixture <label> <exitafter> <env-assignments...>
+# FIXTURE_TIMEOUT=<seconds> (set per call, e.g. by B8) kills a run that hangs;
+# its label then reports "no BENCH_JSON line".
 run_fixture() {
    local label="$1" exitafter="$2"; shift 2
    echo "  -> $label"
    local log
    log="$(mktemp)"
-   if env "$@" INFINITE_EXITAFTER="$exitafter" "$APP" -ApplePersistenceIgnoreState YES > "$log" 2>&1; then
-      :
+   env "$@" INFINITE_EXITAFTER="$exitafter" "$APP" -ApplePersistenceIgnoreState YES > "$log" 2>&1 &
+   local pid=$! wd=""
+   if [[ -n "${FIXTURE_TIMEOUT:-}" ]]; then
+      # Watchdog's own output goes nowhere so it never holds a pipe open.
+      ( sleep "$FIXTURE_TIMEOUT"; kill -9 "$pid" 2>/dev/null && echo "     watchdog: killed after ${FIXTURE_TIMEOUT}s" >&2 ) > /dev/null 2>&1 &
+      wd=$!
+   fi
+   wait "$pid" || true
+   if [[ -n "$wd" ]]; then
+      { kill "$wd" && wait "$wd"; } 2>/dev/null || true
    fi
    local n
    n=$(grep -c '^BENCH_JSON ' "$log" || true)
@@ -167,7 +177,34 @@ else
 fi
 
 echo "B8 Media I/O"
-skip "B8_media_io"
+# B8 Media I/O per benchmark-suite.md §4: looping H.264 clips into Outputs,
+# plus projector windows, camera and Syphon/Spout Out. Clips are generated
+# into bench/media/ (gitignored) on first use; never website/ or assets/
+# videos. The camera is only opened if permission was already granted
+# ("camera":"skipped" otherwise - the bench never raises the dialog). Leave
+# Infinite in front: unfocused=1 / unpaced=1 / overlap=1 mean "not a
+# baseline". B8_FRAMES (default 300) can be raised for longer runs.
+B8_FRAMES="${B8_FRAMES:-300}"
+B8_EXIT=$((B8_FRAMES + 50))
+B8_MEDIA="$REPO_ROOT/bench/media"
+if [[ ! -s "$B8_MEDIA/b8_2160p30_3.mp4" ]]; then
+   INFINITE_BENCH_B8MEDIA="$B8_MEDIA" "$SCRIPT_DIR/b8_make_clips.sh" || echo "     b8_make_clips.sh failed - B8 runs will report setup FAIL" >&2
+fi
+b8() { # b8 <clips> <res> <windows> <camera> <syphon>
+   FIXTURE_TIMEOUT=240 run_fixture "B8_media_io clips=$1,res=$2,windows=$3,camera=$4,syphon=$5" "$B8_EXIT" \
+      INFINITE_BENCH_B8=1 INFINITE_BENCH_B8MEDIA="$B8_MEDIA" INFINITE_BENCH_B8FRAMES="$B8_FRAMES" \
+      INFINITE_BENCH_B8CLIPS="$1" INFINITE_BENCH_B8RES="$2" INFINITE_BENCH_B8WINDOWS="$3" \
+      INFINITE_BENCH_B8CAMERA="$4" INFINITE_BENCH_B8SYPHON="$5"
+}
+b8 2 1080 0 0 0
+b8 4 1080 0 0 0
+b8 2 2160 0 0 0
+b8 4 2160 0 0 0
+b8 2 1080 2 0 0
+b8 2 1080 3 0 0
+b8 2 1080 0 1 0
+b8 2 1080 0 0 1
+b8 4 2160 3 1 1
 
 echo "B9 Memory footprint"
 # B9 Memory footprint per benchmark-suite.md §4 (B2 and B4 scenes at scale l, animated).
