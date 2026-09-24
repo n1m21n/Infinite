@@ -494,4 +494,14 @@ namespace Platform
       std::lock_guard<std::mutex> lock(gClock.mutex);
       return gClock.bpm;
    }
+
+   void MidiInjectBytes(const unsigned char* data, size_t len, MidiDeviceId device)
+   {
+      if (!data || len == 0)
+         return;
+      DWORD_PTR param = 0;
+      for (size_t i = 0; i < len && i < sizeof(DWORD_PTR); i++)
+         param |= ((DWORD_PTR)data[i]) << (i * 8);
+      HandleShortMessage((UINT)device, param);
+   }
 }

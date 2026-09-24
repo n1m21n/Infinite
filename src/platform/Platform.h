@@ -757,6 +757,10 @@ namespace Platform
    std::string MidiDeviceSummary(); // comma-joined names of connected sources, for status text
    std::string MidiDeviceName(MidiDeviceId device); // "" if not currently connected
 
+   // Injects raw MIDI bytes (Note On, Note Off, CC, Clock) into the MIDI subsystem
+   // for benchmarks and tests, identically to hardware MIDI arrival.
+   void MidiInjectBytes(const unsigned char* data, size_t len, MidiDeviceId device = 0);
+
    // Current value for a specific (device, channel, controller) binding.
    // Returns false (value left at 0) if that binding has never been seen.
    bool MidiRead(MidiDeviceId device, int channel, int controller, bool isNote, float& outValue01);

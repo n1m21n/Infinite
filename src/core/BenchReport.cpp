@@ -513,16 +513,45 @@ namespace Bench
 
       j["frame_ms"] = frameMs.ToJsonP5099Max();
 
-      j["projector_ms"] = projectorMs.Empty()
-         ? nlohmann::json{ { "p50", nullptr }, { "p99", nullptr }, { "missed_vsync", nullptr } }
-         : nlohmann::json{
-              { "p50", projectorMs.Percentile(50) },
-              { "p99", projectorMs.Percentile(99) },
-              { "missed_vsync", projectorMissedVsyncFraction },
-           };
+      if (projectorMeasured)
+      {
+         j["projector"] = {
+            { "refresh_hz", projectorRefreshHz },
+            { "target_rate_hz", projectorTargetRateHz },
+            { "present_interval_ms", projectorPresentMs.ToJsonP5099Max() },
+            { "jitter_stddev_ms", projectorJitterStdDev },
+            { "missed_vsync_pct", projectorMissedVsyncPct },
+         };
+         j["projector_ms"] = {
+            { "p50", projectorPresentMs.Percentile(50) },
+            { "p99", projectorPresentMs.Percentile(99) },
+            { "missed_vsync", projectorMissedVsyncPct / 100.0 },
+         };
+      }
+      else if (!projectorMs.Empty())
+      {
+         j["projector_ms"] = {
+            { "p50", projectorMs.Percentile(50) },
+            { "p99", projectorMs.Percentile(99) },
+            { "missed_vsync", projectorMissedVsyncFraction },
+         };
+      }
+      else
+      {
+         j["projector_ms"] = { { "p50", nullptr }, { "p99", nullptr }, { "missed_vsync", nullptr } };
+      }
 
       j["stages_cpu_ms"] = stagesCpuMs;
       j["stages_gpu_ms"] = stagesGpuMs;
+
+      if (inputToPhotonMeasured)
+      {
+         j["input_to_photon_frames"] = {
+            { "p50", inputToPhotonFrames.Percentile(50) },
+            { "max", inputToPhotonFrames.Max() },
+            { "samples", (int)inputToPhotonFrames.Count() },
+         };
+      }
 
       if (audioMeasured)
       {
@@ -577,6 +606,14 @@ namespace Bench
          memObj["gpu_est_breakdown"] = memGpuEstBreakdown;
       }
       j["mem"] = memObj;
+
+      if (!targetsPass.empty())
+      {
+         nlohmann::json tp = nlohmann::json::object();
+         for (const auto& [k, v] : targetsPass)
+            tp[k] = v;
+         j["targets_pass"] = tp;
+      }
 
       j["nodes"] = nodes;
       j["tris"] = tris;

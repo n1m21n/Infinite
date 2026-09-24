@@ -64772,7 +64772,110 @@ int RunSyphonPatchTest()
    return 0;
 }
 
-static void BuildBenchB2Scene(const std::string& scaleStr, bool isAnim, int& outRender3DIdx, int& outOutputIdx)
+static void BuildBenchB1Audio(long numVoices, int bufferFrames = 256, float yOffset = 0.0f)
+{
+   numVoices = std::max(1L, std::min(64L, numVoices));
+   static const char* kVoiceTypes[] = { "Sampler", "Wavetable", "Oscillator" };
+   const std::string samplerWav = TmpPath("infinite_bench_b1_voice.wav");
+   {
+      const int fixtureFrames = 2205;
+      std::vector<int16_t> fixturePcm(fixtureFrames);
+      for (int i = 0; i < fixtureFrames; i++)
+      {
+         const float t = (float)i / (float)(fixtureFrames - 1);
+         fixturePcm[i] = (int16_t)(sinf(t * 30.0f) * 30000.0f);
+      }
+      std::ofstream f(samplerWav, std::ios::binary);
+      auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
+      auto writeU16 = [&](uint16_t v) { f.write((const char*)&v, 2); };
+      const uint32_t dataSize = (uint32_t)(fixturePcm.size() * sizeof(int16_t));
+      f.write("RIFF", 4); writeU32(36 + dataSize); f.write("WAVE", 4);
+      f.write("fmt ", 4); writeU32(16); writeU16(1); writeU16(1);
+      writeU32(44100); writeU32(44100 * 2); writeU16(2); writeU16(16);
+      f.write("data", 4); writeU32(dataSize);
+      f.write((const char*)fixturePcm.data(), dataSize);
+   }
+
+   GraphNode* lfoGn = SpawnNode("LFO", "Modulators", -260.0f, yOffset);
+   const int lfoIdx = lfoGn->index;
+
+   std::vector<int> voiceOutIdx;
+   voiceOutIdx.reserve(numVoices);
+   const int perRow = 6;
+   for (long v = 0; v < numVoices; v++)
+   {
+      const float x = (float)(v % perRow) * 260.0f;
+      const float y = yOffset + (float)(v / perRow) * 900.0f;
+      const int srcType = (int)(v % 3);
+      const int srcIdx = SpawnNode(kVoiceTypes[srcType], "Synths", x, y)->index;
+      if (srcType == 0)
+      {
+         if (auto* sampler = dynamic_cast<SamplerNode*>(FindNodeByIndex(srcIdx)->node.get()))
+            sampler->LoadFile(samplerWav);
+      }
+      const int filterIdx = SpawnNode("Audio Filter", "AudioEffects", x, y + 150.0f)->index;
+      const int shaperIdx = SpawnNode("Wavetable Shaper", "AudioEffects", x, y + 300.0f)->index;
+      const int delayIdx  = SpawnNode("Delay", "AudioEffects", x, y + 450.0f)->index;
+      const int reverbIdx = SpawnNode("Reverb", "AudioEffects", x, y + 600.0f)->index;
+      const int dynIdx    = SpawnNode("Dynamics", "AudioEffects", x, y + 750.0f)->index;
+
+      static_cast<AudioEffectNode*>(FindNodeByIndex(filterIdx)->node.get())->input.Connect(FindNodeByIndex(srcIdx)->node.get());
+      static_cast<AudioEffectNode*>(FindNodeByIndex(shaperIdx)->node.get())->input.Connect(FindNodeByIndex(filterIdx)->node.get());
+      static_cast<AudioEffectNode*>(FindNodeByIndex(delayIdx)->node.get())->input.Connect(FindNodeByIndex(shaperIdx)->node.get());
+      static_cast<AudioEffectNode*>(FindNodeByIndex(reverbIdx)->node.get())->input.Connect(FindNodeByIndex(delayIdx)->node.get());
+      static_cast<AudioEffectNode*>(FindNodeByIndex(dynIdx)->node.get())->input.Connect(FindNodeByIndex(reverbIdx)->node.get());
+
+      Modulation::Instance().Bind(filterIdx, /*paramIndex=mix*/ 0, lfoIdx, /*outputIndex=*/ 0);
+
+      voiceOutIdx.push_back(dynIdx);
+   }
+
+   std::vector<int> mixerOutIdx;
+   for (size_t base = 0; base < voiceOutIdx.size(); base += 12)
+   {
+      const size_t chunk = std::min((size_t)12, voiceOutIdx.size() - base);
+      const int mixIdx = SpawnNode("Mixer", "Utility", 2400.0f, yOffset + (float)(base / 12) * 900.0f)->index;
+      auto* mix = static_cast<MixerNode*>(FindNodeByIndex(mixIdx)->node.get());
+      mix->numChannels = (int)chunk;
+      for (size_t s = 0; s < chunk; s++)
+         mix->AudioInputSlot((int)s)->Connect(FindNodeByIndex(voiceOutIdx[base + s])->node.get());
+      mixerOutIdx.push_back(mixIdx);
+   }
+
+   int finalOutSrcIdx;
+   if (mixerOutIdx.size() == 1)
+   {
+      finalOutSrcIdx = mixerOutIdx[0];
+   }
+   else
+   {
+      const int finalMixIdx = SpawnNode("Mixer", "Utility", 2700.0f, yOffset)->index;
+      auto* finalMix = static_cast<MixerNode*>(FindNodeByIndex(finalMixIdx)->node.get());
+      finalMix->numChannels = (int)mixerOutIdx.size();
+      for (size_t s = 0; s < mixerOutIdx.size(); s++)
+         finalMix->AudioInputSlot((int)s)->Connect(FindNodeByIndex(mixerOutIdx[s])->node.get());
+      finalOutSrcIdx = finalMixIdx;
+   }
+
+   const int audioOutIdx = SpawnNode("Audio Out", "Utility", 3000.0f, yOffset)->index;
+   static_cast<AudioOutputNode*>(FindNodeByIndex(audioOutIdx)->node.get())->input.Connect(FindNodeByIndex(finalOutSrcIdx)->node.get());
+
+   for (GraphNode& gn : gNodes)
+      gn.showParams = true;
+
+   if (bufferFrames > 0)
+   {
+      if (AudioEngine::Instance().SampleRate() > 0.0)
+         AudioEngine::Instance().Stop();
+      AudioEngine::Instance().SetRequestedBufferFrames(bufferFrames);
+   }
+   if (AudioEngine::Instance().SampleRate() <= 0.0)
+      StartAudioEngine(gAudioStartError);
+   RebuildAudioTopology();
+}
+
+static void BuildBenchB2Scene(const std::string& scaleStr, bool isAnim, int& outRender3DIdx, int& outOutputIdx,
+                              int* outTwistIdx = nullptr, int* outMatIdx = nullptr, int* outCamIdx = nullptr)
 {
    int effectCount = 10;
    int triDetail = 30;
@@ -64799,6 +64902,7 @@ static void BuildBenchB2Scene(const std::string& scaleStr, bool isAnim, int& out
    op->input = torus;
    op->op = GeometryOpNode::kTwist;
    op->amount = 1.5f;
+   if (outTwistIdx) *outTwistIdx = opIdx;
 
    int matIdx = SpawnNode("Material", "3D", xBase + 520.0f, yBase)->index;
    auto* mat = static_cast<MaterialNode*>(FindNodeByIndex(matIdx)->node.get());
@@ -64808,12 +64912,14 @@ static void BuildBenchB2Scene(const std::string& scaleStr, bool isAnim, int& out
    mat->color[0] = 0.85f;
    mat->color[1] = 0.45f;
    mat->color[2] = 0.20f;
+   if (outMatIdx) *outMatIdx = matIdx;
 
    int camIdx = SpawnNode("Camera", "3D", xBase + 520.0f, yBase + 260.0f)->index;
    auto* cam = static_cast<CameraNode*>(FindNodeByIndex(camIdx)->node.get());
    cam->distance = 4.2f;
    cam->elevation = 20.0f;
    cam->azimuth = 45.0f;
+   if (outCamIdx) *outCamIdx = camIdx;
 
    int lightIdx = SpawnNode("Light", "3D", xBase + 520.0f, yBase + 520.0f)->index;
    auto* light = static_cast<LightNode*>(FindNodeByIndex(lightIdx)->node.get());
@@ -65102,6 +65208,27 @@ int main(int argc, char** argv)
    static Bench::PercentileRing sBenchB9FrameMs;
    static std::vector<std::pair<int, double>> sBenchB9RssSamples;
    static std::vector<std::pair<int, double>> sBenchB9PhysSamples;
+   static int sBenchB3OutputIdx = -1;
+   static int sBenchB3Render3DIdx = -1;
+   static int sBenchB3TwistIdx = -1;
+   static int sBenchB3MatIdx = -1;
+   static int sBenchB3CamIdx = -1;
+   static std::string sBenchB3Variant;
+   static int sBenchB3MonitorRefreshHz = 60;
+   static int sBenchB3TargetRateHz = 60;
+   static Bench::PercentileRing sBenchB3FrameMs;
+   static Bench::PercentileRing sBenchB3ProjIntervalRing;
+   static Bench::PercentileRing sBenchB3InputToPhotonFrames;
+   static double sBenchB3LastProjSwapMs = -1.0;
+   static int sBenchB3MissedVsyncCount = 0;
+   static int sBenchB3TotalVsyncCount = 0;
+   static uint64_t sBenchB3XrunBaseline = 0;
+   static int sBenchB3PendingInputInjectFrame = -1;
+   static unsigned long long sBenchB3RevBeforeInject = 0;
+   static double sBenchB3RssStartMb = -1.0;
+   static double sBenchB3RssPeakMb = -1.0;
+   static double sBenchB3PhysStartMb = -1.0;
+   static double sBenchB3PhysPeakMb = -1.0;
 
    // No-op on macOS (which gets a `.ips` report for free); on Windows this is
    // the only thing standing between a crash and a completely silent exit,
@@ -67867,141 +67994,76 @@ int main(int argc, char** argv)
          sBenchB9RssPeakMb = std::max(sBenchB9RssStartMb, sBenchB9RssBuiltMb);
          sBenchB9PhysPeakMb = std::max(sBenchB9PhysStartMb, sBenchB9PhysBuiltMb);
       }
+      else if (getenv("INFINITE_BENCH_B3") != nullptr ||
+               getenv("INFINITE_BENCH_B3LIVE") != nullptr ||
+               getenv("INFINITE_BENCH_B3SCALE") != nullptr)
+      {
+         // B3 Live performance fixture (docs/plans/perf/benchmark-suite.md §4).
+         std::string scaleStr = "s";
+         const char* bench3Arg = getenv("INFINITE_BENCH_B3SCALE");
+         if (!bench3Arg) bench3Arg = getenv("INFINITE_BENCH_B3LIVE");
+         if (!bench3Arg) bench3Arg = getenv("INFINITE_BENCH_B3");
+         if (bench3Arg && strlen(bench3Arg) > 0 && strcmp(bench3Arg, "1") != 0)
+            scaleStr = bench3Arg;
+
+         const int voices = (scaleStr == "m" || scaleStr == "medium" || scaleStr == "16") ? 16 : 8;
+         const int bufFrames = getenv("INFINITE_BENCH_B3BUFFER") ? atoi(getenv("INFINITE_BENCH_B3BUFFER")) : 256;
+
+         sBenchB3Variant = std::string("scale=") + scaleStr;
+         if (const char* t = getenv("INFINITE_BENCH_GPUTIMERS"); t && strcmp(t, "0") == 0)
+            sBenchB3Variant += ",gputimers=0";
+
+         // 1. Audio: B1-lite
+         BuildBenchB1Audio(voices, bufFrames, /*yOffset=*/1200.0f);
+
+         // 2. Visuals: B2-lite (scale s effects chain, animated)
+         BuildBenchB2Scene("s", /*isAnim=*/true, sBenchB3Render3DIdx, sBenchB3OutputIdx,
+                           &sBenchB3TwistIdx, &sBenchB3MatIdx, &sBenchB3CamIdx);
+
+         // 3. Gesture/macro playback on Material metallic
+         if (sBenchB3MatIdx >= 0)
+         {
+            GestureRecorder::Playback pb;
+            pb.samples = {
+               { 0.15f, 0.0, false },
+               { 0.85f, 1.0, false },
+               { 0.15f, 2.0, false }
+            };
+            pb.speed = 1.0f;
+            pb.recordedMin = 0.15f;
+            pb.recordedMax = 0.85f;
+            GestureRecorder::Instance().SetPlayback(sBenchB3MatIdx, 1, pb);
+         }
+
+         // 4. 3 Prediction modulators bound to visual parameters
+         const int driftIdx = SpawnNode("Drift", "Prediction", 2600.0f, 600.0f)->index;
+         const int movesIdx = SpawnNode("Moves", "Prediction", 2600.0f, 800.0f)->index;
+         const int predModIdx = SpawnNode("Predictive Modulator", "Prediction", 2600.0f, 1000.0f)->index;
+
+         if (sBenchB3MatIdx >= 0)
+            Modulation::Instance().Bind(sBenchB3MatIdx, 0, driftIdx, 0); // Material roughness
+         if (sBenchB3TwistIdx >= 0)
+            Modulation::Instance().Bind(sBenchB3TwistIdx, 0, movesIdx, 0); // Twist amount
+         if (sBenchB3CamIdx >= 0)
+            Modulation::Instance().Bind(sBenchB3CamIdx, 1, predModIdx, 0); // Camera elevation
+
+         // 5. Start MIDI engine for simulated injection
+         if (!Platform::MidiIsRunning())
+         {
+            std::string midiErr;
+            Platform::MidiStart(midiErr);
+         }
+
+         sBenchB3RssStartMb = sMainRssStartMb;
+         sBenchB3PhysStartMb = sMainPhysStartMb;
+         sBenchB3RssPeakMb = sBenchB3RssStartMb;
+         sBenchB3PhysPeakMb = sBenchB3PhysStartMb;
+      }
       else if (const char* bench1Arg = getenv("INFINITE_BENCH_B1VOICES"))
       {
-         // B1 Heavy audio fixture (docs/plans/perf/benchmark-suite.md §4).
-         // N voices, each Sampler/Wavetable/Oscillator (cycled) through a
-         // per-voice chain: Audio Filter -> Wavetable Shaper (the closest
-         // registered node to the doc's illustrative "Drive" - there is no
-         // node literally named Drive) -> Delay -> Reverb -> Dynamics, summed
-         // through a tree of Mixers (MixerNode::kMaxSlots=12, so >12 voices
-         // needs a second level) into one Audio Out. One shared LFO is bound
-         // to every voice's Filter `mix` (AudioEffectNode::VisitParams always
-         // puts `mix` at param index 0 - see AudioEffectNode.cpp - so this is
-         // safe without knowing any effect-specific param layout) as the
-         // "modulated params" load case the doc asks for: worst case is every
-         // voice's modulation evaluated every block, not just one.
-         //
-         // Real per-voice source/effect indices are captured as ints and
-         // re-resolved through FindNodeByIndex() rather than held as
-         // GraphNode* across later SpawnNode calls, and rather than indexed
-         // directly into gNodes[] - GraphNode::index is a stable id, not a
-         // vector slot, so gNodes[idx] silently breaks the moment any
-         // earlier node in the session was removed. See codebase-
-         // navigation's note on SpawnNode's dangling-prone GraphNode*.
          const long numVoices = std::max(1L, std::min(64L, atol(bench1Arg)));
-         static const char* kVoiceTypes[] = { "Sampler", "Wavetable", "Oscillator" };
-         const std::string samplerWav = TmpPath("infinite_bench_b1_voice.wav");
-         {
-            const int fixtureFrames = 2205;
-            std::vector<int16_t> fixturePcm(fixtureFrames);
-            for (int i = 0; i < fixtureFrames; i++)
-            {
-               const float t = (float)i / (float)(fixtureFrames - 1);
-               fixturePcm[i] = (int16_t)(sinf(t * 30.0f) * 30000.0f);
-            }
-            std::ofstream f(samplerWav, std::ios::binary);
-            auto writeU32 = [&](uint32_t v) { f.write((const char*)&v, 4); };
-            auto writeU16 = [&](uint16_t v) { f.write((const char*)&v, 2); };
-            const uint32_t dataSize = (uint32_t)(fixturePcm.size() * sizeof(int16_t));
-            f.write("RIFF", 4); writeU32(36 + dataSize); f.write("WAVE", 4);
-            f.write("fmt ", 4); writeU32(16); writeU16(1); writeU16(1);
-            writeU32(44100); writeU32(44100 * 2); writeU16(2); writeU16(16);
-            f.write("data", 4); writeU32(dataSize);
-            f.write((const char*)fixturePcm.data(), dataSize);
-         }
-
-         GraphNode* lfoGn = SpawnNode("LFO", "Modulators", -260.0f, 0.0f);
-         const int lfoIdx = lfoGn->index;
-
-         std::vector<int> voiceOutIdx;
-         voiceOutIdx.reserve(numVoices);
-         const int perRow = 6;
-         for (long v = 0; v < numVoices; v++)
-         {
-            const float x = (float)(v % perRow) * 260.0f;
-            const float y = (float)(v / perRow) * 900.0f;
-            const int srcType = (int)(v % 3);
-            const int srcIdx = SpawnNode(kVoiceTypes[srcType], "Synths", x, y)->index;
-            if (srcType == 0)
-            {
-               if (auto* sampler = dynamic_cast<SamplerNode*>(FindNodeByIndex(srcIdx)->node.get()))
-                  sampler->LoadFile(samplerWav);
-            }
-            const int filterIdx = SpawnNode("Audio Filter", "AudioEffects", x, y + 150.0f)->index;
-            const int shaperIdx = SpawnNode("Wavetable Shaper", "AudioEffects", x, y + 300.0f)->index;
-            const int delayIdx  = SpawnNode("Delay", "AudioEffects", x, y + 450.0f)->index;
-            const int reverbIdx = SpawnNode("Reverb", "AudioEffects", x, y + 600.0f)->index;
-            const int dynIdx    = SpawnNode("Dynamics", "AudioEffects", x, y + 750.0f)->index;
-
-            // Re-resolved through FindNodeByIndex rather than gNodes[idx] -
-            // GraphNode::index is a stable id from a monotonically increasing
-            // counter, not a vector slot, so gNodes[idx] is an out-of-bounds/
-            // wrong-node read the moment any earlier node in the session was
-            // removed (see codebase-navigation's SpawnNode note, and the
-            // working precedent at main.cpp:66029).
-            static_cast<AudioEffectNode*>(FindNodeByIndex(filterIdx)->node.get())->input.Connect(FindNodeByIndex(srcIdx)->node.get());
-            static_cast<AudioEffectNode*>(FindNodeByIndex(shaperIdx)->node.get())->input.Connect(FindNodeByIndex(filterIdx)->node.get());
-            static_cast<AudioEffectNode*>(FindNodeByIndex(delayIdx)->node.get())->input.Connect(FindNodeByIndex(shaperIdx)->node.get());
-            static_cast<AudioEffectNode*>(FindNodeByIndex(reverbIdx)->node.get())->input.Connect(FindNodeByIndex(delayIdx)->node.get());
-            static_cast<AudioEffectNode*>(FindNodeByIndex(dynIdx)->node.get())->input.Connect(FindNodeByIndex(reverbIdx)->node.get());
-
-            Modulation::Instance().Bind(filterIdx, /*paramIndex=mix*/ 0, lfoIdx, /*outputIndex=*/ 0);
-
-            voiceOutIdx.push_back(dynIdx);
-         }
-
-         // Sum voices through a tree of Mixers - MixerNode::kMaxSlots is 12,
-         // so more than 12 voices needs a second level rather than one Mixer
-         // whose numChannels exceeds what it actually exposes pins for.
-         std::vector<int> mixerOutIdx;
-         for (size_t base = 0; base < voiceOutIdx.size(); base += 12)
-         {
-            const size_t chunk = std::min((size_t)12, voiceOutIdx.size() - base);
-            const int mixIdx = SpawnNode("Mixer", "Utility", 2400.0f, (float)(base / 12) * 900.0f)->index;
-            auto* mix = static_cast<MixerNode*>(FindNodeByIndex(mixIdx)->node.get());
-            mix->numChannels = (int)chunk;
-            for (size_t s = 0; s < chunk; s++)
-               mix->AudioInputSlot((int)s)->Connect(FindNodeByIndex(voiceOutIdx[base + s])->node.get());
-            mixerOutIdx.push_back(mixIdx);
-         }
-
-         int finalOutSrcIdx;
-         if (mixerOutIdx.size() == 1)
-         {
-            finalOutSrcIdx = mixerOutIdx[0];
-         }
-         else
-         {
-            const int finalMixIdx = SpawnNode("Mixer", "Utility", 2700.0f, 0.0f)->index;
-            auto* finalMix = static_cast<MixerNode*>(FindNodeByIndex(finalMixIdx)->node.get());
-            finalMix->numChannels = (int)mixerOutIdx.size();
-            for (size_t s = 0; s < mixerOutIdx.size(); s++)
-               finalMix->AudioInputSlot((int)s)->Connect(FindNodeByIndex(mixerOutIdx[s])->node.get());
-            finalOutSrcIdx = finalMixIdx;
-         }
-
-         const int audioOutIdx = SpawnNode("Audio Out", "Utility", 3000.0f, 0.0f)->index;
-         static_cast<AudioOutputNode*>(FindNodeByIndex(audioOutIdx)->node.get())->input.Connect(FindNodeByIndex(finalOutSrcIdx)->node.get());
-
-         for (GraphNode& gn : gNodes)
-            gn.showParams = true;
-
-         // Reopen the device at the requested buffer size (64/128/256/512 -
-         // benchmark-suite.md §4's sweep), same pattern as
-         // INFINITE_OFFLINERENDER_BUFFER above, then actually start the
-         // engine - RunTopology's real callback thread is what B1 measures,
-         // so (unlike AUDIOGRAPHTEST) this fixture needs a live device, not
-         // just a built topology.
-         if (const char* bufEnv = getenv("INFINITE_BENCH_B1BUFFER"))
-         {
-            if (AudioEngine::Instance().SampleRate() > 0.0)
-               AudioEngine::Instance().Stop();
-            AudioEngine::Instance().SetRequestedBufferFrames(atoi(bufEnv));
-         }
-         if (AudioEngine::Instance().SampleRate() <= 0.0)
-            StartAudioEngine(gAudioStartError);
-         RebuildAudioTopology();
+         const int bufFrames = getenv("INFINITE_BENCH_B1BUFFER") ? atoi(getenv("INFINITE_BENCH_B1BUFFER")) : 0;
+         BuildBenchB1Audio(numVoices, bufFrames, 0.0f);
       }
       else if (getenv("INFINITE_BENCH_B5EMPTY") != nullptr)
       {
@@ -68206,10 +68268,11 @@ int main(int argc, char** argv)
 
       const bool isBenchB5c = (getenv("INFINITE_BENCH_B5STAGES") != nullptr || getenv("INFINITE_BENCH_B5C") != nullptr);
       const bool isBenchB2 = (getenv("INFINITE_BENCH_B2") != nullptr || getenv("INFINITE_BENCH_B2VISUALS") != nullptr || getenv("INFINITE_BENCH_B2SCALE") != nullptr);
+      const bool isBenchB3 = (getenv("INFINITE_BENCH_B3") != nullptr || getenv("INFINITE_BENCH_B3LIVE") != nullptr || getenv("INFINITE_BENCH_B3SCALE") != nullptr);
       const bool isBenchB4 = getenv("INFINITE_BENCH_B4SCALE") != nullptr;
       const bool isBenchB9 = (getenv("INFINITE_BENCH_B9SCENE") != nullptr || getenv("INFINITE_BENCH_B9") != nullptr || getenv("INFINITE_BENCH_B9MEMORY") != nullptr);
       const bool benchStagesSample = (isBenchB5c || isBenchB2 || isBenchB4) && (frameId >= 32 && frameId < 152);
-      const bool benchStagesCpuSample = (isBenchB5c || isBenchB2 || isBenchB4 || isBenchB9) && (frameId >= 32 && frameId < 152);
+      const bool benchStagesCpuSample = (isBenchB5c || isBenchB2 || isBenchB4 || isBenchB9 || isBenchB3) && (frameId >= 32 && frameId < 152);
       // B2 per-node GPU split: time each Render 3D / filter draw by node type
       // instead of the enclosing "cook" stage (GL timer queries cannot nest).
       const bool benchGpuPerNode = (isBenchB2 && getenv("INFINITE_BENCH_B2GPUNODES") != nullptr) ||
@@ -85441,6 +85504,200 @@ int main(int argc, char** argv)
          }
       }
 
+      // B3 Live performance fixture (benchmark-suite.md §4).
+      // B1-lite + B2-lite + one open projector window + simulated MIDI notes/CC +
+      // gesture playback + Prediction modulators running.
+      // Measures projector p99/jitter/missed-vsync, canvas frame p50/p99,
+      // audio load/xruns, and input-to-photon latency (parameter change to Output revision change).
+      if (isBenchB3)
+      {
+         const int b3TotalFrames = getenv("INFINITE_BENCH_B3FRAMES") ? std::max(60, std::atoi(getenv("INFINITE_BENCH_B3FRAMES"))) : 600;
+         if (frameId == 2)
+         {
+            gVsync = false;
+            glfwSwapInterval(0);
+            gTargetFps = 0;
+            const double r2 = Bench::ProcessRssMb();
+            const double p2 = Bench::ProcessPhysFootprintMb();
+            if (sBenchB3RssStartMb < 0.0) sBenchB3RssStartMb = r2;
+            if (sBenchB3PhysStartMb < 0.0) sBenchB3PhysStartMb = p2;
+            if (r2 > sBenchB3RssPeakMb) sBenchB3RssPeakMb = r2;
+            if (p2 > sBenchB3PhysPeakMb) sBenchB3PhysPeakMb = p2;
+
+            if (sBenchB3OutputIdx >= 0)
+            {
+               if (auto* outGn = FindNodeByIndex(sBenchB3OutputIdx))
+                  OpenProjectorWindow(window, *outGn);
+            }
+
+            GLFWmonitor* primMon = glfwGetPrimaryMonitor();
+            const GLFWvidmode* mode = primMon ? glfwGetVideoMode(primMon) : nullptr;
+            sBenchB3MonitorRefreshHz = mode ? mode->refreshRate : 60;
+            sBenchB3TargetRateHz = sBenchB3MonitorRefreshHz;
+
+            sBenchB3XrunBaseline = AudioEngine::Instance().XrunCount();
+            AudioEngine::Instance().RawLoadHistory().Reset();
+            AudioEngine::Instance().ResetStageLoadHistory();
+         }
+
+         // MIDI injection every frame
+         if (frameId >= 2)
+         {
+            if (frameId % 15 == 0)
+            {
+               const int noteNum = 60 + ((frameId / 15) % 12);
+               const unsigned char noteOn[3] = { 0x90, (unsigned char)noteNum, 100 };
+               Platform::MidiInjectBytes(noteOn, 3, 0);
+            }
+            else if (frameId % 15 == 12)
+            {
+               const int noteNum = 60 + ((frameId / 15) % 12);
+               const unsigned char noteOff[3] = { 0x80, (unsigned char)noteNum, 0 };
+               Platform::MidiInjectBytes(noteOff, 3, 0);
+            }
+
+            const unsigned char ccVal = (unsigned char)((std::sin((double)frameId * 0.05) * 0.5 + 0.5) * 127.0);
+            const unsigned char ccMsg[3] = { 0xB0, 74, ccVal };
+            Platform::MidiInjectBytes(ccMsg, 3, 0);
+         }
+
+         // Input-to-photon latency: inject parameter change on Twist every 20 frames
+         if (frameId >= 32 && frameId <= b3TotalFrames - 20 && (frameId % 20 == 0))
+         {
+            if (auto* twistGn = FindNodeByIndex(sBenchB3TwistIdx))
+            {
+               if (auto* twist = dynamic_cast<GeometryOpNode*>(twistGn->node.get()))
+               {
+                  twist->amount += 0.05f;
+                  sBenchB3PendingInputInjectFrame = frameId;
+                  if (auto* outGn = FindNodeByIndex(sBenchB3OutputIdx))
+                  {
+                     if (auto* outNode = dynamic_cast<OutputNode*>(outGn->node.get()))
+                        sBenchB3RevBeforeInject = outNode->Input().Revision();
+                  }
+               }
+            }
+         }
+
+         // Check if texture revision moved in response to input injection
+         if (sBenchB3PendingInputInjectFrame >= 0)
+         {
+            if (auto* outGn = FindNodeByIndex(sBenchB3OutputIdx))
+            {
+               if (auto* outNode = dynamic_cast<OutputNode*>(outGn->node.get()))
+               {
+                  if (outNode->Input().Revision() != sBenchB3RevBeforeInject)
+                  {
+                     const int latencyFrames = frameId - sBenchB3PendingInputInjectFrame + 1;
+                     sBenchB3InputToPhotonFrames.Push((double)latencyFrames);
+                     sBenchB3PendingInputInjectFrame = -1;
+                  }
+               }
+            }
+         }
+
+         // Sample canvas frame time and memory
+         if (frameId >= 32 && frameId <= b3TotalFrames)
+         {
+            if (gLastFrameMs > 0.0)
+               sBenchB3FrameMs.Push(gLastFrameMs);
+            const double curRss = Bench::ProcessRssMb();
+            const double curPhys = Bench::ProcessPhysFootprintMb();
+            if (curRss > sBenchB3RssPeakMb) sBenchB3RssPeakMb = curRss;
+            if (curPhys > sBenchB3PhysPeakMb) sBenchB3PhysPeakMb = curPhys;
+         }
+
+         if (frameId == b3TotalFrames)
+         {
+            Bench::BenchReport report;
+            report.bench = "B3_live_performance";
+            report.variant = sBenchB3Variant;
+            report.frames = b3TotalFrames;
+            report.nodes = (int)gNodes.size();
+            report.frameMs = sBenchB3FrameMs;
+
+            report.stagesCpuMs = {
+               { "modulation", sStageModulation.Percentile(50) },
+               { "cook", sStageCook.Percentile(50) },
+               { "node_bodies", sStageNodeBodies.Percentile(50) },
+               { "editor_end", sStageEditorEnd.Percentile(50) },
+               { "imgui_render", sStageImGuiRender.Percentile(50) },
+               { "projectors", sStageProjectors.Percentile(50) },
+               { "swap", sStageSwap.Percentile(50) },
+            };
+
+            report.projectorMeasured = true;
+            report.projectorRefreshHz = sBenchB3MonitorRefreshHz;
+            report.projectorTargetRateHz = sBenchB3TargetRateHz;
+            report.projectorPresentMs = sBenchB3ProjIntervalRing;
+            report.projectorJitterStdDev = sBenchB3ProjIntervalRing.StdDev();
+            report.projectorMissedVsyncPct = (sBenchB3TotalVsyncCount > 0)
+               ? ((double)sBenchB3MissedVsyncCount / (double)sBenchB3TotalVsyncCount * 100.0)
+               : 0.0;
+
+            report.inputToPhotonMeasured = true;
+            report.inputToPhotonFrames = sBenchB3InputToPhotonFrames;
+
+            report.audioMeasured = true;
+            const char* bufEnv = getenv("INFINITE_BENCH_B3BUFFER");
+            report.audioBuffer = bufEnv ? atoi(bufEnv) : 256;
+            report.audioSampleRate = AudioEngine::Instance().SampleRate();
+            report.audioLoad = AudioEngine::Instance().RawLoadHistory().Drain();
+            report.audioXruns = AudioEngine::Instance().XrunCount() - sBenchB3XrunBaseline;
+
+            report.memRssStartMb = sBenchB3RssStartMb;
+            report.memRssEndMb = Bench::ProcessRssMb();
+            if (report.memRssEndMb > sBenchB3RssPeakMb) sBenchB3RssPeakMb = report.memRssEndMb;
+            report.memRssPeakMb = sBenchB3RssPeakMb;
+
+            report.memPhysStartMb = sBenchB3PhysStartMb;
+            report.memPhysEndMb = Bench::ProcessPhysFootprintMb();
+            if (report.memPhysEndMb > sBenchB3PhysPeakMb) sBenchB3PhysPeakMb = report.memPhysEndMb;
+            report.memPhysPeakMb = sBenchB3PhysPeakMb;
+
+            // §6 Target evaluations
+            report.targetsPass["audio_xruns_zero"] = (report.audioXruns == 0);
+            report.targetsPass["audio_cb_load_p99_le_50"] = (report.audioLoad.Percentile(99) <= 0.50);
+            report.targetsPass["projector_missed_vsync_lt_half_pct"] = (report.projectorMissedVsyncPct < 0.5);
+            report.targetsPass["projector_locked_rate"] = (report.projectorPresentMs.Percentile(99) <= 1.10 * (1000.0 / (double)std::max(1, report.projectorTargetRateHz)));
+            report.targetsPass["input_to_photon_le_2_frames"] = (report.inputToPhotonFrames.Percentile(50) <= 2.0);
+
+            if (sBenchB3Render3DIdx >= 0)
+            {
+               if (auto* gn = FindNodeByIndex(sBenchB3Render3DIdx))
+               {
+                  if (auto* r = dynamic_cast<Render3DNode*>(gn->node.get()))
+                  {
+                     for (int s = 0; s < Render3DNode::kSlots; s++)
+                     {
+                        if (r->geometry[s])
+                           report.tris += (int)r->geometry[s]->GetMesh().FaceCount();
+                     }
+                     report.drawCalls = (int)r->LastDrawCalls();
+                  }
+               }
+            }
+
+            if (sBenchB3OutputIdx >= 0)
+            {
+               if (auto* outGn = FindNodeByIndex(sBenchB3OutputIdx))
+               {
+                  if (auto* outNode = dynamic_cast<OutputNode*>(outGn->node.get()))
+                  {
+                     glBindFramebuffer(GL_READ_FRAMEBUFFER, outNode->GetFbo().fbo);
+                     report.outputHash = Bench::HashFramebufferRGBA8(outNode->GetOutputWidth(), outNode->GetOutputHeight());
+                     glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+                  }
+               }
+            }
+
+            report.Emit();
+            printf("B3LIVE DONE\n");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
       // B9 Memory footprint fixture (benchmark-suite.md §4).
       // Measures RSS and Physical Footprint growth rate (slope MB/100f), peak footprint,
       // startup/built/f32/f152 memory, and estimated GPU memory breakdown.
@@ -93750,6 +94007,20 @@ int main(int argc, char** argv)
                glClear(GL_COLOR_BUFFER_BIT);
             }
             glfwSwapBuffers(projWindow);
+            if (isBenchB3 && frameId >= 32)
+            {
+               const double nowSwapMs = Bench::ScopedStageTimer::NowMs();
+               if (sBenchB3LastProjSwapMs > 0.0)
+               {
+                  const double intervalMs = nowSwapMs - sBenchB3LastProjSwapMs;
+                  sBenchB3ProjIntervalRing.Push(intervalMs);
+                  const double expectedIntervalMs = 1000.0 / (sBenchB3MonitorRefreshHz > 0 ? (double)sBenchB3MonitorRefreshHz : 60.0);
+                  if (intervalMs > 1.5 * expectedIntervalMs)
+                     sBenchB3MissedVsyncCount++;
+                  sBenchB3TotalVsyncCount++;
+               }
+               sBenchB3LastProjSwapMs = nowSwapMs;
+            }
          }
          if (refreshTopmost && !gProjectorWindows.empty())
             sLastTopmostRefresh = now;

@@ -401,6 +401,22 @@ namespace Bench
       PercentileRing frameMs;
       PercentileRing projectorMs;
       double projectorMissedVsyncFraction = -1.0; // -1 = not measured
+
+      // Detailed projector pacing (B3)
+      bool projectorMeasured = false;
+      int projectorRefreshHz = 0;
+      int projectorTargetRateHz = 0;
+      PercentileRing projectorPresentMs;
+      double projectorJitterStdDev = 0.0;
+      double projectorMissedVsyncPct = 0.0;
+
+      // Input-to-photon latency in frames (B3)
+      bool inputToPhotonMeasured = false;
+      PercentileRing inputToPhotonFrames;
+
+      // Targets pass/fail map (B3)
+      std::map<std::string, bool> targetsPass;
+
       nlohmann::json stagesCpuMs = nlohmann::json::object();
       nlohmann::json stagesGpuMs = nlohmann::json::object();
 

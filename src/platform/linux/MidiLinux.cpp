@@ -709,6 +709,45 @@ namespace Platform
       std::lock_guard<std::mutex> lock(gClock.mutex);
       return (float)gClock.bpm;
    }
+
+   void MidiInjectBytes(const unsigned char* data, size_t len, MidiDeviceId device)
+   {
+      if (!data || len == 0)
+         return;
+      snd_seq_event_t ev;
+      std::memset(&ev, 0, sizeof(ev));
+      const unsigned char status = data[0] & 0xF0;
+      const int channel = data[0] & 0x0F;
+      if (status == 0x90 && len >= 3)
+      {
+         ev.type = SND_SEQ_EVENT_NOTEON;
+         ev.data.note.channel = channel;
+         ev.data.note.note = data[1];
+         ev.data.note.velocity = data[2];
+         HandleSeqEvent((unsigned int)device, ev);
+      }
+      else if (status == 0x80 && len >= 3)
+      {
+         ev.type = SND_SEQ_EVENT_NOTEOFF;
+         ev.data.note.channel = channel;
+         ev.data.note.note = data[1];
+         ev.data.note.velocity = data[2];
+         HandleSeqEvent((unsigned int)device, ev);
+      }
+      else if (status == 0xB0 && len >= 3)
+      {
+         ev.type = SND_SEQ_EVENT_CONTROLLER;
+         ev.data.control.channel = channel;
+         ev.data.control.param = data[1];
+         ev.data.control.value = data[2];
+         HandleSeqEvent((unsigned int)device, ev);
+      }
+      else if (data[0] == 0xF8)
+      {
+         ev.type = SND_SEQ_EVENT_CLOCK;
+         HandleSeqEvent((unsigned int)device, ev);
+      }
+   }
 }
 
 // ---- INFINITE_MIDIPARSETEST harness hook ------------------------------------

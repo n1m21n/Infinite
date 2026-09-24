@@ -4793,6 +4793,16 @@ namespace Platform
       return (float)(60.0 / (24.0 * secondsPerPulse));
    }
 
+   void MidiInjectBytes(const unsigned char* data, size_t len, MidiDeviceId device)
+   {
+      if (!data || len == 0)
+         return;
+      if (data[0] >= 0xF8)
+         HandleMidiRealtimeByte(data[0]);
+      else
+         HandleMidiBytes(data, len, device);
+   }
+
    // ---- audio plugin hosting (Audio Units) ---------------------------------
    // See Platform.h's plugin section for the contract. Every Objective-C
    // object involved is confined below this line; the only function here that
