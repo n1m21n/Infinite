@@ -68893,6 +68893,7 @@ int main(int argc, char** argv)
       static double sBenchB5cRssStartMb = -1.0;
       static Bench::PercentileRing sBenchB2FrameMs;
       static double sBenchB2RssStartMb = -1.0;
+      static unsigned long long sBenchB2FboAtF32 = 0; // FboAllocationCount at the start of the sample window
 
       const bool isBenchB5c = (getenv("INFINITE_BENCH_B5STAGES") != nullptr || getenv("INFINITE_BENCH_B5C") != nullptr);
       const bool isBenchB2 = (getenv("INFINITE_BENCH_B2") != nullptr || getenv("INFINITE_BENCH_B2VISUALS") != nullptr || getenv("INFINITE_BENCH_B2SCALE") != nullptr);
@@ -86094,12 +86095,17 @@ int main(int argc, char** argv)
       if (isBenchB2 || isBenchB4)
       {
          if (frameId == 2) { gVsync = false; SetCanvasSwapInterval(0); gTargetFps = 0; sBenchB2RssStartMb = Bench::ProcessRssMb(); }
+         if (frameId == 32)
+            sBenchB2FboAtF32 = GLUtil::FboAllocationCount();
          if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
             sBenchB2FrameMs.Push(gLastFrameMs);
          if (frameId == 152)
          {
             Bench::BenchReport report;
             report.bench = isBenchB4 ? "B4_complex_3d" : "B2_heavy_visuals";
+            // Render targets (re)allocated inside the sample window; a
+            // steady-state chain should allocate none.
+            report.fboAllocsSteady = (long long)(GLUtil::FboAllocationCount() - sBenchB2FboAtF32);
             report.variant = sBenchB2Variant;
             report.frames = 152;
             report.nodes = (int)gNodes.size();

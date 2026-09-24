@@ -639,6 +639,7 @@ namespace Bench
       j["nodes"] = nodes;
       j["tris"] = tris;
       j["draw_calls"] = drawCalls < 0 ? nlohmann::json(nullptr) : nlohmann::json(drawCalls);
+      j["fbo_allocs_steady"] = fboAllocsSteady < 0 ? nlohmann::json(nullptr) : nlohmann::json(fboAllocsSteady);
       j["output_hash"] = outputHash.empty() ? "n/a" : outputHash;
 
       std::printf("BENCH_JSON %s\n", j.dump().c_str());
