@@ -6,45 +6,43 @@
 
 NodeFactory& NodeFactory::Instance()
 {
-   static NodeFactory instance;
-   return instance;
+   static NodeFactory factory;
+   return factory;
 }
 
 void NodeFactory::Register(const std::string& name, CreateNodeFn createFn, const std::string& category)
 {
-   if (mFactoryMap.count(name) != 0)
+   // emplace leaves an existing entry untouched, which is exactly the rule:
+   // the first registration is the one every saved patch already refers to.
+   const bool inserted = mEntries.emplace(name, Entry{ category, std::move(createFn) }).second;
+   if (!inserted)
    {
-      // Refuse rather than overwrite: whichever registration came first is the
-      // one every existing patch file already refers to by that name.
       fprintf(stderr, "node name collision: \"%s\" is already registered\n", name.c_str());
       mDuplicates.push_back(name);
       return;
    }
-   mFactoryMap[name] = NodeInfo{ name, category, createFn };
 
-   auto& list = mByCategory[category];
-   if (list.empty())
+   std::vector<std::string>& names = mNamesByCategory[category];
+   if (names.empty())
       mCategoryOrder.push_back(category);
-   list.push_back(name);
+   names.push_back(name);
 }
 
 INode* NodeFactory::MakeNode(const std::string& name)
 {
-   auto it = mFactoryMap.find(name);
-   if (it != mFactoryMap.end())
-      return it->second.createFn();
-   return nullptr;
+   const auto found = mEntries.find(name);
+   return found != mEntries.end() ? found->second.create() : nullptr;
 }
 
 std::string NodeFactory::CategoryOf(const std::string& name) const
 {
-   auto it = mFactoryMap.find(name);
-   return it != mFactoryMap.end() ? it->second.category : std::string();
+   const auto found = mEntries.find(name);
+   return found != mEntries.end() ? found->second.category : std::string();
 }
 
 const std::vector<std::string>& NodeFactory::GetNodesInCategory(const std::string& category) const
 {
-   static const std::vector<std::string> kEmpty;
-   auto it = mByCategory.find(category);
-   return it != mByCategory.end() ? it->second : kEmpty;
+   static const std::vector<std::string> kNone;
+   const auto found = mNamesByCategory.find(category);
+   return found != mNamesByCategory.end() ? found->second : kNone;
 }

@@ -5,9 +5,11 @@
 #include <string>
 #include <vector>
 
-// Minimal GL FBO / shader-pass helpers, ported from BespokeSynth's VizGL.
-// Targets OpenGL 3.2 core profile (matches Bespoke's macOS context) using plain
-// GLSL #version 150 shaders and a shared fullscreen-quad draw.
+// Infinite's small OpenGL toolkit for image nodes: render targets (Fbo),
+// fragment-only programs compiled against one shared fullscreen-quad vertex
+// shader, single-pass draws into a target, screen blits, and CPU readback.
+// Targets the OpenGL 3.2 core profile (GLSL #version 150), the newest core
+// profile macOS offers and the common floor for Windows and Linux.
 namespace GLUtil
 {
    struct Fbo
