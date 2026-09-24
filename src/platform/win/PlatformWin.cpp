@@ -23,6 +23,7 @@
 #include <psapi.h>
 #pragma comment(lib, "psapi.lib")
 #include <wrl/client.h>
+#include <dxgi.h>
 
 #include <onnxruntime_cxx_api.h>
 #include <dml_provider_factory.h>
@@ -239,6 +240,91 @@ namespace Platform
    {
       // macOS-only concern (App Nap throttling timer sources). Windows has no
       // equivalent power-throttling behavior that affects GLFW timers.
+   }
+
+   namespace
+   {
+      // Projector pacing clock (see Platform.h). The DXGI output of the
+      // display the primary Output window is on; WaitForVBlank blocks until
+      // that output's next vertical blank, whatever window owns it.
+      struct DisplayRefreshClock
+      {
+         Microsoft::WRL::ComPtr<IDXGIOutput> output;
+         HMONITOR monitor = nullptr;
+         LARGE_INTEGER lastReturn{};
+         bool haveLast = false;
+      };
+      DisplayRefreshClock gRefreshClock;
+
+      Microsoft::WRL::ComPtr<IDXGIOutput> FindDxgiOutput(HMONITOR monitor)
+      {
+         Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
+         if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))))
+            return nullptr;
+         Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
+         for (UINT a = 0; factory->EnumAdapters1(a, &adapter) != DXGI_ERROR_NOT_FOUND; a++)
+         {
+            Microsoft::WRL::ComPtr<IDXGIOutput> output;
+            for (UINT o = 0; adapter->EnumOutputs(o, &output) != DXGI_ERROR_NOT_FOUND; o++)
+            {
+               DXGI_OUTPUT_DESC desc{};
+               if (SUCCEEDED(output->GetDesc(&desc)) && desc.Monitor == monitor)
+                  return output;
+               output.Reset();
+            }
+            adapter.Reset();
+         }
+         return nullptr;
+      }
+   }
+
+   bool WaitForDisplayRefresh(int x, int y, double refreshHz, int intervals)
+   {
+      if (refreshHz <= 0.0 || intervals < 1)
+         return false;
+      // GLFW's Win32 monitor positions are virtual-screen pixels, the space
+      // MonitorFromPoint takes.
+      const HMONITOR monitor = MonitorFromPoint(POINT{ x + 1, y + 1 }, MONITOR_DEFAULTTONULL);
+      if (monitor == nullptr)
+         return false;
+      DisplayRefreshClock& clock = gRefreshClock;
+      if (clock.monitor != monitor || !clock.output)
+      {
+         clock.output = FindDxgiOutput(monitor);
+         clock.monitor = monitor;
+         clock.haveLast = false;
+      }
+      if (!clock.output)
+         return false;
+
+      // Refreshes already begun since the last return decide how many
+      // blanks are still owed; late (or first call) waits for the next one.
+      LARGE_INTEGER freq, now;
+      QueryPerformanceFrequency(&freq);
+      QueryPerformanceCounter(&now);
+      int owed = 1;
+      if (clock.haveLast)
+      {
+         const double elapsedSec = (double)(now.QuadPart - clock.lastReturn.QuadPart) / (double)freq.QuadPart;
+         owed = std::max(1, intervals - (int)std::floor(elapsedSec * refreshHz));
+      }
+      for (int i = 0; i < owed; i++)
+         if (FAILED(clock.output->WaitForVBlank()))
+         {
+            clock.output.Reset();
+            clock.haveLast = false;
+            return false;
+         }
+      QueryPerformanceCounter(&clock.lastReturn);
+      clock.haveLast = true;
+      return true;
+   }
+
+   void StopDisplayRefreshClock()
+   {
+      gRefreshClock.output.Reset();
+      gRefreshClock.monitor = nullptr;
+      gRefreshClock.haveLast = false;
    }
 
    double PollTrackpadMagnificationDelta()

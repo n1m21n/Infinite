@@ -28,6 +28,26 @@ namespace Platform
    // Call once at startup and keep the app running for the token to matter.
    void PreventAppNap();
 
+   // Refresh clock of one display, used to pace projector (Output) windows to
+   // the display they are on instead of to the canvas window's swap. (x, y)
+   // is any point on that display in GLFW virtual-desktop coordinates
+   // (glfwGetMonitorPos works); refreshHz is its current mode's rate.
+   // Blocks until the display has begun `intervals` (>= 1) new refreshes
+   // since this call last returned. If the caller is already past that
+   // refresh it waits for the next one rather than returning mid-scanout, so
+   // presents land on a whole number of refresh periods. It never relies on
+   // a swap blocking, so it holds when every window is occluded or hidden.
+   // Returns false without waiting when the display has no usable clock
+   // (point on no display, rate <= 0, clock stalled); the caller then
+   // presents unpaced for that frame. Main thread only.
+   //   macOS: CVDisplayLink on that display.  Windows: DXGI WaitForVBlank on
+   //   that display's output.  Linux: a steady timer at refreshHz (no
+   //   portable vblank source; right rate, not locked to scanout phase).
+   bool WaitForDisplayRefresh(int x, int y, double refreshHz, int intervals);
+   // Releases the clock WaitForDisplayRefresh started. Call when the last
+   // projector window closes; the next Wait starts a fresh one.
+   void StopDisplayRefreshClock();
+
    // Current process resident set size in MB. Used by the INFINITE_BENCH
    // suite (docs/plans/perf/benchmark-suite.md) for the mem.rss_mb field -
    // not called anywhere on the hot path, so a syscall per call is fine.

@@ -3,6 +3,8 @@
 #include "platform/common/SubjectMaskOnnx.h"
 #include "tinyfiledialogs.h"
 
+#include <chrono>
+#include <thread>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -106,6 +108,49 @@ namespace Platform
    void PreventAppNap()
    {
       // No App Nap mechanism on Linux that affects GLFW.
+   }
+
+   namespace
+   {
+      // Projector pacing clock (see Platform.h). GLX/EGL/Wayland offer no
+      // portable per-display vblank wait, so this is a steady timer at the
+      // display's rate: the right cadence, not locked to scanout phase.
+      struct DisplayRefreshClock
+      {
+         std::chrono::steady_clock::time_point last{};
+         bool haveLast = false;
+      };
+      DisplayRefreshClock gRefreshClock;
+   }
+
+   bool WaitForDisplayRefresh(int /*x*/, int /*y*/, double refreshHz, int intervals)
+   {
+      using Clock = std::chrono::steady_clock;
+      if (refreshHz <= 0.0 || intervals < 1)
+         return false;
+      DisplayRefreshClock& clock = gRefreshClock;
+      const auto period = std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(1.0 / refreshHz));
+      const Clock::time_point now = Clock::now();
+      if (!clock.haveLast)
+      {
+         clock.last = now;
+         clock.haveLast = true;
+      }
+      Clock::time_point target = clock.last + period * intervals;
+      if (now >= target) // late: next tick on the same phase grid
+         target = clock.last + period * ((now - clock.last) / period + 1);
+      const auto slack = target - Clock::now();
+      if (slack > std::chrono::milliseconds(2))
+         std::this_thread::sleep_for(slack - std::chrono::milliseconds(1));
+      while (Clock::now() < target)
+         std::this_thread::yield();
+      clock.last = target;
+      return true;
+   }
+
+   void StopDisplayRefreshClock()
+   {
+      gRefreshClock.haveLast = false;
    }
 
    double PollTrackpadMagnificationDelta()

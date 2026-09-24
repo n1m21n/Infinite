@@ -1740,6 +1740,41 @@ namespace
       int windowedX = 100, windowedY = 100, windowedW = 1280, windowedH = 720; // restore box
    };
    std::vector<ProjectorWindow> gProjectorWindows;
+
+   // Who paces the frame loop. With a projector window open and no offline
+   // render running, the display the primary Output window is on does: every
+   // context presents at swap interval 0 and the loop waits on that display's
+   // refresh clock just before the projectors present (see
+   // PaceProjectorPresent). Otherwise the canvas's own swap paces it, as it
+   // always has. gCanvasSwapInterval is what the canvas asks for when it owns
+   // pacing (Vsync setting, 0 during an export); every site that used to call
+   // glfwSwapInterval on the main context goes through SetCanvasSwapInterval,
+   // so opening a projector or ending an export can't leave two vsync waits
+   // in one frame.
+   int gCanvasSwapInterval = 1;
+   int gAppliedCanvasSwapInterval = -1;
+
+   bool ProjectorPacingActive()
+   {
+      return !gProjectorWindows.empty() && !gOfflineRender.active && !gArrangeWavRender.active;
+   }
+
+   // Main context must be current (true at every caller, as it was for the
+   // glfwSwapInterval calls these replace).
+   void ApplyCanvasSwapInterval()
+   {
+      const int want = ProjectorPacingActive() ? 0 : gCanvasSwapInterval;
+      if (want == gAppliedCanvasSwapInterval)
+         return;
+      glfwSwapInterval(want);
+      gAppliedCanvasSwapInterval = want;
+   }
+
+   void SetCanvasSwapInterval(int interval)
+   {
+      gCanvasSwapInterval = interval;
+      ApplyCanvasSwapInterval();
+   }
    // Bottom-left by default: the module browser docks on the right, and the
    // minimap draws (and takes its clicks) on the foreground draw list, so a
    // right-hand corner would sit on top of the panel and swallow clicks meant
@@ -41763,7 +41798,7 @@ namespace
       // fast as it can go" and "a bit faster than realtime" on a heavy patch,
       // which is what makes a long render look like it has stalled.
       gOfflineRender.vsyncWasOn = gVsync;
-      glfwSwapInterval(0);
+      SetCanvasSwapInterval(0);
 
       gOfflineRender.startSeconds = Transport::Instance().Seconds();
       Transport::Instance().SetOfflineMode(true, takeSampleRate);
@@ -42845,7 +42880,7 @@ namespace
       else
          Transport::Instance().NotifyAudioEngineStopped();
       Transport::Instance().SetPlaying(gArrangeWavRender.wasPlaying);
-      glfwSwapInterval(gArrangeWavRender.vsyncWasOn ? 1 : 0);
+      SetCanvasSwapInterval(gArrangeWavRender.vsyncWasOn ? 1 : 0);
       gArrangeWavRender.active = false;
       gArrangeWavRender.timelineAudio = false;
       gArrangeWavRender.cancelRequested = false;
@@ -42911,7 +42946,7 @@ namespace
       gArrangeWavRender.wasPlaying = Transport::Instance().IsPlaying();
       gArrangeWavRender.vsyncWasOn = gVsync;
       gArrangeWavRender.startedTime = glfwGetTime();
-      glfwSwapInterval(0);
+      SetCanvasSwapInterval(0);
 
       Transport::Instance().Seek(startSec);
       Transport::Instance().SetOfflineMode(true, rate);
@@ -45088,7 +45123,7 @@ namespace
 
             if (ImGui::Checkbox("Vsync", &gVsync))
             {
-               glfwSwapInterval(gVsync ? 1 : 0);
+               SetCanvasSwapInterval(gVsync ? 1 : 0);
                SaveGeneralSettings();
             }
 
@@ -47553,6 +47588,127 @@ namespace
       return bestIndex;
    }
 
+   // Projector pacing policy (ProjectorPacingActive says when it applies).
+   // The primary Output is the first fullscreen projector window, else the
+   // first one opened; with two Outputs on displays of different refresh,
+   // only the primary's is presented on its refresh grid.
+   //
+   // Rate: a whole divisor of that display's refresh R, never an uneven
+   // rate. The base divisor is the largest that still gives >= 60 fps
+   // (60 Hz -> every refresh, 120 -> every 2nd = 60 fps, 144 -> 72 fps).
+   // Native R only with headroom: the frame's own work (everything but the
+   // wait) must fit in 55% of a refresh at p95 over a 2 s window, and it drops
+   // back to the base divisor as soon as p95 crosses 85%.
+   struct ProjectorPacer
+   {
+      static constexpr int kWindow = 120;
+      double refreshHz = 0.0;
+      int baseIntervals = 1;
+      int intervals = 1;
+      int monitorX = 0, monitorY = 0;
+      bool haveMonitor = false;
+      double lastMonitorCheck = -1.0;
+      double lastPresent = -1.0; // glfwGetTime() when the last wait returned
+      std::vector<double> workMs;
+
+      void SetDisplay(int x, int y, double hz)
+      {
+         haveMonitor = true;
+         monitorX = x;
+         monitorY = y;
+         if (hz == refreshHz)
+            return;
+         refreshHz = hz;
+         baseIntervals = hz > 0.0 ? std::max(1, (int)std::floor(hz / 60.0 + 0.02)) : 1;
+         intervals = baseIntervals;
+         workMs.clear();
+      }
+
+      void AddWork(double ms)
+      {
+         if (baseIntervals <= 1 || refreshHz <= 0.0)
+            return;
+         workMs.push_back(ms);
+         if ((int)workMs.size() < kWindow)
+            return;
+         std::sort(workMs.begin(), workMs.end());
+         const double p95 = workMs[(size_t)(0.95 * (double)(workMs.size() - 1))];
+         const double periodMs = 1000.0 / refreshHz;
+         if (intervals == baseIntervals && p95 < 0.55 * periodMs)
+            intervals = 1;
+         else if (intervals == 1 && p95 > 0.85 * periodMs)
+            intervals = baseIntervals;
+         workMs.clear();
+      }
+
+      void Reset()
+      {
+         *this = ProjectorPacer{};
+      }
+   };
+   ProjectorPacer gProjectorPacer;
+
+   // Called once per frame right before the projectors present. Blocks on the
+   // primary Output display's refresh clock when projector pacing is active;
+   // otherwise releases the clock (last projector closed, export running).
+   void PaceProjectorPresent()
+   {
+      ProjectorPacer& pacer = gProjectorPacer;
+      if (!ProjectorPacingActive())
+      {
+         if (pacer.haveMonitor)
+         {
+            Platform::StopDisplayRefreshClock();
+            pacer.Reset();
+         }
+         return;
+      }
+
+      // Which display the primary Output is on, re-read twice a second: the
+      // user can drag it or fullscreen it onto another display at any time.
+      const double now = glfwGetTime();
+      if (!pacer.haveMonitor || now - pacer.lastMonitorCheck >= 0.5)
+      {
+         pacer.lastMonitorCheck = now;
+         const ProjectorWindow* primary = &gProjectorWindows[0];
+         for (const ProjectorWindow& pw : gProjectorWindows)
+            if (pw.fullscreen)
+            {
+               primary = &pw;
+               break;
+            }
+         int monitorCount = 0;
+         GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+         const int idx = ProjectorMonitorIndex(primary->window);
+         if (idx >= 0 && idx < monitorCount)
+         {
+            int mx = 0, my = 0;
+            glfwGetMonitorPos(monitors[idx], &mx, &my);
+            const GLFWvidmode* mode = glfwGetVideoMode(monitors[idx]);
+            pacer.SetDisplay(mx, my, mode ? (double)mode->refreshRate : 0.0);
+         }
+      }
+      if (!pacer.haveMonitor)
+         return;
+
+      if (pacer.lastPresent >= 0.0)
+         pacer.AddWork((now - pacer.lastPresent) * 1000.0);
+      if (!Platform::WaitForDisplayRefresh(pacer.monitorX, pacer.monitorY, pacer.refreshHz, pacer.intervals) &&
+          pacer.refreshHz > 0.0 && pacer.lastPresent >= 0.0)
+      {
+         // No display clock (stalled link, display asleep): the canvas is at
+         // swap interval 0 too, so hold the rate on a plain timer rather than
+         // letting the whole loop run unpaced.
+         const double deadline = pacer.lastPresent + (double)pacer.intervals / pacer.refreshHz;
+         const double slack = deadline - glfwGetTime();
+         if (slack > 0.002)
+            std::this_thread::sleep_for(std::chrono::duration<double>(slack - 0.001));
+         while (glfwGetTime() < deadline)
+            std::this_thread::yield();
+      }
+      pacer.lastPresent = glfwGetTime();
+   }
+
    // Enters or leaves fullscreen on a projector window, targeting a specific
    // monitor. Deliberately NOT exclusive GLFW fullscreen
    // (glfwSetWindowMonitor with a monitor) - exclusive fullscreen is exactly
@@ -47791,12 +47947,14 @@ namespace
 
       glfwSetKeyCallback(projWindow, ProjectorKeyCallback);
 
-      // The main window owns vsync - without this, each projector context
-      // inherits a driver-default swap interval, which is a second vsync
-      // wait per frame per open projector window.
+      // Projector contexts never wait in their swap: the loop is paced by the
+      // primary Output display's refresh clock (PaceProjectorPresent), so a
+      // driver-default interval here would be a second vsync wait per frame
+      // per window. The canvas drops to 0 too while any projector is open.
       glfwMakeContextCurrent(projWindow);
       glfwSwapInterval(0);
       glfwMakeContextCurrent(mainWindow);
+      ApplyCanvasSwapInterval();
 
       ProjectorWindow pw;
       pw.window = projWindow;
@@ -65519,8 +65677,10 @@ int main(int argc, char** argv)
       double lastSwapMs = -1.0;
       int refreshHz = 0;
       int monitorIndex = -1;
+      int onVsync = 0; // intervals within 1.5 ms of a whole number of this display's refreshes
    };
    static std::vector<BenchB8Window> sBenchB8Win;
+   static bool sBenchB8ForceOverlap = false; // INFINITE_BENCH_B8OVERLAP=1: leave projectors on top of the canvas
    static bool sBenchB8Sampling = false;
 
    // B6 Canvas navigation fixture state (docs/plans/perf/benchmark-suite.md §4)
@@ -65927,9 +66087,9 @@ int main(int argc, char** argv)
    }
 
    if (gHeadlessTestWindow)
-      glfwSwapInterval(0);
+      SetCanvasSwapInterval(0);
    else
-      glfwSwapInterval(1);
+      SetCanvasSwapInterval(1);
    Platform::PreventAppNap();
 
    // Covers both the red close button and Cmd+Q: GLFW's Cocoa backend routes
@@ -66169,7 +66329,7 @@ int main(int argc, char** argv)
    // persisted preference now that it's loaded. Headless test windows stay
    // uncapped regardless - they don't want to be paced by the display.
    if (!gHeadlessTestWindow)
-      glfwSwapInterval(gVsync ? 1 : 0);
+      SetCanvasSwapInterval(gVsync ? 1 : 0);
    LoadBrowserFilterPrefs();
    gBrowserFavorites.Load();
 
@@ -68424,6 +68584,7 @@ int main(int argc, char** argv)
          sBenchB8Windows = std::clamp(envInt("INFINITE_BENCH_B8WINDOWS", 0), 0, 3);
          sBenchB8WantCamera = envOn("INFINITE_BENCH_B8CAMERA");
          sBenchB8WantSyphon = envOn("INFINITE_BENCH_B8SYPHON");
+         sBenchB8ForceOverlap = envOn("INFINITE_BENCH_B8OVERLAP");
          sBenchB8TotalFrames = std::max(60, envInt("INFINITE_BENCH_B8FRAMES", 600));
 
          sBenchB8Variant = "clips=" + std::to_string(sBenchB8Clips) + ",res=" + std::to_string(sBenchB8Res) +
@@ -68763,6 +68924,9 @@ int main(int argc, char** argv)
          sGpuTimerRing.Poll(frameId);
 
       gFrameStart = glfwGetTime();
+      // A projector opened or closed, or an export started or ended, since
+      // last frame: hand pacing to the right owner before this frame swaps.
+      ApplyCanvasSwapInterval();
       glfwPollEvents();
 
       // A recording Stop click sets StopRequested() rather than calling
@@ -68995,7 +69159,7 @@ int main(int argc, char** argv)
             else
                Transport::Instance().NotifyAudioEngineStopped();
             Transport::Instance().SetPlaying(gOfflineRender.wasPlaying);
-            glfwSwapInterval(gOfflineRender.vsyncWasOn ? 1 : 0);
+            SetCanvasSwapInterval(gOfflineRender.vsyncWasOn ? 1 : 0);
             gOfflineRender.active = false;
             gOfflineRender.arrangeDriven = false;
             gOfflineRender.timelineVideo = false;
@@ -85805,7 +85969,7 @@ int main(int argc, char** argv)
       if (getenv("INFINITE_FPSTEST") != nullptr)
       {
          static double sUncapped = 0.0;
-         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); }
+         if (frameId == 2) { gVsync = false; SetCanvasSwapInterval(0); }
          if (frameId == 30) { sUncapped = gLastFrameMs; gTargetFps = 30; }
          if (frameId == 60)
          {
@@ -85830,7 +85994,7 @@ int main(int argc, char** argv)
       {
          static double sSum = 0.0, sMin = 1e30, sMax = 0.0;
          static int sSampleCount = 0;
-         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; }
+         if (frameId == 2) { gVsync = false; SetCanvasSwapInterval(0); gTargetFps = 0; }
          auto* render = static_cast<Render3DNode*>(gNodes[1].node.get());
          if (frameId >= 2)
             render->CookIfNeeded(frameId);
@@ -85865,7 +86029,7 @@ int main(int argc, char** argv)
       {
          static Bench::PercentileRing sFrameMs;
          static double sRssStartMb = -1.0;
-         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; sRssStartMb = Bench::ProcessRssMb(); }
+         if (frameId == 2) { gVsync = false; SetCanvasSwapInterval(0); gTargetFps = 0; sRssStartMb = Bench::ProcessRssMb(); }
          if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
             sFrameMs.Push(gLastFrameMs);
          if (frameId == 152)
@@ -85891,7 +86055,7 @@ int main(int argc, char** argv)
       // each main-loop stage to report median ms per stage in stagesCpuMs.
       if (isBenchB5c)
       {
-         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; sBenchB5cRssStartMb = Bench::ProcessRssMb(); }
+         if (frameId == 2) { gVsync = false; SetCanvasSwapInterval(0); gTargetFps = 0; sBenchB5cRssStartMb = Bench::ProcessRssMb(); }
          if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
             sBenchB5cFrameMs.Push(gLastFrameMs);
          if (frameId == 152)
@@ -85929,7 +86093,7 @@ int main(int argc, char** argv)
       // RSS memory, and output_hash quality guard.
       if (isBenchB2 || isBenchB4)
       {
-         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; sBenchB2RssStartMb = Bench::ProcessRssMb(); }
+         if (frameId == 2) { gVsync = false; SetCanvasSwapInterval(0); gTargetFps = 0; sBenchB2RssStartMb = Bench::ProcessRssMb(); }
          if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
             sBenchB2FrameMs.Push(gLastFrameMs);
          if (frameId == 152)
@@ -86013,7 +86177,7 @@ int main(int argc, char** argv)
          {
             // Keep vsync ON for B3 per §6 (do NOT disable vsync!)
             gVsync = true;
-            glfwSwapInterval(1);
+            SetCanvasSwapInterval(1);
             gTargetFps = 0;
             const double r2 = Bench::ProcessRssMb();
             const double f2 = Bench::ProcessFootprintMb();
@@ -86283,7 +86447,7 @@ int main(int argc, char** argv)
          if (frameId == 2)
          {
             gVsync = sBenchB6Vsync;
-            glfwSwapInterval(sBenchB6Vsync ? 1 : 0);
+            SetCanvasSwapInterval(sBenchB6Vsync ? 1 : 0);
             gTargetFps = 0;
             const double r2 = Bench::ProcessRssMb();
             const double f2 = Bench::ProcessFootprintMb();
@@ -86553,7 +86717,7 @@ int main(int argc, char** argv)
             if (frameId == 2)
             {
                gVsync = true;
-               glfwSwapInterval(1);
+               SetCanvasSwapInterval(1);
                gTargetFps = 0;
 
                for (int w = 0; w < sBenchB8Windows && w < (int)sBenchB8OutputIdx.size(); w++)
@@ -86563,11 +86727,11 @@ int main(int argc, char** argv)
                // Canvas at the top-left of the primary display, projectors in
                // a column right of it. Sizes are kept modest (the canvas at
                // most 1280x800, projectors 480x270) so a bench run does not
-               // cover the whole screen. The canvas must stay unoccluded:
-               // projectors present at swap interval 0 and the whole loop is
-               // paced by the canvas's vsync, which macOS stops blocking on an
-               // occluded window (B3 lesson).
-               if (GLFWmonitor* mon = glfwGetPrimaryMonitor(); mon && !gProjectorWindows.empty())
+               // cover the whole screen. The loop is paced by the primary
+               // Output display's refresh clock, not the canvas's swap, so
+               // occlusion no longer unpaces it; B8OVERLAP=1 skips this layout
+               // (projectors stay where they open, over the canvas) to prove it.
+               if (GLFWmonitor* mon = glfwGetPrimaryMonitor(); mon && !gProjectorWindows.empty() && !sBenchB8ForceOverlap)
                {
                   int wx = 0, wy = 0, ww = 0, wh = 0;
                   glfwGetMonitorWorkarea(mon, &wx, &wy, &ww, &wh);
@@ -86874,11 +87038,15 @@ int main(int argc, char** argv)
                {
                   const BenchB8Window& bw = sBenchB8Win[k];
                   const int hz = bw.refreshHz > 0 ? bw.refreshHz : mainHz;
-                  // Projectors present at swap interval 0 and are paced by the
-                  // canvas loop, so the rate they can hold is the canvas's.
-                  const double periodMs = 1000.0 / (double)std::max(1, mainHz);
+                  // Projectors are paced to the primary Output display's
+                  // refresh, every `paced_every` refreshes (1 at <= 75 Hz; see
+                  // ProjectorPacer), so that is the period they must hold.
+                  const int pacedEvery = std::max(1, gProjectorPacer.intervals);
+                  const double periodMs = 1000.0 * (double)pacedEvery / (double)std::max(1, hz);
                   const size_t missed = bw.intervalMs.CountOver(1.5 * periodMs);
                   const double missedFrac = bw.intervalMs.Empty() ? 0.0 : (double)missed / (double)bw.intervalMs.Count();
+                  const nlohmann::json onVsyncFrac = bw.intervalMs.Empty()
+                     ? nlohmann::json(nullptr) : nlohmann::json((double)bw.onVsync / (double)bw.intervalMs.Count());
                   wins.push_back({
                      { "refresh_hz", hz },
                      { "monitor", bw.monitorIndex },
@@ -86887,7 +87055,8 @@ int main(int argc, char** argv)
                      { "interval_ms", p5099max(bw.intervalMs) },
                      { "jitter_stddev_ms", bw.intervalMs.StdDev() },
                      { "missed_vsync_frac", missedFrac },
-                     { "on_vsync_frac", nullptr }, // swap interval 0: not vsync-locked by construction
+                     { "on_vsync_frac", onVsyncFrac },
+                     { "paced_every", pacedEvery },
                   });
                   const std::string key = "window" + std::to_string(k);
                   verdict(key + "_interval_p99_locked", !bw.intervalMs.Empty(),
@@ -86971,7 +87140,7 @@ int main(int argc, char** argv)
          if (frameId == 2)
          {
             gVsync = false;
-            glfwSwapInterval(0);
+            SetCanvasSwapInterval(0);
             gTargetFps = 0;
             // "start" is process launch, not frame 2: by frame 2 the scene
             // is already built, and the peak has to include launch and the
@@ -87254,7 +87423,7 @@ int main(int argc, char** argv)
       {
          static Bench::PercentileRing sFrameMs;
          static double sRssStartMb = -1.0;
-         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; sRssStartMb = Bench::ProcessRssMb(); }
+         if (frameId == 2) { gVsync = false; SetCanvasSwapInterval(0); gTargetFps = 0; sRssStartMb = Bench::ProcessRssMb(); }
          if (frameId >= 32 && frameId < 152 && gLastFrameMs > 0.0)
             sFrameMs.Push(gLastFrameMs);
          if (frameId == 152)
@@ -87323,7 +87492,7 @@ int main(int argc, char** argv)
       {
          static double sSum = 0.0, sMin = 1e30, sMax = 0.0;
          static int sSampleCount = 0;
-         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; }
+         if (frameId == 2) { gVsync = false; SetCanvasSwapInterval(0); gTargetFps = 0; }
          if (getenv("INFINITE_NODECHAINPERFTEST_VERBOSE") != nullptr)
          {
             fprintf(stderr, "[nodechain] frame=%d lastMs=%.2f\n", frameId, gLastFrameMs);
@@ -87366,7 +87535,7 @@ int main(int argc, char** argv)
          static double sSum = 0.0, sMin = 1e30, sMax = 0.0;
          static int sSampleCount = 0;
          static Render3DNode* sRender = nullptr;
-         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; }
+         if (frameId == 2) { gVsync = false; SetCanvasSwapInterval(0); gTargetFps = 0; }
          if (getenv("INFINITE_MIXEDSTRESSTEST_VERBOSE") != nullptr)
          {
             fprintf(stderr, "[mixedstress] frame=%d lastMs=%.2f nodes=%zu\n",
@@ -87404,7 +87573,7 @@ int main(int argc, char** argv)
       {
          static double sSum = 0.0, sMin = 1e30, sMax = 0.0;
          static int sSampleCount = 0;
-         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; }
+         if (frameId == 2) { gVsync = false; SetCanvasSwapInterval(0); gTargetFps = 0; }
          auto* render = static_cast<Render3DNode*>(gNodes[1].node.get());
          if (frameId >= 2)
             render->CookIfNeeded(frameId);
@@ -87434,7 +87603,7 @@ int main(int argc, char** argv)
       {
          static double sSum = 0.0, sMin = 1e30, sMax = 0.0;
          static int sSampleCount = 0;
-         if (frameId == 2) { gVsync = false; glfwSwapInterval(0); gTargetFps = 0; }
+         if (frameId == 2) { gVsync = false; SetCanvasSwapInterval(0); gTargetFps = 0; }
          auto* render = static_cast<Render3DNode*>(gNodes[1].node.get());
          if (frameId >= 2)
             render->CookIfNeeded(frameId);
@@ -87479,7 +87648,7 @@ int main(int argc, char** argv)
          if (!sVsyncOff && frameId == 2)
          {
             gVsync = false;
-            glfwSwapInterval(0);
+            SetCanvasSwapInterval(0);
             sVsyncOff = true;
          }
 
@@ -95322,6 +95491,11 @@ int main(int argc, char** argv)
       static double sLastTopmostRefresh = 0.0;
       const double now = glfwGetTime();
       const bool refreshTopmost = now - sLastTopmostRefresh >= 0.5;
+      // With a projector open this is where the loop waits for the primary
+      // Output display's refresh, so the presents below land on its grid
+      // whether or not the canvas (or the projector) is covered or hidden.
+      // Outside the `projectors` stage timer: it is idle time, not work.
+      PaceProjectorPresent();
       {
          ConditionalStageTimer timerProjectors(benchStagesCpuSample ? &sStageProjectors : nullptr);
          for (size_t i = gProjectorWindows.size(); i-- > 0; )
@@ -95389,7 +95563,13 @@ int main(int argc, char** argv)
                BenchB8Window& bw = sBenchB8Win[i];
                bw.presentMs.Push(endMs - benchB8SwapStartMs);
                if (bw.lastSwapMs >= 0.0)
-                  bw.intervalMs.Push(endMs - bw.lastSwapMs);
+               {
+                  const double iv = endMs - bw.lastSwapMs;
+                  bw.intervalMs.Push(iv);
+                  const double refreshMs = bw.refreshHz > 0 ? 1000.0 / (double)bw.refreshHz : sBenchB8RefreshMs;
+                  if (std::fabs(iv - std::max(1.0, std::round(iv / refreshMs)) * refreshMs) <= 1.5)
+                     bw.onVsync++;
+               }
                bw.lastSwapMs = endMs;
             }
             if (isBenchB3 && frameId >= 32)
@@ -95447,8 +95627,9 @@ int main(int argc, char** argv)
       // this frame to the display's refresh, and topping that up against a
       // second, unrelated budget just fights the vsync quantization instead of
       // capping anything more precisely (the Target FPS control is disabled in
-      // the UI whenever Vsync is on, for the same reason).
-      if (gTargetFps > 0 && !gVsync)
+      // the UI whenever Vsync is on, for the same reason). Skipped too while a
+      // projector window paces the loop to its display's refresh.
+      if (gTargetFps > 0 && !gVsync && !ProjectorPacingActive())
       {
          const double budget = 1.0 / (double)gTargetFps;
          const double deadline = gFrameStart + budget;
@@ -95531,6 +95712,7 @@ int main(int argc, char** argv)
    }
 
    CloseAllProjectorWindows();
+   Platform::StopDisplayRefreshClock();
    AudioEngine::Instance().Stop();
    UpdateCheck::Shutdown(); // joins the worker thread so the process doesn't exit mid-request
    MovementLog::Stop();
