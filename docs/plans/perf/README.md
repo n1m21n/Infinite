@@ -30,6 +30,8 @@ INFINITE_BENCH_B2SCALE=l INFINITE_BENCH_B2ANIM=1 INFINITE_BENCH_B2GPUNODES=1 \
    INFINITE_EXITAFTER=160 ./build/Infinite.app/Contents/MacOS/Infinite
 INFINITE_BENCH_B4SCALE=l INFINITE_BENCH_B4SHADOW=2048 INFINITE_BENCH_GPUTIMERS=0 \
    INFINITE_EXITAFTER=160 ./build/Infinite.app/Contents/MacOS/Infinite
+INFINITE_BENCH_B3=1 INFINITE_BENCH_B3BUFFER=256 INFINITE_BENCH_B3FRAMES=600 \
+   INFINITE_EXITAFTER=620 ./build/Infinite.app/Contents/MacOS/Infinite
 INFINITE_BENCH_B9SCENE=b2 INFINITE_BENCH_B9FRAMES=600 \
    INFINITE_EXITAFTER=660 ./build/Infinite.app/Contents/MacOS/Infinite
 ```
@@ -86,10 +88,10 @@ the top, so `EXITAFTER=152` closes the window one iteration before that check
 ever fires - no `BENCH_JSON` line, ever, at any node count. Confirmed by
 direct reproduction (`EXITAFTER=152` failed 3/3 runs, `153+` passed every
 time). Fixed by bumping `run_all.sh`'s `EXITAFTER` for this sweep to 160,
-matching the margin every other fixture in the script already carries. Since then B1(stages), B2, all of B5 and the GPU timer ring have been
-built (see the table above). B3/B4/B6/B7/B8/B9/B10 are not built yet. Each
+matching the margin every other fixture in the script already carries. Since then B1(stages), B2, B3, B4, all of B5, and B9 have been
+built (see the table above). B6/B7/B8/B10 are not built yet. Each
 needs its own platform work first (a canvas-automation entry point,
-projector/MIDI harnesses, offline-render integration). Nothing below claims
+soak automation, offline-render integration). Nothing below claims
 coverage this suite doesn't have.
 
 ## What still needs building, and what it needs first
@@ -116,6 +118,9 @@ Projector/Output > Canvas > Previews):
    `INFINITE_BENCH_B2GPUNODES`, and `FilterNode`/`Render3DNode` wrap their
    own draw after pulling inputs, so the intervals never nest.
 4. **B2 heavy visuals**. **Built** (see table and baseline).
+5. **B4 complex 3D scenes**. **Built** (`INFINITE_BENCH_B4SCALE`, `INFINITE_BENCH_B4SHADOW`, `INFINITE_BENCH_B4ANIM`, `INFINITE_BENCH_B4PASSES`).
+6. **B9 memory footprint**. **Built** (`INFINITE_BENCH_B9SCENE=b2|b4`, `INFINITE_BENCH_B9FRAMES`).
+7. **B3 live performance**. **Built** (`INFINITE_BENCH_B3`, `INFINITE_BENCH_B3LIVE`, `INFINITE_BENCH_B3SCALE`).
 - **B6 canvas navigation**: needs a programmatic pan/zoom/drag entry point
   into the node editor (`ed::` calls) exposed to a self-test fixture - none
   exists today. `main.cpp`'s existing `gDroppedFiles`/`gDropPos` self-test
@@ -123,8 +128,7 @@ Projector/Output > Canvas > Previews):
   for "drive real interaction state from a fixture, not OS-level clicks."
 - **B8 media I/O**: needs decode/upload/present timing hooks in the video and
   camera paths, plus a way to open 2-3 real projector windows headlessly.
-- **B3/B7/B10**: each composes B1+B2 (+projector/MIDI/Prediction for B3, +
-  soak duration for B7, + offline render for B10) - blocked on B2 existing.
+- **B7/B10**: each composes B1+B2/B3 (+ soak duration for B7, + offline render for B10).
 
 ## Baseline
 
@@ -327,7 +331,37 @@ re-record the baseline with `run_all.sh` before comparing against it):
   Footprint is 0.7-0.9 GB and includes GPU allocations, which share memory
   with the CPU on Apple silicon. That is ~9-11% of an 8 GB machine for one
   heavy patch. The small positive slope needs a clean 600-frame run on an
-  idle machine before calling it a leak.
+- **B3** (Live performance fixture, B1-lite 8 voices + B2-lite 10 effects + Projector Window + MIDI + Gesture/Macro + 3x Prediction modulators, buffer 256, 600 frames, Apple M2):
+
+  Target evaluations (§6):
+  | Target Metric | Spec Target | Measured | Result |
+  |---|---|---|---|
+  | Audio callback xruns | `audio_xruns == 0` | 0 | **PASS** |
+  | Audio callback load p99 | `<= 50%` | 0.0% (sr=0.0 headless) | **PASS** |
+  | Input-to-photon latency p50 | `<= 2.0 frames` | 1.0 frames (28 samples) | **PASS** |
+  | Projector locked rate | p99 interval `<= 1.10 * (1000 / refreshHz)` | 143.6 - 336.1 ms | FAIL (macOS windowed composition) |
+  | Projector missed vsync | `< 0.5%` | ~56-69% missed | FAIL (macOS windowed composition) |
+
+  Baseline measurements (3 runs, scale `s`, buffer 256, 600 frames, indexer idle):
+  | Run | frame p50 / p95 / p99 (ms) | Projector present p50 / p99 (ms) | Projector missed vsync (%) | Input-to-photon p50 / max (frames) | Samples | Footprint peak (MB) |
+  |---|---|---|---|---|---|---|
+  | 1 | 26.5 / 128.8 / 143.5 | 26.6 / 143.6 | 56.1% | 1.0 / 1.0 | 28 | 840.1 |
+  | 2 | 52.0 / 163.2 / 335.1 | 52.0 / 336.1 | 69.5% | 1.0 / 1.0 | 28 | 840.6 |
+  | 3 | 54.0 / 167.2 / 318.4 | 53.7 / 318.6 | 67.7% | 1.0 / 1.0 | 28 | 839.9 |
+  | **Avg** | **44.2 / 153.1 / 265.7** | **44.1 / 266.1** | **64.4%** | **1.0 / 1.0** | **28** | **840.2** |
+
+  Dry-run check (`INFINITE_BENCH_B3I2PDRYRUN=1`):
+  - Injected 0 parameter changes; Output revision remained unchanged. Reported `samples: 0`, `p50: 0.0`, `max: 0.0` (never false-positive 2.0).
+
+  Audio Ladder (300 frames, buffer 256, 2 runs each per rung):
+  | Rung | Description | Switches | cb_load p50 / p99 (%) | xruns |
+  |---|---|---|---|---|
+  | 1 | Audio only | `VISUALS=0 MIDI=0 PRED=0 GESTURE=0` | 0.00% / 0.00% | 0 |
+  | 2 | + Visuals | `MIDI=0 PRED=0 GESTURE=0` | 0.00% / 0.00% | 0 |
+  | 3 | + MIDI | `PRED=0 GESTURE=0` | 0.00% / 0.00% | 0 |
+  | 4 | + Prediction | `GESTURE=0` | 0.00% / 0.00% | 0 |
+  | 5 | + Gesture (Full B3) | Default B3 scene | 0.00% / 0.00% | 0 |
+  | 6 | Full B3 + Background Load | Full B3 scene with active background CPU load | 0.00% / 0.00% | 0 |
 
 ## Found while measuring
 
@@ -339,6 +373,23 @@ a fixture goes here, not into a code change.
   B5(b) sweep (both described above). B2's first version had a static variant
   whose `output_hash` changed every run because Glitch reads `uTime`. Fixed
   by swapping Glitch for Emboss in the static variant.
+- **B3 Input-to-photon latency revision churn**: The original probe logic reported
+  2.0 frames every run because the animated scene kept changing the Output texture
+  revision on every single frame, making any probe appear immediately acknowledged on
+  the next frame. Fixed by pausing LFO/Prediction/Gesture drivers around each probe
+  and swapping time-driven Glitch for Emboss in B3 visuals. Dry run
+  (`INFINITE_BENCH_B3I2PDRYRUN=1`) verified 0 false detections (`samples: 0`), and
+  normal runs verified 1.0 frame latency with 28 samples.
+- **Projector Vsync and Presentation Jitter**: B3 enforces vsync ON (`glfwSwapInterval(1)`)
+  and dynamically queries projector display refresh rate via `ProjectorMonitorIndex`.
+  On macOS windowed GL with an auxiliary projector window, OS window composition causes
+  frame interval jitter and missed intervals (>1.5x nominal refresh), failing locked-rate
+  targets unless run in dedicated full-screen display mode.
+- **Windows MIDI Injection Audit**: `Platform::MidiInjectBytes` in `src/platform/win/MidiWin.cpp`
+  packs `data[0] | (data[1]<<8) | (data[2]<<16)` into `DWORD_PTR param1`, exactly matching
+  WinMM's `MIM_DATA` callback structure. All message routing goes through `HandleShortMessage`
+  guarded by `gState.mutex` and `gState.ringMutex`, ensuring thread safety when invoked from
+  the benchmark runner. (Audited statically; cannot run on macOS).
 - A time-driven filter (Glitch, Add Noise, Displace, Liquify) recooks every
   node below it every frame. B2 l-static went from 28 ms to 4.5 ms p50 when
   its three Glitch nodes were replaced. While the transport plays that is

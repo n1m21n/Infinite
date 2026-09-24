@@ -64875,7 +64875,8 @@ static void BuildBenchB1Audio(long numVoices, int bufferFrames = 256, float yOff
 }
 
 static void BuildBenchB2Scene(const std::string& scaleStr, bool isAnim, int& outRender3DIdx, int& outOutputIdx,
-                              int* outTwistIdx = nullptr, int* outMatIdx = nullptr, int* outCamIdx = nullptr)
+                              int* outTwistIdx = nullptr, int* outMatIdx = nullptr, int* outCamIdx = nullptr,
+                              bool useEmbossForGlitch = false)
 {
    int effectCount = 10;
    int triDetail = 30;
@@ -64992,7 +64993,7 @@ static void BuildBenchB2Scene(const std::string& scaleStr, bool isAnim, int& out
    for (int i = 0; i < effectCount; i++)
    {
       const EffectDef& eff = kEffectDefs[i % kNumEffectTypes];
-      const char* effName = (!isAnim && strcmp(eff.name, "glitch") == 0) ? "emboss" : eff.name;
+      const char* effName = ((!isAnim || useEmbossForGlitch) && strcmp(eff.name, "glitch") == 0) ? "emboss" : eff.name;
       const float nodeX = curX + (float)(i % 8) * 260.0f;
       const float nodeY = curY + (float)(i / 8) * 200.0f;
 
@@ -65224,6 +65225,8 @@ int main(int argc, char** argv)
    static uint64_t sBenchB3XrunBaseline = 0;
    static int sBenchB3PendingInputInjectFrame = -1;
    static unsigned long long sBenchB3RevBeforeInject = 0;
+   static bool sBenchB3ProbePaused = false;
+   static bool sBenchB3I2PDryRun = false;
    static double sBenchB3RssStartMb = -1.0;
    static double sBenchB3RssPeakMb = -1.0;
    static double sBenchB3FootStartMb = -1.0;
@@ -68007,7 +68010,18 @@ int main(int argc, char** argv)
          const int voices = (scaleStr == "m" || scaleStr == "medium" || scaleStr == "16") ? 16 : 8;
          const int bufFrames = getenv("INFINITE_BENCH_B3BUFFER") ? atoi(getenv("INFINITE_BENCH_B3BUFFER")) : 256;
 
+         const bool b3EnableVisuals = (getenv("INFINITE_BENCH_B3VISUALS") == nullptr || strcmp(getenv("INFINITE_BENCH_B3VISUALS"), "0") != 0);
+         const bool b3EnableMidi = (getenv("INFINITE_BENCH_B3MIDI") == nullptr || strcmp(getenv("INFINITE_BENCH_B3MIDI"), "0") != 0);
+         const bool b3EnablePred = (getenv("INFINITE_BENCH_B3PRED") == nullptr || strcmp(getenv("INFINITE_BENCH_B3PRED"), "0") != 0);
+         const bool b3EnableGesture = (getenv("INFINITE_BENCH_B3GESTURE") == nullptr || strcmp(getenv("INFINITE_BENCH_B3GESTURE"), "0") != 0);
+         sBenchB3I2PDryRun = (getenv("INFINITE_BENCH_B3I2PDRYRUN") != nullptr && strcmp(getenv("INFINITE_BENCH_B3I2PDRYRUN"), "0") != 0);
+
          sBenchB3Variant = std::string("scale=") + scaleStr;
+         if (!b3EnableVisuals) sBenchB3Variant += ",visuals=0";
+         if (!b3EnableMidi) sBenchB3Variant += ",midi=0";
+         if (!b3EnablePred) sBenchB3Variant += ",pred=0";
+         if (!b3EnableGesture) sBenchB3Variant += ",gesture=0";
+         if (sBenchB3I2PDryRun) sBenchB3Variant += ",i2pdryrun=1";
          if (const char* t = getenv("INFINITE_BENCH_GPUTIMERS"); t && strcmp(t, "0") == 0)
             sBenchB3Variant += ",gputimers=0";
 
@@ -68015,41 +68029,51 @@ int main(int argc, char** argv)
          BuildBenchB1Audio(voices, bufFrames, /*yOffset=*/1200.0f);
 
          // 2. Visuals: B2-lite (scale s effects chain, animated)
-         BuildBenchB2Scene("s", /*isAnim=*/true, sBenchB3Render3DIdx, sBenchB3OutputIdx,
-                           &sBenchB3TwistIdx, &sBenchB3MatIdx, &sBenchB3CamIdx);
-
-         // 3. Gesture/macro playback on Material metallic
-         if (sBenchB3MatIdx >= 0)
+         if (b3EnableVisuals)
          {
-            GestureRecorder::Playback pb;
-            pb.samples = {
-               { 0.15f, 0.0, false },
-               { 0.85f, 1.0, false },
-               { 0.15f, 2.0, false }
-            };
-            pb.speed = 1.0f;
-            pb.recordedMin = 0.15f;
-            pb.recordedMax = 0.85f;
-            GestureRecorder::Instance().SetPlayback(sBenchB3MatIdx, 1, pb);
+            BuildBenchB2Scene("s", /*isAnim=*/true, sBenchB3Render3DIdx, sBenchB3OutputIdx,
+                              &sBenchB3TwistIdx, &sBenchB3MatIdx, &sBenchB3CamIdx,
+                              /*useEmbossForGlitch=*/true);
+
+            // 3. Gesture/macro playback on Material metallic
+            if (b3EnableGesture && sBenchB3MatIdx >= 0)
+            {
+               GestureRecorder::Playback pb;
+               pb.samples = {
+                  { 0.15f, 0.0, false },
+                  { 0.85f, 1.0, false },
+                  { 0.15f, 2.0, false }
+               };
+               pb.speed = 1.0f;
+               pb.recordedMin = 0.15f;
+               pb.recordedMax = 0.85f;
+               GestureRecorder::Instance().SetPlayback(sBenchB3MatIdx, 1, pb);
+            }
+
+            // 4. 3 Prediction modulators bound to visual parameters
+            if (b3EnablePred)
+            {
+               const int driftIdx = SpawnNode("Drift", "Prediction", 2600.0f, 600.0f)->index;
+               const int movesIdx = SpawnNode("Moves", "Prediction", 2600.0f, 800.0f)->index;
+               const int predModIdx = SpawnNode("Predictive Modulator", "Prediction", 2600.0f, 1000.0f)->index;
+
+               if (sBenchB3MatIdx >= 0)
+                  Modulation::Instance().Bind(sBenchB3MatIdx, 0, driftIdx, 0); // Material roughness
+               if (sBenchB3TwistIdx >= 0)
+                  Modulation::Instance().Bind(sBenchB3TwistIdx, 0, movesIdx, 0); // Twist amount
+               if (sBenchB3CamIdx >= 0)
+                  Modulation::Instance().Bind(sBenchB3CamIdx, 1, predModIdx, 0); // Camera elevation
+            }
          }
 
-         // 4. 3 Prediction modulators bound to visual parameters
-         const int driftIdx = SpawnNode("Drift", "Prediction", 2600.0f, 600.0f)->index;
-         const int movesIdx = SpawnNode("Moves", "Prediction", 2600.0f, 800.0f)->index;
-         const int predModIdx = SpawnNode("Predictive Modulator", "Prediction", 2600.0f, 1000.0f)->index;
-
-         if (sBenchB3MatIdx >= 0)
-            Modulation::Instance().Bind(sBenchB3MatIdx, 0, driftIdx, 0); // Material roughness
-         if (sBenchB3TwistIdx >= 0)
-            Modulation::Instance().Bind(sBenchB3TwistIdx, 0, movesIdx, 0); // Twist amount
-         if (sBenchB3CamIdx >= 0)
-            Modulation::Instance().Bind(sBenchB3CamIdx, 1, predModIdx, 0); // Camera elevation
-
          // 5. Start MIDI engine for simulated injection
-         if (!Platform::MidiIsRunning())
+         if (b3EnableMidi)
          {
-            std::string midiErr;
-            Platform::MidiStart(midiErr);
+            if (!Platform::MidiIsRunning())
+            {
+               std::string midiErr;
+               Platform::MidiStart(midiErr);
+            }
          }
 
          sBenchB3RssStartMb = sMainRssStartMb;
@@ -85510,10 +85534,14 @@ int main(int argc, char** argv)
       if (isBenchB3)
       {
          const int b3TotalFrames = getenv("INFINITE_BENCH_B3FRAMES") ? std::max(60, std::atoi(getenv("INFINITE_BENCH_B3FRAMES"))) : 600;
+         const bool b3EnableMidi = (getenv("INFINITE_BENCH_B3MIDI") == nullptr || strcmp(getenv("INFINITE_BENCH_B3MIDI"), "0") != 0);
+         const bool b3EnableVisuals = (getenv("INFINITE_BENCH_B3VISUALS") == nullptr || strcmp(getenv("INFINITE_BENCH_B3VISUALS"), "0") != 0);
+
          if (frameId == 2)
          {
-            gVsync = false;
-            glfwSwapInterval(0);
+            // Keep vsync ON for B3 per §6 (do NOT disable vsync!)
+            gVsync = true;
+            glfwSwapInterval(1);
             gTargetFps = 0;
             const double r2 = Bench::ProcessRssMb();
             const double f2 = Bench::ProcessFootprintMb();
@@ -85528,9 +85556,34 @@ int main(int argc, char** argv)
                   OpenProjectorWindow(window, *outGn);
             }
 
-            GLFWmonitor* primMon = glfwGetPrimaryMonitor();
-            const GLFWvidmode* mode = primMon ? glfwGetVideoMode(primMon) : nullptr;
-            sBenchB3MonitorRefreshHz = mode ? mode->refreshRate : 60;
+            int refreshHz = 60;
+            if (!gProjectorWindows.empty())
+            {
+               const int monIdx = ProjectorMonitorIndex(gProjectorWindows[0].window);
+               int monCount = 0;
+               GLFWmonitor** monitors = glfwGetMonitors(&monCount);
+               if (monIdx >= 0 && monIdx < monCount)
+               {
+                  const GLFWvidmode* mode = glfwGetVideoMode(monitors[monIdx]);
+                  if (mode && mode->refreshRate > 0)
+                     refreshHz = mode->refreshRate;
+               }
+               else
+               {
+                  GLFWmonitor* primMon = glfwGetPrimaryMonitor();
+                  const GLFWvidmode* mode = primMon ? glfwGetVideoMode(primMon) : nullptr;
+                  if (mode && mode->refreshRate > 0)
+                     refreshHz = mode->refreshRate;
+               }
+            }
+            else
+            {
+               GLFWmonitor* primMon = glfwGetPrimaryMonitor();
+               const GLFWvidmode* mode = primMon ? glfwGetVideoMode(primMon) : nullptr;
+               if (mode && mode->refreshRate > 0)
+                  refreshHz = mode->refreshRate;
+            }
+            sBenchB3MonitorRefreshHz = refreshHz;
             sBenchB3TargetRateHz = sBenchB3MonitorRefreshHz;
 
             sBenchB3XrunBaseline = AudioEngine::Instance().XrunCount();
@@ -85538,8 +85591,8 @@ int main(int argc, char** argv)
             AudioEngine::Instance().ResetStageLoadHistory();
          }
 
-         // MIDI injection every frame
-         if (frameId >= 2)
+         // MIDI injection every frame (if enabled)
+         if (b3EnableMidi && frameId >= 2)
          {
             if (frameId % 15 == 0)
             {
@@ -85560,35 +85613,31 @@ int main(int argc, char** argv)
          }
 
          // Input-to-photon latency: inject parameter change on Twist every 20 frames
-         if (frameId >= 32 && frameId <= b3TotalFrames - 20 && (frameId % 20 == 0))
+         const int kProbeInterval = 20;
+         if (b3EnableVisuals && frameId >= 32 && frameId <= b3TotalFrames - 10)
          {
-            if (auto* twistGn = FindNodeByIndex(sBenchB3TwistIdx))
+            if (frameId % kProbeInterval == kProbeInterval - 1)
             {
-               if (auto* twist = dynamic_cast<GeometryOpNode*>(twistGn->node.get()))
-               {
-                  twist->amount += 0.05f;
-                  sBenchB3PendingInputInjectFrame = frameId;
-                  if (auto* outGn = FindNodeByIndex(sBenchB3OutputIdx))
-                  {
-                     if (auto* outNode = dynamic_cast<OutputNode*>(outGn->node.get()))
-                        sBenchB3RevBeforeInject = outNode->Input().Revision();
-                  }
-               }
+               // 1 frame prior to injection: pause animation drivers so frame settles
+               sBenchB3ProbePaused = true;
             }
-         }
-
-         // Check if texture revision moved in response to input injection
-         if (sBenchB3PendingInputInjectFrame >= 0)
-         {
-            if (auto* outGn = FindNodeByIndex(sBenchB3OutputIdx))
+            else if (frameId % kProbeInterval == 0 && sBenchB3PendingInputInjectFrame < 0)
             {
-               if (auto* outNode = dynamic_cast<OutputNode*>(outGn->node.get()))
+               sBenchB3ProbePaused = true;
+               if (auto* outGn = FindNodeByIndex(sBenchB3OutputIdx))
                {
-                  if (outNode->Input().Revision() != sBenchB3RevBeforeInject)
+                  if (auto* outNode = dynamic_cast<OutputNode*>(outGn->node.get()))
                   {
-                     const int latencyFrames = frameId - sBenchB3PendingInputInjectFrame + 1;
-                     sBenchB3InputToPhotonFrames.Push((double)latencyFrames);
-                     sBenchB3PendingInputInjectFrame = -1;
+                     sBenchB3RevBeforeInject = outNode->Input().Revision();
+                     sBenchB3PendingInputInjectFrame = frameId;
+                     if (!sBenchB3I2PDryRun)
+                     {
+                        if (auto* twistGn = FindNodeByIndex(sBenchB3TwistIdx))
+                        {
+                           if (auto* twist = dynamic_cast<GeometryOpNode*>(twistGn->node.get()))
+                              twist->amount += 0.05f;
+                        }
+                     }
                   }
                }
             }
@@ -85624,17 +85673,20 @@ int main(int argc, char** argv)
                { "swap", sStageSwap.Percentile(50) },
             };
 
-            report.projectorMeasured = true;
-            report.projectorRefreshHz = sBenchB3MonitorRefreshHz;
-            report.projectorTargetRateHz = sBenchB3TargetRateHz;
-            report.projectorPresentMs = sBenchB3ProjIntervalRing;
-            report.projectorJitterStdDev = sBenchB3ProjIntervalRing.StdDev();
-            report.projectorMissedVsyncPct = (sBenchB3TotalVsyncCount > 0)
-               ? ((double)sBenchB3MissedVsyncCount / (double)sBenchB3TotalVsyncCount * 100.0)
-               : 0.0;
+            if (b3EnableVisuals)
+            {
+               report.projectorMeasured = true;
+               report.projectorRefreshHz = sBenchB3MonitorRefreshHz;
+               report.projectorTargetRateHz = sBenchB3TargetRateHz;
+               report.projectorPresentMs = sBenchB3ProjIntervalRing;
+               report.projectorJitterStdDev = sBenchB3ProjIntervalRing.StdDev();
+               report.projectorMissedVsyncPct = (sBenchB3TotalVsyncCount > 0)
+                  ? ((double)sBenchB3MissedVsyncCount / (double)sBenchB3TotalVsyncCount * 100.0)
+                  : 0.0;
 
-            report.inputToPhotonMeasured = true;
-            report.inputToPhotonFrames = sBenchB3InputToPhotonFrames;
+               report.inputToPhotonMeasured = true;
+               report.inputToPhotonFrames = sBenchB3InputToPhotonFrames;
+            }
 
             report.audioMeasured = true;
             const char* bufEnv = getenv("INFINITE_BENCH_B3BUFFER");
@@ -85656,9 +85708,14 @@ int main(int argc, char** argv)
             // §6 Target evaluations
             report.targetsPass["audio_xruns_zero"] = (report.audioXruns == 0);
             report.targetsPass["audio_cb_load_p99_le_50"] = (report.audioLoad.Percentile(99) <= 0.50);
-            report.targetsPass["projector_missed_vsync_lt_half_pct"] = (report.projectorMissedVsyncPct < 0.5);
-            report.targetsPass["projector_locked_rate"] = (report.projectorPresentMs.Percentile(99) <= 1.10 * (1000.0 / (double)std::max(1, report.projectorTargetRateHz)));
-            report.targetsPass["input_to_photon_le_2_frames"] = (report.inputToPhotonFrames.Percentile(50) <= 2.0);
+            if (b3EnableVisuals)
+            {
+               report.targetsPass["projector_missed_vsync_lt_half_pct"] = (report.projectorMissedVsyncPct < 0.5);
+               report.targetsPass["projector_locked_rate"] = (report.projectorPresentMs.Percentile(99) <= 1.10 * (1000.0 / (double)std::max(1, report.projectorTargetRateHz)));
+               report.targetsPass["input_to_photon_le_2_frames"] = sBenchB3I2PDryRun
+                  ? (sBenchB3InputToPhotonFrames.Count() == 0)
+                  : (sBenchB3InputToPhotonFrames.Count() >= 20 && sBenchB3InputToPhotonFrames.Percentile(50) <= 2.0);
+            }
 
             if (sBenchB3Render3DIdx >= 0)
             {
@@ -92711,7 +92768,8 @@ int main(int argc, char** argv)
       {
          ConditionalStageTimer timerModulation(benchStagesCpuSample ? &sStageModulation : nullptr);
          Bench::ConditionalGpuStageTimer timerModulationGpu(benchStagesSample ? &sGpuTimerRing : nullptr, "modulation", frameId);
-         ApplyModulationAndPalette(frameId, true);
+         if (!sBenchB3ProbePaused)
+            ApplyModulationAndPalette(frameId, true);
       }
 
       {
@@ -92732,6 +92790,28 @@ int main(int argc, char** argv)
                gn.node->CookIfNeeded(frameId);
          }
          Bench::NodeGpuRing() = nullptr;
+      }
+
+      if (isBenchB3 && sBenchB3PendingInputInjectFrame >= 0)
+      {
+         if (auto* outGn = FindNodeByIndex(sBenchB3OutputIdx))
+         {
+            if (auto* outNode = dynamic_cast<OutputNode*>(outGn->node.get()))
+            {
+               if (outNode->Input().Revision() != sBenchB3RevBeforeInject)
+               {
+                  const int latencyFrames = frameId - sBenchB3PendingInputInjectFrame + 1;
+                  sBenchB3InputToPhotonFrames.Push((double)latencyFrames);
+                  sBenchB3PendingInputInjectFrame = -1;
+                  sBenchB3ProbePaused = false;
+               }
+               else if (frameId - sBenchB3PendingInputInjectFrame >= 5)
+               {
+                  sBenchB3PendingInputInjectFrame = -1;
+                  sBenchB3ProbePaused = false;
+               }
+            }
+         }
       }
       if (getenv("INFINITE_SHOWCASE") != nullptr && frameId == 1)
       {
