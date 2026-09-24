@@ -456,10 +456,12 @@ namespace Platform
    constexpr double kReverseLookbackSeconds = 0.5;
 
    // Converted frames the decode thread keeps ready ahead of the playhead.
-   // Two, not the four MediaWin/MediaLinux use: a 4K RGBA frame is 33 MB, and
-   // one 4K decode is ~2-4 ms against a 33 ms frame, so two frames of slack
-   // already cover a whole missed cook.
-   constexpr size_t kVideoReadaheadFrames = 2;
+   // One, not the four MediaWin/MediaLinux use: a 4K RGBA frame is 33 MB, so
+   // every frame of readahead is 130 MB across four 4K clips, and at two the
+   // B8 4x2160 run paged on an 8 GB machine. With the frame being converted
+   // behind it that is still a whole source frame of slack (a 4K decode is
+   // ~2-4 ms of a 33 ms frame).
+   constexpr size_t kVideoReadaheadFrames = 1;
 
    struct CachedVideoFrame
    {
@@ -499,8 +501,10 @@ namespace Platform
 
       // ---- decode thread only
       VideoStream stream;
-      // A second reader parked at the loop point once `stream` is near the
-      // end of the file, with its first frame already converted, so the
+      // A second reader parked at the loop point once `stream` has reached
+      // the end of the file (and been closed, so a clip never holds two
+      // decoder sessions and their frame pools), with its first frame
+      // already converted, so the
       // wrap back to it shows a frame in the same call instead of waiting
       // for a reader rebuild (B8 loop-boundary stall).
       VideoStream standby;
@@ -609,6 +613,9 @@ namespace Platform
          };
          s.output = [[AVAssetReaderTrackOutput alloc] initWithTrack:h->track outputSettings:settings];
          s.output.alwaysCopiesSampleData = NO;
+         // Lets a finished stream be rewound to the loop point in place (see
+         // PrewarmStandby) instead of setting up a second decoder session.
+         s.output.supportsRandomAccess = YES;
          if (![s.reader canAddOutput:s.output])
          {
             outError = "cannot add video output";
@@ -844,7 +851,7 @@ namespace Platform
       }
       void GiveRecycled(VideoHandle* h, std::vector<unsigned char>&& buf)
       {
-         if (!buf.empty() && h->recycle.size() < kVideoReadaheadFrames + 1)
+         if (!buf.empty() && h->recycle.empty()) // one spare: 33 MB each at 4K
             h->recycle.push_back(std::move(buf));
       }
 
@@ -863,12 +870,45 @@ namespace Platform
          h->standbyFrames.clear();
       }
 
+      // Where the parked frame starts: the wrap it serves may land a hair
+      // before the time it was parked at and still be that frame.
+      double StandbyStart(const VideoHandle* h)
+      {
+         if (h->standby.reader == nil || h->standbyFrames.empty())
+            return -1.0;
+         return std::min(h->standby.from, h->standbyFrames.front().pts);
+      }
+
       // Parks h->standby at `at` with its first frame already converted.
+      // h->stream has just run out: it is rewound in place when it can be
+      // (one decoder session per clip, and no reader set-up on the way to
+      // the wrap), otherwise closed and a new reader opened.
       void PrewarmStandby(VideoHandle* h, double at)
       {
          ClearStandby(h);
+         bool rewound = false;
+         if (h->stream.reader != nil && h->stream.finished &&
+             h->stream.reader.status == AVAssetReaderStatusReading)
+         {
+            @try
+            {
+               const CMTime start = CMTimeMakeWithSeconds(at, 600);
+               const CMTime end = CMTimeMakeWithSeconds(h->duration + 1.0, 600);
+               [h->stream.output resetForReadingTimeRanges:@[ [NSValue valueWithCMTimeRange:CMTimeRangeFromTimeToTime(start, end)] ]];
+               h->standby = h->stream;
+               h->standby.finished = false;
+               h->standby.from = at;
+               h->stream = VideoStream{};
+               rewound = true;
+            }
+            @catch (NSException*)
+            {
+            }
+         }
+         CloseStream(h->stream);
+         h->stream.finished = true;
          std::string err;
-         if (!StartStream(h, h->standby, at, err))
+         if (!rewound && !StartStream(h, h->standby, at, err))
             return;
          double pts = 0.0;
          CMSampleBufferRef sample = DecodeNext(h->standby, pts);
@@ -905,7 +945,7 @@ namespace Platform
       {
          ReleasePending(h);
          std::deque<ReadyVideoFrame> frames;
-         if (h->standby.reader != nil && !h->standbyFrames.empty() && StandbyCovers(h->standby.from, tgt))
+         if (StandbyCovers(StandbyStart(h), tgt))
          {
             CloseStream(h->stream);
             h->stream = h->standby;
@@ -929,6 +969,8 @@ namespace Platform
          uint64_t gen = 0;
          double pendingPullMs = 0.0;
          double prewarmTriedAt = -1.0;
+         double lastPushMs = 0.0;
+         const double frameMs = 1000.0 / (h->nominalFps > 0.0 ? h->nominalFps : 30.0);
          std::unique_lock<std::mutex> lock(h->mutex);
          while (!h->stop)
          {
@@ -943,7 +985,7 @@ namespace Platform
                std::deque<ReadyVideoFrame> frames;
                @autoreleasepool { frames = CarryOutSeek(h, from, tgt, fill); }
                lock.lock();
-               h->standbyAt = h->standbyFrames.empty() ? -1.0 : h->standby.from;
+               h->standbyAt = StandbyStart(h);
                prewarmTriedAt = -1.0; // used or dropped: park one again near the next end
                if (h->seekGen != gen)
                   continue; // superseded while it ran; the next pass seeks again
@@ -958,15 +1000,15 @@ namespace Platform
             }
 
             // 2. Nothing to decode right now - end of file, or enough ready
-            //    ahead of the playhead. Within the last second of the file,
-            //    use the idle time to park a reader at the loop point; then
-            //    wait until a frame is taken or a seek arrives.
-            const bool idle = h->stream.finished || h->ready.size() >= kVideoReadaheadFrames;
-            if (idle)
+            //    ahead of the playhead (behind it, decoding goes on and a
+            //    newer frame replaces a stale ready one). At the end of the
+            //    file, swap the spent reader for one parked at the loop
+            //    point; then wait until a frame is taken or a seek arrives.
+            const bool behind = h->decodeHead <= h->target.load() + 0.001;
+            if (h->stream.finished || (h->ready.size() >= kVideoReadaheadFrames && !behind))
             {
                const double at = h->prewarmAt;
-               const bool nearEnd = h->stream.finished || h->decodeHead >= h->duration - 1.0;
-               if (nearEnd && at != prewarmTriedAt && at < h->duration)
+               if (h->stream.finished && at != prewarmTriedAt && at < h->duration)
                {
                   prewarmTriedAt = at;
                   h->standbyAt = -1.0;
@@ -974,7 +1016,7 @@ namespace Platform
                   @autoreleasepool { PrewarmStandby(h, at); }
                   lock.lock();
                   if (h->seekGen == gen)
-                     h->standbyAt = h->standbyFrames.empty() ? -1.0 : h->standby.from;
+                     h->standbyAt = StandbyStart(h);
                   continue;
                }
                h->cv.wait_for(lock, std::chrono::milliseconds(50));
@@ -985,8 +1027,11 @@ namespace Platform
             // 4. Pull one frame. The one before it (pending) is converted
             //    only if this one does not already supersede it: frames the
             //    playhead has passed (catching up after a stall) cost their
-            //    decode and nothing else. A backward seek's lookback span goes
-            //    to the frame cache instead, for the reverse steps after it.
+            //    decode and nothing else - but one still goes out every source
+            //    frame interval, so a clip that cannot decode in real time
+            //    plays slowly instead of freezing. A backward seek's lookback
+            //    span goes to the frame cache instead, for the reverse steps
+            //    after it.
             ReadyVideoFrame out;
             bool push = false;
             double pts = 0.0;
@@ -1003,7 +1048,8 @@ namespace Platform
                {
                   const double horizon = std::max(h->target.load(), h->fillUntil);
                   const bool filling = h->fillUntil >= 0.0 && h->pendingPts <= h->fillUntil + 0.001;
-                  if (sample != nullptr && pts <= horizon + 0.001)
+                  const bool overdue = !filling && Bench::MediaNowMs() - lastPushMs >= frameMs;
+                  if (sample != nullptr && pts <= horizon + 0.001 && !overdue)
                   {
                      if (filling)
                         PushCacheFrame(h, h->pendingPts, h->pending);
@@ -1040,7 +1086,17 @@ namespace Platform
                continue; // stale stream; the seek branch drops `pending`
             }
             if (push)
+            {
+               if (h->ready.size() >= kVideoReadaheadFrames)
+               {
+                  GiveRecycled(h, std::move(h->ready.front().pixels));
+                  h->ready.pop_front();
+                  if (bench)
+                     bench->dropped.fetch_add(1, std::memory_order_relaxed);
+               }
                h->ready.push_back(std::move(out));
+               lastPushMs = Bench::MediaNowMs();
+            }
             else
                GiveRecycled(h, std::move(out.pixels));
             if (sample != nullptr)
@@ -1911,7 +1967,10 @@ namespace Platform
          handle->seekFrom = backward ? std::max(0.0, seconds - kReverseLookbackSeconds) : seconds;
          // A loop wrap (or any long jump back): park the next one's reader here.
          if (backward && (handle->eof || base - seconds > 1.0))
-            handle->prewarmAt = seconds;
+            // The same loop point comes back a little differently each time
+            // (a wrap overshoots by up to a cook): keep the earliest, which
+            // the parked frame covers for all of them.
+            handle->prewarmAt = std::abs(seconds - handle->prewarmAt) < 0.5 ? std::min(seconds, handle->prewarmAt) : seconds;
          const bool standbyFits = StandbyCovers(handle->standbyAt, seconds);
          for (auto& f : handle->ready)
             GiveRecycled(handle, std::move(f.pixels));
