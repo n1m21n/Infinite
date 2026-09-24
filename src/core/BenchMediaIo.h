@@ -31,9 +31,9 @@ namespace Bench
       return duration<double, std::milli>(steady_clock::now().time_since_epoch()).count();
    }
 
-   // Single-producer, lock-free, allocation-free sample ring. Each ring has one
-   // producer: the decode thread, or for macOS's loopDecodeMs and every
-   // cacheHitMs the thread calling VideoFrameAt. The fixture
+   // Single-producer, lock-free, allocation-free sample ring. The producer is
+   // whichever thread decodes: the main thread on macOS (AVAssetReader runs
+   // inside VideoFrameAt), the decode thread on Windows and Linux. The fixture
    // reads it on the main thread at the end of the run while that producer may
    // still be running, so every slot is an atomic (relaxed - a torn *set* of
    // samples near the write head is fine, a torn float is not).
@@ -74,18 +74,16 @@ namespace Bench
    // Platform::VideoBenchStats.
    struct MediaDecodeStats
    {
-      // One real decode: macOS DecodeNext (AVAssetReader sample, plus the
-      // BGRA->RGBA flip for frames that get shown), Windows ReadNextVideoFrame (ReadSample + RGB32->RGBA flip),
+      // One real decode: macOS DecodeNext (AVAssetReader sample + BGRA->RGBA
+      // flip), Windows ReadNextVideoFrame (ReadSample + RGB32->RGBA flip),
       // Linux decodeOneFrame (avcodec + sws_scale + flip).
       SpscSampleRing decodeMs;
       // A request served from the decoded-frame cache instead of the decoder
       // (macOS TryUseCache, Linux TryUseCacheLocked). Windows has no cache.
       SpscSampleRing cacheHitMs;
       // The loop boundary: time from a reader restart/seek to the first frame
-      // decoded after it. On macOS it is what the viewer waits: from the
-      // VideoFrameAt call that asked for the seek to the call that handed back
-      // the new position's first frame (~0 when the parked loop-point reader
-      // takes the wrap).
+      // decoded after it. On macOS that is the whole VideoFrameAt call that
+      // restarted (StartReader + every decode it took to reach the position).
       SpscSampleRing loopDecodeMs;
 
       std::atomic<uint32_t> decoded{ 0 };
