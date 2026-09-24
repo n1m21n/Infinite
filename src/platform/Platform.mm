@@ -607,18 +607,17 @@ namespace Platform
          h->height = h_;
          h->pending.resize((size_t)w * h_ * 4); // same size every frame: no realloc, no clear
 
-         // BGRA -> RGBA, and flip rows for GL's bottom-up textures
+         // BGRA -> RGBA, and flip rows for GL's bottom-up textures (the
+         // Platform.h contract). AVAssetReader cannot hand out RGBA itself
+         // (32RGBA/32ABGR fail with "Cannot Decode"), so the conversion stays,
+         // but as a vectorised vImage permute per row, written straight into
+         // its flipped position: one pass, no scalar byte shuffle.
+         static const uint8_t kBgraToRgba[4] = { 2, 1, 0, 3 };
          for (int y = 0; y < h_; y++)
          {
-            const unsigned char* srcRow = src + (size_t)y * srcStride;
-            unsigned char* dstRow = h->pending.data() + (size_t)(h_ - 1 - y) * w * 4;
-            for (int x = 0; x < w; x++)
-            {
-               dstRow[x * 4 + 0] = srcRow[x * 4 + 2];
-               dstRow[x * 4 + 1] = srcRow[x * 4 + 1];
-               dstRow[x * 4 + 2] = srcRow[x * 4 + 0];
-               dstRow[x * 4 + 3] = srcRow[x * 4 + 3];
-            }
+            vImage_Buffer srcRow = { (void*)(src + (size_t)y * srcStride), 1, (vImagePixelCount)w, srcStride };
+            vImage_Buffer dstRow = { h->pending.data() + (size_t)(h_ - 1 - y) * w * 4, 1, (vImagePixelCount)w, (size_t)w * 4 };
+            vImagePermuteChannels_ARGB8888(&srcRow, &dstRow, kBgraToRgba, kvImageDoNotTile);
          }
 
          CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);

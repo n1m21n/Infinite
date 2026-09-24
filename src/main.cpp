@@ -60698,6 +60698,28 @@ static void RunVideoExactTest()
       failures += seekWrong;
       Platform::VideoClose(vid);
    }
+   // INFINITE_VIDEOEXACTTEST=<movie>: also print an FNV-1a hash of every
+   // frame of that movie as delivered (RGBA, bottom-up), so a decoder change
+   // can be diffed pixel-for-pixel against a reference decode of the same file.
+   const char* hashClip = getenv("INFINITE_VIDEOEXACTTEST");
+   if (hashClip != nullptr && std::strcmp(hashClip, "1") != 0)
+   {
+      Platform::VideoHandle* vid = Platform::VideoOpen(hashClip, error);
+      std::vector<unsigned char> px;
+      const int n = vid ? (int)std::lround(Platform::VideoDuration(vid) * 30.0) : 0;
+      for (int i = 0; i < n; i++)
+      {
+         Platform::VideoFrameAt(vid, (i + 0.5) / 30.0, px);
+         uint64_t h = 1469598103934665603ull;
+         for (unsigned char c : px)
+         {
+            h ^= c;
+            h *= 1099511628211ull;
+         }
+         printf("  hash %d %016llx\n", i, (unsigned long long)h);
+      }
+      Platform::VideoClose(vid);
+   }
    Transport::Instance().SetOfflineMode(false);
    std::remove(path.c_str());
    printf("%s\n", failures == 0 ? "VIDEOEXACTTEST OK" : "VIDEOEXACTTEST FAIL - BUG");
