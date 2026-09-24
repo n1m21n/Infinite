@@ -65188,6 +65188,72 @@ static void BuildBenchB4Scene(const std::string& scaleStr, const std::string& sh
       gn.showParams = true;
 }
 
+static void BuildBenchB6Scene(int n, bool collapsed, float& outMaxX, float& outMaxY, int& outDragNodeIdx)
+{
+   struct B6Type { const char* type; const char* cat; };
+   static const B6Type kTypes[] = {
+      { "Shape", "Source" },
+      { "Noise", "Source" },
+      { "invert", "Compositing" },
+      { "gaussianblur", "Effects" },
+      { "Math", "Modulators" },
+      { "Audio Filter", "Audio" },
+      { "Delay", "Audio" },
+      { "Reverb", "Audio" },
+      { "LFO", "Modulators" },
+      { "Color Ramp", "Effects" },
+      { "Range to Range", "Modulators" },
+      { "Constant", "Modulators" }
+   };
+   const int kTypeCount = (int)(sizeof(kTypes) / sizeof(kTypes[0]));
+
+   int cols = 16;
+   if (n >= 400) cols = 24;
+   else if (n >= 300) cols = 20;
+   else if (n >= 200) cols = 16;
+   else cols = std::max(4, (int)std::ceil(std::sqrt((double)n * 1.33)));
+
+   const float stepX = 280.0f;
+   const float stepY = 240.0f;
+   outMaxX = 0.0f;
+   outMaxY = 0.0f;
+
+   std::vector<int> spawnedIndices;
+   spawnedIndices.reserve(n);
+
+   for (int i = 0; i < n; i++)
+   {
+      const int t = i % kTypeCount;
+      const float x = (float)(i % cols) * stepX;
+      const float y = (float)(i / cols) * stepY;
+      if (x > outMaxX) outMaxX = x;
+      if (y > outMaxY) outMaxY = y;
+
+      GraphNode* gn = SpawnNode(kTypes[t].type, kTypes[t].cat, x, y);
+      if (gn)
+         spawnedIndices.push_back(gn->index);
+   }
+
+   // Chain adjacent nodes with cables
+   for (size_t i = 1; i < spawnedIndices.size(); i++)
+   {
+      GraphNode* prev = FindNodeByIndex(spawnedIndices[i - 1]);
+      GraphNode* curr = FindNodeByIndex(spawnedIndices[i]);
+      if (!prev || !curr || !prev->node || !curr->node) continue;
+
+      WireInputSlot(*prev, *curr, 0, 0);
+   }
+
+   for (GraphNode& gn : gNodes)
+      gn.showParams = !collapsed;
+
+   if (!spawnedIndices.empty())
+      outDragNodeIdx = spawnedIndices[0];
+
+   // Stop transport so pure canvas cost is measured, not cooking
+   Transport::Instance().SetPlaying(false);
+}
+
 int main(int argc, char** argv)
 {
    const double sMainStartMs = Bench::ScopedStageTimer::NowMs();
@@ -65236,6 +65302,36 @@ int main(int argc, char** argv)
    static double sBenchB3RssPeakMb = -1.0;
    static double sBenchB3FootStartMb = -1.0;
    static double sBenchB3FootPeakMb = -1.0;
+
+   // B6 Canvas navigation fixture state (docs/plans/perf/benchmark-suite.md §4)
+   static std::string sBenchB6Variant;
+   static std::string sBenchB6Mode = "all";
+   static int sBenchB6NodeCount = 300;
+   static int sBenchB6TotalFrames = 600;
+   static bool sBenchB6Collapsed = false;
+   static bool sBenchB6Vsync = true;
+   static bool sBenchB6Unfocused = false;
+   static float sBenchB6GridMaxX = 0.0f;
+   static float sBenchB6GridMaxY = 0.0f;
+   static int sBenchB6DragNodeIndex = -1;
+   static double sBenchB6RssStartMb = -1.0;
+   static double sBenchB6FootStartMb = -1.0;
+   static double sBenchB6FootPeakMb = -1.0;
+   static Bench::PercentileRing sBenchB6FrameMs;
+   static Bench::PercentileRing sBenchB6PanFrameMs;
+   static Bench::PercentileRing sBenchB6ZoomFrameMs;
+   static Bench::PercentileRing sBenchB6DragFrameMs;
+   static Bench::PercentileRing sBenchB6DropdownFrameMs;
+   static double sBenchB6VisibleNodesSum = 0.0;
+   static double sBenchB6BodiesDrawnSum = 0.0;
+   static double sBenchB6OffscreenBodyMsSum = 0.0;
+   static int sBenchB6SampledFrames = 0;
+   static int sBenchB6DropdownOpenFrames = 0;
+   static double sBenchB6RefreshMs = 1000.0 / 60.0;
+   static int sBenchB6OnVsyncFrames = 0;
+   static int sBenchB6IntervalFrames = 0;
+   static ImVec2 sBenchB6DragStartPos(0.0f, 0.0f);
+   static float sBenchB6DragMovedPx = 0.0f;
 
    // No-op on macOS (which gets a `.ips` report for free); on Windows this is
    // the only thing standing between a crash and a completely silent exit,
@@ -68086,6 +68182,47 @@ int main(int argc, char** argv)
          sBenchB3RssPeakMb = sBenchB3RssStartMb;
          sBenchB3FootPeakMb = sBenchB3FootStartMb;
       }
+      else if (getenv("INFINITE_BENCH_B6") != nullptr ||
+               getenv("INFINITE_BENCH_B6NODES") != nullptr ||
+               getenv("INFINITE_BENCH_B6MODE") != nullptr ||
+               getenv("INFINITE_BENCH_B6COLLAPSED") != nullptr)
+      {
+         // B6 Canvas navigation fixture (docs/plans/perf/benchmark-suite.md §4).
+         int nodeCount = 300;
+         if (const char* nEnv = getenv("INFINITE_BENCH_B6NODES"))
+            nodeCount = std::max(1, std::atoi(nEnv));
+         else if (const char* b6Arg = getenv("INFINITE_BENCH_B6"))
+         {
+            if (strlen(b6Arg) > 0 && strcmp(b6Arg, "1") != 0 && std::atoi(b6Arg) > 0)
+               nodeCount = std::atoi(b6Arg);
+         }
+         sBenchB6NodeCount = nodeCount;
+
+         sBenchB6TotalFrames = getenv("INFINITE_BENCH_B6FRAMES") ? std::max(60, std::atoi(getenv("INFINITE_BENCH_B6FRAMES"))) : 600;
+
+         const char* modeEnv = getenv("INFINITE_BENCH_B6MODE");
+         sBenchB6Mode = (modeEnv && strlen(modeEnv) > 0) ? modeEnv : "all";
+
+         sBenchB6Collapsed = (getenv("INFINITE_BENCH_B6COLLAPSED") != nullptr &&
+                              strcmp(getenv("INFINITE_BENCH_B6COLLAPSED"), "0") != 0);
+
+         sBenchB6Vsync = (getenv("INFINITE_BENCH_B6VSYNC") == nullptr ||
+                          strcmp(getenv("INFINITE_BENCH_B6VSYNC"), "0") != 0);
+
+         sBenchB6Variant = "n=" + std::to_string(nodeCount) + ",mode=" + sBenchB6Mode;
+         if (sBenchB6Collapsed)
+            sBenchB6Variant += ",collapsed=1";
+         if (!sBenchB6Vsync)
+            sBenchB6Variant += ",vsync=0";
+         if (const char* t = getenv("INFINITE_BENCH_GPUTIMERS"); t && strcmp(t, "0") == 0)
+            sBenchB6Variant += ",gputimers=0";
+
+         BuildBenchB6Scene(nodeCount, sBenchB6Collapsed, sBenchB6GridMaxX, sBenchB6GridMaxY, sBenchB6DragNodeIndex);
+
+         sBenchB6RssStartMb = sMainRssStartMb;
+         sBenchB6FootStartMb = sMainFootStartMb;
+         sBenchB6FootPeakMb = sBenchB6FootStartMb;
+      }
       else if (const char* bench1Arg = getenv("INFINITE_BENCH_B1VOICES"))
       {
          const long numVoices = std::max(1L, std::min(64L, atol(bench1Arg)));
@@ -68285,6 +68422,8 @@ int main(int argc, char** argv)
       static Bench::PercentileRing sStageModulation;
       static Bench::PercentileRing sStageCook;
       static Bench::PercentileRing sStageNodeBodies;
+      static Bench::PercentileRing sStageLinks;
+      static Bench::PercentileRing sStageCookAll;
       static Bench::PercentileRing sStageEditorEnd;
       static Bench::PercentileRing sStageImGuiRender;
       static Bench::PercentileRing sStageProjectors;
@@ -68299,15 +68438,18 @@ int main(int argc, char** argv)
       const bool isBenchB2 = (getenv("INFINITE_BENCH_B2") != nullptr || getenv("INFINITE_BENCH_B2VISUALS") != nullptr || getenv("INFINITE_BENCH_B2SCALE") != nullptr);
       const bool isBenchB3 = (getenv("INFINITE_BENCH_B3") != nullptr || getenv("INFINITE_BENCH_B3LIVE") != nullptr || getenv("INFINITE_BENCH_B3SCALE") != nullptr);
       const bool isBenchB4 = getenv("INFINITE_BENCH_B4SCALE") != nullptr;
+      const bool isBenchB6 = (getenv("INFINITE_BENCH_B6") != nullptr || getenv("INFINITE_BENCH_B6NODES") != nullptr || getenv("INFINITE_BENCH_B6MODE") != nullptr || getenv("INFINITE_BENCH_B6COLLAPSED") != nullptr);
       const bool isBenchB9 = (getenv("INFINITE_BENCH_B9SCENE") != nullptr || getenv("INFINITE_BENCH_B9") != nullptr || getenv("INFINITE_BENCH_B9MEMORY") != nullptr);
-      const bool benchStagesSample = (isBenchB5c || isBenchB2 || isBenchB4) && (frameId >= 32 && frameId < 152);
-      const bool benchStagesCpuSample = (isBenchB5c || isBenchB2 || isBenchB4 || isBenchB9 || isBenchB3) && (frameId >= 32 && frameId < 152);
+      const bool benchStagesSample = ((isBenchB5c || isBenchB2 || isBenchB4) && (frameId >= 32 && frameId < 152)) ||
+                                     (isBenchB6 && (frameId >= 32 && frameId < sBenchB6TotalFrames));
+      const bool benchStagesCpuSample = ((isBenchB5c || isBenchB2 || isBenchB4 || isBenchB9 || isBenchB3) && (frameId >= 32 && frameId < 152)) ||
+                                        (isBenchB6 && (frameId >= 32 && frameId < sBenchB6TotalFrames));
       // B2 per-node GPU split: time each Render 3D / filter draw by node type
       // instead of the enclosing "cook" stage (GL timer queries cannot nest).
       const bool benchGpuPerNode = (isBenchB2 && getenv("INFINITE_BENCH_B2GPUNODES") != nullptr) ||
                                    (isBenchB4 && getenv("INFINITE_BENCH_B4PASSES") != nullptr);
 
-      if (isBenchB5c || isBenchB2 || isBenchB4)
+      if (isBenchB5c || isBenchB2 || isBenchB4 || isBenchB6)
          sGpuTimerRing.Poll(frameId);
 
       gFrameStart = glfwGetTime();
@@ -85808,6 +85950,253 @@ int main(int argc, char** argv)
          }
       }
 
+      // B6 Canvas navigation fixture (benchmark-suite.md §4).
+      // Large patch (200-400 nodes spread out on a 2D grid).
+      // Programmatic pan/zoom through node-editor API, programmatic node drag, dropdown open.
+      if (isBenchB6)
+      {
+         const int b6TotalFrames = sBenchB6TotalFrames;
+
+         if (frameId == 2)
+         {
+            gVsync = sBenchB6Vsync;
+            glfwSwapInterval(sBenchB6Vsync ? 1 : 0);
+            gTargetFps = 0;
+            const double r2 = Bench::ProcessRssMb();
+            const double f2 = Bench::ProcessFootprintMb();
+            if (sBenchB6RssStartMb < 0.0) sBenchB6RssStartMb = r2;
+            if (sBenchB6FootStartMb < 0.0) sBenchB6FootStartMb = f2;
+            if (f2 > sBenchB6FootPeakMb) sBenchB6FootPeakMb = f2;
+
+            glfwFocusWindow(window);
+            if (GLFWmonitor* mon = glfwGetPrimaryMonitor())
+               if (const GLFWvidmode* mode = glfwGetVideoMode(mon); mode && mode->refreshRate > 0)
+                  sBenchB6RefreshMs = 1000.0 / (double)mode->refreshRate;
+         }
+
+         // Focus check (lessons from B3: an occluded/unfocused window is unpaced on macOS)
+         if (frameId >= 2 && frameId < b6TotalFrames)
+         {
+            const bool isFocused = (glfwGetWindowAttrib(window, GLFW_FOCUSED) != 0);
+            if (!isFocused && !sBenchB6Unfocused)
+            {
+               sBenchB6Unfocused = true;
+               sBenchB6Variant += ",unfocused=1";
+               fprintf(stderr, "[bench B6] window lost focus at frame %d -> unfocused=1\n", frameId);
+            }
+
+            const double curFoot = Bench::ProcessFootprintMb();
+            if (curFoot > sBenchB6FootPeakMb)
+               sBenchB6FootPeakMb = curFoot;
+         }
+
+         // Motion script during the sampled window (frameId 32 to b6TotalFrames)
+         if (frameId >= 32 && frameId < b6TotalFrames)
+         {
+            const int sampleStart = 32;
+            const int totalSampleFrames = b6TotalFrames - sampleStart;
+            const int relFrame = frameId - sampleStart;
+
+            std::string activeMode = sBenchB6Mode;
+            int modeRelFrame = relFrame;
+            int modeFrameCount = totalSampleFrames;
+
+            if (sBenchB6Mode == "all")
+            {
+               const int phaseLength = std::max(1, totalSampleFrames / 4);
+               const int phase = std::min(3, relFrame / phaseLength);
+               modeRelFrame = relFrame % phaseLength;
+               modeFrameCount = phaseLength;
+               switch (phase)
+               {
+                  case 0: activeMode = "pan"; break;
+                  case 1: activeMode = "zoom"; break;
+                  case 2: activeMode = "drag"; break;
+                  case 3: activeMode = "dropdown"; break;
+                  default: activeMode = "pan"; break;
+               }
+            }
+
+            const float t = (modeFrameCount > 1) ? (float)modeRelFrame / (float)(modeFrameCount - 1) : 0.0f;
+
+            if (activeMode == "pan")
+            {
+               // Constant-speed sweep across the whole grid and back: 0 -> 1 -> 0
+               const float u = (t <= 0.5f) ? (t * 2.0f) : (2.0f - t * 2.0f);
+               const float targetScrollX = u * sBenchB6GridMaxX;
+               const float targetScrollY = u * sBenchB6GridMaxY;
+               ed::SetViewScroll(ImVec2(targetScrollX, targetScrollY));
+               ed::SetViewZoom(1.0f);
+            }
+            else if (activeMode == "zoom")
+            {
+               // Zoom: 0.25x -> 2.0x -> 0.25x
+               const float u = (t <= 0.5f) ? (t * 2.0f) : (2.0f - t * 2.0f);
+               const float targetZoom = 0.25f * std::pow(8.0f, u);
+               ed::SetViewScroll(ImVec2(sBenchB6GridMaxX * 0.5f, sBenchB6GridMaxY * 0.5f));
+               ed::SetViewZoom(targetZoom);
+            }
+            else if (activeMode == "drag")
+            {
+               ed::SetViewScroll(ImVec2(0.0f, 0.0f));
+               ed::SetViewZoom(1.0f);
+
+               // Moved through the same needsPosition path a load/paste uses,
+               // not synthetic mouse events: the GLFW backend overwrites an
+               // injected mouse position with the real cursor every frame
+               // unless the fixture also warps the user's cursor
+               // (INFINITE_DRAGTEST does), which a benchmark must not do.
+               // What is measured is the canvas cost of a node that moves
+               // every frame (its links re-route), not ImGui's input path.
+               if (sBenchB6DragNodeIndex >= 0)
+               {
+                  if (GraphNode* dragGn = FindNodeByIndex(sBenchB6DragNodeIndex))
+                  {
+                     const ImVec2 nodePos = ed::GetNodePosition(dragGn->NodeId());
+                     if (modeRelFrame == 0)
+                        sBenchB6DragStartPos = nodePos;
+                     const float moved = std::hypot(nodePos.x - sBenchB6DragStartPos.x, nodePos.y - sBenchB6DragStartPos.y);
+                     if (moved > sBenchB6DragMovedPx)
+                        sBenchB6DragMovedPx = moved;
+                     const float angle = (float)modeRelFrame * (2.0f * 3.1415926535f / 60.0f);
+                     const float radius = 75.0f;
+                     dragGn->spawnX = sBenchB6DragStartPos.x + radius * (std::cos(angle) - 1.0f);
+                     dragGn->spawnY = sBenchB6DragStartPos.y + radius * std::sin(angle);
+                     dragGn->needsPosition = true;
+                  }
+               }
+            }
+            else if (activeMode == "dropdown")
+            {
+               ed::SetViewScroll(ImVec2(0.0f, 0.0f));
+               ed::SetViewZoom(1.0f);
+
+               const bool openDropdown = ((modeRelFrame / 30) % 2 == 0);
+               if (openDropdown)
+               {
+                  gDropdown.options = MathNode::OpNames();
+                  gDropdown.current = (modeRelFrame / 5) % gDropdown.options.size();
+                  gDropdown.justOpened = (modeRelFrame % 30 == 0);
+               }
+               else if (modeRelFrame % 30 == 0)
+               {
+                  // Clearing options alone leaves an empty popup on screen.
+                  if (GImGui->OpenPopupStack.Size > 0) // indexes [0]: crashes on an empty stack
+                  ImGui::ClosePopupToLevel(0, false);
+                  gDropdown.options.clear();
+                  gDropdown.justOpened = false;
+               }
+               // Counted so the report proves the popup really opened.
+               if (GImGui->OpenPopupStack.Size > 0)
+                  sBenchB6DropdownOpenFrames++;
+            }
+
+            if (gLastFrameMs > 0.0)
+            {
+               // Paced frames land on a whole number of refresh periods. A
+               // window that is focused but off-screen (another Space, fully
+               // covered) is not vsync-blocked on macOS and runs free - the
+               // focus check alone cannot see that.
+               const double periods = gLastFrameMs / sBenchB6RefreshMs;
+               const double k = std::max(1.0, std::round(periods));
+               if (std::fabs(gLastFrameMs - k * sBenchB6RefreshMs) <= 1.5)
+                  sBenchB6OnVsyncFrames++;
+               sBenchB6IntervalFrames++;
+               sBenchB6FrameMs.Push(gLastFrameMs);
+               if (activeMode == "pan")
+                  sBenchB6PanFrameMs.Push(gLastFrameMs);
+               else if (activeMode == "zoom")
+                  sBenchB6ZoomFrameMs.Push(gLastFrameMs);
+               else if (activeMode == "drag")
+                  sBenchB6DragFrameMs.Push(gLastFrameMs);
+               else if (activeMode == "dropdown")
+                  sBenchB6DropdownFrameMs.Push(gLastFrameMs);
+            }
+         }
+
+         if (frameId == b6TotalFrames)
+         {
+            if (GImGui->OpenPopupStack.Size > 0) // indexes [0]: crashes on an empty stack
+               ImGui::ClosePopupToLevel(0, false);
+            gDropdown.options.clear();
+            gDropdown.justOpened = false;
+
+            Bench::BenchReport report;
+            report.bench = "B6_canvas_nav";
+            report.variant = sBenchB6Variant;
+            report.frames = b6TotalFrames;
+            report.nodes = (int)gNodes.size();
+            report.frameMs = sBenchB6FrameMs;
+
+            report.stagesCpuMs = {
+               { "modulation", sStageModulation.Percentile(50) },
+               { "cook", sStageCook.Percentile(50) },
+               { "node_bodies", sStageNodeBodies.Percentile(50) },
+               { "links", sStageLinks.Percentile(50) },
+               { "cook_all", sStageCookAll.Percentile(50) },
+               { "editor_end", sStageEditorEnd.Percentile(50) },
+               { "imgui_render", sStageImGuiRender.Percentile(50) },
+               { "swap", sStageSwap.Percentile(50) },
+               { "pan_p50", sBenchB6PanFrameMs.Percentile(50) },
+               { "zoom_p50", sBenchB6ZoomFrameMs.Percentile(50) },
+               { "drag_p50", sBenchB6DragFrameMs.Percentile(50) },
+               { "dropdown_p50", sBenchB6DropdownFrameMs.Percentile(50) },
+            };
+
+            sGpuTimerRing.Finish();
+            report.stagesGpuMs = sGpuTimerRing.ToJsonP50();
+
+            report.memRssStartMb = sBenchB6RssStartMb;
+            report.memRssEndMb = Bench::ProcessRssMb();
+            report.memFootStartMb = sBenchB6FootStartMb;
+            report.memFootEndMb = Bench::ProcessFootprintMb();
+            if (report.memFootEndMb > sBenchB6FootPeakMb) sBenchB6FootPeakMb = report.memFootEndMb;
+            report.memFootPeakMb = sBenchB6FootPeakMb;
+
+            report.canvasNavMeasured = true;
+            report.visibleNodesAvg = (sBenchB6SampledFrames > 0) ? (sBenchB6VisibleNodesSum / (double)sBenchB6SampledFrames) : 0.0;
+            report.bodiesDrawnAvg = (sBenchB6SampledFrames > 0) ? (sBenchB6BodiesDrawnSum / (double)sBenchB6SampledFrames) : 0.0;
+            report.offscreenBodiesMsAvg = (sBenchB6SampledFrames > 0) ? (sBenchB6OffscreenBodyMsSum / (double)sBenchB6SampledFrames) : 0.0;
+            report.panFrameMs = sBenchB6PanFrameMs;
+            report.zoomFrameMs = sBenchB6ZoomFrameMs;
+            report.dragFrameMs = sBenchB6DragFrameMs;
+            report.dropdownFrameMs = sBenchB6DropdownFrameMs;
+            report.dragNodeMovedPx = sBenchB6DragMovedPx;
+            report.dropdownOpenFrames = sBenchB6DropdownOpenFrames;
+
+            const double onVsyncFrac = (sBenchB6IntervalFrames > 0)
+               ? (double)sBenchB6OnVsyncFrames / (double)sBenchB6IntervalFrames : 0.0;
+            const bool unpaced = sBenchB6Vsync && onVsyncFrac < 0.80;
+            if (unpaced)
+            {
+               report.variant += ",unpaced=1";
+               fprintf(stderr, "[bench B6] vsync on but only %.0f%% of frames on a refresh boundary -> unpaced=1\n", onVsyncFrac * 100.0);
+            }
+            report.onVsyncFrac = onVsyncFrac;
+
+            // A trusted run (focused, vsync on, paced) gets a verdict either
+            // way. Otherwise the frame times are a lower bound - vsync can only
+            // add waiting - so a miss is still a real FAIL, but a pass is
+            // unproven and stays null.
+            const bool trusted = !sBenchB6Unfocused && sBenchB6Vsync && !unpaced;
+            auto verdict = [&](const char* key, double measured, double limit) {
+               if (sBenchB6PanFrameMs.Empty())
+                  report.targetsPass[key] = nullptr;
+               else if (trusted || measured > limit)
+                  report.targetsPass[key] = (measured <= limit);
+               else
+                  report.targetsPass[key] = nullptr;
+            };
+            verdict("canvas_pan_p50_ge_60fps", sBenchB6PanFrameMs.Percentile(50), 17.2);
+            verdict("canvas_pan_p95_ge_45fps", sBenchB6PanFrameMs.Percentile(95), 22.8);
+
+            report.Emit();
+            printf("B6CANVASNAV DONE\n");
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
       // B9 Memory footprint fixture (benchmark-suite.md §4).
       // Measures RSS and Physical Footprint growth rate (slope MB/100f), peak footprint,
       // startup/built/f32/f152 memory, and estimated GPU memory breakdown.
@@ -87053,6 +87442,11 @@ int main(int argc, char** argv)
       Bench::ConditionalGpuStageTimer timerNodeBodiesGpu(benchStagesSample ? &sGpuTimerRing : nullptr, "node_bodies", frameId);
       PruneDeadGroups();
 
+      const bool b6TrackVis = isBenchB6 && (frameId >= 32 && frameId < sBenchB6TotalFrames);
+      int b6FrameVisibleCount = 0;
+      int b6FrameBodiesDrawnCount = 0;
+      double b6FrameOffscreenMs = 0.0;
+
       for (GraphNode& gn : gNodes)
       {
          // Build step 15 ("Instrument Mode"): a node mounted by an
@@ -87077,6 +87471,26 @@ int main(int argc, char** argv)
          // normally since the FieldGraphNode box itself is never hidden.
          if (gn.hiddenFromCanvas)
             continue;
+
+         bool b6NodeIsVisible = true;
+         double b6NodeDrawStartMs = 0.0;
+         if (b6TrackVis)
+         {
+            const ImVec2 np = ed::GetNodePosition(gn.NodeId());
+            ImVec2 ns = ed::GetNodeSize(gn.NodeId());
+            if (ns.x <= 0.0f || ns.y <= 0.0f)
+               ns = ImVec2(200.0f, 150.0f);
+            const ImVec2 pMinScreen = ed::CanvasToScreen(np);
+            const ImVec2 pMaxScreen = ed::CanvasToScreen(ImVec2(np.x + ns.x, np.y + ns.y));
+            const ImGuiIO& io = ImGui::GetIO();
+            b6NodeIsVisible = !(pMaxScreen.x < 0.0f || pMinScreen.x > io.DisplaySize.x ||
+                                pMaxScreen.y < 0.0f || pMinScreen.y > io.DisplaySize.y);
+            if (b6NodeIsVisible)
+               b6FrameVisibleCount++;
+            b6FrameBodiesDrawnCount++;
+            if (!b6NodeIsVisible)
+               b6NodeDrawStartMs = Bench::ScopedStageTimer::NowMs();
+         }
 
          if (gn.needsPosition)
          {
@@ -88220,7 +88634,32 @@ int main(int argc, char** argv)
             ed::PopStyleVar(3);
          else if (hasCookWarning)
             ed::PopStyleVar();
+
+         if (b6TrackVis && !b6NodeIsVisible)
+         {
+            b6FrameOffscreenMs += (Bench::ScopedStageTimer::NowMs() - b6NodeDrawStartMs);
+         }
       }
+
+      // B6 only: end node_bodies here so links get their own stage. Other
+      // fixtures keep the old span (bodies through the arrange overlay) so
+      // their recorded baselines stay comparable; a GL timer query can't
+      // nest, so the links GPU timer must not start inside that span either.
+      if (isBenchB6)
+      {
+         timerNodeBodies.Stop();
+         timerNodeBodiesGpu.Stop();
+      }
+      if (b6TrackVis)
+      {
+         sBenchB6VisibleNodesSum += (double)b6FrameVisibleCount;
+         sBenchB6BodiesDrawnSum += (double)b6FrameBodiesDrawnCount;
+         sBenchB6OffscreenBodyMsSum += b6FrameOffscreenMs;
+         sBenchB6SampledFrames++;
+      }
+
+      ConditionalStageTimer timerLinks((isBenchB6 && benchStagesCpuSample) ? &sStageLinks : nullptr);
+      Bench::ConditionalGpuStageTimer timerLinksGpu((isBenchB6 && benchStagesSample) ? &sGpuTimerRing : nullptr, "links", frameId);
 
       // ---- draw existing links ----
       // Link ids are derived from the destination pin id (kLinkIdBase +
@@ -88461,6 +88900,9 @@ int main(int argc, char** argv)
             }
          }
       }
+
+      timerLinks.Stop();
+      timerLinksGpu.Stop();
 
       // ---- handle new connections ----
       const CategoryColors::Color& defStreamCol = CategoryColors::CableColorFor(CategoryColors::CableType::Stream);
@@ -93829,9 +94271,14 @@ int main(int argc, char** argv)
       // (camera, Syphon In, video) stops pulling frames into the graph, and
       // a GPU effect stops rendering. Nothing reads its texture - every
       // image read resolves past it (ImageCable::Resolved).
-      for (GraphNode& gn : gNodes)
-         if (!gn.node->bypassed)
-            gn.node->CookIfNeeded(frameId);
+      {
+         // B6 only: the whole-graph cook is outside every other stage, so
+         // without this the canvas bench cannot tell cook time from UI time.
+         ConditionalStageTimer timerCookAll((isBenchB6 && benchStagesCpuSample) ? &sStageCookAll : nullptr);
+         for (GraphNode& gn : gNodes)
+            if (!gn.node->bypassed)
+               gn.node->CookIfNeeded(frameId);
+      }
 
       // Arrangement monitor (overhaul WP4): after the cook, so the clips it
       // selects and the textures it reads belong to the same frame.

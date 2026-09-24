@@ -553,6 +553,22 @@ namespace Bench
          };
       }
 
+      if (canvasNavMeasured)
+      {
+         j["canvas_nav"] = {
+            { "visible_nodes_avg", visibleNodesAvg },
+            { "bodies_drawn_avg", bodiesDrawnAvg },
+            { "offscreen_bodies_ms_avg", offscreenBodiesMsAvg },
+            { "pan_frame_ms", panFrameMs.ToJsonP5099Max() },
+            { "zoom_frame_ms", zoomFrameMs.ToJsonP5099Max() },
+            { "drag_frame_ms", dragFrameMs.ToJsonP5099Max() },
+            { "dropdown_frame_ms", dropdownFrameMs.ToJsonP5099Max() },
+            { "drag_node_moved_px", dragNodeMovedPx },
+            { "dropdown_open_frames", dropdownOpenFrames },
+            { "on_vsync_frac", onVsyncFrac }
+         };
+      }
+
       if (audioMeasured)
       {
          j["audio"] = {

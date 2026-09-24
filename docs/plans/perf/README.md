@@ -35,7 +35,14 @@ INFINITE_BENCH_B3=1 INFINITE_BENCH_B3BUFFER=256 INFINITE_BENCH_B3FRAMES=600 \
    INFINITE_EXITAFTER=620 ./build/Infinite.app/Contents/MacOS/Infinite
 INFINITE_BENCH_B9SCENE=b2 INFINITE_BENCH_B9FRAMES=600 \
    INFINITE_EXITAFTER=660 ./build/Infinite.app/Contents/MacOS/Infinite
+# B6: leave Infinite in front; `unfocused=1` or `unpaced=1` in variant = discard
+INFINITE_BENCH_B6NODES=300 INFINITE_BENCH_B6MODE=all INFINITE_BENCH_GPUTIMERS=0 \
+   INFINITE_EXITAFTER=650 ./build/Infinite.app/Contents/MacOS/Infinite -ApplePersistenceIgnoreState YES
 ```
+
+`-ApplePersistenceIgnoreState YES` stops macOS from showing its "reopen
+windows?" dialog after a fixture has crashed. That dialog blocks `glfwInit`,
+so every later run hangs. `run_all.sh` always passes it.
 
 Every fixture prints exactly one `BENCH_JSON {...}` line (schema in
 benchmark-suite.md §3) followed by a `<NAME> DONE` marker, then closes its
@@ -53,7 +60,7 @@ frame count (B5).
 | B3 Live performance | B1-lite+B2-lite+projector+MIDI+macros+Prediction; missed vsyncs, input-to-photon | **Yes** (`INFINITE_BENCH_B3`, `INFINITE_BENCH_B3LIVE`, `INFINITE_BENCH_B3SCALE`) | Composes B1-lite (8/16 voices) + B2-lite (animated compositing chain) + 1 projector window on Output + simulated MIDI note/CC injection + macro/gesture playback on Material + Prediction modulators (Drift, Moves, Predictive Modulator). Measures projector refresh/present interval percentiles/jitter stddev/missed vsync pct, audio load/xruns, input-to-photon latency (parameter twist injection to Output revision update), memory footprint and RSS. |
 | B4 Complex 3D scenes | many objects/instancing/lights/shadows/materials/HDRI/ocean | **Yes** (`INFINITE_BENCH_B4SCALE`, `INFINITE_BENCH_B4SHADOW`, `INFINITE_BENCH_B4ANIM`, `INFINITE_BENCH_B4PASSES`) | One Render 3D at 1080p, 4x MSAA, ACES, straight into Output, with all four geometry slots busy: Ocean (resolution 96/160/256), cubes instanced on a sphere's faces (1k/5k/20k), a radial Array of metal tori (8/24/64), and a glass sphere (so the transmissive pass runs). Sun + point + spot light, a synthetic 1024x512 `.hdr` through the HDRI node, sun shadows at `off`/1024/2048/4096. `anim=1` plays the transport (the Ocean moves) and an LFO orbits the camera, bound by the slider's name at frame 4 because `Modulation::Bind` takes the UI's draw-order index. `anim=0` stops the transport, which otherwise runs from startup, so the scene caches and `output_hash` is stable. Reports `tris` as drawn (instances included) and `draw_calls`. `passes=1` splits Render 3D's GPU time into `r3d_shadow`/`r3d_opaque`/`r3d_transmissive`/`r3d_resolve`. |
 | B5 Fundamentals | (a) empty patch, **(b) node-count scaling**, **(c) per-stage CPU+GPU split**, **(d) audio-thread-alone**, **(e) startup time**, **(f) load/save time**, **(g) undo-snapshot time** | **All of (a)-(g)** (`INFINITE_BENCH_B5EMPTY`, `INFINITE_BENCH_B5NODES`, `INFINITE_BENCH_B5STAGES`, `INFINITE_BENCH_B5AUDIOALONE`, `INFINITE_BENCH_B5STARTUP`, `INFINITE_BENCH_B5LOADSAVE`, `INFINITE_BENCH_B5UNDO`) | (a) zero-node floor, frame_ms percentiles + RSS, same 120-frame sampled window as (b) so the two are directly comparable. (b) 50/100/200/400 mixed nodes laid out on a grid (not stacked at origin - the flaw called out in benchmark-suite.md §2 against MIXEDSTRESSTEST/GEOMDENSITYTEST). Reports frame_ms percentiles + RSS. (c) same mixed-node grid as (b), wraps seven main-loop stages (`modulation`, `cook`, `node_bodies`, `editor_end`, `imgui_render`, `projectors`, `swap`) in `ConditionalStageTimer`s sampled over the same frame window, reports p50 CPU ms per stage into `stages_cpu_ms` (`stages_gpu_ms` still empty - blocked on the GPU timer ring below). (d) one Oscillator straight into Audio Out, no effects chain, buffer sweep 64/128/256/512 - isolates the audio callback's fixed per-block cost from B1's DSP-graph cost; reuses B1's wall-clock-window + `AudioLoadRing` pattern. (e) startup milestone timings from entry through first frame swap (`pre_window`, `window_gl`, `imgui_fonts`, `scanners_load`, `first_frame_render`, `total_to_first_frame`). (f)/(g) reuse (b)/(c)'s mixed-node grid (`INFINITE_BENCH_B5LOADSAVE=<n>`/`INFINITE_BENCH_B5UNDO=<n>`), fire once at `frameId==32`, and time the real patch I/O and undo paths back to back (`SavePatchTo`→`LoadPatchFrom`; `PushUndoCheckpoint`→`Undo`) via `Bench::ScopedStageTimer::NowMs()` - not synthetic serialize-only calls, so (f) includes whatever `ApplyPatchData`/field-graph remap does on load, and (g) includes the real `BuildPatchData`/`ApplyPatchData` round trip Undo takes. `stages_cpu_ms: {save, load}` / `{push_checkpoint, undo_restore}`. |
-| B6 Canvas navigation | programmatic pan/zoom/drag, never OS-level UI scripting | No | "Missing today" per the doc; not started. |
+| B6 Canvas navigation | programmatic pan/zoom/drag, never OS-level UI scripting | **Yes** (`INFINITE_BENCH_B6NODES`, `B6MODE=pan\|zoom\|drag\|dropdown\|all`, `B6COLLAPSED`, `B6VSYNC`, `B6FRAMES`, default 300 nodes / 600 frames) | Builds a wired grid of 12 cycled node types (image, audio, modulator, utility) and drives the view through new `ed::SetViewScroll`/`SetViewZoom` calls. Pan sweeps the whole grid and back. Zoom goes 0.25 to 2 and back. Drag moves one node in a circle through the `needsPosition` path. Dropdown opens and closes Math's op list every 30 frames. `all` splits the window into those four phases. Reports frame_ms plus per-phase p50/p99/max, and `canvas_nav` has visible vs drawn node bodies, the ms spent on off-screen bodies, drag distance, dropdown-open frames and `on_vsync_frac`. `stages_cpu_ms` adds `links` and `cook_all` (B6 only, see "Found while measuring"). |
 | B7 Soak/thermal | 30min B3, long variant only | No | Depends on B3. |
 | B8 Media I/O | video/camera/projector/Syphon-Spout | No | "Missing today" per the doc; not started. |
 | B9 Memory footprint | B2/B4 at `l` scale | **Yes** (`INFINITE_BENCH_B9SCENE=b2\|b4`, `INFINITE_BENCH_B9FRAMES`, default 600) | Builds the B2 or B4 scene at scale l, animated, GPU timers off. Reports RSS and OS footprint (`phys_footprint` on macOS, `PrivateUsage` on Windows, VmRSS + VmSwap on Linux) at launch, after the build, at frames 32 and 152, and at the end. Also reports the peak over the whole run and a least-squares slope per 100 frames from frame 32. `gpu_est_mb` sums every texture, renderbuffer and buffer the GL wrappers allocated, split into textures, render targets, shadow maps, mesh buffers and instance buffers. Use footprint, not RSS, for leaks and headroom (see "Found while measuring"). |
@@ -90,7 +97,7 @@ ever fires - no `BENCH_JSON` line, ever, at any node count. Confirmed by
 direct reproduction (`EXITAFTER=152` failed 3/3 runs, `153+` passed every
 time). Fixed by bumping `run_all.sh`'s `EXITAFTER` for this sweep to 160,
 matching the margin every other fixture in the script already carries. Since then B1(stages), B2, B3, B4, all of B5, and B9 have been
-built (see the table above). B6/B7/B8/B10 are not built yet. Each
+built (see the table above), and B6 after them. B7/B8/B10 are not built yet. Each
 needs its own platform work first (a canvas-automation entry point,
 soak automation, offline-render integration). Nothing below claims
 coverage this suite doesn't have.
@@ -122,11 +129,7 @@ Projector/Output > Canvas > Previews):
 5. **B4 complex 3D scenes**. **Built** (`INFINITE_BENCH_B4SCALE`, `INFINITE_BENCH_B4SHADOW`, `INFINITE_BENCH_B4ANIM`, `INFINITE_BENCH_B4PASSES`).
 6. **B9 memory footprint**. **Built** (`INFINITE_BENCH_B9SCENE=b2|b4`, `INFINITE_BENCH_B9FRAMES`).
 7. **B3 live performance**. **Built** (`INFINITE_BENCH_B3`, `INFINITE_BENCH_B3LIVE`, `INFINITE_BENCH_B3SCALE`).
-- **B6 canvas navigation**: needs a programmatic pan/zoom/drag entry point
-  into the node editor (`ed::` calls) exposed to a self-test fixture - none
-  exists today. `main.cpp`'s existing `gDroppedFiles`/`gDropPos` self-test
-  pattern (see `codebase-navigation`'s living map) is the closest precedent
-  for "drive real interaction state from a fixture, not OS-level clicks."
+8. **B6 canvas navigation**. **Built** (`INFINITE_BENCH_B6NODES`, `INFINITE_BENCH_B6MODE`, `INFINITE_BENCH_B6COLLAPSED`, `INFINITE_BENCH_B6VSYNC`).
 - **B8 media I/O**: needs decode/upload/present timing hooks in the video and
   camera paths, plus a way to open 2-3 real projector windows headlessly.
 - **B7/B10**: each composes B1+B2/B3 (+ soak duration for B7, + offline render for B10).
@@ -166,6 +169,38 @@ re-record the baseline with `run_all.sh` before comparing against it):
 | B2_heavy_visuals | s, static | 4.0 / 5.7 / 7.6 | 0.16 | 2.2 | 1800 | 17 |
 | B2_heavy_visuals | m, static | 4.1 / 7.1 / 7.7 | 0.14 | 2.3 | 7308 | 31 |
 | B2_heavy_visuals | l, static | 4.5 / 7.0 / 7.6 | 0.13 | 2.4 | 12396 | 41 |
+
+### B6 canvas navigation: verification runs, not a baseline
+
+Recorded 2026-09-24 while the machine was in use (load avg ~3), 300-400
+frames, GPU timers off. Every vsync-on run came out `unpaced=1`: the window
+was not being paced by the display, so these numbers show work per frame,
+not a real on-screen frame rate. Targets report `null` unless a run is focused,
+vsync on and paced, except when a lower bound already fails (see below).
+
+| Variant | frame_ms p50 / p95 | `node_bodies` | off-screen bodies ms | `cook_all` | visible nodes |
+|---|---|---|---|---|---|
+| n=300, all | 22.6 / 26.0 | 7.4 | 6.4 | 8.9 | ~23 |
+| n=300, all, collapsed | 21.7 / - | 5.7 | 5.2 | - | - |
+| n=300, pan, vsync=0 | 21.9 / - | - | - | - | - |
+| n=200, pan | 15.6 / - | 4.7 | 4.0 | - | - |
+| n=400, pan | 29.3 / - | 9.6 | 8.7 | - | - |
+
+Other n=300 stages (p50 ms): `links` 0.55, `editor_end` 1.4,
+`imgui_render` 1.7, `swap` 0.56, `modulation` 0.26. Named stages now add up to
+~20.8 of the 22.6 ms frame. The drag moved the node 150 px and the dropdown
+was open 58 frames, so both phases really ran. Footprint peaked at 936 MB
+(200 nodes), ~1.24 GB (300) and 1.54 GB (400), about 4 MB per node.
+
+How targets are decided: `canvas_pan_p50_ge_60fps` (p50 <= 17.2 ms) and
+`canvas_pan_p95_ge_45fps` (p95 <= 22.8 ms) are `true`/`false` only when the run
+is trusted (focused, vsync on, `on_vsync_frac` >= 0.80). An untrusted run can
+only be faster than the real thing, so if it already misses the limit it
+reports `false`. Otherwise it reports `null`. At 300 nodes both targets fail
+on that lower bound alone.
+
+Still to do: 3 full `run_all.sh` passes on an idle machine with Infinite in
+front the whole time, then add the B6 rows to the baseline.
 
 ## Top costs per benchmark
 
@@ -449,6 +484,37 @@ a fixture goes here, not into a code change.
 - The transport starts playing at launch, so any fixture that wants a still
   frame has to stop it. B2's static variant does not, which is harmless only
   because Emboss replaced Glitch and nothing else in B2 reads time.
+- **B6: every node re-cooks every frame even when nothing changes**. The
+  whole-graph cook loop in the main loop (`for (GraphNode& gn : gNodes) ...
+  CookIfNeeded(frameId)`) sat outside every stage timer, which hid ~9 ms of a
+  22.6 ms frame at 300 nodes with the transport stopped. `CookIfNeeded` only
+  skips a second cook in the *same* frame (`mLastCookFrame`). There is no
+  dirty check, so Noise, Shape and every Filter run their GPU pass every
+  frame. In a `sample` profile, `FilterNode`/`NoiseNode`/`ShapeNode::CookIfNeeded`
+  were ~20% of main-thread samples. B6 now times the loop as `cook_all`
+  (B6 only, so older benches keep their stage meanings). This is the biggest
+  single lever for large patches.
+- **B6: off-screen node bodies are drawn in full**. With ~23 of 300 nodes on
+  screen, ~6.4 of 7.4 ms of `node_bodies` goes to nodes nobody can see. Cost
+  grows ~0.07 ms per node, whatever is on screen.
+- **B6: collapsing params barely helps**. `B6COLLAPSED=1` saves only ~1.4 ms
+  at 300 nodes. Most of the body cost is in the fixed per-node UI: audio body
+  meters (`DrawAudioFilterBody`, `DrawModulatorMeter`, Delay/Reverb bodies),
+  not the param rows.
+- **B6 fixture notes**: the drag moves the node through `spawnX/spawnY` +
+  `needsPosition`, not a synthetic mouse drag. The GLFW backend overwrites
+  an injected mouse position with the real cursor unless the cursor is
+  warped, so a fake mouse drag moved the node 0 px. It measures the cost of
+  moving a node, not ImGui's drag hit-testing. `ImGui::ClosePopupToLevel(0,
+  false)` crashes on an empty popup stack. The dropdown phase only calls it
+  while `OpenPopupStack.Size > 0`. Early B6 runs crashed there, and after
+  that macOS's reopen-windows dialog hung every later launch (hence
+  `-ApplePersistenceIgnoreState YES`).
+- **macOS vsync is not a pacing guarantee**: GL vsync does not block for a
+  window that is covered, off-screen or on another Space, and the focus flag
+  can't see that. B6 counts frame intervals within 1.5 ms of a whole number
+  of refresh periods. Below 80% it tags the run `unpaced=1`. B3 has the
+  same exposure.
 - `.git/hooks/post-commit` starts `tools/semi-brain/4_engine/sync_brain.py
   --sync` in the background after every commit. It uses ~4 cores for ~5
   minutes, and B1 runs during it showed 8-68 xruns instead of 0-2. Never run

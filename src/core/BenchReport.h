@@ -414,8 +414,21 @@ namespace Bench
       bool inputToPhotonMeasured = false;
       PercentileRing inputToPhotonFrames;
 
-      // Targets pass/fail map (B3)
-      std::map<std::string, bool> targetsPass;
+      // Targets pass/fail map
+      std::map<std::string, nlohmann::json> targetsPass;
+
+      // Canvas navigation (B6)
+      bool canvasNavMeasured = false;
+      double visibleNodesAvg = 0.0;
+      double bodiesDrawnAvg = 0.0;
+      double offscreenBodiesMsAvg = 0.0;
+      PercentileRing panFrameMs;
+      PercentileRing zoomFrameMs;
+      PercentileRing dragFrameMs;
+      PercentileRing dropdownFrameMs;
+      double dragNodeMovedPx = 0.0;   // proves the synthetic drag moved a node
+      int dropdownOpenFrames = 0;     // proves the popup actually opened
+      double onVsyncFrac = 0.0;       // share of frame intervals on a refresh boundary
 
       nlohmann::json stagesCpuMs = nlohmann::json::object();
       nlohmann::json stagesGpuMs = nlohmann::json::object();
