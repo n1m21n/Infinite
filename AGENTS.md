@@ -78,7 +78,7 @@ One owner per topic: if two files seem to disagree, the skill named in this tabl
 
 ## Core Invariants & Rules
 
-1. **Clean Room / Licensing**: Infinite is MIT licensed. Never open, read, grep, or reference GPL sources (e.g. Kronos, Cmajor, SuperCollider, BespokeSynth). Citing open academic papers (e.g. Kronos paper Norilo 2015) is permitted; GPL code is strictly prohibited.
+1. **Clean Room / Licensing**: Infinite is MIT licensed. Never open, read, grep, or reference GPL/AGPL source code (e.g. Kronos, Cmajor, SuperCollider, BespokeSynth). Citing open academic papers (e.g. Kronos paper Norilo 2015) is permitted. The one exception is `prior-art-scout`: it may read a copyleft project's *discussions* (issues, PR threads, commit messages, docs), but never its source or diffs. Licence tags are in `prior-art-scout/peers.md`.
 2. **Syntax Rules**: Bare names, no sigils (e.g. `P.y += bass * 2`, never `@P.y += bass * 2`).
 3. **Three platforms**: every `Platform::` function has macOS, Windows and Linux sides (`windows-parity`, `linux-parity`).
 4. **Execution Rule**: Before making changes or running procedures related to any category above, always view and execute against the corresponding skill file.
