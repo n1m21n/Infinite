@@ -88,7 +88,12 @@ run_fixture "B2_heavy_visuals scale=l,anim=1,gpunodes=1" 160 \
    INFINITE_BENCH_B2SCALE=l INFINITE_BENCH_B2ANIM=1 INFINITE_BENCH_B2GPUNODES=1
 
 echo "B3 Live performance"
-skip "B3_live"
+# B3 Live performance fixture per benchmark-suite.md §4.
+# B3_FRAMES defaults to 600 frames; can be overridden via B3_FRAMES for quick runs.
+B3_FRAMES="${B3_FRAMES:-600}"
+B3_EXIT=$((B3_FRAMES + 50))
+run_fixture "B3_live_performance scale=s,buf=256" "$B3_EXIT" \
+   INFINITE_BENCH_B3SCALE=s INFINITE_BENCH_B3BUFFER=256 INFINITE_BENCH_B3FRAMES="$B3_FRAMES"
 
 echo "B4 Complex 3D scenes"
 # GL timer queries stall the CPU on macOS (glEndQuery flushes and waits), so
