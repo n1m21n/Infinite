@@ -25,11 +25,11 @@ retriever.py searches both.
 
 import sqlite3
 import json
+import sys
 import os
 import struct
 import numpy as np
 from pathlib import Path
-from fastembed import TextEmbedding
 
 EXTRACTORS_OUT = Path(__file__).resolve().parent / "output"
 DB_FILE = EXTRACTORS_OUT / "knowledge_index.db"
@@ -221,14 +221,18 @@ def prepare_documents(corpora):
 
     # F. Real Session History (what was asked, decided, and why - across every local session,
     # from both Claude Code and Antigravity/Gemini transcripts)
-    for idx, turn in enumerate(sessions):
+    # Ids number turns within their own session, so a new turn never renumbers anyone else's
+    # doc (the incremental index keys on doc_id).
+    ordinal = {}
+    for turn in sessions:
         session_id = turn.get("session_id", "")
         user_text = turn.get("user_text", "")
         assistant_text = turn.get("assistant_text", "")
+        source_tool = turn.get("source_tool", "claude_code")
+        n = ordinal[(source_tool, session_id)] = ordinal.get((source_tool, session_id), -1) + 1
         if not user_text.strip():
             continue
-        source_tool = turn.get("source_tool", "claude_code")
-        doc_id = f"session::{source_tool}::{session_id}::{idx}"
+        doc_id = f"session::{source_tool}::{session_id}::{n}"
         title = f"Session [{source_tool}] {session_id[:8]}: {user_text[:60]}"
         content = f"{user_text}\n\n{assistant_text}"
         documents.append((doc_id, "session_history", title, content, content[:300], turn.get("cwd", "")))
@@ -250,8 +254,11 @@ def prepare_documents(corpora):
         )
         documents.append((doc_id, "session_insight", title, content, content[:300], ""))
 
-    for idx, pair in enumerate(global_analysis.get("problem_solution_pairs", [])):
-        doc_id = f"problem_solution::{pair.get('session_id', '')}::{idx}"
+    pair_ordinal = {}
+    for pair in global_analysis.get("problem_solution_pairs", []):
+        sid = pair.get("session_id", "")
+        n = pair_ordinal[sid] = pair_ordinal.get(sid, -1) + 1
+        doc_id = f"problem_solution::{sid}::{n}"
         title = f"Problem -> Solution: {pair.get('problem_summary', '')[:60]}"
         content = f"Problem: {pair.get('problem_summary', '')}\n\nSolution: {pair.get('solution_summary', '')}"
         documents.append((doc_id, "session_insight", title, content, content[:300], ""))
@@ -288,17 +295,23 @@ def prepare_documents(corpora):
     return documents
 
 def build_hybrid_index():
+    """Update both index DBs in place from the corpora: only docs whose content changed are
+    re-inserted, and their vectors come from the shared L1 cache (a text is embedded once)."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from l1.outputs import reconcile
+    from l1.store import Store
+    from l1.vector_cache import VectorCache
+
     EXTRACTORS_OUT.mkdir(parents=True, exist_ok=True)
     documents = prepare_documents(load_corpora())
     print(f"Total documents prepared for hybrid index: {len(documents)}")
-
-    public_docs = [d for d in documents if d[1] not in PRIVATE_CATEGORIES]
-    private_docs = [d for d in documents if d[1] in PRIVATE_CATEGORIES]
-
-    print("Computing FastEmbed dense embeddings (CPU ONNX)...")
-    embed_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
-    write_index(DB_FILE, public_docs, embed_model)
-    write_index(PRIVATE_DB_FILE, private_docs, embed_model)
+    store, cache = Store(), VectorCache()
+    added, changed, deleted = store.sync_docs(documents, PRIVATE_CATEGORIES)
+    print(f"Doc store: {added} added, {changed} changed, {deleted} deleted")
+    for db, private in ((DB_FILE, False), (PRIVATE_DB_FILE, True)):
+        ins, dele = reconcile(db, store, private, cache)
+        print(f"{db.name}: {ins} rows written, {dele} removed")
+    print(f"Embedded {cache.misses} new texts ({cache.hits} from cache)")
 
 if __name__ == "__main__":
     build_hybrid_index()

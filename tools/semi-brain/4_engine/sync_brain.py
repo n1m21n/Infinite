@@ -19,7 +19,17 @@ EXTRACTORS_DIR = SEMI_BRAIN_DIR / "1_extractors"
 DATASETS_DIR = SEMI_BRAIN_DIR / "3_datasets"
 DISTILLED_DIR = SEMI_BRAIN_DIR / "2_distilled_brain"
 
+def run_l1_sync(full=False):
+    """Incremental sync through the L1 store: only new commits, appended transcript lines and
+    changed docs are processed; the index DBs are updated in place. See l1/sync.py."""
+    sys.path.insert(0, str(SEMI_BRAIN_DIR))
+    from l1.sync import sync
+    sync(full=full)
+
+
 def run_extraction_pipeline():
+    """The old full rebuild (every extractor over the whole history, index DBs unlinked and
+    re-embedded). Kept behind --legacy-sync for comparison."""
     print("🔄 Running incremental extraction pipeline...")
     
     # 1. Mine git history
@@ -83,6 +93,8 @@ def record_feedback(task: str, chosen_fix: str, rejected_fix: str, reason: str):
 def main():
     parser = argparse.ArgumentParser(description="Synchronize and improve the Semi-Brain environment")
     parser.add_argument("--sync", action="store_true", help="Run full incremental sync across Git, docs, and datasets")
+    parser.add_argument("--full", action="store_true", help="With --sync: also refit session analysis / dev trajectory now instead of on their 30 min cadence")
+    parser.add_argument("--legacy-sync", action="store_true", help="Old full rebuild of every corpus and both index DBs")
     parser.add_argument("--feedback", action="store_true", help="Record an agent correction / preference pair")
     parser.add_argument("--task", type=str, help="Task description for feedback")
     parser.add_argument("--chosen", type=str, help="The correct/preferred implementation")
@@ -104,7 +116,7 @@ def main():
         except BlockingIOError:
             print("Another Semi-Brain sync is already running - skipping.")
             return
-        run_extraction_pipeline()
+        run_extraction_pipeline() if args.legacy_sync else run_l1_sync(args.full)
 
 if __name__ == "__main__":
     main()
