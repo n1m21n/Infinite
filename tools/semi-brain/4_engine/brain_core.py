@@ -498,10 +498,11 @@ class SemiBrainCognitiveEngine:
                     meta = v
                     break
         if not meta:
-            return {"file": "", "line": 0, "subsystem": fallback_subsystem}
+            return {"file": "", "line": 0, "end_line": 0, "subsystem": fallback_subsystem}
         return {
             "file": meta.get("file", ""),
             "line": meta.get("line", 0),
+            "end_line": meta.get("end_line", 0),
             "subsystem": meta.get("subsystem", fallback_subsystem)
         }
 

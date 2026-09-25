@@ -6,7 +6,8 @@ the prompt hook, or into the same content as JSON.
 
   Files     top files, each with the evidence that put it there (a past commit, a chat, a
             symbol hit)
-  Symbols   top symbols with file:line
+  Symbols   top symbols with file:start-end, the definition's whole span, so the reader can
+            open just those lines of a 95k-line file
   Area      the L4 area the top file sits in, named by its most connected files
   Past      the best past commits for this problem
   Skills    skills worth loading: skills compartment hits, promoted when the skill's text
@@ -27,6 +28,14 @@ MAIN_CPP = "src/main.cpp"
 
 def _short(path):
     return path[4:] if path.startswith("src/") else path
+
+
+def _span(meta):
+    """`file:start-end` for a symbol, `file:start` when the end is unknown or the same line."""
+    if not meta["file"]:
+        return ""
+    end = meta.get("end_line") or 0
+    return f"{_short(meta['file'])}:{meta['line']}" + (f"-{end}" if end > meta["line"] else "")
 
 
 def _title_of(frame, doc_id):
@@ -104,8 +113,21 @@ def ranked_regions(engine, path, frame, top_n=2):
     return engine._regions().rank_regions(frame.ast_impacted_symbols, top_n=top_n)
 
 
+def region_focus(engine, frame, region):
+    """The best-ranked matched symbol defined in `region` of main.cpp, with its span: the
+    ~50 lines to open first instead of the region's ~2,800. None if no matched symbol is.
+    Measured only (replay.py focus_hit) until symbol matching makes it worth showing."""
+    for s in frame.ast_impacted_symbols:
+        m = engine._get_symbol_meta(s)
+        if m["file"] == MAIN_CPP and region["line_start"] <= m["line"] <= region["line_end"]:
+            return {"symbol": s, "line": m["line"], "end_line": max(m.get("end_line") or 0, m["line"])}
+    return None
+
+
 def region_label(engine, path, frame, top_n=2):
-    """`src/main.cpp@region L{start}-{end}` labels for `ranked_regions`, joined for display."""
+    """`src/main.cpp@region L{start}-{end}` labels for `ranked_regions`, joined for display.
+    The region's focus span is not shown: on the replay it overlaps an edited function 11% of
+    the time (ceiling 12% for any matched symbol), so it would mislead; replay.py tracks it."""
     return ", ".join(f"{MAIN_CPP}@{r['id']} L{r['line_start']}-{r['line_end']}"
                       for r in ranked_regions(engine, path, frame, top_n))
 
@@ -128,7 +150,7 @@ def brief_data(engine, frame):
     symbols = []
     for s in frame.ast_impacted_symbols[:N_SYMBOLS]:
         m = engine._get_symbol_meta(s)
-        symbols.append({"symbol": s, "at": f"{_short(m['file'])}:{m['line']}" if m["file"] else ""})
+        symbols.append({"symbol": s, "at": _span(m)})
     past = [h["title"].replace("Commit [", "").replace("]:", "") for h in frame.compartments.get("history", [])[:N_PAST]]
     skills = rank_skills(engine, frame)[:N_SKILLS]
     before = research_line(engine, frame)
