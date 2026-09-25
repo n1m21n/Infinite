@@ -12,6 +12,8 @@ subprocesses that each re-read the whole history.
             The two refits are global (k-means topics, trend summaries): one new chat turn barely
             moves them, and under background QoS each costs tens of seconds. Between refits they
             stay owed; new turns still reach the index as docs on every sync. --full forces them.
+  outcomes  per-prompt read/edited files from the session transcripts (l1/outcomes.py), the
+            outcome log briefs are scored against; re-reads only changed sessions
   index     corpora -> L1 doc store (content-hash diff) -> both index DBs reconciled in place,
             then the L3 doc -> code edges (l3/network.py) rebuilt from the same corpora
 
@@ -109,6 +111,7 @@ def sync(full=False):
     claude = run.stage("claude", sources.sync_claude_sessions, store)
     antigravity = run.stage("antigravity", sources.sync_antigravity, store)
     ast = run.stage("ast", sync_ast, store)
+    run.stage("outcomes", _outcomes)
 
     # Derived stages owed a run survive a failed or interrupted sync (first sync: all of them).
     owed = set(store.get_wm("sync:owed", list(DERIVED)))
@@ -144,6 +147,12 @@ def sync(full=False):
         print(f"  deferred           {', '.join(sorted(deferred))} (due {time.strftime('%H:%M', time.localtime(min(deferred.values())))})", flush=True)
     print(f"  {'total':<18} {total:7.2f}s  index={stats}", flush=True)
     return report
+
+
+def _outcomes():
+    from l1.outcomes import update
+    sys.path.insert(0, str(SEMI_BRAIN_DIR / "1_extractors"))
+    return update()["reparsed"] > 0
 
 
 def _quiet(fn):

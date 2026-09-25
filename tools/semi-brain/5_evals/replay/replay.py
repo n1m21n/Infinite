@@ -12,11 +12,20 @@ Ranked outputs scored:
 
 Metrics (per query variant, averaged over cases): MRR, recall@{1,5,10,20}.
 gate = mean(file MRR, symbol MRR, file R@10, symbol R@10) on the "full" variant.
+files_nohub = the file metrics with HUB_FILES dropped from both the ranking and the targets
+  (cases whose only target is a hub are skipped). src/main.cpp is edited by most fixes and
+  ranked first by most answers, so the plain file MRR mostly measures that; nohub_gate =
+  mean(nohub file MRR, nohub file R@10) is what a ranking change should move.
 
 Appends one scorecard line to history.jsonl; per-case detail goes to runs/ (local only).
 
     python3 replay.py --label baseline            # all cases
     python3 replay.py --label quick --limit 40    # the most recent 40 cases
+    python3 replay.py --label X --cases sessions  # real prompts -> files they edited
+                                                  # (build_session_cases.py; local only)
+
+Session cases have no target symbols; their gate is mean(file MRR, file R@10), and by default
+SESSION_SAMPLE of them, evenly spread over time, are run so the replay stays at minutes.
 """
 
 import argparse
@@ -41,9 +50,12 @@ sys.path.insert(0, str(SEMI_BRAIN_DIR / "4_engine"))
 sys.path.insert(0, str(SEMI_BRAIN_DIR / "1_extractors"))
 
 CASES_FILE = HERE / "cases.json"
+SESSION_CASES_FILE = SEMI_BRAIN_DIR / "l1" / "state" / "session_cases.json"
+SESSION_SAMPLE = 150
 HISTORY_FILE = HERE / "history.jsonl"
 RUNS_DIR = HERE / "runs"
 KS = (1, 5, 10, 20)
+HUB_FILES = ("src/main.cpp",)
 VARIANTS = ("full", "subject")
 
 _W = {}
@@ -126,6 +138,9 @@ def run_case(case):
             result["variants"][v] = {
                 "latency_ms": round(lat * 1000, 1),
                 "files": rank_metrics(files, case["target_files"]),
+                "files_nohub": rank_metrics([f for f in files if f not in HUB_FILES],
+                                            [f for f in case["target_files"] if f not in HUB_FILES])
+                               if set(case["target_files"]) - set(HUB_FILES) else None,
                 "symbols": rank_metrics(syms, case["target_symbols"]) if case["target_symbols"] else None,
                 "top_files": files[:10], "top_symbols": syms[:10],
             }
@@ -137,8 +152,11 @@ def summarize(results):
     for v in VARIANTS:
         rows = [r["variants"][v] for r in results]
         block = {}
-        for kind in ("files", "symbols"):
-            ms = [r[kind] for r in rows if r[kind] is not None]
+        for kind in ("files", "files_nohub", "symbols"):
+            ms = [r.get(kind) for r in rows if r.get(kind) is not None]
+            if not ms:
+                block[kind] = None
+                continue
             block[kind] = {"n": len(ms), "mrr": round(statistics.mean(m["rr"] for m in ms), 4)}
             for k in KS:
                 block[kind][f"r@{k}"] = round(statistics.mean(m[f"r@{k}"] for m in ms), 4)
@@ -147,7 +165,12 @@ def summarize(results):
                                "mean": round(statistics.mean(lats), 1)}
         out[v] = block
     f, s = out["full"]["files"], out["full"]["symbols"]
-    out["gate"] = round((f["mrr"] + s["mrr"] + f["r@10"] + s["r@10"]) / 4, 4)
+    h = out["full"]["files_nohub"]
+    out["nohub_gate"] = round((h["mrr"] + h["r@10"]) / 2, 4) if h else None
+    if s is None:
+        out["gate"] = round((f["mrr"] + f["r@10"]) / 2, 4)
+    else:
+        out["gate"] = round((f["mrr"] + s["mrr"] + f["r@10"] + s["r@10"]) / 4, 4)
     return out
 
 
@@ -158,11 +181,22 @@ def main():
     ap.add_argument("--jobs", type=int, default=3)
     ap.add_argument("--embargo-hours", type=float, default=12.0)
     ap.add_argument("--no-history", action="store_true")
+    ap.add_argument("--cases", choices=("commits", "sessions"), default="commits")
+    ap.add_argument("--sample", type=int, default=None,
+                    help=f"evenly spaced sample of N cases (sessions default {SESSION_SAMPLE})")
     args = ap.parse_args()
 
-    cases = json.loads(CASES_FILE.read_text())
+    if args.cases == "sessions":
+        cases = json.loads(SESSION_CASES_FILE.read_text())
+        if args.sample is None:
+            args.sample = SESSION_SAMPLE
+    else:
+        cases = json.loads(CASES_FILE.read_text())
     if args.limit:
         cases = cases[-args.limit:]
+    if args.sample and args.sample < len(cases):
+        step = len(cases) / args.sample
+        cases = [cases[int(i * step)] for i in range(args.sample)]
     t0 = time.time()
     ctx = get_context("spawn")
     with ctx.Pool(args.jobs, initializer=_init_worker, initargs=(args.embargo_hours,)) as pool:
@@ -176,7 +210,7 @@ def main():
     summary = summarize(results)
     head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=REPO_PATH,
                           capture_output=True, text=True).stdout.strip()
-    card = {"kind": "replay", "when": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    card = {"kind": "replay" if args.cases == "commits" else "replay-sessions", "when": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "label": args.label, "head": head, "cases": len(results),
             "embargo_hours": args.embargo_hours, "wall_s": round(wall, 1),
             "mean_build_s": round(statistics.mean(r["build_s"] for r in results), 2), **summary}
