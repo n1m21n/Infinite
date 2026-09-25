@@ -28,7 +28,6 @@ namespace
 FilterNode::~FilterNode()
 {
    GLUtil::DestroyFbo(mOut);
-   GLUtil::DestroyFbo(mMid);
    if (mProgram != 0)
       glDeleteProgram(mProgram);
    if (mPreProgram != 0)
@@ -147,7 +146,6 @@ void FilterNode::CookIfNeeded(int frameId)
    if (srcTex == 0)
    {
       GLUtil::DestroyFbo(mOut);
-      GLUtil::DestroyFbo(mMid);
       mHasBuilt = false;
       return;
    }
@@ -174,13 +172,19 @@ void FilterNode::CookIfNeeded(int frameId)
    unsigned int passTex = 0;
    if (mPreProgram != 0)
    {
-      if (!GLUtil::EnsureFbo(mMid, mInput.Width(), mInput.Height(), GL_RGBA16F))
+      // The pre-pass target is the shared scratch buffer, not a per-node one:
+      // it only has to live from this pass to the main pass below. That holds
+      // because both input Pulls already ran above, so no other cook (and no
+      // other AcquireScratchFbo) can run between the two passes. Keep it that
+      // way - a Pull or cook moved in between would overwrite it.
+      GLUtil::Fbo* mid = GLUtil::AcquireScratchFbo(mInput.Width(), mInput.Height(), GL_RGBA16F);
+      if (mid == nullptr)
          return;
-      GLUtil::RunShaderPass(mMid, mPreProgram, [this, srcTex, srcTex2, &sig]()
+      GLUtil::RunShaderPass(*mid, mPreProgram, [this, srcTex, srcTex2, &sig]()
       {
          BindUniforms(mPreLocs, srcTex, srcTex2, 0, sig.time);
       });
-      passTex = GLUtil::FboTexture(mMid);
+      passTex = GLUtil::FboTexture(*mid);
    }
    GLUtil::RunShaderPass(mOut, mProgram, [this, srcTex, srcTex2, passTex, &sig]()
    {

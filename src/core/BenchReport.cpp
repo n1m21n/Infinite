@@ -438,13 +438,16 @@ namespace Bench
       GpuMemBreakdown GetBreakdown()
       {
          GpuMemBreakdown bd;
-         auto addBytes = [&bd](GpuMemCategory cat, size_t bytes)
+         auto addBytes = [&bd](GpuMemCategory cat, size_t bytes, const std::string& label)
          {
             const double mb = (double)bytes / (1024.0 * 1024.0);
             switch (cat)
             {
                case GpuMemCategory::Textures: bd.texturesMb += mb; break;
-               case GpuMemCategory::RenderTargets: bd.renderTargetsMb += mb; break;
+               case GpuMemCategory::RenderTargets:
+                  bd.renderTargetsMb += mb;
+                  bd.renderTargetsByLabelMb[label] += mb;
+                  break;
                case GpuMemCategory::ShadowMaps: bd.shadowMapsMb += mb; break;
                case GpuMemCategory::MeshBuffers: bd.meshBuffersMb += mb; break;
                case GpuMemCategory::InstanceBuffers: bd.instanceBuffersMb += mb; break;
@@ -452,11 +455,11 @@ namespace Bench
          };
 
          for (const auto& [id, entry] : sTextures)
-            addBytes(entry.category, entry.bytes);
+            addBytes(entry.category, entry.bytes, entry.nodeType);
          for (const auto& [id, entry] : sRenderbuffers)
-            addBytes(entry.category, entry.bytes);
+            addBytes(entry.category, entry.bytes, entry.nodeType);
          for (const auto& [id, entry] : sBuffers)
-            addBytes(entry.category, entry.bytes);
+            addBytes(entry.category, entry.bytes, entry.nodeType);
 
          return bd;
       }
@@ -636,6 +639,7 @@ namespace Bench
       j["nodes"] = nodes;
       j["tris"] = tris;
       j["draw_calls"] = drawCalls < 0 ? nlohmann::json(nullptr) : nlohmann::json(drawCalls);
+      j["fbo_allocs_steady"] = fboAllocsSteady < 0 ? nlohmann::json(nullptr) : nlohmann::json(fboAllocsSteady);
       j["output_hash"] = outputHash.empty() ? "n/a" : outputHash;
 
       std::printf("BENCH_JSON %s\n", j.dump().c_str());

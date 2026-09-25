@@ -44,6 +44,11 @@ variants from 1 run (the 3-run 1080 set could not be paced: screen locked).
 | | | B8 2x1080 W2 / W3 / overlap | missed vsync (spec: < 0.5%) | 0 / 0.4 / 0.4% (period never waited for) | 0.75 / 0.56 / 0.37%; re-measure W2 / W3: 0.37 / 0% | met in all 6 re-measure runs (at most 1 doubled interval per run) |
 | | | B8 2x1080 W2 / W3 / overlap | projector `on_vsync_frac` | null (canvas 0.14-0.19) | 0.97 / 0.99 / 0.99 | new metric |
 | | | B8 2x1080 W2 / W3 / overlap | canvas frame p50 ms | 7.6 / 7.7 / 7.3 | 16.66 / 16.66 / 16.67 | = one refresh by design (base ran unpaced) |
+| Shared scratch target for two-pass filters (one RGBA16F pre-pass buffer per size, not one per node) | `6ec7ec7` | B9 b2 (l, anim, 600 f) | gpu_est render_targets MB | 469.6 | 343.0 | -27% |
+| | | B9 b2 | footprint peak MB | 908 | 764 | -16% |
+| | | B2 l-anim, timers off, 5 pairs (sync_brain running) | frame p50 / p99 ms | 14.32 / 17.53 | 14.38 / 17.32 | +0% / -1% (noise) |
+| | | B2 l-static | output_hash | 29dcc23d9a902c68 | 29dcc23d9a902c68 | identical (2 runs each side) |
+| | | B2 l-anim / l-static | fbo_allocs_steady (frames 32-152) | not reported | 0 / 0 | new metric |
 
 Projector pacing (2 rounds interleaved vs `f2b0c1b`, unfocused, swapping; judge by change).
 Re-measure 2026-09-25 against the spec targets (benchmark-suite.md §6 and the fixture's own verdicts): `main` `2297371`, 3 runs each of W2 and W3,
@@ -649,11 +654,28 @@ a fixture goes here, not into a code change.
   pages out memory under pressure, so RSS is not a reliable footprint number
   here. B9 now reports `phys_footprint` (`task_vm_info`) as `footprint_*`. At
   B2 l, RSS reads 62 MB while the OS charges the app 901 MB.
-- **B2's render targets take 470 MB** (B9, scale l): about 28 full 1080p
-  16-bit buffers, roughly one per effect, plus the two-pass blur
-  intermediates. Effects keep their own full-size output buffers and don't
-  share or reuse them, so memory grows linearly with chain length. That
-  matters most on the 8 GB machines. Not fixed (measure only).
+- **B2's render targets took 470 MB** (B9, scale l). The first reading here
+  blamed ~28 per-effect 16-bit buffers; the code and B9's new
+  `render_targets_by_label_mb` say otherwise. At 1080p (MiB):
+
+  | what | count | format | MB |
+  |---|---|---|---|
+  | effect outputs (`FilterNode::mOut`) + Output | 30 + 1 | RGBA8 | 245.2 |
+  | two-pass pre-pass intermediates (`mMid`: gaussianblur, bloom, diffuseglow) | 9 | RGBA16F | 142.4 |
+  | Render 3D: MSAA colour+depth / resolve colour+depth / scene colour (mips) | 1 | mixed | 55.4 / 13.8 / 10.5 |
+  | node viewport | 1 | RGBA8 + depth | 2.2 |
+
+  The 9 intermediates are written by the pre-pass and read only by the main
+  pass straight after it in the same cook, so they are never live together.
+  **Fixed** in `6ec7ec7`: they share one `GLUtil::AcquireScratchFbo` target per
+  (size, format) (`ScratchFbo`, 15.8 MB), freed after 300 unused frames.
+  469.6 -> 343.0 MB, footprint peak 908 -> 764 MB, identical pixels (see
+  scoreboard). Still open: the 31 RGBA8 outputs persist by design (cook memo,
+  fan-out, previews); sharing them needs a lifetime analysis.
+- **B2 l-anim's `output_hash` is not deterministic.** Three `main` runs gave
+  three hashes: the LFOs run on wall time, so the frame-152 image depends on
+  timing. Use l-static for pixel identity; it cooks every effect, including
+  every pre-pass, on its first frame.
 - **GPU timer queries distort `frame_ms` on macOS.** Apple's Metal-backed GL
   makes `glEndQuery(GL_TIME_ELAPSED)` flush the context and block until the
   GPU catches up (`sample`: `glEndQuery_Exec` → `flushContext` →

@@ -105,7 +105,6 @@ private:
    ImageCable mInput;
    ImageCable mInput2; // only used when Def().inputs == 2
    GLUtil::Fbo mOut;
-   GLUtil::Fbo mMid; // prePassBody's output; empty for single-pass filters
    unsigned int mProgram = 0;
    unsigned int mPreProgram = 0;
    bool mShaderTried = false;

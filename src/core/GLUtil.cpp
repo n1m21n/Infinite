@@ -109,7 +109,7 @@ namespace GLUtil
       sQuadVaos.erase(it);
    }
 
-   bool EnsureFbo(Fbo& fbo, int w, int h, unsigned int internalFormat)
+   bool EnsureFbo(Fbo& fbo, int w, int h, unsigned int internalFormat, const char* label)
    {
       if (w <= 0 || h <= 0)
          return false;
@@ -132,7 +132,7 @@ namespace GLUtil
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-      Bench::GpuMem::RecordTexture(fbo.tex, Bench::GpuMemCategory::RenderTargets, w, h, internalFormat, false, "Fbo");
+      Bench::GpuMem::RecordTexture(fbo.tex, Bench::GpuMemCategory::RenderTargets, w, h, internalFormat, false, label);
 
       glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo);
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fbo.tex, 0);
@@ -168,6 +168,51 @@ namespace GLUtil
       if (fbo.fbo != 0)
          glDeleteFramebuffers(1, &fbo.fbo);
       fbo = Fbo();
+   }
+
+   namespace
+   {
+      struct ScratchEntry
+      {
+         Fbo fbo;
+         unsigned long long lastUsedFrame = 0;
+      };
+      constexpr unsigned long long kScratchIdleFrames = 300;
+      std::vector<ScratchEntry> sScratch; // a handful of entries at most: linear scan
+      unsigned long long sScratchFrame = 0;
+   }
+
+   Fbo* AcquireScratchFbo(int w, int h, unsigned int internalFormat)
+   {
+      for (ScratchEntry& e : sScratch)
+      {
+         if (e.fbo.w == w && e.fbo.h == h && e.fbo.internalFormat == internalFormat)
+         {
+            e.lastUsedFrame = sScratchFrame;
+            return &e.fbo;
+         }
+      }
+      ScratchEntry e;
+      if (!EnsureFbo(e.fbo, w, h, internalFormat, "ScratchFbo"))
+         return nullptr;
+      e.lastUsedFrame = sScratchFrame;
+      sScratch.push_back(e);
+      return &sScratch.back().fbo;
+   }
+
+   void EndFrameScratchFbos()
+   {
+      ++sScratchFrame;
+      for (size_t i = 0; i < sScratch.size();)
+      {
+         if (sScratchFrame - sScratch[i].lastUsedFrame > kScratchIdleFrames)
+         {
+            DestroyFbo(sScratch[i].fbo);
+            sScratch.erase(sScratch.begin() + (long)i);
+         }
+         else
+            i++;
+      }
    }
 
    // The driver's info log for a shader or program, at its full length. A

@@ -324,6 +324,9 @@ namespace Bench
       double shadowMapsMb = 0.0;
       double meshBuffersMb = 0.0;
       double instanceBuffersMb = 0.0;
+      // Render targets split by the label each allocation was recorded with
+      // ("Fbo", "ScratchFbo", "Render3D_MSAA", ...), so B9 shows what they are.
+      std::map<std::string, double> renderTargetsByLabelMb;
 
       double TotalMb() const
       {
@@ -337,7 +340,8 @@ namespace Bench
             { "render_targets_mb", renderTargetsMb },
             { "shadow_maps_mb", shadowMapsMb },
             { "mesh_buffers_mb", meshBuffersMb },
-            { "instance_buffers_mb", instanceBuffersMb }
+            { "instance_buffers_mb", instanceBuffersMb },
+            { "render_targets_by_label_mb", renderTargetsByLabelMb }
          };
       }
    };
@@ -396,6 +400,7 @@ namespace Bench
       int nodes = 0;
       int tris = 0;
       int drawCalls = -1; // Render 3D draw calls last frame; -1 = not measured (null)
+      long long fboAllocsSteady = -1; // GLUtil::FboAllocationCount delta over the sample window; -1 = not measured (null)
       std::string outputHash;
 
       PercentileRing frameMs;
