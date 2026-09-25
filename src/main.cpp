@@ -1742,29 +1742,35 @@ namespace
    };
    std::vector<ProjectorWindow> gProjectorWindows;
 
-   // Who paces the frame loop. With a projector window open and no offline
-   // render running, the display the primary Output window is on does: every
-   // context presents at swap interval 0 and the loop waits on that display's
-   // refresh clock just before the projectors present (see
-   // PaceProjectorPresent). Otherwise the canvas's own swap paces it, as it
-   // always has. gCanvasSwapInterval is what the canvas asks for when it owns
-   // pacing (Vsync setting, 0 during an export); every site that used to call
-   // glfwSwapInterval on the main context goes through SetCanvasSwapInterval,
-   // so opening a projector or ending an export can't leave two vsync waits
-   // in one frame.
+   // Who paces the frame loop: one frame clock. Unless an offline render is
+   // running, the loop waits on a display's refresh clock once per frame,
+   // after the canvas swap and just before the projectors present (see
+   // PaceProjectorPresent), and every context presents at swap interval 0.
+   // The display is the primary Output window's while a projector is open,
+   // else the canvas window's when Vsync is on. With Vsync off and no
+   // projector (and always during an export) nothing waits and the loop runs
+   // unpaced or on the Target FPS limiter. The canvas's own blocking swap no
+   // longer paces anything: macOS skips it for an occluded window and on
+   // this machine returns on a 120 Hz grid on a 60 Hz display.
+   // gCanvasSwapInterval is what the canvas asks for (Vsync setting, 0 during
+   // an export); every site that used to call glfwSwapInterval on the main
+   // context goes through SetCanvasSwapInterval, and ApplyCanvasSwapInterval
+   // runs at the top of every frame, so no frame waits twice.
    int gCanvasSwapInterval = 1;
    int gAppliedCanvasSwapInterval = -1;
 
-   bool ProjectorPacingActive()
+   bool FrameClockActive()
    {
-      return !gProjectorWindows.empty() && !gOfflineRender.active && !gArrangeWavRender.active;
+      if (gOfflineRender.active || gArrangeWavRender.active)
+         return false;
+      return !gProjectorWindows.empty() || gCanvasSwapInterval > 0;
    }
 
    // Main context must be current (true at every caller, as it was for the
    // glfwSwapInterval calls these replace).
    void ApplyCanvasSwapInterval()
    {
-      const int want = ProjectorPacingActive() ? 0 : gCanvasSwapInterval;
+      const int want = FrameClockActive() ? 0 : gCanvasSwapInterval;
       if (want == gAppliedCanvasSwapInterval)
          return;
       glfwSwapInterval(want);
@@ -47597,10 +47603,11 @@ namespace
       return bestIndex;
    }
 
-   // Projector pacing policy (ProjectorPacingActive says when it applies).
+   // Frame clock rate policy (FrameClockActive says when it applies).
    // The primary Output is the first fullscreen projector window, else the
    // first one opened; with two Outputs on displays of different refresh,
-   // only the primary's is presented on its refresh grid.
+   // only the primary's is presented on its refresh grid. With no projector
+   // open it is the canvas window's display.
    //
    // Rate: a whole divisor of that display's refresh R, never an uneven
    // rate. The base divisor is the largest that still gives >= 60 fps
@@ -47717,12 +47724,13 @@ namespace
    }
 
    // Called once per frame right before the projectors present. Blocks on the
-   // primary Output display's refresh clock when projector pacing is active;
-   // otherwise releases the clock (last projector closed, export running).
-   void PaceProjectorPresent()
+   // frame clock's display (the primary Output's, else the canvas's) while
+   // FrameClockActive; otherwise releases the clock (Vsync off with no
+   // projector, export running).
+   void PaceProjectorPresent(GLFWwindow* canvas)
    {
       ProjectorPacer& pacer = gProjectorPacer;
-      if (!ProjectorPacingActive())
+      if (!FrameClockActive())
       {
          if (pacer.haveMonitor)
          {
@@ -47738,16 +47746,20 @@ namespace
       if (!pacer.haveMonitor || now - pacer.lastMonitorCheck >= 0.5)
       {
          pacer.lastMonitorCheck = now;
-         const ProjectorWindow* primary = &gProjectorWindows[0];
-         for (const ProjectorWindow& pw : gProjectorWindows)
-            if (pw.fullscreen)
-            {
-               primary = &pw;
-               break;
-            }
+         GLFWwindow* clockWindow = canvas;
+         if (!gProjectorWindows.empty())
+         {
+            clockWindow = gProjectorWindows[0].window;
+            for (const ProjectorWindow& pw : gProjectorWindows)
+               if (pw.fullscreen)
+               {
+                  clockWindow = pw.window;
+                  break;
+               }
+         }
          int monitorCount = 0;
          GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-         const int idx = ProjectorMonitorIndex(primary->window);
+         const int idx = ProjectorMonitorIndex(clockWindow);
          if (idx >= 0 && idx < monitorCount)
          {
             int mx = 0, my = 0;
@@ -95828,7 +95840,7 @@ int main(int argc, char** argv)
       // Output display's refresh, so the presents below land on its grid
       // whether or not the canvas (or the projector) is covered or hidden.
       // Outside the `projectors` stage timer: it is idle time, not work.
-      PaceProjectorPresent();
+      PaceProjectorPresent(window);
       {
          ConditionalStageTimer timerProjectors(benchStagesCpuSample ? &sStageProjectors : nullptr, Bench::FrameTail::kProjectors);
          for (size_t i = gProjectorWindows.size(); i-- > 0; )
@@ -95977,7 +95989,7 @@ int main(int argc, char** argv)
       // capping anything more precisely (the Target FPS control is disabled in
       // the UI whenever Vsync is on, for the same reason). Skipped too while a
       // projector window paces the loop to its display's refresh.
-      if (gTargetFps > 0 && !gVsync && !ProjectorPacingActive())
+      if (gTargetFps > 0 && !gVsync && !FrameClockActive())
       {
          const double budget = 1.0 / (double)gTargetFps;
          const double deadline = gFrameStart + budget;
