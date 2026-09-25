@@ -1,21 +1,29 @@
 #!/usr/bin/env python3
 """
 build_main_cpp_regions.py
-Virtual split of src/main.cpp into ~40-80 regions: groups of top-level symbols that belong
-together, so a brief can say `main.cpp@region L100-200` instead of just `main.cpp` and the
+Virtual split of src/main.cpp into contiguous, non-overlapping line-range regions covering the
+whole file, so a brief can say `main.cpp@region L100-2300` instead of just `main.cpp` and the
 brain (or a person) reads a few thousand lines instead of grepping the whole 95k-line file.
 
-Signals feeding one weighted symbol graph, strongest first (see l4/louvain.py for the cluster
-step, shared with l4/clusters.py's file-level areas):
-  co-edit  two top-level symbols touched by the same commit's diff hunks to main.cpp (same
-           logic as clusters.py's file co-change: a commit of n symbols adds 1/(n-1) per pair;
-           commits touching more than MAX_COMMIT_SYMBOLS symbols are sweeping and skipped)
-  calls    the AST forward call graph, restricted to edges where both ends are main.cpp
-           top-level symbols
-  family   symbols sharing a name prefix (DrawArrange*, Field*Test*): first two camelCase words
-  banner   symbols between the same pair of `// ====` banner lines, chained lightly
+A region is a run of file lines, not a semantic cluster: v1 grouped symbols by community
+(co-edit + call + name-family + light proximity) and took the min/max line of each community's
+members as its "range". Communities aren't contiguous - a handful of far-apart symbols pulled
+into the same cluster stretched that envelope across other clusters' ranges, so most regions
+overlapped (68/80) and the last one stopped 12k lines short of EOF. This version never looks at
+cluster membership for the range: it walks the file top to bottom and only ever cuts *between*
+two adjacent symbols, so every region is one real slice of the file and the slices tile it
+exactly.
 
-Output: output/main_cpp_regions.json - {built_at, source_commit, regions: [...],
+Cut points, strongest rule first:
+  banner   a `// ====` banner between two adjacent symbols is always a cut - it is the file's
+           own section marker (self-test blocks, mostly).
+  weakest link   inside any run still over the cap, repeatedly cut at the adjacent pair with the
+           lowest affinity (co-edit + call-graph + name-family), same signals v1 used to cluster,
+           now used to score adjacency instead of communities.
+  cap      no region may exceed MAX_REGION_SPAN lines; a run that has no more affinity signal
+           left to cut on is split at its midpoint so the cap still holds.
+
+Output: output/main_cpp_regions.json - {built_at, source_commit, region_count, regions: [...],
 symbol_to_region: {symbol: region_id}}. Static (built off HEAD, not embargo-aware per commit):
 regions are keyed by symbol name, which is stable enough for the replay's region score to use
 against any past commit's target symbols.
@@ -27,7 +35,7 @@ import json
 import re
 import subprocess
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -35,48 +43,83 @@ REPO_PATH = Path(__file__).resolve().parents[3]
 SEMI_BRAIN_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SEMI_BRAIN_DIR))
 
-from l4.louvain import louvain  # noqa: E402
-
 MAIN_CPP = "src/main.cpp"
 AST_GRAPH_FILE = Path(__file__).resolve().parent / "output" / "ast_symbol_graph.json"
 OUTPUT_FILE = Path(__file__).resolve().parent / "output" / "main_cpp_regions.json"
 
 MAX_COMMIT_SYMBOLS = 40
-CALL_W = 0.3
-NAME_W = 0.2
-BANNER_W = 0.15
-# The point of a region is "read these 2-3k lines instead of the whole file": semantic ties
-# alone (co-edit/call/name) scatter across the file as a feature grows over years, so a region
-# built from them alone can span nearly the whole file - no more readable than main.cpp itself.
-# A strong chain edge between each symbol and its immediate file neighbour keeps clustering
-# anchored to physical proximity; semantic ties still pull the occasional distant symbol in,
-# but can't out-compete a run of local chain edges for a whole contiguous block.
-PROXIMITY_W = 1.5
-MAX_FAMILY_GROUP = 30
+COEDIT_W = 1.0
+CALL_W = 0.6
+NAME_W = 0.4
 # A region should be a chunk someone can actually read instead of grepping the whole file.
-MAX_REGION_SPAN = 6000
+MAX_REGION_SPAN = 3000
 # A callee shared by many main.cpp callers is a generic helper (color/layout/undo utilities),
-# not a feature: using it to cluster would glue unrelated Draw*Body functions into one region,
-# same collapse-to-one-blob failure clusters.py notes for plain label propagation on files.
+# not a feature: an edge through it would pull unrelated neighbours together the same way a
+# shared helper collapsed clusters into one blob in the old community version.
 HUB_CALLEE_MAX_CALLERS = 12
-# A single global resolution can't hit the target region count without a trade-off: high
-# enough to keep semantic clusters apart (no giant blob), the raw community count is a few
-# hundred (mostly singletons); low enough to merge those singletons away, main.cpp's own call
-# graph percolates into one region spanning nearly the whole file. So: cluster at a resolution
-# that stays split (no blob), then merge the smallest communities into their best-connected (or
-# line-nearest) neighbour until the count is in range - shrinking from a good clustering, not
-# coarsening a global parameter into one.
-RESOLUTION = 3.0
-TARGET_RANGE = (40, 80)
+MAX_FAMILY_GROUP = 30
+STOPWORDS = {
+    "the", "and", "for", "with", "into", "from", "this", "that", "add", "adds", "fix", "fixes",
+    "fixed", "chore", "feat", "docs", "test", "tests", "wip", "semi", "brain", "node", "nodes",
+    "make", "makes", "when", "now", "not", "its", "was", "were", "onto", "off", "out", "off",
+    "use", "used", "using", "via", "per", "one", "two", "main", "cpp", "region", "regions",
+}
 
 HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
 BANNER_RE = re.compile(r"^// ={5,}\s*(.*)$")
+WORD_RE = re.compile(r"[A-Z][a-z0-9]*|[A-Z]+(?![a-z])|[a-z0-9]+")
 
 
 def load_main_symbols():
     graph = json.loads(AST_GRAPH_FILE.read_text())
     syms = {name: meta for name, meta in graph["symbols"].items() if meta.get("file") == MAIN_CPP}
     return syms, graph["forward_call_graph"]
+
+
+def build_roots(ordered):
+    """Collapses nested/overlapping symbols (a class and its own member functions, both listed
+    as separate main.cpp symbols with the member's range inside the class's) into one top-level
+    interval per group, extended to cover every member. Regions are cut between these roots: a
+    walk that instead visited every nested symbol individually would see end lines jump backward
+    (the class's end line, then a member's much earlier one) and produce backwards/negative-span
+    boundaries. Every symbol - root or nested - is still mapped to a region afterwards, by line,
+    in main()."""
+    roots = []
+    for start, end, name in ordered:
+        if roots and start <= roots[-1][1]:
+            if end > roots[-1][1]:
+                roots[-1] = (roots[-1][0], end, roots[-1][2])
+        else:
+            roots.append([start, end, name])
+    return [tuple(r) for r in roots]
+
+
+def split_big_roots(ordered, max_span, main_syms):
+    """A handful of top-level functions (RegisterNodes: 42k lines of REGISTER_NODE macro calls,
+    no nested symbols the AST extractor can see) are themselves bigger than the cap, with no
+    sub-boundary to cut at - a semantic split can't happen because there's no semantic structure
+    inside them. Chunked into max_span-line pieces (`Name#2`, `Name#3`, ...) and added to
+    main_syms so the rest of the pipeline (adjacency, naming, key_functions) treats each chunk
+    like any other symbol; this is the same "no signal left, cut on line count alone" fallback
+    fill_gaps uses for stretches with no symbols at all."""
+    out = []
+    for start, end, name in ordered:
+        span = end - start + 1
+        if span <= max_span:
+            out.append((start, end, name))
+            continue
+        n_chunks = -(-span // max_span)
+        size = -(-span // n_chunks)
+        cur = start
+        i = 1
+        while cur <= end:
+            chunk_end = min(cur + size - 1, end)
+            chunk_name = name if i == 1 else f"{name}#{i}"
+            out.append((cur, chunk_end, chunk_name))
+            main_syms[chunk_name] = {"line": cur, "end_line": chunk_end}
+            cur = chunk_end + 1
+            i += 1
+    return out
 
 
 def symbol_at_line(ordered, line):
@@ -92,14 +135,20 @@ def symbol_at_line(ordered, line):
             hi = mid - 1
     if best is None:
         return None
-    start, end, name = best
-    return name
+    return best[2]
 
 
-def commit_hashes():
-    out = subprocess.run(["git", "log", "--format=%H", "--follow", "--", MAIN_CPP],
+def commit_log():
+    """[(hash, subject)] for every commit that has ever touched main.cpp, oldest last."""
+    out = subprocess.run(["git", "log", "--format=%H%x01%s", "--follow", "--", MAIN_CPP],
                           cwd=REPO_PATH, capture_output=True, text=True, check=True)
-    return [h for h in out.stdout.splitlines() if h]
+    log = []
+    for line in out.stdout.splitlines():
+        if "\x01" not in line:
+            continue
+        h, subject = line.split("\x01", 1)
+        log.append((h, subject))
+    return log
 
 
 def touched_lines(commit_hash):
@@ -120,13 +169,19 @@ def touched_lines(commit_hash):
     return lines
 
 
-def build_coedit_adj(ordered):
+def build_symbol_adj_and_commit_symbols(ordered, log):
+    """Returns (adj, commits_by_symbol): adj is the co-edit weighted graph over main.cpp
+    symbols; commits_by_symbol maps a symbol name to the list of (hash, subject) that touched
+    it, for naming."""
     adj = defaultdict(lambda: defaultdict(float))
-    for h in commit_hashes():
+    commits_by_symbol = defaultdict(list)
+    for h, subject in log:
         lines = touched_lines(h)
         if not lines:
             continue
         syms = sorted({symbol_at_line(ordered, l) for l in lines} - {None})
+        for s in syms:
+            commits_by_symbol[s].append((h, subject))
         if not 2 <= len(syms) <= MAX_COMMIT_SYMBOLS:
             continue
         w = 1.0 / (len(syms) - 1)
@@ -134,7 +189,7 @@ def build_coedit_adj(ordered):
             for b in syms[i + 1:]:
                 adj[a][b] += w
                 adj[b][a] += w
-    return adj
+    return adj, commits_by_symbol
 
 
 def resolve_callee(name, main_syms):
@@ -164,26 +219,10 @@ def add_call_edges(adj, main_syms, fwd_graph):
         adj[dst][src] += CALL_W
 
 
-WORD_RE = re.compile(r"[A-Z][a-z0-9]*|[A-Z]+(?![a-z])|[a-z0-9]+")
-
-
 def family_key(sym_name):
     short = sym_name.split("::")[-1]
     words = WORD_RE.findall(short)
     return "".join(words[:2]) if words else short
-
-
-def add_name_edges(adj, main_syms):
-    groups = defaultdict(list)
-    for name in main_syms:
-        groups[family_key(name)].append(name)
-    for key, members in groups.items():
-        if not 2 <= len(members) <= MAX_FAMILY_GROUP:
-            continue
-        for i, a in enumerate(members):
-            for b in members[i + 1:]:
-                adj[a][b] += NAME_W
-                adj[b][a] += NAME_W
 
 
 def banner_map():
@@ -196,183 +235,260 @@ def banner_map():
     return banners
 
 
-def add_banner_edges(adj, ordered, banners):
-    """Symbols between the same pair of consecutive banners get a light chain edge, and each
-    symbol's nearest preceding banner label is returned for naming."""
+def banner_label_at(ordered, banners):
+    """The nearest-preceding banner label for each symbol, and per adjacent-pair, whether a
+    banner falls strictly between them (a hard cut)."""
     label_at = {}
+    hard_cut_after = [False] * (len(ordered) - 1)
     if not banners:
-        return label_at
-    for start, end, name in ordered:
-        lbl = None
-        for bline, label in banners:
-            if bline <= start:
-                lbl = label
-            else:
-                break
-        if lbl:
-            label_at[name] = lbl
-    by_label = defaultdict(list)
-    for name, lbl in label_at.items():
-        by_label[lbl].append(name)
-    for lbl, members in by_label.items():
-        if len(members) < 2:
-            continue
-        for a, b in zip(members, members[1:]):
-            adj[a][b] += BANNER_W
-            adj[b][a] += BANNER_W
-    return label_at
+        return label_at, hard_cut_after
+    bidx = 0
+    cur_label = None
+    for i, (start, end, name) in enumerate(ordered):
+        while bidx < len(banners) and banners[bidx][0] <= start:
+            cur_label = banners[bidx][1]
+            bidx += 1
+        if cur_label:
+            label_at[name] = cur_label
+    # a cut is "hard" wherever the label changes between i and i+1 (a banner sits in between)
+    for i in range(len(ordered) - 1):
+        a, b = ordered[i][2], ordered[i + 1][2]
+        if label_at.get(a) != label_at.get(b) and label_at.get(b) is not None:
+            hard_cut_after[i] = True
+    return label_at, hard_cut_after
 
 
-def add_proximity_edges(adj, ordered):
-    for (_, _, a), (_, _, b) in zip(ordered, ordered[1:]):
-        adj[a][b] += PROXIMITY_W
-        adj[b][a] += PROXIMITY_W
+def boundary_weights(ordered, adj):
+    """affinity[i] = tie strength between ordered[i] and ordered[i+1] - the "weakest link" cut
+    signal. Only looks at declared edges (co-edit/call/name), not physical adjacency, so a run
+    with no signal at all is genuinely weak everywhere and falls back to a midpoint split."""
+    weights = []
+    for i in range(len(ordered) - 1):
+        a, b = ordered[i][2], ordered[i + 1][2]
+        weights.append(adj.get(a, {}).get(b, 0.0))
+    return weights
 
 
-def cluster(adj, main_syms, ordered):
-    comm = louvain(adj, resolution=RESOLUTION)
-    next_id = max(comm.values(), default=-1) + 1
-    for name in main_syms:
-        if name not in comm:
-            comm[name] = next_id  # isolated symbol, no edges at all: its own community
-            next_id += 1
-    comm = merge_small(comm, adj, ordered, TARGET_RANGE[1])
-    return comm, RESOLUTION
+def split_segment(seg, weights, max_span, seg_bounds):
+    """seg: (i0, i1) inclusive symbol-index range. Splits recursively on the weakest boundary
+    until every piece's real rendered span (per seg_bounds - the same boundaries the final
+    regions are built from) is under max_span. Hard cuts are applied first, upstream, so this
+    only ever makes size-driven cuts."""
+    i0, i1 = seg
+    line_start, line_end = seg_bounds(i0, i1)
+    if line_end - line_start + 1 <= max_span:
+        return [seg]
+    if i0 >= i1:
+        return [seg]  # a single symbol (plus its share of surrounding dead space) over the cap
+    candidates = list(range(i0, i1))  # cut "after" index j, for j in [i0, i1)
+    weak = min(candidates, key=lambda j: (weights[j], abs(j - (i0 + i1) // 2)))
+    left, right = (i0, weak), (weak + 1, i1)
+    return split_segment(left, weights, max_span, seg_bounds) + \
+        split_segment(right, weights, max_span, seg_bounds)
 
 
-def merge_small(comm, adj, ordered, max_regions, max_span=MAX_REGION_SPAN):
-    """Repeatedly folds the smallest community into whichever other community it's most
-    connected to (or, failing any connection, the line-nearest one) until at most max_regions
-    remain. A merge that would stretch the target past max_span lines is skipped in favour of
-    the next-best tie, so a region stays a readable chunk instead of a whole-file thematic
-    grab-bag reached only through a chain of semantic ties."""
-    lo, hi = {}, {}
-    for start, end, name in ordered:
-        lo[name] = start
-        hi[name] = end
-    centroid = {name: (lo[name] + hi[name]) / 2 for name in lo}
-    members = defaultdict(set)
-    for name, c in comm.items():
-        members[c].add(name)
-
-    def span_after_merge(a, b):
-        lines = [lo[n] for n in members[a]] + [lo[n] for n in members[b]] + \
-                [hi[n] for n in members[a]] + [hi[n] for n in members[b]]
-        return max(lines) - min(lines)
-
-    def nearest_by_line(c, avoid=()):
-        c_mid = sum(centroid[n] for n in members[c]) / len(members[c])
-        best, best_dist = None, None
-        for other in members:
-            if other == c or other in avoid or not members[other]:
+def commit_keyword(members, commits_by_symbol, exclude_words):
+    """The most common non-stopword token across commit subjects that touched this region's
+    symbols, excluding words already spent on the family/banner part of the name."""
+    counts = Counter()
+    seen_hashes = set()
+    for m in members:
+        for h, subject in commits_by_symbol.get(m, []):
+            if (h, m) in seen_hashes:
                 continue
-            o_mid = sum(centroid[n] for n in members[other]) / len(members[other])
-            dist = abs(o_mid - c_mid)
-            if best_dist is None or dist < best_dist:
-                best, best_dist = other, dist
-        return best
-
-    while len([c for c in members if members[c]]) > max_regions:
-        smallest = min((c for c in members if members[c]), key=lambda c: len(members[c]))
-        neighbours = {}
-        for n in members[smallest]:
-            for m, w in adj.get(n, {}).items():
-                other = comm[m]
-                if other != smallest:
-                    neighbours[other] = neighbours.get(other, 0.0) + w
-        target = next((cand for cand in sorted(neighbours, key=neighbours.get, reverse=True)
-                       if span_after_merge(smallest, cand) <= max_span), None)
-        if target is None:
-            # no semantic tie fits under the span cap (or none at all): the physically
-            # nearest community, even if that too exceeds the cap - it must merge somewhere.
-            target = nearest_by_line(smallest)
-        if target is None:
-            break
-        for n in members[smallest]:
-            comm[n] = target
-        members[target] |= members[smallest]
-        members[smallest] = set()
-    return comm
+            seen_hashes.add((h, m))
+            for w in WORD_RE.findall(subject):
+                lw = w.lower()
+                if len(lw) < 3 or lw in STOPWORDS or lw in exclude_words:
+                    continue
+                counts[lw] += 1
+    if not counts:
+        return None
+    return counts.most_common(1)[0][0]
 
 
 def slugify(text):
     return re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", text.lower())).strip("-")[:40]
 
 
+def is_gap(name):
+    return name.startswith("__gap")
+
+
+def name_region(members, label_at, commits_by_symbol):
+    real = [m for m in members if not is_gap(m)]
+    if not real:
+        # a stretch of file the AST extractor found no top-level symbols in (e.g. macro-heavy
+        # self-test bodies): name it from the enclosing banner alone, there's nothing else to go on.
+        lbl = next((label_at[m] for m in members if m in label_at), None)
+        return slugify(lbl) + "-block" if lbl else "unparsed-block"
+    labels = [label_at[m] for m in real if m in label_at]
+    families = [family_key(m) for m in real]
+    if labels and labels.count(max(set(labels), key=labels.count)) >= len(real) / 2:
+        base = max(set(labels), key=labels.count)
+    else:
+        base = max(set(families), key=families.count)
+    base_slug = slugify(base)
+    kw = commit_keyword(real, commits_by_symbol, exclude_words=set(WORD_RE.findall(base.lower())))
+    if kw and kw not in base_slug:
+        return slugify(f"{base}-{kw}")
+    return base_slug or "region"
+
+
+def fill_gaps(ordered, max_span, file_lines):
+    """Inserts synthetic `__gap_<start>` placeholder entries for any stretch between two real
+    symbols (or before the first / after the last, to EOF) over half the cap, so the segmenter
+    always has a cut point inside code the AST extractor didn't parse into top-level symbols -
+    otherwise that stretch is one unsplittable, over-cap region. A gap doesn't need to be over
+    the cap by itself to cause trouble: a run of several sub-cap gaps between sparse symbols can
+    add up to an over-cap segment with no single cut point big enough to trigger a split on."""
+    GAP_TRIGGER = max_span // 2
+
+    def chunk_gap(filled, start, end):
+        length = end - start + 1
+        if length <= 0:
+            return
+        if length <= max_span:
+            filled.append((start, end, f"__gap_{start}"))
+            return
+        n_chunks = -(-length // max_span)  # ceil
+        size = -(-length // n_chunks)      # roughly equal pieces, each <= max_span
+        cur = start
+        while cur <= end:
+            chunk_end = min(cur + size - 1, end)
+            filled.append((cur, chunk_end, f"__gap_{cur}"))
+            cur = chunk_end + 1
+
+    filled = []
+    prev_end = ordered[0][0] - 1
+    for start, end, name in ordered:
+        gap = start - 1 - prev_end
+        if gap > GAP_TRIGGER:
+            chunk_gap(filled, prev_end + 1, start - 1)
+        filled.append((start, end, name))
+        prev_end = end
+    if file_lines - prev_end > GAP_TRIGGER:
+        chunk_gap(filled, prev_end + 1, file_lines)
+    return filled
+
+
 def main():
     main_syms, fwd_graph = load_main_symbols()
-    ordered = sorted(((m["line"], m.get("end_line", m["line"]), name)
-                      for name, m in main_syms.items()))
+    all_syms_ordered = sorted(((m["line"], m.get("end_line", m["line"]), name)
+                               for name, m in main_syms.items()))
+    ordered = build_roots(all_syms_ordered)
+    ordered = split_big_roots(ordered, MAX_REGION_SPAN, main_syms)
+    file_text_lines = (REPO_PATH / MAIN_CPP).read_text(errors="replace").splitlines()
+    file_lines = len(file_text_lines)
 
-    adj = build_coedit_adj(ordered)
+    log = commit_log()
+    adj, commits_by_symbol = build_symbol_adj_and_commit_symbols(ordered, log)
+    ordered = fill_gaps(ordered, MAX_REGION_SPAN, file_lines)
+    # scale co-edit weight, then add call and name-family ties on the same graph
+    for a in list(adj):
+        for b in list(adj[a]):
+            adj[a][b] *= COEDIT_W
     add_call_edges(adj, main_syms, fwd_graph)
-    add_name_edges(adj, main_syms)
-    banners = banner_map()
-    label_at = add_banner_edges(adj, ordered, banners)
-    add_proximity_edges(adj, ordered)
-
+    groups = defaultdict(list)
     for name in main_syms:
-        adj.setdefault(name, defaultdict(float))
-    comm, resolution = cluster(adj, main_syms, ordered)
+        groups[family_key(name)].append(name)
+    for members in groups.values():
+        if not 2 <= len(members) <= MAX_FAMILY_GROUP:
+            continue
+        for i, a in enumerate(members):
+            for b in members[i + 1:]:
+                adj[a][b] += NAME_W
+                adj[b][a] += NAME_W
 
-    by_region = defaultdict(list)
-    for name, c in comm.items():
-        by_region[c].append(name)
+    banners = banner_map()
+    label_at, hard_cut_after = banner_label_at(ordered, banners)
+    weights = boundary_weights(ordered, adj)
+
+    # The line a region actually gets assigned (line_start/line_end below) has to agree with
+    # what split_segment measures while deciding whether to cut - otherwise a segment can pass
+    # its own span check using bare symbol start/end, then grow past the cap once the dead space
+    # on either side (not itself a full/half-cap gap, so fill_gaps left it alone) is tiled onto
+    # it. `bnd[i]` is the fixed boundary line between symbol i and i+1 (their gap's midpoint);
+    # every region's real start/end is derived from these same boundaries, both here and in
+    # split_segment, so there is never a second, disagreeing notion of a region's size.
+    n = len(ordered)
+    bnd = [(ordered[i][1] + ordered[i + 1][0]) // 2 for i in range(n - 1)]
+
+    def seg_bounds(i0, i1):
+        line_start = 1 if i0 == 0 else bnd[i0 - 1] + 1
+        line_end = file_lines if i1 == n - 1 else bnd[i1]
+        return line_start, line_end
+
+    # 1. split at hard (banner) cuts
+    hard_segments = []
+    start = 0
+    for i in range(n - 1):
+        if hard_cut_after[i]:
+            hard_segments.append((start, i))
+            start = i + 1
+    hard_segments.append((start, n - 1))
+
+    # 2. split anything still over the cap at its weakest boundary
+    segments = []
+    for seg in hard_segments:
+        segments.extend(split_segment(seg, weights, MAX_REGION_SPAN, seg_bounds))
+    segments.sort()
 
     regions = []
     symbol_to_region = {}
-    for c, members in by_region.items():
-        members = [m for m in members if m in main_syms]
-        if not members:
-            continue
-        labels = [label_at[m] for m in members if m in label_at]
-        families = [family_key(m) for m in members]
-        if labels and labels.count(max(set(labels), key=labels.count)) >= len(members) / 2:
-            name = slugify(max(set(labels), key=labels.count))
-        else:
-            name = slugify(max(set(families), key=families.count))
-        rid = name or f"region-{c}"
+    for k, (i0, i1) in enumerate(segments):
+        members = [ordered[i][2] for i in range(i0, i1 + 1)]
+        line_start, line_end = seg_bounds(i0, i1)
+        real_members = [m for m in members if not is_gap(m)]
+        degree = {m: sum(adj.get(m, {}).values()) for m in real_members}
+        key = sorted(real_members, key=lambda m: -degree[m])[:5]
+        rid = name_region(members, label_at, commits_by_symbol)
         base_rid, dupe = rid, 1
         existing_ids = {r["id"] for r in regions}
         while rid in existing_ids:
             dupe += 1
             rid = f"{base_rid}-{dupe}"
-        regions.append(_region_record(rid, members, main_syms, adj, label_at))
-        for m in members:
+        regions.append({
+            "id": rid,
+            "line_start": line_start,
+            "line_end": line_end,
+            "member_count": len(real_members),
+            "banner": label_at.get(members[0], ""),
+            "key_functions": [f"{m} L{main_syms[m]['line']}" for m in key],
+        })
+        for m in real_members:
             symbol_to_region[m] = rid
 
-    regions.sort(key=lambda r: r["line_start"])
+    # Roots drove the cuts, but every symbol - including the nested ones build_roots folded
+    # away (a class's own member functions) - still needs a region so a brief naming one of
+    # them resolves. Regions are contiguous and sorted by line_start, so this is one linear scan.
+    region_bounds = [(r["line_start"], r["line_end"], r["id"]) for r in regions]
+    ri = 0
+    for start, _end, name in all_syms_ordered:
+        if name in symbol_to_region:
+            continue
+        while ri + 1 < len(region_bounds) and start > region_bounds[ri][1]:
+            ri += 1
+        if region_bounds[ri][0] <= start <= region_bounds[ri][1]:
+            symbol_to_region[name] = region_bounds[ri][2]
 
     head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=REPO_PATH,
                           capture_output=True, text=True).stdout.strip()
     out = {
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source_commit": head,
-        "resolution": resolution,
         "region_count": len(regions),
         "regions": regions,
         "symbol_to_region": symbol_to_region,
     }
     OUTPUT_FILE.write_text(json.dumps(out, indent=1))
-    print(f"{len(regions)} regions (resolution={resolution}) -> {OUTPUT_FILE}")
 
-
-def _region_record(rid, members, main_syms, adj, label_at):
-    metas = [(m, main_syms[m]) for m in members]
-    line_start = min(meta["line"] for _, meta in metas)
-    line_end = max(meta.get("end_line", meta["line"]) for _, meta in metas)
-    degree = {m: sum(adj.get(m, {}).values()) for m in members}
-    key = sorted(members, key=lambda m: -degree[m])[:5]
-    labels = [label_at[m] for m in members if m in label_at]
-    banner = max(set(labels), key=labels.count) if labels else ""
-    return {
-        "id": rid,
-        "line_start": line_start,
-        "line_end": line_end,
-        "member_count": len(members),
-        "banner": banner,
-        "key_functions": [f"{m} L{main_syms[m]['line']}" for m in key],
-    }
+    spans = sorted(r["line_end"] - r["line_start"] + 1 for r in regions)
+    overlaps = sum(1 for a, b in zip(regions, regions[1:]) if a["line_end"] >= b["line_start"])
+    gap = (regions[0]["line_start"] != 1) or (regions[-1]["line_end"] != file_lines)
+    print(f"{len(regions)} regions -> {OUTPUT_FILE}")
+    print(f"median span {spans[len(spans)//2]}, max span {spans[-1]}, overlaps {overlaps}, "
+          f"covers whole file: {not gap}")
 
 
 if __name__ == "__main__":
