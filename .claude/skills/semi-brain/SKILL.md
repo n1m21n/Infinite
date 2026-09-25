@@ -29,10 +29,12 @@ To get an immediate architectural breakdown and invariant brief for any task:
 python3 tools/semi-brain/4_engine/semi_brain_cli.py "<description of bug or feature>"
 
 # Short brief (~200 tokens): likely files with the past fix/chat behind each,
-# symbols with file:line, the code area, past fixes, skills to load. Start here.
+# symbols with file:start-end, the code area, past fixes, skills to load. Start here.
 python3 tools/semi-brain/4_engine/semi_brain_cli.py --brief "<description>"   # --json for tools
 
-# Fast Apple Metal Local Neural Router (LoRA fine-tuned Qwen2.5-0.5B):
+# Manual diagnostic only: the LoRA router (Qwen2.5-0.5B), adapter from 2026-09-15 (before
+# v2), free prose, never scored and not in the brief. Decided 2026-09-25: not retrained or
+# wired in unless a replay shows it catches what L0 notes miss.
 python3 tools/semi-brain/4_engine/semi_brain_cli.py "<description of bug or feature>" --neural
 ```
 
@@ -50,6 +52,18 @@ brief (a lead, not a fact)". Treat it as a lead: check the files it names
 before acting on them. When a session id is known, the files edited earlier
 in that session, and lately anywhere, count too (`l3/recent.py`, with
 weights from `l3/weights.py`).
+
+**The goal is to save Claude time and tokens, so every hooked prompt is put in an arm**
+(`l5/serve.py`): `holdout` (25%, random) gets no brief and is the baseline; `quiet` gets
+none because `l5/gate.py` judged the brain unsure (best symbol score < 20 or fewer than two
+ranking lists agreeing on the top non-hub file; calibration in its docstring: only 30% of
+prompts touch a non-hub src/ file, and the brief's top 4 hits in 16%); `shown` gets it.
+Every brief is logged with its arm and confidence either way. `l1/outcomes.py` records what
+each turn cost (tool calls, calls up to the first edit, context and output tokens), and
+`python3 5_evals/live.py` prints `savings`: median cost per arm, `shown_vs_holdout`
+(negative = the brief saves), and `would_hit4` per arm (was the quiet arm right to be
+quiet). That comparison, not the replay, answers "does the brief pay for itself"; it needs
+about 50 working turns per arm before it means anything.
 
 The same brief, plus L0, is available as MCP tools (server `semi-brain` in
 `.mcp.json`, `l0/mcp_server.py`): `brain_brief`, `brain_recall`,
@@ -74,7 +88,10 @@ split) -> 0.36 (weighted-vote ranking), region R@3 0.54.
 `5_evals/live.py` scores the same thing against real turns: region hit@1/@2
 from git-diffing the commits of turns that touched main.cpp (only turns that
 committed are scorable - `l1/outcomes.py` has no line-level record for
-edits that were never committed).
+edits that were never committed). The replay's `focus_hit` asks the next step down: does the
+best matched symbol inside a top region overlap the edited function? 11% on commits, 0% on
+prompts, with a ceiling of 12% (0% on prompts) for any matched symbol, so the brief does not show a focus
+span; symbol matching, not the pick, is what limits line-level precision.
 
 To run the automated 30-case benchmark evaluation suite (self-confirming; the
 replay above is the real gate):

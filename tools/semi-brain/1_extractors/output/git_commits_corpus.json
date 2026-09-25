@@ -1,6 +1,730 @@
 [
   {
-<<<<<<< HEAD
+    "hash": "126478b1e70859edf16188b2e488776662ad292c",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 21:21:57 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/perf-block3-media into main",
+      "description": "Merge feature/perf-block3-media into main",
+      "bullets": [],
+      "body": "Block 3 (media + release gate): B8 decode-drop targets met on a\nverified-quiet machine with no code change; Spout HasClients no\nlonger reports a receiver it can't see; camera texture reuse via\nglTexSubImage2D on steady-state frames; Linux frameCache honors\nVideoFrameAt's same-frame no-op contract; B10 offline-render +\nA/V-sync fixture built (Goertzel narrowband onset detection); m2-8gb\nbaseline corrected for 12 rows stale from before the already-shipped\n951d22c canvas-pacing fix. driver.sh --full and --group\nvideo,export,media,ui both clean (0 unexplained failures); verify-gate\nadvisory review: clear to merge.",
+      "raw": "Merge feature/perf-block3-media into main\n\nBlock 3 (media + release gate): B8 decode-drop targets met on a\nverified-quiet machine with no code change; Spout HasClients no\nlonger reports a receiver it can't see; camera texture reuse via\nglTexSubImage2D on steady-state frames; Linux frameCache honors\nVideoFrameAt's same-frame no-op contract; B10 offline-render +\nA/V-sync fixture built (Goertzel narrowband onset detection); m2-8gb\nbaseline corrected for 12 rows stale from before the already-shipped\n951d22c canvas-pacing fix. driver.sh --full and --group\nvideo,export,media,ui both clean (0 unexplained failures); verify-gate\nadvisory review: clear to merge."
+    },
+    "stat": "",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/known-test-failures.txt",
+      "bench/baselines/m2-8gb.jsonl",
+      "docs/plans/perf/README.md",
+      "scripts/bench/compare.py",
+      "scripts/bench/run_all.sh",
+      "src/core/BenchReport.cpp",
+      "src/core/BenchReport.h",
+      "src/main.cpp",
+      "src/nodes/OutputNode.cpp",
+      "src/nodes/OutputNode.h",
+      "src/nodes/VideoInNode.cpp",
+      "src/nodes/VideoInNode.h",
+      "src/platform/Platform.h",
+      "src/platform/Platform.mm",
+      "src/platform/linux/MediaLinux.cpp",
+      "src/platform/linux/SyphonLinux.cpp",
+      "src/platform/win/PlatformWinSyphon.cpp"
+    ]
+  },
+  {
+    "hash": "af4640f55565ee3614ec24af7b8d3c24405dcb01",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 21:21:44 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "perf",
+      "title": "docs(perf): Block 3 close-out - baseline correction, B10, verify-gate, user-impact table",
+      "description": "Block 3 close-out - baseline correction, B10, verify-gate, user-impact table",
+      "bullets": [],
+      "body": "Documents Block 3 steps 4-6: B10 fixture built, three baseline\nre-verification attempts (two correctly rejected as contended, the\nthird root-caused as a stale pre-951d22c baseline rather than a real\nregression or a fourth blind re-run), driver.sh --full/--group results,\nand verify-gate's pass/clear-to-merge findings. Updates the top Block\ntable, open items 5-7, the Baseline trust paragraph, What still needs\nbuilding, and adds Scoreboard rows plus a one-screen before/after\nuser-impact table by priority tier (Audio/Projector/Canvas/Previews).",
+      "raw": "docs(perf): Block 3 close-out - baseline correction, B10, verify-gate, user-impact table\n\nDocuments Block 3 steps 4-6: B10 fixture built, three baseline\nre-verification attempts (two correctly rejected as contended, the\nthird root-caused as a stale pre-951d22c baseline rather than a real\nregression or a fourth blind re-run), driver.sh --full/--group results,\nand verify-gate's pass/clear-to-merge findings. Updates the top Block\ntable, open items 5-7, the Baseline trust paragraph, What still needs\nbuilding, and adds Scoreboard rows plus a one-screen before/after\nuser-impact table by priority tier (Audio/Projector/Canvas/Previews)."
+    },
+    "stat": "docs/plans/perf/README.md | 146 +++++++++++++++++++++++++++++++++++++++++-----\n 1 file changed, 133 insertions(+), 13 deletions(-)",
+    "files": [
+      "docs/plans/perf/README.md"
+    ]
+  },
+  {
+    "hash": "b383afa87950b75a1901403906ca186eabfa57b6",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 21:10:23 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "hygiene",
+      "title": "docs(hygiene): baseline MODDROPDOWNUNDOTEST as pre-existing, unrelated",
+      "description": "baseline MODDROPDOWNUNDOTEST as pre-existing, unrelated",
+      "bullets": [],
+      "body": "Full driver.sh --full run for Block 3 surfaced this failure for the\nfirst time. Confirmed via git diff against the branch's merge-base\nthat none of Block 3's 7 commits touch the dropdown/undo/onSelect\npath; the modulated-control undo-suppression feature it exercises was\nadded earlier (2c92715/2910b2a), already on main. Root cause of the\npick itself not landing is not yet diagnosed - flagged separately for\nits own investigation, out of scope here.",
+      "raw": "docs(hygiene): baseline MODDROPDOWNUNDOTEST as pre-existing, unrelated\n\nFull driver.sh --full run for Block 3 surfaced this failure for the\nfirst time. Confirmed via git diff against the branch's merge-base\nthat none of Block 3's 7 commits touch the dropdown/undo/onSelect\npath; the modulated-control undo-suppression feature it exercises was\nadded earlier (2c92715/2910b2a), already on main. Root cause of the\npick itself not landing is not yet diagnosed - flagged separately for\nits own investigation, out of scope here."
+    },
+    "stat": ".claude/skills/run-infinite-hygiene/known-test-failures.txt | 2 ++\n 1 file changed, 2 insertions(+)",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/known-test-failures.txt"
+    ]
+  },
+  {
+    "hash": "97617eb369924ce46b3f3ed52929a8264fe9b42a",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 21:05:43 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "bench(baseline): correct stale pre-pacing-fix B6/B8 rows, add B10/B7",
+      "description": "bench(baseline): correct stale pre-pacing-fix B6/B8 rows, add B10/B7",
+      "bullets": [],
+      "body": "The m2-8gb baseline mixed two source commits: c602a0d (B2/B4, trusted)\nand beb4d87 (B6, most of B8) \u2014 and beb4d87 predates 951d22c (\"one frame\nclock paces the canvas-only loop too\", Block 2 step 2b) by ~3 hours on\nthe same day. Before that fix the canvas loop's swap interval didn't\nactually block, so it free-ran at ~120fps (p50 ~8.3ms) instead of real\n60Hz. Every affected baseline row already self-documents this with its\nown unpaced=1 tag (compare.py's own untrusted marker), and\ndocs/plans/perf/README.md already lists it as closed.\nReplaced those 12 stale unpaced=1 rows (4x B6_canvas_nav, 8x\nB8_media_io) with fresh trusted numbers from a verified-quiet run.\nVerified the replacement is exactly isolated: every untouched row\ncompares baseline-vs-baseline at 0% delta.\nAlso added B10_offline_av_sync (2 variants, previously absent - new\nthis block) and carried forward the B7_soak step-0 result (marked\nuntrusted/unfocused=1 per its own capture conditions, as before).",
+      "raw": "bench(baseline): correct stale pre-pacing-fix B6/B8 rows, add B10/B7\n\nThe m2-8gb baseline mixed two source commits: c602a0d (B2/B4, trusted)\nand beb4d87 (B6, most of B8) \u2014 and beb4d87 predates 951d22c (\"one frame\nclock paces the canvas-only loop too\", Block 2 step 2b) by ~3 hours on\nthe same day. Before that fix the canvas loop's swap interval didn't\nactually block, so it free-ran at ~120fps (p50 ~8.3ms) instead of real\n60Hz. Every affected baseline row already self-documents this with its\nown unpaced=1 tag (compare.py's own untrusted marker), and\ndocs/plans/perf/README.md already lists it as closed.\n\nReplaced those 12 stale unpaced=1 rows (4x B6_canvas_nav, 8x\nB8_media_io) with fresh trusted numbers from a verified-quiet run.\nVerified the replacement is exactly isolated: every untouched row\ncompares baseline-vs-baseline at 0% delta.\n\nAlso added B10_offline_av_sync (2 variants, previously absent - new\nthis block) and carried forward the B7_soak step-0 result (marked\nuntrusted/unfocused=1 per its own capture conditions, as before)."
+    },
+    "stat": "bench/baselines/m2-8gb.jsonl | 119 ++++++++++++++++++++++---------------------\n 1 file changed, 61 insertions(+), 58 deletions(-)",
+    "files": [
+      "bench/baselines/m2-8gb.jsonl"
+    ]
+  },
+  {
+    "hash": "d12582d619cef9f8e98c8ba169444bae8e6a2cbb",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 20:01:51 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "bench",
+      "title": "feat(bench): implement B10 offline render + A/V sync fixture",
+      "description": "implement B10 offline render + A/V sync fixture",
+      "bullets": [
+        "a broadband amplitude threshold missed most bursts because the B3",
+        "a single loud Goertzel window was still enough to count as an"
+      ],
+      "body": "INFINITE_BENCH_B10 renders the real B3-shaped scene (B1-lite audio +\nB2-lite visuals + gesture/macro playback + Prediction modulators) for\nINFINITE_BENCH_B10SECONDS (default 30s) through the real Arrangement\noffline path - StartOfflineRenderSession(isArrange=true), the same\ncall ArrangeRenderExecuteJob makes - then redecodes the written movie\nand correlates markers the way INFINITE_RECEXPORTTEST does for its own\nsynthetic take.\nMarkers: a 1kHz tone burst (OutputNode::DrainOfflineAudioCapture) and a\nwhite flash (OutputNode::CaptureOfflineFrame) are laid over the take's\nown real audio/video at 5 fixed timestamps (B10Bench, OutputNode.h),\nstrictly gated behind INFINITE_BENCH_B10 so B3/B7 (which share this\nsame scene-construction gate) are untouched.\nAudio-marker detection went through two real fixes after the first\nrun measured only 1 of 5 onsets:\nmix is loud for most of the take, so quiet-to-loud transitions\nrarely happen; replaced with a per-window Goertzel at the marker's\nown frequency, which the ambient mix is very unlikely to spike at\nthe same instant (measured 1 -> 6 found, still not 5)\nonset, so one spurious blip over-counted; now requires the loud\nrun to sustain for most of the marker's own duration before\ncounting it (measured 6 -> 5/5, stable across 4 full runs)\nConfirmed empirically that output_hash is not usable as a B10\ndeterminism gate the way it is for B2/B4's real static variant: B10\nrenders the B3-shaped scene, whose macro/gesture playback and\nPrediction modulators run on wall-clock time regardless of B10's own\nanim=0/1 flag (which only silences the B2-lite visual layer). Two\nanim=0 runs of the same commit, both settled to the same frame B2/B9\nsample at, produced different hashes. scripts/bench/compare.py now\nclassifies B10 the same way it already does for B3/B9: hash printed\ninformationally, never gated.\nMeasured results (4 full 30s runs on this machine): 5/5 audio + 5/5\nvideo markers every run, drift end/worst ~0ms (well inside EBU R37's\n40ms early / 60ms late and av-sync-sweep's 1/2-frame tolerances),\nframes exact 900/900, 0 dropped, realtime factor ~2.1-2.3x. av-sync-\nsweep driver (--skip-build) reruns 18/18 clean both before and after\nthis change.\nWires the B10 stub in scripts/bench/run_all.sh (anim=1 and anim=0\nvariants) and adds Bench::BenchReport::offlineRender plus B10's\ntargetsPass keys, consumed generically by compare.py's existing\ntargets-pass gate.\nDoes not touch src/audio/, AudioEngine, or any audio-thread code -\nconfirmed via git diff before relying on this for the B7 soak\ncarry-forward decision.",
+      "raw": "feat(bench): implement B10 offline render + A/V sync fixture\n\nINFINITE_BENCH_B10 renders the real B3-shaped scene (B1-lite audio +\nB2-lite visuals + gesture/macro playback + Prediction modulators) for\nINFINITE_BENCH_B10SECONDS (default 30s) through the real Arrangement\noffline path - StartOfflineRenderSession(isArrange=true), the same\ncall ArrangeRenderExecuteJob makes - then redecodes the written movie\nand correlates markers the way INFINITE_RECEXPORTTEST does for its own\nsynthetic take.\n\nMarkers: a 1kHz tone burst (OutputNode::DrainOfflineAudioCapture) and a\nwhite flash (OutputNode::CaptureOfflineFrame) are laid over the take's\nown real audio/video at 5 fixed timestamps (B10Bench, OutputNode.h),\nstrictly gated behind INFINITE_BENCH_B10 so B3/B7 (which share this\nsame scene-construction gate) are untouched.\n\nAudio-marker detection went through two real fixes after the first\nrun measured only 1 of 5 onsets:\n - a broadband amplitude threshold missed most bursts because the B3\n   mix is loud for most of the take, so quiet-to-loud transitions\n   rarely happen; replaced with a per-window Goertzel at the marker's\n   own frequency, which the ambient mix is very unlikely to spike at\n   the same instant (measured 1 -> 6 found, still not 5)\n - a single loud Goertzel window was still enough to count as an\n   onset, so one spurious blip over-counted; now requires the loud\n   run to sustain for most of the marker's own duration before\n   counting it (measured 6 -> 5/5, stable across 4 full runs)\n\nConfirmed empirically that output_hash is not usable as a B10\ndeterminism gate the way it is for B2/B4's real static variant: B10\nrenders the B3-shaped scene, whose macro/gesture playback and\nPrediction modulators run on wall-clock time regardless of B10's own\nanim=0/1 flag (which only silences the B2-lite visual layer). Two\nanim=0 runs of the same commit, both settled to the same frame B2/B9\nsample at, produced different hashes. scripts/bench/compare.py now\nclassifies B10 the same way it already does for B3/B9: hash printed\ninformationally, never gated.\n\nMeasured results (4 full 30s runs on this machine): 5/5 audio + 5/5\nvideo markers every run, drift end/worst ~0ms (well inside EBU R37's\n40ms early / 60ms late and av-sync-sweep's 1/2-frame tolerances),\nframes exact 900/900, 0 dropped, realtime factor ~2.1-2.3x. av-sync-\nsweep driver (--skip-build) reruns 18/18 clean both before and after\nthis change.\n\nWires the B10 stub in scripts/bench/run_all.sh (anim=1 and anim=0\nvariants) and adds Bench::BenchReport::offlineRender plus B10's\ntargetsPass keys, consumed generically by compare.py's existing\ntargets-pass gate.\n\nDoes not touch src/audio/, AudioEngine, or any audio-thread code -\nconfirmed via git diff before relying on this for the B7 soak\ncarry-forward decision."
+    },
+    "stat": "scripts/bench/compare.py |  36 ++++-\n scripts/bench/run_all.sh |  16 +-\n src/core/BenchReport.cpp |   2 +\n src/core/BenchReport.h   |   4 +\n src/main.cpp             | 402 ++++++++++++++++++++++++++++++++++++++++++++++-\n src/nodes/OutputNode.cpp |  70 ++++++++-\n src/nodes/OutputNode.h   |  19 +++\n 7 files changed, 535 insertions(+), 14 deletions(-)",
+    "files": [
+      "scripts/bench/compare.py",
+      "scripts/bench/run_all.sh",
+      "src/core/BenchReport.cpp",
+      "src/core/BenchReport.h",
+      "src/main.cpp",
+      "src/nodes/OutputNode.cpp",
+      "src/nodes/OutputNode.h"
+    ]
+  },
+  {
+    "hash": "1bc224418e3ebedbade7a8ad38b3a4d34bec5b6d",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 17:47:05 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "perf",
+      "title": "docs(perf): Block 3 steps 1-3 - B8 decode targets met on a quiet machine, camera unproven",
+      "description": "Block 3 steps 1-3 - B8 decode targets met on a quiet machine, camera unproven",
+      "bullets": [],
+      "body": "",
+      "raw": "docs(perf): Block 3 steps 1-3 - B8 decode targets met on a quiet machine, camera unproven"
+    },
+    "stat": "docs/plans/perf/README.md | 37 +++++++++++++++++++++++++++++++++++++\n 1 file changed, 37 insertions(+)",
+    "files": [
+      "docs/plans/perf/README.md"
+    ]
+  },
+  {
+    "hash": "0a0acbf1203de6b83a8461dfb6a505c3e4964395",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 17:44:23 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "platform",
+      "title": "fix(platform): Spout HasClients no longer reports a receiver it cannot see (Found 7)",
+      "description": "Spout HasClients no longer reports a receiver it cannot see (Found 7)",
+      "bullets": [],
+      "body": "Windows SyphonServerHasClients returned spout.IsInitialized(), so after the\nfirst send the Syphon Out body read \"Clients: Active\" with nobody receiving.\nIt now returns false, and a new three-sided Platform::SyphonServerCanReportClients()\n(macOS true, Windows/Linux false) lets the body say \"Clients: not reported\"\nand the B8 bench emit has_clients null without a platform #if in main.cpp.\nSPOUTLOOPTEST now fails if a backend that cannot report receivers claims one\nbefore any receiver exists. Windows CI only; macOS build verified.",
+      "raw": "fix(platform): Spout HasClients no longer reports a receiver it cannot see (Found 7)\n\nWindows SyphonServerHasClients returned spout.IsInitialized(), so after the\nfirst send the Syphon Out body read \"Clients: Active\" with nobody receiving.\nIt now returns false, and a new three-sided Platform::SyphonServerCanReportClients()\n(macOS true, Windows/Linux false) lets the body say \"Clients: not reported\"\nand the B8 bench emit has_clients null without a platform #if in main.cpp.\nSPOUTLOOPTEST now fails if a backend that cannot report receivers claims one\nbefore any receiver exists. Windows CI only; macOS build verified."
+    },
+    "stat": "src/main.cpp                           | 26 ++++++++++++++++++--------\n src/platform/Platform.h                |  8 ++++++++\n src/platform/Platform.mm               |  5 +++++\n src/platform/linux/SyphonLinux.cpp     |  5 +++++\n src/platform/win/PlatformWinSyphon.cpp | 22 ++++++++++++++--------\n 5 files changed, 50 insertions(+), 16 deletions(-)",
+    "files": [
+      "src/main.cpp",
+      "src/platform/Platform.h",
+      "src/platform/Platform.mm",
+      "src/platform/linux/SyphonLinux.cpp",
+      "src/platform/win/PlatformWinSyphon.cpp"
+    ]
+  },
+  {
+    "hash": "163a688c90c49cd77895f441ac9db0f5bbc7b883",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 17:33:50 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/provenance-cleanup into main",
+      "description": "Merge feature/provenance-cleanup into main",
+      "bullets": [],
+      "body": "# Conflicts:\n#\tsrc/core/GLUtil.cpp\n#\ttools/semi-brain/1_extractors/output/git_commits_corpus.json\n#\ttools/semi-brain/1_extractors/output/knowledge_index.db\n#\ttools/semi-brain/1_extractors/output/recovered_docs_corpus.json\n#\ttools/semi-brain/1_extractors/output/skills_and_invariants_corpus.json\n#\ttools/semi-brain/3_datasets/train_dpo_preference.jsonl\n#\ttools/semi-brain/3_datasets/train_sft_alpaca.jsonl\n#\ttools/semi-brain/3_datasets/train_sft_sharegpt.jsonl",
+      "raw": "Merge feature/provenance-cleanup into main\n\n# Conflicts:\n#\tsrc/core/GLUtil.cpp\n#\ttools/semi-brain/1_extractors/output/git_commits_corpus.json\n#\ttools/semi-brain/1_extractors/output/knowledge_index.db\n#\ttools/semi-brain/1_extractors/output/recovered_docs_corpus.json\n#\ttools/semi-brain/1_extractors/output/skills_and_invariants_corpus.json\n#\ttools/semi-brain/3_datasets/train_dpo_preference.jsonl\n#\ttools/semi-brain/3_datasets/train_sft_alpaca.jsonl\n#\ttools/semi-brain/3_datasets/train_sft_sharegpt.jsonl"
+    },
+    "stat": "",
+    "files": [
+      "src/core/GLUtil.cpp",
+      "tools/semi-brain/1_extractors/output/git_commits_corpus.json",
+      "tools/semi-brain/1_extractors/output/recovered_docs_corpus.json",
+      "tools/semi-brain/1_extractors/output/skills_and_invariants_corpus.json",
+      "tools/semi-brain/3_datasets/train_dpo_preference.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_alpaca.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_sharegpt.jsonl"
+    ]
+  },
+  {
+    "hash": "7021b12782e4bd410e098a2510bf8abfd11ea5b4",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 17:22:21 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "nodes",
+      "title": "fix(nodes): reuse camera texture via glTexSubImage2D on steady-state frames (B8 Found 5)",
+      "description": "reuse camera texture via glTexSubImage2D on steady-state frames (B8 Found 5)",
+      "bullets": [],
+      "body": "VideoInNode uploaded every camera frame with glTexImage2D (full\nreallocation) instead of glTexSubImage2D. Now only reallocates on the\nfirst real frame (replacing the placeholder) or an actual size change;\nverified mHasPlaceholder is correctly cleared after the first real\nupload and mTex/mTexWidth/mTexHeight are never reset by\nClose/ReopenCamera, so steady-state frames take the sub-image path and\na device/resolution change still reallocates. Clean build verified\n(cmake --build build --target Infinite).",
+      "raw": "fix(nodes): reuse camera texture via glTexSubImage2D on steady-state frames (B8 Found 5)\n\nVideoInNode uploaded every camera frame with glTexImage2D (full\nreallocation) instead of glTexSubImage2D. Now only reallocates on the\nfirst real frame (replacing the placeholder) or an actual size change;\nverified mHasPlaceholder is correctly cleared after the first real\nupload and mTex/mTexWidth/mTexHeight are never reset by\nClose/ReopenCamera, so steady-state frames take the sub-image path and\na device/resolution change still reallocates. Clean build verified\n(cmake --build build --target Infinite)."
+    },
+    "stat": "src/nodes/VideoInNode.cpp | 18 +++++++++++++++++-\n src/nodes/VideoInNode.h   |  5 +++++\n 2 files changed, 22 insertions(+), 1 deletion(-)",
+    "files": [
+      "src/nodes/VideoInNode.cpp",
+      "src/nodes/VideoInNode.h"
+    ]
+  },
+  {
+    "hash": "81aedf95b8542f265c6ce1fb3a2734dd6b8965ec",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 17:01:44 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "linux",
+      "title": "fix(linux): honor VideoFrameAt's \"same frame\" no-op contract in TryUseCacheLocked",
+      "description": "honor VideoFrameAt's \"same frame\" no-op contract in TryUseCacheLocked",
+      "bullets": [],
+      "body": "src/platform/linux/MediaLinux.cpp's TryUseCacheLocked always copied the\ncached frame and always returned true on a cache hit, even when it was the\nexact frame already handed back last call. That breaks the contract\ndocumented on VideoFrameAt in Platform.h (\"Returns true only when that is a\nnew frame ... false leaves outPixels as they were\") which macOS's\nTryUseCache honours via CacheResult::Same/deliveredPts. On Linux this meant\nevery repeat request - the common case whenever the canvas refresh rate\nexceeds the clip's fps - did a full RGBA copy and forced the caller to\nre-upload via glTexSubImage2D on an unchanged frame.\nFix: track h->deliveredSeconds (already maintained by the caller) and\nreturn false without copying when the cache hit matches it within\nkVideoEpsilonSeconds, mirroring Platform.mm's TryUseCache line for line.\nVerified by isolating the function's logic in a standalone translation unit\nand compiling with g++ -fsyntax-only -std=c++17 (clean). NOT run through\ntools/linux/local.sh's container+Xvfb rig this session: Docker/OrbStack was\nleft un-started because the host machine was already at 83% swap usage from\nconcurrent load (see docs/plans/perf/README.md's \"Block 3 step 1\" section\nfor the full evidence and why the rest of this block's decode-drop A/B work\nis blocked on the same load this session).\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "fix(linux): honor VideoFrameAt's \"same frame\" no-op contract in TryUseCacheLocked\n\nsrc/platform/linux/MediaLinux.cpp's TryUseCacheLocked always copied the\ncached frame and always returned true on a cache hit, even when it was the\nexact frame already handed back last call. That breaks the contract\ndocumented on VideoFrameAt in Platform.h (\"Returns true only when that is a\nnew frame ... false leaves outPixels as they were\") which macOS's\nTryUseCache honours via CacheResult::Same/deliveredPts. On Linux this meant\nevery repeat request - the common case whenever the canvas refresh rate\nexceeds the clip's fps - did a full RGBA copy and forced the caller to\nre-upload via glTexSubImage2D on an unchanged frame.\n\nFix: track h->deliveredSeconds (already maintained by the caller) and\nreturn false without copying when the cache hit matches it within\nkVideoEpsilonSeconds, mirroring Platform.mm's TryUseCache line for line.\n\nVerified by isolating the function's logic in a standalone translation unit\nand compiling with g++ -fsyntax-only -std=c++17 (clean). NOT run through\ntools/linux/local.sh's container+Xvfb rig this session: Docker/OrbStack was\nleft un-started because the host machine was already at 83% swap usage from\nconcurrent load (see docs/plans/perf/README.md's \"Block 3 step 1\" section\nfor the full evidence and why the rest of this block's decode-drop A/B work\nis blocked on the same load this session).\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/plans/perf/README.md         | 64 ++++++++++++++++++++++++++++++++++++++-\n src/platform/linux/MediaLinux.cpp | 12 ++++++--\n 2 files changed, 73 insertions(+), 3 deletions(-)",
+    "files": [
+      "docs/plans/perf/README.md",
+      "src/platform/linux/MediaLinux.cpp"
+    ]
+  },
+  {
+    "hash": "47fed7f268cc3ffee9840d6bc67cdb6175eb89c4",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 16:57:39 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "perf",
+      "title": "docs(perf): Block 3 step 0 re-baseline \u2014 tail-fence confirmed off, real fails vs load confound",
+      "description": "Block 3 step 0 re-baseline \u2014 tail-fence confirmed off, real fails vs load confound",
+      "bullets": [
+        "B3 and two B8 window variants read worse than the close-out on this run;",
+        "B8 4x2160 no-window decode dropped frames on all 4 clips, worse than the",
+        "B7 rss/xruns/thermal are well inside target but the run still tags",
+        "Code read confirms the brief's step 1 first lead (loop-point reader",
+        "Code read confirms two more Found items: MediaLinux.cpp:229 always"
+      ],
+      "body": "Ran B3/B8 (genuinely focused via a tight process-frontmost loop) and a 30-min\nB7 soak on feature/perf-block3-media (worktree infinte-block3 off 9ce52a5),\nwith INFINITE_BENCH_TAILFENCE unset and the fixture's own sFencesOff gate\nconfirmed off, so none of the historical 3249e37..f9c58f5 fence inflation is\nin these numbers.\nFindings recorded, nothing fixed yet:\nattributed to real concurrent machine load (swap climbed several GB during\nthe pass, matching the README's own established \"don't trust this\" rule),\nnot a regression and not the tail-fence probe.\nclose-out's near-pass; consistent with the brief's own memory-bound\nprediction for an 8 GB machine, open item 6 stays open.\nunfocused=1 despite the focus loop running the full 30 minutes, so it\nstays unproven, matching Block 1's precedent for the same symptom.\nrewind via supportsRandomAccess + resetForReadingTimeRanges) is already\nshipped in 88787d7, predating this block, so the real 4x2160 decode-drop\ncause is something else (upload path or memory pressure), not open work.\ncopies+reports a cache hit instead of honouring the \"same frame again\"\nno-op contract, and VideoInNode.cpp:206 calls glTexImage2D (full\nrealloc) every camera frame instead of glTexSubImage2D.\nSteps 1-6 (fixes, B10 fixture, new baseline, driver.sh --full, verify-gate,\nmerge) not started this session.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
+      "raw": "docs(perf): Block 3 step 0 re-baseline \u2014 tail-fence confirmed off, real fails vs load confound\n\nRan B3/B8 (genuinely focused via a tight process-frontmost loop) and a 30-min\nB7 soak on feature/perf-block3-media (worktree infinte-block3 off 9ce52a5),\nwith INFINITE_BENCH_TAILFENCE unset and the fixture's own sFencesOff gate\nconfirmed off, so none of the historical 3249e37..f9c58f5 fence inflation is\nin these numbers.\n\nFindings recorded, nothing fixed yet:\n- B3 and two B8 window variants read worse than the close-out on this run;\n  attributed to real concurrent machine load (swap climbed several GB during\n  the pass, matching the README's own established \"don't trust this\" rule),\n  not a regression and not the tail-fence probe.\n- B8 4x2160 no-window decode dropped frames on all 4 clips, worse than the\n  close-out's near-pass; consistent with the brief's own memory-bound\n  prediction for an 8 GB machine, open item 6 stays open.\n- B7 rss/xruns/thermal are well inside target but the run still tags\n  unfocused=1 despite the focus loop running the full 30 minutes, so it\n  stays unproven, matching Block 1's precedent for the same symptom.\n- Code read confirms the brief's step 1 first lead (loop-point reader\n  rewind via supportsRandomAccess + resetForReadingTimeRanges) is already\n  shipped in 88787d7, predating this block, so the real 4x2160 decode-drop\n  cause is something else (upload path or memory pressure), not open work.\n- Code read confirms two more Found items: MediaLinux.cpp:229 always\n  copies+reports a cache hit instead of honouring the \"same frame again\"\n  no-op contract, and VideoInNode.cpp:206 calls glTexImage2D (full\n  realloc) every camera frame instead of glTexSubImage2D.\n\nSteps 1-6 (fixes, B10 fixture, new baseline, driver.sh --full, verify-gate,\nmerge) not started this session.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/plans/perf/README.md | 64 ++++++++++++++++++++++++++++++++++++++++++++++-\n 1 file changed, 63 insertions(+), 1 deletion(-)",
+    "files": [
+      "docs/plans/perf/README.md"
+    ]
+  },
+  {
+    "hash": "80138a1ffa47db59f14dcf10751bd86609366bc5",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 16:41:16 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "merge(semi-brain): v2 alive - closed learning loop, region ranking, symbol scoring",
+      "description": "merge(semi-brain): v2 alive - closed learning loop, region ranking, symbol scoring",
+      "bullets": [],
+      "body": "Block C: warm brief hook/server, outcome log, recency prior, L0 notes + MCP,\nnightly sleep retuning. Plus: 73-region main.cpp split with weighted-vote\nregion ranking (region R@1 0.20->0.3571, R@3 0.5408), live.py region hit@k,\nreal diff-derived symbol targets for 128 session-replay cases, and a stable\nlocal cache for the embedding model. File replay gates unchanged and held\nthroughout: commit gate 0.568, prompt nohub_gate 0.423.\nMerge conflict in docs/plans/perf/README.md (unrelated concurrent perf work):\nkept the newer main-branch measurement, dropped the feature branch's stale\nduplicate row for the same optimization.",
+      "raw": "merge(semi-brain): v2 alive - closed learning loop, region ranking, symbol scoring\n\nBlock C: warm brief hook/server, outcome log, recency prior, L0 notes + MCP,\nnightly sleep retuning. Plus: 73-region main.cpp split with weighted-vote\nregion ranking (region R@1 0.20->0.3571, R@3 0.5408), live.py region hit@k,\nreal diff-derived symbol targets for 128 session-replay cases, and a stable\nlocal cache for the embedding model. File replay gates unchanged and held\nthroughout: commit gate 0.568, prompt nohub_gate 0.423.\n\nMerge conflict in docs/plans/perf/README.md (unrelated concurrent perf work):\nkept the newer main-branch measurement, dropped the feature branch's stale\nduplicate row for the same optimization."
+    },
+    "stat": "",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/SKILL.md",
+      ".claude/skills/semi-brain/SKILL.md",
+      ".mcp.json",
+      "tools/semi-brain/.gitignore",
+      "tools/semi-brain/1_extractors/analyze_session_linguistics.py",
+      "tools/semi-brain/1_extractors/build_ast_graph.py",
+      "tools/semi-brain/1_extractors/build_main_cpp_regions.py",
+      "tools/semi-brain/1_extractors/index_codebase.py",
+      "tools/semi-brain/1_extractors/mine_git_history.py",
+      "tools/semi-brain/1_extractors/output/ast_symbol_graph.json",
+      "tools/semi-brain/1_extractors/output/git_commits_corpus.json",
+      "tools/semi-brain/1_extractors/output/knowledge_index.db",
+      "tools/semi-brain/1_extractors/output/main_cpp_regions.json",
+      "tools/semi-brain/1_extractors/output/recovered_docs_corpus.json",
+      "tools/semi-brain/1_extractors/output/skills_and_invariants_corpus.json",
+      "tools/semi-brain/1_extractors/parse_skills_and_rules.py",
+      "tools/semi-brain/1_extractors/recover_git_docs.py",
+      "tools/semi-brain/3_datasets/train_dpo_preference.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_alpaca.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_sharegpt.jsonl",
+      "tools/semi-brain/4_engine/brain_core.py",
+      "tools/semi-brain/4_engine/hooks/prompt_brief.py",
+      "tools/semi-brain/4_engine/install_hooks.sh",
+      "tools/semi-brain/4_engine/retriever.py",
+      "tools/semi-brain/4_engine/semi_brain_cli.py",
+      "tools/semi-brain/4_engine/sync_brain.py",
+      "tools/semi-brain/5_evals/live.py",
+      "tools/semi-brain/5_evals/replay/bench.py",
+      "tools/semi-brain/5_evals/replay/build_cases.py",
+      "tools/semi-brain/5_evals/replay/build_session_cases.py",
+      "tools/semi-brain/5_evals/replay/cases.json",
+      "tools/semi-brain/5_evals/replay/gitdata.py",
+      "tools/semi-brain/5_evals/replay/history.jsonl",
+      "tools/semi-brain/5_evals/replay/replay.py",
+      "tools/semi-brain/5_evals/replay/timeline.py",
+      "tools/semi-brain/l0/__init__.py",
+      "tools/semi-brain/l0/cli.py",
+      "tools/semi-brain/l0/mcp_server.py",
+      "tools/semi-brain/l0/store.py",
+      "tools/semi-brain/l1/__init__.py",
+      "tools/semi-brain/l1/ast_cache.py",
+      "tools/semi-brain/l1/ast_source.py",
+      "tools/semi-brain/l1/brain_watchd.py",
+      "tools/semi-brain/l1/fsevents.py",
+      "tools/semi-brain/l1/outcomes.py",
+      "tools/semi-brain/l1/outputs.py",
+      "tools/semi-brain/l1/research.py",
+      "tools/semi-brain/l1/sleep.py",
+      "tools/semi-brain/l1/sources.py",
+      "tools/semi-brain/l1/store.py",
+      "tools/semi-brain/l1/sync.py",
+      "tools/semi-brain/l1/vector_cache.py",
+      "tools/semi-brain/l2/__init__.py",
+      "tools/semi-brain/l2/compartments.py",
+      "tools/semi-brain/l3/__init__.py",
+      "tools/semi-brain/l3/network.py",
+      "tools/semi-brain/l3/recent.py",
+      "tools/semi-brain/l3/weights.py",
+      "tools/semi-brain/l4/__init__.py",
+      "tools/semi-brain/l4/clusters.py",
+      "tools/semi-brain/l4/louvain.py",
+      "tools/semi-brain/l4/regions.py",
+      "tools/semi-brain/l5/__init__.py",
+      "tools/semi-brain/l5/brief.py",
+      "tools/semi-brain/l5/serve.py"
+    ]
+  },
+  {
+    "hash": "6683f062b2b8738d0542a78102e406582dc799de",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 16:30:48 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "semi-brain",
+      "title": "docs(semi-brain): document weighted-vote region ranking and the watchd bench-pause gotcha",
+      "description": "document weighted-vote region ranking and the watchd bench-pause gotcha",
+      "bullets": [],
+      "body": "Region R@1 0.20 baseline -> 0.34 contiguous split -> 0.36 weighted-vote ranking, R@3 0.54.\nAlso notes where the fastembed cache now lives and how to recover a watchd daemon that didn't\nresume after a bench paused it (briefs.jsonl stops growing while outcomes.jsonl keeps syncing).",
+      "raw": "docs(semi-brain): document weighted-vote region ranking and the watchd bench-pause gotcha\n\nRegion R@1 0.20 baseline -> 0.34 contiguous split -> 0.36 weighted-vote ranking, R@3 0.54.\nAlso notes where the fastembed cache now lives and how to recover a watchd daemon that didn't\nresume after a bench paused it (briefs.jsonl stops growing while outcomes.jsonl keeps syncing)."
+    },
+    "stat": ".claude/skills/semi-brain/SKILL.md | 48 +++++++++++++++++++++++++-------------\n 1 file changed, 32 insertions(+), 16 deletions(-)",
+    "files": [
+      ".claude/skills/semi-brain/SKILL.md"
+    ]
+  },
+  {
+    "hash": "c497a1d6a4b1e72908d11c20e89e214b357c5387",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 16:24:12 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "semi-brain",
+      "title": "feat(semi-brain): live per-region hit@k, and a stable local cache for the embedding model",
+      "description": "live per-region hit@k, and a stable local cache for the embedding model",
+      "bullets": [],
+      "body": "live.py now scores region hit@1/hit@2 by diffing the commits of turns that touched main.cpp\nand joining against the brief's logged main_regions - only turns that actually committed are\nscorable, since outcomes.jsonl has no line-level record for uncommitted edits.\nfastembed defaulted to tempfile.gettempdir()/fastembed_cache, which macOS can sweep between\nruns and force a re-download; VectorCache now points it at l1/state/fastembed_cache (gitignored,\nnever pushed). Moved the existing 64MB cache there directly - no new download.",
+      "raw": "feat(semi-brain): live per-region hit@k, and a stable local cache for the embedding model\n\nlive.py now scores region hit@1/hit@2 by diffing the commits of turns that touched main.cpp\nand joining against the brief's logged main_regions - only turns that actually committed are\nscorable, since outcomes.jsonl has no line-level record for uncommitted edits.\n\nfastembed defaulted to tempfile.gettempdir()/fastembed_cache, which macOS can sweep between\nruns and force a re-download; VectorCache now points it at l1/state/fastembed_cache (gitignored,\nnever pushed). Moved the existing 64MB cache there directly - no new download."
+    },
+    "stat": "tools/semi-brain/5_evals/live.py    | 39 ++++++++++++++++++++++++++++++++++++-\n tools/semi-brain/l1/vector_cache.py |  6 +++++-\n 2 files changed, 43 insertions(+), 2 deletions(-)",
+    "files": [
+      "tools/semi-brain/5_evals/live.py",
+      "tools/semi-brain/l1/vector_cache.py"
+    ]
+  },
+  {
+    "hash": "eae8f5b6f7abaca894fff4a782189ad25e374145",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 16:24:05 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "semi-brain",
+      "title": "feat(semi-brain): derive real target symbols for prompt-replay cases that committed",
+      "description": "derive real target symbols for prompt-replay cases that committed",
+      "bullets": [],
+      "body": "build_session_cases.py reuses build_cases.target_symbols (innermost function/class touched by\na diff) against the diff from each turn's parent commit to its own last commit, for the 128 of\n501 session cases whose turn actually committed - the rest have no line-level record in\noutcomes.jsonl and keep target_symbols=[]. replay.py's symbol MRR/R@10 for sessions stays\nadditive (summarize(..., symbols_gate=False)): session gate held at 0.7857, nohub_gate at 0.423.",
+      "raw": "feat(semi-brain): derive real target symbols for prompt-replay cases that committed\n\nbuild_session_cases.py reuses build_cases.target_symbols (innermost function/class touched by\na diff) against the diff from each turn's parent commit to its own last commit, for the 128 of\n501 session cases whose turn actually committed - the rest have no line-level record in\noutcomes.jsonl and keep target_symbols=[]. replay.py's symbol MRR/R@10 for sessions stays\nadditive (summarize(..., symbols_gate=False)): session gate held at 0.7857, nohub_gate at 0.423."
+    },
+    "stat": ".../5_evals/replay/build_session_cases.py          | 39 +++++++++++++++++++---\n 1 file changed, 35 insertions(+), 4 deletions(-)",
+    "files": [
+      "tools/semi-brain/5_evals/replay/build_session_cases.py"
+    ]
+  },
+  {
+    "hash": "a5285a052072e5050a5b70fd041caf9a2348e8d1",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 16:23:58 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "semi-brain",
+      "title": "feat(semi-brain): rank main.cpp regions by weighted symbol vote, not just the first hit",
+      "description": "rank main.cpp regions by weighted symbol vote, not just the first hit",
+      "bullets": [],
+      "body": "Regions.rank_regions scores every predicted symbol's region by 1/(rank+1) and sums, so\nseveral agreeing lower-ranked symbols can outrank one stray higher-ranked one. Used by both\nthe brief (top-2 regions shown, with ids logged to briefs.jsonl for live.py) and replay's\nregion_hit, which now reports region R@1 and R@3 instead of a single hit rate.\nCommit-case replay: gate 0.568 (held), nohub_gate 0.6963 (held), region R@1 0.3367 -> 0.3571,\nregion R@3 0.5408. Session-case replay: gate 0.7857 (held), nohub_gate 0.423 (held).",
+      "raw": "feat(semi-brain): rank main.cpp regions by weighted symbol vote, not just the first hit\n\nRegions.rank_regions scores every predicted symbol's region by 1/(rank+1) and sums, so\nseveral agreeing lower-ranked symbols can outrank one stray higher-ranked one. Used by both\nthe brief (top-2 regions shown, with ids logged to briefs.jsonl for live.py) and replay's\nregion_hit, which now reports region R@1 and R@3 instead of a single hit rate.\n\nCommit-case replay: gate 0.568 (held), nohub_gate 0.6963 (held), region R@1 0.3367 -> 0.3571,\nregion R@3 0.5408. Session-case replay: gate 0.7857 (held), nohub_gate 0.423 (held)."
+    },
+    "stat": "tools/semi-brain/5_evals/replay/history.jsonl |  2 ++\n tools/semi-brain/5_evals/replay/replay.py     | 40 +++++++++++++++++----------\n tools/semi-brain/l4/regions.py                | 13 +++++++++\n tools/semi-brain/l5/brief.py                  | 26 +++++++++--------\n tools/semi-brain/l5/serve.py                  |  4 ++-\n 5 files changed, 57 insertions(+), 28 deletions(-)",
+    "files": [
+      "tools/semi-brain/5_evals/replay/history.jsonl",
+      "tools/semi-brain/5_evals/replay/replay.py",
+      "tools/semi-brain/l4/regions.py",
+      "tools/semi-brain/l5/brief.py",
+      "tools/semi-brain/l5/serve.py"
+    ]
+  },
+  {
+    "hash": "d15c72acaf9109d6c6fc74ce35551666912b176e",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 15:55:20 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "semi-brain",
+      "title": "fix(semi-brain): regions v2 - contiguous non-overlapping cuts, whole-file coverage",
+      "description": "regions v2 - contiguous non-overlapping cuts, whole-file coverage",
+      "bullets": [],
+      "body": "v1 clustered main.cpp symbols into communities and took each cluster's min/max\nline as its \"region\" - communities aren't contiguous, so 68/80 regions\noverlapped and the split stopped 12k lines short of EOF. This walks the file\ntop to bottom instead: cuts only ever land between adjacent symbols (banners\nfirst, then the weakest co-edit/call/name-family link, capped at ~3000 lines),\nso every region is one real, non-overlapping slice. Nested symbols (a class\nand its own methods) are collapsed to one root before cutting so end lines\nnever jump backward; a handful of top-level functions bigger than the cap on\ntheir own (RegisterNodes: ~42k lines of macro calls, no internal structure)\nare chunked by line count, the same fallback used for stretches with no\nsymbols at all.\n73 regions, 0 overlaps, covers L1-95768, max span 2972. Replay: commit gate\nholds at 0.568, prompt nohub holds at 0.423, region_hit rises 0.20 -> 0.34\n(full) / 0.26 (subject).",
+      "raw": "fix(semi-brain): regions v2 - contiguous non-overlapping cuts, whole-file coverage\n\nv1 clustered main.cpp symbols into communities and took each cluster's min/max\nline as its \"region\" - communities aren't contiguous, so 68/80 regions\noverlapped and the split stopped 12k lines short of EOF. This walks the file\ntop to bottom instead: cuts only ever land between adjacent symbols (banners\nfirst, then the weakest co-edit/call/name-family link, capped at ~3000 lines),\nso every region is one real, non-overlapping slice. Nested symbols (a class\nand its own methods) are collapsed to one root before cutting so end lines\nnever jump backward; a handful of top-level functions bigger than the cap on\ntheir own (RegisterNodes: ~42k lines of macro calls, no internal structure)\nare chunked by line count, the same fallback used for stretches with no\nsymbols at all.\n\n73 regions, 0 overlaps, covers L1-95768, max span 2972. Replay: commit gate\nholds at 0.568, prompt nohub holds at 0.423, region_hit rises 0.20 -> 0.34\n(full) / 0.26 (subject)."
+    },
+    "stat": ".../1_extractors/build_main_cpp_regions.py         |  526 +--\n .../1_extractors/output/main_cpp_regions.json      | 3722 +++++++++-----------\n tools/semi-brain/5_evals/replay/history.jsonl      |    2 +\n 3 files changed, 2013 insertions(+), 2237 deletions(-)",
+    "files": [
+      "tools/semi-brain/1_extractors/build_main_cpp_regions.py",
+      "tools/semi-brain/1_extractors/output/main_cpp_regions.json",
+      "tools/semi-brain/5_evals/replay/history.jsonl"
+    ]
+  },
+  {
+    "hash": "9ce52a501c6e71a818703172f3213d92012976c2",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 15:39:24 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/perf-block2-closeout: Block 2 close-out",
+      "description": "Merge feature/perf-block2-closeout: Block 2 close-out",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/perf-block2-closeout: Block 2 close-out"
+    },
+    "stat": "",
+    "files": [
+      "docs/plans/perf/README.md",
+      "src/core/BenchFrameTail.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "9d4d13a88788bc63e778fdc6aa742585994b79a8",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 15:38:54 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "perf",
+      "title": "docs(perf): Block 2 close-out steps 2-4 - B8 heavy, B3 trusted pass, state and scoreboard",
+      "description": "Block 2 close-out steps 2-4 - B8 heavy, B3 trusted pass, state and scoreboard",
+      "bullets": [],
+      "body": "",
+      "raw": "docs(perf): Block 2 close-out steps 2-4 - B8 heavy, B3 trusted pass, state and scoreboard"
+    },
+    "stat": "docs/plans/perf/README.md | 20 ++++++++++++++------\n 1 file changed, 14 insertions(+), 6 deletions(-)",
+    "files": [
+      "docs/plans/perf/README.md"
+    ]
+  },
+  {
+    "hash": "f9c58f5894fe64886c3e491b5d5e6f2df3e9afd2",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 15:38:27 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "bench",
+      "title": "fix(bench): B3 slow-frame checkpoints; GPU-done fences opt-in",
+      "description": "B3 slow-frame checkpoints; GPU-done fences opt-in",
+      "bullets": [],
+      "body": "Checkpoints split each frame from wait end to wait start with nothing\nuntimed. They showed ~9.6 ms every frame between the canvas swap and the\nprojector render: the Tail fence's glFlush right after an interval-0 swap\nblocks on macOS. With it the probe turned B3 from 0% missed vsync into\n1.6-13.8%. The fences are now opt-in (INFINITE_BENCH_TAILFENCE=1).",
+      "raw": "fix(bench): B3 slow-frame checkpoints; GPU-done fences opt-in\n\nCheckpoints split each frame from wait end to wait start with nothing\nuntimed. They showed ~9.6 ms every frame between the canvas swap and the\nprojector render: the Tail fence's glFlush right after an interval-0 swap\nblocks on macOS. With it the probe turned B3 from 0% missed vsync into\n1.6-13.8%. The fences are now opt-in (INFINITE_BENCH_TAILFENCE=1)."
+    },
+    "stat": "src/core/BenchFrameTail.h | 38 +++++++++++++++++++++++++++++++++++++-\n src/main.cpp              | 22 ++++++++++++++++++++--\n 2 files changed, 57 insertions(+), 3 deletions(-)",
+    "files": [
+      "src/core/BenchFrameTail.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "5bb165d357e4925da410b4b8f41face5e60761fc",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 15:20:29 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "semi-brain",
+      "title": "feat(semi-brain): virtual split of main.cpp into ~80 regions",
+      "description": "virtual split of main.cpp into ~80 regions",
+      "bullets": [],
+      "body": "l4/regions.py + 1_extractors/build_main_cpp_regions.py cluster main.cpp's\ntop-level symbols into regions using co-edit history, the call graph\n(hub callees suppressed so generic helpers don't glue Draw*Body functions\ntogether), name families, `// ====` banners, and a strong file-order\nproximity chain that keeps regions readable line ranges instead of\nscattered whole-file grab-bags (median span ~580 lines, only 5/80 forced\nover the 6000-line cap by the merge fallback). Shared Louvain step\nextracted from clusters.py into l4/louvain.py.\nWired in: a brief's Files line shows `main.cpp@region L{start}-{end}`\ninstead of the bare path (l5/brief.py); `semi_brain_cli.py --regions`\nprints the ~2k-char table of contents; replay.py scores region_hit\n(additive, not part of gate/nohub_gate) - whether the best-ranked\nmain.cpp symbol lands in the same region as the target, catching\n\"right file, wrong 30k lines\" that file MRR can't see. Baseline on the\n181-commit replay: 0.20.\nBoth replay gates hold exactly at the last kept scorecard (gate\n0.568/0.7857, nohub_gate 0.6963/0.423) - additive only, no ranking change.",
+      "raw": "feat(semi-brain): virtual split of main.cpp into ~80 regions\n\nl4/regions.py + 1_extractors/build_main_cpp_regions.py cluster main.cpp's\ntop-level symbols into regions using co-edit history, the call graph\n(hub callees suppressed so generic helpers don't glue Draw*Body functions\ntogether), name families, `// ====` banners, and a strong file-order\nproximity chain that keeps regions readable line ranges instead of\nscattered whole-file grab-bags (median span ~580 lines, only 5/80 forced\nover the 6000-line cap by the merge fallback). Shared Louvain step\nextracted from clusters.py into l4/louvain.py.\n\nWired in: a brief's Files line shows `main.cpp@region L{start}-{end}`\ninstead of the bare path (l5/brief.py); `semi_brain_cli.py --regions`\nprints the ~2k-char table of contents; replay.py scores region_hit\n(additive, not part of gate/nohub_gate) - whether the best-ranked\nmain.cpp symbol lands in the same region as the target, catching\n\"right file, wrong 30k lines\" that file MRR can't see. Baseline on the\n181-commit replay: 0.20.\n\nBoth replay gates hold exactly at the last kept scorecard (gate\n0.568/0.7857, nohub_gate 0.6963/0.423) - additive only, no ranking change."
+    },
+    "stat": ".claude/skills/semi-brain/SKILL.md                 |   13 +\n .../1_extractors/build_main_cpp_regions.py         |  379 ++++\n .../1_extractors/output/main_cpp_regions.json      | 2352 ++++++++++++++++++++\n tools/semi-brain/4_engine/brain_core.py            |    8 +\n tools/semi-brain/4_engine/semi_brain_cli.py        |   12 +-\n tools/semi-brain/5_evals/replay/history.jsonl      |    3 +\n tools/semi-brain/5_evals/replay/replay.py          |   30 +-\n tools/semi-brain/l4/clusters.py                    |   35 +-\n tools/semi-brain/l4/louvain.py                     |   39 +\n tools/semi-brain/l4/regions.py                     |   68 +\n tools/semi-brain/l5/brief.py                       |   20 +-\n 11 files changed, 2921 insertions(+), 38 deletions(-)\n create mode 100644 tools/semi-brain/1_extractors/build_main_cpp_regions.py\n create mode 100644 tools/semi-brain/1_extractors/output/main_cpp_regions.json\n create mode 100644 tools/semi-brain/l4/louvain.py\n create mode 100644 tools/semi-brain/l4/regions.py",
+    "files": [
+      ".claude/skills/semi-brain/SKILL.md",
+      "tools/semi-brain/1_extractors/build_main_cpp_regions.py",
+      "tools/semi-brain/1_extractors/output/main_cpp_regions.json",
+      "tools/semi-brain/4_engine/brain_core.py",
+      "tools/semi-brain/4_engine/semi_brain_cli.py",
+      "tools/semi-brain/5_evals/replay/history.jsonl",
+      "tools/semi-brain/5_evals/replay/replay.py",
+      "tools/semi-brain/l4/clusters.py",
+      "tools/semi-brain/l4/louvain.py",
+      "tools/semi-brain/l4/regions.py",
+      "tools/semi-brain/l5/brief.py"
+    ]
+  },
+  {
+    "hash": "9c250479e987c6ed993c2b12e1c9fc8b743cf26e",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 15:02:06 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "semi-brain",
+      "title": "feat(semi-brain): C4 nightly sleep retunes weights, gated by replay",
+      "description": "C4 nightly sleep retunes weights, gated by replay",
+      "bullets": [],
+      "body": "l1/sleep.py runs nightly via launchd, retunes l3/weights.py against\nthe session replay (even cases pick, odd cases confirm, with-main.cpp\nscore must not drop), credits L0 notes from real edits, and writes\nlook-here proposals for the owner to approve/reject. Skips itself\nwhile Infinite or the daemon is running.\nBoth replay gates (commits and sessions) hold at the last kept\nscorecard: gate 0.568/0.7857, nohub_gate 0.6963/0.423.",
+      "raw": "feat(semi-brain): C4 nightly sleep retunes weights, gated by replay\n\nl1/sleep.py runs nightly via launchd, retunes l3/weights.py against\nthe session replay (even cases pick, odd cases confirm, with-main.cpp\nscore must not drop), credits L0 notes from real edits, and writes\nlook-here proposals for the owner to approve/reject. Skips itself\nwhile Infinite or the daemon is running.\n\nBoth replay gates (commits and sessions) hold at the last kept\nscorecard: gate 0.568/0.7857, nohub_gate 0.6963/0.423."
+    },
+    "stat": ".claude/skills/semi-brain/SKILL.md                 |     59 +-\n .../1_extractors/output/ast_symbol_graph.json      | 235052 ++++++++++--------\n .../1_extractors/output/git_commits_corpus.json    |  18508 +-\n .../1_extractors/output/knowledge_index.db         |    Bin 25616384 -> 33603584 bytes\n .../1_extractors/output/recovered_docs_corpus.json |    532 +-\n .../output/skills_and_invariants_corpus.json       |    406 +-\n .../3_datasets/train_dpo_preference.jsonl          |     16 +\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl |    364 +-\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl |    364 +-\n tools/semi-brain/4_engine/brain_core.py            |     16 +-\n tools/semi-brain/4_engine/install_hooks.sh         |     48 +-\n tools/semi-brain/5_evals/replay/history.jsonl      |      2 +\n tools/semi-brain/5_evals/replay/replay.py          |     74 +-\n tools/semi-brain/l1/sleep.py                       |    296 +\n tools/semi-brain/l3/recent.py                      |      4 +-\n tools/semi-brain/l3/weights.py                     |     28 +\n 16 files changed, 151517 insertions(+), 104252 deletions(-)\n create mode 100644 tools/semi-brain/l1/sleep.py\n create mode 100644 tools/semi-brain/l3/weights.py",
+    "files": [
+      ".claude/skills/semi-brain/SKILL.md",
+      "tools/semi-brain/1_extractors/output/ast_symbol_graph.json",
+      "tools/semi-brain/1_extractors/output/git_commits_corpus.json",
+      "tools/semi-brain/1_extractors/output/knowledge_index.db",
+      "tools/semi-brain/1_extractors/output/recovered_docs_corpus.json",
+      "tools/semi-brain/1_extractors/output/skills_and_invariants_corpus.json",
+      "tools/semi-brain/3_datasets/train_dpo_preference.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_alpaca.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_sharegpt.jsonl",
+      "tools/semi-brain/4_engine/brain_core.py",
+      "tools/semi-brain/4_engine/install_hooks.sh",
+      "tools/semi-brain/5_evals/replay/history.jsonl",
+      "tools/semi-brain/5_evals/replay/replay.py",
+      "tools/semi-brain/l1/sleep.py",
+      "tools/semi-brain/l3/recent.py",
+      "tools/semi-brain/l3/weights.py"
+    ]
+  },
+  {
+    "hash": "1058b5e1b0847c8f0409387db6fe33a5c22c1492",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 14:42:25 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "semi-brain",
+      "title": "fix(semi-brain): hook fallback syncs the main checkout's brain, never a pre-v2 one",
+      "description": "hook fallback syncs the main checkout's brain, never a pre-v2 one",
+      "bullets": [],
+      "body": "With the daemon paused, a commit in another worktree ran that worktree's\nsync_brain.py; on a branch without the v2 brain that is the legacy full\nrebuild (over an hour of CPU, under benchmarks). The fallback now runs in the\nmain checkout and only when it has the incremental sync (l1/sync.py).",
+      "raw": "fix(semi-brain): hook fallback syncs the main checkout's brain, never a pre-v2 one\n\nWith the daemon paused, a commit in another worktree ran that worktree's\nsync_brain.py; on a branch without the v2 brain that is the legacy full\nrebuild (over an hour of CPU, under benchmarks). The fallback now runs in the\nmain checkout and only when it has the incremental sync (l1/sync.py)."
+    },
+    "stat": "tools/semi-brain/4_engine/install_hooks.sh | 8 +++++++-\n 1 file changed, 7 insertions(+), 1 deletion(-)",
+    "files": [
+      "tools/semi-brain/4_engine/install_hooks.sh"
+    ]
+  },
+  {
+    "hash": "ed77cb5c28c1d9d52d5e148f092d63ffbd7f7a00",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 14:42:10 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "mcp",
+      "title": "chore(mcp): register the semi-brain MCP server (tools/semi-brain/l0/mcp_server.py)",
+      "description": "register the semi-brain MCP server (tools/semi-brain/l0/mcp_server.py)",
+      "bullets": [],
+      "body": "",
+      "raw": "chore(mcp): register the semi-brain MCP server (tools/semi-brain/l0/mcp_server.py)"
+    },
+    "stat": ".mcp.json | 9 ++++++++-\n 1 file changed, 8 insertions(+), 1 deletion(-)",
+    "files": [
+      ".mcp.json"
+    ]
+  },
+  {
+    "hash": "4119ff48d17d97e45fc0c9a5250e2968ec43f0c9",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 14:42:10 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "semi-brain",
+      "title": "feat(semi-brain): C5 L0 notes - assert channel, CLI and MCP server",
+      "description": "C5 L0 notes - assert channel, CLI and MCP server",
+      "bullets": [],
+      "body": "l0/store.py: an append-only note log (l1/state/l0.jsonl, local only) of\nfacts, decisions, rejected alternatives, open questions and hints, each with\nevidence checked against the repo and a trust tier (owner > verified >\nclaude). Weight = Beta reliability per (region, kind) x calibrated\nconfidence x tier x decay, capped at 0.6; repeats and retrievals never add\nweight. Matching notes join the file ranking as one capped RRF list and show\nas Note lines in the brief; the server logs which notes each brief showed.\nl0/cli.py (assert/recall/list/retract/approve) and l0/mcp_server.py\n(stdlib stdio MCP: brain_brief, brain_recall, brain_assert, brain_retract;\nnever owner tier).\nReplay unchanged (L0 empty, notes cut at the case time): sessions 0.7857,\nnohub 0.423.",
+      "raw": "feat(semi-brain): C5 L0 notes - assert channel, CLI and MCP server\n\nl0/store.py: an append-only note log (l1/state/l0.jsonl, local only) of\nfacts, decisions, rejected alternatives, open questions and hints, each with\nevidence checked against the repo and a trust tier (owner > verified >\nclaude). Weight = Beta reliability per (region, kind) x calibrated\nconfidence x tier x decay, capped at 0.6; repeats and retrievals never add\nweight. Matching notes join the file ranking as one capped RRF list and show\nas Note lines in the brief; the server logs which notes each brief showed.\n\nl0/cli.py (assert/recall/list/retract/approve) and l0/mcp_server.py\n(stdlib stdio MCP: brain_brief, brain_recall, brain_assert, brain_retract;\nnever owner tier).\n\nReplay unchanged (L0 empty, notes cut at the case time): sessions 0.7857,\nnohub 0.423."
+    },
+    "stat": "tools/semi-brain/4_engine/brain_core.py |  20 ++-\n tools/semi-brain/l0/__init__.py         |   4 +\n tools/semi-brain/l0/cli.py              |  83 +++++++++++\n tools/semi-brain/l0/mcp_server.py       | 138 ++++++++++++++++++\n tools/semi-brain/l0/store.py            | 251 ++++++++++++++++++++++++++++++++\n tools/semi-brain/l5/brief.py            |   9 +-\n tools/semi-brain/l5/serve.py            |   6 +-\n 7 files changed, 503 insertions(+), 8 deletions(-)\n create mode 100644 tools/semi-brain/l0/__init__.py\n create mode 100644 tools/semi-brain/l0/cli.py\n create mode 100644 tools/semi-brain/l0/mcp_server.py\n create mode 100644 tools/semi-brain/l0/store.py",
+    "files": [
+      "tools/semi-brain/4_engine/brain_core.py",
+      "tools/semi-brain/l0/__init__.py",
+      "tools/semi-brain/l0/cli.py",
+      "tools/semi-brain/l0/mcp_server.py",
+      "tools/semi-brain/l0/store.py",
+      "tools/semi-brain/l5/brief.py",
+      "tools/semi-brain/l5/serve.py"
+    ]
+  },
+  {
+    "hash": "19de37dcb536452443c38a6d9abca810e986fcc0",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 14:36:24 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "perf",
+      "title": "docs(perf): Block 2 close-out step 1 - skipped checks run on 6be9e9b..93ba4e0",
+      "description": "Block 2 close-out step 1 - skipped checks run on 6be9e9b..93ba4e0",
+      "bullets": [],
+      "body": "",
+      "raw": "docs(perf): Block 2 close-out step 1 - skipped checks run on 6be9e9b..93ba4e0"
+    },
+    "stat": "docs/plans/perf/README.md | 15 ++++++++++++++-\n 1 file changed, 14 insertions(+), 1 deletion(-)",
+    "files": [
+      "docs/plans/perf/README.md"
+    ]
+  },
+  {
+    "hash": "93ba4e0fac07ad2521fb77dcaad6b7d8183afbb3",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 14:04:44 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/perf-block2-pacing: Block 2 projector + canvas pacing",
+      "description": "Merge feature/perf-block2-pacing: Block 2 projector + canvas pacing",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/perf-block2-pacing: Block 2 projector + canvas pacing"
+    },
+    "stat": "",
+    "files": [
+      "docs/plans/perf/README.md",
+      "scripts/bench/display_refresh.m",
+      "src/audio/dsp/AudioFilterKernel.h",
+      "src/core/BenchFrameTail.h",
+      "src/core/BenchReport.cpp",
+      "src/core/BenchReport.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "9426303643c4274a421a7c08779b639edc93fe2a",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 12:37:42 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "perf",
+      "title": "docs(perf): Block 2 results - where we stand, open items 2-5, scoreboard rows",
+      "description": "Block 2 results - where we stand, open items 2-5, scoreboard rows",
+      "bullets": [],
+      "body": "",
+      "raw": "docs(perf): Block 2 results - where we stand, open items 2-5, scoreboard rows"
+    },
+    "stat": "docs/plans/perf/README.md | 22 ++++++++++++++--------\n 1 file changed, 14 insertions(+), 8 deletions(-)",
+    "files": [
+      "docs/plans/perf/README.md"
+    ]
+  },
+  {
+    "hash": "5550a2038ca5f42ef7cf0665e27c7753b8d4792a",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 12:35:39 2026 +0530",
+    "parsed_message": {
+      "type": "perf",
+      "scope": "projector",
+      "title": "perf(projector): step 3a - render projectors before the frame-clock wait, swap after",
+      "description": "step 3a - render projectors before the frame-clock wait, swap after",
+      "bullets": [],
+      "body": "B3 A/B vs 6fd5fa3 (1 pair, auto gate): projector p99 33.1 -> 18.4 ms,\nmissed vsync 1.59% -> 0.88%, slow frames 9 -> 5, input-to-photon 1 frame.",
+      "raw": "perf(projector): step 3a - render projectors before the frame-clock wait, swap after\n\nB3 A/B vs 6fd5fa3 (1 pair, auto gate): projector p99 33.1 -> 18.4 ms,\nmissed vsync 1.59% -> 0.88%, slow frames 9 -> 5, input-to-photon 1 frame."
+    },
+    "stat": "src/main.cpp | 42 +++++++++++++++++++++++++++++++++++-------\n 1 file changed, 35 insertions(+), 7 deletions(-)",
+    "files": [
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "6fd5fa3f30a635cea88240137b4bdaee2c070d89",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 12:27:15 2026 +0530",
+    "parsed_message": {
+      "type": "perf",
+      "scope": "filter",
+      "title": "perf(filter): closed-form Audio Filter response instead of a settled-sine simulation (Block 2 step 3c)",
+      "description": "closed-form Audio Filter response instead of a settled-sine simulation (Block 2 step 3c)",
+      "bullets": [],
+      "body": "Step 1 named the B3 projector tail: modulated Audio Filter nodes\nrecomputed their response curve on the main thread, and\nAudioFilterDsp::MagnitudeDb ran up to 8000 samples of a sine through a\nscratch filter per point (up to ~15 ms per 160-point curve). Frames\nwhere those recomputes landed missed the refresh.\nBoth primitives are linear and time-invariant, so MagnitudeDb now\nevaluates the transfer function of the same scratch instance: the TPT\nSVF as the bilinear transform of the analog SVF using its own g and k\n(LP 1/(1 - W^2 + jkW), HP W^2 times that, one factor per stage), and\nthe biquad from its own coefficients at z = e^(jw). The comb path was\nalready closed form. It is still the one definition the DSP fixture\ncompares the running kernel against: DSPTEST filter magnitude cases\nall pass (LP24 stopband now -76.27 dB analytic against -76.27 dB\nmeasured, was -76.29), and FILTERCURVECACHETEST passes.\nB3 scale=s buf 256, ab.sh vs main, 1 pair (auto stop at |change| >=\n30%), both runs unfocused because another app took the foreground:\nprojector p99 34.27 -> 18.05 ms, missed vsync 11.64% -> 0.53%,\njitter 35.0 -> 1.2 ms, input-to-photon 1 -> 1 frame, xruns 0 -> 0.\nSlow frames 3 of 567, and one of them is the focus-loss frame.",
+      "raw": "perf(filter): closed-form Audio Filter response instead of a settled-sine simulation (Block 2 step 3c)\n\nStep 1 named the B3 projector tail: modulated Audio Filter nodes\nrecomputed their response curve on the main thread, and\nAudioFilterDsp::MagnitudeDb ran up to 8000 samples of a sine through a\nscratch filter per point (up to ~15 ms per 160-point curve). Frames\nwhere those recomputes landed missed the refresh.\n\nBoth primitives are linear and time-invariant, so MagnitudeDb now\nevaluates the transfer function of the same scratch instance: the TPT\nSVF as the bilinear transform of the analog SVF using its own g and k\n(LP 1/(1 - W^2 + jkW), HP W^2 times that, one factor per stage), and\nthe biquad from its own coefficients at z = e^(jw). The comb path was\nalready closed form. It is still the one definition the DSP fixture\ncompares the running kernel against: DSPTEST filter magnitude cases\nall pass (LP24 stopband now -76.27 dB analytic against -76.27 dB\nmeasured, was -76.29), and FILTERCURVECACHETEST passes.\n\nB3 scale=s buf 256, ab.sh vs main, 1 pair (auto stop at |change| >=\n30%), both runs unfocused because another app took the foreground:\nprojector p99 34.27 -> 18.05 ms, missed vsync 11.64% -> 0.53%,\njitter 35.0 -> 1.2 ms, input-to-photon 1 -> 1 frame, xruns 0 -> 0.\nSlow frames 3 of 567, and one of them is the focus-loss frame."
+    },
+    "stat": "src/audio/dsp/AudioFilterKernel.h | 103 +++++++++++++-------------------------\n src/main.cpp                      |  27 ++++------\n 2 files changed, 47 insertions(+), 83 deletions(-)",
+    "files": [
+      "src/audio/dsp/AudioFilterKernel.h",
+      "src/main.cpp"
+    ]
+  },
+  {
     "hash": "e18ce27cf092cc5c30f2fc6dffa9a9e8b0bf9988",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
@@ -22,6 +746,48 @@
       "tools/semi-brain/5_evals/replay/replay.py",
       "tools/semi-brain/l3/recent.py",
       "tools/semi-brain/l5/serve.py"
+    ]
+  },
+  {
+    "hash": "951d22cbd20335d44061781d6288f99b98e73bd4",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 12:18:13 2026 +0530",
+    "parsed_message": {
+      "type": "perf",
+      "scope": "pacing",
+      "title": "perf(pacing): one frame clock paces the canvas-only loop too (Block 2 step 2b)",
+      "description": "one frame clock paces the canvas-only loop too (Block 2 step 2b)",
+      "bullets": [],
+      "body": "Diagnosis (scripts/bench/display_refresh.m, this M2 Air): the display\nreally is 60 Hz - glfwGetVideoMode 60, maximumFramesPerSecond 60,\nCVDisplayLink nominal 16.666 ms / actual 16.667 ms, 60 ticks per second.\nThe reference rate was right (not 2a); the canvas's blocking swap at\ninterval 1 returned on a 120 Hz grid (frame p50 8.33 ms, swap 3-6 ms), so\nB6 vsync=1 was never on vsync.\nFrameClockActive replaces ProjectorPacingActive: unless an export runs,\nthe loop waits once per frame on a display refresh clock (the primary\nOutput's with a projector open, else the canvas window's when Vsync is\non) at the same place as before, after the canvas swap, and every context\nswaps at interval 0. Vsync off with no projector, and gOfflineRender /\ngArrangeWavRender, stay unpaced; the Target FPS limiter keys off the same\npredicate. ApplyCanvasSwapInterval still runs at the top of every frame.\nB6 n=300 pan vsync=1, ab.sh vs main (visible): base unpaced=1,\non_vsync_frac 0.00, pan p50 8.25 / p95 11.63 ms; branch trusted,\non_vsync_frac 1.00, pan p50 16.67 / p95 16.82 ms (target <= 17.2 / 22.8).",
+      "raw": "perf(pacing): one frame clock paces the canvas-only loop too (Block 2 step 2b)\n\nDiagnosis (scripts/bench/display_refresh.m, this M2 Air): the display\nreally is 60 Hz - glfwGetVideoMode 60, maximumFramesPerSecond 60,\nCVDisplayLink nominal 16.666 ms / actual 16.667 ms, 60 ticks per second.\nThe reference rate was right (not 2a); the canvas's blocking swap at\ninterval 1 returned on a 120 Hz grid (frame p50 8.33 ms, swap 3-6 ms), so\nB6 vsync=1 was never on vsync.\n\nFrameClockActive replaces ProjectorPacingActive: unless an export runs,\nthe loop waits once per frame on a display refresh clock (the primary\nOutput's with a projector open, else the canvas window's when Vsync is\non) at the same place as before, after the canvas swap, and every context\nswaps at interval 0. Vsync off with no projector, and gOfflineRender /\ngArrangeWavRender, stay unpaced; the Target FPS limiter keys off the same\npredicate. ApplyCanvasSwapInterval still runs at the top of every frame.\n\nB6 n=300 pan vsync=1, ab.sh vs main (visible): base unpaced=1,\non_vsync_frac 0.00, pan p50 8.25 / p95 11.63 ms; branch trusted,\non_vsync_frac 1.00, pan p50 16.67 / p95 16.82 ms (target <= 17.2 / 22.8)."
+    },
+    "stat": "scripts/bench/display_refresh.m | 51 ++++++++++++++++++++++++++++++\n src/main.cpp                    | 70 ++++++++++++++++++++++++-----------------\n 2 files changed, 92 insertions(+), 29 deletions(-)\n create mode 100644 scripts/bench/display_refresh.m",
+    "files": [
+      "scripts/bench/display_refresh.m",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "3249e37d47b7bffe664ada3b57c16d101198dfb9",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 12:06:42 2026 +0530",
+    "parsed_message": {
+      "type": "perf",
+      "scope": "bench",
+      "title": "perf(bench): slow-frame attribution for B3 and B8 (Block 2 step 1)",
+      "description": "slow-frame attribution for B3 and B8 (Block 2 step 1)",
+      "bullets": [],
+      "body": "Measurement only. While B3 (not the B7 soak) or B8 samples, every frame\nkeeps its stage times, work (last present -> pacing wait), the wait itself,\nGPU completion of the canvas and projector swaps (glFenceSync polled\nwithout blocking; GL_TIME_ELAPSED reads null on Apple GL), the focused\nflag and node-body time per node type. BENCH_JSON gains slow_frames:\nframes whose projector interval exceeds 1.5 periods, with medians over\nslow frames next to all frames, and per-node-type growth.\nB3 (scale=s, buf 256), one run: 198 of 567 frames slow. On slow frames\nnode bodies take 10.6 ms against 1.9 ms, and Audio Filter accounts for\n14.9 ms against 0.85 ms (no other type moves more than 0.1 ms). GPU\nfences signal in ~0.01 ms, so the GPU is not the cause. Focused frames\nare slow at the same rate (8/27) as unfocused ones. Slow frames recur\nevery 2-4 frames: the modulated filters' response-curve recompute (a\nsettled-sine MagnitudeDb simulation, capped at 20 Hz per node) lands on\nthe main thread, the frame misses the refresh, and the late-arrival rule\nin WaitForDisplayRefresh rounds it up to 33 or 50 ms.",
+      "raw": "perf(bench): slow-frame attribution for B3 and B8 (Block 2 step 1)\n\nMeasurement only. While B3 (not the B7 soak) or B8 samples, every frame\nkeeps its stage times, work (last present -> pacing wait), the wait itself,\nGPU completion of the canvas and projector swaps (glFenceSync polled\nwithout blocking; GL_TIME_ELAPSED reads null on Apple GL), the focused\nflag and node-body time per node type. BENCH_JSON gains slow_frames:\nframes whose projector interval exceeds 1.5 periods, with medians over\nslow frames next to all frames, and per-node-type growth.\n\nB3 (scale=s, buf 256), one run: 198 of 567 frames slow. On slow frames\nnode bodies take 10.6 ms against 1.9 ms, and Audio Filter accounts for\n14.9 ms against 0.85 ms (no other type moves more than 0.1 ms). GPU\nfences signal in ~0.01 ms, so the GPU is not the cause. Focused frames\nare slow at the same rate (8/27) as unfocused ones. Slow frames recur\nevery 2-4 frames: the modulated filters' response-curve recompute (a\nsettled-sine MagnitudeDb simulation, capped at 20 Hz per node) lands on\nthe main thread, the frame misses the refresh, and the late-arrival rule\nin WaitForDisplayRefresh rounds it up to 33 or 50 ms."
+    },
+    "stat": "src/core/BenchFrameTail.h | 234 ++++++++++++++++++++++++++++++++++++++++++++++\n src/core/BenchReport.cpp  |   2 +\n src/core/BenchReport.h    |   3 +\n src/main.cpp              | 146 ++++++++++++++++++++++++++---\n 4 files changed, 372 insertions(+), 13 deletions(-)\n create mode 100644 src/core/BenchFrameTail.h",
+    "files": [
+      "src/core/BenchFrameTail.h",
+      "src/core/BenchReport.cpp",
+      "src/core/BenchReport.h",
+      "src/main.cpp"
     ]
   },
   {
@@ -68,6 +834,77 @@
       "tools/semi-brain/4_engine/install_hooks.sh",
       "tools/semi-brain/l1/brain_watchd.py",
       "tools/semi-brain/l5/serve.py"
+    ]
+  },
+  {
+    "hash": "6be9e9b80d69b1cb5a1c2d14ab4d32e7becd63c4",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 11:32:52 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "perf",
+      "title": "docs(perf): Block 1 state - merged",
+      "description": "Block 1 state - merged",
+      "bullets": [],
+      "body": "",
+      "raw": "docs(perf): Block 1 state - merged"
+    },
+    "stat": "docs/plans/perf/README.md | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)",
+    "files": [
+      "docs/plans/perf/README.md"
+    ]
+  },
+  {
+    "hash": "caafc69fd2982280cfc3f786945bdde91b771fb1",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 11:32:43 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "audio",
+      "title": "Merge feature/perf-block1-audio into main",
+      "description": "Merge feature/perf-block1-audio into main",
+      "bullets": [],
+      "body": "Block 1 (audio): real xrun counter, reverb kernel load (B1 p99 at 256\n52.8% -> 44.4%), B7 soak bench. 0 xruns in 10 min at 256; soak RSS -3.6%.",
+      "raw": "Merge feature/perf-block1-audio into main\n\nBlock 1 (audio): real xrun counter, reverb kernel load (B1 p99 at 256\n52.8% -> 44.4%), B7 soak bench. 0 xruns in 10 min at 256; soak RSS -3.6%."
+    },
+    "stat": "",
+    "files": [
+      "CMakeLists.txt",
+      "docs/plans/perf/README.md",
+      "scripts/bench/compare.py",
+      "scripts/bench/run_all.sh",
+      "src/audio/AudioEngine.cpp",
+      "src/audio/AudioEngine.h",
+      "src/audio/dsp/ReverbKernel.cpp",
+      "src/audio/dsp/ReverbKernel.h",
+      "src/audio/dsp/ReverbKernelLegacy.cpp",
+      "src/core/BenchReport.cpp",
+      "src/core/BenchReport.h",
+      "src/main.cpp",
+      "src/platform/Platform.mm",
+      "src/platform/linux/AudioDeviceLinux.cpp",
+      "src/platform/win/AudioDeviceWin.cpp"
+    ]
+  },
+  {
+    "hash": "996d662919d0d6c1ce517cd226896c7f0a26b591",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 11:24:49 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "perf",
+      "title": "docs(perf): Block 1 audio results - B1 load, 10-min xrun proof, B7 soak",
+      "description": "Block 1 audio results - B1 load, 10-min xrun proof, B7 soak",
+      "bullets": [],
+      "body": "",
+      "raw": "docs(perf): Block 1 audio results - B1 load, 10-min xrun proof, B7 soak"
+    },
+    "stat": "docs/plans/perf/README.md | 39 ++++++++++++++++++++++++++++++---------\n 1 file changed, 30 insertions(+), 9 deletions(-)",
+    "files": [
+      "docs/plans/perf/README.md"
     ]
   },
   {
@@ -202,6 +1039,361 @@
       "tools/semi-brain/5_evals/replay/history.jsonl",
       "tools/semi-brain/l2/__init__.py",
       "tools/semi-brain/l2/compartments.py"
+    ]
+  },
+  {
+    "hash": "a8d8c46c456facbdab23d4f23104b5e5cf3781ca",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 10:13:21 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "bench: B7 soak fixture - B3 on wall-clock time with 10 s samples",
+      "description": "bench: B7 soak fixture - B3 on wall-clock time with 10 s samples",
+      "bullets": [
+        "rss_growth_pct: median RSS of the last 5 min vs the first 5 min after",
+        "xruns_total (deadline + os) = 0; targets_pass.soak_xruns_zero",
+        "thermal_fps_drop_pct: first window vs last, reported only"
+      ],
+      "body": "INFINITE_BENCH_B7 runs the B3 fixture for INFINITE_BENCH_B7MINUTES\n(default 30). Every 10 s it appends a \"soak\" sample: frame p50/p99, RSS,\nfootprint, that window's cb_load p99 (AudioLoadRing::DrainRange over the\nwindow's pushes) and the three xrun counters. At the end:\na 2 min warm-up; targets_pass.soak_rss_growth_lt_2pct\nB3's projector/latency targets are not applied to B7. run_all.sh --soak\nruns it (B7_MINUTES, visible window, watchdog); compare.py flags a soak\nover 2% RSS growth or with any xrun and prints the thermal drop as info.",
+      "raw": "bench: B7 soak fixture - B3 on wall-clock time with 10 s samples\n\nINFINITE_BENCH_B7 runs the B3 fixture for INFINITE_BENCH_B7MINUTES\n(default 30). Every 10 s it appends a \"soak\" sample: frame p50/p99, RSS,\nfootprint, that window's cb_load p99 (AudioLoadRing::DrainRange over the\nwindow's pushes) and the three xrun counters. At the end:\n\n- rss_growth_pct: median RSS of the last 5 min vs the first 5 min after\n  a 2 min warm-up; targets_pass.soak_rss_growth_lt_2pct\n- xruns_total (deadline + os) = 0; targets_pass.soak_xruns_zero\n- thermal_fps_drop_pct: first window vs last, reported only\n\nB3's projector/latency targets are not applied to B7. run_all.sh --soak\nruns it (B7_MINUTES, visible window, watchdog); compare.py flags a soak\nover 2% RSS growth or with any xrun and prints the thermal drop as info."
+    },
+    "stat": "scripts/bench/compare.py |  21 ++++++++-\n scripts/bench/run_all.sh |  11 ++++-\n src/core/BenchReport.cpp |   3 ++\n src/core/BenchReport.h   |  16 +++++++\n src/main.cpp             | 119 ++++++++++++++++++++++++++++++++++++++++++++---\n 5 files changed, 160 insertions(+), 10 deletions(-)",
+    "files": [
+      "scripts/bench/compare.py",
+      "scripts/bench/run_all.sh",
+      "src/core/BenchReport.cpp",
+      "src/core/BenchReport.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "fd8e0851de22529b1a55b10650ef470c85035b01",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 10:07:17 2026 +0530",
+    "parsed_message": {
+      "type": "perf",
+      "scope": "reverb",
+      "title": "perf(reverb): kernel-local vectorised LFO bank with a polynomial sine",
+      "description": "kernel-local vectorised LFO bank with a polynomial sine",
+      "bullets": [],
+      "body": "The 16 FDN line LFOs cost 32 sinf per sample per voice through\nAnalogDsp::DriftLfo. ProcessBlockSimd now advances all 16 in one\nbranch-free loop (SoA state, vectorises) and evaluates sin(2*pi*p) with\nan odd degree-9 polynomial (max error 1.9e-7). Phase arithmetic matches\nDriftLfo::Advance; the drift phase is bit-identical. NEON, SSE2 and the\nscalar fallback all read the same bank. DriftLfo itself is unchanged\n(Flanger/Phaser/Delay/Chorus share it); ProcessBlockScalar and the\nfrozen legacy kernel keep using it.\nNot bit-exact, so the quality gate applies: 10 s B1-like render vs the\npre-perf kernel, max abs diff 3.9e-6 (analog off) / 4.3e-6 (analog on),\ntolerance 1e-4. SIMD vs Scalar A/B: 1.6e-6 (tol 1e-5).\nB1 buffer 256, ab.sh 3 pairs vs 8792754: cb_load p99 50% -> 45%,\np50 47% -> 31%, reverb stage 0.29 -> 0.12 ms.",
+      "raw": "perf(reverb): kernel-local vectorised LFO bank with a polynomial sine\n\nThe 16 FDN line LFOs cost 32 sinf per sample per voice through\nAnalogDsp::DriftLfo. ProcessBlockSimd now advances all 16 in one\nbranch-free loop (SoA state, vectorises) and evaluates sin(2*pi*p) with\nan odd degree-9 polynomial (max error 1.9e-7). Phase arithmetic matches\nDriftLfo::Advance; the drift phase is bit-identical. NEON, SSE2 and the\nscalar fallback all read the same bank. DriftLfo itself is unchanged\n(Flanger/Phaser/Delay/Chorus share it); ProcessBlockScalar and the\nfrozen legacy kernel keep using it.\n\nNot bit-exact, so the quality gate applies: 10 s B1-like render vs the\npre-perf kernel, max abs diff 3.9e-6 (analog off) / 4.3e-6 (analog on),\ntolerance 1e-4. SIMD vs Scalar A/B: 1.6e-6 (tol 1e-5).\n\nB1 buffer 256, ab.sh 3 pairs vs 8792754: cb_load p99 50% -> 45%,\np50 47% -> 31%, reverb stage 0.29 -> 0.12 ms."
+    },
+    "stat": "src/audio/dsp/ReverbKernel.cpp | 44 +++++++++++++++++++++++++++++++++++++++---\n src/audio/dsp/ReverbKernel.h   |  7 +++++++\n src/main.cpp                   |  2 +-\n 3 files changed, 49 insertions(+), 4 deletions(-)",
+    "files": [
+      "src/audio/dsp/ReverbKernel.cpp",
+      "src/audio/dsp/ReverbKernel.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "8792754f5acfa659dfca9bbc33c8b32db0237218",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 09:57:42 2026 +0530",
+    "parsed_message": {
+      "type": "perf",
+      "scope": "reverb",
+      "title": "perf(reverb): cache per-block damping/cutoff/predelay coefficients (bit-exact)",
+      "description": "cache per-block damping/cutoff/predelay coefficients (bit-exact)",
+      "bullets": [],
+      "body": "ProcessBlockSimd recomputed pow() for the base cutoff, exp() for the\ndamping coefficient and lround() for the predelay every block (and the\ndamping exp every sample in analog mode, where the cutoff drifts). Each\nis now cached against its NaN-seeded input and recomputed only when the\ninput changes. The no-op readPos %= capacity is gone. All three SIMD\nbranches share this preamble.\nDSPTEST gains a 10 s check of the live kernel against a frozen copy of\nthe pre-perf kernel (ReverbKernelLegacy.cpp, test-only) on a B1-like\nvoice, analog off and on, with a mid-run param change: max diff 0.\nB1 buffer 256, ab.sh 3 pairs vs e2b4013: cb_load p99 52.6% -> 50.1%,\nreverb stage 0.31 -> 0.29 ms.",
+      "raw": "perf(reverb): cache per-block damping/cutoff/predelay coefficients (bit-exact)\n\nProcessBlockSimd recomputed pow() for the base cutoff, exp() for the\ndamping coefficient and lround() for the predelay every block (and the\ndamping exp every sample in analog mode, where the cutoff drifts). Each\nis now cached against its NaN-seeded input and recomputed only when the\ninput changes. The no-op readPos %= capacity is gone. All three SIMD\nbranches share this preamble.\n\nDSPTEST gains a 10 s check of the live kernel against a frozen copy of\nthe pre-perf kernel (ReverbKernelLegacy.cpp, test-only) on a B1-like\nvoice, analog off and on, with a mid-run param change: max diff 0.\n\nB1 buffer 256, ab.sh 3 pairs vs e2b4013: cb_load p99 52.6% -> 50.1%,\nreverb stage 0.31 -> 0.29 ms."
+    },
+    "stat": "CMakeLists.txt                       |   1 +\n src/audio/dsp/ReverbKernel.cpp       |  43 ++-\n src/audio/dsp/ReverbKernel.h         |   3 +\n src/audio/dsp/ReverbKernelLegacy.cpp | 569 +++++++++++++++++++++++++++++++++++\n src/main.cpp                         |  88 ++++++\n 5 files changed, 699 insertions(+), 5 deletions(-)\n create mode 100644 src/audio/dsp/ReverbKernelLegacy.cpp",
+    "files": [
+      "CMakeLists.txt",
+      "src/audio/dsp/ReverbKernel.cpp",
+      "src/audio/dsp/ReverbKernel.h",
+      "src/audio/dsp/ReverbKernelLegacy.cpp",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "e2b40136b6d6cac59ee482bc92791780f405272a",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 09:48:59 2026 +0530",
+    "parsed_message": {
+      "type": "perf",
+      "scope": "audio",
+      "title": "perf(audio): real xrun counter - deadline misses + OS-reported, gaps info only",
+      "description": "real xrun counter - deadline misses + OS-reported, gaps info only",
+      "bullets": [],
+      "body": "XrunCount() was a callback-gap heuristic. It is now the sum of two\nlock-free counters: deadline misses (render time >= the period) and\nOS-reported xruns (macOS kAudioDeviceProcessorOverload; Windows counts a\ndrained WASAPI buffer before a write; Linux stays 0 - miniaudio has no\nunderrun notification). The old gap heuristic is kept as its own\ncounter for information only.\nBench JSON \"audio\" keeps \"xruns\" (= deadline + os) and adds\n\"xruns_deadline\", \"xruns_os\" and \"xrun_gaps\". Stop() resets all three;\nthe top-bar tooltip splits late blocks from device-reported ones.\nWindows path is compile-checked only (CI cannot run WASAPI).",
+      "raw": "perf(audio): real xrun counter - deadline misses + OS-reported, gaps info only\n\nXrunCount() was a callback-gap heuristic. It is now the sum of two\nlock-free counters: deadline misses (render time >= the period) and\nOS-reported xruns (macOS kAudioDeviceProcessorOverload; Windows counts a\ndrained WASAPI buffer before a write; Linux stays 0 - miniaudio has no\nunderrun notification). The old gap heuristic is kept as its own\ncounter for information only.\n\nBench JSON \"audio\" keeps \"xruns\" (= deadline + os) and adds\n\"xruns_deadline\", \"xruns_os\" and \"xrun_gaps\". Stop() resets all three;\nthe top-bar tooltip splits late blocks from device-reported ones.\n\nWindows path is compile-checked only (CI cannot run WASAPI)."
+    },
+    "stat": "src/audio/AudioEngine.cpp               | 65 ++++++++++++++++++++++++---------\n src/audio/AudioEngine.h                 | 40 ++++++++++++++++----\n src/core/BenchReport.cpp                |  3 ++\n src/core/BenchReport.h                  |  5 ++-\n src/main.cpp                            | 54 +++++++++++++++++++--------\n src/platform/Platform.mm                | 11 +++---\n src/platform/linux/AudioDeviceLinux.cpp |  5 +++\n src/platform/win/AudioDeviceWin.cpp     | 18 +++++++++\n 8 files changed, 153 insertions(+), 48 deletions(-)",
+    "files": [
+      "src/audio/AudioEngine.cpp",
+      "src/audio/AudioEngine.h",
+      "src/core/BenchReport.cpp",
+      "src/core/BenchReport.h",
+      "src/main.cpp",
+      "src/platform/Platform.mm",
+      "src/platform/linux/AudioDeviceLinux.cpp",
+      "src/platform/win/AudioDeviceWin.cpp"
+    ]
+  },
+  {
+    "hash": "2324f7587367cdab72b8d8d9af066582019b17fd",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 09:34:11 2026 +0530",
+    "parsed_message": {
+      "type": "perf",
+      "scope": "core",
+      "title": "Merge docs/perf-final-plan into main",
+      "description": "Merge docs/perf-final-plan into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge docs/perf-final-plan into main"
+    },
+    "stat": "",
+    "files": [
+      "docs/plans/perf/README.md"
+    ]
+  },
+  {
+    "hash": "ea6f5ae86f883cc6c6219be98a0257fccc6be85a",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 09:34:08 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "perf",
+      "title": "docs(perf): frozen plan to finish; B7/B10 back in scope",
+      "description": "frozen plan to finish; B7/B10 back in scope",
+      "bullets": [],
+      "body": "",
+      "raw": "docs(perf): frozen plan to finish; B7/B10 back in scope"
+    },
+    "stat": "docs/plans/perf/README.md | 20 ++++++++++++++++++--\n 1 file changed, 18 insertions(+), 2 deletions(-)",
+    "files": [
+      "docs/plans/perf/README.md"
+    ]
+  },
+  {
+    "hash": "3fa297369bb826303b2e82c619f315f9164bb42a",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 09:26:39 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Merge fix/bench-visible-window into main",
+      "description": "Merge fix/bench-visible-window into main",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Merge fix/bench-visible-window into main\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "",
+    "files": [
+      "bench/baselines/m2-8gb.jsonl",
+      "docs/plans/perf/README.md",
+      "scripts/bench/run_all.sh",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "127dbc3b5b53aa7108c5b7d6e94aaf105864f8e1",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 09:26:34 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "perf",
+      "title": "docs(perf): B3/B6/B8 baseline from a visible window; new open items",
+      "description": "B3/B6/B8 baseline from a visible window; new open items",
+      "bullets": [],
+      "body": "Hidden harness window was the cause of unfocused rows, not the launching\nshell. Summary table and open items updated: B8 light projector p99 just\nover the lock limit, canvas vsync not blocking on macOS 27, B8 decode.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "docs(perf): B3/B6/B8 baseline from a visible window; new open items\n\nHidden harness window was the cause of unfocused rows, not the launching\nshell. Summary table and open items updated: B8 light projector p99 just\nover the lock limit, canvas vsync not blocking on macOS 27, B8 decode.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/plans/perf/README.md | 66 ++++++++++++++++++++++++++++-------------------\n 1 file changed, 40 insertions(+), 26 deletions(-)",
+    "files": [
+      "docs/plans/perf/README.md"
+    ]
+  },
+  {
+    "hash": "43d5a76c251cc9dc5ed87e4bd0653794475eab16",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 09:26:34 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "bench(baseline): B3/B6/B8 rows from a visible-window run (beb4d87)",
+      "description": "bench(baseline): B3/B6/B8 rows from a visible-window run (beb4d87)",
+      "bullets": [],
+      "body": "The 15 B3/B6/B8 rows were all unfocused=1 (hidden harness window). They\nare replaced by a run_all.sh --quiet --only B3,B6,B8 run with\nINFINITE_BENCH_VISIBLE: none is unfocused now; B3, B6 vsync=0 and B8\nheavy are trusted, the rest stay unpaced (canvas vsync does not block).\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "bench(baseline): B3/B6/B8 rows from a visible-window run (beb4d87)\n\nThe 15 B3/B6/B8 rows were all unfocused=1 (hidden harness window). They\nare replaced by a run_all.sh --quiet --only B3,B6,B8 run with\nINFINITE_BENCH_VISIBLE: none is unfocused now; B3, B6 vsync=0 and B8\nheavy are trusted, the rest stay unpaced (canvas vsync does not block).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "bench/baselines/m2-8gb.jsonl | 30 +++++++++++++++---------------\n 1 file changed, 15 insertions(+), 15 deletions(-)",
+    "files": [
+      "bench/baselines/m2-8gb.jsonl"
+    ]
+  },
+  {
+    "hash": "beb4d870b81c66806019fa933d81ce9a523f728b",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 09:23:52 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "bench",
+      "title": "fix(bench): give B3/B6/B8 a real window via INFINITE_BENCH_VISIBLE",
+      "description": "give B3/B6/B8 a real window via INFINITE_BENCH_VISIBLE",
+      "bullets": [],
+      "body": "INFINITE_EXITAFTER makes every harness run headless (hidden window,\nProhibited activation policy), so the fixtures that measure focus and\ndisplay pacing could never be trusted: every B3/B6/B8 row came back\nunfocused=1 no matter where the suite was launched from.\nINFINITE_BENCH_VISIBLE opts back into a normal window; run_all.sh sets\nit for B3/B6/B8 only, so the other fixtures stay headless.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "fix(bench): give B3/B6/B8 a real window via INFINITE_BENCH_VISIBLE\n\nINFINITE_EXITAFTER makes every harness run headless (hidden window,\nProhibited activation policy), so the fixtures that measure focus and\ndisplay pacing could never be trusted: every B3/B6/B8 row came back\nunfocused=1 no matter where the suite was launched from.\nINFINITE_BENCH_VISIBLE opts back into a normal window; run_all.sh sets\nit for B3/B6/B8 only, so the other fixtures stay headless.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "scripts/bench/run_all.sh | 6 +++++-\n src/main.cpp             | 8 ++++++--\n 2 files changed, 11 insertions(+), 3 deletions(-)",
+    "files": [
+      "scripts/bench/run_all.sh",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "4d6807ff0a86aa3b9a862db0142d1997e4d86b90",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 09:05:30 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge chore/bench-baseline into main",
+      "description": "Merge chore/bench-baseline into main",
+      "bullets": [],
+      "body": "compare.py fit for the current BENCH_JSON (untrusted rows, medians, spec-target\ngates, deterministic-only hashes), run_all.sh --quiet/--only and the commit env\nvar, and a full-suite baseline with the spec-target summary in the perf README.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Merge chore/bench-baseline into main\n\ncompare.py fit for the current BENCH_JSON (untrusted rows, medians, spec-target\ngates, deterministic-only hashes), run_all.sh --quiet/--only and the commit env\nvar, and a full-suite baseline with the spec-target summary in the perf README.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "",
+    "files": [
+      "bench/baselines/m2-8gb-9326563.jsonl",
+      "bench/baselines/m2-8gb.jsonl",
+      "docs/plans/perf/README.md",
+      "scripts/bench/compare.py",
+      "scripts/bench/run_all.sh",
+      "src/core/BenchReport.cpp"
+    ]
+  },
+  {
+    "hash": "794d2e57962cfb4e9b04f72dc625876f15733130",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 09:05:20 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "perf",
+      "title": "docs(perf): spec-target summary and the new baseline",
+      "description": "spec-target summary and the new baseline",
+      "bullets": [],
+      "body": "Summary table at the top (target | baseline | pass/fail) with the targets\nstill failing listed as open items; Baseline section rewritten for\nm2-8gb.jsonl, with the 9326563 -> c602a0d before/after.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "docs(perf): spec-target summary and the new baseline\n\nSummary table at the top (target | baseline | pass/fail) with the targets\nstill failing listed as open items; Baseline section rewritten for\nm2-8gb.jsonl, with the 9326563 -> c602a0d before/after.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/plans/perf/README.md | 266 +++++++++++++++++++++-------------------------\n 1 file changed, 120 insertions(+), 146 deletions(-)",
+    "files": [
+      "docs/plans/perf/README.md"
+    ]
+  },
+  {
+    "hash": "03dc009af3ccb4e32ae067660dffc5d7f49d950c",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 09:05:20 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "ui",
+      "title": "bench(baseline): full-suite baseline at c602a0d; keep the 9326563 one",
+      "description": "bench(baseline): full-suite baseline at c602a0d; keep the 9326563 one",
+      "bullets": [],
+      "body": "58 BENCH_JSON lines from run_all.sh --quiet (B1-B6, B8, B9). B3/B6/B8 rows are\nunfocused (the app is never activated when launched from a background\nprocess), so compare.py treats them as untrusted.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "bench(baseline): full-suite baseline at c602a0d; keep the 9326563 one\n\n58 BENCH_JSON lines from run_all.sh --quiet (B1-B6, B8, B9). B3/B6/B8 rows are\nunfocused (the app is never activated when launched from a background\nprocess), so compare.py treats them as untrusted.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "bench/baselines/m2-8gb-9326563.jsonl | 13 +++++++\n bench/baselines/m2-8gb.jsonl         | 71 +++++++++++++++++++++++++++++-------\n 2 files changed, 71 insertions(+), 13 deletions(-)\n create mode 100644 bench/baselines/m2-8gb-9326563.jsonl",
+    "files": [
+      "bench/baselines/m2-8gb-9326563.jsonl",
+      "bench/baselines/m2-8gb.jsonl"
+    ]
+  },
+  {
+    "hash": "d899a0b3ceabc1f2bc74f2075cb509395155561b",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 09:01:38 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "bench(run_all): --only <B..> re-runs selected benchmarks",
+      "description": "bench(run_all): --only <B..> re-runs selected benchmarks",
+      "bullets": [],
+      "body": "Lets a run re-do just the fixtures that came out unfocused/unpaced instead\nof the whole suite.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "bench(run_all): --only <B..> re-runs selected benchmarks\n\nLets a run re-do just the fixtures that came out unfocused/unpaced instead\nof the whole suite.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "scripts/bench/run_all.sh | 39 ++++++++++++++++++++++++++++++++++++++-\n 1 file changed, 38 insertions(+), 1 deletion(-)",
+    "files": [
+      "scripts/bench/run_all.sh"
+    ]
+  },
+  {
+    "hash": "c602a0d9c1b7c6abc240f1c867413c5f0dfc0102",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 08:48:56 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "bench(compare): record the B4 static hash that proved it deterministic",
+      "description": "bench(compare): record the B4 static hash that proved it deterministic",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "bench(compare): record the B4 static hash that proved it deterministic\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "scripts/bench/compare.py | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)",
+    "files": [
+      "scripts/bench/compare.py"
+    ]
+  },
+  {
+    "hash": "1809dbc39e9e93db7819a48bbdb112ff44832cbc",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 08:43:53 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "ui",
+      "title": "bench(run_all): --quiet pauses the brain watch daemon; commit label from env",
+      "description": "bench(run_all): --quiet pauses the brain watch daemon; commit label from env",
+      "bullets": [],
+      "body": "run_all.sh exports INFINITE_BENCH_COMMIT and GitCommitShaShort prefers it, so\nBENCH_JSON's commit is right when the app runs outside the repo. --quiet boots\ncom.infinite.semi-brain.watchd out (after any running sync_brain.py\nfinishes), restores it in an EXIT trap, and logs quiet=1 plus swap used at\nstart and end. The run log is now tee'd next to the results file.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "bench(run_all): --quiet pauses the brain watch daemon; commit label from env\n\nrun_all.sh exports INFINITE_BENCH_COMMIT and GitCommitShaShort prefers it, so\nBENCH_JSON's commit is right when the app runs outside the repo. --quiet boots\ncom.infinite.semi-brain.watchd out (after any running sync_brain.py\nfinishes), restores it in an EXIT trap, and logs quiet=1 plus swap used at\nstart and end. The run log is now tee'd next to the results file.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "scripts/bench/run_all.sh | 53 +++++++++++++++++++++++++++++++++++++++++++++++-\n src/core/BenchReport.cpp |  5 ++++-\n 2 files changed, 56 insertions(+), 2 deletions(-)",
+    "files": [
+      "scripts/bench/run_all.sh",
+      "src/core/BenchReport.cpp"
+    ]
+  },
+  {
+    "hash": "345eb148e478d08cf5b7b5fe5ed166abac38c75f",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 08:43:05 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "bench(compare): untrusted rows, repeated-run medians, spec-target gates",
+      "description": "bench(compare): untrusted rows, repeated-run medians, spec-target gates",
+      "bullets": [],
+      "body": "Strip unfocused/unpaced/overlap from the variant key and mark those rows\nUNTRUSTED (printed, never gated, never passing). Median over repeated runs\nwith n shown. Gate on false targets_pass verdicts, B8 window missed vsync and\ninterval p99, B6 canvas p50/p95, footprint_peak_mb (RSS is info only),\nrender_targets_mb and fbo_allocs_steady. output_hash only compared on anim=0.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "bench(compare): untrusted rows, repeated-run medians, spec-target gates\n\nStrip unfocused/unpaced/overlap from the variant key and mark those rows\nUNTRUSTED (printed, never gated, never passing). Median over repeated runs\nwith n shown. Gate on false targets_pass verdicts, B8 window missed vsync and\ninterval p99, B6 canvas p50/p95, footprint_peak_mb (RSS is info only),\nrender_targets_mb and fbo_allocs_steady. output_hash only compared on anim=0.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "scripts/bench/compare.py | 336 +++++++++++++++++++++++++++++++++--------------\n 1 file changed, 240 insertions(+), 96 deletions(-)",
+    "files": [
+      "scripts/bench/compare.py"
     ]
   },
   {
@@ -363,6 +1555,91 @@
     ]
   },
   {
+    "hash": "74b1fc316d5388106b6b7d787f46a321a95b1ccf",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 06:12:08 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "render3d",
+      "title": "Merge bugfix/perf-shared-render-targets into main",
+      "description": "Merge bugfix/perf-shared-render-targets into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge bugfix/perf-shared-render-targets into main"
+    },
+    "stat": "",
+    "files": [
+      "docs/plans/perf/README.md",
+      "src/core/BenchReport.cpp",
+      "src/core/BenchReport.h",
+      "src/core/GLUtil.cpp",
+      "src/core/GLUtil.h",
+      "src/main.cpp",
+      "src/nodes/FilterNode.cpp",
+      "src/nodes/FilterNode.h"
+    ]
+  },
+  {
+    "hash": "7066c02acc2558684b38332a0145cc0d47415c3a",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 06:12:02 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "perf",
+      "title": "docs(perf): shared scratch target numbers from a clean branch build",
+      "description": "shared scratch target numbers from a clean branch build",
+      "bullets": [],
+      "body": "The first frame-time and l-static runs used a binary rebuilt after another\nsession switched the shared checkout, so they compared main with main.\nRe-measured from a dedicated worktree: footprint peak 764 MB, 5 A/B pairs\np50 +0% / p99 -1%, l-static hash unchanged.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "docs(perf): shared scratch target numbers from a clean branch build\n\nThe first frame-time and l-static runs used a binary rebuilt after another\nsession switched the shared checkout, so they compared main with main.\nRe-measured from a dedicated worktree: footprint peak 764 MB, 5 A/B pairs\np50 +0% / p99 -1%, l-static hash unchanged.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/plans/perf/README.md | 6 +++---\n 1 file changed, 3 insertions(+), 3 deletions(-)",
+    "files": [
+      "docs/plans/perf/README.md"
+    ]
+  },
+  {
+    "hash": "b4f4fa4fc6b62f466083ed50b74cc0c2f8f25110",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 05:44:30 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "perf",
+      "title": "docs(perf): true B2 render-target breakdown, shared scratch target result",
+      "description": "true B2 render-target breakdown, shared scratch target result",
+      "bullets": [],
+      "body": "Replace the \"28 per-effect 16-bit buffers\" finding with the measured\nbreakdown (31 RGBA8 outputs, 9 RGBA16F pre-pass intermediates, Render 3D)\nand the fix: 469.6 -> 343.0 MB, identical l-static pixels, frame time\nunchanged. Note that B2 l-anim's output_hash is not deterministic.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "docs(perf): true B2 render-target breakdown, shared scratch target result\n\nReplace the \"28 per-effect 16-bit buffers\" finding with the measured\nbreakdown (31 RGBA8 outputs, 9 RGBA16F pre-pass intermediates, Render 3D)\nand the fix: 469.6 -> 343.0 MB, identical l-static pixels, frame time\nunchanged. Note that B2 l-anim's output_hash is not deterministic.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/plans/perf/README.md | 32 +++++++++++++++++++++++++++-----\n 1 file changed, 27 insertions(+), 5 deletions(-)",
+    "files": [
+      "docs/plans/perf/README.md"
+    ]
+  },
+  {
+    "hash": "6b9fd2859989787012544057f4ccd7141ae723b7",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 05:28:07 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "bench(b2): report fbo_allocs_steady over the frame 32-152 sample window",
+      "description": "bench(b2): report fbo_allocs_steady over the frame 32-152 sample window",
+      "bullets": [],
+      "body": "GLUtil::FboAllocationCount delta for B2/B4, so a pooled render target that\nre-allocates every frame shows up in the bench JSON.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "bench(b2): report fbo_allocs_steady over the frame 32-152 sample window\n\nGLUtil::FboAllocationCount delta for B2/B4, so a pooled render target that\nre-allocates every frame shows up in the bench JSON.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "src/core/BenchReport.cpp | 1 +\n src/core/BenchReport.h   | 1 +\n src/main.cpp             | 6 ++++++\n 3 files changed, 8 insertions(+)",
+    "files": [
+      "src/core/BenchReport.cpp",
+      "src/core/BenchReport.h",
+      "src/main.cpp"
+    ]
+  },
+  {
     "hash": "5f4779d68b77a45f735170e090b07d1d2d284a1f",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
@@ -432,6 +1709,49 @@
       "src/core/BenchReport.cpp",
       "src/core/BenchReport.h",
       "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "6ec7ec7dae0c3412ae500d3b8470ec8a33e392e1",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 05:10:01 2026 +0530",
+    "parsed_message": {
+      "type": "perf",
+      "scope": "filter",
+      "title": "perf(filter): two-pass filters use the shared scratch target, not a per-node mMid",
+      "description": "two-pass filters use the shared scratch target, not a per-node mMid",
+      "bullets": [],
+      "body": "The RGBA16F pre-pass intermediate lives only from the pre-pass to the main\npass of one cook, and both input Pulls run before it, so no other cook can\ntouch it in between. One shared buffer per size replaces nine per-node ones\nin B2 l. The main loop ages the pool once per frame.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "perf(filter): two-pass filters use the shared scratch target, not a per-node mMid\n\nThe RGBA16F pre-pass intermediate lives only from the pre-pass to the main\npass of one cook, and both input Pulls run before it, so no other cook can\ntouch it in between. One shared buffer per size replaces nine per-node ones\nin B2 l. The main loop ages the pool once per frame.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "src/main.cpp             |  1 +\n src/nodes/FilterNode.cpp | 14 +++++++++-----\n src/nodes/FilterNode.h   |  1 -\n 3 files changed, 10 insertions(+), 6 deletions(-)",
+    "files": [
+      "src/main.cpp",
+      "src/nodes/FilterNode.cpp",
+      "src/nodes/FilterNode.h"
+    ]
+  },
+  {
+    "hash": "05254ec26a116a1a8fe75417ef7e263c92749439",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 05:10:00 2026 +0530",
+    "parsed_message": {
+      "type": "perf",
+      "scope": "gl",
+      "title": "perf(gl): shared scratch render-target pool, labelled render-target breakdown",
+      "description": "shared scratch render-target pool, labelled render-target breakdown",
+      "bullets": [],
+      "body": "GLUtil::AcquireScratchFbo hands out one render target per (w, h, format)\nfor intermediates written and read inside one cook. Entries go through\nEnsureFbo/DestroyFbo (GpuMem + FboAllocationCount stay correct), are tagged\n\"ScratchFbo\", and are freed after 300 unused frames by EndFrameScratchFbos.\nEnsureFbo takes an optional GpuMem label; GpuMemBreakdown now also reports\nrender targets split by label so B9 shows what they are.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "perf(gl): shared scratch render-target pool, labelled render-target breakdown\n\nGLUtil::AcquireScratchFbo hands out one render target per (w, h, format)\nfor intermediates written and read inside one cook. Entries go through\nEnsureFbo/DestroyFbo (GpuMem + FboAllocationCount stay correct), are tagged\n\"ScratchFbo\", and are freed after 300 unused frames by EndFrameScratchFbos.\nEnsureFbo takes an optional GpuMem label; GpuMemBreakdown now also reports\nrender targets split by label so B9 shows what they are.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "src/core/BenchReport.cpp | 13 ++++++++-----\n src/core/BenchReport.h   |  6 +++++-\n src/core/GLUtil.cpp      | 49 ++++++++++++++++++++++++++++++++++++++++++++++--\n src/core/GLUtil.h        | 21 ++++++++++++++++++++-\n 4 files changed, 80 insertions(+), 9 deletions(-)",
+    "files": [
+      "src/core/BenchReport.cpp",
+      "src/core/BenchReport.h",
+      "src/core/GLUtil.cpp",
+      "src/core/GLUtil.h"
     ]
   },
   {
@@ -1349,9 +2669,6 @@
   },
   {
     "hash": "386d7c7b1bcbf61b11de67377a54e1676ef2a9b2",
-=======
-    "hash": "3563c7280b573b5eb796332e654b2c03b4de64de",
->>>>>>> feature/provenance-cleanup
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
     "author_date": "Thu Sep 24 16:39:34 2026 +0530",
@@ -1370,7 +2687,84 @@
       "body": "Five core headers described themselves as \"ported from BespokeSynth\" or\ncontrasted themselves against it. Their actual code is Infinite's own; what\nwas borrowed was architecture (a name-keyed node registry, pull-based\nper-frame cooking, one node shell hosting many effect types). Say that\naccurately instead:\n(unordered_map entries; first registration still wins; duplicates still\nrecorded).\ndriver logs are now read at full length instead of truncated at 1 KB,\nwhich FormulaNode shows to the user verbatim. Error prefixes unchanged.\ndesign on its own terms.\nInfinite's ideas come from, what Field specifically adds, and that the\nproject is built with AI coding assistance.\nVerified: builds (VST3 off in this worktree), ROUNDTRIPTEST save/load\n287/287 (copy/paste 284/287 is the known Predictive-node reset), PATCHTEST.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
       "raw": "Rewrite provenance comments and add prior-art acknowledgements\n\nFive core headers described themselves as \"ported from BespokeSynth\" or\ncontrasted themselves against it. Their actual code is Infinite's own; what\nwas borrowed was architecture (a name-keyed node registry, pull-based\nper-frame cooking, one node shell hosting many effect types). Say that\naccurately instead:\n\n- NodeFactory: fresh implementation behind the unchanged public API\n  (unordered_map entries; first registration still wins; duplicates still\n  recorded).\n- GLUtil::CompileProgram: rewritten around CompileStage/InfoLog helpers;\n  driver logs are now read at full length instead of truncated at 1 KB,\n  which FormulaNode shows to the user verbatim. Error prefixes unchanged.\n- INode, ImageCable, FilterDefs, GLUtil: header comments describe the\n  design on its own terms.\n- README: new Prior Art & Acknowledgements section naming the tools\n  Infinite's ideas come from, what Field specifically adds, and that the\n  project is built with AI coding assistance.\n- SCRIPTING_NODE_SPECIFICATION: drop \"Bespoke DAG Architecture\".\n\nVerified: builds (VST3 off in this worktree), ROUNDTRIPTEST save/load\n287/287 (copy/paste 284/287 is the known Predictive-node reset), PATCHTEST.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
     },
-<<<<<<< HEAD
+    "stat": "README.md                            |  22 ++++++++\n docs/SCRIPTING_NODE_SPECIFICATION.md |   2 +-\n src/core/FilterDefs.h                |   5 +-\n src/core/GLUtil.cpp                  | 100 ++++++++++++++++++++++-------------\n src/core/GLUtil.h                    |   8 +--\n src/core/INode.h                     |   9 ++--\n src/core/ImageCable.h                |   8 ++-\n src/core/NodeFactory.cpp             |  34 ++++++------\n src/core/NodeFactory.h               |  49 ++++++++++-------\n 9 files changed, 146 insertions(+), 91 deletions(-)",
+    "files": [
+      "README.md",
+      "docs/SCRIPTING_NODE_SPECIFICATION.md",
+      "src/core/FilterDefs.h",
+      "src/core/GLUtil.cpp",
+      "src/core/GLUtil.h",
+      "src/core/INode.h",
+      "src/core/ImageCable.h",
+      "src/core/NodeFactory.cpp",
+      "src/core/NodeFactory.h"
+    ]
+  },
+  {
+    "hash": "68ff9f08238f11d7751b8b12fab16cb2c3494340",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 16:47:02 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "README: drop \\\"written from scratch\\\" from the acknowledgements intro",
+      "description": "README: drop \\\"written from scratch\\\" from the acknowledgements intro",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "README: drop \\\"written from scratch\\\" from the acknowledgements intro\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "README.md | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)",
+    "files": [
+      "README.md"
+    ]
+  },
+  {
+    "hash": "84fb9f922836631e4edde436ceed232b6187004e",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 16:46:29 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "audio",
+      "title": "README: state exactly how BespokeSynth was used as a reference",
+      "description": "README: state exactly how BespokeSynth was used as a reference",
+      "bullets": [],
+      "body": "The first building blocks were written with BespokeSynth's source open as a\ndesign reference, under an instruction not to copy code. Say that, rather\nthan the unprovable \"contains no BespokeSynth source code\".\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "README: state exactly how BespokeSynth was used as a reference\n\nThe first building blocks were written with BespokeSynth's source open as a\ndesign reference, under an instruction not to copy code. Say that, rather\nthan the unprovable \"contains no BespokeSynth source code\".\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "README.md                                          |   2 +-\n .../1_extractors/output/git_commits_corpus.json    | 656 +++++++++++++++++++++\n .../1_extractors/output/knowledge_index.db         | Bin 25616384 -> 7876608 bytes\n .../1_extractors/output/recovered_docs_corpus.json | 508 ++++++++--------\n .../output/skills_and_invariants_corpus.json       |   2 +-\n .../3_datasets/train_dpo_preference.jsonl          |   7 +\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl | 197 ++++---\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl | 197 ++++---\n 8 files changed, 1155 insertions(+), 414 deletions(-)",
+    "files": [
+      "README.md",
+      "tools/semi-brain/1_extractors/output/git_commits_corpus.json",
+      "tools/semi-brain/1_extractors/output/knowledge_index.db",
+      "tools/semi-brain/1_extractors/output/recovered_docs_corpus.json",
+      "tools/semi-brain/1_extractors/output/skills_and_invariants_corpus.json",
+      "tools/semi-brain/3_datasets/train_dpo_preference.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_alpaca.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_sharegpt.jsonl"
+    ]
+  },
+  {
+    "hash": "3563c7280b573b5eb796332e654b2c03b4de64de",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Sep 24 16:39:34 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Rewrite provenance comments and add prior-art acknowledgements",
+      "description": "Rewrite provenance comments and add prior-art acknowledgements",
+      "bullets": [
+        "NodeFactory: fresh implementation behind the unchanged public API",
+        "GLUtil::CompileProgram: rewritten around CompileStage/InfoLog helpers;",
+        "INode, ImageCable, FilterDefs, GLUtil: header comments describe the",
+        "README: new Prior Art & Acknowledgements section naming the tools",
+        "SCRIPTING_NODE_SPECIFICATION: drop \"Bespoke DAG Architecture\"."
+      ],
+      "body": "Five core headers described themselves as \"ported from BespokeSynth\" or\ncontrasted themselves against it. Their actual code is Infinite's own; what\nwas borrowed was architecture (a name-keyed node registry, pull-based\nper-frame cooking, one node shell hosting many effect types). Say that\naccurately instead:\n(unordered_map entries; first registration still wins; duplicates still\nrecorded).\ndriver logs are now read at full length instead of truncated at 1 KB,\nwhich FormulaNode shows to the user verbatim. Error prefixes unchanged.\ndesign on its own terms.\nInfinite's ideas come from, what Field specifically adds, and that the\nproject is built with AI coding assistance.\nVerified: builds (VST3 off in this worktree), ROUNDTRIPTEST save/load\n287/287 (copy/paste 284/287 is the known Predictive-node reset), PATCHTEST.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+      "raw": "Rewrite provenance comments and add prior-art acknowledgements\n\nFive core headers described themselves as \"ported from BespokeSynth\" or\ncontrasted themselves against it. Their actual code is Infinite's own; what\nwas borrowed was architecture (a name-keyed node registry, pull-based\nper-frame cooking, one node shell hosting many effect types). Say that\naccurately instead:\n\n- NodeFactory: fresh implementation behind the unchanged public API\n  (unordered_map entries; first registration still wins; duplicates still\n  recorded).\n- GLUtil::CompileProgram: rewritten around CompileStage/InfoLog helpers;\n  driver logs are now read at full length instead of truncated at 1 KB,\n  which FormulaNode shows to the user verbatim. Error prefixes unchanged.\n- INode, ImageCable, FilterDefs, GLUtil: header comments describe the\n  design on its own terms.\n- README: new Prior Art & Acknowledgements section naming the tools\n  Infinite's ideas come from, what Field specifically adds, and that the\n  project is built with AI coding assistance.\n- SCRIPTING_NODE_SPECIFICATION: drop \"Bespoke DAG Architecture\".\n\nVerified: builds (VST3 off in this worktree), ROUNDTRIPTEST save/load\n287/287 (copy/paste 284/287 is the known Predictive-node reset), PATCHTEST.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+    },
     "stat": "README.md                            |  22 ++++++++\n docs/SCRIPTING_NODE_SPECIFICATION.md |   2 +-\n src/core/FilterDefs.h                |   5 +-\n src/core/GLUtil.cpp                  | 100 ++++++++++++++++++++++-------------\n src/core/GLUtil.h                    |   8 +--\n src/core/INode.h                     |   9 ++--\n src/core/ImageCable.h                |   8 ++-\n src/core/NodeFactory.cpp             |  34 ++++++------\n src/core/NodeFactory.h               |  49 ++++++++++-------\n 9 files changed, 146 insertions(+), 91 deletions(-)",
     "files": [
       "README.md",
@@ -1403,9 +2797,6 @@
       "src/main.cpp",
       "src/platform/Platform.mm"
     ]
-=======
-    "stat": "README.md                            |  22 ++++++++\n docs/SCRIPTING_NODE_SPECIFICATION.md |   2 +-\n src/core/FilterDefs.h                |   5 +-\n src/core/GLUtil.cpp                  | 100 ++++++++++++++++++++++-------------\n src/core/GLUtil.h                    |   8 +--\n src/core/INode.h                     |   9 ++--\n src/core/ImageCable.h                |   8 ++-\n src/core/NodeFactory.cpp             |  34 ++++++------\n src/core/NodeFactory.h               |  49 ++++++++++-------\n 9 files changed, 146 insertions(+), 91 deletions(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "3626c3d172e94a262633be26e370e676a364f279",
@@ -1421,7 +2812,6 @@
       "body": "",
       "raw": "Merge branch 'feature/b8-media-io' into main"
     },
-<<<<<<< HEAD
     "stat": "",
     "files": [
       ".gitignore",
@@ -1445,9 +2835,6 @@
       "src/platform/linux/MediaLinux.cpp",
       "src/platform/win/MediaWin.cpp"
     ]
-=======
-    "stat": ""
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "1986db064002f0adde07bd2372a3b7f6b30052f6",
@@ -1463,7 +2850,6 @@
       "body": "INFINITE_BENCH_B8: 1-4 looping H.264 clips (1080p30/2160p30, generated\ninto gitignored bench/media/ by scripts/bench/b8_make_clips.sh) into\nOutputs, 0-3 projector windows, optional camera and Syphon/Spout Out.\nBENCH_JSON \"media_io\" reports per-clip decode vs cache-hit ms, loop-\nboundary decode, decoded/dropped/skipped, repeats vs expected repeats,\nuploads vs new frames, reader restarts; per-window present/interval/\njitter/missed vsync; Syphon publish ms; camera fps or \"skipped\".\nInstrumentation is inert unless the fixture sets Bench::MediaIoEnabled():\nPlatform::VideoBenchStats on all three platforms (lock-free SPSC ring for\nthe Win/Linux decode threads), read-only CameraAuthorizationStatus on all\nthree platforms (never prompts). GPU upload timing only with\nINFINITE_BENCH_GPUTIMERS=1, via the per-node ring with the cook query off.\nrun_all.sh runs the 9-variant ladder (B8_FRAMES, default 300) under a new\nopt-in FIXTURE_TIMEOUT watchdog. README records verification numbers (not\na baseline: unfocused/unpaced) and findings 1-8, measured, not fixed.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
       "raw": "feat(bench): B8 media I/O fixture\n\nINFINITE_BENCH_B8: 1-4 looping H.264 clips (1080p30/2160p30, generated\ninto gitignored bench/media/ by scripts/bench/b8_make_clips.sh) into\nOutputs, 0-3 projector windows, optional camera and Syphon/Spout Out.\nBENCH_JSON \"media_io\" reports per-clip decode vs cache-hit ms, loop-\nboundary decode, decoded/dropped/skipped, repeats vs expected repeats,\nuploads vs new frames, reader restarts; per-window present/interval/\njitter/missed vsync; Syphon publish ms; camera fps or \"skipped\".\n\nInstrumentation is inert unless the fixture sets Bench::MediaIoEnabled():\nPlatform::VideoBenchStats on all three platforms (lock-free SPSC ring for\nthe Win/Linux decode threads), read-only CameraAuthorizationStatus on all\nthree platforms (never prompts). GPU upload timing only with\nINFINITE_BENCH_GPUTIMERS=1, via the per-node ring with the cook query off.\n\nrun_all.sh runs the 9-variant ladder (B8_FRAMES, default 300) under a new\nopt-in FIXTURE_TIMEOUT watchdog. README records verification numbers (not\na baseline: unfocused/unpaced) and findings 1-8, measured, not fixed.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
     },
-<<<<<<< HEAD
     "stat": ".gitignore                         |   1 +\n docs/plans/perf/README.md          | 152 ++++++++-\n docs/plans/perf/benchmark-suite.md |   2 +-\n scripts/bench/b8_make_clips.sh     |  54 +++\n scripts/bench/run_all.sh           |  43 ++-\n src/core/BenchMediaIo.h            | 132 ++++++++\n src/core/BenchReport.cpp           |   3 +\n src/core/BenchReport.h             |   4 +\n src/main.cpp                       | 667 ++++++++++++++++++++++++++++++++++++-\n src/nodes/SyphonOutNode.cpp        |   5 +\n src/nodes/SyphonOutNode.h          |   7 +\n src/nodes/VideoInNode.cpp          |  20 ++\n src/nodes/VideoInNode.h            |   6 +\n src/nodes/VideoSourceNode.cpp      |  62 +++-\n src/nodes/VideoSourceNode.h        |   6 +\n src/platform/Platform.h            |  24 ++\n src/platform/Platform.mm           |  56 ++++\n src/platform/linux/CameraLinux.cpp |   7 +\n src/platform/linux/MediaLinux.cpp  |  48 ++-\n src/platform/win/MediaWin.cpp      |  43 +++\n 20 files changed, 1323 insertions(+), 19 deletions(-)\n create mode 100755 scripts/bench/b8_make_clips.sh\n create mode 100644 src/core/BenchMediaIo.h",
     "files": [
       ".gitignore",
@@ -1487,9 +2873,6 @@
       "src/platform/linux/MediaLinux.cpp",
       "src/platform/win/MediaWin.cpp"
     ]
-=======
-    "stat": ".gitignore                         |   1 +\n docs/plans/perf/README.md          | 152 ++++++++-\n docs/plans/perf/benchmark-suite.md |   2 +-\n scripts/bench/b8_make_clips.sh     |  54 +++\n scripts/bench/run_all.sh           |  43 ++-\n src/core/BenchMediaIo.h            | 132 ++++++++\n src/core/BenchReport.cpp           |   3 +\n src/core/BenchReport.h             |   4 +\n src/main.cpp                       | 667 ++++++++++++++++++++++++++++++++++++-\n src/nodes/SyphonOutNode.cpp        |   5 +\n src/nodes/SyphonOutNode.h          |   7 +\n src/nodes/VideoInNode.cpp          |  20 ++\n src/nodes/VideoInNode.h            |   6 +\n src/nodes/VideoSourceNode.cpp      |  62 +++-\n src/nodes/VideoSourceNode.h        |   6 +\n src/platform/Platform.h            |  24 ++\n src/platform/Platform.mm           |  56 ++++\n src/platform/linux/CameraLinux.cpp |   7 +\n src/platform/linux/MediaLinux.cpp  |  48 ++-\n src/platform/win/MediaWin.cpp      |  43 +++\n 20 files changed, 1323 insertions(+), 19 deletions(-)\n create mode 100755 scripts/bench/b8_make_clips.sh\n create mode 100644 src/core/BenchMediaIo.h"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "356546bd9aeb4f00e297d5d0aaed6a2519bedf27",
@@ -1505,7 +2888,6 @@
       "body": "",
       "raw": "Merge branch 'feature/b6-canvas-nav-fixture' into main"
     },
-<<<<<<< HEAD
     "stat": "",
     "files": [
       "docs/plans/perf/README.md",
@@ -1517,9 +2899,6 @@
       "src/core/BenchReport.h",
       "src/main.cpp"
     ]
-=======
-    "stat": ""
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "ef58a66cff3e080deb7594ad00fd96d3d3f6a46a",
@@ -1537,7 +2916,6 @@
       "body": "Programmatic pan/zoom/drag/dropdown over a wired 300-node grid through new\ned::SetViewScroll/SetViewZoom calls, no OS-level UI scripting. Reports\nvisible vs drawn bodies, off-screen body cost, per-phase frame times,\non-vsync fraction (unpaced runs are tagged and their targets go null unless a\nlower bound already fails), and a B6-only cook_all stage for the untimed\nwhole-graph cook loop. run_all.sh runs B6 and passes\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
       "raw": "feat(bench): B6 canvas navigation fixture\n\nProgrammatic pan/zoom/drag/dropdown over a wired 300-node grid through new\ned::SetViewScroll/SetViewZoom calls, no OS-level UI scripting. Reports\nvisible vs drawn bodies, off-screen body cost, per-phase frame times,\non-vsync fraction (unpaced runs are tagged and their targets go null unless a\nlower bound already fails), and a B6-only cook_all stage for the untimed\nwhole-graph cook loop. run_all.sh runs B6 and passes\n-ApplePersistenceIgnoreState so a crashed fixture can't hang later launches.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
     },
-<<<<<<< HEAD
     "stat": "docs/plans/perf/README.md                          |  80 +++-\n external/imgui-node-editor/imgui_node_editor.h     |   4 +\n .../imgui-node-editor/imgui_node_editor_api.cpp    |  26 ++\n .../imgui-node-editor/imgui_node_editor_internal.h |  28 ++\n scripts/bench/run_all.sh                           |  20 +-\n src/core/BenchReport.cpp                           |  16 +\n src/core/BenchReport.h                             |  17 +-\n src/main.cpp                                       | 459 ++++++++++++++++++++-\n 8 files changed, 633 insertions(+), 17 deletions(-)",
     "files": [
       "docs/plans/perf/README.md",
@@ -1549,9 +2927,6 @@
       "src/core/BenchReport.h",
       "src/main.cpp"
     ]
-=======
-    "stat": "docs/plans/perf/README.md                          |  80 +++-\n external/imgui-node-editor/imgui_node_editor.h     |   4 +\n .../imgui-node-editor/imgui_node_editor_api.cpp    |  26 ++\n .../imgui-node-editor/imgui_node_editor_internal.h |  28 ++\n scripts/bench/run_all.sh                           |  20 +-\n src/core/BenchReport.cpp                           |  16 +\n src/core/BenchReport.h                             |  17 +-\n src/main.cpp                                       | 459 ++++++++++++++++++++-\n 8 files changed, 633 insertions(+), 17 deletions(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "82cfb1be883cdc81ab718384c89efdb5e14e21c6",
@@ -1567,7 +2942,6 @@
       "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
       "raw": "Merge branch 'fix/audio-stale-device' into main\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
     },
-<<<<<<< HEAD
     "stat": "",
     "files": [
       "docs/plans/perf/README.md",
@@ -1575,9 +2949,6 @@
       "src/platform/linux/AudioDeviceLinux.cpp",
       "src/platform/win/AudioDeviceWin.cpp"
     ]
-=======
-    "stat": ""
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "884e2236436a8bc52cf5b2b696b7d5e5743aca63",
@@ -1593,14 +2964,10 @@
       "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
       "raw": "docs(perf): mark stale saved output device bullet as fixed\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
     },
-<<<<<<< HEAD
     "stat": "docs/plans/perf/README.md | 20 ++++++++++++--------\n 1 file changed, 12 insertions(+), 8 deletions(-)",
     "files": [
       "docs/plans/perf/README.md"
     ]
-=======
-    "stat": "docs/plans/perf/README.md | 20 ++++++++++++--------\n 1 file changed, 12 insertions(+), 8 deletions(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "9a164d38693f1d6cc30063fb6e46bc30d19b5b9b",
@@ -1616,16 +2983,12 @@
       "body": "",
       "raw": "fix(audio): fallback to default device when saved device id is stale or invalid"
     },
-<<<<<<< HEAD
     "stat": "src/platform/Platform.mm                | 60 +++++++++++++++++++++++----------\n src/platform/linux/AudioDeviceLinux.cpp | 28 ++++++++++-----\n src/platform/win/AudioDeviceWin.cpp     | 35 +++++++++++++------\n 3 files changed, 87 insertions(+), 36 deletions(-)",
     "files": [
       "src/platform/Platform.mm",
       "src/platform/linux/AudioDeviceLinux.cpp",
       "src/platform/win/AudioDeviceWin.cpp"
     ]
-=======
-    "stat": "src/platform/Platform.mm                | 60 +++++++++++++++++++++++----------\n src/platform/linux/AudioDeviceLinux.cpp | 28 ++++++++++-----\n src/platform/win/AudioDeviceWin.cpp     | 35 +++++++++++++------\n 3 files changed, 87 insertions(+), 36 deletions(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "b493ab90e28cfada889e3fa4a076c9f981105e7f",
@@ -1641,15 +3004,11 @@
       "body": "",
       "raw": "Merge branch 'fix/bench-b3-audio-vsync' into main"
     },
-<<<<<<< HEAD
     "stat": "",
     "files": [
       "docs/plans/perf/README.md",
       "src/main.cpp"
     ]
-=======
-    "stat": ""
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "dfd7434df88546fb3215278e94e95c2900f3413c",
@@ -1671,15 +3030,11 @@
       "body": "AudioObjectID made the engine fail (-10875), so every audio row was 0.\nengine is not running.\nso the canvas vsync paces the loop. Runs where the canvas lost focus\nare tagged ,unfocused=1.\nThe dry run reports i2p_dryrun_no_false_samples instead.\nprojector and stale-device findings.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
       "raw": "fix(bench): make B3 audio, projector pacing and i2p results real\n\n- B1/B3/B5d force the system default output device. A stale saved\n  AudioObjectID made the engine fail (-10875), so every audio row was 0.\n- audio is reported as not measured (null, no audio targets) when the\n  engine is not running.\n- B3 lays the canvas and projector side by side and focuses the canvas,\n  so the canvas vsync paces the loop. Runs where the canvas lost focus\n  are tagged ,unfocused=1.\n- i2p: zero samples is null; the target needs >=20 samples and max <=2.\n  The dry run reports i2p_dryrun_no_false_samples instead.\n- README: void the first B3 baseline and ladder; record the unpaced\n  projector and stale-device findings.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
     },
-<<<<<<< HEAD
     "stat": "docs/plans/perf/README.md | 86 ++++++++++++++++++++++++++--------------------\n src/main.cpp              | 87 ++++++++++++++++++++++++++++++++++++++---------\n 2 files changed, 121 insertions(+), 52 deletions(-)",
     "files": [
       "docs/plans/perf/README.md",
       "src/main.cpp"
     ]
-=======
-    "stat": "docs/plans/perf/README.md | 86 ++++++++++++++++++++++++++--------------------\n src/main.cpp              | 87 ++++++++++++++++++++++++++++++++++++++---------\n 2 files changed, 121 insertions(+), 52 deletions(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "46f4d2a978d03730aae66a9ee529b4aa355dfbb8",
@@ -1695,15 +3050,11 @@
       "body": "",
       "raw": "Merge branch 'fix/bench-b3-measurement' into main"
     },
-<<<<<<< HEAD
     "stat": "",
     "files": [
       "docs/plans/perf/README.md",
       "src/main.cpp"
     ]
-=======
-    "stat": ""
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "a89e3b5d2e9d4871fc565d2b94837d9215557742",
@@ -1719,15 +3070,11 @@
       "body": "",
       "raw": "fix(bench): fix B3 input-to-photon latency probe and projector measurement"
     },
-<<<<<<< HEAD
     "stat": "docs/plans/perf/README.md |  63 +++++++++++--\n src/main.cpp              | 230 +++++++++++++++++++++++++++++++---------------\n 2 files changed, 212 insertions(+), 81 deletions(-)",
     "files": [
       "docs/plans/perf/README.md",
       "src/main.cpp"
     ]
-=======
-    "stat": "docs/plans/perf/README.md |  63 +++++++++++--\n src/main.cpp              | 230 +++++++++++++++++++++++++++++++---------------\n 2 files changed, 212 insertions(+), 81 deletions(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "7f8d873990229b5c4f4302b4c7c3ad19d9f86ce3",
@@ -1743,15 +3090,11 @@
       "body": "",
       "raw": "bench: add B3 live performance to run_all.sh and perf README"
     },
-<<<<<<< HEAD
     "stat": "docs/plans/perf/README.md | 2 +-\n scripts/bench/run_all.sh  | 7 ++++++-\n 2 files changed, 7 insertions(+), 2 deletions(-)",
     "files": [
       "docs/plans/perf/README.md",
       "scripts/bench/run_all.sh"
     ]
-=======
-    "stat": "docs/plans/perf/README.md | 2 +-\n scripts/bench/run_all.sh  | 7 ++++++-\n 2 files changed, 7 insertions(+), 2 deletions(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "18caec83b0b636749b2652845aa9b16435c01a27",
@@ -1767,7 +3110,6 @@
       "body": "",
       "raw": "Merge branch 'main' into feature/bench-b3-live-performance"
     },
-<<<<<<< HEAD
     "stat": "",
     "files": [
       "docs/plans/perf/README.md",
@@ -1779,9 +3121,6 @@
       "src/platform/linux/PlatformLinux.cpp",
       "src/platform/win/PlatformWin.cpp"
     ]
-=======
-    "stat": ""
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "0720f3f9b610452f7e8796f57d09a38da9485211",
@@ -1802,7 +3141,6 @@
       "body": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
       "raw": "Implement Benchmark B3 (Live Performance Under Load)\n\n- Live scenario combining B1-lite (8/16 voices at configurable buffer), B2-lite (scale s visual scene, animated), open projector window, simulated MIDI note/CC input stream, gesture playback on Material metallic, and 3 Prediction modulators (Drift, Moves, Predictive Modulator) driving visual params.\n- Measures projector presentation interval p99, stddev jitter, missed vsync pct against monitor refresh rate, canvas frame p50/p99, audio callback load p99 & xruns, input-to-photon latency (parameter change to output texture revision change), and memory footprint.\n- Evaluates \u00a76 benchmark targets in BenchReport JSON emission.\n- Cross-platform MIDI injection support (macOS CoreMIDI, Linux ALSA, Windows WinMM).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
     },
-<<<<<<< HEAD
     "stat": "src/core/BenchReport.cpp         |  51 +++-\n src/core/BenchReport.h           |  16 ++\n src/main.cpp                     | 519 +++++++++++++++++++++++++++++----------\n src/platform/Platform.h          |   4 +\n src/platform/Platform.mm         |  10 +\n src/platform/linux/MidiLinux.cpp |  39 +++\n src/platform/win/MidiWin.cpp     |  10 +\n 7 files changed, 518 insertions(+), 131 deletions(-)",
     "files": [
       "src/core/BenchReport.cpp",
@@ -1813,9 +3151,6 @@
       "src/platform/linux/MidiLinux.cpp",
       "src/platform/win/MidiWin.cpp"
     ]
-=======
-    "stat": "src/core/BenchReport.cpp         |  51 +++-\n src/core/BenchReport.h           |  16 ++\n src/main.cpp                     | 519 +++++++++++++++++++++++++++++----------\n src/platform/Platform.h          |   4 +\n src/platform/Platform.mm         |  10 +\n src/platform/linux/MidiLinux.cpp |  39 +++\n src/platform/win/MidiWin.cpp     |  10 +\n 7 files changed, 518 insertions(+), 131 deletions(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "8fb7a41281118251dfae6d308f4db3fe52b7dafc",
@@ -1835,7 +3170,6 @@
       "body": "",
       "raw": "Fix B9 peak RSS coverage and add phys_footprint memory tracking\n\n- Track peak RSS across the entire run including post-build and frame 2\n- Add Platform::ProcessPhysFootprintMb (task_vm_info.phys_footprint on macOS, PrivateUsage on Windows, RssAnon on Linux)\n- Calculate memory growth slope from physical footprint next to RSS"
     },
-<<<<<<< HEAD
     "stat": "src/core/BenchReport.cpp             | 17 ++++++++++++++\n src/core/BenchReport.h               | 14 ++++++++++--\n src/main.cpp                         | 44 ++++++++++++++++++++++++++++++++----\n src/platform/Platform.h              |  6 +++++\n src/platform/Platform.mm             | 11 +++++++++\n src/platform/linux/PlatformLinux.cpp | 22 ++++++++++++++++++\n src/platform/win/PlatformWin.cpp     |  9 ++++++++\n tools/bench.py                       | 32 ++++++++++++++------------\n 8 files changed, 134 insertions(+), 21 deletions(-)",
     "files": [
       "src/core/BenchReport.cpp",
@@ -1847,9 +3181,6 @@
       "src/platform/win/PlatformWin.cpp",
       "tools/bench.py"
     ]
-=======
-    "stat": "src/core/BenchReport.cpp             | 17 ++++++++++++++\n src/core/BenchReport.h               | 14 ++++++++++--\n src/main.cpp                         | 44 ++++++++++++++++++++++++++++++++----\n src/platform/Platform.h              |  6 +++++\n src/platform/Platform.mm             | 11 +++++++++\n src/platform/linux/PlatformLinux.cpp | 22 ++++++++++++++++++\n src/platform/win/PlatformWin.cpp     |  9 ++++++++\n tools/bench.py                       | 32 ++++++++++++++------------\n 8 files changed, 134 insertions(+), 21 deletions(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "694898577c18f52c5a25e26b89237ce64e278df2",
@@ -1865,7 +3196,6 @@
       "body": "",
       "raw": "Merge feature/bench-b9-memory into main"
     },
-<<<<<<< HEAD
     "stat": "",
     "files": [
       "docs/plans/perf/README.md",
@@ -1886,9 +3216,6 @@
       "src/platform/win/PlatformWin.cpp",
       "tools/bench.py"
     ]
-=======
-    "stat": ""
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "e4088a55a4187f75c7166f92e27973fa4f29c844",
@@ -1904,7 +3231,6 @@
       "body": "B9's peak started at frame 2, after the scene was built, so it could come\nout below rss_built_mb (b2: 155 < 281). Start is now process launch, and\nthe peak covers launch, build and every frame to the end.\nRSS falls under memory pressure because macOS compresses pages, so it\nreads as the app freeing memory it still holds. Platform::ProcessFootprintMb\nadds the OS-charged number on each platform: phys_footprint on macOS,\nPrivateUsage on Windows, VmRSS + VmSwap on Linux. B9 reports it at the same\npoints as RSS, with its own peak and slope. README records the first B9\nresults, the footprint check and the 470 MB of B2 render targets.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
       "raw": "Fix B9 peak and report OS memory footprint alongside RSS\n\nB9's peak started at frame 2, after the scene was built, so it could come\nout below rss_built_mb (b2: 155 < 281). Start is now process launch, and\nthe peak covers launch, build and every frame to the end.\n\nRSS falls under memory pressure because macOS compresses pages, so it\nreads as the app freeing memory it still holds. Platform::ProcessFootprintMb\nadds the OS-charged number on each platform: phys_footprint on macOS,\nPrivateUsage on Windows, VmRSS + VmSwap on Linux. B9 reports it at the same\npoints as RSS, with its own peak and slope. README records the first B9\nresults, the footprint check and the 470 MB of B2 render targets.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
     },
-<<<<<<< HEAD
     "stat": "docs/plans/perf/README.md            | 39 ++++++++++++++++++++++++--\n src/core/BenchReport.cpp             | 16 +++++++++++\n src/core/BenchReport.h               | 11 ++++++++\n src/main.cpp                         | 53 ++++++++++++++++++++++++++++--------\n src/platform/Platform.h              |  9 ++++++\n src/platform/Platform.mm             | 11 ++++++++\n src/platform/linux/PlatformLinux.cpp | 20 ++++++++++++++\n src/platform/win/PlatformWin.cpp     | 11 ++++++++\n 8 files changed, 156 insertions(+), 14 deletions(-)",
     "files": [
       "docs/plans/perf/README.md",
@@ -1916,9 +3242,6 @@
       "src/platform/linux/PlatformLinux.cpp",
       "src/platform/win/PlatformWin.cpp"
     ]
-=======
-    "stat": "docs/plans/perf/README.md            | 39 ++++++++++++++++++++++++--\n src/core/BenchReport.cpp             | 16 +++++++++++\n src/core/BenchReport.h               | 11 ++++++++\n src/main.cpp                         | 53 ++++++++++++++++++++++++++++--------\n src/platform/Platform.h              |  9 ++++++\n src/platform/Platform.mm             | 11 ++++++++\n src/platform/linux/PlatformLinux.cpp | 20 ++++++++++++++\n src/platform/win/PlatformWin.cpp     | 11 ++++++++\n 8 files changed, 156 insertions(+), 14 deletions(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "318998b766d16e30d7b6369ac53fec294eb4280b",
@@ -1934,7 +3257,6 @@
       "body": "INFINITE_BENCH_B9SCENE=b2|b4 runs the B2 or B4 scene at scale l, animated.\nIt reports RSS at start, after building, at frames 32 and 152, and at the\nend, plus the peak and the slope per 100 frames. It also estimates GPU\nmemory, split into textures, render targets, shadow maps, mesh buffers and\ninstance buffers, by summing every allocation the GL wrappers can see.\nThe B2/B4 scene builders move into functions so B9 can reuse them.\ntools/bench.py wraps the fixtures in one CLI.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
       "raw": "Add B9 memory-footprint benchmark and GPU memory estimate\n\nINFINITE_BENCH_B9SCENE=b2|b4 runs the B2 or B4 scene at scale l, animated.\nIt reports RSS at start, after building, at frames 32 and 152, and at the\nend, plus the peak and the slope per 100 frames. It also estimates GPU\nmemory, split into textures, render targets, shadow maps, mesh buffers and\ninstance buffers, by summing every allocation the GL wrappers can see.\nThe B2/B4 scene builders move into functions so B9 can reuse them.\ntools/bench.py wraps the fixtures in one CLI.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
     },
-<<<<<<< HEAD
     "stat": "docs/plans/perf/benchmark-suite.md |   2 +-\n scripts/bench/compare.py           |  35 +-\n scripts/bench/run_all.sh           |   9 +-\n src/core/BenchReport.cpp           | 217 +++++++++-\n src/core/BenchReport.h             |  63 +++\n src/core/GLUtil.cpp                |   6 +\n src/core/NodeViewport.cpp          |  28 +-\n src/main.cpp                       | 782 +++++++++++++++++++++----------------\n src/nodes/EnvironmentNode.cpp      |   6 +\n src/nodes/Geometry3DNodes.cpp      |  43 +-\n src/nodes/ImageSourceNode.cpp      |   9 +\n tools/bench.py                     | 184 +++++++++\n 12 files changed, 1017 insertions(+), 367 deletions(-)\n create mode 100644 tools/bench.py",
     "files": [
       "docs/plans/perf/benchmark-suite.md",
@@ -1950,9 +3272,6 @@
       "src/nodes/ImageSourceNode.cpp",
       "tools/bench.py"
     ]
-=======
-    "stat": "docs/plans/perf/benchmark-suite.md |   2 +-\n scripts/bench/compare.py           |  35 +-\n scripts/bench/run_all.sh           |   9 +-\n src/core/BenchReport.cpp           | 217 +++++++++-\n src/core/BenchReport.h             |  63 +++\n src/core/GLUtil.cpp                |   6 +\n src/core/NodeViewport.cpp          |  28 +-\n src/main.cpp                       | 782 +++++++++++++++++++++----------------\n src/nodes/EnvironmentNode.cpp      |   6 +\n src/nodes/Geometry3DNodes.cpp      |  43 +-\n src/nodes/ImageSourceNode.cpp      |   9 +\n tools/bench.py                     | 184 +++++++++\n 12 files changed, 1017 insertions(+), 367 deletions(-)\n create mode 100644 tools/bench.py"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "9eb3e05abc58d3b8161149bf8cd444574cb92b62",
@@ -1968,14 +3287,10 @@
       "body": "",
       "raw": "Merge fix/hdri-background-seam into main"
     },
-<<<<<<< HEAD
     "stat": "",
     "files": [
       "src/nodes/Geometry3DNodes.cpp"
     ]
-=======
-    "stat": ""
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "2d522251ede92b0cd2996007def0a0f11e2d03de",
@@ -1991,16 +3306,12 @@
       "body": "",
       "raw": "Merge feature/ocean-normals-no-weld into main"
     },
-<<<<<<< HEAD
     "stat": "",
     "files": [
       "docs/plans/perf/README.md",
       "src/core/Mesh.cpp",
       "src/main.cpp"
     ]
-=======
-    "stat": ""
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "e4350a690949918db04b85b46c8f5f849caf93f1",
@@ -2016,14 +3327,10 @@
       "body": "47c46ad replaced src/main.cpp with an older copy. That removed the\ncached GetNodeInstanceIndexScan from 1d19afa and brought back the\nper-call scan over every node's title. This commit restores it and\nkeeps the Ocean self-test that 47c46ad added.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
       "raw": "Restore node-instance cache dropped by the Ocean normals commit\n\n47c46ad replaced src/main.cpp with an older copy. That removed the\ncached GetNodeInstanceIndexScan from 1d19afa and brought back the\nper-call scan over every node's title. This commit restores it and\nkeeps the Ocean self-test that 47c46ad added.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
     },
-<<<<<<< HEAD
     "stat": "src/main.cpp | 58 +++++++++++++++++++++++++++++++++++++++++++++++-----------\n 1 file changed, 47 insertions(+), 11 deletions(-)",
     "files": [
       "src/main.cpp"
     ]
-=======
-    "stat": "src/main.cpp | 58 +++++++++++++++++++++++++++++++++++++++++++++++-----------\n 1 file changed, 47 insertions(+), 11 deletions(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "47c46adfd59e5e2b67a9d278e52d3d2b7dfcaf17",
@@ -2039,16 +3346,12 @@
       "body": "",
       "raw": "Optimize MeshOps::Ocean normals via direct index buffer accumulation without weld map"
     },
-<<<<<<< HEAD
     "stat": "docs/plans/perf/README.md |  17 ++++++++\n src/core/Mesh.cpp         |  32 +++++++++++++-\n src/main.cpp              | 104 +++++++++++++++++++++++++---------------------\n 3 files changed, 103 insertions(+), 50 deletions(-)",
     "files": [
       "docs/plans/perf/README.md",
       "src/core/Mesh.cpp",
       "src/main.cpp"
     ]
-=======
-    "stat": "docs/plans/perf/README.md |  17 ++++++++\n src/core/Mesh.cpp         |  32 +++++++++++++-\n src/main.cpp              | 104 +++++++++++++++++++++++++---------------------\n 3 files changed, 103 insertions(+), 50 deletions(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "f897274495643140d5559b2377aac65d0f12de78",
@@ -2064,14 +3367,10 @@
       "body": "texture() at the equirect u=0/1 wrap relied on implicit screen-space\nderivatives, which blow up right at the wrap (u jumps ~1 to ~0 between\nadjacent fragments) and force the smallest mip - a thin vertical line\nof the image's average colour up the sky. Sample twice, once as-is and\nonce shifted half a turn so its own wrap lands away from this\nfragment, and feed textureGrad() whichever pair of derivatives is\nsmall. The reflection path (sampleEnv, textureLod) was already correct\nand is untouched; dirToEquirect has only these two call sites in the\ncodebase.\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
       "raw": "Fix HDRI background seam with seam-safe textureGrad sampling\n\ntexture() at the equirect u=0/1 wrap relied on implicit screen-space\nderivatives, which blow up right at the wrap (u jumps ~1 to ~0 between\nadjacent fragments) and force the smallest mip - a thin vertical line\nof the image's average colour up the sky. Sample twice, once as-is and\nonce shifted half a turn so its own wrap lands away from this\nfragment, and feed textureGrad() whichever pair of derivatives is\nsmall. The reflection path (sampleEnv, textureLod) was already correct\nand is untouched; dirToEquirect has only these two call sites in the\ncodebase.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
     },
-<<<<<<< HEAD
     "stat": "src/nodes/Geometry3DNodes.cpp | 22 +++++++++++++++++++++-\n 1 file changed, 21 insertions(+), 1 deletion(-)",
     "files": [
       "src/nodes/Geometry3DNodes.cpp"
     ]
-=======
-    "stat": "src/nodes/Geometry3DNodes.cpp | 22 +++++++++++++++++++++-\n 1 file changed, 21 insertions(+), 1 deletion(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "0972dd64c7b916502f284daa1cca7208f6428129",
@@ -2087,7 +3386,6 @@
       "body": "",
       "raw": "Merge feature/bench-b4-complex-3d into main"
     },
-<<<<<<< HEAD
     "stat": "",
     "files": [
       ".claude/skills/new-effect-node/SKILL.md",
@@ -2123,9 +3421,6 @@
       "tools/semi-brain/3_datasets/train_sft_alpaca.jsonl",
       "tools/semi-brain/3_datasets/train_sft_sharegpt.jsonl"
     ]
-=======
-    "stat": ""
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "c1b568db5488fddc998d241dd2c510af5cccfe94",
@@ -2141,7 +3436,6 @@
       "body": "B4 renders one 1080p Render 3D scene with an ocean, 1k-20k instanced\ncubes, a torus array, a glass sphere, three lights, sun shadows and an\nHDRI. It sweeps scale and shadow resolution and reports drawn tris and\ndraw calls. INFINITE_BENCH_B4PASSES times the shadow, opaque,\ntransmissive and resolve passes separately.\nINFINITE_BENCH_GPUTIMERS=0 turns off the GL timer queries.\nglEndQuery(GL_TIME_ELAPSED) stalls the CPU on macOS and roughly\ndoubles frame_ms.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
       "raw": "Add B4 complex-3D benchmark and a switch to turn GPU timers off\n\nB4 renders one 1080p Render 3D scene with an ocean, 1k-20k instanced\ncubes, a torus array, a glass sphere, three lights, sun shadows and an\nHDRI. It sweeps scale and shadow resolution and reports drawn tris and\ndraw calls. INFINITE_BENCH_B4PASSES times the shadow, opaque,\ntransmissive and resolve passes separately.\n\nINFINITE_BENCH_GPUTIMERS=0 turns off the GL timer queries.\nglEndQuery(GL_TIME_ELAPSED) stalls the CPU on macOS and roughly\ndoubles frame_ms.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
     },
-<<<<<<< HEAD
     "stat": "docs/plans/perf/README.md     |  53 +++++++++-\n scripts/bench/run_all.sh      |  17 ++-\n src/core/BenchReport.cpp      |  13 +++\n src/core/BenchReport.h        |  10 ++\n src/main.cpp                  | 241 ++++++++++++++++++++++++++++++++++++++++--\n src/nodes/Geometry3DNodes.cpp |   8 +-\n 6 files changed, 330 insertions(+), 12 deletions(-)",
     "files": [
       "docs/plans/perf/README.md",
@@ -2189,9 +3483,6 @@
     "files": [
       "README.md"
     ]
-=======
-    "stat": "docs/plans/perf/README.md     |  53 +++++++++-\n scripts/bench/run_all.sh      |  17 ++-\n src/core/BenchReport.cpp      |  13 +++\n src/core/BenchReport.h        |  10 ++\n src/main.cpp                  | 241 ++++++++++++++++++++++++++++++++++++++++--\n src/nodes/Geometry3DNodes.cpp |   8 +-\n 6 files changed, 330 insertions(+), 12 deletions(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "299e97f6d86ec15c3306e9ddc99cf368446d8808",
@@ -2207,14 +3498,10 @@
       "body": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
       "raw": "docs(perf): record clean B1 SIMD, B5(f/g) sweep and B5(b) A/B results\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
     },
-<<<<<<< HEAD
     "stat": "docs/plans/perf/README.md | 52 +++++++++++++++++++++++++++++++++++++----------\n 1 file changed, 41 insertions(+), 11 deletions(-)",
     "files": [
       "docs/plans/perf/README.md"
     ]
-=======
-    "stat": "docs/plans/perf/README.md | 52 +++++++++++++++++++++++++++++++++++++----------\n 1 file changed, 41 insertions(+), 11 deletions(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "dba9c4084cff44c17d04df3151db58b6f94098b0",
@@ -2230,14 +3517,10 @@
       "body": "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>",
       "raw": "Add Trendshift badge to README\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
     },
-<<<<<<< HEAD
     "stat": "README.md | 1 +\n 1 file changed, 1 insertion(+)",
     "files": [
       "README.md"
     ]
-=======
-    "stat": "README.md | 1 +\n 1 file changed, 1 insertion(+)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "e04b7a69bae775445ffb2f1507fe8e7ba0e5b067",
@@ -2253,7 +3536,6 @@
       "body": "FilterDef gains an optional prePassBody. FilterNode runs it into an RGBA16F\nintermediate bound as uPass, then runs the main body. Gaussian Blur, Box\nBlur, Bloom and Diffuse Glow now use a horizontal pass and a vertical pass,\nso they read 2N texels per pixel instead of N\u00b2. In B2 on an M2, effect GPU\ntime drops from 32.7 to 8.6 ms/frame at scale l and frame p50 drops from\n49.7 to 21.4 ms. Outputs match within 16F rounding, checked with the new\nINFINITE_BENCH_DUMPRGBA dump and scripts/bench/rgbadiff.py.\nThe uploaded uTime value is now part of FilterNode::Signature. A\ntime-driven filter caches while the transport is stopped, where it used\nto re-render every frame and recook everything downstream.\nHygiene: 87 passed, 0 failed.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
       "raw": "Split blur-family filters into two passes; cache time filters while stopped\n\nFilterDef gains an optional prePassBody. FilterNode runs it into an RGBA16F\nintermediate bound as uPass, then runs the main body. Gaussian Blur, Box\nBlur, Bloom and Diffuse Glow now use a horizontal pass and a vertical pass,\nso they read 2N texels per pixel instead of N\u00b2. In B2 on an M2, effect GPU\ntime drops from 32.7 to 8.6 ms/frame at scale l and frame p50 drops from\n49.7 to 21.4 ms. Outputs match within 16F rounding, checked with the new\nINFINITE_BENCH_DUMPRGBA dump and scripts/bench/rgbadiff.py.\n\nThe uploaded uTime value is now part of FilterNode::Signature. A\ntime-driven filter caches while the transport is stopped, where it used\nto re-render every frame and recook everything downstream.\n\nHygiene: 87 passed, 0 failed.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
     },
-<<<<<<< HEAD
     "stat": ".claude/skills/new-effect-node/SKILL.md |  20 +++--\n docs/plans/perf/README.md               |  36 ++++++--\n scripts/bench/rgbadiff.py               |  17 ++++\n src/core/BenchReport.cpp                |  11 +++\n src/core/FilterDefs.cpp                 |  84 ++++++++++++------\n src/core/FilterDefs.h                   |   7 ++\n src/nodes/FilterNode.cpp                | 148 +++++++++++++++++++++-----------\n src/nodes/FilterNode.h                  |  47 ++++++----\n 8 files changed, 265 insertions(+), 105 deletions(-)\n create mode 100755 scripts/bench/rgbadiff.py",
     "files": [
       ".claude/skills/new-effect-node/SKILL.md",
@@ -2265,9 +3547,6 @@
       "src/nodes/FilterNode.cpp",
       "src/nodes/FilterNode.h"
     ]
-=======
-    "stat": ".claude/skills/new-effect-node/SKILL.md |  20 +++--\n docs/plans/perf/README.md               |  36 ++++++--\n scripts/bench/rgbadiff.py               |  17 ++++\n src/core/BenchReport.cpp                |  11 +++\n src/core/FilterDefs.cpp                 |  84 ++++++++++++------\n src/core/FilterDefs.h                   |   7 ++\n src/nodes/FilterNode.cpp                | 148 +++++++++++++++++++++-----------\n src/nodes/FilterNode.h                  |  47 ++++++----\n 8 files changed, 265 insertions(+), 105 deletions(-)\n create mode 100755 scripts/bench/rgbadiff.py"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "c3e5a6c00b9731d58ac607df720e67ac335ad1f5",
@@ -2283,7 +3562,6 @@
       "body": "GpuTimerRing now sums every interval a stage records in one frame, so one\nstage can cover every instance of a node type. With\nINFINITE_BENCH_B2GPUNODES, FilterNode and Render3DNode time their own draw\nthrough Bench::NodeGpuRing() in place of the enclosing cook stage. On an M2,\nBloom, Gaussian Blur and Diffuse Glow account for ~92% of B2's GPU time,\nwhile Render 3D costs ~1 ms.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
       "raw": "Add per-node GPU split to B2 and sum per-frame intervals in the GPU ring\n\nGpuTimerRing now sums every interval a stage records in one frame, so one\nstage can cover every instance of a node type. With\nINFINITE_BENCH_B2GPUNODES, FilterNode and Render3DNode time their own draw\nthrough Bench::NodeGpuRing() in place of the enclosing cook stage. On an M2,\nBloom, Gaussian Blur and Diffuse Glow account for ~92% of B2's GPU time,\nwhile Render 3D costs ~1 ms.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
     },
-<<<<<<< HEAD
     "stat": "docs/plans/perf/README.md     |  33 +++++++---\n scripts/bench/run_all.sh      |   3 +\n src/core/BenchReport.cpp      | 142 +++++++++++++++++++-----------------------\n src/core/BenchReport.h        |  36 +++++++++--\n src/main.cpp                  |   9 ++-\n src/nodes/FilterNode.cpp      |   2 +\n src/nodes/Geometry3DNodes.cpp |   2 +\n 7 files changed, 135 insertions(+), 92 deletions(-)",
     "files": [
       "docs/plans/perf/README.md",
@@ -2294,9 +3572,6 @@
       "src/nodes/FilterNode.cpp",
       "src/nodes/Geometry3DNodes.cpp"
     ]
-=======
-    "stat": "docs/plans/perf/README.md     |  33 +++++++---\n scripts/bench/run_all.sh      |   3 +\n src/core/BenchReport.cpp      | 142 +++++++++++++++++++-----------------------\n src/core/BenchReport.h        |  36 +++++++++--\n src/main.cpp                  |   9 ++-\n src/nodes/FilterNode.cpp      |   2 +\n src/nodes/Geometry3DNodes.cpp |   2 +\n 7 files changed, 135 insertions(+), 92 deletions(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "0aa8d464b57775a3bd0b3d6916b0204eab2d6bad",
@@ -2312,7 +3587,6 @@
       "body": "Bench::GpuTimerRing times main-loop stages with GL_TIME_ELAPSED through a\n4-deep per-stage ring that it polls without blocking. It feeds\nstages_gpu_ms for B2 and B5(c). It does not wrap the projectors stage\nbecause query objects are per-context, and it does not wrap swap. Its\ndestructor makes no GL calls because the ring outlives the context.\nThe B2 fixture chains Geometry -> Render 3D 1080p -> 10/20/30 effects ->\nOutput at scales s/m/l, with animated and static variants. The static\nvariant swaps Glitch (uTime) for Emboss so output_hash is deterministic.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
       "raw": "Add GPU timer query ring and B2 heavy-visuals benchmark\n\nBench::GpuTimerRing times main-loop stages with GL_TIME_ELAPSED through a\n4-deep per-stage ring that it polls without blocking. It feeds\nstages_gpu_ms for B2 and B5(c). It does not wrap the projectors stage\nbecause query objects are per-context, and it does not wrap swap. Its\ndestructor makes no GL calls because the ring outlives the context.\n\nThe B2 fixture chains Geometry -> Render 3D 1080p -> 10/20/30 effects ->\nOutput at scales s/m/l, with animated and static variants. The static\nvariant swaps Glitch (uTime) for Emboss so output_hash is deterministic.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
     },
-<<<<<<< HEAD
     "stat": "docs/plans/perf/README.md |  72 +++++++++----\n scripts/bench/run_all.sh  |   8 +-\n src/core/BenchReport.cpp  | 219 ++++++++++++++++++++++++++++++++++++++\n src/core/BenchReport.h    |  93 ++++++++++++++++\n src/main.cpp              | 265 +++++++++++++++++++++++++++++++++++++++++++++-\n 5 files changed, 635 insertions(+), 22 deletions(-)",
     "files": [
       "docs/plans/perf/README.md",
@@ -2321,9 +3595,6 @@
       "src/core/BenchReport.h",
       "src/main.cpp"
     ]
-=======
-    "stat": "docs/plans/perf/README.md |  72 +++++++++----\n scripts/bench/run_all.sh  |   8 +-\n src/core/BenchReport.cpp  | 219 ++++++++++++++++++++++++++++++++++++++\n src/core/BenchReport.h    |  93 ++++++++++++++++\n src/main.cpp              | 265 +++++++++++++++++++++++++++++++++++++++++++++-\n 5 files changed, 635 insertions(+), 22 deletions(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "a1c04532d030ad40c4920d74e34f0a3981e3196a",
@@ -2339,15 +3610,11 @@
       "body": "",
       "raw": "docs(bench): record B5(f/g) load/save & undo benchmarks in plan and runner"
     },
-<<<<<<< HEAD
     "stat": "docs/plans/perf/README.md | 22 ++++++++++++++++++----\n scripts/bench/run_all.sh  |  7 ++++++-\n 2 files changed, 24 insertions(+), 5 deletions(-)",
     "files": [
       "docs/plans/perf/README.md",
       "scripts/bench/run_all.sh"
     ]
-=======
-    "stat": "docs/plans/perf/README.md | 22 ++++++++++++++++++----\n scripts/bench/run_all.sh  |  7 ++++++-\n 2 files changed, 24 insertions(+), 5 deletions(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "0ddc8af5d70f0d8a0376d82b389b54c3b27e57c5",
@@ -2363,14 +3630,10 @@
       "body": "",
       "raw": "Add bench/results/ to .gitignore"
     },
-<<<<<<< HEAD
     "stat": ".gitignore | 1 +\n 1 file changed, 1 insertion(+)",
     "files": [
       ".gitignore"
     ]
-=======
-    "stat": ".gitignore | 1 +\n 1 file changed, 1 insertion(+)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "a518103984199d7ae125b02a9ea31a16433fb10c",
@@ -2386,16 +3649,12 @@
       "body": "",
       "raw": "Vectorize ReverbKernel 16-line FDN processing via SIMD (NEON, SSE, portable fallback)"
     },
-<<<<<<< HEAD
     "stat": "src/audio/dsp/ReverbKernel.cpp | 582 +++++++++++++++++++++++++++++++++++++++--\n src/audio/dsp/ReverbKernel.h   |   2 +\n src/main.cpp                   | 223 +++++++++++++++-\n 3 files changed, 791 insertions(+), 16 deletions(-)",
     "files": [
       "src/audio/dsp/ReverbKernel.cpp",
       "src/audio/dsp/ReverbKernel.h",
       "src/main.cpp"
     ]
-=======
-    "stat": "src/audio/dsp/ReverbKernel.cpp | 582 +++++++++++++++++++++++++++++++++++++++--\n src/audio/dsp/ReverbKernel.h   |   2 +\n src/main.cpp                   | 223 +++++++++++++++-\n 3 files changed, 791 insertions(+), 16 deletions(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "1d19afae477b87a977ffdabd3ead678110d004d7",
@@ -2411,7 +3670,6 @@
       "body": "",
       "raw": "Add B1(stages) DSP callback timing breakdown, B5(e) startup benchmark, and optimize UI hot spots"
     },
-<<<<<<< HEAD
     "stat": "docs/plans/perf/README.md                          |  59 +--\n docs/plans/perf/benchmark-suite.md                 |   2 +-\n scripts/bench/run_all.sh                           |   6 +-\n src/audio/AudioEngine.cpp                          |  28 +-\n src/audio/AudioEngine.h                            |  45 +-\n src/main.cpp                                       | 445 +++++++++++++-----\n .../1_extractors/output/git_commits_corpus.json    | 112 ++++-\n .../1_extractors/output/knowledge_index.db         | Bin 25559040 -> 25616384 bytes\n .../1_extractors/output/recovered_docs_corpus.json | 516 ++++++++++-----------\n .../3_datasets/train_dpo_preference.jsonl          |   1 +\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl | 180 +++----\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl | 180 +++----\n 12 files changed, 994 insertions(+), 580 deletions(-)",
     "files": [
       "docs/plans/perf/README.md",
@@ -2427,9 +3685,6 @@
       "tools/semi-brain/3_datasets/train_sft_alpaca.jsonl",
       "tools/semi-brain/3_datasets/train_sft_sharegpt.jsonl"
     ]
-=======
-    "stat": "docs/plans/perf/README.md                          |  59 +--\n docs/plans/perf/benchmark-suite.md                 |   2 +-\n scripts/bench/run_all.sh                           |   6 +-\n src/audio/AudioEngine.cpp                          |  28 +-\n src/audio/AudioEngine.h                            |  45 +-\n src/main.cpp                                       | 445 +++++++++++++-----\n .../1_extractors/output/git_commits_corpus.json    | 112 ++++-\n .../1_extractors/output/knowledge_index.db         | Bin 25559040 -> 25616384 bytes\n .../1_extractors/output/recovered_docs_corpus.json | 516 ++++++++++-----------\n .../3_datasets/train_dpo_preference.jsonl          |   1 +\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl | 180 +++----\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl | 180 +++----\n 12 files changed, 994 insertions(+), 580 deletions(-)"
->>>>>>> feature/provenance-cleanup
   },
   {
     "hash": "d8cec963bf4db78bc73fabbaaf4ad654be38cc05",
@@ -2574,79 +3829,6 @@
       ".claude/skills/run-infinite-hygiene/driver.sh",
       "src/main.cpp"
     ]
-  },
-  {
-    "hash": "404d3f95ee746c2d45f94d31fa026644ef8717b0",
-    "author_name": "n1m21n",
-    "author_email": "namansoniii21@gmail.com",
-    "author_date": "Wed Sep 23 19:36:28 2026 +0530",
-    "parsed_message": {
-      "type": "fix",
-      "scope": "ui",
-      "title": "Merge bugfix/canvas-ui-hotspots into main",
-      "description": "Merge bugfix/canvas-ui-hotspots into main",
-      "bullets": [],
-      "body": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
-      "raw": "Merge bugfix/canvas-ui-hotspots into main\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
-    },
-    "stat": ""
-  },
-  {
-    "hash": "e3df9823cc17a137e04be802fc02e88845c50ca2",
-    "author_name": "n1m21n",
-    "author_email": "namansoniii21@gmail.com",
-    "author_date": "Wed Sep 23 19:36:28 2026 +0530",
-    "parsed_message": {
-      "type": "fix",
-      "scope": "core",
-      "title": "Merge bugfix/modulated-undo-followups into main",
-      "description": "Merge bugfix/modulated-undo-followups into main",
-      "bullets": [],
-      "body": "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
-      "raw": "Merge bugfix/modulated-undo-followups into main\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
-    },
-    "stat": ""
-  },
-  {
-    "hash": "f3b1424553b504aa0323fdaf917132ed51133653",
-    "author_name": "n1m21n",
-    "author_email": "namansoniii21@gmail.com",
-    "author_date": "Wed Sep 23 19:22:18 2026 +0530",
-    "parsed_message": {
-      "type": "feat",
-      "scope": "core",
-      "title": "Cut per-frame canvas cost of modulated filter curves and node titles",
-      "description": "Cut per-frame canvas cost of modulated filter curves and node titles",
-      "bullets": [
-        "NodeTitleWithInstance / GetNodeInstanceIndex rescanned every node (with",
-        "The Audio Filter response curve was recomputed at full 160 points every",
-        "EQ curve and peak scan hoist band coefficients and per-point trig out of"
-      ],
-      "body": "Two measured main-thread hot spots under INFINITE_MIXEDSTRESSTEST:\n3 dynamic_casts + DisplayName each) for every title drawn - O(N^2) per\nframe. It now reads a rank/total cache built once per gNodes shape,\ninvalidated alongside the FindNodeByUid cache (erase/clear/load and once\nper frame), and re-validated per lookup against slot pointer/uid/index\nplus the live shape/op field of every dynamically-titled node, so callers\noutside the per-frame draw can never see a stale \"#N\". Nodes not stored\nin gNodes fall back to the original scan. Output is unchanged.\nframe while an LFO moved it. Modulation-driven change (signature changing\non consecutive frames with no drag) now recomputes at the 48-point drag\nresolution, capped at 20 Hz per node on a per-node phase grid so nodes\ndon't all land on the same frame. The first change and the settled curve\nare always full resolution and bit-identical to a direct recompute; a\nuser drag keeps its existing path. Also fixes a curve left at 48 points\nafter a drag whose last recompute was coarse.\nthe band x point loop (identical arithmetic); the spectrum Hann window\ncomes from a static table built with the same expression.\nAdds INFINITE_NODETITLETEST and INFINITE_FILTERCURVECACHETEST and wires\nthem into the hygiene driver.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
-      "raw": "Cut per-frame canvas cost of modulated filter curves and node titles\n\nTwo measured main-thread hot spots under INFINITE_MIXEDSTRESSTEST:\n\n- NodeTitleWithInstance / GetNodeInstanceIndex rescanned every node (with\n  3 dynamic_casts + DisplayName each) for every title drawn - O(N^2) per\n  frame. It now reads a rank/total cache built once per gNodes shape,\n  invalidated alongside the FindNodeByUid cache (erase/clear/load and once\n  per frame), and re-validated per lookup against slot pointer/uid/index\n  plus the live shape/op field of every dynamically-titled node, so callers\n  outside the per-frame draw can never see a stale \"#N\". Nodes not stored\n  in gNodes fall back to the original scan. Output is unchanged.\n\n- The Audio Filter response curve was recomputed at full 160 points every\n  frame while an LFO moved it. Modulation-driven change (signature changing\n  on consecutive frames with no drag) now recomputes at the 48-point drag\n  resolution, capped at 20 Hz per node on a per-node phase grid so nodes\n  don't all land on the same frame. The first change and the settled curve\n  are always full resolution and bit-identical to a direct recompute; a\n  user drag keeps its existing path. Also fixes a curve left at 48 points\n  after a drag whose last recompute was coarse.\n\n- EQ curve and peak scan hoist band coefficients and per-point trig out of\n  the band x point loop (identical arithmetic); the spectrum Hann window\n  comes from a static table built with the same expression.\n\nAdds INFINITE_NODETITLETEST and INFINITE_FILTERCURVECACHETEST and wires\nthem into the hygiene driver.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
-    },
-    "stat": ".claude/skills/run-infinite-hygiene/driver.sh |   4 +\n src/audio/dsp/EqKernel.h                      |  77 ++++-\n src/main.cpp                                  | 451 +++++++++++++++++++++++++-\n 3 files changed, 500 insertions(+), 32 deletions(-)"
-  },
-  {
-    "hash": "2910b2a80b9e8efc91059798958771afe72e7464",
-    "author_name": "n1m21n",
-    "author_email": "namansoniii21@gmail.com",
-    "author_date": "Wed Sep 23 19:08:41 2026 +0530",
-    "parsed_message": {
-      "type": "feat",
-      "scope": "core",
-      "title": "Close the remaining modulated-control and dropdown undo leaks",
-      "description": "Close the remaining modulated-control and dropdown undo leaks",
-      "bullets": [
-        "AudioKnobRow::Checkbox gains the ModCheckbox outUserChanged out-param",
-        "One dropdown pick pushed two entries (popup + the onSelect lambda's",
-        "Projection \"match input res\" checkpointed after writing the node;",
-        "MODDROPDOWNUNDOTEST now also drives a row Checkbox (Delay sync),"
-      ],
-      "body": "Follow-up to 2c92715. Invariant: modulation never creates an undo entry\nor dirties the patch; each real user edit creates exactly one undo entry\nholding the pre-edit state.\n(return value unchanged). The 19 callers that checkpointed on any\nchange now checkpoint only on a user click, so a cable flipping an\n\"analog\"/\"sync\"/\"freeze\"/... toggle no longer serializes the patch.\nown checkpoint). The popup now commits through CommitDropdownPick,\nwhich checkpoints once and suppresses the lambda's.\nit now edits a temporary so the entry holds the pre-change state.\nGrid X/Y dropped a post-drag checkpoint that stacked on ModSlider's\nown pre-drag one.\nDropdownButton (Audio Color Ramp mode) and DropdownKnob (Osc FM mode),\nand commits a real user pick through CommitDropdownPick, asserting one\nentry and a correct Undo. Added to GROUP_MODULATION and FULL_TESTS.\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
-      "raw": "Close the remaining modulated-control and dropdown undo leaks\n\nFollow-up to 2c92715. Invariant: modulation never creates an undo entry\nor dirties the patch; each real user edit creates exactly one undo entry\nholding the pre-edit state.\n\n- AudioKnobRow::Checkbox gains the ModCheckbox outUserChanged out-param\n  (return value unchanged). The 19 callers that checkpointed on any\n  change now checkpoint only on a user click, so a cable flipping an\n  \"analog\"/\"sync\"/\"freeze\"/... toggle no longer serializes the patch.\n- One dropdown pick pushed two entries (popup + the onSelect lambda's\n  own checkpoint). The popup now commits through CommitDropdownPick,\n  which checkpoints once and suppresses the lambda's.\n- Projection \"match input res\" checkpointed after writing the node;\n  it now edits a temporary so the entry holds the pre-change state.\n  Grid X/Y dropped a post-drag checkpoint that stacked on ModSlider's\n  own pre-drag one.\n- MODDROPDOWNUNDOTEST now also drives a row Checkbox (Delay sync),\n  DropdownButton (Audio Color Ramp mode) and DropdownKnob (Osc FM mode),\n  and commits a real user pick through CommitDropdownPick, asserting one\n  entry and a correct Undo. Added to GROUP_MODULATION and FULL_TESTS.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
-    },
-    "stat": ".claude/skills/run-infinite-hygiene/driver.sh |   2 +\n src/main.cpp                                  | 367 +++++++++++++++++++-------\n 2 files changed, 276 insertions(+), 93 deletions(-)"
   },
   {
     "hash": "4d621402f67b4771e2743b73d52e3cc4abd16fa8",

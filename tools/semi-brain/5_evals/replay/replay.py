@@ -9,6 +9,9 @@ the bug description, and score what it returns against what the commit actually 
 Ranked outputs scored:
   symbols  frame.ast_impacted_symbols, in order
   files    the file of each of those symbols, then src/ filepaths of the retrieved docs
+  focus    (additive) of the brief's top-2 main.cpp regions, whether the focus symbol it names
+           in one (l5/brief.py region_focus: ~50 lines instead of ~2,800) overlaps the span of
+           a main.cpp target symbol - the brief's line-level precision
   region   (main.cpp cases only, additive - not part of gate) whether the best-ranked
            predicted symbol that resolves to a main.cpp region (l4/regions.py) lands in the
            same region as a target symbol; "right file, wrong 30k lines" scores 0 here even
@@ -149,6 +152,35 @@ def region_hit(regions, predicted_symbols, target_symbols):
             "r3": 1.0 if any(rid in target_regions for rid in ranked_ids[:3]) else 0.0}
 
 
+def focus_hit(engine, regions, frame, target_symbols):
+    """None if no target symbol is defined in main.cpp; else {"hit": 1.0 when a focus span of
+    the brief's top-2 regions overlaps a target's span (no focus = miss), "ceiling": the same
+    for any matched symbol in those regions - what a better focus pick could reach}."""
+    from l5.brief import region_focus
+    spans = []
+    for t in target_symbols:
+        m = engine._get_symbol_meta(t)
+        if m["file"] == "src/main.cpp":
+            spans.append((m["line"], max(m.get("end_line") or 0, m["line"])))
+    if not spans:
+        return None
+
+    def overlaps(lo, hi):
+        return any(lo <= e and s <= hi for s, e in spans)
+
+    out = {"hit": 0.0, "ceiling": 0.0}
+    for r in regions.rank_regions(frame.ast_impacted_symbols, top_n=2):
+        f = region_focus(engine, frame, r)
+        if f and overlaps(f["line"], f["end_line"]):
+            out["hit"] = 1.0
+        for sym in frame.ast_impacted_symbols:
+            m = engine._get_symbol_meta(sym)
+            if (m["file"] == "src/main.cpp" and r["line_start"] <= m["line"] <= r["line_end"]
+                    and overlaps(m["line"], max(m.get("end_line") or 0, m["line"]))):
+                out["ceiling"] = 1.0
+    return out
+
+
 def run_case(case):
     tl, cache, regions = _W["timeline"], _W["cache"], _W["regions"]
     t0 = time.perf_counter()
@@ -168,6 +200,8 @@ def run_case(case):
                 "latency_ms": round(lat * 1000, 1), **file_metrics(files, case["target_files"]),
                 "symbols": rank_metrics(syms, case["target_symbols"]) if case["target_symbols"] else None,
                 "region": region_hit(regions, syms, case["target_symbols"]),
+                "focus": focus_hit(engine, regions, frame, case["target_symbols"]),
+                "confidence": frame.confidence,
                 "top_files": files[:10], "top_symbols": syms[:10],
             }
         # Weight sets for the sleep job (l1/sleep.py --grid): the full query again with each
@@ -238,6 +272,11 @@ def summarize(results, symbols_gate=True):
         else:
             block["region_hit"] = None
             block["region_r3"] = None
+        focus = [r["focus"] for r in rows if r.get("focus") is not None]
+        block["focus_hit"] = ({"n": len(focus),
+                               "rate": round(statistics.mean(f["hit"] for f in focus), 4),
+                               "ceiling": round(statistics.mean(f["ceiling"] for f in focus), 4)}
+                              if focus else None)
         out[v] = block
     f, s = out["full"]["files"], out["full"]["symbols"]
     h = out["full"]["files_nohub"]

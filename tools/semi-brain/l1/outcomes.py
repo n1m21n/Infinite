@@ -13,6 +13,12 @@ that got edited in the brief?) and what learned ranking trains on.
   paths    repo-relative; paths inside other worktrees of this repo map to the same file
   sources  <session>.jsonl and its subagents/*.jsonl (their tool calls belong to the parent
            turn running at that moment)
+  cost     what the turn spent, subagents included - what a brief is meant to save:
+             tools    tool calls
+             explore  tool calls up to and including the first edit (all of them if none)
+             tokens   context tokens processed (input + cache read + cache write), per API call
+             out      output tokens
+           an API call is counted once, though the transcript repeats it per content block
 
 Written to l1/state/outcomes.jsonl (local only: it holds prompt text). Incremental: a
 session is re-read only when one of its files changed size or mtime.
@@ -36,6 +42,7 @@ OUT = STATE_DIR / "outcomes.jsonl"
 WATERMARK = STATE_DIR / "outcomes_seen.json"
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 MAX_PROMPT = 2000
+SCHEMA = 2  # bump when a turn gains a field: every session is re-read once
 
 PATH_RE = re.compile(rf"^{re.escape(str(REPO_PATH))}[^/]*/(?:\.claude/worktrees/[^/]+/)?(.+)$")
 COMMIT_RE = re.compile(r"^\[[^\]\s]+(?: \(root-commit\))? ([0-9a-f]{7,40})\] ", re.M)
@@ -74,7 +81,7 @@ def prompt_text(rec):
 
 
 def _events(path):
-    """(t, kind, value) from one transcript: prompt / read / edit / commit."""
+    """(t, kind, value) from one transcript: prompt / read / edit / commit / tool / usage."""
     out = []
     try:
         lines = path.open(encoding="utf-8", errors="replace")
@@ -93,13 +100,20 @@ def _events(path):
             if text is not None:
                 out.append((t, "prompt", text))
                 continue
-            content = (rec.get("message") or {}).get("content")
+            msg = rec.get("message") or {}
+            usage = msg.get("usage") if rec.get("type") == "assistant" else None
+            if isinstance(usage, dict) and msg.get("id"):
+                ctx = sum(usage.get(k) or 0 for k in
+                          ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))
+                out.append((t, "usage", (msg["id"], ctx, usage.get("output_tokens") or 0)))
+            content = msg.get("content")
             if not isinstance(content, list):
                 continue
             for c in content:
                 if not isinstance(c, dict):
                     continue
                 if c.get("type") == "tool_use":
+                    out.append((t, "tool", c.get("name", "")))
                     inp = c.get("input") or {}
                     f = repo_path(inp.get("file_path") or inp.get("notebook_path"))
                     if f and c.get("name") in EDIT_TOOLS:
@@ -125,17 +139,31 @@ def session_turns(session_id, files):
     if not prompts:
         return []
     turns = [{"session": session_id, "t": p[0], "t_end": None, "prompt": p[2][:MAX_PROMPT],
-              "read": [], "edited": [], "commits": []} for p in prompts]
+              "read": [], "edited": [], "commits": [],
+              "tools": 0, "explore": 0, "tokens": 0, "out": 0} for p in prompts]
     for i in range(len(turns) - 1):
         turns[i]["t_end"] = turns[i + 1]["t"]
     starts = [t["t"] for t in turns]
-    for t, kind, value in main + subs:
+    calls = [{} for _ in turns]  # message id -> (context, output), last record wins
+    for t, kind, value in sorted(main + subs, key=lambda e: e[0]):
         if kind == "prompt" or t < starts[0]:
             continue
         i = max(j for j, s in enumerate(starts) if s <= t)
+        turn = turns[i]
+        if kind == "tool":
+            turn["tools"] += 1
+            if not turn["edited"]:
+                turn["explore"] += 1
+            continue
+        if kind == "usage":
+            calls[i][value[0]] = value[1:]
+            continue
         key = {"read": "read", "edit": "edited", "commit": "commits"}[kind]
-        if value not in turns[i][key]:
-            turns[i][key].append(value)
+        if value not in turn[key]:
+            turn[key].append(value)
+    for turn, c in zip(turns, calls):
+        turn["tokens"] = sum(ctx for ctx, _ in c.values())
+        turn["out"] = sum(o for _, o in c.values())
     return turns
 
 
@@ -156,6 +184,8 @@ def resolve_commits(hashes):
 def update():
     from mine_git_history import commit_files
     seen = json.loads(WATERMARK.read_text()) if WATERMARK.exists() else {}
+    if seen.get("_schema") != SCHEMA:
+        seen = {}
     old = {}
     if OUT.exists():
         for line in OUT.open():
@@ -168,7 +198,7 @@ def update():
     for f in SESSIONS_DIR.glob("*/subagents/*.jsonl"):
         groups.setdefault(f.parent.parent.name, []).append(f)
 
-    new_seen, changed = {}, 0
+    new_seen, changed = {"_schema": SCHEMA}, 0
     for sid, files in groups.items():
         sig = [[str(f), f.stat().st_size, int(f.stat().st_mtime)] for f in sorted(files)]
         new_seen[sid] = sig
