@@ -75,31 +75,25 @@ def parse_commit_message(title, body):
         "raw": f"{title}\n\n{body}".strip()
     }
 
-def mine_repository():
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"Mining Git history from: {REPO_PATH}")
-    
-    # Run batch git log
-    cmd = ["git", "log", "--stat", "--summary", "--pretty=format:===COMMIT_START===%n%H%n%an%n%ae%n%ad%n%s%n===BODY_START===%n%b%n===BODY_END==="]
-    res = subprocess.run(cmd, cwd=REPO_PATH, capture_output=True, text=True, errors="replace", check=True)
-    
-    raw_commits = res.stdout.split("===COMMIT_START===")
-    print(f"Parsing {len(raw_commits)-1} commits...")
-    
+LOG_FORMAT = "--pretty=format:===COMMIT_START===%n%H%n%an%n%ae%n%ad%n%s%n===BODY_START===%n%b%n===BODY_END==="
+
+
+def parse_log_output(stdout):
+    """`git log --stat --summary LOG_FORMAT` output -> corpus records, in log order."""
     commits_data = []
-    for chunk in raw_commits:
+    for chunk in stdout.split("===COMMIT_START==="):
         chunk = chunk.strip()
         if not chunk:
             continue
-            
+
         parts = chunk.split("===BODY_START===")
         header_lines = parts[0].strip().split("\n")
         body_and_stat = parts[1] if len(parts) > 1 else ""
-        
+
         body_parts = body_and_stat.split("===BODY_END===")
         body = body_parts[0].strip() if len(body_parts) > 0 else ""
         stat = body_parts[1].strip() if len(body_parts) > 1 else ""
-        
+
         if len(header_lines) >= 4:
             chash = header_lines[0]
             author_name = header_lines[1]
@@ -108,17 +102,33 @@ def mine_repository():
             title = header_lines[4] if len(header_lines) > 4 else ""
         else:
             continue
-            
-        parsed_msg = parse_commit_message(title, body)
-        
+
         commits_data.append({
             "hash": chash,
             "author_name": author_name,
             "author_email": author_email,
             "author_date": author_date,
-            "parsed_message": parsed_msg,
+            "parsed_message": parse_commit_message(title, body),
             "stat": stat
         })
+    return commits_data
+
+
+def mine_commits(revs=None):
+    """Records for the whole history (revs=None) or just the listed commit hashes."""
+    cmd = ["git", "log", "--stat", "--summary", LOG_FORMAT]
+    if revs is not None:
+        if not revs:
+            return []
+        cmd = ["git", "log", "--no-walk=unsorted", "--stat", "--summary", LOG_FORMAT, *revs]
+    res = subprocess.run(cmd, cwd=REPO_PATH, capture_output=True, text=True, errors="replace", check=True)
+    return parse_log_output(res.stdout)
+
+
+def mine_repository():
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    print(f"Mining Git history from: {REPO_PATH}")
+    commits_data = mine_commits()
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(commits_data, f, indent=2)

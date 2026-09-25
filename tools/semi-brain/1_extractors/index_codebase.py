@@ -103,9 +103,8 @@ def write_index(db_file, documents, embed_model):
     conn.close()
     print(f"✅ SQLite Hybrid Knowledge Index built successfully at: {db_file}")
 
-def build_hybrid_index():
-    EXTRACTORS_OUT.mkdir(parents=True, exist_ok=True)
-
+def load_corpora():
+    """Read every corpus index_codebase consumes, keyed by name."""
     print("Loading extracted corpora...")
     commits = []
     if (EXTRACTORS_OUT / "git_commits_corpus.json").exists():
@@ -150,6 +149,29 @@ def build_hybrid_index():
     if (EXTRACTORS_OUT / "dev_trajectory_corpus.json").exists():
         with open(EXTRACTORS_OUT / "dev_trajectory_corpus.json", "r", encoding="utf-8") as f:
             dev_trajectory = json.load(f)
+
+    return {
+        "commits": commits,
+        "ast_data": ast_data,
+        "docs": docs,
+        "skills": skills,
+        "byox": byox,
+        "sessions": sessions,
+        "session_analysis": session_analysis,
+        "dev_trajectory": dev_trajectory,
+    }
+
+def prepare_documents(corpora):
+    """Corpora -> (doc_id, category, title, content, snippet, filepath) rows. Pure, so the
+    replay benchmark can call it on time-restricted corpora."""
+    commits = corpora.get("commits") or []
+    ast_data = corpora.get("ast_data") or {}
+    docs = corpora.get("docs") or []
+    skills = corpora.get("skills") or []
+    byox = corpora.get("byox") or []
+    sessions = corpora.get("sessions") or []
+    session_analysis = corpora.get("session_analysis") or {}
+    dev_trajectory = corpora.get("dev_trajectory") or {}
 
     # Prepare documents for indexing
     documents = [] # list of (doc_id, category, title, content, snippet, filepath)
@@ -263,7 +285,11 @@ def build_hybrid_index():
         title = f"Dev Trajectory - node category: {nc}"
         content = _trend_sentence("Node category", nc, info)
         documents.append((doc_id, "dev_trajectory", title, content, content[:300], ""))
+    return documents
 
+def build_hybrid_index():
+    EXTRACTORS_OUT.mkdir(parents=True, exist_ok=True)
+    documents = prepare_documents(load_corpora())
     print(f"Total documents prepared for hybrid index: {len(documents)}")
 
     public_docs = [d for d in documents if d[1] not in PRIVATE_CATEGORIES]

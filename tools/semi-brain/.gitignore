@@ -8,3 +8,8 @@
 1_extractors/output/dev_trajectory_corpus.json
 1_extractors/output/knowledge_index_private.db
 1_extractors/output/.sync.lock
+1_extractors/output/knowledge_index_private.db-*
+# L1 state (doc store, vector cache, parse cache) holds session text and its vectors.
+l1/state/
+# Per-case replay detail; only the scorecards in history.jsonl are kept.
+5_evals/replay/runs/

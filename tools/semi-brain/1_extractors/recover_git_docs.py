@@ -18,41 +18,46 @@ def run_cmd(cmd):
     res = subprocess.run(cmd, cwd=REPO_PATH, shell=True, capture_output=True, text=True)
     return res.stdout.strip()
 
+def is_target_doc(f):
+    return f.startswith("docs/plans/") or f.startswith("docs/prompts/") or f.startswith(".claude/skills/") or f.endswith(".md")
+
+
+def deleted_paths(rev_range=""):
+    """Markdown/doc paths deleted anywhere in history (or only within rev_range, e.g. 'a..b')."""
+    cmd = f'git log {rev_range} --diff-filter=D --summary | grep "delete mode" | awk \'{{print $4}}\''
+    return sorted(set(f for f in (l.strip() for l in run_cmd(cmd).split("\n")) if f and is_target_doc(f)))
+
+
+def recover_path(file_path):
+    """The file's content just before its most recent deletion, or None."""
+    # Find commit where file was deleted
+    del_commit = run_cmd(f'git log -1 --diff-filter=D --pretty=format:"%H" -- "{file_path}"')
+    if del_commit:
+        # Show file from the commit right before deletion (del_commit^)
+        content = run_cmd(f'git show {del_commit}^:"{file_path}"')
+        if content and not content.startswith("fatal:"):
+            commit_info = run_cmd(f'git log -1 --pretty=format:"%an|%ad|%s" {del_commit}^')
+            return {
+                "path": file_path,
+                "deleted_in_commit": del_commit,
+                "commit_info": commit_info,
+                "content": content
+            }
+    return None
+
+
 def recover_docs():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     print(f"Scanning Git object history for historical docs and prompts...")
-    
-    # Find all deleted paths that were in docs/plans or docs/prompts or .claude/skills
-    cmd = 'git log --diff-filter=D --summary | grep "delete mode" | awk \'{print $4}\''
-    deleted_files = list(set([line.strip() for line in run_cmd(cmd).split("\n") if line.strip()]))
-    
-    # Filter for docs, plans, skills, prompts
-    target_deleted = [
-        f for f in deleted_files 
-        if f.startswith("docs/plans/") or f.startswith("docs/prompts/") or f.startswith(".claude/skills/") or f.endswith(".md")
-    ]
-    
+
+    target_deleted = deleted_paths()
     print(f"Found {len(target_deleted)} deleted markdown/doc files in Git history.")
-    
-    recovered = []
-    for file_path in target_deleted:
-        # Find commit where file was deleted
-        del_commit = run_cmd(f'git log -1 --diff-filter=D --pretty=format:"%H" -- "{file_path}"')
-        if del_commit:
-            # Show file from the commit right before deletion (del_commit^)
-            content = run_cmd(f'git show {del_commit}^:"{file_path}"')
-            if content and not content.startswith("fatal:"):
-                commit_info = run_cmd(f'git log -1 --pretty=format:"%an|%ad|%s" {del_commit}^')
-                recovered.append({
-                    "path": file_path,
-                    "deleted_in_commit": del_commit,
-                    "commit_info": commit_info,
-                    "content": content
-                })
-    
+
+    recovered = [r for r in (recover_path(p) for p in target_deleted) if r]
+
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(recovered, f, indent=2)
-        
+
     print(f"Successfully recovered {len(recovered)} historical docs & prompts into {OUTPUT_FILE}")
 
 if __name__ == "__main__":

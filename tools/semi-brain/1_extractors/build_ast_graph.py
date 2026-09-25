@@ -52,9 +52,13 @@ def infer_subsystem(file_path: str) -> str:
 
 def extract_symbols_and_calls(file_path: Path):
     rel_path = str(file_path.relative_to(REPO_PATH))
+    return extract_from_bytes(rel_path, file_path.read_bytes())
+
+def extract_from_bytes(rel_path: str, source_bytes: bytes):
+    """Parse one file's bytes. Pure function of (path, content), so callers can cache the
+    result by content hash (the incremental sync and the replay benchmark both do)."""
     subsystem = infer_subsystem(rel_path)
-    source_bytes = file_path.read_bytes()
-    
+
     tree = parser.parse(source_bytes)
     root = tree.root_node
     
@@ -86,6 +90,7 @@ def extract_symbols_and_calls(file_path: Path):
                     "name": class_name,
                     "file": rel_path,
                     "line": node.start_point[0] + 1,
+                    "end_line": node.end_point[0] + 1,
                     "subsystem": subsystem
                 }
                 # Recurse class body
@@ -110,6 +115,7 @@ def extract_symbols_and_calls(file_path: Path):
                     "full_name": prefix,
                     "file": rel_path,
                     "line": node.start_point[0] + 1,
+                    "end_line": node.end_point[0] + 1,
                     "subsystem": subsystem
                 }
                 if body_node:
@@ -160,6 +166,7 @@ def extract_symbols_and_calls(file_path: Path):
                 "full_name": full_func_id,
                 "file": rel_path,
                 "line": node.start_point[0] + 1,
+                "end_line": node.end_point[0] + 1,
                 "subsystem": subsystem
             }
             
@@ -193,6 +200,42 @@ def extract_symbols_and_calls(file_path: Path):
         "calls": {k: list(set(v)) for k, v in calls.items()}
     }
 
+def assemble_graph(results):
+    """Merge per-file extraction results (in a stable order) into the graph document.
+    Later files win on a symbol-id collision, as before."""
+    all_symbols = {}
+    forward_call_graph = defaultdict(list)
+    reverse_call_graph = defaultdict(list)
+    file_includes = {}
+    subsystems_map = defaultdict(list)
+    total_calls = 0
+
+    for res in results:
+        file_path = res["file"]
+        subsystems_map[res["subsystem"]].append(file_path)
+        file_includes[file_path] = res["includes"]
+        for sym_id, sym_meta in res["symbols"].items():
+            all_symbols[sym_id] = sym_meta
+        for caller, callees in res["calls"].items():
+            for c in callees:
+                forward_call_graph[caller].append(c)
+                reverse_call_graph[c].append(caller)
+                total_calls += 1
+
+    return {
+        "stats": {
+            "total_files": len(results),
+            "total_symbols": len(all_symbols),
+            "total_call_edges": total_calls,
+            "subsystems_count": len(subsystems_map)
+        },
+        "subsystems": {k: sorted(list(set(v))) for k, v in sorted(subsystems_map.items())},
+        "symbols": all_symbols,
+        "forward_call_graph": {k: sorted(list(set(v))) for k, v in forward_call_graph.items()},
+        "reverse_call_graph": {k: sorted(list(set(v))) for k, v in reverse_call_graph.items()},
+        "file_includes": file_includes
+    }
+
 def build_complete_graph():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     print(f"Scanning C++ files in {SRC_DIR}...")
@@ -200,51 +243,17 @@ def build_complete_graph():
     cpp_files = list(SRC_DIR.glob("**/*.cpp")) + list(SRC_DIR.glob("**/*.h")) + list(SRC_DIR.glob("**/*.mm"))
     print(f"Found {len(cpp_files)} source and header files.")
     
-    all_symbols = {}
-    forward_call_graph = defaultdict(list)
-    reverse_call_graph = defaultdict(list)
-    file_includes = {}
-    subsystems_map = defaultdict(list)
-    
-    total_calls = 0
-    
+    results = []
     for f in cpp_files:
         try:
-            res = extract_symbols_and_calls(f)
-            file_path = res["file"]
-            subsys = res["subsystem"]
-            subsystems_map[subsys].append(file_path)
-            file_includes[file_path] = res["includes"]
-            
-            for sym_id, sym_meta in res["symbols"].items():
-                all_symbols[sym_id] = sym_meta
-                
-            for caller, callees in res["calls"].items():
-                for c in callees:
-                    forward_call_graph[caller].append(c)
-                    reverse_call_graph[c].append(caller)
-                    total_calls += 1
+            results.append(extract_symbols_and_calls(f))
         except Exception as e:
             print(f"Error parsing {f}: {e}")
+    graph_data = assemble_graph(results)
+    all_symbols = graph_data["symbols"]
+    total_calls = graph_data["stats"]["total_call_edges"]
+    subsystems_map = graph_data["subsystems"]
 
-    # Remove duplicates
-    forward_clean = {k: sorted(list(set(v))) for k, v in forward_call_graph.items()}
-    reverse_clean = {k: sorted(list(set(v))) for k, v in reverse_call_graph.items()}
-    
-    graph_data = {
-        "stats": {
-            "total_files": len(cpp_files),
-            "total_symbols": len(all_symbols),
-            "total_call_edges": total_calls,
-            "subsystems_count": len(subsystems_map)
-        },
-        "subsystems": {k: sorted(list(set(v))) for k, v in sorted(subsystems_map.items())},
-        "symbols": all_symbols,
-        "forward_call_graph": forward_clean,
-        "reverse_call_graph": reverse_clean,
-        "file_includes": file_includes
-    }
-    
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(graph_data, f, indent=2)
         
