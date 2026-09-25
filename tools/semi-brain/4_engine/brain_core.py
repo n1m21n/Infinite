@@ -37,6 +37,7 @@ SUBSYSTEM_ANCHOR_SYMBOLS = {
 }
 
 from retriever import HybridRetriever
+from l2.compartments import merge as merge_compartments
 
 @dataclass
 class ProblemFrame:
@@ -191,8 +192,9 @@ class SemiBrainCognitiveEngine:
         subsystem = self.infer_subsystem(query)
         q = query.lower()
         
-        # 1. Run Hybrid Search over SQLite Index (BM25 + Dense)
-        hybrid_hits = self.retriever.hybrid_search(query, top_k=8)
+        # 1. L2: BM25 + dense inside each compartment, merged by per-compartment quota
+        by_compartment = self.retriever.compartment_search(query)
+        hybrid_hits = merge_compartments(by_compartment)
         
         # Extract AST symbols from hybrid hits and graph
         matched_symbols = []

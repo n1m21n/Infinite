@@ -12,6 +12,9 @@ from typing import List, Dict, Any
 from fastembed import TextEmbedding
 
 SEMI_BRAIN_DIR = Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(SEMI_BRAIN_DIR))
+from l2.compartments import COMPARTMENTS, compartment_of  # noqa: E402
 DB_FILE = SEMI_BRAIN_DIR / "1_extractors" / "output" / "knowledge_index.db"
 # Local-only index of chat/session-derived documents (see index_codebase.py). Absent on a fresh
 # clone - the retriever then answers from the public index alone.
@@ -21,6 +24,7 @@ class HybridRetriever:
     def __init__(self):
         self.db_paths = [DB_FILE, PRIVATE_DB_FILE]
         self._embed_model = None
+        self._categories = {}
         
     @property
     def embed_model(self):
@@ -96,6 +100,8 @@ class HybridRetriever:
         scale = np.maximum(np.abs(m).max(axis=1), 1e-9) / 127.0
         self._int8 = np.round(m / scale[:, None]).astype(np.int8)
         self._scale = scale.astype(np.float32)
+        comp = np.array([compartment_of(r[1]) for r in rows])
+        self._comp_idx = {c: np.flatnonzero(comp == c) for c in COMPARTMENTS}
         self._vector_cache = True
 
     RESCORE = 1000
@@ -107,9 +113,7 @@ class HybridRetriever:
         if not getattr(self, "_vector_cache", False):
             return []
 
-        query_vec = np.asarray(list(self.embed_model.embed([query]))[0], dtype=np.float32)
-        query_vec = query_vec / np.maximum(np.linalg.norm(query_vec), 1e-9)
-
+        query_vec = self._query_vec(query)
         n = len(self._doc_meta)
         qbits = np.packbits(query_vec > 0)
         ham = self._POPCOUNT[np.bitwise_xor(self._bits, qbits)].sum(axis=1)
@@ -126,6 +130,80 @@ class HybridRetriever:
             item["dense_score"] = float(sims[j])
             scored.append(item)
         return scored
+
+    def _query_vec(self, query):
+        memo = getattr(self, "_qmemo", None)
+        if memo and memo[0] == query:
+            return memo[1]
+        v = np.asarray(list(self.embed_model.embed([query]))[0], dtype=np.float32)
+        v = v / np.maximum(np.linalg.norm(v), 1e-9)
+        self._qmemo = (query, v)
+        return v
+
+    @staticmethod
+    def _fts_query(query):
+        clean_q = " OR ".join([f'"{w}"' for w in query.replace('"', '').split() if len(w) > 2])
+        return clean_q or f'"{query}"'
+
+    def compartment_search(self, query: str, limit: int = 20) -> Dict[str, List[Dict[str, Any]]]:
+        """L2: BM25 and dense ranked inside each compartment, fused per compartment by RRF.
+        Returns {compartment: [hits, best first]}."""
+        self._load_vector_cache()
+        clean_q = self._fts_query(query)
+        bm25 = {c: [] for c in COMPARTMENTS}
+        for db_path in self.db_paths:
+            if not db_path.exists():
+                continue
+            conn = sqlite3.connect(db_path)
+            try:
+                cats = self._categories.get(db_path)
+                if cats is None:
+                    cats = self._categories[db_path] = [
+                        r[0] for r in conn.execute("SELECT DISTINCT category FROM vector_documents")]
+                groups = {}
+                for cat in cats:
+                    groups.setdefault(compartment_of(cat), []).append(cat)
+                for comp, group in groups.items():
+                    filt = " OR ".join(f'category:"{c}"' for c in group)
+                    sql = ("SELECT doc_id, category, title, content, filepath, rank FROM fts_documents "
+                           "WHERE fts_documents MATCH ? ORDER BY rank LIMIT ?")
+                    for row in conn.execute(sql, (f"({filt}) AND ({clean_q})", limit)):
+                        bm25[comp].append({"doc_id": row[0], "category": row[1], "title": row[2],
+                                           "snippet": row[3][:300], "filepath": row[4], "bm25_rank": row[5]})
+            except sqlite3.OperationalError:
+                pass
+            finally:
+                conn.close()
+
+        dense = {c: [] for c in COMPARTMENTS}
+        if getattr(self, "_vector_cache", False):
+            qv = self._query_vec(query)
+            qbits = np.packbits(qv > 0)
+            ham = self._POPCOUNT[np.bitwise_xor(self._bits, qbits)].sum(axis=1)
+            for comp, idx in self._comp_idx.items():
+                if not len(idx):
+                    continue
+                c = min(self.RESCORE, len(idx))
+                cand = idx[np.argpartition(ham[idx], c - 1)[:c]] if c < len(idx) else idx
+                sims = (self._int8[cand].astype(np.float32) @ qv) * self._scale[cand]
+                k = min(limit, len(cand))
+                top = np.argpartition(-sims, k - 1)[:k]
+                for j in top[np.argsort(-sims[top])]:
+                    item = dict(self._doc_meta[cand[j]])
+                    item["dense_score"] = float(sims[j])
+                    dense[comp].append(item)
+
+        out = {}
+        for comp in COMPARTMENTS:
+            b = sorted(bm25[comp], key=lambda r: r["bm25_rank"])[:limit]
+            scores, docs = {}, {}
+            for lst in (b, dense[comp]):
+                for rank, item in enumerate(lst):
+                    docs.setdefault(item["doc_id"], item)
+                    scores[item["doc_id"]] = scores.get(item["doc_id"], 0.0) + 1.0 / (61.0 + rank)
+            ranked = sorted(scores, key=scores.get, reverse=True)
+            out[comp] = [dict(docs[d], rrf_score=scores[d], compartment=comp) for d in ranked]
+        return out
 
     def hybrid_search(self, query: str, top_k: int = 6) -> List[Dict[str, Any]]:
         """
