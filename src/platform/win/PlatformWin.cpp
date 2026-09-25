@@ -24,6 +24,10 @@
 #pragma comment(lib, "psapi.lib")
 #include <wrl/client.h>
 #include <dxgi.h>
+// WaitForDisplayRefresh's CreateDXGIFactory1. Pulled in here, not only in
+// CMake's Infinite link list, because infinite-vst3-scanner compiles this
+// file too and would otherwise fail to link.
+#pragma comment(lib, "dxgi.lib")
 
 #include <onnxruntime_cxx_api.h>
 #include <dml_provider_factory.h>
