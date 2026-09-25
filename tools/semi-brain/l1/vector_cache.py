@@ -42,7 +42,11 @@ class VectorCache:
     def embedder(self):
         if self._embedder is None:
             from fastembed import TextEmbedding
-            self._embedder = TextEmbedding(model_name=self.model)
+            # fastembed defaults to tempfile.gettempdir()/fastembed_cache, which macOS/CI can
+            # sweep between runs, forcing a re-download; STATE_DIR is this machine's stable
+            # local state, already gitignored and never pushed (see SKILL.md privacy section).
+            self._embedder = TextEmbedding(model_name=self.model,
+                                           cache_dir=str(STATE_DIR / "fastembed_cache"))
         return self._embedder
 
     def _lookup(self, keys):
