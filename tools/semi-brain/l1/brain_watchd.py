@@ -15,6 +15,8 @@ in sync as things change, instead of a batch sync after every commit.
             code, skill or doc change syncs as soon as the debounce allows.
   deferred  the sync defers its 30-minute session refits (last_sync.json "deferred_until");
             the daemon runs one more sync when the earliest of them comes due.
+  briefs    a thread serves the prompt hook's briefs from a warm engine over
+            $GITDIR/brain_brief.sock (l5/serve.py); BRAIN_NO_SERVE=1 turns it off.
 
 The post-commit/post-merge hooks see this daemon's pidfile and step aside while it is alive.
 Named brain_watchd, not sync_*, so the pgrep in scripts/bench/ab.sh only matches a running sync.
@@ -30,6 +32,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from l1 import REPO_PATH, STATE_DIR, SEMI_BRAIN_DIR  # noqa: E402
 from l1.fsevents import watch  # noqa: E402
+from l5.serve import BriefServer  # noqa: E402
 
 DEBOUNCE_S = 2.0
 TRANSCRIPT_GAP_S = 60.0
@@ -37,6 +40,7 @@ LOCK_RETRY_S = 10.0
 LOG_MAX = 1 << 20
 
 sys.path.insert(0, str(SEMI_BRAIN_DIR / "1_extractors"))
+sys.path.insert(0, str(SEMI_BRAIN_DIR / "4_engine"))
 from mine_session_history import SESSIONS_DIR as CLAUDE_DIR  # noqa: E402
 from mine_antigravity_history import BRAIN_DIR as ANTIGRAVITY_DIR  # noqa: E402
 
@@ -50,6 +54,7 @@ def git_common_dir():
 GITDIR = git_common_dir()
 LOCK = GITDIR / "sync_brain.lock"
 PIDFILE = GITDIR / "brain_watchd.pid"
+SOCK = GITDIR / "brain_brief.sock"
 LOG = STATE_DIR / "watchd.log"
 
 
@@ -181,6 +186,8 @@ def main():
     d = Daemon()
     d.pending = {"startup"}  # catch up on whatever changed while the daemon was down
     log(f"watching {len(paths)} paths, pid {os.getpid()}")
+    if os.environ.get("BRAIN_NO_SERVE") != "1":
+        BriefServer(SOCK, STATE_DIR, log=log).start()
     try:
         watch(paths, d.on_events, latency=0.5, tick=d.tick, tick_every=0.5)
     finally:

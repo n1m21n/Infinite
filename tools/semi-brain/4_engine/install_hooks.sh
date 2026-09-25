@@ -5,8 +5,12 @@
 #   daemon  (default) a launchd agent running l1/brain_watchd.py: FSEvents on git refs, src/,
 #           .claude/skills, docs/ and the session transcripts, 2 s debounce, then one incremental
 #           sync at background QoS / nice 19. Replaces the batch sync after every commit.
+#           The daemon itself runs at normal priority: it idles, but its brief server answers
+#           the prompt hook and must not be throttled; the syncs it starts are taskpolicy -b.
 #   hooks   post-commit / post-merge -> .git/hooks/sync-brain-bg, the fallback runner. It steps
 #           aside while the daemon is alive (pidfile), so a commit never starts a second sync.
+#   claude  a UserPromptSubmit hook in .claude/settings.json (gitignored, so per machine):
+#           4_engine/hooks/prompt_brief.py adds the daemon's brief to every prompt.
 #
 #   install_hooks.sh               hooks + daemon
 #   install_hooks.sh --no-daemon   hooks only
@@ -59,6 +63,23 @@ done
 chmod +x "$HOOKS_DIR/sync-brain-bg" "$HOOKS_DIR/post-commit" "$HOOKS_DIR/post-merge"
 echo "hooks: post-commit, post-merge -> sync-brain-bg"
 
+# Claude Code hooks, merged into the project's .claude/settings.json (other keys kept).
+"$PYTHON" - "$REPO_ROOT/.claude/settings.json" << 'PY'
+import json, sys
+from pathlib import Path
+path = Path(sys.argv[1])
+cfg = json.loads(path.read_text()) if path.exists() else {}
+hooks = cfg.setdefault("hooks", {})
+cmd = 'python3 "$CLAUDE_PROJECT_DIR/tools/semi-brain/4_engine/hooks/prompt_brief.py"'
+entries = [e for e in hooks.get("UserPromptSubmit", [])
+           if not any("prompt_brief.py" in h.get("command", "") for h in e.get("hooks", []))]
+entries.append({"hooks": [{"type": "command", "command": cmd, "timeout": 5}]})
+hooks["UserPromptSubmit"] = entries
+path.parent.mkdir(exist_ok=True)
+path.write_text(json.dumps(cfg, indent=2) + "\n")
+print(f"claude: UserPromptSubmit -> prompt_brief.py ({path})")
+PY
+
 [ "$1" = "--no-daemon" ] && exit 0
 [ "$(uname)" = "Darwin" ] || { echo "daemon: macOS only (launchd + FSEvents); hooks only here"; exit 0; }
 
@@ -78,9 +99,7 @@ cat << EOF > "$PLIST"
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>ThrottleInterval</key><integer>30</integer>
-  <key>ProcessType</key><string>Background</string>
-  <key>Nice</key><integer>19</integer>
-  <key>LowPriorityIO</key><true/>
+  <key>ProcessType</key><string>Standard</string>
   <key>EnvironmentVariables</key>
   <dict><key>PATH</key><string>/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin</string></dict>
   <key>StandardOutPath</key><string>$STATE_DIR/watchd.stdout.log</string>
