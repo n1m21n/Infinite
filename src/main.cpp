@@ -47676,7 +47676,11 @@ namespace
       void Place(bool isCanvas)
       {
          Bench::FrameTail& tail = Bench::Tail();
-         if (!tail.active)
+         // Opt-in (INFINITE_BENCH_TAILFENCE=1): the fence's glFlush right after
+         // an interval-0 swap blocks ~10 ms on macOS, which turned B3 from
+         // 0.2% missed vsync into 1.6-13.8%. Off, the probe costs nothing.
+         static const bool sFencesOff = [] { const char* e = getenv("INFINITE_BENCH_TAILFENCE"); return !(e && e[0] == '1'); }();
+         if (!tail.active || sFencesOff)
             return;
          Drop();
          sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
@@ -47776,6 +47780,7 @@ namespace
             tail.cur.workMs = (now - pacer.lastPresent) * 1000.0;
          gTailProjFence.Poll();
          tail.cur.canvasGpuPendingAtWait = gTailCanvasFence.Poll();
+         tail.MarkAt(Bench::FrameTail::kMarkWaitStart, tailWaitStartMs);
       }
       if (!Platform::WaitForDisplayRefresh(pacer.monitorX, pacer.monitorY, pacer.refreshHz, pacer.intervals) &&
           pacer.refreshHz > 0.0 && pacer.lastPresent >= 0.0)
@@ -47793,7 +47798,8 @@ namespace
       pacer.lastPresent = glfwGetTime();
       if (tail.active)
       {
-         tail.cur.waitMs = Bench::ScopedStageTimer::NowMs() - tailWaitStartMs;
+         tail.lastWaitEndMs = Bench::ScopedStageTimer::NowMs();
+         tail.cur.waitMs = tail.lastWaitEndMs - tailWaitStartMs;
          PollTailFences();
       }
    }
@@ -69138,6 +69144,7 @@ int main(int argc, char** argv)
                                   ? 1000.0 * (double)gProjectorPacer.intervals / gProjectorPacer.refreshHz : 0.0;
          Bench::Tail().BeginFrame((isBenchB3 && !isBenchB7 && frameId >= 32) || sBenchB8Sampling, period,
                                    glfwGetWindowAttrib(window, GLFW_FOCUSED) != 0);
+         Bench::Tail().MarkAt(Bench::FrameTail::kMarkFrameStart, Bench::ScopedStageTimer::NowMs());
          if (sTailLoopStart >= 0.0)
             Bench::Tail().cur.loopMs = (gFrameStart - sTailLoopStart) * 1000.0;
          sTailLoopStart = gFrameStart;
@@ -69148,6 +69155,8 @@ int main(int argc, char** argv)
       // last frame: hand pacing to the right owner before this frame swaps.
       ApplyCanvasSwapInterval();
       glfwPollEvents();
+      if (Bench::Tail().active)
+         Bench::Tail().MarkAt(Bench::FrameTail::kMarkPolled, Bench::ScopedStageTimer::NowMs());
 
       // A recording Stop click sets StopRequested() rather than calling
       // OutputNode::StopRecordingAsync() directly, so that frame gets to
@@ -70050,6 +70059,8 @@ int main(int argc, char** argv)
       }
 
       ImGui::NewFrame();
+      if (Bench::Tail().active)
+         Bench::Tail().MarkAt(Bench::FrameTail::kMarkNewFrame, Bench::ScopedStageTimer::NowMs());
 
       Transport::Instance().Tick(ImGui::GetIO().DeltaTime);
 
@@ -95802,11 +95813,16 @@ int main(int argc, char** argv)
       }
 
       if (Bench::Tail().active)
+      {
          PollTailFences();
+         Bench::Tail().MarkAt(Bench::FrameTail::kMarkCanvasSwap, Bench::ScopedStageTimer::NowMs());
+      }
       {
          ConditionalStageTimer timerSwap(benchStagesCpuSample ? &sStageSwap : nullptr, Bench::FrameTail::kSwap);
          glfwSwapBuffers(window);
       }
+      if (Bench::Tail().active)
+         Bench::Tail().MarkAt(Bench::FrameTail::kMarkSwapped, Bench::ScopedStageTimer::NowMs());
       gTailCanvasFence.Place(true);
       if (frameId == 0)
          sFirstFrameEndMs = Bench::ScopedStageTimer::NowMs();
@@ -95816,6 +95832,8 @@ int main(int argc, char** argv)
       // Unconditional for the same reason as the call above (Linux
       // factory-context IRunLoop timers with no editor open).
       Platform::PumpPluginEditorEvents();
+      if (Bench::Tail().active)
+         Bench::Tail().MarkAt(Bench::FrameTail::kMarkPumped, Bench::ScopedStageTimer::NowMs());
 
       // Projector output: blit this frame's cooked result of each open
       // window's node into that window. Runs after the editor's own swap so

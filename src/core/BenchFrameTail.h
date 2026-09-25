@@ -47,6 +47,16 @@ namespace Bench
          return kNames[s];
       }
 
+      enum Mark { kMarkFrameStart, kMarkPolled, kMarkNewFrame, kMarkCanvasSwap, kMarkSwapped, kMarkPumped, kMarkWaitStart, kMarkCount };
+      static const char* SegmentName(int s)
+      {
+         // Segment s runs from the checkpoint before it to mark s.
+         static const char* kNames[kMarkCount] = {
+            "wait_end_to_frame_start", "poll_events", "imgui_new_frame", "frame_body", "canvas_swap", "fence_and_plugin_pump", "projector_render",
+         };
+         return kNames[s];
+      }
+
       struct Record
       {
          double intervalMs = 0.0;   // projector (window 0) swap to swap
@@ -63,9 +73,16 @@ namespace Bench
          std::map<std::string, double> typeMs; // node body time per node type
          int index = 0;             // sampled-frame index, to see periodicity
          bool focused = true;       // canvas was the key window this frame
+         // Checkpoints (NowMs) that split workMs with nothing left untimed:
+         // previous wait end -> frame start -> after glfwPollEvents -> after
+         // ImGui::NewFrame -> before the canvas swap -> after it -> after the
+         // plugin editor pump -> wait start (after the projector render pass).
+         double prevWaitEndMs = -1.0;
+         std::array<double, kMarkCount> markMs{ -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0 };
       };
 
       bool active = false;
+      double lastWaitEndMs = -1.0;
       double periodMs = 1000.0 / 60.0;
       Record cur;
       std::vector<Record> all;
@@ -78,6 +95,18 @@ namespace Bench
          cur = Record{};
          cur.index = (int)all.size();
          cur.focused = focused;
+         cur.prevWaitEndMs = lastWaitEndMs;
+      }
+      void MarkAt(int m, double nowMs)
+      {
+         if (active && m >= 0 && m < kMarkCount)
+            cur.markMs[(size_t)m] = nowMs;
+      }
+      static double Segment(const Record& r, int s)
+      {
+         const double from = s == 0 ? r.prevWaitEndMs : r.markMs[(size_t)(s - 1)];
+         const double to = r.markMs[(size_t)s];
+         return (from < 0.0 || to < 0.0) ? -1.0 : to - from;
       }
       void AddStage(int s, double ms)
       {
@@ -140,6 +169,10 @@ namespace Bench
          for (int s = 0; s < kStageCount; s++)
             st[StageName(s)] = col([s](const Record& r) { return r.stageMs[(size_t)s]; });
          j["stages_ms"] = st;
+         nlohmann::json seg = nlohmann::json::object();
+         for (int m = 0; m < kMarkCount; m++)
+            seg[SegmentName(m)] = col([m](const Record& r) { return Segment(r, m); });
+         j["segments_ms"] = seg;
          int pending = 0;
          for (const Record* r : rs)
             pending += r->canvasGpuPendingAtWait ? 1 : 0;
@@ -201,11 +234,14 @@ namespace Bench
             nlohmann::json st = nlohmann::json::object();
             for (int s = 0; s < kStageCount; s++)
                st[StageName(s)] = r.stageMs[(size_t)s];
+            nlohmann::json seg = nlohmann::json::object();
+            for (int m = 0; m < kMarkCount; m++)
+               seg[SegmentName(m)] = Segment(r, m);
             firstSlow.push_back({
                { "interval_ms", r.intervalMs }, { "loop_ms", r.loopMs },
                { "work_ms", r.workMs }, { "wait_ms", r.waitMs },
                { "canvas_gpu_ms", r.canvasGpuMs }, { "proj_gpu_ms", r.projGpuMs },
-               { "stages_ms", st },
+               { "stages_ms", st }, { "segments_ms", seg },
                { "top_node", r.topNode }, { "top_node_ms", r.topNodeMs },
                { "nodes_ms", r.nodesMs }, { "focused", r.focused },
             });
