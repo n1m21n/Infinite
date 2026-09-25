@@ -175,6 +175,43 @@ measurement, because it is a logic/contract fix, not a perf number. Nothing
 else in steps 1-6 was attempted after this finding, to avoid producing
 numbers that look like a baseline but are not one.
 
+### Block 3 steps 1-3, resumed (2026-09-25, `0a0acbf`, quiet machine)
+
+Prerequisites this time: ChatGPT quit (`pgrep -x ChatGPT` empty), daemon
+paused (`run_all.sh --quiet --only B8`), `caffeinate -dimsu`, screen
+unlocked, swap 5.6 -> 7.0 GB over the run. Every row `focused`, except the
+first launch (2x1080, `unfocused=1`).
+
+| B8 variant | decode (per clip) | frame p99 | footprint peak | verdict |
+|---|---|---|---|---|
+| 2x1080 | 137 / 137 decoded, 0 dropped, 30.3 fps | 23.0 ms | 394 MB | unproven (unfocused), values inside the limit |
+| 4x1080 | 136-137, 0 dropped, 30.2-30.4 fps | 17.6 ms | 486 MB | **pass** |
+| 2x2160 | 136, 0 dropped, 30.3 fps | 17.6 ms | 763 MB | **pass** |
+| 4x2160 | 148-149, 0 dropped, 30.4-30.6 fps; worst loop decode 51 ms (on the decode thread) | 39.6 ms | 1133 MB | **pass**, decode targets met |
+| 2x1080 + Syphon | 136, 0 dropped | 17.6 ms | 399 MB | **pass** (the old "clip1 not real time" does not reproduce) |
+| 2x1080 + camera | 136, 0 dropped | 17.6 ms | 367 MB | camera `skipped` (never granted) |
+| 2x1080 + 2 / 3 windows | 137-138, 0 dropped | 25.5 / 27.3 ms | 407 / 431 MB | decode pass; windows **fail** (p99 25.5 / 27.3 ms, missed 1.1 / 2.2%) |
+| heavy: 4x2160 + 3 windows + camera + Syphon | 154-155; clip0 1 dropped at a 63 ms loop wrap | 34.6 ms | 1377 MB | **fail** (clip0, windows p99 34.6 ms, missed 13.5%) |
+
+- **Step 1 (decode drops): targets met with no code change.** 4x2160 is
+  *not* memory-bound on a quiet 8 GB M2: 1.13 GB footprint, 0 drops. The
+  step-0 fail (all four clips not real time) and the older "1 dropped" were
+  machine load (ChatGPT, concurrent sessions, un-paused daemon). The
+  loop-point rewind lead was already on `main` (`88787d7`), and the upload/
+  deadline leads were not needed for the target. Nothing was changed, so
+  there is nothing to gate.
+- **2 / 3 window misses are not decode or projector work.** The 3-6 slow
+  frames per run are either a 13-14 ms `canvas_swap` or a display-refresh
+  wait that overran with 1.5-3 ms of work: OS/WindowServer scheduling under
+  7 GB swap. No commit in this block touches the macOS projector path.
+  Recorded in Found; not chased.
+- **Step 2 (Spout `HasClients`, Found 7): fixed** in `0a0acbf`. Windows now
+  returns false, and a new three-sided `Platform::SyphonServerCanReportClients()`
+  makes the Syphon Out body say "Clients: not reported". `SPOUTLOOPTEST`
+  checks the contract. CI-only, unverified locally.
+- **Step 3 (camera): unproven.** The owner was asked once. Access is still
+  `not_determined`, so every camera variant runs without one.
+
 ## Scoreboard
 
 One row per measured win (or loss). Medians on the M2 8 GB machine; change %
