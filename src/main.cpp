@@ -8298,7 +8298,9 @@ namespace
       if (n->PublishedWidth() > 0 && n->PublishedHeight() > 0)
       {
          ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "Broadcasting: %dx%d", n->PublishedWidth(), n->PublishedHeight());
-         if (n->HasClients())
+         if (!Platform::SyphonServerCanReportClients())
+            ImGui::TextDisabled("Clients: not reported");
+         else if (n->HasClients())
             ImGui::TextColored(ImVec4(0.3f, 0.9f, 1.0f, 1.0f), "Clients: Active");
          else
             ImGui::TextDisabled("Clients: Waiting for app...");
@@ -52377,11 +52379,20 @@ static bool RunSpoutLoopTest()
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
    glBindTexture(GL_TEXTURE_2D, 0);
 
-   SyphonClientHandle* client = SyphonClientCreate();
+   // Contract check, before any receiver exists: a backend that cannot see
+   // receivers must never claim one. Spout used to return IsInitialized()
+   // here, so after the first send the node read "Clients: Active" alone.
    SyphonServerPublish(server, srcTex, w, h, false);
+   bool ok = true;
+   if (!SyphonServerCanReportClients() && SyphonServerHasClients(server))
+   {
+      printf("SPOUTLOOPTEST FAIL (HasClients true with no receiver, on a backend that cannot report receivers)\n");
+      ok = false;
+   }
+
+   SyphonClientHandle* client = SyphonClientCreate();
    bool connected = client != nullptr && SyphonClientConnect(client, "Spout", senderName);
 
-   bool ok = true;
    bool skipped = false;
    if (!connected)
    {
@@ -87423,11 +87434,10 @@ int main(int argc, char** argv)
                   {
                      const Bench::PercentileRing pub = ringOf(sy->BenchPublishMs(), sSyphonStart);
                      nlohmann::json syj = { { "publish_ms", p5099max(pub) }, { "publishes", (int)pub.Count() } };
-#if defined(__APPLE__)
-                     syj["has_clients"] = sy->HasClients();
-#else
-                     syj["has_clients"] = nullptr; // Spout cannot say whether anyone is receiving
-#endif
+                     if (Platform::SyphonServerCanReportClients())
+                        syj["has_clients"] = sy->HasClients();
+                     else
+                        syj["has_clients"] = nullptr; // Spout cannot say whether anyone is receiving
                      media["syphon"] = syj;
                   }
                }
