@@ -12,6 +12,7 @@ the prompt hook, or into the same content as JSON.
   Skills    skills worth loading: skills compartment hits, promoted when the skill's text
             names one of the top files (L3 edge)
   Before    the best research-compartment hit (research doc or mined explainer)
+  Notes     L0 notes the query matches (l0/store.py): kind, tier, weight, claim
 
 Every line is cut to fit; the whole brief stays under BUDGET characters (~4 chars per token).
 """
@@ -20,7 +21,7 @@ import re
 import sqlite3
 
 BUDGET = 900
-N_FILES, N_SYMBOLS, N_PAST, N_SKILLS = 4, 4, 2, 2
+N_FILES, N_SYMBOLS, N_PAST, N_SKILLS, N_NOTES = 4, 4, 2, 2, 2
 
 
 def _short(path):
@@ -116,7 +117,9 @@ def brief_data(engine, frame):
     before = research_line(engine, frame)
     return {"query": frame.raw_query, "files": files, "symbols": symbols,
             "area": area_name(engine, frame.ranked_files[0]) if frame.ranked_files else "",
-            "past": past, "skills": skills, "before": before}
+            "past": past, "skills": skills, "before": before,
+            "notes": [{k: n[k] for k in ("id", "kind", "tier", "weight", "claim")}
+                      for n in getattr(frame, "notes", [])[:N_NOTES]]}
 
 
 def render(data, budget=BUDGET):
@@ -135,6 +138,8 @@ def render(data, budget=BUDGET):
         lines.append("Load skills: " + ", ".join(data["skills"]))
     if data["before"]:
         lines.append("Discussed before: " + data["before"][:80])
+    for n in data.get("notes", []):
+        lines.append(f"Note ({n['kind']}, {n['tier']}, w{n['weight']:.2f}): {n['claim']}")
     out, used = [], 0
     for line in lines:
         line = line if len(line) <= 260 else line[:257] + "..."

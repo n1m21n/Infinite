@@ -43,6 +43,7 @@ from l2.compartments import merge as merge_compartments
 from l3.network import Network, SEED_WEIGHT
 from l4.clusters import Areas
 from l3.recent import RecentWork
+from l0.store import Store as L0Store, BOOST_KINDS
 
 _IDENT_RE = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+")
 _STOP = {"the", "and", "for", "with", "get", "set", "node", "nodes", "fix", "from", "into",
@@ -73,6 +74,7 @@ class ProblemFrame:
     ranked_files: List[str] = field(default_factory=list)
     file_evidence: Dict[str, List[str]] = field(default_factory=dict)
     compartments: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
+    notes: List[Dict[str, Any]] = field(default_factory=list)
 
 @dataclass
 class ImpactNode:
@@ -148,6 +150,7 @@ class SemiBrainCognitiveEngine:
         self.retriever = HybridRetriever()
         self.network = Network.load(self.ast_graph)
         self.recent = self._load_recent()
+        self.l0 = L0Store()
 
     def _load_recent(self):
         commits = SEMI_BRAIN_DIR / "1_extractors" / "output" / "git_commits_corpus.json"
@@ -222,7 +225,8 @@ class SemiBrainCognitiveEngine:
     def analyze_problem(self, query: str, now: Optional[float] = None, session: str = "",
                         embargo: float = 0.0) -> ProblemFrame:
         """now/session/embargo feed the work-in-progress prior (l3/recent.py): files edited
-        earlier in this session and lately anywhere, from events before now - embargo."""
+        earlier in this session and lately anywhere, from events before now - embargo. The
+        same cutoff applies to L0 notes (l0/store.py)."""
         subsystem = self.infer_subsystem(query)
         q = query.lower()
         
@@ -317,7 +321,9 @@ class SemiBrainCognitiveEngine:
         # work to continue, and on the commit replay the 12 h embargo leaves only noise.
         work = (recent.rankings(time.time() if now is None else now, session, embargo)
                 if recent and session else ([], []))
-        ranked_files, evidence = self._rank_files(matched_symbols, spread, why, work)
+        l0 = getattr(self, "l0", None)
+        notes = l0.match(query, now, embargo) if l0 is not None else []
+        ranked_files, evidence = self._rank_files(matched_symbols, spread, why, work, notes)
         
         # 2. System 1 Priors
         priors = [
@@ -388,6 +394,7 @@ class SemiBrainCognitiveEngine:
             ranked_files=ranked_files,
             file_evidence=evidence,
             compartments=by_compartment,
+            notes=notes,
         )
 
     SEEDS_PER_COMPARTMENT = 10
@@ -433,12 +440,13 @@ class SemiBrainCognitiveEngine:
     SESSION_W = 1.0
     RECENT_W = 0.25
 
-    def _rank_files(self, matched_symbols, spread, why, work=([], [])):
+    def _rank_files(self, matched_symbols, spread, why, work=([], []), notes=()):
         """Files most likely involved, best first, with the doc ids that point at each: the
         files of the matched symbols (in symbol order), the network's spread and the recent
         work (this session's edits, recent edits anywhere), fused by weighted RRF. Weights
         from the session replay: recent-anywhere at 0.5 lifted nohub MRR most but cost file
-        MRR with main.cpp, 0.25 kept both (l3/recent.py)."""
+        MRR with main.cpp, 0.25 kept both (l3/recent.py). L0 notes add their files as one
+        more list whose weight is the best note's score, never above l0.store.CAP."""
         lexical = []
         for sym in matched_symbols:
             f = self._get_symbol_meta(sym).get("file", "")
@@ -447,6 +455,10 @@ class SemiBrainCognitiveEngine:
         fused = defaultdict(float)
         lists = ((lexical, 1.0), (sorted(spread, key=spread.get, reverse=True), 1.0),
                  (work[0], self.SESSION_W), (work[1], self.RECENT_W))
+        boost = [n for n in notes if n["kind"] in BOOST_KINDS and n["files"]]
+        if boost:
+            note_files = list(dict.fromkeys(f for n in boost for f in n["files"]))
+            lists += ((note_files, boost[0]["score"]),)
         for lst, w in lists:
             for rank, f in enumerate(lst):
                 fused[f] += w / (self.FILE_RRF_K + rank + 1)

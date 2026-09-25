@@ -12,7 +12,8 @@ on every prompt.
            when a sync has finished since it was built - l1/state/last_sync.json is written at
            the end of every sync - and swapped in when ready, so no request waits for a reload
   log      every answered query goes to l1/state/briefs.jsonl (local only), which the outcome
-           log joins with what was actually read and edited afterwards
+           log joins with what was actually read and edited afterwards; the L0 note ids it
+           showed are what the sleep job credits (l1/sleep.py)
 """
 
 import json
@@ -80,7 +81,8 @@ class BriefServer(threading.Thread):
         ms = round((time.perf_counter() - t) * 1000, 1)
         rec = {"t": time.time(), "session": req.get("session", ""), "query": query,
                "files": [f["file"] for f in data["files"]],
-               "symbols": [s["symbol"] for s in data["symbols"]], "ms": ms}
+               "symbols": [s["symbol"] for s in data["symbols"]],
+               "notes": [n["id"] for n in data.get("notes", [])], "ms": ms}
         try:
             with open(self.state_dir / "briefs.jsonl", "a") as f:
                 f.write(json.dumps(rec) + "\n")
