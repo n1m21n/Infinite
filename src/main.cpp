@@ -65745,6 +65745,13 @@ int main(int argc, char** argv)
    static double sBenchB3RssPeakMb = -1.0;
    static double sBenchB3FootStartMb = -1.0;
    static double sBenchB3FootPeakMb = -1.0;
+   // B7 soak (the B3 fixture, run on wall-clock time): one sample per 10 s
+   // window, verdicts at the end (benchmark-suite.md §6).
+   static double sBenchB7StartS = -1.0;
+   static double sBenchB7LastSampleS = -1.0;
+   static uint64_t sBenchB7LoadMark = 0;
+   static Bench::PercentileRing sBenchB7WinFrameMs;
+   static nlohmann::json sBenchB7Samples = nlohmann::json::array();
 
    // B8 Media I/O fixture state (docs/plans/perf/benchmark-suite.md §4)
    static std::string sBenchB8Variant;
@@ -68591,8 +68598,10 @@ int main(int argc, char** argv)
       }
       else if (getenv("INFINITE_BENCH_B3") != nullptr ||
                getenv("INFINITE_BENCH_B3LIVE") != nullptr ||
-               getenv("INFINITE_BENCH_B3SCALE") != nullptr)
+               getenv("INFINITE_BENCH_B3SCALE") != nullptr ||
+               getenv("INFINITE_BENCH_B7") != nullptr)
       {
+         // B7 soak runs this same fixture for INFINITE_BENCH_B7MINUTES.
          // B3 Live performance fixture (docs/plans/perf/benchmark-suite.md §4).
          std::string scaleStr = "s";
          const char* bench3Arg = getenv("INFINITE_BENCH_B3SCALE");
@@ -69004,7 +69013,8 @@ int main(int argc, char** argv)
 
       const bool isBenchB5c = (getenv("INFINITE_BENCH_B5STAGES") != nullptr || getenv("INFINITE_BENCH_B5C") != nullptr);
       const bool isBenchB2 = (getenv("INFINITE_BENCH_B2") != nullptr || getenv("INFINITE_BENCH_B2VISUALS") != nullptr || getenv("INFINITE_BENCH_B2SCALE") != nullptr);
-      const bool isBenchB3 = (getenv("INFINITE_BENCH_B3") != nullptr || getenv("INFINITE_BENCH_B3LIVE") != nullptr || getenv("INFINITE_BENCH_B3SCALE") != nullptr);
+      const bool isBenchB7 = getenv("INFINITE_BENCH_B7") != nullptr;
+      const bool isBenchB3 = (getenv("INFINITE_BENCH_B3") != nullptr || getenv("INFINITE_BENCH_B3LIVE") != nullptr || getenv("INFINITE_BENCH_B3SCALE") != nullptr || isBenchB7);
       const bool isBenchB4 = getenv("INFINITE_BENCH_B4SCALE") != nullptr;
       const bool isBenchB6 = (getenv("INFINITE_BENCH_B6") != nullptr || getenv("INFINITE_BENCH_B6NODES") != nullptr || getenv("INFINITE_BENCH_B6MODE") != nullptr || getenv("INFINITE_BENCH_B6COLLAPSED") != nullptr);
       const bool isBenchB9 = (getenv("INFINITE_BENCH_B9SCENE") != nullptr || getenv("INFINITE_BENCH_B9") != nullptr || getenv("INFINITE_BENCH_B9MEMORY") != nullptr);
@@ -86289,7 +86299,11 @@ int main(int argc, char** argv)
       // audio load/xruns, and input-to-photon latency (parameter change to Output revision change).
       if (isBenchB3)
       {
-         const int b3TotalFrames = getenv("INFINITE_BENCH_B3FRAMES") ? std::max(60, std::atoi(getenv("INFINITE_BENCH_B3FRAMES"))) : 600;
+         // B7 has no frame count: it ends on elapsed time (b3TotalFrames is
+         // set to the frame the time runs out on, below).
+         int b3TotalFrames = isBenchB7 ? std::numeric_limits<int>::max() / 2
+            : getenv("INFINITE_BENCH_B3FRAMES") ? std::max(60, std::atoi(getenv("INFINITE_BENCH_B3FRAMES"))) : 600;
+         const double b7Minutes = getenv("INFINITE_BENCH_B7MINUTES") ? std::max(1.0, std::atof(getenv("INFINITE_BENCH_B7MINUTES"))) : 30.0;
          const bool b3EnableMidi = (getenv("INFINITE_BENCH_B3MIDI") == nullptr || strcmp(getenv("INFINITE_BENCH_B3MIDI"), "0") != 0);
          const bool b3EnableVisuals = (getenv("INFINITE_BENCH_B3VISUALS") == nullptr || strcmp(getenv("INFINITE_BENCH_B3VISUALS"), "0") != 0);
 
@@ -86373,6 +86387,8 @@ int main(int argc, char** argv)
             sBenchB3XrunBaseline = AudioEngine::Instance().Xruns();
             AudioEngine::Instance().RawLoadHistory().Reset();
             AudioEngine::Instance().ResetStageLoadHistory();
+            sBenchB7StartS = sBenchB7LastSampleS = glfwGetTime();
+            sBenchB7LoadMark = AudioEngine::Instance().RawLoadHistory().Written();
          }
 
          // A frame measured while the canvas wasn't the key window may be
@@ -86447,11 +86463,48 @@ int main(int argc, char** argv)
             if (curFoot > sBenchB3FootPeakMb) sBenchB3FootPeakMb = curFoot;
          }
 
+         // B7 soak: close a window every 10 s, stop when the time is up.
+         if (isBenchB7 && frameId >= 32 && sBenchB7StartS >= 0.0)
+         {
+            if (gLastFrameMs > 0.0)
+               sBenchB7WinFrameMs.Push(gLastFrameMs);
+            const double nowS = glfwGetTime();
+            if (nowS - sBenchB7LastSampleS >= 10.0)
+            {
+               sBenchB7LastSampleS = nowS;
+               const Bench::AudioLoadRing& ring = AudioEngine::Instance().RawLoadHistory();
+               const uint64_t written = ring.Written();
+               const Bench::PercentileRing winLoad = ring.DrainRange(sBenchB7LoadMark, written);
+               sBenchB7LoadMark = written;
+               const AudioEngine::XrunCounts x = AudioEngine::Instance().Xruns();
+               sBenchB7Samples.push_back({
+                  { "t_s", nowS - sBenchB7StartS },
+                  { "frame_ms_p50", sBenchB7WinFrameMs.Percentile(50) },
+                  { "frame_ms_p99", sBenchB7WinFrameMs.Percentile(99) },
+                  { "rss_mb", Bench::ProcessRssMb() },
+                  { "footprint_mb", Bench::ProcessFootprintMb() },
+                  { "cb_load_p99", winLoad.Empty() ? nlohmann::json(nullptr) : nlohmann::json(winLoad.Percentile(99)) },
+                  { "xruns_deadline", x.deadline - sBenchB3XrunBaseline.deadline },
+                  { "xruns_os", x.os - sBenchB3XrunBaseline.os },
+                  { "xrun_gaps", x.gaps - sBenchB3XrunBaseline.gaps },
+               });
+               sBenchB7WinFrameMs = Bench::PercentileRing();
+               if (nowS - sBenchB7StartS >= b7Minutes * 60.0)
+                  b3TotalFrames = frameId;
+            }
+         }
+
          if (frameId == b3TotalFrames)
          {
             Bench::BenchReport report;
-            report.bench = "B3_live_performance";
+            report.bench = isBenchB7 ? "B7_soak" : "B3_live_performance";
             report.variant = sBenchB3Variant;
+            if (isBenchB7)
+            {
+               char minutesStr[32];
+               snprintf(minutesStr, sizeof(minutesStr), ",minutes=%g", b7Minutes);
+               report.variant += minutesStr;
+            }
             report.frames = b3TotalFrames;
             report.nodes = (int)gNodes.size();
             report.frameMs = sBenchB3FrameMs;
@@ -86507,7 +86560,9 @@ int main(int argc, char** argv)
                report.targetsPass["audio_xruns_zero"] = (report.audioXruns == 0);
                report.targetsPass["audio_cb_load_p99_le_50"] = (report.audioLoad.Percentile(99) <= 0.50);
             }
-            if (b3EnableVisuals)
+            // B7 is judged on the soak verdicts below, not on B3's
+            // projector/latency targets.
+            if (b3EnableVisuals && !isBenchB7)
             {
                report.targetsPass["projector_missed_vsync_lt_half_pct"] = (report.projectorMissedVsyncPct < 0.5);
                report.targetsPass["projector_locked_rate"] = (report.projectorPresentMs.Percentile(99) <= 1.10 * (1000.0 / (double)std::max(1, report.projectorTargetRateHz)));
@@ -86550,8 +86605,60 @@ int main(int argc, char** argv)
                }
             }
 
+            if (isBenchB7)
+            {
+               // rss_growth_pct: median RSS of the last 5 min against the
+               // first 5 min after a 2 min warm-up. Thermal fps drop: the
+               // first 10 s window against the last (reported, not gated).
+               constexpr double kWarmupS = 120.0, kSpanS = 300.0;
+               const double endS = sBenchB7Samples.empty() ? 0.0 : sBenchB7Samples.back()["t_s"].get<double>();
+               std::vector<double> firstRss, lastRss;
+               for (const auto& smp : sBenchB7Samples)
+               {
+                  const double t = smp["t_s"].get<double>();
+                  if (t >= kWarmupS && t < kWarmupS + kSpanS) firstRss.push_back(smp["rss_mb"].get<double>());
+                  if (t > endS - kSpanS) lastRss.push_back(smp["rss_mb"].get<double>());
+               }
+               auto median = [](std::vector<double> v) {
+                  std::sort(v.begin(), v.end());
+                  const size_t n = v.size();
+                  return (n % 2) ? v[n / 2] : 0.5 * (v[n / 2 - 1] + v[n / 2]);
+               };
+               nlohmann::json growth = nullptr;
+               if (!firstRss.empty() && !lastRss.empty())
+               {
+                  const double first = median(firstRss), last = median(lastRss);
+                  if (first > 0.0) growth = (last - first) / first * 100.0;
+               }
+               nlohmann::json fpsFirst = nullptr, fpsLast = nullptr, fpsDrop = nullptr;
+               if (sBenchB7Samples.size() >= 2)
+               {
+                  const double p50First = sBenchB7Samples.front()["frame_ms_p50"].get<double>();
+                  const double p50Last = sBenchB7Samples.back()["frame_ms_p50"].get<double>();
+                  if (p50First > 0.0 && p50Last > 0.0)
+                  {
+                     fpsFirst = 1000.0 / p50First;
+                     fpsLast = 1000.0 / p50Last;
+                     fpsDrop = (1000.0 / p50First - 1000.0 / p50Last) / (1000.0 / p50First) * 100.0;
+                  }
+               }
+               report.soak = {
+                  { "minutes", b7Minutes },
+                  { "interval_s", 10 },
+                  { "warmup_s", kWarmupS },
+                  { "rss_growth_pct", growth },
+                  { "xruns_total", report.audioXruns },
+                  { "fps_first", fpsFirst },
+                  { "fps_last", fpsLast },
+                  { "thermal_fps_drop_pct", fpsDrop },
+                  { "samples", sBenchB7Samples },
+               };
+               report.targetsPass["soak_rss_growth_lt_2pct"] = growth.is_null() ? nlohmann::json(nullptr) : nlohmann::json(growth.get<double>() < 2.0);
+               report.targetsPass["soak_xruns_zero"] = report.audioMeasured ? nlohmann::json(report.audioXruns == 0) : nlohmann::json(nullptr);
+            }
+
             report.Emit();
-            printf("B3LIVE DONE\n");
+            printf(isBenchB7 ? "B7SOAK DONE\n" : "B3LIVE DONE\n");
             fflush(stdout);
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }

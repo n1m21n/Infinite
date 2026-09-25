@@ -142,6 +142,19 @@ namespace Bench
          return out;
       }
 
+      // Main thread, while the audio thread keeps pushing: total pushes so
+      // far, and the samples in [from, to) of that count (whatever of it the
+      // ring still holds). B7's soak reads its 10 s windows this way.
+      uint64_t Written() const { return mWriteIndex.load(std::memory_order_relaxed); }
+      PercentileRing DrainRange(uint64_t from, uint64_t to) const
+      {
+         PercentileRing out;
+         const uint64_t start = std::max(from, to > kCapacity ? to - kCapacity : 0);
+         for (uint64_t i = start; i < to; i++)
+            out.Push((double)mSamples[i % kCapacity].load(std::memory_order_relaxed));
+         return out;
+      }
+
    private:
       std::array<std::atomic<float>, kCapacity> mSamples {};
       std::atomic<uint64_t> mWriteIndex { 0 };
@@ -475,6 +488,9 @@ namespace Bench
 
       double memGpuEstMb = -1.0;
       nlohmann::json memGpuEstBreakdown = nlohmann::json::object();
+
+      // B7 soak: samples every 10 s plus the soak verdicts. null = not a soak.
+      nlohmann::json soak = nullptr;
 
       void Emit() const;
    };

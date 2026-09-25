@@ -642,6 +642,9 @@ namespace Bench
          j["targets_pass"] = tp;
       }
 
+      if (!soak.is_null())
+         j["soak"] = soak;
+
       j["nodes"] = nodes;
       j["tris"] = tris;
       j["draw_calls"] = drawCalls < 0 ? nlohmann::json(nullptr) : nlohmann::json(drawCalls);

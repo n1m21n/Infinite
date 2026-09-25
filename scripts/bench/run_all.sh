@@ -109,7 +109,7 @@ run_fixture() {
    # B3/B6/B8 measure display pacing and focus: they need a real, visible
    # window (every other fixture runs headless).
    local visible=()
-   case "$label" in B3_*|B6_*|B8_*) visible=(INFINITE_BENCH_VISIBLE=1) ;; esac
+   case "$label" in B3_*|B6_*|B7_*|B8_*) visible=(INFINITE_BENCH_VISIBLE=1) ;; esac
    env "$@" ${visible[@]+"${visible[@]}"} INFINITE_EXITAFTER="$exitafter" "$APP" -ApplePersistenceIgnoreState YES > "$log" 2>&1 &
    local pid=$! wd=""
    if [[ -n "${FIXTURE_TIMEOUT:-}" ]]; then
@@ -252,7 +252,14 @@ fi
 if want B7; then
 if [[ "$SOAK" -eq 1 ]]; then
    echo "B7 Soak and thermal (--soak)"
-   skip "B7_soak"
+   # The B3 fixture for B7_MINUTES (default 30) of wall-clock time, sampled
+   # every 10 s. Keep the Mac awake and unlocked with Infinite in front
+   # (caffeinate -dimsu scripts/bench/run_all.sh --soak --quiet --only B7).
+   # EXITAFTER allows ~250 fps so the frame cap never ends it before the
+   # clock does; the watchdog allows 10 min over.
+   B7_MINUTES="${B7_MINUTES:-30}"
+   FIXTURE_TIMEOUT=$((B7_MINUTES * 60 + 600)) run_fixture "B7_soak minutes=$B7_MINUTES" $((B7_MINUTES * 60 * 250)) \
+      INFINITE_BENCH_B7=1 INFINITE_BENCH_B7MINUTES="$B7_MINUTES"
 else
    echo "B7 Soak and thermal: skipped (pass --soak to include)"
 fi
