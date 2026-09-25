@@ -1,20 +1,24 @@
+// Frozen copy of ReverbKernel::ProcessBlockSimd as it was before the Block 1
+// perf work (docs/plans/perf/README.md, main 2324f75). Test-only: DSPTEST
+// renders the live kernel and this one side by side, so every optimisation
+// of the live kernel is checked against the sound it replaced - bit-exact
+// for the exact changes, within -80 dBFS for the approximate ones. Do not
+// edit or optimise this file; it is the reference, not a second kernel.
 #include "ReverbKernel.h"
-
-#include <limits>
 
 #include "nodes/AudioEffectNode.h"
 
 #if defined(__ARM_NEON) || defined(__ARM_NEON__)
 #include <arm_neon.h>
-#define REVERB_SIMD_NEON 1
+#define REVERB_LEGACY_SIMD_NEON 1
 #elif defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
 #include <emmintrin.h>
-#define REVERB_SIMD_SSE 1
+#define REVERB_LEGACY_SIMD_SSE 1
 #endif
 
 namespace
 {
-#if defined(REVERB_SIMD_NEON)
+#if defined(REVERB_LEGACY_SIMD_NEON)
 inline float32x4_t FlushDenormal_Neon(float32x4_t v)
 {
    const float32x4_t thresh = vdupq_n_f32(1.0e-15f);
@@ -100,7 +104,7 @@ inline void Hadamard16_Neon(float32x4_t& v0, float32x4_t& v1, float32x4_t& v2, f
 }
 #endif
 
-#if defined(REVERB_SIMD_SSE)
+#if defined(REVERB_LEGACY_SIMD_SSE)
 inline __m128 FlushDenormal_Sse(__m128 v)
 {
    const __m128 thresh = _mm_set1_ps(1.0e-15f);
@@ -171,23 +175,7 @@ inline void Hadamard16_Sse(__m128& v0, __m128& v1, __m128& v2, __m128& v3)
 #endif
 } // namespace
 
-void ReverbKernel::PushParams(const AudioEffectNode& node, double sampleRate)
-{
-   mSampleRate = sampleRate;
-   mMailbox.Push(kSize, node.Param("size"));
-   mMailbox.Push(kDecaySeconds, node.Param("decay"));
-   mMailbox.Push(kDamping, node.Param("damping"));
-   mMailbox.Push(kPredelayMs, node.Param("predelay"));
-   mMailbox.Push(kWidth, node.Param("width"));
-   mAnalog.store(node.Param("analog") != 0.0f ? 1 : 0, std::memory_order_relaxed);
-}
-
-void ReverbKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* sidechain, AudioBuffer& out)
-{
-   ProcessBlockSimd(in, sidechain, out);
-}
-
-void ReverbKernel::ProcessBlockSimd(const AudioBuffer& in, const AudioBuffer* /*sidechain*/, AudioBuffer& out)
+void ReverbKernel::ProcessBlockLegacy(const AudioBuffer& in, const AudioBuffer* /*sidechain*/, AudioBuffer& out)
 {
    using namespace ReverbDsp;
 
@@ -216,18 +204,6 @@ void ReverbKernel::ProcessBlockSimd(const AudioBuffer& in, const AudioBuffer* /*
    int cachedActiveLen[kNumLines];
    float cachedDecayGain[kNumLines];
 
-   // Per-block caches for values that only move when their input moves.
-   // Each is recomputed with exactly the old expression whenever its key
-   // changes, so the output is bit-identical to computing it every sample
-   // (DSPTEST's live-vs-pre-perf check). NaN keys never compare equal, so the
-   // first sample always computes.
-   float prevDamping = std::numeric_limits<float>::quiet_NaN();
-   float cachedBaseCutoff = 0.0f;
-   float prevCutoffHz = std::numeric_limits<float>::quiet_NaN();
-   float cachedDampCoeff = 0.0f;
-   float prevPredelayMs = std::numeric_limits<float>::quiet_NaN();
-   int cachedPredelaySamples = 0;
-
    for (int i = 0; i < out.numFrames; i++)
    {
       const float size = std::clamp(mMailbox.SmoothedValue(kSize), 0.0f, 1.0f);
@@ -240,19 +216,12 @@ void ReverbKernel::ProcessBlockSimd(const AudioBuffer& in, const AudioBuffer* /*
       const float inR = numChannels >= 2 ? in.channels[1][i] : inL;
       const float inMono = numChannels >= 2 ? 0.5f * (inL + inR) : inL;
 
-      if (predelayMs != prevPredelayMs)
-      {
-         prevPredelayMs = predelayMs;
-         cachedPredelaySamples = std::clamp((int)std::lround(predelayMs * 0.001f * (float)mSampleRate), 0,
-                                            mPredelayCapacity - 1);
-      }
-      const int predelaySamples = cachedPredelaySamples;
+      const int predelaySamples = std::clamp((int)std::lround(predelayMs * 0.001f * (float)mSampleRate), 0,
+                                              mPredelayCapacity - 1);
       mPredelayL[(size_t)mPredelayWrite] = inL;
       mPredelayR[(size_t)mPredelayWrite] = inR;
-      // mPredelayWrite and predelaySamples are both in [0, capacity), so the
-      // difference is in (-capacity, capacity): one conditional add wraps it
-      // (the old `%= capacity` was a no-op on that range).
       int readPos = mPredelayWrite - predelaySamples;
+      readPos %= mPredelayCapacity;
       if (readPos < 0)
          readPos += mPredelayCapacity;
       const float predelayedL = mPredelayL[(size_t)readPos];
@@ -281,21 +250,9 @@ void ReverbKernel::ProcessBlockSimd(const AudioBuffer& in, const AudioBuffer* /*
 
       const float scaleFactor = 0.15f + 0.85f * size;
       const float dynamicAir = analog ? std::clamp(mInputEnv * 4.0f, 0.0f, 1.0f) : 1.0f;
-      if (damping != prevDamping)
-      {
-         prevDamping = damping;
-         cachedBaseCutoff = 18000.0f * std::pow(800.0f / 18000.0f, damping);
-      }
-      const float baseCutoff = cachedBaseCutoff;
+      const float baseCutoff = 18000.0f * std::pow(800.0f / 18000.0f, damping);
       const float cutoffHz = analog ? std::max(600.0f, baseCutoff * (1.0f - 0.20f * (1.0f - dynamicAir))) : baseCutoff;
-      // Keyed on cutoffHz, which folds in damping and (analog only) the
-      // input-following dynamicAir, so both invalidate it.
-      if (cutoffHz != prevCutoffHz)
-      {
-         prevCutoffHz = cutoffHz;
-         cachedDampCoeff = 1.0f - std::exp(-2.0f * 3.14159265f * cutoffHz / (float)mSampleRate);
-      }
-      const float dampCoeff = cachedDampCoeff;
+      const float dampCoeff = 1.0f - std::exp(-2.0f * 3.14159265f * cutoffHz / (float)mSampleRate);
       const float modDepthSamples = analog ? 10.0f : 4.0f;
 
       if (size != prevSize || decaySeconds != prevDecaySeconds)
@@ -310,7 +267,7 @@ void ReverbKernel::ProcessBlockSimd(const AudioBuffer& in, const AudioBuffer* /*
          }
       }
 
-#if defined(REVERB_SIMD_NEON)
+#if defined(REVERB_LEGACY_SIMD_NEON)
       float32x4_t delayedOut_v[4];
       float32x4_t decayGain_v[4];
       float32x4_t dampState_v[4];
@@ -411,7 +368,7 @@ void ReverbKernel::ProcessBlockSimd(const AudioBuffer& in, const AudioBuffer* /*
                                     vaddq_f32(delayedOut_v[2], delayedOut_v[3]));
       const float sumEven = vgetq_lane_f32(sum_v, 0) + vgetq_lane_f32(sum_v, 2);
       const float sumOdd  = vgetq_lane_f32(sum_v, 1) + vgetq_lane_f32(sum_v, 3);
-#elif defined(REVERB_SIMD_SSE)
+#elif defined(REVERB_LEGACY_SIMD_SSE)
       __m128 delayedOut_v[4];
       __m128 decayGain_v[4];
       __m128 dampState_v[4];
@@ -605,129 +562,6 @@ void ReverbKernel::ProcessBlockSimd(const AudioBuffer& in, const AudioBuffer* /*
    {
       mLines[l].writePos = lineWritePos[l];
       mLines[l].dampState = lineDampStates[l];
-   }
-
-   const float payload[2] = { blockDryPeak, blockWetPeak };
-   mLevelMeter.Write(payload, 2);
-}
-
-void ReverbKernel::ProcessBlockScalar(const AudioBuffer& in, const AudioBuffer* /*sidechain*/, AudioBuffer& out)
-{
-   using namespace ReverbDsp;
-
-   const int numChannels = std::min(in.numChannels, std::min(out.numChannels, 2));
-   const float rateScale = (float)(mSampleRate / 44100.0);
-   const float outScale = 1.0f / std::sqrt((float)kNumLines);
-   const bool analog = mAnalog.load(std::memory_order_relaxed) != 0;
-
-   float blockDryPeak = 0.0f, blockWetPeak = 0.0f;
-
-   for (int i = 0; i < out.numFrames; i++)
-   {
-      const float size = std::clamp(mMailbox.SmoothedValue(kSize), 0.0f, 1.0f);
-      const float decaySeconds = std::max(0.05f, mMailbox.SmoothedValue(kDecaySeconds));
-      const float damping = std::clamp(mMailbox.SmoothedValue(kDamping), 0.0f, 1.0f);
-      const float predelayMs = std::max(0.0f, mMailbox.SmoothedValue(kPredelayMs));
-      const float width = std::clamp(mMailbox.SmoothedValue(kWidth), 0.0f, 1.0f);
-
-      const float inL = in.channels[0][i];
-      const float inR = numChannels >= 2 ? in.channels[1][i] : inL;
-      const float inMono = numChannels >= 2 ? 0.5f * (inL + inR) : inL;
-
-      const int predelaySamples = std::clamp((int)std::lround(predelayMs * 0.001f * (float)mSampleRate), 0,
-                                              mPredelayCapacity - 1);
-      mPredelayL[(size_t)mPredelayWrite] = inL;
-      mPredelayR[(size_t)mPredelayWrite] = inR;
-      int readPos = mPredelayWrite - predelaySamples;
-      readPos %= mPredelayCapacity;
-      if (readPos < 0)
-         readPos += mPredelayCapacity;
-      const float predelayedL = mPredelayL[(size_t)readPos];
-      const float predelayedR = mPredelayR[(size_t)readPos];
-      mPredelayWrite++;
-      if (mPredelayWrite >= mPredelayCapacity)
-         mPredelayWrite = 0;
-
-      float diffusedL = predelayedL;
-      for (int s = 0; s < kNumDiffusionStages; s++)
-         diffusedL = mDiffuserL[s].Process(diffusedL);
-      float diffusedR = predelayedR;
-      for (int s = 0; s < kNumDiffusionStages; s++)
-         diffusedR = mDiffuserR[s].Process(diffusedR);
-
-      diffusedL = mInputLpfL.Process(diffusedL);
-      diffusedR = mInputLpfR.Process(diffusedR);
-
-      if (analog)
-      {
-         diffusedL = AnalogDsp::AsymTanh(diffusedL, 0.12f);
-         diffusedR = AnalogDsp::AsymTanh(diffusedR, 0.12f);
-         mInputEnv += (std::fabs(inMono) - mInputEnv) * 0.001f;
-         mInputEnv = DspMath::FlushDenormal(mInputEnv);
-      }
-
-      const float scaleFactor = 0.15f + 0.85f * size;
-      const float dynamicAir = analog ? std::clamp(mInputEnv * 4.0f, 0.0f, 1.0f) : 1.0f;
-      const float baseCutoff = 18000.0f * std::pow(800.0f / 18000.0f, damping);
-      const float cutoffHz = analog ? std::max(600.0f, baseCutoff * (1.0f - 0.20f * (1.0f - dynamicAir))) : baseCutoff;
-      const float dampCoeff = 1.0f - std::exp(-2.0f * 3.14159265f * cutoffHz / (float)mSampleRate);
-      const float modDepthSamples = analog ? 10.0f : 4.0f;
-
-      float delayedOut[kNumLines];
-      int activeLen[kNumLines];
-
-      for (int line = 0; line < kNumLines; line++)
-      {
-         activeLen[line] = std::clamp((int)std::lround(kBaseLengths44k[line] * rateScale * scaleFactor), 8,
-                                       mLines[line].capacity - 32);
-         const float lfoVal = mLfo[line].Advance(kLfoRates[line], 0.25f, 0.08f, mSampleRate);
-         const float modDelay = std::clamp((float)activeLen[line] + lfoVal * modDepthSamples, 4.0f,
-                                            (float)(mLines[line].capacity - 4));
-         delayedOut[line] = mLines[line].Read(modDelay);
-      }
-
-      float mixed[kNumLines];
-      for (int line = 0; line < kNumLines; line++)
-         mixed[line] = delayedOut[line];
-      HadamardMixN(mixed, kNumLines);
-
-      for (int line = 0; line < kNumLines; line++)
-      {
-         const float decayGain =
-            std::pow(10.0f, -3.0f * (float)activeLen[line] / ((float)mSampleRate * decaySeconds));
-         const float fb = mixed[line] * decayGain;
-
-         FdnLine& l = mLines[line];
-         l.dampState = FlushDenormal(l.dampState + dampCoeff * (fb - l.dampState));
-
-         const float side = (line % 2 == 0) ? diffusedL : diffusedR;
-         const float sign = (line < kNumLines / 2) ? 0.5f : -0.5f;
-         l.Write(FlushDenormal(side * sign + l.dampState));
-      }
-
-      float sumEven = 0.0f, sumOdd = 0.0f;
-      for (int line = 0; line < kNumLines; line++)
-      {
-         if (line % 2 == 0)
-            sumEven += delayedOut[line];
-         else
-            sumOdd += delayedOut[line];
-      }
-      const float crossGain = 1.0f - width * 0.4f;
-      const float wetL = (sumEven + crossGain * sumOdd) * outScale;
-      const float wetR = (sumOdd + crossGain * sumEven) * outScale;
-
-      out.channels[0][i] = wetL;
-      if (numChannels >= 2)
-         out.channels[1][i] = wetR;
-      for (int ch = 2; ch < numChannels; ch++)
-         out.channels[ch][i] = 0.0f;
-
-      for (int ch = 0; ch < numChannels; ch++)
-      {
-         blockDryPeak = std::max(blockDryPeak, std::fabs(in.channels[ch][i]));
-         blockWetPeak = std::max(blockWetPeak, std::fabs(out.channels[ch][i]));
-      }
    }
 
    const float payload[2] = { blockDryPeak, blockWetPeak };

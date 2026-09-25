@@ -239,6 +239,9 @@ public:
    void ProcessBlock(const AudioBuffer& in, const AudioBuffer* sidechain, AudioBuffer& out) override;
    void ProcessBlockScalar(const AudioBuffer& in, const AudioBuffer* sidechain, AudioBuffer& out);
    void ProcessBlockSimd(const AudioBuffer& in, const AudioBuffer* sidechain, AudioBuffer& out);
+   // Test-only frozen reference (ReverbKernelLegacy.cpp): the kernel before
+   // the Block 1 perf work, for DSPTEST's old-vs-new comparison.
+   void ProcessBlockLegacy(const AudioBuffer& in, const AudioBuffer* sidechain, AudioBuffer& out);
 
    int LatencySamples() const override { return 0; }
    MeterRing* ExtraMeter() override { return &mLevelMeter; }

@@ -50020,6 +50020,94 @@ static bool RunReverbFixture()
       all &= simdEquivOk;
    }
 
+   // 7) Live kernel vs the frozen pre-perf kernel (ProcessBlockLegacy,
+   //    ReverbKernelLegacy.cpp): 10 s at 48 kHz / 256, B1's Reverb settings
+   //    (the defaults), analog off and on. The input is a B1-like voice: a
+   //    detuned saw with a new note every 250 ms and a decaying envelope.
+   //    Halfway through, every param moves (both kernels get the same push),
+   //    so any cached coefficient that fails to invalidate shows up here.
+   //    kReverbLegacyTol is the quality rule from docs/plans/perf: 0 while
+   //    only exact changes are in, 1e-4 (-80 dBFS) once an approximate one
+   //    (the fast LFO sine) is in. The measured max diff is always printed.
+   {
+      constexpr float kReverbLegacyTol = 0.0f;
+      const double sampleRate = 48000.0;
+      const int blockSize = 256;
+      const int totalFrames = 480000; // 10 s
+
+      const EffectDef* reverbDef = nullptr;
+      for (const EffectDef& d : GetEffectDefs())
+         if (d.name == "Reverb")
+            reverbDef = &d;
+
+      for (int analogOn = 0; analogOn < 2 && reverbDef; analogOn++)
+      {
+         AudioEffectNode node(*reverbDef);
+         *node.ParamPtr("analog") = (float)analogOn;
+
+         ReverbKernel live, legacy;
+         live.PrepareToPlay(sampleRate, blockSize);
+         legacy.PrepareToPlay(sampleRate, blockSize);
+         live.PushParams(node, sampleRate);
+         legacy.PushParams(node, sampleRate);
+
+         float inChL[blockSize], inChR[blockSize];
+         float* inChannels[2] = { inChL, inChR };
+         AudioBuffer inBuf;
+         inBuf.channels = inChannels;
+         inBuf.numChannels = 2;
+         inBuf.numFrames = blockSize;
+         float liveL[blockSize], liveR[blockSize], oldL[blockSize], oldR[blockSize];
+         float* liveCh[2] = { liveL, liveR };
+         float* oldCh[2] = { oldL, oldR };
+         AudioBuffer liveBuf, oldBuf;
+         liveBuf.channels = liveCh;
+         oldBuf.channels = oldCh;
+         liveBuf.numChannels = oldBuf.numChannels = 2;
+         liveBuf.numFrames = oldBuf.numFrames = blockSize;
+
+         static const float kNotesHz[8] = { 110.0f, 164.8f, 130.8f, 196.0f, 146.8f, 220.0f, 123.5f, 174.6f };
+         float phaseA = 0.0f, phaseB = 0.0f;
+         float maxDiff = 0.0f;
+         for (int offset = 0; offset < totalFrames; offset += blockSize)
+         {
+            if (offset == totalFrames / 2)
+            {
+               *node.ParamPtr("size") = 0.85f;
+               *node.ParamPtr("decay") = 4.0f;
+               *node.ParamPtr("damping") = 0.7f;
+               *node.ParamPtr("predelay") = 37.0f;
+               *node.ParamPtr("width") = 0.3f;
+               live.PushParams(node, sampleRate);
+               legacy.PushParams(node, sampleRate);
+            }
+            for (int k = 0; k < blockSize; k++)
+            {
+               const int n = offset + k;
+               const int noteLen = 12000; // 250 ms
+               const float hz = kNotesHz[(n / noteLen) % 8];
+               const float env = std::exp(-(float)(n % noteLen) / 3000.0f);
+               phaseA += hz / (float)sampleRate;
+               phaseB += hz * 1.006f / (float)sampleRate;
+               phaseA -= std::floor(phaseA);
+               phaseB -= std::floor(phaseB);
+               const float saw = (2.0f * phaseA - 1.0f) + (2.0f * phaseB - 1.0f);
+               inChL[k] = 0.35f * env * saw;
+               inChR[k] = 0.35f * env * (0.8f * saw + 0.2f * (2.0f * phaseA - 1.0f));
+            }
+            live.ProcessBlockSimd(inBuf, nullptr, liveBuf);
+            legacy.ProcessBlockLegacy(inBuf, nullptr, oldBuf);
+            for (int ch = 0; ch < 2; ch++)
+               for (int k = 0; k < blockSize; k++)
+                  maxDiff = std::max(maxDiff, std::fabs(liveBuf.channels[ch][k] - oldBuf.channels[ch][k]));
+         }
+         const bool ok = maxDiff <= kReverbLegacyTol;
+         printf("DSPTEST reverb live vs pre-perf kernel, analog %s, 10 s: max diff %.3e (tol %.1e)  %s\n",
+                analogOn ? "on" : "off", maxDiff, kReverbLegacyTol, ok ? "OK" : "FAIL");
+         all &= ok;
+      }
+   }
+
    return all;
 }
 
