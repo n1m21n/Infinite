@@ -147,11 +147,21 @@ def main():
     parser.add_argument("--test", action="store_true", help="Run with a sample audio click/retrigger bug")
     parser.add_argument("--neural", "--local-router", dest="neural", action="store_true", help="Run local neural router model on Apple Metal")
     
+    parser.add_argument("--brief", action="store_true", help="L5: a ~200-token brief (files, symbols, why, skills)")
+    parser.add_argument("--json", action="store_true", help="with --brief: the same content as JSON")
+
     args = parser.parse_args()
     
     query = args.query or "Fix audio pop/click when retriggering an arranged audio clip mid-playback with active envelope modulation"
     
-    if args.neural:
+    if args.brief:
+        import json
+        sys.path.insert(0, str(ENGINE_DIR.parent))
+        from l5.brief import brief_data, render
+        engine = SemiBrainCognitiveEngine()
+        data = brief_data(engine, engine.analyze_problem(query))
+        print(json.dumps(data, indent=1) if args.json else render(data))
+    elif args.neural:
         run_neural_routing(query)
     else:
         run_cognitive_analysis(query)

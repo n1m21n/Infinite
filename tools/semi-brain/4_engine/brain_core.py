@@ -70,6 +70,7 @@ class ProblemFrame:
     ast_callers_found: List[str] = field(default_factory=list)
     ranked_files: List[str] = field(default_factory=list)
     file_evidence: Dict[str, List[str]] = field(default_factory=dict)
+    compartments: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
 
 @dataclass
 class ImpactNode:
@@ -367,6 +368,7 @@ class SemiBrainCognitiveEngine:
             ast_callers_found=callers,
             ranked_files=ranked_files,
             file_evidence=evidence,
+            compartments=by_compartment,
         )
 
     SEEDS_PER_COMPARTMENT = 10
