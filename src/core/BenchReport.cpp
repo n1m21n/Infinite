@@ -646,6 +646,8 @@ namespace Bench
 
       if (!soak.is_null())
          j["soak"] = soak;
+      if (!offlineRender.is_null())
+         j["offline_render"] = offlineRender;
 
       j["nodes"] = nodes;
       j["tris"] = tris;

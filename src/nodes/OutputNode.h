@@ -14,6 +14,25 @@
 #include "gl3.h" // GLsync, for the recording readback fences below
 #include "audio/AudioCaptureRing.h"
 
+// B10 offline-render A/V sync markers (docs/plans/perf/benchmark-suite.md
+// §4). Shared between OutputNode.cpp's marker injection (added to the real
+// B3-shaped scene's audio/video only when INFINITE_BENCH_B10 is set - see
+// B10BenchActive()/B10MarkerAt() there) and main.cpp's B10 fixture driver,
+// which redecodes the take and correlates onsets against these same times,
+// the same way INFINITE_RECEXPORTTEST does for its own synthetic markers.
+// A single definition so the injector and the analyzer can never disagree.
+namespace B10Bench
+{
+   constexpr double kMarkerAt[] = { 4.0, 9.0, 14.0, 19.0, 24.0 };
+   constexpr int kMarkerCount = 5;
+   constexpr double kMarkerSeconds = 0.2;
+   // Pure tone injected during each marker window. 1kHz lands on an exact
+   // Goertzel bin for both 44.1kHz and 48kHz sample rates at a 20ms analysis
+   // window (882 and 960 samples respectively -> k=20 exactly), which the
+   // main.cpp analyzer relies on to avoid spectral leakage.
+   constexpr double kToneHz = 1000.0;
+}
+
 // Terminal node. Passes its input through into its own FBO (identity pass) so it
 // has a real cook/output-texture lifecycle like any other node, and can also
 // record the cooked result to an H.264 movie a frame at a time.

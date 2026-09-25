@@ -32,6 +32,11 @@ namespace Platform
       return false;
    }
 
+   bool SyphonServerCanReportClients()
+   {
+      return false;
+   }
+
    void SyphonServerDestroy(SyphonServerHandle* handle)
    {
       delete handle;

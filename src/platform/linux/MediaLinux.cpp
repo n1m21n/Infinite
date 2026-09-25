@@ -205,7 +205,11 @@ namespace Platform
 
       // Serves a request directly from the reverse-playback cache when
       // possible, without touching the decode thread at all. Caller must
-      // hold h->mutex. Mirrors Platform.mm's TryUseCache.
+      // hold h->mutex. Mirrors Platform.mm's TryUseCache, including its
+      // "Same" case: a request that lands on the frame already delivered
+      // is a no-op (false, outPixels untouched) so the caller skips the
+      // re-upload, per the contract documented on VideoFrameAt in
+      // Platform.h ("Returns true only when that is a new frame").
       bool TryUseCacheLocked(VideoHandle* h, double seconds, std::vector<unsigned char>& outPixels,
                              double& outPts)
       {
@@ -226,8 +230,12 @@ namespace Platform
          if (best == nullptr)
             best = &h->frameCache.front();
 
-         outPixels = best->rgba; // copy - the cache keeps its own owning copy
          outPts = best->pts;
+         const double delivered = h->deliveredSeconds.load();
+         if (delivered >= 0.0 && std::fabs(best->pts - delivered) < kVideoEpsilonSeconds)
+            return false; // same frame already handed back - no copy, no re-upload
+
+         outPixels = best->rgba; // copy - the cache keeps its own owning copy
          return true;
       }
 

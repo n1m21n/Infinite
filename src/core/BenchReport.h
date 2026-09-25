@@ -495,6 +495,10 @@ namespace Bench
       // B7 soak: samples every 10 s plus the soak verdicts. null = not a soak.
       nlohmann::json soak = nullptr;
 
+      // B10 offline render + A/V sync: realtime factor, frames, drift at the
+      // re-decoded markers. Built by the fixture; null = not an offline render.
+      nlohmann::json offlineRender = nullptr;
+
       void Emit() const;
    };
 }

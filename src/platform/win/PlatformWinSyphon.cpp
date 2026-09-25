@@ -100,14 +100,20 @@ namespace Platform
       handle->spout.SendTexture(textureId, GL_TEXTURE_2D, (unsigned int)width, (unsigned int)height, !flipped);
    }
 
-   bool SyphonServerHasClients(SyphonServerHandle* handle)
+   bool SyphonServerHasClients(SyphonServerHandle* /*handle*/)
    {
-      // Spout deliberately doesn't track receiver count (a receiver just
-      // polls shared memory; there's no connection handshake on the sender
-      // side to count) - IsInitialized() is the closest available proxy,
-      // meaning this reports "publishing has started" rather than "someone
-      // is actually receiving."
-      return handle != nullptr && handle->spout.IsInitialized();
+      // Spout doesn't track receivers (a receiver just polls shared memory;
+      // there is no handshake on the sender side to count). This used to
+      // return IsInitialized(), i.e. "publishing has started", which the
+      // Syphon Out body showed as "Clients: Active" with nobody receiving.
+      // Never claim a receiver we cannot see; SyphonServerCanReportClients()
+      // tells the UI to say "not reported" instead.
+      return false;
+   }
+
+   bool SyphonServerCanReportClients()
+   {
+      return false;
    }
 
    void SyphonServerDestroy(SyphonServerHandle* handle)

@@ -6770,6 +6770,11 @@ namespace Platform
       return handle->server.hasClients;
    }
 
+   bool SyphonServerCanReportClients()
+   {
+      return true;
+   }
+
    void SyphonServerDestroy(SyphonServerHandle* handle)
    {
       if (!handle) return;

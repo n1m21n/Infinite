@@ -110,6 +110,9 @@ run_fixture() {
    # window (every other fixture runs headless).
    local visible=()
    case "$label" in B3_*|B6_*|B7_*|B8_*) visible=(INFINITE_BENCH_VISIBLE=1) ;; esac
+   # B10 renders through the offscreen offline-render FBO path (same as
+   # B2/B4/B9), not the live/projector loop B3/B6/B7/B8 pace against a real
+   # display - no visible window needed.
    env "$@" ${visible[@]+"${visible[@]}"} INFINITE_EXITAFTER="$exitafter" "$APP" -ApplePersistenceIgnoreState YES > "$log" 2>&1 &
    local pid=$! wd=""
    if [[ -n "${FIXTURE_TIMEOUT:-}" ]]; then
@@ -314,7 +317,18 @@ fi
 
 if want B10; then
 echo "B10 Offline render and A/V sync"
-skip "B10_offline_av_sync"
+# B10 Offline render/A-V-sync fixture per benchmark-suite.md §4: the B3-shaped
+# scene rendered for B10_SECONDS (default 30s) through the real Arrangement
+# offline path, then redecoded and its markers correlated the way
+# INFINITE_RECEXPORTTEST does. The main loop free-runs (swap interval 0)
+# while the take renders, so EXITAFTER is a generous frame cap, not tied to
+# the take's own 30s of content; FIXTURE_TIMEOUT is the real safety net.
+B10_SECONDS="${B10_SECONDS:-30}"
+FIXTURE_TIMEOUT=240 run_fixture "B10_offline_av_sync seconds=$B10_SECONDS,anim=1" 20000 \
+   INFINITE_BENCH_B10=1 INFINITE_BENCH_B10SECONDS="$B10_SECONDS"
+# anim=0: output_hash stability check (mirrors B2/B4's static variant).
+FIXTURE_TIMEOUT=240 run_fixture "B10_offline_av_sync seconds=$B10_SECONDS,anim=0" 20000 \
+   INFINITE_BENCH_B10=1 INFINITE_BENCH_B10SECONDS="$B10_SECONDS" INFINITE_BENCH_B10ANIM=0
 
 fi
 

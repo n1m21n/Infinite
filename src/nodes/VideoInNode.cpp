@@ -125,6 +125,8 @@ void VideoInNode::EnsurePlaceholder()
 
    mWidth = kSize;
    mHeight = kSize;
+   mTexWidth = kSize;
+   mTexHeight = kSize;
    mHasPlaceholder = true;
 }
 
@@ -203,7 +205,21 @@ void VideoInNode::CookIfNeeded(int frameId)
             Bench::ConditionalGpuStageTimer benchGpu(mBench ? Bench::NodeGpuRing() : nullptr, "camera_upload", frameId);
             glBindTexture(GL_TEXTURE_2D, mTex);
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, mFrame.data());
+            // A camera's frame size is fixed once opened, so this is a full
+            // reallocation only on the first real frame (replacing the
+            // placeholder) or an actual device/resolution change - every
+            // other frame reuses the allocation via glTexSubImage2D, same
+            // pattern as VideoSourceNode's clip-decode upload.
+            if (mTexWidth != w || mTexHeight != h || mHasPlaceholder)
+            {
+               glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, mFrame.data());
+               mTexWidth = w;
+               mTexHeight = h;
+            }
+            else
+            {
+               glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, mFrame.data());
+            }
             glBindTexture(GL_TEXTURE_2D, 0);
             benchGpu.Stop();
             if (mBench && frameSeq != mBench->lastSeq)

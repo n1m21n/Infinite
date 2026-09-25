@@ -1063,7 +1063,15 @@ namespace Platform
    SyphonServerHandle* SyphonServerCreate(const std::string& serverName);
    void SyphonServerUpdateName(SyphonServerHandle* handle, const std::string& serverName);
    void SyphonServerPublish(SyphonServerHandle* handle, unsigned int textureId, int width, int height, bool flipped = false);
+   // True only when some receiver is known to be reading this server. Never
+   // a guess: where the backend cannot see receivers it returns false, and
+   // SyphonServerCanReportClients() says so.
    bool SyphonServerHasClients(SyphonServerHandle* handle);
+   // Whether SyphonServerHasClients can see receivers at all. macOS (Syphon)
+   // yes. Windows (Spout: receivers just read shared memory, no handshake)
+   // and Linux (no sharing backend) no, so a UI must say "not reported"
+   // rather than "waiting".
+   bool SyphonServerCanReportClients();
    void SyphonServerDestroy(SyphonServerHandle* handle);
 
    // Syphon Directory & Client (Receiver)

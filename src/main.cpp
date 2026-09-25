@@ -8298,7 +8298,9 @@ namespace
       if (n->PublishedWidth() > 0 && n->PublishedHeight() > 0)
       {
          ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "Broadcasting: %dx%d", n->PublishedWidth(), n->PublishedHeight());
-         if (n->HasClients())
+         if (!Platform::SyphonServerCanReportClients())
+            ImGui::TextDisabled("Clients: not reported");
+         else if (n->HasClients())
             ImGui::TextColored(ImVec4(0.3f, 0.9f, 1.0f, 1.0f), "Clients: Active");
          else
             ImGui::TextDisabled("Clients: Waiting for app...");
@@ -52377,11 +52379,20 @@ static bool RunSpoutLoopTest()
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
    glBindTexture(GL_TEXTURE_2D, 0);
 
-   SyphonClientHandle* client = SyphonClientCreate();
+   // Contract check, before any receiver exists: a backend that cannot see
+   // receivers must never claim one. Spout used to return IsInitialized()
+   // here, so after the first send the node read "Clients: Active" alone.
    SyphonServerPublish(server, srcTex, w, h, false);
+   bool ok = true;
+   if (!SyphonServerCanReportClients() && SyphonServerHasClients(server))
+   {
+      printf("SPOUTLOOPTEST FAIL (HasClients true with no receiver, on a backend that cannot report receivers)\n");
+      ok = false;
+   }
+
+   SyphonClientHandle* client = SyphonClientCreate();
    bool connected = client != nullptr && SyphonClientConnect(client, "Spout", senderName);
 
-   bool ok = true;
    bool skipped = false;
    if (!connected)
    {
@@ -68694,10 +68705,12 @@ int main(int argc, char** argv)
       else if (getenv("INFINITE_BENCH_B3") != nullptr ||
                getenv("INFINITE_BENCH_B3LIVE") != nullptr ||
                getenv("INFINITE_BENCH_B3SCALE") != nullptr ||
-               getenv("INFINITE_BENCH_B7") != nullptr)
+               getenv("INFINITE_BENCH_B7") != nullptr ||
+               getenv("INFINITE_BENCH_B10") != nullptr)
       {
-         // B7 soak runs this same fixture for INFINITE_BENCH_B7MINUTES.
-         // B3 Live performance fixture (docs/plans/perf/benchmark-suite.md §4).
+         // B7 soak and B10 offline-render/A-V-sync both run this same
+         // B3-shaped fixture (docs/plans/perf/benchmark-suite.md §4).
+         const bool isBenchB10 = getenv("INFINITE_BENCH_B10") != nullptr;
          std::string scaleStr = "s";
          const char* bench3Arg = getenv("INFINITE_BENCH_B3SCALE");
          if (!bench3Arg) bench3Arg = getenv("INFINITE_BENCH_B3LIVE");
@@ -68709,7 +68722,11 @@ int main(int argc, char** argv)
          const int bufFrames = getenv("INFINITE_BENCH_B3BUFFER") ? atoi(getenv("INFINITE_BENCH_B3BUFFER")) : 256;
 
          const bool b3EnableVisuals = (getenv("INFINITE_BENCH_B3VISUALS") == nullptr || strcmp(getenv("INFINITE_BENCH_B3VISUALS"), "0") != 0);
-         const bool b3EnableMidi = (getenv("INFINITE_BENCH_B3MIDI") == nullptr || strcmp(getenv("INFINITE_BENCH_B3MIDI"), "0") != 0);
+         // B10 renders offline, not through the live projector/MIDI loop B3's
+         // own i2p measurement needs - simulated MIDI injection would just be
+         // dead weight (and a spurious Platform::MidiStart) on a batch render.
+         const bool b3EnableMidi = !isBenchB10 &&
+            (getenv("INFINITE_BENCH_B3MIDI") == nullptr || strcmp(getenv("INFINITE_BENCH_B3MIDI"), "0") != 0);
          const bool b3EnablePred = (getenv("INFINITE_BENCH_B3PRED") == nullptr || strcmp(getenv("INFINITE_BENCH_B3PRED"), "0") != 0);
          const bool b3EnableGesture = (getenv("INFINITE_BENCH_B3GESTURE") == nullptr || strcmp(getenv("INFINITE_BENCH_B3GESTURE"), "0") != 0);
          sBenchB3I2PDryRun = (getenv("INFINITE_BENCH_B3I2PDRYRUN") != nullptr && strcmp(getenv("INFINITE_BENCH_B3I2PDRYRUN"), "0") != 0);
@@ -68726,10 +68743,15 @@ int main(int argc, char** argv)
          // 1. Audio: B1-lite
          BuildBenchB1Audio(voices, bufFrames, /*yOffset=*/1200.0f);
 
-         // 2. Visuals: B2-lite (scale s effects chain, animated)
+         // 2. Visuals: B2-lite (scale s effects chain, animated by default).
+         // B10 alone can ask for anim=0 (INFINITE_BENCH_B10ANIM=0), to check
+         // output_hash stability the same way B2's anim=0 variant does -
+         // B3/B7 keep the animated chain unconditionally, unchanged.
+         const bool b3IsAnim = !isBenchB10 ||
+            (getenv("INFINITE_BENCH_B10ANIM") == nullptr || strcmp(getenv("INFINITE_BENCH_B10ANIM"), "0") != 0);
          if (b3EnableVisuals)
          {
-            BuildBenchB2Scene("s", /*isAnim=*/true, sBenchB3Render3DIdx, sBenchB3OutputIdx,
+            BuildBenchB2Scene("s", b3IsAnim, sBenchB3Render3DIdx, sBenchB3OutputIdx,
                               &sBenchB3TwistIdx, &sBenchB3MatIdx, &sBenchB3CamIdx,
                               /*useEmbossForGlitch=*/true);
 
@@ -87423,11 +87445,10 @@ int main(int argc, char** argv)
                   {
                      const Bench::PercentileRing pub = ringOf(sy->BenchPublishMs(), sSyphonStart);
                      nlohmann::json syj = { { "publish_ms", p5099max(pub) }, { "publishes", (int)pub.Count() } };
-#if defined(__APPLE__)
-                     syj["has_clients"] = sy->HasClients();
-#else
-                     syj["has_clients"] = nullptr; // Spout cannot say whether anyone is receiving
-#endif
+                     if (Platform::SyphonServerCanReportClients())
+                        syj["has_clients"] = sy->HasClients();
+                     else
+                        syj["has_clients"] = nullptr; // Spout cannot say whether anyone is receiving
                      media["syphon"] = syj;
                   }
                }
@@ -87595,6 +87616,385 @@ int main(int argc, char** argv)
             report.Emit();
             printf("B9MEMORY DONE\n");
             fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // B10 Offline render and A/V sync (docs/plans/perf/benchmark-suite.md
+      // §4): the B3-shaped scene (built above, shared with B3/B7) rendered
+      // for INFINITE_BENCH_B10SECONDS (default 30s) through the real
+      // Arrangement offline path - StartOfflineRenderSession(out, 0, 0,
+      // /*isArrange=*/true), the same call ArrangeRenderExecuteJob makes -
+      // then the written movie is redecoded and its markers correlated
+      // exactly the way INFINITE_RECEXPORTTEST does for its own synthetic
+      // take. OutputNode.cpp's B10BenchActive()/B10MarkerAt() lay the
+      // tone+flash pair over this scene's own real audio/video, strictly
+      // under INFINITE_BENCH_B10, so B3/B7 (which build the identical scene)
+      // are untouched.
+      if (getenv("INFINITE_BENCH_B10") != nullptr)
+      {
+         static bool sB10Started = false;
+         static bool sB10Done = false;
+         static int sB10DoneFrame = -1;
+         static double sB10WallStart = 0.0;
+         static double sB10WallEnd = 0.0;
+         static int sB10Fps = 30;
+         static int sB10DurationSeconds = 30;
+         static std::string sB10Path;
+         static std::string sB10OutputHash;
+
+         auto b10Output = []() -> OutputNode* {
+            if (sBenchB3OutputIdx < 0)
+               return nullptr;
+            auto* gn = FindNodeByIndex(sBenchB3OutputIdx);
+            return gn != nullptr ? dynamic_cast<OutputNode*>(gn->node.get()) : nullptr;
+         };
+
+         // Same steady-state-hash capture point B2/B9's anim=0 variant uses
+         // (frameId 32->152 warmup/sample window), so this is at least
+         // reported from settled content rather than mid-buildout. It is
+         // informational only, not a determinism gate: unlike B2/B4's real
+         // static variant, B10 renders the B3-shaped scene, whose
+         // macro/gesture playback and Prediction modulators run on
+         // wall-clock time regardless of B10's own anim=0/1 flag (that flag
+         // only silences the B2-lite visual layer). Confirmed empirically -
+         // two anim=0 runs of the same commit, both settled to frame 152,
+         // produced different output_hash values - so scripts/bench/compare.py
+         // classifies B10 as nondeterministic the same way it already does
+         // for B3/B9, and never gates on its hash.
+         if (frameId == 2)
+         {
+            gVsync = false;
+            SetCanvasSwapInterval(0);
+            gTargetFps = 0;
+         }
+
+         if (frameId == 152)
+         {
+            if (OutputNode* out = b10Output())
+            {
+               glBindFramebuffer(GL_READ_FRAMEBUFFER, out->GetFbo().fbo);
+               sB10OutputHash = Bench::HashFramebufferRGBA8(out->GetOutputWidth(), out->GetOutputHeight());
+               glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+            }
+         }
+
+         if (!sB10Started && frameId == 153)
+         {
+            sB10Started = true;
+            OutputNode* out = b10Output();
+            if (out == nullptr)
+            {
+               printf("[FAIL] B10: no Output node built for the B3-shaped scene\n");
+               Bench::BenchReport report;
+               report.bench = "B10_offline_av_sync";
+               report.frames = 0;
+               report.Emit();
+               printf("B10 DONE\n");
+               fflush(stdout);
+               glfwSetWindowShouldClose(window, GLFW_TRUE);
+            }
+            else
+            {
+               sB10DurationSeconds = getenv("INFINITE_BENCH_B10SECONDS")
+                  ? std::max(5, atoi(getenv("INFINITE_BENCH_B10SECONDS"))) : 30;
+               sB10Fps = 30;
+               sB10Path = TmpPath("infinite_bench_b10.mp4");
+               std::remove(sB10Path.c_str());
+               out->recordVideoPath = sB10Path;
+               out->videoFormat = 0;
+               out->offlineFps = sB10Fps;
+               out->offlineDurationSeconds = sB10DurationSeconds;
+               out->offlineTotalFramesOverride = sB10Fps * sB10DurationSeconds;
+               out->includeAudio = true;
+               sB10WallStart = glfwGetTime();
+               StartOfflineRenderSession(out, 0, 0, /*isArrange=*/true);
+               if (!gOfflineRender.active)
+               {
+                  printf("[FAIL] B10 could not start the offline take: %s\n", out->RecordStatus().c_str());
+                  Bench::BenchReport report;
+                  report.bench = "B10_offline_av_sync";
+                  report.frames = 0;
+                  report.Emit();
+                  printf("B10 DONE\n");
+                  fflush(stdout);
+                  glfwSetWindowShouldClose(window, GLFW_TRUE);
+               }
+            }
+         }
+
+         if (sB10Started && !sB10Done && frameId > 3)
+         {
+            if (!gOfflineRender.active && b10Output() != nullptr && !b10Output()->IsOfflineFinalizing())
+            {
+               sB10Done = true;
+               sB10DoneFrame = frameId;
+               sB10WallEnd = glfwGetTime();
+            }
+         }
+
+         // Same settle margin OFFLINERENDERTEST uses before inspecting the
+         // file: AVFoundation's own asset metadata can lag the bytes this
+         // same process just finished writing by a beat or two.
+         if (sB10Done && sB10DoneFrame >= 0 && frameId == sB10DoneFrame + 60)
+         {
+            OutputNode* out = b10Output();
+            Bench::BenchReport report;
+            report.bench = "B10_offline_av_sync";
+            // compare.py's deterministic()/normalize_variant() key off this
+            // string the same way every other bench's variant does - needs
+            // its own anim=/seconds= tags (b3IsAnim/sB10DurationSeconds),
+            // not B3's "scale=s" wording, which carries neither.
+            const bool b10AnimForReport =
+               (getenv("INFINITE_BENCH_B10ANIM") == nullptr || strcmp(getenv("INFINITE_BENCH_B10ANIM"), "0") != 0);
+            report.variant = "seconds=" + std::to_string(sB10DurationSeconds) +
+                              ",anim=" + (b10AnimForReport ? std::string("1") : std::string("0"));
+            report.frames = out != nullptr ? out->LastRecordedFrames() : 0;
+            report.nodes = (int)gNodes.size();
+            report.outputHash = sB10OutputHash;
+
+            const int expectedFrames = sB10Fps * sB10DurationSeconds;
+            const int wroteFrames = out != nullptr ? out->LastRecordedFrames() : 0;
+            const int droppedFrames = out != nullptr ? out->LastDroppedFrames() : 0;
+            const double wallSeconds = std::max(0.001, sB10WallEnd - sB10WallStart);
+            const double takeSeconds = (double)sB10DurationSeconds;
+            const double realtimeFactor = takeSeconds / wallSeconds;
+
+            const Platform::MovieInfo info = Platform::InspectMovie(sB10Path);
+
+            printf("[B10] wrote=%d expected=%d dropped=%d wall=%.2fs realtime_factor=%.2fx "
+                   "file_duration=%.2fs\n",
+                   wroteFrames, expectedFrames, droppedFrames, wallSeconds, realtimeFactor,
+                   info.duration);
+
+            // ---- redecode ----
+            // Video markers reuse INFINITE_RECEXPORTTEST's plain luminance
+            // threshold below (the flash dominates B3's own visuals). Audio
+            // markers can't: B3's own mix is loud for most of the take, so a
+            // broadband amplitude threshold produces a "loud" run for most
+            // of the clip and misses the quiet-to-loud rising edge the tone
+            // burst is supposed to create (this is exactly how the first
+            // real run of this fixture failed - 1 of 5 audio onsets found).
+            // Instead, look for narrowband energy at B10Bench::kToneHz via a
+            // per-window Goertzel, which the ambient mix is very unlikely to
+            // spike at the same instant, and threshold against a baseline
+            // computed from the clip itself rather than a fixed constant.
+            Platform::SampleBuffer audio;
+            std::string audioErr;
+            std::vector<double> audioOnsets;
+            if (Platform::DecodeVideoAudioTrackToBuffer(sB10Path, audio, audioErr) && audio.numFrames > 0)
+            {
+               // 20ms window: at both 44.1kHz (882 samples) and 48kHz (960
+               // samples) this lands B10Bench::kToneHz=1000Hz on an exact
+               // Goertzel bin (k=20), so there's no spectral leakage to
+               // widen the peak or bias the baseline.
+               const int win = (int)std::lround(audio.sampleRate * 0.02);
+               const double k = std::floor(0.5 + (double)win * B10Bench::kToneHz / audio.sampleRate);
+               const double omega = (2.0 * M_PI / (double)win) * k;
+               const double coeff = 2.0 * std::cos(omega);
+
+               std::vector<double> power;
+               std::vector<double> windowStartSec;
+               for (int i = 0; win > 0 && i + win <= audio.numFrames; i += win)
+               {
+                  double s0 = 0.0, s1 = 0.0, s2 = 0.0;
+                  for (int n = 0; n < win; n++)
+                  {
+                     s0 = (double)audio.channelData[(size_t)(i + n)] + coeff * s1 - s2;
+                     s2 = s1;
+                     s1 = s0;
+                  }
+                  power.push_back(s2 * s2 + s1 * s1 - coeff * s1 * s2);
+                  windowStartSec.push_back((double)i / audio.sampleRate);
+               }
+
+               if (!power.empty())
+               {
+                  // Baseline = median window power (robust to the 5 marker
+                  // spikes themselves, which are a small fraction of a 30s
+                  // clip's ~1500 windows).
+                  std::vector<double> sorted = power;
+                  std::sort(sorted.begin(), sorted.end());
+                  const double median = sorted[sorted.size() / 2];
+                  const double threshold = std::max(median * 8.0, 1e-6);
+
+                  // A single-window threshold crossing isn't enough to call
+                  // it a marker: real B3 content can clear the adaptive
+                  // threshold for a window or two by coincidence (this is
+                  // how the Goertzel-only version of this detector produced
+                  // 6 onsets for 5 real bursts - one short spurious blip).
+                  // Each real burst is B10Bench::kMarkerSeconds long, so
+                  // require the "loud" run to sustain for most of that
+                  // before counting it, with margin for window/burst
+                  // boundary misalignment on either end.
+                  const double windowSeconds = (double)win / audio.sampleRate;
+                  const int minSustainWindows =
+                     std::max(1, (int)std::floor(B10Bench::kMarkerSeconds / windowSeconds * 0.6));
+
+                  bool loud = false;
+                  size_t runStart = 0;
+                  int runLen = 0;
+                  for (size_t i = 0; i <= power.size(); i++)
+                  {
+                     const bool nowLoud = i < power.size() && power[i] > threshold;
+                     if (nowLoud && !loud)
+                     {
+                        runStart = i;
+                        runLen = 1;
+                     }
+                     else if (nowLoud && loud)
+                     {
+                        runLen++;
+                     }
+                     else if (!nowLoud && loud)
+                     {
+                        if (runLen >= minSustainWindows)
+                           audioOnsets.push_back(windowStartSec[runStart]);
+                        runLen = 0;
+                     }
+                     loud = nowLoud;
+                  }
+               }
+            }
+            else
+            {
+               printf("  [FAIL] B10 could not decode the take's audio track: %s\n", audioErr.c_str());
+            }
+
+            std::vector<double> videoOnsets;
+            std::string videoErr;
+            if (Platform::VideoHandle* vid = Platform::VideoOpen(sB10Path, videoErr))
+            {
+               const int vw = Platform::VideoWidth(vid);
+               const int vh = Platform::VideoHeight(vid);
+               std::vector<unsigned char> px;
+               bool bright = false;
+               const double stepSeconds = 1.0 / ((double)sB10Fps * 4.0);
+               for (double t = 0.0; t < takeSeconds; t += stepSeconds)
+               {
+                  bool gotFrame = Platform::VideoFrameAt(vid, t, px);
+                  for (int waitedMs = 0;
+                       !gotFrame && waitedMs < 2000 && Platform::VideoDecodeIsCatchingUp(vid);
+                       waitedMs++)
+                  {
+                     std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                     gotFrame = Platform::VideoFrameAt(vid, t, px);
+                  }
+                  if (!gotFrame && px.empty())
+                     continue;
+                  if ((int)px.size() < vw * vh * 4)
+                     continue;
+                  double sum = 0.0;
+                  int count = 0;
+                  for (int y = vh / 4; y < vh * 3 / 4; y += 4)
+                     for (int x = vw / 4; x < vw * 3 / 4; x += 4)
+                     {
+                        sum += px[((size_t)y * vw + x) * 4];
+                        count++;
+                     }
+                  const double lum = count > 0 ? sum / count / 255.0 : 0.0;
+                  const bool nowBright = lum > 0.5;
+                  if (nowBright && !bright)
+                     videoOnsets.push_back(t);
+                  bright = nowBright;
+               }
+               Platform::VideoClose(vid);
+            }
+            else
+            {
+               printf("  [FAIL] B10 could not open the take for decoding: %s\n", videoErr.c_str());
+            }
+
+            printf("[B10] markers found: audio=%d video=%d (expected %d)\n",
+                   (int)audioOnsets.size(), (int)videoOnsets.size(), B10Bench::kMarkerCount);
+
+            bool markersOk = (int)audioOnsets.size() == B10Bench::kMarkerCount &&
+                              (int)videoOnsets.size() == B10Bench::kMarkerCount;
+            double driftEndMs = 0.0, driftWorstMs = 0.0, ebuWorstEarlyMs = 0.0, ebuWorstLateMs = 0.0;
+            nlohmann::json markerDeltasMs = nlohmann::json::array();
+            if (markersOk)
+            {
+               std::vector<double> deltaMs(B10Bench::kMarkerCount);
+               for (int m = 0; m < B10Bench::kMarkerCount; m++)
+               {
+                  deltaMs[m] = (videoOnsets[m] - audioOnsets[m]) * 1000.0;
+                  markerDeltasMs.push_back(deltaMs[m]);
+                  printf("  marker %d: audio %.3fs video %.3fs video-minus-audio %+.0fms\n",
+                         m + 1, audioOnsets[m], videoOnsets[m], deltaMs[m]);
+                  ebuWorstEarlyMs = std::max(ebuWorstEarlyMs, deltaMs[m]);   // audio early: delta > 0
+                  ebuWorstLateMs = std::max(ebuWorstLateMs, -deltaMs[m]);   // audio late: delta < 0
+               }
+               driftEndMs = std::fabs(deltaMs.back() - deltaMs.front());
+               for (int m = 0; m < B10Bench::kMarkerCount; m++)
+                  driftWorstMs = std::max(driftWorstMs, std::fabs(deltaMs[m] - deltaMs.front()));
+            }
+
+            const double frameMs = 1000.0 / (double)sB10Fps;
+            const bool avSyncEndOk = markersOk && driftEndMs <= frameMs * 1.0 + 1.0;
+            const bool avSyncWorstOk = markersOk && driftWorstMs <= frameMs * 2.0 + 1.0;
+            // EBU R37: audio at most 40ms early, 60ms late.
+            const bool ebuR37Ok = markersOk && ebuWorstEarlyMs <= 40.0 && ebuWorstLateMs <= 60.0;
+            const bool framesOk = wroteFrames == expectedFrames;
+            const bool droppedOk = droppedFrames == 0;
+            const bool overallOk = markersOk && avSyncEndOk && avSyncWorstOk && ebuR37Ok &&
+                                    framesOk && droppedOk;
+
+            printf("[%s] B10 AV SYNC END: %.0fms (tolerance %.0fms)\n",
+                   avSyncEndOk ? "pass" : "FAIL", driftEndMs, frameMs * 1.0 + 1.0);
+            printf("[%s] B10 AV SYNC WORST: %.0fms (tolerance %.0fms)\n",
+                   avSyncWorstOk ? "pass" : "FAIL", driftWorstMs, frameMs * 2.0 + 1.0);
+            printf("[%s] B10 EBU R37: worst early %.0fms (<=40) worst late %.0fms (<=60)\n",
+                   ebuR37Ok ? "pass" : "FAIL", ebuWorstEarlyMs, ebuWorstLateMs);
+            printf("[%s] B10 FRAMES: wrote=%d expected=%d dropped=%d\n",
+                   (framesOk && droppedOk) ? "pass" : "FAIL", wroteFrames, expectedFrames, droppedFrames);
+
+            nlohmann::json offline;
+            offline["realtime_factor"] = realtimeFactor;
+            offline["wall_seconds"] = wallSeconds;
+            offline["take_seconds"] = takeSeconds;
+            offline["fps"] = sB10Fps;
+            offline["frames_written"] = wroteFrames;
+            offline["frames_expected"] = expectedFrames;
+            offline["dropped"] = droppedFrames;
+            offline["file_duration_sec"] = info.duration;
+            offline["markers_found_audio"] = (int)audioOnsets.size();
+            offline["markers_found_video"] = (int)videoOnsets.size();
+            offline["markers_expected"] = B10Bench::kMarkerCount;
+            offline["marker_delta_ms"] = markerDeltasMs;
+            offline["drift_end_ms"] = driftEndMs;
+            offline["drift_end_frames"] = driftEndMs / frameMs;
+            offline["drift_worst_ms"] = driftWorstMs;
+            offline["drift_worst_frames"] = driftWorstMs / frameMs;
+            offline["ebu_r37_worst_early_ms"] = ebuWorstEarlyMs;
+            offline["ebu_r37_worst_late_ms"] = ebuWorstLateMs;
+            offline["av_sync_end_ok"] = avSyncEndOk;
+            offline["av_sync_worst_ok"] = avSyncWorstOk;
+            offline["ebu_r37_ok"] = ebuR37Ok;
+            offline["frames_ok"] = framesOk;
+            offline["dropped_ok"] = droppedOk;
+            offline["overall_ok"] = overallOk;
+            report.offlineRender = offline;
+
+            // Generic targets_pass, same mechanism every other fixture's
+            // gated verdicts use (README/compare.py surface a false one as
+            // a TARGET regardless of bench name) - null when the markers
+            // didn't round-trip cleanly enough to judge at all, same
+            // "unproven, not failed" convention B7's soak targets use.
+            report.targetsPass["b10_av_sync_end_le_1_frame"] =
+               markersOk ? nlohmann::json(avSyncEndOk) : nlohmann::json(nullptr);
+            report.targetsPass["b10_av_sync_worst_le_2_frames"] =
+               markersOk ? nlohmann::json(avSyncWorstOk) : nlohmann::json(nullptr);
+            report.targetsPass["b10_ebu_r37"] =
+               markersOk ? nlohmann::json(ebuR37Ok) : nlohmann::json(nullptr);
+            report.targetsPass["b10_frames_exact"] = framesOk;
+            report.targetsPass["b10_dropped_zero"] = droppedOk;
+            report.targetsPass["b10_markers_roundtrip"] = markersOk;
+
+            report.Emit();
+            printf("%s\n", overallOk ? "B10 OK" : "B10 FAIL");
+            printf("B10 DONE\n");
+            fflush(stdout);
+            std::remove(sB10Path.c_str());
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
       }
