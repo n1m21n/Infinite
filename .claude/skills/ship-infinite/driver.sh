@@ -219,7 +219,7 @@ step_release_windows() {
         fi
         local stage="$work/stage-$arch/Infinite"
         mkdir -p "$stage"
-        cp "$work/$art"/* "$stage/" 2>/dev/null
+        cp -R "$work/$art"/. "$stage/"
         (cd "$work/stage-$arch" && zip -qr "$work/$art.zip" Infinite)
         gh release upload "$tag" "$work/$art.zip" --clobber
         echo "    uploaded $art.zip onto release $tag"
