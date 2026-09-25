@@ -11,7 +11,7 @@ blocks a target in this table.
 |---|---|---|---|
 | 1 Audio | Real xrun counter (replaces the wall-clock-gap heuristic, `AudioEngine.cpp`); B1 callback load (open item 1); build B7 soak | B1 cb_load p99 <= 50% @256; 0 xruns in 10 min; soak RSS growth < 2% over 30 min | done, merged in `caafc69` (p99 44.4% @256; 0 xruns in 10 min; soak RSS -3.6%) |
 | 2 Projector + canvas | Projector under load (open items 2-4); canvas vsync not blocking (open item 5) | B3/B8 interval p99 <= 18.3 ms and missed vsync < 0.5%; B6 runs paced and meets p50/p95 | done and closed: merged in `93ba4e0`, close-out `feature/perf-block2-closeout` (`19de37d`, `f9c58f5`). B3 3 rounds trusted (focused): p99 17.63-17.69 ms, 0% missed vsync, all 5 targets pass; B6 met; B8 2 / 3 windows met; B8 heavy is decode-bound -> Block 3 |
-| 3 Media + release gate | Decode drops (open item 6, blocked - see below); camera run (open item 7, needs access granted once); Linux `frameCache` copy (**fixed**, unverified by rig), `VideoInNode` realloc, Spout `HasClients` (Found while measuring 5, 7); build B10 | B8 decode real time, 0 dropped; B10 A/V drift within `av-sync-sweep` limits; new baseline; `driver.sh --full` clean | **steps 0-1 partial, blocked** (`feature/perf-block3-media`, worktree `../infinte-block3` off `9ce52a5`): re-baseline done; Linux `frameCache` dedup fix landed (logic-verified, not rig-verified); decode-drop A/B investigation, B10, new baseline, `driver.sh --full` and merge all blocked this session by sustained multi-session machine load (swap 83% used, concurrent `claude` processes) that makes every focused/timed measurement untrustworthy - see "Block 3 step 1" below for the STOP-rule evidence |
+| 3 Media + release gate | Decode drops (open item 6, **closed** - targets met with no code change on a quiet machine); camera run (open item 7, still unproven - access `not_determined`); Linux `frameCache` copy (**fixed**, unverified by rig), camera texture reuse, Spout `HasClients` (Found while measuring 5, 7, **fixed**); B10 (**built**) | B8 decode real time, 0 dropped; B10 A/V drift within `av-sync-sweep` limits; new baseline; `driver.sh --full` clean | **done**: 7 commits (`81aedf9`..`b383afa`, `feature/perf-block3-media`, worktree `../infinte-block3` off `9ce52a5`); B8 decode targets met on a quiet machine (step 1); Spout `HasClients` and camera texture reuse fixed (step 2); B10 offline-render + A/V-sync fixture built (step 5); baseline corrected for 12 rows stale from before the already-shipped `951d22c` pacing fix, not a new regression (step 6, root-caused via `git merge-base --is-ancestor beb4d87 951d22c`); `driver.sh --full` and `verify-gate` run pre-merge - see "Block 3 steps 4-6" below |
 
 Every block: one branch, `ab.sh` gate (keep only if better), `verify-gate`
 sweeps, merge `--no-ff`, update the State column here.
@@ -47,9 +47,9 @@ because an untrusted run can only look better than the real thing.
 2. ~~**B3 projector pacing**~~: closed by Block 2 (`6fd5fa3`, `5550a20`) and measured clean after `f9c58f5` removed a probe stall: p99 17.63-17.69 ms, 0% missed, 3 trusted rounds. Was p99 50.0 ms / missed 12.0%. Cause (Block 2 step 1): Audio Filter response curves re-simulated a settled sine per point (14.9 ms of node bodies on slow frames vs 0.85 ms), and a late frame waits for the next refresh. Now p99 18.05-18.4 ms, missed 0.53-0.88%: p99 met, missed vsync still just over 0.5%, and no run is trusted yet (another app takes focus ~2 s after launch).
 3. **B8 heavy projector pacing** (Block 3: decode-bound on base and branch alike, close-out step 2): with 4x2160 clips, 3 windows, camera and Syphon, the window interval p99 is 33.0-33.2 ms and missed vsync is 9.4%. The canvas frame p95/p99 is 32.8/33.0 ms, so the load halves the rate.
 4. ~~**B8 light projector pacing**~~: closed by `5550a20` (worst p99 18.1 ms, 0% missed, trusted). Was: with a visible canvas beside them, the 2 and 3 window variants miss no vsyncs but their interval p99 is 18.6-18.7 ms, just over the 18.3 ms lock limit.
-5. ~~**Canvas vsync does not block**~~: closed by `951d22c` (2b: one frame clock - every context swaps at interval 0 and the loop waits once on the display refresh). Was: with swap interval 1 the canvas runs at ~120 fps (p50 8.3 ms) and almost no frames land on a refresh boundary, so every vsync=1 B6 row and every B8 row without the heavy load is `unpaced=1`. The canvas fps targets stay unproven until the canvas is really display-paced.
-6. **B8 decode:** 4x2160 with no windows dropped 1 frame, and clip1 of 2x1080 + Syphon was judged not real time.
-7. **Camera** access has never been granted on this machine (`camera: skipped, not_determined`), so the camera variants run without one.
+5. ~~**Canvas vsync does not block**~~: closed by `951d22c` (2b: one frame clock - every context swaps at interval 0 and the loop waits once on the display refresh). Was: with swap interval 1 the canvas runs at ~120 fps (p50 8.3 ms) and almost no frames land on a refresh boundary, so every vsync=1 B6 row and every B8 row without the heavy load is `unpaced=1`. The baseline itself was not re-captured after this fix landed and kept 12 stale pre-fix rows; corrected in Block 3 step 6 (`97617eb`). Every affected row is now trusted at a real 16.67-16.68 ms p50.
+6. ~~**B8 decode:**~~ closed by Block 3 step 1 (`1bc2244`): targets met with **no code change** on a quiet 8 GB M2 - 4x2160 is not memory-bound (1.13 GB footprint, 0 drops), and the earlier "4x2160 not real time" / "1 dropped" readings were machine load (ChatGPT, concurrent sessions, un-paused semi-brain daemon), not a real decode gap.
+7. **Camera** access has never been granted on this machine (`camera: skipped, not_determined`), so the camera variants run without one. Texture-reuse fix (`7021b12`, Found 5) landed regardless, but is unmeasured end-to-end pending access.
 
 ### Block 3 step 0 re-baseline (2026-09-25, `feature/perf-block3-media`, worktree `../infinte-block3` off `9ce52a5`, uncommitted results)
 
@@ -212,6 +212,109 @@ first launch (2x1080, `unfocused=1`).
 - **Step 3 (camera): unproven.** The owner was asked once. Access is still
   `not_determined`, so every camera variant runs without one.
 
+### Block 3 steps 4-6 (2026-09-25, same branch/worktree): B10 fixture, baseline re-verification and correction, pre-merge gates
+
+**Step 4 (B10 fixture): built**, `d12582d`. `INFINITE_BENCH_B10` composes B3
+(live performance) with an offline render and a Goertzel narrowband
+audio-onset detector for A/V sync measurement: 5 markers at 0.2 s each,
+1000 Hz tone, minimum-sustain-duration gating so a single noisy sample can't
+register a false onset. Both rows are trusted (non-`unfocused`,
+non-`unpaced`) from their first capture, since the fixture inherits B3's
+already-paced, already-focused harness rather than a fresh unproven path.
+
+**Step 5 (baseline re-verification): three attempts, two correctly rejected,
+one real fix found instead of a fourth blind re-run.**
+
+Attempts 1 and 2 (`run_all.sh --quiet --only B1,B2,B3,B4,B5,B6,B8,B9,B10`,
+daemon paused/restored automatically both times) each showed the same
+shape: B10 clean, but B1-B9 broadly regressed 10-100% across nearly every
+fixture, despite the run itself reporting 0 contention flags. Per the
+standing rule (an asymmetric fingerprint - B10 clean, everything else
+broadly down - is not proof of a clean machine even when the harness says
+so), neither was promoted. Both were reported honestly with full numbers
+instead.
+
+On the second re-check, `B6_canvas_nav`'s regression stood out as
+qualitatively different from the rest: it converged on exactly 16.67 ms
+(60 Hz) p50 across both runs, rather than the noisy, run-to-run-varying
+shape contention produces elsewhere. Flagging this distinctly (not lumping
+it into "still contended") led to the real root cause: the existing
+baseline's B6 numbers (8.25-11.17 ms p50 for the vsync=1 variants) are
+*faster* than 60 Hz vsync allows on this machine's Built-In Retina LCD
+(confirmed via `system_profiler` - no external display, no ProMotion, ever)
+- i.e. the baseline itself was wrong, not the branch.
+
+Root-caused via `git merge-base --is-ancestor beb4d87 951d22c` (true) and
+`git log 951d22c..HEAD -- src/main.cpp` (empty): the baseline mixed two
+source commits, `c602a0d` (trusted) for most rows and `beb4d87` for the
+`B6_canvas_nav` vsync=1 rows and 8 of 9 `B8_media_io` rows, and `beb4d87`
+predates `951d22c` ("one frame clock paces the canvas-only loop too",
+already shipped in Block 2 step 2b and already marked closed above) by
+about 3 hours on the same calendar day. Those 12 rows were captured
+pre-fix, self-tagged `unpaced=1`, and simply never re-captured after the
+fix landed - not a regression on this branch, and not machine contention.
+
+Fixed by rebuilding the baseline (`97617eb`) rather than chasing a fake
+regression or forcing a third/fourth full re-run: replaced the 12 stale
+rows with matching trusted rows from the third (quiet, verified) run,
+added B10's 2 previously-absent rows, and kept the B7 soak row (still
+correctly marked `unfocused=1` per its own capture conditions, unrelated to
+this fix). Verified surgical: `compare.py` against the pre-edit baseline
+shows every one of the other 49 rows at exactly 0% delta.
+
+**Step 6 (pre-merge gates):** `driver.sh --full --skip-build` run against a
+verified-current build (`build/Infinite.app` postdates every edited source
+file's mtime). One new failure, `MODDROPDOWNUNDOTEST`, root-caused as
+pre-existing and unrelated (its feature landed in `2c92715`/`2910b2a`, well
+before this branch; `git diff 9ce52a5..HEAD -- src/main.cpp src/core/` has
+zero hits for onSelect/dropdown/undo) and documented in
+`known-test-failures.txt` (`b383afa`), with its own root cause (why the
+pick itself doesn't land) flagged separately as out of scope. `VIDEOAUDIOTEST`
+and `RECEXPORTTEST` reported `[stale-baseline]` (now passing) but were left
+baselined, since both entries already document themselves as flaky/
+flip-flopping between runs of the same binary.
+
+**`verify-gate` (advisory, pre-merge), `git diff 9ce52a5..HEAD`, 17 files,
++842/-92, matches the 7-commit summary above with no surprises: recommendation
+clear to merge.**
+
+- **av-sync-sweep: pass.** RECSYNCTEST 8/8, RECEXPORTTEST pass (drift 0/33 ms,
+  within tolerance), a real 30 s B10 fixture run: 900/900 frames, 0 dropped,
+  5/5 markers on both audio and video, sub-ms drift, EBU R37 pass. Marker
+  injection confirmed strictly gated behind `INFINITE_BENCH_B10`, with no
+  effect on the live render loop.
+- **linux-parity: pass, code-verified only** - flagged needs-human-review:
+  run `tools/linux/local.sh` + `xvfb-harness.sh` on real Linux/CI before
+  merge; not a blocker (matches this session's own note that `81aedf9` was
+  logic-verified, not rig-verified - no Linux rig available this session).
+- **output-projection-sweep: pass.** The new
+  `SyphonServerCanReportClients()` is correctly three-sided. The Windows
+  Spout fix is flagged needs-human-review: confirm on real Windows hardware
+  with `WGL_NV_DX_interop2`, not executable from this macOS worktree; not a
+  blocker.
+- **infinite-code-review (all four standards): pass.** Goertzel math
+  verified correct; `VideoInNode` texture-reuse gating verified safe
+  (`mHasPlaceholder` reset correctly); no audio-thread or two-object-rule
+  violations.
+- **invariant-interaction-audit:** the one `clamp()` in the B10 tone
+  injection was traced end to end - feeds directly and only into
+  `RecorderAppendAudio`, bench-fixture-only, env-gated - no blast-radius
+  concern.
+
+Two non-blocking follow-ups flagged for later, not gating this merge: a
+Linux container/CI run to confirm `TryUseCacheLocked`, and a real Windows
+box to confirm the Spout fix.
+
+**User impact, this session only (Block 3, measured numbers above), by
+priority tier:**
+
+| Tier | Before | After | What changed |
+|---|---|---|---|
+| Audio | not touched this session | not touched this session | Block 3 made no audio-path changes; audio wins are Block 1's (Scoreboard above) |
+| Projector / Output | B8 heavy (4x2160, 3 windows, camera, Syphon) still decode-bound, p99 33.0-33.2 ms, 9.4% missed vsync; Spout `HasClients` could report a receiver it can't see | same decode-bound number (untouched, still open item 3); Spout `HasClients` now correctly returns false when it can't report clients | measurement/correctness fix only (`0a0acbf`); no perf change to the decode-bound path itself |
+| Canvas | baseline claimed B6 vsync=1 p50 8.25-11.17 ms (physically impossible on this machine's 60 Hz-only panel; stale, pre-`951d22c`, `unpaced=1`) | baseline now reads the real, vsync-locked p50 16.67-16.68 ms, trusted | not a regression and not a win - a baseline correction (`97617eb`) matching a pacing fix that had already shipped in Block 2 |
+| Previews (media/decode) | 4x2160 decode "not real time" / "1 dropped" believed real | confirmed not real: targets met with **zero code change** on a verified-quiet machine (1.13 GB footprint, 0 drops); camera texture path re-allocates a full texture every frame | decode gap was a measurement artifact of machine load, not code (`1bc2244`); camera path now reuses via `glTexSubImage2D` on steady-state frames (`7021b12`, unmeasured end-to-end - camera access still `not_determined`) |
+
 ## Scoreboard
 
 One row per measured win (or loss). Medians on the M2 8 GB machine; change %
@@ -268,6 +371,11 @@ variants from 1 run (the 3-run 1080 set could not be paced: screen locked).
 | | | B2 l-anim, timers off, 5 pairs (sync_brain running) | frame p50 / p99 ms | 14.32 / 17.53 | 14.38 / 17.32 | +0% / -1% (noise) |
 | | | B2 l-static | output_hash | 29dcc23d9a902c68 | 29dcc23d9a902c68 | identical (2 runs each side) |
 | | | B2 l-anim / l-static | fbo_allocs_steady (frames 32-152) | not reported | 0 / 0 | new metric |
+| Linux `frameCache`: honor `VideoFrameAt`'s same-frame no-op contract in `TryUseCacheLocked` (Found while measuring) | `81aedf9` | - | - | logic-verified, not rig-verified (no Linux rig this session) | - | fix landed, unmeasured |
+| Camera texture reuse: `glTexSubImage2D` on steady-state frames instead of a full re-alloc (B8 Found 5) | `7021b12` | B8 2x1080 + camera | camera path | full texture re-alloc every frame | `glTexSubImage2D` reuse when size unchanged | qualitative fix; camera access `not_determined` in this sandbox, unmeasured end-to-end |
+| Spout `HasClients` no longer reports a receiver it cannot see (Found 7) | `0a0acbf` | - | - | Windows path returned a stale/wrong true | now returns false when it cannot report clients; `SPOUTLOOPTEST` checks the contract | CI-only, unverified locally (no Windows rig) |
+| B10 offline-render + A/V-sync fixture built (new bench, not a perf change) | `d12582d` | B10 | - | fixture did not exist | Goertzel narrowband onset detection, 5 markers, min-sustain gating | new coverage; both rows trusted, non-`unfocused`/`unpaced` |
+| Baseline correction: replace 12 stale pre-`951d22c` B6/B8 rows (measurement fix, not a product change) | `97617eb` | B6 vsync=1 (4 rows), B8 (8 of 9 non-heavy rows) | frame p50 ms | 8.25-11.17 (stale, `unpaced=1`, captured pre-fix) | 16.67-16.68 (real vsync lock, trusted) | baseline now matches the already-shipped `951d22c` fix; every untouched baseline row verified at 0% delta |
 
 Projector pacing (2 rounds interleaved vs `f2b0c1b`, unfocused, swapping; judge by change).
 Re-measure 2026-09-25 against the spec targets (benchmark-suite.md §6 and the fixture's own verdicts): `main` `2297371`, 3 runs each of W2 and W3,
@@ -429,10 +537,11 @@ ever fires - no `BENCH_JSON` line, ever, at any node count. Confirmed by
 direct reproduction (`EXITAFTER=152` failed 3/3 runs, `153+` passed every
 time). Fixed by bumping `run_all.sh`'s `EXITAFTER` for this sweep to 160,
 matching the margin every other fixture in the script already carries. Since then B1(stages), B2, B3, B4, all of B5, and B9 have been
-built (see the table above), then B6, B8 and B7. B10 is not built yet. It
-needs its own platform work first (a canvas-automation entry point,
-soak automation, offline-render integration). Nothing below claims
-coverage this suite doesn't have.
+built (see the table above), then B6, B8 and B7. B10 is now built (Block 3
+step 5, `d12582d`): composes B3 + offline render with a Goertzel
+narrowband audio-onset detector (5 markers, minimum-sustain-duration
+gating) for A/V drift measurement. Nothing below claims coverage this
+suite doesn't have.
 
 ## What still needs building, and what it needs first
 
@@ -468,7 +577,8 @@ Projector/Output > Canvas > Previews):
    and Linux decode on their own threads). Upload, camera and publish timing
    live in the nodes, and present timing in the projector loop. All of it is
    inert unless the fixture sets `Bench::MediaIoEnabled()`.
-- **B10**: composes B3 + offline render. (B7 is built: Block 1.)
+- **B10**: **Built** (`d12582d`). Composes B3 + offline render, Goertzel
+  narrowband onset detection for A/V sync. (B7 is built: Block 1.)
 
 ## Baseline
 
@@ -493,10 +603,20 @@ made every harness window hidden, not because of where the suite was
 launched: a hidden window can never be focused or display-paced.
 `INFINITE_BENCH_VISIBLE` (set by `run_all.sh` for B3/B6/B8 only) fixes that,
 and no row is `unfocused` any more. Trusted: B3, B6 vsync=0 and B8 heavy.
-Still `unpaced=1`: the four vsync=1 B6 rows and the other eight B8 rows,
-because the canvas is not vsync-blocked (open item 5). `compare.py` prints
-those rows but never gates on them. A miss in them is still real. Nothing
-in them counts as a pass.
+
+**Fixed in Block 3 (`951d22c`, "one frame clock paces the canvas-only loop
+too"), and the baseline corrected to match (Block 3 step 6):** the four
+vsync=1 B6 rows and 7 of the other 8 B8 rows used to read `unpaced=1`
+because the canvas loop's swap interval didn't actually block, so it
+free-ran at ~120 fps (p50 ~8.3 ms) instead of real 60 Hz. `951d22c` fixed
+the pacing itself back in Block 2 step 2b, but the baseline file still
+carried the pre-fix `unpaced=1` numbers for those 12 rows (from commit
+`beb4d87`, captured ~3 hours before `951d22c` landed the same day) because
+it was never re-captured after the fix. Every affected row now reads a real,
+vsync-locked p50 of 16.67-16.68 ms, on a trusted (non-`unpaced`) capture.
+Verified the replacement touched nothing else: comparing the corrected
+baseline against the file it replaced shows every untouched row at exactly
+0% delta.
 
 **Hash determinism.** `anim=0` hashes match earlier runs: B2 s / m / l static
 are `51da349ab649bf2e` / `acbd116345c11903` / `29dcc23d9a902c68`, and B4 l
