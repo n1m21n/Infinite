@@ -577,6 +577,8 @@ namespace Bench
 
       if (!mediaIo.is_null())
          j["media_io"] = mediaIo;
+      if (!slowFrames.is_null())
+         j["slow_frames"] = slowFrames;
 
       if (audioMeasured)
       {

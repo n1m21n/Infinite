@@ -45,6 +45,7 @@
 #include "IconsLucide.h"
 #include "core/SysInfo.h"
 #include "core/BenchReport.h"
+#include "core/BenchFrameTail.h"
 
 #if defined(_WIN32)
 #include <fcntl.h>
@@ -1741,29 +1742,35 @@ namespace
    };
    std::vector<ProjectorWindow> gProjectorWindows;
 
-   // Who paces the frame loop. With a projector window open and no offline
-   // render running, the display the primary Output window is on does: every
-   // context presents at swap interval 0 and the loop waits on that display's
-   // refresh clock just before the projectors present (see
-   // PaceProjectorPresent). Otherwise the canvas's own swap paces it, as it
-   // always has. gCanvasSwapInterval is what the canvas asks for when it owns
-   // pacing (Vsync setting, 0 during an export); every site that used to call
-   // glfwSwapInterval on the main context goes through SetCanvasSwapInterval,
-   // so opening a projector or ending an export can't leave two vsync waits
-   // in one frame.
+   // Who paces the frame loop: one frame clock. Unless an offline render is
+   // running, the loop waits on a display's refresh clock once per frame,
+   // after the canvas swap and just before the projectors present (see
+   // PaceProjectorPresent), and every context presents at swap interval 0.
+   // The display is the primary Output window's while a projector is open,
+   // else the canvas window's when Vsync is on. With Vsync off and no
+   // projector (and always during an export) nothing waits and the loop runs
+   // unpaced or on the Target FPS limiter. The canvas's own blocking swap no
+   // longer paces anything: macOS skips it for an occluded window and on
+   // this machine returns on a 120 Hz grid on a 60 Hz display.
+   // gCanvasSwapInterval is what the canvas asks for (Vsync setting, 0 during
+   // an export); every site that used to call glfwSwapInterval on the main
+   // context goes through SetCanvasSwapInterval, and ApplyCanvasSwapInterval
+   // runs at the top of every frame, so no frame waits twice.
    int gCanvasSwapInterval = 1;
    int gAppliedCanvasSwapInterval = -1;
 
-   bool ProjectorPacingActive()
+   bool FrameClockActive()
    {
-      return !gProjectorWindows.empty() && !gOfflineRender.active && !gArrangeWavRender.active;
+      if (gOfflineRender.active || gArrangeWavRender.active)
+         return false;
+      return !gProjectorWindows.empty() || gCanvasSwapInterval > 0;
    }
 
    // Main context must be current (true at every caller, as it was for the
    // glfwSwapInterval calls these replace).
    void ApplyCanvasSwapInterval()
    {
-      const int want = ProjectorPacingActive() ? 0 : gCanvasSwapInterval;
+      const int want = FrameClockActive() ? 0 : gCanvasSwapInterval;
       if (want == gAppliedCanvasSwapInterval)
          return;
       glfwSwapInterval(want);
@@ -20244,12 +20251,12 @@ namespace
    }
 
    // ---- Audio Filter -----------------------------------------------------
-   // Cached per-node response curve: the underlying MagnitudeDb sweep is a
-   // settled-sine measurement (AudioFilterKernel.h) that runs an actual
-   // settle-then-measure simulation of the filter primitive per point (up to
-   // ~8000 simulated samples each) - cheap for a one-off recompute, but not
-   // free across 160 points every single ImGui frame while freq/Q/gain are
-   // being dragged (up to ~1.28M simulated samples/frame). Recomputed only
+   // Cached per-node response curve. MagnitudeDb (AudioFilterKernel.h) used
+   // to be a settled-sine simulation of up to ~8000 samples per point (up to
+   // ~1.28M simulated samples per 160-point curve), which is what the
+   // throttling below was built around; it is now the closed-form transfer
+   // function (~microseconds per curve), so the throttle only saves a little
+   // draw-list churn. Recomputed only
    // when the signature (everything it depends on) actually changed (per
    // audio-node-ui-system.md §3f's "computed main-thread ... never by
    // calling into the live AudioNode" - this recomputes from a *scratch*
@@ -20303,16 +20310,11 @@ namespace
       return v - std::floor(v);
    }
 
-   // Throttling *how often* the recompute fires (below) caps it at ~12.5Hz,
-   // but that alone isn't enough: a full 160-point AudioFilterDsp::MagnitudeDb
-   // sweep is a real settle-then-measure simulation per point (up to ~8000
-   // samples each, each involving a sin() call) and measures ~10-15ms on its
-   // own at Q=18/48kHz - comparable to or larger than an entire 60fps frame
-   // budget (16.6ms), so even a throttled recompute still stalls the frame it
-   // lands on. kFilterCurveDragPoints cuts the *cost* of each recompute by
-   // dropping the point count while a drag is live (measured ~3-5x cheaper at
-   // 48 points) - full kFilterCurveFullPoints resolution always returns the
-   // instant the drag ends.
+   // Throttling *how often* the recompute fires (below) caps it at ~12.5Hz.
+   // kFilterCurveDragPoints drops the point count while a drag is live; it
+   // dates from the settled-sine MagnitudeDb, when a full 160-point sweep
+   // measured ~10-15ms at Q=18/48kHz - full kFilterCurveFullPoints
+   // resolution always returns the instant the drag ends.
    const double kFilterCurveThrottleSec = 0.08; // ~12.5 Hz cap on the full recompute while dragging
    const int kFilterCurveDragPoints = 48;
    const int kFilterCurveFullPoints = 160;
@@ -40752,20 +40754,28 @@ namespace
       }
    };
 
+   // tailStage: also add this stage's time to the current frame's slow-frame
+   // record (Bench::Tail(), B3/B8 only) even when `sink` isn't sampling.
    struct ConditionalStageTimer
    {
       Bench::PercentileRing* mSink;
+      int mTailStage;
       double mStart;
       bool mStopped = false;
-      explicit ConditionalStageTimer(Bench::PercentileRing* sink)
-         : mSink(sink), mStart(sink ? Bench::ScopedStageTimer::NowMs() : 0.0)
+      explicit ConditionalStageTimer(Bench::PercentileRing* sink, int tailStage = -1)
+         : mSink(sink), mTailStage(Bench::Tail().active ? tailStage : -1),
+           mStart((sink || mTailStage >= 0) ? Bench::ScopedStageTimer::NowMs() : 0.0)
       {
       }
       void Stop()
       {
-         if (mSink && !mStopped)
+         if ((mSink || mTailStage >= 0) && !mStopped)
          {
-            mSink->Push(Bench::ScopedStageTimer::NowMs() - mStart);
+            const double ms = Bench::ScopedStageTimer::NowMs() - mStart;
+            if (mSink)
+               mSink->Push(ms);
+            if (mTailStage >= 0)
+               Bench::Tail().AddStage(mTailStage, ms);
             mStopped = true;
          }
       }
@@ -47588,10 +47598,11 @@ namespace
       return bestIndex;
    }
 
-   // Projector pacing policy (ProjectorPacingActive says when it applies).
+   // Frame clock rate policy (FrameClockActive says when it applies).
    // The primary Output is the first fullscreen projector window, else the
    // first one opened; with two Outputs on displays of different refresh,
-   // only the primary's is presented on its refresh grid.
+   // only the primary's is presented on its refresh grid. With no projector
+   // open it is the canvas window's display.
    //
    // Rate: a whole divisor of that display's refresh R, never an uneven
    // rate. The base divisor is the largest that still gives >= 60 fps
@@ -47648,13 +47659,73 @@ namespace
    };
    ProjectorPacer gProjectorPacer;
 
+   // Slow-frame attribution (Bench::Tail, B3/B8 only): when the GPU finished
+   // a frame's work. A fence goes in after the canvas swap and after the last
+   // projector swap; it is polled without blocking at a few points in the
+   // following loop, and the first poll that sees it signaled writes "fence
+   // -> signaled" ms into the record of the frame that placed it. An upper
+   // bound, at the resolution of the poll points. Sync objects are shared
+   // across the share group, so any context may poll.
+   struct TailFence
+   {
+      GLsync sync = nullptr;
+      double placedMs = 0.0;
+      size_t record = 0; // Bench::Tail().all index of the frame that placed it
+      bool canvas = false;
+
+      void Place(bool isCanvas)
+      {
+         Bench::FrameTail& tail = Bench::Tail();
+         if (!tail.active)
+            return;
+         Drop();
+         sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+         glFlush();
+         placedMs = Bench::ScopedStageTimer::NowMs();
+         record = tail.all.size(); // `cur` is pushed at this index by EndFrame
+         canvas = isCanvas;
+      }
+      // True while the fence is still in flight.
+      bool Poll()
+      {
+         if (sync == nullptr)
+            return false;
+         const GLenum r = glClientWaitSync(sync, 0, 0);
+         if (r != GL_ALREADY_SIGNALED && r != GL_CONDITION_SATISFIED)
+            return r == GL_TIMEOUT_EXPIRED;
+         const double ms = Bench::ScopedStageTimer::NowMs() - placedMs;
+         Bench::FrameTail& tail = Bench::Tail();
+         Bench::FrameTail::Record* rec = record < tail.all.size() ? &tail.all[record]
+                                         : (record == tail.all.size() ? &tail.cur : nullptr);
+         if (rec != nullptr)
+            (canvas ? rec->canvasGpuMs : rec->projGpuMs) = ms;
+         Drop();
+         return false;
+      }
+      void Drop()
+      {
+         if (sync != nullptr)
+            glDeleteSync(sync);
+         sync = nullptr;
+      }
+   };
+   TailFence gTailCanvasFence;
+   TailFence gTailProjFence;
+
+   void PollTailFences()
+   {
+      gTailCanvasFence.Poll();
+      gTailProjFence.Poll();
+   }
+
    // Called once per frame right before the projectors present. Blocks on the
-   // primary Output display's refresh clock when projector pacing is active;
-   // otherwise releases the clock (last projector closed, export running).
-   void PaceProjectorPresent()
+   // frame clock's display (the primary Output's, else the canvas's) while
+   // FrameClockActive; otherwise releases the clock (Vsync off with no
+   // projector, export running).
+   void PaceProjectorPresent(GLFWwindow* canvas)
    {
       ProjectorPacer& pacer = gProjectorPacer;
-      if (!ProjectorPacingActive())
+      if (!FrameClockActive())
       {
          if (pacer.haveMonitor)
          {
@@ -47670,16 +47741,20 @@ namespace
       if (!pacer.haveMonitor || now - pacer.lastMonitorCheck >= 0.5)
       {
          pacer.lastMonitorCheck = now;
-         const ProjectorWindow* primary = &gProjectorWindows[0];
-         for (const ProjectorWindow& pw : gProjectorWindows)
-            if (pw.fullscreen)
-            {
-               primary = &pw;
-               break;
-            }
+         GLFWwindow* clockWindow = canvas;
+         if (!gProjectorWindows.empty())
+         {
+            clockWindow = gProjectorWindows[0].window;
+            for (const ProjectorWindow& pw : gProjectorWindows)
+               if (pw.fullscreen)
+               {
+                  clockWindow = pw.window;
+                  break;
+               }
+         }
          int monitorCount = 0;
          GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-         const int idx = ProjectorMonitorIndex(primary->window);
+         const int idx = ProjectorMonitorIndex(clockWindow);
          if (idx >= 0 && idx < monitorCount)
          {
             int mx = 0, my = 0;
@@ -47693,6 +47768,15 @@ namespace
 
       if (pacer.lastPresent >= 0.0)
          pacer.AddWork((now - pacer.lastPresent) * 1000.0);
+      Bench::FrameTail& tail = Bench::Tail();
+      const double tailWaitStartMs = tail.active ? Bench::ScopedStageTimer::NowMs() : 0.0;
+      if (tail.active)
+      {
+         if (pacer.lastPresent >= 0.0)
+            tail.cur.workMs = (now - pacer.lastPresent) * 1000.0;
+         gTailProjFence.Poll();
+         tail.cur.canvasGpuPendingAtWait = gTailCanvasFence.Poll();
+      }
       if (!Platform::WaitForDisplayRefresh(pacer.monitorX, pacer.monitorY, pacer.refreshHz, pacer.intervals) &&
           pacer.refreshHz > 0.0 && pacer.lastPresent >= 0.0)
       {
@@ -47707,6 +47791,11 @@ namespace
             std::this_thread::yield();
       }
       pacer.lastPresent = glfwGetTime();
+      if (tail.active)
+      {
+         tail.cur.waitMs = Bench::ScopedStageTimer::NowMs() - tailWaitStartMs;
+         PollTailFences();
+      }
    }
 
    // Enters or leaves fullscreen on a projector window, targeting a specific
@@ -69042,6 +69131,19 @@ int main(int argc, char** argv)
          sGpuTimerRing.Poll(frameId);
 
       gFrameStart = glfwGetTime();
+      {
+         // Slow-frame attribution: B3 (not the B7 soak) and B8 while sampling.
+         static double sTailLoopStart = -1.0;
+         const double period = gProjectorPacer.refreshHz > 0.0
+                                  ? 1000.0 * (double)gProjectorPacer.intervals / gProjectorPacer.refreshHz : 0.0;
+         Bench::Tail().BeginFrame((isBenchB3 && !isBenchB7 && frameId >= 32) || sBenchB8Sampling, period,
+                                   glfwGetWindowAttrib(window, GLFW_FOCUSED) != 0);
+         if (sTailLoopStart >= 0.0)
+            Bench::Tail().cur.loopMs = (gFrameStart - sTailLoopStart) * 1000.0;
+         sTailLoopStart = gFrameStart;
+         if (Bench::Tail().active)
+            PollTailFences();
+      }
       // A projector opened or closed, or an export started or ended, since
       // last frame: hand pacing to the right owner before this frame swaps.
       ApplyCanvasSwapInterval();
@@ -86533,6 +86635,8 @@ int main(int argc, char** argv)
                // Zero samples is "not measured" (null), never a latency of 0.
                report.inputToPhotonMeasured = sBenchB3InputToPhotonFrames.Count() > 0;
                report.inputToPhotonFrames = sBenchB3InputToPhotonFrames;
+               if (!isBenchB7)
+                  report.slowFrames = Bench::Tail().Report();
             }
 
             report.audioMeasured = AudioEngine::Instance().SampleRate() > 0.0;
@@ -87107,6 +87211,8 @@ int main(int argc, char** argv)
                report.frames = b8Total;
                report.nodes = (int)gNodes.size();
                report.frameMs = sBenchB8FrameMs;
+               if (!sBenchB8Win.empty())
+                  report.slowFrames = Bench::Tail().Report();
 
                report.stagesCpuMs = {
                   { "modulation", sStageModulation.Percentile(50) },
@@ -88599,7 +88705,7 @@ int main(int argc, char** argv)
          }
       }
 
-      ConditionalStageTimer timerNodeBodies(benchStagesCpuSample ? &sStageNodeBodies : nullptr);
+      ConditionalStageTimer timerNodeBodies(benchStagesCpuSample ? &sStageNodeBodies : nullptr, Bench::FrameTail::kNodeBodies);
       Bench::ConditionalGpuStageTimer timerNodeBodiesGpu(benchStagesSample ? &sGpuTimerRing : nullptr, "node_bodies", frameId);
       PruneDeadGroups();
 
@@ -88635,6 +88741,7 @@ int main(int argc, char** argv)
 
          bool b6NodeIsVisible = true;
          double b6NodeDrawStartMs = 0.0;
+         const double tailNodeStartMs = Bench::Tail().active ? Bench::ScopedStageTimer::NowMs() : 0.0;
          if (b6TrackVis)
          {
             const ImVec2 np = ed::GetNodePosition(gn.NodeId());
@@ -89829,6 +89936,8 @@ int main(int argc, char** argv)
          {
             b6FrameOffscreenMs += (Bench::ScopedStageTimer::NowMs() - b6NodeDrawStartMs);
          }
+         if (Bench::Tail().active)
+            Bench::Tail().AddNode(gn.typeName, Bench::ScopedStageTimer::NowMs() - tailNodeStartMs);
       }
 
       // B6 only: end node_bodies here so links get their own stage. Other
@@ -89848,7 +89957,7 @@ int main(int argc, char** argv)
          sBenchB6SampledFrames++;
       }
 
-      ConditionalStageTimer timerLinks((benchB6Stages && benchStagesCpuSample) ? &sStageLinks : nullptr);
+      ConditionalStageTimer timerLinks((benchB6Stages && benchStagesCpuSample) ? &sStageLinks : nullptr, Bench::FrameTail::kLinks);
       Bench::ConditionalGpuStageTimer timerLinksGpu((benchB6Stages && benchStagesSample) ? &sGpuTimerRing : nullptr, "links", frameId);
 
       // ---- draw existing links ----
@@ -93222,7 +93331,7 @@ int main(int argc, char** argv)
       const auto edEndStart = kEdPerf ? std::chrono::steady_clock::now()
                                       : std::chrono::steady_clock::time_point{};
       {
-         ConditionalStageTimer timerEditorEnd(benchStagesCpuSample ? &sStageEditorEnd : nullptr);
+         ConditionalStageTimer timerEditorEnd(benchStagesCpuSample ? &sStageEditorEnd : nullptr, Bench::FrameTail::kEditorEnd);
          Bench::ConditionalGpuStageTimer timerEditorEndGpu(benchStagesSample ? &sGpuTimerRing : nullptr, "editor_end", frameId);
          // Flush against any bottom-docked panel, for the same reason as the
          // Draw*Docked EndChild calls above.
@@ -94453,14 +94562,14 @@ int main(int argc, char** argv)
       }
 
       {
-         ConditionalStageTimer timerModulation(benchStagesCpuSample ? &sStageModulation : nullptr);
+         ConditionalStageTimer timerModulation(benchStagesCpuSample ? &sStageModulation : nullptr, Bench::FrameTail::kModulation);
          Bench::ConditionalGpuStageTimer timerModulationGpu(benchStagesSample ? &sGpuTimerRing : nullptr, "modulation", frameId);
          if (!sBenchB3ProbePaused)
             ApplyModulationAndPalette(frameId, true);
       }
 
       {
-         ConditionalStageTimer timerCook(benchStagesCpuSample ? &sStageCook : nullptr);
+         ConditionalStageTimer timerCook(benchStagesCpuSample ? &sStageCook : nullptr, Bench::FrameTail::kCook);
          Bench::ConditionalGpuStageTimer timerCookGpu(benchStagesSample && !benchGpuPerNode ? &sGpuTimerRing : nullptr, "cook", frameId);
          Bench::NodeGpuRing() = benchStagesSample && benchGpuPerNode ? &sGpuTimerRing : nullptr;
          for (GraphNode& gn : gNodes)
@@ -95464,7 +95573,7 @@ int main(int argc, char** argv)
       {
          // B6 only: the whole-graph cook is outside every other stage, so
          // without this the canvas bench cannot tell cook time from UI time.
-         ConditionalStageTimer timerCookAll((benchB6Stages && benchStagesCpuSample) ? &sStageCookAll : nullptr);
+         ConditionalStageTimer timerCookAll((benchB6Stages && benchStagesCpuSample) ? &sStageCookAll : nullptr, Bench::FrameTail::kCookAll);
          for (GraphNode& gn : gNodes)
             if (!gn.node->bypassed)
                gn.node->CookIfNeeded(frameId);
@@ -95655,7 +95764,7 @@ int main(int argc, char** argv)
       int fbW, fbH;
       glfwGetFramebufferSize(window, &fbW, &fbH);
       {
-         ConditionalStageTimer timerImGuiRender(benchStagesCpuSample ? &sStageImGuiRender : nullptr);
+         ConditionalStageTimer timerImGuiRender(benchStagesCpuSample ? &sStageImGuiRender : nullptr, Bench::FrameTail::kImGuiRender);
          Bench::ConditionalGpuStageTimer timerImGuiRenderGpu(benchStagesSample ? &sGpuTimerRing : nullptr, "imgui_render", frameId);
          ImGui::Render();
          glViewport(0, 0, fbW, fbH);
@@ -95692,10 +95801,13 @@ int main(int argc, char** argv)
          }
       }
 
+      if (Bench::Tail().active)
+         PollTailFences();
       {
-         ConditionalStageTimer timerSwap(benchStagesCpuSample ? &sStageSwap : nullptr);
+         ConditionalStageTimer timerSwap(benchStagesCpuSample ? &sStageSwap : nullptr, Bench::FrameTail::kSwap);
          glfwSwapBuffers(window);
       }
+      gTailCanvasFence.Place(true);
       if (frameId == 0)
          sFirstFrameEndMs = Bench::ScopedStageTimer::NowMs();
 
@@ -95716,15 +95828,21 @@ int main(int argc, char** argv)
       // reasserted on a throttle - cheap and imperceptible at 0.5s, wasteful
       // to do every frame.
       static double sLastTopmostRefresh = 0.0;
+      static double sTailProjIntervalMs = -1.0;
       const double now = glfwGetTime();
       const bool refreshTopmost = now - sLastTopmostRefresh >= 0.5;
-      // With a projector open this is where the loop waits for the primary
-      // Output display's refresh, so the presents below land on its grid
-      // whether or not the canvas (or the projector) is covered or hidden.
-      // Outside the `projectors` stage timer: it is idle time, not work.
-      PaceProjectorPresent();
+      // Projectors present in two passes around the frame clock's wait (Block
+      // 2 step 3a): every window renders into its back buffer and flushes
+      // first, so the GPU works through the blits while the loop waits; only
+      // the swaps run after the wait returns, so the presents land as soon
+      // after the refresh as possible. A dead source's window is closed in the
+      // first pass, so the second only sees windows that rendered.
+      // `projectors` (stage timer and Bench::Tail) is both passes; the wait
+      // between them is idle time, not work.
+      double projWorkMs = 0.0;
+      const bool timeProjectors = benchStagesCpuSample || Bench::Tail().active;
       {
-         ConditionalStageTimer timerProjectors(benchStagesCpuSample ? &sStageProjectors : nullptr);
+         const double projRenderStartMs = timeProjectors ? Bench::ScopedStageTimer::NowMs() : 0.0;
          for (size_t i = gProjectorWindows.size(); i-- > 0; )
          {
             GraphNode* src = FindNodeByIndex(gProjectorWindows[i].nodeIndex);
@@ -95779,11 +95897,37 @@ int main(int argc, char** argv)
                glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
                glClear(GL_COLOR_BUFFER_BIT);
             }
+            glFlush();
+         }
+         if (timeProjectors)
+            projWorkMs += Bench::ScopedStageTimer::NowMs() - projRenderStartMs;
+      }
+      // The frame clock's wait: the primary Output display's refresh with a
+      // projector open, else the canvas's when Vsync is on, so the presents
+      // below land on its grid whether or not the canvas (or the projector)
+      // is covered or hidden.
+      PaceProjectorPresent(window);
+      {
+         const double projSwapStartMs = timeProjectors ? Bench::ScopedStageTimer::NowMs() : 0.0;
+         for (size_t i = gProjectorWindows.size(); i-- > 0; )
+         {
+            GLFWwindow* projWindow = gProjectorWindows[i].window;
+            glfwMakeContextCurrent(projWindow);
             // B8: present cost and swap-to-swap interval per window. CPU only -
             // a GL timer query must never span this context switch.
             const double benchB8SwapStartMs = (sBenchB8Sampling && i < sBenchB8Win.size())
                                                  ? Bench::ScopedStageTimer::NowMs() : -1.0;
             glfwSwapBuffers(projWindow);
+            if (i == 0 && Bench::Tail().active)
+            {
+               // Window 0 is the last to present (backwards loop): its fence
+               // covers every projector's work this frame.
+               static double sTailLastProjSwapMs = -1.0;
+               const double swapMs = Bench::ScopedStageTimer::NowMs();
+               sTailProjIntervalMs = sTailLastProjSwapMs >= 0.0 ? swapMs - sTailLastProjSwapMs : -1.0;
+               sTailLastProjSwapMs = swapMs;
+               gTailProjFence.Place(false);
+            }
             if (benchB8SwapStartMs >= 0.0)
             {
                const double endMs = Bench::ScopedStageTimer::NowMs();
@@ -95814,11 +95958,22 @@ int main(int argc, char** argv)
                sBenchB3LastProjSwapMs = nowSwapMs;
             }
          }
+         if (timeProjectors)
+         {
+            projWorkMs += Bench::ScopedStageTimer::NowMs() - projSwapStartMs;
+            if (benchStagesCpuSample)
+               sStageProjectors.Push(projWorkMs);
+            Bench::Tail().AddStage(Bench::FrameTail::kProjectors, projWorkMs);
+         }
          if (refreshTopmost && !gProjectorWindows.empty())
             sLastTopmostRefresh = now;
          if (!gProjectorWindows.empty())
             glfwMakeContextCurrent(window);
       }
+      // The projectors timer above has closed, so this frame's record is complete.
+      if (sTailProjIntervalMs > 0.0)
+         Bench::Tail().EndFrame(sTailProjIntervalMs);
+      sTailProjIntervalMs = -1.0;
 
       GLUtil::EndFrameScratchFbos();
       ++frameId;
@@ -95857,7 +96012,7 @@ int main(int argc, char** argv)
       // capping anything more precisely (the Target FPS control is disabled in
       // the UI whenever Vsync is on, for the same reason). Skipped too while a
       // projector window paces the loop to its display's refresh.
-      if (gTargetFps > 0 && !gVsync && !ProjectorPacingActive())
+      if (gTargetFps > 0 && !gVsync && !FrameClockActive())
       {
          const double budget = 1.0 / (double)gTargetFps;
          const double deadline = gFrameStart + budget;

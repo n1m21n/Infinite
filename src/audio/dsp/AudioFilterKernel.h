@@ -97,13 +97,24 @@ namespace AudioFilterDsp
       }
    }
 
-   // Closed-form-by-measurement magnitude response, in dB, of one band at
-   // `evalHz` - feed a settled sine through a *scratch* instance of the same
-   // primitive the kernel uses, never the live AudioNode (per
-   // audio-node-ui-system.md §3f/§3). Used by both the response-curve
-   // visualizer (main.cpp) and the DSP test fixture, so there is exactly one
-   // definition of "the analytic response" to compare the running kernel
-   // against.
+   // Magnitude response, in dB, of one band at `evalHz`, evaluated from the
+   // transfer function of a *scratch* instance of the same primitive the
+   // kernel uses, never the live AudioNode (per audio-node-ui-system.md
+   // §3f/§3). Used by both the response-curve visualizer (main.cpp) and the
+   // DSP test fixture, so there is exactly one definition of "the analytic
+   // response" to compare the running kernel against.
+   //
+   // Both primitives are linear and time-invariant, so this is the settled
+   // steady-state gain a sine at evalHz sees - what this function used to
+   // measure by running up to 8000 samples of a sine through the scratch
+   // instance per point. That simulation cost up to ~15 ms per 160-point
+   // curve and, with modulated filters on the canvas, was the whole of B3's
+   // slow-frame tail (docs/plans/perf/README.md, Block 2).
+   //   TptSvf: the bilinear transform of the analog SVF with prewarped g, so
+   //   on the unit circle s = j*tan(pi*f/fs)/g and one stage is
+   //   LP 1/(1 - W^2 + j*k*W), HP W^2/(same), W = tan(pi*evalHz/fs)/g.
+   //   Biquad: H(z) = (b0 + b1 z^-1 + b2 z^-2) / (1 + a1 z^-1 + a2 z^-2) at
+   //   z = e^(j*w), from the scratch instance's own coefficients.
    inline float MagnitudeDb(int type, float freqHz, float q, float gainDb, float evalHz, double sampleRate)
    {
       if (evalHz <= 0.0f || sampleRate <= 0.0)
@@ -115,74 +126,32 @@ namespace AudioFilterDsp
                                           evalHz, sampleRate);
       }
 
-      const double periodSamples = std::max(4.0, sampleRate / (double)evalHz);
-      // Settling time depends on the *filter's* cutoff/Q, not on evalHz - a
-      // budget sized only off the eval tone's own period (the original
-      // version here) starves the settle phase whenever evalHz is far above
-      // freqHz, since a fast tone's "8 cycles" is a handful of samples long
-      // even though the filter's own state needs many more to stop ringing.
-      // Measured separately from settling, so evalHz still gets enough
-      // cycles of its own for an accurate RMS regardless of how short the
-      // settle phase is.
-      const double freqPeriodSamples = std::max(4.0, sampleRate / (double)std::max(1.0f, freqHz));
-      const int settleSamples =
-         (int)std::clamp(freqPeriodSamples * 6.0 * (double)std::max(1.0f, q), 200.0, 4000.0);
-      const int measureSamples = (int)std::clamp(periodSamples * 8.0, 64.0, 4000.0);
-      const int totalSamples = std::min(8000, settleSamples + measureSamples);
-      const int skip = std::min(settleSamples, totalSamples - 16);
-      const double phaseInc = 2.0 * M_PI * (double)evalHz / sampleRate;
-
-      double sumInSq = 0.0, sumOutSq = 0.0;
-      double phase = 0.0;
-
+      double magSq = 1.0;
       if (IsSvf(type))
       {
-         const int stages = SvfStageCount(type);
-         DspMath::TptSvf svf[3];
-         for (int s = 0; s < stages; s++)
-         {
-            svf[s].SetSampleRate(sampleRate);
-            svf[s].SetCutoff(freqHz, q);
-         }
-         for (int i = 0; i < totalSamples; i++)
-         {
-            const float x = (float)sin(phase);
-            float y = x;
-            for (int s = 0; s < stages; s++)
-            {
-               DspMath::TptSvf::Outputs o = svf[s].Process(y);
-               y = IsHighpass(type) ? o.high : o.low;
-            }
-            if (i >= skip)
-            {
-               sumInSq += (double)x * (double)x;
-               sumOutSq += (double)y * (double)y;
-            }
-            phase += phaseInc;
-         }
+         DspMath::TptSvf svf;
+         svf.SetSampleRate(sampleRate);
+         svf.SetCutoff(freqHz, q);
+         const double w = tan(M_PI * std::min((double)evalHz, 0.4999 * sampleRate) / (double)svf.sampleRate) /
+                          std::max(1e-12, (double)svf.g);
+         const double re = 1.0 - w * w, im = (double)svf.k * w;
+         double stageSq = 1.0 / std::max(1e-300, re * re + im * im);
+         if (IsHighpass(type))
+            stageSq *= w * w * w * w;
+         for (int s = 0; s < SvfStageCount(type); s++)
+            magSq *= stageSq;
       }
       else
       {
          DspMath::Biquad bq;
          ConfigureBiquad(bq, type, freqHz, q, gainDb, sampleRate);
-         for (int i = 0; i < totalSamples; i++)
-         {
-            const float x = (float)sin(phase);
-            const float y = bq.Process(x);
-            if (i >= skip)
-            {
-               sumInSq += (double)x * (double)x;
-               sumOutSq += (double)y * (double)y;
-            }
-            phase += phaseInc;
-         }
+         const double w = 2.0 * M_PI * (double)evalHz / sampleRate;
+         const double c1 = cos(w), s1 = sin(w), c2 = cos(2.0 * w), s2 = sin(2.0 * w);
+         const double nr = bq.b0 + bq.b1 * c1 + bq.b2 * c2, ni = -(bq.b1 * s1 + bq.b2 * s2);
+         const double dr = 1.0 + bq.a1 * c1 + bq.a2 * c2, di = -(bq.a1 * s1 + bq.a2 * s2);
+         magSq = (nr * nr + ni * ni) / std::max(1e-300, dr * dr + di * di);
       }
-
-      const int n = std::max(1, totalSamples - skip);
-      const double inRms = sqrt(sumInSq / n);
-      const double outRms = sqrt(sumOutSq / n);
-      const double ratio = outRms / std::max(1e-9, inRms);
-      return (float)(20.0 * log10(std::max(1e-9, ratio)));
+      return (float)(10.0 * log10(std::max(1e-18, magSq)));
    }
 }
 
