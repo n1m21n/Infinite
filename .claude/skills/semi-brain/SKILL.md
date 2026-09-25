@@ -28,11 +28,23 @@ To get an immediate architectural breakdown and invariant brief for any task:
 # Cognitive reasoning analysis (RAG + AST + System 1/2 + MCTS Choice Tree):
 python3 tools/semi-brain/4_engine/semi_brain_cli.py "<description of bug or feature>"
 
+# Short brief (~200 tokens): likely files with the past fix/chat behind each,
+# symbols with file:line, the code area, past fixes, skills to load. Start here.
+python3 tools/semi-brain/4_engine/semi_brain_cli.py --brief "<description>"   # --json for tools
+
 # Fast Apple Metal Local Neural Router (LoRA fine-tuned Qwen2.5-0.5B):
 python3 tools/semi-brain/4_engine/semi_brain_cli.py "<description of bug or feature>" --neural
 ```
 
-To run the automated 30-case benchmark evaluation suite:
+How a query is answered: L2 searches each compartment (code, history, skills,
+plans, conversations, research, external) separately and merges them by quota;
+L3 follows the hits along doc -> code edges (a commit's files, files/symbols a
+chat or skill names) to rank files; L4 adds files that usually change with the
+best ones; L5 writes the brief. On the historical replay this scores 0.568
+(file MRR 0.80, top file right 49% of the time) against 0.28 before Block B.
+
+To run the automated 30-case benchmark evaluation suite (self-confirming; the
+replay above is the real gate):
 ```bash
 python3 tools/semi-brain/5_evals/run_evals.py
 ```
