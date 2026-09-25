@@ -65987,8 +65987,12 @@ int main(int argc, char** argv)
    // WindowServer isn't waiting on it - a slow frame no longer trips the
    // 10-second unresponsive watchdog that writes a "hang" spindump to the
    // Desktop.
-   const bool gHeadlessTestWindow = getenv("INFINITE_EXITAFTER") != nullptr ||
-                                    getenv("IMAGERESYNTH_SCREENSHOT") != nullptr;
+   // INFINITE_BENCH_VISIBLE opts a harness run back into a real window: the
+   // B3/B6/B8 fixtures measure display pacing and focus, which a hidden
+   // window can never have (they would always report unfocused/unpaced).
+   const bool gHeadlessTestWindow = (getenv("INFINITE_EXITAFTER") != nullptr ||
+                                     getenv("IMAGERESYNTH_SCREENSHOT") != nullptr) &&
+                                    getenv("INFINITE_BENCH_VISIBLE") == nullptr;
    // The Dock icon comes from NSApplication's activation policy, not window
    // visibility, so GLFW_VISIBLE=false alone still leaves a headless test run
    // bouncing in the Dock. Must claim the shared-application singleton before
