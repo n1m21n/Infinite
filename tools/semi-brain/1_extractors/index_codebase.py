@@ -14,11 +14,14 @@ Builds a high-speed SQLite Hybrid Search Index (FTS5 BM25 + FastEmbed Dense Vect
 8. Dev Trajectory - session turns classified against this repo's own Conventional Commit
    type/scope vocabulary and its node-category taxonomy, with weekly trend slopes
    (from dev_trajectory_corpus.json, produced by classify_dev_trajectory.py)
+9. Research - docs/prior-art, docs/fix-briefs, docs/reference as they stand in the tree
+   (research_doc, public), and research explainers mined from past sessions
+   (session_research, private). See l1/research.py.
 
 Written as two databases with the same schema:
 - knowledge_index.db          - sources 1-5 (code, commits, docs, skills, blueprints).
                                  Built only from what is already public in this repo; tracked in git.
-- knowledge_index_private.db  - sources 6-8, derived from local chat/session transcripts.
+- knowledge_index_private.db  - sources 6-8 and session_research, derived from local chat/session transcripts.
                                  Never committed or pushed (see tools/semi-brain/.gitignore).
 retriever.py searches both.
 """
@@ -35,7 +38,7 @@ EXTRACTORS_OUT = Path(__file__).resolve().parent / "output"
 DB_FILE = EXTRACTORS_OUT / "knowledge_index.db"
 PRIVATE_DB_FILE = EXTRACTORS_OUT / "knowledge_index_private.db"
 # Categories built from local chat/session transcripts - these go to PRIVATE_DB_FILE only.
-PRIVATE_CATEGORIES = {"session_history", "session_insight", "dev_trajectory"}
+PRIVATE_CATEGORIES = {"session_history", "session_insight", "dev_trajectory", "session_research"}
 
 def serialize_vector(vec: np.ndarray) -> bytes:
     """Pack float32 vector into binary bytes."""
@@ -150,7 +153,13 @@ def load_corpora():
         with open(EXTRACTORS_OUT / "dev_trajectory_corpus.json", "r", encoding="utf-8") as f:
             dev_trajectory = json.load(f)
 
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from l1 import REPO_PATH
+    from l1.research import load_research_docs
+    research_docs = load_research_docs(REPO_PATH)
+
     return {
+        "research_docs": research_docs,
         "commits": commits,
         "ast_data": ast_data,
         "docs": docs,
@@ -223,6 +232,8 @@ def prepare_documents(corpora):
     # from both Claude Code and Antigravity/Gemini transcripts)
     # Ids number turns within their own session, so a new turn never renumbers anyone else's
     # doc (the incremental index keys on doc_id).
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from l1.research import is_explainer
     ordinal = {}
     for turn in sessions:
         session_id = turn.get("session_id", "")
@@ -230,8 +241,8 @@ def prepare_documents(corpora):
         assistant_text = turn.get("assistant_text", "")
         source_tool = turn.get("source_tool", "claude_code")
         n = ordinal[(source_tool, session_id)] = ordinal.get((source_tool, session_id), -1) + 1
-        if not user_text.strip():
-            continue
+        if not user_text.strip() or is_explainer(turn):
+            continue  # an explainer is indexed once, as session_research (section I)
         doc_id = f"session::{source_tool}::{session_id}::{n}"
         title = f"Session [{source_tool}] {session_id[:8]}: {user_text[:60]}"
         content = f"{user_text}\n\n{assistant_text}"
@@ -292,6 +303,11 @@ def prepare_documents(corpora):
         title = f"Dev Trajectory - node category: {nc}"
         content = _trend_sentence("Node category", nc, info)
         documents.append((doc_id, "dev_trajectory", title, content, content[:300], ""))
+
+    # I. Research compartment - reached directly rather than buried among commits and raw turns.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from l1.research import research_documents
+    documents.extend(research_documents(corpora))
     return documents
 
 def build_hybrid_index():

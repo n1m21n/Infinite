@@ -7,6 +7,7 @@ just before a given commit.
   git commits      commits with committer time < case time (the fix itself excluded)
   AST graph        every src/ code file at the fix's parent, parsed (cached per blob)
   skills/AGENTS    .claude/skills/*/SKILL.md and AGENTS.md at the parent
+  research docs    docs/prior-art, docs/fix-briefs, docs/reference at the parent
   recovered docs   docs whose deleting commit predates the case
   BYOX             static, unchanged
   sessions         turns older than case time minus an embargo (default 12 h), so the
@@ -91,6 +92,11 @@ class Timeline:
                                 "content": self.reader.read(blob).decode("utf-8", "replace")})
         return records
 
+    def research_at(self, commit):
+        from l1.research import RESEARCH_DIRS, is_research_doc
+        return [{"path": path, "content": self.reader.read(blob).decode("utf-8", "replace")}
+                for path, blob in ls_tree(commit, *RESEARCH_DIRS) if is_research_doc(path)]
+
     def corpora_at(self, case):
         cutoff = case["time"]
         sessions = [t for ts, t in self.turns if ts is not None and ts < cutoff - self.embargo]
@@ -104,6 +110,7 @@ class Timeline:
             "docs": [d for d in self.recovered
                      if self.commit_time.get(d.get("deleted_in_commit"), float("inf")) < cutoff],
             "skills": self.skills_at(case["parent"]),
+            "research_docs": self.research_at(case["parent"]),
             "byox": self.byox,
             "sessions": sessions,
             "session_analysis": {"global": {"problem_solution_pairs": self._pairs(tagged)[:500]}},
