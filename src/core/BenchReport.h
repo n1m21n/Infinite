@@ -447,7 +447,10 @@ namespace Bench
       int audioBuffer = 0;
       double audioSampleRate = 0.0;
       PercentileRing audioLoad; // raw per-block load fraction samples
-      uint64_t audioXruns = 0;
+      uint64_t audioXruns = 0;         // deadline + os (AudioEngine::XrunCount)
+      uint64_t audioXrunsDeadline = 0; // blocks that used the whole period
+      uint64_t audioXrunsOs = 0;       // device-reported overload/underrun
+      uint64_t audioXrunGaps = 0;      // callback-gap heuristic, info only
 
       double memRssStartMb = -1.0;
       double memRssBuiltMb = -1.0;

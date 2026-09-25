@@ -328,13 +328,37 @@ public:
    void SetTopology(AudioTopology topology);
 
    double SampleRate() const;
-   uint64_t XrunCount() const;
 
-   // Called from Platform's kAudioDeviceProcessorOverload listener - a real
-   // CoreAudio overload notification, not the wall-clock heuristic Process()
-   // uses below. May land on an arbitrary CoreAudio-managed thread, so this
-   // must stay atomic-only: no locks, no allocation, nothing that touches
-   // main.cpp UI state.
+   // Xruns, split by where the evidence comes from. XrunCount() is the one
+   // number to gate on: deadline misses + OS-reported overloads. Callback
+   // gaps are the old wall-clock heuristic, kept for information only - a
+   // late callback is not by itself a dropout, so it is never counted as one.
+   //  - deadline: blocks whose RunTopology + preview took >= the block period
+   //    (the same topologyMs the cb_load meter uses). Identical on all three
+   //    platforms.
+   //  - os: the device said it under-ran. macOS: kAudioDeviceProcessorOverload.
+   //    Windows: WASAPI padding already 0 when a buffer is about to be
+   //    written. Linux: miniaudio reports nothing, so this stays 0 there.
+   //  - gaps: wall-clock gap between callbacks > kXrunGapMultiplier x period.
+   // All four are per engine run: Stop() resets them together.
+   struct XrunCounts
+   {
+      uint64_t deadline = 0;
+      uint64_t os = 0;
+      uint64_t gaps = 0;
+      uint64_t Total() const { return deadline + os; }
+   };
+   uint64_t XrunCount() const;
+   uint64_t XrunDeadlineCount() const;
+   uint64_t XrunOsCount() const;
+   uint64_t CallbackGapCount() const;
+   XrunCounts Xruns() const;
+
+   // Called by the platform audio backend when the device itself reports an
+   // overload/underrun (macOS kAudioDeviceProcessorOverload listener, Windows
+   // render loop). Bumps the "os" counter only. May land on an arbitrary
+   // OS-managed thread, so this must stay atomic-only: no locks, no
+   // allocation, nothing that touches main.cpp UI state.
    void NotifyProcessorOverload();
 
    // True unless the engine believes it should be producing audio
@@ -555,7 +579,9 @@ private:
    double mLastBlockEndBeat = -1e18;
 
    std::atomic<double> mSampleRate { 0.0 };
-   std::atomic<uint64_t> mXrunCount { 0 };
+   std::atomic<uint64_t> mXrunDeadline { 0 };
+   std::atomic<uint64_t> mXrunOs { 0 };
+   std::atomic<uint64_t> mCallbackGaps { 0 };
    std::atomic<double> mLastCallbackMs { -1.0 };
    std::atomic<double> mLastBlockLoad { 0.0 };
    Bench::AudioLoadRing mRawLoadHistory;

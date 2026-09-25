@@ -65039,6 +65039,18 @@ int RunSyphonPatchTest()
    return 0;
 }
 
+// Fills the bench report's four xrun fields as "since `base`" - each bench
+// window baselines the counters at its start so device-open settling does
+// not count against the run. audioXruns (deadline + os) is the gated number.
+static void BenchFillXruns(Bench::BenchReport& report, const AudioEngine::XrunCounts& base)
+{
+   const AudioEngine::XrunCounts now = AudioEngine::Instance().Xruns();
+   report.audioXrunsDeadline = now.deadline - base.deadline;
+   report.audioXrunsOs = now.os - base.os;
+   report.audioXrunGaps = now.gaps - base.gaps;
+   report.audioXruns = report.audioXrunsDeadline + report.audioXrunsOs;
+}
+
 static void BuildBenchB1Audio(long numVoices, int bufferFrames = 256, float yOffset = 0.0f)
 {
    numVoices = std::max(1L, std::min(64L, numVoices));
@@ -65636,7 +65648,7 @@ int main(int argc, char** argv)
    static double sBenchB3LastProjSwapMs = -1.0;
    static int sBenchB3MissedVsyncCount = 0;
    static int sBenchB3TotalVsyncCount = 0;
-   static uint64_t sBenchB3XrunBaseline = 0;
+   static AudioEngine::XrunCounts sBenchB3XrunBaseline;
    static int sBenchB3PendingInputInjectFrame = -1;
    static unsigned long long sBenchB3RevBeforeInject = 0;
    static bool sBenchB3ProbePaused = false;
@@ -67525,8 +67537,11 @@ int main(int argc, char** argv)
          const bool restarted = StartAudioEngine(restartError);
          Check("AudioEngine::Start succeeds on restart", restarted);
          std::this_thread::sleep_for(std::chrono::milliseconds(80));
-         const uint64_t xrunAfterCycle = AudioEngine::Instance().XrunCount();
-         Check("Stop/Start cycle adds no xrun", restarted && xrunAfterCycle == 0);
+         // Total covers the deadline + OS counters; the callback-gap counter
+         // is the one a stale timestamp would trip, so check it too.
+         const AudioEngine::XrunCounts xrunAfterCycle = AudioEngine::Instance().Xruns();
+         Check("Stop/Start cycle adds no xrun", restarted && xrunAfterCycle.Total() == 0);
+         Check("Stop/Start cycle adds no callback gap", restarted && xrunAfterCycle.gaps == 0);
 
          // Leave the engine Off and the fixture graph gone, matching the
          // "audio starts off" contract the rest of this file's tests rely on.
@@ -70637,7 +70652,8 @@ int main(int argc, char** argv)
 
          const bool audioEngineOn = AudioEngine::Instance().SampleRate() > 0.0;
          const double audioLoad = AudioEngine::Instance().LastBlockLoad();
-         const uint64_t xruns = AudioEngine::Instance().XrunCount();
+         const AudioEngine::XrunCounts xrunParts = AudioEngine::Instance().Xruns();
+         const uint64_t xruns = xrunParts.Total();
          const bool audioDead = audioEngineOn && !AudioEngine::Instance().IsAlive();
          char cpuReadout[32];
          if (audioDead)
@@ -70654,8 +70670,10 @@ int main(int argc, char** argv)
          TopBarLabel(cpuReadout, true);
 
          if (audioEngineOn && xruns > 0 && ImGui::IsItemHovered())
-            ImGui::SetTooltip("%llu buffer underrun%s detected this session",
-                              (unsigned long long)xruns, xruns == 1 ? "" : "s");
+            ImGui::SetTooltip("xruns=%llu this session\n%llu late block%s (render over the deadline)\n%llu reported by the audio device",
+                              (unsigned long long)xruns,
+                              (unsigned long long)xrunParts.deadline, xrunParts.deadline == 1 ? "" : "s",
+                              (unsigned long long)xrunParts.os);
 
          // Left cluster's true rightmost extent (window-local X), used below
          // to crop the right cluster instead of letting it overlap the left
@@ -84703,7 +84721,11 @@ int main(int argc, char** argv)
             }
          }
 
-         printf("xruns=%llu\n", (unsigned long long)AudioEngine::Instance().XrunCount());
+         {
+            const AudioEngine::XrunCounts xr = AudioEngine::Instance().Xruns();
+            printf("xruns=%llu (deadline=%llu os=%llu) gaps=%llu\n", (unsigned long long)xr.Total(),
+                   (unsigned long long)xr.deadline, (unsigned long long)xr.os, (unsigned long long)xr.gaps);
+         }
          printf("%s\n", overallOk ? "AUDIO TEARDOWN SWEEP OK" : "AUDIO TEARDOWN SWEEP FAIL");
       }
 
@@ -86260,7 +86282,7 @@ int main(int argc, char** argv)
             sBenchB3MonitorRefreshHz = refreshHz;
             sBenchB3TargetRateHz = sBenchB3MonitorRefreshHz;
 
-            sBenchB3XrunBaseline = AudioEngine::Instance().XrunCount();
+            sBenchB3XrunBaseline = AudioEngine::Instance().Xruns();
             AudioEngine::Instance().RawLoadHistory().Reset();
             AudioEngine::Instance().ResetStageLoadHistory();
          }
@@ -86377,7 +86399,7 @@ int main(int argc, char** argv)
             report.audioBuffer = bufEnv ? atoi(bufEnv) : 256;
             report.audioSampleRate = AudioEngine::Instance().SampleRate();
             report.audioLoad = AudioEngine::Instance().RawLoadHistory().Drain();
-            report.audioXruns = AudioEngine::Instance().XrunCount() - sBenchB3XrunBaseline;
+            BenchFillXruns(report, sBenchB3XrunBaseline);
 
             report.memRssStartMb = sBenchB3RssStartMb;
             report.memRssEndMb = Bench::ProcessRssMb();
@@ -87372,13 +87394,13 @@ int main(int argc, char** argv)
       // building/debugging this fixture - the doc's own number is 60s).
       // cb_load is drained from AudioEngine::RawLoadHistory() (raw per-block
       // samples - see AudioEngine.h's comment on why LastBlockLoad()'s
-      // smoothing is wrong for a percentile) and xruns from XrunCount(),
+      // smoothing is wrong for a percentile) and xruns from Xruns(),
       // baselined at the start of the measurement window so device-open
       // settling doesn't count against this run.
       if (getenv("INFINITE_BENCH_B1VOICES") != nullptr)
       {
          static double sStartTimeS = -1.0;
-         static uint64_t sXrunBaseline = 0;
+         static AudioEngine::XrunCounts sXrunBaseline;
          static Bench::PercentileRing sFrameMs;
          static double sRssStartMb = -1.0;
          const double nowS = glfwGetTime();
@@ -87386,7 +87408,7 @@ int main(int argc, char** argv)
          if (sStartTimeS < 0.0 && nowS > 1.5)
          {
             sStartTimeS = nowS;
-            sXrunBaseline = AudioEngine::Instance().XrunCount();
+            sXrunBaseline = AudioEngine::Instance().Xruns();
             AudioEngine::Instance().RawLoadHistory().Reset();
             AudioEngine::Instance().ResetStageLoadHistory();
             sRssStartMb = Bench::ProcessRssMb();
@@ -87408,7 +87430,7 @@ int main(int argc, char** argv)
             report.audioBuffer = bufArg ? atoi(bufArg) : 0;
             report.audioSampleRate = AudioEngine::Instance().SampleRate();
             report.audioLoad = AudioEngine::Instance().RawLoadHistory().Drain();
-            report.audioXruns = AudioEngine::Instance().XrunCount() - sXrunBaseline;
+            BenchFillXruns(report, sXrunBaseline);
             report.memRssStartMb = sRssStartMb;
             report.memRssEndMb = Bench::ProcessRssMb();
             for (int s = 0; s < kAudioStageCount; s++)
@@ -87461,14 +87483,14 @@ int main(int argc, char** argv)
       if (getenv("INFINITE_BENCH_B5AUDIOALONE") != nullptr)
       {
          static double sStartTimeS = -1.0;
-         static uint64_t sXrunBaseline = 0;
+         static AudioEngine::XrunCounts sXrunBaseline;
          const double nowS = glfwGetTime();
          const double windowS = getenv("INFINITE_BENCH_B5AUDIOALONE_SECONDS")
                                     ? atof(getenv("INFINITE_BENCH_B5AUDIOALONE_SECONDS")) : 30.0;
          if (sStartTimeS < 0.0 && nowS > 1.0)
          {
             sStartTimeS = nowS;
-            sXrunBaseline = AudioEngine::Instance().XrunCount();
+            sXrunBaseline = AudioEngine::Instance().Xruns();
             AudioEngine::Instance().RawLoadHistory().Reset();
          }
          if (sStartTimeS >= 0.0 && nowS - sStartTimeS >= windowS)
@@ -87482,7 +87504,7 @@ int main(int argc, char** argv)
             report.audioBuffer = atoi(bufArg);
             report.audioSampleRate = AudioEngine::Instance().SampleRate();
             report.audioLoad = AudioEngine::Instance().RawLoadHistory().Drain();
-            report.audioXruns = AudioEngine::Instance().XrunCount() - sXrunBaseline;
+            BenchFillXruns(report, sXrunBaseline);
             report.Emit();
             printf("B5AUDIOALONE DONE\n");
             fflush(stdout);

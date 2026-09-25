@@ -587,6 +587,9 @@ namespace Bench
             { "cb_load_p99", audioLoad.Percentile(99) },
             { "cb_load_max", audioLoad.Max() },
             { "xruns", audioXruns },
+            { "xruns_deadline", audioXrunsDeadline },
+            { "xruns_os", audioXrunsOs },
+            { "xrun_gaps", audioXrunGaps },
          };
       }
       else
