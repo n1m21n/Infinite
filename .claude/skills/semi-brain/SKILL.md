@@ -43,6 +43,18 @@ chat or skill names) to rank files; L4 adds files that usually change with the
 best ones; L5 writes the brief. On the historical replay this scores 0.568
 (file MRR 0.80, top file right 49% of the time) against 0.28 before Block B.
 
+**The brief arrives by itself.** A UserPromptSubmit hook
+(`4_engine/hooks/prompt_brief.py`) asks the daemon's warm brief server
+(`l5/serve.py`, ~150 ms) and adds the brief to every prompt as "Semi-Brain
+brief (a lead, not a fact)". Treat it as a lead: check the files it names
+before acting on them. When a session id is known, the files edited earlier
+in that session, and lately anywhere, count too (`l3/recent.py`, with
+weights from `l3/weights.py`).
+
+The same brief, plus L0, is available as MCP tools (server `semi-brain` in
+`.mcp.json`, `l0/mcp_server.py`): `brain_brief`, `brain_recall`,
+`brain_assert`, `brain_retract`.
+
 To run the automated 30-case benchmark evaluation suite (self-confirming; the
 replay above is the real gate):
 ```bash
@@ -64,6 +76,50 @@ corpora get swept into your commit. Retrieval changes are gated by the
 historical replay: `python3 tools/semi-brain/5_evals/replay/replay.py --label X`
 must not score below the last kept scorecard in `5_evals/replay/history.jsonl`.
 
+**Two replays gate a change**, and both must hold:
+
+| Replay | Command | Gate |
+|---|---|---|
+| Past fix commits (181) | `replay.py --label X` | `gate` >= the last `replay` card |
+| Real prompts -> files that turn edited (local only) | `replay.py --label X --cases sessions` | `nohub_gate` does not drop |
+
+`nohub` scores leave `src/main.cpp` out. It is a target in 87% of prompts,
+so with it every answer looks right. Each full replay takes about 1-2.5 min.
+Run replays only while no benchmark is measuring (`ab.sh`/`run_all.sh`, or
+the watch daemon paused).
+
+**Leave notes for later sessions (L0).** When a session establishes something
+the next one should know, assert it: a fact you verified, a decision and its
+reason, an alternative you rejected and why, an open question, or where to
+look for what.
+```bash
+python3 tools/semi-brain/l0/cli.py assert "<claim>" --kind fact|decision|rejected|question|hint \
+  --evidence commit:<hash> --evidence symbol:<Name> --evidence file:<path>[:line] --confidence 0.7
+python3 tools/semi-brain/l0/cli.py recall "<question>"   # what a query would see
+python3 tools/semi-brain/l0/cli.py retract <id> --reason "<why it was wrong>"
+```
+- Assert only what the session established, never a guess.
+- The tier is set for you:
+  - verified: some evidence resolves in the repo
+  - claude: nothing resolves
+  - owner: only on the owner's own word (`--owner`, `approve`); never on your own inference
+- A note's weight is capped at 0.6, so it can never outrank code.
+- Repeating a claim, or retrieving it, never adds weight. Only later edits to the note's files do, credited nightly.
+- Matching notes show as `Note (...)` lines in the brief.
+
+**Sleep (nightly, automatic).** `l1/sleep.py` runs at 04:30 via launchd:
+- It retunes the weights on the prompt replay: even cases pick, odd cases must confirm, and the with-main.cpp score must not drop.
+- It credits L0 notes from real edits.
+- It writes "look here" proposals: files the brief keeps missing, with the words of those prompts.
+- It skips itself while Infinite runs or the daemon is paused.
+
+The owner reviews the proposals:
+```bash
+python3 tools/semi-brain/l1/sleep.py --proposals
+python3 tools/semi-brain/l1/sleep.py --approve <id>   # owner only -> owner-tier L0 note
+python3 tools/semi-brain/l1/sleep.py --reject <id>
+```
+
 What *is* manual:
 1. **Log a user correction** into the DPO preference dataset:
    ```bash
@@ -79,7 +135,8 @@ What *is* manual:
 **Privacy**: chat/session-derived corpora (`session_history_corpus.json`,
 `antigravity_history_corpus.json`, `session_analysis_corpus.json`,
 `session_embeddings_cache.npy`, `dev_trajectory_corpus.json`,
-`knowledge_index_private.db`) never leave this machine. They are gitignored,
+`knowledge_index_private.db`, and all of `l1/state/`: outcome log, briefs,
+L0 notes, proposals, learned weights) never leave this machine. They are gitignored,
 and `.git/hooks/pre-push` blocks them. The rest of the brain (code, public
 `knowledge_index.db`, `3_datasets/*.jsonl`) may be committed, in its own
 commit, not inside a feature commit.

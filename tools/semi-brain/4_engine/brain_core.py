@@ -43,6 +43,7 @@ from l2.compartments import merge as merge_compartments
 from l3.network import Network, SEED_WEIGHT
 from l4.clusters import Areas
 from l3.recent import RecentWork
+from l3 import weights as learned_weights
 from l0.store import Store as L0Store, BOOST_KINDS
 
 _IDENT_RE = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+")
@@ -151,6 +152,7 @@ class SemiBrainCognitiveEngine:
         self.network = Network.load(self.ast_graph)
         self.recent = self._load_recent()
         self.l0 = L0Store()
+        self.weights = learned_weights.load()
 
     def _load_recent(self):
         commits = SEMI_BRAIN_DIR / "1_extractors" / "output" / "git_commits_corpus.json"
@@ -319,7 +321,8 @@ class SemiBrainCognitiveEngine:
         recent = getattr(self, "recent", None)
         # Only for a live session (the prompt hook passes one): without it there is no ongoing
         # work to continue, and on the commit replay the 12 h embargo leaves only noise.
-        work = (recent.rankings(time.time() if now is None else now, session, embargo)
+        wts = getattr(self, "weights", None) or learned_weights.DEFAULTS
+        work = (recent.rankings(time.time() if now is None else now, session, embargo, wts["tau_days"])
                 if recent and session else ([], []))
         l0 = getattr(self, "l0", None)
         notes = l0.match(query, now, embargo) if l0 is not None else []
@@ -437,16 +440,13 @@ class SemiBrainCognitiveEngine:
         fscore, sscore, why = network.activate(seeds)
         return fscore, why, sscore
 
-    SESSION_W = 1.0
-    RECENT_W = 0.25
-
     def _rank_files(self, matched_symbols, spread, why, work=([], []), notes=()):
         """Files most likely involved, best first, with the doc ids that point at each: the
         files of the matched symbols (in symbol order), the network's spread and the recent
-        work (this session's edits, recent edits anywhere), fused by weighted RRF. Weights
-        from the session replay: recent-anywhere at 0.5 lifted nohub MRR most but cost file
-        MRR with main.cpp, 0.25 kept both (l3/recent.py). L0 notes add their files as one
+        work (this session's edits, recent edits anywhere), fused by weighted RRF with the
+        weights of l3/weights.py (retuned nightly by l1/sleep.py). L0 notes add their files as one
         more list whose weight is the best note's score, never above l0.store.CAP."""
+        wts = getattr(self, "weights", None) or learned_weights.DEFAULTS
         lexical = []
         for sym in matched_symbols:
             f = self._get_symbol_meta(sym).get("file", "")
@@ -454,7 +454,7 @@ class SemiBrainCognitiveEngine:
                 lexical.append(f)
         fused = defaultdict(float)
         lists = ((lexical, 1.0), (sorted(spread, key=spread.get, reverse=True), 1.0),
-                 (work[0], self.SESSION_W), (work[1], self.RECENT_W))
+                 (work[0], wts["session_w"]), (work[1], wts["recent_w"]))
         boost = [n for n in notes if n["kind"] in BOOST_KINDS and n["files"]]
         if boost:
             note_files = list(dict.fromkeys(f for n in boost for f in n["files"]))

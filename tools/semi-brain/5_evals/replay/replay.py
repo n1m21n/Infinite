@@ -23,6 +23,8 @@ Appends one scorecard line to history.jsonl; per-case detail goes to runs/ (loca
     python3 replay.py --label quick --limit 40    # the most recent 40 cases
     python3 replay.py --label X --cases sessions  # real prompts -> files they edited
                                                   # (build_session_cases.py; local only)
+    python3 replay.py --label X --cases sessions --grid sets.json --out run.json
+                                                  # also score weight sets (l1/sleep.py)
 
 Session cases have no target symbols; their gate is mean(file MRR, file R@10), and by default
 SESSION_SAMPLE of them, evenly spread over time, are run so the replay stays at minutes.
@@ -117,6 +119,8 @@ def build_engine(corpora, cache, tmpdir):
     engine.retriever._embed_model = cache
     engine.retriever._load_vector_cache()
     engine.recent = _W.get("recent")
+    from l3 import weights
+    engine.weights = weights.load()
     return engine, len(docs)
 
 
@@ -130,33 +134,54 @@ def run_case(case):
         result = {"commit": case["commit"], "subject": case["subject"], "docs": ndocs,
                   "build_s": round(build_s, 2), "variants": {}}
         for v in VARIANTS:
-            q = case[f"query_{v}"]
             t1 = time.perf_counter()
-            frame = engine.analyze_problem(q, now=case["time"], session=case.get("session", ""),
-                                           embargo=case["recent_embargo"])
+            frame = _analyze(engine, case, case[f"query_{v}"])
             lat = time.perf_counter() - t1
             syms = list(frame.ast_impacted_symbols)
-            # The engine's own ranked file list (L3 onwards); before it, the files of the
-            # matched symbols then of the retrieved docs.
-            files = list(frame.ranked_files)
-            for s in syms:
-                f = engine._get_symbol_meta(s).get("file", "")
-                if f and f not in files:
-                    files.append(f)
-            for h in frame.retrieved_context:
-                f = h.get("filepath", "") or ""
-                if f.startswith("src/") and f not in files:
-                    files.append(f)
+            files = answer_files(engine, frame)
             result["variants"][v] = {
-                "latency_ms": round(lat * 1000, 1),
-                "files": rank_metrics(files, case["target_files"]),
-                "files_nohub": rank_metrics([f for f in files if f not in HUB_FILES],
-                                            [f for f in case["target_files"] if f not in HUB_FILES])
-                               if set(case["target_files"]) - set(HUB_FILES) else None,
+                "latency_ms": round(lat * 1000, 1), **file_metrics(files, case["target_files"]),
                 "symbols": rank_metrics(syms, case["target_symbols"]) if case["target_symbols"] else None,
                 "top_files": files[:10], "top_symbols": syms[:10],
             }
+        # Weight sets for the sleep job (l1/sleep.py --grid): the full query again with each
+        # set, on the engine already built for this case - a grid point costs one query.
+        if case.get("grid"):
+            base = dict(engine.weights)
+            result["grid"] = []
+            for g in case["grid"]:
+                engine.weights = dict(base, **g)
+                files = answer_files(engine, _analyze(engine, case, case["query_full"]))
+                result["grid"].append(file_metrics(files, case["target_files"]))
+            engine.weights = base
     return result
+
+
+def _analyze(engine, case, query):
+    return engine.analyze_problem(query, now=case["time"], session=case.get("session", ""),
+                                  embargo=case["recent_embargo"])
+
+
+def answer_files(engine, frame):
+    """The engine's own ranked file list (L3 onwards); after it, the files of the matched
+    symbols then of the retrieved docs."""
+    files = list(frame.ranked_files)
+    for s in frame.ast_impacted_symbols:
+        f = engine._get_symbol_meta(s).get("file", "")
+        if f and f not in files:
+            files.append(f)
+    for h in frame.retrieved_context:
+        f = h.get("filepath", "") or ""
+        if f.startswith("src/") and f not in files:
+            files.append(f)
+    return files
+
+
+def file_metrics(files, targets):
+    return {"files": rank_metrics(files, targets),
+            "files_nohub": rank_metrics([f for f in files if f not in HUB_FILES],
+                                        [f for f in targets if f not in HUB_FILES])
+                           if set(targets) - set(HUB_FILES) else None}
 
 
 def summarize(results):
@@ -196,6 +221,9 @@ def main():
     ap.add_argument("--cases", choices=("commits", "sessions"), default="commits")
     ap.add_argument("--sample", type=int, default=None,
                     help=f"evenly spaced sample of N cases (sessions default {SESSION_SAMPLE})")
+    ap.add_argument("--grid", help="JSON file: a list of weight sets (l3/weights.py keys) to "
+                                   "score on each case as well (l1/sleep.py)")
+    ap.add_argument("--out", help="also write the run (card + cases) to this file")
     args = ap.parse_args()
 
     if args.cases == "sessions":
@@ -210,7 +238,8 @@ def main():
         step = len(cases) / args.sample
         cases = [cases[int(i * step)] for i in range(args.sample)]
     recent_embargo = SESSION_RECENT_EMBARGO_S if args.cases == "sessions" else args.embargo_hours * 3600.0
-    cases = [dict(c, recent_embargo=recent_embargo) for c in cases]
+    grid = json.loads(Path(args.grid).read_text()) if args.grid else None
+    cases = [dict(c, recent_embargo=recent_embargo, grid=grid) for c in cases]
     t0 = time.time()
     ctx = get_context("spawn")
     with ctx.Pool(args.jobs, initializer=_init_worker, initargs=(args.embargo_hours,)) as pool:
@@ -230,7 +259,10 @@ def main():
             "mean_build_s": round(statistics.mean(r["build_s"] for r in results), 2), **summary}
     RUNS_DIR.mkdir(exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    (RUNS_DIR / f"{stamp}-{args.label}.json").write_text(json.dumps({"card": card, "cases": results}, indent=1))
+    run = json.dumps({"card": card, "cases": results}, indent=1)
+    (RUNS_DIR / f"{stamp}-{args.label}.json").write_text(run)
+    if args.out:
+        Path(args.out).write_text(run)
     if not args.no_history:
         with open(HISTORY_FILE, "a") as f:
             f.write(json.dumps(card) + "\n")

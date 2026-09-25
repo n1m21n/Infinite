@@ -61,13 +61,13 @@ class RecentWork:
                 commits.append((t, c["files"]))
         return cls(turns, commits)
 
-    def rankings(self, now, session="", embargo=0.0):
+    def rankings(self, now, session="", embargo=0.0, tau_days=TAU_DAYS):
         cut = now - embargo
         sess, recent = {}, {}
         for t, s, files in self.events:
             if t >= cut:
                 break
-            w = math.exp(-(now - t) / 86400.0 / TAU_DAYS)
+            w = math.exp(-(now - t) / 86400.0 / tau_days)
             for f in files:
                 recent[f] = recent.get(f, 0.0) + w
                 if session and s == session:
