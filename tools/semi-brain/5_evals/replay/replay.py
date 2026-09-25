@@ -30,7 +30,8 @@ Appends one scorecard line to history.jsonl; per-case detail goes to runs/ (loca
     python3 replay.py --label X --cases sessions --grid sets.json --out run.json
                                                   # also score weight sets (l1/sleep.py)
 
-Session cases have no target symbols; their gate is mean(file MRR, file R@10), and by default
+Session cases only have target symbols where the turn committed (build_session_cases.py); their
+gate is still mean(file MRR, file R@10) - symbol MRR/R@10 there is additive, not part of it. By default
 SESSION_SAMPLE of them, evenly spread over time, are run so the replay stays at minutes.
 """
 
@@ -134,18 +135,18 @@ def build_engine(corpora, cache, tmpdir):
 
 def region_hit(regions, predicted_symbols, target_symbols):
     """None if the case has no target in a known main.cpp region (most cases: main.cpp is a
-    target in 87% of prompts, but not every target symbol resolves to a region). Otherwise 1.0
-    if the best-ranked predicted symbol that IS in a region lands in one of the target
-    region(s), else 0.0 - same-file-different-region ("right file, wrong 2k lines") counts as
-    a miss, which is the point: file MRR can't see that distinction, this metric can."""
+    target in 87% of prompts, but not every target symbol resolves to a region). Otherwise
+    {"r1": ..., "r3": ...}: 1.0/0.0 per k, from Regions.rank_regions's weighted-vote ranking of
+    predicted_symbols (not just the single best-ranked one) - same-file-different-region
+    ("right file, wrong 2k lines") counts as a miss, which is the point: file MRR can't see
+    that distinction, this metric can."""
     target_regions = {r["id"] for r in (regions.region_for_symbol(t) for t in target_symbols) if r}
     if not target_regions:
         return None
-    for s in predicted_symbols:
-        r = regions.region_for_symbol(s)
-        if r:
-            return 1.0 if r["id"] in target_regions else 0.0
-    return 0.0
+    ranked = regions.rank_regions(predicted_symbols, top_n=3)
+    ranked_ids = [r["id"] for r in ranked]
+    return {"r1": 1.0 if ranked_ids[:1] and ranked_ids[0] in target_regions else 0.0,
+            "r3": 1.0 if any(rid in target_regions for rid in ranked_ids[:3]) else 0.0}
 
 
 def run_case(case):
@@ -209,7 +210,10 @@ def file_metrics(files, targets):
                            if set(targets) - set(HUB_FILES) else None}
 
 
-def summarize(results):
+def summarize(results, symbols_gate=True):
+    """`symbols_gate=False` (session cases) keeps `gate` file-only even when some cases now
+    carry target_symbols (build_session_cases.py, committed turns only) - symbol MRR/R@10 is
+    reported in the card either way, but stays additive there, never gating."""
     out = {}
     for v in VARIANTS:
         rows = [r["variants"][v] for r in results]
@@ -226,13 +230,19 @@ def summarize(results):
         block["latency_ms"] = {"p50": lats[len(lats) // 2], "p95": lats[int(len(lats) * 0.95) - 1],
                                "mean": round(statistics.mean(lats), 1)}
         regions = [r.get("region") for r in rows if r.get("region") is not None]
-        block["region_hit"] = {"n": len(regions),
-                               "rate": round(statistics.mean(regions), 4)} if regions else None
+        if regions:
+            block["region_hit"] = {"n": len(regions),
+                                   "rate": round(statistics.mean(r["r1"] for r in regions), 4)}
+            block["region_r3"] = {"n": len(regions),
+                                  "rate": round(statistics.mean(r["r3"] for r in regions), 4)}
+        else:
+            block["region_hit"] = None
+            block["region_r3"] = None
         out[v] = block
     f, s = out["full"]["files"], out["full"]["symbols"]
     h = out["full"]["files_nohub"]
     out["nohub_gate"] = round((h["mrr"] + h["r@10"]) / 2, 4) if h else None
-    if s is None:
+    if s is None or not symbols_gate:
         out["gate"] = round((f["mrr"] + f["r@10"]) / 2, 4)
     else:
         out["gate"] = round((f["mrr"] + s["mrr"] + f["r@10"] + s["r@10"]) / 4, 4)
@@ -278,7 +288,7 @@ def main():
             print(f"[{i}/{len(cases)}] rr_file={fr:.2f} build={r['build_s']}s {r['subject'][:60]}", flush=True)
     wall = time.time() - t0
 
-    summary = summarize(results)
+    summary = summarize(results, symbols_gate=(args.cases != "sessions"))
     head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=REPO_PATH,
                           capture_output=True, text=True).stdout.strip()
     card = {"kind": "replay" if args.cases == "commits" else "replay-sessions", "when": datetime.now(timezone.utc).isoformat(timespec="seconds"),

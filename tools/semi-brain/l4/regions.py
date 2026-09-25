@@ -53,6 +53,19 @@ class Regions:
             return ""
         return f"{MAIN_CPP}@{r['id']} L{r['line_start']}-{r['line_end']}"
 
+    def rank_regions(self, symbols, top_n=3):
+        """Rank regions by weighted vote from `symbols` (best-ranked first): each symbol votes
+        1/(rank+1) for the region it falls in, so several agreeing lower-ranked symbols can
+        outrank one stray higher-ranked one. Ties go to the smaller (more specific) region.
+        Returns up to `top_n` region dicts, empty if none of `symbols` resolve to a region."""
+        scores = {}
+        for i, s in enumerate(symbols):
+            r = self.region_for_symbol(s)
+            if r:
+                scores[r["id"]] = scores.get(r["id"], 0.0) + 1.0 / (i + 1)
+        ranked = sorted(scores, key=lambda rid: (-scores[rid], self._by_id[rid]["member_count"]))
+        return [self._by_id[rid] for rid in ranked[:top_n]]
+
     def toc(self, budget=TOC_BUDGET):
         """The table of contents: one line per region, region id, line range, size and its
         key functions, cut to `budget` characters."""

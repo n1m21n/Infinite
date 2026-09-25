@@ -79,10 +79,12 @@ class BriefServer(threading.Thread):
         engine = self.engine()
         data = brief_data(engine, engine.analyze_problem(query, session=req.get("session", "")))
         ms = round((time.perf_counter() - t) * 1000, 1)
+        main_regions = next((f["region_ids"] for f in data["files"] if f.get("region_ids")), [])
         rec = {"t": time.time(), "session": req.get("session", ""), "query": query,
                "files": [f["file"] for f in data["files"]],
                "symbols": [s["symbol"] for s in data["symbols"]],
-               "notes": [n["id"] for n in data.get("notes", [])], "ms": ms}
+               "notes": [n["id"] for n in data.get("notes", [])], "ms": ms,
+               "main_regions": main_regions}
         try:
             with open(self.state_dir / "briefs.jsonl", "a") as f:
                 f.write(json.dumps(rec) + "\n")

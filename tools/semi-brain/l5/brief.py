@@ -22,6 +22,7 @@ import sqlite3
 
 BUDGET = 900
 N_FILES, N_SYMBOLS, N_PAST, N_SKILLS, N_NOTES = 4, 4, 2, 2, 2
+MAIN_CPP = "src/main.cpp"
 
 
 def _short(path):
@@ -95,18 +96,18 @@ def rank_skills(engine, frame):
     return [name for _, name in sorted(scored, key=lambda x: -x[0])]
 
 
-def region_label(engine, path, frame):
-    """`src/main.cpp@region L{start}-{end}` in place of the bare path, from whichever of the
-    frame's matched symbols falls in a known main.cpp region (l4/regions.py); "" otherwise,
-    including for every file that isn't main.cpp."""
+def ranked_regions(engine, path, frame, top_n=2):
+    """Up to `top_n` region dicts, best first, from Regions.rank_regions's weighted vote over
+    the frame's matched symbols (l4/regions.py); [] for every file that isn't main.cpp."""
     if not path.endswith("main.cpp") or not hasattr(engine, "_regions"):
-        return ""
-    regions = engine._regions()
-    for s in frame.ast_impacted_symbols:
-        lbl = regions.label(s)
-        if lbl:
-            return lbl
-    return ""
+        return []
+    return engine._regions().rank_regions(frame.ast_impacted_symbols, top_n=top_n)
+
+
+def region_label(engine, path, frame, top_n=2):
+    """`src/main.cpp@region L{start}-{end}` labels for `ranked_regions`, joined for display."""
+    return ", ".join(f"{MAIN_CPP}@{r['id']} L{r['line_start']}-{r['line_end']}"
+                      for r in ranked_regions(engine, path, frame, top_n))
 
 
 def area_name(engine, path):
@@ -122,7 +123,8 @@ def brief_data(engine, frame):
     files = []
     for f in frame.ranked_files[:N_FILES]:
         files.append({"file": f, "why": _why(frame, frame.file_evidence.get(f, [])),
-                      "region": region_label(engine, f, frame)})
+                      "region": region_label(engine, f, frame),
+                      "region_ids": [r["id"] for r in ranked_regions(engine, f, frame)]})
     symbols = []
     for s in frame.ast_impacted_symbols[:N_SYMBOLS]:
         m = engine._get_symbol_meta(s)
