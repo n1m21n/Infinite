@@ -6,7 +6,6 @@ using Reciprocal Rank Fusion (RRF).
 """
 
 import sqlite3
-import struct
 import numpy as np
 from pathlib import Path
 from typing import List, Dict, Any
@@ -30,8 +29,7 @@ class HybridRetriever:
         return self._embed_model
 
     def unpack_vector(self, blob: bytes) -> np.ndarray:
-        num_floats = len(blob) // 4
-        return np.array(struct.unpack(f"{num_floats}f", blob), dtype=np.float32)
+        return np.frombuffer(blob, dtype=np.float32)
 
     def bm25_search(self, query: str, limit: int = 15) -> List[Dict[str, Any]]:
         """Run BM25 search against SQLite FTS5."""
@@ -72,7 +70,11 @@ class HybridRetriever:
         return results[:limit]
 
     def _load_vector_cache(self):
-        if hasattr(self, "_vector_cache") and self._vector_cache is not None:
+        """Two tiers, no float32 matrix kept:
+          fast     1 sign bit per dimension (48 bytes/doc), Hamming distance -> RESCORE candidates
+          precise  int8 per-vector-scaled codes, dot product with the float query re-ranks them
+        """
+        if getattr(self, "_vector_cache", None) is not None:
             return
         rows = []
         for db_path in self.db_paths:
@@ -82,49 +84,47 @@ class HybridRetriever:
             rows.extend(conn.execute(
                 "SELECT doc_id, category, title, snippet, filepath, embedding FROM vector_documents").fetchall())
             conn.close()
-        
-        self._doc_meta = []
-        vecs = []
-        for row in rows:
-            doc_id, cat, title, snippet, fpath, blob = row
-            self._doc_meta.append({
-                "doc_id": doc_id,
-                "category": cat,
-                "title": title,
-                "snippet": snippet,
-                "filepath": fpath
-            })
-            vecs.append(self.unpack_vector(blob))
-            
-        if vecs:
-            self._vector_matrix = np.array(vecs, dtype=np.float32)
-            # Normalize matrix rows once
-            norms = np.linalg.norm(self._vector_matrix, axis=1, keepdims=True)
-            self._vector_matrix = self._vector_matrix / np.maximum(norms, 1e-9)
-            self._vector_cache = True
-        else:
+
+        self._doc_meta = [{"doc_id": r[0], "category": r[1], "title": r[2], "snippet": r[3], "filepath": r[4]}
+                          for r in rows]
+        if not rows:
             self._vector_cache = False
+            return
+        m = np.frombuffer(b"".join(r[5] for r in rows), dtype=np.float32).reshape(len(rows), -1)
+        m = m / np.maximum(np.linalg.norm(m, axis=1, keepdims=True), 1e-9)
+        self._bits = np.packbits(m > 0, axis=1)
+        scale = np.maximum(np.abs(m).max(axis=1), 1e-9) / 127.0
+        self._int8 = np.round(m / scale[:, None]).astype(np.int8)
+        self._scale = scale.astype(np.float32)
+        self._vector_cache = True
+
+    RESCORE = 1000
+    _POPCOUNT = np.array([bin(i).count("1") for i in range(256)], dtype=np.uint16)
 
     def dense_search(self, query: str, limit: int = 15) -> List[Dict[str, Any]]:
-        """Run sub-millisecond dense vector similarity search via matrix multiplication."""
+        """Hamming top-RESCORE on sign bits, then int8 cosine re-rank of those candidates."""
         self._load_vector_cache()
         if not getattr(self, "_vector_cache", False):
             return []
-            
-        query_vec = list(self.embed_model.embed([query]))[0]
+
+        query_vec = np.asarray(list(self.embed_model.embed([query]))[0], dtype=np.float32)
         query_vec = query_vec / np.maximum(np.linalg.norm(query_vec), 1e-9)
-        
-        # Single vectorized dot-product across all 8,070 documents
-        sims = np.dot(self._vector_matrix, query_vec)
-        top_indices = np.argpartition(-sims, min(limit, len(sims)-1))[:limit]
-        top_indices = top_indices[np.argsort(-sims[top_indices])]
-        
+
+        n = len(self._doc_meta)
+        qbits = np.packbits(query_vec > 0)
+        ham = self._POPCOUNT[np.bitwise_xor(self._bits, qbits)].sum(axis=1)
+        c = min(self.RESCORE, n)
+        cand = np.argpartition(ham, c - 1)[:c] if c < n else np.arange(n)
+        sims = (self._int8[cand].astype(np.float32) @ query_vec) * self._scale[cand]
+        k = min(limit, len(cand))
+        top = np.argpartition(-sims, k - 1)[:k]
+        top = top[np.argsort(-sims[top])]
+
         scored = []
-        for idx in top_indices:
-            item = dict(self._doc_meta[idx])
-            item["dense_score"] = float(sims[idx])
+        for j in top:
+            item = dict(self._doc_meta[cand[j]])
+            item["dense_score"] = float(sims[j])
             scored.append(item)
-            
         return scored
 
     def hybrid_search(self, query: str, top_k: int = 6) -> List[Dict[str, Any]]:
