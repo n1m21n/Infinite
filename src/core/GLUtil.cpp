@@ -215,6 +215,7 @@ namespace GLUtil
       }
    }
 
+
    // The driver's info log for a shader or program, at its full length. A
    // fixed-size buffer would cut a long GLSL error list off mid-line, and
    // FormulaNode shows this text to the user verbatim.
