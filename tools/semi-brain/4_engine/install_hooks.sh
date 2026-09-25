@@ -42,9 +42,15 @@ cat << 'EOF' > "$HOOKS_DIR/sync-brain-bg"
 # one runs just marks "run again"), background QoS, lowest CPU priority, so builds and
 # benchmarks keep the machine. scripts/bench/ab.sh waits for it to finish.
 # While the watch daemon (brain_watchd) is alive it has already seen this change: step aside.
-GITDIR="$(git rev-parse --git-common-dir)"
+# The brain lives in the main checkout: a commit in another worktree syncs that one, and a
+# checkout without the incremental sync (l1/sync.py; the pre-v2 brain rebuilt everything, over
+# an hour of CPU) is never synced from a hook.
+GITDIR="$(cd "$(git rev-parse --git-common-dir)" && pwd)"
 PID="$(cat "$GITDIR/brain_watchd.pid" 2>/dev/null)"
 [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null && exit 0
+ROOT="$(dirname "$GITDIR")"
+[ -f "$ROOT/tools/semi-brain/l1/sync.py" ] || exit 0
+cd "$ROOT" || exit 0
 LOCK="$GITDIR/sync_brain.lock"; PENDING="$GITDIR/sync_brain.pending"
 touch "$PENDING"
 mkdir "$LOCK" 2>/dev/null || exit 0      # a runner is active; it will pick up PENDING
