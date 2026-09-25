@@ -1,5 +1,318 @@
 [
   {
+    "hash": "1fb744a0efd86d1fe6c6bf494036ebb41c31161d",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 20:11:18 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "semi-brain",
+      "title": "chore(semi-brain): replay scorecards for the focus_hit runs (gates unchanged: 0.568 / nohub 0.4299)",
+      "description": "replay scorecards for the focus_hit runs (gates unchanged: 0.568 / nohub 0.4299)",
+      "bullets": [],
+      "body": "",
+      "raw": "chore(semi-brain): replay scorecards for the focus_hit runs (gates unchanged: 0.568 / nohub 0.4299)"
+    },
+    "stat": "tools/semi-brain/5_evals/replay/history.jsonl | 2 ++\n 1 file changed, 2 insertions(+)",
+    "files": [
+      "tools/semi-brain/5_evals/replay/history.jsonl"
+    ]
+  },
+  {
+    "hash": "11e770f136ec5addc3b43528fa112243036d5699",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 20:11:07 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "semi-brain",
+      "title": "feat(semi-brain): quiet arm - no brief when the brain is unsure",
+      "description": "quiet arm - no brief when the brain is unsure",
+      "bullets": [],
+      "body": "analyze_problem now reports confidence: the best symbol score and how many ranking lists agree\non the top non-hub file. l5/gate.py shows the brief only when sym_top >= 20 and agree >= 2;\notherwise the hook gets nothing (arm quiet), with the would-be brief still logged so the live\ncard can check the call. Calibrated on 400 real prompts: only 30% touch a non-hub src/ file,\nthe brief's top 4 hits in 16%; the gate silences 27% and keeps 86% of the useful briefs. The\nreplay logs confidence per case. Skill: arms, turn cost, savings card, focus_hit, and the\nrouter recorded as a manual, unscored diagnostic.",
+      "raw": "feat(semi-brain): quiet arm - no brief when the brain is unsure\n\nanalyze_problem now reports confidence: the best symbol score and how many ranking lists agree\non the top non-hub file. l5/gate.py shows the brief only when sym_top >= 20 and agree >= 2;\notherwise the hook gets nothing (arm quiet), with the would-be brief still logged so the live\ncard can check the call. Calibrated on 400 real prompts: only 30% touch a non-hub src/ file,\nthe brief's top 4 hits in 16%; the gate silences 27% and keeps 86% of the useful briefs. The\nreplay logs confidence per case. Skill: arms, turn cost, savings card, focus_hit, and the\nrouter recorded as a manual, unscored diagnostic."
+    },
+    "stat": ".claude/skills/semi-brain/SKILL.md        | 23 ++++++++++++++++++---\n tools/semi-brain/4_engine/brain_core.py   | 16 ++++++++++++---\n tools/semi-brain/5_evals/replay/replay.py |  1 +\n tools/semi-brain/l5/gate.py               | 33 +++++++++++++++++++++++++++++++\n tools/semi-brain/l5/serve.py              | 22 +++++++++++++--------\n 5 files changed, 81 insertions(+), 14 deletions(-)\n create mode 100644 tools/semi-brain/l5/gate.py",
+    "files": [
+      ".claude/skills/semi-brain/SKILL.md",
+      "tools/semi-brain/4_engine/brain_core.py",
+      "tools/semi-brain/5_evals/replay/replay.py",
+      "tools/semi-brain/l5/gate.py",
+      "tools/semi-brain/l5/serve.py"
+    ]
+  },
+  {
+    "hash": "3adf08ec97ab6b59f045580e94d32c9a39b27826",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 20:10:58 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "semi-brain",
+      "title": "feat(semi-brain): symbol spans in the brief, focus_hit in the replay",
+      "description": "symbol spans in the brief, focus_hit in the replay",
+      "bullets": [],
+      "body": "Brief symbols now read file:start-end (the definition's whole span from the AST graph), so a\nright symbol costs ~50 lines to read instead of a search. The replay gains focus_hit: does the\nbest matched symbol inside a top main.cpp region overlap the edited function. It is 11% on\ncommits and 0% on prompts, with a ceiling of 12% for any matched symbol, so the brief keeps\nshowing regions without a focus span - symbol matching is what limits line-level precision.",
+      "raw": "feat(semi-brain): symbol spans in the brief, focus_hit in the replay\n\nBrief symbols now read file:start-end (the definition's whole span from the AST graph), so a\nright symbol costs ~50 lines to read instead of a search. The replay gains focus_hit: does the\nbest matched symbol inside a top main.cpp region overlap the edited function. It is 11% on\ncommits and 0% on prompts, with a ceiling of 12% for any matched symbol, so the brief keeps\nshowing regions without a focus span - symbol matching is what limits line-level precision."
+    },
+    "stat": "tools/semi-brain/4_engine/brain_core.py   |  3 ++-\n tools/semi-brain/5_evals/replay/replay.py | 38 +++++++++++++++++++++++++++++++\n tools/semi-brain/l5/brief.py              | 28 ++++++++++++++++++++---\n 3 files changed, 65 insertions(+), 4 deletions(-)",
+    "files": [
+      "tools/semi-brain/4_engine/brain_core.py",
+      "tools/semi-brain/5_evals/replay/replay.py",
+      "tools/semi-brain/l5/brief.py"
+    ]
+  },
+  {
+    "hash": "a4a4b30fcb8f944f6c06c3b17e0649f975055da1",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 19:47:45 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "semi-brain",
+      "title": "feat(semi-brain): measure what a brief saves - turn cost in the outcome log, a 25% holdout arm",
+      "description": "measure what a brief saves - turn cost in the outcome log, a 25% holdout arm",
+      "bullets": [],
+      "body": "The outcome log now records each turn's tool calls, calls before the first edit, context\ntokens and output tokens (API calls deduped by message id, subagents included). The brief\nserver gives the prompt hook no brief on a random quarter of prompts and logs the arm, so\nlive.py can compare the cost of turns with a brief against turns without one.",
+      "raw": "feat(semi-brain): measure what a brief saves - turn cost in the outcome log, a 25% holdout arm\n\nThe outcome log now records each turn's tool calls, calls before the first edit, context\ntokens and output tokens (API calls deduped by message id, subagents included). The brief\nserver gives the prompt hook no brief on a random quarter of prompts and logs the arm, so\nlive.py can compare the cost of turns with a brief against turns without one."
+    },
+    "stat": "tools/semi-brain/4_engine/hooks/prompt_brief.py |  6 ++--\n tools/semi-brain/5_evals/live.py                | 37 ++++++++++++++++++++-\n tools/semi-brain/l1/outcomes.py                 | 44 +++++++++++++++++++++----\n tools/semi-brain/l5/serve.py                    | 26 ++++++++++++---\n 4 files changed, 98 insertions(+), 15 deletions(-)",
+    "files": [
+      "tools/semi-brain/4_engine/hooks/prompt_brief.py",
+      "tools/semi-brain/5_evals/live.py",
+      "tools/semi-brain/l1/outcomes.py",
+      "tools/semi-brain/l5/serve.py"
+    ]
+  },
+  {
+    "hash": "6683f062b2b8738d0542a78102e406582dc799de",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 16:30:48 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "semi-brain",
+      "title": "docs(semi-brain): document weighted-vote region ranking and the watchd bench-pause gotcha",
+      "description": "document weighted-vote region ranking and the watchd bench-pause gotcha",
+      "bullets": [],
+      "body": "Region R@1 0.20 baseline -> 0.34 contiguous split -> 0.36 weighted-vote ranking, R@3 0.54.\nAlso notes where the fastembed cache now lives and how to recover a watchd daemon that didn't\nresume after a bench paused it (briefs.jsonl stops growing while outcomes.jsonl keeps syncing).",
+      "raw": "docs(semi-brain): document weighted-vote region ranking and the watchd bench-pause gotcha\n\nRegion R@1 0.20 baseline -> 0.34 contiguous split -> 0.36 weighted-vote ranking, R@3 0.54.\nAlso notes where the fastembed cache now lives and how to recover a watchd daemon that didn't\nresume after a bench paused it (briefs.jsonl stops growing while outcomes.jsonl keeps syncing)."
+    },
+    "stat": ".claude/skills/semi-brain/SKILL.md | 48 +++++++++++++++++++++++++-------------\n 1 file changed, 32 insertions(+), 16 deletions(-)",
+    "files": [
+      ".claude/skills/semi-brain/SKILL.md"
+    ]
+  },
+  {
+    "hash": "c497a1d6a4b1e72908d11c20e89e214b357c5387",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 16:24:12 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "semi-brain",
+      "title": "feat(semi-brain): live per-region hit@k, and a stable local cache for the embedding model",
+      "description": "live per-region hit@k, and a stable local cache for the embedding model",
+      "bullets": [],
+      "body": "live.py now scores region hit@1/hit@2 by diffing the commits of turns that touched main.cpp\nand joining against the brief's logged main_regions - only turns that actually committed are\nscorable, since outcomes.jsonl has no line-level record for uncommitted edits.\nfastembed defaulted to tempfile.gettempdir()/fastembed_cache, which macOS can sweep between\nruns and force a re-download; VectorCache now points it at l1/state/fastembed_cache (gitignored,\nnever pushed). Moved the existing 64MB cache there directly - no new download.",
+      "raw": "feat(semi-brain): live per-region hit@k, and a stable local cache for the embedding model\n\nlive.py now scores region hit@1/hit@2 by diffing the commits of turns that touched main.cpp\nand joining against the brief's logged main_regions - only turns that actually committed are\nscorable, since outcomes.jsonl has no line-level record for uncommitted edits.\n\nfastembed defaulted to tempfile.gettempdir()/fastembed_cache, which macOS can sweep between\nruns and force a re-download; VectorCache now points it at l1/state/fastembed_cache (gitignored,\nnever pushed). Moved the existing 64MB cache there directly - no new download."
+    },
+    "stat": "tools/semi-brain/5_evals/live.py    | 39 ++++++++++++++++++++++++++++++++++++-\n tools/semi-brain/l1/vector_cache.py |  6 +++++-\n 2 files changed, 43 insertions(+), 2 deletions(-)",
+    "files": [
+      "tools/semi-brain/5_evals/live.py",
+      "tools/semi-brain/l1/vector_cache.py"
+    ]
+  },
+  {
+    "hash": "eae8f5b6f7abaca894fff4a782189ad25e374145",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 16:24:05 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "semi-brain",
+      "title": "feat(semi-brain): derive real target symbols for prompt-replay cases that committed",
+      "description": "derive real target symbols for prompt-replay cases that committed",
+      "bullets": [],
+      "body": "build_session_cases.py reuses build_cases.target_symbols (innermost function/class touched by\na diff) against the diff from each turn's parent commit to its own last commit, for the 128 of\n501 session cases whose turn actually committed - the rest have no line-level record in\noutcomes.jsonl and keep target_symbols=[]. replay.py's symbol MRR/R@10 for sessions stays\nadditive (summarize(..., symbols_gate=False)): session gate held at 0.7857, nohub_gate at 0.423.",
+      "raw": "feat(semi-brain): derive real target symbols for prompt-replay cases that committed\n\nbuild_session_cases.py reuses build_cases.target_symbols (innermost function/class touched by\na diff) against the diff from each turn's parent commit to its own last commit, for the 128 of\n501 session cases whose turn actually committed - the rest have no line-level record in\noutcomes.jsonl and keep target_symbols=[]. replay.py's symbol MRR/R@10 for sessions stays\nadditive (summarize(..., symbols_gate=False)): session gate held at 0.7857, nohub_gate at 0.423."
+    },
+    "stat": ".../5_evals/replay/build_session_cases.py          | 39 +++++++++++++++++++---\n 1 file changed, 35 insertions(+), 4 deletions(-)",
+    "files": [
+      "tools/semi-brain/5_evals/replay/build_session_cases.py"
+    ]
+  },
+  {
+    "hash": "a5285a052072e5050a5b70fd041caf9a2348e8d1",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 16:23:58 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "semi-brain",
+      "title": "feat(semi-brain): rank main.cpp regions by weighted symbol vote, not just the first hit",
+      "description": "rank main.cpp regions by weighted symbol vote, not just the first hit",
+      "bullets": [],
+      "body": "Regions.rank_regions scores every predicted symbol's region by 1/(rank+1) and sums, so\nseveral agreeing lower-ranked symbols can outrank one stray higher-ranked one. Used by both\nthe brief (top-2 regions shown, with ids logged to briefs.jsonl for live.py) and replay's\nregion_hit, which now reports region R@1 and R@3 instead of a single hit rate.\nCommit-case replay: gate 0.568 (held), nohub_gate 0.6963 (held), region R@1 0.3367 -> 0.3571,\nregion R@3 0.5408. Session-case replay: gate 0.7857 (held), nohub_gate 0.423 (held).",
+      "raw": "feat(semi-brain): rank main.cpp regions by weighted symbol vote, not just the first hit\n\nRegions.rank_regions scores every predicted symbol's region by 1/(rank+1) and sums, so\nseveral agreeing lower-ranked symbols can outrank one stray higher-ranked one. Used by both\nthe brief (top-2 regions shown, with ids logged to briefs.jsonl for live.py) and replay's\nregion_hit, which now reports region R@1 and R@3 instead of a single hit rate.\n\nCommit-case replay: gate 0.568 (held), nohub_gate 0.6963 (held), region R@1 0.3367 -> 0.3571,\nregion R@3 0.5408. Session-case replay: gate 0.7857 (held), nohub_gate 0.423 (held)."
+    },
+    "stat": "tools/semi-brain/5_evals/replay/history.jsonl |  2 ++\n tools/semi-brain/5_evals/replay/replay.py     | 40 +++++++++++++++++----------\n tools/semi-brain/l4/regions.py                | 13 +++++++++\n tools/semi-brain/l5/brief.py                  | 26 +++++++++--------\n tools/semi-brain/l5/serve.py                  |  4 ++-\n 5 files changed, 57 insertions(+), 28 deletions(-)",
+    "files": [
+      "tools/semi-brain/5_evals/replay/history.jsonl",
+      "tools/semi-brain/5_evals/replay/replay.py",
+      "tools/semi-brain/l4/regions.py",
+      "tools/semi-brain/l5/brief.py",
+      "tools/semi-brain/l5/serve.py"
+    ]
+  },
+  {
+    "hash": "d15c72acaf9109d6c6fc74ce35551666912b176e",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 15:55:20 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "semi-brain",
+      "title": "fix(semi-brain): regions v2 - contiguous non-overlapping cuts, whole-file coverage",
+      "description": "regions v2 - contiguous non-overlapping cuts, whole-file coverage",
+      "bullets": [],
+      "body": "v1 clustered main.cpp symbols into communities and took each cluster's min/max\nline as its \"region\" - communities aren't contiguous, so 68/80 regions\noverlapped and the split stopped 12k lines short of EOF. This walks the file\ntop to bottom instead: cuts only ever land between adjacent symbols (banners\nfirst, then the weakest co-edit/call/name-family link, capped at ~3000 lines),\nso every region is one real, non-overlapping slice. Nested symbols (a class\nand its own methods) are collapsed to one root before cutting so end lines\nnever jump backward; a handful of top-level functions bigger than the cap on\ntheir own (RegisterNodes: ~42k lines of macro calls, no internal structure)\nare chunked by line count, the same fallback used for stretches with no\nsymbols at all.\n73 regions, 0 overlaps, covers L1-95768, max span 2972. Replay: commit gate\nholds at 0.568, prompt nohub holds at 0.423, region_hit rises 0.20 -> 0.34\n(full) / 0.26 (subject).",
+      "raw": "fix(semi-brain): regions v2 - contiguous non-overlapping cuts, whole-file coverage\n\nv1 clustered main.cpp symbols into communities and took each cluster's min/max\nline as its \"region\" - communities aren't contiguous, so 68/80 regions\noverlapped and the split stopped 12k lines short of EOF. This walks the file\ntop to bottom instead: cuts only ever land between adjacent symbols (banners\nfirst, then the weakest co-edit/call/name-family link, capped at ~3000 lines),\nso every region is one real, non-overlapping slice. Nested symbols (a class\nand its own methods) are collapsed to one root before cutting so end lines\nnever jump backward; a handful of top-level functions bigger than the cap on\ntheir own (RegisterNodes: ~42k lines of macro calls, no internal structure)\nare chunked by line count, the same fallback used for stretches with no\nsymbols at all.\n\n73 regions, 0 overlaps, covers L1-95768, max span 2972. Replay: commit gate\nholds at 0.568, prompt nohub holds at 0.423, region_hit rises 0.20 -> 0.34\n(full) / 0.26 (subject)."
+    },
+    "stat": ".../1_extractors/build_main_cpp_regions.py         |  526 +--\n .../1_extractors/output/main_cpp_regions.json      | 3722 +++++++++-----------\n tools/semi-brain/5_evals/replay/history.jsonl      |    2 +\n 3 files changed, 2013 insertions(+), 2237 deletions(-)",
+    "files": [
+      "tools/semi-brain/1_extractors/build_main_cpp_regions.py",
+      "tools/semi-brain/1_extractors/output/main_cpp_regions.json",
+      "tools/semi-brain/5_evals/replay/history.jsonl"
+    ]
+  },
+  {
+    "hash": "5bb165d357e4925da410b4b8f41face5e60761fc",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 15:20:29 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "semi-brain",
+      "title": "feat(semi-brain): virtual split of main.cpp into ~80 regions",
+      "description": "virtual split of main.cpp into ~80 regions",
+      "bullets": [],
+      "body": "l4/regions.py + 1_extractors/build_main_cpp_regions.py cluster main.cpp's\ntop-level symbols into regions using co-edit history, the call graph\n(hub callees suppressed so generic helpers don't glue Draw*Body functions\ntogether), name families, `// ====` banners, and a strong file-order\nproximity chain that keeps regions readable line ranges instead of\nscattered whole-file grab-bags (median span ~580 lines, only 5/80 forced\nover the 6000-line cap by the merge fallback). Shared Louvain step\nextracted from clusters.py into l4/louvain.py.\nWired in: a brief's Files line shows `main.cpp@region L{start}-{end}`\ninstead of the bare path (l5/brief.py); `semi_brain_cli.py --regions`\nprints the ~2k-char table of contents; replay.py scores region_hit\n(additive, not part of gate/nohub_gate) - whether the best-ranked\nmain.cpp symbol lands in the same region as the target, catching\n\"right file, wrong 30k lines\" that file MRR can't see. Baseline on the\n181-commit replay: 0.20.\nBoth replay gates hold exactly at the last kept scorecard (gate\n0.568/0.7857, nohub_gate 0.6963/0.423) - additive only, no ranking change.",
+      "raw": "feat(semi-brain): virtual split of main.cpp into ~80 regions\n\nl4/regions.py + 1_extractors/build_main_cpp_regions.py cluster main.cpp's\ntop-level symbols into regions using co-edit history, the call graph\n(hub callees suppressed so generic helpers don't glue Draw*Body functions\ntogether), name families, `// ====` banners, and a strong file-order\nproximity chain that keeps regions readable line ranges instead of\nscattered whole-file grab-bags (median span ~580 lines, only 5/80 forced\nover the 6000-line cap by the merge fallback). Shared Louvain step\nextracted from clusters.py into l4/louvain.py.\n\nWired in: a brief's Files line shows `main.cpp@region L{start}-{end}`\ninstead of the bare path (l5/brief.py); `semi_brain_cli.py --regions`\nprints the ~2k-char table of contents; replay.py scores region_hit\n(additive, not part of gate/nohub_gate) - whether the best-ranked\nmain.cpp symbol lands in the same region as the target, catching\n\"right file, wrong 30k lines\" that file MRR can't see. Baseline on the\n181-commit replay: 0.20.\n\nBoth replay gates hold exactly at the last kept scorecard (gate\n0.568/0.7857, nohub_gate 0.6963/0.423) - additive only, no ranking change."
+    },
+    "stat": ".claude/skills/semi-brain/SKILL.md                 |   13 +\n .../1_extractors/build_main_cpp_regions.py         |  379 ++++\n .../1_extractors/output/main_cpp_regions.json      | 2352 ++++++++++++++++++++\n tools/semi-brain/4_engine/brain_core.py            |    8 +\n tools/semi-brain/4_engine/semi_brain_cli.py        |   12 +-\n tools/semi-brain/5_evals/replay/history.jsonl      |    3 +\n tools/semi-brain/5_evals/replay/replay.py          |   30 +-\n tools/semi-brain/l4/clusters.py                    |   35 +-\n tools/semi-brain/l4/louvain.py                     |   39 +\n tools/semi-brain/l4/regions.py                     |   68 +\n tools/semi-brain/l5/brief.py                       |   20 +-\n 11 files changed, 2921 insertions(+), 38 deletions(-)\n create mode 100644 tools/semi-brain/1_extractors/build_main_cpp_regions.py\n create mode 100644 tools/semi-brain/1_extractors/output/main_cpp_regions.json\n create mode 100644 tools/semi-brain/l4/louvain.py\n create mode 100644 tools/semi-brain/l4/regions.py",
+    "files": [
+      ".claude/skills/semi-brain/SKILL.md",
+      "tools/semi-brain/1_extractors/build_main_cpp_regions.py",
+      "tools/semi-brain/1_extractors/output/main_cpp_regions.json",
+      "tools/semi-brain/4_engine/brain_core.py",
+      "tools/semi-brain/4_engine/semi_brain_cli.py",
+      "tools/semi-brain/5_evals/replay/history.jsonl",
+      "tools/semi-brain/5_evals/replay/replay.py",
+      "tools/semi-brain/l4/clusters.py",
+      "tools/semi-brain/l4/louvain.py",
+      "tools/semi-brain/l4/regions.py",
+      "tools/semi-brain/l5/brief.py"
+    ]
+  },
+  {
+    "hash": "9c250479e987c6ed993c2b12e1c9fc8b743cf26e",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 15:02:06 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "semi-brain",
+      "title": "feat(semi-brain): C4 nightly sleep retunes weights, gated by replay",
+      "description": "C4 nightly sleep retunes weights, gated by replay",
+      "bullets": [],
+      "body": "l1/sleep.py runs nightly via launchd, retunes l3/weights.py against\nthe session replay (even cases pick, odd cases confirm, with-main.cpp\nscore must not drop), credits L0 notes from real edits, and writes\nlook-here proposals for the owner to approve/reject. Skips itself\nwhile Infinite or the daemon is running.\nBoth replay gates (commits and sessions) hold at the last kept\nscorecard: gate 0.568/0.7857, nohub_gate 0.6963/0.423.",
+      "raw": "feat(semi-brain): C4 nightly sleep retunes weights, gated by replay\n\nl1/sleep.py runs nightly via launchd, retunes l3/weights.py against\nthe session replay (even cases pick, odd cases confirm, with-main.cpp\nscore must not drop), credits L0 notes from real edits, and writes\nlook-here proposals for the owner to approve/reject. Skips itself\nwhile Infinite or the daemon is running.\n\nBoth replay gates (commits and sessions) hold at the last kept\nscorecard: gate 0.568/0.7857, nohub_gate 0.6963/0.423."
+    },
+    "stat": ".claude/skills/semi-brain/SKILL.md                 |     59 +-\n .../1_extractors/output/ast_symbol_graph.json      | 235052 ++++++++++--------\n .../1_extractors/output/git_commits_corpus.json    |  18508 +-\n .../1_extractors/output/knowledge_index.db         |    Bin 25616384 -> 33603584 bytes\n .../1_extractors/output/recovered_docs_corpus.json |    532 +-\n .../output/skills_and_invariants_corpus.json       |    406 +-\n .../3_datasets/train_dpo_preference.jsonl          |     16 +\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl |    364 +-\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl |    364 +-\n tools/semi-brain/4_engine/brain_core.py            |     16 +-\n tools/semi-brain/4_engine/install_hooks.sh         |     48 +-\n tools/semi-brain/5_evals/replay/history.jsonl      |      2 +\n tools/semi-brain/5_evals/replay/replay.py          |     74 +-\n tools/semi-brain/l1/sleep.py                       |    296 +\n tools/semi-brain/l3/recent.py                      |      4 +-\n tools/semi-brain/l3/weights.py                     |     28 +\n 16 files changed, 151517 insertions(+), 104252 deletions(-)\n create mode 100644 tools/semi-brain/l1/sleep.py\n create mode 100644 tools/semi-brain/l3/weights.py",
+    "files": [
+      ".claude/skills/semi-brain/SKILL.md",
+      "tools/semi-brain/1_extractors/output/ast_symbol_graph.json",
+      "tools/semi-brain/1_extractors/output/git_commits_corpus.json",
+      "tools/semi-brain/1_extractors/output/knowledge_index.db",
+      "tools/semi-brain/1_extractors/output/recovered_docs_corpus.json",
+      "tools/semi-brain/1_extractors/output/skills_and_invariants_corpus.json",
+      "tools/semi-brain/3_datasets/train_dpo_preference.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_alpaca.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_sharegpt.jsonl",
+      "tools/semi-brain/4_engine/brain_core.py",
+      "tools/semi-brain/4_engine/install_hooks.sh",
+      "tools/semi-brain/5_evals/replay/history.jsonl",
+      "tools/semi-brain/5_evals/replay/replay.py",
+      "tools/semi-brain/l1/sleep.py",
+      "tools/semi-brain/l3/recent.py",
+      "tools/semi-brain/l3/weights.py"
+    ]
+  },
+  {
+    "hash": "1058b5e1b0847c8f0409387db6fe33a5c22c1492",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 14:42:25 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "semi-brain",
+      "title": "fix(semi-brain): hook fallback syncs the main checkout's brain, never a pre-v2 one",
+      "description": "hook fallback syncs the main checkout's brain, never a pre-v2 one",
+      "bullets": [],
+      "body": "With the daemon paused, a commit in another worktree ran that worktree's\nsync_brain.py; on a branch without the v2 brain that is the legacy full\nrebuild (over an hour of CPU, under benchmarks). The fallback now runs in the\nmain checkout and only when it has the incremental sync (l1/sync.py).",
+      "raw": "fix(semi-brain): hook fallback syncs the main checkout's brain, never a pre-v2 one\n\nWith the daemon paused, a commit in another worktree ran that worktree's\nsync_brain.py; on a branch without the v2 brain that is the legacy full\nrebuild (over an hour of CPU, under benchmarks). The fallback now runs in the\nmain checkout and only when it has the incremental sync (l1/sync.py)."
+    },
+    "stat": "tools/semi-brain/4_engine/install_hooks.sh | 8 +++++++-\n 1 file changed, 7 insertions(+), 1 deletion(-)",
+    "files": [
+      "tools/semi-brain/4_engine/install_hooks.sh"
+    ]
+  },
+  {
+    "hash": "ed77cb5c28c1d9d52d5e148f092d63ffbd7f7a00",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 14:42:10 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "mcp",
+      "title": "chore(mcp): register the semi-brain MCP server (tools/semi-brain/l0/mcp_server.py)",
+      "description": "register the semi-brain MCP server (tools/semi-brain/l0/mcp_server.py)",
+      "bullets": [],
+      "body": "",
+      "raw": "chore(mcp): register the semi-brain MCP server (tools/semi-brain/l0/mcp_server.py)"
+    },
+    "stat": ".mcp.json | 9 ++++++++-\n 1 file changed, 8 insertions(+), 1 deletion(-)",
+    "files": [
+      ".mcp.json"
+    ]
+  },
+  {
+    "hash": "4119ff48d17d97e45fc0c9a5250e2968ec43f0c9",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 14:42:10 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "semi-brain",
+      "title": "feat(semi-brain): C5 L0 notes - assert channel, CLI and MCP server",
+      "description": "C5 L0 notes - assert channel, CLI and MCP server",
+      "bullets": [],
+      "body": "l0/store.py: an append-only note log (l1/state/l0.jsonl, local only) of\nfacts, decisions, rejected alternatives, open questions and hints, each with\nevidence checked against the repo and a trust tier (owner > verified >\nclaude). Weight = Beta reliability per (region, kind) x calibrated\nconfidence x tier x decay, capped at 0.6; repeats and retrievals never add\nweight. Matching notes join the file ranking as one capped RRF list and show\nas Note lines in the brief; the server logs which notes each brief showed.\nl0/cli.py (assert/recall/list/retract/approve) and l0/mcp_server.py\n(stdlib stdio MCP: brain_brief, brain_recall, brain_assert, brain_retract;\nnever owner tier).\nReplay unchanged (L0 empty, notes cut at the case time): sessions 0.7857,\nnohub 0.423.",
+      "raw": "feat(semi-brain): C5 L0 notes - assert channel, CLI and MCP server\n\nl0/store.py: an append-only note log (l1/state/l0.jsonl, local only) of\nfacts, decisions, rejected alternatives, open questions and hints, each with\nevidence checked against the repo and a trust tier (owner > verified >\nclaude). Weight = Beta reliability per (region, kind) x calibrated\nconfidence x tier x decay, capped at 0.6; repeats and retrievals never add\nweight. Matching notes join the file ranking as one capped RRF list and show\nas Note lines in the brief; the server logs which notes each brief showed.\n\nl0/cli.py (assert/recall/list/retract/approve) and l0/mcp_server.py\n(stdlib stdio MCP: brain_brief, brain_recall, brain_assert, brain_retract;\nnever owner tier).\n\nReplay unchanged (L0 empty, notes cut at the case time): sessions 0.7857,\nnohub 0.423."
+    },
+    "stat": "tools/semi-brain/4_engine/brain_core.py |  20 ++-\n tools/semi-brain/l0/__init__.py         |   4 +\n tools/semi-brain/l0/cli.py              |  83 +++++++++++\n tools/semi-brain/l0/mcp_server.py       | 138 ++++++++++++++++++\n tools/semi-brain/l0/store.py            | 251 ++++++++++++++++++++++++++++++++\n tools/semi-brain/l5/brief.py            |   9 +-\n tools/semi-brain/l5/serve.py            |   6 +-\n 7 files changed, 503 insertions(+), 8 deletions(-)\n create mode 100644 tools/semi-brain/l0/__init__.py\n create mode 100644 tools/semi-brain/l0/cli.py\n create mode 100644 tools/semi-brain/l0/mcp_server.py\n create mode 100644 tools/semi-brain/l0/store.py",
+    "files": [
+      "tools/semi-brain/4_engine/brain_core.py",
+      "tools/semi-brain/l0/__init__.py",
+      "tools/semi-brain/l0/cli.py",
+      "tools/semi-brain/l0/mcp_server.py",
+      "tools/semi-brain/l0/store.py",
+      "tools/semi-brain/l5/brief.py",
+      "tools/semi-brain/l5/serve.py"
+    ]
+  },
+  {
     "hash": "e18ce27cf092cc5c30f2fc6dffa9a9e8b0bf9988",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
