@@ -36,19 +36,18 @@ import json
 import re
 import os
 from collections import Counter
+import sys
 from pathlib import Path
 
 import numpy as np
-from fastembed import TextEmbedding
 
 EXTRACTORS_OUT = Path(__file__).resolve().parent / "output"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 INPUT_FILE = EXTRACTORS_OUT / "session_history_corpus.json"
 ANTIGRAVITY_INPUT_FILE = EXTRACTORS_OUT / "antigravity_history_corpus.json"
 OUTPUT_FILE = EXTRACTORS_OUT / "session_analysis_corpus.json"
-EMBEDDING_CACHE_FILE = EXTRACTORS_OUT / "session_embeddings_cache.npy"
 
 EMBED_TEXT_CHARS = 500        # per turn, for clustering - title-length context is enough
-EMBED_BATCH_SIZE = 32         # kept small deliberately - this machine runs under real memory pressure
 NUM_CLUSTERS_DIVISOR = 40     # ~1 cluster per 40 turns, clamped below
 MIN_CLUSTERS, MAX_CLUSTERS = 6, 40
 KMEANS_ITERS = 25
@@ -253,7 +252,7 @@ def build_problem_solution_pairs(turns):
     return pairs
 
 
-def analyze():
+def analyze(cache=None):
     if not INPUT_FILE.exists():
         print(f"No session history corpus at {INPUT_FILE}; run mine_session_history.py first.")
         return
@@ -302,30 +301,15 @@ def analyze():
 
     embed_texts = [(t["user_text"] + " " + t["assistant_text"])[:EMBED_TEXT_CHARS] for t in turns]
 
-    # Embedding ~2.7k turns on this machine takes 30-40 minutes under memory pressure - cache the
-    # result so re-running the (cheap) classification/clustering logic doesn't pay that cost again.
-    if EMBEDDING_CACHE_FILE.exists():
-        cached = np.load(EMBEDDING_CACHE_FILE)
-        if cached.shape[0] == len(embed_texts):
-            print(f"Reusing cached embeddings from {EMBEDDING_CACHE_FILE}", flush=True)
-            vectors = cached
-        else:
-            vectors = None
-    else:
-        vectors = None
-
-    if vectors is None:
-        print("Loading embedding model...", flush=True)
-        embed_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
-        print(f"Computing embeddings for {len(embed_texts)} turns (batches of {EMBED_BATCH_SIZE})...", flush=True)
-        vector_chunks = []
-        for i in range(0, len(embed_texts), EMBED_BATCH_SIZE):
-            batch = embed_texts[i:i + EMBED_BATCH_SIZE]
-            vector_chunks.extend(embed_model.embed(batch, batch_size=EMBED_BATCH_SIZE))
-            print(f"  embedded {min(i + EMBED_BATCH_SIZE, len(embed_texts))}/{len(embed_texts)}", flush=True)
-        vectors = np.array(vector_chunks, dtype=np.float32)
-        del vector_chunks
-        np.save(EMBEDDING_CACHE_FILE, vectors)
+    # Embedding ~2.7k turns takes 30-40 minutes under memory pressure. The shared L1 vector cache
+    # (keyed by the text itself) means only turns never seen before are embedded; the old
+    # whole-array .npy cache was thrown away every time the turn count changed.
+    if cache is None:
+        from l1.vector_cache import VectorCache
+        cache = VectorCache()
+    hits0, misses0 = cache.hits, cache.misses
+    vectors = np.array(cache.get_many(embed_texts), dtype=np.float32).reshape(len(embed_texts), -1)
+    print(f"Embeddings: {cache.hits - hits0} cached, {cache.misses - misses0} new", flush=True)
 
     k = max(MIN_CLUSTERS, min(MAX_CLUSTERS, len(turns) // NUM_CLUSTERS_DIVISOR))
     print(f"Clustering into {k} topics via k-means...")

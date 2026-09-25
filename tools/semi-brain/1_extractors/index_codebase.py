@@ -14,28 +14,31 @@ Builds a high-speed SQLite Hybrid Search Index (FTS5 BM25 + FastEmbed Dense Vect
 8. Dev Trajectory - session turns classified against this repo's own Conventional Commit
    type/scope vocabulary and its node-category taxonomy, with weekly trend slopes
    (from dev_trajectory_corpus.json, produced by classify_dev_trajectory.py)
+9. Research - docs/prior-art, docs/fix-briefs, docs/reference as they stand in the tree
+   (research_doc, public), and research explainers mined from past sessions
+   (session_research, private). See l1/research.py.
 
 Written as two databases with the same schema:
 - knowledge_index.db          - sources 1-5 (code, commits, docs, skills, blueprints).
                                  Built only from what is already public in this repo; tracked in git.
-- knowledge_index_private.db  - sources 6-8, derived from local chat/session transcripts.
+- knowledge_index_private.db  - sources 6-8 and session_research, derived from local chat/session transcripts.
                                  Never committed or pushed (see tools/semi-brain/.gitignore).
 retriever.py searches both.
 """
 
 import sqlite3
 import json
+import sys
 import os
 import struct
 import numpy as np
 from pathlib import Path
-from fastembed import TextEmbedding
 
 EXTRACTORS_OUT = Path(__file__).resolve().parent / "output"
 DB_FILE = EXTRACTORS_OUT / "knowledge_index.db"
 PRIVATE_DB_FILE = EXTRACTORS_OUT / "knowledge_index_private.db"
 # Categories built from local chat/session transcripts - these go to PRIVATE_DB_FILE only.
-PRIVATE_CATEGORIES = {"session_history", "session_insight", "dev_trajectory"}
+PRIVATE_CATEGORIES = {"session_history", "session_insight", "dev_trajectory", "session_research"}
 
 def serialize_vector(vec: np.ndarray) -> bytes:
     """Pack float32 vector into binary bytes."""
@@ -103,9 +106,8 @@ def write_index(db_file, documents, embed_model):
     conn.close()
     print(f"✅ SQLite Hybrid Knowledge Index built successfully at: {db_file}")
 
-def build_hybrid_index():
-    EXTRACTORS_OUT.mkdir(parents=True, exist_ok=True)
-
+def load_corpora():
+    """Read every corpus index_codebase consumes, keyed by name."""
     print("Loading extracted corpora...")
     commits = []
     if (EXTRACTORS_OUT / "git_commits_corpus.json").exists():
@@ -150,6 +152,35 @@ def build_hybrid_index():
     if (EXTRACTORS_OUT / "dev_trajectory_corpus.json").exists():
         with open(EXTRACTORS_OUT / "dev_trajectory_corpus.json", "r", encoding="utf-8") as f:
             dev_trajectory = json.load(f)
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from l1 import REPO_PATH
+    from l1.research import load_research_docs
+    research_docs = load_research_docs(REPO_PATH)
+
+    return {
+        "research_docs": research_docs,
+        "commits": commits,
+        "ast_data": ast_data,
+        "docs": docs,
+        "skills": skills,
+        "byox": byox,
+        "sessions": sessions,
+        "session_analysis": session_analysis,
+        "dev_trajectory": dev_trajectory,
+    }
+
+def prepare_documents(corpora):
+    """Corpora -> (doc_id, category, title, content, snippet, filepath) rows. Pure, so the
+    replay benchmark can call it on time-restricted corpora."""
+    commits = corpora.get("commits") or []
+    ast_data = corpora.get("ast_data") or {}
+    docs = corpora.get("docs") or []
+    skills = corpora.get("skills") or []
+    byox = corpora.get("byox") or []
+    sessions = corpora.get("sessions") or []
+    session_analysis = corpora.get("session_analysis") or {}
+    dev_trajectory = corpora.get("dev_trajectory") or {}
 
     # Prepare documents for indexing
     documents = [] # list of (doc_id, category, title, content, snippet, filepath)
@@ -199,14 +230,20 @@ def build_hybrid_index():
 
     # F. Real Session History (what was asked, decided, and why - across every local session,
     # from both Claude Code and Antigravity/Gemini transcripts)
-    for idx, turn in enumerate(sessions):
+    # Ids number turns within their own session, so a new turn never renumbers anyone else's
+    # doc (the incremental index keys on doc_id).
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from l1.research import is_explainer
+    ordinal = {}
+    for turn in sessions:
         session_id = turn.get("session_id", "")
         user_text = turn.get("user_text", "")
         assistant_text = turn.get("assistant_text", "")
-        if not user_text.strip():
-            continue
         source_tool = turn.get("source_tool", "claude_code")
-        doc_id = f"session::{source_tool}::{session_id}::{idx}"
+        n = ordinal[(source_tool, session_id)] = ordinal.get((source_tool, session_id), -1) + 1
+        if not user_text.strip() or is_explainer(turn):
+            continue  # an explainer is indexed once, as session_research (section I)
+        doc_id = f"session::{source_tool}::{session_id}::{n}"
         title = f"Session [{source_tool}] {session_id[:8]}: {user_text[:60]}"
         content = f"{user_text}\n\n{assistant_text}"
         documents.append((doc_id, "session_history", title, content, content[:300], turn.get("cwd", "")))
@@ -228,8 +265,11 @@ def build_hybrid_index():
         )
         documents.append((doc_id, "session_insight", title, content, content[:300], ""))
 
-    for idx, pair in enumerate(global_analysis.get("problem_solution_pairs", [])):
-        doc_id = f"problem_solution::{pair.get('session_id', '')}::{idx}"
+    pair_ordinal = {}
+    for pair in global_analysis.get("problem_solution_pairs", []):
+        sid = pair.get("session_id", "")
+        n = pair_ordinal[sid] = pair_ordinal.get(sid, -1) + 1
+        doc_id = f"problem_solution::{sid}::{n}"
         title = f"Problem -> Solution: {pair.get('problem_summary', '')[:60]}"
         content = f"Problem: {pair.get('problem_summary', '')}\n\nSolution: {pair.get('solution_summary', '')}"
         documents.append((doc_id, "session_insight", title, content, content[:300], ""))
@@ -264,15 +304,30 @@ def build_hybrid_index():
         content = _trend_sentence("Node category", nc, info)
         documents.append((doc_id, "dev_trajectory", title, content, content[:300], ""))
 
+    # I. Research compartment - reached directly rather than buried among commits and raw turns.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from l1.research import research_documents
+    documents.extend(research_documents(corpora))
+    return documents
+
+def build_hybrid_index():
+    """Update both index DBs in place from the corpora: only docs whose content changed are
+    re-inserted, and their vectors come from the shared L1 cache (a text is embedded once)."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from l1.outputs import reconcile
+    from l1.store import Store
+    from l1.vector_cache import VectorCache
+
+    EXTRACTORS_OUT.mkdir(parents=True, exist_ok=True)
+    documents = prepare_documents(load_corpora())
     print(f"Total documents prepared for hybrid index: {len(documents)}")
-
-    public_docs = [d for d in documents if d[1] not in PRIVATE_CATEGORIES]
-    private_docs = [d for d in documents if d[1] in PRIVATE_CATEGORIES]
-
-    print("Computing FastEmbed dense embeddings (CPU ONNX)...")
-    embed_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
-    write_index(DB_FILE, public_docs, embed_model)
-    write_index(PRIVATE_DB_FILE, private_docs, embed_model)
+    store, cache = Store(), VectorCache()
+    added, changed, deleted = store.sync_docs(documents, PRIVATE_CATEGORIES)
+    print(f"Doc store: {added} added, {changed} changed, {deleted} deleted")
+    for db, private in ((DB_FILE, False), (PRIVATE_DB_FILE, True)):
+        ins, dele = reconcile(db, store, private, cache)
+        print(f"{db.name}: {ins} rows written, {dele} removed")
+    print(f"Embedded {cache.misses} new texts ({cache.hits} from cache)")
 
 if __name__ == "__main__":
     build_hybrid_index()

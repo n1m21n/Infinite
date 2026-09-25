@@ -14,8 +14,8 @@ REPO_PATH = Path(__file__).resolve().parents[3]
 OUTPUT_DIR = Path(__file__).resolve().parent / "output"
 OUTPUT_FILE = OUTPUT_DIR / "skills_and_invariants_corpus.json"
 
-def parse_skills():
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+def collect_records():
+    """AGENTS.md and every .claude/skills/*/SKILL.md, as corpus records."""
     skills_dir = REPO_PATH / ".claude" / "skills"
     agents_md = REPO_PATH / "AGENTS.md"
     
@@ -32,7 +32,7 @@ def parse_skills():
         
     # Ingest all skills
     if skills_dir.exists():
-        for skill_path in skills_dir.glob("*/SKILL.md"):
+        for skill_path in sorted(skills_dir.glob("*/SKILL.md")):
             skill_name = skill_path.parent.name
             content = skill_path.read_text(encoding="utf-8")
             
@@ -47,7 +47,12 @@ def parse_skills():
                 "description": description,
                 "content": content
             })
-            
+    return records
+
+
+def parse_skills():
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    records = collect_records()
     print(f"Parsed {len(records)} skills and rules.")
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(records, f, indent=2)

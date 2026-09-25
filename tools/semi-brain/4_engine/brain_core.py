@@ -10,6 +10,8 @@ The computational reasoning engine for the Semi-Brain:
 import json
 import os
 import re
+import time
+from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Any
 from pathlib import Path
@@ -37,6 +39,26 @@ SUBSYSTEM_ANCHOR_SYMBOLS = {
 }
 
 from retriever import HybridRetriever
+from l2.compartments import merge as merge_compartments
+from l3.network import Network, SEED_WEIGHT
+from l4.clusters import Areas
+from l4.regions import Regions
+from l3.recent import RecentWork
+from l3 import weights as learned_weights
+from l0.store import Store as L0Store, BOOST_KINDS
+
+_IDENT_RE = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+")
+_STOP = {"the", "and", "for", "with", "get", "set", "node", "nodes", "fix", "from", "into",
+         "when", "not", "its", "this", "that", "only"}
+
+
+def _split_ident(token):
+    return [w.lower() for w in _IDENT_RE.findall(token)]
+
+
+def _stem(w):
+    return w[:-1] if len(w) > 4 and w.endswith("s") and not w.endswith("ss") else w
+
 
 @dataclass
 class ProblemFrame:
@@ -51,6 +73,10 @@ class ProblemFrame:
     retrieved_context: List[Dict[str, Any]] = field(default_factory=list)
     ast_impacted_symbols: List[str] = field(default_factory=list)
     ast_callers_found: List[str] = field(default_factory=list)
+    ranked_files: List[str] = field(default_factory=list)
+    file_evidence: Dict[str, List[str]] = field(default_factory=dict)
+    compartments: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
+    notes: List[Dict[str, Any]] = field(default_factory=list)
 
 @dataclass
 class ImpactNode:
@@ -124,6 +150,18 @@ class SemiBrainCognitiveEngine:
         self.load_cognitive_schemas()
         self.load_ast_graph()
         self.retriever = HybridRetriever()
+        self.network = Network.load(self.ast_graph)
+        self.recent = self._load_recent()
+        self.l0 = L0Store()
+        self.weights = learned_weights.load()
+
+    def _load_recent(self):
+        commits = SEMI_BRAIN_DIR / "1_extractors" / "output" / "git_commits_corpus.json"
+        try:
+            corpus = json.loads(commits.read_text()) if commits.exists() else []
+        except ValueError:
+            corpus = []
+        return RecentWork.load(SEMI_BRAIN_DIR / "l1" / "state", corpus)
         
     def load_cognitive_schemas(self):
         self.schemas = {}
@@ -187,20 +225,25 @@ class SemiBrainCognitiveEngine:
             return "audio_dsp"
         return "core_system"
 
-    def analyze_problem(self, query: str) -> ProblemFrame:
+    def analyze_problem(self, query: str, now: Optional[float] = None, session: str = "",
+                        embargo: float = 0.0) -> ProblemFrame:
+        """now/session/embargo feed the work-in-progress prior (l3/recent.py): files edited
+        earlier in this session and lately anywhere, from events before now - embargo. The
+        same cutoff applies to L0 notes (l0/store.py)."""
         subsystem = self.infer_subsystem(query)
         q = query.lower()
         
-        # 1. Run Hybrid Search over SQLite Index (BM25 + Dense)
-        hybrid_hits = self.retriever.hybrid_search(query, top_k=8)
+        # 1. L2: BM25 + dense inside each compartment, merged by per-compartment quota
+        by_compartment = self.retriever.compartment_search(query)
+        hybrid_hits = merge_compartments(by_compartment)
         
-        # Extract AST symbols from hybrid hits and graph
+        # Symbols the code compartment retrieved: a score bonus by rank, not a fixed head of
+        # the list, so lexical/word/network evidence can outrank a weak retrieval hit.
+        hit_bonus = {}
+        for rank, hit in enumerate(by_compartment.get("code", [])[:self.CODE_HITS]):
+            hit_bonus[hit["title"].replace("Symbol: ", "")] = self.HIT_BONUS / (1.0 + 0.25 * rank)
         matched_symbols = []
-        for hit in hybrid_hits:
-            if hit["category"] == "ast_symbol":
-                sym_clean = hit["title"].replace("Symbol: ", "")
-                matched_symbols.append(sym_clean)
-                
+
         # Scored symbol lookup
         raw_tokens = re.findall(r"[A-Za-z0-9_]+", query)
         tokens = set([t.lower() for t in raw_tokens if len(t) > 2])
@@ -212,14 +255,22 @@ class SemiBrainCognitiveEngine:
                     tokens.add(s.lower())
                     
         rag_text = " ".join([h.get("title", "") + " " + h.get("snippet", "") for h in hybrid_hits]).lower()
+
+        # L3 prior: how strongly the network points at each file (1.0 = the top file).
+        spread, why, net_syms = self._spread(by_compartment)
+        top = max(spread.values(), default=0.0)
+        prior = {f: v / top for f, v in spread.items()} if top > 0 else {}
         
+        qwords = {_stem(w) for t in raw_tokens for w in _split_ident(t) if len(w) > 2} - _STOP
+        sym_words = self._symbol_words()
+
         scored_candidates = []
         for sym_name, sym_meta in self.ast_graph.get("symbols", {}).items():
             sym_lower = sym_name.lower()
             sym_base = sym_name.split("::")[-1]
             sym_base_lower = sym_base.lower()
             
-            score = 0.0
+            score = hit_bonus.get(sym_name, 0.0)
             # 1. Exact match with token in query
             if sym_base_lower in tokens or sym_lower in tokens:
                 score += 10.0
@@ -239,11 +290,23 @@ class SemiBrainCognitiveEngine:
             if any(t in sym_lower for t in tokens if len(t) >= 4):
                 score += 1.5
                 
+            # 6. Words of the name (CamelCase split) shared with the query: a function the
+            #    report describes but never names (ArrangeResyncUnsyncedSampleLengths).
+            base_w, cls_w = sym_words[sym_name]
+            ov_base, ov_cls = len(base_w & qwords), len(cls_w & qwords)
+            if ov_base and ov_base + ov_cls >= 2:
+                score += self.WORD_BASE * ov_base + self.WORD_CLASS * ov_cls
+
+            # 7. The network points at this symbol's file, or names the symbol itself
+            if score > 0.0:
+                score += self.FILE_PRIOR * prior.get(sym_meta.get("file", ""), 0.0)
+                score += self.SYMBOL_PRIOR * net_syms.get(sym_name, 0.0)
+
             if score > 2.0:
                 scored_candidates.append((score, sym_name))
                 
         scored_candidates.sort(key=lambda x: x[0], reverse=True)
-        for _, sym_name in scored_candidates[:12]:
+        for _, sym_name in scored_candidates[:self.MAX_SYMBOLS]:
             if sym_name not in matched_symbols:
                 matched_symbols.append(sym_name)
 
@@ -256,6 +319,15 @@ class SemiBrainCognitiveEngine:
                 matched_symbols.append(anchor_sym)
 
         callers = self.get_callers_for_symbols(matched_symbols)
+        recent = getattr(self, "recent", None)
+        # Only for a live session (the prompt hook passes one): without it there is no ongoing
+        # work to continue, and on the commit replay the 12 h embargo leaves only noise.
+        wts = getattr(self, "weights", None) or learned_weights.DEFAULTS
+        work = (recent.rankings(time.time() if now is None else now, session, embargo, wts["tau_days"])
+                if recent and session else ([], []))
+        l0 = getattr(self, "l0", None)
+        notes = l0.match(query, now, embargo) if l0 is not None else []
+        ranked_files, evidence = self._rank_files(matched_symbols, spread, why, work, notes)
         
         # 2. System 1 Priors
         priors = [
@@ -322,8 +394,97 @@ class SemiBrainCognitiveEngine:
             blast_radius_questions=blast_q,
             retrieved_context=hybrid_hits,
             ast_impacted_symbols=matched_symbols,
-            ast_callers_found=callers
+            ast_callers_found=callers,
+            ranked_files=ranked_files,
+            file_evidence=evidence,
+            compartments=by_compartment,
+            notes=notes,
         )
+
+    SEEDS_PER_COMPARTMENT = 10
+    FILE_RRF_K = 10.0
+
+    CODE_HITS = 12
+    HIT_BONUS = 3.0
+    MAX_SYMBOLS = 24
+    WORD_BASE = 2.0
+    WORD_CLASS = 1.0
+
+    def _symbol_words(self):
+        """{symbol: (words of its own name, words of its scope)}, stemmed, cached per graph."""
+        graph = self.ast_graph
+        cache = getattr(self, "_sym_words", None)
+        if cache is not None and cache[0] is graph:
+            return cache[1]
+        out = {}
+        for name in graph.get("symbols", {}):
+            *scope, base = name.split("::")
+            out[name] = ({_stem(w) for w in _split_ident(base) if len(w) > 2} - _STOP,
+                         {_stem(w) for p in scope for w in _split_ident(p) if len(w) > 2} - _STOP)
+        self._sym_words = (graph, out)
+        return out
+
+    FILE_PRIOR = 4.0
+    SYMBOL_PRIOR = 2.0
+
+    def _spread(self, by_compartment):
+        """L3 spreading activation from every compartment's top hits along doc -> code edges.
+        Returns (file_scores, why, symbol_scores)."""
+        network = getattr(self, "network", None)
+        if network is None:
+            return {}, {}, {}
+        seeds = []
+        for comp, hits in by_compartment.items():
+            w = SEED_WEIGHT.get(comp, 0.0)
+            for rank, hit in enumerate(hits[:self.SEEDS_PER_COMPARTMENT]):
+                seeds.append((hit, w / (rank + 1)))
+        fscore, sscore, why = network.activate(seeds)
+        return fscore, why, sscore
+
+    def _rank_files(self, matched_symbols, spread, why, work=([], []), notes=()):
+        """Files most likely involved, best first, with the doc ids that point at each: the
+        files of the matched symbols (in symbol order), the network's spread and the recent
+        work (this session's edits, recent edits anywhere), fused by weighted RRF with the
+        weights of l3/weights.py (retuned nightly by l1/sleep.py). L0 notes add their files as one
+        more list whose weight is the best note's score, never above l0.store.CAP."""
+        wts = getattr(self, "weights", None) or learned_weights.DEFAULTS
+        lexical = []
+        for sym in matched_symbols:
+            f = self._get_symbol_meta(sym).get("file", "")
+            if f and f not in lexical:
+                lexical.append(f)
+        fused = defaultdict(float)
+        lists = ((lexical, 1.0), (sorted(spread, key=spread.get, reverse=True), 1.0),
+                 (work[0], wts["session_w"]), (work[1], wts["recent_w"]))
+        boost = [n for n in notes if n["kind"] in BOOST_KINDS and n["files"]]
+        if boost:
+            note_files = list(dict.fromkeys(f for n in boost for f in n["files"]))
+            lists += ((note_files, boost[0]["score"]),)
+        for lst, w in lists:
+            for rank, f in enumerate(lst):
+                fused[f] += w / (self.FILE_RRF_K + rank + 1)
+        areas = self._areas()
+        if areas is not None:
+            fused = areas.rerank(fused)
+        ranked = sorted(fused, key=fused.get, reverse=True)
+        return ranked, {f: why[f][:3] for f in ranked[:20] if why.get(f)}
+
+    def _areas(self):
+        """L4 areas of the current network, built once per network."""
+        network = getattr(self, "network", None)
+        if network is None:
+            return None
+        cache = getattr(self, "_areas_cache", None)
+        if cache is None or cache[0] is not network:
+            cache = self._areas_cache = (network, Areas(network))
+        return cache[1]
+
+    def _regions(self):
+        """L4 virtual split of src/main.cpp, loaded once per engine (static, not per network)."""
+        cache = getattr(self, "_regions_cache", None)
+        if cache is None:
+            cache = self._regions_cache = Regions()
+        return cache
 
     def _get_symbol_meta(self, sym: str, fallback_subsystem: str = "core_system") -> Dict[str, Any]:
         symbols_db = self.ast_graph.get("symbols", {})

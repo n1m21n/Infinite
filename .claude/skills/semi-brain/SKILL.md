@@ -28,11 +28,56 @@ To get an immediate architectural breakdown and invariant brief for any task:
 # Cognitive reasoning analysis (RAG + AST + System 1/2 + MCTS Choice Tree):
 python3 tools/semi-brain/4_engine/semi_brain_cli.py "<description of bug or feature>"
 
+# Short brief (~200 tokens): likely files with the past fix/chat behind each,
+# symbols with file:line, the code area, past fixes, skills to load. Start here.
+python3 tools/semi-brain/4_engine/semi_brain_cli.py --brief "<description>"   # --json for tools
+
 # Fast Apple Metal Local Neural Router (LoRA fine-tuned Qwen2.5-0.5B):
 python3 tools/semi-brain/4_engine/semi_brain_cli.py "<description of bug or feature>" --neural
 ```
 
-To run the automated 30-case benchmark evaluation suite:
+How a query is answered: L2 searches each compartment (code, history, skills,
+plans, conversations, research, external) separately and merges them by quota;
+L3 follows the hits along doc -> code edges (a commit's files, files/symbols a
+chat or skill names) to rank files; L4 adds files that usually change with the
+best ones; L5 writes the brief. On the historical replay this scores 0.568
+(file MRR 0.80, top file right 49% of the time) against 0.28 before Block B.
+
+**The brief arrives by itself.** A UserPromptSubmit hook
+(`4_engine/hooks/prompt_brief.py`) asks the daemon's warm brief server
+(`l5/serve.py`, ~150 ms) and adds the brief to every prompt as "Semi-Brain
+brief (a lead, not a fact)". Treat it as a lead: check the files it names
+before acting on them. When a session id is known, the files edited earlier
+in that session, and lately anywhere, count too (`l3/recent.py`, with
+weights from `l3/weights.py`).
+
+The same brief, plus L0, is available as MCP tools (server `semi-brain` in
+`.mcp.json`, `l0/mcp_server.py`): `brain_brief`, `brain_recall`,
+`brain_assert`, `brain_retract`.
+
+**main.cpp is a virtual split of 73 contiguous, non-overlapping regions**
+(`l4/regions.py`, built by `1_extractors/build_main_cpp_regions.py` from
+co-edit history, the call graph, name families and `// ====` banners, full
+file coverage, 3000-line cap; regenerate after a large main.cpp
+reorganization with `python3 1_extractors/build_main_cpp_regions.py`).
+`Regions.rank_regions(symbols)` ranks regions by a weighted vote over a
+result's matched symbols (each votes `1/(rank+1)` for its region, so several
+agreeing lower-ranked symbols can outrank one stray higher-ranked one) -
+shared by the brief (shows the top 2, `src/main.cpp@drawoscillator
+L13399-14991`, instead of the bare 95k-line path) and by the replay's
+`region_hit`/`region_r3` (additive, not part of `gate`): whether the
+top-ranked (or top-3) region matches the target's, not just the file -
+"right file, wrong 30k lines" is a miss there even though file MRR can't see
+it. On the 181-commit replay: region R@1 0.20 (baseline) -> 0.34 (contiguous
+split) -> 0.36 (weighted-vote ranking), region R@3 0.54.
+`python3 4_engine/semi_brain_cli.py --regions` prints the table of contents.
+`5_evals/live.py` scores the same thing against real turns: region hit@1/@2
+from git-diffing the commits of turns that touched main.cpp (only turns that
+committed are scorable - `l1/outcomes.py` has no line-level record for
+edits that were never committed).
+
+To run the automated 30-case benchmark evaluation suite (self-confirming; the
+replay above is the real gate):
 ```bash
 python3 tools/semi-brain/5_evals/run_evals.py
 ```
@@ -41,10 +86,60 @@ python3 tools/semi-brain/5_evals/run_evals.py
 
 ## 3. How to Update & Improve the Brain After Completing Work
 
-Syncing with commits is automatic: `.git/hooks/post-commit` runs
-`sync_brain.py --sync` in the background (see `run-infinite-hygiene`
-"Efficient routes"). Don't run it by hand, and never `git commit -am`
-afterwards, or the regenerated corpora get swept into your commit.
+Syncing is automatic: a launchd agent (`l1/brain_watchd.py`, installed by
+`4_engine/install_hooks.sh`) watches git, `src/`, skills, `docs/` and the
+session transcripts and runs an incremental `sync_brain.py --sync` 2 s after
+things go quiet; without the daemon, post-commit/post-merge do it (see
+`run-infinite-hygiene` "Efficient routes"). A sync takes seconds. Session
+analysis / dev trajectory refit at most every 30 min (`--sync --full` forces
+them). Don't run it by hand, and never `git commit -am`, or the regenerated
+corpora get swept into your commit. Retrieval changes are gated by the
+historical replay: `python3 tools/semi-brain/5_evals/replay/replay.py --label X`
+must not score below the last kept scorecard in `5_evals/replay/history.jsonl`.
+
+**Two replays gate a change**, and both must hold:
+
+| Replay | Command | Gate |
+|---|---|---|
+| Past fix commits (181) | `replay.py --label X` | `gate` >= the last `replay` card |
+| Real prompts -> files that turn edited (local only) | `replay.py --label X --cases sessions` | `nohub_gate` does not drop |
+
+`nohub` scores leave `src/main.cpp` out. It is a target in 87% of prompts,
+so with it every answer looks right. Each full replay takes about 1-2.5 min.
+Run replays only while no benchmark is measuring (`ab.sh`/`run_all.sh`, or
+the watch daemon paused).
+
+**Leave notes for later sessions (L0).** When a session establishes something
+the next one should know, assert it: a fact you verified, a decision and its
+reason, an alternative you rejected and why, an open question, or where to
+look for what.
+```bash
+python3 tools/semi-brain/l0/cli.py assert "<claim>" --kind fact|decision|rejected|question|hint \
+  --evidence commit:<hash> --evidence symbol:<Name> --evidence file:<path>[:line] --confidence 0.7
+python3 tools/semi-brain/l0/cli.py recall "<question>"   # what a query would see
+python3 tools/semi-brain/l0/cli.py retract <id> --reason "<why it was wrong>"
+```
+- Assert only what the session established, never a guess.
+- The tier is set for you:
+  - verified: some evidence resolves in the repo
+  - claude: nothing resolves
+  - owner: only on the owner's own word (`--owner`, `approve`); never on your own inference
+- A note's weight is capped at 0.6, so it can never outrank code.
+- Repeating a claim, or retrieving it, never adds weight. Only later edits to the note's files do, credited nightly.
+- Matching notes show as `Note (...)` lines in the brief.
+
+**Sleep (nightly, automatic).** `l1/sleep.py` runs at 04:30 via launchd:
+- It retunes the weights on the prompt replay: even cases pick, odd cases must confirm, and the with-main.cpp score must not drop.
+- It credits L0 notes from real edits.
+- It writes "look here" proposals: files the brief keeps missing, with the words of those prompts.
+- It skips itself while Infinite runs or the daemon is paused.
+
+The owner reviews the proposals:
+```bash
+python3 tools/semi-brain/l1/sleep.py --proposals
+python3 tools/semi-brain/l1/sleep.py --approve <id>   # owner only -> owner-tier L0 note
+python3 tools/semi-brain/l1/sleep.py --reject <id>
+```
 
 What *is* manual:
 1. **Log a user correction** into the DPO preference dataset:
@@ -61,10 +156,19 @@ What *is* manual:
 **Privacy**: chat/session-derived corpora (`session_history_corpus.json`,
 `antigravity_history_corpus.json`, `session_analysis_corpus.json`,
 `session_embeddings_cache.npy`, `dev_trajectory_corpus.json`,
-`knowledge_index_private.db`) never leave this machine. They are gitignored,
-and `.git/hooks/pre-push` blocks them. The rest of the brain (code, public
-`knowledge_index.db`, `3_datasets/*.jsonl`) may be committed, in its own
-commit, not inside a feature commit.
+`knowledge_index_private.db`, and all of `l1/state/`: outcome log, briefs,
+L0 notes, proposals, learned weights, the fastembed model cache) never leave
+this machine. They are gitignored, and `.git/hooks/pre-push` blocks them.
+The rest of the brain (code, public `knowledge_index.db`,
+`3_datasets/*.jsonl`) may be committed, in its own commit, not inside a
+feature commit.
+
+**Watch daemon gotcha**: `com.infinite.semi-brain.watchd` pauses itself
+during a bench run and does not always resume on its own afterward - if
+`l1/state/briefs.jsonl` stops growing across a session while `outcomes.jsonl`
+keeps growing (it syncs independently, on its own cadence), the daemon is
+probably down. Check with `launchctl list | grep brain`; restart it with
+`launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.infinite.semi-brain.watchd.plist`.
 
 ---
 

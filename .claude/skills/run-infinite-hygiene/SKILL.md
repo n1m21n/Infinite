@@ -151,7 +151,7 @@ route it replaces. If a route would drop a guarantee, take the long one.
 | Tests per fix | `driver.sh --group <area>` for the area touched (`--fast` for a pure smoke); `--group ui` runs in the pre-push hook. `--full` only before a release. | Shared-code rule above still applies |
 | Test list | Trust `driver.sh`'s registry and the known-failures files; don't hand-enumerate or re-verify tests one at a time. | Same list, one source of truth |
 | Before push | `.git/hooks/pre-push` (local): blocks private semi-brain corpora / session categories in `knowledge_index.db`, then runs `--group ui` on the pushed sha in `../infinte-base`. Skip tests only with `INFINITE_SKIP_PREPUSH_TESTS=1`. | Privacy rule + UI smoke on exactly what is pushed |
-| semi-brain sync | post-commit/post-merge call `.git/hooks/sync-brain-bg`: one background run at `nice 19` / background QoS, extra triggers coalesce. | Brain still syncs every commit, without stealing bench CPU |
+| semi-brain sync | launchd agent `brain_watchd` (FSEvents, 2 s debounce) runs one incremental sync at `nice 19` / background QoS under the `$GITDIR/sync_brain.lock`; post-commit/post-merge `sync-brain-bg` is the fallback and steps aside while the daemon is alive. | Seconds per sync instead of a full rebuild, without stealing bench CPU |
 
 ## Backgrounded tests: waiting means waiting
 

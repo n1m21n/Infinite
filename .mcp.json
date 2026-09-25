@@ -7,6 +7,13 @@
     "deepwiki": {
       "type": "http",
       "url": "https://mcp.deepwiki.com/mcp"
+    },
+    "semi-brain": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "tools/semi-brain/l0/mcp_server.py"
+      ]
     }
   }
 }
