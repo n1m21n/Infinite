@@ -11,7 +11,7 @@ blocks a target in this table.
 |---|---|---|---|
 | 1 Audio | Real xrun counter (replaces the wall-clock-gap heuristic, `AudioEngine.cpp`); B1 callback load (open item 1); build B7 soak | B1 cb_load p99 <= 50% @256; 0 xruns in 10 min; soak RSS growth < 2% over 30 min | done, merged in `caafc69` (p99 44.4% @256; 0 xruns in 10 min; soak RSS -3.6%) |
 | 2 Projector + canvas | Projector under load (open items 2-4); canvas vsync not blocking (open item 5) | B3/B8 interval p99 <= 18.3 ms and missed vsync < 0.5%; B6 runs paced and meets p50/p95 | done and closed: merged in `93ba4e0`, close-out `feature/perf-block2-closeout` (`19de37d`, `f9c58f5`). B3 3 rounds trusted (focused): p99 17.63-17.69 ms, 0% missed vsync, all 5 targets pass; B6 met; B8 2 / 3 windows met; B8 heavy is decode-bound -> Block 3 |
-| 3 Media + release gate | Decode drops (open item 6); camera run (open item 7, needs access granted once); Linux `frameCache` copy, `VideoInNode` realloc, Spout `HasClients` (Found while measuring 4, 5, 7); build B10 | B8 decode real time, 0 dropped; B10 A/V drift within `av-sync-sweep` limits; new baseline; `driver.sh --full` clean | not started |
+| 3 Media + release gate | Decode drops (open item 6); camera run (open item 7, needs access granted once); Linux `frameCache` copy, `VideoInNode` realloc, Spout `HasClients` (Found while measuring 4, 5, 7); build B10 | B8 decode real time, 0 dropped; B10 A/V drift within `av-sync-sweep` limits; new baseline; `driver.sh --full` clean | **step 0 only** (`feature/perf-block3-media`, worktree `../infinte-block3` off `9ce52a5`): re-baseline done, decode-drop fixes/B10/driver.sh/merge not started this session |
 
 Every block: one branch, `ab.sh` gate (keep only if better), `verify-gate`
 sweeps, merge `--no-ff`, update the State column here.
@@ -50,6 +50,68 @@ because an untrusted run can only look better than the real thing.
 5. ~~**Canvas vsync does not block**~~: closed by `951d22c` (2b: one frame clock - every context swaps at interval 0 and the loop waits once on the display refresh). Was: with swap interval 1 the canvas runs at ~120 fps (p50 8.3 ms) and almost no frames land on a refresh boundary, so every vsync=1 B6 row and every B8 row without the heavy load is `unpaced=1`. The canvas fps targets stay unproven until the canvas is really display-paced.
 6. **B8 decode:** 4x2160 with no windows dropped 1 frame, and clip1 of 2x1080 + Syphon was judged not real time.
 7. **Camera** access has never been granted on this machine (`camera: skipped, not_determined`), so the camera variants run without one.
+
+### Block 3 step 0 re-baseline (2026-09-25, `feature/perf-block3-media`, worktree `../infinte-block3` off `9ce52a5`, uncommitted results)
+
+Ran with the tail-fence probe off by default (confirmed: `INFINITE_BENCH_TAILFENCE`
+unset in the shell and in the fixture's own `sFencesOff` gate at
+`src/main.cpp:47682`, so nothing from `3249e37` is inflating these numbers).
+`run_all.sh --quiet --only B3,B8` and a separate `run_all.sh --soak --quiet
+--only B7`, each with a script-driven focus loop (`osascript`/System Events
+holding the `Infinite` process frontmost every 0.3 s) rather than a human
+sitting at the machine. **Caveat that matters for every number below: these
+runs shared the machine with the agent session that launched them** (this
+Claude Code process, its browser tooling, the build itself finishing
+moments earlier) - swap climbed 4.5 -> 5.5 GB during the B3/B8 pass. That is
+exactly the kind of load the existing README already flags as invalidating a
+"trusted" reading (see the `93e184d`/`88787d7` re-check table above, "machine
+swapping 5.7 of 7 GB"), so none of these count as the clean 3-round gate the
+brief's step 5 needs - they are the step 0 re-baseline only, to see which old
+fails were the tail-fence probe and which are real.
+
+| Bench / variant | Metric | Result | vs. close-out (`f9c58f5`/`9ce52a5`) |
+|---|---|---|---|
+| B3 s, buf=256 (focused, `focused_frames==frames`) | projector p99 / missed vsync | 23.79 ms / 0.88% | worse (close-out: 17.6 ms / 0%); **fails both targets** on this load, not a tail-fence artefact (fence confirmed off) - attributed to shared-machine load, not re-opened |
+| B8 2x1080 / 4x1080 / 2x2160, no windows | decode | all `clipN_decode_realtime: true` | matches close-out (pass) |
+| B8 4x2160, no windows | decode | all 4 clips `decode_realtime: false` | **worse** than close-out (which read 1 dropped frame, mostly passing) - open item 6 not closed, and on this loaded run it regressed further, consistent with the brief's own note that 4x2160 is memory-bound on 8 GB |
+| B8 2x1080 + 2/3 windows | window interval p99 / missed vsync | both windows fail `interval_p99_locked` and `missed_vsync_lt_half_pct` | worse than close-out's "2/3 windows met" - again attributed to shared-machine load pending a clean re-run |
+| B8 4x2160 + 3 windows + camera + Syphon | decode + window targets | all fail | same as close-out (still the open, decode-bound heavy case; camera reports `skipped, not_determined` as before) |
+| B7 30 min soak | rss_growth_pct / xruns_total / thermal_fps_drop_pct | -34.65% / 0 / -0.004% | well inside target (<2% growth, 0 xruns), but **`variant` still reports `unfocused=1`** despite the focus loop running the whole 30 min - same as Block 1's soak, this stays **unproven** by the README's own trust rule (a pass inside the limit does not count as proof when unfocused), not a regression |
+
+**Code finding, not yet re-measured under a clean gate:** the loop-point
+reader rewind lead from this block's brief (`supportsRandomAccess` +
+`resetForReadingTimeRanges` instead of a full reader rebuild) is **already
+implemented on `main`**, landed in `88787d7` ("Reapply decode on a thread per
+clip", `src/platform/Platform.mm:715-999`, predates this block). So step 1's
+first lead is not open work; the remaining 4x2160/heavy decode drops need a
+different cause than the one the brief's leads describe - likely the "move
+upload off the paced path" and "present the last ready frame on a deadline"
+leads, neither of which is implemented yet (grep for `PBO`/`IOSurface`
+upload paths in `VideoNode`/`VideoInNode` turns up none), or the memory
+pressure on an 8 GB machine the brief itself flags as the expected failure
+mode for 4x2160.
+
+**Two other Found-while-measuring items confirmed by reading the code (not
+yet fixed or gated), matching the open findings:**
+- **Found 4** (Linux `frameCache` copy + repeat hand-back):
+  `src/platform/linux/MediaLinux.cpp:229`, `TryUseCacheLocked` always does
+  `outPixels = best->rgba` (a full vector copy) and always returns `true` on
+  a cache hit, unlike `Platform.h`'s stated contract ("a request that lands
+  on the same frame again returns false and leaves the caller's pixels
+  alone, so the caller skips the upload") that the macOS path honours via
+  `deliveredPts`. Confirmed by reading; not run through `tools/linux/local.sh`
+  this session.
+- **Found 5** (`VideoInNode` `glTexImage2D` every camera frame):
+  `src/nodes/VideoInNode.cpp:206` calls `glTexImage2D` (full reallocation)
+  on every camera frame instead of `glTexSubImage2D` against a pre-sized
+  texture. Confirmed by reading; not verified end-to-end because camera
+  access is not granted on this machine (see open item 7).
+
+None of the above were fixed this session - per the brief's step 0
+instruction, this is the re-baseline to tell probe artefacts from real fails.
+Steps 1-6 (decode-drop fixes with 3-round `ab.sh` gates, the two code-read
+fixes above, the camera run, building B10, the new baseline, `driver.sh
+--full`, `verify-gate`, and the merge) are not started.
 
 ## Scoreboard
 
