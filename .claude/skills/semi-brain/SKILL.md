@@ -41,10 +41,16 @@ python3 tools/semi-brain/5_evals/run_evals.py
 
 ## 3. How to Update & Improve the Brain After Completing Work
 
-Syncing with commits is automatic: `.git/hooks/post-commit` runs
-`sync_brain.py --sync` in the background (see `run-infinite-hygiene`
-"Efficient routes"). Don't run it by hand, and never `git commit -am`
-afterwards, or the regenerated corpora get swept into your commit.
+Syncing is automatic: a launchd agent (`l1/brain_watchd.py`, installed by
+`4_engine/install_hooks.sh`) watches git, `src/`, skills, `docs/` and the
+session transcripts and runs an incremental `sync_brain.py --sync` 2 s after
+things go quiet; without the daemon, post-commit/post-merge do it (see
+`run-infinite-hygiene` "Efficient routes"). A sync takes seconds. Session
+analysis / dev trajectory refit at most every 30 min (`--sync --full` forces
+them). Don't run it by hand, and never `git commit -am`, or the regenerated
+corpora get swept into your commit. Retrieval changes are gated by the
+historical replay: `python3 tools/semi-brain/5_evals/replay/replay.py --label X`
+must not score below the last kept scorecard in `5_evals/replay/history.jsonl`.
 
 What *is* manual:
 1. **Log a user correction** into the DPO preference dataset:
