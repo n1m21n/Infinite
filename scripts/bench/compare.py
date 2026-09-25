@@ -42,9 +42,11 @@ output_hash (the quality guard):
     8bd85fec4eeb5123 on two runs of 1809dbc). Several new lines
     for one deterministic key that disagree among themselves are flagged too.
   - Nondeterministic, printed "n/a (nondeterministic)": every other hashed
-    variant - B2/B4 anim=1, B2 gpunodes=1, B3, B9. Their LFOs and animation
-    run on wall-clock time, so the frame captured at the sample boundary
-    differs between two runs of the same commit.
+    variant - B2/B4 anim=1, B2 gpunodes=1, B3, B9, B10 (both variants - B10
+    renders the same B3-shaped scene, whose macro/gesture playback and
+    Prediction modulators run regardless of B10's own anim=0/1 flag). Their
+    LFOs and animation run on wall-clock time, so the frame captured at the
+    sample boundary differs between two runs of the same commit.
   - Fixtures that do not hash (B1, B5, B6, B8) report "n/a".
 
 Exits 1 if any trusted row was flagged, 0 otherwise.
@@ -137,7 +139,19 @@ def targets(rows):
     return out
 
 
-def deterministic(variant):
+def deterministic(bench, variant):
+    # B10 renders the B3-shaped scene (macro/gesture playback + Prediction
+    # modulators running), the same content already documented above as
+    # nondeterministic for B3 itself - those run on wall-clock time
+    # regardless of B10's own anim=0/1 flag, which only silences the B2-lite
+    # visual layer on top. So B10's anim=0 variant carries the "anim=0" tag
+    # for readability (compare.py's generic variant-parsing elsewhere), but
+    # is not bit-identical run to run and must not be hash-gated like B2/B4's
+    # real static variant is. Confirmed empirically: two anim=0 runs of the
+    # same commit produced different output_hash values even after settling
+    # 150 frames before capture (see docs/plans/perf/README.md Block 3 notes).
+    if bench == "B10_offline_av_sync":
+        return False
     return "anim=0" in variant.split(",")
 
 
@@ -208,6 +222,18 @@ def compare_key(key, bg, ng):
         info.append(f"soak: rss growth {fmt(median(b, 'soak', 'rss_growth_pct'))}%->{fmt(growth)}%, "
                     f"thermal fps drop {fmt(median(b, 'soak', 'thermal_fps_drop_pct'))}%->{fmt(drop)}% (info)")
 
+    if bench == "B10_offline_av_sync":
+        # Verdicts themselves gate through the generic targets_pass block
+        # below (b10_av_sync_end_le_1_frame / b10_av_sync_worst_le_2_frames /
+        # b10_ebu_r37 / b10_frames_exact / b10_dropped_zero /
+        # b10_markers_roundtrip) - this is just the human-readable summary.
+        rtf = median(n, "offline_render", "realtime_factor")
+        drift_end = median(n, "offline_render", "drift_end_ms")
+        drift_worst = median(n, "offline_render", "drift_worst_ms")
+        dropped = maximum(n, "offline_render", "dropped")
+        info.append(f"offline: realtime factor {fmt(rtf)}x, drift end/worst "
+                    f"{fmt(drift_end, 0)}/{fmt(drift_worst, 0)}ms, dropped {fmt(dropped, 0)} (info)")
+
     bt, nt = targets(b), targets(n)
     for k, v in nt.items():
         if v is False:
@@ -220,7 +246,7 @@ def compare_key(key, bg, ng):
     nh = {r.get("output_hash") for r in n} - {None, "n/a"}
     if not bh and not nh:
         hash_str = "n/a"
-    elif not deterministic(variant):
+    elif not deterministic(bench, variant):
         hash_str = "n/a (nondeterministic)"
     elif len(nh) > 1:
         hash_str = "UNSTABLE"

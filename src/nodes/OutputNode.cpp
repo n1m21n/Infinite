@@ -19,6 +19,37 @@ namespace
       "out vec4 fragColor;\n"
       "uniform sampler2D uTex;\n"
       "void main() { fragColor = texture(uTex, vUv); }\n";
+
+   // B10 (docs/plans/perf/benchmark-suite.md §4) offline-render A/V sync
+   // markers, analogous to INFINITE_RECEXPORTTEST's tone+flash pair but laid
+   // over the real B3-shaped scene's own audio/video instead of a synthetic
+   // take, so the drift measured is the real Arrangement offline path's.
+   // Strictly gated to INFINITE_BENCH_B10 - both hooks below are no-ops on
+   // every other run, including B3/B7 which share this same offline-render
+   // machinery. Times (B10Bench::kMarkerAt, OutputNode.h) leave margin at
+   // both ends of a 30s take. The video flash is bright enough to dominate
+   // B3's own visuals, so main.cpp's plain luminance threshold finds a clean
+   // onset there; but B3's own audio mix is loud for most of the take, so a
+   // broadband amplitude threshold on the audio track is not reliable - the
+   // main.cpp analyzer instead looks for narrowband energy at kToneHz
+   // specifically (Goertzel), which the ambient mix is very unlikely to
+   // spike at the same instant.
+
+   bool B10BenchActive()
+   {
+      static const bool active = (getenv("INFINITE_BENCH_B10") != nullptr);
+      return active;
+   }
+
+   bool B10MarkerAt(double t)
+   {
+      for (int m = 0; m < B10Bench::kMarkerCount; m++)
+      {
+         if (t >= B10Bench::kMarkerAt[m] && t < B10Bench::kMarkerAt[m] + B10Bench::kMarkerSeconds)
+            return true;
+      }
+      return false;
+   }
 }
 
 OutputNode::~OutputNode()
@@ -340,8 +371,25 @@ void OutputNode::DrainOfflineAudioCapture()
    int n;
    while ((n = mCaptureRing.Read(scratch, 4096)) > 0)
    {
-      Platform::RecorderAppendAudio(mOfflineRecorder, scratch, n / 2);
-      mOfflineAudioFramesAppended += n / 2;
+      const int frames = n / 2;
+      if (B10BenchActive() && mOfflineAudioSampleRate > 0.0)
+      {
+         // Added on top of the real B3-shaped mix, not a replacement - this
+         // is the same take B10 also measures decode/frame-drop/realtime
+         // factor against, so it has to stay the genuine graph output.
+         for (int k = 0; k < frames; k++)
+         {
+            const double t = (double)(mOfflineAudioFramesAppended + k) / mOfflineAudioSampleRate;
+            if (B10MarkerAt(t))
+            {
+               const float v = (float)(0.9 * std::sin(2.0 * M_PI * B10Bench::kToneHz * t));
+               scratch[(size_t)k * 2 + 0] = std::clamp(scratch[(size_t)k * 2 + 0] + v, -1.0f, 1.0f);
+               scratch[(size_t)k * 2 + 1] = std::clamp(scratch[(size_t)k * 2 + 1] + v, -1.0f, 1.0f);
+            }
+         }
+      }
+      Platform::RecorderAppendAudio(mOfflineRecorder, scratch, frames);
+      mOfflineAudioFramesAppended += frames;
    }
 }
 
@@ -416,6 +464,24 @@ void OutputNode::CaptureOfflineFrame()
       // The graph resolution shrank mid-take: feed a black frame of the
       // take's locked size rather than reading out of bounds.
       memset(buf.data(), 0, buf.size());
+   }
+
+   if (B10BenchActive() && mOfflineRecordFps > 0)
+   {
+      // mOfflineFramesDone is the index of the frame about to be appended
+      // (it increments below), so this is the frame's own nominal time -
+      // matching the audio hook's use of mOfflineAudioFramesAppended above.
+      const double t = (double)mOfflineFramesDone / (double)mOfflineRecordFps;
+      if (B10MarkerAt(t))
+      {
+         for (size_t i = 0; i + 3 < buf.size(); i += 4)
+         {
+            buf[i + 0] = 255;
+            buf[i + 1] = 255;
+            buf[i + 2] = 255;
+            buf[i + 3] = 255;
+         }
+      }
    }
 
    // Always counted, even if the append itself is dropped by the encoder -
