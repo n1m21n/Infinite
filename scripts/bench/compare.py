@@ -37,7 +37,7 @@ output_hash (the quality guard):
   - Deterministic, compared: every variant with anim=0 (B2 static, B4 static).
     Nothing moves, so the Output frame must be bit-identical run to run
     (B2 l-static 29dcc23d9a902c68 on two runs of e04b7a6; B4 l-static
-    confirmed with two runs of the bench plumbing branch). Several new lines
+    8bd85fec4eeb5123 on two runs of 1809dbc). Several new lines
     for one deterministic key that disagree among themselves are flagged too.
   - Nondeterministic, printed "n/a (nondeterministic)": every other hashed
     variant - B2/B4 anim=1, B2 gpunodes=1, B3, B9. Their LFOs and animation
