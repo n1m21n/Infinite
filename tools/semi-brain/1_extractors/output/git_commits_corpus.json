@@ -1,5 +1,61 @@
 [
   {
+    "hash": "80bebd60250acc16e72f0ee1c076d8c2d595baf6",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 21:28:15 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/semi-brain-v2-alive into main",
+      "description": "Merge feature/semi-brain-v2-alive into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/semi-brain-v2-alive into main"
+    },
+    "stat": "",
+    "files": [
+      ".claude/skills/semi-brain/SKILL.md",
+      "tools/semi-brain/1_extractors/output/git_commits_corpus.json",
+      "tools/semi-brain/1_extractors/output/knowledge_index.db",
+      "tools/semi-brain/1_extractors/output/skills_and_invariants_corpus.json",
+      "tools/semi-brain/3_datasets/train_sft_alpaca.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_sharegpt.jsonl",
+      "tools/semi-brain/4_engine/brain_core.py",
+      "tools/semi-brain/4_engine/hooks/prompt_brief.py",
+      "tools/semi-brain/5_evals/live.py",
+      "tools/semi-brain/5_evals/replay/history.jsonl",
+      "tools/semi-brain/5_evals/replay/replay.py",
+      "tools/semi-brain/l1/outcomes.py",
+      "tools/semi-brain/l5/brief.py",
+      "tools/semi-brain/l5/gate.py",
+      "tools/semi-brain/l5/serve.py"
+    ]
+  },
+  {
+    "hash": "131a210c53dec5495106c7ebec11fdb5bf2cbbc5",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 21:25:19 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "semi-brain",
+      "title": "chore(semi-brain): sync extractors corpus and datasets",
+      "description": "sync extractors corpus and datasets",
+      "bullets": [],
+      "body": "",
+      "raw": "chore(semi-brain): sync extractors corpus and datasets"
+    },
+    "stat": ".../1_extractors/output/git_commits_corpus.json    | 313 +++++++++++++++++++++\n .../1_extractors/output/knowledge_index.db         | Bin 33603584 -> 33759232 bytes\n .../output/skills_and_invariants_corpus.json       |   2 +-\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl |  16 +-\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl |  16 +-\n 5 files changed, 344 insertions(+), 3 deletions(-)",
+    "files": [
+      "tools/semi-brain/1_extractors/output/git_commits_corpus.json",
+      "tools/semi-brain/1_extractors/output/knowledge_index.db",
+      "tools/semi-brain/1_extractors/output/skills_and_invariants_corpus.json",
+      "tools/semi-brain/3_datasets/train_sft_alpaca.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_sharegpt.jsonl"
+    ]
+  },
+  {
     "hash": "126478b1e70859edf16188b2e488776662ad292c",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
@@ -92,6 +148,69 @@
     ]
   },
   {
+    "hash": "1fb744a0efd86d1fe6c6bf494036ebb41c31161d",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 20:11:18 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "semi-brain",
+      "title": "chore(semi-brain): replay scorecards for the focus_hit runs (gates unchanged: 0.568 / nohub 0.4299)",
+      "description": "replay scorecards for the focus_hit runs (gates unchanged: 0.568 / nohub 0.4299)",
+      "bullets": [],
+      "body": "",
+      "raw": "chore(semi-brain): replay scorecards for the focus_hit runs (gates unchanged: 0.568 / nohub 0.4299)"
+    },
+    "stat": "tools/semi-brain/5_evals/replay/history.jsonl | 2 ++\n 1 file changed, 2 insertions(+)",
+    "files": [
+      "tools/semi-brain/5_evals/replay/history.jsonl"
+    ]
+  },
+  {
+    "hash": "11e770f136ec5addc3b43528fa112243036d5699",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 20:11:07 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "semi-brain",
+      "title": "feat(semi-brain): quiet arm - no brief when the brain is unsure",
+      "description": "quiet arm - no brief when the brain is unsure",
+      "bullets": [],
+      "body": "analyze_problem now reports confidence: the best symbol score and how many ranking lists agree\non the top non-hub file. l5/gate.py shows the brief only when sym_top >= 20 and agree >= 2;\notherwise the hook gets nothing (arm quiet), with the would-be brief still logged so the live\ncard can check the call. Calibrated on 400 real prompts: only 30% touch a non-hub src/ file,\nthe brief's top 4 hits in 16%; the gate silences 27% and keeps 86% of the useful briefs. The\nreplay logs confidence per case. Skill: arms, turn cost, savings card, focus_hit, and the\nrouter recorded as a manual, unscored diagnostic.",
+      "raw": "feat(semi-brain): quiet arm - no brief when the brain is unsure\n\nanalyze_problem now reports confidence: the best symbol score and how many ranking lists agree\non the top non-hub file. l5/gate.py shows the brief only when sym_top >= 20 and agree >= 2;\notherwise the hook gets nothing (arm quiet), with the would-be brief still logged so the live\ncard can check the call. Calibrated on 400 real prompts: only 30% touch a non-hub src/ file,\nthe brief's top 4 hits in 16%; the gate silences 27% and keeps 86% of the useful briefs. The\nreplay logs confidence per case. Skill: arms, turn cost, savings card, focus_hit, and the\nrouter recorded as a manual, unscored diagnostic."
+    },
+    "stat": ".claude/skills/semi-brain/SKILL.md        | 23 ++++++++++++++++++---\n tools/semi-brain/4_engine/brain_core.py   | 16 ++++++++++++---\n tools/semi-brain/5_evals/replay/replay.py |  1 +\n tools/semi-brain/l5/gate.py               | 33 +++++++++++++++++++++++++++++++\n tools/semi-brain/l5/serve.py              | 22 +++++++++++++--------\n 5 files changed, 81 insertions(+), 14 deletions(-)\n create mode 100644 tools/semi-brain/l5/gate.py",
+    "files": [
+      ".claude/skills/semi-brain/SKILL.md",
+      "tools/semi-brain/4_engine/brain_core.py",
+      "tools/semi-brain/5_evals/replay/replay.py",
+      "tools/semi-brain/l5/gate.py",
+      "tools/semi-brain/l5/serve.py"
+    ]
+  },
+  {
+    "hash": "3adf08ec97ab6b59f045580e94d32c9a39b27826",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 20:10:58 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "semi-brain",
+      "title": "feat(semi-brain): symbol spans in the brief, focus_hit in the replay",
+      "description": "symbol spans in the brief, focus_hit in the replay",
+      "bullets": [],
+      "body": "Brief symbols now read file:start-end (the definition's whole span from the AST graph), so a\nright symbol costs ~50 lines to read instead of a search. The replay gains focus_hit: does the\nbest matched symbol inside a top main.cpp region overlap the edited function. It is 11% on\ncommits and 0% on prompts, with a ceiling of 12% for any matched symbol, so the brief keeps\nshowing regions without a focus span - symbol matching is what limits line-level precision.",
+      "raw": "feat(semi-brain): symbol spans in the brief, focus_hit in the replay\n\nBrief symbols now read file:start-end (the definition's whole span from the AST graph), so a\nright symbol costs ~50 lines to read instead of a search. The replay gains focus_hit: does the\nbest matched symbol inside a top main.cpp region overlap the edited function. It is 11% on\ncommits and 0% on prompts, with a ceiling of 12% for any matched symbol, so the brief keeps\nshowing regions without a focus span - symbol matching is what limits line-level precision."
+    },
+    "stat": "tools/semi-brain/4_engine/brain_core.py   |  3 ++-\n tools/semi-brain/5_evals/replay/replay.py | 38 +++++++++++++++++++++++++++++++\n tools/semi-brain/l5/brief.py              | 28 ++++++++++++++++++++---\n 3 files changed, 65 insertions(+), 4 deletions(-)",
+    "files": [
+      "tools/semi-brain/4_engine/brain_core.py",
+      "tools/semi-brain/5_evals/replay/replay.py",
+      "tools/semi-brain/l5/brief.py"
+    ]
+  },
+  {
     "hash": "d12582d619cef9f8e98c8ba169444bae8e6a2cbb",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
@@ -117,6 +236,28 @@
       "src/main.cpp",
       "src/nodes/OutputNode.cpp",
       "src/nodes/OutputNode.h"
+    ]
+  },
+  {
+    "hash": "a4a4b30fcb8f944f6c06c3b17e0649f975055da1",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 19:47:45 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "semi-brain",
+      "title": "feat(semi-brain): measure what a brief saves - turn cost in the outcome log, a 25% holdout arm",
+      "description": "measure what a brief saves - turn cost in the outcome log, a 25% holdout arm",
+      "bullets": [],
+      "body": "The outcome log now records each turn's tool calls, calls before the first edit, context\ntokens and output tokens (API calls deduped by message id, subagents included). The brief\nserver gives the prompt hook no brief on a random quarter of prompts and logs the arm, so\nlive.py can compare the cost of turns with a brief against turns without one.",
+      "raw": "feat(semi-brain): measure what a brief saves - turn cost in the outcome log, a 25% holdout arm\n\nThe outcome log now records each turn's tool calls, calls before the first edit, context\ntokens and output tokens (API calls deduped by message id, subagents included). The brief\nserver gives the prompt hook no brief on a random quarter of prompts and logs the arm, so\nlive.py can compare the cost of turns with a brief against turns without one."
+    },
+    "stat": "tools/semi-brain/4_engine/hooks/prompt_brief.py |  6 ++--\n tools/semi-brain/5_evals/live.py                | 37 ++++++++++++++++++++-\n tools/semi-brain/l1/outcomes.py                 | 44 +++++++++++++++++++++----\n tools/semi-brain/l5/serve.py                    | 26 ++++++++++++---\n 4 files changed, 98 insertions(+), 15 deletions(-)",
+    "files": [
+      "tools/semi-brain/4_engine/hooks/prompt_brief.py",
+      "tools/semi-brain/5_evals/live.py",
+      "tools/semi-brain/l1/outcomes.py",
+      "tools/semi-brain/l5/serve.py"
     ]
   },
   {
