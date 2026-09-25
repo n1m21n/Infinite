@@ -95831,13 +95831,18 @@ int main(int argc, char** argv)
       static double sTailProjIntervalMs = -1.0;
       const double now = glfwGetTime();
       const bool refreshTopmost = now - sLastTopmostRefresh >= 0.5;
-      // With a projector open this is where the loop waits for the primary
-      // Output display's refresh, so the presents below land on its grid
-      // whether or not the canvas (or the projector) is covered or hidden.
-      // Outside the `projectors` stage timer: it is idle time, not work.
-      PaceProjectorPresent(window);
+      // Projectors present in two passes around the frame clock's wait (Block
+      // 2 step 3a): every window renders into its back buffer and flushes
+      // first, so the GPU works through the blits while the loop waits; only
+      // the swaps run after the wait returns, so the presents land as soon
+      // after the refresh as possible. A dead source's window is closed in the
+      // first pass, so the second only sees windows that rendered.
+      // `projectors` (stage timer and Bench::Tail) is both passes; the wait
+      // between them is idle time, not work.
+      double projWorkMs = 0.0;
+      const bool timeProjectors = benchStagesCpuSample || Bench::Tail().active;
       {
-         ConditionalStageTimer timerProjectors(benchStagesCpuSample ? &sStageProjectors : nullptr, Bench::FrameTail::kProjectors);
+         const double projRenderStartMs = timeProjectors ? Bench::ScopedStageTimer::NowMs() : 0.0;
          for (size_t i = gProjectorWindows.size(); i-- > 0; )
          {
             GraphNode* src = FindNodeByIndex(gProjectorWindows[i].nodeIndex);
@@ -95892,6 +95897,22 @@ int main(int argc, char** argv)
                glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
                glClear(GL_COLOR_BUFFER_BIT);
             }
+            glFlush();
+         }
+         if (timeProjectors)
+            projWorkMs += Bench::ScopedStageTimer::NowMs() - projRenderStartMs;
+      }
+      // The frame clock's wait: the primary Output display's refresh with a
+      // projector open, else the canvas's when Vsync is on, so the presents
+      // below land on its grid whether or not the canvas (or the projector)
+      // is covered or hidden.
+      PaceProjectorPresent(window);
+      {
+         const double projSwapStartMs = timeProjectors ? Bench::ScopedStageTimer::NowMs() : 0.0;
+         for (size_t i = gProjectorWindows.size(); i-- > 0; )
+         {
+            GLFWwindow* projWindow = gProjectorWindows[i].window;
+            glfwMakeContextCurrent(projWindow);
             // B8: present cost and swap-to-swap interval per window. CPU only -
             // a GL timer query must never span this context switch.
             const double benchB8SwapStartMs = (sBenchB8Sampling && i < sBenchB8Win.size())
@@ -95936,6 +95957,13 @@ int main(int argc, char** argv)
                }
                sBenchB3LastProjSwapMs = nowSwapMs;
             }
+         }
+         if (timeProjectors)
+         {
+            projWorkMs += Bench::ScopedStageTimer::NowMs() - projSwapStartMs;
+            if (benchStagesCpuSample)
+               sStageProjectors.Push(projWorkMs);
+            Bench::Tail().AddStage(Bench::FrameTail::kProjectors, projWorkMs);
          }
          if (refreshTopmost && !gProjectorWindows.empty())
             sLastTopmostRefresh = now;
