@@ -10,7 +10,7 @@ blocks a target in this table.
 | Block | Work | Done when | State |
 |---|---|---|---|
 | 1 Audio | Real xrun counter (replaces the wall-clock-gap heuristic, `AudioEngine.cpp`); B1 callback load (open item 1); build B7 soak | B1 cb_load p99 <= 50% @256; 0 xruns in 10 min; soak RSS growth < 2% over 30 min | done, merged in `caafc69` (p99 44.4% @256; 0 xruns in 10 min; soak RSS -3.6%) |
-| 2 Projector + canvas | Projector under load (open items 2-4); canvas vsync not blocking (open item 5) | B3/B8 interval p99 <= 18.3 ms and missed vsync < 0.5%; B6 runs paced and meets p50/p95 | not started |
+| 2 Projector + canvas | Projector under load (open items 2-4); canvas vsync not blocking (open item 5) | B3/B8 interval p99 <= 18.3 ms and missed vsync < 0.5%; B6 runs paced and meets p50/p95 | done on `feature/perf-block2-pacing` (`3249e37` attribution, `951d22c` one frame clock, `6fd5fa3` closed-form filter curve, `5550a20` render-before-wait); B6 met and trusted; B3 p99 met, missed vsync 0.53-0.88% still just over, runs `unfocused=1` (focus steal, Found in Block 2) |
 | 3 Media + release gate | Decode drops (open item 6); camera run (open item 7, needs access granted once); Linux `frameCache` copy, `VideoInNode` realloc, Spout `HasClients` (Found while measuring 4, 5, 7); build B10 | B8 decode real time, 0 dropped; B10 A/V drift within `av-sync-sweep` limits; new baseline; `driver.sh --full` clean | not started |
 
 Every block: one branch, `ab.sh` gate (keep only if better), `verify-gate`
@@ -30,11 +30,11 @@ because an untrusted run can only look better than the real thing.
 |---|---|---|---|
 | Audio | 0 xruns at 256 frames | B1 buf=256: 0 in 60 s. B3: 0. Block 1 (`a8d8c46`, real counter): B1 buf=256, 24 voices, 0 in 10 min (max load 58%); B7: 0 in 30 min | pass (B1 10 min, daemon paused) |
 | Audio | cb_load p99 <= 50% | B1 buf=64/128/256/512: 61.2 / 55.8 / 52.8 / 51.1%, now 40.8 / 41.1 / 44.4 / 40.3% (`a8d8c46`). B3: 37.4%, now 22.8% | pass (B1, every buffer size; B3). Buffer 64 still has xruns, see Found in Block 1 |
-| Projector | locked 60 fps: interval p99 <= 1.1 x 16.7 = 18.3 ms | B3: 50.0 ms. B8 2 / 3 windows: 18.6-18.7 ms. B8 heavy (4x2160, 3 windows, camera, Syphon): 33.0-33.2 ms | **fail** (B3, B8 heavy, B8 2 / 3 windows) |
-| Projector | missed vsync < 0.5% | B3: 12.0%. B8 2 / 3 windows: 0%. B8 heavy: 9.4% per window | **fail** (B3, B8 heavy); unproven (B8 2 / 3 windows: canvas unpaced) |
+| Projector | locked 60 fps: interval p99 <= 1.1 x 16.7 = 18.3 ms | B3: 50.0 ms, now 18.05-18.4 ms (`6fd5fa3`, `5550a20`; runs `unfocused=1`). B8 2 / 3 windows: 18.6-18.7 ms, now 18.1 / 18.0 ms worst window, 0% missed, trusted (`5550a20`). B8 heavy now ~100 ms, `unfocused=1 unpaced=1`, decode-bound (Block 3). B8 heavy (4x2160, 3 windows, camera, Syphon): 33.0-33.2 ms | **fail** (B3, B8 heavy, B8 2 / 3 windows) |
+| Projector | missed vsync < 0.5% | B3: 12.0%, now 0.53-0.88% (unfocused). B8 2 / 3 windows: 0%. B8 heavy: 9.4% per window | **fail** (B3, B8 heavy); unproven (B8 2 / 3 windows: canvas unpaced) |
 | Projector | input-to-photon <= 2 frames | B3: max 1 frame (28 samples) | pass |
-| Canvas | B6 pan p50 >= 60 fps (<= 17.2 ms) | n=300 all 11.2; n=200 / 400 pan 8.4 / 8.3 ms | unproven (vsync=1 runs unpaced, see open item 5) |
-| Canvas | B6 pan p95 >= 45 fps (<= 22.8 ms) | n=300 all 12.5; n=200 / 400 pan 12.2 / 12.1 ms | unproven |
+| Canvas | B6 pan p50 >= 60 fps (<= 17.2 ms) | n=300 all 11.2; n=200 / 400 pan 8.4 / 8.3 ms. vsync=1 pan now 16.67 ms, on_vsync_frac 1.00 (`951d22c`) | pass (trusted) |
+| Canvas | B6 pan p95 >= 45 fps (<= 22.8 ms) | n=300 all 12.5; n=200 / 400 pan 12.2 / 12.1 ms. vsync=1 pan now 16.82 ms | pass (trusted) |
 | Memory | no §6 target; gated on change (+20%) | B9 footprint peak b2 / b4: 760 / 640 MB. Render targets b2 / b4: 343 / 91 MB | baseline recorded |
 | Memory | `fbo_allocs_steady` = 0 | 0 in every B2 and B4 variant | pass |
 | Memory | soak: RSS growth < 2% over 30 min | B7 30 min (`a8d8c46`): RSS growth -3.6%, 0 xruns, thermal fps drop 0.07% (59.96 -> 59.92) | unproven (run `unfocused=1`; value inside the limit) |
@@ -44,10 +44,10 @@ because an untrusted run can only look better than the real thing.
 **Open items: every target that still fails.** These are listed, not fixed.
 
 1. ~~**B1 audio load**~~: closed by Block 1 (reverb kernel), p99 40.3-44.4% at every buffer size.
-2. **B3 projector pacing:** interval p99 is 50.0 ms, missed vsync 12.0% and jitter 8.6 ms (trusted run). About one doubled interval in eight.
+2. **B3 projector pacing:** was p99 50.0 ms / missed 12.0%. Cause (Block 2 step 1): Audio Filter response curves re-simulated a settled sine per point (14.9 ms of node bodies on slow frames vs 0.85 ms), and a late frame waits for the next refresh. Now p99 18.05-18.4 ms, missed 0.53-0.88%: p99 met, missed vsync still just over 0.5%, and no run is trusted yet (another app takes focus ~2 s after launch).
 3. **B8 heavy projector pacing:** with 4x2160 clips, 3 windows, camera and Syphon, the window interval p99 is 33.0-33.2 ms and missed vsync is 9.4%. The canvas frame p95/p99 is 32.8/33.0 ms, so the load halves the rate.
-4. **B8 light projector pacing:** with a visible canvas beside them, the 2 and 3 window variants miss no vsyncs but their interval p99 is 18.6-18.7 ms, just over the 18.3 ms lock limit.
-5. **Canvas vsync does not block (macOS 27, 60 Hz panel):** with swap interval 1 the canvas runs at ~120 fps (p50 8.3 ms) and almost no frames land on a refresh boundary, so every vsync=1 B6 row and every B8 row without the heavy load is `unpaced=1`. The canvas fps targets stay unproven until the canvas is really display-paced.
+4. ~~**B8 light projector pacing**~~: closed by `5550a20` (worst p99 18.1 ms, 0% missed, trusted). Was: with a visible canvas beside them, the 2 and 3 window variants miss no vsyncs but their interval p99 is 18.6-18.7 ms, just over the 18.3 ms lock limit.
+5. ~~**Canvas vsync does not block**~~: closed by `951d22c` (2b: one frame clock - every context swaps at interval 0 and the loop waits once on the display refresh). Was: with swap interval 1 the canvas runs at ~120 fps (p50 8.3 ms) and almost no frames land on a refresh boundary, so every vsync=1 B6 row and every B8 row without the heavy load is `unpaced=1`. The canvas fps targets stay unproven until the canvas is really display-paced.
 6. **B8 decode:** 4x2160 with no windows dropped 1 frame, and clip1 of 2x1080 + Syphon was judged not real time.
 7. **Camera** access has never been granted on this machine (`camera: skipped, not_determined`), so the camera variants run without one.
 
@@ -98,6 +98,9 @@ variants from 1 run (the 3-run 1080 set could not be paced: screen locked).
 | | | B8 2x1080 W2 / W3 / overlap | missed vsync (spec: < 0.5%) | 0 / 0.4 / 0.4% (period never waited for) | 0.75 / 0.56 / 0.37%; re-measure W2 / W3: 0.37 / 0% | met in all 6 re-measure runs (at most 1 doubled interval per run) |
 | | | B8 2x1080 W2 / W3 / overlap | projector `on_vsync_frac` | null (canvas 0.14-0.19) | 0.97 / 0.99 / 0.99 | new metric |
 | | | B8 2x1080 W2 / W3 / overlap | canvas frame p50 ms | 7.6 / 7.7 / 7.3 | 16.66 / 16.66 / 16.67 | = one refresh by design (base ran unpaced) |
+| Block 2: one frame clock (2b) | `951d22c` | B6 vsync=1 pan | on_vsync_frac / p50 / p95 ms | 0.00 / 8.25 / 11.63 (unpaced) | 1.00 / 16.67 / 16.82 | paced; meets <= 17.2 / 22.8 |
+| Block 2: closed-form filter curve (3c) | `6fd5fa3` | B3 s, buf 256 (unfocused) | projector p99 / missed vsync / jitter | 34.27 ms / 11.64% / 35.0 ms | 18.05 ms / 0.53% / 1.2 ms | -47% / -95% / -97% |
+| Block 2: render projectors before the wait (3a) | `5550a20` | B3 s, buf 256 (unfocused), vs `6fd5fa3` | projector p99 / missed vsync / slow frames | 33.1 ms / 1.59% / 9 | 18.4 ms / 0.88% / 5 | -44% / -45% / -44% (1 pair, auto gate) |
 | Shared scratch target for two-pass filters (one RGBA16F pre-pass buffer per size, not one per node) | `6ec7ec7` | B9 b2 (l, anim, 600 f) | gpu_est render_targets MB | 469.6 | 343.0 | -27% |
 | | | B9 b2 | footprint peak MB | 908 | 764 | -16% |
 | | | B2 l-anim, timers off, 5 pairs (sync_brain running) | frame p50 / p99 ms | 14.32 / 17.53 | 14.38 / 17.32 | +0% / -1% (noise) |
@@ -602,6 +605,9 @@ docstring lists which hashes it compares.
   left in front for the whole run.
 
 ## Found while measuring
+
+**Found in Block 2 (not fixed):** (a) an app named ChatGPT takes the foreground ~2 s after every bench launch, so every B3 run is `unfocused=1` (`open -n -W --env` does not help); (b) after 3c/3a, 2-4 B3 slow frames per 600 have 28-32 ms of work no stage timer accounts for; (c) `SetCanvasSwapInterval` audit: every call site goes through `ApplyCanvasSwapInterval`, so no frame gets two vsync waits; at export end the canvas swaps at interval 1 for one frame with no clock wait (export still flagged), then the frame-top Apply returns it to 0.
+
 
 Per §8: this suite measures, it does not fix. Anything found while building
 a fixture goes here, not into a code change.
