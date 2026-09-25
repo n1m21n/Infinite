@@ -20251,12 +20251,12 @@ namespace
    }
 
    // ---- Audio Filter -----------------------------------------------------
-   // Cached per-node response curve: the underlying MagnitudeDb sweep is a
-   // settled-sine measurement (AudioFilterKernel.h) that runs an actual
-   // settle-then-measure simulation of the filter primitive per point (up to
-   // ~8000 simulated samples each) - cheap for a one-off recompute, but not
-   // free across 160 points every single ImGui frame while freq/Q/gain are
-   // being dragged (up to ~1.28M simulated samples/frame). Recomputed only
+   // Cached per-node response curve. MagnitudeDb (AudioFilterKernel.h) used
+   // to be a settled-sine simulation of up to ~8000 samples per point (up to
+   // ~1.28M simulated samples per 160-point curve), which is what the
+   // throttling below was built around; it is now the closed-form transfer
+   // function (~microseconds per curve), so the throttle only saves a little
+   // draw-list churn. Recomputed only
    // when the signature (everything it depends on) actually changed (per
    // audio-node-ui-system.md §3f's "computed main-thread ... never by
    // calling into the live AudioNode" - this recomputes from a *scratch*
@@ -20310,16 +20310,11 @@ namespace
       return v - std::floor(v);
    }
 
-   // Throttling *how often* the recompute fires (below) caps it at ~12.5Hz,
-   // but that alone isn't enough: a full 160-point AudioFilterDsp::MagnitudeDb
-   // sweep is a real settle-then-measure simulation per point (up to ~8000
-   // samples each, each involving a sin() call) and measures ~10-15ms on its
-   // own at Q=18/48kHz - comparable to or larger than an entire 60fps frame
-   // budget (16.6ms), so even a throttled recompute still stalls the frame it
-   // lands on. kFilterCurveDragPoints cuts the *cost* of each recompute by
-   // dropping the point count while a drag is live (measured ~3-5x cheaper at
-   // 48 points) - full kFilterCurveFullPoints resolution always returns the
-   // instant the drag ends.
+   // Throttling *how often* the recompute fires (below) caps it at ~12.5Hz.
+   // kFilterCurveDragPoints drops the point count while a drag is live; it
+   // dates from the settled-sine MagnitudeDb, when a full 160-point sweep
+   // measured ~10-15ms at Q=18/48kHz - full kFilterCurveFullPoints
+   // resolution always returns the instant the drag ends.
    const double kFilterCurveThrottleSec = 0.08; // ~12.5 Hz cap on the full recompute while dragging
    const int kFilterCurveDragPoints = 48;
    const int kFilterCurveFullPoints = 160;
