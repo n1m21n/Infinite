@@ -452,6 +452,9 @@ namespace Bench
       // Spout publish, camera. Built by the fixture; null = not measured.
       nlohmann::json mediaIo = nullptr;
 
+      // Slow-frame attribution (B3, B8): Bench::FrameTail::Report(). null = not measured.
+      nlohmann::json slowFrames = nullptr;
+
       nlohmann::json stagesCpuMs = nlohmann::json::object();
       nlohmann::json stagesGpuMs = nlohmann::json::object();
 
