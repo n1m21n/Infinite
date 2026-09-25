@@ -9,7 +9,7 @@ blocks a target in this table.
 
 | Block | Work | Done when | State |
 |---|---|---|---|
-| 1 Audio | Real xrun counter (replaces the wall-clock-gap heuristic, `AudioEngine.cpp`); B1 callback load (open item 1); build B7 soak | B1 cb_load p99 <= 50% @256; 0 xruns in 10 min; soak RSS growth < 2% over 30 min | done on `feature/perf-block1-audio` (p99 44.4% @256; 0 xruns in 10 min; soak RSS -3.6%), awaiting merge |
+| 1 Audio | Real xrun counter (replaces the wall-clock-gap heuristic, `AudioEngine.cpp`); B1 callback load (open item 1); build B7 soak | B1 cb_load p99 <= 50% @256; 0 xruns in 10 min; soak RSS growth < 2% over 30 min | done, merged in `caafc69` (p99 44.4% @256; 0 xruns in 10 min; soak RSS -3.6%) |
 | 2 Projector + canvas | Projector under load (open items 2-4); canvas vsync not blocking (open item 5) | B3/B8 interval p99 <= 18.3 ms and missed vsync < 0.5%; B6 runs paced and meets p50/p95 | not started |
 | 3 Media + release gate | Decode drops (open item 6); camera run (open item 7, needs access granted once); Linux `frameCache` copy, `VideoInNode` realloc, Spout `HasClients` (Found while measuring 4, 5, 7); build B10 | B8 decode real time, 0 dropped; B10 A/V drift within `av-sync-sweep` limits; new baseline; `driver.sh --full` clean | not started |
 
