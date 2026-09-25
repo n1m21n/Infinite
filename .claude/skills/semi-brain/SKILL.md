@@ -55,18 +55,26 @@ The same brief, plus L0, is available as MCP tools (server `semi-brain` in
 `.mcp.json`, `l0/mcp_server.py`): `brain_brief`, `brain_recall`,
 `brain_assert`, `brain_retract`.
 
-**main.cpp is a virtual split of ~80 regions** (`l4/regions.py`, built by
-`1_extractors/build_main_cpp_regions.py` from co-edit history, the call
-graph, name families and `// ====` banners; regenerate after a large
-main.cpp reorganization with `python3 1_extractors/build_main_cpp_regions.py`).
-A brief names the region instead of the bare path -
-`src/main.cpp@drawoscillator L13399-14991` - so read that one region, not
-the whole 95k-line file. `python3 4_engine/semi_brain_cli.py --regions`
-prints the table of contents. The replay's `region_hit` (additive, not part
-of `gate`) scores whether the best-ranked main.cpp symbol lands in the same
-region as the target, not just the same file - "right file, wrong 30k
-lines" is a miss there even though file MRR can't see it; baseline on the
-181-commit replay is 0.20.
+**main.cpp is a virtual split of 73 contiguous, non-overlapping regions**
+(`l4/regions.py`, built by `1_extractors/build_main_cpp_regions.py` from
+co-edit history, the call graph, name families and `// ====` banners, full
+file coverage, 3000-line cap; regenerate after a large main.cpp
+reorganization with `python3 1_extractors/build_main_cpp_regions.py`).
+`Regions.rank_regions(symbols)` ranks regions by a weighted vote over a
+result's matched symbols (each votes `1/(rank+1)` for its region, so several
+agreeing lower-ranked symbols can outrank one stray higher-ranked one) -
+shared by the brief (shows the top 2, `src/main.cpp@drawoscillator
+L13399-14991`, instead of the bare 95k-line path) and by the replay's
+`region_hit`/`region_r3` (additive, not part of `gate`): whether the
+top-ranked (or top-3) region matches the target's, not just the file -
+"right file, wrong 30k lines" is a miss there even though file MRR can't see
+it. On the 181-commit replay: region R@1 0.20 (baseline) -> 0.34 (contiguous
+split) -> 0.36 (weighted-vote ranking), region R@3 0.54.
+`python3 4_engine/semi_brain_cli.py --regions` prints the table of contents.
+`5_evals/live.py` scores the same thing against real turns: region hit@1/@2
+from git-diffing the commits of turns that touched main.cpp (only turns that
+committed are scorable - `l1/outcomes.py` has no line-level record for
+edits that were never committed).
 
 To run the automated 30-case benchmark evaluation suite (self-confirming; the
 replay above is the real gate):
@@ -149,10 +157,18 @@ What *is* manual:
 `antigravity_history_corpus.json`, `session_analysis_corpus.json`,
 `session_embeddings_cache.npy`, `dev_trajectory_corpus.json`,
 `knowledge_index_private.db`, and all of `l1/state/`: outcome log, briefs,
-L0 notes, proposals, learned weights) never leave this machine. They are gitignored,
-and `.git/hooks/pre-push` blocks them. The rest of the brain (code, public
-`knowledge_index.db`, `3_datasets/*.jsonl`) may be committed, in its own
-commit, not inside a feature commit.
+L0 notes, proposals, learned weights, the fastembed model cache) never leave
+this machine. They are gitignored, and `.git/hooks/pre-push` blocks them.
+The rest of the brain (code, public `knowledge_index.db`,
+`3_datasets/*.jsonl`) may be committed, in its own commit, not inside a
+feature commit.
+
+**Watch daemon gotcha**: `com.infinite.semi-brain.watchd` pauses itself
+during a bench run and does not always resume on its own afterward - if
+`l1/state/briefs.jsonl` stops growing across a session while `outcomes.jsonl`
+keeps growing (it syncs independently, on its own cadence), the daemon is
+probably down. Check with `launchctl list | grep brain`; restart it with
+`launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.infinite.semi-brain.watchd.plist`.
 
 ---
 
