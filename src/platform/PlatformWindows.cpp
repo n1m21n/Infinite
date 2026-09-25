@@ -1,12 +1,13 @@
 #include "Platform.h"
 
-#if defined(_WIN32)
 
 #include "platform/OpenGLHeaders.h"
 #include "audio/AudioFileWriter.h"
 #include "core/RuntimeLog.h"
 
 #include <windows.h>
+#include <timeapi.h>
+#include <avrt.h>
 #define GLFW_INCLUDE_NONE
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3.h>
@@ -256,11 +257,16 @@ namespace Platform
          return L"ffmpeg.exe";
       }
 
+      // Owner of every file dialog (the editor window), see SetFileDialogOwner.
+      std::atomic<HWND> gFileDialogOwner { nullptr };
+
+      // Turbo: may run on a worker thread (main.cpp runs dialogs off the
+      // render thread so playback and output keep going); it initialises its
+      // own STA apartment and never touches JUCE.
       std::string RunFileDialog(bool save, bool folder, const wchar_t* title,
                                 const std::vector<std::pair<std::wstring, std::wstring>>& filters,
                                 const std::string& suggested = {}, const std::string& initialDir = {})
       {
-         EnsureJuceInitialised();
          const HRESULT init = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
          IFileDialog* dialog = nullptr;
          HRESULT hr = CoCreateInstance(save ? CLSID_FileSaveDialog : CLSID_FileOpenDialog, nullptr,
@@ -281,6 +287,16 @@ namespace Platform
          std::vector<COMDLG_FILTERSPEC> specs;
          for (const auto& f : filters) specs.push_back({ f.first.c_str(), f.second.c_str() });
          if (!specs.empty()) dialog->SetFileTypes((UINT)specs.size(), specs.data());
+         // Save dialogs append the first filter's extension ("*.inf" -> inf)
+         // when the user types a bare name.
+         if (save && !filters.empty())
+         {
+            std::wstring ext = filters.front().second;
+            const size_t semi = ext.find(L';');
+            if (semi != std::wstring::npos) ext = ext.substr(0, semi);
+            if (ext.rfind(L"*.", 0) == 0) ext = ext.substr(2);
+            if (!ext.empty() && ext != L"*") dialog->SetDefaultExtension(ext.c_str());
+         }
          if (!suggested.empty()) dialog->SetFileName(Utf8ToWide(suggested).c_str());
          if (!initialDir.empty())
          {
@@ -293,7 +309,7 @@ namespace Platform
          }
 
          std::string result;
-         if (SUCCEEDED(dialog->Show(nullptr)))
+         if (SUCCEEDED(dialog->Show(gFileDialogOwner.load())))
          {
             IShellItem* item = nullptr;
             if (SUCCEEDED(dialog->GetResult(&item)) && item)
@@ -394,6 +410,45 @@ namespace Platform
       if (!gJuce) gJuce = std::make_unique<juce::ScopedJuceInitialiser_GUI>();
    }
 
+   void PreciseSleep(double seconds)
+   {
+      if (seconds <= 0.0)
+         return;
+      thread_local HANDLE timer = CreateWaitableTimerExW(
+         nullptr, nullptr, 0x00000002 /* CREATE_WAITABLE_TIMER_HIGH_RESOLUTION */, TIMER_ALL_ACCESS);
+      if (timer != nullptr)
+      {
+         LARGE_INTEGER due;
+         due.QuadPart = -(LONGLONG)(seconds * 1.0e7); // relative, 100 ns units
+         if (SetWaitableTimerEx(timer, &due, 0, nullptr, nullptr, nullptr, 0))
+         {
+            WaitForSingleObject(timer, INFINITE);
+            return;
+         }
+      }
+      static const bool periodSet = (timeBeginPeriod(1) == 0 /* TIMERR_NOERROR */);
+      (void)periodSet;
+      Sleep((DWORD)std::max(0.0, seconds * 1000.0));
+   }
+
+   void TerminateNow(int code)
+   {
+      TerminateProcess(GetCurrentProcess(), (UINT)code);
+   }
+
+   void BoostRenderThread()
+   {
+      DWORD taskIndex = 0;
+      HANDLE task = AvSetMmThreadCharacteristicsW(L"Games", &taskIndex);
+      if (task != nullptr)
+      {
+         AvSetMmThreadPriority(task, AVRT_PRIORITY_HIGH);
+         RuntimeLog::Write("render thread registered with MMCSS (Games)");
+      }
+      else
+         RuntimeLog::Write("MMCSS registration refused (error %lu)", GetLastError());
+   }
+
    void PreventAppNap() { SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED); }
 
    void ConfigureOutputWindow(GLFWwindow* window, bool borderless, bool topmost,
@@ -419,12 +474,21 @@ namespace Platform
       glfwSetInputMode(window, GLFW_CURSOR, hideCursor ? GLFW_CURSOR_HIDDEN : GLFW_CURSOR_NORMAL);
    }
 
+   void SetFileDialogOwner(GLFWwindow* window)
+   {
+      EnsureJuceInitialised();
+      gFileDialogOwner.store(window != nullptr ? glfwGetWin32Window(window) : nullptr);
+   }
+
    void ReassertOutputWindowTopmost(GLFWwindow* window)
    {
       if (window == nullptr)
          return;
       HWND hwnd = glfwGetWin32Window(window);
-      if (hwnd != nullptr)
+      // Only when something actually took the topmost flag away: re-asserting
+      // it every half second on a window that already has it made Windows
+      // re-evaluate the z-order and the focused fullscreen editor flicker.
+      if (hwnd != nullptr && (GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST) == 0)
          SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
                       SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
    }
@@ -548,17 +612,33 @@ namespace Platform
       return !contours.empty();
    }
 
+   // ---- video file decoding (Turbo) -------------------------------------
+   // One worker thread per clip owns the cv::VideoCapture. It decodes the
+   // frame the render thread asked for and then reads ahead in the playback
+   // direction into a small cache, so steady playback finds its next frame
+   // already decoded instead of waiting a frame for it.
+   //  - forward: sequential read-ahead; small jumps (speed > 1, a slow UI
+   //    frame) are reached with grab() instead of a keyframe seek.
+   //  - reverse: one seek per batch. The worker decodes the frames just
+   //    below the target in one forward run and serves them backwards,
+   //    instead of paying a keyframe seek for every single frame.
+   // Frames are BGR8 in GL row order (bottom-up): the GPU swizzles BGR on
+   // upload, so the CPU no longer converts every pixel to RGBA.
    struct VideoHandle
    {
+      struct CachedFrame
+      {
+         long long index = -1;
+         std::vector<unsigned char> pixels;
+      };
+
       cv::VideoCapture capture;
       std::atomic<int> width { 0 };
       std::atomic<int> height { 0 };
       double duration = 0.0;
       double fps = 30.0;
+      long long frameCount = 0;          // guarded by frameMutex (shrinks if the container lied)
 
-      // OpenCV/FFmpeg decoding is kept off the UI/render thread. Only the
-      // worker touches VideoCapture; the main thread submits a target frame
-      // and consumes the newest completed RGBA buffer without waiting.
       std::mutex frameMutex;
       std::condition_variable frameReady;
       std::thread decoder;
@@ -566,11 +646,16 @@ namespace Platform
       bool requestPending = false;
       long long requestedFrame = 0;
       long long lastQueuedFrame = -1;
-      long long lastDecodedFrame = -1;
+      int direction = 1;
       uint64_t requestSerial = 0;
       uint64_t publishedSerial = 0;
       uint64_t consumedSerial = 0;
       std::vector<unsigned char> publishedPixels;
+      std::deque<CachedFrame> cache;
+      std::vector<std::vector<unsigned char>> freeBuffers;
+      size_t cacheCapacity = 4;
+
+      long long lastDecodedFrame = -1000000; // decoder thread only
 
       ~VideoHandle()
       {
@@ -578,60 +663,261 @@ namespace Platform
             std::lock_guard<std::mutex> lock(frameMutex);
             stopping = true;
          }
-         frameReady.notify_one();
+         frameReady.notify_all();
          if (decoder.joinable())
             decoder.join();
       }
    };
 
-   VideoHandle* VideoOpen(const std::string& path, std::string& error)
+   namespace
    {
-      auto handle = std::make_unique<VideoHandle>();
-      if (!handle->capture.open(path, cv::CAP_FFMPEG))
-         if (!handle->capture.open(path)) { error = "OpenCV could not open video"; return nullptr; }
-      handle->width.store((int)handle->capture.get(cv::CAP_PROP_FRAME_WIDTH), std::memory_order_relaxed);
-      handle->height.store((int)handle->capture.get(cv::CAP_PROP_FRAME_HEIGHT), std::memory_order_relaxed);
-      handle->fps = handle->capture.get(cv::CAP_PROP_FPS); if (handle->fps <= 0.0) handle->fps = 30.0;
-      const double frames = handle->capture.get(cv::CAP_PROP_FRAME_COUNT);
-      handle->duration = frames > 0 ? frames / handle->fps : 0.0;
-      VideoHandle* raw = handle.get();
-      handle->decoder = std::thread([raw]()
+      constexpr long long kVideoGrabInsteadOfSeek = 12;
+      constexpr size_t kVideoCacheBudgetBytes = 160ull * 1024ull * 1024ull;
+
+      // Decoder thread only. Positions the capture on `target` as cheaply as
+      // possible and writes the frame into `out` as bottom-up BGR8.
+      bool VideoDecodeInto(VideoHandle* v, long long target, std::vector<unsigned char>& out)
+      {
+         const long long gap = target - (v->lastDecodedFrame + 1);
+         bool positioned = false;
+         if (gap >= 0 && gap <= kVideoGrabInsteadOfSeek)
+         {
+            positioned = true;
+            for (long long i = 0; i < gap; ++i)
+            {
+               if (!v->capture.grab())
+               {
+                  positioned = false;
+                  break;
+               }
+            }
+         }
+         if (!positioned)
+            v->capture.set(cv::CAP_PROP_POS_FRAMES, (double)target);
+
+         cv::Mat frame;
+         if (!v->capture.read(frame) || frame.empty())
+         {
+            v->lastDecodedFrame = -1000000; // force a real seek next time
+            return false;
+         }
+         v->lastDecodedFrame = target;
+
+         if (frame.type() != CV_8UC3)
+         {
+            cv::Mat converted;
+            if (frame.channels() == 4)
+               cv::cvtColor(frame, converted, cv::COLOR_BGRA2BGR);
+            else if (frame.channels() == 1)
+               cv::cvtColor(frame, converted, cv::COLOR_GRAY2BGR);
+            else
+               frame.convertTo(converted, CV_8UC3);
+            frame = converted;
+         }
+
+         out.resize((size_t)frame.cols * (size_t)frame.rows * 3);
+         cv::Mat dst(frame.rows, frame.cols, CV_8UC3, out.data());
+         cv::flip(frame, dst, 0);
+         v->width.store(frame.cols, std::memory_order_relaxed);
+         v->height.store(frame.rows, std::memory_order_relaxed);
+         return true;
+      }
+
+      // Called with frameMutex held. Next frame worth decoding speculatively,
+      // or -1 when the cache is full / playing backwards / at the end.
+      long long VideoPrefetchTarget(const VideoHandle* v)
+      {
+         if (v->direction <= 0 || v->cache.size() >= v->cacheCapacity)
+            return -1;
+         long long base = v->lastQueuedFrame;
+         if (!v->cache.empty())
+            base = std::max(base, v->cache.back().index);
+         const long long next = base + 1;
+         if (next < 0 || (v->frameCount > 0 && next >= v->frameCount))
+            return -1;
+         return next;
+      }
+
+      // Called with frameMutex held.
+      void VideoRecycle(VideoHandle* v, std::vector<unsigned char>&& buffer)
+      {
+         if (v->freeBuffers.size() < 4 && buffer.capacity() > 0)
+            v->freeBuffers.push_back(std::move(buffer));
+      }
+
+      // Called with frameMutex held.
+      std::vector<unsigned char> VideoTakeBuffer(VideoHandle* v)
+      {
+         if (v->freeBuffers.empty())
+            return {};
+         std::vector<unsigned char> buffer = std::move(v->freeBuffers.back());
+         v->freeBuffers.pop_back();
+         return buffer;
+      }
+
+      void VideoDecodeWorker(VideoHandle* v)
       {
          for (;;)
          {
-            long long targetFrame = 0;
+            long long target = -1;
             uint64_t serial = 0;
+            bool prefetch = false;
+            int direction = 1;
+            std::vector<unsigned char> scratch;
             {
-               std::unique_lock<std::mutex> lock(raw->frameMutex);
-               raw->frameReady.wait(lock, [raw]() { return raw->stopping || raw->requestPending; });
-               if (raw->stopping)
+               std::unique_lock<std::mutex> lock(v->frameMutex);
+               v->frameReady.wait(lock, [v]()
+               {
+                  return v->stopping || v->requestPending || VideoPrefetchTarget(v) >= 0;
+               });
+               if (v->stopping)
                   return;
-               targetFrame = raw->requestedFrame;
-               serial = raw->requestSerial;
-               raw->requestPending = false;
+
+               direction = v->direction;
+               if (v->requestPending)
+               {
+                  target = v->requestedFrame;
+                  serial = v->requestSerial;
+                  v->requestPending = false;
+
+                  // Serve from the cache when read-ahead already has it and
+                  // drop entries the playhead has moved past.
+                  bool served = false;
+                  for (auto it = v->cache.begin(); it != v->cache.end();)
+                  {
+                     if (it->index == target && !served)
+                     {
+                        VideoRecycle(v, std::move(v->publishedPixels));
+                        v->publishedPixels = std::move(it->pixels);
+                        v->publishedSerial = serial;
+                        served = true;
+                        it = v->cache.erase(it);
+                     }
+                     else if ((direction > 0 && it->index < target) ||
+                              (direction < 0 && it->index > target))
+                     {
+                        VideoRecycle(v, std::move(it->pixels));
+                        it = v->cache.erase(it);
+                     }
+                     else
+                        ++it;
+                  }
+                  if (served)
+                     continue;
+               }
+               else
+               {
+                  target = VideoPrefetchTarget(v);
+                  prefetch = true;
+               }
+               scratch = VideoTakeBuffer(v);
             }
 
-            if (targetFrame != raw->lastDecodedFrame + 1)
-               raw->capture.set(cv::CAP_PROP_POS_FRAMES, (double)targetFrame);
-
-            cv::Mat bgr;
-            if (!raw->capture.read(bgr))
-               continue;
-            cv::Mat rgba;
-            cv::cvtColor(bgr, rgba, cv::COLOR_BGR2RGBA);
-            cv::flip(rgba, rgba, 0);
-            std::vector<unsigned char> pixels(rgba.datastart, rgba.dataend);
-            raw->lastDecodedFrame = targetFrame;
-
+            // Reverse playback: decode [target - N + 1, target] in one forward
+            // run, keep the lower frames for the next requests.
+            if (!prefetch && direction < 0)
             {
-               std::lock_guard<std::mutex> lock(raw->frameMutex);
-               raw->width.store(rgba.cols, std::memory_order_relaxed);
-               raw->height.store(rgba.rows, std::memory_order_relaxed);
-               raw->publishedPixels.swap(pixels);
-               raw->publishedSerial = serial;
+               const long long batch = (long long)std::max<size_t>(1, v->cacheCapacity);
+               const long long start = std::max(0LL, target - batch + 1);
+               std::vector<VideoHandle::CachedFrame> decoded;
+               for (long long f = start; f <= target; ++f)
+               {
+                  VideoHandle::CachedFrame cf;
+                  cf.index = f;
+                  if (f == target)
+                     cf.pixels = std::move(scratch);
+                  else
+                  {
+                     std::lock_guard<std::mutex> lock(v->frameMutex);
+                     cf.pixels = VideoTakeBuffer(v);
+                  }
+                  if (VideoDecodeInto(v, f, cf.pixels))
+                     decoded.push_back(std::move(cf));
+               }
+               std::lock_guard<std::mutex> lock(v->frameMutex);
+               for (auto& cf : decoded)
+               {
+                  if (cf.index == target)
+                  {
+                     VideoRecycle(v, std::move(v->publishedPixels));
+                     v->publishedPixels = std::move(cf.pixels);
+                     v->publishedSerial = serial;
+                  }
+                  else if (v->cache.size() < v->cacheCapacity)
+                     v->cache.push_back(std::move(cf));
+                  else
+                     VideoRecycle(v, std::move(cf.pixels));
+               }
+               continue;
+            }
+
+            const bool ok = VideoDecodeInto(v, target, scratch);
+            std::lock_guard<std::mutex> lock(v->frameMutex);
+            if (!ok)
+            {
+               // A failed read-ahead means the container over-reported its
+               // length: stop speculating past this point.
+               if (prefetch)
+                  v->frameCount = target;
+               VideoRecycle(v, std::move(scratch));
+               continue;
+            }
+            if (prefetch)
+            {
+               VideoHandle::CachedFrame cf;
+               cf.index = target;
+               cf.pixels = std::move(scratch);
+               v->cache.push_back(std::move(cf));
+            }
+            else
+            {
+               VideoRecycle(v, std::move(v->publishedPixels));
+               v->publishedPixels = std::move(scratch);
+               v->publishedSerial = serial;
             }
          }
-      });
+      }
+   }
+
+   VideoHandle* VideoOpen(const std::string& path, std::string& error)
+   {
+      auto handle = std::make_unique<VideoHandle>();
+      // Hardware decode (D3D11VA/DXVA through FFmpeg) unless disabled with
+      // INFINITE_VIDEO_HWACCEL=0. Falls back to software, then to any backend.
+      bool opened = false;
+      const char* hw = std::getenv("INFINITE_VIDEO_HWACCEL");
+      if (hw == nullptr || std::strcmp(hw, "0") != 0)
+      {
+         const std::vector<int> params = { cv::CAP_PROP_HW_ACCELERATION, cv::VIDEO_ACCELERATION_ANY };
+         opened = handle->capture.open(path, cv::CAP_FFMPEG, params);
+      }
+      if (!opened)
+         opened = handle->capture.open(path, cv::CAP_FFMPEG);
+      if (!opened)
+         opened = handle->capture.open(path);
+      if (!opened)
+      {
+         error = "OpenCV could not open video";
+         return nullptr;
+      }
+      const int w = (int)handle->capture.get(cv::CAP_PROP_FRAME_WIDTH);
+      const int h = (int)handle->capture.get(cv::CAP_PROP_FRAME_HEIGHT);
+      handle->width.store(w, std::memory_order_relaxed);
+      handle->height.store(h, std::memory_order_relaxed);
+      handle->fps = handle->capture.get(cv::CAP_PROP_FPS);
+      if (handle->fps <= 0.0)
+         handle->fps = 30.0;
+      const double frames = handle->capture.get(cv::CAP_PROP_FRAME_COUNT);
+      handle->frameCount = frames > 0 ? (long long)frames : 0;
+      handle->duration = frames > 0 ? frames / handle->fps : 0.0;
+      const size_t frameBytes = (size_t)std::max(1, w) * (size_t)std::max(1, h) * 3;
+      handle->cacheCapacity = std::clamp<size_t>(kVideoCacheBudgetBytes / frameBytes, 2, 8);
+      RuntimeLog::Write("video opened: %dx%d %.2f fps, hwaccel=%d, read-ahead=%d frames",
+                        w, h, handle->fps,
+                        (int)handle->capture.get(cv::CAP_PROP_HW_ACCELERATION),
+                        (int)handle->cacheCapacity);
+      VideoHandle* raw = handle.get();
+      handle->decoder = std::thread(VideoDecodeWorker, raw);
       return handle.release();
    }
    void VideoClose(VideoHandle* h) { delete h; }
@@ -647,6 +933,8 @@ namespace Platform
          std::lock_guard<std::mutex> lock(h->frameMutex);
          if (targetFrame != h->lastQueuedFrame)
          {
+            if (h->lastQueuedFrame >= 0)
+               h->direction = targetFrame < h->lastQueuedFrame ? -1 : 1;
             h->requestedFrame = targetFrame;
             h->lastQueuedFrame = targetFrame;
             ++h->requestSerial;
@@ -654,7 +942,9 @@ namespace Platform
          }
          if (h->publishedSerial != h->consumedSerial && !h->publishedPixels.empty())
          {
-            out = h->publishedPixels;
+            // Swap instead of copy: the caller's previous buffer goes back to
+            // the decoder as the next scratch buffer.
+            out.swap(h->publishedPixels);
             h->consumedSerial = h->publishedSerial;
             produced = true;
          }
@@ -1018,6 +1308,7 @@ namespace Platform
          float gain = 1.0f, attack = 0.25f, release = 0.08f;
          double sampleRate = 48000.0;
          int blockSize = 512;
+         std::atomic<int> roundTripFrames {0};
          double spikePhase = 0.0;
          std::atomic<unsigned long long> spikeCallbacks {0};
          std::atomic<long long> spikeLastUs {0};
@@ -1038,6 +1329,8 @@ namespace Platform
             if (!device) return;
             sampleRate = device->getCurrentSampleRate();
             blockSize = device->getCurrentBufferSizeSamples();
+            roundTripFrames.store(std::max(0, device->getInputLatencyInSamples()) +
+                                  std::max(0, device->getOutputLatencyInSamples()) + std::max(0, blockSize));
             lastDevice = device->getName().toStdString();
          }
          void audioDeviceStopped() override {}
@@ -1155,6 +1448,7 @@ namespace Platform
    }
    void AudioDeviceClose() { AudioBridgeInstance().callback = nullptr; AudioBridgeInstance().user = nullptr; if (!AudioBridgeInstance().analyzer.load()) AudioBridgeInstance().manager.closeAudioDevice(); }
    uint32_t AudioDeviceBufferFrames(uint32_t) { return (uint32_t)std::max(0, AudioBridgeInstance().blockSize); }
+   int AudioRoundTripLatencyFrames() { return AudioBridgeInstance().roundTripFrames.load(std::memory_order_relaxed); }
    bool AudioDeviceConfigDidChange() { return AudioBridgeInstance().configChanged.exchange(false); }
    bool AudioWillSleep() { return false; }
    bool AudioDidWake() { return false; }
@@ -1695,6 +1989,9 @@ namespace Platform
       else if (r == CameraResolution::Res480p) { w = 640; ht = 480; }
       if (w != 0)
       {
+         // Most USB webcams only reach 30 fps at 720p/1080p in MJPG; the
+         // default YUY2 mode often drops to 5-10 fps. Ignored if unsupported.
+         h->capture.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
          h->capture.set(cv::CAP_PROP_FRAME_WIDTH, w);
          h->capture.set(cv::CAP_PROP_FRAME_HEIGHT, ht);
       }
@@ -1711,11 +2008,13 @@ namespace Platform
          return nullptr;
       }
       h->mirror.store(mirror, std::memory_order_relaxed);
+      h->capture.set(cv::CAP_PROP_BUFFERSIZE, 1); // newest frame, not a queue
       CameraSetResolution(h.get(), res);
       h->running.store(true, std::memory_order_release);
       CameraHandle* raw = h.get();
       h->worker = std::thread([raw]() {
-         cv::Mat frame, rgba;
+         cv::Mat frame;
+         std::vector<unsigned char> pixels;
          int consecutiveFailures = 0;
          while (raw->running.load(std::memory_order_acquire))
          {
@@ -1727,14 +2026,24 @@ namespace Platform
                continue;
             }
             consecutiveFailures = 0;
-            if (raw->mirror.load(std::memory_order_relaxed))
-               cv::flip(frame, frame, 1);
-            cv::cvtColor(frame, rgba, cv::COLOR_BGR2RGBA);
-            cv::flip(rgba, rgba, 0);
+            if (frame.type() != CV_8UC3)
+            {
+               cv::Mat converted;
+               if (frame.channels() == 4) cv::cvtColor(frame, converted, cv::COLOR_BGRA2BGR);
+               else if (frame.channels() == 1) cv::cvtColor(frame, converted, cv::COLOR_GRAY2BGR);
+               else frame.convertTo(converted, CV_8UC3);
+               frame = converted;
+            }
+            // One pass: vertical flip to GL row order, plus the horizontal
+            // mirror when requested (flip code -1 = both axes). Stays BGR8;
+            // the GPU swizzles on upload.
+            pixels.resize((size_t)frame.cols * (size_t)frame.rows * 3);
+            cv::Mat dst(frame.rows, frame.cols, CV_8UC3, pixels.data());
+            cv::flip(frame, dst, raw->mirror.load(std::memory_order_relaxed) ? -1 : 0);
             std::lock_guard<std::mutex> lock(raw->frameMutex);
-            raw->width = rgba.cols;
-            raw->height = rgba.rows;
-            raw->latestFrame.assign(rgba.datastart, rgba.dataend);
+            raw->width = frame.cols;
+            raw->height = frame.rows;
+            raw->latestFrame.swap(pixels);
             ++raw->seq;
          }
       });
@@ -1768,7 +2077,7 @@ namespace Platform
       if (h == nullptr) return false;
       std::lock_guard<std::mutex> lock(h->frameMutex);
       if (h->latestFrame.empty() || h->seq == h->deliveredSeq) return false;
-      out = h->latestFrame;
+      out.swap(h->latestFrame); // recycled by the capture thread
       w = h->width;
       ht = h->height;
       seq = h->seq;
@@ -1777,4 +2086,3 @@ namespace Platform
    }
 }
 
-#endif

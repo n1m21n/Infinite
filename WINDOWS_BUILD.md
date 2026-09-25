@@ -1,26 +1,26 @@
 # Infinite para Windows x64
 
-Este pacote porta o Infinite para Windows mantendo o editor GLFW/ImGui e os recursos do código-fonte atual. As integrações exclusivas do macOS foram substituídas por APIs equivalentes no Windows.
+Infinite-Turbo (for Windows) e a versao nao oficial, exclusiva para Windows, do Infinite. Este pacote porta o Infinite para Windows mantendo o editor GLFW/ImGui e os recursos do código-fonte atual. As integrações exclusivas do macOS foram substituídas por APIs equivalentes no Windows.
 
 ## Compilação rápida
 
 Requisitos: Windows 10 ou 11 x64, Windows Package Manager (`winget`) e pelo menos 35 GB livres. A primeira compilação do OpenCV pode levar bastante tempo.
 
 1. Execute `install-dependencies.bat` e aceite a janela do UAC. O script relança `cmd.exe` como administrador, mostra o progresso ao vivo, atualiza o `PATH` da sessão e instala Git, CMake, Visual Studio 2022 Build Tools com C++, FFmpeg, vcpkg, bibliotecas C++, Windows ML/DirectML e os modelos U2Net. A janela elevada aguarda uma tecla antes de fechar.
-2. Execute `build-windows.bat`.
-3. Abra `dist\Infinite-Windows-x64\Infinite.exe` ou use `run-windows.bat`.
+2. Execute `build-windows.bat`. Por padrão ele só compila a build de teste em `build\windows-vs2022\Release\Infinite-Turbo.exe`.
+3. Rode `run-windows.bat`.
 
-O pacote compilado é criado em `dist\Infinite-Windows-x64.zip`.
+Para gerar o pacote de distribuição (`dist\Infinite-Turbo-Windows-x64` e `dist\Infinite-Turbo-Windows-x64.zip`), use `build-windows.bat pack`.
 
 ## Instalação sem compilar
 
-Use esta sequência somente depois de baixar o `Infinite-Windows-x64.zip` de uma GitHub Release:
+Use esta sequência somente depois de baixar o `Infinite-Turbo-Windows-x64.zip` de uma GitHub Release:
 
 1. Extraia o ZIP para uma pasta normal.
 2. Execute `install-runtime.bat` uma vez. Ele instala FFmpeg e os modelos usados pelo Remove Background.
 3. Execute `run-windows.bat`.
 
-Não execute `install-dependencies.bat` para usar o binário pronto. Ele instala compiladores, vcpkg e bibliotecas de desenvolvimento e só é necessário para gerar um novo `Infinite.exe`.
+Não execute `install-dependencies.bat` para usar o binário pronto. Ele instala compiladores, vcpkg e bibliotecas de desenvolvimento e só é necessário para gerar um novo `Infinite-Turbo.exe`.
 
 ## CV em botões e seletores
 
@@ -153,7 +153,7 @@ Na revisão 22, a categoria proprietária `NVIDIA VFX` foi removida. O node exis
 
 DirectML usa DirectX 12 e funciona com GPUs compatíveis de NVIDIA, AMD e Intel. Em computadores híbridos, o Infinite escolhe para inferência o adaptador com mais memória dedicada, evitando que a RTX fique ociosa enquanto a GPU integrada processa o modelo. As sessões ONNX são persistentes e a execução continua na thread mais recente da R20, sem bloquear UI, áudio ou output.
 
-O instalador baixa `Microsoft.Windows.AI.MachineLearning 2.2.12` do NuGet oficial. O pacote compilado leva `onnxruntime.dll` e `DirectML.dll` ao lado de `Infinite.exe`, portanto não exige conta NVIDIA, NGC, Maxine nem instalação separada no computador que executa a distribuição.
+O instalador baixa `Microsoft.Windows.AI.MachineLearning 2.2.12` do NuGet oficial. O pacote compilado leva `onnxruntime.dll` e `DirectML.dll` ao lado de `Infinite-Turbo.exe`, portanto não exige conta NVIDIA, NGC, Maxine nem instalação separada no computador que executa a distribuição.
 
 Na revisão 23, o CMake passou a localizar explicitamente o header C++ nativo `onnxruntime_cxx_api.h` dentro da pasta `winml` do pacote NuGet e a publicar essa pasta ao compilador. Isso corrige o erro C1083 da R22: o alvo CMake importado foi encontrado, mas não propagou o include do pacote 2.2.12 neste fluxo fora do MSBuild.
 
@@ -199,8 +199,8 @@ cmake --preset windows-vs2022 --fresh -DINFINITE_ENABLE_DIRECTML_MATTING=OFF
 - sem entrada de áudio: autorize o microfone e selecione um dispositivo WASAPI válido no Infinite.
 - Spout sem imagem: confirme que emissor e receptor usam a mesma GPU e o mesmo nome de sender.
 - plugin não aparece: adicione sua pasta VST3 no painel e execute uma nova varredura.
-- gravação sem áudio: confirme que `ffmpeg.exe` está no `PATH` ou junto de `Infinite.exe`.
-- aplicativo fecha imediatamente: execute `diagnose-windows.bat` ao lado de `Infinite.exe` e envie o arquivo `Infinite-diagnostic.log`. O diagnóstico registra o código de saída, dependências PE, GPU e falhas recentes do Windows.
+- gravação sem áudio: confirme que `ffmpeg.exe` está no `PATH` ou junto de `Infinite-Turbo.exe`.
+- aplicativo fecha imediatamente: execute `diagnose-windows.bat` ao lado de `Infinite-Turbo.exe` e envie o arquivo `Infinite-Turbo-diagnostic.log`. O diagnóstico registra o código de saída, dependências PE, GPU e falhas recentes do Windows.
 - violação de acesso `0xC0000005` antes da interface ou durante `INFINITE_DSPTEST`: use a revisão 10. Ela inicializa o runtime JUCE antes dos modos headless e do GLFW, desativa o buffer dos logs e registra cada etapa em `%LOCALAPPDATA%\Infinite\Infinite-startup.log`.
 - erros `OutputDebugStringA`, `EXCEPTION_POINTERS`, `WINAPI` ou `SetUnhandledExceptionFilter` ao compilar a revisão 10: use a revisão 11. O `main.cpp` agora inclui explicitamente a API Win32 usada pelo diagnóstico.
 - muitos erros começando por `Mesh.h`, `Geometry3DNodes.h` ou `Polyline` na revisão 11: use a revisão 12. A instrumentação deixou de incluir `windows.h` em `main.cpp`, evitando a colisão com a função GDI `Polyline`. Esses erros não eram causados pelo JUCE nem pelos nodes 3D.
@@ -214,7 +214,7 @@ cmake --preset windows-vs2022 --fresh -DINFINITE_ENABLE_DIRECTML_MATTING=OFF
 - a interface pausa ao soltar um cabo sem completar a ligação: use a revisão 17. O menu de busca continua abrindo, mas não instancia mais todos os módulos apenas para ordenar sugestões.
 - Video Player sem áudio, trim ou cues: use a revisão 17. Ligue o novo output `audio` a `Audio Out`; os quatro inputs de cue disparam quando o sinal cruza de zero para um valor positivo.
 - Projection deforma a imagem, Video In trava a interface, output some atrás da UI ou 30 FPS fica em 28-29: use a revisão 18. Ela preserva aspecto, move a câmera para background, mantém o output flutuante e remove o segundo VSync.
-- Infinite.exe abre um terminal, ou falta diagnóstico e recuperação de crash: use a revisão 18. O executável é GUI; o log e o autosave ficam em `%LOCALAPPDATA%\Infinite`.
+- Infinite-Turbo.exe abre um terminal, ou falta diagnóstico e recuperação de crash: use a revisão 18. O executável é GUI; o log e o autosave ficam em `%LOCALAPPDATA%\Infinite`.
 - Video aparece sem preview/`Choose video...`, previews 3D derrubam o FPS, ou o output abre grande e some ao clicar na UI: use a revisão 19. Ela corrige a classificação mista de vídeo+áudio, adiciona monitor universal, decodifica vídeo fora da UI e usa fullscreen borderless topmost no monitor escolhido.
 - Feedback parece não fazer nada, a lista de módulos está desordenada, Video fica largo, falta GPU/VRAM, Remove Background congela a UI ou a lateral não redimensiona: use a revisão 20.
 - `Windows ML package was not found`: execute `install-dependencies.bat` da revisão 22 e depois rode `build-windows.bat` novamente.
@@ -229,7 +229,7 @@ cmake --preset windows-vs2022 --fresh -DINFINITE_ENABLE_DIRECTML_MATTING=OFF
 - Text ainda fica transparente ou a UI cai ao digitar, ou a gravação do Output derruba frames no início: use a revisão 31. Text usa um worker GDI+ latest-only e Output usa captura OpenGL assíncrona com PBO triplo, pacing CFR e áudio fora da UI.
 - erro MSVC C2027/C2338 em `TextWindowsRasterState` ao compilar a R31: aplique a revisão 31A. Ela move o construtor de `TextNode` para depois da definição completa do estado privado do worker.
 - `DirectML only` falha: atualize o driver da GPU e confirme suporte a DirectX 12. Volte para `Auto GPU (DX12)` para manter o fallback CPU enquanto investiga.
-- o status mostra `OpenCV CPU fallback`: o Infinite tentou DirectML e registrou a causa em `%LOCALAPPDATA%\Infinite\Infinite.log`. As DLLs `onnxruntime.dll` e `DirectML.dll` devem estar ao lado de `Infinite.exe`.
+- o status mostra `OpenCV CPU fallback`: o Infinite tentou DirectML e registrou a causa em `%LOCALAPPDATA%\Infinite\Infinite.log`. As DLLs `onnxruntime.dll` e `DirectML.dll` devem estar ao lado de `Infinite-Turbo.exe`.
 
 ## Licenças
 

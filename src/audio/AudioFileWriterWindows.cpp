@@ -1,6 +1,5 @@
 #include "AudioFileWriter.h"
 
-#if defined(_WIN32)
 
 #include "shine.h"
 #include <juce_audio_formats/juce_audio_formats.h>
@@ -109,4 +108,3 @@ namespace AudioRecordings
    bool WriteWav(const std::string&path,const float*data,int frames,double rate,int channels){if(!data||frames<=0||rate<=0)return false;AudioFileWriter w;if(!w.Open(path,rate,channels,AudioFileWriter::Format::Wav))return false;w.Append(data,frames);w.Close();return true;}
 }
 
-#endif

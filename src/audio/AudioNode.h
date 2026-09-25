@@ -76,12 +76,17 @@ public:
    virtual void SetNoteInbox(NoteEventQueue* inbox, int cursor) { (void)inbox; (void)cursor; }
 
    // Slot-aware inbox setter for a note consumer with more than one note
-   // input (currently only Note Merge). Default forwards slot 0 to the
-   // existing single-slot overload so every pre-existing consumer needs no
-   // change.
+   // input (currently only Note Merge, which overrides this).
+   // Turbo fix: the default used to forward only slot 0, but the topology
+   // builder calls this with the node's REAL note-pin slot - and the Plugin
+   // node keeps audio at slot 0 and notes at slot 1, so no VST instrument ever
+   // received a note (the same for any single-note-pin node whose pin is not
+   // slot 0). The builder only calls this for slots whose NoteInputSlot() is
+   // non-null, so a node with one note pin gets exactly one call: forward it
+   // whatever the slot index is.
    virtual void SetNoteInbox(int inputSlot, NoteEventQueue* inbox, int cursor)
    {
-      if (inputSlot == 0)
-         SetNoteInbox(inbox, cursor);
+      (void)inputSlot;
+      SetNoteInbox(inbox, cursor);
    }
 };

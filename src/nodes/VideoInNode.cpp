@@ -98,6 +98,8 @@ void VideoInNode::EnsurePlaceholder()
 
    mWidth = kSize;
    mHeight = kSize;
+   mTexW = kSize;
+   mTexH = kSize;
    mHasPlaceholder = true;
 }
 
@@ -159,11 +161,20 @@ void VideoInNode::CookIfNeeded(int frameId)
       unsigned long long frameSeq = 0;
       if (Platform::CameraReadFrame(mCamera, mFrame, w, h, frameSeq) && !mFrame.empty())
       {
-         if (w > 0 && h > 0)
+         if (w > 0 && h > 0 && mFrame.size() >= (size_t)w * (size_t)h * 3)
          {
+            // BGR8 from the capture thread, uploaded without CPU conversion;
+            // storage reallocated only when the camera resolution changes.
             glBindTexture(GL_TEXTURE_2D, mTex);
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, mFrame.data());
+            if (w != mTexW || h != mTexH)
+            {
+               glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_BGR, GL_UNSIGNED_BYTE, mFrame.data());
+               mTexW = w;
+               mTexH = h;
+            }
+            else
+               glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_BGR, GL_UNSIGNED_BYTE, mFrame.data());
             glBindTexture(GL_TEXTURE_2D, 0);
 
             mWidth = w;

@@ -9,7 +9,7 @@ this skill directory.
 ## Run this first
 
 ```bash
-.claude/skills/audio-node-sweep/driver.sh
+test-windows.bat -Only AUDIOPARAMSWEEPTEST,AUDIOTEARDOWNSWEEPTEST
 ```
 
 Add `--skip-build` to reuse the existing `build/` tree. Runs both sweeps
@@ -118,7 +118,7 @@ on the next run because they enumerate `NodeFactory` themselves.
   defaults, actually do anything audible?
 - `[FAIL]` (teardown sweep) — a real use-after-free: a downstream cable
   wasn't cleared, or the process didn't reach the verdict line at all
-  (crashed - see the `[CRASH]` handling in `driver.sh`).
+  (crashed - see the `[CRASH]` handling in the test driver).
 - `[SKIP]` — no synthetic input exists to drive this node's params at all
   (currently only MIDI Notes: it reads live/injected hardware MIDI, not a
   note-cable input). Not a clean bill of health, the same way the geometry
@@ -223,17 +223,17 @@ case can be added to the blind-spots list above rather than assumed covered.
 
 ## Gotchas
 
-- Like `run-infinite-hygiene`'s suite, the verdict is a printf line, not an
+- Like `run-turbo-tests`'s suite, the verdict is a printf line, not an
   exit code from the app itself - `main()` returns 0 even when
   `AUDIOPARAMSWEEPTEST` fails (it returns 1 only for that specific early-exit
   path; the teardown sweep's `main()` always returns 0 like every other
-  windowed fixture). `driver.sh` greps for each sweep's own `... OK`/`...
+  windowed fixture). the test driver greps for each sweep's own `... OK`/`...
   FAIL` marker rather than trusting the exit code alone.
 - The teardown sweep needs `INFINITE_EXITAFTER` set (see any other windowed
   fixture) or the app will sit in its normal event loop after printing the
   verdict.
-- This is a different, narrower harness than `run-infinite-hygiene` - it does
-  not build/screenshot/eyeball rendering. `run-infinite-hygiene`'s suite runs
+- This is a different, narrower harness than `run-turbo-tests` - it does
+  not build/screenshot/eyeball rendering. `run-turbo-tests`'s suite runs
   both of these sweeps too, so a plain pre-commit hygiene run already covers
   this; use this skill directly when you want the sweeps in isolation or are
   adding a new audio/note node and want fast iteration (`--skip-build`).

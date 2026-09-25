@@ -12,8 +12,8 @@
 #include "ImageCable.h"
 #include "GLUtil.h"
 
-// Background removal using Apple Vision on macOS and U2Net through Windows ML
-// + DirectML/DX12 on Windows, with a portable OpenCV CPU fallback.
+// Background removal with U2Net through Windows ML + DirectML/DX12, with an
+// OpenCV CPU fallback.
 //
 // Masking costs a GPU readback plus a Vision pass, which is far too slow to run
 // every frame at video rates, so the mask is computed on demand (or at a capped
@@ -70,12 +70,23 @@ private:
    void QueueMask(unsigned int srcTex, int w, int h);
    void WorkerLoop();
    void ConsumeCompletedMask();
+   void PollReadbacks();
+   void ReleaseGpuFrames(uint64_t upTo, uint64_t keep);
 
    ImageCable mInput;
    GLUtil::Fbo mOut;
    unsigned int mProgram = 0;
    unsigned int mMaskTex = 0;
-   unsigned int mPairedSourceTex = 0;
+   unsigned int mPairedSourceTex = 0; // non-owning: texture of the GpuFrame paired with mMaskTex
+   struct GpuFrame { uint64_t serial = 0; GLUtil::Fbo fbo; };
+   struct PendingReadback { uint64_t serial = 0; unsigned int pbo = 0; void* fence = nullptr; int w = 0, h = 0; };
+   std::deque<GpuFrame> mGpuFrames;          // full-res copies awaiting / paired with a mask
+   std::vector<GpuFrame> mFreeGpuFrames;
+   std::deque<PendingReadback> mPendingReadbacks;
+   std::vector<unsigned int> mFreePbos;
+   GLUtil::Fbo mSmall;                       // downscaled copy that gets read back
+   unsigned int mReadFbo = 0;
+   uint64_t mPairedSerial = 0;
    bool mShaderTried = false;
    bool mNeedsMask = false;
    int mLastCookFrame = -1;
@@ -96,7 +107,6 @@ private:
    std::deque<FrameRequest> mRequests;
    uint64_t mNextSerial = 0;
    std::vector<unsigned char> mCompletedMask;
-   std::vector<unsigned char> mCompletedSource;
    int mCompletedWidth = 0;
    int mCompletedHeight = 0;
    uint64_t mCompletedSerial = 0;

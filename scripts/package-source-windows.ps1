@@ -2,8 +2,8 @@ $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
 $distRoot = Join-Path $root 'dist'
-$stage = Join-Path $distRoot 'Infinite-Windows-GitHub-Source-R31A'
-$zip = Join-Path $distRoot 'Infinite-Windows-GitHub-Source-R31A.zip'
+$stage = Join-Path $distRoot 'Infinite-Turbo-Windows-Source'
+$zip = Join-Path $distRoot 'Infinite-Turbo-Windows-Source.zip'
 
 if (Test-Path -LiteralPath $stage) {
     Remove-Item -LiteralPath $stage -Recurse -Force
@@ -15,21 +15,20 @@ New-Item -ItemType Directory -Path $stage -Force | Out-Null
 
 $rootFiles = @(
     '.gitignore',
-    '.gitmodules',
     'ARCHITECTURE.md',
+    'CHANGELOG-TURBO.md',
     'CMakeLists.txt',
     'CMakePresets.json',
     'LICENSE',
     'PACKAGE_MANIFEST.txt',
-    'PATCH-R31A-INSTRUCOES.txt',
     'README.md',
     'WINDOWS_BUILD.md',
     'build-windows.bat',
     'diagnose-windows.bat',
     'install-dependencies.bat',
     'install-runtime.bat',
-    'package.sh',
     'run-windows.bat',
+    'test-windows.bat',
     'vcpkg.json'
 )
 foreach ($relative in $rootFiles) {
@@ -51,8 +50,6 @@ Copy-Item -LiteralPath (Join-Path $root '.github\workflows\windows-build.yml') -
 $assetDir = Join-Path $stage 'assets'
 New-Item -ItemType Directory -Path $assetDir -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $root 'assets\Infinite.ico') -Destination $assetDir
-Copy-Item -LiteralPath (Join-Path $root 'assets\Infinite.icns') -Destination $assetDir
-Copy-Item -LiteralPath (Join-Path $root 'assets\InfinitePatch.icns') -Destination $assetDir
 Copy-Item -LiteralPath (Join-Path $root 'assets\fonts') -Destination $assetDir -Recurse
 Copy-Item -LiteralPath (Join-Path $root 'assets\examples') -Destination $assetDir -Recurse
 
@@ -67,7 +64,7 @@ foreach ($relative in @('CODE_STANDARDS.md', 'screenshot.png')) {
 
 $externalDir = Join-Path $stage 'external'
 New-Item -ItemType Directory -Path $externalDir -Force | Out-Null
-foreach ($name in @('imgui', 'imgui-node-editor', 'json', 'shine', 'stb', 'syphon')) {
+foreach ($name in @('imgui', 'imgui-node-editor', 'json', 'shine', 'stb')) {
     Copy-Item -LiteralPath (Join-Path $root (Join-Path 'external' $name)) -Destination $externalDir -Recurse
 }
 
@@ -82,7 +79,7 @@ Intentionally omitted because they are not consumed by the Windows build:
 - editor-specific .claude state
 
 The future compiled release must be attached separately as:
-dist\Infinite-Windows-x64.zip
+dist\Infinite-Turbo-Windows-x64.zip
 "@ | Set-Content -LiteralPath (Join-Path $stage 'GITHUB_DELIVERY.md') -Encoding UTF8
 
 Compress-Archive -LiteralPath $stage -DestinationPath $zip -CompressionLevel Optimal

@@ -130,7 +130,7 @@ prompt:
    shipped bug before (see the `geometry-transform-sweep` skill) — call
    them out explicitly in the prompt rather than assuming the implementer
    already knows the convention.
-4. Point the prompt at running `.claude/skills/geometry-transform-sweep/driver.sh`
+4. Point the prompt at running `test-windows.bat -Only TRANSFORMSWEEPTEST,MAPPINGSWEEPTEST,REVISIONSWEEPTEST,RENDER3DCACHESWEEPTEST`
    afterward if the new node has a geometry input — it catches exactly the
    two bug classes above automatically instead of relying on manual review.
 
@@ -150,16 +150,16 @@ zero memory of this conversation. Structure:
   genuinely has more than one reasonable answer, say that explicitly and
   give the fresh session your recommendation plus why, rather than silently
   picking one without flagging it as a choice.
-- **Always end with a build step.** This is a compiled macOS app, not
+- **Always end with a build step.** This is a compiled Windows app, not
   something you can smoke-test by reading source. Include:
   ```
-  cmake --build build -j"$(sysctl -n hw.ncpu)"
+  build-windows.bat
   ```
-  (reuses the existing configured `build/` tree — see `run-infinite-hygiene`
+  (reuses the existing configured `build/` tree — see `run-turbo-tests`
   for the fuller build/test story) and tell the implementer to confirm it
   compiles clean, not just that the edit "looks right." If the change
   touches a geometry-consuming node, also tell it to run
-  `.claude/skills/geometry-transform-sweep/driver.sh` before considering it
+  `test-windows.bat -Only TRANSFORMSWEEPTEST,MAPPINGSWEEPTEST,REVISIONSWEEPTEST,RENDER3DCACHESWEEPTEST` before considering it
   done.
 - **Say explicitly what's out of scope**, if the surrounding conversation
   turned up adjacent things worth fixing that this prompt deliberately

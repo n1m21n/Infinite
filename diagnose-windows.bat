@@ -1,21 +1,22 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
-title Infinite - diagnostico de inicializacao
+title Infinite-Turbo - diagnostico de inicializacao
 
-set "LOG=%~dp0Infinite-diagnostic.log"
+set "LOG=%~dp0Infinite-Turbo-diagnostic.log"
 set "INFINITE_EXE="
-if exist "%~dp0Infinite.exe" set "INFINITE_EXE=%~dp0Infinite.exe"
-if not defined INFINITE_EXE if exist "%~dp0dist\Infinite-Windows-x64\Infinite.exe" set "INFINITE_EXE=%~dp0dist\Infinite-Windows-x64\Infinite.exe"
-if not defined INFINITE_EXE if exist "%~dp0build\windows-vs2022\Release\Infinite.exe" set "INFINITE_EXE=%~dp0build\windows-vs2022\Release\Infinite.exe"
+if exist "%~dp0Infinite-Turbo.exe" set "INFINITE_EXE=%~dp0Infinite-Turbo.exe"
+if not defined INFINITE_EXE if exist "%~dp0dist\Infinite-Turbo-Windows-x64\Infinite-Turbo.exe" set "INFINITE_EXE=%~dp0dist\Infinite-Turbo-Windows-x64\Infinite-Turbo.exe"
+if not defined INFINITE_EXE if exist "%~dp0build\windows-vs2022\Release\Infinite-Turbo.exe" set "INFINITE_EXE=%~dp0build\windows-vs2022\Release\Infinite-Turbo.exe"
+if not defined INFINITE_EXE if exist "%~dp0build\windows-vs2022\Debug\Infinite-Turbo.exe" set "INFINITE_EXE=%~dp0build\windows-vs2022\Debug\Infinite-Turbo.exe"
 
->"%LOG%" echo Infinite Windows - diagnostico de inicializacao
+>"%LOG%" echo Infinite-Turbo (for Windows) - diagnostico de inicializacao
 >>"%LOG%" echo Data: %DATE% %TIME%
 >>"%LOG%" echo Pasta: %CD%
 >>"%LOG%" echo.
 
 if not defined INFINITE_EXE (
-  >>"%LOG%" echo ERRO: Infinite.exe nao encontrado.
+  >>"%LOG%" echo ERRO: Infinite-Turbo.exe nao encontrado.
   type "%LOG%"
   pause
   exit /b 1
@@ -67,7 +68,7 @@ for %%D in (onnxruntime.dll DirectML.dll) do (
 
 >>"%LOG%" echo.
 >>"%LOG%" echo ===== EXECUCAO =====
-echo Executando Infinite.exe. Aguarde a abertura ou o encerramento...
+echo Executando Infinite-Turbo.exe. Aguarde a abertura ou o encerramento...
 set "STARTUP_LOG_EXE=!INFINITE_DIR!Infinite-startup.log"
 set "STARTUP_LOG_LOCAL=%LOCALAPPDATA%\Infinite\Infinite-startup.log"
 if exist "!STARTUP_LOG_EXE!" del /q "!STARTUP_LOG_EXE!"
@@ -98,17 +99,17 @@ if exist "!VST_SCANNER!" (
   >>"%LOG%" echo Scanner auxiliar: !VST_SCANNER!
   certutil -hashfile "!VST_SCANNER!" SHA256 >>"%LOG%" 2>&1
 ) else (
-  >>"%LOG%" echo ERRO: infinite-vst3-scanner.exe nao encontrado ao lado do Infinite.exe.
+  >>"%LOG%" echo ERRO: infinite-vst3-scanner.exe nao encontrado ao lado do Infinite-Turbo.exe.
 )
 if exist "%LOCALAPPDATA%\Infinite\Infinite-vst3.log" (
   type "%LOCALAPPDATA%\Infinite\Infinite-vst3.log" >>"%LOG%" 2>&1
 ) else (
   >>"%LOG%" echo Infinite-vst3.log ainda nao foi criado.
 )
-if exist "%LOCALAPPDATA%\Infinite\PluginVST3Blocklist-v3.txt" (
+for %%B in ("%LOCALAPPDATA%\Infinite\PluginVST3Blocklist-v*.txt") do (
   >>"%LOG%" echo.
-  >>"%LOG%" echo Blocklist VST3 atual:
-  type "%LOCALAPPDATA%\Infinite\PluginVST3Blocklist-v3.txt" >>"%LOG%" 2>&1
+  >>"%LOG%" echo Blocklist VST3 atual: %%~nxB
+  type "%%~fB" >>"%LOG%" 2>&1
 )
 
 >>"%LOG%" echo.
@@ -121,7 +122,7 @@ if exist "%LOCALAPPDATA%\Infinite\Infinite.log" (
 
 >>"%LOG%" echo.
 >>"%LOG%" echo ===== EVENTOS DE ERRO RECENTES =====
-powershell.exe -NoProfile -Command "$start=(Get-Date).AddMinutes(-10); Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=$start; Level=2} -ErrorAction SilentlyContinue | Where-Object { $_.Message -match 'Infinite.exe' } | Select-Object -First 8 TimeCreated,ProviderName,Id,Message | Format-List" >>"%LOG%" 2>&1
+powershell.exe -NoProfile -Command "$start=(Get-Date).AddMinutes(-10); Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=$start; Level=2} -ErrorAction SilentlyContinue | Where-Object { $_.Message -match 'Infinite-Turbo.exe' } | Select-Object -First 8 TimeCreated,ProviderName,Id,Message | Format-List" >>"%LOG%" 2>&1
 
 echo.
 echo Diagnostico concluido.

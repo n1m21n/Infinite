@@ -188,7 +188,7 @@ fields need to be in the signature by hand.
 ## 7. Tests — write them with the node, not after
 
 - Confirm the node is picked up by `geometry-transform-sweep`
-  (`.claude/skills/geometry-transform-sweep/driver.sh`) rather than writing
+  (`test-windows.bat -Only TRANSFORMSWEEPTEST,MAPPINGSWEEPTEST,REVISIONSWEEPTEST,RENDER3DCACHESWEEPTEST`) rather than writing
   a per-node version: it checks (1) moving/rotating/scaling an upstream
   source propagates through to final output, (2) a `Mapping` node's
   UV/offset/rotate/scale propagates the same way, (3) the revision/
@@ -199,7 +199,7 @@ fields need to be in the signature by hand.
 - Manually verify the caching trap (§4): change every field your
   `CookIfNeeded` reads, one at a time, and confirm the render updates each
   time.
-- Then run `/run-infinite-hygiene` before committing.
+- Then run `/run-turbo-tests` before committing.
 
 ---
 
@@ -219,7 +219,7 @@ A node is done when all of these hold:
 5. Its params survive save → load → undo → copy/paste → delete unchanged.
 6. Its own cache correctly invalidates on every field its `CookIfNeeded`
    reads — no stale/frozen render after a param change.
-7. `/run-infinite-hygiene` passes.
+7. `/run-turbo-tests` passes.
 8. `README.md`'s 3D node table and `ARCHITECTURE.md` (if relevant) are
    updated.
 

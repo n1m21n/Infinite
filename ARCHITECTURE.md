@@ -1,5 +1,11 @@
 # Architecture Map
 
+> **Infinite-Turbo note (0.32):** this project is Windows-only now. `src/main.cpp` is ~38,300
+> lines, so the line numbers below are from the original 9k-line file and are only a rough
+> guide: search for the function names instead. The Platform Layer is `PlatformWindows.cpp`
+> (+ `PluginVST3Windows.cpp`, `AudioFileWriterWindows.cpp`, `TextNodeWindows.cpp`); ignore
+> every mention of `Platform.mm`, AppKit, AU or Syphon internals below.
+
 Documentation-only index of where things live in this codebase. No code was
 moved to produce this — `main.cpp` is a single ~9,146-line file (almost
 entirely one `int main()`), so instead of a risky physical split, this doc

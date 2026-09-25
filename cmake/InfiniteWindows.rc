@@ -6,8 +6,8 @@ GLFW_ICON ICON "../assets/Infinite.ico"
 IDI_ICON1 ICON "../assets/Infinite.ico"
 
 1 VERSIONINFO
- FILEVERSION 0,1,0,0
- PRODUCTVERSION 0,1,0,0
+ FILEVERSION 0,32,0,0
+ PRODUCTVERSION 0,32,0,0
  FILEFLAGSMASK 0x3fL
  FILEOS 0x40004L
  FILETYPE 0x1L
@@ -16,13 +16,13 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName", "Infinite Project\0"
-            VALUE "FileDescription", "Infinite audiovisual modular workstation\0"
-            VALUE "FileVersion", "0.1.0\0"
-            VALUE "InternalName", "Infinite\0"
-            VALUE "OriginalFilename", "Infinite.exe\0"
-            VALUE "ProductName", "Infinite\0"
-            VALUE "ProductVersion", "0.1.0\0"
+            VALUE "CompanyName", "Noisetupi / Infinite community\0"
+            VALUE "FileDescription", "Infinite-Turbo (for Windows) - unofficial audiovisual modular workstation\0"
+            VALUE "FileVersion", "0.32.0\0"
+            VALUE "InternalName", "Infinite-Turbo\0"
+            VALUE "OriginalFilename", "Infinite-Turbo.exe\0"
+            VALUE "ProductName", "Infinite-Turbo (for Windows)\0"
+            VALUE "ProductVersion", "0.32.0\0"
         END
     END
     BLOCK "VarFileInfo"

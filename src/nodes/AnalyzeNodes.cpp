@@ -1,10 +1,6 @@
 #include "AnalyzeNodes.h"
 
-#if defined(__APPLE__)
-#include <Accelerate/Accelerate.h>
-#else
 #include <juce_dsp/juce_dsp.h>
-#endif
 #include "platform/OpenGLHeaders.h"
 #include <algorithm>
 #include <atomic>
@@ -546,10 +542,7 @@ AudioAnalyzeNode::AudioAnalyzeNode()
    }
 }
 
-AudioAnalyzeNode::~AudioAnalyzeNode()
-{
-   // The audio tap is process-wide; leave it running for any other audio nodes.
-}
+// Defined at the end of this file, after AudioAnalyzeTapNode.
 
 const char* AudioAnalyzeNode::OutputLabel(int index) const
 {
@@ -585,6 +578,8 @@ void AudioAnalyzeNode::Stop()
 
 bool AudioAnalyzeNode::IsRunning() const
 {
+   if (audioInput.IsConnected())
+      return true;
    if (fileSource != nullptr)
       return fileSource->IsLoaded();
    return Platform::AudioIsRunning();
@@ -625,7 +620,14 @@ void AudioAnalyzeNode::CookIfNeeded(int frameId)
 
    Platform::AudioLevels levels;
    bool running = false;
-   if (fileSource != nullptr)
+   if (audioInput.IsConnected())
+   {
+      levels = ReadTapLevels();
+      running = true;
+      if (mStatus != "analysing the audio pin")
+         mStatus = "analysing the audio pin";
+   }
+   else if (fileSource != nullptr)
    {
       fileSource->CookIfNeeded(frameId);
       levels = fileSource->Levels();
@@ -688,21 +690,12 @@ public:
    {
       // FFT setup allocates - main thread only, at construction, never on
       // the audio thread (mirrors PaulStretchNode's mFftSetup lifetime).
-#if defined(__APPLE__)
-      mFftSetup = vDSP_create_fftsetup(kFileFftLog2, FFT_RADIX2);
-      vDSP_hann_window(mWindow, kFileFftSize, vDSP_HANN_NORM);
-#else
       for (int i = 0; i < kFileFftSize; ++i)
          mWindow[i] = 0.5f * (1.0f - std::cos(2.0f * (float)M_PI * (float)i / (float)(kFileFftSize - 1)));
-#endif
    }
 
    ~AudioFilePlayerAudioNode() override
    {
-#if defined(__APPLE__)
-      if (mFftSetup != nullptr)
-         vDSP_destroy_fftsetup(mFftSetup);
-#endif
    }
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
@@ -867,20 +860,11 @@ private:
       }
       rms = std::sqrt(rms / (float)kFileFftSize);
 
-#if defined(__APPLE__)
-      vDSP_vmul(mLinear, 1, mWindow, 1, mWindowedScratch, 1, kFileFftSize);
-      DSPSplitComplex split = { mReal, mImag };
-      vDSP_ctoz((const DSPComplex*)mWindowedScratch, 2, &split, 1, kFileSpectrumSize);
-      vDSP_fft_zrip(mFftSetup, &split, 1, kFileFftLog2, FFT_FORWARD);
-
-      vDSP_zvabs(&split, 1, mMagnitude, 1, kFileSpectrumSize);
-#else
       for (int i = 0; i < kFileFftSize; ++i)
          mComplexInput[i] = { mLinear[i] * mWindow[i], 0.0f };
       mFft.perform(mComplexInput, mComplexOutput, false);
       for (int i = 0; i < kFileSpectrumSize; ++i)
          mMagnitude[i] = std::abs(mComplexOutput[i]);
-#endif
       const float norm = 2.0f / (float)kFileFftSize;
       for (int i = 0; i < kFileSpectrumSize; i++)
          mMagnitude[i] *= norm;
@@ -955,23 +939,15 @@ private:
    Platform::SampleBuffer* mActiveBuffer = nullptr;
    SampleSlot mSampleSlot;
 
-#if defined(__APPLE__)
-   FFTSetup mFftSetup = nullptr;
-#else
    juce::dsp::FFT mFft { kFileFftLog2 };
    juce::dsp::Complex<float> mComplexInput[kFileFftSize] = {};
    juce::dsp::Complex<float> mComplexOutput[kFileFftSize] = {};
-#endif
    float mWindow[kFileFftSize] = {};
    float mRing[kFileFftSize] = {};
    int mRingWrite = 0;
    int mRingCount = 0;
    float mLinear[kFileFftSize] = {};
    float mWindowedScratch[kFileFftSize] = {};
-#if defined(__APPLE__)
-   float mReal[kFileSpectrumSize] = {};
-   float mImag[kFileSpectrumSize] = {};
-#endif
    float mMagnitude[kFileSpectrumSize] = {};
    float mPrevMagnitude[kFileSpectrumSize] = {};
    float mPrevFlux = 0.0f;
@@ -1011,7 +987,7 @@ bool AudioFileNode::Open(const std::string& path)
    mAudioNode->PushParams(volume, gain, attack, release, loop, monitor);
    mAudioNode->RequestRestart();
 
-   const size_t slash = path.find_last_of('/');
+   const size_t slash = path.find_last_of("/\\");
    mFileName = (slash == std::string::npos) ? path : path.substr(slash + 1);
    mFilePath = path;
    mStatus = "loaded";
@@ -1089,4 +1065,174 @@ void AudioFileNode::CookIfNeeded(int frameId)
    }
 
    mLevels = mAudioNode->ReadLevels();
+}
+
+// ====================================================== Audio Analyze tap
+//
+// Turbo: AudioAnalyzeNode's graph input. Passes its input through unchanged
+// and runs the same FFT level / band / onset analysis AudioFilePlayerAudioNode
+// runs on its playback, on a mono mix of whatever is patched in. Fixed-size
+// members only: nothing allocates on the audio thread.
+class AudioAnalyzeTapNode : public AudioNode
+{
+public:
+   AudioAnalyzeTapNode()
+   {
+      for (int i = 0; i < kFileFftSize; ++i)
+         mWindow[i] = 0.5f * (1.0f - std::cos(2.0f * (float)M_PI * (float)i / (float)(kFileFftSize - 1)));
+   }
+
+   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
+   {
+      mSampleRate = sampleRate > 0.0 ? sampleRate : 48000.0;
+   }
+
+   void PushParams(float attack, float release)
+   {
+      mAttack.store(std::clamp(attack, 0.01f, 1.0f), std::memory_order_relaxed);
+      mRelease.store(std::clamp(release, 0.005f, 1.0f), std::memory_order_relaxed);
+   }
+
+   Platform::AudioLevels ReadLevels() const
+   {
+      Platform::AudioLevels out = mLevelsPublish[mLevelsReady.load(std::memory_order_acquire)];
+      out.onset = mOnsetPending.exchange(false, std::memory_order_acq_rel);
+      return out;
+   }
+
+   void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& output) override
+   {
+      // First connected input (the pin is slot 0, but be robust to gaps).
+      const AudioBuffer* in = nullptr;
+      for (int k = 0; k < numInputs && in == nullptr; k++)
+         if (inputs[k] != nullptr && inputs[k]->numChannels > 0)
+            in = inputs[k];
+      const int frames = output.numFrames;
+      for (int ch = 0; ch < output.numChannels; ch++)
+      {
+         const float* src = (in != nullptr && in->numChannels > 0)
+                               ? in->channels[std::min(ch, in->numChannels - 1)] : nullptr;
+         if (src != nullptr)
+            std::copy(src, src + frames, output.channels[ch]);
+         else
+            std::fill(output.channels[ch], output.channels[ch] + frames, 0.0f);
+      }
+      if (in == nullptr || in->numChannels <= 0)
+      {
+         for (int i = 0; i < frames; i++)
+            Push(0.0f);
+      }
+      else
+      {
+         const float* l = in->channels[0];
+         const float* r = in->numChannels > 1 ? in->channels[1] : l;
+         for (int i = 0; i < frames; i++)
+            Push(0.5f * (l[i] + r[i]));
+      }
+      Analyse();
+   }
+
+private:
+   void Push(float s)
+   {
+      mRing[mRingWrite] = s;
+      mRingWrite = (mRingWrite + 1) % kFileFftSize;
+      if (mRingCount < kFileFftSize)
+         mRingCount++;
+   }
+
+   void Analyse()
+   {
+      if (mRingCount < kFileFftSize)
+         return;
+      float rms = 0.0f, peak = 0.0f;
+      for (int i = 0; i < kFileFftSize; i++)
+      {
+         const float v = mRing[(mRingWrite + i) % kFileFftSize];
+         rms += v * v;
+         peak = std::max(peak, std::fabs(v));
+         mComplexInput[i] = { v * mWindow[i], 0.0f };
+      }
+      rms = std::sqrt(rms / (float)kFileFftSize);
+      mFft.perform(mComplexInput, mComplexOutput, false);
+      const float norm = 2.0f / (float)kFileFftSize;
+      for (int i = 0; i < kFileSpectrumSize; ++i)
+         mMagnitude[i] = std::abs(mComplexOutput[i]) * norm;
+
+      float flux = 0.0f;
+      for (int i = 0; i < kFileSpectrumSize; i++)
+         flux += std::max(0.0f, mMagnitude[i] - mPrevMagnitude[i]);
+      const bool onset = flux > mPrevFlux * 1.6f && flux > 0.02f;
+      mPrevFlux = mPrevFlux * 0.7f + flux * 0.3f;
+      std::memcpy(mPrevMagnitude, mMagnitude, sizeof(mMagnitude));
+      if (onset)
+         mOnsetPending.store(true, std::memory_order_relaxed);
+
+      const double nyquist = mSampleRate * 0.5;
+      auto rangeEnergy = [this, nyquist](double fromHz, double toHz) {
+         const int lo = std::max(1, (int)(fromHz / nyquist * kFileSpectrumSize));
+         const int hi = std::min(kFileSpectrumSize - 1, (int)(toHz / nyquist * kFileSpectrumSize));
+         float sum = 0.0f; int count = 0;
+         for (int i = lo; i <= hi; i++) { sum += mMagnitude[i]; count++; }
+         return count > 0 ? sum / count : 0.0f;
+      };
+      auto shape = [](float v) { return std::min(1.0f, std::sqrt(v * 12.0f)); };
+      const float attack = mAttack.load(std::memory_order_relaxed);
+      const float release = mRelease.load(std::memory_order_relaxed);
+      auto smooth = [attack, release](float prev, float target) {
+         return prev + (target - prev) * ((target > prev) ? attack : release);
+      };
+
+      mSmoothed.rms = smooth(mSmoothed.rms, std::min(1.0f, rms * 3.0f));
+      mSmoothed.peak = smooth(mSmoothed.peak, std::min(1.0f, peak));
+      mSmoothed.low = smooth(mSmoothed.low, shape(rangeEnergy(20.0, 250.0)));
+      mSmoothed.mid = smooth(mSmoothed.mid, shape(rangeEnergy(250.0, 2000.0)));
+      mSmoothed.high = smooth(mSmoothed.high, shape(rangeEnergy(2000.0, 16000.0)));
+      for (int b = 0; b < Platform::kAudioBands; b++)
+      {
+         const double loHz = 20.0 * std::pow(nyquist / 20.0, (double)b / Platform::kAudioBands);
+         const double hiHz = 20.0 * std::pow(nyquist / 20.0, (double)(b + 1) / Platform::kAudioBands);
+         mSmoothed.bands[b] = smooth(mSmoothed.bands[b], shape(rangeEnergy(loHz, hiHz)));
+      }
+      const int next = 1 - mLevelsReady.load(std::memory_order_relaxed);
+      mLevelsPublish[next] = mSmoothed;
+      mLevelsReady.store(next, std::memory_order_release);
+   }
+
+   double mSampleRate = 48000.0;
+   std::atomic<float> mAttack { 0.5f };
+   std::atomic<float> mRelease { 0.12f };
+   juce::dsp::FFT mFft { kFileFftLog2 };
+   juce::dsp::Complex<float> mComplexInput[kFileFftSize] = {};
+   juce::dsp::Complex<float> mComplexOutput[kFileFftSize] = {};
+   float mWindow[kFileFftSize] = {};
+   float mRing[kFileFftSize] = {};
+   int mRingWrite = 0;
+   int mRingCount = 0;
+   float mMagnitude[kFileSpectrumSize] = {};
+   float mPrevMagnitude[kFileSpectrumSize] = {};
+   float mPrevFlux = 0.0f;
+   Platform::AudioLevels mSmoothed;
+   Platform::AudioLevels mLevelsPublish[2];
+   std::atomic<int> mLevelsReady { 0 };
+   mutable std::atomic<bool> mOnsetPending { false };
+};
+
+AudioAnalyzeNode::~AudioAnalyzeNode()
+{
+   // The live-input tap is process-wide; leave it running for other nodes.
+}
+
+AudioNode* AudioAnalyzeNode::GetAudioNode()
+{
+   if (!mTapNode)
+      mTapNode = std::make_unique<AudioAnalyzeTapNode>();
+   return mTapNode.get();
+}
+
+Platform::AudioLevels AudioAnalyzeNode::ReadTapLevels()
+{
+   GetAudioNode();
+   mTapNode->PushParams(attack, release);
+   return mTapNode->ReadLevels();
 }

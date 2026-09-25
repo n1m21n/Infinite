@@ -1,6 +1,5 @@
 #include "Platform.h"
 
-#if defined(_WIN32)
 
 #include <windows.h>
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -49,7 +48,7 @@ namespace Platform
       // v1/v2 were populated while scans launched the full Infinite app as the
       // child process. v3 belongs to the dedicated minimal scanner helper, so
       // every bundle gets one clean retry under the corrected architecture.
-      fs::path BlocklistPath() { return fs::u8path(InfiniteSettingsDirectory()) / "PluginVST3Blocklist-v3.txt"; }
+      fs::path BlocklistPath() { return fs::u8path(InfiniteSettingsDirectory()) / "PluginVST3Blocklist-v4.txt"; }
 
       void VstLog(const std::string& message)
       {
@@ -138,15 +137,23 @@ namespace Platform
          for (fs::recursive_directory_iterator it(fs::u8path(folder), fs::directory_options::skip_permission_denied, ec), end;
               it != end && !ec; it.increment(ec))
          {
-            if (!it->is_directory(ec))
-               continue;
             std::string extension = it->path().extension().u8string();
             std::transform(extension.begin(), extension.end(), extension.begin(),
                            [](unsigned char c) { return (char)std::tolower(c); });
-            if (extension == ".vst3")
+            if (extension != ".vst3")
+               continue;
+            // Turbo: a VST3 is either a bundle FOLDER (Name.vst3\Contents\...)
+            // or a single .vst3 FILE (a renamed DLL - Kontakt and many other
+            // plugins ship like this). Only folders were accepted, so every
+            // single-file plugin was invisible to the scanner.
+            if (it->is_directory(ec))
             {
                paths.push_back(it->path().u8string());
                it.disable_recursion_pending();
+            }
+            else if (it->is_regular_file(ec))
+            {
+               paths.push_back(it->path().u8string());
             }
          }
       }
@@ -201,7 +208,11 @@ namespace Platform
          return parsed;
       }
 
-      enum class ProbeResult { Success, CleanMiss, Crashed, InfrastructureError };
+      // Turbo: TimedOut is separate from Crashed and never blocklists. Big
+      // instruments (Kontakt, Battery, Massive X...) can spend a long time in
+      // their first scan (licence/content checks) and used to be killed at
+      // 30 s, counted as a crash and blocklisted forever.
+      enum class ProbeResult { Success, CleanMiss, Crashed, TimedOut, InfrastructureError };
 
       ProbeResult ProbeVstBundleOutOfProcess(const std::string& path, std::vector<PluginDesc>& out)
       {
@@ -240,7 +251,7 @@ namespace Platform
          char buffer[4096];
          DWORD count = 0;
          DWORD wait = WAIT_TIMEOUT;
-         const ULONGLONG deadline = GetTickCount64() + 30000;
+         const ULONGLONG deadline = GetTickCount64() + 180000;
          while (GetTickCount64() < deadline)
          {
             DWORD available = 0;
@@ -266,12 +277,23 @@ namespace Platform
          GetExitCodeProcess(process.hProcess, &exitCode);
          CloseHandle(process.hThread);
          CloseHandle(process.hProcess);
-         if (wait != WAIT_OBJECT_0 || exitCode != 0)
+         auto parsed = ParseProbeOutput(output);
+         // Turbo: a plugin that described itself and THEN crashed while its
+         // DLL was being unloaded at process exit (common with Native
+         // Instruments plugins) is usable - the description is complete.
+         // Only a child that produced nothing is a failure.
+         if (parsed.empty() && wait != WAIT_OBJECT_0)
+         {
+            VstLog("scanner timed out (not blocklisted, rescan to retry): " + path);
+            return ProbeResult::TimedOut;
+         }
+         if (parsed.empty() && exitCode != 0)
          {
             VstLog("scanner exit " + std::to_string(exitCode) + " for " + path);
             return ProbeResult::Crashed;
          }
-         auto parsed = ParseProbeOutput(output);
+         if (exitCode != 0)
+            VstLog("scanner exit " + std::to_string(exitCode) + " after a complete description (accepted): " + path);
          for (auto& d : parsed)
          {
             std::lock_guard<std::mutex> lock(gPathMutex);
@@ -389,6 +411,7 @@ namespace Platform
          if (result == ProbeResult::Success) VstLog("scan success: " + path);
          else if (result == ProbeResult::CleanMiss) VstLog("scan found no usable VST3 class: " + path);
          else if (result == ProbeResult::InfrastructureError) VstLog("scan infrastructure error: " + path);
+         else if (result == ProbeResult::TimedOut) VstLog("scan timed out: " + path);
          else VstLog("scan child crashed, failed or timed out: " + path);
          if (result != ProbeResult::Success) gScanFailures.push_back(path);
          if (result == ProbeResult::Crashed) AddToBlocklist(path);
@@ -794,4 +817,3 @@ namespace Platform
    }
 }
 
-#endif

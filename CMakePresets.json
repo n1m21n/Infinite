@@ -8,7 +8,7 @@
   "configurePresets": [
     {
       "name": "windows-vs2022",
-      "displayName": "Infinite Windows x64 (Visual Studio 2022)",
+      "displayName": "Infinite-Turbo Windows x64 (Visual Studio 2022)",
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build/windows-vs2022",
@@ -25,14 +25,12 @@
     {
       "name": "windows-release",
       "configurePreset": "windows-vs2022",
-      "configuration": "Release",
-      "jobs": 4
+      "configuration": "Release"
     },
     {
       "name": "windows-debug",
       "configurePreset": "windows-vs2022",
-      "configuration": "Debug",
-      "jobs": 4
+      "configuration": "Debug"
     }
   ]
 }

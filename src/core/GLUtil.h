@@ -46,8 +46,19 @@ namespace GLUtil
    // own alpha over the same checkerboard pattern the node editor draws
    // behind a transparent preview, instead of showing raw (unpremultiplied)
    // color where alpha is 0.
+   //
+   // Turbo: `fitMode` picks how the texture maps to the window when texW/texH
+   // are given (see OutputFitMode), and the bars/background are `bgRGB`
+   // (black by default - a square video on a 16:9 fullscreen output used to
+   // show grey side bars).
+   enum OutputFitMode { kFitLetterbox = 0, kFitPixel = 1, kFitFill = 2, kFitStretch = 3 };
    void DrawTextureToScreen(unsigned int tex, int windowW, int windowH,
-                             int texW = 0, int texH = 0, bool checkerBg = false);
+                             int texW = 0, int texH = 0, bool checkerBg = false,
+                             int fitMode = kFitLetterbox, const float* bgRGB = nullptr);
+
+   // Draws the shared unit quad (clip-space -1..1, vUv 0..1) with whatever
+   // program/viewport is bound. Used by nodes that composite into sub-rects.
+   void DrawFullscreenQuad();
 
    // VAOs are not shared by GLFW OpenGL contexts even when textures,
    // programs and buffers are. Call while an auxiliary context is current,

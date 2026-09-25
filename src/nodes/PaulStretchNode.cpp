@@ -1,10 +1,6 @@
 #include "PaulStretchNode.h"
 
-#if defined(__APPLE__)
-#include <Accelerate/Accelerate.h>
-#else
 #include <juce_dsp/juce_dsp.h>
-#endif
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -116,12 +112,8 @@ class AudioPaulStretchNode : public AudioNode
 public:
    AudioPaulStretchNode()
    {
-#if defined(__APPLE__)
-      mFftSetup = vDSP_create_fftsetup(kMaxLog2, FFT_RADIX2);
-#else
       for (int w = 0; w < PaulStretchNode::kNumWindowSizes; ++w)
          mFfts[w] = std::make_unique<juce::dsp::FFT>(11 + w);
-#endif
 
       // Precalculate Hann windows for each supported window size
       mWindows.resize(PaulStretchNode::kNumWindowSizes);
@@ -138,14 +130,9 @@ public:
       // Preallocate audio processing work buffers
       mFftInput.resize(kMaxFFTSize, 0.0f);
       mFftOutput.resize(kMaxFFTSize, 0.0f);
-#if defined(__APPLE__)
-      mSplitReal.resize(kMaxFFTSize / 2, 0.0f);
-      mSplitImag.resize(kMaxFFTSize / 2, 0.0f);
-#else
       mComplexInput.resize(kMaxFFTSize);
       mComplexSpectrum.resize(kMaxFFTSize);
       mComplexOutput.resize(kMaxFFTSize);
-#endif
       mMagnitudes.resize(kMaxFFTSize / 2 + 1, 0.0f);
       mPhases.resize(kMaxFFTSize / 2 + 1, 0.0f);
       mUnisonReal.resize(kMaxFFTSize / 2 + 1, 0.0f);
@@ -157,13 +144,6 @@ public:
 
    ~AudioPaulStretchNode() override
    {
-#if defined(__APPLE__)
-      if (mFftSetup != nullptr)
-      {
-         vDSP_destroy_fftsetup(mFftSetup);
-         mFftSetup = nullptr;
-      }
-#endif
    }
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
@@ -385,33 +365,6 @@ public:
 
             // Real-to-complex FFT. Keep Accelerate on macOS and use JUCE's
             // portable FFT backend on Windows.
-#if defined(__APPLE__)
-            DSPSplitComplex splitComplex;
-            splitComplex.realp = mSplitReal.data();
-            splitComplex.imagp = mSplitImag.data();
-
-            vDSP_ctoz((const DSPComplex*)mFftInput.data(), 2, &splitComplex, 1, numSpectrumBins);
-            vDSP_fft_zrip(mFftSetup, &splitComplex, 1, log2N, FFT_FORWARD);
-
-            // Compute polar representation (magnitudes & original phases)
-            // DC bin
-            const float dcVal = splitComplex.realp[0] * 0.5f;
-            mMagnitudes[0] = std::abs(dcVal);
-            mPhases[0] = 0.0f;
-
-            // Nyquist bin is packed in imagp[0]
-            const float nyqVal = splitComplex.imagp[0] * 0.5f;
-            mMagnitudes[numSpectrumBins] = std::abs(nyqVal);
-            mPhases[numSpectrumBins] = 0.0f;
-
-            for (int k = 1; k < numSpectrumBins; ++k)
-            {
-               const float re = splitComplex.realp[k] * 0.5f;
-               const float im = splitComplex.imagp[k] * 0.5f;
-               mMagnitudes[k] = std::sqrt(re * re + im * im);
-               mPhases[k] = std::atan2(im, re);
-            }
-#else
             auto& fft = *mFfts[winIdx];
             for (int i = 0; i < currentFFTSize; ++i)
                mComplexInput[i] = { mFftInput[i], 0.0f };
@@ -424,7 +377,6 @@ public:
                mMagnitudes[k] = std::sqrt(re * re + im * im);
                mPhases[k] = (k == 0 || k == numSpectrumBins) ? 0.0f : std::atan2(im, re);
             }
-#endif
 
             // Spectral transformation: pitch shift, frequency shift, unison detune & phase randomization
             const int totalFreqBins = numSpectrumBins + 1;
@@ -471,35 +423,6 @@ public:
             const float unisonScale = 1.0f / std::sqrt((float)unisonVoices);
 
             // Reconstruct the spectrum and transform back to time domain.
-#if defined(__APPLE__)
-            // DC & Nyquist
-            splitComplex.realp[0] = mUnisonReal[0] * unisonScale;
-            splitComplex.imagp[0] = mUnisonReal[numSpectrumBins] * unisonScale;
-
-            for (int k = 1; k < numSpectrumBins; ++k)
-            {
-               if (!hasPitchOrUnison && phaseRand < 0.001f)
-               {
-                  // Bit-accurate passthrough reconstruction
-                  splitComplex.realp[k] = splitComplex.realp[k] * 0.5f;
-                  splitComplex.imagp[k] = splitComplex.imagp[k] * 0.5f;
-               }
-               else
-               {
-                  splitComplex.realp[k] = mUnisonReal[k] * unisonScale;
-                  splitComplex.imagp[k] = mUnisonImag[k] * unisonScale;
-               }
-            }
-
-            // Inverse FFT
-            vDSP_fft_zrip(mFftSetup, &splitComplex, 1, log2N, FFT_INVERSE);
-            vDSP_ztoc(&splitComplex, 1, (DSPComplex*)mFftOutput.data(), 2, numSpectrumBins);
-
-            // Synthesis windowing and normalization
-            // 75% overlap of Hann^2 window produces a constant sum of 1.5 * (FFT size / 4)
-            // vDSP scaling gives 2.0x, so normalizer is (1.0 / (FFTSize * 1.5))
-            const float normScale = 1.0f / ((float)currentFFTSize * 1.5f);
-#else
             const bool preserveOriginal = !hasPitchOrUnison && phaseRand < 0.001f;
             if (!preserveOriginal)
             {
@@ -522,7 +445,6 @@ public:
             // JUCE normalizes its inverse transform by FFT size. At 75%
             // overlap, the Hann squared windows sum to approximately 1.5.
             const float normScale = 1.0f / 1.5f;
-#endif
             for (int i = 0; i < currentFFTSize; ++i)
             {
                mFftOutput[i] *= window[i] * normScale;
@@ -575,23 +497,14 @@ public:
 private:
    double mSampleRate = 44100.0;
    FastRng mRng;
-#if defined(__APPLE__)
-   FFTSetup mFftSetup = nullptr;
-#else
    std::array<std::unique_ptr<juce::dsp::FFT>, PaulStretchNode::kNumWindowSizes> mFfts;
-#endif
    std::vector<std::vector<float>> mWindows;
 
    std::vector<float> mFftInput;
    std::vector<float> mFftOutput;
-#if defined(__APPLE__)
-   std::vector<float> mSplitReal;
-   std::vector<float> mSplitImag;
-#else
    std::vector<juce::dsp::Complex<float>> mComplexInput;
    std::vector<juce::dsp::Complex<float>> mComplexSpectrum;
    std::vector<juce::dsp::Complex<float>> mComplexOutput;
-#endif
    std::vector<float> mMagnitudes;
    std::vector<float> mPhases;
    std::vector<float> mUnisonReal;
@@ -750,7 +663,7 @@ bool PaulStretchNode::LoadFile(const std::string& path)
       return false;
    }
 
-   const size_t slash = path.find_last_of('/');
+   const size_t slash = path.find_last_of("/\\");
    const std::string name = (slash == std::string::npos) ? path : path.substr(slash + 1);
    FinishBuffer(decoded, name, path, "loaded");
    return true;

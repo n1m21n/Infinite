@@ -680,7 +680,7 @@ bool DrumSequencerNode::LoadFileToLane(int lane, const std::string& path)
       laneStatus[lane] = error.empty() ? "failed to load" : error;
       return false;
    }
-   const size_t slash = path.find_last_of('/');
+   const size_t slash = path.find_last_of("/\\");
    const std::string fileName = (slash == std::string::npos) ? path : path.substr(slash + 1);
    FinishLaneBuffer(lane, decoded, fileName, path, "loaded");
    return true;

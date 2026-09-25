@@ -6,9 +6,7 @@
 
 #include "INode.h"
 
-#if defined(_WIN32)
 struct TextWindowsRasterState;
-#endif
 
 // Text/typography node. Renders via macOS CoreText/CoreGraphics into an
 // offscreen bitmap, then uploads to a GL texture - a leaf node like
@@ -83,17 +81,11 @@ private:
    int mUploadedWidth = 0;
    int mUploadedHeight = 0;
    bool mReportedRasterSuccess = false;
-#if defined(_WIN32)
    // Windows text rasterisation is deliberately isolated from both JUCE and
    // the render thread.  The opaque state owns a GDI+ worker and a latest-only
    // request queue; CookIfNeeded only submits immutable parameter snapshots
    // and uploads completed RGBA buffers.
    std::unique_ptr<TextWindowsRasterState> mWindowsRaster;
-#else
-   // CoreText/CoreGraphics scratch storage used by the original macOS path.
-   std::vector<unsigned char> mPixels;
-   std::vector<unsigned char> mFlipped;
-#endif
 
    // Params actually rasterized into mTex - the cache key CookIfNeeded compares
    // against to decide whether it needs to redo any work at all. Must cover

@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
-title Infinite - instalador de dependencias
+title Infinite-Turbo - instalador de dependencias (Windows x64)
 
 rem O instalador do Visual Studio recusa --passive sem um token UAC elevado.
 rem O argumento interno evita um segundo relancamento e permite validar o UAC.
@@ -155,16 +155,16 @@ call "%VCPKG_ROOT%\bootstrap-vcpkg.bat" -disableMetrics
 if errorlevel 1 exit /b 1
 setx VCPKG_ROOT "%VCPKG_ROOT%" >nul
 
-echo [4/7] Inicializando os submodulos do projeto...
-if exist ".git" (
-  git submodule update --init --recursive
-  if errorlevel 1 exit /b 1
-) else (
-  echo Pacote ZIP detectado: submodulos Git nao sao necessarios para o build Windows.
-)
+echo [4/7] Cache binario do vcpkg...
+rem Guarda as bibliotecas ja compiladas (OpenCV leva ~1h): uma reinstalacao ou
+rem outra copia do projeto reaproveita os binarios em vez de recompilar.
+set "VCPKG_BINARY_CACHE=%LOCALAPPDATA%\InfiniteBuild\vcpkg-binary-cache"
+if not exist "%VCPKG_BINARY_CACHE%" mkdir "%VCPKG_BINARY_CACHE%"
+set "VCPKG_DEFAULT_BINARY_CACHE=%VCPKG_BINARY_CACHE%"
+setx VCPKG_DEFAULT_BINARY_CACHE "%VCPKG_BINARY_CACHE%" >nul
 
-echo [5/7] Compilando e instalando bibliotecas C++...
-"%VCPKG_ROOT%\vcpkg.exe" install --triplet x64-windows-static --x-manifest-root="%CD%"
+echo [5/7] Compilando e instalando bibliotecas C++ (a primeira vez demora)...
+"%VCPKG_ROOT%\vcpkg.exe" install --triplet x64-windows-static --x-manifest-root="%CD%" --x-install-root="%CD%\vcpkg_installed"
 if errorlevel 1 exit /b 1
 
 echo [6/7] Instalando Windows ML e DirectML para GPU DX12...
@@ -226,7 +226,7 @@ if /I not "!PERSON_MODEL_MD5!"=="c09ddc2e0104f800e3e1bb4652583d1f" (
 )
 
 echo.
-echo Dependencias instaladas. Execute build-windows.bat para compilar.
+echo Dependencias instaladas. Execute build-windows.bat para compilar o Infinite-Turbo.
 echo Remove Background usara Windows ML + DirectML em qualquer GPU DX12 compativel.
 exit /b 0
 
@@ -241,11 +241,12 @@ if errorlevel 1 (
 exit /b 0
 
 :refresh_path
-set "MACHINE_PATH="
-set "USER_PATH="
-for /f "usebackq delims=" %%P in (`powershell.exe -NoProfile -Command "[Environment]::GetEnvironmentVariable('Path','Machine')"`) do set "MACHINE_PATH=%%P"
-for /f "usebackq delims=" %%P in (`powershell.exe -NoProfile -Command "[Environment]::GetEnvironmentVariable('Path','User')"`) do set "USER_PATH=%%P"
-if defined MACHINE_PATH set "PATH=!MACHINE_PATH!;!PATH!"
-if defined USER_PATH set "PATH=!USER_PATH!;!PATH!"
-set "PATH=%ProgramFiles%\Git\cmd;%LOCALAPPDATA%\Programs\Git\cmd;%ProgramFiles%\CMake\bin;%LOCALAPPDATA%\Programs\CMake\bin;%LOCALAPPDATA%\Microsoft\WinGet\Links;!PATH!"
+rem Rebuilds PATH from the registry (Machine + User) plus the tool folders,
+rem without appending the current PATH and without duplicates. Appending made
+rem PATH grow past cmd's 8191-character line limit ("The input line is too
+rem long") on machines with many tools installed.
+set "NEW_PATH="
+for /f "usebackq delims=" %%P in (`powershell.exe -NoProfile -Command "$l=New-Object System.Collections.Generic.List[string]; $all=[Environment]::GetEnvironmentVariable('Path','Machine')+';'+[Environment]::GetEnvironmentVariable('Path','User')+';'+$env:SystemRoot+'\System32;'+$env:SystemRoot+';'+$env:SystemRoot+'\System32\WindowsPowerShell\v1.0;'+$env:ProgramFiles+'\Git\cmd;'+$env:LOCALAPPDATA+'\Programs\Git\cmd;'+$env:ProgramFiles+'\CMake\bin;'+$env:LOCALAPPDATA+'\Programs\CMake\bin;'+$env:LOCALAPPDATA+'\Microsoft\WinGet\Links'; foreach($s in $all.Split(';')){ $t=[Environment]::ExpandEnvironmentVariables($s.Trim()).TrimEnd('\'); if($t -and -not $l.Contains($t) -and (Test-Path -LiteralPath $t)){ $l.Add($t) } }; $l -join ';'"`) do set "NEW_PATH=%%P"
+if defined NEW_PATH set "PATH=!NEW_PATH!"
+set "NEW_PATH="
 exit /b 0

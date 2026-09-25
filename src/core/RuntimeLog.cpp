@@ -19,11 +19,7 @@ namespace
    {
       const std::time_t now = std::time(nullptr);
       std::tm local{};
-#if defined(_WIN32)
       localtime_s(&local, &now);
-#else
-      localtime_r(&now, &local);
-#endif
       std::strftime(out, size, "%Y-%m-%d %H:%M:%S", &local);
    }
 }
