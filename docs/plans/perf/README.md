@@ -1,5 +1,21 @@
 # Performance benchmark suite
 
+## Plan to finish (frozen 2026-09-25)
+
+The benchmarks are built and the baseline is trusted. What is left is the
+three blocks below, then release. **The scope is frozen:** anything new found
+while working goes into "Found while measuring" and is not chased, unless it
+blocks a target in this table.
+
+| Block | Work | Done when | State |
+|---|---|---|---|
+| 1 Audio | Real xrun counter (replaces the wall-clock-gap heuristic, `AudioEngine.cpp`); B1 callback load (open item 1); build B7 soak | B1 cb_load p99 <= 50% @256; 0 xruns in 10 min; soak RSS growth < 2% over 30 min | not started |
+| 2 Projector + canvas | Projector under load (open items 2-4); canvas vsync not blocking (open item 5) | B3/B8 interval p99 <= 18.3 ms and missed vsync < 0.5%; B6 runs paced and meets p50/p95 | not started |
+| 3 Media + release gate | Decode drops (open item 6); camera run (open item 7, needs access granted once); Linux `frameCache` copy, `VideoInNode` realloc, Spout `HasClients` (Found while measuring 4, 5, 7); build B10 | B8 decode real time, 0 dropped; B10 A/V drift within `av-sync-sweep` limits; new baseline; `driver.sh --full` clean | not started |
+
+Every block: one branch, `ab.sh` gate (keep only if better), `verify-gate`
+sweeps, merge `--no-ff`, update the State column here.
+
 ## Where we stand against the spec targets
 
 From the baseline `bench/baselines/m2-8gb.jsonl` (2026-09-25, `run_all.sh --quiet`:
@@ -12,7 +28,7 @@ because an untrusted run can only look better than the real thing.
 
 | Scope | Spec target | Baseline value | Result |
 |---|---|---|---|
-| Audio | 0 xruns at 256 frames | B1 buf=256: 0 in 60 s. B3: 0 | pass (60 s, not the 10 min the spec asks; B7 soak on hold) |
+| Audio | 0 xruns at 256 frames | B1 buf=256: 0 in 60 s. B3: 0 | unproven (60 s of a heuristic counter; Block 1) |
 | Audio | cb_load p99 <= 50% | B1 buf=64/128/256/512: 61.2 / 55.8 / 52.8 / 51.1%. B3: 37.4% | **fail** (B1, every buffer size); pass (B3) |
 | Projector | locked 60 fps: interval p99 <= 1.1 x 16.7 = 18.3 ms | B3: 50.0 ms. B8 2 / 3 windows: 18.6-18.7 ms. B8 heavy (4x2160, 3 windows, camera, Syphon): 33.0-33.2 ms | **fail** (B3, B8 heavy, B8 2 / 3 windows) |
 | Projector | missed vsync < 0.5% | B3: 12.0%. B8 2 / 3 windows: 0%. B8 heavy: 9.4% per window | **fail** (B3, B8 heavy); unproven (B8 2 / 3 windows: canvas unpaced) |
@@ -21,7 +37,7 @@ because an untrusted run can only look better than the real thing.
 | Canvas | B6 pan p95 >= 45 fps (<= 22.8 ms) | n=300 all 12.5; n=200 / 400 pan 12.2 / 12.1 ms | unproven |
 | Memory | no §6 target; gated on change (+20%) | B9 footprint peak b2 / b4: 760 / 640 MB. Render targets b2 / b4: 343 / 91 MB | baseline recorded |
 | Memory | `fbo_allocs_steady` = 0 | 0 in every B2 and B4 variant | pass |
-| Memory | soak: RSS growth < 2% over 30 min | not measured | B7 on hold |
+| Memory | soak: RSS growth < 2% over 30 min | not measured | unproven (B7, Block 1) |
 | Video (proposed) | clips decode in real time, 0 dropped | 30.0-30.7 decoded fps; 1 dropped (4x2160, no windows); clip1 of 2x1080 + Syphon judged not real time | **fail** (4x2160, Syphon); pass (B8 heavy); unproven (rest) |
 | Quality | `output_hash` unchanged (anim=0) | B2 s/m/l static and B4 l static match earlier runs | pass |
 
