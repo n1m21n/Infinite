@@ -2,7 +2,11 @@
 # Runs the INFINITE_BENCH suite (docs/plans/perf/benchmark-suite.md) and
 # collects every BENCH_JSON line into bench/results/<machine>/<date>-<sha>.jsonl.
 #
-# Usage: scripts/bench/run_all.sh [--soak] [--app <path-to-Infinite.app>]
+# Usage: scripts/bench/run_all.sh [--soak] [--quiet] [--app <path-to-Infinite.app>]
+#
+# --quiet pauses the semi-brain watch daemon (a launchd agent that runs
+# sync_brain.py about once a minute while transcripts change) for the whole
+# run and restores it on exit. Use it for any run that becomes a baseline.
 #
 # Each fixture is driven by its own INFINITE_BENCH_* env var (the suite is
 # built incrementally - see docs/plans/perf/README.md's status table for
@@ -15,10 +19,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 APP="$REPO_ROOT/build/Infinite.app/Contents/MacOS/Infinite"
 SOAK=0
+QUIET=0
 
 while [[ $# -gt 0 ]]; do
    case "$1" in
       --soak) SOAK=1; shift ;;
+      --quiet) QUIET=1; shift ;;
       --app) APP="$2"; shift 2 ;;
       *) echo "unknown arg: $1" >&2; exit 1 ;;
    esac
@@ -37,6 +43,51 @@ OUT_DIR="$REPO_ROOT/bench/results/$MACHINE_SAFE"
 mkdir -p "$OUT_DIR"
 OUT_FILE="$OUT_DIR/$DATE-$SHA.jsonl"
 : > "$OUT_FILE"
+# Everything this script prints also lands in a run log next to the results.
+exec > >(tee -a "${OUT_FILE%.jsonl}.log") 2>&1
+
+# The app labels BENCH_JSON's "commit" from this, so it is right even when
+# the app runs outside the repo.
+export INFINITE_BENCH_COMMIT="$SHA"
+
+swap_used() { sysctl -n vm.swapusage 2>/dev/null | sed -E 's/.*used = ([0-9.]+M).*/\1/'; }
+
+# --quiet: boot the brain watch daemon out for the run, restore it on exit.
+BRAIN_LABEL="com.infinite.semi-brain.watchd"
+BRAIN_PLIST="$HOME/Library/LaunchAgents/$BRAIN_LABEL.plist"
+BRAIN_DOMAIN="gui/$(id -u)"
+BRAIN_BOOTED_OUT=0
+wait_for_sync_brain() {
+   local waited=0
+   while pgrep -f 'sync_brain.py' > /dev/null; do
+      if [[ "$waited" -eq 0 ]]; then echo "  waiting for a running sync_brain.py to finish..."; fi
+      if [[ "$waited" -ge 600 ]]; then echo "  sync_brain.py still running after 600s - continuing anyway" >&2; return; fi
+      sleep 5; waited=$((waited + 5))
+   done
+}
+restore_brain() {
+   if [[ "$BRAIN_BOOTED_OUT" -eq 1 ]]; then
+      launchctl bootstrap "$BRAIN_DOMAIN" "$BRAIN_PLIST" 2>/dev/null \
+         && echo "run_all.sh: restored $BRAIN_LABEL" \
+         || echo "run_all.sh: WARNING could not restore $BRAIN_LABEL - run: launchctl bootstrap $BRAIN_DOMAIN $BRAIN_PLIST" >&2
+      BRAIN_BOOTED_OUT=0
+   fi
+   if [[ "$QUIET" -eq 1 ]]; then echo "run_all.sh: quiet=1 swap_end=$(swap_used)"; fi
+}
+if [[ "$QUIET" -eq 1 ]]; then
+   trap restore_brain EXIT
+   if [[ -f "$BRAIN_PLIST" ]] && launchctl print "$BRAIN_DOMAIN/$BRAIN_LABEL" > /dev/null 2>&1; then
+      # Let an in-flight sync finish before launchd stops its parent, then
+      # catch one that started in between.
+      wait_for_sync_brain
+      launchctl bootout "$BRAIN_DOMAIN/$BRAIN_LABEL" && BRAIN_BOOTED_OUT=1
+      wait_for_sync_brain
+      echo "run_all.sh: booted out $BRAIN_LABEL for the run"
+   else
+      echo "run_all.sh: $BRAIN_LABEL not loaded - nothing to pause"
+   fi
+   echo "run_all.sh: quiet=1 swap_start=$(swap_used)"
+fi
 
 echo "run_all.sh: machine=$MACHINE sha=$SHA -> $OUT_FILE"
 
