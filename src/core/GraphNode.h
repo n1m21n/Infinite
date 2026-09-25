@@ -53,6 +53,7 @@ struct GraphNode
    bool hasModulatedParams = false; // recomputed each frame, drives the collapsed "mod" tag
    bool hasBipolarParams = false;   // ditto: true if any binding on this node is bipolar - "mod±"
    bool hasPaletteColors = false;   // ditto, for the collapsed "pal" tag
+   int colorTag = 0;                // Turbo: user colour marker, 0 = none (saved in the patch)
 
    // Where to place the node the first frame it appears (canvas coords).
    float spawnX = 0.0f;

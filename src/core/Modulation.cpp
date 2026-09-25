@@ -40,6 +40,17 @@ void Modulation::SetPolarity(int nodeIndex, int paramIndex, int polarity, float 
    it->second.depth = depth;
 }
 
+void Modulation::SetRange(int nodeIndex, int paramIndex, float inMin, float inMax, float outMin, float outMax)
+{
+   auto it = mLinks.find(Key(nodeIndex, paramIndex));
+   if (it == mLinks.end())
+      return;
+   it->second.inMin = inMin;
+   it->second.inMax = inMax;
+   it->second.outMin = outMin;
+   it->second.outMax = outMax;
+}
+
 void Modulation::Unbind(int nodeIndex, int paramIndex)
 {
    const Key key(nodeIndex, paramIndex);

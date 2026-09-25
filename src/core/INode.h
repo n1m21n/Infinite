@@ -203,6 +203,11 @@ public:
       float value = 0.0f;
    };
    virtual std::vector<SweepParamPrereq> SweepPrerequisitesFor(const std::string& /*paramName*/) const { return {}; }
+   // Upstream sweep hooks (used by the ported Predictive nodes): prepare a
+   // node for the param sweep / ask for a running clock. Unused by Turbo's
+   // sweep for now.
+   virtual void SweepPrepare() {}
+   virtual bool SweepNeedsClock() const { return false; }
 
    // Turbo: called on every node by RebuildAudioTopology (main thread) right
    // before the new topology is published. A node that reads another node's

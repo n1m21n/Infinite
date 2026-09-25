@@ -2,23 +2,30 @@
 
 #include <atomic>
 #include <cstdint>
-#include <mutex>
 #include <string>
-#include <thread>
+#include <vector>
 
 #include "INode.h"
 #include "Modulation.h"
 
-// A UDP OSC listener exposed as a modulator: the last float value received
-// at `address` on `port`, remapped through low/high the same way LFONode's
-// output is (see ModulatorNodes.h's header comment - modulators report a
-// zero output texture and the editor draws a value meter instead of a
-// preview).
-//
-// One background thread per instance runs a blocking recvfrom loop; see the
-// .cpp for the stop-flag/socket-close teardown that lets RemoveNodeByIndex's
-// retire-then-destroy pattern (main.cpp) take a receive thread out cleanly
-// without yanking a socket out from under it mid-recvfrom.
+// Turbo: one shared UDP listener per port (OscHub), used by every OSC
+// Receive / OSC to CV node on that port - two nodes on the same port used to
+// fight over the socket and the second one never received anything. The
+// listener binds all interfaces (LAN + loopback), so TouchOSC / Open Stage
+// Control / TouchDesigner on another machine reach it, and it decodes
+// bundles and every numeric argument (f, i, d, h, T/F).
+namespace OscHub
+{
+   void Acquire(int port);
+   void Release(int port);
+   // False when nothing arrived yet on that address.
+   bool Get(int port, const std::string& address, std::vector<float>& outArgs);
+   // Most recent address seen on the port, with a counter that grows on
+   // every message (for "learn" and the monitor line).
+   std::string LastAddress(int port, uint64_t* serial = nullptr);
+   bool PortOpen(int port);
+}
+
 class OscReceiveNode : public INode, public IModulator
 {
 public:
@@ -32,38 +39,79 @@ public:
    void CookIfNeeded(int) override {}
 
    float Value01() override;
+   float RawValue() const { return mRaw; }
+   bool PortOpen() const { return OscHub::PortOpen(mBoundPort); }
 
    int port = 9000;
    std::string address = "/infinite/param1";
+   int argIndex = 0; // which argument of the message (0 = first)
    float low = 0.0f;
    float high = 1.0f;
 
    void VisitParams(ParamVisitor& v) override;
 
 private:
-   void RestartListenerIfNeeded();
-   void StopListener();
-
-   std::atomic<float> mLastValue{ 0.5f };
-   std::thread mThread;
-   std::atomic<bool> mStop{ false };
-   std::intptr_t mSocket = -1;
+   void SyncPort();
    int mBoundPort = -1;
-
-   // The receive thread reads this to filter incoming packets by address;
-   // guarded because the UI can edit `address` on the main thread while the
-   // thread is running.
-   std::mutex mFilterMutex;
-   std::string mAddressFilter;
-   std::string mLastAddress; // main-thread-only: last value mAddressFilter was synced from
+   float mRaw = 0.0f;
 };
 
-// The first pure "sink" node in the codebase: no Value01(), no output
-// texture - it exists purely for the side effect of sending a UDP OSC
-// packet. Modulators are pull-based (Value01() only runs when something
-// downstream asks), so nothing would ever drive this node's CookIfNeeded on
-// its own; it is ticked once per frame from the same "always cook" walk that
-// drives OutputNode/SyphonOutNode in main.cpp.
+// Turbo: OSC to CV. Up to 8 OSC addresses (or 8 arguments of one address)
+// turned into 8 modulator outputs, each with its own input range, invert and
+// smoothing, plus "learn": arm a channel and move the control on the phone /
+// controller - the next address that arrives is assigned to it.
+class OscToCvNode : public INode
+{
+public:
+   static constexpr int kChannels = 8;
+
+   static INode* Create() { return new OscToCvNode(); }
+   OscToCvNode();
+   ~OscToCvNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+
+   int OutputCount() const override { return kChannels; }
+   const char* OutputLabel(int index) const override;
+   IModulator* ModulatorOutput(int index) override;
+
+   float Value(int ch) const { return (ch >= 0 && ch < kChannels) ? mValue[ch] : 0.0f; }
+   float Raw(int ch) const { return (ch >= 0 && ch < kChannels) ? mRaw[ch] : 0.0f; }
+   bool Received(int ch) const { return (ch >= 0 && ch < kChannels) && mHasValue[ch]; }
+   bool PortOpen() const { return OscHub::PortOpen(mBoundPort); }
+   std::string LastAddress() const { return OscHub::LastAddress(mBoundPort); }
+
+   int port = 9000;
+   std::string address[kChannels];
+   int argIndex[kChannels];
+   float inMin[kChannels];
+   float inMax[kChannels];
+   bool invert[kChannels];
+   float smoothing[kChannels]; // 0 = instant .. 0.99 = very slow
+   int learnChannel = -1;      // UI only
+
+private:
+   struct Tap : public IModulator
+   {
+      OscToCvNode* owner = nullptr;
+      int index = 0;
+      float Value01() override { return owner ? owner->Value(index) : 0.0f; }
+   };
+
+   void SyncPort();
+   Tap mTaps[kChannels];
+   float mValue[kChannels] = {};
+   float mRaw[kChannels] = {};
+   bool mHasValue[kChannels] = {};
+   int mBoundPort = -1;
+   uint64_t mLearnSerial = 0;
+   int mLastCookFrame = -1;
+};
+
 class OscSendNode : public INode
 {
 public:
@@ -74,10 +122,6 @@ public:
    int GetOutputHeight() const override { return 0; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "in" : nullptr; }
 
-   // Reads `input`, and sends a UDP packet when its value has moved past
-   // `epsilon` since the last send, or `intervalMs` has elapsed regardless -
-   // the throttle that keeps a bound LFO from flooding the network every
-   // frame while still guaranteeing periodic keep-alive traffic.
    void CookIfNeeded(int frameId) override;
 
    IModulator* input = nullptr;
@@ -92,8 +136,6 @@ public:
 
    void VisitParams(ParamVisitor& v) override;
 
-   // Main-thread readout for the params panel - the last value actually put
-   // on the wire, or the sentinel if nothing has sent yet.
    float LastSent() const { return mLastSent; }
 
 private:

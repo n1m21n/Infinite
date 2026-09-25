@@ -63,6 +63,14 @@ public:
       // again by the apply loop, since *value is being overwritten by the
       // modulator every frame from then on and can't be read back safely.
       float centre = 0.0f;
+      // Turbo range mapper: the part of the modulator's 0..1 that is used
+      // (inMin..inMax) is stretched onto outMin..outMax of the parameter's
+      // own range. outMin > outMax inverts. Defaults = no remap.
+      float inMin = 0.0f;
+      float inMax = 1.0f;
+      float outMin = 0.0f;
+      float outMax = 1.0f;
+      bool HasRange() const { return inMin != 0.0f || inMax != 1.0f || outMin != 0.0f || outMax != 1.0f; }
    };
 
    // Creates a fresh binding, always kAbsolute, capturing the destination
@@ -77,6 +85,7 @@ public:
    // Changes an existing binding's polarity/depth in place, leaving
    // nodeIndex/outputIndex/centre untouched. No-op if nothing is bound there.
    void SetPolarity(int nodeIndex, int paramIndex, int polarity, float depth);
+   void SetRange(int nodeIndex, int paramIndex, float inMin, float inMax, float outMin, float outMax);
    void Unbind(int nodeIndex, int paramIndex);
    void UnbindAllFor(int nodeIndex); // node deleted: drop it as target and as source
 

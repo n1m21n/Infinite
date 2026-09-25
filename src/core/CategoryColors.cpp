@@ -291,12 +291,14 @@ int FamilyRank(const std::string& category)
 {
    if (category == "Source" || category == "Text" || category == "Compositing" ||
        category == "Color" || category == "Mask" || category == "Feedback" ||
-       category == "Resynth" || category == "Effects" || category == "Output")
+       category == "Resynth" || category == "Effects" || category == "Output" ||
+       category == "Video" || category == "Utility")
       return 0;
    if (category == "3D")
       return 1;
    if (category == "Audio" || category == "Synths" || category == "AudioEffects" ||
-       category == "AudioUtility" || category == "Notes")
+       category == "AudioUtility" || category == "Notes" || category == "AudioIO" ||
+       category == "AudioVisual" || category == "Prediction")
       return 2;
    return 3;
 }

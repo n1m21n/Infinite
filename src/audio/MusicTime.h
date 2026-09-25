@@ -246,4 +246,29 @@ namespace MusicTime
       const int idx = degree - extraOct * n;
       return root + 12 * (octave + extraOct) + def.intervals[idx];
    }
+
+   // Ported from upstream (Predictive Notes): snap into the scale AND into
+   // [lo, hi], searching inward from the crossed boundary.
+   inline int SnapToScaleInRange(int midiNote, int root, int scale, int lo, int hi)
+   {
+      if (lo > hi)
+         std::swap(lo, hi);
+      const int clamped = std::clamp(midiNote, lo, hi);
+      const int snapped = SnapToScale(clamped, root, scale, kSnapNearest);
+      if (snapped >= lo && snapped <= hi)
+         return snapped;
+      if (snapped > hi)
+      {
+         for (int n = hi; n >= lo; n--)
+            if (ScaleContainsPitchClass(scale, ((n - root) % 12 + 12) % 12))
+               return n;
+      }
+      else
+      {
+         for (int n = lo; n <= hi; n++)
+            if (ScaleContainsPitchClass(scale, ((n - root) % 12 + 12) % 12))
+               return n;
+      }
+      return lo;
+   }
 }

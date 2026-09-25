@@ -1,5 +1,47 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.37.0-turbo (2026-09-25)
+
+### Menus
+- **Categories reorganised** (node browser, search popup, spawn menu), from what each node does:
+  Source (Text joined it), **Video** (Video, VMPC, Video In, Syphon/Spout In), Effects (Resynthesize
+  joined), **Utility** (Comment, Group, Null, Viewport), **Audio In / Out** (Audio In, Audio Out,
+  Audio File), **Audio to Visual** (Audio Texture, Audio Color Ramp, Audio Displacement, Audio
+  Ribbon - the old 2-node "Audio"), Audio Mix & Routing, Audio Effects & Plugins, Synths & Samplers,
+  Notes & Sequencers, **Prediction**, Modulators (generators), **CV Tools** (Math, Compare, Invert,
+  Range to Range, Smoothing, Mod Depth, Null Modulator, CV to Pitch), **Analysis** (Audio/Image
+  Analyze, Audio to CV, Note to CV, Palette), **MIDI & OSC** (MIDI CC/Trigger, OSC Receive/Send,
+  OSC to CV). Node type names are unchanged; old patches load and re-file their nodes.
+
+### Added
+- **Range mapper** per modulation binding (right-click a modulated parameter): in min/max with
+  "capture" from the live signal, out min/max in the parameter's units, invert, reset. Saved in the
+  patch (trailing tokens of the `mod` line; older builds ignore them).
+- **Color markers** for nodes (right-click > Color marker): coloured band + frame, 8 colours,
+  applies to the whole selection, saved in the patch (6th token of `flags`).
+- **OSC to CV** (MIDI & OSC): 8 channels, each an address + argument index, input range, invert,
+  smoothing, and learn (arm, move the control, the next address is assigned). 8 CV outputs.
+- **Predictive Notes / Quantize / Velocity / Rhythm**, ported from upstream Infinite
+  (NoteModel, NoteTheory): learn from a note chain and play or correct in that style. Their shared
+  cross-session learning pools are saved in `%LOCALAPPDATA%\Infinite\prediction`.
+
+### Changed
+- **Noise**: five 4D types in the style of TouchDesigner's Noise TOP - Simplex 4D (new default),
+  Perlin 4D, Ridged 4D, Turbulence 4D, Billow 4D. The image is a slice of 4D noise and time moves
+  along the 4th axis (speed), so it morphs in place instead of scrolling sideways. New controls:
+  translate x/y, drift x/y (optional scroll), z, rotate, exponent; octaves, lacunarity, gain, warp,
+  contrast, brightness, seed and rgb noise apply too. The original 2D types are unchanged.
+
+### Fixes
+- **VST3 plugins now see the host transport** (play/stop, tempo, time signature, bar and beat
+  position). Tempo-synced and sequenced effects (Glitch 2, Effectrix, synced delays/LFOs) used to
+  read "stopped, no tempo" and pass the audio through dry.
+- **OSC**: the listener only bound 127.0.0.1, so controllers on the LAN (phone, tablet, another
+  PC) never reached it; it now binds all interfaces. Two OSC nodes on the same port fought over the
+  socket (the second got nothing); one shared listener per port now. Bundles and every numeric
+  argument (f, i, d, h, T/F) are decoded. OSC Receive's low/high accept any range (0..127, -1..1),
+  it can pick an argument, and it shows the raw value and the last address received.
+
 ## 0.36.0-turbo (2026-09-25)
 
 ### Fixes

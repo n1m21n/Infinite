@@ -103,6 +103,10 @@
 #include "nodes/Switcher3DNode.h"
 #include "nodes/ModulatorNodes.h"
 #include "nodes/OscNodes.h"
+#include "nodes/PredictiveNotesNode.h"
+#include "nodes/PredictiveQuantizeNode.h"
+#include "nodes/PredictiveVelocityNode.h"
+#include "nodes/PredictiveRhythmNode.h"
 #include "nodes/MidiNodes.h"
 #include "nodes/OutputNode.h"
 #include "nodes/SyphonInNode.h"
@@ -335,6 +339,23 @@ namespace
          out = "GRANULAR";
       if (name == "Fit")
          out = "FIT / RESIZE";
+      // Turbo category captions (the category keys stay one token).
+      if (name == "AudioIO")
+         out = "AUDIO IN / OUT";
+      if (name == "AudioVisual")
+         out = "AUDIO TO VISUAL";
+      if (name == "AudioEffects")
+         out = "AUDIO EFFECTS & PLUGINS";
+      if (name == "AudioUtility")
+         out = "AUDIO MIX & ROUTING";
+      if (name == "Synths")
+         out = "SYNTHS & SAMPLERS";
+      if (name == "Notes")
+         out = "NOTES & SEQUENCERS";
+      if (name == "CVTools")
+         out = "CV TOOLS";
+      if (name == "Control")
+         out = "MIDI & OSC";
       if (out.empty())
          out = name;
       std::transform(out.begin(), out.end(), out.begin(),
@@ -3018,6 +3039,12 @@ namespace
       REGISTER_NODE(AudioAnalyzeNode, Audio Analyze, "Modulators");
       REGISTER_NODE(OscReceiveNode, OSC Receive, "OSC");
       REGISTER_NODE(OscSendNode, OSC Send, "OSC");
+      REGISTER_NODE(OscToCvNode, OSC to CV, "Control");
+      // Ported from upstream Infinite: the note-prediction family.
+      REGISTER_NODE(PredictiveNotesNode, Predictive Notes, "Prediction");
+      REGISTER_NODE(PredictiveQuantizeNode, Predictive Quantize, "Prediction");
+      REGISTER_NODE(PredictiveVelocityNode, Predictive Velocity, "Prediction");
+      REGISTER_NODE(PredictiveRhythmNode, Predictive Rhythm, "Prediction");
 
       // P2 audio-graph proof nodes - see docs/plans/audio/README.md P2.
       // Category deliberately "AudioUtility" not "Audio Utility": Patch.cpp's
@@ -4064,7 +4091,10 @@ namespace
       GraphNode gn;
       gn.node.reset(node);
       gn.typeName = typeName;
-      gn.category = category;
+      // Turbo: the registry's category wins over the caller's (a patch saved
+      // before the menu reorganisation names the old one).
+      const std::string registered = NodeFactory::Instance().CategoryOf(typeName);
+      gn.category = registered.empty() ? category : registered;
       gn.index = gNextIndex++;
       gn.spawnX = x;
       gn.spawnY = y;
@@ -4239,8 +4269,70 @@ namespace
       ModSliderInt("port", &n->port, 1, 65535);
       ImGui::SetNextItemWidth(kParamWidth);
       ImGui::InputText("address", &n->address);
-      ModSlider("low", &n->low, 0.0f, 1.0f);
-      ModSlider("high", &n->high, 0.0f, 1.0f);
+      ImGui::SetNextItemWidth(kParamWidth);
+      ImGui::DragInt("argument", &n->argIndex, 0.1f, 0, 15);
+      // Any range: many controllers send 0..127 or -1..1.
+      ImGui::SetNextItemWidth(kParamWidth);
+      ImGui::DragFloat("low", &n->low, 0.01f, -100000.0f, 100000.0f, "%.3f");
+      ImGui::SetNextItemWidth(kParamWidth);
+      ImGui::DragFloat("high", &n->high, 0.01f, -100000.0f, 100000.0f, "%.3f");
+      ImGui::TextDisabled("raw %.3f%s", n->RawValue(), n->PortOpen() ? "" : "  (port not open)");
+      ImGui::TextDisabled("last: %s", OscHub::LastAddress(n->port).c_str());
+   }
+
+   void DrawOscToCvParams(OscToCvNode* n)
+   {
+      const float W = 300.0f;
+      ImGui::SetNextItemWidth(120.0f);
+      int port = n->port;
+      if (ImGui::InputInt("port##osccvPort", &port, 0, 0))
+         n->port = std::clamp(port, 1, 65535);
+      ImGui::SameLine();
+      ImGui::TextDisabled(n->PortOpen() ? "listening" : "port not open");
+      {
+         const std::string last = n->LastAddress();
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + W);
+         ImGui::TextDisabled("last: %s", last.empty() ? "-" : last.c_str());
+         ImGui::PopTextWrapPos();
+      }
+      for (int c = 0; c < OscToCvNode::kChannels; c++)
+      {
+         ImGui::PushID(9700 + c);
+         ImGui::Separator();
+         ImGui::TextColored(n->Received(c) ? ImVec4(0.5f, 0.9f, 0.6f, 1.0f) : ImVec4(0.6f, 0.62f, 0.68f, 1.0f),
+                            "cv%d", c + 1);
+         ImGui::SameLine();
+         ImGui::SetNextItemWidth(W - 110.0f);
+         ImGui::InputTextWithHint("##addr", "/address", &n->address[c]);
+         ImGui::SameLine();
+         const bool learning = n->learnChannel == c;
+         if (learning)
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.75f, 0.45f, 0.15f, 1.0f));
+         if (ImGui::Button(learning ? "..." : "learn", ImVec2(50.0f, 0)))
+            n->learnChannel = learning ? -1 : c;
+         if (learning)
+            ImGui::PopStyleColor();
+         ImGui::SetNextItemWidth(60.0f);
+         ImGui::DragInt("##arg", &n->argIndex[c], 0.1f, 0, 15, "arg %d");
+         ImGui::SameLine();
+         ImGui::SetNextItemWidth(W - 150.0f);
+         ImGui::DragFloatRange2("##range", &n->inMin[c], &n->inMax[c], 0.01f, -100000.0f, 100000.0f, "%.2f", "%.2f");
+         ImGui::SameLine();
+         ImGui::Checkbox("inv", &n->invert[c]);
+         ImGui::SetNextItemWidth(90.0f);
+         ImGui::DragFloat("##smooth", &n->smoothing[c], 0.005f, 0.0f, 0.99f, "smooth %.2f");
+         ImGui::SameLine();
+         const ImVec2 p0 = ImGui::GetCursorScreenPos();
+         const float bw = W - 100.0f, bh = ImGui::GetFrameHeight() - 6.0f;
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddRectFilled(ImVec2(p0.x, p0.y + 3.0f), ImVec2(p0.x + bw, p0.y + 3.0f + bh), IM_COL32(40, 44, 56, 255), 2.0f);
+         dl->AddRectFilled(ImVec2(p0.x, p0.y + 3.0f), ImVec2(p0.x + bw * n->Value(c), p0.y + 3.0f + bh), IM_COL32(120, 190, 255, 255), 2.0f);
+         char raw[32];
+         snprintf(raw, sizeof(raw), "%.3f", n->Raw(c));
+         dl->AddText(ImVec2(p0.x + 4.0f, p0.y + 2.0f), IM_COL32(230, 235, 245, 255), raw);
+         ImGui::Dummy(ImVec2(bw, ImGui::GetFrameHeight()));
+         ImGui::PopID();
+      }
    }
 
    void DrawOscSendParams(OscSendNode* n)
@@ -5097,6 +5189,19 @@ namespace
       ModSlider("contrast", &n->contrast, 0.1f, 4.0f);
       ModSlider("brightness", &n->brightness, -0.5f, 0.5f);
       ModSlider("seed", &n->seed, 0.0f, 100.0f);
+      if (n->noiseType >= 6)
+      {
+         // 4D types: speed moves along the 4th axis (morph in place); drift
+         // is an optional scroll. Drawn after every older slider so their
+         // CV indices do not move.
+         ModSlider("translate x", &n->translateX, -50.0f, 50.0f);
+         ModSlider("translate y", &n->translateY, -50.0f, 50.0f);
+         ModSlider("drift x", &n->driftX, -5.0f, 5.0f);
+         ModSlider("drift y", &n->driftY, -5.0f, 5.0f);
+         ModSlider("z", &n->zOffset, -20.0f, 20.0f);
+         ModSlider("rotate", &n->rotate, -180.0f, 180.0f, "%.0f deg");
+         ModSlider("exponent", &n->exponent, 0.2f, 4.0f);
+      }
       ModCheckbox("rgb noise", &n->colorNoise);
       if (!n->colorNoise)
       {
@@ -11267,6 +11372,230 @@ namespace
       EndAudioBody();
    }
 
+
+   // Note names for dropdowns (C-1 .. G9), used by the ported Predictive nodes.
+   const std::vector<std::string>& MidiNoteNameList()
+   {
+      static std::vector<std::string> names;
+      if (names.empty())
+      {
+         static const char* kPc[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+         for (int n = 0; n < 128; n++)
+            names.push_back(std::string(kPc[n % 12]) + std::to_string(n / 12 - 1));
+      }
+      return names;
+   }
+
+   // ---- Predictive nodes (ported from upstream Infinite) ----------------------
+   void DrawPredictiveQuantizeBody(GraphNode& gn, PredictiveQuantizeNode* n)
+   {
+      const float conf = n->Confidence01();
+      char stat[64];
+      if (n->ModeCount() > 0)
+         snprintf(stat, sizeof(stat), "%d spacings  -  %d onsets total", n->ModeCount(), n->TotalCaptured());
+      else if (n->TotalCaptured() > 0)
+         snprintf(stat, sizeof(stat), "listening  -  %d onsets", n->TotalCaptured());
+      else
+         snprintf(stat, sizeof(stat), "wire notes in - always adapting");
+
+      const ImVec2 statusPos = ImGui::GetCursorScreenPos();
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+
+      if (conf > 0.0f && gAudioReadout.find(gn.index) == gAudioReadout.end())
+      {
+         char confBadge[32];
+         snprintf(confBadge, sizeof(confBadge), "%d%% conf", (int)std::round(conf * 100.0f));
+         const ImVec2 bsz = ImGui::CalcTextSize(confBadge);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddText(ImVec2(statusPos.x + kAudioNarrowWidth - bsz.x - 7.0f, statusPos.y + 3.0f),
+                     IM_COL32(34, 197, 94, 255), confBadge);
+      }
+
+      {
+         AudioKnobRow row(1);
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
+   void DrawPredictiveVelocityBody(GraphNode& gn, PredictiveVelocityNode* n)
+   {
+      const float conf = n->Confidence01();
+      char stat[64];
+      if (n->HasCurve())
+         snprintf(stat, sizeof(stat), "dynamic range learned  -  %d notes total", n->TotalCaptured());
+      else if (n->TotalCaptured() > 0)
+         snprintf(stat, sizeof(stat), "listening  -  %d notes", n->TotalCaptured());
+      else
+         snprintf(stat, sizeof(stat), "wire notes in - always adapting");
+
+      const ImVec2 statusPos = ImGui::GetCursorScreenPos();
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+
+      if (conf > 0.0f && gAudioReadout.find(gn.index) == gAudioReadout.end())
+      {
+         char confBadge[32];
+         snprintf(confBadge, sizeof(confBadge), "%d%% conf", (int)std::round(conf * 100.0f));
+         const ImVec2 bsz = ImGui::CalcTextSize(confBadge);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddText(ImVec2(statusPos.x + kAudioNarrowWidth - bsz.x - 7.0f, statusPos.y + 3.0f),
+                     IM_COL32(34, 197, 94, 255), confBadge);
+      }
+
+      {
+         AudioKnobRow row(1);
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
+   void DrawPredictiveRhythmBody(GraphNode& gn, PredictiveRhythmNode* n)
+   {
+      const float conf = n->Confidence01();
+      char stat[64];
+      const std::string rootName = MidiNoteNameList()[std::clamp(n->root, 0, 127)];
+      if (n->IsLearning() && n->Dropped() > 0)
+         snprintf(stat, sizeof(stat), "learning  -  %d notes (%d dropped)", n->NotesCaptured(), n->Dropped());
+      else if (n->IsLearning())
+         snprintf(stat, sizeof(stat), "learning  -  %d notes", n->NotesCaptured());
+      else if (n->Building())
+         snprintf(stat, sizeof(stat), "building model...");
+      else if (n->LastLearnTooShort() && n->LearnedNotes() > 0)
+         snprintf(stat, sizeof(stat), "too short, kept %d notes learned", n->LearnedNotes());
+      else if (n->LastLearnTooShort())
+         snprintf(stat, sizeof(stat), "too short to learn, wire notes in");
+      else if (n->LearnedNotes() > 0)
+         snprintf(stat, sizeof(stat), "%d notes learned, root %s", n->LearnedNotes(), rootName.c_str());
+      else
+         snprintf(stat, sizeof(stat), "wire notes in, press Learn");
+
+      const ImVec2 statusPos = ImGui::GetCursorScreenPos();
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+
+      if (conf > 0.0f && gAudioReadout.find(gn.index) == gAudioReadout.end())
+      {
+         char confBadge[32];
+         snprintf(confBadge, sizeof(confBadge), "%d%% conf", (int)std::round(conf * 100.0f));
+         const ImVec2 bsz = ImGui::CalcTextSize(confBadge);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddText(ImVec2(statusPos.x + kAudioNarrowWidth - bsz.x - 7.0f, statusPos.y + 3.0f),
+                     IM_COL32(34, 197, 94, 255), confBadge);
+      }
+
+      {
+         const float w = gAudioContentW;
+         const float h = ImGui::GetFrameHeight();
+         const bool learning = n->IsLearning();
+         if (ImGui::Button(learning ? "Stop##prLearn" : "Learn##prLearn", ImVec2(w, h)))
+         {
+            PushUndoCheckpoint();
+            n->SetLearning(!learning);
+         }
+      }
+      {
+         AudioKnobRow row(2);
+         row.Dropdown("root", MidiNoteNameList(), n->root, [n](int i) { n->root = i; });
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
+   void DrawPredictiveNotesBody(GraphNode& gn, PredictiveNotesNode* n)
+   {
+      const float conf = n->Confidence01();
+      char stat[64];
+      if (n->IsLearning() && n->Dropped() > 0)
+         snprintf(stat, sizeof(stat), "learning  -  %d notes, %d bars (%d dropped)", n->NotesCaptured(), n->BarsCaptured(), n->Dropped());
+      else if (n->IsLearning())
+         snprintf(stat, sizeof(stat), "learning  -  %d notes, %d bars", n->NotesCaptured(), n->BarsCaptured());
+      else if (n->Building())
+         snprintf(stat, sizeof(stat), "building model...");
+      else if (n->LastLearnTooShort() && n->LearnedNotes() > 0)
+         snprintf(stat, sizeof(stat), "too short, kept %d notes learned", n->LearnedNotes());
+      else if (n->LastLearnTooShort())
+         snprintf(stat, sizeof(stat), "too short to learn, wire more notes in");
+      else if (n->LearnedNotes() > 0)
+         snprintf(stat, sizeof(stat), "%d notes learned", n->LearnedNotes());
+      else
+         snprintf(stat, sizeof(stat), "wire notes in, press Learn");
+
+      const ImVec2 statusPos = ImGui::GetCursorScreenPos();
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      if (conf > 0.0f && gAudioReadout.find(gn.index) == gAudioReadout.end())
+      {
+         char confBadge[32];
+         snprintf(confBadge, sizeof(confBadge), "%d%% conf", (int)std::round(conf * 100.0f));
+         const ImVec2 bsz = ImGui::CalcTextSize(confBadge);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddText(ImVec2(statusPos.x + kAudioNodeWidth - bsz.x - 7.0f, statusPos.y + 3.0f),
+                     IM_COL32(34, 197, 94, 255), confBadge);
+      }
+
+      {
+         const float w = gAudioContentW;
+         const float h = ImGui::GetFrameHeight();
+         const bool learning = n->IsLearning();
+         if (ImGui::Button(learning ? "Stop##predLearn" : "Learn##predLearn", ImVec2(w * 0.3f, h)))
+         {
+            PushUndoCheckpoint();
+            n->SetLearning(!learning);
+         }
+         ImGui::SameLine();
+         // Learning meter: how much the model beats a memoryless one, per captured bar.
+         const ImVec2 p0 = ImGui::GetCursorScreenPos();
+         const float mw = w - w * 0.3f - ImGui::GetStyle().ItemSpacing.x;
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddRectFilled(p0, ImVec2(p0.x + mw, p0.y + h), IM_COL32(255, 255, 255, 14), 3.0f);
+         const auto& c = n->Curve();
+         if (c.size() >= 2)
+         {
+            float hi = 0.1f;
+            for (float v : c)
+               hi = std::max(hi, v);
+            for (size_t i = 1; i < c.size(); i++)
+            {
+               const float x0 = p0.x + mw * (float)(i - 1) / (float)(c.size() - 1);
+               const float x1 = p0.x + mw * (float)i / (float)(c.size() - 1);
+               const float y0 = p0.y + h - 3.0f - (h - 6.0f) * std::clamp(c[i - 1] / hi, 0.0f, 1.0f);
+               const float y1 = p0.y + h - 3.0f - (h - 6.0f) * std::clamp(c[i] / hi, 0.0f, 1.0f);
+               dl->AddLine(ImVec2(x0, y0), ImVec2(x1, y1), IM_COL32(120, 200, 140, 230), 1.5f);
+            }
+         }
+         if (conf > 0.0f)
+         {
+            char confStr[32];
+            snprintf(confStr, sizeof(confStr), "%d%%", (int)std::round(conf * 100.0f));
+            const ImVec2 csz = ImGui::CalcTextSize(confStr);
+            dl->AddText(ImVec2(p0.x + mw - csz.x - 6.0f, p0.y + (h - csz.y) * 0.5f),
+                        IM_COL32(34, 197, 94, 255), confStr);
+         }
+         ImGui::Dummy(ImVec2(mw, h));
+      }
+      {
+         AudioKnobRow row(4);
+         row.Knob("stray", &n->stray, 0.0f, 1.0f, "%.2f", kKnobSmall);
+         row.KnobInt("memory", &n->memory, 0, 8);
+         row.Knob("length", &n->lengthSpread, 0.0f, 1.0f, "%.2f", kKnobSmall);
+         row.Knob("velocity", &n->velocitySpread, 0.0f, 1.0f, "%.2f", kKnobSmall);
+         row.End();
+      }
+      {
+         AudioKnobRow row(4);
+         row.KnobInt("low", &n->rangeLow, 0, 127);
+         row.KnobInt("high", &n->rangeHigh, 0, 127);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
    void DrawNoteEchoBody(GraphNode& gn, NoteEchoNode* n)
    {
       char stat[64];
@@ -15415,6 +15744,14 @@ namespace
          DrawVibratoBody(gn, n);
       else if (auto* n = dynamic_cast<NoteEchoNode*>(gn.node.get()))
          DrawNoteEchoBody(gn, n);
+      else if (auto* n = dynamic_cast<PredictiveNotesNode*>(gn.node.get()))
+         DrawPredictiveNotesBody(gn, n);
+      else if (auto* n = dynamic_cast<PredictiveQuantizeNode*>(gn.node.get()))
+         DrawPredictiveQuantizeBody(gn, n);
+      else if (auto* n = dynamic_cast<PredictiveVelocityNode*>(gn.node.get()))
+         DrawPredictiveVelocityBody(gn, n);
+      else if (auto* n = dynamic_cast<PredictiveRhythmNode*>(gn.node.get()))
+         DrawPredictiveRhythmBody(gn, n);
       else if (auto* n = dynamic_cast<NoteRouterNode*>(gn.node.get()))
          DrawNoteRouterBody(gn, n);
       else if (auto* n = dynamic_cast<NoteMergeNode*>(gn.node.get()))
@@ -17813,7 +18150,8 @@ namespace
       // panel rather than producing an image.
       if (dynamic_cast<ImageAnalyzeNode*>(n) != nullptr ||
           dynamic_cast<AudioFileNode*>(n) != nullptr ||
-          dynamic_cast<AudioAnalyzeNode*>(n) != nullptr)
+          dynamic_cast<AudioAnalyzeNode*>(n) != nullptr ||
+          dynamic_cast<OscToCvNode*>(n) != nullptr)
          return false;
       if (dynamic_cast<CameraNode*>(n) != nullptr || dynamic_cast<LightNode*>(n) != nullptr)
          return false;
@@ -18237,6 +18575,113 @@ namespace
       }
    }
 
+   // Turbo: range mapper for one binding - which part of the incoming 0..1
+   // is used, and onto which part of the parameter's range it lands. Shown
+   // in the binding popup (right-click a modulated parameter).
+   // Turbo node colour markers (index 0 = none).
+   constexpr int kNodeTagCount = 9;
+   const char* NodeTagName(int tag)
+   {
+      static const char* kNames[kNodeTagCount] = { "none", "red", "orange", "yellow", "green",
+                                                  "cyan", "blue", "purple", "pink" };
+      return kNames[std::clamp(tag, 0, kNodeTagCount - 1)];
+   }
+   ImU32 NodeTagColor(int tag)
+   {
+      static const ImU32 kColors[kNodeTagCount] = {
+         IM_COL32(0, 0, 0, 0), IM_COL32(239, 68, 68, 255), IM_COL32(249, 140, 40, 255),
+         IM_COL32(245, 205, 50, 255), IM_COL32(60, 200, 100, 255), IM_COL32(40, 200, 220, 255),
+         IM_COL32(70, 130, 245, 255), IM_COL32(160, 100, 240, 255), IM_COL32(240, 100, 180, 255) };
+      return kColors[std::clamp(tag, 0, kNodeTagCount - 1)];
+   }
+   // Applies to the right-clicked node and, when it is part of the selection,
+   // to every selected node.
+   void SetNodeColorTag(GraphNode& target, int tag)
+   {
+      PushUndoCheckpoint();
+      target.colorTag = tag;
+      if (gEditor != nullptr && ed::IsNodeSelected(target.NodeId()))
+      {
+         const int count = ed::GetSelectedObjectCount();
+         std::vector<ed::NodeId> sel(std::max(1, count));
+         const int n = ed::GetSelectedNodes(sel.data(), count);
+         for (int i = 0; i < n; i++)
+            if (GraphNode* g = FindNodeByIndex((int)sel[i].Get() / GraphNode::kStride))
+               g->colorTag = tag;
+      }
+      gPatchDirty = true;
+   }
+
+   void DrawModulationRangeEditor(int nodeIndex, int paramIndex)
+   {
+      Modulation& mod = Modulation::Instance();
+      const Modulation::Source src = mod.ModulatorFor(nodeIndex, paramIndex);
+      if (src.nodeIndex < 0)
+         return;
+      float lo = 0.0f, hi = 1.0f;
+      for (const ParamRef& ref : mod.FrameParams())
+         if (ref.nodeIndex == nodeIndex && ref.paramIndex == paramIndex)
+         {
+            lo = ref.minValue;
+            hi = ref.maxValue;
+            break;
+         }
+      float incoming = 0.0f;
+      if (GraphNode* g = FindNodeByIndex(src.nodeIndex))
+         if (IModulator* m = ModulatorForOutput(g->node.get(), src.outputIndex))
+            incoming = m->Value01();
+
+      ImGui::SeparatorText("Range");
+      ImGui::TextDisabled("incoming %.3f", incoming);
+      float inMin = src.inMin, inMax = src.inMax;
+      ImGui::SetNextItemWidth(220.0f);
+      bool changed = ImGui::DragFloatRange2("in##modIn", &inMin, &inMax, 0.002f, 0.0f, 1.0f,
+                                            "in min %.3f", "in max %.3f", ImGuiSliderFlags_AlwaysClamp);
+      // Output edited in the parameter's own units.
+      const float span = hi - lo;
+      float outLo = lo + span * src.outMin, outHi = lo + span * src.outMax;
+      const float speed = std::max(0.0001f, std::fabs(span) * 0.002f);
+      ImGui::SetNextItemWidth(220.0f);
+      if (ImGui::DragFloat("out min##modOutLo", &outLo, speed, lo, hi, "out min %.3f"))
+         changed = true;
+      ImGui::SetNextItemWidth(220.0f);
+      if (ImGui::DragFloat("out max##modOutHi", &outHi, speed, lo, hi, "out max %.3f"))
+         changed = true;
+      if (ImGui::IsItemActivated())
+         PushUndoCheckpoint();
+      if (ImGui::Button("capture in min"))
+      {
+         inMin = incoming;
+         changed = true;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("capture in max"))
+      {
+         inMax = incoming;
+         changed = true;
+      }
+      if (ImGui::Button("invert"))
+      {
+         std::swap(outLo, outHi);
+         changed = true;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("reset range"))
+      {
+         PushUndoCheckpoint();
+         mod.SetRange(nodeIndex, paramIndex, 0.0f, 1.0f, 0.0f, 1.0f);
+         return;
+      }
+      if (changed)
+      {
+         const float outMin = std::fabs(span) > 1e-9f ? (outLo - lo) / span : 0.0f;
+         const float outMax = std::fabs(span) > 1e-9f ? (outHi - lo) / span : 1.0f;
+         mod.SetRange(nodeIndex, paramIndex, std::clamp(inMin, 0.0f, 1.0f), std::clamp(inMax, 0.0f, 1.0f),
+                      outMin, outMax);
+         gPatchDirty = true;
+      }
+   }
+
    void DrawModulatorMeter(IModulator* mod, int nodeIndex)
    {
       const float value = mod->Value01();
@@ -18384,7 +18829,7 @@ namespace
          { "Image Source", "Loads a still image. Opens the native file picker and decodes anything macOS can read - PNG, JPEG, TIFF, HEIC, RAW and more." },
          { "Video", "Plays video and its soundtrack from separate video/audio output pins. Includes trim in/out, restart, reverse, loop and four cue inputs. Click the timeline to seek or Shift-click to create a cue; any cue input crossing above zero jumps to its marker." },
          { "VMPC", "VJ clip launcher, the MPC for video: 16 pads, one video clip each, hit with the mouse, a CV pin per pad or the note input (base note 36 = pad 1). Per pad: one shot, gate (loops while held) or loop (toggle), trim in/out and speed (negative = reverse). The output is the clip of the last pad hit; with nothing playing it is transparent (or the last frame with hold last frame). Silent: use a Video node for soundtracks." },
-         { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included." },
+         { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included. The 4D types (Simplex, Perlin, Ridged, Turbulence, Billow 4D) work like TouchDesigner's Noise TOP: the picture is a slice of 4D noise and speed moves along the 4th axis, so it morphs in place; drift adds an optional scroll, plus translate, z, rotate and exponent." },
          { "Shape", "The base 2D vector-primitive node - pick any of its 20 shapes from the dropdown, with fill, stroke, feather and background controls. Each shape also has its own directly-spawnable named node (Circle, Hexagon, Star, ...) that just starts on that shape." },
          { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Record, then draw - replaying redraws the stroke in time, and the canvas size follows the input when one is patched in." },
          { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation." },
@@ -18471,6 +18916,10 @@ namespace
          { "Vibrato", "An LFO wired straight to pitch. It is a modulator, not a note-chain node - it has no note input on purpose, because a free-running wobble has no single note to attach to. Patch its output onto a synth's pitch/bend mod dot (e.g. Wavetable's 'bend' knob)." },
          { "Note Filter", "A gate on a note's pitch: scale snaps it to the nearest degree of the chosen scale/root, range drops anything outside lo..hi, and chance randomly drops the rest. A note that gets dropped has its note-off dropped with it, so nothing hangs." },
          { "Note Echo", "Repeats every incoming note event, delay ms apart, with velocity decaying and pitch shifting per repeat - a delay line for notes rather than audio. The original note always passes through first; the repeats are on top of it, not instead of it." },
+         { "Predictive Notes", "Wire a note chain in and press Learn: it listens (passing the notes through), learns the pitches, rhythm, lengths and velocities as a variable-order Markov model, then plays on its own in that style. Stray at the bottom replays the phrase, the middle plays in character, the top ignores the model and picks freely in range. The learned notes are saved with the patch." },
+         { "Predictive Quantize", "A groove quantizer, not a grid one: wire a note chain in and it always listens to the actual spacing between your onsets while also correcting them in the same pass - no Learn/Stop, it just keeps adapting the more you play. The learned spacing profile is global: shared by every Predictive Quantize in every patch, and it keeps only your most recent onsets, so it tracks how you're playing now rather than an ever-growing history. Mix at 0 is untouched, mix at 1 snaps fully onto the nearest learned spacing. Unlike Quantizer's fixed grid, this follows however you actually played it, including swing or a template that isn't on a clean subdivision." },
+         { "Predictive Velocity", "A learned dynamics curve, not a hand-picked one: wire a note chain in and it always listens to the velocities you play while also remapping them in the same pass - no Learn/Stop, it just keeps adapting the more you play. The learned curve is global: shared by every Predictive Velocity in every patch, and it keeps only your most recent notes, so it tracks how you're playing now rather than an ever-growing history. Mix at 0 is untouched, mix at 1 snaps fully onto the learned range, so your loudest playing maps to your own real loudest instead of a theoretical 127. Unlike Velocity Curve's one fixed shape, this follows your own dynamics." },
+         { "Predictive Rhythm", "Wire any note source in and press Learn, same as Predictive Notes. It learns the rhythm, note lengths and velocity as its own habit, but learns pitch as an interval from a 'root' note instead of an absolute pitch - so what comes back out reads as a repeating pattern anchored on one note with occasional deviation (think C2 C2 C2 D3 C2 C2 C2), not a free melody. Root auto-detects to the most common note you played when Learn finishes; change it afterward with the dropdown to transpose the whole learned pattern without relearning." },
          { "Note Router", "The system's only note fan-out point: one input, four distinct outputs. Round Robin cycles through them, Random picks one per note, Chain advances only when the pitch changes (a held note stays put), and Probability rolls each output independently - a note can end up on several outputs at once, or (rarely) none, in which case it falls back to output 1. A note's whole lifetime (on through off) always stays on the output(s) it started on." },
          { "Note Merge", "The system's only note fan-in point: up to four note inputs merged into one output stream, in timestamp order. Each input's notes stay independent voices matched by voice id, not pitch - so two inputs playing the same note at the same time sound as two overlapping voices, not a collision." },
          { "Arpeggiator", "Holds whatever notes are currently down and replays them one at a time on its own clock, either synced to tempo (a note division) or free-running in seconds. Up/Down/Up-Down/Down-Up/As Played order the held notes by pitch or by the order they were pressed; Converge alternates outside-in (lowest, highest, next-lowest...), Diverge alternates inside-out from the middle; Random picks one per step. Repeat x2/x4 fires each note 2 or 4 times in a row before advancing. Stairs Up/Down walks the pattern in overlapping two-note steps (C E, E G, G C...). Join and Spread only differ once octaves is above 1: Spread stacks the pattern octave-by-octave (C3 D3 E3, C4 D4 E4), Join interleaves each note's octaves together (C3 C4, D3 D4, E3 E4), and Join/Spread alternates between the two every full pass - at octaves = 1 all three play identically to Up. The 8-step gate grid below the readout is the primary control: click or drag across cells to mute individual steps without changing the note order (advancing past a muted step still moves the pattern forward, punching a rhythmic hole rather than skipping a note), and the lit cell tracks the currently-sounding step. Octaves stacks the pattern up to 4 octaves higher. Gate sets how much of each step the note actually sounds for before its off. Preset loads a complete starting point (mode, octaves, rate, gate and gate pattern) in one click." },
@@ -18502,6 +18951,7 @@ namespace
          // ---------------- OSC ----------------
          { "OSC Receive", "Listens on a UDP port for Open Sound Control messages matching an address pattern, and reports the last received value as a modulator (remapped through low/high). Behaves like LFO/Random - patch its output onto any slider's modulation pin." },
          { "OSC Send", "Sends its patched modulator input as an Open Sound Control message (address + float) to a host:port over UDP, on change (past an epsilon) or at least every interval - the one node in the patch with no output of its own." },
+         { "OSC to CV", "Up to 8 OSC addresses (or 8 arguments of one address) as 8 modulator outputs, each with its own input range, invert and smoothing. Press learn on a channel and move the control on your phone/controller to assign it. Listens on all network interfaces; several OSC nodes can share one port." },
 
          // ---------------- 3D / geometry pipeline ----------------
          { "Geometry", "The base 3D primitive node - pick any of its 24 shapes from the dropdown. Each shape also has its own directly-spawnable named node (Cube, Sphere, Torus, ...) that just starts on that shape." },
@@ -18694,7 +19144,18 @@ namespace
       if (category == "3D") return "Part of the 3D geometry/render pipeline - geometry and point-cloud nodes feed into Render 3D via a Camera and Lights.";
       if (category == "Notes") return "Part of the note chain - takes note events in on its 'notes' pin and passes them out, changed. Feed a synth (Wavetable, Sampler) from the end of the chain.";
       if (category == "Output") return "Terminal node: shows, exports or records the final result.";
-      if (category == "OSC") return "Sends or receives Open Sound Control messages over UDP to talk to other apps (TouchDesigner, Max, lighting rigs). Loopback/LAN only.";
+      if (category == "Video") return "Video clips, cameras and Spout senders as images: Video, VMPC (clip launcher), Video In, Syphon/Spout In.";
+      if (category == "Utility") return "Patch housekeeping: comments, groups, pass-through Null and Viewport.";
+      if (category == "AudioIO") return "Audio into and out of the graph: the sound card input and output, and audio files.";
+      if (category == "AudioVisual") return "Turns audio into images or geometry: waveform/spectrum textures, colour ramps, displacement, ribbons.";
+      if (category == "AudioUtility") return "Mixing and routing audio: gain, mixers, splitter, blend, looper, MPC pad outputs.";
+      if (category == "AudioEffects") return "Processes audio: filters, dynamics, delays, reverbs, modulation effects, and VST3 plugins.";
+      if (category == "Synths") return "Makes sound from notes: synthesizers, samplers, drum sequencer and the MPC.";
+      if (category == "Prediction") return "Learns how you play and plays back or corrects in that style (ported from upstream Infinite).";
+      if (category == "CVTools") return "Shapes modulation signals: math, compare, invert, range, smoothing, depth.";
+      if (category == "Analysis") return "Measures audio, images or notes and turns the result into modulation values.";
+      if (category == "Control") return "External control: MIDI CC/trigger and OSC in and out. Patch their outputs onto any slider's dot.";
+      if (category == "OSC") return "Sends or receives Open Sound Control messages over UDP to talk to other apps (TouchDesigner, Max, TouchOSC, lighting rigs), on this machine or the LAN.";
       return "No additional notes for this node.";
    }
 
@@ -18825,7 +19286,7 @@ namespace
                { "Video", "Plays a video file. Position follows the transport, so it pauses with everything else. Loop and speed (including reverse) are available." },
                { "VMPC", "VJ clip launcher, the MPC for video: 16 pads, one video clip each, hit with the mouse, a CV pin per pad or the note input (base note 36 = pad 1). Per pad: one shot, gate (loops while held) or loop (toggle), trim in/out and speed (negative = reverse). The output is the clip of the last pad hit; with nothing playing it is transparent (or the last frame with hold last frame). Silent: use a Video node for soundtracks." },
                { "Shape", "Ten vector primitives - circle, ellipse, rectangle, rounded rect, triangle, polygon, star, ring, cross, line - with fill, stroke, feather and background." },
-               { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included." },
+               { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included. The 4D types (Simplex, Perlin, Ridged, Turbulence, Billow 4D) work like TouchDesigner's Noise TOP: the picture is a slice of 4D noise and speed moves along the 4th axis, so it morphs in place; drift adds an optional scroll, plus translate, z, rotate and exponent." },
                { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Strokes can be recorded and replayed as an animation." },
                { "Formula", "A live GLSL shader. Pick a preset or press 'Edit GLSL...' to write your own; four knobs (uA-uD) are exposed for modulation." },
                { "Texture", "Blender-standard procedural textures: Voronoi, Brick, Magic, Wave and Musgrave, each with its own parameter block." },
@@ -18893,6 +19354,7 @@ namespace
             { "OSC", {
                { "OSC Receive", "Listens on a UDP port for Open Sound Control messages matching an address pattern, and reports the last received value as a modulator (remapped through low/high). Behaves like LFO/Random - patch its output onto any slider's modulation pin." },
                { "OSC Send", "Sends its patched modulator input as an Open Sound Control message (address + float) to a host:port over UDP, on change (past an epsilon) or at least every interval - the one node in the patch with no output of its own." },
+               { "OSC to CV", "Up to 8 OSC addresses (or 8 arguments of one address) as 8 modulator outputs, each with its own input range, invert and smoothing. Press learn on a channel and move the control on your phone/controller to assign it. Listens on all network interfaces; several OSC nodes can share one port." },
             } },
          };
 
@@ -19686,6 +20148,7 @@ namespace
          rec.showMiniViewport = gn.showMiniViewport;
          rec.showAdvancedParams = gn.showAdvancedParams;
          rec.showPreview = gn.showPreview;
+         rec.colorTag = gn.colorTag;
          Patch::SaveParams(gn.node.get(), rec.params);
          data.nodes.push_back(std::move(rec));
 
@@ -19817,7 +20280,9 @@ namespace
       for (const auto& link : Modulation::Instance().Links())
          data.modulation.push_back({ link.first.first, link.first.second,
                                      link.second.nodeIndex, link.second.outputIndex,
-                                     link.second.polarity, link.second.depth, link.second.centre });
+                                     link.second.polarity, link.second.depth, link.second.centre,
+                                     link.second.inMin, link.second.inMax,
+                                     link.second.outMin, link.second.outMax });
       for (const auto& link : PaletteBinding::Instance().Links())
          data.palette.push_back({ link.first.first, link.first.second,
                                   link.second.nodeIndex, link.second.swatchIndex });
@@ -19847,6 +20312,30 @@ namespace
       std::error_code ec;
       std::filesystem::remove(std::filesystem::u8path(RecoveryAutosavePath()), ec);
       gRecoveryAvailable = false;
+   }
+
+   // Ported from upstream: the Predictive nodes' shared, cross-session
+   // learning pools live in <settings>/prediction.
+   std::string PredictionDir() { return InfiniteSettingsDirectory() + "/prediction"; }
+   void SavePredictionProfiles()
+   {
+      if (PredictiveQuantizeProfile::HasLearnedData())
+         PredictiveQuantizeProfile::Save(PredictionDir());
+      if (PredictiveVelocityProfile::HasLearnedData())
+         PredictiveVelocityProfile::Save(PredictionDir());
+      if (PredictiveNotesStyle::HasLearnedData())
+         PredictiveNotesStyle::Save(PredictionDir());
+      if (PredictiveRhythmStyle::HasLearnedData())
+         PredictiveRhythmStyle::Save(PredictionDir());
+   }
+   void PollPredictionAutosave()
+   {
+      static double sLast = 0.0;
+      const double now = glfwGetTime();
+      if (sLast > 0.0 && now - sLast < (double)gAutosaveSeconds)
+         return;
+      sLast = now;
+      SavePredictionProfiles();
    }
 
    void PollAutosave()
@@ -19979,6 +20468,7 @@ namespace
          spawned->showMiniViewport = rec.showMiniViewport;
          spawned->showAdvancedParams = rec.showAdvancedParams;
          spawned->showPreview = rec.showPreview;
+         spawned->colorTag = rec.colorTag;
          Patch::LoadParams(spawned->node.get(), rec.params);
          ReloadDerivedState(spawned->node.get());
          // Phase 4 (selection as an input): rewrites a saved kDeleteSelected/
@@ -20050,6 +20540,10 @@ namespace
             source.polarity = m.polarity;
             source.depth = m.depth;
             source.centre = m.centre;
+            source.inMin = m.inMin;
+            source.inMax = m.inMax;
+            source.outMin = m.outMin;
+            source.outMax = m.outMax;
             Modulation::Instance().RestoreLink(dst->index, m.dstParam, source);
          }
       }
@@ -27558,6 +28052,10 @@ int main(int argc, char** argv)
    // signature on first launch and can get the app reported as damaged. Keep
    // all mutable state in Application Support instead.
    std::string settingsDir = InfiniteSettingsDirectory();
+   PredictiveQuantizeProfile::Load(PredictionDir());
+   PredictiveVelocityProfile::Load(PredictionDir());
+   PredictiveNotesStyle::Load(PredictionDir());
+   PredictiveRhythmStyle::Load(PredictionDir());
    // Restores whatever was indexed last run with no rescan - scanning only
    // ever happens from an explicit Refresh click in the Samples/Media panel.
    gSampleScanner.LoadFromDisk();
@@ -36047,7 +36545,8 @@ int main(int argc, char** argv)
          const bool multiOutModulator =
             dynamic_cast<ImageAnalyzeNode*>(gn.node.get()) != nullptr ||
             dynamic_cast<AudioFileNode*>(gn.node.get()) != nullptr ||
-            dynamic_cast<AudioAnalyzeNode*>(gn.node.get()) != nullptr;
+            dynamic_cast<AudioAnalyzeNode*>(gn.node.get()) != nullptr ||
+            dynamic_cast<OscToCvNode*>(gn.node.get()) != nullptr;
          IGeometrySource* geoSourceForViewport = dynamic_cast<IGeometrySource*>(gn.node.get());
          const bool isAudioBodyNode = IsAudioBodyNode(gn.node.get());
          const bool canTogglePreview = CanToggleInlinePreview(gn);
@@ -36388,6 +36887,8 @@ int main(int argc, char** argv)
             }
             else if (auto* n = dynamic_cast<OscReceiveNode*>(gn.node.get()))
                DrawOscReceiveParams(n);
+            else if (auto* n = dynamic_cast<OscToCvNode*>(gn.node.get()))
+               DrawOscToCvParams(n);
             else if (auto* n = dynamic_cast<OscSendNode*>(gn.node.get()))
                DrawOscSendParams(n);
             else if (auto* n = dynamic_cast<MaterialNode*>(gn.node.get()))
@@ -36675,6 +37176,19 @@ int main(int argc, char** argv)
          ed::EndNode();
          gCurrentNodeIndex = -1;
          ed::PopStyleColor(2);
+         // Turbo: colour marker - a band across the top and a coloured frame.
+         if (gn.colorTag > 0)
+         {
+            const ImU32 tag = NodeTagColor(gn.colorTag);
+            if (ImDrawList* bg = ed::GetNodeBackgroundDrawList(gn.NodeId()))
+            {
+               const ImVec2 np = ed::GetNodePosition(gn.NodeId());
+               const ImVec2 ns = ed::GetNodeSize(gn.NodeId());
+               const float rounding = ed::GetStyle().NodeRounding;
+               bg->AddRectFilled(np, ImVec2(np.x + ns.x, np.y + 7.0f), tag, rounding, ImDrawFlags_RoundCornersTop);
+               bg->AddRect(np, ImVec2(np.x + ns.x, np.y + ns.y), tag, rounding, 0, 2.5f);
+            }
+         }
          if (gn.NodeId() == gPendingSidebarRevealNodeId)
          {
             ed::ClearSelection();
@@ -37316,6 +37830,14 @@ int main(int argc, char** argv)
                   copy->showMiniViewport = item.miniViewport;
                   copy->showPreview = item.preview;
                   copy->showAdvancedParams = item.advancedParams;
+                  if (GraphNode* orig = FindNodeByIndex(item.origIndex))
+                     copy->colorTag = orig->colorTag;
+                  // A duplicated Predictive node starts fresh instead of
+                  // inheriting the source's learned model (upstream rule).
+                  if (auto* pn = dynamic_cast<PredictiveNotesNode*>(copy->node.get()))
+                     pn->ResetLearnedState();
+                  else if (auto* pr = dynamic_cast<PredictiveRhythmNode*>(copy->node.get()))
+                     pr->ResetLearnedState();
                   newByOrig[item.origIndex] = copy;
                   gPendingSelect.push_back(copy->NodeId());
                }
@@ -37836,6 +38358,23 @@ int main(int argc, char** argv)
                if (ImGui::MenuItem("Show behind the canvas", "Ctrl+Shift+B", gCanvasBgNodeIndex == gn->index))
                   ToggleCanvasBackground(gn->index);
             }
+            if (ImGui::BeginMenu("Color marker"))
+            {
+               for (int t = 0; t < kNodeTagCount; t++)
+               {
+                  ImGui::PushID(t);
+                  const ImVec2 p0 = ImGui::GetCursorScreenPos();
+                  const float sz = ImGui::GetTextLineHeight();
+                  if (t > 0)
+                     ImGui::GetWindowDrawList()->AddRectFilled(p0, ImVec2(p0.x + sz, p0.y + sz), NodeTagColor(t), 3.0f);
+                  ImGui::Dummy(ImVec2(sz, sz));
+                  ImGui::SameLine();
+                  if (ImGui::MenuItem(NodeTagName(t), nullptr, gn->colorTag == t))
+                     SetNodeColorTag(*gn, t);
+                  ImGui::PopID();
+               }
+               ImGui::EndMenu();
+            }
             if (ImGui::MenuItem("Help"))
             {
                gHelpPopupNodeIndex = gn->index;
@@ -37932,6 +38471,7 @@ int main(int argc, char** argv)
                if (ImGui::SliderFloat("Depth", &depth, -1.0f, 1.0f, "%.2f"))
                   mod.SetPolarity(gModBindingMenuNode, gModBindingMenuParam, Modulation::Source::kBipolar, depth);
             }
+            DrawModulationRangeEditor(gModBindingMenuNode, gModBindingMenuParam);
             ImGui::Separator();
             if (ImGui::MenuItem("Unbind"))
             {
@@ -39010,7 +39550,15 @@ int main(int argc, char** argv)
                // of being silently flattened at the edge - see
                // docs/plans/modulators/00-modulation-polarity.md §4. So,
                // unlike before, v01 is not force-clamped here.
-               const float v01 = modulator->Value01();
+               float v01 = modulator->Value01();
+               // Turbo range mapper (see Modulation::Source::HasRange).
+               if (src.HasRange())
+               {
+                  const float span = src.inMax - src.inMin;
+                  float t = std::fabs(span) < 1e-6f ? 0.0f : (v01 - src.inMin) / span;
+                  t = std::clamp(t, 0.0f, 1.0f);
+                  v01 = src.outMin + (src.outMax - src.outMin) * t;
+               }
                if (src.polarity == Modulation::Source::kBipolar)
                {
                   // Swings around wherever the knob was sitting when the
@@ -39550,6 +40098,7 @@ int main(int argc, char** argv)
       // patch. It writes only when values differ from the previous frame.
       PersistSceneSettingsIfChanged();
       PollAutosave();
+      PollPredictionAutosave();
 
       ++frameId;
 
@@ -39657,6 +40206,7 @@ int main(int argc, char** argv)
       }
    }
 
+   SavePredictionProfiles();
    CloseAllProjectorWindows();
    AudioEngine::Instance().Stop();
    ClearMediaThumbnails();

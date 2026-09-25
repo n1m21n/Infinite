@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.25)
 # Unofficial Windows-only fork of Infinite (https://github.com/n1m21n/Infinite).
 # macOS support was removed on purpose: every platform path below is Windows
 # (MSVC 2022, x64, vcpkg static triplet, JUCE, OpenCV, Spout2, Windows ML).
-project(InfiniteTurbo VERSION 0.36.0 LANGUAGES C CXX)
+project(InfiniteTurbo VERSION 0.37.0 LANGUAGES C CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Infinite-Turbo builds only on Windows x64 with MSVC (Visual Studio 2022).")
@@ -278,6 +278,11 @@ add_executable(Infinite WIN32
     src/nodes/SuperMixerNode.cpp
     src/nodes/LayoutNode.cpp
     src/nodes/VmpcNode.cpp
+    src/audio/NoteModel.cpp
+    src/nodes/PredictiveNotesNode.cpp
+    src/nodes/PredictiveQuantizeNode.cpp
+    src/nodes/PredictiveVelocityNode.cpp
+    src/nodes/PredictiveRhythmNode.cpp
     src/audio/SampleScanner.cpp
     src/audio/PluginScanner.cpp
 
@@ -317,6 +322,8 @@ if(INFINITE_ENABLE_VST3)
     add_executable(infinite-vst3-scanner
         src/scanner_main_windows.cpp
         src/platform/PluginVST3Windows.cpp
+        # The plugin play head (PluginVST3Windows.cpp) reads the Transport.
+        src/core/Transport.cpp
     )
     target_include_directories(infinite-vst3-scanner PRIVATE
         src src/core src/nodes src/platform src/audio

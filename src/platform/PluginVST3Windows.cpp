@@ -18,6 +18,7 @@
 #include <unordered_map>
 
 #include "platform/SettingsPaths.h"
+#include "core/Transport.h"
 
 namespace fs = std::filesystem;
 
@@ -364,8 +365,41 @@ namespace Platform
       PluginHandle* handle = nullptr;
    };
 
+   // Turbo: the host transport, as plugins see it. Without a play head a
+   // plugin reads "stopped, no tempo" - tempo-synced / sequenced effects
+   // (Glitch 2, Effectrix, Gross Beat, synced delays and LFOs) then sit idle
+   // or pass the signal through dry. Everything comes from Transport, which
+   // the audio thread advances once per callback before any node runs.
+   struct HostPlayHead final : public juce::AudioPlayHead
+   {
+      const double* sampleRate = nullptr;
+
+      juce::Optional<PositionInfo> getPosition() const override
+      {
+         Transport& t = Transport::Instance();
+         PositionInfo info;
+         const double beats = t.Beats();
+         const double beatsPerBar = t.BeatsPerBar();
+         const double seconds = t.Seconds();
+         info.setIsPlaying(t.IsPlaying());
+         info.setIsRecording(false);
+         info.setIsLooping(false);
+         info.setBpm((double)t.Tempo());
+         info.setTimeSignature(TimeSignature { t.TimeSigNumerator(), t.TimeSigDenominator() });
+         info.setPpqPosition(beats);
+         const double bars = beatsPerBar > 0.0 ? std::floor(beats / beatsPerBar) : 0.0;
+         info.setPpqPositionOfLastBarStart(bars * beatsPerBar);
+         info.setBarCount((int64_t)bars);
+         info.setTimeInSeconds(seconds);
+         if (sampleRate != nullptr)
+            info.setTimeInSamples((int64_t)std::llround(seconds * *sampleRate));
+         return info;
+      }
+   };
+
    struct PluginHandle final : public juce::AudioProcessorListener
    {
+      HostPlayHead playHead;
       PluginDesc desc;
       std::unique_ptr<juce::AudioPluginInstance> instance;
       std::unique_ptr<EditorWindow> editor;
@@ -509,6 +543,8 @@ namespace Platform
             }
             handle->instance = std::move(instance);
             handle->instance->addListener(handle);
+            handle->playHead.sampleRate = &handle->sampleRate;
+            handle->instance->setPlayHead(&handle->playHead);
             handle->instance->setNonRealtime(false);
             handle->instance->setRateAndBufferSizeDetails(handle->sampleRate, handle->maxFrames);
             handle->instance->prepareToPlay(handle->sampleRate, handle->maxFrames);

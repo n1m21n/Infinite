@@ -21,7 +21,9 @@ public:
    int GetOutputHeight() const override { return mOut.h; }
    void CookIfNeeded(int frameId) override;
 
-   int noiseType = 1;
+   // Turbo: new nodes start on Simplex 4D (index 6); types 0..5 are the
+   // original 2D ones, kept as they were for old patches.
+   int noiseType = 6;
    float width = 1024.0f;
    float height = 1024.0f;
    float scale = 6.0f;
@@ -36,6 +38,17 @@ public:
    bool colorNoise = false;
    float lowColor[3] = { 0.0f, 0.0f, 0.0f };
    float highColor[3] = { 1.0f, 1.0f, 1.0f };
+   // Turbo, 4D types (TouchDesigner Noise TOP style): the image is a slice
+   // of 4D noise - x/y are the picture, z a manual depth, and time moves
+   // along the 4th axis at `speed`, so it morphs in place instead of
+   // scrolling sideways. Drift adds an optional scroll (units/second).
+   float translateX = 0.0f;
+   float translateY = 0.0f;
+   float driftX = 0.0f;
+   float driftY = 0.0f;
+   float zOffset = 0.0f;
+   float rotate = 0.0f;   // degrees
+   float exponent = 1.0f;
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -47,6 +60,9 @@ public:
       v.Float("contrast", contrast); v.Float("brightness", brightness);
       v.Float("seed", seed); v.Bool("colorNoise", colorNoise);
       v.Color("lowColor", lowColor); v.Color("highColor", highColor);
+      v.Float("translateX", translateX); v.Float("translateY", translateY);
+      v.Float("driftX", driftX); v.Float("driftY", driftY);
+      v.Float("zOffset", zOffset); v.Float("rotate", rotate); v.Float("exponent", exponent);
    }
 
 private:

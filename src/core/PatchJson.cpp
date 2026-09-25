@@ -22,6 +22,7 @@ namespace PatchJson
          jn["showMiniViewport"] = n.showMiniViewport;
          jn["showAdvancedParams"] = n.showAdvancedParams;
          jn["showPreview"] = n.showPreview;
+         jn["colorTag"] = n.colorTag;
          jn["params"] = json::object();
          for (const auto& p : n.params)
             jn["params"][p.first] = p.second;
@@ -46,7 +47,8 @@ namespace PatchJson
          out["modulation"].push_back({ {"dstIndex", m.dstIndex}, {"dstParam", m.dstParam},
                                         {"srcIndex", m.srcIndex}, {"srcOutput", m.srcOutput},
                                         {"polarity", m.polarity}, {"depth", m.depth},
-                                        {"centre", m.centre} });
+                                        {"centre", m.centre}, {"inMin", m.inMin}, {"inMax", m.inMax},
+                                        {"outMin", m.outMin}, {"outMax", m.outMax} });
 
       out["palette"] = json::array();
       for (const Patch::PaletteRecord& p : data.palette)

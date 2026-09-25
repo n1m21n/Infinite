@@ -262,7 +262,7 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
       file << "  pos " << FloatToString(px) << " " << FloatToString(py) << "\n";
       file << "  flags " << (node.showParams ? 1 : 0) << " " << (node.bypassed ? 1 : 0) << " "
            << (node.showMiniViewport ? 1 : 0) << " " << (node.showAdvancedParams ? 1 : 0) << " "
-           << (node.showPreview ? 1 : 0) << "\n";
+           << (node.showPreview ? 1 : 0) << " " << node.colorTag << "\n";
       for (const auto& p : node.params)
          file << "  " << p.first << " " << p.second << "\n";
       file << "end\n";
@@ -278,7 +278,9 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
    for (const ModRecord& m : data.modulation)
       file << "mod " << m.dstIndex << " " << m.dstParam << " "
            << m.srcIndex << " " << m.srcOutput << " "
-           << m.polarity << " " << FloatToString(m.depth) << " " << FloatToString(m.centre) << "\n";
+           << m.polarity << " " << FloatToString(m.depth) << " " << FloatToString(m.centre) << " "
+           << FloatToString(m.inMin) << " " << FloatToString(m.inMax) << " "
+           << FloatToString(m.outMin) << " " << FloatToString(m.outMax) << "\n";
    for (const PaletteRecord& p : data.palette)
       file << "pal " << p.dstIndex << " " << p.dstColor << " "
            << p.srcIndex << " " << p.srcSwatch << "\n";
@@ -383,6 +385,9 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          current.showMiniViewport = miniViewport != 0;
          current.showAdvancedParams = advanced != 0;
          current.showPreview = preview != 0;
+         int tag = 0;
+         if (in >> tag)
+            current.colorTag = tag;
       }
       else if (inNode && (tag == "f" || tag == "i" || tag == "b" || tag == "c" || tag == "s"))
       {
@@ -428,6 +433,11 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          m.depth = 1.0f;
          m.centre = 0.0f;
          in >> m.dstIndex >> m.dstParam >> m.srcIndex >> m.srcOutput >> m.polarity >> m.depth >> m.centre;
+         float a = 0.0f, b = 1.0f, cc = 0.0f, d = 1.0f;
+         if (in >> a >> b >> cc >> d)
+         {
+            m.inMin = a; m.inMax = b; m.outMin = cc; m.outMax = d;
+         }
          outData.modulation.push_back(m);
       }
       else if (tag == "pal")

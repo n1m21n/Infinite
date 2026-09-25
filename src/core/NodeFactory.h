@@ -29,6 +29,10 @@ public:
 
    void Register(const std::string& name, CreateNodeFn createFn, const std::string& category);
    INode* MakeNode(const std::string& name);
+   // Registered category of a node type ("" if unknown). Patches store a
+   // category per node, but it is re-derived from here on load, so a
+   // reorganised menu also re-files nodes in old patches.
+   std::string CategoryOf(const std::string& name) const;
 
    // Categories are grouped by the semantic colour family and sorted
    // alphabetically inside it; node names are alphabetical inside each

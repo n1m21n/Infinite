@@ -3,14 +3,14 @@
 [![Original project](https://img.shields.io/badge/original-n1m21n%2FInfinite-181717?logo=github)](https://github.com/n1m21n/Infinite)
 [![Discord](https://img.shields.io/badge/Discord-Infinite-5865F2?logo=discord&logoColor=white)](https://discord.gg/wpKdexvhn)
 
-**Current version: 0.36.0-turbo** (shown in the window title and in the FILE menu, with the build date).
+**Current version: 0.37.0-turbo** (shown in the window title and in the FILE menu, with the build date).
 
 Infinite-Turbo is a **mod of Infinite**, the node-based audiovisual modular workstation by Naman Soni (realtime image and video processing, procedural 3D, audio synthesis, DSP, VST3 hosting, MIDI, OSC and cross-domain CV modulation). It is unofficial and Windows-only.
 
 What "mod" means here:
 
 - The core is Infinite: same node graph, same modules, same way of patching, and patches still use the `.inf` extension.
-- On top of it, Infinite-Turbo adds Windows-specific fixes and tuning (audio thread priorities, VST3 hosting, output windows, build scripts) and new modules of its own: **Layout**, **MPC**, **MPC Out**, **VMPC**, **Looper** and **Super Mixer**.
+- On top of it, Infinite-Turbo adds Windows-specific fixes and tuning (audio thread priorities, VST3 hosting, output windows, build scripts) and new modules of its own: **Layout**, **MPC**, **MPC Out**, **VMPC**, **Looper**, **Super Mixer** and **OSC to CV**, plus the **Predictive** note modules ported from upstream Infinite.
 - Patches that use Turbo-only modules do not open in upstream Infinite, and the two versions are not guaranteed to open each other's files.
 - Problems found in Infinite-Turbo should be reported here, not to the upstream project.
 
@@ -42,6 +42,11 @@ Do not run the application from inside the ZIP.
 |---|---|
 | Canvas preview | any image node's output drawn behind the node canvas, under the patch (like TouchDesigner's background preview), with scaling, darken, node opacity and grid options |
 | Live-coding view | the whole UI goes borderless fullscreen (F11); combine it with the canvas preview and a hidden side panel to patch on top of the image |
+| Node menu | reorganised categories: Video, Utility, Audio In/Out, Audio to Visual, Audio Mix & Routing, Synths & Samplers, Notes & Sequencers, Prediction, CV Tools, Analysis, MIDI & OSC |
+| Range mapper | right-click a modulated parameter: in min/max (the part of the incoming signal used, with capture buttons) and out min/max in the parameter's own units, invert, reset |
+| Color markers | right-click a node > Color marker: 8 colours, applied to every selected node; saved in the patch |
+| OSC | OSC Receive and the new OSC to CV (8 addresses/arguments -> 8 CV outputs, learn, range, invert, smoothing) listen on the LAN too, decode bundles and all numeric arguments, and share ports |
+| Prediction | Predictive Notes, Quantize, Velocity and Rhythm, ported from upstream Infinite: learn how you play, then play or correct in that style |
 | File dialogs | open/save dialogs no longer pause playback, video or outputs, and always open in front of the editor (also in fullscreen) |
 | Side panel | PANEL button in the top bar, Ctrl+B or VIEW > Side panel |
 | Layout node | TouchDesigner-style canvas of exact pixel size (e.g. 1920 x 1080) with 8 image inputs. Each layer starts at the real pixel size of its source; set x/y in canvas pixels, scale (anchored at the layer centre) or an exact width/height, opacity; drag layers on the miniature; 1:1 / fit / fill / centre buttons; x, y, scale and opacity have CV pins |

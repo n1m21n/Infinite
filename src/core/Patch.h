@@ -52,6 +52,7 @@ namespace Patch
       bool showMiniViewport = false;
       bool showAdvancedParams = false; // audio nodes only, see GraphNode.h
       bool showPreview = true;
+      int colorTag = 0; // Turbo: 6th token of the flags line
       // Raw key/value lines, replayed into the node through its ParamVisitor.
       std::vector<std::pair<std::string, std::string>> params;
    };
@@ -78,6 +79,8 @@ namespace Patch
       int polarity = 0;
       float depth = 1.0f;
       float centre = 0.0f;
+      // Turbo range mapper (trailing tokens, defaults = no remap).
+      float inMin = 0.0f, inMax = 1.0f, outMin = 0.0f, outMax = 1.0f;
    };
 
    // A palette node driving one colour swatch on another node.
