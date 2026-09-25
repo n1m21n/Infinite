@@ -169,6 +169,42 @@ inline void Hadamard16_Sse(__m128& v0, __m128& v1, __m128& v2, __m128& v3)
    v3 = _mm_mul_ps(r3, norm);
 }
 #endif
+
+// sin(2*pi*p) for p in [0, 1). Folds to [-pi/2, pi/2] and evaluates an odd
+// degree-9 polynomial (least-squares minimax fit): max error 1.9e-7, the
+// same order as sinf's own. Branch-free so the LFO bank loop vectorises.
+inline float FastSin2Pi(float p)
+{
+   float x = p - 0.5f; // sin(2*pi*p) = -sin(2*pi*x)
+   const float half = std::copysign(0.5f, x);
+   x = std::fabs(x) > 0.25f ? half - x : x;
+   const float y = x * 6.28318531f;
+   const float y2 = y * y;
+   const float r = ((((2.5904942e-6f * y2 - 1.9800900e-4f) * y2 + 8.3328998e-3f) * y2 - 0.16666648f) * y2 + 1.0f) * y;
+   return -r;
+}
+
+// All 16 FDN line LFOs for one sample. Same phase arithmetic as
+// AnalogDsp::DriftLfo::Advance(kLfoRates[l], 0.25, 0.08 Hz, sr) - the
+// drift phase is bit-identical - with FastSin2Pi in place of its two sinf
+// calls (32 sinf per sample was most of the kernel's cost).
+inline void AdvanceLfoBank(float* phase, float* driftPhase, float* out, float sampleRate)
+{
+   using namespace ReverbDsp;
+   const float driftStep = 0.08f / sampleRate;
+   for (int l = 0; l < kNumLines; l++)
+   {
+      const float drift = FastSin2Pi(driftPhase[l]);
+      const float rate = std::max(0.001f, kLfoRates[l] * (1.0f + drift * 0.25f));
+      float ph = phase[l] + rate / sampleRate;
+      ph = ph >= 1.0f ? ph - std::floor(ph) : ph;
+      phase[l] = ph;
+      float dp = driftPhase[l] + driftStep;
+      dp = dp >= 1.0f ? dp - std::floor(dp) : dp;
+      driftPhase[l] = dp;
+      out[l] = FastSin2Pi(ph);
+   }
+}
 } // namespace
 
 void ReverbKernel::PushParams(const AudioEffectNode& node, double sampleRate)
@@ -297,6 +333,8 @@ void ReverbKernel::ProcessBlockSimd(const AudioBuffer& in, const AudioBuffer* /*
       }
       const float dampCoeff = cachedDampCoeff;
       const float modDepthSamples = analog ? 10.0f : 4.0f;
+      alignas(16) float lfoVals[kNumLines];
+      AdvanceLfoBank(mLfoPhase, mLfoDriftPhase, lfoVals, (float)mSampleRate);
 
       if (size != prevSize || decaySeconds != prevDecaySeconds)
       {
@@ -330,7 +368,7 @@ void ReverbKernel::ProcessBlockSimd(const AudioBuffer& in, const AudioBuffer* /*
             const float* buf = lineBufs[line];
             const int activeLen = cachedActiveLen[line];
 
-            const float lfoVal = mLfo[line].Advance(kLfoRates[line], 0.25f, 0.08f, mSampleRate);
+            const float lfoVal = lfoVals[line];
             const float modDelay = std::clamp((float)activeLen + lfoVal * modDepthSamples, 4.0f, (float)(cap - 4));
             const int iDelay = (int)modDelay;
             frac_arr[k] = modDelay - (float)iDelay;
@@ -431,7 +469,7 @@ void ReverbKernel::ProcessBlockSimd(const AudioBuffer& in, const AudioBuffer* /*
             const float* buf = lineBufs[line];
             const int activeLen = cachedActiveLen[line];
 
-            const float lfoVal = mLfo[line].Advance(kLfoRates[line], 0.25f, 0.08f, mSampleRate);
+            const float lfoVal = lfoVals[line];
             const float modDelay = std::clamp((float)activeLen + lfoVal * modDepthSamples, 4.0f, (float)(cap - 4));
             const int iDelay = (int)modDelay;
             frac_arr[k] = modDelay - (float)iDelay;
@@ -522,7 +560,7 @@ void ReverbKernel::ProcessBlockSimd(const AudioBuffer& in, const AudioBuffer* /*
          const float* buf = lineBufs[line];
          const int activeLen = cachedActiveLen[line];
 
-         const float lfoVal = mLfo[line].Advance(kLfoRates[line], 0.25f, 0.08f, mSampleRate);
+         const float lfoVal = lfoVals[line];
          const float modDelay = std::clamp((float)activeLen + lfoVal * modDepthSamples, 4.0f, (float)(cap - 4));
          const int iDelay = (int)modDelay;
          const float frac = modDelay - (float)iDelay;

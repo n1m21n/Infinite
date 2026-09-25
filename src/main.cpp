@@ -50030,7 +50030,7 @@ static bool RunReverbFixture()
    //    only exact changes are in, 1e-4 (-80 dBFS) once an approximate one
    //    (the fast LFO sine) is in. The measured max diff is always printed.
    {
-      constexpr float kReverbLegacyTol = 0.0f;
+      constexpr float kReverbLegacyTol = 1.0e-4f;
       const double sampleRate = 48000.0;
       const int blockSize = 256;
       const int totalFrames = 480000; // 10 s
