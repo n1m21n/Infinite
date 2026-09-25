@@ -41,6 +41,19 @@ from retriever import HybridRetriever
 from l2.compartments import merge as merge_compartments
 from l3.network import Network, SEED_WEIGHT
 
+_IDENT_RE = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+")
+_STOP = {"the", "and", "for", "with", "get", "set", "node", "nodes", "fix", "from", "into",
+         "when", "not", "its", "this", "that", "only"}
+
+
+def _split_ident(token):
+    return [w.lower() for w in _IDENT_RE.findall(token)]
+
+
+def _stem(w):
+    return w[:-1] if len(w) > 4 and w.endswith("s") and not w.endswith("ss") else w
+
+
 @dataclass
 class ProblemFrame:
     raw_query: str
@@ -201,13 +214,13 @@ class SemiBrainCognitiveEngine:
         by_compartment = self.retriever.compartment_search(query)
         hybrid_hits = merge_compartments(by_compartment)
         
-        # Extract AST symbols from hybrid hits and graph
+        # Symbols the code compartment retrieved: a score bonus by rank, not a fixed head of
+        # the list, so lexical/word/network evidence can outrank a weak retrieval hit.
+        hit_bonus = {}
+        for rank, hit in enumerate(by_compartment.get("code", [])[:self.CODE_HITS]):
+            hit_bonus[hit["title"].replace("Symbol: ", "")] = self.HIT_BONUS / (1.0 + 0.25 * rank)
         matched_symbols = []
-        for hit in hybrid_hits:
-            if hit["category"] == "ast_symbol":
-                sym_clean = hit["title"].replace("Symbol: ", "")
-                matched_symbols.append(sym_clean)
-                
+
         # Scored symbol lookup
         raw_tokens = re.findall(r"[A-Za-z0-9_]+", query)
         tokens = set([t.lower() for t in raw_tokens if len(t) > 2])
@@ -225,13 +238,16 @@ class SemiBrainCognitiveEngine:
         top = max(spread.values(), default=0.0)
         prior = {f: v / top for f, v in spread.items()} if top > 0 else {}
         
+        qwords = {_stem(w) for t in raw_tokens for w in _split_ident(t) if len(w) > 2} - _STOP
+        sym_words = self._symbol_words()
+
         scored_candidates = []
         for sym_name, sym_meta in self.ast_graph.get("symbols", {}).items():
             sym_lower = sym_name.lower()
             sym_base = sym_name.split("::")[-1]
             sym_base_lower = sym_base.lower()
             
-            score = 0.0
+            score = hit_bonus.get(sym_name, 0.0)
             # 1. Exact match with token in query
             if sym_base_lower in tokens or sym_lower in tokens:
                 score += 10.0
@@ -251,7 +267,14 @@ class SemiBrainCognitiveEngine:
             if any(t in sym_lower for t in tokens if len(t) >= 4):
                 score += 1.5
                 
-            # 6. The network points at this symbol's file, or names the symbol itself
+            # 6. Words of the name (CamelCase split) shared with the query: a function the
+            #    report describes but never names (ArrangeResyncUnsyncedSampleLengths).
+            base_w, cls_w = sym_words[sym_name]
+            ov_base, ov_cls = len(base_w & qwords), len(cls_w & qwords)
+            if ov_base and ov_base + ov_cls >= 2:
+                score += self.WORD_BASE * ov_base + self.WORD_CLASS * ov_cls
+
+            # 7. The network points at this symbol's file, or names the symbol itself
             if score > 0.0:
                 score += self.FILE_PRIOR * prior.get(sym_meta.get("file", ""), 0.0)
                 score += self.SYMBOL_PRIOR * net_syms.get(sym_name, 0.0)
@@ -260,7 +283,7 @@ class SemiBrainCognitiveEngine:
                 scored_candidates.append((score, sym_name))
                 
         scored_candidates.sort(key=lambda x: x[0], reverse=True)
-        for _, sym_name in scored_candidates[:12]:
+        for _, sym_name in scored_candidates[:self.MAX_SYMBOLS]:
             if sym_name not in matched_symbols:
                 matched_symbols.append(sym_name)
 
@@ -347,6 +370,26 @@ class SemiBrainCognitiveEngine:
 
     SEEDS_PER_COMPARTMENT = 10
     FILE_RRF_K = 10.0
+
+    CODE_HITS = 12
+    HIT_BONUS = 3.0
+    MAX_SYMBOLS = 24
+    WORD_BASE = 2.0
+    WORD_CLASS = 1.0
+
+    def _symbol_words(self):
+        """{symbol: (words of its own name, words of its scope)}, stemmed, cached per graph."""
+        graph = self.ast_graph
+        cache = getattr(self, "_sym_words", None)
+        if cache is not None and cache[0] is graph:
+            return cache[1]
+        out = {}
+        for name in graph.get("symbols", {}):
+            *scope, base = name.split("::")
+            out[name] = ({_stem(w) for w in _split_ident(base) if len(w) > 2} - _STOP,
+                         {_stem(w) for p in scope for w in _split_ident(p) if len(w) > 2} - _STOP)
+        self._sym_words = (graph, out)
+        return out
 
     FILE_PRIOR = 4.0
     SYMBOL_PRIOR = 2.0
