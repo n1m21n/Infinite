@@ -606,7 +606,20 @@ docstring lists which hashes it compares.
 
 ## Found while measuring
 
-**Found in Block 2 (not fixed):** (a) an app named ChatGPT takes the foreground ~2 s after every bench launch, so every B3 run is `unfocused=1` (`open -n -W --env` does not help); (b) after 3c/3a, 2-4 B3 slow frames per 600 have 28-32 ms of work no stage timer accounts for; (c) `SetCanvasSwapInterval` audit: every call site goes through `ApplyCanvasSwapInterval`, so no frame gets two vsync waits; at export end the canvas swaps at interval 1 for one frame with no clock wait (export still flagged), then the frame-top Apply returns it to 0.
+**Block 2 close-out, step 1 (checks on 6be9e9b..93ba4e0):**
+
+| Check | Result |
+|---|---|
+| verify-gate (static: code review, check.py) | pass; check.py's 5 one-sided `Platform::` stubs are the same at 6be9e9b |
+| invariant-interaction-audit, "one frame clock" | pass: `glfwSwapInterval` only in `ApplyCanvasSwapInterval` and the projector context (always 0); one `WaitForDisplayRefresh` caller; no ImGui platform viewports, so the two `glfwSwapBuffers` sites are the only presents; frame limiter skipped while the clock is active |
+| invariant-interaction-audit, "render before the wait" | pass: dead-source close happens in the render pass, so the swap pass only sees live windows; every render and swap makes its own context current; nothing between the passes but the wait |
+| anim=0 `output_hash` | pass: B2 s/m/l `51da349ab649bf2e` / `acbd116345c11903` / `29dcc23d9a902c68`, B4 l `8bd85fec4eeb5123`, all unchanged |
+| B1 buf=256, 3 rounds | pass: cb_load p99 44.9 / 42.5 / 42.6% (median 42.6%, Block 1 44.4%), 0 xruns |
+| output-projection-sweep | same 3 failures at 6be9e9b (SPOUTLOOPTEST skips on macOS, IMAGERESYNTH_SELFTEST's no-texture nodes, check.py) |
+| render-pipeline-sweep | 22/23; CLOTHTEST fails identically at 6be9e9b (the cloth never falls) |
+| FPSTEST (rate-analysis) | same distribution both sides, 10 interleaved runs: median 36.0 ms branch, 36.7 ms base; its one-frame verdict flips on both (Found (d)) |
+
+**Found in Block 2 (not fixed):** (a) an app named ChatGPT takes the foreground ~2 s after every bench launch, so every B3 run is `unfocused=1` (`open -n -W --env` does not help); (b) after 3c/3a, 2-4 B3 slow frames per 600 have 28-32 ms of work no stage timer accounts for; (c) `SetCanvasSwapInterval` audit: every call site goes through `ApplyCanvasSwapInterval`, so no frame gets two vsync waits; at export end the canvas swaps at interval 1 for one frame with no clock wait (export still flagged), then the frame-top Apply returns it to 0. (d) `INFINITE_FPSTEST` judges the 30 fps cap from one frame's interval, so it prints SUSPECT on about 1 run in 3 on both 6be9e9b and 93ba4e0 (capped 33.3-37.4 ms either side); the post-limiter span to `gFrameStart` is not in the budget.
 
 
 Per §8: this suite measures, it does not fix. Anything found while building
