@@ -1,37 +1,94 @@
 #!/bin/bash
 # install_hooks.sh
-# Installs non-blocking Git post-commit and post-merge hooks to keep the Semi-Brain continuously synchronized.
+# Keeps the Semi-Brain in sync without blocking git.
+#
+#   daemon  (default) a launchd agent running l1/brain_watchd.py: FSEvents on git refs, src/,
+#           .claude/skills, docs/ and the session transcripts, 2 s debounce, then one incremental
+#           sync at background QoS / nice 19. Replaces the batch sync after every commit.
+#   hooks   post-commit / post-merge -> .git/hooks/sync-brain-bg, the fallback runner. It steps
+#           aside while the daemon is alive (pidfile), so a commit never starts a second sync.
+#
+#   install_hooks.sh               hooks + daemon
+#   install_hooks.sh --no-daemon   hooks only
+#   install_hooks.sh --uninstall-daemon
 
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-HOOKS_DIR="$REPO_ROOT/.git/hooks"
+set -e
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+GITDIR="$(cd "$REPO_ROOT" && cd "$(git rev-parse --git-common-dir)" && pwd)"
+HOOKS_DIR="$GITDIR/hooks"
+LABEL="com.infinite.semi-brain.watchd"
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+STATE_DIR="$REPO_ROOT/tools/semi-brain/l1/state"
+PYTHON="${PYTHON:-/usr/bin/python3}"
 
-if [ ! -d "$HOOKS_DIR" ]; then
-  echo "Error: .git/hooks directory not found at $HOOKS_DIR"
-  exit 1
+uninstall_daemon() {
+  launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+  rm -f "$PLIST"
+}
+
+if [ "$1" = "--uninstall-daemon" ]; then
+  uninstall_daemon
+  echo "Semi-Brain daemon removed; the post-commit/post-merge hooks sync on their own again."
+  exit 0
 fi
 
-POST_COMMIT="$HOOKS_DIR/post-commit"
-POST_MERGE="$HOOKS_DIR/post-merge"
-
-cat << 'EOF' > "$POST_COMMIT"
+cat << 'EOF' > "$HOOKS_DIR/sync-brain-bg"
 #!/bin/bash
-# Asynchronously trigger Semi-Brain incremental sync in background (non-blocking)
+# Semi-brain sync, shared by post-commit and post-merge. One runner at a time (a trigger while
+# one runs just marks "run again"), background QoS, lowest CPU priority, so builds and
+# benchmarks keep the machine. scripts/bench/ab.sh waits for it to finish.
+# While the watch daemon (brain_watchd) is alive it has already seen this change: step aside.
+GITDIR="$(git rev-parse --git-common-dir)"
+PID="$(cat "$GITDIR/brain_watchd.pid" 2>/dev/null)"
+[ -n "$PID" ] && kill -0 "$PID" 2>/dev/null && exit 0
+LOCK="$GITDIR/sync_brain.lock"; PENDING="$GITDIR/sync_brain.pending"
+touch "$PENDING"
+mkdir "$LOCK" 2>/dev/null || exit 0      # a runner is active; it will pick up PENDING
 (
-  python3 tools/semi-brain/4_engine/sync_brain.py --sync >/dev/null 2>&1
-) &
+  trap 'rmdir "$LOCK"' EXIT
+  while [ -e "$PENDING" ]; do
+    rm -f "$PENDING"
+    taskpolicy -b nice -n 19 python3 tools/semi-brain/4_engine/sync_brain.py --sync >/dev/null 2>&1
+  done
+) </dev/null >/dev/null 2>&1 &
 EOF
 
-cat << 'EOF' > "$POST_MERGE"
-#!/bin/bash
-# Asynchronously trigger Semi-Brain incremental sync in background (non-blocking)
-(
-  python3 tools/semi-brain/4_engine/sync_brain.py --sync >/dev/null 2>&1
-) &
+for h in post-commit post-merge; do
+  printf '#!/bin/bash\n"$(git rev-parse --git-common-dir)/hooks/sync-brain-bg"\n' > "$HOOKS_DIR/$h"
+done
+chmod +x "$HOOKS_DIR/sync-brain-bg" "$HOOKS_DIR/post-commit" "$HOOKS_DIR/post-merge"
+echo "hooks: post-commit, post-merge -> sync-brain-bg"
+
+[ "$1" = "--no-daemon" ] && exit 0
+[ "$(uname)" = "Darwin" ] || { echo "daemon: macOS only (launchd + FSEvents); hooks only here"; exit 0; }
+
+mkdir -p "$STATE_DIR" "$(dirname "$PLIST")"
+cat << EOF > "$PLIST"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$LABEL</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$PYTHON</string>
+    <string>$REPO_ROOT/tools/semi-brain/l1/brain_watchd.py</string>
+  </array>
+  <key>WorkingDirectory</key><string>$REPO_ROOT</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>30</integer>
+  <key>ProcessType</key><string>Background</string>
+  <key>Nice</key><integer>19</integer>
+  <key>LowPriorityIO</key><true/>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin</string></dict>
+  <key>StandardOutPath</key><string>$STATE_DIR/watchd.stdout.log</string>
+  <key>StandardErrorPath</key><string>$STATE_DIR/watchd.stdout.log</string>
+</dict>
+</plist>
 EOF
-
-chmod +x "$POST_COMMIT"
-chmod +x "$POST_MERGE"
-
-echo "✅ Semi-Brain Git hooks installed successfully!"
-echo "   - $POST_COMMIT (non-blocking background sync)"
-echo "   - $POST_MERGE (non-blocking background sync)"
+uninstall_daemon_keep_plist() { launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true; }
+uninstall_daemon_keep_plist
+launchctl bootstrap "gui/$(id -u)" "$PLIST"
+echo "daemon: $LABEL loaded ($PLIST); log $STATE_DIR/watchd.log"
