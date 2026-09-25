@@ -11,7 +11,7 @@ blocks a target in this table.
 |---|---|---|---|
 | 1 Audio | Real xrun counter (replaces the wall-clock-gap heuristic, `AudioEngine.cpp`); B1 callback load (open item 1); build B7 soak | B1 cb_load p99 <= 50% @256; 0 xruns in 10 min; soak RSS growth < 2% over 30 min | done, merged in `caafc69` (p99 44.4% @256; 0 xruns in 10 min; soak RSS -3.6%) |
 | 2 Projector + canvas | Projector under load (open items 2-4); canvas vsync not blocking (open item 5) | B3/B8 interval p99 <= 18.3 ms and missed vsync < 0.5%; B6 runs paced and meets p50/p95 | done and closed: merged in `93ba4e0`, close-out `feature/perf-block2-closeout` (`19de37d`, `f9c58f5`). B3 3 rounds trusted (focused): p99 17.63-17.69 ms, 0% missed vsync, all 5 targets pass; B6 met; B8 2 / 3 windows met; B8 heavy is decode-bound -> Block 3 |
-| 3 Media + release gate | Decode drops (open item 6); camera run (open item 7, needs access granted once); Linux `frameCache` copy, `VideoInNode` realloc, Spout `HasClients` (Found while measuring 4, 5, 7); build B10 | B8 decode real time, 0 dropped; B10 A/V drift within `av-sync-sweep` limits; new baseline; `driver.sh --full` clean | **step 0 only** (`feature/perf-block3-media`, worktree `../infinte-block3` off `9ce52a5`): re-baseline done, decode-drop fixes/B10/driver.sh/merge not started this session |
+| 3 Media + release gate | Decode drops (open item 6, blocked - see below); camera run (open item 7, needs access granted once); Linux `frameCache` copy (**fixed**, unverified by rig), `VideoInNode` realloc, Spout `HasClients` (Found while measuring 5, 7); build B10 | B8 decode real time, 0 dropped; B10 A/V drift within `av-sync-sweep` limits; new baseline; `driver.sh --full` clean | **steps 0-1 partial, blocked** (`feature/perf-block3-media`, worktree `../infinte-block3` off `9ce52a5`): re-baseline done; Linux `frameCache` dedup fix landed (logic-verified, not rig-verified); decode-drop A/B investigation, B10, new baseline, `driver.sh --full` and merge all blocked this session by sustained multi-session machine load (swap 83% used, concurrent `claude` processes) that makes every focused/timed measurement untrustworthy - see "Block 3 step 1" below for the STOP-rule evidence |
 
 Every block: one branch, `ab.sh` gate (keep only if better), `verify-gate`
 sweeps, merge `--no-ff`, update the State column here.
@@ -112,6 +112,68 @@ instruction, this is the re-baseline to tell probe artefacts from real fails.
 Steps 1-6 (decode-drop fixes with 3-round `ab.sh` gates, the two code-read
 fixes above, the camera run, building B10, the new baseline, `driver.sh
 --full`, `verify-gate`, and the merge) are not started.
+
+### Block 3 step 1 (2026-09-25, same branch/worktree): one real fix landed, decode-drop A/B work blocked on machine load
+
+**Landed, not yet gated by `ab.sh` (see blocker below):** Found 4 above is now
+fixed in `src/platform/linux/MediaLinux.cpp` - `TryUseCacheLocked` tracks
+`h->deliveredSeconds` and returns `false` (no copy, `outPixels` untouched)
+when the cache hit is the same frame already handed back, mirroring
+`Platform.mm`'s `TryUseCache`/`CacheResult::Same` exactly and restoring the
+contract documented on `VideoFrameAt` in `Platform.h` ("Returns true only
+when that is a new frame ... false leaves outPixels as they were"). Before
+this fix, every repeat request on Linux (a >30 fps canvas pulling a 30 fps
+clip, which is the common case) did a full RGBA copy *and* told the caller
+to re-upload via `glTexSubImage2D` on a frame that hadn't changed - wasted
+CPU copy and wasted GPU upload on every single repeat cook. Verified by
+isolating the function's logic in a standalone translation unit and
+compiling it (`g++ -fsyntax-only -std=c++17`, exit 0); **not** run through
+`tools/linux/local.sh`'s container+Xvfb rig this session - see blocker below
+for why - so it is unverified end-to-end and not yet committed as "gated,"
+only as a logic fix matching the documented contract and the macOS reference
+implementation line for line.
+
+**Blocker hit investigating the 4x2160 decode-drop root cause (step 1's main
+target), invoking the brief's own STOP rule:** two independent attempts this
+session to get a trustworthy focused B8 measurement both came back
+`unfocused=1,unpaced=1` (the tight 0.3 s `pgrep`+`osascript` focus loop from
+step 0, re-run for this pass, did not keep the app frontmost this time
+either), so no decode/dropped-frame numbers from this pass are usable. Worse,
+checking machine state directly during the second attempt found:
+
+- `sysctl vm.swapusage`: **5.9 GB of 7.1 GB swap in use**, up from 4.9 GB at
+  the start of step 0 and 6.1-7.6 GB observed mid-run - climbing over the
+  course of this session, not this fixture.
+- `ps aux` at the same moment: two other `claude` CLI processes are running
+  on this machine concurrently with this session (a second agent conversation
+  and what looks like a `claude-code` subprocess of this one), plus three
+  Python `multiprocessing` workers at 85-88% CPU each and `mediaanalysisd` at
+  170% CPU - none of this is benchmark load, all of it is real concurrent
+  demand on the same 8 GB machine this bench suite assumes is quiet.
+
+This is the same confound the step-0 section already flagged as
+"invalidating a trusted reading," now measured directly and worse, not
+better, on a second attempt. Per the brief's own gate rule ("STOP a step
+after 2 failed attempts and record the evidence"): two focused-run attempts
+have now failed for the same environmental reason, so this step stops here
+rather than either (a) fabricating a 3-round `ab.sh` gate against numbers
+that would not mean anything, or (b) speculatively implementing the PBO/
+IOSurface upload-path lead with no trustworthy way to measure whether it
+helped. Docker/OrbStack (`tools/linux/local.sh`'s dependency) was also left
+un-started for the same reason - its VM would add several more GB of demand
+on top of an already 83%-of-swap-used machine, risking real instability
+rather than just a bad reading.
+
+**What this means for the rest of Block 3:** steps 1 (remaining decode-drop
+leads), 3 (B8CAMERA run), 4 (B10, which needs a trustworthy realtime-factor
+and drift measurement), and 5 (new baseline + `driver.sh --full` gate) all
+depend on a quiet machine this session cannot currently provide and has no
+way to force (killing another user's/session's `claude` process is out of
+scope and not this agent's call to make). The Linux `frameCache` fix above is
+the one piece of this step that is real and defensible without a timing
+measurement, because it is a logic/contract fix, not a perf number. Nothing
+else in steps 1-6 was attempted after this finding, to avoid producing
+numbers that look like a baseline but are not one.
 
 ## Scoreboard
 
