@@ -19,6 +19,7 @@ from pathlib import Path
 SEMI_BRAIN_DIR = Path(__file__).resolve().parents[1]
 DISTILLED_DIR = SEMI_BRAIN_DIR / "2_distilled_brain"
 AST_GRAPH_FILE = SEMI_BRAIN_DIR / "1_extractors" / "output" / "ast_symbol_graph.json"
+HUB_FILES = ("src/main.cpp",)  # edited by most fixes; naming it alone points nowhere
 
 # Architecturally load-bearing symbols per subsystem that a bug report rarely
 # names literally (e.g. "audio pop on retrigger" never says "ParamMailbox"),
@@ -77,6 +78,7 @@ class ProblemFrame:
     file_evidence: Dict[str, List[str]] = field(default_factory=dict)
     compartments: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
     notes: List[Dict[str, Any]] = field(default_factory=list)
+    confidence: Dict[str, float] = field(default_factory=dict)
 
 @dataclass
 class ImpactNode:
@@ -327,7 +329,9 @@ class SemiBrainCognitiveEngine:
                 if recent and session else ([], []))
         l0 = getattr(self, "l0", None)
         notes = l0.match(query, now, embargo) if l0 is not None else []
-        ranked_files, evidence = self._rank_files(matched_symbols, spread, why, work, notes)
+        ranked_files, evidence, agree = self._rank_files(matched_symbols, spread, why, work, notes)
+        confidence = {"sym_top": round(scored_candidates[0][0], 2) if scored_candidates else 0.0,
+                      "agree": agree}
         
         # 2. System 1 Priors
         priors = [
@@ -399,6 +403,7 @@ class SemiBrainCognitiveEngine:
             file_evidence=evidence,
             compartments=by_compartment,
             notes=notes,
+            confidence=confidence,
         )
 
     SEEDS_PER_COMPARTMENT = 10
@@ -424,6 +429,7 @@ class SemiBrainCognitiveEngine:
         self._sym_words = (graph, out)
         return out
 
+    AGREE_K = 5
     FILE_PRIOR = 4.0
     SYMBOL_PRIOR = 2.0
 
@@ -446,7 +452,9 @@ class SemiBrainCognitiveEngine:
         files of the matched symbols (in symbol order), the network's spread and the recent
         work (this session's edits, recent edits anywhere), fused by weighted RRF with the
         weights of l3/weights.py (retuned nightly by l1/sleep.py). L0 notes add their files as one
-        more list whose weight is the best note's score, never above l0.store.CAP."""
+        more list whose weight is the best note's score, never above l0.store.CAP.
+        Also returns `agree`: how many of those lists have the best non-hub file in their top
+        AGREE_K - independent evidence pointing at one place, a confidence signal (l5/gate.py)."""
         wts = getattr(self, "weights", None) or learned_weights.DEFAULTS
         lexical = []
         for sym in matched_symbols:
@@ -467,7 +475,9 @@ class SemiBrainCognitiveEngine:
         if areas is not None:
             fused = areas.rerank(fused)
         ranked = sorted(fused, key=fused.get, reverse=True)
-        return ranked, {f: why[f][:3] for f in ranked[:20] if why.get(f)}
+        top = next((f for f in ranked if f not in HUB_FILES), None)
+        agree = sum(1 for lst, w in lists if w > 0 and top in lst[:self.AGREE_K]) if top else 0
+        return ranked, {f: why[f][:3] for f in ranked[:20] if why.get(f)}, agree
 
     def _areas(self):
         """L4 areas of the current network, built once per network."""

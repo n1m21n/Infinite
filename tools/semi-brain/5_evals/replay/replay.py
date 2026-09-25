@@ -201,6 +201,7 @@ def run_case(case):
                 "symbols": rank_metrics(syms, case["target_symbols"]) if case["target_symbols"] else None,
                 "region": region_hit(regions, syms, case["target_symbols"]),
                 "focus": focus_hit(engine, regions, frame, case["target_symbols"]),
+                "confidence": frame.confidence,
                 "top_files": files[:10], "top_symbols": syms[:10],
             }
         # Weight sets for the sleep job (l1/sleep.py --grid): the full query again with each
