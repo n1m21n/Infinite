@@ -50020,6 +50020,94 @@ static bool RunReverbFixture()
       all &= simdEquivOk;
    }
 
+   // 7) Live kernel vs the frozen pre-perf kernel (ProcessBlockLegacy,
+   //    ReverbKernelLegacy.cpp): 10 s at 48 kHz / 256, B1's Reverb settings
+   //    (the defaults), analog off and on. The input is a B1-like voice: a
+   //    detuned saw with a new note every 250 ms and a decaying envelope.
+   //    Halfway through, every param moves (both kernels get the same push),
+   //    so any cached coefficient that fails to invalidate shows up here.
+   //    kReverbLegacyTol is the quality rule from docs/plans/perf: 0 while
+   //    only exact changes are in, 1e-4 (-80 dBFS) once an approximate one
+   //    (the fast LFO sine) is in. The measured max diff is always printed.
+   {
+      constexpr float kReverbLegacyTol = 1.0e-4f;
+      const double sampleRate = 48000.0;
+      const int blockSize = 256;
+      const int totalFrames = 480000; // 10 s
+
+      const EffectDef* reverbDef = nullptr;
+      for (const EffectDef& d : GetEffectDefs())
+         if (d.name == "Reverb")
+            reverbDef = &d;
+
+      for (int analogOn = 0; analogOn < 2 && reverbDef; analogOn++)
+      {
+         AudioEffectNode node(*reverbDef);
+         *node.ParamPtr("analog") = (float)analogOn;
+
+         ReverbKernel live, legacy;
+         live.PrepareToPlay(sampleRate, blockSize);
+         legacy.PrepareToPlay(sampleRate, blockSize);
+         live.PushParams(node, sampleRate);
+         legacy.PushParams(node, sampleRate);
+
+         float inChL[blockSize], inChR[blockSize];
+         float* inChannels[2] = { inChL, inChR };
+         AudioBuffer inBuf;
+         inBuf.channels = inChannels;
+         inBuf.numChannels = 2;
+         inBuf.numFrames = blockSize;
+         float liveL[blockSize], liveR[blockSize], oldL[blockSize], oldR[blockSize];
+         float* liveCh[2] = { liveL, liveR };
+         float* oldCh[2] = { oldL, oldR };
+         AudioBuffer liveBuf, oldBuf;
+         liveBuf.channels = liveCh;
+         oldBuf.channels = oldCh;
+         liveBuf.numChannels = oldBuf.numChannels = 2;
+         liveBuf.numFrames = oldBuf.numFrames = blockSize;
+
+         static const float kNotesHz[8] = { 110.0f, 164.8f, 130.8f, 196.0f, 146.8f, 220.0f, 123.5f, 174.6f };
+         float phaseA = 0.0f, phaseB = 0.0f;
+         float maxDiff = 0.0f;
+         for (int offset = 0; offset < totalFrames; offset += blockSize)
+         {
+            if (offset == totalFrames / 2)
+            {
+               *node.ParamPtr("size") = 0.85f;
+               *node.ParamPtr("decay") = 4.0f;
+               *node.ParamPtr("damping") = 0.7f;
+               *node.ParamPtr("predelay") = 37.0f;
+               *node.ParamPtr("width") = 0.3f;
+               live.PushParams(node, sampleRate);
+               legacy.PushParams(node, sampleRate);
+            }
+            for (int k = 0; k < blockSize; k++)
+            {
+               const int n = offset + k;
+               const int noteLen = 12000; // 250 ms
+               const float hz = kNotesHz[(n / noteLen) % 8];
+               const float env = std::exp(-(float)(n % noteLen) / 3000.0f);
+               phaseA += hz / (float)sampleRate;
+               phaseB += hz * 1.006f / (float)sampleRate;
+               phaseA -= std::floor(phaseA);
+               phaseB -= std::floor(phaseB);
+               const float saw = (2.0f * phaseA - 1.0f) + (2.0f * phaseB - 1.0f);
+               inChL[k] = 0.35f * env * saw;
+               inChR[k] = 0.35f * env * (0.8f * saw + 0.2f * (2.0f * phaseA - 1.0f));
+            }
+            live.ProcessBlockSimd(inBuf, nullptr, liveBuf);
+            legacy.ProcessBlockLegacy(inBuf, nullptr, oldBuf);
+            for (int ch = 0; ch < 2; ch++)
+               for (int k = 0; k < blockSize; k++)
+                  maxDiff = std::max(maxDiff, std::fabs(liveBuf.channels[ch][k] - oldBuf.channels[ch][k]));
+         }
+         const bool ok = maxDiff <= kReverbLegacyTol;
+         printf("DSPTEST reverb live vs pre-perf kernel, analog %s, 10 s: max diff %.3e (tol %.1e)  %s\n",
+                analogOn ? "on" : "off", maxDiff, kReverbLegacyTol, ok ? "OK" : "FAIL");
+         all &= ok;
+      }
+   }
+
    return all;
 }
 
@@ -65039,6 +65127,18 @@ int RunSyphonPatchTest()
    return 0;
 }
 
+// Fills the bench report's four xrun fields as "since `base`" - each bench
+// window baselines the counters at its start so device-open settling does
+// not count against the run. audioXruns (deadline + os) is the gated number.
+static void BenchFillXruns(Bench::BenchReport& report, const AudioEngine::XrunCounts& base)
+{
+   const AudioEngine::XrunCounts now = AudioEngine::Instance().Xruns();
+   report.audioXrunsDeadline = now.deadline - base.deadline;
+   report.audioXrunsOs = now.os - base.os;
+   report.audioXrunGaps = now.gaps - base.gaps;
+   report.audioXruns = report.audioXrunsDeadline + report.audioXrunsOs;
+}
+
 static void BuildBenchB1Audio(long numVoices, int bufferFrames = 256, float yOffset = 0.0f)
 {
    numVoices = std::max(1L, std::min(64L, numVoices));
@@ -65636,7 +65736,7 @@ int main(int argc, char** argv)
    static double sBenchB3LastProjSwapMs = -1.0;
    static int sBenchB3MissedVsyncCount = 0;
    static int sBenchB3TotalVsyncCount = 0;
-   static uint64_t sBenchB3XrunBaseline = 0;
+   static AudioEngine::XrunCounts sBenchB3XrunBaseline;
    static int sBenchB3PendingInputInjectFrame = -1;
    static unsigned long long sBenchB3RevBeforeInject = 0;
    static bool sBenchB3ProbePaused = false;
@@ -65645,6 +65745,13 @@ int main(int argc, char** argv)
    static double sBenchB3RssPeakMb = -1.0;
    static double sBenchB3FootStartMb = -1.0;
    static double sBenchB3FootPeakMb = -1.0;
+   // B7 soak (the B3 fixture, run on wall-clock time): one sample per 10 s
+   // window, verdicts at the end (benchmark-suite.md §6).
+   static double sBenchB7StartS = -1.0;
+   static double sBenchB7LastSampleS = -1.0;
+   static uint64_t sBenchB7LoadMark = 0;
+   static Bench::PercentileRing sBenchB7WinFrameMs;
+   static nlohmann::json sBenchB7Samples = nlohmann::json::array();
 
    // B8 Media I/O fixture state (docs/plans/perf/benchmark-suite.md §4)
    static std::string sBenchB8Variant;
@@ -67525,8 +67632,11 @@ int main(int argc, char** argv)
          const bool restarted = StartAudioEngine(restartError);
          Check("AudioEngine::Start succeeds on restart", restarted);
          std::this_thread::sleep_for(std::chrono::milliseconds(80));
-         const uint64_t xrunAfterCycle = AudioEngine::Instance().XrunCount();
-         Check("Stop/Start cycle adds no xrun", restarted && xrunAfterCycle == 0);
+         // Total covers the deadline + OS counters; the callback-gap counter
+         // is the one a stale timestamp would trip, so check it too.
+         const AudioEngine::XrunCounts xrunAfterCycle = AudioEngine::Instance().Xruns();
+         Check("Stop/Start cycle adds no xrun", restarted && xrunAfterCycle.Total() == 0);
+         Check("Stop/Start cycle adds no callback gap", restarted && xrunAfterCycle.gaps == 0);
 
          // Leave the engine Off and the fixture graph gone, matching the
          // "audio starts off" contract the rest of this file's tests rely on.
@@ -68488,8 +68598,10 @@ int main(int argc, char** argv)
       }
       else if (getenv("INFINITE_BENCH_B3") != nullptr ||
                getenv("INFINITE_BENCH_B3LIVE") != nullptr ||
-               getenv("INFINITE_BENCH_B3SCALE") != nullptr)
+               getenv("INFINITE_BENCH_B3SCALE") != nullptr ||
+               getenv("INFINITE_BENCH_B7") != nullptr)
       {
+         // B7 soak runs this same fixture for INFINITE_BENCH_B7MINUTES.
          // B3 Live performance fixture (docs/plans/perf/benchmark-suite.md §4).
          std::string scaleStr = "s";
          const char* bench3Arg = getenv("INFINITE_BENCH_B3SCALE");
@@ -68901,7 +69013,8 @@ int main(int argc, char** argv)
 
       const bool isBenchB5c = (getenv("INFINITE_BENCH_B5STAGES") != nullptr || getenv("INFINITE_BENCH_B5C") != nullptr);
       const bool isBenchB2 = (getenv("INFINITE_BENCH_B2") != nullptr || getenv("INFINITE_BENCH_B2VISUALS") != nullptr || getenv("INFINITE_BENCH_B2SCALE") != nullptr);
-      const bool isBenchB3 = (getenv("INFINITE_BENCH_B3") != nullptr || getenv("INFINITE_BENCH_B3LIVE") != nullptr || getenv("INFINITE_BENCH_B3SCALE") != nullptr);
+      const bool isBenchB7 = getenv("INFINITE_BENCH_B7") != nullptr;
+      const bool isBenchB3 = (getenv("INFINITE_BENCH_B3") != nullptr || getenv("INFINITE_BENCH_B3LIVE") != nullptr || getenv("INFINITE_BENCH_B3SCALE") != nullptr || isBenchB7);
       const bool isBenchB4 = getenv("INFINITE_BENCH_B4SCALE") != nullptr;
       const bool isBenchB6 = (getenv("INFINITE_BENCH_B6") != nullptr || getenv("INFINITE_BENCH_B6NODES") != nullptr || getenv("INFINITE_BENCH_B6MODE") != nullptr || getenv("INFINITE_BENCH_B6COLLAPSED") != nullptr);
       const bool isBenchB9 = (getenv("INFINITE_BENCH_B9SCENE") != nullptr || getenv("INFINITE_BENCH_B9") != nullptr || getenv("INFINITE_BENCH_B9MEMORY") != nullptr);
@@ -70637,7 +70750,8 @@ int main(int argc, char** argv)
 
          const bool audioEngineOn = AudioEngine::Instance().SampleRate() > 0.0;
          const double audioLoad = AudioEngine::Instance().LastBlockLoad();
-         const uint64_t xruns = AudioEngine::Instance().XrunCount();
+         const AudioEngine::XrunCounts xrunParts = AudioEngine::Instance().Xruns();
+         const uint64_t xruns = xrunParts.Total();
          const bool audioDead = audioEngineOn && !AudioEngine::Instance().IsAlive();
          char cpuReadout[32];
          if (audioDead)
@@ -70654,8 +70768,10 @@ int main(int argc, char** argv)
          TopBarLabel(cpuReadout, true);
 
          if (audioEngineOn && xruns > 0 && ImGui::IsItemHovered())
-            ImGui::SetTooltip("%llu buffer underrun%s detected this session",
-                              (unsigned long long)xruns, xruns == 1 ? "" : "s");
+            ImGui::SetTooltip("xruns=%llu this session\n%llu late block%s (render over the deadline)\n%llu reported by the audio device",
+                              (unsigned long long)xruns,
+                              (unsigned long long)xrunParts.deadline, xrunParts.deadline == 1 ? "" : "s",
+                              (unsigned long long)xrunParts.os);
 
          // Left cluster's true rightmost extent (window-local X), used below
          // to crop the right cluster instead of letting it overlap the left
@@ -84703,7 +84819,11 @@ int main(int argc, char** argv)
             }
          }
 
-         printf("xruns=%llu\n", (unsigned long long)AudioEngine::Instance().XrunCount());
+         {
+            const AudioEngine::XrunCounts xr = AudioEngine::Instance().Xruns();
+            printf("xruns=%llu (deadline=%llu os=%llu) gaps=%llu\n", (unsigned long long)xr.Total(),
+                   (unsigned long long)xr.deadline, (unsigned long long)xr.os, (unsigned long long)xr.gaps);
+         }
          printf("%s\n", overallOk ? "AUDIO TEARDOWN SWEEP OK" : "AUDIO TEARDOWN SWEEP FAIL");
       }
 
@@ -86179,7 +86299,11 @@ int main(int argc, char** argv)
       // audio load/xruns, and input-to-photon latency (parameter change to Output revision change).
       if (isBenchB3)
       {
-         const int b3TotalFrames = getenv("INFINITE_BENCH_B3FRAMES") ? std::max(60, std::atoi(getenv("INFINITE_BENCH_B3FRAMES"))) : 600;
+         // B7 has no frame count: it ends on elapsed time (b3TotalFrames is
+         // set to the frame the time runs out on, below).
+         int b3TotalFrames = isBenchB7 ? std::numeric_limits<int>::max() / 2
+            : getenv("INFINITE_BENCH_B3FRAMES") ? std::max(60, std::atoi(getenv("INFINITE_BENCH_B3FRAMES"))) : 600;
+         const double b7Minutes = getenv("INFINITE_BENCH_B7MINUTES") ? std::max(1.0, std::atof(getenv("INFINITE_BENCH_B7MINUTES"))) : 30.0;
          const bool b3EnableMidi = (getenv("INFINITE_BENCH_B3MIDI") == nullptr || strcmp(getenv("INFINITE_BENCH_B3MIDI"), "0") != 0);
          const bool b3EnableVisuals = (getenv("INFINITE_BENCH_B3VISUALS") == nullptr || strcmp(getenv("INFINITE_BENCH_B3VISUALS"), "0") != 0);
 
@@ -86260,9 +86384,11 @@ int main(int argc, char** argv)
             sBenchB3MonitorRefreshHz = refreshHz;
             sBenchB3TargetRateHz = sBenchB3MonitorRefreshHz;
 
-            sBenchB3XrunBaseline = AudioEngine::Instance().XrunCount();
+            sBenchB3XrunBaseline = AudioEngine::Instance().Xruns();
             AudioEngine::Instance().RawLoadHistory().Reset();
             AudioEngine::Instance().ResetStageLoadHistory();
+            sBenchB7StartS = sBenchB7LastSampleS = glfwGetTime();
+            sBenchB7LoadMark = AudioEngine::Instance().RawLoadHistory().Written();
          }
 
          // A frame measured while the canvas wasn't the key window may be
@@ -86337,11 +86463,48 @@ int main(int argc, char** argv)
             if (curFoot > sBenchB3FootPeakMb) sBenchB3FootPeakMb = curFoot;
          }
 
+         // B7 soak: close a window every 10 s, stop when the time is up.
+         if (isBenchB7 && frameId >= 32 && sBenchB7StartS >= 0.0)
+         {
+            if (gLastFrameMs > 0.0)
+               sBenchB7WinFrameMs.Push(gLastFrameMs);
+            const double nowS = glfwGetTime();
+            if (nowS - sBenchB7LastSampleS >= 10.0)
+            {
+               sBenchB7LastSampleS = nowS;
+               const Bench::AudioLoadRing& ring = AudioEngine::Instance().RawLoadHistory();
+               const uint64_t written = ring.Written();
+               const Bench::PercentileRing winLoad = ring.DrainRange(sBenchB7LoadMark, written);
+               sBenchB7LoadMark = written;
+               const AudioEngine::XrunCounts x = AudioEngine::Instance().Xruns();
+               sBenchB7Samples.push_back({
+                  { "t_s", nowS - sBenchB7StartS },
+                  { "frame_ms_p50", sBenchB7WinFrameMs.Percentile(50) },
+                  { "frame_ms_p99", sBenchB7WinFrameMs.Percentile(99) },
+                  { "rss_mb", Bench::ProcessRssMb() },
+                  { "footprint_mb", Bench::ProcessFootprintMb() },
+                  { "cb_load_p99", winLoad.Empty() ? nlohmann::json(nullptr) : nlohmann::json(winLoad.Percentile(99)) },
+                  { "xruns_deadline", x.deadline - sBenchB3XrunBaseline.deadline },
+                  { "xruns_os", x.os - sBenchB3XrunBaseline.os },
+                  { "xrun_gaps", x.gaps - sBenchB3XrunBaseline.gaps },
+               });
+               sBenchB7WinFrameMs = Bench::PercentileRing();
+               if (nowS - sBenchB7StartS >= b7Minutes * 60.0)
+                  b3TotalFrames = frameId;
+            }
+         }
+
          if (frameId == b3TotalFrames)
          {
             Bench::BenchReport report;
-            report.bench = "B3_live_performance";
+            report.bench = isBenchB7 ? "B7_soak" : "B3_live_performance";
             report.variant = sBenchB3Variant;
+            if (isBenchB7)
+            {
+               char minutesStr[32];
+               snprintf(minutesStr, sizeof(minutesStr), ",minutes=%g", b7Minutes);
+               report.variant += minutesStr;
+            }
             report.frames = b3TotalFrames;
             report.nodes = (int)gNodes.size();
             report.frameMs = sBenchB3FrameMs;
@@ -86377,7 +86540,7 @@ int main(int argc, char** argv)
             report.audioBuffer = bufEnv ? atoi(bufEnv) : 256;
             report.audioSampleRate = AudioEngine::Instance().SampleRate();
             report.audioLoad = AudioEngine::Instance().RawLoadHistory().Drain();
-            report.audioXruns = AudioEngine::Instance().XrunCount() - sBenchB3XrunBaseline;
+            BenchFillXruns(report, sBenchB3XrunBaseline);
 
             report.memRssStartMb = sBenchB3RssStartMb;
             report.memRssEndMb = Bench::ProcessRssMb();
@@ -86397,7 +86560,9 @@ int main(int argc, char** argv)
                report.targetsPass["audio_xruns_zero"] = (report.audioXruns == 0);
                report.targetsPass["audio_cb_load_p99_le_50"] = (report.audioLoad.Percentile(99) <= 0.50);
             }
-            if (b3EnableVisuals)
+            // B7 is judged on the soak verdicts below, not on B3's
+            // projector/latency targets.
+            if (b3EnableVisuals && !isBenchB7)
             {
                report.targetsPass["projector_missed_vsync_lt_half_pct"] = (report.projectorMissedVsyncPct < 0.5);
                report.targetsPass["projector_locked_rate"] = (report.projectorPresentMs.Percentile(99) <= 1.10 * (1000.0 / (double)std::max(1, report.projectorTargetRateHz)));
@@ -86440,8 +86605,60 @@ int main(int argc, char** argv)
                }
             }
 
+            if (isBenchB7)
+            {
+               // rss_growth_pct: median RSS of the last 5 min against the
+               // first 5 min after a 2 min warm-up. Thermal fps drop: the
+               // first 10 s window against the last (reported, not gated).
+               constexpr double kWarmupS = 120.0, kSpanS = 300.0;
+               const double endS = sBenchB7Samples.empty() ? 0.0 : sBenchB7Samples.back()["t_s"].get<double>();
+               std::vector<double> firstRss, lastRss;
+               for (const auto& smp : sBenchB7Samples)
+               {
+                  const double t = smp["t_s"].get<double>();
+                  if (t >= kWarmupS && t < kWarmupS + kSpanS) firstRss.push_back(smp["rss_mb"].get<double>());
+                  if (t > endS - kSpanS) lastRss.push_back(smp["rss_mb"].get<double>());
+               }
+               auto median = [](std::vector<double> v) {
+                  std::sort(v.begin(), v.end());
+                  const size_t n = v.size();
+                  return (n % 2) ? v[n / 2] : 0.5 * (v[n / 2 - 1] + v[n / 2]);
+               };
+               nlohmann::json growth = nullptr;
+               if (!firstRss.empty() && !lastRss.empty())
+               {
+                  const double first = median(firstRss), last = median(lastRss);
+                  if (first > 0.0) growth = (last - first) / first * 100.0;
+               }
+               nlohmann::json fpsFirst = nullptr, fpsLast = nullptr, fpsDrop = nullptr;
+               if (sBenchB7Samples.size() >= 2)
+               {
+                  const double p50First = sBenchB7Samples.front()["frame_ms_p50"].get<double>();
+                  const double p50Last = sBenchB7Samples.back()["frame_ms_p50"].get<double>();
+                  if (p50First > 0.0 && p50Last > 0.0)
+                  {
+                     fpsFirst = 1000.0 / p50First;
+                     fpsLast = 1000.0 / p50Last;
+                     fpsDrop = (1000.0 / p50First - 1000.0 / p50Last) / (1000.0 / p50First) * 100.0;
+                  }
+               }
+               report.soak = {
+                  { "minutes", b7Minutes },
+                  { "interval_s", 10 },
+                  { "warmup_s", kWarmupS },
+                  { "rss_growth_pct", growth },
+                  { "xruns_total", report.audioXruns },
+                  { "fps_first", fpsFirst },
+                  { "fps_last", fpsLast },
+                  { "thermal_fps_drop_pct", fpsDrop },
+                  { "samples", sBenchB7Samples },
+               };
+               report.targetsPass["soak_rss_growth_lt_2pct"] = growth.is_null() ? nlohmann::json(nullptr) : nlohmann::json(growth.get<double>() < 2.0);
+               report.targetsPass["soak_xruns_zero"] = report.audioMeasured ? nlohmann::json(report.audioXruns == 0) : nlohmann::json(nullptr);
+            }
+
             report.Emit();
-            printf("B3LIVE DONE\n");
+            printf(isBenchB7 ? "B7SOAK DONE\n" : "B3LIVE DONE\n");
             fflush(stdout);
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
@@ -87372,13 +87589,13 @@ int main(int argc, char** argv)
       // building/debugging this fixture - the doc's own number is 60s).
       // cb_load is drained from AudioEngine::RawLoadHistory() (raw per-block
       // samples - see AudioEngine.h's comment on why LastBlockLoad()'s
-      // smoothing is wrong for a percentile) and xruns from XrunCount(),
+      // smoothing is wrong for a percentile) and xruns from Xruns(),
       // baselined at the start of the measurement window so device-open
       // settling doesn't count against this run.
       if (getenv("INFINITE_BENCH_B1VOICES") != nullptr)
       {
          static double sStartTimeS = -1.0;
-         static uint64_t sXrunBaseline = 0;
+         static AudioEngine::XrunCounts sXrunBaseline;
          static Bench::PercentileRing sFrameMs;
          static double sRssStartMb = -1.0;
          const double nowS = glfwGetTime();
@@ -87386,7 +87603,7 @@ int main(int argc, char** argv)
          if (sStartTimeS < 0.0 && nowS > 1.5)
          {
             sStartTimeS = nowS;
-            sXrunBaseline = AudioEngine::Instance().XrunCount();
+            sXrunBaseline = AudioEngine::Instance().Xruns();
             AudioEngine::Instance().RawLoadHistory().Reset();
             AudioEngine::Instance().ResetStageLoadHistory();
             sRssStartMb = Bench::ProcessRssMb();
@@ -87408,7 +87625,7 @@ int main(int argc, char** argv)
             report.audioBuffer = bufArg ? atoi(bufArg) : 0;
             report.audioSampleRate = AudioEngine::Instance().SampleRate();
             report.audioLoad = AudioEngine::Instance().RawLoadHistory().Drain();
-            report.audioXruns = AudioEngine::Instance().XrunCount() - sXrunBaseline;
+            BenchFillXruns(report, sXrunBaseline);
             report.memRssStartMb = sRssStartMb;
             report.memRssEndMb = Bench::ProcessRssMb();
             for (int s = 0; s < kAudioStageCount; s++)
@@ -87461,14 +87678,14 @@ int main(int argc, char** argv)
       if (getenv("INFINITE_BENCH_B5AUDIOALONE") != nullptr)
       {
          static double sStartTimeS = -1.0;
-         static uint64_t sXrunBaseline = 0;
+         static AudioEngine::XrunCounts sXrunBaseline;
          const double nowS = glfwGetTime();
          const double windowS = getenv("INFINITE_BENCH_B5AUDIOALONE_SECONDS")
                                     ? atof(getenv("INFINITE_BENCH_B5AUDIOALONE_SECONDS")) : 30.0;
          if (sStartTimeS < 0.0 && nowS > 1.0)
          {
             sStartTimeS = nowS;
-            sXrunBaseline = AudioEngine::Instance().XrunCount();
+            sXrunBaseline = AudioEngine::Instance().Xruns();
             AudioEngine::Instance().RawLoadHistory().Reset();
          }
          if (sStartTimeS >= 0.0 && nowS - sStartTimeS >= windowS)
@@ -87482,7 +87699,7 @@ int main(int argc, char** argv)
             report.audioBuffer = atoi(bufArg);
             report.audioSampleRate = AudioEngine::Instance().SampleRate();
             report.audioLoad = AudioEngine::Instance().RawLoadHistory().Drain();
-            report.audioXruns = AudioEngine::Instance().XrunCount() - sXrunBaseline;
+            BenchFillXruns(report, sXrunBaseline);
             report.Emit();
             printf("B5AUDIOALONE DONE\n");
             fflush(stdout);

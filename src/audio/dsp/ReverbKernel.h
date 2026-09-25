@@ -222,6 +222,8 @@ public:
          line.Reset();
       for (auto& lfo : mLfo)
          lfo.Reset();
+      for (int l = 0; l < ReverbDsp::kNumLines; l++)
+         mLfoPhase[l] = mLfoDriftPhase[l] = 0.0f;
       for (auto& d : mDiffuserL)
          d.Reset();
       for (auto& d : mDiffuserR)
@@ -239,6 +241,9 @@ public:
    void ProcessBlock(const AudioBuffer& in, const AudioBuffer* sidechain, AudioBuffer& out) override;
    void ProcessBlockScalar(const AudioBuffer& in, const AudioBuffer* sidechain, AudioBuffer& out);
    void ProcessBlockSimd(const AudioBuffer& in, const AudioBuffer* sidechain, AudioBuffer& out);
+   // Test-only frozen reference (ReverbKernelLegacy.cpp): the kernel before
+   // the Block 1 perf work, for DSPTEST's old-vs-new comparison.
+   void ProcessBlockLegacy(const AudioBuffer& in, const AudioBuffer* sidechain, AudioBuffer& out);
 
    int LatencySamples() const override { return 0; }
    MeterRing* ExtraMeter() override { return &mLevelMeter; }
@@ -253,6 +258,11 @@ private:
    ReverbDsp::AllpassDiffuser mDiffuserR[ReverbDsp::kNumDiffusionStages];
    AnalogDsp::OnePoleLP mInputLpfL, mInputLpfR;
    AnalogDsp::DriftLfo mLfo[ReverbDsp::kNumLines];
+   // Live-path LFO state (ProcessBlockSimd), one array per field so the
+   // 16-line update vectorises. mLfo above stays for ProcessBlockScalar
+   // and ProcessBlockLegacy.
+   float mLfoPhase[ReverbDsp::kNumLines] = {};
+   float mLfoDriftPhase[ReverbDsp::kNumLines] = {};
    float mInputEnv = 0.0f;
 
    std::vector<float> mPredelayL, mPredelayR;

@@ -3849,8 +3849,8 @@ namespace Platform
       // (mirrors the AudioUnitSetProperty silent-fallback case just above).
       AudioObjectID outputDeviceId = 0;
       // kAudioDeviceProcessorOverload listener - a real CoreAudio overload
-      // notification (see AudioEngine::NotifyProcessorOverload), as opposed
-      // to AudioEngine::Process's wall-clock heuristic. Same lifecycle rule
+      // notification (see AudioEngine::NotifyProcessorOverload), counted as
+      // the "os" xrun. Same lifecycle rule
       // as configChangeObserver just above: bound to outputDeviceId, so it
       // must be removed (AudioDeviceClose) before that device reference is
       // dropped, and removal requires passing back this exact block object,
@@ -4445,10 +4445,9 @@ namespace Platform
 #if !defined(INFINITE_VST3_SCANNER)
          if (targetDevice != 0)
          {
-            // Real overload signal from CoreAudio, feeding the same counter
-            // AudioEngine::Process's wall-clock heuristic does - see
-            // AudioEngine::NotifyProcessorOverload's comment for why both
-            // stay live rather than one replacing the other. `engineInstance`
+            // Real overload signal from CoreAudio, feeding AudioEngine's
+            // "os" xrun counter (deadline misses are counted separately in
+            // AudioEngine::Process - see AudioEngine.h's XrunCounts). `engineInstance`
             // is the AudioEngine passed in as `userData`; the block may run
             // on any CoreAudio-managed thread, so it must do nothing but
             // that one atomic increment.

@@ -45,6 +45,12 @@
 #include <thread>
 #include <vector>
 
+// Defined in AudioEngine.cpp (the macOS backend reaches it the same way, see
+// Platform.mm). Bumps AudioEngine's OS-reported xrun counter; atomic-only.
+// This file is not compiled into infinite-vst3-scanner, so the symbol always
+// links.
+extern "C" void AudioEngine_NotifyProcessorOverload(void* engineInstance);
+
 namespace
 {
    constexpr int kMaxChannels = 8;          // matches kAudioMaxChannels in AudioEngine.h
@@ -501,6 +507,10 @@ namespace
 
       // Pump until stopped.
       HANDLE handles[2] = { gRender.stopEvent, gRender.bufferEvent };
+      // False until the first buffer is written: the endpoint buffer starts
+      // empty after Start(), so padding 0 on the first event is expected,
+      // not an underrun.
+      bool primed = false;
       while (gRender.running.load(std::memory_order_acquire))
       {
          const DWORD wait = WaitForMultipleObjects(2, handles, FALSE, 2000);
@@ -518,6 +528,13 @@ namespace
          const UINT32 framesAvailable = capacity - padding;
          if (framesAvailable == 0)
             continue;
+         // Shared-mode WASAPI has no underrun notification. Padding already
+         // at 0 right before we write means the engine drained every frame we
+         // gave it and played silence while waiting: count it as the "os"
+         // xrun, the Windows counterpart of CoreAudio's processor overload.
+         // One relaxed atomic increment - safe on this render thread.
+         if (primed && padding == 0)
+            AudioEngine_NotifyProcessorOverload(gRender.userData);
 
          BYTE* dest = nullptr;
          if (FAILED(gRender.renderer->GetBuffer(framesAvailable, &dest)))
@@ -549,6 +566,7 @@ namespace
          }
 
          gRender.renderer->ReleaseBuffer(frames, 0);
+         primed = true;
       }
 
       gRender.client->Stop();

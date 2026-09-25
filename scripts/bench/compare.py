@@ -32,6 +32,8 @@ Target gates (new run only, benchmark-suite.md section 6 / README):
   - B8 projectors: media_io.windows[i].missed_vsync_frac >= 0.5%
   - B6 canvas: frame_ms p50 > 17.2 ms (60 fps) or p95 > 22.8 ms (45 fps)
   - fbo_allocs_steady > 0 (B2/B4: render targets reallocated in steady state)
+  - B7 soak: soak.rss_growth_pct >= 2 or soak.xruns_total > 0 (worst run);
+    soak.thermal_fps_drop_pct is printed as info, never gated
 
 output_hash (the quality guard):
   - Deterministic, compared: every variant with anim=0 (B2 static, B4 static).
@@ -58,6 +60,7 @@ UNTRUSTED_MARKS = ("unfocused=1", "unpaced=1", "overlap=1")
 MISSED_VSYNC_TARGET = 0.005
 CANVAS_P50_MS = 17.2
 CANVAS_P95_MS = 22.8
+SOAK_RSS_GROWTH_PCT = 2.0
 
 
 def normalize_variant(variant):
@@ -156,6 +159,7 @@ def compare_key(key, bg, ng):
     b, _ = pick(bg)
     n, untrusted = pick(ng)
     reasons = []
+    info = []
 
     def chg(label, bv, nv, threshold, digits=2):
         if up(bv, nv, threshold):
@@ -193,6 +197,17 @@ def compare_key(key, bg, ng):
     if fbo is not None and fbo > 0:
         reasons.append(f"TARGET fbo_allocs_steady {fbo:g} (> 0)")
 
+    if bench == "B7_soak":
+        growth = maximum(n, "soak", "rss_growth_pct")
+        if growth is not None and growth >= SOAK_RSS_GROWTH_PCT:
+            reasons.append(f"TARGET soak rss_growth_pct {growth:.2f}% (>= {SOAK_RSS_GROWTH_PCT}%)")
+        sx = maximum(n, "soak", "xruns_total")
+        if sx is not None and sx > 0:
+            reasons.append(f"TARGET soak xruns_total {sx:g} (> 0)")
+        drop = median(n, "soak", "thermal_fps_drop_pct")
+        info.append(f"soak: rss growth {fmt(median(b, 'soak', 'rss_growth_pct'))}%->{fmt(growth)}%, "
+                    f"thermal fps drop {fmt(median(b, 'soak', 'thermal_fps_drop_pct'))}%->{fmt(drop)}% (info)")
+
     bt, nt = targets(b), targets(n)
     for k, v in nt.items():
         if v is False:
@@ -229,7 +244,7 @@ def compare_key(key, bg, ng):
         tp_str,
         hash_str,
     ]
-    return cols, reasons, untrusted
+    return cols, reasons, untrusted, info
 
 
 def main():
@@ -253,7 +268,7 @@ def main():
         if key not in new:
             print(" ".join(name), "(missing from new run)")
             continue
-        cols, reasons, untrusted = compare_key(key, baseline.get(key), new[key])
+        cols, reasons, untrusted, info = compare_key(key, baseline.get(key), new[key])
         if key not in baseline:
             cols[0] = f"-/{cols[0].split('/')[1]}"
         mark = ""
@@ -269,6 +284,8 @@ def main():
         print(" ".join(name + [c.ljust(w) for c, w in zip(cols, widths[2:])]) + mark)
         for r in reasons:
             print(f"      {'(ignored) ' if untrusted else ''}{r}")
+        for line in info:
+            print(f"      {line}")
 
     print()
     if untrusted_rows:

@@ -19,12 +19,12 @@ namespace
       return duration<double, std::milli>(steady_clock::now().time_since_epoch()).count();
    }
 
-   // Approximate xrun detection: AVAudioSourceNode gives us no direct xrun
-   // notification (unlike raw AUHAL), so we compare the wall-clock gap
-   // between successive Process() entries to the expected block period and
-   // flag anything past this multiple as a probable dropout. This is a
-   // judgment call, not a precise xrun count - retune once real patches
-   // are running.
+   // Callback-gap heuristic: a wall-clock gap between successive Process()
+   // entries past this multiple of the block period. Reported as
+   // CallbackGapCount() for information only - it is NOT an xrun (the OS
+   // can deliver a callback late and still meet the device deadline from
+   // its own buffering), so it never feeds XrunCount(). Real xruns are the
+   // deadline and OS counters; see AudioEngine.h's XrunCounts.
    constexpr double kXrunGapMultiplier = 1.5;
 
    // One-pole smoothing for the load readout - RunTopology's per-block cost
@@ -95,7 +95,7 @@ void AudioEngine::Stop()
    // mLastCallbackMs back to its -1.0 "no previous callback" sentinel means
    // the first callback after the next Start() has nothing stale to compare
    // its gap against, so a restart can no longer trip kXrunGapMultiplier on
-   // its own (bug 3's false-positive xrun on restart). mXrunCount resets to
+   // its own (bug 3's false-positive xrun on restart). The counters reset to
    // 0 alongside it, a deliberate choice, not an oversight: the status-bar
    // readout (main.cpp:17521-17548-ish, "xruns=N") exists to answer "did
    // *this run* introduce dropouts", which only a per-run counter can answer
@@ -103,9 +103,12 @@ void AudioEngine::Stop()
    // restart is clean" from "an earlier run had one and nobody's looked
    // since". If that ever needs to become "since the app launched" instead,
    // this reset is the one place to remove, not something to leave debatable
-   // at every call site.
+   // at every call site. All three counters reset together so XrunCount()
+   // and its parts always describe the same run.
    mLastCallbackMs.store(-1.0, std::memory_order_relaxed);
-   mXrunCount.store(0, std::memory_order_relaxed);
+   mXrunDeadline.store(0, std::memory_order_relaxed);
+   mXrunOs.store(0, std::memory_order_relaxed);
+   mCallbackGaps.store(0, std::memory_order_relaxed);
 
    Transport::Instance().NotifyAudioEngineStopped();
 }
@@ -157,18 +160,40 @@ double AudioEngine::SampleRate() const
 
 uint64_t AudioEngine::XrunCount() const
 {
-   return mXrunCount.load(std::memory_order_relaxed);
+   return Xruns().Total();
+}
+
+uint64_t AudioEngine::XrunDeadlineCount() const
+{
+   return mXrunDeadline.load(std::memory_order_relaxed);
+}
+
+uint64_t AudioEngine::XrunOsCount() const
+{
+   return mXrunOs.load(std::memory_order_relaxed);
+}
+
+uint64_t AudioEngine::CallbackGapCount() const
+{
+   return mCallbackGaps.load(std::memory_order_relaxed);
+}
+
+AudioEngine::XrunCounts AudioEngine::Xruns() const
+{
+   XrunCounts c;
+   c.deadline = mXrunDeadline.load(std::memory_order_relaxed);
+   c.os = mXrunOs.load(std::memory_order_relaxed);
+   c.gaps = mCallbackGaps.load(std::memory_order_relaxed);
+   return c;
 }
 
 void AudioEngine::NotifyProcessorOverload()
 {
-   // Kept alongside, not instead of, the wall-clock heuristic in Process():
-   // kAudioDeviceProcessorOverload catches genuine render-thread overruns,
-   // but the heuristic also catches late/skipped-callback gaps (e.g.
-   // silence-substitution) that this notification may not cover. Either
-   // source bumping the same counter is a deliberate choice, not a race to
-   // fix - see the comment on kXrunGapMultiplier.
-   mXrunCount.fetch_add(1, std::memory_order_relaxed);
+   // The device's own report. Deadline misses are counted separately in
+   // Process(); the two overlap when our render ran long, but each also
+   // catches what the other can't (an OS-side overload with a fast render,
+   // or a slow render the device happened to absorb), so both count.
+   mXrunOs.fetch_add(1, std::memory_order_relaxed);
 }
 
 // Trampoline for Platform.mm's kAudioDeviceProcessorOverload listener - see
@@ -880,7 +905,7 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
       const double expectedGapMs = 1000.0 * (double)numFrames / sampleRate;
       const double actualGapMs = nowMs - lastMs;
       if (actualGapMs > expectedGapMs * kXrunGapMultiplier)
-         mXrunCount.fetch_add(1, std::memory_order_relaxed);
+         mCallbackGaps.fetch_add(1, std::memory_order_relaxed);
    }
    mLastCallbackMs.store(nowMs, std::memory_order_relaxed);
 
@@ -912,6 +937,10 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
    {
       const double expectedGapMs = 1000.0 * (double)numFrames / sampleRate;
       const double instantLoad = expectedGapMs > 0.0 ? topologyMs / expectedGapMs : 0.0;
+      // Deadline miss: this block's render used the whole period, so the
+      // device was handed it late. Same measurement as the cb_load meter.
+      if (expectedGapMs > 0.0 && topologyMs >= expectedGapMs)
+         mXrunDeadline.fetch_add(1, std::memory_order_relaxed);
       const double prevLoad = mLastBlockLoad.load(std::memory_order_relaxed);
       mLastBlockLoad.store(prevLoad + kLoadSmoothing * (instantLoad - prevLoad), std::memory_order_relaxed);
       mRawLoadHistory.Push((float)instantLoad);

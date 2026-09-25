@@ -259,6 +259,11 @@ namespace
 
    RenderState gRender;
 
+   // No OS-reported xrun on Linux: miniaudio's playback callback has no
+   // underrun notification (its ALSA/PulseAudio/PipeWire backends recover
+   // internally and say nothing), so AudioEngine's "os" xrun counter stays 0
+   // here. Deadline misses are still counted by AudioEngine::Process, which
+   // is the same on all three platforms.
    void RenderDataCallback(ma_device* pDevice, void* pOutput, const void* /*pInput*/, ma_uint32 frameCount)
    {
       RenderState* self = static_cast<RenderState*>(pDevice->pUserData);
