@@ -2,7 +2,14 @@
 # Runs the INFINITE_BENCH suite (docs/plans/perf/benchmark-suite.md) and
 # collects every BENCH_JSON line into bench/results/<machine>/<date>-<sha>.jsonl.
 #
-# Usage: scripts/bench/run_all.sh [--soak] [--app <path-to-Infinite.app>]
+# Usage: scripts/bench/run_all.sh [--soak] [--quiet] [--only B3,B6,...] [--app <path-to-Infinite.app>]
+#
+# --only runs just the listed benchmarks, e.g. to re-run fixtures that came
+# out unfocused/unpaced without repeating the whole suite.
+#
+# --quiet pauses the semi-brain watch daemon (a launchd agent that runs
+# sync_brain.py about once a minute while transcripts change) for the whole
+# run and restores it on exit. Use it for any run that becomes a baseline.
 #
 # Each fixture is driven by its own INFINITE_BENCH_* env var (the suite is
 # built incrementally - see docs/plans/perf/README.md's status table for
@@ -15,10 +22,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 APP="$REPO_ROOT/build/Infinite.app/Contents/MacOS/Infinite"
 SOAK=0
+QUIET=0
+ONLY=""
 
 while [[ $# -gt 0 ]]; do
    case "$1" in
       --soak) SOAK=1; shift ;;
+      --quiet) QUIET=1; shift ;;
+      --only) ONLY=",$2,"; shift 2 ;;
       --app) APP="$2"; shift 2 ;;
       *) echo "unknown arg: $1" >&2; exit 1 ;;
    esac
@@ -29,6 +40,8 @@ if [[ ! -x "$APP" ]]; then
    exit 1
 fi
 
+want() { [[ -z "$ONLY" || "$ONLY" == *",$1,"* ]]; }
+
 SHA="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
 DATE="$(date +%Y%m%d-%H%M%S)"
 MACHINE="$(sysctl -n hw.model 2>/dev/null || uname -n)"
@@ -37,6 +50,51 @@ OUT_DIR="$REPO_ROOT/bench/results/$MACHINE_SAFE"
 mkdir -p "$OUT_DIR"
 OUT_FILE="$OUT_DIR/$DATE-$SHA.jsonl"
 : > "$OUT_FILE"
+# Everything this script prints also lands in a run log next to the results.
+exec > >(tee -a "${OUT_FILE%.jsonl}.log") 2>&1
+
+# The app labels BENCH_JSON's "commit" from this, so it is right even when
+# the app runs outside the repo.
+export INFINITE_BENCH_COMMIT="$SHA"
+
+swap_used() { sysctl -n vm.swapusage 2>/dev/null | sed -E 's/.*used = ([0-9.]+M).*/\1/'; }
+
+# --quiet: boot the brain watch daemon out for the run, restore it on exit.
+BRAIN_LABEL="com.infinite.semi-brain.watchd"
+BRAIN_PLIST="$HOME/Library/LaunchAgents/$BRAIN_LABEL.plist"
+BRAIN_DOMAIN="gui/$(id -u)"
+BRAIN_BOOTED_OUT=0
+wait_for_sync_brain() {
+   local waited=0
+   while pgrep -f 'sync_brain.py' > /dev/null; do
+      if [[ "$waited" -eq 0 ]]; then echo "  waiting for a running sync_brain.py to finish..."; fi
+      if [[ "$waited" -ge 600 ]]; then echo "  sync_brain.py still running after 600s - continuing anyway" >&2; return; fi
+      sleep 5; waited=$((waited + 5))
+   done
+}
+restore_brain() {
+   if [[ "$BRAIN_BOOTED_OUT" -eq 1 ]]; then
+      launchctl bootstrap "$BRAIN_DOMAIN" "$BRAIN_PLIST" 2>/dev/null \
+         && echo "run_all.sh: restored $BRAIN_LABEL" \
+         || echo "run_all.sh: WARNING could not restore $BRAIN_LABEL - run: launchctl bootstrap $BRAIN_DOMAIN $BRAIN_PLIST" >&2
+      BRAIN_BOOTED_OUT=0
+   fi
+   if [[ "$QUIET" -eq 1 ]]; then echo "run_all.sh: quiet=1 swap_end=$(swap_used)"; fi
+}
+if [[ "$QUIET" -eq 1 ]]; then
+   trap restore_brain EXIT
+   if [[ -f "$BRAIN_PLIST" ]] && launchctl print "$BRAIN_DOMAIN/$BRAIN_LABEL" > /dev/null 2>&1; then
+      # Let an in-flight sync finish before launchd stops its parent, then
+      # catch one that started in between.
+      wait_for_sync_brain
+      launchctl bootout "$BRAIN_DOMAIN/$BRAIN_LABEL" && BRAIN_BOOTED_OUT=1
+      wait_for_sync_brain
+      echo "run_all.sh: booted out $BRAIN_LABEL for the run"
+   else
+      echo "run_all.sh: $BRAIN_LABEL not loaded - nothing to pause"
+   fi
+   echo "run_all.sh: quiet=1 swap_start=$(swap_used)"
+fi
 
 echo "run_all.sh: machine=$MACHINE sha=$SHA -> $OUT_FILE"
 
@@ -74,6 +132,7 @@ skip() {
    echo "  -> $1: SKIP (no fixture implemented yet - see docs/plans/perf/README.md)"
 }
 
+if want B1; then
 echo "B1 Heavy audio"
 # Buffer-size sweep per benchmark-suite.md §4 (64/128/256/512). SECONDS
 # defaults to 60s per the doc; a run_all.sh invocation can override it with
@@ -85,6 +144,9 @@ for buf in 64 128 256 512; do
       INFINITE_BENCH_B1VOICES=24 INFINITE_BENCH_B1BUFFER="$buf" INFINITE_BENCH_B1SECONDS="$B1_SECONDS"
 done
 
+fi
+
+if want B2; then
 echo "B2 Heavy visuals"
 # B2 Heavy visuals sweep per benchmark-suite.md §4 (scales s/m/l, static and animated variants).
 for scale in s m l; do
@@ -97,6 +159,9 @@ done
 run_fixture "B2_heavy_visuals scale=l,anim=1,gpunodes=1" 160 \
    INFINITE_BENCH_B2SCALE=l INFINITE_BENCH_B2ANIM=1 INFINITE_BENCH_B2GPUNODES=1
 
+fi
+
+if want B3; then
 echo "B3 Live performance"
 # B3 Live performance fixture per benchmark-suite.md §4.
 # B3_FRAMES defaults to 600 frames; can be overridden via B3_FRAMES for quick runs.
@@ -105,6 +170,9 @@ B3_EXIT=$((B3_FRAMES + 50))
 run_fixture "B3_live_performance scale=s,buf=256" "$B3_EXIT" \
    INFINITE_BENCH_B3SCALE=s INFINITE_BENCH_B3BUFFER=256 INFINITE_BENCH_B3FRAMES="$B3_FRAMES"
 
+fi
+
+if want B4; then
 echo "B4 Complex 3D scenes"
 # GL timer queries stall the CPU on macOS (glEndQuery flushes and waits), so
 # the sweeps run with them off and report honest frame_ms. One timed run at
@@ -123,6 +191,9 @@ run_fixture "B4_complex_3d scale=l,shadow=2048,anim=0,gputimers=0" 160 \
 run_fixture "B4_complex_3d scale=l,shadow=2048,anim=1,passes=1" 160 \
    INFINITE_BENCH_B4SCALE=l INFINITE_BENCH_B4PASSES=1
 
+fi
+
+if want B5; then
 echo "B5 Fundamentals"
 run_fixture "B5_fundamentals_empty" 200 INFINITE_BENCH_B5EMPTY=1
 for n in 50 100 200 400; do
@@ -150,6 +221,9 @@ for n in 50 100 200 400; do
    run_fixture "B5_fundamentals_undo n=$n" 60 INFINITE_BENCH_B5UNDO="$n"
 done
 
+fi
+
+if want B6; then
 echo "B6 Canvas navigation"
 # B6 Canvas navigation per benchmark-suite.md §4: programmatic pan/zoom/drag/
 # dropdown over a wired grid, never OS-level UI scripting. Leave Infinite in
@@ -169,6 +243,9 @@ done
 run_fixture "B6_canvas_nav n=300,mode=pan,vsync=0" "$B6_EXIT" \
    INFINITE_BENCH_B6NODES=300 INFINITE_BENCH_B6MODE=pan INFINITE_BENCH_B6VSYNC=0 INFINITE_BENCH_B6FRAMES="$B6_FRAMES" INFINITE_BENCH_GPUTIMERS=0
 
+fi
+
+if want B7; then
 if [[ "$SOAK" -eq 1 ]]; then
    echo "B7 Soak and thermal (--soak)"
    skip "B7_soak"
@@ -176,6 +253,9 @@ else
    echo "B7 Soak and thermal: skipped (pass --soak to include)"
 fi
 
+fi
+
+if want B8; then
 echo "B8 Media I/O"
 # B8 Media I/O per benchmark-suite.md §4: looping H.264 clips into Outputs,
 # plus projector windows, camera and Syphon/Spout Out. Clips are generated
@@ -206,6 +286,9 @@ b8 2 1080 0 1 0
 b8 2 1080 0 0 1
 b8 4 2160 3 1 1
 
+fi
+
+if want B9; then
 echo "B9 Memory footprint"
 # B9 Memory footprint per benchmark-suite.md §4 (B2 and B4 scenes at scale l, animated).
 # B9_FRAMES defaults to 600 frames per the plan; can be overridden via B9_FRAMES for quick runs.
@@ -216,8 +299,13 @@ run_fixture "B9_memory_footprint scene=b2,scale=l,anim=1" "$B9_EXIT" \
 run_fixture "B9_memory_footprint scene=b4,scale=l,anim=1" "$B9_EXIT" \
    INFINITE_BENCH_B9SCENE=b4 INFINITE_BENCH_B9FRAMES="$B9_FRAMES"
 
+fi
+
+if want B10; then
 echo "B10 Offline render and A/V sync"
 skip "B10_offline_av_sync"
+
+fi
 
 echo "Done. Results: $OUT_FILE"
 echo "Compare against a baseline with: scripts/bench/compare.py <baseline.jsonl> $OUT_FILE"

@@ -284,7 +284,10 @@ namespace Bench
    {
       // Diagnostic labelling only (BENCH_JSON's "commit" field) - a shell-out
       // that fails or is unavailable degrades to "unknown" rather than
-      // affecting anything the fixture actually measures.
+      // affecting anything the fixture actually measures. run_all.sh exports
+      // INFINITE_BENCH_COMMIT so an app run outside the repo is still labelled.
+      if (const char* env = std::getenv("INFINITE_BENCH_COMMIT"); env && *env)
+         return env;
 #if defined(_WIN32)
       FILE* pipe = _popen("git rev-parse --short HEAD 2>NUL", "r");
 #else

@@ -1,5 +1,36 @@
 # Performance benchmark suite
 
+## Where we stand against the spec targets
+
+From the baseline `bench/baselines/m2-8gb.jsonl` (commit `c602a0d`, 2026-09-25,
+`run_all.sh --quiet`; details in [Baseline](#baseline)). Targets are
+[`benchmark-suite.md`](benchmark-suite.md) §6, plus the proposed B8 targets
+below. **unproven** = the run was untrusted (unfocused/unpaced), so a value
+inside the limit does not count as a pass. A value outside it still fails,
+because an untrusted run can only look better than the real thing.
+
+| Scope | Spec target | Baseline value | Result |
+|---|---|---|---|
+| Audio | 0 xruns at 256 frames | B1 buf=256: 0 in 60 s. B3: 0 | pass (60 s, not the 10 min the spec asks; B7 soak on hold) |
+| Audio | cb_load p99 <= 50% | B1 buf=64/128/256/512: 61.2 / 55.8 / 52.8 / 51.1%. B3: 37.4% | **fail** (B1, every buffer size); pass (B3) |
+| Projector | locked 60 fps: interval p99 <= 1.1 x 16.7 = 18.3 ms | B3: 34.3 ms. B8 2 / 3 windows: 17.8 / 17.2 ms. B8 heavy (4x2160, 3 windows, camera, Syphon): 32.8-33.1 ms | **fail** (B3, B8 heavy); unproven (B8 2 / 3 windows) |
+| Projector | missed vsync < 0.5% | B3: 11.1%. B8 2 / 3 windows: 0%. B8 heavy: 7.1% per window | **fail** (B3, B8 heavy); unproven (B8 2 / 3 windows) |
+| Projector | input-to-photon <= 2 frames | B3: max 1 frame (28 samples) | unproven |
+| Canvas | B6 pan p50 >= 60 fps (<= 17.2 ms) | n=300 all 11.3; n=200 / 400 pan 8.3 / 8.3 ms | unproven (every B6 run unfocused and unpaced) |
+| Canvas | B6 pan p95 >= 45 fps (<= 22.8 ms) | n=300 all 13.6; n=200 / 400 pan 13.5 / 13.2 ms | unproven |
+| Memory | no §6 target; gated on change (+20%) | B9 footprint peak b2 / b4: 760 / 640 MB. Render targets b2 / b4: 343 / 91 MB | baseline recorded |
+| Memory | `fbo_allocs_steady` = 0 | 0 in every B2 and B4 variant | pass |
+| Memory | soak: RSS growth < 2% over 30 min | not measured | B7 on hold |
+| Video (proposed) | clips decode in real time, 0 dropped | every B8 variant: 30.0-30.7 decoded fps, 0 dropped | unproven |
+| Quality | `output_hash` unchanged (anim=0) | B2 s/m/l static and B4 l static match earlier runs | pass |
+
+**Open items: every target that still fails.** These are listed, not fixed.
+
+1. **B1 audio load:** cb_load p99 is above 50% at every buffer size (51.1-61.2%). The p50 already sits at 49-52%.
+2. **B3 projector pacing:** interval p99 is 34.3 ms, missed vsync 11.1% and jitter 6.8 ms. That is one doubled interval in nine.
+3. **B8 heavy projector pacing:** with 4x2160 clips, 3 windows, camera and Syphon, the window interval p99 is 32.8-33.1 ms and missed vsync is 7.1%. The canvas frame p95/p99 is 32.5/32.9 ms, so the load halves the rate. The light 2 and 3 window variants hold 60 fps.
+4. **Harness: no trusted B3/B6/B8 run yet.** macOS refuses to activate an app launched from a background process (Claude's shell, even through `open`). Every B3, B6 and B8 row came out `unfocused=1`, both in the full run and in the one re-run. To prove the unproven rows, run `scripts/bench/run_all.sh --quiet --only B3,B6,B8` from Terminal.app as the front window. Camera access has also never been granted on this machine (`camera: skipped, not_determined`).
+
 ## Scoreboard
 
 One row per measured win (or loss). Medians on the M2 8 GB machine; change %
@@ -117,6 +148,8 @@ Built on `feature/perf-benchmark-suite`, off `main` at `4d62140`.
 cmake --build build -j8
 scripts/bench/run_all.sh                    # default suite, into bench/results/<machine>/<date>-<sha>.jsonl
 scripts/bench/run_all.sh --soak             # + B7 (30min, when it exists)
+scripts/bench/run_all.sh --quiet            # pause the semi-brain watch daemon; use for any baseline
+scripts/bench/run_all.sh --only B3,B6,B8    # re-run just these (e.g. rows that came out unfocused)
 scripts/bench/compare.py bench/baselines/m2-8gb.jsonl bench/results/.../<run>.jsonl
 ```
 
@@ -251,153 +284,94 @@ Projector/Output > Canvas > Previews):
 
 ## Baseline
 
-Recorded: `bench/baselines/m2-8gb.jsonl`, committed from a clean
-`scripts/bench/run_all.sh` run on this machine (`Mac14,7`, Apple M2, commit
-`9326563`), 13 `BENCH_JSON` lines, zero `FAIL`s, zero xruns anywhere. Default
-windows throughout (60s B1 per buffer size, 30s B5d per buffer size).
+Recorded: `bench/baselines/m2-8gb.jsonl`, from one
+`scripts/bench/run_all.sh --quiet` run on 2026-09-25 (`Mac14,7`, Apple M2 8 GB,
+60 Hz, commit `c602a0d`, i.e. `main` `74b1fc3` plus bench plumbing only).
+58 `BENCH_JSON` lines, no `FAIL`, no xruns. Default windows: 60 s B1 per buffer
+size, 30 s audio-alone, 600 frames B3/B6/B9, 300 frames B8.
+`quiet=1`: the semi-brain watch daemon was paused for the run. Swap in use
+was 1681 MB at the start and 2538 MB at the end. B7 and B10 are skipped (on hold).
 
-| Bench | Variant | frame_ms p50/p95/p99 (ms) | audio cb_load p50/p99 (%) | xruns | nodes | RSS (MB) |
+The previous baseline (commit `9326563`, B1 + B5 only, older than every perf
+fix) is kept as `bench/baselines/m2-8gb-9326563.jsonl`.
+
+**Trust.** B1, B2, B4, B5 and B9 do not depend on focus, so they are trusted.
+All 15 B3, B6 and B8 rows are `unfocused=1`, and every B6 row plus the B8
+rows without projector windows are also `unpaced=1`. The app was never
+activated (see open item 4 at the top). One `--only B3,B6,B8` re-run
+(`d899a0b`) came out the same way, so it was not merged in. `compare.py`
+prints those rows but never gates on them. A miss in them is still real.
+Nothing in them counts as a pass.
+
+**Hash determinism.** `anim=0` hashes match earlier runs: B2 s / m / l static
+are `51da349ab649bf2e` / `acbd116345c11903` / `29dcc23d9a902c68`, and B4 l
+static is `8bd85fec4eeb5123` (the same on two separate runs). `anim=1`, B3 and
+B9 hashes change run to run on the same commit, so `compare.py` does not
+compare them.
+
+| Bench | Variant | frame_ms p50 / p95 / p99 | audio cb_load p50 / p99 (%) | xruns | footprint peak MB | other |
 |---|---|---|---|---|---|---|
-| B1_heavy_audio | 24 voices, buf=64 | 16.7 / 31.2 / 47.2 | 59.3 / 69.4 | 0 | 149 | 398.8 |
-| B1_heavy_audio | 24 voices, buf=128 | 16.7 / 33.7 / 38.4 | 58.2 / 65.0 | 0 | 149 | 369.5 |
-| B1_heavy_audio | 24 voices, buf=256 | 16.7 / 32.5 / 59.9 | 58.0 / 62.3 | 0 | 149 | 330.5 |
-| B1_heavy_audio | 24 voices, buf=512 | 16.7 / 32.5 / 75.3 | 57.1 / 60.3 | 0 | 149 | 370.1 |
-| B5_fundamentals_empty | - | 1.00 / 1.61 / 1.67 | n/a | - | 0 | 256.8 |
-| B5_fundamentals_nodecount | n=50 | 4.42 / 4.53 / 4.58 | n/a | - | 50 | 287.1 |
-| B5_fundamentals_nodecount | n=100 | 7.86 / 8.07 / 8.13 | n/a | - | 100 | 342.0 |
-| B5_fundamentals_nodecount | n=200 | 14.7 / 15.3 / 15.5 | n/a | - | 200 | 369.6 |
-| B5_fundamentals_nodecount | n=400 | 28.6 / 37.5 / 39.9 | n/a | - | 400 | 367.8 |
-| B5_fundamentals_audioalone | buf=64 | n/a (no video loop) | 1.39 / 1.70 | 0 | 2 | n/a |
-| B5_fundamentals_audioalone | buf=128 | n/a | 1.37 / 1.52 | 0 | 2 | n/a |
-| B5_fundamentals_audioalone | buf=256 | n/a | 0.85 / 1.11 | 0 | 2 | n/a |
-| B5_fundamentals_audioalone | buf=512 | n/a | 2.44 / 2.72 | 0 | 2 | n/a |
+| B1 | 24 voices, buf=64 | 16.7 / 30.2 / 51.0 | 51.6 / 61.2 | 0 | - | |
+| B1 | 24 voices, buf=128 | 16.7 / 30.8 / 50.7 | 50.3 / 55.8 | 0 | - | |
+| B1 | 24 voices, buf=256 | 16.7 / 30.3 / 51.1 | 49.5 / 52.8 | 0 | - | |
+| B1 | 24 voices, buf=512 | 16.7 / 70.1 / 72.5 | 48.9 / 51.1 | 0 | - | |
+| B2 | s / m / l, anim | 8.6 / 11.1 / 12.0; 16.8 / 22.7 / 25.0; 19.9 / 23.8 / 26.0 | - | - | - | fbo_allocs_steady 0 |
+| B2 | s / m / l, static | 5.1 / 7.0 / 7.6; 5.0 / 6.6 / 7.4; 4.3 / 7.0 / 9.2 | - | - | - | fbo_allocs_steady 0 |
+| B3 (untrusted) | s, buf=256 | 16.7 / 33.4 / 34.3 | 18.1 / 37.4 | 0 | 751 | projector p99 34.3 ms, missed 11.1%, i2p max 1 |
+| B4 | s / m / l, shadow 2048, anim | 4.9 / 7.5 / 8.2; 7.0 / 10.2 / 10.8; 13.5 / 17.0 / 17.6 | - | - | - | tris 144k / 540k / 1.57M |
+| B4 | m, shadow off / 1024 / 4096 | 6.4 / 9.0 / 9.8; 7.0 / 10.1 / 11.0; 7.3 / 9.8 / 11.5 | - | - | - | |
+| B4 | l, static | 1.2 / 4.8 / 6.1 | - | - | - | |
+| B5 | empty | 1.0 / 3.3 / 4.2 | - | - | - | |
+| B5 | nodecount 50 / 100 / 200 / 400 | p50 4.3 / 7.5 / 13.9 / 25.8; p99 7.9 / 11.1 / 16.6 / 29.6 | - | - | - | |
+| B5 | stages 50 / 100 / 200 / 400 | p50 8.6 / 12.1 / 21.2 / 34.3 | - | - | - | |
+| B5 | audio alone, buf 64 / 128 / 256 / 512 | - | p99 1.71 / 1.51 / 1.13 / 2.74 | 0 | - | |
+| B5 | startup | 342 ms to first frame | - | - | - | imgui_fonts 264 ms |
+| B5 | load / save, n=400 | load 6.0 ms, save 1.9 ms | - | - | - | |
+| B5 | undo, n=400 | push 0.87 ms, restore 1.74 ms | - | - | - | |
+| B6 (untrusted) | n=300 all / collapsed | 11.3 / 13.6 / 14.2; 11.4 / 13.5 / 13.7 | - | - | 1049 / 937 | node_bodies 1.3 ms, cook_all 0.03 ms |
+| B6 (untrusted) | n=200 / 400 pan | 8.4 / 13.5 / 13.7; 8.3 / 13.2 / 13.5 | - | - | 754 / 1166 | |
+| B6 (untrusted) | n=300 pan, vsync=0 | 3.0 / 5.8 / 7.3 | - | - | 955 | |
+| B8 (untrusted) | 2x1080 / 4x1080 / 2x2160 / 4x2160 | p99 13.6 / 13.5 / 13.8 / 18.5 | - | - | 386 / 458 / 763 / 1230 | 0 dropped, 30.0-30.7 decoded fps |
+| B8 (untrusted) | 2x1080 + 2 / 3 windows | 16.7 / 17.0 / 17.8; 16.7 / 16.9 / 17.2 | - | - | 445 / 483 | window p99 17.7-17.8 / 17.2-17.3 ms, missed 0% |
+| B8 (untrusted) | 4x2160 + 3 windows + camera + Syphon | 16.6 / 32.5 / 32.9 | - | - | 1343 | window p99 32.8-33.1 ms, missed 7.1% |
+| B9 | b2, l, anim | 14.4 / 17.2 / 17.5 | - | - | 760 | gpu_est 345 MB (render targets 343) |
+| B9 | b4, l, anim | 13.7 / 16.7 / 18.7 | - | - | 640 | gpu_est 125 MB (render targets 91) |
 
-B2 rows, recorded 2026-09-24 on the same machine from a direct fixture run on
-`feature/gpu-timer-query-ring` (not yet in `bench/baselines/m2-8gb.jsonl`;
-re-record the baseline with `run_all.sh` before comparing against it):
+B1, B2, B4 and B5 do not record a footprint; B9 is the memory gate.
 
-| Bench | Variant | frame_ms p50/p95/p99 (ms) | GPU `cook` p50 (ms) | CPU `swap` p50 (ms) | tris | nodes |
-|---|---|---|---|---|---|---|
-| B2_heavy_visuals | s, anim | 16.7 / 25.5 / 59.6 | 12.7 | 10.8 | 1800 | 18 |
-| B2_heavy_visuals | m, anim | 32.9 / 34.8 / 35.8 | 24.4 | 23.4 | 7308 | 32 |
-| B2_heavy_visuals | l, anim | 46.8 / 50.2 / 51.6 | 36.0 | 33.7 | 12396 | 42 |
-| B2_heavy_visuals | s, static | 4.0 / 5.7 / 7.6 | 0.16 | 2.2 | 1800 | 17 |
-| B2_heavy_visuals | m, static | 4.1 / 7.1 / 7.7 | 0.14 | 2.3 | 7308 | 31 |
-| B2_heavy_visuals | l, static | 4.5 / 7.0 / 7.6 | 0.13 | 2.4 | 12396 | 41 |
+### Old baseline -> new (the perf initiative, `9326563` -> `c602a0d`)
 
-### B6 canvas navigation: verification runs, not a baseline
+`scripts/bench/compare.py bench/baselines/m2-8gb-9326563.jsonl bench/baselines/m2-8gb.jsonl`.
+Only B1 and B5 are in both files.
 
-Recorded 2026-09-24 while the machine was in use (load avg ~3), 300-400
-frames, GPU timers off. Every vsync-on run came out `unpaced=1`: the window
-was not being paced by the display, so these numbers show work per frame,
-not a real on-screen frame rate. Targets report `null` unless a run is focused,
-vsync on and paced, except when a lower bound already fails (see below).
+| Bench / variant | Metric | `9326563` | `c602a0d` | Change |
+|---|---|---|---|---|
+| B1, all buffers | frame p50 ms | 74.0-75.1 | 16.7 | -78% |
+| B1 buf=64 / 128 / 256 / 512 | frame p99 ms | 216 / 216 / 214 / 213 | 51.0 / 50.7 / 51.1 / 72.5 | -76% / -76% / -76% / -66% |
+| B1 buf=64 / 128 / 256 / 512 | cb_load p99 % | 66.0 / 62.7 / 59.8 / 59.5 | 61.2 / 55.8 / 52.8 / 51.1 | -7% / -11% / -12% / -14% |
+| B5 nodecount 400 | frame p50 / p99 ms | 28.6 / 40.0 | 25.8 / 29.6 | -10% / -26% |
+| B5 empty / 50 / 100 | frame p99 ms | 1.67 / 4.58 / 8.13 | 4.17 / 7.87 / 11.06 | **flagged** +150% / +72% / +36%, with p50 unchanged (1.0 / 4.3 / 7.5). The tail of a 152-frame window. Not investigated. |
+| B5 audio alone | cb_load p99 % | 1.1-2.7 | 1.1-2.7 | unchanged |
 
-| Variant | frame_ms p50 / p95 | `node_bodies` | off-screen bodies ms | `cook_all` | visible nodes |
-|---|---|---|---|---|---|
-| n=300, all | 22.6 / 26.0 | 7.4 | 6.4 | 8.9 | ~23 |
-| n=300, all, collapsed | 21.7 / - | 5.7 | 5.2 | - | - |
-| n=300, pan, vsync=0 | 21.9 / - | - | - | - | - |
-| n=200, pan | 15.6 / - | 4.7 | 4.0 | - | - |
-| n=400, pan | 29.3 / - | 9.6 | 8.7 | - | - |
+The old file's B1 frame numbers do not match the table the README used to
+show for it (16.7 ms p50 there). The table came from a different run; the
+file is what `compare.py` reads.
 
-Other n=300 stages (p50 ms): `links` 0.55, `editor_end` 1.4,
-`imgui_render` 1.7, `swap` 0.56, `modulation` 0.26. Named stages now add up to
-~20.8 of the 22.6 ms frame. The drag moved the node 150 px and the dropdown
-was open 58 frames, so both phases really ran. Footprint peaked at 936 MB
-(200 nodes), ~1.24 GB (300) and 1.54 GB (400), about 4 MB per node.
+### How targets are decided
 
-How targets are decided: `canvas_pan_p50_ge_60fps` (p50 <= 17.2 ms) and
-`canvas_pan_p95_ge_45fps` (p95 <= 22.8 ms) are `true`/`false` only when the run
-is trusted (focused, vsync on, `on_vsync_frac` >= 0.80). An untrusted run can
-only be faster than the real thing, so if it already misses the limit it
-reports `false`. Otherwise it reports `null`. At 300 nodes both targets fail
-on that lower bound alone.
+The fixtures report `targets_pass`. A miss is always `false`. A pass is
+`true` only in a trusted run (focused, paced, and for B8 no overlapping
+windows); otherwise it is `null`.
 
-Still to do: 3 full `run_all.sh` passes on an idle machine with Infinite in
-front the whole time, then add the B6 rows to the baseline.
+- B6 `canvas_pan_p50_ge_60fps` / `canvas_pan_p95_ge_45fps`: pan-phase p50 <= 17.2 ms / p95 <= 22.8 ms.
+- B8 `clipN_decode_realtime`: (decoded + 1) / seconds >= the clip's fps, with 0 dropped, 0 skipped, and no repeats beyond the ones the clip rate forces.
+- B8 `windowN_interval_p99_locked`: window interval p99 <= 1.10 x its paced period. `windowN_missed_vsync_lt_half_pct`: intervals over 1.5 periods < 0.5%.
+- B3: `audio_xruns_zero`, `audio_cb_load_p99_le_50`, `projector_locked_rate`, `projector_missed_vsync_lt_half_pct`, `input_to_photon_le_2_frames`.
 
-### B8 media I/O: verification runs, not a baseline
-
-Recorded 2026-09-24 on the M2 (Mac14,7, 60 Hz), 300 frames per variant,
-GPU timers off. Someone was using the machine, so every run is `unfocused=1`
-and `unpaced=1` (0-27% of frames on a refresh boundary). Frame numbers show
-work per frame, not an on-screen rate. The counts (decodes, drops, repeats,
-uploads) don't depend on pacing and hold as measured.
-
-**Clips** (per clip, ranges across the clips of a run; ms):
-
-| Variant | frame p50 / p99 | `cook` | decode p50 / p99 / max | cache hit p50 | loop boundary max | decoded fps | dropped | repeated / expected | uploads / new frames | upload CPU p50 |
-|---|---|---|---|---|---|---|---|---|---|---|
-| 2x1080 | 8.7 / 12.3 | 4.2 | 0.7 / 4.6 / 11.0 | 0.2-0.5 | 14-16 | 30.0 | 0 | 200 / 200 | 268 / 68 | 1.5 |
-| 4x1080 | 10.9 / 23.8 | 8.2 | 0.7-1.3 / 1.9-2.5 / 7.8-9.9 | 0.2-0.3 | 13-15 | 30.1 | 0-1 | 172-173 / 172 | 268 / 95-96 | 1.5-1.7 |
-| 2x2160 | 11.3 / 29.4 | 7.0 | 2.4 / 5.7-20.0 / 19-20 | 1.0-2.6 | 29-31 | 30.0 | 5-7 | 175-177 / 170 | 268 / 91-93 | 1.0-1.3 |
-| 4x2160 | **295 / 765** | **290** | 3.2 / 20-22 / 29-54 | no hits | 100-189 | 22.5-23.3 | **~1600** | 0 / 0 | 268 / 268 | 1.3 |
-| 4x2160 + 3 windows + camera + Syphon | **284 / 366** | **279** | 3.1-3.2 / 20-21 / 26-45 | no hits | 120-143 | 24.6-25.4 | **~1600** | 0 / 0 | 268 / 268 | 1.3 |
-
-`reader_restarts` equals `loop_wraps` in every run (1-2 per clip at 1080 and
-2x2160, 24-34 at 4x2160, where the clock ran on for 80+ s). `skipped` tracks
-`dropped`. Footprint: 875 MB (2x1080), 1.17 GB (2x2160), 1.50-1.68 GB peak
-(4x2160).
-
-**Projector windows** (2x1080, swap interval 0, R = 60 Hz):
-
-| Variant | window | present p50 / p99 | interval p50 / p99 | jitter stddev | missed vsync | `projectors` stage |
-|---|---|---|---|---|---|---|
-| 2 windows | 0 / 1 | 0.22 / 6.0, 0.22 / 0.46 | 10.3 / 29.0, 9.3 / 24.5 | 5.5, 3.7 | 3.7%, 0.4% | 0.54 |
-| 3 windows | 0 / 1 / 2 | 0.18-0.22 / 0.39-6.0 | 9.7-10.6 / 21.9-27.3 | 3.5-5.2 | 6.4%, 6.0%, 0% | 0.80 |
-| heavy | 0 / 1 / 2 | 0.29-0.36 / 7.0-7.8 | 284 / 362-366 | 33 | 100% | 1.37 |
-
-Window intervals follow the canvas frame. Projectors have no pacing of their
-own (finding 6), so a missed vsync here is the canvas's.
-
-**Syphon Out** (publish only, no client connected, `has_clients: false`):
-p50 0.07 / p99 0.16 ms at 1080, 0.18 / 0.42 ms in the heavy run.
-
-**Camera**: `"skipped"`, `camera_skip_reason: "not_determined"`. Infinite
-has never been granted camera access on this machine, and the fixture never
-asks. Camera numbers need a run after access has been granted once, by hand.
-
-**GPU upload**: with `INFINITE_BENCH_GPUTIMERS=1` (2x2160), `media_upload`
-read exactly 0.0 ms on all 268 frames, while `imgui_render` read 1.07 ms in
-the same run. The query measured nothing (see "Found while measuring"), so
-the fixture reports `gpu_per_frame: null` with a `gpu_note` on macOS.
-
-**Profile, heaviest variant** (`sample`, 10 s, 5455 main-thread samples):
-96% under `cook` → `OutputNode::CookIfNeeded` → `VideoSourceNode::CookIfNeeded`
-→ `Platform::VideoFrameAt`. Named stages add up to 282 of the 284 ms p50
-frame, so nothing is unnamed. `cook_all` is 0.0 because every node in the
-B8 graph is pulled by an Output inside `cook`. Inside `VideoFrameAt`,
-attributed by disassembly (the build has no line info):
-
-| Where | Samples | Share |
-|---|---|---|
-| `PushCacheFrame`: `operator new` + `memcpy` of a fresh 33 MB cache entry | 2552 | 47% |
-| `DecodeNext` BGRA→RGBA swizzle + row flip loop | 1304 | 24% |
-| `outPixels = handle->pending` (copy assign) | 760 | 14% |
-| `pending.assign(..., 0)` zero-fill (`bzero`) | 263 | 5% |
-| `AVAssetReaderTrackOutput copyNextSampleBuffer` | 257 | 5% |
-
-**Proposed targets** (proposed, not agreed; the fixture reports them in
-`targets_pass`). A miss is always reported `false`. A pass is `true` only in a
-trusted run (focused, paced, no overlap), otherwise `null`:
-
-- `clipN_decode_realtime`: (decoded + 1) / seconds ≥ the clip's fps, 0
-  dropped, 0 skipped, and `repeated - expected_repeats` ≤ 0. Repeats the clip
-  rate forces don't count against it, only extra ones.
-- `windowN_interval_p99_locked`: frame interval p99 ≤ 1.10 × the refresh
-  period. That is §6's "locked 60 fps, p99 ≤ 16.7 ms", with B3's 10%
-  tolerance so vsync timestamp jitter alone can't fail it.
-- `windowN_missed_vsync_lt_half_pct`: intervals > 1.5 periods < 0.5%.
-
-Measured: at 2x2160 and above, decode fails outright (drops, and at 4x2160
-decoded fps < 30). At 1080 a single loop-boundary drop is enough to fail
-some clips. Projector windows fail both window targets in every run so far.
-All of this is from untrusted runs, so only the failures count.
-
-Still to do: one trusted pass (idle machine, Infinite in front, camera
-access granted once by hand), then the Windows/Linux numbers from CI or a
-tester.
+`compare.py` gates on those verdicts, on the B6 and B8 limits directly, on
+`fbo_allocs_steady` > 0, and on change: frame and audio p99 +10%, xruns up,
+footprint peak and render targets +20%, and window interval p99 +10%. The
+docstring lists which hashes it compares.
 
 ## Top costs per benchmark
 
