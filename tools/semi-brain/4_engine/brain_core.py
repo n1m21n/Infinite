@@ -40,6 +40,7 @@ SUBSYSTEM_ANCHOR_SYMBOLS = {
 from retriever import HybridRetriever
 from l2.compartments import merge as merge_compartments
 from l3.network import Network, SEED_WEIGHT
+from l4.clusters import Areas
 
 _IDENT_RE = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+")
 _STOP = {"the", "and", "for", "with", "get", "set", "node", "nodes", "fix", "from", "into",
@@ -420,8 +421,21 @@ class SemiBrainCognitiveEngine:
         for lst in (lexical, sorted(spread, key=spread.get, reverse=True)):
             for rank, f in enumerate(lst):
                 fused[f] += 1.0 / (self.FILE_RRF_K + rank + 1)
+        areas = self._areas()
+        if areas is not None:
+            fused = areas.rerank(fused)
         ranked = sorted(fused, key=fused.get, reverse=True)
         return ranked, {f: why[f][:3] for f in ranked[:20] if why.get(f)}
+
+    def _areas(self):
+        """L4 areas of the current network, built once per network."""
+        network = getattr(self, "network", None)
+        if network is None:
+            return None
+        cache = getattr(self, "_areas_cache", None)
+        if cache is None or cache[0] is not network:
+            cache = self._areas_cache = (network, Areas(network))
+        return cache[1]
 
     def _get_symbol_meta(self, sym: str, fallback_subsystem: str = "core_system") -> Dict[str, Any]:
         symbols_db = self.ast_graph.get("symbols", {})
