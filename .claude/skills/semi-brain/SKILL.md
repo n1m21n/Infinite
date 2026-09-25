@@ -55,6 +55,19 @@ The same brief, plus L0, is available as MCP tools (server `semi-brain` in
 `.mcp.json`, `l0/mcp_server.py`): `brain_brief`, `brain_recall`,
 `brain_assert`, `brain_retract`.
 
+**main.cpp is a virtual split of ~80 regions** (`l4/regions.py`, built by
+`1_extractors/build_main_cpp_regions.py` from co-edit history, the call
+graph, name families and `// ====` banners; regenerate after a large
+main.cpp reorganization with `python3 1_extractors/build_main_cpp_regions.py`).
+A brief names the region instead of the bare path -
+`src/main.cpp@drawoscillator L13399-14991` - so read that one region, not
+the whole 95k-line file. `python3 4_engine/semi_brain_cli.py --regions`
+prints the table of contents. The replay's `region_hit` (additive, not part
+of `gate`) scores whether the best-ranked main.cpp symbol lands in the same
+region as the target, not just the same file - "right file, wrong 30k
+lines" is a miss there even though file MRR can't see it; baseline on the
+181-commit replay is 0.20.
+
 To run the automated 30-case benchmark evaluation suite (self-confirming; the
 replay above is the real gate):
 ```bash

@@ -9,6 +9,10 @@ the bug description, and score what it returns against what the commit actually 
 Ranked outputs scored:
   symbols  frame.ast_impacted_symbols, in order
   files    the file of each of those symbols, then src/ filepaths of the retrieved docs
+  region   (main.cpp cases only, additive - not part of gate) whether the best-ranked
+           predicted symbol that resolves to a main.cpp region (l4/regions.py) lands in the
+           same region as a target symbol; "right file, wrong 30k lines" scores 0 here even
+           though file MRR can't tell the difference
 
 Metrics (per query variant, averaged over cases): MRR, recall@{1,5,10,20}.
 gate = mean(file MRR, symbol MRR, file R@10, symbol R@10) on the "full" variant.
@@ -48,8 +52,11 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from gitdata import SEMI_BRAIN_DIR, REPO_PATH  # noqa: E402
 
+sys.path.insert(0, str(SEMI_BRAIN_DIR))
 sys.path.insert(0, str(SEMI_BRAIN_DIR / "4_engine"))
 sys.path.insert(0, str(SEMI_BRAIN_DIR / "1_extractors"))
+
+from l4.regions import Regions  # noqa: E402
 
 CASES_FILE = HERE / "cases.json"
 STATE_DIR = SEMI_BRAIN_DIR / "l1" / "state"
@@ -80,6 +87,7 @@ def _init_worker(embargo):
     if (STATE_DIR / "outcomes.jsonl").exists():
         turns = [json.loads(l) for l in open(STATE_DIR / "outcomes.jsonl")]
     _W["recent"] = RecentWork(turns, [(t, rec["files"]) for t, rec in tl.commits])
+    _W["regions"] = Regions()
 
 
 def rank_metrics(ranked, targets):
@@ -124,8 +132,24 @@ def build_engine(corpora, cache, tmpdir):
     return engine, len(docs)
 
 
+def region_hit(regions, predicted_symbols, target_symbols):
+    """None if the case has no target in a known main.cpp region (most cases: main.cpp is a
+    target in 87% of prompts, but not every target symbol resolves to a region). Otherwise 1.0
+    if the best-ranked predicted symbol that IS in a region lands in one of the target
+    region(s), else 0.0 - same-file-different-region ("right file, wrong 2k lines") counts as
+    a miss, which is the point: file MRR can't see that distinction, this metric can."""
+    target_regions = {r["id"] for r in (regions.region_for_symbol(t) for t in target_symbols) if r}
+    if not target_regions:
+        return None
+    for s in predicted_symbols:
+        r = regions.region_for_symbol(s)
+        if r:
+            return 1.0 if r["id"] in target_regions else 0.0
+    return 0.0
+
+
 def run_case(case):
-    tl, cache = _W["timeline"], _W["cache"]
+    tl, cache, regions = _W["timeline"], _W["cache"], _W["regions"]
     t0 = time.perf_counter()
     corpora = tl.corpora_at(case)
     with tempfile.TemporaryDirectory() as tmp:
@@ -142,6 +166,7 @@ def run_case(case):
             result["variants"][v] = {
                 "latency_ms": round(lat * 1000, 1), **file_metrics(files, case["target_files"]),
                 "symbols": rank_metrics(syms, case["target_symbols"]) if case["target_symbols"] else None,
+                "region": region_hit(regions, syms, case["target_symbols"]),
                 "top_files": files[:10], "top_symbols": syms[:10],
             }
         # Weight sets for the sleep job (l1/sleep.py --grid): the full query again with each
@@ -200,6 +225,9 @@ def summarize(results):
         lats = sorted(r["latency_ms"] for r in rows)
         block["latency_ms"] = {"p50": lats[len(lats) // 2], "p95": lats[int(len(lats) * 0.95) - 1],
                                "mean": round(statistics.mean(lats), 1)}
+        regions = [r.get("region") for r in rows if r.get("region") is not None]
+        block["region_hit"] = {"n": len(regions),
+                               "rate": round(statistics.mean(regions), 4)} if regions else None
         out[v] = block
     f, s = out["full"]["files"], out["full"]["symbols"]
     h = out["full"]["files_nohub"]

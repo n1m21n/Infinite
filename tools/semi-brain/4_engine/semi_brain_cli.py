@@ -149,12 +149,18 @@ def main():
     
     parser.add_argument("--brief", action="store_true", help="L5: a ~200-token brief (files, symbols, why, skills)")
     parser.add_argument("--json", action="store_true", help="with --brief: the same content as JSON")
+    parser.add_argument("--regions", action="store_true",
+                        help="L4: the src/main.cpp table of contents (virtual split into regions)")
 
     args = parser.parse_args()
-    
+
     query = args.query or "Fix audio pop/click when retriggering an arranged audio clip mid-playback with active envelope modulation"
-    
-    if args.brief:
+
+    if args.regions:
+        sys.path.insert(0, str(ENGINE_DIR.parent))
+        from l4.regions import Regions
+        print(Regions().toc())
+    elif args.brief:
         import json
         sys.path.insert(0, str(ENGINE_DIR.parent))
         from l5.brief import brief_data, render

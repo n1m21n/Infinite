@@ -95,6 +95,20 @@ def rank_skills(engine, frame):
     return [name for _, name in sorted(scored, key=lambda x: -x[0])]
 
 
+def region_label(engine, path, frame):
+    """`src/main.cpp@region L{start}-{end}` in place of the bare path, from whichever of the
+    frame's matched symbols falls in a known main.cpp region (l4/regions.py); "" otherwise,
+    including for every file that isn't main.cpp."""
+    if not path.endswith("main.cpp") or not hasattr(engine, "_regions"):
+        return ""
+    regions = engine._regions()
+    for s in frame.ast_impacted_symbols:
+        lbl = regions.label(s)
+        if lbl:
+            return lbl
+    return ""
+
+
 def area_name(engine, path):
     areas = engine._areas() if hasattr(engine, "_areas") else None
     if areas is None or path not in areas.area:
@@ -107,7 +121,8 @@ def area_name(engine, path):
 def brief_data(engine, frame):
     files = []
     for f in frame.ranked_files[:N_FILES]:
-        files.append({"file": f, "why": _why(frame, frame.file_evidence.get(f, []))})
+        files.append({"file": f, "why": _why(frame, frame.file_evidence.get(f, [])),
+                      "region": region_label(engine, f, frame)})
     symbols = []
     for s in frame.ast_impacted_symbols[:N_SYMBOLS]:
         m = engine._get_symbol_meta(s)
@@ -126,7 +141,8 @@ def render(data, budget=BUDGET):
     lines = []
     if data["files"]:
         lines.append("Files: " + "; ".join(
-            _short(f["file"]) + (f" ({f['why']})" if f["why"] else "") for f in data["files"]))
+            (f.get("region") or _short(f["file"])) + (f" ({f['why']})" if f["why"] else "")
+            for f in data["files"]))
     if data["symbols"]:
         lines.append("Symbols: " + ", ".join(
             s["symbol"] + (f" {s['at']}" if s["at"] else "") for s in data["symbols"]))

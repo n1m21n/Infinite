@@ -42,6 +42,7 @@ from retriever import HybridRetriever
 from l2.compartments import merge as merge_compartments
 from l3.network import Network, SEED_WEIGHT
 from l4.clusters import Areas
+from l4.regions import Regions
 from l3.recent import RecentWork
 from l3 import weights as learned_weights
 from l0.store import Store as L0Store, BOOST_KINDS
@@ -477,6 +478,13 @@ class SemiBrainCognitiveEngine:
         if cache is None or cache[0] is not network:
             cache = self._areas_cache = (network, Areas(network))
         return cache[1]
+
+    def _regions(self):
+        """L4 virtual split of src/main.cpp, loaded once per engine (static, not per network)."""
+        cache = getattr(self, "_regions_cache", None)
+        if cache is None:
+            cache = self._regions_cache = Regions()
+        return cache
 
     def _get_symbol_meta(self, sym: str, fallback_subsystem: str = "core_system") -> Dict[str, Any]:
         symbols_db = self.ast_graph.get("symbols", {})

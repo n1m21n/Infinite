@@ -22,6 +22,8 @@ its own and is always as current as the network (the replay gets it as of each p
 
 from collections import defaultdict
 
+from l4.louvain import louvain
+
 MAX_COMMIT_FILES = 20
 INCLUDE_W = 0.5
 RESOLUTION = 1.0
@@ -47,41 +49,10 @@ class Areas:
                 if g != f:
                     self.adj[f][g] += INCLUDE_W
                     self.adj[g][f] += INCLUDE_W
-        self.area = self._propagate()
+        self.area = louvain(self.adj, resolution=RESOLUTION, passes=PASSES)
         self.members = defaultdict(list)
         for f, a in self.area.items():
             self.members[a].append(f)
-
-    def _propagate(self):
-        nodes = sorted(self.adj)
-        deg = {n: sum(self.adj[n].values()) for n in nodes}
-        m2 = sum(deg.values())  # 2m
-        comm = {n: i for i, n in enumerate(nodes)}
-        tot = {i: deg[n] for i, n in enumerate(nodes)}
-        if not m2:
-            return comm
-        for _ in range(PASSES):
-            moved = False
-            for n in nodes:
-                c0, k = comm[n], deg[n]
-                links = defaultdict(float)
-                for m, w in self.adj[n].items():
-                    if m != n:
-                        links[comm[m]] += w
-                tot[c0] -= k
-                # modularity gain of joining c: links_to_c - resolution * k * tot_c / 2m
-                best, gain = c0, links.get(c0, 0.0) - RESOLUTION * k * tot[c0] / m2
-                for c, l in sorted(links.items()):
-                    g = l - RESOLUTION * k * tot[c] / m2
-                    if g > gain + 1e-12:
-                        best, gain = c, g
-                tot[best] += k
-                if best != c0:
-                    comm[n] = best
-                    moved = True
-            if not moved:
-                break
-        return comm
 
     def rerank(self, scores, top_n=10, area_w=0.0, cochange_w=0.3, expand_from=5):
         """scores: {file: score}. Returns new scores: each file's own score (top = 1), plus its
