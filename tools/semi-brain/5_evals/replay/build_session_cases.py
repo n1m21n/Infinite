@@ -43,6 +43,7 @@ def main():
         if i < 0:
             continue
         cases.append({"commit": f"session:{turn['session'][:8]}:{int(turn['t'])}", "parent": commits[i][1],
+                      "session": turn["session"],
                       "time": turn["t"], "subject": prompt.splitlines()[0][:80],
                       "query_full": prompt, "query_subject": prompt[:200],
                       "target_files": targets, "target_symbols": []})

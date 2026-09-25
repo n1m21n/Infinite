@@ -76,7 +76,7 @@ class BriefServer(threading.Thread):
         t = time.perf_counter()
         query = (req.get("query") or "")[:MAX_QUERY]
         engine = self.engine()
-        data = brief_data(engine, engine.analyze_problem(query))
+        data = brief_data(engine, engine.analyze_problem(query, session=req.get("session", "")))
         ms = round((time.perf_counter() - t) * 1000, 1)
         rec = {"t": time.time(), "session": req.get("session", ""), "query": query,
                "files": [f["file"] for f in data["files"]],

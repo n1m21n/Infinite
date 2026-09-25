@@ -50,7 +50,11 @@ sys.path.insert(0, str(SEMI_BRAIN_DIR / "4_engine"))
 sys.path.insert(0, str(SEMI_BRAIN_DIR / "1_extractors"))
 
 CASES_FILE = HERE / "cases.json"
-SESSION_CASES_FILE = SEMI_BRAIN_DIR / "l1" / "state" / "session_cases.json"
+STATE_DIR = SEMI_BRAIN_DIR / "l1" / "state"
+SESSION_CASES_FILE = STATE_DIR / "session_cases.json"
+# Recent-work cutoff for prompt cases: what the live hook would have had (sync lag), not the
+# 12 h commit embargo - earlier turns of the same session are exactly what a live brief sees.
+SESSION_RECENT_EMBARGO_S = 120.0
 SESSION_SAMPLE = 150
 HISTORY_FILE = HERE / "history.jsonl"
 RUNS_DIR = HERE / "runs"
@@ -66,8 +70,14 @@ def _init_worker(embargo):
     warnings.filterwarnings("ignore")
     from timeline import Timeline
     from l1.vector_cache import VectorCache
-    _W["timeline"] = Timeline(embargo_hours=embargo)
+    from l3.recent import RecentWork
+    _W["timeline"] = tl = Timeline(embargo_hours=embargo)
     _W["cache"] = VectorCache()
+    # Outcome-log turns and commits; each case sees only events before its cutoff (run_case).
+    turns = []
+    if (STATE_DIR / "outcomes.jsonl").exists():
+        turns = [json.loads(l) for l in open(STATE_DIR / "outcomes.jsonl")]
+    _W["recent"] = RecentWork(turns, [(t, rec["files"]) for t, rec in tl.commits])
 
 
 def rank_metrics(ranked, targets):
@@ -106,6 +116,7 @@ def build_engine(corpora, cache, tmpdir):
     engine.retriever.db_paths = paths
     engine.retriever._embed_model = cache
     engine.retriever._load_vector_cache()
+    engine.recent = _W.get("recent")
     return engine, len(docs)
 
 
@@ -121,7 +132,8 @@ def run_case(case):
         for v in VARIANTS:
             q = case[f"query_{v}"]
             t1 = time.perf_counter()
-            frame = engine.analyze_problem(q)
+            frame = engine.analyze_problem(q, now=case["time"], session=case.get("session", ""),
+                                           embargo=case["recent_embargo"])
             lat = time.perf_counter() - t1
             syms = list(frame.ast_impacted_symbols)
             # The engine's own ranked file list (L3 onwards); before it, the files of the
@@ -197,6 +209,8 @@ def main():
     if args.sample and args.sample < len(cases):
         step = len(cases) / args.sample
         cases = [cases[int(i * step)] for i in range(args.sample)]
+    recent_embargo = SESSION_RECENT_EMBARGO_S if args.cases == "sessions" else args.embargo_hours * 3600.0
+    cases = [dict(c, recent_embargo=recent_embargo) for c in cases]
     t0 = time.time()
     ctx = get_context("spawn")
     with ctx.Pool(args.jobs, initializer=_init_worker, initargs=(args.embargo_hours,)) as pool:

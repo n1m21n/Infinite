@@ -10,6 +10,7 @@ The computational reasoning engine for the Semi-Brain:
 import json
 import os
 import re
+import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Any
@@ -41,6 +42,7 @@ from retriever import HybridRetriever
 from l2.compartments import merge as merge_compartments
 from l3.network import Network, SEED_WEIGHT
 from l4.clusters import Areas
+from l3.recent import RecentWork
 
 _IDENT_RE = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+")
 _STOP = {"the", "and", "for", "with", "get", "set", "node", "nodes", "fix", "from", "into",
@@ -145,6 +147,15 @@ class SemiBrainCognitiveEngine:
         self.load_ast_graph()
         self.retriever = HybridRetriever()
         self.network = Network.load(self.ast_graph)
+        self.recent = self._load_recent()
+
+    def _load_recent(self):
+        commits = SEMI_BRAIN_DIR / "1_extractors" / "output" / "git_commits_corpus.json"
+        try:
+            corpus = json.loads(commits.read_text()) if commits.exists() else []
+        except ValueError:
+            corpus = []
+        return RecentWork.load(SEMI_BRAIN_DIR / "l1" / "state", corpus)
         
     def load_cognitive_schemas(self):
         self.schemas = {}
@@ -208,7 +219,10 @@ class SemiBrainCognitiveEngine:
             return "audio_dsp"
         return "core_system"
 
-    def analyze_problem(self, query: str) -> ProblemFrame:
+    def analyze_problem(self, query: str, now: Optional[float] = None, session: str = "",
+                        embargo: float = 0.0) -> ProblemFrame:
+        """now/session/embargo feed the work-in-progress prior (l3/recent.py): files edited
+        earlier in this session and lately anywhere, from events before now - embargo."""
         subsystem = self.infer_subsystem(query)
         q = query.lower()
         
@@ -298,7 +312,12 @@ class SemiBrainCognitiveEngine:
                 matched_symbols.append(anchor_sym)
 
         callers = self.get_callers_for_symbols(matched_symbols)
-        ranked_files, evidence = self._rank_files(matched_symbols, spread, why)
+        recent = getattr(self, "recent", None)
+        # Only for a live session (the prompt hook passes one): without it there is no ongoing
+        # work to continue, and on the commit replay the 12 h embargo leaves only noise.
+        work = (recent.rankings(time.time() if now is None else now, session, embargo)
+                if recent and session else ([], []))
+        ranked_files, evidence = self._rank_files(matched_symbols, spread, why, work)
         
         # 2. System 1 Priors
         priors = [
@@ -411,18 +430,26 @@ class SemiBrainCognitiveEngine:
         fscore, sscore, why = network.activate(seeds)
         return fscore, why, sscore
 
-    def _rank_files(self, matched_symbols, spread, why):
+    SESSION_W = 1.0
+    RECENT_W = 0.25
+
+    def _rank_files(self, matched_symbols, spread, why, work=([], [])):
         """Files most likely involved, best first, with the doc ids that point at each: the
-        files of the matched symbols (in symbol order) and the network's spread, fused by RRF."""
+        files of the matched symbols (in symbol order), the network's spread and the recent
+        work (this session's edits, recent edits anywhere), fused by weighted RRF. Weights
+        from the session replay: recent-anywhere at 0.5 lifted nohub MRR most but cost file
+        MRR with main.cpp, 0.25 kept both (l3/recent.py)."""
         lexical = []
         for sym in matched_symbols:
             f = self._get_symbol_meta(sym).get("file", "")
             if f and f not in lexical:
                 lexical.append(f)
         fused = defaultdict(float)
-        for lst in (lexical, sorted(spread, key=spread.get, reverse=True)):
+        lists = ((lexical, 1.0), (sorted(spread, key=spread.get, reverse=True), 1.0),
+                 (work[0], self.SESSION_W), (work[1], self.RECENT_W))
+        for lst, w in lists:
             for rank, f in enumerate(lst):
-                fused[f] += 1.0 / (self.FILE_RRF_K + rank + 1)
+                fused[f] += w / (self.FILE_RRF_K + rank + 1)
         areas = self._areas()
         if areas is not None:
             fused = areas.rerank(fused)
