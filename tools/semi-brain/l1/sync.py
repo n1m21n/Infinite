@@ -5,6 +5,7 @@ One incremental semi-brain sync, in-process. Replaces the ten back-to-back extra
 subprocesses that each re-read the whole history.
 
   sources   commits, docs, skills, byox, claude, antigravity   (l1/sources.py)
+            ast graph, re-parsing only changed src/ files          (l1/ast_source.py)
   derived   session analysis   when a session corpus changed, at most every DERIVED_GAP_S
             dev trajectory     when sessions or the AST graph changed, at most every DERIVED_GAP_S
             training data      when commits/docs/skills/byox changed
@@ -26,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from l1 import STATE_DIR, SEMI_BRAIN_DIR  # noqa: E402
 from l1 import sources  # noqa: E402
 from l1.store import Store  # noqa: E402
+from l1.ast_source import sync_ast  # noqa: E402
 
 sys.path.insert(0, str(SEMI_BRAIN_DIR / "3_datasets"))
 
@@ -101,7 +103,7 @@ def sync(full=False):
     byox = run.stage("byox", sources.sync_byox, store)
     claude = run.stage("claude", sources.sync_claude_sessions, store)
     antigravity = run.stage("antigravity", sources.sync_antigravity, store)
-    ast = False  # the AST graph joins the sync in its own step
+    ast = run.stage("ast", sync_ast, store)
 
     # Derived stages owed a run survive a failed or interrupted sync (first sync: all of them).
     owed = set(store.get_wm("sync:owed", list(DERIVED)))

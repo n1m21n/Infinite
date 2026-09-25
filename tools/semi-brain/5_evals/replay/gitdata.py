@@ -6,8 +6,6 @@ commit, blob contents in one `git cat-file --batch` process, and a content-keyed
 so walking 100+ parent trees only parses each file version once.
 """
 
-import json
-import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -15,10 +13,8 @@ from pathlib import Path
 SEMI_BRAIN_DIR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(SEMI_BRAIN_DIR))
 sys.path.insert(0, str(SEMI_BRAIN_DIR / "1_extractors"))
-from l1 import REPO_PATH, STATE_DIR  # noqa: E402
-
-CODE_EXTS = (".cpp", ".h", ".mm")
-
+from l1 import REPO_PATH, STATE_DIR  # noqa: E402,F401
+from l1.ast_cache import CODE_EXTS, ParseCache, graph_order  # noqa: E402,F401
 
 def git(*args, input_bytes=None):
     return subprocess.run(["git", *args], cwd=REPO_PATH, input=input_bytes,
@@ -78,40 +74,5 @@ def ls_tree(commit, *paths):
     return items
 
 
-class ParseCache:
-    """(path, blob sha) -> build_ast_graph.extract_from_bytes result, persisted in l1/state."""
-
-    def __init__(self, db_path=STATE_DIR / "ast_blob_cache.db"):
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(db_path, timeout=60)
-        self.conn.execute("PRAGMA journal_mode=WAL")
-        self.conn.execute("CREATE TABLE IF NOT EXISTS parsed (path TEXT, blob TEXT, result TEXT, PRIMARY KEY (path, blob))")
-        self.mem = {}
-        self._extract = None
-
-    def get(self, path, blob, reader):
-        k = (path, blob)
-        if k in self.mem:
-            return self.mem[k]
-        row = self.conn.execute("SELECT result FROM parsed WHERE path=? AND blob=?", k).fetchone()
-        if row:
-            res = json.loads(row[0])
-        else:
-            if self._extract is None:
-                from build_ast_graph import extract_from_bytes
-                self._extract = extract_from_bytes
-            data = reader.read(blob)
-            res = self._extract(path, data or b"")
-            self.conn.execute("INSERT OR REPLACE INTO parsed VALUES (?,?,?)", (path, blob, json.dumps(res)))
-            self.conn.commit()
-        self.mem[k] = res
-        return res
-
-
 def code_files_at(commit):
     return [(p, b) for p, b in ls_tree(commit, "src") if p.endswith(CODE_EXTS)]
-
-
-def graph_order(items):
-    """Same file order build_ast_graph uses: all .cpp, then .h, then .mm."""
-    return sorted(items, key=lambda pb: (CODE_EXTS.index(Path(pb[0]).suffix), pb[0]))
