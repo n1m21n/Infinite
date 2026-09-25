@@ -12,7 +12,8 @@ subprocesses that each re-read the whole history.
             The two refits are global (k-means topics, trend summaries): one new chat turn barely
             moves them, and under background QoS each costs tens of seconds. Between refits they
             stay owed; new turns still reach the index as docs on every sync. --full forces them.
-  index     corpora -> L1 doc store (content-hash diff) -> both index DBs reconciled in place
+  index     corpora -> L1 doc store (content-hash diff) -> both index DBs reconciled in place,
+            then the L3 doc -> code edges (l3/network.py) rebuilt from the same corpora
 
 Per-stage timings go to stdout and l1/state/last_sync.json.
 """
@@ -75,12 +76,16 @@ def run_training(cache):
 def run_index(store, cache):
     import index_codebase as ic
     from l1.outputs import reconcile
-    docs = ic.prepare_documents(ic.load_corpora())
+    from l3.network import write_network
+    corpora = ic.load_corpora()
+    docs = ic.prepare_documents(corpora)
     added, changed, deleted = store.sync_docs(docs, ic.PRIVATE_CATEGORIES)
     pub = reconcile(ic.DB_FILE, store, False, cache)
     priv = reconcile(ic.PRIVATE_DB_FILE, store, True, cache)
+    network = write_network(corpora)
     return {"docs": len(docs), "added": added, "changed": changed, "deleted": deleted,
-            "public_ins_del": pub, "private_ins_del": priv, "embedded": cache.misses}
+            "public_ins_del": pub, "private_ins_del": priv, "embedded": cache.misses,
+            "network": network}
 
 
 DERIVED = {"session_analysis": run_analysis, "dev_trajectory": run_trajectory,

@@ -88,6 +88,8 @@ def build_engine(corpora, cache, tmpdir):
     engine = SemiBrainCognitiveEngine.__new__(SemiBrainCognitiveEngine)
     engine.schemas = {}
     engine.ast_graph = corpora["ast_data"]
+    from l3.network import Network, build_doc_edges
+    engine.network = Network(build_doc_edges(corpora), corpora["ast_data"])
     engine.retriever = HybridRetriever()
     engine.retriever.db_paths = paths
     engine.retriever._embed_model = cache
@@ -110,7 +112,9 @@ def run_case(case):
             frame = engine.analyze_problem(q)
             lat = time.perf_counter() - t1
             syms = list(frame.ast_impacted_symbols)
-            files = []
+            # The engine's own ranked file list (L3 onwards); before it, the files of the
+            # matched symbols then of the retrieved docs.
+            files = list(frame.ranked_files)
             for s in syms:
                 f = engine._get_symbol_meta(s).get("file", "")
                 if f and f not in files:

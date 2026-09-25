@@ -56,13 +56,21 @@ def file_digest(path):
 
 # ---- git commits --------------------------------------------------------------------------------
 def sync_commits(store):
-    from mine_git_history import mine_commits
+    from mine_git_history import commit_files, mine_commits
     order = git("rev-list", "HEAD").split()
     have = store.record_keys("commit")
     new = [h for h in order if h not in have]
     gone = have - set(order)
     for i in range(0, len(new), 200):
-        store.put_records("commit", [(c["hash"], 0, c) for c in mine_commits(new[i:i + 200])])
+        mined = mine_commits(new[i:i + 200])
+        files = commit_files([c["hash"] for c in mined])
+        store.put_records("commit", [(c["hash"], 0, dict(c, files=files.get(c["hash"], []))) for c in mined])
+    # Records mined before commits carried their file list (L3's commit -> file edges): backfill.
+    missing = [c for c in store.records("commit") if "files" not in c]
+    for i in range(0, len(missing), 500):
+        chunk = missing[i:i + 500]
+        files = commit_files([c["hash"] for c in chunk])
+        store.put_records("commit", [(c["hash"], 0, dict(c, files=files.get(c["hash"], []))) for c in chunk])
     if gone:
         store.put_records("commit", [], remove=gone)
     by_hash = {c["hash"]: c for c in store.records("commit")}

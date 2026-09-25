@@ -49,7 +49,7 @@ def parse_ts(ts):
 
 class Timeline:
     def __init__(self, embargo_hours=12.0):
-        from mine_git_history import parse_commit_message
+        from mine_git_history import commit_files, parse_commit_message
         from build_ast_graph import assemble_graph
         from analyze_session_linguistics import problem_solution_tag, build_problem_solution_pairs
         self._assemble = assemble_graph
@@ -58,10 +58,12 @@ class Timeline:
         self.embargo = embargo_hours * 3600.0
 
         self.commits = []
+        files = commit_files()
         for c in list_commits("HEAD"):
             self.commits.append((c["time"], {
                 "hash": c["hash"], "author_name": c["author_name"], "author_email": c["author_email"],
                 "author_date": c["author_date"], "parsed_message": parse_commit_message(c["subject"], c["body"]),
+                "files": files.get(c["hash"], []),
             }))
         self.commit_time = {rec["hash"]: t for t, rec in self.commits}
 

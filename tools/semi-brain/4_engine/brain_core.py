@@ -10,6 +10,7 @@ The computational reasoning engine for the Semi-Brain:
 import json
 import os
 import re
+from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Any
 from pathlib import Path
@@ -38,6 +39,7 @@ SUBSYSTEM_ANCHOR_SYMBOLS = {
 
 from retriever import HybridRetriever
 from l2.compartments import merge as merge_compartments
+from l3.network import Network, SEED_WEIGHT
 
 @dataclass
 class ProblemFrame:
@@ -52,6 +54,8 @@ class ProblemFrame:
     retrieved_context: List[Dict[str, Any]] = field(default_factory=list)
     ast_impacted_symbols: List[str] = field(default_factory=list)
     ast_callers_found: List[str] = field(default_factory=list)
+    ranked_files: List[str] = field(default_factory=list)
+    file_evidence: Dict[str, List[str]] = field(default_factory=dict)
 
 @dataclass
 class ImpactNode:
@@ -125,6 +129,7 @@ class SemiBrainCognitiveEngine:
         self.load_cognitive_schemas()
         self.load_ast_graph()
         self.retriever = HybridRetriever()
+        self.network = Network.load(self.ast_graph)
         
     def load_cognitive_schemas(self):
         self.schemas = {}
@@ -214,6 +219,11 @@ class SemiBrainCognitiveEngine:
                     tokens.add(s.lower())
                     
         rag_text = " ".join([h.get("title", "") + " " + h.get("snippet", "") for h in hybrid_hits]).lower()
+
+        # L3 prior: how strongly the network points at each file (1.0 = the top file).
+        spread, why, net_syms = self._spread(by_compartment)
+        top = max(spread.values(), default=0.0)
+        prior = {f: v / top for f, v in spread.items()} if top > 0 else {}
         
         scored_candidates = []
         for sym_name, sym_meta in self.ast_graph.get("symbols", {}).items():
@@ -241,6 +251,11 @@ class SemiBrainCognitiveEngine:
             if any(t in sym_lower for t in tokens if len(t) >= 4):
                 score += 1.5
                 
+            # 6. The network points at this symbol's file, or names the symbol itself
+            if score > 0.0:
+                score += self.FILE_PRIOR * prior.get(sym_meta.get("file", ""), 0.0)
+                score += self.SYMBOL_PRIOR * net_syms.get(sym_name, 0.0)
+
             if score > 2.0:
                 scored_candidates.append((score, sym_name))
                 
@@ -258,6 +273,7 @@ class SemiBrainCognitiveEngine:
                 matched_symbols.append(anchor_sym)
 
         callers = self.get_callers_for_symbols(matched_symbols)
+        ranked_files, evidence = self._rank_files(matched_symbols, spread, why)
         
         # 2. System 1 Priors
         priors = [
@@ -324,8 +340,45 @@ class SemiBrainCognitiveEngine:
             blast_radius_questions=blast_q,
             retrieved_context=hybrid_hits,
             ast_impacted_symbols=matched_symbols,
-            ast_callers_found=callers
+            ast_callers_found=callers,
+            ranked_files=ranked_files,
+            file_evidence=evidence,
         )
+
+    SEEDS_PER_COMPARTMENT = 10
+    FILE_RRF_K = 10.0
+
+    FILE_PRIOR = 4.0
+    SYMBOL_PRIOR = 2.0
+
+    def _spread(self, by_compartment):
+        """L3 spreading activation from every compartment's top hits along doc -> code edges.
+        Returns (file_scores, why, symbol_scores)."""
+        network = getattr(self, "network", None)
+        if network is None:
+            return {}, {}, {}
+        seeds = []
+        for comp, hits in by_compartment.items():
+            w = SEED_WEIGHT.get(comp, 0.0)
+            for rank, hit in enumerate(hits[:self.SEEDS_PER_COMPARTMENT]):
+                seeds.append((hit, w / (rank + 1)))
+        fscore, sscore, why = network.activate(seeds)
+        return fscore, why, sscore
+
+    def _rank_files(self, matched_symbols, spread, why):
+        """Files most likely involved, best first, with the doc ids that point at each: the
+        files of the matched symbols (in symbol order) and the network's spread, fused by RRF."""
+        lexical = []
+        for sym in matched_symbols:
+            f = self._get_symbol_meta(sym).get("file", "")
+            if f and f not in lexical:
+                lexical.append(f)
+        fused = defaultdict(float)
+        for lst in (lexical, sorted(spread, key=spread.get, reverse=True)):
+            for rank, f in enumerate(lst):
+                fused[f] += 1.0 / (self.FILE_RRF_K + rank + 1)
+        ranked = sorted(fused, key=fused.get, reverse=True)
+        return ranked, {f: why[f][:3] for f in ranked[:20] if why.get(f)}
 
     def _get_symbol_meta(self, sym: str, fallback_subsystem: str = "core_system") -> Dict[str, Any]:
         symbols_db = self.ast_graph.get("symbols", {})

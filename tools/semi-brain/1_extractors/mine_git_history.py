@@ -125,6 +125,23 @@ def mine_commits(revs=None):
     return parse_log_output(res.stdout)
 
 
+def commit_files(revs=None):
+    """{hash: [paths]} each commit touched (merges: the diff against their first parent).
+    Every commit in history (revs=None) or just the listed hashes."""
+    cmd = ["git", "log", "--diff-merges=first-parent", "--name-only", "--format=%x1e%H"]
+    if revs is not None:
+        if not revs:
+            return {}
+        cmd = cmd[:2] + ["--no-walk=unsorted"] + cmd[2:] + list(revs)
+    res = subprocess.run(cmd, cwd=REPO_PATH, capture_output=True, text=True, errors="replace", check=True)
+    out = {}
+    for rec in res.stdout.split("\x1e"):
+        lines = [l for l in rec.strip().splitlines() if l.strip()]
+        if lines:
+            out[lines[0]] = lines[1:]
+    return out
+
+
 def mine_repository():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     print(f"Mining Git history from: {REPO_PATH}")
