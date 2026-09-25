@@ -56,6 +56,11 @@ private:
    unsigned int mTex = 0;
    int mWidth = 0;
    int mHeight = 0;
+   // Size actually allocated on mTex right now (glTexImage2D), tracked
+   // separately from mWidth/mHeight so a same-size frame only needs
+   // glTexSubImage2D - see the upload site in the .cpp.
+   int mTexWidth = 0;
+   int mTexHeight = 0;
    bool mHasPlaceholder = false;
    unsigned long long mRevision = 1;
    std::vector<unsigned char> mFrame;
