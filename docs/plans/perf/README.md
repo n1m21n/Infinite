@@ -45,8 +45,8 @@ variants from 1 run (the 3-run 1080 set could not be paced: screen locked).
 | | | B8 2x1080 W2 / W3 / overlap | projector `on_vsync_frac` | null (canvas 0.14-0.19) | 0.97 / 0.99 / 0.99 | new metric |
 | | | B8 2x1080 W2 / W3 / overlap | canvas frame p50 ms | 7.6 / 7.7 / 7.3 | 16.66 / 16.66 / 16.67 | = one refresh by design (base ran unpaced) |
 | Shared scratch target for two-pass filters (one RGBA16F pre-pass buffer per size, not one per node) | `6ec7ec7` | B9 b2 (l, anim, 600 f) | gpu_est render_targets MB | 469.6 | 343.0 | -27% |
-| | | B9 b2 | footprint peak MB | 908 | 788 | -13% |
-| | | B2 l-anim, timers off, 3 pairs | frame p50 / p99 ms | 15.56 / 22.55 | 15.49 / 22.68 | -0.5% / +1% (noise) |
+| | | B9 b2 | footprint peak MB | 908 | 764 | -16% |
+| | | B2 l-anim, timers off, 5 pairs (sync_brain running) | frame p50 / p99 ms | 14.32 / 17.53 | 14.38 / 17.32 | +0% / -1% (noise) |
 | | | B2 l-static | output_hash | 29dcc23d9a902c68 | 29dcc23d9a902c68 | identical (2 runs each side) |
 | | | B2 l-anim / l-static | fbo_allocs_steady (frames 32-152) | not reported | 0 / 0 | new metric |
 
@@ -669,7 +669,7 @@ a fixture goes here, not into a code change.
   pass straight after it in the same cook, so they are never live together.
   **Fixed** in `6ec7ec7`: they share one `GLUtil::AcquireScratchFbo` target per
   (size, format) (`ScratchFbo`, 15.8 MB), freed after 300 unused frames.
-  469.6 -> 343.0 MB, footprint peak 908 -> 788 MB, identical pixels (see
+  469.6 -> 343.0 MB, footprint peak 908 -> 764 MB, identical pixels (see
   scoreboard). Still open: the 31 RGBA8 outputs persist by design (cook memo,
   fan-out, previews); sharing them needs a lifetime analysis.
 - **B2 l-anim's `output_hash` is not deterministic.** Three `main` runs gave
