@@ -9,7 +9,7 @@ blocks a target in this table.
 
 | Block | Work | Done when | State |
 |---|---|---|---|
-| 1 Audio | Real xrun counter (replaces the wall-clock-gap heuristic, `AudioEngine.cpp`); B1 callback load (open item 1); build B7 soak | B1 cb_load p99 <= 50% @256; 0 xruns in 10 min; soak RSS growth < 2% over 30 min | not started |
+| 1 Audio | Real xrun counter (replaces the wall-clock-gap heuristic, `AudioEngine.cpp`); B1 callback load (open item 1); build B7 soak | B1 cb_load p99 <= 50% @256; 0 xruns in 10 min; soak RSS growth < 2% over 30 min | done on `feature/perf-block1-audio` (p99 44.4% @256; 0 xruns in 10 min; soak RSS -3.6%), awaiting merge |
 | 2 Projector + canvas | Projector under load (open items 2-4); canvas vsync not blocking (open item 5) | B3/B8 interval p99 <= 18.3 ms and missed vsync < 0.5%; B6 runs paced and meets p50/p95 | not started |
 | 3 Media + release gate | Decode drops (open item 6); camera run (open item 7, needs access granted once); Linux `frameCache` copy, `VideoInNode` realloc, Spout `HasClients` (Found while measuring 4, 5, 7); build B10 | B8 decode real time, 0 dropped; B10 A/V drift within `av-sync-sweep` limits; new baseline; `driver.sh --full` clean | not started |
 
@@ -28,8 +28,8 @@ because an untrusted run can only look better than the real thing.
 
 | Scope | Spec target | Baseline value | Result |
 |---|---|---|---|
-| Audio | 0 xruns at 256 frames | B1 buf=256: 0 in 60 s. B3: 0 | unproven (60 s of a heuristic counter; Block 1) |
-| Audio | cb_load p99 <= 50% | B1 buf=64/128/256/512: 61.2 / 55.8 / 52.8 / 51.1%. B3: 37.4% | **fail** (B1, every buffer size); pass (B3) |
+| Audio | 0 xruns at 256 frames | B1 buf=256: 0 in 60 s. B3: 0. Block 1 (`a8d8c46`, real counter): B1 buf=256, 24 voices, 0 in 10 min (max load 58%); B7: 0 in 30 min | pass (B1 10 min, daemon paused) |
+| Audio | cb_load p99 <= 50% | B1 buf=64/128/256/512: 61.2 / 55.8 / 52.8 / 51.1%, now 40.8 / 41.1 / 44.4 / 40.3% (`a8d8c46`). B3: 37.4%, now 22.8% | pass (B1, every buffer size; B3). Buffer 64 still has xruns, see Found in Block 1 |
 | Projector | locked 60 fps: interval p99 <= 1.1 x 16.7 = 18.3 ms | B3: 50.0 ms. B8 2 / 3 windows: 18.6-18.7 ms. B8 heavy (4x2160, 3 windows, camera, Syphon): 33.0-33.2 ms | **fail** (B3, B8 heavy, B8 2 / 3 windows) |
 | Projector | missed vsync < 0.5% | B3: 12.0%. B8 2 / 3 windows: 0%. B8 heavy: 9.4% per window | **fail** (B3, B8 heavy); unproven (B8 2 / 3 windows: canvas unpaced) |
 | Projector | input-to-photon <= 2 frames | B3: max 1 frame (28 samples) | pass |
@@ -37,13 +37,13 @@ because an untrusted run can only look better than the real thing.
 | Canvas | B6 pan p95 >= 45 fps (<= 22.8 ms) | n=300 all 12.5; n=200 / 400 pan 12.2 / 12.1 ms | unproven |
 | Memory | no §6 target; gated on change (+20%) | B9 footprint peak b2 / b4: 760 / 640 MB. Render targets b2 / b4: 343 / 91 MB | baseline recorded |
 | Memory | `fbo_allocs_steady` = 0 | 0 in every B2 and B4 variant | pass |
-| Memory | soak: RSS growth < 2% over 30 min | not measured | unproven (B7, Block 1) |
+| Memory | soak: RSS growth < 2% over 30 min | B7 30 min (`a8d8c46`): RSS growth -3.6%, 0 xruns, thermal fps drop 0.07% (59.96 -> 59.92) | unproven (run `unfocused=1`; value inside the limit) |
 | Video (proposed) | clips decode in real time, 0 dropped | 30.0-30.7 decoded fps; 1 dropped (4x2160, no windows); clip1 of 2x1080 + Syphon judged not real time | **fail** (4x2160, Syphon); pass (B8 heavy); unproven (rest) |
 | Quality | `output_hash` unchanged (anim=0) | B2 s/m/l static and B4 l static match earlier runs | pass |
 
 **Open items: every target that still fails.** These are listed, not fixed.
 
-1. **B1 audio load:** cb_load p99 is above 50% at every buffer size (51.1-61.2%). The p50 already sits at 49-52%.
+1. ~~**B1 audio load**~~: closed by Block 1 (reverb kernel), p99 40.3-44.4% at every buffer size.
 2. **B3 projector pacing:** interval p99 is 50.0 ms, missed vsync 12.0% and jitter 8.6 ms (trusted run). About one doubled interval in eight.
 3. **B8 heavy projector pacing:** with 4x2160 clips, 3 windows, camera and Syphon, the window interval p99 is 33.0-33.2 ms and missed vsync is 9.4%. The canvas frame p95/p99 is 32.8/33.0 ms, so the load halves the rate.
 4. **B8 light projector pacing:** with a visible canvas beside them, the 2 and 3 window variants miss no vsyncs but their interval p99 is 18.6-18.7 ms, just over the 18.3 ms lock limit.
@@ -64,6 +64,9 @@ variants from 1 run (the 3-run 1080 set could not be paced: screen locked).
 |---|---|---|---|---|---|---|
 | UI frame cost | `1d19afa` | B1 | UI frame ms | 75 | 16.7 | -78% |
 | Reverb SIMD | `a518103` | B1 | cb_load % | 57.4 | 51.4 | -10% |
+| Reverb: cache pow/exp/lround per block, drop `%=` (exact) | `8792754` | B1 buf=256, 24 voices | cb_load p99 % / reverb stage ms | 52.6 / 0.31 | 50.1 / 0.29 | -5% / -6% |
+| Reverb: one polynomial LFO bank per sample (max diff vs pre-perf kernel 4.3e-6) | `fd8e085` | B1 buf=256, 24 voices | cb_load p99 / p50 % / reverb stage ms | 50 / 47 / 0.29 | 45 / 31 / 0.12 | -10% / -34% / -59% |
+| Block 1 total (3 rounds, medians; vs baseline) | `a8d8c46` | B1 buf=64/128/256/512 | cb_load p99 % | 61.2 / 55.8 / 52.8 / 51.1 | 40.8 / 41.1 / 44.4 / 40.3 | -33% / -26% / -16% / -21% |
 | Ocean node | `47c46ad` | Ocean scene | node_bodies ms | ~21 | 3.5 | -83% |
 | Ocean node | `47c46ad` | Ocean scene | frame ms | ~22 | 13.4 | -39% |
 | Time-filter caching | `e04b7a6` | B2 l-static | frame ms | 28 | 4.5 | -84% |
@@ -167,7 +170,7 @@ Built on `feature/perf-benchmark-suite`, off `main` at `4d62140`.
 ```bash
 cmake --build build -j8
 scripts/bench/run_all.sh                    # default suite, into bench/results/<machine>/<date>-<sha>.jsonl
-scripts/bench/run_all.sh --soak             # + B7 (30min, when it exists)
+scripts/bench/run_all.sh --soak             # + B7 (B7_MINUTES, default 30)
 scripts/bench/run_all.sh --quiet            # pause the semi-brain watch daemon; use for any baseline
 scripts/bench/run_all.sh --only B3,B6,B8    # re-run just these (e.g. rows that came out unfocused)
 scripts/bench/compare.py bench/baselines/m2-8gb.jsonl bench/results/.../<run>.jsonl
@@ -225,7 +228,7 @@ frame count (B5).
 | B4 Complex 3D scenes | many objects/instancing/lights/shadows/materials/HDRI/ocean | **Yes** (`INFINITE_BENCH_B4SCALE`, `INFINITE_BENCH_B4SHADOW`, `INFINITE_BENCH_B4ANIM`, `INFINITE_BENCH_B4PASSES`) | One Render 3D at 1080p, 4x MSAA, ACES, straight into Output, with all four geometry slots busy: Ocean (resolution 96/160/256), cubes instanced on a sphere's faces (1k/5k/20k), a radial Array of metal tori (8/24/64), and a glass sphere (so the transmissive pass runs). Sun + point + spot light, a synthetic 1024x512 `.hdr` through the HDRI node, sun shadows at `off`/1024/2048/4096. `anim=1` plays the transport (the Ocean moves) and an LFO orbits the camera, bound by the slider's name at frame 4 because `Modulation::Bind` takes the UI's draw-order index. `anim=0` stops the transport, which otherwise runs from startup, so the scene caches and `output_hash` is stable. Reports `tris` as drawn (instances included) and `draw_calls`. `passes=1` splits Render 3D's GPU time into `r3d_shadow`/`r3d_opaque`/`r3d_transmissive`/`r3d_resolve`. |
 | B5 Fundamentals | (a) empty patch, **(b) node-count scaling**, **(c) per-stage CPU+GPU split**, **(d) audio-thread-alone**, **(e) startup time**, **(f) load/save time**, **(g) undo-snapshot time** | **All of (a)-(g)** (`INFINITE_BENCH_B5EMPTY`, `INFINITE_BENCH_B5NODES`, `INFINITE_BENCH_B5STAGES`, `INFINITE_BENCH_B5AUDIOALONE`, `INFINITE_BENCH_B5STARTUP`, `INFINITE_BENCH_B5LOADSAVE`, `INFINITE_BENCH_B5UNDO`) | (a) zero-node floor, frame_ms percentiles + RSS, same 120-frame sampled window as (b) so the two are directly comparable. (b) 50/100/200/400 mixed nodes laid out on a grid (not stacked at origin - the flaw called out in benchmark-suite.md §2 against MIXEDSTRESSTEST/GEOMDENSITYTEST). Reports frame_ms percentiles + RSS. (c) same mixed-node grid as (b), wraps seven main-loop stages (`modulation`, `cook`, `node_bodies`, `editor_end`, `imgui_render`, `projectors`, `swap`) in `ConditionalStageTimer`s sampled over the same frame window, reports p50 CPU ms per stage into `stages_cpu_ms` (`stages_gpu_ms` still empty - blocked on the GPU timer ring below). (d) one Oscillator straight into Audio Out, no effects chain, buffer sweep 64/128/256/512 - isolates the audio callback's fixed per-block cost from B1's DSP-graph cost; reuses B1's wall-clock-window + `AudioLoadRing` pattern. (e) startup milestone timings from entry through first frame swap (`pre_window`, `window_gl`, `imgui_fonts`, `scanners_load`, `first_frame_render`, `total_to_first_frame`). (f)/(g) reuse (b)/(c)'s mixed-node grid (`INFINITE_BENCH_B5LOADSAVE=<n>`/`INFINITE_BENCH_B5UNDO=<n>`), fire once at `frameId==32`, and time the real patch I/O and undo paths back to back (`SavePatchTo`→`LoadPatchFrom`; `PushUndoCheckpoint`→`Undo`) via `Bench::ScopedStageTimer::NowMs()` - not synthetic serialize-only calls, so (f) includes whatever `ApplyPatchData`/field-graph remap does on load, and (g) includes the real `BuildPatchData`/`ApplyPatchData` round trip Undo takes. `stages_cpu_ms: {save, load}` / `{push_checkpoint, undo_restore}`. |
 | B6 Canvas navigation | programmatic pan/zoom/drag, never OS-level UI scripting | **Yes** (`INFINITE_BENCH_B6NODES`, `B6MODE=pan\|zoom\|drag\|dropdown\|all`, `B6COLLAPSED`, `B6VSYNC`, `B6FRAMES`, default 300 nodes / 600 frames) | Builds a wired grid of 12 cycled node types (image, audio, modulator, utility) and drives the view through new `ed::SetViewScroll`/`SetViewZoom` calls. Pan sweeps the whole grid and back. Zoom goes 0.25 to 2 and back. Drag moves one node in a circle through the `needsPosition` path. Dropdown opens and closes Math's op list every 30 frames. `all` splits the window into those four phases. Reports frame_ms plus per-phase p50/p99/max, and `canvas_nav` has visible vs drawn node bodies, the ms spent on off-screen bodies, drag distance, dropdown-open frames and `on_vsync_frac`. `stages_cpu_ms` adds `links` and `cook_all` (B6 only, see "Found while measuring"). |
-| B7 Soak/thermal | 30min B3, long variant only | No | Depends on B3. |
+| B7 Soak/thermal | 30min B3, long variant only | **Yes** (`INFINITE_BENCH_B7`, `INFINITE_BENCH_B7MINUTES` default 30; `run_all.sh --soak`) | Runs the B3 scene until the time is up. Every 10 s it samples frame p50/p99, RSS, footprint, cb_load p99 and the three xrun counters into `soak.samples`. `soak.rss_growth_pct` is the mean RSS of the last 5 min against the first 5 min after a 120 s warm-up; also `xruns_total`, `fps_first`/`fps_last` and `thermal_fps_drop_pct`. Targets `soak_rss_growth_lt_2pct` and `soak_xruns_zero`; `compare.py` flags both. B3's projector and i2p targets are not checked here. |
 | B8 Media I/O | video/camera/projector/Syphon-Spout | **Built** (`INFINITE_BENCH_B8`, `B8CLIPS=1-4`, `B8RES=1080\|2160`, `B8WINDOWS=0-3`, `B8CAMERA`, `B8SYPHON`, `B8FRAMES` default 600, `B8MEDIA`, `GPUTIMERS=1`) | 1-4 looping Video Source clips (synthetic H.264 1080p30/2160p30 from `scripts/bench/b8_make_clips.sh`, `-g 30 -pix_fmt yuv420p`, 2.0-2.75 s so every run crosses the loop boundary), each into its own Output. Projector windows are opened on Outputs from code and placed beside the canvas (`overlap=1` if the OS stacks them). The camera is opened only if permission is already granted: `CameraAuthorizationStatus()` is read-only on all three platforms, so a run never raises the dialog and reports `"camera":"skipped"` with the reason. Syphon/Spout Out only publishes, and `has_clients` says whether anyone received (null on Windows, `"n/a"` on Linux). `media_io` reports per clip: real decodes (`decode_ms`) split from cache hits (`cache_hit_ms`), the loop-boundary decode (`loop_decode_ms`), decoded/dropped/skipped, `repeated` next to `expected_repeats` (a 30 fps clip on a 60 Hz loop repeats about half its frames by design), `reuploads`, `reader_restarts`, `uploads` vs `new_frames`, and `upload_cpu_ms`. Per window it reports present ms, frame intervals, jitter, R and missed vsync, with `on_vsync_frac` null (projectors run at swap interval 0). Also Syphon publish ms and camera fps/interval. `stages_cpu_ms` uses the B6 names plus `projectors`. GPU upload time comes only with `INFINITE_BENCH_GPUTIMERS=1`, via the per-node ring with the `cook` query off, and reads null on macOS (see "Found while measuring"). |
 | B9 Memory footprint | B2/B4 at `l` scale | **Yes** (`INFINITE_BENCH_B9SCENE=b2\|b4`, `INFINITE_BENCH_B9FRAMES`, default 600) | Builds the B2 or B4 scene at scale l, animated, GPU timers off. Reports RSS and OS footprint (`phys_footprint` on macOS, `PrivateUsage` on Windows, VmRSS + VmSwap on Linux) at launch, after the build, at frames 32 and 152, and at the end. Also reports the peak over the whole run and a least-squares slope per 100 frames from frame 32. `gpu_est_mb` sums every texture, renderbuffer and buffer the GL wrappers allocated, split into textures, render targets, shadow maps, mesh buffers and instance buffers. Use footprint, not RSS, for leaks and headroom (see "Found while measuring"). |
 | B10 Offline render/AV sync | Arrangement render of B3, realtime factor + drift | No | Depends on B3. |
@@ -261,7 +264,7 @@ ever fires - no `BENCH_JSON` line, ever, at any node count. Confirmed by
 direct reproduction (`EXITAFTER=152` failed 3/3 runs, `153+` passed every
 time). Fixed by bumping `run_all.sh`'s `EXITAFTER` for this sweep to 160,
 matching the margin every other fixture in the script already carries. Since then B1(stages), B2, B3, B4, all of B5, and B9 have been
-built (see the table above), then B6 and B8. B7/B10 are not built yet. Each
+built (see the table above), then B6, B8 and B7. B10 is not built yet. It
 needs its own platform work first (a canvas-automation entry point,
 soak automation, offline-render integration). Nothing below claims
 coverage this suite doesn't have.
@@ -300,7 +303,7 @@ Projector/Output > Canvas > Previews):
    and Linux decode on their own threads). Upload, camera and publish timing
    live in the nodes, and present timing in the projector loop. All of it is
    inert unless the fixture sets `Bench::MediaIoEnabled()`.
-- **B7/B10**: each composes B1+B2/B3 (+ soak duration for B7, + offline render for B10).
+- **B10**: composes B3 + offline render. (B7 is built: Block 1.)
 
 ## Baseline
 
@@ -827,6 +830,24 @@ a fixture goes here, not into a code change.
   minutes, and B1 runs during it showed 8-68 xruns instead of 0-2. Never run
   `run_all.sh` right after a commit: check that no `sync_brain` process is
   running first.
+
+- **Found in Block 1 (audio)** (`feature/perf-block1-audio`; recorded, not chased):
+  - The real xrun counter (`AudioEngine::Xruns()`: deadline overruns, OS-reported
+    overloads, and callback gaps) now sees xruns the old heuristic missed. B1 at
+    buffer 64 had 26 / 3 / 0 xruns over three rounds after the reverb work:
+    64 frames is too tight for 24 voices on this machine.
+  - With the reverb cheaper, B1's p99 has come apart from its p50 (p50 ~31%, p99
+    ~41-44%). The tail is now occasional long callbacks, not the average cost.
+  - In one of three B1 sweep rounds, the 128 and 256 rows came back with
+    `audio: null` (the engine was never measured). The log was not kept, so the
+    cause is unknown; the other two rounds were used for those medians.
+  - The output device here runs at 44.1 kHz, not 48 kHz. Every B1 number is at 44.1 kHz.
+  - The B7 soak's RSS ranged 119-165 MB while footprint stayed ~690 MB: RSS
+    undercounts here (see the RSS note above), so a footprint-based growth
+    target would be the stricter one.
+  - A 10-min B1 proof run directly (not through `run_all.sh --quiet`) with the
+    semi-brain watch daemon still loaded showed 4 xruns (max callback load 140%).
+    Any direct bench run has to pause the daemon first.
 
 ## Windows/Linux
 
