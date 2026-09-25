@@ -10,6 +10,12 @@ replay, nothing here is simulated - these are real prompts and real outcomes.
   recall    edited files that were in the brief / edited files
   read      the same for files the turn only read
   nohub     the same with src/main.cpp dropped from both sides (see replay.py HUB_FILES)
+  savings   the point of the brief: per arm (l5/serve.py - shown, holdout, quiet), the median
+            cost of a working turn (outcomes.py: tools, explore, tokens, out) and, for shown
+            briefs, what the brief itself cost (chars / 4 ~ tokens). The held-out turns are
+            the baseline; a brief earns its place when shown turns cost less. would_hit4 = the
+            brief (shown or not) had an edited non-hub file in its top 4
+            Briefs from before the arms existed carry no arm and are left out
 
     python3 5_evals/live.py            # print the card
     python3 5_evals/live.py --days 7   # recent briefs only
@@ -61,6 +67,34 @@ def score(pairs, key, drop=()):
     return {"n": len(rows), **{k: round(statistics.mean(r[k] for r in rows), 3) for k in rows[0]}}
 
 
+COST_KEYS = ("tools", "explore", "tokens", "out")
+
+
+def savings(pairs):
+    by_arm = {}
+    for b, t in pairs:
+        if b.get("arm") and t.get("tools"):
+            by_arm.setdefault(b["arm"], []).append((b, t))
+    out = {}
+    for arm, rows in sorted(by_arm.items()):
+        block = {"n": len(rows)}
+        for k in COST_KEYS:
+            block[k] = statistics.median(t.get(k, 0) for _, t in rows)
+        block["brief_tokens"] = round(statistics.mean(b.get("chars", 0) for b, _ in rows) / 4)
+        edited = [(b, t) for b, t in rows if set(t["edited"]) - set(HUB_FILES)]
+        if edited:
+            block["would_hit4"] = round(statistics.mean(
+                float(bool(set(b["files"][:4]) & (set(t["edited"]) - set(HUB_FILES))))
+                for b, t in edited), 3)
+            block["n_edited"] = len(edited)
+        out[arm] = block
+    base, shown = out.get("holdout"), out.get("shown")
+    if base and shown:
+        out["shown_vs_holdout"] = {k: round(shown[k] / base[k] - 1, 3) if base[k] else None
+                                   for k in COST_KEYS}
+    return out
+
+
 def touched_regions(regions, commit_hashes):
     """Region ids touched by `commit_hashes`' diffs to main.cpp - real git diff hunks, not a
     guess, so this only covers turns that actually committed (outcomes.jsonl has no line-level
@@ -106,7 +140,8 @@ def card(days=None):
     return {"briefs": len(briefs), "matched": len(pairs),
             "median_ms": statistics.median(b["ms"] for b in briefs) if briefs else None,
             "edited": score(pairs, "edited"), "edited_nohub": score(pairs, "edited", HUB_FILES),
-            "read_nohub": score(pairs, "read", HUB_FILES), "regions": score_regions(pairs)}
+            "read_nohub": score(pairs, "read", HUB_FILES), "regions": score_regions(pairs),
+            "savings": savings(pairs)}
 
 
 if __name__ == "__main__":

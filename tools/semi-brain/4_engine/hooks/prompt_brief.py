@@ -6,7 +6,8 @@ Claude Code UserPromptSubmit hook: asks the watch daemon's warm brief server
 additionalContext. Stdlib only and silent on any failure: no daemon, a timeout or
 an error just means no brief, never a blocked prompt.
 
-Skipped: short prompts ("yes", "continue"), slash commands, harness scaffolding.
+Skipped: short prompts ("yes", "continue"), slash commands, harness scaffolding. The server
+decides the rest: a held-out prompt (l5/serve.py arms) comes back with an empty brief.
 """
 
 import json
@@ -45,7 +46,8 @@ def main():
         gitdir = git_common_dir(data.get("cwd") or ".")
         if gitdir is None:
             return
-        reply = ask(gitdir / "brain_brief.sock", prompt, session=data.get("session_id", ""))
+        reply = ask(gitdir / "brain_brief.sock", prompt, session=data.get("session_id", ""),
+                    hook=True)
     except Exception:
         return
     brief = reply.get("brief")
