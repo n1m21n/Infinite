@@ -106,7 +106,11 @@ run_fixture() {
    echo "  -> $label"
    local log
    log="$(mktemp)"
-   env "$@" INFINITE_EXITAFTER="$exitafter" "$APP" -ApplePersistenceIgnoreState YES > "$log" 2>&1 &
+   # B3/B6/B8 measure display pacing and focus: they need a real, visible
+   # window (every other fixture runs headless).
+   local visible=()
+   case "$label" in B3_*|B6_*|B8_*) visible=(INFINITE_BENCH_VISIBLE=1) ;; esac
+   env "$@" ${visible[@]+"${visible[@]}"} INFINITE_EXITAFTER="$exitafter" "$APP" -ApplePersistenceIgnoreState YES > "$log" 2>&1 &
    local pid=$! wd=""
    if [[ -n "${FIXTURE_TIMEOUT:-}" ]]; then
       # Watchdog's own output goes nowhere so it never holds a pipe open.

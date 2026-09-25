@@ -2,8 +2,9 @@
 
 ## Where we stand against the spec targets
 
-From the baseline `bench/baselines/m2-8gb.jsonl` (commit `c602a0d`, 2026-09-25,
-`run_all.sh --quiet`; details in [Baseline](#baseline)). Targets are
+From the baseline `bench/baselines/m2-8gb.jsonl` (2026-09-25, `run_all.sh --quiet`:
+commit `c602a0d` for B1/B2/B4/B5/B9, `beb4d87` for B3/B6/B8; details in
+[Baseline](#baseline)). Targets are
 [`benchmark-suite.md`](benchmark-suite.md) §6, plus the proposed B8 targets
 below. **unproven** = the run was untrusted (unfocused/unpaced), so a value
 inside the limit does not count as a pass. A value outside it still fails,
@@ -13,23 +14,26 @@ because an untrusted run can only look better than the real thing.
 |---|---|---|---|
 | Audio | 0 xruns at 256 frames | B1 buf=256: 0 in 60 s. B3: 0 | pass (60 s, not the 10 min the spec asks; B7 soak on hold) |
 | Audio | cb_load p99 <= 50% | B1 buf=64/128/256/512: 61.2 / 55.8 / 52.8 / 51.1%. B3: 37.4% | **fail** (B1, every buffer size); pass (B3) |
-| Projector | locked 60 fps: interval p99 <= 1.1 x 16.7 = 18.3 ms | B3: 34.3 ms. B8 2 / 3 windows: 17.8 / 17.2 ms. B8 heavy (4x2160, 3 windows, camera, Syphon): 32.8-33.1 ms | **fail** (B3, B8 heavy); unproven (B8 2 / 3 windows) |
-| Projector | missed vsync < 0.5% | B3: 11.1%. B8 2 / 3 windows: 0%. B8 heavy: 7.1% per window | **fail** (B3, B8 heavy); unproven (B8 2 / 3 windows) |
-| Projector | input-to-photon <= 2 frames | B3: max 1 frame (28 samples) | unproven |
-| Canvas | B6 pan p50 >= 60 fps (<= 17.2 ms) | n=300 all 11.3; n=200 / 400 pan 8.3 / 8.3 ms | unproven (every B6 run unfocused and unpaced) |
-| Canvas | B6 pan p95 >= 45 fps (<= 22.8 ms) | n=300 all 13.6; n=200 / 400 pan 13.5 / 13.2 ms | unproven |
+| Projector | locked 60 fps: interval p99 <= 1.1 x 16.7 = 18.3 ms | B3: 50.0 ms. B8 2 / 3 windows: 18.6-18.7 ms. B8 heavy (4x2160, 3 windows, camera, Syphon): 33.0-33.2 ms | **fail** (B3, B8 heavy, B8 2 / 3 windows) |
+| Projector | missed vsync < 0.5% | B3: 12.0%. B8 2 / 3 windows: 0%. B8 heavy: 9.4% per window | **fail** (B3, B8 heavy); unproven (B8 2 / 3 windows: canvas unpaced) |
+| Projector | input-to-photon <= 2 frames | B3: max 1 frame (28 samples) | pass |
+| Canvas | B6 pan p50 >= 60 fps (<= 17.2 ms) | n=300 all 11.2; n=200 / 400 pan 8.4 / 8.3 ms | unproven (vsync=1 runs unpaced, see open item 5) |
+| Canvas | B6 pan p95 >= 45 fps (<= 22.8 ms) | n=300 all 12.5; n=200 / 400 pan 12.2 / 12.1 ms | unproven |
 | Memory | no §6 target; gated on change (+20%) | B9 footprint peak b2 / b4: 760 / 640 MB. Render targets b2 / b4: 343 / 91 MB | baseline recorded |
 | Memory | `fbo_allocs_steady` = 0 | 0 in every B2 and B4 variant | pass |
 | Memory | soak: RSS growth < 2% over 30 min | not measured | B7 on hold |
-| Video (proposed) | clips decode in real time, 0 dropped | every B8 variant: 30.0-30.7 decoded fps, 0 dropped | unproven |
+| Video (proposed) | clips decode in real time, 0 dropped | 30.0-30.7 decoded fps; 1 dropped (4x2160, no windows); clip1 of 2x1080 + Syphon judged not real time | **fail** (4x2160, Syphon); pass (B8 heavy); unproven (rest) |
 | Quality | `output_hash` unchanged (anim=0) | B2 s/m/l static and B4 l static match earlier runs | pass |
 
 **Open items: every target that still fails.** These are listed, not fixed.
 
 1. **B1 audio load:** cb_load p99 is above 50% at every buffer size (51.1-61.2%). The p50 already sits at 49-52%.
-2. **B3 projector pacing:** interval p99 is 34.3 ms, missed vsync 11.1% and jitter 6.8 ms. That is one doubled interval in nine.
-3. **B8 heavy projector pacing:** with 4x2160 clips, 3 windows, camera and Syphon, the window interval p99 is 32.8-33.1 ms and missed vsync is 7.1%. The canvas frame p95/p99 is 32.5/32.9 ms, so the load halves the rate. The light 2 and 3 window variants hold 60 fps.
-4. **Harness: no trusted B3/B6/B8 run yet.** macOS refuses to activate an app launched from a background process (Claude's shell, even through `open`). Every B3, B6 and B8 row came out `unfocused=1`, both in the full run and in the one re-run. To prove the unproven rows, run `scripts/bench/run_all.sh --quiet --only B3,B6,B8` from Terminal.app as the front window. Camera access has also never been granted on this machine (`camera: skipped, not_determined`).
+2. **B3 projector pacing:** interval p99 is 50.0 ms, missed vsync 12.0% and jitter 8.6 ms (trusted run). About one doubled interval in eight.
+3. **B8 heavy projector pacing:** with 4x2160 clips, 3 windows, camera and Syphon, the window interval p99 is 33.0-33.2 ms and missed vsync is 9.4%. The canvas frame p95/p99 is 32.8/33.0 ms, so the load halves the rate.
+4. **B8 light projector pacing:** with a visible canvas beside them, the 2 and 3 window variants miss no vsyncs but their interval p99 is 18.6-18.7 ms, just over the 18.3 ms lock limit.
+5. **Canvas vsync does not block (macOS 27, 60 Hz panel):** with swap interval 1 the canvas runs at ~120 fps (p50 8.3 ms) and almost no frames land on a refresh boundary, so every vsync=1 B6 row and every B8 row without the heavy load is `unpaced=1`. The canvas fps targets stay unproven until the canvas is really display-paced.
+6. **B8 decode:** 4x2160 with no windows dropped 1 frame, and clip1 of 2x1080 + Syphon was judged not real time.
+7. **Camera** access has never been granted on this machine (`camera: skipped, not_determined`), so the camera variants run without one.
 
 ## Scoreboard
 
@@ -287,6 +291,10 @@ Projector/Output > Canvas > Previews):
 Recorded: `bench/baselines/m2-8gb.jsonl`, from one
 `scripts/bench/run_all.sh --quiet` run on 2026-09-25 (`Mac14,7`, Apple M2 8 GB,
 60 Hz, commit `c602a0d`, i.e. `main` `74b1fc3` plus bench plumbing only).
+Its 15 B3, B6 and B8 rows were then replaced with a
+`run_all.sh --quiet --only B3,B6,B8` run of `beb4d87` (the same code plus
+`INFINITE_BENCH_VISIBLE`, so those fixtures get a real window; swap
+2.3 -> 2.7 GB).
 58 `BENCH_JSON` lines, no `FAIL`, no xruns. Default windows: 60 s B1 per buffer
 size, 30 s audio-alone, 600 frames B3/B6/B9, 300 frames B8.
 `quiet=1`: the semi-brain watch daemon was paused for the run. Swap in use
@@ -296,12 +304,15 @@ The previous baseline (commit `9326563`, B1 + B5 only, older than every perf
 fix) is kept as `bench/baselines/m2-8gb-9326563.jsonl`.
 
 **Trust.** B1, B2, B4, B5 and B9 do not depend on focus, so they are trusted.
-All 15 B3, B6 and B8 rows are `unfocused=1`, and every B6 row plus the B8
-rows without projector windows are also `unpaced=1`. The app was never
-activated (see open item 4 at the top). One `--only B3,B6,B8` re-run
-(`d899a0b`) came out the same way, so it was not merged in. `compare.py`
-prints those rows but never gates on them. A miss in them is still real.
-Nothing in them counts as a pass.
+Every earlier B3/B6/B8 row was `unfocused=1` because `INFINITE_EXITAFTER`
+made every harness window hidden, not because of where the suite was
+launched: a hidden window can never be focused or display-paced.
+`INFINITE_BENCH_VISIBLE` (set by `run_all.sh` for B3/B6/B8 only) fixes that,
+and no row is `unfocused` any more. Trusted: B3, B6 vsync=0 and B8 heavy.
+Still `unpaced=1`: the four vsync=1 B6 rows and the other eight B8 rows,
+because the canvas is not vsync-blocked (open item 5). `compare.py` prints
+those rows but never gates on them. A miss in them is still real. Nothing
+in them counts as a pass.
 
 **Hash determinism.** `anim=0` hashes match earlier runs: B2 s / m / l static
 are `51da349ab649bf2e` / `acbd116345c11903` / `29dcc23d9a902c68`, and B4 l
@@ -317,7 +328,7 @@ compare them.
 | B1 | 24 voices, buf=512 | 16.7 / 70.1 / 72.5 | 48.9 / 51.1 | 0 | - | |
 | B2 | s / m / l, anim | 8.6 / 11.1 / 12.0; 16.8 / 22.7 / 25.0; 19.9 / 23.8 / 26.0 | - | - | - | fbo_allocs_steady 0 |
 | B2 | s / m / l, static | 5.1 / 7.0 / 7.6; 5.0 / 6.6 / 7.4; 4.3 / 7.0 / 9.2 | - | - | - | fbo_allocs_steady 0 |
-| B3 (untrusted) | s, buf=256 | 16.7 / 33.4 / 34.3 | 18.1 / 37.4 | 0 | 751 | projector p99 34.3 ms, missed 11.1%, i2p max 1 |
+| B3 | s, buf=256 | 16.7 / 34.5 / 50.0 | 23.8 / 37.3 | 0 | 723 | projector p99 50.0 ms, missed 12.0%, jitter 8.6 ms, i2p max 1 |
 | B4 | s / m / l, shadow 2048, anim | 4.9 / 7.5 / 8.2; 7.0 / 10.2 / 10.8; 13.5 / 17.0 / 17.6 | - | - | - | tris 144k / 540k / 1.57M |
 | B4 | m, shadow off / 1024 / 4096 | 6.4 / 9.0 / 9.8; 7.0 / 10.1 / 11.0; 7.3 / 9.8 / 11.5 | - | - | - | |
 | B4 | l, static | 1.2 / 4.8 / 6.1 | - | - | - | |
@@ -328,12 +339,13 @@ compare them.
 | B5 | startup | 342 ms to first frame | - | - | - | imgui_fonts 264 ms |
 | B5 | load / save, n=400 | load 6.0 ms, save 1.9 ms | - | - | - | |
 | B5 | undo, n=400 | push 0.87 ms, restore 1.74 ms | - | - | - | |
-| B6 (untrusted) | n=300 all / collapsed | 11.3 / 13.6 / 14.2; 11.4 / 13.5 / 13.7 | - | - | 1049 / 937 | node_bodies 1.3 ms, cook_all 0.03 ms |
-| B6 (untrusted) | n=200 / 400 pan | 8.4 / 13.5 / 13.7; 8.3 / 13.2 / 13.5 | - | - | 754 / 1166 | |
-| B6 (untrusted) | n=300 pan, vsync=0 | 3.0 / 5.8 / 7.3 | - | - | 955 | |
-| B8 (untrusted) | 2x1080 / 4x1080 / 2x2160 / 4x2160 | p99 13.6 / 13.5 / 13.8 / 18.5 | - | - | 386 / 458 / 763 / 1230 | 0 dropped, 30.0-30.7 decoded fps |
-| B8 (untrusted) | 2x1080 + 2 / 3 windows | 16.7 / 17.0 / 17.8; 16.7 / 16.9 / 17.2 | - | - | 445 / 483 | window p99 17.7-17.8 / 17.2-17.3 ms, missed 0% |
-| B8 (untrusted) | 4x2160 + 3 windows + camera + Syphon | 16.6 / 32.5 / 32.9 | - | - | 1343 | window p99 32.8-33.1 ms, missed 7.1% |
+| B6 (unpaced) | n=300 all / collapsed | 11.2 / 12.5 / 27.3; 11.0 / 12.5 / 13.3 | - | - | 956 / 945 | |
+| B6 (unpaced) | n=200 / 400 pan | 8.4 / 12.2 / 12.5; 8.3 / 12.1 / 12.4 | - | - | 748 / 1171 | |
+| B6 | n=300 pan, vsync=0 | 3.2 / 7.1 / 7.8 | - | - | 959 | |
+| B8 (unpaced) | 2x1080 / 4x1080 / 2x2160 / 4x2160 | p99 14.5 / 12.1 / 16.7 / 23.7 | - | - | 370 / 456 / 751 / 1270 | 30.3-30.7 decoded fps; 1 dropped at 4x2160 |
+| B8 (unpaced) | 2x1080 + 2 / 3 windows | 16.7 / 18.6 / 18.7; 16.7 / 18.7 / 18.7 | - | - | 426 / 430 | window p99 18.6-18.7 ms, missed 0% |
+| B8 (unpaced) | 2x1080 + camera / + Syphon | p99 12.5 / 12.3 | - | - | 368 / 391 | camera skipped (not granted) |
+| B8 | 4x2160 + 3 windows + camera + Syphon | 16.7 / 32.8 / 33.0 | - | - | 1373 | window p99 33.0-33.2 ms, missed 9.4% |
 | B9 | b2, l, anim | 14.4 / 17.2 / 17.5 | - | - | 760 | gpu_est 345 MB (render targets 343) |
 | B9 | b4, l, anim | 13.7 / 16.7 / 18.7 | - | - | 640 | gpu_est 125 MB (render targets 91) |
 
@@ -788,8 +800,10 @@ a fixture goes here, not into a code change.
   `glTexSubImage2D` reads 0 ms: the driver copies on the CPU and runs the
   blit later, outside the query. So B8 turns GPU timers on only with
   `INFINITE_BENCH_GPUTIMERS=1`, and reports an all-zero stage as null.
-  macOS won't give focus to an app launched from a background shell, even
-  with `open`, so unattended runs come out `unfocused=1`. A fixture window
+  Every harness run used to be headless (`INFINITE_EXITAFTER` hides the
+  window), so B3/B6/B8 could never be focused: that, not the launching
+  shell, was why they came out `unfocused=1`. `run_all.sh` now sets
+  `INFINITE_BENCH_VISIBLE=1` for them, and they take the front while they run. A fixture window
   closed by hand ends the run with no `BENCH_JSON`. `run_all.sh` now has an
   opt-in `FIXTURE_TIMEOUT` watchdog, and B8 uses it.
 - `.git/hooks/post-commit` starts `tools/semi-brain/4_engine/sync_brain.py
