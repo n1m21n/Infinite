@@ -194,7 +194,7 @@ round-trip:
 - Manually verify the caching bug trap yourself: drag a param, confirm the
   image updates; if the effect depends on anything beyond declared params
   and `uSrc`/`uSrc2`, toggle that thing and confirm the image updates too.
-- Then run `/run-infinite-hygiene` before committing.
+- Then run `/run-turbo-tests` before committing.
 
 If you're adding several effects in one session and this keeps mattering,
 that's a signal a golden-image visual-regression sweep (render each
@@ -216,7 +216,7 @@ A node is done when all of these hold:
 4. Its params survive save → load → undo → copy/paste → delete unchanged.
 5. Dragging any param that affects the shader's output visibly updates the
    image every time — no stale/frozen frame.
-6. `/run-infinite-hygiene` passes.
+6. `/run-turbo-tests` passes.
 7. `README.md`'s node table is updated to list it under the right category.
 
 ---

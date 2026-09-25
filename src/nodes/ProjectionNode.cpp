@@ -1,6 +1,7 @@
 #include "ProjectionNode.h"
 
 #include "platform/OpenGLHeaders.h"
+#include <cstring>
 #include <algorithm>
 #include <cmath>
 
@@ -33,8 +34,39 @@ namespace
       "uniform sampler2D uSrc;\n"
       "uniform int uPatternMode;\n"
       "uniform int uHasInput;\n"
+      "uniform vec4 uBlendWidth;\n" // left, right, top, bottom (0 = off), source UV
+      "uniform float uBlendCurve;\n"
+      "uniform float uBlendGamma;\n"
+      "uniform int uBlendMode;\n"   // 0 alpha, 1 black
+      "uniform float uAaPx;\n"      // 0 = off
+      "uniform int uOpaque;\n"      // 1 = opaque black outside (no alpha output)
       "\n"
+      "float ramp(float d, float w) {\n"
+      "   if (w <= 0.0) return 1.0;\n"
+      "   float x = clamp(d / w, 0.0, 1.0);\n"
+      "   float s = x < 0.5 ? 0.5 * pow(2.0 * x, uBlendCurve) : 1.0 - 0.5 * pow(2.0 * (1.0 - x), uBlendCurve);\n"
+      "   return pow(s, 1.0 / max(uBlendGamma, 0.01));\n"
+      "}\n"
+      "\n"
+      "void shade();\n"
       "void main() {\n"
+      "   shade();\n"
+      "   float f = ramp(vUv.x, uBlendWidth.x) * ramp(1.0 - vUv.x, uBlendWidth.y) *\n"
+      "             ramp(1.0 - vUv.y, uBlendWidth.z) * ramp(vUv.y, uBlendWidth.w);\n"
+      "   float aa = 1.0;\n"
+      "   if (uAaPx > 0.0) {\n"
+      "      vec2 fw = max(fwidth(vUv), vec2(1e-6));\n"
+      "      vec2 d = min(vUv, 1.0 - vUv) / fw;\n" // distance to the border, in pixels
+      "      aa = clamp(min(d.x, d.y) / uAaPx, 0.0, 1.0);\n"
+      "   }\n"
+      "   vec4 c = fragColor;\n"
+      "   if (uBlendMode == 1) { c.rgb *= f; f = 1.0; }\n"
+      "   c.a *= f * aa;\n"
+      "   if (uOpaque != 0) { c.rgb *= c.a; c.a = 1.0; }\n"
+      "   fragColor = c;\n"
+      "}\n"
+      "\n"
+      "void shade() {\n"
       "   if (uPatternMode == 1) {\n" // Grid
       "      vec2 g = abs(fract(vUv * 10.0 - 0.5) - 0.5) / max(fwidth(vUv * 10.0), vec2(0.001));\n"
       "      float line = min(g.x, g.y);\n"
@@ -471,6 +503,17 @@ void ProjectionNode::CookIfNeeded(int frameId)
    sig.gridW = gridW;
    sig.gridH = gridH;
    sig.hasInput = hasInput;
+   sig.transparentOutside = transparentOutside;
+   for (int e = 0; e < 4; ++e)
+   {
+      sig.blend[e * 2] = edgeBlendOn[e] ? 1.0f : 0.0f;
+      sig.blend[e * 2 + 1] = edgeBlendWidth[e];
+   }
+   sig.blend[8] = edgeBlendCurve;
+   sig.blend[9] = edgeBlendGamma;
+   sig.blend[10] = (float)edgeBlendMode;
+   sig.blend[11] = antialias ? 1.0f : 0.0f;
+   sig.blend[12] = antialiasPx;
    int ptIdx = 0;
    for (int r = 0; r < 8; ++r)
    {
@@ -497,10 +540,22 @@ void ProjectionNode::CookIfNeeded(int frameId)
 
    glBindFramebuffer(GL_FRAMEBUFFER, mOut.fbo);
    glViewport(0, 0, mOut.w, mOut.h);
-   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+   glClearColor(0.0f, 0.0f, 0.0f, transparentOutside ? 0.0f : 1.0f);
    glClear(GL_COLOR_BUFFER_BIT);
 
    glUseProgram(mProgram);
+   {
+      // vUv.y = 1 at the top of the source image (texV is flipped).
+      float bw[4];
+      for (int e = 0; e < 4; ++e)
+         bw[e] = edgeBlendOn[e] ? std::clamp(edgeBlendWidth[e], 0.0f, 1.0f) : 0.0f;
+      glUniform4f(glGetUniformLocation(mProgram, "uBlendWidth"), bw[0], bw[1], bw[2], bw[3]);
+      glUniform1f(glGetUniformLocation(mProgram, "uBlendCurve"), std::clamp(edgeBlendCurve, 1.0f, 6.0f));
+      glUniform1f(glGetUniformLocation(mProgram, "uBlendGamma"), std::clamp(edgeBlendGamma, 0.5f, 4.0f));
+      glUniform1i(glGetUniformLocation(mProgram, "uBlendMode"), edgeBlendMode == kBlendBlack ? 1 : 0);
+      glUniform1f(glGetUniformLocation(mProgram, "uAaPx"), antialias ? std::clamp(antialiasPx, 0.5f, 8.0f) : 0.0f);
+      glUniform1i(glGetUniformLocation(mProgram, "uOpaque"), transparentOutside ? 0 : 1);
+   }
 
    glActiveTexture(GL_TEXTURE0);
    glBindTexture(GL_TEXTURE_2D, srcTex);

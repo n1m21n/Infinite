@@ -636,7 +636,7 @@ bool SamplerNode::LoadFile(const std::string& path)
       return false;
    }
 
-   const size_t slash = path.find_last_of('/');
+   const size_t slash = path.find_last_of("/\\");
    const std::string fileName = (slash == std::string::npos) ? path : path.substr(slash + 1);
    FinishBuffer(decoded, fileName, path, "loaded");
    return true;

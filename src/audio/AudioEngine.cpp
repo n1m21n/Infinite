@@ -7,9 +7,7 @@
 #include "core/Transport.h"
 #include "platform/Platform.h"
 
-#if defined(__x86_64__)
 #include <xmmintrin.h>
-#endif
 
 namespace
 {
@@ -198,15 +196,17 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
    // same discipline as sInterleaveScratch below. Only touched for a pin
    // whose CompensationDelay::IsActive() is true; the common all-zero-
    // latency topology never writes to this at all.
-   static thread_local float sCompScratch[kAudioMaxNodeInputs][kAudioMaxChannels][kAudioMaxBlockFrames];
+   // Turbo: heap-allocated once per real-time thread instead of a 2 MB
+   // thread_local array - MSVC reserves static TLS for EVERY thread in the
+   // process (JUCE, decoders, workers...), not just the audio thread.
+   static thread_local float* sCompScratch = nullptr;
    static thread_local float* sCompScratchChannels[kAudioMaxNodeInputs][kAudioMaxChannels];
-   static thread_local bool sCompScratchInited = false;
-   if (!sCompScratchInited)
+   if (sCompScratch == nullptr)
    {
+      sCompScratch = new float[(size_t)kAudioMaxNodeInputs * kAudioMaxChannels * kAudioMaxBlockFrames]();
       for (int i = 0; i < kAudioMaxNodeInputs; i++)
          for (int ch = 0; ch < kAudioMaxChannels; ch++)
-            sCompScratchChannels[i][ch] = sCompScratch[i][ch];
-      sCompScratchInited = true;
+            sCompScratchChannels[i][ch] = sCompScratch + ((size_t)i * kAudioMaxChannels + (size_t)ch) * kAudioMaxBlockFrames;
    }
 
    for (AudioTopologyEntry& entry : list->topology.order)
@@ -321,14 +321,10 @@ void AudioEngine::RenderThunk(float** buffers, int numChannels, int numFrames, v
 
 void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
 {
-#if defined(__x86_64__)
+   // x64 MSVC never defines __x86_64__ (it uses _M_X64), so the old guard
+   // left denormal flushing OFF on Windows: reverb/filter tails decaying into
+   // denormals then cost 10-100x CPU per sample. SSE is baseline on x64.
    _mm_setcsr(_mm_getcsr() | 0x8040); // FTZ (bit 15) | DAZ (bit 6)
-#elif defined(__aarch64__)
-   uint64_t fpcr;
-   __asm__ __volatile__("mrs %0, fpcr" : "=r"(fpcr));
-   fpcr |= (1ULL << 24); // FZ bit
-   __asm__ __volatile__("msr fpcr, %0" : : "r"(fpcr));
-#endif
 
    const double sampleRate = mSampleRate.load(std::memory_order_relaxed);
    const double nowMs = NowMs();

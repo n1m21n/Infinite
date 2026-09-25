@@ -6,6 +6,7 @@
 
 #include "INode.h"
 #include "ImageCable.h"
+#include "AudioCable.h"
 #include "Modulation.h"
 #include "Platform.h"
 
@@ -268,6 +269,8 @@ private:
 // --- Audio Analyze ------------------------------------------------------
 // Live audio in, control values out. Makes every parameter in the graph
 // audio-reactive, since any of these outputs can be patched into any slider.
+class AudioAnalyzeTapNode; // AnalyzeNodes.cpp: audio-thread analyser for the graph input
+
 class AudioAnalyzeNode : public INode
 {
 public:
@@ -302,6 +305,18 @@ public:
    // When a file node is patched in, it is analysed instead of the live input.
    AudioFileNode* fileSource = nullptr;
 
+   // Turbo: one "audio" pin that takes any audio cable from the graph (a
+   // synth, a VST, Audio In, a mixer, an Audio File...). It wins over the
+   // live device input. An Audio File wired here still goes through
+   // `fileSource` (it is analysed even with its monitor off), which is also
+   // how patches saved before this pin existed load.
+   AudioCable audioInput;
+   AudioCable* AudioInputSlot(int slot) override { return slot == 0 ? &audioInput : nullptr; }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "audio" : nullptr; }
+   bool RequiresAudioProcessing() const override { return audioInput.IsConnected(); }
+   AudioNode* GetAudioNode();
+   Platform::AudioLevels ReadTapLevels();
+
    bool Start();
    void Stop();
    bool IsRunning() const;
@@ -327,6 +342,7 @@ private:
    };
 
    Tap mTaps[kOutputCount];
+   std::unique_ptr<AudioAnalyzeTapNode> mTapNode;
    Platform::AudioLevels mLevels;
    float mOnsetEnvelope = 0.0f;
    double mLastSeconds = 0.0;

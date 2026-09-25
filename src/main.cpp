@@ -1,9 +1,6 @@
 #define GLFW_INCLUDE_NONE
 #include "platform/OpenGLHeaders.h"
 #include <GLFW/glfw3.h>
-#if defined(__APPLE__)
-#include <CoreFoundation/CoreFoundation.h>
-#endif
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -28,10 +25,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <sys/stat.h>
-#if defined(_WIN32)
 #include <direct.h>
 #define mkdir(path, mode) _mkdir(path)
-#endif
 #include <functional>
 #include <chrono>
 #include <cstdint>
@@ -44,6 +39,8 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <atomic>
+#include <type_traits>
 #include <vector>
 
 #include "core/NodeFactory.h"
@@ -130,6 +127,19 @@
 #include "nodes/GranularNode.h"
 #include "nodes/DrumSequencerNode.h"
 #include "nodes/AudioPluginNode.h"
+
+// Infinite-Turbo build identity: CMake passes the project version; the
+// build date is the compile date of main.cpp.
+#ifndef INFINITE_TURBO_VERSION
+#define INFINITE_TURBO_VERSION "dev"
+#endif
+#define INFINITE_TURBO_TITLE "Infinite-Turbo " INFINITE_TURBO_VERSION
+static const char* kTurboBuildDate = __DATE__ " " __TIME__;
+#include "nodes/LooperNode.h"
+#include "nodes/MpcNode.h"
+#include "nodes/SuperMixerNode.h"
+#include "nodes/LayoutNode.h"
+#include "nodes/VmpcNode.h"
 #include "audio/SampleScanner.h"
 #include "audio/PluginScanner.h"
 #include "audio/MediaExtensions.h"
@@ -303,12 +313,10 @@ namespace
    std::string DisplayName(const std::string& name)
    {
       std::string out;
-#if defined(_WIN32)
       if (name == "Syphon In")
          out = "SYPHON/SPOUT IN";
       if (name == "Syphon Out")
          out = "SYPHON/SPOUT OUT";
-#endif
       // "Dynamics" reads as "compressor" everywhere a user sees it - search,
       // spawn menu, node header, help popup - but the registered type key
       // (gn.typeName, NodeFactory's lookup, every saved patch's node-type
@@ -489,7 +497,6 @@ namespace
 
    void StartupTrace(const char* stage)
    {
-#if defined(_WIN32)
       if (gStartupTraceFile == nullptr)
       {
          // Keep the very first trace independent of std::filesystem and every
@@ -503,9 +510,6 @@ namespace
          std::fprintf(gStartupTraceFile, "%s\n", stage != nullptr ? stage : "(null)");
          std::fflush(gStartupTraceFile);
       }
-#else
-      (void)stage;
-#endif
    }
    // INFINITE_SAMPLERDRAGTEST only: the Samples panel's result row screen
    // rect, captured live each frame it's drawn so the synthetic drag driver
@@ -554,13 +558,23 @@ namespace
    const int kLinkIdBase = 4000000; // far above any node/pin id
    std::vector<LinkInfo> gLinks;
 
+   std::unordered_map<int, size_t> gLinkPosHint; // see gNodePosHint
    const LinkInfo* FindLink(int id)
    {
-      for (const LinkInfo& link : gLinks)
+      auto hint = gLinkPosHint.find(id);
+      if (hint != gLinkPosHint.end() && hint->second < gLinks.size() &&
+          gLinks[hint->second].id == id)
+         return &gLinks[hint->second];
+      for (size_t i = 0; i < gLinks.size(); ++i)
       {
-         if (link.id == id)
-            return &link;
+         if (gLinks[i].id == id)
+         {
+            gLinkPosHint[id] = i;
+            return &gLinks[i];
+         }
       }
+      if (hint != gLinkPosHint.end())
+         gLinkPosHint.erase(hint);
       return nullptr;
    }
    bool gSnapToGrid = true;
@@ -647,6 +661,18 @@ namespace
    // The node browser lives in a docked panel rather than only the canvas popup,
    // so modules can be found without knowing the double-click gesture exists.
    bool gNodePanelOpen = false;
+   // Turbo: TouchDesigner-style canvas preview. One node's output is drawn
+   // behind the node canvas (under the patch), and the whole UI can go
+   // borderless fullscreen (F11) - together they make live-coding possible.
+   int gCanvasBgNodeIndex = -1;       // -1 = off
+   int gCanvasBgFit = 0;              // GLUtil::OutputFitMode
+   float gCanvasBgDim = 0.30f;        // black veil so cables and text stay readable
+   float gCanvasBgNodeAlpha = 0.80f;  // node card opacity while the preview is on
+   bool gCanvasBgGrid = false;
+   bool gCanvasBgActive = false;      // this frame
+   bool gMainFullscreen = false;
+   bool gMainWasMaximized = false;
+   int gMainWindowedX = 100, gMainWindowedY = 100, gMainWindowedW = 1600, gMainWindowedH = 1000;
    // The dockable viewport panel: every node index in this list gets its own
    // card, stacked left-to-right when bottom-docked or top-to-bottom when
    // right/left-docked (see DrawViewportPanelContainer). The panel is showing
@@ -672,10 +698,32 @@ namespace
       int windowedY = 100;
       int windowedW = 1280;
       int windowedH = 720;
+      int swapInterval = 0; // see ApplyMainSwapInterval
+      // Turbo: how the node's texture maps onto this window (GLUtil::OutputFitMode)
+      // and the size last requested in exact pixels (0 = not set).
+      int fitMode = 0;
+      int pixelW = 0;
+      int pixelH = 0;
    };
+   int gProjectorDefaultFitMode = 0; // new output windows inherit the last choice
    std::vector<ProjectorWindow> gProjectorWindows;
    GLFWwindow* gMainWindow = nullptr;
-#if defined(_WIN32)
+
+   // Turbo: exactly one window waits for VSync per frame. Without output
+   // windows that is the editor; with output windows it is the last projector
+   // presented, so the projection is tear-free and paced by its own display
+   // while the editor presents immediately. -1 forces a re-apply.
+   int gMainSwapIntervalApplied = 1;
+   int gGLContextMajor = 3; // what the main window actually got
+   int gGLContextMinor = 2;
+   void ApplyMainSwapInterval(int interval)
+   {
+      if (interval != gMainSwapIntervalApplied)
+      {
+         glfwSwapInterval(interval);
+         gMainSwapIntervalApplied = interval;
+      }
+   }
    constexpr const char* kShortcutNew = "Ctrl+N";
    constexpr const char* kShortcutOpen = "Ctrl+O";
    constexpr const char* kShortcutSave = "Ctrl+S";
@@ -684,16 +732,6 @@ namespace
    constexpr const char* kShortcutRedo = "Ctrl+Shift+Z";
    constexpr const char* kShortcutGroup = "Ctrl+G";
    constexpr const char* kShortcutUngroup = "Ctrl+Shift+G";
-#else
-   constexpr const char* kShortcutNew = "Cmd+N";
-   constexpr const char* kShortcutOpen = "Cmd+O";
-   constexpr const char* kShortcutSave = "Cmd+S";
-   constexpr const char* kShortcutSaveAs = "Cmd+Shift+S";
-   constexpr const char* kShortcutUndo = "Cmd+Z";
-   constexpr const char* kShortcutRedo = "Cmd+Shift+Z";
-   constexpr const char* kShortcutGroup = "Cmd+G";
-   constexpr const char* kShortcutUngroup = "Cmd+Shift+G";
-#endif
    // Bottom-left by default: the module browser docks on the right, and the
    // minimap draws (and takes its clicks) on the foreground draw list, so a
    // right-hand corner would sit on top of the panel and swallow clicks meant
@@ -1445,6 +1483,55 @@ namespace
       }
       return changedByCv;
    }
+
+   // Turbo: a momentary pad button. Returns true while held - by the mouse or
+   // by its CV pin being high (>= 0.5) - so a pad can be played by hand and
+   // by a MIDI controller at the same time. `clicked` reports a mouse press
+   // this frame (used to select the pad). Unlike ModStateButton it stays live
+   // while modulated. `subLabel` is drawn under the main label.
+   bool ModGateButton(const char* label, const ImVec2& size, bool lit, bool selected, bool loaded,
+                      const char* subLabel, bool& clicked)
+   {
+      clicked = false;
+      DiscreteParamRef ref;
+      if (gCurrentNodeIndex >= 0)
+         ref = BeginDiscreteParam(label, 0.0f, 0.0f, 1.0f);
+      const bool cvHigh = ref.valid && ref.modulated && *ref.value >= 0.5f;
+      const float width = ref.valid ? std::max(8.0f, size.x - 18.0f) : size.x;
+      const bool isLight = IsThemeLight();
+      const bool showLit = lit || cvHigh;
+      const ImU32 fill = showLit ? IM_COL32(235, 150, 60, 255)
+                       : loaded  ? (isLight ? IM_COL32(205, 212, 228, 255) : IM_COL32(64, 72, 96, 255))
+                                 : (isLight ? IM_COL32(228, 230, 236, 255) : IM_COL32(40, 43, 55, 255));
+      const ImU32 hover = showLit ? IM_COL32(245, 170, 80, 255)
+                                  : (isLight ? IM_COL32(190, 200, 222, 255) : IM_COL32(80, 90, 118, 255));
+      ImGui::PushStyleColor(ImGuiCol_Button, fill);
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hover);
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(250, 185, 90, 255));
+      ImGui::PushStyleColor(ImGuiCol_Border, selected ? IM_COL32(120, 200, 255, 255) : IM_COL32(90, 96, 120, 200));
+      ImGui::PushStyleColor(ImGuiCol_Text, showLit ? IM_COL32(20, 20, 24, 255)
+                                                   : (isLight ? IM_COL32(40, 45, 60, 255) : IM_COL32(220, 225, 238, 255)));
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, selected ? 2.0f : 1.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.08f, 0.12f));
+      const ImVec2 topLeft = ImGui::GetCursorScreenPos();
+      ImGui::Button(label, ImVec2(width, size.y));
+      clicked = ImGui::IsItemActivated();
+      const bool held = ImGui::IsItemActive();
+      const bool hovered = ImGui::IsItemHovered();
+      ImGui::PopStyleVar(2);
+      ImGui::PopStyleColor(5);
+      if (subLabel != nullptr && subLabel[0] != '\0')
+      {
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddText(ImVec2(topLeft.x + 6.0f, topLeft.y + size.y * 0.42f),
+                     showLit ? IM_COL32(30, 30, 36, 255) : (isLight ? IM_COL32(70, 76, 92, 255) : IM_COL32(150, 158, 180, 255)),
+                     subLabel);
+      }
+      if (ref.valid)
+         EndDiscreteParam(ref, hovered);
+      return held || cvHigh;
+   }
+
 
    // `audioStyle` swaps the widget in the middle of this function for
    // AudioSliderFloat above. Everything around it - the pin, the typed-edit
@@ -2810,6 +2897,7 @@ namespace
       REGISTER_NODE(FormulaNode, Formula, "Source");
       REGISTER_NODE(TextNode, Text, "Text");
       REGISTER_NODE(VideoSourceNode, Video, "Source");
+      REGISTER_NODE(VmpcNode, VMPC, "Source");
       REGISTER_NODE(VideoInNode, Video In, "Source");
       REGISTER_NODE(SyphonInNode, Syphon In, "Source");
       REGISTER_NODE(NoiseNode, Noise, "Source");
@@ -2897,6 +2985,7 @@ namespace
       REGISTER_NODE(ReactionDiffusionNode, Reaction Diffusion, "Feedback");
       REGISTER_NODE(BlendNode, Blend, "Compositing");
       REGISTER_NODE(LayerStackNode, Layer Stack, "Compositing");
+      REGISTER_NODE(LayoutNode, Layout, "Compositing");
       REGISTER_NODE(SwitcherNode, Switcher, "Compositing");
       REGISTER_NODE(OutputNode, Output, "Output");
       REGISTER_NODE(SyphonOutNode, Syphon Out, "Output");
@@ -2946,6 +3035,11 @@ namespace
       REGISTER_NODE(PaulStretchNode, PaulStretch, "Synths");
       REGISTER_NODE(GranularNode, Granular, "Synths");
       REGISTER_NODE(DrumSequencerNode, Drum Sequencer, "Synths");
+      // Infinite-Turbo
+      REGISTER_NODE(MpcNode, MPC, "Synths");
+      REGISTER_NODE(MpcOutNode, MPC Out, "AudioUtility");
+      REGISTER_NODE(LooperNode, Looper, "AudioUtility");
+      REGISTER_NODE(SuperMixerNode, Super Mixer, "AudioUtility");
       // Third-party plugin hosting (Audio Units). Its params reach the plugin
       // directly rather than through ParamMailbox - see AudioPluginNode.h.
       REGISTER_NODE(AudioPluginNode, Plugin, "AudioEffects");
@@ -3111,14 +3205,99 @@ namespace
       return outputIndex == 0 ? dynamic_cast<IModulator*>(node) : nullptr;
    }
 
+   // Turbo: O(1) lookups. gNodes/gLinks are mutated from many places, so the
+   // position caches are hints, validated on every hit and repaired by a
+   // linear scan on a miss - never trusted blindly, never stale.
+   std::unordered_map<int, size_t> gNodePosHint;
    GraphNode* FindNodeByIndex(int index)
    {
-      for (GraphNode& gn : gNodes)
+      auto hint = gNodePosHint.find(index);
+      if (hint != gNodePosHint.end() && hint->second < gNodes.size() &&
+          gNodes[hint->second].index == index)
+         return &gNodes[hint->second];
+      for (size_t i = 0; i < gNodes.size(); ++i)
       {
-         if (gn.index == index)
-            return &gn;
+         if (gNodes[i].index == index)
+         {
+            gNodePosHint[index] = i;
+            return &gNodes[i];
+         }
       }
+      if (hint != gNodePosHint.end())
+         gNodePosHint.erase(hint);
       return nullptr;
+   }
+
+   // ---- Turbo: non-blocking file dialogs --------------------------------
+   // A native dialog used to run on the render thread and block it: the
+   // transport, sequencers, video and every output window froze until it
+   // closed. Now the dialog runs on its own thread (owned by the editor
+   // window, so it opens in front of it even in fullscreen and the editor
+   // ignores input meanwhile) and the result is delivered on the main
+   // thread at the start of a later frame. One dialog at a time.
+   struct PendingFileDialog
+   {
+      std::thread worker;
+      std::shared_ptr<std::atomic<bool>> done;
+      std::shared_ptr<std::string> result;
+      std::function<void(const std::string&)> onDone;
+   };
+   std::vector<PendingFileDialog> gPendingFileDialogs;
+
+   bool FileDialogOpen() { return !gPendingFileDialogs.empty(); }
+
+   void StartFileDialog(std::function<std::string()> dialog, std::function<void(const std::string&)> onDone)
+   {
+      if (!gPendingFileDialogs.empty() || !dialog)
+         return;
+      PendingFileDialog pending;
+      pending.done = std::make_shared<std::atomic<bool>>(false);
+      pending.result = std::make_shared<std::string>();
+      pending.onDone = std::move(onDone);
+      auto done = pending.done;
+      auto result = pending.result;
+      pending.worker = std::thread([dialog = std::move(dialog), done, result]() {
+         *result = dialog();
+         done->store(true, std::memory_order_release);
+      });
+      gPendingFileDialogs.push_back(std::move(pending));
+   }
+
+   // Main thread, once per frame after ImGui::NewFrame.
+   void PollFileDialogs()
+   {
+      for (size_t i = 0; i < gPendingFileDialogs.size(); )
+      {
+         PendingFileDialog& d = gPendingFileDialogs[i];
+         if (!d.done->load(std::memory_order_acquire))
+         {
+            ++i;
+            continue;
+         }
+         if (d.worker.joinable())
+            d.worker.join();
+         const std::string path = *d.result;
+         std::function<void(const std::string&)> cb = std::move(d.onDone);
+         gPendingFileDialogs.erase(gPendingFileDialogs.begin() + (ptrdiff_t)i);
+         if (!path.empty() && cb)
+            cb(path);
+      }
+   }
+
+   // Node-bound variant: the callback only runs if the node still exists.
+   template <typename T>
+   void StartNodeFileDialog(T* node, std::function<std::string()> dialog,
+                            std::type_identity_t<std::function<void(T*, const std::string&)>> onDone)
+   {
+      INode* raw = node;
+      StartFileDialog(std::move(dialog), [raw, onDone](const std::string& path) {
+         for (const GraphNode& gn : gNodes)
+            if (gn.node.get() == raw)
+            {
+               onDone(static_cast<T*>(raw), path);
+               return;
+            }
+      });
    }
 
    IPaletteSource* PaletteSourceByIndex(int nodeIndex)
@@ -3132,6 +3311,8 @@ namespace
    {
       if (dynamic_cast<LayerStackNode*>(gn.node.get()) != nullptr)
          return LayerStackNode::kSlots;
+      if (dynamic_cast<LayoutNode*>(gn.node.get()) != nullptr)
+         return LayoutNode::kSlots;
       if (dynamic_cast<SwitcherNode*>(gn.node.get()) != nullptr)
          return SwitcherNode::kSlots;
       // Modulator input nodes (Math, Range to Range, Smooth, ...) take modulator
@@ -3166,7 +3347,7 @@ namespace
       if (dynamic_cast<PaletteNode*>(gn.node.get()) != nullptr)
          return 1; // the reference image, when it comes from the graph
       if (dynamic_cast<AudioAnalyzeNode*>(gn.node.get()) != nullptr)
-         return 1;
+         return 1; // one "audio" pin (any audio cable, Audio File included)
       if (dynamic_cast<GeometryNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<ModelSourceNode*>(gn.node.get()) != nullptr)
@@ -3269,6 +3450,8 @@ namespace
          return (slot == Render3DNode::kEnvSlot) ? &render->envInput : nullptr;
       if (auto* stack = dynamic_cast<LayerStackNode*>(gn.node.get()))
          return (slot >= 0 && slot < LayerStackNode::kSlots) ? &stack->Input(slot) : nullptr;
+      if (auto* lay = dynamic_cast<LayoutNode*>(gn.node.get()))
+         return (slot >= 0 && slot < LayoutNode::kSlots) ? &lay->Input(slot) : nullptr;
       if (auto* sw = dynamic_cast<SwitcherNode*>(gn.node.get()))
          return (slot >= 0 && slot < SwitcherNode::kSlots) ? &sw->Input(slot) : nullptr;
       if (auto* blend = dynamic_cast<BlendNode*>(gn.node.get()))
@@ -3365,8 +3548,8 @@ namespace
    const int kMaxGeometrySlots = 4;
 
    // Upper bound on how many audio/note-input slots any single node exposes.
-   // The widest today is Mixer, at MixerNode::kSlots (8).
-   const int kMaxAudioSlots = 8;
+   // Turbo: the widest is Super Mixer, at SuperMixerNode::kChannels (16).
+   const int kMaxAudioSlots = 16;
    // Every note-consuming node before AudioPluginNode carried its one note
    // pin at unified slot 0 (Sampler, Envelope, ...), which is why this was 1
    // and the topology builder's wiring pass (RebuildAudioTopology) used to
@@ -3571,7 +3754,13 @@ namespace
       }
       else if (dstAudio != nullptr)
       {
+         // An Audio File keeps the fileSource path (analysed even with its
+         // monitor off); anything else is a plain audio cable.
          dstAudio->fileSource = srcAudioFile;
+         if (srcAudioFile != nullptr)
+            dstAudio->audioInput.Disconnect();
+         else
+            dstAudio->audioInput.Connect(srcNode.node.get());
       }
       else if (IModulator** slotField = dstNode.node->ModulatorInputSlot(slot))
       {
@@ -3913,6 +4102,10 @@ namespace
          gran->ReloadFromPath();
       if (auto* drum = dynamic_cast<DrumSequencerNode*>(node))
          drum->ReloadFromPaths();
+      if (auto* mpc = dynamic_cast<MpcNode*>(node))
+         mpc->ReloadFromPaths();
+      if (auto* vmpc = dynamic_cast<VmpcNode*>(node))
+         vmpc->ReloadFromPaths();
       if (auto* video = dynamic_cast<VideoSourceNode*>(node))
          video->ReloadFromPath();
       if (auto* palette = dynamic_cast<PaletteNode*>(node))
@@ -3946,7 +4139,7 @@ namespace
    void DrawImageSourceParams(ImageSourceNode* n)
    {
       if (ImGui::Button("Choose image...", ImVec2(kPreviewSize, 0)))
-         n->LoadViaDialog();
+         StartNodeFileDialog(n, Platform::OpenImageDialog, [](auto* m, const std::string& path) { m->Load(path); });
 
       if (!n->LastError().empty())
       {
@@ -3959,7 +4152,7 @@ namespace
       else if (!n->LoadedPath().empty())
       {
          std::string file = n->LoadedPath();
-         size_t slash = file.find_last_of('/');
+         size_t slash = file.find_last_of("/\\");
          if (slash != std::string::npos)
             file = file.substr(slash + 1);
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
@@ -4007,11 +4200,7 @@ namespace
       if (servers.empty())
       {
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
-#if defined(_WIN32)
          ImGui::TextDisabled("No active Spout senders found.");
-#else
-         ImGui::TextDisabled("No active Syphon servers found.");
-#endif
          ImGui::PopTextWrapPos();
       }
       else
@@ -4072,7 +4261,7 @@ namespace
    void DrawEnvironmentParams(EnvironmentNode* n)
    {
       if (ImGui::Button("Choose HDRI...", ImVec2(kPreviewSize, 0)))
-         n->LoadViaDialog();
+         StartNodeFileDialog(n, Platform::OpenHdrDialog, [](auto* m, const std::string& path) { m->Load(path); });
 
       if (!n->LastError().empty())
       {
@@ -4083,7 +4272,7 @@ namespace
       else if (!n->LoadedPath().empty())
       {
          std::string file = n->LoadedPath();
-         size_t slash = file.find_last_of('/');
+         size_t slash = file.find_last_of("/\\");
          if (slash != std::string::npos)
             file = file.substr(slash + 1);
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
@@ -4164,11 +4353,7 @@ namespace
       const std::vector<std::string>& fonts = TextNode::AvailableFonts();
       if (n->fontName.empty())
       {
-#if defined(_WIN32)
          const auto preferred = std::find(fonts.begin(), fonts.end(), "Segoe UI");
-#else
-         const auto preferred = std::find(fonts.begin(), fonts.end(), "Helvetica");
-#endif
          n->fontName = preferred != fonts.end() ? *preferred : fonts.front();
       }
       int fontIdx = 0;
@@ -4210,7 +4395,7 @@ namespace
    void DrawVideoParams(VideoSourceNode* n)
    {
       if (ImGui::Button("Choose video...", ImVec2(kPreviewSize, 0)))
-         n->OpenViaDialog();
+         StartNodeFileDialog(n, Platform::OpenVideoDialog, [](auto* m, const std::string& path) { m->Open(path); });
 
       if (ModTriggerButton("Restart##videoRestart", ImVec2(kPreviewSize, 0)))
          n->Restart();
@@ -4224,7 +4409,7 @@ namespace
       else if (!n->LoadedPath().empty())
       {
          std::string file = n->LoadedPath();
-         size_t slash = file.find_last_of('/');
+         size_t slash = file.find_last_of("/\\");
          if (slash != std::string::npos)
             file = file.substr(slash + 1);
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
@@ -4590,6 +4775,37 @@ namespace
          PushUndoCheckpoint();
          n->FlipV();
       }
+
+      // Turbo: alpha outside the geometry + per-edge blending. Always drawn
+      // in this order so the sliders keep stable CV indices.
+      if (ModCheckbox("transparent outside (alpha)", &n->transparentOutside))
+         PushUndoCheckpoint();
+      ImGui::TextDisabled("edge blend");
+      static const char* kEdgeLabels[4] = { "left##pjEdgeL", "right##pjEdgeR", "top##pjEdgeT", "bottom##pjEdgeB" };
+      static const char* kEdgeWidthLabels[4] = { "left width", "right width", "top width", "bottom width" };
+      for (int e = 0; e < 4; ++e)
+      {
+         if (e > 0)
+            ImGui::SameLine(0.0f, 8.0f);
+         if (ModCheckbox(kEdgeLabels[e], &n->edgeBlendOn[e]))
+            PushUndoCheckpoint();
+      }
+      for (int e = 0; e < 4; ++e)
+      {
+         ImGui::BeginDisabled(!n->edgeBlendOn[e]);
+         ModSlider(kEdgeWidthLabels[e], &n->edgeBlendWidth[e], 0.0f, 1.0f, "%.3f", colW);
+         ImGui::EndDisabled();
+      }
+      ModSlider("blend curve", &n->edgeBlendCurve, 1.0f, 6.0f, "%.2f", colW);
+      ModSlider("blend gamma", &n->edgeBlendGamma, 0.5f, 4.0f, "%.2f", colW);
+      static const std::vector<std::string> kBlendModes = { "blend: alpha (fade out)", "blend: black (darken RGB)" };
+      DropdownButton("##pjBlendMode", kBlendModes, n->edgeBlendMode,
+                     [n](int i) { PushUndoCheckpoint(); n->edgeBlendMode = i; }, colW);
+      if (ModCheckbox("antialias edges", &n->antialias))
+         PushUndoCheckpoint();
+      ImGui::BeginDisabled(!n->antialias);
+      ModSlider("antialias px", &n->antialiasPx, 0.5f, 8.0f, "%.1f", colW);
+      ImGui::EndDisabled();
    }
 
    void DrawLFOParams(LFONode* n)
@@ -5589,10 +5805,8 @@ namespace
    void DrawRemoveBgParams(RemoveBgNode* n)
    {
       DropdownButton("detect", RemoveBgNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
-#if defined(_WIN32)
       DropdownButton("backend", RemoveBgNode::BackendNames(), n->backend,
                      [n](int i) { n->backend = i; n->RequestMask(); });
-#endif
       DropdownButton("output", RemoveBgNode::OutputModeNames(), n->outputMode,
                      [n](int i) { n->outputMode = i; });
 
@@ -5718,7 +5932,7 @@ namespace
    void DrawPaletteParams(PaletteNode* n)
    {
       if (ImGui::Button("Choose reference...", ImVec2(kPreviewSize, 0)))
-         n->LoadViaDialog();
+         StartNodeFileDialog(n, Platform::OpenImageDialog, [](auto* m, const std::string& path) { m->Load(path); });
 
       if (!n->LastError().empty())
       {
@@ -5729,7 +5943,7 @@ namespace
       else if (!n->LoadedPath().empty())
       {
          std::string file = n->LoadedPath();
-         const size_t slash = file.find_last_of('/');
+         const size_t slash = file.find_last_of("/\\");
          if (slash != std::string::npos)
             file = file.substr(slash + 1);
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
@@ -6568,7 +6782,8 @@ namespace
       // would otherwise render an empty shell with just the pin - same
       // reasoning as the AudioTextureNode carve-out just below.
       if (dynamic_cast<AudioTextureNode*>(node) != nullptr || dynamic_cast<AudioFileNode*>(node) != nullptr ||
-          dynamic_cast<AudioColorRampNode*>(node) != nullptr ||
+          dynamic_cast<AudioColorRampNode*>(node) != nullptr || dynamic_cast<AudioAnalyzeNode*>(node) != nullptr ||
+          dynamic_cast<VmpcNode*>(node) != nullptr ||
           dynamic_cast<VideoSourceNode*>(node) != nullptr)
          return false;
       return dynamic_cast<IAudioSource*>(node) != nullptr || node->AudioInputSlot(0) != nullptr ||
@@ -9137,14 +9352,10 @@ namespace
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
       if (ImGui::Button("Load...", ImVec2(90, 0)))
-      {
-         const std::string path = Platform::OpenAudioDialog();
-         if (!path.empty())
-         {
+         StartNodeFileDialog(n, Platform::OpenAudioDialog, [](auto* m, const std::string& path) {
             PushUndoCheckpoint();
-            n->LoadFile(path);
-         }
-      }
+            m->LoadFile(path);
+         });
       // Dropping a sample from the Samples search panel directly onto this
       // node's body is handled at the canvas level (see gSampleDragActive),
       // not through ImGui's native drag-drop payload API - the drag source
@@ -9298,14 +9509,10 @@ namespace
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
       if (ImGui::Button("Load...", ImVec2(90, 0)))
-      {
-         const std::string path = Platform::OpenAudioDialog();
-         if (!path.empty())
-         {
+         StartNodeFileDialog(n, Platform::OpenAudioDialog, [](auto* m, const std::string& path) {
             PushUndoCheckpoint();
-            n->LoadFile(path);
-         }
-      }
+            m->LoadFile(path);
+         });
       ImGui::SameLine();
       const bool recording = n->IsRecording();
       if (recording)
@@ -9403,14 +9610,10 @@ namespace
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
       if (ImGui::Button("Load...", ImVec2(80, 0)))
-      {
-         const std::string path = Platform::OpenAudioDialog();
-         if (!path.empty())
-         {
+         StartNodeFileDialog(n, Platform::OpenAudioDialog, [](auto* m, const std::string& path) {
             PushUndoCheckpoint();
-            n->LoadFile(path);
-         }
-      }
+            m->LoadFile(path);
+         });
       ImGui::SameLine();
       const bool recording = n->IsRecording();
       if (recording)
@@ -9540,10 +9743,10 @@ namespace
       ImGui::InvisibleButton("##drumlanewavebody", ImVec2(w, h));
       if (!hasSample && ImGui::IsItemActivated())
       {
-         PushUndoCheckpoint();
-         const std::string path = Platform::OpenAudioDialog();
-         if (!path.empty())
-            n->LoadFileToLane(lane, path);
+         StartNodeFileDialog(n, Platform::OpenAudioDialog, [lane](auto* m, const std::string& path) {
+            PushUndoCheckpoint();
+            m->LoadFileToLane(lane, path);
+         });
       }
 
       const bool isLight = IsThemeLight();
@@ -10010,9 +10213,9 @@ namespace
 
       if (ImGui::Button("Add folder...", ImVec2(-1.0f, 0)))
       {
-         const std::string path = Platform::OpenFolderDialog();
-         if (!path.empty())
-            scanner.AddFolder(path);
+         SampleScanner* target = &scanner;
+         StartFileDialog([] { return Platform::OpenFolderDialog(); },
+                         [target](const std::string& path) { target->AddFolder(path); });
       }
 
       // Folders list, each with its own refresh and remove button. Kept
@@ -10369,9 +10572,8 @@ namespace
          }
          if (ImGui::Button("Add VST3 folder...", ImVec2(-1.0f, 0)))
          {
-            const std::string folder = Platform::OpenFolderDialog("Add VST3 folder");
-            if (!folder.empty())
-               gPluginScanner.AddFolder(folder);
+            StartFileDialog([] { return Platform::OpenFolderDialog("Add VST3 folder"); },
+                            [](const std::string& folder) { gPluginScanner.AddFolder(folder); });
          }
          ImGui::TreePop();
       }
@@ -14553,7 +14755,7 @@ namespace
    // reported free.
    std::string DefaultRecordingFileName(const std::string& dir, const std::string& ext = "wav")
    {
-      std::string base = gPatchPath.empty() ? "Untitled" : gPatchPath.substr(gPatchPath.find_last_of('/') + 1);
+      std::string base = gPatchPath.empty() ? "Untitled" : gPatchPath.substr(gPatchPath.find_last_of("/\\") + 1);
       const size_t dot = base.find_last_of('.');
       if (dot != std::string::npos)
          base = base.substr(0, dot);
@@ -14644,12 +14846,12 @@ namespace
       ImGui::BeginDisabled(recording);
       if (ImGui::Button("Choose...##audioOutChoose", ImVec2(btnW, 0)))
       {
-         const std::string chosen = Platform::OpenFolderDialog("Choose recording folder", RecordingDirFor(n));
-         if (!chosen.empty())
-         {
-            n->recordDirectory = chosen;
-            gPatchDirty = true;
-         }
+         const std::string initial = RecordingDirFor(n);
+         StartNodeFileDialog(n, [initial] { return Platform::OpenFolderDialog("Choose recording folder", initial); },
+                             [](auto* m, const std::string& chosen) {
+                                m->recordDirectory = chosen;
+                                gPatchDirty = true;
+                             });
       }
       ImGui::EndDisabled();
 
@@ -14666,9 +14868,498 @@ namespace
    // node-body loop's DrawPreview-replacement chain; audio nodes have no
    // image to preview, so this entirely replaces DrawPreview +
    // DrawXxxParams for them rather than sitting alongside either.
+   // ======================================================================
+   // Infinite-Turbo nodes: Looper, MPC, MPC Out, Super Mixer
+   // ======================================================================
+
+   void DrawLooperStrip(LooperNode* n, float h)
+   {
+      const float w = gAudioBodyW;
+      const ImVec2 o = ImGui::GetCursorScreenPos();
+      const ImVec2 br(o.x + w, o.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddRectFilled(o, br, ScopeBgCol(), 4.0f);
+      const int st = n->CurrentState();
+      const ImU32 col = st == LooperNode::kRecording || st == LooperNode::kArmed ? IM_COL32(230, 70, 70, 255)
+                      : st == LooperNode::kOverdubbing                             ? IM_COL32(240, 160, 60, 255)
+                                                                                    : IM_COL32(90, 200, 140, 255);
+      if (st == LooperNode::kRecording)
+      {
+         dl->AddRectFilled(ImVec2(o.x + 2.0f, o.y + 2.0f), ImVec2(br.x - 2.0f, br.y - 2.0f), IM_COL32(230, 70, 70, 60), 3.0f);
+      }
+      else if (st == LooperNode::kArmed)
+      {
+         dl->AddText(ImVec2(o.x + 10.0f, o.y + h * 0.5f - 7.0f), col, "armed - waiting for the next grid line");
+      }
+      else if (n->HasLoop())
+      {
+         const float x = o.x + 2.0f + (w - 4.0f) * std::clamp(n->Position01(), 0.0f, 1.0f);
+         dl->AddRectFilled(ImVec2(o.x + 2.0f, o.y + 2.0f), ImVec2(x, br.y - 2.0f),
+                           (col & 0x00FFFFFF) | 0x50000000, 3.0f);
+         dl->AddLine(ImVec2(x, o.y + 2.0f), ImVec2(x, br.y - 2.0f), col, 2.0f);
+      }
+      else
+      {
+         dl->AddText(ImVec2(o.x + 10.0f, o.y + h * 0.5f - 7.0f), IM_COL32(130, 136, 156, 255),
+                     "empty - press REC to record a loop");
+      }
+      dl->AddRect(o, br, ScopeBorderCol(), 4.0f);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawLooperBody(GraphNode& gn, LooperNode* n)
+   {
+      char stat[96];
+      if (n->CurrentState() == LooperNode::kRecording)
+         snprintf(stat, sizeof(stat), "recording %.1f s", n->RecordedSeconds());
+      else if (n->HasLoop())
+         snprintf(stat, sizeof(stat), "%s - loop %.2f s", LooperNode::StateName(n->CurrentState()), n->LengthSeconds());
+      else
+         snprintf(stat, sizeof(stat), "%s - up to %.0f s", LooperNode::StateName(n->CurrentState()), LooperNode::MaxSeconds());
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      DrawLooperStrip(n, 34.0f);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Transport. Every button is a modulatable widget: each gets a CV pin,
+      // so a MIDI controller (via a MIDI CC / Note modulator) can drive it.
+      {
+         const float spacing = ImGui::GetStyle().ItemSpacing.x;
+         const float bw = (gAudioContentW - 3.0f * spacing) / 4.0f;
+         const ImVec2 size(bw, 30.0f);
+         bool requested = false;
+
+         ImGui::PushStyleColor(ImGuiCol_Button, n->IsRecordingOrArmed() ? ImVec4(0.75f, 0.18f, 0.18f, 1.0f)
+                                                                         : ImVec4(0.30f, 0.12f, 0.12f, 1.0f));
+         if (ModStateButton("REC##looperRec", n->IsRecordingOrArmed(), requested, size))
+            n->SetRecord(requested);
+         ImGui::PopStyleColor();
+         ImGui::SameLine();
+
+         ImGui::PushStyleColor(ImGuiCol_Button, n->IsPlaying() ? ImVec4(0.20f, 0.55f, 0.32f, 1.0f)
+                                                               : ImVec4(0.12f, 0.24f, 0.16f, 1.0f));
+         if (ModStateButton("PLAY##looperPlay", n->IsPlaying(), requested, size))
+            n->SetPlay(requested);
+         ImGui::PopStyleColor();
+         ImGui::SameLine();
+
+         ImGui::PushStyleColor(ImGuiCol_Button, n->IsOverdubbing() ? ImVec4(0.80f, 0.50f, 0.15f, 1.0f)
+                                                                   : ImVec4(0.30f, 0.20f, 0.10f, 1.0f));
+         if (ModStateButton("DUB##looperDub", n->IsOverdubbing(), requested, size))
+            n->SetOverdub(requested);
+         ImGui::PopStyleColor();
+         ImGui::SameLine();
+
+         if (ModTriggerButton("CLEAR##looperClear", size))
+            n->Clear();
+      }
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      BeginAudioSection("length");
+      {
+         static const std::vector<std::string> kModes = { "Bars", "Sub-bar", "Free" };
+         static const std::vector<std::string> kSubs = { "1/2 bar", "1/4 bar", "1/8 bar", "1/16 bar" };
+         AudioKnobRow row(3, kKnobStd);
+         row.Dropdown("mode##looperMode", kModes, n->lengthMode,
+                      [n](int v) { PushUndoCheckpoint(); n->lengthMode = v; });
+         if (n->lengthMode != LooperNode::kLengthBars)
+            ImGui::BeginDisabled();
+         row.KnobInt("bars", &n->bars, 1, 32);
+         if (n->lengthMode != LooperNode::kLengthBars)
+            ImGui::EndDisabled();
+         row.Dropdown("sub-bar##looperSub", kSubs, n->subDivision,
+                      [n](int v) { PushUndoCheckpoint(); n->subDivision = v; });
+         row.End();
+      }
+      if (AudioToggleButton("sync to bar##looperSync", &n->syncStart, 110.0f))
+         PushUndoCheckpoint();
+      ImGui::SameLine();
+      if (AudioToggleButton("loop##looperLoop", &n->loop, 70.0f))
+         PushUndoCheckpoint();
+      EndAudioSection();
+
+      BeginAudioSection("playback");
+      {
+         static const std::vector<std::string> kDirs = { "Forward", "Reverse", "Ping-pong" };
+         AudioKnobRow row(3, kKnobStd);
+         row.Dropdown("direction##looperDir", kDirs, n->direction,
+                      [n](int v) { PushUndoCheckpoint(); n->direction = v; });
+         row.Knob("thru", &n->thru, 0.0f, 1.0f, "%.2f");
+         row.Knob("level", &n->level, 0.0f, 1.5f, "%.2f");
+         row.End();
+      }
+      EndAudioSection();
+
+      BeginAudioSection("latency");
+      {
+         if (AudioToggleButton("auto##looperAutoLat", &n->autoLatency, 60.0f))
+            PushUndoCheckpoint();
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("shift each take by the round-trip latency the audio driver reports");
+         ImGui::SameLine();
+         ImGui::TextDisabled("comp %.1f ms", n->CompensationMs());
+         AudioKnobRow row(1, kKnobStd);
+         row.Knob("offset ms", &n->latencyOffsetMs, -100.0f, 300.0f, "%+.0f ms");
+         row.End();
+      }
+      EndAudioSection();
+
+      EndAudioBody();
+   }
+
+   // Waveform with draggable trim handles: click/drag near a handle moves it
+   // (the nearest one), the dimmed parts are outside the played range.
+   void DrawMpcPadWave(MpcNode* n, int p, float w, float h)
+   {
+      const ImVec2 o = ImGui::GetCursorScreenPos();
+      const ImVec2 br(o.x + w, o.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddRectFilled(o, br, ScopeBgCol(), 3.0f);
+      const int count = n->padWaveCount[p];
+      const float innerW = w - 4.0f;
+      if (count > 1)
+      {
+         const float mid = o.y + h * 0.5f;
+         for (int b = 0; b < count; b++)
+         {
+            const float x = o.x + 2.0f + innerW * (float)b / (float)(count - 1);
+            dl->AddLine(ImVec2(x, mid - n->padWaveMax[p][b] * h * 0.45f),
+                        ImVec2(x, mid - n->padWaveMin[p][b] * h * 0.45f), IM_COL32(120, 190, 255, 220), 1.5f);
+         }
+         const float xs = o.x + 2.0f + innerW * std::clamp(n->padStart[p], 0.0f, 1.0f);
+         const float xe = o.x + 2.0f + innerW * std::clamp(n->padEnd[p], 0.0f, 1.0f);
+         dl->AddRectFilled(ImVec2(o.x, o.y), ImVec2(xs, br.y), IM_COL32(0, 0, 0, 140), 3.0f);
+         dl->AddRectFilled(ImVec2(xe, o.y), br, IM_COL32(0, 0, 0, 140), 3.0f);
+         dl->AddLine(ImVec2(xs, o.y), ImVec2(xs, br.y), IM_COL32(120, 230, 140, 255), 2.0f);
+         dl->AddLine(ImVec2(xe, o.y), ImVec2(xe, br.y), IM_COL32(240, 120, 110, 255), 2.0f);
+         dl->AddTriangleFilled(ImVec2(xs, o.y), ImVec2(xs + 7.0f, o.y), ImVec2(xs, o.y + 7.0f), IM_COL32(120, 230, 140, 255));
+         dl->AddTriangleFilled(ImVec2(xe, o.y), ImVec2(xe - 7.0f, o.y), ImVec2(xe, o.y + 7.0f), IM_COL32(240, 120, 110, 255));
+
+         ImGui::SetCursorScreenPos(o);
+         ImGui::InvisibleButton("##mpcTrim", ImVec2(w, h));
+         static int sDragHandle = -1; // 0 = start, 1 = end
+         if (ImGui::IsItemActivated())
+         {
+            PushUndoCheckpoint();
+            const float mx = ImGui::GetIO().MousePos.x;
+            sDragHandle = std::fabs(mx - xs) <= std::fabs(mx - xe) ? 0 : 1;
+         }
+         if (ImGui::IsItemActive() && sDragHandle >= 0)
+         {
+            const float t = std::clamp((ImGui::GetIO().MousePos.x - o.x - 2.0f) / std::max(1.0f, innerW), 0.0f, 1.0f);
+            if (sDragHandle == 0)
+               n->padStart[p] = std::min(t, n->padEnd[p] - 0.001f);
+            else
+               n->padEnd[p] = std::max(t, n->padStart[p] + 0.001f);
+         }
+         if (ImGui::IsItemDeactivated())
+            sDragHandle = -1;
+         if (ImGui::IsItemHovered())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+      }
+      else
+      {
+         dl->AddText(ImVec2(o.x + 8.0f, o.y + h * 0.5f - 7.0f), IM_COL32(130, 136, 156, 255), "no sample");
+         ImGui::Dummy(ImVec2(w, h));
+      }
+      dl->AddRect(o, br, ScopeBorderCol(), 3.0f);
+   }
+
+   void DrawMpcBody(GraphNode& gn, MpcNode* n)
+   {
+      int loaded = 0, playing = 0;
+      for (int p = 0; p < MpcNode::kPads; p++)
+      {
+         loaded += n->PadLoaded(p) ? 1 : 0;
+         playing += n->PadPlaying(p) ? 1 : 0;
+      }
+      char stat[96];
+      snprintf(stat, sizeof(stat), "%d/16 loaded - %d playing - notes %d-%d", loaded, playing, n->baseNote,
+               n->baseNote + MpcNode::kPads - 1);
+      BeginAudioBody(gn.index, gn.category, 560.0f, stat);
+
+      // 4x4 pads, pad 1 bottom-left like the hardware. Each pad is a gate
+      // button with its own CV pin: gate high = pad held.
+      {
+         static const char* kModeTag[3] = { "one shot", "gate", "loop" };
+         const float gap = 6.0f;
+         const float padW = (gAudioContentW - gap * 3.0f) / 4.0f;
+         const float padH = 58.0f;
+         const ImVec2 origin = ImGui::GetCursorScreenPos();
+         for (int row = 0; row < 4; row++)
+         {
+            for (int col = 0; col < 4; col++)
+            {
+               const int p = (3 - row) * 4 + col;
+               ImGui::SetCursorScreenPos(ImVec2(origin.x + (float)col * (padW + gap), origin.y + (float)row * (padH + gap)));
+               ImGui::PushID(p);
+               char label[32];
+               snprintf(label, sizeof(label), "%d##mpcPad%d", p + 1, p + 1);
+               std::string sub = n->PadLoaded(p) ? n->PadName(p) : std::string("empty");
+               if (sub.size() > 14)
+                  sub = sub.substr(0, 13) + ".";
+               sub += std::string("\n") + kModeTag[std::clamp(n->padMode[p], 0, 2)];
+               bool clicked = false;
+               const bool held = ModGateButton(label, ImVec2(padW, padH), n->PadPlaying(p), p == n->selectedPad,
+                                               n->PadLoaded(p), sub.c_str(), clicked);
+               if (clicked)
+                  n->selectedPad = p;
+               if (held != n->uiHeld[p])
+               {
+                  n->uiHeld[p] = held;
+                  n->PadEvent(p, held, 1.0f);
+               }
+               ImGui::PopID();
+            }
+         }
+         ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + 4.0f * (padH + gap)));
+         ImGui::Dummy(ImVec2(gAudioContentW, 2.0f));
+      }
+
+      // Selected pad editor. Plain widgets on purpose: they follow the
+      // selection, and a CV binding that jumped between pads would be
+      // confusing. The pads themselves carry the CV pins.
+      const int p = std::clamp(n->selectedPad, 0, MpcNode::kPads - 1);
+      char header[96];
+      snprintf(header, sizeof(header), "pad %d - %s", p + 1, n->PadLoaded(p) ? n->PadName(p).c_str() : "empty");
+      BeginAudioSection(header);
+      ImGui::PushID(1000 + p);
+      if (ImGui::Button("Load sample..."))
+      {
+         StartNodeFileDialog(n, Platform::OpenAudioDialog, [p](auto* m, const std::string& path) {
+            PushUndoCheckpoint();
+            if (m->LoadPad(p, path))
+            {
+               m->padStart[p] = 0.0f;
+               m->padEnd[p] = 1.0f;
+            }
+         });
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Load folder..."))
+      {
+         StartNodeFileDialog(n, [] { return Platform::OpenFolderDialog("Load a folder into the 16 pads"); },
+                             [](auto* m, const std::string& folder) {
+                                PushUndoCheckpoint();
+                                m->LoadFolder(folder);
+                             });
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Clear pad"))
+      {
+         PushUndoCheckpoint();
+         n->ClearPad(p);
+      }
+      if (!n->PadStatus(p).empty() && n->PadStatus(p) != "loaded" && n->PadStatus(p) != "empty")
+         ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.4f, 1.0f), "%s", n->PadStatus(p).c_str());
+      DrawMpcPadWave(n, p, gAudioContentW, 56.0f);
+
+      int mode = std::clamp(n->padMode[p], 0, 2);
+      if (ImGui::RadioButton("one shot", mode == MpcNode::kOneShot)) { PushUndoCheckpoint(); n->padMode[p] = MpcNode::kOneShot; }
+      ImGui::SameLine();
+      if (ImGui::RadioButton("gate (hold)", mode == MpcNode::kGate)) { PushUndoCheckpoint(); n->padMode[p] = MpcNode::kGate; }
+      ImGui::SameLine();
+      if (ImGui::RadioButton("loop (toggle)", mode == MpcNode::kLoopToggle)) { PushUndoCheckpoint(); n->padMode[p] = MpcNode::kLoopToggle; }
+
+      // Drag fields: drag to change, double-click (or Ctrl+click) to type.
+      const ImGuiSliderFlags clampFlags = ImGuiSliderFlags_AlwaysClamp;
+      const float half = (gAudioContentW - ImGui::GetStyle().ItemSpacing.x) / 2.0f;
+      const float third = (gAudioContentW - 2.0f * ImGui::GetStyle().ItemSpacing.x) / 3.0f;
+      ImGui::SetNextItemWidth(half);
+      ImGui::DragFloat("##mpcStart", &n->padStart[p], 0.001f, 0.0f, 1.0f, "trim in %.3f", clampFlags);
+      if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(half);
+      ImGui::DragFloat("##mpcEnd", &n->padEnd[p], 0.001f, 0.0f, 1.0f, "trim out %.3f", clampFlags);
+      if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+      n->padEnd[p] = std::max(n->padEnd[p], n->padStart[p] + 0.001f);
+      ImGui::SetNextItemWidth(third);
+      ImGui::DragFloat("##mpcVol", &n->padVolume[p], 0.005f, 0.0f, 1.5f, "vol %.2f", clampFlags);
+      if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(third);
+      ImGui::DragFloat("##mpcPitch", &n->padPitch[p], 0.05f, -24.0f, 24.0f, "pitch %.2f st", clampFlags);
+      if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(third);
+      ImGui::DragFloat("##mpcPan", &n->padPan[p], 0.005f, -1.0f, 1.0f, "pan %.2f", clampFlags);
+      if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+      ImGui::PopID();
+      EndAudioSection();
+
+      BeginAudioSection("master");
+      {
+         AudioKnobRow row(2, kKnobStd);
+         row.Knob("volume", &n->volume, 0.0f, 1.5f, "%.2f");
+         row.KnobInt("base note", &n->baseNote, 0, 112);
+         row.End();
+      }
+      if (AudioToggleButton("velocity##mpcVel", &n->velocitySensitive, 100.0f))
+         PushUndoCheckpoint();
+      ImGui::SameLine();
+      ImGui::TextDisabled("pad outs: add an MPC Out node");
+      EndAudioSection();
+
+      EndAudioBody();
+   }
+
+   void DrawMpcOutBody(GraphNode& gn, MpcOutNode* n)
+   {
+      char stat[64];
+      if (n->ConnectedToMpc())
+         snprintf(stat, sizeof(stat), "pad %d", std::clamp(n->pad, 0, 15) + 1);
+      else
+         snprintf(stat, sizeof(stat), "wire an MPC into it");
+      BeginAudioBody(gn.index, gn.category, 260.0f, stat);
+      static const std::vector<std::string> kPads = { "pad 1", "pad 2", "pad 3", "pad 4", "pad 5", "pad 6",
+                                                      "pad 7", "pad 8", "pad 9", "pad 10", "pad 11", "pad 12",
+                                                      "pad 13", "pad 14", "pad 15", "pad 16" };
+      AudioKnobRow row(2, kKnobStd);
+      row.Dropdown("pad##mpcOutPad", kPads, n->pad, [n](int v) { PushUndoCheckpoint(); n->pad = v; });
+      row.Knob("gain", &n->gainDb, -60.0f, 12.0f, "%.1f dB", kKnobStd, /*dbTaper=*/true);
+      row.End();
+      EndAudioBody();
+   }
+
+   void DrawSuperMixerBody(GraphNode& gn, SuperMixerNode* n)
+   {
+      constexpr int N = SuperMixerNode::kChannels;
+      char stat[64];
+      snprintf(stat, sizeof(stat), "16 in -> 1 out   sum %+.1f dB",
+               DspMath::LinearToDb(std::max(n->Level(), 1e-5f)));
+      BeginAudioBody(gn.index, gn.category, kAudioWideWidth + 80.0f, stat);
+      const float dia = 34.0f;
+
+      BeginAudioSection("gain / eq");
+      {
+         char label[16];
+         AudioKnobRow trim(N, dia);
+         for (int i = 0; i < N; i++)
+         {
+            snprintf(label, sizeof(label), "gain %d", i + 1);
+            trim.Knob(label, &n->trimDb[i], -24.0f, 24.0f, "%+.1f dB", dia);
+         }
+         trim.End();
+         AudioKnobRow hi(N, dia);
+         for (int i = 0; i < N; i++)
+         {
+            snprintf(label, sizeof(label), "hi %d", i + 1);
+            hi.Knob(label, &n->eqHigh[i], -15.0f, 15.0f, "%.1f dB", dia);
+         }
+         hi.End();
+         AudioKnobRow mid(N, dia);
+         for (int i = 0; i < N; i++)
+         {
+            snprintf(label, sizeof(label), "mid %d", i + 1);
+            mid.Knob(label, &n->eqMid[i], -15.0f, 15.0f, "%.1f dB", dia);
+         }
+         mid.End();
+         AudioKnobRow midF(N, dia);
+         for (int i = 0; i < N; i++)
+         {
+            snprintf(label, sizeof(label), "mid f %d", i + 1);
+            midF.Knob(label, &n->eqMidFreq[i], 200.0f, 8000.0f, "%.0f Hz", dia, false, /*freqTaper=*/true);
+         }
+         midF.End();
+         AudioKnobRow low(N, dia);
+         for (int i = 0; i < N; i++)
+         {
+            snprintf(label, sizeof(label), "low %d", i + 1);
+            low.Knob(label, &n->eqLow[i], -15.0f, 15.0f, "%.1f dB", dia);
+         }
+         low.End();
+      }
+      EndAudioSection();
+
+      const float cellW = gAudioContentW / (float)N;
+      const float faderH = 130.0f;
+      const float stripTop = ImGui::GetCursorScreenPos().y;
+      for (int i = 0; i < N; i++)
+      {
+         const float cx = gAudioContentX + ((float)i + 0.5f) * cellW;
+         DrawStripMeter(cx + 12.0f, stripTop + 6.0f, 6.0f, faderH - 12.0f, n->ChannelLevel(i));
+      }
+      {
+         AudioKnobRow row(N, faderH);
+         char label[8];
+         for (int i = 0; i < N; i++)
+         {
+            snprintf(label, sizeof(label), "%d", i + 1);
+            row.Fader(label, &n->gainDb[i], -60.0f, 12.0f, "%.1f dB", faderH, /*dbTaper=*/true);
+         }
+         row.End();
+      }
+
+      // Mute / solo rows, one cell per channel, each with its own CV pin.
+      for (int pass = 0; pass < 2; pass++)
+      {
+         const float btnW = std::min(cellW - 4.0f, 50.0f);
+         const float rowY = ImGui::GetCursorScreenPos().y;
+         for (int i = 0; i < N; i++)
+         {
+            const float cx = gAudioContentX + ((float)i + 0.5f) * cellW;
+            ImGui::SetCursorScreenPos(ImVec2(cx - btnW * 0.5f, rowY));
+            ImGui::PushID(9400 + pass * 100 + i);
+            char label[32];
+            if (pass == 0)
+            {
+               snprintf(label, sizeof(label), "M##smMute%d", i + 1);
+               bool v = n->mute[i];
+               if (AudioToggleButton(label, &v, btnW))
+               {
+                  PushUndoCheckpoint();
+                  n->mute[i] = v;
+               }
+            }
+            else
+            {
+               snprintf(label, sizeof(label), "S##smSolo%d", i + 1);
+               bool v = n->solo[i];
+               if (AudioToggleButton(label, &v, btnW))
+               {
+                  PushUndoCheckpoint();
+                  n->solo[i] = v;
+               }
+            }
+            ImGui::PopID();
+         }
+         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, rowY));
+         ImGui::Dummy(ImVec2(gAudioContentW, ImGui::GetFrameHeight() + 3.0f));
+      }
+
+      {
+         AudioKnobRow row(N, dia);
+         char label[16];
+         for (int i = 0; i < N; i++)
+         {
+            snprintf(label, sizeof(label), "pan %d", i + 1);
+            row.Knob(label, &n->pan[i], -1.0f, 1.0f, "%.2f", dia);
+         }
+         row.End();
+      }
+
+      BeginAudioSection("master");
+      {
+         AudioKnobRow row(6, 110.0f);
+         row.Fader("master", &n->masterDb, -60.0f, 12.0f, "%.1f dB", 110.0f, /*dbTaper=*/true);
+         row.End();
+      }
+      EndAudioSection();
+
+      EndAudioBody();
+   }
+
    void DrawAudioNodeBody(GraphNode& gn)
    {
-      if (auto* n = dynamic_cast<OscillatorNode*>(gn.node.get()))
+      if (auto* n = dynamic_cast<LooperNode*>(gn.node.get()))
+         DrawLooperBody(gn, n);
+      else if (auto* n = dynamic_cast<MpcNode*>(gn.node.get()))
+         DrawMpcBody(gn, n);
+      else if (auto* n = dynamic_cast<MpcOutNode*>(gn.node.get()))
+         DrawMpcOutBody(gn, n);
+      else if (auto* n = dynamic_cast<SuperMixerNode*>(gn.node.get()))
+         DrawSuperMixerBody(gn, n);
+      else if (auto* n = dynamic_cast<OscillatorNode*>(gn.node.get()))
          DrawOscillatorBody(gn, n);
       else if (auto* n = dynamic_cast<WavetableNode*>(gn.node.get()))
          DrawWavetableBody(gn, n);
@@ -14830,7 +15521,7 @@ namespace
    void DrawAudioFileParams(AudioFileNode* n)
    {
       if (ImGui::Button("Choose audio...", ImVec2(kPreviewSize, 0)))
-         n->OpenViaDialog();
+         StartNodeFileDialog(n, Platform::OpenAudioDialog, [](auto* m, const std::string& path) { m->Open(path); });
 
       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
       if (!n->FileName().empty())
@@ -14871,7 +15562,11 @@ namespace
 
    void DrawAudioAnalyzeParams(AudioAnalyzeNode* n)
    {
-      if (n->fileSource != nullptr)
+      if (n->audioInput.IsConnected())
+      {
+         ImGui::TextColored(ImVec4(0.5f, 0.9f, 1.0f, 1.0f), "source: audio pin");
+      }
+      else if (n->fileSource != nullptr)
       {
          ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
          ImGui::TextColored(ImVec4(0.5f, 0.9f, 1.0f, 1.0f), "source: Audio File");
@@ -15385,9 +16080,7 @@ namespace
    {
       if (ImGui::Button("Open model...", ImVec2(kParamWidth, 0)))
       {
-         const std::string path = Platform::OpenModelDialog();
-         if (!path.empty())
-            n->Load(path);
+         StartNodeFileDialog(n, Platform::OpenModelDialog, [](auto* m, const std::string& path) { m->Load(path); });
       }
       // Bare TextWrapped has no usable content width inside the node editor and
       // wraps to one character per line; every other panel here sets the wrap
@@ -17138,7 +17831,10 @@ namespace
       // or a note node would slip through to the viewport panel.
       // Video is deliberately a mixed-media exception: it implements
       // IAudioSource for its second output but its first output is a texture.
+      // VMPC too: a note input, but its output is an image.
       const bool mixedMediaVideo = dynamic_cast<VideoSourceNode*>(n) != nullptr;
+      if (dynamic_cast<VmpcNode*>(n) != nullptr)
+         return true;
       if ((!mixedMediaVideo && dynamic_cast<IAudioSource*>(n) != nullptr) || n->AudioInputSlot(0) != nullptr ||
           dynamic_cast<INoteSource*>(n) != nullptr || n->NoteInputSlot(0) != nullptr)
          return false;
@@ -17650,6 +18346,7 @@ namespace
       else if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(dst->node.get()))
       {
          audio->fileSource = nullptr;
+         audio->audioInput.Disconnect();
       }
       else if (IModulator** slotField = dst->node->ModulatorInputSlot(GraphNode::InputSlotFromPin(dstPin)))
       {
@@ -17686,6 +18383,7 @@ namespace
          // ---------------- Source / Text ----------------
          { "Image Source", "Loads a still image. Opens the native file picker and decodes anything macOS can read - PNG, JPEG, TIFF, HEIC, RAW and more." },
          { "Video", "Plays video and its soundtrack from separate video/audio output pins. Includes trim in/out, restart, reverse, loop and four cue inputs. Click the timeline to seek or Shift-click to create a cue; any cue input crossing above zero jumps to its marker." },
+         { "VMPC", "VJ clip launcher, the MPC for video: 16 pads, one video clip each, hit with the mouse, a CV pin per pad or the note input (base note 36 = pad 1). Per pad: one shot, gate (loops while held) or loop (toggle), trim in/out and speed (negative = reverse). The output is the clip of the last pad hit; with nothing playing it is transparent (or the last frame with hold last frame). Silent: use a Video node for soundtracks." },
          { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included." },
          { "Shape", "The base 2D vector-primitive node - pick any of its 20 shapes from the dropdown, with fill, stroke, feather and background controls. Each shape also has its own directly-spawnable named node (Circle, Hexagon, Star, ...) that just starts on that shape." },
          { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Record, then draw - replaying redraws the stroke in time, and the canvas size follows the input when one is patched in." },
@@ -17703,6 +18401,7 @@ namespace
          // ---------------- Compositing ----------------
          { "Blend", "Two inputs and 31 blend modes - the full Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity set, plus Erase." },
          { "Layer Stack", "Four inputs stacked bottom-up: A is the base, D sits on top. Each layer has its own blend mode and opacity, and dragging a layer header reorders the whole layer." },
+         { "Layout", "TouchDesigner-style Layout: a canvas of exact pixel size (1920x1080 by default) with up to 8 image inputs placed on it. Each layer starts at its REAL pixel size, and you set x/y in canvas pixels, a scale (anchored at the layer centre) or an exact custom width/height, and opacity. Drag layers on the miniature, or use 1:1 / fit / fill / centre. x, y, scale and opacity have CV pins." },
          { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. Can be pinned to one input with 'manual'." },
          { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Use it to make differently-sized sources composite predictably." },
          { "Comment", "A free-floating note on the canvas - has no image input or output, just text. Double-click to edit." },
@@ -17729,13 +18428,17 @@ namespace
          { "Palette", "Samples colours from a reference image, loaded here or patched in - a patched cable overrides the loaded file, but the file is kept so unplugging falls back to it. Drag its 'out' onto the square dot beside any colour swatch to bind it - each new cable takes the next swatch, and clicking a bound swatch steps it. Its image output is a gradient of the palette." },
          { "Audio File", "Loads an audio file for playback and Audio Analyze to read. Keeps analysing even while muted - the 'audible' checkbox only controls monitoring." },
          { "Image Analyze", "Turns an image or video into control values and modulation channels. Supports UV point probes, ROI boxes, 22 math/color operations, custom algebraic formulas, and multiple modulation output taps." },
-         { "Audio Analyze", "Extracts level/frequency-band values from an Audio File for modulation." },
+         { "Audio Analyze", "Extracts level, low/mid/high, 8 bands and onsets as modulation values. Source: any audio cable on its audio pin (synth, VST, Audio In, mixer, Audio File); with nothing connected, the live device input (Start listening)." },
          { "Plugin", "Hosts a third-party Audio Unit effect. Drag one in from the Plugins panel (Rescan there indexes what is installed; the list is cached, so launching never rescans), or drop a .component bundle from Finder. \"open\" shows the plugin's own editor in a separate window. The sliders on the body are plugin parameters you chose to expose: turn \"configure\" on and touch a control in the plugin's own window and it appears here as a mapped row - or pick one from the dropdown, since not every plugin's editor tells the host what was touched. Each mapped row is a real param with its own modulation pin, so a Ramp or Envelope can drive it. Right-click a row to unmap it. With nothing loaded, or bypassed, audio passes through unchanged." },
          { "Oscillator", "A synth oscillator with four classic waveforms (sine, triangle, saw, square), interactive amp envelope, unison, filter, hard sync, and fine/coarse tuning. With no note cable connected, it free-runs at a set frequency; connect a note cable and it becomes polyphonic and envelope-gated." },
          { "Wavetable", "Two independent wavetable engines with unison, filter, and pitch/filter/amp envelopes, mixed by an A/B control. With no note cable connected, it free-runs at a set frequency; connect a note cable and it becomes polyphonic and envelope-gated." },
          { "Equation Synth", "A synth defined by a live formula (y = f(x, a, b, c, d, t)) instead of a fixed waveform - knobs a-d feed the equation directly, so turning them reshapes the waveform itself rather than modulating a preset one." },
          { "Sampler", "A sample player: load a file (or drag one in from the Samples search panel), or record from the audio input pin. Click the waveform to audition from that point, or use the audition button - both preview this node on its own dedicated voice, independent of the transport and any note cable, and never cut off or get cut off by an incoming note. Drag the waveform's two edge handles to set the loop range (start/end). pitch/finetune are coarse/fine tuning, speed is a -2..2 varispeed control (negative plays backward), volume is the output level. loop/rev/p-p control what happens at the range edges: loop wraps or bounces (ping-pong) instead of stopping, reverse flips the base direction. With no note cable connected, it free-runs on the transport - starts the moment you hit space, stops when you stop it; connect a note cable and it becomes polyphonic instead, each note played back at the pitch offset from middle C. Spacebar always silences every voice this node is making." },
          { "Drum Sequencer", "An 8-lane, 8-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8x8 step grid. Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
+         { "MPC", "16 sample pads (pad 1 bottom-left). Each pad has one sample and a play mode: one shot (plays the whole sample; a new hit restarts it), gate (plays while held, stops on release, restarts on the next hit) or loop (a hit toggles looping on/off; off rewinds). Click a pad to play and select it; the editor below loads a sample or a whole folder (first 16 audio files), sets the mode, volume, pitch and pan. Every pad has a CV pin (gate: high = held) for MIDI controllers, and the note input plays pads from the base note up (36-51 by default). The output is the master mix; an MPC Out node picks one pad for its own chain." },
+         { "MPC Out", "Takes one pad's own stereo output from an MPC wired into its input, so a pad (a kick, a snare) can get its own effects. Anything that is not an MPC passes straight through." },
+         { "Looper", "A live looper on one audio input. REC starts a take (with sync on, it waits for the next bar or sub-bar line of the transport), PLAY starts/stops the loop, DUB layers the input over the loop while it plays, CLEAR empties it. Length: a number of bars, a fraction of a bar, or free (REC again ends the take). Playback forward, reverse or ping-pong, looping or once. thru is the input monitoring level, level the loop volume. Every button has a CV pin. Takes are shifted by the interface round-trip latency (auto, plus a manual offset in ms) so they land on the grid. Up to 120 s at 48 kHz." },
+         { "Super Mixer", "A 16-channel mixer: per channel an input gain (+/-24 dB), a fader, pan, mute, solo and a 3-band EQ (low shelf 120 Hz, sweepable mid peak, high shelf 8 kHz, each +/-15 dB), plus a master fader. Every control has a CV pin." },
          { "Audio In", "Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch." },
          { "Audio Filter", "One filter, one of 12 types (LP/HP at 12/24/36 dB, BP, notch, shelves, peak, all-pass). Drag the handle on the response curve to set frequency and gain, scroll over it to change Q - the picture is the control." },
          { "Audio Color Ramp", "Splits incoming audio into up to 8 frequency bands - drag the dividers right on the spectrum display to resize them - and assigns each one a colour, VIBGYOR by default from low to high. With no image patched in it outputs the resulting gradient standalone; patch one into its optional image input and it grades that image by luminance through the same audio-reactive palette instead." },
@@ -17794,7 +18497,7 @@ namespace
          // ---------------- Output ----------------
          { "Output", "Terminal node. Shows the final image, exports a PNG, and records an H.264 .mov at a chosen frame rate. Recording captures the cooked output, so what you see is what is written." },
          { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders through Syphon on macOS or Spout on Windows. The Windows UI names this module Syphon/Spout for patch compatibility." },
-         { "Projection", "Warp, corner-pin and perspective-correct an image for projectors, flat walls, or curved screens, with built-in alignment test patterns and custom resolution target." },
+         { "Projection", "Warp, corner-pin and perspective-correct an image for projectors, flat walls, or curved screens, with built-in alignment test patterns and custom resolution target. Outside the warped image the output is transparent (alpha), the outline is antialiased, and each edge can have its own edge blend (width, curve, gamma) that fades the alpha or darkens RGB, for overlapping projectors." },
 
          // ---------------- OSC ----------------
          { "OSC Receive", "Listens on a UDP port for Open Sound Control messages matching an address pattern, and reports the last received value as a modulator (remapped through low/high). Behaves like LFO/Random - patch its output onto any slider's modulation pin." },
@@ -18120,6 +18823,7 @@ namespace
             { "Source", {
                { "Image Source", "Loads a still image. Opens the native file picker and decodes anything macOS can read - PNG, JPEG, TIFF, HEIC, RAW and more." },
                { "Video", "Plays a video file. Position follows the transport, so it pauses with everything else. Loop and speed (including reverse) are available." },
+               { "VMPC", "VJ clip launcher, the MPC for video: 16 pads, one video clip each, hit with the mouse, a CV pin per pad or the note input (base note 36 = pad 1). Per pad: one shot, gate (loops while held) or loop (toggle), trim in/out and speed (negative = reverse). The output is the clip of the last pad hit; with nothing playing it is transparent (or the last frame with hold last frame). Silent: use a Video node for soundtracks." },
                { "Shape", "Ten vector primitives - circle, ellipse, rectangle, rounded rect, triangle, polygon, star, ring, cross, line - with fill, stroke, feather and background." },
                { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included." },
                { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Strokes can be recorded and replayed as an animation." },
@@ -18153,6 +18857,7 @@ namespace
                { "Transform", "Translate, scale, rotate, flip horizontal and flip vertical." },
                { "Blend", "Two inputs and 31 blend modes - the full Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity set, plus Erase." },
                { "Layer Stack", "Four inputs stacked bottom-up: A is the base, D sits on top. Each layer has its own blend mode and opacity, and dragging a layer header reorders the whole layer." },
+               { "Layout", "TouchDesigner-style Layout: a canvas of exact pixel size (1920x1080 by default) with up to 8 image inputs placed on it. Each layer starts at its REAL pixel size, and you set x/y in canvas pixels, a scale (anchored at the layer centre) or an exact custom width/height, and opacity. Drag layers on the miniature, or use 1:1 / fit / fill / centre. x, y, scale and opacity have CV pins." },
                { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. Can be pinned to one input with 'manual'." },
                { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Use it to make differently-sized sources composite predictably." },
                { "Drop Shadow / Outer Glow / Colour Overlay", "Layer-effect style filters." },
@@ -18183,7 +18888,7 @@ namespace
             { "Output", {
                { "Output", "Terminal node. Shows the final image, exports a PNG, and records an H.264 .mov at a chosen frame rate. Recording captures the cooked output, so what you see is what is written." },
                { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders through Syphon on macOS or Spout on Windows. The Windows UI names this module Syphon/Spout for patch compatibility." },
-               { "Projection", "Warp, corner-pin and perspective-correct an image for projectors, flat walls, or curved screens, with built-in alignment test patterns and custom resolution target." },
+               { "Projection", "Warp, corner-pin and perspective-correct an image for projectors, flat walls, or curved screens, with built-in alignment test patterns and custom resolution target. Outside the warped image the output is transparent (alpha), the outline is antialiased, and each edge can have its own edge blend (width, curve, gamma) that fades the alpha or darkens RGB, for overlapping projectors." },
             } },
             { "OSC", {
                { "OSC Receive", "Listens on a UDP port for Open Sound Control messages matching an address pattern, and reports the last received value as a modulator (remapped through low/high). Behaves like LFO/Random - patch its output onto any slider's modulation pin." },
@@ -18314,6 +19019,8 @@ namespace
          return ar->GetAudioNode();
       if (auto* acr = dynamic_cast<AudioColorRampNode*>(node))
          return acr->GetAudioNode();
+      if (auto* aan = dynamic_cast<AudioAnalyzeNode*>(node))
+         return aan->GetAudioNode();
       return node->AudioNodeForNotePorts();
    }
 
@@ -18651,6 +19358,11 @@ namespace
          }
       }
 
+      // Turbo: taps between nodes (MPC Out -> MPC) resolve against the graph
+      // the engine is about to run.
+      for (GraphNode& gn : gNodes)
+         gn.node->ResolveAudioTaps();
+
       AudioTopology topology;
       topology.order = std::move(order);
       topology.terminalBufferIndices = std::move(terminals);
@@ -18769,7 +19481,7 @@ namespace
       AudioEngine::Instance().SetRequestedBufferFrames(gAudioBufferFrames);
       CategoryColors::SetPreset(s.themePreset);
       ApplyTheme();
-      glfwSwapInterval(gVsync ? 1 : 0);
+      gMainSwapIntervalApplied = -1; // re-applied right before the next swap
 
       if (wasRunning)
       {
@@ -19845,26 +20557,34 @@ namespace
       }
    }
 
-   void SavePatchInteractive(bool forceDialog)
+   // `afterSaved` runs once the patch was written (right away, or when the
+   // Save As dialog - which no longer blocks the frame - returns a path).
+   void SavePatchInteractive(bool forceDialog, std::function<void()> afterSaved = {})
    {
-      std::string path = gPatchPath;
-      if (path.empty() || forceDialog)
+      if (!gPatchPath.empty() && !forceDialog)
       {
-         std::string suggested = "Untitled.inf";
-         if (!gPatchPath.empty())
-         {
-            const size_t slash = gPatchPath.find_last_of('/');
-            suggested = (slash == std::string::npos) ? gPatchPath : gPatchPath.substr(slash + 1);
-         }
-         path = Platform::SavePatchDialog(suggested);
-         if (path.empty())
-            return; // cancelled
-         // The dialog does not force an extension, and a patch without one is
-         // awkward to find again.
-         if (path.size() < 4 || path.compare(path.size() - 4, 4, ".inf") != 0)
-            path += ".inf";
+         if (SavePatchTo(gPatchPath) && afterSaved)
+            afterSaved();
+         return;
       }
-      SavePatchTo(path);
+      std::string suggested = "Untitled.inf";
+      if (!gPatchPath.empty())
+      {
+         const size_t slash = gPatchPath.find_last_of("/\\");
+         suggested = (slash == std::string::npos) ? gPatchPath : gPatchPath.substr(slash + 1);
+      }
+      StartFileDialog([suggested] { return Platform::SavePatchDialog(suggested); },
+                      [afterSaved](const std::string& chosen) {
+                         // Same .inf extension and text format as upstream Infinite.
+                         std::string path = chosen;
+                         std::string lower = path;
+                         std::transform(lower.begin(), lower.end(), lower.begin(),
+                                        [](unsigned char c) { return (char)std::tolower(c); });
+                         if (lower.size() < 4 || lower.compare(lower.size() - 4, 4, ".inf") != 0)
+                            path += ".inf";
+                         if (SavePatchTo(path) && afterSaved)
+                            afterSaved();
+                      });
    }
 
    // Set for one frame when an action was deferred because the patch has
@@ -19873,6 +20593,8 @@ namespace
    // The action to run once the "Unsaved Changes" modal is resolved with
    // something other than Cancel (Save or Don't Save).
    std::function<void()> gPendingUnsavedAction;
+   // Set by the modal's Save once the (possibly asynchronous) save finished.
+   bool gUnsavedSaveDone = false;
 
    // The single gate every action that would discard the current patch
    // (New, Open, Open Recent, drag-drop, close/quit) should route through:
@@ -19913,7 +20635,7 @@ namespace
          const size_t slash = gPatchPath.find_last_of("/\\");
          patchName = slash == std::string::npos ? gPatchPath : gPatchPath.substr(slash + 1);
       }
-      std::string title = patchName + (gPatchDirty ? "* - Infinite" : " - Infinite");
+      std::string title = patchName + (gPatchDirty ? "* - " INFINITE_TURBO_TITLE : " - " INFINITE_TURBO_TITLE);
       static std::string previous;
       if (title != previous)
       {
@@ -19978,7 +20700,6 @@ namespace
             return;
          int mx = 0, my = 0;
          glfwGetMonitorPos(monitors[monitorIndex], &mx, &my);
-#if defined(_WIN32)
          // Borderless-window fullscreen is intentional here. Exclusive GLFW
          // fullscreen is allowed to minimise or drop behind the editor when
          // focus moves to monitor 1. A Win32 topmost window remains visible
@@ -19986,13 +20707,6 @@ namespace
          glfwSetWindowPos(pw.window, mx, my);
          glfwSetWindowSize(pw.window, mode->width, mode->height);
          Platform::ConfigureOutputWindow(pw.window, true, true, true);
-#else
-         glfwSetWindowAttrib(pw.window, GLFW_DECORATED, GLFW_FALSE);
-         glfwSetWindowAttrib(pw.window, GLFW_FLOATING, GLFW_TRUE);
-         glfwSetInputMode(pw.window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
-         glfwSetWindowPos(pw.window, mx, my);
-         glfwSetWindowSize(pw.window, mode->width, mode->height);
-#endif
          pw.fullscreen = true;
          pw.monitorIndex = monitorIndex;
       }
@@ -20009,13 +20723,7 @@ namespace
             x = mx + (mw - width) / 2;
             y = my + (mh - height) / 2;
          }
-#if defined(_WIN32)
          Platform::ConfigureOutputWindow(pw.window, false, false, false);
-#else
-         glfwSetWindowAttrib(pw.window, GLFW_DECORATED, GLFW_TRUE);
-         glfwSetWindowAttrib(pw.window, GLFW_FLOATING, GLFW_FALSE);
-         glfwSetInputMode(pw.window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-#endif
          glfwSetWindowPos(pw.window, x, y);
          glfwSetWindowSize(pw.window, width, height);
          pw.fullscreen = false;
@@ -20047,6 +20755,31 @@ namespace
       pw.monitorIndex = monitorIndex;
    }
 
+   // Turbo: sizes the window's drawable area to exactly w x h pixels (the
+   // framebuffer, not the outer frame), leaving fullscreen first if needed.
+   // GLFW sizes windows in screen coordinates; the framebuffer/window ratio
+   // converts, so this stays exact under any Windows display scaling.
+   void SetProjectorPixelSize(ProjectorWindow& pw, int w, int h)
+   {
+      w = std::clamp(w, 16, 16384);
+      h = std::clamp(h, 16, 16384);
+      if (pw.fullscreen)
+         SetProjectorFullscreen(pw, std::max(0, pw.monitorIndex), false);
+      int ww = 0, wh = 0, fw = 0, fh = 0;
+      glfwGetWindowSize(pw.window, &ww, &wh);
+      glfwGetFramebufferSize(pw.window, &fw, &fh);
+      const double sx = (ww > 0 && fw > 0) ? (double)fw / (double)ww : 1.0;
+      const double sy = (wh > 0 && fh > 0) ? (double)fh / (double)wh : 1.0;
+      const int targetW = std::max(1, (int)std::lround(w / sx));
+      const int targetH = std::max(1, (int)std::lround(h / sy));
+      glfwSetWindowSize(pw.window, targetW, targetH);
+      pw.windowedW = targetW;
+      pw.windowedH = targetH;
+      pw.pixelW = w;
+      pw.pixelH = h;
+      RuntimeLog::Write("output window size set to %dx%d px", w, h);
+   }
+
    void ToggleProjectorFullscreen(ProjectorWindow& pw)
    {
       // On entry, use the monitor that contains the window now. `monitorIndex`
@@ -20056,6 +20789,162 @@ namespace
          ? std::max(0, pw.monitorIndex)
          : std::max(0, ProjectorMonitorIndex(pw.window));
       SetProjectorFullscreen(pw, std::max(0, monitor), !pw.fullscreen);
+   }
+
+   // Turbo: borderless fullscreen for the editor itself, on the monitor that
+   // holds it. GLFW's own decorated attribute is used (not a raw Win32 style
+   // change) so GLFW keeps its state consistent; no display mode change.
+   void SetMainWindowFullscreen(bool on)
+   {
+      if (gMainWindow == nullptr || on == gMainFullscreen)
+         return;
+      if (on)
+      {
+         int count = 0;
+         GLFWmonitor** monitors = glfwGetMonitors(&count);
+         if (monitors == nullptr || count <= 0)
+            return;
+         const int mi = std::clamp(ProjectorMonitorIndex(gMainWindow), 0, count - 1);
+         const GLFWvidmode* mode = glfwGetVideoMode(monitors[mi]);
+         if (mode == nullptr)
+            return;
+         gMainWasMaximized = glfwGetWindowAttrib(gMainWindow, GLFW_MAXIMIZED) == GLFW_TRUE;
+         if (gMainWasMaximized)
+            glfwRestoreWindow(gMainWindow);
+         glfwGetWindowPos(gMainWindow, &gMainWindowedX, &gMainWindowedY);
+         glfwGetWindowSize(gMainWindow, &gMainWindowedW, &gMainWindowedH);
+         int mx = 0, my = 0;
+         glfwGetMonitorPos(monitors[mi], &mx, &my);
+         glfwSetWindowAttrib(gMainWindow, GLFW_DECORATED, GLFW_FALSE);
+         glfwSetWindowPos(gMainWindow, mx, my);
+         // One pixel taller than the monitor on purpose: a borderless window
+         // that exactly covers a monitor gets promoted by the driver/DWM to
+         // exclusive-style fullscreen presentation while it has focus, which
+         // flickers against the (topmost, unsynced) output windows. The extra
+         // row keeps it a normal composed window.
+         glfwSetWindowSize(gMainWindow, mode->width, mode->height + 1);
+         gMainFullscreen = true;
+         RuntimeLog::Write("editor fullscreen on monitor %d (%dx%d)", mi, mode->width, mode->height);
+      }
+      else
+      {
+         glfwSetWindowAttrib(gMainWindow, GLFW_DECORATED, GLFW_TRUE);
+         glfwSetWindowPos(gMainWindow, gMainWindowedX, gMainWindowedY);
+         glfwSetWindowSize(gMainWindow, std::max(640, gMainWindowedW), std::max(400, gMainWindowedH));
+         if (gMainWasMaximized)
+            glfwMaximizeWindow(gMainWindow);
+         gMainFullscreen = false;
+         RuntimeLog::Write("editor fullscreen off");
+      }
+   }
+
+   // Nodes whose output can sit behind the canvas: anything with a real
+   // image (geometry nodes go through a Render 3D node first).
+   bool CanShowBehindCanvas(const GraphNode& gn)
+   {
+      return CanShowInViewportPanel(gn) && dynamic_cast<IGeometrySource*>(gn.node.get()) == nullptr;
+   }
+
+   void ToggleCanvasBackground(int nodeIndex)
+   {
+      gCanvasBgNodeIndex = (gCanvasBgNodeIndex == nodeIndex) ? -1 : nodeIndex;
+   }
+
+   int FirstSelectedImageNodeIndex()
+   {
+      if (gEditor == nullptr)
+         return -1;
+      ed::SetCurrentEditor(gEditor);
+      const int count = ed::GetSelectedObjectCount();
+      int found = -1;
+      if (count > 0)
+      {
+         std::vector<ed::NodeId> sel(count);
+         const int n = ed::GetSelectedNodes(sel.data(), count);
+         for (int i = 0; i < n && found < 0; i++)
+            if (GraphNode* gn = FindNodeByIndex((int)sel[i].Get() / GraphNode::kStride))
+               if (CanShowBehindCanvas(*gn))
+                  found = gn->index;
+      }
+      return found;
+   }
+
+   // Ctrl+Shift+B: preview on -> off; off -> the selected node.
+   void ToggleCanvasBackgroundForSelection()
+   {
+      if (gCanvasBgNodeIndex >= 0)
+      {
+         gCanvasBgNodeIndex = -1;
+         return;
+      }
+      gCanvasBgNodeIndex = FirstSelectedImageNodeIndex();
+   }
+
+   // Draws the preview into the canvas rect, under everything the node
+   // editor draws afterwards (same draw list, earlier commands).
+   bool DrawCanvasBackground(GraphNode& gn, ImVec2 tl, ImVec2 size)
+   {
+      if (!CanShowBehindCanvas(gn) || size.x <= 1.0f || size.y <= 1.0f)
+         return false;
+      const unsigned int tex = gn.node->GetOutputTexture();
+      const int tw = gn.node->GetOutputWidth();
+      const int th = gn.node->GetOutputHeight();
+      if (tex == 0 || tw <= 0 || th <= 0)
+         return false;
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(tl.x + size.x, tl.y + size.y);
+      dl->PushClipRect(tl, br, true);
+      dl->AddRectFilled(tl, br, IM_COL32(0, 0, 0, 255));
+      const float fbScale = ImGui::GetIO().DisplayFramebufferScale.x > 0.0f ? ImGui::GetIO().DisplayFramebufferScale.x : 1.0f;
+      float w = size.x, h = size.y;
+      switch (gCanvasBgFit)
+      {
+      case GLUtil::kFitPixel:
+         w = (float)tw / fbScale;
+         h = (float)th / fbScale;
+         break;
+      case GLUtil::kFitFill:
+      {
+         const float k = std::max(size.x / (float)tw, size.y / (float)th);
+         w = (float)tw * k;
+         h = (float)th * k;
+         break;
+      }
+      case GLUtil::kFitStretch:
+         break;
+      default:
+      {
+         const float k = std::min(size.x / (float)tw, size.y / (float)th);
+         w = (float)tw * k;
+         h = (float)th * k;
+         break;
+      }
+      }
+      const ImVec2 a(std::floor(tl.x + (size.x - w) * 0.5f), std::floor(tl.y + (size.y - h) * 0.5f));
+      dl->AddImage((ImTextureID)(intptr_t)tex, a, ImVec2(a.x + w, a.y + h), ImVec2(0, 1), ImVec2(1, 0));
+      if (gCanvasBgDim > 0.0f)
+         dl->AddRectFilled(tl, br, IM_COL32(0, 0, 0, (int)(std::clamp(gCanvasBgDim, 0.0f, 1.0f) * 255.0f)));
+      dl->PopClipRect();
+      return true;
+   }
+
+   // Settings shared by the VIEW menu.
+   void DrawCanvasBackgroundSettings()
+   {
+      static const char* kFitNames[] = { "Fit (letterbox)", "Real pixels 1:1", "Fill (crop)", "Stretch" };
+      ImGui::SetNextItemWidth(170);
+      if (ImGui::BeginCombo("Scaling##canvasbg", kFitNames[std::clamp(gCanvasBgFit, 0, 3)]))
+      {
+         for (int m = 0; m < 4; m++)
+            if (ImGui::Selectable(kFitNames[m], gCanvasBgFit == m))
+               gCanvasBgFit = m;
+         ImGui::EndCombo();
+      }
+      ImGui::SetNextItemWidth(170);
+      ImGui::SliderFloat("Darken##canvasbg", &gCanvasBgDim, 0.0f, 0.9f, "%.2f");
+      ImGui::SetNextItemWidth(170);
+      ImGui::SliderFloat("Node opacity##canvasbg", &gCanvasBgNodeAlpha, 0.1f, 1.0f, "%.2f");
+      ImGui::Checkbox("Grid over the preview##canvasbg", &gCanvasBgGrid);
    }
 
    void ProjectorKeyCallback(GLFWwindow* window, int key, int, int action, int)
@@ -20134,8 +21023,8 @@ namespace
       w = std::max(320, (int)std::lround((double)w * fit));
       h = std::max(180, (int)std::lround((double)h * fit));
 
-      glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-      glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, gGLContextMajor);
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, gGLContextMinor);
       glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
       glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
       glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
@@ -20154,14 +21043,10 @@ namespace
       projector.windowedW = w;
       projector.windowedH = h;
       projector.monitorIndex = ProjectorMonitorIndex(mainWindow);
+      projector.fitMode = gProjectorDefaultFitMode;
       gProjectorWindows.push_back(projector);
       glfwSetKeyCallback(projWindow, ProjectorKeyCallback);
-#if defined(_WIN32)
       Platform::ConfigureOutputWindow(projWindow, false, false, false);
-#else
-      glfwSetWindowAttrib(projWindow, GLFW_FLOATING, GLFW_FALSE);
-      glfwSetInputMode(projWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-#endif
       int mainX = 0, mainY = 0;
       glfwGetWindowPos(mainWindow, &mainX, &mainY);
       glfwSetWindowPos(projWindow, mainX + 60, mainY + 60);
@@ -20173,6 +21058,439 @@ namespace
       glfwMakeContextCurrent(mainWindow);
       RuntimeLog::Write("output window opened: node=%d %dx%d", gn.index, w, h);
    }
+
+   // Turbo: the output-window controls, shown right in the parameter panel
+   // of Output / Projection / Layout nodes (the node's right-click menu has
+   // the same options once a window is open).
+   void DrawOutputWindowPanel(GraphNode& gn)
+   {
+      ImGui::Dummy(ImVec2(0, 3));
+      ImGui::TextColored(ImVec4(0.55f, 0.8f, 1.0f, 1.0f), "OUTPUT WINDOW");
+      if (CanShowBehindCanvas(gn))
+      {
+         const bool behind = gCanvasBgNodeIndex == gn.index;
+         if (behind)
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
+         if (ImGui::Button(behind ? "BEHIND CANVAS: ON" : "SHOW BEHIND CANVAS", ImVec2(kPreviewSize, 0)))
+            ToggleCanvasBackground(gn.index);
+         if (behind)
+            ImGui::PopStyleColor();
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("draw this output under the node canvas (Ctrl+Shift+B)\nsettings in VIEW");
+      }
+      ProjectorWindow* pw = FindProjectorWindow(gn.index);
+      if (pw == nullptr)
+      {
+         if (ImGui::Button("OPEN OUTPUT WINDOW", ImVec2(kPreviewSize, 0)))
+            OpenProjectorWindow(gMainWindow, gn);
+         return;
+      }
+      int fbW = 0, fbH = 0;
+      glfwGetFramebufferSize(pw->window, &fbW, &fbH);
+      ImGui::TextDisabled("window: %d x %d px%s", fbW, fbH, pw->fullscreen ? " (fullscreen)" : "");
+
+      static std::map<int, std::pair<int, int>> sRequested;
+      auto found = sRequested.find(gn.index);
+      if (found == sRequested.end())
+         found = sRequested.emplace(gn.index, std::make_pair(pw->pixelW > 0 ? pw->pixelW : fbW,
+                                                             pw->pixelH > 0 ? pw->pixelH : fbH)).first;
+      int& reqW = found->second.first;
+      int& reqH = found->second.second;
+      const float half = (kPreviewSize - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+      ImGui::SetNextItemWidth(half);
+      ImGui::InputInt("##outWinW", &reqW, 0, 0);
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(half);
+      ImGui::InputInt("##outWinH", &reqH, 0, 0);
+      if (ImGui::Button("APPLY SIZE (W x H px)", ImVec2(kPreviewSize, 0)))
+         SetProjectorPixelSize(*pw, reqW, reqH);
+
+      static const std::vector<std::string> kPresetNames = { "preset...", "1920 x 1080", "1280 x 720", "3840 x 2160",
+                                                             "2560 x 1440", "1080 x 1920", "1080 x 1080",
+                                                             "1024 x 768", "source size" };
+      static const int kPresetW[] = { 0, 1920, 1280, 3840, 2560, 1080, 1080, 1024, -1 };
+      static const int kPresetH[] = { 0, 1080, 720, 2160, 1440, 1920, 1080, 768, -1 };
+      const int nodeIndex = gn.index;
+      DropdownButton("##outWinPreset", kPresetNames, 0, [nodeIndex](int i) {
+         ProjectorWindow* target = FindProjectorWindow(nodeIndex);
+         GraphNode* g = FindNodeByIndex(nodeIndex);
+         if (target == nullptr || g == nullptr || i <= 0)
+            return;
+         int w = kPresetW[i], h = kPresetH[i];
+         if (w < 0)
+         {
+            w = g->node->GetOutputWidth();
+            h = g->node->GetOutputHeight();
+         }
+         if (w > 0 && h > 0)
+         {
+            sRequested[nodeIndex] = std::make_pair(w, h);
+            SetProjectorPixelSize(*target, w, h);
+         }
+      }, kPreviewSize, /*modulatable=*/false);
+
+      static const std::vector<std::string> kFitNames = { "fit (black bars)", "real pixels 1:1", "fill (crop)", "stretch" };
+      DropdownButton("##outWinFit", kFitNames, pw->fitMode, [nodeIndex](int m) {
+         if (ProjectorWindow* target = FindProjectorWindow(nodeIndex))
+         {
+            target->fitMode = m;
+            gProjectorDefaultFitMode = m;
+         }
+      }, kPreviewSize, /*modulatable=*/false);
+
+      if (ImGui::Button(pw->fullscreen ? "EXIT FULLSCREEN (F11)" : "FULLSCREEN (F11)", ImVec2(kPreviewSize, 0)))
+         ToggleProjectorFullscreen(*pw);
+      if (ImGui::Button("CLOSE OUTPUT WINDOW", ImVec2(kPreviewSize, 0)))
+         CloseProjectorWindowFor(gn.index);
+   }
+
+   // ---- Layout (Infinite-Turbo) --------------------------------------------
+   // Miniature of the canvas: every connected layer as its rectangle, click
+   // to select (topmost wins), drag to move it in canvas pixels.
+   void DrawLayoutCanvasEditor(LayoutNode* n, float width)
+   {
+      const float aspect = (float)std::max(1, n->canvasH) / (float)std::max(1, n->canvasW);
+      const float height = std::clamp(width * aspect, 40.0f, width * 1.5f);
+      const float k = std::min(width / (float)std::max(1, n->canvasW), height / (float)std::max(1, n->canvasH));
+      const float mapW = (float)n->canvasW * k;
+      const float mapH = (float)n->canvasH * k;
+      const ImVec2 o = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      dl->AddRectFilled(o, ImVec2(o.x + mapW, o.y + mapH),
+                        IM_COL32((int)(n->bgColor[0] * 255.0f), (int)(n->bgColor[1] * 255.0f),
+                                 (int)(n->bgColor[2] * 255.0f), 255));
+      static const ImU32 kLayerCols[LayoutNode::kSlots] = {
+         IM_COL32(90, 170, 255, 255), IM_COL32(255, 150, 70, 255), IM_COL32(120, 220, 130, 255),
+         IM_COL32(230, 100, 200, 255), IM_COL32(250, 220, 90, 255), IM_COL32(100, 220, 220, 255),
+         IM_COL32(200, 130, 255, 255), IM_COL32(240, 90, 90, 255) };
+      dl->PushClipRect(o, ImVec2(o.x + mapW, o.y + mapH), true);
+      for (int i = 0; i < LayoutNode::kSlots; i++)
+      {
+         if (n->SourceWidth(i) <= 0 || !n->visible[i])
+            continue;
+         float lx, ly, lw, lh;
+         n->LayerRect(i, lx, ly, lw, lh);
+         const ImVec2 a(o.x + lx * k, o.y + ly * k);
+         const ImVec2 b(a.x + lw * k, a.y + lh * k);
+         dl->AddRectFilled(a, b, (kLayerCols[i] & 0x00FFFFFF) | 0x40000000);
+         dl->AddRect(a, b, kLayerCols[i], 0.0f, 0, i == n->selectedLayer ? 2.5f : 1.0f);
+         char label[4];
+         snprintf(label, sizeof(label), "%d", i + 1);
+         dl->AddText(ImVec2(a.x + 3.0f, a.y + 2.0f), kLayerCols[i], label);
+      }
+      dl->PopClipRect();
+      dl->AddRect(o, ImVec2(o.x + mapW, o.y + mapH), IM_COL32(150, 156, 176, 255));
+
+      ImGui::SetCursorScreenPos(o);
+      ImGui::InvisibleButton("##layoutMap", ImVec2(std::max(1.0f, mapW), std::max(1.0f, mapH)));
+      if (ImGui::IsItemActivated())
+      {
+         const ImVec2 m = ImGui::GetIO().MousePos;
+         const float cx = (m.x - o.x) / k, cy = (m.y - o.y) / k;
+         for (int i = LayoutNode::kSlots - 1; i >= 0; i--)
+         {
+            if (n->SourceWidth(i) <= 0 || !n->visible[i])
+               continue;
+            float lx, ly, lw, lh;
+            n->LayerRect(i, lx, ly, lw, lh);
+            if (cx >= lx && cx <= lx + lw && cy >= ly && cy <= ly + lh)
+            {
+               n->selectedLayer = i;
+               break;
+            }
+         }
+         PushUndoCheckpoint();
+      }
+      if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f))
+      {
+         static float sAccumX = 0.0f, sAccumY = 0.0f;
+         const ImVec2 d = ImGui::GetIO().MouseDelta;
+         sAccumX += d.x / k;
+         sAccumY += d.y / k;
+         const float stepX = std::trunc(sAccumX), stepY = std::trunc(sAccumY);
+         const int s = std::clamp(n->selectedLayer, 0, LayoutNode::kSlots - 1);
+         n->x[s] += stepX;
+         n->y[s] += stepY;
+         sAccumX -= stepX;
+         sAccumY -= stepY;
+         gPatchDirty = true;
+      }
+      if (ImGui::IsItemHovered())
+         ImGui::SetTooltip("click a layer to select it, drag to move it (canvas pixels)");
+   }
+
+   void DrawLayoutParams(GraphNode& gn, LayoutNode* n)
+   {
+      const float half = (kPreviewSize - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+      ImGui::TextDisabled("canvas: %d x %d px", n->canvasW, n->canvasH);
+      ImGui::SetNextItemWidth(half);
+      if (ImGui::InputInt("##layoutW", &n->canvasW, 0, 0))
+         gPatchDirty = true;
+      if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(half);
+      if (ImGui::InputInt("##layoutH", &n->canvasH, 0, 0))
+         gPatchDirty = true;
+      if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+      n->canvasW = std::clamp(n->canvasW, 1, 16384);
+      n->canvasH = std::clamp(n->canvasH, 1, 16384);
+      static const std::vector<std::string> kCanvasPresets = { "canvas preset...", "1920 x 1080", "1280 x 720",
+                                                                "3840 x 2160", "2560 x 1440", "1080 x 1920",
+                                                                "1080 x 1080", "1024 x 768", "5760 x 1080 (3 x HD)",
+                                                                "3840 x 1080 (2 x HD)" };
+      static const int kCW[] = { 0, 1920, 1280, 3840, 2560, 1080, 1080, 1024, 5760, 3840 };
+      static const int kCH[] = { 0, 1080, 720, 2160, 1440, 1920, 1080, 768, 1080, 1080 };
+      DropdownButton("##layoutPreset", kCanvasPresets, 0, [n](int i) {
+         if (i <= 0)
+            return;
+         PushUndoCheckpoint();
+         n->canvasW = kCW[i];
+         n->canvasH = kCH[i];
+      }, kPreviewSize, /*modulatable=*/false);
+      ColorSwatch("background", n->bgColor, n);
+      ModSlider("bg alpha", &n->bgAlpha, 0.0f, 1.0f, "%.2f");
+
+      ImGui::Dummy(ImVec2(0, 3));
+      DrawLayoutCanvasEditor(n, kPreviewSize);
+      ImGui::Dummy(ImVec2(0, 3));
+
+      // Selected layer: size mode, exact pixels, quick placements. Plain
+      // drag fields (double-click to type) since they follow the selection.
+      {
+         const int s = std::clamp(n->selectedLayer, 0, LayoutNode::kSlots - 1);
+         ImGui::PushID(7000 + s);
+         ImGui::SetNextItemWidth(kPreviewSize);
+         if (ImGui::BeginCombo("##layoutSel", ("layer " + std::to_string(s + 1)).c_str()))
+         {
+            for (int i = 0; i < LayoutNode::kSlots; i++)
+            {
+               char item[64];
+               if (n->SourceWidth(i) > 0)
+                  snprintf(item, sizeof(item), "layer %d  (%d x %d)", i + 1, n->SourceWidth(i), n->SourceHeight(i));
+               else
+                  snprintf(item, sizeof(item), "layer %d  (not connected)", i + 1);
+               if (ImGui::Selectable(item, i == s))
+                  n->selectedLayer = i;
+            }
+            ImGui::EndCombo();
+         }
+         if (n->SourceWidth(s) > 0)
+            ImGui::TextDisabled("source %d x %d px", n->SourceWidth(s), n->SourceHeight(s));
+         else
+            ImGui::TextDisabled("input %d not connected", s + 1);
+         float lx, ly, lw, lh;
+         n->LayerRect(s, lx, ly, lw, lh);
+         ImGui::TextDisabled("on canvas %.0f x %.0f at %.0f, %.0f", lw, lh, lx, ly);
+
+         bool vis = n->visible[s];
+         if (ImGui::Checkbox("visible", &vis)) { PushUndoCheckpoint(); n->visible[s] = vis; }
+         ImGui::SameLine();
+         bool custom = n->sizeMode[s] == LayoutNode::kSizeCustom;
+         if (ImGui::Checkbox("custom size", &custom))
+         {
+            PushUndoCheckpoint();
+            n->sizeMode[s] = custom ? LayoutNode::kSizeCustom : LayoutNode::kSizeReal;
+            if (custom && (n->customW[s] <= 0 || n->customH[s] <= 0))
+            {
+               float bw = 0.0f, bh = 0.0f;
+               n->BaseSize(s, bw, bh);
+               n->customW[s] = std::max(1, (int)std::lround(bw));
+               n->customH[s] = std::max(1, (int)std::lround(bh));
+            }
+         }
+         if (custom)
+         {
+            ImGui::SetNextItemWidth(half);
+            ImGui::DragInt("##layoutCW", &n->customW[s], 1.0f, 1, 16384, "w %d px", ImGuiSliderFlags_AlwaysClamp);
+            if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(half);
+            ImGui::DragInt("##layoutCH", &n->customH[s], 1.0f, 1, 16384, "h %d px", ImGuiSliderFlags_AlwaysClamp);
+            if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+         }
+         ImGui::SetNextItemWidth(half);
+         ImGui::DragFloat("##layoutX", &n->x[s], 1.0f, -16384.0f, 16384.0f, "x %.0f px");
+         if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+         ImGui::SameLine();
+         ImGui::SetNextItemWidth(half);
+         ImGui::DragFloat("##layoutY", &n->y[s], 1.0f, -16384.0f, 16384.0f, "y %.0f px");
+         if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+
+         const float quarter = (kPreviewSize - 3.0f * ImGui::GetStyle().ItemSpacing.x) / 4.0f;
+         if (ImGui::Button("1:1", ImVec2(quarter, 0))) { PushUndoCheckpoint(); n->PlaceRealSize(s); }
+         if (ImGui::IsItemHovered()) ImGui::SetTooltip("real pixel size (scale 1)");
+         ImGui::SameLine();
+         if (ImGui::Button("fit", ImVec2(quarter, 0))) { PushUndoCheckpoint(); n->PlaceFit(s); }
+         ImGui::SameLine();
+         if (ImGui::Button("fill", ImVec2(quarter, 0))) { PushUndoCheckpoint(); n->PlaceFill(s); }
+         ImGui::SameLine();
+         if (ImGui::Button("ctr", ImVec2(quarter, 0))) { PushUndoCheckpoint(); n->PlaceCenter(s); }
+         if (ImGui::IsItemHovered()) ImGui::SetTooltip("centre on the canvas");
+         ImGui::PopID();
+      }
+
+      // Every layer's animatable controls, always drawn in the same order so
+      // their CV pins keep stable indices (modulate x/y/scale/opacity with an
+      // LFO, a MIDI CC...).
+      ImGui::Dummy(ImVec2(0, 3));
+      ImGui::TextDisabled("layers (CV-controllable)");
+      for (int i = 0; i < LayoutNode::kSlots; i++)
+      {
+         ImGui::PushID(7100 + i);
+         char label[24];
+         if (n->SourceWidth(i) > 0)
+            ImGui::TextColored(ImVec4(0.75f, 0.82f, 1.0f, 1.0f), "%d: %d x %d", i + 1, n->SourceWidth(i), n->SourceHeight(i));
+         else
+            ImGui::TextDisabled("%d: -", i + 1);
+         snprintf(label, sizeof(label), "x %d", i + 1);
+         ModSlider(label, &n->x[i], -(float)n->canvasW, (float)n->canvasW, "%.0f px");
+         snprintf(label, sizeof(label), "y %d", i + 1);
+         ModSlider(label, &n->y[i], -(float)n->canvasH, (float)n->canvasH, "%.0f px");
+         snprintf(label, sizeof(label), "scale %d", i + 1);
+         ModSlider(label, &n->scale[i], 0.0f, 4.0f, "%.3f");
+         snprintf(label, sizeof(label), "opacity %d", i + 1);
+         ModSlider(label, &n->opacity[i], 0.0f, 1.0f, "%.2f");
+         ImGui::PopID();
+      }
+
+      DrawOutputWindowPanel(gn);
+   }
+
+   // ---- VMPC (Infinite-Turbo) ----------------------------------------------
+   void DrawVmpcParams(GraphNode& gn, VmpcNode* n)
+   {
+      const float W = 260.0f;
+      int loaded = 0;
+      for (int p = 0; p < VmpcNode::kPads; p++)
+         loaded += n->PadLoaded(p) ? 1 : 0;
+      ImGui::TextDisabled("%d/16 clips - notes %d-%d", loaded, n->baseNote, n->baseNote + VmpcNode::kPads - 1);
+
+      // 4x4 pads, pad 1 bottom-left like the MPC. Each pad is a gate button
+      // with its own CV pin: gate high = pad held.
+      {
+         static const char* kModeTag[3] = { "one shot", "gate", "loop" };
+         const float gap = 4.0f;
+         const float padW = (W - gap * 3.0f) / 4.0f;
+         const float padH = 46.0f;
+         const ImVec2 origin = ImGui::GetCursorScreenPos();
+         for (int row = 0; row < 4; row++)
+         {
+            for (int col = 0; col < 4; col++)
+            {
+               const int p = (3 - row) * 4 + col;
+               ImGui::SetCursorScreenPos(ImVec2(origin.x + (float)col * (padW + gap), origin.y + (float)row * (padH + gap)));
+               ImGui::PushID(8800 + p);
+               char label[32];
+               snprintf(label, sizeof(label), "%d##vmpcPad%d", p + 1, p + 1);
+               std::string sub = n->PadLoaded(p) ? n->PadName(p) : std::string("empty");
+               if (sub.size() > 10)
+                  sub = sub.substr(0, 9) + ".";
+               sub += std::string("\n") + kModeTag[std::clamp(n->padMode[p], 0, 2)];
+               bool clicked = false;
+               const bool held = ModGateButton(label, ImVec2(padW, padH), n->PadPlaying(p), p == n->selectedPad,
+                                               n->PadLoaded(p), sub.c_str(), clicked);
+               if (clicked)
+                  n->selectedPad = p;
+               if (held != n->uiHeld[p])
+               {
+                  n->uiHeld[p] = held;
+                  n->PadEvent(p, held, 1.0f);
+               }
+               ImGui::PopID();
+            }
+         }
+         ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + 4.0f * (padH + gap)));
+         ImGui::Dummy(ImVec2(W, 2.0f));
+      }
+
+      // Playhead of the clip on air.
+      {
+         const ImVec2 o = ImGui::GetCursorScreenPos();
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         dl->AddRectFilled(o, ImVec2(o.x + W, o.y + 4.0f), IM_COL32(40, 44, 56, 255), 2.0f);
+         if (n->ActivePad() >= 0)
+            dl->AddRectFilled(o, ImVec2(o.x + W * n->ActivePosition01(), o.y + 4.0f), IM_COL32(120, 190, 255, 255), 2.0f);
+         ImGui::Dummy(ImVec2(W, 6.0f));
+      }
+
+      // Selected pad editor. Plain widgets: they follow the selection (the
+      // pads themselves carry the CV pins).
+      const int p = std::clamp(n->selectedPad, 0, VmpcNode::kPads - 1);
+      ImGui::PushID(8900 + p);
+      if (n->PadLoaded(p))
+         ImGui::TextColored(ImVec4(0.75f, 0.82f, 1.0f, 1.0f), "pad %d - %s (%d x %d, %.1f s)", p + 1,
+                            n->PadName(p).c_str(), n->PadWidth(p), n->PadHeight(p), n->PadDuration(p));
+      else
+         ImGui::TextDisabled("pad %d - empty", p + 1);
+      const float third = (W - 2.0f * ImGui::GetStyle().ItemSpacing.x) / 3.0f;
+      if (ImGui::Button("Load video...", ImVec2(third, 0)))
+      {
+         StartNodeFileDialog(n, Platform::OpenVideoDialog, [p](auto* m, const std::string& path) {
+            PushUndoCheckpoint();
+            if (m->LoadPad(p, path))
+            {
+               m->padStart[p] = 0.0f;
+               m->padEnd[p] = 1.0f;
+            }
+         });
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Load folder...", ImVec2(third, 0)))
+      {
+         StartNodeFileDialog(n, [] { return Platform::OpenFolderDialog("Load a folder of videos into the 16 pads"); },
+                             [](auto* m, const std::string& folder) {
+                                PushUndoCheckpoint();
+                                m->LoadFolder(folder);
+                             });
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Clear pad", ImVec2(third, 0)))
+      {
+         PushUndoCheckpoint();
+         n->ClearPad(p);
+      }
+      if (n->PadStatus(p) != "loaded" && n->PadStatus(p) != "empty")
+      {
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + W);
+         ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.4f, 1.0f), "%s", n->PadStatus(p).c_str());
+         ImGui::PopTextWrapPos();
+      }
+
+      int mode = std::clamp(n->padMode[p], 0, 2);
+      if (ImGui::RadioButton("one shot", mode == VmpcNode::kOneShot)) { PushUndoCheckpoint(); n->padMode[p] = VmpcNode::kOneShot; }
+      ImGui::SameLine();
+      if (ImGui::RadioButton("gate", mode == VmpcNode::kGate)) { PushUndoCheckpoint(); n->padMode[p] = VmpcNode::kGate; }
+      ImGui::SameLine();
+      if (ImGui::RadioButton("loop", mode == VmpcNode::kLoopToggle)) { PushUndoCheckpoint(); n->padMode[p] = VmpcNode::kLoopToggle; }
+
+      // Drag fields: drag to change, double-click (or Ctrl+click) to type.
+      const ImGuiSliderFlags clampFlags = ImGuiSliderFlags_AlwaysClamp;
+      ImGui::SetNextItemWidth(third);
+      ImGui::DragFloat("##vmpcStart", &n->padStart[p], 0.001f, 0.0f, 1.0f, "in %.3f", clampFlags);
+      if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(third);
+      ImGui::DragFloat("##vmpcEnd", &n->padEnd[p], 0.001f, 0.0f, 1.0f, "out %.3f", clampFlags);
+      if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+      n->padEnd[p] = std::max(n->padEnd[p], n->padStart[p] + 0.001f);
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(third);
+      ImGui::DragFloat("##vmpcSpeed", &n->padSpeed[p], 0.01f, -4.0f, 4.0f, "speed %.2f", clampFlags);
+      if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+      ImGui::PopID();
+
+      ImGui::SetNextItemWidth(third);
+      ImGui::DragInt("##vmpcBase", &n->baseNote, 0.2f, 0, 112, "base note %d", clampFlags);
+      if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+      ImGui::SameLine();
+      if (ModCheckbox("hold last frame", &n->holdLastFrame))
+         PushUndoCheckpoint();
+      if (ModTriggerButton("STOP##vmpcStop", ImVec2(W, 0)))
+         n->StopAll();
+
+      DrawOutputWindowPanel(gn);
+   }
+
 
 }
 
@@ -25367,6 +26685,39 @@ namespace AudioParamSweep
    }
 }
 
+// Turbo: narrow a sweep to some node types (bisecting a crash, checking a
+// new node). INFINITE_SWEEP_ONLY / INFINITE_SWEEP_SKIP take comma-separated
+// registered names, e.g. set INFINITE_SWEEP_ONLY=MPC,Looper,Super Mixer
+static bool SweepNameListed(const char* envName, const std::string& name)
+{
+   const char* list = getenv(envName);
+   if (list == nullptr || *list == '\0')
+      return false;
+   std::string all(list);
+   size_t start = 0;
+   while (start <= all.size())
+   {
+      const size_t comma = all.find(',', start);
+      std::string item = all.substr(start, comma == std::string::npos ? std::string::npos : comma - start);
+      while (!item.empty() && item.front() == ' ') item.erase(item.begin());
+      while (!item.empty() && item.back() == ' ') item.pop_back();
+      if (item == name)
+         return true;
+      if (comma == std::string::npos)
+         break;
+      start = comma + 1;
+   }
+   return false;
+}
+
+static bool SweepSelected(const std::string& name)
+{
+   const char* only = getenv("INFINITE_SWEEP_ONLY");
+   if (only != nullptr && *only != '\0' && !SweepNameListed("INFINITE_SWEEP_ONLY", name))
+      return false;
+   return !SweepNameListed("INFINITE_SWEEP_SKIP", name);
+}
+
 static int RunAudioParamSweepTest()
 {
    using namespace AudioParamSweep;
@@ -25381,6 +26732,9 @@ static int RunAudioParamSweepTest()
    bool overallOk = true;
    for (const AudioSweepCandidate& cand : candidates)
    {
+      if (!SweepSelected(cand.name))
+         continue;
+      printf("  ... sweeping %s\n", cand.name.c_str());
       // Check A: every declared param survives save -> load, through the
       // real Patch::SaveParams/LoadParams text format.
       std::unique_ptr<INode> a(NodeFactory::Instance().MakeNode(cand.name));
@@ -25979,16 +27333,28 @@ int RunPluginScanTest()
    return 0;
 }
 
+// Turbo: the headless self-tests and the scan child return from main()
+// before glfwInit(), skipping the app's orderly shutdown, and the C++/JUCE
+// static teardown on that path ends in a heap-corruption abort (0xC0000374)
+// after every verdict has already been printed - with or without the new
+// node types, so it is not a node bug. The GUI exit path is unaffected.
+// These branches have nothing left to clean up: flush and leave.
+static int HeadlessExit(int code)
+{
+   std::fflush(stdout);
+   std::fflush(stderr);
+   Platform::TerminateNow(code);
+   return code;
+}
+
 int main(int argc, char** argv)
 {
    std::setvbuf(stdout, nullptr, _IONBF, 0);
    std::setvbuf(stderr, nullptr, _IONBF, 0);
    StartupTrace("startup: main entered");
-#if defined(_WIN32)
    StartupTrace("startup: initializing JUCE");
    Platform::EnsureJuceInitialised();
    StartupTrace("startup: JUCE initialized");
-#endif
 
    if (getenv("INFINITE_AUDIOPARAMSWEEPTEST") != nullptr)
    {
@@ -26005,14 +27371,14 @@ int main(int argc, char** argv)
       // Gotcha); driver.sh greps for "AUDIO PARAM SWEEP FAIL", it doesn't
       // read $?. A real nonzero exit here would misreport a normal [FAIL] as
       // a [CRASH] in that harness's generic per-check loop.
-      return 0;
+      return HeadlessExit(0);
    }
 
    if (getenv("INFINITE_PLUGINSCANTEST") != nullptr)
-      return RunPluginScanTest();
+      return HeadlessExit(RunPluginScanTest());
 
    if (getenv("INFINITE_DSPTEST") != nullptr)
-      return RunDspTest();
+      return HeadlessExit(RunDspTest());
 
    if (getenv("INFINITE_AUDIOPDCTEST") != nullptr)
    {
@@ -26020,7 +27386,7 @@ int main(int argc, char** argv)
       // Always 0, same reasoning as AUDIOPARAMSWEEPTEST above: the printf
       // verdict line is driver.sh's only signal, not $? - a nonzero exit
       // here would misreport a normal [FAIL] as [CRASH].
-      return 0;
+      return HeadlessExit(0);
    }
 
    // Out-of-process half of the plugin scan: describe ONE bundle and exit. The
@@ -26062,7 +27428,7 @@ int main(int argc, char** argv)
       // Always 0: exit status communicates process health (did this bundle's
       // code crash us?) to the parent's waitpid, not whether any class was
       // found - a bundle with zero usable classes is a normal, clean miss.
-      return 0;
+      return HeadlessExit(0);
    }
 
    StartupTrace("startup: initializing GLFW");
@@ -26075,12 +27441,29 @@ int main(int argc, char** argv)
    Platform::InitDocumentHandlingPostGlfw();
    StartupTrace("startup: GLFW initialized");
 
-   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
-
-   GLFWwindow* window = glfwCreateWindow(1600, 1000, "Untitled - Infinite", nullptr, nullptr);
+   // Turbo: ask for the newest core profile the driver offers (4.6 on any
+   // current NVIDIA/AMD/Intel driver) and fall back to the original 3.2. All
+   // shaders stay #version 150, which every core profile accepts; the newer
+   // context unlocks compute shaders, DSA, texture storage and KHR_debug for
+   // future work. Output windows reuse the same version (shared context).
+   GLFWwindow* window = nullptr;
+   {
+      const int kVersions[][2] = { {4, 6}, {4, 5}, {4, 3}, {3, 3}, {3, 2} };
+      for (const auto& v : kVersions)
+      {
+         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, v[0]);
+         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, v[1]);
+         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
+         window = glfwCreateWindow(1600, 1000, "Untitled - " INFINITE_TURBO_TITLE, nullptr, nullptr);
+         if (window != nullptr)
+         {
+            gGLContextMajor = v[0];
+            gGLContextMinor = v[1];
+            break;
+         }
+      }
+   }
    if (!window)
    {
       fprintf(stderr, "glfwCreateWindow failed\n");
@@ -26089,9 +27472,9 @@ int main(int argc, char** argv)
    }
    StartupTrace("startup: window created");
    gMainWindow = window;
+   Platform::SetFileDialogOwner(window);
 
    glfwMakeContextCurrent(window);
-#if defined(_WIN32)
    glewExperimental = GL_TRUE;
    const GLenum glewResult = glewInit();
    glGetError(); // GLEW may leave a benign GL_INVALID_ENUM on a core profile.
@@ -26102,10 +27485,14 @@ int main(int argc, char** argv)
       glfwTerminate();
       return 1;
    }
-#endif
    StartupTrace("startup: OpenGL initialized");
+   RuntimeLog::Write("OpenGL %d.%d core context: %s | %s", gGLContextMajor, gGLContextMinor,
+                     (const char*)glGetString(GL_RENDERER), (const char*)glGetString(GL_VERSION));
    glfwSwapInterval(1);
    Platform::PreventAppNap();
+   // Turbo 0.34: MMCSS boost of the render thread removed - an MMCSS "Games"
+   // thread at high priority can outrank JUCE's audio thread and cause
+   // buffer underruns. Platform::BoostRenderThread() is kept but unused.
 
    // Covers both the red close button and Cmd+Q: GLFW's Cocoa backend routes
    // applicationShouldTerminate: through the same _glfwInputWindowCloseRequest
@@ -26130,16 +27517,9 @@ int main(int argc, char** argv)
          std::filesystem::u8path(Platform::ExecutablePath()).parent_path();
       candidates.push_back((exeDir / "assets" / "fonts" / "IBMPlexSans-Regular.ttf").u8string());
       candidates.push_back("assets/fonts/IBMPlexSans-Regular.ttf");
-#if defined(_WIN32)
       candidates.push_back("C:/Windows/Fonts/SegUIVar.ttf");
       candidates.push_back("C:/Windows/Fonts/segoeui.ttf");
       candidates.push_back("C:/Windows/Fonts/arial.ttf");
-#else
-      candidates.push_back("/System/Library/Fonts/SFNS.ttf");
-      candidates.push_back("/System/Library/Fonts/HelveticaNeue.ttc");
-      candidates.push_back("/System/Library/Fonts/Helvetica.ttc");
-      candidates.push_back("/System/Library/Fonts/Supplemental/Arial.ttf");
-#endif
       ImGuiIO& io = ImGui::GetIO();
       ImFont* uiFont = nullptr;
       for (const std::string& path : candidates)
@@ -28333,6 +29713,7 @@ int main(int argc, char** argv)
       }
 
       ImGui::NewFrame();
+      PollFileDialogs();
 
       Transport::Instance().Tick(ImGui::GetIO().DeltaTime);
 
@@ -28464,13 +29845,16 @@ int main(int argc, char** argv)
       {
          if (ImGui::BeginMenu("FILE"))
          {
+            ImGui::TextDisabled("%s  (build %s)", INFINITE_TURBO_TITLE, kTurboBuildDate);
+            ImGui::TextDisabled("unofficial Windows mod of Infinite");
+            ImGui::Separator();
             if (ImGui::MenuItem("New", kShortcutNew))
                GuardUnsavedChanges([]() { NewPatch(); });
             if (ImGui::MenuItem("Open...", kShortcutOpen))
             {
-               const std::string path = Platform::OpenPatchDialog();
-               if (!path.empty())
+               StartFileDialog(Platform::OpenPatchDialog, [](const std::string& path) {
                   GuardUnsavedChanges([path]() { LoadPatchFrom(path); });
+               });
             }
 
             if (ImGui::BeginMenu("Open Recent", !Patch::Recents().empty()))
@@ -28480,7 +29864,7 @@ int main(int argc, char** argv)
                const std::vector<std::string> recents = Patch::Recents();
                for (const std::string& entry : recents)
                {
-                  const size_t slash = entry.find_last_of('/');
+                  const size_t slash = entry.find_last_of("/\\");
                   const std::string name =
                      (slash == std::string::npos) ? entry : entry.substr(slash + 1);
                   if (ImGui::MenuItem(name.c_str()))
@@ -28511,7 +29895,7 @@ int main(int argc, char** argv)
                ImGui::Separator();
                if (!gPatchPath.empty())
                {
-                  const size_t slash = gPatchPath.find_last_of('/');
+                  const size_t slash = gPatchPath.find_last_of("/\\");
                   ImGui::TextDisabled("%s", (slash == std::string::npos)
                                                ? gPatchPath.c_str()
                                                : gPatchPath.c_str() + slash + 1);
@@ -28533,6 +29917,30 @@ int main(int argc, char** argv)
                gRequestGroup = true;
             if (ImGui::MenuItem("Ungroup", kShortcutUngroup))
                gRequestUngroup = true;
+            ImGui::EndMenu();
+         }
+
+         if (ImGui::BeginMenu("VIEW"))
+         {
+            if (ImGui::MenuItem("Side panel", "Ctrl+B", gNodePanelOpen))
+               gNodePanelOpen = !gNodePanelOpen;
+            if (ImGui::MenuItem("Fullscreen UI", "F11", gMainFullscreen))
+               SetMainWindowFullscreen(!gMainFullscreen);
+            ImGui::SeparatorText("Output behind the canvas");
+            GraphNode* bgNode = gCanvasBgNodeIndex >= 0 ? FindNodeByIndex(gCanvasBgNodeIndex) : nullptr;
+            if (bgNode != nullptr)
+               ImGui::TextDisabled("showing: %s", NodeTitle(*bgNode).c_str());
+            else
+               ImGui::TextDisabled("off");
+            if (ImGui::MenuItem("Show selected node", "Ctrl+Shift+B"))
+            {
+               const int sel = FirstSelectedImageNodeIndex();
+               if (sel >= 0)
+                  gCanvasBgNodeIndex = sel;
+            }
+            if (ImGui::MenuItem("Turn off", nullptr, false, bgNode != nullptr))
+               gCanvasBgNodeIndex = -1;
+            DrawCanvasBackgroundSettings();
             ImGui::EndMenu();
          }
 
@@ -28612,7 +30020,7 @@ int main(int argc, char** argv)
                }
 
                if (ImGui::Checkbox("Vsync", &gVsync))
-                  glfwSwapInterval(gVsync ? 1 : 0);
+                  gMainSwapIntervalApplied = -1; // re-applied right before the next swap
             }
 
             ImGui::SeparatorText("Theme");
@@ -29022,7 +30430,7 @@ int main(int argc, char** argv)
             snprintf(gpuReadout, sizeof(gpuReadout), "GPU N/A");
          const float gpuWidth = ImGui::CalcTextSize("GPU 100%  VRAM 100%").x;
 
-         const char* searchLabel = "SEARCH";
+         const char* searchLabel = "PANEL";
          const float searchWidth = ImGui::CalcTextSize(searchLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
          const float itemGap = ImGui::GetStyle().ItemSpacing.x * 4.0f;
          const float searchX = readoutX - searchWidth - itemGap;
@@ -29063,8 +30471,14 @@ int main(int argc, char** argv)
             // Sits left of the frame readout with a bit of breathing room,
             // so it reads as its own control rather than glued to the fps text.
             ImGui::SameLine(searchX);
+            if (gNodePanelOpen)
+               ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
             if (ImGui::Button(searchLabel))
                gNodePanelOpen = !gNodePanelOpen;
+            if (gNodePanelOpen)
+               ImGui::PopStyleColor();
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("show / hide the side panel: modules, samples, media, plugins (Ctrl+B)");
          }
 
          ImGui::SameLine(readoutX);
@@ -29192,6 +30606,26 @@ int main(int argc, char** argv)
                                 graphHeight);
 
       ed::GetStyle().GridSpacing = gGridSnap;
+
+      // Turbo: output preview behind the canvas.
+      gCanvasBgActive = false;
+      if (gCanvasBgNodeIndex >= 0)
+      {
+         GraphNode* bgNode = FindNodeByIndex(gCanvasBgNodeIndex);
+         if (bgNode == nullptr)
+            gCanvasBgNodeIndex = -1;
+         else
+            gCanvasBgActive = DrawCanvasBackground(*bgNode, gGraphScreenTL, gGraphScreenSize);
+      }
+      const ImVec4 savedEdBg = ed::GetStyle().Colors[ed::StyleColor_Bg];
+      const ImVec4 savedEdGrid = ed::GetStyle().Colors[ed::StyleColor_Grid];
+      if (gCanvasBgActive)
+      {
+         ed::GetStyle().Colors[ed::StyleColor_Bg].w = 0.0f;
+         if (!gCanvasBgGrid)
+            ed::GetStyle().Colors[ed::StyleColor_Grid].w = 0.0f;
+      }
+
       ed::Begin("graph", ImVec2(graphWidth, graphHeight));
 
       if (!gPendingSelect.empty())
@@ -34556,7 +35990,7 @@ int main(int argc, char** argv)
                             ImColor(t.panelBg.r * (1.0f - kTintWeight) + catColor.r * kTintWeight,
                                     t.panelBg.g * (1.0f - kTintWeight) + catColor.g * kTintWeight,
                                     t.panelBg.b * (1.0f - kTintWeight) + catColor.b * kTintWeight,
-                                    isLight ? 0.95f : 0.784f));
+                                    (isLight ? 0.95f : 0.784f) * (gCanvasBgActive ? gCanvasBgNodeAlpha : 1.0f)));
          ed::PushStyleColor(ed::StyleColor_NodeBorder,
                             ImColor(catColor.r, catColor.g, catColor.b, isLight ? 0.75f : 0.55f));
 
@@ -34884,7 +36318,10 @@ int main(int argc, char** argv)
             else if (auto* n = dynamic_cast<FitNode*>(gn.node.get()))
                DrawFitParams(n);
             else if (auto* n = dynamic_cast<ProjectionNode*>(gn.node.get()))
+            {
                DrawProjectionParams(n);
+               DrawOutputWindowPanel(gn);
+            }
             else if (auto* n = dynamic_cast<LFONode*>(gn.node.get()))
                DrawLFOParams(n);
             else if (auto* n = dynamic_cast<RandomNode*>(gn.node.get()))
@@ -35040,6 +36477,10 @@ int main(int argc, char** argv)
                DrawTextParams(n);
             else if (auto* n = dynamic_cast<LayerStackNode*>(gn.node.get()))
                DrawLayerStackParams(n);
+            else if (auto* n = dynamic_cast<LayoutNode*>(gn.node.get()))
+               DrawLayoutParams(gn, n);
+            else if (auto* n = dynamic_cast<VmpcNode*>(gn.node.get()))
+               DrawVmpcParams(gn, n);
             else if (auto* n = dynamic_cast<BlendNode*>(gn.node.get()))
                DrawBlendParams(n);
             else if (auto* n = dynamic_cast<FilterNode*>(gn.node.get()))
@@ -35050,6 +36491,7 @@ int main(int argc, char** argv)
                ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
                ImGui::TextDisabled("Output keeps the input resolution. Insert fit / resize before it to choose width, height and aspect mode for image or video.");
                ImGui::PopTextWrapPos();
+               DrawOutputWindowPanel(gn);
                ImGui::Dummy(ImVec2(0, 3));
 
                if (n->exportImagePath.empty())
@@ -35104,20 +36546,20 @@ int main(int argc, char** argv)
                      if (!current.filename().empty()) suggested = current.filename().u8string();
                      if (!current.parent_path().empty()) initialDirectory = current.parent_path().u8string();
                   }
-                  std::string selected = Platform::SaveVideoDialog(suggested, initialDirectory);
-                  if (!selected.empty())
-                  {
-                     std::string low = selected;
-                     for (char& c : low) c = (char)tolower((unsigned char)c);
-                     const bool hasMov = low.length() >= 4 && low.rfind(".mov") == low.length() - 4;
-                     const bool hasMp4 = low.length() >= 4 && low.rfind(".mp4") == low.length() - 4;
-                     if (!hasMov && !hasMp4)
-                        selected += n->videoFormat == 1 ? ".mov" : ".mp4";
-                     else
-                        n->videoFormat = hasMov ? 1 : 0;
-                     n->recordVideoPath = selected;
-                     gPatchDirty = true;
-                  }
+                  StartNodeFileDialog(n, [suggested, initialDirectory] { return Platform::SaveVideoDialog(suggested, initialDirectory); },
+                     [](auto* m, const std::string& chosen) {
+                        std::string selected = chosen;
+                        std::string low = selected;
+                        for (char& c : low) c = (char)tolower((unsigned char)c);
+                        const bool hasMov = low.length() >= 4 && low.rfind(".mov") == low.length() - 4;
+                        const bool hasMp4 = low.length() >= 4 && low.rfind(".mp4") == low.length() - 4;
+                        if (!hasMov && !hasMp4)
+                           selected += m->videoFormat == 1 ? ".mov" : ".mp4";
+                        else
+                           m->videoFormat = hasMov ? 1 : 0;
+                        m->recordVideoPath = selected;
+                        gPatchDirty = true;
+                     });
                }
                ImGui::EndDisabled();
                if (n->recordVideoPath.empty())
@@ -35257,6 +36699,36 @@ int main(int argc, char** argv)
       // collision-free space across image/audio/note/modulation/palette
       // cables, same as before; only the offset changed.
       gLinks.clear();
+
+      // Turbo: resolve "which node owns this pointer" through maps built once
+      // per frame instead of scanning every node (with a dynamic_cast each)
+      // for every connected input - that was O(N^2) casts per frame. Keys are
+      // the INode*, IGeometrySource* and IPaletteSource* addresses of each
+      // node (all distinct objects/sub-objects); emplace keeps the first
+      // node in gNodes order, matching the old first-match scans.
+      std::unordered_map<const void*, GraphNode*> linkOwner;
+      std::unordered_map<const IModulator*, std::pair<GraphNode*, int>> linkModOwner;
+      linkOwner.reserve(gNodes.size() * 2);
+      for (GraphNode& src : gNodes)
+      {
+         INode* n = src.node.get();
+         linkOwner.emplace((const void*)n, &src);
+         if (const IGeometrySource* geo = dynamic_cast<IGeometrySource*>(n))
+            linkOwner.emplace((const void*)geo, &src);
+         if (const IPaletteSource* pal = dynamic_cast<IPaletteSource*>(n))
+            linkOwner.emplace((const void*)pal, &src);
+         for (int o = 0; o < std::max(1, n->OutputCount()); o++)
+            if (const IModulator* m = ModulatorForOutput(n, o))
+               linkModOwner.emplace(m, std::make_pair(&src, o));
+      }
+      auto ownerOf = [&linkOwner](const void* p) -> GraphNode*
+      {
+         if (p == nullptr)
+            return nullptr;
+         auto it = linkOwner.find(p);
+         return it == linkOwner.end() ? nullptr : it->second;
+      };
+
       for (GraphNode& gn : gNodes)
       {
          int inputs = InputCountFor(gn);
@@ -35266,30 +36738,20 @@ int main(int argc, char** argv)
             if (cable == nullptr || !cable->IsConnected())
                continue;
 
-            for (GraphNode& src : gNodes)
-            {
-               if (src.node.get() == cable->GetSource())
-               {
-                  gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
-                                     src.OutputPinId(), gn.InputPinId(slot) });
-                  break;
-               }
-            }
+            if (GraphNode* src = ownerOf((const void*)cable->GetSource()))
+               gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
+                                  src->OutputPinId(), gn.InputPinId(slot) });
          }
          for (int slot = 0; slot < kMaxAudioSlots; slot++)
          {
             AudioCable* cable = gn.node->AudioInputSlot(slot);
             if (cable == nullptr || !cable->IsConnected())
                continue;
-            for (GraphNode& src : gNodes)
+            if (GraphNode* src = ownerOf((const void*)cable->GetSource()))
             {
-               if (src.node.get() == cable->GetSource())
-               {
-                  const int audioOutput = dynamic_cast<VideoSourceNode*>(src.node.get()) != nullptr ? 1 : 0;
-                  gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
-                                     src.OutputPinId(audioOutput), gn.InputPinId(slot) });
-                  break;
-               }
+               const int audioOutput = dynamic_cast<VideoSourceNode*>(src->node.get()) != nullptr ? 1 : 0;
+               gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
+                                  src->OutputPinId(audioOutput), gn.InputPinId(slot) });
             }
          }
          for (int slot = 0; slot < kMaxNoteSlots; slot++)
@@ -35297,15 +36759,9 @@ int main(int argc, char** argv)
             NoteCable* cable = gn.node->NoteInputSlot(slot);
             if (cable == nullptr || !cable->IsConnected())
                continue;
-            for (GraphNode& src : gNodes)
-            {
-               if (src.node.get() == cable->GetSource())
-               {
-                  gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
-                                     src.OutputPinId(cable->GetOutputSlot()), gn.InputPinId(slot) });
-                  break;
-               }
-            }
+            if (GraphNode* src = ownerOf((const void*)cable->GetSource()))
+               gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
+                                  src->OutputPinId(cable->GetOutputSlot()), gn.InputPinId(slot) });
          }
       }
       for (GraphNode& gn : gNodes)
@@ -35314,19 +36770,11 @@ int main(int argc, char** argv)
          {
             if (wanted == nullptr)
                return;
-            for (GraphNode& src : gNodes)
-            {
-               // Compared against each interface separately: with multiple
-               // inheritance an IGeometrySource* and an INode* into the same
-               // object are different addresses, so one comparison is not enough.
-               const void* asGeo = dynamic_cast<IGeometrySource*>(src.node.get());
-               if (asGeo == wanted || (const void*)src.node.get() == wanted)
-               {
-                  gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
-                                     src.OutputPinId(), gn.InputPinId(slot) });
-                  return;
-               }
-            }
+            // linkOwner holds both the INode* and the IGeometrySource* address
+            // of every node (they differ under multiple inheritance).
+            if (GraphNode* src = ownerOf(wanted))
+               gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
+                                  src->OutputPinId(), gn.InputPinId(slot) });
          };
 
          // Render3DNode's geometry slots are found generically below via
@@ -35343,28 +36791,17 @@ int main(int argc, char** argv)
                linkFromNode(*field, slot);
          if (auto* setColor = dynamic_cast<SetColorNode*>(gn.node.get()))
          {
-            if (setColor->paletteInput != nullptr)
-               for (GraphNode& src : gNodes)
-                  if (dynamic_cast<IPaletteSource*>(src.node.get()) == setColor->paletteInput)
-                  {
-                     gLinks.push_back({ kLinkIdBase + gn.InputPinId(2),
-                                         src.OutputPinId(), gn.InputPinId(2) });
-                     break;
-                  }
+            if (GraphNode* src = ownerOf((const void*)setColor->paletteInput))
+               gLinks.push_back({ kLinkIdBase + gn.InputPinId(2),
+                                  src->OutputPinId(), gn.InputPinId(2) });
          }
 
          auto* audio = dynamic_cast<AudioAnalyzeNode*>(gn.node.get());
          if (audio != nullptr && audio->fileSource != nullptr)
          {
-            for (GraphNode& src : gNodes)
-            {
-               if (src.node.get() == audio->fileSource)
-               {
-                  gLinks.push_back({ kLinkIdBase + gn.InputPinId(0),
-                                     src.OutputPinId(), gn.InputPinId(0) });
-                  break;
-               }
-            }
+            if (GraphNode* src = ownerOf((const void*)static_cast<INode*>(audio->fileSource)))
+               gLinks.push_back({ kLinkIdBase + gn.InputPinId(0),
+                                  src->OutputPinId(), gn.InputPinId(0) });
          }
 
          int modCount = gn.node->ModulatorInputCount();
@@ -35375,21 +36812,10 @@ int main(int argc, char** argv)
             IModulator* wanted = *gn.node->ModulatorInputSlot(slot);
             if (wanted == nullptr)
                continue;
-            bool found = false;
-            for (GraphNode& src : gNodes)
-            {
-               for (int o = 0; o < std::max(1, src.node->OutputCount()) && !found; o++)
-               {
-                  if (ModulatorForOutput(src.node.get(), o) == wanted)
-                  {
-                     gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
-                                        src.OutputPinId(o), gn.InputPinId(slot) });
-                     found = true;
-                  }
-               }
-               if (found)
-                  break;
-            }
+            auto mod = linkModOwner.find(wanted);
+            if (mod != linkModOwner.end())
+               gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
+                                  mod->second.first->OutputPinId(mod->second.second), gn.InputPinId(slot) });
          }
       }
 
@@ -35628,7 +37054,7 @@ int main(int argc, char** argv)
                      }
                      else if (dynamic_cast<AudioAnalyzeNode*>(dstNode->node.get()) != nullptr)
                      {
-                        rejectReason = "Audio Analyze only accepts an Audio File node";
+                        rejectReason = "Audio Analyze only accepts an audio cable";
                      }
                      else if (dstNode->node->ModulatorInputSlot(slot) != nullptr && dynamic_cast<ImageAnalyzeNode*>(dstNode->node.get()) == nullptr)
                      {
@@ -36335,6 +37761,65 @@ int main(int argc, char** argv)
                      }
                      ImGui::EndMenu();
                   }
+                  // Turbo: exact size in pixels + how the image maps to it.
+                  if (ImGui::BeginMenu("Size (pixels)"))
+                  {
+                     int fbW = 0, fbH = 0;
+                     glfwGetFramebufferSize(projector->window, &fbW, &fbH);
+                     ImGui::TextDisabled("current: %d x %d px", fbW, fbH);
+                     static int sReqW = 1920, sReqH = 1080;
+                     static int sReqFor = -1;
+                     if (sReqFor != gn->index)
+                     {
+                        sReqW = projector->pixelW > 0 ? projector->pixelW : fbW;
+                        sReqH = projector->pixelH > 0 ? projector->pixelH : fbH;
+                        sReqFor = gn->index;
+                     }
+                     ImGui::SetNextItemWidth(90.0f);
+                     ImGui::InputInt("W##outw", &sReqW, 0, 0);
+                     ImGui::SameLine();
+                     ImGui::SetNextItemWidth(90.0f);
+                     ImGui::InputInt("H##outh", &sReqH, 0, 0);
+                     if (ImGui::Button("Apply"))
+                        SetProjectorPixelSize(*projector, sReqW, sReqH);
+                     ImGui::Separator();
+                     struct Preset { const char* label; int w, h; };
+                     static const Preset kPresets[] = {
+                        { "1920 x 1080 (Full HD)", 1920, 1080 }, { "1280 x 720 (HD)", 1280, 720 },
+                        { "3840 x 2160 (4K UHD)", 3840, 2160 }, { "2560 x 1440 (QHD)", 2560, 1440 },
+                        { "1080 x 1920 (vertical)", 1080, 1920 }, { "1080 x 1080 (square)", 1080, 1080 },
+                        { "1024 x 768 (4:3)", 1024, 768 }, { "800 x 600 (4:3)", 800, 600 } };
+                     for (const Preset& p : kPresets)
+                        if (ImGui::MenuItem(p.label))
+                        {
+                           sReqW = p.w; sReqH = p.h;
+                           SetProjectorPixelSize(*projector, p.w, p.h);
+                        }
+                     const int srcW = gn->node->GetOutputWidth(), srcH = gn->node->GetOutputHeight();
+                     if (srcW > 0 && srcH > 0)
+                     {
+                        char label[64];
+                        snprintf(label, sizeof(label), "Source size (%d x %d)", srcW, srcH);
+                        if (ImGui::MenuItem(label))
+                        {
+                           sReqW = srcW; sReqH = srcH;
+                           SetProjectorPixelSize(*projector, srcW, srcH);
+                        }
+                     }
+                     ImGui::EndMenu();
+                  }
+                  if (ImGui::BeginMenu("Scaling"))
+                  {
+                     static const char* kFitNames[] = { "Fit (letterbox, black bars)", "Real pixels 1:1 (centred)",
+                                                        "Fill (crop to cover)", "Stretch" };
+                     for (int m = 0; m < 4; m++)
+                        if (ImGui::MenuItem(kFitNames[m], nullptr, projector->fitMode == m))
+                        {
+                           projector->fitMode = m;
+                           gProjectorDefaultFitMode = m;
+                        }
+                     ImGui::EndMenu();
+                  }
                   ImGui::Separator();
                   if (ImGui::MenuItem("Close output window"))
                      CloseProjectorWindowFor(gn->index);
@@ -36345,6 +37830,11 @@ int main(int argc, char** argv)
             {
                if (ImGui::MenuItem("Open output window"))
                   OpenProjectorWindow(window, *gn);
+            }
+            if (CanShowBehindCanvas(*gn))
+            {
+               if (ImGui::MenuItem("Show behind the canvas", "Ctrl+Shift+B", gCanvasBgNodeIndex == gn->index))
+                  ToggleCanvasBackground(gn->index);
             }
             if (ImGui::MenuItem("Help"))
             {
@@ -37012,6 +38502,8 @@ int main(int argc, char** argv)
          gRequestFitView = true; // dev screenshot: frame the whole fixture
 
       ed::End();
+      ed::GetStyle().Colors[ed::StyleColor_Bg] = savedEdBg;
+      ed::GetStyle().Colors[ed::StyleColor_Grid] = savedEdGrid;
       ed::SetCurrentEditor(nullptr);
 
       io.MouseWheel = savedWheel;
@@ -37380,12 +38872,12 @@ int main(int argc, char** argv)
          ImGui::Text("This patch has unsaved changes.");
          ImGui::Text("Save before closing?");
          ImGui::Separator();
-         if (ImGui::Button("Save", ImVec2(100, 0)))
+         // Proceeds only once the save actually went through - a cancelled
+         // Save As dialog or a write failure never sets gUnsavedSaveDone, so
+         // the modal stays up and the user can try again.
+         if (gUnsavedSaveDone)
          {
-            SavePatchInteractive(false);
-            // Only proceed if the save actually went through - a cancelled
-            // Save As dialog or a write failure leaves gPatchDirty set, and
-            // the modal should stay up so the user can try again.
+            gUnsavedSaveDone = false;
             if (!gPatchDirty)
             {
                if (gPendingUnsavedAction)
@@ -37394,6 +38886,8 @@ int main(int argc, char** argv)
                ImGui::CloseCurrentPopup();
             }
          }
+         if (ImGui::Button("Save", ImVec2(100, 0)))
+            SavePatchInteractive(false, []() { gUnsavedSaveDone = true; });
          ImGui::SameLine();
          if (ImGui::Button("Don't Save", ImVec2(100, 0)))
          {
@@ -37418,9 +38912,9 @@ int main(int argc, char** argv)
          static std::string sLastTitle;
          std::string base = gPatchPath.empty()
             ? std::string("Untitled")
-            : gPatchPath.substr(gPatchPath.find_last_of('/') + 1);
+            : gPatchPath.substr(gPatchPath.find_last_of("/\\") + 1);
          std::string title = (gPatchDirty ? std::string("\xE2\x80\xA2 ") : std::string()) +
-            base + " \xE2\x80\x94 Infinite";
+            base + " \xE2\x80\x94 " INFINITE_TURBO_TITLE;
          if (title != sLastTitle)
          {
             glfwSetWindowTitle(window, title.c_str());
@@ -37967,6 +39461,7 @@ int main(int argc, char** argv)
          }
       }
 
+      ApplyMainSwapInterval((gVsync && gProjectorWindows.empty()) ? 1 : 0);
       glfwSwapBuffers(window);
 
       // glfwSwapBuffers blocks on vsync - dead time for AppKit to service a
@@ -37994,11 +39489,20 @@ int main(int argc, char** argv)
          }
 
          GLFWwindow* projWindow = gProjectorWindows[i].window;
-#if defined(_WIN32)
          if (gProjectorWindows[i].fullscreen && refreshProjectorTopmost)
             Platform::ReassertOutputWindowTopmost(projWindow);
-#endif
          glfwMakeContextCurrent(projWindow);
+         {
+            // Backwards loop: index 0 is presented last, so it is the one
+            // that waits for VSync (a single wait per frame, see
+            // ApplyMainSwapInterval).
+            const int wantInterval = (gVsync && i == 0) ? 1 : 0;
+            if (gProjectorWindows[i].swapInterval != wantInterval)
+            {
+               glfwSwapInterval(wantInterval);
+               gProjectorWindows[i].swapInterval = wantInterval;
+            }
+         }
          int pw, ph;
          glfwGetFramebufferSize(projWindow, &pw, &ph);
 
@@ -38026,12 +39530,13 @@ int main(int argc, char** argv)
             if (dynamic_cast<ProjectionNode*>(src->node.get()) != nullptr)
                GLUtil::DrawTextureToScreen(tex, pw, ph, 0, 0, /*checkerBg=*/false);
             else
-               GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/false);
+               GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/false,
+                                           gProjectorWindows[i].fitMode);
          }
          else
          {
             glViewport(0, 0, pw, ph);
-            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
          }
          glfwSwapBuffers(projWindow);
@@ -38052,23 +39557,30 @@ int main(int argc, char** argv)
       // bindings do not swallow them, and gated on no text field having focus
       // so typing an 'S' into a Text node does not save the patch.
       if (!ImGui::GetIO().WantTextInput &&
-#if defined(_WIN32)
           ImGui::GetIO().KeyCtrl)
-#else
-          ImGui::GetIO().KeySuper)
-#endif
       {
          if (ImGui::IsKeyPressed(ImGuiKey_S, false))
             SavePatchInteractive(ImGui::GetIO().KeyShift);
          else if (ImGui::IsKeyPressed(ImGuiKey_O, false))
          {
-            const std::string path = Platform::OpenPatchDialog();
-            if (!path.empty())
+            StartFileDialog(Platform::OpenPatchDialog, [](const std::string& path) {
                GuardUnsavedChanges([path]() { LoadPatchFrom(path); });
+            });
          }
          else if (ImGui::IsKeyPressed(ImGuiKey_N, false))
             GuardUnsavedChanges([]() { NewPatch(); });
+         else if (ImGui::IsKeyPressed(ImGuiKey_B, false))
+         {
+            if (ImGui::GetIO().KeyShift)
+               ToggleCanvasBackgroundForSelection();
+            else
+               gNodePanelOpen = !gNodePanelOpen;
+         }
       }
+      // Turbo: F11 in the editor = borderless fullscreen UI (an output
+      // window keeps its own F11, it has its own key callback).
+      if (ImGui::IsKeyPressed(ImGuiKey_F11, false))
+         SetMainWindowFullscreen(!gMainFullscreen);
 
       // Absolute-deadline frame limiter. Carrying the deadline forward avoids
       // permanently losing cadence after one oversleep on Windows.
@@ -38092,9 +39604,10 @@ int main(int argc, char** argv)
          }
          else
          {
+            // Turbo: high-resolution timer sleep, then at most ~1 ms of spin.
             const double slack = deadline - glfwGetTime();
-            if (slack > 0.004)
-               std::this_thread::sleep_for(std::chrono::duration<double>(slack - 0.0025));
+            if (slack > 0.0015)
+               Platform::PreciseSleep(slack - 0.001);
             while (glfwGetTime() < deadline)
                std::this_thread::yield();
          }

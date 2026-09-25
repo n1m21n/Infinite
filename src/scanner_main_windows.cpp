@@ -72,5 +72,11 @@ int wmain(int argc, wchar_t** argv)
       }
       std::fflush(stdout);
    }
+   // Turbo: leave without running static destructors / DLL unload. Several
+   // plugins (notably Native Instruments) crash while being torn down, which
+   // turned a successful scan into a non-zero exit. Everything useful has
+   // already been written and flushed above.
+   std::fflush(stdout);
+   TerminateProcess(GetCurrentProcess(), 0);
    return 0;
 }

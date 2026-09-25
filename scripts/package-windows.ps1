@@ -1,10 +1,10 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$exe = Join-Path $root 'build\windows-vs2022\Release\Infinite.exe'
+$exe = Join-Path $root 'build\windows-vs2022\Release\Infinite-Turbo.exe'
 $scanner = Join-Path $root 'build\windows-vs2022\Release\infinite-vst3-scanner.exe'
 $distRoot = Join-Path $root 'dist'
-$package = Join-Path $distRoot 'Infinite-Windows-x64'
-$zip = Join-Path $distRoot 'Infinite-Windows-x64.zip'
+$package = Join-Path $distRoot 'Infinite-Turbo-Windows-x64'
+$zip = Join-Path $distRoot 'Infinite-Turbo-Windows-x64.zip'
 
 if (-not (Test-Path -LiteralPath $exe)) {
     throw "Executavel nao encontrado: $exe"
@@ -23,6 +23,7 @@ Copy-Item -LiteralPath $scanner -Destination $package
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $package
 Copy-Item -LiteralPath (Join-Path $root 'README.md') -Destination $package
 Copy-Item -LiteralPath (Join-Path $root 'WINDOWS_BUILD.md') -Destination $package
+Copy-Item -LiteralPath (Join-Path $root 'CHANGELOG-TURBO.md') -Destination $package
 Copy-Item -LiteralPath (Join-Path $root 'PACKAGE_MANIFEST.txt') -Destination $package
 Copy-Item -LiteralPath (Join-Path $root 'run-windows.bat') -Destination $package
 Copy-Item -LiteralPath (Join-Path $root 'diagnose-windows.bat') -Destination $package
@@ -62,8 +63,8 @@ if ($ffmpeg) {
 $commit = 'pacote sem metadados Git'
 try { $commit = (git -C $root rev-parse HEAD).Trim() } catch {}
 @"
-Infinite Windows x64
-Revisao: R31A
+Infinite-Turbo (for Windows) x64
+Versao: 0.32.0-turbo (base R31A)
 Origem: https://github.com/n1m21n/Infinite
 Commit-base: $commit
 Configuracao: Release, VST3 ON, Spout ON, x64-windows-static

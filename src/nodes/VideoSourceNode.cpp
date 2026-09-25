@@ -218,6 +218,9 @@ void VideoSourceNode::EnsurePlaceholder()
 
    mWidth = kSize;
    mHeight = kSize;
+   mTexW = kSize;
+   mTexH = kSize;
+   mRevision = NextTextureRevision();
    mHasPlaceholder = true;
 }
 
@@ -423,15 +426,26 @@ void VideoSourceNode::CookIfNeeded(int frameId)
    {
       const int w = Platform::VideoWidth(mVideo);
       const int h = Platform::VideoHeight(mVideo);
-      if (w > 0 && h > 0)
+      if (w > 0 && h > 0 && mFrame.size() >= (size_t)w * (size_t)h * 3)
       {
+         // BGR8 straight from the decoder; the driver swizzles on upload.
+         // Storage is (re)allocated only when the size changes - every other
+         // frame is a plain sub-image update into the existing texture.
          glBindTexture(GL_TEXTURE_2D, mTex);
          glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, mFrame.data());
+         if (w != mTexW || h != mTexH)
+         {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_BGR, GL_UNSIGNED_BYTE, mFrame.data());
+            mTexW = w;
+            mTexH = h;
+         }
+         else
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_BGR, GL_UNSIGNED_BYTE, mFrame.data());
          glBindTexture(GL_TEXTURE_2D, 0);
          mWidth = w;
          mHeight = h;
          mHasPlaceholder = false;
+         mRevision = NextTextureRevision();
       }
    }
 }

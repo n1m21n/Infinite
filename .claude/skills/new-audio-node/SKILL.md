@@ -196,7 +196,7 @@ For each node add:
   `AUDIOTEARDOWNSWEEPTEST` (spawn, wire into a running graph, delete
   mid-playback, keep rendering — no crash, zero xruns).
 
-Then run `/run-infinite-hygiene` before committing.
+Then run `/run-turbo-tests` before committing.
 
 ---
 
@@ -211,7 +211,7 @@ A node is done when all of these hold:
    real chain ending at `Audio Out`.
 4. Its params survive save → load → undo → copy/paste → delete unchanged.
 5. Deleting it mid-playback does not crash and logs zero xruns.
-6. Its DSP fixture prints `OK`; `/run-infinite-hygiene` passes.
+6. Its DSP fixture prints `OK`; `/run-turbo-tests` passes.
 7. `ARCHITECTURE.md`'s audio section and `docs/plans/audio/README.md` §3 are
    updated to mark it shipped.
 

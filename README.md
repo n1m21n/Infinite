@@ -1,35 +1,86 @@
-# Infinite Windows R31a
+# Infinite-Turbo (for Windows)
 
-[![Windows x64](https://github.com/ricardopalmieri/Infinite/actions/workflows/windows-build.yml/badge.svg?branch=windows%2Fr31a-snapshot)](https://github.com/ricardopalmieri/Infinite/actions/workflows/windows-build.yml)
 [![Original project](https://img.shields.io/badge/original-n1m21n%2FInfinite-181717?logo=github)](https://github.com/n1m21n/Infinite)
 [![Discord](https://img.shields.io/badge/Discord-Infinite-5865F2?logo=discord&logoColor=white)](https://discord.gg/wpKdexvhn)
 
-Infinite is a node-based audiovisual modular workstation combining realtime image and video processing, procedural 3D, audio synthesis, DSP, plugin hosting, MIDI, OSC and cross-domain CV modulation.
+**Current version: 0.36.0-turbo** (shown in the window title and in the FILE menu, with the build date).
 
-This branch contains the complete community Windows R31a port. It was developed from upstream commit [`788404a`](https://github.com/n1m21n/Infinite/commit/788404af4b378941394e2d5dcc45c5542cc903fd) and tested as a standalone Windows 11 application.
+Infinite-Turbo is a **mod of Infinite**, the node-based audiovisual modular workstation by Naman Soni (realtime image and video processing, procedural 3D, audio synthesis, DSP, VST3 hosting, MIDI, OSC and cross-domain CV modulation). It is unofficial and Windows-only.
 
-> The original project was created by [Naman Soni](https://github.com/n1m21n). The Windows R31a port was developed and tested by [Ricardo Palmieri](https://github.com/ricardopalmieri) / Noisetupi. This branch is provided for testing, collaboration and eventual upstream integration.
+What "mod" means here:
+
+- The core is Infinite: same node graph, same modules, same way of patching, and patches still use the `.inf` extension.
+- On top of it, Infinite-Turbo adds Windows-specific fixes and tuning (audio thread priorities, VST3 hosting, output windows, build scripts) and new modules of its own: **Layout**, **MPC**, **MPC Out**, **VMPC**, **Looper** and **Super Mixer**.
+- Patches that use Turbo-only modules do not open in upstream Infinite, and the two versions are not guaranteed to open each other's files.
+- Problems found in Infinite-Turbo should be reported here, not to the upstream project.
+
+Infinite-Turbo started from the Windows R31a community port (upstream commit [`788404a`](https://github.com/n1m21n/Infinite/commit/788404af4b378941394e2d5dcc45c5542cc903fd)). From 0.32 on it targets Windows 10/11 x64 only: every macOS code path was removed so the codebase can be tuned for performance, compatibility and usability on Windows. See [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
+
+> The original project was created by [Naman Soni](https://github.com/n1m21n). Infinite-Turbo is maintained by [Ricardo Palmieri](https://github.com/ricardopalmieri) / Noisetupi. It is not an official Infinite release.
 
 ![Infinite node graph](docs/screenshot.png)
 
-## Download
+## Quick start
 
-Download the latest prebuilt Windows package from:
-
-**[Infinite Windows R31a Releases](https://github.com/ricardopalmieri/Infinite/releases/tag/windows-r31a)**
-
-The prebuilt package contains `Infinite.exe`, runtime files, FFmpeg, segmentation models, documentation and launch helpers.
-
-### Run the prebuilt version
-
-1. Download `Infinite-Windows-R31a-x64.zip`.
-2. Extract the complete ZIP to a writable folder.
-3. Run `install-runtime.bat` once.
-4. Run `run-windows.bat` or open `Infinite.exe`.
+| I want to... | Run |
+|---|---|
+| use a prebuilt ZIP | extract it to a writable folder, run `install-runtime.bat` once, then `run-windows.bat` |
+| set up a dev machine (first time) | `install-dependencies.bat` (UAC, installs VS Build Tools, vcpkg, libraries, Windows ML, models) |
+| compile the test build (default) | `build-windows.bat` (exe in `build\windows-vs2022\Release`) |
+| compile + package (dist folder + ZIP) | `build-windows.bat pack` |
+| debug build | `build-windows.bat debug` |
+| reconfigure from scratch | `build-windows.bat fresh` |
+| run the build | `run-windows.bat` |
+| run the automatic tests | `test-windows.bat` (`-Quick` for a smoke run; results in `build\test-results\summary.txt`) |
+| collect a startup report | `diagnose-windows.bat` (writes `Infinite-Turbo-diagnostic.log`) |
 
 Do not run the application from inside the ZIP.
 
-## Windows R31a highlights
+## What's new in Infinite-Turbo
+
+| Area | Turbo addition |
+|---|---|
+| Canvas preview | any image node's output drawn behind the node canvas, under the patch (like TouchDesigner's background preview), with scaling, darken, node opacity and grid options |
+| Live-coding view | the whole UI goes borderless fullscreen (F11); combine it with the canvas preview and a hidden side panel to patch on top of the image |
+| File dialogs | open/save dialogs no longer pause playback, video or outputs, and always open in front of the editor (also in fullscreen) |
+| Side panel | PANEL button in the top bar, Ctrl+B or VIEW > Side panel |
+| Layout node | TouchDesigner-style canvas of exact pixel size (e.g. 1920 x 1080) with 8 image inputs. Each layer starts at the real pixel size of its source; set x/y in canvas pixels, scale (anchored at the layer centre) or an exact width/height, opacity; drag layers on the miniature; 1:1 / fit / fill / centre buttons; x, y, scale and opacity have CV pins |
+| MPC node | 16 sample pads, one shot / gate / loop toggle, manual trim in/out (drag the handles on the waveform or type the values), per-pad volume, pitch and pan, CV pin per pad; MPC Out gives any pad its own output |
+| VMPC node | the MPC for video: 16 pads with one video clip each (one shot / gate / loop, trim in/out, speed, reverse), triggered by mouse, CV pins or MIDI notes; outputs the clip of the last pad hit |
+| Looper node | REC / PLAY / DUB / CLEAR, bar-synced length, forward / reverse / ping-pong, round-trip latency compensation (auto + manual offset) |
+| Super Mixer node | 16 channels with input gain, fader, pan, mute, solo and 3-band EQ, master fader, CV pin on every control |
+| Projection node | transparent (alpha) outside the warped image, per-edge edge blend (left / right / top / bottom, width, curve, gamma) fading the alpha or darkening RGB, antialiased outline |
+| Audio Analyze | its input takes any audio cable (synth, VST, Audio In, mixer, Audio File), besides the live device input |
+| Output windows | exact size in pixels, Fit / Real pixels 1:1 / Fill / Stretch, black background; in the node's parameters (OUTPUT WINDOW section) and in the node's right-click menu |
+| VST3 | MIDI reaches instrument plugins, longer scan timeout, single-file `.vst3` plugins found (Kontakt and other Native Instruments plugins) |
+| Audio | no more competing MMCSS priority on the render thread (fewer buffer underruns), denormal protection on the audio thread |
+| Build | `build-windows.bat` builds only the test exe; `pack` makes the distributable; `test-windows.bat` runs the self-tests |
+
+Full list per version: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
+
+## Live coding: output behind the patch
+
+1. Select the node whose image you want to see (Output, Projection, Layout, any image node).
+2. Press **Ctrl+Shift+B** (or right-click the node > *Show behind the canvas*, or *SHOW BEHIND CANVAS* in its parameters).
+3. Press **Ctrl+B** to hide the side panel and **F11** to put the UI in fullscreen.
+4. Adjust in **VIEW > Output behind the canvas**: scaling (fit, real pixels 1:1, fill, stretch), darken, node opacity and grid.
+
+Ctrl+Shift+B again turns the preview off. An output window can stay open on a projector at the same time.
+
+### Shortcuts
+
+| Keys | Action |
+|---|---|
+| F11 (editor focused) | UI fullscreen on/off |
+| F11 (output window focused) | output window fullscreen on/off |
+| Ctrl+B | side panel on/off |
+| Ctrl+Shift+B | selected node behind the canvas on/off |
+| Ctrl+N / Ctrl+O / Ctrl+S / Ctrl+Shift+S | new / open / save / save as |
+| Ctrl+Z / Ctrl+Shift+Z | undo / redo |
+| Ctrl+G / Ctrl+Shift+G | group / ungroup |
+| Double-click a slider, knob or drag field | type a value |
+
+## Features inherited from the R31a port
 
 ### Native Windows build and runtime
 
@@ -110,7 +161,7 @@ Do not run the application from inside the ZIP.
 
 ## Platform mapping
 
-| Original macOS integration | Windows R31a implementation |
+| Original macOS integration | Infinite-Turbo implementation |
 |---|---|
 | CoreAudio | JUCE and WASAPI |
 | CoreMIDI | JUCE Windows MIDI |
@@ -131,11 +182,11 @@ Do not run the application from inside the ZIP.
 - Approximately 35 GB of free disk space for the first dependency build.
 - Internet access during dependency installation.
 
-### Clone the Windows branch
+### Clone
 
 ```bat
-git clone --branch windows/r31a-snapshot --recursive https://github.com/ricardopalmieri/Infinite.git
-cd Infinite
+git clone https://github.com/ricardopalmieri/Infinite.git Infinite-Turbo
+cd Infinite-Turbo
 ```
 
 ### Install build dependencies
@@ -148,24 +199,38 @@ Accept the UAC prompt. The installer prepares Git, CMake, Visual Studio Build To
 
 The first installation can take a long time because large C++ dependencies may be compiled locally.
 
-### Compile and package
+### Compile
 
 ```bat
 build-windows.bat
 ```
 
-Build outputs:
+This builds only the test executable:
 
 ```text
-dist\Infinite-Windows-x64\Infinite.exe
-dist\Infinite-Windows-x64.zip
+build\windows-vs2022\Release\Infinite-Turbo.exe
+```
+
+Use `build-windows.bat fresh` after changing the version in `CMakeLists.txt` or after a dependency update.
+
+### Package (release)
+
+```bat
+build-windows.bat pack
+```
+
+Package outputs:
+
+```text
+dist\Infinite-Turbo-Windows-x64\Infinite-Turbo.exe
+dist\Infinite-Turbo-Windows-x64.zip
 ```
 
 Detailed build instructions and troubleshooting are available in [WINDOWS_BUILD.md](WINDOWS_BUILD.md).
 
 ## Runtime files and user data
 
-Infinite stores Windows user data under `%LOCALAPPDATA%\Infinite`:
+Infinite-Turbo stores user data under `%LOCALAPPDATA%\Infinite` (same folder as the R31a port, so existing settings, plugin index and models keep working):
 
 ```text
 Infinite.settings
@@ -181,10 +246,11 @@ These files are not stored in the repository or inside patch documents.
 ## Troubleshooting
 
 - Run `diagnose-windows.bat` if the application exits during startup.
-- Use `Rescan plugins` after changing VST3 folders.
+- Use `Rescan plugins` after changing VST3 folders. Only VST3 is supported; VST2 plugins (`.dll`) are not.
+- "Buffer underruns detected": raise the audio buffer size in the audio settings, and close other audio applications that use the same device.
 - Confirm that Spout sender and receiver use the same GPU.
 - Update the GPU driver if DirectML fails, then use the CPU fallback while investigating.
-- Confirm that `ffmpeg.exe` is beside `Infinite.exe` when recording or playing video audio.
+- Confirm that `ffmpeg.exe` is beside `Infinite-Turbo.exe` when recording or playing video audio.
 - Avoid running the project from OneDrive-synchronized or read-only folders during the first build.
 
 ## Project structure
@@ -193,7 +259,7 @@ These files are not stored in the repository or inside patch documents.
 src/core/       graph, patch, transport, modulation and rendering infrastructure
 src/nodes/      visual, 3D, audio, MIDI, CV and UI nodes
 src/audio/      audio engine, DSP, plugin scanning and file writing
-src/platform/   macOS and Windows platform implementations
+src/platform/   Windows platform layer (JUCE, OpenCV, Spout2, Windows ML, Win32)
 cmake/          platform resources
 scripts/        source and runtime packaging
 assets/         icons, fonts and example patches
@@ -203,7 +269,7 @@ assets/         icons, fonts and example patches
 
 The canonical upstream project is [n1m21n/Infinite](https://github.com/n1m21n/Infinite).
 
-Windows R31a is preserved as a tested snapshot. Compatibility work with newer upstream commits should happen in a separate branch so this reference build remains reproducible.
+The R31a snapshot remains on the `windows/r31a-snapshot` branch. Infinite-Turbo is Windows-only and diverges from upstream; upstream changes are ported selectively.
 
 Bug reports should include:
 
@@ -216,7 +282,7 @@ Bug reports should include:
 ## Credits
 
 - Original Infinite project: [Naman Soni](https://github.com/n1m21n).
-- Windows R31a port and testing: [Ricardo Palmieri](https://github.com/ricardopalmieri) / Noisetupi.
+- Windows port, Infinite-Turbo and testing: [Ricardo Palmieri](https://github.com/ricardopalmieri) / Noisetupi.
 - Infinite's module architecture is a descendant of [BespokeSynth](https://github.com/BespokeSynth/BespokeSynth).
 - Third-party projects include Dear ImGui, imgui-node-editor, GLFW, JUCE, OpenCV, FFmpeg, Spout2, Assimp, Windows ML, DirectML, stb and others listed in the build files.
 

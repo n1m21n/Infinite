@@ -1,6 +1,5 @@
 #include "TextNode.h"
 
-#if defined(_WIN32)
 
 #include "core/RuntimeLog.h"
 #include "platform/OpenGLHeaders.h"
@@ -465,4 +464,3 @@ void TextNode::CookIfNeeded(int frameId)
    }
 }
 
-#endif

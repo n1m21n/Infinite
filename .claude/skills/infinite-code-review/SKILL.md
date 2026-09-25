@@ -205,10 +205,10 @@ expensive because the user acts on these.
   field is invisible in a hunk and obvious in the file.
 - **Build it.** If the change is substantial:
   ```bash
-  .claude/skills/run-infinite-hygiene/driver.sh
+  test-windows.bat
   ```
-  For an audio node specifically, `.claude/skills/audio-node-sweep/driver.sh`;
-  for a geometry node, `.claude/skills/geometry-transform-sweep/driver.sh`.
+  For an audio node specifically, `test-windows.bat -Only AUDIOPARAMSWEEPTEST,AUDIOTEARDOWNSWEEPTEST`;
+  for a geometry node, `test-windows.bat -Only TRANSFORMSWEEPTEST,MAPPINGSWEEPTEST,REVISIONSWEEPTEST,RENDER3DCACHESWEEPTEST`.
   A sweep failure is a confirmed finding with a reproduction attached — worth
   far more than a read-only suspicion.
 - **Distinguish confirmed from suspected** in the report, and say which

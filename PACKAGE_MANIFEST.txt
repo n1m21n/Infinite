@@ -1,27 +1,21 @@
-Infinite Windows source package
-Generated: 2026-08-24
-Revision: 31a - R31 pipelines plus MSVC incomplete-type build fix
+Infinite-Turbo (for Windows) - source package
+Version: 0.32.0-turbo (base: Windows R31a port)
 Upstream: https://github.com/n1m21n/Infinite
 Upstream commit: 788404af4b378941394e2d5dcc45c5542cc903fd
-Target: Windows 10/11 x64, Visual Studio 2022
-Enabled by default: VST3, MIDI/WASAPI, Spout2, OpenCV video/camera/DNN, Assimp, FFmpeg mux, Windows ML + DirectML matting
+Target: Windows 10/11 x64 only, Visual Studio 2022 (MSVC), vcpkg x64-windows-static
+Enabled by default: VST3 (JUCE), MIDI/WASAPI, Spout2, OpenCV video/camera/DNN, Assimp, FFmpeg mux, Windows ML + DirectML matting, AVX2
 Fallback: OpenCV DNN CPU for Remove Background
 
 Entry points:
-- PATCH-R31A-INSTRUCOES.txt
-- install-dependencies.bat
-- build-windows.bat
+- install-dependencies.bat   first-time dev setup (UAC)
+- build-windows.bat          [debug] [fresh] [nopack]
 - run-windows.bat
+- install-runtime.bat        for prebuilt ZIP users
 - diagnose-windows.bat
-- WINDOWS_BUILD.md
+- WINDOWS_BUILD.md, CHANGELOG-TURBO.md
 
-The Windows build package may omit promotional website/video media and the
-macOS-only external/vst3sdk tree. Neither is consumed by the Windows CMake
-target; JUCE supplies the VST3 host implementation used on Windows.
-
-The GitHub source delivery also omits historical PATCH-R8..R31 files,
-apply-r22.bat, crash reports, promotional PDFs, website output and large demo
-videos. They are not used by CMake, the installers or the runtime.
+macOS sources (Objective-C++ platform layer, Syphon, Steinberg VST3 SDK
+submodule, app bundle resources, DMG tooling, website) were removed in 0.32.
 
 Bundled UI font:
 - assets/fonts/IBMPlexSans-Regular.ttf

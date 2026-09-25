@@ -81,19 +81,12 @@ void PluginScanner::StartScan(const std::string& folder)
    }
    else
    {
-#if defined(_WIN32)
       if (const char* common = getenv("CommonProgramFiles"))
          vst3Folders.push_back((fs::u8path(common) / "VST3").u8string());
       if (const char* commonX86 = getenv("CommonProgramFiles(x86)"))
          vst3Folders.push_back((fs::u8path(commonX86) / "VST3").u8string());
       if (const char* local = getenv("LOCALAPPDATA"))
          vst3Folders.push_back((fs::u8path(local) / "Programs" / "Common" / "VST3").u8string());
-#else
-      vst3Folders.push_back("/Library/Audio/Plug-Ins/VST3");
-      const char* home = getenv("HOME");
-      if (home != nullptr)
-         vst3Folders.push_back(std::string(home) + "/Library/Audio/Plug-Ins/VST3");
-#endif
       for (const std::string& userFolder : mFolders)
          if (std::find(vst3Folders.begin(), vst3Folders.end(), userFolder) == vst3Folders.end())
             vst3Folders.push_back(userFolder);

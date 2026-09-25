@@ -213,7 +213,7 @@ row.
 ## Verify
 
 ```bash
-open -n --env INFINITE_AUDIOUITEST=1 -a build/Infinite.app
+set INFINITE_AUDIOUITEST=1& build\windows-vs2022\Release\Infinite-Turbo.exe
 ```
 
 Leaves the window open on a canvas with one of every audio/note node, framed.
@@ -221,7 +221,7 @@ To judge it without a screen-recording permission prompt, render it headless
 instead — this writes a PNG of the whole window and exits:
 
 ```bash
-INFINITE_AUDIOUITEST=1 IMAGERESYNTH_SCREENSHOT=/tmp/audioui.png ./build/Infinite.app/Contents/MacOS/Infinite
+INFINITE_AUDIOUITEST=1 IMAGERESYNTH_SCREENSHOT=/tmp/audioui.png build\windows-vs2022\Release\Infinite-Turbo.exe
 ```
 
 Add new node types to that block in `src/main.cpp`. Then check, in order:
@@ -238,7 +238,7 @@ right place" and "dragging it moves this engine's param" are different claims,
 and the second is the one that has broken. Drive it:
 
 ```bash
-INFINITE_WTDRAGTEST=1 ./build/Infinite.app/Contents/MacOS/Infinite
+INFINITE_WTDRAGTEST=1 build\windows-vs2022\Release\Infinite-Turbo.exe
 ```
 
 The UI fixture also puts one envelope field into the expression state and
@@ -254,14 +254,14 @@ Then the regression suite — UI changes here touch `ModSlider`, which every
 node in the app uses:
 
 ```bash
-.claude/skills/run-infinite-hygiene/driver.sh
+test-windows.bat
 ```
 
 Baseline is 40/41. `PHASEATEST` is a known pre-existing failure (a `"Smooth"`
 node-name collision); it is not a regression and should not be fixed here.
 
 ```bash
-INFINITE_DSPTEST=1 ./build/Infinite.app/Contents/MacOS/Infinite
+INFINITE_DSPTEST=1 build\windows-vs2022\Release\Infinite-Turbo.exe
 ```
 
 Must still end `DSPTEST OK`.

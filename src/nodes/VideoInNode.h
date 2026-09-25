@@ -49,6 +49,8 @@ private:
    unsigned int mTex = 0;
    int mWidth = 0;
    int mHeight = 0;
+   int mTexW = 0; // allocated storage size of mTex
+   int mTexH = 0;
    bool mHasPlaceholder = false;
    unsigned long long mRevision = 1;
    std::vector<unsigned char> mFrame;

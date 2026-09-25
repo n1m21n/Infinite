@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -28,6 +29,10 @@ namespace Platform
    void ConfigureOutputWindow(GLFWwindow* window, bool borderless, bool topmost,
                               bool hideCursor);
    void ReassertOutputWindowTopmost(GLFWwindow* window);
+   // Turbo: every native file/folder dialog is owned by this window, so it
+   // always opens in front of it (also when the editor is fullscreen) and
+   // keeps the editor disabled while it is up. Call on the main thread.
+   void SetFileDialogOwner(GLFWwindow* window);
 
    // Initializes the JUCE message/device layer used by the Windows backend.
    // The Windows main thread calls this before any scanner worker can start.
@@ -42,6 +47,21 @@ namespace Platform
    // wakes the process back up, then bursts through the backlog at once.
    // Call once at startup and keep the app running for the token to matter.
    void PreventAppNap();
+
+   // Turbo: sleeps `seconds` with sub-millisecond accuracy (high-resolution
+   // waitable timer, Windows 10 1803+; falls back to a 1 ms timer period).
+   // Used by the frame limiter instead of std::this_thread::sleep_for, whose
+   // ~15.6 ms default granularity forced a CPU-burning spin-wait.
+   void PreciseSleep(double seconds);
+
+   // Turbo: registers the calling thread (the render/UI thread) with the
+   // Multimedia Class Scheduler Service as a "Games" task, so Windows keeps
+   // its time slices steady under background load. No-op if MMCSS refuses.
+   void BoostRenderThread();
+
+   // Ends the process immediately with `code`, skipping static destructors
+   // (used by the headless self-tests once their output is flushed).
+   void TerminateNow(int code);
 
    // Native open panel filtered to image types. Returns "" if cancelled.
    std::string OpenImageDialog();
@@ -129,9 +149,11 @@ namespace Platform
    int VideoHeight(VideoHandle* handle);
    double VideoDuration(VideoHandle* handle);
 
-   // Decodes forward until the frame covering `seconds` is current. Returns true
-   // when a new frame was produced (so the caller can skip re-uploading).
-   // Seeking backwards restarts the reader, which is how looping works.
+   // Requests the frame covering `seconds` from the clip's decoder thread and
+   // hands back the newest finished frame without waiting. Returns true when a
+   // new frame was produced (so the caller can skip re-uploading).
+   // Turbo: outPixels is BGR8 (3 bytes/pixel), GL bottom-up row order. Upload
+   // it with GL_BGR; the buffer is swapped, not copied, so reuse `outPixels`.
    bool VideoFrameAt(VideoHandle* handle, double seconds, std::vector<unsigned char>& outPixels);
 
    // ---- background removal ----
@@ -230,6 +252,10 @@ namespace Platform
    // queries the hardware directly - lets the UI show what was really
    // negotiated after a requestedBufferFrames the device may have clamped.
    uint32_t AudioDeviceBufferFrames(uint32_t deviceId = 0);
+   // Turbo: input + output latency the driver reports, plus one buffer (the
+   // input capture ring), in frames at the device rate. 0 when unknown.
+   // Safe from any thread.
+   int AudioRoundTripLatencyFrames();
 
    // ---- audio device recovery (config-change / sleep-wake) ----
    // docs/plans/optimization/prompts/02-device-change-and-wake-recovery.md.
@@ -777,7 +803,8 @@ namespace Platform
    void CameraSetMirror(CameraHandle* handle, bool mirrorX);
    void CameraSetResolution(CameraHandle* handle, CameraResolution res);
 
-   // Drains the latest frame into outPixels (RGBA8, GL bottom-up).
+   // Drains the latest frame into outPixels (BGR8, 3 bytes/pixel, GL bottom-up;
+   // mirror already applied). The buffer is swapped, not copied.
    // Returns true only when a new frame was received and written.
    bool CameraReadFrame(CameraHandle* handle, std::vector<unsigned char>& outPixels,
                         int& outWidth, int& outHeight, unsigned long long& outFrameSeq);

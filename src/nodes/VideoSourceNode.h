@@ -23,6 +23,9 @@ public:
    unsigned int GetOutputTexture() override;
    int GetOutputWidth() const override { return mWidth; }
    int GetOutputHeight() const override { return mHeight; }
+   // Only changes when a new frame (or the placeholder) was uploaded, so a
+   // paused clip lets downstream filter caches settle instead of re-rendering.
+   unsigned long long TextureRevision() const override { return mRevision; }
    void CookIfNeeded(int frameId) override;
 
    int OutputCount() const override { return 2; }
@@ -100,6 +103,9 @@ private:
    unsigned int mTex = 0;
    int mWidth = 0;
    int mHeight = 0;
+   int mTexW = 0; // allocated storage size of mTex
+   int mTexH = 0;
+   unsigned long long mRevision = 1;
    bool mHasPlaceholder = false;
    double mDuration = 0.0;
    double mPosition = 0.0;

@@ -3,19 +3,15 @@
 #include "platform/OpenGLHeaders.h"
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 
 #include "Platform.h"
 
 namespace
 {
-#if defined(_WIN32)
    const std::vector<std::string> kModeNames = { "Subject - U2Net", "Person - U2Net Human" };
    const std::vector<std::string> kBackendNames = { "Auto GPU (DX12)", "DirectML only", "CPU" };
-#else
-   const std::vector<std::string> kModeNames = { "Subject (macOS 14+)", "Person (macOS 12+)" };
-   const std::vector<std::string> kBackendNames = { "On-device" };
-#endif
    const std::vector<std::string> kOutputModeNames = { "Cutout", "Mask only", "Background only" };
 
    const char* kFragSrc =
@@ -77,8 +73,13 @@ RemoveBgNode::~RemoveBgNode()
    GLUtil::DestroyFbo(mOut);
    if (mMaskTex != 0)
       glDeleteTextures(1, &mMaskTex);
-   if (mPairedSourceTex != 0)
-      glDeleteTextures(1, &mPairedSourceTex);
+   for (GpuFrame& f : mGpuFrames) GLUtil::DestroyFbo(f.fbo);
+   for (GpuFrame& f : mFreeGpuFrames) GLUtil::DestroyFbo(f.fbo);
+   for (PendingReadback& rb : mPendingReadbacks) { glDeleteSync((GLsync)rb.fence); mFreePbos.push_back(rb.pbo); }
+   if (!mFreePbos.empty()) glDeleteBuffers((GLsizei)mFreePbos.size(), mFreePbos.data());
+   GLUtil::DestroyFbo(mSmall);
+   if (mReadFbo != 0)
+      glDeleteFramebuffers(1, &mReadFbo);
    if (mProgram != 0)
       glDeleteProgram(mProgram);
 }
@@ -92,44 +93,168 @@ bool RemoveBgNode::EnsureShader()
    return mProgram != 0;
 }
 
+// Turbo: the mask pipeline never stalls the render thread.
+//  1. The input is copied on the GPU (blit) into a full-resolution slot that
+//     stays paired with its mask, so cutout and mask always line up.
+//  2. A downscaled copy (longest side kMaskReadbackMaxSide - the models run at
+//     320 px anyway) is read back through a PBO + fence, collected on a later
+//     frame instead of blocking on glReadPixels.
+//  3. The worker only ever sees the newest frame; older waiting requests are
+//     dropped, so the mask never lags behind by a queue of stale frames.
+namespace
+{
+   constexpr int kMaskReadbackMaxSide = 512;
+}
+
 void RemoveBgNode::QueueMask(unsigned int srcTex, int w, int h)
 {
+   PollReadbacks();
+
+   const size_t maxInFlight = (size_t)std::clamp(frameCache, 1, 4);
+   if (mPendingReadbacks.size() >= maxInFlight)
+      return;
    {
       std::lock_guard<std::mutex> lock(mWorkerMutex);
-      if (mRequests.size() >= (size_t)std::clamp(frameCache, 1, 16))
+      // A fresh frame is already waiting for the worker: don't pay for another
+      // copy until it has been picked up.
+      if (!mRequests.empty())
          return;
    }
-   // Only the GL readback remains on the render thread. Model inference runs
-   // on a latest-frame worker below, so a slow mask can never stall the UI,
-   // projector or audio graph and queued video frames never build a backlog.
-   std::vector<unsigned char> pixels((size_t)w * h * 4);
-   GLint prevFbo = 0;
-   glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
-   GLuint fbo = 0;
-   glGenFramebuffers(1, &fbo);
-   glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, srcTex, 0);
-   glPixelStorei(GL_PACK_ALIGNMENT, 1);
-   glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
-   glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
-   glDeleteFramebuffers(1, &fbo);
 
+   const float scale = std::min(1.0f, (float)kMaskReadbackMaxSide / (float)std::max(w, h));
+   const int sw = std::max(1, (int)std::lround(w * scale));
+   const int sh = std::max(1, (int)std::lround(h * scale));
+   if (!GLUtil::EnsureFbo(mSmall, sw, sh))
+      return;
+
+   GpuFrame frame;
+   for (size_t i = 0; i < mFreeGpuFrames.size(); ++i)
    {
-      std::lock_guard<std::mutex> lock(mWorkerMutex);
-      FrameRequest request;
-      request.pixels = std::move(pixels);
-      request.width = w; request.height = h;
-      request.mode = mode; request.backend = backend;
-      request.serial = ++mNextSerial;
-      const size_t limit = (size_t)std::clamp(frameCache, 1, 16);
-      while (mRequests.size() >= limit)
-         mRequests.pop_front();
-      mRequests.push_back(std::move(request));
-      mStatus = mProcessing ? "processing - frames cached" : "processing mask";
+      if (mFreeGpuFrames[i].fbo.w == w && mFreeGpuFrames[i].fbo.h == h)
+      {
+         frame = mFreeGpuFrames[i];
+         mFreeGpuFrames.erase(mFreeGpuFrames.begin() + (long)i);
+         break;
+      }
    }
-   if (!mWorker.joinable())
-      mWorker = std::thread(&RemoveBgNode::WorkerLoop, this);
-   mWorkerWake.notify_one();
+   if (!GLUtil::EnsureFbo(frame.fbo, w, h))
+      return;
+
+   GLint prevRead = 0, prevDraw = 0, prevPbo = 0, prevPack = 4;
+   glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevRead);
+   glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevDraw);
+   glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING, &prevPbo);
+   glGetIntegerv(GL_PACK_ALIGNMENT, &prevPack);
+
+   if (mReadFbo == 0)
+      glGenFramebuffers(1, &mReadFbo);
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, mReadFbo);
+   glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, srcTex, 0);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, frame.fbo.fbo);
+   glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mSmall.fbo);
+   glBlitFramebuffer(0, 0, w, h, 0, 0, sw, sh, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+   glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+
+   PendingReadback rb;
+   rb.w = sw;
+   rb.h = sh;
+   rb.serial = ++mNextSerial;
+   if (!mFreePbos.empty())
+   {
+      rb.pbo = mFreePbos.back();
+      mFreePbos.pop_back();
+   }
+   else
+      glGenBuffers(1, &rb.pbo);
+   glBindBuffer(GL_PIXEL_PACK_BUFFER, rb.pbo);
+   glBufferData(GL_PIXEL_PACK_BUFFER, (GLsizeiptr)sw * sh * 4, nullptr, GL_STREAM_READ);
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, mSmall.fbo);
+   glPixelStorei(GL_PACK_ALIGNMENT, 1);
+   glReadPixels(0, 0, sw, sh, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+   rb.fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+
+   glPixelStorei(GL_PACK_ALIGNMENT, prevPack);
+   glBindBuffer(GL_PIXEL_PACK_BUFFER, (GLuint)prevPbo);
+   glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)prevRead);
+   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)prevDraw);
+
+   frame.serial = rb.serial;
+   mGpuFrames.push_back(frame);
+   if (rb.fence == nullptr)
+   {
+      mFreePbos.push_back(rb.pbo);
+      return;
+   }
+   mPendingReadbacks.push_back(rb);
+}
+
+void RemoveBgNode::PollReadbacks()
+{
+   while (!mPendingReadbacks.empty())
+   {
+      PendingReadback rb = mPendingReadbacks.front();
+      const GLenum state = glClientWaitSync((GLsync)rb.fence, 0, 0);
+      if (state == GL_TIMEOUT_EXPIRED)
+         break; // GPU not there yet - collect it on a later frame
+      mPendingReadbacks.pop_front();
+      glDeleteSync((GLsync)rb.fence);
+
+      std::vector<unsigned char> pixels;
+      if (state != GL_WAIT_FAILED)
+      {
+         GLint prevPbo = 0;
+         glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING, &prevPbo);
+         glBindBuffer(GL_PIXEL_PACK_BUFFER, rb.pbo);
+         const size_t bytes = (size_t)rb.w * rb.h * 4;
+         const void* mapped = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, (GLsizeiptr)bytes, GL_MAP_READ_BIT);
+         if (mapped != nullptr)
+         {
+            pixels.assign((const unsigned char*)mapped, (const unsigned char*)mapped + bytes);
+            glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+         }
+         glBindBuffer(GL_PIXEL_PACK_BUFFER, (GLuint)prevPbo);
+      }
+      mFreePbos.push_back(rb.pbo);
+      if (pixels.empty())
+         continue;
+
+      {
+         std::lock_guard<std::mutex> lock(mWorkerMutex);
+         FrameRequest request;
+         request.pixels = std::move(pixels);
+         request.width = rb.w;
+         request.height = rb.h;
+         request.mode = mode;
+         request.backend = backend;
+         request.serial = rb.serial;
+         mRequests.clear(); // newest frame wins
+         mRequests.push_back(std::move(request));
+         mStatus = mProcessing ? "processing - newest frame queued" : "processing mask";
+      }
+      if (!mWorker.joinable())
+         mWorker = std::thread(&RemoveBgNode::WorkerLoop, this);
+      mWorkerWake.notify_one();
+   }
+}
+
+// Recycles every GPU source copy with serial <= upTo, except `keep` (the one
+// currently paired with the displayed mask).
+void RemoveBgNode::ReleaseGpuFrames(uint64_t upTo, uint64_t keep)
+{
+   for (auto it = mGpuFrames.begin(); it != mGpuFrames.end();)
+   {
+      if (it->serial > upTo || it->serial == keep)
+      {
+         ++it;
+         continue;
+      }
+      if (mFreeGpuFrames.size() < 4)
+         mFreeGpuFrames.push_back(*it);
+      else
+         GLUtil::DestroyFbo(it->fbo);
+      it = mGpuFrames.erase(it);
+   }
 }
 
 void RemoveBgNode::WorkerLoop()
@@ -172,7 +297,6 @@ void RemoveBgNode::WorkerLoop()
          if (ok)
          {
             mCompletedMask = std::move(mask);
-            mCompletedSource = pixels;
             mCompletedWidth = w;
             mCompletedHeight = h;
             mCompletedSerial = serial;
@@ -184,7 +308,6 @@ void RemoveBgNode::WorkerLoop()
          else
          {
             mCompletedMask.clear();
-            mCompletedSource.clear();
             mCompletedWidth = 0;
             mCompletedHeight = 0;
             mCompletedSerial = serial;
@@ -198,16 +321,16 @@ void RemoveBgNode::WorkerLoop()
 void RemoveBgNode::ConsumeCompletedMask()
 {
    std::vector<unsigned char> mask;
-   std::vector<unsigned char> source;
    int w = 0, h = 0;
+   uint64_t serial = 0;
    std::string status;
    {
       std::lock_guard<std::mutex> lock(mWorkerMutex);
       if (mCompletedSerial == 0 || mCompletedSerial == mUploadedSerial)
          return;
       mUploadedSerial = mCompletedSerial;
-      mask = mCompletedMask;
-      source = mCompletedSource;
+      serial = mCompletedSerial;
+      mask.swap(mCompletedMask);
       w = mCompletedWidth;
       h = mCompletedHeight;
       status = mCompletedStatus;
@@ -217,7 +340,12 @@ void RemoveBgNode::ConsumeCompletedMask()
 
    mStatus = status;
    if (mask.empty() || w <= 0 || h <= 0)
+   {
+      // Failed pass: drop its source copy (and anything older), but keep the
+      // frame the visible mask is still paired with.
+      ReleaseGpuFrames(serial, mPairedSerial);
       return;
+   }
 
    if (mMaskTex == 0)
       glGenTextures(1, &mMaskTex);
@@ -230,17 +358,20 @@ void RemoveBgNode::ConsumeCompletedMask()
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
    glBindTexture(GL_TEXTURE_2D, 0);
 
-   if (mPairedSourceTex == 0)
-      glGenTextures(1, &mPairedSourceTex);
-   glBindTexture(GL_TEXTURE_2D, mPairedSourceTex);
-   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, source.data());
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-   glBindTexture(GL_TEXTURE_2D, 0);
-
+   // Pair the mask with the full-resolution GPU copy of the exact frame it
+   // was computed from; everything older than it can be recycled.
+   ReleaseGpuFrames(serial, serial);
+   mPairedSourceTex = 0;
+   mPairedSerial = 0;
+   for (const GpuFrame& f : mGpuFrames)
+   {
+      if (f.serial == serial)
+      {
+         mPairedSourceTex = GLUtil::FboTexture(f.fbo);
+         mPairedSerial = serial;
+         break;
+      }
+   }
 }
 
 void RemoveBgNode::CookIfNeeded(int frameId)

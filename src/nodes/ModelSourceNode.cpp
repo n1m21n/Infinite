@@ -40,7 +40,7 @@ bool ModelSourceNode::Load(const std::string& path)
    mPath = path;
    mMeshRevision = NextMeshRevision();
 
-   const size_t slash = path.find_last_of('/');
+   const size_t slash = path.find_last_of("/\\");
    const std::string name = (slash == std::string::npos) ? path : path.substr(slash + 1);
    mStatus = name + " - " + std::to_string(mMesh.indices.size() / 3) + " triangles";
    return true;

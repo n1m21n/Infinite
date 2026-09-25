@@ -1,4 +1,67 @@
+#define INFINITE_GL_NO_REDIRECT
+#include "platform/OpenGLHeaders.h"
 #include "GLUtil.h"
+#include <algorithm>
+#include <cstring>
+#include <string>
+#include <unordered_map>
+#include <vector>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include "platform/SettingsPaths.h"
+
+namespace GLUtil
+{
+   namespace
+   {
+      struct UniformEntry
+      {
+         std::string name;
+         GLint location = -1;
+      };
+      // Main (GL) thread only, like every other GL call in the app.
+      std::unordered_map<GLuint, std::vector<UniformEntry>>& UniformCache()
+      {
+         static std::unordered_map<GLuint, std::vector<UniformEntry>> cache;
+         return cache;
+      }
+   }
+
+   GLint CachedUniformLocation(GLuint program, const GLchar* name)
+   {
+      if (program == 0 || name == nullptr)
+         return -1;
+      std::vector<UniformEntry>& entries = UniformCache()[program];
+      for (const UniformEntry& e : entries)
+         if (std::strcmp(e.name.c_str(), name) == 0)
+            return e.location;
+      const GLint location = glGetUniformLocation(program, name);
+      // Only cache once the program is linked; before that the driver answers
+      // -1 with GL_INVALID_OPERATION and a later link would make it valid.
+      GLint linked = GL_FALSE;
+      glGetProgramiv(program, GL_LINK_STATUS, &linked);
+      if (linked == GL_TRUE)
+         entries.push_back({ name, location });
+      return location;
+   }
+
+   void LinkProgramInvalidate(GLuint program)
+   {
+      UniformCache().erase(program);
+      glLinkProgram(program);
+   }
+
+   void DeleteProgramInvalidate(GLuint program)
+   {
+      UniformCache().erase(program);
+      glDeleteProgram(program);
+   }
+}
+
 
 #include "platform/OpenGLHeaders.h"
 #define GLFW_INCLUDE_NONE
@@ -64,6 +127,11 @@ namespace GLUtil
       glBindVertexArray(0);
    }
 
+   void DrawFullscreenQuad()
+   {
+      DrawQuad();
+   }
+
    void ForgetCurrentContextObjects()
    {
       GLFWwindow* context = glfwGetCurrentContext();
@@ -126,8 +194,129 @@ namespace GLUtil
       fbo = Fbo();
    }
 
+   // ---- Turbo: on-disk program binary cache -----------------------------
+   // Every node compiles its GLSL the first time it cooks, so opening a big
+   // patch used to stall on dozens of driver compiles. Linked programs are
+   // saved with glGetProgramBinary under
+   // %LOCALAPPDATA%\Infinite\shadercache\<driver hash>\<source hash>.bin and
+   // loaded with glProgramBinary next time. A driver update changes the
+   // driver hash (new folder); a rejected binary falls back to compiling.
+   // Disable with INFINITE_SHADER_CACHE=0.
+   namespace
+   {
+      uint64_t Fnv1a64(const std::string& text, uint64_t hash = 1469598103934665603ull)
+      {
+         for (unsigned char c : text)
+         {
+            hash ^= c;
+            hash *= 1099511628211ull;
+         }
+         return hash;
+      }
+
+      std::string Hex64(uint64_t v)
+      {
+         char buf[17];
+         std::snprintf(buf, sizeof(buf), "%016llx", (unsigned long long)v);
+         return buf;
+      }
+
+      const std::filesystem::path& ShaderCacheDir()
+      {
+         static std::filesystem::path dir = []() -> std::filesystem::path
+         {
+            const char* off = std::getenv("INFINITE_SHADER_CACHE");
+            if (off != nullptr && std::strcmp(off, "0") == 0)
+               return {};
+            GLint formats = 0;
+            if (GLEW_VERSION_4_1 || GLEW_ARB_get_program_binary)
+               glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &formats);
+            if (formats <= 0)
+               return {};
+            const std::string settings = InfiniteSettingsDirectory();
+            if (settings.empty())
+               return {};
+            auto str = [](GLenum e) -> std::string
+            {
+               const GLubyte* s = glGetString(e);
+               return s ? std::string((const char*)s) : std::string();
+            };
+            const std::string driver = str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION);
+            std::filesystem::path d = std::filesystem::u8path(settings) / "shadercache" / Hex64(Fnv1a64(driver));
+            std::error_code ec;
+            std::filesystem::create_directories(d, ec);
+            return ec ? std::filesystem::path() : d;
+         }();
+         return dir;
+      }
+
+      constexpr uint32_t kShaderCacheMagic = 0x43535449; // "ITSC"
+
+      unsigned int LoadCachedProgram(const std::filesystem::path& file)
+      {
+         std::ifstream in(file, std::ios::binary);
+         if (!in)
+            return 0;
+         uint32_t magic = 0, format = 0;
+         in.read((char*)&magic, sizeof(magic));
+         in.read((char*)&format, sizeof(format));
+         if (!in || magic != kShaderCacheMagic)
+            return 0;
+         std::vector<char> blob((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+         if (blob.empty())
+            return 0;
+         unsigned int program = glCreateProgram();
+         glProgramBinary(program, (GLenum)format, blob.data(), (GLsizei)blob.size());
+         GLint linked = GL_FALSE;
+         glGetProgramiv(program, GL_LINK_STATUS, &linked);
+         if (linked != GL_TRUE)
+         {
+            glDeleteProgram(program);
+            glGetError(); // swallow GL_INVALID_ENUM from a stale format
+            return 0;
+         }
+         return program;
+      }
+
+      void SaveCachedProgram(const std::filesystem::path& file, unsigned int program)
+      {
+         GLint length = 0;
+         glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &length);
+         if (length <= 0)
+            return;
+         std::vector<char> blob((size_t)length);
+         GLenum format = 0;
+         GLsizei written = 0;
+         glGetProgramBinary(program, length, &written, &format, blob.data());
+         if (written <= 0)
+            return;
+         const std::filesystem::path tmp = file.string() + ".tmp";
+         {
+            std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
+            if (!out)
+               return;
+            const uint32_t magic = kShaderCacheMagic, fmt = (uint32_t)format;
+            out.write((const char*)&magic, sizeof(magic));
+            out.write((const char*)&fmt, sizeof(fmt));
+            out.write(blob.data(), written);
+            if (!out)
+               return;
+         }
+         std::error_code ec;
+         std::filesystem::rename(tmp, file, ec);
+      }
+   }
+
    unsigned int CompileProgram(const char* fragSrc, std::string* outError)
    {
+      std::filesystem::path cacheFile;
+      if (!ShaderCacheDir().empty())
+      {
+         cacheFile = ShaderCacheDir() / (Hex64(Fnv1a64(std::string(fragSrc), Fnv1a64(kVertSrc))) + ".bin");
+         if (unsigned int cached = LoadCachedProgram(cacheFile))
+            return cached;
+      }
+
       auto report = [outError](const char* prefix, const char* log)
       {
          if (outError != nullptr)
@@ -170,6 +359,8 @@ namespace GLUtil
       glBindAttribLocation(program, 1, "aUv");
       glAttachShader(program, vert);
       glAttachShader(program, frag);
+      if (!cacheFile.empty())
+         glProgramParameteri(program, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
       glLinkProgram(program);
 
       GLint linked = 0;
@@ -187,6 +378,8 @@ namespace GLUtil
          return 0;
       }
 
+      if (!cacheFile.empty())
+         SaveCachedProgram(cacheFile, program);
       return program;
    }
 
@@ -217,14 +410,18 @@ namespace GLUtil
    }
 
    void DrawTextureToScreen(unsigned int tex, int windowW, int windowH, int texW, int texH,
-                             bool checkerBg)
+                             bool checkerBg, int fitMode, const float* bgRGB)
    {
       static const char* kBlitFragSrc =
          "#version 150\n"
          "in vec2 vUv;\n"
          "out vec4 fragColor;\n"
          "uniform sampler2D uTex;\n"
-         "void main() { fragColor = texture(uTex, vUv); }\n";
+         "uniform vec3 uBg;\n"
+         // Turbo: composite over the window background by the texture's
+         // alpha, so transparent / edge-blended outputs fade to black on a
+         // projector instead of showing their raw RGB.
+         "void main() { vec4 c = texture(uTex, vUv); fragColor = vec4(mix(uBg, c.rgb, clamp(c.a, 0.0, 1.0)), 1.0); }\n";
 
       // Composites the texture's own alpha over the same dark checkerboard
       // pattern the node editor draws behind a transparent preview (see
@@ -247,12 +444,14 @@ namespace GLUtil
 
       static unsigned int sBlitProgram = 0;
       static int sLocTex = -1;
+      static int sLocBg = -1;
       static unsigned int sCheckerProgram = 0;
       static int sLocTexChecker = -1;
       if (sBlitProgram == 0)
       {
          sBlitProgram = CompileProgram(kBlitFragSrc);
          sLocTex = glGetUniformLocation(sBlitProgram, "uTex");
+         sLocBg = glGetUniformLocation(sBlitProgram, "uBg");
       }
       if (sCheckerProgram == 0)
       {
@@ -266,11 +465,37 @@ namespace GLUtil
 
       // Clear the full window first (letterbox bars, if any, show this).
       glViewport(0, 0, windowW, windowH);
-      glClearColor(0.1f, 0.1f, 0.1f, 1);
+      if (bgRGB != nullptr)
+         glClearColor(bgRGB[0], bgRGB[1], bgRGB[2], 1);
+      else
+         glClearColor(0.0f, 0.0f, 0.0f, 1);
       glClear(GL_COLOR_BUFFER_BIT);
 
       int vpX = 0, vpY = 0, vpW = windowW, vpH = windowH;
-      if (texW > 0 && texH > 0 && windowW > 0 && windowH > 0)
+      const bool haveSize = texW > 0 && texH > 0 && windowW > 0 && windowH > 0;
+      if (haveSize && fitMode == kFitPixel)
+      {
+         // Real pixel size, centred. Larger than the window = cropped by
+         // the viewport, smaller = black around it.
+         vpW = texW;
+         vpH = texH;
+         vpX = (windowW - texW) / 2;
+         vpY = (windowH - texH) / 2;
+      }
+      else if (haveSize && fitMode == kFitFill)
+      {
+         // Cover the whole window keeping aspect; the overflow is cropped.
+         const float scale = std::max((float)windowW / (float)texW, (float)windowH / (float)texH);
+         vpW = (int)(texW * scale + 0.5f);
+         vpH = (int)(texH * scale + 0.5f);
+         vpX = (windowW - vpW) / 2;
+         vpY = (windowH - vpH) / 2;
+      }
+      else if (haveSize && fitMode == kFitStretch)
+      {
+         // whole window, aspect ignored (vp already covers it)
+      }
+      else if (haveSize)
       {
          const float srcAspect = (float)texW / (float)texH;
          const float dstAspect = (float)windowW / (float)windowH;
@@ -298,6 +523,13 @@ namespace GLUtil
       glBindTexture(GL_TEXTURE_2D, tex);
       if (locTex >= 0)
          glUniform1i(locTex, 0);
+      if (!checkerBg && sLocBg >= 0)
+      {
+         if (bgRGB != nullptr)
+            glUniform3f(sLocBg, bgRGB[0], bgRGB[1], bgRGB[2]);
+         else
+            glUniform3f(sLocBg, 0.0f, 0.0f, 0.0f);
+      }
 
       DrawQuad();
 

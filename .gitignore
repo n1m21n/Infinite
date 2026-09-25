@@ -3,15 +3,12 @@ build-*/
 dist/
 vcpkg_installed/
 CMakeUserPresets.json
-*.dmg
-!website/assets/*.dmg
-!website/*.dmg
+*.log
 
 # editor/runtime state written next to the app
 Infinite.json
 imgui.ini
 
-.DS_Store
 *.swp
 .claude/*.json
 

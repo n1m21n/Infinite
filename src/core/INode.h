@@ -203,4 +203,10 @@ public:
       float value = 0.0f;
    };
    virtual std::vector<SweepParamPrereq> SweepPrerequisitesFor(const std::string& /*paramName*/) const { return {}; }
+
+   // Turbo: called on every node by RebuildAudioTopology (main thread) right
+   // before the new topology is published. A node that reads another node's
+   // audio-thread object directly (MPC Out tapping one MPC pad) resolves that
+   // pointer here, so it always matches the graph the engine is about to run.
+   virtual void ResolveAudioTaps() {}
 };

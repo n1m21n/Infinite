@@ -9,7 +9,7 @@ this skill directory.
 ## Run this first
 
 ```bash
-.claude/skills/geometry-transform-sweep/driver.sh
+test-windows.bat -Only TRANSFORMSWEEPTEST,MAPPINGSWEEPTEST,REVISIONSWEEPTEST,RENDER3DCACHESWEEPTEST
 ```
 
 Add `--skip-build` to reuse the existing `build/` tree. Runs all three
@@ -166,17 +166,17 @@ changed, so a fixture can be added here for it.
 
 ## Gotchas
 
-- Like `run-infinite-hygiene`'s suite, the verdict is a printf line, not an
+- Like `run-turbo-tests`'s suite, the verdict is a printf line, not an
   exit code from the app itself — `main()` always returns 0 regardless of
-  test outcome. `driver.sh` greps for each sweep's own `... OK` / `... FAIL`
+  test outcome. the test driver greps for each sweep's own `... OK` / `... FAIL`
   marker.
 - The transform sweep's injected translation (5, 7, 3) and the mapping
   sweep's injected space/translate/rotate/scale values are arbitrary but
   fixed — don't read anything into the specific numbers, they're just
   distinct-per-field so a swap or partial forward can't accidentally pass.
-- This is a different, narrower harness than `run-infinite-hygiene` — it does
+- This is a different, narrower harness than `run-turbo-tests` — it does
   not build/screenshot/eyeball rendering, it only checks CPU-side
-  propagation and revision stability. `run-infinite-hygiene`'s suite now
+  propagation and revision stability. `run-turbo-tests`'s suite now
   runs all three of these sweeps too (as `TRANSFORMSWEEPTEST`,
   `MAPPINGSWEEPTEST`, `REVISIONSWEEPTEST`), so a plain pre-commit hygiene run
   already covers this; use this skill directly when you want the sweeps in

@@ -1,4 +1,4 @@
-name: Windows x64
+name: Infinite-Turbo Windows x64
 
 on:
   workflow_dispatch:
@@ -90,6 +90,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Infinite-Windows-x64
-          path: dist/Infinite-Windows-x64.zip
+          name: Infinite-Turbo-Windows-x64
+          path: dist/Infinite-Turbo-Windows-x64.zip
           if-no-files-found: error
