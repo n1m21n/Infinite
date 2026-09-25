@@ -19,7 +19,8 @@ sweeps, merge `--no-ff`, update the State column here.
 ## Where we stand against the spec targets
 
 From the baseline `bench/baselines/m2-8gb.jsonl` (2026-09-25, `run_all.sh --quiet`:
-commit `c602a0d` for B1/B2/B4/B5/B9, `beb4d87` for B3/B6/B8; details in
+commit `c602a0d` for B2/B4/B5/B9, `a8d8c46` for B1, `19de37d` for B3,
+`d12582d` for B6/B8/B10; details in
 [Baseline](#baseline)). Targets are
 [`benchmark-suite.md`](benchmark-suite.md) §6, plus the proposed B8 targets
 below. **unproven** = the run was untrusted (unfocused/unpaced), so a value
@@ -594,6 +595,26 @@ size, 30 s audio-alone, 600 frames B3/B6/B9, 300 frames B8.
 `quiet=1`: the semi-brain watch daemon was paused for the run. Swap in use
 was 1681 MB at the start and 2538 MB at the end. B7 and B10 are skipped (on hold).
 
+**Final rows (2026-09-25, `feature/perf-baseline-final`).** The baseline
+still held the pre-fix B1 rows (`c602a0d`) and the pre-Block-2 B3 row
+(`beb4d87`, p99 50 ms, failing), so `compare.py` measured against numbers
+the product no longer has. Five rows now come from the trusted runs that
+closed Blocks 1 and 2, one real row each, no averaging:
+
+| Row | Source run | Why this run |
+|---|---|---|
+| B1 buf=64 | `infinte-audio` `20260925-101737-a8d8c46` | median of 3 cb_load p99 (40.8%); keeps its 3 xruns - buffer 64 is not clean |
+| B1 buf=128 | `infinte-audio` `20260925-102339-a8d8c46` | higher of the 2 complete rounds (41.1%) |
+| B1 buf=256 | `infinte-audio` `20260925-101329-a8d8c46` | higher of the 2 complete rounds (44.7%) |
+| B1 buf=512 | `infinte-audio` `20260925-101329-a8d8c46` | median of 3 (40.3%) |
+| B3 s | `infinte-closeout` `20260925-153805-19de37d` | median of the 3 trusted focused rounds (p99 17.64 ms, 0% missed, 5/5 targets) |
+
+`compare.py` against the file it replaced: every other row at 0% delta.
+Its two new flags are real, not artefacts of the swap: B1 buf=64 xruns
+0 -> 3 (the old 0 came from the wall-clock-gap heuristic, not the real
+counter), and B1 buf=512 UI frame p99 72.5 -> 110 ms (see "Found in the
+final baseline"). The table below shows the final values.
+
 The previous baseline (commit `9326563`, B1 + B5 only, older than every perf
 fix) is kept as `bench/baselines/m2-8gb-9326563.jsonl`.
 
@@ -626,13 +647,13 @@ compare them.
 
 | Bench | Variant | frame_ms p50 / p95 / p99 | audio cb_load p50 / p99 (%) | xruns | footprint peak MB | other |
 |---|---|---|---|---|---|---|
-| B1 | 24 voices, buf=64 | 16.7 / 30.2 / 51.0 | 51.6 / 61.2 | 0 | - | |
-| B1 | 24 voices, buf=128 | 16.7 / 30.8 / 50.7 | 50.3 / 55.8 | 0 | - | |
-| B1 | 24 voices, buf=256 | 16.7 / 30.3 / 51.1 | 49.5 / 52.8 | 0 | - | |
-| B1 | 24 voices, buf=512 | 16.7 / 70.1 / 72.5 | 48.9 / 51.1 | 0 | - | |
+| B1 | 24 voices, buf=64 | 16.7 / - / 47.5 | 33.5 / 40.8 | 3 | - | `a8d8c46` |
+| B1 | 24 voices, buf=128 | 16.7 / - / 47.8 | - / 41.1 | 0 | - | `a8d8c46` |
+| B1 | 24 voices, buf=256 | 16.7 / - / 41.0 | 31.1 / 44.7 | 0 | - | `a8d8c46` |
+| B1 | 24 voices, buf=512 | 16.7 / - / 110.0 | 29.4 / 40.3 | 0 | - | `a8d8c46`; UI p99 regressed, see Found |
 | B2 | s / m / l, anim | 8.6 / 11.1 / 12.0; 16.8 / 22.7 / 25.0; 19.9 / 23.8 / 26.0 | - | - | - | fbo_allocs_steady 0 |
 | B2 | s / m / l, static | 5.1 / 7.0 / 7.6; 5.0 / 6.6 / 7.4; 4.3 / 7.0 / 9.2 | - | - | - | fbo_allocs_steady 0 |
-| B3 | s, buf=256 | 16.7 / 34.5 / 50.0 | 23.8 / 37.3 | 0 | 723 | projector p99 50.0 ms, missed 12.0%, jitter 8.6 ms, i2p max 1 |
+| B3 | s, buf=256 | 16.7 / - / 17.64 | - / 22.5 | 0 | 714 | `19de37d` focused: projector p99 17.64 ms, missed 0%, 5/5 targets (was 50.0 ms / 12.0%) |
 | B4 | s / m / l, shadow 2048, anim | 4.9 / 7.5 / 8.2; 7.0 / 10.2 / 10.8; 13.5 / 17.0 / 17.6 | - | - | - | tris 144k / 540k / 1.57M |
 | B4 | m, shadow off / 1024 / 4096 | 6.4 / 9.0 / 9.8; 7.0 / 10.1 / 11.0; 7.3 / 9.8 / 11.5 | - | - | - | |
 | B4 | l, static | 1.2 / 4.8 / 6.1 | - | - | - | |
@@ -1156,6 +1177,18 @@ a fixture goes here, not into a code change.
   - A 10-min B1 proof run directly (not through `run_all.sh --quiet`) with the
     semi-brain watch daemon still loaded showed 4 xruns (max callback load 140%).
     Any direct bench run has to pause the daemon first.
+
+- **Found in the final baseline** (`feature/perf-baseline-final`; recorded, not chased - scope is frozen):
+  - **B1 buf=512 UI frame p99 regressed: 72.5 ms (`c602a0d`) -> 93-110 ms
+    in all 3 Block 1 rounds (`a8d8c46`).** p50 stays 16.7 ms and audio is
+    fine (cb_load p99 40.3%, 0 xruns), so this is a UI-thread tail, about
+    1 frame in 100 taking 6 refreshes, only at buffer 512 (64/128/256 read
+    41-60 ms, better than before). Never noticed because the baseline was
+    not refreshed after Block 1. Cause unknown - not bisected. Candidate
+    for the next perf cycle.
+  - B7's baseline row is the Block 3 step 0 soak (`9ce52a5`, RSS growth
+    -34.65%), not Block 1's (-3.6%). Both are `unfocused=1`, so both stay
+    unproven; neither is gated.
 
 ## Windows/Linux
 
