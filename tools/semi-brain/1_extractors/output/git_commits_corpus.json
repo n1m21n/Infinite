@@ -1,5 +1,177 @@
 [
   {
+    "hash": "a177efba423a18cd222ef52b6fd992a1f748bb1e",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 26 08:19:38 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "audio",
+      "title": "Merge bugfix/vst3-buses-and-batch-scan into main",
+      "description": "Merge bugfix/vst3-buses-and-batch-scan into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge bugfix/vst3-buses-and-batch-scan into main"
+    },
+    "stat": "",
+    "files": [
+      "src/platform/PluginVST3.mm",
+      "src/platform/linux/PluginVST3Linux.cpp",
+      "src/platform/win/PluginVST3Win.cpp",
+      "src/scanner_main.mm",
+      "src/scanner_main_linux.cpp",
+      "src/scanner_main_win.cpp"
+    ]
+  },
+  {
+    "hash": "029b3ecdd537aa34a368d4d1bcc59c2ac0e0e1dd",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 26 07:56:55 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "plugins",
+      "title": "fix(plugins): Linux VST3 batch scan no longer drops plugins after a slow or bad one",
+      "description": "Linux VST3 batch scan no longer drops plugins after a slow or bad one",
+      "bullets": [
+        "Scanner prints \"@done\\t<path>\" after each bundle; DrainChildStdout's",
+        "The first bundle of a chunk without \"@done\" is the exact offender:",
+        "Bundles are chunked at 256 KB of argv (single chunk in practice)."
+      ],
+      "body": "Port of the Windows fix (3163167). Same failure: one 60 s total deadline\nfor the whole batch silently dropped every bundle after a slow one, and\na crash blocklisted the front of the remaining list rather than the\nbundle that actually crashed.\ntimeout is now idle-based (45 s since the last output) instead of total.\ncrash -> blocklisted, hang -> skipped for this scan and its sentinel\ncleared.\nVerified: builds in the arm64 container (Clang); scanner emits the\nmarkers. No real VST3 bundle runs in the rig, so crash/hang attribution\nis unexercised on Linux; x86_64 GCC is left to CI.",
+      "raw": "fix(plugins): Linux VST3 batch scan no longer drops plugins after a slow or bad one\n\nPort of the Windows fix (3163167). Same failure: one 60 s total deadline\nfor the whole batch silently dropped every bundle after a slow one, and\na crash blocklisted the front of the remaining list rather than the\nbundle that actually crashed.\n\n- Scanner prints \"@done\\t<path>\" after each bundle; DrainChildStdout's\n  timeout is now idle-based (45 s since the last output) instead of total.\n- The first bundle of a chunk without \"@done\" is the exact offender:\n  crash -> blocklisted, hang -> skipped for this scan and its sentinel\n  cleared.\n- Bundles are chunked at 256 KB of argv (single chunk in practice).\n\nVerified: builds in the arm64 container (Clang); scanner emits the\nmarkers. No real VST3 bundle runs in the rig, so crash/hang attribution\nis unexercised on Linux; x86_64 GCC is left to CI."
+    },
+    "stat": "src/platform/linux/PluginVST3Linux.cpp | 156 ++++++++++++++++++++++-----------\n src/scanner_main_linux.cpp             |   4 +\n 2 files changed, 108 insertions(+), 52 deletions(-)",
+    "files": [
+      "src/platform/linux/PluginVST3Linux.cpp",
+      "src/scanner_main_linux.cpp"
+    ]
+  },
+  {
+    "hash": "ca7a01c49da22447f8c285e15f7eeda6197d159e",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 26 07:51:19 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "plugins",
+      "title": "fix(plugins): macOS VST3 batch scan no longer drops plugins after a slow or bad one",
+      "description": "macOS VST3 batch scan no longer drops plugins after a slow or bad one",
+      "bullets": [
+        "Scanner prints \"@done\\t<path>\" after each bundle; the parent's timeout",
+        "The first bundle of a chunk without \"@done\" is the exact offender:",
+        "Bundles are chunked at 256 KB of argv; ARG_MAX makes this a single"
+      ],
+      "body": "Port of the Windows fix (3163167). The batch scanner ran every bundle\nunder one 60 s total deadline, so a folder of slow-to-initialise plugins\ntimed out part way and everything after that point was silently dropped.\nOn a crash the parent blocklisted the front of the remaining list, which\ncould be an innocent bundle that loaded fine but described nothing.\nis now idle-based (45 s since the last output) instead of total.\ncrash -> blocklisted, hang -> skipped for this scan and its sentinel\ncleared so the next launch doesn't blocklist it either.\nchunk in practice, it only guards against a pathological folder.",
+      "raw": "fix(plugins): macOS VST3 batch scan no longer drops plugins after a slow or bad one\n\nPort of the Windows fix (3163167). The batch scanner ran every bundle\nunder one 60 s total deadline, so a folder of slow-to-initialise plugins\ntimed out part way and everything after that point was silently dropped.\nOn a crash the parent blocklisted the front of the remaining list, which\ncould be an innocent bundle that loaded fine but described nothing.\n\n- Scanner prints \"@done\\t<path>\" after each bundle; the parent's timeout\n  is now idle-based (45 s since the last output) instead of total.\n- The first bundle of a chunk without \"@done\" is the exact offender:\n  crash -> blocklisted, hang -> skipped for this scan and its sentinel\n  cleared so the next launch doesn't blocklist it either.\n- Bundles are chunked at 256 KB of argv; ARG_MAX makes this a single\n  chunk in practice, it only guards against a pathological folder."
+    },
+    "stat": "src/platform/PluginVST3.mm | 174 ++++++++++++++++++++++++++++-----------------\n src/scanner_main.mm        |   4 ++\n 2 files changed, 113 insertions(+), 65 deletions(-)",
+    "files": [
+      "src/platform/PluginVST3.mm",
+      "src/scanner_main.mm"
+    ]
+  },
+  {
+    "hash": "31631678f1e2775679b62536edecfb2ad8f16c2b",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 26 07:48:36 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "plugins",
+      "title": "fix(plugins): Windows VST3 scan no longer drops plugins after a slow or bad one",
+      "description": "Windows VST3 scan no longer drops plugins after a slow or bad one",
+      "bullets": [
+        "Scanner prints \"@done\\t<path>\" after each bundle; the parent's timeout",
+        "The first bundle of a chunk without \"@done\" is the exact offender:",
+        "Bundles are spawned in chunks that fit the command-line limit."
+      ],
+      "body": "The batch scanner child ran all bundles under one 60 s total deadline. A\nfolder of slow-to-initialise plugins (NI, iLok, Waves) timed out part way\nand every bundle after that point was silently dropped, which is how a\nlarge plugin folder came back with only a handful listed. On a crash the\nparent blocklisted the front of the remaining list, which could be an\ninnocent bundle that had loaded fine but described nothing - and the\nblocklist is persistent. All bundles also went on one command line,\nwhich CreateProcessW caps at 32767 characters.\nis now idle-based (45 s since the last line) instead of total.\ncrash -> blocklisted, hang -> skipped for this scan only.",
+      "raw": "fix(plugins): Windows VST3 scan no longer drops plugins after a slow or bad one\n\nThe batch scanner child ran all bundles under one 60 s total deadline. A\nfolder of slow-to-initialise plugins (NI, iLok, Waves) timed out part way\nand every bundle after that point was silently dropped, which is how a\nlarge plugin folder came back with only a handful listed. On a crash the\nparent blocklisted the front of the remaining list, which could be an\ninnocent bundle that had loaded fine but described nothing - and the\nblocklist is persistent. All bundles also went on one command line,\nwhich CreateProcessW caps at 32767 characters.\n\n- Scanner prints \"@done\\t<path>\" after each bundle; the parent's timeout\n  is now idle-based (45 s since the last line) instead of total.\n- The first bundle of a chunk without \"@done\" is the exact offender:\n  crash -> blocklisted, hang -> skipped for this scan only.\n- Bundles are spawned in chunks that fit the command-line limit."
+    },
+    "stat": "src/platform/win/PluginVST3Win.cpp | 158 ++++++++++++++++++++++++-------------\n src/scanner_main_win.cpp           |   4 +\n 2 files changed, 106 insertions(+), 56 deletions(-)",
+    "files": [
+      "src/platform/win/PluginVST3Win.cpp",
+      "src/scanner_main_win.cpp"
+    ]
+  },
+  {
+    "hash": "f36814d271e421fb94bdc976490f955e392b2cd3",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 26 07:48:28 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "plugins",
+      "title": "fix(plugins): negotiate every VST3 bus so multi-bus plugins render stereo",
+      "description": "negotiate every VST3 bus so multi-bus plugins render stereo",
+      "bullets": [
+        "Read each bus's arrangement, request stereo (then mono-in/stereo-out,",
+        "Give ProcessData one AudioBusBuffers per bus: main bus wired to the",
+        "Activate the event input bus; strict SDK plugins ignore notes on an",
+        "Render: stop zeroing the repeated channel after a mono plugin is"
+      ],
+      "body": "setBusArrangements was called with one input/one output arrangement and\nProcessData declared one bus each, whatever the plugin actually has. The\nspec requires both to cover every bus, so plugins with aux outputs\n(Kontakt) or a sidechain input (most compressors) rejected the call; the\n\"mono fallback\" was then rejected too but still set the channel count to\n1, so those plugins were rendered from their left channel only.\nthen mono) on the main buses only, and read back what the plugin kept.\nhost, aux inputs fed flagged silence, aux outputs into a discard buffer.\ninactive one.\nduplicated into a stereo cable (left-only output), and handle a plugin\nwith no audio output without indexing channel -1.\nSame code on macOS, Windows and Linux.",
+      "raw": "fix(plugins): negotiate every VST3 bus so multi-bus plugins render stereo\n\nsetBusArrangements was called with one input/one output arrangement and\nProcessData declared one bus each, whatever the plugin actually has. The\nspec requires both to cover every bus, so plugins with aux outputs\n(Kontakt) or a sidechain input (most compressors) rejected the call; the\n\"mono fallback\" was then rejected too but still set the channel count to\n1, so those plugins were rendered from their left channel only.\n\n- Read each bus's arrangement, request stereo (then mono-in/stereo-out,\n  then mono) on the main buses only, and read back what the plugin kept.\n- Give ProcessData one AudioBusBuffers per bus: main bus wired to the\n  host, aux inputs fed flagged silence, aux outputs into a discard buffer.\n- Activate the event input bus; strict SDK plugins ignore notes on an\n  inactive one.\n- Render: stop zeroing the repeated channel after a mono plugin is\n  duplicated into a stereo cable (left-only output), and handle a plugin\n  with no audio output without indexing channel -1.\n\nSame code on macOS, Windows and Linux."
+    },
+    "stat": "src/platform/PluginVST3.mm             | 200 ++++++++++++++++++++-------------\n src/platform/linux/PluginVST3Linux.cpp | 190 ++++++++++++++++++++-----------\n src/platform/win/PluginVST3Win.cpp     | 190 ++++++++++++++++++++-----------\n 3 files changed, 369 insertions(+), 211 deletions(-)",
+    "files": [
+      "src/platform/PluginVST3.mm",
+      "src/platform/linux/PluginVST3Linux.cpp",
+      "src/platform/win/PluginVST3Win.cpp"
+    ]
+  },
+  {
+    "hash": "c1f9c397c406bd21b51f43acaaca1676084a2575",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 26 07:33:16 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Merge bugfix/cull-gesture-playback into main",
+      "description": "Merge bugfix/cull-gesture-playback into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge bugfix/cull-gesture-playback into main"
+    },
+    "stat": "",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "src/core/GraphNode.h",
+      "src/main.cpp",
+      "tools/semi-brain/1_extractors/output/ast_symbol_graph.json",
+      "tools/semi-brain/1_extractors/output/git_commits_corpus.json",
+      "tools/semi-brain/1_extractors/output/knowledge_index.db",
+      "tools/semi-brain/2_distilled_brain/system2_systems_logic.md",
+      "tools/semi-brain/3_datasets/train_sft_alpaca.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_sharegpt.jsonl"
+    ]
+  },
+  {
+    "hash": "10499c63fcd0d2ced331dff9d100cb9e4615cd6a",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 26 07:33:15 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "semi-brain",
+      "title": "chore(semi-brain): sync corpora and index after the cull fix",
+      "description": "sync corpora and index after the cull fix",
+      "bullets": [],
+      "body": "",
+      "raw": "chore(semi-brain): sync corpora and index after the cull fix"
+    },
+    "stat": ".../1_extractors/output/git_commits_corpus.json    |  25 +++++++++++++++++++++\n .../1_extractors/output/knowledge_index.db         | Bin 34082816 -> 34082816 bytes\n .../3_datasets/train_dpo_preference.jsonl          |   1 -\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl |   1 +\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl |   1 +\n 5 files changed, 27 insertions(+), 1 deletion(-)",
+    "files": [
+      "tools/semi-brain/1_extractors/output/git_commits_corpus.json",
+      "tools/semi-brain/1_extractors/output/knowledge_index.db",
+      "tools/semi-brain/3_datasets/train_dpo_preference.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_alpaca.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_sharegpt.jsonl"
+    ]
+  },
+  {
     "hash": "b3a1d2a719e352658dd8818ed124ce5004eef44c",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
