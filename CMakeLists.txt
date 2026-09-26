@@ -532,6 +532,7 @@ set(COMMON_SOURCES
     src/nodes/SyphonOutNode.cpp
     src/nodes/ProjectionNode.cpp
     src/nodes/AudioNodes.cpp
+    src/nodes/AudioMeterNode.cpp
     src/nodes/NoteNodes.cpp
     src/nodes/WavetableNode.cpp
     src/nodes/AnalogNode.cpp
