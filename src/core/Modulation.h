@@ -30,6 +30,10 @@ struct ParamRef
    float minValue = 0.0f;
    float maxValue = 1.0f;
    std::string name;
+   // Turbo: how the widget maps its throw to the value (MIDI learn follows
+   // the same curve): 0 linear, 1 console dB fader (-60..+12, unity at 75%),
+   // 2 logarithmic frequency.
+   int taper = 0;
 };
 
 // Which modulator drives which parameter. Keyed by (nodeIndex, paramIndex) so the

@@ -1,5 +1,42 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.38.1-turbo (2026-09-26)
+
+### Fixed
+- **MIDI faders jumping** (e.g. nanoKONTROL on the Super Mixer): the mapping was linear in dB while
+  the on-screen fader uses the console taper (unity at 75% of throw). MIDI now follows the widget's
+  taper (dB faders and knobs, log frequency knobs), so hardware and screen move together.
+- 7-bit controller jitter: a one-step move that reverses direction is ignored, and each mapping glides
+  to its target ("smooth" in the mapping editor, default 25 ms, 0 = off). Saved with the patch
+  (`midismooth` line, older patches load with the default).
+
+## 0.38.0-turbo (2026-09-26)
+
+### Added
+- **MIDI learn for every parameter** that has a CV pin (sliders, knobs, buttons, toggles,
+  dropdowns, pads):
+  - Ctrl+M or VIEW > MIDI learn mode: the node widgets lock, click a parameter (the one nearest
+    the click in that node), move a control - mapped. Stays in learn mode for the next one; Esc
+    cancels / exits. Pins show the state: orange ring = learnable, pulsing = waiting, green = mapped
+    (bright when MIDI arrives).
+  - Right-click a parameter's pin: MIDI learn / learn again / clear, and the mapping editor.
+  - A mapping is device + channel + CC or note, so sources never mix. Identical controllers get
+    distinct keys ("name", "name #2", ...). "any device" / "any channel" make a patch portable to
+    another machine or controller.
+  - Per mapping: continuous (knob/fader), momentary (hold) or toggle (press on/off), invert, soft
+    takeover (no jumps), and min/max in the parameter's own units - editable any time.
+  - VIEW > MIDI map...: connected devices, rescan (controllers plugged in later), every mapping with
+    live activity, edit, learn again, show node, delete.
+  - Values are written only when new MIDI arrives, so the mouse still works on mapped sliders; a
+    wired modulation cable wins over MIDI. Saved with the patch (`midimap` lines).
+- **VMPC plays the clip's soundtrack** on a new "audio" output (wire it to Audio Out or a mixer),
+  in sync with the picture (the audio is the clock while it plays), with trim, speed/reverse and
+  loop modes; "play audio" and "audio volume" controls. Clips without an audio track stay silent.
+
+### Changed
+- MIDI inputs with the same name get separate ids ("#2", "#3"); the first keeps the old id, so
+  MIDI CC / Trigger nodes saved before keep working.
+
 ## 0.37.0-turbo (2026-09-25)
 
 ### Menus

@@ -288,6 +288,24 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
       file << "expr " << e.dstIndex << " " << e.dstParam << " " << EscapeLine(e.text) << "\n";
    for (const GlobalRecord& g : data.globals)
       file << "glob " << g.name << " " << EscapeLine(g.expr) << "\n";
+   for (const MidiMapRecord& m : data.midi)
+   {
+      // Device keys can hold spaces: percent-escape them into one token.
+      std::string dev;
+      for (char ch : m.deviceKey)
+      {
+         if (ch == ' ') dev += "%20";
+         else if (ch == '%') dev += "%25";
+         else dev += ch;
+      }
+      if (dev.empty())
+         dev = "*";
+      file << "midimap " << m.dstIndex << " " << m.dstParam << " " << (m.isNote ? 1 : 0) << " "
+           << m.channel << " " << m.number << " " << m.mode << " " << (m.soft ? 1 : 0) << " "
+           << (m.invert ? 1 : 0) << " " << FloatToString(m.outMin) << " " << FloatToString(m.outMax) << " "
+           << dev << " " << EscapeLine(m.paramName) << "\n";
+      file << "midismooth " << m.dstIndex << " " << m.dstParam << " " << FloatToString(m.smoothMs) << "\n";
+   }
    if (data.settings.present)
       WriteSettingsLines(file, data.settings, "setting");
 
@@ -456,6 +474,43 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
             raw.erase(0, 1);
          e.text = UnescapeLine(raw);
          outData.expressions.push_back(e);
+      }
+      else if (tag == "midismooth")
+      {
+         int dst = 0, param = 0;
+         float ms = 25.0f;
+         if (in >> dst >> param >> ms)
+            for (MidiMapRecord& m : outData.midi)
+               if (m.dstIndex == dst && m.dstParam == param)
+                  m.smoothMs = ms;
+      }
+      else if (tag == "midimap")
+      {
+         MidiMapRecord m;
+         int isNote = 0, soft = 0, invert = 0;
+         std::string dev;
+         if (in >> m.dstIndex >> m.dstParam >> isNote >> m.channel >> m.number >> m.mode >> soft >> invert
+                >> m.outMin >> m.outMax >> dev)
+         {
+            m.isNote = isNote != 0;
+            m.soft = soft != 0;
+            m.invert = invert != 0;
+            if (dev != "*")
+            {
+               for (size_t i = 0; i < dev.size(); i++)
+               {
+                  if (dev[i] == '%' && i + 2 < dev.size() + 0 && dev.compare(i, 3, "%20") == 0) { m.deviceKey += ' '; i += 2; }
+                  else if (dev[i] == '%' && dev.compare(i, 3, "%25") == 0) { m.deviceKey += '%'; i += 2; }
+                  else m.deviceKey += dev[i];
+               }
+            }
+            std::string raw;
+            std::getline(in, raw);
+            if (!raw.empty() && raw[0] == ' ')
+               raw.erase(0, 1);
+            m.paramName = UnescapeLine(raw);
+            outData.midi.push_back(m);
+         }
       }
       else if (tag == "glob")
       {

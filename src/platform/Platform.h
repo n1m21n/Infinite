@@ -622,6 +622,17 @@ namespace Platform
    bool MidiIsRunning();
    std::string MidiDeviceSummary(); // comma-joined names of connected sources, for status text
    std::string MidiDeviceName(MidiDeviceId device); // "" if not currently connected
+   // Turbo: every connected input with a stable key - its name, or
+   // "name #2", "name #3" for identical controllers - and the id MidiRead
+   // takes. The first of a name keeps the plain-name id older patches saved.
+   struct MidiDeviceInfo
+   {
+      MidiDeviceId id = 0;
+      std::string key;
+   };
+   std::vector<MidiDeviceInfo> MidiDevices();
+   // Closes and reopens every MIDI input (a controller plugged in later).
+   bool MidiRescan(std::string& outError);
 
    // Current value for a specific (device, channel, controller) binding.
    // Returns false (value left at 0) if that binding has never been seen.

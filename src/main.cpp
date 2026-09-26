@@ -144,6 +144,7 @@ static const char* kTurboBuildDate = __DATE__ " " __TIME__;
 #include "nodes/SuperMixerNode.h"
 #include "nodes/LayoutNode.h"
 #include "nodes/VmpcNode.h"
+#include "core/MidiMap.h"
 #include "audio/SampleScanner.h"
 #include "audio/PluginScanner.h"
 #include "audio/MediaExtensions.h"
@@ -1260,6 +1261,49 @@ namespace
       }
    }
 
+   // ---- Turbo MIDI learn: pin decoration + where each param's pin is -----
+   // Every CV pin drawn this frame records its centre (in canvas space) and
+   // label, so a click in MIDI learn mode can pick the parameter under the
+   // mouse, and a mapped / armed parameter can be marked on its pin.
+   struct ParamPinSpot
+   {
+      ImVec2 c;
+      std::string name;
+   };
+   std::map<std::pair<int, int>, ParamPinSpot> gParamPinSpots;
+   int gMidiMenuNode = -1;
+   int gMidiMenuParam = -1;
+   bool gOpenMidiMenu = false;
+   bool gMidiWindowOpen = false;
+   int gMidiWindowSelected = -1;
+
+   std::string CleanParamLabel(const char* label)
+   {
+      std::string s = label != nullptr ? label : "";
+      const size_t hidden = s.find("##");
+      if (hidden != std::string::npos)
+         s = s.substr(0, hidden);
+      return s.empty() ? std::string("control") : s;
+   }
+
+   void DecorateParamPin(ImDrawList* dl, const ImVec2& c, int nodeIndex, int paramIndex, const char* label)
+   {
+      gParamPinSpots[{ nodeIndex, paramIndex }] = { c, CleanParamLabel(label) };
+      const double now = ImGui::GetTime();
+      if (MidiMap::IsArmed(nodeIndex, paramIndex))
+      {
+         const float pulse = 0.5f + 0.5f * std::sin((float)now * 10.0f);
+         dl->AddCircle(c, 7.5f, IM_COL32(255, 150, 40, (int)(110 + 145 * pulse)), 16, 2.5f);
+      }
+      else if (MidiMap::Find(nodeIndex, paramIndex) != nullptr)
+      {
+         const bool hot = MidiMap::RecentlyActive(nodeIndex, paramIndex, now);
+         dl->AddCircle(c, 7.0f, hot ? IM_COL32(150, 255, 170, 255) : IM_COL32(70, 200, 110, 230), 16, 2.0f);
+      }
+      else if (MidiMap::LearnMode())
+         dl->AddCircle(c, 7.0f, IM_COL32(255, 150, 40, 120), 16, 1.5f);
+   }
+
    struct DiscreteParamRef
    {
       int nodeIndex = -1;
@@ -1311,7 +1355,10 @@ namespace
       result.paramIndex = StableDiscreteParamIndex(label);
       const std::pair<int, int> key(result.nodeIndex, result.paramIndex);
       float& slot = gDiscreteParamStore[key];
-      result.modulated = Modulation::Instance().IsModulated(result.nodeIndex, result.paramIndex);
+      // A MIDI mapping drives a discrete control like a CV does (the store
+      // keeps the value MIDI wrote instead of being reset from the UI).
+      result.modulated = Modulation::Instance().IsModulated(result.nodeIndex, result.paramIndex) ||
+                         MidiMap::Find(result.nodeIndex, result.paramIndex) != nullptr;
       if (!result.modulated)
          slot = currentValue;
 
@@ -1342,6 +1389,7 @@ namespace
       dl->AddCircle(c, 4.0f,
                     isLight ? IM_COL32(120, 130, 150, 255) : IM_COL32(30, 32, 42, 255),
                     0, 1.0f);
+      DecorateParamPin(dl, c, result.nodeIndex, result.paramIndex, label);
       ed::EndPin();
       ImGui::SameLine(0.0f, 4.0f);
 
@@ -1609,6 +1657,7 @@ namespace
             : (isLight ? IM_COL32(165, 175, 195, 255) : IM_COL32(95, 100, 120, 255));
       dl->AddCircleFilled(c, 4.0f, pinColor);
       dl->AddCircle(c, 4.0f, isLight ? IM_COL32(120, 130, 150, 255) : IM_COL32(30, 32, 42, 255), 0, 1.0f);
+      DecorateParamPin(dl, c, nodeIndex, paramIndex, label);
       ed::EndPin();
       ImGui::SameLine(0.0f, 4.0f);
 
@@ -2348,6 +2397,8 @@ namespace
       ref.value = value;
       ref.minValue = minV;
       ref.maxValue = maxV;
+      ref.taper = (style == AudioWidgetStyle::VFaderDb || style == AudioWidgetStyle::KnobDb) ? 1
+                : (style == AudioWidgetStyle::KnobFreq ? 2 : 0);
       ref.name = label;
       Modulation::Instance().RegisterParam(ref);
 
@@ -2539,6 +2590,7 @@ namespace
          dl->AddCircle(c, modulated || hasExpr ? 4.0f : 4.5f, pinColor, 12, 2.0f);
          if (modulated || hasExpr)
             dl->AddCircleFilled(c, 2.0f, pinColor);
+         DecorateParamPin(dl, c, nodeIndex, paramIndex, label);
          ed::EndPin();
          ImGui::SetCursorScreenPos(cursorAfter);
       }
@@ -3596,7 +3648,7 @@ namespace
    {
       if (node == nullptr || dynamic_cast<IAudioSource*>(node) == nullptr)
          return false;
-      if (dynamic_cast<VideoSourceNode*>(node) != nullptr)
+      if (dynamic_cast<VideoSourceNode*>(node) != nullptr || dynamic_cast<VmpcNode*>(node) != nullptr)
          return outputIndex == 1;
       return true;
    }
@@ -18612,6 +18664,139 @@ namespace
       gPatchDirty = true;
    }
 
+   const ParamRef* FindFrameParam(int nodeIndex, int paramIndex)
+   {
+      for (const ParamRef& ref : Modulation::Instance().FrameParams())
+         if (ref.nodeIndex == nodeIndex && ref.paramIndex == paramIndex)
+            return &ref;
+      return nullptr;
+   }
+
+   // Turbo MIDI learn: edits one mapping (source + response + range).
+   void DrawMidiMappingEditor(MidiMap::Mapping& m)
+   {
+      bool changed = false;
+      const std::vector<std::string> devices = MidiMap::DeviceKeys();
+      const std::string devLabel = m.deviceKey.empty() ? std::string("any device") : m.deviceKey;
+      const bool connected = m.deviceKey.empty() ||
+                             std::find(devices.begin(), devices.end(), m.deviceKey) != devices.end();
+      ImGui::SetNextItemWidth(230.0f);
+      if (ImGui::BeginCombo("device##midiDev", connected ? devLabel.c_str() : (devLabel + " (not connected)").c_str()))
+      {
+         if (ImGui::Selectable("any device", m.deviceKey.empty()))
+         {
+            m.deviceKey.clear();
+            changed = true;
+         }
+         for (const std::string& d : devices)
+            if (ImGui::Selectable(d.c_str(), d == m.deviceKey))
+            {
+               m.deviceKey = d;
+               changed = true;
+            }
+         ImGui::EndCombo();
+      }
+      char chLabel[16];
+      if (m.channel < 0)
+         snprintf(chLabel, sizeof(chLabel), "any");
+      else
+         snprintf(chLabel, sizeof(chLabel), "%d", m.channel + 1);
+      ImGui::SetNextItemWidth(80.0f);
+      if (ImGui::BeginCombo("channel##midiCh", chLabel))
+      {
+         if (ImGui::Selectable("any", m.channel < 0))
+         {
+            m.channel = -1;
+            changed = true;
+         }
+         for (int ch = 0; ch < 16; ch++)
+         {
+            char item[8];
+            snprintf(item, sizeof(item), "%d", ch + 1);
+            if (ImGui::Selectable(item, m.channel == ch))
+            {
+               m.channel = ch;
+               changed = true;
+            }
+         }
+         ImGui::EndCombo();
+      }
+      ImGui::SameLine();
+      int type = m.isNote ? 1 : 0;
+      if (ImGui::RadioButton("CC", type == 0)) { m.isNote = false; changed = true; }
+      ImGui::SameLine();
+      if (ImGui::RadioButton("note", type == 1)) { m.isNote = true; changed = true; }
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(70.0f);
+      if (ImGui::DragInt("##midiNum", &m.number, 0.2f, 0, 127, m.isNote ? "note %d" : "CC %d", ImGuiSliderFlags_AlwaysClamp))
+         changed = true;
+
+      static const char* kModes[3] = { "continuous (knob / fader)", "momentary (hold)", "toggle (press on / off)" };
+      ImGui::SetNextItemWidth(230.0f);
+      if (ImGui::BeginCombo("mode##midiMode", kModes[std::clamp(m.mode, 0, 2)]))
+      {
+         for (int i = 0; i < 3; i++)
+            if (ImGui::Selectable(kModes[i], m.mode == i))
+            {
+               m.mode = i;
+               changed = true;
+            }
+         ImGui::EndCombo();
+      }
+      if (ImGui::Checkbox("invert##midiInv", &m.invert))
+         changed = true;
+      ImGui::SameLine();
+      if (ImGui::Checkbox("soft takeover##midiSoft", &m.softTakeover))
+      {
+         m.pickedUp = !m.softTakeover;
+         changed = true;
+      }
+      if (ImGui::IsItemHovered())
+         ImGui::SetTooltip("the parameter only follows the control once the control reaches its current value (no jumps)");
+      if (m.mode == MidiMap::kContinuous)
+      {
+         ImGui::SetNextItemWidth(113.0f);
+         if (ImGui::DragFloat("##midiSmooth", &m.smoothMs, 0.5f, 0.0f, 500.0f, "smooth %.0f ms", ImGuiSliderFlags_AlwaysClamp))
+            changed = true;
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("glides to each new MIDI value; 0 = jump straight to it");
+      }
+
+      // Range in the parameter's own units when it is on screen (along the
+      // widget's taper, so a dB fader's min/max read in dB).
+      const ParamRef* ref = FindFrameParam(m.nodeIndex, m.paramIndex);
+      const float lo = ref ? ref->minValue : 0.0f;
+      const float hi = ref ? ref->maxValue : 1.0f;
+      const int taper = ref ? ref->taper : 0;
+      const float span = hi - lo;
+      float outLo = MidiMap::PosToValue(taper, m.outMin, lo, hi), outHi = MidiMap::PosToValue(taper, m.outMax, lo, hi);
+      const float speed = std::max(0.0001f, std::fabs(span) * 0.002f);
+      ImGui::SetNextItemWidth(113.0f);
+      if (ImGui::DragFloat("##midiMin", &outLo, speed, std::min(lo, hi), std::max(lo, hi), "min %.3f"))
+         changed = true;
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(113.0f);
+      if (ImGui::DragFloat("##midiMax", &outHi, speed, std::min(lo, hi), std::max(lo, hi), "max %.3f"))
+         changed = true;
+      ImGui::SameLine();
+      if (ImGui::SmallButton("full"))
+      {
+         outLo = lo;
+         outHi = hi;
+         changed = true;
+      }
+      if (changed)
+      {
+         if (std::fabs(span) > 1e-9f)
+         {
+            m.outMin = MidiMap::ValueToPos(taper, outLo, lo, hi);
+            m.outMax = MidiMap::ValueToPos(taper, outHi, lo, hi);
+         }
+         m.lastRaw = -1.0f;
+         gPatchDirty = true;
+      }
+   }
+
    void DrawModulationRangeEditor(int nodeIndex, int paramIndex)
    {
       Modulation& mod = Modulation::Instance();
@@ -20086,6 +20271,7 @@ namespace
       PushUndoCheckpoint();
       Modulation::Instance().UnbindAllFor(index);
       PaletteBinding::Instance().UnbindAllFor(index);
+      MidiMap::RemoveNode(index);
       gModHistory.erase(index);
       DisconnectAllTo(victim->node.get());
       // A deleted Group's membership set must go with it - otherwise its
@@ -20288,6 +20474,24 @@ namespace
                                   link.second.nodeIndex, link.second.swatchIndex });
       for (const auto& expr : Modulation::Instance().Expressions())
          data.expressions.push_back({ expr.first.first, expr.first.second, expr.second });
+      for (const MidiMap::Mapping& m : MidiMap::All())
+      {
+         Patch::MidiMapRecord rec;
+         rec.dstIndex = m.nodeIndex;
+         rec.dstParam = m.paramIndex;
+         rec.isNote = m.isNote;
+         rec.channel = m.channel;
+         rec.number = m.number;
+         rec.mode = m.mode;
+         rec.soft = m.softTakeover;
+         rec.invert = m.invert;
+         rec.outMin = m.outMin;
+         rec.outMax = m.outMax;
+         rec.deviceKey = m.deviceKey;
+         rec.paramName = m.paramName;
+         rec.smoothMs = m.smoothMs;
+         data.midi.push_back(rec);
+      }
       // Written in list order: a global may reference the ones above it, so
       // the order is part of the meaning, not just presentation.
       for (const ExprGlobals::Global& g : ExprGlobals::All())
@@ -20424,6 +20628,7 @@ namespace
       gModHistory.clear();
       Modulation::Instance().Clear();
       PaletteBinding::Instance().Clear();
+      MidiMap::Clear();
       ExprGlobals::Clear();
       gNextIndex = 1;
       gPatchPath.clear();
@@ -20553,6 +20758,29 @@ namespace
          GraphNode* src = resolve(c.srcIndex);
          if (dst != nullptr && src != nullptr)
             PaletteBinding::Instance().Bind(dst->index, c.dstColor, src->index, c.srcSwatch);
+      }
+      MidiMap::Clear();
+      for (const Patch::MidiMapRecord& rec : data.midi)
+      {
+         GraphNode* dst = resolve(rec.dstIndex);
+         if (dst == nullptr)
+            continue;
+         MidiMap::Mapping m;
+         m.nodeIndex = dst->index;
+         m.paramIndex = rec.dstParam;
+         m.isNote = rec.isNote;
+         m.channel = rec.channel;
+         m.number = rec.number;
+         m.mode = rec.mode;
+         m.softTakeover = rec.soft;
+         m.pickedUp = !rec.soft;
+         m.invert = rec.invert;
+         m.outMin = rec.outMin;
+         m.outMax = rec.outMax;
+         m.deviceKey = rec.deviceKey;
+         m.paramName = rec.paramName;
+         m.smoothMs = rec.smoothMs;
+         MidiMap::Set(m);
       }
       for (const Patch::ExprRecord& e : data.expressions)
       {
@@ -21912,8 +22140,9 @@ namespace
       const int p = std::clamp(n->selectedPad, 0, VmpcNode::kPads - 1);
       ImGui::PushID(8900 + p);
       if (n->PadLoaded(p))
-         ImGui::TextColored(ImVec4(0.75f, 0.82f, 1.0f, 1.0f), "pad %d - %s (%d x %d, %.1f s)", p + 1,
-                            n->PadName(p).c_str(), n->PadWidth(p), n->PadHeight(p), n->PadDuration(p));
+         ImGui::TextColored(ImVec4(0.75f, 0.82f, 1.0f, 1.0f), "pad %d - %s (%d x %d, %.1f s, %s)", p + 1,
+                            n->PadName(p).c_str(), n->PadWidth(p), n->PadHeight(p), n->PadDuration(p),
+                            n->PadHasAudio(p) ? "audio" : "no audio");
       else
          ImGui::TextDisabled("pad %d - empty", p + 1);
       const float third = (W - 2.0f * ImGui::GetStyle().ItemSpacing.x) / 3.0f;
@@ -21979,6 +22208,11 @@ namespace
       ImGui::SameLine();
       if (ModCheckbox("hold last frame", &n->holdLastFrame))
          PushUndoCheckpoint();
+      // The clip's own soundtrack on the "audio" output (wire it to an Audio
+      // Out or a mixer). Clips without an audio track stay silent.
+      if (ModCheckbox("play audio", &n->playAudio))
+         PushUndoCheckpoint();
+      ModSlider("audio volume", &n->audioVolume, 0.0f, 1.5f, "%.2f");
       if (ModTriggerButton("STOP##vmpcStop", ImVec2(W, 0)))
          n->StopAll();
 
@@ -26754,7 +26988,7 @@ namespace AudioParamSweep
       // produce a signal. The generic headless sweep has no such fixture;
       // keep its parameter round-trip coverage but do not report its expected
       // empty output as an audio implementation failure.
-      if (dynamic_cast<VideoSourceNode*>(node) != nullptr)
+      if (dynamic_cast<VideoSourceNode*>(node) != nullptr || dynamic_cast<VmpcNode*>(node) != nullptr)
          return ReadMode::kUnobservable;
       if (shape.isAudioSource)
       {
@@ -30268,6 +30502,7 @@ int main(int argc, char** argv)
       gCurrentNodeIndex = -1;
       PaletteBinding::Instance().ClearFrameColors();
       gDrawnParamPins.clear();
+      gParamPinSpots.clear();
       gDrawnColorPins.clear();
       gParamRightClickConsumedThisFrame = false;
       {
@@ -30424,6 +30659,15 @@ int main(int argc, char** argv)
                gNodePanelOpen = !gNodePanelOpen;
             if (ImGui::MenuItem("Fullscreen UI", "F11", gMainFullscreen))
                SetMainWindowFullscreen(!gMainFullscreen);
+            ImGui::SeparatorText("MIDI");
+            if (ImGui::MenuItem("MIDI learn mode", "Ctrl+M", MidiMap::LearnMode()))
+            {
+               MidiMap::LearnMode() = !MidiMap::LearnMode();
+               if (!MidiMap::LearnMode())
+                  MidiMap::Disarm();
+            }
+            if (ImGui::MenuItem("MIDI map...", nullptr, gMidiWindowOpen))
+               gMidiWindowOpen = !gMidiWindowOpen;
             ImGui::SeparatorText("Output behind the canvas");
             GraphNode* bgNode = gCanvasBgNodeIndex >= 0 ? FindNodeByIndex(gCanvasBgNodeIndex) : nullptr;
             if (bgNode != nullptr)
@@ -36494,6 +36738,9 @@ int main(int argc, char** argv)
 
          ed::BeginNode(gn.NodeId());
          ImGui::PushID(gn.index);
+         const bool midiLearnLock = MidiMap::LearnMode();
+         if (midiLearnLock)
+            ImGui::BeginDisabled();
          const bool dimmed = gn.node->bypassed;
          if (dimmed)
             ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.55f);
@@ -37173,6 +37420,8 @@ int main(int argc, char** argv)
          if (dimmed)
             ImGui::PopStyleVar();
          ImGui::PopID();
+         if (midiLearnLock)
+            ImGui::EndDisabled();
          ed::EndNode();
          gCurrentNodeIndex = -1;
          ed::PopStyleColor(2);
@@ -37195,6 +37444,43 @@ int main(int argc, char** argv)
             ed::SelectNode(gn.NodeId(), false);
             gPendingSidebarRevealNodeId = -1;
             gPendingNavigateSelection = true;
+         }
+      }
+
+      // ---- Turbo MIDI learn: pick a parameter / open its MIDI menu ----------
+      {
+         const int hoveredPin = (int)ed::GetHoveredPin().Get();
+         if (hoveredPin != 0 && GraphNode::IsParamPin(hoveredPin) && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+         {
+            gMidiMenuNode = GraphNode::NodeIndexFromPin(hoveredPin);
+            gMidiMenuParam = GraphNode::ParamIndexFromPin(hoveredPin);
+            gOpenMidiMenu = true;
+            gParamRightClickConsumedThisFrame = true;
+         }
+         if (MidiMap::LearnMode() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+         {
+            const int hoveredNode = (int)ed::GetHoveredNode().Get() / GraphNode::kStride;
+            const ImVec2 mouse = ImGui::GetMousePos();
+            float best = 1e30f;
+            const std::pair<int, int>* pick = nullptr;
+            const ParamPinSpot* pickSpot = nullptr;
+            for (const auto& spot : gParamPinSpots)
+            {
+               if (spot.first.first != hoveredNode)
+                  continue;
+               // Rows first: a parameter's pin sits on its own row, so vertical
+               // distance matters more than horizontal.
+               const float dx = spot.second.c.x - mouse.x, dy = spot.second.c.y - mouse.y;
+               const float d = dx * dx * 0.15f + dy * dy;
+               if (d < best)
+               {
+                  best = d;
+                  pick = &spot.first;
+                  pickSpot = &spot.second;
+               }
+            }
+            if (pick != nullptr)
+               MidiMap::Arm(pick->first, pick->second, pickSpot->name);
          }
       }
 
@@ -37263,7 +37549,8 @@ int main(int argc, char** argv)
                continue;
             if (GraphNode* src = ownerOf((const void*)cable->GetSource()))
             {
-               const int audioOutput = dynamic_cast<VideoSourceNode*>(src->node.get()) != nullptr ? 1 : 0;
+               const int audioOutput = (dynamic_cast<VideoSourceNode*>(src->node.get()) != nullptr ||
+                                        dynamic_cast<VmpcNode*>(src->node.get()) != nullptr) ? 1 : 0;
                gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
                                   src->OutputPinId(audioOutput), gn.InputPinId(slot) });
             }
@@ -38446,6 +38733,140 @@ int main(int argc, char** argv)
          ImGui::OpenPopup("##modbind");
          gOpenModBindingMenu = false;
       }
+      // Turbo MIDI learn: the parameter's MIDI menu (right-click its pin).
+      if (gOpenMidiMenu)
+      {
+         ImGui::OpenPopup("##midiparam");
+         gOpenMidiMenu = false;
+      }
+      if (ImGui::BeginPopup("##midiparam"))
+      {
+         GraphNode* target = FindNodeByIndex(gMidiMenuNode);
+         if (target == nullptr)
+            ImGui::CloseCurrentPopup();
+         else
+         {
+            auto spot = gParamPinSpots.find({ gMidiMenuNode, gMidiMenuParam });
+            const std::string pname = spot != gParamPinSpots.end() ? spot->second.name : std::string("parameter");
+            ImGui::TextUnformatted((NodeTitle(*target) + " / " + pname).c_str());
+            ImGui::Separator();
+            if (MidiMap::IsArmed(gMidiMenuNode, gMidiMenuParam))
+            {
+               ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.25f, 1.0f), "move a control on your MIDI device...");
+               if (ImGui::Button("cancel learn"))
+                  MidiMap::Disarm();
+            }
+            else if (ImGui::Button(MidiMap::Find(gMidiMenuNode, gMidiMenuParam) ? "MIDI learn again" : "MIDI learn"))
+               MidiMap::Arm(gMidiMenuNode, gMidiMenuParam, pname);
+            if (MidiMap::Mapping* m = MidiMap::Find(gMidiMenuNode, gMidiMenuParam))
+            {
+               ImGui::SameLine();
+               if (ImGui::Button("clear MIDI"))
+               {
+                  PushUndoCheckpoint();
+                  MidiMap::Remove(gMidiMenuNode, gMidiMenuParam);
+                  gPatchDirty = true;
+               }
+               else
+               {
+                  ImGui::TextDisabled("%s", MidiMap::SourceLabel(*m).c_str());
+                  DrawMidiMappingEditor(*m);
+               }
+            }
+         }
+         ImGui::EndPopup();
+      }
+
+      if (MidiMap::LearnMode())
+      {
+         // Learn-mode banner over the canvas.
+         const char* msg = MidiMap::AnyArmed()
+            ? "MIDI LEARN - now move a control on your MIDI device  (Esc / Ctrl+M: exit)"
+            : "MIDI LEARN - click a parameter, then move a control  (right-click a pin: options, Esc / Ctrl+M: exit)";
+         ImDrawList* fg = ImGui::GetForegroundDrawList();
+         const ImVec2 at(gGraphScreenTL.x + 12.0f, gGraphScreenTL.y + 10.0f);
+         const ImVec2 sz = ImGui::CalcTextSize(msg);
+         fg->AddRectFilled(ImVec2(at.x - 8.0f, at.y - 5.0f), ImVec2(at.x + sz.x + 8.0f, at.y + sz.y + 5.0f),
+                           IM_COL32(120, 60, 10, 225), 5.0f);
+         fg->AddText(at, IM_COL32(255, 230, 200, 255), msg);
+      }
+
+      if (gMidiWindowOpen)
+      {
+         ImGui::SetNextWindowSize(ImVec2(560, 460), ImGuiCond_FirstUseEver);
+         if (ImGui::Begin("MIDI map", &gMidiWindowOpen))
+         {
+            ImGui::Checkbox("learn mode (Ctrl+M)", &MidiMap::LearnMode());
+            if (!MidiMap::LearnMode())
+               MidiMap::Disarm();
+            ImGui::SameLine();
+            if (ImGui::Button("rescan devices"))
+            {
+               std::string err;
+               MidiMap::Rescan(err);
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", MidiMap::Status().c_str());
+            ImGui::SeparatorText("devices");
+            const std::vector<std::string> devices = MidiMap::DeviceKeys();
+            if (devices.empty())
+               ImGui::TextDisabled("none connected (or MIDI not started yet)");
+            for (const std::string& d : devices)
+               ImGui::BulletText("%s", d.c_str());
+
+            std::vector<MidiMap::Mapping>& maps = MidiMap::All();
+            ImGui::SeparatorText(("mappings (" + std::to_string(maps.size()) + ")").c_str());
+            int removeAt = -1;
+            if (ImGui::BeginChild("##midimaps", ImVec2(0, 170), true))
+            {
+               for (int i = 0; i < (int)maps.size(); i++)
+               {
+                  const MidiMap::Mapping& m = maps[(size_t)i];
+                  GraphNode* g = FindNodeByIndex(m.nodeIndex);
+                  const std::string who = (g ? NodeTitle(*g) : std::string("?")) + " / " + m.paramName;
+                  ImGui::PushID(i);
+                  if (ImGui::SmallButton("x"))
+                     removeAt = i;
+                  ImGui::SameLine();
+                  const bool hot = MidiMap::RecentlyActive(m.nodeIndex, m.paramIndex, ImGui::GetTime());
+                  if (hot)
+                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 1.0f, 0.7f, 1.0f));
+                  if (ImGui::Selectable((who + "   <-   " + MidiMap::SourceLabel(m)).c_str(), gMidiWindowSelected == i))
+                     gMidiWindowSelected = i;
+                  if (hot)
+                     ImGui::PopStyleColor();
+                  ImGui::PopID();
+               }
+            }
+            ImGui::EndChild();
+            if (removeAt >= 0)
+            {
+               PushUndoCheckpoint();
+               maps.erase(maps.begin() + removeAt);
+               gMidiWindowSelected = -1;
+               gPatchDirty = true;
+            }
+            if (gMidiWindowSelected >= 0 && gMidiWindowSelected < (int)maps.size())
+            {
+               MidiMap::Mapping& m = maps[(size_t)gMidiWindowSelected];
+               ImGui::SeparatorText("selected mapping");
+               if (ImGui::Button("learn again"))
+                  MidiMap::Arm(m.nodeIndex, m.paramIndex, m.paramName);
+               ImGui::SameLine();
+               if (ImGui::Button("show node"))
+               {
+                  if (GraphNode* g = FindNodeByIndex(m.nodeIndex))
+                     gPendingSelect.push_back(g->NodeId());
+                  gPendingNavigateSelection = true;
+               }
+               DrawMidiMappingEditor(m);
+            }
+            else
+               ImGui::TextDisabled("select a mapping to edit it. Mappings are saved with the patch.");
+         }
+         ImGui::End();
+      }
+
       if (ImGui::BeginPopup("##modbind"))
       {
          Modulation& mod = Modulation::Instance();
@@ -39528,11 +39949,17 @@ int main(int argc, char** argv)
          // core/ExprGlobals.h.
          ExprGlobals::EvaluateAll(t);
          const std::map<std::string, float>& globals = ExprGlobals::Values();
+         const double midiNow = ImGui::GetTime();
+         MidiMap::Update(midiNow);
          for (const ParamRef& ref : modulation.FrameParams())
          {
             if (ref.value == nullptr)
                continue;
             const Modulation::Source src = modulation.ModulatorFor(ref.nodeIndex, ref.paramIndex);
+            // Turbo MIDI learn: a new value from the mapped control is
+            // written here; a wired modulation cable always wins.
+            if (src.nodeIndex < 0 && MidiMap::Find(ref.nodeIndex, ref.paramIndex) != nullptr)
+               MidiMap::Apply(ref, midiNow);
             if (src.nodeIndex >= 0)
             {
                // A wired modulator always wins over a typed expression - see
@@ -40118,6 +40545,12 @@ int main(int argc, char** argv)
          }
          else if (ImGui::IsKeyPressed(ImGuiKey_N, false))
             GuardUnsavedChanges([]() { NewPatch(); });
+         else if (ImGui::IsKeyPressed(ImGuiKey_M, false))
+         {
+            MidiMap::LearnMode() = !MidiMap::LearnMode();
+            if (!MidiMap::LearnMode())
+               MidiMap::Disarm();
+         }
          else if (ImGui::IsKeyPressed(ImGuiKey_B, false))
          {
             if (ImGui::GetIO().KeyShift)
@@ -40130,6 +40563,13 @@ int main(int argc, char** argv)
       // window keeps its own F11, it has its own key callback).
       if (ImGui::IsKeyPressed(ImGuiKey_F11, false))
          SetMainWindowFullscreen(!gMainFullscreen);
+      if (MidiMap::LearnMode() && !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+      {
+         if (MidiMap::AnyArmed())
+            MidiMap::Disarm();
+         else
+            MidiMap::LearnMode() = false;
+      }
 
       // Absolute-deadline frame limiter. Carrying the deadline forward avoids
       // permanently losing cadence after one oversleep on Windows.

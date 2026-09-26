@@ -1518,6 +1518,8 @@ namespace Platform
       {
          std::vector<std::unique_ptr<juce::MidiInput>> inputs;
          std::map<MidiDeviceId, std::string> names;
+         // Built before any input starts, read-only while they run.
+         std::map<const juce::MidiInput*, MidiDeviceId> ids;
          std::map<MidiKey, float> values;
          std::map<MidiKey, unsigned int> hits;
          std::map<std::pair<MidiDeviceId,int>, MidiLastNote> lastNotes;
@@ -1529,7 +1531,11 @@ namespace Platform
 
          void handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& msg) override
          {
-            const MidiDeviceId dev = HashId(source ? source->getName().toStdString() : "MIDI");
+            MidiDeviceId dev = 0;
+            {
+               auto found = ids.find(source);
+               dev = found != ids.end() ? found->second : HashId(source ? source->getName().toStdString() : "MIDI");
+            }
             const int ch = std::max(0, msg.getChannel() - 1);
             if (msg.isController() || msg.isNoteOnOrOff())
             {
@@ -1575,16 +1581,44 @@ namespace Platform
    bool MidiStart(std::string& error)
    {
       EnsureJuceInitialised();
-      if (!MidiStateInstance().inputs.empty()) return true;
+      MidiState& st = MidiStateInstance();
+      if (!st.inputs.empty()) return true;
+      // Identical controllers share a name; the 2nd, 3rd... get "name #2",
+      // "name #3" so every source has its own id (and MIDI learn never
+      // confuses them). Open everything first, then start, so the id map is
+      // complete before the first callback can read it.
+      std::map<std::string, int> seen;
       for (const auto& d : juce::MidiInput::getAvailableDevices())
       {
-         auto input = juce::MidiInput::openDevice(d.identifier, &MidiStateInstance());
-         if (input) { MidiStateInstance().names[HashId(d.name.toStdString())] = d.name.toStdString(); input->start(); MidiStateInstance().inputs.push_back(std::move(input)); }
+         auto input = juce::MidiInput::openDevice(d.identifier, &st);
+         if (!input) continue;
+         const std::string name = d.name.toStdString();
+         const int n = ++seen[name];
+         const std::string key = n == 1 ? name : name + " #" + std::to_string(n);
+         const MidiDeviceId id = HashId(key);
+         st.names[id] = key;
+         st.ids[input.get()] = id;
+         st.inputs.push_back(std::move(input));
       }
-      if (MidiStateInstance().inputs.empty()) { error = "no MIDI input devices found"; return false; }
+      for (auto& input : st.inputs) input->start();
+      if (st.inputs.empty()) { error = "no MIDI input devices found"; return false; }
       return true;
    }
-   void MidiStop() { for (auto& i : MidiStateInstance().inputs) if (i) i->stop(); MidiStateInstance().inputs.clear(); }
+   void MidiStop() { for (auto& i : MidiStateInstance().inputs) if (i) i->stop(); MidiStateInstance().inputs.clear(); MidiStateInstance().ids.clear(); }
+   std::vector<MidiDeviceInfo> MidiDevices()
+   {
+      std::vector<MidiDeviceInfo> out;
+      if (MidiStateInstance().inputs.empty()) return out;
+      for (const auto& n : MidiStateInstance().names) out.push_back({ n.first, n.second });
+      std::sort(out.begin(), out.end(), [](const MidiDeviceInfo& a, const MidiDeviceInfo& b) { return a.key < b.key; });
+      return out;
+   }
+   bool MidiRescan(std::string& error)
+   {
+      MidiStop();
+      MidiStateInstance().names.clear();
+      return MidiStart(error);
+   }
    bool MidiIsRunning() { return !MidiStateInstance().inputs.empty(); }
    std::string MidiDeviceSummary() { std::ostringstream s; bool first=true; for (const auto& n : MidiStateInstance().names) { if(!first)s<<", "; s<<n.second; first=false; } return s.str(); }
    std::string MidiDeviceName(MidiDeviceId id) { auto it=MidiStateInstance().names.find(id); return it==MidiStateInstance().names.end()?std::string():it->second; }

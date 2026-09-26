@@ -104,6 +104,26 @@ namespace Patch
    // One patch-wide named value an expression can read - see
    // core/ExprGlobals.h. Order is meaningful (a global may reference the ones
    // declared before it), so these are written and read as a list.
+   // Turbo MIDI learn mapping (see core/MidiMap.h).
+   //   midimap <dst> <param> <isNote> <channel> <number> <mode> <soft> <invert>
+   //           <outMin> <outMax> <deviceKey|*> <param name to end of line>
+   struct MidiMapRecord
+   {
+      int dstIndex = 0;
+      int dstParam = 0;
+      bool isNote = false;
+      int channel = -1;
+      int number = 0;
+      int mode = 0;
+      bool soft = false;
+      bool invert = false;
+      float outMin = 0.0f;
+      float outMax = 1.0f;
+      std::string deviceKey; // "" = any device
+      std::string paramName;
+      float smoothMs = 25.0f; // "midismooth <dst> <param> <ms>" line (0.39+)
+   };
+
    struct GlobalRecord
    {
       std::string name;
@@ -153,6 +173,7 @@ namespace Patch
       std::vector<PaletteRecord> palette;
       std::vector<ExprRecord> expressions;
       std::vector<GlobalRecord> globals;
+      std::vector<MidiMapRecord> midi;
       SceneSettings settings;
    };
 
