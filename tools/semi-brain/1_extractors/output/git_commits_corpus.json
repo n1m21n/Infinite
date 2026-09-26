@@ -1,5 +1,30 @@
 [
   {
+    "hash": "b3a1d2a719e352658dd8818ed124ce5004eef44c",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 26 07:20:15 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "semi-brain",
+      "title": "chore(semi-brain): skip-gate-vs-writers pattern, DPO pair for the cull miss; sync corpora",
+      "description": "skip-gate-vs-writers pattern, DPO pair for the cull miss; sync corpora",
+      "bullets": [],
+      "body": "",
+      "raw": "chore(semi-brain): skip-gate-vs-writers pattern, DPO pair for the cull miss; sync corpora"
+    },
+    "stat": ".../1_extractors/output/ast_symbol_graph.json      | 12058 ++++++++++---------\n .../1_extractors/output/git_commits_corpus.json    |   184 +\n .../1_extractors/output/knowledge_index.db         |   Bin 33759232 -> 34082816 bytes\n .../2_distilled_brain/system2_systems_logic.md     |     1 +\n .../3_datasets/train_dpo_preference.jsonl          |     1 +\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl |     9 +\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl |     9 +\n 7 files changed, 6256 insertions(+), 6006 deletions(-)",
+    "files": [
+      "tools/semi-brain/1_extractors/output/ast_symbol_graph.json",
+      "tools/semi-brain/1_extractors/output/git_commits_corpus.json",
+      "tools/semi-brain/1_extractors/output/knowledge_index.db",
+      "tools/semi-brain/2_distilled_brain/system2_systems_logic.md",
+      "tools/semi-brain/3_datasets/train_dpo_preference.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_alpaca.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_sharegpt.jsonl"
+    ]
+  },
+  {
     "hash": "faf6a2e3f7b27cc90c4245afb0172ecb91a2942d",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
