@@ -47,6 +47,10 @@ int main(int argc, char** argv)
                      sanitize(d.manufacturer).c_str(), sanitize(d.identifier).c_str(), sanitize(d.path).c_str(),
                      d.acceptsNotes ? 1 : 0);
       }
+      // Progress marker, printed even when the bundle described nothing:
+      // the parent's timeout is idle-based and resets on each of these, and
+      // the first bundle without one is the one the child died inside.
+      std::printf("@done\t%s\n", bundlePath);
       std::fflush(stdout);
    }
    return 0;
