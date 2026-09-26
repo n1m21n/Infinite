@@ -207,6 +207,7 @@ namespace
 #include "nodes/SyphonOutNode.h"
 #include "nodes/ProjectionNode.h"
 #include "nodes/AudioNodes.h"
+#include "nodes/AudioMeterNode.h"
 #include "nodes/AudioEffectNode.h"
 #include "nodes/WavetableNode.h"
 #include "nodes/AnalogNode.h"
@@ -6117,6 +6118,7 @@ namespace
       // AudioUtility folded into Utility, alongside Output/Projection/Syphon/
       // OSC above - see CategoryColors.h/.cpp.
       REGISTER_NODE(GainNode, Gain, "Utility");
+      REGISTER_NODE(AudioMeterNode, Audio Meter, "Utility");
       REGISTER_NODE(AudioInputNode, Audio In, "Utility");
       REGISTER_NODE(AudioOutputNode, Audio Out, "Utility");
       // P2.8 routing nodes - the system's only summing/fan-out points, see
@@ -11944,6 +11946,7 @@ namespace
           dynamic_cast<DrumSequencerNode*>(node) != nullptr)
          return kAudioWideWidth;
       if (dynamic_cast<GainNode*>(node) != nullptr ||
+          dynamic_cast<AudioMeterNode*>(node) != nullptr ||
           dynamic_cast<BlendAudioNode*>(node) != nullptr ||
           dynamic_cast<AudioInputNode*>(node) != nullptr ||
           dynamic_cast<SplitterNode*>(node) != nullptr ||
@@ -15326,6 +15329,232 @@ namespace
       BeginAudioSection("master & scope");
       DrawImageSpectralSynthScope(n, 48.0f, gAudioContentW);
       EndAudioSection();
+
+      EndAudioBody();
+   }
+
+   // ---- Audio Meter ------------------------------------------------------
+   // A stereo bridge meter: L and R bars either side of one shared dB scale,
+   // each showing RMS (solid) inside peak (translucent), a peak-hold line,
+   // and a max-peak readout above that turns red once the channel has hit
+   // 0 dBFS. Click anywhere on it to clear the readouts, holds and clip.
+   //
+   // The scale is piecewise rather than linear in dB so the working range
+   // (-24..0) gets most of the pixels - a linear -60..0 scale gives -60..-40,
+   // which nobody mixes at, as much height as the top 20 dB. Breakpoints are
+   // our own, picked so every labelled tick stays at least one text line
+   // apart at the meter's fixed height.
+   namespace AudioMeterScale
+   {
+      struct Point { float db, frac; };
+      static const Point kCurve[] = {
+         { -60.0f, 0.00f }, { -48.0f, 0.10f }, { -36.0f, 0.22f }, { -24.0f, 0.38f },
+         { -18.0f, 0.48f }, { -12.0f, 0.60f }, { -6.0f, 0.75f },  { -3.0f, 0.83f },
+         { 0.0f, 0.92f },   { 3.0f, 1.00f },
+      };
+
+      inline float DbToFrac(float db)
+      {
+         const int n = (int)(sizeof(kCurve) / sizeof(kCurve[0]));
+         if (db <= kCurve[0].db)
+            return 0.0f;
+         for (int i = 1; i < n; i++)
+         {
+            if (db <= kCurve[i].db)
+            {
+               const float t = (db - kCurve[i - 1].db) / (kCurve[i].db - kCurve[i - 1].db);
+               return kCurve[i - 1].frac + t * (kCurve[i].frac - kCurve[i - 1].frac);
+            }
+         }
+         return 1.0f;
+      }
+
+      inline float LevelToDb(float lvl) { return lvl > 1e-5f ? 20.0f * log10f(lvl) : -120.0f; }
+
+      // "-inf" below the floor, explicit sign above 0 so an over reads as one.
+      inline void FormatDb(char* buf, size_t size, float lvl)
+      {
+         const float db = LevelToDb(lvl);
+         if (db <= -99.0f)
+            snprintf(buf, size, "-inf");
+         else if (db > 0.05f)
+            snprintf(buf, size, "+%.1f", db);
+         else
+            snprintf(buf, size, "%.1f", db);
+      }
+   }
+
+   void DrawAudioMeterVisualizer(AudioMeterNode* n, float x, float y, float w, float h)
+   {
+      using namespace AudioMeterScale;
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 origin(x, y);
+      const ImVec2 br(x + w, y + h);
+      const bool isLight = IsThemeLight();
+      const float textH = ImGui::GetTextLineHeight();
+
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 3.0f);
+
+      // Zone colours, shared by bars, hold lines and readouts: green for
+      // normal level, amber for the last 6 dB of headroom, red for overs.
+      const ImU32 kGreen = isLight ? IM_COL32(40, 165, 90, 255) : IM_COL32(75, 215, 120, 255);
+      const ImU32 kAmber = isLight ? IM_COL32(222, 150, 30, 255) : IM_COL32(255, 190, 90, 255);
+      const ImU32 kRed = isLight ? IM_COL32(220, 55, 45, 255) : IM_COL32(255, 90, 80, 255);
+      const ImU32 slotCol = isLight ? IM_COL32(0, 0, 0, 14) : IM_COL32(255, 255, 255, 10);
+      auto zoneCol = [&](float db) { return db > 0.0f ? kRed : db > -6.0f ? kAmber : kGreen; };
+      auto withAlpha = [](ImU32 c, int a) { return (c & ~IM_COL32_A_MASK) | ((ImU32)a << IM_COL32_A_SHIFT); };
+
+      // Geometry: [readout] row on top, bars in the middle, L/R captions
+      // below; bars sit either side of a centred scale column.
+      const float pad = 6.0f;
+      const float scaleW = 30.0f;
+      const float barW = std::min(44.0f, (w - 2.0f * pad - scaleW) * 0.5f);
+      const float groupW = 2.0f * barW + scaleW;
+      const float lx = x + (w - groupW) * 0.5f;
+      const float rx = lx + barW + scaleW;
+      const float scaleCx = lx + barW + scaleW * 0.5f;
+      const float readTop = y + pad;
+      const float readH = textH + 4.0f;
+      const float barTop = readTop + readH + 6.0f;
+      const float barBot = br.y - pad - textH - 2.0f;
+      const float barH = barBot - barTop;
+      auto yOf = [&](float db) { return barBot - DbToFrac(db) * barH; };
+
+      // Scale: labelled ticks as short marks in the centre column plus a
+      // faint line across each bar slot; unlabelled minor marks between.
+      dl->AddRectFilled(ImVec2(lx, barTop), ImVec2(lx + barW, barBot), slotCol, 2.0f);
+      dl->AddRectFilled(ImVec2(rx, barTop), ImVec2(rx + barW, barBot), slotCol, 2.0f);
+      static const float kLabelled[] = { 0.0f, -6.0f, -12.0f, -24.0f, -36.0f, -48.0f };
+      static const float kMinor[] = { 3.0f, -3.0f, -9.0f, -18.0f, -30.0f, -42.0f, -54.0f };
+      for (float db : kMinor)
+      {
+         const float ty = std::floor(yOf(db)) + 0.5f;
+         dl->AddLine(ImVec2(lx + barW + 2.0f, ty), ImVec2(lx + barW + 5.0f, ty), ScopeMidLineCol(), 1.0f);
+         dl->AddLine(ImVec2(rx - 5.0f, ty), ImVec2(rx - 2.0f, ty), ScopeMidLineCol(), 1.0f);
+      }
+      for (float db : kLabelled)
+      {
+         const float ty = std::floor(yOf(db)) + 0.5f;
+         const ImU32 lineCol = db == 0.0f ? ScopeMidLineCol() : ScopeGridCol();
+         dl->AddLine(ImVec2(lx, ty), ImVec2(lx + barW, ty), lineCol, 1.0f);
+         dl->AddLine(ImVec2(rx, ty), ImVec2(rx + barW, ty), lineCol, 1.0f);
+         dl->AddLine(ImVec2(lx + barW + 2.0f, ty), ImVec2(lx + barW + 7.0f, ty), ScopeTextCol(), 1.0f);
+         dl->AddLine(ImVec2(rx - 7.0f, ty), ImVec2(rx - 2.0f, ty), ScopeTextCol(), 1.0f);
+         char buf[8];
+         snprintf(buf, sizeof(buf), "%.0f", db);
+         const ImVec2 ts = ImGui::CalcTextSize(buf);
+         dl->AddText(ImVec2(scaleCx - ts.x * 0.5f, ty - ts.y * 0.5f), ScopeTextCol(), buf);
+      }
+
+      // One channel: peak bar (translucent), RMS bar (solid) over it, both
+      // split into colour zones so the bar reads like a hardware LED stack
+      // rather than one block that changes colour all at once.
+      static const float kZoneEdges[] = { -120.0f, -6.0f, 0.0f, 3.0f };
+      const ImU32 kZoneCols[] = { kGreen, kAmber, kRed };
+      auto fillZones = [&](float bx, float levelDb, int alpha) {
+         if (levelDb <= -60.0f)
+            return;
+         for (int z = 0; z < 3; z++)
+         {
+            const float lo = kZoneEdges[z];
+            const float hi = std::min(kZoneEdges[z + 1], levelDb);
+            if (hi <= lo)
+               break;
+            const float y0 = yOf(hi);
+            const float y1 = z == 0 ? barBot : yOf(lo);
+            dl->AddRectFilled(ImVec2(bx + 1.0f, y0), ImVec2(bx + barW - 1.0f, y1),
+                              withAlpha(kZoneCols[z], alpha));
+         }
+      };
+      auto drawChannel = [&](float bx, float peak, float rms, float hold) {
+         dl->PushClipRect(ImVec2(bx, barTop), ImVec2(bx + barW, barBot), true);
+         fillZones(bx, LevelToDb(peak), isLight ? 90 : 80);
+         fillZones(bx, LevelToDb(rms), isLight ? 235 : 225);
+         // LED segmentation: a 1px gap every 3px, in the scope background.
+         const ImU32 gapCol = withAlpha(ScopeBgCol(), 150);
+         for (float gy = barBot - 3.0f; gy > barTop; gy -= 3.0f)
+            dl->AddLine(ImVec2(bx, gy), ImVec2(bx + barW, gy), gapCol, 1.0f);
+         const float holdDb = LevelToDb(hold);
+         if (holdDb > -60.0f)
+         {
+            const float hy = yOf(holdDb);
+            dl->AddRectFilled(ImVec2(bx + 1.0f, hy - 1.0f), ImVec2(bx + barW - 1.0f, hy + 1.0f), zoneCol(holdDb));
+         }
+         dl->PopClipRect();
+      };
+      drawChannel(lx, n->PeakL(), n->RmsL(), n->PeakHoldL());
+      drawChannel(rx, n->PeakR(), n->RmsR(), n->PeakHoldR());
+
+      // Max-peak readouts, one per bar. Red box once that channel clipped.
+      auto drawReadout = [&](float bx, float maxPeak, bool clipped) {
+         const ImVec2 a(bx, readTop), b(bx + barW, readTop + readH);
+         dl->AddRectFilled(a, b, clipped ? kRed : slotCol, 2.0f);
+         char buf[12];
+         FormatDb(buf, sizeof(buf), maxPeak);
+         const ImVec2 ts = ImGui::CalcTextSize(buf);
+         const ImU32 txt = clipped ? IM_COL32(255, 255, 255, 255)
+                                   : maxPeak > 1e-5f ? ImGui::GetColorU32(ImGuiCol_Text) : ScopeTextCol();
+         dl->AddText(ImVec2(bx + (barW - ts.x) * 0.5f, readTop + (readH - ts.y) * 0.5f), txt, buf);
+      };
+      drawReadout(lx, n->MaxPeakL(), n->ClipL());
+      drawReadout(rx, n->MaxPeakR(), n->ClipR());
+      {
+         const ImVec2 ts = ImGui::CalcTextSize("pk");
+         dl->AddText(ImVec2(scaleCx - ts.x * 0.5f, readTop + (readH - ts.y) * 0.5f), ScopeTextCol(), "pk");
+      }
+
+      // Channel captions under the bars; "dB" under the scale.
+      auto caption = [&](float cx, const char* s) {
+         const ImVec2 ts = ImGui::CalcTextSize(s);
+         dl->AddText(ImVec2(cx - ts.x * 0.5f, barBot + 2.0f), ScopeTextCol(), s);
+      };
+      caption(lx + barW * 0.5f, "L");
+      caption(rx + barW * 0.5f, "R");
+      caption(scaleCx, "dB");
+
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::InvisibleButton("##audiometer", ImVec2(w, h));
+      if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+         n->ResetPeaks();
+      if (ImGui::IsItemHovered())
+      {
+         char l[12], r[12], buf[64];
+         FormatDb(l, sizeof(l), n->RmsL());
+         FormatDb(r, sizeof(r), n->RmsR());
+         snprintf(buf, sizeof(buf), "L %s  R %s", l, r);
+         SetAudioReadout("rms", buf);
+      }
+   }
+
+   void DrawAudioMeterBody(GraphNode& gn, AudioMeterNode* n)
+   {
+      using namespace AudioMeterScale;
+      char stat[64];
+      if (!n->HasInput())
+         snprintf(stat, sizeof(stat), "no input");
+      else if (n->ClipL() || n->ClipR())
+         snprintf(stat, sizeof(stat), "CLIP %s%s - click to reset", n->ClipL() ? "L" : "", n->ClipR() ? "R" : "");
+      else if (n->PeakL() > 1e-5f || n->PeakR() > 1e-5f)
+      {
+         char l[12], r[12];
+         FormatDb(l, sizeof(l), n->PeakL());
+         FormatDb(r, sizeof(r), n->PeakR());
+         snprintf(stat, sizeof(stat), "L %s  R %s dB", l, r);
+      }
+      else
+         snprintf(stat, sizeof(stat), "no signal");
+
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Same height as Limiter's gain-reduction meter, which spans that
+      // body's two kKnobLarge knob rows (DrawLimiterBody), so the two
+      // meters line up when they sit side by side on the canvas.
+      const float rowH = kKnobLarge + 4.0f + ImGui::GetTextLineHeight() + ImGui::GetStyle().ItemSpacing.y;
+      const float meterH = 2.0f * rowH;
+      DrawAudioMeterVisualizer(n, gAudioContentX, ImGui::GetCursorScreenPos().y, gAudioContentW, meterH);
 
       EndAudioBody();
    }
@@ -24519,6 +24748,8 @@ namespace
          DrawDrumSequencerBody(gn, n);
       else if (auto* n = dynamic_cast<GainNode*>(gn.node.get()))
          DrawGainBody(gn, n);
+      else if (auto* n = dynamic_cast<AudioMeterNode*>(gn.node.get()))
+         DrawAudioMeterBody(gn, n);
       else if (auto* n = dynamic_cast<MixerNode*>(gn.node.get()))
          DrawMixerBody(gn, n);
       else if (auto* n = dynamic_cast<SplitterNode*>(gn.node.get()))
@@ -39734,6 +39965,7 @@ namespace
          { "Splitter", "The explicit fan-out point for audio: an ordinary audio output feeds exactly one destination, so sending one signal to several places needs this node. Its own output is the one exempt from that rule. On the audio thread it is a plain copy - it exists for the graph-level visibility and the fan-out cap, not because copying is otherwise needed." },
          { "Gain", "A single gain stage in dB, with a level meter - the simplest audio utility there is. Reach for it to trim a source before a Mixer, or to set up a clean level for something that has no output volume of its own." },
          { "Blend Audio", "A two-input crossfader: blend 0 is A only, 1 is B only, 0.5 an equal-power centre. Not a second place to sum two signals (that's Mixer) - it picks a point between them, and its blend knob has a modulation pin, so an LFO or Macro can sweep the crossfade." },
+         { "Audio Meter", "A stereo level meter: separate L and R bars on a shared -60 to +3 dBFS scale, each showing RMS (solid) inside peak (faint), a peak-hold line, and the channel's highest peak as a number on top, which turns red once that channel has reached 0 dBFS. Audio passes through unchanged. It measures whatever its input is patched to even with its output left unconnected, so it can hang off any cable as a tap. Click the meter to clear the peak numbers, holds and clip." },
 
          // ---------------- Synths ----------------
          { "Granular", "A granular synthesizer: it dissects a loaded sample (or audio recorded through its own 'record in' pin) into micro-grains and re-emits them - grain length and density set the texture, position/scan set where in the sample the grain cloud reads from, and freeze pins it there. The four random controls (position spray, length, pitch, pan) plus reverse probability are what turn a sample into a cloud rather than a stutter. Drag the waveform's edge handles to trim start/end; the grain dots on the display are the live emission." },
@@ -90222,7 +90454,7 @@ int main(int argc, char** argv)
                }
 
                ImGui::Dummy(ImVec2(0, 8));
-               ImGui::Separator();
+               NodeSeparator();
                ImGui::TextDisabled("Offline Render");
 
                // A take drives the whole patch's Transport/AudioEngine, not
