@@ -73,6 +73,9 @@ public:
    // shared across every AudioEffectNode of this kind, so an index into it is
    // the stable handle UI code binds ModKnob/AudioSlider to directly.
    float* ParamPtr(size_t index) { return &mParamValues[index]; }
+   // Post-mix mono samples since the last call (main thread), for the live
+   // spectrum visualizers.
+   int ReadSpectrumSamples(float* out, int maxCount);
    float Param(size_t index) const { return mParamValues[index]; }
    // -1 if `name` isn't in this effect's table. A linear search over a
    // couple dozen entries, fine at UI/CookIfNeeded rates; not called from the

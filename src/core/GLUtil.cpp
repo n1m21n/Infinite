@@ -194,6 +194,49 @@ namespace GLUtil
       fbo = Fbo();
    }
 
+   namespace
+   {
+      struct ScratchEntry
+      {
+         Fbo fbo;
+         unsigned long long lastUsedFrame = 0;
+      };
+      constexpr unsigned long long kScratchIdleFrames = 300;
+      std::vector<ScratchEntry> sScratch; // a handful of entries at most
+      unsigned long long sScratchFrame = 0;
+   }
+
+   Fbo* AcquireScratchFbo(int w, int h, unsigned int internalFormat)
+   {
+      for (ScratchEntry& e : sScratch)
+         if (e.fbo.w == w && e.fbo.h == h && e.fbo.internalFormat == internalFormat)
+         {
+            e.lastUsedFrame = sScratchFrame;
+            return &e.fbo;
+         }
+      ScratchEntry e;
+      if (!EnsureFbo(e.fbo, w, h, internalFormat))
+         return nullptr;
+      e.lastUsedFrame = sScratchFrame;
+      sScratch.push_back(e);
+      return &sScratch.back().fbo;
+   }
+
+   void EndFrameScratchFbos()
+   {
+      ++sScratchFrame;
+      for (size_t i = 0; i < sScratch.size();)
+      {
+         if (sScratchFrame - sScratch[i].lastUsedFrame > kScratchIdleFrames)
+         {
+            DestroyFbo(sScratch[i].fbo);
+            sScratch.erase(sScratch.begin() + (long)i);
+         }
+         else
+            i++;
+      }
+   }
+
    // ---- Turbo: on-disk program binary cache -----------------------------
    // Every node compiles its GLSL the first time it cooks, so opening a big
    // patch used to stall on dozens of driver compiles. Linked programs are

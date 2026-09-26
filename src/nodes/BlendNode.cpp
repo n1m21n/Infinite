@@ -22,6 +22,7 @@ namespace
            "   vec4 a = texture(uTexA, vUv);\n"
            "   vec4 b = texture(uTexB, vUv);\n"
            "   if (uMode == 30) { fragColor = vec4(a.rgb, a.a * (1.0 - b.a * uMix)); return; }\n"
+           "   if (uMode == 31) { fragColor = vec4(a.rgb, a.a * (1.0 - (1.0 - b.a) * uMix)); return; }\n"
            "   vec3 blended = blendMode(uMode, a.rgb, b.rgb);\n"
            "   fragColor = vec4(mix(a.rgb, blended, uMix * b.a), max(a.a, b.a));\n"
            "}\n";
@@ -61,6 +62,7 @@ void BlendNode::CookIfNeeded(int frameId)
    if (texA == 0 && texB == 0)
    {
       GLUtil::DestroyFbo(mOut);
+      mHasBuilt = false;
       return;
    }
 
@@ -71,6 +73,16 @@ void BlendNode::CookIfNeeded(int frameId)
       return;
    if (!GLUtil::EnsureFbo(mOut, w, h))
       return;
+
+   CookSignature sig;
+   VisitParams(sig.params);
+   sig.revs[0] = mInputA.Revision();
+   sig.revs[1] = mInputB.Revision();
+   sig.w = w;
+   sig.h = h;
+   if (mHasBuilt && sig == mBuiltSig)
+      return;
+   NodeWorkCounter()++;
 
    GLUtil::RunShaderPass(mOut, mProgram, [this, texA, texB]()
    {
@@ -90,4 +102,7 @@ void BlendNode::CookIfNeeded(int frameId)
       glUniform1i(locMode, mModeIndex);
       glUniform1f(locMix, mMix);
    });
+   mBuiltSig = std::move(sig);
+   mHasBuilt = true;
+   mRevision = NextTextureRevision();
 }

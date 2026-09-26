@@ -56,6 +56,7 @@ void FitNode::CookIfNeeded(int frameId)
    if (srcTex == 0)
    {
       GLUtil::DestroyFbo(mOut);
+      mHasBuilt = false;
       return;
    }
 
@@ -98,6 +99,15 @@ void FitNode::CookIfNeeded(int frameId)
          break;
    }
 
+   CookSignature sig;
+   VisitParams(sig.params);
+   sig.revs[0] = mInput.Revision();
+   sig.w = srcW;
+   sig.h = srcH;
+   if (mHasBuilt && sig == mBuiltSig)
+      return;
+   NodeWorkCounter()++;
+
    GLUtil::RunShaderPass(mOut, mProgram, [this, srcTex, scaleX, scaleY]()
    {
       glActiveTexture(GL_TEXTURE0);
@@ -107,4 +117,7 @@ void FitNode::CookIfNeeded(int frameId)
       glUniform3f(glGetUniformLocation(mProgram, "uBgColor"), bgColor[0], bgColor[1], bgColor[2]);
       glUniform1f(glGetUniformLocation(mProgram, "uBgOpacity"), bgOpacity);
    });
+   mBuiltSig = std::move(sig);
+   mHasBuilt = true;
+   mRevision = NextTextureRevision();
 }

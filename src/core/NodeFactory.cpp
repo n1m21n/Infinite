@@ -30,6 +30,7 @@ namespace
          { "Text", "Source" },
          { "Video", "Video" }, { "VMPC", "Video" }, { "Video In", "Video" }, { "Syphon In", "Video" },
          { "Resynthesize", "Effects" },
+         { "Macro Knob", "Macros" }, { "Macro XY", "Macros" },
          { "Comment", "Utility" }, { "Group", "Utility" }, { "Null", "Utility" }, { "Viewport", "Utility" },
          // audio
          { "Audio In", "AudioIO" }, { "Audio Out", "AudioIO" }, { "Audio File", "AudioIO" },
@@ -39,9 +40,9 @@ namespace
          { "Predictive Velocity", "Prediction" }, { "Predictive Rhythm", "Prediction" },
          // control
          { "Math", "CVTools" }, { "Compare", "CVTools" }, { "Invert", "CVTools" }, { "Range to Range", "CVTools" },
-         { "Smoothing", "CVTools" }, { "Mod Depth", "CVTools" }, { "Null Modulator", "CVTools" }, { "CV to Pitch", "CVTools" },
+         { "Smoothing", "CVTools" }, { "CV Recorder", "CVTools" }, { "Mod Depth", "CVTools" }, { "Null Modulator", "CVTools" }, { "CV to Pitch", "CVTools" },
          { "Audio Analyze", "Analysis" }, { "Image Analyze", "Analysis" }, { "Audio to CV", "Analysis" },
-         { "Note to CV", "Analysis" }, { "Palette", "Analysis" },
+         { "Note to CV", "Analysis" }, { "Velocity to CV", "Analysis" }, { "Palette", "Analysis" },
          { "MIDI CC", "Control" }, { "MIDI Trigger", "Control" }, { "OSC Receive", "Control" },
          { "OSC Send", "Control" }, { "OSC to CV", "Control" },
       };

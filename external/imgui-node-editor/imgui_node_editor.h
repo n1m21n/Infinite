@@ -352,6 +352,13 @@ IMGUI_NODE_EDITOR_API void RejectDeletedItem();
 IMGUI_NODE_EDITOR_API void EndDelete();
 
 IMGUI_NODE_EDITOR_API void SetNodePosition(NodeId nodeId, const ImVec2& editorPosition);
+// --- Infinite local change: off-screen node culling ---
+// Call instead of BeginNode/EndNode for a node the app chooses not to draw
+// this frame. Returns true (and keeps the node and the pins it emitted last
+// time live, so links to it still land) only when the node was laid out
+// before, is at least `margin` canvas units outside the view, is not
+// selected, and no drag/resize is in progress. On false, draw it normally.
+IMGUI_NODE_EDITOR_API bool KeepOffscreenNodeAlive(NodeId nodeId, float margin);
 IMGUI_NODE_EDITOR_API void SetGroupSize(NodeId nodeId, const ImVec2& size);
 IMGUI_NODE_EDITOR_API ImVec2 GetNodePosition(NodeId nodeId);
 IMGUI_NODE_EDITOR_API ImVec2 GetNodeSize(NodeId nodeId);

@@ -1685,6 +1685,47 @@ void ed::EditorContext::SetNodePosition(NodeId nodeId, const ImVec2& position)
     }
 }
 
+// --- Infinite local change: off-screen node culling ---
+// See KeepOffscreenNodeAlive in imgui_node_editor.h. The node is marked live
+// without a BeginNode, so it keeps its bounds and pin chain from the last
+// real layout; it still gets its own channels, because End() swaps channels
+// for every live node and draws any whose bounds turn out visible.
+bool ed::EditorContext::KeepOffscreenNodeAlive(NodeId nodeId, float margin)
+{
+    auto node = FindNode(nodeId);
+    if (!node || node->m_Type != NodeType::Node || !node->m_HasPinLayout)
+        return false;
+    if (node->m_RestoreState || node->m_CenterOnScreen || node->m_IsSelected)
+        return false;
+    if (m_CurrentAction && (m_CurrentAction->AsDrag() || m_CurrentAction->AsSize()))
+        return false;
+
+    auto view = GetViewRect();
+    view.Expand(margin);
+    if (view.Overlaps(node->m_Bounds))
+        return false;
+
+    const ImVec2 delta = node->m_Bounds.Min - node->m_PinsOrigin;
+    for (auto pin = node->m_LastPin; pin; pin = pin->m_PreviousPin)
+    {
+        if (delta.x != 0.0f || delta.y != 0.0f)
+        {
+            pin->m_Bounds.Translate(delta);
+            pin->m_Pivot.Translate(delta);
+        }
+        pin->m_IsLive = true;
+    }
+    node->m_PinsOrigin = node->m_Bounds.Min;
+    node->m_IsLive = true;
+
+    if (auto drawList = GetDrawList())
+    {
+        node->m_Channel = drawList->_Splitter._Count;
+        ImDrawList_ChannelsGrow(drawList, drawList->_Splitter._Count + c_ChannelsPerNode);
+    }
+    return true;
+}
+
 void ed::EditorContext::SetGroupSize(NodeId nodeId, const ImVec2& size)
 {
     auto node = FindNode(nodeId);
@@ -5375,6 +5416,9 @@ void ed::NodeBuilder::End()
     }
     else
         m_CurrentNode->m_Type        = NodeType::Node;
+
+    m_CurrentNode->m_PinsOrigin   = m_CurrentNode->m_Bounds.Min;
+    m_CurrentNode->m_HasPinLayout = !m_IsGroup;
 
     m_CurrentNode = nullptr;
 }

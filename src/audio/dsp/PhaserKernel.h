@@ -47,6 +47,7 @@ public:
       kRateHz,
       kDepth,
       kSpread,
+      kFeedback,
       kNumSlots
    };
 
@@ -65,6 +66,7 @@ public:
          mStagesR[i].Reset();
       }
       mPhase = 0.0;
+      mFbL = mFbR = 0.0f;
    }
 
    void PushParams(const AudioEffectNode& node, double sampleRate) override;
@@ -91,4 +93,6 @@ private:
    AllpassStage mStagesL[kMaxStages];
    AllpassStage mStagesR[kMaxStages];
    double mPhase = 0.0;
+   // One-sample feedback tap per channel (kept separate so the L/R spread survives).
+   float mFbL = 0.0f, mFbR = 0.0f;
 };

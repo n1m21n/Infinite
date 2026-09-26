@@ -356,8 +356,14 @@ public:
       // Platform::AudioInputCaptureRead is lock-free and zero-fills on
       // underrun, so this is safe to call unconditionally even before the
       // tap has produced its first block (or if mic permission was denied).
+      // Turbo: this node's own channel / pair of the device, own cursor.
+      const int first = std::max(0, mFirstChannel.load(std::memory_order_relaxed));
+      const bool mono = mMono.load(std::memory_order_relaxed);
       float* chans[2] = { buffer.channels[0], buffer.numChannels > 1 ? buffer.channels[1] : buffer.channels[0] };
-      const int captured = Platform::AudioInputCaptureRead(chans, buffer.numFrames, 2);
+      const int want = (mono || buffer.numChannels < 2) ? 1 : 2;
+      const int captured = Platform::AudioInputCaptureReadChannels(chans, buffer.numFrames, first, want, mCursor);
+      if (mono && buffer.numChannels > 1)
+         std::copy(buffer.channels[0], buffer.channels[0] + buffer.numFrames, buffer.channels[1]);
 
       float peak = 0.0f;
       for (int i = 0; i < buffer.numFrames; i++)
@@ -375,10 +381,12 @@ public:
    }
 
    // Main thread only.
-   void PushParams(float gainDb)
+   void PushParams(float gainDb, int firstChannel, bool mono)
    {
       mGainDb.store(gainDb, std::memory_order_relaxed);
       mMailbox.Push(kGainDbParam, gainDb);
+      mFirstChannel.store(firstChannel, std::memory_order_relaxed);
+      mMono.store(mono, std::memory_order_relaxed);
    }
 
    MeterRing& Meter() { return mMeter; }
@@ -387,6 +395,9 @@ private:
    ParamMailbox mMailbox;
    MeterRing mMeter;
    std::atomic<float> mGainDb { 0.0f };
+   std::atomic<int> mFirstChannel { 0 };
+   std::atomic<bool> mMono { false };
+   unsigned long long mCursor = 0; // audio thread only
 };
 
 AudioInputNode::AudioInputNode() { Platform::AudioInputCaptureAddRef(); }
@@ -400,7 +411,7 @@ void AudioInputNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioCaptureNode>();
-   mAudioNode->PushParams(gainDb);
+   mAudioNode->PushParams(gainDb, firstChannel, mono);
 
    std::string error;
    Platform::AudioInputCapturePump(error); // no-op once the tap is already live
@@ -413,6 +424,8 @@ void AudioInputNode::CookIfNeeded(int frameId)
 void AudioInputNode::VisitParams(ParamVisitor& v)
 {
    v.Float("gainDb", gainDb);
+   v.Int("firstChannel", firstChannel);
+   v.Bool("mono", mono);
 }
 
 AudioNode* AudioInputNode::GetAudioNode()

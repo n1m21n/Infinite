@@ -35,6 +35,7 @@
 #include <filesystem>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <set>
 #include <memory>
 #include <string>
@@ -77,6 +78,9 @@
 #include "nodes/TextureNode.h"
 #include "nodes/ResynthNode.h"
 #include "nodes/MacroNodes.h"
+#include "nodes/DriftNode.h"
+#include "nodes/SlideshowNode.h"
+#include "nodes/AudioMeterNode.h"
 #include "nodes/UINodes.h"
 #include "nodes/CurvesNode.h"
 #include "nodes/RemoveBgNode.h"
@@ -255,6 +259,11 @@ namespace
    const float kKnobLarge = kKnobStd;
    const float kKnobSmall = kKnobStd;
    const float kKnobDiameter = kKnobSmall;
+   // Macro family body cells (ported from upstream).
+   const float kMacroCell = 112.0f;
+   const float kMacroWideCell = 176.0f;
+   const float kMacroRowH = 26.0f;
+   const float kMacroFaderH = 96.0f;
    // Shared height for a time-domain effect graph (Dynamics' transfer
    // curve, Delay's tap graph, Reverb's decay envelope) - one number so the
    // three read as the same instrument family instead of each picking its
@@ -309,6 +318,73 @@ namespace
    void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, float size, float rounding = 4.0f)
    {
       DrawCheckerboardBackdrop(dl, origin, ImVec2(origin.x + size, origin.y + size), rounding);
+   }
+
+   // Blender-style numpad view hotkeys for any hovered orbit-camera viewport
+   // item (mini-viewport, viewport-panel card, Render3D preview): 1/3/7 snap
+   // to front/right/top, Ctrl+1/3/7 to back/left/bottom, 0 to a default
+   // three-quarter view. Both the number row and the numeric keypad fire the
+   // same view, matching Blender's own leniency. Must be called right after
+   // the InvisibleButton/item whose hover state should gate it - like the
+   // drag/wheel handling beside every call site, it reads
+   // ImGui::IsItemHovered() for the *last* item, so no hover state needs to
+   // be threaded through. Also refuses to fire while a text field has focus,
+   // so typing "1" into a param field doesn't reframe a hovered-but-unrelated
+   // viewport behind it. Returns true if it changed azimuth/elevation. An
+   // optional onWillChange is invoked right before the write happens - the
+   // two Render3D call sites use it to PushUndoCheckpoint() while the old
+   // values are still live, matching that camera's "orbit"/"elevation"
+   // sliders; the two gNodeCameras (mini-viewport/panel) sites pass nothing,
+   // matching drag-orbit there, which also pushes no undo checkpoint.
+   bool ApplyViewHotkeys(float& azimuth, float& elevation, const std::function<void()>& onWillChange = nullptr)
+   {
+      if (!ImGui::IsItemHovered() || ImGui::GetIO().WantTextInput)
+         return false;
+
+      const bool ctrl = ImGui::GetIO().KeyCtrl;
+      // Pole clamp matches the drag-orbit elevation clamp used everywhere
+      // else in this file (DrawPreview, the Render3D "elevation" slider):
+      // exactly 90 makes the up vector parallel to the view direction and
+      // the image rolls.
+      const float kPole = 85.9437f;
+
+      auto pressed = [](ImGuiKey rowKey, ImGuiKey padKey) {
+         return ImGui::IsKeyPressed(rowKey, false) || ImGui::IsKeyPressed(padKey, false);
+      };
+
+      float newAzimuth, newElevation;
+      if (pressed(ImGuiKey_1, ImGuiKey_Keypad1))
+      {
+         newAzimuth = ctrl ? 180.0f : 0.0f;      // front / back
+         newElevation = 0.0f;
+      }
+      else if (pressed(ImGuiKey_3, ImGuiKey_Keypad3))
+      {
+         newAzimuth = ctrl ? -90.0f : 90.0f;     // right / left
+         newElevation = 0.0f;
+      }
+      else if (pressed(ImGuiKey_7, ImGuiKey_Keypad7))
+      {
+         newAzimuth = 0.0f;
+         newElevation = ctrl ? -kPole : kPole;   // top / bottom
+      }
+      else if (pressed(ImGuiKey_0, ImGuiKey_Keypad0))
+      {
+         newAzimuth = 34.3775f;                  // default three-quarter view
+         newElevation = 22.9183f;
+      }
+      else
+      {
+         return false;
+      }
+
+      // Snapshot before the write, not after - an undo checkpoint taken
+      // once the new values are already live would have nothing to restore.
+      if (onWillChange)
+         onWillChange();
+      azimuth = newAzimuth;
+      elevation = newElevation;
+      return true;
    }
 
    // Registered node names are the patch-file keys and must not change, so
@@ -454,6 +530,54 @@ namespace
    void PushUndoCheckpoint();
 
    std::vector<GraphNode> gNodes;
+
+   // Disambiguates nodes that share a title (three LFOs, two Super Mixers):
+   // rank by GraphNode::index (spawn order, never reused) so the number a
+   // user memorised does not shuffle when an unrelated node is deleted.
+   // Display only - patches are unaffected.
+   int GetNodeInstanceIndex(const GraphNode& target, int* outTotal = nullptr)
+   {
+      // Rebuilt once per frame (NodeTitle does a few dynamic_casts, and the
+      // canvas asks for every node), keyed by GraphNode::index.
+      static int sFrame = -1;
+      static size_t sCount = 0;
+      static std::unordered_map<int, std::pair<int, int>> sRank; // index -> (rank, total)
+      const int frame = ImGui::GetFrameCount();
+      if (frame != sFrame || sCount != gNodes.size() || sRank.find(target.index) == sRank.end())
+      {
+         sFrame = frame;
+         sCount = gNodes.size();
+         sRank.clear();
+         std::unordered_map<std::string, std::vector<int>> byTitle;
+         for (const GraphNode& g : gNodes)
+            byTitle[NodeTitle(g)].push_back(g.index);
+         for (auto& kv : byTitle)
+         {
+            std::sort(kv.second.begin(), kv.second.end());
+            const int total = (int)kv.second.size();
+            for (int i = 0; i < total; i++)
+               sRank[kv.second[i]] = { i + 1, total };
+         }
+      }
+      auto it = sRank.find(target.index);
+      if (it == sRank.end())
+      {
+         if (outTotal != nullptr)
+            *outTotal = 1;
+         return 1;
+      }
+      if (outTotal != nullptr)
+         *outTotal = it->second.second;
+      return it->second.first;
+   }
+
+   // NodeTitle plus " #N" when another node shares the title; unchanged for a unique node.
+   std::string NodeTitleWithInstance(const GraphNode& gn)
+   {
+      int total = 0;
+      const int inst = GetNodeInstanceIndex(gn, &total);
+      return total <= 1 ? NodeTitle(gn) : NodeTitle(gn) + " #" + std::to_string(inst);
+   }
 
    // Which node indices each Group considers its own, once-in-always-in. Kept
    // outside GroupNode because it is keyed by GraphNode::index, not anything
@@ -877,8 +1001,20 @@ namespace
       // the first few frames rather than only on the frame it appears, which
       // otherwise left it open but dead until it was clicked a third time.
       int framesOpen = 0;
+      bool cursorToEnd = false; // opened by typing: the typed text is already in, caret after it
    };
    CommentEditRequest gCommentEdit;
+
+   inline float CommentFontScale(int sizeIdx)
+   {
+      switch (sizeIdx)
+      {
+         case 0: return 0.82f;
+         case 2: return 1.35f;
+         case 3: return 1.85f;
+         default: return 1.0f;
+      }
+   }
    // Screen-space rect of the last comment body drawn, so the dev test can aim
    // a synthetic double-click at it. Inside a node ImGui draws in canvas space,
    // hence the explicit conversion where this is filled in.
@@ -1276,6 +1412,7 @@ namespace
    bool gOpenMidiMenu = false;
    bool gMidiWindowOpen = false;
    int gMidiWindowSelected = -1;
+   bool gModMatrixOpen = false; // Turbo: VIEW > Modulation matrix (Shift+M)
 
    std::string CleanParamLabel(const char* label)
    {
@@ -2960,6 +3097,7 @@ namespace
    void RegisterNodes()
    {
       REGISTER_NODE(ImageSourceNode, Image Source, "Source");
+      REGISTER_NODE(SlideshowNode, Slideshow, "Source");
       REGISTER_NODE(ShapeNode, Shape, "Source");
       for (int i = 0; i < (int)ShapeNode::ShapeNames().size(); i++)
       {
@@ -3070,12 +3208,21 @@ namespace
       REGISTER_NODE(CompareNode, Compare, "Modulators");
       REGISTER_NODE(RangeToRangeNode, Range to Range, "Modulators");
       REGISTER_NODE(SmoothNode, Smoothing, "Modulators");
+      REGISTER_NODE(CVRecorderNode, CV Recorder, "Modulators");
       REGISTER_NODE(InvertNode, Invert, "Modulators");
       REGISTER_NODE(ModDepthNode, Mod Depth, "Modulators");
       REGISTER_NODE(ModCurveNode, Mod Curve, "Modulators");
       REGISTER_NODE(CVToPitchNode, CV to Pitch, "Modulators");
       REGISTER_NODE(MacroKnobNode, Macro Knob, "Modulators");
       REGISTER_NODE(MacroXYNode, Macro XY, "Modulators");
+      REGISTER_NODE(MacroSliderNode, Macro Slider, "Macros");
+      REGISTER_NODE(MacroBipolarKnobNode, Macro Bipolar Knob, "Macros");
+      REGISTER_NODE(MacroToggleNode, Macro Toggle, "Macros");
+      REGISTER_NODE(MacroTriggerNode, Macro Trigger, "Macros");
+      REGISTER_NODE(MacroNumBoxNode, Macro NumBox, "Macros");
+      REGISTER_NODE(MacroRadioSelectorNode, Macro Radio Selector, "Macros");
+      REGISTER_NODE(MacroStepGateNode, Macro Step Gate, "Macros");
+      REGISTER_NODE(DriftNode, Drift, "Modulators");
       NodeFactory::Instance().Register("Button", &UIButtonNode::Create, "UI");
       NodeFactory::Instance().Register("Horizontal Slider", &UISliderNode::CreateHorizontal, "UI");
       NodeFactory::Instance().Register("Vertical Slider", &UISliderNode::CreateVertical, "UI");
@@ -3123,6 +3270,7 @@ namespace
       // directly rather than through ParamMailbox - see AudioPluginNode.h.
       REGISTER_NODE(AudioPluginNode, Plugin, "AudioEffects");
       REGISTER_NODE(GainNode, Gain, "AudioUtility");
+      REGISTER_NODE(AudioMeterNode, Audio Meter, "AudioUtility");
       REGISTER_NODE(AudioInputNode, Audio In, "AudioUtility");
       REGISTER_NODE(AudioOutputNode, Audio Out, "AudioUtility");
       // P2.8 routing nodes - the system's only summing/fan-out points, see
@@ -3163,6 +3311,9 @@ namespace
       REGISTER_NODE(NoteStrumNode, Note Strum, "Notes");
       REGISTER_NODE(EnvelopeNode, Envelope, "Modulators");
       REGISTER_NODE(NoteToCVNode, Note to CV, "Modulators");
+      REGISTER_NODE(VelocityToCVNode, Velocity to CV, "Modulators");
+      REGISTER_NODE(KeyboardNode, Keyboard, "Notes");
+      REGISTER_NODE(NoteSwitcherNode, Note Switcher, "Notes");
       REGISTER_NODE(AudioToCVNode, Audio to CV, "Modulators");
 
       // P3c effects - one AudioEffectNode class serves every EffectDef table
@@ -3656,6 +3807,9 @@ namespace
    // Defined near DisconnectAllTo/RemoveNodeByIndex, below; forward-declared
    // here since DisconnectLinkById (earlier in the file) needs to call it too.
    void RebuildAudioTopology();
+   // Set around a batch of removals (a multi-node delete) so the audio graph
+   // is rebuilt once after the batch instead of once per node.
+   bool gDeferAudioRebuild = false;
 
    // Which geometry-ish pin a node exposes at a given slot, and how to set it.
    // Geometry, camera and light connections are raw pointers rather than
@@ -4170,6 +4324,8 @@ namespace
    {
       if (auto* img = dynamic_cast<ImageSourceNode*>(node))
          img->ReloadFromPath();
+      if (auto* slideshow = dynamic_cast<SlideshowNode*>(node))
+         slideshow->ReloadFromFolder();
       if (auto* env = dynamic_cast<EnvironmentNode*>(node))
          env->ReloadFromPath();
       if (auto* model = dynamic_cast<ModelSourceNode*>(node))
@@ -5517,6 +5673,328 @@ namespace
       ImGui::SliderFloat("##macro", &n->value, 0.0f, 1.0f, "%.3f");
       ModSlider("curve", &n->curve, 0.2f, 4.0f);
       ModCheckbox("invert", &n->invert);
+   }
+
+   // ---- macro family bodies ----------------------------------------------
+   // The control sits in the node body (not behind the params toggle) so it
+   // can be played and MIDI-learned directly; the caption is centred below.
+   void MacroCaption(const ImVec2& origin, float cellW, float contentH, const std::string& caption)
+   {
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImU32 capCol = IsThemeLight() ? IM_COL32(50, 55, 70, 255) : IM_COL32(176, 182, 198, 255);
+      const float textH = ImGui::GetTextLineHeight();
+      const float capY = origin.y + contentH + 4.0f;
+      if (!caption.empty())
+      {
+         const ImVec2 ts = ImGui::CalcTextSize(caption.c_str());
+         dl->PushClipRect(ImVec2(origin.x, capY), ImVec2(origin.x + cellW, capY + textH), true);
+         dl->AddText(ImVec2(origin.x + std::max(0.0f, (cellW - ts.x) * 0.5f), capY), capCol, caption.c_str());
+         dl->PopClipRect();
+      }
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::Dummy(ImVec2(cellW, contentH + 4.0f + textH));
+   }
+
+   void MacroNameField(std::string& label, float cellW)
+   {
+      char buf[64];
+      snprintf(buf, sizeof(buf), "%s", label.c_str());
+      ImGui::SetNextItemWidth(cellW);
+      if (ImGui::InputTextWithHint("##macroname", "name", buf, sizeof(buf)))
+      {
+         label = buf;
+         gPatchDirty = true;
+      }
+   }
+
+   void DrawMacroSliderBody(MacroSliderNode* n)
+   {
+      const std::string caption = n->label.empty() ? std::string("slider") : n->label;
+      ModKnob(caption.c_str(), &n->value, 0.0f, 1.0f, "%.2f", kMacroFaderH, kMacroCell, AudioWidgetStyle::VFader);
+   }
+
+   void DrawMacroBipolarKnobBody(MacroBipolarKnobNode* n)
+   {
+      const std::string caption = n->label.empty() ? std::string("bipolar") : n->label;
+      // double-click types a value (0 recentres)
+      ModKnob(caption.c_str(), &n->value, -1.0f, 1.0f, "%+.2f", kKnobStd, kMacroCell);
+   }
+
+   void DrawMacroToggleBody(MacroToggleNode* n)
+   {
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      DiscreteParamRef ref = BeginDiscreteParam("state", n->state ? 1.0f : 0.0f, 0.0f, 1.0f);
+      if (ref.valid && ref.modulated)
+         n->state = *ref.value >= 0.5f;
+      const float btnH = kMacroRowH + 4.0f, btnW = 72.0f;
+      const ImVec2 bTL = ImGui::GetCursorScreenPos();
+      const ImVec2 bBR(bTL.x + btnW, bTL.y + btnH);
+      if (ImGui::InvisibleButton("##macrotogglebtn", ImVec2(btnW, btnH)) && !(ref.valid && ref.modulated))
+      {
+         PushUndoCheckpoint();
+         n->state = !n->state;
+         gPatchDirty = true;
+      }
+      const bool hovered = ImGui::IsItemHovered();
+      EndDiscreteParam(ref, hovered);
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const bool isLight = IsThemeLight();
+      const float rad = btnH * 0.5f;
+      dl->AddRectFilled(bTL, bBR, n->state ? (isLight ? IM_COL32(34, 197, 94, 255) : IM_COL32(22, 163, 74, 255))
+                                           : (isLight ? IM_COL32(215, 222, 235, 255) : IM_COL32(36, 40, 52, 255)), rad);
+      dl->AddRect(bTL, bBR, hovered ? IM_COL32(255, 255, 255, 120)
+                                    : (isLight ? IM_COL32(180, 190, 205, 255) : IM_COL32(55, 62, 78, 255)), rad, 0, 1.2f);
+      const float thumbX = n->state ? (bBR.x - rad) : (bTL.x + rad);
+      dl->AddCircleFilled(ImVec2(thumbX, bTL.y + rad), rad - 4.0f, IM_COL32(255, 255, 255, 255));
+      const char* text = n->state ? "ON" : "OFF";
+      const ImVec2 ts = ImGui::CalcTextSize(text);
+      const float tx = n->state ? bTL.x + (rad * 2.0f - ts.x) * 0.5f : bBR.x - rad * 2.0f + (rad * 2.0f - ts.x) * 0.5f;
+      dl->AddText(ImVec2(tx, bTL.y + (btnH - ts.y) * 0.5f),
+                  n->state ? IM_COL32(255, 255, 255, 255) : (isLight ? IM_COL32(90, 100, 120, 255) : IM_COL32(160, 170, 190, 255)),
+                  text);
+      MacroCaption(origin, kMacroCell, btnH, n->label.empty() ? std::string("toggle") : n->label);
+   }
+
+   void DrawMacroTriggerBody(MacroTriggerNode* n)
+   {
+      const float r = 22.0f, bezel = 3.0f, contentH = (r + bezel) * 2.0f;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      DiscreteParamRef ref = BeginDiscreteParam("trigger", n->pressed ? 1.0f : 0.0f, 0.0f, 1.0f);
+      const ImVec2 padTL = ImGui::GetCursorScreenPos();
+      ImGui::InvisibleButton("##macrotriggerbtn", ImVec2(contentH, contentH));
+      const bool hovered = ImGui::IsItemHovered();
+      n->pressed = ImGui::IsItemActive() || (ref.valid && ref.modulated && *ref.value >= 0.5f);
+      EndDiscreteParam(ref, hovered);
+      if (n->pressed)
+         n->flash = 1.0f;
+      else
+         n->flash = std::max(0.0f, n->flash - ImGui::GetIO().DeltaTime * 4.0f);
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const bool isLight = IsThemeLight();
+      const ImVec2 center(padTL.x + contentH * 0.5f, padTL.y + contentH * 0.5f);
+      dl->AddCircleFilled(center, r + bezel, isLight ? IM_COL32(210, 218, 230, 255) : IM_COL32(30, 34, 44, 255), 32);
+      dl->AddCircle(center, r + bezel, isLight ? IM_COL32(175, 185, 200, 255) : IM_COL32(50, 56, 70, 255), 32, 1.2f);
+      if (n->flash > 0.0f)
+      {
+         dl->AddCircleFilled(center, r, IM_COL32(245, 158, 11, (int)(n->flash * 255.0f)), 32);
+         dl->AddCircle(center, r, IM_COL32(255, 230, 100, 255), 32, 2.0f);
+      }
+      else
+      {
+         dl->AddCircleFilled(center, r, isLight ? IM_COL32(235, 240, 250, 255) : IM_COL32(42, 48, 62, 255), 32);
+         dl->AddCircle(center, r, isLight ? IM_COL32(190, 200, 215, 255) : IM_COL32(60, 68, 85, 255), 32, 1.0f);
+      }
+      if (hovered)
+         dl->AddCircle(center, r + 2.0f, IM_COL32(255, 255, 255, 80), 32, 1.0f);
+      dl->AddCircleFilled(center, 4.5f, n->flash > 0.0f ? IM_COL32(255, 255, 255, 255)
+                                                         : (isLight ? IM_COL32(140, 150, 170, 255) : IM_COL32(80, 90, 110, 255)), 16);
+      MacroCaption(origin, kMacroCell, contentH, n->label.empty() ? std::string("bang") : n->label);
+   }
+
+   void DrawMacroNumBoxBody(MacroNumBoxNode* n)
+   {
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      if (n->maxVal <= n->minVal)
+         n->maxVal = n->minVal + 1.0f;
+      const float absMax = std::max(std::abs(n->minVal), std::abs(n->maxVal));
+      const char* fmt = n->step >= 1.0f ? "%.0f" : (absMax >= 10.0f ? "%.1f" : "%.3f");
+      ModSlider("##numbox", &n->value, n->minVal, n->maxVal, fmt, kMacroCell - 22.0f);
+      if (n->step > 0.0f)
+         n->value = std::clamp(n->minVal + std::round((n->value - n->minVal) / n->step) * n->step, n->minVal, n->maxVal);
+      const float h = ImGui::GetCursorScreenPos().y - origin.y;
+      ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + h));
+      MacroCaption(ImVec2(origin.x, origin.y), kMacroCell, h, n->label.empty() ? std::string("value") : n->label);
+   }
+
+   void DrawMacroRadioSelectorBody(MacroRadioSelectorNode* n)
+   {
+      const int count = std::clamp(n->count, 2, 8);
+      n->selected = std::clamp(n->selected, 0, count - 1);
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      DiscreteParamRef ref = BeginDiscreteParam("selected", (float)n->selected, 0.0f, (float)(count - 1));
+      if (ref.valid && ref.modulated)
+         n->selected = std::clamp((int)lroundf(*ref.value), 0, count - 1);
+      const float gap = 2.0f, btnH = kMacroRowH;
+      const float btnW = (kMacroWideCell - (count - 1) * gap) / (float)count;
+      const ImVec2 rowTL = ImGui::GetCursorScreenPos();
+      const bool isLight = IsThemeLight();
+      bool anyHovered = false;
+      for (int b = 0; b < count; b++)
+      {
+         ImGui::SetCursorScreenPos(ImVec2(rowTL.x + b * (btnW + gap), rowTL.y));
+         ImGui::PushID(b + 700);
+         const bool sel = (b == n->selected);
+         ImGui::PushStyleColor(ImGuiCol_Button, sel ? ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)
+                                                    : (isLight ? ImVec4(0.88f, 0.90f, 0.94f, 1.0f) : ImVec4(0.18f, 0.20f, 0.26f, 1.0f)));
+         ImGui::PushStyleColor(ImGuiCol_Text, sel ? ImVec4(1, 1, 1, 1)
+                                                  : (isLight ? ImVec4(0.3f, 0.35f, 0.45f, 1.0f) : ImVec4(0.7f, 0.75f, 0.85f, 1.0f)));
+         if (ImGui::Button(std::to_string(b + 1).c_str(), ImVec2(btnW, btnH)) && !(ref.valid && ref.modulated))
+         {
+            PushUndoCheckpoint();
+            n->selected = b;
+            gPatchDirty = true;
+         }
+         anyHovered |= ImGui::IsItemHovered();
+         ImGui::PopStyleColor(2);
+         ImGui::PopID();
+      }
+      EndDiscreteParam(ref, anyHovered);
+      MacroCaption(origin, kMacroWideCell + 18.0f, btnH, n->label.empty() ? std::string("selector") : n->label);
+   }
+
+   void DrawMacroStepGateBody(MacroStepGateNode* n)
+   {
+      const float gap = 2.0f, stepH = kMacroRowH;
+      const float stepW = (kMacroWideCell - 7.0f * gap) / 8.0f;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const bool isLight = IsThemeLight();
+      const bool playing = Transport::Instance().IsPlaying();
+      const int playStep = n->CurrentStep();
+      for (int st = 0; st < 8; st++)
+      {
+         const float sx = origin.x + st * (stepW + gap);
+         const ImVec2 sTL(sx, origin.y), sBR(sx + stepW, origin.y + stepH);
+         ImGui::SetCursorScreenPos(sTL);
+         ImGui::PushID(st + 800);
+         if (ImGui::InvisibleButton("##stepgatebtn", ImVec2(stepW, stepH)))
+         {
+            PushUndoCheckpoint();
+            n->pattern ^= (uint8_t)(1u << st);
+            gPatchDirty = true;
+         }
+         ImGui::PopID();
+         const bool on = (n->pattern & (1u << st)) != 0;
+         dl->AddRectFilled(sTL, sBR, on ? (isLight ? IM_COL32(34, 197, 94, 255) : IM_COL32(74, 222, 128, 255))
+                                        : (isLight ? IM_COL32(210, 216, 228, 255) : IM_COL32(28, 31, 40, 255)), 2.5f);
+         if (playing && st == playStep)
+            dl->AddRect(sTL, sBR, IM_COL32(255, 230, 80, 255), 2.5f, 0, 2.0f);
+         else
+            dl->AddRect(sTL, sBR, isLight ? IM_COL32(180, 190, 205, 200) : IM_COL32(48, 52, 65, 200), 2.5f);
+      }
+      MacroCaption(origin, kMacroWideCell, stepH, n->label.empty() ? std::string("step gate") : n->label);
+   }
+
+   void DrawDriftParams(DriftNode* n)
+   {
+      ModSlider("speed", &n->speed, 0.1f, 4.0f, "%.2f");
+      ModSlider("stray", &n->stray, 0.25f, 4.0f, "%.2f");
+      ModSlider("momentum", &n->momentum, 0.0f, 4.0f, "%.2f s");
+      ModSlider("home", &n->home, 0.0f, 1.0f, "%.2f");
+      ModSlider("range lo", &n->rangeLo, 0.0f, 1.0f, "%.2f");
+      ModSlider("range hi", &n->rangeHi, 0.0f, 1.0f, "%.2f");
+      ModSlider("depth", &n->depth, 0.0f, 1.0f, "%.2f");
+      static std::vector<std::string> kQuant;
+      if (kQuant.empty())
+      {
+         kQuant.push_back("off");
+         for (const std::string& d : MusicTime::RateDivisionList())
+            kQuant.push_back(d);
+      }
+      DropdownButton("quantize", kQuant, n->quantizeRate, [n](int i) { n->quantizeRate = i; });
+      ModSlider("smoothing", &n->smoothness, 0.0f, 0.95f, "%.2f");
+      ModSliderInt("seed", &n->seed, 1, 999);
+   }
+
+   // Slideshow (upstream, originally contributed from this fork).
+   void DrawCVRecorderParams(CVRecorderNode* n)
+   {
+      // One button: rec -> stop, and stopping starts the loop immediately.
+      // Fixed width (the preview's), never derived from
+      // GetContentRegionAvail: inside an auto-sizing node that feeds back on
+      // itself and collapsed the old three buttons into slivers.
+      const bool recording = n->IsRecording();
+      char label[48];
+      if (recording)
+         snprintf(label, sizeof(label), "stop  (%.1f beats)###cvRec", n->LengthBeats());
+      else
+         snprintf(label, sizeof(label), "record###cvRec");
+      if (recording)
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
+      if (ImGui::Button(label, ImVec2(kPreviewSize, 0)))
+      {
+         if (recording)
+            n->StopRecording();
+         else
+         {
+            PushUndoCheckpoint();
+            // Recording runs on the beat clock; a stopped transport would
+            // capture a single sample.
+            if (!Transport::Instance().IsPlaying())
+               Transport::Instance().SetPlaying(true);
+            n->StartRecording();
+         }
+      }
+      if (recording)
+         ImGui::PopStyleColor();
+
+      ImGui::BeginDisabled(n->input != nullptr);
+      ModSlider("in (no cable)", &n->constantIn, 0.0f, 1.0f);
+      ImGui::EndDisabled();
+
+      ModSlider("speed", &n->speed, 0.05f, 4.0f);
+      ModSlider("low", &n->low, 0.0f, 1.0f);
+      ModSlider("high", &n->high, 0.0f, 1.0f);
+   }
+
+   void DrawSlideshowParams(SlideshowNode* n)
+   {
+      if (ImGui::Button("Choose folder...", ImVec2(kPreviewSize, 0)))
+         StartNodeFileDialog(n, [start = n->FolderPath()]() { return Platform::OpenFolderDialog("Choose slideshow folder", start); },
+                             [](auto* m, const std::string& path) { m->LoadFolder(path); });
+      if (!n->FolderPath().empty())
+      {
+         if (ImGui::Button("Refresh", ImVec2(kPreviewSize, 0)))
+            n->ReloadFromFolder();
+      }
+      DropdownButton("transition", SlideshowNode::TransitionNames(), n->transition,
+                     [n](int i) { n->transition = i; });
+      ModSlider("hold", &n->holdDuration, 0.05f, 60.0f, "%.2f s");
+      ModSlider("transition time", &n->transitionDuration, 0.0f, 15.0f, "%.2f s");
+      DropdownButton("fit", SlideshowNode::FitModeNames(), n->fitMode,
+                     [n](int i) { n->fitMode = i; });
+      ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
+      ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
+
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+      if (!n->LastError().empty())
+         ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "%s", n->LastError().c_str());
+      if (n->ImageCount() > 0)
+      {
+         const std::string file = n->CurrentFileName();
+         ImGui::TextDisabled("%d/%d  %s", n->CurrentImageNumber(), n->ImageCount(), file.c_str());
+      }
+      else
+         ImGui::TextDisabled("Choose a folder containing images.");
+      ImGui::PopTextWrapPos();
+   }
+
+   void DrawMacroSliderParams(MacroSliderNode* n) { MacroNameField(n->label, kMacroCell); }
+   void DrawMacroBipolarKnobParams(MacroBipolarKnobNode* n) { MacroNameField(n->label, kMacroCell); }
+   void DrawMacroToggleParams(MacroToggleNode* n) { MacroNameField(n->label, kMacroCell); }
+   void DrawMacroTriggerParams(MacroTriggerNode* n) { MacroNameField(n->label, kMacroCell); }
+   void DrawMacroNumBoxParams(MacroNumBoxNode* n)
+   {
+      MacroNameField(n->label, kMacroCell);
+      ImGui::SetNextItemWidth(kMacroCell);
+      if (ImGui::DragFloat("min", &n->minVal, 0.1f)) gPatchDirty = true;
+      ImGui::SetNextItemWidth(kMacroCell);
+      if (ImGui::DragFloat("max", &n->maxVal, 0.1f)) gPatchDirty = true;
+      ImGui::SetNextItemWidth(kMacroCell);
+      if (ImGui::DragFloat("step", &n->step, 0.01f, 0.0f, 1000.0f, "%.3f")) gPatchDirty = true;
+      ImGui::TextDisabled("step 0 = continuous");
+   }
+   void DrawMacroRadioSelectorParams(MacroRadioSelectorNode* n)
+   {
+      MacroNameField(n->label, kMacroWideCell);
+      ModSliderInt("count", &n->count, 2, 8);
+   }
+   void DrawMacroStepGateParams(MacroStepGateNode* n)
+   {
+      MacroNameField(n->label, kMacroWideCell);
+      ModSlider("rate (beats)", &n->rateBeats, 0.0625f, 4.0f);
    }
 
    void AppendUiHistory(std::map<int, std::vector<float>>& histories, int nodeIndex, float value)
@@ -9453,6 +9931,227 @@ namespace
       EndAudioBody();
    }
 
+   // ---- Audio Meter (ported from upstream) ------------------------------
+   namespace AudioMeterScale
+   {
+      struct Point { float db, frac; };
+      static const Point kCurve[] = {
+         { -60.0f, 0.00f }, { -48.0f, 0.10f }, { -36.0f, 0.22f }, { -24.0f, 0.38f },
+         { -18.0f, 0.48f }, { -12.0f, 0.60f }, { -6.0f, 0.75f },  { -3.0f, 0.83f },
+         { 0.0f, 0.92f },   { 3.0f, 1.00f },
+      };
+
+      inline float DbToFrac(float db)
+      {
+         const int n = (int)(sizeof(kCurve) / sizeof(kCurve[0]));
+         if (db <= kCurve[0].db)
+            return 0.0f;
+         for (int i = 1; i < n; i++)
+         {
+            if (db <= kCurve[i].db)
+            {
+               const float t = (db - kCurve[i - 1].db) / (kCurve[i].db - kCurve[i - 1].db);
+               return kCurve[i - 1].frac + t * (kCurve[i].frac - kCurve[i - 1].frac);
+            }
+         }
+         return 1.0f;
+      }
+
+      inline float LevelToDb(float lvl) { return lvl > 1e-5f ? 20.0f * log10f(lvl) : -120.0f; }
+
+      // "-inf" below the floor, explicit sign above 0 so an over reads as one.
+      inline void FormatDb(char* buf, size_t size, float lvl)
+      {
+         const float db = LevelToDb(lvl);
+         if (db <= -99.0f)
+            snprintf(buf, size, "-inf");
+         else if (db > 0.05f)
+            snprintf(buf, size, "+%.1f", db);
+         else
+            snprintf(buf, size, "%.1f", db);
+      }
+   }
+
+   void DrawAudioMeterVisualizer(AudioMeterNode* n, float x, float y, float w, float h)
+   {
+      using namespace AudioMeterScale;
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 origin(x, y);
+      const ImVec2 br(x + w, y + h);
+      const bool isLight = IsThemeLight();
+      // Every legend in the meter is drawn at a reduced size: at the body
+      // font the scale numbers crowded the bars and each other on a 200px
+      // body. The node's own caption/readout strip keep the normal size.
+      ImFont* font = ImGui::GetFont();
+      const float fs = ImGui::GetFontSize() * 0.72f;
+      const float textH = fs;
+      auto textSize = [&](const char* t) { return font->CalcTextSizeA(fs, FLT_MAX, 0.0f, t); };
+      auto text = [&](ImVec2 p, ImU32 c, const char* t) { dl->AddText(font, fs, p, c, t); };
+
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 3.0f);
+
+      // Zone colours, shared by bars, hold lines and readouts: green for
+      // normal level, amber for the last 6 dB of headroom, red for overs.
+      const ImU32 kGreen = isLight ? IM_COL32(40, 165, 90, 255) : IM_COL32(75, 215, 120, 255);
+      const ImU32 kAmber = isLight ? IM_COL32(222, 150, 30, 255) : IM_COL32(255, 190, 90, 255);
+      const ImU32 kRed = isLight ? IM_COL32(220, 55, 45, 255) : IM_COL32(255, 90, 80, 255);
+      const ImU32 slotCol = isLight ? IM_COL32(0, 0, 0, 14) : IM_COL32(255, 255, 255, 10);
+      auto zoneCol = [&](float db) { return db > 0.0f ? kRed : db > -6.0f ? kAmber : kGreen; };
+      auto withAlpha = [](ImU32 c, int a) { return (c & ~IM_COL32_A_MASK) | ((ImU32)a << IM_COL32_A_SHIFT); };
+
+      // Geometry: [readout] row on top, bars in the middle, L/R captions
+      // below; bars sit either side of a centred scale column.
+      const float pad = 10.0f;
+      const float scaleW = 34.0f;
+      const float barW = std::min(36.0f, (w - 2.0f * pad - scaleW) * 0.5f);
+      const float groupW = 2.0f * barW + scaleW;
+      const float lx = x + (w - groupW) * 0.5f;
+      const float rx = lx + barW + scaleW;
+      const float scaleCx = lx + barW + scaleW * 0.5f;
+      const float readTop = y + pad;
+      const float readH = textH + 6.0f;
+      const float barTop = readTop + readH + 10.0f;
+      const float barBot = br.y - pad - textH - 6.0f;
+      const float barH = barBot - barTop;
+      auto yOf = [&](float db) { return barBot - DbToFrac(db) * barH; };
+
+      // Scale: labelled ticks as short marks in the centre column plus a
+      // faint line across each bar slot; unlabelled minor marks between.
+      dl->AddRectFilled(ImVec2(lx, barTop), ImVec2(lx + barW, barBot), slotCol, 2.0f);
+      dl->AddRectFilled(ImVec2(rx, barTop), ImVec2(rx + barW, barBot), slotCol, 2.0f);
+      static const float kLabelled[] = { 0.0f, -6.0f, -12.0f, -24.0f, -36.0f, -48.0f };
+      static const float kMinor[] = { 3.0f, -3.0f, -9.0f, -18.0f, -30.0f, -42.0f, -54.0f };
+      for (float db : kMinor)
+      {
+         const float ty = std::floor(yOf(db)) + 0.5f;
+         dl->AddLine(ImVec2(lx + barW + 2.0f, ty), ImVec2(lx + barW + 5.0f, ty), ScopeMidLineCol(), 1.0f);
+         dl->AddLine(ImVec2(rx - 5.0f, ty), ImVec2(rx - 2.0f, ty), ScopeMidLineCol(), 1.0f);
+      }
+      for (float db : kLabelled)
+      {
+         const float ty = std::floor(yOf(db)) + 0.5f;
+         const ImU32 lineCol = db == 0.0f ? ScopeMidLineCol() : ScopeGridCol();
+         dl->AddLine(ImVec2(lx, ty), ImVec2(lx + barW, ty), lineCol, 1.0f);
+         dl->AddLine(ImVec2(rx, ty), ImVec2(rx + barW, ty), lineCol, 1.0f);
+         char buf[8];
+         snprintf(buf, sizeof(buf), "%.0f", db);
+         const ImVec2 ts = textSize(buf);
+         text(ImVec2(scaleCx - ts.x * 0.5f, ty - ts.y * 0.5f), ScopeTextCol(), buf);
+      }
+
+      // One channel: peak bar (translucent), RMS bar (solid) over it, both
+      // split into colour zones so the bar reads like a hardware LED stack
+      // rather than one block that changes colour all at once.
+      static const float kZoneEdges[] = { -120.0f, -6.0f, 0.0f, 3.0f };
+      const ImU32 kZoneCols[] = { kGreen, kAmber, kRed };
+      auto fillZones = [&](float bx, float levelDb, int alpha) {
+         if (levelDb <= -60.0f)
+            return;
+         for (int z = 0; z < 3; z++)
+         {
+            const float lo = kZoneEdges[z];
+            const float hi = std::min(kZoneEdges[z + 1], levelDb);
+            if (hi <= lo)
+               break;
+            const float y0 = yOf(hi);
+            const float y1 = z == 0 ? barBot : yOf(lo);
+            dl->AddRectFilled(ImVec2(bx + 1.0f, y0), ImVec2(bx + barW - 1.0f, y1),
+                              withAlpha(kZoneCols[z], alpha));
+         }
+      };
+      auto drawChannel = [&](float bx, float peak, float rms, float hold) {
+         dl->PushClipRect(ImVec2(bx, barTop), ImVec2(bx + barW, barBot), true);
+         fillZones(bx, LevelToDb(peak), isLight ? 90 : 80);
+         fillZones(bx, LevelToDb(rms), isLight ? 235 : 225);
+         // LED segmentation: a 1px gap every 3px, in the scope background.
+         const ImU32 gapCol = withAlpha(ScopeBgCol(), 150);
+         for (float gy = barBot - 3.0f; gy > barTop; gy -= 3.0f)
+            dl->AddLine(ImVec2(bx, gy), ImVec2(bx + barW, gy), gapCol, 1.0f);
+         const float holdDb = LevelToDb(hold);
+         if (holdDb > -60.0f)
+         {
+            const float hy = yOf(holdDb);
+            dl->AddRectFilled(ImVec2(bx + 1.0f, hy - 1.0f), ImVec2(bx + barW - 1.0f, hy + 1.0f), zoneCol(holdDb));
+         }
+         dl->PopClipRect();
+      };
+      drawChannel(lx, n->PeakL(), n->RmsL(), n->PeakHoldL());
+      drawChannel(rx, n->PeakR(), n->RmsR(), n->PeakHoldR());
+
+      // Max-peak readouts, one per bar. Red box once that channel clipped.
+      auto drawReadout = [&](float bx, float maxPeak, bool clipped) {
+         const ImVec2 a(bx, readTop), b(bx + barW, readTop + readH);
+         dl->AddRectFilled(a, b, clipped ? kRed : slotCol, 2.0f);
+         char buf[12];
+         FormatDb(buf, sizeof(buf), maxPeak);
+         const ImVec2 ts = textSize(buf);
+         const ImU32 txt = clipped ? IM_COL32(255, 255, 255, 255)
+                                   : maxPeak > 1e-5f ? ImGui::GetColorU32(ImGuiCol_Text) : ScopeTextCol();
+         text(ImVec2(bx + (barW - ts.x) * 0.5f, readTop + (readH - ts.y) * 0.5f), txt, buf);
+      };
+      drawReadout(lx, n->MaxPeakL(), n->ClipL());
+      drawReadout(rx, n->MaxPeakR(), n->ClipR());
+      {
+         const ImVec2 ts = textSize("pk");
+         text(ImVec2(scaleCx - ts.x * 0.5f, readTop + (readH - ts.y) * 0.5f), ScopeTextCol(), "pk");
+      }
+
+      // Channel captions under the bars; "dB" under the scale.
+      auto caption = [&](float cx, const char* s) {
+         const ImVec2 ts = textSize(s);
+         text(ImVec2(cx - ts.x * 0.5f, barBot + 5.0f), ScopeTextCol(), s);
+      };
+      caption(lx + barW * 0.5f, "L");
+      caption(rx + barW * 0.5f, "R");
+      caption(scaleCx, "dB");
+
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::InvisibleButton("##audiometer", ImVec2(w, h));
+      if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+         n->ResetPeaks();
+      if (ImGui::IsItemHovered())
+      {
+         char l[12], r[12], buf[64];
+         FormatDb(l, sizeof(l), n->RmsL());
+         FormatDb(r, sizeof(r), n->RmsR());
+         snprintf(buf, sizeof(buf), "L %s  R %s", l, r);
+         SetAudioReadout("rms", buf);
+      }
+   }
+
+   void DrawAudioMeterBody(GraphNode& gn, AudioMeterNode* n)
+   {
+      using namespace AudioMeterScale;
+      char stat[64];
+      if (!n->HasInput())
+         snprintf(stat, sizeof(stat), "no input");
+      else if (n->ClipL() || n->ClipR())
+         snprintf(stat, sizeof(stat), "CLIP %s%s - click to reset", n->ClipL() ? "L" : "", n->ClipR() ? "R" : "");
+      else if (n->PeakL() > 1e-5f || n->PeakR() > 1e-5f)
+      {
+         char l[12], r[12];
+         FormatDb(l, sizeof(l), n->PeakL());
+         FormatDb(r, sizeof(r), n->PeakR());
+         snprintf(stat, sizeof(stat), "L %s  R %s dB", l, r);
+      }
+      else
+         snprintf(stat, sizeof(stat), "no signal");
+
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Three kKnobLarge knob rows tall - 1.5x Limiter's gain-reduction
+      // meter (two rows, DrawLimiterBody). At the Limiter's height the
+      // -48..0 span was too short to read a level against the ticks.
+      const float rowH = kKnobLarge + 4.0f + ImGui::GetTextLineHeight() + ImGui::GetStyle().ItemSpacing.y;
+      const float meterH = 3.0f * rowH;
+      DrawAudioMeterVisualizer(n, gAudioContentX, ImGui::GetCursorScreenPos().y, gAudioContentW, meterH);
+
+      EndAudioBody();
+   }
+
    void DrawGainBody(GraphNode& gn, GainNode* n)
    {
       // One param, so §7's "a one-param node is visually smaller" holds. A
@@ -9651,6 +10350,13 @@ namespace
       ImGui::SameLine();
       if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
          n->end = std::max(n->end, n->start + 0.01f);
+      {
+         // only a wrapping loop has a seam to fade (ping-pong bounces)
+         const bool xfadeActive = n->loop && !n->pingpong;
+         ImGui::BeginDisabled(!xfadeActive);
+         AudioSlider("loop xfade", &n->xfade, 0.0f, 250.0f, "%.0f ms", AudioFullWidth());
+         ImGui::EndDisabled();
+      }
 
       EndAudioBody();
    }
@@ -10362,6 +11068,217 @@ namespace
    // the mode-specific placeholder text, and mediaKind tags the drag so the
    // release handler knows whether to resolve it against Sampler or against
    // Image Source/Video.
+   // ---- browser favourites / sort / filter (Turbo port of upstream's idea) ----
+   // One flat file next to the app's other preferences, one section per
+   // browser mode: modules by registry name, samples/media by path, plugins
+   // by identifier.
+   struct BrowserFavorites
+   {
+      std::set<std::string> modules, samples, media, plugins;
+      uint64_t version = 1;
+      bool loaded = false;
+
+      static std::string Path()
+      {
+         const std::string dir = InfiniteSettingsDirectory();
+         return dir.empty() ? std::string() : dir + "/Infinite.browserfavorites";
+      }
+      void EnsureLoaded()
+      {
+         if (loaded)
+            return;
+         loaded = true;
+         std::ifstream file(Path());
+         std::string line, section;
+         while (file && std::getline(file, line))
+         {
+            if (!line.empty() && line.back() == '\r')
+               line.pop_back();
+            if (line.empty() || line[0] == '#')
+               continue;
+            if (line.front() == '[' && line.back() == ']')
+            {
+               section = line.substr(1, line.size() - 2);
+               continue;
+            }
+            if (std::set<std::string>* set = Set(section))
+               set->insert(line);
+         }
+         version++;
+      }
+      std::set<std::string>* Set(const std::string& section)
+      {
+         if (section == "modules") return &modules;
+         if (section == "samples") return &samples;
+         if (section == "media") return &media;
+         if (section == "plugins") return &plugins;
+         return nullptr;
+      }
+      bool Is(const char* section, const std::string& key)
+      {
+         EnsureLoaded();
+         const std::set<std::string>* set = Set(section);
+         return set != nullptr && set->count(key) > 0;
+      }
+      void Toggle(const char* section, const std::string& key)
+      {
+         EnsureLoaded();
+         std::set<std::string>* set = Set(section);
+         if (set == nullptr)
+            return;
+         if (!set->erase(key))
+            set->insert(key);
+         version++;
+         std::ofstream file(Path());
+         if (!file)
+            return;
+         const char* names[4] = { "modules", "samples", "media", "plugins" };
+         for (const char* n : names)
+         {
+            file << "[" << n << "]\n";
+            for (const std::string& k : *Set(n))
+               file << k << "\n";
+         }
+      }
+   };
+   BrowserFavorites gBrowserFavorites;
+
+   // Small star toggle drawn as vector shapes (the UI font has no star glyph).
+   bool DrawFavoriteStar(const char* id, bool isFav, float size)
+   {
+      const bool pressed = ImGui::InvisibleButton(id, ImVec2(size, size));
+      const bool hovered = ImGui::IsItemHovered();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
+      const ImVec2 c((mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f);
+      const float ro = size * 0.46f, ri = ro * 0.45f;
+      ImVec2 pts[10];
+      for (int i = 0; i < 10; i++)
+      {
+         const float a = -1.5707963f + (float)i * 0.62831853f;
+         const float r = (i % 2 == 0) ? ro : ri;
+         pts[i] = ImVec2(c.x + cosf(a) * r, c.y + sinf(a) * r);
+      }
+      ImU32 col;
+      if (isFav)
+         col = hovered ? IM_COL32(255, 225, 75, 255) : IM_COL32(255, 200, 40, 255);
+      else if (hovered)
+         col = IM_COL32(255, 215, 80, 220);
+      else
+      {
+         ImVec4 v = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+         v.w *= 0.6f;
+         col = ImGui::GetColorU32(v);
+      }
+      if (isFav)
+         for (int i = 0; i < 10; i++)
+            dl->AddTriangleFilled(c, pts[i], pts[(i + 1) % 10], col);
+      else
+         dl->AddPolyline(pts, 10, col, ImDrawFlags_Closed, 1.2f);
+      if (hovered)
+         ImGui::SetTooltip("%s", isFav ? "Remove from favourites" : "Add to favourites");
+      return pressed;
+   }
+
+   // Filter / sort row shared by the Samples, Media and Plugins modes.
+   struct BrowserListOptions
+   {
+      int filter = 0;   // index into the mode's filter names (0 = All, 1 = Favourites)
+      int sort = 0;     // 0 name, 1 type, 2 folder, 3 favourites first
+      bool descending = false;
+   };
+
+   bool DrawBrowserListOptions(BrowserListOptions& o, const std::vector<std::string>& filterNames,
+                               const std::vector<std::string>& sortNames)
+   {
+      bool changed = false;
+      const float avail = ImGui::GetContentRegionAvail().x;
+      const float arrowW = ImGui::GetFrameHeight();
+      const float half = std::max(60.0f, (avail - arrowW - ImGui::GetStyle().ItemSpacing.x * 2.0f) * 0.5f);
+      ImGui::SetNextItemWidth(half);
+      if (ImGui::BeginCombo("##browserfilter", filterNames[std::clamp(o.filter, 0, (int)filterNames.size() - 1)].c_str()))
+      {
+         for (int i = 0; i < (int)filterNames.size(); i++)
+            if (ImGui::Selectable(filterNames[i].c_str(), o.filter == i))
+            {
+               o.filter = i;
+               changed = true;
+            }
+         ImGui::EndCombo();
+      }
+      if (ImGui::IsItemHovered())
+         ImGui::SetTooltip("show");
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(half);
+      if (ImGui::BeginCombo("##browsersort", sortNames[std::clamp(o.sort, 0, (int)sortNames.size() - 1)].c_str()))
+      {
+         for (int i = 0; i < (int)sortNames.size(); i++)
+            if (ImGui::Selectable(sortNames[i].c_str(), o.sort == i))
+            {
+               o.sort = i;
+               changed = true;
+            }
+         ImGui::EndCombo();
+      }
+      if (ImGui::IsItemHovered())
+         ImGui::SetTooltip("sort by");
+      ImGui::SameLine();
+      if (ImGui::Button(o.descending ? "v##sortdir" : "^##sortdir", ImVec2(arrowW, 0)))
+      {
+         o.descending = !o.descending;
+         changed = true;
+      }
+      if (ImGui::IsItemHovered())
+         ImGui::SetTooltip("%s", o.descending ? "descending" : "ascending");
+      return changed;
+   }
+
+   const std::vector<std::string>& SampleFilterNames()
+   {
+      static const std::vector<std::string> v = { "All", "Favourites", "WAV", "AIFF", "FLAC", "MP3", "M4A", "OGG" };
+      return v;
+   }
+   const std::vector<std::string>& MediaFilterNames()
+   {
+      static const std::vector<std::string> v = { "All", "Favourites", "Video", "Image" };
+      return v;
+   }
+   const std::vector<std::string>& LibrarySortNames()
+   {
+      static const std::vector<std::string> v = { "Name", "Type", "Folder", "Favourites first" };
+      return v;
+   }
+
+   std::string LibraryEntryExt(const SampleScanner::Entry& e)
+   {
+      const size_t dot = e.fileNameLower.find_last_of('.');
+      return dot == std::string::npos ? std::string() : e.fileNameLower.substr(dot + 1);
+   }
+
+   bool LibraryEntryPasses(const SampleScanner::Entry& e, int filter, bool mediaKind)
+   {
+      if (filter == 0)
+         return true;
+      if (filter == 1)
+         return gBrowserFavorites.Is(mediaKind ? "media" : "samples", e.path);
+      if (mediaKind)
+      {
+         const bool video = HasExtension(e.path, kVideoExt);
+         return filter == 2 ? video : !video;
+      }
+      const std::string ext = LibraryEntryExt(e);
+      switch (filter)
+      {
+         case 2: return ext == "wav";
+         case 3: return ext == "aif" || ext == "aiff";
+         case 4: return ext == "flac";
+         case 5: return ext == "mp3";
+         case 6: return ext == "m4a";
+         case 7: return ext == "ogg" || ext == "opus";
+         default: return true;
+      }
+   }
+
    void DrawLibrarySearchPanel(SampleScanner& scanner, const char* idPrefix, const char* searchHint, bool mediaKind)
    {
       scanner.PollResults();
@@ -10428,11 +11345,16 @@ namespace
       {
          std::string lastQuery;
          uint64_t lastIndexVersion = 0;
+         uint64_t lastFavVersion = 0;
+         int lastFilter = -1, lastSort = -1;
+         bool lastDescending = false;
          std::vector<const SampleScanner::Entry*> filtered;
       };
       static LibraryFilterCache sSampleCache;
       static LibraryFilterCache sMediaCache;
       LibraryFilterCache& cache = mediaKind ? sMediaCache : sSampleCache;
+      static BrowserListOptions sSampleOpts, sMediaOpts;
+      BrowserListOptions& opts = mediaKind ? sMediaOpts : sSampleOpts;
 
       // Two independent buffers (not one shared static) so the Samples and
       // Media modes each keep their own in-progress query when the user
@@ -10442,6 +11364,7 @@ namespace
       char* searchBuf = mediaKind ? mediaSearch : sampleSearch;
       ImGui::SetNextItemWidth(-1.0f);
       ImGui::InputTextWithHint("##librarysearch", searchHint, searchBuf, 128);
+      DrawBrowserListOptions(opts, mediaKind ? MediaFilterNames() : SampleFilterNames(), LibrarySortNames());
 
       std::string q = searchBuf;
       std::transform(q.begin(), q.end(), q.begin(), ::tolower);
@@ -10452,28 +11375,61 @@ namespace
       if (!mediaKind && !gPreviewingSamplePath.empty() && !AudioEngine::Instance().Preview().IsPlaying())
          gPreviewingSamplePath.clear();
 
-      // Filtered only when query or index version changes (0 ms when idle/scrolling/browsing).
-      // Pre-computed lowercase fileNameLower eliminates per-entry string allocation.
-      if (cache.lastQuery != q || cache.lastIndexVersion != scanner.IndexVersion())
+      // Filtered/sorted only when something that affects the list changes
+      // (0 ms when idle/scrolling). Pre-computed lowercase fileNameLower
+      // eliminates per-entry string allocation.
+      gBrowserFavorites.EnsureLoaded();
+      if (cache.lastQuery != q || cache.lastIndexVersion != scanner.IndexVersion() ||
+          cache.lastFavVersion != gBrowserFavorites.version || cache.lastFilter != opts.filter ||
+          cache.lastSort != opts.sort || cache.lastDescending != opts.descending)
       {
          cache.filtered.clear();
          const auto& index = scanner.Index();
          cache.filtered.reserve(index.size());
-         if (q.empty())
+         for (const SampleScanner::Entry& entry : index)
          {
-            for (const SampleScanner::Entry& entry : index)
-               cache.filtered.push_back(&entry);
+            if (!q.empty() && entry.fileNameLower.find(q) == std::string::npos)
+               continue;
+            if (!LibraryEntryPasses(entry, opts.filter, mediaKind))
+               continue;
+            cache.filtered.push_back(&entry);
          }
-         else
-         {
-            for (const SampleScanner::Entry& entry : index)
-            {
-               if (entry.fileNameLower.find(q) != std::string::npos)
-                  cache.filtered.push_back(&entry);
-            }
-         }
+         const int sortMode = opts.sort;
+         const char* favSection = mediaKind ? "media" : "samples";
+         std::stable_sort(cache.filtered.begin(), cache.filtered.end(),
+                          [sortMode, favSection](const SampleScanner::Entry* a, const SampleScanner::Entry* b) {
+                             if (sortMode == 3)
+                             {
+                                const bool fa = gBrowserFavorites.Is(favSection, a->path);
+                                const bool fb = gBrowserFavorites.Is(favSection, b->path);
+                                if (fa != fb)
+                                   return fa;
+                             }
+                             if (sortMode == 1)
+                             {
+                                const std::string ea = LibraryEntryExt(*a), eb = LibraryEntryExt(*b);
+                                if (ea != eb)
+                                   return ea < eb;
+                             }
+                             if (sortMode == 2)
+                             {
+                                const std::string da = a->path.substr(0, a->path.find_last_of("/\\"));
+                                const std::string db = b->path.substr(0, b->path.find_last_of("/\\"));
+                                if (da != db)
+                                   return da < db;
+                             }
+                             if (a->fileNameLower != b->fileNameLower)
+                                return a->fileNameLower < b->fileNameLower;
+                             return a->fileName < b->fileName;
+                          });
+         if (opts.descending)
+            std::reverse(cache.filtered.begin(), cache.filtered.end());
          cache.lastQuery = q;
          cache.lastIndexVersion = scanner.IndexVersion();
+         cache.lastFavVersion = gBrowserFavorites.version;
+         cache.lastFilter = opts.filter;
+         cache.lastSort = opts.sort;
+         cache.lastDescending = opts.descending;
       }
 
       const auto& filtered = cache.filtered;
@@ -10503,6 +11459,19 @@ namespace
             const SampleScanner::Entry& entry = *filtered[rowIdx];
 
             ImGui::PushID(entry.path.c_str());
+
+         // favourite star at the head of every row
+         {
+            const float rowH = mediaKind ? 54.0f : ImGui::GetFrameHeight();
+            const float starSz = ImGui::GetFrameHeight() * 0.75f;
+            const float rowY = ImGui::GetCursorPosY();
+            ImGui::SetCursorPosY(rowY + (rowH - starSz) * 0.5f);
+            const char* section = mediaKind ? "media" : "samples";
+            if (DrawFavoriteStar("##fav", gBrowserFavorites.Is(section, entry.path), starSz))
+               gBrowserFavorites.Toggle(section, entry.path);
+            ImGui::SameLine();
+            ImGui::SetCursorPosY(rowY);
+         }
 
          // Media mode has no audition - images/video get no play button, and
          // the Selectable alone keeps the same full-width layout it always
@@ -10677,6 +11646,18 @@ namespace
             else
                ImGui::SetTooltip("%s", entry.path.c_str());
          }
+         if (ImGui::BeginPopupContextItem("##libraryrowmenu"))
+         {
+            const char* section = mediaKind ? "media" : "samples";
+            const bool fav = gBrowserFavorites.Is(section, entry.path);
+            if (ImGui::MenuItem(fav ? "Remove from favourites" : "Add to favourites"))
+               gBrowserFavorites.Toggle(section, entry.path);
+            if (ImGui::MenuItem("Show in Explorer"))
+               Platform::RevealInFileManager(entry.path);
+            if (ImGui::MenuItem("Copy path"))
+               ImGui::SetClipboardText(entry.path.c_str());
+            ImGui::EndPopup();
+         }
 
          ImGui::PopID();
          }
@@ -10786,8 +11767,56 @@ namespace
       ImGui::SetNextItemWidth(-1.0f);
       ImGui::InputTextWithHint("##pluginsearch", "SEARCH PLUGINS...", pluginSearch, sizeof(pluginSearch));
 
+      static BrowserListOptions sPluginOpts;
+      static const std::vector<std::string> kPluginFilters = { "All", "Favourites", "Instruments", "Effects" };
+      static const std::vector<std::string> kPluginSorts = { "Name", "Maker", "Favourites first" };
+      DrawBrowserListOptions(sPluginOpts, kPluginFilters, kPluginSorts);
+
       std::string q = pluginSearch;
       std::transform(q.begin(), q.end(), q.begin(), ::tolower);
+
+      // filtered + sorted view (the scanner index itself stays in scan order)
+      std::vector<const PluginScanner::Entry*> pluginRows;
+      for (const PluginScanner::Entry& entry : gPluginScanner.Index())
+      {
+         if (!q.empty())
+         {
+            std::string hay = entry.name + " " + entry.manufacturer;
+            std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
+            if (hay.find(q) == std::string::npos)
+               continue;
+         }
+         if (sPluginOpts.filter == 1 && !gBrowserFavorites.Is("plugins", entry.identifier))
+            continue;
+         if (sPluginOpts.filter == 2 && !entry.acceptsNotes)
+            continue;
+         if (sPluginOpts.filter == 3 && entry.acceptsNotes)
+            continue;
+         pluginRows.push_back(&entry);
+      }
+      {
+         const int sortMode = sPluginOpts.sort;
+         auto lower = [](std::string t) { std::transform(t.begin(), t.end(), t.begin(), ::tolower); return t; };
+         std::stable_sort(pluginRows.begin(), pluginRows.end(),
+                          [sortMode, &lower](const PluginScanner::Entry* a, const PluginScanner::Entry* b) {
+                             if (sortMode == 2)
+                             {
+                                const bool fa = gBrowserFavorites.Is("plugins", a->identifier);
+                                const bool fb = gBrowserFavorites.Is("plugins", b->identifier);
+                                if (fa != fb)
+                                   return fa;
+                             }
+                             if (sortMode == 1)
+                             {
+                                const std::string ma = lower(a->manufacturer), mb = lower(b->manufacturer);
+                                if (ma != mb)
+                                   return ma < mb;
+                             }
+                             return lower(a->name) < lower(b->name);
+                          });
+         if (sPluginOpts.descending)
+            std::reverse(pluginRows.begin(), pluginRows.end());
+      }
 
       ImGui::BeginChild("##pluginpanellist", ImVec2(0, 0), false);
       // INFINITE_PLUGINDRAGTEST captures the FIRST matching row, not the last:
@@ -10797,14 +11826,18 @@ namespace
       // row is always on screen. (The Samples/Media modes capture the last row
       // because their fixtures stage a folder with exactly one file in it.)
       bool testRowCaptured = false;
-      for (const PluginScanner::Entry& entry : gPluginScanner.Index())
+      for (const PluginScanner::Entry* entryPtr : pluginRows)
       {
-         if (!q.empty())
+         const PluginScanner::Entry& entry = *entryPtr;
+         ImGui::PushID(entry.identifier.c_str());
          {
-            std::string hay = entry.name + " " + entry.manufacturer;
-            std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
-            if (hay.find(q) == std::string::npos)
-               continue;
+            const float starSz = ImGui::GetFrameHeight() * 0.75f;
+            const float rowY = ImGui::GetCursorPosY();
+            ImGui::SetCursorPosY(rowY + (ImGui::GetTextLineHeight() - starSz) * 0.5f);
+            if (DrawFavoriteStar("##fav", gBrowserFavorites.Is("plugins", entry.identifier), starSz))
+               gBrowserFavorites.Toggle("plugins", entry.identifier);
+            ImGui::SameLine();
+            ImGui::SetCursorPosY(rowY);
          }
 
          std::string label = "[" + (entry.format == "vst3" ? std::string("VST3") : std::string("AU")) +
@@ -10832,6 +11865,16 @@ namespace
          }
          if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s\n%s", entry.format.c_str(), entry.identifier.c_str());
+         if (ImGui::BeginPopupContextItem("##pluginrowmenu"))
+         {
+            const bool fav = gBrowserFavorites.Is("plugins", entry.identifier);
+            if (ImGui::MenuItem(fav ? "Remove from favourites" : "Add to favourites"))
+               gBrowserFavorites.Toggle("plugins", entry.identifier);
+            if (!entry.path.empty() && ImGui::MenuItem("Show in Explorer"))
+               Platform::RevealInFileManager(entry.path);
+            ImGui::EndPopup();
+         }
+         ImGui::PopID();
       }
       ImGui::EndChild();
 
@@ -10850,6 +11893,45 @@ namespace
                n->gainDb, Platform::AudioInputCaptureIsRunning() ? "mic in - live" : "mic in - idle");
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Turbo: which input(s) of the device. Pairs "1+2", "3+4"... and every
+      // single channel as mono, named after the driver's channel names.
+      {
+         static std::vector<std::string> sNames;
+         static double sNextRefresh = 0.0;
+         if (ImGui::GetTime() >= sNextRefresh)
+         {
+            sNames = Platform::AudioInputChannelNames();
+            sNextRefresh = ImGui::GetTime() + 1.0;
+         }
+         const int count = std::max(2, (int)sNames.size());
+         std::vector<std::string> options;
+         std::vector<std::pair<int, bool>> choices; // (first, mono)
+         for (int ch = 0; ch + 1 < count; ch += 2)
+         {
+            options.push_back("in " + std::to_string(ch + 1) + "+" + std::to_string(ch + 2));
+            choices.push_back({ ch, false });
+         }
+         for (int ch = 0; ch < count; ch++)
+         {
+            std::string label = "in " + std::to_string(ch + 1) + " (mono)";
+            if (ch < (int)sNames.size() && !sNames[ch].empty())
+               label += "  " + sNames[ch];
+            options.push_back(label);
+            choices.push_back({ ch, true });
+         }
+         int current = 0;
+         for (int i = 0; i < (int)choices.size(); i++)
+            if (choices[i].first == n->firstChannel && choices[i].second == n->mono)
+               current = i;
+         DropdownButton("inputs", options, current, [n, choices](int i) {
+            PushUndoCheckpoint();
+            n->firstChannel = choices[i].first;
+            n->mono = choices[i].second;
+         }, gAudioContentW, false);
+         const std::string dev = Platform::AudioInputDeviceName();
+         ImGui::TextDisabled("%s", dev.empty() ? "default input (Settings > Audio)" : dev.c_str());
+      }
 
       const float faderH = 132.0f;
       const float stripTop = ImGui::GetCursorScreenPos().y;
@@ -12427,6 +13509,634 @@ namespace
       EndAudioBody();
    }
 
+   // ---- Keyboard (ported from upstream) -----------------------------------
+   // Fixed lowNote on purpose: a widget that recentred under an active click
+   // (like the MIDI Notes display) makes the pressed key slide away.
+   int DrawInteractiveKeyboard(const bool held[128], int lowNote, int octaves)
+   {
+      const float w = gAudioBodyW, h = 64.0f;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      static const int kWhiteOffsets[7] = { 0, 2, 4, 5, 7, 9, 11 };
+      static const int kBlackOffsets[5] = { 1, 3, 6, 8, 10 };
+      static const float kBlackSlot[5] = { 0.0f, 1.0f, 3.0f, 4.0f, 5.0f };
+
+      const int whiteCount = 7 * octaves;
+      const float keyW = (w - 4.0f) / (float)whiteCount;
+
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::InvisibleButton("##keyboardHit", ImVec2(w, h));
+      const bool active = ImGui::IsItemActive();
+      const ImVec2 mouse = ImGui::GetIO().MousePos;
+
+      int hitNote = -1;
+      if (active && mouse.x >= origin.x && mouse.x < br.x && mouse.y >= origin.y && mouse.y < br.y)
+      {
+         // Black keys sit visually on top, so test them first.
+         const float relY = mouse.y - origin.y;
+         if (relY < h * 0.62f)
+         {
+            for (int o = 0; o < octaves && hitNote < 0; o++)
+            {
+               for (int k = 0; k < 5; k++)
+               {
+                  const int note = lowNote + o * 12 + kBlackOffsets[k];
+                  const float x = origin.x + 2.0f + ((float)(o * 7) + kBlackSlot[k] + 1.0f) * keyW - keyW * 0.3f;
+                  if (mouse.x >= x && mouse.x < x + keyW * 0.6f)
+                  {
+                     hitNote = note;
+                     break;
+                  }
+               }
+            }
+         }
+         if (hitNote < 0)
+         {
+            const int col = std::clamp((int)((mouse.x - origin.x - 2.0f) / keyW), 0, whiteCount - 1);
+            hitNote = lowNote + (col / 7) * 12 + kWhiteOffsets[col % 7];
+         }
+      }
+
+      for (int o = 0; o < octaves; o++)
+      {
+         for (int k = 0; k < 7; k++)
+         {
+            const int note = lowNote + o * 12 + kWhiteOffsets[k];
+            const bool on = note >= 0 && note < 128 && held[note];
+            const float x = origin.x + 2.0f + (float)(o * 7 + k) * keyW;
+            const ImU32 whiteCol = on ? (isLight ? IM_COL32(50, 130, 245, 255) : IM_COL32(120, 200, 255, 245))
+                                      : (isLight ? IM_COL32(250, 250, 255, 255) : IM_COL32(206, 210, 222, 255));
+            dl->AddRectFilled(ImVec2(x + 0.5f, origin.y + 3.0f), ImVec2(x + keyW - 0.5f, br.y - 3.0f),
+                              whiteCol, 2.0f);
+         }
+      }
+      for (int o = 0; o < octaves; o++)
+      {
+         for (int k = 0; k < 5; k++)
+         {
+            const int note = lowNote + o * 12 + kBlackOffsets[k];
+            const bool on = note >= 0 && note < 128 && held[note];
+            const float x = origin.x + 2.0f + ((float)(o * 7) + kBlackSlot[k] + 1.0f) * keyW - keyW * 0.3f;
+            const ImU32 blackCol = on ? (isLight ? IM_COL32(30, 100, 230, 255) : IM_COL32(90, 170, 235, 255))
+                                      : (isLight ? IM_COL32(60, 65, 80, 255) : IM_COL32(26, 28, 36, 255));
+            dl->AddRectFilled(ImVec2(x, origin.y + 3.0f), ImVec2(x + keyW * 0.6f, origin.y + h * 0.62f),
+                              blackCol, 2.0f);
+         }
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      return hitNote;
+   }
+
+   struct TypingKey { ImGuiKey key; int semitone; };
+
+   // Logic Pro / GarageBand's "Musical Typing" layout - the de facto standard
+   // for playing a software instrument from a QWERTY keyboard. Two rows, each
+   // shaped like one octave of a real piano (letter row = white keys, row
+   // above = black keys sitting between the white keys they sharp), with the
+   // upper row exactly one octave above the lower.
+   static const TypingKey kTypingKeys[] = {
+      { ImGuiKey_Z, 0 }, { ImGuiKey_S, 1 }, { ImGuiKey_X, 2 }, { ImGuiKey_D, 3 },
+      { ImGuiKey_C, 4 }, { ImGuiKey_V, 5 }, { ImGuiKey_G, 6 }, { ImGuiKey_B, 7 },
+      { ImGuiKey_H, 8 }, { ImGuiKey_N, 9 }, { ImGuiKey_J, 10 }, { ImGuiKey_M, 11 },
+      { ImGuiKey_Comma, 12 }, { ImGuiKey_L, 13 }, { ImGuiKey_Period, 14 },
+      { ImGuiKey_Semicolon, 15 }, // no Slash: "/" drops a comment on the canvas
+      { ImGuiKey_Q, 12 }, { ImGuiKey_2, 13 }, { ImGuiKey_W, 14 }, { ImGuiKey_3, 15 },
+      { ImGuiKey_E, 16 }, { ImGuiKey_R, 17 }, { ImGuiKey_5, 18 }, { ImGuiKey_T, 19 },
+      { ImGuiKey_6, 20 }, { ImGuiKey_Y, 21 }, { ImGuiKey_7, 22 }, { ImGuiKey_U, 23 },
+      { ImGuiKey_I, 24 }, { ImGuiKey_9, 25 }, { ImGuiKey_O, 26 }, { ImGuiKey_0, 27 },
+      { ImGuiKey_P, 28 },
+   };
+
+   void DrawKeyboardBody(GraphNode& gn, KeyboardNode* n)
+   {
+      bool held[128];
+      n->HeldKeys(held);
+      const int last = n->LastNote();
+      char stat[64];
+      if (last >= 0)
+         snprintf(stat, sizeof(stat), "%s%d", NoteNameList()[((last % 12) + 12) % 12].c_str(), last / 12 - 1);
+      else
+         snprintf(stat, sizeof(stat), "click, or hover and type");
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      const int baseNote = (n->baseOctave + 1) * 12;
+      const int lowNote = std::clamp(baseNote, 0, 103);
+      const int hit = DrawInteractiveKeyboard(held, lowNote, 3);
+      if (hit != n->mMouseNote)
+      {
+         if (n->mMouseNote >= 0)
+            n->SetKeyState(n->mMouseNote, false);
+         if (hit >= 0)
+            n->SetKeyState(hit, true);
+         n->mMouseNote = hit;
+      }
+
+      // Musical Typing (Z row = white keys, S row = black keys, Q row an octave
+      // up) only while the pointer is over this node, so single-letter typing
+      // never hijacks the rest of the app. Releases are always processed so a
+      // key held while the pointer leaves can't stick.
+      const ImGuiIO& io = ImGui::GetIO();
+      const bool isHovered = ed::GetHoveredNode() == ed::NodeId(gn.NodeId());
+      const bool mods = io.KeyCtrl || io.KeyAlt || io.KeySuper;
+      for (const TypingKey& tk : kTypingKeys)
+      {
+         const int note = std::clamp(baseNote + tk.semitone, 0, 127);
+         if (ImGui::IsKeyReleased(tk.key))
+            n->SetKeyState(note, false);
+         else if (n->computerKeyboardEnabled && isHovered && !mods && !io.WantTextInput &&
+                  ImGui::IsKeyPressed(tk.key, false))
+            n->SetKeyState(note, true);
+      }
+
+      ImGui::Dummy(ImVec2(0.0f, 5.0f));
+      {
+         AudioKnobRow row(4, kKnobLarge);
+         row.KnobInt("octave", &n->baseOctave, -1, 7, kKnobLarge);
+         row.KnobInt("transpose", &n->transpose, -24, 24, kKnobLarge);
+         row.Knob("velocity", &n->velocityScale, 0.0f, 2.0f, "%.2f", kKnobLarge);
+         row.Skip();
+         row.End();
+      }
+      AudioToggleButton("typing", &n->computerKeyboardEnabled, 64.0f);
+      ImGui::SameLine();
+      AudioToggleButton("global scale", &n->useGlobalScale, 96.0f);
+
+      EndAudioBody();
+   }
+
+   // ---- Velocity to CV ------------------------------------------------------
+   void DrawVelocityToCVBody(GraphNode& gn, VelocityToCVNode* n)
+   {
+      char stat[64];
+      snprintf(stat, sizeof(stat), "velocity -> %.2f", n->Value01());
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+      AudioKnobRow row(2);
+      row.Knob("range lo", &n->rangeLow, 0.0f, 1.0f, "%.2f", kKnobLarge);
+      row.Knob("range hi", &n->rangeHigh, 0.0f, 1.0f, "%.2f", kKnobLarge);
+      row.End();
+      EndAudioBody();
+   }
+
+   // ---- Note Switcher -------------------------------------------------------
+   void DrawNoteSwitcherBody(GraphNode& gn, NoteSwitcherNode* n)
+   {
+      const int active = n->ActiveSlot();
+      char stat[64];
+      if (n->manual)
+         snprintf(stat, sizeof(stat), "manual - slot %d", active + 1);
+      else if (n->rateMode == 0)
+         snprintf(stat, sizeof(stat), "every %s - slot %d",
+                  MusicTime::RateDivisionName(NearestRateDivision(n->rateBeats)), active + 1);
+      else
+         snprintf(stat, sizeof(stat), "every %.2fs - slot %d", n->rateSeconds, active + 1);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+      {
+         // active slot lit, connected dim, unconnected darkest
+         const float w = gAudioBodyW;
+         const ImVec2 origin = ImGui::GetCursorScreenPos();
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const float dia = 14.0f;
+         const float gap = (w - (float)NoteSwitcherNode::kSlots * dia) / (float)(NoteSwitcherNode::kSlots + 1);
+         for (int i = 0; i < NoteSwitcherNode::kSlots; i++)
+         {
+            const float cx = origin.x + gap * (float)(i + 1) + dia * (float)i + dia * 0.5f;
+            ImU32 col = IM_COL32(50, 53, 64, 255);
+            if (i == active)
+               col = IM_COL32(120, 200, 255, 255);
+            else if (n->noteInputs[i].IsConnected())
+               col = IM_COL32(70, 120, 170, 255);
+            dl->AddCircleFilled(ImVec2(cx, origin.y + dia * 0.5f), dia * 0.5f, col);
+         }
+         ImGui::Dummy(ImVec2(w, dia + 6.0f));
+      }
+      {
+         AudioKnobRow row(2);
+         DrawRateModeControls(row, &n->rateMode, &n->rateBeats, &n->rateSeconds);
+         row.End();
+      }
+      AudioToggleButton("manual", &n->manual, 64.0f);
+      if (n->manual)
+         ModSliderInt("slot", &n->manualSlot, 0, NoteSwitcherNode::kSlots - 1, gAudioBodyW);
+      EndAudioBody();
+   }
+
+   // ---- Resonator Bank -------------------------------------------------
+   // Log-frequency pole-distribution visualizer: stems showing each active
+   // resonator's center frequency, Q height and stereo pan coloring.
+   void DrawResonatorBankVisualizer(AudioEffectNode* n)
+   {
+      const float w = gAudioBodyW;
+      const float h = kAudioTimeVizH;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float logMin = log10f(20.0f), logMax = log10f(20000.0f);
+      auto freqToX = [&](float hz) {
+         const float t = std::clamp((log10f(std::max(hz, 20.0f)) - logMin) / (logMax - logMin), 0.0f, 1.0f);
+         return origin.x + t * w;
+      };
+
+      for (float hz : { 100.0f, 1000.0f, 10000.0f })
+      {
+         const float x = freqToX(hz);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), ScopeGridCol(), 1.0f);
+         char hzStr[16];
+         if (hz >= 1000.0f)
+            snprintf(hzStr, sizeof(hzStr), "%.0fk", hz / 1000.0f);
+         else
+            snprintf(hzStr, sizeof(hzStr), "%.0f", hz);
+         dl->AddText(ImVec2(x + 2.0f, br.y - 12.0f), ScopeTextCol(), hzStr);
+      }
+
+      const float rootFreq = std::clamp(n->Param("rootFreq"), 20.0f, 2000.0f);
+      const int structure = std::clamp((int)std::round(n->Param("structure")), 0, 3);
+      const int numPoles = std::clamp((int)std::round(n->Param("poles")), 1, 16);
+      const float decay = std::clamp(n->Param("decay"), 0.05f, 10.0f);
+      const float spread = std::clamp(n->Param("spread"), 0.0f, 1.0f);
+      const float damp = std::clamp(n->Param("damp"), 0.0f, 1.0f);
+
+      for (int i = 0; i < numPoles; i++)
+      {
+         float f_i = rootFreq;
+         switch (structure)
+         {
+            case 0: f_i = rootFreq * (float)(i + 1); break;
+            case 1: f_i = rootFreq * (float)(2 * i + 1); break;
+            case 2: {
+               static const int kChordSet[6] = { 0, 7, 12, 16, 19, 24 };
+               f_i = rootFreq * powf(2.0f, (float)(kChordSet[i % 6] + 12 * (i / 6)) / 12.0f);
+               break;
+            }
+            case 3:
+            default:
+               f_i = rootFreq * (float)(i + 1) * sqrtf(1.0f + 0.001f * (float)((i + 1) * (i + 1)));
+               break;
+         }
+         if (f_i > 20000.0f)
+            continue;
+
+         const float x = freqToX(f_i);
+         // Mirrors ResonatorBankKernel::PushParams' decay_i - see the comment
+         // there for the formula and why damp == 0 is a no-op.
+         const float freqRatio = std::min(rootFreq / f_i, 1.0f);
+         const float decay_i = std::clamp(decay * powf(freqRatio, damp), 0.05f, decay);
+         const float q_i = std::clamp(0.4547f * f_i * decay_i, 0.5f, 500.0f);
+         const float normH = std::clamp(log10f(q_i) / log10f(500.0f), 0.1f, 0.9f);
+         const float peakY = br.y - 14.0f - normH * (h - 22.0f);
+         // Damped partials fade as well as shrink, so raising damp visibly
+         // tilts the whole spectrum down and out to the right.
+         const float alphaScale = std::clamp(decay_i / std::max(decay, 0.0001f), 0.25f, 1.0f);
+
+         const float pos = (numPoles > 1) ? ((float)i / (float)(numPoles - 1) - 0.5f) * spread + 0.5f : 0.5f;
+         const ImU32 baseCol = (pos < 0.45f)
+            ? (isLight ? IM_COL32(30, 110, 230, 220) : IM_COL32(110, 200, 255, 220))
+            : ((pos > 0.55f)
+               ? (isLight ? IM_COL32(230, 90, 40, 220) : IM_COL32(255, 140, 90, 220))
+               : (isLight ? IM_COL32(40, 180, 110, 220) : IM_COL32(110, 230, 160, 220)));
+         const unsigned baseAlpha = (baseCol >> IM_COL32_A_SHIFT) & 0xFF;
+         const ImU32 stemCol = (baseCol & ~IM_COL32_A_MASK) |
+            (((unsigned)(baseAlpha * alphaScale)) << IM_COL32_A_SHIFT);
+
+         dl->AddLine(ImVec2(x, br.y - 14.0f), ImVec2(x, peakY), stemCol, 2.0f);
+         dl->AddCircleFilled(ImVec2(x, peakY), 3.0f, stemCol);
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+
+      if (ImGui::IsMouseHoveringRect(origin, br))
+      {
+         static const char* kStructNames[] = { "Harmonic", "Odd", "Chord", "Metallic" };
+         char buf[80];
+         if (damp > 0.001f)
+            snprintf(buf, sizeof(buf), "root %.0f Hz - %s - %d poles - %.0f%% damp", rootFreq, kStructNames[structure], numPoles, damp * 100.0f);
+         else
+            snprintf(buf, sizeof(buf), "root %.0f Hz - %s - %d poles", rootFreq, kStructNames[structure], numPoles);
+         SetAudioReadout("resonator bank", buf);
+      }
+
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawResonatorBankBody(GraphNode& gn, AudioEffectNode* n)
+   {
+      const float rootFreq = n->Param("rootFreq");
+      const int structure = std::clamp((int)std::round(n->Param("structure")), 0, 3);
+      const int poles = std::clamp((int)std::round(n->Param("poles")), 1, 16);
+      const float decay = n->Param("decay");
+      const bool analog = n->Param("analog") != 0.0f;
+      const float damp = std::clamp(n->Param("damp"), 0.0f, 1.0f);
+
+      static const char* kStructNames[] = { "Harmonic", "Odd", "Chord", "Metallic" };
+      char stat[96];
+      if (damp > 0.001f)
+         snprintf(stat, sizeof(stat), "%.0f Hz - %s - %d poles - %.0f%% damp%s", rootFreq, kStructNames[structure], poles, damp * 100.0f, analog ? " - analog" : "");
+      else
+         snprintf(stat, sizeof(stat), "%.0f Hz - %s - %d poles%s", rootFreq, kStructNames[structure], poles, analog ? " - analog" : "");
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawResonatorBankVisualizer(n);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      {
+         AudioKnobRow row(4, kKnobLarge);
+         static const std::vector<std::string> kStructs = { "harmonic", "odd", "chord", "metallic" };
+         row.Dropdown("struct", kStructs, structure, [n](int i) {
+            PushUndoCheckpoint();
+            *n->ParamPtr("structure") = (float)i;
+         });
+         row.Knob("root", n->ParamPtr("rootFreq"), 20.0f, 2000.0f, "%.0f Hz", kKnobLarge);
+         row.Knob("poles", n->ParamPtr("poles"), 1.0f, 16.0f, "%.0f", kKnobLarge);
+         row.Knob("decay", n->ParamPtr("decay"), 0.05f, 10.0f, "%.2fs", kKnobLarge);
+         row.End();
+      }
+
+      {
+         AudioKnobRow row(4, kKnobLarge);
+         row.Knob("scatter", n->ParamPtr("scatter"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("spread", n->ParamPtr("spread"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("damp", n->ParamPtr("damp"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+
+      {
+         bool analogBool = analog;
+         if (AudioToggleButton("analog##resonatorAnalog", &analogBool, 64.0f))
+            *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+      }
+
+      EndAudioBody();
+   }
+
+   // ---- Cycle Shaper ---------------------------------------------------
+   // Single-wavecycle replacement visualizer: shows the synthesized geometric
+   // waveform (Sine / Square / Triangle) within the gate threshold bounds.
+   void DrawCycleShaperVisualizer(AudioEffectNode* n)
+   {
+      const float w = gAudioBodyW;
+      const float h = kAudioTimeVizH;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeGridCol(), 1.0f);
+
+      const int waveform = std::clamp((int)std::round(n->Param("waveform")), 0, 2);
+      const float thresholdDb = std::clamp(n->Param("threshold"), -60.0f, -12.0f);
+      const float threshLinear = powf(10.0f, thresholdDb / 20.0f);
+      const float threshY1 = midY - threshLinear * (h * 0.45f);
+      const float threshY2 = midY + threshLinear * (h * 0.45f);
+      const ImU32 threshCol = isLight ? IM_COL32(180, 80, 80, 100) : IM_COL32(230, 90, 90, 100);
+      dl->AddLine(ImVec2(origin.x, threshY1), ImVec2(br.x, threshY1), threshCol, 1.0f);
+      dl->AddLine(ImVec2(origin.x, threshY2), ImVec2(br.x, threshY2), threshCol, 1.0f);
+
+      const ImU32 waveCol = isLight ? IM_COL32(20, 140, 200, 240) : IM_COL32(80, 200, 255, 240);
+      const int kPlotPoints = 128;
+      ImVec2 pts[kPlotPoints];
+
+      for (int i = 0; i < kPlotPoints; i++)
+      {
+         const float t = (float)i / (float)(kPlotPoints - 1);
+         const float phase = t * (float)(2.0 * M_PI);
+         const float s = sinf(phase);
+         float y = 0.0f;
+
+         switch (waveform)
+         {
+            case 0: y = s; break;
+            case 1: y = (s >= 0.0f ? 1.0f : -1.0f); break;
+            case 2:
+            default:
+               y = (2.0f / (float)M_PI) * asinf(std::clamp(s, -1.0f, 1.0f));
+               break;
+         }
+
+         pts[i] = ImVec2(origin.x + t * w, midY - y * (h * 0.42f));
+      }
+
+      for (int i = 0; i < kPlotPoints - 1; i++)
+         dl->AddLine(pts[i], pts[i + 1], waveCol, 2.0f);
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+
+      if (ImGui::IsMouseHoveringRect(origin, br))
+      {
+         static const char* kWaves[] = { "sine", "square", "triangle" };
+         char buf[64];
+         snprintf(buf, sizeof(buf), "wave: %s - thresh: %.0fdB", kWaves[waveform], thresholdDb);
+         SetAudioReadout("cycle shaper", buf);
+      }
+
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawCycleShaperBody(GraphNode& gn, AudioEffectNode* n)
+   {
+      const int waveform = std::clamp((int)std::round(n->Param("waveform")), 0, 2);
+      const float thresholdDb = n->Param("threshold");
+      const int smooth = std::clamp((int)std::round(n->Param("smooth")), 0, 32);
+      const bool analog = n->Param("analog") != 0.0f;
+
+      static const char* kWaves[] = { "sine", "square", "triangle" };
+      char stat[80];
+      snprintf(stat, sizeof(stat), "%s - %.0fdB - %dsmp%s", kWaves[waveform], thresholdDb, smooth, analog ? " - analog" : "");
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawCycleShaperVisualizer(n);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      {
+         AudioKnobRow row(4);
+         static const std::vector<std::string> kWaveNames = { "sine", "square", "triangle" };
+         row.Dropdown("shape", kWaveNames, waveform, [n](int i) {
+            PushUndoCheckpoint();
+            *n->ParamPtr("waveform") = (float)i;
+         });
+         row.Knob("thresh", n->ParamPtr("threshold"), -60.0f, -12.0f, "%.0fdB", kKnobLarge);
+         row.Knob("smooth", n->ParamPtr("smooth"), 0.0f, 32.0f, "%.0fsmp", kKnobLarge);
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+
+      {
+         bool analogBool = analog;
+         if (AudioToggleButton("analog##cycleShaperAnalog", &analogBool, 64.0f))
+            *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+      }
+
+      EndAudioBody();
+   }
+
+   // ---- Spec Blur ------------------------------------------------------
+   struct SpecBlurSpectrumState
+   {
+      std::vector<float> window;
+      float smoothed[512] = {};
+      SpecBlurSpectrumState() { window.assign(1024, 0.0f); }
+   };
+   static std::unordered_map<AudioEffectNode*, SpecBlurSpectrumState> sSpecBlurSpectrums;
+
+   void DrawSpecBlurVisualizer(AudioEffectNode* n)
+   {
+      const float w = gAudioBodyW;
+      const float h = kAudioTimeVizH;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      // Grid lines: 100Hz, 1kHz, 10kHz
+      const double sr = AudioEngine::Instance().SampleRate() > 0.0 ? AudioEngine::Instance().SampleRate() : 48000.0;
+      auto hzToX = [&](float hz) -> float {
+         const float norm = (log10f(std::max(hz, 20.0f)) - log10f(20.0f)) / (log10f(20000.0f) - log10f(20.0f));
+         return origin.x + std::clamp(norm, 0.0f, 1.0f) * w;
+      };
+
+      dl->AddLine(ImVec2(hzToX(100.0f), origin.y), ImVec2(hzToX(100.0f), br.y), ScopeGridCol(), 1.0f);
+      dl->AddLine(ImVec2(hzToX(1000.0f), origin.y), ImVec2(hzToX(1000.0f), br.y), ScopeGridCol(), 1.0f);
+      dl->AddLine(ImVec2(hzToX(10000.0f), origin.y), ImVec2(hzToX(10000.0f), br.y), ScopeGridCol(), 1.0f);
+
+      SpecBlurSpectrumState& st = sSpecBlurSpectrums[n];
+      const int winSize = 1024;
+      float tempBuf[1024];
+      const int readCount = n->ReadSpectrumSamples(tempBuf, winSize);
+      if (readCount > 0)
+      {
+         if (readCount >= winSize)
+         {
+            st.window.assign(tempBuf + (readCount - winSize), tempBuf + readCount);
+         }
+         else
+         {
+            const int keep = winSize - readCount;
+            std::copy(st.window.begin() + readCount, st.window.end(), st.window.begin());
+            std::copy(tempBuf, tempBuf + readCount, st.window.begin() + keep);
+         }
+      }
+
+      float re[1024];
+      float im[1024];
+      for (int i = 0; i < winSize; i++)
+      {
+         const float wnd = 0.5f * (1.0f - cosf(2.0f * (float)M_PI * (float)i / (float)(winSize - 1)));
+         re[i] = st.window[i] * wnd;
+         im[i] = 0.0f;
+      }
+      WaveTerrainDsp::Radix2FFT::Instance().Forward(re, im);
+
+      for (int i = 1; i < 512; i++)
+      {
+         const float mag = sqrtf(re[i] * re[i] + im[i] * im[i]) * (2.0f / (float)winSize);
+         st.smoothed[i] = st.smoothed[i] * 0.8f + mag * 0.2f;
+      }
+
+      const int kPlotPoints = 128;
+      ImVec2 pts[kPlotPoints];
+      for (int i = 0; i < kPlotPoints; i++)
+      {
+         const float frac = (float)i / (float)(kPlotPoints - 1);
+         const float hz = 20.0f * powf(1000.0f, frac);
+         const int bin = std::clamp((int)(hz * (float)winSize / (float)sr), 1, 511);
+         const float mag = st.smoothed[bin];
+         const float db = 20.0f * log10f(std::max(mag, 1e-4f));
+         // Map -60 dB .. 0 dB to height
+         const float normY = std::clamp((db + 60.0f) / 60.0f, 0.0f, 1.0f);
+         pts[i] = ImVec2(origin.x + frac * w, br.y - normY * (h * 0.9f) - 2.0f);
+      }
+
+      const ImU32 fillCol = isLight ? IM_COL32(140, 70, 220, 45) : IM_COL32(180, 100, 255, 45);
+      const ImU32 lineCol = isLight ? IM_COL32(150, 60, 230, 240) : IM_COL32(200, 130, 255, 240);
+
+      for (int i = 0; i < kPlotPoints - 1; i++)
+      {
+         ImVec2 quad[4] = {
+            pts[i],
+            pts[i + 1],
+            ImVec2(pts[i + 1].x, br.y),
+            ImVec2(pts[i].x, br.y)
+         };
+         dl->AddConvexPolyFilled(quad, 4, fillCol);
+         dl->AddLine(pts[i], pts[i + 1], lineCol, 2.0f);
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+
+      const float blurTime = n->Param("blurTime");
+      const float tilt = n->Param("tilt");
+      const bool freeze = n->Param("freeze") > 0.5f;
+
+      if (ImGui::IsMouseHoveringRect(origin, br))
+      {
+         char buf[64];
+         snprintf(buf, sizeof(buf), "blur: %.0fms - tilt: %+.2f%s", blurTime, tilt, freeze ? " (frozen)" : "");
+         SetAudioReadout("spec blur", buf);
+      }
+
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawSpecBlurBody(GraphNode& gn, AudioEffectNode* n)
+   {
+      const float blurTime = n->Param("blurTime");
+      const float tilt = n->Param("tilt");
+      const float diffusion = n->Param("diffusion");
+      const bool freeze = n->Param("freeze") > 0.5f;
+      const bool analog = n->Param("analog") > 0.5f;
+
+      char stat[80];
+      snprintf(stat, sizeof(stat), "%.0fms - diff: %.2f%s%s", blurTime, diffusion, freeze ? " - frozen" : "", analog ? " - analog" : "");
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawSpecBlurVisualizer(n);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      {
+         AudioKnobRow row(4, kKnobLarge);
+         row.Knob("blur", n->ParamPtr("blurTime"), 10.0f, 5000.0f, "%.0fms", kKnobLarge);
+         row.Knob("tilt", n->ParamPtr("tilt"), -1.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("diffuse", n->ParamPtr("diffusion"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+
+      {
+         bool freezeBool = freeze;
+         if (AudioToggleButton("freeze##specBlurFreeze", &freezeBool, 64.0f))
+            *n->ParamPtr("freeze") = freezeBool ? 1.0f : 0.0f;
+         ImGui::SameLine();
+         bool analogBool = analog;
+         if (AudioToggleButton("analog##specBlurAnalog", &analogBool, 64.0f))
+            *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
+      }
+
+      EndAudioBody();
+   }
+
    // ---- Audio Filter -----------------------------------------------------
    // Cached per-node response curve: the underlying MagnitudeDb sweep is a
    // settled-sine measurement (AudioFilterKernel.h), cheap per call but not
@@ -12477,6 +14187,115 @@ namespace
    // band - the reason Audio Filter is built first (§1.1): X = freq,
    // Y = gain, scroll = Q, double-click = enable/disable. This *is* the
    // Tier 1 control surface's picture, per audio-node-ui-system.md §3g.
+   // Live incoming-signal spectrum drawn behind the response curve (the
+   // thing FabFilter Pro-Q shows) - shared by Audio Filter and EQ so both
+   // visualizers show the same live analyzer, not two separate ones. Taps
+   // the post-mix mono ring AudioEffectRuntime writes every audio block
+   // (AudioEffectNode.cpp's mSpectrumRing) and runs it through the same
+   // Hann-window + Radix2FFT recipe AudioColorRampNode::ProcessAudioFFT
+   // already uses (AudioColorRampNode.cpp) - just plotted against this
+   // visualizer's own log-frequency axis instead of feeding a color ramp.
+   struct AudioSpectrumState
+   {
+      std::vector<float> window = std::vector<float>(1024, 0.0f);
+      std::vector<float> smoothed = std::vector<float>(512, 0.0f);
+   };
+   std::map<int, AudioSpectrumState> gAudioSpectrumCache;
+
+   // Spectrum level has its own dB scale, independent of the +-24 dB gain
+   // axis the response curve uses - same relationship as Pro-Q, where the
+   // analyzer trace and the response curve share an x-axis but not a y-axis.
+   const float kAudioSpectrumFloorDb = -72.0f;
+   const float kAudioSpectrumCeilDb = 0.0f;
+
+   float AudioSpectrumDbToY(float db, float y0, float h)
+   {
+      const float t = (db - kAudioSpectrumFloorDb) / (kAudioSpectrumCeilDb - kAudioSpectrumFloorDb);
+      return y0 + h - std::clamp(t, 0.0f, 1.0f) * h;
+   }
+
+   void UpdateAudioSpectrum(AudioEffectNode* n, AudioSpectrumState& st)
+   {
+      const int winSize = 1024;
+      float tempBuf[1024];
+      const int readCount = n->ReadSpectrumSamples(tempBuf, winSize);
+      if (readCount > 0)
+      {
+         if (readCount >= winSize)
+         {
+            st.window.assign(tempBuf + (readCount - winSize), tempBuf + readCount);
+         }
+         else
+         {
+            const int keep = winSize - readCount;
+            std::copy(st.window.begin() + readCount, st.window.end(), st.window.begin());
+            std::copy(tempBuf, tempBuf + readCount, st.window.begin() + keep);
+         }
+      }
+      // Hann window, built once with the exact expression it used to be
+      // evaluated with per sample, per node, per frame (1024 cosf each).
+      static const std::vector<float> sHann = [] {
+         std::vector<float> w(1024);
+         for (int i = 0; i < 1024; i++)
+            w[i] = 0.5f * (1.0f - cosf(2.0f * 3.14159265358979323846f * (float)i / (float)(1024 - 1)));
+         return w;
+      }();
+      float re[1024];
+      float im[1024];
+      for (int i = 0; i < winSize; i++)
+      {
+         re[i] = st.window[i] * sHann[i];
+         im[i] = 0.0f;
+      }
+      WaveTerrainDsp::Radix2FFT::Instance().Forward(re, im);
+
+      for (int i = 1; i < 512; i++)
+      {
+         const float mag = sqrtf(re[i] * re[i] + im[i] * im[i]) * (2.0f / (float)winSize);
+         st.smoothed[i] = st.smoothed[i] * 0.7f + mag * 0.3f;
+      }
+   }
+
+   void DrawAudioSpectrum(ImDrawList* dl, ImVec2 origin, float w, float h, double sampleRate, const AudioSpectrumState& st,
+                       bool isLight)
+   {
+      const float binWidth = (float)(sampleRate > 0.0 ? sampleRate : 44100.0) / 1024.0f;
+      const float baselineY = origin.y + h;
+      const ImU32 fillCol = isLight ? IM_COL32(70, 90, 120, 40) : IM_COL32(210, 220, 235, 40);
+      const ImU32 lineCol = isLight ? IM_COL32(70, 90, 120, 130) : IM_COL32(210, 220, 235, 130);
+
+      float prevX = FilterVizFreqToX(binWidth, origin.x, w);
+      float prevY = AudioSpectrumDbToY(20.0f * log10f(std::max(st.smoothed[1], 1.0e-6f)), origin.y, h);
+      dl->PathClear();
+      dl->PathLineTo(ImVec2(prevX, prevY));
+      for (int i = 2; i < 512; i++)
+      {
+         const float freq = (float)i * binWidth;
+         const float db = 20.0f * log10f(std::max(st.smoothed[i], 1.0e-6f));
+         const float x = FilterVizFreqToX(freq, origin.x, w);
+         const float y = AudioSpectrumDbToY(db, origin.y, h);
+         dl->AddQuadFilled(ImVec2(prevX, baselineY), ImVec2(x, baselineY), ImVec2(x, y), ImVec2(prevX, prevY), fillCol);
+         dl->PathLineTo(ImVec2(x, y));
+         prevX = x;
+         prevY = y;
+      }
+      dl->PathStroke(lineCol, 0, 1.2f);
+   }
+
+   // Full-resolution response curve, exactly as the visualizer computes it -
+   // the one definition both the cache and FILTERCURVECACHETEST use.
+   void ComputeFilterCurve(std::vector<float>& out, int numPoints, int type, float freq, float q, float gain,
+                           double sampleRate, float originX, float w)
+   {
+      out.resize(numPoints);
+      for (int i = 0; i < numPoints; i++)
+      {
+         const float x = originX + (float)i * (w / (float)(numPoints - 1));
+         const float f = FilterVizXToFreq(x, originX, w);
+         out[i] = AudioFilterDsp::MagnitudeDb(type, freq, q, gain, f, sampleRate);
+      }
+   }
+
    void DrawAudioFilterVisualizer(AudioEffectNode* n, double sampleRate)
    {
       const float w = gAudioBodyW;
@@ -12510,6 +14329,12 @@ namespace
          const float y = FilterVizDbToY(db, origin.y, h);
          dl->AddLine(ImVec2(origin.x, y), ImVec2(br.x, y),
                      db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
+      }
+      // live incoming spectrum behind the curve (own dB axis, like Pro-Q)
+      {
+         AudioSpectrumState& specState = gAudioSpectrumCache[gCurrentNodeIndex];
+         UpdateAudioSpectrum(n, specState);
+         DrawAudioSpectrum(dl, origin, w, h, sampleRate, specState, isLight);
       }
 
       const float type = n->Param("type");
@@ -12738,6 +14563,12 @@ namespace
          dl->AddLine(ImVec2(origin.x, y), ImVec2(br.x, y),
                      db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
       }
+      // live incoming spectrum behind the curve (own dB axis, like Pro-Q)
+      {
+         AudioSpectrumState& specState = gAudioSpectrumCache[gCurrentNodeIndex];
+         UpdateAudioSpectrum(n, specState);
+         DrawAudioSpectrum(dl, origin, w, h, sampleRate, specState, isLight);
+      }
 
       EqBandValues bands[5];
       ReadEqBands(n, bands);
@@ -12896,6 +14727,12 @@ namespace
             const float my = ImGui::GetIO().MousePos.y;
             const float t = std::clamp((origin.y + h - my) / h, 0.0f, 1.0f);
             *n->ParamPtr(kEqQParam[dragBand]) = std::clamp(0.1f * powf(18.0f / 0.1f, t), 0.1f, 18.0f);
+         }
+         else if (ImGui::GetIO().KeyShift)
+         {
+            // Turbo (as upstream): Shift-drag a band dot = its Q, freq/gain stay put.
+            float* qp = n->ParamPtr(kEqQParam[dragBand]);
+            *qp = std::clamp(*qp * expf(-ImGui::GetIO().MouseDelta.y * 0.012f), 0.1f, 18.0f);
          }
          else
          {
@@ -13483,6 +15320,11 @@ namespace
          row.Knob("width", n->ParamPtr("width"), 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
+      }
+      {
+         bool analogBool = n->Param("analog") != 0.0f;
+         if (AudioToggleButton("analog##reverbAnalog", &analogBool, 64.0f))
+            *n->ParamPtr("analog") = analogBool ? 1.0f : 0.0f;
       }
 
       EndAudioBody();
@@ -14209,10 +16051,16 @@ namespace
          row.End();
       }
       {
-         AudioKnobRow row(3);
+         // feedback last: draw order is the modulation pin numbering
+         AudioKnobRow row(4);
          row.Knob("spread", n->ParamPtr("spread"), 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          AddSyncedRateCell(row, n);
+         // The synced rate is a dropdown (hashed pin id) instead of a knob
+         // (sequential id); keep feedback's pin number the same either way.
+         if (n->Param("sync") != 0.0f)
+            gParamCounter++;
+         row.Knob("feedback", n->ParamPtr("feedback"), -0.9f, 0.9f, "%.2f", kKnobLarge);
          row.End();
       }
 
@@ -15764,6 +17612,8 @@ namespace
          DrawDrumSequencerBody(gn, n);
       else if (auto* n = dynamic_cast<GainNode*>(gn.node.get()))
          DrawGainBody(gn, n);
+      else if (auto* n = dynamic_cast<AudioMeterNode*>(gn.node.get()))
+         DrawAudioMeterBody(gn, n);
       else if (auto* n = dynamic_cast<MixerNode*>(gn.node.get()))
          DrawMixerBody(gn, n);
       else if (auto* n = dynamic_cast<SplitterNode*>(gn.node.get()))
@@ -15830,6 +17680,12 @@ namespace
          DrawEnvelopeBody(gn, n);
       else if (auto* n = dynamic_cast<NoteToCVNode*>(gn.node.get()))
          DrawNoteToCVBody(gn, n);
+      else if (auto* n = dynamic_cast<VelocityToCVNode*>(gn.node.get()))
+         DrawVelocityToCVBody(gn, n);
+      else if (auto* n = dynamic_cast<KeyboardNode*>(gn.node.get()))
+         DrawKeyboardBody(gn, n);
+      else if (auto* n = dynamic_cast<NoteSwitcherNode*>(gn.node.get()))
+         DrawNoteSwitcherBody(gn, n);
       else if (auto* n = dynamic_cast<AudioEffectNode*>(gn.node.get()))
       {
          // Every EffectDefs.cpp entry shares this one C++ class (§0.4), so
@@ -15852,6 +17708,15 @@ namespace
             break;
          case EffectVisualizerId::kLimiterMeter:
             DrawLimiterBody(gn, n);
+            break;
+         case EffectVisualizerId::kResonatorBankSpectrum:
+            DrawResonatorBankBody(gn, n);
+            break;
+         case EffectVisualizerId::kCycleShaperWave:
+            DrawCycleShaperBody(gn, n);
+            break;
+         case EffectVisualizerId::kSpecBlurSpectrum:
+            DrawSpecBlurBody(gn, n);
             break;
          case EffectVisualizerId::kDelayTaps:
             DrawDelayBody(gn, n);
@@ -16254,6 +18119,7 @@ namespace
 
       NodeSeparator("surface", colW);
       DropdownButton("shading", GeometryNode::ShadingNames(), n->shading, [n](int i) { n->shading = i; }, colW);
+      DropdownButton("wrap", MaterialNode::WrapModeNames(), n->wrapMode, [n](int i) { n->wrapMode = i; }, colW);
       ColorSwatch("colour", n->color, n);
       ModSlider("metallic", &n->metallic, 0.0f, 1.0f, "%.3f", colW);
       ModSlider("roughness", &n->roughness, 0.02f, 1.0f, "%.3f", colW);
@@ -16638,6 +18504,11 @@ namespace
             ModSlider("scale y", &n->scaleY, 0.05f, 4.0f);
             ModSlider("scale z", &n->scaleZ, 0.05f, 4.0f);
             ModSlider("spin / beat", &n->spin, -2.0f, 2.0f);
+            // rotate / scale about this point instead of the mesh origin.
+            // After spin on purpose: draw order is the modulation pin numbering.
+            ModSlider("pivot x", &n->pivotX, -3.0f, 3.0f);
+            ModSlider("pivot y", &n->pivotY, -3.0f, 3.0f);
+            ModSlider("pivot z", &n->pivotZ, -3.0f, 3.0f);
             break;
          case GeometryOpNode::kArray:
             ModSliderInt("count", &n->count, 1, 128);
@@ -16676,9 +18547,13 @@ namespace
             ModCheckbox("flip", &n->flipNormals);
             break;
          case GeometryOpNode::kExplode:
+         {
+            static const std::vector<std::string> kExplodeByNames = { "Faces", "Loose Parts" };
+            DropdownButton("by", kExplodeByNames, n->explodeBy, [n](int i) { n->explodeBy = i; });
             ModSlider("amount", &n->amount, 0.0f, 3.0f);
             ModSlider("seed", &n->seed, 0.0f, 100.0f);
             break;
+         }
          case GeometryOpNode::kSmooth:
             ModSliderInt("pre-subdivide", &n->levels, 0, 3);
             ModSliderInt("iterations", &n->iterations, 1, 20);
@@ -17609,14 +19484,28 @@ namespace
                                      (int)((n->color[2] * 0.6f + 0.4f) * 255), 255);
       // Clipped to the box so a note longer than its height is cut off at the
       // edge instead of spilling over the params below it.
+      const float drawFontSize = ImGui::GetFontSize() * CommentFontScale(n->fontSize);
       dl->PushClipRect(origin, br, true);
-      if (n->text.empty())
-         dl->AddText(ImVec2(origin.x + 8, origin.y + 6), IM_COL32(150, 150, 160, 255),
-                     "double-click to write");
+      if (n == gCommentEdit.target)
+      {
+         // the editor popup sits on top; drawing the text too would double it
+      }
+      else if (n->text.empty())
+         dl->AddText(ImGui::GetFont(), drawFontSize, ImVec2(origin.x + 8, origin.y + 6), IM_COL32(150, 150, 160, 255),
+                     "double-click or type to write", nullptr, w - 16.0f);
       else
-         dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
+         dl->AddText(ImGui::GetFont(), drawFontSize,
                      ImVec2(origin.x + 8, origin.y + 6), textCol,
                      n->text.c_str(), nullptr, w - 16.0f);
+
+      // bottom-right resize grip
+      const ImU32 gripCol = IM_COL32((int)(n->color[0] * 160 + 60), (int)(n->color[1] * 160 + 60),
+                                     (int)(n->color[2] * 160 + 60), 160);
+      for (int i = 0; i < 3; i++)
+      {
+         const float off = 4.0f + (float)i * 4.0f;
+         dl->AddLine(ImVec2(br.x - off, br.y - 3.0f), ImVec2(br.x - 3.0f, br.y - off), gripCol, 1.2f);
+      }
       dl->PopClipRect();
 
       {
@@ -17627,19 +19516,75 @@ namespace
             gCommentEditRect = gCommentBodyRect;
       }
 
-      if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+      // Corner drag resizes. An active item inside the node keeps the node
+      // editor from dragging the node itself; the delta is divided by the zoom
+      // because the canvas is scaled.
+      const float gripSize = 20.0f;
+      const ImVec2 afterBody = ImGui::GetCursorScreenPos();
+      ImGui::SetCursorScreenPos(ImVec2(br.x - gripSize, br.y - gripSize));
+      ImGui::InvisibleButton("##commentresizegrip", ImVec2(gripSize, gripSize));
+      const bool gripHovered = ImGui::IsItemHovered();
+      const bool gripActive = ImGui::IsItemActive();
+      if (ImGui::IsItemActivated())
+         PushUndoCheckpoint();
+      if (gripHovered || gripActive)
+         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNWSE);
+      if (gripActive)
       {
-         PushUndoCheckpoint(); // before the edit, so one undo restores the old note
-         gCommentEdit.target = n;
-         gCommentEdit.justOpened = true;
+         const float zoom = std::max(0.01f, ed::GetCurrentZoom());
+         const ImGuiIO& io = ImGui::GetIO();
+         n->width = std::clamp(n->width + io.MouseDelta.x / zoom, 120.0f, 1600.0f);
+         n->height = std::clamp(n->height + io.MouseDelta.y / zoom, 60.0f, 1200.0f);
+         gPatchDirty = true;
+      }
+      ImGui::SetCursorScreenPos(afterBody);
+
+      // Double-click, Enter, or just start typing while the pointer is over
+      // the note. Shift-typing is left out so Shift+A / Shift+D keep working
+      // over a comment.
+      ImGuiIO& io = ImGui::GetIO();
+      if (hovered && !gripHovered && !gripActive && gCommentEdit.target == nullptr && !io.WantTextInput)
+      {
+         bool open = ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+         std::string typed;
+         if (!open && !io.KeyCtrl && !io.KeySuper && !io.KeyAlt && !io.KeyShift)
+         {
+            if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))
+               open = true;
+            else
+               for (ImWchar ch : io.InputQueueCharacters)
+                  if (ch > 32 && ch != 127 && ch != '/')
+                  {
+                     char utf8[5] = {};
+                     ImTextCharToUtf8(utf8, ch);
+                     typed += utf8;
+                  }
+            if (!typed.empty())
+               open = true;
+         }
+         if (open)
+         {
+            PushUndoCheckpoint(); // before the edit, so one undo restores the old note
+            if (!typed.empty())
+            {
+               n->text += typed;
+               gCommentEdit.cursorToEnd = true;
+               io.InputQueueCharacters.resize(0);
+               gPatchDirty = true;
+            }
+            gCommentEdit.target = n;
+            gCommentEdit.justOpened = true;
+         }
       }
    }
 
    void DrawCommentParams(CommentNode* n)
    {
-      ModSlider("width", &n->width, 120.0f, 800.0f, "%.0f");
-      ModSlider("height", &n->height, 60.0f, 600.0f, "%.0f");
+      ModSlider("width", &n->width, 120.0f, 1600.0f, "%.0f");
+      ModSlider("height", &n->height, 60.0f, 1200.0f, "%.0f");
       ColorSwatch("colour", n->color, n);
+      static const std::vector<std::string> kSizes = { "Small", "Normal", "Large", "Extra Large" };
+      DropdownButton("font size", kSizes, n->fontSize, [n](int i) { n->fontSize = i; gPatchDirty = true; });
    }
 
    // Padding kept between a group's members and the edge of its box.
@@ -18048,6 +19993,13 @@ namespace
          }
       }
 
+      // Numpad view hotkeys (1/3/7/0, Ctrl+1/3/7). Unlike drag-orbit above,
+      // a hotkey view snap on this render's own camera is treated as a
+      // deliberate edit worth undoing - PushUndoCheckpoint() before the
+      // write, the same as the "orbit"/"elevation" sliders for this same
+      // camera (main.cpp ~23053).
+      ApplyViewHotkeys(*azimuth, *elevation, []() { PushUndoCheckpoint(); });
+
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
                      IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
@@ -18145,6 +20097,10 @@ namespace
             vio.MouseWheel = 0.0f;
          }
       }
+      // Numpad view hotkeys (1/3/7/0, Ctrl+1/3/7). No undo checkpoint here,
+      // matching drag-orbit just above on this same gNodeCameras entry,
+      // which also pushes none.
+      ApplyViewHotkeys(cam.azimuth, cam.elevation);
       if (ImGui::IsItemHovered() || ImGui::IsItemActive())
          dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
                      IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
@@ -18293,7 +20249,7 @@ namespace
 
       const bool closeRequested = ImGui::SmallButton("X");
       ImGui::SameLine();
-      ImGui::TextUnformatted(NodeTitle(gn).c_str());
+      ImGui::TextUnformatted(NodeTitleWithInstance(gn).c_str());
 
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 br(origin.x + imageSize.x, origin.y + imageSize.y);
@@ -18334,6 +20290,9 @@ namespace
                vio.MouseWheel = 0.0f;
             }
          }
+         // Numpad view hotkeys (1/3/7/0, Ctrl+1/3/7). No undo checkpoint,
+         // matching drag-orbit just above on this same gNodeCameras entry.
+         ApplyViewHotkeys(cam.azimuth, cam.elevation);
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             dl->AddRect(origin, br, IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
          // Layout cursor already sits at origin+imageSize from the
@@ -18437,6 +20396,9 @@ namespace
                   vio.MouseWheel = 0.0f;
                }
             }
+            // Numpad view hotkeys (1/3/7/0, Ctrl+1/3/7) - undoable, same as
+            // this render's "orbit"/"elevation" sliders (main.cpp ~23053).
+            ApplyViewHotkeys(*azimuth, *elevation, []() { PushUndoCheckpoint(); });
             if (ImGui::IsItemHovered() || ImGui::IsItemActive())
                dl->AddRect(origin, br, IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
             ImGui::SetCursorScreenPos(origin);
@@ -19029,7 +20991,7 @@ namespace
          { "Color Ramp", "Recolors any 0-1 grayscale input through user-authored stops, up to 32 of them, with linear or constant interpolation. Unlike Gradient Map, it has no shape of its own - the shape comes from upstream." },
 
          // ---------------- Compositing ----------------
-         { "Blend", "Two inputs and 31 blend modes - the full Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity set, plus Erase." },
+         { "Blend", "Two inputs and 32 blend modes - the full Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity set, plus Erase and Anti-Erase (keep A only where B is opaque, a mask)." },
          { "Layer Stack", "Four inputs stacked bottom-up: A is the base, D sits on top. Each layer has its own blend mode and opacity, and dragging a layer header reorders the whole layer." },
          { "Layout", "TouchDesigner-style Layout: a canvas of exact pixel size (1920x1080 by default) with up to 8 image inputs placed on it. Each layer starts at its REAL pixel size, and you set x/y in canvas pixels, a scale (anchored at the layer centre) or an exact custom width/height, and opacity. Drag layers on the miniature, or use 1:1 / fit / fill / centre. x, y, scale and opacity have CV pins." },
          { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. Can be pinned to one input with 'manual'." },
@@ -19047,11 +21009,29 @@ namespace
          { "Compare", "Outputs 1 when the comparison holds, 0 otherwise - >, >=, <, <=, ==, != between two modulators, with a tolerance for the equality checks." },
          { "Range to Range", "Remaps one modulator's input range onto a different output range - patch in a 0..1 LFO and remap it to -2..2, for example." },
          { "Smoothing", "An exponential moving average over another modulator, to damp jittery or steppy sources like Random or Pattern." },
+         { "CV Recorder", "Records any modulator patched into its input and plays it back. Press Rec to capture (live input passes through while recording), press Rec again to stop and it starts looping straight away. speed is the playback rate - 2x plays the take twice as fast - and low/high map the take onto an output range. Takes are timed in beats, so they follow the tempo and pause with the transport (up to 64 beats), and they are saved with the patch. With nothing patched in, it records its own in knob, so you can perform a gesture by hand." },
          { "Envelope", "Applies an ADSR contour to an incoming modulator instead of generating its own trigger: rising above threshold starts attack/decay/sustain, falling back below it starts release. Patch an LFO in and its swing gets shaped by the ADSR, retriggering once per LFO cycle. Output collapses toward 0.5 as the envelope level falls - at level 0 the input has no say, at level 1 it passes through unchanged - so with nothing patched in, 'in' holds steady at its own constant value." },
          { "Mod Curve", "Remaps a modulator through a draggable transfer curve - click empty space to add a point, drag to move it, right-click to remove it (or right-click empty space to reset to a straight line). The gridline marks 0.5, where a bipolar binding's 'no modulation' point lives, and the moving dot shows where the input currently sits on the curve. mix blends between the raw input and the curved output, so 0 is a true bypass." },
          { "CV to Pitch", "Quantizes a modulator to semitone steps over range low..high, shown as a large +/-N st readout. Still outputs 0..1 like any modulator - it just restricts where in 0..1 the value can land, so the span maps onto whole semitones. Scale/root snap to scale degrees instead of every semitone (chromatic = off); glide adds portamento between steps, passing through unquantized values in transit on purpose." },
          { "Macro Knob", "A single named slider (0-1, with a response curve and invert) meant to be patched out to several other sliders at once - one control that fans out to many parameters." },
+         { "Resonator Bank", "Tuned bank of up to 16 parallel bandpass resonators excited by incoming audio. Four harmonic/tuning structures (Harmonic, Odd, Chord, Metallic) with decay (T60), scatter detune and stereo spread." },
+         { "Cycle Shaper", "Replaces every wavecycle of the input with a clean geometric waveform (Sine, Square, Triangle) of the same period and peak amplitude. Timbre is rebuilt while pitch and rhythm survive. Latency is one wavecycle." },
+         { "Spec Blur", "Streaming phase vocoder (N=2048, hop 512) that smears spectral magnitude in time. Transients dissolve into a harmonic cloud with tilt, phase diffusion and freeze. Latency is 42.7 ms (2048 samples); default mix is pinned at 1.0." },
+               { "Cycle Shaper", "Single-cycle waveform distortion and crossfade shaper." },
+         { "Slideshow", "Plays the images of one folder in alphabetical order with a transition (fade, slide, wipe, zoom). Hold and transition time follow the transport; Native keeps source pixels 1:1, Best Fit stretches to fill, Proportional Fit preserves aspect." },
          { "Macro XY", "A 2D pad exposing X and Y as two separate modulator outputs from one drag. The pad's path can be recorded, looped and replayed in time, like Resynthesize's orb." },
+         { "Keyboard", "A hardware-free note source: click-and-drag the on-screen piano, or hover the node and type on your laptop keyboard (Logic/GarageBand's Musical Typing layout - ZXCVBNM... is one octave, QWERTY... the octave above) to test a patch with no MIDI controller at all." },
+         { "Audio Meter", "A stereo level meter: separate L and R bars on a shared -60 to +3 dBFS scale, each showing RMS (solid) inside peak (faint), a peak-hold line, and the channel's highest peak as a number on top, which turns red once that channel has reached 0 dBFS. Audio passes through unchanged. It measures whatever its input is patched to even with its output left unconnected, so it can hang off any cable as a tap. Click the meter to clear the peak numbers, holds and clip." },
+         { "Macro Slider", "A named fader exposed as a modulator - drag its output onto any slider's modulation pin to drive that parameter by hand. The plain 0..1 member of the Macro family; use Macro Knob when you want a response curve and invert as well." },
+         { "Macro Bipolar Knob", "A centre-detent knob running -1 to +1, exposed as a modulator - the right control for anything that has a natural middle (pan, detune, tilt). Its 0..1 output puts the detent at exactly 0.5, which is also where a bipolar modulation binding reads as 'no modulation'." },
+         { "Macro Toggle", "A latching on/off switch exposed as a modulator: output is exactly 0.0 or 1.0, nothing in between. Useful for driving a mode/enable parameter, or for gating another modulator through a Math node's multiply." },
+         { "Macro Trigger", "A momentary pad: output is 1.0 while pressed and 0.0 the moment it is released, with a visible flash on the press. Reach for it to fire something that responds to an edge - a Feedback burst, an envelope, a Resynthesize step - rather than to hold a value." },
+         { "Macro NumBox", "A number box with drag-to-scrub and direct typing, over a range and step you set yourself - for when the value matters as a number (a count, a Hz figure, a bar length) and a 0..1 slider would be the wrong instrument." },
+         { "Macro Radio Selector", "A multiple-choice selector emitting one discrete step per option - the control to use for a dropdown-shaped parameter (a mode, a waveform, a preset index), where a continuous slider would land between valid values. 'count' sets how many options." },
+         { "Macro Step Gate", "An 8-step gate that advances on the transport at rate - a rhythm you draw rather than a curve. The output is the current step's on/off state, so it is the Macro family's answer to 'make this parameter pulse in time' without wiring an LFO and a Compare." },
+         { "Velocity to CV", "Converts how hard each note is played into a modulator (its 0..1 velocity), so touch can drive any parameter - brightness, pan, a filter opening on accents. It holds the last note's velocity through release. range low/high pick which velocities map onto the full 0..1 span (swap them to invert). The pitch counterpart is Note to CV." },
+         { "Note Switcher", "Cycles between up to four connected note inputs every N beats or seconds, or pins to one slot with 'manual' - the note-cable counterpart of Switcher (2D) and Switcher 3D. When the active slot changes, new note-ons come only from the new slot, while notes already held on the old one still get their note-offs passed through, so nothing hangs." },
+         { "Drift", "A musical random walk: an Ornstein-Uhlenbeck drift that keeps wandering around a home point and never jumps. speed is how fast it moves, stray how far it roams (a temperature), momentum how long a push carries on, range lo/hi the walls it bounces off, depth scales the swing. quantize holds the value on a tempo grid (a stepped, sample-and-hold drift) and smoothing rounds the steps off. Turbo keeps upstream's physics around a fixed home instead of the landscape upstream learns from your hand moves." },
          { "Path", "Outputs a moving 3D point (X/Y/Z, each patchable separately) travelling around a built-in shape (circle, helix, spiral, lissajous, etc.) at a beat-synced speed, or along the points of a patched-in geometry/curve source instead." },
          { "Constant", "Outputs one fixed number - the simplest possible modulator, useful for feeding a Math input or a modulation slot that expects a cable rather than manual control." },
          { "Null Modulator", "Pass-through modulation node that accepts an incoming modulator and forwards it to its output. Useful for monitoring, signal routing, or placeholders." },
@@ -19244,6 +21224,13 @@ namespace
          { "outerglow", "Adds a soft glow of a chosen Colour around the image's alpha edge, blurred outward. Amount controls strength." },
          { "coloroverlay", "Flat-tints the image toward a chosen Colour at a given Opacity." },
          { "dropshadow", "Offsets a blurred copy of the image's alpha behind it as a shadow, in a chosen Colour, Offset X/Y and Opacity." },
+         { "show alpha", "Shows the alpha channel as a greyscale image, fully opaque - white is solid, black is transparent. A viewer, not an edit: it replaces the colour so you can see the matte a key produced, and is usually the first thing to reach for when a composite is going wrong." },
+         { "opacity", "Scales the whole image's existing alpha by Opacity - a uniform fade that keeps the colour untouched. Unlike Color Overlay, nothing is tinted; unlike a Blend's opacity, the transparency is baked into the image and travels with it down the chain." },
+         { "set alpha", "Replaces the alpha channel outright with the luminance of a second patched-in image - hand-drawn mattes, a Shape, a Ramp, or another branch's 'show alpha' output. With nothing patched into the second input the image is forced fully opaque instead." },
+         { "alpha invert", "Swaps transparent for solid and back (alpha = 1 - alpha), leaving the colour alone - the 'invert matte' switch a key would otherwise need a second node to get." },
+         { "alpha from luma", "Derives a new alpha channel from the image's own brightness, so a black background becomes transparent with nothing to key against. 'invert' flips which end is solid, for a white-on-black source." },
+         { "alpha levels", "The Levels remap applied to the alpha channel only: Low/High clamp and normalise the matte's range (choking a soft edge tighter or spreading it wider) and Gamma bends the falloff between them. The go-to cleanup pass after Chroma Key or Alpha from Luma." },
+         { "premultiply", "Converts between premultiplied alpha (colour already scaled by its own alpha) and straight alpha. Only reach for this when something looks wrong at the edges: dark fringing on a composite usually means straight alpha needs premultiplying, bright halos the reverse." },
       };
       auto it = kText.find(typeName);
       return it != kText.end() ? it->second : nullptr;
@@ -19501,7 +21488,7 @@ namespace
             } },
             { "Compositing", {
                { "Transform", "Translate, scale, rotate, flip horizontal and flip vertical." },
-               { "Blend", "Two inputs and 31 blend modes - the full Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity set, plus Erase." },
+               { "Blend", "Two inputs and 32 blend modes - the full Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity set, plus Erase and Anti-Erase (keep A only where B is opaque, a mask)." },
                { "Layer Stack", "Four inputs stacked bottom-up: A is the base, D sits on top. Each layer has its own blend mode and opacity, and dragging a layer header reorders the whole layer." },
                { "Layout", "TouchDesigner-style Layout: a canvas of exact pixel size (1920x1080 by default) with up to 8 image inputs placed on it. Each layer starts at its REAL pixel size, and you set x/y in canvas pixels, a scale (anchored at the layer centre) or an exact custom width/height, and opacity. Drag layers on the miniature, or use 1:1 / fit / fill / centre. x, y, scale and opacity have CV pins." },
                { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. Can be pinned to one input with 'manual'." },
@@ -19778,6 +21765,8 @@ namespace
    // terminal entry wired into that node's capture ring.
    void RebuildAudioTopology()
    {
+      if (gDeferAudioRebuild)
+         return;
       std::vector<AudioTopologyEntry> order;
       std::set<INode*> visited;
       std::unordered_map<AudioNode*, int> bufferIndexOf;
@@ -20318,6 +22307,34 @@ namespace
    {
       Patch::Data data;
       data.settings = CaptureSceneSettings();
+
+      // Reverse lookups built once (ported from upstream): every cable
+      // endpoint below is a map lookup instead of a scan of gNodes with a
+      // dynamic_cast inside - this used to be O(N^2) and ran on every undo
+      // checkpoint and autosave.
+      std::unordered_map<const void*, int> addrToIndex;
+      addrToIndex.reserve(gNodes.size() * 2);
+      for (GraphNode& gn : gNodes)
+      {
+         addrToIndex.emplace((const void*)gn.node.get(), gn.index);
+         // multiple inheritance: IGeometrySource*/IPaletteSource* are other addresses
+         if (auto* asGeo = dynamic_cast<IGeometrySource*>(gn.node.get()))
+            addrToIndex.emplace((const void*)asGeo, gn.index);
+         if (auto* asPal = dynamic_cast<IPaletteSource*>(gn.node.get()))
+            addrToIndex.emplace((const void*)asPal, gn.index);
+      }
+      std::unordered_map<const void*, int> modAddrToIndex; // first match wins, like the old scan
+      for (GraphNode& src : gNodes)
+      {
+         const int outputs = std::max(1, src.node->OutputCount());
+         for (int o = 0; o < outputs; o++)
+            if (IModulator* mod = ModulatorForOutput(src.node.get(), o))
+               modAddrToIndex.emplace((const void*)mod, src.index);
+      }
+      auto indexOf = [&addrToIndex](const void* p) -> int {
+         auto it = addrToIndex.find(p);
+         return it != addrToIndex.end() ? it->second : -1;
+      };
       for (GraphNode& gn : gNodes)
       {
          Patch::NodeRecord rec;
@@ -20344,14 +22361,9 @@ namespace
             {
                if (!cable->IsConnected())
                   continue;
-               for (GraphNode& src : gNodes)
-               {
-                  if (src.node.get() == cable->GetSource())
-                  {
-                     data.cables.push_back({ gn.index, slot, src.index });
-                     break;
-                  }
-               }
+               const int srcIndex = indexOf((const void*)cable->GetSource());
+               if (srcIndex >= 0)
+                  data.cables.push_back({ gn.index, slot, srcIndex });
             }
          }
          // Audio/note cables are typed like image cables (a plain
@@ -20363,28 +22375,18 @@ namespace
             AudioCable* cable = gn.node->AudioInputSlot(slot);
             if (cable == nullptr || !cable->IsConnected())
                continue;
-            for (GraphNode& src : gNodes)
-            {
-               if (src.node.get() == cable->GetSource())
-               {
-                  data.audio.push_back({ gn.index, slot, src.index });
-                  break;
-               }
-            }
+            const int srcIndex = indexOf((const void*)cable->GetSource());
+            if (srcIndex >= 0)
+               data.audio.push_back({ gn.index, slot, srcIndex });
          }
          for (int slot = 0; slot < kMaxNoteSlots; slot++)
          {
             NoteCable* cable = gn.node->NoteInputSlot(slot);
             if (cable == nullptr || !cable->IsConnected())
                continue;
-            for (GraphNode& src : gNodes)
-            {
-               if (src.node.get() == cable->GetSource())
-               {
-                  data.notes.push_back({ gn.index, slot, src.index, cable->GetOutputSlot() });
-                  break;
-               }
-            }
+            const int srcIndex = indexOf((const void*)cable->GetSource());
+            if (srcIndex >= 0)
+               data.notes.push_back({ gn.index, slot, srcIndex, cable->GetOutputSlot() });
          }
       }
 
@@ -20396,18 +22398,9 @@ namespace
          {
             if (wanted == nullptr)
                return;
-            for (GraphNode& src : gNodes)
-            {
-               // Compared against IGeometrySource* separately from INode*:
-               // with multiple inheritance they are different addresses into
-               // the same object, so one comparison is not enough.
-               const void* asGeo = dynamic_cast<IGeometrySource*>(src.node.get());
-               if (asGeo == wanted || (const void*)src.node.get() == wanted)
-               {
-                  data.geometry.push_back({ gn.index, slot, src.index });
-                  return;
-               }
-            }
+            const int srcIndex = indexOf(wanted);
+            if (srcIndex >= 0)
+               data.geometry.push_back({ gn.index, slot, srcIndex });
          };
 
          // Render3DNode's geometry slots are found generically below via
@@ -20428,14 +22421,9 @@ namespace
             // it needs its own comparison the same way camera/light do above.
             if (setColor->paletteInput != nullptr)
             {
-               for (GraphNode& src : gNodes)
-               {
-                  if (dynamic_cast<IPaletteSource*>(src.node.get()) == setColor->paletteInput)
-                  {
-                     data.geometry.push_back({ gn.index, 2, src.index });
-                     break;
-                  }
-               }
+               const int srcIndex = indexOf((const void*)setColor->paletteInput);
+               if (srcIndex >= 0)
+                  data.geometry.push_back({ gn.index, 2, srcIndex });
             }
          }
          if (auto* audio = dynamic_cast<AudioAnalyzeNode*>(gn.node.get()))
@@ -20447,18 +22435,9 @@ namespace
                IModulator* wanted = *gn.node->ModulatorInputSlot(slot);
                if (wanted == nullptr)
                   continue;
-               for (GraphNode& src : gNodes)
-               {
-                  bool found = false;
-                  for (int o = 0; o < std::max(1, src.node->OutputCount()) && !found; o++)
-                     if (ModulatorForOutput(src.node.get(), o) == wanted)
-                     {
-                        data.geometry.push_back({ gn.index, slot, src.index });
-                        found = true;
-                     }
-                  if (found)
-                     break;
-               }
+               auto it = modAddrToIndex.find((const void*)wanted);
+               if (it != modAddrToIndex.end())
+                  data.geometry.push_back({ gn.index, slot, it->second });
             }
          }
       }
@@ -20499,6 +22478,8 @@ namespace
       return data;
    }
 
+   std::atomic<bool> gAutosaveWriting { false }; // an autosave worker is writing
+
    std::string RecoveryAutosavePath()
    {
       const std::string dir = InfiniteSettingsDirectory();
@@ -20513,6 +22494,10 @@ namespace
 
    void DiscardRecoveryAutosave()
    {
+      // An autosave still being written on its worker would recreate the
+      // file right after this removes it: give it a moment to finish.
+      for (int i = 0; i < 200 && gAutosaveWriting.load(); i++)
+         std::this_thread::sleep_for(std::chrono::milliseconds(10));
       std::error_code ec;
       std::filesystem::remove(std::filesystem::u8path(RecoveryAutosavePath()), ec);
       gRecoveryAvailable = false;
@@ -20555,28 +22540,35 @@ namespace
          return;
       gLastAutosaveTime = now;
 
-      const std::string target = RecoveryAutosavePath();
-      const std::string temp = target + ".tmp";
-      std::string error;
-      if (!Patch::Write(temp, BuildPatchData(), error))
-      {
-         RuntimeLog::Write("autosave failed: %s", error.c_str());
+      // Turbo: the snapshot is taken here (it reads live node state), the
+      // serialisation and disk write run on a worker so a large patch never
+      // hitches a frame every autosave period. One write in flight at a time.
+      std::atomic<bool>& sWriting = gAutosaveWriting;
+      if (sWriting.load())
          return;
-      }
-
-      std::error_code ec;
-      std::filesystem::rename(std::filesystem::u8path(temp), std::filesystem::u8path(target), ec);
-      if (ec)
-      {
-         ec.clear();
-         std::filesystem::remove(std::filesystem::u8path(target), ec);
-         ec.clear();
+      sWriting.store(true);
+      std::thread([data = BuildPatchData(), target = RecoveryAutosavePath(), &sWriting]() {
+         const std::string temp = target + ".tmp";
+         std::string error;
+         if (!Patch::Write(temp, data, error))
+         {
+            RuntimeLog::Write("autosave failed: %s", error.c_str());
+            sWriting.store(false);
+            return;
+         }
+         std::error_code ec;
          std::filesystem::rename(std::filesystem::u8path(temp), std::filesystem::u8path(target), ec);
-      }
-      if (ec)
-         RuntimeLog::Write("autosave replace failed: %s", ec.message().c_str());
-      else
-         RuntimeLog::Write("autosave written: %s", target.c_str());
+         if (ec)
+         {
+            ec.clear();
+            std::filesystem::remove(std::filesystem::u8path(target), ec);
+            ec.clear();
+            std::filesystem::rename(std::filesystem::u8path(temp), std::filesystem::u8path(target), ec);
+         }
+         if (ec)
+            RuntimeLog::Write("autosave replace failed: %s", ec.message().c_str());
+         sWriting.store(false);
+      }).detach();
    }
 
    bool SavePatchTo(const std::string& path)
@@ -20604,8 +22596,10 @@ namespace
    // checkpoints - that would corrupt the very stack an undo/redo is reading
    // from, and turn opening a 50-node patch into 50 checkpoints.
    bool gSuppressUndoCheckpoints = false;
-   std::vector<Patch::Data> gUndoStack;
-   std::vector<Patch::Data> gRedoStack;
+   // deque: dropping the oldest snapshot at the depth cap is O(1) instead of
+   // shifting 200 full Patch::Data copies (ported from upstream).
+   std::deque<Patch::Data> gUndoStack;
+   std::deque<Patch::Data> gRedoStack;
    const size_t kMaxUndoDepth = 200;
 
    void NewPatch()
@@ -20870,7 +22864,7 @@ namespace
          return;
       gUndoStack.push_back(std::move(snapshot));
       if (gUndoStack.size() > kMaxUndoDepth)
-         gUndoStack.erase(gUndoStack.begin());
+         gUndoStack.pop_front();
       // A fresh action invalidates whatever redo history pointed at a future
       // that no longer follows from the graph's current state.
       gRedoStack.clear();
@@ -20900,7 +22894,7 @@ namespace
       if (gUndoStack.empty())
          return;
       gRedoStack.push_back(BuildPatchData());
-      Patch::Data prev = gUndoStack.back();
+      Patch::Data prev = std::move(gUndoStack.back());
       gUndoStack.pop_back();
       ApplyPatchData(prev);
       gPatchDirty = true;
@@ -20912,7 +22906,7 @@ namespace
       if (gRedoStack.empty())
          return;
       gUndoStack.push_back(BuildPatchData());
-      Patch::Data next = gRedoStack.back();
+      Patch::Data next = std::move(gRedoStack.back());
       gRedoStack.pop_back();
       ApplyPatchData(next);
       gPatchDirty = true;
@@ -21752,7 +23746,7 @@ namespace
       glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
       glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
       glfwWindowHint(GLFW_FLOATING, GLFW_FALSE);
-      GLFWwindow* projWindow = glfwCreateWindow(w, h, NodeTitle(gn).c_str(), nullptr, mainWindow);
+      GLFWwindow* projWindow = glfwCreateWindow(w, h, NodeTitleWithInstance(gn).c_str(), nullptr, mainWindow);
       if (projWindow == nullptr)
       {
          glfwMakeContextCurrent(mainWindow);
@@ -30668,10 +32662,12 @@ int main(int argc, char** argv)
             }
             if (ImGui::MenuItem("MIDI map...", nullptr, gMidiWindowOpen))
                gMidiWindowOpen = !gMidiWindowOpen;
+            if (ImGui::MenuItem("Modulation matrix...", "Shift+M", gModMatrixOpen))
+               gModMatrixOpen = !gModMatrixOpen;
             ImGui::SeparatorText("Output behind the canvas");
             GraphNode* bgNode = gCanvasBgNodeIndex >= 0 ? FindNodeByIndex(gCanvasBgNodeIndex) : nullptr;
             if (bgNode != nullptr)
-               ImGui::TextDisabled("showing: %s", NodeTitle(*bgNode).c_str());
+               ImGui::TextDisabled("showing: %s", NodeTitleWithInstance(*bgNode).c_str());
             else
                ImGui::TextDisabled("off");
             if (ImGui::MenuItem("Show selected node", "Ctrl+Shift+B"))
@@ -30769,15 +32765,42 @@ int main(int argc, char** argv)
             {
                const std::vector<std::string>& presets = CategoryColors::PresetNames();
                const int current = CategoryColors::CurrentPreset();
-               ImGui::SetNextItemWidth(170);
+               // Panel / text / accent fingerprint swatches, so presets can be
+               // told apart without switching to each one. Border polarity follows
+               // the live theme so near-white and near-black swatches stay legible.
+               const float kSw = 10.0f, kGap = 3.0f, kStripW = 3 * kSw + 2 * kGap;
+               auto drawSwatches = [&](ImVec2 pos, const CategoryColors::UiTheme& t) {
+                  ImDrawList* dl = ImGui::GetWindowDrawList();
+                  const CategoryColors::Color cols[3] = { t.panelBg, t.text, t.accent };
+                  const ImU32 border = IsThemeLight() ? IM_COL32(0, 0, 0, 115) : IM_COL32(255, 255, 255, 115);
+                  for (int k = 0; k < 3; k++)
+                  {
+                     const ImVec2 p0(pos.x + k * (kSw + kGap), pos.y), p1(p0.x + kSw, p0.y + kSw);
+                     dl->AddRectFilled(p0, p1, ImGui::GetColorU32(ImVec4(cols[k].r, cols[k].g, cols[k].b, 1.0f)), 2.0f);
+                     dl->AddRect(p0, p1, border, 2.0f, 0, 1.0f);
+                  }
+               };
+               {
+                  const ImVec2 cur = ImGui::GetCursorScreenPos();
+                  const float rowH = ImGui::GetFrameHeight();
+                  drawSwatches(ImVec2(cur.x, cur.y + (rowH - kSw) * 0.5f), CategoryColors::UiThemeForPreset(current));
+                  ImGui::Dummy(ImVec2(kStripW, rowH));
+                  ImGui::SameLine();
+               }
+               ImGui::SetNextItemWidth(190);
                if (ImGui::BeginCombo("Theme", presets[current].c_str()))
                {
                   for (int i = 0; i < (int)presets.size(); i++)
+                  {
                      if (ImGui::Selectable(presets[i].c_str(), current == i))
                      {
                         CategoryColors::SetPreset(i);
                         ApplyTheme();
                      }
+                     const ImVec2 rMin = ImGui::GetItemRectMin(), rMax = ImGui::GetItemRectMax();
+                     drawSwatches(ImVec2(rMax.x - 8.0f - kStripW, rMin.y + (rMax.y - rMin.y - kSw) * 0.5f),
+                                  CategoryColors::UiThemeForPreset(i));
+                  }
                   ImGui::EndCombo();
                }
             }
@@ -36690,6 +38713,17 @@ int main(int argc, char** argv)
 
       PruneDeadGroups();
 
+      // Turbo: nodes whose parameters must be registered every frame even when
+      // scrolled off screen (see the off-screen culling below): anything with
+      // a MIDI mapping or an expression, since both only reach a parameter in
+      // the frames its node draws.
+      std::unordered_set<int> cullExemptNodes;
+      for (const MidiMap::Mapping& m : MidiMap::All())
+         cullExemptNodes.insert(m.nodeIndex);
+      for (const auto& e : Modulation::Instance().Expressions())
+         cullExemptNodes.insert(e.first.first);
+      const bool cullingAllowed = !MidiMap::LearnMode() && getenv("INFINITE_NO_CULL") == nullptr;
+
       for (GraphNode& gn : gNodes)
       {
          if (gn.needsPosition)
@@ -36717,6 +38751,29 @@ int main(int argc, char** argv)
          {
             DrawGroupNode(gn, group);
             continue;
+         }
+
+         // Off-screen culling (ported from upstream): a node well outside the
+         // view keeps the box and pins of its last real layout (so cables to it
+         // still land, see ed::KeepOffscreenNodeAlive) and skips its body.
+         // Always drawn: nodes with modulation / palette / MIDI / expression
+         // bindings (a parameter only exists in the frames its node draws),
+         // everything while a popup is open or in MIDI learn mode, the
+         // Keyboard node (key releases are handled in its body), and every
+         // node once per kCullRefresh frames, staggered, so size or pin
+         // changes made while it is away show up. INFINITE_NO_CULL=1 disables it.
+         if (cullingAllowed)
+         {
+            constexpr int kCullRefresh = 30;
+            constexpr float kCullMargin = 64.0f;
+            const bool mustDraw = gn.hasModulatedParams || gn.hasPaletteColors ||
+                                  cullExemptNodes.count(gn.index) > 0 ||
+                                  ImGui::GetCurrentContext()->OpenPopupStack.Size > 0 ||
+                                  dynamic_cast<KeyboardNode*>(gn.node.get()) != nullptr ||
+                                  gn.NodeId() == gPendingSidebarRevealNodeId ||
+                                  ((frameId + gn.index) % kCullRefresh) == 0;
+            if (!mustDraw && ed::KeepOffscreenNodeAlive(gn.NodeId(), kCullMargin))
+               continue;
          }
 
          // Category tint: same idea as DrawGroupNode's stored colour, but from
@@ -36769,6 +38826,15 @@ int main(int argc, char** argv)
          ImGui::BeginGroup();
 
          ImGui::TextUnformatted(NodeTitle(gn).c_str());
+         {
+            int instanceTotal = 0;
+            const int instanceIdx = GetNodeInstanceIndex(gn, &instanceTotal);
+            if (instanceTotal > 1)
+            {
+               ImGui::SameLine(0.0f, 4.0f);
+               ImGui::TextDisabled("#%d", instanceIdx);
+            }
+         }
          if (isLight)
             ImGui::PushStyleColor(ImGuiCol_Text,
                                   ImVec4(catColor.r * 0.75f, catColor.g * 0.75f,
@@ -36806,6 +38872,20 @@ int main(int argc, char** argv)
             DrawUISliderBody(uiSlider, gn.index, inlinePreviewEnabled);
          else if (auto* uiXy = dynamic_cast<UIXYNode*>(gn.node.get()))
             DrawUIXYBody(uiXy, gn.index, inlinePreviewEnabled);
+         else if (auto* m = dynamic_cast<MacroSliderNode*>(gn.node.get()))
+            DrawMacroSliderBody(m);
+         else if (auto* m = dynamic_cast<MacroBipolarKnobNode*>(gn.node.get()))
+            DrawMacroBipolarKnobBody(m);
+         else if (auto* m = dynamic_cast<MacroToggleNode*>(gn.node.get()))
+            DrawMacroToggleBody(m);
+         else if (auto* m = dynamic_cast<MacroTriggerNode*>(gn.node.get()))
+            DrawMacroTriggerBody(m);
+         else if (auto* m = dynamic_cast<MacroNumBoxNode*>(gn.node.get()))
+            DrawMacroNumBoxBody(m);
+         else if (auto* m = dynamic_cast<MacroRadioSelectorNode*>(gn.node.get()))
+            DrawMacroRadioSelectorBody(m);
+         else if (auto* m = dynamic_cast<MacroStepGateNode*>(gn.node.get()))
+            DrawMacroStepGateBody(m);
          else if (!isAudioBodyNode && dynamic_cast<IModulator*>(gn.node.get()) != nullptr)
          {
             // Audio/note nodes are excluded here even when they implement
@@ -36832,7 +38912,7 @@ int main(int argc, char** argv)
             dl->AddRectFilled(origin, br, IM_COL32(18, 18, 24, 255), 4.0f);
             dl->AddRect(origin, br, IM_COL32(70, 74, 90, 255), 4.0f);
             dl->AddText(ImVec2(origin.x + 12, origin.y + 10), IM_COL32(200, 206, 226, 255),
-                        NodeTitle(gn).c_str());
+                        NodeTitleWithInstance(gn).c_str());
             dl->AddText(ImVec2(origin.x + 12, origin.y + 29), IM_COL32(130, 136, 156, 255),
                         "preview disabled");
          }
@@ -36918,7 +38998,7 @@ int main(int argc, char** argv)
             else
                snprintf(line, sizeof(line), "scene node");
             dl->AddText(ImVec2(origin.x + 12, origin.y + 10), IM_COL32(200, 206, 226, 255),
-                        NodeTitle(gn).c_str());
+                        NodeTitleWithInstance(gn).c_str());
             dl->AddText(ImVec2(origin.x + 12, origin.y + 28), IM_COL32(130, 136, 156, 255), line);
          }
          else if (dynamic_cast<GeometryNode*>(gn.node.get()) != nullptr)
@@ -37053,6 +39133,8 @@ int main(int argc, char** argv)
          {
             if (auto* n = dynamic_cast<ImageSourceNode*>(gn.node.get()))
                DrawImageSourceParams(n);
+            else if (auto* n = dynamic_cast<SlideshowNode*>(gn.node.get()))
+               DrawSlideshowParams(n);
             else if (auto* n = dynamic_cast<SyphonInNode*>(gn.node.get()))
                DrawSyphonInParams(n);
             else if (auto* n = dynamic_cast<EnvironmentNode*>(gn.node.get()))
@@ -37082,6 +39164,8 @@ int main(int argc, char** argv)
                DrawRangeToRangeParams(n);
             else if (auto* n = dynamic_cast<SmoothNode*>(gn.node.get()))
                DrawSmoothParams(n);
+            else if (auto* n = dynamic_cast<CVRecorderNode*>(gn.node.get()))
+               DrawCVRecorderParams(n);
             else if (auto* n = dynamic_cast<InvertNode*>(gn.node.get()))
                DrawInvertParams(n);
             else if (auto* n = dynamic_cast<ModDepthNode*>(gn.node.get()))
@@ -37094,6 +39178,22 @@ int main(int argc, char** argv)
                DrawMacroKnobParams(n);
             else if (auto* n = dynamic_cast<MacroXYNode*>(gn.node.get()))
                DrawMacroXYParams(n);
+            else if (auto* n = dynamic_cast<MacroSliderNode*>(gn.node.get()))
+               DrawMacroSliderParams(n);
+            else if (auto* n = dynamic_cast<MacroBipolarKnobNode*>(gn.node.get()))
+               DrawMacroBipolarKnobParams(n);
+            else if (auto* n = dynamic_cast<MacroToggleNode*>(gn.node.get()))
+               DrawMacroToggleParams(n);
+            else if (auto* n = dynamic_cast<MacroTriggerNode*>(gn.node.get()))
+               DrawMacroTriggerParams(n);
+            else if (auto* n = dynamic_cast<MacroNumBoxNode*>(gn.node.get()))
+               DrawMacroNumBoxParams(n);
+            else if (auto* n = dynamic_cast<MacroRadioSelectorNode*>(gn.node.get()))
+               DrawMacroRadioSelectorParams(n);
+            else if (auto* n = dynamic_cast<MacroStepGateNode*>(gn.node.get()))
+               DrawMacroStepGateParams(n);
+            else if (auto* n = dynamic_cast<DriftNode*>(gn.node.get()))
+               DrawDriftParams(n);
             else if (auto* n = dynamic_cast<UIButtonNode*>(gn.node.get()))
                DrawUIButtonOptions(n);
             else if (auto* n = dynamic_cast<UISliderNode*>(gn.node.get()))
@@ -37351,7 +39451,7 @@ int main(int argc, char** argv)
                      {
                         if (srcGn.node.get() == src)
                         {
-                           srcName = NodeTitle(srcGn);
+                           srcName = NodeTitleWithInstance(srcGn);
                            break;
                         }
                      }
@@ -38032,6 +40132,7 @@ int main(int argc, char** argv)
             if (linkCount > 0 || !toDelete.empty())
                PushUndoCheckpoint();
             gSuppressUndoCheckpoints = true;
+            gDeferAudioRebuild = true;
 
             for (int i = 0; i < linkCount; i++)
             {
@@ -38044,6 +40145,9 @@ int main(int argc, char** argv)
                RemoveNodeByIndex(index);
             }
 
+            gDeferAudioRebuild = false;
+            if (linkCount > 0 || !toDelete.empty())
+               RebuildAudioTopology();
             gSuppressUndoCheckpoints = false;
             ed::ClearSelection();
          }
@@ -38199,11 +40303,15 @@ int main(int argc, char** argv)
             if (!doomed.empty())
                PushUndoCheckpoint();
             gSuppressUndoCheckpoints = true;
+            gDeferAudioRebuild = true;
             for (int index : doomed)
             {
                ed::DeleteNode(ed::NodeId(index * GraphNode::kStride));
                RemoveNodeByIndex(index);
             }
+            gDeferAudioRebuild = false;
+            if (!doomed.empty())
+               RebuildAudioTopology();
             gSuppressUndoCheckpoints = false;
             if (!doomed.empty())
                ed::ClearSelection();
@@ -38716,7 +40824,7 @@ int main(int argc, char** argv)
          }
          else
          {
-            ImGui::TextUnformatted(NodeTitle(*gn).c_str());
+            ImGui::TextUnformatted(NodeTitleWithInstance(*gn).c_str());
             ImGui::Separator();
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 380.0f);
             ImGui::TextWrapped("%s", NodeHelpText(*gn));
@@ -38748,7 +40856,7 @@ int main(int argc, char** argv)
          {
             auto spot = gParamPinSpots.find({ gMidiMenuNode, gMidiMenuParam });
             const std::string pname = spot != gParamPinSpots.end() ? spot->second.name : std::string("parameter");
-            ImGui::TextUnformatted((NodeTitle(*target) + " / " + pname).c_str());
+            ImGui::TextUnformatted((NodeTitleWithInstance(*target) + " / " + pname).c_str());
             ImGui::Separator();
             if (MidiMap::IsArmed(gMidiMenuNode, gMidiMenuParam))
             {
@@ -38791,6 +40899,150 @@ int main(int argc, char** argv)
          fg->AddText(at, IM_COL32(255, 230, 200, 255), msg);
       }
 
+      // ---- Turbo: modulation matrix -------------------------------------
+      // Every modulation cable in one table: source -> destination parameter,
+      // amount (absolute / bipolar depth), the range mapper, and the live
+      // value of the destination. Expressions listed below it.
+      if (!ImGui::GetIO().WantTextInput && !ImGui::GetIO().KeyCtrl && ImGui::GetIO().KeyShift &&
+          ImGui::IsKeyPressed(ImGuiKey_M, false))
+         gModMatrixOpen = !gModMatrixOpen;
+      if (gModMatrixOpen)
+      {
+         ImGui::SetNextWindowSize(ImVec2(820, 420), ImGuiCond_FirstUseEver);
+         if (ImGui::Begin("Modulation matrix", &gModMatrixOpen))
+         {
+            Modulation& mod = Modulation::Instance();
+            // this frame's registered params, for names and live values
+            std::map<Modulation::Key, const ParamRef*> refs;
+            for (const ParamRef& r : mod.FrameParams())
+               refs[Modulation::Key(r.nodeIndex, r.paramIndex)] = &r;
+
+            std::vector<Modulation::Key> keys;
+            for (const auto& link : mod.Links())
+               keys.push_back(link.first);
+            ImGui::Text("%d modulation%s", (int)keys.size(), keys.size() == 1 ? "" : "s");
+            ImGui::SameLine();
+            ImGui::TextDisabled("  (drag a modulator's output onto a parameter pin to add one)");
+
+            Modulation::Key removeKey(-1, -1);
+            const ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV |
+                                          ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY |
+                                          ImGuiTableFlags_SizingStretchProp;
+            if (ImGui::BeginTable("##modmatrix", 7, flags, ImVec2(0, std::max(120.0f, ImGui::GetContentRegionAvail().y - 110.0f))))
+            {
+               ImGui::TableSetupScrollFreeze(0, 1);
+               ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 22.0f);
+               ImGui::TableSetupColumn("source", ImGuiTableColumnFlags_WidthStretch, 1.2f);
+               ImGui::TableSetupColumn("destination", ImGuiTableColumnFlags_WidthStretch, 1.2f);
+               ImGui::TableSetupColumn("parameter", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+               ImGui::TableSetupColumn("amount", ImGuiTableColumnFlags_WidthFixed, 150.0f);
+               ImGui::TableSetupColumn("range in -> out", ImGuiTableColumnFlags_WidthFixed, 230.0f);
+               ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+               ImGui::TableHeadersRow();
+               for (const Modulation::Key& key : keys)
+               {
+                  Modulation::Source src = mod.ModulatorFor(key.first, key.second);
+                  GraphNode* srcNode = FindNodeByIndex(src.nodeIndex);
+                  GraphNode* dstNode = FindNodeByIndex(key.first);
+                  ImGui::PushID(key.first * 100000 + key.second);
+                  ImGui::TableNextRow();
+
+                  ImGui::TableNextColumn();
+                  if (ImGui::SmallButton("x"))
+                     removeKey = key;
+
+                  ImGui::TableNextColumn();
+                  std::string srcLabel = srcNode ? NodeTitleWithInstance(*srcNode) : std::string("?");
+                  if (srcNode && srcNode->node->OutputCount() > 1)
+                     srcLabel += std::string(" . ") + srcNode->node->OutputLabel(src.outputIndex);
+                  if (ImGui::Selectable(srcLabel.c_str(), false) && srcNode)
+                  {
+                     gPendingSelect.push_back(srcNode->NodeId());
+                     gPendingNavigateSelection = true;
+                  }
+
+                  ImGui::TableNextColumn();
+                  if (ImGui::Selectable(dstNode ? NodeTitleWithInstance(*dstNode).c_str() : "?", false) && dstNode)
+                  {
+                     gPendingSelect.push_back(dstNode->NodeId());
+                     gPendingNavigateSelection = true;
+                  }
+
+                  ImGui::TableNextColumn();
+                  auto it = refs.find(key);
+                  const ParamRef* ref = it != refs.end() ? it->second : nullptr;
+                  if (ref != nullptr)
+                     ImGui::TextUnformatted(ref->name.c_str());
+                  else
+                     ImGui::TextDisabled("param %d", key.second);
+
+                  ImGui::TableNextColumn();
+                  {
+                     bool bipolar = src.polarity == Modulation::Source::kBipolar;
+                     if (ImGui::Checkbox("+/-", &bipolar))
+                     {
+                        PushUndoCheckpoint();
+                        mod.SetPolarity(key.first, key.second, bipolar ? Modulation::Source::kBipolar
+                                                                       : Modulation::Source::kAbsolute, src.depth);
+                     }
+                     ImGui::SameLine();
+                     float depth = src.depth;
+                     ImGui::SetNextItemWidth(-1);
+                     ImGui::BeginDisabled(!bipolar); // depth only applies to bipolar
+                     if (ImGui::SliderFloat("##depth", &depth, -1.0f, 1.0f, "%.2f"))
+                        mod.SetPolarity(key.first, key.second, src.polarity, depth);
+                     if (ImGui::IsItemActivated())
+                        PushUndoCheckpoint();
+                     ImGui::EndDisabled();
+                  }
+
+                  ImGui::TableNextColumn();
+                  {
+                     float r[4] = { src.inMin, src.inMax, src.outMin, src.outMax };
+                     ImGui::SetNextItemWidth(-1);
+                     if (ImGui::DragFloat4("##range", r, 0.005f, -1.0f, 2.0f, "%.2f"))
+                        mod.SetRange(key.first, key.second, r[0], r[1], r[2], r[3]);
+                     if (ImGui::IsItemActivated())
+                        PushUndoCheckpoint();
+                     if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("in min, in max -> out min, out max (0..1 of the parameter)");
+                  }
+
+                  ImGui::TableNextColumn();
+                  if (ref != nullptr && ref->value != nullptr && ref->maxValue > ref->minValue)
+                  {
+                     const float t = std::clamp((*ref->value - ref->minValue) / (ref->maxValue - ref->minValue), 0.0f, 1.0f);
+                     char buf[32];
+                     snprintf(buf, sizeof(buf), "%.3g", *ref->value);
+                     ImGui::ProgressBar(t, ImVec2(-1, 0), buf);
+                  }
+                  else
+                     ImGui::TextDisabled("(off screen)");
+                  ImGui::PopID();
+               }
+               ImGui::EndTable();
+            }
+            if (removeKey.first >= 0)
+            {
+               PushUndoCheckpoint();
+               mod.Unbind(removeKey.first, removeKey.second);
+               gPatchDirty = true;
+            }
+
+            const auto& exprs = mod.Expressions();
+            ImGui::SeparatorText(("expressions (" + std::to_string(exprs.size()) + ")").c_str());
+            for (const auto& e : exprs)
+            {
+               GraphNode* g = FindNodeByIndex(e.first.first);
+               auto it = refs.find(e.first);
+               ImGui::BulletText("%s / %s  =  %s", g ? NodeTitleWithInstance(*g).c_str() : "?",
+                                 it != refs.end() ? it->second->name.c_str() : "param", e.second.c_str());
+            }
+            ImGui::TextDisabled("%d MIDI mapping(s): VIEW > MIDI map", (int)MidiMap::All().size());
+         }
+         ImGui::End();
+      }
+
       if (gMidiWindowOpen)
       {
          ImGui::SetNextWindowSize(ImVec2(560, 460), ImGuiCond_FirstUseEver);
@@ -38823,7 +41075,7 @@ int main(int argc, char** argv)
                {
                   const MidiMap::Mapping& m = maps[(size_t)i];
                   GraphNode* g = FindNodeByIndex(m.nodeIndex);
-                  const std::string who = (g ? NodeTitle(*g) : std::string("?")) + " / " + m.paramName;
+                  const std::string who = (g ? NodeTitleWithInstance(*g) : std::string("?")) + " / " + m.paramName;
                   ImGui::PushID(i);
                   if (ImGui::SmallButton("x"))
                      removeAt = i;
@@ -39146,10 +41398,24 @@ int main(int argc, char** argv)
             }
             ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 6.0f);
+            const float commentZoom = gCommentEditRect.z > 0.0f && c->width > 0.0f
+               ? gCommentEditRect.z / std::max(120.0f, c->width) : 1.0f;
+            ImGui::SetWindowFontScale(commentZoom * CommentFontScale(c->fontSize));
             // Filling the whole popup rather than a fixed size: the popup is
             // already pinned to the node's box, so the field just fills it.
-            ImGui::InputTextMultiline("##commenttext", &c->text, ImVec2(-FLT_MIN, -FLT_MIN));
-            ImGui::PopStyleVar();
+            auto toEnd = [](ImGuiInputTextCallbackData* d) -> int {
+               if (gCommentEdit.cursorToEnd)
+               {
+                  d->CursorPos = d->SelectionStart = d->SelectionEnd = d->BufTextLen;
+                  gCommentEdit.cursorToEnd = false;
+               }
+               return 0;
+            };
+            ImGui::InputTextMultiline("##commenttext", &c->text, ImVec2(-FLT_MIN, -FLT_MIN),
+                                      ImGuiInputTextFlags_CallbackAlways, toEnd);
+            ImGui::SetWindowFontScale(1.0f);
+            ImGui::PopStyleVar(2);
             ImGui::PopStyleColor();
             // The checkpoint was pushed when the editor opened, so every
             // keystroke here is part of that one undo step; all that is left is
@@ -39532,6 +41798,57 @@ int main(int argc, char** argv)
             std::string spawnName, spawnCategory;
             ImGui::Separator();
             ImGui::BeginChild("##nodepanellist", ImVec2(0, 0), false);
+            // A module row: favourite star, then the spawn Selectable, with a
+            // right-click menu for the star as well.
+            auto moduleRow = [&](const std::string& name, const std::string& category, const std::string& label) {
+               ImGui::PushID(name.c_str());
+               const float starSz = ImGui::GetFrameHeight() * 0.7f;
+               const float rowY = ImGui::GetCursorPosY();
+               ImGui::SetCursorPosY(rowY + (ImGui::GetTextLineHeight() - starSz) * 0.5f);
+               if (DrawFavoriteStar("##fav", gBrowserFavorites.Is("modules", name), starSz))
+                  gBrowserFavorites.Toggle("modules", name);
+               ImGui::SameLine();
+               ImGui::SetCursorPosY(rowY);
+               if (ImGui::Selectable(label.c_str()))
+               {
+                  spawnName = name;
+                  spawnCategory = category;
+               }
+               if (ImGui::BeginPopupContextItem("##modulerowmenu"))
+               {
+                  const bool fav = gBrowserFavorites.Is("modules", name);
+                  if (ImGui::MenuItem(fav ? "Remove from favourites" : "Add to favourites"))
+                     gBrowserFavorites.Toggle("modules", name);
+                  ImGui::EndPopup();
+               }
+               ImGui::PopID();
+            };
+            gBrowserFavorites.EnsureLoaded();
+            if (q.empty() && !gBrowserFavorites.modules.empty())
+            {
+               std::vector<std::string> favs;
+               for (const std::string& name : gBrowserFavorites.modules)
+                  if (!NodeFactory::Instance().CategoryOf(name).empty() && IsUserSpawnable(name))
+                     favs.push_back(name);
+               if (!favs.empty())
+               {
+                  ImGui::PushID("##favouritesheader");
+                  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.80f, 0.25f, 1.0f));
+                  const bool open = ImGui::CollapsingHeader("FAVOURITES", ImGuiTreeNodeFlags_DefaultOpen);
+                  ImGui::PopStyleColor();
+                  if (open)
+                  {
+                     ImGui::Indent();
+                     for (const std::string& name : favs)
+                     {
+                        const std::string category = NodeFactory::Instance().CategoryOf(name);
+                        moduleRow(name, category, NodeBrowserLabel(name, "SIDEBAR_NODE", category, name));
+                     }
+                     ImGui::Unindent();
+                  }
+                  ImGui::PopID();
+               }
+            }
             for (const std::string& category : NodeFactory::Instance().GetCategories())
             {
                // With a query the categories are only drawn when something in them
@@ -39568,15 +41885,7 @@ int main(int argc, char** argv)
                   else
                      ImGui::SeparatorText(DisplayName(category).c_str());
                   for (const std::string& name : matches)
-                  {
-                     const std::string itemLabel =
-                        NodeBrowserLabel(name, "SIDEBAR_NODE", category, name);
-                     if (ImGui::Selectable(itemLabel.c_str()))
-                     {
-                        spawnName = name;
-                        spawnCategory = category;
-                     }
-                  }
+                     moduleRow(name, category, NodeBrowserLabel(name, "SIDEBAR_NODE", category, name));
                   if (q.empty())
                      ImGui::Unindent();
                }
@@ -40527,6 +42836,7 @@ int main(int argc, char** argv)
       PollAutosave();
       PollPredictionAutosave();
 
+      GLUtil::EndFrameScratchFbos();
       ++frameId;
 
       // Patch shortcuts. Handled outside the node editor so its own Cmd-key

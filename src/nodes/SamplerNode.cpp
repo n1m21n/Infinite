@@ -26,6 +26,7 @@ namespace
    // start/end travel via the plain mStart/mEnd atomics instead - see ProcessBlock/TriggerVoice.
    constexpr int kLoopParam = 4;     // pushed as 0.0/1.0, no smoothing needed but the mailbox has no per-param opt-out
    constexpr int kPingpongParam = 5; // ditto
+   constexpr int kXfadeParam = 6;    // loop crossfade length in milliseconds
    // reverse travels via the plain mReverse atomic instead - see ProcessBlock/TriggerVoice.
 
    constexpr int kMaxVoices = 8;
@@ -49,8 +50,38 @@ namespace
    // between them. `dir` is already updated for the current block (reverse
    // toggling outside a ping-pong bounce) by the caller before this runs.
    // Returns true if the voice hit a non-looping edge and should release.
+   // Loop crossfade (ported from upstream). Length in frames, capped at half
+   // the loop so the fade-out and fade-in regions can never overlap.
+   double LoopFadeFrames(float xfadeMs, double startPos, double endPos, double sampleRate)
+   {
+      if (xfadeMs <= 0.0f || sampleRate <= 0.0)
+         return 0.0;
+      return std::min((double)xfadeMs * 0.001 * sampleRate, (endPos - startPos) * 0.5);
+   }
+
+   // Approaching the loop end the tail is faded (equal power: the two sides
+   // of a hand-placed loop are uncorrelated, so a linear fade would dip ~3 dB)
+   // against the material at the loop start, which the wrap then continues
+   // from. Outside the fade region, or for non-wrapping modes, it is exactly
+   // the plain read, so xfade 0 is bit-identical to the old hard wrap.
+   float ReadLooped(float (*read)(const Platform::SampleBuffer&, double), const Platform::SampleBuffer& buf,
+                    double pos, double startPos, double endPos, double fade, bool wrapping, float dirSign)
+   {
+      const float tail = read(buf, pos);
+      if (!wrapping || fade <= 0.0)
+         return tail;
+      const double toEdge = (dirSign >= 0.0f) ? (endPos - pos) : (pos - startPos);
+      if (toEdge >= fade || toEdge < 0.0)
+         return tail;
+      const double into = fade - toEdge;
+      const double headPos = (dirSign >= 0.0f) ? (startPos + into) : (endPos - into);
+      const float head = read(buf, headPos);
+      const float theta = (float)(into / fade) * (float)M_PI * 0.5f;
+      return tail * cosf(theta) + head * sinf(theta);
+   }
+
    bool AdvanceVoicePosition(double& pos, int& dir, bool loop, bool pingpong, float rate, float speedSign,
-                              double startPos, double endPos)
+                              double startPos, double endPos, double fade)
    {
       const float dirSign = (float)dir * speedSign;
       pos += rate * dirSign;
@@ -67,7 +98,8 @@ namespace
          }
          else if (loop)
          {
-            pos = hitEnd ? startPos : endPos;
+            // wrap past the fade region: ReadLooped already played that much of the head
+            pos = hitEnd ? (startPos + fade) : (endPos - fade);
          }
          else
          {
@@ -108,6 +140,7 @@ public:
       mMailbox.SetImmediate(kVolumeParam, mVolume.load(std::memory_order_relaxed));
       mMailbox.SetImmediate(kLoopParam, mLoop.load(std::memory_order_relaxed) ? 1.0f : 0.0f);
       mMailbox.SetImmediate(kPingpongParam, mPingpong.load(std::memory_order_relaxed) ? 1.0f : 0.0f);
+      mMailbox.SetImmediate(kXfadeParam, mXfade.load(std::memory_order_relaxed));
       // No envelope shaping to speak of - fast fixed attack/release just
       // enough to avoid a click on trigger/steal, not a musical parameter.
       mVoices.SetSampleRate(sampleRate);
@@ -133,8 +166,8 @@ public:
    // Main thread only, called once per frame from CookIfNeeded.
    void DrainRetired() { mSampleSlot.DrainRetired(); }
 
-   void PushParams(float pitch, float finetune, float speed, float volume, float start, float end, bool loop,
-                    bool reverse, bool pingpong)
+   void PushParams(float pitch, float finetune, float speed, float volume, float start, float end, float xfade,
+                   bool loop, bool reverse, bool pingpong)
    {
       mPitch.store(pitch, std::memory_order_relaxed);
       mFinetune.store(finetune, std::memory_order_relaxed);
@@ -151,6 +184,8 @@ public:
       mMailbox.Push(kVolumeParam, volume);
       mMailbox.Push(kLoopParam, loop ? 1.0f : 0.0f);
       mMailbox.Push(kPingpongParam, pingpong ? 1.0f : 0.0f);
+      mMailbox.Push(kXfadeParam, xfade);
+      mXfade.store(xfade, std::memory_order_relaxed);
    }
 
    MeterRing& PlayheadRing() { return mPlayheadRing; }
@@ -303,6 +338,10 @@ public:
          const double startPos = (double)startFrac * mActiveBuffer->numFrames;
          const double endPos = (double)endFrac * mActiveBuffer->numFrames;
          const float speedSign = speed < 0.0f ? -1.0f : 1.0f;
+         // ping-pong reverses at the edge (already continuous), so only a wrapping loop fades
+         const bool wrapping = loop && !pingpong;
+         const double loopFade =
+            wrapping ? LoopFadeFrames(mMailbox.SmoothedValue(kXfadeParam), startPos, endPos, mSampleRate) : 0.0;
 
          float sampleL = 0.0f, sampleR = 0.0f;
 
@@ -323,12 +362,14 @@ public:
 
             const float rate = NoteToRate(mVoices.NoteAt(v), pitchSemis + mVoiceBend[v]) * std::fabs(speed);
             const float env = mVoices.EnvelopeAt(v).Process();
-            const float s = ReadSample(*mActiveBuffer, mVoicePos[v]) * env * mVoices.VelocityAt(v);
+            const float s = ReadLooped(&ReadSample, *mActiveBuffer, mVoicePos[v], startPos, endPos, loopFade, wrapping,
+                                       (float)mVoiceDir[v] * speedSign) * env * mVoices.VelocityAt(v);
 
             sampleL += s;
             sampleR += s; // mono-summed voice, panned centre - no per-voice pan control in this minimal node
 
-            if (AdvanceVoicePosition(mVoicePos[v], mVoiceDir[v], loop, pingpong, rate, speedSign, startPos, endPos))
+            if (AdvanceVoicePosition(mVoicePos[v], mVoiceDir[v], loop, pingpong, rate, speedSign, startPos, endPos,
+                                     loopFade))
                mVoices.NoteOff(mVoiceId[v]);
          }
 
@@ -339,12 +380,13 @@ public:
 
             const float rate = NoteToRate(kReferenceNote, pitchSemis) * std::fabs(speed);
             const float env = mSelfEnv.Process();
-            const float s = ReadSample(*mActiveBuffer, mSelfPos) * env;
+            const float s = ReadLooped(&ReadSample, *mActiveBuffer, mSelfPos, startPos, endPos, loopFade, wrapping,
+                                       (float)mSelfDir * speedSign) * env;
 
             sampleL += s;
             sampleR += s;
 
-            if (AdvanceVoicePosition(mSelfPos, mSelfDir, loop, pingpong, rate, speedSign, startPos, endPos))
+            if (AdvanceVoicePosition(mSelfPos, mSelfDir, loop, pingpong, rate, speedSign, startPos, endPos, loopFade))
                mSelfEnv.NoteOff();
          }
 
@@ -515,6 +557,7 @@ private:
    std::atomic<float> mFinetune { 0.0f };
    std::atomic<float> mSpeed { 1.0f };
    std::atomic<float> mVolume { 0.8f };
+   std::atomic<float> mXfade { 8.0f };
    std::atomic<float> mStart { 0.0f };
    std::atomic<float> mEnd { 1.0f };
    std::atomic<bool> mLoop { false };
@@ -536,7 +579,7 @@ void SamplerNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioSamplerNode>();
-   mAudioNode->PushParams(pitch, finetune, speed, volume, start, end, loop, reverse, pingpong);
+   mAudioNode->PushParams(pitch, finetune, speed, volume, start, end, xfade, loop, reverse, pingpong);
    mAudioNode->DrainRetired();
 
    float playhead = 0.0f;
@@ -557,6 +600,7 @@ void SamplerNode::VisitParams(ParamVisitor& v)
    v.Float("start", start);
    v.Float("end", end);
    v.Float("volume", volume);
+   v.Float("xfade", xfade);
    v.Bool("loop", loop);
    v.Bool("reverse", reverse);
    v.Bool("pingpong", pingpong);

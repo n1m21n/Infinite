@@ -1,5 +1,8 @@
 #pragma once
 
+#include <algorithm>
+#include <cstdint>
+
 #include <string>
 #include <vector>
 
@@ -112,4 +115,153 @@ private:
 
 public:
    MacroXYNode() { mYOutput.owner = this; }
+};
+
+// ---- macro family (ported from upstream Infinite) ---------------------------
+// Hand-driven controls exposed as modulators; each destination maps the
+// 0..1 output into its own range. All are MIDI-learnable from their body.
+
+// A vertical fader.
+class MacroSliderNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new MacroSliderNode(); }
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+   float Value01() override { return std::clamp(value, 0.0f, 1.0f); }
+
+   float value = 0.5f;
+   std::string label = "Slider";
+   void VisitParams(ParamVisitor& v) override { v.Float("value", value); v.Text("label", label); }
+};
+
+// A centre-detent knob, -1..+1; 0.5 out is the centre.
+class MacroBipolarKnobNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new MacroBipolarKnobNode(); }
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+   float Value01() override { return std::clamp((value + 1.0f) * 0.5f, 0.0f, 1.0f); }
+
+   float value = 0.0f;
+   std::string label = "Bipolar";
+   void VisitParams(ParamVisitor& v) override { v.Float("value", value); v.Text("label", label); }
+};
+
+// A latching on/off switch (0 or 1).
+class MacroToggleNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new MacroToggleNode(); }
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+   float Value01() override { return state ? 1.0f : 0.0f; }
+
+   bool state = false;
+   std::string label = "Toggle";
+   void VisitParams(ParamVisitor& v) override { v.Bool("state", state); v.Text("label", label); }
+};
+
+// A momentary bang pad: 1 while held, 0 otherwise.
+class MacroTriggerNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new MacroTriggerNode(); }
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+   float Value01() override { return pressed ? 1.0f : 0.0f; }
+
+   bool pressed = false; // runtime only
+   float flash = 0.0f;   // UI decay
+   std::string label = "Trigger";
+   void VisitParams(ParamVisitor& v) override { v.Text("label", label); }
+};
+
+// A number box: drag or type a value between min and max.
+class MacroNumBoxNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new MacroNumBoxNode(); }
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+   float Value01() override
+   {
+      return maxVal > minVal ? std::clamp((value - minVal) / (maxVal - minVal), 0.0f, 1.0f) : 0.0f;
+   }
+
+   float value = 0.0f;
+   float minVal = 0.0f;
+   float maxVal = 100.0f;
+   float step = 1.0f;
+   std::string label = "NumBox";
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Float("value", value); v.Float("minVal", minVal);
+      v.Float("maxVal", maxVal); v.Float("step", step);
+      v.Text("label", label);
+   }
+};
+
+// A row of 2..8 radio buttons; output steps evenly from 0 to 1.
+class MacroRadioSelectorNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new MacroRadioSelectorNode(); }
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+   float Value01() override
+   {
+      const int n = std::clamp(count, 2, 8);
+      return std::clamp((float)selected / (float)(n - 1), 0.0f, 1.0f);
+   }
+
+   int selected = 0;
+   int count = 8;
+   std::string label = "Selector";
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Int("selected", selected); v.Int("count", count);
+      v.Text("label", label);
+   }
+};
+
+// An 8-step gate sequencer locked to the transport.
+class MacroStepGateNode : public INode, public IModulator
+{
+public:
+   static INode* Create() { return new MacroStepGateNode(); }
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int) override {}
+   float Value01() override;
+   int CurrentStep() const { return mCurrentStep; }
+
+   uint8_t pattern = 0b10011001;
+   float rateBeats = 0.25f; // 16th notes
+   std::string label = "Step Gate";
+   void VisitParams(ParamVisitor& v) override
+   {
+      int patInt = (int)pattern;
+      v.Int("pattern", patInt);
+      pattern = (uint8_t)patInt;
+      v.Float("rateBeats", rateBeats);
+      v.Text("label", label);
+   }
+
+private:
+   int mCurrentStep = 0;
 };

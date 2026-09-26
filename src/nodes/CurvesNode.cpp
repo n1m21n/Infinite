@@ -139,8 +139,20 @@ void CurvesNode::CookIfNeeded(int frameId)
    if (srcTex == 0)
    {
       GLUtil::DestroyFbo(mOut);
+      mHasBuilt = false;
       return;
    }
+   CookSignature sig;
+   // Not VisitParams: it re-decodes the curves (the load path). Curve edits
+   // go through the setters / MarkDirty, which set mLutDirty.
+   sig.params.values = { mix, (float)activeChannel };
+   sig.revs[0] = mInput.Revision();
+   sig.w = mInput.Width();
+   sig.h = mInput.Height();
+   if (mHasBuilt && sig == mBuiltSig && !mLutDirty && mLutTex != 0)
+      return;
+   NodeWorkCounter()++;
+
    if (!EnsureShader())
       return;
    if (mLutDirty || mLutTex == 0)
@@ -158,4 +170,7 @@ void CurvesNode::CookIfNeeded(int frameId)
       glUniform1i(glGetUniformLocation(mProgram, "uLut"), 1);
       glUniform1f(glGetUniformLocation(mProgram, "uMix"), mix);
    });
+   mBuiltSig = std::move(sig);
+   mHasBuilt = true;
+   mRevision = NextTextureRevision();
 }

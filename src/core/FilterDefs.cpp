@@ -62,30 +62,49 @@ const std::vector<FilterDef>& GetFilterDefs()
 {
    static const std::vector<FilterDef> kDefs = {
       // ---------------- Effects: blur family ----------------
+      // The blur family is separable: exp(-(x²+y²)/k) = exp(-x²/k)·exp(-y²/k),
+      // so each 2D kernel runs as a horizontal prePassBody into a 16F
+      // intermediate (uPass) and a vertical main pass - 2N texture reads per
+      // pixel instead of N², same result up to 16F rounding. Bloom's
+      // bright-pass is applied per sample before weighting, so it splits the
+      // same way (exact at integer Radius, where every tap is a texel centre).
       { "gaussianblur", "Effects",
         "uniform float uRadius;\n"
         "void main() {\n"
         "   vec4 sum = vec4(0.0); float total = 0.0;\n"
-        "   for (int x = -4; x <= 4; x++) for (int y = -4; y <= 4; y++) {\n"
-        "      vec2 off = vec2(float(x), float(y)) * uTexelSize * uRadius;\n"
-        "      float w = exp(-float(x*x + y*y) / 8.0);\n"
-        "      sum += texture(uSrc, vUv + off) * w; total += w;\n"
+        "   for (int y = -4; y <= 4; y++) {\n"
+        "      float w = exp(-float(y*y) / 8.0);\n"
+        "      sum += texture(uPass, vUv + vec2(0.0, float(y) * uTexelSize.y * uRadius)) * w; total += w;\n"
         "   }\n"
         "   fragColor = sum / total;\n"
         "}\n",
-        { P("Radius", "uRadius", T::Float, 0.0f, 10.0f, 2.0f) } },
+        { P("Radius", "uRadius", T::Float, 0.0f, 10.0f, 2.0f) }, 1,
+        "uniform float uRadius;\n"
+        "void main() {\n"
+        "   vec4 sum = vec4(0.0); float total = 0.0;\n"
+        "   for (int x = -4; x <= 4; x++) {\n"
+        "      float w = exp(-float(x*x) / 8.0);\n"
+        "      sum += texture(uSrc, vUv + vec2(float(x) * uTexelSize.x * uRadius, 0.0)) * w; total += w;\n"
+        "   }\n"
+        "   fragColor = sum / total;\n"
+        "}\n" },
 
       { "boxblur", "Effects",
         "uniform float uRadius;\n"
         "void main() {\n"
-        "   vec4 sum = vec4(0.0); float total = 0.0;\n"
-        "   for (int x = -4; x <= 4; x++) for (int y = -4; y <= 4; y++) {\n"
-        "      vec2 off = vec2(float(x), float(y)) * uTexelSize * uRadius;\n"
-        "      sum += texture(uSrc, vUv + off); total += 1.0;\n"
-        "   }\n"
-        "   fragColor = sum / total;\n"
+        "   vec4 sum = vec4(0.0);\n"
+        "   for (int y = -4; y <= 4; y++)\n"
+        "      sum += texture(uPass, vUv + vec2(0.0, float(y) * uTexelSize.y * uRadius));\n"
+        "   fragColor = sum / 9.0;\n"
         "}\n",
-        { P("Radius", "uRadius", T::Float, 0.0f, 10.0f, 2.0f) } },
+        { P("Radius", "uRadius", T::Float, 0.0f, 10.0f, 2.0f) }, 1,
+        "uniform float uRadius;\n"
+        "void main() {\n"
+        "   vec4 sum = vec4(0.0);\n"
+        "   for (int x = -4; x <= 4; x++)\n"
+        "      sum += texture(uSrc, vUv + vec2(float(x) * uTexelSize.x * uRadius, 0.0));\n"
+        "   fragColor = sum / 9.0;\n"
+        "}\n" },
 
       { "motionblur", "Effects",
         "uniform float uAngle;\n"
@@ -127,16 +146,25 @@ const std::vector<FilterDef>& GetFilterDefs()
         "void main() {\n"
         "   vec4 c = texture(uSrc, vUv);\n"
         "   vec4 blur = vec4(0.0); float total = 0.0;\n"
-        "   for (int x = -2; x <= 2; x++) for (int y = -2; y <= 2; y++) {\n"
-        "      vec2 off = vec2(float(x), float(y)) * uTexelSize * uRadius;\n"
-        "      float w = exp(-float(x*x + y*y) / 4.0);\n"
-        "      blur += texture(uSrc, vUv + off) * w; total += w;\n"
+        "   for (int y = -2; y <= 2; y++) {\n"
+        "      float w = exp(-float(y*y) / 4.0);\n"
+        "      blur += texture(uPass, vUv + vec2(0.0, float(y) * uTexelSize.y * uRadius)) * w; total += w;\n"
         "   }\n"
         "   blur /= total;\n"
         "   fragColor = vec4(c.rgb + (c.rgb - blur.rgb) * uAmount, c.a);\n"
         "}\n",
         { P("Amount", "uAmount", T::Float, 0.0f, 3.0f, 0.6f),
-          P("Radius", "uRadius", T::Float, 0.1f, 5.0f, 1.5f) } },
+          P("Radius", "uRadius", T::Float, 0.1f, 5.0f, 1.5f) }, 1,
+        // Turbo: separable like the blur family (horizontal pre-pass)
+        "uniform float uRadius;\n"
+        "void main() {\n"
+        "   vec4 sum = vec4(0.0); float total = 0.0;\n"
+        "   for (int x = -2; x <= 2; x++) {\n"
+        "      float w = exp(-float(x*x) / 4.0);\n"
+        "      sum += texture(uSrc, vUv + vec2(float(x) * uTexelSize.x * uRadius, 0.0)) * w; total += w;\n"
+        "   }\n"
+        "   fragColor = sum / total;\n"
+        "}\n" },
 
       // ---------------- Effects: distortion family ----------------
       { "twirl", "Effects",
@@ -307,6 +335,81 @@ const std::vector<FilterDef>& GetFilterDefs()
         "}\n",
         { P("Exposure", "uExposure", T::Float, -3.0f, 3.0f, 0.0f) } },
 
+      // ---------------- Alpha / opacity operators ----------------
+      // Nothing above edits an existing alpha channel directly - chroma/luma
+      // key only produce one. "show alpha" is the debugging tool users
+      // actually reach for first (visualize the matte inline), so it's kept
+      // simplest and first in this block.
+      { "show alpha", "Compositing",
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   fragColor = vec4(vec3(c.a), 1.0);\n"
+        "}\n",
+        {} },
+
+      { "opacity", "Compositing",
+        "uniform float uOpacity;\n"
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   fragColor = vec4(c.rgb, c.a * uOpacity);\n"
+        "}\n",
+        { P("Opacity", "uOpacity", T::Float, 0.0f, 1.0f, 1.0f) } },
+
+      { "set alpha", "Compositing",
+        // Second input is any grayscale/keyed/bw image (e.g. show alpha's
+        // output) whose luminance becomes the new alpha channel.
+        "void main() {\n"
+        "   vec4 a = texture(uSrc, vUv);\n"
+        "   if (uHasSrc2 == 0) { fragColor = vec4(a.rgb, 1.0); return; }\n"
+        "   vec3 b = texture(uSrc2, vUv).rgb;\n"
+        "   float luma = dot(b, vec3(0.299, 0.587, 0.114));\n"
+        "   fragColor = vec4(a.rgb, luma);\n"
+        "}\n",
+        {}, 2 },
+
+      { "alpha invert", "Compositing",
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   fragColor = vec4(c.rgb, 1.0 - c.a);\n"
+        "}\n",
+        {} },
+
+      { "alpha from luma", "Compositing",
+        "uniform int uInvert;\n"
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   float luma = dot(c.rgb, vec3(0.299, 0.587, 0.114));\n"
+        "   if (uInvert == 1) luma = 1.0 - luma;\n"
+        "   fragColor = vec4(c.rgb, luma);\n"
+        "}\n",
+        { E("invert", "uInvert", { "Off", "On" }, 0) } },
+
+      // Low/high/gamma remap matches the Black Point / White Point / Gamma
+      // convention used by the "color adjustments" Levels section below:
+      // clamp-normalize between the two points, then a gamma pow.
+      { "alpha levels", "Compositing",
+        "uniform float uLow;\n"
+        "uniform float uHigh;\n"
+        "uniform float uGamma;\n"
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   float a = clamp((c.a - uLow) / max(uHigh - uLow, 0.0001), 0.0, 1.0);\n"
+        "   a = pow(a, 1.0 / max(uGamma, 0.0001));\n"
+        "   fragColor = vec4(c.rgb, a);\n"
+        "}\n",
+        { P("Low", "uLow", T::Float, 0.0f, 1.0f, 0.0f),
+          P("High", "uHigh", T::Float, 0.0f, 1.0f, 1.0f),
+          P("Gamma", "uGamma", T::Float, 0.1f, 4.0f, 1.0f) } },
+
+      { "premultiply", "Compositing",
+        "uniform int uMode;\n"
+        "void main() {\n"
+        "   vec4 c = texture(uSrc, vUv);\n"
+        "   vec3 col = (uMode == 0) ? c.rgb * c.a : c.rgb / max(c.a, 1e-4);\n"
+        "   fragColor = vec4(col, c.a);\n"
+        "}\n",
+        { E("mode", "uMode", { "Premultiply", "Unpremultiply" }, 0) } },
+
       // ---------------- Effects: bloom / glow ----------------
       { "bloom", "Effects",
         "uniform float uThreshold;\n"
@@ -315,20 +418,29 @@ const std::vector<FilterDef>& GetFilterDefs()
         "void main() {\n"
         "   vec4 c = texture(uSrc, vUv);\n"
         "   vec3 bloom = vec3(0.0); float total = 0.0;\n"
-        "   for (int x = -5; x <= 5; x++) for (int y = -5; y <= 5; y++) {\n"
-        "      vec2 off = vec2(float(x), float(y)) * uTexelSize * uRadius;\n"
-        "      vec3 s = texture(uSrc, vUv + off).rgb;\n"
-        "      float lum = dot(s, vec3(0.299, 0.587, 0.114));\n"
-        "      vec3 bright = max(s - vec3(uThreshold), vec3(0.0)) * step(uThreshold, lum);\n"
-        "      float w = exp(-float(x*x + y*y) / 12.0);\n"
-        "      bloom += bright * w; total += w;\n"
+        "   for (int y = -5; y <= 5; y++) {\n"
+        "      float w = exp(-float(y*y) / 12.0);\n"
+        "      bloom += texture(uPass, vUv + vec2(0.0, float(y) * uTexelSize.y * uRadius)).rgb * w; total += w;\n"
         "   }\n"
         "   bloom /= max(total, 1e-4);\n"
         "   fragColor = vec4(c.rgb + bloom * uIntensity, c.a);\n"
         "}\n",
         { P("Threshold", "uThreshold", T::Float, 0.0f, 1.0f, 0.6f),
           P("Intensity", "uIntensity", T::Float, 0.0f, 5.0f, 1.4f),
-          P("Radius", "uRadius", T::Float, 0.5f, 12.0f, 4.0f) } },
+          P("Radius", "uRadius", T::Float, 0.5f, 12.0f, 4.0f) }, 1,
+        "uniform float uThreshold;\n"
+        "uniform float uRadius;\n"
+        "void main() {\n"
+        "   vec3 bloom = vec3(0.0); float total = 0.0;\n"
+        "   for (int x = -5; x <= 5; x++) {\n"
+        "      vec3 s = texture(uSrc, vUv + vec2(float(x) * uTexelSize.x * uRadius, 0.0)).rgb;\n"
+        "      float lum = dot(s, vec3(0.299, 0.587, 0.114));\n"
+        "      vec3 bright = max(s - vec3(uThreshold), vec3(0.0)) * step(uThreshold, lum);\n"
+        "      float w = exp(-float(x*x) / 12.0);\n"
+        "      bloom += bright * w; total += w;\n"
+        "   }\n"
+        "   fragColor = vec4(bloom / max(total, 1e-4), 1.0);\n"
+        "}\n" },
 
       { "diffuseglow", "Effects",
         "uniform float uAmount;\n"
@@ -336,17 +448,25 @@ const std::vector<FilterDef>& GetFilterDefs()
         "void main() {\n"
         "   vec4 c = texture(uSrc, vUv);\n"
         "   vec3 blur = vec3(0.0); float total = 0.0;\n"
-        "   for (int x = -4; x <= 4; x++) for (int y = -4; y <= 4; y++) {\n"
-        "      vec2 off = vec2(float(x), float(y)) * uTexelSize * uRadius;\n"
-        "      float w = exp(-float(x*x + y*y) / 10.0);\n"
-        "      blur += texture(uSrc, vUv + off).rgb * w; total += w;\n"
+        "   for (int y = -4; y <= 4; y++) {\n"
+        "      float w = exp(-float(y*y) / 10.0);\n"
+        "      blur += texture(uPass, vUv + vec2(0.0, float(y) * uTexelSize.y * uRadius)).rgb * w; total += w;\n"
         "   }\n"
         "   blur /= max(total, 1e-4);\n"
         "   vec3 screen = 1.0 - (1.0 - c.rgb) * (1.0 - blur);\n"
         "   fragColor = vec4(mix(c.rgb, screen, uAmount), c.a);\n"
         "}\n",
         { P("Amount", "uAmount", T::Float, 0.0f, 1.0f, 0.6f),
-          P("Radius", "uRadius", T::Float, 0.5f, 12.0f, 4.0f) } },
+          P("Radius", "uRadius", T::Float, 0.5f, 12.0f, 4.0f) }, 1,
+        "uniform float uRadius;\n"
+        "void main() {\n"
+        "   vec3 blur = vec3(0.0); float total = 0.0;\n"
+        "   for (int x = -4; x <= 4; x++) {\n"
+        "      float w = exp(-float(x*x) / 10.0);\n"
+        "      blur += texture(uSrc, vUv + vec2(float(x) * uTexelSize.x * uRadius, 0.0)).rgb * w; total += w;\n"
+        "   }\n"
+        "   fragColor = vec4(blur / max(total, 1e-4), 1.0);\n"
+        "}\n" },
 
       // ---------------- Effects: glitch ----------------
       // One node, six algorithms behind a dropdown, rather than six near-identical
@@ -933,17 +1053,25 @@ const std::vector<FilterDef>& GetFilterDefs()
         "void main() {\n"
         "   vec4 c = texture(uSrc, vUv);\n"
         "   vec4 blur = vec4(0.0); float total = 0.0;\n"
-        "   for (int x = -3; x <= 3; x++) for (int y = -3; y <= 3; y++) {\n"
-        "      vec2 off = vec2(float(x), float(y)) * uTexelSize * 4.0;\n"
-        "      float w = exp(-float(x*x + y*y) / 6.0);\n"
-        "      blur += texture(uSrc, vUv + off) * w; total += w;\n"
+        "   for (int y = -3; y <= 3; y++) {\n"
+        "      float w = exp(-float(y*y) / 6.0);\n"
+        "      blur += texture(uPass, vUv + vec2(0.0, float(y) * uTexelSize.y * 4.0)) * w; total += w;\n"
         "   }\n"
         "   blur /= total;\n"
         "   vec3 glow = uColor * blur.a * uAmount;\n"
         "   fragColor = vec4(c.rgb + glow * (1.0 - c.a), max(c.a, blur.a * uAmount));\n"
         "}\n",
         { P("Amount", "uAmount", T::Float, 0.0f, 2.0f, 1.0f),
-          P("Color", "uColor", T::Color, 0.0f, 1.0f, 1.0f, 0.9f, 0.3f) } },
+          P("Color", "uColor", T::Color, 0.0f, 1.0f, 1.0f, 0.9f, 0.3f) }, 1,
+        // Turbo: separable (horizontal pre-pass)
+        "void main() {\n"
+        "   vec4 sum = vec4(0.0); float total = 0.0;\n"
+        "   for (int x = -3; x <= 3; x++) {\n"
+        "      float w = exp(-float(x*x) / 6.0);\n"
+        "      sum += texture(uSrc, vUv + vec2(float(x) * uTexelSize.x * 4.0, 0.0)) * w; total += w;\n"
+        "   }\n"
+        "   fragColor = sum / total;\n"
+        "}\n" },
 
       { "coloroverlay", "Compositing",
         "uniform vec3 uColor;\n"

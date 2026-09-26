@@ -13,6 +13,7 @@
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #include <shlobj.h>
+#include <shellapi.h>
 #include <shobjidl.h>
 #include <wincodec.h>
 #include <dshow.h>
@@ -513,6 +514,24 @@ namespace Platform
    std::string OpenFolderDialog(const char* title, const std::string& initialDir)
    { return RunFileDialog(false, true, Utf8ToWide(title ? title : "Select folder").c_str(), {}, {}, initialDir); }
 
+   void RevealInFileManager(const std::string& path)
+   {
+      if (path.empty())
+         return;
+      std::wstring w = Utf8ToWide(path);
+      for (wchar_t& ch : w)
+         if (ch == L'/')
+            ch = L'\\';
+      const DWORD attr = GetFileAttributesW(w.c_str());
+      if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY))
+         ShellExecuteW(nullptr, L"open", w.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+      else
+      {
+         const std::wstring args = L"/select,\"" + w + L"\"";
+         ShellExecuteW(nullptr, L"open", L"explorer.exe", args.c_str(), nullptr, SW_SHOWNORMAL);
+      }
+   }
+
    bool LoadImageRGBA(const std::string& path, std::vector<unsigned char>& out, int& w, int& h, std::string& error)
    {
       cv::Mat src = cv::imread(path, cv::IMREAD_UNCHANGED);
@@ -622,8 +641,7 @@ namespace Platform
    //  - reverse: one seek per batch. The worker decodes the frames just
    //    below the target in one forward run and serves them backwards,
    //    instead of paying a keyframe seek for every single frame.
-   // Frames are BGR8 in GL row order (bottom-up): the GPU swizzles BGR on
-   // upload, so the CPU no longer converts every pixel to RGBA.
+   // Frames are BGRA8 in GL row order (bottom-up), the native upload format.
    struct VideoHandle
    {
       struct CachedFrame
@@ -715,9 +733,15 @@ namespace Platform
             frame = converted;
          }
 
-         out.resize((size_t)frame.cols * (size_t)frame.rows * 3);
-         cv::Mat dst(frame.rows, frame.cols, CV_8UC3, out.data());
-         cv::flip(frame, dst, 0);
+         // BGRA, bottom-up: GL_BGRA + UNSIGNED_INT_8_8_8_8_REV is the
+         // driver's native upload format on Windows GPUs, so the render
+         // thread's glTexSubImage2D is a straight copy instead of a 3-byte
+         // swizzle. The conversion runs here, on the decoder thread.
+         thread_local cv::Mat bgra;
+         cv::cvtColor(frame, bgra, cv::COLOR_BGR2BGRA);
+         out.resize((size_t)frame.cols * (size_t)frame.rows * 4);
+         cv::Mat dst(frame.rows, frame.cols, CV_8UC4, out.data());
+         cv::flip(bgra, dst, 0);
          v->width.store(frame.cols, std::memory_order_relaxed);
          v->height.store(frame.rows, std::memory_order_relaxed);
          return true;
@@ -910,7 +934,7 @@ namespace Platform
       const double frames = handle->capture.get(cv::CAP_PROP_FRAME_COUNT);
       handle->frameCount = frames > 0 ? (long long)frames : 0;
       handle->duration = frames > 0 ? frames / handle->fps : 0.0;
-      const size_t frameBytes = (size_t)std::max(1, w) * (size_t)std::max(1, h) * 3;
+      const size_t frameBytes = (size_t)std::max(1, w) * (size_t)std::max(1, h) * 4;
       handle->cacheCapacity = std::clamp<size_t>(kVideoCacheBudgetBytes / frameBytes, 2, 8);
       RuntimeLog::Write("video opened: %dx%d %.2f fps, hwaccel=%d, read-ahead=%d frames",
                         w, h, handle->fps,
@@ -1245,49 +1269,61 @@ namespace Platform
 
    namespace
    {
-      constexpr size_t kInputRingFrames = 262144;
+      // Turbo: every input channel of the device (up to 32) goes into the
+      // ring, so each Audio In node can pick its own channel or pair. Frames
+      // are a latest-audio window: readers keep their own cursor, so two
+      // Audio In nodes no longer steal each other's samples.
+      constexpr size_t kInputRingFrames = 65536;
+      constexpr int kInputRingChannels = 32;
       struct InputRing
       {
-         float data[2][kInputRingFrames] {};
-         // Monotonic frame counters make this a latest-audio ring rather than
-         // a queue of historical audio. Live monitoring must never replay the
-         // several seconds accumulated while a node existed but the graph was
-         // not yet consuming it.
-         std::atomic<unsigned long long> readFrame {0}, writeFrame {0};
-         void write(const float* const* in, int channels, int frames)
+         std::vector<float> data = std::vector<float>((size_t)kInputRingChannels * kInputRingFrames, 0.0f);
+         std::atomic<int> channels {0};
+         std::atomic<unsigned long long> writeFrame {0};
+         unsigned long long legacyCursor = 0; // for the old two-channel API
+         void write(const float* const* in, int numIn, int frames)
          {
+            const int nch = std::min(numIn, kInputRingChannels);
             const unsigned long long start = writeFrame.load(std::memory_order_relaxed);
-            for (int i = 0; i < frames; ++i)
+            for (int ch = 0; ch < nch; ++ch)
             {
-               const size_t slot = (size_t)((start + (unsigned long long)i) % kInputRingFrames);
-               for (int ch = 0; ch < 2; ++ch)
-                  data[ch][slot] = ch < channels && in[ch] ? in[ch][i] : 0.0f;
+               float* dst = data.data() + (size_t)ch * kInputRingFrames;
+               const float* src = in[ch];
+               for (int i = 0; i < frames; ++i)
+                  dst[(size_t)((start + (unsigned long long)i) % kInputRingFrames)] = src ? src[i] : 0.0f;
             }
+            channels.store(nch, std::memory_order_relaxed);
             writeFrame.store(start + (unsigned long long)std::max(0, frames), std::memory_order_release);
          }
-         int read(float* const* out, int frames, int maxChannels)
+         // Copies the newest audio after `cursor` for channels
+         // [first, first + count) into out[0..count). Returns the number of
+         // those channels that exist on the device (0 = nothing captured).
+         int read(float* const* out, int frames, int first, int count, unsigned long long& cursor)
          {
             const unsigned long long written = writeFrame.load(std::memory_order_acquire);
-            unsigned long long read = readFrame.load(std::memory_order_relaxed);
-            if (written > read + kInputRingFrames)
-               read = written - kInputRingFrames;
-            // If the consumer fell behind, jump to the newest complete block.
-            // At 48 kHz/128 frames this caps software-monitoring delay near one
-            // block instead of the old ring's 5.46-second capacity.
+            unsigned long long read = cursor;
             if (written > read + (unsigned long long)std::max(0, frames))
-               read = written - (unsigned long long)std::max(0, frames);
-            const int available = (int)std::min<unsigned long long>(
-               written - read, (unsigned long long)std::max(0, frames));
-            for (int i = 0; i < available; ++i)
+               read = written - (unsigned long long)std::max(0, frames); // fell behind: newest block
+            const int available = (int)std::min<unsigned long long>(written - std::min(read, written),
+                                                                    (unsigned long long)std::max(0, frames));
+            const int nch = channels.load(std::memory_order_relaxed);
+            for (int k = 0; k < count; ++k)
             {
-               const size_t slot = (size_t)((read + (unsigned long long)i) % kInputRingFrames);
-               for (int ch = 0; ch < maxChannels; ++ch)
-                  out[ch][i] = ch < 2 ? data[ch][slot] : 0.0f;
+               const int ch = first + k;
+               if (ch >= 0 && ch < nch)
+               {
+                  const float* src = data.data() + (size_t)ch * kInputRingFrames;
+                  for (int i = 0; i < available; ++i)
+                     out[k][i] = src[(size_t)((read + (unsigned long long)i) % kInputRingFrames)];
+               }
+               else
+                  std::fill(out[k], out[k] + available, 0.0f);
+               std::fill(out[k] + available, out[k] + frames, 0.0f);
             }
-            readFrame.store(read + (unsigned long long)available, std::memory_order_release);
-            for (int ch = 0; ch < maxChannels; ++ch)
-               std::fill(out[ch] + available, out[ch] + frames, 0.0f);
-            return available > 0 ? std::min(2, maxChannels) : 0;
+            cursor = read + (unsigned long long)available;
+            if (available <= 0)
+               return 0;
+            return std::max(0, std::min(count, nch - first));
          }
       };
 
@@ -1440,6 +1476,11 @@ namespace Platform
       {
          for (const auto& d : AudioListDevices()) if (d.isInput && d.deviceId == requestedInputId) setup.inputDeviceName = d.name;
       }
+      // Turbo: open every input channel (JUCE drops bits the device lacks),
+      // so Audio In nodes can pick any channel of a multichannel interface.
+      setup.useDefaultInputChannels = false;
+      setup.inputChannels.clear();
+      setup.inputChannels.setRange(0, kInputRingChannels, true);
       const juce::String result = AudioBridgeInstance().manager.setAudioDeviceSetup(setup, true);
       if (result.isNotEmpty()) { error = result.toStdString(); return false; }
       AudioBridgeInstance().callback = cb; AudioBridgeInstance().user = user;
@@ -1509,7 +1550,34 @@ namespace Platform
    void AudioInputCaptureRemoveRef() { int v = AudioBridgeInstance().inputRefs.fetch_sub(1); if (v <= 1) AudioBridgeInstance().inputRefs.store(0); }
    void AudioInputCapturePump(std::string& error) { if (AudioBridgeInstance().inputRefs.load() > 0) AudioBridgeInstance().open(2, 2, error); }
    bool AudioInputCaptureIsRunning() { return AudioBridgeInstance().inputRefs.load() > 0 && AudioBridgeInstance().manager.getCurrentAudioDevice() != nullptr; }
-   int AudioInputCaptureRead(float* const* out, int frames, int maxChannels) { return AudioBridgeInstance().inputRing.read(out, frames, maxChannels); }
+   int AudioInputCaptureRead(float* const* out, int frames, int maxChannels)
+   {
+      auto& ring = AudioBridgeInstance().inputRing;
+      return ring.read(out, frames, 0, std::min(2, maxChannels), ring.legacyCursor);
+   }
+   int AudioInputCaptureReadChannels(float* const* out, int frames, int firstChannel, int count,
+                                     unsigned long long& cursor)
+   {
+      return AudioBridgeInstance().inputRing.read(out, frames, firstChannel, count, cursor);
+   }
+   std::vector<std::string> AudioInputChannelNames()
+   {
+      std::vector<std::string> names;
+      if (auto* d = AudioBridgeInstance().manager.getCurrentAudioDevice())
+      {
+         const juce::StringArray all = d->getInputChannelNames();
+         const juce::BigInteger active = d->getActiveInputChannels();
+         for (int i = 0; i < all.size() && i < kInputRingChannels; ++i)
+            if (active[i])
+               names.push_back(all[i].toStdString());
+      }
+      return names;
+   }
+   std::string AudioInputDeviceName()
+   {
+      auto setup = AudioBridgeInstance().manager.getAudioDeviceSetup();
+      return setup.inputDeviceName.toStdString();
+   }
 
    namespace
    {
@@ -2071,9 +2139,13 @@ namespace Platform
             // One pass: vertical flip to GL row order, plus the horizontal
             // mirror when requested (flip code -1 = both axes). Stays BGR8;
             // the GPU swizzles on upload.
-            pixels.resize((size_t)frame.cols * (size_t)frame.rows * 3);
-            cv::Mat dst(frame.rows, frame.cols, CV_8UC3, pixels.data());
-            cv::flip(frame, dst, raw->mirror.load(std::memory_order_relaxed) ? -1 : 0);
+            // Turbo: BGRA (native GL upload format), converted here on the
+            // capture thread rather than swizzled by the driver on the render thread.
+            cv::Mat bgra;
+            cv::cvtColor(frame, bgra, cv::COLOR_BGR2BGRA);
+            pixels.resize((size_t)frame.cols * (size_t)frame.rows * 4);
+            cv::Mat dst(frame.rows, frame.cols, CV_8UC4, pixels.data());
+            cv::flip(bgra, dst, raw->mirror.load(std::memory_order_relaxed) ? -1 : 0);
             std::lock_guard<std::mutex> lock(raw->frameMutex);
             raw->width = frame.cols;
             raw->height = frame.rows;

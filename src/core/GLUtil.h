@@ -25,6 +25,16 @@ namespace GLUtil
    bool EnsureFbo(Fbo& fbo, int w, int h, unsigned int internalFormat = GL_RGBA8);
    void DestroyFbo(Fbo& fbo);
 
+   // Shared scratch render target, one per (w, h, internalFormat), for an
+   // intermediate written and read inside a single cook and never published
+   // (FilterNode's two-pass pre-pass): nine blurs in a chain hold one buffer
+   // instead of nine. Valid ONLY until the next AcquireScratchFbo from any
+   // caller - write it and consume it straight away. Main GL context only.
+   Fbo* AcquireScratchFbo(int w, int h, unsigned int internalFormat);
+
+   // Once per main-loop frame: frees scratch targets unused for 300 frames.
+   void EndFrameScratchFbos();
+
    inline unsigned int FboTexture(const Fbo& fbo) { return fbo.tex; }
 
    // Compiles fragSrc against a shared fullscreen-quad vertex shader (attributes

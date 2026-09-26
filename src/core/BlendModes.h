@@ -15,4 +15,5 @@ namespace BlendModes
    extern const char* kBlendGLSL;
 
    const int kEraseMode = 30;
+   const int kAntiEraseMode = 31; // exact complement of Erase: keep A only where B is opaque
 }

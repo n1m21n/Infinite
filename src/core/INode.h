@@ -97,6 +97,46 @@ inline unsigned long long& NodeWorkCounter()
    return counter;
 }
 
+// Flattens everything a node's VisitParams exposes into one comparable list,
+// for source nodes that skip a cook when nothing changed (NoiseNode,
+// ShapeNode - the FilterNode::Signature idea without a hand-kept field list).
+// Modulation writes straight into the same fields before the cook loop, so a
+// modulated param reads as changed here. Floats compare with ==, so a NaN
+// never matches and just keeps the node cooking.
+class ParamSnapshot : public ParamVisitor
+{
+public:
+   std::vector<float> values;
+   std::vector<std::string> texts;
+
+   void Float(const char*, float& v) override { values.push_back(v); }
+   void Int(const char*, int& v) override { values.push_back((float)v); }
+   void Bool(const char*, bool& v) override { values.push_back(v ? 1.0f : 0.0f); }
+   void Text(const char*, std::string& v) override { texts.push_back(v); }
+   void Color(const char*, float rgb[3]) override { values.insert(values.end(), rgb, rgb + 3); }
+
+   bool operator==(const ParamSnapshot& o) const { return values == o.values && texts == o.texts; }
+   bool operator!=(const ParamSnapshot& o) const { return !(*this == o); }
+};
+
+// Turbo: the same skip-if-unchanged idea for simple image operators (Blend,
+// Fit, Layer Stack, Ramp, Color Ramp, Curves). Everything their output
+// depends on: the params, the upstream texture revisions and the output
+// size. A node that re-renders stamps a fresh TextureRevision, so a chain
+// whose inputs are still settles instead of recooking every frame.
+struct CookSignature
+{
+   ParamSnapshot params;
+   unsigned long long revs[4] = { 0, 0, 0, 0 };
+   int w = 0, h = 0;
+
+   bool operator==(const CookSignature& o) const
+   {
+      return w == o.w && h == o.h && revs[0] == o.revs[0] && revs[1] == o.revs[1] &&
+             revs[2] == o.revs[2] && revs[3] == o.revs[3] && params == o.params;
+   }
+};
+
 class INode
 {
 public:

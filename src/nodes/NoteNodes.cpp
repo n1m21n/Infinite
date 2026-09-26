@@ -4011,3 +4011,454 @@ int BouncingBallsNode::BallPositions(float outX[kMaxBalls], float outY[kMaxBalls
 {
    return mAudioNode ? mAudioNode->BallPositions(outX, outY, outFlash) : 0;
 }
+
+// ---- ported from upstream Infinite (Turbo 0.39) ----------------------------
+
+// ------------------------------------------------------------------ Keyboard
+class AudioKeyboardNode : public AudioNode
+{
+public:
+   void PrepareToPlay(double /*sampleRate*/, int /*maxBlockSize*/) override
+   {
+      mHeld[0].store(0, std::memory_order_relaxed);
+      mHeld[1].store(0, std::memory_order_relaxed);
+      mRingHead.store(0, std::memory_order_relaxed);
+      mRingTail.store(0, std::memory_order_relaxed);
+   }
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& /*output*/) override
+   {
+      // Single-producer (the UI thread, via PushKey) / single-consumer (this),
+      // so a plain relaxed-load/release-store pair is safe with no mutex -
+      // unlike Platform's hardware MIDI ring, nothing else ever writes here.
+      unsigned head = mRingHead.load(std::memory_order_relaxed);
+      const unsigned tail = mRingTail.load(std::memory_order_acquire);
+      while (head != tail)
+      {
+         const KeyEvent& e = mRing[head];
+         NoteEvent ev;
+         ev.note = e.note;
+         ev.velocity = e.velocity;
+         ev.isNoteOn = e.isNoteOn;
+         ev.frameOffset = 0;
+         ev.source = this;
+         if (e.isNoteOn)
+         {
+            ev.voiceId = NextVoiceId();
+            mActiveVoiceId[e.note] = ev.voiceId;
+         }
+         else
+         {
+            ev.voiceId = mActiveVoiceId[e.note];
+         }
+         mOutbox.Push(ev);
+         SetKeyBit(mHeld, e.note, e.isNoteOn);
+         if (e.isNoteOn)
+            mLastNote.store(e.note, std::memory_order_relaxed);
+         head = (head + 1) % kRingCapacity;
+      }
+      mRingHead.store(head, std::memory_order_release);
+   }
+
+   NoteEventQueue* NoteOutbox() override { return &mOutbox; }
+
+   // Main thread only (the producer side of the ring).
+   void PushKey(int note, float velocity01, bool isNoteOn)
+   {
+      const unsigned t = mRingTail.load(std::memory_order_relaxed);
+      const unsigned next = (t + 1) % kRingCapacity;
+      // Full: drop it. At most a couple of key edges per frame can ever be
+      // pending against a 128-entry ring drained every audio block.
+      if (next == mRingHead.load(std::memory_order_acquire))
+         return;
+      mRing[t] = { note, velocity01, isNoteOn };
+      mRingTail.store(next, std::memory_order_release);
+   }
+
+   uint64_t HeldWord(int w) const { return mHeld[w].load(std::memory_order_relaxed); }
+   int LastNote() const { return mLastNote.load(std::memory_order_relaxed); }
+
+private:
+   struct KeyEvent
+   {
+      int note;
+      float velocity;
+      bool isNoteOn;
+   };
+   static constexpr int kRingCapacity = 128;
+   KeyEvent mRing[kRingCapacity];
+   std::atomic<unsigned> mRingHead { 0 };   // consumer-owned (audio thread)
+   std::atomic<unsigned> mRingTail { 0 };   // producer-owned (main thread)
+
+   NoteEventQueue mOutbox;
+   int mActiveVoiceId[128] = {};
+   std::atomic<uint64_t> mHeld[2] { { 0 }, { 0 } };
+   std::atomic<int> mLastNote { -1 };
+};
+
+KeyboardNode::KeyboardNode() = default;
+KeyboardNode::~KeyboardNode() = default;
+
+void KeyboardNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioKeyboardNode>();
+}
+
+void KeyboardNode::VisitParams(ParamVisitor& v)
+{
+   v.Int("baseOctave", baseOctave);
+   v.Int("transpose", transpose);
+   v.Float("velocityScale", velocityScale);
+   v.Bool("computerKeyboardEnabled", computerKeyboardEnabled);
+   v.Bool("useGlobalScale", useGlobalScale);
+}
+
+AudioNode* KeyboardNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioKeyboardNode>();
+   return mAudioNode.get();
+}
+
+void KeyboardNode::SetKeyState(int note, bool down)
+{
+   if (note < 0 || note > 127 || mKeyDown[note] == down)
+      return;
+   mKeyDown[note] = down;
+   if (!mAudioNode)
+      return;
+   const float velocity = std::clamp(0.9f * velocityScale, 0.0f, 1.0f);
+   if (down)
+   {
+      // Transpose is captured at note-on so a knob move mid-hold can't send
+      // this key's note-off to a different pitch than the one it started.
+      int sounding = note + transpose;
+      if (useGlobalScale)
+         sounding = MusicTime::SnapToScale(sounding, Transport::Instance().Key(), Transport::Instance().Scale(), MusicTime::kSnapNearest);
+      sounding = std::clamp(sounding, 0, 127);
+      mSoundingNote[note] = sounding;
+      mAudioNode->PushKey(sounding, velocity, true);
+   }
+   else
+   {
+      mAudioNode->PushKey(mSoundingNote[note], velocity, false);
+   }
+}
+
+void KeyboardNode::HeldKeys(bool out[128]) const
+{
+   const uint64_t w0 = mAudioNode ? mAudioNode->HeldWord(0) : 0;
+   const uint64_t w1 = mAudioNode ? mAudioNode->HeldWord(1) : 0;
+   for (int i = 0; i < 64; i++)
+   {
+      out[i] = (w0 >> i) & 1ull;
+      out[i + 64] = (w1 >> i) & 1ull;
+   }
+}
+
+int KeyboardNode::LastNote() const
+{
+   return mAudioNode ? mAudioNode->LastNote() : -1;
+}
+
+// ---------------------------------------------------------------- Velocity to CV
+class AudioVelocityToCVNode : public AudioNode
+{
+public:
+   void PrepareToPlay(double /*sampleRate*/, int /*maxBlockSize*/) override {}
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& /*output*/) override
+   {
+      NoteEvent evts[64];
+      const int n = (mInbox != nullptr) ? mInbox->Pop(mNoteCursor, evts, 64) : 0;
+      float target = mTarget.load(std::memory_order_relaxed);
+      const float rLow = mRangeLow.load(std::memory_order_relaxed);
+      const float rHigh = mRangeHigh.load(std::memory_order_relaxed);
+      const float span = rHigh - rLow;
+      for (int i = 0; i < n; i++)
+      {
+         if (evts[i].bendUpdate)
+            continue;
+         if (evts[i].isNoteOn)
+         {
+            const float rawVel = std::clamp(evts[i].velocity, 0.0f, 1.0f);
+            target = (std::fabs(span) > 1e-4f) ? std::clamp((rawVel - rLow) / span, 0.0f, 1.0f) : 0.0f;
+         }
+      }
+      mTarget.store(target, std::memory_order_relaxed);
+      mLevel.store(target, std::memory_order_relaxed);
+   }
+
+   void SetNoteInbox(NoteEventQueue* inbox, int cursor) override { mInbox = inbox; mNoteCursor = cursor; }
+
+   // Main thread only.
+   void PushParams(const VelocityToCVNode& n)
+   {
+      mRangeLow.store(n.rangeLow, std::memory_order_relaxed);
+      mRangeHigh.store(n.rangeHigh, std::memory_order_relaxed);
+   }
+
+   float Level() const { return mLevel.load(std::memory_order_relaxed); }
+
+private:
+   NoteEventQueue* mInbox = nullptr;
+   int mNoteCursor = -1;
+   std::atomic<float> mLevel { 0.0f };
+   std::atomic<float> mTarget { 0.0f };
+   std::atomic<float> mRangeLow { 0.0f };
+   std::atomic<float> mRangeHigh { 1.0f };
+};
+
+VelocityToCVNode::VelocityToCVNode() = default;
+VelocityToCVNode::~VelocityToCVNode() = default;
+
+void VelocityToCVNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioVelocityToCVNode>();
+   mAudioNode->PushParams(*this);
+}
+
+void VelocityToCVNode::VisitParams(ParamVisitor& v)
+{
+   v.Float("rangeLow", rangeLow);
+   v.Float("rangeHigh", rangeHigh);
+}
+
+AudioNode* VelocityToCVNode::AudioNodeForNotePorts()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioVelocityToCVNode>();
+   return mAudioNode.get();
+}
+
+float VelocityToCVNode::Value01()
+{
+   return LastVelocity();
+}
+
+float VelocityToCVNode::LastVelocity() const
+{
+   return mAudioNode ? std::clamp(mAudioNode->Level(), 0.0f, 1.0f) : 0.0f;
+}
+
+// ---------------------------------------------------------------- Switcher
+class AudioNoteSwitcherNode : public AudioNode
+{
+public:
+   static constexpr int kSlots = NoteSwitcherNode::kSlots;
+
+   struct VoiceInfo
+   {
+      uint8_t slot = 0;
+      int note = 0;
+   };
+
+   void PrepareToPlay(double /*sampleRate*/, int /*maxBlockSize*/) override
+   {
+      mSourceSlot.Clear();
+      mActiveSlotReadout.store(-1, std::memory_order_relaxed);
+   }
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& /*output*/) override
+   {
+      // 1. Compute active connected slot from clock or manualSlot
+      int connected[kSlots];
+      int count = 0;
+      for (int i = 0; i < kSlots; i++)
+      {
+         if (mInbox[i] != nullptr)
+            connected[count++] = i;
+      }
+
+      int activeSlot = -1;
+      if (count > 0)
+      {
+         const bool manual = mManual.load(std::memory_order_relaxed);
+         const int manualSlot = mManualSlot.load(std::memory_order_relaxed);
+         if (manual || count == 1)
+         {
+            const int pick = manual ? std::clamp(manualSlot, 0, kSlots - 1) : connected[0];
+            activeSlot = (mInbox[pick] != nullptr) ? pick : connected[0];
+         }
+         else
+         {
+            const int rateMode = mRateMode.load(std::memory_order_relaxed);
+            if (rateMode == 0)
+            {
+               const float rateBeats = std::max(0.01f, mRateBeats.load(std::memory_order_relaxed));
+               const double clock = Transport::Instance().Beats();
+               const double pos = clock / (double)rateBeats;
+               const long long index = (long long)std::floor(pos);
+               activeSlot = connected[(int)(((index % count) + count) % count)];
+            }
+            else
+            {
+               const float rateSeconds = std::max(0.01f, mRateSeconds.load(std::memory_order_relaxed));
+               const double clock = Transport::Instance().Seconds();
+               const double pos = clock / (double)rateSeconds;
+               const long long index = (long long)std::floor(pos);
+               activeSlot = connected[(int)(((index % count) + count) % count)];
+            }
+         }
+      }
+      mActiveSlotReadout.store(activeSlot, std::memory_order_relaxed);
+
+      // 2. Pop events from all 4 inboxes
+      struct TaggedEvent
+      {
+         NoteEvent event;
+         uint8_t slot;
+      };
+      TaggedEvent all[kSlots * 64];
+      int total = 0;
+
+      for (int s = 0; s < kSlots; s++)
+      {
+         if (mInbox[s] == nullptr)
+            continue;
+         NoteEvent evts[64];
+         const int n = mInbox[s]->Pop(mCursor[s], evts, 64);
+         for (int i = 0; i < n && total < kSlots * 64; i++)
+         {
+            all[total].event = evts[i];
+            all[total].slot = (uint8_t)s;
+            total++;
+         }
+      }
+
+      std::stable_sort(all, all + total, [](const TaggedEvent& a, const TaggedEvent& b)
+      {
+         return a.event.frameOffset < b.event.frameOffset;
+      });
+
+      // 3-5. Forward note-ons from active slot, note-offs/bends from registered voices
+      for (int i = 0; i < total; i++)
+      {
+         const NoteEvent& e = all[i].event;
+         const uint8_t slot = all[i].slot;
+
+         if (e.isNoteOn)
+         {
+            if ((int)slot == activeSlot)
+            {
+               mSourceSlot.GetOrInsert(e.voiceId) = { slot, e.note };
+               NoteEvent out = e;
+               out.source = this;
+               mOutbox.Push(out);
+            }
+         }
+         else
+         {
+            if (VoiceInfo* info = mSourceSlot.Find(e.voiceId))
+            {
+               NoteEvent out = e;
+               out.source = this;
+               mOutbox.Push(out);
+               if (!e.bendUpdate)
+                  mSourceSlot.Erase(e.voiceId);
+            }
+         }
+      }
+
+      // 6. Orphan flush: if slot for a sounding voice became disconnected, emit note-off and erase
+      mSourceSlot.ForEach([this](int voiceId, VoiceInfo& v) -> bool
+      {
+         if (v.slot >= kSlots || mInbox[v.slot] == nullptr)
+         {
+            NoteEvent off;
+            off.note = v.note;
+            off.velocity = 0.0f;
+            off.isNoteOn = false;
+            off.frameOffset = 0;
+            off.source = this;
+            off.voiceId = voiceId;
+            mOutbox.Push(off);
+            return true;
+         }
+         return false;
+      });
+   }
+
+   NoteEventQueue* NoteOutbox() override { return &mOutbox; }
+
+   void SetNoteInbox(int inputSlot, NoteEventQueue* inbox, int cursor) override
+   {
+      if (inputSlot >= 0 && inputSlot < kSlots)
+      {
+         mInbox[inputSlot] = inbox;
+         mCursor[inputSlot] = cursor;
+      }
+   }
+
+   void PushParams(int rateMode, float rateBeats, float rateSeconds, bool manual, int manualSlot)
+   {
+      mRateMode.store(rateMode, std::memory_order_relaxed);
+      mRateBeats.store(rateBeats, std::memory_order_relaxed);
+      mRateSeconds.store(rateSeconds, std::memory_order_relaxed);
+      mManual.store(manual, std::memory_order_relaxed);
+      mManualSlot.store(manualSlot, std::memory_order_relaxed);
+   }
+
+   int ActiveSlot() const { return mActiveSlotReadout.load(std::memory_order_relaxed); }
+
+private:
+   NoteEventQueue mOutbox;
+   NoteEventQueue* mInbox[kSlots] = {};
+   int mCursor[kSlots] = { -1, -1, -1, -1 };
+   VoiceIdMap<VoiceInfo, 128> mSourceSlot;
+
+   std::atomic<int> mActiveSlotReadout { -1 };
+   std::atomic<int> mRateMode { 0 };
+   std::atomic<float> mRateBeats { 4.0f };
+   std::atomic<float> mRateSeconds { 1.0f };
+   std::atomic<bool> mManual { false };
+   std::atomic<int> mManualSlot { 0 };
+};
+
+NoteSwitcherNode::NoteSwitcherNode() = default;
+NoteSwitcherNode::~NoteSwitcherNode() = default;
+
+void NoteSwitcherNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioNoteSwitcherNode>();
+   mAudioNode->PushParams(rateMode, rateBeats, rateSeconds, manual, manualSlot);
+}
+
+void NoteSwitcherNode::VisitParams(ParamVisitor& v)
+{
+   v.Int("rateMode", rateMode);
+   v.Float("rateBeats", rateBeats);
+   v.Float("rateSeconds", rateSeconds);
+   v.Bool("manual", manual);
+   v.Int("manualSlot", manualSlot);
+}
+
+AudioNode* NoteSwitcherNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioNoteSwitcherNode>();
+   return mAudioNode.get();
+}
+
+const char* NoteSwitcherNode::InputLabel(int slot) const
+{
+   static const char* kLabels[kSlots] = { "1", "2", "3", "4" };
+   return (slot >= 0 && slot < kSlots) ? kLabels[slot] : nullptr;
+}
+
+int NoteSwitcherNode::ActiveSlot() const
+{
+   return mAudioNode ? mAudioNode->ActiveSlot() : -1;
+}

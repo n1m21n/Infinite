@@ -123,6 +123,14 @@ void RampNode::CookIfNeeded(int frameId)
       col[i * 3 + 2] = stopColor[src][2];
    }
 
+   CookSignature sig;
+   VisitParams(sig.params);
+   sig.w = w;
+   sig.h = h;
+   if (mHasBuilt && sig == mBuiltSig)
+      return;
+   NodeWorkCounter()++;
+
    GLUtil::RunShaderPass(mOut, mProgram, [&]()
    {
       glUniform1i(glGetUniformLocation(mProgram, "uType"), type);
@@ -138,4 +146,7 @@ void RampNode::CookIfNeeded(int frameId)
       glUniform3fv(glGetUniformLocation(mProgram, "uStopColor"), kStops, col);
       glUniform1f(glGetUniformLocation(mProgram, "uAspect"), (float)mOut.w / (float)mOut.h);
    });
+   mBuiltSig = std::move(sig);
+   mHasBuilt = true;
+   mRevision = NextTextureRevision();
 }

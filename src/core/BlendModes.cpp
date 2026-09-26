@@ -11,7 +11,7 @@ namespace BlendModes
          "Overlay", "Soft Light", "Hard Light", "Vivid Light", "Linear Light", "Pin Light", "Hard Mix",
          "Difference", "Exclusion", "Subtract", "Divide",
          "Hue", "Saturation", "Color", "Luminosity",
-         "Average", "Negation", "Reflect", "Glow", "Erase"
+         "Average", "Negation", "Reflect", "Glow", "Erase", "Anti-Erase"
       };
    }
 

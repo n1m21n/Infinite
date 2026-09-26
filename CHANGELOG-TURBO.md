@@ -1,5 +1,88 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.40.0-turbo (2026-09-26)
+
+Performance pass, then more upstream features.
+
+### Performance
+- **Off-screen nodes skip their body** (ported from upstream): a node well outside the view keeps its
+  last box and pins (cables still land) and is not drawn. Always drawn: selected, dragged, nodes with
+  modulation / MIDI / expression / palette bindings, anything while a popup or MIDI learn is open,
+  the Keyboard node, and every node once per 30 frames. `INFINITE_NO_CULL=1` turns it off.
+- **Image chains settle**: Noise, Shape, Blend, Fit, Layer Stack, Ramp, Color Ramp and Curves only
+  re-render when their params, inputs or size change, so a still chain stops recooking everything
+  downstream every frame. Filters cache while the transport is stopped even if they read time.
+- **Separable blurs**: Gaussian Blur, Box Blur, Bloom, Diffuse Glow, Unsharp Mask and Outer Glow run
+  as two passes (2N texture reads per pixel instead of N squared), through one shared scratch
+  render target per size. Filter uniform locations are looked up once, not every cook.
+- **Video / camera upload**: decoder and capture threads hand over BGRA (the GPU's native upload
+  format); the render thread no longer pays a 3-byte BGR swizzle per frame.
+- **Undo / delete / autosave**: the patch snapshot is O(N) (was O(N squared) with dynamic_cast in the
+  inner loop), the undo stack drops old entries in O(1), deleting a selection rebuilds the audio graph
+  once instead of once per node, and the autosave writes on a worker thread (no periodic hitch).
+
+### Added
+- **Audio In**: choose the input pair (1+2, 3+4...) or a single channel (mono) of a multichannel
+  interface; each Audio In node reads independently (two Audio In nodes used to steal each
+  other's samples).
+- **Slideshow** (Source): the images of a folder with fade / slide / wipe / zoom transitions.
+- **CV Recorder** (CV Tools): record any modulator on the beat clock, loops on stop, speed, low / high.
+- **Resonator Bank**, **Cycle Shaper**, **Spec Blur** (AudioEffects) with their visualizers.
+- **Reverb**: upstream's 16-line FDN redesign (Schroeder diffusion, delay modulation, SSE path) and
+  an analog toggle. Existing params and patches unchanged.
+- **Audio Filter / EQ**: live spectrum of the signal behind the response curve; EQ: Shift-drag a
+  band dot to change its Q.
+- **Modulation matrix** (VIEW, Shift+M): every modulation cable in one table, with amount,
+  bipolar, range mapper, live value, jump to node and delete; expressions listed below.
+- **Explode**: "by" Faces or Loose Parts (each connected part moves as a rigid piece).
+
+### Not ported
+- Mod Mixer (reverted upstream), Drum Sequencer lane outs (Turbo's MPC + MPC Out covers it),
+  Geometry Table, asset decode cache, Performance Mode, update checker, glTF: next rounds.
+
+## 0.39.0-turbo (2026-09-26)
+
+Upstream features ported (items 1-13 of the easy list), adapted to Turbo.
+
+### Added
+- **Alpha filters** (Compositing): show alpha, opacity, set alpha (second input's luminance becomes
+  the alpha), alpha invert, alpha from luma, alpha levels, premultiply / unpremultiply.
+- **Theme**: Forest Green (light) preset; the Theme picker shows panel / text / accent swatches per
+  preset. Nord's dim text is readable now.
+- **Instance numbering**: nodes that share a title show "#1", "#2"... in the header, MIDI map, output
+  window titles and background-preview labels. Display only, patches are unchanged.
+- **Comment node**: hover it and start typing (or Enter / double-click) to edit, drag the bottom-right
+  corner to resize, font size Small / Normal / Large / Extra Large.
+- **Macros**: Macro Slider, Macro Bipolar Knob, Macro Toggle, Macro Trigger, Macro NumBox (min / max /
+  step), Macro Radio Selector (2-8), Macro Step Gate (8 steps on the transport). All controls live in the
+  node body and can be MIDI-learned there. New "Macros" category (Macro Knob and Macro XY moved in).
+- **Keyboard** (Notes): on-screen piano plus laptop typing while hovered (Z row / Q row), octave,
+  transpose, velocity, snap to the global scale.
+- **Velocity to CV** (Analysis) and **Note Switcher** (Notes, 4 note inputs on a beat / seconds clock
+  or manual).
+- **Drift** (Modulators): Ornstein-Uhlenbeck random walk with speed, stray, momentum, home, range,
+  depth, tempo quantize and smoothing. Upstream's version learns a landscape from your hand moves
+  (its MovementStats engine, not in Turbo); this one keeps the same physics around a fixed home.
+- **Audio Meter** (AudioUtility): stereo RMS + peak bars, peak hold, max-peak readout, clip latch
+  (click to reset); measures even with its output unconnected.
+- **Blend / Layer Stack**: Anti-Erase mode (keep A only where B is opaque), index 31, old patches
+  unchanged.
+- **Transform (geometry)**: pivot x / y / z for rotate and scale.
+- **Material**: UV wrap mode (clamp / repeat / mirror) applied to every map.
+- **Phaser**: feedback knob (-0.9..0.9, default 0.5) around the allpass cascade.
+- **Flanger**: ~7 kHz damping on the feedback path (repeats darken like a BBD).
+- **Sampler**: loop xfade (0-250 ms, default 8 ms, equal power) removes the wrap click.
+- **Browser**: star favourites in all four modes (Modules gets a FAVOURITES section on top), filter
+  (All / Favourites / type) and sort (name / type / folder / favourites first, asc / desc) in Samples,
+  Media and Plugins; right-click a row: favourite, Show in Explorer, copy path. Saved in
+  `%LOCALAPPDATA%\Infinite\Infinite.browserfavorites`.
+- **3D viewports**: numpad-style keys while hovering (1 front, 3 right, 7 top, Ctrl for the opposite
+  side, 0 three-quarter view).
+
+### Not ported
+- **Moves**: it projects a gesture onto the principal components of your recorded hand movements,
+  which needs upstream's MovementLog / MovementStats engine. Left for the prediction-engine port.
+
 ## 0.38.1-turbo (2026-09-26)
 
 ### Fixed

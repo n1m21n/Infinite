@@ -181,8 +181,26 @@ void ColorRampNode::CookIfNeeded(int frameId)
    if (srcTex == 0)
    {
       GLUtil::DestroyFbo(mOut);
+      mHasBuilt = false;
       return;
    }
+   CookSignature sig;
+   {
+      // VisitParams marks the LUT dirty (it doubles as the load path); a
+      // snapshot must not, or the LUT would be rebuilt every frame.
+      const bool lutDirty = mLutDirty;
+      VisitParams(sig.params);
+      mLutDirty = lutDirty;
+   }
+   sig.revs[0] = mInput.Revision();
+   sig.w = mInput.Width();
+   sig.h = mInput.Height();
+   if (mHasBuilt && sig == mBuiltSig && !mLutDirty && mLutTex != 0)
+      return;
+   if (!mHasBuilt || sig.params != mBuiltSig.params)
+      mLutDirty = true; // a stop moved (UI or modulation)
+   NodeWorkCounter()++;
+
    if (!EnsureShader())
       return;
    if (mLutDirty || mLutTex == 0)
@@ -200,4 +218,7 @@ void ColorRampNode::CookIfNeeded(int frameId)
       glUniform1i(glGetUniformLocation(mProgram, "uLut"), 1);
       glUniform1f(glGetUniformLocation(mProgram, "uMix"), mix);
    });
+   mBuiltSig = std::move(sig);
+   mHasBuilt = true;
+   mRevision = NextTextureRevision();
 }

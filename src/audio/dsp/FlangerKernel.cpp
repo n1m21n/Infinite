@@ -21,6 +21,7 @@ void FlangerKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sid
    const float lineCapacityMs = kMaxDelayMs - 2.0f;
    const bool sync = mSync.load(std::memory_order_relaxed) != 0;
    const int rateDiv = mRateDiv.load(std::memory_order_relaxed);
+   const float dampCoef = 1.0f - std::exp(-2.0f * (float)M_PI * 7000.0f / (float)mSampleRate);
 
    for (int i = 0; i < out.numFrames; i++)
    {
@@ -50,8 +51,10 @@ void FlangerKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sid
       const float delayedL = mLineL.Read(lMs * 0.001f * (float)mSampleRate);
       const float delayedR = mLineR.Read(rMs * 0.001f * (float)mSampleRate);
 
-      mLineL.Write(inL + delayedL * feedback);
-      mLineR.Write(inR + delayedR * feedback);
+      mDampL += dampCoef * (delayedL - mDampL);
+      mDampR += dampCoef * (delayedR - mDampR);
+      mLineL.Write(inL + mDampL * feedback);
+      mLineR.Write(inR + mDampR * feedback);
 
       out.channels[0][i] = delayedL;
       if (numChannels >= 2)

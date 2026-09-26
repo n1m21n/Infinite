@@ -308,6 +308,9 @@ namespace Platform
    std::string OpenFolderDialog(const char* title = "Add sample folder",
                                 const std::string& initialDir = std::string());
 
+   // Turbo: opens Explorer with `path` selected (a folder path just opens it).
+   void RevealInFileManager(const std::string& path);
+
    // A whole audio file decoded to planar float PCM, ready for an audio-
    // thread node to read directly (no further per-block decoding). Decoding
    // itself only ever happens on the main thread, at load time.
@@ -352,6 +355,14 @@ namespace Platform
    // isn't running yet, e.g. still waiting on the device to open or on mic
    // permission). Audio-thread safe: lock-free, no allocation.
    int AudioInputCaptureRead(float* const* outChannels, int numFrames, int maxChannels);
+   // Turbo: reads `count` channels starting at `firstChannel` (0-based) of the
+   // input device, with a per-reader cursor (several Audio In nodes can read
+   // the same audio). Audio-thread safe. Returns the channels that exist.
+   int AudioInputCaptureReadChannels(float* const* outChannels, int numFrames, int firstChannel, int count,
+                                     unsigned long long& cursor);
+   // Names of the input device's active channels ("Input 1", "Mic/Line 3"...).
+   std::vector<std::string> AudioInputChannelNames();
+   std::string AudioInputDeviceName();
 
    // ---- audio plugin hosting -----------------------------------------------
    // Every Objective-C object involved in hosting a third-party plugin lives

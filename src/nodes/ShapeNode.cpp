@@ -200,6 +200,12 @@ void ShapeNode::CookIfNeeded(int frameId)
    if (!GLUtil::EnsureFbo(mOut, w, h))
       return;
 
+   ParamSnapshot params;
+   VisitParams(params);
+   if (mHasBuilt && params == mBuiltParams)
+      return; // nothing changed since the last cook - reuse mOut as-is
+
+   NodeWorkCounter()++;
    GLUtil::RunShaderPass(mOut, mProgram, [this]()
    {
       glUniform1i(glGetUniformLocation(mProgram, "uShape"), shapeType);
@@ -218,4 +224,7 @@ void ShapeNode::CookIfNeeded(int frameId)
       glUniform3f(glGetUniformLocation(mProgram, "uBgColor"), bgColor[0], bgColor[1], bgColor[2]);
       glUniform1f(glGetUniformLocation(mProgram, "uBgOpacity"), bgOpacity);
    });
+   mBuiltParams = std::move(params);
+   mHasBuilt = true;
+   mRevision = NextTextureRevision();
 }

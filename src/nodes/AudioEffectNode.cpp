@@ -81,14 +81,20 @@ public:
          const float angle = m * (float)M_PI * 0.5f;
          const float dryGain = cosf(angle);
          const float wetGain = sinf(angle);
+         float monoSum = 0.0f;
          for (int ch = 0; ch < numChannels; ch++)
          {
             const float v = in.channels[ch][i] * dryGain + wet.channels[ch][i] * wetGain;
             output.channels[ch][i] = v;
             peak = std::max(peak, std::fabs(v));
+            monoSum += v;
          }
+         if (i < (int)mMono.size())
+            mMono[i] = numChannels > 0 ? monoSum / (float)numChannels : 0.0f;
       }
       mMeter.Write(&peak, 1);
+      // Post-mix mono tap for the spectrum visualizers (Spec Blur, EQ).
+      mSpectrumRing.Write(mMono.data(), std::min(output.numFrames, (int)mMono.size()));
    }
 
    // Main thread only.
@@ -98,6 +104,8 @@ public:
    MeterRing& Meter() { return mMeter; }
    int LatencySamples() const override { return mKernel->LatencySamples(); }
    MeterRing* KernelExtraMeter() { return mKernel->ExtraMeter(); }
+   // Main thread only.
+   int ReadSpectrumSamples(float* out, int maxCount) { return mSpectrumRing.Read(out, maxCount); }
 
 private:
    static constexpr int kMaxChannels = 8;
@@ -107,6 +115,7 @@ private:
       mMaxBlockSize = std::max(1, maxBlockSize);
       mWetStorage.assign((size_t)mMaxBlockSize * kMaxChannels, 0.0f);
       mSilence.assign((size_t)mMaxBlockSize, 0.0f);
+      mMono.assign((size_t)mMaxBlockSize, 0.0f);
       for (int ch = 0; ch < kMaxChannels; ch++)
          mWetChannels[ch] = mWetStorage.data() + (size_t)ch * mMaxBlockSize;
    }
@@ -121,7 +130,14 @@ private:
    int mMaxBlockSize = 0;
 
    MeterRing mMeter;
+   MeterRing mSpectrumRing;
+   std::vector<float> mMono;
 };
+
+int AudioEffectNode::ReadSpectrumSamples(float* out, int maxCount)
+{
+   return mAudioNode ? mAudioNode->ReadSpectrumSamples(out, maxCount) : 0;
+}
 
 AudioEffectNode::AudioEffectNode(const EffectDef& def) : mix(def.defaultMix), mDef(def)
 {

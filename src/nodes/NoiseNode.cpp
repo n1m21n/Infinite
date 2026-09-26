@@ -269,7 +269,16 @@ void NoiseNode::CookIfNeeded(int frameId)
    if (!GLUtil::EnsureFbo(mOut, w, h))
       return;
 
-   GLUtil::RunShaderPass(mOut, mProgram, [this]()
+   ParamSnapshot params;
+   VisitParams(params);
+   const float seconds = (float)Transport::Instance().Seconds();
+   const float time = seconds * speed;
+   // Raw seconds, not time: Turbo's drift (uSeconds) animates even at speed 0.
+   if (mHasBuilt && params == mBuiltParams && seconds == mBuiltTime)
+      return; // nothing changed since the last cook - reuse mOut as-is
+
+   NodeWorkCounter()++;
+   GLUtil::RunShaderPass(mOut, mProgram, [this, time, seconds]()
    {
       glUniform1i(glGetUniformLocation(mProgram, "uType"), noiseType);
       glUniform1f(glGetUniformLocation(mProgram, "uScale"), scale);
@@ -277,7 +286,7 @@ void NoiseNode::CookIfNeeded(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uLacunarity"), lacunarity);
       glUniform1f(glGetUniformLocation(mProgram, "uGain"), gain);
       glUniform1f(glGetUniformLocation(mProgram, "uWarp"), warp);
-      glUniform1f(glGetUniformLocation(mProgram, "uTime"), (float)Transport::Instance().Seconds() * speed);
+      glUniform1f(glGetUniformLocation(mProgram, "uTime"), time);
       glUniform1f(glGetUniformLocation(mProgram, "uContrast"), contrast);
       glUniform1f(glGetUniformLocation(mProgram, "uBrightness"), brightness);
       glUniform1f(glGetUniformLocation(mProgram, "uSeed"), seed);
@@ -287,9 +296,13 @@ void NoiseNode::CookIfNeeded(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uAspect"), (float)mOut.w / (float)mOut.h);
       glUniform2f(glGetUniformLocation(mProgram, "uTranslate"), translateX, translateY);
       glUniform2f(glGetUniformLocation(mProgram, "uDrift"), driftX, driftY);
-      glUniform1f(glGetUniformLocation(mProgram, "uSeconds"), (float)Transport::Instance().Seconds());
+      glUniform1f(glGetUniformLocation(mProgram, "uSeconds"), seconds);
       glUniform1f(glGetUniformLocation(mProgram, "uZ"), zOffset);
       glUniform1f(glGetUniformLocation(mProgram, "uRot"), rotate);
       glUniform1f(glGetUniformLocation(mProgram, "uExponent"), exponent);
    });
+   mBuiltParams = std::move(params);
+   mBuiltTime = seconds;
+   mHasBuilt = true;
+   mRevision = NextTextureRevision();
 }

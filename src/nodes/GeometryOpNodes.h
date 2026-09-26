@@ -127,6 +127,11 @@ public:
    // are what "rot / step" and "scale / step" mean).
    float rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f;
    float scaleX = 1.0f, scaleY = 1.0f, scaleZ = 1.0f;
+   // Transform / Transform Selected only: point rotate and scale pivot about,
+   // instead of the mesh's own origin. TransformMatrix() shifts into
+   // pivot-local space before R*S and back out before offsetX/Y/Z - at
+   // (0,0,0) (the default) this is a no-op, identical to no pivot existing.
+   float pivotX = 0.0f, pivotY = 0.0f, pivotZ = 0.0f;
    // Transform / Transform Selected only: extra Y-axis rotation per beat, on
    // top of rotY, so a shape can spin on its own - same idea as GeometryNode's
    // spinY. TransformMatrix() bakes this into the mesh cache when not
@@ -144,6 +149,11 @@ public:
    bool flatShade = false, flipNormals = false;
    float seed = 0.0f;
    int axis = 1;
+   // Explode only: 0 = Faces (push each triangle along its own normal - the
+   // original behaviour, and the default so every existing patch looks
+   // unchanged), 1 = Loose Parts (push each connected component of the mesh
+   // outward as a rigid unit - see MeshOps::Explode's looseParts branch).
+   int explodeBy = 0;
 
    // Smooth
    int iterations = 2;
@@ -208,12 +218,14 @@ public:
       v.Float("rotStep", rotStep); v.Float("scaleStep", scaleStep);
       v.Float("rotX", rotX); v.Float("rotY", rotY); v.Float("rotZ", rotZ);
       v.Float("scaleX", scaleX); v.Float("scaleY", scaleY); v.Float("scaleZ", scaleZ);
+      v.Float("pivotX", pivotX); v.Float("pivotY", pivotY); v.Float("pivotZ", pivotZ);
       v.Float("spin", spin);
       v.Bool("radial", radial); v.Float("radius", radius);
       v.Int("levels", levels); v.Float("smooth", smooth);
       v.Float("thickness", thickness); v.Bool("keepOriginal", keepOriginal);
       v.Float("inset", inset); v.Bool("flat", flatShade); v.Bool("flip", flipNormals);
       v.Float("seed", seed); v.Int("axis", axis);
+      v.Int("explodeBy", explodeBy);
       v.Int("iterations", iterations); v.Float("mirrorOffset", mirrorOffset);
       v.Bool("weldSeam", weldSeam); v.Int("screwSteps", screwSteps);
       v.Float("turns", turns); v.Float("rise", rise); v.Float("radiusOffset", radiusOffset);
@@ -237,10 +249,11 @@ public:
 private:
    struct Signature
    {
-      int op = -1, count = 0, levels = 0, axis = 0;
+      int op = -1, count = 0, levels = 0, axis = 0, explodeBy = 0;
       float a = 0, ox = 0, oy = 0, oz = 0, rs = 0, ss = 0, rad = 0;
       float sm = 0, th = 0, ins = 0, sd = 0;
       float rx = 0, ry = 0, rz = 0, sx = 0, sy = 0, sz = 0;
+      float px = 0, py = 0, pz = 0;
       // Only meaningful (and only ever set) while spin != 0 - see the comment
       // on GeometryOpNode::spin. Zero the rest of the time so two builds with
       // spin == 0 still compare equal regardless of when each ran.
@@ -263,6 +276,7 @@ private:
       bool operator==(const Signature& o) const
       {
          return op == o.op && count == o.count && levels == o.levels && axis == o.axis &&
+                explodeBy == o.explodeBy &&
                 a == o.a && ox == o.ox && oy == o.oy && oz == o.oz && rs == o.rs &&
                 ss == o.ss && rad == o.rad && sm == o.sm && th == o.th && ins == o.ins &&
                 sd == o.sd && radial == o.radial && keep == o.keep && flat == o.flat &&
@@ -277,7 +291,8 @@ private:
                 keepSelected == o.keepSelected &&
                 moveAlongNormals == o.moveAlongNormals &&
                 rx == o.rx && ry == o.ry && rz == o.rz &&
-                sx == o.sx && sy == o.sy && sz == o.sz && spinBeats == o.spinBeats &&
+                sx == o.sx && sy == o.sy && sz == o.sz &&
+                px == o.px && py == o.py && pz == o.pz && spinBeats == o.spinBeats &&
                 upstream == o.upstream && upstreamRevision == o.upstreamRevision;
       }
    };

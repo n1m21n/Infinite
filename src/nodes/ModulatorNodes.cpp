@@ -239,6 +239,162 @@ float SmoothNode::Value01()
    return mLast;
 }
 
+// ---------------------------------------------------------------- CV Recorder
+
+namespace
+{
+   const char* kHex = "0123456789abcdef";
+   int HexVal(char c)
+   {
+      if (c >= '0' && c <= '9') return c - '0';
+      if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+      return -1;
+   }
+   unsigned char Quantize(float v) { return (unsigned char)std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f); }
+}
+
+void CVRecorderNode::VisitParams(ParamVisitor& v)
+{
+   v.Float("constantIn", constantIn);
+   v.Float("speed", speed);
+   v.Float("low", low);
+   v.Float("high", high);
+   v.Bool("playing", playing);
+
+   std::string enc;
+   enc.reserve(mData.size() * 2);
+   for (unsigned char b : mData)
+   {
+      enc.push_back(kHex[b >> 4]);
+      enc.push_back(kHex[b & 15]);
+   }
+   const std::string before = enc;
+   v.Text("data", enc);
+   if (enc != before && !mRecording) // a load / undo restore replaced the take
+   {
+      mData.clear();
+      for (size_t i = 0; i + 1 < enc.size() && (int)mData.size() < kMaxSamples; i += 2)
+      {
+         const int hi = HexVal(enc[i]), lo = HexVal(enc[i + 1]);
+         if (hi < 0 || lo < 0) break;
+         mData.push_back((unsigned char)(hi * 16 + lo));
+      }
+      mAnchorSet = false;
+   }
+}
+
+void CVRecorderNode::StartRecording()
+{
+   mRecording = true;
+   mData.clear();
+   mRecStart = Transport::Instance().Beats();
+}
+
+void CVRecorderNode::StopRecording()
+{
+   if (!mRecording)
+      return;
+   mRecording = false;
+   playing = !mData.empty();
+   mAnchorSet = false; // playback restarts from the top of the take
+   mLastBeats = -1.0;
+   mPhase = 0.0;
+}
+
+void CVRecorderNode::StartPlayback()
+{
+   playing = true;
+   mAnchorSet = false;
+   mLastBeats = -1.0;
+   mPhase = 0.0;
+}
+
+void CVRecorderNode::StopPlayback()
+{
+   playing = false;
+}
+
+void CVRecorderNode::Clear()
+{
+   mRecording = false;
+   playing = false;
+   mData.clear();
+}
+
+float CVRecorderNode::Sample(double pos) const
+{
+   const int n = (int)mData.size();
+   if (n == 0)
+      return 0.0f;
+   if (pos < 0.0)
+      pos = 0.0;
+   int i0 = (int)pos;
+   const float f = (float)(pos - i0);
+   i0 %= n;
+   const int i1 = (i0 + 1) % n;
+   return (mData[i0] + (mData[i1] - mData[i0]) * f) * (1.0f / 255.0f);
+}
+
+float CVRecorderNode::Value01()
+{
+   const float in = std::clamp(input ? input->Value01() : constantIn, 0.0f, 1.0f);
+   if (bypassed)
+      return in;
+   const double beats = Transport::Instance().Beats();
+
+   if (mRecording)
+   {
+      double rel = beats - mRecStart;
+      if (rel < 0.0) // transport rewound: start the take over from here
+      {
+         mRecStart = beats;
+         mData.clear();
+         rel = 0.0;
+      }
+      const int idx = (int)(rel * kSamplesPerBeat);
+      if (idx >= kMaxSamples)
+      {
+         StopRecording(); // take is full; fall through to playback
+      }
+      else
+      {
+         // Fill any skipped slots with the previous value so a stalled frame
+         // leaves a hold, not a gap; the current slot tracks the latest input.
+         const unsigned char q = Quantize(in);
+         while ((int)mData.size() <= idx)
+            mData.push_back(mData.empty() ? q : mData.back());
+         mData[idx] = q;
+         mLastOut = in;
+         return in;
+      }
+   }
+
+   if (!mPlaying())
+      return mData.empty() ? in : mLastOut;
+   if (beats == mLastBeats)
+      return mLastOut; // already resolved this tick
+
+   // Integrate the playhead instead of deriving it from (beats - anchor) *
+   // speed: that form jumps the loop position every time `speed` is dragged.
+   // A rewind or first tick only re-seeds mLastBeats, keeping the phase.
+   if (!mAnchorSet || mLastBeats < 0.0 || beats < mLastBeats)
+   {
+      mAnchorSet = true;
+      if (mLastBeats < 0.0)
+         mPhase = 0.0; // fresh pass starts from the top of the take
+   }
+   else
+      mPhase += (beats - mLastBeats) * std::max(0.0f, speed) * kSamplesPerBeat;
+   mLastBeats = beats;
+
+   const double n = (double)mData.size();
+   mPhase = std::fmod(mPhase, n);
+   const double pos = mPhase;
+   mPlayNorm = (float)(pos / n);
+   mLastOut = std::clamp(low + (high - low) * Sample(pos), 0.0f, 1.0f);
+   return mLastOut;
+}
+
 // ---------------------------------------------------------------- Mod Depth
 
 float ModDepthNode::Value01()

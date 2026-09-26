@@ -43,6 +43,13 @@ struct FilterDef
    // Most filters take one image. Set to 2 for filters that read a second
    // texture (uSrc2) - displacement maps, LUTs, and the like.
    int inputs = 1;
+
+   // Optional first pass, for separable kernels. When set, FilterNode runs
+   // this body (same preamble, same uniforms, uSrc = the input) into an
+   // RGBA16F intermediate the size of the input, then runs fragmentBody with
+   // that intermediate bound as uPass. A 2D Gaussian written as a horizontal
+   // prePass plus a vertical main pass reads 2N texels instead of N².
+   std::string prePassBody;
 };
 
 const std::vector<FilterDef>& GetFilterDefs();

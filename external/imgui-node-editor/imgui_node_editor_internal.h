@@ -404,6 +404,12 @@ struct Node final: Object
 
     bool     m_RestoreState;
     bool     m_CenterOnScreen;
+    // --- Infinite local change: off-screen node culling ---
+    // Where m_Bounds.Min was when this node's pins were last laid out by a
+    // real Begin/EndNode, so KeepOffscreenNodeAlive can shift the kept pins
+    // if the node moved since (a programmatic SetNodePosition).
+    ImVec2   m_PinsOrigin;
+    bool     m_HasPinLayout;
 
     Node(EditorContext* editor, NodeId id)
         : Object(editor)
@@ -422,6 +428,8 @@ struct Node final: Object
         , m_HighlightConnectedLinks(false)
         , m_RestoreState(false)
         , m_CenterOnScreen(false)
+        , m_PinsOrigin()
+        , m_HasPinLayout(false)
     {
     }
 
@@ -1319,6 +1327,7 @@ struct EditorContext
     const ImRect& GetRect() const { return m_Canvas.Rect(); }
 
     void SetNodePosition(NodeId nodeId, const ImVec2& screenPosition);
+    bool KeepOffscreenNodeAlive(NodeId nodeId, float margin);
     void SetGroupSize(NodeId nodeId, const ImVec2& size);
     ImVec2 GetNodePosition(NodeId nodeId);
     ImVec2 GetNodeSize(NodeId nodeId);

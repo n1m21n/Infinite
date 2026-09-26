@@ -38,6 +38,7 @@ namespace
            "      float amt = uOpacity[i] * layer.a;\n"
            "      if (!haveBase) { acc = vec4(layer.rgb, layer.a * uOpacity[i]); haveBase = true; continue; }\n"
            "      if (uModes[i] == 30) { acc.a *= (1.0 - amt); continue; }\n"
+           "      if (uModes[i] == 31) { acc.a *= (1.0 - (1.0 - layer.a) * uOpacity[i]); continue; }\n"
            "      vec3 blended = blendMode(uModes[i], acc.rgb, layer.rgb);\n"
            "      acc.rgb = mix(acc.rgb, blended, amt);\n"
            "      acc.a = max(acc.a, layer.a * uOpacity[i]);\n"
@@ -113,6 +114,16 @@ void LayerStackNode::CookIfNeeded(int frameId)
    if (!GLUtil::EnsureFbo(mOut, w, h))
       return;
 
+   CookSignature sig;
+   VisitParams(sig.params);
+   for (int i = 0; i < kSlots && i < 4; i++)
+      sig.revs[i] = tex[i] != 0 ? mInputs[i].Revision() : 0;
+   sig.w = w;
+   sig.h = h;
+   if (mHasBuilt && sig == mBuiltSig)
+      return;
+   NodeWorkCounter()++;
+
    GLUtil::RunShaderPass(mOut, mProgram, [this, &tex, &active]()
    {
       static const char* kTexNames[kSlots] = { "uTex0", "uTex1", "uTex2", "uTex3" };
@@ -126,4 +137,7 @@ void LayerStackNode::CookIfNeeded(int frameId)
       glUniform1iv(glGetUniformLocation(mProgram, "uModes"), kSlots, modes);
       glUniform1fv(glGetUniformLocation(mProgram, "uOpacity"), kSlots, opacities);
    });
+   mBuiltSig = std::move(sig);
+   mHasBuilt = true;
+   mRevision = NextTextureRevision();
 }

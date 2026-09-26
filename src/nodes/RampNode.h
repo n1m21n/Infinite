@@ -23,6 +23,7 @@ public:
    int GetOutputWidth() const override { return mOut.w; }
    int GetOutputHeight() const override { return mOut.h; }
    void CookIfNeeded(int frameId) override;
+   unsigned long long TextureRevision() const override { return mRevision; }
 
    int type = 0;   // linear / radial / angular / diamond / spiral
    int repeat = 0; // clamp / repeat / mirror
@@ -69,4 +70,9 @@ private:
    unsigned int mProgram = 0;
    bool mShaderTried = false;
    int mLastCookFrame = -1;
+
+   // Turbo: skip-if-unchanged (see CookSignature in INode.h)
+   CookSignature mBuiltSig;
+   bool mHasBuilt = false;
+   unsigned long long mRevision = 0;
 };

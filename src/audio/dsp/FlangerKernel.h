@@ -51,6 +51,7 @@ public:
       mLineL.Reset();
       mLineR.Reset();
       mPhase = 0.0;
+      mDampL = mDampR = 0.0f;
    }
 
    void PushParams(const AudioEffectNode& node, double sampleRate) override;
@@ -68,4 +69,7 @@ private:
 
    DelayLine mLineL, mLineR;
    double mPhase = 0.0;
+   // One-pole low-pass (~7 kHz) on the feedback tap only, like a BBD loop:
+   // repeats darken on every pass while the first tap stays full-band.
+   float mDampL = 0.0f, mDampR = 0.0f;
 };

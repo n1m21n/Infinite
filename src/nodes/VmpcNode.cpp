@@ -579,18 +579,18 @@ void VmpcNode::CookIfNeeded(int frameId)
    {
       const int w = Platform::VideoWidth(p.video);
       const int h = Platform::VideoHeight(p.video);
-      if (w > 0 && h > 0 && mFrame.size() >= (size_t)w * (size_t)h * 3)
+      if (w > 0 && h > 0 && mFrame.size() >= (size_t)w * (size_t)h * 4)
       {
          glBindTexture(GL_TEXTURE_2D, mTex);
-         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+         glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
          if (w != mTexW || h != mTexH)
          {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_BGR, GL_UNSIGNED_BYTE, mFrame.data());
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, mFrame.data());
             mTexW = w;
             mTexH = h;
          }
          else
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_BGR, GL_UNSIGNED_BYTE, mFrame.data());
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, mFrame.data());
          glBindTexture(GL_TEXTURE_2D, 0);
          mWidth = w;
          mHeight = h;

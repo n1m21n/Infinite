@@ -86,6 +86,9 @@ enum class EffectVisualizerId
    kWavetableShaperCurve,
    kEqCurve,
    kLimiterMeter,
+   kResonatorBankSpectrum,
+   kCycleShaperWave,
+   kSpecBlurSpectrum,
 };
 
 struct EffectDef

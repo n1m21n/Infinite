@@ -26,11 +26,13 @@ public:
    float width = 260.0f;
    float height = 140.0f;
    float color[3] = { 0.95f, 0.85f, 0.45f };
+   int fontSize = 1; // 0 small, 1 normal, 2 large, 3 extra large
 
    void VisitParams(ParamVisitor& v) override
    {
       v.Text("text", text);
       v.Float("width", width); v.Float("height", height);
+      v.Int("fontSize", fontSize);
       v.Color("color", color);
    }
 };
@@ -266,12 +268,21 @@ public:
    float anisotropyRotation = 0.0f;
    float dispersion = 0.0f;
    float alphaCutoff = 0.0f;
+   // How the albedo/roughness/metallic/normal/ao/emission/clearcoat/sheen
+   // maps sample outside 0..1 UV - 0=Clamp (smear edge pixel, matches every
+   // saved patch before this param existed), 1=Repeat, 2=Mirror.
+   int wrapMode = 0;
+   static const std::vector<std::string>& WrapModeNames()
+   {
+      static const std::vector<std::string> kNames = { "clamp", "repeat", "mirror" };
+      return kNames;
+   }
 
    void VisitParams(ParamVisitor& v) override
    {
       v.Color("color", color); v.Float("metallic", metallic);
       v.Float("roughness", roughness); v.Float("opacity", opacity);
-      v.Int("shading", shading);
+      v.Int("shading", shading); v.Int("wrapMode", wrapMode);
       v.Color("emissionColor", emissionColor); v.Float("emission", emission);
       v.Float("ior", ior); v.Float("transmission", transmission);
       v.Float("transmissionRoughness", transmissionRoughness);

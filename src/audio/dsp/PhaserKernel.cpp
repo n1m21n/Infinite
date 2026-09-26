@@ -10,6 +10,7 @@ void PhaserKernel::PushParams(const AudioEffectNode& node, double sampleRate)
    mMailbox.Push(kRateHz, node.Param("rate"));
    mMailbox.Push(kDepth, node.Param("depth"));
    mMailbox.Push(kSpread, node.Param("spread"));
+   mMailbox.Push(kFeedback, node.Param("feedback"));
    mStageCount.store(std::clamp((int)(node.Param("order") + 0.5f) & ~1, 2, kMaxStages), std::memory_order_relaxed);
    mSync.store(node.Param("sync") != 0.0f ? 1 : 0, std::memory_order_relaxed);
    mRateDiv.store(std::clamp((int)(node.Param("rateDiv") + 0.5f), 0, MusicTime::kNumRateDivisions - 1),
@@ -36,6 +37,7 @@ void PhaserKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
          rateHz = std::max(0.0f, mMailbox.SmoothedValue(kRateHz));
       const float depth = std::clamp(mMailbox.SmoothedValue(kDepth), 0.0f, 1.0f);
       const float spread = std::clamp(mMailbox.SmoothedValue(kSpread), 0.0f, 1.0f);
+      const float fb = std::clamp(mMailbox.SmoothedValue(kFeedback), -0.9f, 0.9f);
 
       mPhase += rateHz / mSampleRate;
       if (mPhase >= 1.0)
@@ -50,13 +52,17 @@ void PhaserKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
       const float aL = AllpassCoeff(fcL, (float)mSampleRate);
       const float aR = AllpassCoeff(fcR, (float)mSampleRate);
 
-      float xL = in.channels[0][i];
-      float xR = numChannels >= 2 ? in.channels[1][i] : xL;
+      // The cascade is unity-magnitude, so |fb| < 1 is stable; the tanh only
+      // tames transients when feedback and a hot input stack up.
+      float xL = std::tanh(in.channels[0][i] + fb * mFbL);
+      float xR = std::tanh((numChannels >= 2 ? in.channels[1][i] : in.channels[0][i]) + fb * mFbR);
       for (int s = 0; s < stages; s++)
       {
          xL = mStagesL[s].Process(xL, aL);
          xR = mStagesR[s].Process(xR, aR);
       }
+      mFbL = xL;
+      mFbR = xR;
 
       out.channels[0][i] = xL;
       if (numChannels >= 2)

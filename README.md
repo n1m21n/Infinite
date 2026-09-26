@@ -3,7 +3,7 @@
 [![Original project](https://img.shields.io/badge/original-n1m21n%2FInfinite-181717?logo=github)](https://github.com/n1m21n/Infinite)
 [![Discord](https://img.shields.io/badge/Discord-Infinite-5865F2?logo=discord&logoColor=white)](https://discord.gg/wpKdexvhn)
 
-**Current version: 0.38.1-turbo** (shown in the window title and in the FILE menu, with the build date).
+**Current version: 0.40.0-turbo** (shown in the window title and in the FILE menu, with the build date).
 
 Infinite-Turbo is a **mod of Infinite**, the node-based audiovisual modular workstation by Naman Soni (realtime image and video processing, procedural 3D, audio synthesis, DSP, VST3 hosting, MIDI, OSC and cross-domain CV modulation). It is unofficial and Windows-only.
 
@@ -60,6 +60,10 @@ Do not run the application from inside the ZIP.
 | Output windows | exact size in pixels, Fit / Real pixels 1:1 / Fill / Stretch, black background; in the node's parameters (OUTPUT WINDOW section) and in the node's right-click menu |
 | VST3 | MIDI reaches instrument plugins, longer scan timeout, single-file `.vst3` plugins found (Kontakt and other Native Instruments plugins) |
 | Audio | no more competing MMCSS priority on the render thread (fewer buffer underruns), denormal protection on the audio thread |
+| Ported from upstream (0.39) | Macro Slider / Bipolar Knob / Toggle / Trigger / NumBox / Radio Selector / Step Gate (MIDI-learnable from the node body), Keyboard (on-screen piano + laptop typing), Velocity to CV, Note Switcher, Drift (musical random walk), Audio Meter, alpha filters (show alpha, opacity, set alpha, alpha invert, alpha from luma, alpha levels, premultiply), Anti-Erase blend, Transform pivot, Material UV wrap, Phaser feedback, Flanger damping, Sampler loop crossfade, Forest Green theme with swatch previews, "#2" numbering for duplicate node titles, editable comments (hover and type, corner resize, font size), numpad view keys |
+| Performance (0.40) | off-screen nodes skip their body, still image chains stop recooking, two-pass blurs, BGRA video upload, O(N) undo snapshots, background autosave |
+| Ported in 0.40 | Slideshow, CV Recorder, Resonator Bank, Cycle Shaper, Spec Blur, FDN Reverb, live spectrum in Audio Filter / EQ (Shift-drag = Q), Explode by loose parts, Audio In channel / pair selection, Modulation matrix window (Shift+M) |
+| Browser | star favourites in Modules / Samples / Media / Plugins (a FAVOURITES section on top of Modules), filter and sort per mode, right-click: favourite / Show in Explorer / copy path |
 | Build | `build-windows.bat` builds only the test exe; `pack` makes the distributable; `test-windows.bat` runs the self-tests |
 
 Full list per version: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
@@ -85,6 +89,10 @@ Ctrl+Shift+B again turns the preview off. An output window can stay open on a pr
 | Ctrl+Z / Ctrl+Shift+Z | undo / redo |
 | Ctrl+G / Ctrl+Shift+G | group / ungroup |
 | Double-click a slider, knob or drag field | type a value |
+| 1 / 3 / 7 / 0 over a 3D viewport (Ctrl for the opposite side) | front / right / top / three-quarter view |
+| Z-row and Q-row letters over a Keyboard node | play notes (Musical Typing) |
+| Hover a comment and type | edit the note |
+| Shift+M | modulation matrix |
 
 ## Features inherited from the R31a port
 

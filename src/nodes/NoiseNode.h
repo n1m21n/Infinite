@@ -20,6 +20,7 @@ public:
    int GetOutputWidth() const override { return mOut.w; }
    int GetOutputHeight() const override { return mOut.h; }
    void CookIfNeeded(int frameId) override;
+   unsigned long long TextureRevision() const override { return mRevision; }
 
    // Turbo: new nodes start on Simplex 4D (index 6); types 0..5 are the
    // original 2D ones, kept as they were for old patches.
@@ -72,4 +73,13 @@ private:
    unsigned int mProgram = 0;
    bool mShaderTried = false;
    int mLastCookFrame = -1;
+
+   // Skip-if-unchanged state: the params (modulation writes into them
+   // before the cook loop) plus, for Noise, the uTime value uploaded.
+   // Transport time only moves while playing or exporting, so a stopped
+   // patch settles and everything downstream caches on mRevision too.
+   bool mHasBuilt = false;
+   ParamSnapshot mBuiltParams;
+   float mBuiltTime = 0.0f;
+   unsigned long long mRevision = 0;
 };

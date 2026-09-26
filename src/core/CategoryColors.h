@@ -32,6 +32,10 @@ namespace CategoryColors
 
    const UiTheme& CurrentUiTheme();
 
+   // The UiTheme of preset `index` (clamped) without switching the live one -
+   // used for the swatch previews in the theme picker.
+   const UiTheme& UiThemeForPreset(int index);
+
    // Display names, in menu order. Index 0 ("Infinite") is the app's own
    // default palette, designed against this app's actual category list;
    // the rest are ports of well-known editor themes, picked for popularity

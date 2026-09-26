@@ -214,6 +214,8 @@ public:
    float Level() const { return mLevel; }
 
    float gainDb = 0.0f;
+   int firstChannel = 0; // 0-based device input channel (Turbo)
+   bool mono = false;    // one channel to both sides instead of a pair
 
 private:
    std::unique_ptr<AudioCaptureNode> mAudioNode;

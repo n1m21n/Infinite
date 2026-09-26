@@ -64,6 +64,12 @@ namespace DspMath
    // +/-1 instead, which is the correct limit anyway). Common cheap
    // saturator approximation; max error versus std::tanh is small enough for
    // audio-rate soft clipping and much cheaper than the libm transcendental.
+   // Flushes denormals to zero (recursive filter / feedback loops).
+   inline float FlushDenormal(float x)
+   {
+      return std::fabs(x) < 1.0e-20f ? 0.0f : x;
+   }
+
    inline float FastTanh(float x)
    {
       if (x < -3.0f)
