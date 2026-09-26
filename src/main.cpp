@@ -15391,7 +15391,14 @@ namespace
       const ImVec2 origin(x, y);
       const ImVec2 br(x + w, y + h);
       const bool isLight = IsThemeLight();
-      const float textH = ImGui::GetTextLineHeight();
+      // Every legend in the meter is drawn at a reduced size: at the body
+      // font the scale numbers crowded the bars and each other on a 200px
+      // body. The node's own caption/readout strip keep the normal size.
+      ImFont* font = ImGui::GetFont();
+      const float fs = ImGui::GetFontSize() * 0.72f;
+      const float textH = fs;
+      auto textSize = [&](const char* t) { return font->CalcTextSizeA(fs, FLT_MAX, 0.0f, t); };
+      auto text = [&](ImVec2 p, ImU32 c, const char* t) { dl->AddText(font, fs, p, c, t); };
 
       dl->AddRectFilled(origin, br, ScopeBgCol(), 3.0f);
 
@@ -15406,17 +15413,17 @@ namespace
 
       // Geometry: [readout] row on top, bars in the middle, L/R captions
       // below; bars sit either side of a centred scale column.
-      const float pad = 6.0f;
-      const float scaleW = 30.0f;
-      const float barW = std::min(44.0f, (w - 2.0f * pad - scaleW) * 0.5f);
+      const float pad = 10.0f;
+      const float scaleW = 34.0f;
+      const float barW = std::min(36.0f, (w - 2.0f * pad - scaleW) * 0.5f);
       const float groupW = 2.0f * barW + scaleW;
       const float lx = x + (w - groupW) * 0.5f;
       const float rx = lx + barW + scaleW;
       const float scaleCx = lx + barW + scaleW * 0.5f;
       const float readTop = y + pad;
-      const float readH = textH + 4.0f;
-      const float barTop = readTop + readH + 6.0f;
-      const float barBot = br.y - pad - textH - 2.0f;
+      const float readH = textH + 6.0f;
+      const float barTop = readTop + readH + 10.0f;
+      const float barBot = br.y - pad - textH - 6.0f;
       const float barH = barBot - barTop;
       auto yOf = [&](float db) { return barBot - DbToFrac(db) * barH; };
 
@@ -15438,12 +15445,10 @@ namespace
          const ImU32 lineCol = db == 0.0f ? ScopeMidLineCol() : ScopeGridCol();
          dl->AddLine(ImVec2(lx, ty), ImVec2(lx + barW, ty), lineCol, 1.0f);
          dl->AddLine(ImVec2(rx, ty), ImVec2(rx + barW, ty), lineCol, 1.0f);
-         dl->AddLine(ImVec2(lx + barW + 2.0f, ty), ImVec2(lx + barW + 7.0f, ty), ScopeTextCol(), 1.0f);
-         dl->AddLine(ImVec2(rx - 7.0f, ty), ImVec2(rx - 2.0f, ty), ScopeTextCol(), 1.0f);
          char buf[8];
          snprintf(buf, sizeof(buf), "%.0f", db);
-         const ImVec2 ts = ImGui::CalcTextSize(buf);
-         dl->AddText(ImVec2(scaleCx - ts.x * 0.5f, ty - ts.y * 0.5f), ScopeTextCol(), buf);
+         const ImVec2 ts = textSize(buf);
+         text(ImVec2(scaleCx - ts.x * 0.5f, ty - ts.y * 0.5f), ScopeTextCol(), buf);
       }
 
       // One channel: peak bar (translucent), RMS bar (solid) over it, both
@@ -15491,22 +15496,22 @@ namespace
          dl->AddRectFilled(a, b, clipped ? kRed : slotCol, 2.0f);
          char buf[12];
          FormatDb(buf, sizeof(buf), maxPeak);
-         const ImVec2 ts = ImGui::CalcTextSize(buf);
+         const ImVec2 ts = textSize(buf);
          const ImU32 txt = clipped ? IM_COL32(255, 255, 255, 255)
                                    : maxPeak > 1e-5f ? ImGui::GetColorU32(ImGuiCol_Text) : ScopeTextCol();
-         dl->AddText(ImVec2(bx + (barW - ts.x) * 0.5f, readTop + (readH - ts.y) * 0.5f), txt, buf);
+         text(ImVec2(bx + (barW - ts.x) * 0.5f, readTop + (readH - ts.y) * 0.5f), txt, buf);
       };
       drawReadout(lx, n->MaxPeakL(), n->ClipL());
       drawReadout(rx, n->MaxPeakR(), n->ClipR());
       {
-         const ImVec2 ts = ImGui::CalcTextSize("pk");
-         dl->AddText(ImVec2(scaleCx - ts.x * 0.5f, readTop + (readH - ts.y) * 0.5f), ScopeTextCol(), "pk");
+         const ImVec2 ts = textSize("pk");
+         text(ImVec2(scaleCx - ts.x * 0.5f, readTop + (readH - ts.y) * 0.5f), ScopeTextCol(), "pk");
       }
 
       // Channel captions under the bars; "dB" under the scale.
       auto caption = [&](float cx, const char* s) {
-         const ImVec2 ts = ImGui::CalcTextSize(s);
-         dl->AddText(ImVec2(cx - ts.x * 0.5f, barBot + 2.0f), ScopeTextCol(), s);
+         const ImVec2 ts = textSize(s);
+         text(ImVec2(cx - ts.x * 0.5f, barBot + 5.0f), ScopeTextCol(), s);
       };
       caption(lx + barW * 0.5f, "L");
       caption(rx + barW * 0.5f, "R");
@@ -15549,11 +15554,11 @@ namespace
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
-      // Same height as Limiter's gain-reduction meter, which spans that
-      // body's two kKnobLarge knob rows (DrawLimiterBody), so the two
-      // meters line up when they sit side by side on the canvas.
+      // Three kKnobLarge knob rows tall - 1.5x Limiter's gain-reduction
+      // meter (two rows, DrawLimiterBody). At the Limiter's height the
+      // -48..0 span was too short to read a level against the ticks.
       const float rowH = kKnobLarge + 4.0f + ImGui::GetTextLineHeight() + ImGui::GetStyle().ItemSpacing.y;
-      const float meterH = 2.0f * rowH;
+      const float meterH = 3.0f * rowH;
       DrawAudioMeterVisualizer(n, gAudioContentX, ImGui::GetCursorScreenPos().y, gAudioContentW, meterH);
 
       EndAudioBody();
