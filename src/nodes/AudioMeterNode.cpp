@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 
 #include "audio/AudioBuffer.h"
@@ -72,6 +73,7 @@ public:
 
       mRmsL.store(rmsL, std::memory_order_relaxed);
       mRmsR.store(rmsR, std::memory_order_relaxed);
+      mBlocks.fetch_add(1, std::memory_order_relaxed);
 
       if (blockPeakL >= 1.0f)
          mClipL.store(true, std::memory_order_relaxed);
@@ -83,8 +85,24 @@ public:
    {
       peakL = mPeakL.exchange(0.0f, std::memory_order_relaxed);
       peakR = mPeakR.exchange(0.0f, std::memory_order_relaxed);
-      rmsL = mRmsL.load(std::memory_order_relaxed);
-      rmsR = mRmsR.load(std::memory_order_relaxed);
+      // The RMS atomics hold the last block's value until the next block,
+      // so when the graph stops calling ProcessBlock (transport stopped,
+      // input unpatched) they would hold it forever and the bars would sit
+      // lit over a "no signal" status. No new block since the last poll
+      // means no signal now.
+      // Judged over 100 ms, not per poll: the UI can poll faster than
+      // blocks arrive (120 fps vs a 512-frame block at 48 kHz), and a
+      // per-poll check would flicker the bars to zero between blocks.
+      const unsigned blocks = mBlocks.load(std::memory_order_relaxed);
+      const auto now = std::chrono::steady_clock::now();
+      if (blocks != mLastPolledBlocks)
+      {
+         mLastPolledBlocks = blocks;
+         mLastBlockSeen = now;
+      }
+      const bool fresh = now - mLastBlockSeen < std::chrono::milliseconds(100);
+      rmsL = fresh ? mRmsL.load(std::memory_order_relaxed) : 0.0f;
+      rmsR = fresh ? mRmsR.load(std::memory_order_relaxed) : 0.0f;
       clipL = mClipL.exchange(false, std::memory_order_relaxed);
       clipR = mClipR.exchange(false, std::memory_order_relaxed);
    }
@@ -100,6 +118,9 @@ private:
    std::atomic<float> mRmsR { 0.0f };
    std::atomic<bool> mClipL { false };
    std::atomic<bool> mClipR { false };
+   std::atomic<unsigned> mBlocks { 0 };
+   unsigned mLastPolledBlocks = 0; // main thread only
+   std::chrono::steady_clock::time_point mLastBlockSeen{}; // main thread only
 };
 
 // ----------------------------------------------------------- AudioMeterNode
