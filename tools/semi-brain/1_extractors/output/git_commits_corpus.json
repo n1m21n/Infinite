@@ -1,5 +1,189 @@
 [
   {
+    "hash": "faf6a2e3f7b27cc90c4245afb0172ecb91a2942d",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 26 07:19:43 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "canvas",
+      "title": "fix(canvas): off-screen cull and closed eye keep gesture loops running",
+      "description": "off-screen cull and closed eye keep gesture loops running",
+      "bullets": [],
+      "body": "A Shift-drag gesture recording only writes its param through a ParamRef the\nnode registered by drawing. The v0.4.4 off-screen cull (94023d5) skips the\nbody of a node outside the view unless it has a driver, and its driver list\n(copied from the collapsed register-only pass) had no gestures. So a gesture\nloop on an off-screen node stepped once per kCullRefresh (30) frames - in the\ncanvas and in any render/record taken while zoomed in - and on a node with\nits eye closed it froze outright (pre-existing).\nBoth gates now ask one question, GraphNode::IsParamDriven, and the flags\nbehind it are set in RefreshParamDriverFlags beside ApplyModulationAndPalette,\none per writer there. Adds hasGestureParams, and flags a performance-panel\nelement's extra targets too: gPerfPendingWrites is filled for every target and\ncleared each frame, so a write to a culled or collapsed extra target was lost.\nCULLDRIVENTEST: a gesture loop on a collapsed node and on an off-screen node\nmust move every frame (19/19 with the fix, 0/19 without). Added to driver.sh.",
+      "raw": "fix(canvas): off-screen cull and closed eye keep gesture loops running\n\nA Shift-drag gesture recording only writes its param through a ParamRef the\nnode registered by drawing. The v0.4.4 off-screen cull (94023d5) skips the\nbody of a node outside the view unless it has a driver, and its driver list\n(copied from the collapsed register-only pass) had no gestures. So a gesture\nloop on an off-screen node stepped once per kCullRefresh (30) frames - in the\ncanvas and in any render/record taken while zoomed in - and on a node with\nits eye closed it froze outright (pre-existing).\n\nBoth gates now ask one question, GraphNode::IsParamDriven, and the flags\nbehind it are set in RefreshParamDriverFlags beside ApplyModulationAndPalette,\none per writer there. Adds hasGestureParams, and flags a performance-panel\nelement's extra targets too: gPerfPendingWrites is filled for every target and\ncleared each frame, so a write to a culled or collapsed extra target was lost.\n\nCULLDRIVENTEST: a gesture loop on a collapsed node and on an off-screen node\nmust move every frame (19/19 with the fix, 0/19 without). Added to driver.sh."
+    },
+    "stat": ".claude/skills/run-infinite-hygiene/driver.sh |   2 +\n src/core/GraphNode.h                          |  16 +++\n src/main.cpp                                  | 180 ++++++++++++++++++++------\n 3 files changed, 156 insertions(+), 42 deletions(-)",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "src/core/GraphNode.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "7b2e0e6a9a136d6a6f564524b84e5aeeeab002cb",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 22:57:05 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "release",
+      "title": "fix(release): support recursive asset copy in Windows release packaging",
+      "description": "support recursive asset copy in Windows release packaging",
+      "bullets": [],
+      "body": "",
+      "raw": "fix(release): support recursive asset copy in Windows release packaging"
+    },
+    "stat": ".claude/skills/ship-infinite/driver.sh | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)",
+    "files": [
+      ".claude/skills/ship-infinite/driver.sh"
+    ]
+  },
+  {
+    "hash": "4635d2c3402e0fcc37bcf4a1f9d356da53b997f9",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 22:11:33 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "windows",
+      "title": "fix(windows): link dxgi wherever PlatformWin.cpp is compiled",
+      "description": "link dxgi wherever PlatformWin.cpp is compiled",
+      "bullets": [],
+      "body": "7afde11 added CreateDXGIFactory1 (WaitForDisplayRefresh's DXGI\nWaitForVBlank) to PlatformWin.cpp. Infinite links dxgi through CMake,\nbut infinite-vst3-scanner compiles the same file without it, so both\nWindows CI jobs failed at link (LNK2019) and v0.4.4 shipped with no\nWindows build. Pull the library in from the file itself, matching the\npsapi pragma above it.",
+      "raw": "fix(windows): link dxgi wherever PlatformWin.cpp is compiled\n\n7afde11 added CreateDXGIFactory1 (WaitForDisplayRefresh's DXGI\nWaitForVBlank) to PlatformWin.cpp. Infinite links dxgi through CMake,\nbut infinite-vst3-scanner compiles the same file without it, so both\nWindows CI jobs failed at link (LNK2019) and v0.4.4 shipped with no\nWindows build. Pull the library in from the file itself, matching the\npsapi pragma above it."
+    },
+    "stat": "src/platform/win/PlatformWin.cpp | 4 ++++\n 1 file changed, 4 insertions(+)",
+    "files": [
+      "src/platform/win/PlatformWin.cpp"
+    ]
+  },
+  {
+    "hash": "ff13c8a39beec5c3c6bbfb8371ad6012ea6de56a",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 22:08:06 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "ui",
+      "title": "Release: rebuild DMG for v0.4.4",
+      "description": "Release: rebuild DMG for v0.4.4",
+      "bullets": [],
+      "body": "",
+      "raw": "Release: rebuild DMG for v0.4.4"
+    },
+    "stat": "website/assets/Infinite.dmg | Bin 12934415 -> 13479203 bytes\n 1 file changed, 0 insertions(+), 0 deletions(-)",
+    "files": [
+      "website/assets/Infinite.dmg"
+    ]
+  },
+  {
+    "hash": "a4fb862a3187d78a5cc0d549ee2f063133e2c9ad",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 22:00:29 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge release/v0.4.4 into main",
+      "description": "Merge release/v0.4.4 into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge release/v0.4.4 into main"
+    },
+    "stat": "",
+    "files": [
+      "CMakeLists.txt",
+      "website/index.html"
+    ]
+  },
+  {
+    "hash": "50dc63581b517d3c91e13c3d5d7f9537d0029beb",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 21:52:12 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Bump version to 0.4.4",
+      "description": "Bump version to 0.4.4",
+      "bullets": [],
+      "body": "",
+      "raw": "Bump version to 0.4.4"
+    },
+    "stat": "CMakeLists.txt     | 4 ++--\n website/index.html | 2 +-\n 2 files changed, 3 insertions(+), 3 deletions(-)",
+    "files": [
+      "CMakeLists.txt",
+      "website/index.html"
+    ]
+  },
+  {
+    "hash": "19183722d14549ff3b5aada34439576342f1eb8a",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 21:39:16 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/perf-baseline-final into main",
+      "description": "Merge feature/perf-baseline-final into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/perf-baseline-final into main"
+    },
+    "stat": "",
+    "files": [
+      "bench/baselines/m2-8gb.jsonl",
+      "docs/plans/perf/README.md"
+    ]
+  },
+  {
+    "hash": "3334916ce1ad9bc0f3b8f0d11a454201d7f2c247",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 21:39:08 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "bench(baseline): final B1/B3 rows from the trusted Block 1/2 runs",
+      "description": "bench(baseline): final B1/B3 rows from the trusted Block 1/2 runs",
+      "bullets": [],
+      "body": "The baseline still held pre-fix B1 (c602a0d) and pre-Block-2 B3\n(beb4d87, failing) rows, so compare.py gated against numbers the\nproduct no longer has. Swap in one real row each from the runs that\nclosed those blocks; every other row verified at 0% delta.\nRecords one regression the refresh exposed: B1 buf=512 UI frame p99\n72.5 -> 93-110 ms in all three Block 1 rounds (audio unaffected).\nNot chased; scope is frozen.",
+      "raw": "bench(baseline): final B1/B3 rows from the trusted Block 1/2 runs\n\nThe baseline still held pre-fix B1 (c602a0d) and pre-Block-2 B3\n(beb4d87, failing) rows, so compare.py gated against numbers the\nproduct no longer has. Swap in one real row each from the runs that\nclosed those blocks; every other row verified at 0% delta.\n\nRecords one regression the refresh exposed: B1 buf=512 UI frame p99\n72.5 -> 93-110 ms in all three Block 1 rounds (audio unaffected).\nNot chased; scope is frozen."
+    },
+    "stat": "bench/baselines/m2-8gb.jsonl | 10 +++++-----\n docs/plans/perf/README.md    | 45 ++++++++++++++++++++++++++++++++++++++------\n 2 files changed, 44 insertions(+), 11 deletions(-)",
+    "files": [
+      "bench/baselines/m2-8gb.jsonl",
+      "docs/plans/perf/README.md"
+    ]
+  },
+  {
+    "hash": "737183bfef0a6074e5a6f9f386cb586c692d843e",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Fri Sep 25 21:28:45 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "semi-brain",
+      "title": "chore(semi-brain): sync corpora and index after merge",
+      "description": "sync corpora and index after merge",
+      "bullets": [],
+      "body": "",
+      "raw": "chore(semi-brain): sync corpora and index after merge"
+    },
+    "stat": ".../1_extractors/output/ast_symbol_graph.json      | 21433 ++++++++++---------\n .../1_extractors/output/git_commits_corpus.json    |   141 +\n .../1_extractors/output/knowledge_index.db         |   Bin 33759232 -> 33759232 bytes\n .../1_extractors/output/recovered_docs_corpus.json |   563 -\n .../output/skills_and_invariants_corpus.json       |    42 -\n .../3_datasets/train_dpo_preference.jsonl          |     7 +-\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl |     6 +\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl |     6 +\n 8 files changed, 11281 insertions(+), 10917 deletions(-)",
+    "files": [
+      "tools/semi-brain/1_extractors/output/ast_symbol_graph.json",
+      "tools/semi-brain/1_extractors/output/git_commits_corpus.json",
+      "tools/semi-brain/1_extractors/output/knowledge_index.db",
+      "tools/semi-brain/1_extractors/output/recovered_docs_corpus.json",
+      "tools/semi-brain/1_extractors/output/skills_and_invariants_corpus.json",
+      "tools/semi-brain/3_datasets/train_dpo_preference.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_alpaca.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_sharegpt.jsonl"
+    ]
+  },
+  {
     "hash": "80bebd60250acc16e72f0ee1c076d8c2d595baf6",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
