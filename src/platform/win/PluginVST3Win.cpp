@@ -1894,13 +1894,19 @@ namespace Platform
       bool processing = false;
 
       Steinberg::Vst::ProcessData processData;
-      Steinberg::Vst::AudioBusBuffers inputBusBuffers[1] = {};
-      Steinberg::Vst::AudioBusBuffers outputBusBuffers[1] = {};
-      float* inChannelPtrs[8] = {};
-      float* outChannelPtrs[8] = {};
-      std::vector<float> inScratch;
+      // One AudioBusBuffers per bus the plugin declares - the spec requires
+      // ProcessData's numInputs/numOutputs to equal the bus counts. Bus 0 is
+      // the main bus wired to the host; aux buses (Kontakt's extra outs, a
+      // compressor's sidechain) read silence and write into auxOutScratch.
+      // The first pluginIn/OutChannels entries of the pointer storage are the
+      // main bus's channels, rewritten every render.
+      std::vector<Steinberg::Vst::AudioBusBuffers> inBuses;
+      std::vector<Steinberg::Vst::AudioBusBuffers> outBuses;
+      std::vector<float*> inChannelPtrs;
+      std::vector<float*> outChannelPtrs;
       std::vector<float> outScratch;
       std::vector<float> zeroScratch;
+      std::vector<float> auxOutScratch;
 
       HostEventList inputEvents;
       HostEventList outputEvents;
@@ -2583,49 +2589,76 @@ namespace Platform
          const double rate = h->sampleRate > 0.0 ? h->sampleRate : 48000.0;
          const int frames = std::min(std::max(h->maxBlockFrames, 1), 4096);
 
-         Steinberg::Vst::SpeakerArrangement inArr = Steinberg::Vst::SpeakerArr::kStereo;
-         Steinberg::Vst::SpeakerArrangement outArr = Steinberg::Vst::SpeakerArr::kStereo;
+         // setBusArrangements and ProcessData must both cover EVERY bus the
+         // plugin declares, not just the main one. Instruments with aux outs
+         // (Kontakt) and effects with a sidechain input (most compressors)
+         // correctly reject a one-bus call; the old code then "fell back" to
+         // mono even though that call was rejected too, so those plugins were
+         // rendered from their left channel only. Now: ask for stereo on the
+         // main buses with every aux bus left as the plugin has it, and read
+         // back whatever the plugin actually settled on.
+         constexpr int kMaxBuses = 64;
+         const int inBusCount =
+            std::min(std::max((int)v->component->getBusCount(Steinberg::Vst::kAudio, Steinberg::Vst::kInput), 0), kMaxBuses);
+         const int outBusCount =
+            std::min(std::max((int)v->component->getBusCount(Steinberg::Vst::kAudio, Steinberg::Vst::kOutput), 0), kMaxBuses);
 
-         const int inBusCount = v->component->getBusCount(Steinberg::Vst::kAudio, Steinberg::Vst::kInput);
-         const int outBusCount = v->component->getBusCount(Steinberg::Vst::kAudio, Steinberg::Vst::kOutput);
+         auto currentArrangement = [&](Steinberg::Vst::BusDirection dir, int index) {
+            Steinberg::Vst::SpeakerArrangement arr = 0;
+            if (v->processor->getBusArrangement(dir, index, arr) == Steinberg::kResultOk)
+               return arr;
+            Steinberg::Vst::BusInfo info = {};
+            if (v->component->getBusInfo(Steinberg::Vst::kAudio, dir, index, info) == Steinberg::kResultOk &&
+                info.channelCount == 1)
+               return (Steinberg::Vst::SpeakerArrangement)Steinberg::Vst::SpeakerArr::kMono;
+            return (Steinberg::Vst::SpeakerArrangement)Steinberg::Vst::SpeakerArr::kStereo;
+         };
+         std::vector<Steinberg::Vst::SpeakerArrangement> inArrs((size_t)inBusCount);
+         std::vector<Steinberg::Vst::SpeakerArrangement> outArrs((size_t)outBusCount);
+         for (int i = 0; i < inBusCount; i++)
+            inArrs[(size_t)i] = currentArrangement(Steinberg::Vst::kInput, i);
+         for (int i = 0; i < outBusCount; i++)
+            outArrs[(size_t)i] = currentArrangement(Steinberg::Vst::kOutput, i);
 
-         int inChannels = (inBusCount > 0) ? 2 : 0;
-         int outChannels = (outBusCount > 0) ? 2 : 0;
+         auto tryMainArrangement = [&](Steinberg::Vst::SpeakerArrangement mainIn,
+                                       Steinberg::Vst::SpeakerArrangement mainOut) {
+            std::vector<Steinberg::Vst::SpeakerArrangement> ins = inArrs;
+            std::vector<Steinberg::Vst::SpeakerArrangement> outs = outArrs;
+            if (!ins.empty())
+               ins[0] = mainIn;
+            if (!outs.empty())
+               outs[0] = mainOut;
+            return v->processor->setBusArrangements(ins.empty() ? nullptr : ins.data(), inBusCount,
+                                                    outs.empty() ? nullptr : outs.data(), outBusCount) ==
+                   Steinberg::kResultOk;
+         };
+         if (inBusCount + outBusCount > 0 &&
+             !tryMainArrangement(Steinberg::Vst::SpeakerArr::kStereo, Steinberg::Vst::SpeakerArr::kStereo) &&
+             !tryMainArrangement(Steinberg::Vst::SpeakerArr::kMono, Steinberg::Vst::SpeakerArr::kStereo))
+            tryMainArrangement(Steinberg::Vst::SpeakerArr::kMono, Steinberg::Vst::SpeakerArr::kMono);
 
-         if (inBusCount > 0 && outBusCount > 0)
-         {
-            inArr = Steinberg::Vst::SpeakerArr::kStereo;
-            outArr = Steinberg::Vst::SpeakerArr::kStereo;
-            if (v->processor->setBusArrangements(&inArr, 1, &outArr, 1) != Steinberg::kResultOk)
-            {
-               inArr = Steinberg::Vst::SpeakerArr::kMono;
-               outArr = Steinberg::Vst::SpeakerArr::kMono;
-               if (v->processor->setBusArrangements(&inArr, 1, &outArr, 1) == Steinberg::kResultOk)
-               {
-                  inChannels = 1;
-                  outChannels = 1;
-               }
-            }
-         }
-         else if (outBusCount > 0)
-         {
-            inChannels = 0;
-            outArr = Steinberg::Vst::SpeakerArr::kStereo;
-            if (v->processor->setBusArrangements(nullptr, 0, &outArr, 1) != Steinberg::kResultOk)
-            {
-               outArr = Steinberg::Vst::SpeakerArr::kMono;
-               v->processor->setBusArrangements(nullptr, 0, &outArr, 1);
-               outChannels = 1;
-            }
-         }
+         for (int i = 0; i < inBusCount; i++)
+            inArrs[(size_t)i] = currentArrangement(Steinberg::Vst::kInput, i);
+         for (int i = 0; i < outBusCount; i++)
+            outArrs[(size_t)i] = currentArrangement(Steinberg::Vst::kOutput, i);
 
+         const int inChannels = inBusCount > 0 ? Steinberg::Vst::SpeakerArr::getChannelCount(inArrs[0]) : 0;
+         const int outChannels = outBusCount > 0 ? Steinberg::Vst::SpeakerArr::getChannelCount(outArrs[0]) : 0;
          v->pluginInChannels = inChannels;
          v->pluginOutChannels = outChannels;
 
+         // Every bus starts deactivated per the VST3 spec (IComponent::
+         // activateBus). Strict SDK-based plugins (FabFilter, some Arturia)
+         // honor that exactly and produce silence on an inactive bus, and
+         // ignore notes on an inactive event bus - lenient ones (Kontakt,
+         // most JUCE plugins) process regardless, which is how this hid.
+         // Aux buses stay inactive; they still get buffers below.
          if (inBusCount > 0)
             v->component->activateBus(Steinberg::Vst::kAudio, Steinberg::Vst::kInput, 0, true);
          if (outBusCount > 0)
             v->component->activateBus(Steinberg::Vst::kAudio, Steinberg::Vst::kOutput, 0, true);
+         if (v->component->getBusCount(Steinberg::Vst::kEvent, Steinberg::Vst::kInput) > 0)
+            v->component->activateBus(Steinberg::Vst::kEvent, Steinberg::Vst::kInput, 0, true);
 
          Steinberg::Vst::ProcessSetup setup = {};
          setup.processMode = Steinberg::Vst::kRealtime;
@@ -2653,33 +2686,48 @@ namespace Platform
             VST3Trace("setProcessing(true) returned %d - continuing (optional call)", (int)procRes);
          v->processing = true;
 
-         v->inScratch.assign((size_t)8 * (size_t)frames, 0.0f);
-         v->outScratch.assign((size_t)8 * (size_t)frames, 0.0f);
+         v->outScratch.assign((size_t)std::max(outChannels, 8) * (size_t)frames, 0.0f);
          v->zeroScratch.assign((size_t)frames, 0.0f);
+         v->auxOutScratch.assign((size_t)frames, 0.0f);
 
          std::memset(&v->processData, 0, sizeof(v->processData));
          v->processData.processMode = Steinberg::Vst::kRealtime;
          v->processData.symbolicSampleSize = Steinberg::Vst::kSample32;
 
-         if (inChannels > 0)
+         size_t totalIn = 0;
+         size_t totalOut = 0;
+         for (const auto a : inArrs)
+            totalIn += (size_t)Steinberg::Vst::SpeakerArr::getChannelCount(a);
+         for (const auto a : outArrs)
+            totalOut += (size_t)Steinberg::Vst::SpeakerArr::getChannelCount(a);
+         v->inChannelPtrs.assign(totalIn, v->zeroScratch.data());
+         v->outChannelPtrs.assign(totalOut, v->auxOutScratch.data());
+         v->inBuses.assign((size_t)inBusCount, Steinberg::Vst::AudioBusBuffers {});
+         v->outBuses.assign((size_t)outBusCount, Steinberg::Vst::AudioBusBuffers {});
+
+         size_t offset = 0;
+         for (int i = 0; i < inBusCount; i++)
          {
-            v->processData.numInputs = 1;
-            v->processData.inputs = v->inputBusBuffers;
-            v->inputBusBuffers[0].numChannels = inChannels;
-            v->inputBusBuffers[0].silenceFlags = 0;
-            v->inputBusBuffers[0].channelBuffers32 = v->inChannelPtrs;
+            const int ch = Steinberg::Vst::SpeakerArr::getChannelCount(inArrs[(size_t)i]);
+            v->inBuses[(size_t)i].numChannels = ch;
+            v->inBuses[(size_t)i].channelBuffers32 = v->inChannelPtrs.data() + offset;
+            // Aux inputs (sidechain) are always fed silence - say so.
+            v->inBuses[(size_t)i].silenceFlags = (i == 0 || ch <= 0) ? 0 : (ch >= 64 ? ~0ull : ((1ull << ch) - 1));
+            offset += (size_t)std::max(ch, 0);
          }
-         else
+         offset = 0;
+         for (int i = 0; i < outBusCount; i++)
          {
-            v->processData.numInputs = 0;
-            v->processData.inputs = nullptr;
+            const int ch = Steinberg::Vst::SpeakerArr::getChannelCount(outArrs[(size_t)i]);
+            v->outBuses[(size_t)i].numChannels = ch;
+            v->outBuses[(size_t)i].channelBuffers32 = v->outChannelPtrs.data() + offset;
+            offset += (size_t)std::max(ch, 0);
          }
 
-         v->processData.numOutputs = 1;
-         v->processData.outputs = v->outputBusBuffers;
-         v->outputBusBuffers[0].numChannels = outChannels;
-         v->outputBusBuffers[0].silenceFlags = 0;
-         v->outputBusBuffers[0].channelBuffers32 = v->outChannelPtrs;
+         v->processData.numInputs = inBusCount;
+         v->processData.inputs = inBusCount > 0 ? v->inBuses.data() : nullptr;
+         v->processData.numOutputs = outBusCount;
+         v->processData.outputs = outBusCount > 0 ? v->outBuses.data() : nullptr;
 
          v->processData.inputEvents = &v->inputEvents;
          v->processData.outputEvents = &v->outputEvents;
@@ -2919,6 +2967,10 @@ namespace Platform
       v->processContext.projectTimeMusic = (double)v->sampleTime / sr * (120.0 / 60.0);
       v->sampleTime += frames;
 
+      // Aux inputs and any unconnected main input read zeroScratch; a plugin
+      // is not supposed to write its inputs, but re-clear it so one that does
+      // can't leak its last block into the next.
+      std::memset(v->zeroScratch.data(), 0, (size_t)frames * sizeof(float));
       if (pluginIn > 0)
       {
          for (int ch = 0; ch < pluginIn; ch++)
@@ -2930,7 +2982,7 @@ namespace Platform
          }
       }
 
-      const bool direct = (pluginOut == outChannels);
+      const bool direct = (pluginOut == outChannels && pluginOut > 0);
       float* outScratchBase = v->outScratch.data();
       for (int ch = 0; ch < pluginOut; ch++)
       {
@@ -2950,21 +3002,25 @@ namespace Platform
          return;
       }
 
+      // Fewer plugin channels than host channels (a mono plugin into a
+      // stereo cable) repeats the last plugin channel - it must not then be
+      // zeroed again, which is what made mono-negotiated plugins left-only.
       if (!direct)
       {
          for (int ch = 0; ch < outChannels; ch++)
          {
             if (out[ch] == nullptr)
                continue;
+            if (pluginOut <= 0)
+            {
+               std::memset(out[ch], 0, (size_t)frames * sizeof(float));
+               continue;
+            }
             const int srcCh = ch < pluginOut ? ch : pluginOut - 1;
             std::memcpy(out[ch], outScratchBase + (size_t)srcCh * (size_t)v->maxBlockFrames,
                         (size_t)frames * sizeof(float));
          }
       }
-
-      for (int ch = pluginOut; ch < outChannels; ch++)
-         if (out[ch] != nullptr && !direct)
-            std::memset(out[ch], 0, (size_t)frames * sizeof(float));
 
       v->inputEvents.clear();
       v->inputParamChanges.clear();
