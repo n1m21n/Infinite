@@ -1,5 +1,73 @@
 [
   {
+    "hash": "35270af160359b70d5c875e19721dc145fd963fc",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 26 08:20:23 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "semi-brain",
+      "title": "chore(semi-brain): sync corpora and index after VST3 and audio meter merges",
+      "description": "sync corpora and index after VST3 and audio meter merges",
+      "bullets": [],
+      "body": "",
+      "raw": "chore(semi-brain): sync corpora and index after VST3 and audio meter merges"
+    },
+    "stat": ".../1_extractors/output/ast_symbol_graph.json      | 18103 ++++++++++---------\n .../1_extractors/output/git_commits_corpus.json    |   172 +\n .../1_extractors/output/knowledge_index.db         |   Bin 34082816 -> 34082816 bytes\n .../3_datasets/train_dpo_preference.jsonl          |     4 +\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl |     7 +\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl |     7 +\n 6 files changed, 9628 insertions(+), 8665 deletions(-)",
+    "files": [
+      "tools/semi-brain/1_extractors/output/ast_symbol_graph.json",
+      "tools/semi-brain/1_extractors/output/git_commits_corpus.json",
+      "tools/semi-brain/1_extractors/output/knowledge_index.db",
+      "tools/semi-brain/3_datasets/train_dpo_preference.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_alpaca.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_sharegpt.jsonl"
+    ]
+  },
+  {
+    "hash": "e74ea82c290b635a71f3bdb1b9718471d2f72fda",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 26 08:20:21 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "audio",
+      "title": "Merge feature/audio-meter-node into main",
+      "description": "Merge feature/audio-meter-node into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/audio-meter-node into main"
+    },
+    "stat": "",
+    "files": [
+      "CMakeLists.txt",
+      "src/main.cpp",
+      "src/nodes/AudioMeterNode.cpp",
+      "src/nodes/AudioMeterNode.h"
+    ]
+  },
+  {
+    "hash": "b50038d4169647ab2e91357dc492ec6c80a2aabb",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 26 08:20:20 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "audio",
+      "title": "feat(audio): Audio Meter node - stereo bridge meter with RMS/peak, hold and clip readout",
+      "description": "Audio Meter node - stereo bridge meter with RMS/peak, hold and clip readout",
+      "bullets": [],
+      "body": "Adds AudioMeterNode (Utility): L/R bars either side of a shared piecewise\ndB scale weighted toward the -24..0 working range, RMS inside peak, a\npeak-hold line and a max-peak readout that turns red past 0 dBFS. Click\nto clear holds and clip.",
+      "raw": "feat(audio): Audio Meter node - stereo bridge meter with RMS/peak, hold and clip readout\n\nAdds AudioMeterNode (Utility): L/R bars either side of a shared piecewise\ndB scale weighted toward the -24..0 working range, RMS inside peak, a\npeak-hold line and a max-peak readout that turns red past 0 dBFS. Click\nto clear holds and clip."
+    },
+    "stat": "CMakeLists.txt               |   1 +\n src/main.cpp                 | 234 ++++++++++++++++++++++++++++++++++++++++++-\n src/nodes/AudioMeterNode.cpp | 210 ++++++++++++++++++++++++++++++++++++++\n src/nodes/AudioMeterNode.h   |  78 +++++++++++++++\n 4 files changed, 522 insertions(+), 1 deletion(-)\n create mode 100644 src/nodes/AudioMeterNode.cpp\n create mode 100644 src/nodes/AudioMeterNode.h",
+    "files": [
+      "CMakeLists.txt",
+      "src/main.cpp",
+      "src/nodes/AudioMeterNode.cpp",
+      "src/nodes/AudioMeterNode.h"
+    ]
+  },
+  {
     "hash": "a177efba423a18cd222ef52b6fd992a1f748bb1e",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
