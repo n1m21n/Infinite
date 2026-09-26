@@ -64690,6 +64690,61 @@ float ArrangeClipBypassBaseValue(const ParamRef& ref, const Modulation::Source& 
    return ShapeToParam(ref, std::clamp(src.centre, ref.minValue, ref.maxValue));
 }
 
+// Which nodes have a param that something other than the hand writes every
+// frame - see GraphNode::IsParamDriven. One flag per writer in
+// ApplyModulationAndPalette just below; keep the two in step, since off-screen
+// culling and the collapsed register-only pass skip any node this misses and
+// its driven params then freeze (collapsed) or step every kCullRefresh frames
+// (off screen). Runs before the node editor draws.
+void RefreshParamDriverFlags()
+{
+   Modulation& modulation = Modulation::Instance();
+   for (GraphNode& gn : gNodes)
+   {
+      gn.hasModulatedParams = false;
+      gn.hasBipolarParams = false;
+      gn.hasPaletteColors = false;
+      gn.hasExpressionParams = false;
+      gn.hasPerfPanelParams = false;
+      gn.hasGestureParams = false;
+   }
+   // Modulators, macros, triggers, predictors, number boxes: all Links().
+   for (const auto& link : modulation.Links())
+   {
+      if (GraphNode* target = FindNodeByIndex(link.first.first))
+      {
+         target->hasModulatedParams = true;
+         if (link.second.polarity == Modulation::Source::kBipolar)
+            target->hasBipolarParams = true;
+      }
+   }
+   for (const auto& link : PaletteBinding::Instance().Links())
+   {
+      if (GraphNode* target = FindNodeByIndex(link.first.first))
+         target->hasPaletteColors = true;
+   }
+   for (const auto& expr : modulation.Expressions())
+   {
+      if (GraphNode* target = FindNodeByIndex(expr.first.first))
+         target->hasExpressionParams = true;
+   }
+   // gPerfPendingWrites is filled for an element's own destination and for
+   // every extra target, and cleared each frame whether or not it landed.
+   for (const auto& elem : gPerfElements)
+   {
+      if (GraphNode* target = FindNodeByIndex(elem.dstIndex))
+         target->hasPerfPanelParams = true;
+      for (const auto& t : elem.targets)
+         if (GraphNode* target = FindNodeByIndex(t.dstIndex))
+            target->hasPerfPanelParams = true;
+   }
+   for (const auto& playback : GestureRecorder::Instance().Playbacks())
+   {
+      if (GraphNode* target = FindNodeByIndex(playback.first.first))
+         target->hasGestureParams = true;
+   }
+}
+
 void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false)
 {
    UpdatePerformanceMatrixMIDI();
@@ -66648,6 +66703,7 @@ int main(int argc, char** argv)
          getenv("INFINITE_MODBOUNDSTEST") != nullptr || getenv("INFINITE_MODMATRIXTEST") != nullptr ||
          getenv("INFINITE_MODCURVETEST") != nullptr ||
          getenv("INFINITE_GESTUREUNDOTEST") != nullptr ||
+         getenv("INFINITE_CULLDRIVENTEST") != nullptr ||
          getenv("INFINITE_PREDBINDTEST") != nullptr ||
          getenv("INFINITE_MODMATRIXGEOM") != nullptr;
 
@@ -69037,6 +69093,16 @@ int main(int argc, char** argv)
          }
          if (getenv("INFINITE_GESTUREUNDOTEST") != nullptr)
             gNodes[0].showParams = true; // params must be drawn for them to register
+         if (getenv("INFINITE_CULLDRIVENTEST") != nullptr)
+         {
+            // Both start on screen with params open so frame 1 can resolve
+            // them; the test then closes gNodes[0]'s eye and moves gNodes[2]
+            // far outside the view, where the off-screen cull skips its body.
+            gNodes[0].showParams = true;
+            GraphNode* far = SpawnNode("Shape", "Source", 700.0f, 60.0f);
+            static_cast<ShapeNode*>(far->node.get())->shapeType = 5;
+            far->showParams = true;
+         }
          if (getenv("INFINITE_MODMATRIXTEST") != nullptr || getenv("INFINITE_MODCURVETEST") != nullptr)
          {
             // Range to Range, not LFO: a deterministic constantIn (like
@@ -70139,41 +70205,7 @@ int main(int argc, char** argv)
       gDrawnParamPins.clear();
       gDrawnColorPins.clear();
       gParamRightClickConsumedThisFrame = false;
-      {
-         Modulation& modulation = Modulation::Instance();
-         for (GraphNode& gn : gNodes)
-         {
-            gn.hasModulatedParams = false;
-            gn.hasBipolarParams = false;
-            gn.hasPaletteColors = false;
-            gn.hasExpressionParams = false;
-            gn.hasPerfPanelParams = false;
-         }
-         for (const auto& link : modulation.Links())
-         {
-            if (GraphNode* target = FindNodeByIndex(link.first.first))
-            {
-               target->hasModulatedParams = true;
-               if (link.second.polarity == Modulation::Source::kBipolar)
-                  target->hasBipolarParams = true;
-            }
-         }
-         for (const auto& link : PaletteBinding::Instance().Links())
-         {
-            if (GraphNode* target = FindNodeByIndex(link.first.first))
-               target->hasPaletteColors = true;
-         }
-         for (const auto& expr : modulation.Expressions())
-         {
-            if (GraphNode* target = FindNodeByIndex(expr.first.first))
-               target->hasExpressionParams = true;
-         }
-         for (const auto& elem : gPerfElements)
-         {
-            if (GraphNode* target = FindNodeByIndex(elem.dstIndex))
-               target->hasPerfPanelParams = true;
-         }
-      }
+      RefreshParamDriverFlags();
 
       // ---------------- node editor ----------------
       const ImGuiViewport* vp = ImGui::GetMainViewport();
@@ -89202,17 +89234,16 @@ int main(int argc, char** argv)
          // pins it had last time it was laid out (so cables to it still land,
          // see KeepOffscreenNodeAlive) and skips its body. Same gate as the
          // collapsed node's register-only pass below: a parameter only exists
-         // for modulation, palette, expressions and the performance panel in
-         // the frames it draws, so a node with any of those bound is always
-         // drawn. So is anything while a popup is open (its contents are
+         // for anything that writes it (GraphNode::IsParamDriven - modulation,
+         // palette, expressions, the performance panel, gesture loops) in the
+         // frames it draws, so a driven node is always drawn. So is anything while a popup is open (its contents are
          // submitted from the body), and every node once per kCullRefresh
          // frames, staggered, so size or pin changes made while it is away
          // (a new param, an input count) show up within half a second.
          {
             constexpr int kCullRefresh = 30;
             constexpr float kCullMargin = 64.0f;
-            const bool mustDraw = gn.hasModulatedParams || gn.hasPaletteColors ||
-                                  gn.hasExpressionParams || gn.hasPerfPanelParams ||
+            const bool mustDraw = gn.IsParamDriven() ||
                                   ImGui::GetCurrentContext()->OpenPopupStack.Size > 0 ||
                                   ((frameId + gn.index) % kCullRefresh) == 0;
             if (!mustDraw && ed::KeepOffscreenNodeAlive(gn.NodeId(), kCullMargin))
@@ -89754,8 +89785,7 @@ int main(int argc, char** argv)
          // the params body does around them. Gated on there being a binding at
          // all so the common collapsed node costs exactly what it did before.
          const bool registerOnlyParams = !isAudioBody && !isComment && !gn.showParams &&
-                                         (gn.hasModulatedParams || gn.hasPaletteColors ||
-                                          gn.hasExpressionParams || gn.hasPerfPanelParams);
+                                         gn.IsParamDriven();
          ImGuiWindow* paramsWindow = ImGui::GetCurrentWindow();
          const bool savedSkipItems = paramsWindow->SkipItems;
          if (registerOnlyParams)
@@ -95474,6 +95504,72 @@ int main(int argc, char** argv)
             printf("gesture undo: recorded=%d goneAfterUndo=%d backAfterRedo=%d param=%d node=%d\n",
                    (int)madeOk, (int)undoOk, (int)redoOk, sidesParam, gNodes[0].index);
             printf("%s\n", ok ? "GESTURE UNDO OK" : "GESTURE UNDO FAIL");
+         }
+      }
+
+      // A gesture loop (Shift-drag recording) on a node whose body is skipped -
+      // off screen (culled) or eye closed (register-only pass) - must still
+      // move every frame. Both skips are gated on GraphNode::IsParamDriven;
+      // before gestures were in it, the culled node stepped once per
+      // kCullRefresh frames and the collapsed one froze, in the canvas and in
+      // any render/record taken while zoomed in.
+      if (getenv("INFINITE_CULLDRIVENTEST") != nullptr)
+      {
+         static int rotParam[2] = { -1, -1 };
+         static float lastRot[2] = { 0.0f, 0.0f };
+         static int changed[2] = { 0, 0 }, sampled = 0;
+         static bool checked = false;
+         GestureRecorder& rec = GestureRecorder::Instance();
+         GraphNode* nodes[2] = { &gNodes[0], &gNodes[2] };
+         auto rotOf = [&](int k) { return static_cast<ShapeNode*>(nodes[k]->node.get())->rotation; };
+
+         // Frame 0: this block runs after the next frame's ClearFrameParams,
+         // so only the first frame still sees the graph's registrations.
+         if (frameId == 0)
+         {
+            for (int k = 0; k < 2; ++k)
+               for (const ParamRef& ref : Modulation::Instance().FrameParams())
+                  if (ref.nodeIndex == nodes[k]->index && ref.name == "rotation")
+                     rotParam[k] = ref.paramIndex;
+            // A one-second 0 -> 180 ramp; the main loop's BeginFrame(shift
+            // up) next frame ends the session and starts it looping.
+            const double t = rec.ClockNow();
+            rec.BeginFrame(/*shiftHeld=*/true, t);
+            for (int k = 0; k < 2; ++k)
+            {
+               rec.NotifyMovement(nodes[k]->index, rotParam[k], 0.0f, t, /*isNewGrab=*/true);
+               rec.NotifyMovement(nodes[k]->index, rotParam[k], 90.0f, t + 0.5, /*isNewGrab=*/false);
+               rec.NotifyMovement(nodes[k]->index, rotParam[k], 180.0f, t + 1.0, /*isNewGrab=*/false);
+            }
+            gNodes[0].showParams = false;
+            gNodes[2].spawnX = gNodes[2].spawnY = 20000.0f;
+            gNodes[2].needsPosition = true;
+            Transport::Instance().SetPlaying(true); // the gesture clock only runs while playing
+         }
+         // 20 frames: past the first-frame layout, and short of the
+         // every-kCullRefresh redraw, so a skipped node gets at most one.
+         else if (frameId >= 5 && frameId < 25)
+         {
+            for (int k = 0; k < 2; ++k)
+            {
+               if (frameId > 5 && rotOf(k) != lastRot[k])
+                  ++changed[k];
+               lastRot[k] = rotOf(k);
+            }
+            if (frameId > 5)
+               ++sampled;
+         }
+         else if (frameId >= 25 && !checked)
+         {
+            checked = true;
+            // Wall-clock frames can repeat a clock value; half the frames
+            // moving is far above the 1-in-30 a skipped node manages.
+            const bool resolved = rotParam[0] >= 0 && rotParam[1] >= 0;
+            const bool collapsedOk = resolved && changed[0] * 2 >= sampled;
+            const bool culledOk = resolved && changed[1] * 2 >= sampled;
+            printf("cull driven: collapsed moved %d/%d, off-screen moved %d/%d (params %d,%d)\n",
+                   changed[0], sampled, changed[1], sampled, rotParam[0], rotParam[1]);
+            printf("%s\n", (collapsedOk && culledOk) ? "CULL DRIVEN OK" : "CULL DRIVEN FAIL");
          }
       }
 

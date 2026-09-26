@@ -72,6 +72,22 @@ struct GraphNode
    // ditto: true if any param on this node is bound to the performance matrix.
    // Keeps collapsed nodes evaluating and registering into FrameParams().
    bool hasPerfPanelParams = false;
+   // ditto: true if any param on this node has a Shift-drag gesture recording
+   // looping on it (GestureRecorder::Playbacks()).
+   bool hasGestureParams = false;
+
+   // The one answer to "does something other than the hand write this node's
+   // params every frame?" Every such writer in ApplyModulationAndPalette goes
+   // through a ParamRef the node registered by drawing, so a node that answers
+   // yes must draw (or run the register-only pass) every frame - off-screen
+   // culling and a closed eye both ask this. Adding a writer to
+   // ApplyModulationAndPalette means adding its flag here and in
+   // RefreshParamDriverFlags, or it freezes/steps on culled and collapsed nodes.
+   bool IsParamDriven() const
+   {
+      return hasModulatedParams || hasPaletteColors || hasExpressionParams ||
+             hasPerfPanelParams || hasGestureParams;
+   }
 
    // Where to place the node the first frame it appears (canvas coords).
    float spawnX = 0.0f;
