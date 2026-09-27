@@ -34,3 +34,9 @@ available under its commercial licence or the GNU Affero General Public
 License version 3 (AGPLv3). Distributing a Windows binary built from this
 package therefore requires compliance with JUCE's applicable licence. See
 https://juce.com/legal/juce-8-licence/ before redistribution.
+
+Building with `INFINITE_ENABLE_ASIO=ON` (Infinite-Turbo default) downloads and
+compiles against the Steinberg ASIO SDK, licensed under the GPLv3 since version
+2.3.4. As with VST3, a binary distributed with ASIO support enabled must be
+distributed under the terms of the GPLv3. ASIO is a trademark of Steinberg
+Media Technologies GmbH.

@@ -333,6 +333,57 @@ namespace Platform
          return {};
       }
 
+      // Turbo: plugins whose editor draws with OpenGL on the UI thread
+      // (Antares Auto-Tune, some iZotope / NI UIs) call wglMakeCurrent for
+      // their own context while their window paints and do not put ours
+      // back. Every later GL call of the editor then lands in the plugin's
+      // context: the Infinite window stops updating (it looks frozen while
+      // audio keeps running) and the driver can hang on the next swap.
+      // Anything that can run plugin UI code saves the current WGL context
+      // and restores it afterwards.
+      struct GlContextKeeper
+      {
+         HDC dc = wglGetCurrentDC();
+         HGLRC rc = wglGetCurrentContext();
+         ~GlContextKeeper()
+         {
+            if (wglGetCurrentContext() != rc || wglGetCurrentDC() != dc)
+               wglMakeCurrent(dc, rc);
+         }
+      };
+
+      // Turbo: many plugins (vocal tools like Auto-Tune, some synths) come up
+      // with a MONO main bus by default. The host fed them a two-channel
+      // buffer anyway, so the plugin wrote channel 0 only and channel 1 kept
+      // whatever was there (silence, or the dry input): panned to the right
+      // in a mixer, nothing came through. Ask for stereo in and out first;
+      // a plugin that refuses keeps its layout and RenderMonoToAll spreads
+      // its single output channel over both sides.
+      void PreferStereoLayout(juce::AudioPluginInstance& p)
+      {
+         const auto stereo = juce::AudioChannelSet::stereo();
+         auto both = p.getBusesLayout();
+         bool wantsChange = false;
+         if (both.outputBuses.size() > 0 && both.outputBuses[0].size() == 1)
+         {
+            both.outputBuses.getReference(0) = stereo;
+            wantsChange = true;
+         }
+         if (both.inputBuses.size() > 0 && both.inputBuses[0].size() == 1)
+         {
+            both.inputBuses.getReference(0) = stereo;
+            wantsChange = true;
+         }
+         if (!wantsChange || p.setBusesLayout(both))
+            return;
+         auto outOnly = p.getBusesLayout(); // e.g. mono in / stereo out
+         if (outOnly.outputBuses.size() > 0 && outOnly.outputBuses[0].size() == 1)
+         {
+            outOnly.outputBuses.getReference(0) = stereo;
+            p.setBusesLayout(outOnly);
+         }
+      }
+
       class EditorWindow final : public juce::DocumentWindow
       {
       public:
@@ -415,6 +466,7 @@ namespace Platform
       double sampleRate = 44100.0;
       int maxFrames = 4096;
       int latencySamples = 0;
+      int mainOutChannels = 2; // Turbo: the plugin's main output bus width, set at prepare
       std::atomic<uint64_t> rejectedBlocks { 0 };
       std::shared_ptr<PluginAsyncState> asyncState;
 
@@ -546,8 +598,13 @@ namespace Platform
             handle->playHead.sampleRate = &handle->sampleRate;
             handle->instance->setPlayHead(&handle->playHead);
             handle->instance->setNonRealtime(false);
+            PreferStereoLayout(*handle->instance);
             handle->instance->setRateAndBufferSizeDetails(handle->sampleRate, handle->maxFrames);
             handle->instance->prepareToPlay(handle->sampleRate, handle->maxFrames);
+            handle->mainOutChannels = std::max(1, handle->instance->getMainBusNumOutputChannels());
+            VstLog("layout " + handle->desc.name + ": in " +
+                   std::to_string(handle->instance->getMainBusNumInputChannels()) + " / out " +
+                   std::to_string(handle->mainOutChannels));
             const int channels = std::max(2, std::max(handle->instance->getTotalNumInputChannels(),
                                                       handle->instance->getTotalNumOutputChannels()));
             handle->work.setSize(channels, handle->maxFrames, false, true, false);
@@ -602,9 +659,11 @@ namespace Platform
          handle->sampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
          handle->maxFrames = std::max(64, maxBlockFrames);
          handle->instance->releaseResources();
+         PreferStereoLayout(*handle->instance);
          handle->instance->setRateAndBufferSizeDetails(handle->sampleRate, handle->maxFrames);
          handle->instance->prepareToPlay(handle->sampleRate, handle->maxFrames);
          handle->instance->reset();
+         handle->mainOutChannels = std::max(1, handle->instance->getMainBusNumOutputChannels());
          const int channels = std::max(2, std::max(handle->instance->getTotalNumInputChannels(),
                                                    handle->instance->getTotalNumOutputChannels()));
          handle->work.setSize(channels, handle->maxFrames, false, true, false);
@@ -704,6 +763,11 @@ namespace Platform
             if (in && in[ch]) work.copyFrom(ch, 0, in[ch], numFrames);
          handle->instance->processBlock(work, handle->midi);
          handle->midi.clear();
+         // Mono main output: copy it over the other channel(s), which the
+         // plugin never wrote (they still hold the input or silence).
+         if (handle->mainOutChannels == 1)
+            for (int ch = 1; ch < std::min(outChannels, work.getNumChannels()); ++ch)
+               work.copyFrom(ch, 0, work, 0, 0, numFrames);
 
          constexpr float kPluginSafetyCeiling = 16.0f;
          uint64_t rejected = 0;
@@ -808,6 +872,7 @@ namespace Platform
    bool PluginOpenEditor(PluginHandle* handle, std::string& outError)
    {
       if (!handle || !handle->instance) { outError = "plugin is not ready"; return false; }
+      GlContextKeeper keepGl;
       if (handle->editor) { handle->editor->toFront(true); return true; }
       auto* editor = handle->instance->createEditorIfNeeded();
       if (!editor) { outError = "plugin has no editor"; return false; }
@@ -819,6 +884,7 @@ namespace Platform
    void PluginCloseEditor(PluginHandle* handle)
    {
       if (!handle || !handle->editor) return;
+      GlContextKeeper keepGl;
       handle->editor.reset();
       gOpenEditorCount.fetch_sub(1);
    }
@@ -829,6 +895,7 @@ namespace Platform
       EnsureJuceInitialised();
       auto* mm = juce::MessageManager::getInstanceWithoutCreating();
       if (!mm || !mm->isThisTheMessageThread()) return false;
+      GlContextKeeper keepGl;
       mm->runDispatchLoopUntil(1);
       return true;
    }

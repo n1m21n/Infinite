@@ -25,6 +25,12 @@ set "DIST_NAME=Infinite-Turbo-Windows-x64"
 
 call :refresh_path
 
+rem The preset already fixes generator and architecture. A CMAKE_GENERATOR_PLATFORM
+rem left in the user environment (set by other toolchains) only makes CMake print
+rem "will be ignored, because CMAKE_GENERATOR is not set" on every rebuild.
+set "CMAKE_GENERATOR_PLATFORM="
+set "CMAKE_GENERATOR_TOOLSET="
+
 if not defined VCPKG_ROOT set "VCPKG_ROOT=%LOCALAPPDATA%\InfiniteBuild\vcpkg"
 if not exist "%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake" (
   echo ERRO: vcpkg nao encontrado. Execute install-dependencies.bat primeiro.

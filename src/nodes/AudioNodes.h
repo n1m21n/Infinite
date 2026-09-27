@@ -270,6 +270,12 @@ public:
    // 0 = WAV, 1 = FLAC, 2 = MP3
    int formatIndex = 0;
 
+   // Turbo: live monitoring. This output is left out of the delay
+   // compensation that lines several Audio Outs up with the slowest one, so
+   // a mic -> plugin -> headphones path is never held back to match a
+   // high-latency branch elsewhere in the patch.
+   bool live = false;
+
    // Where "Choose..." last pointed, or empty for the ~/Desktop default -
    // not persisted as an in-progress recording (nothing about a recording
    // survives save/load, same as every other recorder in this app - see the

@@ -19,6 +19,7 @@ option(INFINITE_ENABLE_VST3 "Build the VST3 plugin backend (JUCE)" ON)
 option(INFINITE_ENABLE_SPOUT "Build Spout input/output support" ON)
 option(INFINITE_ENABLE_DIRECTML_MATTING "Accelerate Remove Background with Windows ML / DirectML" ON)
 option(INFINITE_ENABLE_AVX2 "Compile with /arch:AVX2 (any x64 CPU from ~2013 on)" ON)
+option(INFINITE_ENABLE_ASIO "ASIO driver support (downloads the Steinberg ASIO SDK, GPLv3)" ON)
 option(INFINITE_ENABLE_LTCG "Whole-program optimization (/GL + /LTCG) in Release; slower link" OFF)
 
 # GLFW is built from source and linked statically.
@@ -358,7 +359,9 @@ if(INFINITE_ENABLE_VST3)
         juce::juce_gui_extra
         juce::juce_audio_basics
         juce::juce_audio_processors
-        ole32 shell32 shlwapi version winmm ws2_32
+        # opengl32: PluginVST3Windows.cpp saves/restores the WGL context
+        # around plugin UI code (GlContextKeeper).
+        ole32 shell32 shlwapi version winmm ws2_32 opengl32
     )
     target_compile_options(infinite-vst3-scanner PRIVATE /utf-8 /permissive- /Zc:char8_t-)
     set_target_properties(infinite-vst3-scanner PROPERTIES
@@ -458,6 +461,56 @@ add_custom_command(TARGET Infinite POST_BUILD
 target_compile_options(Infinite PRIVATE /utf-8 /bigobj /permissive- /Zc:char8_t- /Zc:__cplusplus /MP)
 if(TARGET infinite-vst3-scanner)
     target_compile_options(infinite-vst3-scanner PRIVATE /MP)
+endif()
+
+# ---- ASIO (Turbo) -----------------------------------------------------------
+# Steinberg's ASIO SDK has been GPLv3 since 2.3.4 (Oct 2025), the same terms
+# the VST3 build is already under. JUCE only needs common/iasiodrv.h. The zip
+# is fetched once into the build tree; if the download fails the build goes
+# on without ASIO (WASAPI shared / exclusive stay available) and says so.
+if(INFINITE_ENABLE_ASIO)
+    set(INFINITE_ASIO_DIR "${CMAKE_BINARY_DIR}/_deps/asiosdk")
+    if(NOT EXISTS "${INFINITE_ASIO_DIR}/common/iasiodrv.h")
+        set(_asio_zip "${CMAKE_BINARY_DIR}/_deps/asiosdk-2.3.4.zip")
+        set(_asio_sha512 "57de2c0cd0df0783275987e08255abfa49da12982f9d462ac40b7f57300c36e024dcb65d100b799fb3c96a9c7c5ee86e61ceb0e68d2839324206c1629d3905ed")
+        if(NOT EXISTS "${_asio_zip}")
+            message(STATUS "Downloading Steinberg ASIO SDK 2.3.4")
+            file(DOWNLOAD "https://download.steinberg.net/sdk_downloads/ASIO-SDK_2.3.4_2025-10-15.zip"
+                 "${_asio_zip}" STATUS _asio_status TLS_VERIFY ON)
+            list(GET _asio_status 0 _asio_code)
+            if(NOT _asio_code EQUAL 0)
+                file(REMOVE "${_asio_zip}")
+            endif()
+        endif()
+        if(EXISTS "${_asio_zip}")
+            file(SHA512 "${_asio_zip}" _asio_hash)
+            if(_asio_hash STREQUAL _asio_sha512)
+                set(_asio_tmp "${CMAKE_BINARY_DIR}/_deps/asiosdk-extract")
+                file(REMOVE_RECURSE "${_asio_tmp}")
+                file(ARCHIVE_EXTRACT INPUT "${_asio_zip}" DESTINATION "${_asio_tmp}")
+                file(GLOB_RECURSE _asio_hdr "${_asio_tmp}/*/iasiodrv.h" "${_asio_tmp}/common/iasiodrv.h")
+                if(_asio_hdr)
+                    list(GET _asio_hdr 0 _asio_first)
+                    get_filename_component(_asio_common "${_asio_first}" DIRECTORY)
+                    get_filename_component(_asio_root "${_asio_common}" DIRECTORY)
+                    file(REMOVE_RECURSE "${INFINITE_ASIO_DIR}")
+                    file(RENAME "${_asio_root}" "${INFINITE_ASIO_DIR}")
+                endif()
+                file(REMOVE_RECURSE "${_asio_tmp}")
+            else()
+                message(WARNING "ASIO SDK checksum mismatch, ignoring the download")
+                file(REMOVE "${_asio_zip}")
+            endif()
+        endif()
+    endif()
+    if(EXISTS "${INFINITE_ASIO_DIR}/common/iasiodrv.h")
+        target_include_directories(Infinite PRIVATE "${INFINITE_ASIO_DIR}/common")
+        target_compile_definitions(Infinite PRIVATE JUCE_ASIO=1)
+        message(STATUS "ASIO support: ON (${INFINITE_ASIO_DIR})")
+    else()
+        message(WARNING "ASIO SDK not available (download failed?) - building without ASIO. "
+                        "Delete build/windows-vs2022/_deps/asiosdk* and reconfigure to retry.")
+    endif()
 endif()
 
 # Release codegen. /O2 is CMake's default; add intrinsics, favour speed,

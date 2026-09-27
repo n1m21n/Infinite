@@ -457,6 +457,7 @@ void AudioOutputNode::VisitParams(ParamVisitor& v)
 {
    v.Int("formatIndex", formatIndex);
    v.Text("recordDirectory", recordDirectory);
+   v.Bool("live", live);
 }
 
 bool AudioOutputNode::StartRecording(const std::string& path)

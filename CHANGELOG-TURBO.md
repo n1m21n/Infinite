@@ -36,6 +36,28 @@ Performance pass, then more upstream features.
   bipolar, range mapper, live value, jump to node and delete; expressions listed below.
 - **Explode**: "by" Faces or Loose Parts (each connected part moves as a rigid piece).
 
+### Live audio latency
+- **ASIO**: the build downloads Steinberg's ASIO SDK 2.3.4 (GPLv3 since Oct 2025) and enables
+  JUCE's ASIO driver; `INFINITE_ENABLE_ASIO=OFF` to leave it out. If the download fails the build
+  goes on without ASIO.
+- **Settings > Audio > Driver**: WASAPI shared (the old default), ASIO, WASAPI exclusive, WASAPI
+  low latency, DirectSound. Buffer sizes down to 32 frames. The panel shows the driver-reported
+  round trip in ms.
+- **Audio Out "live"**: this output skips the delay compensation that lines several Audio Outs up
+  with the slowest branch, so a mic -> plugin -> headphones path is never held back.
+- The device list is scanned only for the chosen driver and cached (it used to rescan every driver
+  type every frame while Settings was open, which can glitch live audio).
+- build-windows.bat clears a stray CMAKE_GENERATOR_PLATFORM from the environment (the
+  "will be ignored" warning on every build).
+
+### Fixed
+- **Plugins with a mono output** (Auto-Tune and other vocal tools, some synths): only the left
+  channel carried the plugin, so panning right in a mixer gave silence. The host now asks for a
+  stereo layout when loading and, for a plugin that stays mono, copies its output to both sides.
+- **Plugin editors that draw with OpenGL** (Antares Auto-Tune and others) froze the Infinite window
+  while audio kept running: the plugin left its own GL context current. The host now saves and
+  restores the GL context around every piece of plugin UI code and reclaims it after each event pump.
+
 ### Not ported
 - Mod Mixer (reverted upstream), Drum Sequencer lane outs (Turbo's MPC + MPC Out covers it),
   Geometry Table, asset decode cache, Performance Mode, update checker, glTF: next rounds.

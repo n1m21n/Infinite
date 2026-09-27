@@ -141,6 +141,7 @@ namespace Patch
       uint32_t audioInputDeviceId = 0;
       double audioSampleRate = 0.0;
       int audioBufferFrames = 512;
+      int audioDriver = 0; // Turbo: 0 WASAPI shared, 1 ASIO, 2 WASAPI exclusive, 3 WASAPI low latency, 4 DirectSound
       float audioOversample = 1.0f;
       int targetFps = 60;
       bool vsync = true;

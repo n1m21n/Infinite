@@ -70,6 +70,7 @@ namespace PatchJson
          out["settings"] = {
             {"audioOutputDeviceId", s.audioOutputDeviceId}, {"audioInputDeviceId", s.audioInputDeviceId},
             {"audioSampleRate", s.audioSampleRate}, {"audioBufferFrames", s.audioBufferFrames},
+            {"audioDriver", s.audioDriver},
             {"audioOversample", s.audioOversample}, {"targetFps", s.targetFps}, {"vsync", s.vsync},
             {"snapToGrid", s.snapToGrid}, {"gridSnap", s.gridSnap}, {"zoomSensitivity", s.zoomSensitivity},
             {"minimapEnabled", s.minimapEnabled}, {"minimapCorner", s.minimapCorner},

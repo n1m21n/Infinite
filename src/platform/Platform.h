@@ -298,7 +298,16 @@ namespace Platform
       bool isOutput = false;
    };
 
-   std::vector<AudioDeviceInfo> AudioListDevices();
+   std::vector<AudioDeviceInfo> AudioListDevices(); // devices of the requested driver type (cached ~3 s)
+
+   // Turbo: audio driver type. 0 WASAPI shared (default), 1 ASIO, 2 WASAPI
+   // exclusive, 3 WASAPI low latency, 4 DirectSound. Applied on the next
+   // AudioDeviceOpen (Settings > Audio > Apply).
+   void AudioSetRequestedDriver(int driver);
+   int AudioRequestedDriver();
+   std::vector<int> AudioAvailableDrivers();
+   std::string AudioDriverLabel(int driver);
+   std::string AudioCurrentDriverName();
 
    // ---- sample library ----
    // Native open panel restricted to picking a single directory (no files).

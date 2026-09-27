@@ -1273,6 +1273,19 @@ namespace Platform
       // ring, so each Audio In node can pick its own channel or pair. Frames
       // are a latest-audio window: readers keep their own cursor, so two
       // Audio In nodes no longer steal each other's samples.
+      int gRequestedDriver = 0; // see AudioDriverName
+      // JUCE device-type names for the saved driver index.
+      juce::String AudioDriverName(int driver)
+      {
+         switch (driver)
+         {
+            case 1: return "ASIO";
+            case 2: return "Windows Audio (Exclusive Mode)";
+            case 3: return "Windows Audio (Low Latency Mode)";
+            case 4: return "DirectSound";
+            default: return "Windows Audio";
+         }
+      }
       constexpr size_t kInputRingFrames = 65536;
       constexpr int kInputRingChannels = 32;
       struct InputRing
@@ -1465,7 +1478,20 @@ namespace Platform
                         uint32_t requestedInputId)
    {
       if (!AudioBridgeInstance().open(2, 2, error)) return false;
-      auto setup = AudioBridgeInstance().manager.getAudioDeviceSetup();
+      // Turbo: driver type first (ASIO / WASAPI exclusive / low latency...),
+      // then the device setup inside that type.
+      auto& manager = AudioBridgeInstance().manager;
+      const bool isAsio = AudioDriverName(gRequestedDriver) == juce::String("ASIO");
+      {
+         const juce::String wanted = AudioDriverName(gRequestedDriver);
+         bool available = false;
+         for (auto* t : manager.getAvailableDeviceTypes())
+            if (t && t->getTypeName() == wanted)
+               available = true;
+         if (available && manager.getCurrentAudioDeviceType() != wanted)
+            manager.setCurrentAudioDeviceType(wanted, true);
+      }
+      auto setup = manager.getAudioDeviceSetup();
       if (requestedRate > 0) setup.sampleRate = requestedRate;
       if (requestedFrames > 0) setup.bufferSize = requestedFrames;
       if (requestedId != 0)
@@ -1476,6 +1502,9 @@ namespace Platform
       {
          for (const auto& d : AudioListDevices()) if (d.isInput && d.deviceId == requestedInputId) setup.inputDeviceName = d.name;
       }
+      // An ASIO driver is one device for input and output.
+      if (isAsio && setup.outputDeviceName.isNotEmpty())
+         setup.inputDeviceName = setup.outputDeviceName;
       // Turbo: open every input channel (JUCE drops bits the device lacks),
       // so Audio In nodes can pick any channel of a multichannel interface.
       setup.useDefaultInputChannels = false;
@@ -1495,14 +1524,58 @@ namespace Platform
    bool AudioDidWake() { return false; }
    void AudioDeviceDebugSimulateConfigChange() { AudioBridgeInstance().configChanged.store(true); }
 
+   // Turbo: driver types (index = the saved setting). 0 is JUCE's shared
+   // WASAPI, the old behaviour.
+   void AudioSetRequestedDriver(int driver) { gRequestedDriver = std::clamp(driver, 0, 4); }
+   int AudioRequestedDriver() { return gRequestedDriver; }
+   std::string AudioCurrentDriverName()
+   {
+      return AudioBridgeInstance().manager.getCurrentAudioDeviceType().toStdString();
+   }
+   std::vector<int> AudioAvailableDrivers()
+   {
+      EnsureJuceInitialised();
+      std::vector<int> out;
+      auto& types = AudioBridgeInstance().manager.getAvailableDeviceTypes();
+      for (int d = 0; d <= 4; d++)
+         for (auto* t : types)
+            if (t && t->getTypeName() == AudioDriverName(d))
+            {
+               out.push_back(d);
+               break;
+            }
+      return out;
+   }
+   std::string AudioDriverLabel(int driver)
+   {
+      switch (driver)
+      {
+         case 1: return "ASIO (lowest latency)";
+         case 2: return "WASAPI exclusive";
+         case 3: return "WASAPI low latency (shared)";
+         case 4: return "DirectSound";
+         default: return "WASAPI shared (default)";
+      }
+   }
+
+   // Devices of the requested driver type only. Cached: scanning every
+   // driver type touches the hardware and used to run every frame the
+   // Settings panel was open, which can glitch live audio.
    std::vector<AudioDeviceInfo> AudioListDevices()
    {
       EnsureJuceInitialised();
+      static std::vector<AudioDeviceInfo> sCache;
+      static int sCacheDriver = -1;
+      static double sCacheTime = -1.0;
+      const double now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+      if (sCacheDriver == gRequestedDriver && sCacheTime >= 0.0 && now - sCacheTime < 3.0)
+         return sCache;
       std::vector<AudioDeviceInfo> out;
+      const juce::String wanted = AudioDriverName(gRequestedDriver);
       auto& types = AudioBridgeInstance().manager.getAvailableDeviceTypes();
       for (auto* type : types)
       {
-         if (!type) continue;
+         if (!type || type->getTypeName() != wanted) continue;
          type->scanForDevices();
          for (auto input : {false, true})
             for (const auto& name : type->getDeviceNames(input))
@@ -1510,6 +1583,9 @@ namespace Platform
                AudioDeviceInfo d; d.name = name.toStdString(); d.deviceId = HashId(d.name); d.isInput = input; d.isOutput = !input; out.push_back(d);
             }
       }
+      sCache = out;
+      sCacheDriver = gRequestedDriver;
+      sCacheTime = now;
       return out;
    }
 

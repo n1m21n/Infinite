@@ -42,6 +42,7 @@ namespace
       file << p << "audioInputDeviceId " << s.audioInputDeviceId << "\n";
       file << p << "audioSampleRate " << s.audioSampleRate << "\n";
       file << p << "audioBufferFrames " << s.audioBufferFrames << "\n";
+      file << p << "audioDriver " << s.audioDriver << "\n";
       file << p << "audioOversample " << s.audioOversample << "\n";
       file << p << "targetFps " << s.targetFps << "\n";
       file << p << "vsync " << (s.vsync ? 1 : 0) << "\n";
@@ -70,6 +71,7 @@ namespace
       else if (key == "audioInputDeviceId") in >> s.audioInputDeviceId;
       else if (key == "audioSampleRate") in >> s.audioSampleRate;
       else if (key == "audioBufferFrames") in >> s.audioBufferFrames;
+      else if (key == "audioDriver") in >> s.audioDriver;
       else if (key == "audioOversample") in >> s.audioOversample;
       else if (key == "targetFps") in >> s.targetFps;
       else if (key == "vsync") { int v = 0; in >> v; s.vsync = v != 0; }

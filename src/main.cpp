@@ -738,6 +738,7 @@ namespace
    // kernels are the intended future consumer (see README.md's Effects
    // table); this phase just makes the setting exist and be visible.
    float gAudioOversample = 1.0f;
+   int gAudioDriver = 0; // Turbo: see Platform::AudioSetRequestedDriver
    std::string gPatchPath;      // "" until the patch has been saved somewhere
    bool gPatchDirty = false;
    std::string gPatchStatus;
@@ -17032,6 +17033,21 @@ namespace
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
+      // Turbo: live monitoring - skip the multi-output delay compensation.
+      {
+         bool live = n->live;
+         if (ImGui::Checkbox("live (no delay compensation)##audioOutLive", &live))
+         {
+            PushUndoCheckpoint();
+            n->live = live;
+            RebuildAudioTopology();
+         }
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("For a mic -> plugin -> headphones path: this output is never delayed\n"
+                              "to line up with slower branches (a lookahead limiter, a pitch shifter,\n"
+                              "a plugin with latency) feeding other Audio Outs.");
+      }
+
       // Format selector: WAV | FLAC | MP3. A CV value of 0..1 is divided
       // evenly across the available entries by DropdownButton.
       ImGui::BeginDisabled(recording);
@@ -21771,6 +21787,7 @@ namespace
       std::set<INode*> visited;
       std::unordered_map<AudioNode*, int> bufferIndexOf;
       std::vector<AudioTerminal> terminals;
+      std::vector<bool> terminalLive; // Turbo: parallel to terminals
 
       for (GraphNode& gn : gNodes)
       {
@@ -21797,6 +21814,7 @@ namespace
                // Capture is set unconditionally, gated at write-time on the
                // ring's own `enabled` flag - see AudioTerminal's comment.
                terminals.push_back({ idx, ring });
+               terminalLive.push_back(audioOut != nullptr && audioOut->live);
             }
          }
       }
@@ -21980,13 +21998,15 @@ namespace
       // Same alignment one level up, across whichever Audio Out terminals
       // are summed together into the device buffer in RunTopology.
       {
+         // Turbo: "live" Audio Outs neither set nor receive this alignment.
          int maxAmongTerminals = 0;
-         for (const AudioTerminal& terminal : terminals)
-            if (terminal.bufferIndex >= 0)
-               maxAmongTerminals = std::max(maxAmongTerminals, cumulativeLatency[(size_t)terminal.bufferIndex]);
-         for (AudioTerminal& terminal : terminals)
+         for (size_t t = 0; t < terminals.size(); t++)
+            if (terminals[t].bufferIndex >= 0 && !(t < terminalLive.size() && terminalLive[t]))
+               maxAmongTerminals = std::max(maxAmongTerminals, cumulativeLatency[(size_t)terminals[t].bufferIndex]);
+         for (size_t t = 0; t < terminals.size(); t++)
          {
-            if (terminal.bufferIndex < 0)
+            AudioTerminal& terminal = terminals[t];
+            if (terminal.bufferIndex < 0 || (t < terminalLive.size() && terminalLive[t]))
                continue;
             const int delay = maxAmongTerminals - cumulativeLatency[(size_t)terminal.bufferIndex];
             if (delay > 0)
@@ -22054,6 +22074,7 @@ namespace
       s.present = true;
       s.audioOutputDeviceId = gAudioOutputDeviceId;
       s.audioInputDeviceId = gAudioInputDeviceId;
+      s.audioDriver = gAudioDriver;
       s.audioSampleRate = gAudioSampleRate;
       s.audioBufferFrames = gAudioBufferFrames;
       s.audioOversample = gAudioOversample;
@@ -22089,6 +22110,7 @@ namespace
 
       gAudioOutputDeviceId = s.audioOutputDeviceId;
       gAudioInputDeviceId = s.audioInputDeviceId;
+      gAudioDriver = std::max(0, std::min(s.audioDriver, 4));
       gAudioSampleRate = s.audioSampleRate;
       gAudioBufferFrames = std::max(32, std::min(s.audioBufferFrames, 8192));
       gAudioOversample = std::max(1.0f, std::min(s.audioOversample, 4.0f));
@@ -22111,6 +22133,7 @@ namespace
       gAutosaveSeconds = std::max(15, std::min(s.autosaveSeconds, 300));
       RuntimeLog::SetEnabled(gDiagnosticLogEnabled);
 
+      Platform::AudioSetRequestedDriver(gAudioDriver);
       AudioEngine::Instance().SetRequestedDevice(gAudioOutputDeviceId);
       AudioEngine::Instance().SetRequestedInputDevice(gAudioInputDeviceId);
       AudioEngine::Instance().SetRequestedSampleRate(gAudioSampleRate);
@@ -22130,7 +22153,7 @@ namespace
    bool SameSceneSettings(const Patch::SceneSettings& a, const Patch::SceneSettings& b)
    {
       return a.audioOutputDeviceId == b.audioOutputDeviceId &&
-             a.audioInputDeviceId == b.audioInputDeviceId &&
+             a.audioInputDeviceId == b.audioInputDeviceId && a.audioDriver == b.audioDriver &&
              a.audioSampleRate == b.audioSampleRate &&
              a.audioBufferFrames == b.audioBufferFrames &&
              a.audioOversample == b.audioOversample && a.targetFps == b.targetFps &&
@@ -31887,6 +31910,11 @@ int main(int argc, char** argv)
    {
       gFrameStart = glfwGetTime();
       glfwPollEvents();
+      // A hosted plugin editor that renders with OpenGL can paint inside
+      // this message pump and leave its own GL context current (see
+      // GlContextKeeper in PluginVST3Windows.cpp): take ours back.
+      if (Platform::AnyPluginEditorOpen())
+         glfwMakeContextCurrent(window);
       UpdateMainWindowTitle(window);
 
       // Apply any RemoteControl RPC requests queued by the network thread
@@ -32807,6 +32835,28 @@ int main(int argc, char** argv)
 
             ImGui::SeparatorText("Audio");
             {
+               // Turbo: driver type. ASIO (the interface's own driver) or
+               // WASAPI exclusive give the lowest live latency; shared WASAPI
+               // goes through the Windows mixer and adds its buffering.
+               {
+                  const std::vector<int> drivers = Platform::AudioAvailableDrivers();
+                  ImGui::SetNextItemWidth(220);
+                  if (ImGui::BeginCombo("Driver", Platform::AudioDriverLabel(gAudioDriver).c_str()))
+                  {
+                     for (int d : drivers)
+                        if (ImGui::Selectable(Platform::AudioDriverLabel(d).c_str(), d == gAudioDriver) && d != gAudioDriver)
+                        {
+                           gAudioDriver = d;
+                           Platform::AudioSetRequestedDriver(d);
+                           // device names differ per driver type
+                           gAudioOutputDeviceId = 0;
+                           gAudioInputDeviceId = 0;
+                        }
+                     ImGui::EndCombo();
+                  }
+                  if (std::find(drivers.begin(), drivers.end(), 1) == drivers.end())
+                     ImGui::TextDisabled("ASIO not in this build");
+               }
                const std::vector<Platform::AudioDeviceInfo> devices = Platform::AudioListDevices();
                const bool audioRunning = AudioEngine::Instance().SampleRate() > 0.0;
 
@@ -32873,7 +32923,7 @@ int main(int argc, char** argv)
                   ImGui::EndCombo();
                }
 
-               static const int kBufferSizes[] = { 64, 128, 256, 512, 1024, 2048 };
+               static const int kBufferSizes[] = { 32, 48, 64, 96, 128, 192, 256, 512, 1024, 2048 };
                char bufferLabel[16];
                snprintf(bufferLabel, sizeof(bufferLabel), "%d", gAudioBufferFrames);
                ImGui::SetNextItemWidth(220);
@@ -32907,6 +32957,12 @@ int main(int argc, char** argv)
                   const uint32_t actualBufferFrames = Platform::AudioDeviceBufferFrames(gAudioOutputDeviceId);
                   ImGui::TextDisabled("Active: %.0f Hz, %u frames", AudioEngine::Instance().SampleRate(),
                                       actualBufferFrames);
+                  // what the driver reports: input + output latency + one buffer
+                  const int rtFrames = Platform::AudioRoundTripLatencyFrames();
+                  const double sr = AudioEngine::Instance().SampleRate();
+                  if (rtFrames > 0 && sr > 0.0)
+                     ImGui::TextDisabled("%s, round trip ~%.1f ms (driver-reported, plus plugin latency)",
+                                         Platform::AudioCurrentDriverName().c_str(), 1000.0 * rtFrames / sr);
                }
 
                if (ImGui::MenuItem("Apply audio settings"))
