@@ -54,6 +54,9 @@ Performance pass, then more upstream features.
 - **Plugins with a mono output** (Auto-Tune and other vocal tools, some synths): only the left
   channel carried the plugin, so panning right in a mixer gave silence. The host now asks for a
   stereo layout when loading and, for a plugin that stays mono, copies its output to both sides.
+- **Plugin pitch smear at small buffers** (32/48 frames): the plugin processed a full 64-frame
+  buffer on every smaller block and ran ahead of real time. It now processes exactly the block size.
+  A mono source feeding a stereo plugin input goes to both input channels.
 - **Plugin editors that draw with OpenGL** (Antares Auto-Tune and others) froze the Infinite window
   while audio kept running: the plugin left its own GL context current. The host now saves and
   restores the GL context around every piece of plugin UI code and reclaims it after each event pump.

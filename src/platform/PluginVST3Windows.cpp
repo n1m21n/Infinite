@@ -467,6 +467,7 @@ namespace Platform
       int maxFrames = 4096;
       int latencySamples = 0;
       int mainOutChannels = 2; // Turbo: the plugin's main output bus width, set at prepare
+      int mainInChannels = 2;  // Turbo: main input bus width, set at prepare
       std::atomic<uint64_t> rejectedBlocks { 0 };
       std::shared_ptr<PluginAsyncState> asyncState;
 
@@ -601,7 +602,7 @@ namespace Platform
             PreferStereoLayout(*handle->instance);
             handle->instance->setRateAndBufferSizeDetails(handle->sampleRate, handle->maxFrames);
             handle->instance->prepareToPlay(handle->sampleRate, handle->maxFrames);
-            handle->mainOutChannels = std::max(1, handle->instance->getMainBusNumOutputChannels());
+            handle->mainOutChannels = std::max(1, handle->instance->getMainBusNumOutputChannels()); handle->mainInChannels = handle->instance->getMainBusNumInputChannels();
             VstLog("layout " + handle->desc.name + ": in " +
                    std::to_string(handle->instance->getMainBusNumInputChannels()) + " / out " +
                    std::to_string(handle->mainOutChannels));
@@ -663,7 +664,7 @@ namespace Platform
          handle->instance->setRateAndBufferSizeDetails(handle->sampleRate, handle->maxFrames);
          handle->instance->prepareToPlay(handle->sampleRate, handle->maxFrames);
          handle->instance->reset();
-         handle->mainOutChannels = std::max(1, handle->instance->getMainBusNumOutputChannels());
+         handle->mainOutChannels = std::max(1, handle->instance->getMainBusNumOutputChannels()); handle->mainInChannels = handle->instance->getMainBusNumInputChannels();
          const int channels = std::max(2, std::max(handle->instance->getTotalNumInputChannels(),
                                                    handle->instance->getTotalNumOutputChannels()));
          handle->work.setSize(channels, handle->maxFrames, false, true, false);
@@ -761,7 +762,17 @@ namespace Platform
          work.clear(0, numFrames);
          for (int ch = 0; ch < std::min(inChannels, work.getNumChannels()); ++ch)
             if (in && in[ch]) work.copyFrom(ch, 0, in[ch], numFrames);
-         handle->instance->processBlock(work, handle->midi);
+         // Turbo: a one-channel source feeds every channel of a stereo main
+         // input, otherwise the plugin's right side processes silence.
+         if (in && inChannels == 1 && in[0])
+            for (int ch = 1; ch < std::min(handle->mainInChannels, work.getNumChannels()); ++ch)
+               work.copyFrom(ch, 0, in[0], numFrames);
+         // Turbo: process exactly numFrames. work is sized for maxFrames (at
+         // least 64), and handing the whole buffer to processBlock on a
+         // 32/48-frame block made the plugin run ahead of real time and
+         // smear the pitch. The view refers to work's memory, no allocation.
+         juce::AudioBuffer<float> block(work.getArrayOfWritePointers(), work.getNumChannels(), numFrames);
+         handle->instance->processBlock(block, handle->midi);
          handle->midi.clear();
          // Mono main output: copy it over the other channel(s), which the
          // plugin never wrote (they still hold the input or silence).
