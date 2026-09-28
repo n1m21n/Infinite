@@ -638,10 +638,25 @@
         o.start(t); m.start(t); o.stop(t + 0.14); m.stop(t + 0.14);
       } catch (e) { /* no audio, no chirp */ }
     };
-    cv.addEventListener('click', () => {
+    // the canvas never takes clicks: buttons and links under it always win.
+    // a tap on empty space over the bird's body still makes it chirp.
+    const HIT = 'a, button, input, select, textarea, label, summary, video, [role="button"], [tabindex]';
+    const onBird = (x, y) => {
+      if (!cur) return false;
+      const fx = pos.x - window.scrollX, fy = pos.y - window.scrollY;
+      return Math.abs(x - fx) < S * 0.42 && y < fy - 2 && y > fy - S * 0.7;
+    };
+    document.addEventListener('click', (e) => {
+      if (!onBird(e.clientX, e.clientY) || (e.target.closest && e.target.closest(HIT))) return;
       chirp();
       if (!reduced && !flight) { hop = { t0: performance.now() }; kick(); }
     });
+    if (window.matchMedia('(pointer: fine)').matches) {
+      document.addEventListener('mousemove', (e) => {
+        const over = onBird(e.clientX, e.clientY) && !(e.target.closest && e.target.closest(HIT));
+        document.documentElement.classList.toggle('over-bird', over);
+      }, { passive: true });
+    }
 
     const BEAT = 60 / 145 * 1000;
     const frame = (now) => {

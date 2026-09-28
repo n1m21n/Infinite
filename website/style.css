@@ -687,11 +687,12 @@ strong { font-weight: 600; color: var(--ink); }
    -------------------------------------------------------------------------- */
 #bird {
   position: absolute; left: 0; top: 0; z-index: 60;
-  width: 68px; height: 52px; pointer-events: auto; cursor: pointer;
+  width: 68px; height: 52px; pointer-events: none;
   opacity: 0; transition: opacity 0.4s;
   -webkit-tap-highlight-color: transparent;
 }
 #bird.ready { opacity: 1; }
+html.over-bird body { cursor: pointer; }
 
 /* --------------------------------------------------------------------------
    Responsive
@@ -716,8 +717,14 @@ strong { font-weight: 600; color: var(--ink); }
   .nav-links > a:hover { background: none; }
   .nav-sheet-social { display: flex; gap: 18px; padding-top: 14px; }
   .nav-sheet-social a { font-family: var(--font-mono); font-size: 0.85rem; color: var(--ink2); text-decoration: none; padding: 8px 6px; }
-  .nav-actions { margin-left: auto; }
-  .menu-btn { display: block; }
+  /* hamburger left, mark centred, download right */
+  .nav-container { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; }
+  .menu-btn { display: block; justify-self: start; margin-left: -10px; }
+  .brand { justify-self: center; }
+  .brand-name { display: none; }
+  .brand-icon { width: 32px; height: 32px; }
+  .nav-actions { justify-self: end; }
+  .nav-download { margin-left: 0; }
   .hide-sm { display: none; }
 
   .predict-card { grid-template-columns: 1fr; }
