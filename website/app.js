@@ -1435,112 +1435,6 @@ function initKnobsAnimation() {
   window.addEventListener('resize', resize, { passive: true });
 }
 
-// Mobile Slider Navigator for Creative Streams
-function initMobileCapabilitiesSlider() {
-  const grid = document.getElementById('capabilities-grid');
-  const dots = document.querySelectorAll('#cap-slider-dots .cap-dot');
-  const prevBtn = document.getElementById('cap-prev-btn');
-  const nextBtn = document.getElementById('cap-next-btn');
-  const cards = document.querySelectorAll('.capabilities-grid .cap-card');
-
-  if (!grid || cards.length === 0) return;
-
-  let activeIndex = 0;
-
-  function setActiveDot(idx) {
-    activeIndex = Math.max(0, Math.min(cards.length - 1, idx));
-    dots.forEach((dot, i) => {
-      if (i === activeIndex) {
-        dot.classList.add('active');
-      } else {
-        dot.classList.remove('active');
-      }
-    });
-  }
-
-  function scrollToCard(idx) {
-    if (cards.length === 0) return;
-    if (idx < 0) idx = cards.length - 1;
-    if (idx >= cards.length) idx = 0;
-
-    const targetCard = cards[idx];
-    if (!targetCard) return;
-
-    try {
-      targetCard.scrollIntoView({
-        behavior: 'smooth',
-        inline: 'center',
-        block: 'nearest'
-      });
-    } catch (err) {
-      const targetLeft = targetCard.offsetLeft - 16;
-      grid.scrollTo({ left: targetLeft, behavior: 'smooth' });
-    }
-
-    setActiveDot(idx);
-  }
-
-  function bindAction(el, action) {
-    if (!el) return;
-    let lastTime = 0;
-    const handler = (e) => {
-      const now = Date.now();
-      if (now - lastTime < 250) return;
-      lastTime = now;
-      if (e && e.cancelable) {
-        e.preventDefault();
-      }
-      action();
-    };
-    el.addEventListener('click', handler);
-    el.addEventListener('touchend', handler);
-  }
-
-  dots.forEach((dot, idx) => {
-    bindAction(dot, () => scrollToCard(idx));
-  });
-
-  if (prevBtn) {
-    bindAction(prevBtn, () => scrollToCard(activeIndex - 1));
-  }
-  if (nextBtn) {
-    bindAction(nextBtn, () => scrollToCard(activeIndex + 1));
-  }
-
-  // Active dot tracking with IntersectionObserver for rock-solid sync on all mobile devices
-  if ('IntersectionObserver' in window) {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          const idx = parseInt(entry.target.getAttribute('data-index') || '0', 10);
-          setActiveDot(idx);
-        }
-      });
-    }, {
-      root: grid,
-      threshold: 0.55
-    });
-
-    cards.forEach(card => observer.observe(card));
-  } else {
-    let scrollTimeout = null;
-    grid.addEventListener('scroll', () => {
-      if (scrollTimeout) return;
-      scrollTimeout = requestAnimationFrame(() => {
-        scrollTimeout = null;
-        const scrollLeft = grid.scrollLeft;
-        const cardWidth = (cards[0].offsetWidth || 280) + 14;
-        const newIndex = Math.round(scrollLeft / cardWidth);
-        setActiveDot(newIndex);
-      });
-    }, { passive: true });
-  }
-}
-
-
-
-
-
 // ==========================================================================
 // 4. Seamless Audio Player (Single Track + Reactive Amplitude Waveform)
 // ==========================================================================
@@ -1750,17 +1644,17 @@ function initRecipesToggle() {
     if (isHidden) {
       extraRecipes.classList.remove('hidden');
       const span = btn.querySelector('span');
-      if (span) span.textContent = 'Show Fewer Recipes';
+      if (span) span.textContent = 'Show fewer recipes';
     } else {
       extraRecipes.classList.add('hidden');
       const span = btn.querySelector('span');
-      if (span) span.textContent = 'Show More Recipes (3)';
+      if (span) span.textContent = 'Show 3 more recipes';
     }
   });
 }
 
 // ==========================================================================
-// 5. 3 Continuous Ticker Tapes & Interactive Node Modal
+// 5. Node descriptions (used by the node matrix in site.js) & Node Modal
 // ==========================================================================
 const ALL_NODES = [
   { name: 'Wavetable Synth', cat: 'Audio', desc: 'Multi-frame morphing oscillator with 12 factory tables, unison detune, and sub-oscillators.' },
@@ -1784,37 +1678,6 @@ const ALL_NODES = [
   { name: 'Poisson Scattering', cat: '3D Geometry', desc: 'Distribute points smoothly across complex 3D meshes without clustering.' },
   { name: 'XY Motion Pad', cat: 'Modulation', desc: 'Record expressive 2D mouse gestures with spring physics and looping playback.' }
 ];
-
-function initTickerTapes() {
-  const t1 = document.getElementById('ticker-1');
-  const t2 = document.getElementById('ticker-2');
-  const t3 = document.getElementById('ticker-3');
-
-  if (!t1 || !t2 || !t3) return;
-
-  const g1 = ALL_NODES.slice(0, 7);
-  const g2 = ALL_NODES.slice(7, 14);
-  const g3 = ALL_NODES.slice(14);
-
-  function createPillsHtml(group) {
-    const quad = [...group, ...group, ...group, ...group];
-    return quad.map(n => `
-      <div class="ticker-pill" data-name="${escapeHtml(n.name)}" data-cat="${escapeHtml(n.cat)}" data-desc="${escapeHtml(n.desc)}">
-        ${escapeHtml(n.name)}
-      </div>
-    `).join('');
-  }
-
-  t1.innerHTML = createPillsHtml(g1);
-  t2.innerHTML = createPillsHtml(g2);
-  t3.innerHTML = createPillsHtml(g3);
-
-  document.querySelectorAll('.ticker-pill').forEach(pill => {
-    pill.addEventListener('click', () => {
-      openNodeModal(pill.dataset.name, pill.dataset.cat, pill.dataset.desc);
-    });
-  });
-}
 
 function openNodeModal(name, cat, desc) {
   const modal = document.getElementById('node-modal');
@@ -1917,11 +1780,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initWavetableAnimation();
   initParticlesAnimation();
   initKnobsAnimation();
-  initMobileCapabilitiesSlider();
 
   initMinimalAudioPlayer();
   initRecipesToggle();
-  initTickerTapes();
   initModal();
   initCopyButtons();
 });
