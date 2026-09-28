@@ -21,11 +21,11 @@
   <meta name="twitter:description" content="Visuals, music and code on one infinite canvas.">
   <meta name="twitter:image" content="https://n1m21n.github.io/Infinite/assets/film/launch_poster.jpg">
 
-  <link rel="icon" type="image/png" href="assets/icon.png">
+  <link rel="icon" type="image/png" href="assets/icon-64.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="style.css?v=42">
 
@@ -50,7 +50,7 @@
         <span></span><span></span>
       </button>
       <a href="#top" class="brand" aria-label="Infinite home">
-        <img src="assets/icon.png" alt="" class="brand-icon" width="30" height="30">
+        <img src="assets/icon-96.png" alt="" class="brand-icon" width="30" height="30">
         <span class="brand-name">Infinite</span>
       </a>
 
@@ -146,7 +146,7 @@
             <span class="dots"><i></i><i></i><i></i></span>
             <span class="app-title">untitled.infinite</span>
           </div>
-          <img class="product-shot" src="assets/product_canvas_1400.webp"
+          <img class="product-shot" decoding="async" fetchpriority="high" src="assets/product_canvas_1400.webp"
                srcset="assets/product_canvas_1400.webp 1400w, assets/product_canvas.webp 2628w"
                sizes="(max-width: 1100px) 100vw, 1080px"
                alt="The Infinite canvas: visual nodes on the left, synths, sequencers and a mixer on the right, live previews in the side panel" width="2628" height="1464">
@@ -316,7 +316,7 @@
                 <span class="pnode" style="--cat:#A3A9BA">Output</span>
               </div>
             </div>
-            <div class="recipe-media"><img src="assets/howto_visual.jpg" alt="Audio reactive visual patch" loading="lazy"></div>
+            <div class="recipe-media"><img src="assets/howto_visual.webp" width="1100" height="1100" decoding="async" alt="Audio reactive visual patch" loading="lazy"></div>
           </article>
 
           <article class="recipe reveal">
@@ -331,7 +331,7 @@
                 <span class="pnode" style="--cat:#A3A9BA">Audio Out</span>
               </div>
             </div>
-            <div class="recipe-media"><img src="assets/howto_daw.jpg" alt="Audio workstation and synth nodes" loading="lazy"></div>
+            <div class="recipe-media"><img src="assets/howto_daw.webp" width="1200" height="675" decoding="async" alt="Audio workstation and synth nodes" loading="lazy"></div>
           </article>
 
           <div id="extra-recipes" class="extra-recipes hidden">
@@ -347,7 +347,7 @@
                   <span class="pnode" style="--cat:#FACC15">kaleidoscope</span>
                 </div>
               </div>
-              <div class="recipe-media"><img src="assets/recipe_kaleido.jpg" alt="Live visual shader graph" loading="lazy"></div>
+              <div class="recipe-media"><img src="assets/recipe_kaleido.webp" width="1200" height="772" decoding="async" alt="Live visual shader graph" loading="lazy"></div>
             </article>
 
             <article class="recipe">
@@ -362,7 +362,7 @@
                   <span class="pnode" style="--cat:#53C7E3">Chorus</span>
                 </div>
               </div>
-              <div class="recipe-media"><img src="assets/recipe_synth.jpg" alt="Wavetable synth rack" loading="lazy"></div>
+              <div class="recipe-media"><img src="assets/recipe_synth.webp" width="1200" height="790" decoding="async" alt="Wavetable synth rack" loading="lazy"></div>
             </article>
 
             <article class="recipe">
@@ -376,7 +376,7 @@
                   <span class="pnode" style="--cat:#38BDF8">Render 3D</span>
                 </div>
               </div>
-              <div class="recipe-media"><img src="assets/recipe_spectrogram.jpg" alt="Image spectrogram synthesis and 3D texture mapping" loading="lazy"></div>
+              <div class="recipe-media"><img src="assets/recipe_spectrogram.webp" width="1012" height="1428" decoding="async" alt="Image spectrogram synthesis and 3D texture mapping" loading="lazy"></div>
             </article>
           </div>
         </div>
@@ -579,7 +579,7 @@
       <div class="footer-grid">
         <div class="footer-brand">
           <div class="brand">
-            <img src="assets/icon.png" alt="" class="brand-icon" width="30" height="30">
+            <img src="assets/icon-96.png" alt="" class="brand-icon" width="30" height="30">
             <span class="brand-name">Infinite</span>
           </div>
           <p>Visuals, music and code on one infinite canvas.</p>
@@ -612,9 +612,8 @@
     </div>
   </footer>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="nodes.js?v=1"></script>
-  <script src="app.js?v=28"></script>
-  <script src="site.js?v=3"></script>
+  <script src="nodes.js?v=1" defer></script>
+  <script src="app.js?v=30" defer></script>
+  <script src="site.js?v=4" defer></script>
 </body>
 </html>

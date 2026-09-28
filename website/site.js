@@ -215,16 +215,24 @@
     const video = $('#film-video');
     const btn = $('#film-sound');
     if (!video) return;
+    // slow or data-saving connections get the 540p cut and no autoplay:
+    // the poster stays until the visitor taps, so nothing downloads on its own
+    const net = navigator.connection || {};
+    const slow = !!net.saveData || /(^|-)2g|3g/.test(net.effectiveType || '');
     let loaded = false;
     const load = () => {
       if (loaded) return;
       loaded = true;
-      const small = window.innerWidth < 720;
+      const small = slow || window.innerWidth < 720;
       video.src = small ? video.dataset.srcSm : video.dataset.srcLg;
-      video.preload = 'auto';
+      video.preload = slow ? 'metadata' : 'auto';
     };
     const tryPlay = () => { const p = video.play(); if (p && p.catch) p.catch(() => {}); };
-    if ('IntersectionObserver' in window) {
+    if (slow) {
+      video.controls = true;
+      video.addEventListener('play', load, { once: true });
+      video.addEventListener('click', () => { if (!loaded) { load(); tryPlay(); } }, { once: true });
+    } else if ('IntersectionObserver' in window) {
       new IntersectionObserver((es) => {
         const e = es[0];
         if (e.isIntersecting) { load(); if (!reduced || !video.muted) tryPlay(); }
@@ -241,7 +249,7 @@
       if (label) label.textContent = video.muted ? 'Sound on' : 'Sound off';
       if (!video.muted) { if (video.currentTime > 1 && video.ended) video.currentTime = 0; tryPlay(); }
     });
-    video.addEventListener('click', () => { if (video.paused) tryPlay(); else video.pause(); });
+    video.addEventListener('click', () => { if (video.controls) return; if (video.paused) tryPlay(); else video.pause(); });
   }
 
   /* ------------------------------------------------------------ what-if cables */

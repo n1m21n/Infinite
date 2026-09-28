@@ -421,7 +421,6 @@ function animateNatureBranches(timestamp) {
   if (!natureCtx || !natureCanvas || !natureAnimating) return;
   if (networkNodes.length === 0) {
     resizeBranchCanvas();
-    requestAnimationFrame(animateNatureBranches);
     return;
   }
 
@@ -984,12 +983,27 @@ function initParticlesAnimation() {
   const canvas = document.getElementById('anim-particles');
   if (!canvas) return;
 
-  // Use Three.js if available, otherwise pure WebGL 3D
-  if (typeof THREE !== 'undefined') {
-    initThreeJSCube(canvas);
-  } else {
-    initCanvas3DCube(canvas);
-  }
+  // The light 2D cube draws at once. three.js (~150 KB) is fetched only when the
+  // card comes near the screen, and never on slow or data-saving connections;
+  // once it arrives the canvas is swapped for the full glass-and-halo cube.
+  initCanvas3DCube(canvas);
+  const net = navigator.connection || {};
+  if (net.saveData || /(^|-)2g|3g/.test(net.effectiveType || '') || !('IntersectionObserver' in window)) return;
+  const io = new IntersectionObserver((entries) => {
+    if (!entries[0].isIntersecting) return;
+    io.disconnect();
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+    s.async = true;
+    s.onload = () => {
+      if (typeof THREE === 'undefined') return;
+      const fresh = canvas.cloneNode(false);
+      canvas.replaceWith(fresh);
+      initThreeJSCube(fresh);
+    };
+    document.head.appendChild(s);
+  }, { rootMargin: '600px 0px' });
+  io.observe(canvas);
 }
 
 function initThreeJSCube(canvas) {
@@ -1628,9 +1642,9 @@ function initMinimalAudioPlayer() {
       ctx.setLineDash([]);
     }
 
-    requestAnimationFrame(renderWaveform);
   }
-  requestAnimationFrame(renderWaveform);
+  // redraw only while the player is on screen
+  createViewportLoop(waveCanvas, renderWaveform);
 }
 
 // Recipes Show More / Show Less Toggle
