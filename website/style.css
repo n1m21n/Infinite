@@ -508,9 +508,15 @@ strong { font-weight: 600; color: var(--ink); }
 .recipe-media img { width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--r-md); background: var(--inner); }
 
 /* a patch: dark node chips joined by cables with port dots */
-.patch { display: flex; flex-wrap: wrap; align-items: center; row-gap: 12px; margin-top: 18px; }
+/* always one horizontal chain; a chain longer than its card scrolls inside it */
+.patch {
+  display: flex; flex-wrap: nowrap; align-items: center; margin: 16px -2px 0; padding: 2px;
+  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.patch::-webkit-scrollbar { display: none; }
+.recipe-text { min-width: 0; }
 .pnode {
-  position: relative; display: inline-flex; align-items: center; gap: 7px;
+  position: relative; flex: none; display: inline-flex; align-items: center; gap: 7px;
   padding: 6px 10px; border-radius: 10px;
   background: var(--app-panel); color: var(--app-text);
   font-size: 0.74rem; font-weight: 600; white-space: nowrap;
@@ -740,8 +746,15 @@ html.over-bird body { cursor: pointer; }
 
 @media (max-width: 640px) {
   :root { --header-h: 56px; }
-  .chain { grid-template-columns: minmax(0, 1fr); row-gap: 30px; max-width: 360px; margin: 0 auto; }
-  .hand-cap { font-size: 1.9rem; }
+  /* 2 x 2 on phones: compact node cards */
+  .chain { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px 14px; }
+  .hand-cap { font-size: 1.3rem; margin: 0 0 6px 2px; white-space: nowrap; }
+  .node-head { padding: 7px 9px; font-size: 0.74rem; gap: 6px; }
+  .node-cat { display: none; }
+  .node { flex: 1; display: flex; flex-direction: column; }
+  .node-foot { margin-top: auto; }
+  .node-view { margin: 6px; border-radius: 8px; }
+  .node-foot { padding: 0 9px 7px; font-size: 0.58rem; line-height: 1.3; }
   .app-bar { height: 30px; }
   .nature-canvas-wrapper { height: 380px; }
   .wave-card { padding: 14px; gap: 14px; }
@@ -756,13 +769,16 @@ html.over-bird body { cursor: pointer; }
   .btn-dl { flex: 1 1 100%; }
   .tabs { display: flex; width: 100%; }
   .tabs button { flex: 1; padding: 0 8px; }
-  .patch { flex-direction: column; align-items: flex-start; row-gap: 0; }
-  .pnode + .pnode { margin-left: 0; margin-top: 18px; }
+  /* the patch stays a horizontal chain, just smaller */
+  .patch { margin-top: 12px; }
+  .pnode { padding: 4px 6px; gap: 4px; font-size: 0.6rem; border-radius: 7px; letter-spacing: -0.01em; }
+  .pnode::before { width: 5px; height: 5px; }
+  .pnode + .pnode { margin-left: 12px; }
   .pnode + .pnode::after {
-    right: auto; left: 18px; top: auto; bottom: 100%; width: 8px; height: 18px; margin: 0;
-    background: radial-gradient(circle at 50% 3px, var(--ink) 3px, transparent 3.5px) top / 8px 8px no-repeat,
-                radial-gradient(circle at 50% calc(100% - 3px), var(--ink) 3px, transparent 3.5px) bottom / 8px 8px no-repeat,
-                linear-gradient(var(--ink), var(--ink)) center / 2px calc(100% - 8px) no-repeat;
+    width: 12px; height: 6px; margin-top: -3px;
+    background: radial-gradient(circle at 2px 50%, var(--ink) 2px, transparent 2.5px) left / 6px 6px no-repeat,
+                radial-gradient(circle at calc(100% - 2px) 50%, var(--ink) 2px, transparent 2.5px) right / 6px 6px no-repeat,
+                linear-gradient(var(--ink), var(--ink)) center / calc(100% - 6px) 1.5px no-repeat;
   }
   .footer-grid { grid-template-columns: 1fr 1fr; gap: 24px 16px; }
   .slab { padding: 0.3em 0.7em 0.36em; }
