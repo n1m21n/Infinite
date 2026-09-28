@@ -27,7 +27,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="style.css?v=40">
+  <link rel="stylesheet" href="style.css?v=41">
 
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL"></script>
@@ -138,29 +138,18 @@
       </div>
     </section>
 
-    <!-- ================= PRODUCT: one screenshot, zoom tour ================= -->
-    <section class="tour" id="tour" aria-label="A tour of the Infinite canvas">
-      <div class="tour-sticky">
-        <div class="container">
-          <div class="app-window" id="tour-window">
-            <div class="app-bar">
-              <span class="dots"><i></i><i></i><i></i></span>
-              <span class="app-title">untitled.infinite</span>
-              <span class="app-meta mono" id="tour-meta">zoom 1.00x</span>
-            </div>
-            <div class="tour-viewport" id="tour-viewport">
-              <img id="tour-img" src="assets/product_canvas_1400.webp"
-                   srcset="assets/product_canvas_1400.webp 1400w, assets/product_canvas.webp 2628w"
-                   sizes="(max-width: 1100px) 100vw, 1080px"
-                   alt="The Infinite canvas: visual nodes on the left, synths, sequencers and a mixer on the right, live previews in the side panel" width="2628" height="1464">
-              <div class="tour-chip" id="tour-chip"><span class="chip-dot"></span><span id="tour-chip-text">one canvas</span></div>
-            </div>
+    <!-- ================= PRODUCT: one screenshot ================= -->
+    <section class="product" id="tour" aria-label="The Infinite canvas">
+      <div class="container">
+        <div class="app-window reveal">
+          <div class="app-bar">
+            <span class="dots"><i></i><i></i><i></i></span>
+            <span class="app-title">untitled.infinite</span>
           </div>
-          <ol class="tour-steps" id="tour-steps">
-            <li data-step="0"><span class="mono">01</span> Visual nodes, live textures</li>
-            <li data-step="1"><span class="mono">02</span> Synths, sequencers, a mixer</li>
-            <li data-step="2"><span class="mono">03</span> Live previews, side by side</li>
-          </ol>
+          <img class="product-shot" src="assets/product_canvas_1400.webp"
+               srcset="assets/product_canvas_1400.webp 1400w, assets/product_canvas.webp 2628w"
+               sizes="(max-width: 1100px) 100vw, 1080px"
+               alt="The Infinite canvas: visual nodes on the left, synths, sequencers and a mixer on the right, live previews in the side panel" width="2628" height="1464">
         </div>
       </div>
     </section>
@@ -168,12 +157,7 @@
     <!-- ================= FILM ================= -->
     <section id="film" class="section film-section">
       <div class="container">
-        <div class="section-head reveal">
-          <h2 class="slab perch"><span>36 seconds of Infinite</span></h2>
-          <p class="section-sub">The launch film. Every frame was drawn in code, on the same grid the app uses.</p>
-        </div>
         <div class="film-frame reveal">
-          <div class="hud-brackets" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
           <video id="film-video" class="film-video" muted loop playsinline preload="none"
                  poster="assets/film/launch_poster.jpg"
                  data-src-lg="assets/film/infinite_launch.mp4"
@@ -184,7 +168,6 @@
             <svg class="i-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
             <span class="film-sound-label">Sound on</span>
           </button>
-          <div class="film-meta mono" aria-hidden="true">film 01 &nbsp;·&nbsp; 36.4 s &nbsp;·&nbsp; 145 bpm</div>
         </div>
       </div>
     </section>
@@ -409,20 +392,17 @@
       <div class="container">
         <div class="section-head reveal">
           <h2 class="slab perch"><span><b id="node-count">229</b> nodes</span></h2>
-          <p class="section-sub">The whole library, as the app's browser shows it. Filter by family or search. Tap a node for details.</p>
+          <p class="section-sub">Visuals, sound and control, all on one canvas. Tap any node for details.</p>
         </div>
+      </div>
 
-        <div class="library reveal">
-          <div class="library-bar">
-            <label class="lib-search">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-              <input type="search" id="lib-search" placeholder="Search nodes" autocomplete="off" aria-label="Search nodes">
-            </label>
-            <div class="lib-filters" id="lib-filters" role="toolbar" aria-label="Filter by category"></div>
-          </div>
-          <div class="lib-grid mono" id="lib-grid"></div>
-          <p class="lib-empty mono" id="lib-empty" hidden>no node matches. try "noise" or "reverb"</p>
-        </div>
+      <div class="ticker-wrapper reveal" id="tickers" aria-label="Node library">
+        <div class="ticker-track ticker-forward" id="ticker-1"></div>
+        <div class="ticker-track ticker-reverse" id="ticker-2"></div>
+        <div class="ticker-track ticker-forward" id="ticker-3"></div>
+      </div>
+
+      <div class="container">
 
         <div class="center-row docs-row">
           <a href="assets/Infinite_Node_Reference_Manual.pdf" download="Infinite_Node_Reference_Manual.pdf" class="btn btn-ghost btn-sm" target="_blank" rel="noopener">
@@ -635,6 +615,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="nodes.js?v=1"></script>
   <script src="app.js?v=28"></script>
-  <script src="site.js?v=1"></script>
+  <script src="site.js?v=2"></script>
 </body>
 </html>

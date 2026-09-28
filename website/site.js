@@ -210,87 +210,6 @@
     }
   }
 
-  /* ------------------------------------------------------------ zoom tour */
-  function initTour() {
-    const tour = $('#tour');
-    const vp = $('#tour-viewport');
-    const img = $('#tour-img');
-    const chip = $('#tour-chip');
-    const chipText = $('#tour-chip-text');
-    const meta = $('#tour-meta');
-    const steps = $$('#tour-steps li');
-    if (!tour || !vp || !img) return;
-
-    // stops in screenshot units (u, v = zoom centre, z = zoom)
-    const OVER = { u: 0.5, v: 0.5, z: 1 };
-    const STOPS = [
-      { u: 0.20, v: 0.60, z: 2.1, label: 'visual nodes, live textures', cat: CAT.Source },
-      { u: 0.72, v: 0.60, z: 2.1, label: 'synths, sequencers, a mixer', cat: CAT.Synths },
-      { u: 0.87, v: 0.30, z: 2.3, label: 'live previews', cat: CAT.Compositing }
-    ];
-    // progress keys: [p, state, step]  (holds are pairs with the same state = rest)
-    const KEYS = [
-      [0.00, OVER, -1], [0.08, OVER, -1],
-      [0.22, STOPS[0], 0], [0.36, STOPS[0], 0],
-      [0.50, STOPS[1], 1], [0.62, STOPS[1], 1],
-      [0.76, STOPS[2], 2], [0.86, STOPS[2], 2],
-      [1.00, OVER, -1]
-    ];
-
-    let upgraded = false;
-    const upgrade = () => {
-      if (upgraded) return;
-      upgraded = true;
-      const hi = new Image();
-      hi.src = 'assets/product_canvas.webp';
-      hi.decode ? hi.decode().then(() => { img.removeAttribute('srcset'); img.src = hi.src; }).catch(() => {}) : (img.src = hi.src);
-    };
-
-    let lastStep = null, raf = 0;
-    const setChip = (step) => {
-      if (step === lastStep) return;
-      lastStep = step;
-      steps.forEach((li) => li.classList.toggle('on', Number(li.dataset.step) === step));
-      if (!chip || !chipText) return;
-      const label = step < 0 ? 'one canvas' : STOPS[step].label;
-      const col = step < 0 ? '#C2593F' : STOPS[step].cat;
-      chip.classList.add('swap');
-      setTimeout(() => {
-        chipText.textContent = label;
-        chip.style.setProperty('--chip', col);
-        chip.classList.remove('swap');
-      }, 120);
-    };
-
-    const render = () => {
-      raf = 0;
-      const r = tour.getBoundingClientRect();
-      const span = Math.max(1, r.height - window.innerHeight);
-      const p = clamp(-r.top / span, 0, 1);
-      let k = 0;
-      while (k < KEYS.length - 2 && p > KEYS[k + 1][0]) k++;
-      const [p0, s0, st0] = KEYS[k];
-      const [p1, s1, st1] = KEYS[k + 1];
-      const t = smooth(clamp((p - p0) / Math.max(1e-6, p1 - p0), 0, 1));
-      // zoom in log space so it feels even; centre follows linearly
-      const z = Math.exp(lerp(Math.log(s0.z), Math.log(s1.z), t));
-      const u = lerp(s0.u, s1.u, t), v = lerp(s0.v, s1.v, t);
-      const W = vp.clientWidth, H = vp.clientHeight;
-      const tx = clamp(W / 2 - z * u * W, W - z * W, 0);
-      const ty = clamp(H / 2 - z * v * H, H - z * H, 0);
-      img.style.transform = `translate3d(${tx.toFixed(1)}px, ${ty.toFixed(1)}px, 0) scale(${z.toFixed(4)})`;
-      if (meta) meta.textContent = `zoom ${z.toFixed(2)}x`;
-      setChip(t < 0.5 ? st0 : st1);
-      if (z > 1.2) upgrade();
-    };
-    const req = () => { if (!raf) raf = requestAnimationFrame(render); };
-
-    if (reduced) { setChip(-1); return; }
-    window.addEventListener('scroll', req, { passive: true });
-    window.addEventListener('resize', req);
-    render();
-  }
-
   /* ------------------------------------------------------------ film */
   function initFilm() {
     const video = $('#film-video');
@@ -807,78 +726,55 @@
     els.forEach((e) => io.observe(e));
   }
 
-  /* ------------------------------------------------------------ node library */
-  function initLibrary() {
-    const grid = $('#lib-grid');
-    const filters = $('#lib-filters');
-    const search = $('#lib-search');
-    const empty = $('#lib-empty');
+  /* ------------------------------------------------------------ node ticker tapes */
+  function openNode(name, c, opener) {
+    const known = typeof ALL_NODES !== 'undefined' && ALL_NODES.find((n) => n.name.toLowerCase() === name.toLowerCase());
+    const desc = known ? known.desc : `${name} is one of Infinite's ${catLabel(c)} nodes. Drop it on the canvas and patch it into anything; every control on it can be modulated. The Node Reference PDF lists its inputs and settings.`;
+    if (typeof openNodeModal === 'function') openNodeModal(name, catLabel(c), desc);
+    const badge = $('#modal-cat');
+    if (badge) badge.style.setProperty('--cat', CAT[c] || '#A3A9BA');
+    const close = $('#modal-close-btn');
+    if (close) close.focus();
+    lastOpener = opener;
+  }
+
+  function initTickers() {
+    const wrap = $('#tickers');
     const count = $('#node-count');
-    if (!grid || typeof NODE_LIBRARY === 'undefined') return;
-    const LIB = NODE_LIBRARY.slice().sort((a, b) => a[0].localeCompare(b[0]));
-    if (count) count.textContent = LIB.length;
-    const ORDER = ['Source', 'Compositing', 'Effects', '3D', 'Modulators', 'Prediction', 'Macros', 'Utility', 'Notes', 'Synths', 'AudioEffects'];
-    const counts = {};
-    LIB.forEach(([, c]) => { counts[c] = (counts[c] || 0) + 1; });
-    let cat = 'all', q = '';
-
-    const mk = (key, label, n, col) => {
-      const b = document.createElement('button');
-      b.className = 'lib-chip';
-      b.type = 'button';
-      b.dataset.cat = key;
-      b.setAttribute('aria-pressed', String(key === 'all'));
-      if (col) b.style.setProperty('--cat', col);
-      b.innerHTML = `${col ? '<i></i>' : ''}<span></span><small>${n}</small>`;
-      b.querySelector('span').textContent = label;
-      b.addEventListener('click', () => {
-        cat = key;
-        $$('.lib-chip', filters).forEach((c) => c.setAttribute('aria-pressed', String(c === b)));
-        render();
-      });
-      return b;
-    };
-    if (filters) {
-      filters.appendChild(mk('all', 'All', LIB.length, null));
-      ORDER.filter((c) => counts[c]).forEach((c) => filters.appendChild(mk(c, catLabel(c), counts[c], CAT[c])));
-    }
-
-    const render = () => {
-      const qq = q.trim().toLowerCase();
-      const list = LIB.filter(([n, c]) => (cat === 'all' || c === cat) && (!qq || n.toLowerCase().includes(qq) || catLabel(c).toLowerCase().includes(qq)));
-      grid.innerHTML = '';
+    if (!wrap || typeof NODE_LIBRARY === 'undefined') return;
+    if (count) count.textContent = NODE_LIBRARY.length;
+    // one tape per family of the canvas: visuals, sound, control
+    const TAPES = [
+      ['ticker-1', ['Source', 'Compositing', 'Effects', '3D']],
+      ['ticker-2', ['Synths', 'AudioEffects', 'Notes']],
+      ['ticker-3', ['Modulators', 'Prediction', 'Macros', 'Utility']]
+    ];
+    TAPES.forEach(([id, cats], ti) => {
+      const track = document.getElementById(id);
+      if (!track) return;
+      // interleave families so colours alternate along the tape
+      const byCat = cats.map((c) => NODE_LIBRARY.filter((n) => n[1] === c));
+      const list = [];
+      for (let k = 0; list.length < byCat.reduce((a, b) => a + b.length, 0); k++) byCat.forEach((arr) => { if (arr[k]) list.push(arr[k]); });
       const frag = document.createDocumentFragment();
-      list.forEach(([n, c], i) => {
+      [0, 1].forEach((copy) => list.forEach(([n, c]) => {
         const b = document.createElement('button');
         b.type = 'button';
-        b.className = 'lib-node';
-        b.textContent = n;
+        b.className = 'ticker-pill';
         b.style.setProperty('--cat', CAT[c] || '#A3A9BA');
-        b.style.setProperty('--i', Math.min(i, 60));
         b.dataset.cat = c;
+        if (copy) { b.tabIndex = -1; b.setAttribute('aria-hidden', 'true'); }
+        b.innerHTML = '<i></i><span></span>';
+        b.querySelector('span').textContent = n;
         frag.appendChild(b);
-      });
-      grid.appendChild(frag);
-      if (empty) empty.hidden = list.length > 0;
-    };
-    grid.addEventListener('click', (e) => {
-      const b = e.target.closest('.lib-node');
-      if (!b) return;
-      const name = b.textContent, c = b.dataset.cat;
-      const known = typeof ALL_NODES !== 'undefined' && ALL_NODES.find((n) => n.name.toLowerCase() === name.toLowerCase());
-      const desc = known ? known.desc : `${name} is one of Infinite's ${catLabel(c)} nodes. Drop it on the canvas and patch it into anything; every control on it can be modulated. The Node Reference PDF lists its inputs and settings.`;
-      if (typeof openNodeModal === 'function') openNodeModal(name, catLabel(c), desc);
-      const badge = $('#modal-cat');
-      if (badge) badge.style.setProperty('--cat', CAT[c] || '#A3A9BA');
-      const close = $('#modal-close-btn');
-      if (close) close.focus();
-      lastOpener = b;
+      }));
+      track.appendChild(frag);
+      track.style.setProperty('--dur', `${Math.round(list.length * (1.5 + ti * 0.2))}s`);
     });
-    if (search) {
-      let t;
-      search.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { q = search.value; render(); }, 60); });
-    }
-    render();
+    wrap.addEventListener('click', (e) => {
+      const b = e.target.closest('.ticker-pill');
+      if (b) openNode(b.textContent, b.dataset.cat, b);
+    });
   }
 
   /* ------------------------------------------------------------ modal keyboard */
@@ -971,13 +867,12 @@
     initLogo();
     initHeroWord();
     initHud();
-    initTour();
     initFilm();
     initChain();
     initAside();
     initPredictKnobs();
     initReveal();
-    initLibrary();
+    initTickers();
     initModalKeys();
     initTabs();
     initYouTube();
