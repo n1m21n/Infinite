@@ -232,6 +232,8 @@ namespace
 #include "nodes/GrainMolderNode.h"
 #include "nodes/GranularNode.h"
 #include "nodes/DrumSequencerNode.h"
+#include "nodes/LooperNode.h"
+#include "nodes/MpcNode.h"
 #include "nodes/AudioPluginNode.h"
 #include "audio/SampleScanner.h"
 #include "audio/PluginScanner.h"
@@ -6147,6 +6149,9 @@ namespace
       // longer be newly created, per the device-catalog simplification.
       REGISTER_NODE(FieldGraphNode, Field Graph, "Utility");
       REGISTER_NODE(DrumSequencerNode, Drum Sequencer, "Synths");
+      REGISTER_NODE(MpcNode, MPC, "Synths");
+      REGISTER_NODE(MpcOutNode, MPC Out, "Synths");
+      REGISTER_NODE(LooperNode, Looper, "AudioEffects");
       // Third-party plugin hosting (Audio Units). Its params reach the plugin
       // directly rather than through ParamMailbox - see AudioPluginNode.h.
       REGISTER_NODE(AudioPluginNode, Plugin, "AudioEffects");
@@ -8368,6 +8373,8 @@ namespace
          gran->ReloadFromPath();
       if (auto* drum = dynamic_cast<DrumSequencerNode*>(node))
          drum->ReloadFromPaths();
+      if (auto* mpc = dynamic_cast<MpcNode*>(node))
+         mpc->ReloadFromPaths();
       if (auto* video = dynamic_cast<VideoSourceNode*>(node))
          video->ReloadFromPath();
       if (auto* palette = dynamic_cast<PaletteNode*>(node))
@@ -12046,6 +12053,43 @@ namespace
                                  IM_COL32(255, 255, 255, 255), IM_COL32(255, 255, 255, 255));
    }
 
+   // A momentary button that is also a CV-gate destination. Draws a modulation
+   // pin, then a pill button; returns the button's LEVEL - CV high when a cable
+   // drives it, else the mouse being held on it. The node turns level changes
+   // into edges (Looper::SetButtonLevel / Mpc::SetPadHeld), so a held mouse or a
+   // held CV presses exactly once. `litColor` = 0 means "not lit".
+   bool DrawGateButton(const char* label, const char* id, float totalW, float height, ImU32 litColor)
+   {
+      const DiscreteParamHandle h = RegisterDiscreteParam(id, 0.0f, 1.0f, /*isBool=*/true, nullptr);
+      if (h.registered && !h.draw)
+         return h.driven && h.value >= 0.5f;
+      const float pinW = 16.0f;
+      const ImVec2 start = ImGui::GetCursorScreenPos();
+      float btnW = totalW;
+      if (h.registered)
+      {
+         DrawDiscreteParamPin(h, id, pinW, height);
+         ImGui::SetCursorScreenPos(ImVec2(start.x + pinW, start.y));
+         btnW = std::max(20.0f, totalW - pinW);
+      }
+      const bool lit = litColor != 0 || (h.driven && h.value >= 0.5f);
+      bool shown = lit;
+      const ImU32 c = litColor != 0 ? litColor : IM_COL32(55, 115, 235, 255);
+      ImGui::PushID(id);
+      if (h.modulated)
+         ImGui::BeginDisabled();
+      AudioToggleButtonEx(label, &shown, ImVec2(btnW, height), c, c, c, c, c, c, IM_COL32(255, 255, 255, 255),
+                          IM_COL32(255, 255, 255, 255));
+      const bool held = ImGui::IsItemActive();
+      if (h.modulated)
+         ImGui::EndDisabled();
+      ImGui::PopID();
+      if (h.registered)
+         DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
+                                   ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()));
+      return h.driven ? (h.value >= 0.5f) : held;
+   }
+
    bool AudioSoloButton(const char* label, bool* value, float width = 26.0f, float height = 0.0f)
    {
       return AudioToggleButtonEx(label, value, ImVec2(width, height),
@@ -12150,6 +12194,8 @@ namespace
       if (dynamic_cast<WavetableNode*>(node) != nullptr ||
           dynamic_cast<DrumSequencerNode*>(node) != nullptr)
          return kAudioWideWidth;
+      if (dynamic_cast<MpcOutNode*>(node) != nullptr)
+         return kAudioNarrowWidth;
       if (dynamic_cast<GainNode*>(node) != nullptr ||
           dynamic_cast<AudioMeterNode*>(node) != nullptr ||
           dynamic_cast<BlendAudioNode*>(node) != nullptr ||
@@ -17413,6 +17459,219 @@ namespace
          }
       }
 
+      EndAudioBody();
+   }
+
+   // ---- Looper -----------------------------------------------------------
+   void DrawLooperBody(GraphNode& gn, LooperNode* n)
+   {
+      char stat[96];
+      snprintf(stat, sizeof(stat), "%s  -  %.1f s  -  comp %.0f ms", LooperNode::StateName(n->CurrentState()),
+               n->LoopSeconds(), n->CompensationMs());
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      // Four gate buttons: click or CV rising edge presses. Lit while the state
+      // they own is active.
+      {
+         static const char* kLabels[LooperNode::kNumButtons] = { "REC", "PLAY", "DUB", "CLEAR" };
+         static const char* kIds[LooperNode::kNumButtons] = { "rec", "play", "dub", "clear" };
+         const int st = n->CurrentState();
+         const ImU32 lit[LooperNode::kNumButtons] = {
+            (st == LooperNode::kRecording || st == LooperNode::kArmed) ? IM_COL32(210, 60, 60, 255) : 0,
+            (st == LooperNode::kPlaying || st == LooperNode::kOverdubbing) ? IM_COL32(60, 170, 90, 255) : 0,
+            st == LooperNode::kOverdubbing ? IM_COL32(215, 150, 40, 255) : 0, 0u
+         };
+         const float x0 = gAudioContentX;
+         const float y0 = ImGui::GetCursorScreenPos().y;
+         const float cellW = gAudioContentW / (float)LooperNode::kNumButtons;
+         const float h = ImGui::GetFrameHeight() * 1.5f;
+         for (int b = 0; b < LooperNode::kNumButtons; b++)
+         {
+            ImGui::SetCursorScreenPos(ImVec2(x0 + (float)b * cellW, y0));
+            const bool level = DrawGateButton(kLabels[b], kIds[b], cellW - 6.0f, h, lit[b]);
+            n->SetButtonLevel(b, level);
+         }
+         ImGui::SetCursorScreenPos(ImVec2(x0, y0));
+         ImGui::Dummy(ImVec2(gAudioContentW, h));
+      }
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+
+      // Loop position strip: always drawn, so the body height never jumps.
+      {
+         const float w = AudioFullWidth();
+         const float hgt = 8.0f;
+         const ImVec2 p = ImGui::GetCursorScreenPos();
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const bool isLight = IsThemeLight();
+         dl->AddRectFilled(p, ImVec2(p.x + w, p.y + hgt), isLight ? IM_COL32(215, 220, 232, 255) : IM_COL32(30, 33, 42, 255), 3.0f);
+         const int st = n->CurrentState();
+         if (st == LooperNode::kPlaying || st == LooperNode::kOverdubbing || st == LooperNode::kStopped)
+         {
+            const float f = std::clamp(n->Position01(), 0.0f, 1.0f);
+            dl->AddRectFilled(p, ImVec2(p.x + w * f, p.y + hgt),
+                              st == LooperNode::kOverdubbing ? IM_COL32(215, 150, 40, 255) : IM_COL32(60, 170, 90, 255), 3.0f);
+         }
+         else if (st == LooperNode::kRecording)
+         {
+            const float f = n->LoopSeconds() > 0.01f ? std::clamp(n->RecordedSeconds() / n->LoopSeconds(), 0.0f, 1.0f)
+                                                       : std::clamp(n->RecordedSeconds() / (float)LooperNode::MaxSeconds(), 0.0f, 1.0f);
+            dl->AddRectFilled(p, ImVec2(p.x + w * f, p.y + hgt), IM_COL32(210, 60, 60, 255), 3.0f);
+         }
+         ImGui::Dummy(ImVec2(w, hgt));
+      }
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+
+      {
+         AudioKnobRow row(3);
+         std::vector<std::string> takeOptions;
+         takeOptions.push_back("free");
+         for (const std::string& s : MusicTime::RateDivisionList())
+            takeOptions.push_back(s);
+         row.Dropdown("take", takeOptions, n->take, [n](int i) { PushUndoCheckpoint(); n->take = i; });
+         bool changed = false;
+         row.Checkbox("sync", &n->syncStart, &changed);
+         if (changed)
+            PushUndoCheckpoint();
+         row.Checkbox("auto comp", &n->autoLatency, &changed);
+         if (changed)
+            PushUndoCheckpoint();
+         row.End();
+      }
+      {
+         AudioKnobRow row(3);
+         row.Knob("thru", &n->thru, 0.0f, 1.0f, "%.2f");
+         row.Knob("level", &n->level, 0.0f, 1.0f, "%.2f");
+         row.Knob("trim", &n->trimMs, -100.0f, 300.0f, "%.0f ms");
+         row.End();
+      }
+      EndAudioBody();
+   }
+
+   // ---- MPC --------------------------------------------------------------
+   void DrawMpcBody(GraphNode& gn, MpcNode* n)
+   {
+      int loaded = 0;
+      for (int p = 0; p < MpcNode::kPads; p++)
+         loaded += n->PadLoaded(p) ? 1 : 0;
+      char stat[96];
+      snprintf(stat, sizeof(stat), "%d/16 pads  -  base note %d", loaded, n->baseNote);
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      // 4x4 pad grid, pad 1 bottom-left like a hardware MPC. Every pad is a
+      // gate destination; the pin sits inside the pad's cell.
+      {
+         const float gap = 4.0f;
+         const float cellW = (gAudioContentW - gap * 3.0f) / 4.0f;
+         const float cellH = ImGui::GetFrameHeight() * 1.6f;
+         const float x0 = gAudioContentX;
+         const float y0 = ImGui::GetCursorScreenPos().y;
+         for (int row = 0; row < 4; row++)
+         {
+            for (int col = 0; col < 4; col++)
+            {
+               const int pad = (3 - row) * 4 + col;
+               char label[48];
+               char id[16];
+               snprintf(id, sizeof(id), "pad%d", pad + 1);
+               if (n->PadLoaded(pad))
+               {
+                  std::string nm = n->PadName(pad);
+                  const size_t dot = nm.find_last_of('.');
+                  if (dot != std::string::npos && dot > 0)
+                     nm.resize(dot);
+                  if (nm.size() > 9)
+                     nm = nm.substr(0, 8) + ".";
+                  snprintf(label, sizeof(label), "%d %s", pad + 1, nm.c_str());
+               }
+               else
+               {
+                  snprintf(label, sizeof(label), "%d", pad + 1);
+               }
+               ImGui::SetCursorScreenPos(ImVec2(x0 + (float)col * (cellW + gap), y0 + (float)row * (cellH + gap)));
+               ImU32 lit = 0;
+               if (n->PadPlaying(pad))
+                  lit = IM_COL32(60, 170, 90, 255);
+               else if (pad == n->selectedPad)
+                  lit = IM_COL32(90, 110, 190, 255);
+               const bool level = DrawGateButton(label, id, cellW, cellH, lit);
+               n->SetPadHeld(pad, level, 1.0f);
+               if (ImGui::IsItemClicked(ImGuiMouseButton_Right) || (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)))
+                  n->selectedPad = pad;
+            }
+         }
+         ImGui::SetCursorScreenPos(ImVec2(x0, y0));
+         ImGui::Dummy(ImVec2(gAudioContentW, 4.0f * cellH + 3.0f * gap));
+      }
+      ImGui::Dummy(ImVec2(0.0f, 3.0f));
+
+      // Selected pad: load/clear + mode + volume/pitch/pan.
+      {
+         const int sel = MpcNode::Clamp(n->selectedPad);
+         char header[64];
+         if (n->PadLoaded(sel))
+            snprintf(header, sizeof(header), "pad %d - %s", sel + 1, n->PadName(sel).c_str());
+         else
+            snprintf(header, sizeof(header), "pad %d - empty", sel + 1);
+         BeginAudioSection(header);
+         const float gapX = ImGui::GetStyle().ItemSpacing.x;
+         const float btnW = (AudioFullWidth() - gapX * 2.0f) / 3.0f;
+         if (ImGui::Button("Load...##mpcpad", ImVec2(btnW, 0)))
+         {
+            const std::string path = Platform::OpenAudioDialog();
+            if (!path.empty())
+            {
+               PushUndoCheckpoint();
+               n->LoadPad(sel, path);
+            }
+         }
+         ImGui::SameLine();
+         if (ImGui::Button("Folder...##mpcfolder", ImVec2(btnW, 0)))
+         {
+            const std::string folder = Platform::OpenFolderDialog("Load a folder into the 16 pads");
+            if (!folder.empty())
+            {
+               PushUndoCheckpoint();
+               n->LoadFolder(folder);
+            }
+         }
+         ImGui::SameLine();
+         if (ImGui::Button("Clear##mpcclear", ImVec2(btnW, 0)))
+         {
+            PushUndoCheckpoint();
+            n->ClearPad(sel);
+         }
+         static const std::vector<std::string> kModes = { "one shot", "gate", "loop" };
+         AudioKnobRow row(4);
+         row.Dropdown("mode", kModes, n->padMode[sel], [n, sel](int i) { PushUndoCheckpoint(); n->padMode[sel] = i; });
+         row.Knob("volume", &n->padVolume[sel], 0.0f, 1.5f, "%.2f");
+         row.Knob("pitch", &n->padPitch[sel], -24.0f, 24.0f, "%.1f st");
+         row.Knob("pan", &n->padPan[sel], -1.0f, 1.0f, "%.2f");
+         row.End();
+         EndAudioSection();
+      }
+      {
+         AudioKnobRow row(2);
+         row.KnobInt("base note", &n->baseNote, 0, 100);
+         row.Knob("output", &n->volume, 0.0f, 1.5f, "%.2f");
+         row.End();
+      }
+      EndAudioBody();
+   }
+
+   void DrawMpcOutBody(GraphNode& gn, MpcOutNode* n)
+   {
+      char stat[64];
+      if (n->ConnectedToMpc())
+         snprintf(stat, sizeof(stat), "pad %d", n->pad);
+      else
+         snprintf(stat, sizeof(stat), "no MPC wired - pass-through");
+      BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
+      {
+         AudioKnobRow row(2);
+         row.KnobInt("pad", &n->pad, 1, MpcNode::kPads);
+         row.Knob("gain", &n->gainDb, -60.0f, 12.0f, "%.1f dB", kKnobSmall, /*dbTaper=*/true);
+         row.End();
+      }
       EndAudioBody();
    }
 
@@ -24956,6 +25215,12 @@ namespace
          DrawGranularBody(gn, n);
       else if (auto* n = dynamic_cast<DrumSequencerNode*>(gn.node.get()))
          DrawDrumSequencerBody(gn, n);
+      else if (auto* n = dynamic_cast<MpcNode*>(gn.node.get()))
+         DrawMpcBody(gn, n);
+      else if (auto* n = dynamic_cast<MpcOutNode*>(gn.node.get()))
+         DrawMpcOutBody(gn, n);
+      else if (auto* n = dynamic_cast<LooperNode*>(gn.node.get()))
+         DrawLooperBody(gn, n);
       else if (auto* n = dynamic_cast<GainNode*>(gn.node.get()))
          DrawGainBody(gn, n);
       else if (auto* n = dynamic_cast<AudioMeterNode*>(gn.node.get()))
@@ -40028,6 +40293,9 @@ namespace
          { "Molder", "Analysis/genome resynthesis: decomposes a loaded or recorded sample into tracked harmonic partials plus a real residual waveform, then Roll mutates a parameter genome and re-renders a new sample from it - each roll walks further from the last, not from the original. Iterate feeds the last render back in as the new source and re-analyses it (progressively eating the sound); Reset returns fully to the originally loaded/recorded sample - generation 0 and the six shaping knobs (tone/air/snap/stretch/time/pitch) back to neutral, and the analysis itself restored, undoing any Iterate. chaos sets how far the next roll jumps; pitch offsets on top of the genome's own pitch walk; tone balances partials against residual; air/snap are the residual's steady-hiss and transient-attack levels; stretch scales inharmonicity together with harmonic spacing; time warps the attack/decay timing without changing the sample's length. This is a sound designer, not a playable instrument - it takes no note input, only a single self-triggered voice with start/end range, loop, reverse and ping-pong, the same transport as Sampler. Analysis and rendering both run on a background thread, so rolling never stalls the UI. seed/gen/f0/harm in the readout are the exact genome (seed + generation count) and the analysed pitch - two integers are enough to reproduce any rolled sound exactly on reload." },
          { "Grain Molder", "Slices audio into overlapping grains, calculates per-grain metrics (Level, Brightness, Random), and rearranges them based on a continuous blend between original temporal position and metric rank. At amount 0 it is the clean identity passthrough; at 1 it is fully sorted into a swell or brightness contour. Rendering runs asynchronously on a worker thread." },
          { "Drum Sequencer", "An 8-lane, 8-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8x8 step grid. Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
+         { "MPC", "A 16-pad sample player. Click a pad to select it and hit it (the pad grid puts pad 1 bottom-left, like a hardware MPC); every pad also has its own CV pin, so a MIDI CC / Note modulator or any gate can play it, and the notes input plays pad = note - base note (36..51 by default). Load... puts a file on the selected pad, Folder... fills pads 1-16 from the first audio files of a folder in alphabetical order, Clear empties it. Each pad has a mode (one shot plays the whole sample; gate plays while held and stops on release; loop toggles a looping playback on each hit), volume, pitch (semitones, which also changes speed) and pan. output is the master level. The node's audio out is the mix of all pads; wire MPC Out from it to take a single pad on its own for its own effect chain. The pad knobs edit whichever pad is selected, so a modulation cable bound to one follows the selection. Loaded sample paths are saved with the patch; the audio is re-read on load." },
+         { "MPC Out", "Takes one pad's own audio from the MPC wired into its input, so that pad can have its own effects and level. pad picks 1-16 and gain trims it. Wired to anything other than an MPC it passes the audio through unchanged. The MPC's own output still carries the full mix." },
+         { "Looper", "A live audio looper. Wire the sound to loop into the input. REC starts a take, PLAY toggles playback of it, DUB layers what comes in over the loop, CLEAR empties it; each button has a CV pin, so a footswitch or MIDI note can drive them (a rising edge presses). take sets the length: a musical division (1 bar by default) ends by itself, free lets the next REC press end it. With sync on and the transport playing, a take waits for the next grid line. Pressing DUB while recording ends the take and goes straight into overdub. thru monitors the live input, level is the loop's playback level. auto comp shifts each take by the audio interface's measured round-trip latency and trim adds a manual offset in ms, so a loop played in time sits on the grid. The loop lives in memory (up to 60 s) and is not saved with the patch." },
          { "Audio In","Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch. The capture runs on its own engine bound to the system default input, independently of whichever output device is selected, and the header line says why it isn't live when it isn't." },
          { "Audio Filter", "One filter, one of 12 types (LP/HP at 12/24/36 dB, BP, notch, shelves, peak, all-pass). Drag the handle on the response curve to set frequency and gain, Shift-drag to set Q - the picture is the control." },
          { "Audio Color Ramp", "Splits incoming audio into up to 8 frequency bands - drag the dividers right on the spectrum display to resize them - and assigns each one a colour, VIBGYOR by default from low to high. With no image patched in it outputs the resulting gradient standalone; patch one into its optional image input and it grades that image by luminance through the same audio-reactive palette instead." },
@@ -40852,6 +41120,9 @@ namespace
                { "Analog", "Virtual-analog polyphonic synth with dual oscillators, unevenly detuned unison stacking, osc hard sync, sub-oscillator, noise, pre-filter drive, nonlinear ZDF Moog ladder and SVF filters, dual-path stereo spread, and amp ADSR." },
                { "Sampler", "High-resolution multi-sample player with pitch tracking, root note detection, start/end trimming, loop crossfades, and one-shot playback." },
                { "Drum Sequencer", "8-lane pattern drum sequencer with individual sample slots, per-step velocity, swing, choke groups, per-lane mute/solo, and decay envelopes." },
+              { "MPC", "16-pad sample player: per-pad mode (one shot / gate / loop), volume, pitch, pan; pads playable by mouse, CV pin or note; per-pad audio via MPC Out." },
+              { "MPC Out", "Taps one pad of an MPC as its own audio stream for individual effect chains." },
+              { "Looper", "Live audio looper: record, play, overdub and clear with tempo-synced take lengths and interface latency compensation." },
                { "Slicer","Transient- or grid-sliced sample playback: chops a loaded sample into up to 64 slices and maps them chromatically from MIDI note 36, with draggable slice markers, a per-slice attack/decay pair, and a crossthrough toggle that lets a slice run past its own boundary." },
                { "Equation Synth", "Real-time bytebeat and mathematical expression synthesis evaluating user formulas with dynamic variables (t, x, y, inputs)." },
                { "Wave Terrain", "2D terrain trajectory orbital synthesis - a moving point traces a path across a height-mapped surface to generate a waveform." },
@@ -41937,6 +42208,11 @@ namespace
       topology.numBuffers = nextBufferIndex;
       topology.noteOutboxes = std::move(noteOutboxes);
       topology.noteWires = std::move(noteWires);
+      // Nodes that tap another node's audio-thread state directly (MPC Out)
+      // re-resolve the tap against the live graph before it is published.
+      for (GraphNode& gnTap : gNodes)
+         if (gnTap.node != nullptr)
+            gnTap.node->ResolveAudioTaps();
       AudioEngine::Instance().SetTopology(std::move(topology));
       // No device running means no audio callback thread will ever apply
       // this generation's note wiring via RunTopology - and a number of
@@ -94350,6 +94626,7 @@ int main(int argc, char** argv)
                { "Audio File",     "Modulators", "Streaming playback & follower" },
                { "Slicer",         "Synths",     "Beat/transient slicer" },
                { "Drum Sequencer", "Synths",     "Step sequencer & drum kit" },
+               { "MPC",            "Synths",     "16-pad sample player" },
                { "PaulStretch",    "Synths",     "Extreme time-stretch & wash" },
                { "Granular",       "Synths",     "Granular cloud synthesis" },
                { "Grain Molder",   "Synths",     "Granular morph & shape" },
@@ -94360,7 +94637,21 @@ int main(int argc, char** argv)
             {
                if (ImGui::MenuItem(opt.name, opt.category))
                {
-                  if (std::string(opt.name) == "Drum Sequencer")
+                  if (std::string(opt.name) == "MPC")
+                  {
+                     GraphNode* spawned = SpawnNode(opt.name, opt.category, gAudioDropPicker.canvasPos.x,
+                                                    gAudioDropPicker.canvasPos.y);
+                     if (spawned != nullptr)
+                     {
+                        if (auto* mpc = dynamic_cast<MpcNode*>(spawned->node.get()))
+                           for (int i = 0; i < (int)gAudioDropPicker.paths.size() && i < MpcNode::kPads; ++i)
+                              mpc->LoadPad(i, gAudioDropPicker.paths[i]);
+                        spawned->showParams = true;
+                        gPatchDirty = true;
+                        RebuildAudioTopology();
+                     }
+                  }
+                  else if (std::string(opt.name) == "Drum Sequencer")
                   {
                      GraphNode* spawned = SpawnNode(opt.name, opt.category,
                                                     gAudioDropPicker.canvasPos.x,
