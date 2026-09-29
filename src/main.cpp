@@ -16084,23 +16084,14 @@ namespace
       ImGui::SameLine();
       AudioSlider("decay", &n->decay, 0.05f, 10.0f, "%.2f s", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
 
-      // Appended last and full-width rather than paired into a half: draw
-      // order IS the modulation-pin numbering here as everywhere else, so a
-      // new param can only go at the end, and a lone half-width slider under
-      // four filled pairs reads as a ragged grid. A full-width terminal row
-      // reads as deliberate.
-      //
-      // Greyed out unless it does something. The crossfade only exists at a
-      // wrapping loop seam: with loop off there is no seam, and ping-pong
-      // reverses direction rather than jumping, which is already continuous.
-      // Leaving the slider live in those modes would be the same lie the
-      // comb filter's greyed-out cutoff was, in the opposite direction.
-      {
-         const bool xfadeActive = n->loop && !n->pingpong;
-         ImGui::BeginDisabled(!xfadeActive);
-         AudioSlider("loop xfade", &n->xfade, 0.0f, 250.0f, "%.0f ms", AudioFullWidth());
-         ImGui::EndDisabled();
-      }
+      // fade in / fade out close the grid as a pair. They are ms lengths
+      // applied at the start and end of every pass through the range (loop
+      // lap, ping-pong leg, one-shot), so they are always live - no greying.
+      // Draw order is the pin numbering: they take the ordinals the old
+      // single "loop xfade" row used (8) and the next (9).
+      AudioSlider("fade in", &n->fadeIn, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("fade out", &n->fadeOut, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
 
       EndAudioBody();
    }
@@ -40660,7 +40651,7 @@ namespace
          { "Wavetable", "Two independent wavetable engines with unison, filter, and pitch/filter/amp envelopes, mixed by an A/B control. With no note cable connected, it free-runs at a set frequency; connect a note cable and it becomes polyphonic and envelope-gated." },
          { "Analog", "A classic polyphonic virtual-analog synth voice with two analog-style oscillators (osc1 unison stack, osc2 tuning/detune/sync, sub osc one octave down, white noise, pre-filter drive stage, nonlinear ZDF Moog-ladder or SVF filter, and amplitude ADSR across up to 8 voices). Detune reads as the stack's true total width in cents, distributed unevenly across the stack the way separately mistuned circuits sit. Spread is stereo width: it splits the stack across two independent drive/filter chains and places each voice card in the image, so the sides carry different oscillators rather than one panned copy." },
          { "Equation Synth", "A synth defined by a live formula (y = f(x, a, b, c, d, t)) instead of a fixed waveform - knobs a-d feed the equation directly, so turning them reshapes the waveform itself rather than modulating a preset one." },
-         { "Sampler", "A sample player: load a file (or drag one in from the Samples search panel), or record from the audio input pin. Click the waveform to audition from that point, or use the audition button - both preview this node on its own dedicated voice, independent of the transport and any note cable, and never cut off or get cut off by an incoming note. Drag the waveform's two edge handles to set the loop range (start/end). pitch/finetune are coarse/fine tuning, speed is a -2..2 varispeed control (negative plays backward), volume is the output level. loop/rev/p-p control what happens at the range edges: loop wraps or bounces (ping-pong) instead of stopping, reverse flips the base direction. loop xfade crossfades the wrap so the loop seam doesn't click - the jump from the end of the range back to the start is a step discontinuity on almost any material, and 8 ms of equal-power fade covers it; set it to 0 for a hard wrap. It applies only to a wrapping loop: ping-pong reverses direction rather than jumping, so there is no seam there to fade, and the slider greys out. With no note cable connected, it free-runs on the transport - starts the moment you hit space, stops when you stop it; connect a note cable and it becomes polyphonic instead, each note played back at the pitch offset from middle C. Spacebar always silences every voice this node is making." },
+         { "Sampler", "A sample player: load a file (or drag one in from the Samples search panel), or record from the audio input pin. Click the waveform to audition from that point, or use the audition button - both preview this node on its own dedicated voice, independent of the transport and any note cable, and never cut off or get cut off by an incoming note. Drag the waveform's two edge handles to set the loop range (start/end). pitch/finetune are coarse/fine tuning, speed is a -2..2 varispeed control (negative plays backward), volume is the output level. loop/rev/p-p control what happens at the range edges: loop wraps or bounces (ping-pong) instead of stopping, reverse flips the base direction. fade in / fade out are lengths in ms applied at the start and end of every pass through the range (each loop lap, ping-pong leg or one-shot), so a loop dips at its seam instead of clicking; 3 ms each by default, 0 for a hard edge. Patches saved with the old loop xfade load with the defaults. With no note cable connected, it free-runs on the transport - starts the moment you hit space, stops when you stop it; connect a note cable and it becomes polyphonic instead, each note played back at the pitch offset from middle C. Spacebar always silences every voice this node is making." },
          { "Slicer", "Chops a sample into slices and maps them chromatically to the keyboard from MIDI note 36 upward - note 36 plays slice 1, 37 plays slice 2, and so on. A note past the last slice is silent; it does not wrap round to slice 1. Load a file (or drag one in from the Samples panel), or record from the audio input pin. slice by picks where the boundaries come from: onsets runs transient detection over the sample on a background thread, grid divides it arithmetically at the *global transport tempo* (there is no per-node bpm - change the tempo and the grid follows). sensitivity is the detection threshold and is the only control that re-runs the analysis; onsets just caps the result to the strongest N, and division/slice by recompute boundaries instantly. Click a slice band in the waveform to audition it, and in onsets mode drag any marker to move a boundary by hand - hand-edited markers are saved with the patch. Two separate controls decide how long a slice lasts: crossthrough sets whether playback may run PAST the slice's own next onset (off by default - each slice stops where the next begins), while decay shapes only the amplitude envelope, reading 'hold' at the top of its throw where the slice stays at full level. So: crossthrough off + hold is the classic tight chop; crossthrough off + a decay ends at whichever comes first; crossthrough on + hold plays through the rest of the sample; crossthrough on + a decay is a one-shot with a tail over the rest of the break. attack extends each slice's own fade-in from instant up to half a second." },
          { "Molder", "Analysis/genome resynthesis: decomposes a loaded or recorded sample into tracked harmonic partials plus a real residual waveform, then Roll mutates a parameter genome and re-renders a new sample from it - each roll walks further from the last, not from the original. Iterate feeds the last render back in as the new source and re-analyses it (progressively eating the sound); Reset returns fully to the originally loaded/recorded sample - generation 0 and the six shaping knobs (tone/air/snap/stretch/time/pitch) back to neutral, and the analysis itself restored, undoing any Iterate. chaos sets how far the next roll jumps; pitch offsets on top of the genome's own pitch walk; tone balances partials against residual; air/snap are the residual's steady-hiss and transient-attack levels; stretch scales inharmonicity together with harmonic spacing; time warps the attack/decay timing without changing the sample's length. This is a sound designer, not a playable instrument - it takes no note input, only a single self-triggered voice with start/end range, loop, reverse and ping-pong, the same transport as Sampler. Analysis and rendering both run on a background thread, so rolling never stalls the UI. seed/gen/f0/harm in the readout are the exact genome (seed + generation count) and the analysed pitch - two integers are enough to reproduce any rolled sound exactly on reload." },
          { "Grain Molder", "Slices audio into overlapping grains, calculates per-grain metrics (Level, Brightness, Random), and rearranges them based on a continuous blend between original temporal position and metric rank. At amount 0 it is the clean identity passthrough; at 1 it is fully sorted into a swell or brightness contour. Rendering runs asynchronously on a worker thread." },
@@ -51689,9 +51680,11 @@ static bool RunSamplerFixture()
    {
       Params fwd = base;
       Params rev = base; rev.reverse = true;
-      const auto f = trigger(fwd, 4);
-      const auto r = trigger(rev, 4);
-      if (f.empty() || r.empty() || !(r[0] > f[0]))
+      // 64 frames, not 4: the per-pass fade-in scales sample 0 to exactly 0 in
+      // both directions, so the first samples cannot tell them apart.
+      const auto f = trigger(fwd, 64);
+      const auto r = trigger(rev, 64);
+      if (f.empty() || r.empty() || !(r[63] > f[63]))
       {
          printf("SAMPLERTEST reverse param had no effect FAIL\n");
          ok = false;
@@ -51763,6 +51756,70 @@ static bool RunSamplerFixture()
       const auto full = trigger(fullLoop, numFrames / 2 + 50);
       const auto shortR = trigger(shortLoop, numFrames / 2 + 50);
       if (!differs(full, shortR)) { printf("SAMPLERTEST end param had no effect FAIL\n"); ok = false; }
+   }
+
+   // fade in / fade out: a long fade-in must pull the first samples of a pass
+   // well below the un-faded ones, and a long fade-out must do the same to the
+   // last samples before the range edge (one-shot, so the tail is the edge).
+   {
+      auto render = [&](float fi, float fo, int frames) -> std::vector<float>
+      {
+         SamplerNode node;
+         node.LoadFile(path);
+         node.fadeIn = fi;
+         node.fadeOut = fo;
+         node.CookIfNeeded(1);
+         AudioNode* an = node.GetAudioNode();
+         an->PrepareToPlay((double)sampleRate, frames);
+         node.CookIfNeeded(2);
+         NoteEventQueue queue;
+         const int cursor = queue.RegisterConsumer();
+         an->SetNoteInbox(&queue, cursor);
+         NoteEvent on;
+         on.note = 60;
+         on.velocity = 1.0f;
+         on.isNoteOn = true;
+         on.frameOffset = 0;
+         queue.Push(on);
+         std::vector<float> l(frames, 0.0f), r(frames, 0.0f);
+         float* chans[2] = { l.data(), r.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 2;
+         buf.numFrames = frames;
+         an->ProcessBlock(nullptr, 0, buf);
+         return l;
+      };
+      // Ramp is -1..1: the first 400 frames of an un-faded pass sit near -1*0.8;
+      // a 50 ms (2205-frame) fade-in scales that by <= 400/2205.
+      const auto hard = render(0.0f, 0.0f, 600);
+      const auto fadedIn = render(50.0f, 0.0f, 600);
+      float hardMag = 0.0f, fadeMag = 0.0f;
+      for (int i = 300; i < 600; i++)
+      {
+         hardMag = std::max(hardMag, std::fabs(hard[i]));
+         fadeMag = std::max(fadeMag, std::fabs(fadedIn[i]));
+      }
+      if (!(fadeMag < hardMag * 0.5f))
+      {
+         printf("SAMPLERTEST fade in had no effect (hard=%.3f faded=%.3f) FAIL\n", hardMag, fadeMag);
+         ok = false;
+      }
+      // Fade-out: end the sound at the range edge; the last 300 frames before
+      // it must be quieter with a 50 ms fade-out than without.
+      const auto hardTail = render(0.0f, 0.0f, numFrames - 20);
+      const auto fadedTail = render(0.0f, 50.0f, numFrames - 20);
+      float hardTailMag = 0.0f, fadeTailMag = 0.0f;
+      for (int i = numFrames - 320; i < numFrames - 20; i++)
+      {
+         hardTailMag = std::max(hardTailMag, std::fabs(hardTail[i]));
+         fadeTailMag = std::max(fadeTailMag, std::fabs(fadedTail[i]));
+      }
+      if (!(fadeTailMag < hardTailMag * 0.5f))
+      {
+         printf("SAMPLERTEST fade out had no effect (hard=%.3f faded=%.3f) FAIL\n", hardTailMag, fadeTailMag);
+         ok = false;
+      }
    }
 
    // Record: arm recording, feed one block of a known synthetic tone
