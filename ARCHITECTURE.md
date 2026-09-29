@@ -130,7 +130,7 @@ getting a file each:
   *edges* through an SPSC ring (`SetButtonLevel` turns a held mouse or held CV into one
   press). Take length is a `MusicTime` division or free; with sync on and the transport
   running a take waits for the next grid line (capped at one bar). Takes and overdubs are
-  shifted by `Platform::AudioRoundTripLatencyFrames()` (auto comp). Playback is a sample
+  shifted by `Platform::AudioRoundTripLatencyFrames()` (always on; there is no switch). Playback is a sample
   player over the held loop with the Sampler's controls (finetune, pitch, speed, volume,
   fade in / fade out via `src/audio/PassFade.h`): at rate 1.0 the loop stays on the grid,
   at any other rate it plays in length / |rate| and drifts against the transport, and

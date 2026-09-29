@@ -86,7 +86,7 @@ public:
                   std::memory_order_relaxed);
       mFadeInMs.store(std::clamp(n.fadeIn, 0.0f, 250.0f), std::memory_order_relaxed);
       mFadeOutMs.store(std::clamp(n.fadeOut, 0.0f, 250.0f), std::memory_order_relaxed);
-      mAutoLatencyFrames.store(n.autoLatency ? std::max(0, autoLatencyFrames) : 0, std::memory_order_relaxed);
+      mAutoLatencyFrames.store(std::max(0, autoLatencyFrames), std::memory_order_relaxed);
    }
 
    void DrainRetired() { mBufSlot.DrainRetired(); }
@@ -572,8 +572,7 @@ void LooperNode::CookIfNeeded(int frameId)
    if (frameId - mLatencyPollFrame > 30 || frameId < mLatencyPollFrame || testLatencyFrames >= 0)
    {
       mLatencyPollFrame = frameId;
-      mLatencyFrames = !autoLatency ? 0
-                     : (testLatencyFrames >= 0 ? testLatencyFrames : (int)Platform::AudioRoundTripLatencyFrames(0));
+      mLatencyFrames = testLatencyFrames >= 0 ? testLatencyFrames : (int)Platform::AudioRoundTripLatencyFrames(0);
    }
    mAudioNode->PushParams(*this, mLatencyFrames);
    mAudioNode->DrainRetired();
@@ -597,7 +596,6 @@ void LooperNode::VisitParams(ParamVisitor& v)
 {
    v.Int("take", take);
    v.Bool("syncStart", syncStart);
-   v.Bool("autoLatency", autoLatency);
    v.Bool("thru", thru);
    v.Float("finetune", finetune);
    v.Float("pitch", pitch);

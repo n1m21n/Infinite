@@ -32,8 +32,8 @@ class AudioLooperNode;
 //
 // Latency compensation: what you play arrives at the looper late by the
 // interface's round trip, so an uncompensated take sits behind the grid. The
-// take window is shifted by Platform::AudioRoundTripLatencyFrames() (auto) plus
-// (the old manual trim was dropped: auto comp is the one control); it is applied to overdubs as well.
+// take window is shifted by Platform::AudioRoundTripLatencyFrames(), always (there
+// is no switch: the old trim and auto comp controls are gone); it is applied to overdubs as well.
 //
 // Playback is a sample player over the held loop, with the Sampler's own
 // controls: finetune (cents), pitch (semitones), speed (negative plays it
@@ -102,8 +102,7 @@ public:
    // take: 0 = free, n>0 = MusicTime::RateDivision(n - 1). Default 1 bar.
    int take = 3;
    bool syncStart = true; // wait for the next grid line when the transport runs
-   bool autoLatency = true;
-   int testLatencyFrames = -1; // fixtures only: >= 0 replaces the measured round trip
+   int testLatencyFrames = -1; // fixtures only: >= 0 replaces the measured round trip (0 = no compensation)
    bool thru = true;      // monitor the input alongside the loop
    float finetune = 0.0f; // cents, +/-50, stacks on pitch
    float pitch = 0.0f;    // semitones, +/-24
