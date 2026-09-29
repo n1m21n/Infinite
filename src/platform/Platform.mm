@@ -1934,7 +1934,15 @@ namespace Platform
          CGSize size = [h->track naturalSize];
          h->width = (int)std::abs(size.width);
          h->height = (int)std::abs(size.height);
-         h->duration = CMTimeGetSeconds([asset duration]);
+         // A container with no declared duration reports kCMTimeIndefinite,
+         // which CMTimeGetSeconds turns into NaN - and NaN sails through
+         // every `duration > 0` guard downstream as "unknown" only by luck.
+         // Fall back to the video track's own time range, and store a clean
+         // 0.0 (= unknown, no loop) when neither says.
+         double declaredDuration = CMTimeGetSeconds([asset duration]);
+         if (!std::isfinite(declaredDuration) || declaredDuration <= 0.0)
+            declaredDuration = CMTimeGetSeconds([h->track timeRange].duration);
+         h->duration = (std::isfinite(declaredDuration) && declaredDuration > 0.0) ? declaredDuration : 0.0;
          h->nominalFps = [h->track nominalFrameRate];
          if (h->nominalFps <= 0.0)
             h->nominalFps = 30.0;
