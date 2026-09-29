@@ -1531,6 +1531,24 @@ namespace
    uint64_t gDriftFollowPickingUid = 0;
    int   gPerfMidiLearnIdx = -1;
    int   gPerfMidiLearnAxis = 0; // 0 = X or primary, 1 = Y
+   // Per-parameter MIDI learn (right-click a param > "MIDI learn"). Keyed by the
+   // node's uid, not its index, because undo/load renumber indices. Exactly one
+   // MIDI learn may be live at a time across ALL learners (this, the perf
+   // matrix above, and the MIDI CC / MIDI Trigger node buttons): every start
+   // goes through MidiLearnCancelAll() first. Defined after
+   // UpdatePerformanceMatrixMIDI.
+   uint64_t gParamMidiLearnUid = 0;
+   int      gParamMidiLearnParam = -1;
+   void MidiLearnCancelAll();
+   void StartParamMidiLearn(int nodeIndex, int paramIndex);
+   bool ParamMidiLearnIsActiveFor(int nodeIndex, int paramIndex);
+   int  MidiLearnActiveCount();
+   bool ParamMidiLearnActive();
+   bool ParamMidiLearnable(int nodeIndex, int paramIndex);
+   bool ParamMidiLearnCommit(int nodeIndex, int paramIndex, const Platform::MidiCCValue& last);
+   void UpdateParamMidiLearn();
+   void DrawParamMidiLearnBanner();
+   void DrawParamMidiLearnMenuItem(int nodeIndex, int paramIndex);
    struct PerfMidiRuntimeState
    {
       float lastVal = -1.0f;
@@ -10168,6 +10186,7 @@ namespace
       }
       else if (ImGui::Button(n->IsBound() ? "Re-learn" : "MIDI Learn", ImVec2(kPreviewSize, 0)))
       {
+         MidiLearnCancelAll();
          n->StartLearn();
       }
       ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
@@ -10199,7 +10218,10 @@ namespace
          if (lit)
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.85f, 0.35f, 1.0f));
          if (ImGui::Button(n->IsBound() ? "Re-learn" : "MIDI Learn", ImVec2(kPreviewSize, 0)))
+         {
+            MidiLearnCancelAll();
             n->StartLearn();
+         }
          if (lit)
             ImGui::PopStyleColor();
       }
@@ -38884,6 +38906,7 @@ namespace
                      Platform::MidiStart(err);
                      Platform::MidiCCValue flush;
                      while (Platform::MidiPollLastTouched(flush)) {}
+                     MidiLearnCancelAll();
                      gPerfMidiLearnIdx = (int)elemIdx;
                      gPerfMidiLearnAxis = 0;
                      ImGui::CloseCurrentPopup();
@@ -38910,6 +38933,7 @@ namespace
                      Platform::MidiStart(err);
                      Platform::MidiCCValue flush;
                      while (Platform::MidiPollLastTouched(flush)) {}
+                     MidiLearnCancelAll();
                      gPerfMidiLearnIdx = (int)elemIdx;
                      gPerfMidiLearnAxis = 1;
                      ImGui::CloseCurrentPopup();
@@ -38978,6 +39002,7 @@ namespace
                         Platform::MidiStart(err);
                         Platform::MidiCCValue flush;
                         while (Platform::MidiPollLastTouched(flush)) {}
+                        MidiLearnCancelAll();
                         gPerfMidiLearnIdx = (int)elemIdx;
                         gPerfMidiLearnAxis = 0;
                         ImGui::CloseCurrentPopup();
@@ -40116,6 +40141,263 @@ namespace
       }
    }
 
+   // ---- Per-parameter MIDI learn ------------------------------------------
+   // Right-click a parameter > "MIDI learn", then move a hardware control. The
+   // captured (device, channel, controller/note) becomes a MIDI CC modulator
+   // node bound to that parameter through the ordinary Modulation binding, so
+   // it is visible on the canvas, removable via Unbind / node delete, undoable
+   // and saved by the existing node + "mod" line paths. Nothing here is a
+   // second mapping system.
+   //
+   // One live learn at a time: MidiLearnCancelAll() is the single choke point
+   // every learner (this, Performance Matrix, MIDI CC node, MIDI Trigger node)
+   // calls before it starts, and it also runs on patch reset/load/undo/redo.
+   // It also flushes the depth-1 Platform::MidiPollLastTouched queue so the
+   // new learner never captures a stale event.
+
+   bool ParamMidiLearnActive()
+   {
+      return gParamMidiLearnUid != 0 && gParamMidiLearnParam >= 0;
+   }
+
+   int MidiLearnActiveCount()
+   {
+      int count = 0;
+      if (gPerfMidiLearnIdx >= 0)
+         count++;
+      if (ParamMidiLearnActive())
+         count++;
+      for (GraphNode& gn : gNodes)
+      {
+         if (auto* cc = dynamic_cast<MidiCCNode*>(gn.node.get()))
+         {
+            if (cc->IsLearning())
+               count++;
+         }
+         else if (auto* trig = dynamic_cast<MidiTriggerNode*>(gn.node.get()))
+         {
+            if (trig->IsLearning())
+               count++;
+         }
+      }
+      return count;
+   }
+
+   void MidiLearnCancelAll()
+   {
+      gPerfMidiLearnIdx = -1;
+      gParamMidiLearnUid = 0;
+      gParamMidiLearnParam = -1;
+      for (GraphNode& gn : gNodes)
+      {
+         if (auto* cc = dynamic_cast<MidiCCNode*>(gn.node.get()))
+            cc->CancelLearn();
+         else if (auto* trig = dynamic_cast<MidiTriggerNode*>(gn.node.get()))
+            trig->CancelLearn();
+      }
+      if (Platform::MidiIsRunning())
+      {
+         Platform::MidiCCValue flush;
+         while (Platform::MidiPollLastTouched(flush)) {}
+      }
+   }
+
+   bool ParamMidiLearnIsActiveFor(int nodeIndex, int paramIndex)
+   {
+      if (!ParamMidiLearnActive() || paramIndex != gParamMidiLearnParam)
+         return false;
+      return UidForIndex(nodeIndex) == gParamMidiLearnUid;
+   }
+
+   void StartParamMidiLearn(int nodeIndex, int paramIndex)
+   {
+      const uint64_t uid = UidForIndex(nodeIndex);
+      MidiLearnCancelAll();
+      if (uid == 0 || paramIndex < 0)
+         return;
+      std::string err;
+      if (!Platform::MidiIsRunning() && !Platform::MidiStart(err))
+         return; // no MIDI input available: nothing to listen to
+      gParamMidiLearnUid = uid;
+      gParamMidiLearnParam = paramIndex;
+      // The start may have raced a stale event in between the flush above and
+      // MidiStart bringing the queue up.
+      Platform::MidiCCValue flush;
+      while (Platform::MidiPollLastTouched(flush)) {}
+   }
+
+   // A learnable target is a param nothing else drives. A binding from a MIDI
+   // CC node is fine (that is "re-learn"); a binding from any other modulator,
+   // an expression, or a gesture recording is refused rather than silently
+   // replaced. Also refuses a MIDI CC node's own params (learning a CC node's
+   // "low" from the CC would be a feedback trap the user did not ask for).
+   bool ParamMidiLearnable(int nodeIndex, int paramIndex)
+   {
+      Modulation& mod = Modulation::Instance();
+      if (mod.HasExpression(nodeIndex, paramIndex))
+         return false;
+      GestureRecorder& rec = GestureRecorder::Instance();
+      if (rec.IsArmed(nodeIndex, paramIndex) || rec.Playbacks().count(GestureRecorder::Key(nodeIndex, paramIndex)) > 0)
+         return false;
+      const Modulation::Source cur = mod.ModulatorFor(nodeIndex, paramIndex);
+      if (cur.nodeIndex >= 0)
+      {
+         GraphNode* srcNode = FindNodeByIndex(cur.nodeIndex);
+         if (srcNode == nullptr || dynamic_cast<MidiCCNode*>(srcNode->node.get()) == nullptr)
+            return false;
+      }
+      return true;
+   }
+
+   // Core of the capture, separated from the polling so the headless test can
+   // drive it. Returns true when the binding was made.
+   bool ParamMidiLearnCommit(int nodeIndex, int paramIndex, const Platform::MidiCCValue& last)
+   {
+      if (!ParamMidiLearnable(nodeIndex, paramIndex))
+         return false;
+      GraphNode* dest = FindNodeByIndex(nodeIndex);
+      if (dest == nullptr)
+         return false;
+      Modulation& mod = Modulation::Instance();
+
+      // One undo step for the whole gesture (spawn + bind).
+      PushUndoCheckpoint();
+      const bool wasSuppressed = gSuppressUndoCheckpoints;
+      gSuppressUndoCheckpoints = true;
+
+      // Reuse a live modulator already on this exact control so one knob can
+      // drive several params. Bypassed ones are skipped: a bypassed modulator
+      // neither cooks nor applies. Non-default range/invert are the user's
+      // own tuning, so those nodes are not shared.
+      int srcIndex = -1;
+      for (GraphNode& gn : gNodes)
+      {
+         auto* cc = dynamic_cast<MidiCCNode*>(gn.node.get());
+         if (cc == nullptr || cc->bypassed)
+            continue;
+         if (cc->device == (int)last.device && cc->channel == last.channel &&
+             cc->controller == last.controller && cc->isNote == last.isNote &&
+             cc->low == 0.0f && cc->high == 1.0f && !cc->invert)
+         {
+            srcIndex = gn.index;
+            break;
+         }
+      }
+      if (srcIndex < 0)
+      {
+         float sx = dest->spawnX - 320.0f;
+         float sy = dest->spawnY;
+         if (gEditor != nullptr)
+         {
+            ed::EditorContext* prev = ed::GetCurrentEditor();
+            ed::SetCurrentEditor(gEditor);
+            const ImVec2 p = ed::GetNodePosition(dest->NodeId());
+            ed::SetCurrentEditor(prev);
+            const ImVec2 spot = FindFreeSpawnPosition(ImVec2(p.x - 320.0f, p.y));
+            sx = spot.x;
+            sy = spot.y;
+         }
+         GraphNode* spawned = SpawnNode("MIDI CC", "Modulators", sx, sy);
+         auto* cc = spawned != nullptr ? dynamic_cast<MidiCCNode*>(spawned->node.get()) : nullptr;
+         if (cc == nullptr)
+         {
+            gSuppressUndoCheckpoints = wasSuppressed;
+            return false;
+         }
+         cc->device = (int)last.device;
+         cc->channel = last.channel;
+         cc->controller = last.controller;
+         cc->isNote = last.isNote;
+         srcIndex = spawned->index;
+      }
+
+      // Re-resolve after the spawn: gNodes may have reallocated.
+      mod.Bind(nodeIndex, paramIndex, srcIndex, 0);
+      const Modulation::Source bound = mod.ModulatorFor(nodeIndex, paramIndex);
+      if (!bound.hasRange)
+      {
+         // Param was not in this frame's FrameParams (collapsed node): fall
+         // back to the sticky record of its declared span.
+         if (const ParamRef* known = mod.KnownParam(nodeIndex, paramIndex))
+            mod.SetRange(nodeIndex, paramIndex, known->minValue, known->maxValue);
+      }
+      gSuppressUndoCheckpoints = wasSuppressed;
+      return true;
+   }
+
+   // Main thread, once per frame, outside ed::Begin/End and before the
+   // modulation apply (which needs this frame's FrameParams for Bind).
+   void UpdateParamMidiLearn()
+   {
+      if (!ParamMidiLearnActive())
+         return;
+      ImGuiIO& lio = ImGui::GetIO();
+      if (ImGui::GetCurrentContext() != nullptr && ImGui::IsKeyPressed(ImGuiKey_Escape, false) && !lio.WantTextInput)
+      {
+         MidiLearnCancelAll();
+         return;
+      }
+      GraphNode* dest = FindNodeByUid(gParamMidiLearnUid);
+      if (dest == nullptr)
+      {
+         MidiLearnCancelAll(); // target deleted while listening
+         return;
+      }
+      Platform::MidiCCValue last;
+      if (!Platform::MidiPollLastTouched(last))
+         return;
+      const int nodeIndex = dest->index;
+      const int paramIndex = gParamMidiLearnParam;
+      gParamMidiLearnUid = 0;
+      gParamMidiLearnParam = -1;
+      ParamMidiLearnCommit(nodeIndex, paramIndex, last);
+   }
+
+   // Orange strip along the top of the canvas while listening. Drawn on the
+   // foreground list so it needs no window of its own.
+   void DrawParamMidiLearnBanner()
+   {
+      if (!ParamMidiLearnActive())
+         return;
+      GraphNode* dest = FindNodeByUid(gParamMidiLearnUid);
+      if (dest == nullptr)
+         return;
+      const ParamRef* known = Modulation::Instance().KnownParam(dest->index, gParamMidiLearnParam);
+      char text[192];
+      snprintf(text, sizeof(text), "MIDI learn: %s > %s - move a knob, fader or pad (Esc to cancel)",
+               dest->typeName.c_str(), (known != nullptr && !known->name.empty()) ? known->name.c_str() : "parameter");
+      ImDrawList* dl = ImGui::GetForegroundDrawList();
+      const ImVec2 ts = ImGui::CalcTextSize(text);
+      const ImGuiViewport* vp = ImGui::GetMainViewport();
+      const float pulse = 0.75f + 0.25f * sinf((float)ImGui::GetTime() * 5.0f);
+      const ImVec2 a(vp->Pos.x + (vp->Size.x - ts.x) * 0.5f - 12.0f, vp->Pos.y + 44.0f);
+      const ImVec2 b(a.x + ts.x + 24.0f, a.y + ts.y + 12.0f);
+      dl->AddRectFilled(a, b, IM_COL32(60, 40, 8, (int)(230 * pulse)), 6.0f);
+      dl->AddRect(a, b, IM_COL32(255, 185, 45, (int)(255 * pulse)), 6.0f, 0, 1.5f);
+      dl->AddText(ImVec2(a.x + 12.0f, a.y + 6.0f), IM_COL32(255, 185, 45, 255), text);
+   }
+
+   // The right-click entry. Inside the ##modbind popup.
+   void DrawParamMidiLearnMenuItem(int nodeIndex, int paramIndex)
+   {
+      if (ParamMidiLearnIsActiveFor(nodeIndex, paramIndex))
+      {
+         if (ImGui::MenuItem("Listening... (click or Esc to cancel)"))
+            MidiLearnCancelAll();
+         return;
+      }
+      if (!ParamMidiLearnable(nodeIndex, paramIndex))
+      {
+         ImGui::BeginDisabled();
+         ImGui::MenuItem("MIDI learn (already driven by something else)");
+         ImGui::EndDisabled();
+         return;
+      }
+      const Modulation::Source cur = Modulation::Instance().ModulatorFor(nodeIndex, paramIndex);
+      if (ImGui::MenuItem(cur.nodeIndex >= 0 ? "Re-learn MIDI" : "MIDI learn"))
+         StartParamMidiLearn(nodeIndex, paramIndex);
+   }
+
    void DrawPerfPanelContent()
    {
       if (gPerfLayout.pageCount < 1) gPerfLayout.pageCount = 1;
@@ -40983,7 +41265,7 @@ namespace
          { "Macro Step Gate", "An 8-step gate that advances on the transport at rateBeats - a rhythm you draw rather than a curve. The output is the current step's on/off state, so it is the Macro family's answer to 'make this parameter pulse in time' without wiring an LFO and a Compare." },
 
          // ---------------- MIDI / conversion modulators ----------------
-         { "MIDI CC", "Binds one physical control on a MIDI controller - a knob, fader or pad - and reports its position as a modulator. Press Learn and move the control; the node remembers that channel + controller number and polls only that binding. low/high remap the output range and invert flips it. Works with any class-compliant USB MIDI controller, since it only ever reads generic Control Change / Note On messages." },
+         { "MIDI CC", "Binds one physical control on a MIDI controller - a knob, fader or pad - and reports its position as a modulator. Press Learn and move the control; the node remembers that channel + controller number and polls only that binding. low/high remap the output range and invert flips it. Works with any class-compliant USB MIDI controller, since it only ever reads generic Control Change / Note On messages. You rarely need to add this node by hand: right-click any parameter, choose MIDI learn, and move a control - this node is created (or reused if that control already has one) and bound to the parameter over its full range. Only one MIDI learn runs at a time; starting another cancels the first, and Esc cancels." },
          { "MIDI Trigger", "The pad counterpart of MIDI CC: it fires a decaying 0..1 pulse whenever one specific MIDI note is hit, then sits at 0. A pad hit is an event rather than a position, so this spikes and decays over 'hold' seconds the way Audio Analyze's onset output does, instead of holding a live value. Velocity sensitivity scales the spike by how hard the pad was struck." },
          { "Note to CV", "Converts a note stream's pitch into a modulator, so which note is playing can drive any parameter - a filter cutoff, a warp amount, pan. It is a pitch tracker, not an envelope: it holds the last note's pitch on release rather than falling back toward 0 (that's Envelope's job). rangeLow/High set which note range maps onto the full 0..1 span, glide smooths the jump between notes." },
          { "Velocity to CV", "Converts how hard each note is played into a modulator (its 0..1 velocity), so touch can drive any parameter - brightness, pan, a filter opening on accents. It holds the last note's velocity through release. range low/high pick which velocities map onto the full 0..1 span (swap them to invert). The pitch counterpart is Note to CV." },
@@ -45742,6 +46024,9 @@ namespace
    void NewPatch()
    {
       MovementLog::NoteMark(MovementLog::Mark::PatchNew);
+      // Learn state keys on node uids / element indices that this reset
+      // invalidates; a learn must never survive a patch change.
+      MidiLearnCancelAll();
       // Retire rather than destroy outright: NewPatch can run mid-frame (it's
       // the first step of ApplyPatchData, which Undo/Redo call), after this
       // frame's ImGui draw list has already queued AddImage() calls
@@ -69102,6 +69387,7 @@ int main(int argc, char** argv)
          getenv("INFINITE_CULLDRIVENTEST") != nullptr ||
          getenv("INFINITE_PREDBINDTEST") != nullptr ||
          getenv("INFINITE_MPCMODTEST") != nullptr ||
+         getenv("INFINITE_MIDILEARNTEST") != nullptr ||
          getenv("INFINITE_MODMATRIXGEOM") != nullptr;
 
       if (getenv("INFINITE_AUDIOUITEST") != nullptr)
@@ -71462,6 +71748,12 @@ int main(int argc, char** argv)
             // simplest way to reproduce it without a real Random node.
             SpawnNode("Range to Range", "Modulators", 60.0f, 500.0f);
             gNodes[0].showParams = true; // params must be drawn for them to register
+         }
+         if (getenv("INFINITE_MIDILEARNTEST") != nullptr)
+         {
+            SpawnNode("Range to Range", "Modulators", 60.0f, 500.0f);
+            SpawnNode("MPC", "Synths", 400.0f, 500.0f);
+            gNodes[3].showParams = true;
          }
          if (getenv("INFINITE_MPCMODTEST") != nullptr)
          {
@@ -94827,6 +95119,7 @@ int main(int argc, char** argv)
                const int perfKind = destRef->isBool ? 3 : (destRef->isEnum ? 7 : 0);
                if (ImGui::MenuItem("Add to Performance Matrix"))
                   AddToPerformanceMatrix(nodeIndex, paramIndex, perfKind);
+               DrawParamMidiLearnMenuItem(nodeIndex, paramIndex);
                if (ImGui::MenuItem("View in Modulation Matrix"))
                {
                   gModMatrixOpen = true;
@@ -95001,6 +95294,7 @@ int main(int argc, char** argv)
                }
                if (ImGui::MenuItem("Add to Performance Matrix"))
                   AddToPerformanceMatrix(nodeIndex, paramIndex, perfKind);
+               DrawParamMidiLearnMenuItem(nodeIndex, paramIndex);
                if (!destRef->isBool)
                {
                   if (ImGui::MenuItem("Enter Expression"))
@@ -97483,7 +97777,11 @@ int main(int argc, char** argv)
          ConditionalStageTimer timerModulation(benchStagesCpuSample ? &sStageModulation : nullptr, Bench::FrameTail::kModulation);
          Bench::ConditionalGpuStageTimer timerModulationGpu(benchStagesSample ? &sGpuTimerRing : nullptr, "modulation", frameId);
          if (!sBenchB3ProbePaused)
+         {
+            UpdateParamMidiLearn();
+            DrawParamMidiLearnBanner();
             ApplyModulationAndPalette(frameId, true);
+         }
       }
 
       {
@@ -98031,6 +98329,194 @@ int main(int argc, char** argv)
             }
             printf("%s\n", ok ? "MPC MOD TEST OK" : "MPC MOD TEST FAIL");
          }
+      }
+
+      if (getenv("INFINITE_MIDILEARNTEST") != nullptr)
+      {
+         // Per-parameter MIDI learn: learn -> bind -> drive, reuse, cancel,
+         // clash with the other learners, refusal, undo, save/load.
+         static bool ok = true, midiUp = false;
+         Modulation& mod = Modulation::Instance();
+         auto bad = [&](const char* what)
+         {
+            printf("MIDILEARNTEST %s FAIL\n", what);
+            ok = false;
+         };
+         MpcNode* mpc = nullptr;
+         int mpcIdx = -1, r2rIdx = -1;
+         for (GraphNode& gn : gNodes)
+         {
+            if (auto* m = dynamic_cast<MpcNode*>(gn.node.get())) { mpc = m; mpcIdx = gn.index; }
+            if (dynamic_cast<RangeToRangeNode*>(gn.node.get()) != nullptr) r2rIdx = gn.index;
+         }
+         auto ccCount = [&]() -> int
+         {
+            int c = 0;
+            for (GraphNode& gn : gNodes)
+               if (dynamic_cast<MidiCCNode*>(gn.node.get()) != nullptr) c++;
+            return c;
+         };
+         auto firstCC = [&]() -> MidiCCNode*
+         {
+            for (GraphNode& gn : gNodes)
+               if (auto* c = dynamic_cast<MidiCCNode*>(gn.node.get())) return c;
+            return nullptr;
+         };
+         auto inject = [&](int cc, int val)
+         {
+            const unsigned char msg[3] = { 0xB0, (unsigned char)cc, (unsigned char)val };
+            Platform::MidiInjectBytes(msg, 3, 77);
+         };
+         const int volA = MpcNode::ParamId(2, MpcNode::kVolume);
+         const int volB = MpcNode::ParamId(3, MpcNode::kVolume);
+         const int volC = MpcNode::ParamId(4, MpcNode::kVolume);
+         const int volD = MpcNode::ParamId(5, MpcNode::kVolume);
+         const int volE = MpcNode::ParamId(6, MpcNode::kVolume);
+         const ParamRef* known = mpc != nullptr ? mod.KnownParam(mpcIdx, volA) : nullptr;
+         const float kLo = known != nullptr ? known->minValue : 0.0f;
+         const float kHi = known != nullptr ? known->maxValue : 1.0f;
+         auto near = [&](float a, float b) { return std::fabs(a - b) < 0.02f * std::max(1.0f, std::fabs(kHi - kLo)); };
+
+         if (frameId == 1 && mpc != nullptr)
+         {
+            std::string err;
+            midiUp = Platform::MidiStart(err);
+            if (!midiUp)
+               printf("MIDILEARNTEST note: MidiStart unavailable (%s); skipping\n", err.c_str());
+            else
+            {
+               StartParamMidiLearn(mpcIdx, volA);
+               if (MidiLearnActiveCount() != 1 || !ParamMidiLearnIsActiveFor(mpcIdx, volA))
+                  bad("start: exactly one learn (param) should be live");
+               inject(20, 64);
+            }
+         }
+         if (midiUp && mpc != nullptr)
+         {
+            if (frameId == 3)
+            {
+               // Captured at the top of the previous frame.
+               MidiCCNode* cc = firstCC();
+               if (ccCount() != 1 || cc == nullptr) bad("learn did not spawn exactly one MIDI CC node");
+               else if (cc->device != 77 || cc->channel != 0 || cc->controller != 20 || cc->isNote)
+                  bad("spawned node did not take the captured device/channel/controller");
+               if (!mod.IsModulated(mpcIdx, volA)) bad("learned param is not bound");
+               else
+               {
+                  const Modulation::Source src = mod.ModulatorFor(mpcIdx, volA);
+                  if (!src.hasRange || !near(src.lo, kLo) || !near(src.hi, kHi)) bad("binding range is not the param's range");
+               }
+               if (MidiLearnActiveCount() != 0) bad("learn still live after capture");
+               inject(20, 127);
+            }
+            if (frameId == 7)
+            {
+               if (!near(mpc->padVolume[2], kHi)) bad("CC 127 did not drive the param to its max");
+               inject(20, 0);
+            }
+            if (frameId == 10)
+            {
+               if (!near(mpc->padVolume[2], kLo)) bad("CC 0 did not drive the param to its min");
+               // Same control onto a second param: must reuse the node.
+               StartParamMidiLearn(mpcIdx, volB);
+               inject(20, 64);
+            }
+            if (frameId == 12)
+            {
+               MidiCCNode* cc = firstCC();
+               if (ccCount() != 1) bad("second param on the same CC spawned a duplicate node");
+               if (!mod.IsModulated(mpcIdx, volB) || mod.ModulatorFor(mpcIdx, volB).nodeIndex != mod.ModulatorFor(mpcIdx, volA).nodeIndex)
+                  bad("second param is not bound to the shared node");
+               (void)cc;
+               // Cancel: nothing binds afterwards.
+               StartParamMidiLearn(mpcIdx, volC);
+               if (MidiLearnActiveCount() != 1) bad("cancel setup: learn not live");
+               MidiLearnCancelAll();
+               if (MidiLearnActiveCount() != 0) bad("cancel left a learn live");
+               inject(21, 64);
+            }
+            if (frameId == 14)
+            {
+               if (mod.IsModulated(mpcIdx, volC) || ccCount() != 1) bad("a cancelled learn still bound");
+               // Clash matrix.
+               StartParamMidiLearn(mpcIdx, volC);
+               MidiLearnCancelAll(); // what every perf start site does first
+               gPerfMidiLearnIdx = 0;
+               if (MidiLearnActiveCount() != 1 || ParamMidiLearnActive()) bad("perf learn start did not cancel the param learn");
+               StartParamMidiLearn(mpcIdx, volC);
+               if (gPerfMidiLearnIdx != -1 || MidiLearnActiveCount() != 1) bad("param learn start did not cancel the perf learn");
+               MidiCCNode* cc = firstCC();
+               if (cc != nullptr)
+               {
+                  MidiLearnCancelAll();
+                  cc->StartLearn();
+                  StartParamMidiLearn(mpcIdx, volC);
+                  if (cc->IsLearning() || MidiLearnActiveCount() != 1) bad("param learn start did not cancel the node learner");
+               }
+               MidiLearnCancelAll();
+               // Refusal: a param another (non-MIDI) modulator drives.
+               if (r2rIdx >= 0)
+               {
+                  mod.Bind(mpcIdx, volD, r2rIdx);
+                  if (ParamMidiLearnable(mpcIdx, volD)) bad("a param driven by a non-MIDI modulator was offered MIDI learn");
+                  Platform::MidiCCValue fake;
+                  fake.device = 77; fake.channel = 0; fake.controller = 22;
+                  if (ParamMidiLearnCommit(mpcIdx, volD, fake)) bad("commit replaced a non-MIDI binding");
+                  if (mod.ModulatorFor(mpcIdx, volD).nodeIndex != r2rIdx) bad("non-MIDI binding was disturbed");
+                  mod.Unbind(mpcIdx, volD);
+               }
+               // A different CC spawns a second node; undo must take it and the
+               // binding back in one step.
+               StartParamMidiLearn(mpcIdx, volE);
+               inject(30, 100);
+            }
+            if (frameId == 16)
+            {
+               if (ccCount() != 2 || !mod.IsModulated(mpcIdx, volE)) bad("second CC did not spawn a second node and bind");
+               Undo();
+            }
+            if (frameId == 18)
+            {
+               if (ccCount() != 1 || mod.IsModulated(mpcIdx, volE)) bad("undo did not remove the learned node and binding in one step");
+               if (!mod.IsModulated(mpcIdx, volA)) bad("undo removed too much");
+               Redo();
+            }
+            if (frameId == 20)
+            {
+               if (ccCount() != 2 || !mod.IsModulated(mpcIdx, volE)) bad("redo did not restore the learned node and binding");
+               // Undo while listening cancels the listen.
+               StartParamMidiLearn(mpcIdx, volC);
+               Undo();
+            }
+            if (frameId == 22)
+            {
+               if (MidiLearnActiveCount() != 0) bad("undo left a learn live");
+               Redo();
+            }
+            if (frameId == 24)
+            {
+               inject(20, 127);
+               SavePatchTo(TmpPath("infinite_midilearntest.infinite"));
+            }
+            if (frameId == 26)
+            {
+               NewPatch();
+               LoadPatchFrom(TmpPath("infinite_midilearntest.infinite"));
+            }
+            if (frameId == 30)
+            {
+               MidiCCNode* cc = firstCC();
+               if (ccCount() != 2 || cc == nullptr) bad("reload lost the learned nodes");
+               else if (cc->device != 77 || cc->controller != 20) bad("reload lost the captured mapping");
+               if (!mod.IsModulated(mpcIdx, volA) || !mod.IsModulated(mpcIdx, volB) || !mod.IsModulated(mpcIdx, volE))
+                  bad("learned bindings did not survive save/load");
+               if (mod.IsModulated(mpcIdx, volC)) bad("reload invented a binding");
+               if (!near(mpc->padVolume[2], kHi)) bad("reloaded mapping does not drive the param");
+               if (MidiLearnActiveCount() != 0) bad("learn live after reload");
+            }
+         }
+         if (frameId == 32)
+            printf("%s\n", ok ? "MIDILEARNTEST OK" : "MIDILEARNTEST FAIL");
       }
 
       if (getenv("INFINITE_MODMATRIXGEOM") != nullptr)
