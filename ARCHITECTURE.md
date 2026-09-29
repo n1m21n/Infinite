@@ -137,10 +137,19 @@ getting a file each:
   overdub is paused. The loop audio is not saved with the patch.
 - **`src/nodes/MpcNode.h`/`.cpp`** — **MPC** (16-pad sampler, one master stereo out: one
   `SampleSlot` and one independent voice per pad; one-shot / gate / loop-toggle; pads hit
-  by mouse, per-pad CV gate pin, or notes 36..51). Per pad: mode, volume, pitch, pan,
-  speed, fine tune. **Modulation addressing is per pad and independent of selection**:
-  float params live at `MpcNode::ParamId(pad, k) = 100 + pad * 5 + k`, each pad's mode at
-  a label-hashed discrete slot (`"pad N mode##mpcmodeN"`). `DrawMpcBody` registers all 16
+  by mouse, per-pad CV gate pin, or notes 36..51). Per pad: mode, sync (Free / Synced) and
+  rate (a `MusicTime` division), volume, pitch, pan, speed, fine tune, fade in, fade out
+  (`src/audio/PassFade.h`). **Synced** pads are quantised on the audio thread
+  (`AudioMpcNode::Schedule`): a hit is latched and released into the block's event list at
+  the exact frame the next grid line falls on (from `Transport::BlockStartBeats()` and the
+  tempo), fires at once with the transport stopped, a gate release before the line cancels
+  the hit, and a loop pad re-triggers on every line; restarts of a sounding voice carry a
+  short decaying residual (declick). **Modulation addressing is per pad and independent of
+  selection**: float params live at `MpcNode::ParamId(pad, k)` (`100 + pad * 5 + k` for the
+  first five, `180 + pad * 2 + (k - 5)` for the two fades), each pad's mode, sync and rate
+  at label-hashed discrete slots (`"pad N mode##mpcmodeN"`, `"pad N sync##mpcsyncN"`,
+  `"pad N rate##mpcdivN"`, registered in that kind-by-kind order). The node is wider than
+  the shared 440 (`MpcNodeWidth()`) so the 4x4 grid of 105 px square pads fits. `DrawMpcBody` registers all 16
   pads every frame (`RegisterMpcParams`; the unselected pads through `ModSlider` under
   `gParamRegisterOnly`, the EQ's hidden-band mechanism, the selected pad through its real
   widgets), so selecting a pad never rebinds, hides or retargets a cable; an unselected
