@@ -27,7 +27,7 @@ class MpcNode : public INode, public IAudioSource
 {
 public:
    static constexpr int kPads = 16;
-   static constexpr int kWaveCache = 64;
+   static constexpr int kWaveCache = 128;
    enum PadMode { kOneShot = 0, kGate = 1, kLoopToggle = 2 };
 
    static INode* Create() { return new MpcNode(); }
@@ -77,6 +77,33 @@ public:
    float padWaveMax[kPads][kWaveCache] = {};
    int padWaveCount[kPads] = {};
    std::string padPath[kPads]; // persisted
+
+   // UI-only, main thread. Canvas-space rects (x0,y0,x1,y1) of each pad and of
+   // the selected-pad waveform, cached while the card draws so a file dropped
+   // on the canvas can be routed to the pad under it; padFlash is the
+   // ImGui time of a pad's last hit, for the pad's hit feedback.
+   float padRect[kPads][4] = {};
+   float waveRect[4] = {};
+   double padFlash[kPads] = {};
+   // Pad under a canvas point, -1 when none.
+   int PadAtCanvas(float x, float y) const
+   {
+      for (int p = 0; p < kPads; p++)
+         if (x >= padRect[p][0] && x <= padRect[p][2] && y >= padRect[p][1] && y <= padRect[p][3])
+            return p;
+      return -1;
+   }
+   // First empty pad at or after `from` (wrapping), or -1 when all 16 are loaded.
+   int NextEmptyPad(int from) const
+   {
+      for (int i = 0; i < kPads; i++)
+      {
+         const int p = (Clamp(from) + i) % kPads;
+         if (padPath[p].empty())
+            return p;
+      }
+      return -1;
+   }
 
    static int Clamp(int pad) { return pad < 0 ? 0 : (pad >= kPads ? kPads - 1 : pad); }
 

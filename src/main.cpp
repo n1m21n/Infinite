@@ -17765,57 +17765,144 @@ namespace
    }
 
    // ---- MPC --------------------------------------------------------------
+   // Routes a dropped audio file to a pad: the pad under the drop, else the
+   // selected-pad waveform's box (the selected pad), else the first empty pad,
+   // else the selected pad. Further files in one drop fill the next empty pads.
+   void MpcDropFiles(MpcNode* n, float cx, float cy, const std::vector<std::string>& paths)
+   {
+      int pad = n->PadAtCanvas(cx, cy);
+      if (pad < 0 && cx >= n->waveRect[0] && cx <= n->waveRect[2] && cy >= n->waveRect[1] && cy <= n->waveRect[3])
+         pad = MpcNode::Clamp(n->selectedPad);
+      if (pad < 0)
+      {
+         pad = n->NextEmptyPad(0);
+         if (pad < 0)
+            pad = MpcNode::Clamp(n->selectedPad);
+      }
+      for (const std::string& path : paths)
+      {
+         if (pad < 0)
+            break;
+         if (n->LoadPad(pad, path))
+            n->selectedPad = pad;
+         const int next = n->NextEmptyPad(pad + 1);
+         pad = (next >= 0 && next != pad) ? next : -1;
+      }
+   }
+
    void DrawMpcBody(GraphNode& gn, MpcNode* n)
    {
       int loaded = 0;
       for (int p = 0; p < MpcNode::kPads; p++)
          loaded += n->PadLoaded(p) ? 1 : 0;
-      char stat[96];
-      snprintf(stat, sizeof(stat), "%d/16 pads  -  base note %d", loaded, n->baseNote);
+      char stat[112];
+      const int hi = std::min(127, n->baseNote + MpcNode::kPads - 1);
+      if (loaded == 0)
+         snprintf(stat, sizeof(stat), "empty - drop samples here, then click a pad or send notes %d-%d", n->baseNote, hi);
+      else
+         snprintf(stat, sizeof(stat), "%d/16 loaded - click a pad or send notes %d-%d", loaded, n->baseNote, hi);
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      const bool isLight = IsThemeLight();
+      const double now = ImGui::GetTime();
+      int openLoadPad = -1;
 
       // 4x4 pad grid, pad 1 bottom-left like a hardware MPC. Every pad is a
-      // gate destination; the pin sits inside the pad's cell.
+      // gate destination; the pin sits at the left of the pad's cell.
       {
          const float gap = 4.0f;
          const float cellW = (gAudioContentW - gap * 3.0f) / 4.0f;
-         const float cellH = ImGui::GetFrameHeight() * 1.6f;
+         const float cellH = 52.0f;
          const float x0 = gAudioContentX;
          const float y0 = ImGui::GetCursorScreenPos().y;
+         static const char* kModeTag[3] = { "shot", "gate", "loop" };
          for (int row = 0; row < 4; row++)
          {
             for (int col = 0; col < 4; col++)
             {
                const int pad = (3 - row) * 4 + col;
-               char label[48];
                char id[16];
                snprintf(id, sizeof(id), "pad%d", pad + 1);
-               if (n->PadLoaded(pad))
-               {
-                  std::string nm = n->PadName(pad);
-                  const size_t dot = nm.find_last_of('.');
-                  if (dot != std::string::npos && dot > 0)
-                     nm.resize(dot);
-                  if (nm.size() > 9)
-                     nm = nm.substr(0, 8) + ".";
-                  snprintf(label, sizeof(label), "%d %s", pad + 1, nm.c_str());
-               }
-               else
-               {
-                  snprintf(label, sizeof(label), "%d", pad + 1);
-               }
                ImGui::SetCursorScreenPos(ImVec2(x0 + (float)col * (cellW + gap), y0 + (float)row * (cellH + gap)));
-               ImU32 lit = 0;
-               if (n->PadPlaying(pad))
-                  lit = IM_COL32(60, 170, 90, 255);
-               else if (pad == n->selectedPad)
-                  lit = IM_COL32(90, 110, 190, 255);
+               const bool isLoaded = n->PadLoaded(pad);
+               const bool isSel = pad == n->selectedPad;
+               const bool playing = n->PadPlaying(pad);
+               bool activated = false;
                const bool level = DrawGateButton(id, cellW, cellH,
                   [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx, bool hovered, bool lvl)
-                  { PaintTransportButton(dl, mn, mx, hovered, lvl, lit != 0, lit != 0 ? lit : IM_COL32(120, 130, 160, 255), 0, label); });
-               n->SetPadHeld(pad, level, 1.0f);
-               if (ImGui::IsItemClicked(ImGuiMouseButton_Right) || (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)))
+                  {
+                     n->padRect[pad][0] = mn.x; n->padRect[pad][1] = mn.y;
+                     n->padRect[pad][2] = mx.x; n->padRect[pad][3] = mx.y;
+                     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+                        n->selectedPad = pad;
+                     const bool hit = lvl || (now - n->padFlash[pad]) < 0.14;
+                     const bool lit = playing || hit;
+                     const ImU32 green = isLight ? IM_COL32(35, 150, 80, 255) : IM_COL32(60, 175, 100, 255);
+                     ImU32 fill = isLoaded ? (isLight ? IM_COL32(214, 221, 236, 255) : IM_COL32(40, 46, 64, 255))
+                                           : (isLight ? IM_COL32(232, 235, 242, 255) : IM_COL32(26, 28, 37, 255));
+                     if (hovered && !lit)
+                        fill = isLight ? IM_COL32(204, 212, 230, 255) : IM_COL32(52, 59, 80, 255);
+                     if (lit)
+                        fill = green;
+                     dl->AddRectFilled(mn, mx, fill, 6.0f);
+                     const ImU32 selCol = isLight ? IM_COL32(50, 100, 230, 255) : IM_COL32(110, 160, 255, 255);
+                     const ImU32 edge = isLight ? IM_COL32(170, 178, 195, 255) : IM_COL32(85, 92, 115, 200);
+                     dl->AddRect(mn, mx, isSel ? selCol : edge, 6.0f, 0, isSel ? 2.0f : 1.0f);
+
+                     const ImU32 ink = lit ? IM_COL32(255, 255, 255, 255)
+                                           : (isLoaded ? (isLight ? IM_COL32(40, 45, 60, 255) : IM_COL32(215, 220, 235, 255))
+                                                       : (isLight ? IM_COL32(120, 128, 150, 255) : IM_COL32(120, 128, 150, 255)));
+                     const ImU32 dim = lit ? IM_COL32(255, 255, 255, 190) : (isLight ? IM_COL32(95, 105, 130, 255) : IM_COL32(150, 158, 180, 255));
+                     dl->PushClipRect(ImVec2(mn.x + 1.0f, mn.y + 1.0f), ImVec2(mx.x - 1.0f, mx.y - 1.0f), true);
+                     char num[8];
+                     snprintf(num, sizeof(num), "%d", pad + 1);
+                     dl->AddText(ImVec2(mn.x + 6.0f, mn.y + 3.0f), ink, num);
+                     if (isLoaded)
+                     {
+                        const char* tag = kModeTag[std::clamp(n->padMode[pad], 0, 2)];
+                        const ImVec2 ts = ImGui::CalcTextSize(tag);
+                        dl->AddText(ImVec2(mx.x - ts.x - 6.0f, mn.y + 3.0f), dim, tag);
+                        // Waveform thumbnail.
+                        const int cnt = n->padWaveCount[pad];
+                        const float wx0 = mn.x + 5.0f, wx1 = mx.x - 5.0f;
+                        const float wy = (mn.y + 19.0f + mx.y - 16.0f) * 0.5f;
+                        const float wh = (mx.y - 16.0f) - (mn.y + 19.0f);
+                        float peak = 0.05f;
+                        for (int i = 0; i < cnt; i++)
+                           peak = std::max(peak, std::max(std::fabs(n->padWaveMin[pad][i]), std::fabs(n->padWaveMax[pad][i])));
+                        const ImU32 wc = lit ? IM_COL32(255, 255, 255, 230) : (isLight ? IM_COL32(30, 110, 230, 220) : IM_COL32(150, 214, 255, 210));
+                        for (int i = 0; i < cnt; i++)
+                        {
+                           const float x = wx0 + (wx1 - wx0) * (float)i / (float)cnt;
+                           const float bw = std::max(1.0f, (wx1 - wx0) / (float)cnt);
+                           const float t = wy - n->padWaveMax[pad][i] / peak * wh * 0.5f;
+                           const float b = wy - n->padWaveMin[pad][i] / peak * wh * 0.5f;
+                           dl->AddRectFilled(ImVec2(x, std::min(t, wy - 0.5f)), ImVec2(x + bw, std::max(b, wy + 0.5f)), wc);
+                        }
+                        // Name, extension stripped.
+                        std::string nm = n->PadName(pad);
+                        const size_t dot = nm.find_last_of('.');
+                        if (dot != std::string::npos && dot > 0)
+                           nm.resize(dot);
+                        dl->AddText(ImVec2(mn.x + 6.0f, mx.y - 16.0f), dim, nm.c_str());
+                     }
+                     else
+                     {
+                        const char* hint = "+ load";
+                        const ImVec2 ts = ImGui::CalcTextSize(hint);
+                        dl->AddText(ImVec2((mn.x + mx.x - ts.x) * 0.5f, (mn.y + mx.y - ts.y) * 0.5f + 4.0f), dim, hint);
+                     }
+                     dl->PopClipRect();
+                  },
+                  &activated);
+               if (activated)
+               {
                   n->selectedPad = pad;
+                  if (!isLoaded)
+                     openLoadPad = pad; // an empty pad has nothing to play: a click means "put a sample here"
+               }
+               if (level)
+                  n->padFlash[pad] = now;
+               n->SetPadHeld(pad, level, 1.0f);
             }
          }
          ImGui::SetCursorScreenPos(ImVec2(x0, y0));
@@ -17823,28 +17910,80 @@ namespace
       }
       ImGui::Dummy(ImVec2(0.0f, 3.0f));
 
-      // Selected pad: load/clear + mode + volume/pitch/pan.
+      // Selected pad: waveform, load/clear, mode + volume/pitch/pan.
       {
          const int sel = MpcNode::Clamp(n->selectedPad);
-         char header[64];
+         char header[96];
          if (n->PadLoaded(sel))
             snprintf(header, sizeof(header), "pad %d - %s", sel + 1, n->PadName(sel).c_str());
          else
             snprintf(header, sizeof(header), "pad %d - empty", sel + 1);
          BeginAudioSection(header);
+
+         // Waveform of what is on the selected pad. Empty, it is the drop target
+         // and a click opens the file dialog.
+         {
+            const float w = AudioFullWidth();
+            const float h = 48.0f;
+            const ImVec2 origin = ImGui::GetCursorScreenPos();
+            const ImVec2 br(origin.x + w, origin.y + h);
+            n->waveRect[0] = origin.x; n->waveRect[1] = origin.y; n->waveRect[2] = br.x; n->waveRect[3] = br.y;
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const bool has = n->PadLoaded(sel);
+            ImGui::InvisibleButton("##mpcwave", ImVec2(w, h));
+            const bool hov = ImGui::IsItemHovered();
+            if (!has && ImGui::IsItemClicked(ImGuiMouseButton_Left))
+               openLoadPad = sel;
+            dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+            dl->PushClipRect(origin, br, true);
+            const float midY = origin.y + h * 0.5f;
+            dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+            if (has)
+            {
+               const int cnt = n->padWaveCount[sel];
+               float peak = 0.05f;
+               for (int i = 0; i < cnt; i++)
+                  peak = std::max(peak, std::max(std::fabs(n->padWaveMin[sel][i]), std::fabs(n->padWaveMax[sel][i])));
+               const ImU32 wc = n->PadPlaying(sel) ? (isLight ? IM_COL32(35, 150, 80, 230) : IM_COL32(110, 215, 145, 225))
+                                                   : (isLight ? IM_COL32(30, 110, 230, 210) : IM_COL32(150, 214, 255, 200));
+               for (int i = 0; i < cnt; i++)
+               {
+                  const float x = origin.x + w * (float)i / (float)cnt;
+                  const float bw = std::max(1.0f, w / (float)cnt);
+                  const float t = midY - n->padWaveMax[sel][i] / peak * h * 0.45f;
+                  const float b = midY - n->padWaveMin[sel][i] / peak * h * 0.45f;
+                  dl->AddRectFilled(ImVec2(x, std::min(t, midY - 0.5f)), ImVec2(x + bw, std::max(b, midY + 0.5f)), wc);
+               }
+            }
+            else
+            {
+               const char* msg = "drop a sample here, or click to load";
+               const ImVec2 ts = ImGui::CalcTextSize(msg);
+               dl->AddText(ImVec2(origin.x + (w - ts.x) * 0.5f, midY - ts.y * 0.5f), ScopeTextCol(), msg);
+            }
+            dl->PopClipRect();
+            dl->AddRect(origin, br, (!has && hov) ? (isLight ? IM_COL32(50, 100, 230, 255) : IM_COL32(110, 160, 255, 255)) : ScopeBorderCol(), 4.0f);
+            if (!has && hov)
+               ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+         }
+         ImGui::Dummy(ImVec2(0.0f, 2.0f));
+
          const float gapX = ImGui::GetStyle().ItemSpacing.x;
          const float btnW = (AudioFullWidth() - gapX * 2.0f) / 3.0f;
-         if (ImGui::Button("Load...##mpcpad", ImVec2(btnW, 0)))
+         const float btnH = ImGui::GetFrameHeight();
+         bool loadPressed;
+         if (!n->PadLoaded(sel))
          {
-            const std::string path = Platform::OpenAudioDialog();
-            if (!path.empty())
-            {
-               PushUndoCheckpoint();
-               n->LoadPad(sel, path);
-            }
+            // Nothing here yet: make the way forward the loudest thing on the card.
+            bool on = true;
+            loadPressed = AudioToggleButton("Load...##mpcpad", &on, btnW, btnH);
          }
+         else
+            loadPressed = AudioSmallButton("Load...##mpcpad", btnW, btnH);
+         if (loadPressed)
+            openLoadPad = sel;
          ImGui::SameLine();
-         if (ImGui::Button("Folder...##mpcfolder", ImVec2(btnW, 0)))
+         if (AudioSmallButton("Folder...##mpcfolder", btnW, btnH))
          {
             const std::string folder = Platform::OpenFolderDialog("Load a folder into the 16 pads");
             if (!folder.empty())
@@ -17854,11 +17993,14 @@ namespace
             }
          }
          ImGui::SameLine();
-         if (ImGui::Button("Clear##mpcclear", ImVec2(btnW, 0)))
+         ImGui::BeginDisabled(!n->PadLoaded(sel));
+         if (AudioSmallButton("Clear##mpcclear", btnW, btnH))
          {
             PushUndoCheckpoint();
             n->ClearPad(sel);
          }
+         ImGui::EndDisabled();
+         ImGui::Dummy(ImVec2(0.0f, 2.0f));
          static const std::vector<std::string> kModes = { "one shot", "gate", "loop" };
          AudioKnobRow row(4);
          row.Dropdown("mode", kModes, n->padMode[sel], [n, sel](int i) { PushUndoCheckpoint(); n->padMode[sel] = i; });
@@ -17875,6 +18017,17 @@ namespace
          row.End();
       }
       EndAudioBody();
+
+      if (openLoadPad >= 0)
+      {
+         const std::string path = Platform::OpenAudioDialog();
+         if (!path.empty())
+         {
+            PushUndoCheckpoint();
+            if (n->LoadPad(openLoadPad, path))
+               n->selectedPad = openLoadPad;
+         }
+      }
    }
 
    void DrawMpcOutBody(GraphNode& gn, MpcOutNode* n)
@@ -40512,9 +40665,9 @@ namespace
          { "Molder", "Analysis/genome resynthesis: decomposes a loaded or recorded sample into tracked harmonic partials plus a real residual waveform, then Roll mutates a parameter genome and re-renders a new sample from it - each roll walks further from the last, not from the original. Iterate feeds the last render back in as the new source and re-analyses it (progressively eating the sound); Reset returns fully to the originally loaded/recorded sample - generation 0 and the six shaping knobs (tone/air/snap/stretch/time/pitch) back to neutral, and the analysis itself restored, undoing any Iterate. chaos sets how far the next roll jumps; pitch offsets on top of the genome's own pitch walk; tone balances partials against residual; air/snap are the residual's steady-hiss and transient-attack levels; stretch scales inharmonicity together with harmonic spacing; time warps the attack/decay timing without changing the sample's length. This is a sound designer, not a playable instrument - it takes no note input, only a single self-triggered voice with start/end range, loop, reverse and ping-pong, the same transport as Sampler. Analysis and rendering both run on a background thread, so rolling never stalls the UI. seed/gen/f0/harm in the readout are the exact genome (seed + generation count) and the analysed pitch - two integers are enough to reproduce any rolled sound exactly on reload." },
          { "Grain Molder", "Slices audio into overlapping grains, calculates per-grain metrics (Level, Brightness, Random), and rearranges them based on a continuous blend between original temporal position and metric rank. At amount 0 it is the clean identity passthrough; at 1 it is fully sorted into a swell or brightness contour. Rendering runs asynchronously on a worker thread." },
          { "Drum Sequencer", "An 8-lane, 8-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8x8 step grid. Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
-         { "MPC", "A 16-pad sample player. Click a pad to select it and hit it (the pad grid puts pad 1 bottom-left, like a hardware MPC); every pad also has its own CV pin, so a MIDI CC / Note modulator or any gate can play it, and the notes input plays pad = note - base note (36..51 by default). Load... puts a file on the selected pad, Folder... fills pads 1-16 from the first audio files of a folder in alphabetical order, Clear empties it. Each pad has a mode (one shot plays the whole sample; gate plays while held and stops on release; loop toggles a looping playback on each hit), volume, pitch (semitones, which also changes speed) and pan. output is the master level. The node's audio out is the mix of all pads; wire MPC Out from it to take a single pad on its own for its own effect chain. The pad knobs edit whichever pad is selected, so a modulation cable bound to one follows the selection. Loaded sample paths are saved with the patch; the audio is re-read on load." },
+         { "MPC", "How to use: wire the out into Audio Out, drop audio files onto the pads (or click an empty pad, or Load... / Folder... for the first 16 files of a folder), then click a pad or send notes into the notes input - note 36 plays pad 1 up to 51 for pad 16 (base note moves that range). A 16-pad sample player: pad 1 is bottom-left like a hardware MPC, the selected pad's waveform shows in the panel, and each pad has its own CV pin, so a MIDI CC / Note modulator or any gate can play it. Each pad has a mode (one shot plays the whole sample; gate plays while held and stops on release; loop toggles a looping playback on each hit), volume, pitch (semitones, which also changes speed) and pan; right-click a pad to select it without hitting it. output is the master level. The node's audio out is the mix of all pads; wire MPC Out from it to take a single pad on its own for its own effect chain. The pad knobs edit whichever pad is selected, so a modulation cable bound to one follows the selection. Loaded sample paths are saved with the patch; the audio is re-read on load." },
          { "MPC Out", "Takes one pad's own audio from the MPC wired into its input, so that pad can have its own effects and level. pad picks 1-16 and gain trims it. Wired to anything other than an MPC it passes the audio through unchanged. The MPC's own output still carries the full mix." },
-         { "Looper", "A live audio looper. Wire the sound to loop into the input. REC starts a take, PLAY toggles playback of it, DUB layers what comes in over the loop, CLEAR empties it; each button has a CV pin, so a footswitch or MIDI note can drive them (a rising edge presses). take sets the length: a musical division (1 bar by default) ends by itself, free lets the next REC press end it. With sync on and the transport playing, a take waits for the next grid line. Pressing DUB while recording ends the take and goes straight into overdub. thru monitors the live input, level is the loop's playback level. auto comp shifts each take by the audio interface's measured round-trip latency and trim adds a manual offset in ms, so a loop played in time sits on the grid. The loop lives in memory (up to 60 s) and is not saved with the patch." },
+         { "Looper", "How to use: wire the sound to loop into the input and the out to Audio Out, press REC (it waits for the next bar when the transport plays and sync is on), and the take ends by itself after the take length, then loops; PLAY stops and restarts it, DUB layers what comes in over it, CLEAR empties it. The waveform shows the loop with a playhead and the beat grid, and the line under the title says what the looper is doing. Each button has a CV pin, so a footswitch or MIDI note can drive them (a rising edge presses). take sets the length: a musical division (1 bar by default), or free, where the next REC press ends it. Pressing DUB while recording ends the take and goes straight into overdub. thru monitors the live input, level is the loop's playback level. auto comp shifts each take by the audio interface's measured round-trip latency and trim adds a manual offset in ms, so a loop played in time sits on the grid. The loop lives in memory (up to 60 s) and is not saved with the patch." },
          { "Audio In","Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch. The capture runs on its own engine bound to the system default input, independently of whichever output device is selected, and the header line says why it isn't live when it isn't." },
          { "Audio Filter", "One filter, one of 12 types (LP/HP at 12/24/36 dB, BP, notch, shelves, peak, all-pass). Drag the handle on the response curve to set frequency and gain, Shift-drag to set Q - the picture is the control." },
          { "Audio Color Ramp", "Splits incoming audio into up to 8 frequency bands - drag the dividers right on the spectrum display to resize them - and assigns each one a colour, VIBGYOR by default from low to high. With no image patched in it outputs the resulting gradient standalone; patch one into its optional image input and it grades that image by luminance through the same audio-reactive palette instead." },
@@ -73313,6 +73466,8 @@ int main(int argc, char** argv)
          int dropTargetLane =
             dropTargetDrum != nullptr ? DrumSequencerLaneForCanvasPos(dropTargetDrum, canvasPos.x, canvasPos.y) : 0;
          SamplerNode* dropTargetSampler = FindNodeUnderCanvasPoint<SamplerNode>(canvasPos);
+         MpcNode* dropTargetMpc = FindNodeUnderCanvasPoint<MpcNode>(canvasPos);
+         std::vector<std::string> mpcDropPaths;
          SlicerNode* dropTargetSlicer = FindNodeUnderCanvasPoint<SlicerNode>(canvasPos);
          PaulStretchNode* dropTargetPaul = FindNodeUnderCanvasPoint<PaulStretchNode>(canvasPos);
          GranularNode* dropTargetGran = FindNodeUnderCanvasPoint<GranularNode>(canvasPos);
@@ -73467,6 +73622,11 @@ int main(int argc, char** argv)
                   dropTargetDrum->LoadFileToLane(dropTargetLane, path);
                   dropTargetLane = (dropTargetLane + 1) % DrumSequencerNode::kNumLanes;
                   gPatchDirty = true;
+                  continue;
+               }
+               if (dropTargetMpc != nullptr)
+               {
+                  mpcDropPaths.push_back(path); // loaded together below, so a multi-file drop fills successive pads
                   continue;
                }
                if (dropTargetSampler != nullptr)
@@ -73720,6 +73880,12 @@ int main(int argc, char** argv)
             if (spawned != nullptr)
                spawned->showParams = true;
             offset += 240.0f;
+         }
+         if (dropTargetMpc != nullptr && !mpcDropPaths.empty())
+         {
+            ensureDroppedCheckpoint();
+            MpcDropFiles(dropTargetMpc, canvasPos.x, canvasPos.y, mpcDropPaths);
+            gPatchDirty = true;
          }
          if (!pendingAudioDropPaths.empty())
          {
@@ -94588,6 +94754,13 @@ int main(int argc, char** argv)
                   PushUndoCheckpoint();
                   const int lane = DrumSequencerLaneForCanvasPos(targetDrum, canvasMouse.x, canvasMouse.y);
                   targetDrum->LoadFileToLane(lane, gSampleDragPath);
+                  gPatchDirty = true;
+               }
+               else if (MpcNode* targetMpc = FindNodeUnderCanvasPoint<MpcNode>(canvasMouse))
+               {
+                  // Dropped onto an MPC: onto the pad under the cursor, else the next empty one.
+                  PushUndoCheckpoint();
+                  MpcDropFiles(targetMpc, canvasMouse.x, canvasMouse.y, { gSampleDragPath });
                   gPatchDirty = true;
                }
                else if (SamplerNode* targetSampler = FindNodeUnderCanvasPoint<SamplerNode>(canvasMouse))
