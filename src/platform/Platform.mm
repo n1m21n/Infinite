@@ -4035,6 +4035,93 @@ namespace Platform
       return (uint32_t)frames;
    }
 
+   namespace
+   {
+      // One direction's latency contribution for a CoreAudio device, in
+      // frames at that device's own nominal rate: the device's fixed latency
+      // + the HAL safety offset + the first stream's latency + one IO buffer.
+      // Every property is optional - a missing one contributes 0 rather than
+      // failing the readout.
+      uint32_t CoreAudioDirectionFrames(AudioObjectID dev, AudioObjectPropertyScope scope)
+      {
+         auto readU32 = [&](AudioObjectID obj, AudioObjectPropertySelector sel,
+                            AudioObjectPropertyScope sc) -> uint32_t {
+            AudioObjectPropertyAddress a { sel, sc, kAudioObjectPropertyElementMain };
+            UInt32 v = 0;
+            UInt32 sz = sizeof(v);
+            if (AudioObjectGetPropertyData(obj, &a, 0, nullptr, &sz, &v) != noErr)
+               return 0;
+            return (uint32_t)v;
+         };
+         uint32_t total = readU32(dev, kAudioDevicePropertyLatency, scope);
+         total += readU32(dev, kAudioDevicePropertySafetyOffset, scope);
+         total += readU32(dev, kAudioDevicePropertyBufferFrameSize, kAudioObjectPropertyScopeGlobal);
+
+         AudioObjectPropertyAddress streamsAddr { kAudioDevicePropertyStreams, scope,
+                                                  kAudioObjectPropertyElementMain };
+         UInt32 streamsSize = 0;
+         if (AudioObjectGetPropertyDataSize(dev, &streamsAddr, 0, nullptr, &streamsSize) == noErr &&
+             streamsSize >= sizeof(AudioObjectID))
+         {
+            std::vector<AudioObjectID> streams(streamsSize / sizeof(AudioObjectID));
+            if (AudioObjectGetPropertyData(dev, &streamsAddr, 0, nullptr, &streamsSize, streams.data()) == noErr &&
+                !streams.empty())
+               total += readU32(streams[0], kAudioStreamPropertyLatency, kAudioObjectPropertyScopeGlobal);
+         }
+         return total;
+      }
+
+      double CoreAudioNominalRate(AudioObjectID dev)
+      {
+         AudioObjectPropertyAddress a { kAudioDevicePropertyNominalSampleRate, kAudioObjectPropertyScopeGlobal,
+                                        kAudioObjectPropertyElementMain };
+         Float64 rate = 0.0;
+         UInt32 sz = sizeof(rate);
+         if (AudioObjectGetPropertyData(dev, &a, 0, nullptr, &sz, &rate) != noErr)
+            return 0.0;
+         return (double)rate;
+      }
+
+      AudioObjectID CoreAudioResolveDevice(uint32_t id, AudioObjectPropertySelector defaultSel)
+      {
+         if (id != 0)
+            return (AudioObjectID)id;
+         AudioObjectPropertyAddress a { defaultSel, kAudioObjectPropertyScopeGlobal,
+                                        kAudioObjectPropertyElementMain };
+         AudioObjectID dev = kAudioObjectUnknown;
+         UInt32 sz = sizeof(dev);
+         if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &a, 0, nullptr, &sz, &dev) != noErr)
+            return kAudioObjectUnknown;
+         return dev;
+      }
+   }
+
+   uint32_t AudioRoundTripLatencyFrames(uint32_t outputDeviceId)
+   {
+      const AudioObjectID outDev = CoreAudioResolveDevice(outputDeviceId, kAudioHardwarePropertyDefaultOutputDevice);
+      if (outDev == kAudioObjectUnknown)
+         return 0;
+      const double outRate = CoreAudioNominalRate(outDev);
+      const uint32_t outFrames = CoreAudioDirectionFrames(outDev, kAudioObjectPropertyScopeOutput);
+
+      double inFrames = 0.0;
+      const AudioObjectID inDev = CoreAudioResolveDevice(AudioInputCaptureGetDevice(),
+                                                         kAudioHardwarePropertyDefaultInputDevice);
+      if (inDev != kAudioObjectUnknown)
+      {
+         const double inRate = CoreAudioNominalRate(inDev);
+         const uint32_t f = CoreAudioDirectionFrames(inDev, kAudioObjectPropertyScopeInput);
+         // Express the input side at the output device's rate so the two add.
+         inFrames = (inRate > 0.0 && outRate > 0.0) ? (double)f * outRate / inRate : (double)f;
+      }
+      return (uint32_t)std::llround((double)outFrames + inFrames);
+   }
+
+   // Output modes are a Windows concept (WASAPI); CoreAudio already runs at
+   // the HAL's own buffer size, so there is nothing to select here.
+   void AudioSetOutputMode(int) {}
+   int AudioOutputModeActive() { return 0; }
+
    bool AudioPcmConversionSelfTest()
    {
       // Nothing to test here: CoreAudio's AVAudioEngine render path only ever

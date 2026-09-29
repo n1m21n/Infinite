@@ -4,7 +4,12 @@
 //   - AudioDeviceOpen/Close: WASAPI shared-mode, event-driven render loop on
 //     a dedicated thread; the app's render callback is handed planar float
 //     buffers exactly like the macOS version did, then interleaved into the
-//     WASAPI endpoint buffer here.
+//     WASAPI endpoint buffer here. Optional opt-in modes (Platform::
+//     AudioSetOutputMode): IAudioClient3 minimum-period shared stream, and
+//     WASAPI exclusive. Every failure falls back one step toward the default
+//     shared path, so a request can never leave the app without audio.
+//   - AudioRoundTripLatencyFrames: output stream latency (measured off the
+//     open stream) + input endpoint period (cached), for the settings readout.
 //   - AudioListDevices / AudioDeviceBufferFrames: MMDevice enumeration.
 //   - Config-change recovery: an IMMNotificationClient latches the same
 //     atomic PollAudioRecovery consumes (sleep/wake flags stay false - those
@@ -72,6 +77,20 @@ namespace
    std::vector<DeviceEntry> gDevices;
 
    std::atomic<bool> gConfigChangedFlag{ false };
+
+   // Output-stream mode (Platform::AudioSetOutputMode): 0 standard shared
+   // (today's behaviour, the default), 1 IAudioClient3 low-latency shared,
+   // 2 WASAPI exclusive. `Active` is what the open stream really runs after
+   // fallback. `Disabled` latches when an exclusive stream dies at runtime
+   // (device invalidated, format changed under us) so the recovery restart
+   // that follows does not walk straight back into the same failure; it is
+   // cleared whenever the user changes the setting.
+   std::atomic<int> gOutputModeRequested{ 0 };
+   std::atomic<int> gOutputModeActive{ 0 };
+   std::atomic<bool> gExclusiveDisabled{ false };
+   // Output-side latency estimate of the open stream, in frames at its rate
+   // (0 = none open / unknown). Written once by the render thread at setup.
+   std::atomic<uint32_t> gOutputLatencyFrames{ 0 };
 
    class NotificationClient : public IMMNotificationClient
    {
@@ -359,6 +378,8 @@ namespace
       int channels = 0;
       UINT32 bufferFrames = 0;
       WORD pcmBits = 0;    // 0 = float mix format; 16/32 = PCM, see IsSupportedPcmFormat
+      int mode = 0;        // stream mode actually opened (see gOutputModeRequested)
+      int requestedMode = 0; // snapshot of gOutputModeRequested taken by AudioDeviceOpen
 
       // Thread machinery
       std::thread thread;
@@ -411,6 +432,9 @@ namespace
          enumerator = nullptr;
          client = nullptr;
          renderer = nullptr;
+         mode = 0;
+         gOutputModeActive.store(0, std::memory_order_release);
+         gOutputLatencyFrames.store(0, std::memory_order_release);
 
          if (stopEvent != nullptr)
          {
@@ -426,6 +450,294 @@ namespace
    };
 
    RenderState gRender;
+
+   // ---- render stream open attempts ------------------------------------------
+   // Each attempt starts from a freshly activated IAudioClient (a client that
+   // failed Initialize cannot be reused), leaves gRender.client/renderer null
+   // on failure, and on success has the stream started with gRender.sampleRate,
+   // channels, pcmBits, bufferFrames and mode filled in. Render thread only.
+
+   // Frees a CoTaskMem-allocated WAVEFORMATEX on every exit path.
+   struct MixFormatGuard
+   {
+      WAVEFORMATEX* fmt = nullptr;
+      ~MixFormatGuard() { if (fmt != nullptr) CoTaskMemFree(fmt); }
+   };
+
+   void ReleaseRenderStream()
+   {
+      if (gRender.renderer != nullptr)
+      {
+         gRender.renderer->Release();
+         gRender.renderer = nullptr;
+      }
+      if (gRender.client != nullptr)
+      {
+         gRender.client->Release();
+         gRender.client = nullptr;
+      }
+      gRender.sampleRate = 0.0;
+      gRender.channels = 0;
+      gRender.bufferFrames = 0;
+      gRender.pcmBits = 0;
+   }
+
+   bool ActivateRenderClient(IMMDevice* device)
+   {
+      ReleaseRenderStream();
+      const HRESULT hr = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr,
+                                          reinterpret_cast<void**>(&gRender.client));
+      if (FAILED(hr) || gRender.client == nullptr)
+      {
+         gRender.client = nullptr;
+         return false;
+      }
+      return true;
+   }
+
+   // Common tail of every successful Initialize*: read back the buffer, bind
+   // the event, fetch the render service and Start(). Returns false (with the
+   // stream released) if any step fails so the caller can try the next mode.
+   bool FinishRenderStream(double rate, int channels, WORD pcmBits, int mode)
+   {
+      UINT32 bufferSize = 0;
+      if (FAILED(gRender.client->GetBufferSize(&bufferSize)) || bufferSize == 0)
+      {
+         ReleaseRenderStream();
+         return false;
+      }
+      // Exclusive event mode needs the WHOLE endpoint buffer filled every
+      // event; the render loop's scratch holds kPlanarCapacity frames, so a
+      // larger device buffer cannot be served and is rejected up front.
+      if (mode == 2 && bufferSize > (UINT32)kPlanarCapacity)
+      {
+         ReleaseRenderStream();
+         return false;
+      }
+      gRender.sampleRate = rate;
+      gRender.channels = channels;
+      gRender.pcmBits = pcmBits;
+      gRender.bufferFrames = bufferSize;
+
+      HRESULT hr = gRender.client->SetEventHandle(gRender.bufferEvent);
+      if (SUCCEEDED(hr))
+         hr = gRender.client->GetService(__uuidof(IAudioRenderClient),
+                                         reinterpret_cast<void**>(&gRender.renderer));
+      if (SUCCEEDED(hr) && mode == 2)
+      {
+         // Exclusive event streams expect a primed buffer: hand the driver one
+         // full buffer of silence before Start() so the first period is not
+         // whatever the endpoint memory held.
+         BYTE* silence = nullptr;
+         hr = gRender.renderer->GetBuffer(bufferSize, &silence);
+         if (SUCCEEDED(hr))
+            hr = gRender.renderer->ReleaseBuffer(bufferSize, AUDCLNT_BUFFERFLAGS_SILENT);
+      }
+      if (SUCCEEDED(hr))
+      {
+         ResetEvent(gRender.bufferEvent);
+         hr = gRender.client->Start();
+      }
+      if (FAILED(hr))
+      {
+         ReleaseRenderStream();
+         return false;
+      }
+
+      // Output-side latency estimate: what the engine says the stream adds,
+      // never less than one buffer. Approximate by nature (drivers differ in
+      // what GetStreamLatency includes) - the readout labels it an estimate.
+      REFERENCE_TIME streamLatency = 0;
+      uint32_t latencyFrames = 0;
+      if (SUCCEEDED(gRender.client->GetStreamLatency(&streamLatency)) && streamLatency > 0)
+         latencyFrames = (uint32_t)std::llround((double)streamLatency * rate / 1e7);
+      gOutputLatencyFrames.store(std::max<uint32_t>(latencyFrames, bufferSize),
+                                 std::memory_order_release);
+      gRender.mode = mode;
+      return true;
+   }
+
+   // Mode 0: the original path - shared mode at the engine's default period.
+   bool OpenSharedStandard(IMMDevice* device)
+   {
+      if (!ActivateRenderClient(device))
+         return false;
+      MixFormatGuard mix;
+      if (FAILED(gRender.client->GetMixFormat(&mix.fmt)) || mix.fmt == nullptr)
+      {
+         ReleaseRenderStream();
+         return false;
+      }
+      const bool isFloat = IsFloatFormat(mix.fmt);
+      const bool isPcm = !isFloat && IsSupportedPcmFormat(mix.fmt);
+      if (!((isFloat || isPcm) && mix.fmt->nChannels <= kMaxChannels))
+      {
+         ReleaseRenderStream();
+         return false;
+      }
+      REFERENCE_TIME period = 0;
+      gRender.client->GetDevicePeriod(nullptr, &period);
+      if (FAILED(gRender.client->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+                                            period, 0, mix.fmt, nullptr)))
+      {
+         ReleaseRenderStream();
+         return false;
+      }
+      return FinishRenderStream((double)mix.fmt->nSamplesPerSec, (int)mix.fmt->nChannels,
+                                isPcm ? mix.fmt->wBitsPerSample : (WORD)0, 0);
+   }
+
+   // Mode 1: IAudioClient3 shared stream at the engine's minimum period
+   // (Windows 10+, driver permitting). Same mix format and same pump as mode
+   // 0, just a smaller period. Fails (so the caller falls back to mode 0)
+   // when the interface is missing, the engine offers no smaller period, or
+   // the stream cannot be initialised.
+   bool OpenSharedLowLatency(IMMDevice* device)
+   {
+#if defined(__IAudioClient3_INTERFACE_DEFINED__)
+      if (!ActivateRenderClient(device))
+         return false;
+      IAudioClient3* client3 = nullptr;
+      if (FAILED(gRender.client->QueryInterface(__uuidof(IAudioClient3),
+                                                reinterpret_cast<void**>(&client3))) ||
+          client3 == nullptr)
+      {
+         ReleaseRenderStream();
+         return false;
+      }
+      MixFormatGuard mix;
+      const bool haveMix = SUCCEEDED(gRender.client->GetMixFormat(&mix.fmt)) && mix.fmt != nullptr;
+      const bool isFloat = haveMix && IsFloatFormat(mix.fmt);
+      const bool isPcm = haveMix && !isFloat && IsSupportedPcmFormat(mix.fmt);
+      UINT32 defaultPeriod = 0, fundamentalPeriod = 0, minPeriod = 0, maxPeriod = 0;
+      bool ok = haveMix && (isFloat || isPcm) && mix.fmt->nChannels <= kMaxChannels &&
+                SUCCEEDED(client3->GetSharedModeEnginePeriod(mix.fmt, &defaultPeriod, &fundamentalPeriod,
+                                                             &minPeriod, &maxPeriod)) &&
+                minPeriod > 0 && minPeriod < defaultPeriod;
+      if (ok)
+         ok = SUCCEEDED(client3->InitializeSharedAudioStream(AUDCLNT_STREAMFLAGS_EVENTCALLBACK, minPeriod,
+                                                             mix.fmt, nullptr));
+      client3->Release();
+      if (!ok)
+      {
+         ReleaseRenderStream();
+         return false;
+      }
+      return FinishRenderStream((double)mix.fmt->nSamplesPerSec, (int)mix.fmt->nChannels,
+                                isPcm ? mix.fmt->wBitsPerSample : (WORD)0, 1);
+#else
+      (void)device;
+      return false;
+#endif
+   }
+
+   // Mode 2: WASAPI exclusive, event-driven, at the device's minimum period.
+   // Exclusive mode has no mix format, so probe IsFormatSupported over a short
+   // list of formats the render loop can convert (float32, 32-bit PCM incl.
+   // 24-in-32, 16-bit PCM) at the shared mix rate first, then common rates.
+   // Exclusive-only failure modes fall through to the caller's next mode:
+   // device already in use, no supported format, unaligned/oversized buffer.
+   bool OpenExclusive(IMMDevice* device)
+   {
+      if (!ActivateRenderClient(device))
+         return false;
+
+      // Hints from the shared mix format: rate, channel count, speaker mask.
+      double mixRate = 48000.0;
+      int channels = 2;
+      DWORD channelMask = 0;
+      {
+         MixFormatGuard mix;
+         if (SUCCEEDED(gRender.client->GetMixFormat(&mix.fmt)) && mix.fmt != nullptr)
+         {
+            mixRate = (double)mix.fmt->nSamplesPerSec;
+            channels = (int)mix.fmt->nChannels;
+            if (mix.fmt->wFormatTag == WAVE_FORMAT_EXTENSIBLE)
+               channelMask = reinterpret_cast<const WAVEFORMATEXTENSIBLE*>(mix.fmt)->dwChannelMask;
+         }
+      }
+      if (channels < 1 || channels > kMaxChannels)
+      {
+         ReleaseRenderStream();
+         return false;
+      }
+      if (channelMask == 0)
+         channelMask = channels == 1 ? 0x4u /* FRONT_CENTER */ : channels == 2 ? 0x3u /* FL|FR */ : 0u;
+
+      struct Candidate { bool isFloat; WORD container; WORD valid; };
+      static const Candidate kCandidates[] = {
+         { true, 32, 32 }, { false, 32, 32 }, { false, 32, 24 }, { false, 16, 16 }
+      };
+      const double rates[] = { mixRate, 48000.0, 44100.0, 96000.0, 88200.0 };
+
+      WAVEFORMATEXTENSIBLE chosen{};
+      bool found = false;
+      for (const double rate : rates)
+      {
+         for (const Candidate& c : kCandidates)
+         {
+            WAVEFORMATEXTENSIBLE w{};
+            w.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
+            w.Format.nChannels = (WORD)channels;
+            w.Format.nSamplesPerSec = (DWORD)rate;
+            w.Format.wBitsPerSample = c.container;
+            w.Format.nBlockAlign = (WORD)(channels * c.container / 8);
+            w.Format.nAvgBytesPerSec = w.Format.nSamplesPerSec * w.Format.nBlockAlign;
+            w.Format.cbSize = 22;
+            w.Samples.wValidBitsPerSample = c.valid;
+            w.dwChannelMask = channelMask;
+            w.SubFormat = c.isFloat ? KSDATAFORMAT_SUBTYPE_IEEE_FLOAT : KSDATAFORMAT_SUBTYPE_PCM;
+            if (gRender.client->IsFormatSupported(AUDCLNT_SHAREMODE_EXCLUSIVE, &w.Format, nullptr) == S_OK)
+            {
+               chosen = w;
+               found = true;
+               break;
+            }
+         }
+         if (found)
+            break;
+      }
+      if (!found)
+      {
+         ReleaseRenderStream();
+         return false;
+      }
+
+      REFERENCE_TIME defaultPeriod = 0, minPeriod = 0;
+      gRender.client->GetDevicePeriod(&defaultPeriod, &minPeriod);
+      REFERENCE_TIME period = minPeriod > 0 ? minPeriod : defaultPeriod;
+      if (period <= 0)
+      {
+         ReleaseRenderStream();
+         return false;
+      }
+
+      HRESULT hr = gRender.client->Initialize(AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+                                              period, period, &chosen.Format, nullptr);
+      if (hr == AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED)
+      {
+         // The driver wants a frame-aligned period: it reports the aligned
+         // buffer size, then the client must be recreated to retry.
+         UINT32 alignedFrames = 0;
+         gRender.client->GetBufferSize(&alignedFrames);
+         if (alignedFrames == 0 || !ActivateRenderClient(device))
+         {
+            ReleaseRenderStream();
+            return false;
+         }
+         period = (REFERENCE_TIME)(10000000.0 / (double)chosen.Format.nSamplesPerSec * alignedFrames + 0.5);
+         hr = gRender.client->Initialize(AUDCLNT_SHAREMODE_EXCLUSIVE, AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+                                         period, period, &chosen.Format, nullptr);
+      }
+      if (FAILED(hr))
+      {
+         ReleaseRenderStream();
+         return false;
+      }
+      const bool isFloat = IsEqualGUID(chosen.SubFormat, KSDATAFORMAT_SUBTYPE_IEEE_FLOAT) != 0;
+      return FinishRenderStream((double)chosen.Format.nSamplesPerSec, channels,
+                                isFloat ? (WORD)0 : chosen.Format.wBitsPerSample, 2);
+   }
 
    void RenderThreadMain(std::wstring endpointId, bool registerNotifications)
    {
@@ -443,53 +755,25 @@ namespace
                gRender.enumerator->RegisterEndpointNotificationCallback(&gNotifyClient);
 
             IMMDevice* device = nullptr;
-            hr = FAILED(hr) ? hr : gRender.enumerator->GetDevice(endpointId.c_str(), &device);
+            hr = gRender.enumerator->GetDevice(endpointId.c_str(), &device);
             if (SUCCEEDED(hr) && device != nullptr)
             {
-               hr = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr,
-                                     reinterpret_cast<void**>(&gRender.client));
-               device->Release();
-            }
-            if (SUCCEEDED(hr) && gRender.client != nullptr)
-            {
-               WAVEFORMATEX* mixFormat = nullptr;
-               hr = gRender.client->GetMixFormat(&mixFormat);
-               if (SUCCEEDED(hr) && mixFormat != nullptr)
+               // Try the requested mode, then step down toward the standard
+               // shared path (mode 0 is the original, always-attempted path).
+               for (int m = gRender.requestedMode; m >= 0; --m)
                {
-                  const bool isFloat = IsFloatFormat(mixFormat);
-                  const bool isPcm = !isFloat && IsSupportedPcmFormat(mixFormat);
-                  if ((isFloat || isPcm) && mixFormat->nChannels <= kMaxChannels)
+                  if (m == 2 && gExclusiveDisabled.load(std::memory_order_acquire))
+                     continue;
+                  const bool opened = m == 2 ? OpenExclusive(device)
+                                             : m == 1 ? OpenSharedLowLatency(device)
+                                                      : OpenSharedStandard(device);
+                  if (opened)
                   {
-                     REFERENCE_TIME period = 0;
-                     gRender.client->GetDevicePeriod(nullptr, &period);
-
-                     hr = gRender.client->Initialize(AUDCLNT_SHAREMODE_SHARED,
-                                                     AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
-                                                     period, 0, mixFormat, nullptr);
-                     if (SUCCEEDED(hr))
-                     {
-                        gRender.sampleRate = (double)mixFormat->nSamplesPerSec;
-                        gRender.channels = (int)mixFormat->nChannels;
-                        gRender.pcmBits = isPcm ? mixFormat->wBitsPerSample : 0;
-
-                        UINT32 bufferSize = 0;
-                        gRender.client->GetBufferSize(&bufferSize);
-                        gRender.bufferFrames = bufferSize;
-
-                        hr = gRender.client->SetEventHandle(gRender.bufferEvent);
-                        if (SUCCEEDED(hr))
-                           hr = gRender.client->GetService(__uuidof(IAudioRenderClient),
-                                                           reinterpret_cast<void**>(&gRender.renderer));
-                        if (SUCCEEDED(hr))
-                           hr = gRender.client->Start();
-                     }
+                     gOutputModeActive.store(m, std::memory_order_release);
+                     break;
                   }
-                  else
-                  {
-                     hr = AUDCLNT_E_UNSUPPORTED_FORMAT;
-                  }
-                  CoTaskMemFree(mixFormat);
                }
+               device->Release();
             }
          }
       }
@@ -511,6 +795,13 @@ namespace
       // empty after Start(), so padding 0 on the first event is expected,
       // not an underrun.
       bool primed = false;
+      // Exclusive event mode: the whole endpoint buffer is ours on every
+      // event (GetCurrentPadding is not meaningful), so write it all and skip
+      // the shared-mode underrun heuristic below.
+      const bool exclusive = gRender.mode == 2;
+      // True when the pump ends because the stream died rather than because
+      // Stop() asked - see the tail of this function.
+      bool streamFailed = false;
       while (gRender.running.load(std::memory_order_acquire))
       {
          const DWORD wait = WaitForMultipleObjects(2, handles, FALSE, 2000);
@@ -520,8 +811,11 @@ namespace
             continue; // timeout or error: re-check the running flag
 
          UINT32 padding = 0;
-         if (FAILED(gRender.client->GetCurrentPadding(&padding)))
+         if (!exclusive && FAILED(gRender.client->GetCurrentPadding(&padding)))
+         {
+            streamFailed = true;
             break;
+         }
          const UINT32 capacity = gRender.bufferFrames;
          if (padding > capacity)
             continue;
@@ -533,12 +827,15 @@ namespace
          // gave it and played silence while waiting: count it as the "os"
          // xrun, the Windows counterpart of CoreAudio's processor overload.
          // One relaxed atomic increment - safe on this render thread.
-         if (primed && padding == 0)
+         if (!exclusive && primed && padding == 0)
             AudioEngine_NotifyProcessorOverload(gRender.userData);
 
          BYTE* dest = nullptr;
          if (FAILED(gRender.renderer->GetBuffer(framesAvailable, &dest)))
+         {
+            streamFailed = true;
             break;
+         }
 
          const int frames = (int)std::min<UINT32>(framesAvailable, kPlanarCapacity);
          float* planar[kMaxChannels];
@@ -570,6 +867,20 @@ namespace
       }
 
       gRender.client->Stop();
+
+      // Device loss / invalidation on an opt-in mode: the standard path keeps
+      // its historical behaviour (IMMNotificationClient raises the flag for a
+      // removed or changed default device), but a low-latency or exclusive
+      // stream can also die on its own (exclusive format changed in the sound
+      // control panel, driver reset). Latch the same flag PollAudioRecovery
+      // consumes so the engine restarts, and stop trusting exclusive until the
+      // user re-selects it, so the restart lands on a working stream.
+      if (streamFailed && gRender.mode != 0)
+      {
+         if (gRender.mode == 2)
+            gExclusiveDisabled.store(true, std::memory_order_release);
+         gConfigChangedFlag.store(true, std::memory_order_release);
+      }
    }
 }
 
@@ -665,6 +976,8 @@ namespace Platform
       gRender.sampleRate = 0.0;
       gRender.channels = 0;
       gRender.bufferFrames = 0;
+      gRender.mode = 0;
+      gRender.requestedMode = std::clamp(gOutputModeRequested.load(std::memory_order_acquire), 0, 2);
 
       gRender.stopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
       gRender.bufferEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
@@ -704,8 +1017,9 @@ namespace Platform
       // CoreAudio which actually applies these. Deliberately discarded, not
       // a TODO: the audio-settings UI (main.cpp) disables both controls on
       // Windows rather than let them sit live and silently do nothing - see
-      // docs/plans/windows-render/FIX_BRIEF.md addendum A2 for the tradeoff
-      // against AUDCLNT_SHAREMODE_EXCLUSIVE, which was not taken.
+      // docs/plans/windows-render/FIX_BRIEF.md addendum A2. The opt-in
+      // low-latency / exclusive modes (Platform::AudioSetOutputMode) pick the
+      // device's minimum period instead of these two values, by design.
       (void)requestedSampleRate;
       (void)requestedBufferFrames;
       outSampleRate = gRender.sampleRate;
@@ -769,6 +1083,20 @@ namespace Platform
       }
       enumerator->Release();
       return result;
+   }
+
+   void AudioSetOutputMode(int mode)
+   {
+      const int clamped = std::clamp(mode, 0, 2);
+      if (gOutputModeRequested.exchange(clamped, std::memory_order_acq_rel) != clamped)
+         gExclusiveDisabled.store(false, std::memory_order_release); // a fresh choice deserves a fresh try
+   }
+
+   int AudioOutputModeActive()
+   {
+      if (!gRender.running.load(std::memory_order_acquire))
+         return 0;
+      return gOutputModeActive.load(std::memory_order_acquire);
    }
 
    // Headless round-trip check for the PCM<->float helpers above (FIX_BRIEF.md
@@ -1348,6 +1676,65 @@ namespace Platform
    uint32_t AudioInputCaptureGetDevice()
    {
       return gRequestedInputDeviceId.load(std::memory_order_relaxed);
+   }
+
+   uint32_t AudioRoundTripLatencyFrames(uint32_t /*outputDeviceId*/)
+   {
+      // Output side: measured off the open stream by the render thread.
+      // Nothing open means nothing to report.
+      const uint32_t outFrames = gOutputLatencyFrames.load(std::memory_order_acquire);
+      const double outRate = gRender.running.load(std::memory_order_acquire) ? gRender.sampleRate : 0.0;
+      if (outFrames == 0 || outRate <= 0.0)
+         return 0;
+
+      // Input side: the input endpoint's shared-mode device period, probed
+      // once per (input device, output rate) and cached - probing costs a COM
+      // round trip and this is polled by a UI every frame. Main thread only,
+      // so the cache needs no lock. A failed probe caches 0 (input unknown).
+      static uint32_t sCachedInputId = 0xFFFFFFFFu;
+      static double sCachedRate = 0.0;
+      static uint32_t sCachedInputFrames = 0;
+      const uint32_t inputId = gRequestedInputDeviceId.load(std::memory_order_relaxed);
+      if (inputId != sCachedInputId || outRate != sCachedRate)
+      {
+         sCachedInputId = inputId;
+         sCachedRate = outRate;
+         sCachedInputFrames = 0;
+
+         ComScope com;
+         IMMDeviceEnumerator* enumerator = nullptr;
+         if (com.ok &&
+             SUCCEEDED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
+                                        __uuidof(IMMDeviceEnumerator),
+                                        reinterpret_cast<void**>(&enumerator))) &&
+             enumerator != nullptr)
+         {
+            IMMDevice* device = nullptr;
+            std::wstring endpointId;
+            std::string name;
+            bool isInput = false;
+            if (inputId != 0 && ResolveEndpoint(inputId, endpointId, name, &isInput) && isInput)
+               enumerator->GetDevice(endpointId.c_str(), &device);
+            else
+               enumerator->GetDefaultAudioEndpoint(eCapture, eConsole, &device);
+            if (device != nullptr)
+            {
+               IAudioClient* client = nullptr;
+               if (SUCCEEDED(device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr,
+                                              reinterpret_cast<void**>(&client))) &&
+                   client != nullptr)
+               {
+                  REFERENCE_TIME defPeriod = 0;
+                  if (SUCCEEDED(client->GetDevicePeriod(&defPeriod, nullptr)) && defPeriod > 0)
+                     sCachedInputFrames = (uint32_t)std::llround((double)defPeriod * outRate / 1e7);
+                  client->Release();
+               }
+               device->Release();
+            }
+            enumerator->Release();
+         }
+      }
+      return outFrames + sCachedInputFrames;
    }
 
    void AudioInputCapturePump(std::string& outError)

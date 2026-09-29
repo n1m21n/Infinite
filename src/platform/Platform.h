@@ -404,6 +404,28 @@ namespace Platform
    // negotiated after a requestedBufferFrames the device may have clamped.
    uint32_t AudioDeviceBufferFrames(uint32_t deviceId = 0);
 
+   // Best available estimate of the audio round-trip latency (input to
+   // output: what a Looper/overdub has to compensate for) in FRAMES at the
+   // output device's current rate: output-side (device latency + safety
+   // offset + stream latency + buffer) plus input-side of the input device
+   // Infinite captures from (AudioInputCaptureGetDevice(), 0 = system default).
+   // 0 means unknown. `outputDeviceId` follows AudioDeviceBufferFrames (0 =
+   // system default output). Main-thread only; cheap enough for a per-frame
+   // UI readout (a handful of property reads on macOS, cached atomics on
+   // Windows, a cached value on Linux) - never call from the audio thread.
+   uint32_t AudioRoundTripLatencyFrames(uint32_t outputDeviceId = 0);
+
+   // Output-stream mode preference for the render device, applied on the next
+   // AudioDeviceOpen. 0 = standard (default, the platform's normal path),
+   // 1 = low-latency shared, 2 = exclusive. Only Windows acts on this
+   // (IAudioClient3 minimum-period shared stream / WASAPI exclusive); every
+   // request degrades toward 0 rather than failing the open. macOS and Linux
+   // ignore it and always run mode 0.
+   void AudioSetOutputMode(int mode);
+   // The mode the currently open render device is actually running (after any
+   // fallback); 0 when no device is open or the platform has no such modes.
+   int AudioOutputModeActive();
+
    // Headless round-trip check for the WASAPI PCM<->float conversion helpers
    // (docs/plans/windows-render/FIX_BRIEF.md addendum A1: WASAPI shared mode
    // can hand back a non-float mix format, and the render/capture paths must
