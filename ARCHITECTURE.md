@@ -124,6 +124,37 @@ getting a file each:
   **Wave Terrain**, and **Equation Synth**. Lifted out of
   `SamplerNode.cpp` so a new sample-playing node never has to reimplement its
   own use-after-free trap.
+- **`src/nodes/LooperNode.h`/`.cpp`** — **Looper** (Synths; a generator, so bypassed it
+  outputs nothing), a live audio looper (Rec / Play / Dub / Clear). The audio thread owns
+  the whole state machine and a stereo loop buffer of up to 60 s; the INode posts button
+  *edges* through an SPSC ring (`SetButtonLevel` turns a held mouse or held CV into one
+  press). Take length is a `MusicTime` division or free; with sync on and the transport
+  running a take waits for the next grid line (capped at one bar). Takes and overdubs are
+  shifted by `Platform::AudioRoundTripLatencyFrames()` (always on; there is no switch). Playback is a sample
+  player over the held loop with the Sampler's controls (finetune, pitch, speed, volume,
+  fade in / fade out via `src/audio/PassFade.h`): at rate 1.0 the loop stays on the grid,
+  at any other rate it plays in length / |rate| and drifts against the transport, and
+  overdub is paused. The loop audio is not saved with the patch.
+- **`src/nodes/MpcNode.h`/`.cpp`** — **MPC** (16-pad sampler, one master stereo out: one
+  `SampleSlot` and one independent voice per pad; one-shot / gate / loop-toggle; pads hit
+  by mouse, per-pad CV gate pin, or notes 36..51). Per pad: mode, sync (Free / Synced) and
+  rate (a `MusicTime` division), volume, pitch, pan, speed, fine tune, fade in, fade out
+  (`src/audio/PassFade.h`). **Synced** pads are quantised on the audio thread
+  (`AudioMpcNode::Schedule`): a hit is latched and released into the block's event list at
+  the exact frame the next grid line falls on (from `Transport::BlockStartBeats()` and the
+  tempo), fires at once with the transport stopped, a gate release before the line cancels
+  the hit, and a loop pad re-triggers on every line; restarts of a sounding voice carry a
+  short decaying residual (declick). **Modulation addressing is per pad and independent of
+  selection**: float params live at `MpcNode::ParamId(pad, k)` (`100 + pad * 5 + k` for the
+  first five, `180 + pad * 2 + (k - 5)` for the two fades), each pad's mode, sync and rate
+  at label-hashed discrete slots (`"pad N mode##mpcmodeN"`, `"pad N sync##mpcsyncN"`,
+  `"pad N rate##mpcdivN"`, registered in that kind-by-kind order). The node is wider than
+  the shared 440 (`MpcNodeWidth()`) so the 4x4 grid of 105 px square pads fits. `DrawMpcBody` registers all 16
+  pads every frame (`RegisterMpcParams`; the unselected pads through `ModSlider` under
+  `gParamRegisterOnly`, the EQ's hidden-band mechanism, the selected pad through its real
+  widgets), so selecting a pad never rebinds, hides or retargets a cable; an unselected
+  pad's cables land on 1 px stub pins on its tile's orange mod dot. Covered by
+  `INFINITE_MPCMODTEST`. (There is no MPC Out node and no audio-tap plumbing.)
 - **`src/nodes/AnalogNode.h`/`.cpp` & `src/nodes/AnalogSynthCore.h`** — virtual-analog
   polyphonic synthesizer node. Features dual PolyBLEP anti-aliased oscillators
   (osc 1 unison stack, osc 2 tune/detune/sync, sub-oscillator, noise generator,

@@ -553,6 +553,8 @@ set(COMMON_SOURCES
     src/nodes/MetallicNode.cpp
     src/nodes/AudioEffectNode.cpp
     src/nodes/SamplerNode.cpp
+    src/nodes/LooperNode.cpp
+    src/nodes/MpcNode.cpp
     src/nodes/SlicerNode.cpp
     src/nodes/PaulStretchNode.cpp
     src/nodes/MolderNode.cpp

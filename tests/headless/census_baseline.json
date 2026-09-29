@@ -2512,5 +2512,25 @@
   "animates": false,
   "render_vs_frame": 0.02,
   "peak": 0.672
+ },
+ {
+  "type": "MPC",
+  "cat": "Synths",
+  "out": "audio",
+  "issues": [
+   "silent"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.0
+ },
+ {
+  "type": "Looper",
+  "cat": "Synths",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.853
  }
 ]

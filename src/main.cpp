@@ -232,6 +232,8 @@ namespace
 #include "nodes/GrainMolderNode.h"
 #include "nodes/GranularNode.h"
 #include "nodes/DrumSequencerNode.h"
+#include "nodes/LooperNode.h"
+#include "nodes/MpcNode.h"
 #include "nodes/AudioPluginNode.h"
 #include "audio/SampleScanner.h"
 #include "audio/PluginScanner.h"
@@ -3095,6 +3097,19 @@ namespace
    // exactly as it always has (drag, clamp, Ctrl+click, the
    // IsItemActivated/IsItemHovered surface ModSlider's surrounding logic
    // depends on) and only the pixels are ours.
+   // The one text size of an audio node body's labels: the slider name and value
+   // ("fine tune", "0 c") and any label drawn inside a widget (the MPC pads' number, mode
+   // tag and file name) use it, so they cannot drift apart.
+   inline float AudioLabelFontSize() { return ImGui::GetFontSize(); }
+   inline void AudioLabelText(ImDrawList* dl, ImVec2 pos, ImU32 col, const char* text)
+   {
+      dl->AddText(ImGui::GetFont(), AudioLabelFontSize(), pos, col, text);
+   }
+   inline ImVec2 AudioLabelSize(const char* text)
+   {
+      return ImGui::GetFont()->CalcTextSizeA(AudioLabelFontSize(), FLT_MAX, 0.0f, text);
+   }
+
    bool AudioSliderFloat(const char* label, float* value, float minV, float maxV, const char* fmt,
                          float width, ImU32 fillColor, bool readOnly,
                          FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
@@ -3181,7 +3196,7 @@ namespace
       char valBuf[48];
       FormatAudioParam(valBuf, sizeof(valBuf), fmt, *value);
       const float textY = r0.y + (r1.y - r0.y - ImGui::GetTextLineHeight()) * 0.5f;
-      const ImVec2 valSize = ImGui::CalcTextSize(valBuf);
+      const ImVec2 valSize = AudioLabelSize(valBuf);
       const float valX = r1.x - 7.0f - valSize.x;
       dl->PushClipRect(r0, r1, true);
       ImU32 valCol, nameCol;
@@ -3213,10 +3228,10 @@ namespace
             ? (readOnly ? IM_COL32(100, 106, 122, 255) : IM_COL32(80, 86, 102, 255))
             : (readOnly ? IM_COL32(178, 181, 196, 255) : IM_COL32(198, 202, 216, 255));
       }
-      dl->AddText(ImVec2(valX, textY), valCol, valBuf);
+      AudioLabelText(dl, ImVec2(valX, textY), valCol, valBuf);
 
       dl->PushClipRect(r0, ImVec2(std::max(r0.x, valX - 6.0f), r1.y), true);
-      dl->AddText(ImVec2(r0.x + 7.0f, textY), nameCol, name.c_str());
+      AudioLabelText(dl, ImVec2(r0.x + 7.0f, textY), nameCol, name.c_str());
       dl->PopClipRect();
       dl->PopClipRect();
 
@@ -3967,10 +3982,14 @@ namespace
    bool ModSlider(const char* label, float* value, float minV, float maxV, const char* fmt = "%.3f",
                   float width = kParamWidth, bool audioStyle = false, float step = 0.0f,
                   FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
-                  int explicitParamIndex = -1)
+                  int explicitParamIndex = -1, const char* nameOverride = nullptr)
    {
       const int nodeIndex = gCurrentNodeIndex;
       const int paramIndex = (explicitParamIndex >= 0) ? explicitParamIndex : gParamCounter++;
+      // nameOverride: what the matrix / binding menu / perf picker call the
+      // param, when the drawn caption alone is ambiguous (the MPC draws one
+      // "volume" row that stands for whichever pad is selected).
+      const char* paramName = nameOverride != nullptr ? nameOverride : label;
 
       ParamRef ref;
       ref.nodeIndex = nodeIndex;
@@ -3979,7 +3998,7 @@ namespace
       ref.minValue = minV;
       ref.maxValue = maxV;
       ref.step = step;
-      ref.name = label;
+      ref.name = paramName;
       ref.posToValue = posToValue;
       ref.valueToPos = valueToPos;
       Modulation::Instance().RegisterParam(ref);
@@ -4038,7 +4057,7 @@ namespace
       GraphNode* curGn = FindNodeByIndex(nodeIndex);
       // rowMin starts after the pin box + its SameLine gap, not at the pin
       // itself - see the matching comment on DrawDiscreteParamPin's push.
-      gParamPinScreenList.push_back({ nodeIndex, paramIndex, curGn ? curGn->typeName : "", label ? label : "", c,
+      gParamPinScreenList.push_back({ nodeIndex, paramIndex, curGn ? curGn->typeName : "", paramName ? paramName : "", c,
                                       ImVec2(p.x + box + 4.0f, p.y), ImVec2(p.x + width, p.y + box + 4.0f) });
       if (paramIndex == gPredTestSizeXParam && nodeIndex == gPredTestNodeIndex)
          gPredTestSliderCanvas = ImVec4(p.x + box + 4.0f, p.y, p.x + width, p.y + box + 4.0f);
@@ -6147,6 +6166,8 @@ namespace
       // longer be newly created, per the device-catalog simplification.
       REGISTER_NODE(FieldGraphNode, Field Graph, "Utility");
       REGISTER_NODE(DrumSequencerNode, Drum Sequencer, "Synths");
+      REGISTER_NODE(MpcNode, MPC, "Synths");
+      REGISTER_NODE(LooperNode, Looper, "Synths");
       // Third-party plugin hosting (Audio Units). Its params reach the plugin
       // directly rather than through ParamMailbox - see AudioPluginNode.h.
       REGISTER_NODE(AudioPluginNode, Plugin, "AudioEffects");
@@ -8368,6 +8389,8 @@ namespace
          gran->ReloadFromPath();
       if (auto* drum = dynamic_cast<DrumSequencerNode*>(node))
          drum->ReloadFromPaths();
+      if (auto* mpc = dynamic_cast<MpcNode*>(node))
+         mpc->ReloadFromPaths();
       if (auto* video = dynamic_cast<VideoSourceNode*>(node))
          video->ReloadFromPath();
       if (auto* palette = dynamic_cast<PaletteNode*>(node))
@@ -11989,9 +12012,11 @@ namespace
    float AudioHalfWidth() { return (gAudioContentW - ImGui::GetStyle().ItemSpacing.x) * 0.5f; }
 
    bool AudioSlider(const char* label, float* v, float lo, float hi, const char* fmt, float width,
-                    FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr)
+                    FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
+                    int explicitParamIndex = -1, const char* nameOverride = nullptr)
    {
-      return ModSlider(label, v, lo, hi, fmt, width, /*audioStyle=*/true, /*step=*/0.0f, posToValue, valueToPos);
+      return ModSlider(label, v, lo, hi, fmt, width, /*audioStyle=*/true, /*step=*/0.0f, posToValue, valueToPos,
+                       explicitParamIndex, nameOverride);
    }
 
    bool AudioSliderInt(const char* label, int* v, int lo, int hi, float width)
@@ -12044,6 +12069,97 @@ namespace
                                  IM_COL32(75, 135, 245, 255), IM_COL32(108, 132, 220, 255),
                                  IM_COL32(40, 95, 215, 255), IM_COL32(120, 144, 230, 255),
                                  IM_COL32(255, 255, 255, 255), IM_COL32(255, 255, 255, 255));
+   }
+
+   // A momentary button that is also a CV-gate destination. Draws the
+   // modulation pin (vertically centred on the control, P2), then an invisible
+   // button that `paint` dresses; returns the button's LEVEL - CV high when a
+   // cable drives it, else the mouse being held on it. The node turns level
+   // changes into edges (Looper::SetButtonLevel / Mpc::SetPadHeld), so a held
+   // mouse or a held CV presses exactly once. `paint(dl, min, max, hovered,
+   // level)` draws the face; `activated` reports a fresh mouse press.
+   using GatePainter = std::function<void(ImDrawList*, ImVec2, ImVec2, bool, bool)>;
+   bool DrawGateButton(const char* id, float totalW, float height, const GatePainter& paint,
+                       bool* activated = nullptr)
+   {
+      if (activated != nullptr)
+         *activated = false;
+      const DiscreteParamHandle h = RegisterDiscreteParam(id, 0.0f, 1.0f, /*isBool=*/true, nullptr);
+      if (h.registered && !h.draw)
+         return h.driven && h.value >= 0.5f;
+      const float pinW = 16.0f;
+      const ImVec2 start = ImGui::GetCursorScreenPos();
+      float btnW = totalW;
+      if (h.registered)
+      {
+         DrawDiscreteParamPin(h, id, pinW, height);
+         ImGui::SetCursorScreenPos(ImVec2(start.x + pinW, start.y));
+         btnW = std::max(20.0f, totalW - pinW);
+      }
+      ImGui::PushID(id);
+      if (h.modulated)
+         ImGui::BeginDisabled();
+      ImGui::InvisibleButton("##gate", ImVec2(btnW, height));
+      const bool held = ImGui::IsItemActive();
+      const bool hovered = ImGui::IsItemHovered();
+      if (activated != nullptr)
+         *activated = ImGui::IsItemActivated();
+      const ImVec2 mn = ImGui::GetItemRectMin();
+      const ImVec2 mx = ImGui::GetItemRectMax();
+      if (h.modulated)
+         ImGui::EndDisabled();
+      ImGui::PopID();
+      const bool level = h.driven ? (h.value >= 0.5f) : held;
+      paint(ImGui::GetWindowDrawList(), mn, mx, hovered && !h.modulated, level);
+      if (h.registered)
+         DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsMouseHoveringRect(mn, mx));
+      return level;
+   }
+
+   // A Sampler-standard button that is also a CV-gate destination: same
+   // ImGui::Button drawing, height and width rules as the Sampler's buttons, a
+   // 16 px modulation pin to its left. Returns the LEVEL (CV high when a cable
+   // drives it, else the mouse held on it); the node turns level changes into
+   // edges. style: 0 plain, 1 red (a stop/active action), 2 blue toggle, `lit`
+   // being its on state.
+   bool DrawGateControl(const char* id, const char* label, float btnW, int style, bool lit)
+   {
+      const DiscreteParamHandle h = RegisterDiscreteParam(id, 0.0f, 1.0f, /*isBool=*/true, nullptr);
+      if (h.registered && !h.draw)
+         return h.driven && h.value >= 0.5f;
+      const float pinW = 16.0f;
+      const float height = ImGui::GetFrameHeight();
+      const ImVec2 start = ImGui::GetCursorScreenPos();
+      if (h.registered)
+      {
+         DrawDiscreteParamPin(h, id, pinW, height);
+         ImGui::SetCursorScreenPos(ImVec2(start.x + pinW, start.y));
+      }
+      ImGui::PushID(id);
+      if (h.modulated)
+         ImGui::BeginDisabled();
+      if (style == 2)
+      {
+         bool v = lit;
+         AudioToggleButton(label, &v, btnW);
+      }
+      else
+      {
+         if (style == 1)
+            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+         ImGui::Button(label, ImVec2(btnW, 0));
+         if (style == 1)
+            ImGui::PopStyleColor();
+      }
+      const bool held = ImGui::IsItemActive();
+      const ImVec2 mn = ImGui::GetItemRectMin();
+      const ImVec2 mx = ImGui::GetItemRectMax();
+      if (h.modulated)
+         ImGui::EndDisabled();
+      ImGui::PopID();
+      if (h.registered)
+         DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsMouseHoveringRect(mn, mx));
+      return h.driven ? (h.value >= 0.5f) : held;
    }
 
    bool AudioSoloButton(const char* label, bool* value, float width = 26.0f, float height = 0.0f)
@@ -12143,8 +12259,20 @@ namespace
              dynamic_cast<VibratoNode*>(node) != nullptr || dynamic_cast<EnvelopeNode*>(node) != nullptr;
    }
 
+   // MPC: four columns of (16 px gate pin gutter + a square pad), so the pads
+   // can be 105 px a side (+25% on the 440 px node's ~84). The node is as wide
+   // as that grid needs, not the shared 440.
+   constexpr float kMpcPadSide = 105.0f;
+   constexpr float kMpcPinGutter = 16.0f;
+   float MpcNodeWidth()
+   {
+      return 4.0f * (kMpcPinGutter + kMpcPadSide) + 3.0f * ImGui::GetStyle().ItemSpacing.x;
+   }
+
    float AudioNodeWidth(INode* node)
    {
+      if (dynamic_cast<MpcNode*>(node) != nullptr)
+         return MpcNodeWidth();
       if (auto* mixer = dynamic_cast<MixerNode*>(node))
          return std::max(280.0f, (float)mixer->numChannels * 80.0f);
       if (dynamic_cast<WavetableNode*>(node) != nullptr ||
@@ -15978,23 +16106,14 @@ namespace
       ImGui::SameLine();
       AudioSlider("decay", &n->decay, 0.05f, 10.0f, "%.2f s", AudioHalfWidth(), LogTaper::PosToValue, LogTaper::ValueToPos);
 
-      // Appended last and full-width rather than paired into a half: draw
-      // order IS the modulation-pin numbering here as everywhere else, so a
-      // new param can only go at the end, and a lone half-width slider under
-      // four filled pairs reads as a ragged grid. A full-width terminal row
-      // reads as deliberate.
-      //
-      // Greyed out unless it does something. The crossfade only exists at a
-      // wrapping loop seam: with loop off there is no seam, and ping-pong
-      // reverses direction rather than jumping, which is already continuous.
-      // Leaving the slider live in those modes would be the same lie the
-      // comb filter's greyed-out cutoff was, in the opposite direction.
-      {
-         const bool xfadeActive = n->loop && !n->pingpong;
-         ImGui::BeginDisabled(!xfadeActive);
-         AudioSlider("loop xfade", &n->xfade, 0.0f, 250.0f, "%.0f ms", AudioFullWidth());
-         ImGui::EndDisabled();
-      }
+      // fade in / fade out close the grid as a pair. They are ms lengths
+      // applied at the start and end of every pass through the range (loop
+      // lap, ping-pong leg, one-shot), so they are always live - no greying.
+      // Draw order is the pin numbering: they take the ordinals the old
+      // single "loop xfade" row used (8) and the next (9).
+      AudioSlider("fade in", &n->fadeIn, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("fade out", &n->fadeOut, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
 
       EndAudioBody();
    }
@@ -17414,6 +17533,667 @@ namespace
       }
 
       EndAudioBody();
+   }
+
+   // ---- Looper -----------------------------------------------------------
+   // Status line: what the looper is doing right now and what a press will do.
+   // Rate drift rule: at any playback rate other than exactly 1.0x the loop
+   // plays in length / |rate| and drifts against the transport; overdub pauses.
+   void LooperStatusText(LooperNode* n, char* out, size_t cap)
+   {
+      const Transport& tr = Transport::Instance();
+      const double bpm = std::max(1.0f, tr.Tempo());
+      const double bar = std::max(1e-6, tr.BeatsPerBar());
+      const std::vector<std::string>& divs = MusicTime::RateDivisionList();
+      const char* takeName = (n->take > 0 && n->take - 1 < (int)divs.size()) ? divs[(size_t)(n->take - 1)].c_str() : "free";
+      char len[48];
+      const double bars = (double)n->LengthSeconds() * bpm / 60.0 / bar;
+      if (std::fabs(bars - std::round(bars)) < 0.02 && bars >= 0.98)
+         snprintf(len, sizeof(len), "%d bar%s", (int)std::lround(bars), std::lround(bars) == 1 ? "" : "s");
+      else
+         snprintf(len, sizeof(len), "%.2f bars", bars);
+      const bool unity = n->AtUnity();
+      char drift[64] = "";
+      if (!unity)
+         snprintf(drift, sizeof(drift), " - %.2fx, drifts off the grid", std::fabs(n->Rate()));
+      switch (n->CurrentState())
+      {
+         case LooperNode::kArmed:
+         {
+            double grid = bar;
+            if (n->take > 0)
+               grid = std::min(bar, MusicTime::BeatsFor((MusicTime::RateDivision)std::clamp(n->take - 1, 0, MusicTime::kNumRateDivisions - 1)));
+            const double into = std::fmod(tr.Beats(), grid);
+            snprintf(out, cap, "armed - starts in %.1f beats", grid - into);
+            break;
+         }
+         case LooperNode::kRecording:
+            if (n->TargetSeconds() > 0.0f)
+               snprintf(out, cap, "recording - %.1f / %.1f s (%s)", n->LengthSeconds(), n->TargetSeconds(), takeName);
+            else
+               snprintf(out, cap, "recording - %.1f s - Rec ends it", n->LengthSeconds());
+            break;
+         case LooperNode::kPlaying:
+            snprintf(out, cap, "playing - %s - %.2f s - comp %.0f ms%s", len, n->LengthSeconds(), n->CompensationMs(), drift);
+            break;
+         case LooperNode::kOverdubbing:
+            snprintf(out, cap, "overdubbing - %s - %.2f s", len, n->LengthSeconds());
+            break;
+         case LooperNode::kStopped:
+            snprintf(out, cap, "stopped - %s - Play resumes%s", len, drift);
+            break;
+         default:
+            if (n->take > 0)
+               snprintf(out, cap, "empty - Rec records %s (%s)", takeName, n->syncStart ? "on the grid" : "now");
+            else
+               snprintf(out, cap, "empty - Rec starts, Rec again ends the take");
+            break;
+      }
+      if (n->CurrentState() == LooperNode::kOverdubbing && !unity)
+      {
+         // Overdub only writes at the recorded rate.
+         const size_t used = strlen(out);
+         if (used + 1 < cap)
+            snprintf(out + used, cap - used, " (paused off 1.00x)");
+      }
+   }
+
+   // Loop waveform, drawn like the Sampler's (same 140 px box, same columns,
+   // colours, playhead and border) with the Looper's extras: beat and bar ticks
+   // when the loop is a whole number of beats, and the recorded extent against
+   // the take window while a fixed take records. No start/end triangles: the
+   // Looper has no start/end.
+   void DrawLooperWave(LooperNode* n, float h, float w)
+   {
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const bool isLight = IsThemeLight();
+      const int st = n->CurrentState();
+      const Transport& tr = Transport::Instance();
+      const double bpm = std::max(1.0f, tr.Tempo());
+      const double bar = std::max(1e-6, tr.BeatsPerBar());
+
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+      const float midY = origin.y + h * 0.5f;
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+
+      const float len = n->LengthSeconds();
+      const float tgt = n->TargetSeconds();
+      float span = (st == LooperNode::kRecording && tgt > 0.0f) ? tgt : len;
+      if (span <= 0.0f && n->take > 0)
+      {
+         const double beats = MusicTime::BeatsFor((MusicTime::RateDivision)std::clamp(n->take - 1, 0, MusicTime::kNumRateDivisions - 1));
+         span = (float)(beats * 60.0 / bpm); // the take window it would record
+      }
+      const ImU32 recCol = isLight ? IM_COL32(205, 55, 55, 255) : IM_COL32(235, 90, 90, 255);
+
+      if (span > 0.0f)
+      {
+         const double beats = (double)span * bpm / 60.0;
+         if (std::fabs(beats - std::round(beats)) < std::max(0.03, beats * 0.01) && beats >= 1.0 && beats <= 128.0)
+         {
+            const int nb = (int)std::lround(beats);
+            for (int b = 0; b <= nb; b++)
+            {
+               const float x = origin.x + w * (float)b / (float)nb;
+               const bool isBar = std::fmod((double)b, bar) < 1e-6;
+               const ImU32 tc = isLight ? IM_COL32(60, 70, 100, isBar ? 90 : 55) : IM_COL32(200, 210, 235, isBar ? 70 : 38);
+               if (isBar)
+                  dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), tc, 1.0f);
+               else
+               {
+                  dl->AddLine(ImVec2(x, origin.y), ImVec2(x, origin.y + 6.0f), tc, 1.0f);
+                  dl->AddLine(ImVec2(x, br.y - 6.0f), ImVec2(x, br.y), tc, 1.0f);
+               }
+            }
+         }
+      }
+
+      if (len > 0.0f)
+      {
+         const float total = std::max(span, len);
+         const float colW = w / (float)LooperNode::kWaveCols;
+         const ImU32 col = isLight ? IM_COL32(30, 110, 230, 210) : IM_COL32(150, 214, 255, 200);
+         for (int c = 0; c < LooperNode::kWaveCols; c++)
+         {
+            if (total * (float)c / (float)LooperNode::kWaveCols >= len)
+               break;
+            const float x = origin.x + colW * (float)c;
+            const float top = midY - n->waveMax[c] * h * 0.45f;
+            const float bot = midY - n->waveMin[c] * h * 0.45f;
+            dl->AddRectFilled(ImVec2(x, std::min(top, midY - 0.5f)), ImVec2(x + std::max(1.0f, colW), std::max(bot, midY + 0.5f)), col);
+         }
+      }
+
+      if (st == LooperNode::kPlaying || st == LooperNode::kOverdubbing || st == LooperNode::kStopped)
+      {
+         const float x = origin.x + w * std::clamp(n->Position01(), 0.0f, 1.0f);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y),
+                     isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 200, 90, 240), 2.0f);
+      }
+      else if (st == LooperNode::kRecording)
+      {
+         const float f = tgt > 0.0f ? std::clamp(len / tgt, 0.0f, 1.0f) : 1.0f;
+         const float x = origin.x + w * f;
+         dl->AddRectFilled(origin, ImVec2(x, br.y), IM_COL32(220, 70, 70, isLight ? 26 : 34));
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), recCol, 2.0f);
+      }
+
+      if (st == LooperNode::kEmpty)
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "no loop - press Rec");
+      else if (st == LooperNode::kArmed)
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "waiting for the next grid line");
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawLooperBody(GraphNode& gn, LooperNode* n)
+   {
+      char stat[128];
+      LooperStatusText(n, stat, sizeof(stat));
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      // Rec / Play / Dub / Clear: the Sampler's own button widths (70), height
+      // and drawing, each with a CV gate pin. Rec is a plain button that goes
+      // red as "Stop" while a take is armed or recording; Play and Dub are the
+      // blue toggles; Clear is momentary. Click or CV rising edge presses.
+      {
+         static const char* kIds[LooperNode::kNumButtons] = { "rec", "play", "dub", "clear" };
+         const int st = n->CurrentState();
+         const bool recActive = st == LooperNode::kRecording || st == LooperNode::kArmed;
+         const bool playActive = st == LooperNode::kPlaying || st == LooperNode::kOverdubbing;
+         const bool dubActive = st == LooperNode::kOverdubbing;
+         const float gapX = ImGui::GetStyle().ItemSpacing.x;
+         const float btnW = 70.0f;
+         const float cellW = 16.0f + btnW + gapX;
+         const float x0 = gAudioContentX;
+         const float y0 = ImGui::GetCursorScreenPos().y;
+         const float rowH = ImGui::GetFrameHeight();
+         for (int b = 0; b < LooperNode::kNumButtons; b++)
+         {
+            ImGui::SetCursorScreenPos(ImVec2(x0 + (float)b * cellW, y0));
+            const char* label = b == LooperNode::kRec ? (recActive ? "Stop" : "Rec")
+                              : b == LooperNode::kPlay ? (playActive ? "Stop" : "Play")
+                              : b == LooperNode::kDub ? "Dub" : "Clear";
+            const int style = b == LooperNode::kRec ? (recActive ? 1 : 0)
+                            : b == LooperNode::kPlay ? 2 : b == LooperNode::kDub ? 2 : 0;
+            const bool lit = b == LooperNode::kPlay ? playActive : b == LooperNode::kDub ? dubActive : false;
+            n->SetButtonLevel(b, DrawGateControl(kIds[b], label, btnW, style, lit));
+         }
+         ImGui::SetCursorScreenPos(ImVec2(x0, y0));
+         ImGui::Dummy(ImVec2(gAudioContentW, rowH));
+      }
+
+      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      DrawLooperWave(n, 140.0f, AudioFullWidth());
+      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+
+      // Same rows, ranges and formats as the Sampler. Draw order is the pin
+      // numbering: append only.
+      AudioSlider("finetune", &n->finetune, -50.0f, 50.0f, "%.0f c", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
+      AudioSlider("speed", &n->speed, -2.0f, 2.0f, "%.2fx", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("volume", &n->volume, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+      AudioSlider("fade in", &n->fadeIn, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("fade out", &n->fadeOut, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
+
+      {
+         AudioKnobRow row(3);
+         std::vector<std::string> takeOptions;
+         takeOptions.push_back("free");
+         for (const std::string& s : MusicTime::RateDivisionList())
+            takeOptions.push_back(s);
+         row.Dropdown("take", takeOptions, n->take, [n](int i) { PushUndoCheckpoint(); n->take = i; });
+         bool changed = false;
+         row.Checkbox("sync", &n->syncStart, &changed);
+         if (changed)
+            PushUndoCheckpoint();
+         row.Checkbox("thru", &n->thru, &changed);
+         if (changed)
+            PushUndoCheckpoint();
+         row.End();
+      }
+      EndAudioBody();
+   }
+
+   // ---- MPC --------------------------------------------------------------
+   // ---- MPC modulation addressing ------------------------------------------
+   // Every pad's every param is a modulation destination with an address that is
+   // a function of (pad, param) ONLY: floats at explicit ids
+   // MpcNode::ParamId(pad, k) (100 + pad * 5 + k), the mode at a label-hashed
+   // discrete slot whose label carries the pad ("pad N mode##mpcmodeN"). The
+   // selected pad only decides which pad's widgets are DRAWN; the other fifteen
+   // register through exactly the same calls under gParamRegisterOnly (the EQ's
+   // hidden-band mechanism), so a cable never rebinds, retargets or stops
+   // driving when the selection moves.
+   const std::vector<std::string>& MpcModeList()
+   {
+      static const std::vector<std::string> kModes = { "one shot", "gate", "loop" };
+      return kModes;
+   }
+   std::string MpcModeLabel(int pad)
+   {
+      char buf[48];
+      snprintf(buf, sizeof(buf), "pad %d mode##mpcmode%d", pad + 1, pad);
+      return buf;
+   }
+   std::string MpcParamName(int pad, int k)
+   {
+      char buf[48];
+      snprintf(buf, sizeof(buf), "pad %d %s", pad + 1, MpcNode::Info(k).name);
+      return buf;
+   }
+   // Sync: Pattern A of the rhythmic-quantization-standard ("Synced"/"Free" then
+   // the canonical division list), one pair per pad. Index 0 is Synced.
+   const std::vector<std::string>& MpcSyncList()
+   {
+      static const std::vector<std::string> kSync = { "Synced", "Free" };
+      return kSync;
+   }
+   enum MpcDiscreteKind { kMpcMode = 0, kMpcSync, kMpcDiv, kMpcNumDiscrete };
+   std::string MpcDiscreteLabel(int pad, int which)
+   {
+      char buf[48];
+      if (which == kMpcMode)
+         return MpcModeLabel(pad);
+      snprintf(buf, sizeof(buf), which == kMpcSync ? "pad %d sync##mpcsync%d" : "pad %d rate##mpcdiv%d", pad + 1, pad);
+      return buf;
+   }
+   int* MpcDiscreteValue(MpcNode* n, int pad, int which)
+   {
+      pad = MpcNode::Clamp(pad);
+      return which == kMpcMode ? &n->padMode[pad] : (which == kMpcSync ? &n->padSync[pad] : &n->padDiv[pad]);
+   }
+   const std::vector<std::string>& MpcDiscreteList(int which)
+   {
+      return which == kMpcMode ? MpcModeList() : (which == kMpcSync ? MpcSyncList() : MusicTime::RateDivisionList());
+   }
+   int MpcDiscreteMax(int which)
+   {
+      return which == kMpcMode ? 2 : (which == kMpcSync ? 1 : (int)MusicTime::kNumRateDivisions - 1);
+   }
+   // Registers (never draws) one of `pad`'s dropdown params; applies a driven value.
+   void RegisterMpcPadDiscrete(MpcNode* n, int pad, int which)
+   {
+      const std::string label = MpcDiscreteLabel(pad, which);
+      int* value = MpcDiscreteValue(n, pad, which);
+      const int hi = MpcDiscreteMax(which);
+      const DiscreteParamHandle h = RegisterDiscreteParam(label.c_str(), (float)*value, (float)hi,
+                                                          /*isBool=*/false, &MpcDiscreteList(which));
+      if (h.driven)
+         *value = std::clamp((int)lroundf(h.value), 0, hi);
+   }
+   // Registers (never draws) `pad`'s float params (the drawn pad's are the real widgets).
+   void RegisterMpcPadFloats(MpcNode* n, int pad)
+   {
+      const bool saved = gParamRegisterOnly;
+      gParamRegisterOnly = true;
+      for (int k = 0; k < MpcNode::kNumPadParams; k++)
+      {
+         const MpcNode::ParamInfo& info = MpcNode::Info(k);
+         const std::string name = MpcParamName(pad, k);
+         ModSlider(info.name, n->PadParamPtr(pad, k), info.lo, info.hi, info.fmt, 100.0f, /*audioStyle=*/true, 0.0f,
+                   nullptr, nullptr, MpcNode::ParamId(pad, k), name.c_str());
+      }
+      gParamRegisterOnly = saved;
+   }
+   // Register every pad's params in fixed order, whatever is selected:
+   // DiscreteParamSlot probes on a hash collision in first-seen order, so the
+   // order the dropdowns first register in must not depend on the selection. The
+   // 16 mode dropdowns go first (as before sync existed), then the 16 sync, then
+   // the 16 division ones. `drawnPad` (-1: none) keeps its float sliders for the
+   // real widgets (its dropdowns are still registered here, then re-registered,
+   // same slot, by the real dropdowns).
+   void RegisterMpcParams(MpcNode* n, int drawnPad)
+   {
+      for (int p = 0; p < MpcNode::kPads; p++)
+         if (p != drawnPad)
+            RegisterMpcPadFloats(n, p);
+      for (int which = 0; which < kMpcNumDiscrete; which++)
+         for (int p = 0; p < MpcNode::kPads; p++)
+            RegisterMpcPadDiscrete(n, p, which);
+   }
+   // Pin ids currently bound on `pad` (floats then the dropdown slots).
+   std::vector<int> MpcPadBoundPins(MpcNode* n, int pad, int nodeIndex)
+   {
+      (void)n;
+      std::vector<int> pins;
+      for (int k = 0; k < MpcNode::kNumPadParams; k++)
+         if (Modulation::Instance().IsModulated(nodeIndex, MpcNode::ParamId(pad, k)))
+            pins.push_back(MpcNode::ParamId(pad, k));
+      for (int which = 0; which < kMpcNumDiscrete; which++)
+      {
+         const int slot = DiscreteParamSlot(nodeIndex, MpcDiscreteLabel(pad, which));
+         if (Modulation::Instance().IsModulated(nodeIndex, slot))
+            pins.push_back(slot);
+      }
+      return pins;
+   }
+
+   // Routes a dropped audio file to a pad: the pad under the drop, else the
+   // selected-pad waveform's box (the selected pad), else the first empty pad,
+   // else the selected pad. Further files in one drop fill the next empty pads.
+   void MpcDropFiles(MpcNode* n, float cx, float cy, const std::vector<std::string>& paths)
+   {
+      int pad = n->PadAtCanvas(cx, cy);
+      if (pad < 0 && cx >= n->waveRect[0] && cx <= n->waveRect[2] && cy >= n->waveRect[1] && cy <= n->waveRect[3])
+         pad = MpcNode::Clamp(n->selectedPad);
+      if (pad < 0)
+      {
+         pad = n->NextEmptyPad(0);
+         if (pad < 0)
+            pad = MpcNode::Clamp(n->selectedPad);
+      }
+      for (const std::string& path : paths)
+      {
+         if (pad < 0)
+            break;
+         if (n->LoadPad(pad, path))
+            n->selectedPad = pad;
+         const int next = n->NextEmptyPad(pad + 1);
+         pad = (next >= 0 && next != pad) ? next : -1;
+      }
+   }
+
+   void DrawMpcBody(GraphNode& gn, MpcNode* n)
+   {
+      int loaded = 0;
+      for (int p = 0; p < MpcNode::kPads; p++)
+         loaded += n->PadLoaded(p) ? 1 : 0;
+      char stat[112];
+      if (loaded == 0)
+         snprintf(stat, sizeof(stat), "empty - drop samples here, then click a pad or send notes 36-51");
+      else
+         snprintf(stat, sizeof(stat), "%d/16 loaded - click a pad or send notes 36-51", loaded);
+      BeginAudioBody(gn.index, gn.category, MpcNodeWidth(), stat);
+      const bool isLight = IsThemeLight();
+      const double now = ImGui::GetTime();
+      int openLoadPad = -1;
+      const int sel = MpcNode::Clamp(n->selectedPad);
+      n->selectedPad = sel;
+
+      // The 15 pads that are not drawn this frame register under
+      // gParamRegisterOnly (see the addressing note above), the selected one
+      // through its real widgets below. Same fixed pad order every frame.
+      RegisterMpcParams(n, sel);
+      std::vector<int> boundPins[MpcNode::kPads];
+      for (int p = 0; p < MpcNode::kPads; p++)
+         boundPins[p] = MpcPadBoundPins(n, p, gn.index);
+
+      // 4x4 pad grid, pad 1 bottom-left like a hardware MPC. Every pad is a
+      // perfect square (kMpcPadSide, and the node is widened to fit them: see
+      // MpcNodeWidth), with a gate (CV trigger) pin in a 16 px gutter to its left.
+      {
+         const float gap = ImGui::GetStyle().ItemSpacing.x;
+         const float pinW = kMpcPinGutter;
+         const float side = kMpcPadSide;
+         const float cellW = pinW + side;
+         const float x0 = gAudioContentX;
+         const float y0 = ImGui::GetCursorScreenPos().y;
+         static const char* kModeTag[3] = { "shot", "gate", "loop" };
+         for (int row = 0; row < 4; row++)
+         {
+            for (int col = 0; col < 4; col++)
+            {
+               const int pad = (3 - row) * 4 + col;
+               char id[16];
+               snprintf(id, sizeof(id), "pad%d", pad + 1);
+               ImGui::SetCursorScreenPos(ImVec2(x0 + (float)col * (cellW + gap), y0 + (float)row * (side + gap)));
+               const bool isLoaded = n->PadLoaded(pad);
+               const bool isSel = pad == sel;
+               const bool playing = n->PadPlaying(pad);
+               const bool anyMod = !boundPins[pad].empty();
+               ImVec2 modDot(0.0f, 0.0f);
+               bool activated = false;
+               const bool level = DrawGateButton(id, cellW, side,
+                  [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx, bool hovered, bool lvl)
+                  {
+                     n->padRect[pad][0] = mn.x; n->padRect[pad][1] = mn.y;
+                     n->padRect[pad][2] = mx.x; n->padRect[pad][3] = mx.y;
+                     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+                        n->selectedPad = pad;
+                     const bool hit = lvl || (now - n->padFlash[pad]) < 0.14;
+                     const bool lit = playing || hit;
+                     const ImU32 green = isLight ? IM_COL32(35, 150, 80, 255) : IM_COL32(60, 175, 100, 255);
+                     ImU32 fill = isLoaded ? (isLight ? IM_COL32(214, 221, 236, 255) : IM_COL32(40, 46, 64, 255))
+                                           : (isLight ? IM_COL32(232, 235, 242, 255) : IM_COL32(26, 28, 37, 255));
+                     if (hovered && !lit)
+                        fill = isLight ? IM_COL32(204, 212, 230, 255) : IM_COL32(52, 59, 80, 255);
+                     if (lit)
+                        fill = green;
+                     dl->AddRectFilled(mn, mx, fill, 6.0f);
+                     const ImU32 selCol = isLight ? IM_COL32(50, 100, 230, 255) : IM_COL32(110, 160, 255, 255);
+                     const ImU32 edge = isLight ? IM_COL32(170, 178, 195, 255) : IM_COL32(85, 92, 115, 200);
+                     dl->AddRect(mn, mx, isSel ? selCol : edge, 6.0f, 0, isSel ? 2.0f : 1.0f);
+
+                     const ImU32 ink = lit ? IM_COL32(255, 255, 255, 255)
+                                           : (isLoaded ? (isLight ? IM_COL32(40, 45, 60, 255) : IM_COL32(215, 220, 235, 255))
+                                                       : IM_COL32(120, 128, 150, 255));
+                     const ImU32 dim = lit ? IM_COL32(255, 255, 255, 190) : (isLight ? IM_COL32(95, 105, 130, 255) : IM_COL32(150, 158, 180, 255));
+                     dl->PushClipRect(ImVec2(mn.x + 1.0f, mn.y + 1.0f), ImVec2(mx.x - 1.0f, mx.y - 1.0f), true);
+                     // All text in the pad is the size of a slider's label
+                     // (AudioLabelText): number and mode tag on top, name below.
+                     const float lh = AudioLabelFontSize();
+                     char num[8];
+                     snprintf(num, sizeof(num), "%d", pad + 1);
+                     AudioLabelText(dl, ImVec2(mn.x + 5.0f, mn.y + 3.0f), ink, num);
+                     // Mode tag; a synced pad also shows its division ("loop 1/8").
+                     char tag[32];
+                     snprintf(tag, sizeof(tag), "%s", kModeTag[std::clamp(n->padMode[pad], 0, 2)]);
+                     if (n->padSync[pad] == MpcNode::kSynced)
+                        snprintf(tag, sizeof(tag), "%s %s", kModeTag[std::clamp(n->padMode[pad], 0, 2)],
+                                 MusicTime::RateDivisionName(n->padDiv[pad]));
+                     const ImVec2 ts = AudioLabelSize(tag);
+                     AudioLabelText(dl, ImVec2(mx.x - ts.x - 5.0f, mn.y + 3.0f), dim, tag);
+                     if (isLoaded)
+                     {
+                        // Waveform, drawn as the Sampler draws its own: bars
+                        // at 0.45 of the box either side of the mid line, no
+                        // auto-gain.
+                        const int cnt = n->padWaveCount[pad];
+                        const float wx0 = mn.x + 5.0f, wx1 = mx.x - 5.0f;
+                        const float wTop = mn.y + lh + 7.0f, wBot = mx.y - lh - 7.0f;
+                        const float wy = (wTop + wBot) * 0.5f;
+                        const float wh = wBot - wTop;
+                        const ImU32 wc = lit ? IM_COL32(255, 255, 255, 230) : (isLight ? IM_COL32(30, 110, 230, 210) : IM_COL32(150, 214, 255, 200));
+                        for (int i = 0; i < cnt; i++)
+                        {
+                           const float x = wx0 + (wx1 - wx0) * (float)i / (float)cnt;
+                           const float bw = std::max(1.0f, (wx1 - wx0) / (float)cnt);
+                           const float t = wy - n->padWaveMax[pad][i] * wh * 0.45f;
+                           const float b = wy - n->padWaveMin[pad][i] * wh * 0.45f;
+                           dl->AddRectFilled(ImVec2(x, std::min(t, wy - 0.5f)), ImVec2(x + bw, std::max(b, wy + 0.5f)), wc);
+                        }
+                        std::string nm = n->PadName(pad);
+                        const size_t dot = nm.find_last_of('.');
+                        if (dot != std::string::npos && dot > 0)
+                           nm.resize(dot);
+                        dl->PushClipRect(ImVec2(mn.x + 1.0f, mn.y + 1.0f), ImVec2(mx.x - 16.0f, mx.y - 1.0f), true);
+                        AudioLabelText(dl, ImVec2(mn.x + 5.0f, mx.y - lh - 4.0f), dim, nm.c_str());
+                        dl->PopClipRect();
+                     }
+                     else
+                     {
+                        const char* hint = "+ load";
+                        const ImVec2 hs = AudioLabelSize(hint);
+                        AudioLabelText(dl, ImVec2((mn.x + mx.x - hs.x) * 0.5f, (mn.y + mx.y - hs.y) * 0.5f), dim, hint);
+                     }
+                     // Modulation indicator: an orange dot at the bottom right
+                     // of any pad with a bound param (any of its nine).
+                     modDot = ImVec2(mx.x - 8.0f, mx.y - 8.0f);
+                     if (anyMod)
+                     {
+                        dl->AddCircleFilled(modDot, 4.0f, isLight ? IM_COL32(215, 125, 20, 255) : IM_COL32(255, 190, 90, 255));
+                        dl->AddCircle(modDot, 4.0f, isLight ? IM_COL32(110, 115, 130, 255) : IM_COL32(30, 32, 40, 255), 12, 1.0f);
+                     }
+                     dl->PopClipRect();
+                  },
+                  &activated);
+               if (activated)
+               {
+                  n->selectedPad = pad;
+                  if (!isLoaded)
+                     openLoadPad = pad; // an empty pad has nothing to play: a click means "put a sample here"
+               }
+               if (level)
+                  n->padFlash[pad] = now;
+               n->SetPadHeld(pad, level, 1.0f);
+
+               // A cable to an unselected pad's param has no slider on screen
+               // to land on: give each bound one a 1 px invisible pin on the
+               // tile's dot (as a collapsed node does), so the cable stays
+               // attached and visible. The selected pad's cables land on its
+               // real sliders below.
+               if (!isSel && anyMod && modDot.x != 0.0f)
+               {
+                  const ImVec2 restore = ImGui::GetCursorScreenPos();
+                  for (int slot : boundPins[pad])
+                  {
+                     const int pinId = gn.index * GraphNode::kStride + GraphNode::kParamBase + slot;
+                     gDrawnParamPins.insert(pinId);
+                     ImGui::SetCursorScreenPos(ImVec2(modDot.x - 0.5f, modDot.y - 0.5f));
+                     ed::BeginPin(pinId, ed::PinKind::Input);
+                     ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+                     ImGui::Dummy(ImVec2(1.0f, 1.0f));
+                     ed::EndPin();
+                  }
+                  ImGui::SetCursorScreenPos(restore);
+               }
+            }
+         }
+         ImGui::SetCursorScreenPos(ImVec2(x0, y0));
+         ImGui::Dummy(ImVec2(gAudioContentW, 4.0f * side + 3.0f * gap));
+      }
+      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+
+      // Selected pad: header, waveform (also the drop target), Load / Folder /
+      // Clear, then Sampler-style slider rows for that pad's params.
+      {
+         const int cur = MpcNode::Clamp(n->selectedPad); // a right-click above may have moved it
+         char header[96];
+         if (n->PadLoaded(cur))
+            snprintf(header, sizeof(header), "pad %d - %s", cur + 1, n->PadName(cur).c_str());
+         else
+            snprintf(header, sizeof(header), "pad %d - empty", cur + 1);
+         BeginAudioSection(header);
+
+         {
+            const float w = AudioFullWidth();
+            const float h = 90.0f;
+            const ImVec2 origin = ImGui::GetCursorScreenPos();
+            const ImVec2 br(origin.x + w, origin.y + h);
+            n->waveRect[0] = origin.x; n->waveRect[1] = origin.y; n->waveRect[2] = br.x; n->waveRect[3] = br.y;
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const bool has = n->PadLoaded(cur);
+            ImGui::InvisibleButton("##mpcwave", ImVec2(w, h));
+            const bool hov = ImGui::IsItemHovered();
+            if (!has && ImGui::IsItemClicked(ImGuiMouseButton_Left))
+               openLoadPad = cur;
+            // Same drawing as DrawSamplerWaveform.
+            dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+            dl->PushClipRect(origin, br, true);
+            const float midY = origin.y + h * 0.5f;
+            dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+            if (has)
+            {
+               const int cnt = n->padWaveCount[cur];
+               const ImU32 wc = isLight ? IM_COL32(30, 110, 230, 210) : IM_COL32(150, 214, 255, 200);
+               for (int i = 0; i < cnt; i++)
+               {
+                  const float x = origin.x + w * (float)i / (float)cnt;
+                  const float bw = std::max(1.0f, w / (float)cnt);
+                  const float t = midY - n->padWaveMax[cur][i] * h * 0.45f;
+                  const float b = midY - n->padWaveMin[cur][i] * h * 0.45f;
+                  dl->AddRectFilled(ImVec2(x, std::min(t, midY - 0.5f)), ImVec2(x + bw, std::max(b, midY + 0.5f)), wc);
+               }
+            }
+            else
+               dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "no sample loaded");
+            dl->PopClipRect();
+            dl->AddRect(origin, br, (!has && hov) ? (isLight ? IM_COL32(50, 100, 230, 255) : IM_COL32(110, 160, 255, 255)) : ScopeBorderCol(), 4.0f);
+            if (!has && hov)
+               ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+         }
+         ImGui::Dummy(ImVec2(0.0f, 6.0f));
+
+         if (ImGui::Button("Load...", ImVec2(90, 0)))
+            openLoadPad = cur;
+         ImGui::SameLine();
+         if (ImGui::Button("Folder...", ImVec2(90, 0)))
+         {
+            const std::string folder = Platform::OpenFolderDialog("Load a folder into the 16 pads");
+            if (!folder.empty())
+            {
+               PushUndoCheckpoint();
+               n->LoadFolder(folder);
+            }
+         }
+         ImGui::SameLine();
+         ImGui::BeginDisabled(!n->PadLoaded(cur));
+         if (ImGui::Button("Clear", ImVec2(70, 0)))
+         {
+            PushUndoCheckpoint();
+            n->ClearPad(cur);
+         }
+         ImGui::EndDisabled();
+         ImGui::Dummy(ImVec2(0.0f, 6.0f));
+
+         // Same rows, ranges and formats as the Sampler; float ids are fixed
+         // per (pad, param) so the drawn pad can change without moving a cable.
+         auto slider = [&](int k, float width)
+         {
+            const MpcNode::ParamInfo& info = MpcNode::Info(k);
+            const std::string name = MpcParamName(cur, k);
+            AudioSlider(info.name, n->PadParamPtr(cur, k), info.lo, info.hi, info.fmt, width, nullptr, nullptr,
+                        MpcNode::ParamId(cur, k), name.c_str());
+         };
+         // Two-column grid, five rows: timing (sync | rate), tuning, level,
+         // pan | mode, fades. The rate (division) dropdown is greyed while the pad
+         // is Free; it stays registered, so a cable on it survives.
+         auto dropdown = [&](int which, float width)
+         {
+            const std::string label = MpcDiscreteLabel(cur, which);
+            int* value = MpcDiscreteValue(n, cur, which);
+            DropdownButton(label.c_str(), MpcDiscreteList(which), *value,
+                           [value](int i) { PushUndoCheckpoint(); *value = i; }, width, /*showCaption=*/false);
+         };
+         dropdown(kMpcSync, AudioHalfWidth());
+         ImGui::SameLine();
+         ImGui::BeginDisabled(n->padSync[cur] != MpcNode::kSynced);
+         dropdown(kMpcDiv, AudioHalfWidth());
+         ImGui::EndDisabled();
+         slider(MpcNode::kFine, AudioHalfWidth());
+         ImGui::SameLine();
+         slider(MpcNode::kPitch, AudioHalfWidth());
+         slider(MpcNode::kSpeed, AudioHalfWidth());
+         ImGui::SameLine();
+         slider(MpcNode::kVolume, AudioHalfWidth());
+         slider(MpcNode::kPan, AudioHalfWidth());
+         ImGui::SameLine();
+         dropdown(kMpcMode, AudioHalfWidth());
+         slider(MpcNode::kFadeIn, AudioHalfWidth());
+         ImGui::SameLine();
+         slider(MpcNode::kFadeOut, AudioHalfWidth());
+         EndAudioSection();
+      }
+      EndAudioBody();
+
+      if (openLoadPad >= 0)
+      {
+         const std::string path = Platform::OpenAudioDialog();
+         if (!path.empty())
+         {
+            PushUndoCheckpoint();
+            if (n->LoadPad(openLoadPad, path))
+               n->selectedPad = openLoadPad;
+         }
+      }
    }
 
    // Sort/filter option lists and predicates for the Samples and Media
@@ -24956,6 +25736,10 @@ namespace
          DrawGranularBody(gn, n);
       else if (auto* n = dynamic_cast<DrumSequencerNode*>(gn.node.get()))
          DrawDrumSequencerBody(gn, n);
+      else if (auto* n = dynamic_cast<MpcNode*>(gn.node.get()))
+         DrawMpcBody(gn, n);
+      else if (auto* n = dynamic_cast<LooperNode*>(gn.node.get()))
+         DrawLooperBody(gn, n);
       else if (auto* n = dynamic_cast<GainNode*>(gn.node.get()))
          DrawGainBody(gn, n);
       else if (auto* n = dynamic_cast<AudioMeterNode*>(gn.node.get()))
@@ -40023,11 +40807,13 @@ namespace
          { "Wavetable", "Two independent wavetable engines with unison, filter, and pitch/filter/amp envelopes, mixed by an A/B control. With no note cable connected, it free-runs at a set frequency; connect a note cable and it becomes polyphonic and envelope-gated." },
          { "Analog", "A classic polyphonic virtual-analog synth voice with two analog-style oscillators (osc1 unison stack, osc2 tuning/detune/sync, sub osc one octave down, white noise, pre-filter drive stage, nonlinear ZDF Moog-ladder or SVF filter, and amplitude ADSR across up to 8 voices). Detune reads as the stack's true total width in cents, distributed unevenly across the stack the way separately mistuned circuits sit. Spread is stereo width: it splits the stack across two independent drive/filter chains and places each voice card in the image, so the sides carry different oscillators rather than one panned copy." },
          { "Equation Synth", "A synth defined by a live formula (y = f(x, a, b, c, d, t)) instead of a fixed waveform - knobs a-d feed the equation directly, so turning them reshapes the waveform itself rather than modulating a preset one." },
-         { "Sampler", "A sample player: load a file (or drag one in from the Samples search panel), or record from the audio input pin. Click the waveform to audition from that point, or use the audition button - both preview this node on its own dedicated voice, independent of the transport and any note cable, and never cut off or get cut off by an incoming note. Drag the waveform's two edge handles to set the loop range (start/end). pitch/finetune are coarse/fine tuning, speed is a -2..2 varispeed control (negative plays backward), volume is the output level. loop/rev/p-p control what happens at the range edges: loop wraps or bounces (ping-pong) instead of stopping, reverse flips the base direction. loop xfade crossfades the wrap so the loop seam doesn't click - the jump from the end of the range back to the start is a step discontinuity on almost any material, and 8 ms of equal-power fade covers it; set it to 0 for a hard wrap. It applies only to a wrapping loop: ping-pong reverses direction rather than jumping, so there is no seam there to fade, and the slider greys out. With no note cable connected, it free-runs on the transport - starts the moment you hit space, stops when you stop it; connect a note cable and it becomes polyphonic instead, each note played back at the pitch offset from middle C. Spacebar always silences every voice this node is making." },
+         { "Sampler", "A sample player: load a file (or drag one in from the Samples search panel), or record from the audio input pin. Click the waveform to audition from that point, or use the audition button - both preview this node on its own dedicated voice, independent of the transport and any note cable, and never cut off or get cut off by an incoming note. Drag the waveform's two edge handles to set the loop range (start/end). pitch/finetune are coarse/fine tuning, speed is a -2..2 varispeed control (negative plays backward), volume is the output level. loop/rev/p-p control what happens at the range edges: loop wraps or bounces (ping-pong) instead of stopping, reverse flips the base direction. fade in / fade out are lengths in ms applied at the start and end of every pass through the range (each loop lap, ping-pong leg or one-shot), so a loop dips at its seam instead of clicking; 3 ms each by default, 0 for a hard edge. Patches saved with the old loop xfade load with the defaults. With no note cable connected, it free-runs on the transport - starts the moment you hit space, stops when you stop it; connect a note cable and it becomes polyphonic instead, each note played back at the pitch offset from middle C. Spacebar always silences every voice this node is making." },
          { "Slicer", "Chops a sample into slices and maps them chromatically to the keyboard from MIDI note 36 upward - note 36 plays slice 1, 37 plays slice 2, and so on. A note past the last slice is silent; it does not wrap round to slice 1. Load a file (or drag one in from the Samples panel), or record from the audio input pin. slice by picks where the boundaries come from: onsets runs transient detection over the sample on a background thread, grid divides it arithmetically at the *global transport tempo* (there is no per-node bpm - change the tempo and the grid follows). sensitivity is the detection threshold and is the only control that re-runs the analysis; onsets just caps the result to the strongest N, and division/slice by recompute boundaries instantly. Click a slice band in the waveform to audition it, and in onsets mode drag any marker to move a boundary by hand - hand-edited markers are saved with the patch. Two separate controls decide how long a slice lasts: crossthrough sets whether playback may run PAST the slice's own next onset (off by default - each slice stops where the next begins), while decay shapes only the amplitude envelope, reading 'hold' at the top of its throw where the slice stays at full level. So: crossthrough off + hold is the classic tight chop; crossthrough off + a decay ends at whichever comes first; crossthrough on + hold plays through the rest of the sample; crossthrough on + a decay is a one-shot with a tail over the rest of the break. attack extends each slice's own fade-in from instant up to half a second." },
          { "Molder", "Analysis/genome resynthesis: decomposes a loaded or recorded sample into tracked harmonic partials plus a real residual waveform, then Roll mutates a parameter genome and re-renders a new sample from it - each roll walks further from the last, not from the original. Iterate feeds the last render back in as the new source and re-analyses it (progressively eating the sound); Reset returns fully to the originally loaded/recorded sample - generation 0 and the six shaping knobs (tone/air/snap/stretch/time/pitch) back to neutral, and the analysis itself restored, undoing any Iterate. chaos sets how far the next roll jumps; pitch offsets on top of the genome's own pitch walk; tone balances partials against residual; air/snap are the residual's steady-hiss and transient-attack levels; stretch scales inharmonicity together with harmonic spacing; time warps the attack/decay timing without changing the sample's length. This is a sound designer, not a playable instrument - it takes no note input, only a single self-triggered voice with start/end range, loop, reverse and ping-pong, the same transport as Sampler. Analysis and rendering both run on a background thread, so rolling never stalls the UI. seed/gen/f0/harm in the readout are the exact genome (seed + generation count) and the analysed pitch - two integers are enough to reproduce any rolled sound exactly on reload." },
          { "Grain Molder", "Slices audio into overlapping grains, calculates per-grain metrics (Level, Brightness, Random), and rearranges them based on a continuous blend between original temporal position and metric rank. At amount 0 it is the clean identity passthrough; at 1 it is fully sorted into a swell or brightness contour. Rendering runs asynchronously on a worker thread." },
          { "Drum Sequencer", "An 8-lane, 8-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8x8 step grid. Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
+         { "MPC", "How to use: wire the out into Audio Out, drop audio files onto the pads (or click an empty pad, or Load... / Folder... for the first 16 files of a folder), then click a pad or send notes into the notes input - notes 36 to 51 play pads 1 to 16. A 16-pad sample player: pad 1 is bottom-left like a hardware MPC, every pad is a square tile showing its waveform, number and mode, and each pad has its own CV pin, so a MIDI CC / Note modulator or any gate can play it. Every pad is its own voice, so pads play together, and a click plays at once. A hit follows the pad's mode: one shot plays the whole sample and a new hit restarts it; gate plays while held (mouse down, CV high or note held) and stops on release; loop toggles a looping playback on each hit. Click selects a pad (right-click selects without playing); the rows below the pads edit the selected pad: sync and rate, fine tune (cents), pitch (semitones), speed (negative plays backwards), volume, pan, mode, and fade in / fade out (ms, at the start and end of every pass), defined as on the Sampler. sync is per pad: Free (the default) plays a hit at once; Synced latches the hit and fires it on the next grid line of the transport at the chosen rate (1/4, 1/8, 1 bar ... the same divisions as every other node), sample-accurately; a hit on the line itself fires on it, with the transport stopped it fires at once, and in gate mode letting go before the line cancels the hit. In loop mode a synced pad re-triggers the sample on every division while it is on (one pass per division: a longer sample is cut at the line, a shorter one leaves a gap), and with the transport stopped it plays as a plain loop. The rate control is greyed while a pad is Free. Every param of every pad can be modulated at any time: a cable stays bound to its own pad when you select another pad, and an orange dot on a tile shows that pad has a modulated param. A tile shows the mode and, when synced, the rate. The node's audio out is the mix of all pads. Loaded sample paths and pad settings are saved with the patch; the audio is re-read on load." },
+         { "Looper", "How to use: wire the sound to loop into the input and the out to Audio Out, press Rec (it waits for the next bar when the transport plays and sync is on), and the take ends by itself after the take length, then loops; Play stops and restarts it, Dub layers what comes in over it, Clear empties it. The waveform shows the loop with a playhead and the beat grid, and the line under the title says what the looper is doing. Each button has a CV pin, so a footswitch or MIDI note can drive them (a rising edge presses). take sets the length: a musical division (1 bar by default), or free, where the next Rec press ends it. Pressing Dub while recording ends the take and goes straight into overdub. Playback has the Sampler's controls: finetune (cents), pitch (semitones), speed (negative plays backwards), volume, and fade in / fade out (ms) at the start and end of every pass. At exactly 1.00x the loop stays on the grid; at any other rate it plays in length / rate and DRIFTS against the transport, and Dub is paused while it does (layers are only written at the rate they were recorded). thru monitors the live input. Each take is always shifted by the audio interface's measured round-trip latency, so a loop played in time sits on the grid. The loop lives in memory (up to 60 s) and is not saved with the patch." },
          { "Audio In","Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch. The capture runs on its own engine bound to the system default input, independently of whichever output device is selected, and the header line says why it isn't live when it isn't." },
          { "Audio Filter", "One filter, one of 12 types (LP/HP at 12/24/36 dB, BP, notch, shelves, peak, all-pass). Drag the handle on the response curve to set frequency and gain, Shift-drag to set Q - the picture is the control." },
          { "Audio Color Ramp", "Splits incoming audio into up to 8 frequency bands - drag the dividers right on the spectrum display to resize them - and assigns each one a colour, VIBGYOR by default from low to high. With no image patched in it outputs the resulting gradient standalone; patch one into its optional image input and it grades that image by luminance through the same audio-reactive palette instead." },
@@ -40852,6 +41638,8 @@ namespace
                { "Analog", "Virtual-analog polyphonic synth with dual oscillators, unevenly detuned unison stacking, osc hard sync, sub-oscillator, noise, pre-filter drive, nonlinear ZDF Moog ladder and SVF filters, dual-path stereo spread, and amp ADSR." },
                { "Sampler", "High-resolution multi-sample player with pitch tracking, root note detection, start/end trimming, loop crossfades, and one-shot playback." },
                { "Drum Sequencer", "8-lane pattern drum sequencer with individual sample slots, per-step velocity, swing, choke groups, per-lane mute/solo, and decay envelopes." },
+              { "MPC", "16-pad sample player: per-pad mode (one shot / gate / loop), sync (free or quantised to a division), volume, pitch, pan, speed, fine tune, fade in / out; polyphonic; pads playable by mouse, CV pin or note 36-51." },
+                   { "Looper", "Live audio looper: record, play, overdub and clear with tempo-synced take lengths and interface latency compensation." },
                { "Slicer","Transient- or grid-sliced sample playback: chops a loaded sample into up to 64 slices and maps them chromatically from MIDI note 36, with draggable slice markers, a per-slice attack/decay pair, and a crossthrough toggle that lets a slice run past its own boundary." },
                { "Equation Synth", "Real-time bytebeat and mathematical expression synthesis evaluating user formulas with dynamic variables (t, x, y, inputs)." },
                { "Wave Terrain", "2D terrain trajectory orbital synthesis - a moving point traces a path across a height-mapped surface to generate a waveform." },
@@ -51041,9 +51829,11 @@ static bool RunSamplerFixture()
    {
       Params fwd = base;
       Params rev = base; rev.reverse = true;
-      const auto f = trigger(fwd, 4);
-      const auto r = trigger(rev, 4);
-      if (f.empty() || r.empty() || !(r[0] > f[0]))
+      // 64 frames, not 4: the per-pass fade-in scales sample 0 to exactly 0 in
+      // both directions, so the first samples cannot tell them apart.
+      const auto f = trigger(fwd, 64);
+      const auto r = trigger(rev, 64);
+      if (f.empty() || r.empty() || !(r[63] > f[63]))
       {
          printf("SAMPLERTEST reverse param had no effect FAIL\n");
          ok = false;
@@ -51115,6 +51905,70 @@ static bool RunSamplerFixture()
       const auto full = trigger(fullLoop, numFrames / 2 + 50);
       const auto shortR = trigger(shortLoop, numFrames / 2 + 50);
       if (!differs(full, shortR)) { printf("SAMPLERTEST end param had no effect FAIL\n"); ok = false; }
+   }
+
+   // fade in / fade out: a long fade-in must pull the first samples of a pass
+   // well below the un-faded ones, and a long fade-out must do the same to the
+   // last samples before the range edge (one-shot, so the tail is the edge).
+   {
+      auto render = [&](float fi, float fo, int frames) -> std::vector<float>
+      {
+         SamplerNode node;
+         node.LoadFile(path);
+         node.fadeIn = fi;
+         node.fadeOut = fo;
+         node.CookIfNeeded(1);
+         AudioNode* an = node.GetAudioNode();
+         an->PrepareToPlay((double)sampleRate, frames);
+         node.CookIfNeeded(2);
+         NoteEventQueue queue;
+         const int cursor = queue.RegisterConsumer();
+         an->SetNoteInbox(&queue, cursor);
+         NoteEvent on;
+         on.note = 60;
+         on.velocity = 1.0f;
+         on.isNoteOn = true;
+         on.frameOffset = 0;
+         queue.Push(on);
+         std::vector<float> l(frames, 0.0f), r(frames, 0.0f);
+         float* chans[2] = { l.data(), r.data() };
+         AudioBuffer buf;
+         buf.channels = chans;
+         buf.numChannels = 2;
+         buf.numFrames = frames;
+         an->ProcessBlock(nullptr, 0, buf);
+         return l;
+      };
+      // Ramp is -1..1: the first 400 frames of an un-faded pass sit near -1*0.8;
+      // a 50 ms (2205-frame) fade-in scales that by <= 400/2205.
+      const auto hard = render(0.0f, 0.0f, 600);
+      const auto fadedIn = render(50.0f, 0.0f, 600);
+      float hardMag = 0.0f, fadeMag = 0.0f;
+      for (int i = 300; i < 600; i++)
+      {
+         hardMag = std::max(hardMag, std::fabs(hard[i]));
+         fadeMag = std::max(fadeMag, std::fabs(fadedIn[i]));
+      }
+      if (!(fadeMag < hardMag * 0.5f))
+      {
+         printf("SAMPLERTEST fade in had no effect (hard=%.3f faded=%.3f) FAIL\n", hardMag, fadeMag);
+         ok = false;
+      }
+      // Fade-out: end the sound at the range edge; the last 300 frames before
+      // it must be quieter with a 50 ms fade-out than without.
+      const auto hardTail = render(0.0f, 0.0f, numFrames - 20);
+      const auto fadedTail = render(0.0f, 50.0f, numFrames - 20);
+      float hardTailMag = 0.0f, fadeTailMag = 0.0f;
+      for (int i = numFrames - 320; i < numFrames - 20; i++)
+      {
+         hardTailMag = std::max(hardTailMag, std::fabs(hardTail[i]));
+         fadeTailMag = std::max(fadeTailMag, std::fabs(fadedTail[i]));
+      }
+      if (!(fadeTailMag < hardTailMag * 0.5f))
+      {
+         printf("SAMPLERTEST fade out had no effect (hard=%.3f faded=%.3f) FAIL\n", hardTailMag, fadeTailMag);
+         ok = false;
+      }
    }
 
    // Record: arm recording, feed one block of a known synthetic tone
@@ -55545,6 +56399,618 @@ static bool RunSlicerFixture()
    return ok;
 }
 
+
+// ------------------------------------------------------------ LOOPERTEST / MPCTEST
+namespace LooperMpcTest
+{
+   constexpr int kSr = 48000;
+   constexpr int kBlock = 256;
+
+   // Drives a node's audio half block by block. `feed(i)` gives the input
+   // sample at absolute frame i (mono, copied to both channels); pass an empty
+   // function for no input. Returns the left channel.
+   template <typename NodeT>
+   std::vector<float> Run(NodeT& node, int startFrame, int frames, const std::function<float(int)>& feed,
+                          bool advanceTransport, int* cookId)
+   {
+      AudioNode* an = node.GetAudioNode();
+      std::vector<float> out;
+      out.reserve((size_t)frames);
+      int done = 0;
+      while (done < frames)
+      {
+         const int n = std::min(kBlock, frames - done);
+         if (advanceTransport)
+            Transport::Instance().AdvanceAudioClock(n);
+         node.CookIfNeeded((*cookId)++);
+         std::vector<float> inL((size_t)n, 0.0f), inR((size_t)n, 0.0f), oL((size_t)n, 0.0f), oR((size_t)n, 0.0f);
+         if (feed)
+            for (int i = 0; i < n; i++)
+               inL[(size_t)i] = inR[(size_t)i] = feed(startFrame + done + i);
+         float* inCh[2] = { inL.data(), inR.data() };
+         float* outCh[2] = { oL.data(), oR.data() };
+         AudioBuffer inBuf;
+         inBuf.channels = inCh;
+         inBuf.numChannels = 2;
+         inBuf.numFrames = n;
+         AudioBuffer outBuf;
+         outBuf.channels = outCh;
+         outBuf.numChannels = 2;
+         outBuf.numFrames = n;
+         const AudioBuffer* ins[1] = { &inBuf };
+         an->ProcessBlock(feed ? ins : nullptr, feed ? 1 : 0, outBuf);
+         out.insert(out.end(), oL.begin(), oL.end());
+         done += n;
+      }
+      node.CookIfNeeded((*cookId)++);
+      return out;
+   }
+
+   float Peak(const std::vector<float>& v, size_t from = 0, size_t to = (size_t)-1)
+   {
+      float p = 0.0f;
+      for (size_t i = from; i < v.size() && i < to; i++)
+         p = std::max(p, std::fabs(v[i]));
+      return p;
+   }
+
+   float Rms(const std::vector<float>& v, size_t from, size_t to)
+   {
+      double a = 0.0;
+      size_t n = 0;
+      for (size_t i = from; i < v.size() && i < to; i++, n++)
+         a += (double)v[i] * v[i];
+      return n > 0 ? (float)std::sqrt(a / (double)n) : 0.0f;
+   }
+
+   int Onset(const std::vector<float>& v, size_t from, float thresh = 0.15f)
+   {
+      for (size_t i = from; i < v.size(); i++)
+         if (std::fabs(v[i]) > thresh)
+            return (int)i;
+      return -1;
+   }
+
+   std::unique_ptr<LooperNode> MakeLooper(int take, bool sync, int compFrames)
+   {
+      auto n = std::make_unique<LooperNode>();
+      n->take = take;
+      n->syncStart = sync;
+      n->testLatencyFrames = compFrames > 0 ? compFrames : 0;
+      n->thru = false;
+      n->fadeIn = 0.0f; // exact-sample assertions: hard pass edges
+      n->fadeOut = 0.0f;
+      int id = 1;
+      n->CookIfNeeded(id++);
+      n->GetAudioNode()->PrepareToPlay((double)kSr, kBlock);
+      n->CookIfNeeded(id++);
+      return n;
+   }
+
+   void Press(LooperNode& n, int button)
+   {
+      n.SetButtonLevel(button, false);
+      n.SetButtonLevel(button, true);
+      n.SetButtonLevel(button, false);
+   }
+}
+
+static bool RunLooperFixture()
+{
+   using namespace LooperMpcTest;
+   bool ok = true;
+   auto fail = [&](const char* what)
+   {
+      printf("LOOPERTEST %s FAIL\n", what);
+      ok = false;
+   };
+   Transport& transport = Transport::Instance();
+   const float savedBpm = transport.Tempo();
+   const bool savedPlaying = transport.IsPlaying();
+   auto tone = [](float freq, float amp) { return [freq, amp](int i) { return amp * std::sin(6.2831853f * freq * (float)i / (float)kSr); }; };
+   int cook = 100;
+
+   transport.SetPlaying(false);
+
+   // 1) free take: record 1024 frames, REC again ends it, the loop then repeats
+   //    with period 1024 and the record pass itself is silent (thru = 0).
+   {
+      auto n = MakeLooper(0, false, 0);
+      Press(*n, LooperNode::kRec);
+      const std::vector<float> rec = Run(*n, 0, 1024, tone(220.0f, 0.5f), false, &cook);
+      if (n->CurrentState() != LooperNode::kRecording)
+         fail("free take: not recording after REC");
+      if (Peak(rec) > 1e-4f)
+         fail("free take: record pass is audible with thru = 0");
+      Press(*n, LooperNode::kRec);
+      const std::vector<float> play = Run(*n, 1024, 4096, nullptr, false, &cook);
+      if (n->CurrentState() != LooperNode::kPlaying)
+         fail("free take: not playing after second REC");
+      if (std::fabs(n->LoopSeconds() - 1024.0f / (float)kSr) > 3.0f / (float)kSr)
+         fail("free take: loop length is not the recorded length");
+      if (Peak(play) < 0.3f)
+         fail("free take: playback is silent");
+      float worst = 0.0f;
+      for (size_t i = 0; i + 1024 < play.size(); i++)
+         worst = std::max(worst, std::fabs(play[i] - play[i + 1024]));
+      if (worst > 1e-3f)
+         fail("free take: playback is not periodic at the loop length");
+
+      // 2) overdub layers onto the loop; toggling DUB again returns to plain play.
+      const float before = Rms(play, 1024, 3072);
+      Press(*n, LooperNode::kDub);
+      Run(*n, 5120, 2048, tone(468.75f, 0.2f), false, &cook); // 10 whole cycles per 1024-frame pass
+      if (n->CurrentState() != LooperNode::kOverdubbing)
+         fail("overdub: state is not overdubbing after DUB");
+      Press(*n, LooperNode::kDub);
+      const std::vector<float> after = Run(*n, 7168, 4096, nullptr, false, &cook);
+      if (n->CurrentState() != LooperNode::kPlaying)
+         fail("overdub: DUB again did not return to playing");
+      if (!(Rms(after, 1024, 3072) > before * 1.2f))
+         fail("overdub: the layered input did not raise the loop level");
+
+      // 3) thru monitors the live input; volume 0 silences the loop.
+      n->thru = true;
+      n->volume = 0.0f;
+      Run(*n, 11264, 2048, nullptr, false, &cook); // let the ramps settle
+      const std::vector<float> monitored = Run(*n, 13312, 1024, tone(1000.0f, 0.3f), false, &cook);
+      if (std::fabs(Peak(monitored, 256) - 0.3f) > 0.02f)
+         fail("thru: input is not monitored at unity with volume = 0");
+
+      // 4) CLEAR empties the loop.
+      Press(*n, LooperNode::kClear);
+      n->thru = false;
+      n->volume = 1.0f;
+      Run(*n, 14336, 512, nullptr, false, &cook);
+      const std::vector<float> cleared = Run(*n, 14848, 2048, nullptr, false, &cook);
+      if (n->CurrentState() != LooperNode::kEmpty || Peak(cleared) > 1e-4f)
+         fail("clear: the loop was not emptied");
+   }
+
+   // 5) fixed take (quarter note at 120 BPM = 24000 frames) ends by itself.
+   {
+      auto n = MakeLooper(MusicTime::kQuarter + 1, false, 0);
+      transport.SetTempo(120.0f);
+      Press(*n, LooperNode::kRec);
+      Run(*n, 0, 24000 + 2 * kBlock, tone(220.0f, 0.5f), false, &cook);
+      if (n->CurrentState() != LooperNode::kPlaying ||
+          std::fabs(n->LoopSeconds() - 0.5f) > 3.0f / (float)kSr)
+         fail("fixed take: did not end at a quarter note");
+   }
+
+   // 6) compensation: a click that arrives at press+F lands F - comp frames into
+   //    the loop, so it plays comp frames earlier than an uncompensated take.
+   {
+      const int clickAt = 2000;
+      auto clickFeed = [clickAt](int i) { return i == clickAt ? 0.9f : 0.0f; };
+      int onset[2] = { -1, -1 };
+      const int comps[2] = { 0, 480 };
+      for (int k = 0; k < 2; k++)
+      {
+         auto n = MakeLooper(MusicTime::kQuarter + 1, false, comps[k]);
+         Press(*n, LooperNode::kRec);
+         const std::vector<float> out = Run(*n, 0, 60000, clickFeed, false, &cook);
+         onset[k] = Onset(out, 1000);
+      }
+      if (onset[0] < 0 || std::abs(onset[0] - (24000 + clickAt)) > 3)
+         fail("compensation: uncompensated click is not one loop after the press");
+      if (onset[1] < 0 || std::abs((onset[0] - onset[1]) - 480) > 3)
+         fail("compensation: 480 frames of latency compensation did not move the take 480 frames earlier");
+   }
+
+   // 6b) playback rate: speed 2 plays the recorded 1024-frame loop in 512 frames;
+   //     speed -1 plays it backwards; pitch +12 st is the same as speed 2.
+   {
+      auto rampFeed = [](int i) { return i < 1024 ? (float)i / 1024.0f * 0.8f : 0.0f; };
+      auto n = MakeLooper(0, false, 0);
+      Press(*n, LooperNode::kRec);
+      Run(*n, 0, 1024, rampFeed, false, &cook);
+      Press(*n, LooperNode::kRec);
+      n->speed = 2.0f;
+      Run(*n, 1024, 4096, nullptr, false, &cook); // settle the rate ramp
+      const std::vector<float> fast = Run(*n, 5120, 3072, nullptr, false, &cook);
+      float worst = 0.0f;
+      for (size_t i = 0; i + 512 < fast.size(); i++)
+         worst = std::max(worst, std::fabs(fast[i] - fast[i + 512]));
+      if (worst > 2e-3f || Peak(fast) < 0.3f)
+         fail("rate: speed 2 does not repeat every 512 frames");
+      n->speed = 1.0f;
+      n->pitch = 12.0f;
+      Run(*n, 8192, 4096, nullptr, false, &cook);
+      const std::vector<float> oct = Run(*n, 12288, 3072, nullptr, false, &cook);
+      worst = 0.0f;
+      for (size_t i = 0; i + 512 < oct.size(); i++)
+         worst = std::max(worst, std::fabs(oct[i] - oct[i + 512]));
+      if (worst > 2e-3f)
+         fail("rate: pitch +12 st is not the same as speed 2");
+      n->pitch = 0.0f;
+      n->speed = -1.0f;
+      Run(*n, 15360, 4096, nullptr, false, &cook);
+      const std::vector<float> rev = Run(*n, 19456, 2048, nullptr, false, &cook);
+      int down = 0, steps = 0;
+      for (size_t i = 1; i < rev.size(); i++)
+      {
+         if (std::fabs(rev[i] - rev[i - 1]) > 1e-6f)
+         {
+            steps++;
+            down += rev[i] < rev[i - 1] ? 1 : 0;
+         }
+      }
+      if (steps < 100 || down < steps * 9 / 10)
+         fail("rate: speed -1 does not play the loop backwards");
+      if (n->AtUnity())
+         fail("rate: AtUnity is true at speed -1");
+      // Off unity, overdub writes nothing: the loop is unchanged afterwards.
+      n->speed = 1.0f;
+      Run(*n, 21504, 4096, nullptr, false, &cook);
+      const std::vector<float> base = Run(*n, 25600, 2048, nullptr, false, &cook);
+      n->speed = 2.0f;
+      Press(*n, LooperNode::kDub);
+      Run(*n, 27648, 4096, tone(300.0f, 0.4f), false, &cook);
+      Press(*n, LooperNode::kDub);
+      n->speed = 1.0f;
+      Run(*n, 31744, 4096, nullptr, false, &cook);
+      const std::vector<float> baseAfter = Run(*n, 35840, 2048, nullptr, false, &cook);
+      if (std::fabs(Rms(base, 0, base.size()) - Rms(baseAfter, 0, baseAfter.size())) > 0.01f)
+         fail("rate: overdub at speed 2 changed the loop");
+   }
+
+   // 6c) fades: a 250 ms fade in / fade out at the loop seam leaves the seam
+   //     sample near zero on a constant loop; hard edges (0 ms) leave it full.
+   {
+      auto dc = [](int) { return 0.5f; };
+      float seam[2] = { 1.0f, 1.0f };
+      for (int k = 0; k < 2; k++)
+      {
+         auto n = MakeLooper(0, false, 0);
+         n->fadeIn = k == 0 ? 0.0f : 20.0f;
+         n->fadeOut = k == 0 ? 0.0f : 20.0f;
+         Press(*n, LooperNode::kRec);
+         Run(*n, 0, 4800, dc, false, &cook);
+         Press(*n, LooperNode::kRec);
+         Run(*n, 4800, 4800 * 2, nullptr, false, &cook);
+         const std::vector<float> p = Run(*n, 14400, 4800 * 2, nullptr, false, &cook);
+         float mn = 1.0f;
+         for (size_t i = 0; i < p.size(); i++)
+            mn = std::min(mn, std::fabs(p[i]));
+         seam[k] = mn;
+      }
+      if (seam[0] < 0.45f)
+         fail("fades: 0 ms fades still dip at the seam");
+      if (seam[1] > 0.1f)
+         fail("fades: 20 ms fades do not reach silence at the seam");
+   }
+
+   // 7) synced take: REC pressed mid-bar arms, starts on the bar line, and the
+   //    take is exactly one bar long, aligned to the grid.
+   {
+      transport.SetTempo(120.0f);
+      transport.SetTimeSignature(4, 4);
+      transport.SetPlaying(true);
+      transport.Rewind();
+      transport.NotifyAudioEngineStarted((double)kSr);
+      const int bar = 96000;
+      auto n = MakeLooper(MusicTime::k1Bar + 1, true, 0);
+      auto feed = [bar](int i) { return i == bar + 100 ? 0.9f : 0.0f; };
+      Run(*n, 0, 10 * kBlock, feed, true, &cook);
+      Press(*n, LooperNode::kRec);
+      Run(*n, 10 * kBlock, 20 * kBlock, feed, true, &cook);
+      if (n->CurrentState() != LooperNode::kArmed)
+         fail("sync: REC mid-bar did not arm");
+      const int upTo = bar + 2 * kBlock;
+      std::vector<float> out = Run(*n, 30 * kBlock, upTo - 30 * kBlock, feed, true, &cook);
+      if (n->CurrentState() != LooperNode::kRecording)
+         fail("sync: take did not start at the bar line");
+      const std::vector<float> rest = Run(*n, upTo, 2 * bar - upTo + 2 * kBlock, feed, true, &cook);
+      out.insert(out.end(), rest.begin(), rest.end());
+      if (n->CurrentState() != LooperNode::kPlaying || std::fabs(n->LoopSeconds() - 2.0f) > 3.0f / (float)kSr)
+         fail("sync: take is not exactly one bar");
+      // The click sits 100 frames after the bar line, so it plays 100 frames
+      // after the next bar line (2 * bar).
+      const int on = Onset(out, (size_t)(bar + 2 * kBlock - 30 * kBlock)) + 30 * kBlock; // out starts at frame 30 blocks
+      if (on < 0 || std::abs(on - (2 * bar + 100)) > 3)
+         fail("sync: take is not aligned to the grid");
+   }
+
+   transport.SetTempo(savedBpm);
+   transport.SetPlaying(savedPlaying);
+   printf("LOOPERTEST %s\n", ok ? "OK" : "FAIL");
+   return ok;
+}
+
+static bool RunMpcFixture()
+{
+   using namespace LooperMpcTest;
+   bool ok = true;
+   auto fail = [&](const char* what)
+   {
+      printf("MPCTEST %s FAIL\n", what);
+      ok = false;
+   };
+   int cook = 1000;
+   const std::string longWav = DrumSeqTest::WriteSustainedWav(TmpPath("infinite_mpc_long.wav"), kSr, kSr);
+   const std::string shortWav = DrumSeqTest::WriteSustainedWav(TmpPath("infinite_mpc_short.wav"), 2000, kSr);
+
+   auto make = [&]()
+   {
+      auto n = std::make_unique<MpcNode>();
+      n->CookIfNeeded(1);
+      n->GetAudioNode()->PrepareToPlay((double)kSr, kBlock);
+      n->CookIfNeeded(2);
+      return n;
+   };
+   auto hold = [&](MpcNode& n, int pad, bool down) { n.SetPadHeld(pad, down, 1.0f); };
+
+   {
+      auto n = make();
+      if (!n->LoadPad(3, longWav) || !n->LoadPad(1, longWav) || !n->LoadPad(7, shortWav))
+      {
+         fail("could not load the fixture samples");
+         return false;
+      }
+      n->padMode[1] = MpcNode::kGate;
+      n->padMode[7] = MpcNode::kLoopToggle;
+      n->CookIfNeeded(cook++);
+
+      // one shot: keeps sounding after release.
+      hold(*n, 3, true);
+      Run(*n, 0, 4 * kBlock, nullptr, false, &cook);
+      hold(*n, 3, false);
+      const std::vector<float> o1 = Run(*n, 0, 8 * kBlock, nullptr, false, &cook);
+      if (Peak(o1) < 0.3f || Peak(o1, 4 * kBlock) < 0.3f)
+         fail("one shot: stopped on release");
+      // let it ring out is not needed; restart a fresh node for the other modes.
+   }
+   {
+      auto n = make();
+      n->LoadPad(1, longWav);
+      n->padMode[1] = MpcNode::kGate;
+      n->CookIfNeeded(cook++);
+      hold(*n, 1, true);
+      const std::vector<float> held = Run(*n, 0, 6 * kBlock, nullptr, false, &cook);
+      hold(*n, 1, false);
+      const std::vector<float> rel = Run(*n, 0, 6 * kBlock, nullptr, false, &cook);
+      if (Peak(held, kBlock) < 0.3f)
+         fail("gate: silent while held");
+      if (Peak(rel, 2 * kBlock) > 1e-4f)
+         fail("gate: still sounding after release");
+   }
+   {
+      auto n = make();
+      n->LoadPad(7, shortWav);
+      n->padMode[7] = MpcNode::kLoopToggle;
+      n->CookIfNeeded(cook++);
+      hold(*n, 7, true);
+      hold(*n, 7, false);
+      const std::vector<float> on = Run(*n, 0, 40 * kBlock, nullptr, false, &cook);
+      if (Peak(on, 30 * kBlock) < 0.3f)
+         fail("loop: did not keep looping past the sample length");
+      hold(*n, 7, true);
+      hold(*n, 7, false);
+      const std::vector<float> off = Run(*n, 0, 6 * kBlock, nullptr, false, &cook);
+      if (Peak(off, 2 * kBlock) > 1e-4f)
+         fail("loop: second hit did not stop it");
+   }
+
+   // note input: notes 36..51 = pads 1..16 (fixed); other pads stay silent.
+   {
+      auto n = make();
+      n->LoadPad(5, longWav);
+      n->CookIfNeeded(cook++);
+      NoteEventQueue inbox;
+      n->GetAudioNode()->SetNoteInbox(&inbox, inbox.RegisterConsumer());
+      NoteEvent miss;
+      miss.note = 36 + 6;
+      miss.velocity = 1.0f;
+      miss.isNoteOn = true;
+      inbox.Push(miss);
+      const std::vector<float> none = Run(*n, 0, 3 * kBlock, nullptr, false, &cook);
+      NoteEvent on = miss;
+      on.note = 36 + 5;
+      inbox.Push(on);
+      const std::vector<float> hit = Run(*n, 0, 3 * kBlock, nullptr, false, &cook);
+      if (Peak(none) > 1e-4f)
+         fail("note in: an unmapped pad sounded");
+      if (Peak(hit) < 0.3f)
+         fail("note in: note 41 did not play pad 6");
+   }
+
+   // Polyphony: two pads held at once are independent voices. Releasing the
+   // gate pad leaves the loop pad sounding, and the mix is louder than either.
+   {
+      auto n = make();
+      n->LoadPad(0, longWav);
+      n->LoadPad(9, shortWav);
+      n->padMode[0] = MpcNode::kGate;
+      n->padMode[9] = MpcNode::kLoopToggle;
+      n->CookIfNeeded(cook++);
+      hold(*n, 0, true);
+      const std::vector<float> one = Run(*n, 0, 4 * kBlock, nullptr, false, &cook);
+      hold(*n, 9, true);
+      hold(*n, 9, false);
+      const std::vector<float> both = Run(*n, 0, 4 * kBlock, nullptr, false, &cook);
+      if (!(Peak(both) > Peak(one) * 1.05f))
+         fail("poly: two pads together are not louder than one");
+      hold(*n, 0, false);
+      const std::vector<float> rest = Run(*n, 0, 20 * kBlock, nullptr, false, &cook);
+      if (Peak(rest, 10 * kBlock) < 0.3f)
+         fail("poly: releasing the gate pad stopped the loop pad");
+      hold(*n, 9, true);
+      hold(*n, 9, false);
+      const std::vector<float> end = Run(*n, 0, 6 * kBlock, nullptr, false, &cook);
+      if (Peak(end, 2 * kBlock) > 1e-4f)
+         fail("poly: toggling the loop pad off left something playing");
+   }
+   // Per-pad params act on that pad only: volume 0 on pad 2 silences pad 2, not
+   // pad 4; speed 2 shortens a one shot to half; speed -1 plays backwards.
+   {
+      auto n = make();
+      n->LoadPad(2, longWav);
+      n->LoadPad(4, longWav);
+      n->padVolume[2] = 0.0f;
+      n->CookIfNeeded(cook++);
+      hold(*n, 2, true);
+      const std::vector<float> a = Run(*n, 0, 3 * kBlock, nullptr, false, &cook);
+      hold(*n, 2, false);
+      hold(*n, 4, true);
+      const std::vector<float> b = Run(*n, 0, 3 * kBlock, nullptr, false, &cook);
+      if (Peak(a) > 1e-4f)
+         fail("params: pad volume 0 still sounds");
+      if (Peak(b) < 0.3f)
+         fail("params: pad 3 volume 0 silenced pad 5");
+   }
+   {
+      auto n = make();
+      n->LoadPad(6, shortWav); // 2000 frames
+      n->padSpeed[6] = 2.0f;
+      n->CookIfNeeded(cook++);
+      hold(*n, 6, true);
+      hold(*n, 6, false);
+      const std::vector<float> o = Run(*n, 0, 6 * kBlock, nullptr, false, &cook);
+      // 2000 frames at 2x is ~1000 output frames: gone within 1300.
+      if (Peak(o, 1300) > 1e-4f || Peak(o) < 0.3f)
+         fail("speed 2: one shot did not finish in half the time");
+      n->padSpeed[6] = -1.0f;
+      n->CookIfNeeded(cook++);
+      hold(*n, 6, true);
+      hold(*n, 6, false);
+      const std::vector<float> r = Run(*n, 0, 6 * kBlock, nullptr, false, &cook);
+      if (Peak(r) < 0.3f)
+         fail("speed -1: reverse playback is silent");
+   }
+
+   // Per-pad fades: fade in 100 ms holds the first 64 frames near silence, 0 ms
+   // starts at full level.
+   {
+      float first[2] = { 0.0f, 1.0f };
+      for (int k = 0; k < 2; k++)
+      {
+         auto n = make();
+         n->LoadPad(0, longWav);
+         n->padFadeIn[0] = k == 0 ? 0.0f : 100.0f;
+         n->CookIfNeeded(cook++);
+         hold(*n, 0, true);
+         hold(*n, 0, false);
+         const std::vector<float> o = Run(*n, 0, 4 * kBlock, nullptr, false, &cook);
+         first[k] = Peak(o, 0, 64);
+      }
+      if (first[0] < 0.3f)
+         fail("fades: fade in 0 ms does not start at full level");
+      if (first[1] > 0.05f)
+         fail("fades: fade in 100 ms does not ramp the start");
+   }
+
+   // Per-pad sync: a Synced pad's hit is latched to the next grid line of the
+   // transport, sample-accurately; a Free pad is untouched; a stopped transport
+   // fires at once; a gate release before the line cancels; a synced loop pad
+   // re-triggers on every division.
+   {
+      Transport& transport = Transport::Instance();
+      const float savedBpm = transport.Tempo();
+      const bool savedPlaying = transport.IsPlaying();
+      auto startClock = [&]()
+      {
+         transport.SetTempo(120.0f);
+         transport.SetTimeSignature(4, 4);
+         transport.SetPlaying(true);
+         transport.Rewind();
+         transport.NotifyAudioEngineStarted((double)kSr);
+      };
+      const int pre = 10 * kBlock;           // frames run before the hit
+      const int quarter = kSr / 2;           // 1/4 note at 120 bpm
+      startClock();
+      {
+         auto n = make();
+         n->LoadPad(0, longWav);
+         n->padSync[0] = MpcNode::kSynced;
+         n->padDiv[0] = (int)MusicTime::kQuarter;
+         n->CookIfNeeded(cook++);
+         Run(*n, 0, pre, nullptr, true, &cook);
+         hold(*n, 0, true);
+         hold(*n, 0, false);
+         const std::vector<float> o = Run(*n, 0, quarter + 2000, nullptr, true, &cook);
+         const int on = Onset(o, 0, 0.02f);
+         if (on < 0 || std::abs(on - (quarter - pre)) > 40)
+            fail("sync: a 1/4 pad's hit did not land on the next quarter line");
+         if (Peak(o, 0, (size_t)(quarter - pre - 8)) > 1e-4f)
+            fail("sync: a synced pad sounded before its line");
+      }
+      startClock();
+      {
+         auto n = make();
+         n->LoadPad(0, longWav);
+         n->LoadPad(1, longWav);
+         n->padSync[0] = MpcNode::kSynced;
+         n->CookIfNeeded(cook++);
+         Run(*n, 0, pre, nullptr, true, &cook);
+         hold(*n, 1, true); // pad 2 is Free: immediate even with the transport running
+         hold(*n, 1, false);
+         const std::vector<float> o = Run(*n, 0, 3 * kBlock, nullptr, true, &cook);
+         if (Peak(o, 0, kBlock) < 0.3f)
+            fail("sync: a Free pad was delayed");
+      }
+      transport.SetPlaying(false);
+      {
+         auto n = make();
+         n->LoadPad(0, longWav);
+         n->padSync[0] = MpcNode::kSynced;
+         n->CookIfNeeded(cook++);
+         hold(*n, 0, true);
+         hold(*n, 0, false);
+         const std::vector<float> o = Run(*n, 0, 3 * kBlock, nullptr, false, &cook);
+         if (Peak(o, 0, kBlock) < 0.3f)
+            fail("sync: with the transport stopped a synced pad did not fire at once");
+      }
+      startClock();
+      {
+         auto n = make();
+         n->LoadPad(0, longWav);
+         n->padSync[0] = MpcNode::kSynced;
+         n->padMode[0] = MpcNode::kGate;
+         n->CookIfNeeded(cook++);
+         Run(*n, 0, pre, nullptr, true, &cook);
+         hold(*n, 0, true);
+         hold(*n, 0, false); // released before the line: the hit is cancelled
+         const std::vector<float> o = Run(*n, 0, quarter + 2000, nullptr, true, &cook);
+         if (Peak(o) > 1e-4f)
+            fail("sync: a gate released before the line still fired");
+      }
+      startClock();
+      {
+         auto n = make();
+         n->LoadPad(0, shortWav); // 2000 frames
+         n->padSync[0] = MpcNode::kSynced;
+         n->padMode[0] = MpcNode::kLoopToggle;
+         n->padDiv[0] = (int)MusicTime::kEighth; // 12000 frames
+         n->CookIfNeeded(cook++);
+         Run(*n, 0, pre, nullptr, true, &cook);
+         hold(*n, 0, true);
+         hold(*n, 0, false);
+         const int base = 12000 - pre;
+         const std::vector<float> o = Run(*n, 0, base + 3 * 12000, nullptr, true, &cook);
+         if (Peak(o, 0, (size_t)(base - 8)) > 1e-4f)
+            fail("sync loop: sounded before the first line");
+         for (int k = 0; k < 3; k++)
+         {
+            if (Peak(o, (size_t)(base + k * 12000 + 100), (size_t)(base + k * 12000 + 1500)) < 0.3f)
+               fail("sync loop: the sample was not re-triggered on a division line");
+            if (Peak(o, (size_t)(base + k * 12000 + 4000), (size_t)(base + k * 12000 + 11000)) > 1e-4f)
+               fail("sync loop: not one pass per division (the sample kept playing)");
+         }
+         hold(*n, 0, true); // toggle off, quantised too
+         hold(*n, 0, false);
+         const std::vector<float> off = Run(*n, 0, 3 * 12000, nullptr, true, &cook);
+         if (Peak(off, 12000 * 2, off.size()) > 1e-4f)
+            fail("sync loop: the second hit did not stop the loop");
+      }
+      transport.SetTempo(savedBpm);
+      transport.SetPlaying(savedPlaying);
+   }
+
+   printf("MPCTEST %s\n", ok ? "OK" : "FAIL");
+   return ok;
+}
+
 static int RunDspTest()
 {
    const bool gainOk = RunGainFixture();
@@ -55564,6 +57030,8 @@ static int RunDspTest()
    const bool paulStretchOk = RunPaulStretchFixture();
    const bool granularOk = RunGranularFixture();
    const bool drumSeqOk = RunDrumSequencerFixture();
+   const bool looperOk = RunLooperFixture();
+   const bool mpcOk = RunMpcFixture();
    const bool wavetableShaperOk = RunWavetableShaperFixture();
    const bool eqOk = RunEqFixture();
    const bool noteStackOk = RunNoteStackFixture();
@@ -55574,7 +57042,7 @@ static int RunDspTest()
    const bool audioDisplacementOk = RunAudioDisplacementFixture();
    const bool all = gainOk && filterOk && oscWaveformOk && noteSchedulingOk && envelopeOk && voiceStealOk &&
                     musicTimeOk && audioFilterOk && dynamicsOk && delayOk && reverbOk && samplerOk && slicerOk &&
-                    paulStretchOk && granularOk && drumSeqOk && wavetableShaperOk && eqOk && noteStackOk &&
+                    paulStretchOk && granularOk && drumSeqOk && looperOk && mpcOk && wavetableShaperOk && eqOk && noteStackOk &&
                     freqShifterOk && spectralSynthOk && waveTerrainOk && equationOk && audioDisplacementOk &&
                     portableFftOk;
    printf("%s\n", all ? "DSPTEST OK" : "DSPTEST SUSPECT");
@@ -67633,6 +69101,7 @@ int main(int argc, char** argv)
          getenv("INFINITE_GESTUREUNDOTEST") != nullptr ||
          getenv("INFINITE_CULLDRIVENTEST") != nullptr ||
          getenv("INFINITE_PREDBINDTEST") != nullptr ||
+         getenv("INFINITE_MPCMODTEST") != nullptr ||
          getenv("INFINITE_MODMATRIXGEOM") != nullptr;
 
       if (getenv("INFINITE_AUDIOUITEST") != nullptr)
@@ -69993,6 +71462,12 @@ int main(int argc, char** argv)
             // simplest way to reproduce it without a real Random node.
             SpawnNode("Range to Range", "Modulators", 60.0f, 500.0f);
             gNodes[0].showParams = true; // params must be drawn for them to register
+         }
+         if (getenv("INFINITE_MPCMODTEST") != nullptr)
+         {
+            SpawnNode("Range to Range", "Modulators", 60.0f, 500.0f); // gNodes[2]
+            SpawnNode("MPC", "Synths", 400.0f, 500.0f);               // gNodes[3]
+            gNodes[3].showParams = true;
          }
 #ifndef NDEBUG
          if (getenv("INFINITE_PREDBINDTEST") != nullptr)
@@ -72427,6 +73902,8 @@ int main(int argc, char** argv)
          int dropTargetLane =
             dropTargetDrum != nullptr ? DrumSequencerLaneForCanvasPos(dropTargetDrum, canvasPos.x, canvasPos.y) : 0;
          SamplerNode* dropTargetSampler = FindNodeUnderCanvasPoint<SamplerNode>(canvasPos);
+         MpcNode* dropTargetMpc = FindNodeUnderCanvasPoint<MpcNode>(canvasPos);
+         std::vector<std::string> mpcDropPaths;
          SlicerNode* dropTargetSlicer = FindNodeUnderCanvasPoint<SlicerNode>(canvasPos);
          PaulStretchNode* dropTargetPaul = FindNodeUnderCanvasPoint<PaulStretchNode>(canvasPos);
          GranularNode* dropTargetGran = FindNodeUnderCanvasPoint<GranularNode>(canvasPos);
@@ -72581,6 +74058,11 @@ int main(int argc, char** argv)
                   dropTargetDrum->LoadFileToLane(dropTargetLane, path);
                   dropTargetLane = (dropTargetLane + 1) % DrumSequencerNode::kNumLanes;
                   gPatchDirty = true;
+                  continue;
+               }
+               if (dropTargetMpc != nullptr)
+               {
+                  mpcDropPaths.push_back(path); // loaded together below, so a multi-file drop fills successive pads
                   continue;
                }
                if (dropTargetSampler != nullptr)
@@ -72834,6 +74316,12 @@ int main(int argc, char** argv)
             if (spawned != nullptr)
                spawned->showParams = true;
             offset += 240.0f;
+         }
+         if (dropTargetMpc != nullptr && !mpcDropPaths.empty())
+         {
+            ensureDroppedCheckpoint();
+            MpcDropFiles(dropTargetMpc, canvasPos.x, canvasPos.y, mpcDropPaths);
+            gPatchDirty = true;
          }
          if (!pendingAudioDropPaths.empty())
          {
@@ -93704,6 +95192,13 @@ int main(int argc, char** argv)
                   targetDrum->LoadFileToLane(lane, gSampleDragPath);
                   gPatchDirty = true;
                }
+               else if (MpcNode* targetMpc = FindNodeUnderCanvasPoint<MpcNode>(canvasMouse))
+               {
+                  // Dropped onto an MPC: onto the pad under the cursor, else the next empty one.
+                  PushUndoCheckpoint();
+                  MpcDropFiles(targetMpc, canvasMouse.x, canvasMouse.y, { gSampleDragPath });
+                  gPatchDirty = true;
+               }
                else if (SamplerNode* targetSampler = FindNodeUnderCanvasPoint<SamplerNode>(canvasMouse))
                {
                   // Dropped onto an existing Sampler: swap its file.
@@ -94350,6 +95845,7 @@ int main(int argc, char** argv)
                { "Audio File",     "Modulators", "Streaming playback & follower" },
                { "Slicer",         "Synths",     "Beat/transient slicer" },
                { "Drum Sequencer", "Synths",     "Step sequencer & drum kit" },
+               { "MPC",            "Synths",     "16-pad sample player" },
                { "PaulStretch",    "Synths",     "Extreme time-stretch & wash" },
                { "Granular",       "Synths",     "Granular cloud synthesis" },
                { "Grain Molder",   "Synths",     "Granular morph & shape" },
@@ -94360,7 +95856,21 @@ int main(int argc, char** argv)
             {
                if (ImGui::MenuItem(opt.name, opt.category))
                {
-                  if (std::string(opt.name) == "Drum Sequencer")
+                  if (std::string(opt.name) == "MPC")
+                  {
+                     GraphNode* spawned = SpawnNode(opt.name, opt.category, gAudioDropPicker.canvasPos.x,
+                                                    gAudioDropPicker.canvasPos.y);
+                     if (spawned != nullptr)
+                     {
+                        if (auto* mpc = dynamic_cast<MpcNode*>(spawned->node.get()))
+                           for (int i = 0; i < (int)gAudioDropPicker.paths.size() && i < MpcNode::kPads; ++i)
+                              mpc->LoadPad(i, gAudioDropPicker.paths[i]);
+                        spawned->showParams = true;
+                        gPatchDirty = true;
+                        RebuildAudioTopology();
+                     }
+                  }
+                  else if (std::string(opt.name) == "Drum Sequencer")
                   {
                      GraphNode* spawned = SpawnNode(opt.name, opt.category,
                                                     gAudioDropPicker.canvasPos.x,
@@ -96371,6 +97881,155 @@ int main(int argc, char** argv)
             // would race it and drop this frame's printf output when stdout
             // is fully-buffered (i.e. always, once redirected to a file).
             printf("%s\n", (test1Ok && test2Ok && test3Ok) ? "MOD BOUNDS TEST OK" : "SUSPECT");
+         }
+      }
+
+      // MPC modulation stability (spec 11): a binding on one pad's param must
+      // keep driving THAT pad and only that pad when another pad is selected,
+      // and must survive save/load. Every pad's every param has a fixed
+      // address (MpcNode::ParamId / the per-pad mode label), independent of
+      // the selected pad.
+      if (getenv("INFINITE_MPCMODTEST") != nullptr)
+      {
+         static bool ok = true;
+         static int mpcIdx = -1;
+         Modulation& mod = Modulation::Instance();
+         auto bad = [&](const char* what)
+         {
+            printf("MPC MOD TEST %s FAIL\n", what);
+            ok = false;
+         };
+         auto findMpc = [&]() -> MpcNode*
+         {
+            for (GraphNode& gn : gNodes)
+               if (auto* m = dynamic_cast<MpcNode*>(gn.node.get()))
+               {
+                  mpcIdx = gn.index;
+                  return m;
+               }
+            return nullptr;
+         };
+         auto findR2R = [&]() -> RangeToRangeNode*
+         {
+            for (GraphNode& gn : gNodes)
+               if (auto* r = dynamic_cast<RangeToRangeNode*>(gn.node.get()))
+                  return r;
+            return nullptr;
+         };
+         auto r2rIndex = [&]() -> int
+         {
+            for (GraphNode& gn : gNodes)
+               if (dynamic_cast<RangeToRangeNode*>(gn.node.get()) != nullptr)
+                  return gn.index;
+            return -1;
+         };
+         MpcNode* mpc = findMpc();
+         RangeToRangeNode* r2r = findR2R();
+         const int volA = mpc != nullptr ? MpcNode::ParamId(2, MpcNode::kVolume) : -1;
+         if (frameId == 1 && mpc != nullptr && r2r != nullptr)
+         {
+            r2r->outLow = r2r->outHigh = 1.0f;
+            r2r->clampOutput = true;
+            r2r->constantIn = 1.0f;
+            mpc->selectedPad = 0;
+            mod.Bind(mpcIdx, volA, r2rIndex());
+            mod.SetRange(mpcIdx, volA, 0.2f, 0.6f);
+            const int modeSlot = DiscreteParamSlot(mpcIdx, MpcModeLabel(2));
+            mod.Bind(mpcIdx, modeSlot, r2rIndex());
+            // The per-pad transport and fade params: a float and two dropdowns.
+            const int fadeA = MpcNode::ParamId(2, MpcNode::kFadeIn);
+            mod.Bind(mpcIdx, fadeA, r2rIndex());
+            mod.SetRange(mpcIdx, fadeA, 50.0f, 150.0f);
+            mod.Bind(mpcIdx, DiscreteParamSlot(mpcIdx, MpcDiscreteLabel(2, kMpcSync)), r2rIndex());
+            mod.Bind(mpcIdx, DiscreteParamSlot(mpcIdx, MpcDiscreteLabel(2, kMpcDiv)), r2rIndex());
+         }
+         auto checkAddresses = [&](const char* when)
+         {
+            // Every pad's every float param registered under its fixed id, at
+            // that pad's own storage, with a per-pad name.
+            for (int p = 0; p < MpcNode::kPads; p++)
+               for (int k = 0; k < MpcNode::kNumPadParams; k++)
+               {
+                  const ParamRef* r = nullptr;
+                  for (const ParamRef& fr : mod.FrameParams())
+                     if (fr.nodeIndex == mpcIdx && fr.paramIndex == MpcNode::ParamId(p, k))
+                        r = &fr;
+                  if (r == nullptr || r->value != mpc->PadParamPtr(p, k) || r->name != MpcParamName(p, k))
+                  {
+                     char what[96];
+                     snprintf(what, sizeof(what), "%s: pad %d param %d not at its fixed address", when, p + 1, k);
+                     bad(what);
+                     return;
+                  }
+               }
+         };
+         if (frameId == 8 && mpc != nullptr)
+         {
+            checkAddresses("selected pad 1");
+            if (std::fabs(mpc->padVolume[2] - 0.6f) > 1e-3f || mpc->padMode[2] != MpcNode::kLoopToggle)
+               bad("binding did not drive pad 3 (volume 0.6, mode loop)");
+            if (std::fabs(mpc->padVolume[0] - 0.8f) > 1e-6f || mpc->padMode[0] != MpcNode::kOneShot)
+               bad("binding leaked onto the selected pad 1");
+            if (std::fabs(mpc->padFadeIn[2] - 150.0f) > 0.5f || mpc->padDiv[2] != (int)MusicTime::kNumRateDivisions - 1 ||
+                mpc->padSync[2] != MpcNode::kFree)
+               bad("binding did not drive pad 3's fade in (150) / rate (1/64) / sync (Free)");
+            if (std::fabs(mpc->padFadeIn[0] - 3.0f) > 1e-6f || mpc->padDiv[0] != (int)MusicTime::kQuarter ||
+                mpc->padSync[0] != MpcNode::kFree)
+               bad("fade / sync / rate binding leaked onto the selected pad 1");
+            mpc->selectedPad = 5; // the whole point
+            r2r->outLow = r2r->outHigh = 0.0f;
+         }
+         if (frameId == 14 && mpc != nullptr)
+         {
+            checkAddresses("selected pad 6");
+            if (!mod.IsModulated(mpcIdx, volA) || mod.IsModulated(mpcIdx, MpcNode::ParamId(5, MpcNode::kVolume)))
+               bad("selecting pad 6 moved the binding");
+            if (std::fabs(mpc->padVolume[2] - 0.2f) > 1e-3f)
+               bad("pad 3 stopped following its cable while pad 6 was selected");
+            if (std::fabs(mpc->padVolume[5] - 0.8f) > 1e-6f || mpc->padMode[5] != MpcNode::kOneShot)
+               bad("the cable also drove the selected pad 6");
+            if (std::fabs(mpc->padFadeIn[2] - 50.0f) > 0.5f || mpc->padDiv[2] != 0 || mpc->padSync[2] != MpcNode::kSynced)
+               bad("pad 3's fade in / rate / sync stopped following its cable while pad 6 was selected");
+            if (std::fabs(mpc->padFadeIn[5] - 3.0f) > 1e-6f || mpc->padDiv[5] != (int)MusicTime::kQuarter ||
+                mpc->padSync[5] != MpcNode::kFree)
+               bad("the fade / sync / rate cables also drove the selected pad 6");
+            SavePatchTo(TmpPath("infinite_mpcmodtest.infinite"));
+         }
+         if (frameId == 16)
+         {
+            NewPatch();
+            LoadPatchFrom(TmpPath("infinite_mpcmodtest.infinite"));
+            mpc = nullptr; // indices changed; re-resolved below
+         }
+         if (frameId == 26)
+         {
+            mpc = findMpc();
+            if (mpc == nullptr)
+               bad("MPC missing after reload");
+            else
+            {
+               const int vol = MpcNode::ParamId(2, MpcNode::kVolume);
+               const int modeSlot = DiscreteParamSlot(mpcIdx, MpcModeLabel(2));
+               const Modulation::Source src = mod.ModulatorFor(mpcIdx, vol);
+               if (!mod.IsModulated(mpcIdx, vol) || !mod.IsModulated(mpcIdx, modeSlot) ||
+                   mod.IsModulated(mpcIdx, MpcNode::ParamId(5, MpcNode::kVolume)))
+                  bad("bindings did not survive save/load on the right pad");
+               if (!mod.IsModulated(mpcIdx, MpcNode::ParamId(2, MpcNode::kFadeIn)) ||
+                   !mod.IsModulated(mpcIdx, DiscreteParamSlot(mpcIdx, MpcDiscreteLabel(2, kMpcSync))) ||
+                   !mod.IsModulated(mpcIdx, DiscreteParamSlot(mpcIdx, MpcDiscreteLabel(2, kMpcDiv))) ||
+                   mod.IsModulated(mpcIdx, MpcNode::ParamId(5, MpcNode::kFadeIn)))
+                  bad("fade / sync / rate bindings did not survive save/load on the right pad");
+               if (!src.hasRange || std::fabs(src.lo - 0.2f) > 1e-4f || std::fabs(src.hi - 0.6f) > 1e-4f)
+                  bad("binding range changed across save/load");
+               if (mpc->selectedPad != 5)
+                  bad("selected pad was not restored");
+               checkAddresses("after reload");
+               if (std::fabs(mpc->padVolume[2] - 0.2f) > 1e-3f)
+                  bad("pad 3 not driven after reload");
+               if (std::fabs(mpc->padVolume[5] - 0.8f) > 1e-6f)
+                  bad("reload put the cable on the selected pad");
+            }
+            printf("%s\n", ok ? "MPC MOD TEST OK" : "MPC MOD TEST FAIL");
          }
       }
 
