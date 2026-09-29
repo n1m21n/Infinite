@@ -99,6 +99,7 @@ namespace PatchSchema
    {
       std::string s = "{\"type\":" + Q(t.name) + ",\"category\":" + Q(t.category);
       s += ",\"hardware_driven\":" + std::string(t.hardwareDriven ? "true" : "false");
+      s += ",\"can_bypass\":" + std::string(t.canBypass ? "true" : "false");
       s += ",\"params\":[";
       for (size_t i = 0; i < t.params.size(); i++)
       {
@@ -158,6 +159,13 @@ namespace PatchSchema
                                   "did you mean: " + Join(Nearest(n.typeName, env.allTypes, 3))));
             continue;
          }
+         if (n.bypassed && !t->canBypass)
+         {
+            Headless::Issue is = Make("W_BYPASS_IGNORED",
+                                      t->name + " cannot be bypassed (it has more than one input, or it is an instrument with no pass-through), so bypassed=1 is ignored and the node stays on",
+                                      n.line, n.index, "remove the node or its cables to switch it off; only single-input nodes can be bypassed");
+            (env.forRender ? errors : warnings).push_back(is);
+         }
          std::set<std::string> seenKeys;
          std::vector<std::string> keys;
          for (const ParamInfo& p : t->params)
@@ -196,8 +204,23 @@ namespace PatchSchema
 
       auto checkCables = [&](const std::vector<Patch::CableRecord>& list, const char* tag)
       {
+         std::map<std::pair<int, int>, int> slotLine; // (dst, slot) -> line of the first cable
          for (const Patch::CableRecord& c : list)
          {
+            // Two cables into one slot: the later one silently replaces the first.
+            if (known(c.dstIndex))
+            {
+               auto ins = slotLine.insert({ { c.dstIndex, c.dstSlot }, c.line });
+               if (!ins.second)
+               {
+                  errors.push_back(Make("E_SLOT_TAKEN",
+                                        typeOf(c.dstIndex) + " slot " + std::to_string(c.dstSlot) + " already has a cable (line " +
+                                           std::to_string(ins.first->second) + "); this one (line " + std::to_string(c.line) +
+                                           ") would replace it",
+                                        c.line, c.dstIndex, "an input takes one cable; one output can feed many inputs, so fan out from the source, or merge with a Blend/Mixer"));
+                  continue;
+               }
+            }
             if (!known(c.dstIndex) || !known(c.srcIndex))
             {
                errors.push_back(Make("E_DANGLING",
@@ -260,8 +283,29 @@ namespace PatchSchema
             errors.push_back(Make("E_DANGLING", "mod line refers to a node that does not exist", m.line,
                                   !known(m.dstIndex) ? m.dstIndex : m.srcIndex));
          else
+         {
             flowsTo.insert({ m.srcIndex, m.dstIndex });
+            const TypeSchema* srcSchema = env.schema(typeOf(m.srcIndex));
+            if (srcSchema != nullptr)
+            {
+               const bool ok = m.srcOutput >= 0 && m.srcOutput < (int)srcSchema->outputs.size() &&
+                               srcSchema->outputs[m.srcOutput].modulator;
+               if (!ok)
+               {
+                  std::string which;
+                  for (size_t o = 0; o < srcSchema->outputs.size(); o++)
+                     if (srcSchema->outputs[o].modulator)
+                        which += (which.empty() ? "" : ", ") + std::to_string(o);
+                  errors.push_back(Make("E_NOT_A_MODULATOR",
+                                        typeOf(m.srcIndex) + " output " + std::to_string(m.srcOutput) + " is not a modulator, so it cannot drive a parameter",
+                                        m.line, m.dstIndex,
+                                        which.empty() ? "use an LFO, Envelope, Macro, Path or an analyzer output as the mod source"
+                                                      : "that node's modulator outputs are: " + which));
+               }
+            }
+         }
       }
+      CheckParamIndices(data, env, errors);
       for (const Patch::ExprRecord& e : data.expressions)
          if (!known(e.dstIndex))
             errors.push_back(Make("E_DANGLING", "expr line refers to node " + std::to_string(e.dstIndex) + " which does not exist",
@@ -306,6 +350,72 @@ namespace PatchSchema
       findCycle(data.audio, "audio");
       findCycle(data.notes, "note");
 
+      // Image and geometry loops. The cook hands a node its own last-frame
+      // texture when it meets it again, so a loop of plain nodes is a hidden
+      // one-frame delay whose result depends on cook order. A Feedback node
+      // is the sanctioned delay: edges leaving one do not count. Modulator-
+      // input pins (Math, Smooth...) ride on `geo` lines too; those loops are
+      // a different case and not reported here.
+      {
+         std::map<int, std::vector<int>> adj;
+         auto addEdges = [&](const std::vector<Patch::CableRecord>& list)
+         {
+            for (const Patch::CableRecord& c : list)
+            {
+               if (!known(c.srcIndex) || !known(c.dstIndex) || typeOf(c.srcIndex) == "Feedback")
+                  continue;
+               const TypeSchema* d = env.schema(typeOf(c.dstIndex));
+               bool modSlot = false;
+               if (d != nullptr)
+                  for (const SlotInfo& in : d->inputs)
+                     if (in.slot == c.dstSlot && in.kind == "modulator")
+                        modSlot = true;
+               if (!modSlot)
+                  adj[c.srcIndex].push_back(c.dstIndex);
+            }
+         };
+         addEdges(data.cables);
+         addEdges(data.geometry);
+         std::map<int, int> state;
+         std::vector<int> path;
+         std::set<int> inReported;
+         std::function<void(int)> dfs = [&](int u)
+         {
+            state[u] = 1;
+            path.push_back(u);
+            for (int v : adj[u])
+            {
+               if (state[v] == 1)
+               {
+                  std::string names;
+                  bool on = false;
+                  bool fresh = false;
+                  for (int n : path)
+                  {
+                     if (n == v)
+                        on = true;
+                     if (on)
+                     {
+                        names += typeOf(n) + " " + std::to_string(n) + " -> ";
+                        fresh = inReported.insert(n).second || fresh;
+                     }
+                  }
+                  if (fresh)
+                     warnings.push_back(Make("W_IMAGE_CYCLE",
+                                             "these nodes feed each other with no Feedback node in the loop: " + names + typeOf(v) + " " + std::to_string(v),
+                                             0, v, "the loop becomes a hidden one-frame delay whose result depends on cook order; put a Feedback node in it"));
+               }
+               else if (state[v] == 0)
+                  dfs(v);
+            }
+            path.pop_back();
+            state[u] = 2;
+         };
+         for (const auto& kv : adj)
+            if (state[kv.first] == 0)
+               dfs(kv.first);
+      }
+
       // Terminals: an Output or the audio master. Everything that cannot reach one does nothing.
       std::vector<int> terminals;
       int outputs = 0;
@@ -340,5 +450,73 @@ namespace PatchSchema
       for (const Patch::NodeRecord& n : data.nodes)
          if (!reaches.count(n.index) && env.schema(n.typeName) != nullptr)
             warnings.push_back(Make("W_UNUSED_NODE", n.typeName + " does not reach an Output or Audio Out", n.line, n.index));
+
+      // Cables per destination, by slot, over every cable kind.
+      std::map<int, std::set<int>> filled;
+      for (const auto* list : { &data.cables, &data.geometry, &data.audio, &data.notes })
+         for (const Patch::CableRecord& c : *list)
+            if (known(c.srcIndex) && known(c.dstIndex))
+               filled[c.dstIndex].insert(c.dstSlot);
+
+      // A merge node with an empty input does not fail, it dims: the missing
+      // side counts as transparent black (or silence). Only where it matters,
+      // that is on a node that reaches an Output.
+      struct MergeRule { const char* type; size_t need; const char* what; };
+      static const MergeRule kMerge[] = { { "Blend", 2, "both A and B" },
+                                          { "Blend Audio", 2, "both A and B" },
+                                          { "Layer Stack", 1, "at least its base layer" },
+                                          { "Mixer", 1, "at least one input" } };
+      for (const Patch::NodeRecord& n : data.nodes)
+      {
+         if (!reaches.count(n.index))
+            continue;
+         for (const MergeRule& r : kMerge)
+            if (n.typeName == r.type && filled[n.index].size() < r.need)
+               warnings.push_back(Make("W_OPEN_INPUT",
+                                       n.typeName + " needs " + r.what + " connected; " + std::to_string(filled[n.index].size()) +
+                                          " of its inputs " + (filled[n.index].size() == 1 ? "is" : "are") + " wired, so the empty side counts as transparent black or silence",
+                                       n.line, n.index, "cable something into every input, or use a single-input node instead"));
+      }
+
+      // An Output whose image pin is empty renders a blank frame without complaint.
+      for (const Patch::NodeRecord& n : data.nodes)
+      {
+         if (n.typeName != "Output")
+            continue;
+         bool imageWired = false;
+         for (const Patch::CableRecord& c : data.cables)
+            if (c.dstIndex == n.index && c.dstSlot == 0 && known(c.srcIndex))
+               imageWired = true;
+         if (!imageWired)
+            warnings.push_back(Make("W_OUTPUT_EMPTY", "Output " + std::to_string(n.index) + " has nothing cabled into its image input, so every frame is blank",
+                                    n.line, n.index, "add a 'cable " + std::to_string(n.index) + " 0 <source node>' line"));
+      }
+   }
+
+   void CheckParamIndices(const Patch::Data& data, const Env& env, std::vector<Headless::Issue>& errors)
+   {
+      if (!env.maxParamIndex)
+         return;
+      std::map<int, std::string> typeOfIndex;
+      for (const Patch::NodeRecord& n : data.nodes)
+         typeOfIndex[n.index] = n.typeName;
+      auto check = [&](int dst, int param, int line, const char* what)
+      {
+         auto it = typeOfIndex.find(dst);
+         if (it == typeOfIndex.end())
+            return;
+         const int max = env.maxParamIndex(it->second);
+         if (max == -2)
+            return;
+         if (param < 0 || param > max)
+            errors.push_back(Make("E_BAD_PARAM",
+                                  std::string(what) + " line targets parameter " + std::to_string(param) + " but " + it->second +
+                                     (max < 0 ? " has no modulatable parameters" : " only has parameters 0.." + std::to_string(max)),
+                                  line, dst, "run Infinite --describe \"" + it->second + "\" for the modulatable indices"));
+      };
+      for (const Patch::ModRecord& m : data.modulation)
+         check(m.dstIndex, m.dstParam, m.line, "mod");
+      for (const Patch::ExprRecord& e : data.expressions)
+         check(e.dstIndex, e.dstParam, e.line, "expr");
    }
 }

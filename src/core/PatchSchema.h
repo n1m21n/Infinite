@@ -47,6 +47,7 @@ namespace PatchSchema
    {
       std::string label;
       std::string kind; // image | geometry | modulator | audio | note | palette | camera | light
+      bool modulator = false; // a `mod` line may read this output (a modulator or a predictor)
    };
 
    struct TypeSchema
@@ -58,6 +59,7 @@ namespace PatchSchema
       std::vector<OutputInfo> outputs;
       std::vector<ModulatableInfo> modulatable;
       bool hardwareDriven = false;
+      bool canBypass = false; // `flags bypassed=1` takes effect (CanBypass in main.cpp)
    };
 
    // Answer of the connection rule for one record.
@@ -71,7 +73,13 @@ namespace PatchSchema
       // The real rule (IsInputSlotCompatible via probe nodes). tag is
       // cable|geo|aud|note.
       std::function<Link(const std::string& srcType, int srcOutput, const std::string& dstType, int dstSlot)> link;
-      bool forRender = false; // E_NO_OUTPUT is an error rather than silence
+      // Highest `mod`/`expr` parameter index the node type registers when drawn:
+      // -2 = not known here, -1 = it registers none. Filled from a drawn node,
+      // so it is only available once a window has drawn one.
+      std::function<int(const std::string& type)> maxParamIndex;
+      // Strict: E_NO_OUTPUT is an error rather than silence, and so is
+      // W_BYPASS_IGNORED (the render would not match what the author wrote).
+      bool forRender = false;
    };
 
    std::string ParamKindName(char kind);
@@ -79,6 +87,11 @@ namespace PatchSchema
 
    // The `n` closest names to `word` by edit distance (case-insensitive).
    std::vector<std::string> Nearest(const std::string& word, const std::vector<std::string>& pool, size_t n);
+
+   // E_BAD_PARAM for `mod`/`expr` lines whose parameter index the destination
+   // does not have. Split out because the index list only exists after a node
+   // has been drawn, which a render checks after loading. Needs env.maxParamIndex.
+   void CheckParamIndices(const Patch::Data& data, const Env& env, std::vector<Headless::Issue>& errors);
 
    // Appends to `errors` / `warnings`. Never mutates `data`.
    void Validate(const Patch::Data& data, const Env& env, std::vector<Headless::Issue>& errors,

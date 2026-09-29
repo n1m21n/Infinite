@@ -1182,6 +1182,12 @@ namespace
    double gHeadlessAudioRate = 0.0;
    // Validator warnings from the load, folded into the job's status JSON.
    std::vector<Headless::Issue> gHeadlessPreWarnings;
+   // The authored patch of a --render/--frame job, kept so the checks that need
+   // drawn nodes (E_BAD_PARAM) can run once the graph is loaded.
+   Patch::Data gHeadlessPatch;
+   // Highest `mod`/`expr` parameter index per node type, read off drawn nodes
+   // (-1 = registers none). Absent = not measured, so E_BAD_PARAM stays quiet.
+   std::map<std::string, int> gModulatableMax;
 
    bool HeadlessJobActive()
    {
@@ -7921,9 +7927,13 @@ namespace
          }
          const int outs = std::max(1, gn->node->OutputCount());
          for (int o = 0; o < outs; o++)
+         {
+            const SrcCaps caps = CapsOf(gn, o);
             t->outputs.push_back({ gn->node->OutputLabel(o) != nullptr ? gn->node->OutputLabel(o) : "out",
-                                   KindOfOutput(CapsOf(gn, o)) });
+                                   KindOfOutput(caps), caps.modulator || caps.predictor });
+         }
          t->hardwareDriven = gn->node->IsHardwareDriven();
+         t->canBypass = CanBypass(*gn);
       }
       const PatchSchema::TypeSchema* raw = t.get();
       sSchemas[typeName] = std::move(t);
@@ -7947,6 +7957,11 @@ namespace
          if (!SlotKindOf(*dst, dstSlot, kind))
             return PatchSchema::Link::BadSlot;
          return CapsAcceptedBy(CapsOf(src, srcOut), dst, dstSlot) ? PatchSchema::Link::Ok : PatchSchema::Link::KindMismatch;
+      };
+      env.maxParamIndex = [](const std::string& type)
+      {
+         auto it = gModulatableMax.find(type);
+         return it == gModulatableMax.end() ? -2 : it->second;
       };
       env.forRender = forRender;
       return env;
@@ -66347,13 +66362,56 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
 
    if (job.mode == Headless::Mode::Validate)
    {
-      Patch::Data data;
-      std::string err;
-      if (!Patch::Read(job.patch, data, err))
-         return fail("E_LOAD", err);
+      static Patch::Data sData;
+      static std::vector<std::pair<std::string, int>> sProbed; // type, node index
+      const int t = ++sTicks;
+      if (t == 1)
+      {
+         std::string err;
+         if (!Patch::Read(job.patch, sData, err))
+            return fail("E_LOAD", err);
+         // The parameter indices a `mod`/`expr` line may use only exist once a
+         // node has been drawn, so draw one of each type the file drives.
+         std::set<std::string> driven;
+         std::map<int, std::string> typeOfIndex;
+         for (const Patch::NodeRecord& n : sData.nodes)
+            typeOfIndex[n.index] = n.typeName;
+         for (const Patch::ModRecord& m : sData.modulation)
+            if (typeOfIndex.count(m.dstIndex))
+               driven.insert(typeOfIndex[m.dstIndex]);
+         for (const Patch::ExprRecord& e : sData.expressions)
+            if (typeOfIndex.count(e.dstIndex))
+               driven.insert(typeOfIndex[e.dstIndex]);
+         int i = 0;
+         for (const std::string& type : driven)
+         {
+            const PatchSchema::TypeSchema* ts = SchemaFor(type);
+            if (ts == nullptr || ts->hardwareDriven)
+               continue;
+            GraphNode* gn = SpawnNode(type, ts->category, (float)(i % 16) * 420.0f, (float)(i / 16) * 700.0f);
+            if (gn == nullptr)
+               continue;
+            gn->showParams = true;
+            sProbed.push_back({ type, gn->index });
+            i++;
+         }
+         if (!sProbed.empty())
+            return;
+      }
+      else if (t < 8 && !sProbed.empty())
+         return;
+
+      for (const auto& pr : sProbed)
+      {
+         int max = -1;
+         for (const ParamRef& r : Modulation::Instance().FrameParams())
+            if (r.nodeIndex == pr.second)
+               max = std::max(max, r.paramIndex);
+         gModulatableMax[pr.first] = max;
+      }
       const PatchSchema::Env env = MakeSchemaEnv(job.forRender);
-      PatchSchema::Validate(data, env, sStatus.errors, sStatus.warnings);
-      sStatus.extraJson.push_back("\"nodes\":" + std::to_string(data.nodes.size()));
+      PatchSchema::Validate(sData, env, sStatus.errors, sStatus.warnings);
+      sStatus.extraJson.push_back("\"nodes\":" + std::to_string(sData.nodes.size()));
       sPhase = Phase::Done;
       HeadlessFinish(window, sStatus, sWall);
       return;
@@ -66436,6 +66494,30 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
    {
       if (++sTicks < 3)
          return;
+
+      // E_BAD_PARAM needs drawn nodes, so it is checked here on the loaded
+      // graph rather than in the strict pass before load.
+      {
+         for (const ParamRef& r : Modulation::Instance().FrameParams())
+            if (GraphNode* g = FindNodeByIndex(r.nodeIndex))
+            {
+               auto it = gModulatableMax.find(g->typeName);
+               gModulatableMax[g->typeName] = std::max(it == gModulatableMax.end() ? -1 : it->second, r.paramIndex);
+            }
+         for (GraphNode& g : gNodes)
+            if (!gModulatableMax.count(g.typeName))
+               gModulatableMax[g.typeName] = -1;
+         std::vector<Headless::Issue> bad;
+         PatchSchema::CheckParamIndices(gHeadlessPatch, MakeSchemaEnv(true), bad);
+         if (!bad.empty())
+         {
+            for (const Headless::Issue& is : bad)
+               sStatus.errors.push_back(is);
+            sPhase = Phase::Done;
+            HeadlessFinish(window, sStatus, sWall);
+            return;
+         }
+      }
 
       // Resolve the Output. --output takes a node index or a display name.
       std::vector<int> outs;
@@ -69952,6 +70034,7 @@ int main(int argc, char** argv)
          const PatchSchema::Env env = MakeSchemaEnv(gHeadlessJob.mode == Headless::Mode::Render ||
                                                     gHeadlessJob.mode == Headless::Mode::Frame);
          PatchSchema::Validate(probe, env, st.errors, gHeadlessPreWarnings);
+         gHeadlessPatch = probe;
          if (!st.errors.empty())
          {
             st.warnings = gHeadlessPreWarnings;

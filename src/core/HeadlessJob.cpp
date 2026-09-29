@@ -286,7 +286,8 @@ namespace Headless
          return 2;
       if (c == "E_LOAD" || c == "E_NO_OUTPUT" || c == "E_AMBIGUOUS_OUTPUT" || c == "E_UNKNOWN_TYPE" ||
           c == "E_BAD_SLOT" || c == "E_KIND_MISMATCH" || c == "E_DANGLING" || c == "E_CYCLE" ||
-          c == "E_DUPLICATE_INDEX")
+          c == "E_DUPLICATE_INDEX" || c == "E_SLOT_TAKEN" || c == "E_NOT_A_MODULATOR" || c == "E_BAD_PARAM" ||
+          c == "W_BYPASS_IGNORED")
          return 3;
       if (c == "E_HARDWARE_SOURCE")
          return 4;
