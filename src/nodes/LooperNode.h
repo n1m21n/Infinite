@@ -50,6 +50,7 @@ public:
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
    void VisitParams(ParamVisitor& v) override;
+   void SweepPrepare() override;
 
    INode* BypassSource() override { return input.GetSource(); }
    AudioNode* GetAudioNode() override;

@@ -45,6 +45,9 @@ public:
    {
       const double sr = sampleRate > 0.0 ? sampleRate : 48000.0;
       mSampleRate.store(sr, std::memory_order_relaxed);
+      // Start the gain ramps at their targets, not at construction defaults.
+      mThruNow = mThru.load(std::memory_order_relaxed);
+      mLevelNow = mLevel.load(std::memory_order_relaxed);
       if (mBufRate == sr)
          return;
       auto* buf = new LoopBuf();
@@ -118,7 +121,10 @@ public:
             break;
          const int cmd = mCmds[head];
          mCmdHead.store((head + 1) % kCmdCapacity, std::memory_order_release);
-         ApplyButton(cmd);
+         if (cmd < 0)
+            SeedTone(); // sweep rig only (LooperNode::SweepPrepare)
+         else
+            ApplyButton(cmd);
       }
 
       // An armed take starts on the first grid line inside this block.
@@ -273,6 +279,25 @@ private:
       mPos = mTakeComp % mLength;
    }
 
+   // Fills the loop with one second of a tone and starts playing it, so the
+   // AUDIOPARAMSWEEPTEST rig has a loop to observe level and thru against.
+   void SeedTone()
+   {
+      if (mBuf == nullptr || mBuf->capacity < kMinTakeFrames)
+         return;
+      const double sr = mSampleRate.load(std::memory_order_relaxed);
+      mLength = (int)std::min<double>(mBuf->capacity, sr);
+      for (int i = 0; i < mLength; i++)
+      {
+         const float v = 0.5f * (float)std::sin(6.283185307179586 * 220.0 * (double)i / sr);
+         mBuf->ch[0][(size_t)i] = v;
+         mBuf->ch[1][(size_t)i] = v;
+      }
+      mPos = 0;
+      mTakeComp = 0;
+      mState = LooperNode::kPlaying;
+   }
+
    void ApplyButton(int button)
    {
       switch (button)
@@ -407,6 +432,12 @@ void LooperNode::SetButtonLevel(int button, bool level)
       GetAudioNode();
       mAudioNode->PushCommand(button);
    }
+}
+
+void LooperNode::SweepPrepare()
+{
+   GetAudioNode();
+   mAudioNode->PushCommand(-1);
 }
 
 void LooperNode::CookIfNeeded(int frameId)

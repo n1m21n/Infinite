@@ -6150,7 +6150,7 @@ namespace
       REGISTER_NODE(FieldGraphNode, Field Graph, "Utility");
       REGISTER_NODE(DrumSequencerNode, Drum Sequencer, "Synths");
       REGISTER_NODE(MpcNode, MPC, "Synths");
-      REGISTER_NODE(MpcOutNode, MPC Out, "Synths");
+      REGISTER_NODE(MpcOutNode, MPC Out, "AudioEffects");
       REGISTER_NODE(LooperNode, Looper, "AudioEffects");
       // Third-party plugin hosting (Audio Units). Its params reach the plugin
       // directly rather than through ParamMailbox - see AudioPluginNode.h.
@@ -55821,6 +55821,395 @@ static bool RunSlicerFixture()
    return ok;
 }
 
+
+// ------------------------------------------------------------ LOOPERTEST / MPCTEST
+namespace LooperMpcTest
+{
+   constexpr int kSr = 48000;
+   constexpr int kBlock = 256;
+
+   // Drives a node's audio half block by block. `feed(i)` gives the input
+   // sample at absolute frame i (mono, copied to both channels); pass an empty
+   // function for no input. Returns the left channel.
+   template <typename NodeT>
+   std::vector<float> Run(NodeT& node, int startFrame, int frames, const std::function<float(int)>& feed,
+                          bool advanceTransport, int* cookId)
+   {
+      AudioNode* an = node.GetAudioNode();
+      std::vector<float> out;
+      out.reserve((size_t)frames);
+      int done = 0;
+      while (done < frames)
+      {
+         const int n = std::min(kBlock, frames - done);
+         if (advanceTransport)
+            Transport::Instance().AdvanceAudioClock(n);
+         node.CookIfNeeded((*cookId)++);
+         std::vector<float> inL((size_t)n, 0.0f), inR((size_t)n, 0.0f), oL((size_t)n, 0.0f), oR((size_t)n, 0.0f);
+         if (feed)
+            for (int i = 0; i < n; i++)
+               inL[(size_t)i] = inR[(size_t)i] = feed(startFrame + done + i);
+         float* inCh[2] = { inL.data(), inR.data() };
+         float* outCh[2] = { oL.data(), oR.data() };
+         AudioBuffer inBuf;
+         inBuf.channels = inCh;
+         inBuf.numChannels = 2;
+         inBuf.numFrames = n;
+         AudioBuffer outBuf;
+         outBuf.channels = outCh;
+         outBuf.numChannels = 2;
+         outBuf.numFrames = n;
+         const AudioBuffer* ins[1] = { &inBuf };
+         an->ProcessBlock(feed ? ins : nullptr, feed ? 1 : 0, outBuf);
+         out.insert(out.end(), oL.begin(), oL.end());
+         done += n;
+      }
+      node.CookIfNeeded((*cookId)++);
+      return out;
+   }
+
+   float Peak(const std::vector<float>& v, size_t from = 0, size_t to = (size_t)-1)
+   {
+      float p = 0.0f;
+      for (size_t i = from; i < v.size() && i < to; i++)
+         p = std::max(p, std::fabs(v[i]));
+      return p;
+   }
+
+   float Rms(const std::vector<float>& v, size_t from, size_t to)
+   {
+      double a = 0.0;
+      size_t n = 0;
+      for (size_t i = from; i < v.size() && i < to; i++, n++)
+         a += (double)v[i] * v[i];
+      return n > 0 ? (float)std::sqrt(a / (double)n) : 0.0f;
+   }
+
+   int Onset(const std::vector<float>& v, size_t from, float thresh = 0.15f)
+   {
+      for (size_t i = from; i < v.size(); i++)
+         if (std::fabs(v[i]) > thresh)
+            return (int)i;
+      return -1;
+   }
+
+   std::unique_ptr<LooperNode> MakeLooper(int take, bool sync, float trimMs)
+   {
+      auto n = std::make_unique<LooperNode>();
+      n->take = take;
+      n->syncStart = sync;
+      n->autoLatency = false;
+      n->trimMs = trimMs;
+      n->thru = 0.0f;
+      n->level = 1.0f;
+      int id = 1;
+      n->CookIfNeeded(id++);
+      n->GetAudioNode()->PrepareToPlay((double)kSr, kBlock);
+      n->CookIfNeeded(id++);
+      return n;
+   }
+
+   void Press(LooperNode& n, int button)
+   {
+      n.SetButtonLevel(button, false);
+      n.SetButtonLevel(button, true);
+      n.SetButtonLevel(button, false);
+   }
+}
+
+static bool RunLooperFixture()
+{
+   using namespace LooperMpcTest;
+   bool ok = true;
+   auto fail = [&](const char* what)
+   {
+      printf("LOOPERTEST %s FAIL\n", what);
+      ok = false;
+   };
+   Transport& transport = Transport::Instance();
+   const float savedBpm = transport.Tempo();
+   const bool savedPlaying = transport.IsPlaying();
+   auto tone = [](float freq, float amp) { return [freq, amp](int i) { return amp * std::sin(6.2831853f * freq * (float)i / (float)kSr); }; };
+   int cook = 100;
+
+   transport.SetPlaying(false);
+
+   // 1) free take: record 1024 frames, REC again ends it, the loop then repeats
+   //    with period 1024 and the record pass itself is silent (thru = 0).
+   {
+      auto n = MakeLooper(0, false, 0.0f);
+      Press(*n, LooperNode::kRec);
+      const std::vector<float> rec = Run(*n, 0, 1024, tone(220.0f, 0.5f), false, &cook);
+      if (n->CurrentState() != LooperNode::kRecording)
+         fail("free take: not recording after REC");
+      if (Peak(rec) > 1e-4f)
+         fail("free take: record pass is audible with thru = 0");
+      Press(*n, LooperNode::kRec);
+      const std::vector<float> play = Run(*n, 1024, 4096, nullptr, false, &cook);
+      if (n->CurrentState() != LooperNode::kPlaying)
+         fail("free take: not playing after second REC");
+      if (std::fabs(n->LoopSeconds() - 1024.0f / (float)kSr) > 3.0f / (float)kSr)
+         fail("free take: loop length is not the recorded length");
+      if (Peak(play) < 0.3f)
+         fail("free take: playback is silent");
+      float worst = 0.0f;
+      for (size_t i = 0; i + 1024 < play.size(); i++)
+         worst = std::max(worst, std::fabs(play[i] - play[i + 1024]));
+      if (worst > 1e-3f)
+         fail("free take: playback is not periodic at the loop length");
+
+      // 2) overdub layers onto the loop; toggling DUB again returns to plain play.
+      const float before = Rms(play, 1024, 3072);
+      Press(*n, LooperNode::kDub);
+      Run(*n, 5120, 2048, tone(468.75f, 0.2f), false, &cook); // 10 whole cycles per 1024-frame pass
+      if (n->CurrentState() != LooperNode::kOverdubbing)
+         fail("overdub: state is not overdubbing after DUB");
+      Press(*n, LooperNode::kDub);
+      const std::vector<float> after = Run(*n, 7168, 4096, nullptr, false, &cook);
+      if (n->CurrentState() != LooperNode::kPlaying)
+         fail("overdub: DUB again did not return to playing");
+      if (!(Rms(after, 1024, 3072) > before * 1.2f))
+         fail("overdub: the layered input did not raise the loop level");
+
+      // 3) thru monitors the live input; level scales the loop.
+      n->thru = 1.0f;
+      n->level = 0.0f;
+      Run(*n, 11264, 2048, nullptr, false, &cook); // let the ramps settle
+      const std::vector<float> monitored = Run(*n, 13312, 1024, tone(1000.0f, 0.3f), false, &cook);
+      if (std::fabs(Peak(monitored, 256) - 0.3f) > 0.02f)
+         fail("thru: input is not monitored at unity with level = 0");
+
+      // 4) CLEAR empties the loop.
+      Press(*n, LooperNode::kClear);
+      n->thru = 0.0f;
+      Run(*n, 14336, 512, nullptr, false, &cook);
+      const std::vector<float> cleared = Run(*n, 14848, 2048, nullptr, false, &cook);
+      if (n->CurrentState() != LooperNode::kEmpty || Peak(cleared) > 1e-4f)
+         fail("clear: the loop was not emptied");
+   }
+
+   // 5) fixed take (quarter note at 120 BPM = 24000 frames) ends by itself.
+   {
+      auto n = MakeLooper(MusicTime::kQuarter + 1, false, 0.0f);
+      transport.SetTempo(120.0f);
+      Press(*n, LooperNode::kRec);
+      Run(*n, 0, 24000 + 2 * kBlock, tone(220.0f, 0.5f), false, &cook);
+      if (n->CurrentState() != LooperNode::kPlaying ||
+          std::fabs(n->LoopSeconds() - 0.5f) > 3.0f / (float)kSr)
+         fail("fixed take: did not end at a quarter note");
+   }
+
+   // 6) compensation: a click that arrives at press+F lands F - comp frames into
+   //    the loop, so it plays comp frames earlier than an uncompensated take.
+   {
+      const int clickAt = 2000;
+      auto clickFeed = [clickAt](int i) { return i == clickAt ? 0.9f : 0.0f; };
+      int onset[2] = { -1, -1 };
+      const float trims[2] = { 0.0f, 10.0f };
+      for (int k = 0; k < 2; k++)
+      {
+         auto n = MakeLooper(MusicTime::kQuarter + 1, false, trims[k]);
+         Press(*n, LooperNode::kRec);
+         const std::vector<float> out = Run(*n, 0, 60000, clickFeed, false, &cook);
+         onset[k] = Onset(out, 1000);
+      }
+      if (onset[0] < 0 || std::abs(onset[0] - (24000 + clickAt)) > 3)
+         fail("compensation: uncompensated click is not one loop after the press");
+      if (onset[1] < 0 || std::abs((onset[0] - onset[1]) - 480) > 3)
+         fail("compensation: 10 ms trim did not move the take 480 frames earlier");
+   }
+
+   // 7) synced take: REC pressed mid-bar arms, starts on the bar line, and the
+   //    take is exactly one bar long, aligned to the grid.
+   {
+      transport.SetTempo(120.0f);
+      transport.SetTimeSignature(4, 4);
+      transport.SetPlaying(true);
+      transport.Rewind();
+      transport.NotifyAudioEngineStarted((double)kSr);
+      const int bar = 96000;
+      auto n = MakeLooper(MusicTime::k1Bar + 1, true, 0.0f);
+      auto feed = [bar](int i) { return i == bar + 100 ? 0.9f : 0.0f; };
+      Run(*n, 0, 10 * kBlock, feed, true, &cook);
+      Press(*n, LooperNode::kRec);
+      Run(*n, 10 * kBlock, 20 * kBlock, feed, true, &cook);
+      if (n->CurrentState() != LooperNode::kArmed)
+         fail("sync: REC mid-bar did not arm");
+      const int upTo = bar + 2 * kBlock;
+      std::vector<float> out = Run(*n, 30 * kBlock, upTo - 30 * kBlock, feed, true, &cook);
+      if (n->CurrentState() != LooperNode::kRecording)
+         fail("sync: take did not start at the bar line");
+      const std::vector<float> rest = Run(*n, upTo, 2 * bar - upTo + 2 * kBlock, feed, true, &cook);
+      out.insert(out.end(), rest.begin(), rest.end());
+      if (n->CurrentState() != LooperNode::kPlaying || std::fabs(n->LoopSeconds() - 2.0f) > 3.0f / (float)kSr)
+         fail("sync: take is not exactly one bar");
+      // The click sits 100 frames after the bar line, so it plays 100 frames
+      // after the next bar line (2 * bar).
+      const int on = Onset(out, (size_t)(bar + 2 * kBlock - 30 * kBlock)) + 30 * kBlock; // out starts at frame 30 blocks
+      if (on < 0 || std::abs(on - (2 * bar + 100)) > 3)
+         fail("sync: take is not aligned to the grid");
+   }
+
+   transport.SetTempo(savedBpm);
+   transport.SetPlaying(savedPlaying);
+   printf("LOOPERTEST %s\n", ok ? "OK" : "FAIL");
+   return ok;
+}
+
+static bool RunMpcFixture()
+{
+   using namespace LooperMpcTest;
+   bool ok = true;
+   auto fail = [&](const char* what)
+   {
+      printf("MPCTEST %s FAIL\n", what);
+      ok = false;
+   };
+   int cook = 1000;
+   const std::string longWav = DrumSeqTest::WriteSustainedWav(TmpPath("infinite_mpc_long.wav"), kSr, kSr);
+   const std::string shortWav = DrumSeqTest::WriteSustainedWav(TmpPath("infinite_mpc_short.wav"), 2000, kSr);
+
+   auto make = [&]()
+   {
+      auto n = std::make_unique<MpcNode>();
+      n->CookIfNeeded(1);
+      n->GetAudioNode()->PrepareToPlay((double)kSr, kBlock);
+      n->CookIfNeeded(2);
+      return n;
+   };
+   auto hold = [&](MpcNode& n, int pad, bool down) { n.SetPadHeld(pad, down, 1.0f); };
+
+   {
+      auto n = make();
+      if (!n->LoadPad(3, longWav) || !n->LoadPad(1, longWav) || !n->LoadPad(7, shortWav))
+      {
+         fail("could not load the fixture samples");
+         return false;
+      }
+      n->padMode[1] = MpcNode::kGate;
+      n->padMode[7] = MpcNode::kLoopToggle;
+      n->CookIfNeeded(cook++);
+
+      // one shot: keeps sounding after release.
+      hold(*n, 3, true);
+      Run(*n, 0, 4 * kBlock, nullptr, false, &cook);
+      hold(*n, 3, false);
+      const std::vector<float> o1 = Run(*n, 0, 8 * kBlock, nullptr, false, &cook);
+      if (Peak(o1) < 0.3f || Peak(o1, 4 * kBlock) < 0.3f)
+         fail("one shot: stopped on release");
+      // let it ring out is not needed; restart a fresh node for the other modes.
+   }
+   {
+      auto n = make();
+      n->LoadPad(1, longWav);
+      n->padMode[1] = MpcNode::kGate;
+      n->CookIfNeeded(cook++);
+      hold(*n, 1, true);
+      const std::vector<float> held = Run(*n, 0, 6 * kBlock, nullptr, false, &cook);
+      hold(*n, 1, false);
+      const std::vector<float> rel = Run(*n, 0, 6 * kBlock, nullptr, false, &cook);
+      if (Peak(held, kBlock) < 0.3f)
+         fail("gate: silent while held");
+      if (Peak(rel, 2 * kBlock) > 1e-4f)
+         fail("gate: still sounding after release");
+   }
+   {
+      auto n = make();
+      n->LoadPad(7, shortWav);
+      n->padMode[7] = MpcNode::kLoopToggle;
+      n->CookIfNeeded(cook++);
+      hold(*n, 7, true);
+      hold(*n, 7, false);
+      const std::vector<float> on = Run(*n, 0, 40 * kBlock, nullptr, false, &cook);
+      if (Peak(on, 30 * kBlock) < 0.3f)
+         fail("loop: did not keep looping past the sample length");
+      hold(*n, 7, true);
+      hold(*n, 7, false);
+      const std::vector<float> off = Run(*n, 0, 6 * kBlock, nullptr, false, &cook);
+      if (Peak(off, 2 * kBlock) > 1e-4f)
+         fail("loop: second hit did not stop it");
+   }
+
+   // note input: base note + pad index; a pad outside the range is ignored.
+   {
+      auto n = make();
+      n->LoadPad(5, longWav);
+      n->baseNote = 36;
+      n->CookIfNeeded(cook++);
+      NoteEventQueue inbox;
+      n->GetAudioNode()->SetNoteInbox(&inbox, inbox.RegisterConsumer());
+      NoteEvent miss;
+      miss.note = 36 + 6;
+      miss.velocity = 1.0f;
+      miss.isNoteOn = true;
+      inbox.Push(miss);
+      const std::vector<float> none = Run(*n, 0, 3 * kBlock, nullptr, false, &cook);
+      NoteEvent on = miss;
+      on.note = 36 + 5;
+      inbox.Push(on);
+      const std::vector<float> hit = Run(*n, 0, 3 * kBlock, nullptr, false, &cook);
+      if (Peak(none) > 1e-4f)
+         fail("note in: an unmapped pad sounded");
+      if (Peak(hit) < 0.3f)
+         fail("note in: note = base + 5 did not play pad 6");
+   }
+
+   // MPC Out: takes one pad on its own; the master still carries the mix.
+   {
+      auto n = make();
+      n->LoadPad(5, longWav);
+      n->CookIfNeeded(cook++);
+      MpcOutNode out;
+      out.input.Connect(n.get());
+      out.ResolveAudioTaps();
+      out.CookIfNeeded(1);
+      out.GetAudioNode()->PrepareToPlay((double)kSr, kBlock);
+      if (!out.ConnectedToMpc())
+         fail("mpc out: did not resolve the wired MPC");
+      hold(*n, 5, true);
+      float peakPad6 = 0.0f, peakPad7 = 1.0f, peakMaster = 0.0f;
+      for (int which = 0; which < 2; which++)
+      {
+         out.pad = which == 0 ? 6 : 7;
+         std::vector<float> l(kBlock, 0.0f), r(kBlock, 0.0f), ol(kBlock, 0.0f), orr(kBlock, 0.0f);
+         float* mch[2] = { l.data(), r.data() };
+         float* och[2] = { ol.data(), orr.data() };
+         AudioBuffer mb;
+         mb.channels = mch;
+         mb.numChannels = 2;
+         mb.numFrames = kBlock;
+         AudioBuffer ob;
+         ob.channels = och;
+         ob.numChannels = 2;
+         ob.numFrames = kBlock;
+         for (int b = 0; b < 3; b++)
+         {
+            n->CookIfNeeded(cook++);
+            n->GetAudioNode()->ProcessBlock(nullptr, 0, mb);
+            out.CookIfNeeded(cook++);
+            const AudioBuffer* ins[1] = { &mb };
+            out.GetAudioNode()->ProcessBlock(ins, 1, ob);
+         }
+         if (which == 0)
+         {
+            peakPad6 = Peak(ol);
+            peakMaster = Peak(l);
+         }
+         else
+            peakPad7 = Peak(ol);
+      }
+      if (peakPad6 < 0.3f)
+         fail("mpc out: pad 6 not delivered");
+      if (peakPad7 > 1e-4f)
+         fail("mpc out: another pad leaked");
+      if (peakMaster < 0.3f)
+         fail("mpc out: master lost the mix");
+   }
+
+   printf("MPCTEST %s\n", ok ? "OK" : "FAIL");
+   return ok;
+}
+
 static int RunDspTest()
 {
    const bool gainOk = RunGainFixture();
@@ -55840,6 +56229,8 @@ static int RunDspTest()
    const bool paulStretchOk = RunPaulStretchFixture();
    const bool granularOk = RunGranularFixture();
    const bool drumSeqOk = RunDrumSequencerFixture();
+   const bool looperOk = RunLooperFixture();
+   const bool mpcOk = RunMpcFixture();
    const bool wavetableShaperOk = RunWavetableShaperFixture();
    const bool eqOk = RunEqFixture();
    const bool noteStackOk = RunNoteStackFixture();
@@ -55850,7 +56241,7 @@ static int RunDspTest()
    const bool audioDisplacementOk = RunAudioDisplacementFixture();
    const bool all = gainOk && filterOk && oscWaveformOk && noteSchedulingOk && envelopeOk && voiceStealOk &&
                     musicTimeOk && audioFilterOk && dynamicsOk && delayOk && reverbOk && samplerOk && slicerOk &&
-                    paulStretchOk && granularOk && drumSeqOk && wavetableShaperOk && eqOk && noteStackOk &&
+                    paulStretchOk && granularOk && drumSeqOk && looperOk && mpcOk && wavetableShaperOk && eqOk && noteStackOk &&
                     freqShifterOk && spectralSynthOk && waveTerrainOk && equationOk && audioDisplacementOk &&
                     portableFftOk;
    printf("%s\n", all ? "DSPTEST OK" : "DSPTEST SUSPECT");

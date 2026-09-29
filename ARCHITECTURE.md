@@ -124,6 +124,20 @@ getting a file each:
   **Wave Terrain**, and **Equation Synth**. Lifted out of
   `SamplerNode.cpp` so a new sample-playing node never has to reimplement its
   own use-after-free trap.
+- **`src/nodes/LooperNode.h`/`.cpp`** — **Looper**, a live audio looper (REC / PLAY /
+  DUB / CLEAR). The audio thread owns the whole state machine and a stereo loop
+  buffer of up to 60 s; the INode posts button *edges* through an SPSC ring
+  (`SetButtonLevel` turns a held mouse or held CV into one press). Take length is a
+  `MusicTime` division or free; with sync on and the transport running a take waits
+  for the next grid line (capped at one bar). Takes and overdubs are shifted by
+  `Platform::AudioRoundTripLatencyFrames()` plus a manual trim. The loop audio is not
+  saved with the patch.
+- **`src/nodes/MpcNode.h`/`.cpp`** — **MPC** (16-pad sampler: one `SampleSlot` and one
+  voice per pad; one-shot / gate / loop-toggle; pads hit by mouse, per-pad CV gate pin,
+  or note = base note + pad) and **MPC Out**, which taps one pad's private stereo
+  buffer. The tap is a raw pointer from the MPC's audio half, re-resolved by
+  `INode::ResolveAudioTaps()` in `RebuildAudioTopology` just before `SetTopology`;
+  a per-block serial number makes a bypassed MPC read as silence rather than stale audio.
 - **`src/nodes/AnalogNode.h`/`.cpp` & `src/nodes/AnalogSynthCore.h`** — virtual-analog
   polyphonic synthesizer node. Features dual PolyBLEP anti-aliased oscillators
   (osc 1 unison stack, osc 2 tune/detune/sync, sub-oscillator, noise generator,
