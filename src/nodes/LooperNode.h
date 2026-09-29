@@ -71,6 +71,10 @@ public:
    float Level() const { return mPeak; }
    float CompensationMs() const { return mCompMs; }
    float RecordedSeconds() const { return mRecordedSec; }
+   // Frames held (loop length, or recorded so far), and the fixed take's target
+   // length while recording (0 = free / not recording).
+   float LengthSeconds() const { return mLenSec; }
+   float TargetSeconds() const { return mTargetSec; }
    static const char* StateName(int state);
    static constexpr double MaxSeconds() { return 60.0; }
 
@@ -84,6 +88,13 @@ public:
 
    AudioCable input;
 
+   // Loop waveform for the card: min/max columns spanning the loop (or, while a
+   // fixed take records, the whole take with the not-yet-recorded tail zero).
+   // Refreshed by CookIfNeeded from the audio thread's peak bins.
+   static constexpr int kWaveCols = 200;
+   float waveMin[kWaveCols] = {};
+   float waveMax[kWaveCols] = {};
+
 private:
    std::unique_ptr<AudioLooperNode> mAudioNode;
    int mLastCookFrame = -1;
@@ -94,6 +105,8 @@ private:
    float mPos01 = 0.0f;
    float mPeak = 0.0f;
    float mCompMs = 0.0f;
+   float mLenSec = 0.0f;
+   float mTargetSec = 0.0f;
    int mLatencyFrames = 0;   // cached AudioRoundTripLatencyFrames, main thread
    int mLatencyPollFrame = -1000000;
 };

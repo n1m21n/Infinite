@@ -25,6 +25,10 @@ namespace
    constexpr int kMinTakeFrames = 32;
    constexpr int kDeclickFrames = 128;
    constexpr int kCmdCapacity = 32;
+   // Waveform peak bins: one min/max pair per 1024 frames of loop, written by
+   // the audio thread (relaxed atomics, no allocation) and read by the UI.
+   constexpr int kBinFrames = 1024;
+   constexpr int kMaxBins = kMaxFrames / kBinFrames + 2;
 
    struct LoopBuf
    {
@@ -89,6 +93,36 @@ public:
    float PublishedPeak() const { return mPubPeak.exchange(0.0f, std::memory_order_relaxed); }
    double SampleRate() const { return mSampleRate.load(std::memory_order_relaxed); }
    int CompensationFrames() const { return mPubComp.load(std::memory_order_relaxed); }
+   int PublishedLenFrames() const { return mPubLen.load(std::memory_order_relaxed); }
+   int PublishedTargetFrames() const { return mPubTarget.load(std::memory_order_relaxed); }
+
+   // Main thread. Fills `cols` min/max columns covering frames [0, total) from
+   // the peak bins; columns past `len` (not recorded yet) come back zero.
+   void CopyPeaks(int len, int total, int cols, float* mn, float* mx) const
+   {
+      const int avail = std::min(kMaxBins, (len + kBinFrames - 1) / kBinFrames);
+      for (int c = 0; c < cols; c++)
+      {
+         mn[c] = 0.0f;
+         mx[c] = 0.0f;
+         if (total <= 0 || len <= 0)
+            continue;
+         const int64_t f0 = (int64_t)total * c / cols;
+         const int64_t f1 = std::max<int64_t>(f0 + 1, (int64_t)total * (c + 1) / cols);
+         if (f0 >= len)
+            continue;
+         const int b0 = (int)(f0 / kBinFrames);
+         const int b1 = std::min(avail - 1, (int)((std::min<int64_t>(f1, len) - 1) / kBinFrames));
+         float lo = 0.0f, hi = 0.0f;
+         for (int b = b0; b <= b1; b++)
+         {
+            lo = std::min(lo, mBinMin[b].load(std::memory_order_relaxed));
+            hi = std::max(hi, mBinMax[b].load(std::memory_order_relaxed));
+         }
+         mn[c] = lo;
+         mx[c] = hi;
+      }
+   }
 
    // ---- audio thread -----------------------------------------------------
    void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& output) override
@@ -161,6 +195,7 @@ public:
                {
                   mBuf->ch[0][(size_t)mLength] = inL;
                   mBuf->ch[1][(size_t)mLength] = inR;
+                  TouchBin(mLength, 0.5f * (inL + inR), false);
                   mLength++;
                }
                if ((mTarget > 0 && mLength >= mTarget) || mLength >= mBuf->capacity)
@@ -178,6 +213,7 @@ public:
                   const int w = ((idx - mTakeComp % mLength) + mLength) % mLength;
                   mBuf->ch[0][(size_t)w] = std::clamp(mBuf->ch[0][(size_t)w] + inL, -4.0f, 4.0f);
                   mBuf->ch[1][(size_t)w] = std::clamp(mBuf->ch[1][(size_t)w] + inR, -4.0f, 4.0f);
+                  TouchBin(w, 0.5f * (mBuf->ch[0][(size_t)w] + mBuf->ch[1][(size_t)w]), true);
                }
                if (++mPos >= mLength)
                   mPos = 0;
@@ -190,6 +226,9 @@ public:
       }
       mThruNow = thruTarget;
       mLevelNow = levelTarget;
+      FlushBin();
+      mPubLen.store(mState == LooperNode::kEmpty ? 0 : mLength, std::memory_order_relaxed);
+      mPubTarget.store(mState == LooperNode::kRecording ? mTarget : 0, std::memory_order_relaxed);
 
       const bool hasLoop = mLength > 0 && mState != LooperNode::kRecording && mState != LooperNode::kArmed;
       mPubState.store(mState, std::memory_order_relaxed);
@@ -243,8 +282,48 @@ private:
       return std::clamp((int)((next - start) / beatsPerFrame), 0, std::max(0, numFrames - 1));
    }
 
+   // Publishes the bin being accumulated. Audio thread.
+   void FlushBin()
+   {
+      if (mAccBin >= 0 && mAccBin < kMaxBins)
+      {
+         mBinMin[mAccBin].store(mAccMin, std::memory_order_relaxed);
+         mBinMax[mAccBin].store(mAccMax, std::memory_order_relaxed);
+      }
+   }
+
+   // A frame was written at `idx` with mono value `v`. Moving into another bin
+   // publishes the finished one; an overdub seeds the new bin from what the
+   // loop already holds there (one bounded 1024-frame scan per bin).
+   void TouchBin(int idx, float v, bool seedFromBuffer)
+   {
+      const int b = idx / kBinFrames;
+      if (b >= kMaxBins)
+         return;
+      if (b != mAccBin)
+      {
+         FlushBin();
+         mAccBin = b;
+         mAccMin = 0.0f;
+         mAccMax = 0.0f;
+         if (seedFromBuffer && mBuf != nullptr)
+         {
+            const int end = std::min(mLength, (b + 1) * kBinFrames);
+            for (int i = b * kBinFrames; i < end; i++)
+            {
+               const float m = 0.5f * (mBuf->ch[0][(size_t)i] + mBuf->ch[1][(size_t)i]);
+               mAccMin = std::min(mAccMin, m);
+               mAccMax = std::max(mAccMax, m);
+            }
+         }
+      }
+      mAccMin = std::min(mAccMin, v);
+      mAccMax = std::max(mAccMax, v);
+   }
+
    void BeginTake()
    {
+      mAccBin = -1;
       mState = LooperNode::kRecording;
       mLength = 0;
       mPos = 0;
@@ -296,6 +375,18 @@ private:
       mPos = 0;
       mTakeComp = 0;
       mState = LooperNode::kPlaying;
+      mAccBin = -1;
+      for (int b = 0; b * kBinFrames < mLength && b < kMaxBins; b++)
+      {
+         float lo = 0.0f, hi = 0.0f;
+         for (int i = b * kBinFrames; i < std::min(mLength, (b + 1) * kBinFrames); i++)
+         {
+            lo = std::min(lo, mBuf->ch[0][(size_t)i]);
+            hi = std::max(hi, mBuf->ch[0][(size_t)i]);
+         }
+         mBinMin[b].store(lo, std::memory_order_relaxed);
+         mBinMax[b].store(hi, std::memory_order_relaxed);
+      }
    }
 
    void ApplyButton(int button)
@@ -376,6 +467,9 @@ private:
    int mTakeComp = 0; // compensation the held loop was recorded with
    float mThruNow = 1.0f;
    float mLevelNow = 1.0f;
+   int mAccBin = -1;
+   float mAccMin = 0.0f;
+   float mAccMax = 0.0f;
 
    // Main -> audio.
    int mCmds[kCmdCapacity] = {};
@@ -395,6 +489,10 @@ private:
    std::atomic<float> mPubPos { 0.0f };
    mutable std::atomic<float> mPubPeak { 0.0f };
    std::atomic<int> mPubComp { 0 };
+   std::atomic<int> mPubLen { 0 };
+   std::atomic<int> mPubTarget { 0 };
+   std::atomic<float> mBinMin[kMaxBins] = {};
+   std::atomic<float> mBinMax[kMaxBins] = {};
 };
 
 // ---------------------------------------------------------------- main thread
@@ -464,6 +562,12 @@ void LooperNode::CookIfNeeded(int frameId)
    mPeak = std::max(mPeak * 0.85f, mAudioNode->PublishedPeak());
    const double sr = std::max(1.0, mAudioNode->SampleRate());
    mCompMs = (float)((double)mAudioNode->CompensationFrames() * 1000.0 / sr);
+
+   const int len = mAudioNode->PublishedLenFrames();
+   const int tgt = mAudioNode->PublishedTargetFrames();
+   mLenSec = (float)((double)len / sr);
+   mTargetSec = (float)((double)tgt / sr);
+   mAudioNode->CopyPeaks(len, tgt > 0 ? tgt : len, kWaveCols, waveMin, waveMax);
 }
 
 void LooperNode::VisitParams(ParamVisitor& v)

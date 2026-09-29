@@ -12053,13 +12053,19 @@ namespace
                                  IM_COL32(255, 255, 255, 255), IM_COL32(255, 255, 255, 255));
    }
 
-   // A momentary button that is also a CV-gate destination. Draws a modulation
-   // pin, then a pill button; returns the button's LEVEL - CV high when a cable
-   // drives it, else the mouse being held on it. The node turns level changes
-   // into edges (Looper::SetButtonLevel / Mpc::SetPadHeld), so a held mouse or a
-   // held CV presses exactly once. `litColor` = 0 means "not lit".
-   bool DrawGateButton(const char* label, const char* id, float totalW, float height, ImU32 litColor)
+   // A momentary button that is also a CV-gate destination. Draws the
+   // modulation pin (vertically centred on the control, P2), then an invisible
+   // button that `paint` dresses; returns the button's LEVEL - CV high when a
+   // cable drives it, else the mouse being held on it. The node turns level
+   // changes into edges (Looper::SetButtonLevel / Mpc::SetPadHeld), so a held
+   // mouse or a held CV presses exactly once. `paint(dl, min, max, hovered,
+   // level)` draws the face; `activated` reports a fresh mouse press.
+   using GatePainter = std::function<void(ImDrawList*, ImVec2, ImVec2, bool, bool)>;
+   bool DrawGateButton(const char* id, float totalW, float height, const GatePainter& paint,
+                       bool* activated = nullptr)
    {
+      if (activated != nullptr)
+         *activated = false;
       const DiscreteParamHandle h = RegisterDiscreteParam(id, 0.0f, 1.0f, /*isBool=*/true, nullptr);
       if (h.registered && !h.draw)
          return h.driven && h.value >= 0.5f;
@@ -12072,22 +12078,76 @@ namespace
          ImGui::SetCursorScreenPos(ImVec2(start.x + pinW, start.y));
          btnW = std::max(20.0f, totalW - pinW);
       }
-      const bool lit = litColor != 0 || (h.driven && h.value >= 0.5f);
-      bool shown = lit;
-      const ImU32 c = litColor != 0 ? litColor : IM_COL32(55, 115, 235, 255);
       ImGui::PushID(id);
       if (h.modulated)
          ImGui::BeginDisabled();
-      AudioToggleButtonEx(label, &shown, ImVec2(btnW, height), c, c, c, c, c, c, IM_COL32(255, 255, 255, 255),
-                          IM_COL32(255, 255, 255, 255));
+      ImGui::InvisibleButton("##gate", ImVec2(btnW, height));
       const bool held = ImGui::IsItemActive();
+      const bool hovered = ImGui::IsItemHovered();
+      if (activated != nullptr)
+         *activated = ImGui::IsItemActivated();
+      const ImVec2 mn = ImGui::GetItemRectMin();
+      const ImVec2 mx = ImGui::GetItemRectMax();
       if (h.modulated)
          ImGui::EndDisabled();
       ImGui::PopID();
+      const bool level = h.driven ? (h.value >= 0.5f) : held;
+      paint(ImGui::GetWindowDrawList(), mn, mx, hovered && !h.modulated, level);
       if (h.registered)
-         DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
-                                   ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()));
-      return h.driven ? (h.value >= 0.5f) : held;
+         DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsMouseHoveringRect(mn, mx));
+      return level;
+   }
+
+   // Transport-button face: a state-coloured glyph plus label. Idle it is the
+   // standard quiet button with the glyph in the button's own colour (so REC is
+   // always recognisably red); lit it fills with that colour and the glyph and
+   // label go white. glyph: 0 record dot, 1 play triangle, 2 overdub ring+plus,
+   // 3 clear cross.
+   void PaintTransportButton(ImDrawList* dl, ImVec2 mn, ImVec2 mx, bool hovered, bool pressed, bool lit,
+                             ImU32 accent, int glyph, const char* label, float pulse = 1.0f)
+   {
+      const bool isLight = IsThemeLight();
+      const float r = 5.0f;
+      ImU32 fill;
+      if (lit)
+      {
+         const int a = (int)(255.0f * pulse);
+         fill = (accent & 0x00FFFFFFu) | ((ImU32)std::clamp(a, 0, 255) << 24);
+      }
+      else if (pressed)
+         fill = isLight ? IM_COL32(195, 202, 215, 255) : IM_COL32(64, 70, 89, 255);
+      else if (hovered)
+         fill = isLight ? IM_COL32(208, 214, 225, 255) : IM_COL32(51, 56, 71, 255);
+      else
+         fill = isLight ? IM_COL32(220, 225, 235, 255) : IM_COL32(33, 36, 46, 255);
+      dl->AddRectFilled(mn, mx, fill, r);
+      dl->AddRect(mn, mx, lit ? ((accent & 0x00FFFFFFu) | 0xFF000000u) : (isLight ? IM_COL32(170, 178, 195, 255) : IM_COL32(130, 138, 160, 200)), r, 0, 1.0f);
+
+      const ImU32 ink = lit ? IM_COL32(255, 255, 255, 255) : accent;
+      const ImU32 textCol = lit ? IM_COL32(255, 255, 255, 255) : (isLight ? IM_COL32(40, 45, 60, 255) : IM_COL32(210, 215, 230, 255));
+      const float gw = 12.0f;
+      const ImVec2 ts = ImGui::CalcTextSize(label);
+      const float gap = 6.0f;
+      const float total = gw + gap + ts.x;
+      const float x0 = std::floor((mn.x + mx.x - total) * 0.5f);
+      const ImVec2 c(x0 + gw * 0.5f, (mn.y + mx.y) * 0.5f);
+      switch (glyph)
+      {
+         case 0: dl->AddCircleFilled(c, 5.0f, ink, 16); break;
+         case 1:
+            dl->AddTriangleFilled(ImVec2(c.x - 4.0f, c.y - 5.5f), ImVec2(c.x - 4.0f, c.y + 5.5f), ImVec2(c.x + 5.5f, c.y), ink);
+            break;
+         case 2:
+            dl->AddCircle(c, 5.5f, ink, 16, 1.6f);
+            dl->AddLine(ImVec2(c.x - 3.0f, c.y), ImVec2(c.x + 3.0f, c.y), ink, 1.6f);
+            dl->AddLine(ImVec2(c.x, c.y - 3.0f), ImVec2(c.x, c.y + 3.0f), ink, 1.6f);
+            break;
+         default:
+            dl->AddLine(ImVec2(c.x - 4.0f, c.y - 4.0f), ImVec2(c.x + 4.0f, c.y + 4.0f), ink, 2.0f);
+            dl->AddLine(ImVec2(c.x - 4.0f, c.y + 4.0f), ImVec2(c.x + 4.0f, c.y - 4.0f), ink, 2.0f);
+            break;
+      }
+      dl->AddText(ImVec2(x0 + gw + gap, c.y - ts.y * 0.5f), textCol, label);
    }
 
    bool AudioSoloButton(const char* label, bool* value, float width = 26.0f, float height = 0.0f)
@@ -17463,24 +17523,198 @@ namespace
    }
 
    // ---- Looper -----------------------------------------------------------
+   // Status line: what the looper is doing right now and what a press will do.
+   void LooperStatusText(LooperNode* n, char* out, size_t cap)
+   {
+      const Transport& tr = Transport::Instance();
+      const double bpm = std::max(1.0f, tr.Tempo());
+      const double bar = std::max(1e-6, tr.BeatsPerBar());
+      const std::vector<std::string>& divs = MusicTime::RateDivisionList();
+      const char* takeName = (n->take > 0 && n->take - 1 < (int)divs.size()) ? divs[(size_t)(n->take - 1)].c_str() : "free";
+      char len[48];
+      const double bars = (double)n->LengthSeconds() * bpm / 60.0 / bar;
+      if (std::fabs(bars - std::round(bars)) < 0.02 && bars >= 0.98)
+         snprintf(len, sizeof(len), "%d bar%s", (int)std::lround(bars), std::lround(bars) == 1 ? "" : "s");
+      else
+         snprintf(len, sizeof(len), "%.2f bars", bars);
+      switch (n->CurrentState())
+      {
+         case LooperNode::kArmed:
+         {
+            double grid = bar;
+            if (n->take > 0)
+               grid = std::min(bar, MusicTime::BeatsFor((MusicTime::RateDivision)std::clamp(n->take - 1, 0, MusicTime::kNumRateDivisions - 1)));
+            const double into = std::fmod(tr.Beats(), grid);
+            snprintf(out, cap, "armed - starts in %.1f beats", grid - into);
+            break;
+         }
+         case LooperNode::kRecording:
+            if (n->TargetSeconds() > 0.0f)
+               snprintf(out, cap, "recording - %.1f / %.1f s (%s)", n->LengthSeconds(), n->TargetSeconds(), takeName);
+            else
+               snprintf(out, cap, "recording - %.1f s - REC ends it", n->LengthSeconds());
+            break;
+         case LooperNode::kPlaying:
+            snprintf(out, cap, "playing - %s - %.2f s - comp %.0f ms", len, n->LengthSeconds(), n->CompensationMs());
+            break;
+         case LooperNode::kOverdubbing:
+            snprintf(out, cap, "overdubbing - %s - %.2f s", len, n->LengthSeconds());
+            break;
+         case LooperNode::kStopped:
+            snprintf(out, cap, "stopped - %s - PLAY resumes", len);
+            break;
+         default:
+            if (n->take > 0)
+               snprintf(out, cap, "empty - REC records %s (%s)", takeName, n->syncStart ? "on the grid" : "now");
+            else
+               snprintf(out, cap, "empty - REC starts, REC again ends the take");
+            break;
+      }
+   }
+
+   // Loop waveform: min/max columns from the audio thread's peak bins, beat and
+   // bar ticks when the loop is a whole number of beats, a moving playhead, and
+   // for a fixed take the recorded extent against the take window. Never blank:
+   // an empty looper shows the take window it would record and says how to start.
+   void DrawLooperWave(LooperNode* n, float h)
+   {
+      const float w = AudioFullWidth();
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const bool isLight = IsThemeLight();
+      const int st = n->CurrentState();
+      const Transport& tr = Transport::Instance();
+      const double bpm = std::max(1.0f, tr.Tempo());
+      const double bar = std::max(1e-6, tr.BeatsPerBar());
+
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+      const float midY = origin.y + h * 0.5f;
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+
+      const float len = n->LengthSeconds();
+      const float tgt = n->TargetSeconds();
+      float span = (st == LooperNode::kRecording && tgt > 0.0f) ? tgt : len;
+      if (span <= 0.0f && n->take > 0)
+      {
+         const double beats = MusicTime::BeatsFor((MusicTime::RateDivision)std::clamp(n->take - 1, 0, MusicTime::kNumRateDivisions - 1));
+         span = (float)(beats * 60.0 / bpm); // the take window it would record
+      }
+
+      const ImU32 recCol = isLight ? IM_COL32(205, 55, 55, 255) : IM_COL32(235, 90, 90, 255);
+      const ImU32 dubCol = isLight ? IM_COL32(205, 130, 20, 255) : IM_COL32(245, 175, 60, 255);
+      const ImU32 playCol = isLight ? IM_COL32(30, 140, 75, 235) : IM_COL32(110, 215, 145, 225);
+      const ImU32 idleCol = isLight ? IM_COL32(120, 130, 150, 220) : IM_COL32(130, 140, 165, 200);
+      ImU32 waveCol = idleCol;
+      if (st == LooperNode::kRecording || st == LooperNode::kArmed) waveCol = recCol;
+      else if (st == LooperNode::kOverdubbing) waveCol = dubCol;
+      else if (st == LooperNode::kPlaying) waveCol = playCol;
+
+      // Beat / bar ticks over the span, when it is a whole number of beats.
+      if (span > 0.0f)
+      {
+         const double beats = (double)span * bpm / 60.0;
+         if (std::fabs(beats - std::round(beats)) < std::max(0.03, beats * 0.01) && beats >= 1.0 && beats <= 128.0)
+         {
+            const int nb = (int)std::lround(beats);
+            for (int b = 0; b <= nb; b++)
+            {
+               const float x = origin.x + w * (float)b / (float)nb;
+               const bool isBar = std::fmod((double)b, bar) < 1e-6;
+               const ImU32 tc = isLight ? IM_COL32(60, 70, 100, isBar ? 90 : 55) : IM_COL32(200, 210, 235, isBar ? 70 : 38);
+               if (isBar)
+                  dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), tc, 1.0f);
+               else
+               {
+                  dl->AddLine(ImVec2(x, origin.y), ImVec2(x, origin.y + 6.0f), tc, 1.0f);
+                  dl->AddLine(ImVec2(x, br.y - 6.0f), ImVec2(x, br.y), tc, 1.0f);
+               }
+            }
+         }
+      }
+
+      // Waveform columns (auto-gained so a quiet take is still readable).
+      if (len > 0.0f)
+      {
+         float peak = 0.0f;
+         for (int c = 0; c < LooperNode::kWaveCols; c++)
+            peak = std::max(peak, std::max(std::fabs(n->waveMin[c]), std::fabs(n->waveMax[c])));
+         const float gain = peak > 0.01f ? std::min(8.0f, 0.95f / peak) : 1.0f;
+         const float total = std::max(span, len);
+         const float colW = w / (float)LooperNode::kWaveCols;
+         const ImU32 col = (st == LooperNode::kArmed || st == LooperNode::kStopped)
+                              ? ((waveCol & 0x00FFFFFFu) | 0x90000000u) : waveCol;
+         for (int c = 0; c < LooperNode::kWaveCols; c++)
+         {
+            const float x = origin.x + colW * (float)c;
+            if (total * (float)c / (float)LooperNode::kWaveCols >= len)
+               break;
+            const float top = midY - n->waveMax[c] * gain * h * 0.45f;
+            const float bot = midY - n->waveMin[c] * gain * h * 0.45f;
+            dl->AddRectFilled(ImVec2(x, std::min(top, midY - 0.5f)), ImVec2(x + std::max(1.0f, colW), std::max(bot, midY + 0.5f)), col);
+         }
+      }
+
+      // Playhead and recorded extent.
+      if (st == LooperNode::kPlaying || st == LooperNode::kOverdubbing || st == LooperNode::kStopped)
+      {
+         const float x = origin.x + w * std::clamp(n->Position01(), 0.0f, 1.0f);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y),
+                     isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 200, 90, 240), 2.0f);
+      }
+      else if (st == LooperNode::kRecording)
+      {
+         const float f = tgt > 0.0f ? std::clamp(len / tgt, 0.0f, 1.0f) : 1.0f;
+         const float x = origin.x + w * f;
+         dl->AddRectFilled(origin, ImVec2(x, br.y), IM_COL32(220, 70, 70, isLight ? 26 : 34));
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), recCol, 2.0f);
+      }
+
+      // Centre message while there is nothing to draw.
+      const char* msg = nullptr;
+      if (st == LooperNode::kEmpty)
+         msg = n->take > 0 ? "press REC to record" : "press REC, then REC again to stop";
+      else if (st == LooperNode::kArmed)
+         msg = "waiting for the next grid line";
+      if (msg != nullptr)
+      {
+         const ImVec2 ts = ImGui::CalcTextSize(msg);
+         dl->AddText(ImVec2(origin.x + (w - ts.x) * 0.5f, midY - ts.y * 0.5f), ScopeTextCol(), msg);
+      }
+      dl->PopClipRect();
+      const bool hot = st == LooperNode::kRecording || st == LooperNode::kArmed;
+      const float pulse = st == LooperNode::kArmed ? 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 6.0f) : 1.0f;
+      dl->AddRect(origin, br, hot ? ((recCol & 0x00FFFFFFu) | ((ImU32)(255.0f * pulse) << 24)) : ScopeBorderCol(), 4.0f, 0,
+                  hot ? 2.0f : 1.0f);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
    void DrawLooperBody(GraphNode& gn, LooperNode* n)
    {
       char stat[96];
-      snprintf(stat, sizeof(stat), "%s  -  %.1f s  -  comp %.0f ms", LooperNode::StateName(n->CurrentState()),
-               n->LoopSeconds(), n->CompensationMs());
+      LooperStatusText(n, stat, sizeof(stat));
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
-      // Four gate buttons: click or CV rising edge presses. Lit while the state
-      // they own is active.
+      // Four gate buttons: click or CV rising edge presses. Each is dressed in
+      // the colour of the state it owns and lights while that state is active.
       {
          static const char* kLabels[LooperNode::kNumButtons] = { "REC", "PLAY", "DUB", "CLEAR" };
          static const char* kIds[LooperNode::kNumButtons] = { "rec", "play", "dub", "clear" };
          const int st = n->CurrentState();
-         const ImU32 lit[LooperNode::kNumButtons] = {
-            (st == LooperNode::kRecording || st == LooperNode::kArmed) ? IM_COL32(210, 60, 60, 255) : 0,
-            (st == LooperNode::kPlaying || st == LooperNode::kOverdubbing) ? IM_COL32(60, 170, 90, 255) : 0,
-            st == LooperNode::kOverdubbing ? IM_COL32(215, 150, 40, 255) : 0, 0u
+         const bool isLight = IsThemeLight();
+         const ImU32 accents[LooperNode::kNumButtons] = {
+            isLight ? IM_COL32(205, 55, 55, 255) : IM_COL32(225, 75, 75, 255),
+            isLight ? IM_COL32(35, 150, 80, 255) : IM_COL32(60, 175, 100, 255),
+            isLight ? IM_COL32(205, 130, 20, 255) : IM_COL32(220, 150, 40, 255),
+            isLight ? IM_COL32(90, 105, 150, 255) : IM_COL32(140, 155, 200, 255)
          };
+         const bool active[LooperNode::kNumButtons] = {
+            st == LooperNode::kRecording || st == LooperNode::kArmed,
+            st == LooperNode::kPlaying || st == LooperNode::kOverdubbing,
+            st == LooperNode::kOverdubbing, false
+         };
+         const float pulse = st == LooperNode::kArmed ? 0.55f + 0.45f * std::sin((float)ImGui::GetTime() * 6.0f) : 1.0f;
          const float x0 = gAudioContentX;
          const float y0 = ImGui::GetCursorScreenPos().y;
          const float cellW = gAudioContentW / (float)LooperNode::kNumButtons;
@@ -17488,38 +17722,21 @@ namespace
          for (int b = 0; b < LooperNode::kNumButtons; b++)
          {
             ImGui::SetCursorScreenPos(ImVec2(x0 + (float)b * cellW, y0));
-            const bool level = DrawGateButton(kLabels[b], kIds[b], cellW - 6.0f, h, lit[b]);
+            const bool level = DrawGateButton(kIds[b], cellW - 6.0f, h,
+               [&, b](ImDrawList* dl, ImVec2 mn, ImVec2 mx, bool hovered, bool lvl)
+               {
+                  const bool lit = active[b] || (b == LooperNode::kClear && lvl);
+                  PaintTransportButton(dl, mn, mx, hovered, lvl, lit, accents[b], b, kLabels[b], b == 0 ? pulse : 1.0f);
+               });
             n->SetButtonLevel(b, level);
          }
          ImGui::SetCursorScreenPos(ImVec2(x0, y0));
          ImGui::Dummy(ImVec2(gAudioContentW, h));
       }
-      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      ImGui::Dummy(ImVec2(0.0f, 3.0f));
 
-      // Loop position strip: always drawn, so the body height never jumps.
-      {
-         const float w = AudioFullWidth();
-         const float hgt = 8.0f;
-         const ImVec2 p = ImGui::GetCursorScreenPos();
-         ImDrawList* dl = ImGui::GetWindowDrawList();
-         const bool isLight = IsThemeLight();
-         dl->AddRectFilled(p, ImVec2(p.x + w, p.y + hgt), isLight ? IM_COL32(215, 220, 232, 255) : IM_COL32(30, 33, 42, 255), 3.0f);
-         const int st = n->CurrentState();
-         if (st == LooperNode::kPlaying || st == LooperNode::kOverdubbing || st == LooperNode::kStopped)
-         {
-            const float f = std::clamp(n->Position01(), 0.0f, 1.0f);
-            dl->AddRectFilled(p, ImVec2(p.x + w * f, p.y + hgt),
-                              st == LooperNode::kOverdubbing ? IM_COL32(215, 150, 40, 255) : IM_COL32(60, 170, 90, 255), 3.0f);
-         }
-         else if (st == LooperNode::kRecording)
-         {
-            const float f = n->LoopSeconds() > 0.01f ? std::clamp(n->RecordedSeconds() / n->LoopSeconds(), 0.0f, 1.0f)
-                                                       : std::clamp(n->RecordedSeconds() / (float)LooperNode::MaxSeconds(), 0.0f, 1.0f);
-            dl->AddRectFilled(p, ImVec2(p.x + w * f, p.y + hgt), IM_COL32(210, 60, 60, 255), 3.0f);
-         }
-         ImGui::Dummy(ImVec2(w, hgt));
-      }
-      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      DrawLooperWave(n, 76.0f);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
       {
          AudioKnobRow row(3);
@@ -17593,7 +17810,9 @@ namespace
                   lit = IM_COL32(60, 170, 90, 255);
                else if (pad == n->selectedPad)
                   lit = IM_COL32(90, 110, 190, 255);
-               const bool level = DrawGateButton(label, id, cellW, cellH, lit);
+               const bool level = DrawGateButton(id, cellW, cellH,
+                  [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx, bool hovered, bool lvl)
+                  { PaintTransportButton(dl, mn, mx, hovered, lvl, lit != 0, lit != 0 ? lit : IM_COL32(120, 130, 160, 255), 0, label); });
                n->SetPadHeld(pad, level, 1.0f);
                if (ImGui::IsItemClicked(ImGuiMouseButton_Right) || (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)))
                   n->selectedPad = pad;
