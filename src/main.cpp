@@ -112,6 +112,7 @@ namespace
 #include "core/MovementLog.h"
 #include "core/MovementStats.h"
 #include "core/ColorStats.h"
+#include "core/HeadlessJob.h"
 #include "core/GestureRecorder.h"
 #include "core/Expression.h"
 #include "core/field/FieldTypes.h"
@@ -1167,6 +1168,27 @@ namespace
       double endSeconds = 0.0;
    };
    OfflineRenderState gOfflineRender;
+
+   // ---- headless jobs (--render / --frame, see core/HeadlessJob.h) ----
+   // One place decides "this process is a batch job, not a session": the job
+   // itself, the INFINITE_EXITAFTER dev harness and screenshot mode all mean
+   // no autosave, no control server, no update check, no audio device.
+   Headless::Job gHeadlessJob;
+   int gHeadlessExitCode = 0;
+   // Sample rate an offline take runs the graph at when no device is open.
+   // Read by RebuildAudioTopology and StartOfflineRenderSession as the last
+   // fallback after the device rate; 0 outside a headless job.
+   double gHeadlessAudioRate = 0.0;
+
+   bool HeadlessJobActive()
+   {
+      return gHeadlessJob.mode != Headless::Mode::None;
+   }
+   bool IsHeadlessProcess()
+   {
+      return HeadlessJobActive() || getenv("INFINITE_EXITAFTER") != nullptr ||
+             getenv("IMAGERESYNTH_SCREENSHOT") != nullptr;
+   }
 
    // ---- Arrangement render jobs (WP7) --------------------------------------
    // One job = one file. The timeline's Render popup fills one in, and either
@@ -41589,7 +41611,8 @@ namespace
 
       const double sampleRate = AudioEngine::Instance().SampleRate() > 0.0
          ? AudioEngine::Instance().SampleRate()
-         : ((gOfflineRender.active && gOfflineRender.node != nullptr) ? gOfflineRender.node->OfflineAudioSampleRate() : 0.0);
+         : ((gOfflineRender.active && gOfflineRender.node != nullptr) ? gOfflineRender.node->OfflineAudioSampleRate()
+                                                                      : gHeadlessAudioRate);
       if (sampleRate > 0.0)
       {
          for (AudioTopologyEntry& entry : order)
@@ -42000,7 +42023,9 @@ namespace
       const bool wantsGraphAudio =
          n->includeAudio && (isArrange || (n->AudioInput().IsConnected() &&
          dynamic_cast<AudioFileNode*>(n->AudioInput().GetSource()) == nullptr));
-      if (wantsGraphAudio && AudioEngine::Instance().SampleRate() <= 0.0)
+      // A headless job never opens a device: the take runs at the job's own
+      // rate (gHeadlessAudioRate), which is what makes it reproducible.
+      if (wantsGraphAudio && AudioEngine::Instance().SampleRate() <= 0.0 && gHeadlessAudioRate <= 0.0)
       {
          if (!StartAudioEngine(gAudioStartError))
             n->SetRecordStatus("no audio device (" + gAudioStartError + ") - rendering video only");
@@ -42013,9 +42038,11 @@ namespace
       // first captured that whole live tail into the head of the take's
       // audio track, so the file came out with more audio than picture and
       // everything after the tail sat out of sync.
-      const double takeSampleRate = AudioEngine::Instance().SampleRate();
+      double takeSampleRate = AudioEngine::Instance().SampleRate();
       if (takeSampleRate > 0.0)
          AudioEngine::Instance().Stop();
+      else
+         takeSampleRate = gHeadlessAudioRate; // 0 outside a headless job
 
       if (!n->StartOfflineRender(n->recordVideoPath, takeSampleRate, width, height, isArrange))
       {
@@ -46273,8 +46300,10 @@ namespace
       gPatchPath = path;
       gPatchDirty = false;
       gPatchStatus = "Opened";
-      Patch::NoteRecent(path);
       gRequestFitView = true;
+      if (HeadlessJobActive())
+         return true; // a batch job leaves recents and the real autosave alone
+      Patch::NoteRecent(path);
       // The autosave from whatever was open before is no longer relevant
       // now that the user has deliberately loaded something else - see §3.
       DiscardAutosave();
@@ -66095,6 +66124,227 @@ static bool BuildBenchB8Scene(const std::vector<std::string>& clipPaths, bool wi
    return true;
 }
 
+
+// ---- headless jobs: the per-frame driver for --render / --frame ----
+// Runs once per main-loop iteration AFTER the normal frame's ImGui pass. The
+// hidden window keeps drawing frames on purpose: a node registers its ParamRefs
+// (modulation, expressions, gestures) only by being drawn, so skipping the
+// draw would render a patch whose modulation never lands.
+static void HeadlessFinish(GLFWwindow* window, Headless::Status& st, double startWall)
+{
+   st.elapsedMs = (long long)((glfwGetTime() - startWall) * 1000.0);
+   st.ok = st.errors.empty();
+   gHeadlessExitCode = Headless::Emit(gHeadlessJob, st);
+   glfwSetWindowShouldClose(window, GLFW_TRUE);
+}
+
+static void HeadlessTick(int& frameId, GLFWwindow* window)
+{
+   enum class Phase { Warm, Running, Frames, Done };
+   static Phase sPhase = Phase::Warm;
+   static int sTicks = 0;
+   static double sWall = -1.0;
+   static Headless::Status sStatus;
+   static OutputNode* sOut = nullptr;
+   static int sOutIndex = -1;
+   static size_t sNextTime = 0;
+   static int sNextFrame = 0;
+
+   const Headless::Job& job = gHeadlessJob;
+   if (sPhase == Phase::Done || !HeadlessJobActive() || job.mode == Headless::Mode::Version)
+      return;
+   if (sWall < 0.0)
+   {
+      sWall = glfwGetTime();
+      sStatus.mode = job.mode == Headless::Mode::Render ? "render" : "frame";
+      sStatus.patch = job.patch;
+      sStatus.out = job.out;
+      sStatus.fps = job.fps;
+   }
+   auto fail = [&](const char* code, const std::string& msg, int node = -1)
+   {
+      sStatus.errors.push_back({ code, msg, 0, node });
+      sPhase = Phase::Done;
+      HeadlessFinish(window, sStatus, sWall);
+   };
+
+   if (glfwGetTime() - sWall > job.timeoutSec)
+   {
+      if (gOfflineRender.active && gOfflineRender.node != nullptr)
+         gOfflineRender.node->RequestFinishOfflineRender(true);
+      fail("E_TIMEOUT", "job exceeded --timeout " + std::to_string((int)job.timeoutSec) + " s");
+      return;
+   }
+
+   if (sPhase == Phase::Warm)
+   {
+      if (++sTicks < 3)
+         return;
+
+      // Resolve the Output. --output takes a node index or a display name.
+      std::vector<int> outs;
+      for (GraphNode& gn : gNodes)
+         if (gn.typeName == "Output")
+            outs.push_back(gn.index);
+      if (outs.empty())
+         return fail("E_NO_OUTPUT", "the patch has no Output node");
+      if (!job.output.empty())
+      {
+         char* end = nullptr;
+         const long want = std::strtol(job.output.c_str(), &end, 10);
+         const bool numeric = end != nullptr && *end == '\0';
+         sOutIndex = -1;
+         for (int idx : outs)
+            if (numeric && idx == (int)want)
+               sOutIndex = idx;
+         if (sOutIndex < 0)
+            return fail("E_NO_OUTPUT", "--output " + job.output + " is not an Output node index");
+      }
+      else if (outs.size() > 1)
+         return fail("E_AMBIGUOUS_OUTPUT", "the patch has " + std::to_string(outs.size()) +
+                                              " Output nodes; pick one with --output <index>");
+      else
+         sOutIndex = outs.front();
+      GraphNode* gn = FindNodeByIndex(sOutIndex);
+      sOut = gn != nullptr ? static_cast<OutputNode*>(gn->node.get()) : nullptr;
+      if (sOut == nullptr)
+         return fail("E_NO_OUTPUT", "Output node vanished");
+
+      if (job.mode == Headless::Mode::Render)
+      {
+         std::string ext = std::filesystem::path(job.out).extension().string();
+         for (char& c : ext)
+            c = (char)tolower((unsigned char)c);
+         if (ext != ".mp4" && ext != ".mov")
+            return fail("E_UNSUPPORTED_CONTAINER", "--render writes .mp4 or .mov, got '" + ext + "'");
+         std::error_code ec;
+         const std::filesystem::path parent = std::filesystem::path(job.out).parent_path();
+         if (!parent.empty())
+            std::filesystem::create_directories(parent, ec);
+         std::filesystem::remove(job.out, ec);
+
+         sOut->recordVideoPath = job.out;
+         sOut->offlineFps = job.fps;
+         if (job.duration > 0.0)
+         {
+            const int secs = std::max(1, (int)std::ceil(job.duration - 1e-9));
+            if ((double)secs != job.duration)
+               sStatus.warnings.push_back({ "W_DURATION_ROUNDED",
+                                            "--duration rounds up to whole seconds (" + std::to_string(secs) + ")", 0, -1 });
+            sOut->offlineDurationSeconds = secs;
+         }
+         sOut->includeAudio = !job.noAudio;
+
+         StartOfflineRenderSession(sOut);
+         if (!gOfflineRender.active)
+         {
+            const std::string why = sOut->RecordStatus();
+            return fail(why.rfind("refused:", 0) == 0 ? "E_HARDWARE_SOURCE" : "E_RENDER",
+                        why.empty() ? "offline render did not start" : why);
+         }
+         gOfflineRender.startSeconds = job.start;
+         sStatus.frames = sOut->OfflineFramesTotal();
+         sStatus.audioSampleRate = sOut->OfflineNeedsGraphAudio() ? gHeadlessAudioRate : 0.0;
+         sStatus.audioFrames = sOut->OfflineNeedsGraphAudio()
+                                  ? (long long)(gHeadlessAudioRate * (double)sStatus.frames / (double)job.fps)
+                                  : 0;
+         sPhase = Phase::Running;
+         return;
+      }
+
+      // --frame: a single .png, or a directory for one or several times.
+      std::string ext = std::filesystem::path(job.out).extension().string();
+      for (char& c : ext)
+         c = (char)tolower((unsigned char)c);
+      if (ext == ".png" && job.times.size() > 1)
+         return fail("E_USAGE", "several --frame times need an output directory, not a .png file");
+      if (ext != ".png")
+      {
+         std::error_code ec;
+         std::filesystem::create_directories(job.out, ec);
+      }
+      else if (!std::filesystem::path(job.out).parent_path().empty())
+      {
+         std::error_code ec;
+         std::filesystem::create_directories(std::filesystem::path(job.out).parent_path(), ec);
+      }
+      Transport::Instance().SetOfflineMode(true, gHeadlessAudioRate);
+      Transport::Instance().SetPlaying(true);
+      sNextTime = 0;
+      sNextFrame = 0;
+      sPhase = Phase::Frames;
+      return;
+   }
+
+   if (sPhase == Phase::Running)
+   {
+      if (gOfflineRender.active || sOut->IsOfflineFinalizing())
+         return;
+      std::error_code ec;
+      const auto size = std::filesystem::exists(job.out, ec) ? std::filesystem::file_size(job.out, ec) : 0;
+      sStatus.statusText = sOut->RecordStatus();
+      sStatus.width = sOut->GetOutputWidth();
+      sStatus.height = sOut->GetOutputHeight();
+      if (size == 0)
+         return fail("E_RENDER", sStatus.statusText.empty() ? "no output file was written" : sStatus.statusText);
+      sStatus.files.push_back(job.out);
+      sPhase = Phase::Done;
+      HeadlessFinish(window, sStatus, sWall);
+      return;
+   }
+
+   if (sPhase == Phase::Frames)
+   {
+      const double budgetStart = glfwGetTime();
+      while (sNextTime < job.times.size())
+      {
+         const int target = (int)std::llround(job.times[sNextTime] * (double)job.fps);
+         if (sNextFrame > target)
+            sNextFrame = target; // duplicate time: re-export what the last step cooked
+         const bool needStep = sNextFrame <= target;
+         if (needStep)
+         {
+            ++frameId;
+            Transport::Instance().SetOfflineVideoTime((double)sNextFrame / (double)job.fps);
+            ApplyModulationAndPalette(frameId);
+            ArrangeSeekVideoSampleSources(Transport::Instance().Beats());
+            for (GraphNode& gn : gNodes)
+               if (!gn.node->bypassed)
+                  gn.node->CookIfNeeded(frameId);
+         }
+         if (sNextFrame == target)
+         {
+            const int w = sOut->GetOutputWidth(), h = sOut->GetOutputHeight();
+            if (w <= 0 || h <= 0)
+               return fail("E_RENDER", "the Output produced no image (is its input connected?)", sOutIndex);
+            std::string path = job.out;
+            if (std::filesystem::path(job.out).extension() != ".png" && std::filesystem::path(job.out).extension() != ".PNG")
+            {
+               char name[96];
+               std::snprintf(name, sizeof(name), "/frame_%05d.png", target);
+               path = job.out + (job.out.back() == '/' ? std::string(name + 1) : std::string(name));
+            }
+            ExportImage(sOut, path);
+            std::error_code ec;
+            if (!std::filesystem::exists(path, ec))
+               return fail("E_RENDER", "could not write " + path);
+            sStatus.files.push_back(path);
+            sStatus.width = w;
+            sStatus.height = h;
+            sStatus.frames = (long long)sStatus.files.size();
+            sNextTime++;
+         }
+         else
+            sNextFrame++;
+         if (glfwGetTime() - budgetStart > 0.1)
+            return;
+      }
+      Transport::Instance().SetOfflineMode(false);
+      sPhase = Phase::Done;
+      HeadlessFinish(window, sStatus, sWall);
+   }
+}
+
 int main(int argc, char** argv)
 {
    const double sMainStartMs = Bench::ScopedStageTimer::NowMs();
@@ -66425,6 +66675,44 @@ int main(int argc, char** argv)
    if (getenv("INFINITE_PREDV2TEST") != nullptr)
       return PredictionNodes::RunPredV2Test() ? 0 : 1;
 
+   {
+      std::string usageError;
+      if (Headless::ParseArgs(argc, argv, gHeadlessJob, usageError))
+      {
+         if (gHeadlessJob.mode == Headless::Mode::Version)
+         {
+            std::printf(gHeadlessJob.json ? "{\"ok\":true,\"version\":\"%s\",\"headless\":1}\n" : "%s\n",
+                        INFINITE_VERSION_STRING);
+            return 0;
+         }
+         if (!usageError.empty())
+         {
+            Headless::Status st;
+            st.mode = "usage";
+            st.errors.push_back({ "E_USAGE", usageError, 0, -1 });
+            return Headless::Emit(gHeadlessJob, st);
+         }
+         // Cocoa chdir's a bundled app into Contents/Resources at glfwInit, so
+         // every path the caller typed has to be pinned to their cwd first.
+         for (std::string* path : { &gHeadlessJob.patch, &gHeadlessJob.out, &gHeadlessJob.jsonPath })
+         {
+            if (path->empty())
+               continue;
+            const bool keepSlash = path->back() == '/';
+            std::error_code ec;
+            *path = std::filesystem::absolute(*path, ec).lexically_normal().string();
+            if (keepSlash && path->back() != '/')
+               *path += '/';
+         }
+         gHeadlessAudioRate = gHeadlessJob.sampleRate;
+#if defined(_WIN32)
+         _putenv_s("INFINITE_NO_UPDATE_CHECK", "1");
+#else
+         setenv("INFINITE_NO_UPDATE_CHECK", "1", 1);
+#endif
+      }
+   }
+
    if (argc >= 3 && std::strcmp(argv[1], "--dump-movement-log") == 0)
    {
       MovementLog::DumpLog(argv[2], std::cout);
@@ -66495,9 +66783,7 @@ int main(int argc, char** argv)
    // INFINITE_BENCH_VISIBLE opts a harness run back into a real window: the
    // B3/B6/B8 fixtures measure display pacing and focus, which a hidden
    // window can never have (they would always report unfocused/unpaced).
-   const bool gHeadlessTestWindow = (getenv("INFINITE_EXITAFTER") != nullptr ||
-                                     getenv("IMAGERESYNTH_SCREENSHOT") != nullptr) &&
-                                    getenv("INFINITE_BENCH_VISIBLE") == nullptr;
+   const bool gHeadlessTestWindow = IsHeadlessProcess() && getenv("INFINITE_BENCH_VISIBLE") == nullptr;
    // The Dock icon comes from NSApplication's activation policy, not window
    // visibility, so GLFW_VISIBLE=false alone still leaves a headless test run
    // bouncing in the Dock. Must claim the shared-application singleton before
@@ -66869,14 +67155,14 @@ int main(int argc, char** argv)
    // crash marker/autosave left by the real app - see UsingAutosaveTestPaths
    // for the two tests that deliberately exercise this function directly
    // against their own redirected files instead.
-   if (getenv("INFINITE_EXITAFTER") == nullptr)
+   if (getenv("INFINITE_EXITAFTER") == nullptr && !HeadlessJobActive())
       CheckAutosaveRecovery();
 
    // Embedded local control server (see docs/plans - RemoteControl) - lets an
    // external tool (the Infinite MCP server) drive this running instance.
    // Loopback-only; port overridable for running more than one instance.
    // Skipped in headless/test modes so self-test runs do not bind/unbind port 7777.
-   if (getenv("INFINITE_EXITAFTER") == nullptr && getenv("IMAGERESYNTH_SCREENSHOT") == nullptr)
+   if (!IsHeadlessProcess())
    {
       int controlPort = 7777;
       if (const char* portEnv = getenv("INFINITE_CONTROL_PORT"))
@@ -69379,7 +69665,23 @@ int main(int argc, char** argv)
    char recordPath[512] = "";
    snprintf(recordPath, sizeof(recordPath), "%s/infinite_output.mp4", desktopDir.c_str());
 
-   if (argc > 1 && argv[1] != nullptr && argv[1][0] != '-')
+   if (HeadlessJobActive())
+   {
+      Patch::Data probe;
+      std::string readError;
+      if (!Patch::Read(gHeadlessJob.patch, probe, readError))
+      {
+         Headless::Status st;
+         st.mode = gHeadlessJob.mode == Headless::Mode::Render ? "render" : "frame";
+         st.patch = gHeadlessJob.patch;
+         st.errors.push_back({ "E_LOAD", readError, 0, -1 });
+         gHeadlessExitCode = Headless::Emit(gHeadlessJob, st);
+         glfwSetWindowShouldClose(window, GLFW_TRUE);
+      }
+      else
+         LoadPatchFrom(gHeadlessJob.patch);
+   }
+   else if (argc > 1 && argv[1] != nullptr && argv[1][0] != '-')
    {
       const std::string argPath = argv[1];
       if (HasExtension(argPath, std::vector<std::string> { "inf", "infinite" }))
@@ -69729,8 +70031,11 @@ int main(int argc, char** argv)
       // next queued job starts on the next one (WP7).
       ArrangeRenderQueueTick();
 
+      if (HeadlessJobActive())
+         HeadlessTick(frameId, window);
+
       // Same dev-harness carve-out as the startup check above.
-      if (getenv("INFINITE_EXITAFTER") == nullptr)
+      if (getenv("INFINITE_EXITAFTER") == nullptr && !HeadlessJobActive())
          PollAutosave();
 
       // Apply any RemoteControl RPC requests queued by the network thread
@@ -96835,7 +97140,7 @@ int main(int argc, char** argv)
    // delete the marker. Same INFINITE_EXITAFTER carve-out as the startup
    // check: a harness run never created the real marker, so it must not
    // delete it either - see UsingAutosaveTestPaths.
-   if (getenv("INFINITE_EXITAFTER") == nullptr)
+   if (getenv("INFINITE_EXITAFTER") == nullptr && !HeadlessJobActive())
    {
       const std::string marker = AutosaveMarkerPath();
       if (!marker.empty())
@@ -96892,5 +97197,5 @@ int main(int argc, char** argv)
    // driver.sh run). One flush here covers every self-test's exit path
    // instead of requiring each one to remember its own.
    fflush(stdout);
-   std::_Exit(0);
+   std::_Exit(gHeadlessExitCode);
 }
