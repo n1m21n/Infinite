@@ -26,6 +26,8 @@ namespace Headless
       Render,
       Frame,
       Version,
+      Describe,
+      Validate,
    };
 
    struct Job
@@ -41,6 +43,8 @@ namespace Headless
       int fps = 30;
       double sampleRate = 48000.0;
       bool noAudio = false;
+      std::string describeType; // --describe <type>, empty = every type
+      bool forRender = false;    // --validate --for-render: a missing Output is an error
       bool json = false; // --version --json
       double timeoutSec = 600.0;
    };
@@ -53,6 +57,7 @@ namespace Headless
       std::string message;
       int line = 0;     // patch line, 0 = none
       int node = -1;    // node index, -1 = none
+      std::string hint; // what to change, may be empty
    };
 
    struct Status

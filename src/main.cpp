@@ -113,6 +113,7 @@ namespace
 #include "core/MovementStats.h"
 #include "core/ColorStats.h"
 #include "core/HeadlessJob.h"
+#include "core/PatchSchema.h"
 #include "core/GestureRecorder.h"
 #include "core/Expression.h"
 #include "core/field/FieldTypes.h"
@@ -1179,6 +1180,8 @@ namespace
    // Read by RebuildAudioTopology and StartOfflineRenderSession as the last
    // fallback after the device rate; 0 outside a headless job.
    double gHeadlessAudioRate = 0.0;
+   // Validator warnings from the load, folded into the job's status JSON.
+   std::vector<Headless::Issue> gHeadlessPreWarnings;
 
    bool HeadlessJobActive()
    {
@@ -7718,6 +7721,47 @@ namespace
       return false;
    }
 
+   // What a source node's output can be plugged into - the flags
+   // IsInputSlotCompatible wants, gathered once so ConnectNodes and the patch
+   // validator ask the same rule the same way.
+   struct SrcCaps
+   {
+      bool modulator = false;
+      IPaletteSource* palette = nullptr;
+      IGeometrySource* geometry = nullptr;
+      CameraNode* camera = nullptr;
+      LightNode* light = nullptr;
+      bool environment = false;
+      bool audio = false;
+      bool note = false;
+      bool predictor = false;
+   };
+
+   SrcCaps CapsOf(GraphNode* src, int srcOutputIndex)
+   {
+      SrcCaps c;
+      INode* n = src->node.get();
+      c.modulator = dynamic_cast<IModulator*>(n) != nullptr || ModulatorForOutput(n, srcOutputIndex) != nullptr;
+      c.palette = dynamic_cast<IPaletteSource*>(n);
+      c.geometry = dynamic_cast<IGeometrySource*>(n);
+      if (c.geometry != nullptr && !c.geometry->IsGeometryOutputIndex(srcOutputIndex))
+         c.geometry = nullptr;
+      c.camera = dynamic_cast<CameraNode*>(n);
+      c.light = dynamic_cast<LightNode*>(n);
+      c.environment = dynamic_cast<EnvironmentNode*>(n) != nullptr;
+      auto* audioSource = dynamic_cast<IAudioSource*>(n);
+      c.audio = audioSource != nullptr && audioSource->IsAudioOutputIndex(srcOutputIndex);
+      c.note = dynamic_cast<INoteSource*>(n) != nullptr;
+      c.predictor = dynamic_cast<IPredictor*>(n) != nullptr;
+      return c;
+   }
+
+   bool CapsAcceptedBy(const SrcCaps& c, GraphNode* dst, int slot)
+   {
+      return IsInputSlotCompatible(dst, slot, c.modulator, c.palette, c.geometry, c.camera, c.light,
+                                   c.environment, c.audio, c.note, c.predictor);
+   }
+
    // Headless equivalent of the ed::QueryNewLink handler's connect-acceptance
    // path (below, in the main editor draw loop) - same validity checks and
    // wiring calls, extracted so RemoteControl's `connect` RPC can wire an
@@ -7743,23 +7787,11 @@ namespace
          return false;
       }
 
-      const bool srcIsModulator = dynamic_cast<IModulator*>(srcNode->node.get()) != nullptr ||
-                                   ModulatorForOutput(srcNode->node.get(), srcOutputIndex) != nullptr;
-      auto* srcPalette = dynamic_cast<IPaletteSource*>(srcNode->node.get());
-      auto* srcGeometry = dynamic_cast<IGeometrySource*>(srcNode->node.get());
-      if (srcGeometry != nullptr && !srcGeometry->IsGeometryOutputIndex(srcOutputIndex))
-         srcGeometry = nullptr;
-      auto* srcCamera = dynamic_cast<CameraNode*>(srcNode->node.get());
-      auto* srcLight = dynamic_cast<LightNode*>(srcNode->node.get());
-      const bool srcIsEnvironment = dynamic_cast<EnvironmentNode*>(srcNode->node.get()) != nullptr;
-      auto* srcAudioSource = dynamic_cast<IAudioSource*>(srcNode->node.get());
-      const bool srcIsAudioNode = srcAudioSource != nullptr && srcAudioSource->IsAudioOutputIndex(srcOutputIndex);
-      const bool srcIsNoteSource = dynamic_cast<INoteSource*>(srcNode->node.get()) != nullptr;
-
-      const bool srcIsPredictor = dynamic_cast<IPredictor*>(srcNode->node.get()) != nullptr;
-      if (!IsInputSlotCompatible(dstNode, dstSlot, srcIsModulator, srcPalette, srcGeometry, srcCamera,
-                                  srcLight, srcIsEnvironment, srcIsAudioNode, srcIsNoteSource,
-                                  srcIsPredictor))
+      const SrcCaps caps = CapsOf(srcNode, srcOutputIndex);
+      const bool srcIsAudioNode = caps.audio;
+      const bool srcIsNoteSource = caps.note;
+      const bool srcIsPredictor = caps.predictor;
+      if (!CapsAcceptedBy(caps, dstNode, dstSlot))
       {
          // Same verdict either way; only the wording differs, so the RPC
          // caller learns which rule refused it rather than a generic "no".
@@ -7786,6 +7818,128 @@ namespace
           dstNode->node->NoteInputSlot(dstSlot) != nullptr)
          RebuildAudioTopology();
       return true;
+   }
+
+   // ---- patch schema (Infinite --describe / --validate) ----
+   // Records what a node's VisitParams declares: tag letter, key, default.
+   class SchemaParamRecorder : public ParamVisitor
+   {
+   public:
+      std::vector<PatchSchema::ParamInfo>& out;
+      explicit SchemaParamRecorder(std::vector<PatchSchema::ParamInfo>& o) : out(o) {}
+      static std::string F(float v)
+      {
+         char b[48];
+         std::snprintf(b, sizeof(b), "%.9g", v);
+         return b;
+      }
+      void Float(const char* n, float& v) override { out.push_back({ n, 'f', F(v) }); }
+      void Int(const char* n, int& v) override { out.push_back({ n, 'i', std::to_string(v) }); }
+      void Bool(const char* n, bool& v) override { out.push_back({ n, 'b', v ? "1" : "0" }); }
+      void Text(const char* n, std::string& v) override { out.push_back({ n, 's', v }); }
+      void Color(const char* n, float rgb[3]) override { out.push_back({ n, 'c', F(rgb[0]) + " " + F(rgb[1]) + " " + F(rgb[2]) }); }
+   };
+
+   const char* KindOfOutput(const SrcCaps& c)
+   {
+      if (c.predictor) return "predictor";
+      if (c.audio) return "audio";
+      if (c.note) return "note";
+      if (c.geometry != nullptr) return "geometry";
+      if (c.camera != nullptr) return "camera";
+      if (c.light != nullptr) return "light";
+      if (c.palette != nullptr) return "palette";
+      if (c.modulator) return "modulator";
+      return "image";
+   }
+
+   bool SlotKindOf(GraphNode& gn, int slot, std::string& kind)
+   {
+      INode* n = gn.node.get();
+      if (n->AudioInputSlot(slot) != nullptr) kind = "audio";
+      else if (n->NoteInputSlot(slot) != nullptr) kind = "note";
+      else if (n->GeometryInputSlot(slot) != nullptr) kind = "geometry";
+      else if (n->ModulatorInputSlot(slot) != nullptr) kind = "modulator";
+      else if (CableFor(gn, slot) != nullptr) kind = "image";
+      else return false;
+      return true;
+   }
+
+   // A free-standing instance (never on the canvas) used to answer schema and
+   // connection-rule questions about a node type. Cached for the process.
+   GraphNode* SchemaProbe(const std::string& typeName)
+   {
+      static std::map<std::string, std::unique_ptr<GraphNode>> sProbes;
+      auto it = sProbes.find(typeName);
+      if (it != sProbes.end())
+         return it->second.get();
+      std::unique_ptr<GraphNode> gn;
+      if (INode* made = NodeFactory::Instance().MakeNode(typeName))
+      {
+         gn = std::make_unique<GraphNode>();
+         gn->node.reset(made);
+         gn->typeName = typeName;
+         gn->category = NodeFactory::Instance().CategoryOf(typeName);
+      }
+      GraphNode* raw = gn.get();
+      sProbes[typeName] = std::move(gn);
+      return raw;
+   }
+
+   const PatchSchema::TypeSchema* SchemaFor(const std::string& typeName)
+   {
+      static std::map<std::string, std::unique_ptr<PatchSchema::TypeSchema>> sSchemas;
+      auto it = sSchemas.find(typeName);
+      if (it != sSchemas.end())
+         return it->second.get();
+      GraphNode* gn = SchemaProbe(typeName);
+      std::unique_ptr<PatchSchema::TypeSchema> t;
+      if (gn != nullptr)
+      {
+         t = std::make_unique<PatchSchema::TypeSchema>();
+         t->name = typeName;
+         t->category = gn->category;
+         SchemaParamRecorder rec(t->params);
+         gn->node->VisitParams(rec);
+         for (int slot = 0; slot < 64; slot++)
+         {
+            std::string kind;
+            if (!SlotKindOf(*gn, slot, kind))
+               continue;
+            const char* label = gn->node->InputLabel(slot);
+            t->inputs.push_back({ slot, kind, label != nullptr ? label : "" });
+         }
+         const int outs = std::max(1, gn->node->OutputCount());
+         for (int o = 0; o < outs; o++)
+            t->outputs.push_back({ gn->node->OutputLabel(o) != nullptr ? gn->node->OutputLabel(o) : "out",
+                                   KindOfOutput(CapsOf(gn, o)) });
+         t->hardwareDriven = gn->node->IsHardwareDriven();
+      }
+      const PatchSchema::TypeSchema* raw = t.get();
+      sSchemas[typeName] = std::move(t);
+      return raw;
+   }
+
+   PatchSchema::Env MakeSchemaEnv(bool forRender)
+   {
+      PatchSchema::Env env;
+      env.schema = [](const std::string& n) { return SchemaFor(n); };
+      for (const std::string& cat : NodeFactory::Instance().GetCategories())
+         for (const std::string& n : NodeFactory::Instance().GetNodesInCategory(cat))
+            env.allTypes.push_back(n);
+      env.link = [](const std::string& srcType, int srcOut, const std::string& dstType, int dstSlot)
+      {
+         GraphNode* src = SchemaProbe(srcType);
+         GraphNode* dst = SchemaProbe(dstType);
+         if (src == nullptr || dst == nullptr)
+            return PatchSchema::Link::Ok;
+         std::string kind;
+         if (!SlotKindOf(*dst, dstSlot, kind))
+            return PatchSchema::Link::BadSlot;
+         return CapsAcceptedBy(CapsOf(src, srcOut), dst, dstSlot) ? PatchSchema::Link::Ok : PatchSchema::Link::KindMismatch;
+      };
+      env.forRender = forRender;
+      return env;
    }
 
    // Connections captured for a copy/duplicate cluster, in terms of *original*
@@ -66151,12 +66305,17 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
    static int sNextFrame = 0;
 
    const Headless::Job& job = gHeadlessJob;
-   if (sPhase == Phase::Done || !HeadlessJobActive() || job.mode == Headless::Mode::Version)
+   if (sPhase == Phase::Done || !HeadlessJobActive() || job.mode == Headless::Mode::Version ||
+       glfwWindowShouldClose(window))
       return;
    if (sWall < 0.0)
    {
       sWall = glfwGetTime();
-      sStatus.mode = job.mode == Headless::Mode::Render ? "render" : "frame";
+      sStatus.mode = job.mode == Headless::Mode::Render     ? "render"
+                     : job.mode == Headless::Mode::Describe ? "describe"
+                     : job.mode == Headless::Mode::Validate ? "validate"
+                                                            : "frame";
+      sStatus.warnings = gHeadlessPreWarnings;
       sStatus.patch = job.patch;
       sStatus.out = job.out;
       sStatus.fps = job.fps;
@@ -66173,6 +66332,93 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
       if (gOfflineRender.active && gOfflineRender.node != nullptr)
          gOfflineRender.node->RequestFinishOfflineRender(true);
       fail("E_TIMEOUT", "job exceeded --timeout " + std::to_string((int)job.timeoutSec) + " s");
+      return;
+   }
+
+   if (job.mode == Headless::Mode::Validate)
+   {
+      Patch::Data data;
+      std::string err;
+      if (!Patch::Read(job.patch, data, err))
+         return fail("E_LOAD", err);
+      const PatchSchema::Env env = MakeSchemaEnv(job.forRender);
+      PatchSchema::Validate(data, env, sStatus.errors, sStatus.warnings);
+      sStatus.extraJson.push_back("\"nodes\":" + std::to_string(data.nodes.size()));
+      sPhase = Phase::Done;
+      HeadlessFinish(window, sStatus, sWall);
+      return;
+   }
+
+   if (job.mode == Headless::Mode::Describe)
+   {
+      static std::vector<std::pair<std::string, int>> sSpawned; // type, node index
+      const int t = ++sTicks;
+      std::vector<std::string> types;
+      for (const std::string& cat : NodeFactory::Instance().GetCategories())
+         for (const std::string& n : NodeFactory::Instance().GetNodesInCategory(cat))
+            if (job.describeType.empty() || n == job.describeType)
+               types.push_back(n);
+      if (t == 1)
+      {
+         if (types.empty())
+         {
+            std::vector<std::string> all;
+            for (const std::string& cat : NodeFactory::Instance().GetCategories())
+               for (const std::string& n : NodeFactory::Instance().GetNodesInCategory(cat))
+                  all.push_back(n);
+            Headless::Issue is;
+            is.code = "E_UNKNOWN_TYPE";
+            is.message = "unknown node type '" + job.describeType + "'";
+            const std::vector<std::string> near = PatchSchema::Nearest(job.describeType, all, 3);
+            for (size_t i = 0; i < near.size(); i++)
+               is.hint += (i ? ", " : "did you mean: ") + near[i];
+            sStatus.errors.push_back(is);
+            sPhase = Phase::Done;
+            HeadlessFinish(window, sStatus, sWall);
+            return;
+         }
+         // Spawn one expanded instance of each type on the canvas so the draw
+         // pass registers its modulatable parameters (ParamRef ranges, labels).
+         // A node that opens a device on spawn is described from its schema alone.
+         int i = 0;
+         for (const std::string& n : types)
+         {
+            const PatchSchema::TypeSchema* ts = SchemaFor(n);
+            if (ts == nullptr || ts->hardwareDriven)
+               continue;
+            GraphNode* gn = SpawnNode(n, ts->category, (float)(i % 16) * 420.0f, (float)(i / 16) * 700.0f);
+            if (gn == nullptr)
+               continue;
+            gn->showParams = true;
+            sSpawned.push_back({ n, gn->index });
+            i++;
+         }
+         return;
+      }
+      if (t < 8)
+         return;
+
+      std::map<std::string, int> indexOf(sSpawned.begin(), sSpawned.end());
+      std::string typesJson = "\"types\":[";
+      bool first = true;
+      for (const std::string& n : types)
+      {
+         PatchSchema::TypeSchema ts = *SchemaFor(n);
+         auto it = indexOf.find(n);
+         if (it != indexOf.end())
+            for (const ParamRef& r : Modulation::Instance().FrameParams())
+               if (r.nodeIndex == it->second)
+                  ts.modulatable.push_back({ r.paramIndex, r.name, r.minValue, r.maxValue, r.step, r.isEnum, r.isBool, r.enumOptions });
+         std::sort(ts.modulatable.begin(), ts.modulatable.end(),
+                   [](const auto& a, const auto& b) { return a.index < b.index; });
+         typesJson += (first ? "" : ",") + PatchSchema::ToJson(ts);
+         first = false;
+      }
+      typesJson += "]";
+      sStatus.extraJson.push_back("\"count\":" + std::to_string(types.size()));
+      sStatus.extraJson.push_back(typesJson);
+      sPhase = Phase::Done;
+      HeadlessFinish(window, sStatus, sWall);
       return;
    }
 
@@ -69669,17 +69915,36 @@ int main(int argc, char** argv)
    {
       Patch::Data probe;
       std::string readError;
-      if (!Patch::Read(gHeadlessJob.patch, probe, readError))
+      const bool loadsPatch = gHeadlessJob.mode == Headless::Mode::Render || gHeadlessJob.mode == Headless::Mode::Frame;
+      Headless::Status st;
+      st.mode = gHeadlessJob.mode == Headless::Mode::Render ? "render" : "frame";
+      st.patch = gHeadlessJob.patch;
+      if (!loadsPatch)
       {
-         Headless::Status st;
-         st.mode = gHeadlessJob.mode == Headless::Mode::Render ? "render" : "frame";
-         st.patch = gHeadlessJob.patch;
+         // describe / validate do their work in HeadlessTick
+      }
+      else if (!Patch::Read(gHeadlessJob.patch, probe, readError))
+      {
          st.errors.push_back({ "E_LOAD", readError, 0, -1 });
          gHeadlessExitCode = Headless::Emit(gHeadlessJob, st);
          glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
       else
-         LoadPatchFrom(gHeadlessJob.patch);
+      {
+         // Strict pass before anything is applied: a broken authored file is
+         // reported with its line numbers instead of loading half a graph.
+         const PatchSchema::Env env = MakeSchemaEnv(gHeadlessJob.mode == Headless::Mode::Render ||
+                                                    gHeadlessJob.mode == Headless::Mode::Frame);
+         PatchSchema::Validate(probe, env, st.errors, gHeadlessPreWarnings);
+         if (!st.errors.empty())
+         {
+            st.warnings = gHeadlessPreWarnings;
+            gHeadlessExitCode = Headless::Emit(gHeadlessJob, st);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+         else
+            LoadPatchFrom(gHeadlessJob.patch);
+      }
    }
    else if (argc > 1 && argv[1] != nullptr && argv[1][0] != '-')
    {

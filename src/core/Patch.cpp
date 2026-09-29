@@ -504,8 +504,10 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
    std::vector<LegacyClip> legacyClips;
    bool sawArrangeLine = false;
 
+   int lineNo = 1; // the header was line 1
    while (std::getline(file, line))
    {
+      lineNo++;
       // Leading whitespace is cosmetic in the file, so strip it before parsing.
       size_t start = line.find_first_not_of(" \t");
       if (start == std::string::npos)
@@ -519,6 +521,7 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       if (tag == "node")
       {
          current = NodeRecord();
+         current.line = lineNo;
          in >> current.index >> current.category;
          std::getline(in, current.typeName);
          if (!current.typeName.empty() && current.typeName[0] == ' ')
@@ -564,10 +567,12 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          if (!value.empty() && value[0] == ' ')
             value.erase(0, 1);
          current.params.push_back({ tag + " " + name, value });
+         current.paramLines.push_back(lineNo);
       }
       else if (tag == "cable" || tag == "geo")
       {
          CableRecord c;
+         c.line = lineNo;
          in >> c.dstIndex >> c.dstSlot >> c.srcIndex;
          // srcOutput is a later addition (build step 11, §5.3); missing on
          // older patches, where >>'s failed-extraction behaviour leaves it
@@ -587,6 +592,7 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       else if (tag == "aud" || tag == "note")
       {
          CableRecord c;
+         c.line = lineNo;
          in >> c.dstIndex >> c.dstSlot >> c.srcIndex;
          if (tag == "aud")
             outData.audio.push_back(c);
@@ -605,6 +611,7 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          // patches, where >>'s failed-extraction behaviour leaves these
          // initialised values in place - see the "flags" precedent above.
          ModRecord m;
+         m.line = lineNo;
          m.polarity = 0;
          m.depth = 1.0f;
          m.centre = 0.0f;
@@ -635,6 +642,7 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       else if (tag == "expr")
       {
          ExprRecord e;
+         e.line = lineNo;
          in >> e.dstIndex >> e.dstParam;
          std::string raw;
          std::getline(in, raw);

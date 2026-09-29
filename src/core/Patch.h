@@ -123,6 +123,10 @@ namespace Patch
       bool showAdvancedParams = false; // audio nodes only, see GraphNode.h
       // Raw key/value lines, replayed into the node through its ParamVisitor.
       std::vector<std::pair<std::string, std::string>> params;
+      // Reader line numbers (1-based, 0 = not read from a file), so the
+      // validator can cite scene.inf:41. Not written back.
+      int line = 0;
+      std::vector<int> paramLines; // parallel to params
    };
 
    struct CableRecord
@@ -136,6 +140,7 @@ namespace Patch
       // than one note output, and only a node like VideoSourceNode (image +
       // audio on separate outputs) has more than one audio output.
       int srcOutput = 0;
+      int line = 0; // reader line number, see NodeRecord::line
    };
 
    struct ModRecord
@@ -162,6 +167,7 @@ namespace Patch
       // written) alongside lo/hi - see the format comment above.
       bool enabled = true;
       float curve = 0.0f; // in [-1.0, 1.0], 0 = linear
+      int line = 0;
    };
 
    // A palette node driving one colour swatch on another node.
@@ -181,6 +187,7 @@ namespace Patch
       int dstParam = 0;
       std::string text;
       float curve = 0.0f; // in [-1.0, 1.0], 0 = linear
+      int line = 0;
    };
 
    // One patch-wide named value an expression can read - see

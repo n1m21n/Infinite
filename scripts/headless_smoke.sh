@@ -32,5 +32,30 @@ fi
 "$BIN" --render "$PATCH" "$OUT/x.avi" >/dev/null; [ $? = 2 ]; check "bad container exit 2" $?
 "$BIN" --render "$ROOT/assets/examples/patch_1.inf" "$OUT/x.mp4" >/dev/null; [ $? = 3 ]; check "no Output exit 3" $?
 
+cat > "$OUT/bad.inf" <<'INF'
+infinite-patch 1
+node 1 Source Shpe
+end
+node 2 Source Shape
+  f sizee 0.5
+end
+node 3 Utility Output
+end
+cable 3 0 2
+aud 3 0 2
+cable 3 5 2
+cable 9 0 2
+INF
+r=$("$BIN" --validate "$OUT/bad.inf"); rc=$?
+[ "$rc" = 3 ]; check "validate bad patch exit 3" $?
+for code in E_UNKNOWN_TYPE W_UNKNOWN_PARAM E_KIND_MISMATCH E_BAD_SLOT E_DANGLING; do
+  echo "$r" | grep -q "\"$code\""; check "validate reports $code" $?
+done
+echo "$r" | grep -q '"line":2'; check "validate cites line numbers" $?
+r=$("$BIN" --validate "$PATCH" --for-render); [ $? = 0 ]; check "validate good patch exit 0" $?
+r=$("$BIN" --describe Blend); [ $? = 0 ] && [ "$(echo "$r" | json "d['types'][0]['type']")" = "Blend" ]; check "describe one type" $?
+"$BIN" --describe Blnd >/dev/null; [ $? = 3 ]; check "describe unknown type exit 3" $?
+r=$("$BIN" --describe); [ "$(echo "$r" | json "d['count'] > 250")" = "True" ]; check "describe lists every type" $?
+
 rm -rf "$OUT"
 exit $fail

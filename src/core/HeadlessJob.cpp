@@ -41,7 +41,10 @@ namespace Headless
                s += ",\"node\":" + std::to_string(is.node);
             if (is.line > 0)
                s += ",\"line\":" + std::to_string(is.line);
-            s += ",\"message\":\"" + JsonEscape(is.message) + "\"}";
+            s += ",\"message\":\"" + JsonEscape(is.message) + "\"";
+            if (!is.hint.empty())
+               s += ",\"hint\":\"" + JsonEscape(is.hint) + "\"";
+            s += "}";
          }
          s += "]";
       }
@@ -85,6 +88,56 @@ namespace Headless
       {
          job.mode = Mode::Frame;
          positional = 3;
+      }
+      else if (first == "--describe")
+      {
+         job.mode = Mode::Describe;
+         for (int i = 2; i < argc; i++)
+         {
+            const std::string a = argv[i];
+            if (a == "--json" && i + 1 < argc)
+               job.jsonPath = argv[++i];
+            else if (a.rfind("--", 0) == 0)
+            {
+               usageError = "unknown option " + a;
+               return true;
+            }
+            else if (job.describeType.empty())
+               job.describeType = a;
+            else
+            {
+               usageError = "usage: Infinite --describe [<type name>] [--json <file>]";
+               return true;
+            }
+         }
+         return true;
+      }
+      else if (first == "--validate")
+      {
+         job.mode = Mode::Validate;
+         std::vector<std::string> pos;
+         for (int i = 2; i < argc; i++)
+         {
+            const std::string a = argv[i];
+            if (a == "--json" && i + 1 < argc)
+               job.jsonPath = argv[++i];
+            else if (a == "--for-render")
+               job.forRender = true;
+            else if (a.rfind("--", 0) == 0)
+            {
+               usageError = "unknown option " + a;
+               return true;
+            }
+            else
+               pos.push_back(a);
+         }
+         if (pos.size() != 1)
+         {
+            usageError = "usage: Infinite --validate <patch.inf> [--for-render] [--json <file>]";
+            return true;
+         }
+         job.patch = pos[0];
+         return true;
       }
       else if (first == "--version")
       {
@@ -228,7 +281,8 @@ namespace Headless
       if (c == "E_USAGE" || c == "E_UNSUPPORTED_CONTAINER")
          return 2;
       if (c == "E_LOAD" || c == "E_NO_OUTPUT" || c == "E_AMBIGUOUS_OUTPUT" || c == "E_UNKNOWN_TYPE" ||
-          c == "E_BAD_SLOT" || c == "E_KIND_MISMATCH" || c == "E_DANGLING" || c == "E_CYCLE")
+          c == "E_BAD_SLOT" || c == "E_KIND_MISMATCH" || c == "E_DANGLING" || c == "E_CYCLE" ||
+          c == "E_DUPLICATE_INDEX")
          return 3;
       if (c == "E_HARDWARE_SOURCE")
          return 4;

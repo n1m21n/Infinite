@@ -399,6 +399,7 @@ set(COMMON_SOURCES
     src/core/MovementStats.cpp
     src/core/ColorStats.cpp
     src/core/HeadlessJob.cpp
+    src/core/PatchSchema.cpp
     src/core/GestureRecorder.cpp
     src/core/Expression.cpp
     src/core/SysInfo.cpp
