@@ -13,6 +13,7 @@
 #include "audio/AudioNode.h"
 #include "audio/DspMath.h"
 #include "audio/NoteEventQueue.h"
+#include "audio/PassFade.h"
 #include "audio/SampleSlot.h"
 #include "core/AudioDecodeCache.h"
 #include "platform/Platform.h"
@@ -20,6 +21,7 @@
 namespace
 {
    constexpr int kReleaseFrames = 96; // ~2 ms fade when a gate/loop stops
+   constexpr float kPassFadeMs = 3.0f; // fixed fade at each end of a pass (clicks)
    constexpr int kCmdCapacity = 256;
    constexpr int kMaxEvents = 128;
 
@@ -44,6 +46,8 @@ class AudioMpcNode : public AudioNode
 public:
    AudioMpcNode()
    {
+      // Sized here as well as in PrepareToPlay: a graph rebuild can run a block
+      // on a node before its PrepareToPlay.
       mPadOut.assign((size_t)MpcNode::kPads * 2 * kAudioMaxBlockFrames, 0.0f);
       for (int p = 0; p < MpcNode::kPads; p++)
       {
@@ -51,12 +55,15 @@ public:
          mVolume[p].store(0.8f, std::memory_order_relaxed);
          mPitch[p].store(0.0f, std::memory_order_relaxed);
          mPan[p].store(0.0f, std::memory_order_relaxed);
+         mSpeed[p].store(1.0f, std::memory_order_relaxed);
+         mFine[p].store(0.0f, std::memory_order_relaxed);
       }
    }
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
    {
       mSampleRate = sampleRate > 0.0 ? sampleRate : 48000.0;
+      mPadOut.assign((size_t)MpcNode::kPads * 2 * kAudioMaxBlockFrames, 0.0f);
    }
 
    void SetNoteInbox(NoteEventQueue* inbox, int cursor) override
@@ -88,25 +95,19 @@ public:
       for (int p = 0; p < MpcNode::kPads; p++)
       {
          mMode[p].store(std::clamp(n.padMode[p], 0, 2), std::memory_order_relaxed);
-         mVolume[p].store(std::clamp(n.padVolume[p], 0.0f, 2.0f), std::memory_order_relaxed);
+         mVolume[p].store(std::clamp(n.padVolume[p], 0.0f, 1.0f), std::memory_order_relaxed);
          mPitch[p].store(std::clamp(n.padPitch[p], -24.0f, 24.0f), std::memory_order_relaxed);
          mPan[p].store(std::clamp(n.padPan[p], -1.0f, 1.0f), std::memory_order_relaxed);
+         mSpeed[p].store(std::clamp(n.padSpeed[p], -2.0f, 2.0f), std::memory_order_relaxed);
+         mFine[p].store(std::clamp(n.padFine[p], -50.0f, 50.0f), std::memory_order_relaxed);
       }
-      mMaster.store(std::clamp(n.volume, 0.0f, 2.0f), std::memory_order_relaxed);
-      mBaseNote.store(std::clamp(n.baseNote, 0, 112), std::memory_order_relaxed);
    }
+   // Sweep hook: any note starts every pad, so all 16 pads' params are audible
+   // through the one held note the sweep drives.
+   void SetTestAllPads(bool on) { mTestAllPads.store(on, std::memory_order_relaxed); }
 
    unsigned int PlayingMask() const { return mPlayingMask.load(std::memory_order_relaxed); }
    float Peak() const { return mPeak.exchange(0.0f, std::memory_order_relaxed); }
-
-   // ---- MPC Out tap (audio thread, after this node's ProcessBlock) -------
-   uint64_t BlockCounter() const { return mBlockCounter.load(std::memory_order_acquire); }
-   const float* PadChannel(int pad, int ch) const
-   {
-      return mPadOut.data() +
-             ((size_t)std::clamp(pad, 0, MpcNode::kPads - 1) * 2 + (size_t)(ch & 1)) * kAudioMaxBlockFrames;
-   }
-   int LastBlockFrames() const { return mLastFrames; }
 
    // ---- audio thread ----------------------------------------------------
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
@@ -148,7 +149,8 @@ public:
       }
       if (mNoteInbox != nullptr)
       {
-         const int base = mBaseNote.load(std::memory_order_relaxed);
+         const int base = MpcNode::kFirstNote;
+         const bool all = mTestAllPads.load(std::memory_order_relaxed);
          NoteEvent notes[64];
          int n = 0;
          while ((n = mNoteInbox->Pop(mNoteCursor, notes, 64)) > 0)
@@ -157,11 +159,17 @@ public:
             {
                if (notes[i].bendUpdate)
                   continue;
+               const int off = std::clamp(notes[i].frameOffset, 0, std::max(0, numFrames - 1));
+               if (all)
+               {
+                  for (int q = 0; q < MpcNode::kPads; q++)
+                     addEvent({ off, q, notes[i].isNoteOn, notes[i].velocity });
+                  continue;
+               }
                const int pad = notes[i].note - base;
                if (pad < 0 || pad >= MpcNode::kPads)
                   continue;
-               addEvent({ std::clamp(notes[i].frameOffset, 0, std::max(0, numFrames - 1)), pad,
-                          notes[i].isNoteOn, notes[i].velocity });
+               addEvent({ off, pad, notes[i].isNoteOn, notes[i].velocity });
             }
          }
       }
@@ -182,7 +190,6 @@ public:
       }
       Render(cursor, numFrames);
 
-      const float master = mMaster.load(std::memory_order_relaxed);
       float peak = 0.0f;
       for (int i = 0; i < numFrames; i++)
       {
@@ -192,8 +199,6 @@ public:
             l += PadWrite(p, 0)[i];
             r += PadWrite(p, 1)[i];
          }
-         l *= master;
-         r *= master;
          if (output.numChannels > 0)
             output.channels[0][i] = l;
          if (output.numChannels > 1)
@@ -214,8 +219,6 @@ public:
       float prev = mPeak.load(std::memory_order_relaxed);
       if (peak > prev)
          mPeak.store(peak, std::memory_order_relaxed);
-      mLastFrames = numFrames;
-      mBlockCounter.fetch_add(1, std::memory_order_release);
    }
 
 private:
@@ -224,6 +227,7 @@ private:
       bool active = false;
       bool looping = false;
       double pos = 0.0;
+      bool reverse = false; // direction the pass was started in
       float gain = 1.0f;
       int release = -1; // >= 0: frames left in the stop fade
    };
@@ -238,7 +242,9 @@ private:
       Voice& v = mVoice[p];
       v.active = mActive[p] != nullptr && mActive[p]->numFrames > 1;
       v.looping = looping;
-      v.pos = 0.0;
+      const float speed = mSpeed[p].load(std::memory_order_relaxed);
+      v.reverse = speed < 0.0f;
+      v.pos = (v.reverse && mActive[p] != nullptr) ? (double)(mActive[p]->numFrames - 1) - 1e-3 : 0.0;
       v.release = -1;
       v.gain = std::clamp(velocity, 0.0f, 1.0f);
    }
@@ -295,8 +301,13 @@ private:
          const float* src0 = buf->channelData.data();
          const float* src1 = buf->channels > 1 ? src0 + frames : src0;
          const double srcRate = buf->sampleRate > 0.0 ? buf->sampleRate : mSampleRate;
-         const double step = (srcRate / mSampleRate) *
-                             std::pow(2.0, (double)mPitch[p].load(std::memory_order_relaxed) / 12.0);
+         const float speed = mSpeed[p].load(std::memory_order_relaxed);
+         const double semis = (double)mPitch[p].load(std::memory_order_relaxed) +
+                              (double)mFine[p].load(std::memory_order_relaxed) / 100.0;
+         const double rate = (srcRate / mSampleRate) * std::pow(2.0, semis / 12.0) * (double)speed;
+         const double step = rate;
+         const float dirSign = step < 0.0 ? -1.0f : 1.0f;
+         const double lastPos = (double)(frames - 1);
          float panL = 1.0f, panR = 1.0f;
          DspMath::EqualPowerPan(mPan[p].load(std::memory_order_relaxed), panL, panR);
          const float vol = mVolume[p].load(std::memory_order_relaxed) * v.gain;
@@ -306,13 +317,13 @@ private:
          float* outR = PadWrite(p, 1);
          for (int i = from; i < to; i++)
          {
-            int idx = (int)v.pos;
-            if (idx >= frames - 1)
+            if (v.pos >= lastPos || v.pos < 0.0)
             {
                if (v.looping)
                {
-                  v.pos = std::fmod(v.pos, (double)(frames - 1));
-                  idx = std::clamp((int)v.pos, 0, frames - 2);
+                  v.pos = std::fmod(v.pos, lastPos);
+                  if (v.pos < 0.0)
+                     v.pos += lastPos;
                }
                else
                {
@@ -320,13 +331,15 @@ private:
                   break;
                }
             }
+            const int idx = std::clamp((int)v.pos, 0, frames - 2);
             const float frac = (float)(v.pos - (double)idx);
             const float a = src0[idx] + (src0[idx + 1] - src0[idx]) * frac;
             const float b = src1[idx] + (src1[idx + 1] - src1[idx]) * frac;
-            float env = 1.0f;
+            float env = PassFade::Gain(v.pos, 0.0, lastPos, dirSign, kPassFadeMs, kPassFadeMs,
+                                       (float)std::fabs(step), mSampleRate);
             if (v.release >= 0)
             {
-               env = (float)v.release / (float)kReleaseFrames;
+               env *= (float)v.release / (float)kReleaseFrames;
                if (--v.release < 0)
                {
                   v.active = false;
@@ -346,7 +359,6 @@ private:
    const Platform::SampleBuffer* mActive[MpcNode::kPads] = {};
    Voice mVoice[MpcNode::kPads];
    std::vector<float> mPadOut;
-   int mLastFrames = 0;
 
    NoteEventQueue* mNoteInbox = nullptr;
    int mNoteCursor = -1;
@@ -359,12 +371,12 @@ private:
    std::atomic<float> mVolume[MpcNode::kPads];
    std::atomic<float> mPitch[MpcNode::kPads];
    std::atomic<float> mPan[MpcNode::kPads];
-   std::atomic<float> mMaster { 0.8f };
-   std::atomic<int> mBaseNote { 36 };
+   std::atomic<float> mSpeed[MpcNode::kPads];
+   std::atomic<float> mFine[MpcNode::kPads];
+   std::atomic<bool> mTestAllPads { false };
 
    std::atomic<unsigned int> mPlayingMask { 0 };
    mutable std::atomic<float> mPeak { 0.0f };
-   std::atomic<uint64_t> mBlockCounter { 0 };
 };
 
 // ------------------------------------------------------------------ MpcNode
@@ -376,6 +388,8 @@ MpcNode::MpcNode() : mAudioNode(std::make_unique<AudioMpcNode>())
       padVolume[p] = 0.8f;
       padPitch[p] = 0.0f;
       padPan[p] = 0.0f;
+      padSpeed[p] = 1.0f;
+      padFine[p] = 0.0f;
    }
 }
 
@@ -485,6 +499,11 @@ void MpcNode::ReloadFromPaths()
    }
 }
 
+void MpcNode::PushParamsNow()
+{
+   mAudioNode->PushParams(*this);
+}
+
 void MpcNode::CookIfNeeded(int frameId)
 {
    if (frameId == mLastCookFrame)
@@ -511,17 +530,20 @@ void MpcNode::VisitParams(ParamVisitor& v)
       v.Float(key, padPitch[p]);
       snprintf(key, sizeof(key), "pad%d_pan", p);
       v.Float(key, padPan[p]);
+      snprintf(key, sizeof(key), "pad%d_speed", p);
+      v.Float(key, padSpeed[p]);
+      snprintf(key, sizeof(key), "pad%d_fine", p);
+      v.Float(key, padFine[p]);
    }
-   v.Int("baseNote", baseNote);
-   v.Float("volume", volume);
    v.Int("selectedPad", selectedPad);
 }
 
 void MpcNode::SweepPrepare()
 {
-   // The sweep drives one held note (69). Map it to pad 0 and give that pad a
-   // synthetic looping-length tone so the pad params are observable.
-   baseNote = 69;
+   // The sweep drives one held note (69), outside the fixed 36..51 range. In
+   // this mode any note starts every pad, each holding a synthetic tone, so all
+   // 16 pads' params are observable.
+   mAudioNode->SetTestAllPads(true);
    auto* buf = new Platform::SampleBuffer();
    buf->channels = 2;
    buf->numFrames = 48000;
@@ -533,116 +555,10 @@ void MpcNode::SweepPrepare()
       buf->channelData[(size_t)i] = s;
       buf->channelData[(size_t)buf->numFrames + (size_t)i] = s;
    }
-   mAudioNode->PushBuffer(0, buf);
-}
-
-// --------------------------------------------------------------- MPC Out
-class AudioMpcOutNode : public AudioNode
-{
-public:
-   void SetSource(AudioMpcNode* src) { mSource.store(src, std::memory_order_release); }
-   void PushParams(int pad, float gainDb)
+   for (int p = 0; p < kPads; p++)
    {
-      mPad.store(std::clamp(pad, 0, MpcNode::kPads - 1), std::memory_order_relaxed);
-      mGain.store(DspMath::DbToLinear(std::clamp(gainDb, -60.0f, 12.0f)), std::memory_order_relaxed);
+      auto* copy = new Platform::SampleBuffer(*buf);
+      mAudioNode->PushBuffer(p, copy);
    }
-   float Peak() const { return mPeak.exchange(0.0f, std::memory_order_relaxed); }
-
-   void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& output) override
-   {
-      const AudioBuffer* in = numInputs > 0 ? inputs[0] : nullptr;
-      AudioMpcNode* src = mSource.load(std::memory_order_acquire);
-      const float gain = mGain.load(std::memory_order_relaxed);
-      float peak = 0.0f;
-      if (in == nullptr)
-      {
-         Silence(output);
-      }
-      else if (src == nullptr)
-      {
-         for (int ch = 0; ch < output.numChannels; ch++)
-         {
-            const float* s = in->channels[std::min(ch, in->numChannels - 1)];
-            for (int i = 0; i < output.numFrames; i++)
-            {
-               output.channels[ch][i] = s[i] * gain;
-               peak = std::max(peak, std::fabs(output.channels[ch][i]));
-            }
-         }
-      }
-      else
-      {
-         const uint64_t block = src->BlockCounter();
-         if (block == mLastBlock || src->LastBlockFrames() < output.numFrames)
-         {
-            Silence(output); // the MPC did not render this block (bypassed)
-         }
-         else
-         {
-            const int pad = mPad.load(std::memory_order_relaxed);
-            for (int ch = 0; ch < output.numChannels; ch++)
-            {
-               const float* s = src->PadChannel(pad, ch);
-               for (int i = 0; i < output.numFrames; i++)
-               {
-                  output.channels[ch][i] = s[i] * gain;
-                  peak = std::max(peak, std::fabs(output.channels[ch][i]));
-               }
-            }
-         }
-         mLastBlock = block;
-      }
-      float prev = mPeak.load(std::memory_order_relaxed);
-      if (peak > prev)
-         mPeak.store(peak, std::memory_order_relaxed);
-   }
-
-private:
-   static void Silence(AudioBuffer& output)
-   {
-      for (int ch = 0; ch < output.numChannels; ch++)
-         std::fill(output.channels[ch], output.channels[ch] + output.numFrames, 0.0f);
-   }
-
-   std::atomic<AudioMpcNode*> mSource { nullptr };
-   std::atomic<int> mPad { 0 };
-   std::atomic<float> mGain { 1.0f };
-   mutable std::atomic<float> mPeak { 0.0f };
-   uint64_t mLastBlock = ~0ull;
-};
-
-MpcOutNode::MpcOutNode() : mAudioNode(std::make_unique<AudioMpcOutNode>()) {}
-MpcOutNode::~MpcOutNode() = default;
-
-AudioNode* MpcOutNode::GetAudioNode()
-{
-   return mAudioNode.get();
-}
-
-void MpcOutNode::ResolveAudioTaps()
-{
-   auto* mpc = dynamic_cast<MpcNode*>(input.GetSource());
-   mConnectedToMpc = mpc != nullptr;
-   mAudioNode->SetSource(mpc != nullptr ? mpc->AudioHalf() : nullptr);
-}
-
-void MpcOutNode::CookIfNeeded(int frameId)
-{
-   if (frameId == mLastCookFrame)
-      return;
-   mLastCookFrame = frameId;
-   mAudioNode->PushParams(pad - 1, gainDb);
-   mLevel = mAudioNode->Peak();
-}
-
-void MpcOutNode::VisitParams(ParamVisitor& v)
-{
-   v.Int("pad", pad);
-   v.Float("gainDb", gainDb);
-}
-
-void MpcOutNode::SweepPrepare()
-{
-   // With nothing wired to an MPC the node is a pass-through, which the
-   // sweep's drive tone already exercises.
+   delete buf;
 }

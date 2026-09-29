@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <memory>
 
 #include "core/AudioCable.h"
@@ -32,7 +33,17 @@ class AudioLooperNode;
 // Latency compensation: what you play arrives at the looper late by the
 // interface's round trip, so an uncompensated take sits behind the grid. The
 // take window is shifted by Platform::AudioRoundTripLatencyFrames() (auto) plus
-// a manual trim in ms; both are applied to overdubs as well.
+// (the old manual trim was dropped: auto comp is the one control); it is applied to overdubs as well.
+//
+// Playback is a sample player over the held loop, with the Sampler's own
+// controls: finetune (cents), pitch (semitones), speed (negative plays it
+// backwards) and volume, plus fade in / fade out (ms) applied at the start and
+// end of every pass through the loop. The playback rate is
+//    speed * 2^((pitch + finetune / 100) / 12)
+// At exactly 1.0 the loop is its recorded length and stays on the grid. Any
+// other rate plays it in length / |rate|, so it DRIFTS against the transport
+// (that is the point of varispeed), and overdub is paused: layers are only
+// written at the rate they were recorded at.
 //
 // Not saved: the loop audio itself (params only) - a patch reloads empty.
 class LooperNode : public INode, public IAudioSource
@@ -52,7 +63,8 @@ public:
    void VisitParams(ParamVisitor& v) override;
    void SweepPrepare() override;
 
-   INode* BypassSource() override { return input.GetSource(); }
+   // No BypassSource: the Looper is a generator (Synths). Bypassed, it outputs
+   // nothing, like the Sampler. It is not a pass-through effect.
    AudioNode* GetAudioNode() override;
    AudioCable* AudioInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    const char* InputLabel(int slot) const override { return slot == 0 ? "audio" : nullptr; }
@@ -78,13 +90,27 @@ public:
    static const char* StateName(int state);
    static constexpr double MaxSeconds() { return 60.0; }
 
+   // Playback rate of the held loop: speed * 2^((pitch + finetune / 100) / 12).
+   static float RateFor(float pitchSemis, float fineCents, float speed)
+   {
+      return speed * std::pow(2.0f, (pitchSemis + fineCents / 100.0f) / 12.0f);
+   }
+   float Rate() const { return RateFor(pitch, finetune, speed); }
+   // True when the loop plays at its recorded speed (locked to the grid).
+   bool AtUnity() const { return std::fabs(Rate() - 1.0f) < 1e-4f; }
+
    // take: 0 = free, n>0 = MusicTime::RateDivision(n - 1). Default 1 bar.
    int take = 3;
    bool syncStart = true; // wait for the next grid line when the transport runs
    bool autoLatency = true;
-   float trimMs = 0.0f;   // -100..300, added to the auto figure
-   float thru = 1.0f;     // input monitoring level (0 = loop only)
-   float level = 1.0f;    // loop playback level
+   int testLatencyFrames = -1; // fixtures only: >= 0 replaces the measured round trip
+   bool thru = true;      // monitor the input alongside the loop
+   float finetune = 0.0f; // cents, +/-50, stacks on pitch
+   float pitch = 0.0f;    // semitones, +/-24
+   float speed = 1.0f;    // -2..2: scales rate and pitch together, negative plays backwards
+   float volume = 1.0f;   // 0..1, loop playback level (unity: the loop sits level with the live input)
+   float fadeIn = 3.0f;   // ms, 0..250, ramp at the start of every pass
+   float fadeOut = 3.0f;  // ms, 0..250, ramp at the end of every pass
 
    AudioCable input;
 

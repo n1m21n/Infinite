@@ -182,12 +182,6 @@ public:
    bool bypassed = false;
    virtual INode* BypassSource() { return nullptr; }
 
-   // Called on the main thread by RebuildAudioTopology just before the new
-   // topology is published, for every node. A node that reads another node's
-   // audio-thread state directly (MPC Out tapping an MPC's per-pad buffers)
-   // re-resolves that pointer here so it always matches the live graph.
-   virtual void ResolveAudioTaps() {}
-
    // Label shown next to an input pin. Defaults to A, B, C... in the editor.
    virtual const char* InputLabel(int /*slot*/) const { return nullptr; }
 

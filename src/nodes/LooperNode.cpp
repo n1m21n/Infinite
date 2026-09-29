@@ -10,6 +10,7 @@
 #include "audio/AudioEngine.h"
 #include "audio/AudioNode.h"
 #include "audio/MusicTime.h"
+#include "audio/PassFade.h"
 #include "audio/SampleSlot.h"
 #include "core/Transport.h"
 #include "platform/Platform.h"
@@ -23,7 +24,6 @@ namespace
    constexpr double kMaxSeconds = LooperNode::MaxSeconds();
    constexpr int kMaxFrames = 12000000;
    constexpr int kMinTakeFrames = 32;
-   constexpr int kDeclickFrames = 128;
    constexpr int kCmdCapacity = 32;
    // Waveform peak bins: one min/max pair per 1024 frames of loop, written by
    // the audio thread (relaxed atomics, no allocation) and read by the UI.
@@ -51,7 +51,8 @@ public:
       mSampleRate.store(sr, std::memory_order_relaxed);
       // Start the gain ramps at their targets, not at construction defaults.
       mThruNow = mThru.load(std::memory_order_relaxed);
-      mLevelNow = mLevel.load(std::memory_order_relaxed);
+      mVolumeNow = mVolume.load(std::memory_order_relaxed);
+      mRateNow = mRate.load(std::memory_order_relaxed);
       if (mBufRate == sr)
          return;
       auto* buf = new LoopBuf();
@@ -78,10 +79,14 @@ public:
    {
       mTake.store(std::clamp(n.take, 0, (int)MusicTime::kNumRateDivisions), std::memory_order_relaxed);
       mSync.store(n.syncStart, std::memory_order_relaxed);
-      mThru.store(std::clamp(n.thru, 0.0f, 2.0f), std::memory_order_relaxed);
-      mLevel.store(std::clamp(n.level, 0.0f, 2.0f), std::memory_order_relaxed);
+      mThru.store(n.thru ? 1.0f : 0.0f, std::memory_order_relaxed);
+      mVolume.store(std::clamp(n.volume, 0.0f, 1.0f), std::memory_order_relaxed);
+      mRate.store(LooperNode::RateFor(std::clamp(n.pitch, -24.0f, 24.0f), std::clamp(n.finetune, -50.0f, 50.0f),
+                                      std::clamp(n.speed, -2.0f, 2.0f)),
+                  std::memory_order_relaxed);
+      mFadeInMs.store(std::clamp(n.fadeIn, 0.0f, 250.0f), std::memory_order_relaxed);
+      mFadeOutMs.store(std::clamp(n.fadeOut, 0.0f, 250.0f), std::memory_order_relaxed);
       mAutoLatencyFrames.store(n.autoLatency ? std::max(0, autoLatencyFrames) : 0, std::memory_order_relaxed);
-      mTrimMs.store(std::clamp(n.trimMs, -100.0f, 300.0f), std::memory_order_relaxed);
    }
 
    void DrainRetired() { mBufSlot.DrainRetired(); }
@@ -137,13 +142,16 @@ public:
          mBuf = mBufSlot.Active();
          mState = LooperNode::kEmpty;
          mLength = 0;
-         mPos = 0;
+         mPos = 0.0;
       }
 
       const float thruTarget = mThru.load(std::memory_order_relaxed);
-      const float levelTarget = mLevel.load(std::memory_order_relaxed);
-      const double compFrames = (double)mAutoLatencyFrames.load(std::memory_order_relaxed) +
-                                (double)mTrimMs.load(std::memory_order_relaxed) * 0.001 * sr;
+      const float volumeTarget = mVolume.load(std::memory_order_relaxed);
+      const float rateTarget = mRate.load(std::memory_order_relaxed);
+      const float fadeInMs = mFadeInMs.load(std::memory_order_relaxed);
+      const float fadeOutMs = mFadeOutMs.load(std::memory_order_relaxed);
+      const bool unity = std::fabs(rateTarget - 1.0f) < 1e-4f && std::fabs(mRateNow - 1.0f) < 1e-4f;
+      const double compFrames = (double)mAutoLatencyFrames.load(std::memory_order_relaxed);
       mComp = (int)std::clamp(compFrames, 0.0, sr);
       mPubComp.store(mComp, std::memory_order_relaxed);
 
@@ -178,7 +186,8 @@ public:
          }
          const float t = (float)(i + 1) * invN;
          const float thru = mThruNow + (thruTarget - mThruNow) * t;
-         const float lvl = mLevelNow + (levelTarget - mLevelNow) * t;
+         const float vol = mVolumeNow + (volumeTarget - mVolumeNow) * t;
+         const float rate = mRateNow + (rateTarget - mRateNow) * t;
          float outL = inL * thru;
          float outR = inR * thru;
 
@@ -203,20 +212,32 @@ public:
             }
             else if ((mState == LooperNode::kPlaying || mState == LooperNode::kOverdubbing) && mLength > 0)
             {
-               const int idx = std::clamp(mPos, 0, mLength - 1);
-               outL += mBuf->ch[0][(size_t)idx] * lvl;
-               outR += mBuf->ch[1][(size_t)idx] * lvl;
-               if (mState == LooperNode::kOverdubbing)
+               // Linear-interpolated read at the fractional playhead, scaled by the
+               // per-pass fade (the whole loop is one pass; a negative rate walks it
+               // backwards and the fade-in follows).
+               const int i0 = std::clamp((int)mPos, 0, mLength - 1);
+               const int i1 = (i0 + 1 >= mLength) ? 0 : i0 + 1;
+               const float fr = (float)(mPos - (double)i0);
+               const float g = PassFade::Gain(mPos, 0.0, (double)mLength, rate < 0.0f ? -1.0f : 1.0f, fadeInMs, fadeOutMs,
+                                              std::fabs(rate), sr) * vol;
+               outL += (mBuf->ch[0][(size_t)i0] + (mBuf->ch[0][(size_t)i1] - mBuf->ch[0][(size_t)i0]) * fr) * g;
+               outR += (mBuf->ch[1][(size_t)i0] + (mBuf->ch[1][(size_t)i1] - mBuf->ch[1][(size_t)i0]) * fr) * g;
+               if (mState == LooperNode::kOverdubbing && unity)
                {
                   // This input was played against the loop position `latency`
-                  // frames ago.
-                  const int w = ((idx - mTakeComp % mLength) + mLength) % mLength;
+                  // frames ago. Only at the recorded speed: layers written at another
+                  // rate would land smeared or doubled.
+                  const int w = ((i0 - mTakeComp % mLength) + mLength) % mLength;
                   mBuf->ch[0][(size_t)w] = std::clamp(mBuf->ch[0][(size_t)w] + inL, -4.0f, 4.0f);
                   mBuf->ch[1][(size_t)w] = std::clamp(mBuf->ch[1][(size_t)w] + inR, -4.0f, 4.0f);
                   TouchBin(w, 0.5f * (mBuf->ch[0][(size_t)w] + mBuf->ch[1][(size_t)w]), true);
                }
-               if (++mPos >= mLength)
-                  mPos = 0;
+               mPos += (double)rate;
+               const double len = (double)mLength;
+               if (mPos >= len)
+                  mPos = std::fmod(mPos, len);
+               else if (mPos < 0.0)
+                  mPos = len + std::fmod(mPos, len);
             }
          }
 
@@ -225,7 +246,8 @@ public:
          peak = std::max(peak, std::max(std::fabs(outL), std::fabs(outR)));
       }
       mThruNow = thruTarget;
-      mLevelNow = levelTarget;
+      mVolumeNow = volumeTarget;
+      mRateNow = rateTarget;
       FlushBin();
       mPubLen.store(mState == LooperNode::kEmpty ? 0 : mLength, std::memory_order_relaxed);
       mPubTarget.store(mState == LooperNode::kRecording ? mTarget : 0, std::memory_order_relaxed);
@@ -235,7 +257,7 @@ public:
       mPubLoopSec.store(hasLoop ? (float)((double)mLength / sr) : 0.0f, std::memory_order_relaxed);
       mPubRecSec.store(mState == LooperNode::kRecording ? (float)((double)mLength / sr) : 0.0f,
                        std::memory_order_relaxed);
-      mPubPos.store(hasLoop ? (float)mPos / (float)std::max(1, mLength) : 0.0f, std::memory_order_relaxed);
+      mPubPos.store(hasLoop ? (float)(mPos / (double)std::max(1, mLength)) : 0.0f, std::memory_order_relaxed);
       if (peak > mPubPeak.load(std::memory_order_relaxed))
          mPubPeak.store(peak, std::memory_order_relaxed);
    }
@@ -326,7 +348,7 @@ private:
       mAccBin = -1;
       mState = LooperNode::kRecording;
       mLength = 0;
-      mPos = 0;
+      mPos = 0.0;
       mTakeComp = mComp;
       mSkip = mComp;
    }
@@ -341,21 +363,12 @@ private:
          mLength = 0;
          return;
       }
-      // Short fades at both ends so the seam does not click.
-      const int fade = std::min(kDeclickFrames, mLength / 4);
-      for (int i = 0; i < fade; i++)
-      {
-         const float g = (float)i / (float)std::max(1, fade);
-         for (int ch = 0; ch < 2; ch++)
-         {
-            mBuf->ch[ch][(size_t)i] *= g;
-            mBuf->ch[ch][(size_t)(mLength - 1 - i)] *= g;
-         }
-      }
+      // No destructive fade here: the per-pass fade in / fade out (see
+      // PassFade.h) is applied on playback, so the recording stays untouched.
       mState = next;
       // The take ended `comp` frames after its musical end, so the loop is
       // already that far into its next pass.
-      mPos = mTakeComp % mLength;
+      mPos = (double)(mTakeComp % mLength);
    }
 
    // Fills the loop with one second of a tone and starts playing it, so the
@@ -372,7 +385,7 @@ private:
          mBuf->ch[0][(size_t)i] = v;
          mBuf->ch[1][(size_t)i] = v;
       }
-      mPos = 0;
+      mPos = 0.0;
       mTakeComp = 0;
       mState = LooperNode::kPlaying;
       mAccBin = -1;
@@ -387,6 +400,12 @@ private:
          mBinMin[b].store(lo, std::memory_order_relaxed);
          mBinMax[b].store(hi, std::memory_order_relaxed);
       }
+   }
+
+   // Where a restarted loop begins: the top, or the end when it plays backwards.
+   double StartPos() const
+   {
+      return mRate.load(std::memory_order_relaxed) < 0.0f ? std::max(0.0, (double)mLength - 1.0) : 0.0;
    }
 
    void ApplyButton(int button)
@@ -425,7 +444,7 @@ private:
          else if (mState == LooperNode::kStopped && mLength > 0)
          {
             mState = LooperNode::kPlaying;
-            mPos = 0;
+            mPos = StartPos();
          }
          break;
       case LooperNode::kDub:
@@ -438,13 +457,13 @@ private:
          else if (mState == LooperNode::kStopped && mLength > 0)
          {
             mState = LooperNode::kOverdubbing;
-            mPos = 0;
+            mPos = StartPos();
          }
          break;
       case LooperNode::kClear:
          mState = LooperNode::kEmpty;
          mLength = 0;
-         mPos = 0;
+         mPos = 0.0;
          mTarget = 0;
          break;
       default:
@@ -461,12 +480,13 @@ private:
    int mState = LooperNode::kEmpty;
    int mLength = 0;   // frames in the loop, or recorded so far
    int mTarget = 0;   // fixed-length take, 0 = free
-   int mPos = 0;
+   double mPos = 0.0; // fractional playhead, frames
    int mSkip = 0;     // input frames still to drop before the take's start
    int mComp = 0;     // current compensation, frames
    int mTakeComp = 0; // compensation the held loop was recorded with
    float mThruNow = 1.0f;
-   float mLevelNow = 1.0f;
+   float mVolumeNow = 1.0f;
+   float mRateNow = 1.0f;
    int mAccBin = -1;
    float mAccMin = 0.0f;
    float mAccMax = 0.0f;
@@ -478,9 +498,11 @@ private:
    std::atomic<int> mTake { 3 };
    std::atomic<bool> mSync { true };
    std::atomic<float> mThru { 1.0f };
-   std::atomic<float> mLevel { 1.0f };
+   std::atomic<float> mVolume { 1.0f };
+   std::atomic<float> mRate { 1.0f };
+   std::atomic<float> mFadeInMs { 3.0f };
+   std::atomic<float> mFadeOutMs { 3.0f };
    std::atomic<int> mAutoLatencyFrames { 0 };
-   std::atomic<float> mTrimMs { 0.0f };
 
    // Audio -> main.
    std::atomic<int> mPubState { LooperNode::kEmpty };
@@ -547,10 +569,11 @@ void LooperNode::CookIfNeeded(int frameId)
 
    // The driver's round-trip figure is a handful of property reads; twice a
    // second is plenty for something that only changes with the device.
-   if (frameId - mLatencyPollFrame > 30 || frameId < mLatencyPollFrame)
+   if (frameId - mLatencyPollFrame > 30 || frameId < mLatencyPollFrame || testLatencyFrames >= 0)
    {
       mLatencyPollFrame = frameId;
-      mLatencyFrames = autoLatency ? (int)Platform::AudioRoundTripLatencyFrames(0) : 0;
+      mLatencyFrames = !autoLatency ? 0
+                     : (testLatencyFrames >= 0 ? testLatencyFrames : (int)Platform::AudioRoundTripLatencyFrames(0));
    }
    mAudioNode->PushParams(*this, mLatencyFrames);
    mAudioNode->DrainRetired();
@@ -575,7 +598,11 @@ void LooperNode::VisitParams(ParamVisitor& v)
    v.Int("take", take);
    v.Bool("syncStart", syncStart);
    v.Bool("autoLatency", autoLatency);
-   v.Float("trimMs", trimMs);
-   v.Float("thru", thru);
-   v.Float("level", level);
+   v.Bool("thru", thru);
+   v.Float("finetune", finetune);
+   v.Float("pitch", pitch);
+   v.Float("speed", speed);
+   v.Float("volume", volume);
+   v.Float("fadeIn", fadeIn);
+   v.Float("fadeOut", fadeOut);
 }

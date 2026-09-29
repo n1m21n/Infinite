@@ -8,7 +8,6 @@
 #include "core/NoteCable.h"
 
 class AudioMpcNode;
-class AudioMpcOutNode;
 
 // A 16-pad sample player in the spirit of an MPC.
 //
@@ -17,18 +16,47 @@ class AudioMpcOutNode;
 //   Gate     - plays while the pad is held, stops on release
 //   Loop     - a hit toggles a looping playback on/off
 // Pads are hit with the mouse, with each pad's CV pin (a MIDI controller via a
-// MIDI CC / Note modulator), or with the note input (note = base note + pad
-// index; 36..51 by default, the usual pad-controller layout).
+// MIDI CC / Note modulator), or with the note input (notes 36..51 = pads 1..16,
+// the usual pad-controller layout; fixed).
 //
-// Output: the node's own audio output is the master mix. Every pad is also
-// rendered to its own stereo buffer; an "MPC Out" node wired from this node
-// picks one pad, which is how a pad gets its own effect chain.
+// Every pad is its own voice: two pads sound at once, each with its own mode,
+// and a retrigger follows the pad's mode (one shot and gate restart the sample,
+// loop toggles it off). Per pad: mode, volume, pitch, pan, speed, fine tune,
+// with the Sampler's definitions (see kInfo). The card shows the selected
+// pad's rows, but ALL 16 pads' params are registered for modulation every frame
+// under stable ids (ParamId) that do not depend on the selection.
+//
+// Output: one master stereo mix of all pads.
 class MpcNode : public INode, public IAudioSource
 {
 public:
    static constexpr int kPads = 16;
    static constexpr int kWaveCache = 128;
    enum PadMode { kOneShot = 0, kGate = 1, kLoopToggle = 2 };
+
+   // The float params every pad has, in id order.
+   enum PadParam { kVolume = 0, kPitch, kPan, kSpeed, kFine, kNumPadParams };
+   struct ParamInfo
+   {
+      const char* name;
+      float lo, hi, def;
+      const char* fmt;
+   };
+   static const ParamInfo& Info(int k)
+   {
+      static const ParamInfo kInfo[kNumPadParams] = {
+         { "volume", 0.0f, 1.0f, 0.8f, "%.2f" },
+         { "pitch", -24.0f, 24.0f, 0.0f, "%.1f st" },
+         { "pan", -1.0f, 1.0f, 0.0f, "%.2f" },
+         { "speed", -2.0f, 2.0f, 1.0f, "%.2fx" },
+         { "fine tune", -50.0f, 50.0f, 0.0f, "%.0f c" },
+      };
+      return kInfo[k < 0 ? 0 : (k >= kNumPadParams ? kNumPadParams - 1 : k)];
+   }
+   // Stable modulation address of pad `pad`'s float param `k`: a function of
+   // (pad, k) only, never of the selected pad or of draw order.
+   static constexpr int ParamId(int pad, int k) { return 100 + pad * kNumPadParams + k; }
+   static constexpr int kFirstNote = 36;
 
    static INode* Create() { return new MpcNode(); }
    MpcNode();
@@ -40,6 +68,7 @@ public:
    void CookIfNeeded(int frameId) override;
    void VisitParams(ParamVisitor& v) override;
    void SweepPrepare() override;
+   void PushParamsNow(); // fixtures: publish params without a frame cook
 
    AudioNode* GetAudioNode() override;
    NoteCable* NoteInputSlot(int slot) override { return slot == 0 ? &noteInput : nullptr; }
@@ -61,16 +90,26 @@ public:
    const std::string& PadName(int pad) const { return padName[Clamp(pad)]; }
    float Level() const { return mLevel; }
 
-   // For MPC Out's tap (main thread, topology rebuild only).
-   AudioMpcNode* AudioHalf() { return mAudioNode.get(); }
-
    int padMode[kPads];
    float padVolume[kPads];
    float padPitch[kPads]; // semitones
    float padPan[kPads];
-   int baseNote = 36;
-   float volume = 0.8f;
+   float padSpeed[kPads]; // -2..2, negative plays backwards
+   float padFine[kPads];  // cents
    int selectedPad = 0;
+
+   float* PadParamPtr(int pad, int k)
+   {
+      pad = Clamp(pad);
+      switch (k)
+      {
+      case kVolume: return &padVolume[pad];
+      case kPitch: return &padPitch[pad];
+      case kPan: return &padPan[pad];
+      case kSpeed: return &padSpeed[pad];
+      default: return &padFine[pad];
+      }
+   }
    NoteCable noteInput;
 
    float padWaveMin[kPads][kWaveCache] = {};
@@ -114,40 +153,4 @@ private:
    unsigned int mPlayingMask = 0;
    bool mHeld[kPads] = {};
    std::string padName[kPads];
-};
-
-// Picks one pad's own stereo output from an MPC wired into its input. Anything
-// else wired in simply passes through.
-class MpcOutNode : public INode, public IAudioSource
-{
-public:
-   static INode* Create() { return new MpcOutNode(); }
-   MpcOutNode();
-   ~MpcOutNode() override;
-
-   unsigned int GetOutputTexture() override { return 0; }
-   int GetOutputWidth() const override { return 0; }
-   int GetOutputHeight() const override { return 0; }
-   void CookIfNeeded(int frameId) override;
-   void VisitParams(ParamVisitor& v) override;
-   void SweepPrepare() override;
-
-   INode* BypassSource() override { return input.GetSource(); }
-   AudioNode* GetAudioNode() override;
-   AudioCable* AudioInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
-   const char* InputLabel(int slot) const override { return slot == 0 ? "mpc" : nullptr; }
-   void ResolveAudioTaps() override;
-
-   bool ConnectedToMpc() const { return mConnectedToMpc; }
-   float Level() const { return mLevel; }
-
-   int pad = 1; // 1..16, as numbered on the MPC's grid
-   float gainDb = 0.0f;
-   AudioCable input;
-
-private:
-   std::unique_ptr<AudioMpcOutNode> mAudioNode;
-   int mLastCookFrame = -1;
-   bool mConnectedToMpc = false;
-   float mLevel = 0.0f;
 };
