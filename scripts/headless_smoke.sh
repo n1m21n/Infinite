@@ -57,5 +57,9 @@ r=$("$BIN" --describe Blend); [ $? = 0 ] && [ "$(echo "$r" | json "d['types'][0]
 "$BIN" --describe Blnd >/dev/null; [ $? = 3 ]; check "describe unknown type exit 3" $?
 r=$("$BIN" --describe); [ "$(echo "$r" | json "d['count'] > 250")" = "True" ]; check "describe lists every type" $?
 
+# A1/A3: a CRLF copy with a UTF-8 BOM reads the same as the original
+(printf '\xef\xbb\xbf'; sed 's/$/\r/' "$PATCH") > "$OUT/crlf.inf"
+"$BIN" --validate "$OUT/crlf.inf" --for-render >/dev/null; check "CRLF + BOM patch validates" $?
+
 rm -rf "$OUT"
 exit $fail

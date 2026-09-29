@@ -469,6 +469,12 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       outError = "file is empty";
       return false;
    }
+   // A Windows editor or an AI tool may write CRLF line ends and a UTF-8 BOM.
+   // std::getline keeps the '\r', which would end up inside type names and
+   // string values, and the BOM would fail the magic check.
+   if (line.size() >= 3 && (unsigned char)line[0] == 0xEF && (unsigned char)line[1] == 0xBB &&
+       (unsigned char)line[2] == 0xBF)
+      line.erase(0, 3);
    {
       std::istringstream header(line);
       std::string magic;
@@ -508,6 +514,8 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
    while (std::getline(file, line))
    {
       lineNo++;
+      if (!line.empty() && line.back() == '\r')
+         line.pop_back();
       // Leading whitespace is cosmetic in the file, so strip it before parsing.
       size_t start = line.find_first_not_of(" \t");
       if (start == std::string::npos)
