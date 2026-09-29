@@ -1016,20 +1016,18 @@
  {
   "type": "HDRI",
   "cat": "3D",
-  "out": "image",
-  "issues": [
-   "clock-suspect"
-  ],
+  "out": "environment",
+  "issues": [],
   "animates": false,
-  "render_vs_frame": 3.67
+  "render_vs_frame": 0.43
  },
  {
   "type": "Render 3D",
   "cat": "3D",
   "out": "image",
-  "issues": [
-   "validate:E_KIND_MISMATCH"
-  ]
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.43
  },
  {
   "type": "Resynthesize",

@@ -35,8 +35,15 @@ FEED = {
     "geometry": "3D Cube",
     "audio": "Synths Oscillator",
     "note": "Notes Random Note Generator",
+    "camera": "3D Camera",
+    "light": "3D Light",
+    "environment": "3D HDRI",
+    "palette": "Modulators Palette",
 }
-TAG = {"image": "cable", "geometry": "geo", "audio": "aud", "note": "note"}
+TAG = {"image": "cable", "geometry": "geo", "audio": "aud", "note": "note",
+       "camera": "geo", "light": "geo", "environment": "cable", "palette": "geo"}
+# Where a 3D-side output plugs in on a Render 3D (Set Vertex Color for a palette).
+RENDER_SLOT = {"camera": 4, "light": 5, "environment": 8}
 SHAPE_POS_X = 5  # Shape modulatable index for "pos x": visible for any shape, never its size
 
 
@@ -67,6 +74,15 @@ def build(t):
     elif kind == "note":
         osc, sh = add("Synths Oscillator"), add("Source Shape")
         links += [f"note {osc} 0 1 0", f"cable {out} 0 {sh}", f"aud {out} 1 {osc}"]
+    elif kind in RENDER_SLOT:
+        cube = add("3D Cube")
+        r = add("3D Render 3D", "  f width 512\n  f height 512\n")
+        links += [f"geo {r} 0 {cube}", f"{TAG[kind]} {r} {RENDER_SLOT[kind]} 1", f"cable {out} 0 {r}"]
+    elif kind == "palette":
+        cube = add("3D Cube")
+        vc = add("3D Set Vertex Color")
+        r = add("3D Render 3D", "  f width 512\n  f height 512\n")
+        links += [f"geo {vc} 0 {cube}", f"geo {vc} 2 1", f"geo {r} 0 {vc}", f"cable {out} 0 {r}"]
     else:
         sh = add("Source Shape")
         links += [f"cable {out} 0 {sh}", f"mod {sh} {SHAPE_POS_X} 1 0 0 1 0"]

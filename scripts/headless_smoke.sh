@@ -65,5 +65,14 @@ r=$("$BIN" --describe); [ "$(echo "$r" | json "d['count'] > 250")" = "True" ]; c
 r=$("$BIN" --describe Blend); [ "$(echo "$r" | json "len(d['types'][0]['inputs'])")" = "2" ]; check "Blend describes 2 inputs" $?
 r=$("$BIN" --describe "Render 3D"); [ "$(echo "$r" | json "[i['kind'] for i in d['types'][0]['inputs'] if i['slot'] in (4,8)]")" = "['camera', 'environment']" ]; check "Render 3D camera and env slot kinds" $?
 
+# Topology cases (G1-G13): each .inf must give exactly the codes in its .expect
+# ('-' = a clean validate). Errors and warnings are compared together.
+for f in "$ROOT"/tests/headless/topology/*.inf; do
+  name=$(basename "$f" .inf)
+  got=$("$BIN" --validate "$f" --for-render 2>/dev/null | json "' '.join(sorted(set(i['code'] for i in d['errors'] + d['warnings']))) or '-'")
+  want=$(tr ' ' '\n' < "${f%.inf}.expect" | grep -v '^$' | sort | tr '\n' ' ' | sed 's/ $//')
+  [ "$got" = "$want" ]; check "topology $name ($want)" $?
+done
+
 rm -rf "$OUT"
 exit $fail

@@ -1,0 +1,9 @@
+infinite-patch 1
+node 1 Source Shape
+end
+node 2 Source Shape
+end
+node 3 Utility Output
+end
+cable 3 0 1
+mod 1 0 2 0 0 1 0

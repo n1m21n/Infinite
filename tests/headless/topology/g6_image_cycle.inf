@@ -1,0 +1,13 @@
+infinite-patch 1
+node 1 Source Shape
+end
+node 2 Compositing Blend
+end
+node 3 Compositing Fit
+end
+node 4 Utility Output
+end
+cable 2 0 1
+cable 2 1 3
+cable 3 0 2
+cable 4 0 2

@@ -1,0 +1,12 @@
+infinite-patch 1
+node 1 3D Cube
+end
+node 2 3D Camera
+end
+node 3 3D Render 3D
+end
+node 4 Utility Output
+end
+geo 3 0 1
+geo 3 4 2
+cable 4 0 3
