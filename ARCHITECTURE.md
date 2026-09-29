@@ -124,20 +124,28 @@ getting a file each:
   **Wave Terrain**, and **Equation Synth**. Lifted out of
   `SamplerNode.cpp` so a new sample-playing node never has to reimplement its
   own use-after-free trap.
-- **`src/nodes/LooperNode.h`/`.cpp`** — **Looper**, a live audio looper (REC / PLAY /
-  DUB / CLEAR). The audio thread owns the whole state machine and a stereo loop
-  buffer of up to 60 s; the INode posts button *edges* through an SPSC ring
-  (`SetButtonLevel` turns a held mouse or held CV into one press). Take length is a
-  `MusicTime` division or free; with sync on and the transport running a take waits
-  for the next grid line (capped at one bar). Takes and overdubs are shifted by
-  `Platform::AudioRoundTripLatencyFrames()` plus a manual trim. The loop audio is not
-  saved with the patch.
-- **`src/nodes/MpcNode.h`/`.cpp`** — **MPC** (16-pad sampler: one `SampleSlot` and one
-  voice per pad; one-shot / gate / loop-toggle; pads hit by mouse, per-pad CV gate pin,
-  or note = base note + pad) and **MPC Out**, which taps one pad's private stereo
-  buffer. The tap is a raw pointer from the MPC's audio half, re-resolved by
-  `INode::ResolveAudioTaps()` in `RebuildAudioTopology` just before `SetTopology`;
-  a per-block serial number makes a bypassed MPC read as silence rather than stale audio.
+- **`src/nodes/LooperNode.h`/`.cpp`** — **Looper** (Synths; a generator, so bypassed it
+  outputs nothing), a live audio looper (Rec / Play / Dub / Clear). The audio thread owns
+  the whole state machine and a stereo loop buffer of up to 60 s; the INode posts button
+  *edges* through an SPSC ring (`SetButtonLevel` turns a held mouse or held CV into one
+  press). Take length is a `MusicTime` division or free; with sync on and the transport
+  running a take waits for the next grid line (capped at one bar). Takes and overdubs are
+  shifted by `Platform::AudioRoundTripLatencyFrames()` (auto comp). Playback is a sample
+  player over the held loop with the Sampler's controls (finetune, pitch, speed, volume,
+  fade in / fade out via `src/audio/PassFade.h`): at rate 1.0 the loop stays on the grid,
+  at any other rate it plays in length / |rate| and drifts against the transport, and
+  overdub is paused. The loop audio is not saved with the patch.
+- **`src/nodes/MpcNode.h`/`.cpp`** — **MPC** (16-pad sampler, one master stereo out: one
+  `SampleSlot` and one independent voice per pad; one-shot / gate / loop-toggle; pads hit
+  by mouse, per-pad CV gate pin, or notes 36..51). Per pad: mode, volume, pitch, pan,
+  speed, fine tune. **Modulation addressing is per pad and independent of selection**:
+  float params live at `MpcNode::ParamId(pad, k) = 100 + pad * 5 + k`, each pad's mode at
+  a label-hashed discrete slot (`"pad N mode##mpcmodeN"`). `DrawMpcBody` registers all 16
+  pads every frame (`RegisterMpcParams`; the unselected pads through `ModSlider` under
+  `gParamRegisterOnly`, the EQ's hidden-band mechanism, the selected pad through its real
+  widgets), so selecting a pad never rebinds, hides or retargets a cable; an unselected
+  pad's cables land on 1 px stub pins on its tile's orange mod dot. Covered by
+  `INFINITE_MPCMODTEST`. (There is no MPC Out node and no audio-tap plumbing.)
 - **`src/nodes/AnalogNode.h`/`.cpp` & `src/nodes/AnalogSynthCore.h`** — virtual-analog
   polyphonic synthesizer node. Features dual PolyBLEP anti-aliased oscillators
   (osc 1 unison stack, osc 2 tune/detune/sync, sub-oscillator, noise generator,
