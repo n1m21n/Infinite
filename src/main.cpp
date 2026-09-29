@@ -1097,6 +1097,10 @@ namespace
    uint32_t gAudioInputDeviceId = 0;
    double gAudioSampleRate = 0.0;
    int gAudioBufferFrames = 512;
+   // Windows-only output stream mode (Platform::AudioSetOutputMode): 0 standard
+   // shared (default, today's behaviour), 1 low-latency shared, 2 exclusive.
+   // Persisted, but a no-op on macOS/Linux (their UI never shows it).
+   int gAudioOutputMode = 0;
    // Placeholder only - no DSP node reads this yet. P3c's Drive/AudioFilter
    // kernels are the intended future consumer (see README.md's Effects
    // table); this phase just makes the setting exist and be visible.
@@ -44554,6 +44558,8 @@ namespace
             gAudioBufferFrames = atoi(val.c_str());
          else if (key == "oversample")
             gAudioOversample = std::strtof(val.c_str(), nullptr);
+         else if (key == "outputMode")
+            gAudioOutputMode = std::clamp(atoi(val.c_str()), 0, 2);
       }
    }
 
@@ -44568,6 +44574,7 @@ namespace
       file << "sampleRate=" << gAudioSampleRate << "\n";
       file << "bufferFrames=" << gAudioBufferFrames << "\n";
       file << "oversample=" << gAudioOversample << "\n";
+      file << "outputMode=" << gAudioOutputMode << "\n";
    }
 
    // One flat preference file holding the user's default expression globals -
@@ -45469,6 +45476,36 @@ namespace
                                  "period. Change it in Sound settings.");
 #endif
 
+#if defined(_WIN32)
+            {
+               // Opt-in low-latency output. Every mode falls back toward
+               // Standard if the device or driver refuses it, so choosing
+               // one can never leave the app silent; takes effect on Apply.
+               static const char* kOutputModeLabels[] = { "Standard (shared)", "Low latency (shared)",
+                                                          "Exclusive" };
+               gAudioOutputMode = std::clamp(gAudioOutputMode, 0, 2);
+               ImGui::SetNextItemWidth(240.0f);
+               if (ImGui::BeginCombo("Output mode", kOutputModeLabels[gAudioOutputMode]))
+               {
+                  for (int i = 0; i < 3; i++)
+                     if (ImGui::Selectable(kOutputModeLabels[i], gAudioOutputMode == i))
+                     {
+                        gAudioOutputMode = i;
+                        SaveAudioSettings();
+                     }
+                  ImGui::EndCombo();
+               }
+               if (ImGui::IsItemHovered())
+                  ImGui::SetTooltip("Standard: Windows shared mode (default).\n"
+                                    "Low latency: shared mode at the driver's smallest period "
+                                    "(Windows 10+).\n"
+                                    "Exclusive: takes the device from other apps for the lowest "
+                                    "latency.\n"
+                                    "If a mode is unavailable Infinite steps back toward Standard. "
+                                    "Click Apply audio settings to use it.");
+            }
+#endif
+
             static const float kOversampleValues[] = { 1.0f, 2.0f, 4.0f };
             static const char* kOversampleLabels[] = { "1x", "2x", "4x" };
             int oversampleIdx = 0;
@@ -45492,6 +45529,28 @@ namespace
                const uint32_t actualBufferFrames = Platform::AudioDeviceBufferFrames(gAudioOutputDeviceId);
                ImGui::TextDisabled("Active: %.0f Hz, %u frames", AudioEngine::Instance().SampleRate(),
                                    actualBufferFrames);
+#if defined(_WIN32)
+               {
+                  static const char* kActiveModeLabels[] = { "standard", "low-latency shared", "exclusive" };
+                  ImGui::TextDisabled("Output mode in use: %s",
+                                      kActiveModeLabels[std::clamp(Platform::AudioOutputModeActive(), 0, 2)]);
+               }
+#endif
+               // Round-trip (input to output) latency estimate: what a
+               // looper/overdub must compensate for. 0 = the platform cannot say.
+               {
+                  const double rate = AudioEngine::Instance().SampleRate();
+                  const uint32_t rtFrames = Platform::AudioRoundTripLatencyFrames(gAudioOutputDeviceId);
+                  if (rtFrames > 0 && rate > 0.0)
+                     ImGui::TextDisabled("Round-trip latency: ~%.1f ms (%u frames)",
+                                         (double)rtFrames * 1000.0 / rate, rtFrames);
+                  else
+                     ImGui::TextDisabled("Round-trip latency: unknown");
+                  if (ImGui::IsItemHovered())
+                     ImGui::SetTooltip("Estimate: output device + stream + buffer, plus the input "
+                                       "device's own latency. Real hardware chains can add more "
+                                       "(interfaces, Bluetooth, drivers).");
+               }
             }
 
             ImGui::Spacing();
@@ -45504,6 +45563,7 @@ namespace
                AudioEngine::Instance().SetRequestedDevice(gAudioOutputDeviceId);
                AudioEngine::Instance().SetRequestedSampleRate(gAudioSampleRate);
                AudioEngine::Instance().SetRequestedBufferFrames(gAudioBufferFrames);
+               Platform::AudioSetOutputMode(gAudioOutputMode);
                SaveAudioSettings();
 
                if (wasRunning)
@@ -67464,6 +67524,7 @@ int main(int argc, char** argv)
    AudioEngine::Instance().SetRequestedDevice(gAudioOutputDeviceId);
    AudioEngine::Instance().SetRequestedSampleRate(gAudioSampleRate);
    AudioEngine::Instance().SetRequestedBufferFrames(gAudioBufferFrames);
+   Platform::AudioSetOutputMode(gAudioOutputMode);
    // The window was just created with vsync hardcoded on (above); apply the
    // persisted preference now that it's loaded. Headless test windows stay
    // uncapped regardless - they don't want to be paced by the display.

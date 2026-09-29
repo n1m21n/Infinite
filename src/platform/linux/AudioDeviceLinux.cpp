@@ -629,6 +629,36 @@ namespace Platform
       return 512;
    }
 
+   uint32_t AudioRoundTripLatencyFrames(uint32_t /*outputDeviceId*/)
+   {
+      // Only meaningful for the open device: miniaudio reports the period
+      // size and period count it actually negotiated, so the driver-side
+      // queue depth is periods * period. Anything not open reads as unknown.
+      if (!gRender.deviceInited || gRender.sampleRate <= 0.0)
+         return 0;
+      const ma_uint32 outPeriod = gRender.device.playback.internalPeriodSizeInFrames;
+      const ma_uint32 outPeriods = std::max<ma_uint32>(1, gRender.device.playback.internalPeriods);
+      const double outFrames = (double)outPeriod * (double)outPeriods;
+
+      // Input side: the live tap's real negotiated queue when the Audio In
+      // node has one open; otherwise assume the input would run the same
+      // buffering as the output (an estimate, not a measurement - the tap is
+      // only opened on demand, so there is nothing to query yet).
+      double inFrames = outFrames;
+      if (gTap.deviceInited && gTap.sampleRate > 0.0)
+      {
+         const ma_uint32 inRate = gTap.device.capture.internalSampleRate;
+         const double inQueue = (double)gTap.device.capture.internalPeriodSizeInFrames *
+                                (double)std::max<ma_uint32>(1, gTap.device.capture.internalPeriods);
+         inFrames = inRate > 0 ? inQueue * gRender.sampleRate / (double)inRate : inQueue;
+      }
+      return (uint32_t)std::llround(outFrames + inFrames);
+   }
+
+   // Output modes are a Windows concept (WASAPI). Linux always runs mode 0.
+   void AudioSetOutputMode(int /*mode*/) {}
+   int AudioOutputModeActive() { return 0; }
+
    bool AudioDeviceConfigDidChange()
    {
       return gConfigChangedFlag.exchange(false, std::memory_order_acq_rel);

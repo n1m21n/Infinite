@@ -359,7 +359,30 @@ double VideoSourceNode::WrapPosition(double raw) const
    }
    else
    {
-      raw = std::max(raw, (double)trimStart);
+      // Duration unknown (container declared none and the platform's own
+      // probe found none). An explicit trimEnd is still a real end point the
+      // user chose, so loop/clamp against it instead of running off the
+      // clip's end; with no trimEnd either there is genuinely nothing to
+      // wrap against and only the start bound applies.
+      const double start = std::max((double)trimStart, 0.0);
+      if (trimEnd > 0.0f && (double)trimEnd - start >= 0.001)
+      {
+         const double range = (double)trimEnd - start;
+         if (loop)
+         {
+            raw = start + std::fmod(raw - start, range);
+            if (raw < start)
+               raw += range;
+         }
+         else
+         {
+            raw = std::clamp(raw, start, (double)trimEnd);
+         }
+      }
+      else
+      {
+         raw = std::max(raw, (double)trimStart);
+      }
    }
    return raw;
 }

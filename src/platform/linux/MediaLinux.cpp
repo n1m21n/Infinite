@@ -239,6 +239,54 @@ namespace Platform
          return true;
       }
 
+      // Last-resort duration for containers whose header carries none
+      // (MPEG-TS, some MKV/WebM, raw elementary streams): seek far past any
+      // real end, read the remaining packets to EOF and take the furthest
+      // packet end time - the same idea MediaWin.cpp's open-time probe uses.
+      // Runs on a SEPARATE demuxer context so the playback context is never
+      // left parked at the end or mid-seek. Bounded (packet cap) and silent on
+      // failure: 0.0 stays "unknown" (a genuinely unbounded source), which
+      // VideoSourceNode treats as "no loop". Decode thread, once, at open.
+      double ProbeDurationBySeekingToEnd(const std::string& path, int streamIndex)
+      {
+         AVFormatContext* probe = nullptr;
+         if (avformat_open_input(&probe, path.c_str(), nullptr, nullptr) < 0)
+            return 0.0;
+         double result = 0.0;
+         if (avformat_find_stream_info(probe, nullptr) >= 0 && streamIndex >= 0 &&
+             streamIndex < (int)probe->nb_streams)
+         {
+            const AVStream* st = probe->streams[streamIndex];
+            const double tb = av_q2d(st->time_base);
+            if (tb > 0.0)
+            {
+               const int64_t farTs = (int64_t)(3.0e8 / tb); // ~10 years in stream ticks
+               if (av_seek_frame(probe, streamIndex, farTs, AVSEEK_FLAG_BACKWARD) >= 0)
+               {
+                  AVPacket* pkt = av_packet_alloc();
+                  bool have = false;
+                  int64_t lastEnd = 0;
+                  for (int i = 0; pkt != nullptr && i < 200000 && av_read_frame(probe, pkt) >= 0; ++i)
+                  {
+                     if (pkt->stream_index == streamIndex && pkt->pts != AV_NOPTS_VALUE)
+                     {
+                        const int64_t end = pkt->pts + std::max<int64_t>(pkt->duration, 0);
+                        if (!have || end > lastEnd)
+                           lastEnd = end;
+                        have = true;
+                     }
+                     av_packet_unref(pkt);
+                  }
+                  av_packet_free(&pkt);
+                  if (have && lastEnd > 0)
+                     result = (double)lastEnd * tb;
+               }
+            }
+         }
+         avformat_close_input(&probe);
+         return result;
+      }
+
       void VideoThreadMain(VideoHandle* h)
       {
          AVFormatContext* fmt = nullptr;
@@ -302,6 +350,8 @@ namespace Platform
             h->duration = (double)fmt->duration / (double)AV_TIME_BASE;
          else if (stream->duration > 0)
             h->duration = (double)stream->duration * av_q2d(stream->time_base);
+         if (h->duration <= 0.0)
+            h->duration = ProbeDurationBySeekingToEnd(h->path, streamIndex);
 
          SwsContext* sws = sws_getContext(codecCtx->width, codecCtx->height, codecCtx->pix_fmt,
                                           codecCtx->width, codecCtx->height, AV_PIX_FMT_RGBA,
