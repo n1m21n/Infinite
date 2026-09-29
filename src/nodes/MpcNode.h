@@ -21,10 +21,26 @@ class AudioMpcNode;
 //
 // Every pad is its own voice: two pads sound at once, each with its own mode,
 // and a retrigger follows the pad's mode (one shot and gate restart the sample,
-// loop toggles it off). Per pad: mode, volume, pitch, pan, speed, fine tune,
-// with the Sampler's definitions (see kInfo). The card shows the selected
+// loop toggles it off). Per pad: mode, sync (+ division), volume, pitch, pan,
+// speed, fine tune, fade in, fade out, with the Sampler's definitions (see
+// kInfo). The card shows the selected
 // pad's rows, but ALL 16 pads' params are registered for modulation every frame
 // under stable ids (ParamId) that do not depend on the selection.
+//
+// Per-pad transport (sync). A pad is Free (default) or Synced to a MusicTime
+// division (Pattern A of the rhythmic-quantization-standard: "Synced"/"Free"
+// plus the canonical division list).
+//   Free   - a trigger plays at once (the behaviour before sync existed).
+//   Synced - a trigger is LATCHED and fires on the next grid line of the
+//            transport (sample-accurate: the audio thread places it at the exact
+//            frame the line falls on). A trigger that lands exactly on a line
+//            fires on it. With the transport stopped it fires at once. In gate
+//            mode, releasing before the line cancels the hit (the release itself
+//            is never delayed). In loop mode the toggle is quantised as well, and
+//            while the pad is on the sample re-triggers on EVERY division (one
+//            pass per division, rate-locked; a sample longer than the division
+//            is cut at the line, a shorter one leaves a gap). With the transport
+//            stopped a synced loop pad plays as a plain loop.
 //
 // Output: one master stereo mix of all pads.
 class MpcNode : public INode, public IAudioSource
@@ -35,7 +51,8 @@ public:
    enum PadMode { kOneShot = 0, kGate = 1, kLoopToggle = 2 };
 
    // The float params every pad has, in id order.
-   enum PadParam { kVolume = 0, kPitch, kPan, kSpeed, kFine, kNumPadParams };
+   enum PadParam { kVolume = 0, kPitch, kPan, kSpeed, kFine, kFadeIn, kFadeOut, kNumPadParams };
+   enum SyncMode { kSynced = 0, kFree = 1 }; // Pattern A order: index 0 is "Synced"
    struct ParamInfo
    {
       const char* name;
@@ -50,12 +67,21 @@ public:
          { "pan", -1.0f, 1.0f, 0.0f, "%.2f" },
          { "speed", -2.0f, 2.0f, 1.0f, "%.2fx" },
          { "fine tune", -50.0f, 50.0f, 0.0f, "%.0f c" },
+         { "fade in", 0.0f, 250.0f, 3.0f, "%.0f ms" },
+         { "fade out", 0.0f, 250.0f, 3.0f, "%.0f ms" },
       };
       return kInfo[k < 0 ? 0 : (k >= kNumPadParams ? kNumPadParams - 1 : k)];
    }
    // Stable modulation address of pad `pad`'s float param `k`: a function of
-   // (pad, k) only, never of the selected pad or of draw order.
-   static constexpr int ParamId(int pad, int k) { return 100 + pad * kNumPadParams + k; }
+   // (pad, k) only, never of the selected pad or of draw order. The first five
+   // keep the ids they had before fades existed (100 + pad * 5 + k); the two fade
+   // params sit in their own block at 180 + pad * 2 + (k - 5), so no saved
+   // binding moved. The discrete params (mode, sync, division) live in the
+   // label-hashed 400..799 slots.
+   static constexpr int ParamId(int pad, int k)
+   {
+      return k < 5 ? 100 + pad * 5 + k : 180 + pad * 2 + (k - 5);
+   }
    static constexpr int kFirstNote = 36;
 
    static INode* Create() { return new MpcNode(); }
@@ -96,6 +122,10 @@ public:
    float padPan[kPads];
    float padSpeed[kPads]; // -2..2, negative plays backwards
    float padFine[kPads];  // cents
+   float padFadeIn[kPads];  // ms, 0..250
+   float padFadeOut[kPads]; // ms, 0..250
+   int padSync[kPads];      // SyncMode: 0 Synced, 1 Free (default)
+   int padDiv[kPads];       // MusicTime::RateDivision index (used when Synced)
    int selectedPad = 0;
 
    float* PadParamPtr(int pad, int k)
@@ -107,6 +137,8 @@ public:
       case kPitch: return &padPitch[pad];
       case kPan: return &padPan[pad];
       case kSpeed: return &padSpeed[pad];
+      case kFadeIn: return &padFadeIn[pad];
+      case kFadeOut: return &padFadeOut[pad];
       default: return &padFine[pad];
       }
    }
