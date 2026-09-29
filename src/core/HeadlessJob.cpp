@@ -1,9 +1,13 @@
 #include "HeadlessJob.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#ifndef _WIN32
+#include <sys/types.h>
+#endif
 
 namespace Headless
 {
@@ -345,6 +349,52 @@ namespace Headless
       IssuesJson(s, st.errors);
       s += "}";
       return s;
+   }
+
+   namespace
+   {
+      // A long render's mdat box is past 2 GB, beyond a 32-bit long (Windows).
+      int SeekForward(FILE* f, uint64_t bytes)
+      {
+#ifdef _WIN32
+         return _fseeki64(f, (__int64)bytes, SEEK_CUR);
+#else
+         return fseeko(f, (off_t)bytes, SEEK_CUR);
+#endif
+      }
+   }
+
+   bool MovieHasIndex(const std::string& path)
+   {
+      FILE* f = std::fopen(path.c_str(), "rb");
+      if (f == nullptr)
+         return false;
+      bool found = false;
+      unsigned char head[16];
+      // Walk top-level ISO BMFF boxes: 32-bit size + type, size 1 = 64-bit
+      // size follows, size 0 = runs to end of file.
+      while (!found && std::fread(head, 1, 8, f) == 8)
+      {
+         uint64_t size = ((uint64_t)head[0] << 24) | ((uint64_t)head[1] << 16) | ((uint64_t)head[2] << 8) | head[3];
+         uint64_t headerBytes = 8;
+         if (size == 1)
+         {
+            if (std::fread(head + 8, 1, 8, f) != 8)
+               break;
+            size = 0;
+            for (int i = 8; i < 16; i++)
+               size = (size << 8) | head[i];
+            headerBytes = 16;
+         }
+         if (std::memcmp(head + 4, "moov", 4) == 0)
+            found = true;
+         else if (size == 0 || size < headerBytes)
+            break;
+         else if (SeekForward(f, size - headerBytes) != 0)
+            break;
+      }
+      std::fclose(f);
+      return found;
    }
 
    int Emit(const Job& job, const Status& status)

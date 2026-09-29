@@ -98,4 +98,9 @@ namespace Headless
 
    // "0.5,1,2.25" -> {0.5, 1, 2.25}; false on any non-number or negative value.
    bool ParseTimes(const std::string& list, std::vector<double>& out);
+
+   // True when an .mp4/.mov has a top-level 'moov' box - the index an encoder
+   // writes last. A file without one has a plausible size but no player can
+   // open it, so a render only reports ok once this holds.
+   bool MovieHasIndex(const std::string& path);
 }

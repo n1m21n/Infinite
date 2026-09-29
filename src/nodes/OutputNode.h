@@ -156,6 +156,9 @@ public:
    // Cancel button/main.cpp's progress dialog so clicking Cancel never blocks
    // the main thread waiting on Platform::RecorderStop.
    bool IsOfflineFinalizing() const { return mOfflineFinalizeThread.joinable(); }
+   // Whether the last offline render's file was finished cleanly. Only
+   // meaningful once IsOfflineFinalizing() has gone false.
+   bool LastOfflineRenderOk() const { return mOfflineFinalizeResult.ok; }
    // True while that finalize is an abort rather than a completion, so the
    // progress window can say "Cancelling..." instead of "Finalizing..." -
    // which read as a hang when cancel was the slow path.

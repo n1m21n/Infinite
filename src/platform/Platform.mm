@@ -3081,19 +3081,27 @@ namespace Platform
       if (outDroppedCount != nullptr)
          *outDroppedCount = (int)handle->droppedCount.load(std::memory_order_relaxed);
 
-      __block bool done = false;
       @autoreleasepool
       {
-         [handle->writer finishWritingWithCompletionHandler:^{ done = true; }];
+         // finishWriting is async and writes the moov index last. This used to
+         // spin NSRunLoop runUntilDate, which returns at once on a thread whose
+         // run loop has no sources - every caller but the self-tests is on the
+         // background finalize thread - so the wait was ~0 ms and a process
+         // that exited next (headless --render, quit after export) left a file
+         // with no index. The completion handler runs on an AVFoundation
+         // queue, never this thread, so a semaphore cannot deadlock.
+         dispatch_semaphore_t finished = dispatch_semaphore_create(0);
+         [handle->writer finishWritingWithCompletionHandler:^{ dispatch_semaphore_signal(finished); }];
+         const bool timedOut = dispatch_semaphore_wait(finished,
+                                                       dispatch_time(DISPATCH_TIME_NOW, (int64_t)60 * NSEC_PER_SEC)) != 0;
 
-         // finishWriting is async; the encoder is fast enough that a short spin is fine
-         for (int i = 0; i < 2000 && !done; i++)
-            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.005]];
-
-         if (handle->writer.status == AVAssetWriterStatusFailed)
+         if (timedOut || handle->writer.status != AVAssetWriterStatusCompleted)
          {
             NSError* err = handle->writer.error;
-            outError = err ? std::string([[err localizedDescription] UTF8String]) : "write failed";
+            outError = err ? std::string([[err localizedDescription] UTF8String])
+                           : (timedOut ? "timed out finishing the file" : "write failed");
+            if (timedOut)
+               [handle->writer cancelWriting];
             delete handle;
             return false;
          }

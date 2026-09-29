@@ -66533,6 +66533,12 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
       sStatus.height = sOut->GetOutputHeight();
       if (size == 0)
          return fail("E_RENDER", sStatus.statusText.empty() ? "no output file was written" : sStatus.statusText);
+      if (!sOut->LastOfflineRenderOk())
+         return fail("E_RENDER", sStatus.statusText.empty() ? "the encoder did not finish the file" : sStatus.statusText);
+      // A size > 0 file can still have no index (the pre-fix finishWriting
+      // race); never report ok for a file no player can open.
+      if (!Headless::MovieHasIndex(job.out))
+         return fail("E_RENDER", "the file was written but has no index (moov), so it cannot be played");
       sStatus.files.push_back(job.out);
       sPhase = Phase::Done;
       HeadlessFinish(window, sStatus, sWall);

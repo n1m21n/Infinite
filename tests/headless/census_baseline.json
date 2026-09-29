@@ -11,64 +11,57 @@
   "type": "Slideshow",
   "cat": "Source",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.3
  },
  {
   "type": "Shape",
   "cat": "Source",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
  },
  {
   "type": "Circle",
   "cat": "Source",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
  },
  {
   "type": "Ellipse",
   "cat": "Source",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.01
  },
  {
   "type": "Rectangle",
   "cat": "Source",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
  },
  {
   "type": "Rounded Rect",
   "cat": "Source",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
  },
  {
   "type": "Triangle",
   "cat": "Source",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
  },
  {
   "type": "Polygon",
@@ -98,19 +91,17 @@
   "type": "Cross",
   "cat": "Source",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
  },
  {
   "type": "Line",
   "cat": "Source",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.01
  },
  {
   "type": "Hexagon",
@@ -124,10 +115,9 @@
   "type": "Heart",
   "cat": "Source",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.01
  },
  {
   "type": "Arrow",
@@ -149,19 +139,17 @@
   "type": "Gear",
   "cat": "Source",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
  },
  {
   "type": "Superellipse",
   "cat": "Source",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
  },
  {
   "type": "Pie",
@@ -191,10 +179,9 @@
   "type": "Blob",
   "cat": "Source",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
  },
  {
   "type": "Formula",
@@ -208,28 +195,25 @@
   "type": "FieldPixel",
   "cat": "Source",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.84
  },
  {
   "type": "Text",
   "cat": "Source",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.0
  },
  {
   "type": "Video",
   "cat": "Source",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.33
  },
  {
   "type": "Video In",
@@ -311,10 +295,9 @@
   "type": "Projection",
   "cat": "Utility",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": true
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.22
  },
  {
   "type": "OSC Receive",
@@ -636,7 +619,7 @@
   "out": "geometry",
   "issues": [],
   "animates": true,
-  "render_vs_frame": 0.42
+  "render_vs_frame": 0.41
  },
  {
   "type": "Material",
@@ -1133,9 +1116,10 @@
   "cat": "Effects",
   "out": "image",
   "issues": [
-   "render-ok-but-file-unreadable"
+   "clock-suspect"
   ],
-  "animates": true
+  "animates": true,
+  "render_vs_frame": 3.37
  },
  {
   "type": "vignette",
@@ -1157,10 +1141,9 @@
   "type": "diffuseglow",
   "cat": "Effects",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": true
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.15
  },
  {
   "type": "glitch",
@@ -1302,19 +1285,17 @@
   "type": "Null",
   "cat": "Compositing",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": true
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
  },
  {
   "type": "Viewport",
   "cat": "Compositing",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": true
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
  },
  {
   "type": "Curves",
@@ -1352,10 +1333,9 @@
   "type": "Trails",
   "cat": "Compositing",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": true
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.24
  },
  {
   "type": "Reaction Diffusion",
@@ -1401,19 +1381,17 @@
   "type": "transform",
   "cat": "Compositing",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": true
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
  },
  {
   "type": "invert",
   "cat": "Compositing",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": true
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.14
  },
  {
   "type": "posterize",
@@ -1451,10 +1429,9 @@
   "type": "opacity",
   "cat": "Compositing",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": true
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
  },
  {
   "type": "set alpha",
@@ -1468,28 +1445,25 @@
   "type": "alpha invert",
   "cat": "Compositing",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": true
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
  },
  {
   "type": "alpha from luma",
   "cat": "Compositing",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": true
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
  },
  {
   "type": "alpha levels",
   "cat": "Compositing",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": true
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
  },
  {
   "type": "premultiply",
@@ -1503,28 +1477,25 @@
   "type": "chroma key",
   "cat": "Compositing",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": true
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
  },
  {
   "type": "luma key",
   "cat": "Compositing",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": true
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
  },
  {
   "type": "lookup",
   "cat": "Compositing",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": true
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
  },
  {
   "type": "lut",
@@ -1538,28 +1509,25 @@
   "type": "gradientmap",
   "cat": "Compositing",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": true
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.49
  },
  {
   "type": "color adjustments",
   "cat": "Compositing",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": true
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
  },
  {
   "type": "outerglow",
   "cat": "Compositing",
   "out": "image",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": true
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
  },
  {
   "type": "coloroverlay",
@@ -1581,19 +1549,17 @@
   "type": "LFO",
   "cat": "Modulators",
   "out": "modulator",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": true
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.01
  },
  {
   "type": "Random",
   "cat": "Modulators",
   "out": "modulator",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": true
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.02
  },
  {
   "type": "Pattern",
@@ -1607,10 +1573,9 @@
   "type": "Math",
   "cat": "Modulators",
   "out": "modulator",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.01
  },
  {
   "type": "Compare",
@@ -1632,28 +1597,25 @@
   "type": "Smoothing",
   "cat": "Modulators",
   "out": "modulator",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
  },
  {
   "type": "Invert",
   "cat": "Modulators",
   "out": "modulator",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
  },
  {
   "type": "Mod Depth",
   "cat": "Modulators",
   "out": "modulator",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
  },
  {
   "type": "Mod Curve",
@@ -1701,19 +1663,17 @@
   "type": "Geometry Table",
   "cat": "Modulators",
   "out": "modulator",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
  },
  {
   "type": "Constant",
   "cat": "Modulators",
   "out": "modulator",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
  },
  {
   "type": "Null Modulator",
@@ -1783,7 +1743,7 @@
    "clock-suspect"
   ],
   "animates": false,
-  "render_vs_frame": 4.76
+  "render_vs_frame": 12.71
  },
  {
   "type": "Velocity to CV",
@@ -1814,9 +1774,11 @@
   "cat": "Prediction",
   "out": "predictor",
   "issues": [
-   "render-ok-but-file-unreadable"
+   "nondeterministic",
+   "clock-suspect"
   ],
-  "animates": true
+  "animates": true,
+  "render_vs_frame": 8.04
  },
  {
   "type": "Moves",
@@ -1827,7 +1789,7 @@
    "clock-suspect"
   ],
   "animates": true,
-  "render_vs_frame": 28.13
+  "render_vs_frame": 37.14
  },
  {
   "type": "Predictive Modulator",
@@ -1863,7 +1825,7 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.678
+  "peak": 0.669
  },
  {
   "type": "Predictive Velocity",
@@ -1872,7 +1834,7 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.586
+  "peak": 0.776
  },
  {
   "type": "Predictive Rhythm",
@@ -1921,19 +1883,17 @@
   "type": "Macro Toggle",
   "cat": "Macros",
   "out": "modulator",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.01
  },
  {
   "type": "Macro Trigger",
   "cat": "Macros",
   "out": "modulator",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.01
  },
  {
   "type": "Macro NumBox",
@@ -1966,7 +1926,7 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.598
+  "peak": 0.677
  },
  {
   "type": "Wavetable",
@@ -1975,16 +1935,18 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.535
+  "peak": 0.501
  },
  {
   "type": "Analog",
   "cat": "Synths",
   "out": "audio",
   "issues": [
-   "render-ok-but-file-unreadable"
+   "clips"
   ],
-  "animates": false
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 1.383
  },
  {
   "type": "Wave Terrain",
@@ -1995,7 +1957,7 @@
   ],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 1.142
+  "peak": 1.08
  },
  {
   "type": "Equation Synth",
@@ -2004,7 +1966,7 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.766
+  "peak": 0.724
  },
  {
   "type": "Spectral Synth",
@@ -2013,18 +1975,16 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.098
+  "peak": 0.095
  },
  {
   "type": "Metallic",
   "cat": "Synths",
   "out": "audio",
-  "issues": [
-   "clips"
-  ],
+  "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 1.042
+  "peak": 0.998
  },
  {
   "type": "Sampler",
@@ -2075,9 +2035,11 @@
   "cat": "Synths",
   "out": "audio",
   "issues": [
-   "render-ok-but-file-unreadable"
+   "silent"
   ],
-  "animates": false
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.0
  },
  {
   "type": "Granular",
@@ -2114,10 +2076,10 @@
   "type": "Field Effect",
   "cat": "AudioEffects",
   "out": "audio",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.991
  },
  {
   "type": "Plugin",
@@ -2367,9 +2329,11 @@
   "cat": "Notes",
   "out": "note",
   "issues": [
-   "render-ok-but-file-unreadable"
+   "silent"
   ],
-  "animates": false
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.0
  },
  {
   "type": "Note Filter",
@@ -2378,7 +2342,7 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.591
+  "peak": 0.677
  },
  {
   "type": "Note Transpose",
@@ -2387,7 +2351,7 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.573
+  "peak": 0.672
  },
  {
   "type": "Pitch Bend",
@@ -2396,7 +2360,7 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.567
+  "peak": 0.754
  },
  {
   "type": "Velocity Curve",
@@ -2405,7 +2369,7 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.754
+  "peak": 0.672
  },
  {
   "type": "Gate",
@@ -2414,7 +2378,7 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.554
+  "peak": 0.677
  },
  {
   "type": "Humanizer",
@@ -2423,7 +2387,7 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.554
+  "peak": 0.725
  },
  {
   "type": "Quantizer",
@@ -2432,7 +2396,7 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.554
+  "peak": 0.677
  },
  {
   "type": "Glide",
@@ -2441,7 +2405,7 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.554
+  "peak": 0.754
  },
  {
   "type": "Note Echo",
@@ -2450,7 +2414,7 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.476
+  "peak": 0.754
  },
  {
   "type": "Note Router",
@@ -2459,7 +2423,7 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.383
+  "peak": 0.675
  },
  {
   "type": "Note Merge",
@@ -2468,7 +2432,7 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.554
+  "peak": 0.677
  },
  {
   "type": "Note Switcher",
@@ -2486,7 +2450,7 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.778
+  "peak": 0.672
  },
  {
   "type": "Note Sequencer",
@@ -2504,7 +2468,7 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.554
+  "peak": 0.754
  },
  {
   "type": "Chorder",
@@ -2522,16 +2486,16 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.754
+  "peak": 0.677
  },
  {
   "type": "Note Capturer",
   "cat": "Notes",
   "out": "note",
-  "issues": [
-   "render-ok-but-file-unreadable"
-  ],
-  "animates": false
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.677
  },
  {
   "type": "Bouncing Balls",
@@ -2540,7 +2504,7 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.604
+  "peak": 0.587
  },
  {
   "type": "Note Strum",
@@ -2549,6 +2513,6 @@
   "issues": [],
   "animates": false,
   "render_vs_frame": 0.02,
-  "peak": 0.677
+  "peak": 0.672
  }
 ]

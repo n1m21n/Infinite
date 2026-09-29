@@ -550,7 +550,7 @@ deterministic.** What it found:
   `tests/headless/patch_video.inf` (21 `mod` lines) differ from each other and match single-time runs.
 - ✅ E2: `--describe` gives 297 types, identical across two runs. Per-type runs match the full dump
   (Reverb 7, Oscillator 22 modulatable). The 19 types without modulatables are I/O and utility nodes.
-- ❌ E9 for `--render`: 3+ parallel renders all report `ok` and all write broken files (E14). `--frame` is fine.
+- ✅ E14 fixed (step 2b): `RecorderStop` waits on a semaphore; headless checks the finalize result and the `moov` index before `ok`. 6 parallel renders all valid; census `--jobs 4` 0 unreadable (was 50); RECEXPORTTEST and VIDEOAUDIOTEST, both known failures since v0.4, now pass 3/3 and are removed from the baseline.
 - ✅ E9: `--frame` leaves `~/Library/Application Support/Infinite` untouched. 3 parallel runs
   give byte-identical PNGs.
 - ✅ E10 for the chosen Output (`sOut->recordVideoPath = job.out`). Still open: a second
@@ -653,6 +653,8 @@ right because the author knew the rules below, and today no tool tells the AI an
 | D5 | Slot layout: Render 3D geo A–D are slots 0–3, env is slot **8**, and 4–7 are unused | C | Numeric guessing fails | Name-based slots (3.2): `geo render.env hdri`. |
 | D6 | Geometry fan-out (one Cube into Render 3D and into a Transform) | C (correct) | The original is not changed | Keep. Add a golden. |
 | D7 | Simulations (Particle System, Cloth, Ocean) run on Transport beats with a 0.25 s catch-up cap and reset on rewind | C | `--frame` steps every frame from 0 (`main.cpp` ~66545), so frame 60 has its full history. It's deterministic (xorshift seeded from `seed`) | Keep. Document: `--frame 30` costs 30 steps. A tempo change in the patch changes the particle timing (dt is derived from beats and BPM). |
+| D8b | **Every Prediction node (IPredictor: Drift, Moves, and the rest of the green family) ticks on the wall clock**: `main.cpp` ~65236 feeds `pred->Tick(frameId, glfwGetTime() delta)` | C (census: Drift, Moves nondeterministic run to run) | Offline, `dt` must be `1/fps` from the Transport. Same fix class as D8 and the gesture clock (7.3); one shared "frame dt" helper for all three. |
+| D8c | Note to CV reads a value produced on the audio thread, so under `--frame` the result depends on where audio happens to be (census: nondeterministic) | L | Decide how `--frame` advances audio (block-locked to the frame, as `--render` does) and add a census row that asserts audio-driven visuals are deterministic with a *changing* input (the census feeds a constant tone today, which hides this for Audio Displacement / Audio Color Ramp). |
 | D8 | **Audio Displacement uses the wall clock** for its attack/decay (`AudioDisplacementNode.cpp:182`, `steady_clock`) | C | Offline `--frame` cooks many frames in one tick, so dt clamps to 1 ms and the displacement barely reacts. It's non-deterministic across machines | Same fix as the gesture clock (7.3): dt from `Transport::Seconds()`. Also audit `WaveTerrainNode.cpp:746` (a wall-clock rebuild throttle can leave stale meshes offline). Add both to 7.3's param-trace test. |
 | D9 | Model 3D / HDRI / Image textures load asynchronously | L | = E4 | Graph-ready barrier (E4) covers the geometry importers too. |
 | D10 | Heavy 3D (maxParticles, subdivide levels, Array count × Instance on Points) explodes the vertex count | L | An AI can write `levels 6` on a 100k-vert mesh | `--explain` prints the vert/point count per node. The validator warns above a budget (e.g. 5 M verts); `--timeout` is the hard stop. |
