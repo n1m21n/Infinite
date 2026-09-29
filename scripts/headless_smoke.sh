@@ -61,5 +61,9 @@ r=$("$BIN" --describe); [ "$(echo "$r" | json "d['count'] > 250")" = "True" ]; c
 (printf '\xef\xbb\xbf'; sed 's/$/\r/' "$PATCH") > "$OUT/crlf.inf"
 "$BIN" --validate "$OUT/crlf.inf" --for-render >/dev/null; check "CRLF + BOM patch validates" $?
 
+# G1: Blend has two inputs; Render 3D camera/light pins and the env kind are real slots
+r=$("$BIN" --describe Blend); [ "$(echo "$r" | json "len(d['types'][0]['inputs'])")" = "2" ]; check "Blend describes 2 inputs" $?
+r=$("$BIN" --describe "Render 3D"); [ "$(echo "$r" | json "[i['kind'] for i in d['types'][0]['inputs'] if i['slot'] in (4,8)]")" = "['camera', 'environment']" ]; check "Render 3D camera and env slot kinds" $?
+
 rm -rf "$OUT"
 exit $fail

@@ -7285,7 +7285,7 @@ namespace
       if (auto* sw = dynamic_cast<SwitcherNode*>(gn.node.get()))
          return (slot >= 0 && slot < SwitcherNode::kSlots) ? &sw->Input(slot) : nullptr;
       if (auto* blend = dynamic_cast<BlendNode*>(gn.node.get()))
-         return slot == 0 ? &blend->InputA() : &blend->InputB();
+         return slot == 0 ? &blend->InputA() : (slot == 1 ? &blend->InputB() : nullptr);
       if (auto* filter = dynamic_cast<FilterNode*>(gn.node.get()))
       {
          if (slot == 0)
@@ -7850,17 +7850,27 @@ namespace
       if (c.light != nullptr) return "light";
       if (c.palette != nullptr) return "palette";
       if (c.modulator) return "modulator";
+      if (c.environment) return "environment";
       return "image";
    }
 
    bool SlotKindOf(GraphNode& gn, int slot, std::string& kind)
    {
       INode* n = gn.node.get();
-      if (n->AudioInputSlot(slot) != nullptr) kind = "audio";
+      // Camera, light and palette pins are raw pointers with no generic
+      // accessor; they are saved as `geo` lines like the geometry pins.
+      if (dynamic_cast<Render3DNode*>(n) != nullptr && slot == Render3DNode::kSlots) kind = "camera";
+      else if (dynamic_cast<Render3DNode*>(n) != nullptr && slot > Render3DNode::kSlots &&
+               slot - Render3DNode::kSlots - 1 < Render3DNode::kLightSlots) kind = "light";
+      else if (dynamic_cast<SetColorNode*>(n) != nullptr && slot == 2) kind = "palette";
+      else if (n->AudioInputSlot(slot) != nullptr) kind = "audio";
       else if (n->NoteInputSlot(slot) != nullptr) kind = "note";
       else if (n->GeometryInputSlot(slot) != nullptr) kind = "geometry";
       else if (n->ModulatorInputSlot(slot) != nullptr) kind = "modulator";
-      else if (CableFor(gn, slot) != nullptr) kind = "image";
+      else if (slot < InputCountFor(gn) && CableFor(gn, slot) != nullptr)
+         // Render 3D's env pin is an ImageCable, but IsInputSlotCompatible only
+         // lets an Environment (HDRI) node plug into it, not a general image.
+         kind = dynamic_cast<Render3DNode*>(n) != nullptr ? "environment" : "image";
       else return false;
       return true;
    }

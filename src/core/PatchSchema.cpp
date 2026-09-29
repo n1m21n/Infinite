@@ -219,14 +219,17 @@ namespace PatchSchema
             if (slotInfo != nullptr)
             {
                const std::string t = tag;
-               const bool tagOk = (t == "cable" && slotInfo->kind == "image") ||
+               const bool tagOk = (t == "cable" && (slotInfo->kind == "image" || slotInfo->kind == "environment")) ||
                                   (t == "aud" && slotInfo->kind == "audio") ||
                                   (t == "note" && slotInfo->kind == "note") ||
-                                  (t == "geo" && (slotInfo->kind == "geometry" || slotInfo->kind == "modulator"));
+                                  (t == "geo" && (slotInfo->kind == "geometry" || slotInfo->kind == "modulator" ||
+                                                  slotInfo->kind == "camera" || slotInfo->kind == "light" ||
+                                                  slotInfo->kind == "palette"));
                if (!tagOk)
                {
                   static const std::map<std::string, std::string> kTagFor = {
-                     { "image", "cable" }, { "audio", "aud" }, { "note", "note" }, { "geometry", "geo" }, { "modulator", "geo" } };
+                     { "image", "cable" }, { "environment", "cable" }, { "audio", "aud" }, { "note", "note" }, { "geometry", "geo" }, { "modulator", "geo" },
+                     { "camera", "geo" }, { "light", "geo" }, { "palette", "geo" } };
                   errors.push_back(Make("E_KIND_MISMATCH",
                                         typeOf(c.dstIndex) + " slot " + std::to_string(c.dstSlot) + " takes " + slotInfo->kind +
                                            ", but the line is '" + t + "'",
