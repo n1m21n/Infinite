@@ -1,0 +1,2554 @@
+[
+ {
+  "type": "Image Source",
+  "cat": "Source",
+  "out": "image",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.5
+ },
+ {
+  "type": "Slideshow",
+  "cat": "Source",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Shape",
+  "cat": "Source",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Circle",
+  "cat": "Source",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Ellipse",
+  "cat": "Source",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Rectangle",
+  "cat": "Source",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Rounded Rect",
+  "cat": "Source",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Triangle",
+  "cat": "Source",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Polygon",
+  "cat": "Source",
+  "out": "image",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Star",
+  "cat": "Source",
+  "out": "image",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Ring",
+  "cat": "Source",
+  "out": "image",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.04
+ },
+ {
+  "type": "Cross",
+  "cat": "Source",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Line",
+  "cat": "Source",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Hexagon",
+  "cat": "Source",
+  "out": "image",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Heart",
+  "cat": "Source",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Arrow",
+  "cat": "Source",
+  "out": "image",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Crescent",
+  "cat": "Source",
+  "out": "image",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Gear",
+  "cat": "Source",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Superellipse",
+  "cat": "Source",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Pie",
+  "cat": "Source",
+  "out": "image",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.01
+ },
+ {
+  "type": "Teardrop",
+  "cat": "Source",
+  "out": "image",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Chevron",
+  "cat": "Source",
+  "out": "image",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Blob",
+  "cat": "Source",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Formula",
+  "cat": "Source",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "FieldPixel",
+  "cat": "Source",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Text",
+  "cat": "Source",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Video",
+  "cat": "Source",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Video In",
+  "cat": "Source",
+  "out": "image",
+  "issues": [
+   "render:E_HARDWARE_SOURCE"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Noise",
+  "cat": "Source",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.47
+ },
+ {
+  "type": "Texture",
+  "cat": "Source",
+  "out": "image",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.52
+ },
+ {
+  "type": "Ramp",
+  "cat": "Source",
+  "out": "image",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.27
+ },
+ {
+  "type": "Draw",
+  "cat": "Source",
+  "out": "image",
+  "issues": [
+   "black"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.0
+ },
+ {
+  "type": "Audio Texture",
+  "cat": "Source",
+  "out": "image",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.0
+ },
+ {
+  "type": "Syphon In",
+  "cat": "Utility",
+  "out": "image",
+  "issues": [
+   "render:E_HARDWARE_SOURCE"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Output",
+  "cat": "Utility",
+  "out": "image",
+  "issues": [
+   "frame:E_AMBIGUOUS_OUTPUT"
+  ]
+ },
+ {
+  "type": "Syphon Out",
+  "cat": "Utility",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "Projection",
+  "cat": "Utility",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "OSC Receive",
+  "cat": "Utility",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "OSC Send",
+  "cat": "Utility",
+  "out": "image",
+  "issues": [
+   "frame:E_RENDER"
+  ]
+ },
+ {
+  "type": "Field Graph",
+  "cat": "Utility",
+  "out": "image",
+  "issues": [
+   "frame:E_RENDER"
+  ]
+ },
+ {
+  "type": "Gain",
+  "cat": "Utility",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.853
+ },
+ {
+  "type": "Audio Meter",
+  "cat": "Utility",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.853
+ },
+ {
+  "type": "Audio In",
+  "cat": "Utility",
+  "out": "audio",
+  "issues": [
+   "render:E_HARDWARE_SOURCE"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Audio Out",
+  "cat": "Utility",
+  "out": "image",
+  "issues": [
+   "frame:E_RENDER"
+  ]
+ },
+ {
+  "type": "Mixer",
+  "cat": "Utility",
+  "out": "audio",
+  "issues": [
+   "clips"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 6.827
+ },
+ {
+  "type": "Splitter",
+  "cat": "Utility",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.853
+ },
+ {
+  "type": "Blend Audio",
+  "cat": "Utility",
+  "out": "audio",
+  "issues": [
+   "clips"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 1.207
+ },
+ {
+  "type": "Geometry",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.48
+ },
+ {
+  "type": "Plane",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.38
+ },
+ {
+  "type": "Cube",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.48
+ },
+ {
+  "type": "Sphere",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.42
+ },
+ {
+  "type": "Icosphere",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.43
+ },
+ {
+  "type": "Torus",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.4
+ },
+ {
+  "type": "Cylinder",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.45
+ },
+ {
+  "type": "Cone",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.42
+ },
+ {
+  "type": "Torus Knot",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.52
+ },
+ {
+  "type": "Capsule",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.44
+ },
+ {
+  "type": "Tube",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.44
+ },
+ {
+  "type": "Pyramid",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.44
+ },
+ {
+  "type": "Prism",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.46
+ },
+ {
+  "type": "Helix",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.52
+ },
+ {
+  "type": "Supershape",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.4
+ },
+ {
+  "type": "Tetrahedron",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.38
+ },
+ {
+  "type": "Octahedron",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.4
+ },
+ {
+  "type": "Dodecahedron",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.44
+ },
+ {
+  "type": "Rounded Cube",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.47
+ },
+ {
+  "type": "Mobius Strip",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.4
+ },
+ {
+  "type": "Klein Bottle",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.42
+ },
+ {
+  "type": "Gear 3D",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.43
+ },
+ {
+  "type": "Star 3D",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.42
+ },
+ {
+  "type": "Disc",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.39
+ },
+ {
+  "type": "Arrow 3D",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.42
+ },
+ {
+  "type": "Model 3D",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.33
+ },
+ {
+  "type": "Text 3D",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.55
+ },
+ {
+  "type": "Null 3D",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.43
+ },
+ {
+  "type": "Ocean",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.42
+ },
+ {
+  "type": "Material",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.48
+ },
+ {
+  "type": "Displacement",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.42
+ },
+ {
+  "type": "Audio Displacement",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.44
+ },
+ {
+  "type": "Audio Ribbon",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.33
+ },
+ {
+  "type": "Mapping",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.43
+ },
+ {
+  "type": "Particle System",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.78
+ },
+ {
+  "type": "Cloth",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.46
+ },
+ {
+  "type": "Join Geometry",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.43
+ },
+ {
+  "type": "Union",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.43
+ },
+ {
+  "type": "Intersect",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.43
+ },
+ {
+  "type": "Difference",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.33
+ },
+ {
+  "type": "Metaballs",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.4
+ },
+ {
+  "type": "Resynthesize 3D",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.43
+ },
+ {
+  "type": "Image to Points",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.76
+ },
+ {
+  "type": "Depth Projection",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.37
+ },
+ {
+  "type": "Curve",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.42
+ },
+ {
+  "type": "Mesh to Points",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.38
+ },
+ {
+  "type": "Mesh to Edges",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.36
+ },
+ {
+  "type": "Mesh to Faces",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.41
+ },
+ {
+  "type": "Transform",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.47
+ },
+ {
+  "type": "Array",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.5
+ },
+ {
+  "type": "Subdivide",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.43
+ },
+ {
+  "type": "Solidify",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.43
+ },
+ {
+  "type": "Extrude",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.45
+ },
+ {
+  "type": "Wireframe",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.54
+ },
+ {
+  "type": "Triangulate",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.56
+ },
+ {
+  "type": "Normals",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.46
+ },
+ {
+  "type": "Explode",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.57
+ },
+ {
+  "type": "Twist",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.46
+ },
+ {
+  "type": "Smooth",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.43
+ },
+ {
+  "type": "Mirror",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.43
+ },
+ {
+  "type": "Screw",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.58
+ },
+ {
+  "type": "Select",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.43
+ },
+ {
+  "type": "Delete Selected",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.33
+ },
+ {
+  "type": "Transform Selected",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.45
+ },
+ {
+  "type": "Extrude Selected",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.45
+ },
+ {
+  "type": "Delete",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.33
+ },
+ {
+  "type": "Instance on Points",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.56
+ },
+ {
+  "type": "Set Vertex Color",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.43
+ },
+ {
+  "type": "Wrap",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.44
+ },
+ {
+  "type": "Field Modifier",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.45
+ },
+ {
+  "type": "Field Primitive",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.75
+ },
+ {
+  "type": "Distribute Points on Faces",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.58
+ },
+ {
+  "type": "Points to Vertices",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.35
+ },
+ {
+  "type": "Distribute Points in Grid",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.41
+ },
+ {
+  "type": "Merge by Distance",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.46
+ },
+ {
+  "type": "Switcher 3D",
+  "cat": "3D",
+  "out": "geometry",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.43
+ },
+ {
+  "type": "Camera",
+  "cat": "3D",
+  "out": "camera",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Light",
+  "cat": "3D",
+  "out": "light",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "HDRI",
+  "cat": "3D",
+  "out": "image",
+  "issues": [
+   "clock-suspect"
+  ],
+  "animates": false,
+  "render_vs_frame": 3.67
+ },
+ {
+  "type": "Render 3D",
+  "cat": "3D",
+  "out": "image",
+  "issues": [
+   "validate:E_KIND_MISMATCH"
+  ]
+ },
+ {
+  "type": "Resynthesize",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "gaussianblur",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.24
+ },
+ {
+  "type": "boxblur",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.25
+ },
+ {
+  "type": "motionblur",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.24
+ },
+ {
+  "type": "radialblur",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.29
+ },
+ {
+  "type": "unsharpmask",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "twirl",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "pinchpunch",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.3
+ },
+ {
+  "type": "ripple",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "pixelate",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.26
+ },
+ {
+  "type": "addnoise",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "vignette",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.31
+ },
+ {
+  "type": "bloom",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "diffuseglow",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "glitch",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.33
+ },
+ {
+  "type": "lensdistortion",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "displace",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.25
+ },
+ {
+  "type": "liquify",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "symmetry",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "kaleidoscope",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "mirror tile",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.25
+ },
+ {
+  "type": "crop",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "emboss",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.03
+ },
+ {
+  "type": "normal map",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.19
+ },
+ {
+  "type": "convolve",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.24
+ },
+ {
+  "type": "halftone",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.17
+ },
+ {
+  "type": "edge sobel",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.03
+ },
+ {
+  "type": "edge outline",
+  "cat": "Effects",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.22
+ },
+ {
+  "type": "Fit",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "Comment",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [
+   "frame:E_RENDER"
+  ]
+ },
+ {
+  "type": "Group",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [
+   "frame:E_RENDER"
+  ]
+ },
+ {
+  "type": "Null",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "Viewport",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "Curves",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.93
+ },
+ {
+  "type": "Color Ramp",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.67
+ },
+ {
+  "type": "Remove Background",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "Feedback",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "Trails",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "Reaction Diffusion",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 1.09
+ },
+ {
+  "type": "Blend",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "Layer Stack",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "Switcher",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "Audio Color Ramp",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.14
+ },
+ {
+  "type": "transform",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "invert",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "posterize",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.18
+ },
+ {
+  "type": "threshold",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.0
+ },
+ {
+  "type": "exposure",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "show alpha",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.0
+ },
+ {
+  "type": "opacity",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "set alpha",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "alpha invert",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "alpha from luma",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "alpha levels",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "premultiply",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "chroma key",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "luma key",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "lookup",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "lut",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "gradientmap",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "color adjustments",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "outerglow",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "coloroverlay",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.13
+ },
+ {
+  "type": "dropshadow",
+  "cat": "Compositing",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.23
+ },
+ {
+  "type": "LFO",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "Random",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "Pattern",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.03
+ },
+ {
+  "type": "Math",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Compare",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.01
+ },
+ {
+  "type": "Range to Range",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Smoothing",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Invert",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Mod Depth",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Mod Curve",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "CV to Pitch",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "MIDI CC",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [
+   "render:E_HARDWARE_SOURCE"
+  ],
+  "animates": false
+ },
+ {
+  "type": "MIDI Trigger",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [
+   "render:E_HARDWARE_SOURCE"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Path",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Geometry Table",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Constant",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Null Modulator",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Image Analyze",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.01
+ },
+ {
+  "type": "Palette",
+  "cat": "Modulators",
+  "out": "palette",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Audio File",
+  "cat": "Modulators",
+  "out": "audio",
+  "issues": [
+   "silent"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.0
+ },
+ {
+  "type": "Audio Analyze",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.01
+ },
+ {
+  "type": "Vibrato",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Envelope",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Note to CV",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [
+   "nondeterministic",
+   "clock-suspect"
+  ],
+  "animates": false,
+  "render_vs_frame": 4.76
+ },
+ {
+  "type": "Velocity to CV",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.01
+ },
+ {
+  "type": "CV Recorder",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Audio to CV",
+  "cat": "Modulators",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.01
+ },
+ {
+  "type": "Drift",
+  "cat": "Prediction",
+  "out": "predictor",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": true
+ },
+ {
+  "type": "Moves",
+  "cat": "Prediction",
+  "out": "predictor",
+  "issues": [
+   "nondeterministic",
+   "clock-suspect"
+  ],
+  "animates": true,
+  "render_vs_frame": 28.13
+ },
+ {
+  "type": "Predictive Modulator",
+  "cat": "Prediction",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Predictive Coloring",
+  "cat": "Prediction",
+  "out": "image",
+  "issues": [],
+  "animates": true,
+  "render_vs_frame": 0.32
+ },
+ {
+  "type": "Predictive Notes",
+  "cat": "Prediction",
+  "out": "note",
+  "issues": [
+   "silent"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.0
+ },
+ {
+  "type": "Predictive Quantize",
+  "cat": "Prediction",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.678
+ },
+ {
+  "type": "Predictive Velocity",
+  "cat": "Prediction",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.586
+ },
+ {
+  "type": "Predictive Rhythm",
+  "cat": "Prediction",
+  "out": "note",
+  "issues": [
+   "silent"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.0
+ },
+ {
+  "type": "Macro Knob",
+  "cat": "Macros",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Macro Slider",
+  "cat": "Macros",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Macro Bipolar Knob",
+  "cat": "Macros",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Macro XY",
+  "cat": "Macros",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02
+ },
+ {
+  "type": "Macro Toggle",
+  "cat": "Macros",
+  "out": "modulator",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Macro Trigger",
+  "cat": "Macros",
+  "out": "modulator",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Macro NumBox",
+  "cat": "Macros",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.01
+ },
+ {
+  "type": "Macro Radio Selector",
+  "cat": "Macros",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.01
+ },
+ {
+  "type": "Macro Step Gate",
+  "cat": "Macros",
+  "out": "modulator",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.01
+ },
+ {
+  "type": "Oscillator",
+  "cat": "Synths",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.598
+ },
+ {
+  "type": "Wavetable",
+  "cat": "Synths",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.535
+ },
+ {
+  "type": "Analog",
+  "cat": "Synths",
+  "out": "audio",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Wave Terrain",
+  "cat": "Synths",
+  "out": "audio",
+  "issues": [
+   "clips"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 1.142
+ },
+ {
+  "type": "Equation Synth",
+  "cat": "Synths",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.766
+ },
+ {
+  "type": "Spectral Synth",
+  "cat": "Synths",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.098
+ },
+ {
+  "type": "Metallic",
+  "cat": "Synths",
+  "out": "audio",
+  "issues": [
+   "clips"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 1.042
+ },
+ {
+  "type": "Sampler",
+  "cat": "Synths",
+  "out": "audio",
+  "issues": [
+   "silent"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.0
+ },
+ {
+  "type": "Slicer",
+  "cat": "Synths",
+  "out": "audio",
+  "issues": [
+   "silent"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.0
+ },
+ {
+  "type": "PaulStretch",
+  "cat": "Synths",
+  "out": "audio",
+  "issues": [
+   "silent"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.0
+ },
+ {
+  "type": "Molder",
+  "cat": "Synths",
+  "out": "audio",
+  "issues": [
+   "silent"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.0
+ },
+ {
+  "type": "Grain Molder",
+  "cat": "Synths",
+  "out": "audio",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Granular",
+  "cat": "Synths",
+  "out": "audio",
+  "issues": [
+   "silent"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.0
+ },
+ {
+  "type": "Field Synth",
+  "cat": "Synths",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.915
+ },
+ {
+  "type": "Drum Sequencer",
+  "cat": "Synths",
+  "out": "audio",
+  "issues": [
+   "silent"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.0
+ },
+ {
+  "type": "Field Effect",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Plugin",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.853
+ },
+ {
+  "type": "Audio Filter",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.664
+ },
+ {
+  "type": "EQ",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [
+   "clips"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 1.57
+ },
+ {
+  "type": "Dynamics",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.592
+ },
+ {
+  "type": "Limiter",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.884
+ },
+ {
+  "type": "Delay",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.83
+ },
+ {
+  "type": "Reverb",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.882
+ },
+ {
+  "type": "Drive",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [
+   "clips"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 1.581
+ },
+ {
+  "type": "Stereo",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [
+   "clips"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 1.207
+ },
+ {
+  "type": "Pitch Shifter",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.105
+ },
+ {
+  "type": "Chorus",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.758
+ },
+ {
+  "type": "Flanger",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [
+   "clips"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 1.417
+ },
+ {
+  "type": "Phaser",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [
+   "clips"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 1.112
+ },
+ {
+  "type": "Bitcrush",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.971
+ },
+ {
+  "type": "Transient Shaper",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.853
+ },
+ {
+  "type": "Stutter",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.864
+ },
+ {
+  "type": "Ring Mod",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.824
+ },
+ {
+  "type": "Frequency Shifter",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [
+   "clips"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 1.308
+ },
+ {
+  "type": "Tremolo",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.823
+ },
+ {
+  "type": "Formant Filter",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [
+   "clips"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 5.442
+ },
+ {
+  "type": "Wavetable Shaper",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [
+   "clips"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 1.92
+ },
+ {
+  "type": "Resonator Bank",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [
+   "clips"
+  ],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 2.418
+ },
+ {
+  "type": "Cycle Shaper",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.798
+ },
+ {
+  "type": "Spec Blur",
+  "cat": "AudioEffects",
+  "out": "audio",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.595
+ },
+ {
+  "type": "MIDI Notes",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [
+   "render:E_HARDWARE_SOURCE"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Keyboard",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Note Filter",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.591
+ },
+ {
+  "type": "Note Transpose",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.573
+ },
+ {
+  "type": "Pitch Bend",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.567
+ },
+ {
+  "type": "Velocity Curve",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.754
+ },
+ {
+  "type": "Gate",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.554
+ },
+ {
+  "type": "Humanizer",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.554
+ },
+ {
+  "type": "Quantizer",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.554
+ },
+ {
+  "type": "Glide",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.554
+ },
+ {
+  "type": "Note Echo",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.476
+ },
+ {
+  "type": "Note Router",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.383
+ },
+ {
+  "type": "Note Merge",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.554
+ },
+ {
+  "type": "Note Switcher",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.677
+ },
+ {
+  "type": "Arpeggiator",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.778
+ },
+ {
+  "type": "Note Sequencer",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.559
+ },
+ {
+  "type": "Random Note Generator",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.554
+ },
+ {
+  "type": "Chorder",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.762
+ },
+ {
+  "type": "Note Stack",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.754
+ },
+ {
+  "type": "Note Capturer",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [
+   "render-ok-but-file-unreadable"
+  ],
+  "animates": false
+ },
+ {
+  "type": "Bouncing Balls",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.604
+ },
+ {
+  "type": "Note Strum",
+  "cat": "Notes",
+  "out": "note",
+  "issues": [],
+  "animates": false,
+  "render_vs_frame": 0.02,
+  "peak": 0.677
+ }
+]

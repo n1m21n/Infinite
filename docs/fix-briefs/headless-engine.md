@@ -115,8 +115,19 @@ through the same `width/height` arguments `StartOfflineRenderSession` already ta
 After `LoadPatchFrom`, set `recordVideoPath`, `offlineFps`, `offlineDurationSeconds`,
 `offlinePrerollFrames` on the chosen Output and call `StartOfflineRenderSession`. The existing
 frame loop already calls `RunOfflineRenderStep` each frame. In headless mode:
-- skip the canvas/ImGui draw and `DrawOfflineRenderProgressWindow` (nothing sees it; it costs
-  frames); keep `glfwPollEvents` so the process stays responsive on macOS;
+- **do NOT simply skip the canvas draw.** Modulation, expressions, palette, performance-panel
+  values and gesture playback are only applied to params that **registered this frame while
+  their node body drew** (`main.cpp` ~95787: "the parameter registry is rebuilt every frame while
+  nodes draw"; `Modulation::RegisterParam`, `FrameParams()`). Skip the draw and every `mod`,
+  `expr` and `gesture` line silently stops working, so the render comes out static. The app
+  already has a no-draw mechanism: `gParamRegisterOnly` (`main.cpp` ~2691, used by collapsed
+  nodes and the hidden-band pattern at ~21643), which runs the body's widget calls to register
+  params without drawing. In headless mode, run every node's body in register-only mode each
+  frame. Don't cull by `IsParamDriven()`, because a headless run has no viewport to cull
+  against and the cost is small next to cooking. Skip only the ImGui render/submit and
+  `DrawOfflineRenderProgressWindow`. Keep `glfwPollEvents`. Test: a patch whose only motion is
+  one LFO → param renders frames that differ from each other; the same patch with the draw
+  fully skipped must fail that test (proving the test catches the bug);
 - when `PollOfflineFinalize()` clears `IsOfflineRendering()`, write the status and exit.
 
 `--start` needs a seek before the session starts. Check what `Transport` seek does to
@@ -193,6 +204,53 @@ plus output count per kind. `--describe <type>` prints one. This JSON is the sou
 the skill (block 5) and for the validator; nothing is hand-listed. Spawning every node headless
 is also a free smoke test: any type that crashes or leaks GL state here is a real bug, file it.
 
+### 3.1b Every UI control, one row per control (found after step 2)
+
+Measured on the step-2 `--describe` output (297 types): 5,402 saved params (3,820 float,
+724 int, 399 bool, 365 colour, 94 text) and 1,789 modulatable controls. **The two lists aren't
+joined**, so an author can't get from what's on screen to what goes in the file:
+- **1,063 of 1,789 modulatable labels aren't a saved key.** The UI says `size x` / `pos x` / `shape`,
+  but the file needs `sizeX` / `posX` / `shapeType`. `ParamRef` has no key field, so a `mod` or
+  `expr` line can't be written by key, and `--explain` can't name what a binding drives.
+- **Dropdowns carry no option names.** Shape's `shape` is `isEnum` with `enum: []`; the file is
+  `i shapeType 0..19`. Nobody can tell which number is "star". The same goes for the 724 int
+  params (Oscillator `waveform`, `filterType`, `fmMode`, …).
+- **Ranges exist only for modulatable controls.** About 3,600 saved params have no min/max, so
+  `W_OUT_OF_RANGE` can't fire for them. Some of those are internal state (not a UI control at
+  all) that an author shouldn't touch, and nothing marks which.
+- **Buttons are actions, not state** (open editor, load file, randomize, reset, record, learn),
+  so they have no file form. That's fine, but nothing tells an author which state a button
+  produces or whether that state is saved at all.
+
+Fix, without touching the ~158 `Draw*Params` functions one by one:
+1. **Join by address.** During the register-only pass, run a `ParamVisitor` that records
+   `&value` for every `VisitParams` key, then match each registered `ParamRef.value` pointer
+   (valid within that frame) to its key. Add `std::string key` to `ParamRef` (filled by this
+   pass, and in `Modulation::mKnownParams`). A `ParamRef` whose pointer matches no key is an
+   **unsaved control**, a real save/load bug (list them; `ROUNDTRIPTEST` should have caught it).
+   A key that no widget ever registers is either a plain control or internal state.
+2. **Dropdown options at registration.** The combo helpers that set `ref.isEnum`
+   (`main.cpp` ~3306) already have the item strings. Copy them into `enumOptions` there, once
+   per helper, not per node. Then allow `i shapeType Star` in the file (the reader maps the name to
+   the index via `--describe`; the writer still writes numbers), and have `--explain` print names.
+3. **Plain controls get ranges too.** The ~18 non-modulatable widgets (`docs/node_param_audit.md`)
+   register a range-only record in the same pass (a flag on `ParamRef`, never shown as a pin).
+4. **`--describe` becomes one list per node**, with one row per saved key:
+   `key, kind, default, label, min, max, step, options[], modulatable_index|null, ui:true|false`.
+   `ui:false` = internal state: the validator warns `W_INTERNAL_PARAM` if a hand-written patch
+   sets one, and the skill says not to.
+5. **Actions list.** `--describe` adds `actions: [{label, effect}]` for each button, taken from
+   the node-help text where it exists (`project_node_help_coverage`). The effect is one of:
+   "sets `path`" (write the key instead), "randomizes params" (use `--set` or a seed), or
+   "**UI-only**". UI-only covers learned/trained state (Prediction family), live recording
+   into a sampler, and plugin editor state. For each of these, check whether the result is
+   saved in the patch; if it's saved, a patch made in the UI carries it, and if not, it's a
+   save/load gap to report.
+6. Test: for 10 node types spanning categories (Shape, Oscillator, Wavetable, Reverb, FieldPixel,
+   LFO, Render 3D, Sampler, Mixer, Predictive LFO), every on-screen control appears in
+   `--describe` with its key and label, every dropdown shows its option names, and
+   `i <key> <OptionName>` round-trips to the same index.
+
 ### 3.2 Names instead of numbers (backward compatible)
 Keep format version `1` readable forever. Extend the reader, not the meaning:
 - `cable`/`geo`/`aud`/`note` accept a slot **name** in place of the number
@@ -228,6 +286,37 @@ Keep format version `1` readable forever. Extend the reader, not the meaning:
 The interactive app keeps loading leniently; it only additionally logs the warnings.
 Record the reader line number on each record while parsing (Patch.cpp reader) so messages can
 cite `scene.inf:41`.
+
+**Strict by default outside the UI.** Every CLI mode (`--render`, `--frame`, `--frames-dir`,
+`--stems`, `--audio-summary`, `--validate`) and the RPC's `load_patch_text` run in strict mode:
+any warning is promoted to an error, nothing renders, exit code `3`, and the status JSON lists
+every problem at once (don't stop at the first one, so one fix round clears them all).
+`--lenient` opts back out for old or hand-merged patches. Double-clicking a file and the
+Finder/Explorer open path stay lenient, so no existing user patch stops opening. Test: a patch
+with one misspelled param renders under `--lenient`, refuses under the default, and the error
+names the line and the nearest valid key.
+
+### 3.3b `--explain`: read back what actually loaded
+`Infinite --explain my.inf [--json]` loads the patch (strict), then prints the **live** graph,
+not the file. So it reflects what `ApplyPatchData` actually built after remapping, clamping
+and defaults, generated from the same state `PatchJson::ToJson` reads:
+
+```
+Output (3) <- image: Field Pixel "hero" (2) out 0
+Field Pixel "hero" (2)   size 1920x1080   kernel: 14 lines, compiled OK
+  radius 0.40   <- LFO "lfo1" (1) out 0, bipolar, depth 0.50, range 0.20..0.60
+  hue    0.10   <- expr: sin(t*2)*0.5+0.5
+LFO "lfo1" (1)   rate 1/4 (synced, 120 BPM)   shape sine
+Audio master <- Reverb (5) <- Oscillator (4) <- notes: Random Note Generator (6)
+Unconnected: none   Unused outputs: none
+```
+
+Params are shown by key with their resolved value. Anything left at its default is marked
+`(default)` in `--json` and hidden in text unless you pass `--all`. Modulation shows the resolved
+range (`Modulation::ResolvedSourceFor`), not just the raw record. The skill's loop requires
+comparing this against the intent before rendering. It's the check that catches a patch that's
+valid but wrong, like modulating the wrong param or wiring the wrong input. It's also exposed as
+an `explain` RPC method against the running app.
 
 ### 3.4 Format doc
 Write `docs/reference/patch-format.md`: the grammar (lift and complete the comment at the top of
@@ -278,10 +367,22 @@ Create `.claude/skills/infinite-patch-authoring/SKILL.md` (and the `.agents/skil
 add it to the `AGENTS.md` catalog under Process, and a copy under `docs/ai-skills/` with an
 "Install AI Skill" constant in `AISkillContent.h` next to the Field one (keep them in sync the
 way that header's comment says). Contents:
-- The loop (validate -> frame -> summary -> render), exact commands, exit codes, JSON fields.
-- How to get node facts: **always** `Infinite --describe <type> --json`, never memory. The skill
-  does not list params; it may list the ~20 most useful types by task (image, 3D, audio, mod) with
-  one line each, generated from `--describe` by a script so it can be regenerated.
+- The loop, as a checklist the AI may not skip: describe -> write -> validate (strict) ->
+  **explain and compare to intent** -> frame + summary -> fix -> render. Exact commands, exit
+  codes, JSON fields.
+- How to get node facts: **always** `Infinite --describe <type> --json`, never memory.
+
+**Generated, never hand-written.** Everything in the skill that states a fact about nodes
+(type list by task, one-line descriptions, common params and slots, example snippets) is
+produced by `tools/gen-patch-skill.py` from `Infinite --describe --json`, between
+`<!-- generated:begin -->` / `<!-- generated:end -->` markers. Only the loop, the rules and
+the troubleshooting prose are hand-written. The same script regenerates the
+`docs/ai-skills/` copy and the `AISkillContent.h` constant, which gives that header the single
+source of truth its comment says is missing (extend the script to cover the Field and
+expression skills too if their content can be derived the same way; otherwise leave them). CI
+job in block 5: run the generator and fail if the output differs from what's committed
+("skill is stale, run tools/gen-patch-skill.py"). Also render every example patch with
+`--strict` and fail on any error. A node change that isn't reflected in the skill can't merge.
 - The format essentials, defaults rule, name-based slots, and the rules that bite: bypass rule
   (2+ input nodes never bypass), no sigils, the Field rules (link to `field-language`).
 - 3 verified example patches committed under `assets/examples/authoring/`, each rendered by
@@ -404,15 +505,172 @@ args, and feeds the directory to `fx.py`'s reader. The same goes for `--stems` i
 `assemble.py`. Write this up as a short section in this brief's final report for the owner to
 apply, and don't edit `~/infinite-launch-video` from this session.
 
+## Block 8 — Node census: find edge cases by machine, not by memory
+
+Hand-listing edge cases does not scale to ~300 types (80 of them 3D, 36 Compositing, plus the
+integrated audio↔visual nodes). `scripts/node_census.py` spawns **every** registered type alone,
+feeds each input slot a canonical source of its kind (image: Formula, geometry: Cube, audio:
+Oscillator, notes: Random Note Generator), routes the first output somewhere observable
+(Output / Render 3D → Output / the Output's audio pin / a Shape's `pos x`), and checks
+validate, render, black, NaN, size changes, determinism, render-vs-frame clock gap, and audio
+silence/clipping. The full run takes 4.5 min on 4 jobs.
+
+**First run (2026-09-29, 297 types): 259 clean. No crashes, hangs or NaNs, and every type is
+deterministic.** What it found:
+
+| Finding | Types | St | Action |
+|---|---|---|---|
+| **`--render` says `ok`, exit 0, "rendered 60 frames", but the `.mov` is unreadable (`moov atom not found`)**: 50 of 297 rows at `--jobs 4`; always with 3+ parallel renders | any | C | E14 below (finalize wait returns before `finishWriting` completes). Serious: the AI and the film engine both trust `ok`. The baseline is recorded with this bug present, so fixing it shows as 50 improved rows. |
+| Render 3D's `env` slot is reported as kind `image`, but only an HDRI plugs in (`E_KIND_MISMATCH` for Formula) | Render 3D | C | `--describe` must report the real accepted source (`kind: environment`, `accepts: [HDRI]`). Generalise: the schema's kind comes from `CapsAcceptedBy`, not from `CableFor`. |
+| Default params clip a 0.85-peak input | Formant Filter 5.4, Resonator Bank 2.4, Wavetable Shaper 1.9, Drive 1.6, EQ 1.6, Flanger 1.4, Analog 1.4, Frequency Shifter 1.3, Blend Audio 1.2, Stereo 1.2, Wave Terrain 1.1, Phaser 1.1, Metallic 1.0 (Mixer 6.8 is 8 summed inputs, expected) | C | Hand to `param-truth-audit` (default gain staging). The skill tells the AI to follow these with a limiter or lower gain. |
+| Silent with no asset | Audio File, Sampler, Slicer, PaulStretch, Molder, Grain Molder, Granular | C (expected) | Census gains `tests/headless/fixtures/` (a 2 s WAV, a PNG, a 2 s MP4, an OBJ) and sets `path` for asset nodes. Then silence is a real failure. |
+| Silent without a pattern or performer | Keyboard, Drum Sequencer, Predictive Notes | C (expected) | Per-type seed params in a small `census_overrides.json`. |
+| Hardware sources refuse with rc 4 | Video In, Syphon In, Audio In, MIDI CC/Trigger/Notes | C (correct) | Keep as an expected row. |
+| Harness gaps | Output, Audio Out, Comment, Group, Field Graph, OSC Send, Draw | — | Special-case in the census; not engine bugs. |
+| Render-vs-frame clock gap | HDRI 3.7, addnoise 3.4 (addnoise reads `Transport::Seconds`, so this is H.264 noise on grain) | L | The clock check is only trustworthy on lossless frames. Switch it to the PNG-sequence path (7.2) once that lands. It missed Audio Displacement (D8) for this reason. |
+
+**How it stays useful:**
+- `--baseline build/census/census.json` prints only rows that changed and exits 1, so a new
+  node or a regression shows up in one line. Commit a baseline under `tests/headless/census_baseline.json`.
+- Run it in `verify-gate` whenever a diff touches `src/nodes/` or node registration, and in CI on Linux.
+- Next layers, in this order (each is a loop over the schema, not a hand list):
+  1. **Param sweep**: every modulatable at min/mid/max → crash, NaN, black, silent, or
+     "no visible or audible change" (a dead control; feeds `param-truth-audit`).
+  2. **Enum sweep**: every dropdown option once (needs 3.1b's option names).
+  3. **Pair sweep**: for each output kind × input slot the validator accepts, one real render;
+     validator-says-ok but engine-refuses = a schema bug (like the env slot).
+  4. **Bypass sweep**: every bypassable type bypassed → output equals its input (G3/G4).
+  5. **Pacing sweep**: lossless render-vs-frame, catches every wall-clock node (D8 class).
+- Every finding becomes a row in the generated skill (block 6), so the AI learns it once.
+
+## Edge cases (every one needs a test or an explicit "won't fix" note)
+
+**Status after steps 1–2 (commits `5c286db`, `35f8306`; checked against `build/` on 2026-09-29):**
+- ✅ E1: `HeadlessTick` keeps the hidden window drawing, and the 3 `--frame` times of
+  `tests/headless/patch_video.inf` (21 `mod` lines) differ from each other and match single-time runs.
+- ✅ E2: `--describe` gives 297 types, identical across two runs. Per-type runs match the full dump
+  (Reverb 7, Oscillator 22 modulatable). The 19 types without modulatables are I/O and utility nodes.
+- ❌ E9 for `--render`: 3+ parallel renders all report `ok` and all write broken files (E14). `--frame` is fine.
+- ✅ E9: `--frame` leaves `~/Library/Application Support/Infinite` untouched. 3 parallel runs
+  give byte-identical PNGs.
+- ✅ E10 for the chosen Output (`sOut->recordVideoPath = job.out`). Still open: a second
+  Output, or `exportImagePath`, in the patch.
+- ⚠️ A1/A3: CRLF and BOM files are now **refused** by strict mode (loud, good), but the message
+  reads `unknown node type 'Random Note Generator\r'`, and the GUI still loads CRLF silently
+  wrong. Fix the reader (strip `\r`, skip the BOM), which fixes both.
+- ⚠️ Type names are internal (`FieldPixel`), while the UI shows "Field Pixel". The hint catches it;
+  accepting display names as aliases (and saying which one `--describe` prints) removes the trap.
+- ⚠️ Controls not joined to saved keys, dropdowns have no option names: see 3.1b.
+- ❌ Graph topology: the validator accepts every broken case tested (G1–G15 below).
+- Not yet checked: A2, A5–A7, A9, E3–E8, E11–E13, G8, L*, P*.
+
+Status: **C** = confirmed in code on 2026-09-29, **L** = likely, verify first.
+
+### The engine itself
+| # | Case | St | Required behaviour |
+|---|---|---|---|
+| E1 | Param registry only fills while node bodies draw (see 1.3) | C | Register-only pass for every node, every headless frame |
+| E2 | `--describe` ranges/indices come from the same registry | C | `--describe` runs one register-only pass per spawned node before reading `KnownParam` |
+| E3 | `mod`/`expr` `dstParam` is the **order** widgets register in. A node whose visible widgets change with a mode or dropdown could shift indices | L | `--describe` reports indices per mode where they differ. The validator warns when a binding's index resolves to a different key than the one `--explain` shows. Nodes that register hidden widgets (the band pattern at `main.cpp` ~21643) are the model fix. List the offenders you find instead of fixing them all. |
+| E4 | Assets load asynchronously (video decode, `AudioDecodeCache`, model import, `RemoveBgNode`/`SlicerNode`/`MolderNode` threads), so early frames render black or silent | L | A "graph ready" barrier before frame 0: poll every node for pending loads (add `INode::IsLoading()`, default false) with a timeout. The 2-frame preroll is not enough. |
+| E5 | Field kernel fails to compile: keep-last-working means the first compile leaves nothing, so the frame is black | C (by design) | Strict mode: compile error = `E_FIELD_COMPILE` with the compiler's line and column. Also compile with the target GLSL version on macOS (GLSL 330 on Windows/Linux per `windows-parity`), so "works on Mac, black on Linux" is caught on the Mac. |
+| E6 | Output size odd (H.264 needs even), zero, or bigger than `GL_MAX_TEXTURE_SIZE` | L | Validate up front with a clear error. Round odd sizes only if `--allow-round`. |
+| E7 | Mac locked or on battery overnight: App Nap and occlusion throttling stall a hidden window (the "B8 locked-screen trap" in `run-infinite-hygiene`) | L | Headless mode holds an activity assertion (`NSProcessInfo beginActivityWithOptions` on macOS, `SetThreadExecutionState` on Windows). Test a render with the screen locked. |
+| E8 | Disk full or process killed mid-render leaves a partial file that looks valid | L | Write to `out.partial.<ext>` and rename on success. On failure, delete it and exit `5`. The same goes for PNG sequences (write to `dir.partial/`, then rename). |
+| E9 | Two renders at once, or a render while the GUI app runs, collide on shared state: `Infinite.autosave.inf`, recents, prefs, `control_token`, the plugin cache, fixed `TmpPath` names | C (shared files exist) | Headless writes none of these. Any temp file it needs gets the PID in its name. Test: 4 renders in parallel plus the GUI open, and every output is correct. |
+| E10 | A patch carries `s recordVideoPath` (`OutputNode.h:252`) or other output-path params | C | Headless ignores every output path stored in the patch and writes only where the CLI says. A downloaded patch must never choose where files get written. |
+| E11 | Plugins: licence/registration dialogs, editors that open windows, AU needing the main run loop, very slow scans | L | Headless never opens a plugin editor. It uses the existing plugin cache and never rescans. A plugin that shows a modal dialog hits `--timeout` with a message naming it. `--no-plugins` bypasses them (with a warning). |
+| E12 | Patch uses arrangement clips/timeline: does `--render` from Transport 0 play them? | L | Decide explicitly (recommended: yes, the same as pressing play). `--explain` lists clips. |
+| E13 | Sample-rate-dependent nodes prepared at the default rate before `--sample-rate` is applied | L | Set the offline rate before `RebuildAudioTopology` and before any node prepares |
+| E14 | **`--render` reports `ok`, exit 0, but the `.mov` has no index (`moov atom not found`)**. Always with 3+ renders in parallel (2 are fine, serial is fine), and also once serially with the Output size modulated mid-render | C | Root cause (very likely): `Platform::RecorderStop` waits for `finishWritingWithCompletionHandler` by spinning `NSRunLoop runUntilDate` (`Platform.mm:3087-3091`) on the background finalize thread (`OutputNode.cpp` ~517). That thread's run loop has no sources, so `runUntilDate` returns immediately, the 2000 × 5 ms wait takes about 0 ms, and `done == false` is never checked (only `Failed` is). The GUI survives because the process lives on; headless exits first. Fix: wait on a `dispatch_semaphore` signalled by the completion handler (60 s timeout, same as the worker wait above it), and return an error when it times out or when `writer.status != Completed`. Then, separately, lock the encoder size at frame 0 for a size-changing Output (`W_SIZE_CHANGED`). Headless verifies the finished file opens before it reports `ok` (exit 5 otherwise). Test: census with `--jobs 4` shows zero `render-ok-but-file-unreadable`. This also affects GUI exports on quit and the film engine's parallel shots. |
+
+### Authoring the file
+| # | Case | St | Required behaviour |
+|---|---|---|---|
+| A1 | **CRLF line endings** (a Windows editor, some AI tools): `std::getline` keeps `\r`, so the type name becomes `"Random Note Generator\r"` and the node is **silently skipped**. `s` values get a stray `\r`. `end\r` doesn't close the block. | C | Reader strips a trailing `\r` from every line. Test with a CRLF copy of `patch_1.inf`. |
+| A2 | Trailing spaces after a type name or value | C | Trim trailing whitespace on type names and non-`s` values |
+| A3 | UTF-8 BOM at file start makes the magic check fail ("not an Infinite patch", which is at least loud) | C | Skip a leading BOM |
+| A4 | Tabs, blank lines, `#` comments | partly C (leading whitespace is already stripped) | Comments are explicit (block 3.2) |
+| A5 | Patch from a newer Infinite: `version > kVersion` refuses, but a *same-version* patch with params added by a newer build drops them silently | C | Write a `built-with <app version>` line (unknown tags are already ignored by older builds). Strict mode on an older build reports "patch uses params this build doesn't have (written by vX)". |
+| A6 | Media paths (`s path`, 12 nodes; `filePath`, `exportImagePath`) are absolute, so a patch moved to another machine or CI renders black or silent | C (params exist) | Resolve a relative path against the patch file's folder first. The validator errors `E_MISSING_MEDIA` naming the node and path. `--canonicalize --relative-media` rewrites paths relative to the patch. |
+| A7 | Numbers: `1e-3`, `.5`, `-0`, `nan`, `inf`, commas | L | Accept what `strtod` accepts (C locale only). Reject nan/inf. The validator flags an unparsable number instead of letting `atof` turn it into 0. No `setlocale` call exists today; keep it that way and add a test that forces `LC_NUMERIC=de_DE` and checks the parse. |
+| A8 | Duplicate node index, duplicate `id` word, a cable to itself, two cables into one single-input slot | L | Validator errors for each (the last-wins behaviour today is silent) |
+| A9 | Huge files (an AI loops and writes 50k nodes), very long `s` lines | L | Caps on the validator (node count, line length) with clear errors. RPC `load_patch_text` has a size cap. |
+
+### The live and AI loop
+| # | Case | St | Required behaviour |
+|---|---|---|---|
+| L1 | **Live reload reads a half-written file** while the AI is saving | L | Reload only after the file's size and mtime have been stable for 300 ms **and** it parses. A failed parse keeps the current graph and shows the error in the banner, never an empty canvas. The skill tells the AI to write to a temp file and rename it (an atomic save). |
+| L2 | The user edits in the UI while the AI edits the file | L | Unsaved-edit guard (block 4). Add a diff banner, "file changed: 3 nodes, 2 cables", with Reload / Keep mine. |
+| L3 | Reload floods undo history | L | One checkpoint per reload, with reloads within 2 s merged into one |
+| L4 | Reload resets stateful nodes (feedback, sims) and the transport position while the user is performing | L | Keep the transport position. Stateful nodes reset only if their own params changed, and the reset is shown in the banner. |
+| L5 | The AI judges a PNG wrong: tiny contact sheet, colour-managed viewer, 16-bit PNG shown as 8-bit | L | Contact sheet cells ≥ 480 px wide, sRGB tagged. Stats in JSON (2.2) are the ground truth for black, clipped and empty. |
+| L6 | The AI can't hear, so "sounds good" is unverifiable | by design | The skill says so, and ends music tasks by asking the user to listen. Never claim it sounds good. |
+| L7 | The AI uses a node or param that exists only on one OS (per-OS `#if` nodes, `project_node_help_coverage` memory) | L | `--describe` marks platform availability. Validator warning `W_PLATFORM_ONLY`. |
+
+### Platform
+| # | Case | St | Required behaviour |
+|---|---|---|---|
+| P1 | **Windows: `Infinite.exe` is built `WIN32_EXECUTABLE TRUE`** (`CMakeLists.txt:874`), so stdout and stderr are not attached to the terminal and the JSON status line and exit code are invisible or unreliable in cmd/PowerShell | C | Ship a tiny console-subsystem `infinite.exe` (or `Infinite-cli.exe`) that launches the GUI binary with the args and pipes its output back, or call `AttachConsole(ATTACH_PARENT_PROCESS)` early in headless mode and document its limitations. Recommended: the separate console shim (the same pattern as the console-subsystem helper at `CMakeLists.txt:933`). |
+| P2 | macOS: running the binary through a symlink (the "command line tool" button) must still find the bundle's Resources (fonts, shaders) | L | Resolve `_NSGetExecutablePath` + `realpath`, never `argv[0]`. Test from a symlink in `/usr/local/bin`. |
+| P3 | macOS Gatekeeper/quarantine on a freshly downloaded app run from the terminal first | L | The shim prints a hint if the binary is quarantined. The app must be opened once from Finder (document it). |
+| P4 | Linux: no `DISPLAY`/`WAYLAND_DISPLAY`, Wayland-only desktops, AppImage FUSE missing | C (GLFW needs a display) | `E_NO_DISPLAY` with the `xvfb-run` hint (1.6). Document `--appimage-extract-and-run`. |
+| P5 | Unicode or space-containing paths, and Windows long paths > 260 characters | L | UTF-8 everywhere and wide APIs on Windows (`windows-parity`). Test with `~/Desktop/My Shots/ünïcode.inf`. |
+
+### Graph topology: chains, splits, merges, loops, bypass
+Tested on `build/` on 2026-09-29 with 11 small patches (Shape, Formula, Blend, Fit, Feedback,
+Oscillator, Mixer, LFO). **`--validate` returned `ok` with no warnings for every broken one.**
+
+| # | Case | St | What happens today | Required behaviour |
+|---|---|---|---|---|
+| G1 | **Blend reports 64 input slots** in `--describe` (every other type is right). `SchemaFor` (`main.cpp` ~7904) probes slots 0–63 with `SlotKindOf`, and `CableFor` maps *any* Blend slot > 0 to input B (`main.cpp` ~7287) | C | `cable 3 5 2` passes the validator and silently **replaces** input B (the frame equals a Formula-only render) | Bound the probe by `InputCountFor(gn)` for image slots. Make `CableFor` return null for Blend slot ≥ 2. Test: `cable <blend> 2 …` → `E_BAD_SLOT`. |
+| G2 | Two cables into one slot (A8) | C | The last line wins with no message (Output showed only the second source) | `E_SLOT_TAKEN` naming both lines. Fan-*out* from one output stays legal. |
+| G3 | `flags … bypassed=1` on a node that can't be bypassed (Blend, Mixer, 2+ inputs; `CanBypass`, `main.cpp` 7268) | C | The frame loop clears it silently (`main.cpp` ~95801), so the author's "off" node is on | `W_BYPASS_IGNORED` (strict: error) using the same `CanBypass` probe. `--explain` shows the effective bypass state. |
+| G4 | Bypassed 1-input node | C (works) | Passes its input through (a bypassed Fit equals no Fit) | Keep. `--explain` marks it `bypassed → passes <src>`. Add to goldens. |
+| G5 | Bypassed synth | C (by design) | Silence (`BypassSource()` null) | `--explain` says "bypassed: silent" so the AI doesn't think audio vanished for another reason. |
+| G6 | **Image loop without a Feedback node** (Blend → Fit → Blend) | C | No hang, no error: the cook memo hands back last frame's texture, so it acts as a hidden one-frame delay whose result depends on cook order | `W_IMAGE_CYCLE` naming the nodes and suggesting a Feedback node. A loop that passes through a Feedback node is legal and must stay silent. Extend `findCycle` (`PatchSchema.cpp` ~274) to image and geometry cables, with Feedback as the one breaker. |
+| G7 | Image loop *through* Feedback | C (works) | Legal by design (`FeedbackNodes.h`); a 50 % Blend with Feedback renders | Keep silent. Add a golden, because trails/echo patches depend on it. |
+| G8 | Geometry loops | L | Not checked by the validator | Same as G6 for `geo` cables. Verify whether the geometry cook recurses or memoizes before choosing error vs warning. |
+| G9 | `mod` whose source is not a modulator (`mod 3 0 3`, source = Shape) and `dstParam` 999 | C | Accepted with no message | `E_NOT_A_MODULATOR` and `E_BAD_PARAM` (index past the node's `KnownParam` count). |
+| G10 | Modulator loops (LFO A rate ← LFO B, LFO B rate ← LFO A) | C (renders) | Accepted and renders | Keep legal (it's a real technique) but warn `W_MOD_CYCLE` once and state the one-frame lag in `--explain`, so determinism tests know about it. |
+| G11 | Merge with an empty input (Blend with only A, mix 0.5) | C | The missing input counts as transparent black, so the picture dims (alpha 189 instead of 255) | `W_OPEN_INPUT` on merge nodes (Blend, Layer Stack, Mixer, Blend Audio) when a slot the mix depends on is empty. |
+| G12 | Audio fan-out (one Oscillator into two Mixer channels) | C (correct) | Same pitch (225 Hz); it's summed, not pulled twice. Peak 1.71, so it **clips** | Keep. `--audio-summary` must report clipping (peak > 1.0) as a warning, and the skill tells the AI to lower gain after merges. |
+| G13 | Nodes reachable only through `mod`/`pal` (an LFO) count as used; a whole chain that never reaches Output/Audio Out is `W_UNUSED_NODE` | C (code read) | Correct already | Keep. Also warn when an Output's image input is empty (`W_OUTPUT_EMPTY`), which today renders a blank frame silently. |
+| G14 | Nodes with both image and audio pins (Output slot 1 = audio, Oscillator slot 0 = notes, 1 = FM) | C | `E_KIND_MISMATCH` already catches wrong kinds | Once 3.2 lands, name-based slots (`cable out.audio …`) remove numeric guessing. |
+| G15 | Usage text says `--render … <out.mp4\|mov\|wav>`, but `.wav` is refused with `E_UNSUPPORTED_CONTAINER` | C | Contradicts itself | Either support `.wav` (audio-only render, useful for sound design) or drop it from the usage text. Recommended: support it, since 7.1 stems need it anyway. |
+
+### 3D category (80 types): what makes it harder
+Test prompt: "a cube emitting particles, colour-gradient it". The patch (Cube → Set Vertex Color →
+Render 3D geo A, Particle System → geo B) validates clean and renders at 0.1/1/2 s. It only looks
+right because the author knew the rules below, and today no tool tells the AI any of them.
+
+| # | Case | St | What happens today | Required behaviour |
+|---|---|---|---|---|
+| D1 | **Particle System has no geometry input**: it emits from Point/Sphere/Box/Disc only (`SimulationNodes.h:29`) | C | "A cube emitting particles" = a Box emitter with `emitRadius 0.5` sized to the unit cube (half-extent 0.5, `Mesh.cpp:117`) and hidden inside it. It can't emit from the surface, and when the cube moves or spins the emitter does not follow | The skill has a recipes table ("emit from a mesh" → Box/Sphere matched to the primitive's size; moving emitter → modulate the emitter's position params from the same source as the mesh). If surface emission matters, it's a node feature, not a headless one. `--describe` says "emitter: built-in shapes only". |
+| D2 | **"Gradient" means 4 different things** in 3D: particle age (`startColor`→`endColor`), Set Vertex Color `Index` (rampA→rampB by vertex order, so on a cube it shows **per-face banding**, not a smooth sweep), `Position` (bbox → RGB rainbow that **ignores rampA/rampB**), and `Texture` fed by a Ramp image (same gradient on every face, via UV) | C | The help text says Set Vertex Color has "a two-colour Ramp" source, but no source by that name exists (`GeometryOpNodes.cpp:1098`) | Fix the help text (`main.cpp` 40136). The skill's recipes table maps "gradient across the object" → the real options with a rendered thumbnail each. Optional node fix: a `Position` axis + rampA/rampB mode. `--explain` prints which gradient each colour param actually drives. |
+| D3 | Colour stacking: Set Vertex Color vs each modifier's own material block (`color`, `inherit`) | L | `inherit 0` on a downstream Transform resets colour (test gf.inf: the red copy) | `--explain` shows the effective material per Render 3D input. The validator warns when a vertex colour is set upstream of an `inherit 0` modifier that replaces it. |
+| D4 | **Framing**: Render 3D's camera doesn't auto-frame | C | A Transform with `offsetX 1.2` pushed a cube out of the frame. Nothing warns | `--explain` prints each geometry input's world bbox and whether it is inside the camera frustum. `W_OUT_OF_FRAME`, plus image stats (2.2) "object covers N % of frame". |
+| D5 | Slot layout: Render 3D geo A–D are slots 0–3, env is slot **8**, and 4–7 are unused | C | Numeric guessing fails | Name-based slots (3.2): `geo render.env hdri`. |
+| D6 | Geometry fan-out (one Cube into Render 3D and into a Transform) | C (correct) | The original is not changed | Keep. Add a golden. |
+| D7 | Simulations (Particle System, Cloth, Ocean) run on Transport beats with a 0.25 s catch-up cap and reset on rewind | C | `--frame` steps every frame from 0 (`main.cpp` ~66545), so frame 60 has its full history. It's deterministic (xorshift seeded from `seed`) | Keep. Document: `--frame 30` costs 30 steps. A tempo change in the patch changes the particle timing (dt is derived from beats and BPM). |
+| D8 | **Audio Displacement uses the wall clock** for its attack/decay (`AudioDisplacementNode.cpp:182`, `steady_clock`) | C | Offline `--frame` cooks many frames in one tick, so dt clamps to 1 ms and the displacement barely reacts. It's non-deterministic across machines | Same fix as the gesture clock (7.3): dt from `Transport::Seconds()`. Also audit `WaveTerrainNode.cpp:746` (a wall-clock rebuild throttle can leave stale meshes offline). Add both to 7.3's param-trace test. |
+| D9 | Model 3D / HDRI / Image textures load asynchronously | L | = E4 | Graph-ready barrier (E4) covers the geometry importers too. |
+| D10 | Heavy 3D (maxParticles, subdivide levels, Array count × Instance on Points) explodes the vertex count | L | An AI can write `levels 6` on a 100k-vert mesh | `--explain` prints the vert/point count per node. The validator warns above a budget (e.g. 5 M verts); `--timeout` is the hard stop. |
+| D11 | Units: rotations in degrees, sizes relative to the unit primitive, camera in orbit terms (`camDistance`, `camAzimuth`, `camElevation`) | C | Easy to mix up | `--describe` carries a `unit` per param (deg, px, ms, Hz, world). The generated skill (block 6) prints it. |
+
+Tests for G1–G15 and D1–D11 go in `tests/headless/topology/` as one `.inf` per case plus the expected
+validator codes. They are cheap (under 200 ms each) and run with the step 2 gate.
+
 ## Order and commits
 
 | Step | Delivers | Gate before moving on |
 |---|---|---|
-| 1 | Block 1 (`--render`, `--frame`, status, exit codes) macOS | `--render` of `assets/examples/patch_1.inf` produces a playable file with audio; `--frame` PNG matches what the Output shows |
-| 2 | Block 3.1 + 3.3 (`--describe`, validator) | every registered type spawns headless without crash; a typo'd param yields `W_UNKNOWN_PARAM` with a suggestion |
+| 1 | Block 1 (`--render`, `--frame`, status, exit codes) macOS + E1, E4, E8, E9, E10 | the LFO-only patch renders moving frames; `--render` of `assets/examples/patch_1.inf` produces a playable file with audio; `--frame` PNG matches what the Output shows |
+| 2 | Block 3.1 + 3.3 + 3.3b (`--describe`, strict validator, `--explain`) | every registered type spawns headless without crash; a typo'd param refuses under strict with the nearest key; `--explain` of `assets/examples/patch_1.inf` lists every cable and binding the UI shows; A1–A3, A6–A8 pass on a CRLF + BOM + relative-media copy; G1–G3, G6, G9, G11 give their codes |
+| 2b | Block 8 census (script + baseline) + E14 | full census runs; E14 fixed and the census shows no `render-ok-but-file-unreadable` |
 | 3 | Block 2 | sine test passes; black patch reports 100 % black |
-| 4 | Block 3.2 + 3.4 | an authored patch using names loads identically to its canonicalized numeric form (compare `PatchJson::ToJson`) |
-| 5 | Block 1.6 Linux/Windows + Block 5 | Linux CI renders goldens; Windows builds |
+| 4 | Block 3.1b (controls joined, dropdown names, actions) + 3.2 + 3.4 | an authored patch using names loads identically to its canonicalized numeric form (compare `PatchJson::ToJson`) |
+| 5 | Block 1.6 Linux/Windows + Block 5 + P1–P5 | Linux CI renders goldens; Windows builds |
 | 6 | Block 6 skill + exit-criterion run | the 60 s run, timed, written into the commit message |
 | 7 | Block 7.3 gesture-clock fix (own commit, can land any time after step 1) | the 30/30/60 fps param-trace test passes |
 | 8 | Block 7.1 + 7.2 (`--node`, alpha PNG sequence) | a 50%-alpha red shape reads (255,0,0,128); a tapped node renders without an Output in the patch |
