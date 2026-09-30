@@ -45972,17 +45972,46 @@ namespace
    std::deque<UndoEntry> gRedoStack;
    const size_t kMaxUndoDepth = 200;
 
-   // The clock GestureRecorder timestamps its samples with, read safely.
+   // The clock gesture playback reads, read safely. Live, that is
+   // GestureRecorder::ClockNow(): the clock samples were timestamped with,
+   // which only advances while Transport plays (see AdvanceClock). During an
+   // offline render (Render Now, headless --render/--frame, arrange WAV) it is
+   // Transport's offline video seconds instead: AdvanceClock runs once per UI
+   // frame on wall-clock DeltaTime, while the offline pump renders many video
+   // frames per UI frame, so the live clock would stair-step and differ run to
+   // run. Offline, every loop starts at 0 (GestureSyncClockAxis), so a loop's
+   // phase is (T * speed) mod duration and --frame at T matches --render at T.
+   //
    // Undo/Redo are reachable before ImGui::CreateContext() - the headless
    // self-tests that exercise the undo stack (PERFMATRIXTEST) run from main()
-   // well before the context exists. GestureRecorder::ClockNow() is just a
-   // stored double (see AdvanceClock) rather than ImGui::GetTime(), so it's
-   // safe to read with no context - it simply reads 0.0, and no context also
-   // means nothing can have recorded a gesture, so that value is never
-   // actually read.
+   // well before the context exists. Both clocks are plain stored values
+   // rather than ImGui::GetTime(), so this is safe to read with no context.
+   double GesturePlaybackClock()
+   {
+      Transport& transport = Transport::Instance();
+      return transport.IsOfflineMode() ? transport.Seconds() : GestureRecorder::Instance().ClockNow();
+   }
+
    double GestureClockNow()
    {
-      return GestureRecorder::Instance().ClockNow();
+      return GesturePlaybackClock();
+   }
+
+   // Re-bases every loop's startTime when playback switches clocks, so the
+   // startTime and the clock GetPlaybackValue reads are on the same axis.
+   // One edge detector here instead of a call at every SetOfflineMode site:
+   // Render Now, --frame, arrange WAV and the self-test fixtures all toggle
+   // offline mode, and a missed site would leave loops on the wrong axis.
+   // Called once per ApplyModulationAndPalette, before playback is read.
+   void GestureSyncClockAxis()
+   {
+      static bool sWasOffline = false;
+      const bool offline = Transport::Instance().IsOfflineMode();
+      if (offline == sWasOffline)
+         return;
+      sWasOffline = offline;
+      GestureRecorder& recorder = GestureRecorder::Instance();
+      recorder.RestartLoops(offline ? 0.0 : recorder.ClockNow());
    }
 
    // Rewrites a snapshot's gesture keys from the indices that were live when
@@ -67307,6 +67336,8 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false)
    // once their session ends - same precedence as above: a wired modulator
    // or a typed expression already owns the field, so a recording only
    // plays back once neither is in the way.
+   GestureSyncClockAxis();
+   const double gestureNow = GesturePlaybackClock();
    for (const ParamRef& ref : modulation.FrameParams())
    {
       if (ref.value == nullptr)
@@ -67315,13 +67346,13 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false)
           modulation.HasExpression(ref.nodeIndex, ref.paramIndex))
          continue;
       float playbackValue = 0.0f;
-      // GestureRecorder's own clock, not `t` above (Transport's own clock) -
-      // samples were timestamped with GestureRecorder::ClockNow() when
-      // recorded (see ModSlider/ModKnob/VFaderFloat/BipolarKnobFloat), so
-      // playback has to read the same clock back. That clock only advances
-      // while Transport is playing (see AdvanceClock), so pausing freezes a
-      // looping recording in place instead of continuing to animate it.
-      if (GestureRecorder::Instance().GetPlaybackValue(ref.nodeIndex, ref.paramIndex, GestureRecorder::Instance().ClockNow(), playbackValue))
+      // Live: GestureRecorder's own clock, not `t` above - samples were
+      // timestamped with GestureRecorder::ClockNow() when recorded (see
+      // ModSlider/ModKnob/VFaderFloat/BipolarKnobFloat), and that clock only
+      // advances while Transport plays, so pausing freezes a looping
+      // recording in place. Offline: Transport's video seconds, one step per
+      // rendered frame - see GesturePlaybackClock.
+      if (GestureRecorder::Instance().GetPlaybackValue(ref.nodeIndex, ref.paramIndex, gestureNow, playbackValue))
       {
          *ref.value = ShapeToParam(ref, playbackValue);
          MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex, MovementLog::Source::Gesture);
@@ -74270,7 +74301,7 @@ int main(int argc, char** argv)
       // pausing (spacebar) freezes a looping recording in place instead of
       // letting it keep animating on wall-clock time - see AdvanceClock.
       GestureRecorder::Instance().AdvanceClock(ImGui::GetIO().DeltaTime, Transport::Instance().IsPlaying());
-      GestureRecorder::Instance().BeginFrame(ImGui::GetIO().KeyShift, GestureRecorder::Instance().ClockNow());
+      GestureRecorder::Instance().BeginFrame(ImGui::GetIO().KeyShift, GesturePlaybackClock());
       gGlobalScaleTooltipHovered = false;
 
       if (!gPendingSelect.empty())

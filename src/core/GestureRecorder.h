@@ -198,6 +198,12 @@ public:
    // underneath it has just been rebuilt.
    void Restore(PlaybackMap playbacks, double nowSec);
 
+   // Restarts every loop from `nowSec` and keeps everything else: samples,
+   // speed, range, curve, and any in-progress session. Used when playback
+   // switches clocks (live ClockNow() <-> offline Transport seconds), so each
+   // loop's startTime sits on the axis it is about to be read against.
+   void RestartLoops(double nowSec);
+
    // Installs one recording, leaving every other param's alone. Used when a
    // node is duplicated or pasted: the copy inherits the original's loop,
    // speed and range override included, and starts in phase with it rather

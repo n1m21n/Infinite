@@ -267,6 +267,12 @@ void GestureRecorder::Restore(PlaybackMap playbacks, double nowSec)
    mArmedParams.clear();
 }
 
+void GestureRecorder::RestartLoops(double nowSec)
+{
+   for (auto& entry : mPlayback)
+      entry.second.startTime = nowSec;
+}
+
 void GestureRecorder::SetPlayback(int nodeIndex, int paramIndex, Playback playback)
 {
    if (playback.samples.size() < 2)
