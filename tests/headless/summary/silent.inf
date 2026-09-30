@@ -1,0 +1,10 @@
+infinite-patch 1
+# An oscillator turned all the way down: --audio-summary must warn W_SILENT.
+node 1 Synths Oscillator
+  id osc
+  f volume 0
+end
+node 2 AudioUtility Audio Out
+  id speakers
+end
+aud speakers 0 osc

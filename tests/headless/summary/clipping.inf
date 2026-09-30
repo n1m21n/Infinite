@@ -1,0 +1,18 @@
+infinite-patch 1
+# The same sine pushed 12 dB past full scale: --audio-summary must warn W_CLIPPING.
+node 1 Synths Oscillator
+  id osc
+  f frequency 1000
+  i waveform Sine
+  f volume 1
+end
+node 2 AudioEffects Audio Filter
+  id boost
+  f freq 18000
+  f outputGainDb 12
+end
+node 3 AudioUtility Audio Out
+  id speakers
+end
+aud boost 0 osc
+aud speakers 0 boost

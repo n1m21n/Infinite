@@ -1,0 +1,11 @@
+infinite-patch 1
+# A picture that is black on purpose: --frame must report 100 % black.
+node 1 Source Formula
+  id black
+  s formula return vec4(0.0, 0.0, 0.0, 1.0);
+  b animate 0
+end
+node 2 Utility Output
+  id out
+end
+cable out 0 black
