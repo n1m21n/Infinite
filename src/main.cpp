@@ -1194,6 +1194,12 @@ namespace
    // Highest `mod`/`expr` parameter index per node type, read off drawn nodes
    // (-1 = registers none). Absent = not measured, so E_BAD_PARAM stays quiet.
    std::map<std::string, int> gModulatableMax;
+   // While a --validate / --describe probe is waiting for spawned nodes to
+   // register their parameters, the off-screen cull is switched off and every
+   // node that gets past it is noted here, so the probe waits for "each probed
+   // node has been drawn" rather than a fixed number of ticks.
+   bool gHeadlessProbeAll = false;
+   std::set<int> gHeadlessDrawn;
 
    bool HeadlessJobActive()
    {
@@ -68304,6 +68310,21 @@ static void HeadlessFinish(GLFWwindow* window, Headless::Status& st, double star
    glfwSetWindowShouldClose(window, GLFW_TRUE);
 }
 
+// A probe (validate / describe) is done once every spawned node has been drawn
+// with its parameters open, and at least 3 ticks have passed so the first
+// frame's layout has settled. Replaces a fixed 8-tick wait that a slow start
+// or the off-screen cull could cut short (false "has no modulatable parameters").
+static const int kHeadlessProbeCapTicks = 120;
+static bool HeadlessProbeDone(const std::vector<std::pair<std::string, int>>& probed, int ticks)
+{
+   if (ticks < 3)
+      return false;
+   for (const auto& pr : probed)
+      if (!gHeadlessDrawn.count(pr.second))
+         return false;
+   return true;
+}
+
 static void HeadlessTick(int& frameId, GLFWwindow* window)
 {
    enum class Phase { Warm, Running, Frames, Done };
@@ -68383,10 +68404,20 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
             i++;
          }
          if (!sProbed.empty())
+         {
+            gHeadlessProbeAll = true;
+            gHeadlessDrawn.clear();
             return;
+         }
       }
-      else if (t < 8 && !sProbed.empty())
+      else if (!sProbed.empty() && !HeadlessProbeDone(sProbed, t))
+      {
+         if (t >= kHeadlessProbeCapTicks)
+            return fail("E_PROBE_TIMEOUT", "a node the patch drives never drew its parameters within " +
+                                              std::to_string(kHeadlessProbeCapTicks) + " frames, so mod/expr lines cannot be checked");
          return;
+      }
+      gHeadlessProbeAll = false;
 
       for (const auto& pr : sProbed)
       {
@@ -68448,10 +68479,23 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
             sSpawned.push_back({ n, gn->index });
             i++;
          }
+         gHeadlessProbeAll = true;
+         gHeadlessDrawn.clear();
          return;
       }
-      if (t < 8)
+      if (!HeadlessProbeDone(sSpawned, t) && t < kHeadlessProbeCapTicks)
          return;
+      gHeadlessProbeAll = false;
+      // A node that never draws (a Group, a Comment) registers nothing: it is
+      // described from its schema alone and listed so that is visible.
+      {
+         std::string undrawn;
+         for (const auto& pr : sSpawned)
+            if (!gHeadlessDrawn.count(pr.second))
+               undrawn += (undrawn.empty() ? "\"" : ",\"") + Headless::JsonEscape(pr.first) + "\"";
+         if (!undrawn.empty())
+            fprintf(stderr, "describe: never drawn: %s\n", undrawn.c_str());
+      }
 
       std::map<std::string, int> indexOf(sSpawned.begin(), sSpawned.end());
       std::string typesJson = "\"types\":[";
@@ -68479,8 +68523,40 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
 
    if (sPhase == Phase::Warm)
    {
+      if (sTicks == 0)
+      {
+         gHeadlessProbeAll = true;
+         gHeadlessDrawn.clear();
+      }
       if (++sTicks < 3)
          return;
+      // The parameter-index check below needs every node a mod/expr line
+      // drives to have drawn (it registers its parameters by drawing). They
+      // are param-driven, so the cull never skips them; this only guards a
+      // slow first frame. Past the cap the check runs on what registered.
+      if (sTicks < kHeadlessProbeCapTicks)
+      {
+         std::map<int, std::string> typeOfFileIndex;
+         for (const Patch::NodeRecord& n : gHeadlessPatch.nodes)
+            typeOfFileIndex[n.index] = n.typeName;
+         std::set<std::string> drivenTypes;
+         for (const Patch::ModRecord& m : gHeadlessPatch.modulation)
+            if (typeOfFileIndex.count(m.dstIndex))
+               drivenTypes.insert(typeOfFileIndex[m.dstIndex]);
+         for (const Patch::ExprRecord& e : gHeadlessPatch.expressions)
+            if (typeOfFileIndex.count(e.dstIndex))
+               drivenTypes.insert(typeOfFileIndex[e.dstIndex]);
+         for (const std::string& type : drivenTypes)
+         {
+            bool drew = false;
+            for (GraphNode& g : gNodes)
+               if (g.typeName == type && gHeadlessDrawn.count(g.index))
+                  drew = true;
+            if (!drew)
+               return;
+         }
+      }
+      gHeadlessProbeAll = false;
 
       // E_BAD_PARAM needs drawn nodes, so it is checked here on the loaded
       // graph rather than in the strict pass before load.
@@ -92177,7 +92253,7 @@ int main(int argc, char** argv)
          {
             constexpr int kCullRefresh = 30;
             constexpr float kCullMargin = 64.0f;
-            const bool mustDraw = gn.IsParamDriven() ||
+            const bool mustDraw = gn.IsParamDriven() || gHeadlessProbeAll ||
                                   ImGui::GetCurrentContext()->OpenPopupStack.Size > 0 ||
                                   ((frameId + gn.index) % kCullRefresh) == 0;
             if (!mustDraw && ed::KeepOffscreenNodeAlive(gn.NodeId(), kCullMargin))
@@ -92190,6 +92266,8 @@ int main(int argc, char** argv)
                }
                continue;
             }
+            if (gHeadlessProbeAll)
+               gHeadlessDrawn.insert(gn.index);
          }
 
          // Category tint: same idea as DrawGroupNode's stored colour, but from

@@ -74,5 +74,14 @@ for f in "$ROOT"/tests/headless/topology/*.inf; do
   [ "$got" = "$want" ]; check "topology $name ($want)" $?
 done
 
+# C0: the probe waits for every node to draw, not a fixed 8 ticks. patch_1 has a
+# Wavetable that used to give a false E_BAD_PARAM; run it several times.
+ok=0
+for i in 1 2 3 4 5 6; do
+  r=$("$BIN" --validate "$ROOT/assets/examples/patch_1.inf" 2>/dev/null); [ "$(echo "$r" | json "d['ok']")" = "True" ] && ok=$((ok+1))
+done
+[ "$ok" = 6 ]; check "patch_1 validates 6/6 (probe barrier)" $?
+r=$("$BIN" --describe 2>/dev/null); [ "$(echo "$r" | json "sum(len(t['modulatable']) for t in d['types']) > 1500")" = "True" ]; check "describe registers off-screen nodes too" $?
+
 rm -rf "$OUT"
 exit $fail

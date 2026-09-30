@@ -291,7 +291,7 @@ namespace Headless
          return 3;
       if (c == "E_HARDWARE_SOURCE")
          return 4;
-      if (c == "E_TIMEOUT")
+      if (c == "E_TIMEOUT" || c == "E_PROBE_TIMEOUT")
          return 6;
       return 5;
    }
