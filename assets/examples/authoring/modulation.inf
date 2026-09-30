@@ -1,0 +1,14 @@
+infinite-patch 1
+# An LFO drives a Shape's sizeX (by key); an expression drives its rotation.
+node 1 Source Shape
+  id shape
+end
+node 2 Modulators LFO
+  id lfo
+end
+node 3 Utility Output
+  id out
+end
+cable out 0 shape
+mod shape sizeX lfo 0 0 1 0.5
+expr shape rotation sin(t) * 90

@@ -192,6 +192,19 @@ for f in image audio modulation; do
   "$BIN" --validate "$F/$f.inf" >/dev/null 2>&1; check "format: $f.inf validates strictly" $?
 done
 
+# --- R41: the authoring skill's example patches, and the skill itself ---
+E="$ROOT/assets/examples/authoring"
+for f in image audio modulation; do
+  "$BIN" --validate "$E/$f.inf" >/dev/null 2>&1; check "authoring example: $f.inf validates strictly" $?
+done
+"$BIN" --frame "$E/image.inf" 0 "$OUT/ex_image.png" >/dev/null 2>&1; [ -s "$OUT/ex_image.png" ]; check "authoring example: image.inf renders a frame" $?
+"$BIN" --frame "$E/modulation.inf" 0.5 "$OUT/ex_mod.png" >/dev/null 2>&1; [ -s "$OUT/ex_mod.png" ]; check "authoring example: modulation.inf renders a frame" $?
+"$BIN" --audio-summary "$E/audio.inf" "$OUT/ex_audio.json" --duration 2 >/dev/null 2>&1; [ -s "$OUT/ex_audio.json" ]; check "authoring example: audio.inf measures" $?
+# macOS only: the committed skill is generated from the macOS node list (Linux/Windows lack some nodes)
+if [ "$(uname)" = Darwin ]; then
+  python3 "$ROOT/tools/gen-patch-skill.py" --check --bin "$BIN" >/dev/null 2>&1; check "authoring skill is not stale (tools/gen-patch-skill.py --check)" $?
+fi
+
 # --- explain (3.3b): the live graph read back after the load ---
 rel() { sed -n '/^Relations/,/^Unconnected/p' | grep -c "^  $1 "; }
 P1="$ROOT/assets/examples/patch_1.inf"

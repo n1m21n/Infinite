@@ -46902,6 +46902,23 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                gShowUpdateCheckModal = true;
             }
 
+            ImGui::Spacing();
+            ImGui::SeparatorText("AI assistants");
+            static std::string sPatchSkillStatus;
+            if (ImGui::Button("Install AI Skill##patchAuthoring"))
+            {
+               const std::string folder = Platform::OpenFolderDialog("Choose folder for the patch authoring AI skill file");
+               if (!folder.empty())
+                  sPatchSkillStatus = SaveAISkillFile(folder, "infinite-patch-authoring.md", AISkillContent::kPatchAuthoringMarkdown);
+            }
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("Save a reference file you can hand to any AI assistant (or drop into ~/.claude/skills/)\nso it can write, check and render Infinite patches from the command line.");
+            if (!sPatchSkillStatus.empty())
+            {
+               ImGui::SameLine();
+               ImGui::TextDisabled("%s", sPatchSkillStatus.c_str());
+            }
+
             ImGui::EndTabItem();
          }
 

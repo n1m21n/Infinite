@@ -50,6 +50,7 @@ One owner per topic: if two files seem to disagree, the skill named in this tabl
 | `codebase-lenses` | Process | Split a request into seven concern lenses; decides which skills to load |
 | `codebase-navigation` | Process | How to search this codebase completely; living map of wiring hotspots |
 | `bug-blast-radius` | Process | The 9-question impact analysis before fixing any bug (sole owner of the 9 questions) |
+| `infinite-patch-authoring` | Process | Write, validate, explain and render `.inf` patches headless; node facts are generated (`tools/gen-patch-skill.py`) |
 | `write-fix-brief` | Process | Turn a bug report / findings / idea into a verified implementation prompt |
 | `invariant-interaction-audit` | Process | Before shipping any guarantee: can a sibling control or call site undo it |
 | `infinite-code-review` | Process | Review code against Infinite's four standards |
