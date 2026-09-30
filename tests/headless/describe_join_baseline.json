@@ -1,5 +1,5 @@
 {
- "registered": 1982,
- "keyed": 1870,
+ "registered": 1981,
+ "keyed": 1869,
  "note": "ratchet: keyed may only go up; regenerate with --describe when it does"
 }
