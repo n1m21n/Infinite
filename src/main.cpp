@@ -47762,6 +47762,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    // reload = the file watcher re-reading the open file (R39): same read and
    // resolve, but applied like an undo step - one checkpoint first, the stacks,
    // view and routing mode kept, no recents/autosave bookkeeping.
+   bool LoadPatchDataImpl(Patch::Data& data, const std::string& path, bool reload);
+
    bool LoadPatchFromImpl(const std::string& path, bool reload)
    {
       Patch::Data data;
@@ -47771,6 +47773,14 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          gPatchStatus = "Open failed: " + error;
          return false;
       }
+      return LoadPatchDataImpl(data, path, reload);
+   }
+
+   // path is empty for patch source that never was a file (the live RPC's
+   // load_patch_text): applied like a reload, and the open file's path and
+   // watch stamp stay as they were.
+   bool LoadPatchDataImpl(Patch::Data& data, const std::string& path, bool reload)
+   {
       if (data.hasNamedRefs)
       {
          // A hand-written file that names nodes/slots: turn the words into indices first.
@@ -47815,8 +47825,16 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       if (reload)
       {
          PushUndoCheckpoint(); // Cmd+Z returns to the graph as it was before the reload
+         const std::string keptPath = gPatchPath;
          ApplyPatchData(data);
          gArrangePatchGeneration++;
+         if (path.empty())
+         {
+            gPatchPath = keptPath; // NewPatch cleared it; the text is an edit of that file
+            gPatchDirty = true;
+            gPatchStatus = openNote.empty() ? "Patch replaced over RPC" : openNote;
+            return true;
+         }
          gPatchPath = path;
          gPatchDirty = false;
          gPatchStatus = openNote.empty() ? "Reloaded (file changed on disk)" : openNote;
@@ -48967,6 +48985,138 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          for (const auto& kv : feederIndexByType)
             feederIndices.push_back(kv.second);
          outResult = { {"wiredSlots", wired}, {"feederIndices", feederIndices} };
+         return true;
+      }
+      else if (method == "load_patch_text")
+      {
+         // Patch source in the request, no temp file. Applied as one undo step.
+         Patch::Data data;
+         std::string readError;
+         if (!Patch::ReadText(params.value("text", std::string()), data, readError))
+         {
+            outError = readError;
+            return false;
+         }
+         if (!LoadPatchDataImpl(data, std::string(), true))
+         {
+            outError = gPatchStatus;
+            return false;
+         }
+         outResult = { {"nodes", (int)gNodes.size()}, {"status", gPatchStatus} };
+         return true;
+      }
+      else if (method == "validate_patch_text")
+      {
+         // The strict check the CLI runs before a load, against patch source
+         // held in the request. Nothing on the canvas changes.
+         Patch::Data data;
+         std::string readError;
+         std::vector<Headless::Issue> errors, warnings;
+         if (!Patch::ReadText(params.value("text", std::string()), data, readError))
+            errors.push_back({ "E_LOAD", readError, 0, -1 });
+         else
+         {
+            const PatchSchema::Env env = MakeSchemaEnv(false);
+            PatchSchema::Resolve(data, env, errors);
+            if (errors.empty())
+               PatchSchema::ResolveKeys(data, env, errors);
+            if (errors.empty())
+               PatchSchema::Validate(data, env, errors, warnings);
+            if (params.value("strict", true))
+               Headless::PromoteWarnings(warnings, errors);
+         }
+         auto issuesJson = [](const std::vector<Headless::Issue>& v)
+         {
+            json a = json::array();
+            for (const Headless::Issue& is : v)
+               a.push_back({ {"code", is.code}, {"message", is.message}, {"line", is.line}, {"node", is.node}, {"hint", is.hint} });
+            return a;
+         };
+         outResult = { {"ok", errors.empty()}, {"errors", issuesJson(errors)}, {"warnings", issuesJson(warnings)},
+                       {"nodes", (int)data.nodes.size()} };
+         return true;
+      }
+      else if (method == "describe")
+      {
+         // The static schema of one node type (or the list of types when none is
+         // given). Control ranges need a drawn node, so they are the CLI's job:
+         // `Infinite --describe <type> --json`.
+         const std::string type = params.value("type", std::string());
+         if (type.empty())
+         {
+            json cats = json::object();
+            for (const std::string& cat : NodeFactory::Instance().GetCategories())
+               cats[cat] = NodeFactory::Instance().GetNodesInCategory(cat);
+            outResult = { {"types", cats} };
+            return true;
+         }
+         const PatchSchema::TypeSchema* ts = SchemaFor(type);
+         if (ts == nullptr)
+         {
+            outError = "unknown node type '" + type + "'";
+            return false;
+         }
+         json pj = json::array(), in = json::array(), out = json::array();
+         for (const auto& pi : ts->params)
+            pj.push_back({ {"key", pi.key}, {"kind", std::string(1, pi.kind)}, {"default", pi.def} });
+         for (const auto& si : ts->inputs)
+            in.push_back({ {"slot", si.slot}, {"kind", si.kind}, {"label", si.label} });
+         for (const auto& oi : ts->outputs)
+            out.push_back({ {"label", oi.label}, {"kind", oi.kind}, {"modulator", oi.modulator} });
+         outResult = { {"type", ts->name}, {"category", ts->category}, {"params", pj}, {"inputs", in}, {"outputs", out},
+                       {"canBypass", ts->canBypass}, {"hardwareDriven", ts->hardwareDriven} };
+         return true;
+      }
+      else if (method == "batch")
+      {
+         // Array of {method, params} run in one frame, all or nothing, as ONE
+         // undo step. On the first failure everything already done is undone.
+         // Node indices are renumbered by that undo (ApplyPatchData remaps), so
+         // a caller that rolled back should re-read get_graph.
+         if (!params.contains("calls") || !params["calls"].is_array())
+         {
+            outError = "batch needs a 'calls' array of {method, params}";
+            return false;
+         }
+         PushUndoCheckpoint(); // the single checkpoint for the whole batch
+         const size_t undoDepth = gUndoStack.size();
+         const bool wasSuppressed = gSuppressUndoCheckpoints;
+         gSuppressUndoCheckpoints = true; // calls inside must not add their own
+         json results = json::array();
+         std::string failMsg;
+         int failAt = -1;
+         for (size_t i = 0; i < params["calls"].size() && failAt < 0; i++)
+         {
+            const json& call = params["calls"][i];
+            const std::string m = call.value("method", std::string());
+            if (m.empty() || m == "batch" || m == "undo" || m == "redo" || m == "new_patch" || m == "load_patch")
+            {
+               failMsg = "method '" + m + "' is not allowed inside a batch";
+               failAt = (int)i;
+               break;
+            }
+            json r;
+            std::string e;
+            if (!HandleRpcCommand(m, call.contains("params") ? call["params"] : json::object(), r, e))
+            {
+               failMsg = m + ": " + e;
+               failAt = (int)i;
+               break;
+            }
+            results.push_back(r);
+         }
+         gSuppressUndoCheckpoints = wasSuppressed;
+         if (failAt >= 0)
+         {
+            if (gUndoStack.size() == undoDepth)
+            {
+               Undo();
+               gRedoStack.clear(); // the rolled-back attempt is not something to redo
+            }
+            outError = "batch call " + std::to_string(failAt) + " failed, nothing applied - " + failMsg;
+            return false;
+         }
+         outResult = { {"results", results} };
          return true;
       }
       else if (method == "save_patch")
@@ -66755,6 +66905,67 @@ int RunVST3BlocklistTest()
 // is one of the two that triggers the redirect) rather than reimplementing
 // the check, so a regression in the real function is what this catches.
 // Headless like PLUGINSCANTEST above - no GL/ImGui needed.
+// ====================================================== INFINITE_RPCBATCHTEST
+//
+// R495: the live RPC methods, driven through the real HandleRpcCommand.
+void RunRpcBatchTest()
+{
+   using json = nlohmann::json;
+   bool ok = true;
+   auto Check = [&](const char* label, bool pass)
+   {
+      printf("  [%s] %s\n", pass ? "pass" : "FAIL", label);
+      if (!pass)
+         ok = false;
+   };
+   auto Call = [&](const char* m, const json& p, json& r, std::string& e) { return HandleRpcCommand(m, p, r, e); };
+   json r;
+   std::string e;
+
+   NewPatch();
+   PushUndoCheckpoint();
+   const size_t undo0 = gUndoStack.size();
+   json good = { {"calls", json::array({ { {"method", "create_node"}, {"params", { {"typeName", "Shape"}, {"category", "Source"} }} },
+                                          { {"method", "create_node"}, {"params", { {"typeName", "Output"}, {"category", "Utility"} }} } })} };
+   Check("batch of two creates succeeds", Call("batch", good, r, e) && gNodes.size() == 2 && r["results"].size() == 2);
+   Check("batch is one undo checkpoint", gUndoStack.size() == undo0 + 1);
+   Undo();
+   Check("one undo removes the whole batch", gNodes.empty());
+   Redo();
+   Check("redo brings it back", gNodes.size() == 2);
+
+   const size_t undoBefore = gUndoStack.size();
+   json bad = { {"calls", json::array({ { {"method", "create_node"}, {"params", { {"typeName", "Shape"}, {"category", "Source"} }} },
+                                         { {"method", "delete_node"}, {"params", { {"index", 99999} }} } })} };
+   Check("failing batch reports failure", !Call("batch", bad, r, e) && e.find("batch call 1 failed") != std::string::npos);
+   Check("failing batch rolls everything back", gNodes.size() == 2);
+   Check("failing batch leaves no extra undo or redo entry", gUndoStack.size() == undoBefore && gRedoStack.empty());
+   json banned = { {"calls", json::array({ { {"method", "new_patch"} } })} };
+   Check("new_patch is refused inside a batch", !Call("batch", banned, r, e) && gNodes.size() == 2);
+
+   const std::string text =
+      "infinite-patch 1\nnode 1 Source Shape\n  id picture\nend\nnode 2 Utility Output\n  id out\nend\nnode 3 Source Shape\n  id extra\nend\ncable out 0 picture\n";
+   json vp = { {"text", text} };
+   Check("validate_patch_text accepts a good patch", Call("validate_patch_text", vp, r, e) && r["ok"] == true && r["nodes"] == 3);
+   json vbad = { {"text", "infinite-patch 1\nnode 1 Source Shape\nend\ncable 1 0 7\n"} };
+   Check("validate_patch_text reports a bad cable", Call("validate_patch_text", vbad, r, e) && r["ok"] == false && !r["errors"].empty());
+   json vnone = { {"text", "not a patch"} };
+   Check("validate_patch_text reports E_LOAD", Call("validate_patch_text", vnone, r, e) && r["errors"][0]["code"] == "E_LOAD");
+   Check("validation did not touch the canvas", gNodes.size() == 2);
+
+   Check("load_patch_text replaces the graph", Call("load_patch_text", vp, r, e) && gNodes.size() == 3);
+   Undo();
+   Check("load_patch_text is one undo step", gNodes.size() == 2);
+   json lbad = { {"text", "not a patch"} };
+   Check("load_patch_text refuses garbage, canvas kept", !Call("load_patch_text", lbad, r, e) && gNodes.size() == 2);
+
+   Check("describe with a type", Call("describe", { {"type", "Shape"} }, r, e) && r["type"] == "Shape" && r["params"].is_array());
+   Check("describe without a type lists them", Call("describe", json::object(), r, e) && r["types"].is_object());
+   Check("describe unknown type errors", !Call("describe", { {"type", "Nope"} }, r, e));
+
+   printf("RPCBATCHTEST %s\n", ok ? "OK" : "FAIL");
+}
+
 // ====================================================== INFINITE_PATCHWATCHTEST
 //
 // R39: the open file changing on disk. Drives the real LoadPatchFromImpl /
@@ -83172,6 +83383,9 @@ int main(int argc, char** argv)
 
          printf("%s\n", allOk ? "FIELDGRAPHRATE OK" : "SUSPECT");
       }
+
+      if (getenv("INFINITE_RPCBATCHTEST") != nullptr && frameId == 4)
+         RunRpcBatchTest();
 
       if (getenv("INFINITE_PATCHWATCHTEST") != nullptr && frameId == 4) // needs the ImGui context, so in-loop
          RunPatchWatchTest();

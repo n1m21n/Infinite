@@ -23,7 +23,20 @@ import sys
 import time
 
 DEFAULT_PORT = 7777
-TOKEN_PATH = os.path.expanduser("~/Library/Application Support/Infinite/control_token")
+
+
+def app_support_dir():
+    """The directory AppPaths::AppSupportDir() returns (src/platform/AppPaths.h)."""
+    if sys.platform == "win32":
+        base = os.environ.get("APPDATA") or os.path.join(os.path.expanduser("~"), "AppData", "Roaming")
+    elif sys.platform == "darwin":
+        base = os.path.expanduser("~/Library/Application Support")
+    else:
+        base = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    return os.path.join(base, "Infinite")
+
+
+TOKEN_PATH = os.path.join(app_support_dir(), "control_token")
 
 
 class RpcClient:

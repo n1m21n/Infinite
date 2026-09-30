@@ -491,7 +491,17 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       outError = "could not open " + path;
       return false;
    }
+   return ReadStream(file, outData, outError);
+}
 
+bool ReadText(const std::string& text, Data& outData, std::string& outError)
+{
+   std::istringstream stream(text);
+   return ReadStream(stream, outData, outError);
+}
+
+bool ReadStream(std::istream& file, Data& outData, std::string& outError)
+{
    std::string line;
    if (!std::getline(file, line))
    {
