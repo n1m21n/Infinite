@@ -230,8 +230,6 @@ void JoinGeometryNode::RebuildIfNeeded()
    }
    if (mBuiltMode != mode)
       dirty = true;
-   if (mBuiltKeepInputColours != keepInputColours)
-      dirty = true;
    if (!dirty)
       return;
 
@@ -269,11 +267,21 @@ void JoinGeometryNode::RebuildIfNeeded()
       if (probe.HasVertexColor())
          anyAuthoredColour = true;
       // RealizeInstances paints per-instance colour onto a colourless stamp,
-      // so an instanced input contributes authored colour even when its own
-      // mesh carries none (Mesh.cpp, the instanceColors branch).
+      // so an instanced input contributes authored colour when its instance
+      // colours say something - but InstanceOnPoints fills one triple per
+      // instance even when nothing upstream had colour (white 1,1,1), so
+      // "has a colour array" is not "was authored". Only a non-white triple
+      // counts, or every instanced input would bake manufactured white.
       if (InstanceOnPointsNode* inst = FindInstancer(inputs[i]))
-         if (inst->InstanceColors().size() >= 3)
-            anyAuthoredColour = true;
+      {
+         const std::vector<float>& ic = inst->InstanceColors();
+         for (size_t k = 0; k + 2 < ic.size(); k += 3)
+            if (ic[k] != 1.0f || ic[k + 1] != 1.0f || ic[k + 2] != 1.0f)
+            {
+               anyAuthoredColour = true;
+               break;
+            }
+      }
 
       const Material& mat = inputMaterials[i];
       if (!haveFirstAlbedo)
@@ -290,7 +298,7 @@ void JoinGeometryNode::RebuildIfNeeded()
       }
    }
    const bool bakePerInputColour =
-      (mode == kMerge) && keepInputColours && (anyAuthoredColour || albedosDiffer);
+      (mode == kMerge) && (anyAuthoredColour || albedosDiffer);
 
    bool haveFirst = false;
    for (int i = 0; i < kSlots; i++)
@@ -379,7 +387,6 @@ void JoinGeometryNode::RebuildIfNeeded()
       }
    }
    mBuiltMode = mode;
-   mBuiltKeepInputColours = keepInputColours;
    mBakedPerInputColour = bakePerInputColour;
    mMeshRevision = NextMeshRevision();
 }
