@@ -49231,6 +49231,67 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          return true;
       }
 
+      else if (method == "render_frame")
+      {
+         // The live counterpart of `--frame`: writes the Output's current image (what the last
+         // cooked frame produced, at the Output's own size) through the same ExportImage and
+         // reports the same per-frame numbers. It does not seek the transport or step time, so
+         // a running patch is left exactly as it was; use --frame for a frame at a given time.
+         const std::string path = params.value("path", std::string());
+         if (path.empty())
+         {
+            outError = "missing path";
+            return false;
+         }
+         std::vector<int> outs;
+         for (GraphNode& gn : gNodes)
+            if (gn.typeName == "Output")
+               outs.push_back(gn.index);
+         if (outs.empty())
+         {
+            outError = "the patch has no Output node";
+            return false;
+         }
+         int outIndex = params.value("output", -1);
+         if (outIndex < 0 && outs.size() > 1)
+         {
+            outError = "the patch has " + std::to_string(outs.size()) + " Output nodes; pass output = node index";
+            return false;
+         }
+         if (outIndex < 0)
+            outIndex = outs.front();
+         GraphNode* og = FindNodeByIndex(outIndex);
+         if (og == nullptr || og->typeName != "Output")
+         {
+            outError = "output is not an Output node index";
+            return false;
+         }
+         OutputNode* out = static_cast<OutputNode*>(og->node.get());
+         const int w = out->GetOutputWidth(), h = out->GetOutputHeight();
+         if (w <= 0 || h <= 0)
+         {
+            outError = "the Output produced no image (is its input connected?)";
+            return false;
+         }
+         std::error_code ec;
+         const std::filesystem::path parent = std::filesystem::path(path).parent_path();
+         if (!parent.empty())
+            std::filesystem::create_directories(parent, ec);
+         std::vector<unsigned char> pixels;
+         ExportImage(out, path, 90, &pixels);
+         if (!std::filesystem::exists(path, ec))
+         {
+            outError = "could not write " + path;
+            return false;
+         }
+         const ColorStats::FrameSummary fs = ColorStats::SummarizeRgba8(pixels.data(), w, h);
+         outResult = { { "file", path }, { "width", w }, { "height", h }, { "output", outIndex },
+                       { "frame_stats", json::parse("{" + ColorStats::FrameSummaryJsonFields(fs) + "}") } };
+         if (fs.blackPercent >= 100.0)
+            outResult["warning"] = "W_BLACK_FRAME: the frame is entirely black";
+         return true;
+      }
+
       outError = "unknown method '" + method + "'";
       return false;
    }
@@ -66962,6 +67023,11 @@ void RunRpcBatchTest()
    Check("describe with a type", Call("describe", { {"type", "Shape"} }, r, e) && r["type"] == "Shape" && r["params"].is_array());
    Check("describe without a type lists them", Call("describe", json::object(), r, e) && r["types"].is_object());
    Check("describe unknown type errors", !Call("describe", { {"type", "Nope"} }, r, e));
+
+   Check("render_frame needs a path", !Call("render_frame", json::object(), r, e) && e == "missing path");
+   NewPatch();
+   Check("render_frame without an Output errors", !Call("render_frame", { {"path", "/tmp/infinite_rf.png"} }, r, e) &&
+                                                     e.find("no Output") != std::string::npos);
 
    printf("RPCBATCHTEST %s\n", ok ? "OK" : "FAIL");
 }

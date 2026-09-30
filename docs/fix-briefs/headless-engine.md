@@ -346,6 +346,7 @@ This is what makes "write a file, open it in Infinite" instant while the owner w
   Treat reload as one undo checkpoint so Cmd+Z returns to the previous graph.
 - **`infinite open <patch>` from a shell while the app runs** already goes through the OS open
   handler; confirm it reuses the running instance on all three platforms and note the result.
+  **Result (R497, 2026-09-30):** macOS reuses the running instance (LaunchServices open-file event -> `PollPendingOpenFile`). Windows and Linux do not: `PollPendingOpenFile` is a stub there, so a second process starts. Filed as its own quest.
 - **RPC:** add `batch` (array of `{method, params}` executed in one frame, all-or-nothing using
   one undo checkpoint), `load_patch_text` (patch source in the request, no temp file),
   `validate_patch_text`, `render_frame` (same code as `--frame`, against the live graph, into a
