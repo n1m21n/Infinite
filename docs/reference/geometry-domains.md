@@ -1,255 +1,230 @@
 # Geometry domains — the 3D node contract map
 
-Phase 1 deliverable of `docs/plans/geometry/domain-audit-prompt.md`. This is a
-reference document, not a design doc: it states what the code does today, per
-node, per mode, with file:line citations and an explicit verified/inferred
-mark on every row. Phase 2 builds the legality matrix on top of this. Phase 3
-audits names against this. No enforcement code exists yet.
+Phase 1 deliverable of `docs/plans/geometry/domain-audit-prompt.md`, **re-verified
+2026-09-30 against current source** (branch `feature/geometry-domain-map`, after
+the Phase 4/5 fixes landed). Every row below was checked by reading the body
+named in the citation. Status column: `V` = body read, no row is inferred.
+Line numbers are current; the older revision of this file (2026-09-09) had
+drifted throughout. **Phase 2 and Phase 3 sections at the bottom are the
+original 2026-09-09 text and are partly stale** (see the banner there).
 
-`IGeometrySource` is defined at `src/nodes/Geometry3DNodes.h:118-208`. It is a
-union interface: `GetMesh()` is pure virtual (every producer returns
-*something*), `GetPointCloud()`/`GetCurve()` default to `nullptr`, and seven
-side-channel accessors (material, vertex/particle colour, per-map texture,
-mapping transform, instance colour, instance selection, instance transform
-override) default to empty/identity so an implementer only overrides what it
-actually has.
+Interface: `IGeometrySource`, `src/nodes/Geometry3DNodes.h:174-272`. `GetMesh()` and
+`MeshRevision()` pure virtual (`:188,194`); `GetPointCloud()`/`GetCurve()` default
+`nullptr` (`:261,270`); `GetMaterialTexture(0)` defaults to `GetSurfaceTexture()`
+(`:208-211`); all other channels default empty/identity/0.
+Warning channel: `ICookWarningSource::CookWarning()` + `DescribeGeometryMismatch`
+(`:291-340`).
 
-**Emission tags:**
+**Predicates that decide everything** (`src/core/Mesh.h`): `Mesh::Empty()` =
+`vertices.empty() || indices.empty()` (`:47`); `HasGeometry()` = `!vertices.empty()`
+(`:51`); `FaceCount()` = `indices.size()/3` (`:52`). So a **verts-only mesh is
+`Empty()`**.
 
-| tag | meaning | real geometry? |
-|---|---|---|
-| `mesh:surface` | vertices + faces | yes |
-| `mesh:verts` | vertices, no indices | yes |
-| `mesh:standin` | fabricated billboard-quad mesh, thumbnail only | **no** |
-| `mesh:none` | permanently-empty stub | **no** |
-| `cloud` | `GetPointCloud()` non-null | yes |
-| `curve` | `GetCurve()` non-null | yes |
+## Tags and channels
 
-**Side channels A–G:**
+| tag | meaning |
+|---|---|
+| `mesh:surface` | vertices + indices |
+| `mesh:verts` | vertices, no indices (counts as `Empty()`) |
+| `mesh:standin` | fabricated quad mesh. **Now zero producers** (D5 fixed) |
+| `mesh:none` | honest empty mesh |
+| `cloud` / `curve` | `GetPointCloud()` / `GetCurve()` non-null |
 
-| # | channel | carrier | revision stamp |
+| # | channel | carrier | stamp |
 |---|---|---|---|
-| A | Material | `GetMaterial()` | **none** |
-| B | `Mesh::vertexColor` | inside mesh | piggybacks `MeshRevision` |
-| C | `Particle::r/g/b` | inside cloud | `PointCloudRevision` |
-| D | `InstanceColors()` | side, chain walk | via instancer |
-| E | textures (`GetMaterialTexture`) | side | `SurfaceTextureRevision` |
-| F | `GetMappingTransform()` | side | **none** |
-| G | `InstanceSelection()` | side | `InstanceSelectionRevision` |
+| A | Material | `GetMaterial()` | `MaterialRevision()` (content hash, `:146`) - exists now |
+| B | `Mesh::vertexColor` | in mesh (valid iff size == verts*3, `HasVertexColor`) | `MeshRevision` |
+| C | `Particle::r/g/b` + `hasColor` | in cloud | `PointCloudRevision` |
+| D | `InstanceColors()` | concrete on `InstanceOnPointsNode` only, not in interface | via instancer |
+| E | textures | `GetSurfaceTexture`/`GetMaterialTexture` | `SurfaceTextureRevision` |
+| F | `GetMappingTransform()` | side | `MappingRevision()` - exists now |
+| G | `InstanceSelection()` + `InstanceTransformOverride()` | side | `InstanceSelectionRevision` |
 
----
+Shader product: `base = toLinear(uBaseColor) * vInstanceColor * vVertexColor`, then
+`*= texture` when `uHasTexture` (`Geometry3DNodes.cpp:643-644`). Cloud draws feed
+`p.r/g/b` into `vInstanceColor` and still multiply `material.color` and the surface
+texture (`:1936-1945, 2016`).
 
-## Node count: 28, not 29 — resolved
+## Roster: 30 implementers
 
-Grepping `class .* : public.*IGeometrySource` across all of `src/` (not just
-`src/nodes/`) yields exactly 28 distinct node classes (listed below), plus 5
-`IGeometrySource`-implementing structs in `src/main.cpp` that are self-test
-probes/fixtures (`DummyGeo` ×2, `CloudProbe`, `TransformProbeSource`,
-`MappingProbeSource`) — not user-facing nodes, correctly excluded from the
-node catalog. No 29th user-facing implementer exists anywhere in the
-codebase. `PathNode` and `GeometryTableNode` were double-checked directly
-(`src/nodes/PathNode.h:19`, `src/nodes/GeometryTableNode.h:17`) and both
-implement `IModulator`, not `IGeometrySource` — they are geometry
-*consumers* only, as the established-findings table already had them.
-`git log --all --diff-filter=D` over `src/nodes/*.h`/`*.cpp` shows no
-deleted geometry-node file that could explain a since-removed 29th class.
-**Conclusion: the audit prompt's count of 29 was simply incorrect; 28 is the
-authoritative roster for phase 2.**
+Base-class grep over `src/`: 30 user-facing node classes (the old file said
+"28" over a 29-row table; the prompt said 29). New since then: `DepthProjectionNode`
+(`DepthProjectionNode.h:26`). Excluded: self-test probes in `main.cpp`; `PathNode`,
+`GeometryTableNode` are consumers only (IModulator).
 
----
+## 1. Emission per node, per mode
 
-## Emission per node, per mode
+| Node | Cite | Emission | Mode dependence | Fwd cloud/curve from input | S |
+|---|---|---|---|---|---|
+| Geometry | `Geometry3DNodes.h:343`, `.cpp` | mesh:surface | shape param only | no input | V |
+| Text3D | `Text3DNode.h:25` | mesh:surface | none | no input | V |
+| Ocean | `OceanNode.h:24` | mesh:surface | none | no input | V |
+| ModelSource | `ModelSourceNode.h:27` | mesh:surface (empty if bypassed/unloaded) | none | no input | V |
+| AudioRibbon | `AudioRibbonNode.h:33` | mesh:surface | none | no input | V |
+| Curve | `CurveNode.h:28,36` | mesh:surface (tube) **+ curve** | none | no input | V |
+| FieldPrimitive | `FieldPrimitiveNode.h:106,119,122`; `.cpp:877-1121` | **mesh only.** topology Points(0) = mesh:verts (`.cpp:1106-1121`); Plane/Sphere/Cylinder/Torus/Disc = mesh:surface. cloud/curve hardcoded `nullptr` | topology only | no input | V |
+| FieldElement | `FieldElementNode.h:146-175`; `.cpp:541-666` | input wired: input's mesh with vertices rewritten (indices copied verbatim, or triangles referencing cut verts dropped when `maxElements` truncates, `ElementStore.cpp:155-187`). No input: **originates** `generateCount` verts, no indices = mesh:verts (`.cpp:584-597`). Input with `vertices.empty()` (cloud/curve-only) clears own mesh (`.cpp:569-581`) | wired vs unwired | **cloud + curve forwarded live and unmodified** (`.h:171-175`); kernel never touches the cloud | V |
+| GeometryOp | `GeometryOpNodes.h:26`; `.cpp:200-270,523-577` | mesh (op result; kTransform on instancer input leaves stamp mesh, moves via group matrix) | 13 ops | cloud: kTransform transforms it (`.cpp:530-564`), other ops forward as-is; **curve forwarded UNTRANSFORMED always** (`.h:112`) | V |
+| Displacement | `.cpp:611-630` | mesh (same topology, normals recomputed) | none | **neither** (no override) | V |
+| AudioDisplacement | `.cpp:260-476` | mesh (subdivided, displaced) | 5 modes | **neither** (`.h` has none) | V |
+| InstanceOnPoints | `GeometryOpNodes.cpp:730-733` | mesh = the **stamp** (`instanceShape->GetMesh()`), N placements carried separately | none | n/a (consumes cloud) | V |
+| SetColor ("Set Vertex Color", `main.cpp:6119`) | `GeometryOpNodes.cpp:1226-1334` | mesh or cloud (whichever the input has, recoloured) | none | cloud yes (`.h:763`); **curve NO** | V |
+| Wrap | `.cpp:995-1034` | mesh (source, world-space baked) | 3 modes | **neither** | V |
+| Null3D | `UtilityNodes.h:187,195` | passthrough mesh+cloud+curve | none | **both (fixed)** | V |
+| Material | `UtilityNodes.h:290,298` | passthrough | none | **both (fixed)** | V |
+| Mapping | `UtilityNodes.h:468,476` | passthrough | none | **both (fixed)** | V |
+| Switcher3D | `Switcher3DNode.h/.cpp` (full read) | active input's mesh | 4 slots | **NEITHER** (no `GetPointCloud`/`GetCurve` anywhere in the class) | V |
+| Join | `UtilityNodes.cpp:257-387` | mesh:surface (inputs with `src.Empty()` skipped, `:266,316`) | merge / other modes | neither | V |
+| MetaBall | `Mesh.cpp:4036-4110` | mesh:surface; UVs are per-triangle constants (0,0)/(1,0)/(0,1) (`:4001-4003`) | none | neither | V |
+| MeshToPoints | `UtilityNodes.h:809`; `.cpp:653-668` | **cloud + mesh:none** (D5 fixed; GetMesh returns empty unless bypassed) | 3 sample modes | neither | V |
+| MergeByDistance | `PointDistributionNodes.cpp:531-541` | mesh | none | **neither** | V |
+| DistributeOnFaces | `PointDistributionNodes.h:39`; `.cpp:171-178` | cloud + mesh:none | none | neither | V |
+| PointsToVertices | `.cpp:268-343` | mesh:verts (cloud path) or copy of input verts | cloud vs mesh input | neither | V |
+| DistributeInGrid | `.h:264`; `.cpp:453` | cloud + mesh:none; terminal | none | no input | V |
+| ParticleSystem | `SimulationNodes.h:26,48` | cloud + mesh:none; terminal | none | no input | V |
+| Cloth | `SimulationNodes.h:125-176` | mesh (simulated); returns early with **no mesh** if input `Empty()` (`.cpp:294`) | none | **cloud + curve forwarded** (`.h:163-171`) | V |
+| MeshResynth | `GenerativeNodes.h:47-111` | mesh (generational copy) | none | **neither** | V |
+| ImageToPoints | `GenerativeNodes.h:186-219`, `.cpp:338-359` | cloud + mesh:none (`MeshRevision()` constant 0); terminal (ImageCable) | none | no input | V |
+| DepthProjection (new) | `DepthProjectionNode.h:82-103`, `.cpp:141-156, 478-601` | outputType 0 = cloud + mesh:none; outputType 1 = mesh:surface (edge-torn grid, may be verts-only if all triangles torn) + cloud null. Bypass or no depth input = nothing | **outputType** | no input | V |
 
-All entries below were verified by reading the actual accessor body unless
-marked `inferred`. "Terminal" = no geometry input pin.
+FieldPrimitive resolved: not mode-dependent across domains. `GetPointCloud()`/
+`GetCurve()` always null (`.h:119,122`); topology toggles only mesh:verts vs mesh:surface.
 
-| Node | File | Emission | Mode dependence | Status |
-|---|---|---|---|---|
-| Geometry | `Geometry3DNodes.h:211`, `.cpp:796` | `mesh:surface` | none (shape param, not domain-changing) | verified |
-| Text3D | `Text3DNode.h:13`, `.cpp:52-61` | `mesh:surface` | none | verified |
-| Ocean | `OceanNode.h:14`, `.cpp:35-44` | `mesh:surface` | none | verified |
-| ModelSource | `ModelSourceNode.h:27-35` | `mesh:surface` | none | verified |
-| AudioRibbon | `AudioRibbonNode.h:16` | `mesh:surface` | none | verified |
-| CurveNode | `CurveNode.h:14,35` | `mesh:surface` **+** `curve` | none | verified |
-| GeometryOp | `GeometryOpNodes.h:26`, `.cpp:157-460` | `mesh:surface` (or instance-domain redirect, see below) | 10 ops (`kTransform`…`kScrew`, `kSelect`, `kDelete`); none change the emission tag itself | verified |
-| Displacement | `GeometryOpNodes.h:371`, `.cpp:550-662` | `mesh:surface` | none | verified |
-| AudioDisplacement | `AudioDisplacementNode.h:17`, `.cpp:514-516` | `mesh:surface` | none | verified |
-| InstanceOnPoints | `GeometryOpNodes.h:541`, `.cpp:666-880` | `mesh:surface` (the stamp mesh, not realized copies) | none | verified |
-| SetColor | `GeometryOpNodes.h:694`, `.cpp:1149-1258` | passthrough (mesh or cloud, whichever input has) | none | verified |
-| Wrap | `GeometryOpNodes.h:834`, `.cpp:926-1017` | `mesh:surface` | none | verified |
-| Null3D | `UtilityNodes.h:134`, `.cpp:17-36` | passthrough for mesh only — **cloud/curve NOT forwarded** (see anomalies) | none | verified |
-| Material | `UtilityNodes.h:211`, `.cpp:40-107` | passthrough for mesh only — **cloud/curve NOT forwarded** | none | verified |
-| Mapping | `UtilityNodes.h:354`, `.cpp:149-168` | passthrough for mesh only — **cloud/curve NOT forwarded** | none | verified |
-| Join (×4-input) | `UtilityNodes.h:441`, `.cpp:183-428` | `mesh:surface` | none (mesh-only op; never reads cloud/curve) | verified |
-| MetaBall | `UtilityNodes.h:582`, `.cpp:645-708` | `mesh:surface` (marching cubes) | none | verified |
-| MeshToPoints | `UtilityNodes.h:689`, `.cpp:434-641` | `mesh:standin` **+** `cloud` | none | verified |
-| MergeByDistance | `PointDistributionNodes.h:288`, `.cpp:504-509` | `mesh:surface` | none | verified |
-| DistributeOnFaces | `PointDistributionNodes.h:20` | `mesh:standin` **+** `cloud` | none | verified |
-| PointsToVertices | `PointDistributionNodes.h:137` | `mesh:verts` | none | verified (header only, `.cpp` build logic not independently re-read — see gaps) |
-| DistributeInGrid | `PointDistributionNodes.h:233,254` | `mesh:standin` **+** `cloud` | none; terminal, no geometry input | verified |
-| ParticleSystem | `SimulationNodes.h:26,41,48-53` | `mesh:none` **+** `cloud` | none; terminal | verified |
-| Cloth | `SimulationNodes.h:125`, `.cpp:271,285-287,527-616` | `mesh:surface` (simulated, instancer realized at rest-build) | none | verified |
-| MeshResynth | `GenerativeNodes.h:20,66-102` | `mesh:surface` | none | verified |
-| ImageToPoints | `GenerativeNodes.h:158,174-204` | `mesh:standin` **+** `cloud` | none; terminal (ImageCable input, not geometry) | verified |
-| Switcher3D | `Switcher3DNode.h:27`, `.cpp:56-119` | mesh = active input's tag — **cloud/curve NOT forwarded regardless of active slot** | 4-way input switch; only changes *which* mesh, not cloud/curve behaviour | verified |
-| FieldPrimitive | `FieldPrimitiveNode.h:16,119,122`, `.cpp:884-1119` | **mesh only, always.** `topology=Points` → `mesh:verts` (`.cpp:1105-1119`); `topology`∈{Plane,Sphere,Cylinder,Torus,Disc} → `mesh:surface` (`.cpp:884-1090`). `GetPointCloud()`/`GetCurve()` hardcoded `nullptr` unconditionally | yes — `mesh:verts` vs `mesh:surface` only | **verified — resolves the open question below** |
-| FieldElement | `FieldElementNode.h:16,146-163`, `.cpp:535-659`, `ElementStore.cpp:93-188` | **conditional.** With `input` wired: propagates input's tag — `ElementStore::ToMesh` rebuilds `mOutMesh` from `inMesh` verbatim when `boundCount == inCount` (`ElementStore.cpp:155-160`), or safely truncates (drops any triangle referencing a cut vertex, never leaves a dangling index) when `maxElements < inCount` (`:161-187`), which can turn a `mesh:surface` input into an effectively-`mesh:verts` output if truncation removes every surviving triangle. With no `input`: **originates fresh** as a generator — `n = max(1, generateCount)` bare vertices, no indices, i.e. always `mesh:verts` (`.cpp:584-593`) | none (kernel/topology-driven, not a UI mode) | **verified** |
+## 2. Pin requirements
 
-### FieldPrimitive — resolved
+"Gate" = the code that actually rejects/degrades. "Warn" = `CookWarning` wiring.
 
-The established-findings table in the audit prompt listed FieldPrimitive as
-"`mesh` + `cloud` + `curve`, mode-dependent, unverified." That premise is
-**false**. `GetPointCloud()` and `GetCurve()` are inline `override` bodies
-that unconditionally `return nullptr` (`FieldPrimitiveNode.h:119,122`) — no
-`topology` value ever produces a cloud or curve. The `topology` dropdown only
-toggles between `mesh:verts` (Points) and `mesh:surface` (everything else).
-This closes the phase-1 exit requirement for this node.
+| Pin | Requires | Gate (verified) | verts-only input | cloud/curve input | Warn |
+|---|---|---|---|---|---|
+| MeshResynth.input | surface | `GenerativeNodes.cpp:190` warn; `ApplyGeneration` returns on `vertices.empty()` (`:72`) | runs; Smooth/Extrude/RecalculateNormals see no faces, normals zeroed (`Mesh.cpp:1782`) | mesh copy empty, nothing | kMeshSurface (`:190`) |
+| MetaBall.cloudSource | cloud, reads `px/py/pz/scale` only, not colour | `UtilityNodes.cpp:755` | n/a | curve: nothing | yes (per earlier read) |
+| InstanceOnPoints.cloudSource | cloud; **wins over pointSource** | `GeometryOpNodes.cpp:802-820` | n/a | - | yes (cloud) |
+| InstanceOnPoints.pointSource | mesh; **mode 0 needs only vertices, modes 1/2 need faces** | gate `!HasGeometry()` (`:830`); `ToPoints` mode 0 `Mesh.cpp:2470-2540`, edges `:2541-2652`, faces `:2653-2693` | mode 0 works; modes 1/2 yield 0 instances, silently | 0 instances | **none** |
+| InstanceOnPoints.instanceShape | any mesh | `GeometryOpNodes.cpp:730-746` | draws verts-only stamp as nothing (Render needs faces) | empty stamp | none |
+| Cloth.input | **surface** | `SimulationNodes.cpp:294` `srcLocal.Empty()` returns, no output; constraints from `src.indices` | **no output at all** (old doc said "unconstrained particles": wrong) | no mesh output (cloud/curve forwarded) | **none** |
+| Displacement.input | surface (no gate) | `GeometryOpNodes.cpp:620-624` -> `MeshOps::Displace` (`Mesh.cpp:2369-2426`) always ends in `RecalculateNormals` | smooth: all normals zeroed (`Mesh.cpp:1782`); **flatShade: result is an empty mesh** (`:1704-1749` builds from indices) | mesh empty | **none** |
+| AudioDisplacement.input | surface | `.cpp:268` warn, `:275` gate on `vertices.empty()` | runs, ends in `RecalculateNormals` (`:470`): normals zeroed / flat = empty | empty | kMeshSurface (`:268`) |
+| Wrap.sourceInput | surface | `Mesh.cpp:3043-3045` `worldSource.Empty()` returns source unchanged | **returned un-wrapped** (but world-baked) | empty | none on source |
+| Wrap.targetInput | surface (nearest); optional in bend modes | `Mesh.cpp:3048` `target.Empty()` -> unchanged unless bend + `radiusOverride>0`; nearest loop uses `FaceCount()` (`:3133`) | treated as absent (`:3061` `worldTarget.Empty()` -> uses override) | treated as absent | kMeshSurface (`.cpp:1003`); **misclassifies verts-only as "nothing"** |
+| Join inputs 1-4 | surface to contribute | `UtilityNodes.cpp:266,316` `Empty()` skip | **silently skipped** | skipped | none |
+| GeometryOp.input | any (no gate at `:200-211`); kTransform/kArray are pure vertex ops | no per-op gate at pin | kTransform keeps verts-only intact | mesh empty; cloud handled `:523` | none |
+| MergeByDistance.input | surface per warning, but op body only needs vertices | `Mesh.cpp:612-663` (`vertices.empty()` gate; faces loop optional) | works (welds verts) but node warns anyway | mesh empty | kMeshSurface |
+| MeshToPoints.input | mode 0 vertices; modes 1/2 faces | `UtilityNodes.cpp:550-573`, `ToPoints` as above | mode 0 works, 1/2 emit 0 points | 0 points | **none** |
+| DistributeOnFaces.input | surface | `Mesh.cpp:2760` `faceCount==0` returns empty | 0 points | 0 points | kMeshSurface |
+| PointsToVertices.input | cloud preferred, else mesh vertices | `PointDistributionNodes.cpp:268-305` | works (copies verts) | cloud path | none |
+| Path.curve | curve | `PathNode.cpp:25-37` | - | - | kCurve |
+| Path.geometry (mesh-follow) | surface | `BoundaryLoops`/`SliceContours` over indices (`PathNode.cpp:96-101`) | no loops, no follow | no follow | none |
+| GeometryTable.geo | any | cloud `:56,82`, curve `:64,170`, mesh `:103-109,190-196` | mesh mode reads `FaceCount()` (`:132`) | supported | n/a |
+| SetColor.input | any | `GeometryOpNodes.cpp:1226-1227` | passes | cloud recoloured; curve **dropped** | none |
+| Material / Mapping / Null3D | any | passthrough | passes | passes (fixed) | n/a |
+| Switcher3D.geoA-D | any | active slot | passes | **cloud/curve dropped** | n/a |
+| FieldElement.input | any with `vertices` (else clears) | `.cpp:566-581` | runs, indices copied | kernel skips cloud, cloud forwarded | none |
 
----
+Warning wiring recap: warnings exist for MeshResynth, MetaBall.cloud, InstanceOnPoints.cloud,
+Wrap.target, DistributeOnFaces, MergeByDistance, AudioDisplacement, Path.curve. Missing:
+Cloth, Displacement, InstanceOnPoints.pointSource, Join, MeshToPoints, PointsToVertices,
+GeometryOp, Path.geometry, Wrap.source.
 
-## Consumer pin requirements
+## 3. Side channels A-G per node
 
-| Pin | Requires | Cites | Status |
-|---|---|---|---|
-| MeshResynth `.input` | `mesh:surface` | forwards A/E/F/PassthroughSource/instance-* (`.h:66-102`) | verified |
-| MetaBall `.cloudSource` | `cloud` — reads `px/py/pz/scale` only, **not** `r/g/b` (`.cpp:668-679`) | — | verified — colour from an upstream Set Color has no effect on MetaBall |
-| InstanceOnPoints `.cloudSource` | `cloud`, wins over `.pointSource` when both connected (`.cpp:733-751`) | — | verified |
-| InstanceOnPoints `.pointSource` | `mesh:surface`-shaped (reads `->GetMesh()`, samples via `MeshOps::ToPoints`, needs `HasGeometry()` not full topology) (`.cpp:756-770`) | — | verified |
-| InstanceOnPoints `.instanceShape` | `mesh:any` — reads `->GetMesh()`/`->GetModelMatrix()` (`.cpp:552,671,716-718,729`) | — | verified |
-| Path `.curve` | `curve` | established findings | verified (prior session) |
-| PointsToVertices `.input` | `cloud`, preferred, wins over mesh when present; degrades gracefully to a `mesh:verts`-shaped vertex/vertexColor copy when input has no cloud (does not require `.indices` either way) | `PointDistributionNodes.cpp:244-316` | **verified** — cloud path (`:274-289`) reads `px/py/pz`, `nx/ny/nz`, `r/g/b`, and `alive` (if `aliveOnly`); no-cloud fallback (`:297-305`) copies `input->GetMesh()`'s vertices/vertexColor only, never touches `.indices` |
-| DistributeOnFaces `.input` | `mesh:surface` — needs face topology (uses `MeshOps::DistributeOnFaces`, area-weighted) | — | verified vs. MeshToPoints' index-order method |
-| Cloth `.input` | `mesh:surface` for a physically meaningful result; degrades gracefully (no crash) on `mesh:verts` | `RebuildFromInput`, `SimulationNodes.cpp:271-402`, constraint loop `:338-356` | **verified** — one PBD distance-constraint kind only (no separate shear/bend, contra earlier phase-1 note), built by walking `src.indices` in triples; on an index-less input the loop never executes so `mConstraints` stays empty and the mesh simulates as an unconstrained particle set (gravity/wind/pin still apply) rather than refusing |
-| Displacement `.input` | `mesh:surface`, vertex-level only — does not require `->indices` beyond what `MeshOps::Displace` needs | `.cpp:561` | verified |
-| AudioDisplacement `.input` | `mesh:surface` | `.cpp:514-516` | verified |
-| Wrap `.sourceInput` | `mesh:any` — struct-copied into output, `vertexColor` rides along (`Mesh.cpp:3020`) | — | verified |
-| Wrap `.targetInput` | `mesh:surface` — needs real triangles for nearest-surface search (`Mesh.cpp:2965+`) | — | verified |
-| Join ×4 inputs | `mesh:any`; realizes any upstream instancer via `MeshOps::RealizeInstances` before merging (`.cpp:239-246`) | — | verified |
-| GeometryOp `.input` | `mesh:any`; redirects `kTransform`/`kSelect`/`kDelete` to instance-domain ops when wrapping an instancer (`.cpp:132-144,246-258,318-421`) | — | verified |
-| MergeByDistance `.input` | `mesh:surface` | forwards all 7 channels + PassthroughSource unchanged | verified |
-| GeometryTable `.geo` | any (reads mesh, cloud, and curve) | established findings; **not an `IGeometrySource` implementer itself** — `IModulator`, holds `IGeometrySource*` as consumer only (`GeometryTableNode.h:17,34-35`) | verified this pass |
-| Material, Mapping, Null3D, SetColor, Switcher3D, Render3D, FieldElement | any (passthrough/terminal) | — | verified for mesh; **cloud/curve pins on Null3D/Material/Mapping/Switcher3D silently starve downstream consumers — see anomalies** |
+`fwd` forwards, `orig` originates, `drop` not forwarded, `xform` transforms, `-` n/a.
 
----
-
-## Side-channel behaviour per node (A–G)
-
-`fwd` = forwards from input unchanged. `orig` = originates fresh (overrides
-the input's value). `drop` = silently not forwarded, falls to base-class
-default. `n/a` = channel doesn't apply (node has no relevant input/output).
-
-| Node | A Material | B vertexColor | C particle colour | D InstanceColors | E texture | F MappingTransform | G InstanceSelection |
+| Node | A Material | B vertexColor | C particle colour | D InstanceColors | E textures | F Mapping | G Selection |
 |---|---|---|---|---|---|---|---|
-| Geometry | orig (own fields) | n/a | n/a | n/a | orig (own `mTextureInput`, albedo-only) | **drop** (no override, base identity) | n/a |
-| AudioRibbon | n/a (no override found) | n/a | n/a | n/a | **drop** — hardcoded `return 0` (`.h:37`) | n/a | n/a |
-| AudioDisplacement | fwd | fwd (implicit, struct-level) | n/a | fwd | fwd (`.cpp:514-516`) | fwd | fwd |
-| GeometryOp | **orig when `inheritMaterial==false`**, else fwd (`.cpp:484-511`) | implicit via `MeshOps::*`; **not individually verified per-op** (see gaps) | n/a | fwd | fwd | fwd | fwd |
-| Displacement | fwd | fwd | n/a | fwd | fwd | fwd | fwd — deliberately preserved so instancer stays visible through it (`.h:407-409`) |
-| InstanceOnPoints | fwd (from `instanceShape`, `.cpp:687-714`) | flows into D via point-sampling of upstream `vertexColor` | flows into D via cloud `p.r/g/b` | **originates** (`mColors`, `.cpp:746-748,815-817`) | fwd (from `instanceShape`, `.h:559-566`) | **drop — no override at all in the class.** Forwards A and E from the same input but not F. Flagged as an oversight, not a design choice (see anomalies) | n/a — root of the instancer chain, not a downstream consumer of selection |
-| SetColor | fwd | **orig** (`.cpp:1156-1184`) | **orig** (`.cpp:1190-1217`) | fwd | fwd | fwd | fwd — **but no `GetCurve()` override exists anywhere in the class (`.h:694-826`, full body scanned); a curve routed through SetColor is dropped, same defect as Null3D/Material/Mapping/Switcher3D (see anomalies)** |
-| Wrap | fwd (from `sourceInput` only) | fwd, incidental via struct copy (`Mesh.cpp:3020`) | n/a | fwd (from `sourceInput`) | fwd (from `sourceInput`) | fwd (from `sourceInput`) | fwd (from `sourceInput`) |
-| Null3D | fwd | fwd | n/a | fwd | fwd | fwd | fwd — **but `GetPointCloud()`/`GetCurve()` are not overridden at all, contradicting the class's own "everything is forwarded" comment (`.h:131-133`)** |
-| Material | **orig** (unless bypassed, `.cpp:52-91`) | fwd (mesh passthrough) | n/a | fwd | orig, per-`MaterialMap` channel (`.cpp:98-107`) — own `mMaps[map]` cable if connected, else forwards input | fwd | fwd — **same cloud/curve gap as Null3D** |
-| Mapping | fwd | fwd | n/a | fwd | fwd | **orig** (own `space`/`translate`/`rotate`/`scale`/`triplanarBlend`, `.cpp:149-159`) | fwd — **same cloud/curve gap as Null3D** |
-| Join | picks one input via `materialFrom` index (`.cpp:341-417`) | **historically manufactured from albedo when absent — fixed on `bugfix/join-geometry-manufactured-vertex-colour`; now preserves correctly per-input** | n/a | n/a (realizes instances before merge) | picks same `materialFrom` slot as A, consistent (`.cpp:341-417`) | picks same `materialFrom` slot as A/E | n/a |
-| MetaBall | orig (own fields, inferred) | n/a | **drop** — reads only `px/py/pz/scale` from cloud, never `r/g/b` (`.cpp:668-679`) | n/a | **drop — no override anywhere in class** | **drop — no override anywhere in class** | n/a |
-| MeshToPoints | n/a (mesh:standin only) | flows into emitted cloud's `r/g/b` when instancer realized, weighted by D (`.cpp:496-501`) | **originates** the emitted cloud's colour from sampled mesh points | consumed (multiplies into emitted per-particle colour) | n/a | n/a | n/a — sampling collapses the instancer, nothing left to select |
-| MergeByDistance | fwd | fwd | n/a | fwd | fwd | fwd | fwd — clean, complete passthrough, no gaps found |
-| DistributeOnFaces | fwd | n/a (emits standin+cloud) | originates (sampled) | n/a | fwd | fwd | n/a |
-| ParticleSystem | n/a | n/a | originates own | n/a | n/a | n/a | n/a |
-| Cloth | fwd (`.cpp:535-541`, checks `bypassed`/`inheritMaterial`) | implicit, simulated mesh carries it forward | n/a | **drop — deliberate.** Instancer realized into concrete mesh at rest-build (`.cpp:285-287`); nothing left to select/transform as a group afterward | fwd (`.cpp:566-569`) | fwd (`.h:155-158`) | **drop — deliberate, same reasoning as D** |
-| MeshResynth | fwd | implicit | n/a | fwd | fwd | fwd | fwd — clean operator, matches GeometryOp's pattern |
-| ImageToPoints | n/a | n/a | originates from image sample | n/a | **drop — deliberately hardcoded to avoid double-applying colour via both `r/g/b` and a surface texture sample (`.h:198-204`, documented, not a bug)** | n/a | n/a |
-| Switcher3D | fwd (from `Active()` input, `.cpp:56-119`) | fwd (mesh passthrough) | n/a | fwd | fwd | fwd | fwd — **but `GetPointCloud()`/`GetCurve()` never overridden; every other accessor correctly routes through `Active()`, cloud/curve simply weren't added** |
-| FieldElement | fwd | fwd | n/a | fwd | fwd | fwd | fwd — most complete forwarding wrapper found; the only one that also forwards cloud/curve (`.h:146-163`) |
+| Geometry / Text3D / Ocean / ModelSource | orig | never set (none write it) | - | - | orig, own `mTextureInput`, albedo only (default routing of `GetMaterialTexture`) | **drop** (default identity) | - |
+| AudioRibbon | orig | cleared (`.cpp:132`) | - | - | `GetSurfaceTexture` hardcoded 0 (`.h:38`) | drop | - |
+| Curve | orig | none | - | - | none (no override) | drop | - |
+| FieldPrimitive | `Material()` default (`.h:109`) | ToMesh: only if kernel wrote `cd` | - | - | 0 | identity | nullptr |
+| FieldElement | fwd | fwd if input has it, else empty; kernel-written `cd` overrides (`ElementStore.cpp:129-152`) | cloud forwarded untouched | fwd | fwd | fwd | fwd |
+| GeometryOp | orig if `!inheritMaterial` else fwd | rides in MeshOps | xform for kTransform only | fwd | fwd | fwd | fwd; kTransform+selectionOnly writes transform override (`.cpp:240-258`) |
+| Displacement | orig/fwd (`inheritMaterial`) | rides in `out = in` copy (flat: RemapVertexColor) | - | fwd | fwd | fwd | fwd |
+| AudioDisplacement | orig/fwd | rides (`mCache = src`) | - | fwd | fwd | fwd | fwd |
+| InstanceOnPoints | fwd from instanceShape | - | reads `p.r/g/b` into D | **orig** `mColors`; **always filled** (white default too) (`.cpp:815-817,884-886`) | fwd from instanceShape | **fwd now** (`.h:611-614`, Phase 5); **`MappingRevision` not overridden -> 0** | orig/fwd |
+| SetColor | fwd | **orig** | **orig** | fwd | fwd | fwd | fwd |
+| Wrap | fwd from source | rides (struct copy) | - | fwd source | fwd source | fwd source | fwd source |
+| Null3D / Material / Mapping | fwd; Material **orig** | fwd | fwd (cloud) | fwd | fwd; Material orig per-map | fwd; Mapping **orig** | fwd |
+| Switcher3D | fwd active | fwd | **drop** (no cloud) | fwd | fwd | fwd | fwd |
+| Join | picks via `materialFrom` | **orig only when some input has authored colour or albedos differ and `keepInputColours`** (`.cpp:274-293`) | - | consumed (realized) | one input | one input | - |
+| MetaBall | orig | none | reads xyz/scale only | - | **drop** (default); UVs would be per-triangle stamps so a texture is meaningless | drop | - |
+| MeshToPoints | fwd tint (`mBuiltMaterialRev` in dirty check) | **-> C** | **orig** from mesh/instance colours | consumed | fwd | fwd | - |
+| MergeByDistance | fwd | remapped (`Mesh.cpp:661`) | - | fwd | fwd | fwd | fwd |
+| DistributeOnFaces | fwd | -> C | **orig**, bakes inherited tint | - | fwd | fwd | - |
+| PointsToVertices | fwd | **orig** from cloud r/g/b | reads | - | fwd | fwd | - |
+| DistributeInGrid | orig | - | orig | - | 0 | - | - |
+| ParticleSystem | - | - | **orig** (`hasColor` true, `.cpp:135-136,198`) | - | - | - | - |
+| Cloth | fwd | rides | forwarded | **drop, deliberate**: instancer baked by `RealizeInstances` at rest build (`.cpp:286-288`); nothing left to select/group-move | **`GetSurfaceTexture` only; per-map `GetMaterialTexture` not forwarded** | fwd | drop (baked) |
+| MeshResynth | fwd | rides | - | fwd | fwd | fwd | fwd |
+| ImageToPoints | orig tint | - | **orig** (image*tint) | - | 0 (deliberate) | - | - |
+| DepthProjection | orig (tint, metallic, roughness, opacity) | **orig in mesh mode** (sample colour * tint) | **orig in cloud mode** | - | colour-input texture (`.cpp:183-188`) | identity | - |
 
----
+### Deliberate vs oversight (prompt's three anomalies)
 
-## Anomalies — resolved
-
-The audit prompt flagged three anomalies as needing investigation. Resolved:
-
-| Node | Missing channel | Verdict | Reasoning |
-|---|---|---|---|
-| **InstanceOnPoints** | F (`GetMappingTransform`) | **Oversight — real gap.** Forwards A and E from the same `instanceShape` input but drops F with no comment. The stamp mesh has real UVs; nothing topologically prevents forwarding Mapping. Also absent from `MAPPINGSWEEPTEST`. | recommend fixing in phase 4 |
-| **MetaBall** | F, E (`GetMappingTransform`, `GetMaterialTexture`) | **Deliberate — defensible.** Marching-cubes output has no meaningful UVs (no UV-writing code found in the region of `Primitives::MetaBalls`, not independently confirmed by reading that function body — see gaps). Texture/mapping would have nothing coherent to sample onto. | no fix needed; consider documenting in-code |
-| **Cloth** | G/D (instance selection, group transform / "PASS") | **Deliberate — not a bug.** `RebuildFromInput()` bakes (`MeshOps::RealizeInstances`) the upstream instancer into one concrete simulated mesh at rest-build time (`.cpp:285-287`). A PBD solve over one shared point set cannot represent "N independent instances," so there is nothing left to select or group-transform downstream. | **remove from any fix list** — this was misclassified as an anomaly in the original audit prompt |
-
-## Anomalies — newly found this pass (not in the original prompt)
-
-| Node | Missing channel | Verdict |
+| Omission | Verdict | Evidence |
 |---|---|---|
-| **Switcher3D** | `GetPointCloud()`, `GetCurve()` | **Oversight.** Every one of the other 7 side-channel accessors + `PassthroughSource()` correctly routes through `Active()`. Cloud/curve were never added. A cloud or curve source patched into any of the 4 slots is invisible downstream regardless of which slot is active. Directly contradicts the audit prompt's own classification of Switcher3D as a clean tag-of-input passthrough. |
-| **Null3D** | `GetPointCloud()`, `GetCurve()` | **Oversight.** Class comment states "everything is forwarded" (`.h:131-133`); false for cloud/curve. |
-| **Material** | `GetPointCloud()`, `GetCurve()` | **Oversight.** Header frames the node as "a pass-through in the geometry chain" (`.h:207-210`); true for mesh, false for cloud/curve. |
-| **Mapping** | `GetPointCloud()`, `GetCurve()` | **Oversight.** Same shape as Null3D/Material. |
-| **SetColor** | `GetCurve()` only (it does forward `GetPointCloud()`) | **Oversight.** Forwards mesh, cloud, and every side channel correctly; curve alone is dropped with no override anywhere in the class. |
+| InstanceOnPoints F | **Was oversight, now FIXED** (forwarded); residual: no `MappingRevision` override | `GeometryOpNodes.h:611-614` |
+| MetaBall E/F | **Deliberate, defensible** | UVs are per-triangle constants (`Mesh.cpp:4001-4003`), no meaningful surface parameterisation |
+| Cloth G/D (PASS) | **Deliberate** | `SimulationNodes.cpp:286-288` bakes instancer into the sim mesh |
 
-All four share one fix shape — this is a single sweep, not four separate
-investigations. Recommend adding to `codebase-navigation`'s living map (see
-below) and fixing together in phase 4.
+## 4. Anomalies (real-bug candidates, current source)
 
----
+| # | Where | Finding | Severity |
+|---|---|---|---|
+| 1 | Join `keepInputColours` (`UtilityNodes.h:576,615`, `.cpp:233,293,382`, `main.cpp:26360`) | The doc, D4 and commit df55bf1 said it was removed; merge 906acfa put it back. Default true. | Regression of a decided design |
+| 2 | Join `anyAuthoredColour` (`.cpp:274-276`) | Counts any instancer input as authored colour, but `InstanceOnPoints` always fills `mColors` (white default), so instancer -> Join bakes colour and neutralises albedo: the original manufactured-colour bug via a new door | High, confirm against `RealizeInstances` (`Mesh.cpp:499-523`, it only multiplies/creates colour when `instanceColors` given) |
+| 3 | GeometryOp kTransform (`.h:108-113`, `.cpp:229-269`) | Mesh and cloud are transformed, **curve is forwarded untransformed**. Also `selectionOnly` transforms the whole cloud (`.cpp:530-564` has no mask) | High |
+| 4 | DistributeOnFaces (`PointDistributionNodes.cpp:56-62,149`) | Bakes inherited material tint into particle colour but dirty check omits `MaterialRevision`; goes stale on upstream colour change. MeshToPoints does include it | Medium |
+| 5 | `DescribeGeometryMismatch` (`Geometry3DNodes.h:296-297`) | `hasVerts = !Empty()` == "has surface". mesh:verts reports "got nothing" for kMeshSurface, and would falsely fail kMeshVertices. `kMeshVertices` is unused so latent | Medium |
+| 6 | Displacement/AudioDisplacement on verts-only | Normals zeroed; with flatShade the mesh vanishes. No warning on Displacement | Medium |
+| 7 | DepthProjection (`.cpp:406-408,500-503,541-543`, `GetSurfaceTexture :183-188`, `GetMaterial :168`) | Colour texture is baked into `p.r/g/b`/`vertexColor` **and** returned as surface texture, and `tint` is baked **and** is `material.color`. Shader multiplies all (`Geometry3DNodes.cpp:643-644,2016`): texture applied twice, tint squared. ImageToPoints removed only the texture half (`GenerativeNodes.h:212-218`) and still squares tint (`.cpp:324-326` + `GetMaterial :365`) | Medium |
+| 8 | Switcher3D | Still drops cloud/curve. The old "wrapper drops cloud/curve" finding is fixed for Null3D/Material/Mapping only | Medium |
+| 9 | SetColor | Still no `GetCurve()` | Low |
+| 10 | Displacement, AudioDisplacement, MergeByDistance, Wrap, MeshResynth, Join | None forward cloud/curve; contradicts the old doc's propagation table for Displacement/MergeByDistance | Low-Medium |
+| 11 | Cloth | `GetMaterialTexture` not forwarded (per-map textures lost) | Low |
+| 12 | InstanceOnPoints | `MappingRevision()` defaults to 0 | Low |
+| 13 | FieldElement | Kernel is silently skipped on a cloud input (no warning) | Low |
+| 14 | MergeByDistance | Warns kMeshSurface but op works on verts-only | Low |
 
-## What this pass did NOT verify (explicit negatives)
+## 5. Claims in the prompt / older doc that turned out wrong
 
-- `Primitives::MetaBalls()`'s body in `Mesh.cpp` — not read directly to
-  confirm marching-cubes vertices leave `u/v` at 0; inferred from absence of
-  UV-writing code in the surrounding grep sweep.
-- `MeshOps::RemapVertexColor` call sites inside each of `GeometryOpNode`'s 13
-  individual ops (`kSubdivide`, `kMirror`, `kBevel`, etc.) — the shared helper
-  exists (`Mesh.h:360`) and Wrap/Transform are confirmed to preserve colour via
-  struct-copy, but not every op's `MeshOps::*` implementation in `Mesh.cpp` was
-  individually traced for vertexColor correctness. Real gap for anyone
-  auditing channel B specifically. `kDelete` was confirmed separately (see
-  anomalies follow-up) to collapse straight to a fully-empty mesh rather than
-  ever leaving vertices with no indices — it cannot produce a `mesh:verts`
-  result by stripping indices.
-- Whether `GeometryOpNode`'s `kSubdivide`/`kSelect` ops can change a mesh's
-  emission tag (e.g. strip all indices while leaving vertices) — `kDelete` was
-  checked and cannot (`Mesh.cpp:5004-5039`, collapses to fully empty instead);
-  `kSubdivide`/`kSelect` were not independently traced this pass.
-- `InstanceColors()` (channel D) has no revision stamp and is not part of the
-  `IGeometrySource` interface at all — it's a concrete accessor on
-  `InstanceOnPointsNode` (`GeometryOpNodes.h:591`). Every call site does an
-  explicit `FindInstancer`/`dynamic_cast` first; a plain `IGeometrySource*`
-  cannot read it. This matters for phase 2's satisfaction rule: "does this
-  chain preserve instance colour" is not answerable from the interface alone.
-- No per-map (per-`MaterialMap`) UV/mapping-transform concept exists —
-  `GetMaterialTexture(int map)` always samples through the single
-  `GetMappingTransform()`, consistent with the interface's comment
-  (`Geometry3DNodes.h:144-149`) but not independently re-verified against the
-  shader.
+| Claim | Reality |
+|---|---|
+| "29 implementers" / "28" | 30 (DepthProjection added); old doc listed 29 rows under a "28" heading |
+| Null3D/Material/Mapping drop cloud/curve | Fixed (`UtilityNodes.h:187-195,290-298,468-476`). Switcher3D and SetColor.curve still open |
+| mesh:standin producers (MeshToPoints, DistributeOnFaces, DistributeInGrid, ImageToPoints) | All return an honestly empty mesh now |
+| Material and mapping have "no revision stamp" | Both exist (`MaterialRevision`, `MappingRevision`) |
+| Cloth on verts-only degrades to unconstrained particles | Returns early, no output (`SimulationNodes.cpp:294`) |
+| Displacement, MergeByDistance "forward all 7 channels" | Seven side channels yes; cloud/curve no |
+| InstanceOnPoints drops MAP | Forwarded now |
+| "Set Color" | Node is "Set Vertex Color" (`main.cpp:6119`) |
+| `keepInputColours` removed | Present (anomaly 1) |
+| FieldPrimitive "mesh+cloud+curve, mode-dependent" | Mesh only; verts vs surface |
+| Wrap.target "needs real triangles" | True for nearest; bend modes work without a target (radius override), verts-only target is treated as absent |
+| All cited line numbers | Drifted; replaced above |
 
----
+## 6. What I did NOT find or verify
 
-## Node count discrepancy — open question
+- No implementer emits `mesh:standin` (grep of GetMesh bodies; D5).
+- No `kMeshVertices` caller (grep): the verts-only classification bug is latent.
+- No warning wiring for the nine pins listed under "Missing".
+- `GeometryOp` ops other than kTransform/kArray were not traced for verts-only input (the only channel-B-relevant claim is that kTransform is a pure vertex op).
+- `MeshOps::Subdivide` on a face-less mesh not traced past the entry (`Mesh.cpp:719-750`); AudioDisplacement's verts-only result is bounded by `RecalculateNormals` only.
+- Render3D / NodeViewport mesh-vs-cloud preference code not re-read; relied on `GenerativeNodes.cpp:340-349` comment plus the cloud draw path (`Geometry3DNodes.cpp:1936-2016`).
+- Per-map UV/mapping (no per-map mapping concept found; one `GetMappingTransform()` for all maps).
+- No Windows/Linux angle: this audit touches no `Platform::` code (`GeometryNode` model loading is unchanged).
+- Did not run any sweep (`TRANSFORMSWEEPTEST` etc.); no code executed.
 
-28 confirmed `IGeometrySource` implementers found by base-class grep, not the
-29 stated in the audit prompt. No 29th class was found in `src/nodes/`. Raise
-to the user before phase 2 locks in a fixed roster: was a class renamed or
-removed since the prompt was written, or was one class double-counted?
+## 7. Living-map entry to add to `codebase-navigation` (recommended, not applied)
 
----
-
-## Codebase-navigation map addition
-
-Recommend adding to `.claude/skills/codebase-navigation`'s living map:
-
-> **IGeometrySource passthrough wrappers silently drop `GetPointCloud()`/
-> `GetCurve()`**: `Null3DNode`, `MaterialNode`, `MappingNode`
-> (`src/nodes/UtilityNodes.h`), and `Switcher3DNode`
-> (`src/nodes/Switcher3DNode.cpp`) all forward mesh + all 7 side-channels +
-> `PassthroughSource()`/instance-* correctly, but none override
-> `GetPointCloud()`/`GetCurve()` — a cloud or curve source routed through any
-> of them becomes invisible downstream even though each node's own comments
-> describe it as a complete no-op passthrough. Any new `IGeometrySource`
-> passthrough wrapper needs to explicitly forward these two; the base class
-> defaults to `nullptr` and nothing enforces the "if you forward
-> `PassthroughSource`, forward cloud/curve too" pairing.
+Replace the "IGeometrySource passthrough wrappers silently drop GetPointCloud()/GetCurve()"
+entry: Null3D/Material/Mapping now forward both (ebf4f67); still open are Switcher3D
+(all) and SetColor (`GetCurve`), and Displacement/AudioDisplacement/Wrap/MergeByDistance/
+MeshResynth/Join never forward cloud/curve. Add: **`Mesh::Empty()` means "no surface", not
+"no vertices"; use `HasGeometry()` for vertices**; and **Join's `keepInputColours` was
+resurrected by merge 906acfa**.
 
 ---
----
+
+> **Stale banner (2026-09-30):** Phase 2/3 below are the original 2026-09-09 text. Since then Phase 4/5 landed (D1 warnings, D5 empty stand-ins, passthrough cloud/curve for Null3D/Material/Mapping/Cloth, MaterialRevision/MappingRevision). Where they disagree with sections 1-6 above, the sections above win.
 
 # Phase 2 — the rule matrix
 
