@@ -1,0 +1,12 @@
+infinite-patch 1
+# A steady 1 kHz sine into Audio Out: --audio-summary must find it in the 1 kHz band.
+node 1 Synths Oscillator
+  id osc
+  f frequency 1000
+  i waveform Sine
+  f volume 0.5
+end
+node 2 AudioUtility Audio Out
+  id speakers
+end
+aud speakers 0 osc

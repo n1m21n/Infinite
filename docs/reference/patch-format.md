@@ -94,8 +94,31 @@ expression on `rotation`. These three files are run through `--validate` (strict
 |---|---|
 | `--validate f.inf` | does it load, strictly; every problem with its line |
 | `--explain f.inf [--json] [--all]` | what the loaded graph actually is: nodes, non-default params, every wire, resolved modulation range |
-| `--frame f.inf 0 out.png` | one picture |
+| `--frame f.inf 0 out.png` | one picture, plus its numbers (`frame_stats`) in the status line |
+| `--frame f.inf 0,1,2 dir/ --contact-sheet sheet.png` | several times in one image, each cell stamped with its time |
+| `--audio-summary f.inf out.json [--duration S] [--wav out.wav]` | what it sounds like, as numbers: loudness, peaks, clipping, silence, spectrum, tempo guess |
 | `--canonicalize in out` | the numeric form the GUI would write |
+
+Reading the result without opening a file: the status line (last line of stdout) carries the headline
+numbers, so a check is one command and one JSON read.
+
+| Field | Mode | Meaning |
+|---|---|---|
+| `frame_stats[]` | `--frame` | per frame: `mean_luma`, `min_luma`, `max_luma`, `mean_rgb`, `black_percent`, `white_percent`, `alpha_coverage`, `mean_alpha`, `luma_histogram` (16 bins, sums to 1). Luma is BT.709 on the encoded 8-bit values, 0..1 |
+| `contact_sheet` | `--frame --contact-sheet` | `file`, `size`, `cells`, `cell_width` (480 px); an sRGB-tagged PNG |
+| `audio_summary` | `--audio-summary` | `integrated_lufs` (BS.1770, gated), `true_peak_dbtp` (4x oversampled), `sample_peak_dbfs`, `rms_dbfs` per channel, `dc_offset`, `clipped_percent`, `silence_ratio`, `stereo_correlation`, `onset_count_estimate`, `bpm_estimate` + `bpm_confidence` (estimates, not a beat tracker), `loudest_band_hz`. `null` means the number does not exist for this signal (loudness of silence) |
+| `source`, `sinks[]` | `--audio-summary` | what was measured: `mix` is every Audio Out and every Output with audio wired in, summed, as the speakers would get it; `--output <node>` measures one of them |
+
+`out.json` holds the same numbers plus `spectrum` (32 log-spaced bands, 20 Hz to 20 kHz, mean dB) and
+`loudness_per_second`, so a fade or a drop-out shows. Without `--duration` the range is the Output's
+own render length, else 10 s. The patch needs no Output: an Audio Out is enough.
+
+| Code | Exit | Means |
+|---|---|---|
+| `W_BLACK_FRAME` | 0 | a frame is 100 % black: nothing reached the Output at that time |
+| `W_CLIPPING` | 0 | samples at or over full scale; a file written from this distorts |
+| `W_SILENT` | 0 | nothing above -70 LUFS in the whole range |
+| `E_NO_AUDIO` | 3 | no Audio Out and no Output with audio wired in |
 
 `--explain` prints the graph that was built, not the file, then the status JSON on the last line.
 For `tests/headless/format/modulation.inf`:

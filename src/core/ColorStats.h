@@ -202,4 +202,26 @@ namespace ColorStats
 
    // File path helper
    std::string StatsPath(const std::string& logDir);
+
+   // What one exported frame looks like, in numbers (`Infinite --frame` puts
+   // one of these per frame in its status line, docs/fix-briefs/headless-engine.md
+   // 2.2). Luma is BT.709 on the encoded 8-bit values, 0..1, same as AddPixel.
+   constexpr int kFrameLumaBins = 16;
+   struct FrameSummary
+   {
+      int width = 0;
+      int height = 0;
+      double meanLuma = 0.0;
+      double minLuma = 0.0;
+      double maxLuma = 0.0;
+      double meanRgb[3] = { 0.0, 0.0, 0.0 };
+      double blackPercent = 0.0;   // pixels whose R, G and B are all 0
+      double whitePercent = 0.0;   // pixels whose R, G and B are all 255
+      double alphaCoverage = 0.0;  // percent of pixels with any alpha at all
+      double meanAlpha = 0.0;      // 0..1
+      double lumaHistogram[kFrameLumaBins] = {}; // share of pixels per bin, sums to 1
+   };
+   FrameSummary SummarizeRgba8(const uint8_t* pixels, int width, int height);
+   // `"mean_luma":0.41,...` with no surrounding braces, so the caller can add its own keys.
+   std::string FrameSummaryJsonFields(const FrameSummary& s);
 }

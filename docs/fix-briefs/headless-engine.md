@@ -184,12 +184,23 @@ drop-out is visible. Put the DSP in a new `src/core/AudioAnalysis.{h,cpp}` with 
 dependency so a unit test can call it on a synthesized sine (a 1 kHz sine at -20 dBFS must read
 -20 ± 0.1 LUFS-ish and 1 kHz must be the loudest band). `--wav` also writes the samples.
 
+**As built (2026-09-30).** The module is `src/core/AudioSummary.{h,cpp}`: `src/platform/common/AudioAnalysis.h`
+already owns the other name. Self-test: `INFINITE_AUDIOSUMMARYTEST=1` (in the hygiene fast tier).
+The measured signal is the device mix (every terminal summed) unless `--output <node>` names one
+Audio Out / Output; the JSON says which (`source`, `sinks`). Cooks video nodes per frame at `--fps`
+so picture-driven audio behaves as in a render. Codes: `E_NO_AUDIO` (exit 3), `W_CLIPPING` (G12),
+`W_SILENT`. Reference: `docs/reference/patch-format.md`, "Checking a file".
+
 ### 2.2 Image summary alongside PNGs
 `--frame` also emits, per frame in the status JSON: mean/min/max luma, mean RGB, % pure black,
 % clipped white, alpha coverage, and a 16-bin luma histogram, via `src/core/ColorStats`. This is
 what lets Claude catch "black frame", "blown out" and "nothing rendered" without reading the
 image. Add `--contact-sheet <out.png>` to `--frame` with several times: one PNG grid with
 timestamps, so one image read covers a whole animation.
+
+**As built (2026-09-30).** `frame_stats[]` and `contact_sheet` in the status JSON; `W_BLACK_FRAME`
+when a frame is 100 % black. The sheet is `src/core/ContactSheet.{h,cpp}`: 480 px cells, square-ish
+grid, time label per cell, `sRGB` chunk. Fixtures: `tests/headless/summary/`.
 
 ## Block 3 — the patch as an authored language
 

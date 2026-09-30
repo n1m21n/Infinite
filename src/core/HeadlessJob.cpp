@@ -95,6 +95,11 @@ namespace Headless
          job.mode = Mode::Frame;
          positional = 3;
       }
+      else if (first == "--audio-summary")
+      {
+         job.mode = Mode::AudioSummary;
+         positional = 2;
+      }
       else if (first == "--describe")
       {
          job.mode = Mode::Describe;
@@ -304,6 +309,20 @@ namespace Headless
                return true;
             job.jsonPath = v;
          }
+         else if (a == "--wav" && job.mode == Mode::AudioSummary)
+         {
+            const char* v = next("--wav");
+            if (v == nullptr)
+               return true;
+            job.wavPath = v;
+         }
+         else if (a == "--contact-sheet" && job.mode == Mode::Frame)
+         {
+            const char* v = next("--contact-sheet");
+            if (v == nullptr)
+               return true;
+            job.contactSheet = v;
+         }
          else if (a == "--no-audio")
             job.noAudio = true;
          else if (a == "--lenient")
@@ -320,13 +339,15 @@ namespace Headless
       if ((int)pos.size() != positional)
       {
          usageError = job.mode == Mode::Render
-                         ? "usage: Infinite --render <patch.inf> <out.mp4|mov|wav> [options]"
-                         : "usage: Infinite --frame <patch.inf> <T[,T...]> <out.png|out_dir/> [options]";
+                         ? "usage: Infinite --render <patch.inf> <out.mp4|mov> [options]"
+                         : job.mode == Mode::AudioSummary
+                              ? "usage: Infinite --audio-summary <patch.inf> <out.json> [--start S] [--duration S] [--wav <out.wav>] [options]"
+                              : "usage: Infinite --frame <patch.inf> <T[,T...]> <out.png|out_dir/> [--contact-sheet <sheet.png>] [options]";
          return true;
       }
 
       job.patch = pos[0];
-      if (job.mode == Mode::Render)
+      if (job.mode == Mode::Render || job.mode == Mode::AudioSummary)
          job.out = pos[1];
       else
       {
@@ -345,7 +366,8 @@ namespace Headless
       // W_OUT_OF_RANGE stays advisory until a real corpus of GUI-saved patches has been
       // checked to give zero hits (docs/fix-briefs/headless-engine.md 3.1b); the corpus in
       // this repo is one file, which is not enough to promote it.
-      return code == "W_UNUSED_NODE" || code == "W_NO_OUTPUT" || code == "W_DURATION_ROUNDED" || code == "W_OUT_OF_RANGE";
+      return code == "W_UNUSED_NODE" || code == "W_NO_OUTPUT" || code == "W_DURATION_ROUNDED" || code == "W_OUT_OF_RANGE" ||
+             code == "W_CLIPPING" || code == "W_SILENT" || code == "W_BLACK_FRAME";
    }
 
    void PromoteWarnings(std::vector<Issue>& warnings, std::vector<Issue>& errors)
@@ -373,7 +395,7 @@ namespace Headless
       const std::string& c = status.errors.front().code;
       if (c == "E_USAGE" || c == "E_UNSUPPORTED_CONTAINER")
          return 2;
-      if (c == "E_LOAD" || c == "E_NO_OUTPUT" || c == "E_AMBIGUOUS_OUTPUT" || c == "E_UNKNOWN_TYPE" ||
+      if (c == "E_LOAD" || c == "E_NO_OUTPUT" || c == "E_NO_AUDIO" || c == "E_AMBIGUOUS_OUTPUT" || c == "E_UNKNOWN_TYPE" ||
           c == "E_BAD_SLOT" || c == "E_KIND_MISMATCH" || c == "E_DANGLING" || c == "E_CYCLE" ||
           c == "E_DUPLICATE_INDEX" || c == "E_DUPLICATE_ID" || c == "E_BAD_ID" || c == "E_BAD_REF" || c == "E_BAD_KEY" || c == "E_BAD_VALUE" || c == "E_SLOT_TAKEN" || c == "E_NOT_A_MODULATOR" || c == "E_BAD_PARAM")
          return 3;

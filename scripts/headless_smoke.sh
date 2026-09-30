@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# End-to-end check of the headless CLI (docs/fix-briefs/headless-engine.md, blocks 1 and 3).
-# Spawns Infinite --frame / --render / bad input and asserts the status JSON,
+# End-to-end check of the headless CLI (docs/fix-briefs/headless-engine.md, blocks 1, 2 and 3).
+# Spawns Infinite --frame / --render / --audio-summary / bad input and asserts the status JSON,
 # the exit code and the files. Usage: scripts/headless_smoke.sh [path/to/Infinite]
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -201,6 +201,38 @@ r=$("$BIN" --explain "$S/misspelled.inf" 2>/dev/null); rc=$?
 "$BIN" --explain "$S/misspelled.inf" --lenient 2>/dev/null | grep -q '^Relations ('; check "explain --lenient: explains it anyway" $?
 "$BIN" --explain "$OUT/missing.inf" >/dev/null 2>&1; [ $? = 3 ]; check "explain: missing patch exit 3" $?
 "$BIN" --explain >/dev/null 2>&1; [ $? = 2 ]; check "explain: no patch exit 2" $?
+
+# --- summaries (block 2): audio numbers and per-frame image stats ---
+M="$ROOT/tests/headless/summary"
+INFINITE_AUDIOSUMMARYTEST=1 "$BIN" 2>/dev/null | tail -1 | grep -q '^AUDIOSUMMARYTEST: PASS$'; check "summary: analyzer self-test (1 kHz sine at -20 dBFS reads -20 LUFS)" $?
+r=$("$BIN" --audio-summary "$M/sine.inf" "$OUT/sine.json" --duration 2 --wav "$OUT/sine.wav" 2>/dev/null); rc=$?
+check "summary: sine exit 0" $rc
+[ "$(echo "$r" | json "d['mode']=='audio-summary' and 900 < d['audio_summary']['loudest_band_hz'] < 1200 and d['audio']['frames']==96000 and d['warnings']==[]")" = "True" ]; check "summary: sine loudest band is 1 kHz, 2 s at 48 kHz, no warnings" $?
+[ "$(python3 -c "
+import json; d=json.load(open('$OUT/sine.json'))
+print(len(d['spectrum']['mean_db'])==32 and len(d['loudness_per_second'])==2 and d['source']=='mix' and abs(d['integrated_lufs']-d['sample_peak_dbfs'])<0.2)")" = "True" ]; check "summary: out.json has 32 bands, per-second loudness, LUFS == sine peak" $?
+[ "$(wc -c < "$OUT/sine.wav" | tr -d ' ')" -gt 380000 ]; check "summary: --wav written" $?
+"$BIN" --audio-summary "$M/sine.inf" "$OUT/sine2.json" --duration 2 >/dev/null 2>&1; cmp -s "$OUT/sine.json" "$OUT/sine2.json"; check "summary: two runs give the same file" $?
+r=$("$BIN" --audio-summary "$M/clipping.inf" "$OUT/clip.json" --duration 1 2>/dev/null); rc=$?
+[ "$rc" = 0 ] && [ "$(echo "$r" | json "[w['code'] for w in d['warnings']]==['W_CLIPPING'] and d['audio_summary']['clipped_percent'] > 10")" = "True" ]; check "summary: over full scale warns W_CLIPPING, still exit 0" $?
+r=$("$BIN" --audio-summary "$M/silent.inf" "$OUT/silent.json" --duration 1 2>/dev/null); rc=$?
+[ "$rc" = 0 ] && [ "$(echo "$r" | json "[w['code'] for w in d['warnings']]==['W_SILENT'] and d['audio_summary']['integrated_lufs'] is None")" = "True" ]; check "summary: silence warns W_SILENT, loudness null" $?
+r=$("$BIN" --audio-summary "$M/no_audio.inf" "$OUT/na.json" 2>/dev/null); rc=$?
+[ "$rc" = 3 ] && [ ! -e "$OUT/na.json" ] && echo "$r" | grep -q '"E_NO_AUDIO"'; check "summary: no audio terminal exit 3 E_NO_AUDIO, nothing written" $?
+r=$("$BIN" --audio-summary "$PATCH" "$OUT/one.json" --duration 1 --output 15 2>/dev/null); rc=$?
+[ "$rc" = 0 ] && [ "$(echo "$r" | json "d['source']=='node' and d['source_node']==15 and len(d['sinks'])==2")" = "True" ]; check "summary: --output picks one of two audio terminals" $?
+"$BIN" --audio-summary "$PATCH" "$OUT/x.json" --output 7 >/dev/null 2>&1; [ $? = 3 ]; check "summary: --output on a non-terminal exit 3" $?
+"$BIN" --audio-summary "$M/sine.inf" >/dev/null 2>&1; [ $? = 2 ]; check "summary: no out.json exit 2" $?
+"$BIN" --frame "$M/black.inf" 0 "$OUT/x.png" --wav "$OUT/x.wav" >/dev/null 2>&1; [ $? = 2 ]; check "summary: --wav outside --audio-summary exit 2" $?
+
+r=$("$BIN" --frame "$M/black.inf" 0,1 "$OUT/black/" --contact-sheet "$OUT/black/sheet.png" 2>/dev/null); rc=$?
+[ "$rc" = 0 ] && [ "$(echo "$r" | json "[f['black_percent'] for f in d['frame_stats']]==[100.0,100.0] and [w['code'] for w in d['warnings']]==['W_BLACK_FRAME','W_BLACK_FRAME']")" = "True" ]; check "summary: black patch reports 100 % black and W_BLACK_FRAME per frame" $?
+r=$("$BIN" --frame "$PATCH" 0,1,2 "$OUT/cs/" --contact-sheet "$OUT/cs/sheet.png" 2>/dev/null); rc=$?
+[ "$rc" = 0 ] && [ "$(echo "$r" | json "len(d['frame_stats'])==3 and all(len(f['luma_histogram'])==16 and abs(sum(f['luma_histogram'])-1)<0.01 and f['black_percent']<100 for f in d['frame_stats']) and d['contact_sheet']['cells']==3 and d['contact_sheet']['cell_width']>=480 and not any(w['code']=='W_BLACK_FRAME' for w in d['warnings'])")" = "True" ]; check "summary: frame_stats per frame, 16-bin histogram sums to 1, sheet cells >= 480 px" $?
+[ "$(python3 -c "
+import struct; b=open('$OUT/cs/sheet.png','rb').read()
+print(b[12:16]==b'IHDR' and b[37:41]==b'sRGB' and struct.unpack('>I',b[16:20])[0] >= 960)")" = "True" ]; check "summary: contact sheet is an sRGB-tagged PNG" $?
+"$BIN" --render "$PATCH" "$OUT/x.mp4" --contact-sheet "$OUT/x.png" >/dev/null 2>&1; [ $? = 2 ]; check "summary: --contact-sheet outside --frame exit 2" $?
 
 rm -rf "$OUT"
 exit $fail

@@ -1,0 +1,9 @@
+infinite-patch 1
+# A picture-only patch: --audio-summary has nothing to measure (E_NO_AUDIO).
+node 1 Source Shape
+  id picture
+end
+node 2 Utility Output
+  id out
+end
+cable out 0 picture

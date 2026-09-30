@@ -397,7 +397,9 @@ set(COMMON_SOURCES
     src/core/Modulation.cpp
     src/core/MovementLog.cpp
     src/core/MovementStats.cpp
+    src/core/AudioSummary.cpp
     src/core/ColorStats.cpp
+    src/core/ContactSheet.cpp
     src/core/HeadlessJob.cpp
     src/core/PatchSchema.cpp
     src/core/PatchExplain.cpp
