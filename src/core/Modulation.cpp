@@ -208,6 +208,7 @@ void Modulation::RegisterParam(const ParamRef& ref)
    // would silently make every log/dB knob linear.
    frame.posToValue = ref.posToValue;
    frame.valueToPos = ref.valueToPos;
+   frame.srcAddr = ref.srcAddr;
 
    ParamRef& known = mKnownParams[Key(ref.nodeIndex, ref.paramIndex)];
    known.nodeIndex = ref.nodeIndex;
@@ -227,6 +228,13 @@ void Modulation::RegisterParam(const ParamRef& ref)
    // not "this param lost its options".
    if (!ref.enumOptions.empty() && known.enumOptions != ref.enumOptions)
       known.enumOptions = ref.enumOptions;
+}
+
+void Modulation::SetKnownKey(int nodeIndex, int paramIndex, const std::string& key)
+{
+   auto it = mKnownParams.find(Key(nodeIndex, paramIndex));
+   if (it != mKnownParams.end())
+      it->second.key = key;
 }
 
 const ParamRef* Modulation::KnownParam(int nodeIndex, int paramIndex) const

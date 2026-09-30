@@ -34,6 +34,7 @@ namespace PatchSchema
       float minValue = 0.0f, maxValue = 1.0f, step = 0.0f;
       bool isEnum = false, isBool = false;
       std::vector<std::string> enumOptions;
+      std::string key; // the saved key this control edits; empty = not found (see unkeyed)
    };
 
    struct SlotInfo
@@ -50,6 +51,18 @@ namespace PatchSchema
       bool modulator = false; // a `mod` line may read this output (a modulator or a predictor)
    };
 
+   // One saved key with what the UI knows about it (filled from a drawn probe node).
+   struct ControlInfo
+   {
+      std::string key;
+      std::string label;             // what the UI calls it; empty if no widget registers it
+      int index = -1;                // the mod/expr parameter index; -1 = not modulatable
+      bool hasRange = false;         // min/max come from a registered widget
+      float minValue = 0.0f, maxValue = 0.0f, step = 0.0f;
+      bool isEnum = false, isBool = false;
+      std::vector<std::string> options;
+   };
+
    struct TypeSchema
    {
       std::string name;
@@ -58,6 +71,11 @@ namespace PatchSchema
       std::vector<SlotInfo> inputs;
       std::vector<OutputInfo> outputs;
       std::vector<ModulatableInfo> modulatable;
+      // How well the labelled controls were joined to saved keys (main.cpp ParamKeyJoiner).
+      std::vector<ControlInfo> controls; // one per saved f/i/b key, when controlsKnown
+      bool controlsKnown = false;        // a probe node was drawn and joined
+      int joinRegistered = 0; // controls the draw pass registered
+      int joinKeyed = 0;      // of those, with a saved key
       bool hardwareDriven = false;
       bool canBypass = false; // `flags bypassed=1` takes effect (CanBypass in main.cpp)
    };
@@ -77,10 +95,35 @@ namespace PatchSchema
       // -2 = not known here, -1 = it registers none. Filled from a drawn node,
       // so it is only available once a window has drawn one.
       std::function<int(const std::string& type)> maxParamIndex;
-      // Strict: E_NO_OUTPUT is an error rather than silence, and so is
-      // W_BYPASS_IGNORED (the render would not match what the author wrote).
+      // Control keys (ParamRef.key). paramIndexOfKey: -2 = the type was never probed,
+      // -1 = it has no such modulatable control, else the `mod`/`expr` parameter index.
+      // Only available once a headless run has drawn and joined a node of the type.
+      std::function<int(const std::string& type, const std::string& key)> paramIndexOfKey;
+      std::function<std::vector<std::string>(const std::string& type)> modulatableKeys;
+      // The option names of a dropdown key (empty when it is not one).
+      std::function<std::vector<std::string>(const std::string& type, const std::string& key)> optionsOf;
+      // E_NO_OUTPUT is an error rather than a warning. (Strict mode, which
+      // promotes the warnings too, is Headless::PromoteWarnings.)
       bool forRender = false;
    };
+
+   // The authoring name of each input of a type, parallel to t.inputs: the
+   // lowercased label with every non-alphanumeric run turned into `_`; an empty
+   // label is "input", a numeric one "in_<n>"; a repeated name gets `_2`, `_3`.
+   // Never parses as an integer, so it cannot be mistaken for a slot number.
+   std::vector<std::string> SlotNames(const TypeSchema& t);
+
+   // Turns every `id`/slot word in `data` into the index it stands for, so
+   // Validate and ApplyPatchData only ever see numbers. Reports E_BAD_ID,
+   // E_DUPLICATE_ID and E_BAD_REF (unknown node or slot word, with the nearest
+   // names). A no-op when data.hasNamedRefs is false. Clears the words it
+   // resolved; `id` values stay on the nodes (--keep-ids) until the caller drops them.
+   void Resolve(Patch::Data& data, const Env& env, std::vector<Headless::Issue>& errors);
+
+   // Turns `mod 5 radius ...` / `expr 5 radius ...` keys into parameter indices and
+   // `i shapeType Star` option names into numbers. Reports E_BAD_KEY and E_BAD_VALUE with
+   // the nearest valid names. Records it could not resolve are left as they were.
+   void ResolveKeys(Patch::Data& data, const Env& env, std::vector<Headless::Issue>& errors);
 
    std::string ParamKindName(char kind);
    std::string ToJson(const TypeSchema& t);

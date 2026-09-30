@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end check of the headless CLI (docs/fix-briefs/headless-engine.md, block 1).
+# End-to-end check of the headless CLI (docs/fix-briefs/headless-engine.md, blocks 1 and 3).
 # Spawns Infinite --frame / --render / bad input and asserts the status JSON,
 # the exit code and the files. Usage: scripts/headless_smoke.sh [path/to/Infinite]
 set -u
@@ -73,6 +73,134 @@ for f in "$ROOT"/tests/headless/topology/*.inf; do
   want=$(tr ' ' '\n' < "${f%.inf}.expect" | grep -v '^$' | sort | tr '\n' ' ' | sed 's/ $//')
   [ "$got" = "$want" ]; check "topology $name ($want)" $?
 done
+
+# C0: the probe waits for every node to draw, not a fixed 8 ticks. patch_1 has a
+# Wavetable that used to give a false E_BAD_PARAM; run it several times.
+ok=0
+for i in 1 2 3 4 5 6; do
+  r=$("$BIN" --validate "$ROOT/assets/examples/patch_1.inf" 2>/dev/null); [ "$(echo "$r" | json "d['ok']")" = "True" ] && ok=$((ok+1))
+done
+[ "$ok" = 6 ]; check "patch_1 validates 6/6 (probe barrier)" $?
+r=$("$BIN" --describe 2>/dev/null); [ "$(echo "$r" | json "sum(len(t['modulatable']) for t in d['types']) > 1500")" = "True" ]; check "describe registers off-screen nodes too" $?
+
+# C1: strict by default, --lenient opts out. A misspelled param refuses (exit 3),
+# names its line and the nearest key; --lenient renders it.
+S="$ROOT/tests/headless/strict"
+r=$("$BIN" --frame "$S/misspelled.inf" 0 "$OUT/s.png" 2>/dev/null); rc=$?
+[ "$rc" = 3 ]; check "strict: misspelled param exit 3" $?
+[ ! -e "$OUT/s.png" ]; check "strict: nothing rendered" $?
+[ "$(echo "$r" | json "[(e['code'],e['line'],e.get('promoted'),e['hint']) for e in d['errors']]")" = "[('W_UNKNOWN_PARAM', 119, True, \"did you mean 'damping'?\")]" ]; check "strict: error names line and nearest key" $?
+r=$("$BIN" --frame "$S/misspelled.inf" 0 "$OUT/s.png" --lenient 2>/dev/null); rc=$?
+[ "$rc" = 0 ] && [ -s "$OUT/s.png" ]; check "lenient: misspelled param renders, exit 0" $?
+[ "$(echo "$r" | json "'W_UNKNOWN_PARAM' in [w['code'] for w in d['warnings']] and not d['errors']")" = "True" ]; check "lenient: still reported as a warning" $?
+"$BIN" --validate "$S/misspelled.inf" >/dev/null 2>&1; [ $? = 3 ]; check "validate is strict by default" $?
+"$BIN" --validate "$S/misspelled.inf" --lenient >/dev/null 2>&1; [ $? = 0 ]; check "validate --lenient exit 0" $?
+# the topology warnings are errors by default, warnings under --lenient
+for g in g3_bypass_blend g6_image_cycle g11_open_blend g13_output_empty; do
+  "$BIN" --validate "$ROOT/tests/headless/topology/$g.inf" --for-render >/dev/null 2>&1; [ $? = 3 ]; check "strict: $g exit 3" $?
+  "$BIN" --validate "$ROOT/tests/headless/topology/$g.inf" --for-render --lenient >/dev/null 2>&1; [ $? = 0 ]; check "lenient: $g exit 0" $?
+done
+# advisory warnings never block: unused nodes in the real fixtures
+"$BIN" --validate "$ROOT/assets/examples/patch_1.inf" >/dev/null 2>&1; [ $? = 0 ]; check "strict: unused nodes stay advisory (patch_1)" $?
+# every problem at once: warnings promoted before load AND E_BAD_PARAM found after
+r=$("$BIN" --frame "$S/all_at_once.inf" 0 "$OUT/a.png" 2>/dev/null); rc=$?
+[ "$rc" = 3 ]; check "strict: all-at-once exit 3" $?
+[ "$(echo "$r" | json "sorted(e['code'] for e in d['errors'])")" = "['E_BAD_PARAM', 'W_BYPASS_IGNORED', 'W_UNKNOWN_PARAM']" ]; check "strict: all-at-once lists every problem" $?
+
+# --- names (C2): a hand-written patch canonicalizes to the numeric twin ---
+N="$ROOT/tests/headless/names"
+"$BIN" --canonicalize "$N/numeric.inf" "$OUT/n_num.inf" >/dev/null 2>&1; check "names: numeric canonicalize" $?
+"$BIN" --canonicalize "$N/named.inf" "$OUT/n_named.inf" >/dev/null 2>&1; check "names: named canonicalize" $?
+cmp -s "$OUT/n_num.inf" "$OUT/n_named.inf"; check "names: named == numeric (byte-identical)" $?
+# CRLF, BOM and trailing spaces on every line must not change the result
+sed 's/$/\r/' "$N/named.inf" > "$OUT/crlf.inf"
+printf '\xef\xbb\xbf' > "$OUT/bom.inf"; cat "$N/named.inf" >> "$OUT/bom.inf"
+sed 's/$/   /' "$N/named.inf" > "$OUT/trail.inf"
+for v in crlf bom trail; do
+  "$BIN" --canonicalize "$OUT/$v.inf" "$OUT/n_$v.inf" >/dev/null 2>&1
+  cmp -s "$OUT/n_num.inf" "$OUT/n_$v.inf"; check "names: $v variant canonicalizes identically" $?
+done
+# the same picture from both spellings
+"$BIN" --frame "$N/numeric.inf" 0 "$OUT/fn.png" >/dev/null 2>&1; "$BIN" --frame "$N/named.inf" 0 "$OUT/fa.png" >/dev/null 2>&1
+cmp -s "$OUT/fn.png" "$OUT/fa.png"; check "names: identical --frame PNGs" $?
+# a GUI-written file is untouched by the new reader/writer
+"$BIN" --canonicalize "$ROOT/assets/examples/patch_1.inf" "$OUT/p1.inf" >/dev/null 2>&1
+cmp -s "$OUT/p1.inf" "$N/patch_1.canonical.inf"; check "names: patch_1 load-write byte-identical to baseline" $?
+# errors: unknown id, duplicate id, bad id
+printf 'infinite-patch 1\nnode 1 Source Shape\n  id a\nend\nnode 2 Utility Output\n  id a\nend\n' > "$OUT/dup.inf"
+r=$("$BIN" --validate "$OUT/dup.inf" 2>/dev/null); [ "$(echo "$r" | json "d['errors'][0]['code']")" = "E_DUPLICATE_ID" ]; check "names: duplicate id reported" $?
+printf 'infinite-patch 1\nnode 1 Source Shape\n  id 7up\nend\n' > "$OUT/bad.inf"
+r=$("$BIN" --validate "$OUT/bad.inf" 2>/dev/null); [ "$(echo "$r" | json "d['errors'][0]['code']")" = "E_BAD_ID" ]; check "names: bad id reported" $?
+printf 'infinite-patch 1\nnode 1 Source Shape\n  id shape\nend\nnode 2 Utility Output\nend\ncable out 0 shpae\n' > "$OUT/ref.inf"
+r=$("$BIN" --validate "$OUT/ref.inf" 2>/dev/null); rc=$?
+[ "$rc" = 3 ] && [ "$(echo "$r" | json "d['errors'][0]['code']")" = "E_BAD_REF" ]; check "names: unknown reference exit 3" $?
+
+# --- key join (C3): every labelled control should know its saved key; the count may only go up ---
+BASE="$ROOT/tests/headless/describe_join_baseline.json"
+r=$("$BIN" --describe 2>/dev/null)
+[ "$(echo "$r" | json "d['join_stats']['keyed'] >= json.load(open('$BASE'))['keyed']")" = "True" ]; check "describe: keyed controls did not drop below the baseline" $?
+[ "$(echo "$r" | json "[m['key'] for t in d['types'] if t['type']=='Shape' for m in t['modulatable'] if m['label']=='size x'][0]")" = "sizeX" ]; check "describe: Shape 'size x' is key sizeX" $?
+[ "$(echo "$r" | json "[m['key'] for t in d['types'] if t['type']=='Shape' for m in t['modulatable'] if m['label']=='shape'][0]")" = "shapeType" ]; check "describe: Shape dropdown 'shape' is key shapeType (perturbation tier)" $?
+
+# --- describe rows (C4): one row per saved key, dropdown options present ---
+[ "$(echo "$r" | json "sum(1 for t in d['types'] for m in t['modulatable'] if 'enum' in m and len(m['enum'])==0)")" = "0" ]; check "describe: no dropdown has an empty option list" $?
+for ty in Shape Oscillator Wavetable Reverb FieldPixel LFO "Render 3D" Sampler Mixer "Predictive Modulator"; do
+  [ "$(echo "$r" | json "(lambda t: len(t['rows'])==len(t['params']) and all(rw['ui'] and rw['label'] for rw in t['rows'] if rw['modulatable_index'] is not None) and all(len(rw['options'])>0 for rw in t['rows'] if rw['options'] is not None and rw['key'] in [m.get('key') for m in t['modulatable'] if 'enum' in m]))([t for t in d['types'] if t['type']=='$ty'][0])")" = "True" ]; check "describe: $ty rows complete" $?
+done
+[ "$(echo "$r" | json "[rw['options'][:3] for t in d['types'] if t['type']=='Shape' for rw in t['rows'] if rw['key']=='shapeType'][0]")" = "['Circle', 'Ellipse', 'Rectangle']" ]; check "describe: shapeType lists option names" $?
+r2=$("$BIN" --validate "$N/out_of_range.inf" 2>/dev/null); rc=$?
+[ "$rc" = 0 ] && [ "$(echo "$r2" | json "sorted(w['code'] for w in d['warnings'])")" = "['W_OUT_OF_RANGE', 'W_OUT_OF_RANGE']" ]; check "validate: W_OUT_OF_RANGE reported, advisory (exit 0)" $?
+r2=$("$BIN" --validate "$ROOT/assets/examples/patch_1.inf" 2>/dev/null)
+[ "$(echo "$r2" | json "sum(1 for w in d['warnings'] if w['code'] in ('W_OUT_OF_RANGE','W_INTERNAL_PARAM'))")" = "0" ]; check "validate: GUI-saved patch_1 has zero range/internal hits" $?
+
+# --- keyed (C5): controls by key, dropdowns by option name == the numeric twin ---
+K="$ROOT/tests/headless/keyed"
+"$BIN" --canonicalize "$K/keyed.inf" "$OUT/ck.inf" >/dev/null 2>&1; "$BIN" --canonicalize "$K/numeric.inf" "$OUT/cn.inf" >/dev/null 2>&1
+cmp -s "$OUT/ck.inf" "$OUT/cn.inf"; check "keyed: canonicalize identical to numeric twin" $?
+"$BIN" --frame "$K/numeric.inf" 0 "$OUT/kn.png" >/dev/null 2>&1; "$BIN" --frame "$K/keyed.inf" 0 "$OUT/kk.png" >/dev/null 2>&1
+cmp -s "$OUT/kn.png" "$OUT/kk.png"; check "keyed: identical --frame PNGs" $?
+r=$("$BIN" --frame "$K/misspelled.inf" 0 "$OUT/km.png" 2>/dev/null); rc=$?
+[ "$rc" = 3 ] && [ ! -e "$OUT/km.png" ]; check "keyed: misspelled key exit 3, nothing rendered" $?
+[ "$(echo "$r" | json "[(e['code'],e['line'],e['hint'].split(',')[0]) for e in d['errors']]")" = "[('E_BAD_KEY', 14, 'did you mean: sizeX')]" ]; check "keyed: error names line and nearest key sizeX" $?
+
+# --- format doc fixtures (3.4): the three patches docs/reference/patch-format.md shows ---
+F="$ROOT/tests/headless/format"
+for f in image audio modulation; do
+  "$BIN" --validate "$F/$f.inf" >/dev/null 2>&1; check "format: $f.inf validates strictly" $?
+done
+
+# --- explain (3.3b): the live graph read back after the load ---
+rel() { sed -n '/^Relations/,/^Unconnected/p' | grep -c "^  $1 "; }
+P1="$ROOT/assets/examples/patch_1.inf"
+r=$("$BIN" --explain "$P1" 2>/dev/null); rc=$?
+check "explain: patch_1 exit 0" $rc
+for t in cable geo aud note mod pal expr; do
+  [ "$(echo "$r" | rel $t)" = "$(grep -c "^$t " "$P1")" ]; check "explain: patch_1 $t lines == $t records in the file" $?
+done
+r=$("$BIN" --explain "$F/image.inf" 2>/dev/null)
+echo "$r" | grep -q '^    shapeType Star (6)$' && echo "$r" | grep -q '^    sizeX 0.6$'; check "explain: changed params by key, dropdown by option name" $?
+echo "$r" | grep -q '(default)'; [ $? = 1 ]; check "explain: defaults hidden in text" $?
+echo "$r" | grep -q '^  cable Output "out" (2) slot 0 \[in\] <- Shape "shape" (1)$'; check "explain: cable names both ends and the slot" $?
+"$BIN" --explain "$F/image.inf" --all 2>/dev/null | grep -q '^    posX 0.5   (default)$'; check "explain --all: defaults listed and marked" $?
+r=$("$BIN" --explain "$F/audio.inf" 2>/dev/null)
+echo "$r" | grep -q '^  note Wavetable "synth" (2) slot 0 \[notes\] <- Random Note Generator "notes" (1)$' &&
+  echo "$r" | grep -q '^  aud Audio Out "speakers" (3) slot 0 \[audio\] <- Wavetable "synth" (2)$'; check "explain: audio and note wires carry slot names" $?
+r=$("$BIN" --explain "$F/modulation.inf" 2>/dev/null)
+echo "$r" | grep -q '^  mod Shape "shape" (1) sizeX <- LFO "lfo" (2) out 0, absolute, depth 1, range 0.01..1$'; check "explain: mod shows key, source and resolved range" $?
+echo "$r" | grep -q '^  expr Shape "shape" (1) rotation = sin(t) \* 90$'; check "explain: expr shows key and text" $?
+echo "$r" | grep -q '^    sizeX .*(live value, driven by mod)$'; check "explain: a driven param is marked, not shown as authored" $?
+r=$("$BIN" --explain "$F/modulation.inf" --json 2>/dev/null)
+[ "$(echo "$r" | python3 -c "
+import sys,json
+g=json.loads(sys.stdin.readline()); st=json.loads(sys.stdin.readline())
+sh=[n for n in g['nodes'] if n['id']=='shape'][0]; p={q['key']:q for q in sh['params']}
+print(st['ok'] and st['mode']=='explain' and len(g['nodes'])==3 and sorted(x['kind'] for x in g['relations'])==['cable','expr','mod']
+      and p['f sizeX'].get('driven')=='mod' and p['f rotation'].get('driven')=='expr' and p['f posX']['default'] and g['unconnected']==[])")" = "True" ]; check "explain --json: graph line then status line" $?
+r=$("$BIN" --explain "$S/misspelled.inf" 2>/dev/null); rc=$?
+[ "$rc" = 3 ] && [ "$(echo "$r" | wc -l | tr -d ' ')" = 1 ]; check "explain: strict, a misspelled param exits 3 with no graph" $?
+"$BIN" --explain "$S/misspelled.inf" --lenient 2>/dev/null | grep -q '^Relations ('; check "explain --lenient: explains it anyway" $?
+"$BIN" --explain "$OUT/missing.inf" >/dev/null 2>&1; [ $? = 3 ]; check "explain: missing patch exit 3" $?
+"$BIN" --explain >/dev/null 2>&1; [ $? = 2 ]; check "explain: no patch exit 2" $?
 
 rm -rf "$OUT"
 exit $fail

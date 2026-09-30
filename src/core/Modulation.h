@@ -79,6 +79,15 @@ struct ParamRef
    std::vector<std::string> enumOptions;
    FaderPosToValueFn posToValue = nullptr;
    FaderValueToPosFn valueToPos = nullptr;
+   // The address of the node member this control edits (a float/int/bool that
+   // VisitParams also exposes), when the widget knows it. Frame-only and never
+   // dereferenced: --describe compares it with the addresses VisitParams hands
+   // out to learn which saved key this control is. nullptr = not known.
+   const void* srcAddr = nullptr;
+   // The saved key this control edits (`radius` for the "size x" label).
+   // Filled by the headless join (main.cpp ParamKeyJoiner), kept only in
+   // mKnownParams; empty when unknown.
+   std::string key;
 };
 
 // Which modulator drives which parameter. Keyed by (nodeIndex, paramIndex) so the
@@ -265,6 +274,8 @@ public:
    // the stored copy: the raw float* is only valid within the frame that
    // registered it - never store or dereference it from here.
    const ParamRef* KnownParam(int nodeIndex, int paramIndex) const;
+   // Records the saved key for a control in the sticky store (headless join).
+   void SetKnownKey(int nodeIndex, int paramIndex, const std::string& key);
    const std::map<Key, ParamRef>& AllKnownParams() const { return mKnownParams; }
 
 private:

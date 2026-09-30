@@ -8,9 +8,11 @@
 //
 //   Infinite --render <patch.inf> <out.(mp4|mov|wav)> [--start S] [--duration S]
 //            [--fps N] [--output <index|name>] [--sample-rate HZ] [--no-audio]
-//            [--json <file>] [--timeout S]
+//            [--json <file>] [--timeout S] [--lenient]
 //   Infinite --frame  <patch.inf> <T | T1,T2,...> <out.png | out_dir/>
-//            [--fps N] [--output <index|name>] [--sample-rate HZ] [--json <file>]
+//            [--fps N] [--output <index|name>] [--sample-rate HZ] [--json <file>] [--lenient]
+//   Infinite --canonicalize <in.inf> <out.inf> [--keep-ids] [--lenient] [--json <file>]
+//   Infinite --explain <patch.inf> [--json] [--all] [--lenient]
 //   Infinite --version --json
 //
 // Argument parsing, the status JSON and the exit-code table live here with no
@@ -28,6 +30,8 @@ namespace Headless
       Version,
       Describe,
       Validate,
+      Canonicalize,
+      Explain,
    };
 
    struct Job
@@ -46,6 +50,12 @@ namespace Headless
       std::string describeType; // --describe <type>, empty = every type
       bool forRender = false;    // --validate --for-render: a missing Output is an error
       bool json = false; // --version --json
+      // --lenient: warnings stay warnings. Without it every CLI mode is strict
+      // and a warning the schema pass raised is promoted to an error (exit 3).
+      bool lenient = false;
+      bool explainJson = false; // --explain --json: the graph as JSON instead of text
+      bool explainAll = false;  // --explain --all: list parameters left at their default too
+      bool keepIds = false; // --canonicalize --keep-ids: leave `id <word>` lines in
       double timeoutSec = 600.0;
    };
 
@@ -58,6 +68,7 @@ namespace Headless
       int line = 0;     // patch line, 0 = none
       int node = -1;    // node index, -1 = none
       std::string hint; // what to change, may be empty
+      bool promoted = false; // a W_ warning that strict mode turned into an error
    };
 
    struct Status
@@ -73,6 +84,7 @@ namespace Headless
       double audioSampleRate = 0.0;
       long long audioFrames = 0;
       long long elapsedMs = 0;
+      std::string stdoutText; // printed before the status line (--explain)
       std::string statusText; // the Output's RecordStatus, when there is one
       std::vector<std::string> files; // every file written
       std::vector<std::string> extraJson; // pre-rendered `"key":value` fragments
@@ -85,6 +97,15 @@ namespace Headless
    // an ordinary interactive launch (argv[1] is a patch path, a fixture flag,
    // or nothing).
    bool ParseArgs(int argc, char** argv, Job& job, std::string& usageError);
+
+   // Warnings that describe a patch that still means what it says (a node that
+   // reaches no output, no Output in a non-render check, a rounded duration).
+   // Everything else is a sign the file does not do what its author wrote, so
+   // strict mode refuses it.
+   bool IsAdvisory(const std::string& code);
+   // Strict mode: moves every non-advisory warning into `errors`, keeping its
+   // W_ code and marking it promoted. Advisory ones stay in `warnings`.
+   void PromoteWarnings(std::vector<Issue>& warnings, std::vector<Issue>& errors);
 
    // 0 ok, 2 usage, 3 patch load/validation, 4 refused (live source),
    // 5 render/encode failure, 6 timeout.

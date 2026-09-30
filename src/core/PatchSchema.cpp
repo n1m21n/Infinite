@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <cstdlib>
 #include <map>
 #include <set>
 
@@ -61,6 +62,200 @@ namespace PatchSchema
       }
    }
 
+   std::vector<std::string> SlotNames(const TypeSchema& t)
+   {
+      std::vector<std::string> out;
+      std::set<std::string> used;
+      for (const SlotInfo& in : t.inputs)
+      {
+         std::string n;
+         bool gap = false;
+         for (char ch : in.label)
+         {
+            const unsigned char c = (unsigned char)ch;
+            if (std::isalnum(c))
+            {
+               if (gap && !n.empty())
+                  n += '_';
+               gap = false;
+               n += (char)std::tolower(c);
+            }
+            else
+               gap = true;
+         }
+         if (n.empty())
+            n = "input";
+         else if (std::isdigit((unsigned char)n[0]))
+            n = "in_" + n;
+         std::string unique = n;
+         for (int k = 2; !used.insert(unique).second; k++)
+            unique = n + "_" + std::to_string(k);
+         out.push_back(unique);
+      }
+      return out;
+   }
+
+   void Resolve(Patch::Data& data, const Env& env, std::vector<Headless::Issue>& errors)
+   {
+      if (!data.hasNamedRefs)
+         return;
+      std::map<std::string, int> ids;
+      std::vector<std::string> idPool;
+      for (Patch::NodeRecord& n : data.nodes)
+      {
+         if (n.id.empty())
+            continue;
+         bool ok = !std::isdigit((unsigned char)n.id[0]);
+         for (char ch : n.id)
+            ok = ok && (std::isalnum((unsigned char)ch) || ch == '_');
+         if (!ok)
+         {
+            errors.push_back(Make("E_BAD_ID", "'" + n.id + "' is not a valid id", n.idLine, n.index,
+                                  "an id starts with a letter or _ and holds letters, digits and _"));
+            continue;
+         }
+         if (!ids.insert({ n.id, n.index }).second)
+         {
+            errors.push_back(Make("E_DUPLICATE_ID", "id '" + n.id + "' is used by two nodes", n.idLine, n.index,
+                                  "give every node its own id"));
+            continue;
+         }
+         idPool.push_back(n.id);
+      }
+
+      std::map<int, const Patch::NodeRecord*> byIndex;
+      for (const Patch::NodeRecord& n : data.nodes)
+         byIndex.insert({ n.index, &n });
+
+      auto node = [&](std::string& word, int& index, int line) {
+         if (word.empty())
+            return;
+         auto it = ids.find(word);
+         if (it == ids.end())
+         {
+            const std::vector<std::string> near = Nearest(word, idPool, 3);
+            errors.push_back(Make("E_BAD_REF", "no node has the id '" + word + "'", line, -1,
+                                  near.empty() ? "add an `id " + word + "` line to the node" : "did you mean: " + Join(near)));
+         }
+         else
+            index = it->second;
+         word.clear();
+      };
+      auto slot = [&](std::string& word, int dstIndex, int& out, int line) {
+         if (word.empty())
+            return;
+         auto nd = byIndex.find(dstIndex);
+         const TypeSchema* t = nd == byIndex.end() || !env.schema ? nullptr : env.schema(nd->second->typeName);
+         bool found = false;
+         std::vector<std::string> names;
+         if (t != nullptr)
+         {
+            names = SlotNames(*t);
+            for (size_t i = 0; i < names.size(); i++)
+               if (names[i] == word)
+               {
+                  out = t->inputs[i].slot;
+                  found = true;
+                  break;
+               }
+         }
+         if (!found && t != nullptr)
+            errors.push_back(Make("E_BAD_REF", "'" + word + "' is not an input of " + t->name, line, dstIndex,
+                                  "inputs: " + Join(names)));
+         word.clear();
+      };
+      auto cable = [&](Patch::CableRecord& c) {
+         node(c.dstRef, c.dstIndex, c.line);
+         node(c.srcRef, c.srcIndex, c.line);
+         slot(c.slotRef, c.dstIndex, c.dstSlot, c.line);
+      };
+      for (Patch::CableRecord& c : data.cables)
+         cable(c);
+      for (Patch::CableRecord& c : data.geometry)
+         cable(c);
+      for (Patch::CableRecord& c : data.audio)
+         cable(c);
+      for (Patch::CableRecord& c : data.notes)
+         cable(c);
+      for (Patch::ModRecord& m : data.modulation)
+      {
+         node(m.dstRef, m.dstIndex, m.line);
+         node(m.srcRef, m.srcIndex, m.line);
+      }
+      for (Patch::PaletteRecord& p : data.palette)
+      {
+         node(p.dstRef, p.dstIndex, 0);
+         node(p.srcRef, p.srcIndex, 0);
+      }
+      for (Patch::ExprRecord& e : data.expressions)
+         node(e.dstRef, e.dstIndex, e.line);
+      data.hasNamedRefs = false;
+   }
+
+   void ResolveKeys(Patch::Data& data, const Env& env, std::vector<Headless::Issue>& errors)
+   {
+      if (!data.hasKeyRefs)
+         return;
+      std::map<int, const Patch::NodeRecord*> byIndex;
+      for (const Patch::NodeRecord& n : data.nodes)
+         byIndex.insert({ n.index, &n });
+      auto key = [&](const std::string& word, int dstIndex, int& out, int line) -> bool {
+         auto nd = byIndex.find(dstIndex);
+         if (nd == byIndex.end())
+            return true; // E_DANGLING is Validate's to report
+         const std::string& type = nd->second->typeName;
+         const int idx = env.paramIndexOfKey ? env.paramIndexOfKey(type, word) : -2;
+         if (idx >= 0)
+         {
+            out = idx;
+            return true;
+         }
+         const std::vector<std::string> pool = env.modulatableKeys ? env.modulatableKeys(type) : std::vector<std::string>();
+         errors.push_back(Make("E_BAD_KEY",
+                               idx == -2 ? "cannot look up '" + word + "': " + type + " could not be drawn here"
+                                         : "'" + word + "' is not a modulatable control of " + type,
+                               line, dstIndex, pool.empty() ? "" : "did you mean: " + Join(Nearest(word, pool, 3))));
+         return false;
+      };
+      for (Patch::ModRecord& m : data.modulation)
+         if (!m.dstKey.empty() && key(m.dstKey, m.dstIndex, m.dstParam, m.line))
+            m.dstKey.clear();
+      for (Patch::ExprRecord& e : data.expressions)
+         if (!e.dstKey.empty() && key(e.dstKey, e.dstIndex, e.dstParam, e.line))
+            e.dstKey.clear();
+      for (Patch::NodeRecord& n : data.nodes)
+         for (size_t i = 0; i < n.params.size(); i++)
+         {
+            std::string& value = n.params[i].second;
+            if (n.params[i].first.size() < 3 || n.params[i].first[0] != 'i' || value.empty())
+               continue;
+            char* end = nullptr;
+            std::strtod(value.c_str(), &end);
+            if (end != value.c_str() && *end == '\0')
+               continue;
+            const std::string k = n.params[i].first.substr(2);
+            const int line = i < n.paramLines.size() ? n.paramLines[i] : n.line;
+            const std::vector<std::string> opts = env.optionsOf ? env.optionsOf(n.typeName, k) : std::vector<std::string>();
+            int found = -1;
+            for (size_t o = 0; o < opts.size(); o++)
+               if (Lower(opts[o]) == Lower(value))
+                  found = (int)o;
+            if (found >= 0)
+               value = std::to_string(found);
+            else
+               errors.push_back(Make("E_BAD_VALUE",
+                                     opts.empty() ? "'" + value + "' is not a number, and " + k + " has no named options"
+                                                  : "'" + value + "' is not an option of " + k,
+                                     line, n.index, opts.empty() ? "write the number" : "did you mean: " + Join(Nearest(value, opts, 3))));
+         }
+      bool left = false;
+      for (const Patch::ModRecord& m : data.modulation)
+         left = left || !m.dstKey.empty();
+      for (const Patch::ExprRecord& e : data.expressions)
+         left = left || !e.dstKey.empty();
+      data.hasKeyRefs = left;
+   }
+
    std::string ParamKindName(char kind)
    {
       switch (kind)
@@ -108,11 +303,12 @@ namespace PatchSchema
               "\",\"kind\":" + Q(ParamKindName(p.kind)) + ",\"default\":" + Q(p.def) + "}";
       }
       s += "],\"inputs\":[";
+      const std::vector<std::string> slotNames = SlotNames(t);
       for (size_t i = 0; i < t.inputs.size(); i++)
       {
          const SlotInfo& in = t.inputs[i];
          s += (i ? "," : "") + std::string("{\"slot\":") + std::to_string(in.slot) + ",\"kind\":" + Q(in.kind) +
-              ",\"label\":" + Q(in.label) + "}";
+              ",\"label\":" + Q(in.label) + ",\"name\":" + Q(slotNames[i]) + "}";
       }
       s += "],\"outputs\":[";
       for (size_t i = 0; i < t.outputs.size(); i++)
@@ -123,6 +319,7 @@ namespace PatchSchema
       {
          const ModulatableInfo& m = t.modulatable[i];
          s += (i ? "," : "") + std::string("{\"index\":") + std::to_string(m.index) + ",\"label\":" + Q(m.label) +
+              (m.key.empty() ? "" : ",\"key\":" + Q(m.key)) +
               ",\"min\":" + Num(m.minValue) + ",\"max\":" + Num(m.maxValue) + ",\"step\":" + Num(m.step);
          if (m.isBool)
             s += ",\"bool\":true";
@@ -135,7 +332,32 @@ namespace PatchSchema
          }
          s += "}";
       }
-      s += "]}";
+      s += "],\"rows\":[";
+      {
+         bool firstRow = true;
+         for (const ParamInfo& p : t.params)
+         {
+            const ControlInfo* c = nullptr;
+            for (const ControlInfo& ci : t.controls)
+               if (ci.key == p.key)
+                  c = &ci;
+            s += (firstRow ? "" : ",") + std::string("{\"key\":") + Q(p.key) + ",\"tag\":\"" + std::string(1, p.kind) +
+                 "\",\"kind\":" + Q(ParamKindName(p.kind)) + ",\"default\":" + Q(p.def);
+            firstRow = false;
+            s += ",\"label\":" + (c && !c->label.empty() ? Q(c->label) : std::string("null"));
+            s += c && c->hasRange ? ",\"min\":" + Num(c->minValue) + ",\"max\":" + Num(c->maxValue) + ",\"step\":" + Num(c->step)
+                                  : std::string(",\"min\":null,\"max\":null,\"step\":null");
+            s += ",\"options\":[";
+            if (c)
+               for (size_t k = 0; k < c->options.size(); k++)
+                  s += (k ? "," : "") + Q(c->options[k]);
+            s += "],\"modulatable_index\":" + (c && c->index >= 0 ? std::to_string(c->index) : std::string("null"));
+            // ui: a widget registers this key when the node is drawn at its defaults. false = none did
+            // (internal state, a plain control, or a control the current mode hides); null = not probed.
+            s += std::string(",\"ui\":") + (!t.controlsKnown ? "null" : (c && !c->label.empty() ? "true" : "false")) + "}";
+         }
+      }
+      s += "],\"join\":{\"registered\":" + std::to_string(t.joinRegistered) + ",\"keyed\":" + std::to_string(t.joinKeyed) + "}}";
       return s;
    }
 
@@ -164,7 +386,7 @@ namespace PatchSchema
             Headless::Issue is = Make("W_BYPASS_IGNORED",
                                       t->name + " cannot be bypassed (it has more than one input, or it is an instrument with no pass-through), so bypassed=1 is ignored and the node stays on",
                                       n.line, n.index, "remove the node or its cables to switch it off; only single-input nodes can be bypassed");
-            (env.forRender ? errors : warnings).push_back(is);
+            warnings.push_back(is);
          }
          std::set<std::string> seenKeys;
          std::vector<std::string> keys;
@@ -189,7 +411,26 @@ namespace PatchSchema
                warnings.push_back(Make("W_UNKNOWN_PARAM", "'" + key + "' is not a parameter of " + t->name, line, n.index,
                                        near.empty() ? "" : "did you mean '" + near.front() + "'?"));
             }
-            else if (found->kind != kind)
+            else if (found->kind == kind && t->controlsKnown)
+            {
+               const ControlInfo* c = nullptr;
+               for (const ControlInfo& ci : t->controls)
+                  if (ci.key == key)
+                     c = &ci;
+               // W_INTERNAL_PARAM is deliberately not raised: a key with no registered widget
+               // is often just hidden by the current mode (Shape's size/aspect), and patch_1
+               // (GUI-saved) would give ~180 false hits. `ui:false` in --describe carries the fact.
+               if (c != nullptr && !c->label.empty() && c->hasRange && (kind == 'f' || kind == 'i') && c->maxValue > c->minValue)
+               {
+                  const double v = std::atof(n.params[i].second.c_str());
+                  const double slack = 1e-4 * (c->maxValue - c->minValue);
+                  if (v < c->minValue - slack || v > c->maxValue + slack)
+                     warnings.push_back(Make("W_OUT_OF_RANGE",
+                                             "'" + key + "' is " + n.params[i].second + " but its control runs " + Num(c->minValue) + ".." + Num(c->maxValue),
+                                             line, n.index, "the node clamps it; use a value inside the range"));
+               }
+            }
+            if (found != nullptr && found->kind != kind)
                warnings.push_back(Make("W_TYPE_MISMATCH",
                                        "'" + key + "' is written as " + ParamKindName(kind) + " but " + t->name +
                                           " reads it as " + ParamKindName(found->kind),

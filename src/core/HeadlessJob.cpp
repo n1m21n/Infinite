@@ -48,6 +48,8 @@ namespace Headless
             s += ",\"message\":\"" + JsonEscape(is.message) + "\"";
             if (!is.hint.empty())
                s += ",\"hint\":\"" + JsonEscape(is.hint) + "\"";
+            if (is.promoted)
+               s += ",\"promoted\":true";
             s += "}";
          }
          s += "]";
@@ -127,6 +129,8 @@ namespace Headless
                job.jsonPath = argv[++i];
             else if (a == "--for-render")
                job.forRender = true;
+            else if (a == "--lenient")
+               job.lenient = true;
             else if (a.rfind("--", 0) == 0)
             {
                usageError = "unknown option " + a;
@@ -137,10 +141,69 @@ namespace Headless
          }
          if (pos.size() != 1)
          {
-            usageError = "usage: Infinite --validate <patch.inf> [--for-render] [--json <file>]";
+            usageError = "usage: Infinite --validate <patch.inf> [--for-render] [--lenient] [--json <file>]";
             return true;
          }
          job.patch = pos[0];
+         return true;
+      }
+      else if (first == "--explain")
+      {
+         job.mode = Mode::Explain;
+         std::vector<std::string> pos;
+         for (int i = 2; i < argc; i++)
+         {
+            const std::string a = argv[i];
+            if (a == "--json")
+               job.explainJson = true;
+            else if (a == "--all")
+               job.explainAll = true;
+            else if (a == "--lenient")
+               job.lenient = true;
+            else if (a.rfind("--", 0) == 0)
+            {
+               usageError = "unknown option " + a;
+               return true;
+            }
+            else
+               pos.push_back(a);
+         }
+         if (pos.size() != 1)
+         {
+            usageError = "usage: Infinite --explain <patch.inf> [--json] [--all] [--lenient]";
+            return true;
+         }
+         job.patch = pos[0];
+         return true;
+      }
+      else if (first == "--canonicalize")
+      {
+         job.mode = Mode::Canonicalize;
+         std::vector<std::string> pos;
+         for (int i = 2; i < argc; i++)
+         {
+            const std::string a = argv[i];
+            if (a == "--json" && i + 1 < argc)
+               job.jsonPath = argv[++i];
+            else if (a == "--keep-ids")
+               job.keepIds = true;
+            else if (a == "--lenient")
+               job.lenient = true;
+            else if (a.rfind("--", 0) == 0)
+            {
+               usageError = "unknown option " + a;
+               return true;
+            }
+            else
+               pos.push_back(a);
+         }
+         if (pos.size() != 2)
+         {
+            usageError = "usage: Infinite --canonicalize <in.inf> <out.inf> [--keep-ids] [--lenient] [--json <file>]";
+            return true;
+         }
+         job.patch = pos[0];
+         job.out = pos[1];
          return true;
       }
       else if (first == "--version")
@@ -243,6 +306,8 @@ namespace Headless
          }
          else if (a == "--no-audio")
             job.noAudio = true;
+         else if (a == "--lenient")
+            job.lenient = true;
          else if (a.rfind("--", 0) == 0)
          {
             usageError = "unknown option " + a;
@@ -275,6 +340,30 @@ namespace Headless
       return true;
    }
 
+   bool IsAdvisory(const std::string& code)
+   {
+      // W_OUT_OF_RANGE stays advisory until a real corpus of GUI-saved patches has been
+      // checked to give zero hits (docs/fix-briefs/headless-engine.md 3.1b); the corpus in
+      // this repo is one file, which is not enough to promote it.
+      return code == "W_UNUSED_NODE" || code == "W_NO_OUTPUT" || code == "W_DURATION_ROUNDED" || code == "W_OUT_OF_RANGE";
+   }
+
+   void PromoteWarnings(std::vector<Issue>& warnings, std::vector<Issue>& errors)
+   {
+      std::vector<Issue> keep;
+      for (Issue& w : warnings)
+      {
+         if (IsAdvisory(w.code))
+            keep.push_back(w);
+         else
+         {
+            w.promoted = true;
+            errors.push_back(w);
+         }
+      }
+      warnings.swap(keep);
+   }
+
    int ExitCodeFor(const Status& status)
    {
       if (status.ok && status.errors.empty())
@@ -286,13 +375,16 @@ namespace Headless
          return 2;
       if (c == "E_LOAD" || c == "E_NO_OUTPUT" || c == "E_AMBIGUOUS_OUTPUT" || c == "E_UNKNOWN_TYPE" ||
           c == "E_BAD_SLOT" || c == "E_KIND_MISMATCH" || c == "E_DANGLING" || c == "E_CYCLE" ||
-          c == "E_DUPLICATE_INDEX" || c == "E_SLOT_TAKEN" || c == "E_NOT_A_MODULATOR" || c == "E_BAD_PARAM" ||
-          c == "W_BYPASS_IGNORED")
+          c == "E_DUPLICATE_INDEX" || c == "E_DUPLICATE_ID" || c == "E_BAD_ID" || c == "E_BAD_REF" || c == "E_BAD_KEY" || c == "E_BAD_VALUE" || c == "E_SLOT_TAKEN" || c == "E_NOT_A_MODULATOR" || c == "E_BAD_PARAM")
          return 3;
       if (c == "E_HARDWARE_SOURCE")
          return 4;
-      if (c == "E_TIMEOUT")
+      if (c == "E_TIMEOUT" || c == "E_PROBE_TIMEOUT")
          return 6;
+      // Any promoted warning is a patch problem, whatever came first.
+      for (const Issue& e : status.errors)
+         if (e.code.rfind("W_", 0) == 0)
+            return 3;
       return 5;
    }
 
@@ -411,6 +503,13 @@ namespace Headless
          }
          else
             std::fprintf(stderr, "could not write %s\n", job.jsonPath.c_str());
+      }
+      if (!status.stdoutText.empty())
+      {
+         // The status JSON stays the last line on its own, whatever came before it.
+         std::fputs(status.stdoutText.c_str(), stdout);
+         if (status.stdoutText.back() != '\n')
+            std::fputc('\n', stdout);
       }
       std::fprintf(stdout, "%s\n", json.c_str());
       std::fflush(stdout);

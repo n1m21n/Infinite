@@ -114,6 +114,9 @@ namespace
 #include "core/ColorStats.h"
 #include "core/HeadlessJob.h"
 #include "core/PatchSchema.h"
+#include "core/PatchExplain.h"
+
+static std::string ExplainLive(bool json, bool all); // defined with the headless job code
 #include "core/GestureRecorder.h"
 #include "core/Expression.h"
 #include "core/field/FieldTypes.h"
@@ -1188,12 +1191,23 @@ namespace
    double gHeadlessAudioRate = 0.0;
    // Validator warnings from the load, folded into the job's status JSON.
    std::vector<Headless::Issue> gHeadlessPreWarnings;
+bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one node per type first
+   // Strict mode: the warnings of the pre-load pass that were promoted to errors.
+   // They wait here so the Warm phase can report them together with E_BAD_PARAM,
+   // which needs drawn nodes - one round of fixes clears everything.
+   std::vector<Headless::Issue> gHeadlessPromoted;
    // The authored patch of a --render/--frame job, kept so the checks that need
    // drawn nodes (E_BAD_PARAM) can run once the graph is loaded.
    Patch::Data gHeadlessPatch;
    // Highest `mod`/`expr` parameter index per node type, read off drawn nodes
    // (-1 = registers none). Absent = not measured, so E_BAD_PARAM stays quiet.
    std::map<std::string, int> gModulatableMax;
+   // While a --validate / --describe probe is waiting for spawned nodes to
+   // register their parameters, the off-screen cull is switched off and every
+   // node that gets past it is noted here, so the probe waits for "each probed
+   // node has been drawn" rather than a fixed number of ticks.
+   bool gHeadlessProbeAll = false;
+   std::set<int> gHeadlessDrawn;
 
    bool HeadlessJobActive()
    {
@@ -3317,11 +3331,24 @@ namespace
       return shown;
    }
 
+   // The member a wrapper widget (ModSliderInt/ModKnobInt/ModCheckbox, a dropdown
+   // that knows its int) is editing, handed to the ModSlider/ModKnob/
+   // RegisterDiscreteParam it wraps so the ParamRef can say which saved key it
+   // is (ParamRef::srcAddr). Set immediately before that call, consumed by it.
+   const void* gPendingSrcAddr = nullptr;
+   const void* TakePendingSrcAddr(const void* fallback)
+   {
+      const void* a = gPendingSrcAddr != nullptr ? gPendingSrcAddr : fallback;
+      gPendingSrcAddr = nullptr;
+      return a;
+   }
+
    DiscreteParamHandle RegisterDiscreteParam(const char* label, float current, float maxV,
                                              bool isBool, const std::vector<std::string>* options,
                                              bool momentary = false)
    {
       DiscreteParamHandle h;
+      const void* srcAddr = TakePendingSrcAddr(nullptr);
       if (gCurrentNodeIndex < 0)
          return h; // a settings dialog / browser widget, not a node param
       h.registered = true;
@@ -3349,6 +3376,7 @@ namespace
       ref.isBool = isBool;
       ref.isEnum = !isBool;
       ref.momentary = momentary; // a gate button: triggers pulse it instead of flipping it
+      ref.srcAddr = srcAddr;
       // Only hand the option list over when the sticky store doesn't already
       // hold it: copying a dozens-long list of std::strings every frame for
       // every visible dropdown is exactly the allocation churn that made a
@@ -3941,6 +3969,7 @@ namespace
       if (value == nullptr)
          return false;
 
+      gPendingSrcAddr = value;
       const DiscreteParamHandle h =
          RegisterDiscreteParam(label, *value ? 1.0f : 0.0f, 1.0f, /*isBool=*/true, nullptr);
       if (!h.registered)
@@ -4021,6 +4050,7 @@ namespace
       ref.name = paramName;
       ref.posToValue = posToValue;
       ref.valueToPos = valueToPos;
+      ref.srcAddr = TakePendingSrcAddr(value);
       Modulation::Instance().RegisterParam(ref);
       if (gParamRegisterOnly)
          return false; // registered, deliberately not drawn - see gParamRegisterOnly
@@ -4518,6 +4548,7 @@ namespace
             slot = (float)*value;
       }
 
+      gPendingSrcAddr = value;
       bool changed = ModSlider(label, &slot, (float)minV, (float)maxV, "%.0f", width, audioStyle, /*step=*/1.0f);
       // lroundf, not (int)(x + 0.5f): the latter truncates toward zero, so
       // -3.7 lands on -3 instead of -4 and every negative-range param (octave,
@@ -5260,6 +5291,7 @@ namespace
       ref.name = (nameOverride != nullptr) ? nameOverride : label;
       ref.posToValue = p2v;
       ref.valueToPos = v2p;
+      ref.srcAddr = TakePendingSrcAddr(value);
       Modulation::Instance().RegisterParam(ref);
       if (gParamRegisterOnly)
          return false; // registered, deliberately not drawn - see gParamRegisterOnly
@@ -5532,6 +5564,7 @@ namespace
             slot = (float)*value;
       }
 
+      gPendingSrcAddr = value;
       bool changed = ModKnob(label, &slot, (float)minV, (float)maxV, "%.0f", diameter, cellW,
                              AudioWidgetStyle::Knob, /*step=*/1.0f);
       slot = std::clamp(slot, (float)minV, (float)maxV);
@@ -7871,6 +7904,20 @@ namespace
       return true;
    }
 
+   // ---- ParamRef.key join results (see ParamKeyJoiner further down) ----
+   struct ParamJoinType
+   {
+      std::map<int, std::string> keyOfParam; // paramIndex -> saved key
+      std::map<std::string, int> paramOfKey;
+      std::set<int> unkeyed;                 // registered controls with no key found
+      std::map<int, std::string> unkeyedName; // their labels
+      std::set<std::string> plainKeys;       // saved f/i/b keys no control registered
+      std::map<std::string, std::vector<std::string>> optionsOfKey; // dropdown names by key
+      int registered = 0;
+      bool done = false;
+   };
+   static std::map<std::string, ParamJoinType> gParamJoin;
+
    // ---- patch schema (Infinite --describe / --validate) ----
    // Records what a node's VisitParams declares: tag letter, key, default.
    class SchemaParamRecorder : public ParamVisitor
@@ -8007,6 +8054,31 @@ namespace
       {
          auto it = gModulatableMax.find(type);
          return it == gModulatableMax.end() ? -2 : it->second;
+      };
+      env.paramIndexOfKey = [](const std::string& type, const std::string& key)
+      {
+         auto it = gParamJoin.find(type);
+         if (it == gParamJoin.end() || !it->second.done)
+            return -2;
+         auto k = it->second.paramOfKey.find(key);
+         return k == it->second.paramOfKey.end() ? -1 : k->second;
+      };
+      env.modulatableKeys = [](const std::string& type)
+      {
+         std::vector<std::string> keys;
+         auto it = gParamJoin.find(type);
+         if (it != gParamJoin.end())
+            for (const auto& kv : it->second.paramOfKey)
+               keys.push_back(kv.first);
+         return keys;
+      };
+      env.optionsOf = [](const std::string& type, const std::string& key)
+      {
+         auto it = gParamJoin.find(type);
+         if (it == gParamJoin.end())
+            return std::vector<std::string>();
+         auto o = it->second.optionsOfKey.find(key);
+         return o == it->second.optionsOfKey.end() ? std::vector<std::string>() : o->second;
       };
       env.forRender = forRender;
       return env;
@@ -47629,6 +47701,45 @@ namespace
          gPatchStatus = "Open failed: " + error;
          return false;
       }
+      if (data.hasNamedRefs)
+      {
+         // A hand-written file that names nodes/slots: turn the words into indices first.
+         std::vector<Headless::Issue> resolveErrors;
+         PatchSchema::Resolve(data, MakeSchemaEnv(false), resolveErrors);
+         if (!resolveErrors.empty())
+         {
+            gPatchStatus = "Open failed: line " + std::to_string(resolveErrors.front().line) + ": " + resolveErrors.front().message;
+            return false;
+         }
+      }
+
+      std::string openNote;
+      if (data.hasKeyRefs)
+      {
+         // Keys and option names need a drawn node of each type (a headless run has probed
+         // them). The window app has not, so those lines are dropped with a status line.
+         std::vector<Headless::Issue> keyErrors;
+         PatchSchema::ResolveKeys(data, MakeSchemaEnv(false), keyErrors);
+         if (!keyErrors.empty() || data.hasKeyRefs)
+         {
+            data.modulation.erase(std::remove_if(data.modulation.begin(), data.modulation.end(),
+                                                 [](const Patch::ModRecord& m) { return !m.dstKey.empty(); }),
+                                  data.modulation.end());
+            data.expressions.erase(std::remove_if(data.expressions.begin(), data.expressions.end(),
+                                                  [](const Patch::ExprRecord& e) { return !e.dstKey.empty(); }),
+                                   data.expressions.end());
+            for (Patch::NodeRecord& n : data.nodes)
+               n.params.erase(std::remove_if(n.params.begin(), n.params.end(),
+                                             [](const std::pair<std::string, std::string>& p)
+                                             {
+                                                char* end = nullptr;
+                                                std::strtod(p.second.c_str(), &end);
+                                                return p.first[0] == 'i' && !p.second.empty() && (end == p.second.c_str() || *end != '\0');
+                                             }),
+                              n.params.end());
+            openNote = "Opened, but " + std::to_string(keyErrors.size()) + " line(s) that name a control or option could not be resolved and were skipped";
+         }
+      }
 
       MovementLog::NoteMark(MovementLog::Mark::PatchLoaded);
       ApplyPatchData(data);
@@ -47647,7 +47758,7 @@ namespace
 
       gPatchPath = path;
       gPatchDirty = false;
-      gPatchStatus = "Opened";
+      gPatchStatus = openNote.empty() ? "Opened" : openNote;
       gRequestFitView = true;
       if (HeadlessJobActive())
          return true; // a batch job leaves recents and the real autosave alone
@@ -47657,6 +47768,58 @@ namespace
       DiscardAutosave();
       gLastAutosaveTime = 0.0;
       return true;
+   }
+
+   // `Infinite --canonicalize in out`: data-level Read -> Write, so an authored
+   // file comes out exactly as a GUI save would write it (numbers, no comments).
+   // Second half of --canonicalize: strict check, then the writer.
+   void FinishCanonicalize(Patch::Data& data, const Headless::Job& job, Headless::Status& st)
+   {
+      std::string error;
+      const PatchSchema::Env env = MakeSchemaEnv(false);
+      std::vector<Headless::Issue> warnings;
+      PatchSchema::Validate(data, env, st.errors, warnings);
+      if (!job.lenient)
+         Headless::PromoteWarnings(warnings, st.errors);
+      st.warnings = warnings;
+      if (!st.errors.empty())
+         return;
+      if (!job.keepIds)
+         for (Patch::NodeRecord& n : data.nodes)
+            n.id.clear();
+      if (!Patch::Write(job.out, data, error))
+      {
+         st.errors.push_back({ "E_LOAD", error, 0, -1 });
+         return;
+      }
+      st.files.push_back(job.out);
+      st.extraJson.push_back("\"nodes\":" + std::to_string(data.nodes.size()));
+   }
+
+   // `Infinite --canonicalize in out`: data-level Read -> Resolve -> Validate -> Write, so an
+   // authored file comes out exactly as a GUI save would write it (numbers, no comments).
+   // Returns true when the file names controls or options: those need a drawn node per type,
+   // so the job continues in HeadlessTick (gHeadlessPatch holds the name-resolved data).
+   bool RunCanonicalize(const Headless::Job& job, Headless::Status& st)
+   {
+      Patch::Data data;
+      std::string error;
+      if (!Patch::Read(job.patch, data, error))
+      {
+         st.errors.push_back({ "E_LOAD", error, 0, -1 });
+         return false;
+      }
+      PatchSchema::Resolve(data, MakeSchemaEnv(false), st.errors);
+      if (!st.errors.empty())
+         return false;
+      if (data.hasKeyRefs)
+      {
+         gHeadlessPatch = data;
+         gHeadlessNeedProbe = true;
+         return true;
+      }
+      FinishCanonicalize(data, job, st);
+      return false;
    }
 
    // Shared by PushUndoCheckpoint (freshly captured) and the node-drag
@@ -48456,6 +48619,13 @@ namespace
          }
          out["links"] = links;
          outResult = out;
+         return true;
+      }
+      else if (method == "explain")
+      {
+         outResult = json::object();
+         outResult["text"] = ExplainLive(false, params.value("all", false));
+         outResult["graph"] = json::parse(ExplainLive(true, true));
          return true;
       }
       else if (method == "get_params")
@@ -68296,12 +68466,430 @@ static bool BuildBenchB8Scene(const std::vector<std::string>& clipPaths, bool wi
 // hidden window keeps drawing frames on purpose: a node registers its ParamRefs
 // (modulation, expressions, gestures) only by being drawn, so skipping the
 // draw would render a patch whose modulation never lands.
+static std::string ExplainLive(bool json, bool all)
+{
+   static std::map<std::string, std::map<std::string, std::string>> sDefaults;
+   PatchExplain::Env xenv;
+   xenv.defaultParams = [&](const std::string& type) -> std::map<std::string, std::string>
+   {
+      auto it = sDefaults.find(type);
+      if (it != sDefaults.end())
+         return it->second;
+      std::map<std::string, std::string> out;
+      if (std::unique_ptr<INode> fresh { NodeFactory::Instance().MakeNode(type) })
+      {
+         std::vector<std::pair<std::string, std::string>> raw;
+         Patch::SaveParams(fresh.get(), raw);
+         for (const auto& kv : raw)
+            out[kv.first] = kv.second;
+      }
+      return sDefaults[type] = out;
+   };
+   xenv.slotName = [&](const std::string& type, int slot, const std::string&) -> std::string
+   {
+      // Slots are one numbering across kinds (Wavetable: 0 notes, 1 fm in), and
+      // SlotNames is parallel to inputs, not indexed by slot.
+      const PatchSchema::TypeSchema* ts = SchemaFor(type);
+      if (ts == nullptr)
+         return std::string();
+      const std::vector<std::string> names = PatchSchema::SlotNames(*ts);
+      for (size_t i = 0; i < ts->inputs.size() && i < names.size(); i++)
+         if (ts->inputs[i].slot == slot)
+            return names[i];
+      return std::string();
+   };
+   xenv.paramLabel = [&](int node, int param) -> std::string
+   {
+      const ParamRef* k = Modulation::Instance().KnownParam(node, param);
+      return k != nullptr ? k->name : std::string();
+   };
+   // The join lives per type (the probe nodes are gone after the load), so a
+   // running app that never probed answers "" and the label is shown instead.
+   xenv.paramKey = [&](int node, int param) -> std::string
+   {
+      const GraphNode* gn = FindNodeByIndex(node);
+      if (gn == nullptr)
+         return std::string();
+      auto it = gParamJoin.find(gn->typeName);
+      if (it == gParamJoin.end())
+         return std::string();
+      auto k = it->second.keyOfParam.find(param);
+      return k == it->second.keyOfParam.end() ? std::string() : k->second;
+   };
+   xenv.optionName = [&](const std::string& type, const std::string& key, int value) -> std::string
+   {
+      auto it = gParamJoin.find(type);
+      if (it == gParamJoin.end())
+         return std::string();
+      auto o = it->second.optionsOfKey.find(key);
+      if (o == it->second.optionsOfKey.end() || value < 0 || value >= (int)o->second.size())
+         return std::string();
+      return o->second[value];
+   };
+   xenv.resolveMod = [&](const Patch::ModRecord& m, float& lo, float& hi) -> bool
+   {
+      const ParamRef* k = Modulation::Instance().KnownParam(m.dstIndex, m.dstParam);
+      if (k == nullptr)
+         return false;
+      const Modulation::Source src = Modulation::Instance().ResolvedSourceFor(*k);
+      lo = src.lo;
+      hi = src.hi;
+      return true;
+   };
+   xenv.idOf = [&](int index) -> std::string
+   {
+      for (const Patch::NodeRecord& n : gHeadlessPatch.nodes)
+         if (n.index == index)
+            return n.id;
+      return std::string();
+   };
+   const PatchExplain::Explanation ex = PatchExplain::Build(BuildPatchData(), xenv);
+   return json ? PatchExplain::ToJson(ex) : PatchExplain::ToText(ex, all);
+}
+
 static void HeadlessFinish(GLFWwindow* window, Headless::Status& st, double startWall)
 {
    st.elapsedMs = (long long)((glfwGetTime() - startWall) * 1000.0);
    st.ok = st.errors.empty();
    gHeadlessExitCode = Headless::Emit(gHeadlessJob, st);
    glfwSetWindowShouldClose(window, GLFW_TRUE);
+}
+
+// A probe (validate / describe) is done once every spawned node has been drawn
+// with its parameters open, and at least 3 ticks have passed so the first
+// frame's layout has settled. Replaces a fixed 8-tick wait that a slow start
+// or the off-screen cull could cut short (false "has no modulatable parameters").
+static const int kHeadlessProbeCapTicks = 120;
+static bool HeadlessProbeDone(const std::vector<std::pair<std::string, int>>& probed, int ticks)
+{
+   if (ticks < 3)
+      return false;
+   for (const auto& pr : probed)
+      if (!gHeadlessDrawn.count(pr.second))
+         return false;
+   return true;
+}
+
+
+// ---- ParamRef.key join (docs/fix-briefs/headless-engine.md 3.1b) ------------
+// A control registered by the draw pass knows its label, not the key the file
+// stores. Two tiers find the key of each control on a drawn probe node:
+//   1. by address: the widget hands over the member it edits (ParamRef::srcAddr)
+//      and VisitParams hands out the address of every saved member;
+//   2. by perturbation: for the rest (dropdowns take an int by value, some
+//      knobs edit a local copy), change one saved value, draw a frame, and see
+//      which unmatched control's value followed it.
+// The result is remembered per type, so key -> parameter index works for any
+// later node of that type.
+
+
+class AddrCollector : public ParamVisitor
+{
+public:
+   std::map<const void*, std::string> keyOfAddr;
+   std::vector<std::pair<std::string, char>> keys; // f/i/b keys in file order
+   void Float(const char* n, float& v) override { keyOfAddr[&v] = n; keys.push_back({ n, 'f' }); }
+   void Int(const char* n, int& v) override { keyOfAddr[&v] = n; keys.push_back({ n, 'i' }); }
+   void Bool(const char* n, bool& v) override { keyOfAddr[&v] = n; keys.push_back({ n, 'b' }); }
+   void Text(const char*, std::string&) override {}
+   void Color(const char*, float*) override {}
+};
+
+// Changes the value of one saved key (mode 0, remembering the old one) or puts it back (mode 1).
+class KeyPerturber : public ParamVisitor
+{
+public:
+   std::string key;
+   int mode = 0;
+   double old = 0.0;
+   double now = 0.0;
+   bool hit = false;
+   char kind = 'f';
+   int attempt = 0; // 0,1,2: which of the candidate values to try (a widget may clamp one away)
+   void Float(const char* n, float& v) override
+   {
+      if (key != n) return;
+      hit = true; kind = 'f';
+      if (mode == 0)
+      {
+         old = v;
+         static const float kCand[] = { 0.5f, 0.25f, 0.9f, 0.1f };
+         int seen = 0;
+         for (float c : kCand)
+            if (std::fabs(c - v) > 1e-3f && seen++ == attempt)
+            {
+               v = c;
+               break;
+            }
+         now = v;
+      }
+      else v = (float)old;
+   }
+   void Int(const char* n, int& v) override
+   {
+      if (key != n) return;
+      hit = true; kind = 'i';
+      if (mode == 0)
+      {
+         old = v;
+         static const int kCand[] = { 0, 1, 2, 3, -1 };
+         int seen = 0;
+         for (int c : kCand)
+            if (c != v && seen++ == attempt)
+            {
+               v = c;
+               break;
+            }
+         now = v;
+      }
+      else v = (int)old;
+   }
+   void Bool(const char* n, bool& v) override
+   {
+      if (key != n) return;
+      hit = true; kind = 'b';
+      if (mode == 0) { old = v ? 1 : 0; v = !v; now = v ? 1 : 0; }
+      else v = old != 0.0;
+   }
+   void Text(const char*, std::string&) override {}
+   void Color(const char*, float*) override {}
+};
+
+class ParamKeyJoiner
+{
+public:
+   // probed: (type, node index) of drawn probe nodes, one per type.
+   void Begin(const std::vector<std::pair<std::string, int>>& probed)
+   {
+      mNodes.clear();
+      for (const auto& pr : probed)
+      {
+         if (gParamJoin[pr.first].done)
+            continue;
+         Node n;
+         n.type = pr.first;
+         n.index = pr.second;
+         mNodes.push_back(std::move(n));
+      }
+   }
+
+   // Call once per tick after the frame was drawn. True when every node is finished.
+   bool Step()
+   {
+      bool pending = false;
+      for (Node& n : mNodes)
+      {
+         if (n.finished)
+            continue;
+         GraphNode* gn = FindNodeByIndex(n.index);
+         if (gn == nullptr)
+         {
+            Finish(n);
+            continue;
+         }
+         if (n.stage == 0)
+         {
+            // A node registers its controls only on a frame that draws its body; give a
+            // slow first frame a few ticks before deciding it has none.
+            bool any = false;
+            for (const ParamRef& r : Modulation::Instance().FrameParams())
+               any = any || r.nodeIndex == n.index;
+            if (!any && n.wait++ < 30)
+            {
+               pending = true;
+               continue;
+            }
+            n.stage = 1;
+            Tier1(n, *gn);
+         }
+         else
+            Tier2(n, *gn);
+         if (!n.finished)
+            pending = true;
+      }
+      return !pending;
+   }
+
+private:
+   struct Node
+   {
+      std::string type;
+      int index = 0;
+      bool finished = false;
+      ParamJoinType join;
+      std::vector<std::pair<std::string, char>> keys;
+      std::map<int, float> baseline;      // unmatched paramIndex -> value before perturbing
+      std::map<int, std::string> label;   // unmatched paramIndex -> label
+      std::map<int, std::pair<float, float>> range;
+      std::map<std::string, int> attempt;
+      std::vector<std::string> queue;     // candidate keys still to try
+      size_t next = 0;
+      std::string trying;
+      KeyPerturber perturb;
+      bool applied = false;
+      int wait = 0;
+      int stage = 0;
+   };
+   std::vector<Node> mNodes;
+
+   void Finish(Node& n)
+   {
+      n.finished = true;
+      ParamJoinType& out = gParamJoin[n.type];
+      out = n.join;
+      out.done = true;
+      for (const auto& kv : n.label)
+         if (!out.keyOfParam.count(kv.first))
+         {
+            out.unkeyed.insert(kv.first);
+            out.unkeyedName[kv.first] = kv.second;
+         }
+      std::set<std::string> used;
+      for (const auto& kv : out.keyOfParam)
+         used.insert(kv.second);
+      for (const auto& k : n.keys)
+         if (!used.count(k.first))
+            out.plainKeys.insert(k.first);
+      // Remember the key on the probe's sticky record too.
+      for (const auto& kv : out.keyOfParam)
+      {
+         Modulation::Instance().SetKnownKey(n.index, kv.first, kv.second);
+         if (const ParamRef* k = Modulation::Instance().KnownParam(n.index, kv.first))
+            if (!k->enumOptions.empty())
+               out.optionsOfKey[kv.second] = k->enumOptions;
+      }
+   }
+
+   void Tier1(Node& n, GraphNode& gn)
+   {
+      AddrCollector ac;
+      gn.node->VisitParams(ac);
+      n.keys = ac.keys;
+      std::set<std::string> taken;
+      for (const ParamRef& r : Modulation::Instance().FrameParams())
+      {
+         if (r.nodeIndex != n.index)
+            continue;
+         n.join.registered++;
+         auto it = r.srcAddr != nullptr ? ac.keyOfAddr.find(r.srcAddr) : ac.keyOfAddr.end();
+         if (it != ac.keyOfAddr.end() && !taken.count(it->second))
+         {
+            taken.insert(it->second);
+            n.join.keyOfParam[r.paramIndex] = it->second;
+            n.join.paramOfKey[it->second] = r.paramIndex;
+         }
+         else if (!n.join.keyOfParam.count(r.paramIndex))
+         {
+            n.label[r.paramIndex] = r.name;
+            n.range[r.paramIndex] = { r.minValue, r.maxValue };
+            if (r.value != nullptr)
+               n.baseline[r.paramIndex] = *r.value;
+         }
+      }
+      // A param that ended up matched on a later ref is not unmatched.
+      for (auto it = n.label.begin(); it != n.label.end();)
+         it = n.join.keyOfParam.count(it->first) ? n.label.erase(it) : std::next(it);
+      if (n.label.empty())
+      {
+         Finish(n);
+         return;
+      }
+      for (const auto& k : n.keys)
+         if (!taken.count(k.first))
+            n.queue.push_back(k.first);
+      Apply(n, gn);
+   }
+
+   // Perturb the next candidate key, or finish.
+   void Apply(Node& n, GraphNode& gn)
+   {
+      if (n.next >= n.queue.size())
+      {
+         Finish(n);
+         return;
+      }
+      n.trying = n.queue[n.next++];
+      n.perturb = KeyPerturber();
+      n.perturb.key = n.trying;
+      n.perturb.attempt = n.attempt[n.trying];
+      gn.node->VisitParams(n.perturb);
+      n.applied = n.perturb.hit;
+   }
+
+   void Tier2(Node& n, GraphNode& gn)
+   {
+      if (n.applied)
+      {
+         // Which unmatched control followed the change?
+         int found = -1, count = 0;
+         for (const ParamRef& r : Modulation::Instance().FrameParams())
+         {
+            if (r.nodeIndex != n.index || !n.label.count(r.paramIndex) || r.value == nullptr)
+               continue;
+            const float base = n.baseline[r.paramIndex];
+            const float v = *r.value;
+            const bool moved = std::fabs(v - base) > 1e-4f;
+            const bool followed = n.perturb.kind == 'f' ? std::fabs(v - (float)n.perturb.now) < 1e-3f
+                                                        : std::lround(v) == std::lround(n.perturb.now);
+            if (moved && followed)
+            {
+               found = r.paramIndex;
+               count++;
+            }
+         }
+         n.perturb.mode = 1;
+         gn.node->VisitParams(n.perturb); // put it back
+         if (count == 1)
+         {
+            n.join.keyOfParam[found] = n.trying;
+            n.join.paramOfKey[n.trying] = found;
+            n.label.erase(found);
+            n.baseline.erase(found);
+            n.range.erase(found);
+         }
+         else if (count == 0 && n.attempt[n.trying] < 2)
+         {
+            // The widget may have clamped the value away; try the next candidate.
+            n.attempt[n.trying]++;
+            n.queue.push_back(n.trying);
+         }
+      }
+      if (n.label.empty())
+      {
+         Finish(n);
+         return;
+      }
+      Apply(n, gn);
+   }
+};
+
+// Fills a type's per-key control table from the join and the sticky ParamRef records of
+// the drawn probe node `nodeIndex`. Options come from KnownParam (FrameParams drops them).
+static void AttachControls(PatchSchema::TypeSchema& ts, int nodeIndex)
+{
+   auto it = gParamJoin.find(ts.name);
+   ts.controls.clear();
+   ts.controlsKnown = it != gParamJoin.end() && it->second.done;
+   if (!ts.controlsKnown)
+      return;
+   for (const auto& kv : it->second.keyOfParam)
+   {
+      const ParamRef* k = Modulation::Instance().KnownParam(nodeIndex, kv.first);
+      if (k == nullptr)
+         continue;
+      PatchSchema::ControlInfo c;
+      c.key = kv.second;
+      c.label = k->name.empty() ? kv.second : k->name;
+      c.index = kv.first;
+      c.hasRange = true;
+      c.minValue = k->minValue;
+      c.maxValue = k->maxValue;
+      c.step = k->step;
+      c.isEnum = k->isEnum;
+      c.isBool = k->isBool;
+      c.options = k->enumOptions;
+      ts.controls.push_back(std::move(c));
+   }
 }
 
 static void HeadlessTick(int& frameId, GLFWwindow* window)
@@ -68326,6 +68914,8 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
       sStatus.mode = job.mode == Headless::Mode::Render     ? "render"
                      : job.mode == Headless::Mode::Describe ? "describe"
                      : job.mode == Headless::Mode::Validate ? "validate"
+                     : job.mode == Headless::Mode::Canonicalize ? "canonicalize"
+                     : job.mode == Headless::Mode::Explain ? "explain"
                                                             : "frame";
       sStatus.warnings = gHeadlessPreWarnings;
       sStatus.patch = job.patch;
@@ -68347,16 +68937,99 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
       return;
    }
 
+   if (gHeadlessNeedProbe)
+   {
+      // The file names controls (`mod 5 radius ...`) or dropdown options (`i shapeType Star`).
+      // Both only exist once a node of each type has been drawn, so draw one of each, join
+      // them to their saved keys, resolve the patch, and only then load it.
+      static std::vector<std::pair<std::string, int>> sPr;
+      static ParamKeyJoiner sPrJoin;
+      static bool sPrBegun = false;
+      static int sPrTicks = 0;
+      const int t = ++sPrTicks;
+      if (t == 1)
+      {
+         std::set<std::string> types;
+         for (const Patch::NodeRecord& n : gHeadlessPatch.nodes)
+            types.insert(n.typeName);
+         int i = 0;
+         for (const std::string& type : types)
+         {
+            const PatchSchema::TypeSchema* ts = SchemaFor(type);
+            if (ts == nullptr || ts->hardwareDriven)
+               continue;
+            GraphNode* gn = SpawnNode(type, ts->category, (float)(i % 16) * 420.0f, (float)(i / 16) * 700.0f);
+            if (gn == nullptr)
+               continue;
+            gn->showParams = true;
+            sPr.push_back({ type, gn->index });
+            i++;
+         }
+         gHeadlessProbeAll = true;
+         gHeadlessDrawn.clear();
+         return;
+      }
+      if (!HeadlessProbeDone(sPr, t) && t < kHeadlessProbeCapTicks)
+         return;
+      if (!sPrBegun)
+      {
+         std::vector<std::pair<std::string, int>> drawn;
+         for (const auto& pr : sPr)
+            if (gHeadlessDrawn.count(pr.second))
+               drawn.push_back(pr);
+         sPrJoin.Begin(drawn);
+         sPrBegun = true;
+      }
+      if (!sPrJoin.Step() && t < 4 * kHeadlessProbeCapTicks)
+         return;
+      gHeadlessProbeAll = false;
+      gHeadlessNeedProbe = false;
+      std::vector<Headless::Issue> keyErrors;
+      PatchSchema::ResolveKeys(gHeadlessPatch, MakeSchemaEnv(true), keyErrors);
+      if (!keyErrors.empty())
+      {
+         for (const Headless::Issue& is : gHeadlessPromoted)
+            sStatus.errors.push_back(is);
+         for (const Headless::Issue& is : keyErrors)
+            sStatus.errors.push_back(is);
+         std::stable_sort(sStatus.errors.begin(), sStatus.errors.end(),
+                          [](const Headless::Issue& a, const Headless::Issue& b)
+                          { return (a.line > 0 ? a.line : 1 << 30) < (b.line > 0 ? b.line : 1 << 30); });
+         sPhase = Phase::Done;
+         HeadlessFinish(window, sStatus, sWall);
+         return;
+      }
+      if (job.mode == Headless::Mode::Canonicalize)
+      {
+         FinishCanonicalize(gHeadlessPatch, job, sStatus);
+         sPhase = Phase::Done;
+         HeadlessFinish(window, sStatus, sWall);
+         return;
+      }
+      LoadPatchFrom(job.patch); // starts from an empty canvas, so the probes are gone
+      return;
+   }
+
    if (job.mode == Headless::Mode::Validate)
    {
       static Patch::Data sData;
       static std::vector<std::pair<std::string, int>> sProbed; // type, node index
+      static std::vector<std::pair<std::string, int>> sRequired; // the ones a mod/expr line drives
+      static ParamKeyJoiner sJoin;
+      static bool sJoinBegun = false;
       const int t = ++sTicks;
       if (t == 1)
       {
          std::string err;
          if (!Patch::Read(job.patch, sData, err))
             return fail("E_LOAD", err);
+         PatchSchema::Resolve(sData, MakeSchemaEnv(job.forRender), sStatus.errors);
+         if (!sStatus.errors.empty())
+         {
+            sPhase = Phase::Done;
+            HeadlessFinish(window, sStatus, sWall);
+            return;
+         }
          // The parameter indices a `mod`/`expr` line may use only exist once a
          // node has been drawn, so draw one of each type the file drives.
          std::set<std::string> driven;
@@ -68369,8 +69042,14 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
          for (const Patch::ExprRecord& e : sData.expressions)
             if (typeOfIndex.count(e.dstIndex))
                driven.insert(typeOfIndex[e.dstIndex]);
+         // Every other type in the file is probed too, for its control ranges
+         // (W_OUT_OF_RANGE / W_INTERNAL_PARAM), but a node that never draws
+         // (a Group) is only an error when a mod/expr line needs it.
+         std::set<std::string> all(driven);
+         for (const Patch::NodeRecord& n : sData.nodes)
+            all.insert(n.typeName);
          int i = 0;
-         for (const std::string& type : driven)
+         for (const std::string& type : all)
          {
             const PatchSchema::TypeSchema* ts = SchemaFor(type);
             if (ts == nullptr || ts->hardwareDriven)
@@ -68380,13 +69059,44 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
                continue;
             gn->showParams = true;
             sProbed.push_back({ type, gn->index });
+            if (driven.count(type))
+               sRequired.push_back({ type, gn->index });
             i++;
          }
          if (!sProbed.empty())
+         {
+            gHeadlessProbeAll = true;
+            gHeadlessDrawn.clear();
             return;
+         }
       }
-      else if (t < 8 && !sProbed.empty())
-         return;
+      else if (!sProbed.empty() && !HeadlessProbeDone(sProbed, t))
+      {
+         if (t < kHeadlessProbeCapTicks)
+            return;
+         if (!HeadlessProbeDone(sRequired, t))
+            return fail("E_PROBE_TIMEOUT", "a node the patch drives never drew its parameters within " +
+                                              std::to_string(kHeadlessProbeCapTicks) + " frames, so mod/expr lines cannot be checked");
+      }
+      if (!sProbed.empty())
+      {
+         if (!sJoinBegun)
+         {
+            std::vector<std::pair<std::string, int>> drawn;
+            for (const auto& pr : sProbed)
+               if (gHeadlessDrawn.count(pr.second))
+                  drawn.push_back(pr);
+            sJoin.Begin(drawn);
+            sJoinBegun = true;
+         }
+         if (!sJoin.Step() && t < 4 * kHeadlessProbeCapTicks)
+            return;
+         for (const auto& pr : sProbed)
+            if (gHeadlessDrawn.count(pr.second))
+               if (PatchSchema::TypeSchema* mts = const_cast<PatchSchema::TypeSchema*>(SchemaFor(pr.first)))
+                  AttachControls(*mts, pr.second);
+      }
+      gHeadlessProbeAll = false;
 
       for (const auto& pr : sProbed)
       {
@@ -68397,7 +69107,11 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
          gModulatableMax[pr.first] = max;
       }
       const PatchSchema::Env env = MakeSchemaEnv(job.forRender);
-      PatchSchema::Validate(sData, env, sStatus.errors, sStatus.warnings);
+      PatchSchema::ResolveKeys(sData, env, sStatus.errors);
+      if (sStatus.errors.empty())
+         PatchSchema::Validate(sData, env, sStatus.errors, sStatus.warnings);
+      if (!job.lenient)
+         Headless::PromoteWarnings(sStatus.warnings, sStatus.errors);
       sStatus.extraJson.push_back("\"nodes\":" + std::to_string(sData.nodes.size()));
       sPhase = Phase::Done;
       HeadlessFinish(window, sStatus, sWall);
@@ -68448,28 +69162,78 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
             sSpawned.push_back({ n, gn->index });
             i++;
          }
+         gHeadlessProbeAll = true;
+         gHeadlessDrawn.clear();
          return;
       }
-      if (t < 8)
+      if (!HeadlessProbeDone(sSpawned, t) && t < kHeadlessProbeCapTicks)
          return;
+      // Which saved key is each control? Needs the nodes still drawing.
+      static ParamKeyJoiner sJoiner;
+      static bool sJoinBegun = false;
+      if (!sJoinBegun)
+      {
+         std::vector<std::pair<std::string, int>> drawn;
+         for (const auto& pr : sSpawned)
+            if (gHeadlessDrawn.count(pr.second))
+               drawn.push_back(pr);
+         sJoiner.Begin(drawn);
+         sJoinBegun = true;
+      }
+      if (!sJoiner.Step() && t < 4 * kHeadlessProbeCapTicks)
+         return;
+      gHeadlessProbeAll = false;
+      // A node that never draws (a Group, a Comment) registers nothing: it is
+      // described from its schema alone and listed so that is visible.
+      {
+         std::string undrawn;
+         for (const auto& pr : sSpawned)
+            if (!gHeadlessDrawn.count(pr.second))
+               undrawn += (undrawn.empty() ? "\"" : ",\"") + Headless::JsonEscape(pr.first) + "\"";
+         if (!undrawn.empty())
+            fprintf(stderr, "describe: never drawn: %s\n", undrawn.c_str());
+      }
 
       std::map<std::string, int> indexOf(sSpawned.begin(), sSpawned.end());
       std::string typesJson = "\"types\":[";
+      std::string unkeyedList;
+      int joinRegistered = 0, joinKeyed = 0;
       bool first = true;
       for (const std::string& n : types)
       {
          PatchSchema::TypeSchema ts = *SchemaFor(n);
          auto it = indexOf.find(n);
+         const ParamJoinType* join = gParamJoin.count(n) ? &gParamJoin[n] : nullptr;
          if (it != indexOf.end())
             for (const ParamRef& r : Modulation::Instance().FrameParams())
                if (r.nodeIndex == it->second)
-                  ts.modulatable.push_back({ r.paramIndex, r.name, r.minValue, r.maxValue, r.step, r.isEnum, r.isBool, r.enumOptions });
+               {
+                  std::string key;
+                  if (join != nullptr && join->keyOfParam.count(r.paramIndex))
+                     key = join->keyOfParam.at(r.paramIndex);
+                  const ParamRef* known = Modulation::Instance().KnownParam(r.nodeIndex, r.paramIndex);
+                  ts.modulatable.push_back({ r.paramIndex, r.name, r.minValue, r.maxValue, r.step, r.isEnum, r.isBool,
+                                             known != nullptr ? known->enumOptions : r.enumOptions, key });
+                  ts.joinRegistered++;
+                  if (!key.empty())
+                     ts.joinKeyed++;
+                  else
+                     unkeyedList += (unkeyedList.empty() ? "" : ",") + std::string("{\"type\":\"") + Headless::JsonEscape(n) +
+                                    "\",\"index\":" + std::to_string(r.paramIndex) + ",\"label\":\"" + Headless::JsonEscape(r.name) + "\"}";
+               }
+         if (it != indexOf.end())
+            AttachControls(ts, it->second);
+         joinRegistered += ts.joinRegistered;
+         joinKeyed += ts.joinKeyed;
          std::sort(ts.modulatable.begin(), ts.modulatable.end(),
                    [](const auto& a, const auto& b) { return a.index < b.index; });
          typesJson += (first ? "" : ",") + PatchSchema::ToJson(ts);
          first = false;
       }
       typesJson += "]";
+      sStatus.extraJson.push_back("\"join_stats\":{\"registered\":" + std::to_string(joinRegistered) + ",\"keyed\":" +
+                                  std::to_string(joinKeyed) + ",\"unkeyed\":" + std::to_string(joinRegistered - joinKeyed) + "}");
+      sStatus.extraJson.push_back("\"unkeyed\":[" + unkeyedList + "]");
       sStatus.extraJson.push_back("\"count\":" + std::to_string(types.size()));
       sStatus.extraJson.push_back(typesJson);
       sPhase = Phase::Done;
@@ -68479,8 +69243,40 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
 
    if (sPhase == Phase::Warm)
    {
+      if (sTicks == 0)
+      {
+         gHeadlessProbeAll = true;
+         gHeadlessDrawn.clear();
+      }
       if (++sTicks < 3)
          return;
+      // The parameter-index check below needs every node a mod/expr line
+      // drives to have drawn (it registers its parameters by drawing). They
+      // are param-driven, so the cull never skips them; this only guards a
+      // slow first frame. Past the cap the check runs on what registered.
+      if (sTicks < kHeadlessProbeCapTicks)
+      {
+         std::map<int, std::string> typeOfFileIndex;
+         for (const Patch::NodeRecord& n : gHeadlessPatch.nodes)
+            typeOfFileIndex[n.index] = n.typeName;
+         std::set<std::string> drivenTypes;
+         for (const Patch::ModRecord& m : gHeadlessPatch.modulation)
+            if (typeOfFileIndex.count(m.dstIndex))
+               drivenTypes.insert(typeOfFileIndex[m.dstIndex]);
+         for (const Patch::ExprRecord& e : gHeadlessPatch.expressions)
+            if (typeOfFileIndex.count(e.dstIndex))
+               drivenTypes.insert(typeOfFileIndex[e.dstIndex]);
+         for (const std::string& type : drivenTypes)
+         {
+            bool drew = false;
+            for (GraphNode& g : gNodes)
+               if (g.typeName == type && gHeadlessDrawn.count(g.index))
+                  drew = true;
+            if (!drew)
+               return;
+         }
+      }
+      gHeadlessProbeAll = false;
 
       // E_BAD_PARAM needs drawn nodes, so it is checked here on the loaded
       // graph rather than in the strict pass before load.
@@ -68496,14 +69292,31 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
                gModulatableMax[g.typeName] = -1;
          std::vector<Headless::Issue> bad;
          PatchSchema::CheckParamIndices(gHeadlessPatch, MakeSchemaEnv(true), bad);
-         if (!bad.empty())
+         if (!bad.empty() || !gHeadlessPromoted.empty())
          {
+            // Everything strict mode found, in file order, so one fix round clears it.
+            for (const Headless::Issue& is : gHeadlessPromoted)
+               sStatus.errors.push_back(is);
             for (const Headless::Issue& is : bad)
                sStatus.errors.push_back(is);
+            std::stable_sort(sStatus.errors.begin(), sStatus.errors.end(),
+                             [](const Headless::Issue& a, const Headless::Issue& b)
+                             { return (a.line > 0 ? a.line : 1 << 30) < (b.line > 0 ? b.line : 1 << 30); });
             sPhase = Phase::Done;
             HeadlessFinish(window, sStatus, sWall);
             return;
          }
+      }
+
+      if (job.mode == Headless::Mode::Explain)
+      {
+         // The live graph, read back after the load: what ApplyPatchData built, not the file.
+         sStatus.stdoutText = ExplainLive(job.explainJson, job.explainAll);
+         sStatus.warnings = gHeadlessPreWarnings;
+         sStatus.ok = true;
+         sPhase = Phase::Done;
+         HeadlessFinish(window, sStatus, sWall);
+         return;
       }
 
       // Resolve the Output. --output takes a node index or a display name.
@@ -72028,11 +72841,23 @@ int main(int argc, char** argv)
    {
       Patch::Data probe;
       std::string readError;
-      const bool loadsPatch = gHeadlessJob.mode == Headless::Mode::Render || gHeadlessJob.mode == Headless::Mode::Frame;
+      const bool loadsPatch = gHeadlessJob.mode == Headless::Mode::Render || gHeadlessJob.mode == Headless::Mode::Frame ||
+                              gHeadlessJob.mode == Headless::Mode::Explain;
       Headless::Status st;
-      st.mode = gHeadlessJob.mode == Headless::Mode::Render ? "render" : "frame";
+      st.mode = gHeadlessJob.mode == Headless::Mode::Render ? "render" : gHeadlessJob.mode == Headless::Mode::Explain ? "explain" : "frame";
       st.patch = gHeadlessJob.patch;
-      if (!loadsPatch)
+      if (gHeadlessJob.mode == Headless::Mode::Canonicalize)
+      {
+         st.mode = "canonicalize";
+         st.out = gHeadlessJob.out;
+         if (!RunCanonicalize(gHeadlessJob, st))
+         {
+            st.ok = st.errors.empty();
+            gHeadlessExitCode = Headless::Emit(gHeadlessJob, st);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+      else if (!loadsPatch)
       {
          // describe / validate do their work in HeadlessTick
       }
@@ -72048,14 +72873,28 @@ int main(int argc, char** argv)
          // reported with its line numbers instead of loading half a graph.
          const PatchSchema::Env env = MakeSchemaEnv(gHeadlessJob.mode == Headless::Mode::Render ||
                                                     gHeadlessJob.mode == Headless::Mode::Frame);
-         PatchSchema::Validate(probe, env, st.errors, gHeadlessPreWarnings);
+         PatchSchema::Resolve(probe, env, st.errors);
+         if (st.errors.empty())
+            PatchSchema::Validate(probe, env, st.errors, gHeadlessPreWarnings);
          gHeadlessPatch = probe;
+         if (!gHeadlessJob.lenient)
+         {
+            // Strict: a hard error stops the load, so everything is reported now;
+            // otherwise the promoted warnings wait for the Warm phase (which adds
+            // E_BAD_PARAM) and the graph is loaded only to be checked.
+            if (!st.errors.empty())
+               Headless::PromoteWarnings(gHeadlessPreWarnings, st.errors);
+            else
+               Headless::PromoteWarnings(gHeadlessPreWarnings, gHeadlessPromoted);
+         }
          if (!st.errors.empty())
          {
             st.warnings = gHeadlessPreWarnings;
             gHeadlessExitCode = Headless::Emit(gHeadlessJob, st);
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
+         else if (probe.hasKeyRefs || gHeadlessJob.mode == Headless::Mode::Explain)
+            gHeadlessNeedProbe = true; // HeadlessTick probes the types, resolves the keys, then loads
          else
             LoadPatchFrom(gHeadlessJob.patch);
       }
@@ -72424,6 +73263,11 @@ int main(int argc, char** argv)
       std::string pendingOpenPatch;
       while (Platform::PollPendingOpenFile(pendingOpenPatch))
       {
+         // A headless job owns the canvas: macOS hands the .inf argument to the app as
+         // an open-file event too, and loading it here would replace the probe nodes
+         // (or reload the graph a job has already loaded).
+         if (HeadlessJobActive())
+            continue;
          LoadPatchFrom(pendingOpenPatch);
          gRequestFitView = true;
       }
@@ -92177,7 +93021,7 @@ int main(int argc, char** argv)
          {
             constexpr int kCullRefresh = 30;
             constexpr float kCullMargin = 64.0f;
-            const bool mustDraw = gn.IsParamDriven() ||
+            const bool mustDraw = gn.IsParamDriven() || gHeadlessProbeAll ||
                                   ImGui::GetCurrentContext()->OpenPopupStack.Size > 0 ||
                                   ((frameId + gn.index) % kCullRefresh) == 0;
             if (!mustDraw && ed::KeepOffscreenNodeAlive(gn.NodeId(), kCullMargin))
@@ -92190,6 +93034,8 @@ int main(int argc, char** argv)
                }
                continue;
             }
+            if (gHeadlessProbeAll)
+               gHeadlessDrawn.insert(gn.index);
          }
 
          // Category tint: same idea as DrawGroupNode's stored colour, but from
