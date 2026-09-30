@@ -33235,8 +33235,16 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    // buffer size. Follow the device's real period where the platform reports
    // one, the Settings -> Audio value otherwise, and never exceed the
    // capacity every node was prepared with.
+   //
+   // A headless job is the exception: it must sound the same on every machine
+   // and in CI, so it pumps a fixed block and ignores both the device period
+   // and the Settings value (R478).
+   constexpr int kHeadlessAudioBlockFrames = 512;
+
    int OfflineAudioBlockFrames()
    {
+      if (gHeadlessJob.mode != Headless::Mode::None)
+         return std::min(kHeadlessAudioBlockFrames, kAudioMaxBlockFrames);
       int frames = (int)Platform::AudioDeviceBufferFrames(gAudioOutputDeviceId);
       if (frames <= 0)
          frames = gAudioBufferFrames;
@@ -80451,6 +80459,25 @@ int main(int argc, char** argv)
                    lOk ? "OK" : "FAIL", activeRate, blockNow, engineRate, gAudioBufferFrames,
                    devPeriod);
             allOk = allOk && lOk;
+
+            // R478: a headless job ignores the device and the Settings value,
+            // so the same patch pumps the same blocks on every machine.
+            {
+               const int savedSetting = gAudioBufferFrames;
+               const Headless::Mode savedMode = gHeadlessJob.mode;
+               gHeadlessJob.mode = Headless::Mode::Render;
+               bool fixed = true;
+               for (int setting : { 64, 128, 1024 })
+               {
+                  gAudioBufferFrames = setting;
+                  fixed = fixed && OfflineAudioBlockFrames() == kHeadlessAudioBlockFrames;
+               }
+               gAudioBufferFrames = savedSetting;
+               gHeadlessJob.mode = savedMode;
+               printf("headless audio block is fixed at %d regardless of settings: %s\n",
+                      kHeadlessAudioBlockFrames, fixed ? "OK" : "FAIL");
+               allOk = allOk && fixed;
+            }
 
             std::string why;
             if (!Arrange::Validate(gArrange, &why))
