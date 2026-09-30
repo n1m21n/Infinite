@@ -203,6 +203,7 @@ void Modulation::RegisterParam(const ParamRef& ref)
    frame.name = ref.name;
    frame.isEnum = ref.isEnum;
    frame.isBool = ref.isBool;
+   frame.momentary = ref.momentary;
    // The widget's own taper: the predictor path maps in fader space, and a copy that dropped these
    // would silently make every log/dB knob linear.
    frame.posToValue = ref.posToValue;
@@ -217,6 +218,7 @@ void Modulation::RegisterParam(const ParamRef& ref)
    known.step = ref.step;
    known.isEnum = ref.isEnum;
    known.isBool = ref.isBool;
+   known.momentary = ref.momentary;
    known.posToValue = ref.posToValue;
    known.valueToPos = ref.valueToPos;
    if (known.name != ref.name)

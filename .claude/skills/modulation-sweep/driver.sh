@@ -9,6 +9,7 @@ ASSERT=(
   "MODMATRIXGEOM:30"    # the matrix's own row fill must be scroll-invariant
   "MODBOUNDSTEST:30"    # a binding's lo/hi range, clamping and integer snapping at the destination
   "MPCMODTEST:30"       # MPC: a per-pad binding keeps driving its own pad when the selection moves, and survives save/load
+  "LOOPERTRIGTEST:30"   # a Macro Trigger on a Looper button presses on every trigger (momentary gate), a checkbox still toggles
   "MACROTEST:30"        # macro controls as modulation sources, across save/load
   "PERFMATRIXTEST:1"    # performance matrix patch round trip (headless, exit-code gated)
   "ROUNDTRIPTEST:35"    # every node type's params, incl. modulators, survive save/load

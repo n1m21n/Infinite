@@ -3318,7 +3318,8 @@ namespace
    }
 
    DiscreteParamHandle RegisterDiscreteParam(const char* label, float current, float maxV,
-                                             bool isBool, const std::vector<std::string>* options)
+                                             bool isBool, const std::vector<std::string>* options,
+                                             bool momentary = false)
    {
       DiscreteParamHandle h;
       if (gCurrentNodeIndex < 0)
@@ -3347,6 +3348,7 @@ namespace
       ref.name = StripParamLabel(label);
       ref.isBool = isBool;
       ref.isEnum = !isBool;
+      ref.momentary = momentary; // a gate button: triggers pulse it instead of flipping it
       // Only hand the option list over when the sticky store doesn't already
       // hold it: copying a dozens-long list of std::strings every frame for
       // every visible dropdown is exactly the allocation churn that made a
@@ -12106,7 +12108,8 @@ namespace
    {
       if (activated != nullptr)
          *activated = false;
-      const DiscreteParamHandle h = RegisterDiscreteParam(id, 0.0f, 1.0f, /*isBool=*/true, nullptr);
+      const DiscreteParamHandle h = RegisterDiscreteParam(id, 0.0f, 1.0f, /*isBool=*/true, nullptr,
+                                                          /*momentary=*/true);
       if (h.registered && !h.draw)
          return h.driven && h.value >= 0.5f;
       const float pinW = 16.0f;
@@ -12146,7 +12149,8 @@ namespace
    // being its on state.
    bool DrawGateControl(const char* id, const char* label, float btnW, int style, bool lit)
    {
-      const DiscreteParamHandle h = RegisterDiscreteParam(id, 0.0f, 1.0f, /*isBool=*/true, nullptr);
+      const DiscreteParamHandle h = RegisterDiscreteParam(id, 0.0f, 1.0f, /*isBool=*/true, nullptr,
+                                                          /*momentary=*/true);
       if (h.registered && !h.draw)
          return h.driven && h.value >= 0.5f;
       const float pinW = 16.0f;
@@ -39389,6 +39393,8 @@ namespace
             const ParamRef* kp = Modulation::Instance().KnownParam(dstIndex, dstParam);
             if (kp == nullptr)
                return 0;
+            if (kp->momentary)
+               return 0; // a gate button takes the plain 1-while-held / 0-on-release write
             const int span = (int)std::lround(kp->maxValue - kp->minValue);
             if (kp->isBool || (kp->step == 1.0f && span == 1))
                return 1;
@@ -39916,6 +39922,7 @@ namespace
                   if (dstParam < 0) return 0;
                   const ParamRef* kp = Modulation::Instance().KnownParam(dstIndex, dstParam);
                   if (kp == nullptr) return 0;
+                  if (kp->momentary) return 0; // a gate button takes the plain 1-while-held / 0-on-release write
                   const int span = (int)std::lround(kp->maxValue - kp->minValue);
                   if (kp->isBool || (kp->step == 1.0f && span == 1)) return 1;
                   if (kp->isEnum) return span >= 1 ? span : 0;
@@ -67164,6 +67171,21 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false)
          }
          if (auto* trigNode = dynamic_cast<MacroTriggerNode*>(modNode->node.get()))
          {
+            // A momentary gate button (Looper transport, MPC pad) acts on a rising edge,
+            // so the trigger follows the pad's own level - high while held, and for at
+            // least this one apply on a tap - instead of flipping the bool per trigger,
+            // where every second trigger would land on the falling edge and do nothing.
+            if (ref.momentary)
+            {
+               const float level = (trigNode->pressed || trigNode->justTriggered) ? ref.maxValue : ref.minValue;
+               if (*ref.value != level)
+               {
+                  *ref.value = level;
+                  MovementLog::NoteWriter(ref.nodeIndex, ref.paramIndex,
+                                          ModulatorLogSource(modNode->node.get(), src.nodeIndex));
+               }
+               continue;
+            }
             const int span = (int)std::lround(ref.maxValue - ref.minValue);
             const bool isStepping = ref.isEnum || ref.isBool || (ref.step == 1.0f && span >= 1);
             if (isStepping)
@@ -69387,6 +69409,7 @@ int main(int argc, char** argv)
          getenv("INFINITE_CULLDRIVENTEST") != nullptr ||
          getenv("INFINITE_PREDBINDTEST") != nullptr ||
          getenv("INFINITE_MPCMODTEST") != nullptr ||
+         getenv("INFINITE_LOOPERTRIGTEST") != nullptr ||
          getenv("INFINITE_MIDILEARNTEST") != nullptr ||
          getenv("INFINITE_MODMATRIXGEOM") != nullptr;
 
@@ -71754,6 +71777,15 @@ int main(int argc, char** argv)
             SpawnNode("Range to Range", "Modulators", 60.0f, 500.0f);
             SpawnNode("MPC", "Synths", 400.0f, 500.0f);
             gNodes[3].showParams = true;
+         }
+         if (getenv("INFINITE_LOOPERTRIGTEST") != nullptr)
+         {
+            SpawnNode("Macro Trigger", "Macros", 60.0f, 500.0f);  // trigger A -> a Looper button
+            SpawnNode("Macro Trigger", "Macros", 60.0f, 700.0f);  // trigger B -> a plain checkbox
+            SpawnNode("Looper", "Synths", 400.0f, 500.0f);
+            for (GraphNode& gn : gNodes)
+               if (dynamic_cast<LooperNode*>(gn.node.get()) != nullptr)
+                  gn.showParams = true; // params must be drawn for them to register
          }
          if (getenv("INFINITE_MPCMODTEST") != nullptr)
          {
@@ -98328,6 +98360,89 @@ int main(int argc, char** argv)
                   bad("reload put the cable on the selected pad");
             }
             printf("%s\n", ok ? "MPC MOD TEST OK" : "MPC MOD TEST FAIL");
+         }
+      }
+
+      if (getenv("INFINITE_LOOPERTRIGTEST") != nullptr)
+      {
+         // A Macro Trigger patched onto a Looper transport button must press it on EVERY
+         // trigger (the Looper acts on rising edges; a flip-per-trigger bool only rose on
+         // every second one), while a Macro Trigger on an ordinary checkbox still toggles it.
+         static bool ok = true;
+         static int looperIdx = -1, trigA = -1, trigB = -1;
+         static bool thruStart = false;
+         Modulation& mod = Modulation::Instance();
+         auto bad = [&](const char* what)
+         {
+            printf("LOOPER TRIGGER TEST %s FAIL\n", what);
+            ok = false;
+         };
+         LooperNode* looper = nullptr;
+         MacroTriggerNode* ta = nullptr;
+         MacroTriggerNode* tb = nullptr;
+         for (GraphNode& gn : gNodes)
+         {
+            if (auto* l = dynamic_cast<LooperNode*>(gn.node.get())) { looper = l; looperIdx = gn.index; }
+            else if (auto* t = dynamic_cast<MacroTriggerNode*>(gn.node.get()))
+            {
+               if (ta == nullptr) { ta = t; trigA = gn.index; }
+               else { tb = t; trigB = gn.index; }
+            }
+         }
+         if (looper == nullptr || ta == nullptr || tb == nullptr)
+         {
+            if (frameId == 1)
+               bad("fixture missing");
+         }
+         else
+         {
+            if (frameId == 2)
+            {
+               int thruParam = -1;
+               bool momentaryRec = false;
+               for (const ParamRef& ref : mod.FrameParams())
+               {
+                  if (ref.nodeIndex != looperIdx) continue;
+                  if (ref.name == "thru") { thruParam = ref.paramIndex; if (ref.momentary) bad("thru checkbox flagged momentary"); }
+                  if (ref.name == "rec") momentaryRec = ref.momentary;
+               }
+               if (thruParam < 0) bad("thru checkbox not registered");
+               if (!momentaryRec) bad("rec button not registered momentary");
+               mod.Bind(looperIdx, DiscreteParamSlot(looperIdx, "rec"), trigA);
+               if (thruParam >= 0)
+                  mod.Bind(looperIdx, thruParam, trigB);
+            }
+            // Fire A on frames 4, 8, 12 (a tap: justTriggered without a held pad).
+            if (frameId == 4 || frameId == 8 || frameId == 12)
+               ta->justTriggered = true;
+            if (frameId == 14)
+            {
+               const int presses = looper->ButtonPresses(LooperNode::kRec);
+               if (presses != 3)
+               {
+                  char what[96];
+                  snprintf(what, sizeof(what), "3 triggers gave %d Rec presses (want 3)", presses);
+                  bad(what);
+               }
+               if (looper->ButtonPresses(LooperNode::kPlay) != 0 || looper->ButtonPresses(LooperNode::kClear) != 0)
+                  bad("trigger on Rec pressed another button");
+               // The checkbox still flips per trigger (its start value is whatever the
+               // binding inherited, so compare against that).
+               thruStart = looper->thru;
+               tb->justTriggered = true;
+            }
+            if (frameId == 17)
+            {
+               if (looper->thru == thruStart)
+                  bad("a trigger no longer toggles an ordinary checkbox (1st)");
+               tb->justTriggered = true;
+            }
+            if (frameId == 20)
+            {
+               if (looper->thru != thruStart)
+                  bad("a trigger no longer toggles an ordinary checkbox (2nd)");
+               printf("%s\n", ok ? "LOOPER TRIGGER TEST OK" : "LOOPER TRIGGER TEST FAIL");
+            }
          }
       }
 

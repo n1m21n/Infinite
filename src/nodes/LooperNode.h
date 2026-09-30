@@ -75,6 +75,8 @@ public:
    // high); a rising edge posts the press to the audio thread, so a held CV or
    // a held mouse presses exactly once.
    void SetButtonLevel(int button, bool level);
+   // Rising edges seen so far (main thread; fixtures assert on it).
+   int ButtonPresses(int button) const { return button >= 0 && button < kNumButtons ? mButtonPresses[button] : 0; }
 
    // Published by the audio thread, refreshed every CookIfNeeded.
    int CurrentState() const { return mState; }
@@ -124,6 +126,7 @@ private:
    std::unique_ptr<AudioLooperNode> mAudioNode;
    int mLastCookFrame = -1;
    bool mButtonLevel[kNumButtons] = {};
+   int mButtonPresses[kNumButtons] = {};
    int mState = kEmpty;
    float mLoopSec = 0.0f;
    float mRecordedSec = 0.0f;

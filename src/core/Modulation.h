@@ -71,6 +71,11 @@ struct ParamRef
    std::string name;
    bool isEnum = false;
    bool isBool = false;
+   // A bool that is a momentary button (a gate: the node acts on its rising
+   // edge, e.g. Looper transport, MPC pads), not a two-state switch. A trigger
+   // (Macro Trigger, perf Trigger/Bang) must PULSE it 0 -> 1 -> 0 rather than
+   // flip it, or every second trigger lands on the falling edge and does nothing.
+   bool momentary = false;
    std::vector<std::string> enumOptions;
    FaderPosToValueFn posToValue = nullptr;
    FaderValueToPosFn valueToPos = nullptr;
