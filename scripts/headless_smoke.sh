@@ -83,5 +83,29 @@ done
 [ "$ok" = 6 ]; check "patch_1 validates 6/6 (probe barrier)" $?
 r=$("$BIN" --describe 2>/dev/null); [ "$(echo "$r" | json "sum(len(t['modulatable']) for t in d['types']) > 1500")" = "True" ]; check "describe registers off-screen nodes too" $?
 
+# C1: strict by default, --lenient opts out. A misspelled param refuses (exit 3),
+# names its line and the nearest key; --lenient renders it.
+S="$ROOT/tests/headless/strict"
+r=$("$BIN" --frame "$S/misspelled.inf" 0 "$OUT/s.png" 2>/dev/null); rc=$?
+[ "$rc" = 3 ]; check "strict: misspelled param exit 3" $?
+[ ! -e "$OUT/s.png" ]; check "strict: nothing rendered" $?
+[ "$(echo "$r" | json "[(e['code'],e['line'],e.get('promoted'),e['hint']) for e in d['errors']]")" = "[('W_UNKNOWN_PARAM', 119, True, \"did you mean 'damping'?\")]" ]; check "strict: error names line and nearest key" $?
+r=$("$BIN" --frame "$S/misspelled.inf" 0 "$OUT/s.png" --lenient 2>/dev/null); rc=$?
+[ "$rc" = 0 ] && [ -s "$OUT/s.png" ]; check "lenient: misspelled param renders, exit 0" $?
+[ "$(echo "$r" | json "'W_UNKNOWN_PARAM' in [w['code'] for w in d['warnings']] and not d['errors']")" = "True" ]; check "lenient: still reported as a warning" $?
+"$BIN" --validate "$S/misspelled.inf" >/dev/null 2>&1; [ $? = 3 ]; check "validate is strict by default" $?
+"$BIN" --validate "$S/misspelled.inf" --lenient >/dev/null 2>&1; [ $? = 0 ]; check "validate --lenient exit 0" $?
+# the topology warnings are errors by default, warnings under --lenient
+for g in g3_bypass_blend g6_image_cycle g11_open_blend g13_output_empty; do
+  "$BIN" --validate "$ROOT/tests/headless/topology/$g.inf" --for-render >/dev/null 2>&1; [ $? = 3 ]; check "strict: $g exit 3" $?
+  "$BIN" --validate "$ROOT/tests/headless/topology/$g.inf" --for-render --lenient >/dev/null 2>&1; [ $? = 0 ]; check "lenient: $g exit 0" $?
+done
+# advisory warnings never block: unused nodes in the real fixtures
+"$BIN" --validate "$ROOT/assets/examples/patch_1.inf" >/dev/null 2>&1; [ $? = 0 ]; check "strict: unused nodes stay advisory (patch_1)" $?
+# every problem at once: warnings promoted before load AND E_BAD_PARAM found after
+r=$("$BIN" --frame "$S/all_at_once.inf" 0 "$OUT/a.png" 2>/dev/null); rc=$?
+[ "$rc" = 3 ]; check "strict: all-at-once exit 3" $?
+[ "$(echo "$r" | json "sorted(e['code'] for e in d['errors'])")" = "['E_BAD_PARAM', 'W_BYPASS_IGNORED', 'W_UNKNOWN_PARAM']" ]; check "strict: all-at-once lists every problem" $?
+
 rm -rf "$OUT"
 exit $fail

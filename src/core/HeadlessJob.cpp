@@ -48,6 +48,8 @@ namespace Headless
             s += ",\"message\":\"" + JsonEscape(is.message) + "\"";
             if (!is.hint.empty())
                s += ",\"hint\":\"" + JsonEscape(is.hint) + "\"";
+            if (is.promoted)
+               s += ",\"promoted\":true";
             s += "}";
          }
          s += "]";
@@ -127,6 +129,8 @@ namespace Headless
                job.jsonPath = argv[++i];
             else if (a == "--for-render")
                job.forRender = true;
+            else if (a == "--lenient")
+               job.lenient = true;
             else if (a.rfind("--", 0) == 0)
             {
                usageError = "unknown option " + a;
@@ -137,7 +141,7 @@ namespace Headless
          }
          if (pos.size() != 1)
          {
-            usageError = "usage: Infinite --validate <patch.inf> [--for-render] [--json <file>]";
+            usageError = "usage: Infinite --validate <patch.inf> [--for-render] [--lenient] [--json <file>]";
             return true;
          }
          job.patch = pos[0];
@@ -243,6 +247,8 @@ namespace Headless
          }
          else if (a == "--no-audio")
             job.noAudio = true;
+         else if (a == "--lenient")
+            job.lenient = true;
          else if (a.rfind("--", 0) == 0)
          {
             usageError = "unknown option " + a;
@@ -275,6 +281,27 @@ namespace Headless
       return true;
    }
 
+   bool IsAdvisory(const std::string& code)
+   {
+      return code == "W_UNUSED_NODE" || code == "W_NO_OUTPUT" || code == "W_DURATION_ROUNDED";
+   }
+
+   void PromoteWarnings(std::vector<Issue>& warnings, std::vector<Issue>& errors)
+   {
+      std::vector<Issue> keep;
+      for (Issue& w : warnings)
+      {
+         if (IsAdvisory(w.code))
+            keep.push_back(w);
+         else
+         {
+            w.promoted = true;
+            errors.push_back(w);
+         }
+      }
+      warnings.swap(keep);
+   }
+
    int ExitCodeFor(const Status& status)
    {
       if (status.ok && status.errors.empty())
@@ -286,13 +313,16 @@ namespace Headless
          return 2;
       if (c == "E_LOAD" || c == "E_NO_OUTPUT" || c == "E_AMBIGUOUS_OUTPUT" || c == "E_UNKNOWN_TYPE" ||
           c == "E_BAD_SLOT" || c == "E_KIND_MISMATCH" || c == "E_DANGLING" || c == "E_CYCLE" ||
-          c == "E_DUPLICATE_INDEX" || c == "E_SLOT_TAKEN" || c == "E_NOT_A_MODULATOR" || c == "E_BAD_PARAM" ||
-          c == "W_BYPASS_IGNORED")
+          c == "E_DUPLICATE_INDEX" || c == "E_SLOT_TAKEN" || c == "E_NOT_A_MODULATOR" || c == "E_BAD_PARAM")
          return 3;
       if (c == "E_HARDWARE_SOURCE")
          return 4;
       if (c == "E_TIMEOUT" || c == "E_PROBE_TIMEOUT")
          return 6;
+      // Any promoted warning is a patch problem, whatever came first.
+      for (const Issue& e : status.errors)
+         if (e.code.rfind("W_", 0) == 0)
+            return 3;
       return 5;
    }
 

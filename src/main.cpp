@@ -1188,6 +1188,10 @@ namespace
    double gHeadlessAudioRate = 0.0;
    // Validator warnings from the load, folded into the job's status JSON.
    std::vector<Headless::Issue> gHeadlessPreWarnings;
+   // Strict mode: the warnings of the pre-load pass that were promoted to errors.
+   // They wait here so the Warm phase can report them together with E_BAD_PARAM,
+   // which needs drawn nodes - one round of fixes clears everything.
+   std::vector<Headless::Issue> gHeadlessPromoted;
    // The authored patch of a --render/--frame job, kept so the checks that need
    // drawn nodes (E_BAD_PARAM) can run once the graph is loaded.
    Patch::Data gHeadlessPatch;
@@ -68429,6 +68433,8 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
       }
       const PatchSchema::Env env = MakeSchemaEnv(job.forRender);
       PatchSchema::Validate(sData, env, sStatus.errors, sStatus.warnings);
+      if (!job.lenient)
+         Headless::PromoteWarnings(sStatus.warnings, sStatus.errors);
       sStatus.extraJson.push_back("\"nodes\":" + std::to_string(sData.nodes.size()));
       sPhase = Phase::Done;
       HeadlessFinish(window, sStatus, sWall);
@@ -68572,10 +68578,16 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
                gModulatableMax[g.typeName] = -1;
          std::vector<Headless::Issue> bad;
          PatchSchema::CheckParamIndices(gHeadlessPatch, MakeSchemaEnv(true), bad);
-         if (!bad.empty())
+         if (!bad.empty() || !gHeadlessPromoted.empty())
          {
+            // Everything strict mode found, in file order, so one fix round clears it.
+            for (const Headless::Issue& is : gHeadlessPromoted)
+               sStatus.errors.push_back(is);
             for (const Headless::Issue& is : bad)
                sStatus.errors.push_back(is);
+            std::stable_sort(sStatus.errors.begin(), sStatus.errors.end(),
+                             [](const Headless::Issue& a, const Headless::Issue& b)
+                             { return (a.line > 0 ? a.line : 1 << 30) < (b.line > 0 ? b.line : 1 << 30); });
             sPhase = Phase::Done;
             HeadlessFinish(window, sStatus, sWall);
             return;
@@ -72126,6 +72138,16 @@ int main(int argc, char** argv)
                                                     gHeadlessJob.mode == Headless::Mode::Frame);
          PatchSchema::Validate(probe, env, st.errors, gHeadlessPreWarnings);
          gHeadlessPatch = probe;
+         if (!gHeadlessJob.lenient)
+         {
+            // Strict: a hard error stops the load, so everything is reported now;
+            // otherwise the promoted warnings wait for the Warm phase (which adds
+            // E_BAD_PARAM) and the graph is loaded only to be checked.
+            if (!st.errors.empty())
+               Headless::PromoteWarnings(gHeadlessPreWarnings, st.errors);
+            else
+               Headless::PromoteWarnings(gHeadlessPreWarnings, gHeadlessPromoted);
+         }
          if (!st.errors.empty())
          {
             st.warnings = gHeadlessPreWarnings;

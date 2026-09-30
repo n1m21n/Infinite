@@ -77,8 +77,8 @@ namespace PatchSchema
       // -2 = not known here, -1 = it registers none. Filled from a drawn node,
       // so it is only available once a window has drawn one.
       std::function<int(const std::string& type)> maxParamIndex;
-      // Strict: E_NO_OUTPUT is an error rather than silence, and so is
-      // W_BYPASS_IGNORED (the render would not match what the author wrote).
+      // E_NO_OUTPUT is an error rather than a warning. (Strict mode, which
+      // promotes the warnings too, is Headless::PromoteWarnings.)
       bool forRender = false;
    };
 

@@ -164,7 +164,7 @@ namespace PatchSchema
             Headless::Issue is = Make("W_BYPASS_IGNORED",
                                       t->name + " cannot be bypassed (it has more than one input, or it is an instrument with no pass-through), so bypassed=1 is ignored and the node stays on",
                                       n.line, n.index, "remove the node or its cables to switch it off; only single-input nodes can be bypassed");
-            (env.forRender ? errors : warnings).push_back(is);
+            warnings.push_back(is);
          }
          std::set<std::string> seenKeys;
          std::vector<std::string> keys;
