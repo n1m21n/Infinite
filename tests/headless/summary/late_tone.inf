@@ -1,0 +1,22 @@
+infinite-patch 1
+# Silent until t = 2 s, then a 1 kHz tone. A render started at 2 s must carry the tone from its
+# first sample; if the audio clock stays at 0 it is silent (R476).
+node 1 Synths Oscillator
+  id osc
+  f frequency 1000
+  i waveform Sine
+  f volume 0
+end
+node 2 AudioUtility Audio Out
+  id speakers
+end
+node 3 Source Shape
+  id shape
+end
+node 4 Utility Output
+  id out
+end
+cable out 0 shape
+aud out 1 osc
+aud speakers 0 osc
+expr osc volume clamp(t - 2, 0, 1) * 0.5

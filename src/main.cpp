@@ -69510,6 +69510,10 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
          }
          sOut->includeAudio = !job.noAudio;
 
+         // Seek before the session starts: StartOfflineRenderSession captures
+         // the transport position for SetOfflineMode and the audio clock, so
+         // seeking after it left picture at S and audio at 0.
+         Transport::Instance().Seek(job.start);
          StartOfflineRenderSession(sOut);
          if (!gOfflineRender.active)
          {

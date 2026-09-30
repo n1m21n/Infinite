@@ -27,6 +27,17 @@ if command -v ffprobe >/dev/null; then
   ffprobe -v error -show_entries stream=codec_type -of csv=p=0 "$OUT/r.mp4" | grep -q audio; check "mp4 has audio track" $?
 fi
 
+# R476: --render --start S carries the audio clock to S, not just the picture (tone begins at 2 s)
+if command -v ffmpeg >/dev/null; then
+  LT="$ROOT/tests/headless/summary/late_tone.inf"
+  "$BIN" --render "$LT" "$OUT/lt0.mp4" --start 0 --duration 1 --fps 30 >/dev/null
+  "$BIN" --render "$LT" "$OUT/lt2.mp4" --start 2 --duration 1 --fps 30 >/dev/null
+  mv0=$(ffmpeg -i "$OUT/lt0.mp4" -af volumedetect -vn -f null - 2>&1 | sed -n 's/.*max_volume: \(-*[0-9.]*\) dB.*/\1/p')
+  mv2=$(ffmpeg -i "$OUT/lt2.mp4" -af volumedetect -vn -f null - 2>&1 | sed -n 's/.*max_volume: \(-*[0-9.]*\) dB.*/\1/p')
+  python3 -c "import sys; sys.exit(0 if float('${mv0:--999}') < -60 else 1)"; check "render --start 0: late tone not yet audible" $?
+  python3 -c "import sys; sys.exit(0 if float('${mv2:--999}') > -20 else 1)"; check "render --start 2: audio starts at 2 s, not 0" $?
+fi
+
 "$BIN" --render "$OUT/missing.inf" "$OUT/x.mp4" >/dev/null; [ $? = 3 ]; check "missing patch exit 3" $?
 "$BIN" --frame "$PATCH" abc "$OUT/x.png" >/dev/null; [ $? = 2 ]; check "bad time exit 2" $?
 "$BIN" --render "$PATCH" "$OUT/x.avi" >/dev/null; [ $? = 2 ]; check "bad container exit 2" $?
