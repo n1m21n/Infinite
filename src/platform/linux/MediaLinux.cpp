@@ -26,6 +26,7 @@
 #include "../Platform.h"
 #include "BenchMediaIo.h"
 #include "../common/FfmpegAudioDecodeHook.h"
+#include "HostEnvironmentLinux.h"
 #include "tinyfiledialogs.h"
 
 extern "C"
@@ -555,6 +556,7 @@ namespace Platform
       const char* wayland = std::getenv("WAYLAND_DISPLAY");
       if ((!disp || disp[0] == '\0') && (!wayland || wayland[0] == '\0')) return "";
 
+      ScopedHostEnvironment hostEnv;
       const char* const filterPatterns[] = {
          "*.mp4", "*.mov", "*.m4v", "*.avi", "*.mkv", "*.webm", "*.wmv"
       };

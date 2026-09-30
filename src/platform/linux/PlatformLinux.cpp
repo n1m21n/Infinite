@@ -1,6 +1,7 @@
 #include "platform/Platform.h"
 #include "platform/AppPaths.h"
 #include "platform/common/SubjectMaskOnnx.h"
+#include "platform/linux/HostEnvironmentLinux.h"
 #include "tinyfiledialogs.h"
 
 #include <chrono>
@@ -235,6 +236,7 @@ namespace Platform
 
       if (!IsHeadlessOrExitAfter())
       {
+         ScopedHostEnvironment hostEnv;
          tinyfd_messageBox(title.c_str(), message.c_str(), "ok", "error", 1);
       }
    }
@@ -242,6 +244,7 @@ namespace Platform
    std::string OpenImageDialog()
    {
       if (IsHeadlessOrExitAfter()) return "";
+      ScopedHostEnvironment hostEnv;
       EnsureDialogBackendChecked();
       const char* const filterPatterns[] = {
          "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.tif", "*.tiff",
@@ -261,6 +264,7 @@ namespace Platform
    std::string OpenHdrDialog()
    {
       if (IsHeadlessOrExitAfter()) return "";
+      ScopedHostEnvironment hostEnv;
       EnsureDialogBackendChecked();
       const char* const filterPatterns[] = {
          "*.hdr", "*.exr"
@@ -279,6 +283,7 @@ namespace Platform
    std::string OpenModelDialog()
    {
       if (IsHeadlessOrExitAfter()) return "";
+      ScopedHostEnvironment hostEnv;
       EnsureDialogBackendChecked();
       const char* const filterPatterns[] = {
          "*.obj", "*.ply", "*.stl"
@@ -297,6 +302,7 @@ namespace Platform
    std::string OpenPatchDialog()
    {
       if (IsHeadlessOrExitAfter()) return "";
+      ScopedHostEnvironment hostEnv;
       EnsureDialogBackendChecked();
       const char* const filterPatterns[] = {
          "*.infinite", "*.inf"
@@ -315,6 +321,7 @@ namespace Platform
    std::string SavePatchDialog(const std::string& suggestedName)
    {
       if (IsHeadlessOrExitAfter()) return "";
+      ScopedHostEnvironment hostEnv;
       EnsureDialogBackendChecked();
       const char* const filterPatterns[] = {
          "*.infinite"
@@ -336,6 +343,7 @@ namespace Platform
    std::string OpenDeviceDialog()
    {
       if (IsHeadlessOrExitAfter()) return "";
+      ScopedHostEnvironment hostEnv;
       EnsureDialogBackendChecked();
       const char* const filterPatterns[] = {
          "*.field", "*.infdev"
@@ -354,6 +362,7 @@ namespace Platform
    std::string SaveDeviceDialog(const std::string& suggestedName)
    {
       if (IsHeadlessOrExitAfter()) return "";
+      ScopedHostEnvironment hostEnv;
       EnsureDialogBackendChecked();
       const char* const filterPatterns[] = {
          "*.field"
@@ -375,6 +384,7 @@ namespace Platform
    std::string OpenFolderDialog(const char* title, const std::string& initialDir)
    {
       if (IsHeadlessOrExitAfter()) return "";
+      ScopedHostEnvironment hostEnv;
       EnsureDialogBackendChecked();
       const char* res = tinyfd_selectFolderDialog(
          title ? title : "Select Folder",
@@ -387,6 +397,8 @@ namespace Platform
    {
       if (url.rfind("https://", 0) != 0 && url.rfind("http://", 0) != 0)
          return;
+
+      ScopedHostEnvironment hostEnv;
 
       pid_t pid;
       char* argv[] = {
@@ -427,6 +439,8 @@ namespace Platform
       struct stat st;
       if (stat(path.c_str(), &st) != 0)
          return;
+
+      ScopedHostEnvironment hostEnv;
 
       const std::string uri = "file://" + UriEncodePath(path);
 

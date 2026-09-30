@@ -85,6 +85,10 @@ fi
 cat > "$APPDIR/AppRun" <<'APPRUN_EOF'
 #!/bin/sh
 HERE="$(dirname "$(readlink -f "$0")")"
+# Preserve the host's original LD_LIBRARY_PATH so child processes running host
+# utilities (zenity, kdialog, xdg-open) can run against host libraries without
+# symbol lookup errors from AppImage's bundled libs (Issue #25).
+export APPIMAGE_ORIGINAL_LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
 export LD_LIBRARY_PATH="$HERE/usr/lib:${LD_LIBRARY_PATH:-}"
 exec "$HERE/usr/bin/Infinite" "$@"
 APPRUN_EOF

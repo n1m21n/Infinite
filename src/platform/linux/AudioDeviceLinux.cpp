@@ -879,6 +879,7 @@ namespace Platform
 // and Platform.mm decline it the same way), and sleep/wake (Linux has no
 // such notification concept, same as Windows).
 // ---------------------------------------------------------------------------
+#include "platform/linux/HostEnvironmentLinux.h"
 #include "tinyfiledialogs.h"
 
 namespace Platform
@@ -890,6 +891,7 @@ namespace Platform
       const char* wayland = std::getenv("WAYLAND_DISPLAY");
       if ((!disp || disp[0] == '\0') && (!wayland || wayland[0] == '\0')) return "";
 
+      ScopedHostEnvironment hostEnv;
       const char* const filterPatterns[] = {
          "*.wav", "*.aif", "*.aiff", "*.mp3", "*.flac"
       };

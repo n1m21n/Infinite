@@ -149,7 +149,7 @@ TIER1_CHECKS=(
 # Windows runs of this same driver never set an env var their binary doesn't
 # recognise (which would print no verdict line and read as a bare FAIL).
 if [ "$OS" = "Linux" ]; then
-  TIER1_CHECKS+=("MIDIPARSETEST:1")
+  TIER1_CHECKS+=("MIDIPARSETEST:1" "HOSTENVTEST:1")
 fi
 
 GROUP_AUDIO=(
