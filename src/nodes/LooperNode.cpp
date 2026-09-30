@@ -549,6 +549,7 @@ void LooperNode::SetButtonLevel(int button, bool level)
    mButtonLevel[button] = level;
    if (rising)
    {
+      mButtonPresses[button]++;
       GetAudioNode();
       mAudioNode->PushCommand(button);
    }
