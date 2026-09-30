@@ -47925,7 +47925,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    void NoteGraphEditedForLiveIssues()
    {
       gLiveIssueSerial++;
-      gLiveIssueEditTime = ImGui::GetTime();
+      // Self-tests apply patches before any ImGui context exists (R496).
+      gLiveIssueEditTime = ImGui::GetCurrentContext() != nullptr ? ImGui::GetTime() : 0.0;
    }
 
    void RefreshLiveIssues()
