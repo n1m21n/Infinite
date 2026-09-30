@@ -1,6 +1,7 @@
 #include "ColorStats.h"
 
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -598,5 +599,79 @@ namespace ColorStats
       o.saturation = OUStep(o.saturation, theta, sigma.saturation, dt, rng);
       o.vibrance   = OUStep(o.vibrance,   theta, sigma.vibrance,   dt, rng);
       o.hueShift   = OUStep(o.hueShift,   theta, sigma.hueShift,   dt, rng);
+   }
+
+   FrameSummary SummarizeRgba8(const uint8_t* pixels, int width, int height)
+   {
+      FrameSummary out;
+      out.width = width;
+      out.height = height;
+      const size_t count = (size_t)std::max(0, width) * (size_t)std::max(0, height);
+      if (pixels == nullptr || count == 0)
+         return out;
+
+      // Integer sums: exact, and a 4K frame's 8 million pixels stay far inside 64 bits.
+      uint64_t sum[4] = { 0, 0, 0, 0 };
+      uint64_t black = 0, white = 0, covered = 0;
+      uint64_t bins[kFrameLumaBins] = {};
+      // Luma in 1/10000ths of the 0..255 range, so min/max need no float per pixel.
+      uint32_t minY = 0xffffffffu, maxY = 0;
+      for (size_t i = 0; i < count; i++)
+      {
+         const uint8_t* px = pixels + i * 4;
+         const uint32_t r = px[0], g = px[1], b = px[2], a = px[3];
+         sum[0] += r;
+         sum[1] += g;
+         sum[2] += b;
+         sum[3] += a;
+         if ((r | g | b) == 0)
+            black++;
+         if ((r & g & b) == 255)
+            white++;
+         if (a != 0)
+            covered++;
+         const uint32_t y = 2126u * r + 7152u * g + 722u * b; // 0..2550000
+         minY = std::min(minY, y);
+         maxY = std::max(maxY, y);
+         bins[std::min<uint32_t>(kFrameLumaBins - 1, y * kFrameLumaBins / 2550001u)]++;
+      }
+      const double n = (double)count;
+      for (int c = 0; c < 3; c++)
+         out.meanRgb[c] = (double)sum[c] / (n * 255.0);
+      out.meanAlpha = (double)sum[3] / (n * 255.0);
+      out.meanLuma = 0.2126 * out.meanRgb[0] + 0.7152 * out.meanRgb[1] + 0.0722 * out.meanRgb[2];
+      out.minLuma = (double)minY / 2550000.0;
+      out.maxLuma = (double)maxY / 2550000.0;
+      out.blackPercent = 100.0 * (double)black / n;
+      out.whitePercent = 100.0 * (double)white / n;
+      out.alphaCoverage = 100.0 * (double)covered / n;
+      for (int i = 0; i < kFrameLumaBins; i++)
+         out.lumaHistogram[i] = (double)bins[i] / n;
+      return out;
+   }
+
+   std::string FrameSummaryJsonFields(const FrameSummary& s)
+   {
+      auto num = [](double v, const char* fmt)
+      {
+         char buf[32];
+         std::snprintf(buf, sizeof(buf), fmt, v);
+         return std::string(buf);
+      };
+      std::string o;
+      o += "\"mean_luma\":" + num(s.meanLuma, "%.4f");
+      o += ",\"min_luma\":" + num(s.minLuma, "%.4f");
+      o += ",\"max_luma\":" + num(s.maxLuma, "%.4f");
+      o += ",\"mean_rgb\":[" + num(s.meanRgb[0], "%.4f") + "," + num(s.meanRgb[1], "%.4f") + "," +
+           num(s.meanRgb[2], "%.4f") + "]";
+      o += ",\"black_percent\":" + num(s.blackPercent, "%.3f");
+      o += ",\"white_percent\":" + num(s.whitePercent, "%.3f");
+      o += ",\"alpha_coverage\":" + num(s.alphaCoverage, "%.3f");
+      o += ",\"mean_alpha\":" + num(s.meanAlpha, "%.4f");
+      o += ",\"luma_histogram\":[";
+      for (int i = 0; i < kFrameLumaBins; i++)
+         o += (i ? "," : "") + num(s.lumaHistogram[i], "%.4f");
+      o += "]";
+      return o;
    }
 }
