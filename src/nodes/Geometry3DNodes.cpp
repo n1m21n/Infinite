@@ -2405,6 +2405,17 @@ void Render3DNode::CookIfNeeded(int frameId)
    // 0 - sorted alpha / refraction for overlapping sprites is its own piece
    // of work, left for later), so they're excluded from both the detection
    // and the deferral below.
+   // Translucent = a mesh slot with opacity < 1 that is not transmissive
+   // (transmissive slots have their own pass). Clouds are excluded for the
+   // same reason as above.
+   auto isTranslucentMesh = [&](IGeometrySource* s)
+   {
+      if (s == nullptr || s->GetPointCloud() != nullptr)
+         return false;
+      const Material m = s->GetMaterial();
+      return m.opacity < 0.999f && m.transmission <= 0.001f;
+   };
+
    bool anyTransmissive = false;
    for (int i = 0; i < kSlots; i++)
    {
@@ -2425,6 +2436,11 @@ void Render3DNode::CookIfNeeded(int frameId)
       // snapshot of everything opaque drawn first - sampling the buffer this
       // same draw is writing to would be a feedback loop.
       if (s->GetPointCloud() == nullptr && anyTransmissive && s->GetMaterial().transmission > 0.001f)
+         continue;
+      // Translucent (opacity < 1) meshes wait for the sorted pass below: drawn
+      // in slot order with depth write on, a nearer one drawn first hides a
+      // farther one that should show through it.
+      if (isTranslucentMesh(s))
          continue;
       drawSlot(i);
    }
@@ -2469,6 +2485,66 @@ void Render3DNode::CookIfNeeded(int frameId)
          drawSlot(i);
       }
       glDepthMask(GL_TRUE);
+   }
+
+   // Sorted translucent pass: farthest slot first by the view-space depth of
+   // its bounding-box centre, blending over the opaque result, no depth write
+   // so a translucent surface never hides another behind it. Per-slot only: an
+   // instanced slot or one mesh overlapping itself is not sorted internally.
+   {
+      struct TranslucentDraw { float depth; int slot; };
+      std::vector<TranslucentDraw> translucent;
+      for (int i = 0; i < kSlots; i++)
+      {
+         IGeometrySource* s = geometry[i];
+         if (!isTranslucentMesh(s))
+            continue;
+         const Mesh& mesh = s->GetMesh();
+         if (!mesh.HasGeometry())
+            continue;
+         const GpuMesh& gpu = mGpu[i];
+         float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
+         if (gpu.source == (const void*)s && gpu.hasBounds && gpu.meshRevision == s->MeshRevision())
+         {
+            for (int k = 0; k < 3; k++) { lo[k] = gpu.lo[k]; hi[k] = gpu.hi[k]; }
+         }
+         else
+         {
+            // Not uploaded yet (first frame, or edited since): a single-frame
+            // render must sort correctly too, so walk the vertices here.
+            for (const Vertex& v : mesh.vertices)
+            {
+               const float pt[3] = { v.px, v.py, v.pz };
+               for (int k = 0; k < 3; k++)
+               {
+                  if (!std::isfinite(pt[k]))
+                     continue;
+                  lo[k] = std::min(lo[k], pt[k]);
+                  hi[k] = std::max(hi[k], pt[k]);
+               }
+            }
+         }
+         const float cx = lo[0] <= hi[0] ? 0.5f * (lo[0] + hi[0]) : 0.0f;
+         const float cy = lo[1] <= hi[1] ? 0.5f * (lo[1] + hi[1]) : 0.0f;
+         const float cz = lo[2] <= hi[2] ? 0.5f * (lo[2] + hi[2]) : 0.0f;
+         const Mat4 model = s->GetModelMatrix();
+         const float wx = model.m[0]*cx + model.m[4]*cy + model.m[8]*cz + model.m[12];
+         const float wy = model.m[1]*cx + model.m[5]*cy + model.m[9]*cz + model.m[13];
+         const float wz = model.m[2]*cx + model.m[6]*cy + model.m[10]*cz + model.m[14];
+         const float viewZ = view.m[2]*wx + view.m[6]*wy + view.m[10]*wz + view.m[14];
+         translucent.push_back({ viewZ, i });
+      }
+      // View space looks down -Z, so the farthest surface has the smallest z.
+      std::stable_sort(translucent.begin(), translucent.end(),
+                       [](const TranslucentDraw& a, const TranslucentDraw& b) { return a.depth < b.depth; });
+      if (!translucent.empty())
+      {
+         glUseProgram(mProgram);
+         glDepthMask(GL_FALSE);
+         for (const TranslucentDraw& t : translucent)
+            drawSlot(t.slot);
+         glDepthMask(GL_TRUE);
+      }
    }
 
    glBindVertexArray(0);
