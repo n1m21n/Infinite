@@ -67497,6 +67497,106 @@ int RunCameraConvTest()
    printf("%s\n", ok ? "CAMERACONVTEST OK" : "CAMERACONVTEST FAIL - BUG");
    return ok ? 0 : 1;
 }
+
+// ======================================================== INFINITE_HOSTENVTEST
+#include "platform/linux/HostEnvironmentLinux.h"
+
+int RunHostEnvTest()
+{
+   setvbuf(stdout, nullptr, _IONBF, 0);
+   bool ok = true;
+
+   // 1. With APPIMAGE_ORIGINAL_LD_LIBRARY_PATH non-empty:
+   {
+      setenv("LD_LIBRARY_PATH", "/tmp/.mount_Inf123/usr/lib:/orig/path", 1);
+      setenv("APPIMAGE_ORIGINAL_LD_LIBRARY_PATH", "/orig/path", 1);
+      {
+         Platform::ScopedHostEnvironment env;
+         const char* val = getenv("LD_LIBRARY_PATH");
+         const bool match = val && std::string(val) == "/orig/path";
+         if (!match) ok = false;
+         printf("  hostenv test 1 (restore original non-empty): %s\n", match ? "OK" : "FAIL");
+      }
+      const char* restored = getenv("LD_LIBRARY_PATH");
+      const bool restOk = restored && std::string(restored) == "/tmp/.mount_Inf123/usr/lib:/orig/path";
+      if (!restOk) ok = false;
+      printf("  hostenv test 1 restored: %s\n", restOk ? "OK" : "FAIL");
+   }
+
+   // 2. With APPIMAGE_ORIGINAL_LD_LIBRARY_PATH empty:
+   {
+      setenv("LD_LIBRARY_PATH", "/tmp/.mount_Inf123/usr/lib", 1);
+      setenv("APPIMAGE_ORIGINAL_LD_LIBRARY_PATH", "", 1);
+      {
+         Platform::ScopedHostEnvironment env;
+         const char* val = getenv("LD_LIBRARY_PATH");
+         const bool match = (val == nullptr);
+         if (!match) ok = false;
+         printf("  hostenv test 2 (unset on empty original): %s\n", match ? "OK" : "FAIL");
+      }
+      const char* restored = getenv("LD_LIBRARY_PATH");
+      const bool restOk = restored && std::string(restored) == "/tmp/.mount_Inf123/usr/lib";
+      if (!restOk) ok = false;
+      printf("  hostenv test 2 restored: %s\n", restOk ? "OK" : "FAIL");
+   }
+
+   // 3. Fallback: strip APPDIR when APPIMAGE_ORIGINAL_LD_LIBRARY_PATH is unset
+   {
+      unsetenv("APPIMAGE_ORIGINAL_LD_LIBRARY_PATH");
+      setenv("APPDIR", "/tmp/.mount_InfABC", 1);
+      setenv("LD_LIBRARY_PATH", "/tmp/.mount_InfABC/usr/lib:/usr/local/cuda/lib", 1);
+      {
+         Platform::ScopedHostEnvironment env;
+         const char* val = getenv("LD_LIBRARY_PATH");
+         const bool match = val && std::string(val) == "/usr/local/cuda/lib";
+         if (!match) ok = false;
+         printf("  hostenv test 3 (strip APPDIR fallback): %s\n", match ? "OK" : "FAIL");
+      }
+      const char* restored = getenv("LD_LIBRARY_PATH");
+      const bool restOk = restored && std::string(restored) == "/tmp/.mount_InfABC/usr/lib:/usr/local/cuda/lib";
+      if (!restOk) ok = false;
+      printf("  hostenv test 3 restored: %s\n", restOk ? "OK" : "FAIL");
+   }
+
+   // 4. Fallback: all entries belong to AppImage
+   {
+      unsetenv("APPIMAGE_ORIGINAL_LD_LIBRARY_PATH");
+      setenv("APPDIR", "/tmp/.mount_InfABC", 1);
+      setenv("LD_LIBRARY_PATH", "/tmp/.mount_InfABC/usr/lib:/tmp/.mount_InfABC/lib", 1);
+      {
+         Platform::ScopedHostEnvironment env;
+         const char* val = getenv("LD_LIBRARY_PATH");
+         const bool match = (val == nullptr);
+         if (!match) ok = false;
+         printf("  hostenv test 4 (strip all AppImage paths): %s\n", match ? "OK" : "FAIL");
+      }
+      const char* restored = getenv("LD_LIBRARY_PATH");
+      const bool restOk = restored && std::string(restored) == "/tmp/.mount_InfABC/usr/lib:/tmp/.mount_InfABC/lib";
+      if (!restOk) ok = false;
+      printf("  hostenv test 4 restored: %s\n", restOk ? "OK" : "FAIL");
+   }
+
+   // 5. Clean start: LD_LIBRARY_PATH unset
+   {
+      unsetenv("APPIMAGE_ORIGINAL_LD_LIBRARY_PATH");
+      unsetenv("APPDIR");
+      unsetenv("LD_LIBRARY_PATH");
+      {
+         Platform::ScopedHostEnvironment env;
+         const char* val = getenv("LD_LIBRARY_PATH");
+         const bool match = (val == nullptr);
+         if (!match) ok = false;
+         printf("  hostenv test 5 (originally unset remains unset): %s\n", match ? "OK" : "FAIL");
+      }
+      const char* restored = getenv("LD_LIBRARY_PATH");
+      const bool restOk = (restored == nullptr);
+      if (!restOk) ok = false;
+      printf("  hostenv test 5 restored: %s\n", restOk ? "OK" : "FAIL");
+   }
+
+   printf("%s\n", ok ? "HOSTENVTEST OK" : "HOSTENVTEST FAIL - BUG");
+   return ok ? 0 : 1;
+}
 #endif // __linux__
 
 // ==================================================== INFINITE_SYPHONPATCHTEST
@@ -68829,6 +68929,8 @@ int main(int argc, char** argv)
 #if defined(__linux__)
    if (getenv("INFINITE_CAMERACONVTEST") != nullptr)
       return RunCameraConvTest();
+   if (getenv("INFINITE_HOSTENVTEST") != nullptr)
+      return RunHostEnvTest();
 #endif
 
    if (getenv("INFINITE_MOVELOGTEST") != nullptr || getenv("INFINITE_MOVEMENTLOGTEST") != nullptr)
