@@ -67106,11 +67106,32 @@ void ApplyModulationAndPalette(int frameId, bool isNormalFrame = false)
    // Advance every predictor exactly once, before any binding reads it (idempotency: a predictor
    // driving N params must not run N times as fast). A bypassed predictor is not ticked, so it
    // freezes rather than advancing unseen and jumping on un-bypass.
+   // Live, dt is wall-clock time between calls. Offline (Render Now, headless --render/--frame),
+   // it is the step in Transport's video seconds instead: the offline pump calls this many times per
+   // wall-clock frame, so a wall dt would be a few random milliseconds per rendered frame. The video
+   // step also makes a repeat call at the same T (the normal-frame call during a take, a re-exported
+   // --frame) tick by 0 rather than a second time.
    {
       static double sLastTickTime = -1.0;
-      const double nowWall = glfwGetTime();
-      const double tickDt = sLastTickTime < 0.0 ? 0.0 : std::clamp(nowWall - sLastTickTime, 0.0, 0.25);
-      sLastTickTime = nowWall;
+      static double sLastOfflineT = 0.0;
+      static bool sWasOfflineTick = false;
+      Transport& transport = Transport::Instance();
+      double tickDt = 0.0;
+      if (transport.IsOfflineMode())
+      {
+         const double videoT = transport.Seconds();
+         tickDt = sWasOfflineTick ? std::clamp(videoT - sLastOfflineT, 0.0, 0.25) : 0.0;
+         sLastOfflineT = videoT;
+         sWasOfflineTick = true;
+         sLastTickTime = -1.0; // first live tick after the take gets dt 0, not a stale gap
+      }
+      else
+      {
+         sWasOfflineTick = false;
+         const double nowWall = glfwGetTime();
+         tickDt = sLastTickTime < 0.0 ? 0.0 : std::clamp(nowWall - sLastTickTime, 0.0, 0.25);
+         sLastTickTime = nowWall;
+      }
       for (GraphNode& gn : gNodes)
          if (gn.node != nullptr && !gn.node->bypassed)
             if (auto* pred = dynamic_cast<IPredictor*>(gn.node.get()))
