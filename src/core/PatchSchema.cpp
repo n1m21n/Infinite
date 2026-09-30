@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <cstdlib>
 #include <map>
 #include <set>
 
@@ -267,6 +268,31 @@ namespace PatchSchema
          }
          s += "}";
       }
+      s += "],\"rows\":[";
+      {
+         bool firstRow = true;
+         for (const ParamInfo& p : t.params)
+         {
+            const ControlInfo* c = nullptr;
+            for (const ControlInfo& ci : t.controls)
+               if (ci.key == p.key)
+                  c = &ci;
+            s += (firstRow ? "" : ",") + std::string("{\"key\":") + Q(p.key) + ",\"tag\":\"" + std::string(1, p.kind) +
+                 "\",\"kind\":" + Q(ParamKindName(p.kind)) + ",\"default\":" + Q(p.def);
+            firstRow = false;
+            s += ",\"label\":" + (c && !c->label.empty() ? Q(c->label) : std::string("null"));
+            s += c && c->hasRange ? ",\"min\":" + Num(c->minValue) + ",\"max\":" + Num(c->maxValue) + ",\"step\":" + Num(c->step)
+                                  : std::string(",\"min\":null,\"max\":null,\"step\":null");
+            s += ",\"options\":[";
+            if (c)
+               for (size_t k = 0; k < c->options.size(); k++)
+                  s += (k ? "," : "") + Q(c->options[k]);
+            s += "],\"modulatable_index\":" + (c && c->index >= 0 ? std::to_string(c->index) : std::string("null"));
+            // ui: a widget registers this key when the node is drawn at its defaults. false = none did
+            // (internal state, a plain control, or a control the current mode hides); null = not probed.
+            s += std::string(",\"ui\":") + (!t.controlsKnown ? "null" : (c && !c->label.empty() ? "true" : "false")) + "}";
+         }
+      }
       s += "],\"join\":{\"registered\":" + std::to_string(t.joinRegistered) + ",\"keyed\":" + std::to_string(t.joinKeyed) + "}}";
       return s;
    }
@@ -321,7 +347,26 @@ namespace PatchSchema
                warnings.push_back(Make("W_UNKNOWN_PARAM", "'" + key + "' is not a parameter of " + t->name, line, n.index,
                                        near.empty() ? "" : "did you mean '" + near.front() + "'?"));
             }
-            else if (found->kind != kind)
+            else if (found->kind == kind && t->controlsKnown)
+            {
+               const ControlInfo* c = nullptr;
+               for (const ControlInfo& ci : t->controls)
+                  if (ci.key == key)
+                     c = &ci;
+               // W_INTERNAL_PARAM is deliberately not raised: a key with no registered widget
+               // is often just hidden by the current mode (Shape's size/aspect), and patch_1
+               // (GUI-saved) would give ~180 false hits. `ui:false` in --describe carries the fact.
+               if (c != nullptr && !c->label.empty() && c->hasRange && (kind == 'f' || kind == 'i') && c->maxValue > c->minValue)
+               {
+                  const double v = std::atof(n.params[i].second.c_str());
+                  const double slack = 1e-4 * (c->maxValue - c->minValue);
+                  if (v < c->minValue - slack || v > c->maxValue + slack)
+                     warnings.push_back(Make("W_OUT_OF_RANGE",
+                                             "'" + key + "' is " + n.params[i].second + " but its control runs " + Num(c->minValue) + ".." + Num(c->maxValue),
+                                             line, n.index, "the node clamps it; use a value inside the range"));
+               }
+            }
+            if (found != nullptr && found->kind != kind)
                warnings.push_back(Make("W_TYPE_MISMATCH",
                                        "'" + key + "' is written as " + ParamKindName(kind) + " but " + t->name +
                                           " reads it as " + ParamKindName(found->kind),

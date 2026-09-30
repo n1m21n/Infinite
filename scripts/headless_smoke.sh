@@ -142,5 +142,16 @@ r=$("$BIN" --describe 2>/dev/null)
 [ "$(echo "$r" | json "[m['key'] for t in d['types'] if t['type']=='Shape' for m in t['modulatable'] if m['label']=='size x'][0]")" = "sizeX" ]; check "describe: Shape 'size x' is key sizeX" $?
 [ "$(echo "$r" | json "[m['key'] for t in d['types'] if t['type']=='Shape' for m in t['modulatable'] if m['label']=='shape'][0]")" = "shapeType" ]; check "describe: Shape dropdown 'shape' is key shapeType (perturbation tier)" $?
 
+# --- describe rows (C4): one row per saved key, dropdown options present ---
+[ "$(echo "$r" | json "sum(1 for t in d['types'] for m in t['modulatable'] if 'enum' in m and len(m['enum'])==0)")" = "0" ]; check "describe: no dropdown has an empty option list" $?
+for ty in Shape Oscillator Wavetable Reverb FieldPixel LFO "Render 3D" Sampler Mixer "Predictive Modulator"; do
+  [ "$(echo "$r" | json "(lambda t: len(t['rows'])==len(t['params']) and all(rw['ui'] and rw['label'] for rw in t['rows'] if rw['modulatable_index'] is not None) and all(len(rw['options'])>0 for rw in t['rows'] if rw['options'] is not None and rw['key'] in [m.get('key') for m in t['modulatable'] if 'enum' in m]))([t for t in d['types'] if t['type']=='$ty'][0])")" = "True" ]; check "describe: $ty rows complete" $?
+done
+[ "$(echo "$r" | json "[rw['options'][:3] for t in d['types'] if t['type']=='Shape' for rw in t['rows'] if rw['key']=='shapeType'][0]")" = "['Circle', 'Ellipse', 'Rectangle']" ]; check "describe: shapeType lists option names" $?
+r2=$("$BIN" --validate "$N/out_of_range.inf" 2>/dev/null); rc=$?
+[ "$rc" = 0 ] && [ "$(echo "$r2" | json "sorted(w['code'] for w in d['warnings'])")" = "['W_OUT_OF_RANGE', 'W_OUT_OF_RANGE']" ]; check "validate: W_OUT_OF_RANGE reported, advisory (exit 0)" $?
+r2=$("$BIN" --validate "$ROOT/assets/examples/patch_1.inf" 2>/dev/null)
+[ "$(echo "$r2" | json "sum(1 for w in d['warnings'] if w['code'] in ('W_OUT_OF_RANGE','W_INTERNAL_PARAM'))")" = "0" ]; check "validate: GUI-saved patch_1 has zero range/internal hits" $?
+
 rm -rf "$OUT"
 exit $fail

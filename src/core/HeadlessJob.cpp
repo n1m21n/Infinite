@@ -313,7 +313,10 @@ namespace Headless
 
    bool IsAdvisory(const std::string& code)
    {
-      return code == "W_UNUSED_NODE" || code == "W_NO_OUTPUT" || code == "W_DURATION_ROUNDED";
+      // W_OUT_OF_RANGE stays advisory until a real corpus of GUI-saved patches has been
+      // checked to give zero hits (docs/fix-briefs/headless-engine.md 3.1b); the corpus in
+      // this repo is one file, which is not enough to promote it.
+      return code == "W_UNUSED_NODE" || code == "W_NO_OUTPUT" || code == "W_DURATION_ROUNDED" || code == "W_OUT_OF_RANGE";
    }
 
    void PromoteWarnings(std::vector<Issue>& warnings, std::vector<Issue>& errors)

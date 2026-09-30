@@ -68680,6 +68680,35 @@ private:
    }
 };
 
+// Fills a type's per-key control table from the join and the sticky ParamRef records of
+// the drawn probe node `nodeIndex`. Options come from KnownParam (FrameParams drops them).
+static void AttachControls(PatchSchema::TypeSchema& ts, int nodeIndex)
+{
+   auto it = gParamJoin.find(ts.name);
+   ts.controls.clear();
+   ts.controlsKnown = it != gParamJoin.end() && it->second.done;
+   if (!ts.controlsKnown)
+      return;
+   for (const auto& kv : it->second.keyOfParam)
+   {
+      const ParamRef* k = Modulation::Instance().KnownParam(nodeIndex, kv.first);
+      if (k == nullptr)
+         continue;
+      PatchSchema::ControlInfo c;
+      c.key = kv.second;
+      c.label = k->name.empty() ? kv.second : k->name;
+      c.index = kv.first;
+      c.hasRange = true;
+      c.minValue = k->minValue;
+      c.maxValue = k->maxValue;
+      c.step = k->step;
+      c.isEnum = k->isEnum;
+      c.isBool = k->isBool;
+      c.options = k->enumOptions;
+      ts.controls.push_back(std::move(c));
+   }
+}
+
 static void HeadlessTick(int& frameId, GLFWwindow* window)
 {
    enum class Phase { Warm, Running, Frames, Done };
@@ -68727,6 +68756,9 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
    {
       static Patch::Data sData;
       static std::vector<std::pair<std::string, int>> sProbed; // type, node index
+      static std::vector<std::pair<std::string, int>> sRequired; // the ones a mod/expr line drives
+      static ParamKeyJoiner sJoin;
+      static bool sJoinBegun = false;
       const int t = ++sTicks;
       if (t == 1)
       {
@@ -68752,8 +68784,14 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
          for (const Patch::ExprRecord& e : sData.expressions)
             if (typeOfIndex.count(e.dstIndex))
                driven.insert(typeOfIndex[e.dstIndex]);
+         // Every other type in the file is probed too, for its control ranges
+         // (W_OUT_OF_RANGE / W_INTERNAL_PARAM), but a node that never draws
+         // (a Group) is only an error when a mod/expr line needs it.
+         std::set<std::string> all(driven);
+         for (const Patch::NodeRecord& n : sData.nodes)
+            all.insert(n.typeName);
          int i = 0;
-         for (const std::string& type : driven)
+         for (const std::string& type : all)
          {
             const PatchSchema::TypeSchema* ts = SchemaFor(type);
             if (ts == nullptr || ts->hardwareDriven)
@@ -68763,6 +68801,8 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
                continue;
             gn->showParams = true;
             sProbed.push_back({ type, gn->index });
+            if (driven.count(type))
+               sRequired.push_back({ type, gn->index });
             i++;
          }
          if (!sProbed.empty())
@@ -68774,10 +68814,29 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
       }
       else if (!sProbed.empty() && !HeadlessProbeDone(sProbed, t))
       {
-         if (t >= kHeadlessProbeCapTicks)
+         if (t < kHeadlessProbeCapTicks)
+            return;
+         if (!HeadlessProbeDone(sRequired, t))
             return fail("E_PROBE_TIMEOUT", "a node the patch drives never drew its parameters within " +
                                               std::to_string(kHeadlessProbeCapTicks) + " frames, so mod/expr lines cannot be checked");
-         return;
+      }
+      if (!sProbed.empty())
+      {
+         if (!sJoinBegun)
+         {
+            std::vector<std::pair<std::string, int>> drawn;
+            for (const auto& pr : sProbed)
+               if (gHeadlessDrawn.count(pr.second))
+                  drawn.push_back(pr);
+            sJoin.Begin(drawn);
+            sJoinBegun = true;
+         }
+         if (!sJoin.Step() && t < 4 * kHeadlessProbeCapTicks)
+            return;
+         for (const auto& pr : sProbed)
+            if (gHeadlessDrawn.count(pr.second))
+               if (PatchSchema::TypeSchema* mts = const_cast<PatchSchema::TypeSchema*>(SchemaFor(pr.first)))
+                  AttachControls(*mts, pr.second);
       }
       gHeadlessProbeAll = false;
 
@@ -68892,7 +68951,9 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
                   std::string key;
                   if (join != nullptr && join->keyOfParam.count(r.paramIndex))
                      key = join->keyOfParam.at(r.paramIndex);
-                  ts.modulatable.push_back({ r.paramIndex, r.name, r.minValue, r.maxValue, r.step, r.isEnum, r.isBool, r.enumOptions, key });
+                  const ParamRef* known = Modulation::Instance().KnownParam(r.nodeIndex, r.paramIndex);
+                  ts.modulatable.push_back({ r.paramIndex, r.name, r.minValue, r.maxValue, r.step, r.isEnum, r.isBool,
+                                             known != nullptr ? known->enumOptions : r.enumOptions, key });
                   ts.joinRegistered++;
                   if (!key.empty())
                      ts.joinKeyed++;
@@ -68900,6 +68961,8 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
                      unkeyedList += (unkeyedList.empty() ? "" : ",") + std::string("{\"type\":\"") + Headless::JsonEscape(n) +
                                     "\",\"index\":" + std::to_string(r.paramIndex) + ",\"label\":\"" + Headless::JsonEscape(r.name) + "\"}";
                }
+         if (it != indexOf.end())
+            AttachControls(ts, it->second);
          joinRegistered += ts.joinRegistered;
          joinKeyed += ts.joinKeyed;
          std::sort(ts.modulatable.begin(), ts.modulatable.end(),

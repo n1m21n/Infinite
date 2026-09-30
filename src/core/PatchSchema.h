@@ -51,6 +51,18 @@ namespace PatchSchema
       bool modulator = false; // a `mod` line may read this output (a modulator or a predictor)
    };
 
+   // One saved key with what the UI knows about it (filled from a drawn probe node).
+   struct ControlInfo
+   {
+      std::string key;
+      std::string label;             // what the UI calls it; empty if no widget registers it
+      int index = -1;                // the mod/expr parameter index; -1 = not modulatable
+      bool hasRange = false;         // min/max come from a registered widget
+      float minValue = 0.0f, maxValue = 0.0f, step = 0.0f;
+      bool isEnum = false, isBool = false;
+      std::vector<std::string> options;
+   };
+
    struct TypeSchema
    {
       std::string name;
@@ -60,6 +72,8 @@ namespace PatchSchema
       std::vector<OutputInfo> outputs;
       std::vector<ModulatableInfo> modulatable;
       // How well the labelled controls were joined to saved keys (main.cpp ParamKeyJoiner).
+      std::vector<ControlInfo> controls; // one per saved f/i/b key, when controlsKnown
+      bool controlsKnown = false;        // a probe node was drawn and joined
       int joinRegistered = 0; // controls the draw pass registered
       int joinKeyed = 0;      // of those, with a saved key
       bool hardwareDriven = false;

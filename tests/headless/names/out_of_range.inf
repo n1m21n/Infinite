@@ -1,0 +1,8 @@
+infinite-patch 1
+node 1 Source Shape
+  f sizeX 5
+  i shapeType 77
+end
+node 2 Utility Output
+end
+cable 2 0 1
