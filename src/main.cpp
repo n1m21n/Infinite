@@ -69560,6 +69560,7 @@ int main(int argc, char** argv)
          getenv("INFINITE_MODBOUNDSTEST") != nullptr || getenv("INFINITE_MODMATRIXTEST") != nullptr ||
          getenv("INFINITE_MODCURVETEST") != nullptr ||
          getenv("INFINITE_GESTUREUNDOTEST") != nullptr ||
+         getenv("INFINITE_OFFLINECLOCKTEST") != nullptr ||
          getenv("INFINITE_CULLDRIVENTEST") != nullptr ||
          getenv("INFINITE_PREDBINDTEST") != nullptr ||
          getenv("INFINITE_MPCMODTEST") != nullptr ||
@@ -71907,7 +71908,7 @@ int main(int argc, char** argv)
             SpawnNode("LFO", "Modulators", 60.0f, 500.0f);
             gNodes[0].showParams = true;
          }
-         if (getenv("INFINITE_MODTEST") != nullptr)
+         if (getenv("INFINITE_MODTEST") != nullptr || getenv("INFINITE_OFFLINECLOCKTEST") != nullptr)
          {
             SpawnNode("LFO", "Modulators", 60.0f, 500.0f);
             gNodes[0].showParams = true; // params must be drawn for them to register
@@ -98886,6 +98887,98 @@ int main(int argc, char** argv)
                    (int)madeOk, (int)undoOk, (int)redoOk, sidesParam, gNodes[0].index);
             printf("%s\n", ok ? "GESTURE UNDO OK" : "GESTURE UNDO FAIL");
          }
+      }
+
+      // Every time-based animation source must advance on offline Transport
+      // time during a render, exactly once per rendered frame, whatever the
+      // wall clock does. One Shape carries an LFO binding (size x), a time
+      // expression (size y) and a gesture loop (rotation). The same range is
+      // swept offline twice at 30 fps and once at 60 fps, the way the Render
+      // Now pump does it (variable-size batches of frames per UI frame, the
+      // live gesture clock advancing by a random wall dt between batches),
+      // then once from a 2.5 s start. Before the gesture clock followed
+      // Transport offline, rotation stair-stepped on the wall dt and the
+      // two 30 fps runs disagreed.
+      if (getenv("INFINITE_OFFLINECLOCKTEST") != nullptr && frameId == 1)
+      {
+         Modulation& mod = Modulation::Instance();
+         GestureRecorder& rec = GestureRecorder::Instance();
+         Transport& transport = Transport::Instance();
+         auto* shape = static_cast<ShapeNode*>(gNodes[0].node.get());
+         int sizeXParam = -1, sizeYParam = -1, rotParam = -1;
+         for (const ParamRef& ref : mod.FrameParams())
+         {
+            if (ref.nodeIndex != gNodes[0].index)
+               continue;
+            if (ref.name == "size x") sizeXParam = ref.paramIndex;
+            if (ref.name == "size y") sizeYParam = ref.paramIndex;
+            if (ref.name == "rotation") rotParam = ref.paramIndex;
+         }
+         const bool resolved = sizeXParam >= 0 && sizeYParam >= 0 && rotParam >= 0;
+         if (resolved)
+         {
+            mod.Bind(gNodes[0].index, sizeXParam, gNodes[2].index);
+            mod.SetExpression(gNodes[0].index, sizeYParam, "lerp(lo, hi, mod(t, 4) / 4)");
+            // A one-second -90 -> 90 ramp, ended at once so it is already looping.
+            const double t0 = rec.ClockNow();
+            rec.BeginFrame(/*shiftHeld=*/true, t0);
+            rec.NotifyMovement(gNodes[0].index, rotParam, -90.0f, t0, /*isNewGrab=*/true);
+            rec.NotifyMovement(gNodes[0].index, rotParam, 0.0f, t0 + 0.5, /*isNewGrab=*/false);
+            rec.NotifyMovement(gNodes[0].index, rotParam, 90.0f, t0 + 1.0, /*isNewGrab=*/false);
+            rec.BeginFrame(/*shiftHeld=*/false, t0 + 1.0);
+         }
+         transport.SetPlaying(false); // every run enters offline from the same transport position
+
+         struct Values { float sizeX, sizeY, rot; };
+         int sweepFrameId = 1000000; // clear of the main loop's ids, so no modulator memo is reused
+         uint32_t lcg = 12345u;
+         auto sweep = [&](int fps, double start, int frames, uint32_t wallSeed) {
+            std::vector<Values> out;
+            lcg = wallSeed;
+            transport.SetOfflineMode(true, 48000.0);
+            int n = 0;
+            while (n < frames)
+            {
+               lcg = lcg * 1664525u + 1013904223u;
+               rec.AdvanceClock((double)(lcg >> 8) / (double)(1u << 24) * 0.2, true); // wall dt in [0, 0.2)
+               const int batch = 1 + (int)((lcg >> 4) % 7u);
+               for (int b = 0; b < batch && n < frames; ++b, ++n)
+               {
+                  transport.SetOfflineVideoTime(start + (double)n / (double)fps);
+                  ApplyModulationAndPalette(++sweepFrameId);
+                  out.push_back({ shape->sizeX, shape->sizeY, shape->rotation });
+               }
+            }
+            transport.SetOfflineMode(false, 0.0);
+            return out;
+         };
+         const std::vector<Values> a = sweep(30, 0.0, 90, 1u);
+         const std::vector<Values> b = sweep(30, 0.0, 90, 777u);
+         const std::vector<Values> c = sweep(60, 0.0, 180, 4242u);
+         const std::vector<Values> d = sweep(30, 2.5, 60, 99u);
+
+         const bool sameRuns = a.size() == b.size() && std::memcmp(a.data(), b.data(), a.size() * sizeof(Values)) == 0;
+         double worstRate = 0.0, worstRamp = 0.0, worstStart = 0.0;
+         for (size_t k = 0; k < a.size() && 2 * k < c.size(); ++k)
+         {
+            worstRate = std::max(worstRate, (double)std::abs(a[k].sizeX - c[2 * k].sizeX));
+            worstRate = std::max(worstRate, (double)std::abs(a[k].sizeY - c[2 * k].sizeY));
+            worstRate = std::max(worstRate, (double)std::abs(a[k].rot - c[2 * k].rot));
+         }
+         auto ramp = [](double t) { return -90.0 + 180.0 * std::fmod(t, 1.0); };
+         for (size_t k = 0; k < a.size(); ++k)
+            worstRamp = std::max(worstRamp, std::abs((double)a[k].rot - ramp((double)k / 30.0)));
+         for (size_t k = 0; k < d.size(); ++k)
+            worstStart = std::max(worstStart, std::abs((double)d[k].rot - ramp(2.5 + (double)k / 30.0)));
+         // The LFO and expression must actually move, or equal runs prove nothing.
+         const bool moving = !a.empty() && a.front().sizeX != a[a.size() / 2].sizeX &&
+                             a.front().sizeY != a[a.size() / 2].sizeY;
+
+         const bool ok = resolved && moving && sameRuns && worstRate <= 1e-6 && worstRamp <= 1e-3 && worstStart <= 1e-3;
+         printf("offline clock: params %d,%d,%d moving=%d 30==30 %s, 30 vs 60 worst %.3g, ramp worst %.3g, start 2.5 worst %.3g\n",
+                sizeXParam, sizeYParam, rotParam, (int)moving, sameRuns ? "identical" : "DIFFERENT",
+                worstRate, worstRamp, worstStart);
+         printf("%s\n", ok ? "OFFLINE CLOCK OK" : "OFFLINE CLOCK FAIL");
       }
 
       // A gesture loop (Shift-drag recording) on a node whose body is skipped -
