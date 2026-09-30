@@ -157,7 +157,6 @@ These draw through a shared/generic path, so this script cannot attribute contro
 | friction | slider | yes |
 | mode | dropdown | yes |
 | material from input | slider (int) | yes |
-| keep input colours | checkbox | yes |
 
 ### Curve
 
@@ -426,7 +425,6 @@ These draw through a shared/generic path, so this script cannot attribute contro
 | --- | --- | --- |
 | mode | dropdown | yes |
 | material from input | slider (int) | yes |
-| keep input colours | checkbox | yes |
 | balls | slider (int) | yes |
 | spread | slider | yes |
 | orbit / beat | slider | yes |

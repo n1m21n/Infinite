@@ -26356,8 +26356,6 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       // picked from an input rather than authored here, since editing colour
       // and shading now lives on the dedicated Material node.
       ModSliderInt("material from input", &n->materialFrom, 0, JoinGeometryNode::kSlots - 1);
-      if (n->mode == JoinGeometryNode::kMerge)
-         ModCheckbox("keep input colours", &n->keepInputColours);
    }
 
    void DrawSwitcher3DParams(Switcher3DNode* n)
@@ -87098,6 +87096,31 @@ int main(int argc, char** argv)
                }
             }
             results.push_back({ "JoinGeometryNode (merge -> material -> merge)", nestedOk, false, nullptr, nestedNote });
+
+            // An instanced input: InstanceOnPoints always fills one colour
+            // triple per instance (white when the source had none), so the
+            // mere presence of instance colours must not count as authored
+            // colour - or a merge of plain instances invents vertexColor and
+            // freezes every downstream Material out.
+            {
+               GeometryNode instShape;
+               instShape.shape = 1; // cube
+               InstanceOnPointsNode plainInst;
+               plainInst.pointSource = &probeMesh;
+               plainInst.instanceShape = &instShape;
+               plainInst.pointMode = 0; // vertices
+               plainInst.maxPoints = 8;
+               cook(&plainInst);
+
+               JoinGeometryNode joinInst;
+               joinInst.mode = JoinGeometryNode::kMerge;
+               joinInst.inputs[0] = &plainInst;
+               cook(&joinInst);
+               const bool instOk = plainInst.InstanceCount() > 0 && !joinInst.GetMesh().Empty() &&
+                                   !meshColour(joinInst.GetMesh());
+               results.push_back({ "JoinGeometryNode (plain instances stay colourless)", instOk, false, nullptr,
+                                    instOk ? "" : "merge invented vertexColor from white instance colours" });
+            }
          }
 
          MergeByDistanceNode mergeNode; mergeNode.input = &meshProbe; mergeNode.threshold = 0.0f;
