@@ -153,5 +153,15 @@ r2=$("$BIN" --validate "$N/out_of_range.inf" 2>/dev/null); rc=$?
 r2=$("$BIN" --validate "$ROOT/assets/examples/patch_1.inf" 2>/dev/null)
 [ "$(echo "$r2" | json "sum(1 for w in d['warnings'] if w['code'] in ('W_OUT_OF_RANGE','W_INTERNAL_PARAM'))")" = "0" ]; check "validate: GUI-saved patch_1 has zero range/internal hits" $?
 
+# --- keyed (C5): controls by key, dropdowns by option name == the numeric twin ---
+K="$ROOT/tests/headless/keyed"
+"$BIN" --canonicalize "$K/keyed.inf" "$OUT/ck.inf" >/dev/null 2>&1; "$BIN" --canonicalize "$K/numeric.inf" "$OUT/cn.inf" >/dev/null 2>&1
+cmp -s "$OUT/ck.inf" "$OUT/cn.inf"; check "keyed: canonicalize identical to numeric twin" $?
+"$BIN" --frame "$K/numeric.inf" 0 "$OUT/kn.png" >/dev/null 2>&1; "$BIN" --frame "$K/keyed.inf" 0 "$OUT/kk.png" >/dev/null 2>&1
+cmp -s "$OUT/kn.png" "$OUT/kk.png"; check "keyed: identical --frame PNGs" $?
+r=$("$BIN" --frame "$K/misspelled.inf" 0 "$OUT/km.png" 2>/dev/null); rc=$?
+[ "$rc" = 3 ] && [ ! -e "$OUT/km.png" ]; check "keyed: misspelled key exit 3, nothing rendered" $?
+[ "$(echo "$r" | json "[(e['code'],e['line'],e['hint'].split(',')[0]) for e in d['errors']]")" = "[('E_BAD_KEY', 14, 'did you mean: sizeX')]" ]; check "keyed: error names line and nearest key sizeX" $?
+
 rm -rf "$OUT"
 exit $fail

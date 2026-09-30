@@ -192,6 +192,70 @@ namespace PatchSchema
       data.hasNamedRefs = false;
    }
 
+   void ResolveKeys(Patch::Data& data, const Env& env, std::vector<Headless::Issue>& errors)
+   {
+      if (!data.hasKeyRefs)
+         return;
+      std::map<int, const Patch::NodeRecord*> byIndex;
+      for (const Patch::NodeRecord& n : data.nodes)
+         byIndex.insert({ n.index, &n });
+      auto key = [&](const std::string& word, int dstIndex, int& out, int line) -> bool {
+         auto nd = byIndex.find(dstIndex);
+         if (nd == byIndex.end())
+            return true; // E_DANGLING is Validate's to report
+         const std::string& type = nd->second->typeName;
+         const int idx = env.paramIndexOfKey ? env.paramIndexOfKey(type, word) : -2;
+         if (idx >= 0)
+         {
+            out = idx;
+            return true;
+         }
+         const std::vector<std::string> pool = env.modulatableKeys ? env.modulatableKeys(type) : std::vector<std::string>();
+         errors.push_back(Make("E_BAD_KEY",
+                               idx == -2 ? "cannot look up '" + word + "': " + type + " could not be drawn here"
+                                         : "'" + word + "' is not a modulatable control of " + type,
+                               line, dstIndex, pool.empty() ? "" : "did you mean: " + Join(Nearest(word, pool, 3))));
+         return false;
+      };
+      for (Patch::ModRecord& m : data.modulation)
+         if (!m.dstKey.empty() && key(m.dstKey, m.dstIndex, m.dstParam, m.line))
+            m.dstKey.clear();
+      for (Patch::ExprRecord& e : data.expressions)
+         if (!e.dstKey.empty() && key(e.dstKey, e.dstIndex, e.dstParam, e.line))
+            e.dstKey.clear();
+      for (Patch::NodeRecord& n : data.nodes)
+         for (size_t i = 0; i < n.params.size(); i++)
+         {
+            std::string& value = n.params[i].second;
+            if (n.params[i].first.size() < 3 || n.params[i].first[0] != 'i' || value.empty())
+               continue;
+            char* end = nullptr;
+            std::strtod(value.c_str(), &end);
+            if (end != value.c_str() && *end == '\0')
+               continue;
+            const std::string k = n.params[i].first.substr(2);
+            const int line = i < n.paramLines.size() ? n.paramLines[i] : n.line;
+            const std::vector<std::string> opts = env.optionsOf ? env.optionsOf(n.typeName, k) : std::vector<std::string>();
+            int found = -1;
+            for (size_t o = 0; o < opts.size(); o++)
+               if (Lower(opts[o]) == Lower(value))
+                  found = (int)o;
+            if (found >= 0)
+               value = std::to_string(found);
+            else
+               errors.push_back(Make("E_BAD_VALUE",
+                                     opts.empty() ? "'" + value + "' is not a number, and " + k + " has no named options"
+                                                  : "'" + value + "' is not an option of " + k,
+                                     line, n.index, opts.empty() ? "write the number" : "did you mean: " + Join(Nearest(value, opts, 3))));
+         }
+      bool left = false;
+      for (const Patch::ModRecord& m : data.modulation)
+         left = left || !m.dstKey.empty();
+      for (const Patch::ExprRecord& e : data.expressions)
+         left = left || !e.dstKey.empty();
+      data.hasKeyRefs = left;
+   }
+
    std::string ParamKindName(char kind)
    {
       switch (kind)

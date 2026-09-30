@@ -178,6 +178,7 @@ namespace Patch
       float curve = 0.0f; // in [-1.0, 1.0], 0 = linear
       int line = 0;
       std::string dstRef, srcRef; // authoring names, see CableRecord
+      std::string dstKey;         // a control key in place of dstParam (`mod 5 radius ...`)
    };
 
    // A palette node driving one colour swatch on another node.
@@ -200,6 +201,7 @@ namespace Patch
       float curve = 0.0f; // in [-1.0, 1.0], 0 = linear
       int line = 0;
       std::string dstRef; // authoring name, see CableRecord
+      std::string dstKey; // a control key in place of dstParam
    };
 
    // One patch-wide named value an expression can read - see
@@ -461,6 +463,9 @@ namespace Patch
       // True when the file used an `id` line or a word where an index goes, so
       // the loader knows PatchSchema::Resolve has to run before ApplyPatchData.
       bool hasNamedRefs = false;
+      // True when a mod/expr line used a control key, or an `i` value is a dropdown
+      // option name. PatchSchema::ResolveKeys needs a probed node per type for those.
+      bool hasKeyRefs = false;
    };
 
    bool Write(const std::string& path, const Data& data, std::string& outError);

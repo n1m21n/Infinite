@@ -1188,6 +1188,7 @@ namespace
    double gHeadlessAudioRate = 0.0;
    // Validator warnings from the load, folded into the job's status JSON.
    std::vector<Headless::Issue> gHeadlessPreWarnings;
+bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one node per type first
    // Strict mode: the warnings of the pre-load pass that were promoted to errors.
    // They wait here so the Warm phase can report them together with E_BAD_PARAM,
    // which needs drawn nodes - one round of fixes clears everything.
@@ -7900,6 +7901,20 @@ namespace
       return true;
    }
 
+   // ---- ParamRef.key join results (see ParamKeyJoiner further down) ----
+   struct ParamJoinType
+   {
+      std::map<int, std::string> keyOfParam; // paramIndex -> saved key
+      std::map<std::string, int> paramOfKey;
+      std::set<int> unkeyed;                 // registered controls with no key found
+      std::map<int, std::string> unkeyedName; // their labels
+      std::set<std::string> plainKeys;       // saved f/i/b keys no control registered
+      std::map<std::string, std::vector<std::string>> optionsOfKey; // dropdown names by key
+      int registered = 0;
+      bool done = false;
+   };
+   static std::map<std::string, ParamJoinType> gParamJoin;
+
    // ---- patch schema (Infinite --describe / --validate) ----
    // Records what a node's VisitParams declares: tag letter, key, default.
    class SchemaParamRecorder : public ParamVisitor
@@ -8036,6 +8051,31 @@ namespace
       {
          auto it = gModulatableMax.find(type);
          return it == gModulatableMax.end() ? -2 : it->second;
+      };
+      env.paramIndexOfKey = [](const std::string& type, const std::string& key)
+      {
+         auto it = gParamJoin.find(type);
+         if (it == gParamJoin.end() || !it->second.done)
+            return -2;
+         auto k = it->second.paramOfKey.find(key);
+         return k == it->second.paramOfKey.end() ? -1 : k->second;
+      };
+      env.modulatableKeys = [](const std::string& type)
+      {
+         std::vector<std::string> keys;
+         auto it = gParamJoin.find(type);
+         if (it != gParamJoin.end())
+            for (const auto& kv : it->second.paramOfKey)
+               keys.push_back(kv.first);
+         return keys;
+      };
+      env.optionsOf = [](const std::string& type, const std::string& key)
+      {
+         auto it = gParamJoin.find(type);
+         if (it == gParamJoin.end())
+            return std::vector<std::string>();
+         auto o = it->second.optionsOfKey.find(key);
+         return o == it->second.optionsOfKey.end() ? std::vector<std::string>() : o->second;
       };
       env.forRender = forRender;
       return env;
@@ -47670,6 +47710,34 @@ namespace
          }
       }
 
+      std::string openNote;
+      if (data.hasKeyRefs)
+      {
+         // Keys and option names need a drawn node of each type (a headless run has probed
+         // them). The window app has not, so those lines are dropped with a status line.
+         std::vector<Headless::Issue> keyErrors;
+         PatchSchema::ResolveKeys(data, MakeSchemaEnv(false), keyErrors);
+         if (!keyErrors.empty() || data.hasKeyRefs)
+         {
+            data.modulation.erase(std::remove_if(data.modulation.begin(), data.modulation.end(),
+                                                 [](const Patch::ModRecord& m) { return !m.dstKey.empty(); }),
+                                  data.modulation.end());
+            data.expressions.erase(std::remove_if(data.expressions.begin(), data.expressions.end(),
+                                                  [](const Patch::ExprRecord& e) { return !e.dstKey.empty(); }),
+                                   data.expressions.end());
+            for (Patch::NodeRecord& n : data.nodes)
+               n.params.erase(std::remove_if(n.params.begin(), n.params.end(),
+                                             [](const std::pair<std::string, std::string>& p)
+                                             {
+                                                char* end = nullptr;
+                                                std::strtod(p.second.c_str(), &end);
+                                                return p.first[0] == 'i' && !p.second.empty() && (end == p.second.c_str() || *end != '\0');
+                                             }),
+                              n.params.end());
+            openNote = "Opened, but " + std::to_string(keyErrors.size()) + " line(s) that name a control or option could not be resolved and were skipped";
+         }
+      }
+
       MovementLog::NoteMark(MovementLog::Mark::PatchLoaded);
       ApplyPatchData(data);
       // New document: drop the old one's clip clipboard and selection.
@@ -47687,7 +47755,7 @@ namespace
 
       gPatchPath = path;
       gPatchDirty = false;
-      gPatchStatus = "Opened";
+      gPatchStatus = openNote.empty() ? "Opened" : openNote;
       gRequestFitView = true;
       if (HeadlessJobActive())
          return true; // a batch job leaves recents and the real autosave alone
@@ -47701,25 +47769,16 @@ namespace
 
    // `Infinite --canonicalize in out`: data-level Read -> Write, so an authored
    // file comes out exactly as a GUI save would write it (numbers, no comments).
-   void RunCanonicalize(const Headless::Job& job, Headless::Status& st)
+   // Second half of --canonicalize: strict check, then the writer.
+   void FinishCanonicalize(Patch::Data& data, const Headless::Job& job, Headless::Status& st)
    {
-      Patch::Data data;
       std::string error;
-      if (!Patch::Read(job.patch, data, error))
-      {
-         st.errors.push_back({ "E_LOAD", error, 0, -1 });
-         return;
-      }
       const PatchSchema::Env env = MakeSchemaEnv(false);
-      PatchSchema::Resolve(data, env, st.errors);
-      if (st.errors.empty())
-      {
-         std::vector<Headless::Issue> warnings;
-         PatchSchema::Validate(data, env, st.errors, warnings);
-         if (!job.lenient)
-            Headless::PromoteWarnings(warnings, st.errors);
-         st.warnings = warnings;
-      }
+      std::vector<Headless::Issue> warnings;
+      PatchSchema::Validate(data, env, st.errors, warnings);
+      if (!job.lenient)
+         Headless::PromoteWarnings(warnings, st.errors);
+      st.warnings = warnings;
       if (!st.errors.empty())
          return;
       if (!job.keepIds)
@@ -47732,6 +47791,32 @@ namespace
       }
       st.files.push_back(job.out);
       st.extraJson.push_back("\"nodes\":" + std::to_string(data.nodes.size()));
+   }
+
+   // `Infinite --canonicalize in out`: data-level Read -> Resolve -> Validate -> Write, so an
+   // authored file comes out exactly as a GUI save would write it (numbers, no comments).
+   // Returns true when the file names controls or options: those need a drawn node per type,
+   // so the job continues in HeadlessTick (gHeadlessPatch holds the name-resolved data).
+   bool RunCanonicalize(const Headless::Job& job, Headless::Status& st)
+   {
+      Patch::Data data;
+      std::string error;
+      if (!Patch::Read(job.patch, data, error))
+      {
+         st.errors.push_back({ "E_LOAD", error, 0, -1 });
+         return false;
+      }
+      PatchSchema::Resolve(data, MakeSchemaEnv(false), st.errors);
+      if (!st.errors.empty())
+         return false;
+      if (data.hasKeyRefs)
+      {
+         gHeadlessPatch = data;
+         gHeadlessNeedProbe = true;
+         return true;
+      }
+      FinishCanonicalize(data, job, st);
+      return false;
    }
 
    // Shared by PushUndoCheckpoint (freshly captured) and the node-drag
@@ -68405,17 +68490,7 @@ static bool HeadlessProbeDone(const std::vector<std::pair<std::string, int>>& pr
 //      which unmatched control's value followed it.
 // The result is remembered per type, so key -> parameter index works for any
 // later node of that type.
-struct ParamJoinType
-{
-   std::map<int, std::string> keyOfParam; // paramIndex -> saved key
-   std::map<std::string, int> paramOfKey;
-   std::set<int> unkeyed;                 // registered controls with no key found
-   std::map<int, std::string> unkeyedName; // their labels
-   std::set<std::string> plainKeys;       // saved f/i/b keys no control registered
-   int registered = 0;
-   bool done = false;
-};
-static std::map<std::string, ParamJoinType> gParamJoin;
+
 
 class AddrCollector : public ParamVisitor
 {
@@ -68505,7 +68580,6 @@ public:
          n.index = pr.second;
          mNodes.push_back(std::move(n));
       }
-      mStage = 0;
    }
 
    // Call once per tick after the frame was drawn. True when every node is finished.
@@ -68522,14 +68596,26 @@ public:
             Finish(n);
             continue;
          }
-         if (mStage == 0)
+         if (n.stage == 0)
+         {
+            // A node registers its controls only on a frame that draws its body; give a
+            // slow first frame a few ticks before deciding it has none.
+            bool any = false;
+            for (const ParamRef& r : Modulation::Instance().FrameParams())
+               any = any || r.nodeIndex == n.index;
+            if (!any && n.wait++ < 30)
+            {
+               pending = true;
+               continue;
+            }
+            n.stage = 1;
             Tier1(n, *gn);
+         }
          else
             Tier2(n, *gn);
          if (!n.finished)
             pending = true;
       }
-      mStage++;
       return !pending;
    }
 
@@ -68550,9 +68636,10 @@ private:
       std::string trying;
       KeyPerturber perturb;
       bool applied = false;
+      int wait = 0;
+      int stage = 0;
    };
    std::vector<Node> mNodes;
-   int mStage = 0;
 
    void Finish(Node& n)
    {
@@ -68574,7 +68661,12 @@ private:
             out.plainKeys.insert(k.first);
       // Remember the key on the probe's sticky record too.
       for (const auto& kv : out.keyOfParam)
+      {
          Modulation::Instance().SetKnownKey(n.index, kv.first, kv.second);
+         if (const ParamRef* k = Modulation::Instance().KnownParam(n.index, kv.first))
+            if (!k->enumOptions.empty())
+               out.optionsOfKey[kv.second] = k->enumOptions;
+      }
    }
 
    void Tier1(Node& n, GraphNode& gn)
@@ -68731,6 +68823,7 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
       sStatus.mode = job.mode == Headless::Mode::Render     ? "render"
                      : job.mode == Headless::Mode::Describe ? "describe"
                      : job.mode == Headless::Mode::Validate ? "validate"
+                     : job.mode == Headless::Mode::Canonicalize ? "canonicalize"
                                                             : "frame";
       sStatus.warnings = gHeadlessPreWarnings;
       sStatus.patch = job.patch;
@@ -68749,6 +68842,79 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
       if (gOfflineRender.active && gOfflineRender.node != nullptr)
          gOfflineRender.node->RequestFinishOfflineRender(true);
       fail("E_TIMEOUT", "job exceeded --timeout " + std::to_string((int)job.timeoutSec) + " s");
+      return;
+   }
+
+   if (gHeadlessNeedProbe)
+   {
+      // The file names controls (`mod 5 radius ...`) or dropdown options (`i shapeType Star`).
+      // Both only exist once a node of each type has been drawn, so draw one of each, join
+      // them to their saved keys, resolve the patch, and only then load it.
+      static std::vector<std::pair<std::string, int>> sPr;
+      static ParamKeyJoiner sPrJoin;
+      static bool sPrBegun = false;
+      static int sPrTicks = 0;
+      const int t = ++sPrTicks;
+      if (t == 1)
+      {
+         std::set<std::string> types;
+         for (const Patch::NodeRecord& n : gHeadlessPatch.nodes)
+            types.insert(n.typeName);
+         int i = 0;
+         for (const std::string& type : types)
+         {
+            const PatchSchema::TypeSchema* ts = SchemaFor(type);
+            if (ts == nullptr || ts->hardwareDriven)
+               continue;
+            GraphNode* gn = SpawnNode(type, ts->category, (float)(i % 16) * 420.0f, (float)(i / 16) * 700.0f);
+            if (gn == nullptr)
+               continue;
+            gn->showParams = true;
+            sPr.push_back({ type, gn->index });
+            i++;
+         }
+         gHeadlessProbeAll = true;
+         gHeadlessDrawn.clear();
+         return;
+      }
+      if (!HeadlessProbeDone(sPr, t) && t < kHeadlessProbeCapTicks)
+         return;
+      if (!sPrBegun)
+      {
+         std::vector<std::pair<std::string, int>> drawn;
+         for (const auto& pr : sPr)
+            if (gHeadlessDrawn.count(pr.second))
+               drawn.push_back(pr);
+         sPrJoin.Begin(drawn);
+         sPrBegun = true;
+      }
+      if (!sPrJoin.Step() && t < 4 * kHeadlessProbeCapTicks)
+         return;
+      gHeadlessProbeAll = false;
+      gHeadlessNeedProbe = false;
+      std::vector<Headless::Issue> keyErrors;
+      PatchSchema::ResolveKeys(gHeadlessPatch, MakeSchemaEnv(true), keyErrors);
+      if (!keyErrors.empty())
+      {
+         for (const Headless::Issue& is : gHeadlessPromoted)
+            sStatus.errors.push_back(is);
+         for (const Headless::Issue& is : keyErrors)
+            sStatus.errors.push_back(is);
+         std::stable_sort(sStatus.errors.begin(), sStatus.errors.end(),
+                          [](const Headless::Issue& a, const Headless::Issue& b)
+                          { return (a.line > 0 ? a.line : 1 << 30) < (b.line > 0 ? b.line : 1 << 30); });
+         sPhase = Phase::Done;
+         HeadlessFinish(window, sStatus, sWall);
+         return;
+      }
+      if (job.mode == Headless::Mode::Canonicalize)
+      {
+         FinishCanonicalize(gHeadlessPatch, job, sStatus);
+         sPhase = Phase::Done;
+         HeadlessFinish(window, sStatus, sWall);
+         return;
+      }
+      LoadPatchFrom(job.patch); // starts from an empty canvas, so the probes are gone
       return;
    }
 
@@ -68849,7 +69015,9 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
          gModulatableMax[pr.first] = max;
       }
       const PatchSchema::Env env = MakeSchemaEnv(job.forRender);
-      PatchSchema::Validate(sData, env, sStatus.errors, sStatus.warnings);
+      PatchSchema::ResolveKeys(sData, env, sStatus.errors);
+      if (sStatus.errors.empty())
+         PatchSchema::Validate(sData, env, sStatus.errors, sStatus.warnings);
       if (!job.lenient)
          Headless::PromoteWarnings(sStatus.warnings, sStatus.errors);
       sStatus.extraJson.push_back("\"nodes\":" + std::to_string(sData.nodes.size()));
@@ -72578,10 +72746,12 @@ int main(int argc, char** argv)
       {
          st.mode = "canonicalize";
          st.out = gHeadlessJob.out;
-         RunCanonicalize(gHeadlessJob, st);
-         st.ok = st.errors.empty();
-         gHeadlessExitCode = Headless::Emit(gHeadlessJob, st);
-         glfwSetWindowShouldClose(window, GLFW_TRUE);
+         if (!RunCanonicalize(gHeadlessJob, st))
+         {
+            st.ok = st.errors.empty();
+            gHeadlessExitCode = Headless::Emit(gHeadlessJob, st);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
       }
       else if (!loadsPatch)
       {
@@ -72619,6 +72789,8 @@ int main(int argc, char** argv)
             gHeadlessExitCode = Headless::Emit(gHeadlessJob, st);
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
+         else if (probe.hasKeyRefs)
+            gHeadlessNeedProbe = true; // HeadlessTick probes the types, resolves the keys, then loads
          else
             LoadPatchFrom(gHeadlessJob.patch);
       }
@@ -72987,6 +73159,11 @@ int main(int argc, char** argv)
       std::string pendingOpenPatch;
       while (Platform::PollPendingOpenFile(pendingOpenPatch))
       {
+         // A headless job owns the canvas: macOS hands the .inf argument to the app as
+         // an open-file event too, and loading it here would replace the probe nodes
+         // (or reload the graph a job has already loaded).
+         if (HeadlessJobActive())
+            continue;
          LoadPatchFrom(pendingOpenPatch);
          gRequestFitView = true;
       }

@@ -616,6 +616,13 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
             value.erase(0, 1);
          if (tag != "s")
             value = TrimRight(value); // numbers only; text keeps its own spaces
+         if (tag == "i")
+         {
+            char* end = nullptr;
+            std::strtod(value.c_str(), &end);
+            if (!value.empty() && (end == value.c_str() || *end != '\0'))
+               outData.hasKeyRefs = true; // a dropdown option name
+         }
          current.params.push_back({ tag + " " + name, value });
          current.paramLines.push_back(lineNo);
       }
@@ -667,7 +674,8 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          m.polarity = 0;
          m.depth = 1.0f;
          m.centre = 0.0f;
-         if (ReadRef(in, m.dstIndex, m.dstRef, outData.hasNamedRefs) && (in >> m.dstParam) &&
+         if (ReadRef(in, m.dstIndex, m.dstRef, outData.hasNamedRefs) &&
+             ReadRef(in, m.dstParam, m.dstKey, outData.hasKeyRefs) &&
              ReadRef(in, m.srcIndex, m.srcRef, outData.hasNamedRefs))
             in >> m.srcOutput >> m.polarity >> m.depth >> m.centre;
          // lo/hi are a later addition still; missing on any patch saved
@@ -700,7 +708,7 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          ExprRecord e;
          e.line = lineNo;
          if (ReadRef(in, e.dstIndex, e.dstRef, outData.hasNamedRefs))
-            in >> e.dstParam;
+            ReadRef(in, e.dstParam, e.dstKey, outData.hasKeyRefs);
          std::string raw;
          std::getline(in, raw);
          if (!raw.empty() && raw[0] == ' ')

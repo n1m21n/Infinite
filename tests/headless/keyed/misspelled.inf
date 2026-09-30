@@ -1,0 +1,15 @@
+infinite-patch 1
+# Controls by key, dropdowns by option name.
+node 1 Source Shape
+  id shape
+  i shapeType Star
+end
+node 2 Modulators LFO
+  id lfo
+end
+node 3 Utility Output
+  id out
+end
+cable out 0 shape
+mod shape sizeXx lfo 0 0 1 0.5
+expr shape rotation 30

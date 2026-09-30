@@ -95,6 +95,13 @@ namespace PatchSchema
       // -2 = not known here, -1 = it registers none. Filled from a drawn node,
       // so it is only available once a window has drawn one.
       std::function<int(const std::string& type)> maxParamIndex;
+      // Control keys (ParamRef.key). paramIndexOfKey: -2 = the type was never probed,
+      // -1 = it has no such modulatable control, else the `mod`/`expr` parameter index.
+      // Only available once a headless run has drawn and joined a node of the type.
+      std::function<int(const std::string& type, const std::string& key)> paramIndexOfKey;
+      std::function<std::vector<std::string>(const std::string& type)> modulatableKeys;
+      // The option names of a dropdown key (empty when it is not one).
+      std::function<std::vector<std::string>(const std::string& type, const std::string& key)> optionsOf;
       // E_NO_OUTPUT is an error rather than a warning. (Strict mode, which
       // promotes the warnings too, is Headless::PromoteWarnings.)
       bool forRender = false;
@@ -112,6 +119,11 @@ namespace PatchSchema
    // names). A no-op when data.hasNamedRefs is false. Clears the words it
    // resolved; `id` values stay on the nodes (--keep-ids) until the caller drops them.
    void Resolve(Patch::Data& data, const Env& env, std::vector<Headless::Issue>& errors);
+
+   // Turns `mod 5 radius ...` / `expr 5 radius ...` keys into parameter indices and
+   // `i shapeType Star` option names into numbers. Reports E_BAD_KEY and E_BAD_VALUE with
+   // the nearest valid names. Records it could not resolve are left as they were.
+   void ResolveKeys(Patch::Data& data, const Env& env, std::vector<Headless::Issue>& errors);
 
    std::string ParamKindName(char kind);
    std::string ToJson(const TypeSchema& t);
