@@ -111,7 +111,9 @@ namespace
 #include "core/Modulation.h"
 #include "core/MovementLog.h"
 #include "core/MovementStats.h"
+#include "core/AudioSummary.h"
 #include "core/ColorStats.h"
+#include "core/ContactSheet.h"
 #include "core/HeadlessJob.h"
 #include "core/PatchSchema.h"
 #include "core/PatchExplain.h"
@@ -27837,7 +27839,10 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          ImGui::TextDisabled("(no parameters)");
    }
 
-   void ExportImage(OutputNode* out, const std::string& path, int jpgQuality = 90)
+   // `keepPixels`, when given, receives the RGBA8 rows exactly as read back
+   // (bottom row first), so a caller can measure the frame it just wrote.
+   void ExportImage(OutputNode* out, const std::string& path, int jpgQuality = 90,
+                    std::vector<unsigned char>* keepPixels = nullptr)
    {
       int w = out->GetOutputWidth();
       int h = out->GetOutputHeight();
@@ -27876,6 +27881,32 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       {
          stbi_write_png(path.c_str(), w, h, 4, pixels.data(), w * 4);
       }
+      if (keepPixels != nullptr)
+         keepPixels->swap(pixels);
+   }
+
+   // Top-row-first RGBA8 to a PNG that says it is sRGB (stb writes no colour
+   // chunk of its own).
+   bool WriteSrgbPng(const std::string& path, int w, int h, const unsigned char* rgba)
+   {
+      std::vector<uint8_t> png;
+      stbi_flip_vertically_on_write(0);
+      const int ok = stbi_write_png_to_func(
+         [](void* ctx, void* data, int size)
+         {
+            auto* bytes = static_cast<std::vector<uint8_t>*>(ctx);
+            bytes->insert(bytes->end(), static_cast<uint8_t*>(data), static_cast<uint8_t*>(data) + size);
+         },
+         &png, w, h, 4, rgba, w * 4);
+      if (!ok || png.empty())
+         return false;
+      png = ContactSheet::TagSrgb(png);
+      FILE* f = std::fopen(path.c_str(), "wb");
+      if (f == nullptr)
+         return false;
+      const bool wrote = std::fwrite(png.data(), 1, png.size(), f) == png.size();
+      std::fclose(f);
+      return wrote;
    }
 
    void ExportPng(OutputNode* out, const std::string& path)
@@ -68894,7 +68925,7 @@ static void AttachControls(PatchSchema::TypeSchema& ts, int nodeIndex)
 
 static void HeadlessTick(int& frameId, GLFWwindow* window)
 {
-   enum class Phase { Warm, Running, Frames, Done };
+   enum class Phase { Warm, Running, Frames, Audio, Done };
    static Phase sPhase = Phase::Warm;
    static int sTicks = 0;
    static double sWall = -1.0;
@@ -68903,6 +68934,15 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
    static int sOutIndex = -1;
    static size_t sNextTime = 0;
    static int sNextFrame = 0;
+   static std::string sFrameStats;          // --frame: one JSON object per exported frame
+   static ContactSheet::Builder sSheet;     // --frame --contact-sheet
+   // --audio-summary
+   static std::unique_ptr<AudioSummary::Analyzer> sAnalyzer;
+   static AudioFileWriter sSummaryWav;
+   static AudioCaptureRing* sSinkRing = nullptr; // one sink picked with --output; null = the device mix
+   static std::string sAudioSource;              // JSON describing what was measured
+   static double sAudioSeconds = 0.0;
+   static long long sAudioTotal = 0, sAudioDone = 0, sAudioStep = 0;
 
    const Headless::Job& job = gHeadlessJob;
    if (sPhase == Phase::Done || !HeadlessJobActive() || job.mode == Headless::Mode::Version ||
@@ -68916,6 +68956,7 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
                      : job.mode == Headless::Mode::Validate ? "validate"
                      : job.mode == Headless::Mode::Canonicalize ? "canonicalize"
                      : job.mode == Headless::Mode::Explain ? "explain"
+                     : job.mode == Headless::Mode::AudioSummary ? "audio-summary"
                                                             : "frame";
       sStatus.warnings = gHeadlessPreWarnings;
       sStatus.patch = job.patch;
@@ -69319,6 +69360,102 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
          return;
       }
 
+      if (job.mode == Headless::Mode::AudioSummary)
+      {
+         // Offline audio only: nothing is encoded. The graph is stepped the
+         // way --render steps it, so the numbers describe the audio a render
+         // of the same range would carry.
+         if (INode* hw = FindHardwareDrivenNode())
+         {
+            int hwIndex = -1;
+            for (GraphNode& g : gNodes)
+               if (g.node.get() == hw)
+                  hwIndex = g.index;
+            return fail("E_HARDWARE_SOURCE", "the patch has a live source (camera/MIDI/Syphon In) "
+                                             "that can't be pre-synthesized offline", hwIndex);
+         }
+
+         // Every place audio leaves the graph: an Audio Out, or an Output with its audio input wired.
+         struct Sink
+         {
+            int index;
+            std::string type;
+            AudioCaptureRing* ring;
+         };
+         std::vector<Sink> sinks;
+         std::vector<OutputNode*> videoOuts;
+         for (GraphNode& g : gNodes)
+         {
+            auto* audioOut = dynamic_cast<AudioOutputNode*>(g.node.get());
+            auto* outNode = dynamic_cast<OutputNode*>(g.node.get());
+            if (outNode != nullptr)
+               videoOuts.push_back(outNode);
+            if (audioOut == nullptr && outNode == nullptr)
+               continue;
+            bool wired = false;
+            for (int slot = 0; slot < kMaxAudioSlots; slot++)
+               if (AudioCable* cable = g.node->AudioInputSlot(slot))
+                  wired = wired || cable->IsConnected();
+            if (wired)
+               sinks.push_back({ g.index, g.typeName, audioOut ? &audioOut->CaptureRing() : &outNode->CaptureRing() });
+         }
+         if (sinks.empty())
+            return fail("E_NO_AUDIO", "no audio reaches an Audio Out or an Output's audio input, so there is nothing to measure");
+
+         sSinkRing = nullptr;
+         sAudioSource = "\"source\":\"mix\"";
+         if (!job.output.empty())
+         {
+            char* end = nullptr;
+            const long want = std::strtol(job.output.c_str(), &end, 10);
+            const bool numeric = end != nullptr && *end == '\0';
+            for (const Sink& sk : sinks)
+               if (numeric && sk.index == (int)want)
+               {
+                  sSinkRing = sk.ring;
+                  sAudioSource = "\"source\":\"node\",\"source_node\":" + std::to_string(sk.index);
+               }
+            if (sSinkRing == nullptr)
+               return fail("E_NO_OUTPUT", "--output " + job.output + " is not an Audio Out or an Output with audio wired in");
+         }
+         sAudioSource += ",\"sinks\":[";
+         for (size_t i = 0; i < sinks.size(); i++)
+            sAudioSource += std::string(i ? "," : "") + "{\"node\":" + std::to_string(sinks[i].index) + ",\"type\":\"" +
+                            Headless::JsonEscape(sinks[i].type) + "\"}";
+         sAudioSource += "]";
+
+         // Same default range as --render: the one Output's own duration.
+         sAudioSeconds = job.duration > 0.0 ? job.duration
+                         : videoOuts.size() == 1 ? (double)std::max(1, videoOuts.front()->offlineDurationSeconds)
+                                                 : 10.0;
+         sAudioTotal = (long long)std::llround(sAudioSeconds * gHeadlessAudioRate);
+         sAudioDone = 0;
+         sAudioStep = 0;
+
+         std::error_code ec;
+         for (const std::string* path : { &job.out, &job.wavPath })
+            if (!path->empty() && !std::filesystem::path(*path).parent_path().empty())
+               std::filesystem::create_directories(std::filesystem::path(*path).parent_path(), ec);
+         if (!job.wavPath.empty() &&
+             !sSummaryWav.Open(job.wavPath, gHeadlessAudioRate, 2, AudioFileWriter::Format::Wav))
+            return fail("E_RENDER", "could not create " + job.wavPath);
+
+         sAnalyzer = std::make_unique<AudioSummary::Analyzer>(gHeadlessAudioRate);
+         Transport::Instance().Seek(job.start);
+         Transport::Instance().SetOfflineMode(true, gHeadlessAudioRate);
+         Transport::Instance().SetPlaying(true);
+         RebuildAudioTopology();
+         if (sSinkRing != nullptr)
+         {
+            float discard[4096];
+            while (sSinkRing->Read(discard, 4096) > 0)
+               ;
+            sSinkRing->enabled.store(true, std::memory_order_relaxed);
+         }
+         sPhase = Phase::Audio;
+         return;
+      }
+
       // Resolve the Output. --output takes a node index or a display name.
       std::vector<int> outs;
       for (GraphNode& gn : gNodes)
@@ -69468,11 +69605,32 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
                std::snprintf(name, sizeof(name), "/frame_%05d.png", target);
                path = job.out + (job.out.back() == '/' ? std::string(name + 1) : std::string(name));
             }
-            ExportImage(sOut, path);
+            std::vector<unsigned char> pixels;
+            ExportImage(sOut, path, 90, &pixels);
             std::error_code ec;
             if (!std::filesystem::exists(path, ec))
                return fail("E_RENDER", "could not write " + path);
             sStatus.files.push_back(path);
+            {
+               // What the frame looks like, in numbers, so a caller that
+               // cannot open the PNG still knows a black or blown-out one.
+               const ColorStats::FrameSummary fs = ColorStats::SummarizeRgba8(pixels.data(), w, h);
+               char head[96];
+               std::snprintf(head, sizeof(head), "{\"time\":%.6g,\"frame\":%d,\"file\":\"", job.times[sNextTime], target);
+               sFrameStats += std::string(sFrameStats.empty() ? "" : ",") + head + Headless::JsonEscape(path) + "\"," +
+                              ColorStats::FrameSummaryJsonFields(fs) + "}";
+               char when[32];
+               std::snprintf(when, sizeof(when), "%.6g", job.times[sNextTime]);
+               if (fs.blackPercent >= 100.0)
+                  sStatus.warnings.push_back({ "W_BLACK_FRAME", std::string("the frame at ") + when + " s is entirely black",
+                                               0, sOutIndex, "check that something visible reaches the Output at that time" });
+               if (!job.contactSheet.empty())
+               {
+                  char label[32];
+                  std::snprintf(label, sizeof(label), "%.2fs", job.times[sNextTime]);
+                  sSheet.Add(pixels.data(), w, h, true, label);
+               }
+            }
             sStatus.width = w;
             sStatus.height = h;
             sStatus.frames = (long long)sStatus.files.size();
@@ -69484,6 +69642,128 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
             return;
       }
       Transport::Instance().SetOfflineMode(false);
+      sStatus.extraJson.push_back("\"frame_stats\":[" + sFrameStats + "]");
+      if (!job.contactSheet.empty())
+      {
+         const ContactSheet::Image sheet = sSheet.Build();
+         std::error_code ec;
+         if (!std::filesystem::path(job.contactSheet).parent_path().empty())
+            std::filesystem::create_directories(std::filesystem::path(job.contactSheet).parent_path(), ec);
+         if (sheet.width <= 0 || !WriteSrgbPng(job.contactSheet, sheet.width, sheet.height, sheet.rgba.data()))
+            return fail("E_RENDER", "could not write " + job.contactSheet);
+         sStatus.files.push_back(job.contactSheet);
+         sStatus.extraJson.push_back("\"contact_sheet\":{\"file\":\"" + Headless::JsonEscape(job.contactSheet) +
+                                     "\",\"size\":[" + std::to_string(sheet.width) + "," + std::to_string(sheet.height) +
+                                     "],\"cells\":" + std::to_string(sSheet.Count()) +
+                                     ",\"cell_width\":" + std::to_string(ContactSheet::kCellWidth) + "}");
+      }
+      sPhase = Phase::Done;
+      HeadlessFinish(window, sStatus, sWall);
+      return;
+   }
+
+   if (sPhase == Phase::Audio)
+   {
+      static float sL[kAudioMaxBlockFrames];
+      static float sR[kAudioMaxBlockFrames];
+      static float* sChannels[2] = { sL, sR };
+      static std::vector<float> sInterleaved;
+
+      const double rate = gHeadlessAudioRate;
+      const double budgetStart = glfwGetTime();
+      const int blockCap = OfflineAudioBlockFrames();
+      while (sAudioDone < sAudioTotal)
+      {
+         // One video frame of graph time, then the audio that belongs to it:
+         // the order the offline render pump runs in, so modulators and
+         // anything else cooked per frame move exactly as they do in a take.
+         ++frameId;
+         Transport::Instance().SetOfflineVideoTime(job.start + (double)sAudioStep / (double)job.fps);
+         ApplyModulationAndPalette(frameId);
+         ArrangeSeekVideoSampleSources(Transport::Instance().Beats());
+         for (GraphNode& gn : gNodes)
+            if (!gn.node->bypassed)
+               gn.node->CookIfNeeded(frameId);
+         sAudioStep++;
+
+         const long long target = std::min(sAudioTotal, (long long)std::llround((double)sAudioStep * rate / (double)job.fps));
+         while (sAudioDone < target)
+         {
+            const int n = (int)std::min<long long>(blockCap, target - sAudioDone);
+            AudioBuffer buf;
+            buf.channels = sChannels;
+            buf.numChannels = 2;
+            buf.numFrames = n;
+            AudioEngine::Instance().ProcessOffline(buf);
+
+            sInterleaved.assign((size_t)n * 2, 0.0f);
+            if (sSinkRing != nullptr)
+            {
+               // One sink: what RunTopology just wrote into its capture ring,
+               // not the sum of every sink that the device buffer holds.
+               sSinkRing->Read(sInterleaved.data(), n * 2);
+               for (int i = 0; i < n; i++)
+               {
+                  sL[i] = sInterleaved[(size_t)i * 2 + 0];
+                  sR[i] = sInterleaved[(size_t)i * 2 + 1];
+               }
+            }
+            else
+               for (int i = 0; i < n; i++)
+               {
+                  sInterleaved[(size_t)i * 2 + 0] = sL[i];
+                  sInterleaved[(size_t)i * 2 + 1] = sR[i];
+               }
+            sAnalyzer->Push(sL, sR, n);
+            if (sSummaryWav.IsOpen())
+               sSummaryWav.Append(sInterleaved.data(), n);
+            sAudioDone += n;
+         }
+         if (glfwGetTime() - budgetStart > 0.1)
+            return;
+      }
+
+      if (sSinkRing != nullptr)
+         sSinkRing->enabled.store(false, std::memory_order_relaxed);
+      Transport::Instance().SetOfflineMode(false);
+      Transport::Instance().SetPlaying(false);
+
+      const AudioSummary::Result res = sAnalyzer->Finish();
+      char range[96];
+      std::snprintf(range, sizeof(range), "\"start\":%.6g,\"duration\":%.6g,", job.start, sAudioSeconds);
+      const std::string context = std::string(range) + sAudioSource;
+      {
+         // The file carries everything; the status line repeats the headline
+         // numbers so one read of stdout is enough to judge the take.
+         std::ofstream f(job.out, std::ios::binary | std::ios::trunc);
+         f << "{\"patch\":\"" << Headless::JsonEscape(job.patch) << "\"," << context << ","
+           << AudioSummary::ToJson(res, true).substr(1) << "\n";
+         f.close();
+         if (!f)
+            return fail("E_RENDER", "could not write " + job.out);
+      }
+      sStatus.files.push_back(job.out);
+      if (sSummaryWav.IsOpen())
+      {
+         sSummaryWav.Close();
+         sStatus.files.push_back(job.wavPath);
+      }
+      sStatus.audioSampleRate = rate;
+      sStatus.audioFrames = sAudioTotal;
+      sStatus.extraJson.push_back(context);
+      sStatus.extraJson.push_back("\"audio_summary\":" + AudioSummary::ToJson(res, false));
+
+      char num[64];
+      if (res.clippedFrames > 0)
+      {
+         std::snprintf(num, sizeof(num), "%+.2f dBFS, %.3f%% of frames", AudioSummary::Db(res.samplePeak), res.clippedPercent);
+         sStatus.warnings.push_back({ "W_CLIPPING", std::string("the signal reaches or passes full scale (sample peak ") + num +
+                                                       "); a file written from it will distort",
+                                      0, -1, "lower the level feeding the Audio Out / Output" });
+      }
+      if (!std::isfinite(res.integratedLufs))
+         sStatus.warnings.push_back({ "W_SILENT", "the whole range is silent (nothing above -70 LUFS)", 0, -1,
+                                      "check that a note or audio source is playing in this range" });
       sPhase = Phase::Done;
       HeadlessFinish(window, sStatus, sWall);
    }
@@ -69702,6 +69982,17 @@ int main(int argc, char** argv)
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return RunDspTest();
 
+   // The --audio-summary maths on synthesized signals with known answers
+   // (docs/fix-briefs/headless-engine.md 2.1).
+   if (getenv("INFINITE_AUDIOSUMMARYTEST") != nullptr)
+   {
+      std::string report;
+      const bool ok = AudioSummary::SelfTest(report);
+      std::fputs(report.c_str(), stdout);
+      std::printf("AUDIOSUMMARYTEST: %s\n", ok ? "PASS" : "FAIL");
+      return ok ? 0 : 1;
+   }
+
    if (getenv("INFINITE_FIELDTEST") != nullptr)
       return RunFieldTest();
 
@@ -69840,7 +70131,8 @@ int main(int argc, char** argv)
          }
          // Cocoa chdir's a bundled app into Contents/Resources at glfwInit, so
          // every path the caller typed has to be pinned to their cwd first.
-         for (std::string* path : { &gHeadlessJob.patch, &gHeadlessJob.out, &gHeadlessJob.jsonPath })
+         for (std::string* path : { &gHeadlessJob.patch, &gHeadlessJob.out, &gHeadlessJob.jsonPath,
+                                    &gHeadlessJob.wavPath, &gHeadlessJob.contactSheet })
          {
             if (path->empty())
                continue;
@@ -72842,9 +73134,12 @@ int main(int argc, char** argv)
       Patch::Data probe;
       std::string readError;
       const bool loadsPatch = gHeadlessJob.mode == Headless::Mode::Render || gHeadlessJob.mode == Headless::Mode::Frame ||
-                              gHeadlessJob.mode == Headless::Mode::Explain;
+                              gHeadlessJob.mode == Headless::Mode::Explain || gHeadlessJob.mode == Headless::Mode::AudioSummary;
       Headless::Status st;
-      st.mode = gHeadlessJob.mode == Headless::Mode::Render ? "render" : gHeadlessJob.mode == Headless::Mode::Explain ? "explain" : "frame";
+      st.mode = gHeadlessJob.mode == Headless::Mode::Render ? "render"
+                : gHeadlessJob.mode == Headless::Mode::Explain ? "explain"
+                : gHeadlessJob.mode == Headless::Mode::AudioSummary ? "audio-summary"
+                                                                    : "frame";
       st.patch = gHeadlessJob.patch;
       if (gHeadlessJob.mode == Headless::Mode::Canonicalize)
       {
@@ -72876,6 +73171,11 @@ int main(int argc, char** argv)
          PatchSchema::Resolve(probe, env, st.errors);
          if (st.errors.empty())
             PatchSchema::Validate(probe, env, st.errors, gHeadlessPreWarnings);
+         // An audio summary needs no picture Output; its own check (E_NO_AUDIO) covers the audio side.
+         if (gHeadlessJob.mode == Headless::Mode::AudioSummary)
+            gHeadlessPreWarnings.erase(std::remove_if(gHeadlessPreWarnings.begin(), gHeadlessPreWarnings.end(),
+                                                      [](const Headless::Issue& w) { return w.code == "W_NO_OUTPUT"; }),
+                                       gHeadlessPreWarnings.end());
          gHeadlessPatch = probe;
          if (!gHeadlessJob.lenient)
          {
