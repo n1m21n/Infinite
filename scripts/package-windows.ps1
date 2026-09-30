@@ -60,13 +60,19 @@ if ($ffmpeg) {
     Copy-Item -LiteralPath $ffmpeg -Destination $package
 }
 
+# Versao lida do CMakeLists.txt (project(... VERSION x.y.z)), para o pacote
+# nunca ficar com um numero velho escrito a mao.
+$version = 'desconhecida'
+$cmakeText = Get-Content -LiteralPath (Join-Path $root 'CMakeLists.txt') -Raw
+if ($cmakeText -match 'project\(InfiniteTurbo VERSION ([0-9.]+)') { $version = "$($Matches[1])-turbo" }
+
 $commit = 'pacote sem metadados Git'
 try { $commit = (git -C $root rev-parse HEAD).Trim() } catch {}
 @"
 Infinite-Turbo (for Windows) x64
-Versao: 0.32.0-turbo (base R31A)
+Versao: $version
 Origem: https://github.com/n1m21n/Infinite
-Commit-base: $commit
+Commit: $commit
 Configuracao: Release, VST3 ON, Spout ON, x64-windows-static
 Remove Background: Windows ML + DirectML/DX12, com fallback OpenCV CPU
 "@ | Set-Content -LiteralPath (Join-Path $package 'VERSAO.txt') -Encoding UTF8
