@@ -284,6 +284,8 @@ public:
                                            SynthModes::kNumFilterTypes - 1);
          eng[e].filterStages = SynthModes::FilterStages(filterType);
          eng[e].filterShape = SynthModes::FilterShapeOf(filterType);
+         eng[e].filterIsComb = SynthModes::IsCombFilter(filterType);
+         eng[e].filterCombNegative = SynthModes::CombIsNegative(filterType);
          eng[e].filterAmount = mEngFilterAmount[e].load(std::memory_order_relaxed);
          eng[e].pitchAmount = mEngPitchAmount[e].load(std::memory_order_relaxed);
          eng[e].ampA = mEngAmpAdsr[e][0].load(std::memory_order_relaxed);
@@ -580,6 +582,7 @@ private:
       int table, unison, octave, semi;
       int warpMode;
       int filterStages, filterShape;
+      bool filterIsComb, filterCombNegative;
       float filterAmount;
       float pitchAmount;
       float ampA, ampD, ampS, ampR;
@@ -608,6 +611,7 @@ private:
       double opPhase = 0.0; // internal cross-mod operator, used when the other engine is off
       float lastOut = 0.0f; // previous sample, read by the other engine's cross-mod
       DspMath::TptSvf filter[2][WavetableSynthCore::kMaxStages];
+      DspMath::CombFilter comb[2];
 
       void Reset(double sampleRate)
       {
@@ -622,6 +626,7 @@ private:
                filter[ch][s].SetSampleRate(sampleRate);
                filter[ch][s].Reset();
             }
+            comb[ch].Reset();
          }
       }
    };
@@ -743,7 +748,20 @@ private:
       // closes, which reads as the warp knob having stopped working.
       st.lastOut = std::clamp(sumMono * norm, -4.0f, 4.0f);
 
-      if (eb.filterStages > 0)
+      if (eb.filterIsComb)
+      {
+         // Cutoff in octaves off the knob, matching the SVF path below, so
+         // switching between comb and LP/HP/etc mid-patch doesn't jump the
+         // envelope's perceived depth.
+         const float hz = se.cutoff * exp2f(eb.filterAmount * filtEnv);
+         float* chans[2] = { &sumL, &sumR };
+         for (int ch = 0; ch < 2; ch++)
+         {
+            st.comb[ch].SetParams(hz, se.resonance, eb.filterCombNegative, mSampleRate);
+            *chans[ch] = st.comb[ch].Process(*chans[ch]);
+         }
+      }
+      else if (eb.filterStages > 0)
       {
          // Cutoff in octaves off the knob, so the envelope moves the same
          // musical distance wherever the knob is parked.

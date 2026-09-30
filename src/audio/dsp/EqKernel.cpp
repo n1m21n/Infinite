@@ -41,6 +41,14 @@ void EqKernel::PushParams(const AudioEffectNode& node, double sampleRate)
       mMailbox.Push(b * kCoeffsPerBand + 2, bq.b2);
       mMailbox.Push(b * kCoeffsPerBand + 3, bq.a1);
       mMailbox.Push(b * kCoeffsPerBand + 4, bq.a2);
+
+      // Comb bands read these raw slots instead (see kBandFreqSlot0); "on"
+      // is folded into mBandIsComb so a disabled comb band falls through to
+      // the bypass biquad.
+      mMailbox.Push(kBandFreqSlot0 + b, freq);
+      mMailbox.Push(kBandQSlot0 + b, q);
+      mBandIsComb[b].store(on && EqDsp::IsComb(type), std::memory_order_relaxed);
+      mBandCombNegative[b].store(EqDsp::CombIsNegative(type), std::memory_order_relaxed);
    }
 
    mMailbox.Push(kOutputGainSlot, node.Param("outputGainDb"));

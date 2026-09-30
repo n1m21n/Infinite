@@ -121,6 +121,17 @@ public:
 
    float CurrentRotation() const { return mCurrentRotation; }
 
+   // Baked wavetable cycles for UI display (full-bandwidth mip 0, one per
+   // morph frame) - a copy of what BuildBankFromPixels just wrote into the
+   // audio-thread bank, kept here because CookIfNeeded/RenderPreview already
+   // run on the main/UI thread, so no cross-thread sync is needed for reads.
+   const float* DisplayFrame(int frame) const
+   {
+      return mDisplayFrames[std::clamp(frame, 0, WaveTerrainDsp::kFrames - 1)];
+   }
+   static constexpr int kDisplayFrameCount = WaveTerrainDsp::kFrames;
+   static constexpr int kDisplayFrameSize = WaveTerrainDsp::kFrameSize;
+
 private:
    ImageCable mTextureInput;
    NoteCable mNoteInput;
@@ -131,6 +142,7 @@ private:
    unsigned int mPreviewTex = 0;
    int mPreviewSize = 128;
    std::vector<uint8_t> mPixels;
+   float mDisplayFrames[WaveTerrainDsp::kFrames][WaveTerrainDsp::kFrameSize] = {};
    int mLastCookFrame = -1;
    float mCurrentRotation = 0.0f;
    unsigned long long mLastTexRev = 0;

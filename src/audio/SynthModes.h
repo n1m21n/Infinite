@@ -123,6 +123,14 @@ namespace SynthModes
       kShapeNotch
    };
 
+   // Comb + / Comb - are not built from TptSvf like everything above - they
+   // are a delay line with feedback (DspMath::CombFilter), the one filter
+   // family here with genuine memory rather than single-sample integrator
+   // state. FilterStages()/FilterShapeOf() below deliberately don't cover
+   // them (a comb has no cascade depth or low/high/band/notch shape); call
+   // sites test IsCombFilter()/CombIsNegative() instead and drive a
+   // DspMath::CombFilter directly. Appended last so existing saved
+   // filterType ints keep their meaning.
    enum FilterType
    {
       kFilterOff = 0,
@@ -130,6 +138,7 @@ namespace SynthModes
       kFilterHP12, kFilterHP24, kFilterHP36,
       kFilterBP12, kFilterBP24,
       kFilterNotch12, kFilterNotch24,
+      kFilterCombPos, kFilterCombNeg,
       kNumFilterTypes
    };
 
@@ -140,7 +149,8 @@ namespace SynthModes
          "lp 12", "lp 24", "lp 36",
          "hp 12", "hp 24", "hp 36",
          "bp 12", "bp 24",
-         "notch 12", "notch 24"
+         "notch 12", "notch 24",
+         "comb +", "comb -"
       };
       return kNames;
    }
@@ -174,6 +184,56 @@ namespace SynthModes
          case kFilterNotch12: case kFilterNotch24: return kShapeNotch;
          default: return kShapeLow;
       }
+   }
+
+   // Turbo: Equation, Wave Terrain and Image Spectral Synth saved a five-entry
+   // node-local filter index (off, lp12, lp24, hp12, bp12) before the shared
+   // list existed. Upstream switched them to the shared enum, which silently
+   // re-maps old patches (a saved hp12 would load as lp36). Here the local
+   // order stays and every other shared type, comb included, is appended
+   // after it, so old patches keep their filter and the new types are there.
+   inline FilterType LegacyFilterToType(int local)
+   {
+      static const FilterType kMap[] = {
+         kFilterOff, kFilterLP12, kFilterLP24, kFilterHP12, kFilterBP12,
+         kFilterLP36, kFilterHP24, kFilterHP36, kFilterBP24,
+         kFilterNotch12, kFilterNotch24, kFilterCombPos, kFilterCombNeg
+      };
+      constexpr int kCount = (int)(sizeof(kMap) / sizeof(kMap[0]));
+      static_assert(kCount == kNumFilterTypes, "every shared filter type needs a legacy slot");
+      return (local >= 0 && local < kCount) ? kMap[local] : kFilterOff;
+   }
+
+   inline const std::vector<std::string>& LegacyFilterList()
+   {
+      static const std::vector<std::string> list = [] {
+         std::vector<std::string> v;
+         for (int i = 0; i < kNumFilterTypes; i++)
+            v.push_back(FilterName(LegacyFilterToType(i)));
+         return v;
+      }();
+      return list;
+   }
+
+   inline bool IsCombFilter(int type)
+   {
+      return type == kFilterCombPos || type == kFilterCombNeg;
+   }
+
+   inline bool CombIsNegative(int type)
+   {
+      return type == kFilterCombNeg;
+   }
+
+   // Whether this type has a cutoff control at all. Not the same question as
+   // FilterStages() > 0: a comb reads the cutoff knob (as its tooth spacing)
+   // while having no cascade depth, so UI that greys the knob out must ask
+   // this rather than counting stages. Anything unrecognised reports false,
+   // which keeps an out-of-range saved index reading as a bypass - the same
+   // degradation FilterStages() was written to give the render path.
+   inline bool FilterUsesCutoff(int type)
+   {
+      return IsCombFilter(type) || FilterStages(type) > 0;
    }
 
    // Maximum cascade depth any type asks for - the per-voice, per-engine,

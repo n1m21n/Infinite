@@ -84,14 +84,25 @@ void NodeFactory::Register(const std::string& name, CreateNodeFn createFn, const
    list.insert(std::lower_bound(list.begin(), list.end(), name, AlphabeticalLess), name);
 }
 
-std::string NodeFactory::CategoryOf(const std::string& name) const
+std::string NodeFactory::CategoryOf(const std::string& requested) const
 {
-   auto it = mFactoryMap.find(name);
+   auto it = mFactoryMap.find(CanonicalName(requested));
    return it != mFactoryMap.end() ? it->second.category : std::string();
 }
 
-INode* NodeFactory::MakeNode(const std::string& name)
+const std::string& NodeFactory::CanonicalName(const std::string& name)
 {
+   // old name -> current name. Saved patches store the type name as text.
+   static const std::map<std::string, std::string> kRenamed = {
+      { "Set Color", "Set Vertex Color" }, // 0.41, same name as upstream
+   };
+   auto it = kRenamed.find(name);
+   return it != kRenamed.end() ? it->second : name;
+}
+
+INode* NodeFactory::MakeNode(const std::string& requested)
+{
+   const std::string& name = CanonicalName(requested);
    auto it = mFactoryMap.find(name);
    if (it != mFactoryMap.end())
       return it->second.createFn();

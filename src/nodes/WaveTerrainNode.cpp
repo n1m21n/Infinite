@@ -7,6 +7,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <vector>
 
 #include "audio/AudioBuffer.h"
@@ -31,9 +32,11 @@ namespace
       "Luminance", "Red", "Green", "Blue", "Alpha", "Edge Magnitude"
    };
 
-   const std::vector<std::string> kFilterNames = {
-      "Bypass", "Lowpass 12dB", "Lowpass 24dB", "Highpass 12dB", "Bandpass"
-   };
+   // Turbo: filterType keeps the node-local order this node always saved
+   // (off, lp12, lp24, hp12, bp12) with the rest of the shared list, comb
+   // included, appended after it - see SynthModes::LegacyFilterList(). The
+   // audio half gets the shared SynthModes::FilterType via LegacyFilterToType.
+   const std::vector<std::string>& kFilterNames = SynthModes::LegacyFilterList();
 
    enum SmoothedParam
    {
@@ -187,7 +190,7 @@ public:
       mUnison.store(std::clamp(n.unison, 1, kMaxUnison), std::memory_order_relaxed);
       mOctave.store(n.octave, std::memory_order_relaxed);
       mSemi.store(n.semi, std::memory_order_relaxed);
-      mFilterType.store(n.filterType, std::memory_order_relaxed);
+      mFilterType.store((int)SynthModes::LegacyFilterToType(n.filterType), std::memory_order_relaxed);
       mFilterAmount.store(n.filterAmount, std::memory_order_relaxed);
 
       mAmpAdsr[0].store(n.ampAttack, std::memory_order_relaxed);
@@ -443,10 +446,8 @@ private:
       double phase[kMaxUnison] = {};
       Envelope amp;
       Envelope filt;
-      // filter[2] is L/R stage 1; filter2[2] is L/R stage 2, only run for
-      // LP24 (a real 24dB/oct cascade, not the same TptSvf reused twice).
-      DspMath::TptSvf filter[2];
-      DspMath::TptSvf filter2[2];
+      DspMath::TptSvf filter[2][SynthModes::kMaxFilterStages];
+      DspMath::CombFilter comb[2];
 
       void Reset(double sampleRate)
       {
@@ -464,10 +465,12 @@ private:
          filt.SetSampleRate(sampleRate);
          for (int c = 0; c < 2; c++)
          {
-            filter[c].SetSampleRate(sampleRate);
-            filter[c].Reset();
-            filter2[c].SetSampleRate(sampleRate);
-            filter2[c].Reset();
+            for (int s = 0; s < SynthModes::kMaxFilterStages; s++)
+            {
+               filter[c][s].SetSampleRate(sampleRate);
+               filter[c][s].Reset();
+            }
+            comb[c].Reset();
          }
       }
    };
@@ -513,49 +516,46 @@ private:
       sumL *= norm;
       sumR *= norm;
 
-      if (filterType > 0)
-      {
-         const float modulatedCutoff = cutoffHz * exp2f(filterAmount * filtEnv);
-         const float clampedHz = std::clamp(modulatedCutoff, 20.0f, 20000.0f);
-         const float q = 0.707f + resonance * 9.0f;
+      const float modulatedCutoff = cutoffHz * exp2f(filterAmount * filtEnv);
+      const float clampedHz = std::clamp(modulatedCutoff, 20.0f, 20000.0f);
 
+      if (SynthModes::IsCombFilter(filterType))
+      {
+         const bool negative = SynthModes::CombIsNegative(filterType);
+         float* chans[2] = { &outL, &outR };
+         float in[2] = { sumL, sumR };
          for (int c = 0; c < 2; c++)
          {
-            v.filter[c].SetCutoff(clampedHz, q);
-            if (filterType == 2) // LP24
-               v.filter2[c].SetCutoff(clampedHz, q);
+            v.comb[c].SetParams(clampedHz, resonance, negative, mSampleRate);
+            *chans[c] = v.comb[c].Process(in[c]);
          }
+         return;
+      }
 
-         auto resL = v.filter[0].Process(sumL);
-         auto resR = v.filter[1].Process(sumR);
+      const int filterStages = SynthModes::FilterStages(filterType);
+      if (filterStages > 0)
+      {
+         const float q = 0.707f + resonance * 9.0f;
+         const int filterShape = SynthModes::FilterShapeOf(filterType);
 
-         switch (filterType)
+         float* chans[2] = { &outL, &outR };
+         float in[2] = { sumL, sumR };
+         for (int c = 0; c < 2; c++)
          {
-            case 1: // LP12
-               outL = resL.low;
-               outR = resR.low;
-               break;
-            case 2: // LP24 - genuine two-stage cascade, not the same single
-                    // TptSvf output reused (that was identical to LP12).
+            float x = in[c];
+            for (int s = 0; s < filterStages; s++)
             {
-               auto resL2 = v.filter2[0].Process(resL.low);
-               auto resR2 = v.filter2[1].Process(resR.low);
-               outL = resL2.low;
-               outR = resR2.low;
-               break;
+               v.filter[c][s].SetCutoff(clampedHz, q);
+               const auto res = v.filter[c][s].Process(x);
+               switch (filterShape)
+               {
+                  case SynthModes::kShapeHigh:  x = res.high;  break;
+                  case SynthModes::kShapeBand:  x = res.band;  break;
+                  case SynthModes::kShapeNotch: x = res.notch; break;
+                  default:                      x = res.low;  break;
+               }
             }
-            case 3: // HP12
-               outL = resL.high;
-               outR = resR.high;
-               break;
-            case 4: // BP
-               outL = resL.band;
-               outR = resR.band;
-               break;
-            default:
-               outL = sumL;
-               outR = sumR;
-               break;
+            *chans[c] = x;
          }
       }
       else
@@ -787,6 +787,9 @@ void WaveTerrainNode::RenderPreview(int /*frameId*/)
                                          orbitType, channel,
                                          centerX, centerY, radiusX, radiusY,
                                          ratioA, ratioB, phaseOffset, totalRotRad);
+
+      for (int f = 0; f < WaveTerrainDsp::kFrames; f++)
+         std::memcpy(mDisplayFrames[f], bank.Frame(f, 0), sizeof(mDisplayFrames[f]));
 
       mAudioNode->SwapBank(bank);
 

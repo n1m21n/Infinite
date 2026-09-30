@@ -57,6 +57,7 @@ public:
 
    void TriggerPreview(float frac);
    void StopPreview();
+   void Seek(float frac);
    bool IsPlaying() const { return mIsPlaying; }
 
    const std::string& FilePath() const { return mFilePath; }
@@ -82,6 +83,7 @@ public:
    float volume = 0.8f;           // 0.0 .. 2.0 output volume
    float start = 0.0f;            // 0.0 .. 1.0 playback/loop start
    float end = 1.0f;              // 0.0 .. 1.0 playback/loop end
+   float position = 0.0f;         // 0.0 .. 1.0 playhead/scrub position within [start, end]
    bool loop = true;              // loop playback within [start, end]
 
    AudioCable audioInput;         // record source

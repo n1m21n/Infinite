@@ -37,6 +37,14 @@ public:
       return node->GetOutputTexture();
    }
 
+   // Turbo (from upstream): the resolved source's current texture without
+   // cooking it - for a caller that already pulled it this frame.
+   unsigned int Texture() const
+   {
+      INode* node = Resolved();
+      return node ? node->GetOutputTexture() : 0;
+   }
+
    int Width() const
    {
       INode* node = Resolved();

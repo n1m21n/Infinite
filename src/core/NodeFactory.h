@@ -29,6 +29,9 @@ public:
 
    void Register(const std::string& name, CreateNodeFn createFn, const std::string& category);
    INode* MakeNode(const std::string& name);
+   // Turbo: a node type that was renamed keeps loading under its old name.
+   // Returns the current registered name for an old one, else `name` as is.
+   static const std::string& CanonicalName(const std::string& name);
    // Registered category of a node type ("" if unknown). Patches store a
    // category per node, but it is re-derived from here on load, so a
    // reorganised menu also re-files nodes in old patches.

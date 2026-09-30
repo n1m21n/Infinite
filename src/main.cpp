@@ -119,6 +119,12 @@
 #include "nodes/AudioNodes.h"
 #include "nodes/AudioEffectNode.h"
 #include "nodes/WavetableNode.h"
+#include "nodes/AnalogNode.h"
+#include "nodes/DepthProjectionNode.h"
+#include "nodes/GeometryTableNode.h"
+#include "nodes/SlicerNode.h"
+#include "nodes/MolderNode.h"
+#include "nodes/GrainMolderNode.h"
 #include "nodes/WaveTerrainNode.h"
 #include "nodes/EquationNode.h"
 #include "nodes/ImageSpectralSynthNode.h"
@@ -130,6 +136,7 @@
 #include "nodes/MetallicNode.h"
 #include "audio/Wavetable.h"
 #include "nodes/NoteNodes.h"
+#include "nodes/ChordProgressionNode.h"
 #include "nodes/SamplerNode.h"
 #include "nodes/PaulStretchNode.h"
 #include "nodes/GranularNode.h"
@@ -1574,6 +1581,17 @@ namespace
       return changed;
    }
 
+   // Turbo: upstream signature. The 2-arg version already pushes the undo
+   // checkpoint on a real click, so outUserChanged stays false here and the
+   // caller never pushes a second one.
+   bool ModCheckbox(const char* label, bool* value, bool* outUserChanged)
+   {
+      if (outUserChanged)
+         *outUserChanged = false;
+      return ModCheckbox(label, value);
+   }
+
+
    void DropdownButton(const char* label, const std::vector<std::string>& options,
                        int current, std::function<void(int)> onSelect,
                        float width, bool modulatable)
@@ -2511,14 +2529,11 @@ namespace
       auto DrawWidget = [&](float* v, ImU32 col, bool readOnly) -> bool
       {
          if (style == AudioWidgetStyle::VFaderDb)
-            return VFaderFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
-                                ConsoleFaderTaper::PosToValue, ConsoleFaderTaper::ValueToPos);
+            return VFaderFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f);
          if (style == AudioWidgetStyle::KnobDb)
-            return KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
-                              ConsoleFaderTaper::PosToValue, ConsoleFaderTaper::ValueToPos);
+            return KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f);
          if (style == AudioWidgetStyle::KnobFreq)
-            return KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f,
-                              FrequencyTaper::PosToValue, FrequencyTaper::ValueToPos);
+            return KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f);
          return style == AudioWidgetStyle::VFader
             ? VFaderFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f)
             : KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f);
@@ -3146,6 +3161,7 @@ namespace
       REGISTER_NODE(MetaBallNode, Metaballs, "3D");
       REGISTER_NODE(MeshResynthNode, Resynthesize 3D, "3D");
       REGISTER_NODE(ImageToPointsNode, Image to Points, "3D");
+      REGISTER_NODE(DepthProjectionNode, Depth Projection, "3D");
       REGISTER_NODE(CurveNode, Curve, "3D");
       // Three names, one class - Points/Edges/Faces are the same sampler.
       for (int i = 0; i < 3; i++)
@@ -3171,7 +3187,7 @@ namespace
             "3D");
       }
       REGISTER_NODE(InstanceOnPointsNode, Instance on Points, "3D");
-      REGISTER_NODE(SetColorNode, Set Color, "3D");
+      REGISTER_NODE(SetColorNode, Set Vertex Color, "3D");
       REGISTER_NODE(WrapNode, Wrap, "3D");
       REGISTER_NODE(DistributePointsOnFacesNode, Distribute Points on Faces, "3D");
       REGISTER_NODE(PointsToVerticesNode, Points to Vertices, "3D");
@@ -3206,6 +3222,7 @@ namespace
       REGISTER_NODE(RandomNode, Random, "Modulators");
       REGISTER_NODE(PatternNode, Pattern, "Modulators");
       REGISTER_NODE(MathNode, Math, "Modulators");
+      REGISTER_NODE(GeometryTableNode, Geometry Table, "Modulators");
       REGISTER_NODE(CompareNode, Compare, "Modulators");
       REGISTER_NODE(RangeToRangeNode, Range to Range, "Modulators");
       REGISTER_NODE(SmoothNode, Smoothing, "Modulators");
@@ -3254,6 +3271,7 @@ namespace
       // the save format (confirmed: it silently ate the type name on load).
       REGISTER_NODE(OscillatorNode, Oscillator, "Synths");
       REGISTER_NODE(WavetableNode, Wavetable, "Synths");
+      REGISTER_NODE(AnalogNode, Analog, "Synths");
       REGISTER_NODE(WaveTerrainNode, Wave Terrain, "Synths");
       REGISTER_NODE(EquationNode, Equation Synth, "Synths");
       REGISTER_NODE(ImageSpectralSynthNode, Spectral Synth, "Synths");
@@ -3261,6 +3279,9 @@ namespace
       REGISTER_NODE(SamplerNode, Sampler, "Synths");
       REGISTER_NODE(PaulStretchNode, PaulStretch, "Synths");
       REGISTER_NODE(GranularNode, Granular, "Synths");
+      REGISTER_NODE(SlicerNode, Slicer, "Synths");
+      REGISTER_NODE(MolderNode, Molder, "Synths");
+      REGISTER_NODE(GrainMolderNode, Grain Molder, "Synths");
       REGISTER_NODE(DrumSequencerNode, Drum Sequencer, "Synths");
       // Infinite-Turbo
       REGISTER_NODE(MpcNode, MPC, "Synths");
@@ -3314,6 +3335,7 @@ namespace
       REGISTER_NODE(NoteToCVNode, Note to CV, "Modulators");
       REGISTER_NODE(VelocityToCVNode, Velocity to CV, "Modulators");
       REGISTER_NODE(KeyboardNode, Keyboard, "Notes");
+      REGISTER_NODE(ChordProgressionNode, Chord Progression, "Notes");
       REGISTER_NODE(NoteSwitcherNode, Note Switcher, "Notes");
       REGISTER_NODE(AudioToCVNode, Audio to CV, "Modulators");
 
@@ -3597,6 +3619,8 @@ namespace
          return 1;
       if (dynamic_cast<ImageToPointsNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<DepthProjectionNode*>(gn.node.get()) != nullptr)
+         return 2; // depth and optional color
       if (dynamic_cast<ClothNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr)
@@ -3605,6 +3629,8 @@ namespace
          return 1; // an optional point cloud to surface
       if (dynamic_cast<PathNode*>(gn.node.get()) != nullptr)
          return 2; // an optional curve, or geometry to travel around
+      if (dynamic_cast<GeometryTableNode*>(gn.node.get()) != nullptr)
+         return 1; // geometry to sample
       if (dynamic_cast<OceanNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<MaterialNode*>(gn.node.get()) != nullptr)
@@ -3699,6 +3725,8 @@ namespace
          return slot == 0 ? &resynth->Input() : nullptr;
       if (auto* i2p = dynamic_cast<ImageToPointsNode*>(gn.node.get()))
          return slot == 0 ? &i2p->Input() : nullptr;
+      if (auto* dp = dynamic_cast<DepthProjectionNode*>(gn.node.get()))
+         return (slot == 0) ? &dp->DepthInput() : ((slot == 1) ? &dp->ColorInput() : nullptr);
       if (auto* curves = dynamic_cast<CurvesNode*>(gn.node.get()))
          return slot == 0 ? &curves->Input() : nullptr;
       if (auto* cramp = dynamic_cast<ColorRampNode*>(gn.node.get()))
@@ -4286,9 +4314,11 @@ namespace
       return center; // exhausted the search area - stack rather than fail
    }
 
-   GraphNode* SpawnNode(const std::string& typeName, const std::string& category,
+   GraphNode* SpawnNode(const std::string& requestedTypeName, const std::string& category,
                         float x = 0.0f, float y = 0.0f)
    {
+      // Turbo: an old patch's renamed type comes back under its current name.
+      const std::string typeName = NodeFactory::CanonicalName(requestedTypeName);
       INode* node = NodeFactory::Instance().MakeNode(typeName);
       if (node == nullptr)
          return nullptr;
@@ -4335,6 +4365,12 @@ namespace
          audio->ReloadFromPath();
       if (auto* sampler = dynamic_cast<SamplerNode*>(node))
          sampler->ReloadFromPath();
+      if (auto* slicer = dynamic_cast<SlicerNode*>(node))
+         slicer->ReloadFromPath();
+      if (auto* molder = dynamic_cast<MolderNode*>(node))
+         molder->ReloadFromPath();
+      if (auto* gm = dynamic_cast<GrainMolderNode*>(node))
+         gm->ReloadFromPath();
       if (auto* paul = dynamic_cast<PaulStretchNode*>(node))
          paul->ReloadFromPath();
       if (auto* gran = dynamic_cast<GranularNode*>(node))
@@ -7308,6 +7344,24 @@ namespace
          index++;
       }
 
+      // Turbo: toggle cell (ported for the upstream Analog body). Centred in
+      // its cell at knob height; ModCheckbox keeps it modulatable.
+      bool Checkbox(const char* label, bool* value)
+      {
+         if (value == nullptr)
+         {
+            index++;
+            return false;
+         }
+         const float cellX0 = x0 + (float)index * cellW;
+         const float checkY = y0 + headerH + (maxDia - ImGui::GetFrameHeight()) * 0.5f;
+         const float textW = ImGui::CalcTextSize(label).x + ImGui::GetFrameHeight() + 4.0f;
+         ImGui::SetCursorScreenPos(ImVec2(cellX0 + std::max(2.0f, (cellW - textW) * 0.5f), checkY));
+         const bool changed = ModCheckbox(label, value);
+         index++;
+         return changed;
+      }
+
       void Skip() { index++; }
 
       void End() const
@@ -7747,11 +7801,14 @@ namespace
       ImGui::SetNextItemAllowOverlap();
       ImGui::SetCursorScreenPos(origin);
       ImGui::InvisibleButton("##paulstretchwavebody", ImVec2(w, h));
-      if (hasSample && ImGui::IsItemActivated())
+      if (hasSample && (ImGui::IsItemActivated() || (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))))
       {
          const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
          const float target = (frac < n->start || frac > n->end) ? n->start : frac;
-         n->TriggerPreview(target);
+         n->position = target;
+         n->Seek(target);
+         if (!n->IsPlaying())
+            n->TriggerPreview(target);
       }
 
       const bool isLight = IsThemeLight();
@@ -7820,7 +7877,10 @@ namespace
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
          if (ImGui::IsItemActive())
+         {
             n->start = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, n->end - 0.01f);
+            n->position = std::clamp(n->position, n->start, n->end);
+         }
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
 
@@ -7829,7 +7889,10 @@ namespace
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
          if (ImGui::IsItemActive())
+         {
             n->end = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, n->start + 0.01f, 1.0f);
+            n->position = std::clamp(n->position, n->start, n->end);
+         }
          if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
       }
@@ -8664,7 +8727,7 @@ namespace
          row.End();
       }
       {
-         const bool filterOff = SynthModes::FilterStages(eng.filterType) == 0;
+         const bool filterOff = !SynthModes::FilterUsesCutoff(eng.filterType);
          const bool warpOff = eng.warpMode == SynthModes::kWarpOff;
          AudioKnobRow row(4, kKnobLarge, ImGui::GetFrameHeight() + 5.0f);
 
@@ -8972,7 +9035,7 @@ namespace
          row.End();
       }
       {
-         const bool filterOff = SynthModes::FilterStages(eng.filterType) == 0;
+         const bool filterOff = !SynthModes::FilterUsesCutoff(eng.filterType);
          AudioKnobRow row(4, kKnobLarge, ImGui::GetFrameHeight() + 5.0f);
 
          row.DropdownKnob("oscFilter", SynthModes::FilterTypeList(), eng.filterType,
@@ -9100,8 +9163,9 @@ namespace
          const bool filterOff = (n->filterType == MetallicDsp::kFilterOff);
          AudioKnobRow row(4, kKnobLarge, ImGui::GetFrameHeight() + 5.0f);
 
-         row.DropdownKnob("metalFilter", MetallicDsp::FilterModeList(), n->filterType,
-                          [n](int i) { PushUndoCheckpoint(); n->filterType = i; },
+         row.DropdownKnob("metalFilter", MetallicDsp::FilterModeDisplayList(),
+                          MetallicDsp::FilterModeToDisplayIndex(n->filterType),
+                          [n](int displayIdx) { PushUndoCheckpoint(); n->filterType = MetallicDsp::DisplayIndexToFilterMode(displayIdx); },
                           "filter", &n->filterCutoff, 20.0f, 18000.0f, "%.0f Hz", filterOff);
          row.Knob("reso", &n->filterResonance, 0.0f, 1.0f, "%.2f");
          row.Knob("drive", &n->drive, 0.0f, 1.0f, "%.2f");
@@ -9230,7 +9294,12 @@ namespace
       }
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
-      // Live Terrain Viewport & Orbit Scanning Overlay (Aspect-Ratio Preserving)
+      // Baked Wavetable Stack - the node bakes the incoming texture into an
+      // 8-frame band-limited wavetable bank every rebuild (orbit-sampled ->
+      // FFT -> mip pyramid, see WaveTerrainNode::RenderPreview); this shows
+      // those baked cycles directly (stacked morph frames, à la a classic
+      // wavetable editor) instead of the raw texture + orbit path, so the
+      // display matches what the audio thread is actually playing back.
       {
          const float containerW = gAudioContentW;
          const float previewH = 140.0f;
@@ -9238,59 +9307,74 @@ namespace
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const ImVec2 containerBr(origin.x + containerW, origin.y + previewH);
 
-         // Background panel
          dl->AddRectFilled(origin, containerBr, IM_COL32(14, 16, 20, 255), 4.0f);
-         dl->AddRect(origin, containerBr, IM_COL32(40, 44, 56, 180), 4.0f, 0, 1.0f);
+         dl->PushClipRect(origin, containerBr, true);
 
-         if (n->GetOutputTexture() != 0)
+         const int frameCount = WaveTerrainNode::kDisplayFrameCount;
+         const int sampleCount = WaveTerrainNode::kDisplayFrameSize;
+         const float framePos = std::clamp(n->position, 0.0f, 1.0f) * (float)(frameCount - 1);
+
+         // Stack offset: each frame further from the current morph position
+         // recedes up-and-right, like looking down a row of wavetable cycles.
+         const float stackDx = 10.0f;
+         const float stackDy = 8.0f;
+         const float traceW = containerW - stackDx * (frameCount - 1) - 12.0f;
+         const float traceH = (previewH - stackDy * (frameCount - 1) - 16.0f) * 0.62f;
+         constexpr int kPlotPoints = 160;
+
+         auto sampleFrame = [n](int frame, float t) -> float {
+            const float x = t * (float)WaveTerrainNode::kDisplayFrameSize;
+            const int i0 = (int)x & (WaveTerrainNode::kDisplayFrameSize - 1);
+            const int i1 = (i0 + 1) & (WaveTerrainNode::kDisplayFrameSize - 1);
+            const float fx = x - floorf(x);
+            const float* d = n->DisplayFrame(frame);
+            return d[i0] + (d[i1] - d[i0]) * fx;
+         };
+
+         // Back-to-front so nearer (closer to the current morph position)
+         // traces draw on top of farther ones.
+         int order[WaveTerrainNode::kDisplayFrameCount];
+         for (int i = 0; i < frameCount; i++)
+            order[i] = i;
+         std::sort(order, order + frameCount, [framePos](int a, int b) {
+            return fabsf((float)a - framePos) > fabsf((float)b - framePos);
+         });
+
+         for (int oi = 0; oi < frameCount; oi++)
          {
-            const float imgSize = previewH - 8.0f;
-            const float imgX = origin.x + (containerW - imgSize) * 0.5f;
-            const float imgY = origin.y + 4.0f;
-            const ImVec2 imgTl(imgX, imgY);
-            const ImVec2 imgBr(imgX + imgSize, imgY + imgSize);
+            const int f = order[oi];
+            const float dist = fabsf((float)f - framePos) / (float)std::max(1, frameCount - 1);
+            const float prox = 1.0f - std::clamp(dist, 0.0f, 1.0f); // 1 = current frame
 
-            dl->AddImage((ImTextureID)(intptr_t)n->GetOutputTexture(), imgTl, imgBr, ImVec2(0, 1), ImVec2(1, 0));
-            dl->AddRect(imgTl, imgBr, IM_COL32(50, 200, 255, 120), 2.0f, 0, 1.0f);
+            const float baseX = origin.x + 6.0f + stackDx * (float)f;
+            const float baseY = origin.y + previewH - 8.0f - stackDy * (float)f;
 
-            // Dynamic Glowing Orbit Trajectory Overlay (drawn cleanly on top of image every frame).
-            // Frame 0 (cyan) and frame 7 (magenta) are both drawn now that the
-            // morph knob spans a real fraction of the image between them
-            // (see EvaluateOrbit's morphCy in WaveTerrainDsp.h) - previously
-            // only frame 0 was ever drawn here, so the span the `position`
-            // ("morph") knob sweeps across was invisible while dragging it.
-            constexpr int kOrbitPoints = 128;
-            ImVec2 orbitPts[kOrbitPoints];
-            ImVec2 orbitPtsEnd[kOrbitPoints];
-            const float totalRot = n->rotation + n->CurrentRotation();
-            const float totalRotRad = totalRot * (3.14159265f / 180.0f);
-
-            for (int i = 0; i < kOrbitPoints; i++)
+            ImVec2 pts[kPlotPoints];
+            for (int i = 0; i < kPlotPoints; i++)
             {
-               const float t = (float)i / (float)kOrbitPoints;
-               float u = 0.0f, v = 0.0f;
-               WaveTerrainDsp::EvaluateOrbit(n->orbitType, t, 0, n->centerX, n->centerY,
-                                            n->radiusX, n->radiusY, n->ratioA, n->ratioB,
-                                            n->phaseOffset, totalRotRad, u, v);
-               orbitPts[i] = ImVec2(imgTl.x + std::clamp(u, 0.0f, 1.0f) * imgSize,
-                                    imgBr.y - std::clamp(v, 0.0f, 1.0f) * imgSize);
-
-               float u7 = 0.0f, v7 = 0.0f;
-               WaveTerrainDsp::EvaluateOrbit(n->orbitType, t, WaveTerrainDsp::kFrames - 1, n->centerX, n->centerY,
-                                            n->radiusX, n->radiusY, n->ratioA, n->ratioB,
-                                            n->phaseOffset, totalRotRad, u7, v7);
-               orbitPtsEnd[i] = ImVec2(imgTl.x + std::clamp(u7, 0.0f, 1.0f) * imgSize,
-                                       imgBr.y - std::clamp(v7, 0.0f, 1.0f) * imgSize);
+               const float t = (float)i / (float)(kPlotPoints - 1);
+               const float s = sampleFrame(f, t);
+               pts[i] = ImVec2(baseX + t * traceW, baseY - traceH * 0.5f - s * traceH * 0.5f);
             }
 
-            // Frame 7 (magenta), drawn first so frame 0's cyan sits on top.
-            dl->AddPolyline(orbitPtsEnd, kOrbitPoints, IM_COL32(240, 0, 200, 55), ImDrawFlags_Closed, 3.5f);
-            dl->AddPolyline(orbitPtsEnd, kOrbitPoints, IM_COL32(255, 170, 240, 200), ImDrawFlags_Closed, 1.5f);
+            const ImU32 glow = IM_COL32(40, 200, 220, (int)(30 + 40 * prox));
+            const bool isLight = IsThemeLight();
+            const ImU32 coreLo = isLight ? IM_COL32(0, 130, 190, (int)(70 + 120 * prox))
+                                          : IM_COL32(60, 210, 255, (int)(70 + 130 * prox));
+            const ImU32 coreHi = isLight ? IM_COL32(0, 90, 150, 255) : IM_COL32(190, 250, 255, 255);
+            const ImU32 core = prox > 0.97f ? coreHi : coreLo;
 
-            // Frame 0 (cyan).
-            dl->AddPolyline(orbitPts, kOrbitPoints, IM_COL32(0, 240, 220, 60), ImDrawFlags_Closed, 3.5f);
-            dl->AddPolyline(orbitPts, kOrbitPoints, IM_COL32(200, 255, 255, 240), ImDrawFlags_Closed, 1.5f);
+            dl->AddPolyline(pts, kPlotPoints, glow, 0, prox > 0.97f ? 3.5f : 2.0f);
+            dl->AddPolyline(pts, kPlotPoints, core, 0, prox > 0.97f ? 1.6f : 1.0f);
          }
+
+         dl->PopClipRect();
+         dl->AddRect(origin, containerBr, IM_COL32(40, 44, 56, 180), 4.0f, 0, 1.0f);
+
+         char label[64];
+         snprintf(label, sizeof(label), "wavetable  -  frame %.2f / %d", n->position * (frameCount - 1), frameCount - 1);
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 6.0f), IM_COL32(140, 150, 165, 200), label);
+
          ImGui::Dummy(ImVec2(containerW, previewH));
       }
       ImGui::Dummy(ImVec2(0.0f, 6.0f));
@@ -10454,11 +10538,23 @@ namespace
 
       AudioSlider("detune", &n->detune, 0.0f, 100.0f, "%.1f c", AudioHalfWidth());
       ImGui::SameLine();
-      if (AudioSlider("start", &n->start, 0.0f, 1.0f, "%.3f", AudioHalfWidth() * 0.5f - 4.0f))
+      if (AudioSlider("position", &n->position, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+      {
+         n->position = std::clamp(n->position, std::min(n->start, n->end), std::max(n->start, n->end));
+         n->Seek(n->position);
+      }
+
+      if (AudioSlider("start", &n->start, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+      {
          n->start = std::min(n->start, n->end - 0.01f);
+         n->position = std::clamp(n->position, n->start, n->end);
+      }
       ImGui::SameLine();
-      if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth() * 0.5f - 4.0f))
+      if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+      {
          n->end = std::max(n->end, n->start + 0.01f);
+         n->position = std::clamp(n->position, n->start, n->end);
+      }
 
       EndAudioBody();
    }
@@ -13615,6 +13711,204 @@ namespace
       { ImGuiKey_P, 28 },
    };
 
+   // ---- Chord Progression (Turbo) ------------------------------------------
+   // Slot strip (click to select, the playing chord is lit with a progress
+   // bar), a two-octave keyboard that toggles the selected chord's notes, the
+   // selected chord's length in bars plus a root/quality builder, and the
+   // progression-wide knobs. The per-chord length and the keys are plain
+   // widgets, not modulation pins: a pin on "the selected chord" would change
+   // meaning every time another slot is clicked.
+   void DrawChordProgressionBody(GraphNode& gn, ChordProgressionNode* n)
+   {
+      using CP = ChordProgressionNode;
+      n->chordCount = std::clamp(n->chordCount, 1, CP::kMaxChords);
+      const int count = n->chordCount;
+      n->selected = std::clamp(n->selected, 0, count - 1);
+      const int sel = n->selected;
+      const int playing = n->PlayingIndex();
+
+      char stat[96];
+      if (playing >= 0 && playing < count)
+         snprintf(stat, sizeof(stat), "chord %d/%d  -  %s  -  %s", playing + 1, count, n->ChordName(playing).c_str(),
+                  CP::PlayModeNames()[std::clamp(n->playMode, 0, CP::kNumPlayModes - 1)].c_str());
+      else
+         snprintf(stat, sizeof(stat), "%d chords, %.1f bars  -  press play", count, n->TotalBars());
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      const bool isLight = IsThemeLight();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      // Slot strip: 8 per row.
+      {
+         const float w = gAudioBodyW;
+         const int perRow = 8;
+         const int rows = (count + perRow - 1) / perRow;
+         const float gap = 4.0f;
+         const float cellW = (w - gap * (float)(perRow - 1)) / (float)perRow;
+         const float cellH = 36.0f;
+         const ImVec2 origin = ImGui::GetCursorScreenPos();
+         const ImU32 idleCol = isLight ? IM_COL32(222, 226, 236, 255) : IM_COL32(40, 43, 54, 255);
+         const ImU32 selCol = isLight ? IM_COL32(196, 210, 238, 255) : IM_COL32(58, 66, 90, 255);
+         const ImU32 playCol = isLight ? IM_COL32(70, 140, 245, 255) : IM_COL32(70, 130, 210, 255);
+         const ImU32 borderCol = isLight ? IM_COL32(40, 90, 200, 255) : IM_COL32(150, 200, 255, 255);
+         const ImU32 textCol = isLight ? IM_COL32(30, 34, 44, 255) : IM_COL32(226, 230, 240, 255);
+         const ImU32 subCol = isLight ? IM_COL32(80, 86, 100, 255) : IM_COL32(150, 156, 172, 255);
+         for (int i = 0; i < count; i++)
+         {
+            const int r = i / perRow, c = i % perRow;
+            const ImVec2 mn(origin.x + (float)c * (cellW + gap), origin.y + (float)r * (cellH + gap));
+            const ImVec2 mx(mn.x + cellW, mn.y + cellH);
+            ImGui::SetCursorScreenPos(mn);
+            ImGui::PushID(i);
+            if (ImGui::InvisibleButton("##cpslot", ImVec2(cellW, cellH)))
+               n->selected = i;
+            const bool hovered = ImGui::IsItemHovered();
+            ImGui::PopID();
+            ImU32 bg = (i == playing) ? playCol : (i == n->selected ? selCol : idleCol);
+            dl->AddRectFilled(mn, mx, bg, 4.0f);
+            if (i == playing)
+            {
+               const float p = std::clamp(n->PlayingProgress(), 0.0f, 1.0f);
+               dl->AddRectFilled(ImVec2(mn.x + 2.0f, mx.y - 4.0f), ImVec2(mn.x + 2.0f + (cellW - 4.0f) * p, mx.y - 2.0f),
+                                 IM_COL32(255, 255, 255, 170), 1.0f);
+            }
+            if (i == n->selected || hovered)
+               dl->AddRect(mn, mx, i == n->selected ? borderCol : subCol, 4.0f, 0, i == n->selected ? 1.8f : 1.0f);
+            const std::string name = n->ChordName(i);
+            ImVec2 ts = ImGui::CalcTextSize(name.c_str());
+            dl->PushClipRect(mn, mx, true);
+            dl->AddText(ImVec2(mn.x + std::max(3.0f, (cellW - ts.x) * 0.5f), mn.y + 4.0f),
+                        i == playing ? IM_COL32(255, 255, 255, 255) : textCol, name.c_str());
+            char bars[24];
+            snprintf(bars, sizeof(bars), "%g bar", n->chordBars[i]);
+            ts = ImGui::CalcTextSize(bars);
+            dl->AddText(ImVec2(mn.x + (cellW - ts.x) * 0.5f, mn.y + 18.0f),
+                        i == playing ? IM_COL32(235, 240, 255, 220) : subCol, bars);
+            dl->PopClipRect();
+         }
+         ImGui::SetCursorScreenPos(origin);
+         ImGui::Dummy(ImVec2(w, (float)rows * cellH + (float)(rows - 1) * gap));
+      }
+
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Keyboard: the selected chord's keys, click to toggle.
+      {
+         bool held[128] = {};
+         const int low = std::clamp((n->baseOctave + 1) * 12, 0, 104);
+         const int mask = n->chordMask[n->selected];
+         for (int k = 0; k < CP::kKeys; k++)
+            if ((mask & (1 << k)) && low + k < 128)
+               held[low + k] = true;
+         const int hit = DrawInteractiveKeyboard(held, low, 2);
+         if (ImGui::IsItemActivated() && hit >= low && hit < low + CP::kKeys)
+         {
+            PushUndoCheckpoint();
+            n->chordMask[n->selected] ^= (1 << (hit - low));
+            gPatchDirty = true;
+         }
+      }
+
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Selected chord: length and builder.
+      {
+         const float x0 = gAudioContentX;
+         const float y = ImGui::GetCursorScreenPos().y;
+         const float gap = 5.0f;
+         const float lenW = 118.0f, rootW = 58.0f, qualW = 82.0f;
+         const float btnW = (gAudioContentW - lenW - rootW - qualW - gap * 5.0f) / 3.0f;
+         float x = x0;
+
+         ImGui::SetCursorScreenPos(ImVec2(x, y));
+         ImGui::SetNextItemWidth(lenW);
+         float len = n->chordBars[n->selected];
+         if (ImGui::SliderFloat("##cpbars", &len, 0.5f, 16.0f, "%.1f bars"))
+         {
+            n->chordBars[n->selected] = std::clamp(std::round(len * 2.0f) * 0.5f, 0.5f, 16.0f);
+            gPatchDirty = true;
+         }
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint();
+         x += lenW + gap;
+
+         ImGui::SetCursorScreenPos(ImVec2(x, y));
+         AudioBareDropdown("cpRoot", NoteNameList(), n->builderRoot,
+                           [n](int i) { n->builderRoot = i; }, rootW);
+         x += rootW + gap;
+         ImGui::SetCursorScreenPos(ImVec2(x, y));
+         AudioBareDropdown("cpQuality", CP::QualityNames(), n->builderQuality,
+                           [n](int i) { n->builderQuality = i; }, qualW);
+         x += qualW + gap;
+
+         ImGui::SetCursorScreenPos(ImVec2(x, y));
+         if (ImGui::Button("set##cp", ImVec2(btnW, 0.0f)))
+         {
+            PushUndoCheckpoint();
+            n->chordMask[n->selected] = CP::BuildMask(n->builderRoot, n->builderQuality);
+            gPatchDirty = true;
+         }
+         x += btnW + gap;
+         ImGui::SetCursorScreenPos(ImVec2(x, y));
+         if (ImGui::Button("inv##cp", ImVec2(btnW, 0.0f)))
+         {
+            PushUndoCheckpoint();
+            n->chordMask[n->selected] = CP::InvertMask(n->chordMask[n->selected]);
+            gPatchDirty = true;
+         }
+         x += btnW + gap;
+         ImGui::SetCursorScreenPos(ImVec2(x, y));
+         if (ImGui::Button("clear##cp", ImVec2(btnW, 0.0f)))
+         {
+            PushUndoCheckpoint();
+            n->chordMask[n->selected] = 0;
+            gPatchDirty = true;
+         }
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         ImGui::Dummy(ImVec2(gAudioContentW, ImGui::GetFrameHeight()));
+      }
+
+      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+
+      // Progression-wide knobs.
+      {
+         AudioKnobRow row(5, kKnobLarge);
+         row.KnobInt("chords", &n->chordCount, 1, CP::kMaxChords, kKnobLarge);
+         row.KnobInt("octave", &n->baseOctave, -1, 7, kKnobLarge);
+         row.KnobInt("transpose", &n->transpose, -12, 12, kKnobLarge);
+         row.Knob("velocity", &n->velocity, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("gate", &n->gate, 0.05f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+
+      // How the chord is played. rate drives the arp / pulse / alberti /
+      // bass + chord steps, strum the strum spread, octaves the arp range;
+      // each greys out when the mode does not use it.
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      {
+         const int mode = std::clamp(n->playMode, 0, CP::kNumPlayModes - 1);
+         const bool isStrum = mode == CP::kStrumUp || mode == CP::kStrumDown;
+         const bool isArp = mode >= CP::kArpUp && mode <= CP::kArpRandom;
+         AudioKnobRow row(4, kKnobSmall, ImGui::GetFrameHeight() + 5.0f);
+         row.Dropdown("play", CP::PlayModeNames(), mode, [n](int i) { PushUndoCheckpoint(); n->playMode = i; });
+         ImGui::BeginDisabled(!CP::IsStepMode(mode));
+         row.Dropdown("rate", MusicTime::RateDivisionList(),
+                      std::clamp(n->rateDiv, 0, MusicTime::kNumRateDivisions - 1),
+                      [n](int i) { PushUndoCheckpoint(); n->rateDiv = i; });
+         ImGui::EndDisabled();
+         ImGui::BeginDisabled(!isStrum);
+         row.Knob("strum", &n->strumMs, 0.0f, 250.0f, "%.0f ms");
+         ImGui::EndDisabled();
+         ImGui::BeginDisabled(!isArp);
+         row.KnobInt("octaves", &n->arpOctaves, 1, 3);
+         ImGui::EndDisabled();
+         row.End();
+      }
+      AudioToggleButton("bass", &n->bass, 56.0f);
+
+      EndAudioBody();
+   }
+
    void DrawKeyboardBody(GraphNode& gn, KeyboardNode* n)
    {
       bool held[128];
@@ -14906,22 +15200,25 @@ namespace
    {
       const float w = gAudioBodyW;
       const float h = kAudioTimeVizH;
-      const float curveW = w;
+      const float grMeterW = 10.0f;
+      const float grMeterGap = 6.0f;
+      const float curveW = w - grMeterW - grMeterGap;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
       const ImVec2 br(origin.x + w, origin.y + h);
+      const ImVec2 curveBr(origin.x + curveW, br.y);
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       const bool isLight = IsThemeLight();
-      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
-      dl->PushClipRect(origin, br, true);
+      dl->AddRectFilled(origin, ImVec2(curveBr.x, br.y), ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, curveBr, true);
 
       static const float kDbTicks[] = { -48.0f, -36.0f, -24.0f, -12.0f, 0.0f };
       for (float db : kDbTicks)
       {
          const float x = DynVizDbToX(db, origin.x, curveW);
          const float y = DynVizDbToY(db, origin.y, h);
-         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
-         dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + curveW, y),
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, curveBr.y), db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
+         dl->AddLine(ImVec2(origin.x, y), ImVec2(curveBr.x, y),
                      db == 0.0f ? ScopeMidLineCol() : ScopeGridCol(), 1.0f);
          char tickBuf[8];
          snprintf(tickBuf, sizeof(tickBuf), "%.0f", db);
@@ -14933,8 +15230,20 @@ namespace
                   ImVec2(DynVizDbToX(kDynVizMaxDb, origin.x, curveW), DynVizDbToY(kDynVizMaxDb, origin.y, h)),
                   IM_COL32(255, 255, 255, 24), 1.0f);
 
+      // Threshold marker - a vertical line at the knee so the point the
+      // curve bends at reads as a control, not just an inflection the eye
+      // has to find. Amber to stay distinct from the curve (blue) and the
+      // live operating point (white) drawn below.
+      const ImU32 thresholdCol = isLight ? IM_COL32(210, 130, 20, 200) : IM_COL32(255, 180, 70, 190);
+      const float threshX = DynVizDbToX(threshold, origin.x, curveW);
+      dl->AddLine(ImVec2(threshX, origin.y), ImVec2(threshX, curveBr.y), thresholdCol, 1.5f);
+      dl->AddText(ImVec2(threshX + 3.0f, origin.y + 2.0f), thresholdCol, "threshold");
+
       // The gain-computer curve itself, with makeup gain folded in so the
-      // picture matches what actually comes out.
+      // picture matches what actually comes out. The curve's bend at
+      // threshold and its slope past it (1/ratio) ARE threshold and ratio -
+      // this is the static shape of the compressor, independent of program
+      // material.
       dl->PathClear();
       const int kNumPoints = 96;
       for (int i = 0; i < kNumPoints; i++)
@@ -14946,13 +15255,61 @@ namespace
       }
       dl->PathStroke(isLight ? IM_COL32(30, 110, 230, 255) : IM_COL32(150, 214, 255, 245), 0, 1.8f);
 
+      // Live operating point - where the signal actually is right now, read
+      // straight off the kernel's own smoothed envelope (ExtraMeterValue),
+      // never recomputed from the static curve. That's what makes attack and
+      // release visible: the dot lags behind a sudden input jump and eases
+      // back down exactly on the kernel's own timing, not an idealized one.
+      const float liveInDb = std::clamp(n->ExtraMeterValue(0), kDynVizMinDb, kDynVizMaxDb);
+      const float liveGrDb = std::clamp(n->ExtraMeterValue(1), 0.0f, 40.0f);
+      const bool hasSignal = liveInDb > kDynVizMinDb + 0.5f;
+      if (hasSignal)
+      {
+         const float liveOutDb = liveInDb - liveGrDb + makeupDb;
+         const float dotX = DynVizDbToX(liveInDb, origin.x, curveW);
+         const float unprocessedY = DynVizDbToY(liveInDb, origin.y, h);
+         const float dotY = DynVizDbToY(liveOutDb, origin.y, h);
+
+         // Fill the gap between the unprocessed diagonal and the live output
+         // - the visible "how much" of the reduction happening right now.
+         if (liveGrDb > 0.05f)
+         {
+            dl->AddLine(ImVec2(dotX, unprocessedY), ImVec2(dotX, dotY),
+                        isLight ? IM_COL32(230, 120, 20, 150) : IM_COL32(255, 160, 60, 150), 2.5f);
+         }
+
+         const ImU32 dotCol = isLight ? IM_COL32(20, 20, 20, 255) : IM_COL32(255, 255, 255, 255);
+         dl->AddCircleFilled(ImVec2(dotX, dotY), 4.0f, dotCol);
+         dl->AddCircle(ImVec2(dotX, dotY), 4.0f, ScopeBgCol(), 0, 1.5f);
+      }
+
       dl->PopClipRect();
-      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      dl->AddRect(origin, ImVec2(curveBr.x, br.y), ScopeBorderCol(), 3.0f);
+
+      // Gain-reduction meter, a slim bar riding the curve's right edge -
+      // release shows here as the bar's own fall time, since it reads the
+      // same smoothed value as the dot rather than the instantaneous one.
+      {
+         const ImVec2 meterOrigin(curveBr.x + grMeterGap, origin.y);
+         const ImVec2 meterBr(br.x, br.y);
+         dl->AddRectFilled(meterOrigin, meterBr, ScopeBgCol(), 2.0f);
+         const float grT = std::clamp(liveGrDb / 24.0f, 0.0f, 1.0f);
+         const float barTop = meterOrigin.y + (meterBr.y - meterOrigin.y) * (1.0f - grT);
+         if (grT > 0.005f)
+         {
+            dl->AddRectFilled(ImVec2(meterOrigin.x + 1.0f, barTop), ImVec2(meterBr.x - 1.0f, meterBr.y),
+                              isLight ? IM_COL32(230, 120, 20, 230) : IM_COL32(255, 160, 60, 220), 1.5f);
+         }
+         dl->AddRect(meterOrigin, meterBr, ScopeBorderCol(), 2.0f);
+      }
 
       if (ImGui::IsMouseHoveringRect(origin, br))
       {
          char buf[64];
-         snprintf(buf, sizeof(buf), "%.0f dB in -> %.0f dB out, %.0f:1", threshold, threshold + makeupDb, ratio);
+         if (hasSignal)
+            snprintf(buf, sizeof(buf), "%.1f dB in, -%.1f dB GR, %.0f:1", liveInDb, liveGrDb, ratio);
+         else
+            snprintf(buf, sizeof(buf), "%.0f dB in -> %.0f dB out, %.0f:1", threshold, threshold + makeupDb, ratio);
          SetAudioReadout("dynamics", buf);
       }
 
@@ -17594,10 +17951,1053 @@ namespace
       EndAudioBody();
    }
 
+   void DrawAnalogBody(GraphNode& gn, AnalogNode* n)
+   {
+      const bool noteDriven = n->noteInput.GetSource() != nullptr;
+      const int voices = n->ActiveVoices();
+      const auto& filterNames = AnalogFilterTypeList();
+      const char* filterName = (n->filterType >= 0 && n->filterType < (int)filterNames.size())
+                                  ? filterNames[n->filterType].c_str() : "off";
+
+      char stat[96];
+      if (noteDriven)
+         snprintf(stat, sizeof(stat), "%s  -  %d voice%s", filterName, voices, voices == 1 ? "" : "s");
+      else
+         snprintf(stat, sizeof(stat), "%s  -  free run %.0f Hz", filterName, n->freq);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      const auto& waveList = AnalogWaveformList();
+
+      // Oscillator section
+      BeginAudioSection("oscillator");
+      // Tuning header per oscillator, laid out like the Oscillator/Wavetable
+      // header: wave dropdown, fine slider, octave and semitone dropdowns.
+      // oct/semi stay floats in the node (saved patches, modulation, DSP), so
+      // the dropdowns round on write; the semi list spans the full stored
+      // -24..+24 so no saved value falls off the end of it.
+      static const std::vector<std::string> semiNames24 = [] {
+         std::vector<std::string> v;
+         for (int i = -24; i <= 24; i++)
+         {
+            char b[16];
+            snprintf(b, sizeof(b), "semi %+d", i);
+            v.push_back(b);
+         }
+         return v;
+      }();
+      auto tuningHeader = [&](const char* idBase, int& wave, float& fine, float& semi, float& oct) {
+         // Discrete pins are keyed by these id strings, not the ImGui ID
+         // stack, so each oscillator needs its own.
+         const std::string waveId = std::string("wave") + idBase, octId = std::string("oct") + idBase,
+                           semiId = std::string("semi") + idBase;
+         const float w = gAudioContentW;
+         const float x0 = gAudioContentX;
+         const float y = ImGui::GetCursorScreenPos().y;
+         const float gap = 5.0f;
+         const float octW = 74.0f, semiW = 82.0f, fineW = 104.0f;
+         const float waveW = std::max(70.0f, w - octW - semiW - fineW - gap * 3.0f);
+         ImGui::PushID(idBase);
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         AudioBareDropdown(waveId.c_str(), waveList, wave, [&wave](int i) { PushUndoCheckpoint(); wave = i; }, waveW);
+         ImGui::SetCursorScreenPos(ImVec2(x0 + waveW + gap, y));
+         AudioSlider("fine", &fine, -50.0f, 50.0f, "%.1f c", fineW);
+         ImGui::SetCursorScreenPos(ImVec2(x0 + w - octW - semiW - gap, y));
+         AudioBareDropdown(octId.c_str(), OctaveNames(), std::clamp((int)std::lround(oct), -4, 4) + 4,
+                           [&oct](int i) { PushUndoCheckpoint(); oct = (float)(i - 4); }, octW);
+         ImGui::SetCursorScreenPos(ImVec2(x0 + w - semiW, y));
+         AudioBareDropdown(semiId.c_str(), semiNames24, std::clamp((int)std::lround(semi), -24, 24) + 24,
+                           [&semi](int i) { PushUndoCheckpoint(); semi = (float)(i - 24); }, semiW);
+         ImGui::PopID();
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         ImGui::Dummy(ImVec2(w, ImGui::GetFrameHeight()));
+         ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      };
+      tuningHeader("1", n->wave1, n->fine1, n->semi1, n->oct1);
+      tuningHeader("2", n->wave2, n->fine2, n->semi2, n->oct2);
+      {
+         // Row 3: Osc 1 Vol, Osc 2 Vol, Sync & Analog switches
+         AudioKnobRow row(4);
+         row.Knob("vol 1", &n->osc1Vol, 0.0f, 1.0f, "%.2f");
+         row.Knob("vol 2", &n->osc2Vol, 0.0f, 1.0f, "%.2f");
+         row.Checkbox("sync", &n->sync);
+         row.Checkbox("analog", &n->analog);
+         row.End();
+      }
+      {
+         // Row 4: pw, voices, spread, fm
+         AudioKnobRow row(4);
+         row.Knob("pw", &n->pw1, 0.01f, 0.99f, "%.2f");
+         row.Knob("voices", &n->voices, 1.0f, 7.0f, "%.0f");
+         row.Knob("spread", &n->spread, 0.0f, 1.0f, "%.2f");
+         row.Knob("fm", &n->fm, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+      {
+         // Row 5: detune, mix (default 50%), sub, noise
+         AudioKnobRow row(4);
+         row.Knob("detune", &n->detune, 0.0f, 100.0f, "%.1f c");
+         row.Knob("mix", &n->oscMix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("sub", &n->sub, 0.0f, 1.0f, "%.2f");
+         row.Knob("noise", &n->noise, 0.0f, 1.0f, "%.2f");
+         row.End();
+      }
+      EndAudioSection();
+
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+
+      // Filter section
+      BeginAudioSection("filter");
+      {
+         const bool filterOff = (n->filterType == kAFilterOff);
+         AudioKnobRow row(4, kKnobLarge, ImGui::GetFrameHeight() + 5.0f);
+         row.DropdownKnob("analogFlt", filterNames, n->filterType,
+                          [n](int i) { PushUndoCheckpoint(); n->filterType = i; },
+                          "filter", &n->cutoff, 20.0f, 18000.0f, "%.0f Hz", filterOff, kKnobLarge, true);
+         row.Knob("reso", &n->resonance, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("drive", &n->drive, 0.0f, 1.0f, "%.2f");
+         row.Knob("key track", &n->keyTrack, 0.0f, 1.0f, "%.2f");
+         row.End();
+      }
+      EndAudioSection();
+
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+
+      // Envelope section (interactive ADSR curve panel with parameter sliders)
+      ImGui::PushID("amp");
+      DrawEnvelopePanel("amp envelope  -  drag the handles", "##analogAmpEnv", &n->attack,
+                        &n->decay, &n->sustain, &n->release, nullptr, 0.0f, 0.0f, nullptr,
+                        IM_COL32(150, 214, 255, 245));
+      ImGui::PopID();
+
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+
+      // Output section
+      BeginAudioSection("output");
+      {
+         AudioKnobRow row(4);
+         if (noteDriven)
+            ImGui::BeginDisabled();
+         row.Knob("freq", &n->freq, 20.0f, 8000.0f, "%.0f Hz", kKnobLarge);
+         if (noteDriven)
+            ImGui::EndDisabled();
+         row.Knob("volume", &n->volume, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("glide", &n->glide, 0.0f, 2.0f, "%.2f s");
+         row.Knob("bend", &n->pitchBend, -2.0f, 2.0f, "%+.2f st");
+         row.End();
+      }
+      EndAudioSection();
+
+      EndAudioBody();
+   }
+
+   // Waveform + slice markers for the Slicer. Clicking inside a slice's band
+   // auditions that slice; in onsets mode each marker (except the pinned one
+   // at 0) can be dragged. Grid boundaries are derived from the transport, so
+   // dragging them is disabled rather than silently undone on the next
+   // recompute.
+   void DrawSlicerWaveform(SlicerNode* n, float h, float width)
+   {
+      static const char* kPitchClass[12] = { "C", "C#", "D", "D#", "E", "F",
+                                             "F#", "G", "G#", "A", "A#", "B" };
+
+      const float w = width > 0.0f ? width : gAudioContentW;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      const bool hasSample = n->waveformCacheCount > 0;
+      const std::vector<float>& slices = n->Slices();
+      const int sliceCount = (int)slices.size();
+
+      // Body click-catcher first, so it owns hover/active by default; the
+      // marker grab-zones are added afterwards at the same screen position.
+      // ImGui overlap resolution is NOT "last submitted wins" - a later item
+      // is blocked while an earlier one already holds g.HoveredId unless that
+      // earlier item opted in via SetNextItemAllowOverlap() *before* it.
+      ImGui::SetNextItemAllowOverlap();
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::InvisibleButton("##slicerwavebody", ImVec2(w, h));
+      if (hasSample && sliceCount > 0 && ImGui::IsItemActivated())
+      {
+         const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
+         int hit = 0;
+         for (int i = 0; i < sliceCount; i++)
+         {
+            if (slices[i] <= frac)
+               hit = i;
+         }
+         n->TriggerSlicePreview(hit);
+      }
+      if (hasSample && sliceCount > 0 && ImGui::IsItemHovered())
+      {
+         const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
+         int hit = 0;
+         for (int i = 0; i < sliceCount; i++)
+         {
+            if (slices[i] <= frac)
+               hit = i;
+         }
+         const int note = SlicerNode::kBaseNote + hit;
+         char val[48];
+         snprintf(val, sizeof(val), "slice %d - %s%d - click to audition", hit + 1,
+                  kPitchClass[note % 12], note / 12 - 1);
+         SetAudioReadout("#", val);
+      }
+
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+
+      if (hasSample)
+      {
+         // Alternating band shading behind the waveform, so "where does one
+         // slice end" reads without counting marker lines.
+         for (int i = 0; i < sliceCount; i += 2)
+         {
+            const float x0 = origin.x + w * std::clamp(slices[i], 0.0f, 1.0f);
+            const float x1 = origin.x + w * ((i + 1 < sliceCount) ? std::clamp(slices[i + 1], 0.0f, 1.0f) : 1.0f);
+            dl->AddRectFilled(ImVec2(x0, origin.y), ImVec2(x1, br.y),
+                              isLight ? IM_COL32(0, 0, 0, 14) : IM_COL32(255, 255, 255, 12));
+         }
+
+         const int count = n->waveformCacheCount;
+         for (int i = 0; i < count; i++)
+         {
+            const float x = origin.x + w * (float)i / (float)count;
+            const float barW = std::max(1.0f, w / (float)count);
+            const float top = midY - n->waveformMax[i] * h * 0.45f;
+            const float bottom = midY - n->waveformMin[i] * h * 0.45f;
+            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
+                              isLight ? IM_COL32(30, 110, 230, 210) : IM_COL32(150, 214, 255, 200));
+         }
+
+         // Voices in flight, faded by their own amplitude.
+         const SlicerVoiceSnapshot& snap = n->VisualSnapshot();
+         for (int v = 0; v < snap.count; v++)
+         {
+            if (snap.voices[v].amp < 0.002f)
+               continue;
+            const float px = origin.x + w * std::clamp(snap.voices[v].position, 0.0f, 1.0f);
+            const int alpha = (int)(std::clamp(snap.voices[v].amp, 0.0f, 1.0f) * 235.0f) + 20;
+            dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
+                        isLight ? IM_COL32(230, 140, 20, alpha) : IM_COL32(255, 200, 90, alpha), 2.0f);
+         }
+
+         // Slice markers, plus the note each slice answers to when it fits.
+         const ImU32 markerCol = isLight ? IM_COL32(20, 140, 90, 230) : IM_COL32(120, 230, 175, 220);
+         for (int i = 0; i < sliceCount; i++)
+         {
+            const float x = origin.x + w * std::clamp(slices[i], 0.0f, 1.0f);
+            dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), markerCol, i == 0 ? 1.0f : 1.5f);
+
+            const float nextX = origin.x + w * ((i + 1 < sliceCount) ? std::clamp(slices[i + 1], 0.0f, 1.0f) : 1.0f);
+            const int note = SlicerNode::kBaseNote + i;
+            char label[8];
+            snprintf(label, sizeof(label), "%s%d", kPitchClass[note % 12], note / 12 - 1);
+            const ImVec2 ts = ImGui::CalcTextSize(label);
+            if (nextX - x > ts.x + 6.0f)
+               dl->AddText(ImVec2(x + 3.0f, origin.y + 2.0f), ScopeTextCol(), label);
+         }
+      }
+      else
+      {
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "no sample loaded");
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+
+      if (hasSample && n->MarkersAreEditable())
+      {
+         // Narrow grab-zones centred on each marker, submitted after the body
+         // button above. Marker 0 is pinned at the sample's start.
+         const float handleW = 9.0f;
+         for (int i = 1; i < sliceCount; i++)
+         {
+            const float x = origin.x + w * std::clamp(slices[i], 0.0f, 1.0f);
+            const float btnX = std::clamp(x - handleW * 0.5f, origin.x, br.x - handleW);
+            char id[32];
+            snprintf(id, sizeof(id), "##slicermk%d", i);
+            ImGui::SetCursorScreenPos(ImVec2(btnX, origin.y));
+            ImGui::InvisibleButton(id, ImVec2(handleW, h));
+            if (ImGui::IsItemActivated())
+               PushUndoCheckpoint();
+            if (ImGui::IsItemActive())
+               n->MoveSliceMarker(i, (ImGui::GetIO().MousePos.x - origin.x) / w);
+            if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+               ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+         }
+      }
+
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   // Custom node body for the Slicer.
+   //
+   // Draw order below IS the modulation-pin numbering (ModSlider and
+   // RegisterDiscreteParam both take paramIndex = gParamCounter++), so new
+   // params are appended at the end forever - reordering silently rewires
+   // every saved patch's modulation cables.
+   //
+   // Row order (all two-column, each cell exactly AudioHalfWidth()):
+   //    1: slice by (dropdown) | onsets
+   //    2: division (dropdown) | sensitivity
+   //    3: pitch               | finetune
+   //    4: attack              | decay        <- the envelope pair, adjacent
+   //    5: speed               | volume
+   //    6: crossthrough (cbox) | (deliberately empty)
+   //
+   // Pillars: P1 every control sits on the two-column grid (the button strip
+   // is the one deliberate full-width row); P2 the crossthrough checkbox uses
+   // ModCheckbox, which passes ImGui::GetFrameHeight() to
+   // DrawDiscreteParamPin and so centres its modulation dot with no per-node
+   // offset code (same idiom as DrawWavetableBody's engine on/off); P3 both
+   // selectors and the checkbox occupy the left column of their rows, so the
+   // left edge reads as one non-slider column; P5 the mode swap greys the
+   // inactive control instead of removing its cell, so no cell ever moves;
+   // P6 eleven controls is odd, so exactly one cell must be spare - it is the
+   // far-right of the last row, P6's sanctioned position, rather than the
+   // ragged full-width `volume` row this used to end on; P10 the dropdowns
+   // and the checkbox go through the shared AudioBareDropdown /
+   // PushCheckboxStyle theming, never a hand-rolled colour; P11 everything
+   // numeric goes to the readout strip. P4 does not apply - a Synths node
+   // has no `mix`.
+   //
+   // Discrete params (the two dropdowns and the checkbox) are allocated from
+   // kDiscreteParamBase and keyed by label hash, NOT from gParamCounter, so
+   // adding the checkbox shifts no float pin ordinal.
+   void DrawSlicerBody(GraphNode& gn, SlicerNode* n)
+   {
+      static const std::vector<std::string> kSliceByNames = { "onsets", "grid" };
+      static const std::vector<std::string> kDivisionNames = [] {
+         std::vector<std::string> v;
+         for (int i = 0; i < kSlicerNumDivisions; i++)
+            v.push_back(kSlicerDivisionNames[i]);
+         return v;
+      }();
+
+      const int sliceCount = n->SliceCount();
+      char stat[192];
+      if (!n->FileName().empty())
+         snprintf(stat, sizeof(stat), "%s  -  %d slice%s  -  %s", n->FileName().c_str(), sliceCount,
+                  sliceCount == 1 ? "" : "s", n->sliceBy == 0 ? "onsets" : "grid");
+      else
+         snprintf(stat, sizeof(stat), "%s  -  %s", n->Status().c_str(),
+                  n->sliceBy == 0 ? "onsets" : "grid");
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      // Button strip - the one deliberate full-width row (P1's exception).
+      if (ImGui::Button("Load...", ImVec2(90, 0)))
+      {
+         const std::string path = Platform::OpenAudioDialog();
+         if (!path.empty())
+         {
+            PushUndoCheckpoint();
+            n->LoadFile(path);
+         }
+      }
+      ImGui::SameLine();
+      const bool recording = n->IsRecording();
+      if (recording)
+         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+      if (ImGui::Button(recording ? "Stop" : "Record", ImVec2(70, 0)))
+      {
+         PushUndoCheckpoint();
+         if (recording)
+            n->StopRecording();
+         else
+            n->StartRecording();
+      }
+      if (recording)
+         ImGui::PopStyleColor();
+
+      ImGui::SameLine();
+      const bool playing = n->IsPlaying();
+      if (playing)
+         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+      if (ImGui::Button(playing ? "Stop" : "Audition", ImVec2(90, 0)))
+      {
+         if (playing)
+            n->StopPreview();
+         else
+            n->TriggerSlicePreview(-1);
+      }
+      if (playing)
+         ImGui::PopStyleColor();
+      if (ImGui::IsItemHovered())
+         SetAudioReadout("#", "plays the whole sample on this node's own voice");
+
+      ImGui::SameLine();
+      ImGui::BeginDisabled(n->FileName().empty() || n->sliceBy != 0);
+      if (ImGui::Button("re-slice", ImVec2(90, 0)))
+      {
+         PushUndoCheckpoint();
+         n->ReSlice();
+      }
+      ImGui::EndDisabled();
+      if (ImGui::IsItemHovered())
+         SetAudioReadout("#", "re-runs transient detection at the current sensitivity");
+
+      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      DrawSlicerWaveform(n, 140.0f, AudioFullWidth());
+      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+
+      const bool onsetMode = (n->sliceBy == 0);
+      const float halfW = AudioHalfWidth();
+      const float gap = ImGui::GetStyle().ItemSpacing.x;
+
+      // Row 1: slice by | onsets. Row 2: division | sensitivity.
+      // Both selectors sit in the left column of consecutive rows (P3), and
+      // the two mode-specific controls keep their own permanent cells so
+      // switching modes never moves the grid (P5).
+      {
+         const float x0 = gAudioContentX;
+         const float y = ImGui::GetCursorScreenPos().y;
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         AudioBareDropdown("slice by##slicerSliceBy", kSliceByNames, n->sliceBy,
+                           [n](int i) { PushUndoCheckpoint(); n->sliceBy = i; }, halfW);
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         ImGui::Dummy(ImVec2(halfW, ImGui::GetFrameHeight()));
+      }
+      ImGui::SameLine();
+      ImGui::BeginDisabled(!onsetMode);
+      if (AudioSliderInt("onsets", &n->onsets, 1, SlicerNode::kMaxSlices, halfW))
+         n->onsets = std::clamp(n->onsets, 1, SlicerNode::kMaxSlices);
+      ImGui::EndDisabled();
+
+      {
+         const float x0 = gAudioContentX;
+         const float y = ImGui::GetCursorScreenPos().y;
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         ImGui::BeginDisabled(onsetMode);
+         AudioBareDropdown("division##slicerDivision", kDivisionNames, n->division,
+                           [n](int i) { PushUndoCheckpoint(); n->division = i; }, halfW);
+         ImGui::EndDisabled();
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         ImGui::Dummy(ImVec2(halfW, ImGui::GetFrameHeight()));
+      }
+      ImGui::SameLine();
+      ImGui::BeginDisabled(!onsetMode);
+      AudioSlider("sensitivity", &n->sensitivity, 0.0f, 100.0f, "%.0f %%", halfW);
+      ImGui::EndDisabled();
+
+      AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", halfW);
+      ImGui::SameLine();
+      AudioSlider("finetune", &n->finetune, -100.0f, 100.0f, "%.0f c", halfW);
+
+      // attack extends the hidden 2 ms de-click ramp rather than adding a
+      // second envelope, so 0 is exactly the old (instant) behaviour. The
+      // skew puts 100 ms at 12 o'clock over the 0..500 throw.
+      AudioSlider("attack", &n->attack, 0.0f, 500.0f, "%.1f ms", halfW);
+      ImGui::SameLine();
+      // decay owns the ENVELOPE only. The top of its throw is a no-decay
+      // detent - the slice holds at full level after its attack. Where it
+      // stops is `crossthrough`'s business, not decay's.
+      const char* decayFmt = (n->decay >= SlicerNode::kDecayInfinite) ? "hold" : "%.0f ms";
+      AudioSlider("decay", &n->decay, 5.0f, 5000.0f, decayFmt, halfW);
+
+      // speed is exponential (linear in log2) so 1.0x sits at the middle of
+      // the 0.25..4 throw instead of a quarter of the way along it.
+      AudioSlider("speed", &n->speed, 0.25f, 4.0f, "%.2fx", halfW);
+      ImGui::SameLine();
+      AudioSlider("volume", &n->volume, 0.0f, 1.0f, "%.2f", halfW);
+
+      // Row 6, left cell only: the right cell is the one deliberate spare
+      // (P6). The `bool tmp` dance is required - ModCheckbox reports a
+      // modulator-driven flip only through its return value.
+      {
+         const float y = ImGui::GetCursorScreenPos().y;
+         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, y));
+         bool cross = n->crossthrough;
+         bool crossUserChanged = false;
+         if (ModCheckbox("crossthrough##slicerCrossthrough", &cross, &crossUserChanged))
+         {
+            if (crossUserChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
+            n->crossthrough = cross;
+         }
+         if (ImGui::IsItemHovered())
+            SetAudioReadout("crossthrough",
+                            n->crossthrough ? "slices run past their own boundary"
+                                            : "each slice stops at the next onset");
+      }
+      (void)gap;
+
+      EndAudioBody();
+   }
+
+   // Decimated waveform + partial-spectrum strip for Molder, cached on the
+   // node (rebuilt only when a new render/analysis lands - see
+   // MolderNode::RebuildWaveformCache/RebuildPartialCache), never
+   // recomputed per frame.
+   void DrawMolderWaveform(MolderNode* n, float h, float width)
+   {
+      const float w = width > 0.0f ? width : gAudioContentW;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      const bool hasSample = n->waveformCacheCount > 0;
+
+      // Body click-catcher first (see DrawSamplerWaveform's comment on
+      // overlap ordering) - the two range-handle grab-zones are added after,
+      // at the same screen position, and only receive input because this
+      // opts in via SetNextItemAllowOverlap() before being submitted.
+      ImGui::SetNextItemAllowOverlap();
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::InvisibleButton("##molderwavebody", ImVec2(w, h));
+      if (hasSample && ImGui::IsItemActivated())
+      {
+         const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
+         const float target = (frac < n->start || frac > n->end) ? n->start : frac;
+         n->TriggerPreview(target);
+      }
+
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+
+      if (hasSample)
+      {
+         const int count = n->waveformCacheCount;
+         for (int i = 0; i < count; i++)
+         {
+            const float x = origin.x + w * (float)i / (float)count;
+            const float barW = std::max(1.0f, w / (float)count);
+            const float top = midY - n->waveformMax[i] * h * 0.45f;
+            const float bottom = midY - n->waveformMin[i] * h * 0.45f;
+            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
+                              isLight ? IM_COL32(40, 100, 230, 210) : IM_COL32(165, 180, 255, 210));
+         }
+
+         // Dim whatever the start/end range excludes.
+         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
+         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
+         const ImU32 dimCol = isLight ? IM_COL32(255, 255, 255, 140) : IM_COL32(0, 0, 0, 130);
+         if (startX > origin.x)
+            dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
+         if (endX < br.x)
+            dl->AddRectFilled(ImVec2(endX, origin.y), br, dimCol);
+
+         const float px = origin.x + w * std::clamp(n->Playhead(), 0.0f, 1.0f);
+         dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
+                     isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 200, 90, 230), 2.0f);
+
+         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
+                     isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 235), 2.0f);
+         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
+                     isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 235), 2.0f);
+      }
+      else
+      {
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(),
+                     n->IsAnalyzing() ? "analyzing..." : "no sample loaded");
+      }
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+
+      if (hasSample)
+      {
+         const float handleW = 10.0f;
+         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
+         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
+
+         const float grip = 8.0f;
+         const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
+         const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
+         const ImU32 startCol = isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 255);
+         const ImU32 endCol = isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 255);
+         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y), ImVec2(startGripX, origin.y + grip), startCol);
+         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y), ImVec2(startGripX, br.y - grip), startCol);
+         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
+         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, br.y), ImVec2(endGripX + grip * 0.5f, br.y), ImVec2(endGripX, br.y - grip), endCol);
+
+         const float startBtnX = std::clamp(startX - handleW * 0.5f, origin.x, br.x - handleW);
+         const float endBtnX = std::clamp(endX - handleW * 0.5f, origin.x, br.x - handleW);
+
+         ImGui::SetCursorScreenPos(ImVec2(startBtnX, origin.y));
+         ImGui::InvisibleButton("##molderstarthandle", ImVec2(handleW, h));
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint();
+         if (ImGui::IsItemActive())
+            n->start = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, n->end - 0.01f);
+         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+
+         ImGui::SetCursorScreenPos(ImVec2(endBtnX, origin.y));
+         ImGui::InvisibleButton("##molderendhandle", ImVec2(handleW, h));
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint();
+         if (ImGui::IsItemActive())
+            n->end = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, n->start + 0.01f, 1.0f);
+         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+      }
+
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawMolderPartialBars(MolderNode* n, float h, float width)
+   {
+      const float w = width > 0.0f ? width : gAudioContentW;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      const bool isLight = IsThemeLight();
+
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 3.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const int count = n->partialBarCount;
+      if (count > 0)
+      {
+         float maxAmp = 1e-6f;
+         for (int i = 0; i < count; i++)
+            maxAmp = std::max(maxAmp, n->partialBars[i]);
+         for (int i = 0; i < count; i++)
+         {
+            const float x = origin.x + w * (float)i / (float)count;
+            const float barW = std::max(1.0f, w / (float)count - 1.0f);
+            const float frac = std::clamp(n->partialBars[i] / maxAmp, 0.0f, 1.0f);
+            const float top = br.y - frac * h;
+            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, br.y),
+                              isLight ? IM_COL32(90, 70, 200, 200) : IM_COL32(180, 160, 255, 200));
+         }
+      }
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+
+      // Draws into the draw list only, above - without this the cursor never
+      // advances past `origin`, so everything drawn after this call (the
+      // Dummy spacer and the seed/gen/f0/harm readout) renders on top of it
+      // instead of below it.
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawMolderBody(GraphNode& gn, MolderNode* n)
+   {
+      char stat[192];
+      if (!n->FileName().empty())
+         snprintf(stat, sizeof(stat), "%s  -  %s", n->FileName().c_str(), n->Status().c_str());
+      else
+         snprintf(stat, sizeof(stat), "%s", n->Status().c_str());
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      if (ImGui::Button("Load...", ImVec2(80, 0)))
+      {
+         const std::string path = Platform::OpenAudioDialog();
+         if (!path.empty())
+         {
+            PushUndoCheckpoint();
+            n->LoadFile(path);
+         }
+      }
+      ImGui::SameLine();
+      const bool recording = n->IsRecording();
+      if (recording)
+         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+      if (ImGui::Button(recording ? "Stop##molderRec" : "Record##molderRec", ImVec2(70, 0)))
+      {
+         PushUndoCheckpoint();
+         if (recording)
+            n->StopRecording();
+         else
+            n->StartRecording();
+      }
+      if (recording)
+         ImGui::PopStyleColor();
+
+      ImGui::SameLine();
+      if (ImGui::Button("Roll", ImVec2(60, 0)))
+      {
+         PushUndoCheckpoint();
+         n->Roll();
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Iterate", ImVec2(70, 0)))
+      {
+         PushUndoCheckpoint();
+         n->Iterate();
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Reset##molder", ImVec2(60, 0)))
+      {
+         PushUndoCheckpoint();
+         n->Reset();
+      }
+
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+      DrawMolderWaveform(n, 90.0f, AudioFullWidth());
+      ImGui::Dummy(ImVec2(0.0f, 3.0f));
+      DrawMolderPartialBars(n, 36.0f, AudioFullWidth());
+      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+
+      // loop/reverse/ping-pong right-aligned on their own row, anchored off
+      // the fixed declared content width rather than GetContentRegionAvail()
+      // - see DrawSamplerBody's comment on why (it overlaps the node-editor
+      // resize hit-zone otherwise).
+      {
+         const float toggleW = 44.0f;
+         const float modsW = toggleW * 3.0f + ImGui::GetStyle().ItemSpacing.x * 2.0f;
+         const ImVec2 rowScreenPos = ImGui::GetCursorScreenPos();
+         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - modsW, rowScreenPos.y));
+         bool loopBool = n->loop;
+         if (AudioToggleButton("loop##molderLoop", &loopBool))
+         {
+            PushUndoCheckpoint();
+            n->loop = loopBool;
+         }
+         ImGui::SameLine();
+         bool reverseBool = n->reverse;
+         if (AudioToggleButton("rev##molderReverse", &reverseBool))
+         {
+            PushUndoCheckpoint();
+            n->reverse = reverseBool;
+         }
+         ImGui::SameLine();
+         bool pingpongBool = n->pingpong;
+         if (AudioToggleButton("p-p##molderPingpong", &pingpongBool))
+         {
+            PushUndoCheckpoint();
+            n->pingpong = pingpongBool;
+         }
+      }
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      AudioSlider("chaos", &n->chaos, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
+
+      AudioSlider("tone", &n->tone, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("stretch", &n->stretch, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+
+      AudioSlider("air", &n->air, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("snap", &n->snap, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+
+      AudioSlider("time", &n->time, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("level", &n->level, 0.0f, 2.0f, "%.2f", AudioHalfWidth());
+
+      if (AudioSlider("start", &n->start, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+         n->start = std::min(n->start, n->end - 0.01f);
+      ImGui::SameLine();
+      if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+         n->end = std::max(n->end, n->start + 0.01f);
+
+      EndAudioBody();
+   }
+
+   // ----------------------------------------------------------- Grain Molder
+   void DrawGrainMolderWaveform(GrainMolderNode* n, float h, float width)
+   {
+      const float w = width > 0.0f ? width : gAudioContentW;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      const bool hasSample = n->waveformCacheCount > 0;
+
+      ImGui::SetNextItemAllowOverlap();
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::InvisibleButton("##grainmolderwavebody", ImVec2(w, h));
+      if (hasSample && (ImGui::IsItemActivated() || ImGui::IsItemActive()))
+      {
+         const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
+         const float target = std::clamp(frac, n->start, n->end);
+         n->position = target;
+         if (ImGui::IsItemActivated())
+            n->TriggerPreview(target);
+      }
+
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float midY = origin.y + h * 0.5f;
+      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+
+      if (hasSample)
+      {
+         const int count = n->waveformCacheCount;
+         for (int i = 0; i < count; i++)
+         {
+            const float x = origin.x + w * (float)i / (float)count;
+            const float barW = std::max(1.0f, w / (float)count);
+            const float top = midY - n->waveformMax[i] * h * 0.45f;
+            const float bottom = midY - n->waveformMin[i] * h * 0.45f;
+            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
+                              isLight ? IM_COL32(50, 160, 190, 210) : IM_COL32(110, 210, 240, 210));
+         }
+
+         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
+         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
+         const ImU32 dimCol = isLight ? IM_COL32(255, 255, 255, 140) : IM_COL32(0, 0, 0, 130);
+         if (startX > origin.x)
+            dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
+         if (endX < br.x)
+            dl->AddRectFilled(ImVec2(endX, origin.y), br, dimCol);
+
+         // Primary yellow playhead: stays between start and end musically and UI-wise
+         const auto& snap = n->VisualSnapshot();
+         const float posClamped = std::clamp(n->position, n->start, n->end);
+         const float activeFrac = (snap.selfActive && snap.selfPos >= 0.0f) ? snap.selfPos : posClamped;
+         const float posX = origin.x + w * std::clamp(activeFrac, 0.0f, 1.0f);
+         const ImU32 yellowCol = isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 200, 90, 240);
+         dl->AddLine(ImVec2(posX, origin.y), ImVec2(posX, br.y), yellowCol, 2.0f);
+
+         // Polyphonic white playheads moving at different speeds according to incoming pitch
+         for (int v = 0; v < snap.count; v++)
+         {
+            const auto& voice = snap.voices[v];
+            if (voice.amp < 0.002f)
+               continue;
+            const float px = origin.x + w * std::clamp(voice.position, 0.0f, 1.0f);
+            const int alpha = (int)(voice.amp * 255.0f);
+            const ImU32 whiteCol = isLight ? IM_COL32(40, 45, 55, alpha) : IM_COL32(255, 255, 255, alpha);
+            dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), whiteCol, 1.5f);
+         }
+
+         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
+                     isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 235), 2.0f);
+         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
+                     isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 235), 2.0f);
+      }
+      else
+      {
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(),
+                     n->IsRendering() ? "molding..." : "no sample loaded");
+      }
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
+
+      if (hasSample)
+      {
+         const float handleW = 10.0f;
+         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
+         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
+
+         const float grip = 8.0f;
+         const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
+         const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
+         const ImU32 startCol = isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 255);
+         const ImU32 endCol = isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 255);
+         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y), ImVec2(startGripX, origin.y + grip), startCol);
+         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y), ImVec2(startGripX, br.y - grip), startCol);
+         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
+         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, br.y), ImVec2(endGripX + grip * 0.5f, br.y), ImVec2(endGripX, br.y - grip), endCol);
+
+         const float startBtnX = std::clamp(startX - handleW * 0.5f, origin.x, br.x - handleW);
+         const float endBtnX = std::clamp(endX - handleW * 0.5f, origin.x, br.x - handleW);
+
+         ImGui::SetCursorScreenPos(ImVec2(startBtnX, origin.y));
+         ImGui::InvisibleButton("##gmstarthandle", ImVec2(handleW, h));
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint();
+         if (ImGui::IsItemActive())
+            n->start = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, n->end - 0.01f);
+         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+
+         ImGui::SetCursorScreenPos(ImVec2(endBtnX, origin.y));
+         ImGui::InvisibleButton("##gmendhandle", ImVec2(handleW, h));
+         if (ImGui::IsItemActivated())
+            PushUndoCheckpoint();
+         if (ImGui::IsItemActive())
+            n->end = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, n->start + 0.01f, 1.0f);
+         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+      }
+
+      ImGui::SetCursorScreenPos(origin);
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawGrainMolderBody(GraphNode& gn, GrainMolderNode* n)
+   {
+      char stat[192];
+      if (!n->FileName().empty())
+         snprintf(stat, sizeof(stat), "%s  -  %s", n->FileName().c_str(), n->Status().c_str());
+      else
+         snprintf(stat, sizeof(stat), "%s", n->Status().c_str());
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      if (ImGui::Button("Load...##grainMolder", ImVec2(80, 0)))
+      {
+         const std::string path = Platform::OpenAudioDialog();
+         if (!path.empty())
+         {
+            PushUndoCheckpoint();
+            n->LoadFile(path);
+         }
+      }
+      ImGui::SameLine();
+      const bool recording = n->IsRecording();
+      if (recording)
+         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+      if (ImGui::Button(recording ? "Stop##gmRec" : "Record##gmRec", ImVec2(70, 0)))
+      {
+         PushUndoCheckpoint();
+         if (recording)
+            n->StopRecording();
+         else
+            n->StartRecording();
+      }
+      if (recording)
+         ImGui::PopStyleColor();
+
+      ImGui::SameLine();
+      const bool playing = n->IsPlaying();
+      if (playing)
+         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
+      if (ImGui::Button(playing ? "Stop##gmAud" : "Audition##gmAud", ImVec2(80, 0)))
+      {
+         if (playing)
+            n->StopPreview();
+         else
+            n->TriggerPreview(n->start);
+      }
+      if (playing)
+         ImGui::PopStyleColor();
+
+      // loop/rev/p-p toggles right-aligned on header row
+      ImGui::SameLine();
+      const float toggleW = 44.0f;
+      const float modsW = toggleW * 3.0f + ImGui::GetStyle().ItemSpacing.x * 2.0f;
+      const ImVec2 rowScreenPos = ImGui::GetCursorScreenPos();
+      ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - modsW, rowScreenPos.y));
+      bool loopBool = n->loop;
+      if (AudioToggleButton("loop##gmLoop", &loopBool))
+      {
+         PushUndoCheckpoint();
+         n->loop = loopBool;
+      }
+      ImGui::SameLine();
+      bool reverseBool = n->reverse;
+      if (AudioToggleButton("rev##gmReverse", &reverseBool))
+      {
+         PushUndoCheckpoint();
+         n->reverse = reverseBool;
+      }
+      ImGui::SameLine();
+      bool pingpongBool = n->pingpong;
+      if (AudioToggleButton("p-p##gmPingpong", &pingpongBool))
+      {
+         PushUndoCheckpoint();
+         n->pingpong = pingpongBool;
+      }
+
+      // Read-only status word right-aligned
+      {
+         const bool noteConnected = n->noteInput.IsConnected();
+         char status[32];
+         if (noteConnected)
+            snprintf(status, sizeof(status), "notes \xc2\xb7 %d", n->ActiveNoteCount());
+         else if (n->IsAuditioning())
+            snprintf(status, sizeof(status), "auditioning");
+         else
+            snprintf(status, sizeof(status), "%s",
+                     Transport::Instance().IsPlaying() ? "auto \xc2\xb7 running" : "auto \xc2\xb7 press space");
+
+         const ImVec2 textSize = ImGui::CalcTextSize(status);
+         const ImVec2 rowPos = ImGui::GetCursorScreenPos();
+         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + gAudioContentW - textSize.x, rowPos.y));
+         ImGui::TextColored(ImVec4(0.6f, 0.63f, 0.72f, 1.0f), "%s", status);
+      }
+
+      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+      DrawGrainMolderWaveform(n, 130.0f, AudioFullWidth());
+      ImGui::Dummy(ImVec2(0.0f, 6.0f));
+
+      // Row 1: grain | amount
+      AudioSlider("grain", &n->grain, 10.0f, 500.0f, "%.0f ms", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("amount", &n->amount, 0.0f, 1.0f, "%.2f", AudioHalfWidth());
+
+      // Row 2: key | order (or seed if random)
+      {
+         const float pinIndent = 18.0f; // 14px pin + 4px spacing matching ModSlider
+         const float halfTrackW = AudioHalfWidth() - pinIndent;
+
+         ImGui::Dummy(ImVec2(14.0f, 14.0f));
+         ImGui::SameLine(0.0f, 4.0f);
+         static const std::vector<std::string> kKeyNames = { "Level", "Bright", "Random" };
+         AudioBareDropdown("gmKey", kKeyNames, n->key, [n](int i) {
+            PushUndoCheckpoint();
+            n->key = i;
+         }, halfTrackW);
+         ImGui::SameLine();
+
+         if (n->key == 2)
+         {
+            float seedFloat = (float)n->seed;
+            if (AudioSlider("seed", &seedFloat, 1.0f, 9999.0f, "%.0f", AudioHalfWidth()))
+            {
+               PushUndoCheckpoint();
+               n->seed = std::max(1, (int)seedFloat);
+            }
+         }
+         else
+         {
+            ImGui::Dummy(ImVec2(14.0f, 14.0f));
+            ImGui::SameLine(0.0f, 4.0f);
+            static const std::vector<std::string> kOrderNames = { "Ascending", "Descending" };
+            AudioBareDropdown("gmOrder", kOrderNames, n->descending ? 1 : 0, [n](int i) {
+               PushUndoCheckpoint();
+               n->descending = (i == 1);
+            }, halfTrackW);
+         }
+      }
+
+      // Row 3: start | end
+      if (AudioSlider("start", &n->start, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+      {
+         n->start = std::min(n->start, n->end - 0.01f);
+         n->position = std::clamp(n->position, n->start, n->end);
+      }
+      ImGui::SameLine();
+      if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+      {
+         n->end = std::max(n->end, n->start + 0.01f);
+         n->position = std::clamp(n->position, n->start, n->end);
+      }
+
+      // Row 4: position | level
+      if (AudioSlider("position", &n->position, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+         n->position = std::clamp(n->position, n->start, n->end);
+      ImGui::SameLine();
+      AudioSlider("level", &n->level, 0.0f, 2.0f, "%.2f", AudioHalfWidth());
+
+      // Row 5: pitch | decay
+      AudioSlider("pitch", &n->pitch, -24.0f, 24.0f, "%.1f st", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("decay", &n->decay, 0.05f, 10.0f, "%.2f s", AudioHalfWidth());
+
+      EndAudioBody();
+   }
+
    void DrawAudioNodeBody(GraphNode& gn)
    {
       if (auto* n = dynamic_cast<LooperNode*>(gn.node.get()))
          DrawLooperBody(gn, n);
+      else if (auto* n = dynamic_cast<ChordProgressionNode*>(gn.node.get()))
+         DrawChordProgressionBody(gn, n);
+      else if (auto* n = dynamic_cast<GrainMolderNode*>(gn.node.get()))
+         DrawGrainMolderBody(gn, n);
+      else if (auto* n = dynamic_cast<MolderNode*>(gn.node.get()))
+         DrawMolderBody(gn, n);
+      else if (auto* n = dynamic_cast<SlicerNode*>(gn.node.get()))
+         DrawSlicerBody(gn, n);
+      else if (auto* n = dynamic_cast<AnalogNode*>(gn.node.get()))
+         DrawAnalogBody(gn, n);
       else if (auto* n = dynamic_cast<MpcNode*>(gn.node.get()))
          DrawMpcBody(gn, n);
       else if (auto* n = dynamic_cast<MpcOutNode*>(gn.node.get()))
@@ -18244,6 +19644,181 @@ namespace
       NodeSeparator("operators");
       for (int i = 0; i < MeshResynthNode::kOpCount; i++)
          ModSlider(MeshResynthNode::OpNames()[i].c_str(), &n->weight[i], 0.0f, 1.0f);
+   }
+
+   // The row bank as an actual matrix rather than a column of "x1 .xx y1 .xx
+   // z1 .xx" text lines: one bordered cell per (row, axis), value centred, a
+   // draggable output pin sitting in the cell's bottom-right corner. Pin ids
+   // are computed the same way ModSlider computes param pin ids (nodeIndex is
+   // gCurrentNodeIndex, already set by the surrounding BeginNodeParams call),
+   // rather than going through GraphNode::OutputPinId() - this function only
+   // sees the node, not its GraphNode wrapper.
+   void DrawGeometryTableGrid(GeometryTableNode* n, int nodeIndex)
+   {
+      const int rowCount = n->RowCount();
+      const float cellW = kPreviewSize / 3.0f;
+      const float cellH = 34.0f;
+      const float gridW = cellW * 3.0f;
+      const float gridH = cellH * (float)rowCount;
+
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const bool isLight = IsThemeLight();
+      const ImU32 borderCol = isLight ? IM_COL32(60, 68, 85, 140) : IM_COL32(210, 218, 235, 70);
+      const ImU32 textCol = isLight ? IM_COL32(35, 40, 52, 255) : IM_COL32(222, 228, 240, 255);
+      const ImU32 pinFill = isLight ? IM_COL32(50, 120, 240, 255) : IM_COL32(150, 190, 255, 255);
+      const ImU32 pinRing = isLight ? IM_COL32(40, 48, 65, 255) : IM_COL32(20, 22, 30, 255);
+
+      dl->AddRect(origin, ImVec2(origin.x + gridW, origin.y + gridH), borderCol, 8.0f, 0, 1.5f);
+      for (int r = 1; r < rowCount; r++)
+      {
+         const float y = origin.y + cellH * (float)r;
+         dl->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + gridW, y), borderCol, 1.0f);
+      }
+      for (int c = 1; c < 3; c++)
+      {
+         const float x = origin.x + cellW * (float)c;
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, origin.y + gridH), borderCol, 1.0f);
+      }
+
+      for (int r = 0; r < rowCount; r++)
+      {
+         for (int a = 0; a < 3; a++)
+         {
+            const ImVec2 cellMin(origin.x + cellW * (float)a, origin.y + cellH * (float)r);
+            const ImVec2 cellMax(cellMin.x + cellW, cellMin.y + cellH);
+            const int outputIndex = 4 + r * 3 + a;
+
+            char buf[16];
+            snprintf(buf, sizeof(buf), "%.2f", n->DisplayValue(outputIndex));
+            const ImVec2 textSize = ImGui::CalcTextSize(buf);
+            dl->AddText(ImVec2(cellMin.x + (cellW - textSize.x) * 0.5f,
+                               cellMin.y + (cellH - textSize.y) * 0.5f), textCol, buf);
+
+            // The pin itself, positioned in the cell's bottom-right corner.
+            // NOTE: EndPin() normally derives the pin's hit bounds from the
+            // ImGui group opened by BeginPin() - that group's rect is anchored
+            // at whatever the layout cursor was *before* BeginPin() and grows
+            // via the window's monotonic CursorMaxPos. That works for pins
+            // drawn in natural left-to-right/top-to-bottom flow (DrawPin(),
+            // ModSlider's param pins), but here every cell jumps the cursor
+            // to an absolute position and never advances it, so each
+            // successive pin's group-derived bounds would balloon to include
+            // every prior cell too - only the last-drawn pin would end up
+            // hit-testable across the whole grid. ed::PinRect() sets the
+            // pin's bounds explicitly, sidestepping that group-bounds path.
+            ImGui::PushID(outputIndex);
+            const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kOutputBase + outputIndex;
+            ed::BeginPin(pinId, ed::PinKind::Output);
+            ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+            const ImVec2 pinCenter(cellMax.x - 9.0f, cellMax.y - 9.0f);
+            const ImVec2 pinMin(pinCenter.x - kPinHit * 0.5f, pinCenter.y - kPinHit * 0.5f);
+            const ImVec2 pinMax(pinCenter.x + kPinHit * 0.5f, pinCenter.y + kPinHit * 0.5f);
+            ed::PinRect(pinMin, pinMax);
+            dl->AddCircleFilled(pinCenter, kPinRadius * 0.75f, pinFill);
+            dl->AddCircle(pinCenter, kPinRadius * 0.75f, pinRing, 0, 1.5f);
+            ed::EndPin();
+            ImGui::PopID();
+         }
+      }
+
+      ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + gridH));
+      ImGui::Dummy(ImVec2(gridW, 0.0f));
+   }
+
+   void DrawDepthProjectionParams(DepthProjectionNode* n)
+   {
+      if (n->outputType == DepthProjectionNode::kPoints)
+         ImGui::TextDisabled("%zu points", n->PointCount());
+      else
+         ImGui::TextDisabled("%zu triangles (%zu vertices)", n->TriangleCount(), n->GetMesh().vertices.size());
+
+      DropdownButton("projection", DepthProjectionNode::ProjectionNames(), n->projection,
+                     [n](int i) { n->projection = i; });
+      DropdownButton("output", DepthProjectionNode::OutputTypeNames(), n->outputType,
+                     [n](int i) { n->outputType = i; });
+      ModSliderInt("density", &n->density, 8, 400);
+
+      NodeSeparator("depth");
+      DropdownButton("source", DepthProjectionNode::DepthSourceNames(), n->depthSource,
+                     [n](int i) { n->depthSource = i; });
+      ModSlider("near depth", &n->nearDepth, 0.01f, 20.0f);
+      ModSlider("far depth", &n->farDepth, 0.1f, 50.0f);
+      ModSlider("depth scale", &n->depthScale, -5.0f, 5.0f);
+      ModSlider("depth curve", &n->depthCurve, 0.1f, 4.0f);
+      ModSlider("clip near", &n->clipNear, 0.0f, 1.0f);
+      ModSlider("clip far", &n->clipFar, 0.0f, 1.0f);
+
+      if (n->projection == DepthProjectionNode::kPerspective || n->projection == DepthProjectionNode::kRadial)
+      {
+         NodeSeparator("camera");
+         ModSlider("fov", &n->fov, 10.0f, 130.0f);
+         ModCheckbox("auto aspect", &n->autoAspect);
+         if (!n->autoAspect)
+            ModSlider("aspect", &n->customAspect, 0.2f, 4.0f);
+         ModSlider("focal scale", &n->focalScale, 0.1f, 3.0f);
+         ModSlider("center x", &n->principalPointX, -1.0f, 1.0f);
+         ModSlider("center y", &n->principalPointY, -1.0f, 1.0f);
+      }
+      else
+      {
+         NodeSeparator("dimensions");
+         ModSlider("width", &n->planarWidth, 0.1f, 20.0f);
+         ModSlider("height", &n->planarHeight, 0.1f, 20.0f);
+      }
+
+      NodeSeparator("appearance");
+      if (n->outputType == DepthProjectionNode::kPoints)
+         ModSlider("point size", &n->pointSize, 0.01f, 4.0f);
+      else
+         ModSlider("edge tear", &n->edgeTearThreshold, 0.01f, 2.0f);
+
+      DropdownButton("color", DepthProjectionNode::ColorModeNames(), n->colorMode,
+                     [n](int i) { n->colorMode = i; });
+      ColorSwatch("tint", n->tint, n);
+      ModSlider("metallic", &n->metallic, 0.0f, 1.0f);
+      ModSlider("roughness", &n->roughness, 0.0f, 1.0f);
+   }
+
+   void DrawGeometryTableParams(GeometryTableNode* n)
+   {
+      if (n->HasSamples())
+         ImGui::TextDisabled("following %d points", n->SampleCount());
+      else
+         ImGui::TextDisabled("no geometry");
+
+      NodeSeparator("sampling");
+      DropdownButton("mode", GeometryTableNode::SampleModeNames(), n->sampleMode,
+                     [n](int i) { n->sampleMode = i; });
+      ModSliderInt("rows", &n->rows, 1, 16);
+      DropdownButton("sort", GeometryTableNode::SortModeNames(), n->sortMode,
+                     [n](int i) { n->sortMode = i; });
+      ModSlider("offset", &n->offset, 0.0f, 1.0f);
+
+      if (n->sampleMode == GeometryTableNode::kContour)
+      {
+         ModSliderInt("axis 0=X 1=Y 2=Z", &n->sliceAxis, 0, 2);
+         ModSlider("slice at", &n->slicePosition, -3.0f, 3.0f);
+      }
+      if (n->sampleMode == GeometryTableNode::kScatter)
+         ModSlider("seed", &n->seed, 0.0f, 32.0f);
+
+      NodeSeparator("range");
+      DropdownButton("space", GeometryTableNode::SpaceNames(), n->space,
+                     [n](int i) { n->space = i; });
+      if (n->space == GeometryTableNode::kSpaceFixed)
+         ModSlider("extent", &n->extent, 0.1f, 10.0f);
+      ModSlider("smooth", &n->smooth, 0.0f, 1.0f);
+
+      NodeSeparator("table");
+      if (!n->HasSamples())
+         ImGui::TextDisabled("(unpatched - holding 0.5)");
+      // Drawn either way, unpatched or not: every row pin needs to exist and
+      // be draggable this frame regardless of whether it currently reads a
+      // real sample or the neutral 0.5 fallback (§3's "hold at 0.5" rule) -
+      // the generic output-pin row above is capped to the 4 aggregates for
+      // this node type specifically so it never draws these same pin ids too.
+      DrawGeometryTableGrid(n, gCurrentNodeIndex);
    }
 
    void DrawImageToPointsParams(ImageToPointsNode* n)
@@ -21022,6 +22597,7 @@ namespace
          { "Random", "A new random value every N beats, with adjustable smoothing between steps. Deterministic, so rewinding replays the same sequence." },
          { "Pattern", "A 16-step sequencer: drag the bar grid (paint across bars by dragging horizontally), choose how many steps to use or fit them to the transport's time signature, and it loops through them one step every N beats. Optional glide between steps and a bipolar display mode." },
          { "Math", "Combines two modulators - add, subtract, multiply, divide, min, max, average, difference - with gain and offset. Unpatched inputs fall back to a constant, shown as an editable slider; a patched input just shows as 'patched'." },
+         { "Geometry Table", "Samples up to 16 points off a patched geometry source and outputs each as its own X/Y/Z modulator, plus a centroid (cx/cy/cz) and spread aggregate that stay meaningful however the row count or point set changes. Vertex mode reads native vertices (or a point cloud's points, which always wins over its own billboard mesh); Scatter reads an area-weighted random sample instead; Contour walks the mesh's boundary/slice outline (or a patched curve) in order. Sort turns the table into something specific - by axis for a ramp bank, by angle for a phase-ordered ring, by distance from the centre. offset scrubs a read head across the sampled set without re-sampling, so it's the one control worth binding to an LFO. Fixed space maps world units through `extent` (how far the object may travel, not how big it is); Bounds self-scales to the sampled set's own bounding box, which means a rigid translation of the source produces no change - that's by design, not a bug." },
          { "Compare", "Outputs 1 when the comparison holds, 0 otherwise - >, >=, <, <=, ==, != between two modulators, with a tolerance for the equality checks." },
          { "Range to Range", "Remaps one modulator's input range onto a different output range - patch in a 0..1 LFO and remap it to -2..2, for example." },
          { "Smoothing", "An exponential moving average over another modulator, to damp jittery or steppy sources like Random or Pattern." },
@@ -21037,6 +22613,7 @@ namespace
          { "Slideshow", "Plays the images of one folder in alphabetical order with a transition (fade, slide, wipe, zoom). Hold and transition time follow the transport; Native keeps source pixels 1:1, Best Fit stretches to fill, Proportional Fit preserves aspect." },
          { "Macro XY", "A 2D pad exposing X and Y as two separate modulator outputs from one drag. The pad's path can be recorded, looped and replayed in time, like Resynthesize's orb." },
          { "Keyboard", "A hardware-free note source: click-and-drag the on-screen piano, or hover the node and type on your laptop keyboard (Logic/GarageBand's Musical Typing layout - ZXCVBNM... is one octave, QWERTY... the octave above) to test a patch with no MIDI controller at all." },
+         { "Chord Progression", "Plays a looped chord progression locked to the transport. Click a slot to select a chord, click the keys to set its notes (or pick a root and quality and press set; inv moves the lowest note up an octave), and set how many bars it lasts. chords sets how many slots play, octave moves the keyboard, transpose shifts the whole progression, gate shortens each chord (1 = legato), and bass adds the lowest note an octave down. play sets how each chord is played: block, strum up/down (strum = ms between notes), arp up/down/up-down/random (one note per rate step, over 1-3 octaves), pulse (the whole chord re-struck every step), alberti (low-high-middle-high) and bass + chord (oom-pah); gate is the fraction of the chord in block/strum and of each step in the stepped modes. Patch the note output into any synth or plugin instrument." },
          { "Audio Meter", "A stereo level meter: separate L and R bars on a shared -60 to +3 dBFS scale, each showing RMS (solid) inside peak (faint), a peak-hold line, and the channel's highest peak as a number on top, which turns red once that channel has reached 0 dBFS. Audio passes through unchanged. It measures whatever its input is patched to even with its output left unconnected, so it can hang off any cable as a tap. Click the meter to clear the peak numbers, holds and clip." },
          { "Macro Slider", "A named fader exposed as a modulator - drag its output onto any slider's modulation pin to drive that parameter by hand. The plain 0..1 member of the Macro family; use Macro Knob when you want a response curve and invert as well." },
          { "Macro Bipolar Knob", "A centre-detent knob running -1 to +1, exposed as a modulator - the right control for anything that has a natural middle (pan, detune, tilt). Its 0..1 output puts the detent at exactly 0.5, which is also where a bipolar modulation binding reads as 'no modulation'." },
@@ -21058,6 +22635,10 @@ namespace
          { "Plugin", "Hosts a third-party Audio Unit effect. Drag one in from the Plugins panel (Rescan there indexes what is installed; the list is cached, so launching never rescans), or drop a .component bundle from Finder. \"open\" shows the plugin's own editor in a separate window. The sliders on the body are plugin parameters you chose to expose: turn \"configure\" on and touch a control in the plugin's own window and it appears here as a mapped row - or pick one from the dropdown, since not every plugin's editor tells the host what was touched. Each mapped row is a real param with its own modulation pin, so a Ramp or Envelope can drive it. Right-click a row to unmap it. With nothing loaded, or bypassed, audio passes through unchanged." },
          { "Oscillator", "A synth oscillator with four classic waveforms (sine, triangle, saw, square), interactive amp envelope, unison, filter, hard sync, and fine/coarse tuning. With no note cable connected, it free-runs at a set frequency; connect a note cable and it becomes polyphonic and envelope-gated." },
          { "Wavetable", "Two independent wavetable engines with unison, filter, and pitch/filter/amp envelopes, mixed by an A/B control. With no note cable connected, it free-runs at a set frequency; connect a note cable and it becomes polyphonic and envelope-gated." },
+         { "Slicer", "Chops a sample into slices and maps them chromatically to the keyboard from MIDI note 36 upward - note 36 plays slice 1, 37 plays slice 2, and so on. A note past the last slice is silent; it does not wrap round to slice 1. Load a file (or drag one in from the Samples panel), or record from the audio input pin. slice by picks where the boundaries come from: onsets runs transient detection over the sample on a background thread, grid divides it arithmetically at the *global transport tempo* (there is no per-node bpm - change the tempo and the grid follows). sensitivity is the detection threshold and is the only control that re-runs the analysis; onsets just caps the result to the strongest N, and division/slice by recompute boundaries instantly. Click a slice band in the waveform to audition it, and in onsets mode drag any marker to move a boundary by hand - hand-edited markers are saved with the patch. Two separate controls decide how long a slice lasts: crossthrough sets whether playback may run PAST the slice's own next onset (off by default - each slice stops where the next begins), while decay shapes only the amplitude envelope, reading 'hold' at the top of its throw where the slice stays at full level. So: crossthrough off + hold is the classic tight chop; crossthrough off + a decay ends at whichever comes first; crossthrough on + hold plays through the rest of the sample; crossthrough on + a decay is a one-shot with a tail over the rest of the break. attack extends each slice's own fade-in from instant up to half a second." },
+         { "Molder", "Analysis/genome resynthesis: decomposes a loaded or recorded sample into tracked harmonic partials plus a real residual waveform, then Roll mutates a parameter genome and re-renders a new sample from it - each roll walks further from the last, not from the original. Iterate feeds the last render back in as the new source and re-analyses it (progressively eating the sound); Reset returns fully to the originally loaded/recorded sample - generation 0 and the six shaping knobs (tone/air/snap/stretch/time/pitch) back to neutral, and the analysis itself restored, undoing any Iterate. chaos sets how far the next roll jumps; pitch offsets on top of the genome's own pitch walk; tone balances partials against residual; air/snap are the residual's steady-hiss and transient-attack levels; stretch scales inharmonicity together with harmonic spacing; time warps the attack/decay timing without changing the sample's length. This is a sound designer, not a playable instrument - it takes no note input, only a single self-triggered voice with start/end range, loop, reverse and ping-pong, the same transport as Sampler. Analysis and rendering both run on a background thread, so rolling never stalls the UI. seed/gen/f0/harm in the readout are the exact genome (seed + generation count) and the analysed pitch - two integers are enough to reproduce any rolled sound exactly on reload." },
+         { "Grain Molder", "Slices audio into overlapping grains, calculates per-grain metrics (Level, Brightness, Random), and rearranges them based on a continuous blend between original temporal position and metric rank. At amount 0 it is the clean identity passthrough; at 1 it is fully sorted into a swell or brightness contour. Rendering runs asynchronously on a worker thread." },
+         { "Analog", "A classic polyphonic virtual-analog synth voice with two analog-style oscillators (osc1 unison stack, osc2 tuning/detune/sync, sub osc one octave down, white noise, pre-filter drive stage, nonlinear ZDF Moog-ladder or SVF filter, and amplitude ADSR across up to 8 voices). Detune reads as the stack's true total width in cents, distributed unevenly across the stack the way separately mistuned circuits sit. Spread is stereo width: it splits the stack across two independent drive/filter chains and places each voice card in the image, so the sides carry different oscillators rather than one panned copy." },
          { "Equation Synth", "A synth defined by a live formula (y = f(x, a, b, c, d, t)) instead of a fixed waveform - knobs a-d feed the equation directly, so turning them reshapes the waveform itself rather than modulating a preset one." },
          { "Sampler", "A sample player: load a file (or drag one in from the Samples search panel), or record from the audio input pin. Click the waveform to audition from that point, or use the audition button - both preview this node on its own dedicated voice, independent of the transport and any note cable, and never cut off or get cut off by an incoming note. Drag the waveform's two edge handles to set the loop range (start/end). pitch/finetune are coarse/fine tuning, speed is a -2..2 varispeed control (negative plays backward), volume is the output level. loop/rev/p-p control what happens at the range edges: loop wraps or bounces (ping-pong) instead of stopping, reverse flips the base direction. With no note cable connected, it free-runs on the transport - starts the moment you hit space, stops when you stop it; connect a note cable and it becomes polyphonic instead, each note played back at the pitch offset from middle C. Spacebar always silences every voice this node is making." },
          { "Drum Sequencer", "An 8-lane, 8-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8x8 step grid. Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
@@ -21146,6 +22727,8 @@ namespace
          { "Join Geometry", "Combines two or more geometry inputs into one. The boolean modes (Union, Difference, Intersection, etc, each also spawnable as its own named node) need closed, manifold solids to produce a clean result - open surfaces can give garbage." },
          { "Metaballs", "Builds an isosurface (blobby, merging spheres) from a point cloud source, or from a manually-placed set of balls when no cloud is patched in." },
          { "Image to Points", "Converts an image into a 3D point cloud - brightness/depth-source drives per-point depth, with density, threshold, point size and optional colour-from-image." },
+         { "Set Vertex Color", "Writes per-element colour - vertex colours on a mesh, per-particle colour on a point cloud, whichever the input carries. source picks where the colour comes from: flat, position, normal, index, random, a patched Palette node's swatches, or a patched texture sampled at each element's UV. Render 3D reads whatever ended up there. (Called Set Color before 0.41; old patches load it under the new name.)" },
+         { "Depth Projection", "Unprojects a 2D depth map and optional color image into a 3D point cloud or triangulated surface mesh, supporting pinhole camera, planar, radial and cylindrical projections with depth curves and edge tearing." },
          { "Curve", "A generative parametric curve/tube (line, circle, spiral, helix and other presets) extruded into a mesh, with point count, smoothness, spread, height, twist and tube radius/taper controls." },
          { "Mesh to Points", "Samples the input mesh's vertices as a point cloud, for feeding Instance on Points or Metaballs." },
          { "Mesh to Edges", "Samples points along the input mesh's edges as a point cloud, for feeding Instance on Points or Metaballs." },
@@ -26582,11 +28165,12 @@ static bool RunPaulStretchFixture()
             else
             {
                PaulStretchNode reloaded;
+               recNode.position = 0.42f;
                std::vector<std::pair<std::string, std::string>> params;
                Patch::SaveParams(&recNode, params);
                Patch::LoadParams(&reloaded, params);
                reloaded.ReloadFromPath();
-               if (reloaded.waveformCacheCount <= 0 || reloaded.FilePath().empty())
+               if (reloaded.waveformCacheCount <= 0 || reloaded.FilePath().empty() || std::abs(reloaded.position - 0.42f) > 1e-4f)
                {
                   printf("PAULSTRETCHTEST record patch reload failed FAIL\n");
                   ok = false;
@@ -28051,7 +29635,7 @@ static bool RunImageSpectralSynthFixture()
 
    // 6. Test LP24 vs LP12 Filter Steeper Roll-off
    specNode.unison = 1;
-   specNode.filterType = SpectralAdditiveDsp::kFilterLP12;
+   specNode.filterType = SynthModes::kFilterLP12;
    specNode.cutoff = 400.0f;
    specNode.resonance = 0.0f;
    specNode.PushParams();
@@ -28064,7 +29648,7 @@ static bool RunImageSpectralSynthFixture()
          rmsLP12 += bufL[i] * bufL[i];
    }
 
-   specNode.filterType = SpectralAdditiveDsp::kFilterLP24;
+   specNode.filterType = SynthModes::kFilterLP24;
    specNode.PushParams();
 
    float rmsLP24 = 0.0f;
@@ -28163,7 +29747,7 @@ static bool RunImageSpectralSynthFixture()
       paramNode.scanMode = SpectralAdditiveDsp::kScanManual;
       paramNode.position = 0.5f; // frozen scan position - only `pan` changes below
       paramNode.volume = 0.6f;
-      paramNode.filterType = SpectralAdditiveDsp::kFilterOff;
+      paramNode.filterType = SynthModes::kFilterOff;
       paramNode.stereoWidth = 0.0f; // no inherent L/R phase decorrelation - isolate pan alone
       paramNode.pan = 0.0f; // centered
       paramNode.PushParams(); // the constructor pushed the pre-assignment defaults; push again now that the fields above are set
@@ -38915,7 +40499,8 @@ int main(int argc, char** argv)
             dynamic_cast<ImageAnalyzeNode*>(gn.node.get()) != nullptr ||
             dynamic_cast<AudioFileNode*>(gn.node.get()) != nullptr ||
             dynamic_cast<AudioAnalyzeNode*>(gn.node.get()) != nullptr ||
-            dynamic_cast<OscToCvNode*>(gn.node.get()) != nullptr;
+            dynamic_cast<OscToCvNode*>(gn.node.get()) != nullptr ||
+            dynamic_cast<GeometryTableNode*>(gn.node.get()) != nullptr;
          IGeometrySource* geoSourceForViewport = dynamic_cast<IGeometrySource*>(gn.node.get());
          const bool isAudioBodyNode = IsAudioBodyNode(gn.node.get());
          const bool canTogglePreview = CanToggleInlinePreview(gn);
@@ -38994,6 +40579,7 @@ int main(int argc, char** argv)
                   dynamic_cast<CurveNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<MeshResynthNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<ImageToPointsNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<DepthProjectionNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<CameraNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<LightNode*>(gn.node.get()) != nullptr)
          {
@@ -39051,6 +40637,13 @@ int main(int argc, char** argv)
                snprintf(line, sizeof(line), "gen %d, %zu tris", mrs->Generation(), mrs->TriangleCount());
             else if (auto* i2p = dynamic_cast<ImageToPointsNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu points", i2p->PointCount());
+            else if (auto* dp = dynamic_cast<DepthProjectionNode*>(gn.node.get()))
+            {
+               if (dp->outputType == DepthProjectionNode::kPoints)
+                  snprintf(line, sizeof(line), "%zu points", dp->PointCount());
+               else
+                  snprintf(line, sizeof(line), "%zu triangles", dp->TriangleCount());
+            }
             else
                snprintf(line, sizeof(line), "scene node");
             dl->AddText(ImVec2(origin.x + 12, origin.y + 10), IM_COL32(200, 206, 226, 255),
@@ -39280,6 +40873,10 @@ int main(int argc, char** argv)
                DrawMeshResynthParams(n);
             else if (auto* n = dynamic_cast<ImageToPointsNode*>(gn.node.get()))
                DrawImageToPointsParams(n);
+            else if (auto* n = dynamic_cast<DepthProjectionNode*>(gn.node.get()))
+               DrawDepthProjectionParams(n);
+            else if (auto* n = dynamic_cast<GeometryTableNode*>(gn.node.get()))
+               DrawGeometryTableParams(n);
             else if (auto* n = dynamic_cast<CommentNode*>(gn.node.get()))
                DrawCommentParams(n);
             else if (auto* n = dynamic_cast<PathNode*>(gn.node.get()))
@@ -39560,7 +41157,10 @@ int main(int argc, char** argv)
          // it a blank texture. No pin, no way to make that mistake.
          if (dynamic_cast<OutputNode*>(gn.node.get()) == nullptr && !isComment)
          {
-            const int outputs = std::max(1, gn.node->OutputCount());
+            // Geometry Table draws its row pins (index 4 and up) inline in its
+            // table grid; only the four aggregates go through this row.
+            const int outputs = dynamic_cast<GeometryTableNode*>(gn.node.get()) != nullptr
+                                   ? 4 : std::max(1, gn.node->OutputCount());
             float itemW = 0.0f;
             for (int o = 0; o < outputs; o++)
                itemW += kPinHit + 4.0f + ImGui::CalcTextSize(gn.node->OutputLabel(o)).x + (o ? 10.0f : 0.0f);
@@ -39985,14 +41585,14 @@ int main(int argc, char** argv)
                      }
                      else if (dstSetColorNode != nullptr && slot == 2)
                      {
-                        rejectReason = "Set Color palette slot only accepts a Palette node";
+                        rejectReason = "Set Vertex Color palette slot only accepts a Palette node";
                      }
                      else if (dstSetColorNode != nullptr && slot == 1)
                      {
                         if (srcGeometry != nullptr)
-                           rejectReason = "Set Color texture slot accepts a 2D image or texture map, not 3D geometry";
+                           rejectReason = "Set Vertex Color texture slot accepts a 2D image or texture map, not 3D geometry";
                         else
-                           rejectReason = "Set Color texture slot accepts a 2D image or texture map";
+                           rejectReason = "Set Vertex Color texture slot accepts a 2D image or texture map";
                      }
                      else if (dstMappingNode != nullptr)
                      {
@@ -41295,6 +42895,27 @@ int main(int argc, char** argv)
                   // Dropped onto an existing Sampler: swap its file.
                   PushUndoCheckpoint();
                   targetSampler->LoadFile(gSampleDragPath);
+                  gPatchDirty = true;
+               }
+               else if (SlicerNode* targetSlicer = FindNodeUnderCanvasPoint<SlicerNode>(canvasMouse))
+               {
+                  // Dropped onto an existing Slicer: swap its file and re-slice.
+                  PushUndoCheckpoint();
+                  targetSlicer->LoadFile(gSampleDragPath);
+                  gPatchDirty = true;
+               }
+               else if (MolderNode* targetMolder = FindNodeUnderCanvasPoint<MolderNode>(canvasMouse))
+               {
+                  // Dropped onto an existing Molder: swap its source and re-analyze.
+                  PushUndoCheckpoint();
+                  targetMolder->LoadFile(gSampleDragPath);
+                  gPatchDirty = true;
+               }
+               else if (GrainMolderNode* targetGM = FindNodeUnderCanvasPoint<GrainMolderNode>(canvasMouse))
+               {
+                  // Dropped onto an existing Grain Molder: swap its source and mold.
+                  PushUndoCheckpoint();
+                  targetGM->LoadFile(gSampleDragPath);
                   gPatchDirty = true;
                }
                else if (PaulStretchNode* targetPaul = FindNodeUnderCanvasPoint<PaulStretchNode>(canvasMouse))

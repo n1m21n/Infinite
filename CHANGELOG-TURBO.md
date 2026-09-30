@@ -1,5 +1,55 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.41.0-turbo (2026-09-30)
+
+Wave 1 of the upstream catch-up, plus a chord progression node.
+
+### New nodes
+- **Chord Progression** (Notes, Turbo original): a looped chord progression locked to the transport.
+  Up to 16 chords, each set by clicking keys on a two-octave keyboard or filled from a root +
+  quality builder (maj, min, 7, maj7, m7, dim, aug, sus2/4, 6, m6, 9, maj9, m9, m7b5, dim7, add9,
+  7sus4, m(maj7), 5), with `inv` for the next inversion. Each chord lasts its own number of bars
+  (half-bar steps). Chord names are recognised from the keys (including slash chords). Knobs:
+  chords, octave, transpose, velocity, gate (1 = legato); `bass` doubles the lowest note an octave
+  down. Play modes: block, strum up/down (`strum` ms between notes), arp up/down/up-down/random
+  (one note per `rate` step over 1-3 `octaves`), pulse (chord re-struck every step), alberti
+  (low-high-middle-high) and bass + chord (oom-pah). Chord changes and steps are sample-accurate.
+  Plays while the transport runs, releases on stop.
+- **Analog** (Synths, from upstream): polyphonic virtual-analog synth, two oscillators with sync,
+  unison, sub, noise, ZDF ladder / SVF filters, amp envelope.
+- **Slicer**, **Molder**, **Grain Molder** (Synths, from upstream): onset/grid sample slicer played
+  from notes; partial-spectrum resynthesis; granular molding. Samples load by dragging from the
+  Samples panel onto the node.
+- **Geometry Table** (Modulators, from upstream): samples a mesh / point cloud / slice contour into
+  rows of x/y/z modulator outputs plus centroid and spread. Instanced sources read as their base
+  mesh for now.
+- **Depth Projection** (3D, from upstream): turns a depth map (plus optional colour) into a point
+  cloud or torn triangle mesh (perspective, planar, radial, cylindrical).
+
+### Upstream features
+- Compressor transfer curve shows live gain reduction.
+- PaulStretch: modulatable `position` and waveform scrub.
+- Wave Terrain: shows the baked wavetable stack.
+
+### Fixed
+- Nodes with 10+ outputs: the output pin block overflowed into the next node (Image Analyze `cy`,
+  Audio Analyze `b6`-`b8`). Pin stride widened from 1000 to 1050, as upstream.
+
+### Comb filter (from upstream)
+- `comb +` / `comb -` filter types (feedback delay line; cutoff sets the tooth spacing, resonance
+  the depth) in Wavetable, Oscillator, Equation, Wave Terrain, Image Spectral Synth, Metallic,
+  Audio Filter and EQ. The response curves draw the comb teeth.
+- Equation, Wave Terrain and Image Spectral Synth now offer the whole shared filter list (lp/hp
+  12/24/36, bp 12/24, notch 12/24, comb). Unlike upstream, their saved filter index keeps its old
+  meaning: the original five come first and the rest are appended, so old patches do not change
+  filter. Metallic keeps its storage order as upstream does.
+- Audio Filter's comb follows the env and mod sweep like the other types (upstream uses an LFO).
+- Metallic modes are normalised for their strike peak (upstream fix in the same change): louder,
+  and long decays no longer fade into silence early.
+
+### Renamed
+- **Set Color** is now **Set Vertex Color**, as upstream. Old patches load it under the new name.
+
 ## 0.40.0-turbo (2026-09-26)
 
 Performance pass, then more upstream features.

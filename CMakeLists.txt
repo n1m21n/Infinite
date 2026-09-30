@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.25)
 # Unofficial Windows-only fork of Infinite (https://github.com/n1m21n/Infinite).
 # macOS support was removed on purpose: every platform path below is Windows
 # (MSVC 2022, x64, vcpkg static triplet, JUCE, OpenCV, Spout2, Windows ML).
-project(InfiniteTurbo VERSION 0.40.0 LANGUAGES C CXX)
+project(InfiniteTurbo VERSION 0.41.0 LANGUAGES C CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Infinite-Turbo builds only on Windows x64 with MSVC (Visual Studio 2022).")
@@ -173,6 +173,7 @@ add_executable(Infinite WIN32
     src/core/Mesh.cpp
     src/core/NodeViewport.cpp
     src/core/Transport.cpp
+    src/core/AudioDecodeCache.cpp
     src/core/Modulation.cpp
     src/core/Expression.cpp
     src/core/ExprGlobals.cpp
@@ -232,6 +233,9 @@ add_executable(Infinite WIN32
     src/audio/dsp/CycleShaperKernel.cpp
     src/audio/dsp/ResonatorBankKernel.cpp
     src/audio/dsp/SpecBlurKernel.cpp
+    src/audio/dsp/SlicerDsp.cpp
+    src/audio/dsp/MolderDsp.cpp
+    src/audio/dsp/GrainMolderDsp.cpp
     src/nodes/UINodes.cpp
     src/nodes/CurvesNode.cpp
     src/nodes/RemoveBgNode.cpp
@@ -264,6 +268,13 @@ add_executable(Infinite WIN32
     src/nodes/AudioNodes.cpp
     src/nodes/NoteNodes.cpp
     src/nodes/WavetableNode.cpp
+    src/nodes/AnalogNode.cpp
+    src/nodes/SlicerNode.cpp
+    src/nodes/MolderNode.cpp
+    src/nodes/GrainMolderNode.cpp
+    src/nodes/GeometryTableNode.cpp
+    src/nodes/DepthProjectionNode.cpp
+    src/nodes/ChordProgressionNode.cpp
     src/nodes/WaveTerrainNode.cpp
     src/nodes/EquationNode.cpp
     src/nodes/ImageSpectralSynthNode.cpp

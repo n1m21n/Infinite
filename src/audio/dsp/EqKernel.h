@@ -20,13 +20,15 @@ namespace EqDsp
    enum BandType
    {
       kLowShelf = 0, kPeak, kHighShelf, kHp12, kLp12,
+      kCombPos, kCombNeg, // from upstream; appended so saved band types keep their meaning
       kNumBandTypes
    };
 
    inline const char* const* TypeNames()
    {
       static const char* const kNames[kNumBandTypes] = {
-         "low shelf", "peak", "high shelf", "hp 12", "lp 12"
+         "low shelf", "peak", "high shelf", "hp 12", "lp 12",
+         "comb +", "comb -"
       };
       return kNames;
    }
@@ -46,6 +48,8 @@ namespace EqDsp
    }
 
    inline bool UsesGain(int type) { return type == kLowShelf || type == kPeak || type == kHighShelf; }
+   inline bool IsComb(int type) { return type == kCombPos || type == kCombNeg; }
+   inline bool CombIsNegative(int type) { return type == kCombNeg; }
 
    // Configures a scratch Biquad for one band type. Shared by PushParams and
    // the visualizer/tests, so the picture, the running filter and the DSP
@@ -59,6 +63,9 @@ namespace EqDsp
          case kHighShelf: bq.SetHighShelf(freq, q, gainDb, sampleRate); break;
          case kHp12: bq.SetHighpass(freq, q, sampleRate); break;
          case kLp12: bq.SetLowpass(freq, q, sampleRate); break;
+         case kCombPos: case kCombNeg: // delay line, not a biquad - see IsComb; biquad slots carry identity
+            bq.b0 = 1.0f; bq.b1 = 0.0f; bq.b2 = 0.0f; bq.a1 = 0.0f; bq.a2 = 0.0f;
+            break;
          case kPeak: default: bq.SetPeaking(freq, q, gainDb, sampleRate); break;
       }
    }
@@ -99,6 +106,9 @@ namespace EqDsp
    inline float BandMagnitudeDb(int type, float freq, float q, float gainDb, bool enabled,
                                  float evalHz, double sampleRate)
    {
+      if (enabled && IsComb(type))
+         return DspMath::CombMagnitudeDb(freq, DspMath::CombFeedbackFromQ(q), CombIsNegative(type),
+                                          evalHz, sampleRate);
       DspMath::Biquad bq;
       if (enabled)
          ConfigureBiquad(bq, type, freq, q, gainDb, sampleRate);
@@ -121,6 +131,10 @@ public:
    static constexpr int kNumBands = 5;
    static constexpr int kCoeffsPerBand = 5; // b0,b1,b2,a1,a2
    static constexpr int kOutputGainSlot = kNumBands * kCoeffsPerBand;
+   // Raw freq/Q per band for comb bands, which have no biquad coefficients
+   // (their biquad slots carry bypass) - same split upstream uses.
+   static constexpr int kBandFreqSlot0 = kOutputGainSlot + 1;
+   static constexpr int kBandQSlot0 = kBandFreqSlot0 + kNumBands;
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
    {
@@ -134,6 +148,9 @@ public:
       for (auto& band : mBiquad)
          for (auto& bq : band)
             bq.Reset();
+      for (auto& band : mComb)
+         for (auto& comb : band)
+            comb.Reset();
    }
 
    void PushParams(const AudioEffectNode& node, double sampleRate) override;
@@ -141,6 +158,14 @@ public:
    void ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sidechain*/, AudioBuffer& out) override
    {
       const int numChannels = std::min({ in.numChannels, out.numChannels, kMaxChannels });
+
+      bool bandIsComb[kNumBands];
+      bool bandCombNegative[kNumBands];
+      for (int b = 0; b < kNumBands; b++)
+      {
+         bandIsComb[b] = mBandIsComb[b].load(std::memory_order_relaxed);
+         bandCombNegative[b] = mBandCombNegative[b].load(std::memory_order_relaxed);
+      }
 
       for (int i = 0; i < out.numFrames; i++)
       {
@@ -151,6 +176,13 @@ public:
 
          const float outputGain = DspMath::DbToLinear(mMailbox.SmoothedValue(kOutputGainSlot));
 
+         float bandFreq[kNumBands], bandQ[kNumBands];
+         for (int b = 0; b < kNumBands; b++)
+         {
+            bandFreq[b] = mMailbox.SmoothedValue(kBandFreqSlot0 + b);
+            bandQ[b] = mMailbox.SmoothedValue(kBandQSlot0 + b);
+         }
+
          for (int ch = 0; ch < numChannels; ch++)
          {
             // Tiny bias away from exact zero before the recursive stages -
@@ -160,6 +192,14 @@ public:
 
             for (int b = 0; b < kNumBands; b++)
             {
+               if (bandIsComb[b])
+               {
+                  DspMath::CombFilter& comb = mComb[b][ch];
+                  comb.SetParams(bandFreq[b], DspMath::CombFeedbackFromQ(bandQ[b]), bandCombNegative[b],
+                                 mSampleRate);
+                  s = comb.Process(s);
+                  continue;
+               }
                DspMath::Biquad& bq = mBiquad[b][ch];
                bq.b0 = coeffs[b][0];
                bq.b1 = coeffs[b][1];
@@ -180,4 +220,7 @@ private:
    ParamMailbox mMailbox;
    double mSampleRate = 44100.0;
    DspMath::Biquad mBiquad[kNumBands][kMaxChannels];
+   DspMath::CombFilter mComb[kNumBands][kMaxChannels];
+   std::atomic<bool> mBandIsComb[kNumBands] {};
+   std::atomic<bool> mBandCombNegative[kNumBands] {};
 };
