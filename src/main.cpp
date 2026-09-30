@@ -47639,6 +47639,17 @@ namespace
          gPatchStatus = "Open failed: " + error;
          return false;
       }
+      if (data.hasNamedRefs)
+      {
+         // A hand-written file that names nodes/slots: turn the words into indices first.
+         std::vector<Headless::Issue> resolveErrors;
+         PatchSchema::Resolve(data, MakeSchemaEnv(false), resolveErrors);
+         if (!resolveErrors.empty())
+         {
+            gPatchStatus = "Open failed: line " + std::to_string(resolveErrors.front().line) + ": " + resolveErrors.front().message;
+            return false;
+         }
+      }
 
       MovementLog::NoteMark(MovementLog::Mark::PatchLoaded);
       ApplyPatchData(data);
@@ -47667,6 +47678,41 @@ namespace
       DiscardAutosave();
       gLastAutosaveTime = 0.0;
       return true;
+   }
+
+   // `Infinite --canonicalize in out`: data-level Read -> Write, so an authored
+   // file comes out exactly as a GUI save would write it (numbers, no comments).
+   void RunCanonicalize(const Headless::Job& job, Headless::Status& st)
+   {
+      Patch::Data data;
+      std::string error;
+      if (!Patch::Read(job.patch, data, error))
+      {
+         st.errors.push_back({ "E_LOAD", error, 0, -1 });
+         return;
+      }
+      const PatchSchema::Env env = MakeSchemaEnv(false);
+      PatchSchema::Resolve(data, env, st.errors);
+      if (st.errors.empty())
+      {
+         std::vector<Headless::Issue> warnings;
+         PatchSchema::Validate(data, env, st.errors, warnings);
+         if (!job.lenient)
+            Headless::PromoteWarnings(warnings, st.errors);
+         st.warnings = warnings;
+      }
+      if (!st.errors.empty())
+         return;
+      if (!job.keepIds)
+         for (Patch::NodeRecord& n : data.nodes)
+            n.id.clear();
+      if (!Patch::Write(job.out, data, error))
+      {
+         st.errors.push_back({ "E_LOAD", error, 0, -1 });
+         return;
+      }
+      st.files.push_back(job.out);
+      st.extraJson.push_back("\"nodes\":" + std::to_string(data.nodes.size()));
    }
 
    // Shared by PushUndoCheckpoint (freshly captured) and the node-drag
@@ -68382,6 +68428,13 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
          std::string err;
          if (!Patch::Read(job.patch, sData, err))
             return fail("E_LOAD", err);
+         PatchSchema::Resolve(sData, MakeSchemaEnv(job.forRender), sStatus.errors);
+         if (!sStatus.errors.empty())
+         {
+            sPhase = Phase::Done;
+            HeadlessFinish(window, sStatus, sWall);
+            return;
+         }
          // The parameter indices a `mod`/`expr` line may use only exist once a
          // node has been drawn, so draw one of each type the file drives.
          std::set<std::string> driven;
@@ -72120,7 +72173,16 @@ int main(int argc, char** argv)
       Headless::Status st;
       st.mode = gHeadlessJob.mode == Headless::Mode::Render ? "render" : "frame";
       st.patch = gHeadlessJob.patch;
-      if (!loadsPatch)
+      if (gHeadlessJob.mode == Headless::Mode::Canonicalize)
+      {
+         st.mode = "canonicalize";
+         st.out = gHeadlessJob.out;
+         RunCanonicalize(gHeadlessJob, st);
+         st.ok = st.errors.empty();
+         gHeadlessExitCode = Headless::Emit(gHeadlessJob, st);
+         glfwSetWindowShouldClose(window, GLFW_TRUE);
+      }
+      else if (!loadsPatch)
       {
          // describe / validate do their work in HeadlessTick
       }
@@ -72136,7 +72198,9 @@ int main(int argc, char** argv)
          // reported with its line numbers instead of loading half a graph.
          const PatchSchema::Env env = MakeSchemaEnv(gHeadlessJob.mode == Headless::Mode::Render ||
                                                     gHeadlessJob.mode == Headless::Mode::Frame);
-         PatchSchema::Validate(probe, env, st.errors, gHeadlessPreWarnings);
+         PatchSchema::Resolve(probe, env, st.errors);
+         if (st.errors.empty())
+            PatchSchema::Validate(probe, env, st.errors, gHeadlessPreWarnings);
          gHeadlessPatch = probe;
          if (!gHeadlessJob.lenient)
          {

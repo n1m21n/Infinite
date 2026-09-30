@@ -147,6 +147,36 @@ namespace Headless
          job.patch = pos[0];
          return true;
       }
+      else if (first == "--canonicalize")
+      {
+         job.mode = Mode::Canonicalize;
+         std::vector<std::string> pos;
+         for (int i = 2; i < argc; i++)
+         {
+            const std::string a = argv[i];
+            if (a == "--json" && i + 1 < argc)
+               job.jsonPath = argv[++i];
+            else if (a == "--keep-ids")
+               job.keepIds = true;
+            else if (a == "--lenient")
+               job.lenient = true;
+            else if (a.rfind("--", 0) == 0)
+            {
+               usageError = "unknown option " + a;
+               return true;
+            }
+            else
+               pos.push_back(a);
+         }
+         if (pos.size() != 2)
+         {
+            usageError = "usage: Infinite --canonicalize <in.inf> <out.inf> [--keep-ids] [--lenient] [--json <file>]";
+            return true;
+         }
+         job.patch = pos[0];
+         job.out = pos[1];
+         return true;
+      }
       else if (first == "--version")
       {
          job.mode = Mode::Version;
@@ -313,7 +343,7 @@ namespace Headless
          return 2;
       if (c == "E_LOAD" || c == "E_NO_OUTPUT" || c == "E_AMBIGUOUS_OUTPUT" || c == "E_UNKNOWN_TYPE" ||
           c == "E_BAD_SLOT" || c == "E_KIND_MISMATCH" || c == "E_DANGLING" || c == "E_CYCLE" ||
-          c == "E_DUPLICATE_INDEX" || c == "E_SLOT_TAKEN" || c == "E_NOT_A_MODULATOR" || c == "E_BAD_PARAM")
+          c == "E_DUPLICATE_INDEX" || c == "E_DUPLICATE_ID" || c == "E_BAD_ID" || c == "E_BAD_REF" || c == "E_SLOT_TAKEN" || c == "E_NOT_A_MODULATOR" || c == "E_BAD_PARAM")
          return 3;
       if (c == "E_HARDWARE_SOURCE")
          return 4;

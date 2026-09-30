@@ -11,6 +11,7 @@
 //            [--json <file>] [--timeout S] [--lenient]
 //   Infinite --frame  <patch.inf> <T | T1,T2,...> <out.png | out_dir/>
 //            [--fps N] [--output <index|name>] [--sample-rate HZ] [--json <file>] [--lenient]
+//   Infinite --canonicalize <in.inf> <out.inf> [--keep-ids] [--lenient] [--json <file>]
 //   Infinite --version --json
 //
 // Argument parsing, the status JSON and the exit-code table live here with no
@@ -28,6 +29,7 @@ namespace Headless
       Version,
       Describe,
       Validate,
+      Canonicalize,
    };
 
    struct Job
@@ -49,6 +51,7 @@ namespace Headless
       // --lenient: warnings stay warnings. Without it every CLI mode is strict
       // and a warning the schema pass raised is promoted to an error (exit 3).
       bool lenient = false;
+      bool keepIds = false; // --canonicalize --keep-ids: leave `id <word>` lines in
       double timeoutSec = 600.0;
    };
 

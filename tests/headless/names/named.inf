@@ -1,0 +1,19 @@
+infinite-patch 1
+# A hand-written patch: nodes have names, cables use them.
+node 1 Source Shape
+  id shape
+  f size 0.5   
+end
+node 2 Modulators LFO
+  id wobble
+end
+node 3 Compositing Blend
+  id mix
+end
+node 4 Utility Output
+  id out
+end
+cable mix input shape
+cable mix input_2 shape
+cable out in mix
+mod shape 0 wobble 0 0 1 0.5

@@ -56,6 +56,33 @@ namespace
       return buf;
    }
 
+   // A node reference or slot: an integer, or a bare word (an `id` / slot name)
+   // that PatchSchema::Resolve turns into one. A word is stored in `word` and
+   // `num` is left alone.
+   bool ReadRef(std::istringstream& in, int& num, std::string& word, bool& named)
+   {
+      std::string tok;
+      if (!(in >> tok))
+         return false;
+      char* end = nullptr;
+      const long v = std::strtol(tok.c_str(), &end, 10);
+      if (end != tok.c_str() && *end == '\0')
+         num = (int)v;
+      else
+      {
+         word = tok;
+         named = true;
+      }
+      return true;
+   }
+
+   std::string TrimRight(std::string v)
+   {
+      while (!v.empty() && (v.back() == ' ' || v.back() == '\t'))
+         v.pop_back();
+      return v;
+   }
+
    // Same escaping as Writer::Text/Reader::Text below, factored out for the
    // "expr" record - free text on a single line, outside of any node.
    std::string EscapeLine(const std::string& value)
@@ -219,6 +246,8 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
       // unrelated `s uid <hex>` param and the two would collide on load.
       if (node.uid != 0)
          file << "  uid " << node.uid << "\n";
+      if (!node.id.empty())
+         file << "  id " << node.id << "\n";
       file << "  pos " << FloatToString(px) << " " << FloatToString(py) << "\n";
       file << "  flags " << (node.showParams ? 1 : 0) << " " << (node.bypassed ? 1 : 0) << " "
            << (node.showMiniViewport ? 1 : 0) << " " << (node.showAdvancedParams ? 1 : 0) << "\n";
@@ -521,6 +550,10 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       if (start == std::string::npos)
          continue;
       line = line.substr(start);
+      // `#` starts a comment line (hand-written patches). Never part of a
+      // GUI-written file, whose free text always follows a tag.
+      if (line[0] == '#')
+         continue;
 
       std::istringstream in(line);
       std::string tag;
@@ -534,6 +567,7 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          std::getline(in, current.typeName);
          if (!current.typeName.empty() && current.typeName[0] == ' ')
             current.typeName.erase(0, 1);
+         current.typeName = TrimRight(current.typeName);
          inNode = true;
       }
       else if (tag == "end")
@@ -545,6 +579,12 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       else if (tag == "uid" && inNode)
       {
          in >> current.uid;
+      }
+      else if (tag == "id" && inNode)
+      {
+         in >> current.id;
+         current.idLine = lineNo;
+         outData.hasNamedRefs = true;
       }
       else if (tag == "pos" && inNode)
       {
@@ -574,6 +614,8 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          std::getline(in, value);
          if (!value.empty() && value[0] == ' ')
             value.erase(0, 1);
+         if (tag != "s")
+            value = TrimRight(value); // numbers only; text keeps its own spaces
          current.params.push_back({ tag + " " + name, value });
          current.paramLines.push_back(lineNo);
       }
@@ -581,7 +623,8 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       {
          CableRecord c;
          c.line = lineNo;
-         in >> c.dstIndex >> c.dstSlot >> c.srcIndex;
+         ReadRef(in, c.dstIndex, c.dstRef, outData.hasNamedRefs) && ReadRef(in, c.dstSlot, c.slotRef, outData.hasNamedRefs) &&
+            ReadRef(in, c.srcIndex, c.srcRef, outData.hasNamedRefs);
          // srcOutput is a later addition (build step 11, §5.3); missing on
          // older patches, where >>'s failed-extraction behaviour leaves it
          // at its default of 0 - every pre-step-11 image cable and every
@@ -601,7 +644,8 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       {
          CableRecord c;
          c.line = lineNo;
-         in >> c.dstIndex >> c.dstSlot >> c.srcIndex;
+         ReadRef(in, c.dstIndex, c.dstRef, outData.hasNamedRefs) && ReadRef(in, c.dstSlot, c.slotRef, outData.hasNamedRefs) &&
+            ReadRef(in, c.srcIndex, c.srcRef, outData.hasNamedRefs);
          if (tag == "aud")
             outData.audio.push_back(c);
          else
@@ -623,7 +667,9 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          m.polarity = 0;
          m.depth = 1.0f;
          m.centre = 0.0f;
-         in >> m.dstIndex >> m.dstParam >> m.srcIndex >> m.srcOutput >> m.polarity >> m.depth >> m.centre;
+         if (ReadRef(in, m.dstIndex, m.dstRef, outData.hasNamedRefs) && (in >> m.dstParam) &&
+             ReadRef(in, m.srcIndex, m.srcRef, outData.hasNamedRefs))
+            in >> m.srcOutput >> m.polarity >> m.depth >> m.centre;
          // lo/hi are a later addition still; missing on any patch saved
          // before they existed (or a legacy binding this session never
          // resolved a range for - see the write site), where >>'s
@@ -644,14 +690,17 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       else if (tag == "pal")
       {
          PaletteRecord p;
-         in >> p.dstIndex >> p.dstColor >> p.srcIndex >> p.srcSwatch;
+         if (ReadRef(in, p.dstIndex, p.dstRef, outData.hasNamedRefs) && (in >> p.dstColor) &&
+             ReadRef(in, p.srcIndex, p.srcRef, outData.hasNamedRefs))
+            in >> p.srcSwatch;
          outData.palette.push_back(p);
       }
       else if (tag == "expr")
       {
          ExprRecord e;
          e.line = lineNo;
-         in >> e.dstIndex >> e.dstParam;
+         if (ReadRef(in, e.dstIndex, e.dstRef, outData.hasNamedRefs))
+            in >> e.dstParam;
          std::string raw;
          std::getline(in, raw);
          if (!raw.empty() && raw[0] == ' ')

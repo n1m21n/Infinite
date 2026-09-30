@@ -82,6 +82,19 @@ namespace PatchSchema
       bool forRender = false;
    };
 
+   // The authoring name of each input of a type, parallel to t.inputs: the
+   // lowercased label with every non-alphanumeric run turned into `_`; an empty
+   // label is "input", a numeric one "in_<n>"; a repeated name gets `_2`, `_3`.
+   // Never parses as an integer, so it cannot be mistaken for a slot number.
+   std::vector<std::string> SlotNames(const TypeSchema& t);
+
+   // Turns every `id`/slot word in `data` into the index it stands for, so
+   // Validate and ApplyPatchData only ever see numbers. Reports E_BAD_ID,
+   // E_DUPLICATE_ID and E_BAD_REF (unknown node or slot word, with the nearest
+   // names). A no-op when data.hasNamedRefs is false. Clears the words it
+   // resolved; `id` values stay on the nodes (--keep-ids) until the caller drops them.
+   void Resolve(Patch::Data& data, const Env& env, std::vector<Headless::Issue>& errors);
+
    std::string ParamKindName(char kind);
    std::string ToJson(const TypeSchema& t);
 

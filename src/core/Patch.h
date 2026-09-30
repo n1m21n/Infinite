@@ -127,6 +127,12 @@ namespace Patch
       // validator can cite scene.inf:41. Not written back.
       int line = 0;
       std::vector<int> paramLines; // parallel to params
+      // Authoring name from an `id <word>` line (docs/reference/patch-format.md).
+      // Only ever read from a hand-written file: the GUI never sets it, so its
+      // saves are unchanged. PatchSchema::Resolve turns cable/mod/expr/pal
+      // references to it back into indices; the writer emits it only when set.
+      std::string id;
+      int idLine = 0;
    };
 
    struct CableRecord
@@ -141,6 +147,9 @@ namespace Patch
       // audio on separate outputs) has more than one audio output.
       int srcOutput = 0;
       int line = 0; // reader line number, see NodeRecord::line
+      // Authoring names, read from a hand-written file in place of the number.
+      // Empty when the file used a number. PatchSchema::Resolve fills the ints.
+      std::string dstRef, srcRef, slotRef;
    };
 
    struct ModRecord
@@ -168,6 +177,7 @@ namespace Patch
       bool enabled = true;
       float curve = 0.0f; // in [-1.0, 1.0], 0 = linear
       int line = 0;
+      std::string dstRef, srcRef; // authoring names, see CableRecord
    };
 
    // A palette node driving one colour swatch on another node.
@@ -177,6 +187,7 @@ namespace Patch
       int dstColor = 0;
       int srcIndex = 0;
       int srcSwatch = 0;
+      std::string dstRef, srcRef; // authoring names, see CableRecord
    };
 
    // A typed algebraic expression driving one parameter directly, with no
@@ -188,6 +199,7 @@ namespace Patch
       std::string text;
       float curve = 0.0f; // in [-1.0, 1.0], 0 = linear
       int line = 0;
+      std::string dstRef; // authoring name, see CableRecord
    };
 
    // One patch-wide named value an expression can read - see
@@ -446,6 +458,9 @@ namespace Patch
       std::vector<TrackGroupRecord> trackGroups;
       ArrangeSettingsRecord arrangeSettings;
       ViewportRecord viewport;
+      // True when the file used an `id` line or a word where an index goes, so
+      // the loader knows PatchSchema::Resolve has to run before ApplyPatchData.
+      bool hasNamedRefs = false;
    };
 
    bool Write(const std::string& path, const Data& data, std::string& outError);

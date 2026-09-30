@@ -61,6 +61,136 @@ namespace PatchSchema
       }
    }
 
+   std::vector<std::string> SlotNames(const TypeSchema& t)
+   {
+      std::vector<std::string> out;
+      std::set<std::string> used;
+      for (const SlotInfo& in : t.inputs)
+      {
+         std::string n;
+         bool gap = false;
+         for (char ch : in.label)
+         {
+            const unsigned char c = (unsigned char)ch;
+            if (std::isalnum(c))
+            {
+               if (gap && !n.empty())
+                  n += '_';
+               gap = false;
+               n += (char)std::tolower(c);
+            }
+            else
+               gap = true;
+         }
+         if (n.empty())
+            n = "input";
+         else if (std::isdigit((unsigned char)n[0]))
+            n = "in_" + n;
+         std::string unique = n;
+         for (int k = 2; !used.insert(unique).second; k++)
+            unique = n + "_" + std::to_string(k);
+         out.push_back(unique);
+      }
+      return out;
+   }
+
+   void Resolve(Patch::Data& data, const Env& env, std::vector<Headless::Issue>& errors)
+   {
+      if (!data.hasNamedRefs)
+         return;
+      std::map<std::string, int> ids;
+      std::vector<std::string> idPool;
+      for (Patch::NodeRecord& n : data.nodes)
+      {
+         if (n.id.empty())
+            continue;
+         bool ok = !std::isdigit((unsigned char)n.id[0]);
+         for (char ch : n.id)
+            ok = ok && (std::isalnum((unsigned char)ch) || ch == '_');
+         if (!ok)
+         {
+            errors.push_back(Make("E_BAD_ID", "'" + n.id + "' is not a valid id", n.idLine, n.index,
+                                  "an id starts with a letter or _ and holds letters, digits and _"));
+            continue;
+         }
+         if (!ids.insert({ n.id, n.index }).second)
+         {
+            errors.push_back(Make("E_DUPLICATE_ID", "id '" + n.id + "' is used by two nodes", n.idLine, n.index,
+                                  "give every node its own id"));
+            continue;
+         }
+         idPool.push_back(n.id);
+      }
+
+      std::map<int, const Patch::NodeRecord*> byIndex;
+      for (const Patch::NodeRecord& n : data.nodes)
+         byIndex.insert({ n.index, &n });
+
+      auto node = [&](std::string& word, int& index, int line) {
+         if (word.empty())
+            return;
+         auto it = ids.find(word);
+         if (it == ids.end())
+         {
+            const std::vector<std::string> near = Nearest(word, idPool, 3);
+            errors.push_back(Make("E_BAD_REF", "no node has the id '" + word + "'", line, -1,
+                                  near.empty() ? "add an `id " + word + "` line to the node" : "did you mean: " + Join(near)));
+         }
+         else
+            index = it->second;
+         word.clear();
+      };
+      auto slot = [&](std::string& word, int dstIndex, int& out, int line) {
+         if (word.empty())
+            return;
+         auto nd = byIndex.find(dstIndex);
+         const TypeSchema* t = nd == byIndex.end() || !env.schema ? nullptr : env.schema(nd->second->typeName);
+         bool found = false;
+         std::vector<std::string> names;
+         if (t != nullptr)
+         {
+            names = SlotNames(*t);
+            for (size_t i = 0; i < names.size(); i++)
+               if (names[i] == word)
+               {
+                  out = t->inputs[i].slot;
+                  found = true;
+                  break;
+               }
+         }
+         if (!found && t != nullptr)
+            errors.push_back(Make("E_BAD_REF", "'" + word + "' is not an input of " + t->name, line, dstIndex,
+                                  "inputs: " + Join(names)));
+         word.clear();
+      };
+      auto cable = [&](Patch::CableRecord& c) {
+         node(c.dstRef, c.dstIndex, c.line);
+         node(c.srcRef, c.srcIndex, c.line);
+         slot(c.slotRef, c.dstIndex, c.dstSlot, c.line);
+      };
+      for (Patch::CableRecord& c : data.cables)
+         cable(c);
+      for (Patch::CableRecord& c : data.geometry)
+         cable(c);
+      for (Patch::CableRecord& c : data.audio)
+         cable(c);
+      for (Patch::CableRecord& c : data.notes)
+         cable(c);
+      for (Patch::ModRecord& m : data.modulation)
+      {
+         node(m.dstRef, m.dstIndex, m.line);
+         node(m.srcRef, m.srcIndex, m.line);
+      }
+      for (Patch::PaletteRecord& p : data.palette)
+      {
+         node(p.dstRef, p.dstIndex, 0);
+         node(p.srcRef, p.srcIndex, 0);
+      }
+      for (Patch::ExprRecord& e : data.expressions)
+         node(e.dstRef, e.dstIndex, e.line);
+      data.hasNamedRefs = false;
+   }
+
    std::string ParamKindName(char kind)
    {
       switch (kind)
@@ -108,11 +238,12 @@ namespace PatchSchema
               "\",\"kind\":" + Q(ParamKindName(p.kind)) + ",\"default\":" + Q(p.def) + "}";
       }
       s += "],\"inputs\":[";
+      const std::vector<std::string> slotNames = SlotNames(t);
       for (size_t i = 0; i < t.inputs.size(); i++)
       {
          const SlotInfo& in = t.inputs[i];
          s += (i ? "," : "") + std::string("{\"slot\":") + std::to_string(in.slot) + ",\"kind\":" + Q(in.kind) +
-              ",\"label\":" + Q(in.label) + "}";
+              ",\"label\":" + Q(in.label) + ",\"name\":" + Q(slotNames[i]) + "}";
       }
       s += "],\"outputs\":[";
       for (size_t i = 0; i < t.outputs.size(); i++)

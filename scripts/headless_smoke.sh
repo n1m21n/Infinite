@@ -107,5 +107,33 @@ r=$("$BIN" --frame "$S/all_at_once.inf" 0 "$OUT/a.png" 2>/dev/null); rc=$?
 [ "$rc" = 3 ]; check "strict: all-at-once exit 3" $?
 [ "$(echo "$r" | json "sorted(e['code'] for e in d['errors'])")" = "['E_BAD_PARAM', 'W_BYPASS_IGNORED', 'W_UNKNOWN_PARAM']" ]; check "strict: all-at-once lists every problem" $?
 
+# --- names (C2): a hand-written patch canonicalizes to the numeric twin ---
+N="$ROOT/tests/headless/names"
+"$BIN" --canonicalize "$N/numeric.inf" "$OUT/n_num.inf" >/dev/null 2>&1; check "names: numeric canonicalize" $?
+"$BIN" --canonicalize "$N/named.inf" "$OUT/n_named.inf" >/dev/null 2>&1; check "names: named canonicalize" $?
+cmp -s "$OUT/n_num.inf" "$OUT/n_named.inf"; check "names: named == numeric (byte-identical)" $?
+# CRLF, BOM and trailing spaces on every line must not change the result
+sed 's/$/\r/' "$N/named.inf" > "$OUT/crlf.inf"
+printf '\xef\xbb\xbf' > "$OUT/bom.inf"; cat "$N/named.inf" >> "$OUT/bom.inf"
+sed 's/$/   /' "$N/named.inf" > "$OUT/trail.inf"
+for v in crlf bom trail; do
+  "$BIN" --canonicalize "$OUT/$v.inf" "$OUT/n_$v.inf" >/dev/null 2>&1
+  cmp -s "$OUT/n_num.inf" "$OUT/n_$v.inf"; check "names: $v variant canonicalizes identically" $?
+done
+# the same picture from both spellings
+"$BIN" --frame "$N/numeric.inf" 0 "$OUT/fn.png" >/dev/null 2>&1; "$BIN" --frame "$N/named.inf" 0 "$OUT/fa.png" >/dev/null 2>&1
+cmp -s "$OUT/fn.png" "$OUT/fa.png"; check "names: identical --frame PNGs" $?
+# a GUI-written file is untouched by the new reader/writer
+"$BIN" --canonicalize "$ROOT/assets/examples/patch_1.inf" "$OUT/p1.inf" >/dev/null 2>&1
+cmp -s "$OUT/p1.inf" "$N/patch_1.canonical.inf"; check "names: patch_1 load-write byte-identical to baseline" $?
+# errors: unknown id, duplicate id, bad id
+printf 'infinite-patch 1\nnode 1 Source Shape\n  id a\nend\nnode 2 Utility Output\n  id a\nend\n' > "$OUT/dup.inf"
+r=$("$BIN" --validate "$OUT/dup.inf" 2>/dev/null); [ "$(echo "$r" | json "d['errors'][0]['code']")" = "E_DUPLICATE_ID" ]; check "names: duplicate id reported" $?
+printf 'infinite-patch 1\nnode 1 Source Shape\n  id 7up\nend\n' > "$OUT/bad.inf"
+r=$("$BIN" --validate "$OUT/bad.inf" 2>/dev/null); [ "$(echo "$r" | json "d['errors'][0]['code']")" = "E_BAD_ID" ]; check "names: bad id reported" $?
+printf 'infinite-patch 1\nnode 1 Source Shape\n  id shape\nend\nnode 2 Utility Output\nend\ncable out 0 shpae\n' > "$OUT/ref.inf"
+r=$("$BIN" --validate "$OUT/ref.inf" 2>/dev/null); rc=$?
+[ "$rc" = 3 ] && [ "$(echo "$r" | json "d['errors'][0]['code']")" = "E_BAD_REF" ]; check "names: unknown reference exit 3" $?
+
 rm -rf "$OUT"
 exit $fail
