@@ -1,0 +1,32 @@
+infinite-patch 1
+# R473: what --explain adds beyond the file. Cube at x=2; a bypassed Shape (a source: silent); a bypassed Blend (2 inputs: ignored); two LFOs modulating each other (a loop); one arrangement clip.
+node 1 3D Cube
+  id cube
+  uid 101
+  f posX 2
+  c color 1 0 0
+end
+node 2 Source Shape
+  id dead
+  flags 0 1 0 0
+end
+node 3 Modulators LFO
+  id lfoa
+end
+node 4 Modulators LFO
+  id lfob
+end
+node 5 Compositing Blend
+  id mix
+  flags 0 1 0 0
+end
+node 6 Utility Output
+  id out
+end
+cable mix 0 dead
+cable out 0 mix
+mod lfoa phase lfob 0 0 1 0.5
+mod lfob phase lfoa 0 0 1 0.5
+stream 0 0 1 0 0 V1
+streamid 1
+cliptick 0 1 1920 3840 101 0 0 0 0 1 0 0 0 0 intro

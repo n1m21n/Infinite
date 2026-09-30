@@ -69035,6 +69035,73 @@ static std::string ExplainLive(bool json, bool all)
             return n.id;
       return std::string();
    };
+   xenv.nodeNotes = [&](int index, bool fileBypass) -> std::vector<std::string>
+   {
+      std::vector<std::string> out;
+      GraphNode* gn = FindNodeByIndex(index);
+      if (gn == nullptr || gn->node == nullptr)
+         return out;
+      auto num = [](float v)
+      {
+         char b[32];
+         std::snprintf(b, sizeof(b), "%.4g", (double)v);
+         return std::string(b);
+      };
+      // The file's flag, not the live one: the frame loop clears it where bypass cannot apply.
+      bool fileFlag = fileBypass;
+      for (const Patch::NodeRecord& n : gHeadlessPatch.nodes)
+         if (n.index == index)
+            fileFlag = n.bypassed;
+      if (fileFlag)
+      {
+         if (!CanBypass(*gn))
+            out.push_back("bypass ignored: " + std::to_string(InputCountFor(*gn)) + " inputs, nothing to pass through");
+         else if (INode* src = gn->node->BypassSource())
+         {
+            std::string what = "its input";
+            for (const GraphNode& o : gNodes)
+               if (o.node.get() == src)
+                  what = o.typeName + " (" + std::to_string(o.index) + ")";
+            out.push_back("bypassed: passes " + what + " straight through");
+         }
+         else
+            out.push_back("bypassed: silent (nothing passes through)");
+      }
+      if (gn->node->bypassed)
+         return out; // a bypassed source hands out empty geometry
+      if (auto* geo = dynamic_cast<IGeometrySource*>(gn->node.get()))
+      {
+         const Mesh& mesh = geo->GetMesh();
+         if (mesh.HasGeometry())
+         {
+            float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
+            const Mat4 mm = geo->GetModelMatrix();
+            for (const Vertex& v : mesh.vertices)
+            {
+               const float p[3] = { mm.m[0] * v.px + mm.m[4] * v.py + mm.m[8] * v.pz + mm.m[12],
+                                    mm.m[1] * v.px + mm.m[5] * v.py + mm.m[9] * v.pz + mm.m[13],
+                                    mm.m[2] * v.px + mm.m[6] * v.py + mm.m[10] * v.pz + mm.m[14] };
+               for (int k = 0; k < 3; k++)
+               {
+                  lo[k] = std::min(lo[k], p[k]);
+                  hi[k] = std::max(hi[k], p[k]);
+               }
+            }
+            out.push_back("geometry: " + std::to_string(mesh.vertices.size()) + " vertices, " +
+                          std::to_string(mesh.FaceCount()) + " faces, world bbox (" + num(lo[0]) + " " + num(lo[1]) + " " +
+                          num(lo[2]) + ") to (" + num(hi[0]) + " " + num(hi[1]) + " " + num(hi[2]) + ")");
+            const Material mat = geo->GetMaterial();
+            static const char* kShading[] = { "lit", "normals", "uv", "flat" };
+            out.push_back(std::string("material: ") + (mat.shading >= 0 && mat.shading < 4 ? kShading[mat.shading] : "?") +
+                          ", colour " + num(mat.color[0]) + " " + num(mat.color[1]) + " " + num(mat.color[2]) + ", metallic " +
+                          num(mat.metallic) + ", roughness " + num(mat.roughness) + ", opacity " + num(mat.opacity) +
+                          (mat.emission > 0.0f ? ", emission " + num(mat.emission) : std::string()));
+         }
+         else if (geo->IsGeometryOutputIndex(0))
+            out.push_back("geometry: empty (no mesh output)");
+      }
+      return out;
+   };
    const PatchExplain::Explanation ex = PatchExplain::Build(BuildPatchData(), xenv);
    return json ? PatchExplain::ToJson(ex) : PatchExplain::ToText(ex, all);
 }

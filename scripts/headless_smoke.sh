@@ -232,6 +232,14 @@ g=json.loads(sys.stdin.readline()); st=json.loads(sys.stdin.readline())
 sh=[n for n in g['nodes'] if n['id']=='shape'][0]; p={q['key']:q for q in sh['params']}
 print(st['ok'] and st['mode']=='explain' and len(g['nodes'])==3 and sorted(x['kind'] for x in g['relations'])==['cable','expr','mod']
       and p['f sizeX'].get('driven')=='mod' and p['f rotation'].get('driven')=='expr' and p['f posX']['default'] and g['unconnected']==[])")" = "True" ]; check "explain --json: graph line then status line" $?
+# R473: depth beyond the file - effective bypass, mod-loop lag, geometry stats, material, clips
+r=$("$BIN" --explain "$ROOT/tests/headless/explain/depth.inf" --lenient 2>/dev/null)
+echo "$r" | grep -q '^    > bypassed: silent (nothing passes through)$'; check "explain depth: bypassed source says silent" $?
+echo "$r" | grep -q '^    > bypass ignored: 2 inputs, nothing to pass through$'; check "explain depth: ignored bypass is reported" $?
+[ "$(echo "$r" | grep -c 'in a modulation loop: one-frame lag$')" = 2 ]; check "explain depth: both mod-loop edges flagged" $?
+echo "$r" | grep -q '^    > geometry: 96 vertices, 108 faces, world bbox (1.5 -0.5 -0.5) to (2.5 0.5 0.5)$'; check "explain depth: geometry counts and world bbox" $?
+echo "$r" | grep -q '^    > material: lit, colour 1 0 0, '; check "explain depth: effective material" $?
+echo "$r" | grep -q '^  clip video lane 1 "intro" at beat 3, 4 beats, source Cube "cube" (1)$'; check "explain depth: arrangement clip listed" $?
 r=$("$BIN" --explain "$S/misspelled.inf" 2>/dev/null); rc=$?
 [ "$rc" = 3 ] && [ "$(echo "$r" | wc -l | tr -d ' ')" = 1 ]; check "explain: strict, a misspelled param exits 3 with no graph" $?
 "$BIN" --explain "$S/misspelled.inf" --lenient 2>/dev/null | grep -q '^Relations ('; check "explain --lenient: explains it anyway" $?

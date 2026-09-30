@@ -35,6 +35,10 @@ namespace PatchExplain
       std::function<bool(const Patch::ModRecord&, float& lo, float& hi)> resolveMod;
       // Authoring `id` of a node, or "".
       std::function<std::string(int nodeIndex)> idOf;
+      // Facts only the running app knows about a node: what its bypass really does, and for
+      // geometry nodes the vertex/face counts, world bounding box and effective material.
+      // `fileBypass` is the flag the file carried (the frame loop may have cleared the live one).
+      std::function<std::vector<std::string>(int nodeIndex, bool fileBypass)> nodeNotes;
    };
 
    struct Param
@@ -51,6 +55,7 @@ namespace PatchExplain
       std::string type, id;
       bool bypassed = false;
       std::vector<Param> params;
+      std::vector<std::string> notes; // effective bypass, geometry stats, material
    };
    struct Relation
    {
@@ -62,6 +67,7 @@ namespace PatchExplain
       std::vector<Node> nodes;
       std::vector<Relation> relations;
       std::vector<std::string> unconnected; // nodes with no wire in or out
+      std::vector<std::string> clips;       // arrangement clips, one line each
    };
 
    Explanation Build(const Patch::Data& data, const Env& env);

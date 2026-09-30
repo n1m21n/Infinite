@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <set>
 
 #include "HeadlessJob.h"
@@ -91,6 +92,8 @@ namespace PatchExplain
          out.type = n.typeName;
          out.id = env.idOf ? env.idOf(n.index) : n.id;
          out.bypassed = n.bypassed;
+         if (env.nodeNotes)
+            out.notes = env.nodeNotes(n.index, n.bypassed);
          std::map<std::string, std::string> def;
          if (env.defaultParams)
             def = env.defaultParams(n.typeName);
@@ -193,6 +196,60 @@ namespace PatchExplain
          drive(x.dstIndex, x.dstParam, "expr");
          wired.insert(x.dstIndex);
       }
+      // A modulation loop (A drives B, B drives A, or a node driving itself) cannot settle inside
+      // one frame: the edge that closes it reads the other side's value from the previous frame.
+      {
+         std::map<int, std::vector<int>> adj;
+         for (const Patch::ModRecord& m : data.modulation)
+            if (m.enabled)
+               adj[m.srcIndex].push_back(m.dstIndex);
+         auto reaches = [&](int from, int to)
+         {
+            std::set<int> seen;
+            std::vector<int> stack { from };
+            while (!stack.empty())
+            {
+               const int v = stack.back();
+               stack.pop_back();
+               if (v == to)
+                  return true;
+               if (!seen.insert(v).second)
+                  continue;
+               for (int w : adj[v])
+                  stack.push_back(w);
+            }
+            return false;
+         };
+         size_t modAt = e.relations.size() - data.palette.size() - data.expressions.size() - data.modulation.size();
+         for (const Patch::ModRecord& m : data.modulation)
+         {
+            if (m.enabled && reaches(m.dstIndex, m.srcIndex))
+               e.relations[modAt].text += ", in a modulation loop: one-frame lag";
+            modAt++;
+         }
+      }
+      for (const Patch::StreamRecord& s : data.streams)
+      {
+         const char* lane = s.type == Patch::kStreamAudio ? "audio" : "video";
+         for (const Patch::ClipRecord& c : s.clips)
+         {
+            std::string t = std::string("clip ") + lane + " lane " + std::to_string(s.id) + " \"" + c.name + "\" at beat " +
+                            Num((float)c.startTick / 960.0f + 1.0f) + ", " +
+                            Num((float)c.lengthTick / 960.0f) + " beats";
+            std::string src = "unassigned";
+            for (const Patch::NodeRecord& n : data.nodes)
+               if (c.srcUid != 0 && n.uid == c.srcUid)
+                  src = label(n.index);
+            t += ", source " + src;
+            if (c.srcOutput != 0)
+               t += " out " + std::to_string(c.srcOutput);
+            if (c.gainDb != 0.0f)
+               t += ", " + Num(c.gainDb) + " dB";
+            if (!c.enabled)
+               t += ", DISABLED";
+            e.clips.push_back(t);
+         }
+      }
       for (const Node& n : e.nodes)
          if (!wired.count(n.index))
             e.unconnected.push_back(label(n.index));
@@ -211,6 +268,8 @@ namespace PatchExplain
          if (n.bypassed)
             s += "   bypassed";
          s += "\n";
+         for (const std::string& note : n.notes)
+            s += "    > " + note + "\n";
          for (const Param& p : n.params)
          {
             if (p.isDefault && !all)
@@ -222,6 +281,12 @@ namespace PatchExplain
       s += "Relations (" + std::to_string(e.relations.size()) + ")\n";
       for (const Relation& r : e.relations)
          s += "  " + r.text + "\n";
+      if (!e.clips.empty())
+      {
+         s += "Clips (" + std::to_string(e.clips.size()) + ")\n";
+         for (const std::string& t : e.clips)
+            s += "  " + t + "\n";
+      }
       s += "Unconnected:";
       if (e.unconnected.empty())
          s += " none";
@@ -250,12 +315,18 @@ namespace PatchExplain
                s += ",\"driven\":\"" + p.driven + "\"";
             s += "}";
          }
+         s += "],\"notes\":[";
+         for (size_t k = 0; k < n.notes.size(); k++)
+            s += (k ? "," : "") + std::string("\"") + JsonEscape(n.notes[k]) + "\"";
          s += "]}";
       }
       s += "],\"relations\":[";
       for (size_t i = 0; i < e.relations.size(); i++)
          s += (i ? "," : "") + std::string("{\"kind\":\"") + e.relations[i].kind + "\",\"text\":\"" +
               JsonEscape(e.relations[i].text) + "\"}";
+      s += "],\"clips\":[";
+      for (size_t i = 0; i < e.clips.size(); i++)
+         s += (i ? "," : "") + std::string("\"") + JsonEscape(e.clips[i]) + "\"";
       s += "],\"unconnected\":[";
       for (size_t i = 0; i < e.unconnected.size(); i++)
          s += (i ? "," : "") + std::string("\"") + JsonEscape(e.unconnected[i]) + "\"";
