@@ -161,6 +161,41 @@ namespace Patch
       bool diagnosticLog = true;
       bool autosaveEnabled = true;
       int autosaveSeconds = 30;
+      bool audioAutoStart = false; // Turbo: start the audio engine when the app opens (app-level only)
+   };
+
+   // Turbo (upstream format): BPM, time signature and key/scale live on
+   // Transport, not on any node, so without this record they reset on every
+   // load. Defaults match Transport's own, so an older patch reads unchanged.
+   //   transport <bpm> <tsNum> <tsDen> <key> <scale>
+   struct TransportRecord
+   {
+      float bpm = 120.0f;
+      int timeSigNum = 4;
+      int timeSigDen = 4;
+      int key = 0;
+      int scale = 0;
+   };
+
+   // Turbo (upstream format): a Shift-drag gesture recording looping on a
+   // param. One sample of the trace mirrors GestureRecorder::Sample.
+   //   gesture <dst> <param> <speed> <hasRange> <lo> <hi> <count> (<value> <time> <newGrab>)*
+   struct GestureSample
+   {
+      float value = 0.0f;
+      double timeSec = 0.0;
+      bool startsNewGrab = false;
+   };
+
+   struct GestureRecord
+   {
+      int dstIndex = 0;
+      int dstParam = 0;
+      float speed = 1.0f;
+      bool hasRangeOverride = false;
+      float rangeLo = 0.0f, rangeHi = 0.0f;
+      std::vector<GestureSample> samples; // >= 2 entries
+      float curve = 0.0f;
    };
 
    struct Data
@@ -176,6 +211,8 @@ namespace Patch
       std::vector<GlobalRecord> globals;
       std::vector<MidiMapRecord> midi;
       SceneSettings settings;
+      TransportRecord transport;
+      std::vector<GestureRecord> gestures;
    };
 
    bool Write(const std::string& path, const Data& data, std::string& outError);

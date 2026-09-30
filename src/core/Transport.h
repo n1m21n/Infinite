@@ -41,8 +41,20 @@ public:
       mAudioSecondsOffset.store(0.0, std::memory_order_relaxed);
    }
 
-   void SetTempo(float bpm) { mBpm = bpm < 1.0f ? 1.0f : bpm; }
-   float Tempo() const { return mBpm; }
+   // Turbo (upstream approach): while the audio engine drives the clock,
+   // Beats() is offset + elapsed * bpm, so swapping bpm directly re-measures
+   // the whole elapsed span and the playhead jumps. The new tempo is staged
+   // here and applied by the audio thread at the next block boundary, after
+   // re-basing the offsets to "now" (ApplyPendingTempo). Without a live audio
+   // clock the fallback clock is incremental and the tempo lands directly.
+   void SetTempo(float bpm);
+   float Tempo() const
+   {
+      const float pending = mPendingBpm.load(std::memory_order_relaxed);
+      return pending > 0.0f ? pending : mBpm.load(std::memory_order_relaxed);
+   }
+   // Audio thread (AdvanceAudioClock) or main thread when no audio clock.
+   void ApplyPendingTempo();
 
    // Musical position; modulator rates are expressed in beats.
    double Beats() const;
@@ -111,6 +123,7 @@ public:
 private:
    std::atomic<bool> mPlaying { true };
    std::atomic<float> mBpm { 120.0f };
+   std::atomic<float> mPendingBpm { -1.0f };
 
    // Fallback (no audio engine) clock state. Only ever touched by Tick(),
    // which only runs on the main thread and only writes these while

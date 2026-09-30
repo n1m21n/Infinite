@@ -1,5 +1,8 @@
 #include "ImageSourceNode.h"
 
+#include <cstring>
+#include "GltfImport.h"
+
 #include "platform/OpenGLHeaders.h"
 #include <vector>
 
@@ -47,12 +50,72 @@ void ImageSourceNode::EnsurePlaceholder()
    mRevision = NextTextureRevision();
 }
 
+namespace
+{
+   const char* const kGltfScheme = "gltf://";
+
+   bool ParseGltfPseudoPath(const std::string& path, std::string& outRealPath, std::string& outSlot)
+   {
+      const size_t schemeLen = std::strlen(kGltfScheme);
+      if (path.compare(0, schemeLen, kGltfScheme) != 0)
+         return false;
+      const size_t hash = path.find_last_of('#');
+      if (hash == std::string::npos || hash < schemeLen)
+         return false;
+      outRealPath = path.substr(schemeLen, hash - schemeLen);
+      outSlot = path.substr(hash + 1);
+      return !outRealPath.empty() && !outSlot.empty();
+   }
+
+   const GltfImport::GltfDecodedImage* SlotImage(const GltfImport::GltfDecodePackage& pkg, const std::string& slot)
+   {
+      if (slot == "albedo") return &pkg.albedo;
+      if (slot == "roughness") return &pkg.roughness;
+      if (slot == "metallic") return &pkg.metallic;
+      if (slot == "normal") return &pkg.normalMap;
+      if (slot == "ao") return &pkg.occlusion;
+      if (slot == "emission") return &pkg.emissive;
+      return nullptr;
+   }
+}
+
+bool ImageSourceNode::LoadFromDecoded(const std::vector<unsigned char>& pixels, int w, int h,
+                                      const std::string& pseudoPath)
+{
+   if (pixels.empty() || w <= 0 || h <= 0)
+   {
+      mLastError = "no decoded pixels";
+      return false;
+   }
+   UploadPixels(pixels, w, h);
+   mLoadedPath = pseudoPath;
+   pathInput = pseudoPath;
+   return true;
+}
+
 bool ImageSourceNode::Load(const std::string& path)
 {
    if (path.empty())
    {
       mLastError = "no file chosen";
       return false;
+   }
+
+   std::string gltfPath, gltfSlot;
+   if (ParseGltfPseudoPath(path, gltfPath, gltfSlot))
+   {
+      std::string error;
+      const GltfImport::GltfDecodePackage* pkg = GltfImport::DecodeCached(gltfPath, error);
+      const GltfImport::GltfDecodedImage* img = pkg != nullptr ? SlotImage(*pkg, gltfSlot) : nullptr;
+      if (img == nullptr || img->pixels.empty())
+      {
+         mLastError = error.empty() ? ("glTF has no " + gltfSlot + " map") : error;
+         return false;
+      }
+      UploadPixels(img->pixels, img->width, img->height);
+      mLoadedPath = path;
+      pathInput = path;
+      return true;
    }
 
    // Decoded by the OS rather than a bundled decoder, so anything Preview can
@@ -65,7 +128,14 @@ bool ImageSourceNode::Load(const std::string& path)
       mLastError = error;
       return false;
    }
+   UploadPixels(pixels, w, h);
+   mLoadedPath = path;
+   pathInput = path;
+   return true;
+}
 
+void ImageSourceNode::UploadPixels(const std::vector<unsigned char>& pixels, int w, int h)
+{
    if (mTex == 0)
       glGenTextures(1, &mTex);
    glBindTexture(GL_TEXTURE_2D, mTex);
@@ -79,12 +149,9 @@ bool ImageSourceNode::Load(const std::string& path)
 
    mWidth = w;
    mHeight = h;
-   mLoadedPath = path;
-   pathInput = path;
    mLastError.clear();
    mHasPlaceholder = false;
    mRevision = NextTextureRevision();
-   return true;
 }
 
 bool ImageSourceNode::LoadViaDialog()

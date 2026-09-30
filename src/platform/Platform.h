@@ -69,6 +69,13 @@ namespace Platform
    // Decodes any image format the OS understands (png/jpeg/tiff/heic/webp/raw/...)
    // into tightly packed RGBA8, already row-flipped for OpenGL's bottom-up
    // texture convention. Returns false and fills outError on failure.
+   // Turbo (from upstream, glTF import): same output as LoadImageRGBA
+   // (tightly packed RGBA8, row-flipped for OpenGL) for image bytes already in
+   // memory - glTF textures are base64 data-URIs or bytes in the .glb chunk.
+   bool LoadImageRGBAFromMemory(const std::vector<unsigned char>& bytes,
+                                std::vector<unsigned char>& outPixels,
+                                int& outWidth, int& outHeight, std::string& outError);
+
    bool LoadImageRGBA(const std::string& path, std::vector<unsigned char>& outPixels,
                       int& outWidth, int& outHeight, std::string& outError);
 
@@ -469,6 +476,10 @@ namespace Platform
    // Surface both lists in the Plugins panel, with a way to clear the
    // blocklist and retry.
    std::vector<std::string> VST3Blocklist();
+   // Turbo: writes a minidump + log line to %LOCALAPPDATA%\Infinite\crash on an
+   // unhandled exception (CrashHandlerWindows.cpp). Call once, first thing.
+   void InstallCrashHandler();
+   std::string CrashReportDirectory();
    void ClearVST3Blocklist();
 
    // Bundles the most recent EnumerateVST3Plugins() call could not describe

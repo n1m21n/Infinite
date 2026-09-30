@@ -493,6 +493,21 @@ void ChordProgressionNode::CookIfNeeded(int frameId)
       mAudioNode = std::make_unique<AudioChordProgressionNode>();
    chordCount = std::clamp(chordCount, 1, kMaxChords);
    mAudioNode->PushParams(*this);
+
+   // Publish the playing chord's key (main thread, once per chord change).
+   const int playing = PlayingIndex();
+   if (setsKey && playing >= 0 && playing != mLastPublished)
+   {
+      int root = 0, quality = -1;
+      AnalyseMask(chordMask[playing], root, quality);
+      if (chordMask[playing] != 0)
+      {
+         Transport::Instance().SetKey(((root + transpose) % 12 + 12) % 12);
+         if (quality >= 0 && ScaleForQuality(quality) >= 0)
+            Transport::Instance().SetScale(ScaleForQuality(quality));
+      }
+   }
+   mLastPublished = playing;
 }
 
 void ChordProgressionNode::VisitParams(ParamVisitor& v)
@@ -510,6 +525,7 @@ void ChordProgressionNode::VisitParams(ParamVisitor& v)
    v.Int("rateDiv", rateDiv);
    v.Float("strumMs", strumMs);
    v.Int("arpOctaves", arpOctaves);
+   v.Bool("setsKey", setsKey);
    for (int i = 0; i < kMaxChords; i++)
    {
       char key[16];
@@ -598,6 +614,64 @@ int ChordProgressionNode::InvertMask(int mask)
          return mask;
       }
    return mask;
+}
+
+bool ChordProgressionNode::AnalyseMask(int mask, int& rootPc, int& quality)
+{
+   rootPc = 0;
+   quality = -1;
+   if (mask == 0)
+      return false;
+   int bass = 0;
+   while (bass < kKeys && !(mask & (1 << bass)))
+      bass++;
+   const int bassPc = bass % 12;
+   rootPc = bassPc;
+   const int set = PcSetOfMask(mask);
+   int roots[12];
+   int numRoots = 0;
+   roots[numRoots++] = bassPc;
+   for (int pc = 0; pc < 12; pc++)
+      if (pc != bassPc && (set & (1 << pc)))
+         roots[numRoots++] = pc;
+   for (int r = 0; r < numRoots; r++)
+      for (int q = 0; q < kNumQualities; q++)
+         if (PcSetOfQuality(kQualities[q], roots[r]) == set)
+         {
+            rootPc = roots[r];
+            quality = q;
+            return true;
+         }
+   return false;
+}
+
+int ChordProgressionNode::ScaleForQuality(int quality)
+{
+   // Index order matches kQualities.
+   static const int kScale[] = {
+      MusicTime::kMajor,          // maj
+      MusicTime::kNaturalMinor,   // min
+      MusicTime::kMixolydian,     // 7
+      MusicTime::kMajor,          // maj7
+      MusicTime::kDorian,         // m7
+      MusicTime::kLocrian,        // dim
+      MusicTime::kWholeTone,      // aug
+      MusicTime::kMajor,          // sus2
+      MusicTime::kMixolydian,     // sus4
+      MusicTime::kMajor,          // 6
+      MusicTime::kDorian,         // m6
+      MusicTime::kMixolydian,     // 9
+      MusicTime::kMajor,          // maj9
+      MusicTime::kDorian,         // m9
+      MusicTime::kLocrian,        // m7b5
+      -1,                         // dim7: no 7-note scale here fits it, keep the current one
+      MusicTime::kMajor,          // add9
+      MusicTime::kMixolydian,     // 7sus4
+      MusicTime::kMelodicMinor,   // m(maj7)
+      MusicTime::kMinorPentatonic // 5
+   };
+   static_assert(sizeof(kScale) / sizeof(kScale[0]) == (size_t)kNumQualities, "one scale per quality");
+   return kScale[std::clamp(quality, 0, kNumQualities - 1)];
 }
 
 std::string ChordProgressionNode::NameForMask(int mask)

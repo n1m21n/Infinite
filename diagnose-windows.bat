@@ -67,6 +67,23 @@ for %%D in (onnxruntime.dll DirectML.dll) do (
 )
 
 >>"%LOG%" echo.
+>>"%LOG%" echo ===== SYSINFO =====
+for %%I in ("%INFINITE_EXE%") do pushd "%%~dpI"
+set "INFINITE_SYSINFO=1"
+"%INFINITE_EXE%" >>"%LOG%" 2>&1
+set "INFINITE_SYSINFO="
+popd
+
+>>"%LOG%" echo.
+>>"%LOG%" echo ===== CRASH REPORTS =====
+if exist "%LOCALAPPDATA%\Infinite\crash\crash.log" (
+  type "%LOCALAPPDATA%\Infinite\crash\crash.log" >>"%LOG%"
+  dir /b /o-d "%LOCALAPPDATA%\Infinite\crash\*.dmp" >>"%LOG%" 2>&1
+) else (
+  >>"%LOG%" echo nenhum crash registrado
+)
+
+>>"%LOG%" echo.
 >>"%LOG%" echo ===== EXECUCAO =====
 echo Executando Infinite-Turbo.exe. Aguarde a abertura ou o encerramento...
 set "STARTUP_LOG_EXE=!INFINITE_DIR!Infinite-startup.log"

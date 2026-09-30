@@ -67,6 +67,11 @@ public:
    float strumMs = 40.0f;    // 0..250, strum modes
    int arpOctaves = 1;       // 1..3, arp modes
 
+   // When on, each chord that starts playing sets the global key (its root)
+   // and a matching scale, so Quantizer, Random Note and other key-aware
+   // nodes follow the progression.
+   bool setsKey = false;
+
    int chordMask[kMaxChords];
    float chordBars[kMaxChords]; // 0.5..16
 
@@ -86,8 +91,14 @@ public:
    static int BuildMask(int rootPc, int quality);
    static int InvertMask(int mask);
    static std::string NameForMask(int mask);
+   // Root pitch class (0..11) and quality index of a recognised chord;
+   // false (root = lowest note, quality -1) when it matches no quality.
+   static bool AnalyseMask(int mask, int& rootPc, int& quality);
+   // A scale (MusicTime::ScaleType) that fits a chord quality, -1 = none.
+   static int ScaleForQuality(int quality);
 
 private:
    std::unique_ptr<AudioChordProgressionNode> mAudioNode;
    int mLastCookFrame = -1;
+   int mLastPublished = -1;
 };

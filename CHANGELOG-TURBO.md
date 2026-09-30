@@ -1,5 +1,51 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.42.0-turbo (2026-09-30)
+
+Tempo, key and scale stay with the project and can be driven without the mouse; wave B of the
+upstream catch-up.
+
+### Transport
+- **Patches save BPM, time signature, key and scale** (upstream `transport` line, so patches stay
+  compatible both ways). A new document starts at 120 / 4/4 / C major. Undo does not move them.
+- **Tempo changes no longer jump the playhead**: while audio runs, a new tempo lands at the next
+  block after re-basing the clock (upstream fix). Before, every tempo edit during playback
+  re-measured the whole elapsed time.
+- **Transport Control** (Control, Turbo original): PLAY / STOP / REWIND / TAP buttons, each also a
+  trigger pin; bpm with glide (accelerando/ritardando), follow external MIDI clock, key and scale
+  (optionally waiting for the next bar), time signature. Every control is a modulation pin, so a
+  MIDI controller (MIDI learn), LFO, Macro or sequence can drive them. A section only takes over
+  while its `drive` switch is on; off, it mirrors the live transport. `T` taps tempo while the
+  pointer is over the node. AUDIO starts/stops the audio engine; `audio on open` starts it
+  whenever the patch is opened. Outputs (modulators): `beat` and `bar` (0..1 ramps locked to the
+  transport), `bpm` (20..300 as 0..1) and `play` (1 while playing).
+- **Settings > Audio > "Start audio when Infinite opens"** (off by default, machine setting).
+- **Chord Progression `sets key`**: each chord sets the global key and a matching scale, so
+  Quantizer, Random Note and other key-aware nodes follow the progression.
+
+### From upstream
+- **Gesture recording**: hold Shift while dragging any knob or slider to record the movement;
+  releasing Shift loops it (while the transport plays). A green dot on the pin marks a looping
+  param; grabbing it without Shift takes it back. Saved with the patch.
+- **glTF / GLB import**: dropping a .gltf/.glb builds Model 3D + Material + one Image Source per
+  texture map (albedo, roughness, metallic, normal, AO, emission), already wired, in one undo
+  step. Dropped onto an existing Model 3D it just reloads. FBX, DAE and 3DS drops also open.
+- **Sampler fade in / fade out** per pass (replaces the loop crossfade; the old key is ignored).
+- **Patch reader** tolerates CRLF line ends and a UTF-8 BOM (files edited in Notepad or by tools).
+- **Crash reports**: an unhandled crash leaves a minidump and a log line in
+  `%LOCALAPPDATA%\Infinite\crash`. `diagnose-windows.bat` now includes a system report
+  (GL, audio driver and devices, MIDI, VST3 blocklist) and the crash log.
+
+### Looper
+- A Macro Trigger or MIDI pad on REC / PLAY / DUB presses the button once per hit (footswitch
+  style) instead of holding it only while high.
+
+### Not ported
+- Instance selection (needs upstream's instance-realize geometry refactor).
+- Upstream's browser sort/filter strip and 9-category taxonomy: our browsers already sort and
+  filter, and our menu organisation differs.
+- Upstream's right-click MIDI learn: we keep our own MIDI learn mode.
+
 ## 0.41.0-turbo (2026-09-30)
 
 Wave 1 of the upstream catch-up, plus a chord progression node.

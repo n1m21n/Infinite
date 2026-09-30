@@ -130,9 +130,11 @@ public:
    float start = 0.0f;    // 0..1, left edge of the playback/loop range
    float end = 1.0f;      // 0..1, right edge of the playback/loop range
    float volume = 0.8f;   // 0..1
-   // Loop crossfade in ms (wrapping loop only). 8 ms covers the seam click
-   // without smearing a drum loop's downbeat; 0 = the old hard wrap.
-   float xfade = 8.0f;
+   // Per-pass fade in / fade out in ms (from upstream; replaced the loop
+   // crossfade). Every pass through start..end opens and closes with these,
+   // so a loop dips at its seam instead of clicking. 0 / 0 = no fade.
+   float fadeIn = 3.0f;
+   float fadeOut = 3.0f;
    bool loop = false;
    bool reverse = false;  // plays start<-end instead of start->end
    bool pingpong = false; // with loop on, bounces direction at each edge instead of wrapping

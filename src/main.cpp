@@ -137,6 +137,10 @@
 #include "audio/Wavetable.h"
 #include "nodes/NoteNodes.h"
 #include "nodes/ChordProgressionNode.h"
+#include "nodes/TransportControlNode.h"
+#include "core/GestureRecorder.h"
+#include "core/GltfImport.h"
+#include "core/SysInfo.h"
 #include "nodes/SamplerNode.h"
 #include "nodes/PaulStretchNode.h"
 #include "nodes/GranularNode.h"
@@ -785,6 +789,8 @@ namespace
    bool gVsync = true;
    bool gDiagnosticLogEnabled = true;
    bool gAutosaveEnabled = true;
+   bool gAudioAutoStart = false;        // Turbo: Settings > Audio > start audio when Infinite opens
+   bool gAudioAutoStartPending = false; // set at launch, consumed on the first frames
    int gAutosaveSeconds = 30;
    double gLastAutosaveTime = 0.0;
    bool gRecoveryAvailable = false;
@@ -1447,6 +1453,29 @@ namespace
       }
       else if (MidiMap::LearnMode())
          dl->AddCircle(c, 7.0f, IM_COL32(255, 150, 40, 120), 16, 1.5f);
+
+      // Turbo: gesture state - red while a Shift-drag records, green while a
+      // recorded loop plays on this param.
+      const GestureRecorder& gr = GestureRecorder::Instance();
+      if (gr.Playbacks().count(GestureRecorder::Key(nodeIndex, paramIndex)) > 0)
+         dl->AddCircleFilled(ImVec2(c.x + 5.5f, c.y - 5.5f), 2.5f, IM_COL32(90, 220, 120, 255));
+      else if (ImGui::GetIO().KeyShift && gr.IsRecording(nodeIndex, paramIndex))
+         dl->AddCircleFilled(ImVec2(c.x + 5.5f, c.y - 5.5f), 2.5f, IM_COL32(240, 70, 70, 255));
+   }
+
+   // Turbo (from upstream): Shift-drag records a param's movement; releasing
+   // Shift turns the trace into a loop that replays while the transport plays.
+   // A plain grab (no Shift) of a looping param takes it back.
+   void GestureWidgetHook(int nodeIndex, int paramIndex, float value, bool active, bool activated)
+   {
+      if (nodeIndex < 0)
+         return;
+      GestureRecorder& gr = GestureRecorder::Instance();
+      const bool shift = ImGui::GetIO().KeyShift;
+      if (activated && !shift)
+         gr.StopPlayback(nodeIndex, paramIndex);
+      if (active && shift)
+         gr.NotifyMovement(nodeIndex, paramIndex, value, gr.RecordClockNow(), activated);
    }
 
    struct DiscreteParamRef
@@ -1667,8 +1696,11 @@ namespace
       return clicked || firedByCv;
    }
 
+   // toggleOnRise (Turbo): for footswitch-style buttons (Looper transport) a
+   // driving CV presses the button on each rising edge - one Macro Trigger or
+   // MIDI pad hit = one press - instead of holding the state while high.
    bool ModStateButton(const char* label, bool currentState, bool& requestedState,
-                       const ImVec2& size)
+                       const ImVec2& size, bool toggleOnRise = false)
    {
       if (gCurrentNodeIndex < 0)
       {
@@ -1682,10 +1714,20 @@ namespace
       bool changedByCv = false;
       if (ref.modulated)
       {
-         requestedState = *ref.value >= 0.5f;
+         const bool high = *ref.value >= 0.5f;
          const std::pair<int, int> key(ref.nodeIndex, ref.paramIndex);
-         changedByCv = requestedState != gDiscretePreviousHigh[key];
-         gDiscretePreviousHigh[key] = requestedState;
+         if (toggleOnRise)
+         {
+            changedByCv = high && !gDiscretePreviousHigh[key];
+            if (changedByCv)
+               requestedState = !currentState;
+         }
+         else
+         {
+            requestedState = high;
+            changedByCv = requestedState != gDiscretePreviousHigh[key];
+         }
+         gDiscretePreviousHigh[key] = high;
          ImGui::BeginDisabled();
       }
       else
@@ -2040,6 +2082,7 @@ namespace
          // delta is applied, so this is still the pre-drag value.
          if (ImGui::IsItemActivated())
             PushUndoCheckpoint();
+         GestureWidgetHook(nodeIndex, paramIndex, *value, ImGui::IsItemActive(), ImGui::IsItemActivated());
          if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/false);
          // Right-click also jumps straight into the text field, same as
@@ -2703,6 +2746,8 @@ namespace
          changed = DrawWidget(value, IM_COL32(120, 200, 255, 235), /*readOnly=*/false);
          if (gLastAudioWidgetInteraction.activated)
             PushUndoCheckpoint();
+         GestureWidgetHook(nodeIndex, paramIndex, *value, gLastAudioWidgetInteraction.active,
+                           gLastAudioWidgetInteraction.activated);
          const bool hovered = gLastAudioWidgetInteraction.hovered;
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/false);
@@ -3336,6 +3381,7 @@ namespace
       REGISTER_NODE(VelocityToCVNode, Velocity to CV, "Modulators");
       REGISTER_NODE(KeyboardNode, Keyboard, "Notes");
       REGISTER_NODE(ChordProgressionNode, Chord Progression, "Notes");
+      REGISTER_NODE(TransportControlNode, Transport Control, "Control");
       REGISTER_NODE(NoteSwitcherNode, Note Switcher, "Notes");
       REGISTER_NODE(AudioToCVNode, Audio to CV, "Modulators");
 
@@ -7478,7 +7524,8 @@ namespace
          return false;
       return dynamic_cast<IAudioSource*>(node) != nullptr || node->AudioInputSlot(0) != nullptr ||
              dynamic_cast<INoteSource*>(node) != nullptr || node->NoteInputSlot(0) != nullptr ||
-             dynamic_cast<VibratoNode*>(node) != nullptr || dynamic_cast<EnvelopeNode*>(node) != nullptr;
+             dynamic_cast<VibratoNode*>(node) != nullptr || dynamic_cast<EnvelopeNode*>(node) != nullptr ||
+             dynamic_cast<TransportControlNode*>(node) != nullptr; // Turbo: pin-less, bespoke body
    }
 
    // Drains WavetableNode's MeterRing into a small cache on the node itself
@@ -10435,13 +10482,11 @@ namespace
       ImGui::SameLine();
       if (AudioSlider("end", &n->end, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
          n->end = std::max(n->end, n->start + 0.01f);
-      {
-         // only a wrapping loop has a seam to fade (ping-pong bounces)
-         const bool xfadeActive = n->loop && !n->pingpong;
-         ImGui::BeginDisabled(!xfadeActive);
-         AudioSlider("loop xfade", &n->xfade, 0.0f, 250.0f, "%.0f ms", AudioFullWidth());
-         ImGui::EndDisabled();
-      }
+      // Per-pass fades: every pass through start..end opens and closes with
+      // these (a loop dips at its seam instead of clicking).
+      AudioSlider("fade in", &n->fadeIn, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
+      ImGui::SameLine();
+      AudioSlider("fade out", &n->fadeOut, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
 
       EndAudioBody();
    }
@@ -13905,6 +13950,8 @@ namespace
          row.End();
       }
       AudioToggleButton("bass", &n->bass, 56.0f);
+      ImGui::SameLine();
+      AudioToggleButton("sets key", &n->setsKey, 76.0f);
 
       EndAudioBody();
    }
@@ -17533,21 +17580,21 @@ namespace
 
          ImGui::PushStyleColor(ImGuiCol_Button, n->IsRecordingOrArmed() ? ImVec4(0.75f, 0.18f, 0.18f, 1.0f)
                                                                          : ImVec4(0.30f, 0.12f, 0.12f, 1.0f));
-         if (ModStateButton("REC##looperRec", n->IsRecordingOrArmed(), requested, size))
+         if (ModStateButton("REC##looperRec", n->IsRecordingOrArmed(), requested, size, /*toggleOnRise=*/true))
             n->SetRecord(requested);
          ImGui::PopStyleColor();
          ImGui::SameLine();
 
          ImGui::PushStyleColor(ImGuiCol_Button, n->IsPlaying() ? ImVec4(0.20f, 0.55f, 0.32f, 1.0f)
                                                                : ImVec4(0.12f, 0.24f, 0.16f, 1.0f));
-         if (ModStateButton("PLAY##looperPlay", n->IsPlaying(), requested, size))
+         if (ModStateButton("PLAY##looperPlay", n->IsPlaying(), requested, size, /*toggleOnRise=*/true))
             n->SetPlay(requested);
          ImGui::PopStyleColor();
          ImGui::SameLine();
 
          ImGui::PushStyleColor(ImGuiCol_Button, n->IsOverdubbing() ? ImVec4(0.80f, 0.50f, 0.15f, 1.0f)
                                                                    : ImVec4(0.30f, 0.20f, 0.10f, 1.0f));
-         if (ModStateButton("DUB##looperDub", n->IsOverdubbing(), requested, size))
+         if (ModStateButton("DUB##looperDub", n->IsOverdubbing(), requested, size, /*toggleOnRise=*/true))
             n->SetOverdub(requested);
          ImGui::PopStyleColor();
          ImGui::SameLine();
@@ -18984,10 +19031,127 @@ namespace
       EndAudioBody();
    }
 
+   // ---- Transport Control (Turbo) ------------------------------------------
+   bool StartAudioEngine(std::string& outError); // defined with the audio lifecycle code below
+
+   void DrawTransportControlBody(GraphNode& gn, TransportControlNode* n)
+   {
+      Transport& transport = Transport::Instance();
+      char stat[128];
+      const auto& scales = MusicTime::ScaleTypeList();
+      const int scaleIdx = std::clamp(transport.Scale(), 0, (int)scales.size() - 1);
+      snprintf(stat, sizeof(stat), "%.1f bpm  -  %s %s%s  -  %d/%d  -  %s", transport.Tempo(),
+               NoteNameList()[((transport.Key() % 12) + 12) % 12].c_str(), scales[scaleIdx].c_str(),
+               n->KeyPending() ? " (next bar)" : "", transport.TimeSigNumerator(), transport.TimeSigDenominator(),
+               transport.IsPlaying() ? "playing" : "stopped");
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      // Transport buttons: each is a trigger pin too (Macro Trigger, MIDI pad).
+      {
+         const float spacing = ImGui::GetStyle().ItemSpacing.x;
+         const float bw = (gAudioContentW - 4.0f * spacing) / 5.0f;
+         const ImVec2 size(bw, 28.0f);
+         // The audio engine itself (same as the toolbar's Start/Stop Audio).
+         {
+            const bool audioOn = AudioEngine::Instance().SampleRate() > 0.0;
+            bool requested = audioOn;
+            ImGui::PushStyleColor(ImGuiCol_Button, audioOn ? ImVec4(0.16f, 0.52f, 0.28f, 1.0f)
+                                                           : ImVec4(0.30f, 0.30f, 0.34f, 1.0f));
+            if (ModStateButton("AUDIO##tcAudio", audioOn, requested, size, /*toggleOnRise=*/true) && requested != audioOn)
+            {
+               if (!requested)
+                  AudioEngine::Instance().Stop();
+               else
+               {
+                  gAudioStartError.clear();
+                  if (!StartAudioEngine(gAudioStartError))
+                     fprintf(stderr, "audio device: %s\n", gAudioStartError.c_str());
+               }
+            }
+            ImGui::PopStyleColor();
+            ImGui::SameLine();
+         }
+         if (ModTriggerButton("PLAY##tcPlay", size))
+            n->Play();
+         ImGui::SameLine();
+         if (ModTriggerButton("STOP##tcStop", size))
+            n->Stop();
+         ImGui::SameLine();
+         if (ModTriggerButton("REWIND##tcRewind", size))
+            n->Rewind();
+         ImGui::SameLine();
+         if (ModTriggerButton("TAP##tcTap", size))
+            n->Tap();
+      }
+      // T taps while the pointer is over this node (no global hijack).
+      {
+         const ImGuiIO& io = ImGui::GetIO();
+         const bool hovered = ed::GetHoveredNode() == ed::NodeId(gn.NodeId());
+         if (hovered && !io.WantTextInput && !io.KeyCtrl && !io.KeyAlt && !io.KeySuper &&
+             ImGui::IsKeyPressed(ImGuiKey_T, false))
+            n->Tap();
+      }
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      BeginAudioSection("tempo");
+      {
+         AudioKnobRow row(4, kKnobLarge);
+         ImGui::BeginDisabled(!n->driveTempo);
+         row.Knob("bpm", &n->bpm, 20.0f, 300.0f, "%.1f", kKnobLarge);
+         row.Knob("glide", &n->glide, 0.0f, 16.0f, "%.1f s");
+         ImGui::EndDisabled();
+         row.Checkbox("drive##tcTempo", &n->driveTempo);
+         row.Checkbox("MIDI clock##tcClock", &n->followClock);
+         row.End();
+      }
+      if (n->followClock)
+         ImGui::TextDisabled(n->ClockPresent() ? "following MIDI clock" : "MIDI clock: no signal");
+      EndAudioSection();
+
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      BeginAudioSection("key / scale");
+      {
+         AudioKnobRow row(4, kKnobSmall, ImGui::GetFrameHeight() + 5.0f);
+         ImGui::BeginDisabled(!n->driveKey);
+         row.Dropdown("key##tcKey", NoteNameList(), std::clamp(n->key, 0, 11),
+                      [n](int i) { PushUndoCheckpoint(); n->key = i; });
+         row.Dropdown("scale##tcScale", MusicTime::ScaleTypeList(),
+                      std::clamp(n->scale, 0, MusicTime::kNumScaleTypes - 1),
+                      [n](int i) { PushUndoCheckpoint(); n->scale = i; });
+         ImGui::EndDisabled();
+         row.Checkbox("drive##tcKeyDrive", &n->driveKey);
+         row.Checkbox("on bar##tcOnBar", &n->keyOnBar);
+         row.End();
+      }
+      EndAudioSection();
+
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      BeginAudioSection("meter");
+      {
+         static const std::vector<std::string> kDen = { "/2", "/4", "/8", "/16" };
+         AudioKnobRow row(4, kKnobSmall, ImGui::GetFrameHeight() + 5.0f);
+         ImGui::BeginDisabled(!n->driveMeter);
+         row.KnobInt("beats", &n->meterNum, 1, 16);
+         row.Dropdown("unit##tcDen", kDen, std::clamp(n->meterDenIndex, 0, 3),
+                      [n](int i) { PushUndoCheckpoint(); n->meterDenIndex = i; });
+         ImGui::EndDisabled();
+         row.Checkbox("drive##tcMeterDrive", &n->driveMeter);
+         row.Skip();
+         row.End();
+      }
+      EndAudioSection();
+      AudioToggleButton("audio on open", &n->audioOnOpen, 110.0f);
+      ImGui::TextDisabled("T taps tempo while the pointer is over this node");
+
+      EndAudioBody();
+   }
+
    void DrawAudioNodeBody(GraphNode& gn)
    {
       if (auto* n = dynamic_cast<LooperNode*>(gn.node.get()))
          DrawLooperBody(gn, n);
+      else if (auto* n = dynamic_cast<TransportControlNode*>(gn.node.get()))
+         DrawTransportControlBody(gn, n);
       else if (auto* n = dynamic_cast<ChordProgressionNode*>(gn.node.get()))
          DrawChordProgressionBody(gn, n);
       else if (auto* n = dynamic_cast<GrainMolderNode*>(gn.node.get()))
@@ -22613,7 +22777,8 @@ namespace
          { "Slideshow", "Plays the images of one folder in alphabetical order with a transition (fade, slide, wipe, zoom). Hold and transition time follow the transport; Native keeps source pixels 1:1, Best Fit stretches to fill, Proportional Fit preserves aspect." },
          { "Macro XY", "A 2D pad exposing X and Y as two separate modulator outputs from one drag. The pad's path can be recorded, looped and replayed in time, like Resynthesize's orb." },
          { "Keyboard", "A hardware-free note source: click-and-drag the on-screen piano, or hover the node and type on your laptop keyboard (Logic/GarageBand's Musical Typing layout - ZXCVBNM... is one octave, QWERTY... the octave above) to test a patch with no MIDI controller at all." },
-         { "Chord Progression", "Plays a looped chord progression locked to the transport. Click a slot to select a chord, click the keys to set its notes (or pick a root and quality and press set; inv moves the lowest note up an octave), and set how many bars it lasts. chords sets how many slots play, octave moves the keyboard, transpose shifts the whole progression, gate shortens each chord (1 = legato), and bass adds the lowest note an octave down. play sets how each chord is played: block, strum up/down (strum = ms between notes), arp up/down/up-down/random (one note per rate step, over 1-3 octaves), pulse (the whole chord re-struck every step), alberti (low-high-middle-high) and bass + chord (oom-pah); gate is the fraction of the chord in block/strum and of each step in the stepped modes. Patch the note output into any synth or plugin instrument." },
+         { "Chord Progression", "Plays a looped chord progression locked to the transport. Click a slot to select a chord, click the keys to set its notes (or pick a root and quality and press set; inv moves the lowest note up an octave), and set how many bars it lasts. chords sets how many slots play, octave moves the keyboard, transpose shifts the whole progression, gate shortens each chord (1 = legato), and bass adds the lowest note an octave down. sets key makes each chord set the global key and a matching scale, so key-aware nodes follow the progression. play sets how each chord is played: block, strum up/down (strum = ms between notes), arp up/down/up-down/random (one note per rate step, over 1-3 octaves), pulse (the whole chord re-struck every step), alberti (low-high-middle-high) and bass + chord (oom-pah); gate is the fraction of the chord in block/strum and of each step in the stepped modes. Patch the note output into any synth or plugin instrument." },
+         { "Transport Control", "Drives the global transport without the mouse. Every control is a pin: patch an LFO, a Macro, a MIDI CC (or use MIDI learn) into bpm, key, scale or the meter, and a Macro Trigger or MIDI pad into PLAY/STOP/REWIND/TAP. A section only takes over while its drive switch is on; off, its controls follow the live transport. glide ramps tempo changes (accelerando/ritardando), MIDI clock follows an external clock, on bar holds a key/scale change until the next bar. T taps tempo while the pointer is over the node. AUDIO starts/stops the audio engine (audio on open starts it whenever this patch is opened). Outputs: beat and bar are 0..1 ramps locked to the transport, bpm is the tempo mapped 20..300 to 0..1, play is 1 while playing." },
          { "Audio Meter", "A stereo level meter: separate L and R bars on a shared -60 to +3 dBFS scale, each showing RMS (solid) inside peak (faint), a peak-hold line, and the channel's highest peak as a number on top, which turns red once that channel has reached 0 dBFS. Audio passes through unchanged. It measures whatever its input is patched to even with its output left unconnected, so it can hang off any cable as a tap. Click the meter to clear the peak numbers, holds and clip." },
          { "Macro Slider", "A named fader exposed as a modulator - drag its output onto any slider's modulation pin to drive that parameter by hand. The plain 0..1 member of the Macro family; use Macro Knob when you want a response curve and invert as well." },
          { "Macro Bipolar Knob", "A centre-detent knob running -1 to +1, exposed as a modulator - the right control for anything that has a natural middle (pan, detune, tilt). Its 0..1 output puts the detent at exactly 0.5, which is also where a bipolar modulation binding reads as 'no modulation'." },
@@ -23679,6 +23844,7 @@ namespace
       s.diagnosticLog = gDiagnosticLogEnabled;
       s.autosaveEnabled = gAutosaveEnabled;
       s.autosaveSeconds = gAutosaveSeconds;
+      s.audioAutoStart = gAudioAutoStart;
       return s;
    }
 
@@ -23714,6 +23880,10 @@ namespace
       gDiagnosticLogEnabled = s.diagnosticLog;
       gAutosaveEnabled = s.autosaveEnabled;
       gAutosaveSeconds = std::max(15, std::min(s.autosaveSeconds, 300));
+      // App-level preference: only the machine settings file sets it (a
+      // patch's own saved settings never switch it on or off).
+      if (!restartRunningAudio)
+         gAudioAutoStart = s.audioAutoStart;
       RuntimeLog::SetEnabled(gDiagnosticLogEnabled);
 
       Platform::AudioSetRequestedDriver(gAudioDriver);
@@ -23748,7 +23918,7 @@ namespace
              a.viewportPanelDock == b.viewportPanelDock && a.viewportPanelWidth == b.viewportPanelWidth &&
              a.viewportPanelHeight == b.viewportPanelHeight && a.themePreset == b.themePreset &&
              a.diagnosticLog == b.diagnosticLog && a.autosaveEnabled == b.autosaveEnabled &&
-             a.autosaveSeconds == b.autosaveSeconds;
+             a.autosaveSeconds == b.autosaveSeconds && a.audioAutoStart == b.audioAutoStart;
    }
 
    void PersistSceneSettingsIfChanged()
@@ -23866,6 +24036,7 @@ namespace
       PushUndoCheckpoint();
       Modulation::Instance().UnbindAllFor(index);
       PaletteBinding::Instance().UnbindAllFor(index);
+      GestureRecorder::Instance().ClearForNode(index);
       MidiMap::RemoveNode(index);
       gModHistory.erase(index);
       DisconnectAllTo(victim->node.get());
@@ -24048,6 +24219,20 @@ namespace
          }
       }
 
+      for (const auto& [key, playback] : GestureRecorder::Instance().Playbacks())
+      {
+         Patch::GestureRecord g;
+         g.dstIndex = key.first;
+         g.dstParam = key.second;
+         g.speed = playback.speed;
+         g.hasRangeOverride = playback.hasRangeOverride;
+         g.rangeLo = playback.rangeLo;
+         g.rangeHi = playback.rangeHi;
+         g.curve = playback.curve;
+         for (const GestureRecorder::Sample& smp : playback.samples)
+            g.samples.push_back({ smp.value, smp.timeSec, smp.startsNewGrab });
+         data.gestures.push_back(std::move(g));
+      }
       for (const auto& link : Modulation::Instance().Links())
          data.modulation.push_back({ link.first.first, link.first.second,
                                      link.second.nodeIndex, link.second.outputIndex,
@@ -24081,6 +24266,12 @@ namespace
       // the order is part of the meaning, not just presentation.
       for (const ExprGlobals::Global& g : ExprGlobals::All())
          data.globals.push_back({ g.name, g.expr });
+      // Turbo: the transport travels with the patch (and with undo entries).
+      data.transport.bpm = Transport::Instance().Tempo();
+      data.transport.timeSigNum = Transport::Instance().TimeSigNumerator();
+      data.transport.timeSigDen = Transport::Instance().TimeSigDenominator();
+      data.transport.key = Transport::Instance().Key();
+      data.transport.scale = Transport::Instance().Scale();
       return data;
    }
 
@@ -24228,6 +24419,7 @@ namespace
       gModHistory.clear();
       Modulation::Instance().Clear();
       PaletteBinding::Instance().Clear();
+      GestureRecorder::Instance().Clear();
       MidiMap::Clear();
       ExprGlobals::Clear();
       gNextIndex = 1;
@@ -24241,6 +24433,12 @@ namespace
       {
          gUndoStack.clear();
          gRedoStack.clear();
+         // A fresh document also resets the transport; a loaded patch sets
+         // its own right after this (ApplyPatchData).
+         Transport::Instance().SetTempo(120.0f);
+         Transport::Instance().SetTimeSignature(4, 4);
+         Transport::Instance().SetKey(0);
+         Transport::Instance().SetScale(0);
       }
    }
 
@@ -24352,6 +24550,31 @@ namespace
             Modulation::Instance().RestoreLink(dst->index, m.dstParam, source);
          }
       }
+      {
+         GestureRecorder::PlaybackMap loaded;
+         for (const Patch::GestureRecord& g : data.gestures)
+         {
+            GraphNode* dst = resolve(g.dstIndex);
+            if (dst == nullptr || g.samples.size() < 2)
+               continue;
+            GestureRecorder::Playback pb;
+            pb.speed = g.speed;
+            pb.hasRangeOverride = g.hasRangeOverride;
+            pb.rangeLo = g.rangeLo;
+            pb.rangeHi = g.rangeHi;
+            pb.curve = g.curve;
+            for (const Patch::GestureSample& smp : g.samples)
+               pb.samples.push_back({ smp.value, smp.timeSec, smp.startsNewGrab });
+            pb.recordedMin = pb.recordedMax = pb.samples.front().value;
+            for (const GestureRecorder::Sample& smp : pb.samples)
+            {
+               pb.recordedMin = std::min(pb.recordedMin, smp.value);
+               pb.recordedMax = std::max(pb.recordedMax, smp.value);
+            }
+            loaded[GestureRecorder::Key(dst->index, g.dstParam)] = std::move(pb);
+         }
+         GestureRecorder::Instance().Restore(std::move(loaded), GestureRecorder::Instance().ClockNow());
+      }
       for (const Patch::PaletteRecord& c : data.palette)
       {
          GraphNode* dst = resolve(c.dstIndex);
@@ -24392,6 +24615,18 @@ namespace
       for (const Patch::GlobalRecord& g : data.globals)
          ExprGlobals::All().push_back({ g.name, g.expr, 0.0f, std::string() });
 
+      // Turbo: transport before the audio rebuild, so anything it reads sees
+      // the loaded document's tempo and meter. Only when opening a file:
+      // undo/redo leave the live tempo alone, so an undo of a node edit never
+      // snaps back a tempo that was changed (or is being driven) since.
+      if (applySceneSettings)
+      {
+         Transport::Instance().SetTempo(data.transport.bpm);
+         Transport::Instance().SetTimeSignature(data.transport.timeSigNum, data.transport.timeSigDen);
+         Transport::Instance().SetKey(data.transport.key);
+         Transport::Instance().SetScale(data.transport.scale);
+      }
+
       // Once, after every node and cable above is wired, not once per audio
       // cable while loading - a per-cable rebuild here could call
       // SetTopology with a half-wired graph, since load order (data.audio is
@@ -24419,6 +24654,16 @@ namespace
       }
 
       ApplyPatchData(data, true);
+      // Turbo: a Transport Control with "audio on open" starts the engine.
+      if (AudioEngine::Instance().SampleRate() <= 0.0)
+         for (GraphNode& gn : gNodes)
+            if (auto* tc = dynamic_cast<TransportControlNode*>(gn.node.get()); tc != nullptr && tc->audioOnOpen)
+            {
+               gAudioStartError.clear();
+               if (!StartAudioEngine(gAudioStartError))
+                  fprintf(stderr, "audio on open: %s\n", gAudioStartError.c_str());
+               break;
+            }
 
       // A freshly opened file is a new-document boundary: undoing back into
       // whatever was open before this file is not a thing anyone wants.
@@ -31681,6 +31926,10 @@ int main(int argc, char** argv)
    std::setvbuf(stdout, nullptr, _IONBF, 0);
    std::setvbuf(stderr, nullptr, _IONBF, 0);
    StartupTrace("startup: main entered");
+   // Turbo: leave a minidump behind instead of a window that just vanishes.
+   Platform::InstallCrashHandler();
+   if (getenv("INFINITE_CRASHTEST") != nullptr)
+      SysInfo::CrashTest();
    StartupTrace("startup: initializing JUCE");
    Platform::EnsureJuceInitialised();
    StartupTrace("startup: JUCE initialized");
@@ -31815,6 +32064,8 @@ int main(int argc, char** argv)
       return 1;
    }
    StartupTrace("startup: OpenGL initialized");
+   if (getenv("INFINITE_SYSINFO") != nullptr)
+      SysInfo::PrintAndExit(window, INFINITE_TURBO_VERSION);
    RuntimeLog::Write("OpenGL %d.%d core context: %s | %s", gGLContextMajor, gGLContextMinor,
                      (const char*)glGetString(GL_RENDERER), (const char*)glGetString(GL_VERSION));
    glfwSwapInterval(1);
@@ -31991,6 +32242,11 @@ int main(int argc, char** argv)
          controlPort = atoi(portEnv);
       RemoteControl::Start(controlPort);
    }
+
+   // Turbo: opt-in auto-start (Settings > Audio > "Start audio when Infinite
+   // opens"). Started from the main loop once the first frames are up, the
+   // same StartAudioEngine path the toolbar button uses. Never in test runs.
+   gAudioAutoStartPending = gAudioAutoStart && getenv("INFINITE_EXITAFTER") == nullptr;
 
    // The audio engine no longer auto-starts at launch: someone opening the
    // app to work on visuals shouldn't have audio hardware opened out from
@@ -33516,6 +33772,16 @@ int main(int argc, char** argv)
       // prompts/02-device-change-and-wake-recovery.md) - once a frame, main
       // thread only.
       PollAudioRecovery();
+      if (gAudioAutoStartPending && frameId >= 2)
+      {
+         gAudioAutoStartPending = false;
+         if (AudioEngine::Instance().SampleRate() <= 0.0)
+         {
+            gAudioStartError.clear();
+            if (!StartAudioEngine(gAudioStartError))
+               fprintf(stderr, "audio auto-start: %s\n", gAudioStartError.c_str());
+         }
+      }
 
       // Per-frame audio housekeeping off the audio thread (currently just
       // freeing sample-preview buffers the audio thread has retired) - see
@@ -34054,6 +34320,10 @@ int main(int argc, char** argv)
       PollFileDialogs();
 
       Transport::Instance().Tick(ImGui::GetIO().DeltaTime);
+      // Turbo (from upstream): Shift-drag gesture recording. Loops only move
+      // while the transport plays; releasing Shift turns each trace into a loop.
+      GestureRecorder::Instance().AdvanceClock(ImGui::GetIO().DeltaTime, Transport::Instance().IsPlaying());
+      GestureRecorder::Instance().BeginFrame(ImGui::GetIO().KeyShift, GestureRecorder::Instance().ClockNow());
 
       if (getenv("INFINITE_TRANSPORTCLOCKTEST") != nullptr)
       {
@@ -34418,6 +34688,7 @@ int main(int argc, char** argv)
             }
 
             ImGui::SeparatorText("Audio");
+            ImGui::Checkbox("Start audio when Infinite opens", &gAudioAutoStart);
             {
                // Turbo: driver type. ASIO (the interface's own driver) or
                // WASAPI exclusive give the lowest live latency; shared WASAPI
@@ -35094,7 +35365,8 @@ int main(int argc, char** argv)
             "wav", "aif", "aiff", "mp3", "m4a", "aac", "caf", "flac", "ogg"
          };
          static const std::vector<std::string> kModelExt = {
-            "obj", "ply", "stl", "usd", "usda", "usdc", "usdz", "abc"
+            "obj", "ply", "stl", "usd", "usda", "usdc", "usdz", "abc",
+            "fbx", "dae", "3ds" // Turbo: Assimp reads these on Windows
          };
          // Plugin bundles, not files - see the branch that consumes this.
          static const std::vector<std::string> kPluginBundleExt = { "component", "vst3" };
@@ -35183,6 +35455,76 @@ int main(int argc, char** argv)
                spawned = SpawnNode("Audio File", "Modulators", canvasPos.x + offset, canvasPos.y);
                if (spawned != nullptr)
                   static_cast<AudioFileNode*>(spawned->node.get())->Open(path);
+            }
+            else if (HasExtension(path, std::vector<std::string> { "gltf", "glb" }))
+            {
+               // Turbo (from upstream): a glTF/GLB drop builds the whole rig -
+               // Model 3D + Material + one Image Source per texture map,
+               // already wired - as one undo step. Dropped onto an existing
+               // Model 3D it just reloads that node.
+               if (ModelSourceNode* target = FindNodeUnderCanvasPoint<ModelSourceNode>(canvasPos))
+               {
+                  ensureDroppedCheckpoint();
+                  target->Load(path);
+                  gPatchDirty = true;
+                  continue;
+               }
+               ensureDroppedCheckpoint();
+               gSuppressUndoCheckpoints = true;
+               // Indices, not GraphNode*: a later SpawnNode can grow gNodes.
+               int modelIndex = -1;
+               if (GraphNode* modelNode = SpawnNode("Model 3D", "3D", canvasPos.x + offset, canvasPos.y))
+               {
+                  modelIndex = modelNode->index;
+                  static_cast<ModelSourceNode*>(modelNode->node.get())->Load(path);
+               }
+               int materialIndex = -1;
+               if (GraphNode* materialNode = SpawnNode("Material", "3D", canvasPos.x + offset + 260.0f, canvasPos.y))
+                  materialIndex = materialNode->index;
+               if (modelIndex != -1 && materialIndex != -1)
+               {
+                  std::string wireErr;
+                  ConnectNodes(modelIndex, 0, materialIndex, 0, wireErr);
+               }
+               std::string gltfErr;
+               const GltfImport::GltfDecodePackage* pkg = GltfImport::DecodeCached(path, gltfErr);
+               if (pkg != nullptr && materialIndex != -1)
+               {
+                  struct MapSlot { const GltfImport::GltfDecodedImage* img; int mapIndex; const char* slot; };
+                  const MapSlot maps[] = {
+                     { &pkg->albedo, kMapAlbedo, "albedo" },
+                     { &pkg->roughness, kMapRoughness, "roughness" },
+                     { &pkg->metallic, kMapMetallic, "metallic" },
+                     { &pkg->normalMap, kMapNormal, "normal" },
+                     { &pkg->occlusion, kMapAmbientOcclusion, "ao" },
+                     { &pkg->emissive, kMapEmission, "emission" },
+                  };
+                  const float texX = canvasPos.x + offset + 560.0f;
+                  float texY = canvasPos.y;
+                  for (const MapSlot& m : maps)
+                  {
+                     if (m.img->pixels.empty())
+                        continue;
+                     if (GraphNode* texNode = SpawnNode("Image Source", "Source", texX, texY))
+                     {
+                        static_cast<ImageSourceNode*>(texNode->node.get())
+                           ->LoadFromDecoded(m.img->pixels, m.img->width, m.img->height,
+                                             std::string("gltf://") + path + "#" + m.slot);
+                        std::string wireErr;
+                        ConnectNodes(texNode->index, 0, materialIndex, 1 + m.mapIndex, wireErr);
+                     }
+                     texY += 160.0f;
+                  }
+               }
+               if (GraphNode* modelNode = (modelIndex != -1) ? FindNodeByIndex(modelIndex) : nullptr)
+                  modelNode->showParams = true;
+               if (GraphNode* materialNode = (materialIndex != -1) ? FindNodeByIndex(materialIndex) : nullptr)
+                  materialNode->showParams = true;
+               gSuppressUndoCheckpoints = false;
+               gPatchDirty = true;
+               RebuildAudioTopology();
+               offset += 240.0f;
+               continue;
             }
             else if (HasExtension(path, kModelExt))
             {
@@ -44026,6 +44368,19 @@ int main(int argc, char** argv)
                modulation.SetExpressionError(ref.nodeIndex, ref.paramIndex, error);
             }
          }
+      }
+
+      // Turbo: gesture loops play back into their param, unless a cable or an
+      // expression already owns it (same precedence as upstream).
+      for (const ParamRef& ref : Modulation::Instance().FrameParams())
+      {
+         if (ref.value == nullptr || Modulation::Instance().IsModulated(ref.nodeIndex, ref.paramIndex) ||
+             Modulation::Instance().HasExpression(ref.nodeIndex, ref.paramIndex))
+            continue;
+         float v = 0.0f;
+         if (GestureRecorder::Instance().GetPlaybackValue(ref.nodeIndex, ref.paramIndex,
+                                                          GestureRecorder::Instance().ClockNow(), v))
+            *ref.value = std::clamp(v, std::min(ref.minValue, ref.maxValue), std::max(ref.minValue, ref.maxValue));
       }
 
       // A Palette is not an Output, so nothing downstream pulls it, and both its

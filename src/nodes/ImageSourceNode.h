@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "INode.h"
 
@@ -24,7 +25,12 @@ public:
    unsigned long long TextureRevision() const override { return mRevision; }
 
    // Loads `path` into the texture. Returns false and sets LastError() on failure.
+   // A "gltf://<path>#<slot>" pseudo-path (slot: albedo|roughness|metallic|
+   // normal|ao|emission) loads that map from a glTF/GLB via GltfImport, so a
+   // glTF-derived texture saves, reloads and undoes like any file path.
    bool Load(const std::string& path);
+   // Uploads already-decoded RGBA8 pixels (glTF import) under `pseudoPath`.
+   bool LoadFromDecoded(const std::vector<unsigned char>& pixels, int w, int h, const std::string& pseudoPath);
 
    // Opens the native picker, then loads. Returns false if cancelled or failed.
    bool LoadViaDialog();
@@ -48,6 +54,7 @@ public:
    }
 
 private:
+   void UploadPixels(const std::vector<unsigned char>& pixels, int w, int h);
    void EnsurePlaceholder();
 
    unsigned int mTex = 0;

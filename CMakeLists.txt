@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.25)
 # Unofficial Windows-only fork of Infinite (https://github.com/n1m21n/Infinite).
 # macOS support was removed on purpose: every platform path below is Windows
 # (MSVC 2022, x64, vcpkg static triplet, JUCE, OpenCV, Spout2, Windows ML).
-project(InfiniteTurbo VERSION 0.41.0 LANGUAGES C CXX)
+project(InfiniteTurbo VERSION 0.42.0 LANGUAGES C CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Infinite-Turbo builds only on Windows x64 with MSVC (Visual Studio 2022).")
@@ -157,6 +157,8 @@ set(STB_DIR external/stb)
 
 set(INFINITE_PLATFORM_SOURCES
     src/platform/PlatformWindows.cpp
+    src/platform/ImageDecodeMemory.cpp
+    src/platform/CrashHandlerWindows.cpp
     src/platform/PluginVST3Windows.cpp
     src/audio/AudioFileWriterWindows.cpp
     src/nodes/TextNodeWindows.cpp
@@ -174,6 +176,9 @@ add_executable(Infinite WIN32
     src/core/NodeViewport.cpp
     src/core/Transport.cpp
     src/core/AudioDecodeCache.cpp
+    src/core/GestureRecorder.cpp
+    src/core/GltfImport.cpp
+    src/core/SysInfo.cpp
     src/core/Modulation.cpp
     src/core/Expression.cpp
     src/core/ExprGlobals.cpp
@@ -275,6 +280,7 @@ add_executable(Infinite WIN32
     src/nodes/GeometryTableNode.cpp
     src/nodes/DepthProjectionNode.cpp
     src/nodes/ChordProgressionNode.cpp
+    src/nodes/TransportControlNode.cpp
     src/nodes/WaveTerrainNode.cpp
     src/nodes/EquationNode.cpp
     src/nodes/ImageSpectralSynthNode.cpp
@@ -330,9 +336,10 @@ target_include_directories(Infinite PRIVATE
     ${STB_DIR}
     external/json
     external/shine
+    external/cgltf
 )
 
-target_link_libraries(Infinite PRIVATE glfw strmiids)
+target_link_libraries(Infinite PRIVATE glfw strmiids dbghelp)
 
 if(INFINITE_ENABLE_VST3)
     # Scan third-party DLLs in a deliberately tiny helper process. Launching

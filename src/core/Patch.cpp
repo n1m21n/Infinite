@@ -62,6 +62,7 @@ namespace
       file << p << "diagnosticLog " << (s.diagnosticLog ? 1 : 0) << "\n";
       file << p << "autosaveEnabled " << (s.autosaveEnabled ? 1 : 0) << "\n";
       file << p << "autosaveSeconds " << s.autosaveSeconds << "\n";
+      file << p << "audioAutoStart " << (s.audioAutoStart ? 1 : 0) << "\n";
    }
 
    void ReadSettingValue(const std::string& key, std::istringstream& in, SceneSettings& s)
@@ -91,6 +92,7 @@ namespace
       else if (key == "diagnosticLog") { int v = 0; in >> v; s.diagnosticLog = v != 0; }
       else if (key == "autosaveEnabled") { int v = 0; in >> v; s.autosaveEnabled = v != 0; }
       else if (key == "autosaveSeconds") in >> s.autosaveSeconds;
+      else if (key == "audioAutoStart") { int v = 0; in >> v; s.audioAutoStart = v != 0; }
    }
 
    // Written with %.9g so a float survives the round trip exactly rather than
@@ -308,6 +310,24 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
            << dev << " " << EscapeLine(m.paramName) << "\n";
       file << "midismooth " << m.dstIndex << " " << m.dstParam << " " << FloatToString(m.smoothMs) << "\n";
    }
+   file << "transport " << FloatToString(data.transport.bpm) << " "
+        << data.transport.timeSigNum << " " << data.transport.timeSigDen << " "
+        << data.transport.key << " " << data.transport.scale << "\n";
+   for (const GestureRecord& g : data.gestures)
+   {
+      file << "gesture " << g.dstIndex << " " << g.dstParam << " " << FloatToString(g.speed) << " "
+           << (g.hasRangeOverride ? 1 : 0) << " " << FloatToString(g.rangeLo) << " " << FloatToString(g.rangeHi)
+           << " " << g.samples.size();
+      for (const GestureSample& s : g.samples)
+      {
+         char t[40];
+         snprintf(t, sizeof(t), "%.9g", s.timeSec);
+         file << " " << FloatToString(s.value) << " " << t << " " << (s.startsNewGrab ? 1 : 0);
+      }
+      file << "\n";
+      if (std::fabs(g.curve) > 0.0001f)
+         file << "gesturecurve " << g.dstIndex << " " << g.dstParam << " " << FloatToString(g.curve) << "\n";
+   }
    if (data.settings.present)
       WriteSettingsLines(file, data.settings, "setting");
 
@@ -334,6 +354,14 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       outError = "file is empty";
       return false;
    }
+   // A Windows editor or an AI tool may write CRLF line ends and a UTF-8 BOM
+   // (from upstream): std::getline keeps the '\r', which would end up inside
+   // type names and string values, and the BOM would fail the magic check.
+   if (line.size() >= 3 && (unsigned char)line[0] == 0xEF && (unsigned char)line[1] == 0xBB &&
+       (unsigned char)line[2] == 0xBF)
+      line.erase(0, 3);
+   if (!line.empty() && line.back() == '\r')
+      line.pop_back();
    {
       std::istringstream header(line);
       std::string magic;
@@ -356,6 +384,8 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
 
    while (std::getline(file, line))
    {
+      if (!line.empty() && line.back() == '\r')
+         line.pop_back();
       // Leading whitespace is cosmetic in the file, so strip it before parsing.
       size_t start = line.find_first_not_of(" \t");
       if (start == std::string::npos)
@@ -525,6 +555,41 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          g.expr = UnescapeLine(raw);
          if (!g.name.empty())
             outData.globals.push_back(g);
+      }
+      else if (tag == "gesture")
+      {
+         GestureRecord g;
+         int hasRange = 0;
+         size_t count = 0;
+         in >> g.dstIndex >> g.dstParam >> g.speed >> hasRange >> g.rangeLo >> g.rangeHi >> count;
+         g.hasRangeOverride = hasRange != 0;
+         for (size_t i = 0; i < count && in; i++)
+         {
+            GestureSample s;
+            int newGrab = 0;
+            in >> s.value >> s.timeSec >> newGrab;
+            if (!in)
+               break;
+            s.startsNewGrab = newGrab != 0;
+            g.samples.push_back(s);
+         }
+         if (g.samples.size() >= 2)
+            outData.gestures.push_back(std::move(g));
+      }
+      else if (tag == "gesturecurve")
+      {
+         int dstIndex = 0, dstParam = 0;
+         float curve = 0.0f;
+         in >> dstIndex >> dstParam >> curve;
+         for (GestureRecord& g : outData.gestures)
+            if (g.dstIndex == dstIndex && g.dstParam == dstParam)
+               g.curve = curve;
+      }
+      else if (tag == "transport")
+      {
+         // A missing trailing token keeps TransportRecord's default.
+         in >> outData.transport.bpm >> outData.transport.timeSigNum >> outData.transport.timeSigDen
+            >> outData.transport.key >> outData.transport.scale;
       }
       else if (tag == "setting")
       {

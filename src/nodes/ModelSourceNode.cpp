@@ -6,6 +6,8 @@
 
 #include "Platform.h"
 #include "Transport.h"
+#include <cctype>
+#include "GltfImport.h"
 
 ModelSourceNode::~ModelSourceNode()
 {
@@ -17,8 +19,34 @@ bool ModelSourceNode::Load(const std::string& path)
    std::vector<Platform::ModelVertex> vertices;
    std::vector<unsigned int> indices;
    std::string error;
+   std::string note;
 
-   if (!Platform::LoadModel(path, vertices, indices, error))
+   // Turbo (from upstream): .gltf/.glb go through cgltf (GltfImport), which
+   // also derives the material maps main.cpp's drop handler wires up.
+   std::string ext;
+   {
+      const size_t dot = path.find_last_of('.');
+      if (dot != std::string::npos)
+         ext = path.substr(dot + 1);
+      for (char& c : ext)
+         c = (char)std::tolower((unsigned char)c);
+   }
+   if (ext == "gltf" || ext == "glb")
+   {
+      const GltfImport::GltfDecodePackage* pkg = GltfImport::DecodeCached(path, error);
+      if (pkg == nullptr)
+      {
+         mStatus = error.empty() ? "could not load glTF model" : error;
+         return false;
+      }
+      vertices = pkg->vertices;
+      indices = pkg->indices;
+      if (pkg->hadMultipleMaterials)
+         note += " (first of multiple materials)";
+      if (pkg->hadMultipleUVSets)
+         note += " (TEXCOORD_0 only)";
+   }
+   else if (!Platform::LoadModel(path, vertices, indices, error))
    {
       mStatus = error.empty() ? "could not load model" : error;
       return false;
@@ -42,7 +70,7 @@ bool ModelSourceNode::Load(const std::string& path)
 
    const size_t slash = path.find_last_of("/\\");
    const std::string name = (slash == std::string::npos) ? path : path.substr(slash + 1);
-   mStatus = name + " - " + std::to_string(mMesh.indices.size() / 3) + " triangles";
+   mStatus = name + " - " + std::to_string(mMesh.indices.size() / 3) + " triangles" + note;
    return true;
 }
 
