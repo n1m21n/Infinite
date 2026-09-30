@@ -44,6 +44,12 @@ R3="$ROOT/tests/headless/render3d"
 "$BIN" --frame "$R3/translucent_ba.inf" 0 "$OUT/tr_ba.png" >/dev/null
 cmp -s "$OUT/tr_ab.png" "$OUT/tr_ba.png"; check "render3d: translucent slot order does not change the picture" $?
 
+# R18: on Linux a run with no display server says so, with the fix, instead of a dialog
+if [ "$(uname)" = Linux ]; then
+  r=$(env -u DISPLAY -u WAYLAND_DISPLAY "$BIN" --frame "$PATCH" 1.0 "$OUT/nd.png" 2>/dev/null); rc=$?
+  [ "$rc" = 5 ] && echo "$r" | grep -q '"E_NO_DISPLAY"' && echo "$r" | grep -q xvfb-run; check "linux: no display -> E_NO_DISPLAY with xvfb-run hint, exit 5" $?
+fi
+
 "$BIN" --render "$OUT/missing.inf" "$OUT/x.mp4" >/dev/null; [ $? = 3 ]; check "missing patch exit 3" $?
 "$BIN" --frame "$PATCH" abc "$OUT/x.png" >/dev/null; [ $? = 2 ]; check "bad time exit 2" $?
 "$BIN" --render "$PATCH" "$OUT/x.avi" >/dev/null; [ $? = 2 ]; check "bad container exit 2" $?

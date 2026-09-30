@@ -70147,6 +70147,21 @@ int main(int argc, char** argv)
                *path += '/';
          }
          gHeadlessAudioRate = gHeadlessJob.sampleRate;
+         Platform::AttachConsoleForHeadless();
+#if !defined(__APPLE__) && !defined(_WIN32)
+         // GLFW needs a display server. Say so with the fix, instead of the
+         // fatal-error path below (a dialog nobody can see on a headless box).
+         if (getenv("DISPLAY") == nullptr && getenv("WAYLAND_DISPLAY") == nullptr)
+         {
+            Headless::Status st;
+            st.mode = "no-display";
+            st.errors.push_back({ "E_NO_DISPLAY",
+                                  "no DISPLAY or WAYLAND_DISPLAY: Infinite needs a display server to render. "
+                                  "Run it under a virtual one, e.g. xvfb-run -a Infinite --render ...",
+                                  0, -1 });
+            return Headless::Emit(gHeadlessJob, st);
+         }
+#endif
 #if defined(_WIN32)
          _putenv_s("INFINITE_NO_UPDATE_CHECK", "1");
 #else
@@ -70251,6 +70266,13 @@ int main(int argc, char** argv)
    Platform::InitDocumentHandlingPreGlfw();
    if (!glfwInit())
    {
+      if (HeadlessJobActive())
+      {
+         Headless::Status st;
+         st.mode = "startup";
+         st.errors.push_back({ "E_RENDER", "glfwInit failed (no usable display or graphics driver)", 0, -1 });
+         return Headless::Emit(gHeadlessJob, st);
+      }
       Platform::ShowFatalError("Infinite failed to start", "glfwInit failed.");
       return 1;
    }

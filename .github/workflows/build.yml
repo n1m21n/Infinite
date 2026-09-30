@@ -86,6 +86,9 @@ jobs:
       - name: Headless self-tests
         run: ./.github/scripts/headless-tests.sh build/Infinite.app/Contents/MacOS/Infinite
 
+      - name: Headless CLI smoke
+        run: scripts/headless_smoke.sh build/Infinite.app/Contents/MacOS/Infinite
+
   windows:
     name: Windows (${{ matrix.arch }})
     needs: detect
@@ -290,6 +293,13 @@ jobs:
       - name: Virtual display Xvfb tests & screenshot smoke
         run: |
           tools/linux/xvfb-harness.sh --fast
+
+      # The headless CLI end to end (--frame/--render/--audio-summary/--validate
+      # ...), including the E_NO_DISPLAY message when no display is set.
+      - name: Headless CLI smoke (Xvfb)
+        if: matrix.compiler == 'clang'
+        run: |
+          xvfb-run -a scripts/headless_smoke.sh build-linux/Infinite
 
       # media group carries VST3SCANTEST / VST3EDITORSHOTTEST /
       # VST3BLOCKLISTTEST (task 4.4) plus the pre-existing plugin/media drag

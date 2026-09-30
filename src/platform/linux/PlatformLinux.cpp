@@ -672,6 +672,10 @@ namespace Platform
    {
    }
 
+   void AttachConsoleForHeadless()
+   {
+   }
+
    std::string MattingModelPath()
    {
       std::string exe = ExecutablePath();
