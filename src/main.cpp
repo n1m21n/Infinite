@@ -119,6 +119,7 @@ namespace
 #include "core/PatchExplain.h"
 
 static std::string ExplainLive(bool json, bool all); // defined with the headless job code
+static void JoinLiveTier1();                          // defined next to ParamKeyJoiner
 #include "core/GestureRecorder.h"
 #include "core/Expression.h"
 #include "core/field/FieldTypes.h"
@@ -48763,6 +48764,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       }
       else if (method == "explain")
       {
+         JoinLiveTier1();
          outResult = json::object();
          outResult["text"] = ExplainLive(false, params.value("all", false));
          outResult["graph"] = json::parse(ExplainLive(true, true));
@@ -69298,6 +69300,10 @@ public:
       }
    }
 
+   // Live use: match controls to keys by address only. Never perturbs a value, so it is safe on
+   // nodes the user is looking at; controls the address match misses stay unkeyed.
+   void SetTier1Only(bool on) { mTier1Only = on; }
+
    // Call once per tick after the frame was drawn. True when every node is finished.
    bool Step()
    {
@@ -69356,6 +69362,7 @@ private:
       int stage = 0;
    };
    std::vector<Node> mNodes;
+   bool mTier1Only = false;
 
    void Finish(Node& n)
    {
@@ -69414,7 +69421,7 @@ private:
       // A param that ended up matched on a later ref is not unmatched.
       for (auto it = n.label.begin(); it != n.label.end();)
          it = n.join.keyOfParam.count(it->first) ? n.label.erase(it) : std::next(it);
-      if (n.label.empty())
+      if (n.label.empty() || mTier1Only)
       {
          Finish(n);
          return;
@@ -69515,6 +69522,23 @@ static void AttachControls(PatchSchema::TypeSchema& ts, int nodeIndex)
       c.options = k->enumOptions;
       ts.controls.push_back(std::move(c));
    }
+}
+
+// The running app never probes node types, so its key join is empty and `explain` could not name
+// a control or a dropdown option. Fill it from the nodes already on the canvas, address match only.
+static void JoinLiveTier1()
+{
+   std::vector<std::pair<std::string, int>> live;
+   std::set<std::string> seen;
+   for (GraphNode& gn : gNodes)
+      if (!gParamJoin[gn.typeName].done && seen.insert(gn.typeName).second)
+         live.push_back({ gn.typeName, gn.index });
+   if (live.empty())
+      return;
+   ParamKeyJoiner joiner;
+   joiner.SetTier1Only(true);
+   joiner.Begin(live);
+   joiner.Step();
 }
 
 static void HeadlessTick(int& frameId, GLFWwindow* window)
