@@ -176,6 +176,12 @@ struct AudioTerminal
    // gain != 1.0, one per active clip, carrying that clip's own gainDb.
    float gain = 1.0f;
 
+   // False when an earlier canvas terminal already sums this same pooled
+   // buffer into the device (one source wired to both an Audio Out and an
+   // Output, or to two Audio Outs). The device mix counts a source once; this
+   // terminal still writes its own capture ring, so a recording is unchanged.
+   bool mixToDevice = true;
+
    // Arrangement Timeline clip scheduling. `numWindows > 0` marks this as a
    // timeline terminal: [windowOffset, windowOffset + numWindows) indexes
    // AudioTopology::clipWindows, sorted by startBeat and non-overlapping (one
@@ -237,6 +243,25 @@ struct AudioTerminal
    mutable float    peakMin    = 0.0f;
    mutable float    peakMax    = 0.0f;
 };
+
+// Marks every canvas terminal whose pooled buffer an earlier canvas terminal
+// already sums into the device, so the device mix counts a source once. Call
+// after the terminal list is complete; capture rings are unaffected.
+inline void MarkDuplicateDeviceTerminals(std::vector<AudioTerminal>& terminals)
+{
+   for (size_t i = 0; i < terminals.size(); i++)
+   {
+      terminals[i].mixToDevice = true;
+      if (terminals[i].numWindows > 0)
+         continue;
+      for (size_t k = 0; k < i; k++)
+         if (terminals[k].numWindows == 0 && terminals[k].mixToDevice && terminals[k].bufferIndex == terminals[i].bufferIndex)
+         {
+            terminals[i].mixToDevice = false;
+            break;
+         }
+   }
+}
 
 // A full audio-thread topology: nodes in a valid topological order (sources
 // before consumers - AudioEngine::Process relies on this, it does not sort),
