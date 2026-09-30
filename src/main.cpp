@@ -46026,6 +46026,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       }
    }
 
+   void NotePatchFileStamp(const std::string& path); // R39, defined with the watcher below
+
    bool SavePatchTo(const std::string& path)
    {
       Patch::Data data = BuildPatchData();
@@ -46039,6 +46041,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       gPatchPath = path;
       gPatchDirty = false;
       gPatchStatus = "Saved";
+      NotePatchFileStamp(path); // our own write is not an outside change
       Patch::NoteRecent(path);
       // Whatever the autosave was covering is now safely on disk under the
       // user's own file - see §3: leaving it around would offer to recover
@@ -46170,6 +46173,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       PublishArrangeLoop();
    }
 
+   void ClearPatchWatch(); // R39: a genuinely new document stops the file watch
+
    void NewPatch()
    {
       MovementLog::NoteMark(MovementLog::Mark::PatchNew);
@@ -46243,6 +46248,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       {
          gUndoStack.clear();
          gRedoStack.clear();
+         ClearPatchWatch();
          // A genuine "start a fresh document" also resets the global
          // transport - a loaded patch restores its own bpm/time signature/
          // key/scale right after this call (see ApplyPatchData), so this
@@ -47753,7 +47759,10 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       gSuppressUndoCheckpoints = false;
    }
 
-   bool LoadPatchFrom(const std::string& path)
+   // reload = the file watcher re-reading the open file (R39): same read and
+   // resolve, but applied like an undo step - one checkpoint first, the stacks,
+   // view and routing mode kept, no recents/autosave bookkeeping.
+   bool LoadPatchFromImpl(const std::string& path, bool reload)
    {
       Patch::Data data;
       std::string error;
@@ -47803,6 +47812,17 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       }
 
       MovementLog::NoteMark(MovementLog::Mark::PatchLoaded);
+      if (reload)
+      {
+         PushUndoCheckpoint(); // Cmd+Z returns to the graph as it was before the reload
+         ApplyPatchData(data);
+         gArrangePatchGeneration++;
+         gPatchPath = path;
+         gPatchDirty = false;
+         gPatchStatus = openNote.empty() ? "Reloaded (file changed on disk)" : openNote;
+         NotePatchFileStamp(path);
+         return true;
+      }
       ApplyPatchData(data);
       // New document: drop the old one's clip clipboard and selection.
       gArrangePatchGeneration++;
@@ -47821,6 +47841,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       gPatchDirty = false;
       gPatchStatus = openNote.empty() ? "Opened" : openNote;
       gRequestFitView = true;
+      NotePatchFileStamp(path);
       if (HeadlessJobActive())
          return true; // a batch job leaves recents and the real autosave alone
       Patch::NoteRecent(path);
@@ -47830,6 +47851,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       gLastAutosaveTime = 0.0;
       return true;
    }
+
+   bool LoadPatchFrom(const std::string& path) { return LoadPatchFromImpl(path, false); }
 
    // `Infinite --canonicalize in out`: data-level Read -> Write, so an authored
    // file comes out exactly as a GUI save would write it (numbers, no comments).
@@ -49317,6 +49340,78 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
 
    // Set for one frame when an action was deferred because the patch has
    // unsaved changes, so the UI pass knows to pop the confirmation modal.
+   // ---- R39: watch the open patch file ------------------------------------
+   // An AI (or any editor) rewrites the open file; the canvas follows. Polled
+   // once a second on the main thread: mtime + size, no watcher thread and no
+   // Platform:: call. Clean canvas -> reload as one undo step; unsaved edits ->
+   // a banner instead of clobbering them.
+   struct PatchFileStamp
+   {
+      bool valid = false;
+      long long mtime = 0;
+      unsigned long long size = 0;
+      bool operator==(const PatchFileStamp& o) const { return valid == o.valid && mtime == o.mtime && size == o.size; }
+   };
+   PatchFileStamp gPatchStamp;
+   std::string gPatchWatchPath; // not gPatchPath: Undo/Redo run NewPatch, which clears that
+   double gPatchWatchNextPoll = 0.0;
+   bool gPatchChangedOnDisk = false; // banner is up: the file changed while the canvas had unsaved edits
+
+   PatchFileStamp ReadPatchFileStamp(const std::string& path)
+   {
+      PatchFileStamp st;
+      std::error_code ec;
+      const std::filesystem::path fp = std::filesystem::u8path(path);
+      const auto t = std::filesystem::last_write_time(fp, ec);
+      if (ec)
+         return st;
+      const auto sz = std::filesystem::file_size(fp, ec);
+      if (ec)
+         return st;
+      st.valid = true;
+      st.mtime = (long long)t.time_since_epoch().count();
+      st.size = (unsigned long long)sz;
+      return st;
+   }
+
+   void NotePatchFileStamp(const std::string& path)
+   {
+      gPatchWatchPath = path;
+      gPatchStamp = ReadPatchFileStamp(path);
+      gPatchChangedOnDisk = false;
+   }
+
+   void ClearPatchWatch()
+   {
+      gPatchWatchPath.clear();
+      gPatchStamp = PatchFileStamp();
+      gPatchChangedOnDisk = false;
+   }
+
+   void PollPatchFileWatch(bool force = false) // force: the self-test has no window clock
+   {
+      if (gPatchWatchPath.empty() || (!force && HeadlessJobActive()))
+         return;
+      if (!force)
+      {
+         const double now = glfwGetTime();
+         if (now < gPatchWatchNextPoll)
+            return;
+         gPatchWatchNextPoll = now + 1.0;
+      }
+      const PatchFileStamp cur = ReadPatchFileStamp(gPatchWatchPath);
+      if (!cur.valid || cur == gPatchStamp)
+         return; // gone or unchanged (a deleted file keeps the canvas as is)
+      if (gPatchDirty)
+      {
+         gPatchStamp = cur; // remember it so the banner is raised once per change
+         gPatchChangedOnDisk = true;
+         return;
+      }
+      if (!LoadPatchFromImpl(gPatchWatchPath, true))
+         gPatchStamp = cur; // a half-written or invalid file: wait for the next change, keep the canvas
+   }
+
    bool gShowUnsavedChangesModal = false;
    // The action to run once the "Unsaved Changes" modal is resolved with
    // something other than Cancel (Save or Don't Save).
@@ -66659,6 +66754,77 @@ int RunVST3BlocklistTest()
 // is one of the two that triggers the redirect) rather than reimplementing
 // the check, so a regression in the real function is what this catches.
 // Headless like PLUGINSCANTEST above - no GL/ImGui needed.
+// ====================================================== INFINITE_PATCHWATCHTEST
+//
+// R39: the open file changing on disk. Drives the real LoadPatchFromImpl /
+// PollPatchFileWatch against a temp file: own save is not a change, a clean
+// canvas reloads as one undo step, unsaved edits raise the banner instead.
+void RunPatchWatchTest()
+{
+   bool ok = true;
+   auto Check = [&](const char* label, bool pass)
+   {
+      printf("  [%s] %s\n", pass ? "pass" : "FAIL", label);
+      if (!pass)
+         ok = false;
+   };
+   const std::filesystem::path dir = std::filesystem::temp_directory_path() / "infinite_patchwatch_test";
+   std::filesystem::create_directories(dir);
+   const std::string file = (dir / "watch.inf").string();
+   auto WriteN = [&](int n)
+   {
+      Patch::Data d;
+      for (int i = 0; i < n; i++)
+      {
+         Patch::NodeRecord rec;
+         rec.index = i + 1;
+         rec.category = "Source";
+         rec.typeName = "Shape";
+         rec.x = 100.0f * i;
+         d.nodes.push_back(rec);
+      }
+      std::string err;
+      Patch::Write(file, d, err);
+      // Some filesystems stamp at 1 s: force a distinct mtime instead of sleeping.
+      static int bump = 0;
+      std::error_code ec;
+      std::filesystem::last_write_time(file, std::filesystem::file_time_type::clock::now() + std::chrono::seconds(10 * ++bump), ec);
+   };
+
+   WriteN(1);
+   Check("load", LoadPatchFrom(file) && gNodes.size() == 1);
+   PollPatchFileWatch(true);
+   Check("unchanged file -> no reload, no banner", gNodes.size() == 1 && !gPatchChangedOnDisk && gUndoStack.empty());
+
+   WriteN(2);
+   PollPatchFileWatch(true);
+   Check("clean canvas + changed file -> reloaded", gNodes.size() == 2 && !gPatchDirty && !gPatchChangedOnDisk);
+   Check("reload is one undo checkpoint", gUndoStack.size() == 1);
+   Undo();
+   Check("undo returns to the pre-reload graph", gNodes.size() == 1);
+   Redo();
+   Check("redo returns to the reloaded graph", gNodes.size() == 2);
+
+   gPatchDirty = true; // unsaved edits on the canvas
+   WriteN(3);
+   PollPatchFileWatch(true);
+   Check("unsaved edits + changed file -> banner, canvas kept", gNodes.size() == 2 && gPatchDirty && gPatchChangedOnDisk);
+   PollPatchFileWatch(true);
+   Check("banner does not re-fire for the same change", gNodes.size() == 2);
+   Check("Reload button path picks up the file", LoadPatchFromImpl(file, true) && gNodes.size() == 3 && !gPatchDirty);
+
+   gPatchDirty = false;
+   gPatchChangedOnDisk = false;
+   { std::ofstream f(file, std::ios::binary | std::ios::trunc); f << "\x01not a patch"; }
+   std::error_code ec;
+   std::filesystem::last_write_time(file, std::filesystem::file_time_type::clock::now() + std::chrono::seconds(500), ec);
+   PollPatchFileWatch(true);
+   Check("invalid file -> canvas kept", gNodes.size() == 3 && !gPatchDirty);
+
+   std::filesystem::remove_all(dir, ec);
+   printf("PATCHWATCHTEST %s\n", ok ? "OK" : "FAIL");
+}
+
 int RunAutosaveMarkerTest()
 {
    const std::string marker = AutosaveMarkerPath();
@@ -83006,6 +83172,9 @@ int main(int argc, char** argv)
          printf("%s\n", allOk ? "FIELDGRAPHRATE OK" : "SUSPECT");
       }
 
+      if (getenv("INFINITE_PATCHWATCHTEST") != nullptr && frameId == 4) // needs the ImGui context, so in-loop
+         RunPatchWatchTest();
+
       if (getenv("INFINITE_FIELDGRAPHUNDOTEST") != nullptr && frameId == 4)
       {
          printf("[FIELDGRAPHUNDOTEST] Running Field graph-domain undo/redo harness...\n");
@@ -99084,6 +99253,30 @@ int main(int argc, char** argv)
 
       if (gSettingsOpen)
          DrawSettingsWindow(&gSettingsOpen);
+
+      PollPatchFileWatch();
+      if (gPatchChangedOnDisk)
+      {
+         const ImGuiViewport* vp = ImGui::GetMainViewport();
+         ImGui::SetNextWindowPos(ImVec2(vp->GetCenter().x, vp->Pos.y + 48.0f), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+         ImGui::SetNextWindowBgAlpha(0.95f);
+         if (ImGui::Begin("##patchchangedondisk", nullptr,
+                          ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
+                             ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav))
+         {
+            ImGui::TextUnformatted("File changed on disk.");
+            ImGui::SameLine();
+            if (ImGui::Button("Reload"))
+            {
+               if (LoadPatchFromImpl(gPatchWatchPath, true))
+                  gPatchChangedOnDisk = false;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Keep mine"))
+               gPatchChangedOnDisk = false;
+         }
+         ImGui::End();
+      }
 
       if (gShowUnsavedChangesModal)
       {
