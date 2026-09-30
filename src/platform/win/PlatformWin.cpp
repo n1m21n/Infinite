@@ -738,6 +738,24 @@ namespace Platform
       // process with no window station presence of its own.
    }
 
+   void AttachConsoleForHeadless()
+   {
+      // Infinite.exe is a GUI-subsystem binary, so a launch from cmd or
+      // PowerShell has no stdout. Attach to the parent's console, but only
+      // when stdout is not already a file or pipe the caller redirected (a
+      // script capturing the JSON line must keep getting it there). Note the
+      // shell does not wait for a GUI-subsystem exe, so the exit code is only
+      // reliable under `start /wait` or from a script that waits on the process.
+      const HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
+      if (out != nullptr && out != INVALID_HANDLE_VALUE)
+         return;
+      if (!AttachConsole(ATTACH_PARENT_PROCESS))
+         return;
+      FILE* f = nullptr;
+      freopen_s(&f, "CONOUT$", "w", stdout);
+      freopen_s(&f, "CONOUT$", "w", stderr);
+   }
+
    // ---- background removal ------------------------------------------------
    //
    // Windows has no inbox equivalent to Vision, so this runs u2netp (a small

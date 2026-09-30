@@ -626,6 +626,13 @@ namespace Platform
    // afterward - plugin or GLFW - can make the process visible.
    void SuppressAppUIForHeadlessProcess();
 
+   // Headless CLI runs (--render, --frame, ...) print one JSON status line. On
+   // Windows Infinite.exe is a GUI-subsystem binary, so its stdout is not the
+   // terminal that launched it; this attaches to the parent's console (only
+   // when stdout is not already redirected to a file or pipe) so the line is
+   // visible. No-op on macOS and Linux.
+   void AttachConsoleForHeadless();
+
    // Resolves a dropped .vst3 bundle back to the plugin description(s) it contains.
    bool DescribeVST3Bundle(const std::string& bundlePath, std::vector<PluginDesc>& out);
 

@@ -5784,6 +5784,10 @@ namespace Platform
       }
    }
 
+   void AttachConsoleForHeadless()
+   {
+   }
+
    PluginHandle* PluginCreate(const PluginDesc& desc, double sampleRate, int maxBlockFrames)
    {
       if (desc.format == "vst3")
