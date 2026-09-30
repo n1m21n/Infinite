@@ -38,6 +38,12 @@ if command -v ffmpeg >/dev/null; then
   python3 -c "import sys; sys.exit(0 if float('${mv2:--999}') > -20 else 1)"; check "render --start 2: audio starts at 2 s, not 0" $?
 fi
 
+# R275: overlapping translucent meshes composite back-to-front whatever their slot order
+R3="$ROOT/tests/headless/render3d"
+"$BIN" --frame "$R3/translucent_ab.inf" 0 "$OUT/tr_ab.png" >/dev/null
+"$BIN" --frame "$R3/translucent_ba.inf" 0 "$OUT/tr_ba.png" >/dev/null
+cmp -s "$OUT/tr_ab.png" "$OUT/tr_ba.png"; check "render3d: translucent slot order does not change the picture" $?
+
 "$BIN" --render "$OUT/missing.inf" "$OUT/x.mp4" >/dev/null; [ $? = 3 ]; check "missing patch exit 3" $?
 "$BIN" --frame "$PATCH" abc "$OUT/x.png" >/dev/null; [ $? = 2 ]; check "bad time exit 2" $?
 "$BIN" --render "$PATCH" "$OUT/x.avi" >/dev/null; [ $? = 2 ]; check "bad container exit 2" $?

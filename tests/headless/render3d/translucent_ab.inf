@@ -1,0 +1,29 @@
+infinite-patch 1
+# Two overlapping half-transparent cubes, red and blue, one behind the other. Red in slot 0, blue in slot 1.
+node 1 3D Cube
+  id red
+  f posX 0.6
+  c color 1 0 0
+  f opacity 0.5
+end
+node 2 3D Cube
+  id blue
+  f posX -0.6
+  c color 0 0 1
+  f opacity 0.5
+end
+node 3 3D Camera
+end
+node 4 3D Render 3D
+  id r3d
+  f camAzimuth 0
+  f camElevation 0
+  f width 256
+  f height 256
+end
+node 5 Utility Output
+end
+geo r3d 0 red
+geo r3d 1 blue
+geo r3d 4 3
+cable 5 0 r3d
