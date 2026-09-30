@@ -50,7 +50,7 @@ because an untrusted run can only look better than the real thing.
 4. ~~**B8 light projector pacing**~~: closed by `5550a20` (worst p99 18.1 ms, 0% missed, trusted). Was: with a visible canvas beside them, the 2 and 3 window variants miss no vsyncs but their interval p99 is 18.6-18.7 ms, just over the 18.3 ms lock limit.
 5. ~~**Canvas vsync does not block**~~: closed by `951d22c` (2b: one frame clock - every context swaps at interval 0 and the loop waits once on the display refresh). Was: with swap interval 1 the canvas runs at ~120 fps (p50 8.3 ms) and almost no frames land on a refresh boundary, so every vsync=1 B6 row and every B8 row without the heavy load is `unpaced=1`. The baseline itself was not re-captured after this fix landed and kept 12 stale pre-fix rows; corrected in Block 3 step 6 (`97617eb`). Every affected row is now trusted at a real 16.67-16.68 ms p50.
 6. ~~**B8 decode:**~~ closed by Block 3 step 1 (`1bc2244`): targets met with **no code change** on a quiet 8 GB M2 - 4x2160 is not memory-bound (1.13 GB footprint, 0 drops), and the earlier "4x2160 not real time" / "1 dropped" readings were machine load (ChatGPT, concurrent sessions, un-paused semi-brain daemon), not a real decode gap.
-7. **Camera** access has never been granted on this machine (`camera: skipped, not_determined`), so the camera variants run without one. Texture-reuse fix (`7021b12`, Found 5) landed regardless, but is unmeasured end-to-end pending access.
+7. **Camera** (closed 2026-09-30, R24): proven end to end once access was granted. Two traps found: the bench never raises the OS dialog (only `CameraOpen` does, from a running Video In node), and macOS attributes the request to the **launching** app, so a bench started from a shell child reports `not_determined` even when Infinite itself is allowed. Launch it through LaunchServices instead: `open -n -W --stdout out.txt --env INFINITE_BENCH_B8=1 --env ... build/Infinite.app --args -ApplePersistenceIgnoreState YES` (the grant is tied to the ad-hoc signature, so a rebuild asks again). Results, FaceTime HD camera, `unfocused=1`: 2x1080 + 1 window + camera: camera 19.8 fps, upload CPU p50 1.2 ms / p99 2.2 ms (texture reuse `7021b12` works, no per-frame realloc cost), 0 dropped clip frames, window p99 18.6 ms, 0.4% missed vsync; heavy 4x2160 + 3 windows + camera + Syphon: camera 25.0 fps, upload CPU p50 2.5 ms / p99 8.2 ms, window p99 34.3-34.8 ms, 31% missed vsync, 1/1/1/7 dropped clip frames. The camera is not the limiter (its upload is 2.5 ms of a 34 ms frame); the heavy case stays decode-bound (open item 3).
 
 ### Block 3 step 0 re-baseline (2026-09-25, `feature/perf-block3-media`, worktree `../infinte-block3` off `9ce52a5`, uncommitted results)
 
@@ -210,8 +210,8 @@ first launch (2x1080, `unfocused=1`).
   returns false, and a new three-sided `Platform::SyphonServerCanReportClients()`
   makes the Syphon Out body say "Clients: not reported". `SPOUTLOOPTEST`
   checks the contract. CI-only, unverified locally.
-- **Step 3 (camera): unproven.** The owner was asked once. Access is still
-  `not_determined`, so every camera variant runs without one.
+- **Step 3 (camera): proven** (2026-09-30, R24; see open item 7). The owner
+  granted access; the bench must be launched with `open`, not from a shell child.
 
 ### Block 3 steps 4-6 (2026-09-25, same branch/worktree): B10 fixture, baseline re-verification and correction, pre-merge gates
 
