@@ -878,6 +878,18 @@ if(WIN32)
     # WinMain entry doesn't exist here, mainCRTStartup forwards to main().
     set_target_properties(Infinite PROPERTIES WIN32_EXECUTABLE TRUE)
 
+    # Infinite.com: console-subsystem launcher for Infinite.exe so cmd and
+    # PowerShell wait for a headless run and see its exit code and stdout (R489).
+    # cmd/PowerShell resolve `Infinite` to .com before .exe. Own PDB name, or it
+    # would collide with Infinite.pdb in the same output folder.
+    add_executable(infinite-cli src/cli_main_win.cpp)
+    target_compile_definitions(infinite-cli PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
+    set_target_properties(infinite-cli PROPERTIES
+        OUTPUT_NAME Infinite
+        SUFFIX ".com"
+        PDB_NAME infinite-cli)
+    add_dependencies(Infinite infinite-cli)
+
     if(INFINITE_ENABLE_VST3)
         # Windows VST3 hosting: the portable SDK-hosting logic
         # (src/platform/win/PluginVST3Win.cpp) also hosts out-of-process

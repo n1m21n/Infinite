@@ -151,6 +151,45 @@ jobs:
         shell: bash
         run: ./.github/scripts/headless-tests.sh build/Release/Infinite.exe
 
+      # R489: Infinite.exe is GUI-subsystem, so a shell does not wait for it and
+      # never sees its exit code. Infinite.com is the console-subsystem launcher
+      # (src/cli_main_win.cpp). These cases end in argument parsing, before any
+      # window or GL context exists, so the GPU-less runner can run them: the
+      # exit code and the stdout line must reach the caller, both through a
+      # PowerShell pipe and through cmd with a redirected file.
+      - name: Headless CLI shim (Infinite.com)
+        if: matrix.arch == 'x64'
+        shell: pwsh
+        run: |
+          $com = (Resolve-Path "build/Release/Infinite.com").Path
+          $tmp = $env:RUNNER_TEMP
+          $fail = $false
+          function Check($name, $ok) {
+            if ($ok) { Write-Host "[pass] $name" } else { Write-Host "[FAIL] $name"; $script:fail = $true }
+          }
+          $out = & $com --version --json
+          Check "--version: exit 0 reaches PowerShell" ($LASTEXITCODE -eq 0)
+          Check "--version: JSON on stdout through a pipe" (($out | Select-Object -Last 1) -match '"ok":\s*true')
+          $out = & $com --frame (Join-Path $tmp "p.inf") abc (Join-Path $tmp "x.png")
+          Check "bad --frame time: exit 2 reaches PowerShell" ($LASTEXITCODE -eq 2)
+          Check "bad --frame time: E_USAGE status line on stdout" (($out | Select-Object -Last 1) -match 'E_USAGE')
+          Push-Location "build/Release"
+          cmd /c "Infinite --frame $tmp\p.inf abc $tmp\x.png > $tmp\cmd.json & echo %errorlevel% > $tmp\cmd.code"
+          Pop-Location
+          Check "cmd: bare 'Infinite' resolves to Infinite.com and waits (exit 2)" ((Get-Content "$tmp/cmd.code").Trim() -eq "2")
+          Check "cmd: stdout redirected to a file carries the status line" ((Get-Content "$tmp/cmd.json" | Select-Object -Last 1) -match 'E_USAGE')
+          if ($fail) { exit 1 }
+
+      # Informational: the whole macOS/Linux smoke script through the launcher.
+      # The runner has no GPU and several checks are baselined against macOS
+      # node lists, so failures here are read, not gated, until a run shows
+      # which ones are real Windows defects.
+      - name: headless_smoke.sh through Infinite.com (informational)
+        if: matrix.arch == 'x64'
+        continue-on-error: true
+        shell: bash
+        run: scripts/headless_smoke.sh build/Release/Infinite.com
+
       # The exe is handed to people as a single portable file, so it must not
       # import the Visual C++ redistributable's CRT - a /MD build dies at
       # launch with "MSVCP140.dll was not found" on a stock Windows image,
@@ -161,7 +200,7 @@ jobs:
       - name: Assert no Visual C++ redistributable dependency
         shell: pwsh
         run: |
-          $exes = @("build/Release/Infinite.exe", "build/Release/infinite-vst3-scanner.exe")
+          $exes = @("build/Release/Infinite.exe", "build/Release/Infinite.com", "build/Release/infinite-vst3-scanner.exe")
           foreach ($exe in $exes) {
             $bytes = [System.IO.File]::ReadAllBytes($exe)
             $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
@@ -185,6 +224,7 @@ jobs:
           mkdir -p dist/Infinite/assets/models
           cp build/Release/Infinite.exe dist/Infinite/
           cp build/Release/infinite-vst3-scanner.exe dist/Infinite/
+          cp build/Release/Infinite.com dist/Infinite/
           # onnxruntime.dll + DirectML.dll (Platform::SubjectMask's backend)
           # and the bundled u2netp model - CMakeLists.txt's POST_BUILD step
           # already staged these next to the exe in the build tree.

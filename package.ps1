@@ -16,6 +16,7 @@ $Build = Join-Path $Root "build-dist"
 $Stage = Join-Path $Root "dist\Infinite"
 $Exe   = Join-Path $Build "Release\Infinite.exe"
 $ScannerExe = Join-Path $Build "Release\infinite-vst3-scanner.exe"
+$CliCom = Join-Path $Build "Release\Infinite.com"
 $OrtDll = Join-Path $Build "Release\onnxruntime.dll"
 $DmlDll = Join-Path $Build "Release\DirectML.dll"
 $ModelDir = Join-Path $Build "Release\assets\models"
@@ -67,6 +68,8 @@ Copy-Item $Exe $Stage
 # The out-of-process VST3 scanner (src/scanner_main_win.cpp) must sit next to
 # Infinite.exe - Platform::ScannerExecutablePath() looks for it there.
 if (Test-Path $ScannerExe) { Copy-Item $ScannerExe $Stage }
+# Console-subsystem launcher: cmd/PowerShell wait for it and get the exit code (R489).
+if (Test-Path $CliCom) { Copy-Item $CliCom $Stage }
 # ONNX Runtime + DirectML EP and the bundled u2netp model, for
 # Platform::SubjectMask (background removal) - see CMakeLists.txt's
 # POST_BUILD copy comment for why these three are needed next to the exe.
