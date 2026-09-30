@@ -47420,8 +47420,11 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    // disk) and Undo/Redo (from the in-memory stacks). Callers decide what
    // happens to gPatchPath/gUndoStack/gRedoStack afterwards; a loaded file is
    // a new document boundary, an undo is not.
+   void NoteGraphEditedForLiveIssues(); // R30, defined with the live-issue state below
+
    void ApplyPatchData(const Patch::Data& data, std::map<int, int>* outRemap = nullptr)
    {
+      NoteGraphEditedForLiveIssues();
       ScopedPerfTimer perfTimer("ApplyPatchData");
       gSuppressUndoCheckpoints = true;
       NewPatch();
@@ -47856,6 +47859,42 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    // anything - by the time a drag is detected the live positions have
    // already changed, so that caller can't use BuildPatchData() at the point
    // it decides to push).
+   // R30: the same schema pass `Infinite --validate` runs, shown on the node.
+   // Only the warnings that say something while you are building are surfaced
+   // (an empty merge input, a blank Output, a feedback loop); W_UNUSED_NODE and
+   // the parameter warnings would fire on every half-wired node and read as
+   // noise. The pass reruns 300 ms after the last undoable edit, so a drag or
+   // a burst of edits costs one BuildPatchData, not one per frame.
+   std::unordered_map<int, std::vector<Headless::Issue>> gLiveIssues;
+   unsigned gLiveIssueSerial = 1;
+   unsigned gLiveIssueDoneSerial = 0;
+   double gLiveIssueEditTime = 0.0;
+
+   void NoteGraphEditedForLiveIssues()
+   {
+      gLiveIssueSerial++;
+      gLiveIssueEditTime = ImGui::GetTime();
+   }
+
+   void RefreshLiveIssues()
+   {
+      if (gLiveIssueDoneSerial == gLiveIssueSerial || ImGui::GetTime() - gLiveIssueEditTime < 0.3)
+         return;
+      gLiveIssueDoneSerial = gLiveIssueSerial;
+      gLiveIssues.clear();
+
+      Patch::Data data = BuildPatchData();
+      std::vector<Headless::Issue> errors, warnings;
+      const PatchSchema::Env env = MakeSchemaEnv(false);
+      PatchSchema::Resolve(data, env, errors);
+      if (!errors.empty())
+         return; // a graph the resolver rejects is the load path's problem, not a live hint
+      PatchSchema::Validate(data, env, errors, warnings);
+      for (const Headless::Issue& w : warnings)
+         if (w.node >= 0 && (w.code == "W_OPEN_INPUT" || w.code == "W_OUTPUT_EMPTY" || w.code == "W_IMAGE_CYCLE"))
+            gLiveIssues[w.node].push_back(w);
+   }
+
    void PushUndoSnapshot(Patch::Data snapshot)
    {
       if (gSuppressUndoCheckpoints)
@@ -47870,6 +47909,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       // A fresh action invalidates whatever redo history pointed at a future
       // that no longer follows from the graph's current state.
       gRedoStack.clear();
+      NoteGraphEditedForLiveIssues();
       gPatchDirty = true;
    }
 
@@ -88921,6 +88961,47 @@ int main(int argc, char** argv)
                            ? "AUTOSAVE ROUND TRIP OK" : "SUSPECT");
       }
 
+      // R30: the live validate pass marks a half-wired Blend and an empty
+      // Output, leaves a fully wired graph alone, and clears when it is fixed.
+      if (getenv("INFINITE_LIVEISSUETEST") != nullptr && frameId == 4)
+      {
+         const std::string path = "/tmp/infinite_liveissue_test.inf";
+         {
+            std::ofstream f(path);
+            f << "infinite-patch 1\nnode 1 Source Shape\nend\nnode 2 Compositing Blend\nend\n"
+                 "node 3 Utility Output\nend\nnode 4 Utility Output\nend\n"
+                 "cable 2 0 1\ncable 3 0 2\n";
+         }
+         LoadPatchFrom(path);
+         gLiveIssueEditTime = -10.0; // skip the 300 ms debounce
+      }
+      if (getenv("INFINITE_LIVEISSUETEST") != nullptr && frameId == 8)
+      {
+         int openInput = 0, outputEmpty = 0, other = 0;
+         for (const auto& kv : gLiveIssues)
+            for (const Headless::Issue& w : kv.second)
+            {
+               if (w.code == "W_OPEN_INPUT") openInput++;
+               else if (w.code == "W_OUTPUT_EMPTY") outputEmpty++;
+               else other++;
+            }
+         const bool marked = openInput == 1 && outputEmpty == 1 && other == 0;
+         // Wire Blend's B input and the second Output: nothing left to say.
+         const std::string path = "/tmp/infinite_liveissue_test.inf";
+         {
+            std::ofstream f(path);
+            f << "infinite-patch 1\nnode 1 Source Shape\nend\nnode 2 Compositing Blend\nend\n"
+                 "node 3 Utility Output\nend\n"
+                 "cable 2 0 1\ncable 2 1 1\ncable 3 0 2\n";
+         }
+         LoadPatchFrom(path);
+         gLiveIssueEditTime = -10.0;
+         RefreshLiveIssues();
+         printf("LIVEISSUE marked open=%d empty=%d other=%d -> %s; after fix issues=%zu -> %s\n",
+                openInput, outputEmpty, other, marked ? "OK" : "FAIL",
+                gLiveIssues.size(), gLiveIssues.empty() ? "OK" : "FAIL");
+      }
+
       if (getenv("INFINITE_DELETECRASHTEST") != nullptr && frameId == 4)
       {
          RemoveNodeByIndex(gNodes[0].index);
@@ -93284,6 +93365,7 @@ int main(int argc, char** argv)
       int b6FrameBodiesDrawnCount = 0;
       double b6FrameOffscreenMs = 0.0;
 
+      RefreshLiveIssues();
       for (GraphNode& gn : gNodes)
       {
          // Build step 15 ("Instrument Mode"): a node mounted by an
@@ -93405,6 +93487,11 @@ int main(int argc, char** argv)
          // decision called for, in place of a connect-time refusal.
          const auto* warnSrc = dynamic_cast<ICookWarningSource*>(gn.node.get());
          const bool hasCookWarning = warnSrc != nullptr && !warnSrc->CookWarning().empty();
+         // R30: schema warnings from the last live validate pass. A cook
+         // warning is the louder claim (the node is doing the wrong thing now),
+         // so it keeps the red border and the amber one shows only without it.
+         const auto liveIt = gLiveIssues.find(gn.index);
+         const bool hasLiveIssue = !hasCookWarning && liveIt != gLiveIssues.end();
          if (isComment)
          {
             ed::PushStyleColor(ed::StyleColor_NodeBg, ImColor(0, 0, 0, 0));
@@ -93424,6 +93511,11 @@ int main(int argc, char** argv)
             {
                ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(0.95f, 0.25f, 0.2f, 0.9f));
                ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, 2.5f);
+            }
+            else if (hasLiveIssue)
+            {
+               ed::PushStyleColor(ed::StyleColor_NodeBorder, ImColor(0.95f, 0.65f, 0.15f, 0.9f));
+               ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, 2.0f);
             }
             else
             {
@@ -94496,10 +94588,23 @@ int main(int argc, char** argv)
          ed::EndNode();
          if (hasCookWarning && ed::GetHoveredNode() == ed::NodeId(gn.NodeId()))
             ImGui::SetTooltip("%s", warnSrc->CookWarning().c_str());
+         else if (hasLiveIssue && ed::GetHoveredNode() == ed::NodeId(gn.NodeId()))
+         {
+            std::string tip;
+            for (const Headless::Issue& w : liveIt->second)
+            {
+               if (!tip.empty())
+                  tip += "\n";
+               tip += w.message;
+               if (!w.hint.empty())
+                  tip += "\n  -> " + w.hint;
+            }
+            ImGui::SetTooltip("%s", tip.c_str());
+         }
          ed::PopStyleColor(2);
          if (isComment)
             ed::PopStyleVar(3);
-         else if (hasCookWarning)
+         else if (hasCookWarning || hasLiveIssue)
             ed::PopStyleVar();
 
          if (b6TrackVis && !b6NodeIsVisible)
