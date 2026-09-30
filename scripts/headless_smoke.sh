@@ -135,5 +135,12 @@ printf 'infinite-patch 1\nnode 1 Source Shape\n  id shape\nend\nnode 2 Utility O
 r=$("$BIN" --validate "$OUT/ref.inf" 2>/dev/null); rc=$?
 [ "$rc" = 3 ] && [ "$(echo "$r" | json "d['errors'][0]['code']")" = "E_BAD_REF" ]; check "names: unknown reference exit 3" $?
 
+# --- key join (C3): every labelled control should know its saved key; the count may only go up ---
+BASE="$ROOT/tests/headless/describe_join_baseline.json"
+r=$("$BIN" --describe 2>/dev/null)
+[ "$(echo "$r" | json "d['join_stats']['keyed'] >= json.load(open('$BASE'))['keyed']")" = "True" ]; check "describe: keyed controls did not drop below the baseline" $?
+[ "$(echo "$r" | json "[m['key'] for t in d['types'] if t['type']=='Shape' for m in t['modulatable'] if m['label']=='size x'][0]")" = "sizeX" ]; check "describe: Shape 'size x' is key sizeX" $?
+[ "$(echo "$r" | json "[m['key'] for t in d['types'] if t['type']=='Shape' for m in t['modulatable'] if m['label']=='shape'][0]")" = "shapeType" ]; check "describe: Shape dropdown 'shape' is key shapeType (perturbation tier)" $?
+
 rm -rf "$OUT"
 exit $fail

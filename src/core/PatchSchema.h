@@ -34,6 +34,7 @@ namespace PatchSchema
       float minValue = 0.0f, maxValue = 1.0f, step = 0.0f;
       bool isEnum = false, isBool = false;
       std::vector<std::string> enumOptions;
+      std::string key; // the saved key this control edits; empty = not found (see unkeyed)
    };
 
    struct SlotInfo
@@ -58,6 +59,9 @@ namespace PatchSchema
       std::vector<SlotInfo> inputs;
       std::vector<OutputInfo> outputs;
       std::vector<ModulatableInfo> modulatable;
+      // How well the labelled controls were joined to saved keys (main.cpp ParamKeyJoiner).
+      int joinRegistered = 0; // controls the draw pass registered
+      int joinKeyed = 0;      // of those, with a saved key
       bool hardwareDriven = false;
       bool canBypass = false; // `flags bypassed=1` takes effect (CanBypass in main.cpp)
    };

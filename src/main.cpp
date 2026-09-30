@@ -3327,11 +3327,24 @@ namespace
       return shown;
    }
 
+   // The member a wrapper widget (ModSliderInt/ModKnobInt/ModCheckbox, a dropdown
+   // that knows its int) is editing, handed to the ModSlider/ModKnob/
+   // RegisterDiscreteParam it wraps so the ParamRef can say which saved key it
+   // is (ParamRef::srcAddr). Set immediately before that call, consumed by it.
+   const void* gPendingSrcAddr = nullptr;
+   const void* TakePendingSrcAddr(const void* fallback)
+   {
+      const void* a = gPendingSrcAddr != nullptr ? gPendingSrcAddr : fallback;
+      gPendingSrcAddr = nullptr;
+      return a;
+   }
+
    DiscreteParamHandle RegisterDiscreteParam(const char* label, float current, float maxV,
                                              bool isBool, const std::vector<std::string>* options,
                                              bool momentary = false)
    {
       DiscreteParamHandle h;
+      const void* srcAddr = TakePendingSrcAddr(nullptr);
       if (gCurrentNodeIndex < 0)
          return h; // a settings dialog / browser widget, not a node param
       h.registered = true;
@@ -3359,6 +3372,7 @@ namespace
       ref.isBool = isBool;
       ref.isEnum = !isBool;
       ref.momentary = momentary; // a gate button: triggers pulse it instead of flipping it
+      ref.srcAddr = srcAddr;
       // Only hand the option list over when the sticky store doesn't already
       // hold it: copying a dozens-long list of std::strings every frame for
       // every visible dropdown is exactly the allocation churn that made a
@@ -3951,6 +3965,7 @@ namespace
       if (value == nullptr)
          return false;
 
+      gPendingSrcAddr = value;
       const DiscreteParamHandle h =
          RegisterDiscreteParam(label, *value ? 1.0f : 0.0f, 1.0f, /*isBool=*/true, nullptr);
       if (!h.registered)
@@ -4031,6 +4046,7 @@ namespace
       ref.name = paramName;
       ref.posToValue = posToValue;
       ref.valueToPos = valueToPos;
+      ref.srcAddr = TakePendingSrcAddr(value);
       Modulation::Instance().RegisterParam(ref);
       if (gParamRegisterOnly)
          return false; // registered, deliberately not drawn - see gParamRegisterOnly
@@ -4528,6 +4544,7 @@ namespace
             slot = (float)*value;
       }
 
+      gPendingSrcAddr = value;
       bool changed = ModSlider(label, &slot, (float)minV, (float)maxV, "%.0f", width, audioStyle, /*step=*/1.0f);
       // lroundf, not (int)(x + 0.5f): the latter truncates toward zero, so
       // -3.7 lands on -3 instead of -4 and every negative-range param (octave,
@@ -5270,6 +5287,7 @@ namespace
       ref.name = (nameOverride != nullptr) ? nameOverride : label;
       ref.posToValue = p2v;
       ref.valueToPos = v2p;
+      ref.srcAddr = TakePendingSrcAddr(value);
       Modulation::Instance().RegisterParam(ref);
       if (gParamRegisterOnly)
          return false; // registered, deliberately not drawn - see gParamRegisterOnly
@@ -5542,6 +5560,7 @@ namespace
             slot = (float)*value;
       }
 
+      gPendingSrcAddr = value;
       bool changed = ModKnob(label, &slot, (float)minV, (float)maxV, "%.0f", diameter, cellW,
                              AudioWidgetStyle::Knob, /*step=*/1.0f);
       slot = std::clamp(slot, (float)minV, (float)maxV);
@@ -68375,6 +68394,292 @@ static bool HeadlessProbeDone(const std::vector<std::pair<std::string, int>>& pr
    return true;
 }
 
+
+// ---- ParamRef.key join (docs/fix-briefs/headless-engine.md 3.1b) ------------
+// A control registered by the draw pass knows its label, not the key the file
+// stores. Two tiers find the key of each control on a drawn probe node:
+//   1. by address: the widget hands over the member it edits (ParamRef::srcAddr)
+//      and VisitParams hands out the address of every saved member;
+//   2. by perturbation: for the rest (dropdowns take an int by value, some
+//      knobs edit a local copy), change one saved value, draw a frame, and see
+//      which unmatched control's value followed it.
+// The result is remembered per type, so key -> parameter index works for any
+// later node of that type.
+struct ParamJoinType
+{
+   std::map<int, std::string> keyOfParam; // paramIndex -> saved key
+   std::map<std::string, int> paramOfKey;
+   std::set<int> unkeyed;                 // registered controls with no key found
+   std::map<int, std::string> unkeyedName; // their labels
+   std::set<std::string> plainKeys;       // saved f/i/b keys no control registered
+   int registered = 0;
+   bool done = false;
+};
+static std::map<std::string, ParamJoinType> gParamJoin;
+
+class AddrCollector : public ParamVisitor
+{
+public:
+   std::map<const void*, std::string> keyOfAddr;
+   std::vector<std::pair<std::string, char>> keys; // f/i/b keys in file order
+   void Float(const char* n, float& v) override { keyOfAddr[&v] = n; keys.push_back({ n, 'f' }); }
+   void Int(const char* n, int& v) override { keyOfAddr[&v] = n; keys.push_back({ n, 'i' }); }
+   void Bool(const char* n, bool& v) override { keyOfAddr[&v] = n; keys.push_back({ n, 'b' }); }
+   void Text(const char*, std::string&) override {}
+   void Color(const char*, float*) override {}
+};
+
+// Changes the value of one saved key (mode 0, remembering the old one) or puts it back (mode 1).
+class KeyPerturber : public ParamVisitor
+{
+public:
+   std::string key;
+   int mode = 0;
+   double old = 0.0;
+   double now = 0.0;
+   bool hit = false;
+   char kind = 'f';
+   int attempt = 0; // 0,1,2: which of the candidate values to try (a widget may clamp one away)
+   void Float(const char* n, float& v) override
+   {
+      if (key != n) return;
+      hit = true; kind = 'f';
+      if (mode == 0)
+      {
+         old = v;
+         static const float kCand[] = { 0.5f, 0.25f, 0.9f, 0.1f };
+         int seen = 0;
+         for (float c : kCand)
+            if (std::fabs(c - v) > 1e-3f && seen++ == attempt)
+            {
+               v = c;
+               break;
+            }
+         now = v;
+      }
+      else v = (float)old;
+   }
+   void Int(const char* n, int& v) override
+   {
+      if (key != n) return;
+      hit = true; kind = 'i';
+      if (mode == 0)
+      {
+         old = v;
+         static const int kCand[] = { 0, 1, 2, 3, -1 };
+         int seen = 0;
+         for (int c : kCand)
+            if (c != v && seen++ == attempt)
+            {
+               v = c;
+               break;
+            }
+         now = v;
+      }
+      else v = (int)old;
+   }
+   void Bool(const char* n, bool& v) override
+   {
+      if (key != n) return;
+      hit = true; kind = 'b';
+      if (mode == 0) { old = v ? 1 : 0; v = !v; now = v ? 1 : 0; }
+      else v = old != 0.0;
+   }
+   void Text(const char*, std::string&) override {}
+   void Color(const char*, float*) override {}
+};
+
+class ParamKeyJoiner
+{
+public:
+   // probed: (type, node index) of drawn probe nodes, one per type.
+   void Begin(const std::vector<std::pair<std::string, int>>& probed)
+   {
+      mNodes.clear();
+      for (const auto& pr : probed)
+      {
+         if (gParamJoin[pr.first].done)
+            continue;
+         Node n;
+         n.type = pr.first;
+         n.index = pr.second;
+         mNodes.push_back(std::move(n));
+      }
+      mStage = 0;
+   }
+
+   // Call once per tick after the frame was drawn. True when every node is finished.
+   bool Step()
+   {
+      bool pending = false;
+      for (Node& n : mNodes)
+      {
+         if (n.finished)
+            continue;
+         GraphNode* gn = FindNodeByIndex(n.index);
+         if (gn == nullptr)
+         {
+            Finish(n);
+            continue;
+         }
+         if (mStage == 0)
+            Tier1(n, *gn);
+         else
+            Tier2(n, *gn);
+         if (!n.finished)
+            pending = true;
+      }
+      mStage++;
+      return !pending;
+   }
+
+private:
+   struct Node
+   {
+      std::string type;
+      int index = 0;
+      bool finished = false;
+      ParamJoinType join;
+      std::vector<std::pair<std::string, char>> keys;
+      std::map<int, float> baseline;      // unmatched paramIndex -> value before perturbing
+      std::map<int, std::string> label;   // unmatched paramIndex -> label
+      std::map<int, std::pair<float, float>> range;
+      std::map<std::string, int> attempt;
+      std::vector<std::string> queue;     // candidate keys still to try
+      size_t next = 0;
+      std::string trying;
+      KeyPerturber perturb;
+      bool applied = false;
+   };
+   std::vector<Node> mNodes;
+   int mStage = 0;
+
+   void Finish(Node& n)
+   {
+      n.finished = true;
+      ParamJoinType& out = gParamJoin[n.type];
+      out = n.join;
+      out.done = true;
+      for (const auto& kv : n.label)
+         if (!out.keyOfParam.count(kv.first))
+         {
+            out.unkeyed.insert(kv.first);
+            out.unkeyedName[kv.first] = kv.second;
+         }
+      std::set<std::string> used;
+      for (const auto& kv : out.keyOfParam)
+         used.insert(kv.second);
+      for (const auto& k : n.keys)
+         if (!used.count(k.first))
+            out.plainKeys.insert(k.first);
+      // Remember the key on the probe's sticky record too.
+      for (const auto& kv : out.keyOfParam)
+         Modulation::Instance().SetKnownKey(n.index, kv.first, kv.second);
+   }
+
+   void Tier1(Node& n, GraphNode& gn)
+   {
+      AddrCollector ac;
+      gn.node->VisitParams(ac);
+      n.keys = ac.keys;
+      std::set<std::string> taken;
+      for (const ParamRef& r : Modulation::Instance().FrameParams())
+      {
+         if (r.nodeIndex != n.index)
+            continue;
+         n.join.registered++;
+         auto it = r.srcAddr != nullptr ? ac.keyOfAddr.find(r.srcAddr) : ac.keyOfAddr.end();
+         if (it != ac.keyOfAddr.end() && !taken.count(it->second))
+         {
+            taken.insert(it->second);
+            n.join.keyOfParam[r.paramIndex] = it->second;
+            n.join.paramOfKey[it->second] = r.paramIndex;
+         }
+         else if (!n.join.keyOfParam.count(r.paramIndex))
+         {
+            n.label[r.paramIndex] = r.name;
+            n.range[r.paramIndex] = { r.minValue, r.maxValue };
+            if (r.value != nullptr)
+               n.baseline[r.paramIndex] = *r.value;
+         }
+      }
+      // A param that ended up matched on a later ref is not unmatched.
+      for (auto it = n.label.begin(); it != n.label.end();)
+         it = n.join.keyOfParam.count(it->first) ? n.label.erase(it) : std::next(it);
+      if (n.label.empty())
+      {
+         Finish(n);
+         return;
+      }
+      for (const auto& k : n.keys)
+         if (!taken.count(k.first))
+            n.queue.push_back(k.first);
+      Apply(n, gn);
+   }
+
+   // Perturb the next candidate key, or finish.
+   void Apply(Node& n, GraphNode& gn)
+   {
+      if (n.next >= n.queue.size())
+      {
+         Finish(n);
+         return;
+      }
+      n.trying = n.queue[n.next++];
+      n.perturb = KeyPerturber();
+      n.perturb.key = n.trying;
+      n.perturb.attempt = n.attempt[n.trying];
+      gn.node->VisitParams(n.perturb);
+      n.applied = n.perturb.hit;
+   }
+
+   void Tier2(Node& n, GraphNode& gn)
+   {
+      if (n.applied)
+      {
+         // Which unmatched control followed the change?
+         int found = -1, count = 0;
+         for (const ParamRef& r : Modulation::Instance().FrameParams())
+         {
+            if (r.nodeIndex != n.index || !n.label.count(r.paramIndex) || r.value == nullptr)
+               continue;
+            const float base = n.baseline[r.paramIndex];
+            const float v = *r.value;
+            const bool moved = std::fabs(v - base) > 1e-4f;
+            const bool followed = n.perturb.kind == 'f' ? std::fabs(v - (float)n.perturb.now) < 1e-3f
+                                                        : std::lround(v) == std::lround(n.perturb.now);
+            if (moved && followed)
+            {
+               found = r.paramIndex;
+               count++;
+            }
+         }
+         n.perturb.mode = 1;
+         gn.node->VisitParams(n.perturb); // put it back
+         if (count == 1)
+         {
+            n.join.keyOfParam[found] = n.trying;
+            n.join.paramOfKey[n.trying] = found;
+            n.label.erase(found);
+            n.baseline.erase(found);
+            n.range.erase(found);
+         }
+         else if (count == 0 && n.attempt[n.trying] < 2)
+         {
+            // The widget may have clamped the value away; try the next candidate.
+            n.attempt[n.trying]++;
+            n.queue.push_back(n.trying);
+         }
+      }
+      if (n.label.empty())
+      {
+         Finish(n);
+         return;
+      }
+      Apply(n, gn);
+   }
+};
+
 static void HeadlessTick(int& frameId, GLFWwindow* window)
 {
    enum class Phase { Warm, Running, Frames, Done };
@@ -68544,6 +68849,20 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
       }
       if (!HeadlessProbeDone(sSpawned, t) && t < kHeadlessProbeCapTicks)
          return;
+      // Which saved key is each control? Needs the nodes still drawing.
+      static ParamKeyJoiner sJoiner;
+      static bool sJoinBegun = false;
+      if (!sJoinBegun)
+      {
+         std::vector<std::pair<std::string, int>> drawn;
+         for (const auto& pr : sSpawned)
+            if (gHeadlessDrawn.count(pr.second))
+               drawn.push_back(pr);
+         sJoiner.Begin(drawn);
+         sJoinBegun = true;
+      }
+      if (!sJoiner.Step() && t < 4 * kHeadlessProbeCapTicks)
+         return;
       gHeadlessProbeAll = false;
       // A node that never draws (a Group, a Comment) registers nothing: it is
       // described from its schema alone and listed so that is visible.
@@ -68558,21 +68877,40 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
 
       std::map<std::string, int> indexOf(sSpawned.begin(), sSpawned.end());
       std::string typesJson = "\"types\":[";
+      std::string unkeyedList;
+      int joinRegistered = 0, joinKeyed = 0;
       bool first = true;
       for (const std::string& n : types)
       {
          PatchSchema::TypeSchema ts = *SchemaFor(n);
          auto it = indexOf.find(n);
+         const ParamJoinType* join = gParamJoin.count(n) ? &gParamJoin[n] : nullptr;
          if (it != indexOf.end())
             for (const ParamRef& r : Modulation::Instance().FrameParams())
                if (r.nodeIndex == it->second)
-                  ts.modulatable.push_back({ r.paramIndex, r.name, r.minValue, r.maxValue, r.step, r.isEnum, r.isBool, r.enumOptions });
+               {
+                  std::string key;
+                  if (join != nullptr && join->keyOfParam.count(r.paramIndex))
+                     key = join->keyOfParam.at(r.paramIndex);
+                  ts.modulatable.push_back({ r.paramIndex, r.name, r.minValue, r.maxValue, r.step, r.isEnum, r.isBool, r.enumOptions, key });
+                  ts.joinRegistered++;
+                  if (!key.empty())
+                     ts.joinKeyed++;
+                  else
+                     unkeyedList += (unkeyedList.empty() ? "" : ",") + std::string("{\"type\":\"") + Headless::JsonEscape(n) +
+                                    "\",\"index\":" + std::to_string(r.paramIndex) + ",\"label\":\"" + Headless::JsonEscape(r.name) + "\"}";
+               }
+         joinRegistered += ts.joinRegistered;
+         joinKeyed += ts.joinKeyed;
          std::sort(ts.modulatable.begin(), ts.modulatable.end(),
                    [](const auto& a, const auto& b) { return a.index < b.index; });
          typesJson += (first ? "" : ",") + PatchSchema::ToJson(ts);
          first = false;
       }
       typesJson += "]";
+      sStatus.extraJson.push_back("\"join_stats\":{\"registered\":" + std::to_string(joinRegistered) + ",\"keyed\":" +
+                                  std::to_string(joinKeyed) + ",\"unkeyed\":" + std::to_string(joinRegistered - joinKeyed) + "}");
+      sStatus.extraJson.push_back("\"unkeyed\":[" + unkeyedList + "]");
       sStatus.extraJson.push_back("\"count\":" + std::to_string(types.size()));
       sStatus.extraJson.push_back(typesJson);
       sPhase = Phase::Done;

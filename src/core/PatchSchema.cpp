@@ -254,6 +254,7 @@ namespace PatchSchema
       {
          const ModulatableInfo& m = t.modulatable[i];
          s += (i ? "," : "") + std::string("{\"index\":") + std::to_string(m.index) + ",\"label\":" + Q(m.label) +
+              (m.key.empty() ? "" : ",\"key\":" + Q(m.key)) +
               ",\"min\":" + Num(m.minValue) + ",\"max\":" + Num(m.maxValue) + ",\"step\":" + Num(m.step);
          if (m.isBool)
             s += ",\"bool\":true";
@@ -266,7 +267,7 @@ namespace PatchSchema
          }
          s += "}";
       }
-      s += "]}";
+      s += "],\"join\":{\"registered\":" + std::to_string(t.joinRegistered) + ",\"keyed\":" + std::to_string(t.joinKeyed) + "}}";
       return s;
    }
 
