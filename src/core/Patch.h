@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <iosfwd>
 #include <string>
 #include <vector>
 
@@ -473,6 +474,9 @@ namespace Patch
 
    bool Write(const std::string& path, const Data& data, std::string& outError);
    bool Read(const std::string& path, Data& outData, std::string& outError);
+   // The same parser over patch source held in memory (the live RPC's load_patch_text).
+   bool ReadText(const std::string& text, Data& outData, std::string& outError);
+   bool ReadStream(std::istream& in, Data& outData, std::string& outError);
 
    // Applies saved parameters to a node, and collects them from one.
    void SaveParams(INode* node, std::vector<std::pair<std::string, std::string>>& out);
