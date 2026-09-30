@@ -53,6 +53,7 @@ ASSERT=(
   # --- offline render (non-realtime export) ---
   "OFFLINERENDERTEST:300"
   "OFFLINERENDERREFUSETEST:6"
+  "OFFLINECLOCKTEST:8"
   # A take long enough for the encoder queue's byte budget to matter: 1800
   # frames used to have 579 of them silently rejected by the queue, leaving a
   # 20s video track against a 30s audio track - the "audio is sped up" report.
