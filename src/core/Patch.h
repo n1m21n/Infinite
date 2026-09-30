@@ -9,6 +9,9 @@ class INode;
 
 // Patch files: the whole graph written to disk and read back.
 //
+// Guide to writing them by hand (names, keys, defaults, stability): docs/reference/patch-format.md.
+// The record layout below is the authoritative list of tags.
+//
 // The format is line-based text rather than JSON, for two reasons. It stays
 // readable and diffable, which matters when a patch is the user's actual work;
 // and it degrades gracefully - an unknown key or a node type that no longer
