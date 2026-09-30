@@ -12,6 +12,7 @@
 //   Infinite --frame  <patch.inf> <T | T1,T2,...> <out.png | out_dir/>
 //            [--fps N] [--output <index|name>] [--sample-rate HZ] [--json <file>] [--lenient]
 //   Infinite --canonicalize <in.inf> <out.inf> [--keep-ids] [--lenient] [--json <file>]
+//   Infinite --explain <patch.inf> [--json] [--all] [--lenient]
 //   Infinite --version --json
 //
 // Argument parsing, the status JSON and the exit-code table live here with no
@@ -30,6 +31,7 @@ namespace Headless
       Describe,
       Validate,
       Canonicalize,
+      Explain,
    };
 
    struct Job
@@ -51,6 +53,8 @@ namespace Headless
       // --lenient: warnings stay warnings. Without it every CLI mode is strict
       // and a warning the schema pass raised is promoted to an error (exit 3).
       bool lenient = false;
+      bool explainJson = false; // --explain --json: the graph as JSON instead of text
+      bool explainAll = false;  // --explain --all: list parameters left at their default too
       bool keepIds = false; // --canonicalize --keep-ids: leave `id <word>` lines in
       double timeoutSec = 600.0;
    };
@@ -80,6 +84,7 @@ namespace Headless
       double audioSampleRate = 0.0;
       long long audioFrames = 0;
       long long elapsedMs = 0;
+      std::string stdoutText; // printed before the status line (--explain)
       std::string statusText; // the Output's RecordStatus, when there is one
       std::vector<std::string> files; // every file written
       std::vector<std::string> extraJson; // pre-rendered `"key":value` fragments

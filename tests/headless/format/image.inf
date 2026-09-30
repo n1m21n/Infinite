@@ -1,0 +1,11 @@
+infinite-patch 1
+# Smallest image patch: a Shape into an Output. Names instead of indices.
+node 1 Source Shape
+  id shape
+  f sizeX 0.6
+  i shapeType Star
+end
+node 2 Utility Output
+  id out
+end
+cable out 0 shape

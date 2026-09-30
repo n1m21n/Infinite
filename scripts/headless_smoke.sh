@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end check of the headless CLI (docs/fix-briefs/headless-engine.md, block 1).
+# End-to-end check of the headless CLI (docs/fix-briefs/headless-engine.md, blocks 1 and 3).
 # Spawns Infinite --frame / --render / bad input and asserts the status JSON,
 # the exit code and the files. Usage: scripts/headless_smoke.sh [path/to/Infinite]
 set -u
@@ -162,6 +162,45 @@ cmp -s "$OUT/kn.png" "$OUT/kk.png"; check "keyed: identical --frame PNGs" $?
 r=$("$BIN" --frame "$K/misspelled.inf" 0 "$OUT/km.png" 2>/dev/null); rc=$?
 [ "$rc" = 3 ] && [ ! -e "$OUT/km.png" ]; check "keyed: misspelled key exit 3, nothing rendered" $?
 [ "$(echo "$r" | json "[(e['code'],e['line'],e['hint'].split(',')[0]) for e in d['errors']]")" = "[('E_BAD_KEY', 14, 'did you mean: sizeX')]" ]; check "keyed: error names line and nearest key sizeX" $?
+
+# --- format doc fixtures (3.4): the three patches docs/reference/patch-format.md shows ---
+F="$ROOT/tests/headless/format"
+for f in image audio modulation; do
+  "$BIN" --validate "$F/$f.inf" >/dev/null 2>&1; check "format: $f.inf validates strictly" $?
+done
+
+# --- explain (3.3b): the live graph read back after the load ---
+rel() { sed -n '/^Relations/,/^Unconnected/p' | grep -c "^  $1 "; }
+P1="$ROOT/assets/examples/patch_1.inf"
+r=$("$BIN" --explain "$P1" 2>/dev/null); rc=$?
+check "explain: patch_1 exit 0" $rc
+for t in cable geo aud note mod pal expr; do
+  [ "$(echo "$r" | rel $t)" = "$(grep -c "^$t " "$P1")" ]; check "explain: patch_1 $t lines == $t records in the file" $?
+done
+r=$("$BIN" --explain "$F/image.inf" 2>/dev/null)
+echo "$r" | grep -q '^    shapeType Star (6)$' && echo "$r" | grep -q '^    sizeX 0.6$'; check "explain: changed params by key, dropdown by option name" $?
+echo "$r" | grep -q '(default)'; [ $? = 1 ]; check "explain: defaults hidden in text" $?
+echo "$r" | grep -q '^  cable Output "out" (2) slot 0 \[in\] <- Shape "shape" (1)$'; check "explain: cable names both ends and the slot" $?
+"$BIN" --explain "$F/image.inf" --all 2>/dev/null | grep -q '^    posX 0.5   (default)$'; check "explain --all: defaults listed and marked" $?
+r=$("$BIN" --explain "$F/audio.inf" 2>/dev/null)
+echo "$r" | grep -q '^  note Wavetable "synth" (2) slot 0 \[notes\] <- Random Note Generator "notes" (1)$' &&
+  echo "$r" | grep -q '^  aud Audio Out "speakers" (3) slot 0 \[audio\] <- Wavetable "synth" (2)$'; check "explain: audio and note wires carry slot names" $?
+r=$("$BIN" --explain "$F/modulation.inf" 2>/dev/null)
+echo "$r" | grep -q '^  mod Shape "shape" (1) sizeX <- LFO "lfo" (2) out 0, absolute, depth 1, range 0.01..1$'; check "explain: mod shows key, source and resolved range" $?
+echo "$r" | grep -q '^  expr Shape "shape" (1) rotation = sin(t) \* 90$'; check "explain: expr shows key and text" $?
+echo "$r" | grep -q '^    sizeX .*(live value, driven by mod)$'; check "explain: a driven param is marked, not shown as authored" $?
+r=$("$BIN" --explain "$F/modulation.inf" --json 2>/dev/null)
+[ "$(echo "$r" | python3 -c "
+import sys,json
+g=json.loads(sys.stdin.readline()); st=json.loads(sys.stdin.readline())
+sh=[n for n in g['nodes'] if n['id']=='shape'][0]; p={q['key']:q for q in sh['params']}
+print(st['ok'] and st['mode']=='explain' and len(g['nodes'])==3 and sorted(x['kind'] for x in g['relations'])==['cable','expr','mod']
+      and p['f sizeX'].get('driven')=='mod' and p['f rotation'].get('driven')=='expr' and p['f posX']['default'] and g['unconnected']==[])")" = "True" ]; check "explain --json: graph line then status line" $?
+r=$("$BIN" --explain "$S/misspelled.inf" 2>/dev/null); rc=$?
+[ "$rc" = 3 ] && [ "$(echo "$r" | wc -l | tr -d ' ')" = 1 ]; check "explain: strict, a misspelled param exits 3 with no graph" $?
+"$BIN" --explain "$S/misspelled.inf" --lenient 2>/dev/null | grep -q '^Relations ('; check "explain --lenient: explains it anyway" $?
+"$BIN" --explain "$OUT/missing.inf" >/dev/null 2>&1; [ $? = 3 ]; check "explain: missing patch exit 3" $?
+"$BIN" --explain >/dev/null 2>&1; [ $? = 2 ]; check "explain: no patch exit 2" $?
 
 rm -rf "$OUT"
 exit $fail

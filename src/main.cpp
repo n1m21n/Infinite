@@ -114,6 +114,9 @@ namespace
 #include "core/ColorStats.h"
 #include "core/HeadlessJob.h"
 #include "core/PatchSchema.h"
+#include "core/PatchExplain.h"
+
+static std::string ExplainLive(bool json, bool all); // defined with the headless job code
 #include "core/GestureRecorder.h"
 #include "core/Expression.h"
 #include "core/field/FieldTypes.h"
@@ -48618,6 +48621,13 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          outResult = out;
          return true;
       }
+      else if (method == "explain")
+      {
+         outResult = json::object();
+         outResult["text"] = ExplainLive(false, params.value("all", false));
+         outResult["graph"] = json::parse(ExplainLive(true, true));
+         return true;
+      }
       else if (method == "get_params")
       {
          const int index = params.value("index", -1);
@@ -68456,6 +68466,87 @@ static bool BuildBenchB8Scene(const std::vector<std::string>& clipPaths, bool wi
 // hidden window keeps drawing frames on purpose: a node registers its ParamRefs
 // (modulation, expressions, gestures) only by being drawn, so skipping the
 // draw would render a patch whose modulation never lands.
+static std::string ExplainLive(bool json, bool all)
+{
+   static std::map<std::string, std::map<std::string, std::string>> sDefaults;
+   PatchExplain::Env xenv;
+   xenv.defaultParams = [&](const std::string& type) -> std::map<std::string, std::string>
+   {
+      auto it = sDefaults.find(type);
+      if (it != sDefaults.end())
+         return it->second;
+      std::map<std::string, std::string> out;
+      if (std::unique_ptr<INode> fresh { NodeFactory::Instance().MakeNode(type) })
+      {
+         std::vector<std::pair<std::string, std::string>> raw;
+         Patch::SaveParams(fresh.get(), raw);
+         for (const auto& kv : raw)
+            out[kv.first] = kv.second;
+      }
+      return sDefaults[type] = out;
+   };
+   xenv.slotName = [&](const std::string& type, int slot, const std::string&) -> std::string
+   {
+      // Slots are one numbering across kinds (Wavetable: 0 notes, 1 fm in), and
+      // SlotNames is parallel to inputs, not indexed by slot.
+      const PatchSchema::TypeSchema* ts = SchemaFor(type);
+      if (ts == nullptr)
+         return std::string();
+      const std::vector<std::string> names = PatchSchema::SlotNames(*ts);
+      for (size_t i = 0; i < ts->inputs.size() && i < names.size(); i++)
+         if (ts->inputs[i].slot == slot)
+            return names[i];
+      return std::string();
+   };
+   xenv.paramLabel = [&](int node, int param) -> std::string
+   {
+      const ParamRef* k = Modulation::Instance().KnownParam(node, param);
+      return k != nullptr ? k->name : std::string();
+   };
+   // The join lives per type (the probe nodes are gone after the load), so a
+   // running app that never probed answers "" and the label is shown instead.
+   xenv.paramKey = [&](int node, int param) -> std::string
+   {
+      const GraphNode* gn = FindNodeByIndex(node);
+      if (gn == nullptr)
+         return std::string();
+      auto it = gParamJoin.find(gn->typeName);
+      if (it == gParamJoin.end())
+         return std::string();
+      auto k = it->second.keyOfParam.find(param);
+      return k == it->second.keyOfParam.end() ? std::string() : k->second;
+   };
+   xenv.optionName = [&](const std::string& type, const std::string& key, int value) -> std::string
+   {
+      auto it = gParamJoin.find(type);
+      if (it == gParamJoin.end())
+         return std::string();
+      auto o = it->second.optionsOfKey.find(key);
+      if (o == it->second.optionsOfKey.end() || value < 0 || value >= (int)o->second.size())
+         return std::string();
+      return o->second[value];
+   };
+   xenv.resolveMod = [&](const Patch::ModRecord& m, float& lo, float& hi) -> bool
+   {
+      const ParamRef* k = Modulation::Instance().KnownParam(m.dstIndex, m.dstParam);
+      if (k == nullptr)
+         return false;
+      const Modulation::Source src = Modulation::Instance().ResolvedSourceFor(*k);
+      lo = src.lo;
+      hi = src.hi;
+      return true;
+   };
+   xenv.idOf = [&](int index) -> std::string
+   {
+      for (const Patch::NodeRecord& n : gHeadlessPatch.nodes)
+         if (n.index == index)
+            return n.id;
+      return std::string();
+   };
+   const PatchExplain::Explanation ex = PatchExplain::Build(BuildPatchData(), xenv);
+   return json ? PatchExplain::ToJson(ex) : PatchExplain::ToText(ex, all);
+}
+
 static void HeadlessFinish(GLFWwindow* window, Headless::Status& st, double startWall)
 {
    st.elapsedMs = (long long)((glfwGetTime() - startWall) * 1000.0);
@@ -68824,6 +68915,7 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
                      : job.mode == Headless::Mode::Describe ? "describe"
                      : job.mode == Headless::Mode::Validate ? "validate"
                      : job.mode == Headless::Mode::Canonicalize ? "canonicalize"
+                     : job.mode == Headless::Mode::Explain ? "explain"
                                                             : "frame";
       sStatus.warnings = gHeadlessPreWarnings;
       sStatus.patch = job.patch;
@@ -69214,6 +69306,17 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
             HeadlessFinish(window, sStatus, sWall);
             return;
          }
+      }
+
+      if (job.mode == Headless::Mode::Explain)
+      {
+         // The live graph, read back after the load: what ApplyPatchData built, not the file.
+         sStatus.stdoutText = ExplainLive(job.explainJson, job.explainAll);
+         sStatus.warnings = gHeadlessPreWarnings;
+         sStatus.ok = true;
+         sPhase = Phase::Done;
+         HeadlessFinish(window, sStatus, sWall);
+         return;
       }
 
       // Resolve the Output. --output takes a node index or a display name.
@@ -72738,9 +72841,10 @@ int main(int argc, char** argv)
    {
       Patch::Data probe;
       std::string readError;
-      const bool loadsPatch = gHeadlessJob.mode == Headless::Mode::Render || gHeadlessJob.mode == Headless::Mode::Frame;
+      const bool loadsPatch = gHeadlessJob.mode == Headless::Mode::Render || gHeadlessJob.mode == Headless::Mode::Frame ||
+                              gHeadlessJob.mode == Headless::Mode::Explain;
       Headless::Status st;
-      st.mode = gHeadlessJob.mode == Headless::Mode::Render ? "render" : "frame";
+      st.mode = gHeadlessJob.mode == Headless::Mode::Render ? "render" : gHeadlessJob.mode == Headless::Mode::Explain ? "explain" : "frame";
       st.patch = gHeadlessJob.patch;
       if (gHeadlessJob.mode == Headless::Mode::Canonicalize)
       {
@@ -72789,7 +72893,7 @@ int main(int argc, char** argv)
             gHeadlessExitCode = Headless::Emit(gHeadlessJob, st);
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
-         else if (probe.hasKeyRefs)
+         else if (probe.hasKeyRefs || gHeadlessJob.mode == Headless::Mode::Explain)
             gHeadlessNeedProbe = true; // HeadlessTick probes the types, resolves the keys, then loads
          else
             LoadPatchFrom(gHeadlessJob.patch);

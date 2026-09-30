@@ -147,6 +147,35 @@ namespace Headless
          job.patch = pos[0];
          return true;
       }
+      else if (first == "--explain")
+      {
+         job.mode = Mode::Explain;
+         std::vector<std::string> pos;
+         for (int i = 2; i < argc; i++)
+         {
+            const std::string a = argv[i];
+            if (a == "--json")
+               job.explainJson = true;
+            else if (a == "--all")
+               job.explainAll = true;
+            else if (a == "--lenient")
+               job.lenient = true;
+            else if (a.rfind("--", 0) == 0)
+            {
+               usageError = "unknown option " + a;
+               return true;
+            }
+            else
+               pos.push_back(a);
+         }
+         if (pos.size() != 1)
+         {
+            usageError = "usage: Infinite --explain <patch.inf> [--json] [--all] [--lenient]";
+            return true;
+         }
+         job.patch = pos[0];
+         return true;
+      }
       else if (first == "--canonicalize")
       {
          job.mode = Mode::Canonicalize;
@@ -474,6 +503,13 @@ namespace Headless
          }
          else
             std::fprintf(stderr, "could not write %s\n", job.jsonPath.c_str());
+      }
+      if (!status.stdoutText.empty())
+      {
+         // The status JSON stays the last line on its own, whatever came before it.
+         std::fputs(status.stdoutText.c_str(), stdout);
+         if (status.stdoutText.back() != '\n')
+            std::fputc('\n', stdout);
       }
       std::fprintf(stdout, "%s\n", json.c_str());
       std::fflush(stdout);

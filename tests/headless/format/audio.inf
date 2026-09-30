@@ -1,0 +1,20 @@
+infinite-patch 1
+# Smallest audio patch: notes into a synth into Audio Out.
+node 1 Notes Random Note Generator
+  id notes
+end
+node 2 Synths Wavetable
+  id synth
+end
+node 3 AudioUtility Audio Out
+  id speakers
+end
+node 4 Source Shape
+  id picture
+end
+node 5 Utility Output
+  id out
+end
+note synth 0 notes
+aud speakers 0 synth
+cable out 0 picture
