@@ -852,7 +852,7 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer, doub
          // Unreachable today (a device callback always has a rate, and
          // ProcessOffline has Transport::AudioSampleRate()).
       }
-      else
+      else if (terminal.mixToDevice)
       {
          for (int ch = 0; ch < numChannels; ch++)
             for (int i = 0; i < numFrames; i++)

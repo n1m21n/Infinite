@@ -43116,6 +43116,10 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          }
       }
 
+      // One source reaching the device through two canvas terminals (Audio Out
+      // + Output) is mixed once, not twice (R477).
+      MarkDuplicateDeviceTerminals(terminals);
+
       AudioTopology topology;
       topology.order = std::move(order);
       topology.terminalBufferIndices = std::move(terminals);
@@ -64223,7 +64227,23 @@ static bool RunAudioPdcTest()
                             !zeroLatency.terminalBufferIndices[1].compensation.IsActive();
    printf("AUDIOPDCTEST zero-latency patch allocates no compensation delay: %s\n", zeroAllocOk ? "OK" : "FAIL");
 
-   const bool ok = hasLatency && dryOffsetOk && wetOffsetOk && alignedOk && amplitudeOk && zeroAllocOk;
+   // R477: one source wired to two terminals (Audio Out + Output) reaches the
+   // device once. Same topology as zeroLatency, run with the dedupe the build
+   // applies, then without it to prove the check can see a double count.
+   AudioEngine::Instance().SetTopology(zeroLatency);
+   AudioEngine::Instance().ProcessOffline(buffer);
+   const Peak doubled = FindPeak(chan0.data(), kNumFrames);
+   MarkDuplicateDeviceTerminals(zeroLatency.terminalBufferIndices);
+   const bool markOk = zeroLatency.terminalBufferIndices[0].mixToDevice && !zeroLatency.terminalBufferIndices[1].mixToDevice;
+   AudioEngine::Instance().SetTopology(zeroLatency);
+   AudioEngine::Instance().ProcessOffline(buffer);
+   const Peak deduped = FindPeak(chan0.data(), kNumFrames);
+   const bool dedupeOk = markOk && doubled.value > dryAlone.value * 1.9f &&
+                         std::abs(deduped.value - dryAlone.value) <= dryAlone.value * 0.001f;
+   printf("AUDIOPDCTEST same source on two terminals mixes once: alone %.4f  doubled %.4f  deduped %.4f  %s\n",
+          dryAlone.value, doubled.value, deduped.value, dedupeOk ? "OK" : "FAIL");
+
+   const bool ok = hasLatency && dryOffsetOk && wetOffsetOk && alignedOk && amplitudeOk && zeroAllocOk && dedupeOk;
    printf("%s\n", ok ? "AUDIOPDCTEST OK" : "AUDIOPDCTEST FAIL");
    return ok;
 }
