@@ -1,0 +1,289 @@
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>Infinite Roadmap</title><meta name=color-scheme content=dark>
+<link rel=preconnect href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap" rel=stylesheet>
+<style>
+/* Infinite cosmos: the app's night window, the brand gradient as nebula light, glass panels floating in it.
+   Layout rules follow groww-finance/docs/DASHBOARD_DESIGN.md (tokens, five sizes, tile anatomy, fitNums). */
+:root{--void:#05060a;--deep:#0A0B0F;--panel:rgba(24,27,35,.62);--raised:rgba(32,36,47,.72);--line:rgba(145,152,173,.18);--line2:rgba(145,152,173,.34);
+--ink:#EEF0F6;--mut:#9198AD;--coral:#F57F66;--rose:#D99A9C;--lilac:#C7AFC0;--sky:#A9CDF1;--gold:#FFC86B;--pos:#7DE3B4;--red:#FF7A7A;
+--grad:linear-gradient(90deg,#F57F66,#D99A9C 35%,#C7AFC0 65%,#A9CDF1);
+--h1:#FF7A7A;--h2:#F59E6B;--h3:#FFC86B;--h4:#7DE3B4;
+--f1:'Geist',system-ui,-apple-system,sans-serif;--f2:'Geist Mono',ui-monospace,Menlo,monospace;
+--l:40px;--t:25px;--m:16px;--s:13px;--xs:11px;--p:12px;--q:6px;--r:16px;--rs:10px}
+*{box-sizing:border-box}html{background:var(--void);color-scheme:dark}
+body{margin:0;color:var(--ink);font:400 var(--s)/20px var(--f1);min-height:100vh;overflow-x:hidden;
+background:radial-gradient(900px 520px at 12% -8%,rgba(245,127,102,.20),transparent 60%),radial-gradient(800px 600px at 96% 6%,rgba(169,205,241,.16),transparent 62%),
+ radial-gradient(1000px 700px at 50% 110%,rgba(199,175,192,.12),transparent 60%),var(--void);background-attachment:fixed}
+#stars-bg{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none}
+.wrap{position:relative;z-index:1;max-width:1040px;margin:0 auto;padding:var(--p) 16px;display:grid;gap:var(--p)}
+h1,h2,p{margin:0}
+h2{font:500 var(--xs)/16px var(--f2);letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
+h2.h{font:600 var(--m)/24px var(--f1);letter-spacing:0;text-transform:none;color:var(--ink);margin-top:var(--q)}
+.px{font-family:var(--f1);font-weight:700}
+.bar-top{display:flex;justify-content:space-between;font:500 var(--xs)/16px var(--f2);letter-spacing:.08em;color:var(--mut);gap:var(--q);flex-wrap:wrap;text-transform:uppercase}
+.bar-top span:first-child:before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--pos);box-shadow:0 0 8px var(--pos);margin-right:8px;vertical-align:1px;animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+/* header: a planet's rim of light across the bottom of the sky band */
+.sky{position:relative;display:grid;gap:var(--p);padding:var(--p) 0 36px;overflow:hidden}
+.sky:after{content:"";position:absolute;left:50%;bottom:-1180px;width:2400px;height:1200px;transform:translateX(-50%);border-radius:50%;
+ background:radial-gradient(closest-side,#0b0d14 97%,transparent 100%);box-shadow:0 -2px 0 rgba(245,190,170,.55),0 -10px 40px rgba(245,127,102,.30),0 -30px 120px rgba(169,205,241,.18);pointer-events:none}
+.sky>*{position:relative;z-index:1}
+.hero{display:grid;grid-template-columns:1.1fr 1fr;gap:var(--p);align-items:center;padding-top:var(--p)}
+.hero h1{font:700 var(--l)/46px var(--f1);letter-spacing:-.02em;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero h1 small{display:block;font:400 var(--m)/24px var(--f1);letter-spacing:0;color:var(--mut);-webkit-text-fill-color:var(--mut);margin-top:var(--q)}
+.btn{display:inline-block;border:0;border-radius:999px;background:var(--grad);color:#15121a;font:600 var(--s)/20px var(--f1);padding:10px 18px;margin-top:var(--p);cursor:pointer;
+ box-shadow:0 0 0 1px rgba(255,255,255,.15) inset,0 8px 28px rgba(245,127,102,.28);transition:transform .2s cubic-bezier(.34,1.56,.64,1),box-shadow .2s}
+.btn:hover{transform:translateY(-1px);box-shadow:0 0 0 1px rgba(255,255,255,.2) inset,0 10px 36px rgba(199,175,192,.4)}
+.btn:active{transform:translateY(1px) scale(.98)}
+.btn.ghost{background:rgba(255,255,255,.04);color:var(--ink);box-shadow:0 0 0 1px var(--line2) inset;margin-left:var(--q)}
+.playst{display:block;margin-top:8px;font:500 var(--xs)/16px var(--f2);color:var(--mut);max-width:60ch}
+.mascot{position:relative;justify-self:center;text-align:center;width:min(360px,100%)}
+.mascot svg{width:min(300px,70vw);overflow:visible;filter:drop-shadow(0 0 18px rgba(199,175,192,.25))}
+.say{position:relative;background:var(--raised);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--line2);border-radius:var(--r);padding:var(--p) 14px;margin-bottom:var(--p);text-align:left;font:500 var(--s)/20px var(--f1)}
+.say b{display:block;font:500 var(--xs)/16px var(--f2);letter-spacing:.12em;text-transform:uppercase;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.say:before{content:"";position:absolute;left:14px;right:14px;top:-1px;height:1px;background:var(--grad);opacity:.8}
+/* tiles: glass, hairline border, gradient top edge on hover */
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--p)}
+@media(min-width:760px){.stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.tile,.col,.row,.lv,.det,.say{-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.tile{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;align-items:flex-start;gap:var(--q);min-width:0;overflow:hidden;transition:border-color .25s,transform .25s}
+.tile:before{content:"";position:absolute;inset:0 0 auto;height:1px;background:var(--grad);opacity:0;transition:opacity .25s}
+.tile:hover{border-color:var(--line2);transform:translateY(-2px)}.tile:hover:before{opacity:.9}
+.tile h2{min-height:32px}
+@media(min-width:760px){.tile h2{min-height:16px}}
+.num{font:600 var(--l)/44px var(--f1);letter-spacing:-.02em;font-variant-numeric:tabular-nums;align-self:stretch;min-width:0;overflow:hidden;white-space:nowrap}
+.num small{font:400 var(--s)/20px var(--f1);color:var(--mut);letter-spacing:0}
+.g{color:var(--gold);text-shadow:0 0 24px rgba(255,200,107,.25)}.sk{color:var(--sky);text-shadow:0 0 24px rgba(169,205,241,.25)}.pk{color:var(--coral);text-shadow:0 0 24px rgba(245,127,102,.25)}
+.sub{font:400 var(--xs)/16px var(--f1);color:var(--mut);margin-top:auto}
+.spark{width:100%;height:var(--l);align-self:stretch}
+/* level: five orbit dots */
+.seg{display:flex;gap:var(--q);align-self:stretch;align-items:center}
+.seg i{flex:1;height:6px;border-radius:99px;background:rgba(145,152,173,.18)}
+.seg i.on{background:var(--grad);box-shadow:0 0 10px rgba(245,127,102,.35)}.seg i.cur{animation:pulse 2.4s ease-in-out infinite}
+.hearts{display:flex;gap:var(--q);align-items:center}.hearts svg{width:22px;height:22px;filter:drop-shadow(0 0 6px rgba(245,127,102,.4))}
+/* tabs: segmented pill */
+.tabs{display:flex;gap:4px;flex-wrap:wrap;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:999px;justify-self:start;max-width:100%}
+.tabs button{font:500 var(--s)/20px var(--f1);background:none;color:var(--mut);border:0;border-radius:999px;padding:6px 14px;cursor:pointer;transition:color .2s,background .2s}
+.tabs button:hover{color:var(--ink)}
+.tabs button.on{background:var(--grad);color:#15121a;box-shadow:0 4px 18px rgba(199,175,192,.3)}
+.pane{display:none}.pane.on{display:grid;gap:var(--p);animation:rise .35s cubic-bezier(.16,1,.3,1)}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}}
+#qlist,#log,#uplist,#shlist,#wip{display:grid;gap:var(--q)}
+/* levels: an orbit track with the cards as stations */
+.grass{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px var(--p) var(--p);display:grid;gap:var(--p);overflow:hidden}
+.grass:before{content:"";position:absolute;left:-10%;right:-10%;top:38px;height:160px;border-top:1px dashed var(--line2);border-radius:50% 50% 0 0/100% 100% 0 0;pointer-events:none}
+.levels{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--p);position:relative}
+.lv{position:relative;background:var(--raised);border:1px solid var(--line);border-radius:var(--rs);padding:var(--p);cursor:pointer;transition:border-color .2s,transform .2s}
+.lv:hover{transform:translateY(-2px);border-color:var(--line2)}
+.lv:before{content:"";position:absolute;top:-5px;left:14px;width:8px;height:8px;border-radius:50%;background:var(--mut)}
+.lv.done:before{background:var(--sky);box-shadow:0 0 8px var(--sky)}
+.lv.cur{border-color:transparent;background:linear-gradient(var(--deep),var(--deep)) padding-box,var(--grad) border-box;border:1px solid transparent;box-shadow:0 0 30px rgba(245,127,102,.2)}
+.lv.cur:before{background:var(--gold);box-shadow:0 0 12px var(--gold);animation:pulse 2.4s ease-in-out infinite}
+.lv.lock{opacity:.5}
+.lv b{font:600 var(--m)/24px var(--f1);display:block}.lv small{font:400 var(--xs)/16px var(--f1);color:var(--mut)}
+.lv.done small{color:var(--sky)}.lv.cur small{color:var(--gold)}
+.det{background:var(--raised);border:1px solid var(--line);border-radius:var(--rs);padding:var(--p);position:relative}
+/* chips */
+.chips{display:flex;gap:var(--q);flex-wrap:wrap}
+.chips button{font:500 var(--xs)/16px var(--f2);letter-spacing:.04em;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:999px;color:var(--mut);padding:5px 12px;cursor:pointer;transition:all .2s}
+.chips button:hover{color:var(--ink);border-color:var(--line2)}
+.chips button.on{background:var(--ink);color:var(--deep);border-color:var(--ink)}
+/* rows */
+.row{display:flex;gap:var(--p);padding:10px var(--p);border:1px solid var(--line);border-radius:var(--rs);background:var(--panel);cursor:pointer;align-items:center;min-width:0;transition:border-color .2s,background .2s}
+.row:hover{border-color:var(--line2);background:linear-gradient(90deg,rgba(245,127,102,.08),rgba(169,205,241,.06)),var(--panel)}
+.row.open{border-color:var(--line2)}
+.pill{flex:none;background:rgba(238,240,246,.1);color:var(--ink);font:600 var(--xs)/16px var(--f2);padding:2px 8px;border-radius:999px;white-space:nowrap}
+.row .w{flex:1;min-width:0;overflow-wrap:anywhere}
+.row .w b.t{display:block;font-weight:500;font-size:var(--s)}
+.row .w .meta{display:flex;align-items:center;gap:var(--q);flex-wrap:wrap;font:400 var(--xs)/16px var(--f2);color:var(--mut);margin-top:2px}
+.xpv{font:600 var(--m)/24px var(--f2);color:var(--mut);flex:none}.pos{color:var(--pos)}.neg{color:var(--red)}
+.more{display:none;padding:var(--p);margin:-2px 0 var(--q) var(--p);border-left:1px solid var(--line2);font:400 var(--s)/20px var(--f1);color:var(--mut)}.row.open+.more{display:block;animation:rise .3s cubic-bezier(.16,1,.3,1)}
+.more ul{margin:var(--q) 0 0;padding-left:18px}.more a{color:var(--sky)}
+/* roadmap columns */
+.cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--p)}
+.col{position:relative;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:var(--p);display:grid;gap:var(--q);align-content:start;min-width:0;overflow:hidden}
+.col:before{content:"";position:absolute;inset:0 0 auto;height:2px}
+.col h2{display:flex;justify-content:space-between;padding-bottom:var(--q)}
+.col.now:before{background:var(--coral);box-shadow:0 0 16px var(--coral)}.col.now h2{color:var(--coral)}
+.col.next:before{background:var(--sky);box-shadow:0 0 16px var(--sky)}.col.next h2{color:var(--sky)}
+.col.later:before{background:var(--mut)}.col.later h2{color:var(--mut)}
+/* user base */
+.flow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--p)}
+@media(min-width:760px){.flow{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.flow .arrow{display:none}.flow .step{min-width:0}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:112px 1fr 56px;gap:var(--p);align-items:center;font:500 var(--xs)/16px var(--f2);color:var(--mut)}
+.bar span:last-child{text-align:right;color:var(--ink)}
+.bar i{display:block;height:8px;border-radius:99px;box-shadow:0 0 12px currentColor}
+.key{display:flex;gap:var(--p);flex-wrap:wrap;font:400 var(--xs)/16px var(--f1);color:var(--mut);align-items:center}.key i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:var(--q);vertical-align:-1px}
+.cells{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:var(--q)}
+.cell{--h:var(--mut);position:relative;border:1px solid color-mix(in srgb,var(--h) 45%,transparent);border-radius:var(--rs);padding:8px;font:500 var(--xs)/16px var(--f2);color:var(--mut);overflow:hidden;white-space:nowrap;cursor:pointer;
+ background:radial-gradient(120% 90% at 0 0,color-mix(in srgb,var(--h) 22%,transparent),transparent 70%),var(--panel);transition:transform .2s}
+.cell:hover{transform:translateY(-2px)}
+.cell:before{content:"";position:absolute;right:8px;top:10px;width:6px;height:6px;border-radius:50%;background:var(--h);box-shadow:0 0 8px var(--h)}
+.cell span{display:block;font:600 var(--m)/24px var(--f1);color:var(--ink)}
+.foot{text-align:center;padding:28px 0 18px}.foot .px{font-size:var(--t);line-height:32px;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:-.01em}
+.foot .sub{margin-top:var(--q)}
+.ok{color:var(--pos)}.no{color:var(--mut)}
+.note{display:none!important}
+@media(max-width:800px){.cols{grid-template-columns:minmax(0,1fr)}.bar{grid-template-columns:80px 1fr 48px}}
+@media(max-width:700px){.hero{grid-template-columns:minmax(0,1fr)}.mascot{order:-1}.hero h1{font-size:34px;line-height:40px}.tabs{border-radius:var(--r)}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
+</style></head><body>
+<canvas id=stars-bg aria-hidden=true></canvas>
+<div class=wrap>
+<header class=sky>
+<div class=bar-top><span>infinite · mission control</span><span id=gen></span></div>
+<section class=hero>
+ <div><h1>Ship it,<br>play it<small>Every quest ends in a release someone downloads</small></h1><button class=btn id=play onclick="play()">Launch next quest</button> <button class="btn ghost" id=refresh title="Refresh all metrics" onclick="refreshAll()">Refresh telemetry</button><small class=playst id=playst role=status></small></div>
+ <div class=mascot><div class=say><b>Next quest</b><span id=quest></span><br><small class=note id=questwhy></small></div><div id=logo></div></div>
+</section></header>
+<div class=stats>
+ <div class=tile><h2>Level</h2><div class="num" id=lvl></div><div class=seg id=seg></div><div class=sub id=pt></div></div>
+ <div class=tile><h2>Gold · all-time downloads</h2><div class="num g" id=gold></div><svg class="spark g" id=sp-dl></svg><div class=sub id=goldn></div></div>
+ <div class=tile><h2>Stars · GitHub</h2><div class="num sk" id=stars></div><svg class="spark sk" id=sp-st></svg><div class=sub id=starsn></div></div>
+ <div class=tile><h2>Sessions · Google Analytics</h2><div class="num" id=ga></div><div class=sub id=gan></div><div class="sub note" id=gadl></div></div>
+ <div class=tile><h2>XP · quests closed</h2><div class="num pk" id=xp></div><div class="sub note" id=xpn></div></div>
+ <div class=tile><h2>Lives · software health</h2><div class=hearts id=lives></div><div class=num id=hp></div><div class="sub note" id=livesn></div></div>
+</div>
+<div class=tabs id=tabs></div>
+<div class=pane id=p-up><div class="sub note" id=upsub></div><div id=uplist></div></div>
+<div class=pane id=p-road><div class=chips id=rchips></div><div class=cols id=cols></div></div>
+<div class=pane id=p-quests><div class=chips id=qchips></div><div id=qlist></div></div>
+<div class=pane id=p-ladder><div class=grass><div class=levels id=ladder></div><div class="det note" id=ldet></div></div></div>
+<div class=pane id=p-wip><div id=wip></div></div>
+<div class=pane id=p-ship><div class=sub id=shsum></div><div id=shlist></div></div>
+<div class=pane id=p-users><div class=flow id=flow></div><h2 class=h>Downloads by platform</h2><div class=bars id=plat></div>
+ <h2 class=h>Release map</h2><div class=key><span><i style="background:var(--h4)"></i>200+</span><span><i style="background:var(--h3)"></i>50–199</span><span><i style="background:var(--h2)"></i>10–49</span><span><i style="background:var(--h1)"></i>under 10</span></div><div class=cells id=cells></div><p class="sub note" id=unote style="margin-top:12px"></p></div>
+</div>
+<div class=foot><div class=px>To infinity</div><div class=sub>and the next release</div></div>
+</div>
+<script>
+const D=__DATA__;const $=i=>document.getElementById(i);
+const n=v=>Math.round(v).toLocaleString('en-US');
+function px(rows,pal){const h=rows.length,w=Math.max(...rows.map(r=>r.length));let o='';rows.forEach((r,y)=>[...r].forEach((c,x)=>{if(pal[c])o+=`<rect x=${x} y=${y} width=1.02 height=1.02 fill="${pal[c]}"/>`}));return `<svg viewBox="0 0 ${w} ${h}" shape-rendering=crispEdges>${o}</svg>`}
+const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+// a four-point star: filled for a life you have, hollow for one you lost
+const STAR=on=>`<svg viewBox="-12 -12 24 24"><path d="M0-11C1.2-3 3-1.2 11 0 3 1.2 1.2 3 0 11-1.2 3-3 1.2-11 0-3-1.2-1.2-3 0-11Z" fill="${on?'url(#sg)':'none'}" stroke="${on?'none':'var(--line2)'}" stroke-width=1.4 /></svg>`;
+// logo: the lemniscate as an orbit in the brand gradient, a gold planet riding it with a fading trail
+(function(){const a=17.5,cx=20,cy=9,P=t=>{const s=Math.sin(t),c=Math.cos(t),d=1+s*s;return [cx+a*c/d,cy+a*s*c/d*1.25]};
+ let d='';for(let t=0;t<=Math.PI*2+.01;t+=.02){const [x,y]=P(t);d+=(d?'L':'M')+x.toFixed(2)+' '+y.toFixed(2)}
+ const TR=14;let tr='';for(let i=0;i<TR;i++)tr+=`<circle r="${(1.5*(1-i/TR)).toFixed(2)}" fill="#ffd28a" opacity="${(.5*(1-i/TR)).toFixed(2)}"/>`;
+ $('logo').innerHTML=`<svg viewBox="-2 -3 44 24"><defs><linearGradient id=lg x1=0 x2=1><stop offset=0 stop-color="#F57F66"/><stop offset=.35 stop-color="#D99A9C"/><stop offset=.65 stop-color="#C7AFC0"/><stop offset=1 stop-color="#A9CDF1"/></linearGradient>
+ <filter id=gl x=-50% y=-50% width=200% height=200%><feGaussianBlur stdDeviation=.9 /></filter><radialGradient id=pl cx=.35 cy=.35><stop offset=0 stop-color="#fff4d6"/><stop offset=.5 stop-color="#ffc86b"/><stop offset=1 stop-color="#c7702e"/></radialGradient></defs>
+ <path d="${d}" fill=none stroke="url(#lg)" stroke-width=2.2 filter="url(#gl)" opacity=.7 /><path d="${d}" fill=none stroke="url(#lg)" stroke-width=1.1 stroke-linecap=round />
+ <g id=trail>${tr}</g><circle id=ball r=1.9 fill="url(#pl)"/><circle id=halo r=3.6 fill="#ffc86b" opacity=.25 filter="url(#gl)"/></svg>`;
+ const b=$('ball'),h=$('halo'),T=[...$('trail').children];let t=.6;
+ const put=()=>{const [x,y]=P(t);b.setAttribute('cx',x);b.setAttribute('cy',y);h.setAttribute('cx',x);h.setAttribute('cy',y);T.forEach((c,i)=>{const [u,v]=P(t-(i+1)*.07);c.setAttribute('cx',u);c.setAttribute('cy',v)})};
+ put();if(!RM)(function f(){t+=.012;put();requestAnimationFrame(f)})()})();
+// the sky: three layers of stars that twinkle and drift, now and then a shooting star
+(function(){const c=$('stars-bg'),x=c.getContext('2d');let W,H,S=[],shoot=null;const dpr=Math.min(2,devicePixelRatio||1);
+ const TINT=['#ffffff','#ffffff','#ffffff','#A9CDF1','#C7AFC0','#F5B7A6','#ffe2b0'];
+ function size(){W=innerWidth;H=innerHeight;c.width=W*dpr;c.height=H*dpr;x.setTransform(dpr,0,0,dpr,0,0);
+  const n=Math.round(W*H/2600);S=Array.from({length:n},()=>{const z=Math.random();return{x:Math.random()*W,y:Math.random()*H,z,r:.35+z*z*1.5,a:.25+Math.random()*.75,p:Math.random()*6.3,s:.6+Math.random()*2,c:TINT[Math.random()*TINT.length|0]}});draw(0)}
+ function draw(ms){const t=ms/1000;x.clearRect(0,0,W,H);
+  for(const s of S){const y=(s.y+t*(2+s.z*6))%H,tw=RM?1:.55+.45*Math.sin(t*s.s+s.p);x.globalAlpha=s.a*tw;x.fillStyle=s.c;x.beginPath();x.arc(s.x,y,s.r,0,6.283);x.fill();
+   if(s.r>1.45){x.globalAlpha=s.a*tw*.18;x.beginPath();x.arc(s.x,y,s.r*3.2,0,6.283);x.fill()}}
+  if(!RM){if(!shoot&&Math.random()<.004)shoot={x:Math.random()*W*.8,y:Math.random()*H*.35,v:6+Math.random()*5,l:0};
+   if(shoot){const s=shoot;s.l+=1;const k=Math.min(1,s.l/8)*(1-s.l/70),px=s.x+s.l*s.v,py=s.y+s.l*s.v*.42;const g=x.createLinearGradient(px-90,py-38,px,py);
+    g.addColorStop(0,'rgba(255,255,255,0)');g.addColorStop(1,`rgba(255,240,220,${Math.max(0,k)})`);x.globalAlpha=1;x.strokeStyle=g;x.lineWidth=1.6;x.beginPath();x.moveTo(px-90,py-38);x.lineTo(px,py);x.stroke();if(s.l>70)shoot=null}}
+  x.globalAlpha=1}
+ size();addEventListener('resize',size);if(!RM)(function f(ms){draw(ms);requestAnimationFrame(f)})(0)})();
+$('gen').textContent='snapshot '+D.generated+' · '+D.git.branch+' @ '+D.git.commit;
+$('quest').textContent=D.quest;{const t=D.ranked[0];if(t)$('questwhy').textContent='priority '+t.score+' = '+t.score_why.join(' · ')}
+// level
+const L=D.levels,ci=D.level,V=D.vals,LAB={stars:'stars',downloads:'downloads',sessions:'GA sessions'};
+$('lvl').textContent='Lv '+ci;
+$('seg').innerHTML=[1,2,3,4,5].map(i=>`<i class="${i<ci?'on':i==ci?'on cur':''}"></i>`).join('');
+$('pt').textContent=L[ci][0]+' · '+(D.next?('Next: '+(ci+1)+' '+D.next[0]+' · '+Object.entries(D.next[1]).map(([k,m])=>n(Math.min(V[k],m))+'/'+n(m)+' '+LAB[k]).join(' · ')):'Max level');
+// gold / stars / ga
+const R=D.gh.releases;$('gold').textContent=n(D.gh.downloads);
+const lat=R[0];$('goldn').textContent=lat?('Latest '+lat.tag+': '+n(lat.downloads)+' · '+R.length+' releases · counts GitHub release assets only'):'No releases';
+$('stars').textContent=n(D.gh.stars);$('starsn').textContent=D.gh.forks+' forks · '+D.gh.watchers+' watching';
+function spark(id,key){const h=D.hist.map(r=>r[key]);const s=$(id);if(h.length<2){s.outerHTML='<div class=sub>trend starts after the second daily build</div>';return}
+ const mn=Math.min(...h),mx=Math.max(...h)||1,w=200,ht=34;const p=h.map((v,i)=>`${(i/(h.length-1)*w).toFixed(1)},${(ht-3-(v-mn)/((mx-mn)||1)*(ht-6)).toFixed(1)}`).join(' ');
+ s.setAttribute('viewBox',`0 0 ${w} ${ht}`);s.setAttribute('preserveAspectRatio','none');s.innerHTML=`<defs><linearGradient id=f${id} x1=0 y1=0 x2=0 y2=1><stop offset=0 stop-color=currentColor stop-opacity=.28 /><stop offset=1 stop-color=currentColor stop-opacity=0 /></linearGradient></defs><polygon points="0,${ht} ${p} ${w},${ht}" fill="url(#f${id})"/><polyline points="${p}" fill=none stroke="currentColor" stroke-width=2 stroke-linejoin=round vector-effect=non-scaling-stroke />`}
+spark('sp-dl','downloads');spark('sp-st','stars');
+if(D.ga){$('ga').textContent=n(D.ga.sessions);$('gan').textContent='Last '+D.ga.days+' days'+(D.ga.users?' · '+n(D.ga.users)+' users':'')+' · logged '+D.ga.ts.slice(0,10)}
+if(D.ga&&D.ga.dl!=null){$('gadl').innerHTML='<b>'+n(D.ga.dl)+'</b> download clicks on the site ('+Object.entries(D.ga.dl_os||{}).map(([k,v])=>k+' '+v).join(', ')+'). Clicks, not finished downloads, so they differ from GitHub Gold.'}
+else if(!D.ga){$('ga').textContent='—';$('gan').textContent='Not logged yet: roadmap.py ga --sessions N --days 30'}
+// xp / lives
+const Q=D.quests,dn=Q.filter(x=>x.status=='done');$('xp').textContent=D.xp;
+$('xpn').textContent=dn.length+' quests closed = '+D.xp+' XP. Feature or growth +10, fix or infra +5. '+Q.filter(x=>x.status=='open').length+' still open.';
+$('lives').innerHTML='<svg width=0 height=0 style=position:absolute><defs><linearGradient id=sg x1=0 y1=0 x2=1 y2=1><stop offset=0 stop-color="#F57F66"/><stop offset=1 stop-color="#A9CDF1"/></linearGradient></defs></svg>'+Array.from({length:D.lives_max},(_,i)=>STAR(i<D.lives)).join('');
+const G=D.gh;$('hp').innerHTML=D.health+'<small> / 100 health</small>';
+$('livesn').innerHTML='Debt (open bugs, issues, PRs) against momentum (fixes, features, upcoming). GitHub: '+G.issues_closed+' of '+G.issues_total+' closed, '+G.open_issues.length+' open, median '+G.median_days_to_close+' days to close.<br>'+D.health_why.join('<br>');
+// tabs
+const T=[['up','up next'],['road','roadmap'],['wip','in progress'],['quests','quest board'],['ladder','levels'],['ship','shipped'],['users','user base']];
+T.forEach(([k,nm])=>{const b=document.createElement('button');b.textContent=nm;b.onclick=()=>show(k);b.id='t-'+k;$('tabs').appendChild(b)});
+function show(k){T.forEach(([x])=>{$('p-'+x).classList.toggle('on',x==k);$('t-'+x).classList.toggle('on',x==k)});try{history.replaceState(null,'','#'+k)}catch(e){}}show(T.some(([x])=>'#'+x==location.hash)?location.hash.slice(1):'up');
+const CAT={engine:'#A9CDF1',nodes:'#7DE3B4',field:'#C9B3F5',timeline:'#FFC86B',learn:'#9BE7D2',platform:'#F59E6B',ux:'#F2A0C4',ship:'#F5DC7A',growth:'#F57F66'};
+const ICON={feature:'★',fix:'✚',infra:'⚙',growth:'↑'};
+const state=x=>x.status!='open'?x.status:x.user?'needs you':x.blocked?'locked':'ready';
+const mark=s=>s=='ready'?'▶':s=='done'?'✓':s=='locked'?'🔒':s=='needs you'?'?':'✕';
+function qrow(x,host){const st=state(x);const a=document.createElement('div');a.className='row';a.style.opacity=(x.blocked||x.status!='open')?.7:1;
+ a.innerHTML=`<span class=w><b class=t></b><span class=meta><span class=pill style="background:${CAT[x.track]};color:#000">${x.track}</span> ${x.id} · ${x.kind} · ${x.status=='open'?'priority '+x.score+' · ':''}${x.status=='done'?(x.shipped?'shipped '+x.release:'merged, not released'):st}</span></span><span class=xpv title="${st}">${mark(st)}</span>`;a.querySelector('.t').textContent=x.title;
+ a.onclick=()=>a.classList.toggle('open');const d=document.createElement('div');d.className='more';
+ d.textContent=x.kind+' · '+st+' · why: '+x.why+(x.status=='done'?' · +'+x.xp+' XP':'')+(x.release?' · shipped in '+x.release:(x.status=='done'?' · merged to main, not in a release yet':''))+' · skills: '+x.skills.join(', ')+(x.waiting_on.length?' · waiting on '+x.waiting_on.join(', '):'')+(x.unlocks?' · unlocks '+x.unlocks:'')+(x.status=='open'?' · priority '+x.score+': '+x.score_why.join(', '):'');
+ host.append(a,d)}
+// up next: the ranked, ready quests
+$('upsub').textContent='Ranked by priority score: horizon + where it came from (owner ask, bug, PR, issue, plan) + kind + what it unlocks + waiting time + branch already started - effort. Only quests that are unblocked and not waiting on you.';
+D.ranked.forEach((x,i)=>{const a=document.createElement('div');a.className='row';a.style.cursor='default';
+ a.innerHTML=`<span class=pill style="background:${CAT[x.track]};color:#000">${i+1}</span><span class=w><b class=t></b><span class=meta>${x.id} · ${x.track} · ${x.kind} · ${x.origin} · effort ${x.effort}</span></span><span class=xpv>${x.score}</span>`;
+ a.querySelector('.t').textContent=x.title;a.title='priority '+x.score+' = '+x.score_why.join(' · ');$('uplist').appendChild(a)});
+if(D.needs_you.length){$('uplist').insertAdjacentHTML('beforeend','<h2 class=h>Waiting on you ('+D.needs_you.length+')</h2>');D.needs_you.forEach(x=>{const a=document.createElement('div');a.className='row';a.style.cursor='default';a.innerHTML='<span class=w><b class=t></b><span class=meta>'+x.id+'</span></span><span class=xpv>?</span>';a.querySelector('.t').textContent=x.title;$('uplist').appendChild(a)})}
+// roadmap columns
+let rf='all';const tracks=['all',...D.tracks];
+function chips(host,cnt,cb){tracks.forEach(m=>{const b=document.createElement('button');b.textContent=m+' '+cnt(m);b.className=m=='all'?'on':'';b.onclick=()=>{[...host.children].forEach(c=>c.classList.toggle('on',c===b));cb(m)};host.appendChild(b)})}
+chips($('rchips'),m=>Q.filter(x=>x.status=='open'&&(m=='all'||x.track==m)).length,m=>{rf=m;rdraw()});
+function rdraw(){$('cols').innerHTML='';const ord={ready:0,'needs you':1,locked:2};D.horizons.forEach(h=>{const c=document.createElement('div');c.className='col '+h;
+ const xs=Q.filter(x=>x.status=='open'&&x.horizon==h&&(rf=='all'||x.track==rf)).sort((a,b)=>ord[state(a)]-ord[state(b)]||b.score-a.score);
+ c.innerHTML=`<h2 class=px><span>${h}</span><span>${xs.length}</span></h2>`;if(!xs.length)c.insertAdjacentHTML('beforeend','<div class=sub>nothing here</div>');xs.forEach(x=>qrow(x,c));$('cols').appendChild(c)})}rdraw();
+// quest board
+let qf='all';chips($('qchips'),m=>Q.filter(x=>m=='all'||x.track==m).length,m=>{qf=m;qdraw()});
+function qdraw(){$('qlist').innerHTML='';const ord={open:0,done:1,dropped:2};Q.filter(x=>qf=='all'||x.track==qf).sort((a,b)=>ord[a.status]-ord[b.status]||b.score-a.score).forEach(x=>qrow(x,$('qlist')))}qdraw();
+// in progress: uncommitted files + branches not merged to main
+(function(){const G=D.git,dt=G.dirty,box=$('wip');
+ const grp={};dt.forEach(f=>{const k=f.path.startsWith('tools/semi-brain')?'semi-brain data (never push)':(f.path.includes('/')?f.path.split('/')[0]+'/':f.path);(grp[k]=grp[k]||[]).push(f)});
+ let h=`<h2 class=h>Uncommitted (${dt.length} files)</h2>`;
+ if(!dt.length)h+='<div class=sub>Working tree is clean.</div>';
+ Object.entries(grp).forEach(([k,v])=>{h+=`<div class=row style="cursor:default"><span class=w><b class=t>${k}</b><span class=meta>${v.length} file${v.length>1?'s':''} · ${[...new Set(v.map(f=>f.st))].join(' ')}</span></span></div>`});
+ h+=`<h2 class=h>Branches not merged to main (${G.branches.length})</h2>`;
+ G.branches.forEach(b=>{h+=`<div class=row onclick="this.classList.toggle('open')"><span class=w><b class=t>${b.name}</b><span class=meta>${b.ahead} commit${b.ahead>1?'s':''} ahead · last ${b.last.split('|')[0]}${b.name==G.branch?' · you are here':''}</span></span></div><div class=more><ul>${b.commits.map(c=>'<li>'+c.replace(/</g,'&lt;')+'</li>').join('')}</ul></div>`});
+ box.innerHTML=h})();
+// ladder
+L.forEach(([nm,need],i)=>{const e=document.createElement('div');e.className='lv '+(i==ci?'cur':i<ci?'done':'lock');e.innerHTML=`<b>${i} ${nm}</b><small>${i==ci?'▶ you are here':i<ci?'✓ reached':'locked'}</small>`;
+ const req=Object.entries(need).map(([k,m])=>n(m)+' '+LAB[k]+' (now '+n(V[k])+')').join(', ');e.onclick=()=>$('ldet').textContent=`${i} ${nm}: ${req||'start'}.`;$('ladder').appendChild(e)});
+$('ldet').textContent='Tap a level for its requirement. Levels are the user base; XP never levels you up.';
+// shipped
+const tf=R.reduce((s,r)=>s+r.features,0),tx=R.reduce((s,r)=>s+r.fixes,0);
+$('shsum').innerHTML='Full history: docs/releases/HISTORY.md · <b>'+R.length+' releases</b> since '+(R.length?R[R.length-1].date:'—')+' · '+tf+' feature lines · '+tx+' fix lines (counted from release-note bullets) · '+D.git.commits+' commits on main';
+R.forEach(r=>{const a=document.createElement('div');a.className='row';
+ a.innerHTML=`<span class=pill>${r.tag}</span><span class=w>${r.date} · <b>${r.features}</b> ★ features · <b>${r.fixes}</b> ✚ fixes</span><span class="xpv pos">${n(r.downloads)}↓</span>`;
+ a.onclick=()=>a.classList.toggle('open');const d=document.createElement('div');d.className='more';
+ d.innerHTML=Object.entries(r.platforms).map(([k,v])=>k+' '+v).join(' · ')+'<ul>'+r.notes.map(t=>'<li></li>').join('')+'</ul><a href="'+r.url+'" target=_blank>open on GitHub</a>';
+ [...d.querySelectorAll('li')].forEach((li,i)=>li.textContent=r.notes[i]);$('shlist').append(a,d)});
+// user base
+const sess=D.ga?D.ga.sessions:null;
+const steps=[['Sessions',sess==null?'—':n(sess),D.ga?'GA, last '+D.ga.days+' days':'log with roadmap.py ga'],['Downloads',n(D.gh.downloads),'all releases'],['Stars',n(D.gh.stars),'github'],['Forks',n(D.gh.forks),'building on it']];
+steps.forEach(([a,v,b],i)=>{if(i)$('flow').insertAdjacentHTML('beforeend','<span class=arrow>▶</span>');$('flow').insertAdjacentHTML('beforeend',`<div class="tile step"><h2>${a}</h2><div class=num>${v}</div><div class=sub>${b}</div></div>`)});
+const P={};R.forEach(r=>Object.entries(r.platforms).forEach(([k,v])=>P[k]=(P[k]||0)+v));const PC={windows:'#A9CDF1','windows arm':'#C7AFC0',mac:'#F57F66',linux:'#FFC86B',other:'#9198AD'};
+const pm=Math.max(1,...Object.values(P));Object.entries(P).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>$('plat').insertAdjacentHTML('beforeend',`<div class=bar><span>${k}</span><i style="width:${Math.max(2,v/pm*100)}%;background:${PC[k]||'#9198AD'};color:${PC[k]||'#9198AD'}"></i><span>${n(v)}</span></div>`));
+[...R].reverse().forEach(r=>{const e=document.createElement('div');e.className='cell';const v=r.downloads;e.innerHTML=r.tag+'<span>'+n(v)+'</span>';e.title=r.tag+' · '+r.date+' · '+v+' downloads';
+ e.style.setProperty('--h',v>=200?'var(--h4)':v>=50?'var(--h3)':v>=10?'var(--h2)':'var(--h1)');e.onclick=()=>window.open(r.url,'_blank');$('cells').appendChild(e)});
+$('unote').textContent='Downloads are GitHub release asset counts (older releases keep counting). Sessions are logged by hand from GA4. Stars and downloads are snapshotted once a day on build, which draws the trend lines.';
+
+const TOKEN='__TOKEN__';
+function pst(t){$('playst').textContent=t;clearTimeout(pst.t);pst.t=setTimeout(()=>$('playst').textContent='',6000)}
+function copyText(text,ok){const fb=()=>{const a=document.createElement('textarea');a.value=text;document.body.appendChild(a);a.select();let r=false;try{r=document.execCommand('copy')}catch(e){}a.remove();ok(r)};
+ if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(()=>ok(true),fb);else fb()}
+function post(path){return fetch(path,{method:'POST',headers:{'X-Token':TOKEN}}).then(r=>r.json())}
+function play(){if(!D.prompt)return;const id=(D.ranked[0]||{}).id||'the next quest';
+ copyText(D.prompt,ok=>pst(ok?'Copied. Paste it in the Claude chat to start '+id:'Copy blocked here. Say in chat: '+D.prompt))}
+function refreshAll(b){if(!TOKEN||TOKEN.startsWith('__')){pst('Refresh needs the live server: python3 tools/roadmap/roadmap.py serve');return}
+ pst('Refreshing...');post('/refresh').then(r=>{if(r.ok)location.reload();else pst(r.msg)}).catch(()=>pst('Refresh failed: is the server running?'))}
+function fitNums(){document.querySelectorAll('.stats,.flow').forEach(g=>{const ns=[...g.querySelectorAll('.num')].filter(e=>e.offsetWidth);if(!ns.length)return;
+ ns.forEach(e=>{e.style.fontSize='';let f=parseFloat(getComputedStyle(e).fontSize);while(e.scrollWidth>e.clientWidth&&f>13){f--;e.style.fontSize=f+'px'}});
+ const m=Math.min(...ns.map(e=>parseFloat(getComputedStyle(e).fontSize)));ns.forEach(e=>e.style.fontSize=m+'px')})}
+addEventListener('load',fitNums);addEventListener('resize',fitNums);document.fonts&&document.fonts.ready.then(fitNums);$('tabs').addEventListener('click',()=>setTimeout(fitNums));
+</script></body></html>

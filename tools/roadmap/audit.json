@@ -1,0 +1,187 @@
+{
+ "merges": [
+  276,
+  284
+ ],
+ "direct": [
+  396,
+  396
+ ],
+ "notes_total": 336,
+ "evidence": [
+  421,
+  491
+ ],
+ "per_release": {
+  "v0.1": {
+   "quests": 10,
+   "notes": 9
+  },
+  "v0.2-preview": {
+   "quests": 13,
+   "notes": 11
+  },
+  "v0.2.1": {
+   "quests": 26,
+   "notes": 14
+  },
+  "v0.2.2": {
+   "quests": 9,
+   "notes": 9
+  },
+  "v0.2.3": {
+   "quests": 2,
+   "notes": 1
+  },
+  "v0.2.4": {
+   "quests": 22,
+   "notes": 24
+  },
+  "v0.2.5": {
+   "quests": 15,
+   "notes": 20
+  },
+  "v0.2.6": {
+   "quests": 22,
+   "notes": 14
+  },
+  "v0.2.7": {
+   "quests": 13,
+   "notes": 12
+  },
+  "v0.2.75": {
+   "quests": 24,
+   "notes": 20
+  },
+  "v0.2.76": {
+   "quests": 2,
+   "notes": 1
+  },
+  "v0.3.0": {
+   "quests": 28,
+   "notes": 27
+  },
+  "v0.3.1": {
+   "quests": 16,
+   "notes": 16
+  },
+  "v0.3.2": {
+   "quests": 6,
+   "notes": 5
+  },
+  "v0.3.3": {
+   "quests": 19,
+   "notes": 19
+  },
+  "v0.3.4": {
+   "quests": 11,
+   "notes": 11
+  },
+  "v0.3.5": {
+   "quests": 8,
+   "notes": 11
+  },
+  "v0.4.0": {
+   "quests": 51,
+   "notes": 23
+  },
+  "v0.4.1": {
+   "quests": 17,
+   "notes": 15
+  },
+  "v0.4.2": {
+   "quests": 24,
+   "notes": 24
+  },
+  "v0.4.25": {
+   "quests": 5,
+   "notes": 7
+  },
+  "v0.4.3": {
+   "quests": 12,
+   "notes": 9
+  },
+  "v0.4.4": {
+   "quests": 56,
+   "notes": 29
+  },
+  "v0.4.5": {
+   "quests": 6,
+   "notes": 5
+  }
+ },
+ "loose": [],
+ "no_evidence": [
+  "R1 v0.1: 80+ realtime 2D/3D nodes, synthesis, DSP, AU/VST3 hosting, MIDI",
+  "R5 Field language: sample/pixel/element/graph domains, dynamic pins, state",
+  "R8 Geometry pass-through: vertex colour, point clouds, stale material caches",
+  "R10 Linux AppImage release",
+  "R11 Prediction modulator (green learned-modulator family)",
+  "R12 Synth honesty pass: Analog sub DC, Metallic level, Sampler loop click, comb audi",
+  "R13 Perf blocks 1-3: real xrun counter, projector 60fps locked, decode drops",
+  "R18 Headless engine on Windows and Linux",
+  "R20 Publish the 36.4 s launch film",
+  "R22 Verify GA download events fire per platform",
+  "R25 Geometry domain audit",
+  "R30 Headless validator surfaced in the UI as live warnings",
+  "R32 Plan: Fix: undo/redo and node deletion stall on large patches (Windows + macOS)",
+  "R35 Review PR #24: 1st pull request",
+  "R36 Review PR #19: windows 11 fixes",
+  "R41 Headless part 6: the Claude skill for driving Infinite",
+  "R275 Render 3D: sort transparent draws back-to-front, no depth write",
+  "R285 Cosmos redesign of the roadmap dashboard",
+  "R291 Quest ledger backfill v2: backdate R1-R19, add ~20 missed merges, release-note i",
+  "R317 80+ real-time 2D/3D shader and generation nodes, including reaction-diffusion an",
+  "R323 Route any audio signal, envelope, LFO, or curve to modulate visuals, or drive au",
+  "R324 High-performance node canvas with live cable signals, color coding, and draggabl",
+  "R326 Add asynchronous movie recording so H.264 export no longer stalls the GUI or ren",
+  "R330 Add nested category submenus and drop targets for AudioFile/Model/Video/Image no",
+  "R338 Performance Matrix ships ten control types: knob, vertical fader, horizontal sli",
+  "R339 One Performance Matrix control can drive several parameters at once, and an XY p",
+  "R340 Performance Matrix supports multiple pages (rename, duplicate, reorder), per-con",
+  "R341 Add nine Macro nodes \u2014 Knob, Slider, Bipolar Knob, XY, Toggle, Trigger, NumBox, ",
+  "R342 Add three audio effects: Resonator Bank, Cycle Shaper, and Spec Blur",
+  "R343 Add cable visibility toggles \u2014 hide image and geometry, audio and note, or modul",
+  "R345 Add Shift+V to toggle the viewport panel",
+  "R346 Fix the app freezing at 100% CPU on any patch containing a Wavetable node \u2014 its ",
+  "R347 Fix Performance Matrix page names containing spaces being split apart when a pat",
+  "R349 Windows: fix point cloud sprites drawing far larger than intended, which could h",
+  "R350 Windows: add audio support for devices that negotiate a PCM rather than float mi",
+  "R352 Windows: write a crash report and a rolling log to the app support folder when t",
+  "R353 Windows: disable the sample rate and buffer size settings, which shared-mode aud",
+  "R357 Fix autosave failing silently on an unwritable settings directory, with no indic",
+  "R358 Windows: fix MIDI clock sync never working",
+  "R359 Windows: fix Audio Analyze driving visuals from the wrong frequency bands and wi",
+  "R360 Windows: fix dropped MIDI notes when 2 or more controllers are connected at once",
+  "R361 Windows: fix text rendering at the wrong size, with incorrect letter spacing and",
+  "R362 Windows: fix camera frames shearing at unaligned resolutions",
+  "R363 Bump website's displayed version to v0.2.5",
+  "R364 Redesign Pattern modulator with an interactive drag-paint bar grid, step glide, ",
+  "R367 Add a unified Settings panel (Cmd+0) with Appearance, Canvas & Workspace, Audio,",
+  "R368 Add Appearance settings: per-category node color overrides, per-cable-type color",
+  "R369 Persist Canvas & Workspace (grid/minimap/cable visibility), Audio (device/sample",
+  "R374 Fix Poisson Disk scatter tanking frame rate on Distribute Points on Faces",
+  "R388 Reverb: rework the damping filter to a true exponential cutoff curve, so the dam",
+  "R400 Field language: declared audio inputs (`input sample audio <name>`) \u2014 Field Samp",
+  "R421 Infinite is now available on Linux as a real, downloadable app for the first tim",
+  "R423 Fixed drag-and-drop from Finder landing in the wrong place instead of the timeli",
+  "R425 Fixed a crash generating certain meshes with Metaballs on Intel Macs.",
+  "R426 Fixed modulated integer sliders sometimes overwriting your recorded automation.",
+  "R428 New timeline tools \u2014 a tool selector for Select, Trim, Range Selection, Blade, Z",
+  "R431 Bypass overhaul: nodes with 2+ inputs can no longer be bypassed (synths are the ",
+  "R435 A new Prediction category \u2014 Infinite now learns how you move. Four new nodes: Pr",
+  "R436 It learns *you*, not whatever was left running. Your hand movements, exploratory",
+  "R438 Fixed long status text (like an audio input device error) running out past the e",
+  "R443 Lower audio CPU on heavy patches. Reverb is faster (SIMD, cached coefficients, a",
+  "R444 MIDI bindings (performance matrix, MIDI CC, MIDI Trigger) now survive a relaunch",
+  "R445 Exported movies get exact frames from video clips. Export A/V sync measures 0 dr",
+  "R446 Windows: Syphon/Spout Out no longer claims a receiver is connected when it can't",
+  "R447 Linux: video clips no longer re-copy and re-upload a frame that hasn't changed.",
+  "R476 Headless --render --start S leaves the audio clock at 0",
+  "R478 Headless audio block size follows the machine's audio device",
+  "R480 Join Geometry: remove resurrected keepInputColours; instancer input must not cou",
+  "R485 Roadmap ranking: exclude blocked/needs-input from next, don't let guessed rating",
+  "R502 Motion film: cat photo -> Wave Terrain synth -> bends a cube (cat-synth, 30 s, g"
+ ],
+ "first_commit": "2026-08-10"
+}

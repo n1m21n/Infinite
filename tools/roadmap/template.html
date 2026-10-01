@@ -1,0 +1,236 @@
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>Infinite Roadmap</title>
+<link rel=preconnect href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Archivo:wght@500;700&display=swap" rel=stylesheet>
+<style>
+:root{--bg:#dedede;--paper:#f4f4f2;--ink:#0b0b0b;--green:#1fbf3a;--dgreen:#0e7a22;--pink:#ff4fa8;--gold:#ffc61a;--mut:#5b5b5b;--red:#e5383b;
+--f1:'Archivo',system-ui,sans-serif;--f2:'Chakra Petch','Courier New',monospace;
+--l:40px;--m:16px;--s:13px;--xs:11px;--lh:20px;--p:12px;--q:6px}
+@media (prefers-color-scheme:dark){:root[data-force=dark]{--bg:#2a2a2c;--paper:#1b1b1d;--ink:#f2f2f2;--mut:#a5a5a5}}
+*{box-sizing:border-box}html{background:var(--bg)}
+body{margin:0;color:var(--ink);font:500 var(--s)/20px var(--f1);text-transform:uppercase;min-height:100vh;
+background:linear-gradient(90deg,rgba(0,0,0,.06) 1px,transparent 1px) 0 0/24px 24px,linear-gradient(rgba(0,0,0,.06) 1px,transparent 1px) 0 0/24px 24px,var(--paper)}
+.sky{position:relative;display:grid;gap:var(--p);padding:var(--p);margin:calc(-1*var(--p)) calc(-1*var(--p)) 0;background:var(--bg);box-shadow:0 0 0 100vmax var(--bg);clip-path:inset(0 -100vmax)}
+.sky>*{position:relative;z-index:1}
+#hills{position:absolute!important;z-index:0!important;left:50%;bottom:0;width:100vw;height:min(260px,100%);transform:translateX(-50%);pointer-events:none}
+.wrap{position:relative;z-index:1;max-width:1040px;margin:0 auto;padding:var(--p);display:grid;gap:var(--p)}
+h1,h2,.px{font-family:var(--f2);font-weight:700;text-transform:uppercase}
+h1,h2,p{margin:0}
+h2{font-size:var(--m);line-height:24px}
+.bar-top{display:flex;justify-content:space-between;font:500 var(--xs)/16px var(--f1);color:var(--mut);gap:var(--q);flex-wrap:wrap}
+.hero{display:grid;grid-template-columns:1fr 1fr;gap:var(--p);align-items:end}
+.hero h1{font-size:var(--l);line-height:48px}
+.hero h1 small{display:block;font-size:var(--m);line-height:24px}
+.btn{display:inline-block;background:var(--pink);color:#000;border:3px solid #000;font:700 var(--m)/24px var(--f2);padding:var(--q);margin-top:var(--p);cursor:pointer;box-shadow:4px 4px 0 #000;text-transform:lowercase}
+.btn.ghost{background:var(--gold);margin-left:var(--p)}
+.playst{display:block;margin-top:8px;font:600 12px/1.3 var(--f2);opacity:.75;max-width:60ch}
+.btn:active{transform:translate(4px,4px);box-shadow:none}
+.mascot{position:relative;justify-self:center;text-align:center}.mascot svg{width:min(240px,60vw);image-rendering:pixelated;animation:bob 1.2s steps(2) infinite}
+@keyframes bob{50%{transform:translateY(-6px)}}
+.say{position:relative;background:#fff;color:#000;border:3px solid #000;padding:var(--p);font-size:var(--s);box-shadow:4px 4px 0 #000;margin-bottom:var(--p);text-align:left}
+.say:after{content:"";position:absolute;bottom:-14px;right:60px;width:14px;height:14px;background:#fff;border:3px solid #000;border-top:0;border-left:0;transform:rotate(45deg)}
+.say b{color:var(--pink)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--p)}
+.tile{background:var(--paper);border:3px solid var(--ink);box-shadow:5px 5px 0 var(--ink);padding:var(--p)}
+.tile h2{font-size:var(--s);line-height:20px;color:var(--mut)}
+.num{font:700 var(--l)/48px var(--f2)}.g{color:var(--dgreen)}.pk{color:var(--pink)}
+.seg{display:flex;gap:var(--q)}.seg i{flex:1;height:var(--m);border:2px solid var(--ink);background:transparent}.seg i.on{background:var(--green)}
+.hearts{display:flex;gap:var(--q)}.hearts svg{width:34px;height:30px}
+.sub{font:500 var(--xs)/16px var(--f1);color:var(--mut);text-transform:none}
+.tabs{display:flex;gap:var(--q);flex-wrap:wrap}
+.tabs button{font:700 var(--m)/24px var(--f2);background:var(--paper);color:var(--ink);border:3px solid var(--ink);padding:var(--q);cursor:pointer;text-transform:lowercase}
+.tabs button.on{background:var(--green);color:#000;box-shadow:4px 4px 0 #000}
+.pane{display:none}.pane.on{display:grid;gap:var(--p)}
+#qlist,#log{display:grid;gap:var(--q)}
+.grass{background:var(--green);border:3px solid var(--ink);padding:var(--p);position:relative;display:grid;gap:var(--p)}
+.grass:before{content:"";position:absolute;left:0;right:0;top:0;height:var(--p);background:
+ linear-gradient(90deg,var(--dgreen) 50%,transparent 0) 0 0/16px 6px,linear-gradient(90deg,transparent 50%,var(--dgreen) 0) 8px 6px/16px 6px;background-repeat:repeat-x}
+.levels{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:var(--p);position:relative}
+.lv{background:#fff;color:#000;border:3px solid #000;padding:var(--p);cursor:pointer}
+.lv.cur{background:var(--pink);box-shadow:4px 4px 0 #000}.lv.done{background:#d8f5de}.lv.lock{opacity:.6}
+.lv b{font:700 var(--m)/24px var(--f2);display:block}.lv small{text-transform:none;font:500 var(--xs)/16px var(--f1)}
+.det{background:#fff;color:#000;border:3px solid #000;padding:var(--p);text-transform:none;position:relative}
+.chips{display:flex;gap:var(--q);flex-wrap:wrap}
+.chips button{font:700 var(--s)/20px var(--f2);background:none;border:2px solid var(--ink);color:var(--ink);padding:var(--q);cursor:pointer}
+.chips button.on{background:var(--ink);color:var(--paper)}
+.row{display:flex;gap:var(--p);padding:var(--p);border:3px solid var(--ink);background:var(--paper);cursor:pointer;align-items:flex-start}
+.row:hover{background:color-mix(in srgb,var(--green) 18%,var(--paper))}
+.pill{background:var(--ink);color:var(--paper);font:700 var(--xs)/16px var(--f2);padding:0 var(--q);white-space:nowrap}
+.row .w{flex:1;text-transform:none}.xpv{font:700 var(--m)/24px var(--f2)}.pos{color:var(--dgreen)}.neg{color:var(--red)}
+.more{display:none;padding:var(--p);border:3px dashed var(--ink);text-transform:none;font:500 var(--s)/20px var(--f1);color:var(--mut)}.row.open+.more{display:block}
+.flow{display:flex;flex-wrap:wrap;gap:var(--p);align-items:stretch}.step{flex:1;min-width:120px}.arrow{align-self:center;font:700 var(--m)/24px var(--f2)}
+.cells{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:var(--q)}
+.cell{border:2px solid var(--ink);padding:var(--q);font:700 var(--xs)/16px var(--f2);text-align:center;color:#000;overflow:hidden;white-space:nowrap}
+.key{display:flex;gap:var(--p);flex-wrap:wrap;font:500 var(--xs)/16px var(--f1)}.key i{display:inline-block;width:var(--xs);height:var(--xs);border:2px solid var(--ink);margin-right:var(--q)}
+.foot{text-align:center}.foot .px{font-size:var(--l);line-height:48px}.ok{color:var(--dgreen)}.no{color:var(--mut)}
+@media(max-width:700px){.hero{grid-template-columns:1fr}.mascot{order:-1}}
+
+/* roadmap-only pieces, built from the same tokens */
+.sk{color:#1f86d6}
+.hearts{align-items:center}
+.tile{display:grid;gap:var(--q);align-content:start;min-width:0}
+h2.h{font-size:var(--m)}
+.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--p)}
+.col{border:3px solid var(--ink);background:var(--paper);box-shadow:5px 5px 0 var(--ink);padding:var(--p);display:grid;gap:var(--q);align-content:start;min-width:0}
+.col h2{display:flex;justify-content:space-between}
+.col.now h2{color:var(--pink)}.col.next h2{color:#1f86d6}.col.later h2{color:var(--mut)}
+.row{min-width:0}
+.row .w{min-width:0;overflow-wrap:anywhere;font-size:var(--s)}
+.row .w b.t{display:block;font-weight:700}
+.row .w .meta{display:flex;align-items:center;gap:var(--q);flex-wrap:wrap;font-size:var(--xs);line-height:16px;color:var(--mut)}
+.pill{flex:none}
+.more ul{margin:var(--q) 0 0;padding-left:var(--p)}
+.bars{display:grid;gap:var(--q)}
+.bar{display:grid;grid-template-columns:112px 1fr 56px;gap:var(--q);align-items:center;font:700 var(--xs)/16px var(--f2)}
+.bar i{display:block;height:var(--m);border:2px solid var(--ink)}
+.cell span{display:block;font-size:var(--s);line-height:20px}
+.num small{font:500 var(--s)/20px var(--f1)}
+.big{font:700 var(--l)/48px var(--f2)}
+@media(max-width:800px){.cols{grid-template-columns:1fr}.bar{grid-template-columns:80px 1fr 48px}}
+.flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:var(--p)}
+.flow .arrow{display:none}
+.flow .step{min-width:0;flex:none}
+.num{overflow-wrap:anywhere}
+.cells{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}
+.note{display:none!important}
+</style></head><body>
+<div class=wrap>
+<header class=sky><svg id=hills></svg>
+<div class=bar-top><span>infinite · build roadmap</span><span id=gen></span></div>
+<section class=hero>
+ <div><h1>Ship it,<br>play it<small>Every quest ends in a release someone downloads</small></h1><button class=btn id=play onclick="play()">let's play!</button> <button class="btn ghost" id=refresh title="Refresh all metrics" onclick="refreshAll()">refresh all</button><small class=playst id=playst role=status></small></div>
+ <div class=mascot><div class=say><b>Next quest</b><br><span id=quest></span><br><small class=note id=questwhy></small></div><div id=logo></div></div>
+</section></header>
+<div class=stats>
+ <div class=tile><h2>Level</h2><div class="num" id=lvl></div><div class=seg id=seg></div><div class=sub id=pt></div></div>
+ <div class=tile><h2>Gold (all-time downloads)</h2><div class="num g" id=gold></div><div class=sub id=goldn></div></div>
+ <div class=tile><h2>Stars (GitHub)</h2><div class="num sk" id=stars></div><div class=sub id=starsn></div></div>
+ <div class=tile><h2>Sessions (Google Analytics)</h2><div class="num" id=ga></div><div class=sub id=gan></div><div class="sub note" id=gadl></div></div>
+ <div class=tile><h2>XP (quests closed)</h2><div class="num pk" id=xp></div><div class="sub note" id=xpn></div></div>
+ <div class=tile><h2>Lives (software health)</h2><div class=hearts id=lives></div><div class=num id=hp></div><div class="sub note" id=livesn></div></div>
+</div>
+<div class=tabs id=tabs></div>
+<div class=pane id=p-up><div class="sub note" id=upsub></div><div id=uplist></div></div>
+<div class=pane id=p-road><div class=chips id=rchips></div><div class=cols id=cols></div></div>
+<div class=pane id=p-quests><div class=sub id=qaudit></div><div class=chips id=qchips></div><div id=qlist></div></div>
+<div class=pane id=p-ladder><div class=grass><div class=levels id=ladder></div><div class="det note" id=ldet></div></div></div>
+<div class=pane id=p-wip><div id=wip></div></div>
+<div class=pane id=p-ship><div class=sub id=shsum></div><div id=shlist></div></div>
+<div class=pane id=p-users><div class=flow id=flow></div><h2 class=h>Downloads by platform</h2><div class=bars id=plat></div>
+ <h2 class=h>Release map</h2><div class=key><span><i style="background:#1fbf3a"></i>200+</span><span><i style="background:#ffc61a"></i>50–199</span><span><i style="background:#ff8a3d"></i>10–49</span><span><i style="background:#ff4d4d"></i>under 10</span></div><div class=cells id=cells></div><p class="sub note" id=unote style="margin-top:12px"></p></div>
+</div>
+<div class=foot><div class=px>Game on</div></div>
+</div>
+<script>
+const D=__DATA__;const $=i=>document.getElementById(i);
+const n=v=>Math.round(v).toLocaleString('en-US');
+function px(rows,pal){const h=rows.length,w=Math.max(...rows.map(r=>r.length));let o='';rows.forEach((r,y)=>[...r].forEach((c,x)=>{if(pal[c])o+=`<rect x=${x} y=${y} width=1.02 height=1.02 fill="${pal[c]}"/>`}));return `<svg viewBox="0 0 ${w} ${h}" shape-rendering=crispEdges>${o}</svg>`}
+const HEART=['.kk...kk.','kppk.kppk','kpppkpppk','kpppppppk','.kpppppk.','..kpppk..','...kpk...','....k....'];
+// logo: Bernoulli lemniscate, pixelated, coral to sky, with the brand ball riding the loop
+(function(){const W=40,H=18,a=17.5,cx=20,cy=9,on=new Map();
+ for(let t=0;t<Math.PI*2;t+=.004){const s=Math.sin(t),c=Math.cos(t),d=1+s*s,x=Math.round(cx+a*c/d),y=Math.round(cy+a*s*c/d*1.25);on.set(x+','+y,x)}
+ const mix=(p,q,f)=>'#'+[0,2,4].map(i=>Math.round(parseInt(p.substr(i,2),16)*(1-f)+parseInt(q.substr(i,2),16)*f).toString(16).padStart(2,'0')).join('');
+ let o='';on.forEach((x,k)=>{const [X,Y]=k.split(',').map(Number);o+=`<rect x=${X-.1} y=${Y-.1} width=1.2 height=1.2 fill="#000"/>`});
+ on.forEach((x,k)=>{const [X,Y]=k.split(',').map(Number);o+=`<rect x=${X+.1} y=${Y+.1} width=.8 height=.8 fill="${mix('ff6f5e','4fb6ff',X/W)}"/>`});
+ o+=`<rect id=ball width=2.2 height=2.2 fill="#ffc61a" stroke="#000" stroke-width=.4 />`;
+ $('logo').innerHTML=`<svg viewBox="-1 -2 ${W+2} ${H+4}" shape-rendering=crispEdges>${o}</svg>`;
+ let t=0;const b=$('ball');setInterval(()=>{t+=.12;const s=Math.sin(t),c=Math.cos(t),d=1+s*s;b.setAttribute('x',Math.round(cx+a*c/d)-.6);b.setAttribute('y',Math.round(cy+a*s*c/d*1.25)-.6)},90)})();
+const CLOUD=['.......kkkk.......','....kkkwwwwkk.....','..kkwwwwwwwwwkkk..','.kwwwwwwwwwwwwwwk.','kwwwwwwwwwwwwwwwwk','.kkkkkkkkkkkkkkkk.'];
+(function(){const W=1400,H=260,st=14;let o='';for(let x=0;x<W;x+=st){const h=150+Math.round((Math.sin(x/95)*26+Math.sin(x/37)*8)/st)*st;o+=`<rect x=${x} y=${h} width=${st} height=${H-h} fill="#e6e6e4"/>`}
+[[120,60],[820,40],[1180,80]].forEach(([x,y])=>o+=`<g transform="translate(${x},${y}) scale(6)">${px(CLOUD,{k:'#cfcfcf',w:'#fff'}).replace(/<svg[^>]*>|<\/svg>/g,'')}</g>`);
+$('hills').setAttribute('viewBox',`0 0 ${W} ${H}`);$('hills').setAttribute('preserveAspectRatio','xMidYMin slice');$('hills').innerHTML=o})();
+$('gen').textContent='snapshot '+D.generated+' · '+D.git.branch+' @ '+D.git.commit;
+$('quest').textContent=D.quest;{const t=D.ranked[0];if(t)$('questwhy').textContent='priority '+t.score+' = '+t.score_why.join(' · ')}
+// level
+const L=D.levels,ci=D.level,V=D.vals,LAB={stars:'stars',downloads:'downloads',sessions:'GA sessions'};
+$('lvl').textContent='Lv '+ci;
+$('seg').innerHTML=[1,2,3,4,5].map(i=>`<i class="${i<=ci?'on':''}"></i>`).join('');
+$('pt').textContent=L[ci][0]+' · '+(D.next?('Next: '+(ci+1)+' '+D.next[0]+' · '+Object.entries(D.next[1]).map(([k,m])=>n(Math.min(V[k],m))+'/'+n(m)+' '+LAB[k]).join(' · ')):'Max level');
+// gold / stars / ga
+const R=D.gh.releases;$('gold').textContent=n(D.gh.downloads);
+const lat=R[0];$('goldn').textContent=lat?('Latest '+lat.tag+': '+n(lat.downloads)+' · '+R.length+' releases · counts GitHub release assets only'):'No releases';
+$('stars').textContent=n(D.gh.stars);$('starsn').textContent=D.gh.forks+' forks · '+D.gh.watchers+' watching';
+if(D.ga){$('ga').textContent=n(D.ga.sessions);$('gan').textContent='Last '+D.ga.days+' days'+(D.ga.users?' · '+n(D.ga.users)+' users':'')+' · logged '+D.ga.ts.slice(0,10)}
+if(D.ga&&D.ga.dl!=null){$('gadl').innerHTML='<b>'+n(D.ga.dl)+'</b> download clicks on the site ('+Object.entries(D.ga.dl_os||{}).map(([k,v])=>k+' '+v).join(', ')+'). Clicks, not finished downloads, so they differ from GitHub Gold.'}
+else if(!D.ga){$('ga').textContent='—';$('gan').textContent='Not logged yet: roadmap.py ga --sessions N --days 30'}
+// xp / lives
+const Q=D.quests,dn=Q.filter(x=>x.status=='done');$('xp').textContent=D.xp;
+$('xpn').textContent=dn.length+' quests closed = '+D.xp+' XP. Feature or growth +10, fix or infra +5. '+Q.filter(x=>x.status=='open').length+' still open.';
+$('lives').innerHTML=Array.from({length:D.lives_max},(_,i)=>px(HEART,{k:'#000',p:i<D.lives?'#ff4fa8':'#ffffff00'})).join('');
+const G=D.gh;$('hp').innerHTML=D.health+'<small> / 100 health</small>';
+$('livesn').innerHTML='Debt (open bugs, issues, PRs) against momentum (fixes, features, upcoming). GitHub: '+G.issues_closed+' of '+G.issues_total+' closed, '+G.open_issues.length+' open, median '+G.median_days_to_close+' days to close.<br>'+D.health_why.join('<br>');
+// tabs
+const T=[['up','up next'],['road','roadmap'],['wip','in progress'],['quests','quest board'],['ladder','levels'],['ship','shipped'],['users','user base']];
+T.forEach(([k,nm])=>{const b=document.createElement('button');b.textContent=nm;b.onclick=()=>show(k);b.id='t-'+k;$('tabs').appendChild(b)});
+function show(k){T.forEach(([x])=>{$('p-'+x).classList.toggle('on',x==k);$('t-'+x).classList.toggle('on',x==k)});try{history.replaceState(null,'','#'+k)}catch(e){}}show(T.some(([x])=>'#'+x==location.hash)?location.hash.slice(1):'up');
+const CAT={engine:'#8ec5ff',nodes:'#1fbf3a',field:'#c9a3ff',timeline:'#ffc61a',learn:'#9be7d2',platform:'#ff8a3d',ux:'#ff4fa8',ship:'#f5d90a',growth:'#ff6f5e'};
+const ICON={feature:'★',fix:'✚',infra:'⚙',growth:'↑'};
+const state=x=>x.status!='open'?x.status:x.user?'needs you':x.blocked?'locked':'ready';
+const mark=s=>s=='ready'?'▶':s=='done'?'✓':s=='locked'?'🔒':s=='needs you'?'?':'✕';
+const day=t=>t?t.slice(0,10):'';const span=x=>{if(!x.closed||x.status=='open')return 'since '+day(x.ts);const d=Math.max(0,Math.round((new Date(x.closed)-new Date(x.ts))/864e5));return day(x.ts)+(day(x.ts)==day(x.closed)?'':' → '+day(x.closed))+' · '+(d?d+'d':'same day')};
+function qrow(x,host){const st=state(x);const a=document.createElement('div');a.className='row';a.style.opacity=(x.blocked||x.status!='open')?.7:1;
+ a.innerHTML=`<span class=w><b class=t></b><span class=meta><span class=pill style="background:${CAT[x.track]};color:#000">${x.track}</span> ${x.id} · ${x.kind} · ${x.status=='open'?'priority '+x.score+' · ':''}${x.status=='done'?(x.release?'shipped '+x.release:'merged, not released'):st} · ${span(x)}${x.epic?' · <b>epic of '+x.epic.length+'</b>':''}</span></span><span class=xpv title="${st}">${mark(st)}</span>`;a.querySelector('.t').textContent=x.title;
+ a.onclick=()=>a.classList.toggle('open');const d=document.createElement('div');d.className='more';
+ d.textContent=x.kind+' · '+st+' · why: '+x.why+(x.status=='done'?' · +'+x.xp+' XP':'')+(x.release?' · shipped in '+x.release:(x.status=='done'?' · merged to main, not in a release yet':''))+' · skills: '+x.skills.join(', ')+(x.waiting_on.length?' · waiting on '+x.waiting_on.join(', '):'')+(x.unlocks?' · unlocks '+x.unlocks:'')+(x.status=='open'?' · priority '+x.score+': '+x.score_why.join(', '):'')+(x.epic?' · children: '+x.epic.join(', ')+' (an epic earns no XP; its children do)':'')+(x.commits&&x.commits.length?' · evidence: '+x.commits.slice(0,12).join(' ')+(x.commits.length>12?' +'+(x.commits.length-12)+' more':''):'')+(x.logged&&day(x.logged)!=day(x.ts)?' · logged '+day(x.logged):'');
+ host.append(a,d)}
+// up next: the ranked, ready quests
+$('upsub').textContent='Ranked by priority score: horizon + where it came from (owner ask, bug, PR, issue, plan) + kind + what it unlocks + waiting time + branch already started - effort. Only quests that are unblocked and not waiting on you.';
+D.ranked.forEach((x,i)=>{const a=document.createElement('div');a.className='row';a.style.cursor='default';
+ a.innerHTML=`<span class=pill style="background:${CAT[x.track]};color:#000">${i+1}</span><span class=w><b class=t></b><span class=meta>${x.id} · ${x.track} · ${x.kind} · ${x.origin} · effort ${x.effort}</span></span><span class=xpv>${x.score}</span>`;
+ a.querySelector('.t').textContent=x.title;a.title='priority '+x.score+' = '+x.score_why.join(' · ');$('uplist').appendChild(a)});
+if(D.needs_you.length){$('uplist').insertAdjacentHTML('beforeend','<h2 class=h>Waiting on you ('+D.needs_you.length+')</h2>');D.needs_you.forEach(x=>{const a=document.createElement('div');a.className='row';a.style.cursor='default';a.innerHTML='<span class=w><b class=t></b><span class=meta>'+x.id+'</span></span><span class=xpv>?</span>';a.querySelector('.t').textContent=x.title;$('uplist').appendChild(a)})}
+// roadmap columns
+let rf='all';const tracks=['all',...D.tracks];
+function chips(host,cnt,cb){tracks.forEach(m=>{const b=document.createElement('button');b.textContent=m+' '+cnt(m);b.className=m=='all'?'on':'';b.onclick=()=>{[...host.children].forEach(c=>c.classList.toggle('on',c===b));cb(m)};host.appendChild(b)})}
+chips($('rchips'),m=>Q.filter(x=>x.status=='open'&&(m=='all'||x.track==m)).length,m=>{rf=m;rdraw()});
+function rdraw(){$('cols').innerHTML='';const ord={ready:0,'needs you':1,locked:2};D.horizons.forEach(h=>{const c=document.createElement('div');c.className='col '+h;
+ const xs=Q.filter(x=>x.status=='open'&&x.horizon==h&&(rf=='all'||x.track==rf)).sort((a,b)=>ord[state(a)]-ord[state(b)]||b.score-a.score);
+ c.innerHTML=`<h2 class=px><span>${h}</span><span>${xs.length}</span></h2>`;if(!xs.length)c.insertAdjacentHTML('beforeend','<div class=sub>nothing here</div>');xs.forEach(x=>qrow(x,c));$('cols').appendChild(c)})}rdraw();
+// quest board
+let qf='all';chips($('qchips'),m=>Q.filter(x=>m=='all'||x.track==m).length,m=>{qf=m;qdraw()});
+function qdraw(){$('qlist').innerHTML='';const ord={open:0,done:1,dropped:2};Q.filter(x=>qf=='all'||x.track==qf).sort((a,b)=>ord[a.status]-ord[b.status]||(a.status=='open'?b.score-a.score:(b.closed||'').localeCompare(a.closed||''))).forEach(x=>qrow(x,$('qlist')))}qdraw();
+// ledger coverage, from backfill.py's audit
+(function(){const A=D.audit;if(!A)return;const pc=([a,b])=>b?Math.round(a/b*100)+'%':'—';
+ $('qaudit').innerHTML=`<b>Ledger coverage</b> since ${A.first_commit} · merges ${A.merges[0]}/${A.merges[1]} (${pc(A.merges)}) · direct commits ${A.direct[0]}/${A.direct[1]} (${pc(A.direct)}) · done quests with commit evidence ${A.evidence[0]}/${A.evidence[1]} (${pc(A.evidence)}) · ${A.notes_total} release-note bullets checked`+(A.loose.length?` · <b>${A.loose.length} loose commits</b>`:'')+`. Dates and releases come from git, never typed. Newest done first.`})();
+// in progress: uncommitted files + branches not merged to main
+(function(){const G=D.git,dt=G.dirty,box=$('wip');
+ const grp={};dt.forEach(f=>{const k=f.path.startsWith('tools/semi-brain')?'semi-brain data (never push)':(f.path.includes('/')?f.path.split('/')[0]+'/':f.path);(grp[k]=grp[k]||[]).push(f)});
+ let h=`<h2 class=h>Uncommitted (${dt.length} files)</h2>`;
+ if(!dt.length)h+='<div class=sub>Working tree is clean.</div>';
+ Object.entries(grp).forEach(([k,v])=>{h+=`<div class=row style="cursor:default"><span class=w><b class=t>${k}</b><span class=meta>${v.length} file${v.length>1?'s':''} · ${[...new Set(v.map(f=>f.st))].join(' ')}</span></span></div>`});
+ h+=`<h2 class=h>Branches not merged to main (${G.branches.length})</h2>`;
+ G.branches.forEach(b=>{h+=`<div class=row onclick="this.classList.toggle('open')"><span class=w><b class=t>${b.name}</b><span class=meta>${b.ahead} commit${b.ahead>1?'s':''} ahead · last ${b.last.split('|')[0]}${b.name==G.branch?' · you are here':''}</span></span></div><div class=more><ul>${b.commits.map(c=>'<li>'+c.replace(/</g,'&lt;')+'</li>').join('')}</ul></div>`});
+ box.innerHTML=h})();
+// ladder
+L.forEach(([nm,need],i)=>{const e=document.createElement('div');e.className='lv '+(i==ci?'cur':i<ci?'done':'lock');e.innerHTML=`<b>${i} ${nm}</b><small>${i==ci?'▶ you are here':i<ci?'✓ reached':'locked'}</small>`;
+ const req=Object.entries(need).map(([k,m])=>n(m)+' '+LAB[k]+' (now '+n(V[k])+')').join(', ');e.onclick=()=>$('ldet').textContent=`${i} ${nm}: ${req||'start'}.`;$('ladder').appendChild(e)});
+$('ldet').textContent='Tap a level for its requirement. Levels are the user base; XP never levels you up.';
+// shipped
+const tf=R.reduce((s,r)=>s+r.features,0),tx=R.reduce((s,r)=>s+r.fixes,0);
+$('shsum').innerHTML='Full history: docs/releases/HISTORY.md · <b>'+R.length+' releases</b> since '+(R.length?R[R.length-1].date:'—')+' · '+tf+' feature lines · '+tx+' fix lines (counted from release-note bullets) · '+D.git.commits+' commits on main';
+R.forEach(r=>{const a=document.createElement('div');a.className='row';
+ a.innerHTML=`<span class=pill>${r.tag}</span><span class=w>${r.date} · <b>${r.features}</b> ★ features · <b>${r.fixes}</b> ✚ fixes · <b>${Q.filter(x=>x.status=='done'&&x.release==r.tag&&!x.epic).length}</b> quests</span><span class="xpv pos">${n(r.downloads)}↓</span>`;
+ a.onclick=()=>a.classList.toggle('open');const d=document.createElement('div');d.className='more';
+ d.innerHTML=Object.entries(r.platforms).map(([k,v])=>k+' '+v).join(' · ')+'<ul>'+r.notes.map(t=>'<li></li>').join('')+'</ul><a href="'+r.url+'" target=_blank>open on GitHub</a>';
+ [...d.querySelectorAll('li')].forEach((li,i)=>li.textContent=r.notes[i]);$('shlist').append(a,d)});
+// user base
+const sess=D.ga?D.ga.sessions:null;
+const steps=[['Sessions',sess==null?'—':n(sess),D.ga?'GA, last '+D.ga.days+' days':'log with roadmap.py ga'],['Downloads',n(D.gh.downloads),'all releases'],['Stars',n(D.gh.stars),'github'],['Forks',n(D.gh.forks),'building on it']];
+steps.forEach(([a,v,b],i)=>{if(i)$('flow').insertAdjacentHTML('beforeend','<span class=arrow>▶</span>');$('flow').insertAdjacentHTML('beforeend',`<div class="tile step"><h2>${a}</h2><div class=num>${v}</div><div class=sub>${b}</div></div>`)});
+const P={};R.forEach(r=>Object.entries(r.platforms).forEach(([k,v])=>P[k]=(P[k]||0)+v));const PC={windows:'#8ec5ff','windows arm':'#c9a3ff',mac:'#ff4fa8',linux:'#ffc61a',other:'#cfcfcf'};
+const pm=Math.max(1,...Object.values(P));Object.entries(P).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>$('plat').insertAdjacentHTML('beforeend',`<div class=bar><span>${k}</span><i style="width:${Math.max(2,v/pm*100)}%;background:${PC[k]||'#ccc'}"></i><span>${n(v)}</span></div>`));
+[...R].reverse().forEach(r=>{const e=document.createElement('div');e.className='cell';const v=r.downloads;e.innerHTML=r.tag+'<span>'+n(v)+'</span>';e.title=r.tag+' · '+r.date+' · '+v+' downloads';
+ e.style.background=v>=200?'#1fbf3a':v>=50?'#ffc61a':v>=10?'#ff8a3d':'#ff4d4d';e.onclick=()=>window.open(r.url,'_blank');$('cells').appendChild(e)});
+$('unote').textContent='Downloads are GitHub release asset counts (older releases keep counting). Sessions are logged by hand from GA4. Stars and downloads are snapshotted once a day on build, which draws the trend lines.';
+
+const TOKEN='__TOKEN__';
+// Live server only: reload every 20 s while the tab is visible, so the board never sits stale.
+if(!TOKEN.startsWith('__'))setInterval(()=>{if(!document.hidden)location.reload()},20000);
+function pst(t){$('playst').textContent=t;clearTimeout(pst.t);pst.t=setTimeout(()=>$('playst').textContent='',6000)}
+function copyText(text,ok){const fb=()=>{const a=document.createElement('textarea');a.value=text;document.body.appendChild(a);a.select();let r=false;try{r=document.execCommand('copy')}catch(e){}a.remove();ok(r)};
+ if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(()=>ok(true),fb);else fb()}
+function post(path){return fetch(path,{method:'POST',headers:{'X-Token':TOKEN}}).then(r=>r.json())}
+function play(){if(!D.prompt)return;const id=(D.ranked[0]||{}).id||'the next quest';
+ copyText(D.prompt,ok=>pst(ok?'Copied. Paste it in the Claude chat to start '+id:'Copy blocked here. Say in chat: '+D.prompt))}
+function refreshAll(b){if(!TOKEN||TOKEN.startsWith('__')){pst('Refresh needs the live server: python3 tools/roadmap/roadmap.py serve');return}
+ pst('Refreshing...');post('/refresh').then(r=>{if(r.ok)location.reload();else pst(r.msg)}).catch(()=>pst('Refresh failed: is the server running?'))}
+</script></body></html>
