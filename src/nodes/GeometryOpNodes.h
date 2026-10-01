@@ -110,6 +110,7 @@ public:
    // No other operator is defined on a polyline, so they pass it through.
    const Polyline* GetCurve() override;
    unsigned long long CurveStamp() override;
+   float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; }
    // Point cloud forwards unchanged for every op except kTransform, which
    // applies TransformMatrix() to each particle. Deliberately NOT applied for
    // kArray: array's semantics on a point cloud (replicate the whole cloud N
@@ -771,6 +772,7 @@ public:
    // Curve is a plain passthrough - Set Color only writes vertex/particle colour.
    const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
    unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
+   float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; }
    // Forwarded, not identity - see DisplacementNode for why.
    Mat4 GetModelMatrix() const override
    {

@@ -87697,6 +87697,23 @@ int main(int argc, char** argv)
          SetColorNode setCol; setCol.input = &curve;
          report("Set Color forwards the curve", setCol.GetCurve() == &curve.line && setCol.CurveStamp() == 7);
 
+         // R505: a passthrough must not reset the cloud's base size to 1.
+         struct BaseSizeProbe : public CurveProbe
+         {
+            float PointBaseSize() const override { return 3.0f; }
+         };
+         BaseSizeProbe sized;
+         MaterialNode bsMat; bsMat.input = &sized;
+         Null3DNode bsNull; bsNull.input = &sized;
+         MappingNode bsMap; bsMap.input = &sized;
+         SetColorNode bsSet; bsSet.input = &sized;
+         GeometryOpNode bsOp; bsOp.input = &sized;
+         ClothNode bsCloth; bsCloth.input = &sized;
+         report("Material/Null3D/Mapping/SetColor/GeometryOp/Cloth forward PointBaseSize",
+                bsMat.PointBaseSize() == 3.0f && bsNull.PointBaseSize() == 3.0f &&
+                bsMap.PointBaseSize() == 3.0f && bsSet.PointBaseSize() == 3.0f &&
+                bsOp.PointBaseSize() == 3.0f && bsCloth.PointBaseSize() == 3.0f);
+
          // R482: tint is baked into the colour, so the albedo is neutral.
          DepthProjectionNode depthProj; depthProj.tint[0] = 0.5f;
          ImageToPointsNode img2pts; img2pts.tint[0] = 0.5f;

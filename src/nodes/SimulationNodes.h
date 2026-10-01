@@ -170,6 +170,7 @@ public:
    }
    const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
    unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
+   float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; }
    unsigned long long MappingRevision() const override
    {
       return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);

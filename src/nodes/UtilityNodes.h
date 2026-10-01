@@ -194,6 +194,7 @@ public:
    }
    const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
    unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
+   float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; }
    Mat4 GetInstanceGroupMatrix() const override
    {
       return input ? input->GetInstanceGroupMatrix() : Mat4::Identity();
@@ -297,6 +298,7 @@ public:
    }
    const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
    unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
+   float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; }
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
    ImageCable& TextureInput() { return mMaps[kMapAlbedo]; }
@@ -475,6 +477,7 @@ public:
    }
    const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
    unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
+   float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; }
 
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;
