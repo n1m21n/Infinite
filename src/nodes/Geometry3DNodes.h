@@ -293,8 +293,11 @@ inline std::string DescribeGeometryMismatch(IGeometrySource* source, GeometryReq
    if (source == nullptr)
       return std::string();
 
-   const bool hasSurface = !source->GetMesh().Empty() && !source->GetMesh().indices.empty();
-   const bool hasVerts = !source->GetMesh().Empty();
+   // Mesh::Empty() is true for vertices with no faces, so test the two arrays
+   // directly: a vertices-only mesh is "vertices", not "nothing".
+   const Mesh& mesh = source->GetMesh();
+   const bool hasVerts = !mesh.vertices.empty();
+   const bool hasSurface = hasVerts && !mesh.indices.empty();
    const std::vector<Particle>* cloud = source->GetPointCloud();
    const bool hasCloud = cloud != nullptr && !cloud->empty();
    const bool hasCurve = source->GetCurve() != nullptr;

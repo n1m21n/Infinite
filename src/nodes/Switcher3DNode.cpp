@@ -154,6 +154,36 @@ const Mesh& Switcher3DNode::GetMesh()
    return active->GetMesh();
 }
 
+const std::vector<Particle>* Switcher3DNode::GetPointCloud()
+{
+   IGeometrySource* active = Active();
+   return active ? active->GetPointCloud() : nullptr;
+}
+
+unsigned long long Switcher3DNode::PointCloudRevision()
+{
+   IGeometrySource* active = Active();
+   return active ? active->PointCloudRevision() : 0;
+}
+
+float Switcher3DNode::PointBaseSize() const
+{
+   IGeometrySource* active = Active();
+   return active ? active->PointBaseSize() : 1.0f;
+}
+
+const Polyline* Switcher3DNode::GetCurve()
+{
+   IGeometrySource* active = Active();
+   return active ? active->GetCurve() : nullptr;
+}
+
+unsigned long long Switcher3DNode::CurveStamp()
+{
+   IGeometrySource* active = Active();
+   return active ? active->CurveStamp() : 0;
+}
+
 unsigned long long Switcher3DNode::MeshRevision()
 {
    GetMesh(); // ensures the bookkeeping above ran for this call
