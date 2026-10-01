@@ -278,5 +278,9 @@ import struct; b=open('$OUT/cs/sheet.png','rb').read()
 print(b[12:16]==b'IHDR' and b[37:41]==b'sRGB' and struct.unpack('>I',b[16:20])[0] >= 960)")" = "True" ]; check "summary: contact sheet is an sRGB-tagged PNG" $?
 "$BIN" --render "$PATCH" "$OUT/x.mp4" --contact-sheet "$OUT/x.png" >/dev/null 2>&1; [ $? = 2 ]; check "summary: --contact-sheet outside --frame exit 2" $?
 
+# R40: two processes render a patch with a random note source to the same bytes (the note pump that
+# runs without a device used to leave the generator mid-sequence, so the first note varied run to run)
+python3 "$ROOT/tools/determinism-check.py" "$ROOT/tests/headless/format/audio.inf" --binary "$BIN" --times 0,1 --audio-seconds 1 >/dev/null; check "determinism: random-note synth patch renders identically twice" $?
+
 rm -rf "$OUT"
 exit $fail

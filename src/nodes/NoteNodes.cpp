@@ -3092,6 +3092,7 @@ public:
       mPendingOffActive = false;
       mPrevNote = -1;
       mMelody = NoteTheory::MelodyState();
+      mRng = DspMath::WhiteNoise(); // same seed every (re)start: an offline pass must not inherit live blocks' draws
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override

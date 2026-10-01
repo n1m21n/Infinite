@@ -7495,6 +7495,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    // Defined near DisconnectAllTo/RemoveNodeByIndex, below; forward-declared
    // here since DisconnectLinkById (earlier in the file) needs to call it too.
    void RebuildAudioTopology();
+   void ForceAudioRepare(); // next RebuildAudioTopology calls PrepareToPlay on every audio node again
 
    // Forward-declared here since ArrangeImportMediaFile (Arrange media-drop
    // import, earlier in the file) needs to clean up a just-spawned node when
@@ -42592,6 +42593,27 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
              (gArrangeWavRender.active && gArrangeWavRender.timelineAudio);
    }
 
+   // A take starts every node from its prepared state. Without this, a note-only node the
+   // no-device pump (AudioEngine::PumpNoteNodesWithoutDevice, wall-clock driven) already ran keeps the
+   // generator state those blocks left, and RebuildAudioTopology skips it because it is "already
+   // prepared" at this rate - so two renders of one patch started from different random draws.
+   void ForceAudioRepare()
+   {
+      for (GraphNode& gn : gNodes)
+      {
+         AudioNode* an = nullptr;
+         if (auto* s = dynamic_cast<IAudioSource*>(gn.node.get()))
+            an = s->GetAudioNode();
+         if (an == nullptr)
+            if (auto* s = dynamic_cast<INoteSource*>(gn.node.get()))
+               an = s->GetAudioNode();
+         if (an == nullptr)
+            an = gn.node->AudioNodeForNotePorts();
+         if (an != nullptr)
+            an->preparedForSampleRate = -1.0;
+      }
+   }
+
    void RebuildAudioTopology()
    {
       if (gDeferAudioRebuild)
@@ -43453,6 +43475,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       gOfflineRender.startSeconds = Transport::Instance().Seconds();
       Transport::Instance().SetOfflineMode(true, takeSampleRate);
       Transport::Instance().SetPlaying(true);
+      ForceAudioRepare();
       RebuildAudioTopology();
    }
 
@@ -70180,6 +70203,7 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
          Transport::Instance().Seek(job.start);
          Transport::Instance().SetOfflineMode(true, gHeadlessAudioRate);
          Transport::Instance().SetPlaying(true);
+         ForceAudioRepare();
          RebuildAudioTopology();
          if (sSinkRing != nullptr)
          {
