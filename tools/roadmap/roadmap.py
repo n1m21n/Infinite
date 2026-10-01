@@ -389,6 +389,33 @@ def quest_prompt(x: dict) -> str:
             "branch per git-branch-workflow, build, run the gates, then ask me before merging. Mark it done on the roadmap after the merge.")
 
 
+MILESTONE = Path(__file__).with_name("milestone.json")  # hand-edited each release: target version, goals, still-open quest ids
+
+
+def milestone(b: list[dict]) -> dict | None:
+    """Progress toward the next release. Done = closed quests with no release tag yet (growth quests and epics are not
+    release content); scope = those plus the open quest ids listed per goal. The first goal whose rule matches claims a quest."""
+    if not MILESTONE.exists():
+        return None
+    m = json.loads(MILESTONE.read_text())
+    by_id = {x["id"]: x for x in b}
+    goals = [{"key": g["key"], "label": g["label"], "done": [], "open": [i for i in g.get("open", []) if by_id.get(i, {}).get("status") == "open"]} for g in m["goals"]]
+    for x in b:
+        if x["status"] != "done" or x.get("release") or x.get("epic") or x["kind"] == "growth":
+            continue
+        for g, spec in zip(goals, m["goals"]):
+            hit = (spec.get("match") and re.search(spec["match"], x["title"] + " " + x.get("src", ""), re.I)) or x["kind"] in spec.get("kinds", [])
+            if hit:
+                g["done"].append(x["id"])
+                break
+    for g in goals:
+        g["total"] = len(g["done"]) + len(g["open"])
+        g["pct"] = round(100 * len(g["done"]) / g["total"]) if g["total"] else 100
+    done, total = sum(len(g["done"]) for g in goals), sum(g["total"] for g in goals)
+    return {"version": m["version"], "since": m["since"], "theme": m.get("theme", ""), "goals": goals,
+            "done": done, "total": total, "pct": round(100 * done / total) if total else 100}
+
+
 def build(gh: dict) -> dict:
     snapshot(gh)
     rows = _read(METRICS)
@@ -406,7 +433,7 @@ def build(gh: dict) -> dict:
     return {
         "generated": datetime.now(IST).strftime("%Y-%m-%d %H:%M IST"), "git": g, "gh": gh, "vals": vals,
         "level": lv, "levels": LEVELS, "next": nxt, "ga": last_ga, "ga_hist": ga, "hist": hist,
-        "quests": b, "quest": f"{r[0]['id']} {r[0]['title']}" if r else "Board is clear. Add the next quest.",
+        "quests": b, "milestone": milestone(b), "quest": f"{r[0]['id']} {r[0]['title']}" if r else "Board is clear. Add the next quest.",
         "prompt": quest_prompt(r[0]) if r else "",
         "ranked": [{k: x[k] for k in ("id", "title", "track", "kind", "horizon", "origin", "effort", "score", "score_why")}
                    for x in r[:10]], "needs_you": [{"id": x["id"], "title": x["title"]} for x in b if x["status"] == "open" and x.get("user")],

@@ -22,6 +22,7 @@ Git, not memory, says when each quest started, when it closed and which release 
 | `backfill.py` | Reconciles the ledger with git and the release notes. Safe to rerun: a second run writes nothing. |
 | `audit.json` | Coverage written by `backfill.py` and shown on the quest board. |
 | `template.html` → `roadmap.html` | The dashboard. |
+| `milestone.json` | The next-release target shown as the slider above the tabs. Hand-edited **each release**: bump `version`/`since`, rewrite `goals`, list still-open quest ids per goal. Merged quests no tag contains yet count as done automatically; the first matching goal claims a quest (growth quests and epics are skipped). |
 | `metrics.jsonl` | Daily stars/downloads snapshots and GA rows. |
 | `auto.sh` | `backfill.py` then `build`. Runs hourly (launchd) and on git post-merge. Locked by `/tmp/infinite-roadmap.lock`. |
 

@@ -1,0 +1,12 @@
+{
+  "version": "v0.4.6",
+  "since": "v0.4.5",
+  "theme": "New main features, the headless engine, and the important bug fixes",
+  "note": "Edit this file at each release: bump version/since, rewrite goals, list the still-open quest ids per goal. Merged quests that no tag contains yet count automatically; the first goal whose rule matches a quest claims it. Growth quests and epics are not release content.",
+  "goals": [
+    {"key": "headless", "label": "Headless engine", "match": "headless", "open": ["R518", "R517"]},
+    {"key": "fixes", "label": "Important bug fixes", "kinds": ["fix"], "open": ["R519"]},
+    {"key": "features", "label": "New main features", "kinds": ["feature"], "open": []},
+    {"key": "infra", "label": "Tooling and release prep", "kinds": ["infra"], "open": ["R520"]}
+  ]
+}
