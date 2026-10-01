@@ -76825,7 +76825,8 @@ int main(int argc, char** argv)
             }
          }
 
-         // Metronome: click toggles, right-click opens volume / accent. Sits
+         // Metronome: click toggles, right-click opens volume / accent (no hover
+         // text, by design). Sits
          // in the Tempo & Meter group because it follows exactly those two.
          TopBarSameLine(8.0f);
          {
@@ -76834,7 +76835,7 @@ int main(int argc, char** argv)
             const bool metronomeWasOn = gMetronomeOn;
             if (metronomeWasOn)
                ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-            if (ImGui::Button("##metronomeBtn", ImVec2(30.0f, 0.0f)))
+            if (ImGui::Button("##metronomeBtn", ImVec2(32.0f, 0.0f)))
                gMetronomeOn = !gMetronomeOn;
             if (metronomeWasOn)
                ImGui::PopStyleColor();
@@ -76842,16 +76843,18 @@ int main(int argc, char** argv)
                ImVec4 iconCol = ImGui::GetStyleColorVec4(ImGuiCol_Text);
                if (!metronomeWasOn)
                   iconCol.w *= 0.78f;
+               // The pendulum swings with the transport: one extreme per beat,
+               // so every click lands at the end of a swing, as on a real one.
+               // Upright when off or while the transport is stopped.
+               const float swing = (metronomeWasOn && isTransportPlaying)
+                                      ? (float)std::cos(IM_PI * std::fmod(transport.Beats(), 2.0))
+                                      : 0.0f;
                const ImVec2 bmin = ImGui::GetItemRectMin();
                const ImVec2 bmax = ImGui::GetItemRectMax();
                Tabler::DrawMetronome(ImGui::GetWindowDrawList(),
                                      ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f),
-                                     (bmax.y - bmin.y) * 0.88f, ImGui::GetColorU32(iconCol));
+                                     (bmax.y - bmin.y) * 0.84f, ImGui::GetColorU32(iconCol), swing);
             }
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
-               ImGui::SetTooltip("Metronome - click to turn on or off, right-click for volume.\n"
-                                 "Plays while the transport runs, on the beat of the tempo and time signature.\n"
-                                 "It goes to the audio device only: not into recordings or exports.");
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
                ImGui::OpenPopup("##metronomePopup");
 
