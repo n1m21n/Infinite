@@ -43,9 +43,6 @@ h2{font-size:var(--m);line-height:24px}
 .msl .thumb{position:absolute;top:-10px;width:28px;height:36px;margin-left:-14px;background:var(--pink);border:3px solid var(--ink);box-shadow:3px 3px 0 var(--ink)}
 .msl .tick{position:absolute;top:-6px;bottom:-6px;width:2px;background:var(--ink);opacity:.35}
 .msends{display:flex;justify-content:space-between;font:700 var(--xs)/16px var(--f2)}
-.msg{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--p)}
-.msg>div{border:2px solid var(--ink);padding:var(--q)}
-.msg .mb{height:var(--q);border:1px solid var(--ink);margin:var(--q) 0}.msg .mb i{display:block;height:100%;background:var(--green)}
 .tabs{display:flex;gap:var(--q);flex-wrap:wrap}
 .tabs button{font:700 var(--m)/24px var(--f2);background:var(--paper);color:var(--ink);border:3px solid var(--ink);padding:var(--q);cursor:pointer;text-transform:lowercase}
 .tabs button.on{background:var(--green);color:#000;box-shadow:4px 4px 0 #000}
@@ -120,7 +117,7 @@ h2.h{font-size:var(--m)}
 </div>
 <div class=ms id=ms hidden><h2><span id=mst></span><span id=msp></span></h2><div class="sub note" id=msn></div>
  <div class=msl id=msl><div class=fill id=msf></div><div class=thumb id=msth></div></div>
- <div class=msends><span id=msa></span><span id=msb></span></div><div class=msg id=msg></div></div>
+ <div class=msends><span id=msa></span><span id=msb></span></div></div>
 <div class=tabs id=tabs></div>
 <div class=pane id=p-up><div class="sub note" id=upsub></div><div id=uplist></div></div>
 <div class=pane id=p-road><div class=chips id=rchips></div><div class=cols id=cols></div></div>
@@ -140,10 +137,7 @@ const n=v=>Math.round(v).toLocaleString('en-US');
 $('mst').textContent='Next release: '+M.version;$('msp').textContent=M.pct+'% · '+M.done+' of '+M.total+' quests done';
 $('msn').textContent=M.theme+'. Everything merged since '+M.since+' ships here; open quests listed in milestone.json are the rest of the scope.';
 $('msf').style.width=M.pct+'%';$('msth').style.left=M.pct+'%';$('msa').textContent=M.since+' shipped';$('msb').textContent=M.version;
-let acc=0;M.goals.slice(0,-1).forEach(g=>{acc+=g.total;if(M.total){const t=document.createElement('i');t.className='tick';t.style.left=(100*acc/M.total)+'%';$('msl').appendChild(t)}});
-M.goals.forEach(g=>{const d=document.createElement('div'),h=document.createElement('b'),bar=document.createElement('div'),i=document.createElement('i'),s=document.createElement('div');
-h.textContent=g.label+' · '+g.pct+'%';bar.className='mb';i.style.width=g.pct+'%';bar.appendChild(i);s.className='sub';
-s.textContent=g.done.length+' done'+(g.open.length?' · still open: '+g.open.join(', '):' · nothing open');d.append(h,bar,s);$('msg').appendChild(d)})})();
+})();
 
 function px(rows,pal){const h=rows.length,w=Math.max(...rows.map(r=>r.length));let o='';rows.forEach((r,y)=>[...r].forEach((c,x)=>{if(pal[c])o+=`<rect x=${x} y=${y} width=1.02 height=1.02 fill="${pal[c]}"/>`}));return `<svg viewBox="0 0 ${w} ${h}" shape-rendering=crispEdges>${o}</svg>`}
 const HEART=['.kk...kk.','kppk.kppk','kpppkpppk','kpppppppk','.kpppppk.','..kpppk..','...kpk...','....k....'];
@@ -254,5 +248,4 @@ function post(path){return fetch(path,{method:'POST',headers:{'X-Token':TOKEN}})
 function play(){if(!D.prompt)return;const id=(D.ranked[0]||{}).id||'the next quest';
  copyText(D.prompt,ok=>pst(ok?'Copied. Paste it in the Claude chat to start '+id:'Copy blocked here. Say in chat: '+D.prompt))}
 function refreshAll(b){if(!TOKEN||TOKEN.startsWith('__')){pst('Refresh needs the live server: python3 tools/roadmap/roadmap.py serve');return}
- pst('Refreshing...');post('/refresh').then(r=>{if(r.ok)location.reload();else pst(r.msg)}).catch(()=>pst('Refresh failed: is the server running?'))}
-</script></body></html>
+ pst('Refreshing...');post('/refresh').then(r=>{if(r.ok)location.reload();else pst(r</script></body></html>
