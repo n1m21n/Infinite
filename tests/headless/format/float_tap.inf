@@ -1,0 +1,12 @@
+infinite-patch 1
+node 1 Source Shape
+  id shape
+end
+node 2 Effects Feedback
+  id fb
+end
+node 3 Utility Output
+  id out
+end
+cable fb input shape
+cable out in fb

@@ -378,6 +378,67 @@ namespace Headless
          }
          else if (a == "--alpha" && job.mode == Mode::Frames)
             job.alpha = true;
+         else if (a == "--bpm")
+         {
+            if (!numFlag("--bpm", job.bpm))
+               return true;
+            if (job.bpm < 1.0 || job.bpm > 999.0)
+            {
+               usageError = "--bpm must be 1..999";
+               return true;
+            }
+         }
+         else if (a == "--size" && (job.mode == Mode::Frame || job.mode == Mode::Frames))
+         {
+            const char* v = next("--size");
+            if (v == nullptr)
+               return true;
+            int w = 0, h = 0;
+            char tail = 0;
+            if (std::sscanf(v, "%dx%d%c", &w, &h, &tail) != 2 || w < 1 || h < 1 || w > 16384 || h > 16384)
+            {
+               usageError = std::string("--size needs WxH between 1x1 and 16384x16384, got '") + v + "'";
+               return true;
+            }
+            job.sizeW = w;
+            job.sizeH = h;
+         }
+         else if (a == "--depth" && job.mode == Mode::Frames)
+         {
+            double v = 0.0;
+            if (!numFlag("--depth", v))
+               return true;
+            if (v != 8.0 && v != 16.0)
+            {
+               usageError = "--depth must be 8 or 16";
+               return true;
+            }
+            job.depth = (int)v;
+         }
+         else if (a == "--png-level" && (job.mode == Mode::Frame || job.mode == Mode::Frames))
+         {
+            double v = 0.0;
+            if (!numFlag("--png-level", v))
+               return true;
+            if (v < 0.0 || v > 9.0 || v != (double)(int)v)
+            {
+               usageError = "--png-level must be a whole number 0..9";
+               return true;
+            }
+            job.pngLevel = (int)v;
+         }
+         else if (a == "--codec" && job.mode == Mode::Render)
+         {
+            const char* v = next("--codec");
+            if (v == nullptr)
+               return true;
+            job.codec = v;
+            if (job.codec != "h264" && job.codec != "prores4444")
+            {
+               usageError = "--codec must be h264 or prores4444, got '" + job.codec + "'";
+               return true;
+            }
+         }
          else if (a == "--no-audio")
             job.noAudio = true;
          else if (a == "--lenient")
@@ -465,7 +526,7 @@ namespace Headless
       if (status.errors.empty())
          return 5;
       const std::string& c = status.errors.front().code;
-      if (c == "E_USAGE" || c == "E_UNSUPPORTED_CONTAINER")
+      if (c == "E_USAGE" || c == "E_UNSUPPORTED_CONTAINER" || c == "E_UNSUPPORTED_CODEC" || c == "E_UNSUPPORTED_DEPTH")
          return 2;
       if (c == "E_LOAD" || c == "E_NO_OUTPUT" || c == "E_NO_AUDIO" || c == "E_AMBIGUOUS_OUTPUT" || c == "E_UNKNOWN_TYPE" ||
           c == "E_BAD_SLOT" || c == "E_KIND_MISMATCH" || c == "E_DANGLING" || c == "E_CYCLE" ||
