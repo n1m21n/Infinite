@@ -30,6 +30,13 @@ IMGUI_IMPL_API bool     ImGui_ImplGlfw_InitForOther(GLFWwindow* window, bool ins
 IMGUI_IMPL_API void     ImGui_ImplGlfw_Shutdown();
 IMGUI_IMPL_API void     ImGui_ImplGlfw_NewFrame();
 
+// [Infinite patch] Lay ImGui out in points on platforms whose window is in physical pixels
+// (Windows, X11): DisplaySize and mouse positions are divided by `scale`, and
+// DisplayFramebufferScale is multiplied by it, exactly like a Retina display. 1 = upstream
+// behaviour. See src/core/UiScale.h.
+IMGUI_IMPL_API void     ImGui_ImplGlfw_SetPointScale(float scale);
+IMGUI_IMPL_API float    ImGui_ImplGlfw_GetPointScale();
+
 // Emscripten related initialization phase methods
 #ifdef __EMSCRIPTEN__
 IMGUI_IMPL_API void     ImGui_ImplGlfw_InstallEmscriptenCanvasResizeCallback(const char* canvas_selector);

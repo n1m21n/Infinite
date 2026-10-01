@@ -406,6 +406,11 @@ void ImGui_ImplGlfw_WindowFocusCallback(GLFWwindow* window, int focused)
     io.AddFocusEvent(focused != 0);
 }
 
+// [Infinite patch] see ImGui_ImplGlfw_SetPointScale in the header.
+static float g_PointScale = 1.0f;
+void ImGui_ImplGlfw_SetPointScale(float scale) { g_PointScale = scale > 0.0f ? scale : 1.0f; }
+float ImGui_ImplGlfw_GetPointScale() { return g_PointScale; }
+
 void ImGui_ImplGlfw_CursorPosCallback(GLFWwindow* window, double x, double y)
 {
     ImGui_ImplGlfw_Data* bd = ImGui_ImplGlfw_GetBackendData();
@@ -413,6 +418,8 @@ void ImGui_ImplGlfw_CursorPosCallback(GLFWwindow* window, double x, double y)
         bd->PrevUserCallbackCursorPos(window, x, y);
 
     ImGuiIO& io = ImGui::GetIO();
+    x /= g_PointScale; // [Infinite patch]
+    y /= g_PointScale;
     io.AddMousePosEvent((float)x, (float)y);
     bd->LastValidMousePos = ImVec2((float)x, (float)y);
 }
@@ -626,6 +633,19 @@ static bool ImGui_ImplGlfw_Init(GLFWwindow* window, bool install_callbacks, Glfw
     bd->PrevWndProc = (WNDPROC)::GetWindowLongPtrW((HWND)main_viewport->PlatformHandleRaw, GWLP_WNDPROC);
     IM_ASSERT(bd->PrevWndProc != nullptr);
     ::SetWindowLongPtrW((HWND)main_viewport->PlatformHandleRaw, GWLP_WNDPROC, (LONG_PTR)ImGui_ImplGlfw_WndProc);
+
+    // [Infinite patch] The default Win32 IME hook places the candidate window in client
+    // pixels; ImGui hands it points when a point scale is set.
+    static void (*s_DefaultSetImeData)(ImGuiViewport*, ImGuiPlatformImeData*) = nullptr;
+    s_DefaultSetImeData = io.SetPlatformImeDataFn;
+    if (s_DefaultSetImeData != nullptr)
+        io.SetPlatformImeDataFn = [](ImGuiViewport* viewport, ImGuiPlatformImeData* data)
+        {
+            ImGuiPlatformImeData scaled = *data;
+            scaled.InputPos = ImVec2(data->InputPos.x * g_PointScale, data->InputPos.y * g_PointScale);
+            scaled.InputLineHeight = data->InputLineHeight * g_PointScale;
+            s_DefaultSetImeData(viewport, &scaled);
+        };
 #endif
 
     bd->ClientApi = client_api;
@@ -692,13 +712,15 @@ static void ImGui_ImplGlfw_UpdateMouseData()
         {
             // (Optional) Set OS mouse position from Dear ImGui if requested (rarely used, only when ImGuiConfigFlags_NavEnableSetMousePos is enabled by user)
             if (io.WantSetMousePos)
-                glfwSetCursorPos(window, (double)io.MousePos.x, (double)io.MousePos.y);
+                glfwSetCursorPos(window, (double)(io.MousePos.x * g_PointScale), (double)(io.MousePos.y * g_PointScale)); // [Infinite patch]
 
             // (Optional) Fallback to provide mouse position when focused (ImGui_ImplGlfw_CursorPosCallback already provides this when hovered or captured)
             if (bd->MouseWindow == nullptr)
             {
                 double mouse_x, mouse_y;
                 glfwGetCursorPos(window, &mouse_x, &mouse_y);
+                mouse_x /= g_PointScale; // [Infinite patch]
+                mouse_y /= g_PointScale;
                 bd->LastValidMousePos = ImVec2((float)mouse_x, (float)mouse_y);
                 io.AddMousePosEvent((float)mouse_x, (float)mouse_y);
             }
@@ -796,9 +818,10 @@ void ImGui_ImplGlfw_NewFrame()
     int display_w, display_h;
     glfwGetWindowSize(bd->Window, &w, &h);
     glfwGetFramebufferSize(bd->Window, &display_w, &display_h);
-    io.DisplaySize = ImVec2((float)w, (float)h);
+    // [Infinite patch] DisplaySize in points, framebuffer scale carries the rest.
+    io.DisplaySize = ImVec2((float)w / g_PointScale, (float)h / g_PointScale);
     if (w > 0 && h > 0)
-        io.DisplayFramebufferScale = ImVec2((float)display_w / (float)w, (float)display_h / (float)h);
+        io.DisplayFramebufferScale = ImVec2((float)display_w * g_PointScale / (float)w, (float)display_h * g_PointScale / (float)h);
 
     // Setup time step
     // (Accept glfwGetTime() not returning a monotonically increasing value. Seems to happens on disconnecting peripherals and probably on VMs and Emscripten, see #6491, #6189, #6114, #3644)
