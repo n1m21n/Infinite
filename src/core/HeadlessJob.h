@@ -13,7 +13,8 @@
 //            [--contact-sheet <sheet.png>] [--fps N] [--output <index|name>]
 //            [--sample-rate HZ] [--json <file>] [--lenient]
 //   Infinite --frames-dir <patch.inf> <out_dir> --duration S [--start S] [--fps N] [--alpha]
-//            [--node <index[:output]>] [--output <index>] [--json <file>] [--lenient]
+//            [--node <index[:output]>] [--output <index>] [--set <node>.<param>=<value>]... [--json <file>] [--lenient]
+//   --set also applies to --render, --frame and --audio-summary.
 //   Infinite --audio-summary <patch.inf> <out.json> [--start S] [--duration S]
 //            [--wav <out.wav>] [--output <index>] [--fps N] [--sample-rate HZ]
 //            [--json <file>] [--timeout S] [--lenient]
@@ -51,6 +52,7 @@ namespace Headless
       std::string contactSheet;  // --frame --contact-sheet: every requested time on one PNG
       std::string output;        // --output: node index or name; empty = the only Output
       std::string node;          // --node <index[:output]>: tap this node's image instead of an Output's
+      std::vector<std::string> sets; // --set <node>.<param>=<value>, repeatable; applied after load, before the first frame
       bool alpha = false;        // --frames-dir --alpha: write straight alpha instead of opaque PNGs
       std::string jsonPath;      // --json
       std::vector<double> times; // --frame timestamps, seconds, ascending

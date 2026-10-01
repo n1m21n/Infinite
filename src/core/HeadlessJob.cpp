@@ -335,6 +335,20 @@ namespace Headless
                return true;
             job.node = v;
          }
+         else if (a == "--set")
+         {
+            const char* v = next("--set");
+            if (v == nullptr)
+               return true;
+            const std::string spec = v;
+            const size_t dot = spec.find('.'), eq = spec.find('=');
+            if (dot == std::string::npos || eq == std::string::npos || dot == 0 || eq < dot + 2)
+            {
+               usageError = "--set needs <node>.<param>=<value>, got '" + spec + "'";
+               return true;
+            }
+            job.sets.push_back(spec);
+         }
          else if (a == "--alpha" && job.mode == Mode::Frames)
             job.alpha = true;
          else if (a == "--no-audio")
@@ -388,7 +402,7 @@ namespace Headless
       // checked to give zero hits (docs/fix-briefs/headless-engine.md 3.1b); the corpus in
       // this repo is one file, which is not enough to promote it.
       return code == "W_UNUSED_NODE" || code == "W_NO_OUTPUT" || code == "W_DURATION_ROUNDED" || code == "W_OUT_OF_RANGE" ||
-             code == "W_CLIPPING" || code == "W_SILENT" || code == "W_BLACK_FRAME";
+             code == "W_OVERRIDDEN_BY_MODULATION" || code == "W_CLIPPING" || code == "W_SILENT" || code == "W_BLACK_FRAME";
    }
 
    void PromoteWarnings(std::vector<Issue>& warnings, std::vector<Issue>& errors)

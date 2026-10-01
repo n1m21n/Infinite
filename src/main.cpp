@@ -47869,8 +47869,118 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    // path is empty for patch source that never was a file (the live RPC's
    // load_patch_text): applied like a reload, and the open file's path and
    // watch stamp stay as they were.
+   // --set <node>.<param>=<value>: static per-shot overrides, written into the patch data the way a file
+   // line would be, so validation and the loader treat them like authored values. `node` is an index or an
+   // `id` word, `param` a saved key (see --describe). A binding that drives the same control wins every
+   // frame, which is worth a warning. Safe to call twice (the second pass replaces the same lines).
+   void ApplyHeadlessSets(Patch::Data& data, std::vector<Headless::Issue>* errors, std::vector<Headless::Issue>* warnings)
+   {
+      auto err = [&](const char* code, const std::string& msg, const std::string& hint, int node)
+      {
+         if (errors != nullptr)
+         {
+            Headless::Issue is{ code, msg, 0, node };
+            is.hint = hint;
+            errors->push_back(is);
+         }
+      };
+      for (const std::string& spec : gHeadlessJob.sets)
+      {
+         const size_t dot = spec.find('.'), eq = spec.find('=');
+         const std::string nodeRef = spec.substr(0, dot);
+         const std::string key = spec.substr(dot + 1, eq - dot - 1);
+         std::string value = spec.substr(eq + 1);
+         Patch::NodeRecord* n = nullptr;
+         char* end = nullptr;
+         const long idx = std::strtol(nodeRef.c_str(), &end, 10);
+         const bool numeric = end != nodeRef.c_str() && *end == '\0';
+         for (Patch::NodeRecord& r : data.nodes)
+            if ((numeric && r.index == (int)idx) || (!numeric && !r.id.empty() && r.id == nodeRef))
+               n = &r;
+         if (n == nullptr)
+         {
+            err("E_BAD_REF", "--set " + spec + ": the patch has no node '" + nodeRef + "'", "use a node index or an `id` word", -1);
+            continue;
+         }
+         const PatchSchema::TypeSchema* ts = SchemaFor(n->typeName);
+         char tag = 0;
+         for (size_t i = 0; i < n->params.size(); i++)
+            if (n->params[i].first.size() > 2 && n->params[i].first.substr(2) == key)
+               tag = n->params[i].first[0];
+         if (tag == 0 && ts != nullptr)
+            for (const PatchSchema::ParamInfo& pi : ts->params)
+               if (pi.key == key)
+                  tag = pi.kind;
+         if (tag == 0)
+         {
+            err("E_BAD_KEY", "--set " + spec + ": " + n->typeName + " has no saved parameter '" + key + "'",
+                "list them with: Infinite --describe \"" + n->typeName + "\"", n->index);
+            continue;
+         }
+         const bool isNum = !value.empty() && (std::strtod(value.c_str(), &end), end != value.c_str() && *end == '\0');
+         if (tag == 'f' && !isNum)
+         {
+            err("E_BAD_VALUE", "--set " + spec + ": '" + key + "' is a number, got '" + value + "'", "", n->index);
+            continue;
+         }
+         if (tag == 'b')
+         {
+            if (value == "true" || value == "on")
+               value = "1";
+            else if (value == "false" || value == "off")
+               value = "0";
+            else if (value != "0" && value != "1")
+            {
+               err("E_BAD_VALUE", "--set " + spec + ": '" + key + "' is a switch (0/1/true/false), got '" + value + "'", "", n->index);
+               continue;
+            }
+         }
+         if (tag == 'i' && !isNum)
+            data.hasKeyRefs = true; // a dropdown option name, resolved once a node of the type is drawn
+         bool replaced = false;
+         for (auto& pr : n->params)
+            if (pr.first.size() > 2 && pr.first.substr(2) == key)
+            {
+               pr.second = value;
+               replaced = true;
+            }
+         if (!replaced)
+         {
+            n->params.push_back({ std::string(1, tag) + " " + key, value });
+            n->paramLines.resize(n->params.size() - 1, 0);
+            n->paramLines.push_back(0);
+         }
+         if (warnings != nullptr)
+         {
+            auto driven = [&](int dstIndex, int dstParam, const std::string& dstKey)
+            {
+               if (dstIndex != n->index)
+                  return false;
+               if (!dstKey.empty())
+                  return dstKey == key;
+               auto it = gParamJoin.find(n->typeName);
+               if (it == gParamJoin.end())
+                  return false;
+               auto k = it->second.keyOfParam.find(dstParam);
+               return k != it->second.keyOfParam.end() && k->second == key;
+            };
+            bool bound = false;
+            for (const Patch::ModRecord& m : data.modulation)
+               bound = bound || driven(m.dstIndex, m.dstParam, m.dstKey);
+            for (const Patch::ExprRecord& e : data.expressions)
+               bound = bound || driven(e.dstIndex, e.dstParam, e.dstKey);
+            if (bound)
+               warnings->push_back({ "W_OVERRIDDEN_BY_MODULATION",
+                                     "--set " + spec + ": a mod or expr binding drives '" + key + "', so it overrides this value every frame",
+                                     0, n->index, "remove the binding, or set the value it is centred on" });
+         }
+      }
+   }
+
    bool LoadPatchDataImpl(Patch::Data& data, const std::string& path, bool reload)
    {
+      if (HeadlessJobActive() && !gHeadlessJob.sets.empty())
+         ApplyHeadlessSets(data, nullptr, nullptr);
       if (data.hasNamedRefs)
       {
          // A hand-written file that names nodes/slots: turn the words into indices first.
@@ -74107,6 +74217,8 @@ int main(int argc, char** argv)
                                                      gHeadlessJob.mode == Headless::Mode::Frames) &&
                                                     gHeadlessJob.node.empty());
          PatchSchema::Resolve(probe, env, st.errors);
+         if (st.errors.empty() && !gHeadlessJob.sets.empty())
+            ApplyHeadlessSets(probe, &st.errors, &gHeadlessPreWarnings);
          if (!gHeadlessJob.node.empty())
          {
             // --node takes an `id <word>` as well as an index; the render phase wants the index.
@@ -74118,6 +74230,15 @@ int main(int argc, char** argv)
          }
          if (st.errors.empty())
             PatchSchema::Validate(probe, env, st.errors, gHeadlessPreWarnings);
+         // A tapped node needs no Output, and it is the thing being looked at, so it is not "unused".
+         if (!gHeadlessJob.node.empty())
+         {
+            const int tapped = (int)std::strtol(gHeadlessJob.node.c_str(), nullptr, 10);
+            gHeadlessPreWarnings.erase(std::remove_if(gHeadlessPreWarnings.begin(), gHeadlessPreWarnings.end(),
+                                                      [tapped](const Headless::Issue& w)
+                                                      { return w.code == "W_NO_OUTPUT" || (w.code == "W_UNUSED_NODE" && w.node == tapped); }),
+                                       gHeadlessPreWarnings.end());
+         }
          // An audio summary needs no picture Output; its own check (E_NO_AUDIO) covers the audio side.
          if (gHeadlessJob.mode == Headless::Mode::AudioSummary)
             gHeadlessPreWarnings.erase(std::remove_if(gHeadlessPreWarnings.begin(), gHeadlessPreWarnings.end(),

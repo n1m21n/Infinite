@@ -180,6 +180,19 @@ rf=$("$BIN" --frames-dir "$ROOT/tests/headless/format/tap.inf" "$FD" --duration 
 "$BIN" --frame "$ROOT/tests/headless/format/tap.inf" 0 "$OUT/tap.png" >/dev/null 2>&1; [ $? = 3 ]; check "frame without --node still needs an Output" $?
 "$BIN" --frame "$ROOT/tests/headless/format/tap.inf" 0 "$OUT/tap.png" --node 1 >/dev/null 2>&1; [ -s "$OUT/tap.png" ]; check "frame --node writes the tapped image" $?
 
+# --- per-shot overrides (R471 7.4): --set <node>.<param>=<value> ---
+TAP="$ROOT/tests/headless/format/tap.inf"
+cov() { "$BIN" --frames-dir "$TAP" "$OUT/fs" --duration 0.1 --fps 10 --node 1 --alpha "$@" 2>/dev/null | json "d['frame_stats'][0]['alpha_coverage']"; }
+c0=$(cov); c1=$(cov --set shape.sizeX=0.2); c2=$(cov --set 1.sizeX=0.2)
+[ "$c0" != "$c1" ]; check "set: a changed size changes the picture" $?
+[ "$c1" = "$c2" ]; check "set: node by id word and by index give the same picture" $?
+[ "$(cov --set shape.shapeType=Circle)" != "$c0" ]; check "set: a dropdown option name is accepted" $?
+"$BIN" --frame "$TAP" 0 "$OUT/s.png" --node 1 --set shape.nope=1 >/dev/null 2>&1; [ $? = 3 ]; check "set: unknown param exit 3" $?
+"$BIN" --frame "$TAP" 0 "$OUT/s.png" --node 1 --set shape.sizeX=big >/dev/null 2>&1; [ $? = 3 ]; check "set: non-number for a float exit 3" $?
+"$BIN" --frame "$TAP" 0 "$OUT/s.png" --node 1 --set shape.sizeX >/dev/null 2>&1; [ $? = 2 ]; check "set: malformed spec exit 2" $?
+rf=$("$BIN" --frame "$ROOT/tests/headless/format/modulation.inf" 0 "$OUT/s.png" --set shape.sizeX=0.3 2>/dev/null)
+[ "$(echo "$rf" | json "[w['code'] for w in d['warnings']]")" = "['W_OVERRIDDEN_BY_MODULATION']" ]; check "set: a bound control warns W_OVERRIDDEN_BY_MODULATION" $?
+
 # --- describe actions (R474): the buttons a node draws, with what each one does ---
 [ "$(echo "$r" | json "[a['effect'] for t in d['types'] if t['type']=='Sampler' for a in t['actions'] if a['label']=='Load...'][0]")" = "sets a file path (write the key instead)" ]; check "describe: Sampler 'Load...' is a file-path action" $?
 [ "$(echo "$r" | json "[a['label'] for t in d['types'] if t['type']=='Shape' for a in t['actions']][:2]")" = "['Circle', 'Ellipse']" ]; check "describe: Shape lists its buttons in draw order" $?
