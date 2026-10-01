@@ -1,5 +1,6 @@
 #include "platform/Platform.h"
 #include "platform/AppPaths.h"
+#include "platform/common/SingleInstance.h"
 #include "platform/common/SubjectMaskOnnx.h"
 #include "platform/linux/HostEnvironmentLinux.h"
 #include "tinyfiledialogs.h"
@@ -635,17 +636,29 @@ namespace Platform
    {
    }
 
-   bool PollPendingOpenFile(std::string& /*outPath*/)
+   bool ForwardOpenToRunningInstance(const std::string& patchPath)
    {
-      // Same story as PlatformWin.cpp's stub: launch-time opening is already
-      // covered generically in main.cpp (argv[1], checked once at startup
-      // for a .inf/.infinite extension - see the "Exec=Infinite %f" AppImage
-      // desktop entry in tools/linux/package-appimage.sh, which relies on
-      // exactly that path). What's missing here is only the Finder-style
-      // "app already running, OS asks it to open another file" event, which
-      // has no portable equivalent on X11/Wayland without a full
-      // single-instance/D-Bus-activation mechanism - not implemented (P5).
-      return false;
+      const std::string dir = AppPaths::AppSupportDir();
+      if (dir.empty())
+         return true;
+      if (SingleInstance::BecomePrimary(dir))
+         return true;
+      // Someone else holds the lock. With no path there is nothing to hand over;
+      // run as a second instance, as before.
+      if (patchPath.empty())
+         return true;
+      return !SingleInstance::Forward(dir, patchPath);
+   }
+
+   bool PollPendingOpenFile(std::string& outPath)
+   {
+      static auto sLast = std::chrono::steady_clock::time_point();
+      const auto now = std::chrono::steady_clock::now();
+      if (now - sLast < std::chrono::milliseconds(250))
+         return false;
+      sLast = now;
+      static const std::string sDir = AppPaths::AppSupportDir();
+      return !sDir.empty() && SingleInstance::Poll(sDir, outPath);
    }
 
    std::string ExecutablePath()

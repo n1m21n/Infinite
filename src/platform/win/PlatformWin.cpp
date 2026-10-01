@@ -32,10 +32,13 @@
 #include <onnxruntime_cxx_api.h>
 #include <dml_provider_factory.h>
 
+#include "../AppPaths.h"
+#include "../common/SingleInstance.h"
 #include "../common/SubjectMaskOnnx.h"
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <map>
@@ -854,12 +857,30 @@ namespace Platform
    }
    void InitDocumentHandlingPostGlfw() {}
 
-   bool PollPendingOpenFile(std::string&)
+   bool ForwardOpenToRunningInstance(const std::string& patchPath)
    {
-      // Drag-and-drop onto the window goes through glfwSetDropCallback on
-      // all platforms; double-click-to-open associations were implemented
-      // with Apple Events and have no Windows counterpart wired up yet.
-      return false;
+      const std::string dir = AppPaths::AppSupportDir();
+      if (dir.empty())
+         return true;
+      if (SingleInstance::BecomePrimary(dir))
+         return true;
+      if (patchPath.empty())
+         return true; // nothing to hand over: run as a second instance, as before
+      return !SingleInstance::Forward(dir, patchPath);
+   }
+
+   bool PollPendingOpenFile(std::string& outPath)
+   {
+      // A second launch with a patch path (double-click on a .inf, "Open with")
+      // leaves it in the spool for this primary instance; see SingleInstance.h.
+      // Drag-and-drop onto the window goes through glfwSetDropCallback.
+      static auto sLast = std::chrono::steady_clock::time_point();
+      const auto now = std::chrono::steady_clock::now();
+      if (now - sLast < std::chrono::milliseconds(250))
+         return false;
+      sLast = now;
+      static const std::string sDir = AppPaths::AppSupportDir();
+      return !sDir.empty() && SingleInstance::Poll(sDir, outPath);
    }
 
    // ---- networking (update checker) ----------------------------------------

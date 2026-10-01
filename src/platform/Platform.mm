@@ -7232,6 +7232,11 @@ namespace Platform
       }
    }
 
+   bool ForwardOpenToRunningInstance(const std::string&)
+   {
+      return true; // Launch Services already delivers a second open to the running app
+   }
+
    bool PollPendingOpenFile(std::string& outPath)
    {
       std::lock_guard<std::mutex> lock(sOpenFileMutex);
