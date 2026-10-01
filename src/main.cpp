@@ -47777,6 +47777,25 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       return LoadPatchDataImpl(data, path, reload);
    }
 
+   // R501: `mod`/`expr` lines that name a control by key cannot be resolved while loading, because the
+   // window app has not drawn a node of that type yet. They wait here (saved-file indices, plus the
+   // file->live node map) until the nodes have drawn, then PollPendingKeyed resolves and applies them.
+   struct PendingKeyed
+   {
+      std::vector<Patch::ModRecord> mods;
+      std::vector<Patch::ExprRecord> exprs;
+      std::map<int, int> remap;
+      int waited = 0;
+      bool active = false;
+   };
+   PendingKeyed gPendingKeyed;
+   void StashPendingKeyed(PendingKeyed& p)
+   {
+      p.active = (!p.mods.empty() || !p.exprs.empty()) && !HeadlessJobActive();
+      gHeadlessProbeAll = p.active; // draw every body each frame until the keys are joined
+      gPendingKeyed = std::move(p);
+   }
+
    // path is empty for patch source that never was a file (the live RPC's
    // load_patch_text): applied like a reload, and the open file's path and
    // watch stamp stay as they were.
@@ -47795,14 +47814,22 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       }
 
       std::string openNote;
+      PendingKeyed pending;
       if (data.hasKeyRefs)
       {
          // Keys and option names need a drawn node of each type (a headless run has probed
-         // them). The window app has not, so those lines are dropped with a status line.
+         // them). The window app has not: mod/expr lines wait until the nodes have drawn
+         // (PollPendingKeyed); dropdown option names cannot be resolved and are skipped.
          std::vector<Headless::Issue> keyErrors;
          PatchSchema::ResolveKeys(data, MakeSchemaEnv(false), keyErrors);
          if (!keyErrors.empty() || data.hasKeyRefs)
          {
+            for (const Patch::ModRecord& m : data.modulation)
+               if (!m.dstKey.empty())
+                  pending.mods.push_back(m);
+            for (const Patch::ExprRecord& e : data.expressions)
+               if (!e.dstKey.empty())
+                  pending.exprs.push_back(e);
             data.modulation.erase(std::remove_if(data.modulation.begin(), data.modulation.end(),
                                                  [](const Patch::ModRecord& m) { return !m.dstKey.empty(); }),
                                   data.modulation.end());
@@ -47818,7 +47845,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                                                 return p.first[0] == 'i' && !p.second.empty() && (end == p.second.c_str() || *end != '\0');
                                              }),
                               n.params.end());
-            openNote = "Opened, but " + std::to_string(keyErrors.size()) + " line(s) that name a control or option could not be resolved and were skipped";
+            openNote = "Opened; " + std::to_string(pending.mods.size() + pending.exprs.size()) + " binding(s) by control name will attach once the nodes have drawn";
          }
       }
 
@@ -47827,7 +47854,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       {
          PushUndoCheckpoint(); // Cmd+Z returns to the graph as it was before the reload
          const std::string keptPath = gPatchPath;
-         ApplyPatchData(data);
+         ApplyPatchData(data, &pending.remap);
+         StashPendingKeyed(pending);
          gArrangePatchGeneration++;
          if (path.empty())
          {
@@ -47842,7 +47870,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          NotePatchFileStamp(path);
          return true;
       }
-      ApplyPatchData(data);
+      ApplyPatchData(data, &pending.remap);
+      StashPendingKeyed(pending);
       // New document: drop the old one's clip clipboard and selection.
       gArrangePatchGeneration++;
 
@@ -49600,6 +49629,95 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       gPatchWatchPath.clear();
       gPatchStamp = PatchFileStamp();
       gPatchChangedOnDisk = false;
+   }
+
+   // Resolves the keyed bindings a load had to postpone (see PendingKeyed). Runs once a frame; waits for
+   // every destination node to have registered its controls (a node only does that by drawing).
+   void PollPendingKeyed()
+   {
+      if (!gPendingKeyed.active)
+         return;
+      PendingKeyed& pk = gPendingKeyed;
+      auto drawn = [&](int savedIndex)
+      {
+         auto it = pk.remap.find(savedIndex);
+         if (it == pk.remap.end())
+            return true; // the node never loaded: nothing to wait for
+         for (const ParamRef& r : Modulation::Instance().FrameParams())
+            if (r.nodeIndex == it->second)
+               return true;
+         return false;
+      };
+      bool ready = true;
+      for (const Patch::ModRecord& m : pk.mods)
+         ready = ready && drawn(m.dstIndex);
+      for (const Patch::ExprRecord& e : pk.exprs)
+         ready = ready && drawn(e.dstIndex);
+      if (pk.waited % 20 == 0)      if (!ready && ++pk.waited < 60)
+         return;
+      PendingKeyed work = std::move(pk);
+      pk = PendingKeyed();
+      JoinLiveTier1();
+      gHeadlessProbeAll = false;
+      int applied = 0;
+      std::string missed;
+      auto liveOf = [&](int saved) -> GraphNode*
+      {
+         auto it = work.remap.find(saved);
+         return it == work.remap.end() ? nullptr : FindNodeByIndex(it->second);
+      };
+      auto paramOf = [&](const GraphNode& gn, const std::string& key) -> int
+      {
+         auto j = gParamJoin.find(gn.typeName);
+         if (j == gParamJoin.end())
+            return -1;
+         auto k = j->second.paramOfKey.find(key);
+         return k == j->second.paramOfKey.end() ? -1 : k->second;
+      };
+      for (const Patch::ModRecord& m : work.mods)
+      {
+         GraphNode* dst = liveOf(m.dstIndex);
+         GraphNode* src = liveOf(m.srcIndex);
+         if (dst == nullptr || src == nullptr)
+            continue;
+         const int p = paramOf(*dst, m.dstKey);
+         if (p < 0)
+         {
+            missed += (missed.empty() ? "" : ", ") + dst->typeName + "." + m.dstKey;
+            continue;
+         }
+         Modulation::Source source;
+         source.nodeIndex = src->index;
+         source.outputIndex = m.srcOutput;
+         source.polarity = m.polarity;
+         source.depth = m.depth;
+         source.centre = m.centre;
+         source.lo = m.lo;
+         source.hi = m.hi;
+         source.hasRange = m.hasRange;
+         source.enabled = m.enabled;
+         source.curve = m.curve;
+         Modulation::Instance().RestoreLink(dst->index, p, source);
+         applied++;
+      }
+      for (const Patch::ExprRecord& e : work.exprs)
+      {
+         GraphNode* dst = liveOf(e.dstIndex);
+         if (dst == nullptr)
+            continue;
+         const int p = paramOf(*dst, e.dstKey);
+         if (p < 0)
+         {
+            missed += (missed.empty() ? "" : ", ") + dst->typeName + "." + e.dstKey;
+            continue;
+         }
+         Modulation::Instance().SetExpression(dst->index, p, e.text);
+         if (std::abs(e.curve) > 0.0001f)
+            Modulation::Instance().SetExpressionCurve(dst->index, p, e.curve);
+         applied++;
+      }
+      gPatchStatus = std::to_string(applied) + " binding(s) by control name attached" +
+                     (missed.empty() ? std::string() : "; not found: " + missed);
    }
 
    void PollPatchFileWatch(bool force = false) // force: the self-test has no window clock
@@ -74203,6 +74321,7 @@ int main(int argc, char** argv)
       // Apply any RemoteControl RPC requests queued by the network thread
       // since last frame, before any ed:: drawing reads the graph this frame.
       RemoteControl::DrainPending(HandleRpcCommand);
+      PollPendingKeyed(); // before ClearFrameParams: last frame's registered controls are still here
 
       std::string pendingOpenPatch;
       while (Platform::PollPendingOpenFile(pendingOpenPatch))
@@ -94611,7 +94730,7 @@ int main(int argc, char** argv)
          // the params body does around them. Gated on there being a binding at
          // all so the common collapsed node costs exactly what it did before.
          const bool registerOnlyParams = !isAudioBody && !isComment && !gn.showParams &&
-                                         gn.IsParamDriven();
+                                         (gn.IsParamDriven() || gHeadlessProbeAll);
          ImGuiWindow* paramsWindow = ImGui::GetCurrentWindow();
          const bool savedSkipItems = paramsWindow->SkipItems;
          if (registerOnlyParams)

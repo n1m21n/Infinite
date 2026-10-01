@@ -66,6 +66,16 @@ def main():
         except RuntimeError:
             check("render_frame: no path is an error", True)
 
+        # R501: an authored patch that names controls by key must keep those bindings when loaded live.
+        fixture = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tests", "headless", "format", "modulation.inf")
+        c.call("load_patch", path=os.path.abspath(fixture))
+        time.sleep(3.0)
+        g = c.call("get_graph")
+        check("load_patch: keyed mod line attaches after the nodes draw", len(g["modulation"]) == 1)
+        check("load_patch: keyed expr line attaches after the nodes draw", len(g["expressions"]) == 1)
+        check("load_patch: explain shows the mod by key", "mod Shape (1) sizeX <- LFO (2)" in c.call("explain")["text"])
+        c.call("new_patch")
+
         before = len(c.call("get_graph")["nodes"])
         try:
             c.call("batch", calls=[{"method": "create_node", "params": {"typeName": "Shape", "category": "Source"}},
