@@ -1,0 +1,12 @@
+infinite-patch 1
+# Field Pixel: a kernel evaluated per pixel, animated by t.
+node 1 Source FieldPixel
+  id fp
+  f width 256
+  f height 256
+  s code col = vec3(uv.x, 0.5 + 0.5 * sin(uv.y * 20.0 + t), 0.5);
+end
+node 2 Utility Output
+  id out
+end
+cable out 0 fp

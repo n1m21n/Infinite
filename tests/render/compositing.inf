@@ -1,0 +1,20 @@
+infinite-patch 1
+# 2D compositing: a ramp and a star blended, through a blur-style effect chain, into Output.
+node 1 Source Ramp
+  id ramp
+  f angle 90
+end
+node 2 Source Shape
+  id star
+  i shapeType Star
+  f sizeX 0.5
+end
+node 3 Utility Output
+  id out
+end
+node 4 Compositing Blend
+  id blend
+end
+cable blend 0 ramp
+cable blend 1 star
+cable out 0 blend

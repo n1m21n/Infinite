@@ -89,6 +89,11 @@ jobs:
       - name: Headless CLI smoke
         run: scripts/headless_smoke.sh build/Infinite.app/Contents/MacOS/Infinite
 
+      # tests/render/*.inf against tests/render/golden (R504). Tolerant compare; same-machine
+      # exactness is tools/determinism-check.py.
+      - name: Render goldens
+        run: python3 tools/render-check.py --binary build/Infinite.app/Contents/MacOS/Infinite
+
   windows:
     name: Windows (${{ matrix.arch }})
     needs: detect
@@ -340,6 +345,10 @@ jobs:
         if: matrix.compiler == 'clang'
         run: |
           xvfb-run -a scripts/headless_smoke.sh build-linux/Infinite
+
+      - name: Render goldens (Xvfb)
+        if: matrix.compiler == 'clang'
+        run: xvfb-run -a python3 tools/render-check.py --binary build-linux/Infinite
 
       # media group carries VST3SCANTEST / VST3EDITORSHOTTEST /
       # VST3BLOCKLISTTEST (task 4.4) plus the pre-existing plugin/media drag
