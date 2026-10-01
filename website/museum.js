@@ -163,9 +163,11 @@ const shadowTex = canvasTex(256, 256, (g, w, h) => {
   g.fillStyle = '#000';
   g.fillRect(70 - 2000, 70 - 2000, w - 140, h - 140);
 });
+// glow behind each piece: kept close to the frame so it never floods the wall
+const WASH_W = 1.95, WASH_H = 1.8;
 const washTex = canvasTex(256, 256, (g, w, h) => {
   const r = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
-  r.addColorStop(0, 'rgba(255,252,244,0.85)'); r.addColorStop(0.5, 'rgba(255,250,240,0.32)'); r.addColorStop(1, 'rgba(255,250,240,0)');
+  r.addColorStop(0, 'rgba(255,252,244,0.8)'); r.addColorStop(0.55, 'rgba(255,250,240,0.22)'); r.addColorStop(1, 'rgba(255,250,240,0)');
   g.fillStyle = r; g.fillRect(0, 0, w, h);
 });
 // canvas top = v 1 (art top, deepest under the floor) fades out; canvas bottom = v 0 (nearest the floor) is solid
@@ -205,7 +207,7 @@ const pieces = WORKS.map((w, i) => {
   const shadow = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false, opacity: 0.6 }));
   shadow.scale.set(w.w * 1.5, w.h * 1.4, 1); shadow.position.set(0, -0.06, -0.03);
   const wash = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({ map: washTex, transparent: true, depthWrite: false, fog: false }));
-  wash.scale.set(w.w * 3.4, w.h * 2.8, 1); wash.position.set(0, 0, -0.04);
+  wash.scale.set(w.w * WASH_W, w.h * WASH_H, 1); wash.position.set(0, 0, -0.04);
   const frame = new THREE.Mesh(boxGeo, frameMat);
   frame.scale.set(w.w + 0.06, w.h + 0.06, 0.06); frame.position.z = 0;
   const artMat = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
@@ -736,6 +738,84 @@ function stepModeState(dt) {
   w.dist = smooth(w.dist, w.distT, w, 'dv', 0.3, dt);
 }
 
+// ---------------------------------------------------------------------------------------------
+// The digit bird: Infinite's mascot, built from 0s and 1s, patrols the hall and never lands.
+// ---------------------------------------------------------------------------------------------
+const bird = (() => {
+  const COLS = 34, ROWS = 24, X0 = -1.25, X1 = 1.25, Y0 = -0.95, Y1 = 0.85, NF = 8;
+  const FW = 544, FH = 392, CW = FW / COLS, CH = CW * ((Y1 - Y0) / ROWS) / ((X1 - X0) / COLS);
+  const inEll = (px, py, cx, cy, rx, ry, rot) => {
+    const c = Math.cos(rot), s = Math.sin(rot), dx = px - cx, dy = py - cy;
+    const u = dx * c + dy * s, v = -dx * s + dy * c;
+    return (u / rx) ** 2 + (v / ry) ** 2;
+  };
+  const inTri = (px, py, a, b, c) => {
+    const sg = (p1, p2, p3) => (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1]);
+    const p = [px, py], d1 = sg(p, a, b), d2 = sg(p, b, c), d3 = sg(p, c, a);
+    return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+  };
+  const atlas = canvasTex(FW * 4, FH * 2, (g) => {
+    g.font = `620 ${(CW * 1.18).toFixed(2)}px 'Geist Mono', ui-monospace, monospace`;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (let f = 0; f < NF; f++) {
+      const ox0 = (f % 4) * FW, oy0 = Math.floor(f / 4) * FH;
+      const wingRot = 0.4 + 0.8 * Math.sin(2 * Math.PI * f / NF);
+      const d = [-Math.cos(wingRot), -Math.sin(wingRot)];
+      const wc = [d[0] * 0.42, -0.05 + d[1] * 0.42], wr = Math.atan2(d[1], d[0]);
+      const sx = (X1 - X0) / COLS, sy = (Y1 - Y0) / ROWS;
+      for (let j = 0; j < ROWS; j++) for (let i = 0; i < COLS; i++) {
+        const px = X0 + (i + 0.5) * sx, py = Y0 + (j + 0.5) * sy;
+        const body = inEll(px, py, -0.1, 0.2, 0.64, 0.42, -0.18);
+        const head = ((px - 0.46) ** 2 + (py + 0.4) ** 2) / 0.34 ** 2;
+        const tail = inTri(px, py, [-0.55, 0.08], [-1.22, -0.12], [-1.2, 0.1]) || inTri(px, py, [-0.55, 0.08], [-1.2, 0.1], [-0.5, 0.4]);
+        const beak = inTri(px, py, [0.76, -0.52], [1.16, -0.4], [0.76, -0.28]);
+        const wing = inEll(px, py, wc[0], wc[1], 0.52, 0.17, wr) < 1;
+        const eye = (px - 0.56) ** 2 + (py + 0.47) ** 2 < 0.075 ** 2;
+        const inside = body < 1 || head < 1 || tail;
+        let kind = null;
+        if (eye) kind = 'eye'; else if (beak) kind = 'beak'; else if (wing) kind = 'wing';
+        else if (inside) kind = ((body > 0.74 && head > 1) || (head > 0.6 && head < 1 && body > 0.8) || (tail && body > 1)) ? 'edge' : 'body';
+        if (!kind) continue;
+        const h = ((i * 73856093) ^ (j * 19349663) ^ (f * 83492791)) & 0xFFFF;
+        let ch = '1', a = 1;
+        if (kind === 'body') { ch = h % 7 === 0 ? '1' : '0'; a = ch === '1' ? 0.8 : 0.45; }
+        g.globalAlpha = a; g.fillStyle = kind === 'eye' ? '#F57F66' : '#EEF0F6';
+        g.fillText(ch, ox0 + (i + 0.5) * CW, oy0 + (j + 0.5) * CH);
+      }
+    }
+  });
+  atlas.repeat.set(1 / 4, 1 / 2);
+  const mat = new THREE.MeshBasicMaterial({ map: atlas, transparent: true, depthWrite: false, fog: false, opacity: 0 });
+  const mesh = new THREE.Mesh(planeGeo, mat);
+  const BW = 2.0;
+  mesh.scale.set(BW, BW * FH / FW, 1);
+  mesh.renderOrder = 5;
+  scene.add(mesh);
+  let u = 0, prevZ = null, face = 1, bank = 0, vis = 0;
+  return function update(now, dt) {
+    const want = (mode === 'hall' && focusIdx < 0 && !reduceMotion) ? 1 : 0;
+    vis = damp(vis, want, 3, dt);
+    mesh.visible = vis > 0.01; mat.opacity = vis;
+    if (!mesh.visible) return;
+    const zFront = hall.zStart + 8, zBack = hall.lastZ - 3.4;
+    const A = 4.6;
+    const cz = clamp(cam.z - 5.5, zBack + A + 1, zFront - A - 1);   // patrols the stretch of hall in front of the visitor
+    u += dt * 2.4 / A;
+    const z = cz + A * Math.sin(u);
+    const x = Math.sin(u * 3.3) * Math.min(view.W * 0.55, 1.5);
+    const y = 3.0 + Math.sin(u * 5.1) * 0.4;
+    const dz = z - (prevZ ?? z); prevZ = z;
+    if (Math.abs(dz) > 1e-4) face = damp(face, dz < 0 ? 1 : -1, 6, dt);   // the beak leads; flips smoothly at each turn
+    bank = damp(bank, Math.cos(u * 5.1) * 0.12, 4, dt);
+    mesh.position.set(x, y, z);
+    mesh.quaternion.copy(camera.quaternion);
+    mesh.rotateZ(bank * Math.sign(face || 1));
+    mesh.scale.x = BW * (Math.abs(face) < 0.12 ? 0.12 : face);
+    const f = Math.floor((now * 2.4 % 1) * NF) % NF;
+    atlas.offset.set((f % 4) / 4, 0.5 - Math.floor(f / 4) / 2);
+  };
+})();
+
 function frame() {
   raf = requestAnimationFrame(frame);
   const nowMs = performance.now(); const now = nowMs / 1000;
@@ -774,7 +854,7 @@ function frame() {
   }
   // the rotunda wall curves in front of a flat light pool; narrow the pools there so they are not clipped
   washK = damp(washK, mode === 'rotunda' ? 0.5 : 1, reduceMotion ? 30 : 5, dt);
-  for (const p of pieces) { p.wash.scale.x = p.def.w * 3.4 * washK; }
+  for (const p of pieces) { p.wash.scale.x = p.def.w * WASH_W * washK; }
   floorFade = damp(floorFade, mode === 'wall' ? 0 : 1, reduceMotion ? 30 : 5, dt);
   floor.visible = floorFade > 0.01; floorMat.opacity = 0.86 * floorFade;
   reflGroup.visible = floorFade > 0.2;
@@ -791,6 +871,7 @@ function frame() {
   }
 
   updatePieces(now);
+  bird(now, dt);
   for (const p of pieces) p.plq.visible = p.i !== focusIdx;   // the DOM plaque takes over in the close-up
   pickLive(now, false);
   renderer.render(scene, camera);
