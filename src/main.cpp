@@ -70110,7 +70110,10 @@ static void PrimeOfflineStart(int& frameId, double startSeconds)
 
 static void HeadlessTick(int& frameId, GLFWwindow* window)
 {
-   enum class Phase { Warm, Running, Frames, Audio, Done };
+   enum class Phase { Warm, Running, Frames, NodeRender, Audio, Done };
+   static Platform::RecorderHandle* sNodeRec = nullptr; // --render --node: the encoder, opened on the first frame
+   static int sNodeRecW = 0, sNodeRecH = 0;
+   static int sNodeStartFrame = 0, sNodeEndFrame = 0;
    static Phase sPhase = Phase::Warm;
    static int sTicks = 0;
    static double sWall = -1.0;
@@ -70833,7 +70836,29 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
 #endif
             if (ext != ".mov")
                return fail("E_UNSUPPORTED_CONTAINER", "--codec prores4444 writes .mov, got '" + ext + "'");
-            sOut->recordProRes4444 = true;
+            if (sOut != nullptr)
+               sOut->recordProRes4444 = true;
+         }
+         if (sOut == nullptr)
+         {
+            // --render --node: no Output to record from. Step the patch the way
+            // --frames-dir does and hand each tapped frame to the recorder.
+            // Video only: a tapped node's image has no audio of its own.
+            std::error_code ec;
+            const std::filesystem::path parent = std::filesystem::path(job.out).parent_path();
+            if (!parent.empty())
+               std::filesystem::create_directories(parent, ec);
+            std::filesystem::remove(job.out, ec);
+            if (!job.noAudio)
+               sStatus.warnings.push_back({ "W_NODE_NO_AUDIO", "--render --node writes video only", 0, -1,
+                                            "pass --no-audio to silence this, or render without --node for the Output's audio" });
+            sNodeStartFrame = (int)std::llround(job.start * (double)job.fps);
+            sNodeEndFrame = sNodeStartFrame + std::max(1, (int)std::llround(job.duration * (double)job.fps));
+            Transport::Instance().SetOfflineMode(true, gHeadlessAudioRate);
+            Transport::Instance().SetPlaying(true);
+            sNextFrame = 0;
+            sPhase = Phase::NodeRender;
+            return;
          }
          std::error_code ec;
          const std::filesystem::path parent = std::filesystem::path(job.out).parent_path();
@@ -70938,6 +70963,89 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
       // race); never report ok for a file no player can open.
       if (!Headless::MovieHasIndex(job.out))
          return fail("E_RENDER", "the file was written but has no index (moov), so it cannot be played");
+      sStatus.files.push_back(job.out);
+      sPhase = Phase::Done;
+      HeadlessFinish(window, sStatus, sWall);
+      return;
+   }
+
+   if (sPhase == Phase::NodeRender)
+   {
+      const double budgetStart = glfwGetTime();
+      while (sNextFrame < sNodeEndFrame)
+      {
+         // RecorderAppend drops a frame when its queue is full; a headless render
+         // must not, so wait for the encoder to drain instead.
+         if (sNodeRec != nullptr && Platform::RecorderPendingFrameCount(sNodeRec) > 6)
+            return;
+         ++frameId;
+         Transport::Instance().SetOfflineVideoTime((double)sNextFrame / (double)job.fps);
+         ApplyModulationAndPalette(frameId);
+         ArrangeSeekVideoSampleSources(Transport::Instance().Beats());
+         for (GraphNode& gn : gNodes)
+            if (!gn.node->bypassed)
+               gn.node->CookIfNeeded(frameId);
+         if (sNextFrame >= sNodeStartFrame)
+         {
+            if (sTap->GetOutputWidth() <= 0 || sTap->GetOutputHeight() <= 0)
+               return fail("E_RENDER", "the --node " + job.node + " produced no image");
+            int rw = 0, rh = 0;
+            std::vector<unsigned char> rgba;
+            if (!ReadNodeImageRgba8(sTap, sTapOutput, job.codec != "prores4444", rw, rh, rgba))
+               return fail("E_RENDER", "could not read the --node " + job.node + " image");
+            if (job.sizeW > 0 && (rw != job.sizeW || rh != job.sizeH))
+            {
+               rgba = ResizeRgba8(rgba.data(), rw, rh, job.sizeW, job.sizeH);
+               rw = job.sizeW;
+               rh = job.sizeH;
+            }
+            // The encoder wants even sizes; crop the odd row/column.
+            const int cw = rw & ~1, ch = rh & ~1;
+            if (cw <= 0 || ch <= 0)
+               return fail("E_RENDER", "the --node image is too small to encode");
+            if (sNodeRec == nullptr)
+            {
+               std::string err;
+               sNodeRec = Platform::RecorderStart(job.out, cw, ch, job.fps, err, std::string(), true, 0.0, 2,
+                                                  job.codec == "prores4444");
+               if (sNodeRec == nullptr)
+                  return fail("E_RENDER", err.empty() ? "could not start the encoder" : err);
+               Platform::RecorderSetInputIsBgra(sNodeRec, false);
+               sNodeRecW = cw;
+               sNodeRecH = ch;
+            }
+            else if (cw != sNodeRecW || ch != sNodeRecH)
+               return fail("E_RENDER", "the --node image changed size mid-render (" + std::to_string(sNodeRecW) + "x" +
+                                          std::to_string(sNodeRecH) + " -> " + std::to_string(cw) + "x" + std::to_string(ch) +
+                                          "); pass --size to hold it fixed");
+            // The recorder takes bottom-up rows; rgba is top-down.
+            std::vector<unsigned char> frame = Platform::RecorderAcquireFrameBuffer(sNodeRec);
+            frame.resize((size_t)cw * (size_t)ch * 4);
+            for (int i = 0; i < ch; i++)
+               std::memcpy(frame.data() + (size_t)i * cw * 4, rgba.data() + (size_t)(ch - 1 - i) * rw * 4, (size_t)cw * 4);
+            if (!Platform::RecorderAppend(sNodeRec, std::move(frame), 1))
+               return fail("E_RENDER", "the encoder refused a frame");
+         }
+         sNextFrame++;
+         if (glfwGetTime() - budgetStart > 0.1)
+            return;
+      }
+      Transport::Instance().SetOfflineMode(false);
+      std::string err;
+      int written = 0, dropped = 0;
+      const bool stopped = Platform::RecorderStop(sNodeRec, err, &written, &dropped);
+      sNodeRec = nullptr;
+      std::error_code ec;
+      const auto size = std::filesystem::exists(job.out, ec) ? std::filesystem::file_size(job.out, ec) : 0;
+      if (!stopped || size == 0)
+         return fail("E_RENDER", err.empty() ? "the encoder did not finish the file" : err);
+      if (dropped > 0)
+         return fail("E_RENDER", std::to_string(dropped) + " frame(s) were dropped by the encoder");
+      if (!Headless::MovieHasIndex(job.out))
+         return fail("E_RENDER", "the file was written but has no index (moov), so it cannot be played");
+      sStatus.width = sNodeRecW;
+      sStatus.height = sNodeRecH;
+      sStatus.frames = written;
       sStatus.files.push_back(job.out);
       sPhase = Phase::Done;
       HeadlessFinish(window, sStatus, sWall);
