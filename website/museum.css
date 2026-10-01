@@ -121,7 +121,7 @@ body.is-focus .counter { opacity: 1; transform: none; }
 body.is-focus .modes { opacity: 0; pointer-events: none; transform: translate(-50%, 14px); }
 
 .hint {
-  position: fixed; z-index: 9; left: 50%; bottom: calc(max(26px, env(safe-area-inset-bottom) + 14px) + 62px);
+  position: fixed; z-index: 9; left: 50%; bottom: max(30px, calc(env(safe-area-inset-bottom) + 18px));
   transform: translate(-50%, 6px);
   font: 500 11px/1.4 var(--font-mono); letter-spacing: 0.04em; text-transform: lowercase;
   color: var(--ink); text-align: center; white-space: nowrap;

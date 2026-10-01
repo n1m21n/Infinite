@@ -121,7 +121,7 @@ const hallPanels = Array.from({ length: 9 }, () => new THREE.Mesh(new THREE.Plan
 rooms.hall.add(hallLeft, hallRight, hallEnd, hallStart, hallCeil, ...hallPanels);
 
 // --- rotunda ---
-const ROT_R = 4.7;
+const ROT_R = 3.7;
 const rotWall = new THREE.Mesh(new THREE.CylinderGeometry(ROT_R + 0.55, ROT_R + 0.55, 5.4, 96, 1, true), new THREE.MeshLambertMaterial({ color: WALL_C, side: THREE.BackSide, transparent: true }));
 rotWall.position.y = 2.7;
 const rotCeil = new THREE.Mesh(new THREE.RingGeometry(1.5, ROT_R + 0.55, 96), new THREE.MeshLambertMaterial({ color: '#F1ECE0', side: THREE.DoubleSide, transparent: true }));
@@ -448,7 +448,7 @@ function nearestIndex() {
 // ---------------------------------------------------------------------------------------------
 // Mode + focus
 // ---------------------------------------------------------------------------------------------
-const modesEl = $('modes'), thumb = $('modeThumb'), hintEl = $('hint');
+const hintEl = $('hint');
 const HINTS = {
   hall: coarse ? 'Drag up to walk · tap a piece to step up close' : 'Scroll or drag to walk · click a piece to step up close',
   rotunda: coarse ? 'Drag to turn · tap a piece' : 'Drag or scroll to turn · click a piece',
@@ -462,12 +462,6 @@ function showHint(text) {
 }
 function hideHint() { clearTimeout(hintTimer); hintEl.classList.remove('show'); }
 
-function placeThumb() {
-  const on = modesEl.querySelector('button.on');
-  if (!on) return;
-  thumb.style.width = on.offsetWidth + 'px';
-  thumb.style.transform = `translateX(${on.offsetLeft}px)`;
-}
 
 function setMode(m, { silent = false } = {}) {
   if (m === mode) return;
@@ -485,8 +479,6 @@ function setMode(m, { silent = false } = {}) {
   }
   layout(m, true);
   camTime = 0.85;
-  modesEl.querySelectorAll('button').forEach((b) => { const on = b.dataset.mode === m; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-  placeThumb();
   if (!silent) showHint(HINTS[m]);
 }
 
@@ -512,7 +504,6 @@ function exitFocus(quick = false) {
 }
 const stepFocus = (d) => { if (focusIdx >= 0) enterFocus((focusIdx + d + N) % N); };
 
-modesEl.addEventListener('click', (e) => { const b = e.target.closest('button[data-mode]'); if (b) setMode(b.dataset.mode); });
 $('prevBtn').addEventListener('click', () => stepFocus(-1));
 $('nextBtn').addEventListener('click', () => stepFocus(1));
 $('closeBtn').addEventListener('click', () => exitFocus());
@@ -656,8 +647,7 @@ addEventListener('keydown', (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   const k = e.key;
   lastInput = performance.now(); hideHint();
-  if (k === '1') setMode('hall'); else if (k === '2') setMode('rotunda'); else if (k === '3') setMode('wall');
-  else if (k === 'Escape') { if (focusIdx >= 0) exitFocus(); else location.href = 'index.html'; }
+  if (k === 'Escape') { if (focusIdx >= 0) exitFocus(); else location.href = 'index.html'; }
   else if (k === 'Enter' || k === ' ') { if (focusIdx < 0) { e.preventDefault(); enterFocus(nearestIndex()); } }
   else if (focusIdx >= 0) {
     if (k === 'ArrowRight' || k === 'ArrowDown') stepFocus(1); else if (k === 'ArrowLeft' || k === 'ArrowUp') stepFocus(-1);
@@ -776,7 +766,7 @@ function frame() {
 // ---------------------------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------------------------
-function resize() { applyViewParams(); placeThumb(); }
+function resize() { applyViewParams(); }
 addEventListener('resize', resize);
 
 async function boot() {
@@ -796,22 +786,21 @@ async function boot() {
 
   pieces.forEach((p) => { p.plq.material.map = plaqueTex(p.plaqueNo, p.def.title, p.def.meta); p.plq.material.needsUpdate = true; });
 
-  mode = 'hall';
+  mode = 'rotunda';
   applyViewParams();
-  layout('hall', false);
-  roomFade.hall = 1; floorFade = 1;
-  // opening shot: stand outside the hall, then glide in
-  S.hall.pos = -5.5; S.hall.tgt = 0; camTime = 0.1;
-  cam.x = 0; cam.y = EYE; cam.z = hall.zStart + 5.5; cam.yaw = 0;
-  placeThumb();
+  layout('rotunda', false);
+  roomFade.rotunda = 1; floorFade = 1;
+  // opening shot: start turned away from the first piece, then swing round to it
+  S.rotunda.yaw = S.rotunda.tgt = -1.5; camTime = 0.1;
+  cam.x = 0; cam.y = EYE; cam.z = 0; cam.yaw = -1.5;
   requestAnimationFrame(() => {
     frame();
     pickLive(performance.now() / 1000, true);
     setTimeout(() => {
       document.body.classList.remove('is-loading');
       camTime = reduceMotion ? 0.2 : 2.2;
-      S.hall.tgt = 0.0;
-      setTimeout(() => showHint(HINTS.hall), 1800);
+      S.rotunda.tgt = 0;
+      setTimeout(() => showHint(HINTS.rotunda), 1800);
     }, 450);
   });
 }
