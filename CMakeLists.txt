@@ -216,12 +216,12 @@ endif()
 # THAT BINARY - this project, not BtbN. So the exact upstream FFmpeg and
 # x264 SOURCE this build corresponds to is pinned here too, independent of
 # BtbN's own build pipeline, and documented in THIRD_PARTY_NOTICES:
-#   FFmpeg, git commit 1005b294ff on release/8.1 - the commit the pinned
-#   archives' own version string (n8.1.2-53-g1005b294ff) names, 53 commits
-#   past the n8.1.2 release:
-#     https://git.ffmpeg.org/gitweb/ffmpeg.git/snapshot/1005b294ff.tar.gz
+#   FFmpeg, git commit 29e619e767 on release/8.1 - the commit the pinned
+#   archives' own version string (n8.1.3-9-g29e619e767) names, 9 commits
+#   past the n8.1.3 release:
+#     https://git.ffmpeg.org/gitweb/ffmpeg.git/snapshot/29e619e767.tar.gz
 #   NOT ffmpeg-8.1.tar.xz - the release tarball is a different work from a
-#   snapshot 53 commits later, and only the actual commit satisfies section 6.
+#   snapshot 9 commits later, and only the actual commit satisfies section 6.
 #   x264: BtbN pulls x264's stable branch at build time and publishes no
 #   commit id in the release metadata, so the commit has to be read back out
 #   of the shipped libavcodec.so's build-configuration string. See
@@ -242,7 +242,8 @@ endif()
 # Linux Phase 5 AppImage work, 2026-09-16, on an arm64 dev container). BtbN
 # also publishes each autobuild under its own immutable tag
 # (autobuild-YYYY-MM-DD-HH-MM), whose assets never change - pin to one of
-# those instead, and the pinned SHA256 stays valid forever.
+# those instead, and the pinned SHA256 stays valid while the tag exists. BtbN prunes old autobuild
+# tags after a couple of weeks (the 2026-09-15 pin 404'd on 2026-10-01), so re-pin before a release build.
 #
 # ---- How to re-pin when a newer FFmpeg build is wanted ---------------------
 #   1. Find the desired autobuild tag and the exact version string embedded
@@ -252,8 +253,8 @@ endif()
 #        curl -s https://api.github.com/repos/BtbN/FFmpeg-Builds/releases \
 #          | grep -o '"tag_name": *"autobuild-[^"]*"' | head -1
 #      then list that release's assets to read the version string (the
-#      "n8.1.2-53-g1005b294ff" part) out of an asset name like
-#      ffmpeg-n8.1.2-53-g1005b294ff-linux64-gpl-shared-8.1.tar.xz.
+#      "n8.1.3-9-g29e619e767" part) out of an asset name like
+#      ffmpeg-n8.1.3-9-g29e619e767-linux64-gpl-shared-8.1.tar.xz.
 #   2. Download the four *-shared-8.1.tar.xz archives this file actually
 #      links (linux64-gpl, linux64-lgpl, linuxarm64-gpl, linuxarm64-lgpl) from
 #      that tag and `sha256sum` them directly - never copy a hash off a
@@ -264,16 +265,16 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     option(INFINITE_ENABLE_GPL_CODECS "Link GPL FFmpeg + libx264 for H.264 recording on Linux (OFF = LGPL FFmpeg, no H.264 encode)" ON)
 
     # Immutable BtbN/FFmpeg-Builds release tag and the version string its
-    # asset filenames embed - see "How to re-pin" above. Verified 2026-09-16.
-    set(FFMPEG_RELEASE_TAG "autobuild-2026-09-15-13-18")
-    set(FFMPEG_ARCHIVE_VERSION "n8.1.2-53-g1005b294ff")
+    # asset filenames embed - see "How to re-pin" above. Verified 2026-10-01 (the 2026-09-15 tag was pruned upstream and 404'd in CI).
+    set(FFMPEG_RELEASE_TAG "autobuild-2026-09-30-13-08")
+    set(FFMPEG_ARCHIVE_VERSION "n8.1.3-9-g29e619e767")
     set(FFMPEG_LINUX_ARCH "linux64")
-    set(FFMPEG_GPL_SHA256 "cdd23dda4552a11babd04b1e352736339d50cb2bca29f9fd2014e246a3924062")
-    set(FFMPEG_LGPL_SHA256 "c8fb071899337b16680ea1848c87fac27c3f31ff2c88e3c3b6c813f2625e9af1")
+    set(FFMPEG_GPL_SHA256 "76649c19a7a4615b367251ba4a8adc643f65831278a00e7a0c38398f7f06484b")
+    set(FFMPEG_LGPL_SHA256 "d4d7b6936f492c0b866b1cb4a29a1bbae09d6a064b4ec4eb90c95bed7969535a")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
         set(FFMPEG_LINUX_ARCH "linuxarm64")
-        set(FFMPEG_GPL_SHA256 "9b1d14ac6ce89d35ae2511f150477680931a482ea53fd033850f3d5d27af0141")
-        set(FFMPEG_LGPL_SHA256 "aac9ed865431ce338688d657ece3345712107a891dee77d6cad5f6d2fcf58ec5")
+        set(FFMPEG_GPL_SHA256 "d5b52fcb4f8d86d997bb75f6c4b383ca0be3f4cd9efd94ab3b4f27b22984f91c")
+        set(FFMPEG_LGPL_SHA256 "d44838f375c66cf31a8b1473b6f8bad76e5c7dac55870c4d96a75c907a52ba2d")
     endif()
 
     if(INFINITE_ENABLE_GPL_CODECS)
