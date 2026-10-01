@@ -38,6 +38,8 @@ public:
    float width = 1024.0f;   // float so modulators can drive it
    float height = 1024.0f;
    bool matchInput = false; // adopt the source's own resolution
+   float offsetX = 0.0f;    // output pixels; + moves the image right
+   float offsetY = 0.0f;    // output pixels; + moves the image up
    float bgColor[3] = { 0.0f, 0.0f, 0.0f };
    float bgOpacity = 0.0f;
 
@@ -45,6 +47,7 @@ public:
    {
       v.Int("mode", mode); v.Float("width", width); v.Float("height", height);
       v.Bool("matchInput", matchInput);
+      v.Float("offsetX", offsetX); v.Float("offsetY", offsetY);
       v.Color("bgColor", bgColor); v.Float("bgOpacity", bgOpacity);
    }
 
