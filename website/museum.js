@@ -90,15 +90,27 @@ function canvasTex(w, h, draw, { srgb = true, repeat } = {}) {
 // ---------------------------------------------------------------------------------------------
 const WALL_C = '#F3EFE6';
 
-const wallMat = () => new THREE.MeshLambertMaterial({ color: WALL_C, transparent: true });
-
-const floorTex = canvasTex(512, 512, (g, w, h) => {
+// notebook graph-paper: one tile = 5 x 5 cells = 2 m, so a cell is 40 cm
+const GRID_TILE = 2;
+const gridBase = canvasTex(640, 640, (g, w, h) => {
   g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
-  g.strokeStyle = 'rgba(70,55,35,0.10)'; g.lineWidth = 3;
-  g.strokeRect(0, 0, w, h);
-  g.strokeStyle = 'rgba(70,55,35,0.035)'; g.lineWidth = 2;
-  g.beginPath(); g.moveTo(w / 2, 0); g.lineTo(w / 2, h); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
-}, { repeat: [60, 60] });
+  for (let k = 0; k < 5; k++) {
+    const major = k === 0;
+    g.strokeStyle = major ? 'rgba(96,126,170,0.34)' : 'rgba(96,126,170,0.17)';
+    g.lineWidth = major ? 3 : 2;
+    const p = k * 128 + (major ? 1.5 : 1);
+    g.beginPath(); g.moveTo(p, 0); g.lineTo(p, h); g.moveTo(0, p); g.lineTo(w, p); g.stroke();
+  }
+});
+gridBase.wrapS = gridBase.wrapT = THREE.RepeatWrapping;
+function gridMap(w, h) { // a scaled plane needs its own repeat so cells stay square
+  const t = gridBase.clone(); t.needsUpdate = true;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(w / GRID_TILE, h / GRID_TILE);
+  return t;
+}
+const wallMat = () => new THREE.MeshLambertMaterial({ color: WALL_C, map: gridMap(1, 1), transparent: true });
+const setGrid = (mesh, w, h) => { mesh.material.map.repeat.set(w / GRID_TILE, h / GRID_TILE); };
+const floorTex = gridMap(72, 72);
 const floorMat = new THREE.MeshStandardMaterial({ color: '#E4E0D6', map: floorTex, roughness: 0.45, metalness: 0, transparent: true, opacity: 0.86 });
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(72, 72), floorMat);
 floor.rotation.x = -Math.PI / 2;
@@ -115,7 +127,7 @@ const hallLeft = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
 const hallRight = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
 const hallEnd = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
 const hallStart = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
-const hallCeil = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshLambertMaterial({ color: '#F1ECE0', transparent: true }));
+const hallCeil = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshLambertMaterial({ color: '#F1ECE0', map: gridMap(1, 1), transparent: true }));
 const panelMat = new THREE.MeshBasicMaterial({ color: '#FFFDF6', transparent: true, fog: false });
 const hallPanels = Array.from({ length: 9 }, () => new THREE.Mesh(new THREE.PlaneGeometry(1, 1), panelMat));
 rooms.hall.add(hallLeft, hallRight, hallEnd, hallStart, hallCeil, ...hallPanels);
@@ -282,6 +294,9 @@ function applyViewParams() {
   hallEnd.scale.set(view.W * 2 + 0.3, 1, 1); hallEnd.position.set(0, 2.5, zBack);
   hallStart.scale.set(view.W * 2 + 0.3, 1, 1); hallStart.rotation.y = Math.PI; hallStart.position.set(0, 2.5, zFront);
   hallCeil.scale.set(view.W * 2 + 0.3, len, 1); hallCeil.rotation.x = Math.PI / 2; hallCeil.position.set(0, 4.6, cz);
+  setGrid(hallLeft, len, 5); setGrid(hallRight, len, 5);
+  setGrid(hallEnd, view.W * 2 + 0.3, 5); setGrid(hallStart, view.W * 2 + 0.3, 5);
+  setGrid(hallCeil, view.W * 2 + 0.3, len);
   hallPanels.forEach((m, k) => {
     m.rotation.x = Math.PI / 2; m.scale.set(1.1, len / 9 * 0.55, 1);
     m.position.set(0, 4.59, cz - len / 2 + (k + 0.5) * (len / 9));
@@ -412,12 +427,21 @@ function wallClampX(d) {
   return halfW - pad > (b.max - b.min) / 2 ? [0, 0] : [lo, hi];
 }
 
+// Screen space the close-up UI occupies: top chips, bottom plaque + buttons. The piece is fitted into what is left.
+function focusReserve() {
+  const small = innerWidth <= 640;
+  return { top: small ? 78 : 76, bottom: small ? 218 : 128 };
+}
 function focusPose(i) {
   const p = pieces[i], t = Math.tan((view.fov * Math.PI) / 360);
-  const dH = (p.def.h * 1.32) / 2 / t, dW = (p.def.w * 1.28) / 2 / (t * view.aspect);
+  const { top, bottom } = focusReserve();
+  const free = Math.max(120, innerHeight - top - bottom);
+  const fy = (free / innerHeight) * 0.94;                       // share of the screen height the piece may use
+  const dH = p.def.h / (2 * t * fy), dW = p.def.w / (2 * t * view.aspect * 0.9);
   const d = Math.max(dH, dW, 1.1);
+  const lift = ((bottom - top) / 2) * (2 * t * d / innerHeight);  // lower the camera so the piece rises into the free band
   const nx = Math.sin(p.to.ry), nz = Math.cos(p.to.ry);
-  return { x: p.to.x + nx * d, y: p.to.y, z: p.to.z + nz * d, yaw: Math.atan2(nx, nz), pitch: 0 };
+  return { x: p.to.x + nx * d, y: p.to.y - lift, z: p.to.z + nz * d, yaw: Math.atan2(nx, nz), pitch: 0 };
 }
 
 function basePose() {
@@ -450,7 +474,7 @@ function nearestIndex() {
 // ---------------------------------------------------------------------------------------------
 const hintEl = $('hint');
 const HINTS = {
-  hall: coarse ? 'Drag up to walk · tap a piece to step up close' : 'Scroll or drag to walk · click a piece to step up close',
+  hall: coarse ? 'Drag up to walk · drag sideways to look · tap a piece' : 'Scroll to walk · drag to look around · click a piece',
   rotunda: coarse ? 'Drag to turn · tap a piece' : 'Drag or scroll to turn · click a piece',
   wall: coarse ? 'Drag to pan · pinch to zoom · tap a piece' : 'Drag to pan · pinch or ctrl-scroll to zoom · click a piece',
 };
@@ -546,7 +570,10 @@ function flingBy(vx, vy) { // px/s
 }
 function scrollBy(dx, dy) {
   if (focusIdx >= 0) return;
-  if (mode === 'hall') S.hall.tgt += (dy + dx) * 0.0075;
+  if (mode === 'hall') {
+    S.hall.tgt += dy * 0.0075;                                  // wheel / two-finger scroll up-down: walk
+    S.hall.yawT = clamp(S.hall.yawT - dx * 0.0016, -0.75, 0.75); // trackpad sideways swipe: look
+  }
   else if (mode === 'rotunda') S.rotunda.tgt += (dx + dy) * 0.0016;
   else {
     const k = (2 * Math.tan((view.fov * Math.PI) / 360) * S.wall.dist) / innerHeight;
@@ -652,8 +679,13 @@ addEventListener('keydown', (e) => {
   else if (focusIdx >= 0) {
     if (k === 'ArrowRight' || k === 'ArrowDown') stepFocus(1); else if (k === 'ArrowLeft' || k === 'ArrowUp') stepFocus(-1);
   } else if (mode === 'hall') {
-    if (k === 'ArrowUp' || k === 'ArrowRight' || k === 'w') S.hall.tgt += 1.6;
-    else if (k === 'ArrowDown' || k === 'ArrowLeft' || k === 's') S.hall.tgt -= 1.6;
+    const step = e.shiftKey ? 4.8 : 1.6;
+    if (k === 'ArrowUp' || k === 'w' || k === 'W' || k === 'PageDown') S.hall.tgt += k === 'PageDown' ? 4.8 : step;
+    else if (k === 'ArrowDown' || k === 's' || k === 'S' || k === 'PageUp') S.hall.tgt -= k === 'PageUp' ? 4.8 : step;
+    else if (k === 'ArrowLeft' || k === 'a' || k === 'A') S.hall.yawT = clamp(S.hall.yawT + 0.35, -0.75, 0.75);
+    else if (k === 'ArrowRight' || k === 'd' || k === 'D') S.hall.yawT = clamp(S.hall.yawT - 0.35, -0.75, 0.75);
+    else if (k === 'Home') S.hall.tgt = 0;
+    else if (k === 'End') S.hall.tgt = hall.max;
   } else if (mode === 'rotunda') {
     if (k === 'ArrowRight' || k === 'ArrowUp') S.rotunda.tgt -= (Math.PI * 2) / N; else if (k === 'ArrowLeft' || k === 'ArrowDown') S.rotunda.tgt += (Math.PI * 2) / N;
   } else {
@@ -759,6 +791,7 @@ function frame() {
   }
 
   updatePieces(now);
+  for (const p of pieces) p.plq.visible = p.i !== focusIdx;   // the DOM plaque takes over in the close-up
   pickLive(now, false);
   renderer.render(scene, camera);
 }
@@ -786,21 +819,21 @@ async function boot() {
 
   pieces.forEach((p) => { p.plq.material.map = plaqueTex(p.plaqueNo, p.def.title, p.def.meta); p.plq.material.needsUpdate = true; });
 
-  mode = 'rotunda';
+  mode = 'hall';
   applyViewParams();
-  layout('rotunda', false);
-  roomFade.rotunda = 1; floorFade = 1;
-  // opening shot: start turned away from the first piece, then swing round to it
-  S.rotunda.yaw = S.rotunda.tgt = -1.5; camTime = 0.1;
-  cam.x = 0; cam.y = EYE; cam.z = 0; cam.yaw = -1.5;
+  layout('hall', false);
+  roomFade.hall = 1; floorFade = 1;
+  // opening shot: stand outside the hall, then glide in
+  S.hall.pos = -5.5; S.hall.tgt = 0; camTime = 0.1;
+  cam.x = 0; cam.y = EYE; cam.z = hall.zStart + 5.5; cam.yaw = 0;
   requestAnimationFrame(() => {
     frame();
     pickLive(performance.now() / 1000, true);
     setTimeout(() => {
       document.body.classList.remove('is-loading');
       camTime = reduceMotion ? 0.2 : 2.2;
-      S.rotunda.tgt = 0;
-      setTimeout(() => showHint(HINTS.rotunda), 1800);
+      S.hall.tgt = 0.0;
+      setTimeout(() => showHint(HINTS.hall), 1800);
     }, 450);
   });
 }
