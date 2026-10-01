@@ -248,4 +248,5 @@ function post(path){return fetch(path,{method:'POST',headers:{'X-Token':TOKEN}})
 function play(){if(!D.prompt)return;const id=(D.ranked[0]||{}).id||'the next quest';
  copyText(D.prompt,ok=>pst(ok?'Copied. Paste it in the Claude chat to start '+id:'Copy blocked here. Say in chat: '+D.prompt))}
 function refreshAll(b){if(!TOKEN||TOKEN.startsWith('__')){pst('Refresh needs the live server: python3 tools/roadmap/roadmap.py serve');return}
- pst('Refreshing...');post('/refresh').then(r=>{if(r.ok)location.reload();else pst(r</script></body></html>
+ pst('Refreshing...');post('/refresh').then(r=>{if(r.ok)location.reload();else pst(r.msg)}).catch(()=>pst('Refresh failed: is the server running?'))}
+</script></body></html>
