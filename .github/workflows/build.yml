@@ -202,8 +202,18 @@ jobs:
       - name: headless_smoke.sh through Infinite.com (informational)
         if: matrix.arch == 'x64'
         continue-on-error: true
+        timeout-minutes: 8
         shell: bash
         run: scripts/headless_smoke.sh build/Release/Infinite.com
+
+      # Informational for the same reason: the hosted Windows runner has no
+      # GPU, so a window-creation failure is expected and is not a defect.
+      - name: Render goldens (informational)
+        if: matrix.arch == 'x64'
+        continue-on-error: true
+        timeout-minutes: 8
+        shell: bash
+        run: python3 tools/render-check.py --binary build/Release/Infinite.exe
 
       # The exe is handed to people as a single portable file, so it must not
       # import the Visual C++ redistributable's CRT - a /MD build dies at
