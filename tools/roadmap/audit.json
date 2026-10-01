@@ -1,16 +1,16 @@
 {
  "merges": [
-  278,
-  287
+  282,
+  292
  ],
  "direct": [
-  396,
-  405
+  415,
+  415
  ],
- "notes_total": 336,
+ "notes_total": 367,
  "evidence": [
-  426,
-  496
+  432,
+  504
  ],
  "per_release": {
   "v0.1": {
@@ -108,19 +108,13 @@
   "v0.4.5": {
    "quests": 6,
    "notes": 5
+  },
+  "v0.4.6": {
+   "quests": 71,
+   "notes": 31
   }
  },
- "loose": [
-  "2026-10-01 c39cecb Roadmap: fix milestone slider script after trimming goals",
-  "2026-10-01 0ce1734 Roadmap: milestone shows one slider only",
-  "2026-10-01 775efae Roadmap: next-release milestone slider driven by milestone.json",
-  "2026-10-01 420bfcf Roadmap: ignore server/auto logs",
-  "2026-10-01 4424372 Sync semi-brain extractor output and datasets",
-  "2026-10-01 06f8113 Update Discord invite link",
-  "2026-10-01 aed5ea2 Launch video plan and release history",
-  "2026-10-01 d5bef64 Roadmap: quest ledger, board and tooling",
-  "2026-10-01 eec4962 Patch layout tool and preview; document in patch-authoring skill"
- ],
+ "loose": [],
  "no_evidence": [
   "R1 v0.1: 80+ realtime 2D/3D nodes, synthesis, DSP, AU/VST3 hosting, MIDI",
   "R5 Field language: sample/pixel/element/graph domains, dynamic pins, state",
@@ -191,7 +185,9 @@
   "R478 Headless audio block size follows the machine's audio device",
   "R480 Join Geometry: remove resurrected keepInputColours; instancer input must not cou",
   "R485 Roadmap ranking: exclude blocked/needs-input from next, don't let guessed rating",
-  "R502 Motion film: cat photo -> Wave Terrain synth -> bends a cube (cat-synth, 30 s, g"
+  "R502 Motion film: cat photo -> Wave Terrain synth -> bends a cube (cat-synth, 30 s, g",
+  "R530 Interface scaling on high-resolution monitors: the whole interface (text, nodes,",
+  "R531 Field Language Manual gains a \"What's new since v1\" addendum: offset reads of pi"
  ],
  "first_commit": "2026-08-10"
 }

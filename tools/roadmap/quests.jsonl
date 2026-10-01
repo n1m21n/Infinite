@@ -1934,3 +1934,157 @@
 {"ts": "2026-10-01T13:49:19+00:00", "event": "add", "id": "R527", "track": "ux", "kind": "fix", "horizon": "now", "title": "UI scale on every OS and monitor: point-based layout, live rescale on monitor change", "why": "Owner asked to fix interface scaling for all OS and all monitors (docs/fix-briefs/ui-scale-all-displays.md). Node bodies ignored DPI on Windows/X11 and nothing rescaled when the window changed monitor.", "after": [], "user": false, "origin": "ask", "effort": "M", "rate": {"user": 3, "func": 2, "perf": 0, "ux": 3}}
 {"ts": "2026-10-01T13:49:28+00:00", "event": "edit", "id": "R527", "src": "merge:bugfix/ui-scale-hidpi"}
 {"ts": "2026-10-01T13:49:36+00:00", "event": "edit", "id": "R527", "commits": ["b983664"]}
+{"ts": "2026-10-01T14:39:35+00:00", "event": "add", "id": "R528", "after": [], "user": false, "src": "brief:ui-scale-all-displays.md", "track": "engine", "kind": "fix", "horizon": "next", "title": "Fix brief: Fix brief: interface must scale on every OS and every monitor", "why": "docs/fix-briefs/ui-scale-all-displays.md"}
+{"ts": "2026-10-01T19:17:36+05:30", "event": "add", "id": "R529", "after": [], "user": false, "src": "merge:feature/metronome", "track": "engine", "kind": "feature", "horizon": "later", "title": "Metronome", "why": "merged into main (d84b25e)", "origin": "merge"}
+{"ts": "2026-10-01T20:08:52+05:30", "event": "done", "id": "R529", "why": "merged into main (d84b25e)"}
+{"ts": "2026-10-01T20:08:52+05:30", "event": "edit", "id": "R529", "opened": "2026-10-01T19:17:36+05:30", "closed": "2026-10-01T20:08:52+05:30", "release": "", "commits": ["d84b25e"]}
+{"ts": "2026-10-01T14:50:58+00:00", "event": "edit", "id": "R527", "opened": "2026-10-01T18:12:15+05:30", "commits": ["7b13390"]}
+{"ts": "2026-10-01T16:30:21+00:00", "event": "edit", "id": "R17", "opened": "2026-09-29T08:49:52+05:30", "commits": ["5c286db", "35f8306", "3fbaea4", "27eae48", "aa3c033", "665ba2b", "cd87755", "f2ebbf8"], "closed": "2026-09-29T10:21:44+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:22+00:00", "event": "edit", "id": "R19", "opened": "2026-09-28T08:40:22+05:30", "commits": ["d115da9", "1684c96", "ba48e88", "ca40cee", "c97f18c", "529b8f8", "3e8cf1d", "ba96ab1"], "closed": "2026-09-28T20:34:42+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:22+00:00", "event": "edit", "id": "R23", "opened": "2026-10-01T11:30:08+05:30", "commits": ["d656198"], "closed": "2026-10-01T11:30:08+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:23+00:00", "event": "edit", "id": "R24", "opened": "2026-09-30T20:44:39+05:30", "commits": ["7a0cf86"], "closed": "2026-09-30T20:44:39+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:23+00:00", "event": "edit", "id": "R37", "opened": "2026-09-30T17:39:08+05:30", "commits": ["be54d52"], "closed": "2026-09-30T17:39:09+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:23+00:00", "event": "edit", "id": "R38", "opened": "2026-09-30T14:54:45+05:30", "commits": ["1da806e"], "closed": "2026-09-30T16:46:08+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:23+00:00", "event": "edit", "id": "R39", "opened": "2026-09-30T21:07:46+05:30", "commits": ["55bfc22"], "closed": "2026-09-30T21:07:46+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:23+00:00", "event": "edit", "id": "R40", "opened": "2026-10-01T08:03:03+05:30", "commits": ["7b121b2"], "closed": "2026-10-01T08:03:03+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:23+00:00", "event": "edit", "id": "R44", "opened": "2026-09-30T09:06:28+05:30", "commits": ["b7de44c", "db71cb5"], "closed": "2026-09-30T09:06:33+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:50+00:00", "event": "edit", "id": "R276", "opened": "2026-09-29T22:46:06+05:30", "commits": ["beb28d7"], "closed": "2026-09-29T22:46:06+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:50+00:00", "event": "edit", "id": "R277", "opened": "2026-09-29T23:22:14+05:30", "commits": ["5102e3b", "28a64a2", "f7c7d63", "3376bbc", "d797d4d", "218c642", "3f33510"], "closed": "2026-09-30T03:41:53+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:51+00:00", "event": "edit", "id": "R278", "opened": "2026-09-30T00:19:07+05:30", "commits": ["b8a709b", "f5a0281", "9e888ed", "1ef9787", "2638f28"], "closed": "2026-09-30T04:02:13+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:51+00:00", "event": "edit", "id": "R279", "opened": "2026-09-30T04:17:55+05:30", "commits": ["9a8b7d8"], "closed": "2026-09-30T04:17:55+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:51+00:00", "event": "edit", "id": "R281", "opened": "2026-09-29T22:47:59+05:30", "commits": ["e6c7035"], "closed": "2026-09-29T22:47:59+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:51+00:00", "event": "edit", "id": "R286", "opened": "2026-09-30T07:38:44+05:30", "commits": ["f9ef62e"], "closed": "2026-09-30T07:38:44+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:51+00:00", "event": "edit", "id": "R287", "opened": "2026-10-01T11:42:08+05:30", "commits": ["0eea4a1"], "closed": "2026-10-01T11:42:08+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:51+00:00", "event": "edit", "id": "R289", "opened": "2026-10-01T12:19:40+05:30", "commits": ["f941eb5"], "closed": "2026-10-01T12:19:40+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:56+00:00", "event": "edit", "id": "R276", "opened": "2026-09-29T22:46:06+05:30", "commits": ["beb28d7"], "closed": "2026-09-29T22:46:06+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:57+00:00", "event": "edit", "id": "R277", "opened": "2026-09-29T23:22:14+05:30", "commits": ["5102e3b", "28a64a2", "f7c7d63", "3376bbc", "d797d4d", "218c642", "3f33510"], "closed": "2026-09-30T03:41:53+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:58+00:00", "event": "edit", "id": "R278", "opened": "2026-09-30T00:19:07+05:30", "commits": ["b8a709b", "f5a0281", "9e888ed", "1ef9787", "2638f28"], "closed": "2026-09-30T04:02:13+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:58+00:00", "event": "edit", "id": "R279", "opened": "2026-09-30T04:17:55+05:30", "commits": ["9a8b7d8"], "closed": "2026-09-30T04:17:55+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:58+00:00", "event": "edit", "id": "R281", "opened": "2026-09-29T22:47:59+05:30", "commits": ["e6c7035"], "closed": "2026-09-29T22:47:59+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:58+00:00", "event": "edit", "id": "R286", "opened": "2026-09-30T07:38:44+05:30", "commits": ["f9ef62e"], "closed": "2026-09-30T07:38:44+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:59+00:00", "event": "edit", "id": "R287", "opened": "2026-10-01T11:42:08+05:30", "commits": ["0eea4a1"], "closed": "2026-10-01T11:42:08+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:30:59+00:00", "event": "edit", "id": "R289", "opened": "2026-10-01T12:19:40+05:30", "commits": ["f941eb5"], "closed": "2026-10-01T12:19:40+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:19+00:00", "event": "edit", "id": "R470", "opened": "2026-09-30T09:37:49+05:30", "commits": ["88c6ac4", "557ae10", "f54e87c", "ea1feb6"], "closed": "2026-09-30T10:07:42+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:20+00:00", "event": "edit", "id": "R471", "opened": "2026-10-01T10:42:03+05:30", "commits": ["e5dd28b", "7eace44", "77e11b8"], "closed": "2026-10-01T11:09:29+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:20+00:00", "event": "edit", "id": "R473", "opened": "2026-09-30T22:21:38+05:30", "commits": ["19833f8"], "closed": "2026-09-30T22:21:38+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:20+00:00", "event": "edit", "id": "R474", "opened": "2026-10-01T10:20:58+05:30", "commits": ["a0b8a3f"], "closed": "2026-10-01T10:20:58+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:20+00:00", "event": "edit", "id": "R475", "opened": "2026-09-30T22:37:17+05:30", "commits": ["6f91a20"], "closed": "2026-09-30T22:37:17+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:20+00:00", "event": "edit", "id": "R477", "opened": "2026-09-30T20:29:28+05:30", "commits": ["0fb3be9"], "closed": "2026-09-30T20:29:28+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:20+00:00", "event": "edit", "id": "R479", "opened": "2026-09-30T18:22:29+05:30", "commits": ["3d6c30d"], "closed": "2026-09-30T18:22:29+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:20+00:00", "event": "edit", "id": "R481", "opened": "2026-10-01T09:00:56+05:30", "commits": ["9e27e30"], "closed": "2026-10-01T09:00:56+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:20+00:00", "event": "edit", "id": "R482", "opened": "2026-10-01T09:01:01+05:30", "commits": ["e384fd6"], "closed": "2026-10-01T09:01:01+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:20+00:00", "event": "edit", "id": "R483", "opened": "2026-10-01T09:01:01+05:30", "commits": ["96bf16b"], "closed": "2026-10-01T09:01:01+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:20+00:00", "event": "edit", "id": "R484", "opened": "2026-10-01T09:00:57+05:30", "commits": ["982766d"], "closed": "2026-10-01T09:00:57+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:20+00:00", "event": "edit", "id": "R486", "opened": "2026-09-30T18:40:14+05:30", "commits": ["b878210"], "closed": "2026-09-30T18:42:26+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:20+00:00", "event": "edit", "id": "R487", "opened": "2026-09-30T18:56:48+05:30", "commits": ["3992c56"], "closed": "2026-09-30T18:56:49+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:21+00:00", "event": "edit", "id": "R488", "opened": "2026-09-30T19:41:59+05:30", "commits": ["05b5cd7"], "closed": "2026-09-30T19:41:59+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:21+00:00", "event": "edit", "id": "R489", "opened": "2026-09-30T20:48:56+05:30", "commits": ["693180f"], "closed": "2026-09-30T20:48:56+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:21+00:00", "event": "edit", "id": "R490", "opened": "2026-09-30T19:48:01+05:30", "commits": ["da75cf6"], "closed": "2026-09-30T19:48:01+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:21+00:00", "event": "edit", "id": "R491", "opened": "2026-09-30T20:01:13+05:30", "commits": ["e49a1de"], "closed": "2026-09-30T20:01:14+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:21+00:00", "event": "edit", "id": "R492", "opened": "2026-09-30T20:12:01+05:30", "commits": ["f6242ae"], "closed": "2026-09-30T20:12:16+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:21+00:00", "event": "edit", "id": "R493", "opened": "2026-09-30T20:19:40+05:30", "commits": ["6e3e57b"], "closed": "2026-09-30T20:19:40+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:21+00:00", "event": "edit", "id": "R494", "opened": "2026-09-30T21:07:46+05:30", "commits": ["4d33c54"], "closed": "2026-09-30T21:07:47+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:21+00:00", "event": "edit", "id": "R495", "opened": "2026-09-30T21:44:11+05:30", "commits": ["1c1dae2"], "closed": "2026-09-30T21:44:11+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:21+00:00", "event": "edit", "id": "R496", "opened": "2026-09-30T21:17:13+05:30", "commits": ["34aba75"], "closed": "2026-09-30T21:17:13+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:21+00:00", "event": "edit", "id": "R497", "opened": "2026-09-30T22:26:44+05:30", "commits": ["bbde719"], "closed": "2026-09-30T22:26:44+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:21+00:00", "event": "edit", "id": "R498", "opened": "2026-10-01T09:28:29+05:30", "commits": ["b97a3f5"], "closed": "2026-10-01T09:28:29+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:21+00:00", "event": "edit", "id": "R499", "opened": "2026-09-30T21:44:11+05:30", "commits": ["d2849f2"], "closed": "2026-09-30T21:44:12+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:21+00:00", "event": "edit", "id": "R500", "opened": "2026-10-01T12:02:07+05:30", "commits": ["1ed8c81"], "closed": "2026-10-01T12:02:07+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:21+00:00", "event": "edit", "id": "R501", "opened": "2026-10-01T07:39:54+05:30", "commits": ["3628381"], "closed": "2026-10-01T07:39:54+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R503", "opened": "2026-10-01T08:32:47+05:30", "commits": ["9061711"], "closed": "2026-10-01T08:32:47+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R504", "opened": "2026-10-01T12:36:33+05:30", "commits": ["54075d3"], "closed": "2026-10-01T12:36:33+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R505", "opened": "2026-10-01T09:18:49+05:30", "commits": ["247f75b"], "closed": "2026-10-01T09:18:49+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R507", "opened": "2026-10-01T11:27:16+05:30", "commits": ["79c32b9"], "closed": "2026-10-01T11:27:16+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R508", "opened": "2026-10-01T11:45:59+05:30", "commits": ["648e062"], "closed": "2026-10-01T11:45:59+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R509", "opened": "2026-10-01T11:53:18+05:30", "commits": ["a92be77"], "closed": "2026-10-01T11:53:18+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R510", "opened": "2026-10-01T11:30:07+05:30", "commits": ["d656198"], "closed": "2026-10-01T11:30:08+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R511", "opened": "2026-10-01T11:42:07+05:30", "commits": ["0eea4a1"], "closed": "2026-10-01T11:42:08+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R512", "opened": "2026-10-01T11:45:58+05:30", "commits": ["648e062"], "closed": "2026-10-01T11:45:59+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R513", "opened": "2026-10-01T11:53:16+05:30", "commits": ["a92be77"], "closed": "2026-10-01T11:53:18+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R514", "opened": "2026-10-01T12:19:39+05:30", "commits": ["f941eb5"], "closed": "2026-10-01T12:19:40+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R515", "opened": "2026-10-01T12:30:14+05:30", "commits": ["bc8914d"], "closed": "2026-10-01T12:30:15+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R517", "opened": "2026-10-01T17:27:00+05:30", "commits": ["3472a13"], "closed": "2026-10-01T17:27:00+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R518", "opened": "2026-10-01T14:44:44+05:30", "commits": ["b9ee6b6"], "closed": "2026-10-01T14:44:44+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R519", "opened": "2026-10-01T14:44:44+05:30", "commits": ["b9ee6b6"], "closed": "2026-10-01T14:44:44+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R520", "opened": "2026-10-01T14:44:44+05:30", "commits": ["b9ee6b6"], "closed": "2026-10-01T14:44:44+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R521", "opened": "2026-10-01T13:10:48+05:30", "commits": ["0dca01d"], "closed": "2026-10-01T13:10:49+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R522", "opened": "2026-10-01T13:12:54+05:30", "commits": ["df40a73"], "closed": "2026-10-01T13:12:56+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R523", "opened": "2026-10-01T14:07:02+05:30", "commits": ["9664c4c"], "closed": "2026-10-01T14:07:02+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R524", "opened": "2026-10-01T13:43:07+05:30", "commits": ["97b6a73"], "closed": "2026-10-01T14:18:07+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:22+00:00", "event": "edit", "id": "R525", "opened": "2026-10-01T18:20:10+05:30", "commits": ["381269b"], "closed": "2026-10-01T18:20:30+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:23+00:00", "event": "edit", "id": "R526", "opened": "2026-10-01T18:49:58+05:30", "commits": ["b47fbc8"], "closed": "2026-10-01T19:07:32+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:23+00:00", "event": "edit", "id": "R529", "opened": "2026-10-01T19:17:36+05:30", "commits": ["d84b25e"], "closed": "2026-10-01T20:08:52+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T20:08:59+05:30", "event": "add", "id": "R530", "after": [], "user": false, "src": "note:v0.4.6:18", "track": "platform", "kind": "feature", "horizon": "later", "title": "Interface scaling on high-resolution monitors: the whole interface (text, nodes, pins, min", "why": "v0.4.6 release notes, no single matching commit", "origin": "merge"}
+{"ts": "2026-10-01T20:08:59+05:30", "event": "done", "id": "R530", "why": "v0.4.6 release notes, no single matching commit", "release": "v0.4.6"}
+{"ts": "2026-10-01T20:08:59+05:30", "event": "edit", "id": "R530", "opened": "2026-10-01T20:08:59+05:30", "closed": "2026-10-01T20:08:59+05:30", "release": "v0.4.6", "commits": []}
+{"ts": "2026-10-01T20:08:59+05:30", "event": "add", "id": "R531", "after": [], "user": false, "src": "note:v0.4.6:30", "track": "field", "kind": "feature", "horizon": "later", "title": "Field Language Manual gains a \"What's new since v1\" addendum: offset reads of pixel state,", "why": "v0.4.6 release notes, no single matching commit", "origin": "merge"}
+{"ts": "2026-10-01T20:08:59+05:30", "event": "done", "id": "R531", "why": "v0.4.6 release notes, no single matching commit", "release": "v0.4.6"}
+{"ts": "2026-10-01T20:08:59+05:30", "event": "edit", "id": "R531", "opened": "2026-10-01T20:08:59+05:30", "closed": "2026-10-01T20:08:59+05:30", "release": "v0.4.6", "commits": []}
+{"ts": "2026-10-01T16:31:31+00:00", "event": "edit", "id": "R19", "commits": ["1684c96", "3e8cf1d", "529b8f8", "aed5ea2", "ba48e88", "ba96ab1", "c97f18c", "ca40cee", "d115da9"]}
+{"ts": "2026-10-01T16:31:31+00:00", "event": "edit", "id": "R501", "commits": ["3628381", "eec4962"]}
+{"ts": "2026-10-01T14:20:20+05:30", "event": "add", "id": "R532", "after": [], "user": false, "src": "upkeep:v0.4.6", "track": "engine", "kind": "infra", "horizon": "later", "title": "Docs, tests, skills and tooling for v0.4.6", "why": "17 direct commits in the v0.4.6 window with no feature of their own", "origin": "merge"}
+{"ts": "2026-10-01T20:08:49+05:30", "event": "done", "id": "R532", "why": "17 direct commits in the v0.4.6 window with no feature of their own", "release": "v0.4.6"}
+{"ts": "2026-10-01T20:08:49+05:30", "event": "edit", "id": "R532", "opened": "2026-10-01T14:20:20+05:30", "closed": "2026-10-01T20:08:49+05:30", "release": "v0.4.6", "commits": ["075938f", "004547c", "f0e456b", "5e6bfe4", "75ad78c", "985f563", "252d440", "1a6a955", "2024bef", "c19009a", "c39cecb", "0ce1734", "775efae", "420bfcf", "4424372", "06f8113", "d5bef64"]}
+{"ts": "2026-10-01T16:31:32+00:00", "event": "edit", "id": "R19", "opened": "2026-09-28T08:40:22+05:30", "commits": ["1684c96", "3e8cf1d", "529b8f8", "aed5ea2", "ba48e88", "ba96ab1", "c97f18c", "ca40cee", "d115da9"], "closed": "2026-10-01T14:20:21+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:32+00:00", "event": "edit", "id": "R501", "opened": "2026-10-01T07:39:54+05:30", "commits": ["3628381", "eec4962"], "closed": "2026-10-01T14:20:19+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:51+00:00", "event": "edit", "id": "R470", "opened": "2026-09-30T09:37:49+05:30", "commits": ["88c6ac4", "557ae10", "f54e87c", "ea1feb6"], "closed": "2026-09-30T10:07:42+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:51+00:00", "event": "done", "id": "R527", "why": "merged into main (7b13390)"}
+{"ts": "2026-10-01T16:31:51+00:00", "event": "edit", "id": "R527", "commits": ["7b13390", "b983664"]}
+{"ts": "2026-10-01T16:31:51+00:00", "event": "edit", "id": "R471", "opened": "2026-10-01T10:42:03+05:30", "commits": ["e5dd28b", "7eace44", "77e11b8"], "closed": "2026-10-01T11:09:29+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:52+00:00", "event": "edit", "id": "R473", "opened": "2026-09-30T22:21:38+05:30", "commits": ["19833f8"], "closed": "2026-09-30T22:21:38+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:52+00:00", "event": "edit", "id": "R474", "opened": "2026-10-01T10:20:58+05:30", "commits": ["a0b8a3f"], "closed": "2026-10-01T10:20:58+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:52+00:00", "event": "edit", "id": "R475", "opened": "2026-09-30T22:37:17+05:30", "commits": ["6f91a20"], "closed": "2026-09-30T22:37:17+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:52+00:00", "event": "edit", "id": "R477", "opened": "2026-09-30T20:29:28+05:30", "commits": ["0fb3be9"], "closed": "2026-09-30T20:29:28+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:52+00:00", "event": "edit", "id": "R479", "opened": "2026-09-30T18:22:29+05:30", "commits": ["3d6c30d"], "closed": "2026-09-30T18:22:29+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:52+00:00", "event": "edit", "id": "R481", "opened": "2026-10-01T09:00:56+05:30", "commits": ["9e27e30"], "closed": "2026-10-01T09:00:56+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:52+00:00", "event": "edit", "id": "R482", "opened": "2026-10-01T09:01:01+05:30", "commits": ["e384fd6"], "closed": "2026-10-01T09:01:01+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:53+00:00", "event": "edit", "id": "R483", "opened": "2026-10-01T09:01:01+05:30", "commits": ["96bf16b"], "closed": "2026-10-01T09:01:01+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:53+00:00", "event": "edit", "id": "R484", "opened": "2026-10-01T09:00:57+05:30", "commits": ["982766d"], "closed": "2026-10-01T09:00:57+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:53+00:00", "event": "edit", "id": "R486", "opened": "2026-09-30T18:40:14+05:30", "commits": ["b878210"], "closed": "2026-09-30T18:42:26+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:53+00:00", "event": "edit", "id": "R487", "opened": "2026-09-30T18:56:48+05:30", "commits": ["3992c56"], "closed": "2026-09-30T18:56:49+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:53+00:00", "event": "edit", "id": "R488", "opened": "2026-09-30T19:41:59+05:30", "commits": ["05b5cd7"], "closed": "2026-09-30T19:41:59+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:53+00:00", "event": "edit", "id": "R489", "opened": "2026-09-30T20:48:56+05:30", "commits": ["693180f"], "closed": "2026-09-30T20:48:56+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:53+00:00", "event": "edit", "id": "R490", "opened": "2026-09-30T19:48:01+05:30", "commits": ["da75cf6"], "closed": "2026-09-30T19:48:01+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:54+00:00", "event": "edit", "id": "R491", "opened": "2026-09-30T20:01:13+05:30", "commits": ["e49a1de"], "closed": "2026-09-30T20:01:14+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:54+00:00", "event": "edit", "id": "R492", "opened": "2026-09-30T20:12:01+05:30", "commits": ["f6242ae"], "closed": "2026-09-30T20:12:16+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:54+00:00", "event": "edit", "id": "R493", "opened": "2026-09-30T20:19:40+05:30", "commits": ["6e3e57b"], "closed": "2026-09-30T20:19:40+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:54+00:00", "event": "edit", "id": "R494", "opened": "2026-09-30T21:07:46+05:30", "commits": ["4d33c54"], "closed": "2026-09-30T21:07:47+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:54+00:00", "event": "edit", "id": "R495", "opened": "2026-09-30T21:44:11+05:30", "commits": ["1c1dae2"], "closed": "2026-09-30T21:44:11+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:54+00:00", "event": "edit", "id": "R496", "opened": "2026-09-30T21:17:13+05:30", "commits": ["34aba75"], "closed": "2026-09-30T21:17:13+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:55+00:00", "event": "edit", "id": "R497", "opened": "2026-09-30T22:26:44+05:30", "commits": ["bbde719"], "closed": "2026-09-30T22:26:44+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:55+00:00", "event": "edit", "id": "R498", "opened": "2026-10-01T09:28:29+05:30", "commits": ["b97a3f5"], "closed": "2026-10-01T09:28:29+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:55+00:00", "event": "edit", "id": "R499", "opened": "2026-09-30T21:44:11+05:30", "commits": ["d2849f2"], "closed": "2026-09-30T21:44:12+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:55+00:00", "event": "edit", "id": "R500", "opened": "2026-10-01T12:02:07+05:30", "commits": ["1ed8c81"], "closed": "2026-10-01T12:02:07+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:55+00:00", "event": "edit", "id": "R501", "opened": "2026-10-01T07:39:54+05:30", "commits": ["3628381"], "closed": "2026-10-01T07:39:54+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:56+00:00", "event": "edit", "id": "R503", "opened": "2026-10-01T08:32:47+05:30", "commits": ["9061711"], "closed": "2026-10-01T08:32:47+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:56+00:00", "event": "edit", "id": "R504", "opened": "2026-10-01T12:36:33+05:30", "commits": ["54075d3"], "closed": "2026-10-01T12:36:33+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:57+00:00", "event": "edit", "id": "R505", "opened": "2026-10-01T09:18:49+05:30", "commits": ["247f75b"], "closed": "2026-10-01T09:18:49+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:57+00:00", "event": "edit", "id": "R507", "opened": "2026-10-01T11:27:16+05:30", "commits": ["79c32b9"], "closed": "2026-10-01T11:27:16+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:57+00:00", "event": "edit", "id": "R508", "opened": "2026-10-01T11:45:59+05:30", "commits": ["648e062"], "closed": "2026-10-01T11:45:59+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:57+00:00", "event": "edit", "id": "R509", "opened": "2026-10-01T11:53:18+05:30", "commits": ["a92be77"], "closed": "2026-10-01T11:53:18+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:57+00:00", "event": "edit", "id": "R510", "opened": "2026-10-01T11:30:07+05:30", "commits": ["d656198"], "closed": "2026-10-01T11:30:08+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:57+00:00", "event": "edit", "id": "R511", "opened": "2026-10-01T11:42:07+05:30", "commits": ["0eea4a1"], "closed": "2026-10-01T11:42:08+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:57+00:00", "event": "edit", "id": "R512", "opened": "2026-10-01T11:45:58+05:30", "commits": ["648e062"], "closed": "2026-10-01T11:45:59+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:57+00:00", "event": "edit", "id": "R513", "opened": "2026-10-01T11:53:16+05:30", "commits": ["a92be77"], "closed": "2026-10-01T11:53:18+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:57+00:00", "event": "edit", "id": "R514", "opened": "2026-10-01T12:19:39+05:30", "commits": ["f941eb5"], "closed": "2026-10-01T12:19:40+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:57+00:00", "event": "edit", "id": "R515", "opened": "2026-10-01T12:30:14+05:30", "commits": ["bc8914d"], "closed": "2026-10-01T12:30:15+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:58+00:00", "event": "edit", "id": "R517", "opened": "2026-10-01T17:27:00+05:30", "commits": ["3472a13"], "closed": "2026-10-01T17:27:00+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:58+00:00", "event": "edit", "id": "R518", "opened": "2026-10-01T14:44:44+05:30", "commits": ["b9ee6b6"], "closed": "2026-10-01T14:44:44+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:58+00:00", "event": "edit", "id": "R519", "opened": "2026-10-01T14:44:44+05:30", "commits": ["b9ee6b6"], "closed": "2026-10-01T14:44:44+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:58+00:00", "event": "edit", "id": "R520", "opened": "2026-10-01T14:44:44+05:30", "commits": ["b9ee6b6"], "closed": "2026-10-01T14:44:44+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:58+00:00", "event": "edit", "id": "R521", "opened": "2026-10-01T13:10:48+05:30", "commits": ["0dca01d"], "closed": "2026-10-01T13:10:49+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:58+00:00", "event": "edit", "id": "R522", "opened": "2026-10-01T13:12:54+05:30", "commits": ["df40a73"], "closed": "2026-10-01T13:12:56+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:59+00:00", "event": "edit", "id": "R523", "opened": "2026-10-01T14:07:02+05:30", "commits": ["9664c4c"], "closed": "2026-10-01T14:07:02+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:59+00:00", "event": "edit", "id": "R524", "opened": "2026-10-01T13:43:07+05:30", "commits": ["97b6a73"], "closed": "2026-10-01T14:18:07+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:59+00:00", "event": "edit", "id": "R525", "opened": "2026-10-01T18:20:10+05:30", "commits": ["381269b"], "closed": "2026-10-01T18:20:30+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:31:59+00:00", "event": "edit", "id": "R526", "opened": "2026-10-01T18:49:58+05:30", "commits": ["b47fbc8"], "closed": "2026-10-01T19:07:32+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:32:00+00:00", "event": "edit", "id": "R529", "opened": "2026-10-01T19:17:36+05:30", "commits": ["d84b25e"], "closed": "2026-10-01T20:08:52+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T20:08:59+05:30", "event": "add", "id": "R530", "after": [], "user": false, "src": "note:v0.4.6:18", "track": "platform", "kind": "feature", "horizon": "later", "title": "Interface scaling on high-resolution monitors: the whole interface (text, nodes, pins, min", "why": "v0.4.6 release notes, no single matching commit", "origin": "merge"}
+{"ts": "2026-10-01T20:08:59+05:30", "event": "done", "id": "R530", "why": "v0.4.6 release notes, no single matching commit", "release": "v0.4.6"}
+{"ts": "2026-10-01T20:08:59+05:30", "event": "edit", "id": "R530", "opened": "2026-10-01T20:08:59+05:30", "closed": "2026-10-01T20:08:59+05:30", "release": "v0.4.6", "commits": []}
+{"ts": "2026-10-01T20:08:59+05:30", "event": "add", "id": "R531", "after": [], "user": false, "src": "note:v0.4.6:30", "track": "field", "kind": "feature", "horizon": "later", "title": "Field Language Manual gains a \"What's new since v1\" addendum: offset reads of pixel state,", "why": "v0.4.6 release notes, no single matching commit", "origin": "merge"}
+{"ts": "2026-10-01T20:08:59+05:30", "event": "done", "id": "R531", "why": "v0.4.6 release notes, no single matching commit", "release": "v0.4.6"}
+{"ts": "2026-10-01T20:08:59+05:30", "event": "edit", "id": "R531", "opened": "2026-10-01T20:08:59+05:30", "closed": "2026-10-01T20:08:59+05:30", "release": "v0.4.6", "commits": []}
+{"ts": "2026-10-01T16:32:15+00:00", "event": "edit", "id": "R501", "commits": ["3628381", "eec4962"]}
+{"ts": "2026-10-01T16:32:16+00:00", "event": "edit", "id": "R501", "opened": "2026-10-01T07:39:54+05:30", "commits": ["3628381", "eec4962"], "closed": "2026-10-01T14:20:19+05:30", "release": "v0.4.6"}
+{"ts": "2026-10-01T16:32:16+00:00", "event": "edit", "id": "R527", "opened": "2026-10-01T18:12:15+05:30", "commits": ["7b13390"], "closed": "2026-10-01T20:08:49+05:30", "release": "v0.4.6"}
