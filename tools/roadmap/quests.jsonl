@@ -1921,3 +1921,6 @@
 {"ts": "2026-10-01T09:16:15+00:00", "event": "edit", "id": "R518", "opened": "2026-10-01T14:44:44+05:30", "commits": ["b9ee6b6"], "closed": "2026-10-01T14:44:44+05:30", "release": ""}
 {"ts": "2026-10-01T09:16:15+00:00", "event": "edit", "id": "R519", "opened": "2026-10-01T14:44:44+05:30", "commits": ["b9ee6b6"], "closed": "2026-10-01T14:44:44+05:30", "release": ""}
 {"ts": "2026-10-01T09:16:15+00:00", "event": "edit", "id": "R520", "opened": "2026-10-01T14:44:44+05:30", "commits": ["b9ee6b6"], "closed": "2026-10-01T14:44:44+05:30", "release": ""}
+{"ts": "2026-10-01T12:26:59+00:00", "event": "done", "id": "R517", "why": "First real Windows CI run of the headless work: shim, self-tests green on x64 and ARM64; Linux FFmpeg and linuxdeploy re-pinned; macOS smoke informational (no GPU on hosted runner)"}
+{"ts": "2026-10-01T12:26:59+00:00", "event": "edit", "id": "R517", "commits": ["3472a13"]}
+{"ts": "2026-10-01T12:28:27+00:00", "event": "edit", "id": "R517", "opened": "2026-10-01T17:27:00+05:30", "commits": ["3472a13"], "closed": "2026-10-01T17:27:00+05:30", "release": ""}
