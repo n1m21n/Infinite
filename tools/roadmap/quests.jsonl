@@ -1924,3 +1924,13 @@
 {"ts": "2026-10-01T12:26:59+00:00", "event": "done", "id": "R517", "why": "First real Windows CI run of the headless work: shim, self-tests green on x64 and ARM64; Linux FFmpeg and linuxdeploy re-pinned; macOS smoke informational (no GPU on hosted runner)"}
 {"ts": "2026-10-01T12:26:59+00:00", "event": "edit", "id": "R517", "commits": ["3472a13"]}
 {"ts": "2026-10-01T12:28:27+00:00", "event": "edit", "id": "R517", "opened": "2026-10-01T17:27:00+05:30", "commits": ["3472a13"], "closed": "2026-10-01T17:27:00+05:30", "release": ""}
+{"ts": "2026-10-01T18:20:10+05:30", "event": "add", "id": "R525", "after": [], "user": false, "src": "merge:feature/website-seo", "track": "growth", "kind": "feature", "horizon": "later", "title": "Website seo", "why": "merged into main (5f2f44c)", "origin": "merge"}
+{"ts": "2026-10-01T18:20:11+05:30", "event": "done", "id": "R525", "why": "merged into main (5f2f44c)"}
+{"ts": "2026-10-01T18:20:11+05:30", "event": "edit", "id": "R525", "opened": "2026-10-01T18:20:10+05:30", "closed": "2026-10-01T18:20:11+05:30", "release": "", "commits": ["5f2f44c"]}
+{"ts": "2026-10-01T18:49:58+05:30", "event": "add", "id": "R526", "after": [], "user": false, "src": "merge:feature/artworks-museum", "track": "nodes", "kind": "feature", "horizon": "later", "title": "Artworks museum", "why": "merged into main (b47fbc8)", "origin": "merge"}
+{"ts": "2026-10-01T19:07:32+05:30", "event": "done", "id": "R526", "why": "merged into main (b47fbc8)"}
+{"ts": "2026-10-01T19:07:32+05:30", "event": "edit", "id": "R526", "opened": "2026-10-01T18:49:58+05:30", "closed": "2026-10-01T19:07:32+05:30", "release": "", "commits": ["b47fbc8"]}
+{"ts": "2026-10-01T13:39:13+00:00", "event": "edit", "id": "R525", "opened": "2026-10-01T18:20:10+05:30", "commits": ["381269b"], "closed": "2026-10-01T18:20:30+05:30", "release": ""}
+{"ts": "2026-10-01T13:49:19+00:00", "event": "add", "id": "R527", "track": "ux", "kind": "fix", "horizon": "now", "title": "UI scale on every OS and monitor: point-based layout, live rescale on monitor change", "why": "Owner asked to fix interface scaling for all OS and all monitors (docs/fix-briefs/ui-scale-all-displays.md). Node bodies ignored DPI on Windows/X11 and nothing rescaled when the window changed monitor.", "after": [], "user": false, "origin": "ask", "effort": "M", "rate": {"user": 3, "func": 2, "perf": 0, "ux": 3}}
+{"ts": "2026-10-01T13:49:28+00:00", "event": "edit", "id": "R527", "src": "merge:bugfix/ui-scale-hidpi"}
+{"ts": "2026-10-01T13:49:36+00:00", "event": "edit", "id": "R527", "commits": ["b983664"]}
