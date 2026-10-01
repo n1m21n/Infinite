@@ -158,6 +158,20 @@ r=$("$BIN" --validate "$OUT/bad.inf" 2>/dev/null); [ "$(echo "$r" | json "d['err
 printf 'infinite-patch 1\nnode 1 Source Shape\n  id shape\nend\nnode 2 Utility Output\nend\ncable out 0 shpae\n' > "$OUT/ref.inf"
 r=$("$BIN" --validate "$OUT/ref.inf" 2>/dev/null); rc=$?
 [ "$rc" = 3 ] && [ "$(echo "$r" | json "d['errors'][0]['code']")" = "E_BAD_REF" ]; check "names: unknown reference exit 3" $?
+# nodes out of index order keep their own numbers and ids; a source output may be named
+O="$N/out_of_order.inf"
+"$BIN" --validate "$O" >/dev/null 2>&1; check "names: out-of-order indices + named output validate" $?
+r=$("$BIN" --explain "$O" 2>/dev/null)
+echo "$r" | grep -q '^  bloom "glow" (5)$' && echo "$r" | grep -q '^  Audio Analyze "ears" (6)$'; check "names: out-of-order ids bind to their declared index" $?
+echo "$r" | grep -q '^  mod bloom "glow" (5) uIntensity <- Audio Analyze "ears" (6) out 1, absolute, depth 1, range 0.8..2.2$'; check "names: named mod output resolves, lo/hi kept" $?
+sed 's/ears low 0/ears 1 0/' "$O" > "$OUT/oo_num.inf"
+"$BIN" --canonicalize "$O" "$OUT/oo_a.inf" >/dev/null 2>&1; "$BIN" --canonicalize "$OUT/oo_num.inf" "$OUT/oo_b.inf" >/dev/null 2>&1
+cmp -s "$OUT/oo_a.inf" "$OUT/oo_b.inf"; check "names: named output == numeric output (byte-identical)" $?
+sed 's/ears low 0/ears lo 0/' "$O" > "$OUT/oo_bad.inf"
+r=$("$BIN" --validate "$OUT/oo_bad.inf" 2>/dev/null); rc=$?
+[ "$rc" = 3 ] && [ "$(echo "$r" | json "(d['errors'][0]['code'], d['errors'][0]['hint'].split(',')[0])")" = "('E_BAD_REF', 'outputs: level')" ]; check "names: unknown output name exit 3 with the output list" $?
+printf 'infinite-patch 1\nnode 0 Source Shape\nend\n' > "$OUT/idx0.inf"
+r=$("$BIN" --validate "$OUT/idx0.inf" 2>/dev/null); [ "$(echo "$r" | json "d['errors'][0]['code']")" = "E_BAD_INDEX" ]; check "names: node index 0 rejected" $?
 
 # --- key join (C3): every labelled control should know its saved key; the count may only go up ---
 BASE="$ROOT/tests/headless/describe_join_baseline.json"

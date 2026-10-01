@@ -164,10 +164,36 @@ namespace PatchSchema
                                   "inputs: " + Join(names)));
          word.clear();
       };
+      // An output label, as `--describe` lists it (Audio Analyze: level, low, ...). A number
+      // never reaches here: ReadRef keeps digits as the index, so Note Router's "1" is output 1.
+      auto output = [&](std::string& word, int srcIndex, int& out, int line) {
+         if (word.empty())
+            return;
+         auto nd = byIndex.find(srcIndex);
+         const TypeSchema* t = nd == byIndex.end() || !env.schema ? nullptr : env.schema(nd->second->typeName);
+         std::vector<std::string> labels;
+         bool found = false;
+         if (t != nullptr)
+            for (size_t i = 0; i < t->outputs.size(); i++)
+            {
+               labels.push_back(t->outputs[i].label);
+               if (!found && Lower(t->outputs[i].label) == Lower(word))
+               {
+                  out = (int)i;
+                  found = true;
+               }
+            }
+         // An unknown source type is E_UNKNOWN_TYPE's to report; a dangling one E_DANGLING's.
+         if (!found && t != nullptr)
+            errors.push_back(Make("E_BAD_REF", "'" + word + "' is not an output of " + t->name, line, srcIndex,
+                                  labels.empty() ? t->name + " has no outputs" : "outputs: " + Join(labels)));
+         word.clear();
+      };
       auto cable = [&](Patch::CableRecord& c) {
          node(c.dstRef, c.dstIndex, c.line);
          node(c.srcRef, c.srcIndex, c.line);
          slot(c.slotRef, c.dstIndex, c.dstSlot, c.line);
+         output(c.outRef, c.srcIndex, c.srcOutput, c.line);
       };
       for (Patch::CableRecord& c : data.cables)
          cable(c);
@@ -181,6 +207,7 @@ namespace PatchSchema
       {
          node(m.dstRef, m.dstIndex, m.line);
          node(m.srcRef, m.srcIndex, m.line);
+         output(m.outRef, m.srcIndex, m.srcOutput, m.line);
       }
       for (Patch::PaletteRecord& p : data.palette)
       {
@@ -388,6 +415,11 @@ namespace PatchSchema
       std::map<uint64_t, int> uidSeen;
       for (const Patch::NodeRecord& n : data.nodes)
       {
+         // A headless load keeps the file's indices (ApplyPatchData keepIndices), so they must
+         // be ones a live node can carry.
+         if (n.index < 1 || n.index > Patch::kMaxNodeIndex)
+            errors.push_back(Make("E_BAD_INDEX", "node index " + std::to_string(n.index) + " is out of range", n.line, n.index,
+                                  "use an index from 1 to " + std::to_string(Patch::kMaxNodeIndex)));
          if (!byIndex.insert({ n.index, &n }).second)
             errors.push_back(Make("E_DUPLICATE_INDEX", "node index " + std::to_string(n.index) + " is used twice",
                                   n.line, n.index, "give every node its own index"));

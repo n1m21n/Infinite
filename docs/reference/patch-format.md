@@ -31,7 +31,9 @@ node <index> <category> <type name to end of line>
 end
 ```
 
-- `index` is the node's number; other records refer to it.
+- `index` is the node's number (1 to 1000000, unique); other records refer to it. Nodes may appear in
+  any order and the numbers may have gaps: a headless run keeps them as written, so `--explain`, `--node`
+  and `--stems` use the file's numbers.
 - **Defaults rule:** any parameter you leave out keeps the node's default. A hand-written node needs
   only the keys it changes. The GUI writes every key; `--canonicalize` does too.
 - Find category, type name, keys, ranges and dropdown options with `Infinite --describe [type]`.
@@ -57,12 +59,15 @@ GUI and read back the same way; hand-written files rarely need it.
 
 Wherever a node index goes you may write the node's `id`. Wherever a slot goes you may write its
 slot name (the input's label, lower case, non-alphanumerics collapsed to `_`, e.g. `input`, `input_2`;
-`--describe` lists them per type). A control in `mod`/`expr` may be written by its saved key
+`--describe` lists them per type). A source output (`srcOutput` on `mod`, and the optional trailing
+output on `cable`/`geo`/`note`) may be written by its `--describe` output label
+(`mod glow uIntensity ears low 0 1 0.5 0.8 2.2` for Audio Analyze's `low`); a number is always the output
+index. A control in `mod`/`expr` may be written by its saved key
 (`mod shape sizeX lfo 0 0 1 0.5`) instead of the widget order number. `Resolve(named) == numeric`:
 a named file loads to exactly the graph its numeric twin does, and `--canonicalize` writes the numeric
 form (dropping `id` lines unless `--keep-ids`).
 
-Errors are specific and exit 3: `E_BAD_ID`, `E_DUPLICATE_ID`, `E_BAD_REF` (unknown node or slot name),
+Errors are specific and exit 3: `E_BAD_ID`, `E_DUPLICATE_ID`, `E_BAD_REF` (unknown node, slot or output name), `E_BAD_INDEX` (node index out of range),
 `E_BAD_KEY` and `E_BAD_VALUE` (unknown control key or dropdown option), each with the nearest valid
 name as a hint.
 

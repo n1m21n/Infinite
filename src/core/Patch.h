@@ -108,6 +108,11 @@ class INode;
 // Names may contain spaces, so anything free-form is always last on its line.
 namespace Patch
 {
+   // Highest node index a headless load keeps as written: pin ids are
+   // index * GraphNode::kStride (1050) in an int. PatchSchema::Validate
+   // reports E_BAD_INDEX outside 1..kMaxNodeIndex.
+   constexpr int kMaxNodeIndex = 1000000;
+
    struct NodeRecord
    {
       int index = 0;
@@ -153,7 +158,8 @@ namespace Patch
       int line = 0; // reader line number, see NodeRecord::line
       // Authoring names, read from a hand-written file in place of the number.
       // Empty when the file used a number. PatchSchema::Resolve fills the ints.
-      std::string dstRef, srcRef, slotRef;
+      // outRef is an output label (`--describe` outputs[].label) for srcOutput.
+      std::string dstRef, srcRef, slotRef, outRef;
    };
 
    struct ModRecord
@@ -181,8 +187,8 @@ namespace Patch
       bool enabled = true;
       float curve = 0.0f; // in [-1.0, 1.0], 0 = linear
       int line = 0;
-      std::string dstRef, srcRef; // authoring names, see CableRecord
-      std::string dstKey;         // a control key in place of dstParam (`mod 5 radius ...`)
+      std::string dstRef, srcRef, outRef; // authoring names, see CableRecord
+      std::string dstKey;                 // a control key in place of dstParam (`mod 5 radius ...`)
    };
 
    // A palette node driving one colour swatch on another node.

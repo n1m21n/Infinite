@@ -1,0 +1,29 @@
+infinite-patch 1
+# Nodes out of index order (6 before 5) and a mod source output written by its label.
+node 1 Notes Random Note Generator
+  id notes
+end
+node 2 Synths Wavetable
+  id synth
+end
+node 3 Utility Audio Out
+  id speakers
+end
+node 4 Source Shape
+  id shape
+end
+node 6 Modulators Audio Analyze
+  id ears
+end
+node 5 Effects bloom
+  id glow
+end
+node 7 Utility Output
+  id out
+end
+note synth 0 notes
+aud speakers 0 synth
+aud ears 0 synth
+cable glow 0 shape
+cable out 0 glow
+mod glow uIntensity ears low 0 1 0.5 0.8 2.2
