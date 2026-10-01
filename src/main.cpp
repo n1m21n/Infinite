@@ -69682,6 +69682,24 @@ static void JoinLiveTier1()
    joiner.Step();
 }
 
+// A take's first audio blocks start every node from its last pushed parameters. Those came from
+// the wall-clock frame that cooked before the take (a modulator read at an arbitrary transport time),
+// so two renders began from slightly different values and the smoothers carried the difference for
+// a while. Cook one frame at the take's own start time, then re-prepare, so the starting state
+// depends on the patch and the start time only.
+static void PrimeOfflineStart(int& frameId, double startSeconds)
+{
+   ++frameId;
+   Transport::Instance().SetOfflineVideoTime(startSeconds);
+   ApplyModulationAndPalette(frameId);
+   ArrangeSeekVideoSampleSources(Transport::Instance().Beats());
+   for (GraphNode& gn : gNodes)
+      if (!gn.node->bypassed)
+         gn.node->CookIfNeeded(frameId);
+   ForceAudioRepare();
+   RebuildAudioTopology();
+}
+
 static void HeadlessTick(int& frameId, GLFWwindow* window)
 {
    enum class Phase { Warm, Running, Frames, Audio, Done };
@@ -70203,8 +70221,7 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
          Transport::Instance().Seek(job.start);
          Transport::Instance().SetOfflineMode(true, gHeadlessAudioRate);
          Transport::Instance().SetPlaying(true);
-         ForceAudioRepare();
-         RebuildAudioTopology();
+         PrimeOfflineStart(frameId, job.start);
          if (sSinkRing != nullptr)
          {
             float discard[4096];
@@ -70282,6 +70299,7 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
                         why.empty() ? "offline render did not start" : why);
          }
          gOfflineRender.startSeconds = job.start;
+         PrimeOfflineStart(frameId, job.start);
          sStatus.frames = sOut->OfflineFramesTotal();
          sStatus.audioSampleRate = sOut->OfflineNeedsGraphAudio() ? gHeadlessAudioRate : 0.0;
          sStatus.audioFrames = sOut->OfflineNeedsGraphAudio()

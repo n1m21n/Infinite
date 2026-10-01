@@ -1,4 +1,5 @@
 #include "AudioDisplacementNode.h"
+#include "core/Transport.h"
 
 #include <algorithm>
 #include <cmath>
@@ -179,14 +180,27 @@ void AudioDisplacementNode::CookIfNeeded(int frameId)
    // Ballistics filter (Attack / Decay). dtSec used to be hard-coded to
    // 1/60s, which made the attack/decay ms params frame-rate dependent -
    // use the real elapsed time between CookIfNeeded calls instead.
-   const auto now = std::chrono::steady_clock::now();
+   // Offline takes step by the transport's video time, not the wall clock, so two renders match.
    float dtSec = 1.0f / 60.0f;
-   if (mLastCookTime.time_since_epoch().count() != 0)
+   if (Transport::Instance().IsOfflineMode())
    {
-      dtSec = (float)std::chrono::duration<double>(now - mLastCookTime).count();
-      dtSec = std::clamp(dtSec, 1.0f / 1000.0f, 0.25f); // guard against a huge first-call/stall delta
+      const double t = Transport::Instance().Seconds();
+      if (mHasLastCookSeconds)
+         dtSec = std::clamp((float)(t - mLastCookSeconds), 1.0f / 1000.0f, 0.25f);
+      mLastCookSeconds = t;
+      mHasLastCookSeconds = true;
    }
-   mLastCookTime = now;
+   else
+   {
+      mHasLastCookSeconds = false;
+      const auto now = std::chrono::steady_clock::now();
+      if (mLastCookTime.time_since_epoch().count() != 0)
+      {
+         dtSec = (float)std::chrono::duration<double>(now - mLastCookTime).count();
+         dtSec = std::clamp(dtSec, 1.0f / 1000.0f, 0.25f); // guard against a huge first-call/stall delta
+      }
+      mLastCookTime = now;
+   }
 
    const float tau = (targetEnergy > mCurrentEnergy) ? (attack * 0.001f) : (decay * 0.001f);
    const float alpha = (tau > 0.0001f) ? (1.0f - expf(-dtSec / tau)) : 1.0f;

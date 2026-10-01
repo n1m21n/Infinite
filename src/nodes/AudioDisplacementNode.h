@@ -205,6 +205,8 @@ private:
    unsigned long long mMeshRevision = 1;
    int mLastCookFrame = -1;
    std::chrono::steady_clock::time_point mLastCookTime{};
+   double mLastCookSeconds = 0.0;
+   bool mHasLastCookSeconds = false;
    float mPhaseAccum = 0.0f;
    float mCurrentEnergy = 0.0f;
    std::vector<float> mSmoothedSpectrum;

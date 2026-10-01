@@ -22,6 +22,7 @@
 #include "audio/ParamMailbox.h"
 #include "audio/SampleSlot.h"
 #include "audio/SynthModes.h"
+#include "core/Transport.h"
 #include "core/GLUtil.h"
 
 namespace
@@ -745,7 +746,9 @@ void WaveTerrainNode::RenderPreview(int /*frameId*/)
       constexpr double kMinContinuousRebuildInterval = 1.0 / 15.0; // ~15Hz cap
       const auto now = std::chrono::steady_clock::now();
       const double elapsed = std::chrono::duration<double>(now - mLastContinuousRebuild).count();
-      if (elapsed >= kMinContinuousRebuildInterval)
+      // An offline take has no wall clock: rebuild every cook so the terrain the audio reads is the
+      // same on every run (the throttle would pick run-dependent frames to skip).
+      if (elapsed >= kMinContinuousRebuildInterval || Transport::Instance().IsOfflineMode())
       {
          shouldRebuild = true;
          mLastContinuousRebuild = now;

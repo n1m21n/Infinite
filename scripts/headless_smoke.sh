@@ -281,6 +281,7 @@ print(b[12:16]==b'IHDR' and b[37:41]==b'sRGB' and struct.unpack('>I',b[16:20])[0
 # R40: two processes render a patch with a random note source to the same bytes (the note pump that
 # runs without a device used to leave the generator mid-sequence, so the first note varied run to run)
 python3 "$ROOT/tools/determinism-check.py" "$ROOT/tests/headless/format/audio.inf" --binary "$BIN" --times 0,1 --audio-seconds 1 >/dev/null; check "determinism: random-note synth patch renders identically twice" $?
+python3 "$ROOT/tools/determinism-check.py" "$PATCH" --binary "$BIN" --times 0,1 --audio-seconds 1 >/dev/null; check "determinism: the 40-node demo patch (modulators, Wave Terrain, effects) renders identically twice" $?
 
 rm -rf "$OUT"
 exit $fail
