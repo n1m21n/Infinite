@@ -144,6 +144,7 @@ static void JoinLiveTier1();                          // defined next to ParamKe
 #include "core/AISkillContent.h"
 #include "core/Palette.h"
 #include "core/Patch.h"
+#include "core/PatchLayout.h"
 #include "arrange/ArrangeModel.h"
 #include "arrange/ArrangeMediaImport.h"
 #include "core/NodeViewport.h"
@@ -48096,6 +48097,86 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    // reload = the file watcher re-reading the open file (R39): same read and
    // resolve, but applied like an undo step - one checkpoint first, the stacks,
    // view and routing mode kept, no recents/autosave bookkeeping.
+   // A patch with no `pos` records (hand-written / headless-authored) loads with
+   // every node at 0,0. Real sizes only exist once the nodes have drawn, so the
+   // layout waits for them (same shape as RunFieldGraphUnpackPhase2Tick): the
+   // load stashes the data it needs, the per-frame tick measures, places, and
+   // asks for a fit-to-content. Nodes without a measurement after the retry
+   // budget use PatchLayout::EstimateSize.
+   struct PendingAutoLayout
+   {
+      bool active = false;
+      Patch::Data data;          // nodes + cables only
+      std::map<int, int> remap;  // NodeRecord::index -> live GraphNode index
+      int framesWaited = 0;
+   };
+   PendingAutoLayout gPendingAutoLayout;
+   constexpr int kAutoLayoutMinFrames = 2;   // let first-frame sizes settle
+   constexpr int kAutoLayoutMaxFrames = 30;  // then lay out with what we have
+
+   void ScheduleAutoLayout(const Patch::Data& data, const std::map<int, int>& remap)
+   {
+      gPendingAutoLayout = PendingAutoLayout{};
+      if (!PatchLayout::NeedsLayout(data))
+         return;
+      PendingAutoLayout& p = gPendingAutoLayout;
+      p.active = true;
+      p.data.nodes = data.nodes;
+      p.data.cables = data.cables;
+      p.data.geometry = data.geometry;
+      p.data.audio = data.audio;
+      p.data.notes = data.notes;
+      p.remap = remap;
+   }
+
+   void RunAutoLayoutTick()
+   {
+      PendingAutoLayout& p = gPendingAutoLayout;
+      if (!p.active)
+         return;
+      p.framesWaited++;
+      if (p.framesWaited < kAutoLayoutMinFrames)
+         return;
+
+      ed::EditorContext* prevEditor = ed::GetCurrentEditor();
+      ed::SetCurrentEditor(gEditor);
+
+      std::map<int, PatchLayout::Size> measured;
+      bool allMeasured = true;
+      for (const Patch::NodeRecord& rec : p.data.nodes)
+      {
+         auto m = p.remap.find(rec.index);
+         GraphNode* gn = m != p.remap.end() ? FindNodeByIndex(m->second) : nullptr;
+         if (gn == nullptr || gn->hiddenFromCanvas)
+            continue;
+         const ImVec2 s = ed::GetNodeSize(gn->NodeId());
+         if (s.x > 1.0f && s.x < 20000.0f && s.y > 1.0f && s.y < 20000.0f)
+            measured[rec.index] = { s.x, s.y };
+         else
+            allMeasured = false;
+      }
+      if (!allMeasured && p.framesWaited < kAutoLayoutMaxFrames)
+      {
+         ed::SetCurrentEditor(prevEditor);
+         return;
+      }
+
+      const std::map<int, PatchLayout::Pos> pos = PatchLayout::Compute(p.data, &measured);
+      for (const auto& entry : pos)
+      {
+         auto m = p.remap.find(entry.first);
+         GraphNode* gn = m != p.remap.end() ? FindNodeByIndex(m->second) : nullptr;
+         if (gn == nullptr)
+            continue;
+         gn->spawnX = gn->liveX = entry.second.x;
+         gn->spawnY = gn->liveY = entry.second.y;
+         ed::SetNodePosition(gn->NodeId(), ImVec2(entry.second.x, entry.second.y));
+      }
+      ed::SetCurrentEditor(prevEditor);
+      gRequestFitView = true;
+      p = PendingAutoLayout{};
+   }
+
    bool LoadPatchDataImpl(Patch::Data& data, const std::string& path, bool reload);
 
    bool LoadPatchFromImpl(const std::string& path, bool reload)
@@ -48301,6 +48382,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          PushUndoCheckpoint(); // Cmd+Z returns to the graph as it was before the reload
          const std::string keptPath = gPatchPath;
          ApplyPatchData(data, &pending.remap, HeadlessJobActive());
+         ScheduleAutoLayout(data, pending.remap); // before the stash: it moves `pending`
          StashPendingKeyed(pending);
          gArrangePatchGeneration++;
          if (path.empty())
@@ -48317,6 +48399,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          return true;
       }
       ApplyPatchData(data, &pending.remap, HeadlessJobActive());
+      ScheduleAutoLayout(data, pending.remap); // before the stash: it moves `pending`
       StashPendingKeyed(pending);
       // New document: drop the old one's clip clipboard and selection.
       gArrangePatchGeneration++;
@@ -69014,6 +69097,169 @@ int RunSyphonPatchTest()
    return 0;
 }
 
+// ================================================== INFINITE_PATCHLAYOUTTEST
+// Data-level half (headless, before glfwInit): a hand-written patch with no
+// `pos` lines reads as hasPos=false, PatchLayout places it without overlap in
+// band/wiring order, and --canonicalize's Read->Write is unchanged by all of it
+// (a pos-less node is still written `pos 0 0`). The live half - real
+// ed::GetNodeSize measurements through the GUI tick - is the frame test
+// INFINITE_PATCHLAYOUTLIVETEST in the main loop.
+static const char* kPatchLayoutFixture =
+   "infinite-patch 1\n"
+   "# band Picture\n"
+   "node 9 Compositing Comment\n"
+   "  f width 400\n"
+   "  f height 100\n"
+   "end\n"
+   "node 1 Source Shape\n"
+   "  id shape\n"
+   "end\n"
+   "# near blur\n"
+   "node 8 Compositing Comment\n"
+   "end\n"
+   "node 2 Effects Blur\n"
+   "  id blur\n"
+   "end\n"
+   "node 3 Utility Output\n"
+   "  id out\n"
+   "end\n"
+   "node 4 Modulators LFO\n"
+   "end\n"
+   "node 5 Modulators LFO\n"
+   "end\n"
+   "node 6 Notes Arpeggiator\n"
+   "end\n"
+   "node 7 Synths Analog\n"
+   "end\n"
+   "cable 2 0 1\n"
+   "cable 3 0 2\n"
+   "note 7 0 6\n";
+
+int RunPatchLayoutTest()
+{
+   setvbuf(stdout, nullptr, _IONBF, 0);
+   int fails = 0;
+   auto check = [&](bool ok, const char* what)
+   {
+      if (!ok)
+      {
+         printf("PATCHLAYOUTTEST FAIL: %s\n", what);
+         fails++;
+      }
+   };
+
+   const std::string src = TmpPath("infinite_patchlayout_in.inf");
+   const std::string rt = TmpPath("infinite_patchlayout_rt.inf");
+   {
+      std::ofstream f(src);
+      f << kPatchLayoutFixture;
+   }
+   Patch::Data data;
+   std::string err;
+   if (!Patch::Read(src, data, err))
+   {
+      printf("PATCHLAYOUTTEST FAIL: Read: %s\n", err.c_str());
+      return 1;
+   }
+   check(data.nodes.size() == 9, "fixture should read 9 nodes");
+   bool allNoPos = true;
+   for (const Patch::NodeRecord& n : data.nodes)
+      allNoPos = allNoPos && !n.hasPos && n.x == 0.0f && n.y == 0.0f;
+   check(allNoPos, "pos-less nodes must read hasPos=false at 0,0 (reader must not invent positions)");
+   check(PatchLayout::NeedsLayout(data), "NeedsLayout must be true for an all-pos-less patch");
+
+   auto rec = [&](int index) -> const Patch::NodeRecord&
+   {
+      for (const Patch::NodeRecord& n : data.nodes)
+         if (n.index == index)
+            return n;
+      return data.nodes.front();
+   };
+   check(rec(9).layoutHint == "band Picture" && rec(8).layoutHint == "near blur" && rec(1).layoutHint.empty(),
+         "# band / # near hints must attach to the next node block only");
+
+   // --canonicalize stability: Read -> Write is byte-identical to a pre-layout
+   // build, i.e. pos-less nodes still come out as `pos 0 0`.
+   {
+      Patch::Data copy = data;
+      check(Patch::Write(rt, copy, err), "Write of the pos-less data");
+      std::ifstream f(rt);
+      std::string text((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+      size_t zeros = 0, at = 0;
+      while ((at = text.find("  pos 0 0\n", at)) != std::string::npos) { zeros++; at += 1; }
+      check(zeros == 9, "canonicalize must keep writing `pos 0 0` for pos-less nodes");
+      check(PatchLayout::NeedsLayout(data), "Write must not consume or alter the pos-less state");
+   }
+
+   const std::map<int, PatchLayout::Pos> pos = PatchLayout::Compute(data);
+   check(pos.size() == 9, "every node gets a position");
+
+   // No two rectangles overlap.
+   int overlaps = 0;
+   for (const Patch::NodeRecord& a : data.nodes)
+      for (const Patch::NodeRecord& b : data.nodes)
+      {
+         if (a.index >= b.index)
+            continue;
+         const PatchLayout::Size sa = PatchLayout::EstimateSize(a), sb = PatchLayout::EstimateSize(b);
+         const PatchLayout::Pos pa = pos.at(a.index), pb = pos.at(b.index);
+         if (pa.x < pb.x + sb.w && pb.x < pa.x + sa.w && pa.y < pb.y + sb.h && pb.y < pa.y + sa.h)
+            overlaps++;
+      }
+   check(overlaps == 0, "no two nodes may overlap");
+
+   check(pos.at(1).x < pos.at(2).x && pos.at(2).x < pos.at(3).x, "picture chain runs left to right by wiring depth");
+   check(pos.at(6).x < pos.at(7).x, "arpeggiator sits left of the synth it feeds");
+   check(pos.at(1).y < pos.at(7).y && pos.at(7).y < pos.at(4).y, "bands stack Picture, Sound, Modulation");
+   check(pos.at(4).y == pos.at(5).y && pos.at(4).x < pos.at(5).x, "modulators lay out as one row");
+   check(pos.at(8).x == pos.at(2).x && pos.at(8).y + 100.0f < pos.at(2).y, "`# near blur` comment sits above blur");
+   check(pos.at(9).y < pos.at(1).y, "`# band Picture` comment heads the band");
+
+   // A measured size beats the estimate: widen the shape and its column
+   // neighbour must move right by the difference.
+   {
+      std::map<int, PatchLayout::Size> measured;
+      measured[1] = { 2000.0f, 300.0f };
+      const std::map<int, PatchLayout::Pos> wide = PatchLayout::Compute(data, &measured);
+      check(wide.at(2).x >= pos.at(2).x + 1600.0f, "a measured width must push the next column right");
+      measured[1] = { 0.0f, 0.0f };
+      const std::map<int, PatchLayout::Pos> same = PatchLayout::Compute(data, &measured);
+      check(same.at(2).x == pos.at(2).x, "a zero measurement must fall back to the estimate");
+   }
+
+   // Apply -> save -> load keeps the layout and is then never re-laid-out.
+   {
+      Patch::Data placed = data;
+      check(PatchLayout::Apply(placed), "Apply on a pos-less patch");
+      check(!PatchLayout::NeedsLayout(placed), "Apply marks every node hasPos");
+      check(!PatchLayout::Apply(placed), "Apply is a no-op the second time");
+      check(Patch::Write(rt, placed, err), "Write of the laid-out data");
+      Patch::Data back;
+      check(Patch::Read(rt, back, err), "Read of the laid-out file");
+      check(!PatchLayout::NeedsLayout(back), "a saved layout reads back with pos");
+      bool same = back.nodes.size() == placed.nodes.size();
+      for (size_t i = 0; same && i < back.nodes.size(); ++i)
+         same = std::fabs(back.nodes[i].x - placed.nodes[i].x) < 0.01f && std::fabs(back.nodes[i].y - placed.nodes[i].y) < 0.01f;
+      check(same, "positions survive Write -> Read");
+   }
+
+   // One node with a pos line means the author placed things: leave it alone.
+   {
+      Patch::Data mixed = data;
+      mixed.nodes[1].hasPos = true;
+      check(!PatchLayout::NeedsLayout(mixed), "a patch with any pos record is never auto-laid-out");
+      check(!PatchLayout::NeedsLayout(Patch::Data()), "an empty patch needs no layout");
+   }
+   // GUI-built records (undo snapshots, copy/paste) default to hasPos.
+   check(Patch::NodeRecord().hasPos, "NodeRecord defaults to hasPos so GUI snapshots are never re-laid-out");
+
+   std::remove(src.c_str());
+   std::remove(rt.c_str());
+   if (fails == 0)
+      printf("PATCHLAYOUTTEST OK\n");
+   return fails == 0 ? 0 : 1;
+}
+
 // Fills the bench report's four xrun fields as "since `base`" - each bench
 // window baselines the counters at its start so device-open settling does
 // not count against the run. audioXruns (deadline + os) is the gated number.
@@ -71687,6 +71933,8 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_SYPHONPATCHTEST") != nullptr)
       return RunSyphonPatchTest();
+   if (getenv("INFINITE_PATCHLAYOUTTEST") != nullptr)
+      return RunPatchLayoutTest();
 
 #if defined(__linux__)
    if (getenv("INFINITE_CAMERACONVTEST") != nullptr)
@@ -86665,6 +86913,69 @@ int main(int argc, char** argv)
          glfwSetWindowShouldClose(window, GLFW_TRUE);
       }
 
+      // Live half of PATCHLAYOUTTEST: a pos-less file opened through the real
+      // loader must come out laid out from drawn sizes - nothing stacked at 0,0,
+      // no overlapping boxes, the picture chain ordered by wiring depth.
+      if (getenv("INFINITE_PATCHLAYOUTLIVETEST") != nullptr)
+      {
+         static std::string layoutPath;
+         if (frameId == 3)
+         {
+            layoutPath = TmpPath("infinite_patchlayout_live.inf");
+            std::ofstream f(layoutPath);
+            f << "infinite-patch 1\n"
+                 "node 1 Source Shape\n  id shape\nend\n"
+                 "node 2 Utility Output\n  id out\nend\n"
+                 "node 3 Source Shape\n  id shape2\nend\n"
+                 "node 4 Modulators LFO\nend\n"
+                 "cable out 0 shape\n";
+            f.close();
+            const bool opened = LoadPatchFrom(layoutPath);
+            printf("PATCHLAYOUTLIVETEST opened=%d nodes=%zu\n", opened ? 1 : 0, gNodes.size());
+         }
+         if (frameId == 20)
+         {
+            int fails = 0;
+            ed::EditorContext* prevEditor = ed::GetCurrentEditor();
+            ed::SetCurrentEditor(gEditor);
+            std::vector<std::pair<ImVec2, ImVec2>> boxes;
+            int atOrigin = 0;
+            ImVec2 shapePos(0, 0), outPos(0, 0);
+            // The Shape that feeds Output (the first one spawned: file order).
+            int shapeIndex = -1;
+            for (GraphNode& gn : gNodes)
+               if (gn.typeName == "Shape") { shapeIndex = gn.index; break; }
+            for (GraphNode& gn : gNodes)
+            {
+               const ImVec2 p = ed::GetNodePosition(gn.NodeId());
+               const ImVec2 sz = ed::GetNodeSize(gn.NodeId());
+               if (std::fabs(p.x) < 1.0f && std::fabs(p.y) < 1.0f)
+                  atOrigin++;
+               boxes.push_back({ p, ImVec2(p.x + sz.x, p.y + sz.y) });
+               if (gn.typeName == "Shape" && gn.index == shapeIndex)
+                  shapePos = p;
+               if (gn.typeName == "Output")
+                  outPos = p;
+            }
+            ed::SetCurrentEditor(prevEditor);
+            for (size_t i = 0; i < boxes.size(); ++i)
+               for (size_t j = i + 1; j < boxes.size(); ++j)
+                  if (boxes[i].first.x < boxes[j].second.x && boxes[j].first.x < boxes[i].second.x &&
+                      boxes[i].first.y < boxes[j].second.y && boxes[j].first.y < boxes[i].second.y)
+                  {
+                     printf("PATCHLAYOUTLIVETEST FAIL: nodes %zu and %zu overlap\n", i, j);
+                     fails++;
+                  }
+            if (gNodes.size() != 4) { printf("PATCHLAYOUTLIVETEST FAIL: expected 4 nodes, got %zu\n", gNodes.size()); fails++; }
+            if (atOrigin > 1) { printf("PATCHLAYOUTLIVETEST FAIL: %d nodes still at 0,0\n", atOrigin); fails++; }
+            if (!(shapePos.x < outPos.x)) { printf("PATCHLAYOUTLIVETEST FAIL: shape (%.0f) not left of output (%.0f)\n", shapePos.x, outPos.x); fails++; }
+            if (gPendingAutoLayout.active) { printf("PATCHLAYOUTLIVETEST FAIL: layout still pending at frame 20\n"); fails++; }
+            std::remove(layoutPath.c_str());
+            printf("PATCHLAYOUTLIVETEST %s\n", fails == 0 ? "OK" : "FAIL");
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
       if (getenv("INFINITE_ROUNDTRIPTEST") != nullptr && frameId == 4)
       {
          // Every node type that declares params must survive both paths that
@@ -99827,6 +100138,7 @@ int main(int argc, char** argv)
          gFieldGraphPendingUnpack = nullptr;
       }
       RunFieldGraphUnpackPhase2Tick();
+      RunAutoLayoutTick();
 
       // Dynamic pins, Phase 1 (build step 11, §5.5): trigger-pin edge
       // detection for every FieldGraphNode, polled once per frame right

@@ -126,6 +126,13 @@ namespace Patch
       std::string category;
       std::string typeName;
       float x = 0.0f, y = 0.0f;
+      // False only when the reader saw this node block with no `pos` line (a
+      // hand-written file); PatchLayout places those. True for everything the
+      // GUI builds, so undo/redo snapshots are never re-laid-out. Not written.
+      bool hasPos = true;
+      // `# near <id>` / `# band <name>` on the line before the node block (a
+      // Comment's placement hint for PatchLayout). Reader-only, not written.
+      std::string layoutHint;
       bool showParams = false;
       bool bypassed = false;
       bool showMiniViewport = false;
