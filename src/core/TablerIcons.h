@@ -377,38 +377,23 @@ namespace Tabler
       }
    }
 
-   // Metronome: a tapered body with a pendulum pivoting near its base. `swing`
-   // is -1..1 (0 = upright); +-1 tilts the rod about 26 degrees. The rod stands
-   // well clear of the body, like a real one, with its weight on the upper half.
+   // Metronome: a tapered body outline and one pendulum line, nothing else.
+   // `swing` is -1..1 (0 = upright); +-1 tilts the rod about 26 degrees.
    inline void DrawMetronome(ImDrawList* dl, ImVec2 center, float size, ImU32 col, float swing = 0.0f,
                              float customStroke = 0.0f)
    {
       if (!dl) return;
       const float s = size / 24.0f;
-      const float stroke = customStroke > 0.0f ? customStroke : ImMax(1.3f, 1.5f * s);
-      const float cap = stroke * 0.5f;
+      const float stroke = customStroke > 0.0f ? customStroke : ImMax(1.5f, 1.9f * s);
       auto P = [&](float x, float y) { return Point24(center, size, x, y); };
 
-      // Body: narrow top, wide base. Round dots at the corners soften the
-      // mitred joins ImGui gives a polyline.
-      const ImVec2 body[4] = { P(9.3f, 7.5f), P(14.7f, 7.5f), P(19.0f, 21.5f), P(5.0f, 21.5f) };
+      const ImVec2 body[4] = { P(9.3f, 6.5f), P(14.7f, 6.5f), P(19.0f, 21.5f), P(5.0f, 21.5f) };
       dl->AddPolyline(body, 4, col, ImDrawFlags_Closed, stroke);
-      for (const ImVec2& q : body)
-         dl->AddCircleFilled(q, cap, col, 8);
 
-      // Pendulum rod from the pivot, tilted by `swing`.
       const float a = ImClamp(swing, -1.0f, 1.0f) * 0.45f;
-      const float dx = sinf(a), dy = -cosf(a);
-      const ImVec2 pivot = P(12.0f, 18.5f);
-      const float len = 17.0f * s;
-      const ImVec2 tip(pivot.x + dx * len, pivot.y + dy * len);
-      dl->AddLine(pivot, tip, col, stroke);
-      dl->AddCircleFilled(pivot, cap, col, 8);
-      dl->AddCircleFilled(tip, cap, col, 8);
-
-      // Weight on the rod.
-      const float wt = 0.42f;
-      dl->AddCircleFilled(ImVec2(pivot.x + dx * len * wt, pivot.y + dy * len * wt), ImMax(1.5f, 2.0f * s), col, 16);
+      const ImVec2 pivot = P(12.0f, 19.0f);
+      const float len = 16.0f * s;
+      dl->AddLine(pivot, ImVec2(pivot.x + sinf(a) * len, pivot.y - cosf(a) * len), col, stroke);
    }
 
    inline void DrawTimeline(ImDrawList* dl, ImVec2 center, float size, ImU32 col, float customStroke = 0.0f)

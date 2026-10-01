@@ -76843,11 +76843,11 @@ int main(int argc, char** argv)
                ImVec4 iconCol = ImGui::GetStyleColorVec4(ImGuiCol_Text);
                if (!metronomeWasOn)
                   iconCol.w *= 0.78f;
-               // The pendulum swings with the transport: one extreme per beat,
-               // so every click lands at the end of a swing, as on a real one.
-               // Upright when off or while the transport is stopped.
+               // The pendulum flips side on every beat - a hard 0/1, no easing -
+               // so each click lands exactly as it snaps over. Upright when off
+               // or while the transport is stopped.
                const float swing = (metronomeWasOn && isTransportPlaying)
-                                      ? (float)std::cos(IM_PI * std::fmod(transport.Beats(), 2.0))
+                                      ? (((long long)std::floor(transport.Beats()) & 1) ? 1.0f : -1.0f)
                                       : 0.0f;
                const ImVec2 bmin = ImGui::GetItemRectMin();
                const ImVec2 bmax = ImGui::GetItemRectMax();
