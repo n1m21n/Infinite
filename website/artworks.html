@@ -2,225 +2,122 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0B0907">
   <title>Infinite — Artworks</title>
-  <meta name="description" content="A gallery of visuals, motion, and generative art made with Infinite — a real-time node-based audiovisual workstation for macOS and Windows.">
+  <meta name="description" content="A digital museum of visuals, motion and generative art made with Infinite, the free real-time node-based audiovisual workstation. Walk the hall, stand in the rotunda, or pan the wall.">
   <link rel="canonical" href="https://n1m21n.github.io/Infinite/artworks.html">
 
   <!-- Open Graph -->
   <meta property="og:title" content="Infinite — Artworks">
-  <meta property="og:description" content="A gallery of visuals, motion, and generative art made with Infinite.">
-  <meta property="og:image" content="https://n1m21n.github.io/Infinite/assets/screenshot.png">
+  <meta property="og:description" content="A digital museum of visuals, motion and generative art made with Infinite.">
+  <meta property="og:image" content="https://n1m21n.github.io/Infinite/assets/museum/05.jpg">
   <meta property="og:url" content="https://n1m21n.github.io/Infinite/artworks.html">
   <meta property="og:type" content="website">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Infinite — Artworks">
-  <meta name="twitter:description" content="A gallery of visuals, motion, and generative art made with Infinite.">
-  <meta name="twitter:image" content="https://n1m21n.github.io/Infinite/assets/screenshot.png">
+  <meta name="twitter:description" content="A digital museum of visuals, motion and generative art made with Infinite.">
+  <meta name="twitter:image" content="https://n1m21n.github.io/Infinite/assets/museum/05.jpg">
 
   <link rel="icon" type="image/png" href="assets/icon.png">
 
-  <!-- Fonts: Modern Creative Tech Stack (Geist) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="museum.css?v=2">
 
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "ImageGallery",
+    "name": "Infinite — Artworks",
+    "description": "Visuals, motion and generative art made with Infinite.",
+    "url": "https://n1m21n.github.io/Infinite/artworks.html",
+    "isPartOf": { "@type": "WebSite", "url": "https://n1m21n.github.io/Infinite/" }
+  }
+  </script>
 
-    html, body {
-      width: 100%;
-      min-height: 100vh;
-      background-color: #000;
-      color: #fff;
-      overflow-x: hidden;
-      font-family: 'Geist', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
+  <script type="importmap">
+  { "imports": { "three": "./vendor/three.module.min.js" } }
+  </script>
 
-    /* Seamless Borderless Artworks Grid */
-    .artworks-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 0;
-      width: 100vw;
-      min-height: 100vh;
-      padding: 0;
-      margin: 0;
-      border: none;
-      outline: none;
-      background: #000;
-    }
-
-    @media (min-width: 1600px) {
-      .artworks-grid {
-        grid-template-columns: repeat(5, 1fr);
-      }
-    }
-
-    @media (max-width: 1100px) {
-      .artworks-grid {
-        grid-template-columns: repeat(3, 1fr);
-      }
-    }
-
-    /* Mobile: Exactly 2 artworks per row */
-    @media (max-width: 768px) {
-      .artworks-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-    }
-
-    .art-cell {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 3 / 4;
-      overflow: hidden;
-      background: #0d0c0b;
-      margin: 0;
-      padding: 0;
-      border: none;
-      outline: none;
-      content-visibility: auto;
-      contain-intrinsic-size: 300px 400px;
-    }
-
-    .art-video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-      margin: 0;
-      padding: 0;
-      border: none;
-      outline: none;
-      background: #000;
-      transition: transform 0.35s ease;
-    }
-
-    .art-cell:hover .art-video {
-      transform: scale(1.03);
-    }
-
-    /* Subtle Floating Navigation Button */
-    .floating-back-btn {
-      position: fixed;
-      top: 18px;
-      left: 18px;
-      z-index: 1000;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(18, 16, 14, 0.75);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      color: rgba(255, 255, 255, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 9999px;
-      padding: 8px 15px;
-      font-size: 13px;
-      font-weight: 500;
-      text-decoration: none;
-      opacity: 0.65;
-      transition: opacity 0.25s ease, background 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
-      cursor: pointer;
-    }
-
-    .floating-back-btn:hover {
-      opacity: 1;
-      background: rgba(26, 23, 20, 0.95);
-      border-color: rgba(255, 255, 255, 0.3);
-      transform: translateY(-1px);
-      color: #fff;
-    }
-
-    .floating-back-btn svg {
-      width: 15px;
-      height: 15px;
-    }
-  </style>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZC4TYX1WCL"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-ZC4TYX1WCL');
+  </script>
 </head>
-<body>
+<body class="is-loading">
 
-  <!-- Floating Back Button to Return to Home -->
-  <a href="index.html" class="floating-back-btn" title="Back to Infinite">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="19" y1="12" x2="5" y2="12"></line>
-      <polyline points="12 19 5 12 12 5"></polyline>
-    </svg>
+  <h1 class="sr-only">Infinite — Artworks</h1>
+
+  <canvas id="stage" aria-label="Interactive 3D gallery of artworks made with Infinite"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <!-- Opening title -->
+  <div class="intro" id="intro" aria-hidden="true">
+    <div class="intro-eyebrow">Infinite</div>
+    <div class="intro-title">Artworks</div>
+    <div class="intro-bar"><i id="introBar"></i></div>
+  </div>
+
+  <!-- Chrome -->
+  <a href="index.html" class="chip back" title="Back to Infinite">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
     <span>Infinite</span>
   </a>
 
-  <!-- Pure Borderless Video Artworks Grid with Instant Poster & Smart Lazy Streaming -->
-  <main class="artworks-grid">
-    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_01.jpg" data-src="assets/artworks/artwork_01.mp4" loop muted playsinline preload="metadata"></video></div>
-    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_02.jpg" data-src="assets/artworks/artwork_02.mp4" loop muted playsinline preload="metadata"></video></div>
-    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_03.jpg" data-src="assets/artworks/artwork_03.mp4" loop muted playsinline preload="metadata"></video></div>
-    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_04.jpg" data-src="assets/artworks/artwork_04.mp4" loop muted playsinline preload="metadata"></video></div>
-    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_05.jpg" data-src="assets/artworks/artwork_05.mp4" loop muted playsinline preload="metadata"></video></div>
-    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_06.jpg" data-src="assets/artworks/artwork_06.mp4" loop muted playsinline preload="metadata"></video></div>
-    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_07.jpg" data-src="assets/artworks/artwork_07.mp4" loop muted playsinline preload="metadata"></video></div>
-    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_08.jpg" data-src="assets/artworks/artwork_08.mp4" loop muted playsinline preload="metadata"></video></div>
-    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_09.jpg" data-src="assets/artworks/artwork_09.mp4" loop muted playsinline preload="metadata"></video></div>
-    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_10.jpg" data-src="assets/artworks/artwork_10.mp4" loop muted playsinline preload="metadata"></video></div>
-    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_11.jpg" data-src="assets/artworks/artwork_11.mp4" loop muted playsinline preload="metadata"></video></div>
-    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_12.jpg" data-src="assets/artworks/artwork_12.mp4" loop muted playsinline preload="metadata"></video></div>
-    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_13.jpg" data-src="assets/artworks/artwork_13.mp4" loop muted playsinline preload="metadata"></video></div>
-    <div class="art-cell"><video class="art-video" poster="assets/artworks/posters/artwork_14.jpg" data-src="assets/artworks/artwork_14.mp4" loop muted playsinline preload="metadata"></video></div>
-  </main>
+  <div class="counter chip" id="counter" aria-live="polite"><span id="counterNo">01</span><em>/</em><span id="counterTotal">10</span></div>
 
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const videos = document.querySelectorAll('.art-video');
+  <nav class="modes" id="modes" aria-label="View">
+    <i class="thumb" id="modeThumb"></i>
+    <button data-mode="hall" class="on" aria-pressed="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4l6 5v6l-6 5zM21 4l-6 5v6l6 5z"/><rect x="9" y="9" width="6" height="6"/></svg>
+      <span>Hall</span>
+    </button>
+    <button data-mode="rotunda" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.2"/><path d="M12 3.5v2.6M12 17.9v2.6M3.5 12h2.6M17.9 12h2.6"/></svg>
+      <span>Rotunda</span>
+    </button>
+    <button data-mode="wall" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="7" height="9" rx="1"/><rect x="13" y="4" width="8" height="5" rx="1"/><rect x="13" y="12" width="8" height="8" rx="1"/><rect x="3" y="16" width="7" height="4" rx="1"/></svg>
+      <span>Wall</span>
+    </button>
+  </nav>
 
-      // Smart Intersection Observer for instant rendering, smooth scrolling, and zero lag
-      if ('IntersectionObserver' in window) {
-        const videoObserver = new IntersectionObserver((entries) => {
-          entries.forEach(entry => {
-            const video = entry.target;
-            if (entry.isIntersecting) {
-              // Load video source if not already loaded
-              if (!video.src && video.dataset.src) {
-                video.src = video.dataset.src;
-                video.load();
-              }
-              const playPromise = video.play();
-              if (playPromise !== undefined) {
-                playPromise.catch(() => {});
-              }
-            } else {
-              // Pause when out of view to save battery & CPU/GPU
-              if (video.src) {
-                video.pause();
-              }
-            }
-          });
-        }, {
-          rootMargin: '200px 0px',
-          threshold: 0.05
-        });
+  <p class="hint" id="hint"></p>
 
-        videos.forEach(v => videoObserver.observe(v));
-      } else {
-        // Fallback for older browsers
-        videos.forEach(v => {
-          if (v.dataset.src) v.src = v.dataset.src;
-          v.play().catch(() => {});
-        });
-      }
+  <!-- Close-up -->
+  <aside class="plaque" id="plaque" aria-live="polite">
+    <div class="plaque-no" id="plaqueNo">No. 01</div>
+    <div class="plaque-title" id="plaqueTitle">Untitled</div>
+    <div class="plaque-meta" id="plaqueMeta">Infinite, 2026</div>
+  </aside>
+  <div class="focus-ui" id="focusUi">
+    <button class="round" id="prevBtn" aria-label="Previous artwork"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <button class="round" id="nextBtn" aria-label="Next artwork"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+    <button class="round close" id="closeBtn" aria-label="Back to the gallery"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+  </div>
 
-      // Keyboard navigation: Escape key returns home
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-          window.location.href = 'index.html';
-        }
-      });
-    });
-  </script>
+  <!-- Crawlable / no-WebGL gallery (same pieces) -->
+  <section class="plain" id="plain" aria-label="Artworks">
+    <figure><img src="assets/museum/01.jpg" alt="Infinite artwork 1: a glitched water tower in a pastel landscape" loading="lazy" width="720" height="960"></figure>
+    <figure><img src="assets/museum/03.jpg" alt="Infinite artwork 2: a grayscale distorted sphere with warped text" loading="lazy" width="960" height="960"></figure>
+    <figure><img src="assets/museum/02.jpg" alt="Infinite artwork 3: a portrait tiled and mirrored in electric blue" loading="lazy" width="720" height="960"></figure>
+    <figure><img src="assets/museum/06.jpg" alt="Infinite artwork 4: a mushroom and fairy in glowing neon pattern on black" loading="lazy" width="720" height="960"></figure>
+    <figure><img src="assets/museum/04.jpg" alt="Infinite artwork 5: a dodecahedron of text above green hills" loading="lazy" width="720" height="960"></figure>
+    <figure><img src="assets/museum/05.jpg" alt="Infinite artwork 6: pink and orange glitched collage with bold type" loading="lazy" width="720" height="960"></figure>
+    <figure><img src="assets/museum/07.jpg" alt="Infinite artwork 7: a checkerboard warp with chrome shapes" loading="lazy" width="720" height="960"></figure>
+    <figure><img src="assets/museum/08.jpg" alt="Infinite artwork 8: a red halftone face with blue beads" loading="lazy" width="720" height="960"></figure>
+    <figure><img src="assets/museum/09.jpg" alt="Infinite artwork 9: a glitched olive landscape with a pale sphere" loading="lazy" width="720" height="960"></figure>
+    <figure><img src="assets/museum/10.jpg" alt="Infinite artwork 10: a rainbow spiral with the words distortion is sexy" loading="lazy" width="720" height="960"></figure>
+  </section>
+
+  <script type="module" src="museum.js?v=4"></script>
 </body>
 </html>
