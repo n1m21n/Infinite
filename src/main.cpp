@@ -101077,7 +101077,8 @@ int main(int argc, char** argv)
       // then once from a 2.5 s start. Before the gesture clock followed
       // Transport offline, rotation stair-stepped on the wall dt and the
       // two 30 fps runs disagreed.
-      if (getenv("INFINITE_OFFLINECLOCKTEST") != nullptr && frameId == 1)
+      static bool offlineClockDone = false;
+      if (getenv("INFINITE_OFFLINECLOCKTEST") != nullptr && frameId >= 1 && !offlineClockDone)
       {
          Modulation& mod = Modulation::Instance();
          GestureRecorder& rec = GestureRecorder::Instance();
@@ -101093,6 +101094,15 @@ int main(int argc, char** argv)
             if (ref.name == "rotation") rotParam = ref.paramIndex;
          }
          const bool resolved = sizeXParam >= 0 && sizeYParam >= 0 && rotParam >= 0;
+         // The Shape registers its controls only on a frame that draws its
+         // params; under load that frame can slip past frame 1 (a full driver
+         // run saw "params -1,-1,-1"). Retry each frame up to the last one the
+         // driver gives us, and only then report the failure.
+         if (!resolved && frameId < 6)
+            ;
+         else
+         {
+         offlineClockDone = true;
          if (resolved)
          {
             mod.Bind(gNodes[0].index, sizeXParam, gNodes[2].index);
@@ -101157,6 +101167,7 @@ int main(int argc, char** argv)
                 sizeXParam, sizeYParam, rotParam, (int)moving, sameRuns ? "identical" : "DIFFERENT",
                 worstRate, worstRamp, worstStart);
          printf("%s\n", ok ? "OFFLINE CLOCK OK" : "OFFLINE CLOCK FAIL");
+         }
       }
 
       // A gesture loop (Shift-drag recording) on a node whose body is skipped -
