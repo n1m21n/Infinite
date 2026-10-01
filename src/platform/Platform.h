@@ -944,7 +944,10 @@ namespace Platform
                                  const std::string& audioPath = std::string(),
                                  bool loopAudio = true,
                                  double liveAudioSampleRate = 0.0,
-                                 int liveAudioChannels = 2);
+                                 int liveAudioChannels = 2,
+                                 bool proRes4444 = false);
+   // proRes4444 writes Apple ProRes 4444 with the frame's alpha kept (a .mov
+   // only). macOS only: the other platforms refuse it through outError.
    // `pixels` is BGRA8 bottom-up by default - the GPU's native glReadPixels
    // format (GL_BGRA/GL_UNSIGNED_INT_8_8_8_8_REV) on essentially all desktop
    // GPUs, which turns the readback into a straight blit instead of a

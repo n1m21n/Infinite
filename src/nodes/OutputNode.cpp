@@ -132,7 +132,7 @@ bool OutputNode::StartRecording(const std::string& path)
 
    std::string error;
    mRecorder = Platform::RecorderStart(path, mRecordW, mRecordH, mRecordFps, error,
-                                       audioPath, audioLoop, liveAudioSampleRate, 2);
+                                       audioPath, audioLoop, liveAudioSampleRate, 2, recordProRes4444);
    if (mRecorder == nullptr)
    {
       mCaptureRing.enabled.store(false, std::memory_order_relaxed);
@@ -346,7 +346,7 @@ bool OutputNode::StartOfflineRender(const std::string& path, double audioSampleR
 
    std::string error;
    mOfflineRecorder = Platform::RecorderStart(path, mOfflineRecordW, mOfflineRecordH, mOfflineRecordFps, error,
-                                              audioPath, audioLoop, liveAudioSampleRate, 2);
+                                              audioPath, audioLoop, liveAudioSampleRate, 2, recordProRes4444);
    if (mOfflineRecorder == nullptr)
    {
       mCaptureRing.enabled.store(false, std::memory_order_relaxed);

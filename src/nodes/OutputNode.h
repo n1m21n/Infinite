@@ -129,6 +129,8 @@ public:
    int videoFormat = 0; // 0 = .mp4, 1 = .mov
    std::string exportImagePath;
    std::string recordVideoPath;
+   // Headless --codec prores4444: write ProRes 4444 with alpha. Never saved.
+   bool recordProRes4444 = false;
 
    // --- offline render (non-realtime export) ---
    // A second, fully separate capture path from the live recorder above: the
