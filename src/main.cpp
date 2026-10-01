@@ -71845,6 +71845,20 @@ int main(int argc, char** argv)
    }
 #endif
 
+   // One Infinite per user on Windows/Linux: `Infinite song.inf` while the app is
+   // already open hands the file to it and exits (macOS does this through Launch
+   // Services). Dev harnesses that set INFINITE_EXITAFTER, and headless jobs, are
+   // exempt so a test run never talks to the app someone has open.
+   if (!HeadlessJobActive() && getenv("INFINITE_EXITAFTER") == nullptr && getenv("INFINITE_NO_SINGLE_INSTANCE") == nullptr)
+   {
+      std::string openArg;
+      if (argc > 1 && argv[1] != nullptr && argv[1][0] != '-' &&
+          HasExtension(argv[1], std::vector<std::string> { "inf", "infinite" }))
+         openArg = argv[1];
+      if (!Platform::ForwardOpenToRunningInstance(openArg))
+         return 0;
+   }
+
    const double tPreWindow = Bench::ScopedStageTimer::NowMs();
    Platform::InitDocumentHandlingPreGlfw();
    if (!glfwInit())
@@ -75204,6 +75218,7 @@ int main(int argc, char** argv)
             continue;
          LoadPatchFrom(pendingOpenPatch);
          gRequestFitView = true;
+         glfwRequestWindowAttention(window); // a second launch asked for this file; surface the window
       }
 
       // Device-change/sleep-wake self-healing (docs/plans/optimization/

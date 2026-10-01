@@ -1125,6 +1125,13 @@ namespace Platform
    void InitDocumentHandlingPostGlfw();
    bool PollPendingOpenFile(std::string& outPath);
 
+   // Single-instance launch. Call once at startup, before creating the window.
+   // Returns true when this process should carry on as the app; false when a
+   // running Infinite has been handed `patchPath` and this one should exit.
+   // macOS always returns true: Launch Services already routes a second open to
+   // the running app (see PollPendingOpenFile).
+   bool ForwardOpenToRunningInstance(const std::string& patchPath);
+
    // ---- live camera input (for Video In node) -----------------------------
    struct CameraDeviceInfo
    {
