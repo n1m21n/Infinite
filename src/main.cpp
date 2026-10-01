@@ -104,6 +104,7 @@ namespace
 
 #include "core/NodeFactory.h"
 #include "core/CategoryColors.h"
+#include "core/UiScale.h"
 #include "core/GLUtil.h"
 #include "core/GraphNode.h"
 #include "core/FilterDefs.h"
@@ -72265,13 +72266,15 @@ int main(int argc, char** argv)
       glfwGetWindowContentScale(window, &xscale, &yscale);
       const float baseSize = 15.0f;
       const float bakeScale = xscale * manualScale;
-#if defined(_WIN32)
-      const float displayScale = 1.0f;
-      styleScale = xscale * manualScale;
-#else
-      const float displayScale = 1.0f / xscale;
-      styleScale = manualScale;
-#endif
+      int winW = 0, winH = 0, fbW = 0, fbH = 0;
+      glfwGetWindowSize(window, &winW, &winH);
+      glfwGetFramebufferSize(window, &fbW, &fbH);
+      // Decided by the framebuffer, not the OS: Linux X11 is pixel-for-pixel like Windows
+      // (it used to take the macOS branch and stay at 15 px on a hi-DPI monitor), while
+      // Wayland is point-based like macOS. See core/UiScale.h.
+      const UiScale::Result uiScaleResult = UiScale::Resolve(xscale, winW, fbW, manualScale);
+      const float displayScale = uiScaleResult.displayScale;
+      styleScale = uiScaleResult.styleScale;
       const std::string bundledInter = BundledResourcePath("fonts/Inter-Regular.ttf");
       const char* candidates[] = {
          bundledInter.c_str(),
