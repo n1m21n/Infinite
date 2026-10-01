@@ -51,6 +51,8 @@ Infinite features **140+ modular node types**:
 
 The full catalogue, including every node's pins and parameters, is in the [Node Reference Manual](Infinite_Node_Reference_Manual.pdf).
 
+Infinite also renders headless, with no window: pictures, video and sound straight from a `.inf` text file on the command line. See the [Headless User Guide](docs/headless/Infinite_Headless_User_Guide.pdf) ([Markdown](docs/headless/GUIDE.md)).
+
 ![Infinite Modular Node Graph](docs/nodegraph.png)
 
 ---

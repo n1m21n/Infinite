@@ -222,13 +222,17 @@ CHAPTERS = [
         "num": "Twenty-Four",
         "n": 24,
         "title": "Loops, Learning & Listening",
-        "intro": "A live audio looper, three new audio effects, a level meter, two modulator helpers, and the Prediction family: nodes that listen to what you play, learn your habits, and carry on in the same style. "
+        "intro": "A live audio looper, a 16-pad sample player, three new audio effects, a level meter, two modulator helpers, and the Prediction family: nodes that listen to what you play, learn your habits, and carry on in the same style. "
                  "The learning nodes keep what they learn (some of it is saved with the patch), so a good take can be reused.",
         "cards": [
             ("Looper", "SYNTHS · AUDIO OUT",
              "A live audio looper. Wire in the sound, press Rec, and the take ends on its own after the take length and then loops. Play restarts it, Dub layers new sound over it, and Clear empties it. Take length can be a musical division, or free. Every take is shifted by your audio interface's measured latency, so a loop played in time sits on the grid. The loop is kept in memory (up to 60 seconds) and is not saved with the patch.",
              "record a one-bar drum pattern, then Dub a bassline on top of it.",
              ["Audio File", "Looper", "Audio Out"]),
+            ("MPC", "SYNTHS · AUDIO OUT",
+             "A 16-pad sample player in the spirit of an MPC. Each pad holds one sample and one play mode: One shot plays the whole sample, Gate plays while the pad is held, and Loop toggles a looping playback on and off. Hit pads with the mouse, with a MIDI controller, or with notes 36 to 51 on the note input, the usual pad-controller layout. Every pad is its own voice with its own volume, pitch, pan, speed, fine tune and fades, and a pad can be Synced to a musical division so a hit waits for the next grid line. All pads mix to one stereo output.",
+             "load a kick, snare and hat on three pads and play them from a MIDI pad controller through a MIDI Notes node.",
+             ["MIDI Notes", "MPC", "Audio Out"]),
             ("Resonator Bank", "AUDIOEFFECTS · IN/OUT",
              "Up to 16 band-pass resonators running side by side, forming a tuned bank of ringing filters, including a metallic tuning mode. Feed it noise or drums and it rings like a struck bell or plate.",
              "push a drum loop through it in metallic mode for a gamelan-style shimmer.",
