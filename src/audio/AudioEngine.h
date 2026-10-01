@@ -10,6 +10,7 @@
 #include "AudioNode.h"
 #include "CompensationDelay.h"
 #include "SamplePreviewPlayer.h"
+#include "Metronome.h"
 
 // Ceilings shared by the topology builder (main.cpp's RebuildAudioTopology)
 // and the engine's buffer pool. kAudioMaxNodeInputs is Mixer's 8-in ceiling
@@ -158,6 +159,16 @@ public:
    // mixing it in after RunTopology.
    SamplePreviewPlayer& Preview() { return mPreviewPlayer; }
 
+   // Turbo: the "direct" metronome - mixed into the device output after the
+   // graph (like the preview), so it needs no cable and never shows up in an
+   // Audio Out recording. Main thread sets, audio thread reads.
+   void SetDirectClick(bool enabled, float volume, bool accent)
+   {
+      mDirectClickVolume.store(volume, std::memory_order_relaxed);
+      mDirectClickAccent.store(accent, std::memory_order_relaxed);
+      mDirectClick.store(enabled, std::memory_order_relaxed);
+   }
+
 private:
    AudioEngine() = default;
 
@@ -223,4 +234,9 @@ private:
    int mRequestedBufferFrames = 0;
 
    SamplePreviewPlayer mPreviewPlayer;
+
+   std::atomic<bool> mDirectClick { false };
+   std::atomic<float> mDirectClickVolume { 0.5f };
+   std::atomic<bool> mDirectClickAccent { true };
+   MetronomeClick mDirectClickGen; // audio thread only
 };

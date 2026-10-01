@@ -3,7 +3,7 @@
 [![Original project](https://img.shields.io/badge/original-n1m21n%2FInfinite-181717?logo=github)](https://github.com/n1m21n/Infinite)
 [![Discord](https://img.shields.io/badge/Discord-Infinite-5865F2?logo=discord&logoColor=white)](https://discord.gg/wpKdexvhn)
 
-**Current version: 0.42.0-turbo** (shown in the window title and in the FILE menu, with the build date).
+**Current version: 0.42.2-turbo** (shown in the window title and in the FILE menu, with the build date).
 
 Infinite-Turbo is a **mod of Infinite**, the node-based audiovisual modular workstation by Naman Soni (realtime image and video processing, procedural 3D, audio synthesis, DSP, VST3 hosting, MIDI, OSC and cross-domain CV modulation). It is unofficial and Windows-only.
 

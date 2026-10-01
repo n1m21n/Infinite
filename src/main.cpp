@@ -3876,6 +3876,8 @@ namespace
          return false;
       if (dynamic_cast<VideoSourceNode*>(node) != nullptr || dynamic_cast<VmpcNode*>(node) != nullptr)
          return outputIndex == 1;
+      if (dynamic_cast<TransportControlNode*>(node) != nullptr)
+         return outputIndex == 4; // 0..3 are modulators, 4 is the metronome
       return true;
    }
 
@@ -4411,6 +4413,8 @@ namespace
          audio->ReloadFromPath();
       if (auto* sampler = dynamic_cast<SamplerNode*>(node))
          sampler->ReloadFromPath();
+      if (auto* looper = dynamic_cast<LooperNode*>(node))
+         looper->ReloadFromState();
       if (auto* slicer = dynamic_cast<SlicerNode*>(node))
          slicer->ReloadFromPath();
       if (auto* molder = dynamic_cast<MolderNode*>(node))
@@ -17538,7 +17542,10 @@ namespace
       }
       else if (st == LooperNode::kArmed)
       {
-         dl->AddText(ImVec2(o.x + 10.0f, o.y + h * 0.5f - 7.0f), col, "armed - waiting for the next grid line");
+         char armed[96];
+         snprintf(armed, sizeof(armed), "armed - starts on the next %s in %.2f s",
+                  n->lengthMode == LooperNode::kLengthSubBar ? "sub-bar" : "bar", n->ArmedSeconds());
+         dl->AddText(ImVec2(o.x + 10.0f, o.y + h * 0.5f - 7.0f), col, armed);
       }
       else if (n->HasLoop())
       {
@@ -17601,6 +17608,47 @@ namespace
 
          if (ModTriggerButton("CLEAR##looperClear", size))
             n->Clear();
+
+         // Layer history + export (Turbo). UNDO/REDO have CV pins too.
+         const ImVec2 small(bw, 24.0f);
+         const bool canUndo = n->CanUndoLayer();
+         const bool canRedo = n->CanRedoLayer();
+         if (!canUndo)
+            ImGui::BeginDisabled();
+         if (ModTriggerButton("UNDO##looperUndo", small))
+            n->UndoLayer();
+         if (!canUndo)
+            ImGui::EndDisabled();
+         ImGui::SameLine();
+         if (!canRedo)
+            ImGui::BeginDisabled();
+         if (ModTriggerButton("REDO##looperRedo", small))
+            n->RedoLayer();
+         if (!canRedo)
+            ImGui::EndDisabled();
+         ImGui::SameLine();
+         const bool canExport = n->HasLoop() && !n->IsRecordingOrArmed();
+         if (!canExport)
+            ImGui::BeginDisabled();
+         if (ImGui::Button("EXPORT WAV##looperExport", ImVec2(2.0f * bw + spacing, small.y)))
+         {
+            StartNodeFileDialog(n, []() { return Platform::SaveAudioDialog("loop.wav"); },
+                                [](LooperNode* m, const std::string& path) {
+                                   std::string error;
+                                   m->ExportWav(path, error);
+                                });
+         }
+         if (!canExport)
+            ImGui::EndDisabled();
+         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("write the loop (all layers summed) to a 32-bit float WAV");
+         if (n->HistoryCount() > 1 || !n->StatusText().empty())
+         {
+            if (!n->StatusText().empty())
+               ImGui::TextDisabled("layer %d/%d  -  %s", n->HistoryIndex(), n->HistoryCount() - 1, n->StatusText().c_str());
+            else
+               ImGui::TextDisabled("layer %d/%d", n->HistoryIndex(), n->HistoryCount() - 1);
+         }
       }
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
@@ -19137,6 +19185,23 @@ namespace
          ImGui::EndDisabled();
          row.Checkbox("drive##tcMeterDrive", &n->driveMeter);
          row.Skip();
+         row.End();
+      }
+      EndAudioSection();
+
+      // Metronome: `direct` mixes it straight into the device output (no
+      // cable, not in recordings); the `click` output pin sends it into the
+      // graph for routing through a mixer / Audio Out.
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      BeginAudioSection("metronome");
+      {
+         AudioKnobRow row(4, kKnobSmall);
+         row.Checkbox("click##tcClick", &n->click);
+         ImGui::BeginDisabled(!n->click);
+         row.Knob("volume", &n->clickVolume, 0.0f, 1.0f, "%.2f");
+         ImGui::EndDisabled();
+         row.Checkbox("direct##tcClickDirect", &n->clickDirect);
+         row.Checkbox("accent##tcClickAccent", &n->clickAccent);
          row.End();
       }
       EndAudioSection();
@@ -22778,7 +22843,7 @@ namespace
          { "Macro XY", "A 2D pad exposing X and Y as two separate modulator outputs from one drag. The pad's path can be recorded, looped and replayed in time, like Resynthesize's orb." },
          { "Keyboard", "A hardware-free note source: click-and-drag the on-screen piano, or hover the node and type on your laptop keyboard (Logic/GarageBand's Musical Typing layout - ZXCVBNM... is one octave, QWERTY... the octave above) to test a patch with no MIDI controller at all." },
          { "Chord Progression", "Plays a looped chord progression locked to the transport. Click a slot to select a chord, click the keys to set its notes (or pick a root and quality and press set; inv moves the lowest note up an octave), and set how many bars it lasts. chords sets how many slots play, octave moves the keyboard, transpose shifts the whole progression, gate shortens each chord (1 = legato), and bass adds the lowest note an octave down. sets key makes each chord set the global key and a matching scale, so key-aware nodes follow the progression. play sets how each chord is played: block, strum up/down (strum = ms between notes), arp up/down/up-down/random (one note per rate step, over 1-3 octaves), pulse (the whole chord re-struck every step), alberti (low-high-middle-high) and bass + chord (oom-pah); gate is the fraction of the chord in block/strum and of each step in the stepped modes. Patch the note output into any synth or plugin instrument." },
-         { "Transport Control", "Drives the global transport without the mouse. Every control is a pin: patch an LFO, a Macro, a MIDI CC (or use MIDI learn) into bpm, key, scale or the meter, and a Macro Trigger or MIDI pad into PLAY/STOP/REWIND/TAP. A section only takes over while its drive switch is on; off, its controls follow the live transport. glide ramps tempo changes (accelerando/ritardando), MIDI clock follows an external clock, on bar holds a key/scale change until the next bar. T taps tempo while the pointer is over the node. AUDIO starts/stops the audio engine (audio on open starts it whenever this patch is opened). Outputs: beat and bar are 0..1 ramps locked to the transport, bpm is the tempo mapped 20..300 to 0..1, play is 1 while playing." },
+         { "Transport Control", "Drives the global transport without the mouse. Every control is a pin: patch an LFO, a Macro, a MIDI CC (or use MIDI learn) into bpm, key, scale or the meter, and a Macro Trigger or MIDI pad into PLAY/STOP/REWIND/TAP. A section only takes over while its drive switch is on; off, its controls follow the live transport. glide ramps tempo changes (accelerando/ritardando), MIDI clock follows an external clock, on bar holds a key/scale change until the next bar. T taps tempo while the pointer is over the node. AUDIO starts/stops the audio engine (audio on open starts it whenever this patch is opened). Metronome: click turns it on (a pin, so a MIDI pad or Macro Toggle can switch it), accent raises the first beat of the bar, direct plays it straight to the audio device with no cable (and keeps it out of recordings), and the click output sends it into the graph for a mixer or Audio Out. Outputs: beat and bar are 0..1 ramps locked to the transport, bpm is the tempo mapped 20..300 to 0..1, play is 1 while playing, click is the metronome audio." },
          { "Audio Meter", "A stereo level meter: separate L and R bars on a shared -60 to +3 dBFS scale, each showing RMS (solid) inside peak (faint), a peak-hold line, and the channel's highest peak as a number on top, which turns red once that channel has reached 0 dBFS. Audio passes through unchanged. It measures whatever its input is patched to even with its output left unconnected, so it can hang off any cable as a tap. Click the meter to clear the peak numbers, holds and clip." },
          { "Macro Slider", "A named fader exposed as a modulator - drag its output onto any slider's modulation pin to drive that parameter by hand. The plain 0..1 member of the Macro family; use Macro Knob when you want a response curve and invert as well." },
          { "Macro Bipolar Knob", "A centre-detent knob running -1 to +1, exposed as a modulator - the right control for anything that has a natural middle (pan, detune, tilt). Its 0..1 output puts the detent at exactly 0.5, which is also where a bipolar modulation binding reads as 'no modulation'." },
@@ -22809,7 +22874,7 @@ namespace
          { "Drum Sequencer", "An 8-lane, 8-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8x8 step grid. Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
          { "MPC", "16 sample pads (pad 1 bottom-left). Each pad has one sample and a play mode: one shot (plays the whole sample; a new hit restarts it), gate (plays while held, stops on release, restarts on the next hit) or loop (a hit toggles looping on/off; off rewinds). Click a pad to play and select it; the editor below loads a sample or a whole folder (first 16 audio files), sets the mode, volume, pitch and pan. Every pad has a CV pin (gate: high = held) for MIDI controllers, and the note input plays pads from the base note up (36-51 by default). The output is the master mix; an MPC Out node picks one pad for its own chain." },
          { "MPC Out", "Takes one pad's own stereo output from an MPC wired into its input, so a pad (a kick, a snare) can get its own effects. Anything that is not an MPC passes straight through." },
-         { "Looper", "A live looper on one audio input. REC starts a take (with sync on, it waits for the next bar or sub-bar line of the transport), PLAY starts/stops the loop, DUB layers the input over the loop while it plays, CLEAR empties it. Length: a number of bars, a fraction of a bar, or free (REC again ends the take). Playback forward, reverse or ping-pong, looping or once. thru is the input monitoring level, level the loop volume. Every button has a CV pin. Takes are shifted by the interface round-trip latency (auto, plus a manual offset in ms) so they land on the grid. Up to 120 s at 48 kHz." },
+         { "Looper", "A live looper on one audio input. REC starts a take (with sync on, it waits for the next bar or sub-bar line of the transport), PLAY starts/stops the loop, DUB layers the input over the loop while it plays, CLEAR empties it. Length: a number of bars, a fraction of a bar, or free (REC again ends the take). Playback forward, reverse or ping-pong, looping or once. thru is the input monitoring level, level the loop volume. Every button has a CV pin. Takes are shifted by the interface round-trip latency (auto, plus a manual offset in ms) so they land on the grid. A REC pressed up to 200 ms after a line still starts on that line. UNDO / REDO step through the takes and overdub layers (UNDO during an overdub closes and removes it). The loop is saved with the patch (a WAV in the Recordings folder) and EXPORT WAV writes the mix of all layers. Up to 120 s at 48 kHz." },
          { "Super Mixer", "A 16-channel mixer: per channel an input gain (+/-24 dB), a fader, pan, mute, solo and a 3-band EQ (low shelf 120 Hz, sweepable mid peak, high shelf 8 kHz, each +/-15 dB), plus a master fader. Every control has a CV pin." },
          { "Audio In", "Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch." },
          { "Audio Filter", "One filter, one of 12 types (LP/HP at 12/24/36 dB, BP, notch, shelves, peak, all-pass). Drag the handle on the response curve to set frequency and gain, scroll over it to change Q - the picture is the control." },
@@ -24449,6 +24514,8 @@ namespace
    void ApplyPatchData(const Patch::Data& data, bool applySceneSettings = false)
    {
       gSuppressUndoCheckpoints = true;
+      // Loopers respawned here re-adopt their loop audio by id (Turbo).
+      LooperNode::SetRestoringPatch(true);
       NewPatch();
 
       // Saved indices are remapped rather than reused: they only have to be
@@ -24640,6 +24707,7 @@ namespace
          gSuppressSettingsDirtyOnce = true;
       }
 
+      LooperNode::SetRestoringPatch(false);
       gSuppressUndoCheckpoints = false;
    }
 
@@ -41647,8 +41715,9 @@ int main(int argc, char** argv)
                continue;
             if (GraphNode* src = ownerOf((const void*)cable->GetSource()))
             {
-               const int audioOutput = (dynamic_cast<VideoSourceNode*>(src->node.get()) != nullptr ||
-                                        dynamic_cast<VmpcNode*>(src->node.get()) != nullptr) ? 1 : 0;
+               const int audioOutput = dynamic_cast<TransportControlNode*>(src->node.get()) != nullptr ? 4
+                                       : (dynamic_cast<VideoSourceNode*>(src->node.get()) != nullptr ||
+                                          dynamic_cast<VmpcNode*>(src->node.get()) != nullptr) ? 1 : 0;
                gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
                                   src->OutputPinId(audioOutput), gn.InputPinId(slot) });
             }

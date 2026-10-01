@@ -7,6 +7,7 @@
 #include "core/INode.h"
 
 class AudioLooperNode;
+struct LooperCore;
 
 // Infinite-Turbo: a live audio looper (RC-style) on one audio input.
 //
@@ -20,6 +21,20 @@ class AudioLooperNode;
 // thread owns the loop buffer (preallocated once, see AudioLooperNode) and
 // the whole record/play state machine. Every button goes through a
 // modulatable widget in main.cpp, so each has a CV pin for MIDI controllers.
+//
+// Turbo 0.42.2:
+// - Every buffer (two 120 s banks + a 1 s pre-roll) is allocated and
+//   prefaulted on the first frame after the node is inserted, and the audio
+//   thread keeps the pages warm, so the first take never pays page faults.
+// - A REC pressed slightly after a grid line (up to 200 ms or 1/4 of the
+//   grid) still starts the take ON that line, back-filled from the pre-roll.
+// - The loop lives in a LooperCore keyed by `loopId`: a whole-patch undo
+//   (which respawns every node) re-adopts it instead of losing the take.
+// - Each stable state (take done, overdub layer done, clear) is a history
+//   entry: UNDO / REDO walk the layers. The current state is also written
+//   to a 32-bit float WAV sidecar (`loopFile`, in the Recordings folder) so
+//   the take is back when the patch is reopened. EXPORT writes the mix of
+//   all layers to a WAV of your choice.
 class LooperNode : public INode, public IAudioSource
 {
 public:
@@ -50,6 +65,25 @@ public:
    void SetPlay(bool on);
    void SetOverdub(bool on);
    void Clear();
+   // Layer history (main thread). Undo while overdubbing first closes the
+   // layer, then removes it.
+   void UndoLayer();
+   void RedoLayer();
+   bool CanUndoLayer() const;
+   bool CanRedoLayer() const;
+   int HistoryIndex() const;
+   int HistoryCount() const;
+   // Writes the current loop (all layers summed) as a 32-bit float stereo WAV.
+   bool ExportWav(const std::string& path, std::string& error);
+   const std::string& StatusText() const { return mStatus; }
+   float ArmedSeconds() const { return mArmedSec; }
+
+   // Called by main.cpp's ReloadDerivedState after params were loaded:
+   // while a patch is being restored (file open, undo) the node re-adopts
+   // the loop with the same loopId (or loads loopFile); otherwise (paste,
+   // duplicate) it keeps its own identity and copies the source loop.
+   void ReloadFromState();
+   static void SetRestoringPatch(bool restoring);
 
    // Published by the audio thread, refreshed each CookIfNeeded.
    int CurrentState() const { return mState; }
@@ -81,10 +115,19 @@ public:
    float latencyOffsetMs = 0.0f; // -100..+300
    float CompensationMs() const { return mCompMs; }
 
+   // Identity of the loop audio across respawns, and its WAV sidecar.
+   std::string loopId;
+   std::string loopFile;
+
    AudioCable input;
 
 private:
-   std::unique_ptr<AudioLooperNode> mAudioNode;
+   void BindCore(const std::shared_ptr<LooperCore>& core);
+   AudioLooperNode* Audio() const;
+
+   std::shared_ptr<LooperCore> mCore;
+   std::string mStatus;
+   float mArmedSec = 0.0f;
    int mLastCookFrame = -1;
    int mState = kIdle;
    float mLengthSec = 0.0f;

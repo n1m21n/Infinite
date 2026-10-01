@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "core/INode.h"
@@ -19,10 +20,14 @@
 // Outputs (modulators, patch into any param): beat - a 0..1 ramp every beat;
 // bar - a 0..1 ramp every bar; bpm - tempo mapped 20..300 -> 0..1; play - 1
 // while the transport plays.
-class TransportControlNode : public INode, public IModulator
+class AudioTransportClickNode;
+
+class TransportControlNode : public INode, public IAudioSource
 {
 public:
    static INode* Create() { return new TransportControlNode(); }
+   TransportControlNode();
+   ~TransportControlNode() override; // turns the direct click off with the node
 
    unsigned int GetOutputTexture() override { return 0; }
    int GetOutputWidth() const override { return 0; }
@@ -30,8 +35,9 @@ public:
    void CookIfNeeded(int frameId) override;
    void VisitParams(ParamVisitor& v) override;
 
-   float Value01() override; // output 0 (beat)
-   int OutputCount() const override { return 4; }
+   // 0..3 modulators (beat, bar, bpm, play), 4 = the metronome as audio.
+   int OutputCount() const override { return 5; }
+   AudioNode* GetAudioNode() override;
    const char* OutputLabel(int index) const override;
    IModulator* ModulatorOutput(int index) override;
 
@@ -49,6 +55,12 @@ public:
 
    // audio
    bool audioOnOpen = false; // opening a patch with this on starts the audio engine
+
+   // metronome
+   bool click = false;        // on/off (a pin: MIDI pad, Macro Toggle...)
+   float clickVolume = 0.5f;  // 0..1
+   bool clickDirect = true;   // straight to the device output, no cable needed
+   bool clickAccent = true;   // higher click on the first beat of the bar
 
    // meter
    bool driveMeter = false;
@@ -78,11 +90,15 @@ private:
    OutTap mOutTaps[4];
    bool mTapsBound = false;
 
+   std::unique_ptr<AudioTransportClickNode> mAudioNode;
    int mLastCookFrame = -1;
    float mAppliedBpm = -1.0f;   // the gliding tempo actually sent to the transport
    double mLastCookTime = -1.0;
    double mTaps[8] = {};
    int mNumTaps = 0;
    bool mKeyPending = false;
+   bool mDirectSent = false;
+   float mDirectVolSent = -1.0f;
+   bool mDirectAccentSent = true;
    long long mPendingBar = 0;
 };

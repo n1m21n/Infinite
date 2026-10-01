@@ -1,5 +1,32 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.42.2-turbo (2026-10-01)
+
+### Looper
+- **No more late first take**: every buffer (two 120 s banks and a 1 s pre-roll) is allocated and
+  committed on the first frame after the node is inserted, and the audio thread keeps the pages
+  resident, so the first take never stalls on page faults.
+- **Late REC presses land on the grid**: with sync on, a REC pressed up to 200 ms (or 1/4 of the
+  grid) after a bar / sub-bar line starts the take on that line, back-filled from the pre-roll,
+  instead of waiting a whole bar. While armed, the strip shows how long until the take starts.
+- **The loop is saved with the project**: the current loop is written as a 32-bit float WAV in the
+  Recordings folder (`looper_<id>.wav`) and reloaded when the patch opens. A whole-patch undo no
+  longer wipes the loop either (the respawned node re-adopts it).
+- **UNDO / REDO of takes and overdub layers** (with CV pins). UNDO during an overdub closes the
+  layer and removes it; a new layer after an undo drops the redo branch. Up to 32 steps.
+- **EXPORT WAV**: writes the loop, all layers summed, to a 32-bit float stereo WAV.
+- Paste / duplicate of a Looper copies its loop into an independent looper.
+
+## 0.42.1-turbo (2026-10-01)
+
+### Metronome
+- **Transport Control has a metronome**: `click` on/off (a pin, so a MIDI pad or Macro Toggle can
+  switch it), `volume`, `accent` (higher click on the first beat of the bar). Plays while the
+  transport runs, locked to the same beat clock as the sequencers.
+- **Two routes**: `direct` mixes it straight into the audio device output, with no cable and
+  without touching any audio connection (and it stays out of Audio Out recordings); the new
+  `click` output pin sends it into the graph, for a mixer, an effect or an Audio Out.
+
 ## 0.42.0-turbo (2026-09-30)
 
 Tempo, key and scale stay with the project and can be driven without the mouse; wave B of the

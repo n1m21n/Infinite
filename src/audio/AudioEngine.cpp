@@ -353,6 +353,21 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
    // bypass/the transport) across a topology swap, and even with nothing
    // patched to an Audio Out.
    mPreviewPlayer.ProcessBlock(buffer);
+
+   // Turbo: direct metronome, after the graph and the preview.
+   {
+      Transport& transport = Transport::Instance();
+      if (mDirectClick.load(std::memory_order_relaxed) && transport.IsPlaying() && sampleRate > 0.0)
+      {
+         const double spb = sampleRate * 60.0 / std::max(1.0, (double)transport.Tempo());
+         mDirectClickGen.RenderAdd(buffers, std::min(numChannels, 2), numFrames, transport.Beats(), spb,
+                                   transport.BeatsPerBar(), sampleRate,
+                                   mDirectClickVolume.load(std::memory_order_relaxed),
+                                   mDirectClickAccent.load(std::memory_order_relaxed));
+      }
+      else
+         mDirectClickGen.Reset();
+   }
    const double topologyMs = NowMs() - topologyStartMs;
 
    if (sampleRate > 0.0)

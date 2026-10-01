@@ -503,6 +503,7 @@ namespace Platform
    std::string OpenModelDialog() { return RunFileDialog(false, false, L"Open 3D model", {{L"3D models", L"*.obj;*.ply;*.stl;*.fbx;*.gltf;*.glb;*.dae;*.3ds"}}); }
    std::string OpenPatchDialog() { return RunFileDialog(false, false, L"Open Infinite patch", {{L"Infinite patches", L"*.inf"}}); }
    std::string SavePatchDialog(const std::string& suggested) { return RunFileDialog(true, false, L"Save Infinite patch", {{L"Infinite patches", L"*.inf"}}, suggested); }
+   std::string SaveAudioDialog(const std::string& suggested) { return RunFileDialog(true, false, L"Export audio", {{L"WAV audio", L"*.wav"}}, suggested); }
    std::string SaveVideoDialog(const std::string& suggested, const std::string& initialDir)
    {
       return RunFileDialog(true, false, L"Save output video",

@@ -114,6 +114,8 @@ namespace Platform
    // Patch files. Save returns the chosen path, or "" if cancelled.
    std::string OpenPatchDialog();
    std::string SavePatchDialog(const std::string& suggestedName);
+   // Save As for audio exports (Looper); the path carries .wav.
+   std::string SaveAudioDialog(const std::string& suggestedName);
    // Native Save As dialog for the Output node. The returned path already
    // carries the selected .mp4/.mov extension, or is empty when cancelled.
    std::string SaveVideoDialog(const std::string& suggestedName,
