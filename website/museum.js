@@ -798,19 +798,21 @@ const bird = (() => {
     mesh.visible = vis > 0.01; mat.opacity = vis;
     if (!mesh.visible) return;
     const zFront = hall.zStart + 8, zBack = hall.lastZ - 3.4;
-    const A = 4.6;
-    const cz = clamp(cam.z - 5.5, zBack + A + 1, zFront - A - 1);   // patrols the stretch of hall in front of the visitor
+    const A = 2.6;
+    const cz = clamp(cam.z - 6.2, zBack + A + 1, zFront - A - 1);   // patrols the stretch of hall in front of the visitor
     u += dt * 2.4 / A;
     const z = cz + A * Math.sin(u);
-    const x = Math.sin(u * 3.3) * Math.min(view.W * 0.55, 1.5);
-    const y = 3.0 + Math.sin(u * 5.1) * 0.4;
+    const x = Math.sin(u * 3.3) * Math.min(view.W * 0.4, 1.0);
+    const y = 2.55 + Math.sin(u * 5.1) * 0.3;
     const dz = z - (prevZ ?? z); prevZ = z;
     if (Math.abs(dz) > 1e-4) face = damp(face, dz < 0 ? 1 : -1, 6, dt);   // the beak leads; flips smoothly at each turn
     bank = damp(bank, Math.cos(u * 5.1) * 0.12, 4, dt);
     mesh.position.set(x, y, z);
     mesh.quaternion.copy(camera.quaternion);
     mesh.rotateZ(bank * Math.sign(face || 1));
-    mesh.scale.x = BW * (Math.abs(face) < 0.12 ? 0.12 : face);
+    const bw = view.portrait ? BW * 0.85 : BW;
+    mesh.scale.y = bw * FH / FW;
+    mesh.scale.x = bw * (Math.abs(face) < 0.12 ? 0.12 : face);
     const f = Math.floor((now * 2.4 % 1) * NF) % NF;
     atlas.offset.set((f % 4) / 4, 0.5 - Math.floor(f / 4) / 2);
   };
