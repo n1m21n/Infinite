@@ -942,6 +942,22 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
    // bypass/the transport) across a topology swap, and even with nothing
    // patched to an Audio Out.
    mPreviewPlayer.ProcessBlock(buffer);
+   // The metronome sits after the graph for the same reason: it is not a node,
+   // so it never reaches an Audio Out recording. BlockStartBeats() is the
+   // block's first sample (Beats() has already advanced past it).
+   {
+      Transport& transport = Transport::Instance();
+      if (mMetronomeOn.load(std::memory_order_relaxed) && transport.IsPlaying() && sampleRate > 0.0)
+      {
+         const double samplesPerBeat = sampleRate * 60.0 / std::max(1.0, (double)transport.Tempo());
+         mMetronome.RenderAdd(buffers, std::min(numChannels, 2), numFrames, transport.BlockStartBeats(),
+                              samplesPerBeat, transport.BeatsPerBar(), sampleRate,
+                              mMetronomeVolume.load(std::memory_order_relaxed),
+                              mMetronomeAccent.load(std::memory_order_relaxed));
+      }
+      else
+         mMetronome.Reset();
+   }
    const double topologyMs = NowMs() - topologyStartMs;
 
    if (sampleRate > 0.0)

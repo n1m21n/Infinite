@@ -424,6 +424,14 @@ namespace
    // so it can be swapped for a flat neutral fill via Settings > Appearance.
    bool gCheckerboardBackdrop = true;
 
+   // Metronome (top bar, next to the time signature). Volume and the accent
+   // choice are machine settings; "on" is deliberately not saved, so the app
+   // never opens clicking.
+   bool gMetronomeOn = false;
+   float gMetronomeVolume = 0.5f;
+   bool gMetronomeAccent = true;
+   bool gMetronomeDirty = false; // settings file written once the drag ends
+
    void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, ImVec2 br, float rounding = 4.0f)
    {
       const bool isLight = IsThemeLight();
@@ -45963,6 +45971,10 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          gVsync = (line != "0");
       if (std::getline(file, line) && !line.empty())
          gCheckerboardBackdrop = (line != "0");
+      if (std::getline(file, line) && !line.empty())
+         gMetronomeVolume = std::clamp((float)atof(line.c_str()), 0.0f, 1.0f);
+      if (std::getline(file, line) && !line.empty())
+         gMetronomeAccent = (line != "0");
    }
 
    void SaveGeneralSettings()
@@ -45973,7 +45985,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       std::ofstream file(path);
       file << (gAutosaveEnabled ? "1" : "0") << "\n" << gAutosaveSeconds << "\n"
            << gTargetFps << "\n" << (gVsync ? "1" : "0") << "\n"
-           << (gCheckerboardBackdrop ? "1" : "0") << "\n";
+           << (gCheckerboardBackdrop ? "1" : "0") << "\n"
+           << gMetronomeVolume << "\n" << (gMetronomeAccent ? "1" : "0") << "\n";
    }
 
    // One flat preference file for the Canvas & Workspace settings tab.
@@ -76810,6 +76823,51 @@ int main(int argc, char** argv)
                   }
                }
             }
+         }
+
+         // Metronome: click toggles, right-click opens volume / accent. Sits
+         // in the Tempo & Meter group because it follows exactly those two.
+         TopBarSameLine(8.0f);
+         {
+            if (gMetronomeOn)
+               ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+            if (ImGui::Button("Click###metronomeBtn"))
+               gMetronomeOn = !gMetronomeOn;
+            if (gMetronomeOn)
+               ImGui::PopStyleColor();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
+               ImGui::SetTooltip("Metronome - click to turn on or off, right-click for volume.\n"
+                                 "Plays while the transport runs, on the beat of the tempo and time signature.\n"
+                                 "It goes to the audio device only: not into recordings or exports.");
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+               ImGui::OpenPopup("##metronomePopup");
+
+            if (ImGui::BeginPopup("##metronomePopup"))
+            {
+               // The top bar flattens every frame colour to transparent; a
+               // slider needs its real theme frame back to be findable.
+               const ImGuiStyle& base = ImGui::GetStyle();
+               ImGui::PushStyleColor(ImGuiCol_FrameBg, base.Colors[ImGuiCol_FrameBg]);
+               ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, base.Colors[ImGuiCol_FrameBgHovered]);
+               ImGui::PushStyleColor(ImGuiCol_FrameBgActive, base.Colors[ImGuiCol_FrameBgActive]);
+               ImGui::SetNextItemWidth(120.0f);
+               const bool volChanged = ImGui::SliderFloat("volume##metronomeVol", &gMetronomeVolume, 0.0f, 1.0f, "%.2f");
+               ImGui::PopStyleColor(3);
+               if (volChanged)
+                  gMetronomeDirty = true;
+               if (ImGui::Selectable("accent first beat", gMetronomeAccent, ImGuiSelectableFlags_DontClosePopups))
+               {
+                  gMetronomeAccent = !gMetronomeAccent;
+                  gMetronomeDirty = true;
+               }
+               ImGui::EndPopup();
+            }
+            if (gMetronomeDirty && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
+            {
+               SaveGeneralSettings();
+               gMetronomeDirty = false;
+            }
+            AudioEngine::Instance().SetMetronome(gMetronomeOn, gMetronomeVolume, gMetronomeAccent);
          }
 
          ImGui::Separator();

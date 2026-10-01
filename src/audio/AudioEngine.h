@@ -10,6 +10,7 @@
 #include "ClipPeakRing.h"
 #include "AudioNode.h"
 #include "CompensationDelay.h"
+#include "Metronome.h"
 #include "SamplePreviewPlayer.h"
 #include "../core/BenchReport.h"
 
@@ -480,6 +481,16 @@ public:
    // mixing it in after RunTopology.
    SamplePreviewPlayer& Preview() { return mPreviewPlayer; }
 
+   // The metronome: mixed into the device output after the graph and the
+   // preview, only while the transport plays. Main thread sets, audio thread
+   // reads; relaxed atomics because the three values are independent.
+   void SetMetronome(bool enabled, float volume, bool accent)
+   {
+      mMetronomeVolume.store(volume, std::memory_order_relaxed);
+      mMetronomeAccent.store(accent, std::memory_order_relaxed);
+      mMetronomeOn.store(enabled, std::memory_order_relaxed);
+   }
+
    // Live arrangement-clip waveform buckets, written by the audio thread in
    // RunTopology's timeline branch and drained on the main thread by the
    // arrangement panel. Present whether or not a device is open: an offline
@@ -636,6 +647,11 @@ private:
    ClipPeakRing mClipPeaks;
 
    SamplePreviewPlayer mPreviewPlayer;
+
+   std::atomic<bool> mMetronomeOn { false };
+   std::atomic<float> mMetronomeVolume { 0.5f };
+   std::atomic<bool> mMetronomeAccent { true };
+   MetronomeClick mMetronome; // audio thread only
 
    // RunTopology scratch, all fixed-size and all plain AudioEngine members
    // rather than `static thread_local` locals - see the "Allocation on the
