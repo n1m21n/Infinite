@@ -193,6 +193,31 @@ c0=$(cov); c1=$(cov --set shape.sizeX=0.2); c2=$(cov --set 1.sizeX=0.2)
 rf=$("$BIN" --frame "$ROOT/tests/headless/format/modulation.inf" 0 "$OUT/s.png" --set shape.sizeX=0.3 2>/dev/null)
 [ "$(echo "$rf" | json "[w['code'] for w in d['warnings']]")" = "['W_OVERRIDDEN_BY_MODULATION']" ]; check "set: a bound control warns W_OVERRIDDEN_BY_MODULATION" $?
 
+# --- film events -> notes, per-node stems (R471 7.5) ---
+NF="$ROOT/tests/headless/format"
+rm -rf "$OUT/stems"
+rn=$("$BIN" --audio-summary "$NF/notes.inf" "$OUT/n.json" --duration 2.2 --notes "$NF/notes_events.json" --note-map "$NF/notes_map.json" --stems hit --stems-dir "$OUT/stems" 2>/dev/null)
+[ "$(echo "$rn" | json "d['notes']['injected']")" = "3" ]; check "notes: three mapped events injected" $?
+[ "$(echo "$rn" | json "d['notes']['unmapped_types']")" = "['whoosh']" ]; check "notes: an unmapped event type is listed, not played" $?
+[ "$(echo "$rn" | json "'W_UNMAPPED_EVENT' in [w['code'] for w in d['warnings']]")" = "True" ]; check "notes: W_UNMAPPED_EVENT is raised" $?
+[ -f "$OUT/stems/hit.wav" ]; check "stems: one WAV per node" $?
+python3 - "$OUT/stems/hit.wav" <<'PY'
+import wave, array, sys
+w = wave.open(sys.argv[1]); r = w.getframerate()
+a = array.array('h'); a.frombytes(w.readframes(w.getnframes()))
+L = a[0::w.getnchannels()]; thr = max(abs(x) for x in L) * 0.02
+on, quiet = [], 10**9
+for i, x in enumerate(L):
+    if abs(x) > thr and quiet > int(0.05 * r): on.append(i / r)
+    quiet = 0 if abs(x) > thr else quiet + 1
+ok = w.getnframes() == round(2.2 * r) and len(on) == 3 and all(abs(o - t) <= 0.001 for o, t in zip(on, (0.5, 1.0, 1.5)))
+sys.exit(0 if ok else 1)
+PY
+check "stems: onsets land within 1 ms of the events, length = duration" $?
+"$BIN" --audio-summary "$NF/notes.inf" "$OUT/n.json" --duration 1 --notes "$NF/notes_events.json" --note-map "$NF/notes_map.json" --stems keys --stems-dir "$OUT/stems" >/dev/null 2>&1; [ $? = 3 ]; check "stems: a node with no audio output exits 3" $?
+"$BIN" --audio-summary "$NF/notes.inf" "$OUT/n.json" --notes "$NF/notes_events.json" >/dev/null 2>&1; [ $? = 2 ]; check "notes: --notes without --note-map exits 2" $?
+"$BIN" --audio-summary "$NF/notes.inf" "$OUT/n.json" --stems hit >/dev/null 2>&1; [ $? = 2 ]; check "stems: --stems without --stems-dir exits 2" $?
+
 # --- describe actions (R474): the buttons a node draws, with what each one does ---
 [ "$(echo "$r" | json "[a['effect'] for t in d['types'] if t['type']=='Sampler' for a in t['actions'] if a['label']=='Load...'][0]")" = "sets a file path (write the key instead)" ]; check "describe: Sampler 'Load...' is a file-path action" $?
 [ "$(echo "$r" | json "[a['label'] for t in d['types'] if t['type']=='Shape' for a in t['actions']][:2]")" = "['Circle', 'Ellipse']" ]; check "describe: Shape lists its buttons in draw order" $?

@@ -632,6 +632,17 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer, doub
       {
          entry.node->ProcessBlockMulti(inputPtrs, entry.numInputs, outputPtrs, numOuts);
       }
+      if (mOfflineTaps != nullptr)
+         for (OfflineTap& tap : *mOfflineTaps)
+         {
+            if (tap.node != entry.node || tap.output < 0 || tap.output >= numOuts || outputPtrs[tap.output] == nullptr)
+               continue;
+            const AudioBuffer& o = *outputPtrs[tap.output];
+            const float* l = o.channels[0];
+            const float* r = o.numChannels > 1 ? o.channels[1] : o.channels[0];
+            tap.left.insert(tap.left.end(), l, l + numFrames);
+            tap.right.insert(tap.right.end(), r, r + numFrames);
+         }
    }
 
    // Scratch interleave buffer for capture rings, and the terminal-summation

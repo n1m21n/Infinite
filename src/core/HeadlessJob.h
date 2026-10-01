@@ -16,7 +16,8 @@
 //            [--node <index[:output]>] [--output <index>] [--set <node>.<param>=<value>]... [--json <file>] [--lenient]
 //   --set also applies to --render, --frame and --audio-summary.
 //   Infinite --audio-summary <patch.inf> <out.json> [--start S] [--duration S]
-//            [--wav <out.wav>] [--output <index>] [--fps N] [--sample-rate HZ]
+//            [--wav <out.wav>] [--notes <events.json> --note-map <map.json>]
+//            [--stems <id>,<id> --stems-dir <dir>] [--output <index>] [--fps N] [--sample-rate HZ]
 //            [--json <file>] [--timeout S] [--lenient]
 //   Infinite --canonicalize <in.inf> <out.inf> [--keep-ids] [--lenient] [--json <file>]
 //   Infinite --explain <patch.inf> [--json] [--all] [--lenient]
@@ -49,6 +50,10 @@ namespace Headless
       std::string patch;
       std::string out;           // file for --render, file or directory for --frame, .json for --audio-summary
       std::string wavPath;       // --audio-summary --wav: the measured samples, as a file
+      std::string notes;         // --audio-summary --notes: film events as JSON, injected as note-ons
+      std::string noteMap;       // --note-map: event type -> note target (R471 7.5)
+      std::string stemsDir;      // --stems-dir: where the per-node WAVs go
+      std::vector<std::string> stems; // --stems <id>,<id>: one sample-aligned WAV per node's own audio output
       std::string contactSheet;  // --frame --contact-sheet: every requested time on one PNG
       std::string output;        // --output: node index or name; empty = the only Output
       std::string node;          // --node <index[:output]>: tap this node's image instead of an Output's

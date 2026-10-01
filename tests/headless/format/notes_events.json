@@ -1,0 +1,6 @@
+[
+  { "t": 0.5, "type": "impact", "dur": 0.1, "intensity": 1.0 },
+  { "t": 1.0, "type": "impact", "dur": 0.1, "intensity": 0.8 },
+  { "t": 1.5, "type": "impact", "dur": 0.1, "intensity": 0.6 },
+  { "t": 1.7, "type": "whoosh", "dur": 0.4, "intensity": 0.5 }
+]

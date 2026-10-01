@@ -115,6 +115,7 @@ namespace
 #include "core/ColorStats.h"
 #include "core/ContactSheet.h"
 #include "core/HeadlessJob.h"
+#include "core/HeadlessNotes.h"
 #include "core/PatchSchema.h"
 #include "core/PatchExplain.h"
 
@@ -69884,6 +69885,24 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
    static std::string sAudioSource;              // JSON describing what was measured
    static double sAudioSeconds = 0.0;
    static long long sAudioTotal = 0, sAudioDone = 0, sAudioStep = 0;
+   // --stems / --notes (R471 7.5)
+   struct StemTap
+   {
+      std::string file;
+      int nodeIndex = 0;
+   };
+   struct SchedEvent
+   {
+      long long sample = 0;
+      NoteEvent ev;
+      NoteEventQueue* queue = nullptr;
+   };
+   static std::vector<AudioEngine::OfflineTap> sTaps;
+   static std::vector<StemTap> sStemInfo;
+   static std::vector<SchedEvent> sSched;
+   static size_t sSchedNext = 0;
+   static int sNoteTag = 0; // NoteEvent::source for injected notes: any stable address
+   static std::string sNotesJson;
 
    const Headless::Job& job = gHeadlessJob;
    if (sPhase == Phase::Done || !HeadlessJobActive() || job.mode == Headless::Mode::Version ||
@@ -70382,6 +70401,108 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
              !sSummaryWav.Open(job.wavPath, gHeadlessAudioRate, 2, AudioFileWriter::Format::Wav))
             return fail("E_RENDER", "could not create " + job.wavPath);
 
+         // Node refs in --stems / --note-map: an index, or the patch's `id <word>`.
+         auto resolveRef = [&](const std::string& ref) -> GraphNode*
+         {
+            char* e = nullptr;
+            const long idx = std::strtol(ref.c_str(), &e, 10);
+            if (e != ref.c_str() && *e == '\0')
+               return FindNodeByIndex((int)idx);
+            for (const Patch::NodeRecord& n : gHeadlessPatch.nodes)
+               if (!n.id.empty() && n.id == ref)
+                  return FindNodeByIndex(n.index);
+            return nullptr;
+         };
+
+         sTaps.clear();
+         sStemInfo.clear();
+         sSched.clear();
+         sSchedNext = 0;
+         sNotesJson.clear();
+         AudioEngine::Instance().SetOfflineTaps(nullptr);
+         for (const std::string& ref : job.stems)
+         {
+            GraphNode* g = resolveRef(ref);
+            if (g == nullptr)
+               return fail("E_BAD_REF", "--stems " + ref + ": the patch has no such node");
+            auto* as = dynamic_cast<IAudioSource*>(g->node.get());
+            if (as == nullptr || as->GetAudioNode() == nullptr)
+               return fail("E_BAD_REF", "--stems " + ref + ": " + g->typeName + " has no audio output", g->index);
+            std::string name;
+            for (char c : ref)
+               name += (std::isalnum((unsigned char)c) || c == '_' || c == '-') ? c : '_';
+            if (std::isdigit((unsigned char)name[0]) || name.empty())
+               name = "node" + std::to_string(g->index);
+            AudioEngine::OfflineTap tap;
+            tap.node = as->GetAudioNode();
+            tap.left.reserve((size_t)sAudioTotal);
+            tap.right.reserve((size_t)sAudioTotal);
+            sTaps.push_back(std::move(tap));
+            sStemInfo.push_back({ (std::filesystem::path(job.stemsDir) / (name + ".wav")).string(), g->index });
+         }
+         if (!job.stemsDir.empty())
+            std::filesystem::create_directories(job.stemsDir, ec);
+
+         if (!job.notes.empty())
+         {
+            Headless::NoteSchedule plan;
+            std::string notesError;
+            if (!Headless::LoadNoteSchedule(job.notes, job.noteMap, plan, notesError))
+               return fail("E_USAGE", notesError);
+            std::map<std::string, NoteEventQueue*> queueOf;
+            for (const std::string& ref : plan.nodes)
+            {
+               GraphNode* g = resolveRef(ref);
+               if (g == nullptr)
+                  return fail("E_BAD_REF", "--note-map: the patch has no node '" + ref + "'");
+               AudioNode* an = nullptr;
+               if (auto* as = dynamic_cast<IAudioSource*>(g->node.get()))
+                  an = as->GetAudioNode();
+               else if (auto* ns = dynamic_cast<INoteSource*>(g->node.get()))
+                  an = ns->GetAudioNode();
+               NoteEventQueue* q = an != nullptr ? an->NoteOutbox() : nullptr;
+               for (int slot = 0; an != nullptr && q == nullptr && slot < AudioNode::kMaxNoteSlots; slot++)
+                  q = an->appliedInbox[slot];
+               if (q == nullptr)
+                  return fail("E_BAD_REF", "--note-map: " + g->typeName + " '" + ref + "' has no note source wired in; "
+                                           "patch a Keyboard or other note node into it", g->index);
+               queueOf[ref] = q;
+            }
+            int injected = 0;
+            for (const Headless::NoteHit& h : plan.hits)
+            {
+               const long long on = (long long)std::llround((h.t - job.start) * gHeadlessAudioRate);
+               if (on < 0 || on >= sAudioTotal)
+                  continue;
+               NoteEvent ev;
+               ev.note = h.pitch;
+               ev.velocity = h.velocity;
+               ev.source = &sNoteTag;
+               ev.voiceId = NextVoiceId();
+               ev.isNoteOn = true;
+               sSched.push_back({ on, ev, queueOf[h.node] });
+               ev.isNoteOn = false;
+               sSched.push_back({ on + std::max<long long>(1, (long long)std::llround(h.length * gHeadlessAudioRate)), ev, queueOf[h.node] });
+               injected++;
+            }
+            std::stable_sort(sSched.begin(), sSched.end(),
+                             [](const SchedEvent& x, const SchedEvent& y) { return x.sample < y.sample; });
+            std::string unmapped = "[";
+            for (size_t i = 0; i < plan.unmappedTypes.size(); i++)
+               unmapped += std::string(i ? "," : "") + "\"" + Headless::JsonEscape(plan.unmappedTypes[i]) + "\"";
+            unmapped += "]";
+            sNotesJson = "\"notes\":{\"events\":" + std::to_string(plan.hits.size()) + ",\"injected\":" + std::to_string(injected) +
+                         ",\"unmapped_types\":" + unmapped + "}";
+            if (!plan.unmappedTypes.empty())
+               sStatus.warnings.push_back({ "W_UNMAPPED_EVENT", "no map entry for " + std::to_string(plan.unmappedTypes.size()) +
+                                                                 " event type(s), ignored", 0, -1, "add them to --note-map to hear them" });
+            if (!plan.panIgnoredNodes.empty())
+               sStatus.warnings.push_back({ "W_NOTE_PAN_IGNORED", "pan_from is not applied: notes carry no per-note pan", 0, -1,
+                                            "pan the node's own output instead" });
+         }
+         if (!sTaps.empty())
+            AudioEngine::Instance().SetOfflineTaps(&sTaps);
+
          sAnalyzer = std::make_unique<AudioSummary::Analyzer>(gHeadlessAudioRate);
          Transport::Instance().Seek(job.start);
          Transport::Instance().SetOfflineMode(true, gHeadlessAudioRate);
@@ -70716,6 +70837,14 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
             buf.channels = sChannels;
             buf.numChannels = 2;
             buf.numFrames = n;
+            // Film events land at their own sample, inside this block, not on a video frame.
+            while (sSchedNext < sSched.size() && sSched[sSchedNext].sample < sAudioDone + n)
+            {
+               const SchedEvent& se = sSched[sSchedNext++];
+               NoteEvent e = se.ev;
+               e.frameOffset = (int)std::max<long long>(0, se.sample - sAudioDone);
+               se.queue->Push(e);
+            }
             AudioEngine::Instance().ProcessOffline(buf);
 
             sInterleaved.assign((size_t)n * 2, 0.0f);
@@ -70749,6 +70878,26 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
          sSinkRing->enabled.store(false, std::memory_order_relaxed);
       Transport::Instance().SetOfflineMode(false);
       Transport::Instance().SetPlaying(false);
+      AudioEngine::Instance().SetOfflineTaps(nullptr);
+      for (size_t i = 0; i < sTaps.size(); i++)
+      {
+         AudioFileWriter w;
+         if (!w.Open(sStemInfo[i].file, gHeadlessAudioRate, 2, AudioFileWriter::Format::Wav))
+            return fail("E_RENDER", "could not create " + sStemInfo[i].file);
+         const std::vector<float>& L = sTaps[i].left;
+         const std::vector<float>& R = sTaps[i].right;
+         std::vector<float> inter(L.size() * 2);
+         for (size_t k = 0; k < L.size(); k++)
+         {
+            inter[k * 2] = L[k];
+            inter[k * 2 + 1] = R[k];
+         }
+         w.Append(inter.data(), (int)L.size());
+         w.Close();
+         sStatus.files.push_back(sStemInfo[i].file);
+      }
+      if (!sNotesJson.empty())
+         sStatus.extraJson.push_back(sNotesJson);
 
       const AudioSummary::Result res = sAnalyzer->Finish();
       char range[96];

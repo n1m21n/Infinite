@@ -460,6 +460,19 @@ public:
    // over a caller-owned scratch buffer without touching the real device.
    void ProcessOffline(AudioBuffer& buffer);
 
+   // Headless --stems (R471 7.5): while set, RunTopology copies the named node's
+   // output `output` into `left`/`right` right after that node processes, so the
+   // stem is the node's own signal rather than whatever the master mix made of
+   // it. Main thread only and only with no device open (the offline take owns the
+   // ProcessList); null in every live path, where it costs one pointer test.
+   struct OfflineTap
+   {
+      const AudioNode* node = nullptr;
+      int output = 0;
+      std::vector<float> left, right;
+   };
+   void SetOfflineTaps(std::vector<OfflineTap>* taps) { mOfflineTaps = taps; }
+
    // The Samples search panel's audition player (see
    // local-prompts/05-sample-preview-in-search-panel.md). Lives here, not in
    // the node topology, so it is unaffected by the graph, bypass, or the
@@ -663,4 +676,5 @@ private:
    // `static thread_local ... Inited` lazy-init flags (which existed only to
    // solve the per-thread-lazy-allocation problem these members no longer
    // have).
+   std::vector<OfflineTap>* mOfflineTaps = nullptr;
 };

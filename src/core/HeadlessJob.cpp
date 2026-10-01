@@ -321,6 +321,33 @@ namespace Headless
                return true;
             job.wavPath = v;
          }
+         else if ((a == "--notes" || a == "--note-map" || a == "--stems" || a == "--stems-dir") && job.mode == Mode::AudioSummary)
+         {
+            const char* v = next(a.c_str());
+            if (v == nullptr)
+               return true;
+            if (a == "--notes")
+               job.notes = v;
+            else if (a == "--note-map")
+               job.noteMap = v;
+            else if (a == "--stems-dir")
+               job.stemsDir = v;
+            else
+            {
+               std::string list = v;
+               size_t from = 0;
+               while (from <= list.size())
+               {
+                  const size_t comma = list.find(',', from);
+                  const std::string item = list.substr(from, comma == std::string::npos ? std::string::npos : comma - from);
+                  if (!item.empty())
+                     job.stems.push_back(item);
+                  if (comma == std::string::npos)
+                     break;
+                  from = comma + 1;
+               }
+            }
+         }
          else if (a == "--contact-sheet" && job.mode == Mode::Frame)
          {
             const char* v = next("--contact-sheet");
@@ -371,11 +398,21 @@ namespace Headless
                          : job.mode == Mode::Frames
                               ? "usage: Infinite --frames-dir <patch.inf> <out_dir> --duration S [--start S] [--fps N] [--alpha] [--node <index[:output]>] [options]"
                          : job.mode == Mode::AudioSummary
-                              ? "usage: Infinite --audio-summary <patch.inf> <out.json> [--start S] [--duration S] [--wav <out.wav>] [options]"
+                              ? "usage: Infinite --audio-summary <patch.inf> <out.json> [--start S] [--duration S] [--wav <out.wav>] [--notes <events.json> --note-map <map.json>] [--stems <id>,<id> --stems-dir <dir>] [options]"
                               : "usage: Infinite --frame <patch.inf> <T[,T...]> <out.png|out_dir/> [--contact-sheet <sheet.png>] [options]";
          return true;
       }
 
+      if (job.notes.empty() != job.noteMap.empty())
+      {
+         usageError = "--notes and --note-map go together: events file and the map from event type to note target";
+         return true;
+      }
+      if (!job.stems.empty() && job.stemsDir.empty())
+      {
+         usageError = "--stems needs --stems-dir <dir> to say where the per-node WAVs go";
+         return true;
+      }
       if (job.mode == Mode::Frames && job.duration <= 0.0)
       {
          usageError = "--frames-dir needs --duration S";
@@ -402,7 +439,7 @@ namespace Headless
       // checked to give zero hits (docs/fix-briefs/headless-engine.md 3.1b); the corpus in
       // this repo is one file, which is not enough to promote it.
       return code == "W_UNUSED_NODE" || code == "W_NO_OUTPUT" || code == "W_DURATION_ROUNDED" || code == "W_OUT_OF_RANGE" ||
-             code == "W_OVERRIDDEN_BY_MODULATION" || code == "W_CLIPPING" || code == "W_SILENT" || code == "W_BLACK_FRAME";
+             code == "W_OVERRIDDEN_BY_MODULATION" || code == "W_UNMAPPED_EVENT" || code == "W_NOTE_PAN_IGNORED" || code == "W_CLIPPING" || code == "W_SILENT" || code == "W_BLACK_FRAME";
    }
 
    void PromoteWarnings(std::vector<Issue>& warnings, std::vector<Issue>& errors)
