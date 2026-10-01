@@ -1,16 +1,16 @@
 {
  "merges": [
-  276,
-  284
+  278,
+  287
  ],
  "direct": [
   396,
-  396
+  405
  ],
  "notes_total": 336,
  "evidence": [
-  421,
-  491
+  426,
+  496
  ],
  "per_release": {
   "v0.1": {
@@ -110,7 +110,17 @@
    "notes": 5
   }
  },
- "loose": [],
+ "loose": [
+  "2026-10-01 c39cecb Roadmap: fix milestone slider script after trimming goals",
+  "2026-10-01 0ce1734 Roadmap: milestone shows one slider only",
+  "2026-10-01 775efae Roadmap: next-release milestone slider driven by milestone.json",
+  "2026-10-01 420bfcf Roadmap: ignore server/auto logs",
+  "2026-10-01 4424372 Sync semi-brain extractor output and datasets",
+  "2026-10-01 06f8113 Update Discord invite link",
+  "2026-10-01 aed5ea2 Launch video plan and release history",
+  "2026-10-01 d5bef64 Roadmap: quest ledger, board and tooling",
+  "2026-10-01 eec4962 Patch layout tool and preview; document in patch-authoring skill"
+ ],
  "no_evidence": [
   "R1 v0.1: 80+ realtime 2D/3D nodes, synthesis, DSP, AU/VST3 hosting, MIDI",
   "R5 Field language: sample/pixel/element/graph domains, dynamic pins, state",

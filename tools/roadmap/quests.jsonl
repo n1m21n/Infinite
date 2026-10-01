@@ -1906,3 +1906,18 @@
 {"ts": "2026-10-01T13:12:54+05:30", "event": "add", "id": "R522", "after": [], "user": false, "src": "merge:feature/headless-docs-brand", "track": "platform", "kind": "feature", "horizon": "later", "title": "Headless docs brand", "why": "merged into main (df40a73)", "origin": "merge"}
 {"ts": "2026-10-01T13:12:56+05:30", "event": "done", "id": "R522", "why": "merged into main (df40a73)"}
 {"ts": "2026-10-01T13:12:56+05:30", "event": "edit", "id": "R522", "opened": "2026-10-01T13:12:54+05:30", "closed": "2026-10-01T13:12:56+05:30", "release": "", "commits": ["df40a73"]}
+{"ts": "2026-10-01T09:14:55+00:00", "event": "done", "id": "R519", "why": "MPC manual card added, PDF rebuilt"}
+{"ts": "2026-10-01T09:14:55+00:00", "event": "edit", "id": "R519", "commits": ["b9ee6b6"]}
+{"ts": "2026-10-01T09:15:08+00:00", "event": "done", "id": "R518", "why": "Headless guide linked from README and website"}
+{"ts": "2026-10-01T09:15:08+00:00", "event": "edit", "id": "R518", "commits": ["b9ee6b6"]}
+{"ts": "2026-10-01T09:15:22+00:00", "event": "done", "id": "R520", "why": "Draft at docs/releases/v0.4.6-draft.md"}
+{"ts": "2026-10-01T09:15:22+00:00", "event": "edit", "id": "R520", "commits": ["b9ee6b6"]}
+{"ts": "2026-10-01T14:07:02+05:30", "event": "add", "id": "R523", "after": [], "user": false, "src": "merge:bugfix/headless-index-mod-output", "track": "platform", "kind": "fix", "horizon": "later", "title": "Headless index mod output", "why": "merged into main (9664c4c)", "origin": "merge"}
+{"ts": "2026-10-01T14:07:02+05:30", "event": "done", "id": "R523", "why": "merged into main (9664c4c)"}
+{"ts": "2026-10-01T14:07:02+05:30", "event": "edit", "id": "R523", "opened": "2026-10-01T14:07:02+05:30", "closed": "2026-10-01T14:07:02+05:30", "release": "", "commits": ["9664c4c"]}
+{"ts": "2026-10-01T13:43:07+05:30", "event": "add", "id": "R524", "after": [], "user": false, "src": "merge:feature/auto-layout-posless-nodes", "track": "nodes", "kind": "feature", "horizon": "later", "title": "Auto layout posless nodes", "why": "merged into main (97b6a73)", "origin": "merge"}
+{"ts": "2026-10-01T14:18:07+05:30", "event": "done", "id": "R524", "why": "merged into main (97b6a73)"}
+{"ts": "2026-10-01T14:18:07+05:30", "event": "edit", "id": "R524", "opened": "2026-10-01T13:43:07+05:30", "closed": "2026-10-01T14:18:07+05:30", "release": "", "commits": ["97b6a73"]}
+{"ts": "2026-10-01T09:16:15+00:00", "event": "edit", "id": "R518", "opened": "2026-10-01T14:44:44+05:30", "commits": ["b9ee6b6"], "closed": "2026-10-01T14:44:44+05:30", "release": ""}
+{"ts": "2026-10-01T09:16:15+00:00", "event": "edit", "id": "R519", "opened": "2026-10-01T14:44:44+05:30", "commits": ["b9ee6b6"], "closed": "2026-10-01T14:44:44+05:30", "release": ""}
+{"ts": "2026-10-01T09:16:15+00:00", "event": "edit", "id": "R520", "opened": "2026-10-01T14:44:44+05:30", "commits": ["b9ee6b6"], "closed": "2026-10-01T14:44:44+05:30", "release": ""}
