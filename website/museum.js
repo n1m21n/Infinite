@@ -11,16 +11,15 @@ const coarse = matchMedia('(pointer: coarse)').matches;
 // Pieces. Edit titles / years here. `file` is the number of the file in assets/museum.
 // ---------------------------------------------------------------------------------------------
 const WORKS = [
-  { file: '01', kind: 'video', w: 1.2,  h: 1.6,  title: 'Untitled', meta: 'Infinite, 2026 · 4 s loop' },
-  { file: '03', kind: 'video', w: 1.5,  h: 1.5,  title: 'Untitled', meta: 'Infinite, 2026 · 15 s loop' },
-  { file: '02', kind: 'video', w: 1.2,  h: 1.6,  title: 'Untitled', meta: 'Infinite, 2026 · 10 s loop' },
-  { file: '06', kind: 'video', w: 1.2,  h: 1.6,  title: 'Untitled', meta: 'Infinite, 2026 · 10 s loop' },
-  { file: '04', kind: 'video', w: 1.2,  h: 1.6,  title: 'Untitled', meta: 'Infinite, 2026 · 10 s loop' },
-  { file: '05', kind: 'video', w: 1.2,  h: 1.6,  title: 'Untitled', meta: 'Infinite, 2026 · 15 s loop' },
-  { file: '07', kind: 'video', w: 1.2,  h: 1.6,  title: 'Untitled', meta: 'Infinite, 2026 · 4 s loop' },
-  { file: '08', kind: 'video', w: 1.2,  h: 1.6,  title: 'Untitled', meta: 'Infinite, 2026 · 15 s loop' },
-  { file: '09', kind: 'still', w: 1.2,  h: 1.6,  title: 'Untitled', meta: 'Infinite, 2026 · still' },
-  { file: '10', kind: 'video', w: 1.2,  h: 1.6,  title: 'Untitled', meta: 'Infinite, 2026 · 11 s loop' },
+  { file: '01', kind: 'video', w: 1.2, h: 1.6, title: 'Reservoir',  meta: 'Infinite, 2026 · 4 s loop' },
+  { file: '02', kind: 'video', w: 1.2, h: 1.6, title: 'Mirror',     meta: 'Infinite, 2026 · 10 s loop' },
+  { file: '06', kind: 'video', w: 1.2, h: 1.6, title: 'Spore',      meta: 'Infinite, 2026 · 10 s loop' },
+  { file: '04', kind: 'video', w: 1.2, h: 1.6, title: 'Meadow',     meta: 'Infinite, 2026 · 10 s loop' },
+  { file: '05', kind: 'video', w: 1.2, h: 1.6, title: 'Siren',      meta: 'Infinite, 2026 · 15 s loop' },
+  { file: '07', kind: 'video', w: 1.2, h: 1.6, title: 'Chrome',     meta: 'Infinite, 2026 · 4 s loop' },
+  { file: '08', kind: 'video', w: 1.2, h: 1.6, title: 'Halftone',   meta: 'Infinite, 2026 · 15 s loop' },
+  { file: '09', kind: 'still', w: 1.2, h: 1.6, title: 'Eclipse',    meta: 'Infinite, 2026 · still' },
+  { file: '10', kind: 'video', w: 1.2, h: 1.6, title: 'Distortion', meta: 'Infinite, 2026 · 11 s loop' },
 ];
 const N = WORKS.length;
 const EYE = 1.65;           // camera height (m)
@@ -69,7 +68,7 @@ const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 80);
 camera.rotation.order = 'YXZ';
 
 // the room is nearly unlit: just enough ambient to read the architecture; the pieces are lit by their own lamps
-scene.add(new THREE.HemisphereLight(0x5a4a38, 0x1a1510, 1.25));
+scene.add(new THREE.HemisphereLight(0x9a9aa8, 0x4a4540, 1.5));
 
 const maxAniso = renderer.capabilities.getMaxAnisotropy();
 
@@ -87,8 +86,8 @@ function canvasTex(w, h, draw, { srgb = true, repeat } = {}) {
 // ---------------------------------------------------------------------------------------------
 // Environment: floor + three rooms. Each room has a fade value so rooms dissolve into each other.
 // ---------------------------------------------------------------------------------------------
-const WALL_C = '#3A332B';
-const LAMP = '#FFC272';   // warm picture-lamp yellow
+const WALL_C = '#7A7168';
+
 const wallMat = () => new THREE.MeshLambertMaterial({ color: WALL_C, transparent: true });
 
 const floorTex = canvasTex(512, 512, (g, w, h) => {
@@ -98,7 +97,7 @@ const floorTex = canvasTex(512, 512, (g, w, h) => {
   g.strokeStyle = 'rgba(255,220,160,0.04)'; g.lineWidth = 2;
   g.beginPath(); g.moveTo(w / 2, 0); g.lineTo(w / 2, h); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
 }, { repeat: [60, 60] });
-const floorMat = new THREE.MeshStandardMaterial({ color: '#1B1612', map: floorTex, roughness: 0.3, metalness: 0, transparent: true, opacity: 0.9 });
+const floorMat = new THREE.MeshStandardMaterial({ color: '#5A5149', map: floorTex, roughness: 0.5, metalness: 0, transparent: true, opacity: 0.9 });
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(72, 72), floorMat);
 floor.rotation.x = -Math.PI / 2;
 floor.renderOrder = 2;
@@ -114,14 +113,14 @@ const hallLeft = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
 const hallRight = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
 const hallEnd = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
 const hallStart = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
-const hallCeil = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshLambertMaterial({ color: '#241F1A', transparent: true }));
+const hallCeil = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshLambertMaterial({ color: '#4A443E', transparent: true }));
 rooms.hall.add(hallLeft, hallRight, hallEnd, hallStart, hallCeil);
 
 // --- rotunda ---
 const ROT_R = 4.7;
 const rotWall = new THREE.Mesh(new THREE.CylinderGeometry(ROT_R + 0.55, ROT_R + 0.55, 5.4, 96, 1, true), new THREE.MeshLambertMaterial({ color: WALL_C, side: THREE.BackSide, transparent: true }));
 rotWall.position.y = 2.7;
-const rotCeil = new THREE.Mesh(new THREE.RingGeometry(1.5, ROT_R + 0.55, 96), new THREE.MeshLambertMaterial({ color: '#241F1A', side: THREE.DoubleSide, transparent: true }));
+const rotCeil = new THREE.Mesh(new THREE.RingGeometry(1.5, ROT_R + 0.55, 96), new THREE.MeshLambertMaterial({ color: '#4A443E', side: THREE.DoubleSide, transparent: true }));
 rotCeil.rotation.x = Math.PI / 2; rotCeil.position.y = 5.4;
 rooms.rotunda.add(rotWall, rotCeil);
 
@@ -148,7 +147,7 @@ const shadowTex = canvasTex(256, 256, (g, w, h) => {
 });
 const washTex = canvasTex(256, 256, (g, w, h) => {
   const r = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
-  r.addColorStop(0, 'rgba(255,190,100,0.62)'); r.addColorStop(0.45, 'rgba(255,170,80,0.22)'); r.addColorStop(1, 'rgba(255,160,70,0)');
+  r.addColorStop(0, 'rgba(255,255,255,0.7)'); r.addColorStop(0.5, 'rgba(255,255,255,0.24)'); r.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = r; g.fillRect(0, 0, w, h);
 });
 // canvas top = v 1 (art top, deepest under the floor) fades out; canvas bottom = v 0 (nearest the floor) is solid
@@ -163,10 +162,10 @@ function plaqueTex(no, title, meta) {
     g.fillStyle = '#17120D'; g.fillRect(0, 0, w, h);
     g.strokeStyle = 'rgba(255,194,114,0.35)'; g.lineWidth = 4; g.strokeRect(2, 2, w - 4, h - 4);
     g.textBaseline = 'alphabetic';
-    g.fillStyle = '#FFB65C'; g.font = '500 34px "Geist Mono", ui-monospace, monospace';
+    g.fillStyle = '#F57F66'; g.font = '500 34px "Geist Mono", ui-monospace, monospace';
     g.fillText(`NO. ${no}`, 34, 62);
-    g.fillStyle = '#F4EBDD'; g.font = '600 62px "Geist", system-ui, sans-serif';
-    g.fillText(title, 34, 140);
+    g.fillStyle = '#F4EBDD'; g.font = '700 92px "Caveat", cursive';
+    g.fillText(title, 34, 146);
     g.fillStyle = '#8F8271'; g.font = '400 30px "Geist Mono", ui-monospace, monospace';
     g.fillText(meta, 34, 196);
   });
@@ -187,8 +186,8 @@ const pieces = WORKS.map((w, i) => {
   const g = new THREE.Group();
   const shadow = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false, opacity: 0.6 }));
   shadow.scale.set(w.w * 1.5, w.h * 1.4, 1); shadow.position.set(0, -0.06, -0.03);
-  const wash = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({ map: washTex, transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }));
-  wash.scale.set(w.w * 3.2, w.h * 2.6, 1); wash.position.set(0, w.h * 0.18, -0.04);
+  const wash = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({ map: washTex, transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, opacity: 0.9 }));
+  wash.scale.set(w.w * 3.4, w.h * 2.8, 1); wash.position.set(0, 0, -0.04);
   const frame = new THREE.Mesh(boxGeo, frameMat);
   frame.scale.set(w.w + 0.06, w.h + 0.06, 0.06); frame.position.z = 0;
   const artMat = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
@@ -198,18 +197,10 @@ const pieces = WORKS.map((w, i) => {
   const plq = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({ transparent: true }));
   const pw = 0.56; plq.scale.set(pw, pw * 240 / 640, 1);
   plq.position.set(-w.w / 2 + pw / 2 + 0.02, -w.h / 2 - 0.2, 0.01);
-  // brass picture lamp: arm to the wall, shade, and a hot underside
-  const brass = new THREE.MeshLambertMaterial({ color: '#8A6A3A', emissive: '#2A1C08' });
-  const lw = Math.min(0.9, w.w * 0.55);
-  const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, lw, 14), brass);
-  shade.rotation.z = Math.PI / 2; shade.position.set(0, w.h / 2 + 0.16, 0.16);
-  const arm = new THREE.Mesh(boxGeo, brass);
-  arm.scale.set(0.02, 0.02, 0.2); arm.position.set(0, w.h / 2 + 0.16, 0.06);
-  const bulb = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({ color: LAMP, fog: false, toneMapped: false }));
-  bulb.scale.set(lw * 0.9, 0.03, 1); bulb.rotation.x = Math.PI / 2; bulb.position.set(0, w.h / 2 + 0.125, 0.16);
-  const glow = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({ map: washTex, transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }));
-  glow.scale.set(lw * 1.8, 0.5, 1); glow.position.set(0, w.h / 2 + 0.12, 0.2);
-  g.add(shadow, wash, frame, art, plq, shade, arm, bulb, glow);
+  // the piece is its own light source: a point light + a tinted pool, coloured from the artwork (see sampleColour)
+  const light = new THREE.PointLight(0xffffff, 7, 9, 1.4);
+  light.position.set(0, 0, 0.9);
+  g.add(shadow, wash, frame, art, plq, light);
   artGroup.add(g);
   hitMeshes.push(art);
 
@@ -221,7 +212,7 @@ const pieces = WORKS.map((w, i) => {
   reflGroup.add(rg);
 
   const p = {
-    i, def: w, group: g, art, artMat, reflMat, rg, plq, wash,
+    i, def: w, group: g, art, artMat, reflMat, rg, plq, wash, light, col: new THREE.Color(1, 0.8, 0.6), sampleT: 0,
     cur: { x: 0, y: ART_Y, z: 0, ry: 0 }, from: null, to: { x: 0, y: ART_Y, z: 0, ry: 0 },
     t0: 0, delay: 0, dur: 1, arc: 0, hover: 0, poster: null, slot: null, ready: false,
   };
@@ -333,6 +324,30 @@ function updatePieces(now) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Colour of each piece -> its light. Poster once, then the live video a few times a second.
+const sampCv = document.createElement('canvas'); sampCv.width = sampCv.height = 6;
+const sampCx = sampCv.getContext('2d', { willReadFrequently: true });
+const _hsl = {};
+function sampleColour(p, src) {
+  try {
+    sampCx.drawImage(src, 0, 0, 6, 6);
+    const d = sampCx.getImageData(0, 0, 6, 6).data;
+    let r = 0, g = 0, b = 0;
+    for (let k = 0; k < d.length; k += 4) { r += d[k]; g += d[k + 1]; b += d[k + 2]; }
+    const n = d.length / 4;
+    p.col.setRGB(r / n / 255, g / n / 255, b / n / 255, THREE.SRGBColorSpace);
+    p.col.getHSL(_hsl);
+    p.col.setHSL(_hsl.h, Math.min(1, _hsl.s * 1.35 + 0.1), 0.62);   // keep it luminous and saturated whatever the frame
+  } catch (e) { /* tainted or not ready: keep the last colour */ }
+}
+function updateGlow(now, dt) {
+  for (const p of pieces) {
+    if (p.slot && p.slot.v.readyState >= 2 && now - p.sampleT > 0.3) { p.sampleT = now; sampleColour(p, p.slot.v); }
+    p.light.color.lerp(p.col, Math.min(1, dt * 4));
+    p.wash.material.color.copy(p.light.color);
+  }
+}
+
 // Video pool: only the pieces you can see are decoding; everyone else shows the poster frame.
 // ---------------------------------------------------------------------------------------------
 const slots = Array.from({ length: POOL }, () => {
@@ -390,7 +405,7 @@ function pickLive(now, force) {
 // Camera state per mode
 // ---------------------------------------------------------------------------------------------
 let mode = 'hall';
-let washK = 1;
+let washK = 1, lightK = 1;
 let focusIdx = -1;
 const S = {
   hall: { pos: 0, tgt: 0, vel: 0, yaw: 0, yawT: 0, pitch: 0, pitchT: 0 },
@@ -753,8 +768,10 @@ function frame() {
     rooms[k].visible = roomFade[k] > 0.01;
   }
   // the rotunda wall curves in front of a flat light pool; narrow the pools there so they are not clipped
+  lightK = damp(lightK, mode === 'wall' ? 0.3 : mode === 'rotunda' ? 0.75 : 1, reduceMotion ? 30 : 5, dt);
+  for (const p of pieces) { p.light.intensity = 7 * lightK; p.wash.material.opacity = 0.9 * (0.4 + 0.6 * lightK); }
   washK = damp(washK, mode === 'rotunda' ? 0.5 : 1, reduceMotion ? 30 : 5, dt);
-  for (const p of pieces) { p.wash.scale.x = p.def.w * 3.2 * washK; }
+  for (const p of pieces) { p.wash.scale.x = p.def.w * 3.4 * washK; }
   floorFade = damp(floorFade, mode === 'wall' ? 0 : 1, reduceMotion ? 30 : 5, dt);
   floor.visible = floorFade > 0.01; floorMat.opacity = 0.9 * floorFade;
   reflGroup.visible = floorFade > 0.2;
@@ -771,6 +788,7 @@ function frame() {
   }
 
   updatePieces(now);
+  updateGlow(now, dt);
   pickLive(now, false);
   renderer.render(scene, camera);
 }
@@ -792,7 +810,7 @@ async function boot() {
   await Promise.all(pieces.map((p) => new Promise((res) => {
     loader.load(`assets/museum/${p.def.file}.jpg`, (t) => {
       t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = maxAniso;
-      p.poster = t; p.setMap(t); res();
+      p.poster = t; p.setMap(t); sampleColour(p, t.image); p.light.color.copy(p.col); res();
     }, undefined, () => res());
   }).then(() => { loaded++; bar.style.transform = `scaleX(${loaded / N})`; })));
 

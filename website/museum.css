@@ -5,15 +5,19 @@
   --ink: #F4EBDD;
   --ink2: #C9BBA5;
   --muted: #8F8271;
-  --line: rgba(255, 214, 150, 0.16);
-  --accent: #FFB65C;
+  --line: var(--glass-edge);
+  --accent: #F57F66;
+  --brand-grad: linear-gradient(90deg, #F57F66, #D99A9C 35%, #C7AFC0 65%, #A9CDF1);
+  --hand: 'Caveat', cursive;
   --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, Menlo, Monaco, monospace;
   --font-hand: 'Caveat', cursive;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-io: cubic-bezier(0.65, 0, 0.35, 1);
-  --glass: rgba(24, 19, 14, 0.62);
-  --shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  --glass: rgba(251, 250, 246, 0.10);
+  --glass-edge: rgba(251, 250, 246, 0.26);
+  --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.4), var(--glass-hi);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -53,10 +57,10 @@ html, body {
   background: var(--bg);
   transition: opacity 1.1s var(--ease-io) 0.15s, visibility 0s linear 1.3s;
 }
-.intro-eyebrow { font: 500 12px/1 var(--font-mono); letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); }
+.intro-eyebrow { font: 500 12px/1 var(--font-mono); letter-spacing: 0.04em; text-transform: lowercase; color: var(--muted); }
 .intro-title { font: 600 clamp(2.6rem, 9vw, 5.4rem)/1 var(--font-sans); letter-spacing: -0.04em; color: var(--ink); }
 .intro-bar { width: 120px; height: 2px; border-radius: 2px; background: var(--line); overflow: hidden; margin-top: 18px; }
-.intro-bar i { display: block; width: 100%; height: 100%; background: #FFC272; transform: scaleX(0); transform-origin: left; transition: transform 0.4s var(--ease-out); }
+.intro-bar i { display: block; width: 100%; height: 100%; background: var(--brand-grad); transform: scaleX(0); transform-origin: left; transition: transform 0.4s var(--ease-out); }
 body:not(.is-loading) .intro { opacity: 0; visibility: hidden; }
 
 /* ---- chips ---- */
@@ -64,7 +68,7 @@ body:not(.is-loading) .intro { opacity: 0; visibility: hidden; }
   position: fixed; z-index: 10;
   display: flex; align-items: center; gap: 8px;
   background: var(--glass);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2); backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7);
   border: 1px solid var(--line); border-radius: 999px;
   box-shadow: var(--shadow);
   color: var(--ink); text-decoration: none;
@@ -74,7 +78,7 @@ body:not(.is-loading) .intro { opacity: 0; visibility: hidden; }
 }
 .chip svg { width: 15px; height: 15px; }
 .back { top: max(18px, env(safe-area-inset-top)); left: 18px; }
-.back:hover { transform: translateY(-1px); background: rgba(40, 31, 22, 0.8); }
+.back:hover { transform: translateY(-1px); background: rgba(251, 250, 246, 0.2); }
 
 .counter {
   top: max(18px, env(safe-area-inset-top)); right: 18px;
@@ -91,13 +95,13 @@ body.is-focus .counter { opacity: 1; transform: none; }
   transform: translateX(-50%);
   display: flex; padding: 4px; gap: 0;
   background: var(--glass);
-  -webkit-backdrop-filter: blur(16px) saturate(1.2); backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7);
   border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow);
   transition: opacity 0.5s var(--ease-io), transform 0.6s var(--ease-out);
 }
 .modes .thumb {
   position: absolute; top: 4px; bottom: 4px; left: 0; width: 0;
-  border-radius: 999px; background: #FFC272;
+  border-radius: 999px; background: var(--brand-grad); box-shadow: 0 2px 14px rgba(245, 127, 102, 0.35);
   transition: transform 0.55s var(--ease-out), width 0.55s var(--ease-out);
   pointer-events: none;
 }
@@ -111,7 +115,7 @@ body.is-focus .counter { opacity: 1; transform: none; }
   -webkit-tap-highlight-color: transparent;
 }
 .modes button svg { width: 17px; height: 17px; }
-.modes button.on { color: #1A1208; }
+.modes button.on { color: #1F1D1A; }
 .modes button:not(.on):hover { color: var(--ink); }
 .modes button:focus-visible, .round:focus-visible, .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 body.is-focus .modes { opacity: 0; pointer-events: none; transform: translate(-50%, 14px); }
@@ -119,12 +123,14 @@ body.is-focus .modes { opacity: 0; pointer-events: none; transform: translate(-5
 .hint {
   position: fixed; z-index: 9; left: 50%; bottom: calc(max(26px, env(safe-area-inset-bottom) + 14px) + 62px);
   transform: translate(-50%, 6px);
-  font: 500 11px/1.4 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--ink2); text-align: center; white-space: nowrap;
+  font: 500 11px/1.4 var(--font-mono); letter-spacing: 0.04em; text-transform: lowercase;
+  color: var(--ink); text-align: center; white-space: nowrap;
+  padding: 9px 16px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-edge); box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7);
   opacity: 0; pointer-events: none;
   transition: opacity 0.7s var(--ease-io), transform 0.7s var(--ease-out);
 }
-.hint.show { opacity: 0.85; transform: translate(-50%, 0); }
+.hint.show { opacity: 1; transform: translate(-50%, 0); }
 body.is-focus .hint { opacity: 0 !important; }
 
 /* ---- close-up ---- */
@@ -132,14 +138,14 @@ body.is-focus .hint { opacity: 0 !important; }
   position: fixed; z-index: 10; left: 24px; bottom: max(26px, env(safe-area-inset-bottom) + 14px);
   max-width: min(320px, calc(100vw - 48px));
   background: var(--glass);
-  -webkit-backdrop-filter: blur(16px) saturate(1.2); backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7);
   border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow);
   padding: 16px 20px 17px;
   opacity: 0; transform: translateY(14px); pointer-events: none;
   transition: opacity 0.5s var(--ease-io), transform 0.7s var(--ease-out);
 }
 .plaque-no { font: 500 11px/1 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
-.plaque-title { font: 600 22px/1.1 var(--font-sans); letter-spacing: -0.02em; margin-top: 10px; }
+.plaque-title { font: 700 40px/0.9 var(--hand); margin-top: 8px; }
 .plaque-meta { font: 400 12px/1.4 var(--font-mono); color: var(--muted); margin-top: 8px; letter-spacing: 0.02em; }
 body.is-focus .plaque { opacity: 1; transform: none; transition-delay: 0.25s, 0.25s; }
 
@@ -154,16 +160,16 @@ body.is-focus .focus-ui { opacity: 1; transform: none; pointer-events: auto; tra
   width: 46px; height: 46px; border-radius: 50%;
   display: grid; place-items: center; cursor: pointer;
   background: var(--glass);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2); backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7);
   border: 1px solid var(--line); box-shadow: var(--shadow); color: var(--ink);
   transition: transform 0.3s var(--ease-out), background 0.3s;
   -webkit-tap-highlight-color: transparent;
 }
 .round svg { width: 18px; height: 18px; }
-.round:hover { background: rgba(40, 31, 22, 0.85); transform: translateY(-2px); }
+.round:hover { background: rgba(251, 250, 246, 0.22); transform: translateY(-2px); }
 .round:active { transform: scale(0.94); }
-.round.close { background: #FFC272; color: #1A1208; border-color: transparent; }
-.round.close:hover { background: #FFD08F; }
+.round.close { background: var(--brand-grad); color: #1F1D1A; border-color: transparent; }
+.round.close:hover { filter: brightness(1.08); }
 
 /* ---- plain gallery (crawlers, no-WebGL) ---- */
 .plain { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); }
@@ -182,7 +188,7 @@ body.nogl .plain img { width: 100%; height: auto; display: block; border-radius:
   .modes button { padding: 11px 13px 11px 11px; font-size: 12px; gap: 6px; }
   .modes button svg { width: 16px; height: 16px; }
   .plaque { left: 14px; right: 14px; max-width: none; bottom: calc(max(26px, env(safe-area-inset-bottom) + 14px) + 58px); padding: 14px 16px 15px; }
-  .plaque-title { font-size: 19px; }
+  .plaque-title { font-size: 34px; }
   .focus-ui { left: 14px; right: 14px; justify-content: space-between; }
   .focus-ui .close { order: 3; }
   .hint { font-size: 10px; white-space: normal; width: 80vw; }
