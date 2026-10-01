@@ -1,6 +1,6 @@
 # Infinite
 
-[![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/wpKdexvhn)
+[![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/7cpQfCxnx)
 [![YouTube Tutorial](https://img.shields.io/badge/YouTube-Watch%20Tutorial-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=vXRjrDhSq24&t=1421s)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)](https://github.com/n1m21n/Infinite)
 [![License](https://img.shields.io/badge/License-MIT%20%2F%20GPLv3-green)](LICENSE)
@@ -180,7 +180,7 @@ The Linux build has the same node graph and file format as macOS/Windows, with t
 ## Contributing
 
 Contributions, bug reports, and node ideas are welcome!
-- Join the discussion and share creations in our [Discord Community](https://discord.gg/wpKdexvhn).
+- Join the discussion and share creations in our [Discord Community](https://discord.gg/7cpQfCxnx).
 - File bugs or feature requests in [GitHub Issues](https://github.com/n1m21n/Infinite/issues).
 - Submit Pull Requests with clean-room MIT-compatible code following [docs/CODE_STANDARDS.md](docs/CODE_STANDARDS.md).
 
