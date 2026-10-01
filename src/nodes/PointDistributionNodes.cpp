@@ -53,7 +53,10 @@ void DistributePointsOnFacesNode::RebuildIfNeeded()
    const size_t instCount = xformsPtr ? xformsPtr->size() : 0;
 
    const bool sameColor = (mBuiltColor[0] == color[0] && mBuiltColor[1] == color[1] && mBuiltColor[2] == color[2]);
-   if (mBuiltInput == input && mBuiltUpstream == upstream &&
+   // The inherited albedo is baked into every point below, and MeshRevision()
+   // does not move when only the material does - so it keys the rebuild too.
+   const unsigned long long materialRev = inheritMaterial ? input->MaterialRevision() : 0;
+   if (mBuiltInput == input && mBuiltUpstream == upstream && mBuiltMaterialRevision == materialRev &&
        mBuiltInstancer == (const void*)instancer && mBuiltInstRevision == instRev &&
        mBuiltGroupMatrix == groupMatrix && mBuiltInstanceCount == instCount &&
        mBuiltDensity == density && mBuiltMethod == method &&
@@ -164,6 +167,7 @@ void DistributePointsOnFacesNode::RebuildIfNeeded()
    mBuiltPointSize = pointSize;
    mBuiltSeed = seed;
    mBuiltInherit = inheritMaterial;
+   mBuiltMaterialRevision = materialRev;
    mBuiltColor[0] = color[0]; mBuiltColor[1] = color[1]; mBuiltColor[2] = color[2];
    mMeshRevision = NextMeshRevision();
 }

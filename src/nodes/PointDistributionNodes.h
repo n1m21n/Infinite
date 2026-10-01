@@ -128,6 +128,7 @@ private:
    int mBuiltMethod = -1;
    float mBuiltMinDistance = -1.0f, mBuiltPointSize = -1.0f, mBuiltSeed = 0.0f;
    bool mBuiltInherit = true;
+   unsigned long long mBuiltMaterialRevision = 0;
    float mBuiltColor[3] = { -1.0f, -1.0f, -1.0f };
    unsigned long long mMeshRevision = 0;
    mutable unsigned long long mMaterialRevision = 0;
