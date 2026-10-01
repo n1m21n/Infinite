@@ -2228,7 +2228,9 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       if (window != nullptr)
       {
          glfwGetCursorPos(window, &xpos, &ypos);
-         gDropPos = ImVec2((float)xpos, (float)ypos);
+         // Window units -> ImGui points (Windows/X11 lay ImGui out in points, core/UiScale.h).
+         const float pointScale = ImGui_ImplGlfw_GetPointScale();
+         gDropPos = ImVec2((float)xpos / pointScale, (float)ypos / pointScale);
          ImGuiIO& io = ImGui::GetIO();
          io.MousePos = gDropPos;
       }
@@ -46807,11 +46809,14 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             {
                CategoryColors::SetUiScale(uiScale, false);
             }
+            // Applied on release, not per drag step: every rescale rebakes the font atlas, and
+            // the slider itself would move under the cursor while being dragged.
             if (ImGui::IsItemDeactivatedAfterEdit())
             {
                CategoryColors::SaveAppearanceOverrides();
+               UiScale::RequestRescale();
             }
-            ImGui::TextWrapped("Manual multiplier on top of the display's own DPI scale. Requires a restart to take effect.");
+            ImGui::TextWrapped("Manual multiplier on top of the display's own DPI scale. Scales the whole interface, node bodies included.");
 
             ImGui::Spacing();
             // Transparency Backdrop
@@ -49754,11 +49759,12 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          ed::SetCurrentEditor(prevEditor);
 
          GLFWwindow* mainWin = glfwGetCurrentContext();
-         int winW = 0, winH = 0, fbW = 0, fbH = 0;
-         glfwGetWindowSize(mainWin, &winW, &winH);
+         int fbW = 0, fbH = 0;
          glfwGetFramebufferSize(mainWin, &fbW, &fbH);
-         const float scaleX = winW > 0 ? (float)fbW / (float)winW : 1.0f;
-         const float scaleY = winH > 0 ? (float)fbH / (float)winH : 1.0f;
+         // ImGui points -> framebuffer pixels. fb/window alone misses the point scale that
+         // Windows/X11 apply on hi-DPI monitors (core/UiScale.h).
+         const float scaleX = ImGui::GetIO().DisplayFramebufferScale.x;
+         const float scaleY = ImGui::GetIO().DisplayFramebufferScale.y;
 
          const int pad = params.value("padding", 12);
          const int x0 = std::max(0, (int)std::floor(screenMin.x * scaleX) - pad);
@@ -71622,6 +71628,77 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
    }
 }
 
+// Resolves the main window's DPI + the manual slider into UiScale::Current(), hands the point
+// scale to the GLFW backend and (re)bakes the font atlas at the resulting physical size. Safe
+// to call again between frames: the atlas is rebuilt from scratch and, when the GL renderer
+// already exists, its font texture is recreated. Style metrics are never rescaled here -
+// they are in points like everything else, so there is nothing to compound.
+static void ApplyUiScale(GLFWwindow* window, bool rendererReady)
+{
+   float xscale = 1.0f, yscale = 1.0f;
+   glfwGetWindowContentScale(window, &xscale, &yscale);
+   int winW = 0, winH = 0, fbW = 0, fbH = 0;
+   glfwGetWindowSize(window, &winW, &winH);
+   glfwGetFramebufferSize(window, &fbW, &fbH);
+   const UiScale::Result r = UiScale::Resolve(xscale, winW, fbW, CategoryColors::GetUiScale());
+   UiScale::Current() = r;
+   ImGui_ImplGlfw_SetPointScale(r.pointScale);
+
+   ImGuiIO& io = ImGui::GetIO();
+   if (rendererReady)
+      ImGui_ImplOpenGL3_DestroyFontsTexture();
+   io.Fonts->Clear();
+
+   const float bakedPx = UiScale::BakedFontPx(r.bakeScale);
+   const std::string bundledInter = BundledResourcePath("fonts/Inter-Regular.ttf");
+   const char* candidates[] = {
+      bundledInter.c_str(),
+      "/System/Library/Fonts/SFNS.ttf",
+      "/System/Library/Fonts/HelveticaNeue.ttc",
+      "/System/Library/Fonts/Helvetica.ttc",
+      "/System/Library/Fonts/Supplemental/Arial.ttf",
+   };
+   ImFont* uiFont = nullptr;
+   for (const char* path : candidates)
+   {
+      if (path[0] == '\0')
+         continue;
+      uiFont = io.Fonts->AddFontFromFileTTF(path, bakedPx);
+      if (uiFont != nullptr)
+         break;
+   }
+   // Only a real TTF is baked at bakedPx; ImGui's bitmap fallback is 13 px at 1x and must
+   // not be shrunk.
+   io.FontGlobalScale = uiFont != nullptr ? r.fontGlobalScale : 1.0f;
+   if (uiFont == nullptr)
+      io.Fonts->AddFontDefault();
+
+   // Merge a small slice of the Lucide icon font (external/icons/Lucide,
+   // ISC license) into the same atlas at PUA codepoints, so icon glyphs
+   // can be dropped into ordinary ImGui::Text/Button calls alongside UI
+   // text (see IconsLucide.h). MergeMode=true means it rides the same
+   // baseline/line-height as the font just loaded rather than becoming a
+   // separate selectable font - the standard ImGui icon-font idiom.
+   // Restricted to one explicit range (currently just the "search" glyph,
+   // U+E151) rather than Lucide's full 1000+ icon set - the atlas only
+   // pays texture memory for glyphs actually in use.
+   if (uiFont != nullptr)
+   {
+      const std::string bundledLucide = BundledResourcePath("icons/lucide.ttf");
+      if (!bundledLucide.empty())
+      {
+         static const ImWchar iconRanges[] = { 0xE151, 0xE151, 0 };
+         ImFontConfig iconCfg;
+         iconCfg.MergeMode = true;
+         iconCfg.PixelSnapH = true;
+         iconCfg.GlyphMinAdvanceX = bakedPx;
+         io.Fonts->AddFontFromFileTTF(bundledLucide.c_str(), bakedPx, &iconCfg, iconRanges);
+      }
+   }
+   if (rendererReady)
+      ImGui_ImplOpenGL3_CreateFontsTexture();
+}
+
 int main(int argc, char** argv)
 {
    const double sMainStartMs = Bench::ScopedStageTimer::NowMs();
@@ -72160,6 +72237,11 @@ int main(int argc, char** argv)
       glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_FALSE);
    }
 
+   // Windows and X11 size windows in physical pixels: without this a 1600x1000 window is
+   // half its intended size on a 200% monitor (no effect on macOS/Wayland, which are
+   // already point-based). Headless fixtures keep exact pixel sizes.
+   if (!gHeadlessTestWindow)
+      glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
    GLFWwindow* window = glfwCreateWindow(1600, 1000, "Infinite", nullptr, nullptr);
    if (!window)
    {
@@ -72170,6 +72252,28 @@ int main(int argc, char** argv)
       return 1;
    }
    SetWindowIcon(window);
+   // SCALE_TO_MONITOR can make the window larger than the screen (1600x1000 at 150% on a
+   // 1080p panel is 2400x1500 pixels). Fit it to the primary monitor's work area.
+   if (!gHeadlessTestWindow)
+   {
+      if (GLFWmonitor* primary = glfwGetPrimaryMonitor())
+      {
+         int mx = 0, my = 0, mw = 0, mh = 0, ww = 0, wh = 0;
+         glfwGetMonitorWorkarea(primary, &mx, &my, &mw, &mh);
+         glfwGetWindowSize(window, &ww, &wh);
+         // Only when SCALE_TO_MONITOR actually enlarged it: a 1x window keeps today's size.
+         const bool enlarged = ww > 1600 || wh > 1000;
+         if (enlarged && mw > 0 && mh > 0 && (ww > mw || wh > mh))
+         {
+            int l = 0, t = 0, r = 0, b = 0;
+            glfwGetWindowFrameSize(window, &l, &t, &r, &b);
+            const int fitW = std::min(ww, mw - l - r);
+            const int fitH = std::min(wh, mh - t - b);
+            glfwSetWindowSize(window, fitW, fitH);
+            glfwSetWindowPos(window, mx + l + (mw - l - r - fitW) / 2, my + t + (mh - t - b - fitH) / 2);
+         }
+      }
+   }
 
    glfwMakeContextCurrent(window);
 #if !defined(__APPLE__)
@@ -72231,95 +72335,22 @@ int main(int argc, char** argv)
    // the font atlas - loading it after the atlas already exists is too late.
    CategoryColors::LoadPreference();
 
-   // A proper UI typeface instead of ImGui's bitmap default. Retina-aware:
-   // load at 2x and scale down so text stays sharp on a HiDPI display.
+   // A proper UI typeface instead of ImGui's bitmap default, baked sharp for the display.
    //
    // The bundled Inter Regular (external/fonts/Inter, SIL OFL - see that
-   // directory's LICENSE.txt) is tried first on *both* platforms, resolved
-   // relative to the executable's own location (BundledResourcePath, above)
-   // rather than any particular working directory or bundle-launch
-   // assumption. Before this, the candidate list below was macOS-only
-   // system paths with nothing after it - on Windows every one of these
-   // AddFontFromFileTTF calls failed silently and ImGui fell all the way
-   // back to its built-in tiny bitmap font (Proggy). The old macOS system
-   // fonts stay in the list as a fallback chain (belt-and-suspenders for a
-   // dev build missing the bundled asset), they just no longer run first.
-   // manualScale is the user's optional "UI Scale" override (Appearance tab),
-   // on top of whatever the OS reports for the monitor. Windows and macOS
-   // need different math here because glfwGetWindowContentScale means
-   // something different on each: on macOS the window is sized in points and
-   // the framebuffer is a separate, larger pixel buffer (Retina), so xscale
-   // only needs to inform how *sharp* the baked glyphs are - the actual
-   // on-screen point size stays baseSize regardless of xscale, which is what
-   // the FontGlobalScale = 1/xscale below restores. On Windows there is no
-   // such points/pixels split - the window and framebuffer are both in
-   // physical pixels, and xscale is the real OS/monitor DPI factor - so text
-   // must actually get bigger there, not just sharper. Previously this block
-   // used the macOS formula unconditionally, which baked the font at
-   // baseSize*xscale and then divided the *same* xscale back out via
-   // FontGlobalScale, cancelling to a fixed 15 physical px on every Windows
-   // display regardless of its scaling setting (issue #21).
-   const float manualScale = CategoryColors::GetUiScale();
-   float styleScale = manualScale;
-   {
-      float xscale = 1.0f, yscale = 1.0f;
-      glfwGetWindowContentScale(window, &xscale, &yscale);
-      const float baseSize = 15.0f;
-      const float bakeScale = xscale * manualScale;
-      int winW = 0, winH = 0, fbW = 0, fbH = 0;
-      glfwGetWindowSize(window, &winW, &winH);
-      glfwGetFramebufferSize(window, &fbW, &fbH);
-      // Decided by the framebuffer, not the OS: Linux X11 is pixel-for-pixel like Windows
-      // (it used to take the macOS branch and stay at 15 px on a hi-DPI monitor), while
-      // Wayland is point-based like macOS. See core/UiScale.h.
-      const UiScale::Result uiScaleResult = UiScale::Resolve(xscale, winW, fbW, manualScale);
-      const float displayScale = uiScaleResult.displayScale;
-      styleScale = uiScaleResult.styleScale;
-      const std::string bundledInter = BundledResourcePath("fonts/Inter-Regular.ttf");
-      const char* candidates[] = {
-         bundledInter.c_str(),
-         "/System/Library/Fonts/SFNS.ttf",
-         "/System/Library/Fonts/HelveticaNeue.ttc",
-         "/System/Library/Fonts/Helvetica.ttc",
-         "/System/Library/Fonts/Supplemental/Arial.ttf",
-      };
-      ImGuiIO& io = ImGui::GetIO();
-      ImFont* uiFont = nullptr;
-      for (const char* path : candidates)
-      {
-         if (path[0] == '\0')
-            continue;
-         uiFont = io.Fonts->AddFontFromFileTTF(path, baseSize * bakeScale);
-         if (uiFont != nullptr)
-         {
-            io.FontGlobalScale = displayScale;
-            break;
-         }
-      }
-
-      // Merge a small slice of the Lucide icon font (external/icons/Lucide,
-      // ISC license) into the same atlas at PUA codepoints, so icon glyphs
-      // can be dropped into ordinary ImGui::Text/Button calls alongside UI
-      // text (see IconsLucide.h). MergeMode=true means it rides the same
-      // baseline/line-height as the font just loaded rather than becoming a
-      // separate selectable font - the standard ImGui icon-font idiom.
-      // Restricted to one explicit range (currently just the "search" glyph,
-      // U+E151) rather than Lucide's full 1000+ icon set - the atlas only
-      // pays texture memory for glyphs actually in use.
-      if (uiFont != nullptr)
-      {
-         const std::string bundledLucide = BundledResourcePath("icons/lucide.ttf");
-         if (!bundledLucide.empty())
-         {
-            static const ImWchar iconRanges[] = { 0xE151, 0xE151, 0 };
-            ImFontConfig iconCfg;
-            iconCfg.MergeMode = true;
-            iconCfg.PixelSnapH = true;
-            iconCfg.GlyphMinAdvanceX = baseSize * bakeScale;
-            io.Fonts->AddFontFromFileTTF(bundledLucide.c_str(), baseSize * bakeScale, &iconCfg, iconRanges);
-         }
-      }
-   }
+   // directory's LICENSE.txt) is tried first on every platform, resolved
+   // relative to the executable's own location (BundledResourcePath) rather
+   // than any particular working directory; the macOS system fonts after it
+   // are a fallback chain for a dev build missing the bundled asset.
+   //
+   // DPI: the whole UI is laid out in points on every platform (core/UiScale.h).
+   // On Retina/Wayland the OS already sizes the window in points; on Windows and
+   // X11 the GLFW backend divides the pixel window by the monitor's scale. The
+   // user's "UI Scale" slider multiplies on top. Issue #21 (Windows text stuck at
+   // 15 px) and its Linux X11 twin were both the font half of this; node bodies
+   // staying 440 px wide at 200% was the layout half.
+   ApplyUiScale(window, false);
+   glfwSetWindowContentScaleCallback(window, [](GLFWwindow*, float, float) { UiScale::RequestRescale(); });
 
    ImGuiStyle& style = ImGui::GetStyle();
    style.FrameRounding = 3.0f;
@@ -72332,13 +72363,8 @@ int main(int argc, char** argv)
    // knob row. Left unset before this, which meant they inherited 0.
    style.PopupRounding = 12.0f;
    style.ScrollbarRounding = 10.0f;
-   // Scales padding/spacing/rounding/etc alongside the font. On Windows this
-   // also carries the real monitor DPI factor (see styleScale above), since
-   // widget metrics need to grow with the display the same way text does;
-   // on macOS the OS/framebuffer already handles that half, so only the
-   // manual override multiplies here.
-   if (styleScale != 1.0f)
-      style.ScaleAllSizes(styleScale);
+   // No ScaleAllSizes: style metrics are in points, and the point scale (ApplyUiScale above)
+   // grows them together with every other size on screen.
 
    ImGui_ImplGlfw_InitForOpenGL(window, true);
    // Installed after the backend so it chains rather than replacing ImGui's.
@@ -72900,6 +72926,31 @@ int main(int argc, char** argv)
                   y += 700.0f;
                }
             }
+      }
+      else if (getenv("INFINITE_UISCALETEST") != nullptr)
+      {
+         // UI-scale fixture (docs/fix-briefs/ui-scale-all-displays.md): representative node
+         // bodies - a synth, an audio effect, the mixer and the dense Render 3D - laid out at
+         // UI scale 1.0, 1.5 and 2.0 through the live-rescale path. The per-frame half below
+         // asserts every node keeps its 1x size in points, i.e. nothing that fits at 1x
+         // clips or overflows at 2x. Stacked near the origin so none is culled off-screen
+         // at 2x, where the headless window is only 800x500 points.
+         const char* kTypes[][2] = {
+            { "Wavetable", "Synths" }, { "Delay", "AudioEffects" },
+            { "Mixer", "Utility" },    { "Render 3D", "3D" },
+         };
+         float y = 20.0f;
+         for (const auto& t : kTypes)
+         {
+            GraphNode* gn = SpawnNode(t[0], t[1], 20.0f, y);
+            if (gn == nullptr)
+            {
+               printf("UISCALETEST FAIL: could not spawn %s\n", t[0]);
+               continue;
+            }
+            gn->showParams = true;
+            y += 60.0f;
+         }
       }
       else if (const char* stressN = getenv("INFINITE_EDPERFTEST"))
       {
@@ -75566,6 +75617,19 @@ int main(int argc, char** argv)
          }
       }
 
+      // Live rescale between frames: monitor change, OS scale change, or the UI Scale slider.
+      // A minimized window reports 0x0, which would misread Retina as pixel-for-pixel, so
+      // the rescale waits until the window has a size again.
+      if (UiScale::RescaleRequested())
+      {
+         int dirtyW = 0, dirtyH = 0;
+         glfwGetWindowSize(window, &dirtyW, &dirtyH);
+         if (dirtyW > 0 && dirtyH > 0)
+         {
+            UiScale::RescaleRequested() = false;
+            ApplyUiScale(window, true);
+         }
+      }
       ImGui_ImplOpenGL3_NewFrame();
       ImGui_ImplGlfw_NewFrame();
 
@@ -75717,7 +75781,8 @@ int main(int argc, char** argv)
          if (frameId >= 54)
          {
             tio.AddMousePosEvent(gTestMouse.x, gTestMouse.y);
-            glfwSetCursorPos(window, (double)gTestMouse.x, (double)gTestMouse.y);
+            glfwSetCursorPos(window, (double)(gTestMouse.x * ImGui_ImplGlfw_GetPointScale()),
+                             (double)(gTestMouse.y * ImGui_ImplGlfw_GetPointScale()));
          }
       }
 
@@ -75808,7 +75873,8 @@ int main(int argc, char** argv)
             // own between frames (screen-capture tooling, most likely),
             // which a later glfwGetCursorPos() poll would otherwise pick up
             // and use to clobber the AddMousePosEvent target above.
-            glfwSetCursorPos(window, (double)gTestMouse.x, (double)gTestMouse.y);
+            glfwSetCursorPos(window, (double)(gTestMouse.x * ImGui_ImplGlfw_GetPointScale()),
+                             (double)(gTestMouse.y * ImGui_ImplGlfw_GetPointScale()));
          }
       }
 
@@ -75851,7 +75917,8 @@ int main(int argc, char** argv)
             tio.AddKeyEvent(ImGuiMod_Shift, false);
          }
          tio.AddMousePosEvent(gTestMouse.x, gTestMouse.y);
-         glfwSetCursorPos(window, (double)gTestMouse.x, (double)gTestMouse.y);
+         glfwSetCursorPos(window, (double)(gTestMouse.x * ImGui_ImplGlfw_GetPointScale()),
+                             (double)(gTestMouse.y * ImGui_ImplGlfw_GetPointScale()));
       }
 #endif
 
@@ -95110,6 +95177,110 @@ int main(int argc, char** argv)
                    changed, pct, maxDelta);
             printf("%s\n", (r->ActiveSamples() > 1 && changed > 1000)
                               ? "MSAA OK" : "SUSPECT - multisampling had no effect");
+         }
+      }
+
+      if (getenv("INFINITE_UISCALETEST") != nullptr)
+      {
+         // Phases, 8 frames each so the rebake and two node-editor layout passes settle:
+         // scale 1.0 (reference), 1.5, 2.0, 1.25, then the user's own value is restored.
+         // 1.25 asks for a fractional font size even on Retina (37.5 px); 1.5 does on
+         // Windows/X11 (22.5 px). ImGui truncates font sizes, see UiScale::BakedFontPx.
+         static const float kScales[] = { 1.0f, 1.5f, 2.0f, 1.25f };
+         const int kPhases = 4;
+         static float sUserScale = 1.0f;
+         static std::vector<ImVec2> sRef;
+         static int sFailures = 0;
+         const int kPhaseFrames = 8;
+         if (frameId == 1)
+         {
+            const char* firstFailure = nullptr;
+            const int tableFailures = UiScale::SelfCheck(&firstFailure);
+            if (tableFailures != 0)
+            {
+               printf("UISCALETEST FAIL: decision table, %d case(s) wrong, first: %s\n", tableFailures,
+                      firstFailure ? firstFailure : "?");
+               sFailures += tableFailures;
+            }
+            sUserScale = CategoryColors::GetUiScale();
+            CategoryColors::SetUiScale(kScales[0], false);
+            UiScale::RequestRescale();
+         }
+         const int phase = frameId / kPhaseFrames;
+         if (frameId > 1 && frameId % kPhaseFrames == kPhaseFrames - 1 && phase < kPhases)
+         {
+            const float scale = kScales[phase];
+            const ImGuiIO& sio = ImGui::GetIO();
+            int fbW = 0, fbH = 0;
+            glfwGetFramebufferSize(window, &fbW, &fbH);
+            const float drawnW = sio.DisplaySize.x * sio.DisplayFramebufferScale.x;
+            const float fontPx = ImGui::GetFontSize();
+            printf("UISCALETEST scale %.2f: point %.2f bake %.2f display %.0fx%.0f font %.2f\n", scale,
+                   UiScale::Current().pointScale, UiScale::Current().bakeScale, sio.DisplaySize.x,
+                   sio.DisplaySize.y, fontPx);
+            if (std::fabs(drawnW - (float)fbW) > 1.0f)
+            {
+               printf("UISCALETEST FAIL: scale %.1f draws %.1f px into a %d px framebuffer\n", scale, drawnW, fbW);
+               sFailures++;
+            }
+            if (std::fabs(fontPx - UiScale::kBaseFontSize) > 0.01f)
+            {
+               printf("UISCALETEST FAIL: scale %.1f font is %.2f points, not %.0f\n", scale, fontPx,
+                      UiScale::kBaseFontSize);
+               sFailures++;
+            }
+            // The slider must reach the backend: point scale follows it 1:1 on top of the
+            // platform's own factor (1 on Retina/Wayland, xscale on Windows/X11).
+            static float sPointPerSlider = 0.0f;
+            const float pointPerSlider = ImGui_ImplGlfw_GetPointScale() / scale;
+            if (phase == 0)
+               sPointPerSlider = pointPerSlider;
+            else if (!UiScale::Near(pointPerSlider, sPointPerSlider))
+            {
+               printf("UISCALETEST FAIL: scale %.1f gives point scale %.3f, expected %.3f\n", scale,
+                      ImGui_ImplGlfw_GetPointScale(), sPointPerSlider * scale);
+               sFailures++;
+            }
+            for (size_t i = 0; i < gNodes.size(); i++)
+            {
+               const ImVec2 sz = ed::GetNodeSize(gNodes[i].NodeId());
+               if (phase == 0)
+               {
+                  sRef.push_back(sz);
+                  continue;
+               }
+               if (i >= sRef.size())
+                  continue;
+               // A body that clips or overflows at this scale changes its box. Glyph
+               // advances bake at a different pixel size, so allow 1% (min 2 points).
+               const float tolX = std::max(2.0f, sRef[i].x * 0.01f);
+               const float tolY = std::max(2.0f, sRef[i].y * 0.01f);
+               if (std::fabs(sz.x - sRef[i].x) > tolX || std::fabs(sz.y - sRef[i].y) > tolY)
+               {
+                  printf("UISCALETEST FAIL: %s is %.1fx%.1f at scale %.1f, %.1fx%.1f at 1.0\n",
+                         gNodes[i].typeName.c_str(), sz.x, sz.y, scale, sRef[i].x, sRef[i].y);
+                  sFailures++;
+               }
+            }
+            if (phase + 1 < kPhases)
+               CategoryColors::SetUiScale(kScales[phase + 1], false);
+            else
+               CategoryColors::SetUiScale(sUserScale, false);
+            UiScale::RequestRescale();
+         }
+         if (frameId == kPhases * kPhaseFrames + 2)
+         {
+            if (sRef.size() != 4)
+            {
+               printf("UISCALETEST FAIL: measured %zu nodes, expected 4\n", sRef.size());
+               sFailures++;
+            }
+            if (sFailures == 0)
+               printf("UISCALETEST %zu nodes at 1.0/1.5/2.0/1.25, sizes held  OK\n", sRef.size());
+            else
+               printf("UISCALETEST FAIL: %d problem(s)\n", sFailures);
+            fflush(stdout);
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
       }
 
