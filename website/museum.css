@@ -1,12 +1,12 @@
 /* Infinite — Artworks museum. Tokens follow style.css (paper / ink / accent, Geist). */
 :root {
-  --paper: #F4EBDD;
-  --bg: #0B0907;
-  --ink: #F4EBDD;
-  --ink2: #C9BBA5;
-  --muted: #8F8271;
+  --paper: #FBFAF6;
+  --bg: #EFEBE0;
+  --ink: #1F1D1A;
+  --ink2: #5A534C;
+  --muted: #857C74;
   --line: var(--glass-edge);
-  --accent: #F57F66;
+  --accent: #C2593F;
   --brand-grad: linear-gradient(90deg, #F57F66, #D99A9C 35%, #C7AFC0 65%, #A9CDF1);
   --hand: 'Caveat', cursive;
   --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -14,10 +14,10 @@
   --font-hand: 'Caveat', cursive;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-io: cubic-bezier(0.65, 0, 0.35, 1);
-  --glass: rgba(251, 250, 246, 0.10);
-  --glass-edge: rgba(251, 250, 246, 0.26);
-  --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.4), var(--glass-hi);
+  --glass: rgba(255, 255, 255, 0.42);
+  --glass-edge: rgba(255, 255, 255, 0.7);
+  --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(45, 35, 25, 0.04);
+  --shadow: 0 1px 2px rgba(45, 35, 25, 0.06), 0 10px 28px rgba(45, 35, 25, 0.12), var(--glass-hi);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -47,7 +47,7 @@ html, body {
 
 .vignette {
   position: fixed; inset: 0; pointer-events: none;
-  background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+  background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(60, 48, 34, 0.14) 100%);
 }
 
 /* ---- opening ---- */
@@ -68,7 +68,7 @@ body:not(.is-loading) .intro { opacity: 0; visibility: hidden; }
   position: fixed; z-index: 10;
   display: flex; align-items: center; gap: 8px;
   background: var(--glass);
-  -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7);
+  -webkit-backdrop-filter: blur(22px) saturate(1.8); backdrop-filter: blur(22px) saturate(1.8);
   border: 1px solid var(--line); border-radius: 999px;
   box-shadow: var(--shadow);
   color: var(--ink); text-decoration: none;
@@ -78,7 +78,7 @@ body:not(.is-loading) .intro { opacity: 0; visibility: hidden; }
 }
 .chip svg { width: 15px; height: 15px; }
 .back { top: max(18px, env(safe-area-inset-top)); left: 18px; }
-.back:hover { transform: translateY(-1px); background: rgba(251, 250, 246, 0.2); }
+.back:hover { transform: translateY(-1px); background: rgba(255, 255, 255, 0.75); }
 
 .counter {
   top: max(18px, env(safe-area-inset-top)); right: 18px;
@@ -95,13 +95,13 @@ body.is-focus .counter { opacity: 1; transform: none; }
   transform: translateX(-50%);
   display: flex; padding: 4px; gap: 0;
   background: var(--glass);
-  -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7);
+  -webkit-backdrop-filter: blur(22px) saturate(1.8); backdrop-filter: blur(22px) saturate(1.8);
   border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow);
   transition: opacity 0.5s var(--ease-io), transform 0.6s var(--ease-out);
 }
 .modes .thumb {
   position: absolute; top: 4px; bottom: 4px; left: 0; width: 0;
-  border-radius: 999px; background: var(--brand-grad); box-shadow: 0 2px 14px rgba(245, 127, 102, 0.35);
+  border-radius: 999px; background: var(--brand-grad); box-shadow: 0 2px 14px rgba(245, 127, 102, 0.3);
   transition: transform 0.55s var(--ease-out), width 0.55s var(--ease-out);
   pointer-events: none;
 }
@@ -126,7 +126,7 @@ body.is-focus .modes { opacity: 0; pointer-events: none; transform: translate(-5
   font: 500 11px/1.4 var(--font-mono); letter-spacing: 0.04em; text-transform: lowercase;
   color: var(--ink); text-align: center; white-space: nowrap;
   padding: 9px 16px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-edge); box-shadow: var(--shadow);
-  -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7);
+  -webkit-backdrop-filter: blur(22px) saturate(1.8); backdrop-filter: blur(22px) saturate(1.8);
   opacity: 0; pointer-events: none;
   transition: opacity 0.7s var(--ease-io), transform 0.7s var(--ease-out);
 }
@@ -138,7 +138,7 @@ body.is-focus .hint { opacity: 0 !important; }
   position: fixed; z-index: 10; left: 24px; bottom: max(26px, env(safe-area-inset-bottom) + 14px);
   max-width: min(320px, calc(100vw - 48px));
   background: var(--glass);
-  -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7);
+  -webkit-backdrop-filter: blur(22px) saturate(1.8); backdrop-filter: blur(22px) saturate(1.8);
   border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow);
   padding: 16px 20px 17px;
   opacity: 0; transform: translateY(14px); pointer-events: none;
@@ -160,13 +160,13 @@ body.is-focus .focus-ui { opacity: 1; transform: none; pointer-events: auto; tra
   width: 46px; height: 46px; border-radius: 50%;
   display: grid; place-items: center; cursor: pointer;
   background: var(--glass);
-  -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7);
+  -webkit-backdrop-filter: blur(22px) saturate(1.8); backdrop-filter: blur(22px) saturate(1.8);
   border: 1px solid var(--line); box-shadow: var(--shadow); color: var(--ink);
   transition: transform 0.3s var(--ease-out), background 0.3s;
   -webkit-tap-highlight-color: transparent;
 }
 .round svg { width: 18px; height: 18px; }
-.round:hover { background: rgba(251, 250, 246, 0.22); transform: translateY(-2px); }
+.round:hover { background: rgba(255, 255, 255, 0.75); transform: translateY(-2px); }
 .round:active { transform: scale(0.94); }
 .round.close { background: var(--brand-grad); color: #1F1D1A; border-color: transparent; }
 .round.close:hover { filter: brightness(1.08); }

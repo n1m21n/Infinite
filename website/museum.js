@@ -59,16 +59,18 @@ try {
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-const BG = new THREE.Color('#0B0907');
+const BG = new THREE.Color('#EFEBE0');
 const scene = new THREE.Scene();
 scene.background = BG;
-scene.fog = new THREE.Fog(BG, 6, 21);
+scene.fog = new THREE.Fog(BG, 9, 26);
 
 const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 80);
 camera.rotation.order = 'YXZ';
 
-// the room is nearly unlit: just enough ambient to read the architecture; the pieces are lit by their own lamps
-scene.add(new THREE.HemisphereLight(0x9a9aa8, 0x4a4540, 1.5));
+scene.add(new THREE.HemisphereLight(0xfff8ee, 0xf0e8d8, 2.15));
+const sun = new THREE.DirectionalLight(0xfff1dc, 1.1);
+sun.position.set(-2, 6, 3);
+scene.add(sun);
 
 const maxAniso = renderer.capabilities.getMaxAnisotropy();
 
@@ -86,18 +88,18 @@ function canvasTex(w, h, draw, { srgb = true, repeat } = {}) {
 // ---------------------------------------------------------------------------------------------
 // Environment: floor + three rooms. Each room has a fade value so rooms dissolve into each other.
 // ---------------------------------------------------------------------------------------------
-const WALL_C = '#7A7168';
+const WALL_C = '#F3EFE6';
 
 const wallMat = () => new THREE.MeshLambertMaterial({ color: WALL_C, transparent: true });
 
 const floorTex = canvasTex(512, 512, (g, w, h) => {
   g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
-  g.strokeStyle = 'rgba(255,220,160,0.10)'; g.lineWidth = 3;
+  g.strokeStyle = 'rgba(70,55,35,0.10)'; g.lineWidth = 3;
   g.strokeRect(0, 0, w, h);
-  g.strokeStyle = 'rgba(255,220,160,0.04)'; g.lineWidth = 2;
+  g.strokeStyle = 'rgba(70,55,35,0.035)'; g.lineWidth = 2;
   g.beginPath(); g.moveTo(w / 2, 0); g.lineTo(w / 2, h); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
 }, { repeat: [60, 60] });
-const floorMat = new THREE.MeshStandardMaterial({ color: '#5A5149', map: floorTex, roughness: 0.5, metalness: 0, transparent: true, opacity: 0.9 });
+const floorMat = new THREE.MeshStandardMaterial({ color: '#E4E0D6', map: floorTex, roughness: 0.45, metalness: 0, transparent: true, opacity: 0.86 });
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(72, 72), floorMat);
 floor.rotation.x = -Math.PI / 2;
 floor.renderOrder = 2;
@@ -113,16 +115,20 @@ const hallLeft = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
 const hallRight = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
 const hallEnd = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
 const hallStart = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
-const hallCeil = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshLambertMaterial({ color: '#4A443E', transparent: true }));
-rooms.hall.add(hallLeft, hallRight, hallEnd, hallStart, hallCeil);
+const hallCeil = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshLambertMaterial({ color: '#F1ECE0', transparent: true }));
+const panelMat = new THREE.MeshBasicMaterial({ color: '#FFFDF6', transparent: true, fog: false });
+const hallPanels = Array.from({ length: 9 }, () => new THREE.Mesh(new THREE.PlaneGeometry(1, 1), panelMat));
+rooms.hall.add(hallLeft, hallRight, hallEnd, hallStart, hallCeil, ...hallPanels);
 
 // --- rotunda ---
 const ROT_R = 4.7;
 const rotWall = new THREE.Mesh(new THREE.CylinderGeometry(ROT_R + 0.55, ROT_R + 0.55, 5.4, 96, 1, true), new THREE.MeshLambertMaterial({ color: WALL_C, side: THREE.BackSide, transparent: true }));
 rotWall.position.y = 2.7;
-const rotCeil = new THREE.Mesh(new THREE.RingGeometry(1.5, ROT_R + 0.55, 96), new THREE.MeshLambertMaterial({ color: '#4A443E', side: THREE.DoubleSide, transparent: true }));
+const rotCeil = new THREE.Mesh(new THREE.RingGeometry(1.5, ROT_R + 0.55, 96), new THREE.MeshLambertMaterial({ color: '#F1ECE0', side: THREE.DoubleSide, transparent: true }));
 rotCeil.rotation.x = Math.PI / 2; rotCeil.position.y = 5.4;
-rooms.rotunda.add(rotWall, rotCeil);
+const rotHalo = new THREE.Mesh(new THREE.RingGeometry(1.5, 1.9, 96), new THREE.MeshBasicMaterial({ color: '#FFFDF6', side: THREE.DoubleSide, transparent: true, fog: false }));
+rotHalo.rotation.x = Math.PI / 2; rotHalo.position.y = 5.39;
+rooms.rotunda.add(rotWall, rotCeil, rotHalo);
 
 // --- wall ---
 const bigWall = new THREE.Mesh(new THREE.PlaneGeometry(90, 16), wallMat());
@@ -147,7 +153,7 @@ const shadowTex = canvasTex(256, 256, (g, w, h) => {
 });
 const washTex = canvasTex(256, 256, (g, w, h) => {
   const r = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
-  r.addColorStop(0, 'rgba(255,255,255,0.7)'); r.addColorStop(0.5, 'rgba(255,255,255,0.24)'); r.addColorStop(1, 'rgba(255,255,255,0)');
+  r.addColorStop(0, 'rgba(255,252,244,0.85)'); r.addColorStop(0.5, 'rgba(255,250,240,0.32)'); r.addColorStop(1, 'rgba(255,250,240,0)');
   g.fillStyle = r; g.fillRect(0, 0, w, h);
 });
 // canvas top = v 1 (art top, deepest under the floor) fades out; canvas bottom = v 0 (nearest the floor) is solid
@@ -159,14 +165,14 @@ const reflAlphaFixed = canvasTex(4, 128, (g, w, h) => {
 
 function plaqueTex(no, title, meta) {
   return canvasTex(640, 240, (g, w, h) => {
-    g.fillStyle = '#17120D'; g.fillRect(0, 0, w, h);
-    g.strokeStyle = 'rgba(255,194,114,0.35)'; g.lineWidth = 4; g.strokeRect(2, 2, w - 4, h - 4);
+    g.fillStyle = '#FBFAF6'; g.fillRect(0, 0, w, h);
+    g.strokeStyle = 'rgba(45,35,25,0.14)'; g.lineWidth = 4; g.strokeRect(2, 2, w - 4, h - 4);
     g.textBaseline = 'alphabetic';
     g.fillStyle = '#F57F66'; g.font = '500 34px "Geist Mono", ui-monospace, monospace';
     g.fillText(`NO. ${no}`, 34, 62);
-    g.fillStyle = '#F4EBDD'; g.font = '700 92px "Caveat", cursive';
+    g.fillStyle = '#1F1D1A'; g.font = '700 92px "Caveat", cursive';
     g.fillText(title, 34, 146);
-    g.fillStyle = '#8F8271'; g.font = '400 30px "Geist Mono", ui-monospace, monospace';
+    g.fillStyle = '#857C74'; g.font = '400 30px "Geist Mono", ui-monospace, monospace';
     g.fillText(meta, 34, 196);
   });
 }
@@ -186,7 +192,7 @@ const pieces = WORKS.map((w, i) => {
   const g = new THREE.Group();
   const shadow = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false, opacity: 0.6 }));
   shadow.scale.set(w.w * 1.5, w.h * 1.4, 1); shadow.position.set(0, -0.06, -0.03);
-  const wash = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({ map: washTex, transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, opacity: 0.9 }));
+  const wash = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({ map: washTex, transparent: true, depthWrite: false, fog: false }));
   wash.scale.set(w.w * 3.4, w.h * 2.8, 1); wash.position.set(0, 0, -0.04);
   const frame = new THREE.Mesh(boxGeo, frameMat);
   frame.scale.set(w.w + 0.06, w.h + 0.06, 0.06); frame.position.z = 0;
@@ -197,10 +203,7 @@ const pieces = WORKS.map((w, i) => {
   const plq = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({ transparent: true }));
   const pw = 0.56; plq.scale.set(pw, pw * 240 / 640, 1);
   plq.position.set(-w.w / 2 + pw / 2 + 0.02, -w.h / 2 - 0.2, 0.01);
-  // the piece is its own light source: a point light + a tinted pool, coloured from the artwork (see sampleColour)
-  const light = new THREE.PointLight(0xffffff, 7, 9, 1.4);
-  light.position.set(0, 0, 0.9);
-  g.add(shadow, wash, frame, art, plq, light);
+  g.add(shadow, wash, frame, art, plq);
   artGroup.add(g);
   hitMeshes.push(art);
 
@@ -212,7 +215,7 @@ const pieces = WORKS.map((w, i) => {
   reflGroup.add(rg);
 
   const p = {
-    i, def: w, group: g, art, artMat, reflMat, rg, plq, wash, light, col: new THREE.Color(1, 0.8, 0.6), sampleT: 0,
+    i, def: w, group: g, art, artMat, reflMat, rg, plq, wash,
     cur: { x: 0, y: ART_Y, z: 0, ry: 0 }, from: null, to: { x: 0, y: ART_Y, z: 0, ry: 0 },
     t0: 0, delay: 0, dur: 1, arc: 0, hover: 0, poster: null, slot: null, ready: false,
   };
@@ -250,7 +253,7 @@ function wallPositions() {
     const row = i % 2;
     const col = Math.floor(i / 2);
     const x = (col - (per - 1) / 2) * colW + (row ? colW / 2 : 0) - colW / 4;
-    const y = row ? 0.92 : 2.78;
+    const y = row ? 0.86 : 3.08;
     return { x, y, z: WALL_Z, ry: 0 };
   });
 }
@@ -279,6 +282,10 @@ function applyViewParams() {
   hallEnd.scale.set(view.W * 2 + 0.3, 1, 1); hallEnd.position.set(0, 2.5, zBack);
   hallStart.scale.set(view.W * 2 + 0.3, 1, 1); hallStart.rotation.y = Math.PI; hallStart.position.set(0, 2.5, zFront);
   hallCeil.scale.set(view.W * 2 + 0.3, len, 1); hallCeil.rotation.x = Math.PI / 2; hallCeil.position.set(0, 4.6, cz);
+  hallPanels.forEach((m, k) => {
+    m.rotation.x = Math.PI / 2; m.scale.set(1.1, len / 9 * 0.55, 1);
+    m.position.set(0, 4.59, cz - len / 2 + (k + 0.5) * (len / 9));
+  });
   hall.max = hall.zStart - (hall.lastZ - 1.0);
 
   bigWall.position.set(0, 3, WALL_Z - 0.06);
@@ -324,30 +331,6 @@ function updatePieces(now) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Colour of each piece -> its light. Poster once, then the live video a few times a second.
-const sampCv = document.createElement('canvas'); sampCv.width = sampCv.height = 6;
-const sampCx = sampCv.getContext('2d', { willReadFrequently: true });
-const _hsl = {};
-function sampleColour(p, src) {
-  try {
-    sampCx.drawImage(src, 0, 0, 6, 6);
-    const d = sampCx.getImageData(0, 0, 6, 6).data;
-    let r = 0, g = 0, b = 0;
-    for (let k = 0; k < d.length; k += 4) { r += d[k]; g += d[k + 1]; b += d[k + 2]; }
-    const n = d.length / 4;
-    p.col.setRGB(r / n / 255, g / n / 255, b / n / 255, THREE.SRGBColorSpace);
-    p.col.getHSL(_hsl);
-    p.col.setHSL(_hsl.h, Math.min(1, _hsl.s * 1.35 + 0.1), 0.62);   // keep it luminous and saturated whatever the frame
-  } catch (e) { /* tainted or not ready: keep the last colour */ }
-}
-function updateGlow(now, dt) {
-  for (const p of pieces) {
-    if (p.slot && p.slot.v.readyState >= 2 && now - p.sampleT > 0.3) { p.sampleT = now; sampleColour(p, p.slot.v); }
-    p.light.color.lerp(p.col, Math.min(1, dt * 4));
-    p.wash.material.color.copy(p.light.color);
-  }
-}
-
 // Video pool: only the pieces you can see are decoding; everyone else shows the poster frame.
 // ---------------------------------------------------------------------------------------------
 const slots = Array.from({ length: POOL }, () => {
@@ -405,7 +388,7 @@ function pickLive(now, force) {
 // Camera state per mode
 // ---------------------------------------------------------------------------------------------
 let mode = 'hall';
-let washK = 1, lightK = 1;
+let washK = 1;
 let focusIdx = -1;
 const S = {
   hall: { pos: 0, tgt: 0, vel: 0, yaw: 0, yawT: 0, pitch: 0, pitchT: 0 },
@@ -768,12 +751,10 @@ function frame() {
     rooms[k].visible = roomFade[k] > 0.01;
   }
   // the rotunda wall curves in front of a flat light pool; narrow the pools there so they are not clipped
-  lightK = damp(lightK, mode === 'wall' ? 0.3 : mode === 'rotunda' ? 0.75 : 1, reduceMotion ? 30 : 5, dt);
-  for (const p of pieces) { p.light.intensity = 7 * lightK; p.wash.material.opacity = 0.9 * (0.4 + 0.6 * lightK); }
   washK = damp(washK, mode === 'rotunda' ? 0.5 : 1, reduceMotion ? 30 : 5, dt);
   for (const p of pieces) { p.wash.scale.x = p.def.w * 3.4 * washK; }
   floorFade = damp(floorFade, mode === 'wall' ? 0 : 1, reduceMotion ? 30 : 5, dt);
-  floor.visible = floorFade > 0.01; floorMat.opacity = 0.9 * floorFade;
+  floor.visible = floorFade > 0.01; floorMat.opacity = 0.86 * floorFade;
   reflGroup.visible = floorFade > 0.2;
   for (const f of fadables) {
     const o = roomFade[f.room] * f.base;
@@ -788,7 +769,6 @@ function frame() {
   }
 
   updatePieces(now);
-  updateGlow(now, dt);
   pickLive(now, false);
   renderer.render(scene, camera);
 }
@@ -810,7 +790,7 @@ async function boot() {
   await Promise.all(pieces.map((p) => new Promise((res) => {
     loader.load(`assets/museum/${p.def.file}.jpg`, (t) => {
       t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = maxAniso;
-      p.poster = t; p.setMap(t); sampleColour(p, t.image); p.light.color.copy(p.col); res();
+      p.poster = t; p.setMap(t); res();
     }, undefined, () => res());
   }).then(() => { loaded++; bar.style.transform = `scaleX(${loaded / N})`; })));
 
