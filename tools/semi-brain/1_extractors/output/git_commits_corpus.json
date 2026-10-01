@@ -1,5 +1,3086 @@
 [
   {
+    "hash": "97b6a736493b8f143e42bc581dee495f6cd6ed3f",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 14:18:07 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/auto-layout-posless-nodes",
+      "description": "Merge feature/auto-layout-posless-nodes",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>\n# Conflicts:\n#\tsrc/main.cpp",
+      "raw": "Merge feature/auto-layout-posless-nodes\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>\n\n# Conflicts:\n#\tsrc/main.cpp"
+    },
+    "stat": "",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "CMakeLists.txt",
+      "docs/reference/patch-format.md",
+      "src/core/Patch.cpp",
+      "src/core/Patch.h",
+      "src/core/PatchLayout.cpp",
+      "src/core/PatchLayout.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "9664c4c4f65513969d5072861709a7865a4a98f6",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 14:07:02 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Merge bugfix/headless-index-mod-output",
+      "description": "Merge bugfix/headless-index-mod-output",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge bugfix/headless-index-mod-output"
+    },
+    "stat": "",
+    "files": [
+      ".claude/skills/infinite-patch-authoring/SKILL.md",
+      "docs/ai-skills/infinite-patch-authoring.md",
+      "docs/reference/patch-format.md",
+      "scripts/headless_smoke.sh",
+      "src/core/AISkillContent.h",
+      "src/core/Patch.cpp",
+      "src/core/Patch.h",
+      "src/core/PatchSchema.cpp",
+      "src/core/PatchSchema.h",
+      "src/main.cpp",
+      "tests/headless/names/out_of_order.inf"
+    ]
+  },
+  {
+    "hash": "72a0409c59386ead5ce93f6dd5b2d0efc275a34d",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 14:07:02 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "headless: keep file node indices; resolve named source outputs",
+      "description": "headless: keep file node indices; resolve named source outputs",
+      "bullets": [
+        "note-map) used the file's indices against the live graph, so a file"
+      ],
+      "body": "Bug 1: ApplyPatchData renumbered nodes in file order, but every headless\nlookup after the load (--explain ids and bypass notes, --node, --stems,\nwith nodes out of order (or with gaps) labelled the wrong nodes while\nvalidating clean. A headless load now keeps the file's indices\n(keepIndices); Validate reports E_BAD_INDEX outside 1..1000000.\nBug 2: `mod ... <src> low ...` failed the >> on srcOutput, so the line\nfell back to output 0 and dropped polarity/depth/centre/lo/hi. srcOutput\non mod/cable/geo/note is now read as a ref and resolved against the\nsource's --describe output labels; an unknown label is E_BAD_REF listing\nthe outputs.\nSmoke: out_of_order.inf fixture + 6 checks. Skill mirrors regenerated\n(also picks up Fit's param count, stale on main).",
+      "raw": "headless: keep file node indices; resolve named source outputs\n\nBug 1: ApplyPatchData renumbered nodes in file order, but every headless\nlookup after the load (--explain ids and bypass notes, --node, --stems,\n--note-map) used the file's indices against the live graph, so a file\nwith nodes out of order (or with gaps) labelled the wrong nodes while\nvalidating clean. A headless load now keeps the file's indices\n(keepIndices); Validate reports E_BAD_INDEX outside 1..1000000.\n\nBug 2: `mod ... <src> low ...` failed the >> on srcOutput, so the line\nfell back to output 0 and dropped polarity/depth/centre/lo/hi. srcOutput\non mod/cable/geo/note is now read as a ref and resolved against the\nsource's --describe output labels; an unknown label is E_BAD_REF listing\nthe outputs.\n\nSmoke: out_of_order.inf fixture + 6 checks. Skill mirrors regenerated\n(also picks up Fit's param count, stale on main)."
+    },
+    "stat": ".claude/skills/infinite-patch-authoring/SKILL.md |  8 +++---\n docs/ai-skills/infinite-patch-authoring.md       |  8 +++---\n docs/reference/patch-format.md                   | 11 +++++---\n scripts/headless_smoke.sh                        | 14 +++++++++++\n src/core/AISkillContent.h                        | 20 ++++++++-------\n src/core/Patch.cpp                               |  9 ++++---\n src/core/Patch.h                                 | 12 ++++++---\n src/core/PatchSchema.cpp                         | 32 ++++++++++++++++++++++++\n src/core/PatchSchema.h                           |  4 +--\n src/main.cpp                                     | 23 ++++++++++++++---\n tests/headless/names/out_of_order.inf            | 29 +++++++++++++++++++++\n 11 files changed, 140 insertions(+), 30 deletions(-)\n create mode 100644 tests/headless/names/out_of_order.inf",
+    "files": [
+      ".claude/skills/infinite-patch-authoring/SKILL.md",
+      "docs/ai-skills/infinite-patch-authoring.md",
+      "docs/reference/patch-format.md",
+      "scripts/headless_smoke.sh",
+      "src/core/AISkillContent.h",
+      "src/core/Patch.cpp",
+      "src/core/Patch.h",
+      "src/core/PatchSchema.cpp",
+      "src/core/PatchSchema.h",
+      "src/main.cpp",
+      "tests/headless/names/out_of_order.inf"
+    ]
+  },
+  {
+    "hash": "4c25bfa187adaea05c4639d814765a5e5656e703",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 13:43:07 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Auto-layout pos-less nodes on patch open, from drawn node sizes",
+      "description": "Auto-layout pos-less nodes on patch open, from drawn node sizes",
+      "bullets": [],
+      "body": "A patch with no pos records (hand-written/headless) loaded with every node\nat 0,0. PatchLayout (bands Picture/Sound/Modulation, columns by wiring depth,\n# near / # band comment hints) now places them once the GUI has measured real\nsizes via ed::GetNodeSize, falling back to a per-type estimate. NodeRecord\ngains reader-only hasPos/layoutHint; --canonicalize output is unchanged.\nAdds PATCHLAYOUTTEST (data) and PATCHLAYOUTLIVETEST (real loader + editor).",
+      "raw": "Auto-layout pos-less nodes on patch open, from drawn node sizes\n\nA patch with no pos records (hand-written/headless) loaded with every node\nat 0,0. PatchLayout (bands Picture/Sound/Modulation, columns by wiring depth,\n# near / # band comment hints) now places them once the GUI has measured real\nsizes via ed::GetNodeSize, falling back to a per-type estimate. NodeRecord\ngains reader-only hasPos/layoutHint; --canonicalize output is unchanged.\nAdds PATCHLAYOUTTEST (data) and PATCHLAYOUTLIVETEST (real loader + editor)."
+    },
+    "stat": ".claude/skills/run-infinite-hygiene/driver.sh |   4 +\n CMakeLists.txt                                |   1 +\n docs/reference/patch-format.md                |  10 +-\n src/core/Patch.cpp                            |  11 +\n src/core/Patch.h                              |   7 +\n src/core/PatchLayout.cpp                      | 260 +++++++++++++++++++++\n src/core/PatchLayout.h                        |  47 ++++\n src/main.cpp                                  | 312 ++++++++++++++++++++++++++\n 8 files changed, 651 insertions(+), 1 deletion(-)\n create mode 100644 src/core/PatchLayout.cpp\n create mode 100644 src/core/PatchLayout.h",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "CMakeLists.txt",
+      "docs/reference/patch-format.md",
+      "src/core/Patch.cpp",
+      "src/core/Patch.h",
+      "src/core/PatchLayout.cpp",
+      "src/core/PatchLayout.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "df40a736a04ab27ea17a68a657a6bfa6f982e3dd",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 13:12:56 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/headless-docs-brand",
+      "description": "Merge feature/headless-docs-brand",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/headless-docs-brand"
+    },
+    "stat": "",
+    "files": [
+      "docs/headless/Infinite_Headless_User_Guide.pdf",
+      "tools/headless-docs/build.py"
+    ]
+  },
+  {
+    "hash": "581ec84f4da63174c6aec05f9250062dde65f84f",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 13:12:54 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "ui",
+      "title": "Headless user guide PDF: Infinite branding (cream/terracotta, cards, cover, contents)",
+      "description": "Headless user guide PDF: Infinite branding (cream/terracotta, cards, cover, contents)",
+      "bullets": [],
+      "body": "",
+      "raw": "Headless user guide PDF: Infinite branding (cream/terracotta, cards, cover, contents)"
+    },
+    "stat": "docs/headless/Infinite_Headless_User_Guide.pdf | Bin 293863 -> 574029 bytes\n tools/headless-docs/build.py                   | 132 +++++++++++++++++++------\n 2 files changed, 101 insertions(+), 31 deletions(-)",
+    "files": [
+      "docs/headless/Infinite_Headless_User_Guide.pdf",
+      "tools/headless-docs/build.py"
+    ]
+  },
+  {
+    "hash": "0dca01dfc9db27a9ab238dce3cbfd172855024b5",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 13:10:49 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/headless-user-docs (R518)",
+      "description": "Merge feature/headless-user-docs (R518)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/headless-user-docs (R518)"
+    },
+    "stat": "",
+    "files": [
+      "docs/headless/GUIDE.md",
+      "docs/headless/Infinite_Headless_User_Guide.pdf",
+      "tools/headless-docs/build.py"
+    ]
+  },
+  {
+    "hash": "9fb1b98cccc0a46d8ce95af7323effe6d7458128",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 13:10:48 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "ui",
+      "title": "Headless engine user guide (Markdown + PDF) and PDF build script (R518)",
+      "description": "Headless engine user guide (Markdown + PDF) and PDF build script (R518)",
+      "bullets": [],
+      "body": "",
+      "raw": "Headless engine user guide (Markdown + PDF) and PDF build script (R518)"
+    },
+    "stat": "docs/headless/GUIDE.md                         | 233 +++++++++++++++++++++++++\n docs/headless/Infinite_Headless_User_Guide.pdf | Bin 0 -> 293863 bytes\n tools/headless-docs/build.py                   | 101 +++++++++++\n 3 files changed, 334 insertions(+)\n create mode 100644 docs/headless/GUIDE.md\n create mode 100644 docs/headless/Infinite_Headless_User_Guide.pdf\n create mode 100644 tools/headless-docs/build.py",
+    "files": [
+      "docs/headless/GUIDE.md",
+      "docs/headless/Infinite_Headless_User_Guide.pdf",
+      "tools/headless-docs/build.py"
+    ]
+  },
+  {
+    "hash": "54075d351d6aefe0cdc4067514a4e4e7ad2aae53",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 12:36:33 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/determinism-part2 (R504)",
+      "description": "Merge feature/determinism-part2 (R504)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/determinism-part2 (R504)"
+    },
+    "stat": "",
+    "files": [
+      ".github/workflows/build.yml",
+      "docs/determinism-audit.md",
+      "tests/render/audio.inf",
+      "tests/render/compositing.inf",
+      "tests/render/field_pixel.inf",
+      "tests/render/golden/audio_0.png",
+      "tests/render/golden/audio_1.png",
+      "tests/render/golden/audio_audio.json",
+      "tests/render/golden/compositing_0.png",
+      "tests/render/golden/compositing_1.png",
+      "tests/render/golden/field_pixel_0.png",
+      "tests/render/golden/field_pixel_1.png",
+      "tests/render/golden/modulation_0.png",
+      "tests/render/golden/modulation_1.png",
+      "tests/render/golden/render3d_0.png",
+      "tests/render/golden/render3d_1.png",
+      "tests/render/modulation.inf",
+      "tests/render/render3d.inf",
+      "tools/determinism-by-design.txt",
+      "tools/determinism-check.py",
+      "tools/render-check.py"
+    ]
+  },
+  {
+    "hash": "a7df0756ed36e448366497bbed3070f9d33b63bf",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 12:36:29 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "Determinism part 2: per-node bisect, clock/rand audit, tests/render goldens + render-check, CI wiring (R504)",
+      "description": "Determinism part 2: per-node bisect, clock/rand audit, tests/render goldens + render-check, CI wiring (R504)",
+      "bullets": [],
+      "body": "",
+      "raw": "Determinism part 2: per-node bisect, clock/rand audit, tests/render goldens + render-check, CI wiring (R504)"
+    },
+    "stat": ".github/workflows/build.yml           |   9 ++\n docs/determinism-audit.md             |  36 +++++++\n tests/render/audio.inf                |  24 +++++\n tests/render/compositing.inf          |  20 ++++\n tests/render/field_pixel.inf          |  12 +++\n tests/render/golden/audio_0.png       | Bin 0 -> 68564 bytes\n tests/render/golden/audio_1.png       | Bin 0 -> 68564 bytes\n tests/render/golden/audio_audio.json  |   5 +\n tests/render/golden/compositing_0.png | Bin 0 -> 81860 bytes\n tests/render/golden/compositing_1.png | Bin 0 -> 81860 bytes\n tests/render/golden/field_pixel_0.png | Bin 0 -> 3095 bytes\n tests/render/golden/field_pixel_1.png | Bin 0 -> 3093 bytes\n tests/render/golden/modulation_0.png  | Bin 0 -> 113436 bytes\n tests/render/golden/modulation_1.png  | Bin 0 -> 113436 bytes\n tests/render/golden/render3d_0.png    | Bin 0 -> 31892 bytes\n tests/render/golden/render3d_1.png    | Bin 0 -> 31892 bytes\n tests/render/modulation.inf           |  15 +++\n tests/render/render3d.inf             |  29 ++++++\n tools/determinism-by-design.txt       |   4 +\n tools/determinism-check.py            |  41 +++++++-\n tools/render-check.py                 | 180 ++++++++++++++++++++++++++++++++++\n 21 files changed, 373 insertions(+), 2 deletions(-)\n create mode 100644 docs/determinism-audit.md\n create mode 100644 tests/render/audio.inf\n create mode 100644 tests/render/compositing.inf\n create mode 100644 tests/render/field_pixel.inf\n create mode 100644 tests/render/golden/audio_0.png\n create mode 100644 tests/render/golden/audio_1.png\n create mode 100644 tests/render/golden/audio_audio.json\n create mode 100644 tests/render/golden/compositing_0.png\n create mode 100644 tests/render/golden/compositing_1.png\n create mode 100644 tests/render/golden/field_pixel_0.png\n create mode 100644 tests/render/golden/field_pixel_1.png\n create mode 100644 tests/render/golden/modulation_0.png\n create mode 100644 tests/render/golden/modulation_1.png\n create mode 100644 tests/render/golden/render3d_0.png\n create mode 100644 tests/render/golden/render3d_1.png\n create mode 100644 tests/render/modulation.inf\n create mode 100644 tests/render/render3d.inf\n create mode 100644 tools/determinism-by-design.txt\n create mode 100644 tools/render-check.py",
+    "files": [
+      ".github/workflows/build.yml",
+      "docs/determinism-audit.md",
+      "tests/render/audio.inf",
+      "tests/render/compositing.inf",
+      "tests/render/field_pixel.inf",
+      "tests/render/golden/audio_0.png",
+      "tests/render/golden/audio_1.png",
+      "tests/render/golden/audio_audio.json",
+      "tests/render/golden/compositing_0.png",
+      "tests/render/golden/compositing_1.png",
+      "tests/render/golden/field_pixel_0.png",
+      "tests/render/golden/field_pixel_1.png",
+      "tests/render/golden/modulation_0.png",
+      "tests/render/golden/modulation_1.png",
+      "tests/render/golden/render3d_0.png",
+      "tests/render/golden/render3d_1.png",
+      "tests/render/modulation.inf",
+      "tests/render/render3d.inf",
+      "tools/determinism-by-design.txt",
+      "tools/determinism-check.py",
+      "tools/render-check.py"
+    ]
+  },
+  {
+    "hash": "bc8914d341736be4966693398aa0ac17019ea20f",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 12:30:15 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/fit-offset (R289)",
+      "description": "Merge feature/fit-offset (R289)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/fit-offset (R289)"
+    },
+    "stat": "",
+    "files": [
+      "docs/node_param_audit.md",
+      "src/main.cpp",
+      "src/nodes/FitNode.cpp",
+      "src/nodes/FitNode.h"
+    ]
+  },
+  {
+    "hash": "1d6274e4b69aab6f1f8f7e5043a8c64884a21d69",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 12:30:14 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Fit: offset X/Y in output pixels (+ right, + up), modulatable, saved; old patches load at 0 (R289)",
+      "description": "Fit: offset X/Y in output pixels (+ right, + up), modulatable, saved; old patches load at 0 (R289)",
+      "bullets": [],
+      "body": "",
+      "raw": "Fit: offset X/Y in output pixels (+ right, + up), modulatable, saved; old patches load at 0 (R289)"
+    },
+    "stat": "docs/node_param_audit.md | 4 +++-\n src/main.cpp             | 6 ++++--\n src/nodes/FitNode.cpp    | 6 ++++--\n src/nodes/FitNode.h      | 3 +++\n 4 files changed, 14 insertions(+), 5 deletions(-)",
+    "files": [
+      "docs/node_param_audit.md",
+      "src/main.cpp",
+      "src/nodes/FitNode.cpp",
+      "src/nodes/FitNode.h"
+    ]
+  },
+  {
+    "hash": "f941eb5e8881fe616db9fb501ba2be6d966bcf66",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 12:19:40 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/single-instance-open (R500)",
+      "description": "Merge feature/single-instance-open (R500)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/single-instance-open (R500)"
+    },
+    "stat": "",
+    "files": [
+      "src/main.cpp",
+      "src/platform/Platform.h",
+      "src/platform/Platform.mm",
+      "src/platform/common/SingleInstance.h",
+      "src/platform/linux/PlatformLinux.cpp",
+      "src/platform/win/PlatformWin.cpp",
+      "tests/platform/single_instance_test.cpp"
+    ]
+  },
+  {
+    "hash": "9211ec1b8c396718727c7982d359b42563c61dc1",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 12:19:39 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Single-instance open on Windows/Linux: a second launch with a .inf hands it to the running app via a spool dir and exits (R500)",
+      "description": "Single-instance open on Windows/Linux: a second launch with a .inf hands it to the running app via a spool dir and exits (R500)",
+      "bullets": [],
+      "body": "",
+      "raw": "Single-instance open on Windows/Linux: a second launch with a .inf hands it to the running app via a spool dir and exits (R500)"
+    },
+    "stat": "src/main.cpp                            |  15 ++++\n src/platform/Platform.h                 |   7 ++\n src/platform/Platform.mm                |   5 ++\n src/platform/common/SingleInstance.h    | 137 ++++++++++++++++++++++++++++++++\n src/platform/linux/PlatformLinux.cpp    |  33 +++++---\n src/platform/win/PlatformWin.cpp        |  31 ++++++--\n tests/platform/single_instance_test.cpp |  46 +++++++++++\n 7 files changed, 259 insertions(+), 15 deletions(-)\n create mode 100644 src/platform/common/SingleInstance.h\n create mode 100644 tests/platform/single_instance_test.cpp",
+    "files": [
+      "src/main.cpp",
+      "src/platform/Platform.h",
+      "src/platform/Platform.mm",
+      "src/platform/common/SingleInstance.h",
+      "src/platform/linux/PlatformLinux.cpp",
+      "src/platform/win/PlatformWin.cpp",
+      "tests/platform/single_instance_test.cpp"
+    ]
+  },
+  {
+    "hash": "1ed8c81a62281ae7bee9e41a6ad472168e692048",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 12:02:07 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "Merge feature/headless-render-node (R509)",
+      "description": "Merge feature/headless-render-node (R509)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/headless-render-node (R509)"
+    },
+    "stat": "",
+    "files": [
+      "src/core/HeadlessJob.cpp",
+      "src/core/HeadlessJob.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "da5ecb07c9135918ee26cbfe071f077016477aad",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 12:02:06 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "headless: --render --node encodes a tapped node's image to mp4/mov with no Output; --size applies (R509)",
+      "description": "headless: --render --node encodes a tapped node's image to mp4/mov with no Output; --size applies (R509)",
+      "bullets": [],
+      "body": "",
+      "raw": "headless: --render --node encodes a tapped node's image to mp4/mov with no Output; --size applies (R509)"
+    },
+    "stat": "src/core/HeadlessJob.cpp |  14 +++++-\n src/core/HeadlessJob.h   |   2 +-\n src/main.cpp             | 112 ++++++++++++++++++++++++++++++++++++++++++++++-\n 3 files changed, 123 insertions(+), 5 deletions(-)",
+    "files": [
+      "src/core/HeadlessJob.cpp",
+      "src/core/HeadlessJob.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "a92be7719df70ced998fbbc039f9866bdf632d81",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 11:53:18 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/headless-prores4444 (R508)",
+      "description": "Merge feature/headless-prores4444 (R508)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/headless-prores4444 (R508)"
+    },
+    "stat": "",
+    "files": [
+      "src/core/HeadlessJob.h",
+      "src/main.cpp",
+      "src/nodes/OutputNode.cpp",
+      "src/nodes/OutputNode.h",
+      "src/platform/Platform.h",
+      "src/platform/Platform.mm",
+      "src/platform/linux/MediaLinux.cpp",
+      "src/platform/win/MediaWin.cpp"
+    ]
+  },
+  {
+    "hash": "0fa99e85e7c9356e4bca405c457605f6b0e07601",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 11:53:16 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "headless: --render --codec prores4444 writes an alpha .mov via AVFoundation on macOS; Windows/Linux refuse (R508)",
+      "description": "headless: --render --codec prores4444 writes an alpha .mov via AVFoundation on macOS; Windows/Linux refuse (R508)",
+      "bullets": [],
+      "body": "",
+      "raw": "headless: --render --codec prores4444 writes an alpha .mov via AVFoundation on macOS; Windows/Linux refuse (R508)"
+    },
+    "stat": "src/core/HeadlessJob.h            |  2 +-\n src/main.cpp                      | 10 ++++++++--\n src/nodes/OutputNode.cpp          |  4 ++--\n src/nodes/OutputNode.h            |  2 ++\n src/platform/Platform.h           |  5 ++++-\n src/platform/Platform.mm          | 22 +++++++++++++++++++---\n src/platform/linux/MediaLinux.cpp |  8 +++++++-\n src/platform/win/MediaWin.cpp     |  8 +++++++-\n 8 files changed, 50 insertions(+), 11 deletions(-)",
+    "files": [
+      "src/core/HeadlessJob.h",
+      "src/main.cpp",
+      "src/nodes/OutputNode.cpp",
+      "src/nodes/OutputNode.h",
+      "src/platform/Platform.h",
+      "src/platform/Platform.mm",
+      "src/platform/linux/MediaLinux.cpp",
+      "src/platform/win/MediaWin.cpp"
+    ]
+  },
+  {
+    "hash": "648e06268e6cec97721ccd2de8fa76d1b5c93332",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 11:45:59 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "audio",
+      "title": "Merge feature/param-audit-audioslider (R287)",
+      "description": "Merge feature/param-audit-audioslider (R287)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/param-audit-audioslider (R287)"
+    },
+    "stat": "",
+    "files": [
+      "docs/node_param_audit.md",
+      "scripts/audit_node_params.py"
+    ]
+  },
+  {
+    "hash": "8c57fc471370c1143b85f7453b5944b069c3fd00",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 11:45:58 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "audio",
+      "title": "audit_node_params: recognise AudioSlider/AudioSliderInt/DrawGateControl; stop dispatch window bleeding into the next else-if branch (R287)",
+      "description": "audit_node_params: recognise AudioSlider/AudioSliderInt/DrawGateControl; stop dispatch window bleeding into the next else-if branch (R287)",
+      "bullets": [],
+      "body": "",
+      "raw": "audit_node_params: recognise AudioSlider/AudioSliderInt/DrawGateControl; stop dispatch window bleeding into the next else-if branch (R287)"
+    },
+    "stat": "docs/node_param_audit.md     | 1426 ++++++++----------------------------------\n scripts/audit_node_params.py |   10 +-\n 2 files changed, 270 insertions(+), 1166 deletions(-)",
+    "files": [
+      "docs/node_param_audit.md",
+      "scripts/audit_node_params.py"
+    ]
+  },
+  {
+    "hash": "0eea4a1213f4ae4c599688e038bb6b5ea12f0bb8",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 11:42:08 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge docs/manual-refresh (R23)",
+      "description": "Merge docs/manual-refresh (R23)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge docs/manual-refresh (R23)"
+    },
+    "stat": "",
+    "files": [
+      "Infinite_Node_Reference_Manual.pdf",
+      "tools/manual/base/chapters_1_20.pdf",
+      "tools/manual/build.py",
+      "tools/manual/cards.py",
+      "website/assets/Infinite_Node_Reference_Manual.pdf"
+    ]
+  },
+  {
+    "hash": "c77654462042655f715f775c23d7188d0358cf66",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 11:42:07 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "global",
+      "title": "docs: rebuild Node Field Guide PDF with 60 new node cards (chapters 21-24), tools/manual/build.py (R23)",
+      "description": "rebuild Node Field Guide PDF with 60 new node cards (chapters 21-24), tools/manual/build.py (R23)",
+      "bullets": [],
+      "body": "",
+      "raw": "docs: rebuild Node Field Guide PDF with 60 new node cards (chapters 21-24), tools/manual/build.py (R23)"
+    },
+    "stat": "Infinite_Node_Reference_Manual.pdf                | Bin 1607699 -> 8562250 bytes\n tools/manual/base/chapters_1_20.pdf               | Bin 0 -> 7682517 bytes\n tools/manual/build.py                             | 236 ++++++++++++++++++\n tools/manual/cards.py                             | 284 ++++++++++++++++++++++\n website/assets/Infinite_Node_Reference_Manual.pdf | Bin 1607699 -> 8562250 bytes\n 5 files changed, 520 insertions(+)\n create mode 100644 tools/manual/base/chapters_1_20.pdf\n create mode 100644 tools/manual/build.py\n create mode 100644 tools/manual/cards.py",
+    "files": [
+      "Infinite_Node_Reference_Manual.pdf",
+      "tools/manual/base/chapters_1_20.pdf",
+      "tools/manual/build.py",
+      "tools/manual/cards.py",
+      "website/assets/Infinite_Node_Reference_Manual.pdf"
+    ]
+  },
+  {
+    "hash": "d656198464d06edcea923840387bcb66f1d8f4c9",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 11:30:08 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge docs/manual-gap (R23 gap list)",
+      "description": "Merge docs/manual-gap (R23 gap list)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge docs/manual-gap (R23 gap list)"
+    },
+    "stat": "",
+    "files": [
+      "docs/manual_gap.md"
+    ]
+  },
+  {
+    "hash": "dc5971a091f03c619d9aa529391b2483f5fa4fee",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 11:30:07 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "global",
+      "title": "docs: list the 64 registered node types the Node Reference Manual PDF does not mention (R23)",
+      "description": "list the 64 registered node types the Node Reference Manual PDF does not mention (R23)",
+      "bullets": [],
+      "body": "",
+      "raw": "docs: list the 64 registered node types the Node Reference Manual PDF does not mention (R23)"
+    },
+    "stat": "docs/manual_gap.md | 19 +++++++++++++++++++\n 1 file changed, 19 insertions(+)\n create mode 100644 docs/manual_gap.md",
+    "files": [
+      "docs/manual_gap.md"
+    ]
+  },
+  {
+    "hash": "79c32b90cc8be419a24e7f543abb4dd5e107e689",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 11:27:16 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/headless-film-leftovers (R507)",
+      "description": "Merge feature/headless-film-leftovers (R507)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/headless-film-leftovers (R507)"
+    },
+    "stat": "",
+    "files": [
+      "src/core/HeadlessJob.cpp",
+      "src/core/HeadlessJob.h",
+      "src/main.cpp",
+      "tests/headless/format/float_tap.inf"
+    ]
+  },
+  {
+    "hash": "b4f6566dda9225275d8ea9840d6b7d2b22953452",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 11:27:15 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "headless: --size, --png-level, --depth 16, --bpm, --codec refusal; --frames-dir encodes on a bounded worker pool (R507)",
+      "description": "headless: --size, --png-level, --depth 16, --bpm, --codec refusal; --frames-dir encodes on a bounded worker pool (R507)",
+      "bullets": [],
+      "body": "",
+      "raw": "headless: --size, --png-level, --depth 16, --bpm, --codec refusal; --frames-dir encodes on a bounded worker pool (R507)"
+    },
+    "stat": "src/core/HeadlessJob.cpp            |  63 ++++++-\n src/core/HeadlessJob.h              |   8 +\n src/main.cpp                        | 328 ++++++++++++++++++++++++++++++++++--\n tests/headless/format/float_tap.inf |  12 ++\n 4 files changed, 397 insertions(+), 14 deletions(-)\n create mode 100644 tests/headless/format/float_tap.inf",
+    "files": [
+      "src/core/HeadlessJob.cpp",
+      "src/core/HeadlessJob.h",
+      "src/main.cpp",
+      "tests/headless/format/float_tap.inf"
+    ]
+  },
+  {
+    "hash": "77e11b892112b305d0d35aa6948f7779c9a118aa",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 11:09:29 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "audio",
+      "title": "headless: --notes/--note-map inject film events as sample-accurate note-ons; --stems writes one WAV per node's own audio output (R471 7.5)",
+      "description": "headless: --notes/--note-map inject film events as sample-accurate note-ons; --stems writes one WAV per node's own audio output (R471 7.5)",
+      "bullets": [],
+      "body": "",
+      "raw": "headless: --notes/--note-map inject film events as sample-accurate note-ons; --stems writes one WAV per node's own audio output (R471 7.5)"
+    },
+    "stat": "CMakeLists.txt                          |   1 +\n scripts/headless_smoke.sh               |  25 ++++++\n src/audio/AudioEngine.cpp               |  11 +++\n src/audio/AudioEngine.h                 |  14 +++\n src/core/HeadlessJob.cpp                |  41 ++++++++-\n src/core/HeadlessJob.h                  |   7 +-\n src/core/HeadlessNotes.cpp              |  97 +++++++++++++++++++++\n src/core/HeadlessNotes.h                |  31 +++++++\n src/main.cpp                            | 149 ++++++++++++++++++++++++++++++++\n tests/headless/format/notes.inf         |  17 ++++\n tests/headless/format/notes_events.json |   6 ++\n tests/headless/format/notes_map.json    |   1 +\n 12 files changed, 397 insertions(+), 3 deletions(-)\n create mode 100644 src/core/HeadlessNotes.cpp\n create mode 100644 src/core/HeadlessNotes.h\n create mode 100644 tests/headless/format/notes.inf\n create mode 100644 tests/headless/format/notes_events.json\n create mode 100644 tests/headless/format/notes_map.json",
+    "files": [
+      "CMakeLists.txt",
+      "scripts/headless_smoke.sh",
+      "src/audio/AudioEngine.cpp",
+      "src/audio/AudioEngine.h",
+      "src/core/HeadlessJob.cpp",
+      "src/core/HeadlessJob.h",
+      "src/core/HeadlessNotes.cpp",
+      "src/core/HeadlessNotes.h",
+      "src/main.cpp",
+      "tests/headless/format/notes.inf",
+      "tests/headless/format/notes_events.json",
+      "tests/headless/format/notes_map.json"
+    ]
+  },
+  {
+    "hash": "7eace44ddf0f8cb9fa806678b6e01c072bba8d80",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 10:59:32 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "headless: --set <node>.<param>=<value> applies static per-shot overrides after load, warns W_OVERRIDDEN_BY_MODULATION (R471 7.4)",
+      "description": "headless: --set <node>.<param>=<value> applies static per-shot overrides after load, warns W_OVERRIDDEN_BY_MODULATION (R471 7.4)",
+      "bullets": [],
+      "body": "",
+      "raw": "headless: --set <node>.<param>=<value> applies static per-shot overrides after load, warns W_OVERRIDDEN_BY_MODULATION (R471 7.4)"
+    },
+    "stat": "scripts/headless_smoke.sh |  13 +++++\n src/core/HeadlessJob.cpp  |  16 +++++-\n src/core/HeadlessJob.h    |   4 +-\n src/main.cpp              | 121 ++++++++++++++++++++++++++++++++++++++++++++++\n 4 files changed, 152 insertions(+), 2 deletions(-)",
+    "files": [
+      "scripts/headless_smoke.sh",
+      "src/core/HeadlessJob.cpp",
+      "src/core/HeadlessJob.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "e5dd28b5d9f5b42b28c5e3394e90db7dfd1c61b5",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 10:42:03 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "headless: --frames-dir writes a numbered PNG sequence with frames.json; --node taps any node's image with no Output (R471 7.1/7.2)",
+      "description": "headless: --frames-dir writes a numbered PNG sequence with frames.json; --node taps any node's image with no Output (R471 7.1/7.2)",
+      "bullets": [],
+      "body": "",
+      "raw": "headless: --frames-dir writes a numbered PNG sequence with frames.json; --node taps any node's image with no Output (R471 7.1/7.2)"
+    },
+    "stat": "scripts/headless_smoke.sh     |  15 +++\n src/core/HeadlessJob.cpp      |  23 ++++-\n src/core/HeadlessJob.h        |   5 +\n src/main.cpp                  | 208 +++++++++++++++++++++++++++++++++---------\n tests/headless/format/tap.inf |   7 ++\n 5 files changed, 213 insertions(+), 45 deletions(-)\n create mode 100644 tests/headless/format/tap.inf",
+    "files": [
+      "scripts/headless_smoke.sh",
+      "src/core/HeadlessJob.cpp",
+      "src/core/HeadlessJob.h",
+      "src/main.cpp",
+      "tests/headless/format/tap.inf"
+    ]
+  },
+  {
+    "hash": "a0b8a3fbd65a78b2bb858423e7f35ee4f3dc8721",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 10:20:58 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "describe: list each node's buttons with what pressing them does (R474)",
+      "description": "describe: list each node's buttons with what pressing them does (R474)",
+      "bullets": [],
+      "body": "ImGui gets an Infinite-local ButtonLabelHook; the headless probe records every button a node draws and --describe reports it under 'actions' with a label-based effect (file path, randomize/reset, UI-only, unclassified).",
+      "raw": "describe: list each node's buttons with what pressing them does (R474)\n\nImGui gets an Infinite-local ButtonLabelHook; the headless probe records every button a node draws and --describe reports it under 'actions' with a label-based effect (file path, randomize/reset, UI-only, unclassified)."
+    },
+    "stat": "external/imgui/imgui.h           |  3 +++\n external/imgui/imgui_widgets.cpp |  4 ++++\n scripts/headless_smoke.sh        |  5 +++++\n src/core/PatchSchema.cpp         | 20 ++++++++++++++++++++\n src/core/PatchSchema.h           | 13 +++++++++++++\n src/main.cpp                     | 23 +++++++++++++++++++++++\n 6 files changed, 68 insertions(+)",
+    "files": [
+      "external/imgui/imgui.h",
+      "external/imgui/imgui_widgets.cpp",
+      "scripts/headless_smoke.sh",
+      "src/core/PatchSchema.cpp",
+      "src/core/PatchSchema.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "b97a3f5ded3ce43d542b7479f72d81069b3460cf",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 09:28:29 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "tests: OFFLINECLOCKTEST retries resolving the Shape's params each frame instead of only frame 1 (R498)",
+      "description": "tests: OFFLINECLOCKTEST retries resolving the Shape's params each frame instead of only frame 1 (R498)",
+      "bullets": [],
+      "body": "",
+      "raw": "tests: OFFLINECLOCKTEST retries resolving the Shape's params each frame instead of only frame 1 (R498)"
+    },
+    "stat": "src/main.cpp | 13 ++++++++++++-\n 1 file changed, 12 insertions(+), 1 deletion(-)",
+    "files": [
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "247f75b3f1cd2015f7fc14d355733dfb274dba45",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 09:18:49 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "geometry: Material, Null3D, Mapping, Set Color, Geometry Op and Cloth forward PointBaseSize (R505)",
+      "description": "geometry: Material, Null3D, Mapping, Set Color, Geometry Op and Cloth forward PointBaseSize (R505)",
+      "bullets": [],
+      "body": "",
+      "raw": "geometry: Material, Null3D, Mapping, Set Color, Geometry Op and Cloth forward PointBaseSize (R505)"
+    },
+    "stat": "src/main.cpp                | 17 +++++++++++++++++\n src/nodes/GeometryOpNodes.h |  2 ++\n src/nodes/SimulationNodes.h |  1 +\n src/nodes/UtilityNodes.h    |  3 +++\n 4 files changed, 23 insertions(+)",
+    "files": [
+      "src/main.cpp",
+      "src/nodes/GeometryOpNodes.h",
+      "src/nodes/SimulationNodes.h",
+      "src/nodes/UtilityNodes.h"
+    ]
+  },
+  {
+    "hash": "96bf16bd70d474f8936a505d41c2a14e34284bdf",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 09:01:01 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "geometry: Distribute on Faces re-bakes when the inherited material changes (R483)",
+      "description": "geometry: Distribute on Faces re-bakes when the inherited material changes (R483)",
+      "bullets": [],
+      "body": "",
+      "raw": "geometry: Distribute on Faces re-bakes when the inherited material changes (R483)"
+    },
+    "stat": "src/nodes/PointDistributionNodes.cpp | 6 +++++-\n src/nodes/PointDistributionNodes.h   | 1 +\n 2 files changed, 6 insertions(+), 1 deletion(-)",
+    "files": [
+      "src/nodes/PointDistributionNodes.cpp",
+      "src/nodes/PointDistributionNodes.h"
+    ]
+  },
+  {
+    "hash": "e384fd6bd856affc4972c3827adacb5134bef0a5",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 09:01:01 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "geometry: Depth Projection and Image to Points bake tint into colour and report a neutral albedo; Depth Projection stops applying its colour image twice (R482)",
+      "description": "geometry: Depth Projection and Image to Points bake tint into colour and report a neutral albedo; Depth Projection stops applying its colour image twice (R482)",
+      "bullets": [],
+      "body": "",
+      "raw": "geometry: Depth Projection and Image to Points bake tint into colour and report a neutral albedo; Depth Projection stops applying its colour image twice (R482)"
+    },
+    "stat": "src/nodes/DepthProjectionNode.cpp | 10 +++++++---\n src/nodes/GenerativeNodes.cpp     |  7 ++++---\n 2 files changed, 11 insertions(+), 6 deletions(-)",
+    "files": [
+      "src/nodes/DepthProjectionNode.cpp",
+      "src/nodes/GenerativeNodes.cpp"
+    ]
+  },
+  {
+    "hash": "982766d49e94494c9a467e508898941f763caab5",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 09:00:57 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "geometry: Switcher 3D forwards cloud and curve; a vertices-only mesh is vertices, not nothing (R484)",
+      "description": "geometry: Switcher 3D forwards cloud and curve; a vertices-only mesh is vertices, not nothing (R484)",
+      "bullets": [],
+      "body": "",
+      "raw": "geometry: Switcher 3D forwards cloud and curve; a vertices-only mesh is vertices, not nothing (R484)"
+    },
+    "stat": "src/nodes/Geometry3DNodes.h  |  7 +++++--\n src/nodes/Switcher3DNode.cpp | 30 ++++++++++++++++++++++++++++++\n src/nodes/Switcher3DNode.h   |  7 +++++++\n 3 files changed, 42 insertions(+), 2 deletions(-)",
+    "files": [
+      "src/nodes/Geometry3DNodes.h",
+      "src/nodes/Switcher3DNode.cpp",
+      "src/nodes/Switcher3DNode.h"
+    ]
+  },
+  {
+    "hash": "9e27e30cf92ce445f66c2739d24747a3cc51fb0f",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 09:00:56 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "geometry: Transform applies its matrix to a curve (R481); SetColor forwards the curve (R484 part)",
+      "description": "geometry: Transform applies its matrix to a curve (R481); SetColor forwards the curve (R484 part)",
+      "bullets": [],
+      "body": "",
+      "raw": "geometry: Transform applies its matrix to a curve (R481); SetColor forwards the curve (R484 part)"
+    },
+    "stat": "src/main.cpp                  | 73 ++++++++++++++++++++++++++++++++++++++++++-\n src/nodes/GeometryOpNodes.cpp | 46 +++++++++++++++++++++++++++\n src/nodes/GeometryOpNodes.h   | 21 +++++++++----\n 3 files changed, 133 insertions(+), 7 deletions(-)",
+    "files": [
+      "src/main.cpp",
+      "src/nodes/GeometryOpNodes.cpp",
+      "src/nodes/GeometryOpNodes.h"
+    ]
+  },
+  {
+    "hash": "906171144a5a7b2ded664e7d246110b290c00056",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 08:32:47 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "audio",
+      "title": "headless: a take cooks one frame at its own start time before nodes are prepared; Wave Terrain and Audio Displacement stop using the wall clock offline (R503)",
+      "description": "headless: a take cooks one frame at its own start time before nodes are prepared; Wave Terrain and Audio Displacement stop using the wall clock offline (R503)",
+      "bullets": [],
+      "body": "",
+      "raw": "headless: a take cooks one frame at its own start time before nodes are prepared; Wave Terrain and Audio Displacement stop using the wall clock offline (R503)"
+    },
+    "stat": "scripts/headless_smoke.sh           |  1 +\n src/main.cpp                        | 22 ++++++++++++++++++++--\n src/nodes/AudioDisplacementNode.cpp | 24 +++++++++++++++++++-----\n src/nodes/AudioDisplacementNode.h   |  2 ++\n src/nodes/WaveTerrainNode.cpp       |  5 ++++-\n 5 files changed, 46 insertions(+), 8 deletions(-)",
+    "files": [
+      "scripts/headless_smoke.sh",
+      "src/main.cpp",
+      "src/nodes/AudioDisplacementNode.cpp",
+      "src/nodes/AudioDisplacementNode.h",
+      "src/nodes/WaveTerrainNode.cpp"
+    ]
+  },
+  {
+    "hash": "7b121b25217e2aa919793c037e1b8cec5f7bd4c1",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 08:03:03 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "audio",
+      "title": "headless: tools/determinism-check.py; a take re-prepares every audio node so the no-device note pump cannot leave a random note source mid-sequence (R40 part 1)",
+      "description": "headless: tools/determinism-check.py; a take re-prepares every audio node so the no-device note pump cannot leave a random note source mid-sequence (R40 part 1)",
+      "bullets": [],
+      "body": "",
+      "raw": "headless: tools/determinism-check.py; a take re-prepares every audio node so the no-device note pump cannot leave a random note source mid-sequence (R40 part 1)"
+    },
+    "stat": "scripts/headless_smoke.sh  |   4 ++\n src/main.cpp               |  24 +++++++++\n src/nodes/NoteNodes.cpp    |   1 +\n tools/determinism-check.py | 128 +++++++++++++++++++++++++++++++++++++++++++++\n 4 files changed, 157 insertions(+)\n create mode 100644 tools/determinism-check.py",
+    "files": [
+      "scripts/headless_smoke.sh",
+      "src/main.cpp",
+      "src/nodes/NoteNodes.cpp",
+      "tools/determinism-check.py"
+    ]
+  },
+  {
+    "hash": "3628381ddd12b624e77523ca51c5505706d7326c",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Thu Oct 1 07:39:54 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "field",
+      "title": "rpc: load_patch / load_patch_text attach keyed mod and expr lines once the nodes have drawn (R501)",
+      "description": "rpc: load_patch / load_patch_text attach keyed mod and expr lines once the nodes have drawn (R501)",
+      "bullets": [],
+      "body": "",
+      "raw": "rpc: load_patch / load_patch_text attach keyed mod and expr lines once the nodes have drawn (R501)"
+    },
+    "stat": "scripts/live_rpc_smoke.py |  10 ++++\n src/main.cpp              | 129 ++++++++++++++++++++++++++++++++++++++++++++--\n 2 files changed, 134 insertions(+), 5 deletions(-)",
+    "files": [
+      "scripts/live_rpc_smoke.py",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "6f91a201d50c696dea1a5ee976adea331d659458",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 22:37:17 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "rpc: explain on a running app joins control keys from the drawn nodes (address match, no perturbing); scripts/live_rpc_smoke.py drives explain/render_frame/batch live (R475)",
+      "description": "rpc: explain on a running app joins control keys from the drawn nodes (address match, no perturbing); scripts/live_rpc_smoke.py drives explain/render_frame/batch live (R475)",
+      "bullets": [],
+      "body": "",
+      "raw": "rpc: explain on a running app joins control keys from the drawn nodes (address match, no perturbing); scripts/live_rpc_smoke.py drives explain/render_frame/batch live (R475)"
+    },
+    "stat": "scripts/live_rpc_smoke.py | 86 +++++++++++++++++++++++++++++++++++++++++++++++\n src/main.cpp              | 26 +++++++++++++-\n 2 files changed, 111 insertions(+), 1 deletion(-)\n create mode 100644 scripts/live_rpc_smoke.py",
+    "files": [
+      "scripts/live_rpc_smoke.py",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "bbde719fe592f9abf1bc3f1d01320927de863c5a",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 22:26:44 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "rpc: render_frame writes the live Output's current image via ExportImage with frame stats (R497)",
+      "description": "rpc: render_frame writes the live Output's current image via ExportImage with frame stats (R497)",
+      "bullets": [],
+      "body": "",
+      "raw": "rpc: render_frame writes the live Output's current image via ExportImage with frame stats (R497)"
+    },
+    "stat": "docs/fix-briefs/headless-engine.md |  1 +\n src/main.cpp                       | 66 ++++++++++++++++++++++++++++++++++++++\n 2 files changed, 67 insertions(+)",
+    "files": [
+      "docs/fix-briefs/headless-engine.md",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "19833f806d403abec1319028ea54c0d8a4023563",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 22:21:38 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "arrange",
+      "title": "explain: effective bypass, mod-loop lag, clips, geometry counts/world bbox, effective material (R473)",
+      "description": "explain: effective bypass, mod-loop lag, clips, geometry counts/world bbox, effective material (R473)",
+      "bullets": [],
+      "body": "",
+      "raw": "explain: effective bypass, mod-loop lag, clips, geometry counts/world bbox, effective material (R473)"
+    },
+    "stat": "scripts/headless_smoke.sh        |  8 +++++\n src/core/PatchExplain.cpp        | 71 ++++++++++++++++++++++++++++++++++++++++\n src/core/PatchExplain.h          |  6 ++++\n src/main.cpp                     | 67 +++++++++++++++++++++++++++++++++++++\n tests/headless/explain/depth.inf | 32 ++++++++++++++++++\n 5 files changed, 184 insertions(+)\n create mode 100644 tests/headless/explain/depth.inf",
+    "files": [
+      "scripts/headless_smoke.sh",
+      "src/core/PatchExplain.cpp",
+      "src/core/PatchExplain.h",
+      "src/main.cpp",
+      "tests/headless/explain/depth.inf"
+    ]
+  },
+  {
+    "hash": "d2849f2121cf5813645918e81eb92a5a1c70e46e",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 21:44:12 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/live-rpc: RPC batch, text load/validate, describe (R495 part 1)",
+      "description": "Merge feature/live-rpc: RPC batch, text load/validate, describe (R495 part 1)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/live-rpc: RPC batch, text load/validate, describe (R495 part 1)"
+    },
+    "stat": "",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "scripts/node_screenshot.py",
+      "src/core/Patch.cpp",
+      "src/core/Patch.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "1c1dae25d4e53a8e93c950094d1638e481ff5658",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 21:44:11 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "rpc: batch (all-or-nothing, one undo step), load_patch_text, validate_patch_text, describe; node_screenshot.py finds the token on every OS (R495 part 1)",
+      "description": "rpc: batch (all-or-nothing, one undo step), load_patch_text, validate_patch_text, describe; node_screenshot.py finds the token on every OS (R495 part 1)",
+      "bullets": [],
+      "body": "Patch::ReadText parses patch source from memory. RPCBATCHTEST drives the real HandleRpcCommand. PATCHWATCHTEST and RPCBATCHTEST are now in the driver's default list (PATCHWATCHTEST was not, in the previous commit). render_frame is not done: --frame is a tick state machine bound to a headless job.",
+      "raw": "rpc: batch (all-or-nothing, one undo step), load_patch_text, validate_patch_text, describe; node_screenshot.py finds the token on every OS (R495 part 1)\n\nPatch::ReadText parses patch source from memory. RPCBATCHTEST drives the real HandleRpcCommand. PATCHWATCHTEST and RPCBATCHTEST are now in the driver's default list (PATCHWATCHTEST was not, in the previous commit). render_frame is not done: --frame is a tick state machine bound to a headless job."
+    },
+    "stat": ".claude/skills/run-infinite-hygiene/driver.sh |   3 +\n scripts/node_screenshot.py                    |  15 +-\n src/core/Patch.cpp                            |  10 ++\n src/core/Patch.h                              |   4 +\n src/main.cpp                                  | 214 ++++++++++++++++++++++++++\n 5 files changed, 245 insertions(+), 1 deletion(-)",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "scripts/node_screenshot.py",
+      "src/core/Patch.cpp",
+      "src/core/Patch.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "b4c09fb0bd090750062b5b55a1477c6a50dc6c7c",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 21:17:13 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "ui",
+      "title": "Merge bugfix/pretest-imgui-crash (R496)",
+      "description": "Merge bugfix/pretest-imgui-crash (R496)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge bugfix/pretest-imgui-crash (R496)"
+    },
+    "stat": "",
+    "files": [
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "34aba75109a84270fcb5d369731496b4732b52b5",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 21:17:13 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "global",
+      "title": "fix: applying a patch before ImGui exists no longer crashes (live-issue edit clock), unbreaks PERFMATRIXTEST and SYPHONPATCHTEST (R496)",
+      "description": "applying a patch before ImGui exists no longer crashes (live-issue edit clock), unbreaks PERFMATRIXTEST and SYPHONPATCHTEST (R496)",
+      "bullets": [],
+      "body": "R30's NoteGraphEditedForLiveIssues read ImGui::GetTime() from ApplyPatchData; the pre-GL self-tests run it with no context.",
+      "raw": "fix: applying a patch before ImGui exists no longer crashes (live-issue edit clock), unbreaks PERFMATRIXTEST and SYPHONPATCHTEST (R496)\n\nR30's NoteGraphEditedForLiveIssues read ImGui::GetTime() from ApplyPatchData; the pre-GL self-tests run it with no context."
+    },
+    "stat": "src/main.cpp | 3 ++-\n 1 file changed, 2 insertions(+), 1 deletion(-)",
+    "files": [
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "4d33c54c9b08dc24b75ee76dd1d490ac7a3ceaa0",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 21:07:47 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/live-patch-reload: open patch file watch (R39 part 1)",
+      "description": "Merge feature/live-patch-reload: open patch file watch (R39 part 1)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/live-patch-reload: open patch file watch (R39 part 1)"
+    },
+    "stat": "",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "55bfc2262494f7c3b05ff2f8343396ce4e9fcf56",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 21:07:46 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "live reload: the open patch file is watched; a clean canvas reloads as one undo step, unsaved edits get a Reload / Keep mine banner (R39 file watch)",
+      "description": "live reload: the open patch file is watched; a clean canvas reloads as one undo step, unsaved edits get a Reload / Keep mine banner (R39 file watch)",
+      "bullets": [],
+      "body": "Poll mtime+size once a second on the main thread. Own saves and loads refresh the stamp so they never read as outside changes. PATCHWATCHTEST covers unchanged, clean reload + undo/redo, dirty banner, and an invalid file. RPC batch/load_patch_text/render_frame and the cross-platform token path are not in this commit.",
+      "raw": "live reload: the open patch file is watched; a clean canvas reloads as one undo step, unsaved edits get a Reload / Keep mine banner (R39 file watch)\n\nPoll mtime+size once a second on the main thread. Own saves and loads refresh the stamp so they never read as outside changes. PATCHWATCHTEST covers unchanged, clean reload + undo/redo, dirty banner, and an invalid file. RPC batch/load_patch_text/render_frame and the cross-platform token path are not in this commit."
+    },
+    "stat": ".claude/skills/run-infinite-hygiene/driver.sh |   1 +\n src/main.cpp                                  | 195 +++++++++++++++++++++++++-\n 2 files changed, 195 insertions(+), 1 deletion(-)",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "c7181a3c7401adb11dca94171462cb9f7382d97d",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 20:49:00 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/windows-headless-console: Infinite.com console shim (R489)",
+      "description": "Merge feature/windows-headless-console: Infinite.com console shim (R489)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/windows-headless-console: Infinite.com console shim (R489)"
+    },
+    "stat": "",
+    "files": [
+      ".github/workflows/build.yml",
+      "CMakeLists.txt",
+      "package.ps1",
+      "src/cli_main_win.cpp"
+    ]
+  },
+  {
+    "hash": "693180f72e4082332f049f00725e8805b889a035",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 20:48:56 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "windows: Infinite.com console launcher so cmd/PowerShell wait for headless runs and see exit codes + JSON (R489)",
+      "description": "windows: Infinite.com console launcher so cmd/PowerShell wait for headless runs and see exit codes + JSON (R489)",
+      "bullets": [],
+      "body": "Console-subsystem shim next to the GUI-subsystem Infinite.exe; bare 'Infinite' resolves to .com via PATHEXT. Windows-only files; unverified locally, the CI shim step (pre-GL --version and bad --frame cases) is the first real run.",
+      "raw": "windows: Infinite.com console launcher so cmd/PowerShell wait for headless runs and see exit codes + JSON (R489)\n\nConsole-subsystem shim next to the GUI-subsystem Infinite.exe; bare 'Infinite' resolves to .com via PATHEXT. Windows-only files; unverified locally, the CI shim step (pre-GL --version and bad --frame cases) is the first real run."
+    },
+    "stat": ".github/workflows/build.yml |  42 +++++++++++++++++-\n CMakeLists.txt              |  12 +++++\n package.ps1                 |   3 ++\n src/cli_main_win.cpp        | 106 ++++++++++++++++++++++++++++++++++++++++++++\n 4 files changed, 162 insertions(+), 1 deletion(-)\n create mode 100644 src/cli_main_win.cpp",
+    "files": [
+      ".github/workflows/build.yml",
+      "CMakeLists.txt",
+      "package.ps1",
+      "src/cli_main_win.cpp"
+    ]
+  },
+  {
+    "hash": "7a0cf868161c7c04624ff102d7ef7e25abefde4c",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 20:44:39 2026 +0530",
+    "parsed_message": {
+      "type": "perf",
+      "scope": "core",
+      "title": "Merge docs/perf-camera-run: camera run proven (R24)",
+      "description": "Merge docs/perf-camera-run: camera run proven (R24)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge docs/perf-camera-run: camera run proven (R24)"
+    },
+    "stat": "",
+    "files": [
+      "docs/plans/perf/README.md"
+    ]
+  },
+  {
+    "hash": "4cf0abb5b8df378ec008b4ddd2fae0366573c8c5",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 20:44:38 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "perf",
+      "title": "docs(perf): camera run proven end to end; launch the bench via open so macOS attributes camera access to Infinite (R24)",
+      "description": "camera run proven end to end; launch the bench via open so macOS attributes camera access to Infinite (R24)",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>",
+      "raw": "docs(perf): camera run proven end to end; launch the bench via open so macOS attributes camera access to Infinite (R24)\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/plans/perf/README.md | 6 +++---\n 1 file changed, 3 insertions(+), 3 deletions(-)",
+    "files": [
+      "docs/plans/perf/README.md"
+    ]
+  },
+  {
+    "hash": "0fb3be921d07f83de1387696b416e00e3f72d94e",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 20:29:28 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Merge bugfix/device-mix-double-count: device mix counts a shared source once (R477)",
+      "description": "Merge bugfix/device-mix-double-count: device mix counts a shared source once (R477)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge bugfix/device-mix-double-count: device mix counts a shared source once (R477)"
+    },
+    "stat": "",
+    "files": [
+      "src/audio/AudioEngine.cpp",
+      "src/audio/AudioEngine.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "ccd046119c68fc0cf542cf1aa38a0a5fe244c8be",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 20:29:28 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "audio",
+      "title": "audio: a source wired to both Audio Out and an Output mixes into the device once, not twice (R477)",
+      "description": "audio: a source wired to both Audio Out and an Output mixes into the device once, not twice (R477)",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>",
+      "raw": "audio: a source wired to both Audio Out and an Output mixes into the device once, not twice (R477)\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "src/audio/AudioEngine.cpp |  2 +-\n src/audio/AudioEngine.h   | 25 +++++++++++++++++++++++++\n src/main.cpp              | 22 +++++++++++++++++++++-\n 3 files changed, 47 insertions(+), 2 deletions(-)",
+    "files": [
+      "src/audio/AudioEngine.cpp",
+      "src/audio/AudioEngine.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "6e3e57b35b77d69da738d0e4a097a46f1c515914",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 20:19:40 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "audio",
+      "title": "Merge bugfix/headless-audio-block-size: fixed headless audio block (R478)",
+      "description": "Merge bugfix/headless-audio-block-size: fixed headless audio block (R478)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge bugfix/headless-audio-block-size: fixed headless audio block (R478)"
+    },
+    "stat": "",
+    "files": [
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "1ab58ee3ba125608d3e2b9ea6cbf61ef4925cae8",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 20:19:40 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "audio",
+      "title": "headless: fixed 512-frame audio block, independent of device and Settings (R478)",
+      "description": "headless: fixed 512-frame audio block, independent of device and Settings (R478)",
+      "bullets": [],
+      "body": "",
+      "raw": "headless: fixed 512-frame audio block, independent of device and Settings (R478)"
+    },
+    "stat": "src/main.cpp | 27 +++++++++++++++++++++++++++\n 1 file changed, 27 insertions(+)",
+    "files": [
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "f6242ae6d0e0f78bfb76e052a2e1ea3abc25e913",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 20:12:16 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/patch-authoring-skill: generated patch-authoring skill (R41)",
+      "description": "Merge feature/patch-authoring-skill: generated patch-authoring skill (R41)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/patch-authoring-skill: generated patch-authoring skill (R41)"
+    },
+    "stat": "",
+    "files": [
+      ".claude/skills/infinite-patch-authoring/SKILL.md",
+      "AGENTS.md",
+      "assets/examples/authoring/audio.inf",
+      "assets/examples/authoring/image.inf",
+      "assets/examples/authoring/modulation.inf",
+      "docs/ai-skills/infinite-patch-authoring.md",
+      "scripts/headless_smoke.sh",
+      "src/core/AISkillContent.h",
+      "src/main.cpp",
+      "tests/headless/describe_join_baseline.json",
+      "tests/headless/format/audio.inf",
+      "tools/gen-patch-skill.py"
+    ]
+  },
+  {
+    "hash": "66942744bee3c3091698ac76cd96aef61127b7d5",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 20:12:02 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "settings: Install AI Skill button for the patch authoring skill; smoke checks examples and skill staleness (R41)",
+      "description": "settings: Install AI Skill button for the patch authoring skill; smoke checks examples and skill staleness (R41)",
+      "bullets": [],
+      "body": "",
+      "raw": "settings: Install AI Skill button for the patch authoring skill; smoke checks examples and skill staleness (R41)"
+    },
+    "stat": "scripts/headless_smoke.sh | 13 +++++++++++++\n src/main.cpp              | 17 +++++++++++++++++\n 2 files changed, 30 insertions(+)",
+    "files": [
+      "scripts/headless_smoke.sh",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "40de943c237a19c60db65bbe4c0a349692798703",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 20:12:02 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "skill: infinite-patch-authoring, generated from --describe, with tools/gen-patch-skill.py and three example patches (R41)",
+      "description": "skill: infinite-patch-authoring, generated from --describe, with tools/gen-patch-skill.py and three example patches (R41)",
+      "bullets": [],
+      "body": "",
+      "raw": "skill: infinite-patch-authoring, generated from --describe, with tools/gen-patch-skill.py and three example patches (R41)"
+    },
+    "stat": ".claude/skills/infinite-patch-authoring/SKILL.md | 460 ++++++++++++++++++++++\n AGENTS.md                                        |   1 +\n assets/examples/authoring/audio.inf              |  20 +\n assets/examples/authoring/image.inf              |  11 +\n assets/examples/authoring/modulation.inf         |  14 +\n docs/ai-skills/infinite-patch-authoring.md       | 460 ++++++++++++++++++++++\n src/core/AISkillContent.h                        | 470 ++++++++++++++++++++++-\n tests/headless/format/audio.inf                  |   2 +-\n tools/gen-patch-skill.py                         | 114 ++++++\n 9 files changed, 1550 insertions(+), 2 deletions(-)\n create mode 100644 .claude/skills/infinite-patch-authoring/SKILL.md\n create mode 100644 assets/examples/authoring/audio.inf\n create mode 100644 assets/examples/authoring/image.inf\n create mode 100644 assets/examples/authoring/modulation.inf\n create mode 100644 docs/ai-skills/infinite-patch-authoring.md\n create mode 100755 tools/gen-patch-skill.py",
+    "files": [
+      ".claude/skills/infinite-patch-authoring/SKILL.md",
+      "AGENTS.md",
+      "assets/examples/authoring/audio.inf",
+      "assets/examples/authoring/image.inf",
+      "assets/examples/authoring/modulation.inf",
+      "docs/ai-skills/infinite-patch-authoring.md",
+      "src/core/AISkillContent.h",
+      "tests/headless/format/audio.inf",
+      "tools/gen-patch-skill.py"
+    ]
+  },
+  {
+    "hash": "db1510f46d07ca1c5e1296164455acd90feb3794",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 20:12:01 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "tests: lower describe key-join baseline by one - R480 removed the Join keep-input-colours control",
+      "description": "tests: lower describe key-join baseline by one - R480 removed the Join keep-input-colours control",
+      "bullets": [],
+      "body": "",
+      "raw": "tests: lower describe key-join baseline by one - R480 removed the Join keep-input-colours control"
+    },
+    "stat": "tests/headless/describe_join_baseline.json | 6 +++---\n 1 file changed, 3 insertions(+), 3 deletions(-)",
+    "files": [
+      "tests/headless/describe_join_baseline.json"
+    ]
+  },
+  {
+    "hash": "e49a1de9b44ba714716efe43d7ed3aa3ea6d7d10",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 20:01:14 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/live-validator-warnings: validator warnings shown live on nodes (R30)",
+      "description": "Merge feature/live-validator-warnings: validator warnings shown live on nodes (R30)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/live-validator-warnings: validator warnings shown live on nodes (R30)"
+    },
+    "stat": "",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "fbf62510e70ce2192df411a4b55cb73a6684f18a",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 20:01:13 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "ui",
+      "title": "ui: live schema warnings on nodes - open merge input, empty Output, image cycle (R30)",
+      "description": "ui: live schema warnings on nodes - open merge input, empty Output, image cycle (R30)",
+      "bullets": [],
+      "body": "",
+      "raw": "ui: live schema warnings on nodes - open merge input, empty Output, image cycle (R30)"
+    },
+    "stat": ".claude/skills/run-infinite-hygiene/driver.sh |   1 +\n src/main.cpp                                  | 107 +++++++++++++++++++++++++-\n 2 files changed, 107 insertions(+), 1 deletion(-)",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "da75cf6df3ca8109779aad4386dc4bdde08eac85",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 19:48:01 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Merge bugfix/join-keep-colours-removal: Join always preserves colour, no manufactured colour from instances (R480)",
+      "description": "Merge bugfix/join-keep-colours-removal: Join always preserves colour, no manufactured colour from instances (R480)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge bugfix/join-keep-colours-removal: Join always preserves colour, no manufactured colour from instances (R480)"
+    },
+    "stat": "",
+    "files": [
+      "docs/node_param_audit.md",
+      "src/main.cpp",
+      "src/nodes/UtilityNodes.cpp",
+      "src/nodes/UtilityNodes.h"
+    ]
+  },
+  {
+    "hash": "71e4a39601a2cb5d11698e8bcd7d9491c3949808",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 19:48:01 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "join: remove resurrected keepInputColours; plain instancer input no longer counts as authored colour (R480)",
+      "description": "join: remove resurrected keepInputColours; plain instancer input no longer counts as authored colour (R480)",
+      "bullets": [],
+      "body": "",
+      "raw": "join: remove resurrected keepInputColours; plain instancer input no longer counts as authored colour (R480)"
+    },
+    "stat": "docs/node_param_audit.md   |  2 --\n src/main.cpp               | 27 +++++++++++++++++++++++++--\n src/nodes/UtilityNodes.cpp | 23 +++++++++++++++--------\n src/nodes/UtilityNodes.h   |  7 -------\n 4 files changed, 40 insertions(+), 19 deletions(-)",
+    "files": [
+      "docs/node_param_audit.md",
+      "src/main.cpp",
+      "src/nodes/UtilityNodes.cpp",
+      "src/nodes/UtilityNodes.h"
+    ]
+  },
+  {
+    "hash": "05b5cd72d85f60145b5498f89dba0c1150afbed5",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 19:41:59 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/headless-cross-platform: headless on Linux and Windows (R18)",
+      "description": "Merge feature/headless-cross-platform: headless on Linux and Windows (R18)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/headless-cross-platform: headless on Linux and Windows (R18)"
+    },
+    "stat": "",
+    "files": [
+      ".github/workflows/build.yml",
+      "scripts/headless_smoke.sh",
+      "src/main.cpp",
+      "src/platform/Platform.h",
+      "src/platform/Platform.mm",
+      "src/platform/linux/PlatformLinux.cpp",
+      "src/platform/win/PlatformWin.cpp"
+    ]
+  },
+  {
+    "hash": "270c33468c8398897e84745826fcc15d1f8a49b9",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 19:41:59 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "headless: E_NO_DISPLAY on Linux, JSON error when glfwInit fails, Windows console attach, smoke in CI (R18)",
+      "description": "headless: E_NO_DISPLAY on Linux, JSON error when glfwInit fails, Windows console attach, smoke in CI (R18)",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>",
+      "raw": "headless: E_NO_DISPLAY on Linux, JSON error when glfwInit fails, Windows console attach, smoke in CI (R18)\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+    },
+    "stat": ".github/workflows/build.yml          | 10 ++++++++++\n scripts/headless_smoke.sh            |  6 ++++++\n src/main.cpp                         | 22 ++++++++++++++++++++++\n src/platform/Platform.h              |  7 +++++++\n src/platform/Platform.mm             |  4 ++++\n src/platform/linux/PlatformLinux.cpp |  4 ++++\n src/platform/win/PlatformWin.cpp     | 18 ++++++++++++++++++\n 7 files changed, 71 insertions(+)",
+    "files": [
+      ".github/workflows/build.yml",
+      "scripts/headless_smoke.sh",
+      "src/main.cpp",
+      "src/platform/Platform.h",
+      "src/platform/Platform.mm",
+      "src/platform/linux/PlatformLinux.cpp",
+      "src/platform/win/PlatformWin.cpp"
+    ]
+  },
+  {
+    "hash": "3992c56f154d5978a32ab2519910201ce0a52f62",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 18:56:49 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "render3d",
+      "title": "Merge bugfix/render3d-transparent-sort: sorted translucent pass (R275)",
+      "description": "Merge bugfix/render3d-transparent-sort: sorted translucent pass (R275)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge bugfix/render3d-transparent-sort: sorted translucent pass (R275)"
+    },
+    "stat": "",
+    "files": [
+      "scripts/headless_smoke.sh",
+      "src/nodes/Geometry3DNodes.cpp",
+      "tests/headless/render3d/translucent_ab.inf",
+      "tests/headless/render3d/translucent_ba.inf"
+    ]
+  },
+  {
+    "hash": "e1337a8140a05589b40614136766caed041677dd",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 18:56:48 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "render3d: draw translucent meshes in a sorted back-to-front pass with no depth write (R275)",
+      "description": "render3d: draw translucent meshes in a sorted back-to-front pass with no depth write (R275)",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>",
+      "raw": "render3d: draw translucent meshes in a sorted back-to-front pass with no depth write (R275)\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "scripts/headless_smoke.sh                  |  6 +++\n src/nodes/Geometry3DNodes.cpp              | 76 ++++++++++++++++++++++++++++++\n tests/headless/render3d/translucent_ab.inf | 29 ++++++++++++\n tests/headless/render3d/translucent_ba.inf | 29 ++++++++++++\n 4 files changed, 140 insertions(+)\n create mode 100644 tests/headless/render3d/translucent_ab.inf\n create mode 100644 tests/headless/render3d/translucent_ba.inf",
+    "files": [
+      "scripts/headless_smoke.sh",
+      "src/nodes/Geometry3DNodes.cpp",
+      "tests/headless/render3d/translucent_ab.inf",
+      "tests/headless/render3d/translucent_ba.inf"
+    ]
+  },
+  {
+    "hash": "b87821050f9c47cd0bb8749777ca47fca176e925",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 18:42:26 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "Merge feature/geometry-domain-map: geometry domain map phase 1 (R25)",
+      "description": "Merge feature/geometry-domain-map: geometry domain map phase 1 (R25)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/geometry-domain-map: geometry domain map phase 1 (R25)"
+    },
+    "stat": "",
+    "files": [
+      "docs/reference/geometry-domains.md"
+    ]
+  },
+  {
+    "hash": "01120a6fc832182d77c36e98b21808718c306494",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 18:40:14 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "global",
+      "title": "docs: geometry domain map, phase 1 rewrite against current source (R25)",
+      "description": "geometry domain map, phase 1 rewrite against current source (R25)",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>",
+      "raw": "docs: geometry domain map, phase 1 rewrite against current source (R25)\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "docs/reference/geometry-domains.md | 449 +++++++++++++++++--------------------\n 1 file changed, 212 insertions(+), 237 deletions(-)",
+    "files": [
+      "docs/reference/geometry-domains.md"
+    ]
+  },
+  {
+    "hash": "3d6c30daf399615fc0f1ce5ba3299d8eda2a1dc1",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 18:22:29 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "audio",
+      "title": "Merge bugfix/headless-render-start-audio: --render --start moves the audio clock (R476)",
+      "description": "Merge bugfix/headless-render-start-audio: --render --start moves the audio clock (R476)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge bugfix/headless-render-start-audio: --render --start moves the audio clock (R476)"
+    },
+    "stat": "",
+    "files": [
+      "scripts/headless_smoke.sh",
+      "src/main.cpp",
+      "tests/headless/summary/late_tone.inf"
+    ]
+  },
+  {
+    "hash": "7c6eddd4cb8c9f2c55624b21b050c306d677a77e",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 18:22:29 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "audio",
+      "title": "headless: --render --start seeks before the session so audio starts at S too (R476)",
+      "description": "headless: --render --start seeks before the session so audio starts at S too (R476)",
+      "bullets": [],
+      "body": "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>",
+      "raw": "headless: --render --start seeks before the session so audio starts at S too (R476)\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+    },
+    "stat": "scripts/headless_smoke.sh            | 11 +++++++++++\n src/main.cpp                         |  4 ++++\n tests/headless/summary/late_tone.inf | 22 ++++++++++++++++++++++\n 3 files changed, 37 insertions(+)\n create mode 100644 tests/headless/summary/late_tone.inf",
+    "files": [
+      "scripts/headless_smoke.sh",
+      "src/main.cpp",
+      "tests/headless/summary/late_tone.inf"
+    ]
+  },
+  {
+    "hash": "be54d52014df9d0a8c17669c7b125c4fe963d4ce",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 17:39:09 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "audio",
+      "title": "Merge feature/headless-summaries: --audio-summary, frame_stats, --contact-sheet (R37)",
+      "description": "Merge feature/headless-summaries: --audio-summary, frame_stats, --contact-sheet (R37)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/headless-summaries: --audio-summary, frame_stats, --contact-sheet (R37)"
+    },
+    "stat": "",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "CMakeLists.txt",
+      "docs/fix-briefs/headless-engine.md",
+      "docs/reference/patch-format.md",
+      "scripts/headless_smoke.sh",
+      "src/core/AudioSummary.cpp",
+      "src/core/AudioSummary.h",
+      "src/core/ColorStats.cpp",
+      "src/core/ColorStats.h",
+      "src/core/ContactSheet.cpp",
+      "src/core/ContactSheet.h",
+      "src/core/HeadlessJob.cpp",
+      "src/core/HeadlessJob.h",
+      "src/main.cpp",
+      "tests/headless/summary/black.inf",
+      "tests/headless/summary/clipping.inf",
+      "tests/headless/summary/no_audio.inf",
+      "tests/headless/summary/silent.inf",
+      "tests/headless/summary/sine.inf"
+    ]
+  },
+  {
+    "hash": "7ad1d374b5aed6384c7d404355e844c28860f5ce",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 17:39:09 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "headless: summary fixtures, smoke checks, hygiene entry and docs (R37)",
+      "description": "headless: summary fixtures, smoke checks, hygiene entry and docs (R37)",
+      "bullets": [],
+      "body": "tests/headless/summary: sine, clipping, silent, no_audio, black.\nSmoke: 19 checks for block 2 (sine loudest band, W_CLIPPING, W_SILENT,\nE_NO_AUDIO, 100 % black, contact sheet sRGB chunk, determinism).\nAUDIOSUMMARYTEST joins the hygiene fast tier.",
+      "raw": "headless: summary fixtures, smoke checks, hygiene entry and docs (R37)\n\ntests/headless/summary: sine, clipping, silent, no_audio, black.\nSmoke: 19 checks for block 2 (sine loudest band, W_CLIPPING, W_SILENT,\nE_NO_AUDIO, 100 % black, contact sheet sRGB chunk, determinism).\nAUDIOSUMMARYTEST joins the hygiene fast tier."
+    },
+    "stat": ".claude/skills/run-infinite-hygiene/driver.sh |  1 +\n docs/fix-briefs/headless-engine.md            | 11 ++++++++\n docs/reference/patch-format.md                | 25 ++++++++++++++++++-\n scripts/headless_smoke.sh                     | 36 +++++++++++++++++++++++++--\n tests/headless/summary/black.inf              | 11 ++++++++\n tests/headless/summary/clipping.inf           | 18 ++++++++++++++\n tests/headless/summary/no_audio.inf           |  9 +++++++\n tests/headless/summary/silent.inf             | 10 ++++++++\n tests/headless/summary/sine.inf               | 12 +++++++++\n 9 files changed, 130 insertions(+), 3 deletions(-)\n create mode 100644 tests/headless/summary/black.inf\n create mode 100644 tests/headless/summary/clipping.inf\n create mode 100644 tests/headless/summary/no_audio.inf\n create mode 100644 tests/headless/summary/silent.inf\n create mode 100644 tests/headless/summary/sine.inf",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "docs/fix-briefs/headless-engine.md",
+      "docs/reference/patch-format.md",
+      "scripts/headless_smoke.sh",
+      "tests/headless/summary/black.inf",
+      "tests/headless/summary/clipping.inf",
+      "tests/headless/summary/no_audio.inf",
+      "tests/headless/summary/silent.inf",
+      "tests/headless/summary/sine.inf"
+    ]
+  },
+  {
+    "hash": "f7520f048510244cd4de7d8ae1b64d57abab3d25",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 17:39:08 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "audio",
+      "title": "headless: --audio-summary, frame_stats and --contact-sheet (R37)",
+      "description": "headless: --audio-summary, frame_stats and --contact-sheet (R37)",
+      "bullets": [
+        "audio-summary <patch> <out.json> [--start S] [--duration S] [--wav f]",
+        "frame adds frame_stats per frame, W_BLACK_FRAME, and --contact-sheet."
+      ],
+      "body": "[--output node] runs offline audio only and reports the numbers in the\nstatus line and out.json. It measures the device mix, or one Audio Out /\nOutput with --output. E_NO_AUDIO (exit 3), W_CLIPPING, W_SILENT.\nINFINITE_AUDIOSUMMARYTEST runs the analyzer self-test.",
+      "raw": "headless: --audio-summary, frame_stats and --contact-sheet (R37)\n\n--audio-summary <patch> <out.json> [--start S] [--duration S] [--wav f]\n[--output node] runs offline audio only and reports the numbers in the\nstatus line and out.json. It measures the device mix, or one Audio Out /\nOutput with --output. E_NO_AUDIO (exit 3), W_CLIPPING, W_SILENT.\n--frame adds frame_stats per frame, W_BLACK_FRAME, and --contact-sheet.\nINFINITE_AUDIOSUMMARYTEST runs the analyzer self-test."
+    },
+    "stat": "src/core/HeadlessJob.cpp |  32 ++++-\n src/core/HeadlessJob.h   |  15 ++-\n src/main.cpp             | 312 ++++++++++++++++++++++++++++++++++++++++++++++-\n 3 files changed, 344 insertions(+), 15 deletions(-)",
+    "files": [
+      "src/core/HeadlessJob.cpp",
+      "src/core/HeadlessJob.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "d56ede1c8c13e3cab7ff7d94b93391a15d8a734c",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 17:39:08 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "audio",
+      "title": "core: audio summary analyzer, frame summary and contact sheet",
+      "description": "core: audio summary analyzer, frame summary and contact sheet",
+      "bullets": [],
+      "body": "AudioSummary: BS.1770 gated loudness, 4x true peak, RMS, DC, clipping,\nsilence ratio, stereo correlation, 32-band spectrum, per-second loudness,\nonset count and a tempo estimate, with a self-test on synthesized signals.\nColorStats::SummarizeRgba8: luma range, mean RGB, black/white share, alpha\ncoverage, 16-bin histogram. ContactSheet: 480 px cells with a time label,\nsRGB-tagged PNG.",
+      "raw": "core: audio summary analyzer, frame summary and contact sheet\n\nAudioSummary: BS.1770 gated loudness, 4x true peak, RMS, DC, clipping,\nsilence ratio, stereo correlation, 32-band spectrum, per-second loudness,\nonset count and a tempo estimate, with a self-test on synthesized signals.\nColorStats::SummarizeRgba8: luma range, mean RGB, black/white share, alpha\ncoverage, 16-bin histogram. ContactSheet: 480 px cells with a time label,\nsRGB-tagged PNG."
+    },
+    "stat": "CMakeLists.txt            |   2 +\n src/core/AudioSummary.cpp | 681 ++++++++++++++++++++++++++++++++++++++++++++++\n src/core/AudioSummary.h   |  84 ++++++\n src/core/ColorStats.cpp   |  75 +++++\n src/core/ColorStats.h     |  22 ++\n src/core/ContactSheet.cpp | 200 ++++++++++++++\n src/core/ContactSheet.h   |  52 ++++\n 7 files changed, 1116 insertions(+)\n create mode 100644 src/core/AudioSummary.cpp\n create mode 100644 src/core/AudioSummary.h\n create mode 100644 src/core/ContactSheet.cpp\n create mode 100644 src/core/ContactSheet.h",
+    "files": [
+      "CMakeLists.txt",
+      "src/core/AudioSummary.cpp",
+      "src/core/AudioSummary.h",
+      "src/core/ColorStats.cpp",
+      "src/core/ColorStats.h",
+      "src/core/ContactSheet.cpp",
+      "src/core/ContactSheet.h"
+    ]
+  },
+  {
+    "hash": "1da806eff4cf1ac9dabec71528636b6ec3d750e7",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 16:46:08 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/headless-names-explain: names, keys, --explain and the patch format doc (R38)",
+      "description": "Merge feature/headless-names-explain: names, keys, --explain and the patch format doc (R38)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/headless-names-explain: names, keys, --explain and the patch format doc (R38)"
+    },
+    "stat": "",
+    "files": [
+      "CMakeLists.txt",
+      "docs/reference/patch-format.md",
+      "scripts/headless_smoke.sh",
+      "src/core/HeadlessJob.cpp",
+      "src/core/HeadlessJob.h",
+      "src/core/Modulation.cpp",
+      "src/core/Modulation.h",
+      "src/core/Patch.cpp",
+      "src/core/Patch.h",
+      "src/core/PatchExplain.cpp",
+      "src/core/PatchExplain.h",
+      "src/core/PatchSchema.cpp",
+      "src/core/PatchSchema.h",
+      "src/main.cpp",
+      "tests/headless/describe_join_baseline.json",
+      "tests/headless/format/audio.inf",
+      "tests/headless/format/image.inf",
+      "tests/headless/format/modulation.inf",
+      "tests/headless/keyed/keyed.inf",
+      "tests/headless/keyed/misspelled.inf",
+      "tests/headless/keyed/numeric.inf",
+      "tests/headless/names/named.inf",
+      "tests/headless/names/numeric.inf",
+      "tests/headless/names/out_of_range.inf",
+      "tests/headless/names/patch_1.canonical.inf",
+      "tests/headless/strict/all_at_once.inf",
+      "tests/headless/strict/misspelled.inf"
+    ]
+  },
+  {
+    "hash": "30d9fb8597b87aa67bb24e23f283222ab2c647f8",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 16:45:27 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "global",
+      "title": "docs: patch format reference (grammar, names, defaults rule, minimal patches, stability promise)",
+      "description": "patch format reference (grammar, names, defaults rule, minimal patches, stability promise)",
+      "bullets": [],
+      "body": "docs/reference/patch-format.md is the guide to writing .inf files by hand;\nPatch.h keeps the authoritative record layout and points at it. The three\nminimal patches it shows live in tests/headless/format and are validated by\nscripts/headless_smoke.sh.",
+      "raw": "docs: patch format reference (grammar, names, defaults rule, minimal patches, stability promise)\n\ndocs/reference/patch-format.md is the guide to writing .inf files by hand;\nPatch.h keeps the authoritative record layout and points at it. The three\nminimal patches it shows live in tests/headless/format and are validated by\nscripts/headless_smoke.sh."
+    },
+    "stat": "docs/reference/patch-format.md | 131 +++++++++++++++++++++++++++++++++++++++++\n src/core/Patch.h               |   3 +\n 2 files changed, 134 insertions(+)\n create mode 100644 docs/reference/patch-format.md",
+    "files": [
+      "docs/reference/patch-format.md",
+      "src/core/Patch.h"
+    ]
+  },
+  {
+    "hash": "49252d38debf9067dcf942abfe49f257dbb8f618",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 16:45:27 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "headless: --explain reads back the live graph (text, --json, --all, RPC)",
+      "description": "headless: --explain reads back the live graph (text, --json, --all, RPC)",
+      "bullets": [],
+      "body": "Loads the patch (strict unless --lenient), then prints what ApplyPatchData\nbuilt: nodes with the keys that differ from the type's defaults, one line per\nwire starting with its record tag, and the unconnected nodes. Controls are\nshown by saved key, dropdowns by option name, modulation with the range\nResolvedSourceFor gives; a key a mod/expr line writes is marked as a live\nvalue. Explain always probes the types first so keys and options are known.\nThe status JSON stays the last line. Also an explain RPC method.\nSmoke: 116 checks (25 new): patch_1 relation lines equal the file's records\nper tag, the three format fixtures validate strictly, exit codes 0/2/3.",
+      "raw": "headless: --explain reads back the live graph (text, --json, --all, RPC)\n\nLoads the patch (strict unless --lenient), then prints what ApplyPatchData\nbuilt: nodes with the keys that differ from the type's defaults, one line per\nwire starting with its record tag, and the unconnected nodes. Controls are\nshown by saved key, dropdowns by option name, modulation with the range\nResolvedSourceFor gives; a key a mod/expr line writes is marked as a live\nvalue. Explain always probes the types first so keys and options are known.\nThe status JSON stays the last line. Also an explain RPC method.\n\nSmoke: 116 checks (25 new): patch_1 relation lines equal the file's records\nper tag, the three format fixtures validate strictly, exit codes 0/2/3."
+    },
+    "stat": "CMakeLists.txt                       |   1 +\n scripts/headless_smoke.sh            |  41 +++++-\n src/core/HeadlessJob.cpp             |  36 +++++\n src/core/HeadlessJob.h               |   5 +\n src/core/PatchExplain.cpp            | 264 +++++++++++++++++++++++++++++++++++\n src/core/PatchExplain.h              |  72 ++++++++++\n src/main.cpp                         | 110 ++++++++++++++-\n tests/headless/format/audio.inf      |  20 +++\n tests/headless/format/image.inf      |  11 ++\n tests/headless/format/modulation.inf |  14 ++\n 10 files changed, 570 insertions(+), 4 deletions(-)\n create mode 100644 src/core/PatchExplain.cpp\n create mode 100644 src/core/PatchExplain.h\n create mode 100644 tests/headless/format/audio.inf\n create mode 100644 tests/headless/format/image.inf\n create mode 100644 tests/headless/format/modulation.inf",
+    "files": [
+      "CMakeLists.txt",
+      "scripts/headless_smoke.sh",
+      "src/core/HeadlessJob.cpp",
+      "src/core/HeadlessJob.h",
+      "src/core/PatchExplain.cpp",
+      "src/core/PatchExplain.h",
+      "src/main.cpp",
+      "tests/headless/format/audio.inf",
+      "tests/headless/format/image.inf",
+      "tests/headless/format/modulation.inf"
+    ]
+  },
+  {
+    "hash": "334d86a628ad281a0b8ba2f8118822720935cd81",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 16:20:19 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "field",
+      "title": "headless: key-addressed mod/expr lines and dropdown option names",
+      "description": "headless: key-addressed mod/expr lines and dropdown option names",
+      "bullets": [],
+      "body": "mod/expr lines may name a control by its saved key (mod shape sizeX ...)\nand an i line may give a dropdown option by name (i shapeType Star).\nTypes are probed and their controls joined to saved keys before the\npatch loads; an unknown key or option is E_BAD_KEY / E_BAD_VALUE (exit 3)\nwith the nearest suggestion. The GUI drops an unresolved key with a\nstatus line. Canonical output and frames match the numeric twin.",
+      "raw": "headless: key-addressed mod/expr lines and dropdown option names\n\nmod/expr lines may name a control by its saved key (mod shape sizeX ...)\nand an i line may give a dropdown option by name (i shapeType Star).\nTypes are probed and their controls joined to saved keys before the\npatch loads; an unknown key or option is E_BAD_KEY / E_BAD_VALUE (exit 3)\nwith the nearest suggestion. The GUI drops an unresolved key with a\nstatus line. Canonical output and frames match the numeric twin."
+    },
+    "stat": "scripts/headless_smoke.sh           |  10 ++\n src/core/HeadlessJob.cpp            |   2 +-\n src/core/Patch.cpp                  |  12 +-\n src/core/Patch.h                    |   5 +\n src/core/PatchSchema.cpp            |  64 +++++++++\n src/core/PatchSchema.h              |  12 ++\n src/main.cpp                        | 251 ++++++++++++++++++++++++++++++------\n tests/headless/keyed/keyed.inf      |  15 +++\n tests/headless/keyed/misspelled.inf |  15 +++\n tests/headless/keyed/numeric.inf    |  11 ++\n 10 files changed, 357 insertions(+), 40 deletions(-)\n create mode 100644 tests/headless/keyed/keyed.inf\n create mode 100644 tests/headless/keyed/misspelled.inf\n create mode 100644 tests/headless/keyed/numeric.inf",
+    "files": [
+      "scripts/headless_smoke.sh",
+      "src/core/HeadlessJob.cpp",
+      "src/core/Patch.cpp",
+      "src/core/Patch.h",
+      "src/core/PatchSchema.cpp",
+      "src/core/PatchSchema.h",
+      "src/main.cpp",
+      "tests/headless/keyed/keyed.inf",
+      "tests/headless/keyed/misspelled.inf",
+      "tests/headless/keyed/numeric.inf"
+    ]
+  },
+  {
+    "hash": "1046f7094c9cb638358d33e6677f7e3a32c822de",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 15:32:56 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "describe: one row per saved key, real dropdown options, W_OUT_OF_RANGE",
+      "description": "describe: one row per saved key, real dropdown options, W_OUT_OF_RANGE",
+      "bullets": [],
+      "body": "The enum list came from FrameParams, which drops it; it now reads the sticky\nrecord, so Shape's shapeType lists Circle, Ellipse, ... Each type gets a rows\narray (key, kind, default, label, min, max, options, modulatable_index, ui);\nthe old modulatable array stays. Validate probes every type in the file and\nwarns W_OUT_OF_RANGE (advisory). W_INTERNAL_PARAM is not raised: hidden-by-mode\nkeys gave ~180 false hits on GUI-saved patch_1.",
+      "raw": "describe: one row per saved key, real dropdown options, W_OUT_OF_RANGE\n\nThe enum list came from FrameParams, which drops it; it now reads the sticky\nrecord, so Shape's shapeType lists Circle, Ellipse, ... Each type gets a rows\narray (key, kind, default, label, min, max, options, modulatable_index, ui);\nthe old modulatable array stays. Validate probes every type in the file and\nwarns W_OUT_OF_RANGE (advisory). W_INTERNAL_PARAM is not raised: hidden-by-mode\nkeys gave ~180 false hits on GUI-saved patch_1."
+    },
+    "stat": "scripts/headless_smoke.sh             | 11 ++++++\n src/core/HeadlessJob.cpp              |  5 ++-\n src/core/PatchSchema.cpp              | 47 ++++++++++++++++++++++-\n src/core/PatchSchema.h                | 14 +++++++\n src/main.cpp                          | 71 +++++++++++++++++++++++++++++++++--\n tests/headless/names/out_of_range.inf |  8 ++++\n 6 files changed, 150 insertions(+), 6 deletions(-)\n create mode 100644 tests/headless/names/out_of_range.inf",
+    "files": [
+      "scripts/headless_smoke.sh",
+      "src/core/HeadlessJob.cpp",
+      "src/core/PatchSchema.cpp",
+      "src/core/PatchSchema.h",
+      "src/main.cpp",
+      "tests/headless/names/out_of_range.inf"
+    ]
+  },
+  {
+    "hash": "9bfec9b98abcf604a0b2c837f4a6378365e9e7d0",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 15:26:12 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "describe: join each labelled control to its saved key (ParamRef.key)",
+      "description": "describe: join each labelled control to its saved key (ParamRef.key)",
+      "bullets": [],
+      "body": "ParamRef carries a frame-only srcAddr set by ModSlider/ModKnob and by the\nInt/Checkbox wrappers; --describe matches it against VisitParams addresses,\nthen perturbs the leftovers (dropdowns take their int by value) to find the\nrest. 1870 of 1982 controls now name their key. join_stats and the unkeyed\nlist are in --describe; a smoke ratchet keeps the count from dropping.",
+      "raw": "describe: join each labelled control to its saved key (ParamRef.key)\n\nParamRef carries a frame-only srcAddr set by ModSlider/ModKnob and by the\nInt/Checkbox wrappers; --describe matches it against VisitParams addresses,\nthen perturbs the leftovers (dropdowns take their int by value) to find the\nrest. 1870 of 1982 controls now name their key. join_stats and the unkeyed\nlist are in --describe; a smoke ratchet keeps the count from dropping."
+    },
+    "stat": "scripts/headless_smoke.sh                  |   7 +\n src/core/Modulation.cpp                    |   8 +\n src/core/Modulation.h                      |  11 +\n src/core/PatchSchema.cpp                   |   3 +-\n src/core/PatchSchema.h                     |   4 +\n src/main.cpp                               | 340 ++++++++++++++++++++++++++++-\n tests/headless/describe_join_baseline.json |   5 +\n 7 files changed, 376 insertions(+), 2 deletions(-)\n create mode 100644 tests/headless/describe_join_baseline.json",
+    "files": [
+      "scripts/headless_smoke.sh",
+      "src/core/Modulation.cpp",
+      "src/core/Modulation.h",
+      "src/core/PatchSchema.cpp",
+      "src/core/PatchSchema.h",
+      "src/main.cpp",
+      "tests/headless/describe_join_baseline.json"
+    ]
+  },
+  {
+    "hash": "787c61f9a4370c435da1252b18b7df5a8b117205",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 15:18:31 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "headless: names - id lines, named refs, slot names, --canonicalize",
+      "description": "headless: names - id lines, named refs, slot names, --canonicalize",
+      "bullets": [
+        "canonicalize in out [--keep-ids] [--lenient] writes the numeric form."
+      ],
+      "body": "A hand-written patch can give nodes an 'id <word>' and use the word (and input\nslot names) wherever an index goes; PatchSchema::Resolve turns them into numbers\nbefore Validate. '#' comment lines are skipped, trailing spaces trimmed. The\nwriter is unchanged for GUI saves (patch_1 load-write byte-identical).",
+      "raw": "headless: names - id lines, named refs, slot names, --canonicalize\n\nA hand-written patch can give nodes an 'id <word>' and use the word (and input\nslot names) wherever an index goes; PatchSchema::Resolve turns them into numbers\nbefore Validate. '#' comment lines are skipped, trailing spaces trimmed. The\nwriter is unchanged for GUI saves (patch_1 load-write byte-identical).\n--canonicalize in out [--keep-ids] [--lenient] writes the numeric form."
+    },
+    "stat": "scripts/headless_smoke.sh                  |  28 ++\n src/core/HeadlessJob.cpp                   |  32 +-\n src/core/HeadlessJob.h                     |   3 +\n src/core/Patch.cpp                         |  59 ++-\n src/core/Patch.h                           |  15 +\n src/core/PatchSchema.cpp                   | 133 +++++-\n src/core/PatchSchema.h                     |  13 +\n src/main.cpp                               |  68 ++-\n tests/headless/names/named.inf             |  19 +\n tests/headless/names/numeric.inf           |  14 +\n tests/headless/names/patch_1.canonical.inf | 689 +++++++++++++++++++++++++++++\n 11 files changed, 1064 insertions(+), 9 deletions(-)\n create mode 100644 tests/headless/names/named.inf\n create mode 100644 tests/headless/names/numeric.inf\n create mode 100644 tests/headless/names/patch_1.canonical.inf",
+    "files": [
+      "scripts/headless_smoke.sh",
+      "src/core/HeadlessJob.cpp",
+      "src/core/HeadlessJob.h",
+      "src/core/Patch.cpp",
+      "src/core/Patch.h",
+      "src/core/PatchSchema.cpp",
+      "src/core/PatchSchema.h",
+      "src/main.cpp",
+      "tests/headless/names/named.inf",
+      "tests/headless/names/numeric.inf",
+      "tests/headless/names/patch_1.canonical.inf"
+    ]
+  },
+  {
+    "hash": "8fdb31609a61456741213629b02197b52d3c3ffc",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 15:02:53 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "headless: strict by default, --lenient opts out",
+      "description": "headless: strict by default, --lenient opts out",
+      "bullets": [
+        "lenient keeps them warnings. W_BYPASS_IGNORED no longer has a render-only"
+      ],
+      "body": "Every non-advisory validator warning is now an error (kept W_ code, promoted:true,\nexit 3) in --render, --frame and --validate, all reported at once together with\nE_BAD_PARAM. W_UNUSED_NODE, W_NO_OUTPUT and W_DURATION_ROUNDED stay advisory.\nspecial case. Interactive and Finder open stay lenient.",
+      "raw": "headless: strict by default, --lenient opts out\n\nEvery non-advisory validator warning is now an error (kept W_ code, promoted:true,\nexit 3) in --render, --frame and --validate, all reported at once together with\nE_BAD_PARAM. W_UNUSED_NODE, W_NO_OUTPUT and W_DURATION_ROUNDED stay advisory.\n--lenient keeps them warnings. W_BYPASS_IGNORED no longer has a render-only\nspecial case. Interactive and Finder open stay lenient."
+    },
+    "stat": "scripts/headless_smoke.sh             |  24 ++\n src/core/HeadlessJob.cpp              |  36 +-\n src/core/HeadlessJob.h                |  17 +-\n src/core/PatchSchema.cpp              |   2 +-\n src/core/PatchSchema.h                |   4 +-\n src/main.cpp                          |  24 +-\n tests/headless/strict/all_at_once.inf |  15 +\n tests/headless/strict/misspelled.inf  | 693 ++++++++++++++++++++++++++++++++++\n 8 files changed, 806 insertions(+), 9 deletions(-)\n create mode 100644 tests/headless/strict/all_at_once.inf\n create mode 100644 tests/headless/strict/misspelled.inf",
+    "files": [
+      "scripts/headless_smoke.sh",
+      "src/core/HeadlessJob.cpp",
+      "src/core/HeadlessJob.h",
+      "src/core/PatchSchema.cpp",
+      "src/core/PatchSchema.h",
+      "src/main.cpp",
+      "tests/headless/strict/all_at_once.inf",
+      "tests/headless/strict/misspelled.inf"
+    ]
+  },
+  {
+    "hash": "b98384f341fc97ae6c9b67a5d2d40fbcf16b1e5a",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 14:54:45 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "headless: probe waits for every node to draw instead of 8 fixed ticks",
+      "description": "headless: probe waits for every node to draw instead of 8 fixed ticks",
+      "bullets": [],
+      "body": "The off-screen cull only draws a node every 30th frame, so a probe that read\nFrameParams at a fixed tick could see none (false E_BAD_PARAM 'no modulatable\nparameters', and --describe missing ~1200 controls). Probes now switch the cull\noff, wait until each spawned node has drawn, and cap at 120 ticks with\nE_PROBE_TIMEOUT. --describe now sees 1982 modulatable controls, up from 456.",
+      "raw": "headless: probe waits for every node to draw instead of 8 fixed ticks\n\nThe off-screen cull only draws a node every 30th frame, so a probe that read\nFrameParams at a fixed tick could see none (false E_BAD_PARAM 'no modulatable\nparameters', and --describe missing ~1200 controls). Probes now switch the cull\noff, wait until each spawned node has drawn, and cap at 120 ticks with\nE_PROBE_TIMEOUT. --describe now sees 1982 modulatable controls, up from 456."
+    },
+    "stat": "scripts/headless_smoke.sh |  9 +++++\n src/core/HeadlessJob.cpp  |  2 +-\n src/main.cpp              | 84 +++++++++++++++++++++++++++++++++++++++++++++--\n 3 files changed, 91 insertions(+), 4 deletions(-)",
+    "files": [
+      "scripts/headless_smoke.sh",
+      "src/core/HeadlessJob.cpp",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "ea1feb6a41062468d6fbf817ba689cd957b9d2a4",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 10:07:42 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Merge bugfix/offline-gesture-clock: gestures and predictors advance on offline video time (R470)",
+      "description": "Merge bugfix/offline-gesture-clock: gestures and predictors advance on offline video time (R470)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge bugfix/offline-gesture-clock: gestures and predictors advance on offline video time (R470)"
+    },
+    "stat": "",
+    "files": [
+      ".claude/skills/av-sync-sweep/driver.sh",
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "src/core/GestureRecorder.cpp",
+      "src/core/GestureRecorder.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "f54e87cbfe40861b9fc6e3120a7738bb711d910b",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 10:06:16 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "field",
+      "title": "tests: OFFLINECLOCKTEST - LFO, expression and gesture advance on offline time",
+      "description": "tests: OFFLINECLOCKTEST - LFO, expression and gesture advance on offline time",
+      "bullets": [],
+      "body": "One Shape with an LFO binding (size x), a time expression (size y) and a\none-second gesture ramp (rotation), swept offline the way the Render Now pump\ndoes it: variable-size batches of frames per UI frame, with the live gesture\nclock advancing by a random wall dt between batches. Two 30 fps runs must be\nbit-identical, a 60 fps run must match the 30 fps run at every shared\ntimestamp (1e-6), and rotation must follow the analytic ramp, including from\na 2.5 s start.\nAgainst the old gesture clock it fails (30 fps runs differ, rotation up to\n178 degrees off the ramp); with the fix every deviation is 0 or ~1e-13.\nRegistered in the hygiene modulation group, the full run and the av-sync\nsweep's offline section.",
+      "raw": "tests: OFFLINECLOCKTEST - LFO, expression and gesture advance on offline time\n\nOne Shape with an LFO binding (size x), a time expression (size y) and a\none-second gesture ramp (rotation), swept offline the way the Render Now pump\ndoes it: variable-size batches of frames per UI frame, with the live gesture\nclock advancing by a random wall dt between batches. Two 30 fps runs must be\nbit-identical, a 60 fps run must match the 30 fps run at every shared\ntimestamp (1e-6), and rotation must follow the analytic ramp, including from\na 2.5 s start.\n\nAgainst the old gesture clock it fails (30 fps runs differ, rotation up to\n178 degrees off the ramp); with the fix every deviation is 0 or ~1e-13.\nRegistered in the hygiene modulation group, the full run and the av-sync\nsweep's offline section."
+    },
+    "stat": ".claude/skills/av-sync-sweep/driver.sh        |  1 +\n .claude/skills/run-infinite-hygiene/driver.sh |  2 +\n src/main.cpp                                  | 95 ++++++++++++++++++++++++++-\n 3 files changed, 97 insertions(+), 1 deletion(-)",
+    "files": [
+      ".claude/skills/av-sync-sweep/driver.sh",
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "557ae10f8c9d869d35d366f225e2b56c4f9ac999",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 09:41:35 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "prediction: tick predictors on Transport's video step during offline renders",
+      "description": "prediction: tick predictors on Transport's video step during offline renders",
+      "bullets": [
+        "ticks by 0 instead of advancing twice. Live behaviour is unchanged, and the"
+      ],
+      "body": "The predictor tick used the glfwGetTime() delta between calls. The offline\npump calls ApplyModulationAndPalette many times per wall-clock frame, so each\nrendered frame advanced Drift and the other learned modulators by a few\nrandom milliseconds instead of one frame's worth, differently every run.\nOffline, dt is now the step in Transport's video seconds since the previous\ntick (first offline tick 0, clamped to 0.25 like the live path). A second call\nat the same T - the normal-frame call during a take, or a re-exported --frame\nfirst live tick after a take gets dt 0 rather than a stale gap.",
+      "raw": "prediction: tick predictors on Transport's video step during offline renders\n\nThe predictor tick used the glfwGetTime() delta between calls. The offline\npump calls ApplyModulationAndPalette many times per wall-clock frame, so each\nrendered frame advanced Drift and the other learned modulators by a few\nrandom milliseconds instead of one frame's worth, differently every run.\n\nOffline, dt is now the step in Transport's video seconds since the previous\ntick (first offline tick 0, clamped to 0.25 like the live path). A second call\nat the same T - the normal-frame call during a take, or a re-exported --frame\n- ticks by 0 instead of advancing twice. Live behaviour is unchanged, and the\nfirst live tick after a take gets dt 0 rather than a stale gap."
+    },
+    "stat": "src/main.cpp | 27 ++++++++++++++++++++++++---\n 1 file changed, 24 insertions(+), 3 deletions(-)",
+    "files": [
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "88c6ac42846a21df168c1e4118432b610f43d2bd",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 09:37:49 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "gesture: play recordings on Transport's video clock during offline renders",
+      "description": "gesture: play recordings on Transport's video clock during offline renders",
+      "bullets": [
+        "render at T and a --start offset lands on the right phase. Restore during"
+      ],
+      "body": "Gesture playback read GestureRecorder::ClockNow(), which AdvanceClock moves\nonce per UI frame by wall-clock DeltaTime. The offline pump renders many\nvideo frames per UI frame, so during Render Now, headless --render/--frame\nand the arrange WAV take a recorded knob move stair-stepped and played at a\nmachine-dependent speed, different on every run.\nWhile Transport is in offline mode, playback now reads Transport::Seconds()\n(offline video time), and every loop is restarted at 0 on entering offline\nmode and back on the live clock on leaving it (one edge detector,\nGestureSyncClockAxis, instead of a call at each SetOfflineMode site). A\nloop's phase offline is (T * speed) mod duration, so --frame at T matches\nan offline take (undo, load) re-bases on the same axis. The record clock and\nlive behaviour are unchanged.",
+      "raw": "gesture: play recordings on Transport's video clock during offline renders\n\nGesture playback read GestureRecorder::ClockNow(), which AdvanceClock moves\nonce per UI frame by wall-clock DeltaTime. The offline pump renders many\nvideo frames per UI frame, so during Render Now, headless --render/--frame\nand the arrange WAV take a recorded knob move stair-stepped and played at a\nmachine-dependent speed, different on every run.\n\nWhile Transport is in offline mode, playback now reads Transport::Seconds()\n(offline video time), and every loop is restarted at 0 on entering offline\nmode and back on the live clock on leaving it (one edge detector,\nGestureSyncClockAxis, instead of a call at each SetOfflineMode site). A\nloop's phase offline is (T * speed) mod duration, so --frame at T matches\n--render at T and a --start offset lands on the right phase. Restore during\nan offline take (undo, load) re-bases on the same axis. The record clock and\nlive behaviour are unchanged."
+    },
+    "stat": "src/core/GestureRecorder.cpp |  6 +++++\n src/core/GestureRecorder.h   |  6 +++++\n src/main.cpp                 | 61 +++++++++++++++++++++++++++++++++-----------\n 3 files changed, 58 insertions(+), 15 deletions(-)",
+    "files": [
+      "src/core/GestureRecorder.cpp",
+      "src/core/GestureRecorder.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "b7de44ca3ad4da0bb60eca86b8145449beda16c6",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 09:06:33 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "Merge bugfix/linux-appimage-save-dialog: fix issue #25 (cannot save on linux appimage)",
+      "description": "Merge bugfix/linux-appimage-save-dialog: fix issue #25 (cannot save on linux appimage)",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge bugfix/linux-appimage-save-dialog: fix issue #25 (cannot save on linux appimage)"
+    },
+    "stat": "",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "src/main.cpp",
+      "src/platform/linux/AudioDeviceLinux.cpp",
+      "src/platform/linux/HostEnvironmentLinux.h",
+      "src/platform/linux/MediaLinux.cpp",
+      "src/platform/linux/PlatformLinux.cpp",
+      "tools/linux/package-appimage.sh"
+    ]
+  },
+  {
+    "hash": "db71cb5a369a835bc3caff22b75fde4f74dd8dac",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 09:06:28 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "linux",
+      "title": "fix(linux): cleanse AppImage LD_LIBRARY_PATH when executing host dialogs and tools",
+      "description": "cleanse AppImage LD_LIBRARY_PATH when executing host dialogs and tools",
+      "bullets": [
+        "tools/linux/package-appimage.sh: AppRun preserves APPIMAGE_ORIGINAL_LD_LIBRARY_PATH.",
+        "src/platform/linux/HostEnvironmentLinux.h: ScopedHostEnvironment RAII guard restores",
+        "src/platform/linux/{PlatformLinux,AudioDeviceLinux,MediaLinux}.cpp: wrap file dialogs,",
+        "src/main.cpp: add INFINITE_HOSTENVTEST (5 test scenarios covering restoration, unsetting,",
+        ".claude/skills/run-infinite-hygiene/driver.sh: add HOSTENVTEST:1 to Linux Tier 1 checks."
+      ],
+      "body": "Fixes #25: In an AppImage environment, AppRun sets LD_LIBRARY_PATH to $APPDIR/usr/lib.\nWhen native file dialogs (zenity, kdialog, yad) or external tools (xdg-open, gdbus)\nare spawned via popen or posix_spawn, they inherit LD_LIBRARY_PATH and attempt to load\nAppImage's bundled libraries (e.g. Ubuntu 22.04 libpng) instead of host libraries.\nOn modern systems (e.g. CachyOS / Arch), host GTK4 crashes immediately with\n'zenity: symbol lookup error: /usr/lib/libgtk-4.so.1: undefined symbol: png_get_cICP, version PNG16_0',\ncausing Save/Open patch and other file dialogs to fail silently.\noriginal LD_LIBRARY_PATH or strips AppImage mount directories during host tool invocations.\nmessage box, xdg-open and gdbus calls with ScopedHostEnvironment.\nand fallback stripping).",
+      "raw": "fix(linux): cleanse AppImage LD_LIBRARY_PATH when executing host dialogs and tools\n\nFixes #25: In an AppImage environment, AppRun sets LD_LIBRARY_PATH to $APPDIR/usr/lib.\nWhen native file dialogs (zenity, kdialog, yad) or external tools (xdg-open, gdbus)\nare spawned via popen or posix_spawn, they inherit LD_LIBRARY_PATH and attempt to load\nAppImage's bundled libraries (e.g. Ubuntu 22.04 libpng) instead of host libraries.\nOn modern systems (e.g. CachyOS / Arch), host GTK4 crashes immediately with\n'zenity: symbol lookup error: /usr/lib/libgtk-4.so.1: undefined symbol: png_get_cICP, version PNG16_0',\ncausing Save/Open patch and other file dialogs to fail silently.\n\n- tools/linux/package-appimage.sh: AppRun preserves APPIMAGE_ORIGINAL_LD_LIBRARY_PATH.\n- src/platform/linux/HostEnvironmentLinux.h: ScopedHostEnvironment RAII guard restores\n  original LD_LIBRARY_PATH or strips AppImage mount directories during host tool invocations.\n- src/platform/linux/{PlatformLinux,AudioDeviceLinux,MediaLinux}.cpp: wrap file dialogs,\n  message box, xdg-open and gdbus calls with ScopedHostEnvironment.\n- src/main.cpp: add INFINITE_HOSTENVTEST (5 test scenarios covering restoration, unsetting,\n  and fallback stripping).\n- .claude/skills/run-infinite-hygiene/driver.sh: add HOSTENVTEST:1 to Linux Tier 1 checks."
+    },
+    "stat": ".claude/skills/run-infinite-hygiene/driver.sh |   2 +-\n src/main.cpp                                  | 102 ++++++++++++++++++++++++++\n src/platform/linux/AudioDeviceLinux.cpp       |   2 +\n src/platform/linux/HostEnvironmentLinux.h     |  97 ++++++++++++++++++++++++\n src/platform/linux/MediaLinux.cpp             |   2 +\n src/platform/linux/PlatformLinux.cpp          |  14 ++++\n tools/linux/package-appimage.sh               |   4 +\n 7 files changed, 222 insertions(+), 1 deletion(-)\n create mode 100644 src/platform/linux/HostEnvironmentLinux.h",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "src/main.cpp",
+      "src/platform/linux/AudioDeviceLinux.cpp",
+      "src/platform/linux/HostEnvironmentLinux.h",
+      "src/platform/linux/MediaLinux.cpp",
+      "src/platform/linux/PlatformLinux.cpp",
+      "tools/linux/package-appimage.sh"
+    ]
+  },
+  {
+    "hash": "c4a9c5810550f645a05db3f7c46f31c549a76357",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 07:44:24 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/looper-trigger-edge: Macro Trigger fires Looper buttons and MPC pads on every trigger",
+      "description": "Merge feature/looper-trigger-edge: Macro Trigger fires Looper buttons and MPC pads on every trigger",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/looper-trigger-edge: Macro Trigger fires Looper buttons and MPC pads on every trigger"
+    },
+    "stat": "",
+    "files": [
+      ".claude/skills/modulation-sweep/driver.sh",
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "src/core/Modulation.cpp",
+      "src/core/Modulation.h",
+      "src/main.cpp",
+      "src/nodes/LooperNode.cpp",
+      "src/nodes/LooperNode.h"
+    ]
+  },
+  {
+    "hash": "f9ef62e3f1ce593de7b6a1d13f3ae377e930fc71",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 07:38:44 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "looper: a Macro Trigger on a gate button presses on every trigger, not every second one",
+      "description": "looper: a Macro Trigger on a gate button presses on every trigger, not every second one",
+      "bullets": [],
+      "body": "Gate buttons (Looper transport, MPC pads) register their bool ParamRef as\nmomentary; the Macro Trigger apply branch then follows the trigger's level\n(held or tapped) instead of flipping the bool per trigger, and the perf-matrix\nTrigger/Bang writes 1-while-held / 0-on-release instead of stepping.\nCheckboxes and other bools keep toggling. LOOPERTRIGTEST asserts three\ntriggers give three Rec presses and a trigger still toggles a checkbox.",
+      "raw": "looper: a Macro Trigger on a gate button presses on every trigger, not every second one\n\nGate buttons (Looper transport, MPC pads) register their bool ParamRef as\nmomentary; the Macro Trigger apply branch then follows the trigger's level\n(held or tapped) instead of flipping the bool per trigger, and the perf-matrix\nTrigger/Bang writes 1-while-held / 0-on-release instead of stepping.\nCheckboxes and other bools keep toggling. LOOPERTRIGTEST asserts three\ntriggers give three Rec presses and a trigger still toggles a checkbox."
+    },
+    "stat": ".claude/skills/modulation-sweep/driver.sh     |   1 +\n .claude/skills/run-infinite-hygiene/driver.sh |   2 +\n src/core/Modulation.cpp                       |   2 +\n src/core/Modulation.h                         |   5 ++\n src/main.cpp                                  | 121 +++++++++++++++++++++++++-\n src/nodes/LooperNode.cpp                      |   1 +\n src/nodes/LooperNode.h                        |   3 +\n 7 files changed, 132 insertions(+), 3 deletions(-)",
+    "files": [
+      ".claude/skills/modulation-sweep/driver.sh",
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "src/core/Modulation.cpp",
+      "src/core/Modulation.h",
+      "src/main.cpp",
+      "src/nodes/LooperNode.cpp",
+      "src/nodes/LooperNode.h"
+    ]
+  },
+  {
+    "hash": "72a394d94b85f377ba735bf7a43e5e7ef3aa517a",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 04:29:26 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/midi-learn: right-click MIDI learn on any parameter",
+      "description": "Merge feature/midi-learn: right-click MIDI learn on any parameter",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/midi-learn: right-click MIDI learn on any parameter"
+    },
+    "stat": "",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "9a8b7d805d4276594368c82c9a5287f895e38b7b",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 04:17:55 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "midi learn: right-click any parameter > MIDI learn binds a MIDI CC modulator to it",
+      "description": "midi learn: right-click any parameter > MIDI learn binds a MIDI CC modulator to it",
+      "bullets": [],
+      "body": "Built on the existing MIDI CC node and Modulation::Bind, no parallel mapping.\nOne learn owner at a time across param learn, Performance Matrix learn and the\nMIDI CC / Trigger node buttons (MidiLearnCancelAll, also run on NewPatch so\nload/undo/redo cannot leave a stale learn). Reuses a live node on the same\ncontrol, refuses params driven by non-MIDI modulators/expressions/recordings,\none undo step, Esc or a second click cancels. MIDILEARNTEST covers it.",
+      "raw": "midi learn: right-click any parameter > MIDI learn binds a MIDI CC modulator to it\n\nBuilt on the existing MIDI CC node and Modulation::Bind, no parallel mapping.\nOne learn owner at a time across param learn, Performance Matrix learn and the\nMIDI CC / Trigger node buttons (MidiLearnCancelAll, also run on NewPatch so\nload/undo/redo cannot leave a stale learn). Reuses a live node on the same\ncontrol, refuses params driven by non-MIDI modulators/expressions/recordings,\none undo step, Esc or a second click cancels. MIDILEARNTEST covers it."
+    },
+    "stat": ".claude/skills/run-infinite-hygiene/driver.sh |   2 +\n src/main.cpp                                  | 488 +++++++++++++++++++++++++-\n 2 files changed, 489 insertions(+), 1 deletion(-)",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "e9fac4d4c0a71d2aef7c658f7f69ae4035ef79e9",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 04:05:11 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Merge feature/looper-mpc-pads: Looper and MPC nodes, Sampler fade in/out",
+      "description": "Merge feature/looper-mpc-pads: Looper and MPC nodes, Sampler fade in/out",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/looper-mpc-pads: Looper and MPC nodes, Sampler fade in/out"
+    },
+    "stat": "",
+    "files": [
+      ".claude/skills/modulation-sweep/driver.sh",
+      ".claude/skills/run-infinite-hygiene/audio-param-sweep-expected.txt",
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "ARCHITECTURE.md",
+      "CMakeLists.txt",
+      "README.md",
+      "docs/node_param_audit.md",
+      "src/audio/PassFade.h",
+      "src/main.cpp",
+      "src/nodes/LooperNode.cpp",
+      "src/nodes/LooperNode.h",
+      "src/nodes/MpcNode.cpp",
+      "src/nodes/MpcNode.h",
+      "src/nodes/SamplerNode.cpp",
+      "src/nodes/SamplerNode.h",
+      "tests/headless/census_baseline.json"
+    ]
+  },
+  {
+    "hash": "2638f28e95b585ecc1b659cdac8af762493bc00d",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 04:02:13 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "global",
+      "title": "docs: MPC pad size, sync, fades; regenerated param audit",
+      "description": "MPC pad size, sync, fades; regenerated param audit",
+      "bullets": [],
+      "body": "",
+      "raw": "docs: MPC pad size, sync, fades; regenerated param audit"
+    },
+    "stat": "ARCHITECTURE.md          | 17 +++++++++++++----\n README.md                |  2 +-\n docs/node_param_audit.md |  4 +---\n 3 files changed, 15 insertions(+), 8 deletions(-)",
+    "files": [
+      "ARCHITECTURE.md",
+      "README.md",
+      "docs/node_param_audit.md"
+    ]
+  },
+  {
+    "hash": "1ef978721396f10e006cea952bcccfbd50cac140",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 04:02:12 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "tests: sweep expectations for MPC sync, division and fade out (rig blind spots, covered by MPCTEST)",
+      "description": "tests: sweep expectations for MPC sync, division and fade out (rig blind spots, covered by MPCTEST)",
+      "bullets": [],
+      "body": "",
+      "raw": "tests: sweep expectations for MPC sync, division and fade out (rig blind spots, covered by MPCTEST)"
+    },
+    "stat": ".../audio-param-sweep-expected.txt                 | 48 ++++++++++++++++++++++\n 1 file changed, 48 insertions(+)",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/audio-param-sweep-expected.txt"
+    ]
+  },
+  {
+    "hash": "9e888ed42f1670562cdee40a11f7f6f55a0e69b0",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 04:02:12 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "ui",
+      "title": "mpc: bigger pads, per-pad sync + division, per-pad fade in/out, compact two-column panel; pad text uses the slider label size",
+      "description": "mpc: bigger pads, per-pad sync + division, per-pad fade in/out, compact two-column panel; pad text uses the slider label size",
+      "bullets": [],
+      "body": "Pads 84 -> 105 px (node widened via AudioNodeWidth). Per-pad Synced/Free\nwith a MusicTime division: latched triggers fire sample-accurately on the\nnext grid line, immediately when the transport is stopped, loop pads\nre-trigger every division. Per-pad fade in/out (0..250 ms, default 3) via\nPassFade replaces the fixed 3 ms. Fades sit in a new 180+ id block so\nsaved bindings do not move. MPCTEST and MPCMODTEST extended.",
+      "raw": "mpc: bigger pads, per-pad sync + division, per-pad fade in/out, compact two-column panel; pad text uses the slider label size\n\nPads 84 -> 105 px (node widened via AudioNodeWidth). Per-pad Synced/Free\nwith a MusicTime division: latched triggers fire sample-accurately on the\nnext grid line, immediately when the transport is stopped, loop pads\nre-trigger every division. Per-pad fade in/out (0..250 ms, default 3) via\nPassFade replaces the fixed 3 ms. Fades sit in a new 180+ id block so\nsaved bindings do not move. MPCTEST and MPCMODTEST extended."
+    },
+    "stat": "src/main.cpp          | 330 +++++++++++++++++++++++++++++++++++++++++++-------\n src/nodes/MpcNode.cpp | 271 ++++++++++++++++++++++++++++++++++++++---\n src/nodes/MpcNode.h   |  42 ++++++-\n 3 files changed, 574 insertions(+), 69 deletions(-)",
+    "files": [
+      "src/main.cpp",
+      "src/nodes/MpcNode.cpp",
+      "src/nodes/MpcNode.h"
+    ]
+  },
+  {
+    "hash": "3f33510be7f1b5802fe91054fef37bc3802584c3",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 03:41:53 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "looper: remove the auto comp checkbox; latency compensation is always on (old autoLatency key ignored on load)",
+      "description": "looper: remove the auto comp checkbox; latency compensation is always on (old autoLatency key ignored on load)",
+      "bullets": [],
+      "body": "",
+      "raw": "looper: remove the auto comp checkbox; latency compensation is always on (old autoLatency key ignored on load)"
+    },
+    "stat": ".../skills/run-infinite-hygiene/audio-param-sweep-expected.txt |  1 -\n ARCHITECTURE.md                                                |  2 +-\n src/main.cpp                                                   | 10 +++-------\n src/nodes/LooperNode.cpp                                       |  6 ++----\n src/nodes/LooperNode.h                                         |  7 +++----\n 5 files changed, 9 insertions(+), 17 deletions(-)",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/audio-param-sweep-expected.txt",
+      "ARCHITECTURE.md",
+      "src/main.cpp",
+      "src/nodes/LooperNode.cpp",
+      "src/nodes/LooperNode.h"
+    ]
+  },
+  {
+    "hash": "218c642ca03c76a05a5a09bc2da33b76854bcdf1",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 03:22:10 2026 +0530",
+    "parsed_message": {
+      "type": "docs",
+      "scope": "global",
+      "title": "docs: Looper/MPC architecture, README, regenerated param audit",
+      "description": "Looper/MPC architecture, README, regenerated param audit",
+      "bullets": [],
+      "body": "",
+      "raw": "docs: Looper/MPC architecture, README, regenerated param audit"
+    },
+    "stat": "ARCHITECTURE.md          | 36 ++++++++++++++++----------\n README.md                |  2 +-\n docs/node_param_audit.md | 67 +++++++++++++++---------------------------------\n 3 files changed, 44 insertions(+), 61 deletions(-)",
+    "files": [
+      "ARCHITECTURE.md",
+      "README.md",
+      "docs/node_param_audit.md"
+    ]
+  },
+  {
+    "hash": "d797d4d77778d72e95acfe0cae36b874de1ee678",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 03:22:09 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "tests: MPCMODTEST in the modulation groups; refresh sweep and census baselines for Looper/MPC",
+      "description": "tests: MPCMODTEST in the modulation groups; refresh sweep and census baselines for Looper/MPC",
+      "bullets": [],
+      "body": "",
+      "raw": "tests: MPCMODTEST in the modulation groups; refresh sweep and census baselines for Looper/MPC"
+    },
+    "stat": ".claude/skills/modulation-sweep/driver.sh          |  1 +\n .../audio-param-sweep-expected.txt                 | 89 ++++++----------------\n .claude/skills/run-infinite-hygiene/driver.sh      |  2 +\n tests/headless/census_baseline.json                | 11 +--\n 4 files changed, 26 insertions(+), 77 deletions(-)",
+    "files": [
+      ".claude/skills/modulation-sweep/driver.sh",
+      ".claude/skills/run-infinite-hygiene/audio-param-sweep-expected.txt",
+      ".claude/skills/run-infinite-hygiene/driver.sh",
+      "tests/headless/census_baseline.json"
+    ]
+  },
+  {
+    "hash": "3376bbc7aeff228d86fd66dd17667bee80461d1d",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 03:22:09 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "looper, mpc: redo to the Sampler standard; remove MPC Out",
+      "description": "looper, mpc: redo to the Sampler standard; remove MPC Out",
+      "bullets": [],
+      "body": "Looper: registered under Synths (generator, no BypassSource); Sampler-drawn Rec/Play/Dub/Clear buttons with CV pins, Sampler-size waveform with beat/bar ticks and playhead; finetune, pitch, speed, volume, fade in/out sliders; sync/auto comp/thru checkboxes; level and trim dropped. Rate != 1 drifts off the grid and pauses overdub (status line and help say so).\nMPC: square 4x4 pads, polyphonic independent voices, per-pad mode/volume/pitch/pan/speed/fine tune, Sampler-style rows for the selected pad, notes 36..51 fixed, no master volume or base note, MPC Out and audio-tap plumbing removed. Every pad's every param is a stable modulation address independent of selection (MpcNode::ParamId, per-pad mode label); unselected pads' cables land on tile stub pins. Adds INFINITE_MPCMODTEST, polyphony and per-pad param fixtures.",
+      "raw": "looper, mpc: redo to the Sampler standard; remove MPC Out\n\nLooper: registered under Synths (generator, no BypassSource); Sampler-drawn Rec/Play/Dub/Clear buttons with CV pins, Sampler-size waveform with beat/bar ticks and playhead; finetune, pitch, speed, volume, fade in/out sliders; sync/auto comp/thru checkboxes; level and trim dropped. Rate != 1 drifts off the grid and pauses overdub (status line and help say so).\n\nMPC: square 4x4 pads, polyphonic independent voices, per-pad mode/volume/pitch/pan/speed/fine tune, Sampler-style rows for the selected pad, notes 36..51 fixed, no master volume or base note, MPC Out and audio-tap plumbing removed. Every pad's every param is a stable modulation address independent of selection (MpcNode::ParamId, per-pad mode label); unselected pads' cables land on tile stub pins. Adds INFINITE_MPCMODTEST, polyphony and per-pad param fixtures."
+    },
+    "stat": "src/audio/PassFade.h     |  44 +++\n src/core/INode.h         |   6 -\n src/main.cpp             | 926 +++++++++++++++++++++++++++++++----------------\n src/nodes/LooperNode.cpp | 119 +++---\n src/nodes/LooperNode.h   |  36 +-\n src/nodes/MpcNode.cpp    | 212 ++++-------\n src/nodes/MpcNode.h      |  97 ++---\n 7 files changed, 871 insertions(+), 569 deletions(-)\n create mode 100644 src/audio/PassFade.h",
+    "files": [
+      "src/audio/PassFade.h",
+      "src/core/INode.h",
+      "src/main.cpp",
+      "src/nodes/LooperNode.cpp",
+      "src/nodes/LooperNode.h",
+      "src/nodes/MpcNode.cpp",
+      "src/nodes/MpcNode.h"
+    ]
+  },
+  {
+    "hash": "f5a02812ae89019d268a1be252c9281dc1247468",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 02:45:46 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "core",
+      "title": "sampler: replace loop xfade with per-pass fade in / fade out (ms); old xfade key ignored on load; fixture, baselines, help",
+      "description": "sampler: replace loop xfade with per-pass fade in / fade out (ms); old xfade key ignored on load; fixture, baselines, help",
+      "bullets": [],
+      "body": "",
+      "raw": "sampler: replace loop xfade with per-pass fade in / fade out (ms); old xfade key ignored on load; fixture, baselines, help"
+    },
+    "stat": ".../audio-param-sweep-expected.txt                 |   3 +-\n src/main.cpp                                       |  99 +++++++++++----\n src/nodes/SamplerNode.cpp                          | 134 +++++++++------------\n src/nodes/SamplerNode.h                            |  16 ++-\n 4 files changed, 148 insertions(+), 104 deletions(-)",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/audio-param-sweep-expected.txt",
+      "src/main.cpp",
+      "src/nodes/SamplerNode.cpp",
+      "src/nodes/SamplerNode.h"
+    ]
+  },
+  {
+    "hash": "b8a709b384aefbfef7bafb0862e3afb630f2ff97",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 00:19:07 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "mpc: real pad faces (thumbnail, mode, selection, hit flash), selected-pad waveform, file drop onto pads and node, empty-pad load affordance; how-to help for MPC and Looper",
+      "description": "mpc: real pad faces (thumbnail, mode, selection, hit flash), selected-pad waveform, file drop onto pads and node, empty-pad load affordance; how-to help for MPC and Looper",
+      "bullets": [],
+      "body": "",
+      "raw": "mpc: real pad faces (thumbnail, mode, selection, hit flash), selected-pad waveform, file drop onto pads and node, empty-pad load affordance; how-to help for MPC and Looper"
+    },
+    "stat": "src/main.cpp        | 253 +++++++++++++++++++++++++++++++++++++++++++---------\n src/nodes/MpcNode.h |  29 +++++-\n 2 files changed, 241 insertions(+), 41 deletions(-)",
+    "files": [
+      "src/main.cpp",
+      "src/nodes/MpcNode.h"
+    ]
+  },
+  {
+    "hash": "f7c7d6321a1b6fdf2013e703124ac37b9562097e",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Wed Sep 30 00:12:25 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "looper: state-coloured transport buttons with glyphs, loop waveform with playhead and beat grid, explanatory status line",
+      "description": "looper: state-coloured transport buttons with glyphs, loop waveform with playhead and beat grid, explanatory status line",
+      "bullets": [],
+      "body": "",
+      "raw": "looper: state-coloured transport buttons with glyphs, loop waveform with playhead and beat grid, explanatory status line"
+    },
+    "stat": "src/main.cpp             | 319 +++++++++++++++++++++++++++++++++++++++--------\n src/nodes/LooperNode.cpp | 104 +++++++++++++++\n src/nodes/LooperNode.h   |  13 ++\n 3 files changed, 386 insertions(+), 50 deletions(-)",
+    "files": [
+      "src/main.cpp",
+      "src/nodes/LooperNode.cpp",
+      "src/nodes/LooperNode.h"
+    ]
+  },
+  {
+    "hash": "28a64a26bd9f57e8c47bb22c039c24d8bd8667bb",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Tue Sep 29 23:51:49 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "audio",
+      "title": "audio: Looper/MPC fixtures (LOOPERTEST, MPCTEST), sweep seeding and baselines, help text, drop picker entry, docs",
+      "description": "audio: Looper/MPC fixtures (LOOPERTEST, MPCTEST), sweep seeding and baselines, help text, drop picker entry, docs",
+      "bullets": [],
+      "body": "",
+      "raw": "audio: Looper/MPC fixtures (LOOPERTEST, MPCTEST), sweep seeding and baselines, help text, drop picker entry, docs"
+    },
+    "stat": ".../audio-param-sweep-expected.txt                 |  67 ++++\n ARCHITECTURE.md                                    |  14 +\n README.md                                          |   2 +-\n docs/node_param_audit.md                           |  74 +++-\n src/main.cpp                                       | 395 ++++++++++++++++++++-\n src/nodes/LooperNode.cpp                           |  33 +-\n src/nodes/LooperNode.h                             |   1 +\n tests/headless/census_baseline.json                |  29 ++\n 8 files changed, 602 insertions(+), 13 deletions(-)",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/audio-param-sweep-expected.txt",
+      "ARCHITECTURE.md",
+      "README.md",
+      "docs/node_param_audit.md",
+      "src/main.cpp",
+      "src/nodes/LooperNode.cpp",
+      "src/nodes/LooperNode.h",
+      "tests/headless/census_baseline.json"
+    ]
+  },
+  {
+    "hash": "5102e3b0e360c7b478d777f7a8adf4b3262ea3a0",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Tue Sep 29 23:22:14 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "audio",
+      "title": "audio: Looper, MPC and MPC Out nodes (record/overdub looper with tempo sync and latency compensation; 16-pad sampler with per-pad taps)",
+      "description": "audio: Looper, MPC and MPC Out nodes (record/overdub looper with tempo sync and latency compensation; 16-pad sampler with per-pad taps)",
+      "bullets": [],
+      "body": "",
+      "raw": "audio: Looper, MPC and MPC Out nodes (record/overdub looper with tempo sync and latency compensation; 16-pad sampler with per-pad taps)"
+    },
+    "stat": "CMakeLists.txt           |   2 +\n src/core/INode.h         |   6 +\n src/main.cpp             | 293 ++++++++++++++++++++-\n src/nodes/LooperNode.cpp | 446 ++++++++++++++++++++++++++++++++\n src/nodes/LooperNode.h   |  98 +++++++\n src/nodes/MpcNode.cpp    | 648 +++++++++++++++++++++++++++++++++++++++++++++++\n src/nodes/MpcNode.h      | 126 +++++++++\n 7 files changed, 1618 insertions(+), 1 deletion(-)\n create mode 100644 src/nodes/LooperNode.cpp\n create mode 100644 src/nodes/LooperNode.h\n create mode 100644 src/nodes/MpcNode.cpp\n create mode 100644 src/nodes/MpcNode.h",
+    "files": [
+      "CMakeLists.txt",
+      "src/core/INode.h",
+      "src/main.cpp",
+      "src/nodes/LooperNode.cpp",
+      "src/nodes/LooperNode.h",
+      "src/nodes/MpcNode.cpp",
+      "src/nodes/MpcNode.h"
+    ]
+  },
+  {
+    "hash": "8c5ddc038255b0b3d0f7ce85e6cca8e49626e1e8",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Tue Sep 29 22:59:42 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "audio",
+      "title": "Merge feature/win-audio-latency-loopwrap: round-trip latency readout, Windows low-latency/exclusive output, video loop-wrap with unknown duration",
+      "description": "Merge feature/win-audio-latency-loopwrap: round-trip latency readout, Windows low-latency/exclusive output, video loop-wrap with unknown duration",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge feature/win-audio-latency-loopwrap: round-trip latency readout, Windows low-latency/exclusive output, video loop-wrap with unknown duration"
+    },
+    "stat": "",
+    "files": [
+      "src/main.cpp",
+      "src/nodes/VideoSourceNode.cpp",
+      "src/platform/Platform.h",
+      "src/platform/Platform.mm",
+      "src/platform/linux/AudioDeviceLinux.cpp",
+      "src/platform/linux/MediaLinux.cpp",
+      "src/platform/win/AudioDeviceWin.cpp"
+    ]
+  },
+  {
+    "hash": "e6c7035cab76ed2d8d07ca46add36fe4b1664238",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Tue Sep 29 22:47:59 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "video: loop-wrap when the container declares no duration (Linux end-probe, macOS track-range fallback + NaN guard, explicit trimEnd honoured when duration unknown)",
+      "description": "video: loop-wrap when the container declares no duration (Linux end-probe, macOS track-range fallback + NaN guard, explicit trimEnd honoured when duration unknown)",
+      "bullets": [],
+      "body": "",
+      "raw": "video: loop-wrap when the container declares no duration (Linux end-probe, macOS track-range fallback + NaN guard, explicit trimEnd honoured when duration unknown)"
+    },
+    "stat": "src/nodes/VideoSourceNode.cpp     | 25 +++++++++++++++++++-\n src/platform/Platform.mm          | 10 +++++++-\n src/platform/linux/MediaLinux.cpp | 50 +++++++++++++++++++++++++++++++++++++++\n 3 files changed, 83 insertions(+), 2 deletions(-)",
+    "files": [
+      "src/nodes/VideoSourceNode.cpp",
+      "src/platform/Platform.mm",
+      "src/platform/linux/MediaLinux.cpp"
+    ]
+  },
+  {
+    "hash": "beb28d73191def2a661c852fa120663cabd323b5",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Tue Sep 29 22:46:06 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "audio",
+      "title": "audio: round-trip latency readout (Platform::AudioRoundTripLatencyFrames, 3 sides) and Windows opt-in low-latency/exclusive output modes",
+      "description": "audio: round-trip latency readout (Platform::AudioRoundTripLatencyFrames, 3 sides) and Windows opt-in low-latency/exclusive output modes",
+      "bullets": [],
+      "body": "",
+      "raw": "audio: round-trip latency readout (Platform::AudioRoundTripLatencyFrames, 3 sides) and Windows opt-in low-latency/exclusive output modes"
+    },
+    "stat": "src/main.cpp                            |  61 ++++\n src/platform/Platform.h                 |  22 ++\n src/platform/Platform.mm                |  87 ++++++\n src/platform/linux/AudioDeviceLinux.cpp |  30 ++\n src/platform/win/AudioDeviceWin.cpp     | 479 +++++++++++++++++++++++++++++---\n 5 files changed, 633 insertions(+), 46 deletions(-)",
+    "files": [
+      "src/main.cpp",
+      "src/platform/Platform.h",
+      "src/platform/Platform.mm",
+      "src/platform/linux/AudioDeviceLinux.cpp",
+      "src/platform/win/AudioDeviceWin.cpp"
+    ]
+  },
+  {
+    "hash": "f2ebbf8a9b91c20912eac2faf57e4c354b2c4cc3",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Tue Sep 29 10:21:44 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "headless tests: one topology case per validator code; census rig wires 3D-side outputs properly",
+      "description": "headless tests: one topology case per validator code; census rig wires 3D-side outputs properly",
+      "bullets": [],
+      "body": "tests/headless/topology/*.inf with a .expect of the exact codes (errors and\nwarnings together), run from scripts/headless_smoke.sh.\nCensus rig: camera, light, environment and palette outputs were wired as a\nmod source (now correctly E_NOT_A_MODULATOR); they now plug into a Render 3D\n(or Set Vertex Color) and those types feed Render 3D's camera/light/env pins.\nBaseline updated only for the two rows that change because of that rig fix:\nHDRI (clock-suspect -> clean) and Render 3D (validate:E_KIND_MISMATCH, an\nimage fed into the env pin -> clean). Metallic (peak 1.03-1.04, random\nnotes), Wave Terrain and Note to CV flip run to run and are left alone.",
+      "raw": "headless tests: one topology case per validator code; census rig wires 3D-side outputs properly\n\ntests/headless/topology/*.inf with a .expect of the exact codes (errors and\nwarnings together), run from scripts/headless_smoke.sh.\n\nCensus rig: camera, light, environment and palette outputs were wired as a\nmod source (now correctly E_NOT_A_MODULATOR); they now plug into a Render 3D\n(or Set Vertex Color) and those types feed Render 3D's camera/light/env pins.\nBaseline updated only for the two rows that change because of that rig fix:\nHDRI (clock-suspect -> clean) and Render 3D (validate:E_KIND_MISMATCH, an\nimage fed into the env pin -> clean). Metallic (peak 1.03-1.04, random\nnotes), Wave Terrain and Note to CV flip run to run and are left alone."
+    },
+    "stat": "scripts/headless_smoke.sh                            |  9 +++++++++\n scripts/node_census.py                               | 18 +++++++++++++++++-\n tests/headless/census_baseline.json                  | 14 ++++++--------\n tests/headless/topology/g11_open_blend.expect        |  1 +\n tests/headless/topology/g11_open_blend.inf           |  9 +++++++++\n tests/headless/topology/g13_output_empty.expect      |  1 +\n tests/headless/topology/g13_output_empty.inf         |  5 +++++\n tests/headless/topology/g1_blend_slot2_bad.expect    |  1 +\n tests/headless/topology/g1_blend_slot2_bad.inf       | 15 +++++++++++++++\n tests/headless/topology/g1_render3d_camera_ok.expect |  1 +\n tests/headless/topology/g1_render3d_camera_ok.inf    | 12 ++++++++++++\n tests/headless/topology/g2_fan_out_ok.expect         |  1 +\n tests/headless/topology/g2_fan_out_ok.inf            | 16 ++++++++++++++++\n tests/headless/topology/g2_slot_taken.expect         |  1 +\n tests/headless/topology/g2_slot_taken.inf            |  9 +++++++++\n tests/headless/topology/g3_bypass_blend.expect       |  1 +\n tests/headless/topology/g3_bypass_blend.inf          | 13 +++++++++++++\n tests/headless/topology/g4_bypass_fit_ok.expect      |  1 +\n tests/headless/topology/g4_bypass_fit_ok.inf         | 10 ++++++++++\n tests/headless/topology/g6_image_cycle.expect        |  1 +\n tests/headless/topology/g6_image_cycle.inf           | 13 +++++++++++++\n tests/headless/topology/g7_feedback_loop_ok.expect   |  1 +\n tests/headless/topology/g7_feedback_loop_ok.inf      | 16 ++++++++++++++++\n tests/headless/topology/g8_geo_cycle.expect          |  1 +\n tests/headless/topology/g8_geo_cycle.inf             | 16 ++++++++++++++++\n tests/headless/topology/g9_bad_param.expect          |  1 +\n tests/headless/topology/g9_bad_param.inf             |  9 +++++++++\n tests/headless/topology/g9_mod_ok.expect             |  1 +\n tests/headless/topology/g9_mod_ok.inf                |  9 +++++++++\n tests/headless/topology/g9_not_a_modulator.expect    |  1 +\n tests/headless/topology/g9_not_a_modulator.inf       |  9 +++++++++\n 31 files changed, 207 insertions(+), 9 deletions(-)\n create mode 100644 tests/headless/topology/g11_open_blend.expect\n create mode 100644 tests/headless/topology/g11_open_blend.inf\n create mode 100644 tests/headless/topology/g13_output_empty.expect\n create mode 100644 tests/headless/topology/g13_output_empty.inf\n create mode 100644 tests/headless/topology/g1_blend_slot2_bad.expect\n create mode 100644 tests/headless/topology/g1_blend_slot2_bad.inf\n create mode 100644 tests/headless/topology/g1_render3d_camera_ok.expect\n create mode 100644 tests/headless/topology/g1_render3d_camera_ok.inf\n create mode 100644 tests/headless/topology/g2_fan_out_ok.expect\n create mode 100644 tests/headless/topology/g2_fan_out_ok.inf\n create mode 100644 tests/headless/topology/g2_slot_taken.expect\n create mode 100644 tests/headless/topology/g2_slot_taken.inf\n create mode 100644 tests/headless/topology/g3_bypass_blend.expect\n create mode 100644 tests/headless/topology/g3_bypass_blend.inf\n create mode 100644 tests/headless/topology/g4_bypass_fit_ok.expect\n create mode 100644 tests/headless/topology/g4_bypass_fit_ok.inf\n create mode 100644 tests/headless/topology/g6_image_cycle.expect\n create mode 100644 tests/headless/topology/g6_image_cycle.inf\n create mode 100644 tests/headless/topology/g7_feedback_loop_ok.expect\n create mode 100644 tests/headless/topology/g7_feedback_loop_ok.inf\n create mode 100644 tests/headless/topology/g8_geo_cycle.expect\n create mode 100644 tests/headless/topology/g8_geo_cycle.inf\n create mode 100644 tests/headless/topology/g9_bad_param.expect\n create mode 100644 tests/headless/topology/g9_bad_param.inf\n create mode 100644 tests/headless/topology/g9_mod_ok.expect\n create mode 100644 tests/headless/topology/g9_mod_ok.inf\n create mode 100644 tests/headless/topology/g9_not_a_modulator.expect\n create mode 100644 tests/headless/topology/g9_not_a_modulator.inf",
+    "files": [
+      "scripts/headless_smoke.sh",
+      "scripts/node_census.py",
+      "tests/headless/census_baseline.json",
+      "tests/headless/topology/g11_open_blend.expect",
+      "tests/headless/topology/g11_open_blend.inf",
+      "tests/headless/topology/g13_output_empty.expect",
+      "tests/headless/topology/g13_output_empty.inf",
+      "tests/headless/topology/g1_blend_slot2_bad.expect",
+      "tests/headless/topology/g1_blend_slot2_bad.inf",
+      "tests/headless/topology/g1_render3d_camera_ok.expect",
+      "tests/headless/topology/g1_render3d_camera_ok.inf",
+      "tests/headless/topology/g2_fan_out_ok.expect",
+      "tests/headless/topology/g2_fan_out_ok.inf",
+      "tests/headless/topology/g2_slot_taken.expect",
+      "tests/headless/topology/g2_slot_taken.inf",
+      "tests/headless/topology/g3_bypass_blend.expect",
+      "tests/headless/topology/g3_bypass_blend.inf",
+      "tests/headless/topology/g4_bypass_fit_ok.expect",
+      "tests/headless/topology/g4_bypass_fit_ok.inf",
+      "tests/headless/topology/g6_image_cycle.expect",
+      "tests/headless/topology/g6_image_cycle.inf",
+      "tests/headless/topology/g7_feedback_loop_ok.expect",
+      "tests/headless/topology/g7_feedback_loop_ok.inf",
+      "tests/headless/topology/g8_geo_cycle.expect",
+      "tests/headless/topology/g8_geo_cycle.inf",
+      "tests/headless/topology/g9_bad_param.expect",
+      "tests/headless/topology/g9_bad_param.inf",
+      "tests/headless/topology/g9_mod_ok.expect",
+      "tests/headless/topology/g9_mod_ok.inf",
+      "tests/headless/topology/g9_not_a_modulator.expect",
+      "tests/headless/topology/g9_not_a_modulator.inf"
+    ]
+  },
+  {
+    "hash": "cd877550d51047b83fc09aab2d12e3c33edeaf17",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Tue Sep 29 10:21:44 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "validator: E_SLOT_TAKEN, W_BYPASS_IGNORED, W_IMAGE_CYCLE, E_NOT_A_MODULATOR, E_BAD_PARAM, W_OPEN_INPUT, W_OUTPUT_EMPTY",
+      "description": "validator: E_SLOT_TAKEN, W_BYPASS_IGNORED, W_IMAGE_CYCLE, E_NOT_A_MODULATOR, E_BAD_PARAM, W_OPEN_INPUT, W_OUTPUT_EMPTY",
+      "bullets": [
+        "describe also prints can_bypass per type."
+      ],
+      "body": "G2  two cables into one slot: error naming both lines (fan-out stays legal).\nG3  bypassed=1 on a node CanBypass refuses: warning, error in render/frame.\nG6/G8 image and geometry loops not broken by a Feedback node: warning\nnaming the loop. Modulator-input pins are left out (G10).\nG9  mod source output must be a modulator/predictor; mod/expr param index\nmust exist. The index list needs drawn nodes, so --validate draws one\nof each driven type and render/frame checks the loaded graph.\nG11 Blend, Blend Audio, Layer Stack, Mixer with empty inputs on a used node.\nG13 Output with nothing cabled into its image pin.",
+      "raw": "validator: E_SLOT_TAKEN, W_BYPASS_IGNORED, W_IMAGE_CYCLE, E_NOT_A_MODULATOR, E_BAD_PARAM, W_OPEN_INPUT, W_OUTPUT_EMPTY\n\nG2  two cables into one slot: error naming both lines (fan-out stays legal).\nG3  bypassed=1 on a node CanBypass refuses: warning, error in render/frame.\nG6/G8 image and geometry loops not broken by a Feedback node: warning\n    naming the loop. Modulator-input pins are left out (G10).\nG9  mod source output must be a modulator/predictor; mod/expr param index\n    must exist. The index list needs drawn nodes, so --validate draws one\n    of each driven type and render/frame checks the loaded graph.\nG11 Blend, Blend Audio, Layer Stack, Mixer with empty inputs on a used node.\nG13 Output with nothing cabled into its image pin.\n--describe also prints can_bypass per type."
+    },
+    "stat": "src/core/HeadlessJob.cpp |   3 +-\n src/core/PatchSchema.cpp | 178 +++++++++++++++++++++++++++++++++++++++++++++++\n src/core/PatchSchema.h   |  15 +++-\n src/main.cpp             |  97 ++++++++++++++++++++++++--\n 4 files changed, 284 insertions(+), 9 deletions(-)",
+    "files": [
+      "src/core/HeadlessJob.cpp",
+      "src/core/PatchSchema.cpp",
+      "src/core/PatchSchema.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "665ba2becd6ff352562d75bf2317ffebb7ff2687",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Tue Sep 29 10:02:43 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "headless schema: bound image slots by InputCountFor, Blend has 2, real kinds for camera/light/palette/env",
+      "description": "headless schema: bound image slots by InputCountFor, Blend has 2, real kinds for camera/light/palette/env",
+      "bullets": [],
+      "body": "SchemaFor probed slots 0-63, so Blend reported 64 image inputs (G1) and\nCableFor mapped every Blend slot > 1 onto input B. Render 3D's env slot now\nreports 'environment' (only an HDRI plugs in) and its camera/light pins and\nSet Vertex Color's palette pin are listed; before, a valid camera cable\nvalidated as E_BAD_SLOT.",
+      "raw": "headless schema: bound image slots by InputCountFor, Blend has 2, real kinds for camera/light/palette/env\n\nSchemaFor probed slots 0-63, so Blend reported 64 image inputs (G1) and\nCableFor mapped every Blend slot > 1 onto input B. Render 3D's env slot now\nreports 'environment' (only an HDRI plugs in) and its camera/light pins and\nSet Vertex Color's palette pin are listed; before, a valid camera cable\nvalidated as E_BAD_SLOT."
+    },
+    "stat": "scripts/headless_smoke.sh |  4 ++++\n src/core/PatchSchema.cpp  |  9 ++++++---\n src/main.cpp              | 16 +++++++++++++---\n 3 files changed, 23 insertions(+), 6 deletions(-)",
+    "files": [
+      "scripts/headless_smoke.sh",
+      "src/core/PatchSchema.cpp",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "aa3c0335ddb074c52d00e87337856c3afddfc415",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Tue Sep 29 09:55:26 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "patch reader: strip trailing CR per line and skip a leading UTF-8 BOM",
+      "description": "patch reader: strip trailing CR per line and skip a leading UTF-8 BOM",
+      "bullets": [],
+      "body": "CRLF files left a '\\r' in type names and string values (the node was\nsilently skipped in the GUI); a BOM failed the magic check. Fixes A1, A3.",
+      "raw": "patch reader: strip trailing CR per line and skip a leading UTF-8 BOM\n\nCRLF files left a '\\r' in type names and string values (the node was\nsilently skipped in the GUI); a BOM failed the magic check. Fixes A1, A3."
+    },
+    "stat": "scripts/headless_smoke.sh | 4 ++++\n src/core/Patch.cpp        | 8 ++++++++\n 2 files changed, 12 insertions(+)",
+    "files": [
+      "scripts/headless_smoke.sh",
+      "src/core/Patch.cpp"
+    ]
+  },
+  {
+    "hash": "27eae48c6d11273dd4e4f0f78679388d29b391f9",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Tue Sep 29 09:52:24 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "macOS recorder: wait for finishWriting for real; headless --render verifies the file",
+      "description": "macOS recorder: wait for finishWriting for real; headless --render verifies the file",
+      "bullets": [],
+      "body": "RecorderStop waited for finishWritingWithCompletionHandler by spinning\nNSRunLoop runUntilDate on the background finalize thread. That run loop has\nno sources, so each call returned at once and the whole wait took ~0 ms; only\nAVAssetWriterStatusFailed was checked, so it returned success with the moov\nindex still unwritten. Shipped since v0.1; Windows (IMFSinkWriter::Finalize)\nand Linux (av_write_trailer) are synchronous and unaffected. Self-tests call\nit from the main thread, whose run loop does have sources, which hid it.\nNow a dispatch semaphore signalled by the completion handler (60 s timeout,\ncancelWriting on timeout), and anything but AVAssetWriterStatusCompleted is\nan error. Headless --render additionally checks LastOfflineRenderOk() and\nthat the file has a top-level moov box (Headless::MovieHasIndex, 64-bit\nseeks on all three platforms) before reporting ok.\nCensus --jobs 4: 0 unreadable files (was 50), 254/297 clean (was 208).\nRECEXPORTTEST and VIDEOAUDIOTEST pass 3/3 and leave known-test-failures.\nCensus also surfaced Prediction nodes ticking on the wall clock (brief D8b).",
+      "raw": "macOS recorder: wait for finishWriting for real; headless --render verifies the file\n\nRecorderStop waited for finishWritingWithCompletionHandler by spinning\nNSRunLoop runUntilDate on the background finalize thread. That run loop has\nno sources, so each call returned at once and the whole wait took ~0 ms; only\nAVAssetWriterStatusFailed was checked, so it returned success with the moov\nindex still unwritten. Shipped since v0.1; Windows (IMFSinkWriter::Finalize)\nand Linux (av_write_trailer) are synchronous and unaffected. Self-tests call\nit from the main thread, whose run loop does have sources, which hid it.\n\nNow a dispatch semaphore signalled by the completion handler (60 s timeout,\ncancelWriting on timeout), and anything but AVAssetWriterStatusCompleted is\nan error. Headless --render additionally checks LastOfflineRenderOk() and\nthat the file has a top-level moov box (Headless::MovieHasIndex, 64-bit\nseeks on all three platforms) before reporting ok.\n\nCensus --jobs 4: 0 unreadable files (was 50), 254/297 clean (was 208).\nRECEXPORTTEST and VIDEOAUDIOTEST pass 3/3 and leave known-test-failures.\nCensus also surfaced Prediction nodes ticking on the wall clock (brief D8b)."
+    },
+    "stat": ".../run-infinite-hygiene/known-test-failures.txt   |   4 -\n docs/fix-briefs/headless-engine.md                 |   4 +-\n src/core/HeadlessJob.cpp                           |  50 +++\n src/core/HeadlessJob.h                             |   5 +\n src/main.cpp                                       |   6 +\n src/nodes/OutputNode.h                             |   3 +\n src/platform/Platform.mm                           |  24 +-\n tests/headless/census_baseline.json                | 404 ++++++++++-----------\n 8 files changed, 267 insertions(+), 233 deletions(-)",
+    "files": [
+      ".claude/skills/run-infinite-hygiene/known-test-failures.txt",
+      "docs/fix-briefs/headless-engine.md",
+      "src/core/HeadlessJob.cpp",
+      "src/core/HeadlessJob.h",
+      "src/main.cpp",
+      "src/nodes/OutputNode.h",
+      "src/platform/Platform.mm",
+      "tests/headless/census_baseline.json"
+    ]
+  },
+  {
+    "hash": "3fbaea48a4dc055bdefc3a79ed1490cb139fa396",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Tue Sep 29 09:37:58 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "headless: brief adds graph-topology, 3D and census findings; node census script + baseline",
+      "description": "headless: brief adds graph-topology, 3D and census findings; node census script + baseline",
+      "bullets": [],
+      "body": "node_census.py spawns every registered type auto-wired by slot kind and checks\nvalidate/render/black/NaN/size/determinism/file-opens/audio. First run: 297 types,\nno crashes or nondeterminism in --frame; --render with 3+ parallel jobs reports ok\nbut writes moov-less files (E14).",
+      "raw": "headless: brief adds graph-topology, 3D and census findings; node census script + baseline\n\nnode_census.py spawns every registered type auto-wired by slot kind and checks\nvalidate/render/black/NaN/size/determinism/file-opens/audio. First run: 297 types,\nno crashes or nondeterminism in --frame; --render with 3+ parallel jobs reports ok\nbut writes moov-less files (E14)."
+    },
+    "stat": "docs/fix-briefs/headless-engine.md  |  278 +++-\n scripts/node_census.py              |  210 +++\n tests/headless/census_baseline.json | 2554 +++++++++++++++++++++++++++++++++++\n 3 files changed, 3032 insertions(+), 10 deletions(-)\n create mode 100755 scripts/node_census.py\n create mode 100644 tests/headless/census_baseline.json",
+    "files": [
+      "docs/fix-briefs/headless-engine.md",
+      "scripts/node_census.py",
+      "tests/headless/census_baseline.json"
+    ]
+  },
+  {
+    "hash": "35f83067dec28c0149faa8ae75b2ec151d27691b",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Tue Sep 29 09:03:05 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "headless: --describe schema and --validate strict pass",
+      "description": "headless: --describe schema and --validate strict pass",
+      "bullets": [
+        "describe [type] dumps every registered node type from live instances:",
+        "validate and every --render/--frame load run a strict pass over Patch::Data"
+      ],
+      "body": "VisitParams keys/tags/defaults, input slots by kind, outputs by kind, and the\nmodulatable params with ranges/enums (registered by a hidden draw pass).\nbefore it is applied: E_UNKNOWN_TYPE (nearest names), W_UNKNOWN_PARAM,\nW_TYPE_MISMATCH, E_BAD_SLOT, E_KIND_MISMATCH via the real\nIsInputSlotCompatible, E_CYCLE, E_DANGLING, E_DUPLICATE_INDEX,\nW_DUPLICATE_UID, W_UNUSED_NODE, E_NO_OUTPUT. The patch reader now records line\nnumbers so messages cite file:line. ConnectNodes shares the source-capability\nhelper with the validator.",
+      "raw": "headless: --describe schema and --validate strict pass\n\n--describe [type] dumps every registered node type from live instances:\nVisitParams keys/tags/defaults, input slots by kind, outputs by kind, and the\nmodulatable params with ranges/enums (registered by a hidden draw pass).\n--validate and every --render/--frame load run a strict pass over Patch::Data\nbefore it is applied: E_UNKNOWN_TYPE (nearest names), W_UNKNOWN_PARAM,\nW_TYPE_MISMATCH, E_BAD_SLOT, E_KIND_MISMATCH via the real\nIsInputSlotCompatible, E_CYCLE, E_DANGLING, E_DUPLICATE_INDEX,\nW_DUPLICATE_UID, W_UNUSED_NODE, E_NO_OUTPUT. The patch reader now records line\nnumbers so messages cite file:line. ConnectNodes shares the source-capability\nhelper with the validator."
+    },
+    "stat": "CMakeLists.txt            |   1 +\n scripts/headless_smoke.sh |  25 ++++\n src/core/HeadlessJob.cpp  |  58 +++++++-\n src/core/HeadlessJob.h    |   5 +\n src/core/Patch.cpp        |   8 ++\n src/core/Patch.h          |   7 +\n src/core/PatchSchema.cpp  | 341 ++++++++++++++++++++++++++++++++++++++++++++++\n src/core/PatchSchema.h    |  86 ++++++++++++\n src/main.cpp              | 313 ++++++++++++++++++++++++++++++++++++++----\n 9 files changed, 818 insertions(+), 26 deletions(-)\n create mode 100644 src/core/PatchSchema.cpp\n create mode 100644 src/core/PatchSchema.h",
+    "files": [
+      "CMakeLists.txt",
+      "scripts/headless_smoke.sh",
+      "src/core/HeadlessJob.cpp",
+      "src/core/HeadlessJob.h",
+      "src/core/Patch.cpp",
+      "src/core/Patch.h",
+      "src/core/PatchSchema.cpp",
+      "src/core/PatchSchema.h",
+      "src/main.cpp"
+    ]
+  },
+  {
+    "hash": "5c286dbf10a44788355452b9086b6aa5c38d493b",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Tue Sep 29 08:49:52 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "render3d",
+      "title": "headless: --render and --frame CLI modes, status JSON, exit codes (macOS)",
+      "description": "headless: --render and --frame CLI modes, status JSON, exit codes (macOS)",
+      "bullets": [
+        "start seeks the video clock; --size is not supported (Output follows its"
+      ],
+      "body": "Infinite --render <patch> <out.mp4|mov> and --frame <patch> <T,...> <out>\nload a patch on a hidden window, run the existing offline session at a fixed\n48 kHz with no audio device, and print one status JSON line. Exit codes:\n2 usage, 3 load/validation, 4 live source, 5 render, 6 timeout.\ninput). scripts/headless_smoke.sh asserts the JSON, exit codes and files.",
+      "raw": "headless: --render and --frame CLI modes, status JSON, exit codes (macOS)\n\nInfinite --render <patch> <out.mp4|mov> and --frame <patch> <T,...> <out>\nload a patch on a hidden window, run the existing offline session at a fixed\n48 kHz with no audio device, and print one status JSON line. Exit codes:\n2 usage, 3 load/validation, 4 live source, 5 render, 6 timeout.\n--start seeks the video clock; --size is not supported (Output follows its\ninput). scripts/headless_smoke.sh asserts the JSON, exit codes and files."
+    },
+    "stat": "CMakeLists.txt                     |   1 +\n docs/fix-briefs/headless-engine.md | 450 ++++++++++++++++++++++++\n scripts/headless_smoke.sh          |  36 ++\n src/core/HeadlessJob.cpp           | 314 +++++++++++++++++\n src/core/HeadlessJob.h             |  96 +++++\n src/main.cpp                       | 331 +++++++++++++++++-\n tests/headless/patch_video.inf     | 693 +++++++++++++++++++++++++++++++++++++\n 7 files changed, 1908 insertions(+), 13 deletions(-)\n create mode 100644 docs/fix-briefs/headless-engine.md\n create mode 100755 scripts/headless_smoke.sh\n create mode 100644 src/core/HeadlessJob.cpp\n create mode 100644 src/core/HeadlessJob.h\n create mode 100644 tests/headless/patch_video.inf",
+    "files": [
+      "CMakeLists.txt",
+      "docs/fix-briefs/headless-engine.md",
+      "scripts/headless_smoke.sh",
+      "src/core/HeadlessJob.cpp",
+      "src/core/HeadlessJob.h",
+      "src/main.cpp",
+      "tests/headless/patch_video.inf"
+    ]
+  },
+  {
+    "hash": "ba96ab1531621a9a21a24beb0bcb8273ded9c2d1",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Mon Sep 28 20:34:42 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "website: drop platform chip and four section subtitles, 2x2 what-if grid on phones, one-row recipe chains",
+      "description": "website: drop platform chip and four section subtitles, 2x2 what-if grid on phones, one-row recipe chains",
+      "bullets": [],
+      "body": "",
+      "raw": "website: drop platform chip and four section subtitles, 2x2 what-if grid on phones, one-row recipe chains"
+    },
+    "stat": "website/index.html | 10 +---------\n website/style.css  | 36 ++++++++++++++++++++++++++----------\n 2 files changed, 27 insertions(+), 19 deletions(-)",
+    "files": [
+      "website/index.html",
+      "website/style.css"
+    ]
+  },
+  {
+    "hash": "3e8cf1de01a264795ecda594c774988d9f9fda12",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Mon Sep 28 09:39:53 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "website: edge-to-edge desktop header, mobile mark beside the menu button",
+      "description": "website: edge-to-edge desktop header, mobile mark beside the menu button",
+      "bullets": [],
+      "body": "",
+      "raw": "website: edge-to-edge desktop header, mobile mark beside the menu button"
+    },
+    "stat": "website/index.html |  2 +-\n website/style.css  | 15 +++++++++------\n 2 files changed, 10 insertions(+), 7 deletions(-)",
+    "files": [
+      "website/index.html",
+      "website/style.css"
+    ]
+  },
+  {
+    "hash": "529b8f80224bbea11b9d70fe7d803ae2372fbac9",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Mon Sep 28 09:35:12 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "website: recipe images keep 4:3 on mobile, smaller YouTube play button and label",
+      "description": "website: recipe images keep 4:3 on mobile, smaller YouTube play button and label",
+      "bullets": [],
+      "body": "",
+      "raw": "website: recipe images keep 4:3 on mobile, smaller YouTube play button and label"
+    },
+    "stat": "website/index.html |  2 +-\n website/style.css  | 13 ++++++++-----\n 2 files changed, 9 insertions(+), 6 deletions(-)",
+    "files": [
+      "website/index.html",
+      "website/style.css"
+    ]
+  },
+  {
+    "hash": "c97f18c83ee7de064e42f9e11479d12e4866d727",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Mon Sep 28 09:12:38 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "website: lighter for slow networks (webp recipes, small icons, deferred scripts, lazy three.js, 540p film and no autoplay on slow links, offscreen loops pause)",
+      "description": "website: lighter for slow networks (webp recipes, small icons, deferred scripts, lazy three.js, 540p film and no autoplay on slow links, offscreen loops pause)",
+      "bullets": [],
+      "body": "",
+      "raw": "website: lighter for slow networks (webp recipes, small icons, deferred scripts, lazy three.js, 540p film and no autoplay on slow links, offscreen loops pause)"
+    },
+    "stat": "website/app.js                         |  32 +++++++++++++++++++++++---------\n website/assets/howto_daw.webp          | Bin 0 -> 28992 bytes\n website/assets/howto_visual.webp       | Bin 0 -> 150830 bytes\n website/assets/icon-64.png             | Bin 0 -> 3521 bytes\n website/assets/icon-96.png             | Bin 0 -> 5599 bytes\n website/assets/recipe_kaleido.webp     | Bin 0 -> 34826 bytes\n website/assets/recipe_spectrogram.webp | Bin 0 -> 66780 bytes\n website/assets/recipe_synth.webp       | Bin 0 -> 52592 bytes\n website/index.html                     |  27 +++++++++++++--------------\n website/site.js                        |  16 ++++++++++++----\n 10 files changed, 48 insertions(+), 27 deletions(-)\n create mode 100644 website/assets/howto_daw.webp\n create mode 100644 website/assets/howto_visual.webp\n create mode 100644 website/assets/icon-64.png\n create mode 100644 website/assets/icon-96.png\n create mode 100644 website/assets/recipe_kaleido.webp\n create mode 100644 website/assets/recipe_spectrogram.webp\n create mode 100644 website/assets/recipe_synth.webp",
+    "files": [
+      "website/app.js",
+      "website/assets/howto_daw.webp",
+      "website/assets/howto_visual.webp",
+      "website/assets/icon-64.png",
+      "website/assets/icon-96.png",
+      "website/assets/recipe_kaleido.webp",
+      "website/assets/recipe_spectrogram.webp",
+      "website/assets/recipe_synth.webp",
+      "website/index.html",
+      "website/site.js"
+    ]
+  },
+  {
+    "hash": "ca40cee77d9dfc27c9618b12dfef012c2ecfecd7",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Mon Sep 28 09:04:43 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "website: bird never blocks clicks, mobile header with menu left, mark centred, download right",
+      "description": "website: bird never blocks clicks, mobile header with menu left, mark centred, download right",
+      "bullets": [],
+      "body": "",
+      "raw": "website: bird never blocks clicks, mobile header with menu left, mark centred, download right"
+    },
+    "stat": "website/index.html | 10 +++++-----\n website/site.js    | 17 ++++++++++++++++-\n website/style.css  | 13 ++++++++++---\n 3 files changed, 31 insertions(+), 9 deletions(-)",
+    "files": [
+      "website/index.html",
+      "website/site.js",
+      "website/style.css"
+    ]
+  },
+  {
+    "hash": "ba48e88c4ba9db44ece3edaeb234bd13113f2ded",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Mon Sep 28 08:55:33 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "website: static canvas shot, video-only film, node ticker tapes, tighter spacing",
+      "description": "website: static canvas shot, video-only film, node ticker tapes, tighter spacing",
+      "bullets": [],
+      "body": "",
+      "raw": "website: static canvas shot, video-only film, node ticker tapes, tighter spacing"
+    },
+    "stat": "website/index.html |  64 +++++++-----------\n website/site.js    | 189 ++++++++++++-----------------------------------------\n website/style.css  | 142 ++++++++++------------------------------\n 3 files changed, 100 insertions(+), 295 deletions(-)",
+    "files": [
+      "website/index.html",
+      "website/site.js",
+      "website/style.css"
+    ]
+  },
+  {
+    "hash": "1684c96c0da98a62386b287e006cf77d40051375",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Mon Sep 28 08:40:23 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "website: v2 in the launch-film language",
+      "description": "website: v2 in the launch-film language",
+      "bullets": [],
+      "body": "Paper palette, exact lemniscate logo, 'A DAW for <word>' hero, scroll zoom\ntour of one screenshot, the launch film, what-if node chain with cables,\nprediction aside with pixel type and self-turning knobs, the digit bird on\nsection slabs, recipes as node chains, 229-node searchable library, OS tabs\nfor setup, OS-detected downloads. Works at 375 px with no horizontal scroll.",
+      "raw": "website: v2 in the launch-film language\n\nPaper palette, exact lemniscate logo, 'A DAW for <word>' hero, scroll zoom\ntour of one screenshot, the launch film, what-if node chain with cables,\nprediction aside with pixel type and self-turning knobs, the digit bird on\nsection slabs, recipes as node chains, 229-node searchable library, OS tabs\nfor setup, OS-detected downloads. Works at 375 px with no horizontal scroll."
+    },
+    "stat": "website/app.js     |  145 +---\n website/index.html |  983 ++++++++++++-------------\n website/nodes.js   |    3 +\n website/site.js    |  989 +++++++++++++++++++++++++\n website/style.css  | 2047 ++++++++++++++++++----------------------------------\n 5 files changed, 2188 insertions(+), 1979 deletions(-)\n create mode 100644 website/nodes.js\n create mode 100644 website/site.js",
+    "files": [
+      "website/app.js",
+      "website/index.html",
+      "website/nodes.js",
+      "website/site.js",
+      "website/style.css"
+    ]
+  },
+  {
+    "hash": "d115da9b0f7e8b20e034c138e31f62afb2388c7b",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Mon Sep 28 08:40:22 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "website: v2 plan and assets (launch film for web, product canvas screenshot)",
+      "description": "website: v2 plan and assets (launch film for web, product canvas screenshot)",
+      "bullets": [],
+      "body": "",
+      "raw": "website: v2 plan and assets (launch film for web, product canvas screenshot)"
+    },
+    "stat": "docs/plans/website/README.md                |  90 ++++++++++++++++++++++++++++\n website/assets/film/infinite_launch.mp4     | Bin 0 -> 11053119 bytes\n website/assets/film/infinite_launch_540.mp4 | Bin 0 -> 3557193 bytes\n website/assets/film/launch_poster.jpg       | Bin 0 -> 37399 bytes\n website/assets/product_canvas.webp          | Bin 0 -> 303138 bytes\n website/assets/product_canvas_1400.webp     | Bin 0 -> 113950 bytes\n 6 files changed, 90 insertions(+)\n create mode 100644 docs/plans/website/README.md\n create mode 100644 website/assets/film/infinite_launch.mp4\n create mode 100644 website/assets/film/infinite_launch_540.mp4\n create mode 100644 website/assets/film/launch_poster.jpg\n create mode 100644 website/assets/product_canvas.webp\n create mode 100644 website/assets/product_canvas_1400.webp",
+    "files": [
+      "docs/plans/website/README.md",
+      "website/assets/film/infinite_launch.mp4",
+      "website/assets/film/infinite_launch_540.mp4",
+      "website/assets/film/launch_poster.jpg",
+      "website/assets/product_canvas.webp",
+      "website/assets/product_canvas_1400.webp"
+    ]
+  },
+  {
+    "hash": "095ee2acaf81e6597726875debd66c6d3db593f6",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 26 09:09:33 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "ui",
+      "title": "Release: rebuild DMG for v0.4.5",
+      "description": "Release: rebuild DMG for v0.4.5",
+      "bullets": [],
+      "body": "",
+      "raw": "Release: rebuild DMG for v0.4.5"
+    },
+    "stat": "website/assets/Infinite.dmg | Bin 13479203 -> 13510949 bytes\n 1 file changed, 0 insertions(+), 0 deletions(-)",
+    "files": [
+      "website/assets/Infinite.dmg"
+    ]
+  },
+  {
+    "hash": "3ba1de34ebb74eaa4850a5159cd4a815b182290b",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 26 09:01:17 2026 +0530",
+    "parsed_message": {
+      "type": "feat",
+      "scope": "core",
+      "title": "Bump version to 0.4.5",
+      "description": "Bump version to 0.4.5",
+      "bullets": [],
+      "body": "",
+      "raw": "Bump version to 0.4.5"
+    },
+    "stat": "CMakeLists.txt     | 4 ++--\n website/index.html | 2 +-\n 2 files changed, 3 insertions(+), 3 deletions(-)",
+    "files": [
+      "CMakeLists.txt",
+      "website/index.html"
+    ]
+  },
+  {
+    "hash": "7947fa97840894d35d6f49dfe2566f1c051e9149",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 26 08:48:06 2026 +0530",
+    "parsed_message": {
+      "type": "chore",
+      "scope": "semi-brain",
+      "title": "chore(semi-brain): sync corpora and index after audio meter sizing fix",
+      "description": "sync corpora and index after audio meter sizing fix",
+      "bullets": [],
+      "body": "",
+      "raw": "chore(semi-brain): sync corpora and index after audio meter sizing fix"
+    },
+    "stat": ".../1_extractors/output/ast_symbol_graph.json      | 14591 ++++++++++---------\n .../1_extractors/output/git_commits_corpus.json    |    68 +\n .../1_extractors/output/knowledge_index.db         |   Bin 34082816 -> 34082816 bytes\n tools/semi-brain/3_datasets/train_sft_alpaca.jsonl |     3 +\n .../semi-brain/3_datasets/train_sft_sharegpt.jsonl |     3 +\n 5 files changed, 7378 insertions(+), 7287 deletions(-)",
+    "files": [
+      "tools/semi-brain/1_extractors/output/ast_symbol_graph.json",
+      "tools/semi-brain/1_extractors/output/git_commits_corpus.json",
+      "tools/semi-brain/1_extractors/output/knowledge_index.db",
+      "tools/semi-brain/3_datasets/train_sft_alpaca.jsonl",
+      "tools/semi-brain/3_datasets/train_sft_sharegpt.jsonl"
+    ]
+  },
+  {
+    "hash": "d8d0b92d162ff11fd41d01364656c58c7fb9e159",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 26 08:48:04 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "audio",
+      "title": "Merge bugfix/audio-meter-sizing into main",
+      "description": "Merge bugfix/audio-meter-sizing into main",
+      "bullets": [],
+      "body": "",
+      "raw": "Merge bugfix/audio-meter-sizing into main"
+    },
+    "stat": "",
+    "files": [
+      "src/main.cpp",
+      "src/nodes/AudioMeterNode.cpp"
+    ]
+  },
+  {
+    "hash": "a3c70b496bddeb7048e4168a94f0d440ccf19325",
+    "author_name": "n1m21n",
+    "author_email": "namansoniii21@gmail.com",
+    "author_date": "Sat Sep 26 08:48:03 2026 +0530",
+    "parsed_message": {
+      "type": "fix",
+      "scope": "audio",
+      "title": "fix(audio): Audio Meter 1.5x taller, smaller legends, level drops to zero when audio stops",
+      "description": "Audio Meter 1.5x taller, smaller legends, level drops to zero when audio stops",
+      "bullets": [],
+      "body": "The meter is now three knob rows tall instead of two, legends draw at 72%\nof the body font with more padding, and the scale column drops the tick\nstubs that made labels read as '-6-'.\nThe RMS atomics held the last block's value once ProcessBlock stopped\nbeing called, so the bars stayed lit over a 'no signal' status. The UI now\ntreats RMS as zero after 100 ms without a new block (not per poll, which\nwould flicker when the UI outpaces the audio block rate).",
+      "raw": "fix(audio): Audio Meter 1.5x taller, smaller legends, level drops to zero when audio stops\n\nThe meter is now three knob rows tall instead of two, legends draw at 72%\nof the body font with more padding, and the scale column drops the tick\nstubs that made labels read as '-6-'.\n\nThe RMS atomics held the last block's value once ProcessBlock stopped\nbeing called, so the bars stayed lit over a 'no signal' status. The UI now\ntreats RMS as zero after 100 ms without a new block (not per poll, which\nwould flicker when the UI outpaces the audio block rate)."
+    },
+    "stat": "src/main.cpp                 | 47 ++++++++++++++++++++++++--------------------\n src/nodes/AudioMeterNode.cpp | 25 +++++++++++++++++++++--\n 2 files changed, 49 insertions(+), 23 deletions(-)",
+    "files": [
+      "src/main.cpp",
+      "src/nodes/AudioMeterNode.cpp"
+    ]
+  },
+  {
     "hash": "35270af160359b70d5c875e19721dc145fd963fc",
     "author_name": "n1m21n",
     "author_email": "namansoniii21@gmail.com",
