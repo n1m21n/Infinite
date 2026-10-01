@@ -189,7 +189,7 @@ jobs:
             "@echo off",
             "cd /d build\Release",
             "Infinite --frame $tmp\p.inf abc $tmp\x.png > $tmp\cmd.json",
-            "echo %errorlevel%> $tmp\cmd.code")
+            "echo %errorlevel% > $tmp\cmd.code")  # the space matters: "2>" would be a stderr redirect
           cmd /c "$tmp\shim.cmd"
           Check "cmd: bare 'Infinite' resolves to Infinite.com and waits (exit 2)" ((Get-Content "$tmp/cmd.code").Trim() -eq "2")
           Check "cmd: stdout redirected to a file carries the status line" ((Get-Content "$tmp/cmd.json" | Select-Object -Last 1) -match 'E_USAGE')
