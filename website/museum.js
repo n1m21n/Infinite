@@ -1,4 +1,4 @@
-// Infinite — Artworks museum.
+// Infinite — Art Gallery museum.
 // One set of ten framed pieces, three rooms (hall / rotunda / wall). Switching rooms re-hangs the
 // same frames along arcs with a stagger, so the pieces stay the same objects, not a cut.
 import * as THREE from 'three';
