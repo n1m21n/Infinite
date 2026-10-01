@@ -247,7 +247,7 @@ sha_check() {
 }
 
 declare -A LINUXDEPLOY_SHA256=(
-  [x86_64]="36a2d7e274d12e1050d0e9ecfe11d339ed54720b2bec464c286d53f8b07f5c62"
+  [x86_64]="8aea8da0f7f7039d2a2cecb14657d752a222a5e1d3825caeef186c82f751cdd1"
   [aarch64]="__NOT_PINNED__"
 )
 declare -A APPIMAGETOOL_SHA256=(
