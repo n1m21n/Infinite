@@ -27860,8 +27860,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
 
    // `keepPixels`, when given, receives the RGBA8 rows exactly as read back
    // (bottom row first), so a caller can measure the frame it just wrote.
-   void ExportImage(OutputNode* out, const std::string& path, int jpgQuality = 90,
-                    std::vector<unsigned char>* keepPixels = nullptr)
+   void ExportImage(INode* out, const std::string& path, int jpgQuality = 90,
+                    std::vector<unsigned char>* keepPixels = nullptr, int outputIndex = 0)
    {
       int w = out->GetOutputWidth();
       int h = out->GetOutputHeight();
@@ -27874,7 +27874,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       GLuint fbo = 0;
       glGenFramebuffers(1, &fbo);
       glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, out->GetOutputTexture(), 0);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, out->GetOutputTexture(outputIndex), 0);
       glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
       glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
       glDeleteFramebuffers(1, &fbo);
@@ -27902,6 +27902,34 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       }
       if (keepPixels != nullptr)
          keepPixels->swap(pixels);
+   }
+
+   // A node's image output as top-row-first RGBA8, straight alpha. Returns false when the node has
+   // no image there. `opaque` forces alpha to 255 (the picture without its transparency).
+   bool ReadNodeImageRgba8(INode* node, int outputIndex, bool opaque, int& w, int& h, std::vector<unsigned char>& rgba)
+   {
+      w = node->GetOutputWidth();
+      h = node->GetOutputHeight();
+      const unsigned int tex = node->GetOutputTexture(outputIndex);
+      if (w <= 0 || h <= 0 || tex == 0)
+         return false;
+      std::vector<unsigned char> bottomFirst((size_t)w * h * 4);
+      GLint prevFbo = 0;
+      glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+      GLuint fbo = 0;
+      glGenFramebuffers(1, &fbo);
+      glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+      glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, bottomFirst.data());
+      glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
+      glDeleteFramebuffers(1, &fbo);
+      rgba.resize(bottomFirst.size());
+      for (int y = 0; y < h; y++)
+         std::memcpy(&rgba[(size_t)y * w * 4], &bottomFirst[(size_t)(h - 1 - y) * w * 4], (size_t)w * 4);
+      if (opaque)
+         for (size_t i = 3; i < rgba.size(); i += 4)
+            rgba[i] = 255;
+      return true;
    }
 
    // Top-row-first RGBA8 to a PNG that says it is sRGB (stb writes no colour
@@ -69731,6 +69759,9 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
    static double sWall = -1.0;
    static Headless::Status sStatus;
    static OutputNode* sOut = nullptr;
+   static INode* sTap = nullptr;            // the node whose image --frame / --frames-dir reads (an Output, or --node)
+   static int sTapOutput = 0;
+   static std::vector<double> sTimes;       // --frame: the requested times; --frames-dir: start + i/fps
    static int sOutIndex = -1;
    static size_t sNextTime = 0;
    static int sNextFrame = 0;
@@ -69757,6 +69788,7 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
                      : job.mode == Headless::Mode::Canonicalize ? "canonicalize"
                      : job.mode == Headless::Mode::Explain ? "explain"
                      : job.mode == Headless::Mode::AudioSummary ? "audio-summary"
+                     : job.mode == Headless::Mode::Frames ? "frames"
                                                             : "frame";
       sStatus.warnings = gHeadlessPreWarnings;
       sStatus.patch = job.patch;
@@ -70256,34 +70288,58 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
          return;
       }
 
-      // Resolve the Output. --output takes a node index or a display name.
-      std::vector<int> outs;
-      for (GraphNode& gn : gNodes)
-         if (gn.typeName == "Output")
-            outs.push_back(gn.index);
-      if (outs.empty())
-         return fail("E_NO_OUTPUT", "the patch has no Output node");
-      if (!job.output.empty())
+      sTap = nullptr;
+      sTapOutput = 0;
+      if (!job.node.empty())
       {
+         // --node <index[:output]>: tap that node's image; no Output is needed.
          char* end = nullptr;
-         const long want = std::strtol(job.output.c_str(), &end, 10);
-         const bool numeric = end != nullptr && *end == '\0';
-         sOutIndex = -1;
-         for (int idx : outs)
-            if (numeric && idx == (int)want)
-               sOutIndex = idx;
-         if (sOutIndex < 0)
-            return fail("E_NO_OUTPUT", "--output " + job.output + " is not an Output node index");
+         const long idx = std::strtol(job.node.c_str(), &end, 10);
+         long outSlot = 0;
+         if (end == job.node.c_str() || (*end != '\0' && *end != ':') ||
+             (*end == ':' && (outSlot = std::strtol(end + 1, &end, 10), *end != '\0')))
+            return fail("E_USAGE", "--node needs a node index or index:output, got '" + job.node + "'");
+         GraphNode* tg = FindNodeByIndex((int)idx);
+         if (tg == nullptr)
+            return fail("E_BAD_REF", "--node " + job.node + ": the patch has no node with index " + std::to_string(idx));
+         if (outSlot < 0 || outSlot >= tg->node->OutputCount())
+            return fail("E_BAD_SLOT", "--node " + job.node + ": " + tg->typeName + " has " +
+                                         std::to_string(tg->node->OutputCount()) + " output(s)", (int)idx);
+         sTap = tg->node.get();
+         sTapOutput = (int)outSlot;
       }
-      else if (outs.size() > 1)
-         return fail("E_AMBIGUOUS_OUTPUT", "the patch has " + std::to_string(outs.size()) +
-                                              " Output nodes; pick one with --output <index>");
       else
-         sOutIndex = outs.front();
-      GraphNode* gn = FindNodeByIndex(sOutIndex);
-      sOut = gn != nullptr ? static_cast<OutputNode*>(gn->node.get()) : nullptr;
-      if (sOut == nullptr)
-         return fail("E_NO_OUTPUT", "Output node vanished");
+      {
+         // Resolve the Output. --output takes a node index or a display name.
+         std::vector<int> outs;
+         for (GraphNode& gn : gNodes)
+            if (gn.typeName == "Output")
+               outs.push_back(gn.index);
+         if (outs.empty())
+            return fail("E_NO_OUTPUT", "the patch has no Output node");
+         if (!job.output.empty())
+         {
+            char* end = nullptr;
+            const long want = std::strtol(job.output.c_str(), &end, 10);
+            const bool numeric = end != nullptr && *end == '\0';
+            sOutIndex = -1;
+            for (int idx : outs)
+               if (numeric && idx == (int)want)
+                  sOutIndex = idx;
+            if (sOutIndex < 0)
+               return fail("E_NO_OUTPUT", "--output " + job.output + " is not an Output node index");
+         }
+         else if (outs.size() > 1)
+            return fail("E_AMBIGUOUS_OUTPUT", "the patch has " + std::to_string(outs.size()) +
+                                                 " Output nodes; pick one with --output <index>");
+         else
+            sOutIndex = outs.front();
+         GraphNode* gn = FindNodeByIndex(sOutIndex);
+         sOut = gn != nullptr ? static_cast<OutputNode*>(gn->node.get()) : nullptr;
+         if (sOut == nullptr)
+            return fail("E_NO_OUTPUT", "Output node vanished");
+         sTap = sOut;
+      }
 
       if (job.mode == Headless::Mode::Render)
       {
@@ -70331,6 +70387,24 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
          sPhase = Phase::Running;
          return;
       }
+
+      // --frames-dir: every frame of start .. start+duration at fps, as a numbered PNG sequence.
+      if (job.mode == Headless::Mode::Frames)
+      {
+         std::error_code ec;
+         std::filesystem::create_directories(job.out, ec);
+         const long long count = std::max(1LL, (long long)std::llround(job.duration * (double)job.fps));
+         sTimes.clear();
+         for (long long i = 0; i < count; i++)
+            sTimes.push_back(job.start + (double)i / (double)job.fps);
+         Transport::Instance().SetOfflineMode(true, gHeadlessAudioRate);
+         Transport::Instance().SetPlaying(true);
+         sNextTime = 0;
+         sNextFrame = 0;
+         sPhase = Phase::Frames;
+         return;
+      }
+      sTimes = job.times;
 
       // --frame: a single .png, or a directory for one or several times.
       std::string ext = std::filesystem::path(job.out).extension().string();
@@ -70382,9 +70456,9 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
    if (sPhase == Phase::Frames)
    {
       const double budgetStart = glfwGetTime();
-      while (sNextTime < job.times.size())
+      while (sNextTime < sTimes.size())
       {
-         const int target = (int)std::llround(job.times[sNextTime] * (double)job.fps);
+         const int target = (int)std::llround(sTimes[sNextTime] * (double)job.fps);
          if (sNextFrame > target)
             sNextFrame = target; // duplicate time: re-export what the last step cooked
          const bool needStep = sNextFrame <= target;
@@ -70400,18 +70474,35 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
          }
          if (sNextFrame == target)
          {
-            const int w = sOut->GetOutputWidth(), h = sOut->GetOutputHeight();
+            const int w = sTap->GetOutputWidth(), h = sTap->GetOutputHeight();
             if (w <= 0 || h <= 0)
-               return fail("E_RENDER", "the Output produced no image (is its input connected?)", sOutIndex);
+               return fail("E_RENDER", sOut != nullptr ? "the Output produced no image (is its input connected?)"
+                                                       : "the --node " + job.node + " produced no image",
+                           sOut != nullptr ? sOutIndex : -1);
             std::string path = job.out;
-            if (std::filesystem::path(job.out).extension() != ".png" && std::filesystem::path(job.out).extension() != ".PNG")
-            {
-               char name[96];
-               std::snprintf(name, sizeof(name), "/frame_%05d.png", target);
-               path = job.out + (job.out.back() == '/' ? std::string(name + 1) : std::string(name));
-            }
             std::vector<unsigned char> pixels;
-            ExportImage(sOut, path, 90, &pixels);
+            if (job.mode == Headless::Mode::Frames)
+            {
+               char name[32];
+               std::snprintf(name, sizeof(name), "%06zu.png", sNextTime);
+               path = job.out + (job.out.back() == '/' ? "" : "/") + name;
+               int rw = 0, rh = 0;
+               std::vector<unsigned char> rgba;
+               if (!ReadNodeImageRgba8(sTap, sTapOutput, !job.alpha, rw, rh, rgba) ||
+                   !WriteSrgbPng(path, rw, rh, rgba.data()))
+                  return fail("E_RENDER", "could not write " + path);
+               pixels = std::move(rgba);
+            }
+            else
+            {
+               if (std::filesystem::path(job.out).extension() != ".png" && std::filesystem::path(job.out).extension() != ".PNG")
+               {
+                  char name[96];
+                  std::snprintf(name, sizeof(name), "/frame_%05d.png", target);
+                  path = job.out + (job.out.back() == '/' ? std::string(name + 1) : std::string(name));
+               }
+               ExportImage(sTap, path, 90, &pixels, sTapOutput);
+            }
             std::error_code ec;
             if (!std::filesystem::exists(path, ec))
                return fail("E_RENDER", "could not write " + path);
@@ -70421,19 +70512,19 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
                // cannot open the PNG still knows a black or blown-out one.
                const ColorStats::FrameSummary fs = ColorStats::SummarizeRgba8(pixels.data(), w, h);
                char head[96];
-               std::snprintf(head, sizeof(head), "{\"time\":%.6g,\"frame\":%d,\"file\":\"", job.times[sNextTime], target);
+               std::snprintf(head, sizeof(head), "{\"time\":%.6g,\"frame\":%d,\"file\":\"", sTimes[sNextTime], target);
                sFrameStats += std::string(sFrameStats.empty() ? "" : ",") + head + Headless::JsonEscape(path) + "\"," +
                               ColorStats::FrameSummaryJsonFields(fs) + "}";
                char when[32];
-               std::snprintf(when, sizeof(when), "%.6g", job.times[sNextTime]);
+               std::snprintf(when, sizeof(when), "%.6g", sTimes[sNextTime]);
                if (fs.blackPercent >= 100.0)
                   sStatus.warnings.push_back({ "W_BLACK_FRAME", std::string("the frame at ") + when + " s is entirely black",
                                                0, sOutIndex, "check that something visible reaches the Output at that time" });
                if (!job.contactSheet.empty())
                {
                   char label[32];
-                  std::snprintf(label, sizeof(label), "%.2fs", job.times[sNextTime]);
-                  sSheet.Add(pixels.data(), w, h, true, label);
+                  std::snprintf(label, sizeof(label), "%.2fs", sTimes[sNextTime]);
+                  sSheet.Add(pixels.data(), w, h, job.mode != Headless::Mode::Frames, label);
                }
             }
             sStatus.width = w;
@@ -70447,6 +70538,22 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
             return;
       }
       Transport::Instance().SetOfflineMode(false);
+      if (job.mode == Headless::Mode::Frames)
+      {
+         // What a film engine needs to read the sequence back: straight alpha, sRGB, fps, count.
+         char meta[320];
+         std::snprintf(meta, sizeof(meta),
+                       "{\"fps\":%d,\"size\":[%d,%d],\"count\":%zu,\"start\":%.6g,\"alpha\":%s,"
+                       "\"premultiplied\":false,\"color_space\":\"srgb\",\"pattern\":\"%%06d.png\"}\n",
+                       job.fps, sStatus.width, sStatus.height, sTimes.size(), job.start, job.alpha ? "true" : "false");
+         const std::string metaPath = job.out + (job.out.back() == '/' ? "" : "/") + "frames.json";
+         if (FILE* f = std::fopen(metaPath.c_str(), "wb"))
+         {
+            std::fwrite(meta, 1, std::strlen(meta), f);
+            std::fclose(f);
+            sStatus.files.push_back(metaPath);
+         }
+      }
       sStatus.extraJson.push_back("\"frame_stats\":[" + sFrameStats + "]");
       if (!job.contactSheet.empty())
       {
@@ -73961,11 +74068,13 @@ int main(int argc, char** argv)
       Patch::Data probe;
       std::string readError;
       const bool loadsPatch = gHeadlessJob.mode == Headless::Mode::Render || gHeadlessJob.mode == Headless::Mode::Frame ||
+                              gHeadlessJob.mode == Headless::Mode::Frames ||
                               gHeadlessJob.mode == Headless::Mode::Explain || gHeadlessJob.mode == Headless::Mode::AudioSummary;
       Headless::Status st;
       st.mode = gHeadlessJob.mode == Headless::Mode::Render ? "render"
                 : gHeadlessJob.mode == Headless::Mode::Explain ? "explain"
                 : gHeadlessJob.mode == Headless::Mode::AudioSummary ? "audio-summary"
+                : gHeadlessJob.mode == Headless::Mode::Frames ? "frames"
                                                                     : "frame";
       st.patch = gHeadlessJob.patch;
       if (gHeadlessJob.mode == Headless::Mode::Canonicalize)
@@ -73993,9 +74102,20 @@ int main(int argc, char** argv)
       {
          // Strict pass before anything is applied: a broken authored file is
          // reported with its line numbers instead of loading half a graph.
-         const PatchSchema::Env env = MakeSchemaEnv(gHeadlessJob.mode == Headless::Mode::Render ||
-                                                    gHeadlessJob.mode == Headless::Mode::Frame);
+         const PatchSchema::Env env = MakeSchemaEnv((gHeadlessJob.mode == Headless::Mode::Render ||
+                                                     gHeadlessJob.mode == Headless::Mode::Frame ||
+                                                     gHeadlessJob.mode == Headless::Mode::Frames) &&
+                                                    gHeadlessJob.node.empty());
          PatchSchema::Resolve(probe, env, st.errors);
+         if (!gHeadlessJob.node.empty())
+         {
+            // --node takes an `id <word>` as well as an index; the render phase wants the index.
+            const size_t colon = gHeadlessJob.node.find(':');
+            const std::string word = gHeadlessJob.node.substr(0, colon);
+            for (const Patch::NodeRecord& n : probe.nodes)
+               if (!n.id.empty() && n.id == word)
+                  gHeadlessJob.node = std::to_string(n.index) + (colon == std::string::npos ? "" : gHeadlessJob.node.substr(colon));
+         }
          if (st.errors.empty())
             PatchSchema::Validate(probe, env, st.errors, gHeadlessPreWarnings);
          // An audio summary needs no picture Output; its own check (E_NO_AUDIO) covers the audio side.

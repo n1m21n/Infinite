@@ -95,6 +95,11 @@ namespace Headless
          job.mode = Mode::Frame;
          positional = 3;
       }
+      else if (first == "--frames-dir")
+      {
+         job.mode = Mode::Frames;
+         positional = 2;
+      }
       else if (first == "--audio-summary")
       {
          job.mode = Mode::AudioSummary;
@@ -323,6 +328,15 @@ namespace Headless
                return true;
             job.contactSheet = v;
          }
+         else if (a == "--node" && (job.mode == Mode::Frame || job.mode == Mode::Frames))
+         {
+            const char* v = next("--node");
+            if (v == nullptr)
+               return true;
+            job.node = v;
+         }
+         else if (a == "--alpha" && job.mode == Mode::Frames)
+            job.alpha = true;
          else if (a == "--no-audio")
             job.noAudio = true;
          else if (a == "--lenient")
@@ -340,14 +354,21 @@ namespace Headless
       {
          usageError = job.mode == Mode::Render
                          ? "usage: Infinite --render <patch.inf> <out.mp4|mov> [options]"
+                         : job.mode == Mode::Frames
+                              ? "usage: Infinite --frames-dir <patch.inf> <out_dir> --duration S [--start S] [--fps N] [--alpha] [--node <index[:output]>] [options]"
                          : job.mode == Mode::AudioSummary
                               ? "usage: Infinite --audio-summary <patch.inf> <out.json> [--start S] [--duration S] [--wav <out.wav>] [options]"
                               : "usage: Infinite --frame <patch.inf> <T[,T...]> <out.png|out_dir/> [--contact-sheet <sheet.png>] [options]";
          return true;
       }
 
+      if (job.mode == Mode::Frames && job.duration <= 0.0)
+      {
+         usageError = "--frames-dir needs --duration S";
+         return true;
+      }
       job.patch = pos[0];
-      if (job.mode == Mode::Render || job.mode == Mode::AudioSummary)
+      if (job.mode == Mode::Render || job.mode == Mode::AudioSummary || job.mode == Mode::Frames)
          job.out = pos[1];
       else
       {

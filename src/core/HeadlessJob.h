@@ -12,6 +12,8 @@
 //   Infinite --frame  <patch.inf> <T | T1,T2,...> <out.png | out_dir/>
 //            [--contact-sheet <sheet.png>] [--fps N] [--output <index|name>]
 //            [--sample-rate HZ] [--json <file>] [--lenient]
+//   Infinite --frames-dir <patch.inf> <out_dir> --duration S [--start S] [--fps N] [--alpha]
+//            [--node <index[:output]>] [--output <index>] [--json <file>] [--lenient]
 //   Infinite --audio-summary <patch.inf> <out.json> [--start S] [--duration S]
 //            [--wav <out.wav>] [--output <index>] [--fps N] [--sample-rate HZ]
 //            [--json <file>] [--timeout S] [--lenient]
@@ -31,6 +33,7 @@ namespace Headless
       None,
       Render,
       Frame,
+      Frames,
       Version,
       Describe,
       Validate,
@@ -47,6 +50,8 @@ namespace Headless
       std::string wavPath;       // --audio-summary --wav: the measured samples, as a file
       std::string contactSheet;  // --frame --contact-sheet: every requested time on one PNG
       std::string output;        // --output: node index or name; empty = the only Output
+      std::string node;          // --node <index[:output]>: tap this node's image instead of an Output's
+      bool alpha = false;        // --frames-dir --alpha: write straight alpha instead of opaque PNGs
       std::string jsonPath;      // --json
       std::vector<double> times; // --frame timestamps, seconds, ascending
       double start = 0.0;        // --render range start, seconds

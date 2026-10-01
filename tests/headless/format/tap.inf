@@ -1,0 +1,7 @@
+infinite-patch 1
+# A Shape and nothing else: no Output node. --node taps the Shape's image directly.
+node 1 Source Shape
+  id shape
+  f sizeX 0.6
+  i shapeType Star
+end

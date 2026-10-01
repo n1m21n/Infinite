@@ -9,6 +9,7 @@ PATCH="$ROOT/tests/headless/patch_video.inf"
 OUT="$(mktemp -d)"
 fail=0
 check() { if [ "$2" = "0" ]; then echo "[pass] $1"; else echo "[FAIL] $1"; fail=1; fi; }
+json_file() { python3 -c "import json; d=json.load(open('$1')); print($2)"; }
 json() { python3 -c "import sys,json; d=json.loads(sys.stdin.read().strip().splitlines()[-1]); print($1)"; }
 
 r=$("$BIN" --frame "$PATCH" 1.0 "$OUT/f.png"); rc=$?
@@ -164,6 +165,20 @@ r=$("$BIN" --describe 2>/dev/null)
 [ "$(echo "$r" | json "d['join_stats']['keyed'] >= json.load(open('$BASE'))['keyed']")" = "True" ]; check "describe: keyed controls did not drop below the baseline" $?
 [ "$(echo "$r" | json "[m['key'] for t in d['types'] if t['type']=='Shape' for m in t['modulatable'] if m['label']=='size x'][0]")" = "sizeX" ]; check "describe: Shape 'size x' is key sizeX" $?
 [ "$(echo "$r" | json "[m['key'] for t in d['types'] if t['type']=='Shape' for m in t['modulatable'] if m['label']=='shape'][0]")" = "shapeType" ]; check "describe: Shape dropdown 'shape' is key shapeType (perturbation tier)" $?
+
+# --- film backend (R471): --frames-dir PNG sequence, --node tap with no Output ---
+FD="$OUT/fd"; rm -rf "$FD"
+rf=$("$BIN" --frames-dir "$ROOT/tests/headless/format/tap.inf" "$FD" --duration 0.3 --fps 10 --node shape --alpha 2>/dev/null)
+[ "$(echo "$rf" | json "d['ok'] and d['mode']=='frames' and d['frames']==3")" = "True" ]; check "frames-dir: --node taps a patch with no Output, 3 frames" $?
+[ -s "$FD/000000.png" ] && [ -s "$FD/000002.png" ] && [ ! -e "$FD/000003.png" ]; check "frames-dir: numbered PNGs 000000..000002" $?
+[ "$(json_file "$FD/frames.json" "d['fps']==10 and d['count']==3 and d['alpha'] and d['premultiplied']==False and d['color_space']=='srgb'")" = "True" ]; check "frames-dir: frames.json describes the sequence" $?
+[ "$(echo "$rf" | json "0 < d['frame_stats'][0]['alpha_coverage'] < 100")" = "True" ]; check "frames-dir --alpha: the picture keeps its transparency" $?
+rf=$("$BIN" --frames-dir "$ROOT/tests/headless/format/tap.inf" "$FD" --duration 0.1 --fps 10 --node 1 2>/dev/null)
+[ "$(echo "$rf" | json "d['frame_stats'][0]['alpha_coverage']")" = "100.0" ]; check "frames-dir without --alpha: opaque PNGs" $?
+"$BIN" --frames-dir "$ROOT/tests/headless/format/tap.inf" "$FD" --duration 0.1 --node 9 >/dev/null 2>&1; [ $? = 3 ]; check "frames-dir: --node with no such node exit 3" $?
+"$BIN" --frames-dir "$ROOT/tests/headless/format/tap.inf" "$FD" --node 1 >/dev/null 2>&1; [ $? = 2 ]; check "frames-dir: no --duration exit 2" $?
+"$BIN" --frame "$ROOT/tests/headless/format/tap.inf" 0 "$OUT/tap.png" >/dev/null 2>&1; [ $? = 3 ]; check "frame without --node still needs an Output" $?
+"$BIN" --frame "$ROOT/tests/headless/format/tap.inf" 0 "$OUT/tap.png" --node 1 >/dev/null 2>&1; [ -s "$OUT/tap.png" ]; check "frame --node writes the tapped image" $?
 
 # --- describe actions (R474): the buttons a node draws, with what each one does ---
 [ "$(echo "$r" | json "[a['effect'] for t in d['types'] if t['type']=='Sampler' for a in t['actions'] if a['label']=='Load...'][0]")" = "sets a file path (write the key instead)" ]; check "describe: Sampler 'Load...' is a file-path action" $?
