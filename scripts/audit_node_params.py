@@ -26,6 +26,9 @@ MODULATABLE = OrderedDict([
     ("ModKnobInt",         "knob (int)"),
     ("ModSlider",          "slider"),
     ("ModSliderInt",       "slider (int)"),
+    ("AudioSlider",        "slider"),
+    ("AudioSliderInt",     "slider (int)"),
+    ("DrawGateControl",    "gate button"),
     ("ModCheckbox",        "checkbox"),
     ("DropdownButton",     "dropdown"),
     ("AudioBareDropdown",  "dropdown (bare)"),
@@ -109,7 +112,12 @@ def dispatch_map(text):
         if not m:
             continue
         klass = m.group(1)
-        window = "\n".join(lines[i:i + 4])
+        # Stop at the next dynamic_cast so an if/else-if chain does not hand
+        # this node the following branch's Draw* call.
+        end = i + 1
+        while end < min(i + 4, len(lines)) and "dynamic_cast<" not in lines[end]:
+            end += 1
+        window = "\n".join(lines[i:end])
         for fn in re.findall(r"\b(Draw\w*(?:Body|Params))\s*\(", window):
             out.setdefault(klass, set()).add(fn)
     return out
