@@ -1,12 +1,12 @@
 /* Infinite — Art Gallery museum. Tokens follow style.css (paper / ink / accent, Geist). */
 :root {
-  --paper: #FBFAF6;
-  --bg: #EFEBE0;
-  --ink: #1F1D1A;
-  --ink2: #5A534C;
-  --muted: #857C74;
+  --paper: #EEF0F6;
+  --bg: #12162B;
+  --ink: #EEF0F6;
+  --ink2: #A3A9BA;
+  --muted: #8C93A8;
   --line: var(--glass-edge);
-  --accent: #C2593F;
+  --accent: #F57F66;
   --brand-grad: linear-gradient(90deg, #F57F66, #D99A9C 35%, #C7AFC0 65%, #A9CDF1);
   --hand: 'Caveat', cursive;
   --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -14,10 +14,10 @@
   --font-hand: 'Caveat', cursive;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-io: cubic-bezier(0.65, 0, 0.35, 1);
-  --glass: rgba(255, 255, 255, 0.42);
-  --glass-edge: rgba(255, 255, 255, 0.7);
-  --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(45, 35, 25, 0.04);
-  --shadow: 0 1px 2px rgba(45, 35, 25, 0.06), 0 10px 28px rgba(45, 35, 25, 0.12), var(--glass-hi);
+  --glass: rgba(255, 255, 255, 0.10);
+  --glass-edge: rgba(255, 255, 255, 0.22);
+  --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 -1px 0 rgba(255, 255, 255, 0.03);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35), var(--glass-hi);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -47,7 +47,7 @@ html, body {
 
 .vignette {
   position: fixed; inset: 0; pointer-events: none;
-  background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(60, 48, 34, 0.14) 100%);
+  background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(5, 8, 22, 0.45) 100%);
 }
 
 /* ---- opening ---- */
@@ -78,7 +78,7 @@ body:not(.is-loading) .intro { opacity: 0; visibility: hidden; }
 }
 .chip svg { width: 15px; height: 15px; }
 .back { top: max(18px, env(safe-area-inset-top)); left: 18px; }
-.back:hover { transform: translateY(-1px); background: rgba(255, 255, 255, 0.75); }
+.back:hover { transform: translateY(-1px); background: rgba(255, 255, 255, 0.2); }
 
 .counter {
   top: max(18px, env(safe-area-inset-top)); right: 18px;
@@ -166,7 +166,7 @@ body.is-focus .focus-ui { opacity: 1; transform: none; pointer-events: auto; tra
   -webkit-tap-highlight-color: transparent;
 }
 .round svg { width: 18px; height: 18px; }
-.round:hover { background: rgba(255, 255, 255, 0.75); transform: translateY(-2px); }
+.round:hover { background: rgba(255, 255, 255, 0.2); transform: translateY(-2px); }
 .round:active { transform: scale(0.94); }
 .round.close { background: var(--brand-grad); color: #1F1D1A; border-color: transparent; }
 .round.close:hover { filter: brightness(1.08); }

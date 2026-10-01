@@ -59,7 +59,7 @@ try {
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-const BG = new THREE.Color('#EFEBE0');
+const BG = new THREE.Color('#161B33');
 const scene = new THREE.Scene();
 scene.background = BG;
 scene.fog = new THREE.Fog(BG, 9, 26);
@@ -88,15 +88,15 @@ function canvasTex(w, h, draw, { srgb = true, repeat } = {}) {
 // ---------------------------------------------------------------------------------------------
 // Environment: floor + three rooms. Each room has a fade value so rooms dissolve into each other.
 // ---------------------------------------------------------------------------------------------
-const WALL_C = '#F3EFE6';
+const WALL_C = '#FFFFFF';   // surface colour lives in the grid texture (midnight, like the logo)
 
 // notebook graph-paper: one tile = 5 x 5 cells = 2 m, so a cell is 40 cm
 const GRID_TILE = 2;
 const gridBase = canvasTex(640, 640, (g, w, h) => {
-  g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#272E55'; g.fillRect(0, 0, w, h);
   for (let k = 0; k < 5; k++) {
     const major = k === 0;
-    g.strokeStyle = major ? 'rgba(96,126,170,0.34)' : 'rgba(96,126,170,0.17)';
+    g.strokeStyle = major ? 'rgba(150,175,235,0.30)' : 'rgba(150,175,235,0.13)';
     g.lineWidth = major ? 3 : 2;
     const p = k * 128 + (major ? 1.5 : 1);
     g.beginPath(); g.moveTo(p, 0); g.lineTo(p, h); g.moveTo(0, p); g.lineTo(w, p); g.stroke();
@@ -111,7 +111,7 @@ function gridMap(w, h) { // a scaled plane needs its own repeat so cells stay sq
 const wallMat = () => new THREE.MeshLambertMaterial({ color: WALL_C, map: gridMap(1, 1), transparent: true });
 const setGrid = (mesh, w, h) => { mesh.material.map.repeat.set(w / GRID_TILE, h / GRID_TILE); };
 const floorTex = gridMap(72, 72);
-const floorMat = new THREE.MeshStandardMaterial({ color: '#E4E0D6', map: floorTex, roughness: 0.45, metalness: 0, transparent: true, opacity: 0.86 });
+const floorMat = new THREE.MeshStandardMaterial({ color: '#FFFFFF', map: floorTex, roughness: 0.45, metalness: 0, transparent: true, opacity: 0.86 });
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(72, 72), floorMat);
 floor.rotation.x = -Math.PI / 2;
 floor.renderOrder = 2;
@@ -127,7 +127,7 @@ const hallLeft = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
 const hallRight = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
 const hallEnd = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
 const hallStart = new THREE.Mesh(new THREE.PlaneGeometry(1, 5), wallMat());
-const hallCeil = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshLambertMaterial({ color: '#F1ECE0', map: gridMap(1, 1), transparent: true }));
+const hallCeil = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshLambertMaterial({ color: '#C9D0F0', map: gridMap(1, 1), transparent: true }));
 const panelMat = new THREE.MeshBasicMaterial({ color: '#FFFDF6', transparent: true, fog: false });
 const hallPanels = Array.from({ length: 9 }, () => new THREE.Mesh(new THREE.PlaneGeometry(1, 1), panelMat));
 rooms.hall.add(hallLeft, hallRight, hallEnd, hallStart, hallCeil, ...hallPanels);
