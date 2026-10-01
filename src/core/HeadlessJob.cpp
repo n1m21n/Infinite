@@ -355,7 +355,7 @@ namespace Headless
                return true;
             job.contactSheet = v;
          }
-         else if (a == "--node" && (job.mode == Mode::Frame || job.mode == Mode::Frames))
+         else if (a == "--node" && (job.mode == Mode::Frame || job.mode == Mode::Frames || job.mode == Mode::Render))
          {
             const char* v = next("--node");
             if (v == nullptr)
@@ -388,7 +388,7 @@ namespace Headless
                return true;
             }
          }
-         else if (a == "--size" && (job.mode == Mode::Frame || job.mode == Mode::Frames))
+         else if (a == "--size" && (job.mode == Mode::Frame || job.mode == Mode::Frames || job.mode == Mode::Render))
          {
             const char* v = next("--size");
             if (v == nullptr)
@@ -477,6 +477,16 @@ namespace Headless
       if (job.mode == Mode::Frames && job.duration <= 0.0)
       {
          usageError = "--frames-dir needs --duration S";
+         return true;
+      }
+      if (job.mode == Mode::Render && !job.node.empty() && job.duration <= 0.0)
+      {
+         usageError = "--render --node needs --duration S (there is no Output to take the length from)";
+         return true;
+      }
+      if (job.mode == Mode::Render && job.sizeW > 0 && job.node.empty())
+      {
+         usageError = "--size with --render needs --node: an Output renders at its own size";
          return true;
       }
       job.patch = pos[0];

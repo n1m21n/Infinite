@@ -16,7 +16,7 @@
 //            [--node <index[:output]>] [--output <index>] [--set <node>.<param>=<value>]... [--json <file>] [--lenient]
 //            [--size WxH] [--depth 8|16] [--png-level 0..9]
 //   --bpm <N> overrides the patch tempo in --render, --frame, --frames-dir and --audio-summary.
-//   --size WxH rescales --frame / --frames-dir output; --codec h264|prores4444 is for --render.
+//   --size WxH rescales --frame / --frames-dir / --render --node output; --codec h264|prores4444 is for --render; --render --node tapped-node video needs --duration.
 //   --set also applies to --render, --frame and --audio-summary.
 //   Infinite --audio-summary <patch.inf> <out.json> [--start S] [--duration S]
 //            [--wav <out.wav>] [--notes <events.json> --note-map <map.json>]
