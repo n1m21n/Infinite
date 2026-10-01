@@ -167,8 +167,11 @@ Mat4 DepthProjectionNode::GetModelMatrix() const
 
 Material DepthProjectionNode::GetMaterial() const
 {
+   // Tint is already multiplied into every sample's vertex/particle colour
+   // (CookIfNeeded), and the shader multiplies albedo by that colour, so the
+   // albedo reported here is neutral - reporting the tint again squared it.
    Material m;
-   m.color[0] = tint[0]; m.color[1] = tint[1]; m.color[2] = tint[2];
+   m.color[0] = 1.0f; m.color[1] = 1.0f; m.color[2] = 1.0f;
    m.metallic = metallic;
    m.roughness = roughness;
    m.opacity = opacity;
@@ -182,8 +185,9 @@ unsigned long long DepthProjectionNode::MaterialRevision() const
 
 unsigned int DepthProjectionNode::GetSurfaceTexture()
 {
-   if (colorMode == kColorInput && mColorInput.IsConnected())
-      return mColorInput.Texture();
+   // Never expose the colour input as a surface texture: CookIfNeeded already
+   // bakes the same image into every vertex/particle colour, and the shader
+   // multiplies both, so the image was applied twice (see ImageToPointsNode).
    return 0;
 }
 
