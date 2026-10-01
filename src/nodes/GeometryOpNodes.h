@@ -105,12 +105,11 @@ public:
       return ComputeContentRevision(GetMappingTransform(), mMappingRevision, mLastMappingHash);
    }
    IGeometrySource* PassthroughSource() const override { return input; }
-   // Curve is forwarded unchanged for every operator - no GeometryOpNode
-   // operation is defined on a polyline, so "pass it through untouched" is
-   // both correct and what lets a curve survive a Transform on its way to
-   // Render 3D.
-   const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
-   unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
+   // Curve forwards unchanged for every op except kTransform, which applies
+   // TransformMatrix() to each point (same rule as the point cloud below).
+   // No other operator is defined on a polyline, so they pass it through.
+   const Polyline* GetCurve() override;
+   unsigned long long CurveStamp() override;
    // Point cloud forwards unchanged for every op except kTransform, which
    // applies TransformMatrix() to each particle. Deliberately NOT applied for
    // kArray: array's semantics on a point cloud (replicate the whole cloud N
@@ -368,6 +367,13 @@ private:
    unsigned long long mPointCloudBuiltUpstreamRevision = 0;
    Mat4 mPointCloudBuiltMatrix;
    unsigned long long mPointCloudRevision = 0;
+   // kTransform's curve cache - see GetCurve().
+   Polyline mCurveCache;
+   bool mHasCurveCache = false;
+   const void* mCurveBuiltUpstream = nullptr;
+   unsigned long long mCurveBuiltUpstreamStamp = 0;
+   Mat4 mCurveBuiltMatrix;
+   unsigned long long mCurveRevision = 0;
    Mesh mCache;
    Signature mBuilt;
    bool mHasBuilt = false;
@@ -762,6 +768,9 @@ public:
    unsigned long long MeshRevision() override;
    const std::vector<Particle>* GetPointCloud() override;
    unsigned long long PointCloudRevision() override;
+   // Curve is a plain passthrough - Set Color only writes vertex/particle colour.
+   const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
+   unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
    // Forwarded, not identity - see DisplacementNode for why.
    Mat4 GetModelMatrix() const override
    {

@@ -87640,10 +87640,81 @@ int main(int argc, char** argv)
          GeometryOpNode curveXf;
          curveXf.op = GeometryOpNode::kTransform;
          curveXf.input = &curve;
-         report("curve survives Transform", curveXf.GetCurve() == &curve.line && curveXf.CurveStamp() == 7);
+         curveXf.offsetX = 0.0f;
+         const Polyline* curveId = curveXf.GetCurve();
+         report("curve survives an identity Transform with its points intact",
+                curveId != nullptr && curveId->points == curve.line.points);
+         const unsigned long long curveStamp1 = curveXf.CurveStamp();
+         report("curve stamp stable while nothing changes", curveStamp1 == curveXf.CurveStamp());
+         curveXf.offsetX = 4.0f; curveXf.offsetY = 7.0f; curveXf.offsetZ = 3.0f;
+         const Polyline* curveMoved = curveXf.GetCurve();
+         bool curveExact = curveMoved != nullptr && curveMoved->points.size() == curve.line.points.size() &&
+                           curveMoved->closed == curve.line.closed;
+         for (size_t i = 0; curveExact && i + 2 < curve.line.points.size(); i += 3)
+            curveExact = std::fabs(curveMoved->points[i]     - (curve.line.points[i]     + 4.0f)) < 1e-4f &&
+                         std::fabs(curveMoved->points[i + 1] - (curve.line.points[i + 1] + 7.0f)) < 1e-4f &&
+                         std::fabs(curveMoved->points[i + 2] - (curve.line.points[i + 2] + 3.0f)) < 1e-4f;
+         report("kTransform moves every curve point by exactly the offset", curveExact);
+         report("curve stamp moves when the offset changes", curveXf.CurveStamp() != curveStamp1);
+         curveXf.bypassed = true;
+         report("bypassed Transform passes the curve through untouched", curveXf.GetCurve() == &curve.line);
+         curveXf.bypassed = false;
+         GeometryOpNode curveArr;
+         curveArr.op = GeometryOpNode::kArray;
+         curveArr.input = &curve;
+         report("non-Transform op forwards the curve unchanged",
+                curveArr.GetCurve() == &curve.line && curveArr.CurveStamp() == 7);
 
          GeometryOpNode bare;
          report("no input -> no cloud, no curve", bare.GetPointCloud() == nullptr && bare.GetCurve() == nullptr);
+
+         // R484: a vertices-only mesh is vertices, not "nothing".
+         struct VertsProbe : public IGeometrySource
+         {
+            Mesh mesh;
+            const Mesh& GetMesh() override { return mesh; }
+            unsigned long long MeshRevision() override { return 1; }
+            Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+            Material GetMaterial() const override { return Material(); }
+         };
+         VertsProbe verts;
+         verts.mesh.vertices.resize(3);
+         const std::string vertsMsg = DescribeGeometryMismatch(&verts, GeometryRequirement::kMeshSurface);
+         report("vertices-only input reported as vertices, not nothing",
+                vertsMsg.find("vertices only") != std::string::npos);
+         report("vertices-only input satisfies kMeshVertices",
+                DescribeGeometryMismatch(&verts, GeometryRequirement::kMeshVertices).empty());
+
+         // R484: Switcher 3D and Set Color forward cloud / curve.
+         Switcher3DNode sw;
+         sw.manual = true; sw.manualSlot = 1;
+         sw.inputs[1] = &pts;
+         report("Switcher 3D forwards the active slot's cloud",
+                sw.GetPointCloud() == pts.GetPointCloud() && sw.PointCloudRevision() == pts.PointCloudRevision());
+         sw.inputs[2] = &curve; sw.manualSlot = 2;
+         report("Switcher 3D forwards the active slot's curve",
+                sw.GetCurve() == &curve.line && sw.CurveStamp() == 7);
+         SetColorNode setCol; setCol.input = &curve;
+         report("Set Color forwards the curve", setCol.GetCurve() == &curve.line && setCol.CurveStamp() == 7);
+
+         // R482: tint is baked into the colour, so the albedo is neutral.
+         DepthProjectionNode depthProj; depthProj.tint[0] = 0.5f;
+         ImageToPointsNode img2pts; img2pts.tint[0] = 0.5f;
+         report("Depth Projection / Image to Points report neutral albedo",
+                depthProj.GetMaterial().color[0] == 1.0f && img2pts.GetMaterial().color[0] == 1.0f);
+
+         // R483: a material change upstream must rebuild Distribute on Faces.
+         MaterialNode matUp; matUp.input = &cube;
+         matUp.color[0] = 1.0f; matUp.color[1] = 0.0f; matUp.color[2] = 0.0f;
+         DistributePointsOnFacesNode dist; dist.input = &matUp; dist.inheritMaterial = true;
+         dist.CookIfNeeded(24100);
+         const std::vector<Particle>* d1 = dist.GetPointCloud();
+         const float redBefore = (d1 && !d1->empty()) ? (*d1)[0].g : -1.0f;
+         matUp.color[1] = 1.0f;
+         dist.CookIfNeeded(24101);
+         const std::vector<Particle>* d2 = dist.GetPointCloud();
+         report("Distribute on Faces re-bakes when the upstream material changes",
+                d2 && !d2->empty() && redBefore == 0.0f && (*d2)[0].g == 1.0f);
 
          printf("%s\n", allOk ? "POINTCLOUD SWEEP OK" : "POINTCLOUD SWEEP FAIL");
       }

@@ -564,6 +564,52 @@ const std::vector<Particle>* GeometryOpNode::GetPointCloud()
    return &mPointCloudCache;
 }
 
+const Polyline* GeometryOpNode::GetCurve()
+{
+   if (input == nullptr)
+      return nullptr;
+   if (bypassed)
+      return input->GetCurve();
+
+   const Polyline* src = input->GetCurve();
+   if (src == nullptr)
+      return nullptr;
+   if (op != kTransform)
+      return src;
+
+   const unsigned long long upstreamStamp = input->CurveStamp();
+   const Mat4 m = TransformMatrix();
+   if (mHasCurveCache && mCurveBuiltUpstream == input &&
+       mCurveBuiltUpstreamStamp == upstreamStamp && mCurveBuiltMatrix == m)
+      return &mCurveCache;
+
+   mCurveCache = *src;
+   for (size_t i = 0; i + 2 < mCurveCache.points.size(); i += 3)
+   {
+      const float px = mCurveCache.points[i], py = mCurveCache.points[i + 1], pz = mCurveCache.points[i + 2];
+      mCurveCache.points[i]     = m.m[0]*px + m.m[4]*py + m.m[8]*pz  + m.m[12];
+      mCurveCache.points[i + 1] = m.m[1]*px + m.m[5]*py + m.m[9]*pz  + m.m[13];
+      mCurveCache.points[i + 2] = m.m[2]*px + m.m[6]*py + m.m[10]*pz + m.m[14];
+   }
+
+   mHasCurveCache = true;
+   mCurveBuiltUpstream = input;
+   mCurveBuiltUpstreamStamp = upstreamStamp;
+   mCurveBuiltMatrix = m;
+   mCurveRevision = NextMeshRevision();
+   return &mCurveCache;
+}
+
+unsigned long long GeometryOpNode::CurveStamp()
+{
+   if (input == nullptr)
+      return 0;
+   if (bypassed || op != kTransform)
+      return input->CurveStamp();
+   GetCurve();
+   return mCurveRevision;
+}
+
 unsigned long long GeometryOpNode::PointCloudRevision()
 {
    if (input == nullptr)
