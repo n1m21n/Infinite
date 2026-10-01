@@ -533,6 +533,7 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
 
    NodeRecord current;
    bool inNode = false;
+   std::string pendingHint;
 
    // Legacy `clip` lines are seconds; converting them needs the file's bpm,
    // which the `transport` line may carry *after* them. So they are parked
@@ -563,7 +564,13 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
       // `#` starts a comment line (hand-written patches). Never part of a
       // GUI-written file, whose free text always follows a tag.
       if (line[0] == '#')
+      {
+         // `# near <id>` / `# band <name>` is a layout hint for the next node
+         // block (PatchLayout); any other comment is just skipped.
+         if (line.compare(0, 7, "# near ") == 0 || line.compare(0, 7, "# band ") == 0)
+            pendingHint = TrimRight(line.substr(2));
          continue;
+      }
 
       std::istringstream in(line);
       std::string tag;
@@ -573,6 +580,9 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
       {
          current = NodeRecord();
          current.line = lineNo;
+         current.hasPos = false; // until a `pos` line says otherwise
+         current.layoutHint = pendingHint;
+         pendingHint.clear();
          in >> current.index >> current.category;
          std::getline(in, current.typeName);
          if (!current.typeName.empty() && current.typeName[0] == ' ')
@@ -599,6 +609,7 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
       else if (tag == "pos" && inNode)
       {
          in >> current.x >> current.y;
+         current.hasPos = true;
          if (!std::isfinite(current.x) || std::abs(current.x) > 1e6f || current.x <= -2e9f) current.x = 0.0f;
          if (!std::isfinite(current.y) || std::abs(current.y) > 1e6f || current.y <= -2e9f) current.y = 0.0f;
       }

@@ -21,7 +21,7 @@ to writing files.
 ```
 node <index> <category> <type name to end of line>
   id <word>                      optional authoring name
-  pos <x> <y>
+  pos <x> <y>                    optional; if NO node has one, the app lays the patch out on open
   flags <showParams> <bypassed> <showMiniViewport> <showAdvancedParams>
   f <key> <value>                float
   i <key> <value>                int, or a dropdown option name (i shapeType Star)
@@ -87,6 +87,14 @@ Audio (`tests/headless/format/audio.inf`): notes into a synth into Audio Out, pl
 patch renders. Modulation (`tests/headless/format/modulation.inf`): an LFO on `sizeX` and an
 expression on `rotation`. These three files are run through `--validate` (strict) by
 `scripts/headless_smoke.sh`, so they cannot rot.
+
+## Layout on open
+
+If no node in a file has a `pos` line, the app places them itself when the file is opened in the GUI
+(`PatchLayout`, `src/core/PatchLayout.cpp`): three bands (Picture, Sound, Modulation), columns by wiring depth,
+using the nodes' drawn sizes. A `# near <id>` line before a `Comment` node puts it above that node;
+`# band <Picture|Sound|Modulation>` makes it the band's header. A file where any node has `pos` is left as
+written. `--canonicalize` and `--validate` never lay out: a pos-less node still comes out as `pos 0 0`.
 
 ## Checking a file
 

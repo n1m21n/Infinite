@@ -434,6 +434,7 @@ set(COMMON_SOURCES
     src/core/ExprGlobals.cpp
     src/core/Palette.cpp
     src/core/Patch.cpp
+    src/core/PatchLayout.cpp
     src/arrange/ArrangeModel.cpp
     src/arrange/ArrangeMediaImport.cpp
     src/core/RemoteControl.cpp
