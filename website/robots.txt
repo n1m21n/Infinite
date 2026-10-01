@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://n1m21n.github.io/Infinite/sitemap.xml
