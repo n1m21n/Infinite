@@ -13,13 +13,14 @@ reported `nondeterministic_by_design` and passes: live input, plugins with their
 anything else that cannot be bit-exact on purpose.
 
 The frames are compared as decoded-file bytes, so this is exact on one machine. Goldens across
-GPUs need a tolerance and belong to tools/render-check.sh, not here.
+GPUs need a tolerance and belong to tools/render-check.py, not here.
 """
 
 import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -52,6 +53,35 @@ def frames(binary, patch, times, out_dir, timeout):
     return 0, status, sorted(status.get("files", []))
 
 
+def node_indices(patch):
+    """The `node <index> <Category> <Type>` numbers in the patch file, in file order."""
+    out = []
+    with open(patch) as f:
+        for line in f:
+            m = re.match(r"node\s+(\d+)\s", line)
+            if m:
+                out.append(int(m.group(1)))
+    return out
+
+
+def first_differing_node(binary, patch, time, tmp, timeout):
+    """Render each node's own image twice (separate processes) at `time`; the first node in
+    file order whose bytes differ is where nondeterminism enters (or a node upstream of it that
+    has no image of its own). None = every node image matched."""
+    for idx in node_indices(patch):
+        hashes = []
+        for tag in ("a", "b"):
+            d = os.path.join(tmp, f"n{idx}{tag}")
+            code, status = run(binary, ["--frame", patch, str(time), d, "--node", str(idx), "--lenient"], timeout)
+            files = sorted(status.get("files", [])) if code == 0 else []
+            if not files:
+                break # this node has no image output (audio / modulator): skip it
+            hashes.append(sha(files[0]))
+        if len(hashes) == 2 and hashes[0] != hashes[1]:
+            return idx
+    return None
+
+
 def listed_by_design(patch):
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "determinism-by-design.txt")
     if not os.path.exists(path):
@@ -72,6 +102,8 @@ def main():
     ap.add_argument("--audio-seconds", type=float, default=2.0)
     ap.add_argument("--binary", default=DEFAULT_BINARY)
     ap.add_argument("--timeout", type=float, default=300.0)
+    ap.add_argument("--bisect", action="store_true",
+                    help="when a frame differs, also name the first node (patch order) whose own image differs")
     ap.add_argument("--json", action="store_true", help="print the result as one JSON object")
     args = ap.parse_args()
 
@@ -80,7 +112,7 @@ def main():
         return 2
     by_design = listed_by_design(args.patch)
     result = {"patch": args.patch, "deterministic": True, "nondeterministic_by_design": by_design,
-              "frames_compared": 0, "first_differing_frame": None, "audio": "skipped"}
+              "frames_compared": 0, "first_differing_frame": None, "first_differing_node": None, "audio": "skipped"}
 
     with tempfile.TemporaryDirectory() as tmp:
         runs = []
@@ -96,6 +128,9 @@ def main():
             if sha(fa) != sha(fb) and result["first_differing_frame"] is None:
                 result["first_differing_frame"] = os.path.basename(fa)
                 result["deterministic"] = False
+                if args.bisect:
+                    t = args.times.split(",")[result["frames_compared"] - 1]
+                    result["first_differing_node"] = first_differing_node(args.binary, args.patch, t, tmp, args.timeout)
 
         wavs = []
         for tag in ("a", "b"):
@@ -121,6 +156,8 @@ def main():
         print(f"{args.patch}: {verdict} ({result['frames_compared']} frames, audio {result['audio']})")
         if result["first_differing_frame"]:
             print(f"  first differing frame: {result['first_differing_frame']}")
+        if result["first_differing_node"] is not None:
+            print(f"  first differing node: {result['first_differing_node']} (node index in the patch)")
     return 0 if result["deterministic"] else 1
 
 

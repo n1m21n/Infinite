@@ -1,0 +1,4 @@
+# Patches that may differ between two renders on purpose (one patch path per line, # comments).
+# tools/determinism-check.py reports these `nondeterministic_by_design` and passes them.
+# Empty today: every reference patch in tests/render/ renders bit-identically twice.
+# Add a patch here only for live hardware input or a plugin with its own clock, and say why.

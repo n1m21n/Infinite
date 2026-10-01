@@ -1,0 +1,24 @@
+infinite-patch 1
+# Audio: a held-note synth through a reverb to Audio Out.
+node 1 Notes Random Note Generator
+  id notes
+end
+node 2 Synths Wavetable
+  id synth
+end
+node 3 Effects Reverb
+  id verb
+end
+node 4 Utility Audio Out
+  id speakers
+end
+node 5 Source Shape
+  id picture
+end
+node 6 Utility Output
+  id out
+end
+note synth 0 notes
+aud verb 0 synth
+aud speakers 0 verb
+cable out 0 picture
