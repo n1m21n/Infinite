@@ -47774,7 +47774,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    // a new document boundary, an undo is not.
    void NoteGraphEditedForLiveIssues(); // R30, defined with the live-issue state below
 
-   void ApplyPatchData(const Patch::Data& data, std::map<int, int>* outRemap = nullptr)
+   void ApplyPatchData(const Patch::Data& data, std::map<int, int>* outRemap = nullptr, bool keepIndices = false)
    {
       NoteGraphEditedForLiveIssues();
       ScopedPerfTimer perfTimer("ApplyPatchData");
@@ -47784,9 +47784,23 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       // Saved indices are remapped rather than reused: they only have to be
       // internally consistent, and reusing them would collide with the running
       // counter and with the editor's own per-id state.
+      // keepIndices (a headless job): the file's own indices are kept instead,
+      // because everything the job reports or looks up afterwards (--explain,
+      // `id` names, --node, --stems) speaks the file's numbering. Only when they
+      // are all usable; PatchSchema::Validate has already rejected the rest.
+      if (keepIndices)
+      {
+         std::set<int> seen;
+         for (const Patch::NodeRecord& rec : data.nodes)
+            if (rec.index < 1 || rec.index > Patch::kMaxNodeIndex || !seen.insert(rec.index).second)
+               keepIndices = false;
+      }
+      int topIndex = 0;
       std::map<int, int> remap;
       for (const Patch::NodeRecord& rec : data.nodes)
       {
+         if (keepIndices)
+            gNextIndex = rec.index;
          GraphNode* spawned = SpawnNode(rec.typeName, rec.category, rec.x, rec.y);
          if (spawned == nullptr)
          {
@@ -47796,6 +47810,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             continue;
          }
          remap[rec.index] = spawned->index;
+         topIndex = std::max(topIndex, spawned->index);
          // SpawnNode already minted a fresh uid; a patch that carries one
          // overrides it, which is what lets a clip's srcUid still resolve
          // after a full undo or a reload. A patch saved before uids existed
@@ -47845,6 +47860,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          if (auto* geomOp = dynamic_cast<GeometryOpNode*>(spawned->node.get()))
             geomOp->MigrateDeprecatedOp();
       }
+      if (keepIndices)
+         gNextIndex = topIndex + 1;
 
       // `remap` is fully populated now (every node in `data.nodes` has been
       // spawned) - VisitParams/LoadParams above already parsed each
@@ -48283,7 +48300,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       {
          PushUndoCheckpoint(); // Cmd+Z returns to the graph as it was before the reload
          const std::string keptPath = gPatchPath;
-         ApplyPatchData(data, &pending.remap);
+         ApplyPatchData(data, &pending.remap, HeadlessJobActive());
          StashPendingKeyed(pending);
          gArrangePatchGeneration++;
          if (path.empty())
@@ -48299,7 +48316,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          NotePatchFileStamp(path);
          return true;
       }
-      ApplyPatchData(data, &pending.remap);
+      ApplyPatchData(data, &pending.remap, HeadlessJobActive());
       StashPendingKeyed(pending);
       // New document: drop the old one's clip clipboard and selection.
       gArrangePatchGeneration++;

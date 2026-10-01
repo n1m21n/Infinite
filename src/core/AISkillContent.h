@@ -616,8 +616,10 @@ expr <dst> <param|key> <expression>        glob <name> <expression>
 ```
 
 - Wires read destination first: `cable out 0 shape` = "Output slot 0 is fed by shape".
-- Names work everywhere an index does: node `id`s, slot names (`input`, `input_2`, ...), and a
-  parameter's saved key in `mod`/`expr` (`mod shape sizeX lfo 0 0 1 0.5`).
+- Names work everywhere an index does: node `id`s, slot names (`input`, `input_2`, ...), a source's
+  output label (`mod glow uIntensity ears low 0 1 0.5 0.8 2.2`; `--describe` outputs), and a
+  parameter's saved key in `mod`/`expr` (`mod shape sizeX lfo 0 0 1 0.5`). A number is always an index.
+- Node indices need not be in order or contiguous; headless runs keep the file's numbers.
 - Free text (type names, strings, expressions) is always last on its line.
 - Full reference: `docs/reference/patch-format.md`. Three verified starting points live in
   `assets/examples/authoring/` (image, audio, modulation).
@@ -750,12 +752,12 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Audio Filter` | audio:audio | out:audio | 10 | bypass |
 | `Bitcrush` | audio:audio | out:audio | 4 | bypass |
 | `Chorus` | audio:audio | out:audio | 10 | bypass |
-| `Cycle Shaper` | audio:audio | out:audio | 5 | bypass |
+)AISKILL"
+R"AISKILL(| `Cycle Shaper` | audio:audio | out:audio | 5 | bypass |
 | `Delay` | audio:audio | out:audio | 10 | bypass |
 | `Drive` | audio:audio | out:audio | 6 | bypass |
 | `Dynamics` | audio:audio, sidechain:audio | out:audio | 9 |  |
-)AISKILL"
-R"AISKILL(| `EQ` | audio:audio | out:audio | 28 | bypass |
+| `EQ` | audio:audio | out:audio | 28 | bypass |
 | `Field Effect` | in:audio | out:audio | 10 | bypass |
 | `Flanger` | audio:audio | out:audio | 9 | bypass |
 | `Formant Filter` | audio:audio | out:audio | 3 | bypass |
@@ -784,7 +786,7 @@ R"AISKILL(| `EQ` | audio:audio | out:audio | 28 | bypass |
 | `Comment` | none | out:image | 5 |  |
 | `Curves` | input:image | out:image | 6 | bypass |
 | `Feedback` | input:image | out:image | 1 | bypass |
-| `Fit` | input:image | out:image | 6 | bypass |
+| `Fit` | input:image | out:image | 8 | bypass |
 | `Group` | none | out:image | 4 | bypass |
 | `Layer Stack` | input:image, input_2:image, input_3:image, input_4:image | out:image | 8 |  |
 | `Null` | in:image | out:image | 0 | bypass |
@@ -981,12 +983,12 @@ R"AISKILL(| `EQ` | audio:audio | out:audio | 28 | bypass |
 | `Equation Synth` | notes:note | out:audio | 30 | bypass |
 | `Field Synth` | notes:note, in:audio | out:audio | 13 | bypass |
 | `Grain Molder` | notes:note, record_in:audio | out:audio | 14 | bypass |
-| `Granular` | record_in:audio | out:audio | 21 | bypass |
+)AISKILL"
+R"AISKILL(| `Granular` | record_in:audio | out:audio | 21 | bypass |
 | `Looper` | audio:audio | out:audio | 9 | bypass |
 | `MPC` | notes:note | out:audio | 177 | bypass |
 | `Metallic` | notes:note | out:audio | 15 | bypass |
-)AISKILL"
-R"AISKILL(| `Molder` | record_in:audio | out:audio | 16 | bypass |
+| `Molder` | record_in:audio | out:audio | 16 | bypass |
 | `Oscillator` | notes:note, fm_in:audio | out:audio | 22 | bypass |
 | `PaulStretch` | record_in:audio | out:audio | 14 | bypass |
 | `Sampler` | notes:note, record_in:audio | out:audio | 14 | bypass |

@@ -651,7 +651,7 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
          // patch predates this field entirely and was already being
          // silently truncated to output 0 on every prior save, so this is
          // strictly a fix, not a new regression.
-         in >> c.srcOutput;
+         ReadRef(in, c.srcOutput, c.outRef, outData.hasNamedRefs);
          if (tag == "cable")
             outData.cables.push_back(c);
          else
@@ -670,7 +670,7 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
             // srcOutput is a later addition (Note Router); missing on older
             // patches, where >>'s failed-extraction behaviour leaves it 0 -
             // every note source but Router only ever has output 0 anyway.
-            in >> c.srcOutput;
+            ReadRef(in, c.srcOutput, c.outRef, outData.hasNamedRefs);
             outData.notes.push_back(c);
          }
       }
@@ -686,8 +686,9 @@ bool ReadStream(std::istream& file, Data& outData, std::string& outError)
          m.centre = 0.0f;
          if (ReadRef(in, m.dstIndex, m.dstRef, outData.hasNamedRefs) &&
              ReadRef(in, m.dstParam, m.dstKey, outData.hasKeyRefs) &&
-             ReadRef(in, m.srcIndex, m.srcRef, outData.hasNamedRefs))
-            in >> m.srcOutput >> m.polarity >> m.depth >> m.centre;
+             ReadRef(in, m.srcIndex, m.srcRef, outData.hasNamedRefs) &&
+             ReadRef(in, m.srcOutput, m.outRef, outData.hasNamedRefs))
+            in >> m.polarity >> m.depth >> m.centre;
          // lo/hi are a later addition still; missing on any patch saved
          // before they existed (or a legacy binding this session never
          // resolved a range for - see the write site), where >>'s

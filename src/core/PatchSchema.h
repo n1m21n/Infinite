@@ -128,8 +128,8 @@ namespace PatchSchema
 
    // Turns every `id`/slot word in `data` into the index it stands for, so
    // Validate and ApplyPatchData only ever see numbers. Reports E_BAD_ID,
-   // E_DUPLICATE_ID and E_BAD_REF (unknown node or slot word, with the nearest
-   // names). A no-op when data.hasNamedRefs is false. Clears the words it
+   // E_DUPLICATE_ID and E_BAD_REF (unknown node, slot or output word, with the
+   // nearest names; an output word is matched against TypeSchema::outputs labels). A no-op when data.hasNamedRefs is false. Clears the words it
    // resolved; `id` values stay on the nodes (--keep-ids) until the caller drops them.
    void Resolve(Patch::Data& data, const Env& env, std::vector<Headless::Issue>& errors);
 
