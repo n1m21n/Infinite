@@ -377,6 +377,25 @@ namespace Tabler
       }
    }
 
+   // Metronome: a tapered body outline and one pendulum line, nothing else.
+   // `swing` is -1..1 (0 = upright); +-1 tilts the rod about 26 degrees.
+   inline void DrawMetronome(ImDrawList* dl, ImVec2 center, float size, ImU32 col, float swing = 0.0f,
+                             float customStroke = 0.0f)
+   {
+      if (!dl) return;
+      const float s = size / 24.0f;
+      const float stroke = customStroke > 0.0f ? customStroke : ImMax(1.5f, 1.9f * s);
+      auto P = [&](float x, float y) { return Point24(center, size, x, y); };
+
+      const ImVec2 body[4] = { P(9.3f, 6.5f), P(14.7f, 6.5f), P(19.0f, 21.5f), P(5.0f, 21.5f) };
+      dl->AddPolyline(body, 4, col, ImDrawFlags_Closed, stroke);
+
+      const float a = ImClamp(swing, -1.0f, 1.0f) * 0.45f;
+      const ImVec2 pivot = P(12.0f, 19.0f);
+      const float len = 16.0f * s;
+      dl->AddLine(pivot, ImVec2(pivot.x + sinf(a) * len, pivot.y - cosf(a) * len), col, stroke);
+   }
+
    inline void DrawTimeline(ImDrawList* dl, ImVec2 center, float size, ImU32 col, float customStroke = 0.0f)
    {
       if (!dl) return;

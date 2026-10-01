@@ -425,6 +425,14 @@ namespace
    // so it can be swapped for a flat neutral fill via Settings > Appearance.
    bool gCheckerboardBackdrop = true;
 
+   // Metronome (top bar, next to the time signature). Volume and the accent
+   // choice are machine settings; "on" is deliberately not saved, so the app
+   // never opens clicking.
+   bool gMetronomeOn = false;
+   float gMetronomeVolume = 0.5f;
+   bool gMetronomeAccent = true;
+   bool gMetronomeDirty = false; // settings file written once the drag ends
+
    void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, ImVec2 br, float rounding = 4.0f)
    {
       const bool isLight = IsThemeLight();
@@ -45966,6 +45974,10 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          gVsync = (line != "0");
       if (std::getline(file, line) && !line.empty())
          gCheckerboardBackdrop = (line != "0");
+      if (std::getline(file, line) && !line.empty())
+         gMetronomeVolume = std::clamp((float)atof(line.c_str()), 0.0f, 1.0f);
+      if (std::getline(file, line) && !line.empty())
+         gMetronomeAccent = (line != "0");
    }
 
    void SaveGeneralSettings()
@@ -45976,7 +45988,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       std::ofstream file(path);
       file << (gAutosaveEnabled ? "1" : "0") << "\n" << gAutosaveSeconds << "\n"
            << gTargetFps << "\n" << (gVsync ? "1" : "0") << "\n"
-           << (gCheckerboardBackdrop ? "1" : "0") << "\n";
+           << (gCheckerboardBackdrop ? "1" : "0") << "\n"
+           << gMetronomeVolume << "\n" << (gMetronomeAccent ? "1" : "0") << "\n";
    }
 
    // One flat preference file for the Canvas & Workspace settings tab.
@@ -76880,6 +76893,67 @@ int main(int argc, char** argv)
                   }
                }
             }
+         }
+
+         // Metronome: click toggles, right-click opens volume / accent (no hover
+         // text, by design). Sits
+         // in the Tempo & Meter group because it follows exactly those two.
+         TopBarSameLine(8.0f);
+         {
+            // Read once: the click below flips gMetronomeOn, and the push/pop
+            // pair must use the state it was pushed with.
+            const bool metronomeWasOn = gMetronomeOn;
+            if (metronomeWasOn)
+               ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+            if (ImGui::Button("##metronomeBtn", ImVec2(32.0f, 0.0f)))
+               gMetronomeOn = !gMetronomeOn;
+            if (metronomeWasOn)
+               ImGui::PopStyleColor();
+            {
+               ImVec4 iconCol = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+               if (!metronomeWasOn)
+                  iconCol.w *= 0.78f;
+               // The pendulum flips side on every beat - a hard 0/1, no easing -
+               // so each click lands exactly as it snaps over. Upright when off
+               // or while the transport is stopped.
+               const float swing = (metronomeWasOn && isTransportPlaying)
+                                      ? (((long long)std::floor(transport.Beats()) & 1) ? 1.0f : -1.0f)
+                                      : 0.0f;
+               const ImVec2 bmin = ImGui::GetItemRectMin();
+               const ImVec2 bmax = ImGui::GetItemRectMax();
+               Tabler::DrawMetronome(ImGui::GetWindowDrawList(),
+                                     ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f),
+                                     (bmax.y - bmin.y) * 0.84f, ImGui::GetColorU32(iconCol), swing);
+            }
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+               ImGui::OpenPopup("##metronomePopup");
+
+            if (ImGui::BeginPopup("##metronomePopup"))
+            {
+               // The top bar flattens every frame colour to transparent; a
+               // slider needs its real theme frame back to be findable.
+               const ImGuiStyle& base = ImGui::GetStyle();
+               ImGui::PushStyleColor(ImGuiCol_FrameBg, base.Colors[ImGuiCol_FrameBg]);
+               ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, base.Colors[ImGuiCol_FrameBgHovered]);
+               ImGui::PushStyleColor(ImGuiCol_FrameBgActive, base.Colors[ImGuiCol_FrameBgActive]);
+               ImGui::SetNextItemWidth(120.0f);
+               const bool volChanged = ImGui::SliderFloat("volume##metronomeVol", &gMetronomeVolume, 0.0f, 1.0f, "%.2f");
+               ImGui::PopStyleColor(3);
+               if (volChanged)
+                  gMetronomeDirty = true;
+               if (ImGui::Selectable("accent first beat", gMetronomeAccent, ImGuiSelectableFlags_DontClosePopups))
+               {
+                  gMetronomeAccent = !gMetronomeAccent;
+                  gMetronomeDirty = true;
+               }
+               ImGui::EndPopup();
+            }
+            if (gMetronomeDirty && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
+            {
+               SaveGeneralSettings();
+               gMetronomeDirty = false;
+            }
+            AudioEngine::Instance().SetMetronome(gMetronomeOn, gMetronomeVolume, gMetronomeAccent);
          }
 
          ImGui::Separator();
