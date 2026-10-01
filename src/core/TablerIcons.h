@@ -377,6 +377,20 @@ namespace Tabler
       }
    }
 
+   // Tabler-style metronome: tapered body, a pendulum arm and its weight.
+   inline void DrawMetronome(ImDrawList* dl, ImVec2 center, float size, ImU32 col, float customStroke = 0.0f)
+   {
+      if (!dl) return;
+      const float s = size / 24.0f;
+      const float stroke = customStroke > 0.0f ? customStroke : ImMax(1.2f, 1.7f * s);
+      auto P = [&](float x, float y) { return Point24(center, size, x, y); };
+
+      const ImVec2 body[4] = { P(9.5f, 3.0f), P(14.5f, 3.0f), P(19.0f, 20.5f), P(5.0f, 20.5f) };
+      dl->AddPolyline(body, 4, col, ImDrawFlags_Closed | ImDrawFlags_RoundCornersAll, stroke);
+      dl->AddLine(P(12.0f, 16.5f), P(16.5f, 7.0f), col, stroke);
+      dl->AddCircleFilled(P(15.0f, 10.3f), ImMax(1.2f, 1.9f * s), col);
+   }
+
    inline void DrawTimeline(ImDrawList* dl, ImVec2 center, float size, ImU32 col, float customStroke = 0.0f)
    {
       if (!dl) return;

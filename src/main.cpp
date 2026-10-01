@@ -76829,12 +76829,25 @@ int main(int argc, char** argv)
          // in the Tempo & Meter group because it follows exactly those two.
          TopBarSameLine(8.0f);
          {
-            if (gMetronomeOn)
+            // Read once: the click below flips gMetronomeOn, and the push/pop
+            // pair must use the state it was pushed with.
+            const bool metronomeWasOn = gMetronomeOn;
+            if (metronomeWasOn)
                ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-            if (ImGui::Button("Click###metronomeBtn"))
+            if (ImGui::Button("##metronomeBtn", ImVec2(30.0f, 0.0f)))
                gMetronomeOn = !gMetronomeOn;
-            if (gMetronomeOn)
+            if (metronomeWasOn)
                ImGui::PopStyleColor();
+            {
+               ImVec4 iconCol = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+               if (!metronomeWasOn)
+                  iconCol.w *= 0.78f;
+               const ImVec2 bmin = ImGui::GetItemRectMin();
+               const ImVec2 bmax = ImGui::GetItemRectMax();
+               Tabler::DrawMetronome(ImGui::GetWindowDrawList(),
+                                     ImVec2((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f),
+                                     (bmax.y - bmin.y) * 0.88f, ImGui::GetColorU32(iconCol));
+            }
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
                ImGui::SetTooltip("Metronome - click to turn on or off, right-click for volume.\n"
                                  "Plays while the transport runs, on the beat of the tempo and time signature.\n"
