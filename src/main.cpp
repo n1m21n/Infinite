@@ -9121,6 +9121,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          ModSlider("width", &n->width, 16.0f, 4096.0f, "%.0f");
          ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
       }
+      ModSlider("offset X", &n->offsetX, -4096.0f, 4096.0f, "%.0f px");
+      ModSlider("offset Y", &n->offsetY, -4096.0f, 4096.0f, "%.0f px");
       ColorSwatch("bg", n->bgColor, n);
       ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
    }
@@ -41463,7 +41465,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Blend", "Two inputs and 32 blend modes - the full Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity set, plus Erase." },
          { "Layer Stack", "Four inputs stacked bottom-up: A is the base, D sits on top. Each layer has its own blend mode and opacity, and dragging a layer header reorders the whole layer." },
          { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. Can be pinned to one input with 'manual'." },
-         { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Use it to make differently-sized sources composite predictably." },
+         { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Offset X/Y slides the result in output pixels (+ right, + up). Use it to make differently-sized sources composite predictably." },
          { "Comment", "A free-floating note on the canvas - has no image input or output, just text. Double-click to edit." },
          { "Group", "Created with " MODKEY "+G on a selection, not spawned from the palette. Sizes itself automatically to fit its members - drag a node in to grow the box, drag one out to shrink it. Drag anywhere inside the box to move the whole group; right-click > Ungroup (or " MODKEY "+Shift+G) dissolves it, leaving members in place (or ungroup one member from its own context menu)." },
          { "Null", "A pass-through node: its output is exactly its input, unchanged. Useful as a stable junction point to branch a cable to several destinations, or as a placeholder while rewiring." },
@@ -42237,7 +42239,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                { "Blend", "Two inputs and 32 blend modes - the full Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity set, plus Erase." },
                { "Layer Stack", "Four inputs stacked bottom-up: A is the base, D sits on top. Each layer has its own blend mode and opacity, and dragging a layer header reorders the whole layer." },
                { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. Can be pinned to one input with 'manual'." },
-               { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Use it to make differently-sized sources composite predictably." },
+               { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Offset X/Y slides the result in output pixels (+ right, + up). Use it to make differently-sized sources composite predictably." },
                { "Drop Shadow / Outer Glow / Colour Overlay", "Layer-effect style filters." },
                { "Alpha operators", "The one family that edits an existing alpha channel rather than making a new one: Show Alpha (view the matte), Opacity, Set Alpha (take alpha from a second image's luminance), Alpha Invert, Alpha from Luma, Alpha Levels (choke or spread a soft edge) and Premultiply / Unpremultiply." },
                { "Basic", "Exposure, invert, posterize and threshold. Brightness/contrast, levels, HSL, colour balance and channel mixer no longer exist as standalone nodes - they are all sections of Color Adjustments now." },
