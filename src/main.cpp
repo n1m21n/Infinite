@@ -91,12 +91,14 @@ namespace
 #include <fstream>
 #include <map>
 #include <unordered_map>
+#include <condition_variable>
 #include <deque>
 #include <set>
 #include <memory>
 #include <random>
 #include <sstream>
 #include <string>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -27957,6 +27959,247 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       return wrote;
    }
 
+   // True when the node's output texture holds more than 8 bits per channel (RGBA16F / RGBA32F),
+   // i.e. when a 16-bit PNG carries real precision instead of padded bytes.
+   bool NodeImageIsFloat(INode* node, int outputIndex)
+   {
+      const unsigned int tex = node->GetOutputTexture(outputIndex);
+      if (tex == 0)
+         return false;
+      GLint prev = 0, fmt = 0;
+      glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev);
+      glBindTexture(GL_TEXTURE_2D, tex);
+      glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &fmt);
+      glBindTexture(GL_TEXTURE_2D, (GLuint)prev);
+      return fmt == GL_RGBA16F || fmt == GL_RGBA32F;
+   }
+
+   // Same readback as ReadNodeImageRgba8 at 16 bits per channel, top row first, native endian.
+   bool ReadNodeImageRgba16(INode* node, int outputIndex, bool opaque, int& w, int& h, std::vector<uint16_t>& rgba)
+   {
+      w = node->GetOutputWidth();
+      h = node->GetOutputHeight();
+      const unsigned int tex = node->GetOutputTexture(outputIndex);
+      if (w <= 0 || h <= 0 || tex == 0)
+         return false;
+      std::vector<uint16_t> bottomFirst((size_t)w * h * 4);
+      GLint prevFbo = 0;
+      glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+      GLuint fbo = 0;
+      glGenFramebuffers(1, &fbo);
+      glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+      glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_SHORT, bottomFirst.data());
+      glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
+      glDeleteFramebuffers(1, &fbo);
+      rgba.resize(bottomFirst.size());
+      for (int y = 0; y < h; y++)
+         std::memcpy(&rgba[(size_t)y * w * 4], &bottomFirst[(size_t)(h - 1 - y) * w * 4], (size_t)w * 4 * sizeof(uint16_t));
+      if (opaque)
+         for (size_t i = 3; i < rgba.size(); i += 4)
+            rgba[i] = 65535;
+      return true;
+   }
+
+   // Bilinear rescale of straight-alpha RGBA8, weighting colour by alpha so a transparent
+   // texel's hidden colour never bleeds into an edge (that is the dark-fringe bug in miniature).
+   std::vector<unsigned char> ResizeRgba8(const unsigned char* src, int w, int h, int nw, int nh)
+   {
+      std::vector<unsigned char> out((size_t)nw * nh * 4);
+      for (int y = 0; y < nh; y++)
+      {
+         const float fy = std::max(0.0f, ((float)y + 0.5f) * (float)h / (float)nh - 0.5f);
+         const int y0 = std::min(h - 1, (int)fy), y1 = std::min(h - 1, y0 + 1);
+         const float ty = fy - (float)y0;
+         for (int x = 0; x < nw; x++)
+         {
+            const float fx = std::max(0.0f, ((float)x + 0.5f) * (float)w / (float)nw - 0.5f);
+            const int x0 = std::min(w - 1, (int)fx), x1 = std::min(w - 1, x0 + 1);
+            const float tx = fx - (float)x0;
+            const unsigned char* px[4] = { src + ((size_t)y0 * w + x0) * 4, src + ((size_t)y0 * w + x1) * 4,
+                                           src + ((size_t)y1 * w + x0) * 4, src + ((size_t)y1 * w + x1) * 4 };
+            const float wt[4] = { (1 - tx) * (1 - ty), tx * (1 - ty), (1 - tx) * ty, tx * ty };
+            float a = 0, r = 0, g = 0, b = 0;
+            for (int k = 0; k < 4; k++)
+            {
+               const float ak = (float)px[k][3] * wt[k];
+               a += ak;
+               r += (float)px[k][0] * ak;
+               g += (float)px[k][1] * ak;
+               b += (float)px[k][2] * ak;
+            }
+            unsigned char* d = &out[((size_t)y * nw + x) * 4];
+            if (a > 0.0f)
+            {
+               d[0] = (unsigned char)std::lround(std::min(255.0f, r / a));
+               d[1] = (unsigned char)std::lround(std::min(255.0f, g / a));
+               d[2] = (unsigned char)std::lround(std::min(255.0f, b / a));
+            }
+            else
+               d[0] = d[1] = d[2] = 0;
+            d[3] = (unsigned char)std::lround(std::min(255.0f, a));
+         }
+      }
+      return out;
+   }
+
+   // 16-bit RGBA PNG tagged sRGB. stb has no 16-bit writer, but its zlib encoder is reusable.
+   extern "C" unsigned char* stbi_zlib_compress(unsigned char* data, int dataLen, int* outLen, int quality);
+   std::vector<uint8_t> EncodePng16(int w, int h, const uint16_t* rgba, int level)
+   {
+      static uint32_t table[256];
+      static bool tableReady = false;
+      if (!tableReady)
+      {
+         for (uint32_t n = 0; n < 256; n++)
+         {
+            uint32_t c = n;
+            for (int k = 0; k < 8; k++)
+               c = (c & 1) ? 0xEDB88320u ^ (c >> 1) : c >> 1;
+            table[n] = c;
+         }
+         tableReady = true;
+      }
+      std::vector<uint8_t> raw((size_t)h * (1 + (size_t)w * 8));
+      for (int y = 0; y < h; y++)
+      {
+         uint8_t* row = &raw[(size_t)y * (1 + (size_t)w * 8)];
+         *row++ = 0; // filter: none
+         const uint16_t* in = rgba + (size_t)y * w * 4;
+         for (int i = 0; i < w * 4; i++)
+         {
+            *row++ = (uint8_t)(in[i] >> 8);
+            *row++ = (uint8_t)(in[i] & 0xFF);
+         }
+      }
+      int zlen = 0;
+      unsigned char* z = stbi_zlib_compress(raw.data(), (int)raw.size(), &zlen, std::max(1, level));
+      if (z == nullptr)
+         return {};
+      std::vector<uint8_t> png = { 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A };
+      auto chunk = [&](const char* type, const uint8_t* data, size_t n)
+      {
+         const uint8_t len[4] = { (uint8_t)(n >> 24), (uint8_t)(n >> 16), (uint8_t)(n >> 8), (uint8_t)n };
+         png.insert(png.end(), len, len + 4);
+         const size_t at = png.size();
+         png.insert(png.end(), type, type + 4);
+         png.insert(png.end(), data, data + n);
+         uint32_t c = 0xFFFFFFFFu;
+         for (size_t i = at; i < png.size(); i++)
+            c = table[(c ^ png[i]) & 0xFF] ^ (c >> 8);
+         c ^= 0xFFFFFFFFu;
+         const uint8_t crc[4] = { (uint8_t)(c >> 24), (uint8_t)(c >> 16), (uint8_t)(c >> 8), (uint8_t)c };
+         png.insert(png.end(), crc, crc + 4);
+      };
+      const uint8_t ihdr[13] = { (uint8_t)(w >> 24), (uint8_t)(w >> 16), (uint8_t)(w >> 8), (uint8_t)w,
+                                 (uint8_t)(h >> 24), (uint8_t)(h >> 16), (uint8_t)(h >> 8), (uint8_t)h, 16, 6, 0, 0, 0 };
+      chunk("IHDR", ihdr, 13);
+      const uint8_t srgb = 0;
+      chunk("sRGB", &srgb, 1);
+      chunk("IDAT", z, (size_t)zlen);
+      chunk("IEND", nullptr, 0);
+      std::free(z);
+      return png;
+   }
+
+   // --frames-dir encoder: readback stays on the GL thread, zlib runs on a few workers behind a
+   // byte-budgeted queue so a slow disk or a big frame back-pressures instead of eating memory.
+   class PngSequenceWriter
+   {
+   public:
+      explicit PngSequenceWriter(int level, size_t budgetBytes = 256u << 20) : mBudget(budgetBytes)
+      {
+         stbi_write_png_compression_level = level; // set once, before any worker reads it
+         const unsigned n = std::max(1u, std::min(4u, std::thread::hardware_concurrency() / 2));
+         for (unsigned i = 0; i < n; i++)
+            mThreads.emplace_back([this] { Run(); });
+      }
+      ~PngSequenceWriter() { Finish(); }
+      void Submit(std::string path, int w, int h, std::vector<unsigned char> rgba8, std::vector<uint16_t> rgba16, int level)
+      {
+         const size_t bytes = rgba8.size() + rgba16.size() * 2;
+         std::unique_lock<std::mutex> lock(mMutex);
+         mSpace.wait(lock, [&] { return mQueued == 0 || mQueued + bytes <= mBudget; });
+         mQueued += bytes;
+         mJobs.push_back({ std::move(path), w, h, std::move(rgba8), std::move(rgba16), level, bytes });
+         mWork.notify_one();
+      }
+      // Waits for every queued frame; returns the paths that did not reach the disk.
+      std::vector<std::string> Finish()
+      {
+         {
+            std::lock_guard<std::mutex> lock(mMutex);
+            mStop = true;
+         }
+         mWork.notify_all();
+         for (std::thread& t : mThreads)
+            if (t.joinable())
+               t.join();
+         mThreads.clear();
+         return mFailed;
+      }
+
+   private:
+      struct Job
+      {
+         std::string path;
+         int w, h;
+         std::vector<unsigned char> rgba8;
+         std::vector<uint16_t> rgba16;
+         int level;
+         size_t bytes;
+      };
+      void Run()
+      {
+         for (;;)
+         {
+            Job job;
+            {
+               std::unique_lock<std::mutex> lock(mMutex);
+               mWork.wait(lock, [&] { return mStop || !mJobs.empty(); });
+               if (mJobs.empty())
+                  return;
+               job = std::move(mJobs.front());
+               mJobs.pop_front();
+            }
+            bool ok = false;
+            std::vector<uint8_t> png;
+            if (!job.rgba16.empty())
+               png = EncodePng16(job.w, job.h, job.rgba16.data(), job.level);
+            else
+            {
+               stbi_write_png_to_func(
+                  [](void* ctx, void* data, int size)
+                  {
+                     auto* bytes = static_cast<std::vector<uint8_t>*>(ctx);
+                     bytes->insert(bytes->end(), static_cast<uint8_t*>(data), static_cast<uint8_t*>(data) + size);
+                  },
+                  &png, job.w, job.h, 4, job.rgba8.data(), job.w * 4);
+               if (!png.empty())
+                  png = ContactSheet::TagSrgb(png);
+            }
+            if (!png.empty())
+               if (FILE* f = std::fopen(job.path.c_str(), "wb"))
+               {
+                  ok = std::fwrite(png.data(), 1, png.size(), f) == png.size();
+                  std::fclose(f);
+               }
+            std::lock_guard<std::mutex> lock(mMutex);
+            if (!ok)
+               mFailed.push_back(job.path);
+            mQueued -= job.bytes;
+            mSpace.notify_all();
+         }
+      }
+      std::mutex mMutex;
+      std::condition_variable mWork, mSpace;
+      std::deque<Job> mJobs;
+      std::vector<std::thread> mThreads;
+      std::vector<std::string> mFailed;
+      size_t mBudget = 0, mQueued = 0;
+      bool mStop = false;
+   };
+
    void ExportPng(OutputNode* out, const std::string& path)
    {
       ExportImage(out, path);
@@ -47876,6 +48119,9 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    // frame, which is worth a warning. Safe to call twice (the second pass replaces the same lines).
    void ApplyHeadlessSets(Patch::Data& data, std::vector<Headless::Issue>* errors, std::vector<Headless::Issue>* warnings)
    {
+      // --bpm: the shot's tempo wins over the patch's, so beat-synced modulation lands on the film's grid.
+      if (gHeadlessJob.bpm > 0.0)
+         data.transport.bpm = (float)gHeadlessJob.bpm;
       auto err = [&](const char* code, const std::string& msg, const std::string& hint, int node)
       {
          if (errors != nullptr)
@@ -47980,7 +48226,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
 
    bool LoadPatchDataImpl(Patch::Data& data, const std::string& path, bool reload)
    {
-      if (HeadlessJobActive() && !gHeadlessJob.sets.empty())
+      if (HeadlessJobActive() && (!gHeadlessJob.sets.empty() || gHeadlessJob.bpm > 0.0))
          ApplyHeadlessSets(data, nullptr, nullptr);
       if (data.hasNamedRefs)
       {
@@ -69878,6 +70124,7 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
    static int sNextFrame = 0;
    static std::string sFrameStats;          // --frame: one JSON object per exported frame
    static ContactSheet::Builder sSheet;     // --frame --contact-sheet
+   static std::unique_ptr<PngSequenceWriter> sPngWriter; // --frames-dir: zlib off the GL thread
    // --audio-summary
    static std::unique_ptr<AudioSummary::Analyzer> sAnalyzer;
    static AudioFileWriter sSummaryWav;
@@ -70579,6 +70826,9 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
             c = (char)tolower((unsigned char)c);
          if (ext != ".mp4" && ext != ".mov")
             return fail("E_UNSUPPORTED_CONTAINER", "--render writes .mp4 or .mov, got '" + ext + "'");
+         if (job.codec == "prores4444")
+            return fail("E_UNSUPPORTED_CODEC", "--codec prores4444 is not available: the recorder writes H.264 only on every platform",
+                        -1);
          std::error_code ec;
          const std::filesystem::path parent = std::filesystem::path(job.out).parent_path();
          if (!parent.empty())
@@ -70628,6 +70878,8 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
          sTimes.clear();
          for (long long i = 0; i < count; i++)
             sTimes.push_back(job.start + (double)i / (double)job.fps);
+         // Fast zlib by default: a sequence is a hand-off to the film engine, not an archive.
+         sPngWriter = std::make_unique<PngSequenceWriter>(job.pngLevel >= 0 ? job.pngLevel : 1);
          Transport::Instance().SetOfflineMode(true, gHeadlessAudioRate);
          Transport::Instance().SetPlaying(true);
          sNextTime = 0;
@@ -70636,6 +70888,8 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
          return;
       }
       sTimes = job.times;
+      if (job.pngLevel >= 0)
+         stbi_write_png_compression_level = job.pngLevel;
 
       // --frame: a single .png, or a directory for one or several times.
       std::string ext = std::filesystem::path(job.out).extension().string();
@@ -70705,24 +70959,65 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
          }
          if (sNextFrame == target)
          {
-            const int w = sTap->GetOutputWidth(), h = sTap->GetOutputHeight();
+            int w = sTap->GetOutputWidth(), h = sTap->GetOutputHeight();
             if (w <= 0 || h <= 0)
                return fail("E_RENDER", sOut != nullptr ? "the Output produced no image (is its input connected?)"
                                                        : "the --node " + job.node + " produced no image",
                            sOut != nullptr ? sOutIndex : -1);
             std::string path = job.out;
             std::vector<unsigned char> pixels;
-            if (job.mode == Headless::Mode::Frames)
+            const bool sequence = job.mode == Headless::Mode::Frames;
+            if (sequence || job.sizeW > 0)
             {
-               char name[32];
-               std::snprintf(name, sizeof(name), "%06zu.png", sNextTime);
-               path = job.out + (job.out.back() == '/' ? "" : "/") + name;
+               if (sequence)
+               {
+                  char name[32];
+                  std::snprintf(name, sizeof(name), "%06zu.png", sNextTime);
+                  path = job.out + (job.out.back() == '/' ? "" : "/") + name;
+               }
+               else if (std::filesystem::path(job.out).extension() != ".png" && std::filesystem::path(job.out).extension() != ".PNG")
+               {
+                  char name[96];
+                  std::snprintf(name, sizeof(name), "/frame_%05d.png", target);
+                  path = job.out + (job.out.back() == '/' ? std::string(name + 1) : std::string(name));
+               }
                int rw = 0, rh = 0;
                std::vector<unsigned char> rgba;
-               if (!ReadNodeImageRgba8(sTap, sTapOutput, !job.alpha, rw, rh, rgba) ||
-                   !WriteSrgbPng(path, rw, rh, rgba.data()))
-                  return fail("E_RENDER", "could not write " + path);
-               pixels = std::move(rgba);
+               if (!ReadNodeImageRgba8(sTap, sTapOutput, !job.alpha, rw, rh, rgba))
+                  return fail("E_RENDER", "could not read " + path);
+               std::vector<uint16_t> deep;
+               if (sequence && job.depth == 16)
+               {
+                  if (!NodeImageIsFloat(sTap, sTapOutput))
+                     return fail("E_UNSUPPORTED_DEPTH",
+                                 "--depth 16 needs a float source: this image is 8 bits per channel, so a 16-bit PNG would only pad it; drop --depth or tap a node with a 16-bit float output",
+                                 sOut != nullptr ? sOutIndex : -1);
+                  int dw = 0, dh = 0;
+                  if (!ReadNodeImageRgba16(sTap, sTapOutput, !job.alpha, dw, dh, deep))
+                     return fail("E_RENDER", "could not read " + path);
+                  if (job.sizeW > 0 && (dw != job.sizeW || dh != job.sizeH))
+                     return fail("E_UNSUPPORTED_DEPTH", "--size with --depth 16 is not supported: render at the native size, or use --depth 8",
+                                 sOut != nullptr ? sOutIndex : -1);
+               }
+               else if (job.sizeW > 0 && (rw != job.sizeW || rh != job.sizeH))
+               {
+                  rgba = ResizeRgba8(rgba.data(), rw, rh, job.sizeW, job.sizeH);
+                  rw = job.sizeW;
+                  rh = job.sizeH;
+               }
+               w = rw;
+               h = rh;
+               if (sequence)
+               {
+                  sPngWriter->Submit(path, rw, rh, rgba, std::move(deep), job.pngLevel >= 0 ? job.pngLevel : 1);
+                  pixels = std::move(rgba);
+               }
+               else
+               {
+                  if (!WriteSrgbPng(path, rw, rh, rgba.data()))
+                     return fail("E_RENDER", "could not write " + path);
+                  pixels = std::move(rgba);
+               }
             }
             else
             {
@@ -70735,7 +71030,7 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
                ExportImage(sTap, path, 90, &pixels, sTapOutput);
             }
             std::error_code ec;
-            if (!std::filesystem::exists(path, ec))
+            if (!sequence && !std::filesystem::exists(path, ec))
                return fail("E_RENDER", "could not write " + path);
             sStatus.files.push_back(path);
             {
@@ -70769,14 +71064,21 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
             return;
       }
       Transport::Instance().SetOfflineMode(false);
+      if (sPngWriter != nullptr)
+      {
+         const std::vector<std::string> failed = sPngWriter->Finish();
+         sPngWriter.reset();
+         if (!failed.empty())
+            return fail("E_RENDER", "could not write " + failed.front() + (failed.size() > 1 ? " (and " + std::to_string(failed.size() - 1) + " more)" : std::string()));
+      }
       if (job.mode == Headless::Mode::Frames)
       {
          // What a film engine needs to read the sequence back: straight alpha, sRGB, fps, count.
          char meta[320];
          std::snprintf(meta, sizeof(meta),
                        "{\"fps\":%d,\"size\":[%d,%d],\"count\":%zu,\"start\":%.6g,\"alpha\":%s,"
-                       "\"premultiplied\":false,\"color_space\":\"srgb\",\"pattern\":\"%%06d.png\"}\n",
-                       job.fps, sStatus.width, sStatus.height, sTimes.size(), job.start, job.alpha ? "true" : "false");
+                       "\"premultiplied\":false,\"color_space\":\"srgb\",\"depth\":%d,\"pattern\":\"%%06d.png\"}\n",
+                       job.fps, sStatus.width, sStatus.height, sTimes.size(), job.start, job.alpha ? "true" : "false", job.depth);
          const std::string metaPath = job.out + (job.out.back() == '/' ? "" : "/") + "frames.json";
          if (FILE* f = std::fopen(metaPath.c_str(), "wb"))
          {

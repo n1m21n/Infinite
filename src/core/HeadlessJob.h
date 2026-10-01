@@ -14,6 +14,9 @@
 //            [--sample-rate HZ] [--json <file>] [--lenient]
 //   Infinite --frames-dir <patch.inf> <out_dir> --duration S [--start S] [--fps N] [--alpha]
 //            [--node <index[:output]>] [--output <index>] [--set <node>.<param>=<value>]... [--json <file>] [--lenient]
+//            [--size WxH] [--depth 8|16] [--png-level 0..9]
+//   --bpm <N> overrides the patch tempo in --render, --frame, --frames-dir and --audio-summary.
+//   --size WxH rescales --frame / --frames-dir output; --codec h264|prores4444 is for --render.
 //   --set also applies to --render, --frame and --audio-summary.
 //   Infinite --audio-summary <patch.inf> <out.json> [--start S] [--duration S]
 //            [--wav <out.wav>] [--notes <events.json> --note-map <map.json>]
@@ -59,6 +62,11 @@ namespace Headless
       std::string node;          // --node <index[:output]>: tap this node's image instead of an Output's
       std::vector<std::string> sets; // --set <node>.<param>=<value>, repeatable; applied after load, before the first frame
       bool alpha = false;        // --frames-dir --alpha: write straight alpha instead of opaque PNGs
+      int sizeW = 0, sizeH = 0;  // --size WxH: rescale the captured image (0 = the node's own size)
+      int depth = 8;             // --depth 8|16: PNG bit depth; 16 needs a float source texture
+      int pngLevel = -1;         // --png-level 0..9: zlib level (-1 = the fast default)
+      double bpm = 0.0;          // --bpm: overrides the patch's tempo for this run (0 = keep it)
+      std::string codec;         // --codec h264|prores4444 (--render); prores4444 is refused with E_UNSUPPORTED_CODEC
       std::string jsonPath;      // --json
       std::vector<double> times; // --frame timestamps, seconds, ascending
       double start = 0.0;        // --render range start, seconds
