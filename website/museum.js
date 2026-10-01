@@ -787,7 +787,7 @@ const bird = (() => {
   atlas.repeat.set(1 / 4, 1 / 2);
   const mat = new THREE.MeshBasicMaterial({ map: atlas, transparent: true, depthWrite: false, fog: false, opacity: 0 });
   const mesh = new THREE.Mesh(planeGeo, mat);
-  const BW = 2.0;
+  const BW = 1.6;
   mesh.scale.set(BW, BW * FH / FW, 1);
   mesh.renderOrder = 5;
   scene.add(mesh);
