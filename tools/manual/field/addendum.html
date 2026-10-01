@@ -1,0 +1,80 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Field Language Manual - What's new</title>
+<style>
+@page{size:637.92pt 824.88pt;margin:46pt 44pt}
+html{background:#fbf8f2}
+body{font:10.2pt/1.5 "Helvetica Neue",Helvetica,Arial,sans-serif;color:#222;background:#fbf8f2;margin:0}
+.k{font-size:7.5pt;letter-spacing:.2em;color:#777;font-weight:700;text-transform:uppercase}
+h1{font-size:24pt;margin:4pt 0 6pt}
+h2{font-size:14pt;margin:0 0 4pt}
+p.lead{color:#444;margin:0 0 12pt}
+.card{background:#fff;border:1px solid #e3dccb;border-radius:8pt;padding:11pt 14pt;margin:0 0 12pt;break-inside:avoid}
+pre{background:#eee7d6;border-radius:6pt;padding:8pt 10pt;font:8.6pt/1.45 Menlo,monospace;margin:7pt 0;white-space:pre-wrap}
+code{font:8.8pt Menlo,monospace;background:#f6e6dc;color:#b4491f;padding:0 3pt;border-radius:3pt}
+table{border-collapse:collapse;width:100%;font-size:9pt;margin:6pt 0}
+td,th{border-top:1px solid #e3dccb;padding:4pt 6pt;text-align:left;vertical-align:top}
+th{font-size:7.5pt;letter-spacing:.12em;color:#777}
+em.s{font-family:Georgia,serif;color:#555}
+.pb{break-before:page}
+</style></head><body>
+<div class="k">Addendum · Field v1.1</div>
+<h1>What's new since v1</h1>
+<p class="lead">The chapters before this page describe Field v1 as shipped in v0.3.0. Five language additions landed after it. None of them changes how an existing kernel behaves; each one makes something writable that needed C++ before.</p>
+
+<div class="card"><h2>1 · Offset reads of pixel state: <code>A(uv + d)</code></h2>
+<p>In a <code>pixel</code> kernel a state cell can be read at a coordinate, not only where the pixel is. Bare <code>A</code> is sugar for <code>A(uv)</code>. This is what makes reaction-diffusion, advection and every flow effect writable as Field text.</p>
+<pre>state float A = 1 [wrap];     // default boundary is clamp
+d = 1.0 / res;                // one texel
+lapA = A(uv + vec2(d.x, 0.0)) + A(uv - vec2(d.x, 0.0))
+     + A(uv + vec2(0.0, d.y)) + A(uv - vec2(0.0, d.y)) - 4.0 * A;
+first = 1.0 - step(0.5, age); // 1.0 on the first cook only</pre>
+<table><tr><th>Boundary</th><th>Meaning</th></tr>
+<tr><td>(default) clamp</td><td>reads past the edge repeat the edge texel</td></tr>
+<tr><td><code>[wrap]</code></td><td>the texture wraps around</td></tr>
+<tr><td><code>[border]</code></td><td>reads past the edge return the cell's declared initial value</td></tr></table>
+<p>Offset reads of a <code>frame</code>, <code>element</code> or <code>sample</code> cell are refused: those cells have no spatial extent. A kernel with any offset read keeps its state in a 32-bit float bank; without one it stays 16-bit.</p>
+<p><b><code>age</code></b> is a new reserved name in <code>pixel</code> (and, below, <code>element</code>): the number of cooks since the node's state was cleared. Use it for a one-shot seed (<code>1.0 - step(0.5, age)</code> is 1 on the first cook only). <code>frame</code> cannot do this, because it is the global cook counter and is already large when a node spawns.</p></div>
+
+<div class="card"><h2>2 · Element neighbour reads: <code>X.at(k)</code></h2>
+<p>In an <code>element</code> kernel, <code>X.at(k)</code> reads element <em class="s">k</em>'s <code>X</code>, where <code>X</code> is <code>P</code>, <code>N</code>, <code>uv</code>, <code>Cd</code>, a declared attribute, or an element state cell.</p>
+<pre>a = P.at(i - 1)
+b = P.at(i + 1)
+localAvg = (a + b + P) * 0.3333333
+dev = P - localAvg           // how far this point sits from its neighbours</pre>
+<ul><li>The read always sees the cook's <b>input</b>: the incoming mesh for an attribute, the previous cook's value for a state cell. It never sees a value written earlier in the same loop, so the result does not depend on element order.</li>
+<li>Indices clamp to <code>[0, count-1]</code>: element 0 asking for <code>i - 1</code> sees itself.</li>
+<li><code>.at()</code> on a param or frame value is refused (it holds one value for the whole mesh).</li>
+<li>Element simulations must keep positions in <code>state</code>, not <code>P</code>, because <code>P</code> is refilled from the incoming mesh every cook. The Verlet Rope and Buckling Ribbon presets are written this way.</li></ul></div>
+
+<div class="card"><h2>3 · State tables: <code>state float name[N]</code></h2>
+<p>A bounded array in <code>frame</code> and <code>sample</code> kernels. <code>name[k]</code> reads, <code>name[k] = v</code> writes, and <code>k</code> is any expression, clamped to <code>[0, N-1]</code> (clamp, not wrap, not an error, the same rule as <code>.at()</code>).</p>
+<pre>state float buf[12000] = 0.0
+state float wpos = 0.0
+readVal = buf[(wpos - 4800.0 + 24000.0) % 12000.0]
+buf[wpos % 12000.0] = in
+wpos = (wpos + 1.0) % 12000.0   // a delay line built from a table</pre>
+<p>Tables are not available in <code>element</code> or <code>pixel</code>. Their total size is capped at compile time, the same way <code>delay()</code>'s budget is, so an oversized table is a compile error rather than a silent truncation.</p></div>
+
+<div class="pb"></div>
+<div class="card"><h2>4 · Declared audio inputs</h2>
+<p>A Field Effect or Field Synth kernel can declare extra audio inputs. Each declaration creates a real, connectable audio pin on the node, one per name:</p>
+<pre>input sample audio sidechain
+out = in * (1.0 - abs(sidechain))   // duck by the second input</pre>
+<p>On Field Effect the declared inputs follow the native <code>in</code> pin; on Field Synth they follow <code>notes</code> and <code>in</code>. <code>input sample float name</code> is still collected but is not bound to a signal.</p>
+<p>In a Field Pixel kernel, <code>input pixel image name</code> now reads the connected texture (previously it read black). One declared image input is wired; a second is rejected at compile time.</p></div>
+
+<div class="card"><h2>5 · Note history in <code>frame</code>: <code>noteOn</code>, <code>notePitch</code>, <code>noteVel</code></h2>
+<table><tr><th>Name</th><th>Value</th></tr>
+<tr><td><code>noteOn</code></td><td>1.0 only on the sample a note-on registers (an edge, unlike <code>gate</code>, which is held); 0.0 otherwise</td></tr>
+<tr><td><code>notePitch</code></td><td>frequency in Hz of the most recent note (same convention as <code>freq</code>); holds after note-off</td></tr>
+<tr><td><code>noteVel</code></td><td>velocity 0..1 of the most recent note; holds after note-off</td></tr></table>
+<p>These are one shared snapshot per node, like <code>in</code> and <code>sr</code>, not per voice like <code>freq</code> and <code>gate</code>. They are reserved names everywhere (you cannot declare a param, state cell or assignment with them) but read as an inert <code>0.0</code> in any node without a note input.</p>
+<pre>state float env = 0.0
+env = if(noteOn > 0.5, noteVel, env * 0.999)   // jump to the velocity, then decay</pre></div>
+
+<div class="card"><h2>Fixes that change what old kernels read</h2>
+<ul><li><code>reduce.&lt;op&gt;(x)</code> over a plain element-domain local used to return 0.0 always; it now returns the real reduction of this cook's values.</li>
+<li><code>length</code>, <code>normalize</code>, <code>distance</code>, <code>dot</code>, <code>cross</code> now work in <code>element</code> kernels (they read 0.0 before, so <code>length(P)</code> was zero for every vertex).</li>
+<li><code>res</code> and <code>aspect</code> are no longer hoisted into the CPU prologue, where they evaluated to 0; a texel size such as <code>1.0 / res</code> is now correct.</li>
+<li>Vector literals are no longer mistaken for scalars by the constant folder.</li></ul>
+<p style="color:#777;font-size:8.5pt">Presets added since v1 include Gray-Scott reaction-diffusion and a flow/advection pair (Pixel), Verlet Rope and Buckling Ribbon (Element), and the pixel illusion, nature and Field Effect/Synth libraries.</p></div>
+</body></html>
