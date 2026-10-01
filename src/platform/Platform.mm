@@ -2170,6 +2170,9 @@ namespace Platform
       // RecorderAppend of the take, by RecorderSetInputIsBgra - never
       // touched after that, so plain reads on encodeQueue are safe.
       bool inputIsBgra = true;
+      // ProRes 4444 take: the RGBA fallback must carry alpha through instead
+      // of forcing it opaque.
+      bool keepAlpha = false;
 
       // Audio, all optional - nil/zero when the recording is video-only.
       AVAssetWriterInput* audioInput = nil;
@@ -2619,7 +2622,7 @@ namespace Platform
                   dstRow[x * 4 + 0] = srcRow[x * 4 + 2];
                   dstRow[x * 4 + 1] = srcRow[x * 4 + 1];
                   dstRow[x * 4 + 2] = srcRow[x * 4 + 0];
-                  dstRow[x * 4 + 3] = 255;
+                  dstRow[x * 4 + 3] = h->keepAlpha ? srcRow[x * 4 + 3] : 255;
                }
             }
          }
@@ -2724,7 +2727,8 @@ namespace Platform
    RecorderHandle* RecorderStart(const std::string& path, int width, int height,
                                  int fps, std::string& outError,
                                  const std::string& audioPath, bool loopAudio,
-                                 double liveAudioSampleRate, int liveAudioChannels)
+                                 double liveAudioSampleRate, int liveAudioChannels,
+                                 bool proRes4444)
    {
       @autoreleasepool
       {
@@ -2767,7 +2771,18 @@ namespace Platform
          const double bpp = 0.30;
          const NSInteger avgBitRate = (NSInteger)std::min(
             80000000.0, std::max(2000000.0, (double)width * height * (fps > 0 ? fps : 30) * bpp));
-         NSDictionary* videoSettings = @{
+         NSDictionary* videoSettings = proRes4444 ? @{
+            // 4444 keeps the alpha channel; it has no bitrate knob and takes
+            // the same 709 colour tags as the H.264 path.
+            AVVideoCodecKey  : AVVideoCodecTypeAppleProRes4444,
+            AVVideoWidthKey  : @(width),
+            AVVideoHeightKey : @(height),
+            AVVideoColorPropertiesKey : @{
+               AVVideoColorPrimariesKey : AVVideoColorPrimaries_ITU_R_709_2,
+               AVVideoTransferFunctionKey : AVVideoTransferFunction_ITU_R_709_2,
+               AVVideoYCbCrMatrixKey : AVVideoYCbCrMatrix_ITU_R_709_2
+            }
+         } : @{
             AVVideoCodecKey  : AVVideoCodecTypeH264,
             AVVideoWidthKey  : @(width),
             AVVideoHeightKey : @(height),
@@ -2893,6 +2908,7 @@ namespace Platform
          h->width = width;
          h->height = height;
          h->fps = fps > 0 ? fps : 30;
+         h->keepAlpha = proRes4444;
          h->audioLoop = loopAudio;
          h->audioInput = audioInput;
          h->audioFile = audioFile;

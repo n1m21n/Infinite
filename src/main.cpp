@@ -70827,8 +70827,14 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
          if (ext != ".mp4" && ext != ".mov")
             return fail("E_UNSUPPORTED_CONTAINER", "--render writes .mp4 or .mov, got '" + ext + "'");
          if (job.codec == "prores4444")
-            return fail("E_UNSUPPORTED_CODEC", "--codec prores4444 is not available: the recorder writes H.264 only on every platform",
-                        -1);
+         {
+#ifndef __APPLE__
+            return fail("E_UNSUPPORTED_CODEC", "--codec prores4444 is only available on macOS", -1);
+#endif
+            if (ext != ".mov")
+               return fail("E_UNSUPPORTED_CONTAINER", "--codec prores4444 writes .mov, got '" + ext + "'");
+            sOut->recordProRes4444 = true;
+         }
          std::error_code ec;
          const std::filesystem::path parent = std::filesystem::path(job.out).parent_path();
          if (!parent.empty())

@@ -1196,8 +1196,14 @@ namespace Platform
                                  const std::string& audioPath,
                                  bool loopAudio,
                                  double liveAudioSampleRate,
-                                 int liveAudioChannels)
+                                 int liveAudioChannels,
+                                 bool proRes4444)
    {
+      if (proRes4444)
+      {
+         outError = "ProRes 4444 is not available on Linux";
+         return nullptr;
+      }
       RecorderHandle* h = new RecorderHandle();
       h->path = path;
       h->width = width;

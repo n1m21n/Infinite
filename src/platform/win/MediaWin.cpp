@@ -1977,9 +1977,15 @@ namespace Platform
    RecorderHandle* RecorderStart(const std::string& path, int width, int height,
                                  int fps, std::string& outError,
                                  const std::string& audioPath, bool loopAudio,
-                                 double liveAudioSampleRate, int liveAudioChannels)
+                                 double liveAudioSampleRate, int liveAudioChannels,
+                                 bool proRes4444)
    {
       outError.clear();
+      if (proRes4444)
+      {
+         outError = "ProRes 4444 is not available on Windows";
+         return nullptr;
+      }
       ComScope com;
       if (!com.ok || FAILED(MFStartup(MF_VERSION)))
       {

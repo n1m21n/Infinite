@@ -66,7 +66,7 @@ namespace Headless
       int depth = 8;             // --depth 8|16: PNG bit depth; 16 needs a float source texture
       int pngLevel = -1;         // --png-level 0..9: zlib level (-1 = the fast default)
       double bpm = 0.0;          // --bpm: overrides the patch's tempo for this run (0 = keep it)
-      std::string codec;         // --codec h264|prores4444 (--render); prores4444 is refused with E_UNSUPPORTED_CODEC
+      std::string codec;         // --codec h264|prores4444 (--render); prores4444 = alpha .mov, macOS only (E_UNSUPPORTED_CODEC elsewhere)
       std::string jsonPath;      // --json
       std::vector<double> times; // --frame timestamps, seconds, ascending
       double start = 0.0;        // --render range start, seconds
