@@ -290,6 +290,23 @@ namespace PatchSchema
       return out;
    }
 
+   std::string ClassifyAction(const std::string& label)
+   {
+      std::string l;
+      for (char c : label)
+         l += (char)std::tolower((unsigned char)c);
+      auto has = [&](const char* w) { return l.find(w) != std::string::npos; };
+      if (has("random") || has("reset") || has("clear") || has("default") || has("shuffle") || has("mutate"))
+         return "randomizes or resets params (use --set or a seed)";
+      if (has("load") || has("open") || has("browse") || has("choose") || has("import") || has("select file") ||
+          has("pick") || has("replace"))
+         return "sets a file path (write the key instead)";
+      if (has("record") || has("learn") || has("train") || has("editor") || has("capture") || has("calibrat") ||
+          has("scan") || has("tap") || has("panic") || has("midi"))
+         return "UI-only (live state, not saved with the patch)";
+      return "unclassified";
+   }
+
    std::string ToJson(const TypeSchema& t)
    {
       std::string s = "{\"type\":" + Q(t.name) + ",\"category\":" + Q(t.category);
@@ -357,6 +374,9 @@ namespace PatchSchema
             s += std::string(",\"ui\":") + (!t.controlsKnown ? "null" : (c && !c->label.empty() ? "true" : "false")) + "}";
          }
       }
+      s += "],\"actions\":[";
+      for (size_t i = 0; i < t.actions.size(); i++)
+         s += (i ? "," : "") + std::string("{\"label\":") + Q(t.actions[i].label) + ",\"effect\":" + Q(t.actions[i].effect) + "}";
       s += "],\"join\":{\"registered\":" + std::to_string(t.joinRegistered) + ",\"keyed\":" + std::to_string(t.joinKeyed) + "}}";
       return s;
    }

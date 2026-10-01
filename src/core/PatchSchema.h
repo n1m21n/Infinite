@@ -63,6 +63,18 @@ namespace PatchSchema
       std::vector<std::string> options;
    };
 
+   // One button a node draws. `effect` says what pressing it means for a hand-written patch.
+   struct ActionInfo
+   {
+      std::string label;
+      std::string effect;
+   };
+
+   // Best-effort reading of what a button does, from its label alone (no node is clicked):
+   // "sets a path" (write the key instead), "randomizes or resets params", "UI-only", or
+   // "unclassified" when nothing in the label says. Pure, so it is testable without a window.
+   std::string ClassifyAction(const std::string& label);
+
    struct TypeSchema
    {
       std::string name;
@@ -74,6 +86,7 @@ namespace PatchSchema
       // How well the labelled controls were joined to saved keys (main.cpp ParamKeyJoiner).
       std::vector<ControlInfo> controls; // one per saved f/i/b key, when controlsKnown
       bool controlsKnown = false;        // a probe node was drawn and joined
+      std::vector<ActionInfo> actions;   // buttons the probe node drew, in draw order
       int joinRegistered = 0; // controls the draw pass registered
       int joinKeyed = 0;      // of those, with a saved key
       bool hardwareDriven = false;

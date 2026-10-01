@@ -693,11 +693,15 @@ bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool
     return pressed;
 }
 
+void (*ImGui::ButtonLabelHook)(const char* label) = NULL;
+
 bool ImGui::ButtonEx(const char* label, const ImVec2& size_arg, ImGuiButtonFlags flags)
 {
     ImGuiWindow* window = GetCurrentWindow();
     if (window->SkipItems)
         return false;
+    if (ButtonLabelHook)
+        ButtonLabelHook(label);
 
     ImGuiContext& g = *GImGui;
     const ImGuiStyle& style = g.Style;

@@ -165,6 +165,11 @@ r=$("$BIN" --describe 2>/dev/null)
 [ "$(echo "$r" | json "[m['key'] for t in d['types'] if t['type']=='Shape' for m in t['modulatable'] if m['label']=='size x'][0]")" = "sizeX" ]; check "describe: Shape 'size x' is key sizeX" $?
 [ "$(echo "$r" | json "[m['key'] for t in d['types'] if t['type']=='Shape' for m in t['modulatable'] if m['label']=='shape'][0]")" = "shapeType" ]; check "describe: Shape dropdown 'shape' is key shapeType (perturbation tier)" $?
 
+# --- describe actions (R474): the buttons a node draws, with what each one does ---
+[ "$(echo "$r" | json "[a['effect'] for t in d['types'] if t['type']=='Sampler' for a in t['actions'] if a['label']=='Load...'][0]")" = "sets a file path (write the key instead)" ]; check "describe: Sampler 'Load...' is a file-path action" $?
+[ "$(echo "$r" | json "[a['label'] for t in d['types'] if t['type']=='Shape' for a in t['actions']][:2]")" = "['Circle', 'Ellipse']" ]; check "describe: Shape lists its buttons in draw order" $?
+[ "$(echo "$r" | json "sum(1 for t in d['types'] if t['actions'])  > 30")" = "True" ]; check "describe: many node types report actions" $?
+
 # --- describe rows (C4): one row per saved key, dropdown options present ---
 [ "$(echo "$r" | json "sum(1 for t in d['types'] for m in t['modulatable'] if 'enum' in m and len(m['enum'])==0)")" = "0" ]; check "describe: no dropdown has an empty option list" $?
 for ty in Shape Oscillator Wavetable Reverb FieldPixel LFO "Render 3D" Sampler Mixer "Predictive Modulator"; do

@@ -7917,10 +7917,29 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       std::map<int, std::string> unkeyedName; // their labels
       std::set<std::string> plainKeys;       // saved f/i/b keys no control registered
       std::map<std::string, std::vector<std::string>> optionsOfKey; // dropdown names by key
+      std::vector<std::string> buttons;      // button labels the probe node drew, in draw order
       int registered = 0;
       bool done = false;
    };
    static std::map<std::string, ParamJoinType> gParamJoin;
+
+   // Headless --describe: every button a node draws, by node index (ImGui::ButtonLabelHook).
+   static std::map<int, std::vector<std::string>> gProbeButtons;
+   static void CaptureProbeButton(const char* label)
+   {
+      if (!gHeadlessProbeAll || gCurrentNodeIndex < 0 || label == nullptr)
+         return;
+      std::string l(label);
+      const size_t hashes = l.find("##");
+      if (hashes != std::string::npos)
+         l.erase(hashes);
+      if (l.empty())
+         return;
+      std::vector<std::string>& v = gProbeButtons[gCurrentNodeIndex];
+      if (v.size() < 64 && std::find(v.begin(), v.end(), l) == v.end())
+         v.push_back(std::move(l));
+   }
+   static const bool gProbeButtonHookInstalled = (ImGui::ButtonLabelHook = &CaptureProbeButton, true);
 
    // ---- patch schema (Infinite --describe / --validate) ----
    // Records what a node's VisitParams declares: tag letter, key, default.
@@ -69511,6 +69530,7 @@ private:
       ParamJoinType& out = gParamJoin[n.type];
       out = n.join;
       out.done = true;
+      out.buttons = gProbeButtons[n.index];
       for (const auto& kv : n.label)
          if (!out.keyOfParam.count(kv.first))
          {
@@ -69663,6 +69683,9 @@ static void AttachControls(PatchSchema::TypeSchema& ts, int nodeIndex)
       c.options = k->enumOptions;
       ts.controls.push_back(std::move(c));
    }
+   ts.actions.clear();
+   for (const std::string& b : it->second.buttons)
+      ts.actions.push_back({ b, PatchSchema::ClassifyAction(b) });
 }
 
 // The running app never probes node types, so its key join is empty and `explain` could not name
