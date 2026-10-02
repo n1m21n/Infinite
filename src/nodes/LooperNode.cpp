@@ -32,6 +32,9 @@ namespace
    constexpr int kMaxFrames = 12000000;
    constexpr int kMinTakeFrames = 32;
    constexpr int kCmdCapacity = 32;
+   // A synced REC pressed this long after a grid line still starts the take on
+   // that line, back-filled from the pre-roll ring (which holds this much input).
+   constexpr double kLateSeconds = 0.2;
    // Waveform peak bins: one min/max pair per 1024 frames of loop, written by
    // the audio thread (relaxed atomics, no allocation) and read by the UI.
    constexpr int kBinFrames = 1024;
@@ -46,6 +49,9 @@ namespace
       // peak bins, adopted by the audio thread when it swaps the buffer in.
       int preload = 0;
       std::vector<float> binMin, binMax;
+      // The last kLateSeconds of input, always running, for a late REC.
+      std::vector<float> pre[2];
+      int preCap = 0;
    };
 
    // A buffer for `sr`, holding `src` (resampled linearly when its rate
@@ -57,6 +63,9 @@ namespace
       buf->capacity = (int)std::min<double>(sr * kMaxSeconds, (double)kMaxFrames);
       buf->ch[0].assign((size_t)buf->capacity, 0.0f);
       buf->ch[1].assign((size_t)buf->capacity, 0.0f);
+      buf->preCap = (int)std::ceil(sr * kLateSeconds) + 1;
+      buf->pre[0].assign((size_t)buf->preCap, 0.0f);
+      buf->pre[1].assign((size_t)buf->preCap, 0.0f);
       if (src == nullptr || src->numFrames <= 0 || src->channels <= 0 || src->sampleRate <= 0.0)
          return buf;
       const float* L = src->channelData.data();
@@ -280,6 +289,8 @@ public:
          mTarget = 0;
          mTakeComp = 0;
          mAccBin = -1;
+         mPreW = 0;
+         mPreFill = 0;
          if (mBuf != nullptr)
             for (size_t b = 0; b < mBuf->binMin.size(); b++)
             {
@@ -314,6 +325,7 @@ public:
       mComp = (int)std::clamp(compFrames, 0.0, sr);
       mPubComp.store(mComp, std::memory_order_relaxed);
 
+      mBlockFrames = numFrames;
       // Presses, in order (held back while the main thread reads the loop).
       for (; lease != kLeaseGranted;)
       {
@@ -355,6 +367,10 @@ public:
 
          if (mBuf != nullptr)
          {
+            mBuf->pre[0][(size_t)mPreW] = inL;
+            mBuf->pre[1][(size_t)mPreW] = inR;
+            mPreW = (mPreW + 1) % mBuf->preCap;
+            mPreFill = std::min(mPreFill + 1, mBuf->preCap);
             if (mState == LooperNode::kRecording)
             {
                if (mSkip > 0)
@@ -462,6 +478,51 @@ private:
       if (next >= end)
          return -1;
       return std::clamp((int)((next - start) / beatsPerFrame), 0, std::max(0, numFrames - 1));
+   }
+
+   // Frames since the grid line just passed, at this block's start (where
+   // presses land), when a REC this late should still start on that line:
+   // within kLateSeconds and nearer that line than the next. Otherwise -1.
+   int LateFrames(double sr) const
+   {
+      const double bpm = std::max(1.0f, Transport::Instance().Tempo());
+      const double beatsPerFrame = bpm / 60.0 / sr;
+      const double start = Transport::Instance().Beats() - beatsPerFrame * (double)mBlockFrames;
+      const double grid = GridBeats();
+      const double last = std::floor(start / grid + 1e-6) * grid;
+      const double late = std::max(0.0, (start - last) / beatsPerFrame);
+      if (late > kLateSeconds * sr || late >= 0.5 * grid / beatsPerFrame)
+         return -1;
+      return (int)std::lround(late);
+   }
+
+   // A take whose musical start was `late` frames ago. Input for that moment
+   // arrives `comp` frames after it, so when late <= comp it is still to come
+   // (skip less); otherwise the missed frames come from the pre-roll ring.
+   // False when the ring does not hold them yet (arm instead).
+   bool BeginLateTake(int late)
+   {
+      const int missed = late - mComp;
+      if (missed > mPreFill || mBuf == nullptr)
+         return false;
+      BeginTake();
+      if (missed <= 0)
+      {
+         mSkip = -missed;
+         return true;
+      }
+      mSkip = 0;
+      for (int k = 0; k < missed; k++)
+      {
+         const int r = ((mPreW - missed + k) % mBuf->preCap + mBuf->preCap) % mBuf->preCap;
+         const float l = mBuf->pre[0][(size_t)r];
+         const float rr = mBuf->pre[1][(size_t)r];
+         mBuf->ch[0][(size_t)k] = l;
+         mBuf->ch[1][(size_t)k] = rr;
+         TouchBin(k, 0.5f * (l + rr), false);
+      }
+      mLength = missed;
+      return true;
    }
 
    // Publishes the bin being accumulated. Audio thread.
@@ -591,7 +652,11 @@ private:
          {
             mTarget = TargetFrames(mSampleRate.load(std::memory_order_relaxed));
             if (mSync.load(std::memory_order_relaxed) && Transport::Instance().IsPlaying())
-               mState = LooperNode::kArmed;
+            {
+               const int late = LateFrames(mSampleRate.load(std::memory_order_relaxed));
+               if (late < 0 || !BeginLateTake(late))
+                  mState = LooperNode::kArmed;
+            }
             else
                BeginTake();
          }
@@ -656,6 +721,9 @@ private:
    int mSkip = 0;     // input frames still to drop before the take's start
    int mComp = 0;     // current compensation, frames
    int mTakeComp = 0; // compensation the held loop was recorded with
+   int mBlockFrames = 0; // frames in the block being processed
+   int mPreW = 0;        // pre-roll ring write index
+   int mPreFill = 0;     // valid frames in the pre-roll ring
    float mThruNow = 1.0f;
    float mVolumeNow = 1.0f;
    float mRateNow = 1.0f;
