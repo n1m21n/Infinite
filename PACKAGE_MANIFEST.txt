@@ -1,5 +1,5 @@
 Infinite-Turbo (for Windows) - source package
-Version: 0.45.0-turbo (base: Windows R31a port)
+Version: 0.46.0-turbo (base: Windows R31a port)
 Upstream: https://github.com/n1m21n/Infinite
 Upstream commit: 788404af4b378941394e2d5dcc45c5542cc903fd
 Target: Windows 10/11 x64 only, Visual Studio 2022 (MSVC), vcpkg x64-windows-static
@@ -12,6 +12,7 @@ Entry points:
 - run-windows.bat
 - install-runtime.bat        for prebuilt ZIP users
 - diagnose-windows.bat
+- release-windows.bat        clean build, versioned ZIP, release notes, git tag (maintainer)
 - setup-mcp.bat              registers Infinite-Turbo as an MCP server in Claude Desktop
 - WINDOWS_BUILD.md, CHANGELOG-TURBO.md
 

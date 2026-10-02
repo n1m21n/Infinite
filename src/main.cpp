@@ -40,6 +40,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <mutex>
 #include <atomic>
 #include <type_traits>
 #include <vector>
@@ -61,7 +62,9 @@
 #include "core/AudioCable.h"
 #include "core/NoteCable.h"
 #include "core/RemoteControl.h"
+#include "core/Base64.h"
 #include "platform/McpBridge.h"
+#include "platform/AISkillContent.h"
 #include "core/RuntimeLog.h"
 #include "core/PatchJson.h"
 #include "platform/SettingsPaths.h"
@@ -491,6 +494,168 @@ namespace
       }
    }
 
+   // Turbo 0.46 (upstream R527): interface scale. 0 = follow Windows' display
+   // scale (per monitor); otherwise a fixed factor (Settings > Interface scale).
+   float gUiScaleSetting = 0.0f;
+   bool gUiRescaleRequested = false;
+   float gUiPointScale = 1.0f;
+
+   // Turbo 0.46 (upstream's update check, for this fork): one GitHub request
+   // at startup on a worker thread; a newer release shows an UPDATE badge in
+   // the top bar. Off in Settings, or with INFINITE_NO_UPDATE_CHECK set.
+   bool gUpdateCheckEnabled = true;
+   bool gStartWithExample = true; // Turbo 0.46: open superSynthMCP at startup
+   namespace TurboUpdate
+   {
+      constexpr const char* kReleasesApi = "https://api.github.com/repos/ricardopalmieri/Infinite/releases/latest";
+      constexpr const char* kReleasesPage = "https://github.com/ricardopalmieri/Infinite/releases";
+      std::mutex gMutex;
+      std::atomic<int> gStatus { 0 }; // 0 idle, 1 checking, 2 up to date, 3 newer, 4 failed
+      std::string gLatest, gUrl, gError;
+      std::thread gWorker;
+
+      std::vector<int> VersionNumbers(const std::string& text)
+      {
+         std::vector<int> out;
+         int cur = -1;
+         for (char c : text)
+         {
+            if (c >= '0' && c <= '9')
+               cur = (cur < 0 ? 0 : cur * 10) + (c - '0');
+            else if (cur >= 0)
+            {
+               out.push_back(cur);
+               cur = -1;
+               if (c != '.')
+                  break; // "0.46.0-turbo": stop at the suffix
+            }
+         }
+         if (cur >= 0)
+            out.push_back(cur);
+         return out;
+      }
+
+      bool IsNewer(const std::string& latest, const std::string& current)
+      {
+         const std::vector<int> a = VersionNumbers(latest), b = VersionNumbers(current);
+         for (size_t i = 0; i < std::max(a.size(), b.size()); i++)
+         {
+            const int x = i < a.size() ? a[i] : 0, y = i < b.size() ? b[i] : 0;
+            if (x != y)
+               return x > y;
+         }
+         return false;
+      }
+
+      void Start()
+      {
+         if (gStatus.load() == 1 || std::getenv("INFINITE_NO_UPDATE_CHECK") != nullptr)
+            return;
+         if (gWorker.joinable())
+            gWorker.join();
+         gStatus = 1;
+         gWorker = std::thread([]()
+         {
+            std::string body, error;
+            int result = 4;
+            std::string latest, url;
+            if (Platform::HttpGet(kReleasesApi, body, error, 8000))
+            {
+               try
+               {
+                  const nlohmann::json j = nlohmann::json::parse(body);
+                  latest = j.value("tag_name", std::string());
+                  url = j.value("html_url", std::string(kReleasesPage));
+                  result = latest.empty() ? 4 : (IsNewer(latest, INFINITE_TURBO_VERSION) ? 3 : 2);
+                  if (latest.empty())
+                     error = "no release tag";
+               }
+               catch (const std::exception& e)
+               {
+                  error = e.what();
+               }
+            }
+            else if (error == "HTTP 404")
+               error = "no releases published yet";
+            std::lock_guard<std::mutex> lock(gMutex);
+            gLatest = latest;
+            gUrl = url.empty() ? std::string(kReleasesPage) : url;
+            gError = error;
+            gStatus = result;
+         });
+      }
+
+      void Shutdown()
+      {
+         // Never hold up quitting for a slow network: the process is ending.
+         if (gWorker.joinable())
+            gWorker.detach();
+      }
+   }
+
+   void ApplyUiScale(GLFWwindow* window)
+   {
+      float xscale = 1.0f, yscale = 1.0f;
+      glfwGetWindowContentScale(window, &xscale, &yscale);
+      if (!(xscale >= 0.25f))
+         xscale = 1.0f;
+      const float scale = gUiScaleSetting >= 0.5f ? gUiScaleSetting : xscale;
+      gUiPointScale = scale;
+      ImGui_ImplGlfw_SetPointScale(scale);
+
+      // ImGui 1.90 truncates font sizes when it builds the atlas: bake at the
+      // next whole pixel and let FontGlobalScale absorb the difference.
+      const float baseSize = 15.0f;
+      const float bakedPx = std::ceil(baseSize * scale - 1.0e-3f);
+      std::vector<std::string> candidates;
+      const std::filesystem::path exeDir =
+         std::filesystem::u8path(Platform::ExecutablePath()).parent_path();
+      candidates.push_back((exeDir / "assets" / "fonts" / "IBMPlexSans-Regular.ttf").u8string());
+      candidates.push_back("assets/fonts/IBMPlexSans-Regular.ttf");
+      candidates.push_back("C:/Windows/Fonts/SegUIVar.ttf");
+      candidates.push_back("C:/Windows/Fonts/segoeui.ttf");
+      candidates.push_back("C:/Windows/Fonts/arial.ttf");
+      ImGuiIO& io = ImGui::GetIO();
+      io.Fonts->Clear();
+      ImFont* uiFont = nullptr;
+      for (const std::string& path : candidates)
+      {
+         uiFont = io.Fonts->AddFontFromFileTTF(path.c_str(), bakedPx);
+         if (uiFont != nullptr)
+         {
+            io.FontGlobalScale = baseSize / bakedPx;
+            RuntimeLog::Write("UI font loaded: %s (scale %.2f)", path.c_str(), scale);
+            break;
+         }
+      }
+      if (uiFont == nullptr)
+      {
+         io.Fonts->AddFontDefault();
+         io.FontGlobalScale = 1.0f;
+      }
+      else
+      {
+         // Build now so lowercase glyph entries can be mapped to the matching
+         // uppercase IBM Plex shapes before the backend uploads the atlas.
+         io.Fonts->Build();
+         ForceAsciiUppercaseGlyphs(uiFont);
+      }
+   }
+
+   // Between frames: rebuilds the font atlas for a new scale (window moved to
+   // another monitor, Windows scale or the setting changed).
+   void PumpUiRescale(GLFWwindow* window)
+   {
+      if (!gUiRescaleRequested)
+         return;
+      if (glfwGetWindowAttrib(window, GLFW_ICONIFIED))
+         return;
+      gUiRescaleRequested = false;
+      ApplyUiScale(window);
+      ImGui_ImplOpenGL3_DestroyFontsTexture();
+      ImGui_ImplOpenGL3_CreateFontsTexture();
+   }
+
    // True for a NodeFactory-registered name a user should be able to spawn
    // going forward. Currently only excludes GeometryOpNode's three deprecated
    // `*Selected` ops (see the Op enum comment in GeometryOpNodes.h) - they
@@ -629,6 +794,44 @@ namespace
    // on the render's own video time (seconds since the take started, one
    // step per rendered frame) instead of the wall-clock UI clock, so a take
    // plays recorded knob moves at the right speed. < 0 = not rendering.
+   // Turbo 0.46: Performance Mode state (see core/PerfPanel.inl).
+   bool  gPerfPanelOpen = false;
+   int   gPerfPanelDock = 0;              // 0 = bottom, 1 = right, 2 = left, 3 = top
+   float gPerfPanelWidth = 460.0f;
+   float gPerfPanelHeight = 280.0f;
+   const float kPerfPanelMinWidth = 240.0f;
+   const float kPerfPanelMinHeight = 160.0f;
+   bool  gPerfEditMode = true;            // Edit (arrange, assign) or Perform
+   int   gPerfActivePage = 0;
+   int   gPerfRenamingPage = -1;
+   char  gPerfRenamePageBuffer[64] = "";
+   int   gPerfAssigningElemIdx = -1;      // a control waiting for a click on a param
+   int   gPerfAssigningAxis = 0;
+   int   gPerfMidiLearnIdx = -1;
+   int   gPerfMidiLearnAxis = 0;
+   struct PerfMidiRuntimeState
+   {
+      float lastVal = -1.0f;
+      float lastValY = -1.0f;
+      unsigned int lastHitSeq = 0;
+   };
+   std::map<size_t, PerfMidiRuntimeState> gPerfMidiRuntimeStates;
+   std::map<size_t, float> gPerfBangFlash;
+   int   gPerfRenamingElementIdx = -1;
+   char  gPerfRenameElementBuffer[64] = "";
+   Patch::PerfLayoutRecord gPerfLayout;
+   std::vector<Patch::PerfRecord> gPerfElements;
+   std::set<size_t> gPerfSelection;
+   std::vector<Patch::PerfRecord> gPerfClipboard;
+   bool  gPerfMatrixFocused = false;
+   bool  gPerfMatrixClaimedKeys = false;
+   ImVec2 gPerfPanelRectMin(0.0f, 0.0f);
+   ImVec2 gPerfPanelRectMax(0.0f, 0.0f);
+   std::map<std::pair<int, int>, float> gPerfPendingWrites;
+   int   gPerfDragIdx = -1;
+   int   gPerfDragOriginCellX = 0;
+   int   gPerfDragOriginCellY = 0;
+   ImVec2 gPerfDragMouseStart(0.0f, 0.0f);
    double gGestureRenderClock = -1.0;
    // Turbo 0.45: nodes waiting for the auto layout (no position in the file,
    // or an RPC asked) - laid out once they have drawn and have a size.
@@ -646,6 +849,7 @@ namespace
    double gWatchNextPoll = 0.0;
    int gWatchReadFailures = 0;
    bool gReloadBanner = false;
+   std::string gHandoverPath; // Turbo 0.46: a .inf handed over while this patch has unsaved edits
    long long PatchFileStamp(const std::string& path)
    {
       std::error_code ec;
@@ -1606,8 +1810,23 @@ namespace
       return kDiscreteParamBase;
    }
 
+   // Turbo 0.46: a Performance Mode write to a control backed by a per-frame
+   // slot (discrete, int) - consumed where that slot is refreshed, so the
+   // write is not overwritten by the node's own value before it lands.
+   std::map<std::pair<int, int>, float> gPerfSlotWrites;
+   bool TakePerfSlotWrite(const std::pair<int, int>& key, float& out)
+   {
+      auto it = gPerfSlotWrites.find(key);
+      if (it == gPerfSlotWrites.end())
+         return false;
+      out = it->second;
+      gPerfSlotWrites.erase(it);
+      return true;
+   }
+
    DiscreteParamRef BeginDiscreteParam(const char* label, float currentValue,
-                                       float minValue, float maxValue)
+                                       float minValue, float maxValue, int kind = 0,
+                                       const std::vector<std::string>* options = nullptr)
    {
       DiscreteParamRef result;
       if (gCurrentNodeIndex < 0)
@@ -1621,7 +1840,13 @@ namespace
       // keeps the value MIDI wrote instead of being reset from the UI).
       result.modulated = Modulation::Instance().IsModulated(result.nodeIndex, result.paramIndex) ||
                          MidiMap::Find(result.nodeIndex, result.paramIndex) != nullptr;
-      if (!result.modulated)
+      float perfValue = 0.0f;
+      if (TakePerfSlotWrite(key, perfValue))
+      {
+         slot = perfValue; // Turbo 0.46: driven by the Performance Mode this frame
+         result.modulated = true;
+      }
+      else if (!result.modulated)
          slot = currentValue;
 
       ParamRef ref;
@@ -1631,6 +1856,14 @@ namespace
       ref.minValue = minValue;
       ref.maxValue = maxValue;
       ref.name = label != nullptr ? label : "control";
+      ref.step = 1.0f; // kind: 0 plain, 1 checkbox, 2 trigger, 3 dropdown
+      ref.isBool = kind == 1;
+      ref.momentary = kind == 2;
+      if (kind == 3 && options != nullptr)
+      {
+         ref.isEnum = true;
+         ref.enumOptions = *options;
+      }
       Modulation::Instance().RegisterParam(ref);
 
       const int pinId = result.nodeIndex * GraphNode::kStride + GraphNode::kParamBase + result.paramIndex;
@@ -1673,7 +1906,7 @@ namespace
       if (gCurrentNodeIndex < 0)
          return ImGui::Checkbox(label, value);
 
-      DiscreteParamRef ref = BeginDiscreteParam(label, *value ? 1.0f : 0.0f, 0.0f, 1.0f);
+      DiscreteParamRef ref = BeginDiscreteParam(label, *value ? 1.0f : 0.0f, 0.0f, 1.0f, 1);
       bool changed = false;
       if (ref.modulated)
       {
@@ -1718,7 +1951,7 @@ namespace
 
       DiscreteParamRef ref;
       if (modulatable && gCurrentNodeIndex >= 0)
-         ref = BeginDiscreteParam(label, (float)current, 0.0f, (float)options.size() - 1.0f);
+         ref = BeginDiscreteParam(label, (float)current, 0.0f, (float)options.size() - 1.0f, 3, &options);
 
       int safeCurrent = std::clamp(current, 0, (int)options.size() - 1);
       if (ref.valid && ref.modulated)
@@ -1759,7 +1992,7 @@ namespace
       if (gCurrentNodeIndex < 0)
          return ImGui::Button(label, size);
 
-      DiscreteParamRef ref = BeginDiscreteParam(label, 0.0f, 0.0f, 1.0f);
+      DiscreteParamRef ref = BeginDiscreteParam(label, 0.0f, 0.0f, 1.0f, 2);
       const std::pair<int, int> key(ref.nodeIndex, ref.paramIndex);
       bool firedByCv = false;
       if (ref.modulated)
@@ -1798,7 +2031,7 @@ namespace
          return true;
       }
 
-      DiscreteParamRef ref = BeginDiscreteParam(label, currentState ? 1.0f : 0.0f, 0.0f, 1.0f);
+      DiscreteParamRef ref = BeginDiscreteParam(label, currentState ? 1.0f : 0.0f, 0.0f, 1.0f, 1);
       bool changedByCv = false;
       if (ref.modulated)
       {
@@ -2207,7 +2440,10 @@ namespace
    {
       const std::pair<int, int> key(gCurrentNodeIndex, gParamCounter);
       float& slot = gIntParamStore[key];
-      if (!Modulation::Instance().IsModulated(key.first, key.second))
+      float perfValue = 0.0f;
+      if (TakePerfSlotWrite(key, perfValue))
+         slot = perfValue; // Turbo 0.46: Performance Mode
+      else if (!Modulation::Instance().IsModulated(key.first, key.second))
          slot = (float)*value;
 
       bool changed = ModSlider(label, &slot, (float)minV, (float)maxV, "%.0f", width, audioStyle);
@@ -2905,7 +3141,10 @@ namespace
    {
       const std::pair<int, int> key(gCurrentNodeIndex, gParamCounter);
       float& slot = gIntParamStore[key];
-      if (!Modulation::Instance().IsModulated(key.first, key.second))
+      float perfValue = 0.0f;
+      if (TakePerfSlotWrite(key, perfValue))
+         slot = perfValue; // Turbo 0.46: Performance Mode
+      else if (!Modulation::Instance().IsModulated(key.first, key.second))
       {
          auto last = gIntParamLastWritten.find(key);
          if (last == gIntParamLastWritten.end() || last->second != *value)
@@ -5061,6 +5300,8 @@ namespace
       }
       ColorSwatch("bg", n->bgColor, n);
       ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
+      ModSlider("offset X", &n->offsetX, -4096.0f, 4096.0f, "%.0f px"); // Turbo 0.46
+      ModSlider("offset Y", &n->offsetY, -4096.0f, 4096.0f, "%.0f px");
    }
 
    void DrawProjectionHandleOverlay(ProjectionNode* node, ImVec2 origin, ImVec2 imageSize, const char* btnIdSuffix)
@@ -22917,7 +23158,7 @@ namespace
          { "Layer Stack", "Four inputs stacked bottom-up: A is the base, D sits on top. Each layer has its own blend mode and opacity, and dragging a layer header reorders the whole layer." },
          { "Layout", "TouchDesigner-style Layout: a canvas of exact pixel size (1920x1080 by default) with up to 8 image inputs placed on it. Each layer starts at its REAL pixel size, and you set x/y in canvas pixels, a scale (anchored at the layer centre) or an exact custom width/height, and opacity. Drag layers on the miniature, or use 1:1 / fit / fill / centre. x, y, scale and opacity have CV pins." },
          { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. Can be pinned to one input with 'manual'." },
-         { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Use it to make differently-sized sources composite predictably." },
+         { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Offset X/Y slides the result in output pixels (+ right, + up). Use it to make differently-sized sources composite predictably." },
          { "Comment", "A free-floating note on the canvas - has no image input or output, just text. Double-click to edit." },
          { "Group", "A resizable box that owns whatever nodes are geometrically inside it - drag it and its members move together, right-click > Ungroup dissolves it (or ungroup one member from its own context menu)." },
          { "Null", "A pass-through node: its output is exactly its input, unchanged. Useful as a stable junction point to branch a cable to several destinations, or as a placeholder while rewiring." },
@@ -23426,7 +23667,7 @@ namespace
                { "Layer Stack", "Four inputs stacked bottom-up: A is the base, D sits on top. Each layer has its own blend mode and opacity, and dragging a layer header reorders the whole layer." },
                { "Layout", "TouchDesigner-style Layout: a canvas of exact pixel size (1920x1080 by default) with up to 8 image inputs placed on it. Each layer starts at its REAL pixel size, and you set x/y in canvas pixels, a scale (anchored at the layer centre) or an exact custom width/height, and opacity. Drag layers on the miniature, or use 1:1 / fit / fill / centre. x, y, scale and opacity have CV pins." },
                { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. Can be pinned to one input with 'manual'." },
-               { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Use it to make differently-sized sources composite predictably." },
+               { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Offset X/Y slides the result in output pixels (+ right, + up). Use it to make differently-sized sources composite predictably." },
                { "Drop Shadow / Outer Glow / Colour Overlay", "Layer-effect style filters." },
             } },
             { "Modulators", {
@@ -24039,6 +24280,9 @@ namespace
       s.autosaveEnabled = gAutosaveEnabled;
       s.autosaveSeconds = gAutosaveSeconds;
       s.audioAutoStart = gAudioAutoStart;
+      s.uiScale = gUiScaleSetting;
+      s.updateCheck = gUpdateCheckEnabled;
+      s.startWithExample = gStartWithExample;
       return s;
    }
 
@@ -24077,7 +24321,17 @@ namespace
       // App-level preference: only the machine settings file sets it (a
       // patch's own saved settings never switch it on or off).
       if (!restartRunningAudio)
+      {
          gAudioAutoStart = s.audioAutoStart;
+         gUpdateCheckEnabled = s.updateCheck;
+         gStartWithExample = s.startWithExample;
+         const float wantScale = (s.uiScale >= 0.5f && s.uiScale <= 3.0f) ? s.uiScale : 0.0f;
+         if (wantScale != gUiScaleSetting)
+         {
+            gUiScaleSetting = wantScale;
+            gUiRescaleRequested = true;
+         }
+      }
       RuntimeLog::SetEnabled(gDiagnosticLogEnabled);
 
       Platform::AudioSetRequestedDriver(gAudioDriver);
@@ -24112,7 +24366,9 @@ namespace
              a.viewportPanelDock == b.viewportPanelDock && a.viewportPanelWidth == b.viewportPanelWidth &&
              a.viewportPanelHeight == b.viewportPanelHeight && a.themePreset == b.themePreset &&
              a.diagnosticLog == b.diagnosticLog && a.autosaveEnabled == b.autosaveEnabled &&
-             a.autosaveSeconds == b.autosaveSeconds && a.audioAutoStart == b.audioAutoStart;
+             a.autosaveSeconds == b.autosaveSeconds && a.audioAutoStart == b.audioAutoStart &&
+             a.uiScale == b.uiScale && a.updateCheck == b.updateCheck &&
+             a.startWithExample == b.startWithExample;
    }
 
    void PersistSceneSettingsIfChanged()
@@ -24475,6 +24731,8 @@ namespace
       data.transport.scale = Transport::Instance().Scale();
       // Turbo 0.43: the arrangement travels with the patch and with undo.
       ArrangeModelToPatchData(gArrange, data);
+      data.performance = gPerfElements; // Turbo 0.46
+      data.perfLayout = gPerfLayout;
       return data;
    }
 
@@ -24861,6 +25119,44 @@ namespace
       for (const Patch::GlobalRecord& g : data.globals)
          ExprGlobals::All().push_back({ g.name, g.expr, 0.0f, std::string() });
 
+      // Turbo 0.46: Performance Mode controls, re-pointed at the new indices.
+      gPerfElements.clear();
+      gPerfSelection.clear();
+      gPerfAssigningElemIdx = -1;
+      gPerfMidiLearnIdx = -1;
+      gPerfMidiRuntimeStates.clear();
+      for (const Patch::PerfRecord& p : data.performance)
+      {
+         Patch::PerfRecord mapped = p;
+         if (p.dstIndex >= 0)
+         {
+            GraphNode* dst = resolve(p.dstIndex);
+            mapped.dstIndex = dst != nullptr ? dst->index : -1;
+         }
+         mapped.targets.clear();
+         for (const auto& t : p.targets)
+            if (GraphNode* dst = t.dstIndex >= 0 ? resolve(t.dstIndex) : nullptr)
+               mapped.targets.push_back({ dst->index, t.dstParam, t.boolName });
+         mapped.targetsY.clear();
+         for (const auto& t : p.targetsY)
+            if (GraphNode* dst = t.dstIndex >= 0 ? resolve(t.dstIndex) : nullptr)
+               mapped.targetsY.push_back({ dst->index, t.dstParam, t.boolName });
+         // Turbo: `targets` holds only the extra destinations. Upstream files
+         // repeat the primary there too, which wrote (and stepped) it twice.
+         auto stripPrimary = [](std::vector<Patch::PerfTarget>& list, int idx, int param)
+         {
+            list.erase(std::remove_if(list.begin(), list.end(), [idx, param](const Patch::PerfTarget& t)
+                       { return t.dstIndex == idx && t.dstParam == param; }), list.end());
+         };
+         stripPrimary(mapped.targets, mapped.dstIndex, mapped.dstParam);
+         stripPrimary(mapped.targetsY, mapped.dstIndex, mapped.dstParam2);
+         gPerfElements.push_back(mapped);
+      }
+      gPerfLayout = data.perfLayout;
+      if (gPerfLayout.cellSize < 40) gPerfLayout.cellSize = 76;
+      if (gPerfLayout.pageCount < 1) gPerfLayout.pageCount = 1;
+      if (gPerfActivePage >= gPerfLayout.pageCount) gPerfActivePage = gPerfLayout.pageCount - 1;
+
       // Turbo: transport before the audio rebuild, so anything it reads sees
       // the loaded document's tempo and meter. Only when opening a file:
       // undo/redo leave the live tempo alone, so an undo of a node edit never
@@ -25002,6 +25298,46 @@ namespace
          ReloadPatchFromDisk();
    }
 
+   void DrawHandoverBanner()
+   {
+      if (gHandoverPath.empty())
+         return;
+      ImGui::SetNextWindowPos(ImVec2(gGraphScreenTL.x + 14.0f, gGraphScreenTL.y + (gReloadBanner ? 110.0f : 14.0f)));
+      ImGui::SetNextWindowBgAlpha(0.95f);
+      if (ImGui::Begin("##handoverbanner", nullptr,
+                       ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing))
+      {
+         const std::string name = std::filesystem::u8path(gHandoverPath).filename().u8string();
+         ImGui::TextColored(ImVec4(0.95f, 0.70f, 0.25f, 1.0f), "Open %s?", name.c_str());
+         ImGui::TextDisabled("This patch has unsaved edits.");
+         if (ImGui::Button("Save, then open"))
+         {
+            const std::string path = gHandoverPath;
+            gHandoverPath.clear();
+            if (!gPatchPath.empty() && SavePatchTo(gPatchPath))
+            {
+               LoadPatchFrom(path);
+               gRequestFitView = true;
+            }
+            else
+               gHandoverPath = path; // no file yet (Save As first) or save failed
+         }
+         ImGui::SameLine();
+         if (ImGui::Button("Open, discard edits"))
+         {
+            const std::string path = gHandoverPath;
+            gHandoverPath.clear();
+            LoadPatchFrom(path);
+            gRequestFitView = true;
+         }
+         ImGui::SameLine();
+         if (ImGui::Button("Cancel"))
+            gHandoverPath.clear();
+      }
+      ImGui::End();
+   }
+
    void DrawReloadBanner()
    {
       if (!gReloadBanner)
@@ -25025,6 +25361,78 @@ namespace
          }
       }
       ImGui::End();
+   }
+
+   // Turbo 0.46: writes the patch-building skill (AISkillContent.h) as
+   // <folder>/infinite-turbo-patching/SKILL.md; an empty folder means Claude
+   // Code's personal skills folder (%USERPROFILE%\.claude\skills).
+   std::string InstallPatchSkill(const std::string& folder)
+   {
+      std::filesystem::path base;
+      if (folder.empty())
+      {
+         const char* profile = std::getenv("USERPROFILE");
+         if (profile == nullptr)
+            return "AI skill: USERPROFILE is not set";
+         base = std::filesystem::u8path(profile) / ".claude" / "skills";
+      }
+      else
+         base = std::filesystem::u8path(folder);
+      const std::filesystem::path dir = base / "infinite-turbo-patching";
+      std::error_code ec;
+      std::filesystem::create_directories(dir, ec);
+      std::ofstream file(dir / "SKILL.md", std::ios::binary | std::ios::trunc);
+      if (!file)
+         return "AI skill: could not write " + (dir / "SKILL.md").u8string();
+      file << AISkillContent::kPatchSkillMarkdown;
+      if (!file.good())
+         return "AI skill: write failed";
+      return "AI skill saved: " + (dir / "SKILL.md").u8string();
+   }
+
+   // Turbo 0.46: the bundled example (assets/examples/superSynthMCP.inf), the
+   // patch Infinite-Turbo opens with. Loaded as an untitled document so a
+   // Save never overwrites the example; `play` starts audio and the transport.
+   bool LoadExamplePatch(bool play)
+   {
+      const std::filesystem::path exeDir =
+         std::filesystem::u8path(Platform::ExecutablePath()).parent_path();
+      const std::filesystem::path candidates[] = {
+         exeDir / "assets" / "examples" / "superSynthMCP.inf",
+         std::filesystem::u8path("assets/examples/superSynthMCP.inf"),
+      };
+      Patch::Data data;
+      std::string error = "example not found";
+      bool ok = false;
+      std::error_code ec;
+      for (const std::filesystem::path& p : candidates)
+         if (std::filesystem::exists(p, ec) && Patch::Read(p.u8string(), data, error))
+         {
+            ok = true;
+            break;
+         }
+      if (!ok)
+      {
+         RuntimeLog::Write("example patch: %s", error.c_str());
+         return false;
+      }
+      ApplyPatchData(data, false); // keeps this machine's audio device and settings
+      Transport::Instance().SetTempo(data.transport.bpm);
+      Transport::Instance().SetTimeSignature(data.transport.timeSigNum, data.transport.timeSigDen);
+      Transport::Instance().SetKey(data.transport.key);
+      Transport::Instance().SetScale(data.transport.scale);
+      gUndoStack.clear();
+      gRedoStack.clear();
+      gPatchPath.clear();
+      gPatchDirty = false;
+      gPatchStatus = "Example: superSynthMCP (Save As to keep your changes)";
+      gRequestFitView = true;
+      if (play)
+      {
+         gAudioAutoStartPending = true; // the engine starts a couple of frames in
+         Transport::Instance().SetPlaying(true);
+      }
+      return true;
    }
 
    bool RecoverAutosave()
@@ -25120,6 +25528,10 @@ namespace
    // Turbo 0.45: describe / explain / batch / patch text / modulate / live
    // hints / auto layout (see the file).
 #include "core/RpcTools.inl"
+   // Turbo 0.46: Performance Mode (upstream's Performance Matrix).
+#include "core/PerfPanel.inl"
+   // Turbo 0.46: RPC / MCP tools for Turbo-only nodes and Performance Mode.
+#include "core/RpcTurboTools.inl"
 
    // Sets one saved setting by its patch key name (what get_params / explain
    // "settings" list), replaying the right type letter.
@@ -25471,6 +25883,9 @@ namespace
          const bool ok = HandleRpcCommandExtra(method, params, outResult, outError, handled);
          if (handled)
             return ok;
+         const bool okTurbo = HandleRpcCommandTurbo(method, params, outResult, outError, handled);
+         if (handled)
+            return okTurbo;
          return HandleRpcCommandBase(method, params, outResult, outError);
       }
       catch (const std::exception& e)
@@ -32407,6 +32822,23 @@ int main(int argc, char** argv)
          return RunMcpBridge();
       else if (std::strcmp(argv[i], "--mcp-install") == 0)
          return InstallMcpConfig();
+   // Turbo 0.46 (upstream R500): one Infinite-Turbo at a time for opening
+   // patches. A second launch with a .inf (double-click in Explorer) hands
+   // the file to the running one and exits; without a file it opens a second
+   // window as before.
+   if (argc > 1 && argv[1] != nullptr && argv[1][0] != '-')
+   {
+      std::string argPath = Platform::CommandLineArgUtf8(1); // UTF-8, unlike argv
+      if (argPath.empty())
+         argPath = argv[1];
+      const bool isPatch = argPath.size() > 4 &&
+                           (_stricmp(argPath.c_str() + argPath.size() - 4, ".inf") == 0 ||
+                            (argPath.size() > 9 && _stricmp(argPath.c_str() + argPath.size() - 9, ".infinite") == 0));
+      if (isPatch && !Platform::BecomePrimaryInstance() && Platform::ForwardOpenToRunningInstance(argPath))
+         return 0;
+   }
+   if (argc <= 1 || (argv[1] != nullptr && argv[1][0] != '-'))
+      Platform::BecomePrimaryInstance();
    std::setvbuf(stdout, nullptr, _IONBF, 0);
    std::setvbuf(stderr, nullptr, _IONBF, 0);
    StartupTrace("startup: main entered");
@@ -32570,41 +33002,12 @@ int main(int argc, char** argv)
 
    // IBM Plex Sans is shipped with the application so typography is identical
    // on every Windows machine. System faces remain only as an emergency
-   // fallback if the package was copied incompletely. Retina-aware: load at
-   // 2x and scale down on HiDPI displays.
-   {
-      float xscale = 1.0f, yscale = 1.0f;
-      glfwGetWindowContentScale(window, &xscale, &yscale);
-      const float baseSize = 15.0f;
-      std::vector<std::string> candidates;
-      const std::filesystem::path exeDir =
-         std::filesystem::u8path(Platform::ExecutablePath()).parent_path();
-      candidates.push_back((exeDir / "assets" / "fonts" / "IBMPlexSans-Regular.ttf").u8string());
-      candidates.push_back("assets/fonts/IBMPlexSans-Regular.ttf");
-      candidates.push_back("C:/Windows/Fonts/SegUIVar.ttf");
-      candidates.push_back("C:/Windows/Fonts/segoeui.ttf");
-      candidates.push_back("C:/Windows/Fonts/arial.ttf");
-      ImGuiIO& io = ImGui::GetIO();
-      ImFont* uiFont = nullptr;
-      for (const std::string& path : candidates)
-      {
-         uiFont = io.Fonts->AddFontFromFileTTF(path.c_str(), baseSize * xscale);
-         if (uiFont != nullptr)
-         {
-            io.FontGlobalScale = 1.0f / xscale;
-            RuntimeLog::Write("UI font loaded: %s", path.c_str());
-            break;
-         }
-      }
-      if (uiFont != nullptr)
-      {
-         // Build now so lowercase glyph entries can be mapped to the matching
-         // uppercase IBM Plex shapes before the backend uploads the atlas.
-         io.Fonts->Build();
-         ForceAsciiUppercaseGlyphs(uiFont);
-      }
-   }
-
+   // fallback if the package was copied incompletely.
+   // Turbo 0.46 (upstream R527): the UI follows the monitor's scale. ImGui is
+   // laid out in points (the GLFW backend divides the window by the point
+   // scale), the font is baked at its final pixel size and brought back to 15
+   // units, so text and nodes grow together and stay sharp. See ApplyUiScale.
+   ApplyUiScale(window);
    ImGuiStyle& style = ImGui::GetStyle();
    style.FrameRounding = 3.0f;
    style.GrabRounding = 3.0f;
@@ -32612,6 +33015,8 @@ int main(int argc, char** argv)
    style.ItemSpacing = ImVec2(6, 5);
 
    ImGui_ImplGlfw_InitForOpenGL(window, true);
+   // Turbo 0.46: a monitor with another scale (or a Windows scale change).
+   glfwSetWindowContentScaleCallback(window, [](GLFWwindow*, float, float) { gUiRescaleRequested = true; });
    // Installed after the backend so it chains rather than replacing ImGui's.
    glfwSetDropCallback(window, OnFilesDropped);
    ImGui_ImplOpenGL3_Init("#version 150");
@@ -32725,6 +33130,9 @@ int main(int argc, char** argv)
       if (const char* portEnv = getenv("INFINITE_CONTROL_PORT"))
          controlPort = atoi(portEnv);
       RemoteControl::Start(controlPort);
+      // Turbo 0.46: one release check per launch (Settings turns it off).
+      if (gUpdateCheckEnabled)
+         TurboUpdate::Start();
    }
 
    // Turbo: opt-in auto-start (Settings > Audio > "Start audio when Infinite
@@ -34211,13 +34619,19 @@ int main(int argc, char** argv)
 
    if (argc > 1 && argv[1] != nullptr && argv[1][0] != '-')
    {
-      const std::string argPath = argv[1];
+      std::string argPath = Platform::CommandLineArgUtf8(1); // Turbo 0.46: accented paths
+      if (argPath.empty())
+         argPath = argv[1];
       if (HasExtension(argPath, std::vector<std::string> { "inf", "infinite" }))
       {
          LoadPatchFrom(argPath);
          gRequestFitView = true;
       }
    }
+   // Turbo 0.46: with no file to open (and nothing to recover), start on the
+   // bundled example, playing. Settings > "Open the example at startup".
+   if (gStartWithExample && gNodes.empty() && gPatchPath.empty() && !gRecoveryAvailable)
+      LoadExamplePatch(true);
    // Any launch-time Finder open is drained by the in-frame loop below, right
    // after the first glfwPollEvents() call.
 
@@ -34249,12 +34663,36 @@ int main(int argc, char** argv)
       PumpAutoLayout();         // nodes placed by the auto layout once they have a size
       RefreshLiveIssues();      // live validation hints (debounced)
       PollPatchFileWatch();     // Turbo 0.45: the open file changed on disk
+      // Turbo 0.46: the Performance panel keeps the edit shortcuts only while
+      // it was the last thing clicked.
+      if (ImGui::GetCurrentContext() != nullptr &&
+          (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right)))
+      {
+         const ImVec2 m = ImGui::GetIO().MousePos;
+         const bool inPerf = gPerfPanelOpen && m.x >= gPerfPanelRectMin.x && m.x <= gPerfPanelRectMax.x &&
+                             m.y >= gPerfPanelRectMin.y && m.y <= gPerfPanelRectMax.y;
+         if (!inPerf)
+            gPerfMatrixClaimedKeys = false;
+      }
+      if (!gPerfPanelOpen)
+         gPerfMatrixClaimedKeys = false;
+      gPerfMatrixFocused = gPerfMatrixClaimedKeys && gPerfEditMode;
 
       std::string pendingOpenPatch;
       while (Platform::PollPendingOpenFile(pendingOpenPatch))
       {
-         LoadPatchFrom(pendingOpenPatch);
-         gRequestFitView = true;
+         // Turbo 0.46: handed over by a second launch (Explorer double-click).
+         // With unsaved edits here, ask first (banner) instead of replacing them.
+         if (gPatchDirty)
+            gHandoverPath = pendingOpenPatch;
+         else
+         {
+            LoadPatchFrom(pendingOpenPatch);
+            gRequestFitView = true;
+         }
+         if (glfwGetWindowAttrib(window, GLFW_ICONIFIED))
+            glfwRestoreWindow(window);
+         glfwFocusWindow(window);
       }
 
       // Device-change/sleep-wake self-healing (docs/plans/optimization/
@@ -34309,6 +34747,7 @@ int main(int argc, char** argv)
          }
       }
 
+      PumpUiRescale(window); // Turbo 0.46
       ImGui_ImplOpenGL3_NewFrame();
       ImGui_ImplGlfw_NewFrame();
 
@@ -35040,6 +35479,8 @@ int main(int argc, char** argv)
                gModMatrixOpen = !gModMatrixOpen;
             if (ImGui::MenuItem("Arrangement timeline", "Shift+T", gArrangePanelOpen))
                gArrangePanelOpen = !gArrangePanelOpen;
+            if (ImGui::MenuItem("Performance mode", "Shift+P", gPerfPanelOpen))
+               gPerfPanelOpen = !gPerfPanelOpen;
             ImGui::SeparatorText("Output behind the canvas");
             GraphNode* bgNode = gCanvasBgNodeIndex >= 0 ? FindNodeByIndex(gCanvasBgNodeIndex) : nullptr;
             if (bgNode != nullptr)
@@ -35137,6 +35578,37 @@ int main(int argc, char** argv)
                   gMainSwapIntervalApplied = -1; // re-applied right before the next swap
             }
 
+            // Turbo 0.46: interface scale (Auto follows the monitor's Windows scale).
+            ImGui::SeparatorText("Interface scale");
+            {
+               static const float kScales[] = { 0.0f, 0.8f, 0.9f, 1.0f, 1.1f, 1.25f, 1.5f, 1.75f, 2.0f };
+               char current[32];
+               if (gUiScaleSetting <= 0.0f)
+                  snprintf(current, sizeof(current), "Auto (Windows, %.0f%%)", gUiPointScale * 100.0f);
+               else
+                  snprintf(current, sizeof(current), "%.0f%%", gUiScaleSetting * 100.0f);
+               ImGui::SetNextItemWidth(190);
+               if (ImGui::BeginCombo("##uiscale", current))
+               {
+                  for (float sc : kScales)
+                  {
+                     char label[32];
+                     if (sc <= 0.0f)
+                        snprintf(label, sizeof(label), "Auto (Windows)");
+                     else
+                        snprintf(label, sizeof(label), "%.0f%%", sc * 100.0f);
+                     if (ImGui::Selectable(label, sc == gUiScaleSetting))
+                     {
+                        gUiScaleSetting = sc;
+                        gUiRescaleRequested = true;
+                     }
+                  }
+                  ImGui::EndCombo();
+               }
+               if (ImGui::IsItemHovered())
+                  ImGui::SetTooltip("Size of the whole interface. Auto follows the scale Windows uses\n"
+                                    "for the monitor the window is on (and changes when you move it).");
+            }
             ImGui::SeparatorText("Theme");
             {
                const std::vector<std::string>& presets = CategoryColors::PresetNames();
@@ -35356,6 +35828,53 @@ int main(int argc, char** argv)
                gGlobalsOpen = true;
             if (ImGui::MenuItem("Help / module reference"))
                gHelpOpen = true;
+
+            // Turbo 0.46: AI assistants (MCP server + patch-building skill).
+            ImGui::SeparatorText("AI assistants (Claude / MCP)");
+            if (ImGui::MenuItem("Connect to Claude Desktop (MCP)"))
+               InstallMcpConfig(); // reports in a message box
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("Registers this Infinite-Turbo as an MCP server in Claude Desktop's config\n"
+                                 "(same as setup-mcp.bat). Restart Claude Desktop afterwards.");
+            if (ImGui::MenuItem("Install AI skill for Claude Code"))
+               gPatchStatus = InstallPatchSkill(std::string());
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("Writes the patch-building guide to %%USERPROFILE%%\\.claude\\skills\\infinite-turbo-patching");
+            if (ImGui::MenuItem("Save AI skill to a folder..."))
+            {
+               const std::string folder = Platform::OpenFolderDialog("Folder for the infinite-turbo-patching skill");
+               if (!folder.empty())
+                  gPatchStatus = InstallPatchSkill(folder);
+            }
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("Saves infinite-turbo-patching\\SKILL.md: zip that folder to upload it as a skill in\n"
+                                 "Claude (Settings > Capabilities > Skills), or hand the file to any AI assistant.\n"
+                                 "Over MCP the same guide is the authoring_guide tool.");
+
+            ImGui::SeparatorText("Startup");
+            ImGui::Checkbox("Open the example at startup", &gStartWithExample);
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("On: Infinite-Turbo opens with the superSynthMCP example playing.\nOff: it opens empty.");
+            if (ImGui::MenuItem(gPatchDirty ? "Open the example now (drops unsaved edits)" : "Open the example now"))
+               LoadExamplePatch(true);
+
+            ImGui::SeparatorText("Updates");
+            ImGui::Checkbox("Check for updates at startup", &gUpdateCheckEnabled);
+            if (ImGui::MenuItem("Check for updates now"))
+               TurboUpdate::Start();
+            {
+               const int st = TurboUpdate::gStatus.load();
+               std::string latest, err;
+               {
+                  std::lock_guard<std::mutex> lock(TurboUpdate::gMutex);
+                  latest = TurboUpdate::gLatest;
+                  err = TurboUpdate::gError;
+               }
+               if (st == 1) ImGui::TextDisabled("checking...");
+               else if (st == 2) ImGui::TextDisabled("up to date (latest %s)", latest.c_str());
+               else if (st == 3) ImGui::TextDisabled("%s is available", latest.c_str());
+               else if (st == 4) ImGui::TextDisabled("check failed: %s", err.c_str());
+            }
 
             ImGui::SeparatorText("Safety and diagnostics");
             if (ImGui::Checkbox("Diagnostic log", &gDiagnosticLogEnabled))
@@ -35604,7 +36123,20 @@ int main(int argc, char** argv)
          const float searchWidth = ImGui::CalcTextSize(searchLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
          const float itemGap = ImGui::GetStyle().ItemSpacing.x * 4.0f;
          const float searchX = readoutX - searchWidth - itemGap;
-         const float gpuX = searchX - gpuWidth - itemGap;
+         // Turbo 0.46: PERF (Performance Mode) and CLICK (metronome) toggles.
+         const float smallGap = ImGui::GetStyle().ItemSpacing.x;
+         const float perfBtnWidth = ImGui::CalcTextSize("PERF").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+         const float clickBtnWidth = ImGui::CalcTextSize("CLICK").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+         const float perfBtnX = searchX - perfBtnWidth - smallGap;
+         const float clickBtnX = perfBtnX - clickBtnWidth - smallGap;
+         float updateBadgeW = 0.0f; // Turbo 0.46: room for the UPDATE badge
+         if (TurboUpdate::gStatus.load() == 3)
+         {
+            std::lock_guard<std::mutex> lock(TurboUpdate::gMutex);
+            updateBadgeW = ImGui::CalcTextSize(("UPDATE " + TurboUpdate::gLatest).c_str()).x +
+                           ImGui::GetStyle().FramePadding.x * 2.0f + smallGap;
+         }
+         const float gpuX = clickBtnX - updateBadgeW - gpuWidth - itemGap;
          const float audioX = gpuX - audioWidth - itemGap;
 
          {
@@ -35640,6 +36172,57 @@ int main(int argc, char** argv)
          {
             // Sits left of the frame readout with a bit of breathing room,
             // so it reads as its own control rather than glued to the fps text.
+            // Turbo 0.46: newer release badge, left of the toggles.
+            if (TurboUpdate::gStatus.load() == 3)
+            {
+               std::string latest, url;
+               {
+                  std::lock_guard<std::mutex> lock(TurboUpdate::gMutex);
+                  latest = TurboUpdate::gLatest;
+                  url = TurboUpdate::gUrl;
+               }
+               const std::string badge = "UPDATE " + latest;
+               const float badgeW = ImGui::CalcTextSize(badge.c_str()).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+               ImGui::SameLine(clickBtnX - badgeW - smallGap);
+               ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.55f, 0.30f, 1.0f));
+               if (ImGui::Button(badge.c_str()))
+                  Platform::OpenUrl(url);
+               ImGui::PopStyleColor();
+               if (ImGui::IsItemHovered())
+                  ImGui::SetTooltip("Infinite-Turbo %s is out (you have %s): opens the release page",
+                                    latest.c_str(), INFINITE_TURBO_VERSION);
+            }
+            {
+               // Metronome: lit on every beat while it plays (accent on the 1).
+               const bool clickOn = AudioEngine::Instance().TopBarClick();
+               Transport& tr = Transport::Instance();
+               const double beat = tr.Beats();
+               const double frac = beat - std::floor(beat);
+               const bool flash = clickOn && tr.IsPlaying() && frac < 0.18;
+               const bool downbeat = flash && std::fmod(std::floor(beat), std::max(1.0, (double)tr.BeatsPerBar())) < 0.5;
+               ImGui::SameLine(clickBtnX);
+               const int pushed = clickOn ? 1 : 0;
+               if (clickOn)
+                  ImGui::PushStyleColor(ImGuiCol_Button, flash ? (downbeat ? ImVec4(0.95f, 0.55f, 0.20f, 1.0f)
+                                                                          : ImVec4(0.30f, 0.65f, 0.95f, 1.0f))
+                                                               : ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
+               if (ImGui::Button("CLICK"))
+                  AudioEngine::Instance().SetTopBarClick(!clickOn);
+               if (pushed)
+                  ImGui::PopStyleColor();
+               if (ImGui::IsItemHovered())
+                  ImGui::SetTooltip("metronome on the audio output while the transport plays");
+               ImGui::SameLine(perfBtnX);
+               if (gPerfPanelOpen)
+                  ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
+               const bool perfWasOpen = gPerfPanelOpen;
+               if (ImGui::Button("PERF"))
+                  gPerfPanelOpen = !gPerfPanelOpen;
+               if (perfWasOpen)
+                  ImGui::PopStyleColor();
+               if (ImGui::IsItemHovered())
+                  ImGui::SetTooltip("Performance mode: a panel of controls bound to any parameter (Shift+P)");
+            }
             ImGui::SameLine(searchX);
             if (gNodePanelOpen)
                ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
@@ -35743,9 +36326,23 @@ int main(int argc, char** argv)
          gArrangePanelHeight = std::clamp(gArrangePanelHeight, 140.0f,
                                           std::max(140.0f, ImGui::GetContentRegionAvail().y - 220.0f));
       const float arrangeReserve = gArrangePanelOpen ? gArrangePanelHeight + ImGui::GetStyle().ItemSpacing.y : 0.0f;
+      // Turbo 0.46: Performance Mode panel, docked on any side.
+      const bool perfTop = gPerfPanelOpen && gPerfPanelDock == 3;
+      const bool perfBottom = gPerfPanelOpen && gPerfPanelDock == 0;
+      const bool perfLeft = gPerfPanelOpen && gPerfPanelDock == 2;
+      const bool perfRight = gPerfPanelOpen && gPerfPanelDock == 1;
+      if (perfTop || perfBottom)
+         gPerfPanelHeight = std::clamp(gPerfPanelHeight, kPerfPanelMinHeight,
+                                       std::max(kPerfPanelMinHeight, ImGui::GetContentRegionAvail().y - arrangeReserve - 200.0f));
+      if (perfLeft || perfRight)
+         gPerfPanelWidth = std::clamp(gPerfPanelWidth, kPerfPanelMinWidth,
+                                      std::max(kPerfPanelMinWidth, ImGui::GetContentRegionAvail().x - 300.0f));
+      const float perfReserve = (perfTop || perfBottom) ? gPerfPanelHeight + ImGui::GetStyle().ItemSpacing.y : 0.0f;
       const float graphHeight =
-         std::max(150.0f, ImGui::GetContentRegionAvail().y - arrangeReserve -
+         std::max(150.0f, ImGui::GetContentRegionAvail().y - arrangeReserve - perfReserve -
                              ((viewportTop || viewportBottom) ? gViewportPanelHeight + topBottomGap : 0.0f));
+      if (perfTop)
+         DrawPerfPanelDocked("##perfpanel_top", ImVec2(0, gPerfPanelHeight));
 
       // Top- and left-docked viewport panels draw before the canvas: nothing
       // else in this window reserves space above or left of it, so each has
@@ -35753,6 +36350,12 @@ int main(int argc, char** argv)
       // gGraphScreenTL below) reflect it.
       if (viewportTop)
          DrawViewportPanelDocked("##viewportpanel_top", ImVec2(0, gViewportPanelHeight));
+      // Turbo 0.46: after every top panel, so it shares the canvas row.
+      if (perfLeft)
+      {
+         DrawPerfPanelDocked("##perfpanel_left", ImVec2(gPerfPanelWidth, graphHeight));
+         ImGui::SameLine();
+      }
       if (viewportLeft)
       {
          DrawViewportPanelDocked("##viewportpanel_left", ImVec2(gViewportPanelWidth, graphHeight));
@@ -35765,6 +36368,7 @@ int main(int argc, char** argv)
       float rightReserved = 0.0f;
       if (gNodePanelOpen) rightReserved += gNodePanelWidth;
       if (viewportRight) rightReserved += gViewportPanelWidth;
+      if (perfRight) rightReserved += gPerfPanelWidth + ImGui::GetStyle().ItemSpacing.x;
       const float graphWidth = rightReserved > 0.0f
                                   ? std::max(200.0f, ImGui::GetContentRegionAvail().x - rightReserved)
                                   : 0.0f;
@@ -41230,7 +41834,17 @@ int main(int argc, char** argv)
          cullExemptNodes.insert(m.nodeIndex);
       for (const auto& e : Modulation::Instance().Expressions())
          cullExemptNodes.insert(e.first.first);
-      const bool cullingAllowed = !MidiMap::LearnMode() && getenv("INFINITE_NO_CULL") == nullptr;
+      // Turbo 0.46: Performance Mode writes only land on drawn params.
+      for (const Patch::PerfRecord& el : gPerfElements)
+      {
+         if (el.dstIndex >= 0)
+            cullExemptNodes.insert(el.dstIndex);
+         for (const auto& t : el.targets)
+            cullExemptNodes.insert(t.dstIndex);
+         for (const auto& t : el.targetsY)
+            cullExemptNodes.insert(t.dstIndex);
+      }
+      const bool cullingAllowed = !MidiMap::LearnMode() && gPerfAssigningElemIdx < 0 && getenv("INFINITE_NO_CULL") == nullptr;
 
       for (GraphNode& gn : gNodes)
       {
@@ -41308,7 +41922,7 @@ int main(int argc, char** argv)
 
          ed::BeginNode(gn.NodeId());
          ImGui::PushID(gn.index);
-         const bool midiLearnLock = MidiMap::LearnMode();
+         const bool midiLearnLock = MidiMap::LearnMode() || gPerfAssigningElemIdx >= 0; // Turbo 0.46: assign mode too
          if (midiLearnLock)
             ImGui::BeginDisabled();
          const bool dimmed = gn.node->bypassed;
@@ -42110,6 +42724,69 @@ int main(int argc, char** argv)
             gOpenMidiMenu = true;
             gParamRightClickConsumedThisFrame = true;
          }
+         // Turbo 0.46: Performance Mode "Assign Parameter...": the parameter
+         // nearest the mouse in the hovered node lights up; a click binds it.
+         if (gPerfAssigningElemIdx >= 0 && gPerfAssigningElemIdx < (int)gPerfElements.size())
+         {
+            const int hoveredNode = (int)ed::GetHoveredNode().Get() / GraphNode::kStride;
+            const ImVec2 mouse = ImGui::GetMousePos();
+            float best = 1e30f;
+            std::pair<int, int> pick(-1, -1);
+            const ParamPinSpot* pickSpot = nullptr;
+            for (const auto& spot : gParamPinSpots)
+            {
+               if (spot.first.first != hoveredNode)
+                  continue;
+               const float dx = spot.second.c.x - mouse.x, dy = spot.second.c.y - mouse.y;
+               const float d = dx * dx * 0.15f + dy * dy;
+               if (d < best)
+               {
+                  best = d;
+                  pick = spot.first;
+                  pickSpot = &spot.second;
+               }
+            }
+            if (pickSpot != nullptr)
+            {
+               ImDrawList* hl = ImGui::GetWindowDrawList();
+               hl->AddCircleFilled(pickSpot->c, 11.0f, IM_COL32(0, 230, 255, 40), 20);
+               hl->AddCircle(pickSpot->c, 11.0f, IM_COL32(0, 230, 255, 200), 20, 2.0f);
+               const Patch::PerfRecord& el = gPerfElements[(size_t)gPerfAssigningElemIdx];
+               GraphNode* tn = FindNodeByIndex(pick.first);
+               gLiveIssueTip = "Assign '" + el.label + "' " + (gPerfAssigningAxis == 1 ? "(Y axis) " : "") + "-> " +
+                               (tn ? NodeTitleWithInstance(*tn) : std::string("node")) + " / " + pickSpot->name +
+                               "\n(click to assign, Esc or right-click cancels)";
+               if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+               {
+                  PushUndoCheckpoint();
+                  Patch::PerfRecord& e = gPerfElements[(size_t)gPerfAssigningElemIdx];
+                  if (gPerfAssigningAxis == 0)
+                  {
+                     e.dstIndex = pick.first;
+                     e.dstParam = pick.second;
+                     e.boolName.clear();
+                     e.targets.clear(); // extra destinations only; the primary is dstIndex/dstParam
+                     static const char* kDefaults[] = { "Knob", "Fader", "Slider", "Toggle", "XY Pad", "Trigger",
+                                                        "NumBox", "Selector", "Pan/Detent", "Step Gate" };
+                     bool isDefault = e.label.empty();
+                     for (const char* d : kDefaults)
+                        isDefault = isDefault || e.label == d;
+                     if (isDefault)
+                        e.label = pickSpot->name;
+                  }
+                  else
+                  {
+                     if (e.dstIndex < 0)
+                        e.dstIndex = pick.first;
+                     e.dstParam2 = pick.second;
+                     e.targetsY.clear();
+                  }
+                  gPerfAssigningElemIdx = -1;
+               }
+            }
+            if (ImGui::IsKeyPressed(ImGuiKey_Escape) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+               gPerfAssigningElemIdx = -1;
+         }
          if (MidiMap::LearnMode() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
          {
             const int hoveredNode = (int)ed::GetHoveredNode().Get() / GraphNode::kStride;
@@ -42599,7 +43276,7 @@ int main(int argc, char** argv)
       ed::EndCreate();
 
       // ---- keyboard: delete + copy/paste ----
-      const bool typing = io.WantTextInput || gArrangeKeysOwned;
+      const bool typing = io.WantTextInput || gArrangeKeysOwned || gPerfMatrixFocused; // Turbo 0.46
       const bool cmdOrCtrl = io.KeyCtrl || io.KeySuper;
 
       // Shift+Cmd+Z is the Mac convention for redo; Ctrl+Y also works for
@@ -43116,6 +43793,7 @@ int main(int argc, char** argv)
       ed::Suspend();
       DrawClipMatrixDeferredPopups(); // Turbo 0.44
       DrawReloadBanner(); // Turbo 0.45
+      DrawHandoverBanner(); // Turbo 0.46
       if (!gLiveIssueTip.empty() && !ImGui::IsAnyItemActive())
          ImGui::SetTooltip("%s", gLiveIssueTip.c_str()); // Turbo 0.45
       gLiveIssueTip.clear();
@@ -43446,6 +44124,17 @@ int main(int argc, char** argv)
             }
             else if (ImGui::Button(MidiMap::Find(gMidiMenuNode, gMidiMenuParam) ? "MIDI learn again" : "MIDI learn"))
                MidiMap::Arm(gMidiMenuNode, gMidiMenuParam, pname);
+            // Turbo 0.46: put this parameter on the Performance Mode panel
+            // (a toggle for a checkbox, a selector for a dropdown, else a knob).
+            {
+               const ParamRef* known = Modulation::Instance().KnownParam(gMidiMenuNode, gMidiMenuParam);
+               const int perfKind = known != nullptr ? (known->isBool ? 3 : known->isEnum ? 7 : known->momentary ? 5 : 0) : 0;
+               if (ImGui::Button("add to Performance"))
+               {
+                  AddToPerformanceMatrix(gMidiMenuNode, gMidiMenuParam, perfKind);
+                  ImGui::CloseCurrentPopup();
+               }
+            }
             if (MidiMap::Mapping* m = MidiMap::Find(gMidiMenuNode, gMidiMenuParam))
             {
                ImGui::SameLine();
@@ -43489,6 +44178,9 @@ int main(int argc, char** argv)
       if (!ImGui::GetIO().WantTextInput && !ImGui::GetIO().KeyCtrl && ImGui::GetIO().KeyShift &&
           ImGui::IsKeyPressed(ImGuiKey_T, false))
          gArrangePanelOpen = !gArrangePanelOpen;
+      if (!ImGui::GetIO().WantTextInput && !ImGui::GetIO().KeyCtrl && ImGui::GetIO().KeyShift &&
+          ImGui::IsKeyPressed(ImGuiKey_P, false))
+         gPerfPanelOpen = !gPerfPanelOpen; // Turbo 0.46: Performance Mode
       if (gModMatrixOpen)
       {
          ImGui::SetNextWindowSize(ImVec2(820, 420), ImGuiCond_FirstUseEver);
@@ -44532,8 +45224,15 @@ int main(int argc, char** argv)
       // canvas (and below the row above, if that one drew anything) rather
       // than same-line - see the graphHeight calc above ed::Begin(), which
       // already reserved this space.
+      if (perfRight)
+      {
+         ImGui::SameLine();
+         DrawPerfPanelDocked("##perfpanel_right", ImVec2(gPerfPanelWidth, graphHeight));
+      }
       if (viewportBottom)
          DrawViewportPanelDocked("##viewportpanel_bottom", ImVec2(0, gViewportPanelHeight));
+      if (perfBottom)
+         DrawPerfPanelDocked("##perfpanel_bottom", ImVec2(0, gPerfPanelHeight));
 
       // Turbo 0.43: Arrangement Timeline, docked at the bottom.
       if (gArrangePanelOpen)
@@ -44863,6 +45562,23 @@ int main(int argc, char** argv)
                }
             }
          }
+
+         // Turbo 0.46: Performance Mode - MIDI-bound controls, then this
+         // frame's writes from the matrix, before modulation reads anything.
+         UpdatePerformanceMatrixMIDI();
+         gPerfSlotWrites.clear();
+         for (const ParamRef& ref : modulation.FrameParams())
+         {
+            if (ref.value == nullptr)
+               continue;
+            auto it = gPerfPendingWrites.find({ ref.nodeIndex, ref.paramIndex });
+            if (it == gPerfPendingWrites.end())
+               continue;
+            const float lo = std::min(ref.minValue, ref.maxValue), hi = std::max(ref.minValue, ref.maxValue);
+            *ref.value = std::clamp(it->second, lo, hi);
+            gPerfSlotWrites[{ ref.nodeIndex, ref.paramIndex }] = *ref.value;
+         }
+         gPerfPendingWrites.clear();
 
          const double t = Transport::Instance().Seconds();
          // Patch-wide named values, evaluated once before any parameter reads
@@ -45599,6 +46315,7 @@ int main(int argc, char** argv)
    ClearMediaThumbnails();
    gNodes.clear();
    ed::DestroyEditor(gEditor);
+   TurboUpdate::Shutdown(); // Turbo 0.46
    ImGui_ImplOpenGL3_Shutdown();
    ImGui_ImplGlfw_Shutdown();
    ImGui::DestroyContext();

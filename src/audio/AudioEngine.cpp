@@ -565,13 +565,14 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
    // Turbo: direct metronome, after the graph and the preview.
    {
       Transport& transport = Transport::Instance();
-      if (mDirectClick.load(std::memory_order_relaxed) && transport.IsPlaying() && sampleRate > 0.0)
+      const bool nodeClick = mDirectClick.load(std::memory_order_relaxed);
+      if ((nodeClick || mTopBarClick.load(std::memory_order_relaxed)) && transport.IsPlaying() && sampleRate > 0.0)
       {
          const double spb = sampleRate * 60.0 / std::max(1.0, (double)transport.Tempo());
          mDirectClickGen.RenderAdd(buffers, std::min(numChannels, 2), numFrames, transport.Beats(), spb,
                                    transport.BeatsPerBar(), sampleRate,
-                                   mDirectClickVolume.load(std::memory_order_relaxed),
-                                   mDirectClickAccent.load(std::memory_order_relaxed));
+                                   nodeClick ? mDirectClickVolume.load(std::memory_order_relaxed) : 0.5f,
+                                   nodeClick ? mDirectClickAccent.load(std::memory_order_relaxed) : true);
       }
       else
          mDirectClickGen.Reset();

@@ -63,6 +63,9 @@ namespace
       file << p << "autosaveEnabled " << (s.autosaveEnabled ? 1 : 0) << "\n";
       file << p << "autosaveSeconds " << s.autosaveSeconds << "\n";
       file << p << "audioAutoStart " << (s.audioAutoStart ? 1 : 0) << "\n";
+      file << p << "uiScale " << s.uiScale << "\n";
+      file << p << "updateCheck " << (s.updateCheck ? 1 : 0) << "\n";
+      file << p << "startWithExample " << (s.startWithExample ? 1 : 0) << "\n";
    }
 
    void ReadSettingValue(const std::string& key, std::istringstream& in, SceneSettings& s)
@@ -93,6 +96,9 @@ namespace
       else if (key == "autosaveEnabled") { int v = 0; in >> v; s.autosaveEnabled = v != 0; }
       else if (key == "autosaveSeconds") in >> s.autosaveSeconds;
       else if (key == "audioAutoStart") { int v = 0; in >> v; s.audioAutoStart = v != 0; }
+      else if (key == "uiScale") in >> s.uiScale;
+      else if (key == "updateCheck") { int v = 1; in >> v; s.updateCheck = v != 0; }
+      else if (key == "startWithExample") { int v = 1; in >> v; s.startWithExample = v != 0; }
    }
 
    // Written with %.9g so a float survives the round trip exactly rather than
@@ -318,6 +324,33 @@ static bool WriteStream(std::ostream& file, const Data& data, std::string& outEr
            << (m.invert ? 1 : 0) << " " << FloatToString(m.outMin) << " " << FloatToString(m.outMax) << " "
            << dev << " " << EscapeLine(m.paramName) << "\n";
       file << "midismooth " << m.dstIndex << " " << m.dstParam << " " << FloatToString(m.smoothMs) << "\n";
+   }
+   // Turbo 0.46: Performance Mode (upstream's lines, so patches stay compatible).
+   if (data.perfLayout.cellSize != 76 || data.perfLayout.pageCount > 1 || !data.perfLayout.pageNames.empty())
+   {
+      file << "perfui " << data.perfLayout.cellSize << " " << data.perfLayout.pageCount << "\n";
+      for (size_t i = 0; i < data.perfLayout.pageNames.size(); i++)
+         file << "perfname " << i << " " << EscapeLine(data.perfLayout.pageNames[i]) << "\n";
+   }
+   for (size_t i = 0; i < data.performance.size(); i++)
+   {
+      const PerfRecord& p = data.performance[i];
+      std::string boolToken = p.boolName.empty() ? "-" : p.boolName;
+      file << "perf " << p.kind << " " << p.dstIndex << " " << p.dstParam << " " << p.dstParam2 << " "
+           << p.cellX << " " << p.cellY << " " << p.page << " "
+           << FloatToString(p.colorR) << " " << FloatToString(p.colorG) << " " << FloatToString(p.colorB) << " "
+           << FloatToString(p.value) << " " << FloatToString(p.value2) << " "
+           << boolToken << " " << EscapeLine(p.label) << "\n";
+      for (const auto& t : p.targets)
+         file << "perftarget " << i << " " << t.dstIndex << " " << t.dstParam << " 0 "
+              << (t.boolName.empty() ? std::string("-") : t.boolName) << "\n";
+      for (const auto& t : p.targetsY)
+         file << "perftarget " << i << " " << t.dstIndex << " " << t.dstParam << " 1 "
+              << (t.boolName.empty() ? std::string("-") : t.boolName) << "\n";
+      if (p.midiDevice != 0)
+         file << "perfmidi " << i << " 0 " << p.midiDevice << " " << p.midiChannel << " " << p.midiController << " " << (p.midiIsNote ? 1 : 0) << "\n";
+      if (p.midiDeviceY != 0)
+         file << "perfmidi " << i << " 1 " << p.midiDeviceY << " " << p.midiChannelY << " " << p.midiControllerY << " " << (p.midiIsNoteY ? 1 : 0) << "\n";
    }
    file << "transport " << FloatToString(data.transport.bpm) << " "
         << data.transport.timeSigNum << " " << data.transport.timeSigDen << " "
@@ -708,6 +741,97 @@ static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
          for (GestureRecord& g : outData.gestures)
             if (g.dstIndex == dstIndex && g.dstParam == dstParam)
                g.curve = curve;
+      }
+      else if (tag == "perfui")
+      {
+         in >> outData.perfLayout.cellSize >> outData.perfLayout.pageCount;
+         std::string nameToken; // legacy: names as trailing tokens
+         while (in >> nameToken)
+            outData.perfLayout.pageNames.push_back(UnescapeLine(nameToken));
+      }
+      else if (tag == "perfname")
+      {
+         int page = -1;
+         if (in >> page && page >= 0 && page < 1024)
+         {
+            std::string raw;
+            std::getline(in, raw);
+            if (!raw.empty() && raw[0] == ' ')
+               raw.erase(0, 1);
+            if ((int)outData.perfLayout.pageNames.size() <= page)
+               outData.perfLayout.pageNames.resize(page + 1);
+            outData.perfLayout.pageNames[page] = UnescapeLine(raw);
+         }
+      }
+      else if (tag == "perf")
+      {
+         PerfRecord p;
+         in >> p.kind >> p.dstIndex >> p.dstParam >> p.dstParam2
+            >> p.cellX >> p.cellY >> p.page
+            >> p.colorR >> p.colorG >> p.colorB;
+         std::string tok1;
+         if (in >> tok1)
+         {
+            char* endP = nullptr;
+            float val1 = std::strtof(tok1.c_str(), &endP);
+            if (endP != tok1.c_str() && *endP == '\0')
+            {
+               p.value = val1;
+               std::string tok2;
+               if (in >> tok2)
+               {
+                  float val2 = std::strtof(tok2.c_str(), &endP);
+                  if (endP != tok2.c_str() && *endP == '\0')
+                  {
+                     p.value2 = val2;
+                     in >> p.boolName;
+                  }
+                  else
+                     p.boolName = tok2;
+               }
+            }
+            else
+               p.boolName = tok1;
+         }
+         if (p.boolName == "-")
+            p.boolName.clear();
+         std::string raw;
+         std::getline(in, raw);
+         if (!raw.empty() && raw[0] == ' ')
+            raw.erase(0, 1);
+         p.label = UnescapeLine(raw);
+         outData.performance.push_back(p);
+      }
+      else if (tag == "perftarget")
+      {
+         int elemIdx = 0, dstIdx = -1, dstP = -1, axis = 0;
+         std::string bTok;
+         if (in >> elemIdx >> dstIdx >> dstP >> axis >> bTok)
+            if (elemIdx >= 0 && elemIdx < (int)outData.performance.size())
+            {
+               PerfTarget pt;
+               pt.dstIndex = dstIdx;
+               pt.dstParam = dstP;
+               if (bTok != "-") pt.boolName = bTok;
+               (axis == 1 ? outData.performance[elemIdx].targetsY : outData.performance[elemIdx].targets).push_back(pt);
+            }
+      }
+      else if (tag == "perfmidi")
+      {
+         int elemIdx = 0, axis = 0, dev = 0, ch = -1, ctrl = -1, isNoteInt = 0;
+         if (in >> elemIdx >> axis >> dev >> ch >> ctrl >> isNoteInt)
+            if (elemIdx >= 0 && elemIdx < (int)outData.performance.size())
+            {
+               PerfRecord& r = outData.performance[elemIdx];
+               if (axis == 1)
+               {
+                  r.midiDeviceY = dev; r.midiChannelY = ch; r.midiControllerY = ctrl; r.midiIsNoteY = isNoteInt != 0;
+               }
+               else
+               {
+                  r.midiDevice = dev; r.midiChannel = ch; r.midiController = ctrl; r.midiIsNote = isNoteInt != 0;
+               }
+            }
       }
       else if (tag == "transport")
       {

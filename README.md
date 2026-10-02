@@ -3,7 +3,7 @@
 [![Original project](https://img.shields.io/badge/original-n1m21n%2FInfinite-181717?logo=github)](https://github.com/n1m21n/Infinite)
 [![Discord](https://img.shields.io/badge/Discord-Infinite-5865F2?logo=discord&logoColor=white)](https://discord.gg/wpKdexvhn)
 
-**Version 0.45.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
+**Version 0.46.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
 
 Infinite-Turbo is a Windows-only mod of **Infinite**, the node-based audiovisual workstation by Naman Soni: realtime image and video processing, procedural 3D, synthesis and DSP, VST3 hosting, MIDI, OSC and CV modulation across all of them, in one patch.
 
@@ -33,8 +33,11 @@ The core is Infinite (same graph, same modules, `.inf` patches). Turbo adds Wind
 | debug build / clean reconfigure | `build-windows.bat debug` / `build-windows.bat fresh` |
 | run | `run-windows.bat` |
 | connect Claude (MCP) | `setup-mcp.bat`, then restart Claude Desktop |
+| make a release (ZIP + notes + tag) | `release-windows.bat`, then upload `dist\release\*` on the GitHub page it opens |
 | run the self-tests | `test-windows.bat` (`-Quick` for a smoke run) |
 | report a startup problem | `diagnose-windows.bat` (writes `Infinite-Turbo-diagnostic.log`) |
+
+It opens on the **superSynthMCP** example, playing; Settings > Startup turns that off.
 
 ## What Turbo adds
 
@@ -46,7 +49,8 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 |---|---|
 | **Clip Matrix** | session view for audio, video and image clips: tracks x scenes (4 x 8 up to 16 x 16), launches quantized on the audio thread, loop / once / gate, tempo sync and pitch per clip, follow actions, scenes with tempo and meter, MIDI and CV launching, recording into the timeline. **Clip Matrix Out** splits it into one video + audio output per track |
 | **Arrangement Timeline** | upstream's timeline: video and audio tracks, track groups, clips from nodes or files, waveforms and thumbnails, 3D clips, tempo-synced samples, loop, markers, render queue to MP4 / MOV / WAV |
-| **Transport Control** | play / stop / tap, tempo glide, external MIDI clock, key and scale, time signature, metronome; every control is a CV pin |
+| **Performance Mode** | a dockable panel (PERF, Shift+P) of knobs, faders, XY pads, triggers, selectors and step gates on pages, each bound to any parameter by clicking it, with MIDI learn |
+| **Transport Control** | play / stop / tap, tempo glide, external MIDI clock, key and scale, time signature, metronome; every control is a CV pin (CLICK in the top bar is a metronome without a node) |
 | **Looper** | REC / PLAY / DUB, bar-synced, layer undo / redo, export WAV, latency compensation |
 | **MPC** / **MPC Out** | 16 sample pads (one shot, gate, loop), trim, pitch, pan, a CV pin per pad, one output per pad |
 | **VMPC** | the MPC for video clips, with their soundtrack |
@@ -80,6 +84,8 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 | **Live hints** | an amber border (with a tooltip) on half-wired mixers, empty Outputs and image loops without a Feedback node |
 | **Live reload** | the open `.inf` is watched: an outside change reloads it (one undo step), or asks first if you have unsaved edits |
 | **Auto layout** | nodes without a position (patches written by hand or by an AI) are laid out by signal flow |
+| **Single instance** | double-clicking a `.inf` opens it in the running Infinite-Turbo (asks first if there are unsaved edits) |
+| **Interface scale** | follows Windows' display scale per monitor, or a fixed size in Settings |
 | **Browser** | favourites, filter and sort for modules, samples, media and plugins |
 | **Color markers, comments, groups** | right-click a node; comments are edited by hovering and typing |
 
@@ -105,6 +111,9 @@ Infinite-Turbo is also an [MCP](https://modelcontextprotocol.io) server: `Infini
 
 Claude Code: `claude mcp add infinite-turbo -- "C:\path\to\Infinite-Turbo.exe" --mcp`
 
+The Settings menu has the same setup under "AI assistants", plus **Install AI skill for Claude Code**
+and **Save AI skill to a folder** (zip the folder to upload it as a skill in Claude).
+
 If the app is closed, the first request starts it. Every change is one undo step (Ctrl+Z).
 
 | Tool | Purpose |
@@ -115,6 +124,10 @@ If the app is closed, the first request starts it. Every change is one undo step
 | `modulate`, `set_expression`, `unmodulate` | drive a param by name from a modulator or an expression |
 | `batch` | several commands as one undo step, all or nothing (`"$0"` refers to the first result) |
 | `patch_format`, `get_patch_text`, `validate_patch_text`, `load_patch_text` | work with the patch as text |
+| `screenshot_node`, `render_frame` | look at a node's image or the live Output |
+| `authoring_guide` (and the `build_patch` prompt) | the patch-building guide; read once before building |
+| `clip_matrix`, `pads`, `looper` | Turbo only: launch clips and scenes, hit MPC/VMPC pads, drive the Looper |
+| `perf_list`, `perf_add`, `perf_remove`, `perf_show` | Turbo only: build and open the Performance Mode panel |
 | `auto_layout`, `fit_view`, `transport`, `undo`, `redo`, `load_patch`, `save_patch`, `new_patch` | the rest |
 
 The control port listens on `127.0.0.1:7777` only (`INFINITE_CONTROL_PORT` changes it) and needs the token the app writes to `%LOCALAPPDATA%\Infinite\control_token`.
@@ -132,6 +145,7 @@ The control port listens on `127.0.0.1:7777` only (`INFINITE_CONTROL_PORT` chang
 | Shift+T | Arrangement Timeline |
 | Ctrl+M | MIDI learn mode |
 | Shift+M | modulation matrix |
+| Shift+P | Performance Mode |
 | Space | play / stop |
 | Double-click a knob, slider or field | type a value (`=` starts an expression) |
 | Shift + drag a knob | record a gesture |

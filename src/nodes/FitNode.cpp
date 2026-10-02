@@ -13,10 +13,11 @@ namespace
       "out vec4 fragColor;\n"
       "uniform sampler2D uSrc;\n"
       "uniform vec2 uScale;\n"   // source-uv scale about the centre
+      "uniform vec2 uShift;\n"   // Turbo 0.46: output-uv translation of the image
       "uniform vec3 uBgColor;\n"
       "uniform float uBgOpacity;\n"
       "void main() {\n"
-      "   vec2 uv = (vUv - 0.5) * uScale + 0.5;\n"
+      "   vec2 uv = (vUv - uShift - 0.5) * uScale + 0.5;\n"
       "   if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {\n"
       "      fragColor = vec4(uBgColor, uBgOpacity);\n"
       "      return;\n"
@@ -108,8 +109,10 @@ void FitNode::CookIfNeeded(int frameId)
       return;
    NodeWorkCounter()++;
 
-   GLUtil::RunShaderPass(mOut, mProgram, [this, srcTex, scaleX, scaleY]()
+   GLUtil::RunShaderPass(mOut, mProgram, [this, srcTex, scaleX, scaleY, dstW, dstH]()
    {
+      glUniform2f(glGetUniformLocation(mProgram, "uShift"), offsetX / (float)std::max(1, dstW),
+                  offsetY / (float)std::max(1, dstH));
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, srcTex);
       glUniform1i(glGetUniformLocation(mProgram, "uSrc"), 0);

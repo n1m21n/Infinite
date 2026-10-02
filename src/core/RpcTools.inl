@@ -681,6 +681,108 @@ nlohmann::json ExplainNode(GraphNode& gn)
    return out;
 }
 
+// ----------------------------------------------------------- image capture ---
+// Turbo 0.46 (MCP phase 3): a node's image as a small JPEG / PNG, so an MCP
+// client can look at what it built. Read back from the node's current output
+// texture (main thread, GL current), downscaled to fit `maxSize`.
+bool RpcCaptureTexture(unsigned int tex, int w, int h, int maxSize, bool png, std::string& outBase64,
+                       int& outW, int& outH, std::string& err)
+{
+   if (tex == 0 || w <= 0 || h <= 0)
+   {
+      err = "this node has no image output right now (is something connected and playing?)";
+      return false;
+   }
+   std::vector<unsigned char> pixels((size_t)w * (size_t)h * 4);
+   GLint prevFbo = 0;
+   glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
+   GLuint fbo = 0;
+   glGenFramebuffers(1, &fbo);
+   glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+   const bool complete = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+   if (complete)
+   {
+      glPixelStorei(GL_PACK_ALIGNMENT, 1);
+      glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+   }
+   glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prevFbo);
+   glDeleteFramebuffers(1, &fbo);
+   if (!complete)
+   {
+      err = "could not read this node's texture";
+      return false;
+   }
+   // Box-filter down to maxSize on the long side, flipping to top-down rows.
+   const float scale = std::min(1.0f, (float)std::max(16, maxSize) / (float)std::max(w, h));
+   outW = std::max(1, (int)std::lround(w * scale));
+   outH = std::max(1, (int)std::lround(h * scale));
+   std::vector<unsigned char> small((size_t)outW * (size_t)outH * 4);
+   for (int y = 0; y < outH; y++)
+   {
+      const int sy0 = (int)((float)y / outH * h), sy1 = std::max(sy0 + 1, (int)((float)(y + 1) / outH * h));
+      for (int x = 0; x < outW; x++)
+      {
+         const int sx0 = (int)((float)x / outW * w), sx1 = std::max(sx0 + 1, (int)((float)(x + 1) / outW * w));
+         unsigned int acc[4] = { 0, 0, 0, 0 };
+         int n = 0;
+         for (int sy = sy0; sy < sy1 && sy < h; sy++)
+            for (int sx = sx0; sx < sx1 && sx < w; sx++, n++)
+               for (int c = 0; c < 4; c++)
+                  acc[c] += pixels[((size_t)sy * w + sx) * 4 + c];
+         unsigned char* d = &small[((size_t)(outH - 1 - y) * outW + x) * 4];
+         for (int c = 0; c < 4; c++)
+            d[c] = (unsigned char)(n > 0 ? acc[c] / n : 0);
+      }
+   }
+   std::vector<unsigned char> encoded;
+   auto sink = [](void* ctx, void* data, int size)
+   {
+      auto* out = static_cast<std::vector<unsigned char>*>(ctx);
+      out->insert(out->end(), (unsigned char*)data, (unsigned char*)data + size);
+   };
+   stbi_flip_vertically_on_write(0);
+   if (png)
+      stbi_write_png_to_func(sink, &encoded, outW, outH, 4, small.data(), outW * 4);
+   else
+   {
+      std::vector<unsigned char> rgb((size_t)outW * outH * 3);
+      for (size_t i = 0; i < (size_t)outW * outH; i++)
+      {
+         // Over black, so a transparent area reads as black, as on an output.
+         const unsigned a = small[i * 4 + 3];
+         for (int c = 0; c < 3; c++)
+            rgb[i * 3 + c] = (unsigned char)(small[i * 4 + c] * a / 255);
+      }
+      stbi_write_jpg_to_func(sink, &encoded, outW, outH, 3, rgb.data(), 85);
+   }
+   if (encoded.empty())
+   {
+      err = "image encoding failed";
+      return false;
+   }
+   outBase64 = Base64::Encode(encoded.data(), encoded.size());
+   return true;
+}
+
+bool RpcCaptureNode(GraphNode& gn, int output, const nlohmann::json& params, nlohmann::json& outResult,
+                    std::string& outError)
+{
+   INode* n = gn.node.get();
+   const int maxSize = std::clamp(params.value("max_size", 768), 64, 2048);
+   const bool png = params.value("format", std::string("jpeg")) == "png";
+   std::string b64;
+   int w = 0, h = 0;
+   const unsigned int tex = n->GetOutputTextureAt(output);
+   if (!RpcCaptureTexture(tex, n->GetOutputWidthAt(output), n->GetOutputHeightAt(output), maxSize, png, b64, w, h, outError))
+      return false;
+   outResult = { { "image_base64", b64 }, { "mime", png ? "image/png" : "image/jpeg" },
+                 { "index", gn.index }, { "type", gn.typeName }, { "output", output },
+                 { "source_size", { n->GetOutputWidthAt(output), n->GetOutputHeightAt(output) } },
+                 { "image_size", { w, h } } };
+   return true;
+}
+
 // --------------------------------------------------------------- dispatch ---
 bool HandleRpcCommand(const std::string& method, const nlohmann::json& params,
                       nlohmann::json& outResult, std::string& outError);
@@ -1001,6 +1103,52 @@ bool HandleRpcCommandExtra(const std::string& method, const nlohmann::json& para
          t.SetPlaying(params["play"].get<bool>());
       outResult = { { "playing", t.IsPlaying() }, { "bpm", t.Tempo() }, { "beat", t.Beats() },
                     { "audio_running", AudioEngine::Instance().SampleRate() > 0.0 } };
+      return true;
+   }
+   if (method == "screenshot_node")
+   {
+      GraphNode* gn = FindNodeByIndex(params.value("index", -1));
+      if (gn == nullptr)
+      {
+         outError = "unknown node index";
+         return false;
+      }
+      const int output = params.contains("output") ? RpcResolveOutput(*gn, params["output"]) : 0;
+      if (output < 0)
+      {
+         outError = "unknown output";
+         return false;
+      }
+      return RpcCaptureNode(*gn, output, params, outResult, outError);
+   }
+   if (method == "render_frame")
+   {
+      // The live Output (the first one, or the one given), as the projector sees it.
+      GraphNode* target = params.contains("index") ? FindNodeByIndex(params.value("index", -1)) : nullptr;
+      if (target == nullptr)
+         for (GraphNode& g : gNodes)
+            if (dynamic_cast<OutputNode*>(g.node.get()) != nullptr)
+            {
+               target = &g;
+               break;
+            }
+      if (target == nullptr)
+      {
+         outError = "no Output node in the patch (add one, or use screenshot_node on any image node)";
+         return false;
+      }
+      if (!RpcCaptureNode(*target, 0, params, outResult, outError))
+         return false;
+      // Optionally also written to disk at full size (PNG or JPEG by extension).
+      const std::string path = params.value("path", std::string());
+      if (!path.empty())
+      {
+         if (auto* out = dynamic_cast<OutputNode*>(target->node.get()))
+         {
+            ExportImage(out, path);
+            outResult["saved"] = path;
+         }
+      }
       return true;
    }
    if (method == "ping")

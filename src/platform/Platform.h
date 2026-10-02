@@ -822,6 +822,20 @@ namespace Platform
    // AppKit's -[NSApplication finishLaunching] (run inside glfwInit) clobbers.
    void InitDocumentHandlingPostGlfw();
    bool PollPendingOpenFile(std::string& outPath);
+   // Turbo 0.46 (upstream R500): single-instance open. BecomePrimaryInstance
+   // is true for the first Infinite-Turbo (holds a per-user mutex for life);
+   // ForwardOpenToRunningInstance hands a .inf to it (PollPendingOpenFile
+   // there picks it up).
+   bool BecomePrimaryInstance();
+   // Turbo 0.46: small HTTPS GET (update check). Blocking: call from a worker
+   // thread. Fills body and returns true on HTTP 200.
+   bool HttpGet(const std::string& url, std::string& outBody, std::string& outError, int timeoutMs = 10000);
+   // Opens a web page in the default browser.
+   void OpenUrl(const std::string& url);
+   bool ForwardOpenToRunningInstance(const std::string& patchPath);
+   // Turbo 0.46: command-line argument `index` as UTF-8 (argv is in the ANSI
+   // code page, which mangles accented paths); "" if there is none.
+   std::string CommandLineArgUtf8(int index);
 
    // ---- live camera input (for Video In node) -----------------------------
    struct CameraDeviceInfo

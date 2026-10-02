@@ -34,6 +34,13 @@ struct ParamRef
    // the same curve): 0 linear, 1 console dB fader (-60..+12, unity at 75%),
    // 2 logarithmic frequency.
    int taper = 0;
+   // Turbo 0.46 (upstream, for the Performance Mode): what kind of control
+   // drew it, so a matrix control can snap and label it right.
+   bool momentary = false; // a trigger button
+   bool isBool = false;    // a checkbox / toggle
+   float step = 0.0f;      // > 0 = discrete (ints, dropdowns, checkboxes)
+   bool isEnum = false;    // a dropdown: enumOptions holds its labels
+   std::vector<std::string> enumOptions;
 };
 
 // Which modulator drives which parameter. Keyed by (nodeIndex, paramIndex) so the
@@ -122,11 +129,28 @@ public:
    // restart from 1 on a new patch, so a link left over from the previous one
    // does not go stale - it silently re-attaches to whichever node happens to
    // land on that index next.
-   void Clear() { mLinks.clear(); mExpressions.clear(); mExpressionErrors.clear(); }
+   void Clear() { mLinks.clear(); mExpressions.clear(); mExpressionErrors.clear(); mKnown.clear(); }
 
    // Parameters registered during the current frame's node drawing.
    void ClearFrameParams() { mFrameParams.clear(); }
-   void RegisterParam(const ParamRef& ref) { mFrameParams.push_back(ref); }
+   void RegisterParam(const ParamRef& ref)
+   {
+      mFrameParams.push_back(ref);
+      mKnown[Key(ref.nodeIndex, ref.paramIndex)] = ref; // Turbo 0.46
+   }
+   // Turbo 0.46 (upstream): every param seen drawn, kept across frames so a
+   // control bound to an off-screen node still knows its name and range.
+   // `value` is only safe to read through FrameParams (the node may be gone).
+   const ParamRef* KnownParam(int nodeIndex, int paramIndex) const
+   {
+      auto it = mKnown.find(Key(nodeIndex, paramIndex));
+      return it == mKnown.end() ? nullptr : &it->second;
+   }
+   void ForgetKnownParams(int nodeIndex)
+   {
+      for (auto it = mKnown.begin(); it != mKnown.end();)
+         it = it->first.first == nodeIndex ? mKnown.erase(it) : std::next(it);
+   }
    const std::vector<ParamRef>& FrameParams() const { return mFrameParams; }
 
 private:
@@ -134,4 +158,5 @@ private:
    std::map<Key, std::string> mExpressions;
    std::map<Key, std::string> mExpressionErrors;
    std::vector<ParamRef> mFrameParams;
+   std::map<Key, ParamRef> mKnown;
 };

@@ -41,12 +41,15 @@ public:
    bool matchInput = false; // adopt the source's own resolution
    float bgColor[3] = { 0.0f, 0.0f, 0.0f };
    float bgOpacity = 0.0f;
+   float offsetX = 0.0f;    // Turbo 0.46 (upstream R289): output pixels, + moves the image right
+   float offsetY = 0.0f;    // output pixels, + moves the image up
 
    void VisitParams(ParamVisitor& v) override
    {
       v.Int("mode", mode); v.Float("width", width); v.Float("height", height);
       v.Bool("matchInput", matchInput);
       v.Color("bgColor", bgColor); v.Float("bgOpacity", bgOpacity);
+      v.Float("offsetX", offsetX); v.Float("offsetY", offsetY);
    }
 
 private:

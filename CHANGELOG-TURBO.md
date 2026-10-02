@@ -1,5 +1,56 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.46.0-turbo (2026-10-02)
+
+The rest of upstream's Windows-relevant features: Performance Mode, MCP phases 3 and 4, and the
+small items. Left out on purpose: the Field language and everything macOS / Linux / headless only.
+
+### Opens with an example
+- Infinite-Turbo starts on **superSynthMCP**, a bundled example (two Analog synths through delay,
+  mixer and reverb, note sequencers switched from a Performance page, audio-reactive kaleidoscope /
+  glitch / bloom visuals), already playing. It opens untitled, so Save never overwrites it.
+- Settings > Startup: "Open the example at startup" (on by default; off = start empty) and
+  "Open the example now". A `.inf` given on the command line or an autosave to recover wins.
+- `release-windows.bat`: clean build + package, versioned ZIP and release notes in `dist\release`,
+  a local `v<version>` tag, and the GitHub "new release" page opened for the upload.
+
+### Performance Mode (from upstream)
+- **PERF** in the top bar, **Shift+P** or VIEW > Performance mode: a dockable panel (bottom, top, left
+  or right) with pages of controls for playing live: knob, fader, slider, toggle, XY pad, trigger,
+  number box, radio selector, bipolar knob, step gate.
+- Each control is bound to any node parameter: right-click it > Assign Parameter..., then click the
+  parameter on the canvas (the nearest one in the node under the mouse lights up). Or right-click a
+  parameter's pin > "add to Performance".
+- Edit mode (move, resize by type, rename, colour, copy / paste / duplicate, pages: add, rename,
+  duplicate, reorder, delete) and Perform mode. MIDI learn per control (two axes on the XY pad).
+- Saved with the patch in upstream's format (`perfui` / `perfname` / `perf` / `perftarget` /
+  `perfmidi`), so the panels open in both.
+- Discrete parameters (dropdowns, checkboxes, integers) follow the panel too.
+
+### Claude / MCP
+- **`screenshot_node`** and **`render_frame`**: Claude can look at any node's image or the live Output
+  (JPEG / PNG, downscaled); `render_frame path` also saves the Output at full size.
+- **`authoring_guide`** tool and **`build_patch`** prompt: the patch-building guide for AI assistants.
+- **Turbo-only MCP tools**: `clip_matrix` (launch / release clips, scenes, stop rows, read state), `pads`
+  (hit MPC / VMPC pads), `looper` (record, play, overdub, undo, state) and `perf_list` / `perf_add` /
+  `perf_remove` / `perf_show` (build and open the Performance Mode panel).
+- The authoring guide (and the AI skill) gained a **Turbo-only features** section: Clip Matrix, MPC /
+  VMPC, Looper, Super Mixer, Layout, Projection, Spout, Transport Control and Performance Mode keys, so
+  Claude can build patches with the nodes that only exist in Turbo.
+- Settings menu, "AI assistants": Connect to Claude Desktop (same as `setup-mcp.bat`), Install AI skill
+  for Claude Code (`%USERPROFILE%\.claude\skills\infinite-turbo-patching`), Save AI skill to a folder.
+
+### Small ports (from upstream)
+- **Single instance**: double-clicking a `.inf` with Infinite-Turbo already open opens it there (with
+  unsaved edits it asks first: save then open / discard / cancel). Paths with accents work.
+- **Interface scale**: the UI follows Windows' display scale per monitor (and changes when the window
+  moves to another monitor). Settings > Interface scale: Auto or a fixed 80-200%.
+- **Fit**: offset X / Y in output pixels (+ right, + up), modulatable.
+- **CLICK** in the top bar: a metronome on the audio output while the transport plays, no node needed;
+  the button flashes on the beat.
+- **Update check**: one request at startup to this fork's GitHub releases; a newer one shows an
+  UPDATE badge (opens the release page). Settings > Updates turns it off.
+
 ## 0.45.0-turbo (2026-10-02)
 
 Upstream bug fixes, an MCP server for Claude, and three upstream patching aids.

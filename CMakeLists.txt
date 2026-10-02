@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.25)
 # Unofficial Windows-only fork of Infinite (https://github.com/n1m21n/Infinite).
 # macOS support was removed on purpose: every platform path below is Windows
 # (MSVC 2022, x64, vcpkg static triplet, JUCE, OpenCV, Spout2, Windows ML).
-project(InfiniteTurbo VERSION 0.45.0 LANGUAGES C CXX)
+project(InfiniteTurbo VERSION 0.46.0 LANGUAGES C CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Infinite-Turbo builds only on Windows x64 with MSVC (Visual Studio 2022).")
@@ -478,6 +478,12 @@ add_custom_command(TARGET Infinite POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL.txt"
         "$<TARGET_FILE_DIR:Infinite>/assets/fonts/OFL.txt"
+    # Turbo 0.46: the example patch Infinite-Turbo opens with.
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        "$<TARGET_FILE_DIR:Infinite>/assets/examples"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/examples/superSynthMCP.inf"
+        "$<TARGET_FILE_DIR:Infinite>/assets/examples/superSynthMCP.inf"
     VERBATIM)
 # The upstream codebase stores UTF-8 paths in std::string. Preserve that
 # ABI while using C++20 for the Windows ML headers.

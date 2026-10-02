@@ -4,6 +4,8 @@
 #include "platform/OpenGLHeaders.h"
 #include "audio/AudioFileWriter.h"
 #include "core/RuntimeLog.h"
+#include "platform/SettingsPaths.h"
+#include "platform/SingleInstance.h"
 
 #include <windows.h>
 #include <timeapi.h>
@@ -2106,7 +2108,85 @@ namespace Platform
 
    void InitDocumentHandlingPreGlfw() {}
    void InitDocumentHandlingPostGlfw() {}
-   bool PollPendingOpenFile(std::string&) { return false; }
+   // Turbo 0.46: .inf files handed over by a second launch (SingleInstance.h),
+   // polled at most every 0.4 s (a directory scan).
+   static bool sIsPrimaryInstance = false;
+
+   bool PollPendingOpenFile(std::string& outPath)
+   {
+      static auto sNext = std::chrono::steady_clock::now();
+      const auto now = std::chrono::steady_clock::now();
+      if (now < sNext)
+         return false;
+      sNext = now + std::chrono::milliseconds(400);
+      // A second window takes over handed-over files once the first one closes.
+      if (!sIsPrimaryInstance)
+         sIsPrimaryInstance = SingleInstance::BecomePrimary();
+      if (!sIsPrimaryInstance)
+         return false;
+      return SingleInstance::Poll(InfiniteSettingsDirectory(), outPath);
+   }
+
+   bool BecomePrimaryInstance()
+   {
+      if (!sIsPrimaryInstance)
+         sIsPrimaryInstance = SingleInstance::BecomePrimary();
+      return sIsPrimaryInstance;
+   }
+
+   std::string CommandLineArgUtf8(int index)
+   {
+      int count = 0;
+      LPWSTR* args = CommandLineToArgvW(GetCommandLineW(), &count);
+      if (args == nullptr)
+         return std::string();
+      std::string out;
+      if (index >= 0 && index < count)
+      {
+         const int len = WideCharToMultiByte(CP_UTF8, 0, args[index], -1, nullptr, 0, nullptr, nullptr);
+         if (len > 1)
+         {
+            out.resize((size_t)len - 1);
+            WideCharToMultiByte(CP_UTF8, 0, args[index], -1, out.data(), len, nullptr, nullptr);
+         }
+      }
+      LocalFree(args);
+      return out;
+   }
+
+   bool HttpGet(const std::string& url, std::string& outBody, std::string& outError, int timeoutMs)
+   {
+      int status = 0;
+      auto options = juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inAddress)
+                        .withConnectionTimeoutMs(timeoutMs)
+                        .withStatusCode(&status)
+                        .withExtraHeaders("User-Agent: Infinite-Turbo\r\nAccept: application/vnd.github+json");
+      std::unique_ptr<juce::InputStream> stream = juce::URL(juce::String::fromUTF8(url.c_str())).createInputStream(options);
+      if (stream == nullptr)
+      {
+         outError = status != 0 ? "HTTP " + std::to_string(status) : std::string("no connection");
+         return false;
+      }
+      outBody = stream->readEntireStreamAsString().toStdString();
+      if (status != 200)
+      {
+         outError = "HTTP " + std::to_string(status);
+         return false;
+      }
+      return true;
+   }
+
+   void OpenUrl(const std::string& url)
+   {
+      if (url.rfind("https://", 0) != 0 && url.rfind("http://", 0) != 0)
+         return; // web pages only
+      ShellExecuteW(nullptr, L"open", Utf8ToWide(url).c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+   }
+
+   bool ForwardOpenToRunningInstance(const std::string& patchPath)
+   {
+      return SingleInstance::Forward(InfiniteSettingsDirectory(), patchPath);
+   }
 
    struct CameraHandle
    {

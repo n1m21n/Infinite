@@ -13,6 +13,7 @@
 // mode returns from main() before any of that.
 
 #include "McpBridge.h"
+#include "AISkillContent.h"
 
 #include <chrono>
 #include <filesystem>
@@ -34,7 +35,7 @@ using json = nlohmann::json;
 
 namespace
 {
-   const char* kServerVersion = "0.45.0";
+   const char* kServerVersion = "0.46.0";
 
    // ------------------------------------------------------------ stdio ---
    HANDLE gIn = INVALID_HANDLE_VALUE;
@@ -302,6 +303,9 @@ namespace
       { "describe", "Without arguments: every node type with its category and a one-line summary. With {type}: that "
                     "node's inputs (slot, label, kind), outputs (index, label, kind), settings (key, type, default) and help.",
         R"({"type":"object","properties":{"type":{"type":"string","description":"node type name, e.g. gaussianblur"}}})" },
+      { "authoring_guide", "How to build good Infinite-Turbo patches with these tools: the loop, cable kinds, settings vs "
+                           "params, useful nodes, recipes and pitfalls. Read it once before building.",
+        R"({"type":"object","properties":{}})" },
       { "patch_format", "The patch text grammar (for load_patch_text / validate_patch_text) with an example.",
         R"({"type":"object","properties":{}})" },
       { "explain", "Reads back the live graph: every node (or one, with index) with its inputs and what feeds them, "
@@ -341,6 +345,29 @@ namespace
       { "batch", "Runs several commands as one undo step, all or nothing. commands = [{method, params}]; a string "
                  "\"$N\" in params is replaced by command N's result index (\"$N.field\" for another field).",
         R"({"type":"object","properties":{"commands":{"type":"array","items":{"type":"object","properties":{"method":{"type":"string"},"params":{"type":"object"}},"required":["method"]}}},"required":["commands"]})" },
+      { "screenshot_node", "Looks at a node's image (any image output; output by number or label). Returns a picture "
+                           "(JPEG by default, max_size px on the long side, default 768).",
+        R"({"type":"object","properties":{"index":{"type":"integer"},"output":{"type":["integer","string"]},"max_size":{"type":"integer"},"format":{"type":"string","enum":["jpeg","png"]}},"required":["index"]})" },
+      { "render_frame", "Looks at the live Output (the first one, or index) as the projector shows it; path also saves "
+                        "it at full size (.png / .jpg).",
+        R"({"type":"object","properties":{"index":{"type":"integer"},"max_size":{"type":"integer"},"format":{"type":"string","enum":["jpeg","png"]},"path":{"type":"string"}}})" },
+      { "clip_matrix", "Plays a Clip Matrix (session view): launch / release a cell (row, col), stop_row, scene (col), "
+                       "stop_all, or state (what plays and what is queued per row). Launches wait for the quantize grid.",
+        R"({"type":"object","properties":{"index":{"type":"integer"},"action":{"type":"string","enum":["launch","release","stop_row","scene","stop_all","state"]},"row":{"type":"integer"},"col":{"type":"integer"}},"required":["index"]})" },
+      { "pads", "Hits a pad (0-15) of an MPC (samples) or VMPC (video clips): hit, down / up (gate pads), stop_all (VMPC).",
+        R"({"type":"object","properties":{"index":{"type":"integer"},"pad":{"type":"integer"},"action":{"type":"string","enum":["hit","down","up","stop_all"]},"velocity":{"type":"number"}},"required":["index","pad"]})" },
+      { "looper", "Drives a Looper: record, stop_record, play, stop, overdub, stop_overdub, clear, undo, redo, state.",
+        R"({"type":"object","properties":{"index":{"type":"integer"},"action":{"type":"string"}},"required":["index","action"]})" },
+      { "perf_list", "The Performance Mode panel: pages and every control with what it drives.",
+        R"({"type":"object","properties":{}})" },
+      { "perf_add", "Puts a parameter on the Performance Mode panel (by its drawn name, as explain lists it). kind: knob, "
+                    "fader, slider, toggle, xy (param + param_y), trigger, numbox, selector, bipolar, stepgate; default "
+                    "follows the param (toggle for checkboxes, selector for dropdowns). Optional label and page.",
+        R"({"type":"object","properties":{"index":{"type":"integer"},"param":{"type":["string","integer"]},"param_y":{"type":["string","integer"]},"kind":{"type":["string","integer"]},"label":{"type":"string"},"page":{"type":"integer"}},"required":["index","param"]})" },
+      { "perf_remove", "Removes a control from the Performance Mode panel (element number from perf_list).",
+        R"({"type":"object","properties":{"element":{"type":"integer"}},"required":["element"]})" },
+      { "perf_show", "Opens / closes the Performance Mode panel, switches Perform (true) / Edit mode, page, dock side.",
+        R"({"type":"object","properties":{"open":{"type":"boolean"},"perform":{"type":"boolean"},"page":{"type":"integer"},"dock":{"type":"string","enum":["bottom","top","left","right"]}}})" },
       { "auto_layout", "Lays the graph out left to right by signal flow (all nodes, or the given indices).",
         R"({"type":"object","properties":{"nodes":{"type":"array","items":{"type":"integer"}},"fit":{"type":"boolean"}}})" },
       { "set_node_position", "Moves a node on the canvas.",
@@ -365,7 +392,9 @@ namespace
       "settings) -> build with create_node + connect (or batch, with $N references), or write patch text "
       "(patch_format) and validate_patch_text before load_patch_text -> explain to check the result. An image "
       "chain needs an Output node at the end to be seen. Params that modulate / set_expression take are the "
-      "drawn control names explain lists. Everything is undoable (undo).";
+      "drawn control names explain lists. render_frame / screenshot_node show the picture. Turbo-only tools: "
+      "clip_matrix, pads (MPC / VMPC), looper, perf_* (Performance Mode). Read authoring_guide once before "
+      "building. Everything is undoable (undo).";
 
    json ToolList()
    {
@@ -398,6 +427,14 @@ namespace
    {
       if (name == "patch_format")
          return ToolResult(kPatchFormat, false);
+      if (name == "authoring_guide")
+      {
+         std::string guide = AISkillContent::kPatchSkillMarkdown;
+         const size_t end = guide.find("\n---\n", 4); // drop the skill front matter
+         if (guide.rfind("---", 0) == 0 && end != std::string::npos)
+            guide = guide.substr(end + 5);
+         return ToolResult(guide, false);
+      }
       bool known = false;
       for (const Tool& t : kTools)
          known = known || name == t.name;
@@ -407,6 +444,19 @@ namespace
       std::string error;
       if (!CallApp(name, args.is_object() ? args : json::object(), result, error))
          return ToolResult(error, true);
+      // Turbo 0.46: an image reply becomes MCP image content plus its details.
+      if (result.is_object() && result.contains("image_base64") && result["image_base64"].is_string())
+      {
+         const std::string data = result["image_base64"].get<std::string>();
+         const std::string mime = result.value("mime", std::string("image/jpeg"));
+         result.erase("image_base64");
+         result.erase("mime");
+         json r;
+         r["content"] = json::array({ { { "type", "image" }, { "data", data }, { "mimeType", mime } },
+                                      { { "type", "text" },
+                                        { "text", result.dump(1, ' ', false, json::error_handler_t::replace) } } });
+         return r;
+      }
       std::string text;
       if (result.is_object() && result.size() == 1 && result.contains("text") && result["text"].is_string())
          text = result["text"].get<std::string>(); // patch text: hand it over verbatim
@@ -459,7 +509,7 @@ int RunMcpBridge()
          if (version != "2024-11-05" && version != "2025-03-26" && version != "2025-06-18")
             version = "2025-06-18";
          reply["result"] = { { "protocolVersion", version },
-                             { "capabilities", { { "tools", { { "listChanged", false } } } } },
+                             { "capabilities", { { "tools", { { "listChanged", false } } }, { "prompts", { { "listChanged", false } } } } },
                              { "serverInfo", { { "name", "infinite-turbo" }, { "version", kServerVersion } } },
                              { "instructions", kInstructions } };
       }
@@ -476,7 +526,21 @@ int RunMcpBridge()
       else if (method == "resources/list")
          reply["result"] = { { "resources", json::array() } };
       else if (method == "prompts/list")
-         reply["result"] = { { "prompts", json::array() } };
+         reply["result"] = { { "prompts", json::array({ { { "name", "build_patch" },
+                                                          { "description", "Build or change an Infinite-Turbo patch from a description" },
+                                                          { "arguments", json::array({ { { "name", "idea" },
+                                                                                         { "description", "what the patch should do" },
+                                                                                         { "required", true } } }) } } }) } };
+      else if (method == "prompts/get")
+      {
+         const json args = params.contains("arguments") && params["arguments"].is_object() ? params["arguments"] : json::object();
+         const std::string idea = args.contains("idea") && args["idea"].is_string() ? args["idea"].get<std::string>() : "";
+         const std::string text = std::string("Build this in Infinite-Turbo with the infinite-turbo tools: ") + idea +
+                                  "\n\nFollow this guide:\n\n" + AISkillContent::kPatchSkillMarkdown;
+         reply["result"] = { { "description", "Build an Infinite-Turbo patch" },
+                             { "messages", json::array({ { { "role", "user" },
+                                                           { "content", { { "type", "text" }, { "text", text } } } } }) } };
+      }
       else
          reply["error"] = { { "code", -32601 }, { "message", "method not found: " + method } };
       }

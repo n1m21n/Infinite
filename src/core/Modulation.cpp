@@ -77,6 +77,7 @@ void Modulation::Unbind(int nodeIndex, int paramIndex)
 
 void Modulation::UnbindAllFor(int nodeIndex)
 {
+   ForgetKnownParams(nodeIndex); // Turbo 0.46
    for (auto it = mLinks.begin(); it != mLinks.end();)
    {
       if (it->first.first == nodeIndex || it->second.nodeIndex == nodeIndex)

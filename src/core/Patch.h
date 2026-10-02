@@ -173,12 +173,59 @@ namespace Patch
       bool autosaveEnabled = true;
       int autosaveSeconds = 30;
       bool audioAutoStart = false; // Turbo: start the audio engine when the app opens (app-level only)
+      bool startWithExample = true; // Turbo 0.46: open the bundled example at startup (app-level only)
+      bool updateCheck = true; // Turbo 0.46: look for a newer release at startup (app-level only)
+      float uiScale = 0.0f; // Turbo 0.46: 0 = follow Windows' display scale, else a fixed factor (app-level only)
    };
 
    // Turbo (upstream format): BPM, time signature and key/scale live on
    // Transport, not on any node, so without this record they reset on every
    // load. Defaults match Transport's own, so an older patch reads unchanged.
    //   transport <bpm> <tsNum> <tsDen> <key> <scale>
+   // Turbo 0.46 (upstream's Performance Mode): one control on the performance
+   // matrix. kind 0 Knob, 1 VFader, 2 HSlider, 3 Toggle, 4 XY Pad, 5 Trigger,
+   // 6 Number Box, 7 Radio Selector, 8 Bipolar Knob, 9 Step Gate.
+   // dstIndex/dstParam address a node parameter (-1 = unbound macro); the XY
+   // pad uses dstParam2 for Y. targets / targetsY are extra destinations.
+   struct PerfTarget
+   {
+      int dstIndex = -1;
+      int dstParam = -1;
+      std::string boolName;
+   };
+
+   struct PerfRecord
+   {
+      int   kind      = 0;
+      int   dstIndex  = -1;
+      int   dstParam  = -1;
+      int   dstParam2 = -1;
+      int   cellX = 0, cellY = 0;
+      int   page  = 0;
+      float colorR = 0.0f, colorG = 0.0f, colorB = 0.0f;
+      float value = 0.0f;
+      float value2 = 0.0f;
+      std::string boolName;   // toggle only
+      std::string label;      // empty = the destination param's own name
+      std::vector<PerfTarget> targets;
+      std::vector<PerfTarget> targetsY;
+      int  midiDevice     = 0;  // 0 = no MIDI binding
+      int  midiChannel    = -1;
+      int  midiController = -1;
+      bool midiIsNote     = false;
+      int  midiDeviceY    = 0;
+      int  midiChannelY   = -1;
+      int  midiControllerY = -1;
+      bool midiIsNoteY    = false;
+   };
+
+   struct PerfLayoutRecord
+   {
+      int cellSize = 76;
+      int pageCount = 1;
+      std::vector<std::string> pageNames;
+   };
+
    struct TransportRecord
    {
       float bpm = 120.0f;
@@ -362,6 +409,8 @@ namespace Patch
       std::vector<TrackGroupRecord> trackGroups;
       ArrangeSettingsRecord arrangeSettings;
       bool hasArrange = false; // an `arrange` line was read
+      std::vector<PerfRecord> performance; // Turbo 0.46: Performance Mode
+      PerfLayoutRecord perfLayout;
    };
 
    bool Write(const std::string& path, const Data& data, std::string& outError);

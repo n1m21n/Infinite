@@ -35,6 +35,11 @@ New-Item -ItemType Directory -Path $fontTarget -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $root 'assets\fonts\IBMPlexSans-Regular.ttf') -Destination $fontTarget
 Copy-Item -LiteralPath (Join-Path $root 'assets\fonts\OFL.txt') -Destination $fontTarget
 
+# Turbo 0.46: the example patch the app opens with.
+$exampleTarget = Join-Path $package 'assets\examples'
+New-Item -ItemType Directory -Path $exampleTarget -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $root 'assets\examples\superSynthMCP.inf') -Destination $exampleTarget
+
 # Windows ML is self-contained: keep ONNX Runtime and DirectML next to the EXE.
 Get-ChildItem -LiteralPath (Split-Path -Parent $exe) -Filter '*.dll' -File |
     Copy-Item -Destination $package

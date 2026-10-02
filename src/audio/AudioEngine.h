@@ -254,6 +254,10 @@ public:
    // Turbo: the "direct" metronome - mixed into the device output after the
    // graph (like the preview), so it needs no cable and never shows up in an
    // Audio Out recording. Main thread sets, audio thread reads.
+   // Turbo 0.46 (upstream's top-bar Click): an app-level metronome that does
+   // not need a Transport Control node; mixed like the direct click.
+   void SetTopBarClick(bool enabled) { mTopBarClick.store(enabled, std::memory_order_relaxed); }
+   bool TopBarClick() const { return mTopBarClick.load(std::memory_order_relaxed); }
    void SetDirectClick(bool enabled, float volume, bool accent)
    {
       mDirectClickVolume.store(volume, std::memory_order_relaxed);
@@ -393,6 +397,7 @@ private:
    SamplePreviewPlayer mPreviewPlayer;
 
    std::atomic<bool> mDirectClick { false };
+   std::atomic<bool> mTopBarClick { false };
    std::atomic<float> mDirectClickVolume { 0.5f };
    std::atomic<bool> mDirectClickAccent { true };
    MetronomeClick mDirectClickGen; // audio thread only
