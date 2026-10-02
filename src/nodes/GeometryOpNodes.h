@@ -90,6 +90,13 @@ public:
       return input ? input->GetMappingTransform() : MappingTransform();
    }
    IGeometrySource* PassthroughSource() const override { return input; }
+   // Turbo 0.45 (upstream R481): curve and point cloud forward through every
+   // op; kTransform applies TransformMatrix() to them (cached by upstream
+   // revision + matrix). Other ops are not defined on points / polylines.
+   const Polyline* GetCurve() override;
+   unsigned long long CurveStamp() override;
+   const std::vector<Particle>* GetPointCloud() override;
+   unsigned long long PointCloudRevision() override;
    // When this node (or the chain of GeometryOpNodes it's wired through) sits
    // downstream of an InstanceOnPoints and op is kTransform, GetMesh() leaves
    // the stamp mesh alone and this returns the move/rotate/scale as a matrix
@@ -299,6 +306,18 @@ private:
 
    Signature CurrentSignature() const;
 
+   std::vector<Particle> mPointCloudCache;
+   bool mHasPointCloudCache = false;
+   const void* mPointCloudBuiltUpstream = nullptr;
+   unsigned long long mPointCloudBuiltUpstreamRevision = 0;
+   Mat4 mPointCloudBuiltMatrix;
+   unsigned long long mPointCloudRevision = 0;
+   Polyline mCurveCache;
+   bool mHasCurveCache = false;
+   const void* mCurveBuiltUpstream = nullptr;
+   unsigned long long mCurveBuiltUpstreamStamp = 0;
+   Mat4 mCurveBuiltMatrix;
+   unsigned long long mCurveRevision = 0;
    Mesh mCache;
    Signature mBuilt;
    bool mHasBuilt = false;
@@ -635,6 +654,9 @@ public:
    unsigned long long MeshRevision() override;
    const std::vector<Particle>* GetPointCloud() override;
    unsigned long long PointCloudRevision() override;
+   // Curve is a plain passthrough - Set Color only writes vertex/particle colour.
+   const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
+   unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
    // Forwarded, not identity - see DisplacementNode for why.
    Mat4 GetModelMatrix() const override
    {

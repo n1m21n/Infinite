@@ -27,6 +27,7 @@ Copy-Item -LiteralPath (Join-Path $root 'CHANGELOG-TURBO.md') -Destination $pack
 Copy-Item -LiteralPath (Join-Path $root 'PACKAGE_MANIFEST.txt') -Destination $package
 Copy-Item -LiteralPath (Join-Path $root 'run-windows.bat') -Destination $package
 Copy-Item -LiteralPath (Join-Path $root 'diagnose-windows.bat') -Destination $package
+Copy-Item -LiteralPath (Join-Path $root 'setup-mcp.bat') -Destination $package
 Copy-Item -LiteralPath (Join-Path $root 'install-runtime.bat') -Destination $package
 
 $fontTarget = Join-Path $package 'assets\fonts'

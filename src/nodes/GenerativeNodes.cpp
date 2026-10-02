@@ -406,10 +406,10 @@ unsigned long long ImageToPointsNode::MeshRevision()
 
 Material ImageToPointsNode::GetMaterial() const
 {
-   // Matches CookIfNeeded's p.r/g/b: tint always multiplies, the raw texture
-   // (see GetSurfaceTexture) only enters the mix when useImageColor is on.
+   // Turbo 0.45 (upstream R482): tint is already in every point's p.r/g/b and
+   // the shader multiplies albedo by it, so the albedo is neutral (was squared).
    Material m;
-   m.color[0] = tint[0]; m.color[1] = tint[1]; m.color[2] = tint[2];
+   m.color[0] = 1.0f; m.color[1] = 1.0f; m.color[2] = 1.0f;
    return m;
 }
 

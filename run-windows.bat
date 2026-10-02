@@ -7,8 +7,8 @@ rem Procura o executavel ao lado deste arquivo, depois no pacote dist e no build
 set "EXE_NAME=Infinite-Turbo.exe"
 set "INFINITE_EXE="
 if exist "%~dp0%EXE_NAME%" set "INFINITE_EXE=%~dp0%EXE_NAME%"
-if not defined INFINITE_EXE if exist "%~dp0dist\Infinite-Turbo-Windows-x64\%EXE_NAME%" set "INFINITE_EXE=%~dp0dist\Infinite-Turbo-Windows-x64\%EXE_NAME%"
 if not defined INFINITE_EXE if exist "%~dp0build\windows-vs2022\Release\%EXE_NAME%" set "INFINITE_EXE=%~dp0build\windows-vs2022\Release\%EXE_NAME%"
+if not defined INFINITE_EXE if exist "%~dp0dist\Infinite-Turbo-Windows-x64\%EXE_NAME%" set "INFINITE_EXE=%~dp0dist\Infinite-Turbo-Windows-x64\%EXE_NAME%"
 if not defined INFINITE_EXE if exist "%~dp0build\windows-vs2022\Debug\%EXE_NAME%" set "INFINITE_EXE=%~dp0build\windows-vs2022\Debug\%EXE_NAME%"
 
 if not defined INFINITE_EXE (

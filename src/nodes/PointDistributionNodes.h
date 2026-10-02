@@ -113,6 +113,7 @@ private:
    float mBuiltDensity = -1.0f;
    int mBuiltMethod = -1;
    float mBuiltMinDistance = -1.0f, mBuiltPointSize = -1.0f, mBuiltSeed = 0.0f;
+   float mBuiltTint[3] = { -1.0f, -1.0f, -1.0f };
    unsigned long long mMeshRevision = 0;
    int mLastCookFrame = -1;
 };

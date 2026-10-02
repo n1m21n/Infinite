@@ -116,9 +116,19 @@ namespace RemoteControl
                                        {"error", { {"code", -32700}, {"message", e.what()} } } };
                }
 
-               std::string out = responseEnvelope.dump();
+               // Replace, not throw, on bytes that are not UTF-8 (a path or a
+               // text setting): an exception here would end the process.
+               std::string out = responseEnvelope.dump(-1, ' ', false, json::error_handler_t::replace);
                out += "\n";
-               send(fd, out.data(), static_cast<int>(out.size()), 0);
+               // Large replies (explain, patch text) can need several sends.
+               size_t sent = 0;
+               while (sent < out.size())
+               {
+                  const int n = send(fd, out.data() + sent, static_cast<int>(out.size() - sent), 0);
+                  if (n <= 0)
+                     break;
+                  sent += static_cast<size_t>(n);
+               }
             }
          }
          InfiniteCloseSocket(fd);
@@ -132,8 +142,10 @@ namespace RemoteControl
          if (listenFd == kInfiniteInvalidSocket)
             return;
 
+         // Turbo 0.45: exclusive, not SO_REUSEADDR - on Windows that let a
+         // second Infinite bind the same port and steal half the requests.
          int yes = 1;
-         setsockopt(listenFd, SOL_SOCKET, SO_REUSEADDR,
+         setsockopt(listenFd, SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
                     reinterpret_cast<const char*>(&yes), static_cast<int>(sizeof(yes)));
 
          sockaddr_in addr{};
@@ -151,13 +163,18 @@ namespace RemoteControl
             InfiniteCloseSocket(listenFd);
             return;
          }
+         // Only the instance that owns the port publishes its token (a second
+         // instance used to overwrite it and lock clients out of the first).
+         WriteTokenFile(gToken);
 
          for (;;)
          {
             InfiniteSocket clientFd = accept(listenFd, nullptr, nullptr);
             if (clientFd == kInfiniteInvalidSocket)
                continue;
-            ServeConnection(clientFd, nullptr);
+            // Turbo 0.45: one thread per client, so a second MCP client (two
+            // Claude windows) is not stuck behind the first one's connection.
+            std::thread(ServeConnection, clientFd, nullptr).detach();
          }
       }
    }
@@ -169,7 +186,6 @@ namespace RemoteControl
       gStarted = true;
 
       gToken = GenerateToken();
-      WriteTokenFile(gToken);
 
       std::thread(AcceptLoop, port).detach();
    }

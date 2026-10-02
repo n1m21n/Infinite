@@ -69,7 +69,34 @@ struct AudioTerminal
    // Arrangement Timeline owns the output; every other canvas terminal is
    // muted then (its capture ring still records).
    bool live = false;
+
+   // Turbo 0.45 (upstream R477): false when another canvas terminal already
+   // sums this same pooled buffer into the device (one source wired to an
+   // Audio Out and an Output, or to two Audio Outs). The device mix counts a
+   // source once; this terminal still feeds its own capture ring.
+   bool mixToDevice = true;
 };
+
+// Marks duplicate terminals (same pooled buffer) so the device mix counts a
+// source once. A "live" terminal wins over a non-live twin, so input
+// monitoring keeps working in Timeline mode. Call once the list is complete.
+inline void MarkDuplicateDeviceTerminals(std::vector<AudioTerminal>& terminals)
+{
+   for (size_t i = 0; i < terminals.size(); i++)
+      terminals[i].mixToDevice = true;
+   for (size_t i = 0; i < terminals.size(); i++)
+   {
+      if (!terminals[i].mixToDevice)
+         continue;
+      size_t keep = i;
+      for (size_t k = i + 1; k < terminals.size(); k++)
+         if (terminals[k].bufferIndex == terminals[i].bufferIndex && terminals[k].live && !terminals[keep].live)
+            keep = k;
+      for (size_t k = i; k < terminals.size(); k++)
+         if (k != keep && terminals[k].bufferIndex == terminals[i].bufferIndex)
+            terminals[k].mixToDevice = false;
+   }
+}
 
 // Turbo 0.43 (Arrangement Timeline, after upstream's ClipWindow): one clip's
 // slot in musical time, as the audio thread sees it. Beats, not seconds, so

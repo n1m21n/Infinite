@@ -41,16 +41,9 @@ void DistributePointsOnFacesNode::RebuildIfNeeded()
    }
 
    const unsigned long long upstream = input->MeshRevision();
-   if (mBuiltInput == input && mBuiltUpstream == upstream && mBuiltDensity == density &&
-       mBuiltMethod == method && mBuiltMinDistance == minDistance &&
-       mBuiltPointSize == pointSize && mBuiltSeed == seed)
-      return;
-
-   const Mesh& src = input->GetMesh();
-   const std::vector<MeshPoint> points =
-      MeshOps::DistributeOnFaces(src, density, seed, method, minDistance);
-   mCache = MeshOps::PointsToFaces(points, pointSize);
-
+   // Turbo 0.45 (upstream R483): the tint (inherited albedo or own colour) is
+   // baked into every point, and MeshRevision() does not move when only the
+   // material does - so the tint keys the rebuild too.
    float tint[3];
    if (inheritMaterial)
    {
@@ -61,6 +54,16 @@ void DistributePointsOnFacesNode::RebuildIfNeeded()
    {
       tint[0] = color[0]; tint[1] = color[1]; tint[2] = color[2];
    }
+   const bool sameTint = mBuiltTint[0] == tint[0] && mBuiltTint[1] == tint[1] && mBuiltTint[2] == tint[2];
+   if (mBuiltInput == input && mBuiltUpstream == upstream && mBuiltDensity == density &&
+       mBuiltMethod == method && mBuiltMinDistance == minDistance &&
+       mBuiltPointSize == pointSize && mBuiltSeed == seed && sameTint)
+      return;
+
+   const Mesh& src = input->GetMesh();
+   const std::vector<MeshPoint> points =
+      MeshOps::DistributeOnFaces(src, density, seed, method, minDistance);
+   mCache = MeshOps::PointsToFaces(points, pointSize);
 
    mPoints.clear();
    mPoints.reserve(points.size());
@@ -83,6 +86,7 @@ void DistributePointsOnFacesNode::RebuildIfNeeded()
    mBuiltMinDistance = minDistance;
    mBuiltPointSize = pointSize;
    mBuiltSeed = seed;
+   mBuiltTint[0] = tint[0]; mBuiltTint[1] = tint[1]; mBuiltTint[2] = tint[2];
    mMeshRevision = NextMeshRevision();
 }
 

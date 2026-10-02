@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.25)
 # Unofficial Windows-only fork of Infinite (https://github.com/n1m21n/Infinite).
 # macOS support was removed on purpose: every platform path below is Windows
 # (MSVC 2022, x64, vcpkg static triplet, JUCE, OpenCV, Spout2, Windows ML).
-project(InfiniteTurbo VERSION 0.44.1 LANGUAGES C CXX)
+project(InfiniteTurbo VERSION 0.45.0 LANGUAGES C CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Infinite-Turbo builds only on Windows x64 with MSVC (Visual Studio 2022).")
@@ -186,6 +186,7 @@ add_executable(Infinite WIN32
     src/core/Patch.cpp
     src/arrange/ArrangeModel.cpp
     src/core/RemoteControl.cpp
+    src/platform/McpBridgeWindows.cpp
     src/core/RuntimeLog.cpp
     src/core/PatchJson.cpp
     src/core/OscMessage.cpp

@@ -248,15 +248,10 @@ void LoadParams(INode* node, const std::vector<std::pair<std::string, std::strin
    node->VisitParams(reader);
 }
 
-bool Write(const std::string& path, const Data& data, std::string& outError)
+// Turbo 0.45: the writer / reader work on streams so the RPC (MCP) can
+// round-trip patch text without touching the disk.
+static bool WriteStream(std::ostream& file, const Data& data, std::string& outError, const std::string& path)
 {
-   std::ofstream file(path);
-   if (!file)
-   {
-      outError = "could not open " + path + " for writing";
-      return false;
-   }
-
    file << kMagic << " " << kVersion << "\n";
    for (const NodeRecord& node : data.nodes)
    {
@@ -463,15 +458,8 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
    return true;
 }
 
-bool Read(const std::string& path, Data& outData, std::string& outError)
+static bool ReadStream(std::istream& file, Data& outData, std::string& outError)
 {
-   std::ifstream file(path);
-   if (!file)
-   {
-      outError = "could not open " + path;
-      return false;
-   }
-
    std::string line;
    if (!std::getline(file, line))
    {
@@ -523,6 +511,7 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       if (tag == "node")
       {
          current = NodeRecord();
+         current.hasPos = false; // set again by a `pos` line
          in >> current.index >> current.category;
          std::getline(in, current.typeName);
          if (!current.typeName.empty() && current.typeName[0] == ' ')
@@ -542,6 +531,7 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       else if (tag == "pos" && inNode)
       {
          in >> current.x >> current.y;
+         current.hasPos = true;
          if (!std::isfinite(current.x) || std::abs(current.x) > 1e6f || current.x <= -2e9f) current.x = 0.0f;
          if (!std::isfinite(current.y) || std::abs(current.y) > 1e6f || current.y <= -2e9f) current.y = 0.0f;
       }
@@ -1142,4 +1132,42 @@ bool SaveAppSettings(const SceneSettings& settings, std::string& outError)
    }
    return true;
 }
+
+// Turbo 0.45: file and text front ends for the stream reader / writer.
+bool Write(const std::string& path, const Data& data, std::string& outError)
+{
+   std::ofstream file(path);
+   if (!file)
+   {
+      outError = "could not open " + path + " for writing";
+      return false;
+   }
+   return WriteStream(file, data, outError, path);
 }
+
+bool Read(const std::string& path, Data& outData, std::string& outError)
+{
+   std::ifstream file(path);
+   if (!file)
+   {
+      outError = "could not open " + path;
+      return false;
+   }
+   return ReadStream(file, outData, outError);
+}
+
+bool WriteText(const Data& data, std::string& outText, std::string& outError)
+{
+   std::ostringstream out;
+   if (!WriteStream(out, data, outError, "text"))
+      return false;
+   outText = out.str();
+   return true;
+}
+
+bool ReadText(const std::string& text, Data& outData, std::string& outError)
+{
+   std::istringstream in(text);
+   return ReadStream(in, outData, outError);
+}
+} // namespace Patch

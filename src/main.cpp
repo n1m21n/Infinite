@@ -61,6 +61,7 @@
 #include "core/AudioCable.h"
 #include "core/NoteCable.h"
 #include "core/RemoteControl.h"
+#include "platform/McpBridge.h"
 #include "core/RuntimeLog.h"
 #include "core/PatchJson.h"
 #include "platform/SettingsPaths.h"
@@ -624,6 +625,60 @@ namespace
    // True while the timeline panel has keyboard focus: the canvas shortcuts
    // (Delete, Ctrl+D, Ctrl+C/V, ...) stand down and the timeline takes them.
    bool gArrangeKeysOwned = false;
+   // Turbo 0.45 (upstream R470): during a timeline render, gesture loops play
+   // on the render's own video time (seconds since the take started, one
+   // step per rendered frame) instead of the wall-clock UI clock, so a take
+   // plays recorded knob moves at the right speed. < 0 = not rendering.
+   double gGestureRenderClock = -1.0;
+   // Turbo 0.45: nodes waiting for the auto layout (no position in the file,
+   // or an RPC asked) - laid out once they have drawn and have a size.
+   std::vector<int> gAutoLayoutPending;
+   int gAutoLayoutWait = 0;
+   bool gAutoLayoutFit = false;
+   // Turbo 0.45: live validation hints rerun 300 ms after the last edit.
+   unsigned gLiveIssueSerial = 1;
+   std::string gLiveIssueTip; // hovered node's hints, drawn outside the editor
+   // Turbo 0.45: the open patch file is watched (an editor, git or an AI
+   // writing it) - see PollPatchFileWatch.
+   std::string gWatchedPath;
+   long long gWatchedStamp = 0;
+   long long gWatchPendingStamp = 0;
+   double gWatchNextPoll = 0.0;
+   int gWatchReadFailures = 0;
+   bool gReloadBanner = false;
+   long long PatchFileStamp(const std::string& path)
+   {
+      std::error_code ec;
+      const std::filesystem::path p = std::filesystem::u8path(path);
+      const auto t = std::filesystem::last_write_time(p, ec);
+      if (ec)
+         return 0;
+      const auto size = std::filesystem::file_size(p, ec);
+      if (ec)
+         return 0;
+      return (long long)t.time_since_epoch().count() ^ ((long long)size << 40);
+   }
+   double gLiveIssueEditTime = 0.0;
+   void NoteGraphEditedForLiveIssues()
+   {
+      gLiveIssueSerial++;
+      gLiveIssueEditTime = glfwGetTime();
+   }
+   double GesturePlaybackClock()
+   {
+      return gGestureRenderClock >= 0.0 ? gGestureRenderClock : GestureRecorder::Instance().ClockNow();
+   }
+   // Re-bases every loop when playback switches clocks, so startTime and the
+   // clock read are on the same axis. Called once per frame before playback.
+   void GestureSyncClockAxis()
+   {
+      static bool sWasRendering = false;
+      const bool rendering = gGestureRenderClock >= 0.0;
+      if (rendering == sWasRendering)
+         return;
+      sWasRendering = rendering;
+      GestureRecorder::Instance().RestartLoops(rendering ? 0.0 : GestureRecorder::Instance().ClockNow());
+   }
    ImVec2 gArrangePanelMin(0, 0), gArrangePanelMax(0, 0);
    GraphNode* FindNodeByUid(uint64_t uid);
    void ArrangeModelToPatchData(const Arrange::Model& m, Patch::Data& data);
@@ -23907,6 +23962,7 @@ namespace
       AudioTopology topology;
       ArrangeBuildAudioTerminals(bufferIndexOf, topology);
       topology.order = std::move(order);
+      MarkDuplicateDeviceTerminals(terminals); // Turbo 0.45 (upstream R477)
       topology.terminalBufferIndices = std::move(terminals);
       topology.numBuffers = (int)topology.order.size();
       AudioEngine::Instance().SetTopology(std::move(topology));
@@ -24528,6 +24584,10 @@ namespace
       gPatchPath = path;
       gPatchDirty = false;
       gPatchStatus = "Saved";
+      gWatchedPath = path; // Turbo 0.45: our own write is not an outside change
+      gWatchedStamp = PatchFileStamp(path);
+      gWatchPendingStamp = 0;
+      gReloadBanner = false;
       Patch::NoteRecent(path);
       DiscardRecoveryAutosave();
       gLastAutosaveTime = glfwGetTime();
@@ -24570,14 +24630,16 @@ namespace
       MidiMap::Clear();
       ExprGlobals::Clear();
       gNextIndex = 1;
-      gPatchPath.clear();
-      gPatchDirty = false;
-      gPatchStatus = "New patch";
       // Only for a genuine "start a fresh document" - not when NewPatch is
       // called from inside ApplyPatchData as the first step of restoring a
       // snapshot, which must leave the stacks alone.
       if (!gSuppressUndoCheckpoints)
       {
+         // Turbo 0.45: the file name too - an undo used to forget which file
+         // was open (title lost its name, Ctrl+S asked for a new one).
+         gPatchPath.clear();
+         gPatchDirty = false;
+         gPatchStatus = "New patch";
          gUndoStack.clear();
          gRedoStack.clear();
          ArrangeResetSession(); // a fresh document starts with an empty timeline
@@ -24610,9 +24672,24 @@ namespace
       for (const Patch::NodeRecord& rec : data.nodes)
          if (rec.uid >= gNextNodeUid)
             gNextNodeUid = rec.uid + 1;
+      // Turbo 0.45: auto-layout for nodes the file gives no position.
+      gAutoLayoutPending.clear();
+      int autoRow = 0;
       for (const Patch::NodeRecord& rec : data.nodes)
       {
-         GraphNode* spawned = SpawnNode(rec.typeName, rec.category, rec.x, rec.y);
+         // Turbo 0.45: keep the saved index when it is free and ascending
+         // (every file Infinite writes), so undo and RPC callers see the same
+         // numbers; anything else still gets the next free one.
+         if (rec.index >= gNextIndex && rec.index < 100000) // pin ids are index * 1050
+            gNextIndex = rec.index;
+         const float spawnX = rec.hasPos ? rec.x : 0.0f;
+         const float spawnY = rec.hasPos ? rec.y : 260.0f * (float)autoRow;
+         GraphNode* spawned = SpawnNode(rec.typeName, rec.category, spawnX, spawnY);
+         if (spawned != nullptr && !rec.hasPos)
+         {
+            gAutoLayoutPending.push_back(spawned->index);
+            autoRow++;
+         }
          if (spawned == nullptr)
          {
             // A patch naming a node type this build does not have still opens;
@@ -24648,6 +24725,13 @@ namespace
          if (auto* geomOp = dynamic_cast<GeometryOpNode*>(spawned->node.get()))
             geomOp->MigrateDeprecatedOp();
       }
+
+      if (!gAutoLayoutPending.empty())
+      {
+         gAutoLayoutWait = 3; // let them draw once so their sizes are known
+         gAutoLayoutFit = true;
+      }
+      NoteGraphEditedForLiveIssues(); // Turbo 0.45
 
       auto resolve = [&](int savedIndex) -> GraphNode*
       {
@@ -24735,7 +24819,7 @@ namespace
             }
             loaded[GestureRecorder::Key(dst->index, g.dstParam)] = std::move(pb);
          }
-         GestureRecorder::Instance().Restore(std::move(loaded), GestureRecorder::Instance().ClockNow());
+         GestureRecorder::Instance().Restore(std::move(loaded), GesturePlaybackClock());
       }
       for (const Patch::PaletteRecord& c : data.palette)
       {
@@ -24839,12 +24923,108 @@ namespace
       gPatchPath = path;
       gPatchDirty = false;
       gPatchStatus = "Opened";
+      gWatchedPath = path; // Turbo 0.45
+      gWatchedStamp = PatchFileStamp(path);
+      gWatchPendingStamp = 0;
+      gReloadBanner = false;
       Patch::NoteRecent(path);
       DiscardRecoveryAutosave();
       gLastAutosaveTime = glfwGetTime();
       RuntimeLog::Write("patch opened: %s", path.c_str());
       gRequestFitView = true;
       return true;
+   }
+
+   // Turbo 0.45 (upstream R39): re-reads the open file after an outside
+   // change, as one undo step, keeping the file name and the audio device.
+   bool ReloadPatchFromDisk()
+   {
+      Patch::Data data;
+      std::string error;
+      if (!Patch::Read(gPatchPath, data, error))
+      {
+         // Probably caught mid-write: try again on the next poll, a few times.
+         if (++gWatchReadFailures >= 6)
+         {
+            gWatchReadFailures = 0;
+            gWatchedStamp = PatchFileStamp(gPatchPath);
+            gPatchStatus = "Reload failed: " + error;
+         }
+         return false;
+      }
+      gWatchReadFailures = 0;
+      PushUndoCheckpoint();
+      const bool wasSuppressed = gSuppressUndoCheckpoints;
+      ApplyPatchData(data, false);
+      gSuppressUndoCheckpoints = wasSuppressed;
+      gPatchDirty = false;
+      gPatchStatus = "Reloaded: the file changed on disk (Ctrl+Z goes back)";
+      gWatchedPath = gPatchPath;
+      gWatchedStamp = PatchFileStamp(gPatchPath);
+      gWatchPendingStamp = 0;
+      gReloadBanner = false;
+      RuntimeLog::Write("patch reloaded after an outside change: %s", gPatchPath.c_str());
+      return true;
+   }
+
+   void PollPatchFileWatch()
+   {
+      if (gPatchPath.empty())
+      {
+         gReloadBanner = false;
+         return;
+      }
+      if (gPatchPath != gWatchedPath)
+      {
+         gWatchedPath = gPatchPath;
+         gWatchedStamp = PatchFileStamp(gPatchPath);
+         gWatchPendingStamp = 0;
+         return;
+      }
+      const double now = glfwGetTime();
+      if (now < gWatchNextPoll || gReloadBanner)
+         return;
+      gWatchNextPoll = now + 0.4;
+      const long long stamp = PatchFileStamp(gPatchPath);
+      if (stamp == 0 || stamp == gWatchedStamp)
+      {
+         gWatchPendingStamp = 0;
+         return;
+      }
+      if (stamp != gWatchPendingStamp)
+      {
+         gWatchPendingStamp = stamp; // wait one more poll: the writer may not be done
+         return;
+      }
+      if (gPatchDirty)
+         gReloadBanner = true; // unsaved edits here: ask
+      else
+         ReloadPatchFromDisk();
+   }
+
+   void DrawReloadBanner()
+   {
+      if (!gReloadBanner)
+         return;
+      ImGui::SetNextWindowPos(ImVec2(gGraphScreenTL.x + 14.0f, gGraphScreenTL.y + 14.0f));
+      ImGui::SetNextWindowBgAlpha(0.95f);
+      if (ImGui::Begin("##reloadbanner", nullptr,
+                       ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing))
+      {
+         ImGui::TextColored(ImVec4(0.95f, 0.70f, 0.25f, 1.0f), "This patch changed on disk.");
+         ImGui::TextDisabled("You have unsaved edits here.");
+         if (ImGui::Button("Reload from disk"))
+            ReloadPatchFromDisk();
+         ImGui::SameLine();
+         if (ImGui::Button("Keep mine"))
+         {
+            gWatchedStamp = PatchFileStamp(gPatchPath);
+            gWatchPendingStamp = 0;
+            gReloadBanner = false;
+         }
+      }
+      ImGui::End();
    }
 
    bool RecoverAutosave()
@@ -24879,6 +25059,7 @@ namespace
    {
       if (gSuppressUndoCheckpoints)
          return;
+      NoteGraphEditedForLiveIssues(); // Turbo 0.45
       gUndoStack.push_back(std::move(snapshot));
       if (gUndoStack.size() > kMaxUndoDepth)
          gUndoStack.pop_front();
@@ -24936,8 +25117,66 @@ namespace
    // touch gNodes/gEditor/etc exactly as the normal UI code does. Returns
    // false with outError set on any failure; RemoteControl wraps that into a
    // JSON-RPC error reply.
-   bool HandleRpcCommand(const std::string& method, const nlohmann::json& params,
-                         nlohmann::json& outResult, std::string& outError)
+   // Turbo 0.45: describe / explain / batch / patch text / modulate / live
+   // hints / auto layout (see the file).
+#include "core/RpcTools.inl"
+
+   // Sets one saved setting by its patch key name (what get_params / explain
+   // "settings" list), replaying the right type letter.
+   // The saved key ("f radius") for a setting name, case / spaces /
+   // underscores ignored; empty if the node has no such setting.
+   std::string RpcFindSettingKey(INode* node, const std::string& name)
+   {
+      std::vector<std::pair<std::string, std::string>> raw;
+      Patch::SaveParams(node, raw);
+      for (const auto& kv : raw)
+      {
+         const size_t sp = kv.first.find(' ');
+         if (sp != std::string::npos && kv.first.substr(sp + 1) == name)
+            return kv.first;
+      }
+      for (const auto& kv : raw)
+      {
+         const size_t sp = kv.first.find(' ');
+         if (sp != std::string::npos && RpcNorm(kv.first.substr(sp + 1)) == RpcNorm(name))
+            return kv.first;
+      }
+      return std::string();
+   }
+
+   bool RpcSetSetting(GraphNode& gn, const std::string& name, const nlohmann::json& v, std::string& outError)
+   {
+      const std::string matchedKey = RpcFindSettingKey(gn.node.get(), name);
+      if (matchedKey.empty())
+      {
+         outError = "unknown setting '" + name + "' on " + gn.typeName + " (describe or explain lists them)";
+         return false;
+      }
+      std::string valueStr;
+      if (v.is_string())
+         valueStr = v.get<std::string>();
+      else if (v.is_boolean())
+         valueStr = v.get<bool>() ? "1" : "0";
+      else if (v.is_array() && matchedKey[0] == 'c')
+      {
+         for (const auto& e : v)
+            valueStr += (valueStr.empty() ? "" : " ") + e.dump();
+      }
+      else
+         valueStr = v.dump();
+      Patch::LoadParams(gn.node.get(), { { matchedKey, valueStr } });
+      // File paths and other text settings need their derived state rebuilt
+      // (a plugin only when its identity changed - a reload loses its state).
+      const bool isPlugin = dynamic_cast<AudioPluginNode*>(gn.node.get()) != nullptr;
+      if (matchedKey[0] == 's' && (!isPlugin || matchedKey.find("plugin_id") != std::string::npos))
+         ReloadDerivedState(gn.node.get());
+      if (gn.node->RequiresAudioProcessing())
+         RebuildAudioTopology();
+      return true;
+   }
+
+   bool HandleRpcCommandBase(const std::string& method, const nlohmann::json& params,
+                             nlohmann::json& outResult, std::string& outError)
    {
       using json = nlohmann::json;
 
@@ -24956,17 +25195,66 @@ namespace
       }
       else if (method == "create_node")
       {
-         const std::string typeName = params.value("typeName", std::string());
+         std::string typeName = params.value("typeName", std::string());
+         if (typeName.empty())
+            typeName = params.value("type", std::string());
          const std::string category = params.value("category", std::string());
-         const float x = params.value("x", 0.0f);
-         const float y = params.value("y", 0.0f);
+         // Turbo 0.45: no position given = auto layout once it has drawn.
+         const bool autoPlace = !params.contains("x") || !params.contains("y");
+         float x = params.value("x", 0.0f);
+         float y = params.value("y", 0.0f);
+         if (autoPlace)
+         {
+            float right = 0.0f, top = 0.0f;
+            bool any = false;
+            for (const GraphNode& other : gNodes)
+            {
+               right = any ? std::max(right, other.liveX) : other.liveX;
+               top = any ? std::min(top, other.liveY) : other.liveY;
+               any = true;
+            }
+            x = any ? right + 320.0f : 0.0f;
+            y = top;
+         }
+         // Settings are checked on a throwaway instance first, so a bad key
+         // leaves no node and no undo step behind.
+         if (params.contains("settings") && params["settings"].is_object())
+         {
+            std::unique_ptr<INode> probe(NodeFactory::Instance().MakeNode(NodeFactory::CanonicalName(typeName)));
+            if (probe)
+               for (auto it = params["settings"].begin(); it != params["settings"].end(); ++it)
+                  if (RpcFindSettingKey(probe.get(), it.key()).empty())
+                  {
+                     outError = "unknown setting '" + it.key() + "' on " + typeName + " (describe lists them)";
+                     return false;
+                  }
+         }
          GraphNode* gn = SpawnNode(typeName, category, x, y);
          if (gn == nullptr)
          {
-            outError = "unknown node type '" + typeName + "'";
+            outError = "unknown node type '" + typeName + "' (describe lists them)";
             return false;
          }
-         outResult = { {"index", gn->index} };
+         gn->liveX = x;
+         gn->liveY = y;
+         if (params.contains("settings") && params["settings"].is_object())
+         {
+            const bool wasSuppressed = gSuppressUndoCheckpoints;
+            gSuppressUndoCheckpoints = true; // part of the creation's undo step
+            for (auto it = params["settings"].begin(); it != params["settings"].end(); ++it)
+               RpcSetSetting(*gn, it.key(), it.value(), outError);
+            gSuppressUndoCheckpoints = wasSuppressed;
+            outError.clear();
+         }
+         if (params.value("show_params", false))
+            gn->showParams = true;
+         if (autoPlace && params.value("auto_layout", true))
+         {
+            gAutoLayoutPending.push_back(gn->index);
+            gAutoLayoutWait = 2;
+         }
+         outResult = RpcDescribeNodeShape(*gn, false);
+         outResult["index"] = gn->index;
          return true;
       }
       else if (method == "delete_node")
@@ -24984,9 +25272,22 @@ namespace
       else if (method == "connect")
       {
          const int srcIndex = params.value("srcIndex", -1);
-         const int srcOutput = params.value("srcOutput", 0);
          const int dstIndex = params.value("dstIndex", -1);
-         const int dstSlot = params.value("dstSlot", -1);
+         GraphNode* srcGn = FindNodeByIndex(srcIndex);
+         GraphNode* dstGn = FindNodeByIndex(dstIndex);
+         if (srcGn == nullptr || dstGn == nullptr)
+         {
+            outError = "unknown node index";
+            return false;
+         }
+         // Turbo 0.45: slot / output by number or by label ("B", "audio").
+         const int srcOutput = params.contains("srcOutput") ? RpcResolveOutput(*srcGn, params["srcOutput"]) : 0;
+         const int dstSlot = params.contains("dstSlot") ? RpcResolveSlot(*dstGn, params["dstSlot"]) : 0;
+         if (srcOutput < 0 || dstSlot < 0 || dstSlot >= InputCountFor(*dstGn))
+         {
+            outError = "unknown output or input slot (explain / describe list them)";
+            return false;
+         }
          if (!ConnectNodes(srcIndex, srcOutput, dstIndex, dstSlot, outError))
             return false;
          outResult = json::object();
@@ -25061,37 +25362,15 @@ namespace
             outError = "unknown node index";
             return false;
          }
-         // Params are keyed "<type letter> <name>" (Patch.h's f/i/b/c/s
-         // convention) - find the existing key for `name` so we replay it
-         // with the right type letter rather than guessing one.
-         std::vector<std::pair<std::string, std::string>> raw;
-         Patch::SaveParams(gn->node.get(), raw);
-         std::string matchedKey;
-         for (const auto& kv : raw)
+         // Turbo 0.45: shared with create_node's "settings" (RpcSetSetting).
+         if (RpcFindSettingKey(gn->node.get(), name).empty())
          {
-            const size_t sp = kv.first.find(' ');
-            if (sp != std::string::npos && kv.first.substr(sp + 1) == name)
-            {
-               matchedKey = kv.first;
-               break;
-            }
-         }
-         if (matchedKey.empty())
-         {
-            outError = "unknown param '" + name + "' on this node";
+            outError = "unknown setting '" + name + "' on " + gn->typeName + " (describe or explain lists them)";
             return false;
          }
-         std::string valueStr;
-         if (params.contains("value"))
-         {
-            const json& v = params["value"];
-            if (v.is_string())
-               valueStr = v.get<std::string>();
-            else
-               valueStr = v.dump();
-         }
          PushUndoCheckpoint();
-         Patch::LoadParams(gn->node.get(), { { matchedKey, valueStr } });
+         if (!RpcSetSetting(*gn, name, params.contains("value") ? params["value"] : json(""), outError))
+            return false;
          outResult = json::object();
          return true;
       }
@@ -25111,6 +25390,14 @@ namespace
             const float x = params.value("x", 0.0f);
             const float y = params.value("y", 0.0f);
             ed::SetNodePosition(gn->NodeId(), ImVec2(x, y));
+            // Turbo 0.45: a node that has not drawn yet would take its spawn
+            // position on its first draw, and the auto layout would move it.
+            gn->spawnX = x;
+            gn->spawnY = y;
+            gn->liveX = x;
+            gn->liveY = y;
+            gAutoLayoutPending.erase(std::remove(gAutoLayoutPending.begin(), gAutoLayoutPending.end(), gn->index),
+                                     gAutoLayoutPending.end());
             outResult = json::object();
          }
          else
@@ -25170,6 +25457,27 @@ namespace
 
       outError = "unknown method '" + method + "'";
       return false;
+   }
+
+   // Turbo 0.45: the RPC entry point - the extra tools first, then the base set.
+   bool HandleRpcCommand(const std::string& method, const nlohmann::json& params,
+                         nlohmann::json& outResult, std::string& outError)
+   {
+      // A wrong JSON type in the arguments (a string index, say) throws in
+      // nlohmann's value()/get(): an error reply, never a crash.
+      try
+      {
+         bool handled = false;
+         const bool ok = HandleRpcCommandExtra(method, params, outResult, outError, handled);
+         if (handled)
+            return ok;
+         return HandleRpcCommandBase(method, params, outResult, outError);
+      }
+      catch (const std::exception& e)
+      {
+         outError = std::string("bad arguments: ") + e.what();
+         return false;
+      }
    }
 
    // Drawn inside the ed::Suspend() block alongside the popups, so plain
@@ -32093,6 +32401,12 @@ static int HeadlessExit(int code)
 
 int main(int argc, char** argv)
 {
+   // Turbo 0.45: `--mcp` = the MCP bridge for Claude & co. (stdio), no window.
+   for (int i = 1; i < argc; i++)
+      if (std::strcmp(argv[i], "--mcp") == 0)
+         return RunMcpBridge();
+      else if (std::strcmp(argv[i], "--mcp-install") == 0)
+         return InstallMcpConfig();
    std::setvbuf(stdout, nullptr, _IONBF, 0);
    std::setvbuf(stderr, nullptr, _IONBF, 0);
    StartupTrace("startup: main entered");
@@ -33929,7 +34243,12 @@ int main(int argc, char** argv)
 
       // Apply any RemoteControl RPC requests queued by the network thread
       // since last frame, before any ed:: drawing reads the graph this frame.
+      RpcRefreshParamCache();   // Turbo 0.45: names of the params drawn last frame
       RemoteControl::DrainPending(HandleRpcCommand);
+      RpcPumpPendingBinds();    // modulation / expressions waiting for a node to draw
+      PumpAutoLayout();         // nodes placed by the auto layout once they have a size
+      RefreshLiveIssues();      // live validation hints (debounced)
+      PollPatchFileWatch();     // Turbo 0.45: the open file changed on disk
 
       std::string pendingOpenPatch;
       while (Platform::PollPendingOpenFile(pendingOpenPatch))
@@ -34496,7 +34815,7 @@ int main(int argc, char** argv)
       // Turbo (from upstream): Shift-drag gesture recording. Loops only move
       // while the transport plays; releasing Shift turns each trace into a loop.
       GestureRecorder::Instance().AdvanceClock(ImGui::GetIO().DeltaTime, Transport::Instance().IsPlaying());
-      GestureRecorder::Instance().BeginFrame(ImGui::GetIO().KeyShift, GestureRecorder::Instance().ClockNow());
+      GestureRecorder::Instance().BeginFrame(ImGui::GetIO().KeyShift, GesturePlaybackClock());
 
       if (getenv("INFINITE_TRANSPORTCLOCKTEST") != nullptr)
       {
@@ -40979,8 +41298,13 @@ int main(int argc, char** argv)
                                     t.panelBg.g * (1.0f - kTintWeight) + catColor.g * kTintWeight,
                                     t.panelBg.b * (1.0f - kTintWeight) + catColor.b * kTintWeight,
                                     (isLight ? 0.95f : 0.784f) * (gCanvasBgActive ? gCanvasBgNodeAlpha : 1.0f)));
+         // Turbo 0.45: a live validation hint turns the border amber.
+         const bool hasLiveIssue = gLiveIssues.count(gn.index) != 0;
          ed::PushStyleColor(ed::StyleColor_NodeBorder,
-                            ImColor(catColor.r, catColor.g, catColor.b, isLight ? 0.75f : 0.55f));
+                            hasLiveIssue ? ImColor(0.95f, 0.65f, 0.15f, 0.95f)
+                                         : ImColor(catColor.r, catColor.g, catColor.b, isLight ? 0.75f : 0.55f));
+         if (hasLiveIssue)
+            ed::PushStyleVar(ed::StyleVar_NodeBorderWidth, 2.5f);
 
          ed::BeginNode(gn.NodeId());
          ImGui::PushID(gn.index);
@@ -41748,6 +42072,12 @@ int main(int argc, char** argv)
          ed::EndNode();
          gCurrentNodeIndex = -1;
          ed::PopStyleColor(2);
+         if (hasLiveIssue)
+         {
+            ed::PopStyleVar();
+            if (ed::GetHoveredNode() == ed::NodeId(gn.NodeId()))
+               gLiveIssueTip = LiveIssueTooltip(gn.index);
+         }
          // Turbo: colour marker - a band across the top and a coloured frame.
          if (gn.colorTag > 0)
          {
@@ -42785,6 +43115,10 @@ int main(int argc, char** argv)
       // ---- popups: search, spawn menu, dropdown ----
       ed::Suspend();
       DrawClipMatrixDeferredPopups(); // Turbo 0.44
+      DrawReloadBanner(); // Turbo 0.45
+      if (!gLiveIssueTip.empty() && !ImGui::IsAnyItemActive())
+         ImGui::SetTooltip("%s", gLiveIssueTip.c_str()); // Turbo 0.45
+      gLiveIssueTip.clear();
 
       DrawMinimap();
 
@@ -44639,14 +44973,15 @@ int main(int argc, char** argv)
 
       // Turbo: gesture loops play back into their param, unless a cable or an
       // expression already owns it (same precedence as upstream).
+      GestureSyncClockAxis();
+      const double gestureNow = GesturePlaybackClock();
       for (const ParamRef& ref : Modulation::Instance().FrameParams())
       {
          if (ref.value == nullptr || Modulation::Instance().IsModulated(ref.nodeIndex, ref.paramIndex) ||
              Modulation::Instance().HasExpression(ref.nodeIndex, ref.paramIndex))
             continue;
          float v = 0.0f;
-         if (GestureRecorder::Instance().GetPlaybackValue(ref.nodeIndex, ref.paramIndex,
-                                                          GestureRecorder::Instance().ClockNow(), v))
+         if (GestureRecorder::Instance().GetPlaybackValue(ref.nodeIndex, ref.paramIndex, gestureNow, v))
             *ref.value = std::clamp(v, std::min(ref.minValue, ref.maxValue), std::max(ref.minValue, ref.maxValue));
       }
 

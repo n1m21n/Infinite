@@ -141,3 +141,28 @@ void Switcher3DNode::CookIfNeeded(int frameId)
          upstream->CookIfNeeded(frameId);
    }
 }
+
+// Turbo 0.45 (upstream R484)
+const std::vector<Particle>* Switcher3DNode::GetPointCloud()
+{
+   IGeometrySource* active = Active();
+   return active ? active->GetPointCloud() : nullptr;
+}
+
+unsigned long long Switcher3DNode::PointCloudRevision()
+{
+   IGeometrySource* active = Active();
+   return active ? active->PointCloudRevision() : 0;
+}
+
+const Polyline* Switcher3DNode::GetCurve()
+{
+   IGeometrySource* active = Active();
+   return active ? active->GetCurve() : nullptr;
+}
+
+unsigned long long Switcher3DNode::CurveStamp()
+{
+   IGeometrySource* active = Active();
+   return active ? active->CurveStamp() : 0;
+}

@@ -50,6 +50,12 @@ public:
    // chain like InstanceOnPoints -> Switcher 3D -> Render 3D still draws
    // every instance instead of collapsing to a single un-instanced copy.
    IGeometrySource* PassthroughSource() const override;
+   // Turbo 0.45 (upstream R484): cloud and curve come from the same active
+   // slot as the mesh, so a point cloud or curve survives the switcher.
+   const std::vector<Particle>* GetPointCloud() override;
+   unsigned long long PointCloudRevision() override;
+   const Polyline* GetCurve() override;
+   unsigned long long CurveStamp() override;
 
    INode* BypassSource() override
    {

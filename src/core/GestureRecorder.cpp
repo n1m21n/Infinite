@@ -258,6 +258,12 @@ void GestureRecorder::Clear()
    mArmedParams.clear();
 }
 
+void GestureRecorder::RestartLoops(double nowSec)
+{
+   for (auto& entry : mPlayback)
+      entry.second.startTime = nowSec;
+}
+
 void GestureRecorder::Restore(PlaybackMap playbacks, double nowSec)
 {
    mPlayback = std::move(playbacks);

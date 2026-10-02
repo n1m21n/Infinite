@@ -1,5 +1,48 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.45.0-turbo (2026-10-02)
+
+Upstream bug fixes, an MCP server for Claude, and three upstream patching aids.
+
+### Build patches with Claude (MCP)
+- **`Infinite-Turbo.exe --mcp`** is an MCP server (stdio) that edits the patch open in the running app
+  over the local control port. If the app is closed, the first request starts it.
+- **`setup-mcp.bat`** registers it in Claude Desktop's config (other servers kept, `.bak` of the old
+  file). Claude Code: `claude mcp add infinite-turbo -- "<path>\Infinite-Turbo.exe" --mcp`.
+- New RPC tools: `describe` (node types; per type its inputs, outputs, settings and help), `explain`
+  (live graph with connections, param names and ranges, modulation, warnings), `batch` (one undo
+  step, all or nothing, `$N` references), `get_patch_text` / `validate_patch_text` /
+  `load_patch_text`, `modulate` / `set_expression` / `unmodulate` by param name (waits for a new node
+  to draw), `auto_layout`, `transport`, `patch_format`.
+- `create_node` takes `settings` and places the node by itself when no x/y is given; `connect` takes
+  slots and outputs by label ("B", "audio"); `set_param` ignores case, spaces and underscores.
+- The control server serves each client on its own thread and sends large replies whole.
+
+### Patching aids (from upstream)
+- **Live reload**: the open patch file is watched. A change made outside (an editor, git, an AI)
+  reloads it as one undo step; with unsaved edits a banner asks Reload / Keep mine.
+- **Auto layout**: nodes without a `pos` line are laid out by signal flow once they have drawn.
+- **Live hints**: an amber border and a tooltip on a half-wired Blend or two-input filter, an Output
+  with nothing connected, and an image loop without a Feedback node (300 ms after the last edit).
+
+### Fixes (ported from upstream)
+- Transform moves curves and point clouds too; Switcher 3D and Set Color pass curves and clouds on.
+- Depth Projection and Image to Points no longer apply their tint twice (it was squared), and
+  Depth Projection no longer applies its colour image twice.
+- Distribute on Faces re-bakes the point colours when the inherited material or its colour changes.
+- Render 3D draws translucent meshes back to front without depth write, so one does not hide the
+  other behind it.
+- A source wired to both an Audio Out and an Output is mixed into the device once (it was doubled).
+- Gesture loops follow the render's video time during a timeline render (they played at the speed of
+  the UI frame rate).
+
+### Fixes (Turbo)
+- Undo no longer forgets which file is open (the title lost its name and Ctrl+S asked for a new one).
+- Undo, redo and reloads keep the node numbers of the saved patch when they can.
+
+### Docs
+- README rewritten: quick start, what Turbo adds, MCP, shortcuts, build, troubleshooting.
+
 ## 0.44.1-turbo (2026-10-02)
 
 ### Fixes

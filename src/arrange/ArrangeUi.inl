@@ -4266,6 +4266,7 @@ void ArrangeRenderFinish(int status, const std::string& message)
    ArrangeRenderState& r = gArrangeRender;
    if (r.job < 0)
       return;
+   gGestureRenderClock = -1.0; // Turbo 0.45: back to the live gesture clock
    ArrangeRenderJob& job = gArrangeRenderJobs[(size_t)r.job];
    std::string err;
    if (r.recorder != nullptr)
@@ -4426,6 +4427,8 @@ void ArrangeRenderPump(int frameId)
       return;
    }
    Transport::Instance().SetPlaying(true); // a stray Space must not pause a take
+   // Turbo 0.45: gesture loops follow the take's video time.
+   gGestureRenderClock = job.fps > 0 ? (double)job.frame / (double)job.fps : 0.0;
    if (r.warm)
    {
       r.warm = false; // this iteration cooked the graph at the start position

@@ -280,7 +280,7 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
          src = delayed;
       }
       // Turbo: the Arrangement Timeline owns the output in Timeline mode.
-      if (!timeline || terminal.live)
+      if (terminal.mixToDevice && (!timeline || terminal.live))
          for (int ch = 0; ch < numChannels; ch++)
             for (int i = 0; i < numFrames; i++)
                deviceBuffer.channels[ch][i] += src.channels[ch][i];

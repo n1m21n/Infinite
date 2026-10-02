@@ -198,6 +198,10 @@ public:
    // underneath it has just been rebuilt.
    void Restore(PlaybackMap playbacks, double nowSec);
 
+   // Turbo 0.45 (upstream): restarts every loop from `nowSec`, keeping the
+   // rest. Used when playback switches clocks (live <-> timeline render).
+   void RestartLoops(double nowSec);
+
    // Installs one recording, leaving every other param's alone. Used when a
    // node is duplicated or pasted: the copy inherits the original's loop,
    // speed and range override included, and starts in phase with it rather

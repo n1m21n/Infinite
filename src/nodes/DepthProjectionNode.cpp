@@ -167,8 +167,10 @@ Mat4 DepthProjectionNode::GetModelMatrix() const
 
 Material DepthProjectionNode::GetMaterial() const
 {
+   // Turbo 0.45 (upstream R482): tint is already baked into every sample's
+   // colour and the shader multiplies albedo by it, so report a neutral albedo.
    Material m;
-   m.color[0] = tint[0]; m.color[1] = tint[1]; m.color[2] = tint[2];
+   m.color[0] = 1.0f; m.color[1] = 1.0f; m.color[2] = 1.0f;
    m.metallic = metallic;
    m.roughness = roughness;
    m.opacity = opacity;
@@ -182,8 +184,8 @@ unsigned long long DepthProjectionNode::MaterialRevision() const
 
 unsigned int DepthProjectionNode::GetSurfaceTexture()
 {
-   if (colorMode == kColorInput && mColorInput.IsConnected())
-      return mColorInput.Texture();
+   // Turbo 0.45 (upstream R482): the colour input is already baked into the
+   // vertex / particle colours; exposing it as a texture applied it twice.
    return 0;
 }
 

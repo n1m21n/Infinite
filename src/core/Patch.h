@@ -57,6 +57,7 @@ namespace Patch
       std::string category;
       std::string typeName;
       float x = 0.0f, y = 0.0f;
+      bool hasPos = true; // Turbo 0.45: false = no `pos` line in the file (auto layout)
       bool showParams = false;
       bool bypassed = false;
       bool showMiniViewport = false;
@@ -365,6 +366,9 @@ namespace Patch
 
    bool Write(const std::string& path, const Data& data, std::string& outError);
    bool Read(const std::string& path, Data& outData, std::string& outError);
+   // Turbo 0.45: the same format as text in memory (RPC / MCP).
+   bool WriteText(const Data& data, std::string& outText, std::string& outError);
+   bool ReadText(const std::string& text, Data& outData, std::string& outError);
 
    // Applies saved parameters to a node, and collects them from one.
    void SaveParams(INode* node, std::vector<std::pair<std::string, std::string>>& out);
