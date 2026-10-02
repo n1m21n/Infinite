@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <thread>
 
 #include "core/Transport.h"
 #include "platform/Platform.h"
@@ -209,6 +210,10 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
             sCompScratchChannels[i][ch] = sCompScratch + ((size_t)i * kAudioMaxChannels + (size_t)ch) * kAudioMaxBlockFrames;
    }
 
+   const bool timeline = mTimelineMode.load(std::memory_order_relaxed);
+   if (timeline && !list->topology.arrangeTerminals.empty())
+      RunArrangeLookahead(list, numFrames);
+
    for (AudioTopologyEntry& entry : list->topology.order)
    {
       AudioBuffer inputViews[kAudioMaxNodeInputs];
@@ -272,9 +277,11 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
          terminal.compensation.ProcessBlock(src, delayed);
          src = delayed;
       }
-      for (int ch = 0; ch < numChannels; ch++)
-         for (int i = 0; i < numFrames; i++)
-            deviceBuffer.channels[ch][i] += src.channels[ch][i];
+      // Turbo: the Arrangement Timeline owns the output in Timeline mode.
+      if (!timeline || terminal.live)
+         for (int ch = 0; ch < numChannels; ch++)
+            for (int i = 0; i < numFrames; i++)
+               deviceBuffer.channels[ch][i] += src.channels[ch][i];
 
       if (terminal.capture != nullptr && terminal.capture->enabled.load(std::memory_order_relaxed))
       {
@@ -292,6 +299,9 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
          terminal.capture->Write(sInterleaveScratch.data(), numFrames * 2);
       }
    }
+
+   if (timeline && !list->topology.arrangeTerminals.empty())
+      MixArrangeTerminals(list, deviceBuffer, numFrames, numChannels);
 
    // Last line of defence for the hardware stream. A faulty plugin or DSP
    // node must never poison every downstream terminal with NaN/Inf, nor send
@@ -314,6 +324,178 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
    }
 }
 
+// ---- Arrangement Timeline (Turbo 0.43) -------------------------------------
+
+namespace
+{
+   double ArrangeBlockStartBeat() { return Transport::Instance().Beats(); }
+   double ArrangeBeatsPerSample(double sampleRate)
+   {
+      const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
+      return sampleRate > 0.0 ? bpm / 60.0 / sampleRate : 0.0;
+   }
+}
+
+// Before any node cooks: every Audio Sample window under this block tells its
+// file player exactly which source position belongs here (upstream's
+// position lock), so the sample is on the grid however the playhead got
+// there, and tempo sync / pitch apply per block.
+void AudioEngine::RunArrangeLookahead(ProcessList* list, int numFrames)
+{
+   Transport& transport = Transport::Instance();
+   if (!transport.IsPlaying())
+      return;
+   const double sr = mSampleRate.load(std::memory_order_relaxed);
+   const double bps = ArrangeBeatsPerSample(sr > 0.0 ? sr : 48000.0);
+   if (bps <= 0.0)
+      return;
+   const double bpm = std::max(1.0, (double)transport.Tempo());
+   const double blockStart = ArrangeBlockStartBeat();
+   const double blockEnd = blockStart + bps * (double)numFrames;
+   const uint32_t serial = transport.SeekSerial();
+   const ArrangeClipWindow* all = list->topology.arrangeWindows.data();
+   for (const ArrangeTerminal& t : list->topology.arrangeTerminals)
+   {
+      if (t.source == nullptr || t.numWindows <= 0)
+         continue;
+      const bool jumped = serial != t.seenSeekSerial;
+      t.seenSeekSerial = serial;
+      const ArrangeClipWindow* w = all + t.windowOffset;
+      int k = 0;
+      while (k < t.numWindows && w[k].endBeat <= blockStart)
+         k++;
+      if (k >= t.numWindows || w[k].startBeat >= blockEnd)
+      {
+         t.activeWindow = -1;
+         continue;
+      }
+      const bool entered = t.activeWindow != k;
+      t.activeWindow = k;
+      if (!w[k].seekSource)
+         continue;
+      const double effBpm = (w[k].syncToTempo && w[k].sampleBpm > 0.0f) ? (double)w[k].sampleBpm : bpm;
+      const double secs = w[k].sourceOffsetSeconds + (blockStart - w[k].startBeat) * 60.0 / effBpm;
+      const double perSecond = bpm / effBpm;
+      t.source->SetClipSamplePosition(secs, perSecond, w[k].pitch, jumped || entered);
+   }
+}
+
+void AudioEngine::MixArrangeTerminals(ProcessList* list, AudioBuffer& deviceBuffer, int numFrames, int numChannels)
+{
+   Transport& transport = Transport::Instance();
+   const bool playing = transport.IsPlaying();
+   const double sr = mSampleRate.load(std::memory_order_relaxed);
+   const double bps = ArrangeBeatsPerSample(sr > 0.0 ? sr : 48000.0);
+   const double bpm = std::max(1.0, (double)transport.Tempo());
+   const double ramp = 0.003 * bpm / 60.0; // 3 ms declick, in beats
+   const double blockStart = ArrangeBlockStartBeat();
+   const ArrangeClipWindow* all = list->topology.arrangeWindows.data();
+   float peaks[kMaxArrangeLanes];
+   bool touched[kMaxArrangeLanes];
+   for (int i = 0; i < kMaxArrangeLanes; i++)
+   {
+      peaks[i] = 0.0f;
+      touched[i] = false;
+   }
+
+   for (const ArrangeTerminal& t : list->topology.arrangeTerminals)
+   {
+      if (t.bufferIndex < 0 || t.numWindows <= 0)
+         continue;
+      const int slot = std::clamp(t.laneSlot, 0, kMaxArrangeLanes - 1);
+      touched[slot] = true;
+      if (!playing)
+         continue;
+      const float laneGain = mLaneGain[slot].load(std::memory_order_relaxed);
+      const float lanePanL = mLanePanL[slot].load(std::memory_order_relaxed);
+      const float lanePanR = mLanePanR[slot].load(std::memory_order_relaxed);
+      AudioBuffer src = list->buffers[t.bufferIndex].View(numFrames, numChannels);
+      const ArrangeClipWindow* w = all + t.windowOffset;
+      int cursor = std::clamp(t.cursor, 0, t.numWindows - 1);
+      if (cursor > 0 && blockStart < w[cursor - 1].endBeat)
+         cursor = 0; // moved backwards (seek / loop)
+      float peak = 0.0f;
+      for (int i = 0; i < numFrames; i++)
+      {
+         const double beat = blockStart + bps * (double)i;
+         while (cursor + 1 < t.numWindows && beat >= w[cursor].endBeat)
+            cursor++;
+         const ArrangeClipWindow& cw = w[cursor];
+         if (beat < cw.startBeat || beat >= cw.endBeat)
+         {
+            if (t.peakWindow >= 0 && t.peakWindow < t.numWindows && t.peakBucket >= 0)
+               PushPeak({ w[t.peakWindow].clipId, w[t.peakWindow].shape, t.peakBucket, t.peakValue });
+            t.peakWindow = -1;
+            continue;
+         }
+         // Live waveform: peak per 1/16 beat of the clip, published when
+         // the bucket changes.
+         {
+            const int bucket = (int)((beat - cw.startBeat) * 4.0);
+            if (t.peakWindow != cursor || t.peakBucket != bucket)
+            {
+               if (t.peakWindow >= 0 && t.peakWindow < t.numWindows && t.peakBucket >= 0)
+                  PushPeak({ w[t.peakWindow].clipId, w[t.peakWindow].shape, t.peakBucket, t.peakValue });
+               t.peakWindow = cursor;
+               t.peakBucket = bucket;
+               t.peakValue = 0.0f;
+            }
+            float m = std::fabs(src.channels[0][i]);
+            if (numChannels > 1)
+               m = std::max(m, std::fabs(src.channels[1][i]));
+            t.peakValue = std::max(t.peakValue, m);
+         }
+         double g = (double)cw.gain;
+         const double in = beat - cw.startBeat;
+         const double out = cw.endBeat - beat;
+         if (cw.fadeInBeats > 0.0 && in < cw.fadeInBeats)
+            g *= in / cw.fadeInBeats;
+         else if (!cw.abutsPrev && in < ramp)
+            g *= in / ramp;
+         if (cw.fadeOutBeats > 0.0 && out < cw.fadeOutBeats)
+            g *= out / cw.fadeOutBeats;
+         else if (!cw.abutsNext && out < ramp)
+            g *= out / ramp;
+         const float gl = (float)g * laneGain * cw.panL * lanePanL;
+         const float gr = (float)g * laneGain * cw.panR * lanePanR;
+         for (int ch = 0; ch < numChannels; ch++)
+         {
+            const float v = src.channels[ch][i] * (ch == 0 ? gl : (ch == 1 ? gr : (float)g * laneGain));
+            deviceBuffer.channels[ch][i] += v;
+            peak = std::max(peak, std::fabs(v));
+         }
+      }
+      t.cursor = cursor;
+      peaks[slot] = std::max(peaks[slot], peak);
+   }
+   for (int i = 0; i < kMaxArrangeLanes; i++)
+      if (touched[i])
+      {
+         const float prev = mLanePeak[i].load(std::memory_order_relaxed);
+         mLanePeak[i].store(std::max(peaks[i], prev * 0.85f), std::memory_order_relaxed);
+      }
+}
+
+void AudioEngine::SetOfflineRender(bool on)
+{
+   mOffline.store(on, std::memory_order_release);
+   if (on)
+   {
+      // Let a callback already inside the graph finish before the main
+      // thread starts driving it (bounded wait: a stalled driver must not
+      // hang the UI).
+      for (int i = 0; i < 2000 && mInProcess.load(std::memory_order_acquire) != 0; i++)
+         std::this_thread::sleep_for(std::chrono::microseconds(250));
+   }
+}
+
+void AudioEngine::RenderOfflineBlock(AudioBuffer& buffer)
+{
+   Transport::Instance().AdvanceAudioClock(buffer.numFrames);
+   ProcessList* list = mCurrent.load(std::memory_order_acquire);
+   RunTopology(list, buffer);
+}
+
 void AudioEngine::RenderThunk(float** buffers, int numChannels, int numFrames, void* userData)
 {
    static_cast<AudioEngine*>(userData)->Process(buffers, numChannels, numFrames);
@@ -325,6 +507,22 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
    // left denormal flushing OFF on Windows: reverb/filter tails decaying into
    // denormals then cost 10-100x CPU per sample. SSE is baseline on x64.
    _mm_setcsr(_mm_getcsr() | 0x8040); // FTZ (bit 15) | DAZ (bit 6)
+
+   // Turbo 0.43.1: the main thread owns the graph during an offline render.
+   mInProcess.fetch_add(1, std::memory_order_acq_rel);
+   if (mOffline.load(std::memory_order_acquire))
+   {
+      for (int ch = 0; ch < numChannels; ch++)
+         if (buffers[ch] != nullptr)
+            std::fill(buffers[ch], buffers[ch] + numFrames, 0.0f);
+      mInProcess.fetch_sub(1, std::memory_order_acq_rel);
+      return;
+   }
+   struct InProcessGuard
+   {
+      std::atomic<int>& c;
+      ~InProcessGuard() { c.fetch_sub(1, std::memory_order_acq_rel); }
+   } inProcessGuard{ mInProcess };
 
    const double sampleRate = mSampleRate.load(std::memory_order_relaxed);
    const double nowMs = NowMs();

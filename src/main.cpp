@@ -155,6 +155,9 @@
 #define INFINITE_TURBO_TITLE "Infinite-Turbo " INFINITE_TURBO_VERSION
 static const char* kTurboBuildDate = __DATE__ " " __TIME__;
 #include "nodes/LooperNode.h"
+#include "nodes/TimelineNode.h"
+#include "arrange/ArrangeModel.h"
+#include "audio/dsp/SlicerDsp.h"
 #include "nodes/MpcNode.h"
 #include "nodes/SuperMixerNode.h"
 #include "nodes/LayoutNode.h"
@@ -405,10 +408,10 @@ namespace
    std::string DisplayName(const std::string& name)
    {
       std::string out;
-      if (name == "Syphon In")
-         out = "SYPHON/SPOUT IN";
-      if (name == "Syphon Out")
-         out = "SYPHON/SPOUT OUT";
+      if (name == "Spout In")
+         out = "SPOUT IN";
+      if (name == "Spout Out")
+         out = "SPOUT OUT";
       // "Dynamics" reads as "compressor" everywhere a user sees it - search,
       // spawn menu, node header, help popup - but the registered type key
       // (gn.typeName, NodeFactory's lookup, every saved patch's node-type
@@ -602,6 +605,35 @@ namespace
    // the first node spawned in a patch could not be hovered, selected or
    // dragged the way every other node could.
    int gNextIndex = 1;
+   // Turbo 0.43 (from upstream): stable node identity. `index` is reused by
+   // RemoveNodeByIndex; arrangement clips reference `uid`, so a clip survives
+   // undo and reload. Never reused; saved in the patch.
+   uint64_t gNextNodeUid = 1;
+
+   // ---- Arrangement Timeline (Turbo 0.43, port of upstream's) -----------
+   // The one arrangement model; saved with the patch, snapshotted by undo.
+   // Everything else (panel, audio terminals, compositor) reads it.
+   Arrange::Model gArrange;
+   bool gArrangePanelOpen = false;
+   float gArrangePanelHeight = 300.0f;
+   // Timeline mode: the timeline owns the audio output (canvas Audio Outs
+   // are muted, live ones excepted). Session state, never saved - the app
+   // always opens on the canvas (upstream rule).
+   bool gArrangeTimelineMode = false;
+   // True while the timeline panel has keyboard focus: the canvas shortcuts
+   // (Delete, Ctrl+D, Ctrl+C/V, ...) stand down and the timeline takes them.
+   bool gArrangeKeysOwned = false;
+   ImVec2 gArrangePanelMin(0, 0), gArrangePanelMax(0, 0);
+   GraphNode* FindNodeByUid(uint64_t uid);
+   void ArrangeModelToPatchData(const Arrange::Model& m, Patch::Data& data);
+   void ArrangeLoadFromPatchData(const Patch::Data& data, bool fileLoad);
+   void ArrangeSeedAudio(std::set<INode*>& visited, std::vector<AudioTopologyEntry>& order,
+                         std::unordered_map<AudioNode*, int>& bufferIndexOf);
+   void ArrangeBuildAudioTerminals(const std::unordered_map<AudioNode*, int>& bufferIndexOf, AudioTopology& topology);
+   void ArrangeOnNodeRemoved(uint64_t uid);
+   void ArrangeResetSession();
+   bool ArrangeHandleFileDrop(const std::vector<std::string>& paths, ImVec2 pos);
+
    ed::EditorContext* gEditor = nullptr;
    GraphNode* gSelfTestFeeder = nullptr;
    bool gPaletteTestOk = false;    // dev test only
@@ -3169,9 +3201,10 @@ namespace
       REGISTER_NODE(FormulaNode, Formula, "Source");
       REGISTER_NODE(TextNode, Text, "Text");
       REGISTER_NODE(VideoSourceNode, Video, "Source");
+      REGISTER_NODE(TimelineNode, Timeline, "Source");
       REGISTER_NODE(VmpcNode, VMPC, "Source");
       REGISTER_NODE(VideoInNode, Video In, "Source");
-      REGISTER_NODE(SyphonInNode, Syphon In, "Source");
+      REGISTER_NODE(SyphonInNode, Spout In, "Source");
       REGISTER_NODE(NoiseNode, Noise, "Source");
       REGISTER_NODE(TextureNode, Texture, "Source");
       REGISTER_NODE(RampNode, Ramp, "Source");
@@ -3261,7 +3294,7 @@ namespace
       REGISTER_NODE(LayoutNode, Layout, "Compositing");
       REGISTER_NODE(SwitcherNode, Switcher, "Compositing");
       REGISTER_NODE(OutputNode, Output, "Output");
-      REGISTER_NODE(SyphonOutNode, Syphon Out, "Output");
+      REGISTER_NODE(SyphonOutNode, Spout Out, "Output");
       REGISTER_NODE(ProjectionNode, Projection, "Output");
       REGISTER_NODE(LFONode, LFO, "Modulators");
       REGISTER_NODE(RandomNode, Random, "Modulators");
@@ -4381,6 +4414,7 @@ namespace
       const std::string registered = NodeFactory::Instance().CategoryOf(typeName);
       gn.category = registered.empty() ? category : registered;
       gn.index = gNextIndex++;
+      gn.uid = gNextNodeUid++;
       gn.spawnX = x;
       gn.spawnY = y;
       // File/camera sources need an explicit first action. Open their standard
@@ -22874,6 +22908,7 @@ namespace
          { "Drum Sequencer", "An 8-lane, 8-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8x8 step grid. Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
          { "MPC", "16 sample pads (pad 1 bottom-left). Each pad has one sample and a play mode: one shot (plays the whole sample; a new hit restarts it), gate (plays while held, stops on release, restarts on the next hit) or loop (a hit toggles looping on/off; off rewinds). Click a pad to play and select it; the editor below loads a sample or a whole folder (first 16 audio files), sets the mode, volume, pitch and pan. Every pad has a CV pin (gate: high = held) for MIDI controllers, and the note input plays pads from the base note up (36-51 by default). The output is the master mix; an MPC Out node picks one pad for its own chain." },
          { "MPC Out", "Takes one pad's own stereo output from an MPC wired into its input, so a pad (a kick, a snare) can get its own effects. Anything that is not an MPC passes straight through." },
+         { "Timeline", "The Arrangement Timeline's video as a node: the composite of every video track at the playhead (blend modes, opacity, fades, grade). Wire it to an Output to project the arrangement, or into filters like any image. width/height set its resolution. Open the timeline with Shift+T (VIEW > Arrangement timeline)." },
          { "Looper", "A live looper on one audio input. REC starts a take (with sync on, it waits for the next bar or sub-bar line of the transport), PLAY starts/stops the loop, DUB layers the input over the loop while it plays, CLEAR empties it. Length: a number of bars, a fraction of a bar, or free (REC again ends the take). Playback forward, reverse or ping-pong, looping or once. thru is the input monitoring level, level the loop volume. Every button has a CV pin. Takes are shifted by the interface round-trip latency (auto, plus a manual offset in ms) so they land on the grid. A REC pressed up to 200 ms after a line still starts on that line. UNDO / REDO step through the takes and overdub layers (UNDO during an overdub closes and removes it). The loop is saved with the patch (a WAV in the Recordings folder) and EXPORT WAV writes the mix of all layers. Up to 120 s at 48 kHz." },
          { "Super Mixer", "A 16-channel mixer: per channel an input gain (+/-24 dB), a fader, pan, mute, solo and a 3-band EQ (low shelf 120 Hz, sweepable mid peak, high shelf 8 kHz, each +/-15 dB), plus a master fader. Every control has a CV pin." },
          { "Audio In", "Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch." },
@@ -22937,7 +22972,7 @@ namespace
 
          // ---------------- Output ----------------
          { "Output", "Terminal node. Shows the final image, exports a PNG, and records an H.264 .mov at a chosen frame rate. Recording captures the cooked output, so what you see is what is written." },
-         { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders through Syphon on macOS or Spout on Windows. The Windows UI names this module Syphon/Spout for patch compatibility." },
+         { "Spout Out", "Broadcasts video, 3D renders, or visual shaders to other Windows apps through Spout2 (zero-copy GPU texture sharing: Resolume, TouchDesigner, OBS, MadMapper...). Patches that used the old Syphon Out name still open." },
          { "Projection", "Warp, corner-pin and perspective-correct an image for projectors, flat walls, or curved screens, with built-in alignment test patterns and custom resolution target. Outside the warped image the output is transparent (alpha), the outline is antialiased, and each edge can have its own edge blend (width, curve, gamma) that fades the alpha or darkens RGB, for overlapping projectors." },
 
          // ---------------- OSC ----------------
@@ -23145,7 +23180,7 @@ namespace
       if (category == "3D") return "Part of the 3D geometry/render pipeline - geometry and point-cloud nodes feed into Render 3D via a Camera and Lights.";
       if (category == "Notes") return "Part of the note chain - takes note events in on its 'notes' pin and passes them out, changed. Feed a synth (Wavetable, Sampler) from the end of the chain.";
       if (category == "Output") return "Terminal node: shows, exports or records the final result.";
-      if (category == "Video") return "Video clips, cameras and Spout senders as images: Video, VMPC (clip launcher), Video In, Syphon/Spout In.";
+      if (category == "Video") return "Video clips, cameras and Spout senders as images: Video, VMPC (clip launcher), Video In, Spout In.";
       if (category == "Utility") return "Patch housekeeping: comments, groups, pass-through Null and Viewport.";
       if (category == "AudioIO") return "Audio into and out of the graph: the sound card input and output, and audio files.";
       if (category == "AudioVisual") return "Turns audio into images or geometry: waveform/spectrum textures, colour ramps, displacement, ribbons.";
@@ -23349,7 +23384,7 @@ namespace
             } },
             { "Output", {
                { "Output", "Terminal node. Shows the final image, exports a PNG, and records an H.264 .mov at a chosen frame rate. Recording captures the cooked output, so what you see is what is written." },
-               { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders through Syphon on macOS or Spout on Windows. The Windows UI names this module Syphon/Spout for patch compatibility." },
+               { "Spout Out", "Broadcasts video, 3D renders, or visual shaders to other Windows apps through Spout2 (zero-copy GPU texture sharing: Resolume, TouchDesigner, OBS, MadMapper...). Patches that used the old Syphon Out name still open." },
                { "Projection", "Warp, corner-pin and perspective-correct an image for projectors, flat walls, or curved screens, with built-in alignment test patterns and custom resolution target. Outside the warped image the output is transparent (alpha), the outline is antialiased, and each edge can have its own edge blend (width, curve, gamma) that fades the alpha or darkens RGB, for overlapping projectors." },
             } },
             { "OSC", {
@@ -23627,6 +23662,7 @@ namespace
                // Capture is set unconditionally, gated at write-time on the
                // ring's own `enabled` flag - see AudioTerminal's comment.
                terminals.push_back({ idx, ring });
+               terminals.back().live = audioOut != nullptr && audioOut->live;
                terminalLive.push_back(audioOut != nullptr && audioOut->live);
             }
          }
@@ -23658,6 +23694,10 @@ namespace
          if (gn.node->RequiresAudioProcessing())
             CollectAudioChain(gn.node.get(), visited, order, bufferIndexOf);
       }
+
+      // Turbo 0.43: in Timeline mode every node an audio clip plays must run,
+      // wired to an Audio Out or not.
+      ArrangeSeedAudio(visited, order, bufferIndexOf);
 
       // Wire each note-consuming node's inbox to its producer's outbox, now
       // that every relevant node has an `order` entry. NoteEventQueue needs
@@ -23833,6 +23873,7 @@ namespace
          gn.node->ResolveAudioTaps();
 
       AudioTopology topology;
+      ArrangeBuildAudioTerminals(bufferIndexOf, topology);
       topology.order = std::move(order);
       topology.terminalBufferIndices = std::move(terminals);
       topology.numBuffers = (int)topology.order.size();
@@ -24099,6 +24140,7 @@ namespace
       if (victim == nullptr)
          return;
       PushUndoCheckpoint();
+      ArrangeOnNodeRemoved(victim->uid);
       Modulation::Instance().UnbindAllFor(index);
       PaletteBinding::Instance().UnbindAllFor(index);
       GestureRecorder::Instance().ClearForNode(index);
@@ -24181,6 +24223,7 @@ namespace
       {
          Patch::NodeRecord rec;
          rec.index = gn.index;
+         rec.uid = gn.uid;
          rec.category = gn.category;
          rec.typeName = gn.typeName;
          // The cached live position, not the spawn position: the node has almost
@@ -24337,6 +24380,8 @@ namespace
       data.transport.timeSigDen = Transport::Instance().TimeSigDenominator();
       data.transport.key = Transport::Instance().Key();
       data.transport.scale = Transport::Instance().Scale();
+      // Turbo 0.43: the arrangement travels with the patch and with undo.
+      ArrangeModelToPatchData(gArrange, data);
       return data;
    }
 
@@ -24498,6 +24543,7 @@ namespace
       {
          gUndoStack.clear();
          gRedoStack.clear();
+         ArrangeResetSession(); // a fresh document starts with an empty timeline
          // A fresh document also resets the transport; a loaded patch sets
          // its own right after this (ApplyPatchData).
          Transport::Instance().SetTempo(120.0f);
@@ -24522,6 +24568,11 @@ namespace
       // internally consistent, and reusing them would collide with the running
       // counter and with the editor's own per-id state.
       std::map<int, int> remap;
+      // Turbo 0.43: fresh uids start above every saved one, so a node minted
+      // here can never take a uid another record is about to restore.
+      for (const Patch::NodeRecord& rec : data.nodes)
+         if (rec.uid >= gNextNodeUid)
+            gNextNodeUid = rec.uid + 1;
       for (const Patch::NodeRecord& rec : data.nodes)
       {
          GraphNode* spawned = SpawnNode(rec.typeName, rec.category, rec.x, rec.y);
@@ -24533,6 +24584,13 @@ namespace
             continue;
          }
          remap[rec.index] = spawned->index;
+         // Turbo 0.43: keep the saved uid unless something already took it
+         // (a hand-edited file naming one twice) - a clip then goes offline
+         // rather than attaching to the wrong node.
+         if (rec.uid != 0 && FindNodeByUid(rec.uid) == nullptr)
+            spawned->uid = rec.uid;
+         if (spawned->uid >= gNextNodeUid)
+            gNextNodeUid = spawned->uid + 1;
          spawned->showParams = rec.showParams;
          spawned->node->bypassed = rec.bypassed;
          spawned->showMiniViewport = rec.showMiniViewport;
@@ -24706,6 +24764,9 @@ namespace
          ApplySceneSettings(data.settings, true);
          gSuppressSettingsDirtyOnce = true;
       }
+
+      // Turbo 0.43: after the nodes, so clip sources resolve by uid.
+      ArrangeLoadFromPatchData(data, applySceneSettings);
 
       LooperNode::SetRestoringPatch(false);
       gSuppressUndoCheckpoints = false;
@@ -26132,7 +26193,8 @@ namespace
       DrawOutputWindowPanel(gn);
    }
 
-
+   // Turbo 0.43: Arrangement Timeline (model glue, audio, video, panel).
+#include "arrange/ArrangeUi.inl"
 }
 
 // ================================================== Audio node sweep discovery
@@ -34388,6 +34450,8 @@ int main(int argc, char** argv)
       PollFileDialogs();
 
       Transport::Instance().Tick(ImGui::GetIO().DeltaTime);
+      // Turbo 0.43: arrangement faders/schedule/video-sample sync, pre-cook.
+      ArrangeFrameUpdate();
       // Turbo (from upstream): Shift-drag gesture recording. Loops only move
       // while the transport plays; releasing Shift turns each trace into a loop.
       GestureRecorder::Instance().AdvanceClock(ImGui::GetIO().DeltaTime, Transport::Instance().IsPlaying());
@@ -34614,6 +34678,8 @@ int main(int argc, char** argv)
                gMidiWindowOpen = !gMidiWindowOpen;
             if (ImGui::MenuItem("Modulation matrix...", "Shift+M", gModMatrixOpen))
                gModMatrixOpen = !gModMatrixOpen;
+            if (ImGui::MenuItem("Arrangement timeline", "Shift+T", gArrangePanelOpen))
+               gArrangePanelOpen = !gArrangePanelOpen;
             ImGui::SeparatorText("Output behind the canvas");
             GraphNode* bgNode = gCanvasBgNodeIndex >= 0 ? FindNodeByIndex(gCanvasBgNodeIndex) : nullptr;
             if (bgNode != nullptr)
@@ -35312,8 +35378,13 @@ int main(int argc, char** argv)
       // it is exactly what grows the outer window's own scrollbar (see the
       // NoScrollbar comment on its Begin() call above).
       const float topBottomGap = (viewportTop || viewportBottom) ? ImGui::GetStyle().ItemSpacing.y : 0.0f;
+      // Turbo 0.43: the arrangement panel docks under everything else.
+      if (gArrangePanelOpen)
+         gArrangePanelHeight = std::clamp(gArrangePanelHeight, 140.0f,
+                                          std::max(140.0f, ImGui::GetContentRegionAvail().y - 220.0f));
+      const float arrangeReserve = gArrangePanelOpen ? gArrangePanelHeight + ImGui::GetStyle().ItemSpacing.y : 0.0f;
       const float graphHeight =
-         std::max(150.0f, ImGui::GetContentRegionAvail().y -
+         std::max(150.0f, ImGui::GetContentRegionAvail().y - arrangeReserve -
                              ((viewportTop || viewportBottom) ? gViewportPanelHeight + topBottomGap : 0.0f));
 
       // Top- and left-docked viewport panels draw before the canvas: nothing
@@ -35425,6 +35496,9 @@ int main(int argc, char** argv)
 
       // Dropping a file on the canvas spawns the matching source node, already
       // loaded, at the drop point.
+      // Turbo 0.43: files dropped on the timeline panel become Sample clips.
+      if (!gDroppedFiles.empty() && ArrangeHandleFileDrop(gDroppedFiles, gDropPos))
+         gDroppedFiles.clear();
       if (!gDroppedFiles.empty())
       {
          // Everything ModelIO reads. Checked before video because "usdz" and
@@ -41200,6 +41274,20 @@ int main(int argc, char** argv)
                DrawEnvironmentParams(n);
             else if (auto* n = dynamic_cast<VideoSourceNode*>(gn.node.get()))
                DrawVideoParams(n);
+            else if (auto* n = dynamic_cast<TimelineNode*>(gn.node.get()))
+            {
+               // Turbo 0.43: resolution of the arrangement composite.
+               ImGui::SetNextItemWidth(kParamWidth);
+               int wh[2] = { n->width, n->height };
+               if (ImGui::InputInt2("size##timelinesize", wh, ImGuiInputTextFlags_EnterReturnsTrue))
+               {
+                  PushUndoCheckpoint();
+                  n->width = std::clamp(wh[0], 16, 8192);
+                  n->height = std::clamp(wh[1], 16, 8192);
+               }
+               if (ImGui::Button(gArrangePanelOpen ? "Hide timeline" : "Open timeline", ImVec2(kPreviewSize, 0)))
+                  gArrangePanelOpen = !gArrangePanelOpen;
+            }
             else if (auto* n = dynamic_cast<VideoInNode*>(gn.node.get()))
                DrawVideoInParams(n);
             else if (auto* n = dynamic_cast<FitNode*>(gn.node.get()))
@@ -42110,14 +42198,15 @@ int main(int argc, char** argv)
       ed::EndCreate();
 
       // ---- keyboard: delete + copy/paste ----
-      const bool typing = io.WantTextInput;
+      const bool typing = io.WantTextInput || gArrangeKeysOwned;
       const bool cmdOrCtrl = io.KeyCtrl || io.KeySuper;
 
       // Shift+Cmd+Z is the Mac convention for redo; Ctrl+Y also works for
       // anyone used to the Windows/Linux binding.
-      if (!typing && cmdOrCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false))
+      // Undo/redo and Space keep working with the timeline focused.
+      if (!io.WantTextInput && cmdOrCtrl && !io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false))
          Undo();
-      if (!typing && ((cmdOrCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false)) ||
+      if (!io.WantTextInput && ((cmdOrCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false)) ||
                       (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y, false))))
          Redo();
 
@@ -42159,7 +42248,7 @@ int main(int argc, char** argv)
       // Space toggles play/pause on the transport, mirroring the Play/Pause
       // button, so the timeline can be started or paused without reaching
       // for the mouse.
-      if (!typing && !cmdOrCtrl && !io.KeyShift &&
+      if (!io.WantTextInput && !cmdOrCtrl && !io.KeyShift &&
           ImGui::IsKeyPressed(ImGuiKey_Space, false))
          Transport::Instance().TogglePlay();
 
@@ -42708,6 +42797,24 @@ int main(int argc, char** argv)
                      SetInlinePreviewEnabled(*gn, true);
                }
             }
+            // Turbo 0.43: Arrangement Timeline.
+            {
+               const bool fitsVideo = ArrangeNodeVideoCompatible(*gn);
+               const bool fitsAudio = ArrangeNodeAudioCompatible(*gn);
+               if (fitsVideo && fitsAudio)
+               {
+                  if (ImGui::BeginMenu("Add to Timeline"))
+                  {
+                     if (ImGui::MenuItem("video track"))
+                        ArrangeAddNodeToTimeline(gn->index, Arrange::kLaneVideo);
+                     if (ImGui::MenuItem("audio track"))
+                        ArrangeAddNodeToTimeline(gn->index, Arrange::kLaneAudio);
+                     ImGui::EndMenu();
+                  }
+               }
+               else if ((fitsVideo || fitsAudio) && ImGui::MenuItem("Add to Timeline"))
+                  ArrangeAddNodeToTimeline(gn->index);
+            }
             if (CanShowInViewportPanel(*gn))
             {
                // Adds a card rather than replacing whatever is already shown -
@@ -42973,6 +43080,9 @@ int main(int argc, char** argv)
       if (!ImGui::GetIO().WantTextInput && !ImGui::GetIO().KeyCtrl && ImGui::GetIO().KeyShift &&
           ImGui::IsKeyPressed(ImGuiKey_M, false))
          gModMatrixOpen = !gModMatrixOpen;
+      if (!ImGui::GetIO().WantTextInput && !ImGui::GetIO().KeyCtrl && ImGui::GetIO().KeyShift &&
+          ImGui::IsKeyPressed(ImGuiKey_T, false))
+         gArrangePanelOpen = !gArrangePanelOpen;
       if (gModMatrixOpen)
       {
          ImGui::SetNextWindowSize(ImVec2(820, 420), ImGuiCond_FirstUseEver);
@@ -44019,7 +44129,15 @@ int main(int argc, char** argv)
       if (viewportBottom)
          DrawViewportPanelDocked("##viewportpanel_bottom", ImVec2(0, gViewportPanelHeight));
 
+      // Turbo 0.43: Arrangement Timeline, docked at the bottom.
+      if (gArrangePanelOpen)
+         DrawArrangePanelDocked(ImVec2(0, gArrangePanelHeight));
+      else
+         gArrangeKeysOwned = false;
+
       ImGui::End();
+      DrawArrangeClipSettingsWindow();
+      DrawArrangeRenderWindow();
 
       // ---- windows that must live outside the node canvas ----
       if (gFormulaEditorOpen && gFormulaEditor != nullptr)
@@ -44353,6 +44471,14 @@ int main(int argc, char** argv)
             if (ref.value == nullptr)
                continue;
             const Modulation::Source src = modulation.ModulatorFor(ref.nodeIndex, ref.paramIndex);
+            // Turbo 0.43.1: a timeline clip can switch a param's modulation
+            // off while it plays - the knob rests at the binding's centre.
+            if (src.nodeIndex >= 0 && ArrangeModBypassed(ref.nodeIndex, ref.paramIndex))
+            {
+               *ref.value = std::min(std::max(src.centre, std::min(ref.minValue, ref.maxValue)),
+                                     std::max(ref.minValue, ref.maxValue));
+               continue;
+            }
             // Turbo MIDI learn: a new value from the mapped control is
             // written here; a wired modulation cable always wins.
             if (src.nodeIndex < 0 && MidiMap::Find(ref.nodeIndex, ref.paramIndex) != nullptr)
@@ -44659,6 +44785,9 @@ int main(int argc, char** argv)
 
       for (GraphNode& gn : gNodes)
          gn.node->CookIfNeeded(frameId);
+      // Turbo 0.43: the timeline monitor shows this frame's textures.
+      ArrangeCompositeMonitorIfRequested(frameId);
+      ArrangeRenderPump(frameId); // Turbo 0.43.1: offline timeline render, one frame per iteration
 
       // The node cook loop above is the longest single stretch of the frame,
       // and it runs after glfwPollEvents() with the run loop otherwise

@@ -263,6 +263,8 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
       const float px = (std::isfinite(node.x) && std::abs(node.x) <= 1e6f && node.x > -2e9f) ? node.x : 0.0f;
       const float py = (std::isfinite(node.y) && std::abs(node.y) <= 1e6f && node.y > -2e9f) ? node.y : 0.0f;
       file << "node " << node.index << " " << node.category << " " << node.typeName << "\n";
+      if (node.uid != 0)
+         file << "  uid " << node.uid << "\n";
       file << "  pos " << FloatToString(px) << " " << FloatToString(py) << "\n";
       file << "  flags " << (node.showParams ? 1 : 0) << " " << (node.bypassed ? 1 : 0) << " "
            << (node.showMiniViewport ? 1 : 0) << " " << (node.showAdvancedParams ? 1 : 0) << " "
@@ -328,6 +330,116 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
       if (std::fabs(g.curve) > 0.0001f)
          file << "gesturecurve " << g.dstIndex << " " << g.dstParam << " " << FloatToString(g.curve) << "\n";
    }
+   for (size_t i = 0; i < data.streams.size(); i++)
+   {
+      const StreamRecord& s = data.streams[i];
+      file << "stream " << s.type << " " << s.blendMode << " " << FloatToString(s.opacity) << " "
+           << FloatToString(s.gainDb) << " " << FloatToString(s.pan) << " "
+           << (s.enabled ? 1 : 0) << " " << s.groupId << " " << EscapeLine(s.name) << "\n";
+      // The stream's own id trails the line it has always had, so an older
+      // build reading a newer patch still gets the lane (it just ignores the
+      // extra token, which lands after the name and so is part of the name -
+      // hence a separate line instead).
+      if (s.id != 0)
+         file << "streamid " << i << " " << s.id << "\n";
+      // `cliptick`, not `clip`: the old tag's fields are seconds in fixed
+      // positions and reinterpreting them as ticks would silently corrupt
+      // every pre-tick patch. New tag, new grammar, old tag stays readable.
+      for (const ClipRecord& c : s.clips)
+         file << "cliptick " << i << " " << c.id << " " << c.startTick << " " << c.lengthTick << " "
+              << c.srcUid << " " << c.srcOutput << " " << c.fadeInTick << " " << c.fadeOutTick << " "
+              << FloatToString(c.gainDb) << " " << (c.enabled ? 1 : 0) << " " << c.groupId << " "
+              << FloatToString(c.colorR) << " " << FloatToString(c.colorG) << " " << FloatToString(c.colorB) << " "
+              << EscapeLine(c.name) << "\n";
+      // Own lines, not cliptick fields: cliptick ends in a to-end-of-line
+      // name, so nothing can be appended after it.
+      if (s.mute || s.solo)
+         file << "streammix " << i << " " << (s.mute ? 1 : 0) << " " << (s.solo ? 1 : 0) << "\n";
+      if (s.rowHeight != 0.0f)
+         file << "streamrowheight " << i << " " << FloatToString(s.rowHeight) << "\n";
+      for (const ClipRecord& c : s.clips)
+         if (c.blendMode > 0)
+            file << "clipblend " << i << " " << c.id << " " << c.blendMode << "\n";
+      for (const ClipRecord& c : s.clips)
+         if (c.pan != 0.0f || c.pitch != 0.0f || !c.syncToTempo)
+            file << "clipaudio " << i << " " << c.id << " " << FloatToString(c.pan) << " "
+                 << FloatToString(c.pitch) << " " << (c.syncToTempo ? 1 : 0) << "\n";
+      for (const ClipRecord& c : s.clips)
+         if (c.colorBrightness != 0.0f || c.colorContrast != 0.0f || c.colorSaturation != 1.0f)
+            file << "clipgrade " << i << " " << c.id << " " << FloatToString(c.colorBrightness) << " "
+                 << FloatToString(c.colorContrast) << " " << FloatToString(c.colorSaturation) << "\n";
+      for (const ClipRecord& c : s.clips)
+         if (c.opacity != 1.0f)
+            file << "clipopacity " << i << " " << c.id << " " << FloatToString(c.opacity) << "\n";
+      // Variable-length, so it runs to end of line and nothing may be
+      // appended after it - see the format comment in Patch.h.
+      for (const ClipRecord& c : s.clips)
+         if (!c.bypassedModParams.empty())
+         {
+            file << "clipmodbypass " << i << " " << c.id;
+            for (int paramIndex : c.bypassedModParams)
+               file << " " << paramIndex;
+            file << "\n";
+         }
+      for (const ClipRecord& c : s.clips)
+         if (!c.retrigger)
+            file << "clipretrigger " << i << " " << c.id << " 0\n";
+      for (const ClipRecord& c : s.clips)
+         if (c.sampleDropped)
+            file << "clipsample " << i << " " << c.id << " 1\n";
+      // BPM sync (step 3): only written for a Sample with a non-default
+      // sampleBpm or a real sourceDurationSeconds, same append-only,
+      // own-line convention as clipretrigger/clipsample above - an older
+      // reader just skips a tag it doesn't know.
+      for (const ClipRecord& c : s.clips)
+         if (c.sampleDropped && (c.sampleBpm != 120.0f || c.sourceDurationSeconds != 0.0f))
+            file << "clipbpm " << i << " " << c.id << " " << FloatToString(c.sampleBpm) << " "
+                 << FloatToString(c.sourceDurationSeconds) << "\n";
+      // Frozen native-tempo reference (see Clip::origBpm's own comment) -
+      // own tag, same append-only convention, written whenever it's a real
+      // captured value (not the -1 load-time sentinel) so an unsynced clip's
+      // playback ratio round-trips instead of resetting to "native speed"
+      // on every reload.
+      for (const ClipRecord& c : s.clips)
+         if (c.sampleDropped && c.origBpm > 0.0f)
+            file << "cliporigbpm " << i << " " << c.id << " " << FloatToString(c.origBpm) << "\n";
+      // Split-derived source offset: own tag, same append-only convention -
+      // only written when non-zero (i.e. the clip is a split-off right
+      // half) so an unsplit Sample's patch line stays exactly as it was.
+      for (const ClipRecord& c : s.clips)
+         if (c.sampleDropped && c.sourceOffsetSeconds != 0.0f)
+            file << "clipsrcoffset " << i << " " << c.id << " " << FloatToString(c.sourceOffsetSeconds) << "\n";
+   }
+   for (const MarkerRecord& mk : data.markers)
+      file << "marker " << mk.id << " " << mk.posTick << " " << mk.color << " " << EscapeLine(mk.name) << "\n";
+   // Track groups: a new tag line, one per group, same shape as `marker` -
+   // an older reader that doesn't know this tag simply skips the line
+   // (see the "anything else is from a newer version" catch-all below).
+   // The 4th token used to be `collapsed`, now unused (nested groups never
+   // collapse) - written as a literal 0 placeholder so the token positions
+   // stay append-only and an older reader (which still parses that slot as
+   // collapsed, harmlessly) doesn't shift. `parentGroupId` is the new 5th
+   // token, added after it for the same reason.
+   for (const TrackGroupRecord& g : data.trackGroups)
+      file << "trackgroup " << g.id << " " << g.color << " " << (g.enabled ? 1 : 0) << " "
+           << (g.collapsed ? 1 : 0) << " " << g.parentGroupId << " " << EscapeLine(g.name) << "\n";
+   {
+      const ArrangeSettingsRecord& a = data.arrangeSettings;
+      file << "arrange " << a.nextId << " " << a.timeDisplay << " " << a.snapDivision << " "
+           << (a.snapTriplet ? 1 : 0) << " " << FloatToString(a.zoom) << " " << FloatToString(a.scroll) << " "
+           << (a.loopEnabled ? 1 : 0) << " " << a.loopStart << " " << a.loopEnd << " " << a.dockSide << " "
+           << a.renderWidth << " " << a.renderHeight << " " << a.renderFps << " " << a.renderSampleRate << " "
+           << a.renderFormat << " " << a.renderRangeKind << " " << a.renderRangeStart << " "
+           << a.renderRangeEnd << " " << a.renderAudioSource << " " << a.renderVideoSource << " "
+           << EscapeLine(a.renderFolder) << "\n";
+      // Separately-tagged, written only when non-default - same append-only
+      // convention as clipretrigger/clipsample above, so an older reader
+      // (which doesn't know this tag) just skips the line instead of
+      // misparsing the fixed-order "arrange" line's trailing renderFolder.
+      if (!a.importSyncToTempo)
+         file << "arrangeimportsync 0\n";
+   }
+
    if (data.settings.present)
       WriteSettingsLines(file, data.settings, "setting");
 
@@ -410,6 +522,10 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          if (inNode)
             outData.nodes.push_back(current);
          inNode = false;
+      }
+      else if (tag == "uid" && inNode)
+      {
+         in >> current.uid;
       }
       else if (tag == "pos" && inNode)
       {
@@ -591,6 +707,312 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          in >> outData.transport.bpm >> outData.transport.timeSigNum >> outData.transport.timeSigDen
             >> outData.transport.key >> outData.transport.scale;
       }
+      else if (tag == "stream")
+      {
+         // Always pushed, even when malformed: a clip line refers to its
+         // stream by position, so dropping one would shift every later clip
+         // onto the wrong lane. Missing/garbage tokens leave defaults.
+         StreamRecord s;
+         in >> s.type >> s.blendMode >> s.opacity >> s.gainDb >> s.pan;
+         // Trailing fields: a pre-groups patch's `stream` line has no more
+         // numeric tokens here (next thing on the line is the escaped name),
+         // so this extraction fails. Per C++11 that ZEROES the target on
+         // failure - so `enabled` would land on false/disabled unless
+         // explicitly restored to true here. groupId's zero-on-failure IS
+         // the right default (0 = ungrouped), so it needs no such fixup.
+         int enabled = 1;
+         if (!(in >> enabled)) enabled = 1;
+         in >> s.groupId;
+         s.enabled = enabled != 0;
+         std::string raw;
+         std::getline(in, raw);
+         if (!raw.empty() && raw[0] == ' ')
+            raw.erase(0, 1);
+         s.name = UnescapeLine(raw);
+         if (s.type != kStreamVideo && s.type != kStreamAudio) s.type = kStreamVideo;
+         if (s.blendMode < 0 || s.blendMode > 31) s.blendMode = 0;
+         if (!std::isfinite(s.opacity)) s.opacity = 1.0f;
+         s.opacity = std::clamp(s.opacity, 0.0f, 1.0f);
+         if (!std::isfinite(s.gainDb)) s.gainDb = 0.0f;
+         if (!std::isfinite(s.pan)) s.pan = 0.0f;
+         s.pan = std::clamp(s.pan, -1.0f, 1.0f);
+         outData.streams.push_back(std::move(s));
+      }
+      else if (tag == "streamid")
+      {
+         int streamIdx = -1;
+         uint64_t id = 0;
+         if (in >> streamIdx >> id && streamIdx >= 0 && streamIdx < (int)outData.streams.size())
+            outData.streams[streamIdx].id = id;
+      }
+      else if (tag == "streammix")
+      {
+         int streamIdx = -1, mute = 0, solo = 0;
+         if (in >> streamIdx >> mute >> solo && streamIdx >= 0 && streamIdx < (int)outData.streams.size())
+         {
+            outData.streams[streamIdx].mute = mute != 0;
+            outData.streams[streamIdx].solo = solo != 0;
+         }
+      }
+      else if (tag == "streamrowheight")
+      {
+         int streamIdx = -1;
+         float rowHeight = 0.0f;
+         if (in >> streamIdx >> rowHeight && streamIdx >= 0 && streamIdx < (int)outData.streams.size() &&
+             std::isfinite(rowHeight))
+            outData.streams[streamIdx].rowHeight = rowHeight;
+      }
+      else if (tag == "clipblend")
+      {
+         int streamIdx = -1, mode = 0;
+         uint64_t clipId = 0;
+         if (in >> streamIdx >> clipId >> mode && streamIdx >= 0 && streamIdx < (int)outData.streams.size() &&
+             clipId != 0)
+            for (ClipRecord& c : outData.streams[streamIdx].clips)
+               if (c.id == clipId)
+                  c.blendMode = (mode >= 0 && mode <= 31) ? mode : 0;
+      }
+      else if (tag == "clipaudio")
+      {
+         int streamIdx = -1;
+         uint64_t clipId = 0;
+         float pan = 0.0f, pitch = 0.0f;
+         int syncToTempo = 1;
+         if (in >> streamIdx >> clipId >> pan >> pitch >> syncToTempo &&
+             streamIdx >= 0 && streamIdx < (int)outData.streams.size() && clipId != 0)
+         {
+            if (!std::isfinite(pan)) pan = 0.0f;
+            if (!std::isfinite(pitch)) pitch = 0.0f;
+            for (ClipRecord& c : outData.streams[streamIdx].clips)
+               if (c.id == clipId)
+               {
+                  c.pan = std::clamp(pan, -1.0f, 1.0f);
+                  c.pitch = std::clamp(pitch, -24.0f, 24.0f);
+                  c.syncToTempo = syncToTempo != 0;
+               }
+         }
+      }
+      else if (tag == "clipgrade")
+      {
+         int streamIdx = -1;
+         uint64_t clipId = 0;
+         float brightness = 0.0f, contrast = 0.0f, saturation = 1.0f;
+         if (in >> streamIdx >> clipId >> brightness >> contrast >> saturation &&
+             streamIdx >= 0 && streamIdx < (int)outData.streams.size() && clipId != 0)
+         {
+            if (!std::isfinite(brightness)) brightness = 0.0f;
+            if (!std::isfinite(contrast)) contrast = 0.0f;
+            if (!std::isfinite(saturation)) saturation = 1.0f;
+            for (ClipRecord& c : outData.streams[streamIdx].clips)
+               if (c.id == clipId)
+               {
+                  c.colorBrightness = std::clamp(brightness, -1.0f, 1.0f);
+                  c.colorContrast = std::clamp(contrast, -1.0f, 1.0f);
+                  c.colorSaturation = std::clamp(saturation, 0.0f, 2.0f);
+               }
+         }
+      }
+      else if (tag == "clipmodbypass")
+      {
+         int streamIdx = -1;
+         uint64_t clipId = 0;
+         if (in >> streamIdx >> clipId && streamIdx >= 0 &&
+             streamIdx < (int)outData.streams.size() && clipId != 0)
+         {
+            // Read to end of line. A negative index is not a param index
+            // Modulation could ever have bound, so drop it rather than
+            // carrying a value no lookup can match.
+            std::vector<int> params;
+            for (int paramIndex = 0; in >> paramIndex; )
+               if (paramIndex >= 0)
+                  params.push_back(paramIndex);
+            std::sort(params.begin(), params.end());
+            params.erase(std::unique(params.begin(), params.end()), params.end());
+            if (!params.empty())
+               for (ClipRecord& c : outData.streams[streamIdx].clips)
+                  if (c.id == clipId)
+                     c.bypassedModParams = params;
+         }
+      }
+      else if (tag == "clipopacity")
+      {
+         int streamIdx = -1;
+         uint64_t clipId = 0;
+         float opacity = 1.0f;
+         if (in >> streamIdx >> clipId >> opacity &&
+             streamIdx >= 0 && streamIdx < (int)outData.streams.size() && clipId != 0)
+         {
+            if (!std::isfinite(opacity)) opacity = 1.0f;
+            for (ClipRecord& c : outData.streams[streamIdx].clips)
+               if (c.id == clipId)
+                  c.opacity = std::clamp(opacity, 0.0f, 1.0f);
+         }
+      }
+      else if (tag == "clipretrigger")
+      {
+         int streamIdx = -1;
+         uint64_t clipId = 0;
+         int retriggerVal = 1;
+         if (in >> streamIdx >> clipId >> retriggerVal &&
+             streamIdx >= 0 && streamIdx < (int)outData.streams.size() && clipId != 0)
+         {
+            for (ClipRecord& c : outData.streams[streamIdx].clips)
+               if (c.id == clipId)
+               {
+                  c.retrigger = (retriggerVal != 0);
+               }
+         }
+      }
+      else if (tag == "clipsample")
+      {
+         int streamIdx = -1;
+         uint64_t clipId = 0;
+         int sampleVal = 0;
+         if (in >> streamIdx >> clipId >> sampleVal &&
+             streamIdx >= 0 && streamIdx < (int)outData.streams.size() && clipId != 0)
+         {
+            for (ClipRecord& c : outData.streams[streamIdx].clips)
+               if (c.id == clipId)
+                  c.sampleDropped = (sampleVal != 0);
+         }
+      }
+      else if (tag == "clipbpm")
+      {
+         int streamIdx = -1;
+         uint64_t clipId = 0;
+         float sampleBpm = 120.0f, sourceDurationSeconds = 0.0f;
+         if (in >> streamIdx >> clipId >> sampleBpm >> sourceDurationSeconds &&
+             streamIdx >= 0 && streamIdx < (int)outData.streams.size() && clipId != 0)
+         {
+            if (!std::isfinite(sampleBpm) || sampleBpm <= 0.0f) sampleBpm = 120.0f;
+            if (!std::isfinite(sourceDurationSeconds) || sourceDurationSeconds < 0.0f) sourceDurationSeconds = 0.0f;
+            for (ClipRecord& c : outData.streams[streamIdx].clips)
+               if (c.id == clipId)
+               {
+                  c.sampleBpm = sampleBpm;
+                  c.sourceDurationSeconds = sourceDurationSeconds;
+               }
+         }
+      }
+      else if (tag == "cliporigbpm")
+      {
+         int streamIdx = -1;
+         uint64_t clipId = 0;
+         float origBpm = -1.0f;
+         if (in >> streamIdx >> clipId >> origBpm &&
+             streamIdx >= 0 && streamIdx < (int)outData.streams.size() && clipId != 0)
+         {
+            if (!std::isfinite(origBpm) || origBpm <= 0.0f) origBpm = -1.0f;
+            for (ClipRecord& c : outData.streams[streamIdx].clips)
+               if (c.id == clipId)
+                  c.origBpm = origBpm;
+         }
+      }
+      else if (tag == "clipsrcoffset")
+      {
+         int streamIdx = -1;
+         uint64_t clipId = 0;
+         float sourceOffsetSeconds = 0.0f;
+         if (in >> streamIdx >> clipId >> sourceOffsetSeconds &&
+             streamIdx >= 0 && streamIdx < (int)outData.streams.size() && clipId != 0)
+         {
+            if (!std::isfinite(sourceOffsetSeconds) || sourceOffsetSeconds < 0.0f) sourceOffsetSeconds = 0.0f;
+            for (ClipRecord& c : outData.streams[streamIdx].clips)
+               if (c.id == clipId)
+                  c.sourceOffsetSeconds = sourceOffsetSeconds;
+         }
+      }
+      else if (tag == "cliptick")
+      {
+         int streamIdx = -1;
+         ClipRecord c;
+         int enabled = 1;
+         if (in >> streamIdx >> c.id >> c.startTick >> c.lengthTick >> c.srcUid &&
+             streamIdx >= 0 && streamIdx < (int)outData.streams.size() &&
+             c.startTick >= 0 && c.lengthTick > 0)
+         {
+            // Trailing settings: a missing token keeps ClipRecord's default
+            // (C++11 failed-extraction), a garbage one reads as 0, so each is
+            // sanitized below. Same forward-compat pattern as `cable`.
+            in >> c.srcOutput >> c.fadeInTick >> c.fadeOutTick >> c.gainDb >> enabled >> c.groupId;
+            c.enabled = enabled != 0;
+            if (c.srcOutput < 0) c.srcOutput = 0;
+            if (c.fadeInTick < 0) c.fadeInTick = 0;
+            if (c.fadeOutTick < 0) c.fadeOutTick = 0;
+            if (c.fadeInTick > c.lengthTick) c.fadeInTick = c.lengthTick;
+            if (c.fadeOutTick > c.lengthTick) c.fadeOutTick = c.lengthTick;
+            if (!std::isfinite(c.gainDb)) c.gainDb = 0.0f;
+            if (in >> c.colorR >> c.colorG >> c.colorB) {}
+            if (!std::isfinite(c.colorR)) c.colorR = 0.0f;
+            if (!std::isfinite(c.colorG)) c.colorG = 0.0f;
+            if (!std::isfinite(c.colorB)) c.colorB = 0.0f;
+            c.colorR = std::clamp(c.colorR, 0.0f, 1.0f);
+            c.colorG = std::clamp(c.colorG, 0.0f, 1.0f);
+            c.colorB = std::clamp(c.colorB, 0.0f, 1.0f);
+            std::string rawName;
+            std::getline(in, rawName);
+            if (!rawName.empty() && rawName[0] == ' ')
+               rawName.erase(0, 1);
+            c.name = UnescapeLine(rawName);
+            outData.streams[streamIdx].clips.push_back(c);
+         }
+      }
+      else if (tag == "marker")
+      {
+         MarkerRecord mk;
+         if (in >> mk.id >> mk.posTick >> mk.color && mk.posTick >= 0)
+         {
+            std::string raw;
+            std::getline(in, raw);
+            if (!raw.empty() && raw[0] == ' ')
+               raw.erase(0, 1);
+            mk.name = UnescapeLine(raw);
+            outData.markers.push_back(mk);
+         }
+      }
+      else if (tag == "trackgroup")
+      {
+         TrackGroupRecord g;
+         int enabled = 1;
+         if (in >> g.id >> g.color >> enabled && g.id != 0)
+         {
+            g.enabled = enabled != 0;
+            int collapsed = 0;
+            in >> collapsed;
+            g.collapsed = (collapsed != 0);
+            in >> g.parentGroupId;
+            std::string raw;
+            std::getline(in, raw);
+            if (!raw.empty() && raw[0] == ' ')
+               raw.erase(0, 1);
+            g.name = UnescapeLine(raw);
+            outData.trackGroups.push_back(g);
+         }
+      }
+      else if (tag == "arrange")
+      {
+         ArrangeSettingsRecord& a = outData.arrangeSettings;
+         int triplet = 0, loopOn = 0;
+         in >> a.nextId >> a.timeDisplay >> a.snapDivision >> triplet >> a.zoom >> a.scroll
+            >> loopOn >> a.loopStart >> a.loopEnd >> a.dockSide
+            >> a.renderWidth >> a.renderHeight >> a.renderFps >> a.renderSampleRate
+            >> a.renderFormat >> a.renderRangeKind >> a.renderRangeStart >> a.renderRangeEnd
+            >> a.renderAudioSource >> a.renderVideoSource;
+         a.snapTriplet = triplet != 0;
+         a.loopEnabled = loopOn != 0;
+         std::string raw;
+         std::getline(in, raw);
+         if (!raw.empty() && raw[0] == ' ')
+            raw.erase(0, 1);
+         a.renderFolder = UnescapeLine(raw);
+         outData.hasArrange = true;
+      }
+      else if (tag == "arrangeimportsync")
+      {
+         int v = 1;
+         in >> v;
+         outData.arrangeSettings.importSyncToTempo = v != 0;
+      }
       else if (tag == "setting")
       {
          std::string key;
@@ -598,6 +1020,27 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          ReadSettingValue(key, in, outData.settings);
       }
       // Anything else is from a newer version and is deliberately ignored.
+   }
+
+   for (StreamRecord& st : outData.streams)
+      std::stable_sort(st.clips.begin(), st.clips.end(),
+                       [](const ClipRecord& a, const ClipRecord& b) { return a.startTick < b.startTick; });
+   std::stable_sort(outData.markers.begin(), outData.markers.end(),
+                    [](const MarkerRecord& a, const MarkerRecord& b) { return a.posTick < b.posTick; });
+   if (outData.hasArrange)
+   {
+      ArrangeSettingsRecord& a = outData.arrangeSettings;
+      if (a.timeDisplay != 0 && a.timeDisplay != 1) a.timeDisplay = 0;
+      if (a.snapDivision < 0 || a.snapDivision > 64) a.snapDivision = 4;
+      if (!std::isfinite(a.zoom) || a.zoom <= 0.0f) a.zoom = 1.0f;
+      if (!std::isfinite(a.scroll) || a.scroll < 0.0f) a.scroll = 0.0f;
+      if (a.loopStart < 0) a.loopStart = 0;
+      if (a.loopEnd < a.loopStart) a.loopEnd = a.loopStart;
+      if (a.dockSide != 0 && a.dockSide != 1) a.dockSide = 0;
+      a.renderWidth = std::clamp(a.renderWidth, 16, 16384);
+      a.renderHeight = std::clamp(a.renderHeight, 16, 16384);
+      a.renderFps = std::clamp(a.renderFps, 1, 240);
+      if (a.nextId < 1) a.nextId = 1;
    }
 
    if (outData.nodes.empty())

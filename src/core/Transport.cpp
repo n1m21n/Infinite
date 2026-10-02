@@ -71,6 +71,13 @@ void Transport::Tick(float deltaSeconds)
 
    mSeconds += deltaSeconds;
    mBeats += deltaSeconds * (mBpm.load(std::memory_order_relaxed) / 60.0);
+   if (mLoopEnabled.load(std::memory_order_relaxed))
+   {
+      const double start = mLoopStartBeats.load(std::memory_order_relaxed);
+      const double end = mLoopEndBeats.load(std::memory_order_relaxed);
+      if (end > start + 1e-6 && mBeats >= end)
+         ApplySeek(start);
+   }
 }
 
 void Transport::NotifyAudioEngineStarted(double sampleRate)
@@ -97,6 +104,50 @@ void Transport::NotifyAudioEngineStopped()
 void Transport::AdvanceAudioClock(int numFrames)
 {
    ApplyPendingTempo(); // block boundary: rebase and land a staged tempo
+   const double seek = mPendingSeekBeats.exchange(-1.0, std::memory_order_relaxed);
+   if (seek >= 0.0)
+      ApplySeek(seek);
+   else if (mPlaying.load(std::memory_order_relaxed) && mLoopEnabled.load(std::memory_order_relaxed))
+   {
+      // Wrap at the block boundary that reaches the loop end.
+      const double start = mLoopStartBeats.load(std::memory_order_relaxed);
+      const double end = mLoopEndBeats.load(std::memory_order_relaxed);
+      if (end > start + 1e-6 && Beats() >= end)
+         ApplySeek(start);
+   }
    if (mPlaying.load(std::memory_order_relaxed))
       mAudioSampleCounter.fetch_add((uint64_t)numFrames, std::memory_order_relaxed);
+}
+
+void Transport::ApplySeek(double beats)
+{
+   beats = beats < 0.0 ? 0.0 : beats;
+   const double secs = beats * 60.0 / (double)(mBpm.load(std::memory_order_relaxed) > 0.0f ? mBpm.load(std::memory_order_relaxed) : 120.0f);
+   if (mAudioSampleRate.load(std::memory_order_relaxed) > 0.0)
+   {
+      mAudioSampleCounter.store(0, std::memory_order_relaxed);
+      mAudioSecondsOffset.store(secs, std::memory_order_relaxed);
+      mAudioBeatsOffset.store(beats, std::memory_order_relaxed);
+   }
+   else
+   {
+      mBeats = beats;
+      mSeconds = secs;
+   }
+   mSeekSerial.fetch_add(1, std::memory_order_release);
+}
+
+void Transport::SeekBeats(double beats)
+{
+   if (mAudioSampleRate.load(std::memory_order_relaxed) > 0.0)
+      mPendingSeekBeats.store(beats < 0.0 ? 0.0 : beats, std::memory_order_relaxed);
+   else
+      ApplySeek(beats);
+}
+
+void Transport::SetLoop(bool enabled, double beatStart, double beatEnd)
+{
+   mLoopStartBeats.store(beatStart, std::memory_order_relaxed);
+   mLoopEndBeats.store(beatEnd, std::memory_order_relaxed);
+   mLoopEnabled.store(enabled && beatEnd > beatStart, std::memory_order_relaxed);
 }

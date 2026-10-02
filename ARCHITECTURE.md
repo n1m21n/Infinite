@@ -71,8 +71,8 @@ What each node type does: math, state, per-node parameter UI.
 | FeedbackNodes | Feedback/trails/reaction-diffusion |
 | SwitcherNode | Cycles between inputs on a timer |
 | TextNode | Typography via CoreText/CoreGraphics |
-| SyphonInNode | Syphon video client (zero-copy GPU texture receiver) |
-| SyphonOutNode | Syphon video server (zero-copy GPU texture publisher) |
+| SyphonInNode | Spout In: Spout2 video receiver (zero-copy GPU texture) |
+| SyphonOutNode | Spout Out: Spout2 video sender (zero-copy GPU texture) |
 | ProjectionNode | Projection mapping, 4-corner homography warp, mesh warping, and test patterns |
 | OutputNode | Terminal node — identity-pass FBO, drives recording |
 

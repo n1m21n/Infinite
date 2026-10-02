@@ -60,7 +60,7 @@ FPS, frames enviados/perdidos e espera média/máxima da GPU.
 | Áudio de entrada e saída | JUCE com WASAPI |
 | MIDI e clock MIDI | JUCE com Windows MIDI |
 | Host de plugins | VST3 via JUCE, com editor, parâmetros, MIDI e estado |
-| Syphon In/Out | Spout2 Receiver/Sender |
+| Syphon In/Out (macOS) | Spout In/Out: Spout2 Receiver/Sender |
 | Imagem, vídeo e câmera | OpenCV, DirectShow e FFmpeg |
 | Remoção de fundo | U2Net ONNX via Windows ML + DirectML/DX12; OpenCV CPU como fallback |
 | Modelos 3D | Assimp: OBJ, FBX, glTF/GLB, STL, PLY e outros |
@@ -101,7 +101,7 @@ As categorias e os módulos são ordenados alfabeticamente. Sem texto no campo d
 
 ## Spout
 
-No Windows, os módulos aparecem como `syphon/spout in` e `syphon/spout out`, mas mantêm internamente as chaves `Syphon In` e `Syphon Out` para que patches antigos continuem abrindo. Eles publicam e recebem texturas por Spout2.
+Os módulos se chamam `Spout In` e `Spout Out` e publicam e recebem texturas por Spout2. Patches salvos com os nomes antigos (`Syphon In` / `Syphon Out`) abrem normalmente: o nome é convertido na leitura.
 
 ## Video Player
 

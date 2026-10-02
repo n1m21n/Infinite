@@ -37,6 +37,13 @@ class INode;
 //   pal <dstIndex> <dstColor> <srcIndex> <srcSwatch>
 //   expr <dstIndex> <dstParam> <expression text to end of line>
 //   glob <name> <expression text to end of line>
+//   (node block) uid <stable id>
+//   stream / streamid / cliptick / streammix / streamrowheight / clipblend /
+//   clipaudio / clipgrade / clipopacity / clipmodbypass / clipretrigger /
+//   clipsample / clipbpm / cliporigbpm / clipsrcoffset / marker /
+//   trackgroup / arrange / arrangeimportsync
+//     Arrangement Timeline, upstream's grammar verbatim (see upstream
+//     Patch.h for each line's fields).
 //
 // Names may contain spaces, so anything free-form is always last on its line.
 namespace Patch
@@ -44,6 +51,9 @@ namespace Patch
    struct NodeRecord
    {
       int index = 0;
+      // Stable identity (upstream `uid` line): arrangement clips reference
+      // it, so a clip survives undo and reload. 0 = not in the file.
+      uint64_t uid = 0;
       std::string category;
       std::string typeName;
       float x = 0.0f, y = 0.0f;
@@ -198,6 +208,137 @@ namespace Patch
       float curve = 0.0f;
    };
 
+   // Arrangement timeline (docs/plans/arrangement/README.md). A stream is one
+   // lane; it owns its clips, same parent/child shape as PerfRecord::targets,
+   // so reordering or deleting a stream can never leave a clip on the wrong
+   // lane. Clips within one stream never overlap - enforced by the editor,
+   // not here.
+   enum StreamType { kStreamVideo = 0, kStreamAudio = 1 };
+
+   struct ClipRecord
+   {
+      // Ticks, never seconds (Arrange::kPPQ per quarter note). A tempo change
+      // therefore leaves every clip on its bar/beat. Legacy `clip` lines are
+      // seconds; Read() converts them once the whole file (and so the file's
+      // own bpm) has been parsed.
+      uint64_t id        = 0;
+      int64_t  startTick  = 0;   // >= 0
+      int64_t  lengthTick = 0;   // > 0
+      uint64_t srcUid    = 0;    // GraphNode::uid, 0 = unassigned
+      // Only set by legacy `clip` lines, which predate uids. ApplyPatchData
+      // resolves it to a uid and then ignores it. -1 once converted.
+      int      legacySrcIndex = -1;
+      int      srcOutput = 0;
+      int64_t  fadeInTick  = 0;
+      int64_t  fadeOutTick = 0;
+      float    gainDb    = 0.0f;
+      float    pan       = 0.0f;
+      bool     enabled   = true;
+      uint64_t groupId   = 0;    // 0 = not grouped
+      std::string name;          // empty = auto (source node's own title)
+      float  colorR = 0.0f, colorG = 0.0f, colorB = 0.0f; // 0,0,0 = no tint
+      int    blendMode = -1;     // -1 = not in the file: inherit the stream's legacy blendMode
+      // Sample-dropped media fields (own lines - see `clipaudio`/`clipgrade`
+      // in the format comment above - since cliptick already ends in a
+      // to-end-of-line name and nothing can be appended after it).
+      float  pitch   = 0.0f;    // audio only, semitones, +/-24
+      bool   syncToTempo = true; // audio only
+      float  opacity = 1.0f;    // video/image only, 0..1, 1 = fully opaque
+      float  colorBrightness = 0.0f; // video/image only, -1..1, 0 = no change
+      float  colorContrast   = 0.0f; // video/image only, -1..1, 0 = no change
+      float  colorSaturation = 1.0f; // video/image only, 0..2, 1 = no change
+      bool   retrigger       = true;
+      // True only for a clip created by dropping a media file onto the
+      // timeline (as opposed to one whose srcUid was patched in manually) -
+      // "Audio/Video Sample" in the Clip Settings panel, and the only
+      // category the UI lets retrigger.
+      bool   sampleDropped   = false;
+      // Audio-Sample-only BPM sync (step 3 - see Arrange::Clip's own
+      // comments). sourceDurationSeconds is what makes a later sampleBpm
+      // edit able to recompute `length` losslessly without re-decoding.
+      float  sampleBpm             = 120.0f;
+      // The BPM detected at import, display only (see Arrange::Clip::origBpm).
+      // Written only when > 0; -1 is the load-time sentinel for "no line",
+      // which ApplyPatchData maps to 0 = none detected.
+      float  origBpm               = -1.0f;
+      float  sourceDurationSeconds = 0.0f;
+      // Audio-Sample-only (see Arrange::Clip::sourceOffsetSeconds's own
+      // comment). 0 default so a patch saved before this field existed
+      // loads with every Sample reading from the file's own beginning,
+      // exactly like it always has.
+      float  sourceOffsetSeconds   = 0.0f;
+      // Per-clip modulation bypass (see Arrange::Clip::bypassedModParams).
+      // Sorted, deduplicated paramIndices on the clip's source node. Empty
+      // on every clip saved before this field existed, which is the same as
+      // "nothing bypassed" - so an old patch loads identically.
+      std::vector<int> bypassedModParams;
+   };
+
+   struct StreamRecord
+   {
+      uint64_t id     = 0;
+      int   type      = kStreamVideo;
+      int   blendMode = 0;      // legacy lane-wide mode; now per clip (ClipRecord::blendMode)
+      float opacity   = 1.0f;   // video only, 0..1
+      float gainDb    = 0.0f;   // audio only
+      float pan       = 0.0f;   // audio only, -1..1
+      // Trailing fields (added after the original set): an older reader's
+      // `stream` line has fewer tokens, so extraction fails and these keep
+      // their in-struct defaults - `enabled` MUST default true here, not
+      // rely on stream-extraction's zero-init, or every pre-groups patch
+      // would load with every track silently disabled.
+      bool     enabled = true;
+      uint64_t groupId = 0;     // 0 = not in a track group
+      bool  mute      = false;  // audio only; saved on its own `streammix` line
+      bool  solo      = false;  // audio only
+      std::string name;         // empty = auto ("V1", "A2", ...) - label derived by the UI
+      float colorR = 0.0f, colorG = 0.0f, colorB = 0.0f;
+      float rowHeight = 0.0f;   // 0 = default; new field, older patches load at the default height
+      std::vector<ClipRecord> clips;
+   };
+
+   struct TrackGroupRecord
+   {
+      uint64_t    id            = 0;
+      uint32_t    color         = 0xFF808080u;
+      bool        enabled       = true;
+      bool        collapsed     = false;
+      uint64_t    parentGroupId = 0; // 0 = top-level; new field, appended after the old collapsed slot
+      std::string name;
+   };
+
+   struct MarkerRecord
+   {
+      uint64_t id  = 0;
+      int64_t  posTick = 0;
+      uint32_t color = 0xFFFFFFFFu;
+      std::string name;
+   };
+
+   // Arrange::Settings, flattened. Audio mode is deliberately absent: the app
+   // always starts in Canvas mode, so it must never be saved.
+   struct ArrangeSettingsRecord
+   {
+      uint64_t nextId = 1;     // persisted, not recomputed - see Arrange::Model
+      int   timeDisplay = 0;
+      int   snapDivision = 4;     // 0 = off, 1 = bar, d = 1/d (WP6)
+      bool  snapTriplet = false;
+      float zoom = 1.0f;
+      float scroll = 0.0f;
+      bool  loopEnabled = false;
+      int64_t loopStart = 0, loopEnd = 0;
+      int   dockSide = 0;
+      int   renderWidth = 1920, renderHeight = 1080, renderFps = 60;
+      int   renderSampleRate = 48000, renderFormat = 0;
+      int   renderRangeKind = 0;
+      int64_t renderRangeStart = 0, renderRangeEnd = 0;
+      // Deprecated; see ArrangeModel.h. Serialized for file-format
+      // compatibility only.
+      int   renderAudioSource = -1, renderVideoSource = -1;
+      std::string renderFolder;
+      bool  importSyncToTempo = true; // see Arrange::Settings::importSyncToTempo
+   };
+
    struct Data
    {
       std::vector<NodeRecord> nodes;
@@ -213,6 +354,13 @@ namespace Patch
       SceneSettings settings;
       TransportRecord transport;
       std::vector<GestureRecord> gestures;
+      // Turbo 0.43: Arrangement Timeline, same records and file lines as
+      // upstream so patches open in both.
+      std::vector<StreamRecord> streams; // clips nested
+      std::vector<MarkerRecord> markers; // sorted by pos
+      std::vector<TrackGroupRecord> trackGroups;
+      ArrangeSettingsRecord arrangeSettings;
+      bool hasArrange = false; // an `arrange` line was read
    };
 
    bool Write(const std::string& path, const Data& data, std::string& outError);

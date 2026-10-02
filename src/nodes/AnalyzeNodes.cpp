@@ -16,6 +16,7 @@
 #include "audio/AudioNode.h"
 #include "audio/ParamMailbox.h"
 #include "audio/SampleSlot.h"
+#include "audio/dsp/ClipTimeStretch.h"
 
 // =========================================================== Image Analyze
 
@@ -698,9 +699,13 @@ public:
    {
    }
 
-   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
+   void PrepareToPlay(double sampleRate, int maxBlockSize) override
    {
       mSampleRate = sampleRate;
+      // Turbo 0.43.1: the Arrangement Timeline's time/pitch stretcher
+      // (allocates - main thread, here).
+      mStretchCapacity = std::max(64, maxBlockSize);
+      mStretcher.Prepare(sampleRate, mStretchCapacity);
       mMailbox.PrepareToPlay(sampleRate);
       mMailbox.SetImmediate(kFileVolumeParam, mVolume.load(std::memory_order_relaxed));
       mMailbox.SetImmediate(kFileGainParam, mGain.load(std::memory_order_relaxed));
@@ -730,6 +735,18 @@ public:
    void RequestPause() { mPlaying.store(false, std::memory_order_relaxed); }
    void RequestRestart() { mRestartRequested.store(true, std::memory_order_release); }
    bool IsPlaying() const { return mPlaying.load(std::memory_order_relaxed); }
+
+   // Turbo 0.43.1 (port of upstream): Arrangement Timeline Audio Sample
+   // position lock. Audio thread, right before this node's ProcessBlock; the
+   // block then renders the file at exactly that timeline position.
+   void SetClipSamplePosition(double sourceSeconds, double sourcePerSecond, float pitchSemitones, bool force) override
+   {
+      mClipPending = true;
+      mClipSourceSeconds = sourceSeconds;
+      mClipSourcePerSecond = sourcePerSecond;
+      mClipPitch = pitchSemitones;
+      mClipForce = mClipForce || force;
+   }
 
    // Main thread. mFramePos is only ever written by the audio thread and
    // read here - a 64-bit atomic is lock-free on every platform this ships
@@ -785,6 +802,15 @@ public:
       const bool monitor = mMonitor.load(std::memory_order_relaxed);
       const bool hasBuffer = mActiveBuffer != nullptr && mActiveBuffer->numFrames > 0;
 
+      if (mClipPending)
+      {
+         mClipPending = false;
+         ProcessClipBlock(buffer, hasBuffer, monitor);
+         RunAnalysisIfWindowFull();
+         return;
+      }
+      mClipActive = false;
+
       for (int i = 0; i < buffer.numFrames; i++)
       {
          const float volume = mMailbox.SmoothedValue(kFileVolumeParam);
@@ -821,6 +847,91 @@ public:
    }
 
 private:
+   // Arrangement Timeline Sample block (upstream's ProcessClipBlock): the
+   // audio is a pure function of the timeline. Re-seeks only on a jump or
+   // when the requested position drifts > 5 ms from continuous playback, so
+   // split clips and uninterrupted play stay seamless. Rate 1 with no pitch
+   // is a plain interpolated read; anything else goes through the stretcher
+   // (time and pitch independent).
+   void ProcessClipBlock(AudioBuffer& buffer, bool hasBuffer, bool monitor)
+   {
+      if (!hasBuffer)
+      {
+         mClipActive = false;
+         return; // buffer already silenced
+      }
+      const double fileRate = mActiveBuffer->sampleRate > 0.0 ? mActiveBuffer->sampleRate : mSampleRate;
+      const double playbackRate = (fileRate > 0.0 && mSampleRate > 0.0) ? fileRate / mSampleRate : 1.0;
+      const double sourcePerOutput = playbackRate * std::max(0.0, mClipSourcePerSecond);
+      const double target = mClipSourceSeconds * fileRate;
+      const double driftLimit = 0.005 * fileRate;
+
+      bool reseek = !mClipActive || mClipForce;
+      mClipForce = false;
+      if (!reseek && std::fabs(target - mClipSource) > driftLimit)
+         reseek = true;
+      if (reseek)
+         mClipSource = target;
+
+      const double rate = std::clamp(mClipSourcePerSecond, 0.05, 20.0);
+      const bool plain = std::fabs(rate - 1.0) < 1e-4 && mClipPitch == 0.0f;
+      const bool canStretch = mStretcher.Prepared() && buffer.numFrames <= mStretchCapacity;
+      bool direct = mClipDirect;
+      if (reseek || !mClipActive)
+         direct = plain || !canStretch;
+      else if (!plain && canStretch)
+         direct = false;
+
+      const double fileFramesPerInput = playbackRate;
+      const double inputFrame = mClipSource / std::max(1e-9, fileFramesPerInput);
+      if (!direct)
+      {
+         mStretcher.SetPitch(mClipPitch);
+         if (reseek || mClipDirect)
+            mStretcher.Start(*mActiveBuffer, fileFramesPerInput, inputFrame, rate);
+         mStretcher.Render(*mActiveBuffer, fileFramesPerInput, inputFrame, rate, buffer.numFrames);
+      }
+      mClipDirect = direct;
+      mClipActive = true;
+
+      for (int i = 0; i < buffer.numFrames; i++)
+      {
+         const float volume = mMailbox.SmoothedValue(kFileVolumeParam);
+         const float gain = mMailbox.SmoothedValue(kFileGainParam);
+         float left, right;
+         if (direct)
+         {
+            left = ReadBufferInterp(*mActiveBuffer, 0, mClipSource);
+            right = ReadBufferInterp(*mActiveBuffer, 1, mClipSource);
+         }
+         else
+         {
+            left = mStretcher.Out(0, i);
+            right = mStretcher.Out(1, i);
+         }
+         mClipSource += sourcePerOutput;
+         left *= volume;
+         right *= volume;
+         PushAnalysisSample(0.5f * (left + right) * gain);
+         if (monitor)
+            for (int ch = 0; ch < buffer.numChannels; ch++)
+               buffer.channels[ch][i] = (ch % 2 == 0) ? left : right;
+      }
+      mPos = std::max(0.0, mClipSource);
+      mFramePos.store((int64_t)mPos, std::memory_order_relaxed);
+   }
+
+   ClipTimeStretch mStretcher;
+   int mStretchCapacity = 0;
+   bool mClipPending = false;
+   bool mClipForce = false;
+   bool mClipActive = false;
+   bool mClipDirect = true;
+   double mClipSourceSeconds = 0.0;
+   double mClipSourcePerSecond = 1.0;
+   float mClipPitch = 0.0f;
+   double mClipSource = 0.0;
+
    static float ReadSample(const Platform::SampleBuffer& buf, double pos)
    {
       // Rate is always exactly 1.0 (no pitch/speed on this node), so pos is

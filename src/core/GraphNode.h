@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -38,6 +39,10 @@ struct GraphNode
    std::string typeName;
    std::string category;
    int index = 0;
+   // Turbo 0.43 (from upstream): stable identity - `index` is reused, `uid`
+   // never is. Arrangement clips reference it. Assigned at spawn, restored
+   // from the patch's `uid` line.
+   uint64_t uid = 0;
    bool showParams = false; // params start collapsed so the preview leads
    // Inline image/video/render preview. This is separate from showParams: the
    // eye expands controls, while the monitor icon can stop a costly preview

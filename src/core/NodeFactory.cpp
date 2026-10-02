@@ -28,7 +28,7 @@ namespace
       static const std::map<std::string, std::string> kMap = {
          // visual
          { "Text", "Source" },
-         { "Video", "Video" }, { "VMPC", "Video" }, { "Video In", "Video" }, { "Syphon In", "Video" },
+         { "Video", "Video" }, { "VMPC", "Video" }, { "Video In", "Video" }, { "Spout In", "Video" },
          { "Resynthesize", "Effects" },
          { "Macro Knob", "Macros" }, { "Macro XY", "Macros" },
          { "Comment", "Utility" }, { "Group", "Utility" }, { "Null", "Utility" }, { "Viewport", "Utility" },
@@ -95,6 +95,8 @@ const std::string& NodeFactory::CanonicalName(const std::string& name)
    // old name -> current name. Saved patches store the type name as text.
    static const std::map<std::string, std::string> kRenamed = {
       { "Set Color", "Set Vertex Color" }, // 0.41, same name as upstream
+      { "Syphon In", "Spout In" },          // 0.43.2, Windows-only fork
+      { "Syphon Out", "Spout Out" },
    };
    auto it = kRenamed.find(name);
    return it != kRenamed.end() ? it->second : name;

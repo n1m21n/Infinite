@@ -27,6 +27,26 @@ public:
    virtual void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& output) = 0;
    virtual void Reset() {}
 
+   // Turbo 0.43 (Arrangement Timeline): an Audio Sample clip locks its file
+   // player to the timeline. Called on the audio thread right before this
+   // node's ProcessBlock, when the playhead enters the clip or jumps inside
+   // it: play from `sourceSeconds` into the source (negative = the clip
+   // starts later in this block; treat as 0). No-op for nodes without a
+   // playback position.
+   virtual void ClipSeek(double sourceSeconds) { (void)sourceSeconds; }
+
+   // Turbo 0.43.1 (upstream's contract): an Audio Sample clip drives this
+   // node every block it overlaps. `sourceSeconds` = position in the file at
+   // this block's first frame (negative: the clip starts later in the
+   // block), `sourcePerSecond` = file seconds per real second (1 unsynced,
+   // projectTempo / sampleBpm synced), pitch is time-preserving, `force`
+   // marks a jump. A block without the call plays the node's own canvas
+   // way. Audio thread; no-op by default.
+   virtual void SetClipSamplePosition(double sourceSeconds, double sourcePerSecond, float pitchSemitones, bool force)
+   {
+      (void)sourceSeconds; (void)sourcePerSecond; (void)pitchSemitones; (void)force;
+   }
+
    // Samples of latency this node's own processing adds (lookahead,
    // oversampling, a hosted plugin's reported latency, ...) at whatever rate
    // it was last PrepareToPlay'd at. 0 (the default) for the overwhelming

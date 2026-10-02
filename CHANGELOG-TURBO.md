@@ -1,5 +1,47 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.43.2-turbo (2026-10-02)
+
+- **Spout In / Spout Out**: the Syphon nodes are named after what they are on Windows (Spout2), in the
+  node browser, help and docs. Patches with the old `Syphon In` / `Syphon Out` names still open (renamed on
+  load, like Set Color).
+
+## 0.43.1-turbo (2026-10-01)
+
+### Arrangement Timeline, rest of upstream's feature set
+- **Video follows the playhead**: every Video clip is locked to the timeline (jumps, loop, scrub), with
+  a movie offset; "lock video to timeline" off lets it run free.
+- **Render / export queue** (RENDER...): MP4 / MOV with audio, or 32-bit float WAV, of the whole
+  arrangement, the loop, the selected clips or a bar range; offline, one frame at a time, so picture and
+  sound stay frame-accurate. Several jobs run one after another; cancel / show file.
+- **Track groups (folders)**: + GROUP, track menu > Group, collapsible group rows with on/off, colour,
+  rename, nesting, duplicate, ungroup / delete; clicking a group row selects its clips.
+- **Waveforms and thumbnails**: audio clips show the file's waveform (analysed in the background) or,
+  for live sources, what they played; video clips keep a film strip of frames captured while playing.
+- **3D nodes** can be video clips (rendered like their mini viewport).
+- **Audio Samples**: tempo detected on import, "sync to tempo" stretches them to the project tempo
+  without changing pitch (Signalsmith Stretch, MIT, vendored), per-clip pitch +/-24 st, /2 x2 reset.
+- **Per-clip modulation bypass**: a clip can hold any of its source's modulated knobs still while it
+  plays.
+
+## 0.43.0-turbo (2026-10-01)
+
+### Arrangement Timeline (port of upstream's)
+- **Docked timeline panel** (VIEW > Arrangement timeline, Shift+T): video and audio tracks, clips in
+  bars/beats (upstream's model and patch lines verbatim, so arrangements open in both), ruler with
+  scrub, markers, loop range, snap grid (bar to 1/16, triplets; Alt = free), zoom, follow.
+- **Clips** point at canvas nodes: right-click a node > Add to Timeline, double-click an empty spot
+  on a track, or drop audio / video / image files on the panel (each gets its own source node as a
+  "Sample" clip, locked to the timeline). Move (across tracks), trim, fades, split, blade, duplicate,
+  copy/paste, groups, enable/disable, colours, rename, clip settings window.
+- **Timeline mode** (TIMELINE button): the timeline owns the audio output. Audio clips are gated,
+  faded and panned per sample with track gain/pan/mute/solo and meters; canvas Audio Outs go quiet
+  (live ones stay).
+- **Video**: the video tracks are composited at the playhead (32 blend modes, opacity, fades as
+  crossfades, brightness/contrast/saturation), shown in the panel monitor and available as the new
+  **Timeline** source node, so the arrangement can go to an Output / projector.
+- Transport gains seek and a loop range; nodes get a stable `uid` saved in the patch.
+
 ## 0.42.2-turbo (2026-10-01)
 
 ### Looper

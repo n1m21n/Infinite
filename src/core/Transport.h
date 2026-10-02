@@ -39,6 +39,8 @@ public:
       mAudioSampleCounter.store(0, std::memory_order_relaxed);
       mAudioBeatsOffset.store(0.0, std::memory_order_relaxed);
       mAudioSecondsOffset.store(0.0, std::memory_order_relaxed);
+      mPendingSeekBeats.store(-1.0, std::memory_order_relaxed);
+      mSeekSerial.fetch_add(1, std::memory_order_release);
    }
 
    // Turbo (upstream approach): while the audio engine drives the clock,
@@ -55,6 +57,22 @@ public:
    }
    // Audio thread (AdvanceAudioClock) or main thread when no audio clock.
    void ApplyPendingTempo();
+
+   // Turbo (Arrangement Timeline): jump the playhead. With a live audio
+   // clock the target is staged and applied by the audio thread at the next
+   // block boundary (AdvanceAudioClock), so a block never sees a half-moved
+   // clock; without one it lands directly. Seconds follow as beats * 60/bpm.
+   void SeekBeats(double beats);
+   // Loop range in beats: when enabled and playing, reaching `end` jumps to
+   // `start` at the block boundary.
+   void SetLoop(bool enabled, double beatStart, double beatEnd);
+   bool LoopEnabled() const { return mLoopEnabled.load(std::memory_order_relaxed); }
+   double LoopStartBeats() const { return mLoopStartBeats.load(std::memory_order_relaxed); }
+   double LoopEndBeats() const { return mLoopEndBeats.load(std::memory_order_relaxed); }
+   // Bumped by every seek / loop wrap the clock actually applied, so a
+   // reader (the timeline's retrigger, a video clip) can tell a jump from
+   // ordinary playback.
+   uint32_t SeekSerial() const { return mSeekSerial.load(std::memory_order_acquire); }
 
    // Musical position; modulator rates are expressed in beats.
    double Beats() const;
@@ -139,6 +157,13 @@ private:
    std::atomic<double> mAudioSampleRate { 0.0 };
    std::atomic<double> mAudioBeatsOffset { 0.0 };
    std::atomic<double> mAudioSecondsOffset { 0.0 };
+
+   std::atomic<double> mPendingSeekBeats { -1.0 };
+   std::atomic<bool> mLoopEnabled { false };
+   std::atomic<double> mLoopStartBeats { 0.0 };
+   std::atomic<double> mLoopEndBeats { 0.0 };
+   std::atomic<uint32_t> mSeekSerial { 0 };
+   void ApplySeek(double beats);
 
    std::atomic<int> mTimeSigNum { 4 };
    std::atomic<int> mTimeSigDen { 4 };

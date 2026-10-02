@@ -3,7 +3,7 @@
 [![Original project](https://img.shields.io/badge/original-n1m21n%2FInfinite-181717?logo=github)](https://github.com/n1m21n/Infinite)
 [![Discord](https://img.shields.io/badge/Discord-Infinite-5865F2?logo=discord&logoColor=white)](https://discord.gg/wpKdexvhn)
 
-**Current version: 0.42.2-turbo** (shown in the window title and in the FILE menu, with the build date).
+**Current version: 0.43.2-turbo** (shown in the window title and in the FILE menu, with the build date).
 
 Infinite-Turbo is a **mod of Infinite**, the node-based audiovisual modular workstation by Naman Soni (realtime image and video processing, procedural 3D, audio synthesis, DSP, VST3 hosting, MIDI, OSC and cross-domain CV modulation). It is unofficial and Windows-only.
 
@@ -121,7 +121,7 @@ Ctrl+Shift+B again turns the preview off. An output window can stay open on a pr
 ### Spout2 and external output
 
 - Spout2 sender and receiver support.
-- Windows nodes are displayed as `Syphon/Spout In` and `Syphon/Spout Out` while retaining patch compatibility.
+- The nodes are `Spout In` and `Spout Out` (the macOS Syphon nodes of the original; patches saved with the old `Syphon In` / `Syphon Out` names still open).
 - Resizable output windows for Viewport, Null and visual output nodes.
 - F11 borderless fullscreen on the monitor containing the output window.
 - Topmost projector output that remains visible while the main UI is operated.

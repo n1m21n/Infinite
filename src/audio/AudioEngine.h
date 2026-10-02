@@ -64,6 +64,68 @@ struct AudioTerminal
    // sum lands every terminal sample-aligned. Inactive for the common case
    // of one terminal, or several with equal (usually zero) latency.
    CompensationDelay compensation;
+
+   // Turbo: a "live" Audio Out (input monitoring) stays audible while the
+   // Arrangement Timeline owns the output; every other canvas terminal is
+   // muted then (its capture ring still records).
+   bool live = false;
+};
+
+// Turbo 0.43 (Arrangement Timeline, after upstream's ClipWindow): one clip's
+// slot in musical time, as the audio thread sees it. Beats, not seconds, so
+// a tempo change keeps every clip on its bar.
+struct ArrangeClipWindow
+{
+   double startBeat = 0.0;
+   double endBeat = 0.0;     // exclusive
+   double fadeInBeats = 0.0;
+   double fadeOutBeats = 0.0;
+   float gain = 1.0f;        // clip gain, linear
+   float panL = 1.0f;        // clip pan as per-channel gains
+   float panR = 1.0f;
+   bool abutsPrev = false;   // no declick ramp across an exact join
+   bool abutsNext = false;
+   // Audio Sample (file dropped on the timeline): the source is locked to
+   // the timeline - on entering the window (or after a seek) the node is
+   // told where in its file to play from (AudioNode::ClipSeek).
+   bool seekSource = false;
+   double sourceOffsetSeconds = 0.0;
+   // Turbo 0.43.1: Sample tempo sync and pitch (upstream's ClipWindow).
+   //   source seconds at beat b = offset + (b - startBeat) * 60 / effBpm
+   //   effBpm = syncToTempo ? sampleBpm : project tempo
+   bool syncToTempo = false;
+   float sampleBpm = 120.0f;
+   float pitch = 0.0f;
+   // Live waveform: which clip this is, and the shape it was measured under.
+   uint64_t clipId = 0;
+   uint64_t shape = 0;
+};
+
+// Turbo 0.43.1: one live-waveform measurement, audio -> main (SPSC ring).
+struct ArrangePeak
+{
+   uint64_t clipId = 0;
+   uint64_t shape = 0;
+   int bucket = 0;   // 1/16 beat from the clip start
+   float peak = 0.0f;
+};
+
+// One (lane, source node) pair: the source's pooled buffer, gated and
+// shaped by its windows (sorted, non-overlapping) and summed into the device
+// buffer with the lane's live gain/pan (AudioEngine::SetArrangeLaneMix).
+struct ArrangeTerminal
+{
+   int bufferIndex = -1;
+   AudioNode* source = nullptr;
+   int windowOffset = 0;
+   int numWindows = 0;
+   int laneSlot = 0;          // index into the engine's lane mix table
+   mutable int cursor = 0;    // audio thread scratch
+   mutable int activeWindow = -1;
+   mutable uint32_t seenSeekSerial = 0;
+   mutable int peakWindow = -1;   // live waveform accumulation
+   mutable int peakBucket = -1;
+   mutable float peakValue = 0.0f;
 };
 
 // A full audio-thread topology: nodes in a valid topological order (sources
@@ -76,6 +138,9 @@ struct AudioTopology
 {
    std::vector<AudioTopologyEntry> order;
    std::vector<AudioTerminal> terminalBufferIndices;
+   // Turbo: Arrangement Timeline terminals (only built in Timeline mode).
+   std::vector<ArrangeClipWindow> arrangeWindows;
+   std::vector<ArrangeTerminal> arrangeTerminals;
    int numBuffers = 0; // buffer indices used across `order` span [0, numBuffers)
 };
 
@@ -169,8 +234,73 @@ public:
       mDirectClick.store(enabled, std::memory_order_relaxed);
    }
 
+   // Turbo 0.43: Arrangement Timeline audio. In Timeline mode the canvas
+   // Audio Outs are muted (live ones excepted) and the arrangement
+   // terminals play; lane gain/pan live here so a fader drag never needs a
+   // topology rebuild. Main thread sets, audio thread reads.
+   static constexpr int kMaxArrangeLanes = 256;
+   void SetTimelineMode(bool on) { mTimelineMode.store(on, std::memory_order_relaxed); }
+   bool TimelineMode() const { return mTimelineMode.load(std::memory_order_relaxed); }
+   void SetArrangeLaneMix(int slot, float gain, float panL, float panR)
+   {
+      if (slot < 0 || slot >= kMaxArrangeLanes)
+         return;
+      mLaneGain[slot].store(gain, std::memory_order_relaxed);
+      mLanePanL[slot].store(panL, std::memory_order_relaxed);
+      mLanePanR[slot].store(panR, std::memory_order_relaxed);
+   }
+   // Peak of each lane's last block, for the panel's meters.
+   float ArrangeLanePeak(int slot) const
+   {
+      return (slot >= 0 && slot < kMaxArrangeLanes) ? mLanePeak[slot].load(std::memory_order_relaxed) : 0.0f;
+   }
+   // Main thread: drains the live clip-waveform measurements.
+   template <class Fn>
+   void DrainArrangePeaks(Fn&& fn)
+   {
+      uint32_t head = mPeakHead.load(std::memory_order_relaxed);
+      const uint32_t tail = mPeakTail.load(std::memory_order_acquire);
+      while (head != tail)
+      {
+         fn(mPeakRing[head % kPeakRingSize]);
+         head++;
+      }
+      mPeakHead.store(head, std::memory_order_release);
+   }
+
+   // Turbo 0.43.1: offline render. While set, the device callback outputs
+   // silence and leaves the clock alone; the main thread drives the clock
+   // and the graph with RenderOfflineBlock.
+   void SetOfflineRender(bool on);
+   bool OfflineRender() const { return mOffline.load(std::memory_order_acquire); }
+   void RenderOfflineBlock(AudioBuffer& buffer); // advances the transport by buffer.numFrames
+
 private:
    AudioEngine() = default;
+
+   struct ProcessList;
+   void RunArrangeLookahead(ProcessList* list, int numFrames);
+   void MixArrangeTerminals(ProcessList* list, AudioBuffer& deviceBuffer, int numFrames, int numChannels);
+
+   std::atomic<bool> mTimelineMode { false };
+   std::atomic<bool> mOffline { false };
+   std::atomic<int> mInProcess { 0 };
+   static constexpr uint32_t kPeakRingSize = 8192;
+   ArrangePeak mPeakRing[kPeakRingSize];
+   std::atomic<uint32_t> mPeakHead { 0 };
+   std::atomic<uint32_t> mPeakTail { 0 };
+   void PushPeak(const ArrangePeak& p)
+   {
+      const uint32_t tail = mPeakTail.load(std::memory_order_relaxed);
+      if (tail - mPeakHead.load(std::memory_order_acquire) >= kPeakRingSize)
+         return; // full: drop (the waveform just fills in on the next pass)
+      mPeakRing[tail % kPeakRingSize] = p;
+      mPeakTail.store(tail + 1, std::memory_order_release);
+   }
+   std::atomic<float> mLaneGain[kMaxArrangeLanes] = {};
+   std::atomic<float> mLanePanL[kMaxArrangeLanes] = {};
+   std::atomic<float> mLanePanR[kMaxArrangeLanes] = {};
+   std::atomic<float> mLanePeak[kMaxArrangeLanes] = {};
 
    static void RenderThunk(float** buffers, int numChannels, int numFrames, void* userData);
    void Process(float** buffers, int numChannels, int numFrames);
