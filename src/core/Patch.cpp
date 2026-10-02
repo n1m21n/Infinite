@@ -273,12 +273,24 @@ bool Write(const std::string& path, const Data& data, std::string& outError)
          file << "  " << p.first << " " << p.second << "\n";
       file << "end\n";
    }
+   // Turbo 0.44: a 4th token names the source output when it is not 0
+   // (multi-output nodes); older readers ignore it.
    for (const CableRecord& c : data.cables)
-      file << "cable " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << "\n";
+   {
+      file << "cable " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex;
+      if (c.srcOutput != 0)
+         file << " " << c.srcOutput;
+      file << "\n";
+   }
    for (const CableRecord& c : data.geometry)
       file << "geo " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << "\n";
    for (const CableRecord& c : data.audio)
-      file << "aud " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << "\n";
+   {
+      file << "aud " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex;
+      if (c.srcOutput != 0)
+         file << " " << c.srcOutput;
+      file << "\n";
+   }
    for (const CableRecord& c : data.notes)
       file << "note " << c.dstIndex << " " << c.dstSlot << " " << c.srcIndex << " " << c.srcOutput << "\n";
    for (const ModRecord& m : data.modulation)
@@ -569,6 +581,8 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
       {
          CableRecord c;
          in >> c.dstIndex >> c.dstSlot >> c.srcIndex;
+         if (!(in >> c.srcOutput) || c.srcOutput < 0)
+            c.srcOutput = 0;
          if (tag == "cable")
             outData.cables.push_back(c);
          else
@@ -579,7 +593,11 @@ bool Read(const std::string& path, Data& outData, std::string& outError)
          CableRecord c;
          in >> c.dstIndex >> c.dstSlot >> c.srcIndex;
          if (tag == "aud")
+         {
+            if (!(in >> c.srcOutput) || c.srcOutput < 0)
+               c.srcOutput = 0;
             outData.audio.push_back(c);
+         }
          else
          {
             // srcOutput is a later addition (Note Router); missing on older

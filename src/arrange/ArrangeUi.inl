@@ -2676,9 +2676,11 @@ void DrawArrangeLaneHeader(int li, ImVec2 tl, float w, float h, bool& openHeader
          ImGui::SetKeyboardFocusHere();
          gArrangeRenameJustStarted = false;
       }
-      if (ImGui::InputText("##rename", gArrangeRenameBuf, sizeof(gArrangeRenameBuf),
-                           ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll) ||
-          ImGui::IsItemDeactivated())
+      const bool committed = ImGui::InputText("##rename", gArrangeRenameBuf, sizeof(gArrangeRenameBuf),
+                                              ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+      if (ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+         gArrangeRenameLane = 0; // cancel
+      else if (committed || ImGui::IsItemDeactivated())
       {
          const std::string nm = gArrangeRenameBuf;
          const uint64_t id = lane.id;
@@ -2700,6 +2702,8 @@ void DrawArrangeLaneHeader(int li, ImVec2 tl, float w, float h, bool& openHeader
       ImGui::PushStyleColor(ImGuiCol_Text, enabled ? IM_COL32(225, 230, 240, 255) : IM_COL32(120, 125, 140, 255));
       ImGui::TextUnformatted(label.c_str());
       ImGui::PopStyleColor();
+      if (ImGui::IsItemHovered() && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
+         ImGui::SetTooltip("double-click (or F2) to rename");
       if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
       {
          gArrangeRenameLane = lane.id;
@@ -2721,6 +2725,17 @@ void DrawArrangeLaneHeader(int li, ImVec2 tl, float w, float h, bool& openHeader
    }
    if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsAnyItemHovered())
       gArrangeSelLane = lane.id;
+   // Turbo 0.44.1: double-click anywhere free on the header renames too,
+   // and F2 renames the selected track.
+   const bool renameKey = selectedLane && gArrangeKeysOwned && !ImGui::GetIO().WantTextInput &&
+                          ImGui::IsKeyPressed(ImGuiKey_F2, false);
+   if (gArrangeRenameLane != lane.id &&
+       ((hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && !ImGui::IsAnyItemHovered()) || renameKey))
+   {
+      gArrangeRenameLane = lane.id;
+      gArrangeRenameJustStarted = true;
+      snprintf(gArrangeRenameBuf, sizeof(gArrangeRenameBuf), "%s", ArrangeLaneLabel(gArrange, li).c_str());
+   }
 
    if (h >= 42.0f)
    {

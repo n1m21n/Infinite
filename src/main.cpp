@@ -162,6 +162,7 @@ static const char* kTurboBuildDate = __DATE__ " " __TIME__;
 #include "nodes/SuperMixerNode.h"
 #include "nodes/LayoutNode.h"
 #include "nodes/VmpcNode.h"
+#include "nodes/ClipMatrixNode.h"
 #include "core/MidiMap.h"
 #include "audio/SampleScanner.h"
 #include "audio/PluginScanner.h"
@@ -3203,6 +3204,7 @@ namespace
       REGISTER_NODE(VideoSourceNode, Video, "Source");
       REGISTER_NODE(TimelineNode, Timeline, "Source");
       REGISTER_NODE(VmpcNode, VMPC, "Source");
+      REGISTER_NODE(ClipMatrixNode, Clip Matrix, "Source");
       REGISTER_NODE(VideoInNode, Video In, "Source");
       REGISTER_NODE(SyphonInNode, Spout In, "Source");
       REGISTER_NODE(NoiseNode, Noise, "Source");
@@ -3365,6 +3367,7 @@ namespace
       REGISTER_NODE(MpcNode, MPC, "Synths");
       REGISTER_NODE(MpcOutNode, MPC Out, "AudioUtility");
       REGISTER_NODE(LooperNode, Looper, "AudioUtility");
+      REGISTER_NODE(ClipMatrixOutNode, Clip Matrix Out, "AudioUtility");
       REGISTER_NODE(SuperMixerNode, Super Mixer, "AudioUtility");
       // Third-party plugin hosting (Audio Units). Its params reach the plugin
       // directly rather than through ParamMailbox - see AudioPluginNode.h.
@@ -3911,6 +3914,10 @@ namespace
          return outputIndex == 1;
       if (dynamic_cast<TransportControlNode*>(node) != nullptr)
          return outputIndex == 4; // 0..3 are modulators, 4 is the metronome
+      if (dynamic_cast<ClipMatrixNode*>(node) != nullptr)
+         return outputIndex == 1;
+      if (dynamic_cast<ClipMatrixOutNode*>(node) != nullptr)
+         return (outputIndex & 1) == 1; // video, audio per row
       return true;
    }
 
@@ -4111,7 +4118,7 @@ namespace
       }
       else if (AudioCable* audioCable = dstNode.node->AudioInputSlot(slot))
       {
-         audioCable->Connect(srcNode.node.get());
+         audioCable->Connect(srcNode.node.get(), srcOutputIndex);
       }
       else if (NoteCable* noteCable = dstNode.node->NoteInputSlot(slot))
       {
@@ -4121,7 +4128,7 @@ namespace
       {
          ImageCable* cable = CableFor(dstNode, slot);
          if (cable != nullptr)
-            cable->Connect(srcNode.node.get());
+            cable->Connect(srcNode.node.get(), srcOutputIndex);
       }
    }
 
@@ -4421,7 +4428,8 @@ namespace
       // parameter area on spawn so the chooser and camera controls are never
       // hidden behind the small eye toggle.
       if (dynamic_cast<VideoSourceNode*>(node) != nullptr || dynamic_cast<VideoInNode*>(node) != nullptr ||
-          dynamic_cast<FeedbackNode*>(node) != nullptr || dynamic_cast<OutputNode*>(node) != nullptr)
+          dynamic_cast<FeedbackNode*>(node) != nullptr || dynamic_cast<OutputNode*>(node) != nullptr ||
+          dynamic_cast<ClipMatrixNode*>(node) != nullptr || dynamic_cast<ClipMatrixOutNode*>(node) != nullptr)
          gn.showParams = true;
       gNodes.push_back(std::move(gn));
       return &gNodes.back();
@@ -4465,6 +4473,8 @@ namespace
          mpc->ReloadFromPaths();
       if (auto* vmpc = dynamic_cast<VmpcNode*>(node))
          vmpc->ReloadFromPaths();
+      if (auto* cm = dynamic_cast<ClipMatrixNode*>(node))
+         cm->ReloadFromPaths();
       if (auto* video = dynamic_cast<VideoSourceNode*>(node))
          video->ReloadFromPath();
       if (auto* palette = dynamic_cast<PaletteNode*>(node))
@@ -7558,6 +7568,7 @@ namespace
       if (dynamic_cast<AudioTextureNode*>(node) != nullptr || dynamic_cast<AudioFileNode*>(node) != nullptr ||
           dynamic_cast<AudioColorRampNode*>(node) != nullptr || dynamic_cast<AudioAnalyzeNode*>(node) != nullptr ||
           dynamic_cast<VmpcNode*>(node) != nullptr ||
+          dynamic_cast<ClipMatrixNode*>(node) != nullptr || dynamic_cast<ClipMatrixOutNode*>(node) != nullptr ||
           dynamic_cast<VideoSourceNode*>(node) != nullptr)
          return false;
       return dynamic_cast<IAudioSource*>(node) != nullptr || node->AudioInputSlot(0) != nullptr ||
@@ -22033,8 +22044,10 @@ namespace
       // IAudioSource for its second output but its first output is a texture.
       // VMPC too: a note input, but its output is an image.
       const bool mixedMediaVideo = dynamic_cast<VideoSourceNode*>(n) != nullptr;
-      if (dynamic_cast<VmpcNode*>(n) != nullptr)
+      if (dynamic_cast<VmpcNode*>(n) != nullptr || dynamic_cast<ClipMatrixNode*>(n) != nullptr)
          return true;
+      if (dynamic_cast<ClipMatrixOutNode*>(n) != nullptr)
+         return false;
       if ((!mixedMediaVideo && dynamic_cast<IAudioSource*>(n) != nullptr) || n->AudioInputSlot(0) != nullptr ||
           dynamic_cast<INoteSource*>(n) != nullptr || n->NoteInputSlot(0) != nullptr)
          return false;
@@ -22908,6 +22921,8 @@ namespace
          { "Drum Sequencer", "An 8-lane, 8-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8x8 step grid. Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
          { "MPC", "16 sample pads (pad 1 bottom-left). Each pad has one sample and a play mode: one shot (plays the whole sample; a new hit restarts it), gate (plays while held, stops on release, restarts on the next hit) or loop (a hit toggles looping on/off; off rewinds). Click a pad to play and select it; the editor below loads a sample or a whole folder (first 16 audio files), sets the mode, volume, pitch and pan. Every pad has a CV pin (gate: high = held) for MIDI controllers, and the note input plays pads from the base note up (36-51 by default). The output is the master mix; an MPC Out node picks one pad for its own chain." },
          { "MPC Out", "Takes one pad's own stereo output from an MPC wired into its input, so a pad (a kick, a snare) can get its own effects. Anything that is not an MPC passes straight through." },
+         { "Clip Matrix", "Session view / clip launcher (like Ableton Live). Rows are tracks (one clip plays per row), columns are scenes. Drop audio, video or image files on the cells. Click a cell to launch it, the scene buttons on top launch a whole column, STOP stops a row. Launches are quantized on the audio thread to the next grid line (None, 1/16 to 4 bars; global or per clip). Modes: loop (default), once, gate (plays while held). Audio clips can sync to the tempo (stretched, pitch kept) and be pitched; follow actions chain clips; scenes can set the tempo and time signature. Every cell, scene and stop has a CV pin, and notes launch cells (base note + row * scenes + column). Outputs: master video (rows composited, row 1 in front) and master audio; a Clip Matrix Out splits the rows. REC > ARR records the performance into the Arrangement Timeline." },
+         { "Clip Matrix Out", "Wire a Clip Matrix's audio output into it to get every row as its own video and audio output, for per-row effects and mixing." },
          { "Timeline", "The Arrangement Timeline's video as a node: the composite of every video track at the playhead (blend modes, opacity, fades, grade). Wire it to an Output to project the arrangement, or into filters like any image. width/height set its resolution. Open the timeline with Shift+T (VIEW > Arrangement timeline)." },
          { "Looper", "A live looper on one audio input. REC starts a take (with sync on, it waits for the next bar or sub-bar line of the transport), PLAY starts/stops the loop, DUB layers the input over the loop while it plays, CLEAR empties it. Length: a number of bars, a fraction of a bar, or free (REC again ends the take). Playback forward, reverse or ping-pong, looping or once. thru is the input monitoring level, level the loop volume. Every button has a CV pin. Takes are shifted by the interface round-trip latency (auto, plus a manual offset in ms) so they land on the grid. A REC pressed up to 200 ms after a line still starts on that line. UNDO / REDO step through the takes and overdub layers (UNDO during an overdub closes and removes it). The loop is saved with the patch (a WAV in the Recordings folder) and EXPORT WAV writes the mix of all layers. Up to 120 s at 48 kHz." },
          { "Super Mixer", "A 16-channel mixer: per channel an input gain (+/-24 dB), a fader, pan, mute, solo and a 3-band EQ (low shelf 120 Hz, sweepable mid peak, high shelf 8 kHz, each +/-15 dB), plus a master fader. Every control has a CV pin." },
@@ -23522,9 +23537,13 @@ namespace
       return node->AudioNodeForNotePorts();
    }
 
-   int AudioBufferIndexOf(INode* node, const std::unordered_map<AudioNode*, int>& bufferIndexOf)
+   int AudioBufferIndexOf(INode* node, const std::unordered_map<AudioNode*, int>& bufferIndexOf, int outputSlot = 0)
    {
-      AudioNode* an = AudioNodeOfAny(node);
+      // Turbo 0.44: a node with several audio outputs maps each to its own
+      // AudioNode (and so its own buffer).
+      AudioNode* an = (node != nullptr && outputSlot > 0) ? node->AudioNodeForOutput(outputSlot) : nullptr;
+      if (an == nullptr)
+         an = AudioNodeOfAny(node);
       if (an == nullptr)
          return -1;
       auto it = bufferIndexOf.find(an);
@@ -23568,7 +23587,7 @@ namespace
          if (cable->IsConnected())
          {
             CollectAudioChain(cable->GetSource(), visited, outOrder, bufferIndexOf);
-            entry.inputBufferIndices[slot] = AudioBufferIndexOf(cable->GetSource(), bufferIndexOf);
+            entry.inputBufferIndices[slot] = AudioBufferIndexOf(cable->GetSource(), bufferIndexOf, cable->GetOutputSlot());
          }
       }
 
@@ -23612,6 +23631,19 @@ namespace
          entry.outputBufferIndex = (int)outOrder.size();
          bufferIndexOf[audioNode] = entry.outputBufferIndex;
          outOrder.push_back(entry);
+         // Turbo 0.44: extra audio outputs - one more entry (and buffer)
+         // each, same inputs, right after the node's own.
+         for (int x = 0; x < node->ExtraAudioNodeCount(); x++)
+         {
+            AudioNode* extra = node->ExtraAudioNode(x);
+            if (extra == nullptr || bufferIndexOf.count(extra) != 0)
+               continue;
+            AudioTopologyEntry e = entry;
+            e.node = extra;
+            e.outputBufferIndex = (int)outOrder.size();
+            bufferIndexOf[extra] = e.outputBufferIndex;
+            outOrder.push_back(e);
+         }
       }
    }
 
@@ -23656,7 +23688,7 @@ namespace
             if (cable == nullptr || !cable->IsConnected())
                continue;
             CollectAudioChain(cable->GetSource(), visited, order, bufferIndexOf);
-            const int idx = AudioBufferIndexOf(cable->GetSource(), bufferIndexOf);
+            const int idx = AudioBufferIndexOf(cable->GetSource(), bufferIndexOf, cable->GetOutputSlot());
             if (idx >= 0)
             {
                // Capture is set unconditionally, gated at write-time on the
@@ -24059,6 +24091,11 @@ namespace
    // there is exactly one restart implementation, not two.
    void PollAudioRecovery()
    {
+      // Turbo 0.44.1: never touch the device while the timeline renders
+      // offline (the main thread owns the graph; a restart reopened the ASIO
+      // driver mid-render and crashed). Pending flags stay latched for later.
+      if (AudioEngine::Instance().OfflineRender())
+         return;
       const bool willSleep = Platform::AudioWillSleep();
       const bool didWake = Platform::AudioDidWake();
       const bool configChanged = Platform::AudioDeviceConfigDidChange();
@@ -24248,7 +24285,7 @@ namespace
                   continue;
                const int srcIndex = indexOf((const void*)cable->GetSource());
                if (srcIndex >= 0)
-                  data.cables.push_back({ gn.index, slot, srcIndex });
+                  data.cables.push_back({ gn.index, slot, srcIndex, cable->GetOutputSlot() });
             }
          }
          // Audio/note cables are typed like image cables (a plain
@@ -24262,7 +24299,7 @@ namespace
                continue;
             const int srcIndex = indexOf((const void*)cable->GetSource());
             if (srcIndex >= 0)
-               data.audio.push_back({ gn.index, slot, srcIndex });
+               data.audio.push_back({ gn.index, slot, srcIndex, cable->GetOutputSlot() });
          }
          for (int slot = 0; slot < kMaxNoteSlots; slot++)
          {
@@ -24625,7 +24662,7 @@ namespace
          if (dst == nullptr || src == nullptr)
             continue;
          if (ImageCable* cable = CableFor(*dst, c.dstSlot))
-            cable->Connect(src->node.get());
+            cable->Connect(src->node.get(), c.srcOutput);
       }
       for (const Patch::CableRecord& c : data.geometry)
       {
@@ -24641,7 +24678,7 @@ namespace
          if (dst == nullptr || src == nullptr)
             continue;
          if (AudioCable* cable = dst->node->AudioInputSlot(c.dstSlot))
-            cable->Connect(src->node.get());
+            cable->Connect(src->node.get(), c.srcOutput);
       }
       for (const Patch::CableRecord& c : data.notes)
       {
@@ -26195,6 +26232,8 @@ namespace
 
    // Turbo 0.43: Arrangement Timeline (model glue, audio, video, panel).
 #include "arrange/ArrangeUi.inl"
+   // Turbo 0.44: Clip Matrix (session view) UI and recording.
+#include "nodes/ClipMatrixUi.inl"
 }
 
 // ================================================== Audio node sweep discovery
@@ -30964,7 +31003,8 @@ namespace AudioParamSweep
       // produce a signal. The generic headless sweep has no such fixture;
       // keep its parameter round-trip coverage but do not report its expected
       // empty output as an audio implementation failure.
-      if (dynamic_cast<VideoSourceNode*>(node) != nullptr || dynamic_cast<VmpcNode*>(node) != nullptr)
+      if (dynamic_cast<VideoSourceNode*>(node) != nullptr || dynamic_cast<VmpcNode*>(node) != nullptr ||
+          dynamic_cast<ClipMatrixNode*>(node) != nullptr || dynamic_cast<ClipMatrixOutNode*>(node) != nullptr)
          return ReadMode::kUnobservable;
       if (shape.isAudioSource)
       {
@@ -34452,6 +34492,7 @@ int main(int argc, char** argv)
       Transport::Instance().Tick(ImGui::GetIO().DeltaTime);
       // Turbo 0.43: arrangement faders/schedule/video-sample sync, pre-cook.
       ArrangeFrameUpdate();
+      ClipMatrixFrameUpdate(); // Turbo 0.44: matrix events -> arrangement recording
       // Turbo (from upstream): Shift-drag gesture recording. Loops only move
       // while the transport plays; releasing Shift turns each trace into a loop.
       GestureRecorder::Instance().AdvanceClock(ImGui::GetIO().DeltaTime, Transport::Instance().IsPlaying());
@@ -35499,6 +35540,30 @@ int main(int argc, char** argv)
       // Turbo 0.43: files dropped on the timeline panel become Sample clips.
       if (!gDroppedFiles.empty() && ArrangeHandleFileDrop(gDroppedFiles, gDropPos))
          gDroppedFiles.clear();
+      // Turbo 0.44: a file dropped on a Clip Matrix cell loads into it
+      // (several files fill the following cells of the row).
+      if (!gDroppedFiles.empty())
+      {
+         const ImVec2 cp = ed::ScreenToCanvas(gDropPos);
+         if (ClipMatrixHandleDrop(gDroppedFiles[0], cp))
+         {
+            for (GraphNode& g : gNodes)
+               if (auto* m = dynamic_cast<ClipMatrixNode*>(g.node.get()))
+               {
+                  const int r = m->selRow;
+                  int c = m->selCol;
+                  bool mine = m->cellRect[r][c][0] <= cp.x && cp.x <= m->cellRect[r][c][2] &&
+                              m->cellRect[r][c][1] <= cp.y && cp.y <= m->cellRect[r][c][3];
+                  if (!mine)
+                     continue;
+                  for (size_t k = 1; k < gDroppedFiles.size() && c + 1 < ClipMatrixNode::kMaxCols; k++)
+                     m->LoadCell(r, ++c, gDroppedFiles[k]);
+                  if (c >= m->cols)
+                     m->cols = std::min(ClipMatrixNode::kMaxCols, c + 1);
+               }
+            gDroppedFiles.clear();
+         }
+      }
       if (!gDroppedFiles.empty())
       {
          // Everything ModelIO reads. Checked before video because "usdz" and
@@ -41480,6 +41545,10 @@ int main(int argc, char** argv)
                DrawLayoutParams(gn, n);
             else if (auto* n = dynamic_cast<VmpcNode*>(gn.node.get()))
                DrawVmpcParams(gn, n);
+            else if (auto* n = dynamic_cast<ClipMatrixNode*>(gn.node.get()))
+               DrawClipMatrixParams(gn, n);
+            else if (auto* n = dynamic_cast<ClipMatrixOutNode*>(gn.node.get()))
+               DrawClipMatrixOutParams(n);
             else if (auto* n = dynamic_cast<BlendNode*>(gn.node.get()))
                DrawBlendParams(n);
             else if (auto* n = dynamic_cast<FilterNode*>(gn.node.get()))
@@ -41794,7 +41863,7 @@ int main(int argc, char** argv)
 
             if (GraphNode* src = ownerOf((const void*)cable->GetSource()))
                gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
-                                  src->OutputPinId(), gn.InputPinId(slot) });
+                                  src->OutputPinId(cable->GetOutputSlot()), gn.InputPinId(slot) });
          }
          for (int slot = 0; slot < kMaxAudioSlots; slot++)
          {
@@ -41803,9 +41872,11 @@ int main(int argc, char** argv)
                continue;
             if (GraphNode* src = ownerOf((const void*)cable->GetSource()))
             {
-               const int audioOutput = dynamic_cast<TransportControlNode*>(src->node.get()) != nullptr ? 4
+               const int audioOutput = cable->GetOutputSlot() > 0 ? cable->GetOutputSlot()
+                                       : dynamic_cast<TransportControlNode*>(src->node.get()) != nullptr ? 4
                                        : (dynamic_cast<VideoSourceNode*>(src->node.get()) != nullptr ||
-                                          dynamic_cast<VmpcNode*>(src->node.get()) != nullptr) ? 1 : 0;
+                                          dynamic_cast<VmpcNode*>(src->node.get()) != nullptr ||
+                                          dynamic_cast<ClipMatrixNode*>(src->node.get()) != nullptr) ? 1 : 0;
                gLinks.push_back({ kLinkIdBase + gn.InputPinId(slot),
                                   src->OutputPinId(audioOutput), gn.InputPinId(slot) });
             }
@@ -42713,6 +42784,7 @@ int main(int argc, char** argv)
 
       // ---- popups: search, spawn menu, dropdown ----
       ed::Suspend();
+      DrawClipMatrixDeferredPopups(); // Turbo 0.44
 
       DrawMinimap();
 

@@ -1,5 +1,5 @@
 Infinite-Turbo (for Windows) - source package
-Version: 0.43.2-turbo (base: Windows R31a port)
+Version: 0.44.1-turbo (base: Windows R31a port)
 Upstream: https://github.com/n1m21n/Infinite
 Upstream commit: 788404af4b378941394e2d5dcc45c5542cc903fd
 Target: Windows 10/11 x64 only, Visual Studio 2022 (MSVC), vcpkg x64-windows-static

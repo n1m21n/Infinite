@@ -512,6 +512,12 @@ namespace Platform
    }
    std::string OpenVideoDialog() { return RunFileDialog(false, false, L"Open video", {{L"Video", L"*.mp4;*.mov;*.mkv;*.avi;*.webm;*.m4v"}}); }
    std::string OpenAudioDialog() { return RunFileDialog(false, false, L"Open audio", {{L"Audio", L"*.wav;*.aif;*.aiff;*.flac;*.mp3;*.m4a;*.ogg;*.opus"}}); }
+   std::string OpenMediaDialog()
+   {
+      return RunFileDialog(false, false, L"Open clip", {
+         {L"Audio, video and images", L"*.wav;*.aif;*.aiff;*.flac;*.mp3;*.m4a;*.ogg;*.mp4;*.mov;*.m4v;*.avi;*.mkv;*.webm;*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff;*.webp;*.gif"},
+         {L"All files", L"*.*"} });
+   }
    std::string OpenFolderDialog(const char* title, const std::string& initialDir)
    { return RunFileDialog(false, true, Utf8ToWide(title ? title : "Select folder").c_str(), {}, {}, initialDir); }
 

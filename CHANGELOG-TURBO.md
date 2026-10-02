@@ -1,5 +1,39 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.44.1-turbo (2026-10-02)
+
+### Fixes
+- **Crash during the timeline WAV / MP4 render**: while the main thread renders offline the device callback
+  outputs silence, but it skipped its liveness timestamp, so after 0.75 s the audio recovery thought the
+  device had died and reopened the ASIO driver in the middle of the render (crash inside the driver).
+  The engine now stays "alive" during a render and device recovery waits until it ends.
+- Time-stretch buffers (Audio File Player clips, Clip Matrix voices) are no longer reallocated on every
+  audio topology rebuild when nothing changed (avoids freeing memory the audio thread may still be using).
+
+### Timeline
+- **Rename tracks**: double-click the track name or any free spot of the track header, press F2 on the
+  selected track, or right-click > Rename. Enter or clicking away confirms, Esc cancels, an empty name
+  returns to the default (A1, V1...).
+
+## 0.44.0-turbo (2026-10-02)
+
+### Clip Matrix (session view / clip launcher)
+- **New node Clip Matrix** (Source): rows are tracks, columns are scenes (4 x 8 by default, up to 16 x 16).
+  Audio, video and image clips, dropped on the cells or loaded from the cell menu.
+- **Quantized launching on the audio thread**: clips, scenes and stops start on the next grid line
+  (None / free, 1/16 to 4 bars; global or per clip), sample-accurate inside the block.
+- **Modes**: loop (default), once, gate (plays while held). Launching on an empty cell stops the row.
+- **Audio clips** are tempo-aware: detected BPM, sync to tempo (stretched, pitch kept), pitch per clip.
+  Video clips follow the same clock, with their soundtrack.
+- **Follow actions** per clip (after N bars or the clip length: stop, again, next, previous, first, last,
+  any, other, with a chance for action B) and **scenes with tempo / time signature**.
+- Every cell, scene and stop has a CV pin; MIDI notes launch cells (base note + row x scenes + column).
+- **REC > ARR** records the performance into the Arrangement Timeline (one audio / video track per row,
+  each launch and loop pass a clip, one undo step).
+- **Clip Matrix Out** (AudioUtility): splits the matrix into one video + one audio output per row, like
+  MPC Out. Cables now remember which output of a multi-output node they come from (saved as an optional
+  4th token on `cable` / `aud` lines; older files load unchanged).
+
 ## 0.43.2-turbo (2026-10-02)
 
 - **Spout In / Spout Out**: the Syphon nodes are named after what they are on Windows (Spout2), in the

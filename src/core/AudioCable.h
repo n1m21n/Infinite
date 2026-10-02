@@ -16,11 +16,15 @@
 class AudioCable
 {
 public:
-   void Connect(INode* source) { mSource = source; }
-   void Disconnect() { mSource = nullptr; }
+   // `output`: which output pin of the source this cable comes from (Turbo
+   // 0.44 - only multi-audio-output nodes such as Clip Matrix Out care).
+   void Connect(INode* source, int output = 0) { mSource = source; mOutput = output < 0 ? 0 : output; }
+   void Disconnect() { mSource = nullptr; mOutput = 0; }
+   int GetOutputSlot() const { return mOutput; }
    INode* GetSource() const { return mSource; }
    bool IsConnected() const { return mSource != nullptr; }
 
 private:
    INode* mSource = nullptr;
+   int mOutput = 0;
 };

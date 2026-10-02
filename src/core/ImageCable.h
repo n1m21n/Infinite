@@ -12,8 +12,11 @@
 class ImageCable
 {
 public:
-   void Connect(INode* source) { mSource = source; }
-   void Disconnect() { mSource = nullptr; }
+   // `output`: which of the source's image outputs (Turbo 0.44; 0 for every
+   // single-output node).
+   void Connect(INode* source, int output = 0) { mSource = source; mOutput = output < 0 ? 0 : output; }
+   void Disconnect() { mSource = nullptr; mOutput = 0; }
+   int GetOutputSlot() const { return mOutput; }
    INode* GetSource() const { return mSource; }
    bool IsConnected() const { return mSource != nullptr; }
 
@@ -34,7 +37,7 @@ public:
       if (node == nullptr)
          return 0;
       node->CookIfNeeded(frameId);
-      return node->GetOutputTexture();
+      return node == mSource ? node->GetOutputTextureAt(mOutput) : node->GetOutputTexture();
    }
 
    // Turbo (from upstream): the resolved source's current texture without
@@ -42,18 +45,18 @@ public:
    unsigned int Texture() const
    {
       INode* node = Resolved();
-      return node ? node->GetOutputTexture() : 0;
+      return node ? (node == mSource ? node->GetOutputTextureAt(mOutput) : node->GetOutputTexture()) : 0;
    }
 
    int Width() const
    {
       INode* node = Resolved();
-      return node ? node->GetOutputWidth() : 0;
+      return node ? (node == mSource ? node->GetOutputWidthAt(mOutput) : node->GetOutputWidth()) : 0;
    }
    int Height() const
    {
       INode* node = Resolved();
-      return node ? node->GetOutputHeight() : 0;
+      return node ? (node == mSource ? node->GetOutputHeightAt(mOutput) : node->GetOutputHeight()) : 0;
    }
 
    // Current revision of whatever this cable resolves to. Call after Pull()
@@ -67,4 +70,5 @@ public:
 
 private:
    INode* mSource = nullptr;
+   int mOutput = 0;
 };

@@ -142,6 +142,8 @@ bool AudioEngine::IsAlive() const
    if (sampleRate <= 0.0)
       return true; // not supposed to be running at all - "off", not "dead"
 
+   if (mOffline.load(std::memory_order_acquire))
+      return true; // Turbo 0.44.1: the main thread drives the graph, not "dead"
    const double lastMs = mLastCallbackMs.load(std::memory_order_relaxed);
    const double baselineMs = (lastMs >= 0.0) ? lastMs : mStartedAtMs.load(std::memory_order_relaxed);
    if (baselineMs < 0.0)
@@ -479,6 +481,13 @@ void AudioEngine::MixArrangeTerminals(ProcessList* list, AudioBuffer& deviceBuff
 void AudioEngine::SetOfflineRender(bool on)
 {
    mOffline.store(on, std::memory_order_release);
+   if (!on)
+   {
+      // The device callback kept running but skipped its bookkeeping: start
+      // the liveness / xrun clocks fresh so the render gap reads as neither.
+      mLastCallbackMs.store(-1.0, std::memory_order_relaxed);
+      mStartedAtMs.store(NowMs(), std::memory_order_relaxed);
+   }
    if (on)
    {
       // Let a callback already inside the graph finish before the main
@@ -515,6 +524,7 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
       for (int ch = 0; ch < numChannels; ch++)
          if (buffers[ch] != nullptr)
             std::fill(buffers[ch], buffers[ch] + numFrames, 0.0f);
+      mLastCallbackMs.store(NowMs(), std::memory_order_relaxed); // still alive
       mInProcess.fetch_sub(1, std::memory_order_acq_rel);
       return;
    }

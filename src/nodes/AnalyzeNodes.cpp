@@ -704,7 +704,7 @@ public:
       mSampleRate = sampleRate;
       // Turbo 0.43.1: the Arrangement Timeline's time/pitch stretcher
       // (allocates - main thread, here).
-      mStretchCapacity = std::max(64, maxBlockSize);
+      mStretchCapacity = std::max(mStretchCapacity, std::max(64, maxBlockSize));
       mStretcher.Prepare(sampleRate, mStretchCapacity);
       mMailbox.PrepareToPlay(sampleRate);
       mMailbox.SetImmediate(kFileVolumeParam, mVolume.load(std::memory_order_relaxed));

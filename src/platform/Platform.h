@@ -209,6 +209,8 @@ namespace Platform
    // and runs its own AudioNode like SamplerNode, rather than owning a private
    // AVAudioEngine here. OpenAudioDialog is still shared with the file picker.
    std::string OpenAudioDialog();
+   // Turbo 0.44: audio, video or image (Clip Matrix cells).
+   std::string OpenMediaDialog();
 
    bool AudioStart(std::string& outError);
    void AudioStop();

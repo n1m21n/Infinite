@@ -66,6 +66,11 @@ class ClipTimeStretch
 public:
    void Prepare(double engineRate, int maxBlockFrames)
    {
+      // Turbo 0.44.1: topology rebuilds re-run PrepareToPlay on nodes the
+      // audio thread may still be processing; reallocating then would free
+      // buffers under it. Same rate and enough room = nothing to do.
+      if (mPrepared && engineRate == mEngineRate && (int)mOut[0].size() >= maxBlockFrames)
+         return;
       // splitComputation spreads each spectral frame's work over the interval
       // instead of doing it all in one callback, at one interval of latency.
       mStretch.presetDefault(2, (float)engineRate, true);

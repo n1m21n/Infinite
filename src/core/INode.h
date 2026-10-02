@@ -254,4 +254,19 @@ public:
    // audio-thread object directly (MPC Out tapping one MPC pad) resolves that
    // pointer here, so it always matches the graph the engine is about to run.
    virtual void ResolveAudioTaps() {}
+
+   // Turbo 0.44: nodes with several IMAGE outputs (Clip Matrix Out). An
+   // ImageCable remembers which output it reads; every node that has one
+   // image output just answers its usual texture for any index.
+   virtual unsigned int GetOutputTextureAt(int /*output*/) { return GetOutputTexture(); }
+   virtual int GetOutputWidthAt(int /*output*/) const { return GetOutputWidth(); }
+   virtual int GetOutputHeightAt(int /*output*/) const { return GetOutputHeight(); }
+
+   // Turbo 0.44: nodes with several AUDIO outputs. Output `o`'s AudioNode
+   // (null = the node's one AudioNode). Extra AudioNodes are added to the
+   // topology right after the node's own entry, with the same inputs, so
+   // each one gets a buffer of its own.
+   virtual AudioNode* AudioNodeForOutput(int /*output*/) { return nullptr; }
+   virtual int ExtraAudioNodeCount() const { return 0; }
+   virtual AudioNode* ExtraAudioNode(int /*i*/) { return nullptr; }
 };
