@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <memory>
+#include <string>
 
 #include "core/AudioCable.h"
 #include "core/INode.h"
@@ -45,7 +46,14 @@ class AudioLooperNode;
 // (that is the point of varispeed), and overdub is paused: layers are only
 // written at the rate they were recorded at.
 //
-// Not saved: the loop audio itself (params only) - a patch reloads empty.
+// The loop audio is kept: once a take or an overdub settles, the held loop is
+// written as a 32-bit float stereo WAV in the Recordings folder and `loopFile`
+// (a saved param) points at it, so reopening the patch, or a whole-patch undo
+// that respawns the node, brings the loop back (stopped, ready for PLAY).
+// Float, not the shared 16-bit writer: overdubs can sum past 0 dBFS and the
+// file must hold exactly what the looper held. Each new take gets a new file;
+// overdubs and CLEAR rewrite the take's own file, but only one this instance
+// wrote - a loop that came from a patch is never modified on disk.
 class LooperNode : public INode, public IAudioSource
 {
 public:
@@ -105,6 +113,7 @@ public:
    int take = 3;
    bool syncStart = true; // wait for the next grid line when the transport runs
    int testLatencyFrames = -1; // fixtures only: >= 0 replaces the measured round trip (0 = no compensation)
+   std::string testLoopDir;    // fixtures only: non-empty writes loop files there, synchronously
    bool thru = true;      // monitor the input alongside the loop
    float finetune = 0.0f; // cents, +/-50, stacks on pitch
    float pitch = 0.0f;    // semitones, +/-24
@@ -112,6 +121,12 @@ public:
    float volume = 1.0f;   // 0..1, loop playback level (unity: the loop sits level with the live input)
    float fadeIn = 3.0f;   // ms, 0..250, ramp at the start of every pass
    float fadeOut = 3.0f;  // ms, 0..250, ramp at the end of every pass
+
+   // WAV holding the loop audio ("" = no loop). Written by the node, saved
+   // with the patch, read back on load. See the class comment.
+   std::string loopFile;
+   // Why the saved loop could not be read back, or empty.
+   const std::string& LoopStatus() const { return mLoopStatus; }
 
    AudioCable input;
 
@@ -137,4 +152,11 @@ private:
    float mTargetSec = 0.0f;
    int mLatencyFrames = 0;   // cached AudioRoundTripLatencyFrames, main thread
    int mLatencyPollFrame = -1000000;
+
+   // Loop file bookkeeping (main thread). See SyncLoopFile.
+   void SyncLoopFile();
+   std::string mAppliedFile;  // the loopFile the audio half currently holds
+   std::string mLoopStatus;
+   int mSavedVersion = 0;     // audio loop version last written (or loaded)
+   int mFileTake = -1;        // take serial loopFile was written for; -1 = not written here
 };

@@ -58277,6 +58277,60 @@ static bool RunLooperFixture()
          fail("sync: take is not aligned to the grid");
    }
 
+   // 8) the loop survives the patch: a take is written to loopFile as float
+   //    WAV, a fresh node given that loopFile holds the same audio (stopped,
+   //    PLAY plays it), an overdub rewrites the same file, CLEAR empties
+   //    loopFile, and a loop from a patch is never rewritten in place.
+   transport.SetPlaying(false);
+   {
+      std::error_code ec;
+      const std::string dir = TmpPath("infinite_looper_fixture");
+      std::filesystem::create_directories(std::filesystem::u8path(dir), ec);
+      auto ramp = [](int i) { return 1.5f * (float)(i % 1000) / 1000.0f - 0.2f; }; // > 0 dBFS on purpose
+      auto a = MakeLooper(0, false, 0);
+      a->testLoopDir = dir;
+      Press(*a, LooperNode::kRec);
+      Run(*a, 0, 4096, ramp, false, &cook);
+      Press(*a, LooperNode::kRec);
+      Run(*a, 4096, 3 * kBlock, nullptr, false, &cook);
+      const std::string first = a->loopFile;
+      if (first.empty() || !std::filesystem::exists(std::filesystem::u8path(first), ec))
+         fail("persist: a finished take wrote no loop file");
+
+      auto b = MakeLooper(0, false, 0);
+      b->loopFile = first;
+      Run(*b, 0, 2 * kBlock, nullptr, false, &cook);
+      if (b->CurrentState() != LooperNode::kStopped || std::fabs(b->LoopSeconds() - 4096.0f / (float)kSr) > 1.0f / (float)kSr)
+         fail("persist: the loop file did not come back as a stopped 4096-frame loop");
+      Press(*b, LooperNode::kPlay);
+      const std::vector<float> back = Run(*b, 0, 4096, nullptr, false, &cook);
+      float worst = 0.0f;
+      for (int i = 0; i < 4096; i++)
+         worst = std::max(worst, std::fabs(back[(size_t)i] - ramp(i)));
+      if (worst > 1e-6f)
+         fail("persist: the reloaded loop is not sample-exact (float, unclipped)");
+
+      Press(*a, LooperNode::kDub);
+      Run(*a, 0, 2048, tone(468.75f, 0.2f), false, &cook);
+      Press(*a, LooperNode::kDub);
+      Run(*a, 0, 3 * kBlock, nullptr, false, &cook);
+      if (a->loopFile != first)
+         fail("persist: an overdub did not rewrite its own take's file");
+
+      Press(*b, LooperNode::kDub);
+      Run(*b, 0, 2048, tone(468.75f, 0.2f), false, &cook);
+      Press(*b, LooperNode::kDub);
+      Run(*b, 0, 3 * kBlock, nullptr, false, &cook);
+      if (b->loopFile.empty() || b->loopFile == first)
+         fail("persist: an overdub on a loaded loop rewrote the patch's file");
+
+      Press(*a, LooperNode::kClear);
+      Run(*a, 0, 3 * kBlock, nullptr, false, &cook);
+      if (!a->loopFile.empty())
+         fail("persist: CLEAR did not empty loopFile");
+      std::filesystem::remove_all(std::filesystem::u8path(dir), ec);
+   }
+
    transport.SetTempo(savedBpm);
    transport.SetPlaying(savedPlaying);
    printf("LOOPERTEST %s\n", ok ? "OK" : "FAIL");
