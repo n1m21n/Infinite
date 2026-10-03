@@ -3,6 +3,7 @@
 #include <cmath>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "core/AudioCable.h"
 #include "core/INode.h"
@@ -54,10 +55,14 @@ class AudioLooperNode;
 // file must hold exactly what the looper held. Each new take gets a new file;
 // overdubs and CLEAR rewrite the take's own file, but only one this instance
 // wrote - a loop that came from a patch is never modified on disk.
+// UNDO steps back one settled layer at a time (take, overdub, CLEAR), up to
+// kMaxUndo steps, from copies the main thread already makes to write the file;
+// the audio thread holds no history and the loop keeps playing through it.
 class LooperNode : public INode, public IAudioSource
 {
 public:
-   enum Button { kRec = 0, kPlay, kDub, kClear, kNumButtons };
+   enum Button { kRec = 0, kPlay, kDub, kClear, kUndo, kNumButtons };
+   static constexpr int kMaxUndo = 8;
    enum State { kEmpty = 0, kArmed, kRecording, kPlaying, kOverdubbing, kStopped };
 
    static INode* Create() { return new LooperNode(); }
@@ -127,6 +132,8 @@ public:
    std::string loopFile;
    // Why the saved loop could not be read back, or empty.
    const std::string& LoopStatus() const { return mLoopStatus; }
+   // Settled layers UNDO can still step back through.
+   int UndoDepth() const { return mHistory.empty() ? 0 : (int)mHistory.size() - 1; }
 
    AudioCable input;
 
@@ -159,4 +166,23 @@ private:
    std::string mLoopStatus;
    int mSavedVersion = 0;     // audio loop version last written (or loaded)
    int mFileTake = -1;        // take serial loopFile was written for; -1 = not written here
+
+   // Undo history (main thread): every settled loop, oldest first; back() is
+   // what the looper holds now. An empty snapshot is a CLEAR.
+   struct LoopSnap
+   {
+      std::vector<float> interleaved; // stereo
+      int frames = 0;
+      double sampleRate = 0.0;
+   };
+   void PushHistory(std::shared_ptr<const LoopSnap> snap);
+   void RestoreSnap(const LoopSnap& snap);
+   std::string NewLoopPath(const std::string& tag);
+   void WriteLoop(const std::string& path, std::shared_ptr<const LoopSnap> snap);
+   std::vector<std::shared_ptr<const LoopSnap>> mHistory;
+   int mUndoRequests = 0;
+   bool mUndoDubSent = false;   // an UNDO pressed mid-overdub closed the layer first
+   int mUndoFromVersion = 0;    // version when that close was sent
+   bool mAdoptNextCapture = false; // the next settled loop is an undo's own CLEAR, not a layer
+   int mRestoreSerial = 0;
 };

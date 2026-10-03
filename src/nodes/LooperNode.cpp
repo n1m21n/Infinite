@@ -282,12 +282,23 @@ public:
       {
          // Fresh buffer: first prepare or a rate change (empty), or a loop
          // read back from its file (held, stopped).
+         // A loop arriving while one plays (UNDO) carries on playing from the
+         // same place, still on the grid; otherwise it comes in stopped.
+         const bool resume = mLength > 0 && (mState == LooperNode::kPlaying || mState == LooperNode::kOverdubbing);
          mBuf = mBufSlot.Active();
          mLength = mBuf != nullptr ? mBuf->preload : 0;
-         mState = mLength > 0 ? LooperNode::kStopped : LooperNode::kEmpty;
-         mPos = 0.0;
+         if (resume && mLength > 0)
+         {
+            mState = LooperNode::kPlaying;
+            mPos = std::fmod(std::max(0.0, mPos), (double)mLength);
+         }
+         else
+         {
+            mState = mLength > 0 ? LooperNode::kStopped : LooperNode::kEmpty;
+            mPos = 0.0;
+            mTakeComp = 0;
+         }
          mTarget = 0;
-         mTakeComp = 0;
          mAccBin = -1;
          mPreW = 0;
          mPreFill = 0;
@@ -802,7 +813,10 @@ void LooperNode::SetButtonLevel(int button, bool level)
    {
       mButtonPresses[button]++;
       GetAudioNode();
-      mAudioNode->PushCommand(button);
+      if (button == kUndo)
+         mUndoRequests = std::min(mUndoRequests + 1, kMaxUndo); // main thread, see SyncLoopFile
+      else
+         mAudioNode->PushCommand(button);
    }
 }
 
@@ -857,8 +871,22 @@ void LooperNode::SyncLoopFile()
          return;
       auto decoded = std::make_unique<Platform::SampleBuffer>();
       std::string error;
-      if (Platform::DecodeAudioFileToBuffer(loopFile, *decoded, error) && decoded->numFrames > 0)
+      mHistory.clear();
+      mUndoRequests = 0;
+      if (Platform::DecodeAudioFileToBuffer(loopFile, *decoded, error) && decoded->numFrames > 0 && decoded->channels > 0)
       {
+         auto snap = std::make_shared<LoopSnap>();
+         snap->frames = decoded->numFrames;
+         snap->sampleRate = decoded->sampleRate;
+         snap->interleaved.resize((size_t)snap->frames * 2);
+         const float* L = decoded->channelData.data();
+         const float* R = decoded->channels > 1 ? L + decoded->numFrames : L;
+         for (int i = 0; i < snap->frames; i++)
+         {
+            snap->interleaved[(size_t)i * 2] = L[i];
+            snap->interleaved[(size_t)i * 2 + 1] = R[i];
+         }
+         PushHistory(std::move(snap));
          mAudioNode->LoadLoop(std::move(decoded));
          mLoopStatus.clear();
       }
@@ -873,6 +901,33 @@ void LooperNode::SyncLoopFile()
    }
    if (loopFile.empty() && mFileTake < 0)
       mAppliedFile.clear();
+
+   // UNDO, once the loop has settled. Pressed mid-take it is dropped (Rec
+   // again already throws a take away); pressed mid-overdub it first closes
+   // the layer, lets it be captured like any other, then steps back over it.
+   if (mUndoRequests > 0)
+   {
+      if (mState == kRecording || mState == kArmed)
+         mUndoRequests = 0;
+      else if (mState == kOverdubbing && !mUndoDubSent)
+      {
+         mUndoFromVersion = mAudioNode->PublishedVersion();
+         mAudioNode->PushCommand(kDub);
+         mUndoDubSent = true;
+      }
+      else if ((!mUndoDubSent || mAudioNode->PublishedVersion() != mUndoFromVersion) &&
+               mAudioNode->PublishedVersion() == mSavedVersion && mAudioNode->LeaseState() == AudioLooperNode::kLeaseIdle)
+      {
+         mUndoRequests--;
+         mUndoDubSent = false;
+         if (mHistory.size() >= 2)
+         {
+            mHistory.pop_back();
+            RestoreSnap(*mHistory.back());
+         }
+         return;
+      }
+   }
 
    // 2) The held loop settled into new content: write it.
    const int lease = mAudioNode->LeaseState();
@@ -894,19 +949,24 @@ void LooperNode::SyncLoopFile()
    const int len = buf != nullptr ? std::min(mAudioNode->LeasedLength(), buf->capacity) : 0;
    const int version = mAudioNode->LeasedVersion();
    const int takeSerial = mAudioNode->LeasedTake();
-   const double sr = buf != nullptr ? buf->sampleRate : 0.0;
-   std::vector<float> interleaved;
+   auto snap = std::make_shared<LoopSnap>();
+   snap->frames = std::max(0, len);
+   snap->sampleRate = buf != nullptr ? buf->sampleRate : 0.0;
    if (len > 0)
    {
-      interleaved.resize((size_t)len * 2);
+      snap->interleaved.resize((size_t)len * 2);
       for (int i = 0; i < len; i++)
       {
-         interleaved[(size_t)i * 2] = buf->ch[0][(size_t)i];
-         interleaved[(size_t)i * 2 + 1] = buf->ch[1][(size_t)i];
+         snap->interleaved[(size_t)i * 2] = buf->ch[0][(size_t)i];
+         snap->interleaved[(size_t)i * 2 + 1] = buf->ch[1][(size_t)i];
       }
    }
    mAudioNode->ReleaseLease();
    mSavedVersion = version;
+   if (mAdoptNextCapture)
+      mAdoptNextCapture = false; // an undo's CLEAR: already the history's top
+   else if (len > 0 || (!mHistory.empty() && mHistory.back()->frames > 0))
+      PushHistory(snap);
 
    if (len <= 0)
    {
@@ -921,16 +981,70 @@ void LooperNode::SyncLoopFile()
    // from elsewhere, gets a new one.
    std::string path = loopFile;
    if (path.empty() || mFileTake != takeSerial)
-      path = testLoopDir.empty() ? AudioRecordings::GenerateFilePath("looper")
-                                 : testLoopDir + "/looper_" + std::to_string(takeSerial) + "_" +
-                                      std::to_string((uintptr_t)this) + ".wav";
+      path = NewLoopPath(std::to_string(takeSerial));
+   mFileTake = takeSerial;
+   WriteLoop(path, std::move(snap));
+}
+
+void LooperNode::PushHistory(std::shared_ptr<const LoopSnap> snap)
+{
+   mHistory.push_back(std::move(snap));
+   // kMaxUndo steps back, and never more than 256 MB of copies (a 60 s loop
+   // at 48 kHz is 23 MB). The loop held now is always kept.
+   constexpr size_t kMaxBytes = (size_t)256 << 20;
+   size_t bytes = 0;
+   for (const auto& h : mHistory)
+      bytes += h->interleaved.size() * sizeof(float);
+   while (mHistory.size() > 1 && (mHistory.size() > (size_t)kMaxUndo + 1 || bytes > kMaxBytes))
+   {
+      bytes -= mHistory.front()->interleaved.size() * sizeof(float);
+      mHistory.erase(mHistory.begin());
+   }
+}
+
+// Puts `snap` back in the looper and on disk. Main thread.
+void LooperNode::RestoreSnap(const LoopSnap& snap)
+{
+   if (snap.frames <= 0)
+   {
+      mAdoptNextCapture = true;
+      mAudioNode->PushCommand(kClear);
+      return;
+   }
+   auto buffer = std::make_unique<Platform::SampleBuffer>();
+   buffer->channels = 2;
+   buffer->numFrames = snap.frames;
+   buffer->sampleRate = snap.sampleRate;
+   buffer->channelData.resize((size_t)snap.frames * 2);
+   for (int i = 0; i < snap.frames; i++)
+   {
+      buffer->channelData[(size_t)i] = snap.interleaved[(size_t)i * 2];
+      buffer->channelData[(size_t)(snap.frames + i)] = snap.interleaved[(size_t)i * 2 + 1];
+   }
+   mAudioNode->LoadLoop(std::move(buffer));
+   // A file of its own: the take's file may hold a later layer, and an
+   // older save or undo step may still name it.
+   mFileTake = -1;
+   WriteLoop(NewLoopPath("u" + std::to_string(++mRestoreSerial)), std::make_shared<const LoopSnap>(snap));
+}
+
+std::string LooperNode::NewLoopPath(const std::string& tag)
+{
+   if (testLoopDir.empty())
+      return AudioRecordings::GenerateFilePath("looper");
+   return testLoopDir + "/looper_" + tag + "_" + std::to_string((uintptr_t)this) + ".wav";
+}
+
+// Points loopFile at `path` and writes `snap` there: synchronously in
+// fixtures, otherwise on a worker (registered so a respawn waits for it).
+void LooperNode::WriteLoop(const std::string& path, std::shared_ptr<const LoopSnap> snap)
+{
    loopFile = path;
    mAppliedFile = path;
-   mFileTake = takeSerial;
    mLoopStatus.clear();
    if (!testLoopDir.empty())
    {
-      if (!WriteFloatWav(path, interleaved, len, sr))
+      if (!WriteFloatWav(path, snap->interleaved, snap->frames, snap->sampleRate))
          mLoopStatus = "loop file could not be written";
       return;
    }
@@ -938,8 +1052,8 @@ void LooperNode::SyncLoopFile()
       std::lock_guard<std::mutex> lock(gLoopWritesMutex);
       gLoopWrites.insert(path);
    }
-   std::thread([path, data = std::move(interleaved), len, sr]() {
-      WriteFloatWav(path, data, len, sr);
+   std::thread([path, snap = std::move(snap)]() {
+      WriteFloatWav(path, snap->interleaved, snap->frames, snap->sampleRate);
       std::lock_guard<std::mutex> lock(gLoopWritesMutex);
       gLoopWrites.erase(path);
    }).detach();

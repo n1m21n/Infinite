@@ -17834,19 +17834,20 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       LooperStatusText(n, stat, sizeof(stat));
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
-      // Rec / Play / Dub / Clear: the Sampler's own button widths (70), height
-      // and drawing, each with a CV gate pin. Rec is a plain button that goes
-      // red as "Stop" while a take is armed or recording; Play and Dub are the
-      // blue toggles; Clear is momentary. Click or CV rising edge presses.
+      // Rec / Play / Dub / Clear / Undo: the Sampler's button height and
+      // drawing, five across the body, each with a CV gate pin. Rec is a plain
+      // button that goes red as "Stop" while a take is armed or recording;
+      // Play and Dub are the blue toggles; Clear and Undo are momentary. Click
+      // or CV rising edge presses.
       {
-         static const char* kIds[LooperNode::kNumButtons] = { "rec", "play", "dub", "clear" };
+         static const char* kIds[LooperNode::kNumButtons] = { "rec", "play", "dub", "clear", "undo" };
          const int st = n->CurrentState();
          const bool recActive = st == LooperNode::kRecording || st == LooperNode::kArmed;
          const bool playActive = st == LooperNode::kPlaying || st == LooperNode::kOverdubbing;
          const bool dubActive = st == LooperNode::kOverdubbing;
          const float gapX = ImGui::GetStyle().ItemSpacing.x;
-         const float btnW = 70.0f;
-         const float cellW = 16.0f + btnW + gapX;
+         const float cellW = (gAudioContentW + gapX) / (float)LooperNode::kNumButtons;
+         const float btnW = std::min(70.0f, cellW - 16.0f - gapX);
          const float x0 = gAudioContentX;
          const float y0 = ImGui::GetCursorScreenPos().y;
          const float rowH = ImGui::GetFrameHeight();
@@ -17855,7 +17856,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             ImGui::SetCursorScreenPos(ImVec2(x0 + (float)b * cellW, y0));
             const char* label = b == LooperNode::kRec ? (recActive ? "Stop" : "Rec")
                               : b == LooperNode::kPlay ? (playActive ? "Stop" : "Play")
-                              : b == LooperNode::kDub ? "Dub" : "Clear";
+                              : b == LooperNode::kDub ? "Dub" : b == LooperNode::kClear ? "Clear" : "Undo";
             const int style = b == LooperNode::kRec ? (recActive ? 1 : 0)
                             : b == LooperNode::kPlay ? 2 : b == LooperNode::kDub ? 2 : 0;
             const bool lit = b == LooperNode::kPlay ? playActive : b == LooperNode::kDub ? dubActive : false;
@@ -41518,7 +41519,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Grain Molder", "Slices audio into overlapping grains, calculates per-grain metrics (Level, Brightness, Random), and rearranges them based on a continuous blend between original temporal position and metric rank. At amount 0 it is the clean identity passthrough; at 1 it is fully sorted into a swell or brightness contour. Rendering runs asynchronously on a worker thread." },
          { "Drum Sequencer", "An 8-lane, 8-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8x8 step grid. Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
          { "MPC", "How to use: wire the out into Audio Out, drop audio files onto the pads (or click an empty pad, or Load... / Folder... for the first 16 files of a folder), then click a pad or send notes into the notes input - notes 36 to 51 play pads 1 to 16. A 16-pad sample player: pad 1 is bottom-left like a hardware MPC, every pad is a square tile showing its waveform, number and mode, and each pad has its own CV pin, so a MIDI CC / Note modulator or any gate can play it. Every pad is its own voice, so pads play together, and a click plays at once. A hit follows the pad's mode: one shot plays the whole sample and a new hit restarts it; gate plays while held (mouse down, CV high or note held) and stops on release; loop toggles a looping playback on each hit. Click selects a pad (right-click selects without playing); the rows below the pads edit the selected pad: sync and rate, fine tune (cents), pitch (semitones), speed (negative plays backwards), volume, pan, mode, and fade in / fade out (ms, at the start and end of every pass), defined as on the Sampler. sync is per pad: Free (the default) plays a hit at once; Synced latches the hit and fires it on the next grid line of the transport at the chosen rate (1/4, 1/8, 1 bar ... the same divisions as every other node), sample-accurately; a hit on the line itself fires on it, with the transport stopped it fires at once, and in gate mode letting go before the line cancels the hit. In loop mode a synced pad re-triggers the sample on every division while it is on (one pass per division: a longer sample is cut at the line, a shorter one leaves a gap), and with the transport stopped it plays as a plain loop. The rate control is greyed while a pad is Free. Every param of every pad can be modulated at any time: a cable stays bound to its own pad when you select another pad, and an orange dot on a tile shows that pad has a modulated param. A tile shows the mode and, when synced, the rate. The node's audio out is the mix of all pads. Loaded sample paths and pad settings are saved with the patch; the audio is re-read on load." },
-         { "Looper", "How to use: wire the sound to loop into the input and the out to Audio Out, press Rec (with the transport playing and sync on it waits for the next bar; pressed up to 200 ms late, the take still starts on the line just passed), and the take ends by itself after the take length, then loops; Play stops and restarts it, Dub layers what comes in over it, Clear empties it. The waveform shows the loop with a playhead and the beat grid, and the line under the title says what the looper is doing. Each button has a CV pin, so a footswitch or MIDI note can drive them (a rising edge presses). take sets the length: a musical division (1 bar by default), or free, where the next Rec press ends it. Pressing Dub while recording ends the take and goes straight into overdub. Playback has the Sampler's controls: finetune (cents), pitch (semitones), speed (negative plays backwards), volume, and fade in / fade out (ms) at the start and end of every pass. At exactly 1.00x the loop stays on the grid; at any other rate it plays in length / rate and DRIFTS against the transport, and Dub is paused while it does (layers are only written at the rate they were recorded). thru monitors the live input. Each take is always shifted by the audio interface's measured round-trip latency, so a loop played in time sits on the grid. The loop (up to 60 s) is saved as a WAV in your Recordings folder and comes back, stopped, when the patch is opened." },
+         { "Looper", "How to use: wire the sound to loop into the input and the out to Audio Out, press Rec (with the transport playing and sync on it waits for the next bar; pressed up to 200 ms late, the take still starts on the line just passed), and the take ends by itself after the take length, then loops; Play stops and restarts it, Dub layers what comes in over it, Clear empties it. The waveform shows the loop with a playhead and the beat grid, and the line under the title says what the looper is doing. Each button has a CV pin, so a footswitch or MIDI note can drive them (a rising edge presses). take sets the length: a musical division (1 bar by default), or free, where the next Rec press ends it. Pressing Dub while recording ends the take and goes straight into overdub. Undo steps back one layer at a time (the last take, overdub or Clear, up to 8 steps) and the loop keeps playing; pressed during an overdub it throws that layer away. Playback has the Sampler's controls: finetune (cents), pitch (semitones), speed (negative plays backwards), volume, and fade in / fade out (ms) at the start and end of every pass. At exactly 1.00x the loop stays on the grid; at any other rate it plays in length / rate and DRIFTS against the transport, and Dub is paused while it does (layers are only written at the rate they were recorded). thru monitors the live input. Each take is always shifted by the audio interface's measured round-trip latency, so a loop played in time sits on the grid. The loop (up to 60 s) is saved as a WAV in your Recordings folder and comes back, stopped, when the patch is opened." },
          { "Audio In","Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch. The capture runs on its own engine bound to the system default input, independently of whichever output device is selected, and the header line says why it isn't live when it isn't." },
          { "Audio Filter", "One filter, one of 12 types (LP/HP at 12/24/36 dB, BP, notch, shelves, peak, all-pass). Drag the handle on the response curve to set frequency and gain, Shift-drag to set Q - the picture is the control." },
          { "Audio Color Ramp", "Splits incoming audio into up to 8 frequency bands - drag the dividers right on the spectrum display to resize them - and assigns each one a colour, VIBGYOR by default from low to high. With no image patched in it outputs the resulting gradient standalone; patch one into its optional image input and it grades that image by luminance through the same audio-reactive palette instead." },
@@ -58362,6 +58363,48 @@ static bool RunLooperFixture()
       Run(*a, 0, 3 * kBlock, nullptr, false, &cook);
       if (!a->loopFile.empty())
          fail("persist: CLEAR did not empty loopFile");
+
+      // 9) undo: back over an overdub (loop keeps playing, file is the take
+      //    again), over a layer still being dubbed, and over CLEAR.
+      auto c = MakeLooper(0, false, 0);
+      c->testLoopDir = dir;
+      auto fileMatchesRamp = [&](const std::string& path)
+      {
+         Platform::SampleBuffer sb;
+         std::string err;
+         if (!Platform::DecodeAudioFileToBuffer(path, sb, err) || sb.numFrames != 4096)
+            return false;
+         for (int i = 0; i < 4096; i++)
+            if (std::fabs(sb.channelData[(size_t)i] - ramp(i)) > 1e-6f)
+               return false;
+         return true;
+      };
+      Press(*c, LooperNode::kRec);
+      Run(*c, 0, 4096, ramp, false, &cook);
+      Press(*c, LooperNode::kRec);
+      Run(*c, 0, 3 * kBlock, nullptr, false, &cook);
+      Press(*c, LooperNode::kDub);
+      Run(*c, 0, 2048, tone(468.75f, 0.2f), false, &cook);
+      Press(*c, LooperNode::kDub);
+      Run(*c, 0, 3 * kBlock, nullptr, false, &cook);
+      if (c->UndoDepth() != 1 || fileMatchesRamp(c->loopFile))
+         fail("undo: the overdub was not recorded as a layer");
+      Press(*c, LooperNode::kUndo);
+      Run(*c, 0, 3 * kBlock, nullptr, false, &cook);
+      if (c->CurrentState() != LooperNode::kPlaying || !fileMatchesRamp(c->loopFile) || c->UndoDepth() != 0)
+         fail("undo: did not step back to the take, still playing");
+      Press(*c, LooperNode::kDub);
+      Run(*c, 0, 2048, tone(468.75f, 0.2f), false, &cook);
+      Press(*c, LooperNode::kUndo);
+      Run(*c, 0, 4 * kBlock, nullptr, false, &cook);
+      if (c->CurrentState() != LooperNode::kPlaying || !fileMatchesRamp(c->loopFile))
+         fail("undo: pressed mid-overdub did not throw that layer away");
+      Press(*c, LooperNode::kClear);
+      Run(*c, 0, 3 * kBlock, nullptr, false, &cook);
+      Press(*c, LooperNode::kUndo);
+      Run(*c, 0, 3 * kBlock, nullptr, false, &cook);
+      if (c->CurrentState() != LooperNode::kStopped || !fileMatchesRamp(c->loopFile))
+         fail("undo: did not bring the loop back after CLEAR");
       std::filesystem::remove_all(std::filesystem::u8path(dir), ec);
    }
 
