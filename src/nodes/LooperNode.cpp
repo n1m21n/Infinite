@@ -4,10 +4,17 @@
 #include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <mutex>
+#include <set>
+#include <thread>
 #include <vector>
 
 #include "audio/AudioBuffer.h"
 #include "audio/AudioEngine.h"
+#include "audio/AudioFileWriter.h"
 #include "audio/AudioNode.h"
 #include "audio/MusicTime.h"
 #include "audio/PassFade.h"
@@ -25,6 +32,9 @@ namespace
    constexpr int kMaxFrames = 12000000;
    constexpr int kMinTakeFrames = 32;
    constexpr int kCmdCapacity = 32;
+   // A synced REC pressed this long after a grid line still starts the take on
+   // that line, back-filled from the pre-roll ring (which holds this much input).
+   constexpr double kLateSeconds = 0.2;
    // Waveform peak bins: one min/max pair per 1024 frames of loop, written by
    // the audio thread (relaxed atomics, no allocation) and read by the UI.
    constexpr int kBinFrames = 1024;
@@ -35,7 +45,115 @@ namespace
       std::vector<float> ch[2];
       int capacity = 0;
       double sampleRate = 0.0;
+      // A loop read back from its file: frames already in ch[], and their
+      // peak bins, adopted by the audio thread when it swaps the buffer in.
+      int preload = 0;
+      std::vector<float> binMin, binMax;
+      // The last kLateSeconds of input, always running, for a late REC.
+      std::vector<float> pre[2];
+      int preCap = 0;
    };
+
+   // A buffer for `sr`, holding `src` (resampled linearly when its rate
+   // differs, cut at the capacity) when given. Main thread.
+   LoopBuf* MakeLoopBuf(double sr, const Platform::SampleBuffer* src)
+   {
+      auto* buf = new LoopBuf();
+      buf->sampleRate = sr;
+      buf->capacity = (int)std::min<double>(sr * kMaxSeconds, (double)kMaxFrames);
+      buf->ch[0].assign((size_t)buf->capacity, 0.0f);
+      buf->ch[1].assign((size_t)buf->capacity, 0.0f);
+      buf->preCap = (int)std::ceil(sr * kLateSeconds) + 1;
+      buf->pre[0].assign((size_t)buf->preCap, 0.0f);
+      buf->pre[1].assign((size_t)buf->preCap, 0.0f);
+      if (src == nullptr || src->numFrames <= 0 || src->channels <= 0 || src->sampleRate <= 0.0)
+         return buf;
+      const float* L = src->channelData.data();
+      const float* R = src->channels > 1 ? L + src->numFrames : L;
+      const double step = src->sampleRate / sr;
+      const int frames = (int)std::min<double>((double)buf->capacity, std::floor((double)src->numFrames / step));
+      for (int i = 0; i < frames; i++)
+      {
+         const double x = (double)i * step;
+         const int i0 = std::min((int)x, src->numFrames - 1);
+         const int i1 = std::min(i0 + 1, src->numFrames - 1);
+         const float fr = (float)(x - (double)i0);
+         buf->ch[0][(size_t)i] = L[i0] + (L[i1] - L[i0]) * fr;
+         buf->ch[1][(size_t)i] = R[i0] + (R[i1] - R[i0]) * fr;
+      }
+      buf->preload = frames >= kMinTakeFrames ? frames : 0;
+      const int bins = std::min(kMaxBins, (buf->preload + kBinFrames - 1) / kBinFrames);
+      buf->binMin.assign((size_t)bins, 0.0f);
+      buf->binMax.assign((size_t)bins, 0.0f);
+      for (int i = 0; i < buf->preload; i++)
+      {
+         const int b = i / kBinFrames;
+         if (b >= bins)
+            break;
+         const float m = 0.5f * (buf->ch[0][(size_t)i] + buf->ch[1][(size_t)i]);
+         buf->binMin[(size_t)b] = std::min(buf->binMin[(size_t)b], m);
+         buf->binMax[(size_t)b] = std::max(buf->binMax[(size_t)b], m);
+      }
+      return buf;
+   }
+
+   // Loop files being written by a worker right now. A respawned node (undo)
+   // must not read one half written; it waits for it instead. Main thread and
+   // the writer threads only - never the audio thread.
+   std::mutex gLoopWritesMutex;
+   std::set<std::string> gLoopWrites;
+
+   bool LoopWriteInFlight(const std::string& path)
+   {
+      std::lock_guard<std::mutex> lock(gLoopWritesMutex);
+      return gLoopWrites.count(path) != 0;
+   }
+
+   // 32-bit IEEE float WAV (format 3, with the `fact` chunk non-PCM WAVs
+   // carry). Written to a temp name and renamed over the target, so a reader
+   // never sees a partial file.
+   bool WriteFloatWav(const std::string& path, const std::vector<float>& interleaved, int frames, double sr)
+   {
+      namespace fs = std::filesystem;
+      const fs::path target = fs::u8path(path);
+      const fs::path tmp = fs::u8path(path + ".tmp");
+      {
+         std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
+         if (!f)
+            return false;
+         auto u32 = [&f](uint32_t v) { f.write(reinterpret_cast<const char*>(&v), 4); };
+         auto u16 = [&f](uint16_t v) { f.write(reinterpret_cast<const char*>(&v), 2); };
+         const uint32_t dataBytes = (uint32_t)frames * 2u * 4u;
+         f.write("RIFF", 4);
+         u32(4 + (8 + 18) + (8 + 4) + (8 + dataBytes));
+         f.write("WAVE", 4);
+         f.write("fmt ", 4);
+         u32(18);
+         u16(3);                              // WAVE_FORMAT_IEEE_FLOAT
+         u16(2);                              // channels
+         u32((uint32_t)std::lround(sr));      // sample rate
+         u32((uint32_t)std::lround(sr) * 8u); // byte rate
+         u16(8);                              // block align
+         u16(32);                             // bits per sample
+         u16(0);                              // cbSize
+         f.write("fact", 4);
+         u32(4);
+         u32((uint32_t)frames);
+         f.write("data", 4);
+         u32(dataBytes);
+         f.write(reinterpret_cast<const char*>(interleaved.data()), (std::streamsize)dataBytes);
+         if (!f)
+            return false;
+      }
+      std::error_code ec;
+      fs::rename(tmp, target, ec);
+      if (ec)
+      {
+         fs::remove(tmp, ec);
+         return false;
+      }
+      return true;
+   }
 }
 
 // ------------------------------------------------------------- audio thread
@@ -55,14 +173,37 @@ public:
       mRateNow = mRate.load(std::memory_order_relaxed);
       if (mBufRate == sr)
          return;
-      auto* buf = new LoopBuf();
-      buf->sampleRate = sr;
-      buf->capacity = (int)std::min<double>(sr * kMaxSeconds, (double)kMaxFrames);
-      buf->ch[0].assign((size_t)buf->capacity, 0.0f);
-      buf->ch[1].assign((size_t)buf->capacity, 0.0f);
-      mBufSlot.Push(buf);
+      mBufSlot.Push(MakeLoopBuf(sr, mPendingLoad.get()));
+      mPendingLoad.reset();
       mBufRate = sr;
    }
+
+   // Main thread. Hands a loop read back from its file to the audio thread:
+   // now if the engine already has a rate, else at the first PrepareToPlay.
+   void LoadLoop(std::unique_ptr<Platform::SampleBuffer> loop)
+   {
+      if (mBufRate > 0.0)
+         mBufSlot.Push(MakeLoopBuf(mBufRate, loop.get()));
+      else
+         mPendingLoad = std::move(loop);
+   }
+
+   // ---- loop read lease (main thread) -----------------------------------
+   // The main thread may read the loop buffer only while the audio thread
+   // has granted a lease: it grants one at a block boundary when nothing is
+   // being recorded, and while it is held it neither applies presses nor
+   // swaps buffers, so nothing writes the loop. Presses wait (one cook,
+   // typically well under a frame) rather than being dropped.
+   enum Lease { kLeaseIdle = 0, kLeaseAsked, kLeaseGranted, kLeaseRefused };
+   void AskLease() { mLease.store(kLeaseAsked, std::memory_order_release); }
+   int LeaseState() const { return mLease.load(std::memory_order_acquire); }
+   void ReleaseLease() { mLease.store(kLeaseIdle, std::memory_order_release); }
+   // Valid only while the lease is granted.
+   const LoopBuf* LeasedBuf() const { return mLeaseBuf; }
+   int LeasedLength() const { return mLeaseLen; }
+   int LeasedVersion() const { return mLeaseVersion; }
+   int LeasedTake() const { return mLeaseTake; }
+   int PublishedVersion() const { return mPubVersion.load(std::memory_order_relaxed); }
 
    // ---- main thread ------------------------------------------------------
    void PushCommand(int button)
@@ -136,13 +277,53 @@ public:
       const int numFrames = output.numFrames;
       const double sr = mSampleRate.load(std::memory_order_relaxed);
 
-      if (mBufSlot.SwapIn())
+      int lease = mLease.load(std::memory_order_acquire);
+      if (lease != kLeaseGranted && mBufSlot.SwapIn())
       {
-         // Fresh buffer (first prepare, or a rate change): nothing recorded in it.
+         // Fresh buffer: first prepare or a rate change (empty), or a loop
+         // read back from its file (held, stopped).
+         // A loop arriving while one plays (UNDO) carries on playing from the
+         // same place, still on the grid; otherwise it comes in stopped.
+         const bool resume = mLength > 0 && (mState == LooperNode::kPlaying || mState == LooperNode::kOverdubbing);
          mBuf = mBufSlot.Active();
-         mState = LooperNode::kEmpty;
-         mLength = 0;
-         mPos = 0.0;
+         mLength = mBuf != nullptr ? mBuf->preload : 0;
+         if (resume && mLength > 0)
+         {
+            mState = LooperNode::kPlaying;
+            mPos = std::fmod(std::max(0.0, mPos), (double)mLength);
+         }
+         else
+         {
+            mState = mLength > 0 ? LooperNode::kStopped : LooperNode::kEmpty;
+            mPos = 0.0;
+            mTakeComp = 0;
+         }
+         mTarget = 0;
+         mAccBin = -1;
+         mPreW = 0;
+         mPreFill = 0;
+         if (mBuf != nullptr)
+            for (size_t b = 0; b < mBuf->binMin.size(); b++)
+            {
+               mBinMin[b].store(mBuf->binMin[b], std::memory_order_relaxed);
+               mBinMax[b].store(mBuf->binMax[b], std::memory_order_relaxed);
+            }
+      }
+      if (lease == kLeaseAsked)
+      {
+         const bool writing = mState == LooperNode::kRecording || mState == LooperNode::kOverdubbing ||
+                              mState == LooperNode::kArmed;
+         if (writing)
+            lease = kLeaseRefused;
+         else
+         {
+            lease = kLeaseGranted;
+            mLeaseBuf = mBuf;
+            mLeaseLen = mState == LooperNode::kEmpty ? 0 : mLength;
+            mLeaseVersion = mVersion;
+            mLeaseTake = mTakeSerial;
+         }
+         mLease.store(lease, std::memory_order_release);
       }
 
       const float thruTarget = mThru.load(std::memory_order_relaxed);
@@ -155,8 +336,9 @@ public:
       mComp = (int)std::clamp(compFrames, 0.0, sr);
       mPubComp.store(mComp, std::memory_order_relaxed);
 
-      // Presses, in order.
-      for (;;)
+      mBlockFrames = numFrames;
+      // Presses, in order (held back while the main thread reads the loop).
+      for (; lease != kLeaseGranted;)
       {
          const uint32_t head = mCmdHead.load(std::memory_order_relaxed);
          if (head == mCmdTail.load(std::memory_order_acquire))
@@ -196,6 +378,10 @@ public:
 
          if (mBuf != nullptr)
          {
+            mBuf->pre[0][(size_t)mPreW] = inL;
+            mBuf->pre[1][(size_t)mPreW] = inR;
+            mPreW = (mPreW + 1) % mBuf->preCap;
+            mPreFill = std::min(mPreFill + 1, mBuf->preCap);
             if (mState == LooperNode::kRecording)
             {
                if (mSkip > 0)
@@ -249,6 +435,7 @@ public:
       mVolumeNow = volumeTarget;
       mRateNow = rateTarget;
       FlushBin();
+      mPubVersion.store(mVersion, std::memory_order_relaxed);
       mPubLen.store(mState == LooperNode::kEmpty ? 0 : mLength, std::memory_order_relaxed);
       mPubTarget.store(mState == LooperNode::kRecording ? mTarget : 0, std::memory_order_relaxed);
 
@@ -304,6 +491,51 @@ private:
       return std::clamp((int)((next - start) / beatsPerFrame), 0, std::max(0, numFrames - 1));
    }
 
+   // Frames since the grid line just passed, at this block's start (where
+   // presses land), when a REC this late should still start on that line:
+   // within kLateSeconds and nearer that line than the next. Otherwise -1.
+   int LateFrames(double sr) const
+   {
+      const double bpm = std::max(1.0f, Transport::Instance().Tempo());
+      const double beatsPerFrame = bpm / 60.0 / sr;
+      const double start = Transport::Instance().Beats() - beatsPerFrame * (double)mBlockFrames;
+      const double grid = GridBeats();
+      const double last = std::floor(start / grid + 1e-6) * grid;
+      const double late = std::max(0.0, (start - last) / beatsPerFrame);
+      if (late > kLateSeconds * sr || late >= 0.5 * grid / beatsPerFrame)
+         return -1;
+      return (int)std::lround(late);
+   }
+
+   // A take whose musical start was `late` frames ago. Input for that moment
+   // arrives `comp` frames after it, so when late <= comp it is still to come
+   // (skip less); otherwise the missed frames come from the pre-roll ring.
+   // False when the ring does not hold them yet (arm instead).
+   bool BeginLateTake(int late)
+   {
+      const int missed = late - mComp;
+      if (missed > mPreFill || mBuf == nullptr)
+         return false;
+      BeginTake();
+      if (missed <= 0)
+      {
+         mSkip = -missed;
+         return true;
+      }
+      mSkip = 0;
+      for (int k = 0; k < missed; k++)
+      {
+         const int r = ((mPreW - missed + k) % mBuf->preCap + mBuf->preCap) % mBuf->preCap;
+         const float l = mBuf->pre[0][(size_t)r];
+         const float rr = mBuf->pre[1][(size_t)r];
+         mBuf->ch[0][(size_t)k] = l;
+         mBuf->ch[1][(size_t)k] = rr;
+         TouchBin(k, 0.5f * (l + rr), false);
+      }
+      mLength = missed;
+      return true;
+   }
+
    // Publishes the bin being accumulated. Audio thread.
    void FlushBin()
    {
@@ -345,6 +577,7 @@ private:
 
    void BeginTake()
    {
+      mTakeSerial++;
       mAccBin = -1;
       mState = LooperNode::kRecording;
       mLength = 0;
@@ -357,6 +590,7 @@ private:
    // Overdubbing). A take too short to be anything is thrown away.
    void FinishTake(int next)
    {
+      mVersion++;
       if (mBuf == nullptr || mLength < kMinTakeFrames)
       {
          mState = LooperNode::kEmpty;
@@ -429,7 +663,11 @@ private:
          {
             mTarget = TargetFrames(mSampleRate.load(std::memory_order_relaxed));
             if (mSync.load(std::memory_order_relaxed) && Transport::Instance().IsPlaying())
-               mState = LooperNode::kArmed;
+            {
+               const int late = LateFrames(mSampleRate.load(std::memory_order_relaxed));
+               if (late < 0 || !BeginLateTake(late))
+                  mState = LooperNode::kArmed;
+            }
             else
                BeginTake();
          }
@@ -440,7 +678,11 @@ private:
          else if (mState == LooperNode::kArmed)
             mState = mLength > 0 ? LooperNode::kStopped : LooperNode::kEmpty;
          else if (mState == LooperNode::kPlaying || mState == LooperNode::kOverdubbing)
+         {
+            if (mState == LooperNode::kOverdubbing)
+               mVersion++; // a layer settled
             mState = LooperNode::kStopped;
+         }
          else if (mState == LooperNode::kStopped && mLength > 0)
          {
             mState = LooperNode::kPlaying;
@@ -453,7 +695,10 @@ private:
          else if (mState == LooperNode::kPlaying)
             mState = LooperNode::kOverdubbing;
          else if (mState == LooperNode::kOverdubbing)
+         {
+            mVersion++; // a layer settled
             mState = LooperNode::kPlaying;
+         }
          else if (mState == LooperNode::kStopped && mLength > 0)
          {
             mState = LooperNode::kOverdubbing;
@@ -461,6 +706,8 @@ private:
          }
          break;
       case LooperNode::kClear:
+         if (mState != LooperNode::kEmpty)
+            mVersion++;
          mState = LooperNode::kEmpty;
          mLength = 0;
          mPos = 0.0;
@@ -473,6 +720,7 @@ private:
 
    SampleSlotT<LoopBuf> mBufSlot;
    double mBufRate = 0.0; // main thread: the rate the last pushed buffer was sized for
+   std::unique_ptr<Platform::SampleBuffer> mPendingLoad; // main thread: loop waiting for a rate
    std::atomic<double> mSampleRate { 48000.0 };
 
    // Audio-thread state.
@@ -484,12 +732,25 @@ private:
    int mSkip = 0;     // input frames still to drop before the take's start
    int mComp = 0;     // current compensation, frames
    int mTakeComp = 0; // compensation the held loop was recorded with
+   int mBlockFrames = 0; // frames in the block being processed
+   int mPreW = 0;        // pre-roll ring write index
+   int mPreFill = 0;     // valid frames in the pre-roll ring
    float mThruNow = 1.0f;
    float mVolumeNow = 1.0f;
    float mRateNow = 1.0f;
    int mAccBin = -1;
    float mAccMin = 0.0f;
    float mAccMax = 0.0f;
+   int mVersion = 0;    // bumped whenever the held loop settles into new content
+   int mTakeSerial = 0; // bumped at every take start
+
+   // Lease handshake (see AskLease). Written by the audio thread when it
+   // grants, read by the main thread after it sees kLeaseGranted.
+   std::atomic<int> mLease { kLeaseIdle };
+   const LoopBuf* mLeaseBuf = nullptr;
+   int mLeaseLen = 0;
+   int mLeaseVersion = 0;
+   int mLeaseTake = 0;
 
    // Main -> audio.
    int mCmds[kCmdCapacity] = {};
@@ -512,6 +773,7 @@ private:
    mutable std::atomic<float> mPubPeak { 0.0f };
    std::atomic<int> mPubComp { 0 };
    std::atomic<int> mPubLen { 0 };
+   std::atomic<int> mPubVersion { 0 };
    std::atomic<int> mPubTarget { 0 };
    std::atomic<float> mBinMin[kMaxBins] = {};
    std::atomic<float> mBinMax[kMaxBins] = {};
@@ -551,7 +813,10 @@ void LooperNode::SetButtonLevel(int button, bool level)
    {
       mButtonPresses[button]++;
       GetAudioNode();
-      mAudioNode->PushCommand(button);
+      if (button == kUndo)
+         mUndoRequests = std::min(mUndoRequests + 1, kMaxUndo); // main thread, see SyncLoopFile
+      else
+         mAudioNode->PushCommand(button);
    }
 }
 
@@ -576,6 +841,7 @@ void LooperNode::CookIfNeeded(int frameId)
       mLatencyFrames = testLatencyFrames >= 0 ? testLatencyFrames : (int)Platform::AudioRoundTripLatencyFrames(0);
    }
    mAudioNode->PushParams(*this, mLatencyFrames);
+   SyncLoopFile(); // before DrainRetired: a leased buffer may be retiring
    mAudioNode->DrainRetired();
 
    mState = mAudioNode->PublishedState();
@@ -593,6 +859,206 @@ void LooperNode::CookIfNeeded(int frameId)
    mAudioNode->CopyPeaks(len, tgt > 0 ? tgt : len, kWaveCols, waveMin, waveMax);
 }
 
+// Keeps loopFile and the audio half's loop in step, both ways. Main thread.
+void LooperNode::SyncLoopFile()
+{
+   // 1) A loop named by the patch (open, paste, undo respawn) that this node
+   //    does not hold yet: read it back. A file still being written by a
+   //    worker is waited for, not read half done.
+   if (loopFile != mAppliedFile && !loopFile.empty())
+   {
+      if (LoopWriteInFlight(loopFile))
+         return;
+      auto decoded = std::make_unique<Platform::SampleBuffer>();
+      std::string error;
+      mHistory.clear();
+      mUndoRequests = 0;
+      if (Platform::DecodeAudioFileToBuffer(loopFile, *decoded, error) && decoded->numFrames > 0 && decoded->channels > 0)
+      {
+         auto snap = std::make_shared<LoopSnap>();
+         snap->frames = decoded->numFrames;
+         snap->sampleRate = decoded->sampleRate;
+         snap->interleaved.resize((size_t)snap->frames * 2);
+         const float* L = decoded->channelData.data();
+         const float* R = decoded->channels > 1 ? L + decoded->numFrames : L;
+         for (int i = 0; i < snap->frames; i++)
+         {
+            snap->interleaved[(size_t)i * 2] = L[i];
+            snap->interleaved[(size_t)i * 2 + 1] = R[i];
+         }
+         PushHistory(std::move(snap));
+         mAudioNode->LoadLoop(std::move(decoded));
+         mLoopStatus.clear();
+      }
+      else
+         mLoopStatus = "loop file could not be read: " + (error.empty() ? loopFile : error);
+      mAppliedFile = loopFile;
+      mFileTake = -1; // not ours: never rewritten in place
+      // Loading does not change the audio half's version: the file already
+      // holds what it will hold, so there is nothing to write back.
+      mSavedVersion = mAudioNode->PublishedVersion();
+      return;
+   }
+   if (loopFile.empty() && mFileTake < 0)
+      mAppliedFile.clear();
+
+   // UNDO, once the loop has settled. Pressed mid-take it is dropped (Rec
+   // again already throws a take away); pressed mid-overdub it first closes
+   // the layer, lets it be captured like any other, then steps back over it.
+   if (mUndoRequests > 0)
+   {
+      if (mState == kRecording || mState == kArmed)
+         mUndoRequests = 0;
+      else if (mState == kOverdubbing && !mUndoDubSent)
+      {
+         mUndoFromVersion = mAudioNode->PublishedVersion();
+         mAudioNode->PushCommand(kDub);
+         mUndoDubSent = true;
+      }
+      else if ((!mUndoDubSent || mAudioNode->PublishedVersion() != mUndoFromVersion) &&
+               mAudioNode->PublishedVersion() == mSavedVersion && mAudioNode->LeaseState() == AudioLooperNode::kLeaseIdle)
+      {
+         mUndoRequests--;
+         mUndoDubSent = false;
+         if (mHistory.size() >= 2)
+         {
+            mHistory.pop_back();
+            RestoreSnap(*mHistory.back());
+         }
+         return;
+      }
+   }
+
+   // 2) The held loop settled into new content: write it.
+   const int lease = mAudioNode->LeaseState();
+   if (lease == AudioLooperNode::kLeaseIdle)
+   {
+      if (mAudioNode->PublishedVersion() != mSavedVersion)
+         mAudioNode->AskLease();
+      return;
+   }
+   if (lease == AudioLooperNode::kLeaseRefused)
+   {
+      mAudioNode->ReleaseLease(); // recording again: ask once it settles
+      return;
+   }
+   if (lease != AudioLooperNode::kLeaseGranted)
+      return;
+
+   const LoopBuf* buf = mAudioNode->LeasedBuf();
+   const int len = buf != nullptr ? std::min(mAudioNode->LeasedLength(), buf->capacity) : 0;
+   const int version = mAudioNode->LeasedVersion();
+   const int takeSerial = mAudioNode->LeasedTake();
+   auto snap = std::make_shared<LoopSnap>();
+   snap->frames = std::max(0, len);
+   snap->sampleRate = buf != nullptr ? buf->sampleRate : 0.0;
+   if (len > 0)
+   {
+      snap->interleaved.resize((size_t)len * 2);
+      for (int i = 0; i < len; i++)
+      {
+         snap->interleaved[(size_t)i * 2] = buf->ch[0][(size_t)i];
+         snap->interleaved[(size_t)i * 2 + 1] = buf->ch[1][(size_t)i];
+      }
+   }
+   mAudioNode->ReleaseLease();
+   mSavedVersion = version;
+   if (mAdoptNextCapture)
+      mAdoptNextCapture = false; // an undo's CLEAR: already the history's top
+   else if (len > 0 || (!mHistory.empty() && mHistory.back()->frames > 0))
+      PushHistory(snap);
+
+   if (len <= 0)
+   {
+      // Cleared: no loop to keep. The file stays on disk (an older save or
+      // an undo step may still name it).
+      loopFile.clear();
+      mAppliedFile.clear();
+      mFileTake = -1;
+      return;
+   }
+   // Overdubs rewrite this take's own file; a new take, or a loop that came
+   // from elsewhere, gets a new one.
+   std::string path = loopFile;
+   if (path.empty() || mFileTake != takeSerial)
+      path = NewLoopPath(std::to_string(takeSerial));
+   mFileTake = takeSerial;
+   WriteLoop(path, std::move(snap));
+}
+
+void LooperNode::PushHistory(std::shared_ptr<const LoopSnap> snap)
+{
+   mHistory.push_back(std::move(snap));
+   // kMaxUndo steps back, and never more than 256 MB of copies (a 60 s loop
+   // at 48 kHz is 23 MB). The loop held now is always kept.
+   constexpr size_t kMaxBytes = (size_t)256 << 20;
+   size_t bytes = 0;
+   for (const auto& h : mHistory)
+      bytes += h->interleaved.size() * sizeof(float);
+   while (mHistory.size() > 1 && (mHistory.size() > (size_t)kMaxUndo + 1 || bytes > kMaxBytes))
+   {
+      bytes -= mHistory.front()->interleaved.size() * sizeof(float);
+      mHistory.erase(mHistory.begin());
+   }
+}
+
+// Puts `snap` back in the looper and on disk. Main thread.
+void LooperNode::RestoreSnap(const LoopSnap& snap)
+{
+   if (snap.frames <= 0)
+   {
+      mAdoptNextCapture = true;
+      mAudioNode->PushCommand(kClear);
+      return;
+   }
+   auto buffer = std::make_unique<Platform::SampleBuffer>();
+   buffer->channels = 2;
+   buffer->numFrames = snap.frames;
+   buffer->sampleRate = snap.sampleRate;
+   buffer->channelData.resize((size_t)snap.frames * 2);
+   for (int i = 0; i < snap.frames; i++)
+   {
+      buffer->channelData[(size_t)i] = snap.interleaved[(size_t)i * 2];
+      buffer->channelData[(size_t)(snap.frames + i)] = snap.interleaved[(size_t)i * 2 + 1];
+   }
+   mAudioNode->LoadLoop(std::move(buffer));
+   // A file of its own: the take's file may hold a later layer, and an
+   // older save or undo step may still name it.
+   mFileTake = -1;
+   WriteLoop(NewLoopPath("u" + std::to_string(++mRestoreSerial)), std::make_shared<const LoopSnap>(snap));
+}
+
+std::string LooperNode::NewLoopPath(const std::string& tag)
+{
+   if (testLoopDir.empty())
+      return AudioRecordings::GenerateFilePath("looper");
+   return testLoopDir + "/looper_" + tag + "_" + std::to_string((uintptr_t)this) + ".wav";
+}
+
+// Points loopFile at `path` and writes `snap` there: synchronously in
+// fixtures, otherwise on a worker (registered so a respawn waits for it).
+void LooperNode::WriteLoop(const std::string& path, std::shared_ptr<const LoopSnap> snap)
+{
+   loopFile = path;
+   mAppliedFile = path;
+   mLoopStatus.clear();
+   if (!testLoopDir.empty())
+   {
+      if (!WriteFloatWav(path, snap->interleaved, snap->frames, snap->sampleRate))
+         mLoopStatus = "loop file could not be written";
+      return;
+   }
+   {
+      std::lock_guard<std::mutex> lock(gLoopWritesMutex);
+      gLoopWrites.insert(path);
+   }
+   std::thread([path, snap = std::move(snap)]() {
+      WriteFloatWav(path, snap->interleaved, snap->frames, snap->sampleRate);
+      std::lock_guard<std::mutex> lock(gLoopWritesMutex);
+      gLoopWrites.erase(path);
+   }).detach();
+}
+
 void LooperNode::VisitParams(ParamVisitor& v)
 {
    v.Int("take", take);
@@ -604,4 +1070,5 @@ void LooperNode::VisitParams(ParamVisitor& v)
    v.Float("volume", volume);
    v.Float("fadeIn", fadeIn);
    v.Float("fadeOut", fadeOut);
+   v.Text("loopFile", loopFile);
 }
