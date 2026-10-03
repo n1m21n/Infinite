@@ -508,8 +508,8 @@ void RunAutoLayout(const std::vector<int>& which)
          sz.x = sz.x > 1.0f ? sz.x : 240.0f; // canvas units
          sz.y = sz.y > 1.0f ? sz.y : 120.0f;
          ed::SetNodePosition(gn->NodeId(), ImVec2(x, y));
-         gn->liveX = x;
-         gn->liveY = y;
+         gn->spawnX = gn->liveX = x; // spawn too, so a later needsPosition re-place keeps it
+         gn->spawnY = gn->liveY = y;
          rowCentre[v] = y + sz.y * 0.5f;
          y += sz.y + 48.0f;
          width = std::max(width, sz.x);
@@ -533,6 +533,33 @@ void PumpAutoLayout()
    for (int v : gAutoLayoutPending)
       if (FindNodeByIndex(v) != nullptr)
          nodes.push_back(v);
+   // Turbo 0.48 (after upstream 4c25bfa): a big patch can take more than the
+   // first few frames before every node has a measured size; wait for them
+   // (bounded), then lay out with what there is (RunAutoLayout falls back to a
+   // default size for anything still unmeasured, e.g. a culled node).
+   static int sExtraFrames = 0;
+   if (gEditor != nullptr && sExtraFrames < 30)
+   {
+      ed::EditorContext* prev = ed::GetCurrentEditor();
+      ed::SetCurrentEditor(gEditor);
+      bool allMeasured = true;
+      for (int v : nodes)
+      {
+         const ImVec2 sz = ed::GetNodeSize(FindNodeByIndex(v)->NodeId());
+         if (!(sz.x > 1.0f && sz.x < 20000.0f && sz.y > 1.0f && sz.y < 20000.0f))
+         {
+            allMeasured = false;
+            break;
+         }
+      }
+      ed::SetCurrentEditor(prev);
+      if (!allMeasured)
+      {
+         sExtraFrames++;
+         return;
+      }
+   }
+   sExtraFrames = 0;
    gAutoLayoutPending.clear();
    RunAutoLayout(nodes);
    if (gAutoLayoutFit)

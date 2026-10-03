@@ -92,6 +92,16 @@ public:
    bool IsActive() const { return mStage != Stage::Idle; }
    float Level() const { return mLevel; }
 
+   // Turbo 0.48: a sustain-0 envelope that has decayed out is silent but would
+   // stay "active" until a note-off; a caller with no note-offs (one-shot
+   // decay) frees it with ForceIdle().
+   bool InSilentSustain() const { return mStage == Stage::Sustain && mSustainLevel <= 0.0f; }
+   void ForceIdle()
+   {
+      mStage = Stage::Idle;
+      mLevel = 0.0f;
+   }
+
 private:
    enum class Stage
    {

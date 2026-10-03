@@ -135,6 +135,11 @@ public:
    // so a loop dips at its seam instead of clicking. 0 / 0 = no fade.
    float fadeIn = 3.0f;
    float fadeOut = 3.0f;
+   // Turbo 0.48 (upstream port): playback start within [start, end] (0 = start, old
+   // behaviour), and note-voice decay/release in seconds (0 = held, old behaviour;
+   // upstream defaults to 2 s, which loads from its saved key).
+   float position = 0.0f;
+   float decay = 0.0f;
    bool loop = false;
    bool reverse = false;  // plays start<-end instead of start->end
    bool pingpong = false; // with loop on, bounces direction at each edge instead of wrapping

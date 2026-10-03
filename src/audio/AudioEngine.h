@@ -8,6 +8,7 @@
 #include "AudioBuffer.h"
 #include "AudioCaptureRing.h"
 #include "AudioNode.h"
+#include "ClipPeakRing.h"
 #include "CompensationDelay.h"
 #include "SamplePreviewPlayer.h"
 #include "Metronome.h"
@@ -128,15 +129,6 @@ struct ArrangeClipWindow
    uint64_t shape = 0;
 };
 
-// Turbo 0.43.1: one live-waveform measurement, audio -> main (SPSC ring).
-struct ArrangePeak
-{
-   uint64_t clipId = 0;
-   uint64_t shape = 0;
-   int bucket = 0;   // 1/16 beat from the clip start
-   float peak = 0.0f;
-};
-
 // One (lane, source node) pair: the source's pooled buffer, gated and
 // shaped by its windows (sorted, non-overlapping) and summed into the device
 // buffer with the lane's live gain/pan (AudioEngine::SetArrangeLaneMix).
@@ -150,9 +142,13 @@ struct ArrangeTerminal
    mutable int cursor = 0;    // audio thread scratch
    mutable int activeWindow = -1;
    mutable uint32_t seenSeekSerial = 0;
-   mutable int peakWindow = -1;   // live waveform accumulation
+   // Turbo 0.48 (upstream WP8): live waveform bucket in progress, flushed
+   // into AudioEngine::ClipPeaks() once the playhead leaves it.
+   mutable uint64_t peakClipId = 0;
+   mutable uint64_t peakShape = 0;
    mutable int peakBucket = -1;
-   mutable float peakValue = 0.0f;
+   mutable float peakMin = 0.0f;
+   mutable float peakMax = 0.0f;
 };
 
 // A full audio-thread topology: nodes in a valid topological order (sources
@@ -292,19 +288,8 @@ public:
    {
       return (slot >= 0 && slot < kMaxArrangeLanes) ? mLanePeak[slot].load(std::memory_order_relaxed) : 0.0f;
    }
-   // Main thread: drains the live clip-waveform measurements.
-   template <class Fn>
-   void DrainArrangePeaks(Fn&& fn)
-   {
-      uint32_t head = mPeakHead.load(std::memory_order_relaxed);
-      const uint32_t tail = mPeakTail.load(std::memory_order_acquire);
-      while (head != tail)
-      {
-         fn(mPeakRing[head % kPeakRingSize]);
-         head++;
-      }
-      mPeakHead.store(head, std::memory_order_release);
-   }
+   // Live clip-waveform buckets (audio thread writes, main thread reads).
+   ClipPeakRing& ClipPeaks() { return mClipPeaks; }
 
    // Turbo 0.43.1: offline render. While set, the device callback outputs
    // silence and leaves the clock alone; the main thread drives the clock
@@ -323,18 +308,7 @@ private:
    std::atomic<bool> mTimelineMode { false };
    std::atomic<bool> mOffline { false };
    std::atomic<int> mInProcess { 0 };
-   static constexpr uint32_t kPeakRingSize = 8192;
-   ArrangePeak mPeakRing[kPeakRingSize];
-   std::atomic<uint32_t> mPeakHead { 0 };
-   std::atomic<uint32_t> mPeakTail { 0 };
-   void PushPeak(const ArrangePeak& p)
-   {
-      const uint32_t tail = mPeakTail.load(std::memory_order_relaxed);
-      if (tail - mPeakHead.load(std::memory_order_acquire) >= kPeakRingSize)
-         return; // full: drop (the waveform just fills in on the next pass)
-      mPeakRing[tail % kPeakRingSize] = p;
-      mPeakTail.store(tail + 1, std::memory_order_release);
-   }
+   ClipPeakRing mClipPeaks;
    std::atomic<float> mLaneGain[kMaxArrangeLanes] = {};
    std::atomic<float> mLanePanL[kMaxArrangeLanes] = {};
    std::atomic<float> mLanePanR[kMaxArrangeLanes] = {};

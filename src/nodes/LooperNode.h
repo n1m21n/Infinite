@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <memory>
 #include <string>
 
@@ -38,7 +39,10 @@ struct LooperCore;
 class LooperNode : public INode, public IAudioSource
 {
 public:
-   enum LengthMode { kLengthBars = 0, kLengthSubBar = 1, kLengthFree = 2 };
+   // Turbo 0.48: kLengthDivision, a take of one MusicTime division (upstream's
+   // "take": 4 bars .. 1/64, dotted and triplet included), appended so saved
+   // modes keep their meaning.
+   enum LengthMode { kLengthBars = 0, kLengthSubBar = 1, kLengthFree = 2, kLengthDivision = 3 };
    enum Direction { kForward = 0, kReverse = 1, kPingPong = 2 };
    enum State { kIdle = 0, kArmed = 1, kRecording = 2, kPlaying = 3, kOverdubbing = 4, kStopped = 5 };
 
@@ -65,6 +69,13 @@ public:
    void SetPlay(bool on);
    void SetOverdub(bool on);
    void Clear();
+   // Turbo 0.48: a button press resolved on the audio thread against its own
+   // state (REC toggles the take, PLAY toggles playback, DUB toggles
+   // overdub), so CV triggers in quick succession never act on a stale
+   // published state: every trigger is one press.
+   void PressRecord();
+   void PressPlay();
+   void PressOverdub();
    // Layer history (main thread). Undo while overdubbing first closes the
    // layer, then removes it.
    void UndoLayer();
@@ -77,6 +88,8 @@ public:
    bool ExportWav(const std::string& path, std::string& error);
    const std::string& StatusText() const { return mStatus; }
    float ArmedSeconds() const { return mArmedSec; }
+   // Turbo 0.48: > 0 while a quantized PLAY / DUB waits for its grid line.
+   float PlayWaitSeconds() const { return mPlayWaitSec; }
 
    // Called by main.cpp's ReloadDerivedState after params were loaded:
    // while a patch is being restored (file open, undo) the node re-adopts
@@ -115,6 +128,29 @@ public:
    float latencyOffsetMs = 0.0f; // -100..+300
    float CompensationMs() const { return mCompMs; }
 
+   // Turbo 0.48 (from upstream): take length as a MusicTime::RateDivision
+   // index (kLengthDivision), and sampler-style playback of the held loop.
+   // Rate = speed * 2^((pitch + finetune / 100) / 12): varispeed like
+   // upstream (pitch and speed both change the playback rate, so the loop
+   // drifts against the transport away from 1.0, and overdub is paused there:
+   // layers are only written at the speed they were recorded at). A negative
+   // speed flips Forward / Reverse (Ping-pong already walks both ways).
+   // fadeIn / fadeOut (ms) shape every pass through the loop (PassFade.h);
+   // volume scales the whole output (thru + loop). Defaults are the old sound.
+   int takeDivision = 2;   // MusicTime::k1Bar
+   float speed = 1.0f;     // -2..2
+   float pitch = 0.0f;     // semitones, -24..24
+   float finetune = 0.0f;  // cents, -50..50
+   float fadeIn = 0.0f;    // ms, 0..250
+   float fadeOut = 0.0f;   // ms, 0..250
+   float volume = 1.0f;    // 0..2, output level
+   static float RateFor(float pitchSemis, float fineCents, float spd)
+   {
+      return spd * std::pow(2.0f, (pitchSemis + fineCents / 100.0f) / 12.0f);
+   }
+   float Rate() const { return RateFor(pitch, finetune, speed); }
+   bool AtUnity() const { return std::fabs(Rate() - 1.0f) < 1e-4f; }
+
    // Identity of the loop audio across respawns, and its WAV sidecar.
    std::string loopId;
    std::string loopFile;
@@ -128,6 +164,7 @@ private:
    std::shared_ptr<LooperCore> mCore;
    std::string mStatus;
    float mArmedSec = 0.0f;
+   float mPlayWaitSec = 0.0f;
    int mLastCookFrame = -1;
    int mState = kIdle;
    float mLengthSec = 0.0f;

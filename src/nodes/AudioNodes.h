@@ -216,11 +216,29 @@ public:
    float gainDb = 0.0f;
    int firstChannel = 0; // 0-based device input channel (Turbo)
    bool mono = false;    // one channel to both sides instead of a pair
+   // Turbo 0.48: upstream's key. 0 = stereo pair (firstChannel, firstChannel+1;
+   // upstream has only 1+2), k >= 1 = mono input k (1-based, as upstream),
+   // kChannelModeMix = every input summed to mono. kChannelModeLegacy (the
+   // default) means "derive from firstChannel/mono", so older Turbo patches
+   // load unchanged; it is resolved on the first cook.
+   static constexpr int kChannelModeMix = -1;
+   static constexpr int kChannelModeLegacy = -2;
+   int channelMode = kChannelModeLegacy;
+   // Turbo 0.48: the input device the channel choice was made on. Only a hint:
+   // Turbo opens one device (Settings > Audio), the body warns on mismatch.
+   std::string deviceName;
+
+   // Main thread: keeps channelMode and the legacy firstChannel/mono keys in
+   // step (a set_param on either side wins). Called each cook and by the UI.
+   void SyncChannelKeys();
 
 private:
    std::unique_ptr<AudioCaptureNode> mAudioNode;
    int mLastCookFrame = -1;
    float mLevel = 0.0f;
+   int mSyncedFirst = -1000; // -1000 = not synced yet (first cook)
+   bool mSyncedMono = false;
+   int mSyncedMode = kChannelModeLegacy;
 };
 
 // Terminal node: no audio-thread counterpart of its own. It exists purely as

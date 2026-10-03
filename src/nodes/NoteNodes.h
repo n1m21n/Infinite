@@ -683,6 +683,7 @@ public:
    float rateSeconds = 0.2f;
    int maxStep = 4; // semitones, max wander per step
    bool useGlobalScale = true; // follow Transport key/scale by default
+   float groove = 0.0f; // Turbo 0.48: 0..1 swing, delays every odd step by groove * 0.5 * rateBeats
 
    int LastNote() const; // main-thread readout for the visualizer
 

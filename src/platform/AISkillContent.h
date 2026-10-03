@@ -88,7 +88,7 @@ current patch as text.
 | 3D | Geometry, Model 3D, Text 3D, Material, Instance on Points, Particle System, Camera, Light, HDRI, Render 3D |
 | Modulators | LFO, Envelope, Random, Drift, Pattern, Math, Smoothing, Range to Range, Audio Analyze (audio to CV), Image Analyze, MIDI CC, Macro Knob / Slider / XY |
 | Sound | Oscillator, Analog, Wavetable, Sampler, MPC, Granular, Slicer, Audio File, Audio In, Plugin (VST3), Mixer, Super Mixer, Looper, Audio Out |
-| Notes | Keyboard, Note Sequencer, Drum Sequencer, Arpeggiator, Chord Progression, Quantizer, MIDI Notes |
+| Notes | Keyboard, Note Sequencer, Drum Sequencer, Arpeggiator, Chord Progression, MIDI File, Quantizer, MIDI Notes |
 | Performance | Clip Matrix (+ Clip Matrix Out), Transport Control, Timeline |
 
 )SKILL"
@@ -154,13 +154,25 @@ user wants something to play live, trigger clips, loop or mix. Keys below are se
 
 **MPC** (16 sample pads) and **VMPC** (16 video-clip pads): `pad<n>_path` loads pad n (0-15),
 `pad<n>_mode` 0 one shot, 1 gate, 2 loop toggle; MPC also `_volume` / `_pitch` / `_pan` /
-`_start` / `_end`, VMPC `_start` / `_end` / `_speed`. Play with `pads {"index":N,"pad":0}`
-(`down` / `up` for gate pads), or notes (base note 36 = pad 0). **MPC Out** (wired from the MPC's
-output) picks one pad's own audio for its own effect chain.
+`_start` / `_end` / `_speed` (-2..2, negative = backwards) / `_fine` (cents) / `_fadein` /
+`_fadeout` (ms, every pass) / `_sync` (0 synced, 1 free) / `_div` (division index, 6 = 1/4),
+VMPC `_start` / `_end` / `_speed`. A synced pad fires on the next line of its division; a synced
+loop pad restarts on every line. Play with `pads {"index":N,"pad":0}` (`down` / `up` for gate
+pads; `"action":"state"` with `speed` / `fine` / `fade_in` / `fade_out` / `sync` / `division`
+only sets them), or notes (base note 36 = pad 0). **MPC Out** (wired from the MPC's output) picks
+one pad's own audio for its own effect chain.
 
-**Looper** (audio in, bar-synced): `bars`, `syncStart`, `direction`, `level`; drive it with
-`looper {"index":N,"action":"record"}` then `stop_record` / `play` / `overdub` / `clear` /
-`undo`.
+**Looper** (audio in): one "take length" menu: free (REC again closes it), 1/16 to 1/2 bar,
+1 to 32 bars. From the tools: `looper {"index":N,"length":"2 bars","action":"record"}`, then
+`stop_record` (free takes), `play`, `stop`, `overdub`, `stop_overdub`, `clear`, `undo`, `redo`,
+`state`. With `in_time` on (default, key `syncStart`) and the transport playing, REC, PLAY and DUB
+wait for the next bar line (the take length if shorter) and start exactly on it; pressed just
+after a line they start at once, in phase. `state` reports `waiting_s` while one waits. So: start
+the transport first, then record or play. Saved keys: `lengthMode` (0 bars, 1 sub-bar, 2 free, 3
+division), `bars`, `subDivision` (0 = 1/2 .. 3 = 1/16 bar), `takeDivision`, `syncStart`, `loop`,
+`direction`, `thru`, `level`, `speed` / `pitch` / `finetune` (varispeed: away from 1x the loop
+drifts and overdub pauses), `fadeIn` / `fadeOut` (ms per pass), `volume`. A Macro Trigger wired
+to REC / PLAY / DUB or to an MPC pad presses it on every trigger.
 
 **Super Mixer** (16 channels): per channel `trim<n>` / `gain<n>` / `pan<n>` / `mute<n>` /
 `solo<n>` / `eqLow<n>` / `eqMid<n>` / `eqHigh<n>`, plus `master`. Every control is modulatable.
@@ -196,6 +208,14 @@ single steps with `set_param` on `lane<L>_step<S>` (velocity 0..1, 0 = off).
 13sus4, 9#11, m(maj9)), altered dominants (7b9, 7#9, 7#11, 7b13, 7alt, m7b9) and voicings
 (quartal, so what). From the tools, write each chord as `mask<N>`: bit k = key k counted up from
 C of `baseOctave`, two octaves (bits 0-23), e.g. C13 = keys 0,4,7,10,14,21. Chord names follow.
+
+**MIDI File** (Notes): plays a Standard MIDI File (.mid, format 0/1) as notes, locked to the
+transport in beats, so it follows the app tempo (not the file's). Settings: `path` (the file;
+setting it loads it), `track` (0 all, N = track N), `channel` (0 all, 1-16), `transpose`
+(semitones), `velocity` (scale 0-2), `loop`, `loopBars` (0 = file length rounded up to bars),
+`quantize` (start grid as a rate division, 2 = 1 bar default; playback starts, restarts and
+loops on it), `play`. Wire its note output into a synth. The body shows the file's tempo with a
+button that copies it to the transport; dropping a .mid on the canvas spawns one.
 
 **Other Turbo nodes**: OSC to CV (8 OSC addresses to 8 CV outputs), Plugin (VST3 instruments and
 effects; settings `plugin_id` etc., the plugin state is saved with the patch), Chord Progression

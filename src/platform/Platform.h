@@ -211,6 +211,8 @@ namespace Platform
    std::string OpenAudioDialog();
    // Turbo 0.44: audio, video or image (Clip Matrix cells).
    std::string OpenMediaDialog();
+   // Turbo 0.48: Standard MIDI Files (MIDI File node).
+   std::string OpenMidiDialog();
 
    bool AudioStart(std::string& outError);
    void AudioStop();

@@ -150,6 +150,8 @@ public:
       mVoices.SetADSR(2.0f, 0.0f, 1.0f, 15.0f);
       mSelfEnv.SetSampleRate(sampleRate);
       mSelfEnv.SetADSR(2.0f, 0.0f, 1.0f, 15.0f);
+      mLastDecaySec = -1.0f; // re-apply the decay param on the next block
+      mPosParamSeen = false;
 
       if (mRecordBuffer.empty())
          mRecordBuffer.resize((size_t)kMaxRecordSeconds * kMaxRecordSampleRate);
@@ -169,9 +171,11 @@ public:
    // Main thread only, called once per frame from CookIfNeeded.
    void DrainRetired() { mSampleSlot.DrainRetired(); }
 
-   void PushParams(float pitch, float finetune, float speed, float volume, float start, float end, float fadeIn,
-                   float fadeOut, bool loop, bool reverse, bool pingpong)
+   void PushParams(float pitch, float finetune, float speed, float volume, float start, float end, float position,
+                   float decay, float fadeIn, float fadeOut, bool loop, bool reverse, bool pingpong)
    {
+      mPosition.store(position, std::memory_order_relaxed);
+      mDecay.store(decay, std::memory_order_relaxed);
       mPitch.store(pitch, std::memory_order_relaxed);
       mFinetune.store(finetune, std::memory_order_relaxed);
       mSpeed.store(speed, std::memory_order_relaxed);
@@ -271,6 +275,36 @@ public:
       if (mActiveBuffer == nullptr || mActiveBuffer->numFrames <= 0)
          return;
 
+      // Turbo 0.48 (upstream port): note voices decay to silence over `decay` seconds.
+      // 0 keeps the old held envelope (fixed 2 ms attack, full sustain, 15 ms release).
+      const float decaySec = mDecay.load(std::memory_order_relaxed);
+      if (decaySec != mLastDecaySec)
+      {
+         mLastDecaySec = decaySec;
+         if (decaySec > 0.0f)
+         {
+            const float decayMs = std::max(10.0f, decaySec * 1000.0f);
+            mVoices.SetADSR(2.0f, decayMs, 0.0f, decayMs);
+         }
+         else
+            mVoices.SetADSR(2.0f, 0.0f, 1.0f, 15.0f);
+      }
+
+      // Turbo 0.48 (upstream port): moving `position` (knob drag or modulation) scrubs a
+      // sounding self voice to the new start point. Only a change of the raw param
+      // counts: start/end moving (e.g. an LFO on start) must not reset the playhead.
+      {
+         const float rawPos = mPosition.load(std::memory_order_relaxed);
+         if (mPosParamSeen && std::fabs(rawPos - mLastPosParam) > 1e-4f && mSelfEnv.IsActive())
+         {
+            const float curStartFrac = mStart.load(std::memory_order_relaxed);
+            const float curEndFrac = std::max(curStartFrac + 0.001f, mEnd.load(std::memory_order_relaxed));
+            mSelfPos = (double)std::clamp(rawPos, curStartFrac, curEndFrac) * mActiveBuffer->numFrames;
+         }
+         mLastPosParam = rawPos;
+         mPosParamSeen = true;
+      }
+
       // The audition button's Stop always releases the self voice, whoever
       // currently owns it.
       if (mStopRequested.exchange(false, std::memory_order_acq_rel))
@@ -365,6 +399,13 @@ public:
 
             const float rate = NoteToRate(mVoices.NoteAt(v), pitchSemis + mVoiceBend[v]) * std::fabs(speed);
             const float env = mVoices.EnvelopeAt(v).Process();
+            // Turbo 0.48: decay > 0 (sustain 0) has faded the voice out, free it
+            // without waiting for a note-off.
+            if (mVoices.EnvelopeAt(v).InSilentSustain())
+            {
+               mVoices.EnvelopeAt(v).ForceIdle();
+               continue;
+            }
             const float s = ReadSample(*mActiveBuffer, mVoicePos[v]) *
                             FadeGain(mVoicePos[v], startPos, endPos, (float)mVoiceDir[v] * speedSign, fadeInMs,
                                      fadeOutMs, rate, mSampleRate) *
@@ -458,6 +499,17 @@ private:
       return a + (b - a) * frac;
    }
 
+   // Turbo 0.48 (upstream port): where an ordinary trigger starts. `position` (clamped
+   // into the range) is the start point; at 0 (or anywhere at/below start) a reversed
+   // voice starts from the end as before, so old patches play unchanged.
+   float StartFracFor(float initialDirSign, float startFrac, float endFrac) const
+   {
+      const float posFrac = std::clamp(mPosition.load(std::memory_order_relaxed), startFrac, endFrac);
+      if (initialDirSign < 0.0f)
+         return (posFrac <= startFrac) ? endFrac : posFrac;
+      return posFrac;
+   }
+
    // overrideStartFrac >= 0 forces the trigger position; < 0 uses the
    // configured start/end/reverse range like an ordinary note-on. Note-only:
    // always allocates through VoiceAllocator's normal polyphonic round-robin.
@@ -477,7 +529,7 @@ private:
       if (overrideStartFrac >= 0.0f)
          frac = std::clamp(overrideStartFrac, startFrac, endFrac);
       else
-         frac = initialDirSign < 0.0f ? endFrac : startFrac;
+         frac = StartFracFor(initialDirSign, startFrac, endFrac);
 
       mVoicePos[idx] = mActiveBuffer != nullptr ? (double)frac * mActiveBuffer->numFrames : 0.0;
       mVoiceNote[idx] = note;
@@ -520,7 +572,7 @@ private:
       if (overrideStartFrac >= 0.0f)
          frac = std::clamp(overrideStartFrac, startFrac, endFrac); // manual preview click - never start outside the range
       else
-         frac = initialDirSign < 0.0f ? endFrac : startFrac;
+         frac = StartFracFor(initialDirSign, startFrac, endFrac);
 
       mSelfPos = mActiveBuffer != nullptr ? (double)frac * mActiveBuffer->numFrames : 0.0;
       mSelfEnv.NoteOn();
@@ -565,6 +617,11 @@ private:
    std::atomic<float> mVolume { 0.8f };
    std::atomic<float> mFadeIn { 3.0f };
    std::atomic<float> mFadeOut { 3.0f };
+   std::atomic<float> mPosition { 0.0f };
+   std::atomic<float> mDecay { 0.0f };
+   float mLastDecaySec = -1.0f; // audio thread
+   float mLastPosParam = 0.0f; // audio thread, raw `position` of the last block
+   bool mPosParamSeen = false; // audio thread
    std::atomic<float> mStart { 0.0f };
    std::atomic<float> mEnd { 1.0f };
    std::atomic<bool> mLoop { false };
@@ -586,7 +643,10 @@ void SamplerNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioSamplerNode>();
-   mAudioNode->PushParams(pitch, finetune, speed, volume, start, end, fadeIn, fadeOut, loop, reverse, pingpong);
+   // Turbo 0.48: `position` goes raw; the audio thread clamps it into the range
+   // (with end >= start + 0.001) and scrubs only when the raw value changes.
+   mAudioNode->PushParams(pitch, finetune, speed, volume, start, end, position, decay, fadeIn,
+                          fadeOut, loop, reverse, pingpong);
    mAudioNode->DrainRetired();
 
    float playhead = 0.0f;
@@ -612,6 +672,8 @@ void SamplerNode::VisitParams(ParamVisitor& v)
    v.Bool("loop", loop);
    v.Bool("reverse", reverse);
    v.Bool("pingpong", pingpong);
+   v.Float("position", position); // Turbo 0.48: appended, save-compat
+   v.Float("decay", decay);
 }
 
 AudioNode* SamplerNode::GetAudioNode()
@@ -729,6 +791,7 @@ void SamplerNode::FinishBuffer(Platform::SampleBuffer* decoded, const std::strin
    // A fresh buffer has neither been scrubbed nor range-trimmed yet.
    start = 0.0f;
    end = 1.0f;
+   position = 0.0f;
 }
 
 void SamplerNode::ReloadFromPath()
@@ -737,8 +800,10 @@ void SamplerNode::ReloadFromPath()
    {
       float savedStart = start;
       float savedEnd = end;
+      const float savedPos = position;
       LoadFile(mFilePath);
       start = savedStart;
       end = savedEnd;
+      position = savedPos; // restored verbatim; CookIfNeeded clamps it into [start, end]
    }
 }

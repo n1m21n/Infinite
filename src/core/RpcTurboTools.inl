@@ -94,17 +94,94 @@ bool HandleRpcCommandTurbo(const std::string& method, const nlohmann::json& para
       const int pad = std::clamp(params.value("pad", 0), 0, 15);
       const float vel = std::clamp(params.value("velocity", 1.0f), 0.0f, 1.0f);
       const std::string action = params.value("action", std::string("hit"));
+      // Turbo 0.48: optional per-pad settings (MPC), applied before the action.
+      // Saved as pad<n>_speed / _fine / _fadein / _fadeout / _sync / _div.
+      // Everything (action included) is validated first: a bad param errors
+      // out with no undo checkpoint and nothing changed.
+      const bool actionOk = action == "hit" || action == "down" || action == "up" || action == "state" ||
+                            (action == "stop_all" && vmpc != nullptr);
+      if (!actionOk)
+      {
+         outError = "action: hit, down, up, state (VMPC also stop_all)";
+         return false;
+      }
+      struct FloatSet
+      {
+         const char* key;
+         float lo, hi;
+         bool has = false;
+         float value = 0.0f;
+      };
+      FloatSet padFloats[] = { { "speed", -2.0f, 2.0f }, { "fine", -50.0f, 50.0f },
+                               { "fade_in", 0.0f, 250.0f }, { "fade_out", 0.0f, 250.0f } };
+      bool hasSync = false, syncOn = false;
+      int newDiv = -1;
+      for (FloatSet& f : padFloats)
+         if (params.contains(f.key))
+         {
+            if (mpc == nullptr || !params[f.key].is_number())
+            {
+               outError = std::string(f.key) + (mpc == nullptr ? ": MPC only" : ": a number");
+               return false;
+            }
+            f.has = true;
+            f.value = std::clamp(params[f.key].get<float>(), f.lo, f.hi);
+         }
+      if (params.contains("sync"))
+      {
+         if (mpc == nullptr || !params["sync"].is_boolean())
+         {
+            outError = mpc == nullptr ? "sync: MPC only" : "sync: true or false";
+            return false;
+         }
+         hasSync = true;
+         syncOn = params["sync"].get<bool>();
+      }
+      if (params.contains("division"))
+      {
+         if (params["division"].is_number_integer())
+            newDiv = params["division"].get<int>();
+         else if (params["division"].is_string())
+            for (int i = 0; i < MusicTime::kNumRateDivisions; i++)
+               if (params["division"].get<std::string>() == MusicTime::RateDivisionName(i))
+                  newDiv = i;
+         if (mpc == nullptr || newDiv < 0 || newDiv >= MusicTime::kNumRateDivisions)
+         {
+            outError = mpc == nullptr ? "division: MPC only"
+                                      : "division: a MusicTime division name (\"1/4\", \"1/8T\", \"1 bar\"...) or index 0..18";
+            return false;
+         }
+      }
+      const bool anySet = hasSync || newDiv >= 0 || padFloats[0].has || padFloats[1].has || padFloats[2].has ||
+                          padFloats[3].has;
+      if (anySet)
+      {
+         PushUndoCheckpoint(); // validated: one checkpoint before the changes
+         float* dsts[] = { &mpc->padSpeed[pad], &mpc->padFine[pad], &mpc->padFadeIn[pad], &mpc->padFadeOut[pad] };
+         for (int i = 0; i < 4; i++)
+            if (padFloats[i].has)
+               *dsts[i] = padFloats[i].value;
+         if (hasSync)
+            mpc->padSync[pad] = syncOn ? MpcNode::kSynced : MpcNode::kFree;
+         if (newDiv >= 0)
+            mpc->padDiv[pad] = newDiv;
+         gPatchDirty = true;
+      }
       auto event = [&](bool down) { if (mpc) mpc->PadEvent(pad, down, vel); else vmpc->PadEvent(pad, down, vel); };
       if (action == "hit") { event(true); event(false); }
       else if (action == "down") event(true);
       else if (action == "up") event(false);
-      else if (action == "stop_all" && vmpc) vmpc->StopAll();
-      else
-      {
-         outError = "action: hit, down, up (VMPC also stop_all)";
-         return false;
-      }
+      else if (action == "stop_all") vmpc->StopAll();
       outResult = { { "pad", pad }, { "playing", mpc ? mpc->PadPlaying(pad) : vmpc->PadPlaying(pad) } };
+      if (mpc != nullptr)
+      {
+         outResult["speed"] = mpc->padSpeed[pad];
+         outResult["fine"] = mpc->padFine[pad];
+         outResult["fade_in"] = mpc->padFadeIn[pad];
+         outResult["fade_out"] = mpc->padFadeOut[pad];
+         outResult["sync"] = mpc->padSync[pad] == MpcNode::kSynced;
+         outResult["division"] = MusicTime::RateDivisionName(mpc->padDiv[pad]);
+      }
       return true;
    }
    if (method == "looper")
@@ -117,6 +194,131 @@ bool HandleRpcCommandTurbo(const std::string& method, const nlohmann::json& para
          return false;
       }
       const std::string a = params.value("action", std::string("state"));
+      // Turbo 0.48: optional playback settings, applied before the action
+      // (saved keys speed, pitch, finetune, fadeIn, fadeOut, volume,
+      // lengthMode 3 = Division with takeDivision). Everything (action
+      // included) is validated first: a bad param errors out with no undo
+      // checkpoint and nothing changed.
+      static const char* kActions[] = { "record", "stop_record", "play", "stop", "overdub",
+                                        "stop_overdub", "clear", "undo", "redo", "state" };
+      if (std::find(std::begin(kActions), std::end(kActions), a) == std::end(kActions))
+      {
+         outError = "action: record, stop_record, play, stop, overdub, stop_overdub, clear, undo, redo or state";
+         return false;
+      }
+      struct FloatSet
+      {
+         const char* key;
+         float* dst;
+         float lo, hi;
+         bool has = false;
+         float value = 0.0f;
+      };
+      FloatSet lpFloats[] = { { "speed", &lp->speed, -2.0f, 2.0f },       { "pitch", &lp->pitch, -24.0f, 24.0f },
+                              { "finetune", &lp->finetune, -50.0f, 50.0f }, { "fade_in", &lp->fadeIn, 0.0f, 250.0f },
+                              { "fade_out", &lp->fadeOut, 0.0f, 250.0f },  { "volume", &lp->volume, 0.0f, 2.0f } };
+      bool anySet = false;
+      for (FloatSet& f : lpFloats)
+         if (params.contains(f.key))
+         {
+            if (!params[f.key].is_number())
+            {
+               outError = std::string(f.key) + ": a number";
+               return false;
+            }
+            f.has = anySet = true;
+            f.value = std::clamp(params[f.key].get<float>(), f.lo, f.hi);
+         }
+      int newMode = -1, newDiv = -1, newBars = -1, newSub = -1, newInTime = -1;
+      // Turbo 0.48: `length` as the take-length menu reads: "free", "1/16 bar",
+      // "1/8 bar", "1/4 bar", "1/2 bar", "N bars" (or a number of bars).
+      if (params.contains("length"))
+      {
+         const json& l = params["length"];
+         std::string t = l.is_string() ? RpcNorm(l.get<std::string>()) : std::string();
+         int nb = l.is_number_integer() ? l.get<int>() : -1;
+         if (t == "free")
+            newMode = LooperNode::kLengthFree;
+         else if (t == "1/2bar" || t == "1/2")
+            newMode = LooperNode::kLengthSubBar, newSub = 0;
+         else if (t == "1/4bar" || t == "1/4" || t == "1beat")
+            newMode = LooperNode::kLengthSubBar, newSub = 1;
+         else if (t == "1/8bar" || t == "1/8")
+            newMode = LooperNode::kLengthSubBar, newSub = 2;
+         else if (t == "1/16bar" || t == "1/16")
+            newMode = LooperNode::kLengthSubBar, newSub = 3;
+         else
+         {
+            if (nb < 0 && !t.empty())
+            {
+               const size_t digits = t.find_first_not_of("0123456789");
+               if (digits > 0 && (digits == std::string::npos || t.compare(digits, std::string::npos, "bar") == 0 ||
+                                  t.compare(digits, std::string::npos, "bars") == 0))
+                  nb = std::atoi(t.c_str());
+            }
+            if (nb < 1 || nb > 32)
+            {
+               outError = "length: \"free\", \"1/16 bar\", \"1/8 bar\", \"1/4 bar\", \"1/2 bar\" or 1..32 bars (\"2 bars\" or 2)";
+               return false;
+            }
+            newMode = LooperNode::kLengthBars;
+            newBars = nb;
+         }
+         anySet = true;
+      }
+      if (params.contains("in_time"))
+      {
+         if (!params["in_time"].is_boolean())
+         {
+            outError = "in_time: true or false";
+            return false;
+         }
+         newInTime = params["in_time"].get<bool>() ? 1 : 0;
+         anySet = true;
+      }
+      if (params.contains("take"))
+      {
+         // "free", "bars" (keeps `bars`), or a MusicTime division name / index.
+         const json& t = params["take"];
+         const std::string name = t.is_string() ? t.get<std::string>() : std::string();
+         int d = t.is_number_integer() ? t.get<int>() : -1;
+         for (int i = 0; i < MusicTime::kNumRateDivisions && d < 0 && !name.empty(); i++)
+            if (name == MusicTime::RateDivisionName(i))
+               d = i;
+         if (name == "free")
+            newMode = LooperNode::kLengthFree;
+         else if (name == "bars")
+            newMode = LooperNode::kLengthBars;
+         else if (d >= 0 && d < MusicTime::kNumRateDivisions)
+         {
+            newMode = LooperNode::kLengthDivision;
+            newDiv = d;
+         }
+         else
+         {
+            outError = "take: \"free\", \"bars\" or a MusicTime division (\"1 bar\", \"2 bars\", \"1/4\", \"1/8T\"...)";
+            return false;
+         }
+         anySet = true;
+      }
+      if (anySet)
+      {
+         PushUndoCheckpoint(); // validated: one checkpoint before the changes
+         for (const FloatSet& f : lpFloats)
+            if (f.has)
+               *f.dst = f.value;
+         if (newMode >= 0)
+            lp->lengthMode = newMode;
+         if (newDiv >= 0)
+            lp->takeDivision = newDiv;
+         if (newBars >= 0)
+            lp->bars = newBars;
+         if (newSub >= 0)
+            lp->subDivision = newSub;
+         if (newInTime >= 0)
+            lp->syncStart = newInTime == 1;
+         gPatchDirty = true;
+      }
       if (a == "record") lp->SetRecord(true);
       else if (a == "stop_record") lp->SetRecord(false);
       else if (a == "play") lp->SetPlay(true);
@@ -126,13 +328,34 @@ bool HandleRpcCommandTurbo(const std::string& method, const nlohmann::json& para
       else if (a == "clear") lp->Clear();
       else if (a == "undo") lp->UndoLayer();
       else if (a == "redo") lp->RedoLayer();
-      else if (a != "state")
-      {
-         outError = "action: record, stop_record, play, stop, overdub, stop_overdub, clear, undo, redo or state";
-         return false;
-      }
       outResult = { { "recording", lp->IsRecordingOrArmed() }, { "playing", lp->IsPlaying() },
                     { "overdubbing", lp->IsOverdubbing() }, { "has_loop", lp->HasLoop() } };
+      static const char* kModes[] = { "bars", "sub-bar", "free", "division" };
+      outResult["length_mode"] = kModes[std::clamp(lp->lengthMode, 0, 3)];
+      if (lp->lengthMode == LooperNode::kLengthDivision)
+         outResult["take"] = MusicTime::RateDivisionName(lp->takeDivision);
+      outResult["speed"] = lp->speed;
+      outResult["pitch"] = lp->pitch;
+      outResult["finetune"] = lp->finetune;
+      outResult["fade_in"] = lp->fadeIn;
+      outResult["fade_out"] = lp->fadeOut;
+      outResult["volume"] = lp->volume;
+      outResult["at_unity"] = lp->AtUnity(); // false: drifts against the transport, overdub paused
+      {
+         static const char* kSubs[] = { "1/2 bar", "1/4 bar", "1/8 bar", "1/16 bar" };
+         std::string len;
+         if (lp->lengthMode == LooperNode::kLengthFree)
+            len = "free";
+         else if (lp->lengthMode == LooperNode::kLengthSubBar)
+            len = kSubs[std::clamp(lp->subDivision, 0, 3)];
+         else if (lp->lengthMode == LooperNode::kLengthBars)
+            len = std::to_string(lp->bars) + (lp->bars == 1 ? " bar" : " bars");
+         else
+            len = std::string(MusicTime::RateDivisionName(lp->takeDivision)) + " (division)";
+         outResult["length"] = len;
+      }
+      outResult["in_time"] = lp->syncStart;
+      outResult["waiting_s"] = lp->CurrentState() == LooperNode::kArmed ? lp->ArmedSeconds() : lp->PlayWaitSeconds();
       return true;
    }
    if (method == "drum_pattern")

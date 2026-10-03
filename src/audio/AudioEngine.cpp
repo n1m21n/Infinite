@@ -430,27 +430,38 @@ void AudioEngine::MixArrangeTerminals(ProcessList* list, AudioBuffer& deviceBuff
          const ArrangeClipWindow& cw = w[cursor];
          if (beat < cw.startBeat || beat >= cw.endBeat)
          {
-            if (t.peakWindow >= 0 && t.peakWindow < t.numWindows && t.peakBucket >= 0)
-               PushPeak({ w[t.peakWindow].clipId, w[t.peakWindow].shape, t.peakBucket, t.peakValue });
-            t.peakWindow = -1;
+            // Left every window: flush the bucket in progress, or a clip
+            // followed by a gap keeps a flat notch at its right edge.
+            if (t.peakClipId != 0)
+            {
+               if (t.peakBucket >= 0)
+                  mClipPeaks.Write({ t.peakClipId, t.peakShape, t.peakBucket, t.peakMin, t.peakMax });
+               t.peakClipId = 0;
+               t.peakBucket = -1;
+            }
             continue;
          }
-         // Live waveform: peak per 1/16 beat of the clip, published when
-         // the bucket changes.
+         // Turbo 0.48 (upstream WP8): live waveform, signed min/max per 1/16
+         // beat of the clip, measured before fades and gains so editing
+         // those keeps what is drawn. Only complete buckets are published.
          {
-            const int bucket = (int)((beat - cw.startBeat) * 4.0);
-            if (t.peakWindow != cursor || t.peakBucket != bucket)
+            const int bucket = (int)((beat - cw.startBeat) * kClipPeakBucketsPerBeat);
+            if (bucket != t.peakBucket || cw.clipId != t.peakClipId)
             {
-               if (t.peakWindow >= 0 && t.peakWindow < t.numWindows && t.peakBucket >= 0)
-                  PushPeak({ w[t.peakWindow].clipId, w[t.peakWindow].shape, t.peakBucket, t.peakValue });
-               t.peakWindow = cursor;
+               if (t.peakBucket >= 0 && t.peakClipId != 0)
+                  mClipPeaks.Write({ t.peakClipId, t.peakShape, t.peakBucket, t.peakMin, t.peakMax });
+               t.peakClipId = cw.clipId;
+               t.peakShape = cw.shape;
                t.peakBucket = bucket;
-               t.peakValue = 0.0f;
+               t.peakMin = 0.0f;
+               t.peakMax = 0.0f;
             }
-            float m = std::fabs(src.channels[0][i]);
-            if (numChannels > 1)
-               m = std::max(m, std::fabs(src.channels[1][i]));
-            t.peakValue = std::max(t.peakValue, m);
+            for (int ch = 0; ch < std::min(numChannels, 2); ch++)
+            {
+               const float v = src.channels[ch][i];
+               if (v < t.peakMin) t.peakMin = v;
+               if (v > t.peakMax) t.peakMax = v;
+            }
          }
          double g = (double)cw.gain;
          const double in = beat - cw.startBeat;

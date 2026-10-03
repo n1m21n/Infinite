@@ -2646,6 +2646,7 @@ public:
       mCurrentOutNote = -1;
       mCurrentOutVoiceId = 0;
       mPendingOffActive = false;
+      mPendingOnActive = false;
       mPrevNote = -1;
    }
 
@@ -2661,23 +2662,12 @@ public:
       const float rateBeatsP = std::max(0.015625f, mRateBeats.load(std::memory_order_relaxed));
       const float rateSecondsP = std::max(0.01f, mRateSeconds.load(std::memory_order_relaxed));
       const int maxStep = std::max(1, mMaxStep.load(std::memory_order_relaxed));
+      const float groove = std::clamp(mGroove.load(std::memory_order_relaxed), 0.0f, 1.0f);
       const double bpm = (double)Transport::Instance().Tempo();
       const double rateBeats = std::max(0.001, rateMode == 1 ? (double)rateSecondsP * bpm / 60.0 : (double)rateBeatsP);
 
-      if (mPendingOffActive && mPendingOffSample < mSamplePos + (uint64_t)numFrames)
-      {
-         NoteEvent off;
-         off.note = mCurrentOutNote;
-         off.velocity = 0.0f;
-         off.isNoteOn = false;
-         const int offset = (mPendingOffSample > mSamplePos) ? (int)(mPendingOffSample - mSamplePos) : 0;
-         off.frameOffset = std::clamp(offset, 0, numFrames - 1);
-         off.source = this;
-         off.voiceId = mCurrentOutVoiceId;
-         mOutbox.Push(off);
-         mPendingOffActive = false;
-         mCurrentOutNote = -1;
-      }
+      const uint64_t blockEnd = mSamplePos + (uint64_t)numFrames;
+      EmitDueOff(blockEnd, numFrames, 0);
 
       const double beats = Transport::Instance().Beats();
       const long long step = (long long)std::floor(beats / rateBeats);
@@ -2704,23 +2694,49 @@ public:
             off.voiceId = mCurrentOutVoiceId;
             mOutbox.Push(off);
             mPendingOffActive = false;
+            mCurrentOutNote = -1;
          }
+         // A swung note-on of the previous step that has not fired yet (steps
+         // shorter than about two blocks) is dropped: the new step supersedes it.
+         mPendingOnActive = false;
 
+         // Turbo 0.48 (upstream port): MPC-style swing, odd steps are delayed by
+         // groove * 0.5 * rateBeats. groove == 0 keeps the old timing exactly. The
+         // delayed note-on stays pending across blocks (like the note-off), so a
+         // delay longer than a block still lands on its sample.
+         const double samplesPerBeat = mSampleRate * 60.0 / std::max(1.0, bpm);
+         const double stepSamples = rateBeats * samplesPerBeat;
+         const double swingSamplesD = ((step & 1) != 0) ? (double)groove * 0.5 * stepSamples : 0.0;
+
+         mPendingOnSample = mSamplePos + (uint64_t)std::llround(swingSamplesD);
+         mPendingOnNote = note;
+         mPendingOnVelocity = 0.6f + (mRng.Next() * 0.5f + 0.5f) * 0.3f;
+         // 70% gate of what remains after the swung onset, so the off stays before
+         // the next boundary for any groove in [0, 1]; counted from the real on.
+         mPendingOnGate = (uint64_t)std::max(0.0, (stepSamples - swingSamplesD) * 0.7);
+         mPendingOnActive = true;
+      }
+
+      if (mPendingOnActive && mPendingOnSample < blockEnd)
+      {
+         const int onOffset = (mPendingOnSample > mSamplePos) ? (int)(mPendingOnSample - mSamplePos) : 0;
          NoteEvent on;
-         on.note = note;
-         on.velocity = 0.6f + (mRng.Next() * 0.5f + 0.5f) * 0.3f;
+         on.note = mPendingOnNote;
+         on.velocity = mPendingOnVelocity;
          on.isNoteOn = true;
-         on.frameOffset = 0;
+         on.frameOffset = std::clamp(onOffset, 0, numFrames - 1);
          on.source = this;
          on.voiceId = NextVoiceId();
          mOutbox.Push(on);
-         mCurrentOutNote = note;
+         mCurrentOutNote = mPendingOnNote;
          mCurrentOutVoiceId = on.voiceId;
+         mPendingOnActive = false;
 
-         const double samplesPerBeat = mSampleRate * 60.0 / std::max(1.0, bpm);
-         const double stepSamples = rateBeats * samplesPerBeat;
-         mPendingOffSample = mSamplePos + (uint64_t)(stepSamples * 0.7); // fixed 70% gate
+         mPendingOffSample = mSamplePos + (uint64_t)on.frameOffset + mPendingOnGate;
          mPendingOffActive = true;
+         // A gate shorter than the rest of this block: its off lands here too,
+         // at least one frame after the on.
+         EmitDueOff(blockEnd, numFrames, on.frameOffset + 1);
       }
 
       mSamplePos += (uint64_t)numFrames;
@@ -2740,11 +2756,31 @@ public:
       mRateSeconds.store(n.rateSeconds, std::memory_order_relaxed);
       mMaxStep.store(n.maxStep, std::memory_order_relaxed);
       mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
+      mGroove.store(n.groove, std::memory_order_relaxed);
    }
 
    int LastNote() const { return mLastNoteReadout.load(std::memory_order_relaxed); }
 
 private:
+   // Emits the pending note-off when it falls before blockEnd, never before
+   // frame minOffset (so it cannot precede an on emitted in this block).
+   void EmitDueOff(uint64_t blockEnd, int numFrames, int minOffset)
+   {
+      if (!mPendingOffActive || mPendingOffSample >= blockEnd || minOffset >= numFrames)
+         return;
+      NoteEvent off;
+      off.note = mCurrentOutNote;
+      off.velocity = 0.0f;
+      off.isNoteOn = false;
+      const int offset = (mPendingOffSample > mSamplePos) ? (int)(mPendingOffSample - mSamplePos) : 0;
+      off.frameOffset = std::clamp(offset, minOffset, numFrames - 1);
+      off.source = this;
+      off.voiceId = mCurrentOutVoiceId;
+      mOutbox.Push(off);
+      mPendingOffActive = false;
+      mCurrentOutNote = -1;
+   }
+
    NoteEventQueue mOutbox;
    double mSampleRate = 48000.0;
    uint64_t mSamplePos = 0;
@@ -2756,6 +2792,12 @@ private:
    int mPrevNote = -1;
    bool mPendingOffActive = false;
    uint64_t mPendingOffSample = 0;
+   // Turbo 0.48: a swung note-on waiting for its sample (may span blocks).
+   bool mPendingOnActive = false;
+   uint64_t mPendingOnSample = 0;
+   uint64_t mPendingOnGate = 0;
+   int mPendingOnNote = 60;
+   float mPendingOnVelocity = 0.0f;
 
    std::atomic<int> mRangeLow { 48 };
    std::atomic<int> mRangeHigh { 72 };
@@ -2766,6 +2808,7 @@ private:
    std::atomic<float> mRateSeconds { 0.2f };
    std::atomic<int> mMaxStep { 4 };
    std::atomic<bool> mUseGlobalScale { true };
+   std::atomic<float> mGroove { 0.0f };
    std::atomic<int> mLastNoteReadout { -1 };
 };
 
@@ -2793,6 +2836,7 @@ void RandomNoteGeneratorNode::VisitParams(ParamVisitor& v)
    v.Float("rateSeconds", rateSeconds);
    v.Int("maxStep", maxStep);
    v.Bool("useGlobalScale", useGlobalScale);
+   v.Float("groove", groove); // Turbo 0.48: appended, save-compat
 }
 
 AudioNode* RandomNoteGeneratorNode::GetAudioNode()

@@ -514,6 +514,7 @@ namespace Platform
    }
    std::string OpenVideoDialog() { return RunFileDialog(false, false, L"Open video", {{L"Video", L"*.mp4;*.mov;*.mkv;*.avi;*.webm;*.m4v"}}); }
    std::string OpenAudioDialog() { return RunFileDialog(false, false, L"Open audio", {{L"Audio", L"*.wav;*.aif;*.aiff;*.flac;*.mp3;*.m4a;*.ogg;*.opus"}}); }
+   std::string OpenMidiDialog() { return RunFileDialog(false, false, L"Open MIDI file", {{L"MIDI files", L"*.mid;*.midi;*.rmi"}, {L"All files", L"*.*"}}); }
    std::string OpenMediaDialog()
    {
       return RunFileDialog(false, false, L"Open clip", {

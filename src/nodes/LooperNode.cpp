@@ -17,6 +17,8 @@
 #include "audio/AudioEngine.h"
 #include "audio/AudioFileWriter.h"
 #include "audio/AudioNode.h"
+#include "audio/MusicTime.h"
+#include "audio/PassFade.h"
 #include "core/AudioTopologyRequest.h"
 #include "core/Transport.h"
 #include "platform/Platform.h"
@@ -32,7 +34,11 @@ namespace
       kCmdDubOn,
       kCmdDubOff,
       kCmdClear,
-      kCmdSwap // adopt the inactive bank (undo / redo / load), see RequestSwap
+      kCmdSwap, // adopt the inactive bank (undo / redo / load), see RequestSwap
+      // Turbo 0.48: presses resolved against the audio thread's own state.
+      kCmdRecPress,
+      kCmdPlayPress,
+      kCmdDubPress
    };
 
    // Two banks of 120 s stereo at 48 kHz (~46 MB each): the audio thread
@@ -106,6 +112,14 @@ public:
       mDirection.store(std::clamp(n.direction, 0, 2), std::memory_order_relaxed);
       mThru.store(std::clamp(n.thru, 0.0f, 2.0f), std::memory_order_relaxed);
       mLevelParam.store(std::clamp(n.level, 0.0f, 2.0f), std::memory_order_relaxed);
+      mTakeDivision.store(std::clamp(n.takeDivision, 0, (int)MusicTime::kNumRateDivisions - 1),
+                          std::memory_order_relaxed);
+      mRate.store(LooperNode::RateFor(std::clamp(n.pitch, -24.0f, 24.0f), std::clamp(n.finetune, -50.0f, 50.0f),
+                                      std::clamp(n.speed, -2.0f, 2.0f)),
+                  std::memory_order_relaxed);
+      mFadeInMs.store(std::clamp(n.fadeIn, 0.0f, 250.0f), std::memory_order_relaxed);
+      mFadeOutMs.store(std::clamp(n.fadeOut, 0.0f, 250.0f), std::memory_order_relaxed);
+      mVolume.store(std::clamp(n.volume, 0.0f, 2.0f), std::memory_order_relaxed);
       const double autoFrames = n.autoLatency ? (double)Platform::AudioRoundTripLatencyFrames() : 0.0;
       const double frames = autoFrames + (double)std::clamp(n.latencyOffsetMs, -100.0f, 300.0f) * 0.001 * mSampleRate;
       mLatency.store((int)std::clamp(frames, 0.0, mSampleRate), std::memory_order_relaxed);
@@ -143,6 +157,7 @@ public:
    float PublishedPos01() const { return mPubPos.load(std::memory_order_relaxed); }
    float PublishedPeak() const { return mPubPeak.load(std::memory_order_relaxed); }
    float PublishedArmedSec() const { return mPubArmedSec.load(std::memory_order_relaxed); }
+   float PublishedPlayWait() const { return mPubPlayWait.load(std::memory_order_relaxed); }
    double SampleRate() const { return mSampleRate; }
 
    // ---- audio thread ----------------------------------------------------
@@ -151,6 +166,12 @@ public:
       const AudioBuffer* in = (numInputs > 0) ? inputs[0] : nullptr;
       const int numFrames = output.numFrames;
       const float thru = mThru.load(std::memory_order_relaxed);
+      // Turbo 0.48: output volume and playback rate, ramped across the block.
+      const float volTarget = mVolume.load(std::memory_order_relaxed);
+      const float rateTarget = mRate.load(std::memory_order_relaxed);
+      const float fadeInMs = mFadeInMs.load(std::memory_order_relaxed);
+      const float fadeOutMs = mFadeOutMs.load(std::memory_order_relaxed);
+      const float invN = 1.0f / (float)std::max(1, numFrames);
 
       if (!mReady.load(std::memory_order_acquire))
       {
@@ -164,20 +185,34 @@ public:
                inL = in->channels[0][i];
                inR = in->numChannels > 1 ? in->channels[1][i] : inL;
             }
+            const float vol = mVolNow + (volTarget - mVolNow) * (float)(i + 1) * invN;
             if (output.numChannels > 0)
-               output.channels[0][i] = inL * thru;
+               output.channels[0][i] = inL * thru * vol;
             if (output.numChannels > 1)
-               output.channels[1][i] = inR * thru;
+               output.channels[1][i] = inR * thru * vol;
             for (int ch = 2; ch < output.numChannels; ch++)
-               output.channels[ch][i] = inL * thru;
+               output.channels[ch][i] = inL * thru * vol;
          }
+         mVolNow = volTarget;
+         mRateNow = rateTarget;
          return;
       }
 
-      const int direction = mDirection.load(std::memory_order_relaxed);
+      // A negative speed walks the loop the other way: Forward and Reverse
+      // swap (Ping-pong already goes both ways). At speed >= 0 this is the
+      // direction param itself.
+      const int dirParam = mDirection.load(std::memory_order_relaxed);
+      const int direction = rateTarget >= 0.0f || dirParam == LooperNode::kPingPong
+                               ? dirParam
+                               : (dirParam == LooperNode::kReverse ? LooperNode::kForward : LooperNode::kReverse);
+      // Layers are only written at the recorded speed (as upstream): at any
+      // other rate they would land smeared or doubled.
+      const bool unity = std::fabs(rateTarget - 1.0f) < 1e-4f && std::fabs(mRateNow - 1.0f) < 1e-4f;
+      const double sr = mSampleRate;
       const bool loop = mLoop.load(std::memory_order_relaxed);
       const float level = mLevelParam.load(std::memory_order_relaxed);
 
+      mBlockFrames = numFrames;
       // Commands, in order.
       for (;;)
       {
@@ -195,6 +230,16 @@ public:
       float armedSec = 0.0f;
       if (mState == LooperNode::kArmed)
          armedOffset = ArmedStartOffset(numFrames, armedSec);
+      // Turbo 0.48: a quantized PLAY (or DUB from stopped) waits the same way.
+      int playOffset = -1;
+      float playSec = 0.0f;
+      if (mPlayPending != 0)
+      {
+         if (mLength <= 0 || (mState != LooperNode::kIdle && mState != LooperNode::kStopped))
+            mPlayPending = 0;
+         else
+            playOffset = ArmedStartOffset(numFrames, playSec);
+      }
 
       float* bufL = mBuf[mBank][0].data();
       float* bufR = mBuf[mBank][1].data();
@@ -210,11 +255,20 @@ public:
             inL = in->channels[0][i];
             inR = in->numChannels > 1 ? in->channels[1][i] : inL;
          }
+         const float tRamp = (float)(i + 1) * invN;
+         const float vol = mVolNow + (volTarget - mVolNow) * tRamp;
+         const float rate = mRateNow + (rateTarget - mRateNow) * tRamp;
          float outL = inL * thru;
          float outR = inR * thru;
 
          if (mState == LooperNode::kArmed && armedOffset >= 0 && i >= armedOffset)
             BeginTake();
+         if (mPlayPending != 0 && playOffset >= 0 && i >= playOffset)
+         {
+            mState = mPlayPending == 2 ? LooperNode::kOverdubbing : LooperNode::kPlaying;
+            StartPosition(direction);
+            mPlayPending = 0;
+         }
 
          if (mState == LooperNode::kRecording)
          {
@@ -231,12 +285,34 @@ public:
             if ((mTarget > 0 && mLength >= mTarget) || mLength >= kCapacityFrames)
                FinishTake(direction);
          }
+         else if ((mState == LooperNode::kPlaying || mState == LooperNode::kOverdubbing) && mLength > 0 &&
+                  std::fabs(rateTarget) < 1e-6f)
+         {
+            // Turbo 0.48: speed 0. The playhead would hold one frame forever (a
+            // stuck DC level): a one-pass playback (loop off) stops, a loop
+            // stays on but is silent until the speed moves again.
+            if (!loop)
+               Stop(direction);
+         }
          else if ((mState == LooperNode::kPlaying || mState == LooperNode::kOverdubbing) && mLength > 0)
          {
             const int idx = std::clamp(mPos, 0, mLength - 1);
-            outL += bufL[idx] * level;
-            outR += bufR[idx] * level;
-            if (mState == LooperNode::kOverdubbing)
+            // Turbo 0.48: fractional playhead (mPhase, 0..1 toward the next
+            // frame in the direction of travel), linear interpolation and the
+            // per-pass fade. At rate 1 mPhase stays 0 and the fade is exactly
+            // 1, so this reads bufL[idx] * level as before.
+            const int step = (direction == LooperNode::kReverse) ? -1 : (direction == LooperNode::kPingPong ? mPing : 1);
+            int nxt = idx + step;
+            if (nxt >= mLength)
+               nxt = (direction == LooperNode::kPingPong || !loop) ? idx : 0;
+            else if (nxt < 0)
+               nxt = (direction == LooperNode::kPingPong || !loop) ? idx : mLength - 1;
+            const float fr = (float)mPhase;
+            const float g = level * PassFade::Gain((double)idx + (double)fr * (double)step, 0.0, (double)mLength,
+                                                   (float)step, fadeInMs, fadeOutMs, std::fabs(rate), sr);
+            outL += (bufL[idx] + (bufL[nxt] - bufL[idx]) * fr) * g;
+            outR += (bufR[idx] + (bufR[nxt] - bufR[idx]) * fr) * g;
+            if (mState == LooperNode::kOverdubbing && unity)
             {
                // Same compensation: this input was played against the loop
                // position `latency` frames ago.
@@ -246,7 +322,19 @@ public:
                bufL[w] += inL;
                bufR[w] += inR;
             }
-            Advance(direction, loop);
+            mPhase += (double)std::fabs(rate);
+            for (int guard = 0; mPhase >= 1.0 && guard < 16; guard++)
+            {
+               mPhase -= 1.0;
+               Advance(direction, loop);
+               if (mState != LooperNode::kPlaying && mState != LooperNode::kOverdubbing)
+               {
+                  mPhase = 0.0;
+                  break;
+               }
+            }
+            if (mPhase >= 1.0)
+               mPhase = 0.0;
          }
 
          preL[mPreWrite] = inL;
@@ -254,6 +342,8 @@ public:
          if (++mPreWrite >= kPreRollFrames)
             mPreWrite = 0;
 
+         outL *= vol;
+         outR *= vol;
          if (output.numChannels > 0)
             output.channels[0][i] = outL;
          if (output.numChannels > 1)
@@ -262,6 +352,8 @@ public:
             output.channels[ch][i] = outL;
          peak = std::max(peak, std::max(std::fabs(outL), std::fabs(outR)));
       }
+      mVolNow = volTarget;
+      mRateNow = rateTarget;
 
       // Keep the active bank resident: Windows trims the working set of
       // pages nobody touched for a while, and a trimmed page faults (maybe
@@ -286,6 +378,7 @@ public:
       mPubPos.store(hasLoop ? (float)mPos / (float)std::max(1, mLength) : 0.0f, std::memory_order_relaxed);
       mPubPeak.store(peak, std::memory_order_relaxed);
       mPubArmedSec.store(mState == LooperNode::kArmed ? armedSec : 0.0f, std::memory_order_relaxed);
+      mPubPlayWait.store(mPlayPending != 0 ? std::max(1e-3f, playSec) : 0.0f, std::memory_order_relaxed);
       mPubGen.store(mGen, std::memory_order_relaxed);
       // Last: Settled() reads this with acquire, so everything above is
       // visible once the applied count matches.
@@ -295,9 +388,20 @@ public:
 private:
    static constexpr int kCmdCapacity = 64;
 
+   // Turbo 0.48: the take length of kLengthDivision, in beats.
+   double DivisionBeats() const
+   {
+      const int d = std::clamp(mTakeDivision.load(std::memory_order_relaxed), 0, (int)MusicTime::kNumRateDivisions - 1);
+      return std::max(1e-6, MusicTime::BeatsFor((MusicTime::RateDivision)d));
+   }
+
    double GridBeats() const
    {
       const double beatsPerBar = Transport::Instance().BeatsPerBar();
+      // A division take waits for its own division, never longer than a bar
+      // (a 4-bar take still starts on a bar line), as upstream.
+      if (mLengthMode.load(std::memory_order_relaxed) == LooperNode::kLengthDivision)
+         return std::min(DivisionBeats(), std::max(1e-6, beatsPerBar));
       if (mLengthMode.load(std::memory_order_relaxed) == LooperNode::kLengthSubBar)
       {
          static const double kFraction[4] = { 0.5, 0.25, 0.125, 0.0625 };
@@ -314,6 +418,8 @@ private:
       double beats = GridBeats();
       if (mLengthMode.load(std::memory_order_relaxed) == LooperNode::kLengthBars)
          beats = Transport::Instance().BeatsPerBar() * (double)mBars.load(std::memory_order_relaxed);
+      else if (mLengthMode.load(std::memory_order_relaxed) == LooperNode::kLengthDivision)
+         beats = DivisionBeats();
       const double frames = beats * (60.0 / bpm) * mSampleRate;
       return (int)std::clamp(frames, 1.0, (double)kCapacityFrames);
    }
@@ -331,8 +437,10 @@ private:
          return 0; // nothing to sync to: start now
       const double beatsPerSample = BeatsPerSample();
       const double grid = std::max(1e-6, GridBeats());
-      const double now = Transport::Instance().Beats();
-      const double end = now + beatsPerSample * (double)numFrames;
+      // Turbo 0.48: Beats() is already the END of this block (the engine
+      // advances the clock before the graph runs), so step back one block.
+      const double end = Transport::Instance().Beats();
+      const double now = end - beatsPerSample * (double)numFrames;
       const double next = std::ceil(now / grid - 1e-9) * grid;
       secondsToGo = (float)((next - now) / beatsPerSample / mSampleRate);
       if (next >= end)
@@ -347,7 +455,8 @@ private:
       if (!Transport::Instance().IsPlaying())
          return -1;
       const double grid = std::max(1e-6, GridBeats());
-      const double now = Transport::Instance().Beats();
+      // Block start (Beats() is the block end, see ArmedStartOffset).
+      const double now = Transport::Instance().Beats() - BeatsPerSample() * (double)mBlockFrames;
       const double prev = std::floor(now / grid + 1e-9) * grid;
       return (int)std::max(0.0, (now - prev) / BeatsPerSample());
    }
@@ -355,6 +464,7 @@ private:
    void StartPosition(int direction)
    {
       mPing = 1;
+      mPhase = 0.0;
       mPos = (direction == LooperNode::kReverse) ? std::max(0, mLength - 1) : 0;
    }
 
@@ -462,6 +572,34 @@ private:
       }
    }
 
+   // Turbo 0.48: PLAY (and DUB from stopped) with "sync start" on and the
+   // transport running starts on the next grid line, like REC: the loop
+   // lands in time. Pressed just after a line (human timing) it starts at
+   // once, already that far into the loop, so it is still in phase.
+   void StartQuantized(int playState, int direction)
+   {
+      if (!mSyncStart.load(std::memory_order_relaxed) || !Transport::Instance().IsPlaying())
+      {
+         mState = playState;
+         StartPosition(direction);
+         return;
+      }
+      const int late = FramesSinceGrid();
+      const double gridFrames = GridBeats() / BeatsPerSample();
+      const int grace = (int)std::min(0.2 * mSampleRate, 0.25 * gridFrames);
+      if (late >= 0 && late <= grace)
+      {
+         mState = playState;
+         StartPosition(direction);
+         // Catch up the frames since the line (plain frames: rate 1 is the
+         // in-time case; at other speeds the loop drifts anyway).
+         for (int k = 0; k < late && mLength > 0; k++)
+            Advance(direction, true);
+      }
+      else
+         mPlayPending = playState == LooperNode::kOverdubbing ? 2 : 1;
+   }
+
    void Stop(int direction)
    {
       if (mState == LooperNode::kOverdubbing)
@@ -478,6 +616,7 @@ private:
          {
             if (mState == LooperNode::kRecording || mState == LooperNode::kArmed)
                break;
+            mPlayPending = 0;
             mLength = 0;
             mPos = 0;
             mGen++;
@@ -512,10 +651,7 @@ private:
             break;
          case kCmdPlayOn:
             if (mLength > 0 && (mState == LooperNode::kIdle || mState == LooperNode::kStopped))
-            {
-               mState = LooperNode::kPlaying;
-               StartPosition(direction);
-            }
+               StartQuantized(LooperNode::kPlaying, direction);
             break;
          case kCmdPlayOff:
             if (mState == LooperNode::kRecording)
@@ -527,15 +663,13 @@ private:
                Stop(direction);
             else if (mState == LooperNode::kArmed)
                mState = LooperNode::kIdle;
+            mPlayPending = 0; // a second PLAY cancels a start still waiting
             break;
          case kCmdDubOn:
             if (mState == LooperNode::kPlaying)
                mState = LooperNode::kOverdubbing;
             else if (mLength > 0 && (mState == LooperNode::kIdle || mState == LooperNode::kStopped))
-            {
-               mState = LooperNode::kOverdubbing;
-               StartPosition(direction);
-            }
+               StartQuantized(LooperNode::kOverdubbing, direction);
             break;
          case kCmdDubOff:
             if (mState == LooperNode::kOverdubbing)
@@ -545,11 +679,25 @@ private:
             }
             break;
          case kCmdClear:
+            mPlayPending = 0;
             mState = LooperNode::kIdle;
             mLength = 0;
             mPos = 0;
             mTarget = 0;
             mGen++;
+            break;
+         case kCmdRecPress:
+            ApplyCommand(mState == LooperNode::kRecording || mState == LooperNode::kArmed ? kCmdRecOff : kCmdRecOn,
+                         direction);
+            break;
+         case kCmdPlayPress:
+            ApplyCommand(mState == LooperNode::kPlaying || mState == LooperNode::kOverdubbing || mPlayPending != 0
+                            ? kCmdPlayOff
+                            : kCmdPlayOn,
+                         direction);
+            break;
+         case kCmdDubPress:
+            ApplyCommand(mState == LooperNode::kOverdubbing ? kCmdDubOff : kCmdDubOn, direction);
             break;
          case kCmdSwap:
          {
@@ -590,6 +738,11 @@ private:
    int mTarget = 0; // fixed-length take, 0 = free
    int mPos = 0;
    int mPing = 1;
+   int mPlayPending = 0; // Turbo 0.48: quantized start waiting, 1 = play, 2 = overdub
+   int mBlockFrames = 0;
+   double mPhase = 0.0;  // Turbo 0.48: fraction toward the next frame (rate != 1)
+   float mRateNow = 1.0f;
+   float mVolNow = 1.0f;
    int mSkip = 0;        // input frames still to drop before the take starts
    int mTakeLatency = 0; // compensation used by the current loop
    int mPreWrite = 0;
@@ -611,6 +764,11 @@ private:
    std::atomic<int> mDirection { LooperNode::kForward };
    std::atomic<float> mThru { 1.0f };
    std::atomic<float> mLevelParam { 1.0f };
+   std::atomic<int> mTakeDivision { 2 };
+   std::atomic<float> mRate { 1.0f };
+   std::atomic<float> mFadeInMs { 0.0f };
+   std::atomic<float> mFadeOutMs { 0.0f };
+   std::atomic<float> mVolume { 1.0f };
    std::atomic<int> mLatency { 0 };
    std::atomic<int> mSwapFrames { 0 };
    std::atomic<bool> mSwapPending { false };
@@ -627,6 +785,7 @@ private:
    std::atomic<float> mPubPos { 0.0f };
    std::atomic<float> mPubPeak { 0.0f };
    std::atomic<float> mPubArmedSec { 0.0f };
+   std::atomic<float> mPubPlayWait { 0.0f }; // seconds until a quantized PLAY starts, 0 = none
 };
 
 // ---------------------------------------------------------------------------
@@ -1090,6 +1249,9 @@ void LooperNode::SetRecord(bool on) { Audio()->PushCommand(on ? kCmdRecOn : kCmd
 void LooperNode::SetPlay(bool on) { Audio()->PushCommand(on ? kCmdPlayOn : kCmdPlayOff); }
 void LooperNode::SetOverdub(bool on) { Audio()->PushCommand(on ? kCmdDubOn : kCmdDubOff); }
 void LooperNode::Clear() { Audio()->PushCommand(kCmdClear); }
+void LooperNode::PressRecord() { Audio()->PushCommand(kCmdRecPress); }
+void LooperNode::PressPlay() { Audio()->PushCommand(kCmdPlayPress); }
+void LooperNode::PressOverdub() { Audio()->PushCommand(kCmdDubPress); }
 
 void LooperNode::UndoLayer()
 {
@@ -1163,6 +1325,7 @@ void LooperNode::CookIfNeeded(int frameId)
    mPos01 = a->PublishedPos01();
    mLevel = a->PublishedPeak();
    mArmedSec = a->PublishedArmedSec();
+   mPlayWaitSec = a->PublishedPlayWait();
    mCompMs = (float)(1000.0 * a->LatencyFrames() / std::max(1.0, a->SampleRate()));
    if (mState == kRecording || mState == kArmed)
       mStatus.clear();
@@ -1182,4 +1345,12 @@ void LooperNode::VisitParams(ParamVisitor& v)
    v.Float("latencyOffsetMs", latencyOffsetMs);
    v.Text("loopId", loopId);
    v.Text("loopFile", loopFile);
+   // Turbo 0.48: appended (older patches load with the old behaviour).
+   v.Int("takeDivision", takeDivision);
+   v.Float("speed", speed);
+   v.Float("pitch", pitch);
+   v.Float("finetune", finetune);
+   v.Float("fadeIn", fadeIn);
+   v.Float("fadeOut", fadeOut);
+   v.Float("volume", volume);
 }

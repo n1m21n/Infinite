@@ -359,11 +359,45 @@ public:
       // Turbo: this node's own channel / pair of the device, own cursor.
       const int first = std::max(0, mFirstChannel.load(std::memory_order_relaxed));
       const bool mono = mMono.load(std::memory_order_relaxed);
-      float* chans[2] = { buffer.channels[0], buffer.numChannels > 1 ? buffer.channels[1] : buffer.channels[0] };
-      const int want = (mono || buffer.numChannels < 2) ? 1 : 2;
-      const int captured = Platform::AudioInputCaptureReadChannels(chans, buffer.numFrames, first, want, mCursor);
-      if (mono && buffer.numChannels > 1)
-         std::copy(buffer.channels[0], buffer.channels[0] + buffer.numFrames, buffer.channels[1]);
+      int captured = 0;
+      if (mMix.load(std::memory_order_relaxed))
+      {
+         // Turbo 0.48: mix of every input. Each channel is read from the same
+         // cursor into one scratch block and summed (unity per channel, the
+         // trim fader handles level), so no per-block allocation.
+         const int frames = std::min(buffer.numFrames, kAudioMaxBlockFrames);
+         float* mixDst = buffer.channels[0];
+         std::fill(mixDst, mixDst + buffer.numFrames, 0.0f);
+         unsigned long long next = mCursor;
+         for (int ch = 0; ch < kMaxMixChannels; ch++)
+         {
+            unsigned long long c = mCursor;
+            float* one[1] = { mScratch };
+            if (Platform::AudioInputCaptureReadChannels(one, frames, ch, 1, c) <= 0)
+               break; // past the device's last channel (or nothing captured)
+            for (int i = 0; i < frames; i++)
+               mixDst[i] += mScratch[i];
+            next = c;
+            captured = 1;
+         }
+         if (captured == 0)
+         {
+            // Still advance the cursor the way a plain read would.
+            float* one[1] = { mScratch };
+            Platform::AudioInputCaptureReadChannels(one, frames, 0, 1, next);
+         }
+         mCursor = next;
+         if (buffer.numChannels > 1)
+            std::copy(mixDst, mixDst + buffer.numFrames, buffer.channels[1]);
+      }
+      else
+      {
+         float* chans[2] = { buffer.channels[0], buffer.numChannels > 1 ? buffer.channels[1] : buffer.channels[0] };
+         const int want = (mono || buffer.numChannels < 2) ? 1 : 2;
+         captured = Platform::AudioInputCaptureReadChannels(chans, buffer.numFrames, first, want, mCursor);
+         if (mono && buffer.numChannels > 1)
+            std::copy(buffer.channels[0], buffer.channels[0] + buffer.numFrames, buffer.channels[1]);
+      }
 
       float peak = 0.0f;
       for (int i = 0; i < buffer.numFrames; i++)
@@ -381,12 +415,13 @@ public:
    }
 
    // Main thread only.
-   void PushParams(float gainDb, int firstChannel, bool mono)
+   void PushParams(float gainDb, int firstChannel, bool mono, bool mix)
    {
       mGainDb.store(gainDb, std::memory_order_relaxed);
       mMailbox.Push(kGainDbParam, gainDb);
       mFirstChannel.store(firstChannel, std::memory_order_relaxed);
       mMono.store(mono, std::memory_order_relaxed);
+      mMix.store(mix, std::memory_order_relaxed);
    }
 
    MeterRing& Meter() { return mMeter; }
@@ -397,7 +432,10 @@ private:
    std::atomic<float> mGainDb { 0.0f };
    std::atomic<int> mFirstChannel { 0 };
    std::atomic<bool> mMono { false };
+   std::atomic<bool> mMix { false };
    unsigned long long mCursor = 0; // audio thread only
+   static constexpr int kMaxMixChannels = 32; // the input ring's channel cap
+   float mScratch[kAudioMaxBlockFrames] = {}; // mix mode, audio thread only
 };
 
 AudioInputNode::AudioInputNode() { Platform::AudioInputCaptureAddRef(); }
@@ -411,7 +449,8 @@ void AudioInputNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioCaptureNode>();
-   mAudioNode->PushParams(gainDb, firstChannel, mono);
+   SyncChannelKeys();
+   mAudioNode->PushParams(gainDb, firstChannel, mono, channelMode == kChannelModeMix);
 
    std::string error;
    Platform::AudioInputCapturePump(error); // no-op once the tap is already live
@@ -426,6 +465,34 @@ void AudioInputNode::VisitParams(ParamVisitor& v)
    v.Float("gainDb", gainDb);
    v.Int("firstChannel", firstChannel);
    v.Bool("mono", mono);
+   // Turbo 0.48: appended (upstream key names).
+   v.Int("channelMode", channelMode);
+   v.Text("deviceName", deviceName);
+}
+
+void AudioInputNode::SyncChannelKeys()
+{
+   // Turbo 0.48: legacy keys win only when they changed since the last sync
+   // while channelMode did not (set_param on firstChannel/mono, an older Turbo
+   // patch on first cook). A channelMode change (dropdown, undo, set_param)
+   // always wins, so "mix" never collapses back to the legacy pair/mono.
+   const bool firstSync = (mSyncedFirst == -1000);
+   const bool modeValid = channelMode >= kChannelModeMix;
+   const bool modeChanged = !firstSync && channelMode != mSyncedMode;
+   const bool legacyChanged = !firstSync && (firstChannel != mSyncedFirst || mono != mSyncedMono);
+   if (!modeValid || (legacyChanged && !modeChanged))
+      channelMode = mono ? std::max(0, firstChannel) + 1 : 0;
+   if (channelMode > 0)
+   {
+      mono = true;
+      firstChannel = channelMode - 1;
+   }
+   else
+      mono = false; // pair keeps firstChannel; mix ignores it
+   firstChannel = std::max(0, firstChannel);
+   mSyncedFirst = firstChannel;
+   mSyncedMono = mono;
+   mSyncedMode = channelMode;
 }
 
 AudioNode* AudioInputNode::GetAudioNode()

@@ -24,12 +24,23 @@ class AudioMpcOutNode;
 // Output: the node's own audio output is the master mix. Every pad is also
 // rendered to its own stereo buffer; an "MPC Out" node wired from this node
 // picks one pad, which is how a pad gets its own effect chain.
+//
+// Turbo 0.48 (from upstream): per pad speed (-2..2, negative plays the trim
+// range backwards), fine tune (cents), fade in / fade out (ms, every pass
+// through the trim range, see audio/PassFade.h), and sync. A Free pad
+// (default) plays at once. A Synced pad latches a hit and fires it on the
+// next grid line of its MusicTime division (sample-accurate; at once with the
+// transport stopped). Gate: a release before the line cancels the hit. Loop:
+// the toggle is quantised too, and while on the sample restarts on EVERY
+// division line (one pass per division); with the transport stopped a synced
+// loop plays as a plain loop. Defaults keep the old sound.
 class MpcNode : public INode, public IAudioSource
 {
 public:
    static constexpr int kPads = 16;
    static constexpr int kWaveCache = 64;
    enum PadMode { kOneShot = 0, kGate = 1, kLoopToggle = 2 };
+   enum SyncMode { kSynced = 0, kFree = 1 }; // upstream's order (pad<n>_sync)
 
    static INode* Create() { return new MpcNode(); }
    MpcNode();
@@ -70,6 +81,13 @@ public:
    float padPan[kPads];
    float padStart[kPads]; // trim in, 0..1 of the sample
    float padEnd[kPads];   // trim out, 0..1 of the sample
+   // Turbo 0.48 (saved after every older key, see VisitParams).
+   float padSpeed[kPads];   // -2..2, negative plays backwards
+   float padFine[kPads];    // cents, -50..50
+   float padFadeIn[kPads];  // ms, 0..250
+   float padFadeOut[kPads]; // ms, 0..250
+   int padSync[kPads];      // SyncMode, kFree by default
+   int padDiv[kPads];       // MusicTime::RateDivision index (Synced)
    int baseNote = 36;
    float volume = 0.8f;
    bool velocitySensitive = true;

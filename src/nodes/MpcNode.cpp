@@ -12,14 +12,18 @@
 #include "audio/AudioEngine.h"
 #include "audio/AudioNode.h"
 #include "audio/DspMath.h"
+#include "audio/MusicTime.h"
 #include "audio/NoteEventQueue.h"
+#include "audio/PassFade.h"
 #include "audio/SampleSlot.h"
+#include "core/Transport.h"
 #include "platform/Platform.h"
 
 namespace
 {
    constexpr int kReleaseFrames = 96;   // ~2 ms fade when a gate/loop stops
    constexpr int kCmdCapacity = 256;
+   constexpr int kMaxEvents = 128;
 
    struct PadCommand
    {
@@ -34,6 +38,7 @@ namespace
       int pad = 0;
       bool down = false;
       float velocity = 1.0f;
+      bool retrig = false; // Turbo 0.48: synced loop, restart the pass on the grid line
    };
 }
 
@@ -51,6 +56,12 @@ public:
          mPan[p].store(0.0f, std::memory_order_relaxed);
          mStart[p].store(0.0f, std::memory_order_relaxed);
          mEnd[p].store(1.0f, std::memory_order_relaxed);
+         mSpeed[p].store(1.0f, std::memory_order_relaxed);
+         mFine[p].store(0.0f, std::memory_order_relaxed);
+         mFadeIn[p].store(0.0f, std::memory_order_relaxed);
+         mFadeOut[p].store(0.0f, std::memory_order_relaxed);
+         mSync[p].store(MpcNode::kFree, std::memory_order_relaxed);
+         mDiv[p].store((int)MusicTime::kQuarter, std::memory_order_relaxed);
       }
    }
 
@@ -94,6 +105,12 @@ public:
          const float s0 = std::clamp(n.padStart[p], 0.0f, 1.0f);
          mStart[p].store(s0, std::memory_order_relaxed);
          mEnd[p].store(std::clamp(n.padEnd[p], s0, 1.0f), std::memory_order_relaxed);
+         mSpeed[p].store(std::clamp(n.padSpeed[p], -2.0f, 2.0f), std::memory_order_relaxed);
+         mFine[p].store(std::clamp(n.padFine[p], -50.0f, 50.0f), std::memory_order_relaxed);
+         mFadeIn[p].store(std::clamp(n.padFadeIn[p], 0.0f, 250.0f), std::memory_order_relaxed);
+         mFadeOut[p].store(std::clamp(n.padFadeOut[p], 0.0f, 250.0f), std::memory_order_relaxed);
+         mSync[p].store(std::clamp(n.padSync[p], 0, 1), std::memory_order_relaxed);
+         mDiv[p].store(std::clamp(n.padDiv[p], 0, (int)MusicTime::kNumRateDivisions - 1), std::memory_order_relaxed);
       }
       mMaster.store(std::clamp(n.volume, 0.0f, 2.0f), std::memory_order_relaxed);
       mBaseNote.store(std::clamp(n.baseNote, 0, 112), std::memory_order_relaxed);
@@ -122,24 +139,28 @@ public:
          {
             mActive[p] = mSlots[p].Active();
             mVoice[p] = Voice();
+            mLoopOn[p] = false;
+            mPending[p].active = false;
          }
       }
 
       // Collect this block's events: UI/CV at offset 0, notes at their
       // own frame offsets. Kept sorted by offset (insertion sort, tiny N).
-      PadEventAt events[128];
-      int eventCount = 0;
+      // Turbo 0.48: synced pads' hits are then moved onto the grid
+      // (Schedule) into `events`; free pads pass straight through.
+      PadEventAt raw[kMaxEvents];
+      int rawCount = 0;
       auto addEvent = [&](const PadEventAt& e)
       {
-         if (eventCount >= 128)
+         if (rawCount >= kMaxEvents)
             return;
-         int k = eventCount++;
-         while (k > 0 && events[k - 1].offset > e.offset)
+         int k = rawCount++;
+         while (k > 0 && raw[k - 1].offset > e.offset)
          {
-            events[k] = events[k - 1];
+            raw[k] = raw[k - 1];
             k--;
          }
-         events[k] = e;
+         raw[k] = e;
       };
       for (;;)
       {
@@ -148,7 +169,7 @@ public:
             break;
          const PadCommand c = mCmds[head];
          mCmdHead.store((head + 1) % kCmdCapacity, std::memory_order_release);
-         addEvent({ 0, c.pad, c.down, c.velocity });
+         addEvent({ 0, c.pad, c.down, c.velocity, false });
       }
       if (mNoteInbox != nullptr)
       {
@@ -165,7 +186,7 @@ public:
                if (pad < 0 || pad >= MpcNode::kPads)
                   continue;
                addEvent({ std::clamp(notes[i].frameOffset, 0, std::max(0, numFrames - 1)), pad,
-                          notes[i].isNoteOn, notes[i].velocity });
+                          notes[i].isNoteOn, notes[i].velocity, false });
             }
          }
       }
@@ -175,6 +196,10 @@ public:
          std::fill(PadWrite(p, 0), PadWrite(p, 0) + numFrames, 0.0f);
          std::fill(PadWrite(p, 1), PadWrite(p, 1) + numFrames, 0.0f);
       }
+
+      PadEventAt events[kMaxEvents];
+      int eventCount = 0;
+      Schedule(raw, rawCount, numFrames, events, eventCount);
 
       int cursor = 0;
       for (int e = 0; e < eventCount; e++)
@@ -231,6 +256,161 @@ private:
       int release = -1; // >= 0: frames left in the stop fade
    };
 
+   // Turbo 0.48: a synced hit that has been latched and waits for its line.
+   struct Pending
+   {
+      bool active = false;
+      double tgt = 0.0; // absolute beat of the line it fires on
+      float vel = 1.0f;
+      int fire = -1; // frame in the current block, or -1 (a later block)
+   };
+
+   // ---- transport (audio thread), ported from upstream ------------------
+   bool Syncing(int p) const
+   {
+      return mPlaying && mBpf > 0.0 && mSync[p].load(std::memory_order_relaxed) == MpcNode::kSynced;
+   }
+   double Grid(int p) const
+   {
+      const int d = std::clamp(mDiv[p].load(std::memory_order_relaxed), 0, (int)MusicTime::kNumRateDivisions - 1);
+      return std::max(1e-6, MusicTime::BeatsFor((MusicTime::RateDivision)d));
+   }
+   // Frame of this block a line at beat `tgt` falls on: 0 when it is already
+   // behind the block start, -1 when it is in a later block.
+   int FireFrame(double tgt, int numFrames) const
+   {
+      const double f = std::ceil((tgt - mBlockStart) / mBpf - 1e-6);
+      if (f < 0.0)
+         return 0;
+      return f < (double)numFrames ? (int)f : -1;
+   }
+
+   // Turns this block's raw pad events into the events Render/Apply run: a
+   // synced pad's hit is latched to the next grid line and released into the
+   // list at that exact frame; synced loop pads get a re-trigger on every
+   // line. Free pads pass straight through (the old behaviour).
+   void Schedule(const PadEventAt* raw, int rawCount, int numFrames, PadEventAt* out, int& outCount)
+   {
+      outCount = 0;
+      auto push = [&](const PadEventAt& e)
+      {
+         if (outCount >= kMaxEvents)
+            return;
+         int k = outCount++;
+         while (k > 0 && out[k - 1].offset > e.offset)
+         {
+            out[k] = out[k - 1];
+            k--;
+         }
+         out[k] = e;
+      };
+      Transport& tr = Transport::Instance();
+      mPlaying = tr.IsPlaying();
+      mBpf = std::max(1.0f, tr.Tempo()) / 60.0 / std::max(1.0, mSampleRate);
+      // Transport::AdvanceAudioClock already ran for this block, so Beats()
+      // is the block's end (see DrumSequencerNode).
+      mBlockStart = tr.Beats() - mBpf * (double)numFrames;
+
+      int startedAt[MpcNode::kPads];
+      for (int p = 0; p < MpcNode::kPads; p++)
+      {
+         startedAt[p] = -1;
+         const int mode = mMode[p].load(std::memory_order_relaxed);
+         if (mLoopOn[p] && mode != MpcNode::kLoopToggle)
+            mLoopOn[p] = false; // the mode moved away from loop: no more re-triggers
+         else if (mLoopOn[p] && !mPlaying && !mVoice[p].active &&
+                  mSync[p].load(std::memory_order_relaxed) == MpcNode::kSynced)
+            Start(p, mVel[p], true); // transport stopped: a synced loop plays as a plain loop
+         Pending& pd = mPending[p];
+         if (!pd.active)
+            continue;
+         if (!Syncing(p) || pd.tgt < mBlockStart - 1e-6)
+            pd.fire = 0; // transport stopped / pad freed / position jumped past it: fire now
+         else
+         {
+            const double g = Grid(p);
+            if (pd.tgt > mBlockStart + g + 1e-6) // position jumped back: re-latch
+               pd.tgt = std::ceil(mBlockStart / g - 1e-6) * g;
+            pd.fire = FireFrame(pd.tgt, numFrames);
+         }
+      }
+
+      for (int i = 0; i < rawCount; i++)
+      {
+         const PadEventAt& e = raw[i];
+         const int p = e.pad;
+         if (p < 0 || p >= MpcNode::kPads)
+            continue;
+         Pending& pd = mPending[p];
+         if (!e.down)
+         {
+            // Gate: a release before the line cancels the latched hit.
+            if (pd.active && mMode[p].load(std::memory_order_relaxed) == MpcNode::kGate &&
+                (pd.fire < 0 || pd.fire >= e.offset))
+               pd.active = false; // same frame too: the off would sort before the on and hang the gate
+            push(e);
+            continue;
+         }
+         if (!Syncing(p))
+         {
+            pd.active = false;
+            push(e);
+            continue;
+         }
+         if (pd.active)
+         {
+            pd.vel = e.velocity; // already waiting: keep the earlier line
+            continue;
+         }
+         const double g = Grid(p);
+         const double beat = mBlockStart + (double)e.offset * mBpf;
+         pd.active = true;
+         pd.tgt = std::ceil(beat / g - 1e-6) * g;
+         pd.vel = e.velocity;
+         pd.fire = FireFrame(pd.tgt, numFrames);
+         if (pd.fire >= 0)
+            pd.fire = std::max(pd.fire, e.offset);
+      }
+      for (int p = 0; p < MpcNode::kPads; p++)
+      {
+         Pending& pd = mPending[p];
+         if (pd.active && pd.fire >= 0)
+         {
+            push({ pd.fire, p, true, pd.vel, false });
+            startedAt[p] = pd.fire;
+            pd.active = false;
+         }
+      }
+      // Rate-locked loops: a re-trigger on every line while the pad is on.
+      for (int p = 0; p < MpcNode::kPads; p++)
+      {
+         if (!Syncing(p) || mMode[p].load(std::memory_order_relaxed) != MpcNode::kLoopToggle)
+            continue;
+         if (!mLoopOn[p] && startedAt[p] < 0)
+            continue;
+         const double g = Grid(p);
+         double n = std::ceil(mBlockStart / g - 1e-6);
+         for (int guard = 0; guard < 64; guard++, n += 1.0)
+         {
+            int f = (int)std::ceil((n * g - mBlockStart) / mBpf - 1e-6);
+            if (f < 0)
+               f = 0;
+            if (f >= numFrames)
+               break;
+            if (f == startedAt[p])
+               continue;
+            push({ f, p, false, 1.0f, true });
+         }
+      }
+   }
+
+   // Trim range of pad p in source frames (Render's definition).
+   void TrimRange(int p, int frames, double& startFrame, double& endFrame) const
+   {
+      startFrame = (double)mStart[p].load(std::memory_order_relaxed) * (double)(frames - 1);
+      endFrame = std::max(startFrame + 2.0, (double)mEnd[p].load(std::memory_order_relaxed) * (double)(frames - 1));
+   }
+
    float* PadWrite(int pad, int ch)
    {
       return mPadOut.data() + ((size_t)pad * 2 + (size_t)ch) * kAudioMaxBlockFrames;
@@ -242,8 +422,18 @@ private:
       v.active = mActive[p] != nullptr && mActive[p]->numFrames > 0;
       v.looping = looping;
       v.pos = 0.0;
+      mVel[p] = velocity;
       if (v.active)
+      {
          v.pos = (double)mStart[p].load(std::memory_order_relaxed) * (double)(mActive[p]->numFrames - 1);
+         // Turbo 0.48: a negative speed starts at the trim out and walks back.
+         if (mSpeed[p].load(std::memory_order_relaxed) < 0.0f)
+         {
+            double s0 = 0.0, s1 = 0.0;
+            TrimRange(p, mActive[p]->numFrames, s0, s1);
+            v.pos = std::max(s0, s1 - 1.0 - 1e-3);
+         }
+      }
       v.release = -1;
       v.gain = mVelocitySensitive.load(std::memory_order_relaxed) ? std::clamp(velocity, 0.0f, 1.0f) : 1.0f;
    }
@@ -260,6 +450,12 @@ private:
       if (p < 0 || p >= MpcNode::kPads)
          return;
       const int mode = mMode[p].load(std::memory_order_relaxed);
+      if (e.retrig)
+      {
+         if (mLoopOn[p] && mode == MpcNode::kLoopToggle)
+            Start(p, mVel[p], false);
+         return;
+      }
       if (mode == MpcNode::kOneShot)
       {
          if (e.down)
@@ -276,10 +472,21 @@ private:
       {
          if (!e.down)
             return;
-         if (mVoice[p].active && mVoice[p].release < 0)
+         // A free loop is on while its voice sounds (the old rule); a synced
+         // loop's voice stops between passes, so it keeps an explicit flag.
+         const bool synced = mSync[p].load(std::memory_order_relaxed) == MpcNode::kSynced;
+         const bool on = synced ? mLoopOn[p] : (mVoice[p].active && mVoice[p].release < 0);
+         if (on)
+         {
+            mLoopOn[p] = false;
             Release(p);
+         }
          else
-            Start(p, e.velocity, true);
+         {
+            mLoopOn[p] = true;
+            // Synced: one pass per division (Schedule re-triggers on each line).
+            Start(p, e.velocity, !Syncing(p));
+         }
       }
    }
 
@@ -291,7 +498,8 @@ private:
       {
          Voice& v = mVoice[p];
          const Platform::SampleBuffer* buf = mActive[p];
-         if (!v.active || buf == nullptr || buf->numFrames <= 1 || buf->channels <= 0)
+         // numFrames >= 2: every interpolated read below needs idx and idx + 1.
+         if (!v.active || buf == nullptr || buf->numFrames < 2 || buf->channels <= 0)
          {
             v.active = false;
             continue;
@@ -300,13 +508,28 @@ private:
          const float* src0 = buf->channelData.data();
          const float* src1 = buf->channels > 1 ? src0 + frames : src0;
          // Trim: play [startFrame, endFrame); loops wrap inside that range.
-         const double startFrame = (double)mStart[p].load(std::memory_order_relaxed) * (double)(frames - 1);
-         const double endFrame = std::max(startFrame + 2.0,
-                                          (double)mEnd[p].load(std::memory_order_relaxed) * (double)(frames - 1));
+         double startFrame = 0.0, endFrame = 0.0;
+         TrimRange(p, frames, startFrame, endFrame);
          const double rangeLen = std::max(1.0, endFrame - startFrame);
          const double srcRate = buf->sampleRate > 0.0 ? buf->sampleRate : mSampleRate;
-         const double step = (srcRate / mSampleRate) *
-                             std::pow(2.0, (double)mPitch[p].load(std::memory_order_relaxed) / 12.0);
+         // Turbo 0.48: fine tune and speed (negative walks the range back).
+         const double semis = (double)mPitch[p].load(std::memory_order_relaxed) +
+                              (double)mFine[p].load(std::memory_order_relaxed) / 100.0;
+         const double step = (srcRate / mSampleRate) * std::pow(2.0, semis / 12.0) *
+                             (double)mSpeed[p].load(std::memory_order_relaxed);
+         const bool backwards = step < 0.0;
+         const float fadeInMs = mFadeIn[p].load(std::memory_order_relaxed);
+         const float fadeOutMs = mFadeOut[p].load(std::memory_order_relaxed);
+         // Turbo 0.48: the last readable pass position (idx + 1 must exist).
+         const double passEnd = std::max(startFrame, std::min(endFrame - 1.0, (double)(frames - 1)));
+         // Speed 0 (or a vanishing step): a one-shot / gate voice would hold one
+         // sample forever, so it ends; a loop stays on but renders silence.
+         if (std::fabs(step) < 1e-6)
+         {
+            if (!v.looping || v.release >= 0)
+               v.active = false; // (a releasing loop would never finish its fade)
+            continue;
+         }
          float panL = 1.0f, panR = 1.0f;
          DspMath::EqualPowerPan(mPan[p].load(std::memory_order_relaxed), panL, panR);
          const float vol = mVolume[p].load(std::memory_order_relaxed) * v.gain;
@@ -316,29 +539,52 @@ private:
          float* outR = PadWrite(p, 1);
          for (int i = from; i < to; i++)
          {
-            if (v.pos < startFrame)
-               v.pos = startFrame;
-            int idx = (int)v.pos;
-            if (v.pos >= endFrame - 1.0 || idx >= frames - 1)
+            int idx = 0;
+            if (!backwards)
             {
-               if (v.looping)
+               if (v.pos < startFrame)
+                  v.pos = startFrame;
+               idx = (int)v.pos;
+               if (v.pos >= passEnd || idx >= frames - 1)
                {
-                  v.pos = startFrame + std::fmod(v.pos - startFrame, rangeLen);
-                  idx = std::clamp((int)v.pos, 0, frames - 2);
-               }
-               else
-               {
-                  v.active = false;
-                  break;
+                  if (v.looping)
+                  {
+                     v.pos = startFrame + std::fmod(v.pos - startFrame, rangeLen);
+                     idx = std::clamp((int)v.pos, 0, frames - 2);
+                  }
+                  else
+                  {
+                     v.active = false;
+                     break;
+                  }
                }
             }
-            const float frac = (float)(v.pos - (double)idx);
+            else
+            {
+               if (v.pos > passEnd)
+                  v.pos = passEnd;
+               if (v.pos < startFrame)
+               {
+                  if (v.looping)
+                     v.pos = std::max(startFrame, passEnd - std::fmod(startFrame - v.pos, rangeLen));
+                  else
+                  {
+                     v.active = false;
+                     break;
+                  }
+               }
+               idx = std::clamp((int)v.pos, 0, frames - 2);
+            }
+            idx = std::clamp(idx, 0, frames - 2); // frames >= 2 (checked above)
+            const float frac = std::clamp((float)(v.pos - (double)idx), 0.0f, 1.0f);
             const float a = src0[idx] + (src0[idx + 1] - src0[idx]) * frac;
             const float b = src1[idx] + (src1[idx + 1] - src1[idx]) * frac;
-            float env = 1.0f;
+            // Per-pass fade over the trim range (exactly 1 with both at 0).
+            float env = PassFade::Gain(v.pos, startFrame, passEnd, backwards ? -1.0f : 1.0f, fadeInMs, fadeOutMs,
+                                       (float)std::fabs(step), mSampleRate);
             if (v.release >= 0)
             {
-               env = (float)v.release / (float)kReleaseFrames;
+               env *= (float)v.release / (float)kReleaseFrames;
                if (--v.release < 0)
                {
                   v.active = false;
@@ -358,6 +604,12 @@ private:
    const Platform::SampleBuffer* mActive[MpcNode::kPads] = {};
    Voice mVoice[MpcNode::kPads];
    std::vector<float> mPadOut;
+   bool mLoopOn[MpcNode::kPads] = {}; // loop-mode toggle state (audio thread)
+   float mVel[MpcNode::kPads] = {};
+   Pending mPending[MpcNode::kPads];
+   bool mPlaying = false;    // transport state and grid clock, refreshed per block
+   double mBpf = 0.0;        // beats per frame
+   double mBlockStart = 0.0; // beat position of the block's first frame
    int mLastFrames = 0;
 
    NoteEventQueue* mNoteInbox = nullptr;
@@ -373,6 +625,12 @@ private:
    std::atomic<float> mPan[MpcNode::kPads];
    std::atomic<float> mStart[MpcNode::kPads];
    std::atomic<float> mEnd[MpcNode::kPads];
+   std::atomic<float> mSpeed[MpcNode::kPads];
+   std::atomic<float> mFine[MpcNode::kPads];
+   std::atomic<float> mFadeIn[MpcNode::kPads];
+   std::atomic<float> mFadeOut[MpcNode::kPads];
+   std::atomic<int> mSync[MpcNode::kPads];
+   std::atomic<int> mDiv[MpcNode::kPads];
    std::atomic<float> mMaster { 0.8f };
    std::atomic<int> mBaseNote { 36 };
    std::atomic<bool> mVelocitySensitive { true };
@@ -393,6 +651,12 @@ MpcNode::MpcNode() : mAudioNode(std::make_unique<AudioMpcNode>())
       padPan[p] = 0.0f;
       padStart[p] = 0.0f;
       padEnd[p] = 1.0f;
+      padSpeed[p] = 1.0f;
+      padFine[p] = 0.0f;
+      padFadeIn[p] = 0.0f;
+      padFadeOut[p] = 0.0f;
+      padSync[p] = kFree;
+      padDiv[p] = (int)MusicTime::kQuarter;
       padStatus[p] = "empty";
    }
 }
@@ -540,6 +804,22 @@ void MpcNode::VisitParams(ParamVisitor& v)
    v.Float("volume", volume);
    v.Bool("velocitySensitive", velocitySensitive);
    v.Int("selectedPad", selectedPad);
+   // Turbo 0.48: appended after every older key (upstream's key names).
+   for (int p = 0; p < kPads; p++)
+   {
+      snprintf(key, sizeof(key), "pad%d_speed", p);
+      v.Float(key, padSpeed[p]);
+      snprintf(key, sizeof(key), "pad%d_fine", p);
+      v.Float(key, padFine[p]);
+      snprintf(key, sizeof(key), "pad%d_fadein", p);
+      v.Float(key, padFadeIn[p]);
+      snprintf(key, sizeof(key), "pad%d_fadeout", p);
+      v.Float(key, padFadeOut[p]);
+      snprintf(key, sizeof(key), "pad%d_sync", p);
+      v.Int(key, padSync[p]);
+      snprintf(key, sizeof(key), "pad%d_div", p);
+      v.Int(key, padDiv[p]);
+   }
 }
 
 // --------------------------------------------------------------- MPC Out

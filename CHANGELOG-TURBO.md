@@ -1,5 +1,45 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.48.0-turbo (2026-10-03)
+
+### New: MIDI File node (Notes)
+- Plays a Standard MIDI File (.mid / .midi, formats 0 and 1) in time with the transport: positions
+  are in beats, so the file follows the app tempo ("use file tempo" sets the transport to the
+  file's). Playback starts on the quantize grid (default 1 bar) when the transport starts, a file
+  loads, play is turned on, after a seek and at each loop.
+- Track (all or one) and channel filter, transpose, velocity scale, loop with length in bars, a
+  piano-roll preview with the playhead. Note-offs are sent on stop, loop, seek and changes.
+- Drop a .mid on the canvas to create one, or on a MIDI File node to load it there. Own parser,
+  robust against damaged files.
+
+### From upstream Infinite
+- **Looper**: one simple **take length** menu (free, 1/16 to 1/2 bar, 1 to 32 bars) replaces the
+  mode / bars / sub-bar controls; speed, pitch and fine tune (varispeed, like upstream; away from
+  1.0 overdub pauses), fade in / fade out per pass, output volume.
+- **Looper PLAY in time**: with "in time" on (the old "sync to bar") and the transport playing,
+  PLAY and DUB now wait for the next bar line like REC already did (PLAY blinks, "play in 1.2 s");
+  pressed just after a line they start at once, already in phase. Pressing PLAY again cancels.
+  REC and PLAY also lost a one-audio-block late start (the grid was read at the block's end).
+- **MPC**: per pad speed (negative plays the trim range backwards), fine tune, fade in / out and
+  sync to a musical division (a hit waits for the next grid line).
+- **Macro Trigger and Performance bangs** fire Looper buttons and MPC / VMPC pads on every
+  trigger (before, toggles reacted to every second one).
+- **Audio In**: pick a stereo pair, a single input or a mix of all inputs, listed with the
+  device's channel names; warns when the patch was set up on another input device.
+- **Timeline**: live waveforms of clips from node audio are measured at 1/16 beat with min / max,
+  like upstream.
+- **Random Note**: groove (swing of the odd steps, also longer than an audio block).
+- **Sampler**: position (start point inside start..end) and decay (0 = held, as before).
+- **Metronome**: the top bar CLICK is now a drawn metronome whose rod swings with the beat.
+- Patches without node positions wait for the measured node sizes before the automatic layout.
+
+### Notes
+- New saved keys are appended, so older patches load and sound as before. A CV / MIDI mapping on
+  the old Looper mode, sub-bar or "sync to bar" controls needs to be redone on the new menu.
+- MCP: `looper` takes `length` ("2 bars", "1/4 bar", "free") and `in_time`, and reports
+  `length`, `in_time` and `waiting_s`; `looper` and `pads` accept the new params (`pads` also has a `state` action), and invalid
+  values are rejected without changing anything.
+
 ## 0.47.0-turbo (2026-10-02)
 
 ### Claude chat inside the app

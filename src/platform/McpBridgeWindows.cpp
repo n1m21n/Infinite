@@ -35,7 +35,7 @@ using json = nlohmann::json;
 
 namespace
 {
-   const char* kServerVersion = "0.47.0";
+   const char* kServerVersion = "0.48.0";
 
    // ------------------------------------------------------------ stdio ---
    HANDLE gIn = INVALID_HANDLE_VALUE;
@@ -354,10 +354,17 @@ namespace
       { "clip_matrix", "Plays a Clip Matrix (session view): launch / release a cell (row, col), stop_row, scene (col), "
                        "stop_all, or state (what plays and what is queued per row). Launches wait for the quantize grid.",
         R"({"type":"object","properties":{"index":{"type":"integer"},"action":{"type":"string","enum":["launch","release","stop_row","scene","stop_all","state"]},"row":{"type":"integer"},"col":{"type":"integer"}},"required":["index"]})" },
-      { "pads", "Hits a pad (0-15) of an MPC (samples) or VMPC (video clips): hit, down / up (gate pads), stop_all (VMPC).",
-        R"({"type":"object","properties":{"index":{"type":"integer"},"pad":{"type":"integer"},"action":{"type":"string","enum":["hit","down","up","stop_all"]},"velocity":{"type":"number"}},"required":["index","pad"]})" },
-      { "looper", "Drives a Looper: record, stop_record, play, stop, overdub, stop_overdub, clear, undo, redo, state.",
-        R"({"type":"object","properties":{"index":{"type":"integer"},"action":{"type":"string"}},"required":["index","action"]})" },
+      { "pads", "Hits a pad (0-15) of an MPC (samples) or VMPC (video clips): hit, down / up (gate pads), stop_all (VMPC), "
+                "state. MPC pads also take speed (-2..2), fine (cents), fade_in / fade_out (ms), sync (bool) and "
+                "division (\"1/4\", \"1/8T\", \"1 bar\"...), set before the action.",
+        R"({"type":"object","properties":{"index":{"type":"integer"},"pad":{"type":"integer"},"action":{"type":"string","enum":["hit","down","up","stop_all","state"]},"velocity":{"type":"number"},"speed":{"type":"number"},"fine":{"type":"number"},"fade_in":{"type":"number"},"fade_out":{"type":"number"},"sync":{"type":"boolean"},"division":{"type":["string","integer"]}},"required":["index","pad"]})" },
+      { "looper", "Drives a Looper: record, stop_record, play, stop, overdub, stop_overdub, clear, undo, redo, state. "
+                  "With in_time on (default) and the transport playing, record / play / overdub wait for the next bar "
+                  "line (or the take length if shorter); state reports waiting_s. Optional, set before the action: "
+                  "length (\"free\", \"1/16 bar\".. \"1/2 bar\", \"N bars\" or N, 1..32), in_time (bool), take (a "
+                  "division such as \"1/8T\", rarely needed), speed (-2..2), pitch (semitones), finetune (cents), "
+                  "fade_in / fade_out (ms), volume (0..2).",
+        R"({"type":"object","properties":{"index":{"type":"integer"},"action":{"type":"string"},"length":{"type":["string","integer"]},"in_time":{"type":"boolean"},"take":{"type":["string","integer"]},"speed":{"type":"number"},"pitch":{"type":"number"},"finetune":{"type":"number"},"fade_in":{"type":"number"},"fade_out":{"type":"number"},"volume":{"type":"number"}},"required":["index","action"]})" },
       { "drum_pattern", "Drum Sequencer pattern library (Turbo): without pattern, lists the 141 grooves (rock, funk, "
                         "breaks, hip hop, electronic, latin, Brazil, Middle East, India, Africa, jazz; category filters) "
                         "and the lane roles. With index + pattern (number or name) + part (A verse, B bridge, C chorus), "

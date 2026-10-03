@@ -50,11 +50,12 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 | **Clip Matrix** | session view for audio, video and image clips: tracks x scenes (4 x 8 up to 16 x 16), launches quantized on the audio thread, loop / once / gate, tempo sync and pitch per clip, follow actions, scenes with tempo and meter, MIDI and CV launching, recording into the timeline. **Clip Matrix Out** splits it into one video + audio output per track |
 | **Arrangement Timeline** | upstream's timeline: video and audio tracks, track groups, clips from nodes or files, waveforms and thumbnails, 3D clips, tempo-synced samples, loop, markers, render queue to MP4 / MOV / WAV |
 | **Performance Mode** | a dockable panel (PERF, Shift+P) of knobs, faders, XY pads, triggers, selectors and step gates on pages, each bound to any parameter by clicking it, with MIDI learn |
-| **Transport Control** | play / stop / tap, tempo glide, external MIDI clock, key and scale, time signature, metronome; every control is a CV pin (CLICK in the top bar is a metronome without a node) |
-| **Looper** | REC / PLAY / DUB, bar-synced, layer undo / redo, export WAV, latency compensation |
-| **MPC** / **MPC Out** | 16 sample pads (one shot, gate, loop), trim, pitch, pan, a CV pin per pad, one output per pad |
+| **Transport Control** | play / stop / tap, tempo glide, external MIDI clock, key and scale, time signature, metronome; every control is a CV pin (the metronome icon in the top bar is a metronome without a node) |
+| **Looper** | REC / PLAY / DUB that start in time on the bar, one take-length menu (free, 1/16 bar to 32 bars), layer undo / redo, speed / pitch / fine tune (varispeed), fades, volume, export WAV, latency compensation |
+| **MPC** / **MPC Out** | 16 sample pads (one shot, gate, loop), trim, pitch, fine tune, speed (negative = reverse), fades, pan, sync to a musical division, a CV pin per pad, one output per pad |
 | **VMPC** | the MPC for video clips, with their soundtrack |
 | **Super Mixer** | 16 channels, EQ, pan, mute / solo, CV everywhere |
+| **MIDI File** | plays a .mid file (drop it on the canvas) in time with the transport, starting on the quantize grid; track and channel filter, transpose, velocity, loop, piano-roll preview |
 | **Drum Sequencer patterns** | 141 grooves in 10 groups (rock, funk and breaks, hip hop, electronic, latin, Brazil, Middle East, India, Africa, jazz), each in three parts (A verse, B bridge, C chorus with a fill), picked by group and groove with A / B / C buttons; two-tone bells; empty lanes get the bundled Turbo kit |
 | **Chord Progression** | chords held per bar, strum / arp / pulse modes; the builder now has extended, altered and quartal chords (11, 13, maj9#11, 7alt, 7#9, 6/9, so what...) |
 

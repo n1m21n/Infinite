@@ -142,6 +142,7 @@
 #include "audio/Wavetable.h"
 #include "nodes/NoteNodes.h"
 #include "nodes/ChordProgressionNode.h"
+#include "nodes/MidiFileNode.h" // Turbo 0.48
 #include "nodes/TransportControlNode.h"
 #include "core/GestureRecorder.h"
 #include "core/GltfImport.h"
@@ -2037,7 +2038,12 @@ namespace
          return true;
       }
 
-      DiscreteParamRef ref = BeginDiscreteParam(label, currentState ? 1.0f : 0.0f, 0.0f, 1.0f, 1);
+      // Turbo 0.48: a footswitch registers as momentary (kind 2), not as a
+      // checkbox, so a Performance Mode bang or a Macro Trigger drives it with
+      // the plain 1-while-held / 0-on-release level and every trigger rises
+      // (a flip-per-trigger bool only rose on every second one, as upstream
+      // c4a9c58 found for its Looper).
+      DiscreteParamRef ref = BeginDiscreteParam(label, currentState ? 1.0f : 0.0f, 0.0f, 1.0f, toggleOnRise ? 2 : 1);
       bool changedByCv = false;
       if (ref.modulated)
       {
@@ -2059,7 +2065,10 @@ namespace
       }
       else
       {
-         gDiscretePreviousHigh[{ref.nodeIndex, ref.paramIndex}] = currentState;
+         // A rising-edge button idles low between drives: a one-frame
+         // Performance Mode write must still read as an edge while the
+         // button's state is on (e.g. stopping a take).
+         gDiscretePreviousHigh[{ref.nodeIndex, ref.paramIndex}] = toggleOnRise ? false : currentState;
       }
 
       const float width = size.x > 0.0f ? std::max(8.0f, size.x - 18.0f) : size.x;
@@ -2088,8 +2097,11 @@ namespace
    {
       clicked = false;
       DiscreteParamRef ref;
+      // Turbo 0.48: momentary (kind 2), so a Performance Mode bang or Macro
+      // Trigger holds the pad for as long as it is high instead of flipping
+      // it on one trigger and off the next (every trigger plays the pad).
       if (gCurrentNodeIndex >= 0)
-         ref = BeginDiscreteParam(label, 0.0f, 0.0f, 1.0f);
+         ref = BeginDiscreteParam(label, 0.0f, 0.0f, 1.0f, 2);
       const bool cvHigh = ref.valid && ref.modulated && *ref.value >= 0.5f;
       const float width = ref.valid ? std::max(8.0f, size.x - 18.0f) : size.x;
       const bool isLight = IsThemeLight();
@@ -3717,6 +3729,7 @@ namespace
       REGISTER_NODE(VelocityToCVNode, Velocity to CV, "Modulators");
       REGISTER_NODE(KeyboardNode, Keyboard, "Notes");
       REGISTER_NODE(ChordProgressionNode, Chord Progression, "Notes");
+      REGISTER_NODE(MidiFileNode, MIDI File, "Notes"); // Turbo 0.48
       REGISTER_NODE(TransportControlNode, Transport Control, "Control");
       REGISTER_NODE(NoteSwitcherNode, Note Switcher, "Notes");
       REGISTER_NODE(AudioToCVNode, Audio to CV, "Modulators");
@@ -4779,6 +4792,8 @@ namespace
          video->ReloadFromPath();
       if (auto* palette = dynamic_cast<PaletteNode*>(node))
          palette->ReloadFromPath();
+      if (auto* midi = dynamic_cast<MidiFileNode*>(node))
+         midi->ReloadFromPath(); // Turbo 0.48
       if (auto* formula = dynamic_cast<FormulaNode*>(node))
          formula->Apply();
       // Re-instantiates the plugin from the identity VisitParams just restored
@@ -6193,7 +6208,9 @@ namespace
    {
       const float r = 22.0f, bezel = 3.0f, contentH = (r + bezel) * 2.0f;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
-      DiscreteParamRef ref = BeginDiscreteParam("trigger", n->pressed ? 1.0f : 0.0f, 0.0f, 1.0f);
+      // Turbo 0.48: momentary, so a Performance Mode bang presses the trigger
+      // for as long as it is held instead of latching it on every second tap.
+      DiscreteParamRef ref = BeginDiscreteParam("trigger", n->pressed ? 1.0f : 0.0f, 0.0f, 1.0f, 2);
       const ImVec2 padTL = ImGui::GetCursorScreenPos();
       ImGui::InvisibleButton("##macrotriggerbtn", ImVec2(contentH, contentH));
       const bool hovered = ImGui::IsItemHovered();
@@ -7638,9 +7655,12 @@ namespace
       // so it reads as one of the row. v2's DropdownButton put its label to
       // the *right* of the button, which both broke the row's rhythm and ate
       // ~60px of its width.
+      // modCount > 0: only the first modCount options are reachable by CV /
+      // MIDI / Performance (Turbo 0.48: an option appended later keeps the old
+      // modulation range, so existing patches map as before).
       void Dropdown(const char* label, const std::vector<std::string>& options, int current,
                     std::function<void(int)> onSelect,
-                    const std::vector<std::string>& categories = {})
+                    const std::vector<std::string>& categories = {}, int modCount = 0)
       {
          if (options.empty())
          {
@@ -7654,11 +7674,12 @@ namespace
          // bottom-aligning left a tall empty gap above the button and made
          // it read as sitting low relative to the knobs sharing its row.
          ImGui::SetCursorScreenPos(ImVec2(cx - btnW * 0.5f, y0 + (maxDia - btnH) * 0.5f));
-         DiscreteParamRef ref = BeginDiscreteParam(label, (float)current, 0.0f, (float)options.size() - 1.0f);
+         const int modMax = (modCount > 0 ? std::min(modCount, (int)options.size()) : (int)options.size()) - 1;
+         DiscreteParamRef ref = BeginDiscreteParam(label, (float)current, 0.0f, (float)modMax);
          int safe = std::clamp(current, 0, (int)options.size() - 1);
          if (ref.modulated)
          {
-            const int driven = std::clamp((int)lroundf(*ref.value), 0, (int)options.size() - 1);
+            const int driven = std::clamp((int)lroundf(*ref.value), 0, modMax);
             if (driven != safe)
             {
                safe = driven;
@@ -10838,6 +10859,12 @@ namespace
       AudioSlider("fade in", &n->fadeIn, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
       ImGui::SameLine();
       AudioSlider("fade out", &n->fadeOut, 0.0f, 250.0f, "%.0f ms", AudioHalfWidth());
+      // Turbo 0.48 (upstream port): playback start within the range, and note-voice
+      // decay (0 = held). Drawn last so existing modulation pin ordinals stay put.
+      if (AudioSlider("position", &n->position, 0.0f, 1.0f, "%.3f", AudioHalfWidth()))
+         n->position = std::clamp(n->position, n->start, std::max(n->start, n->end)); // start > end via set_param
+      ImGui::SameLine();
+      AudioSlider("decay", &n->decay, 0.0f, 10.0f, n->decay <= 0.0f ? "held" : "%.2f s", AudioHalfWidth());
 
       EndAudioBody();
    }
@@ -12561,43 +12588,74 @@ namespace
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
-      // Turbo: which input(s) of the device. Pairs "1+2", "3+4"... and every
-      // single channel as mono, named after the driver's channel names.
+      // Turbo: which input(s) of the device. Pairs "1+2", "3+4"..., every
+      // single channel as mono and (0.48) a mix of all inputs, named after the
+      // driver's channel names. Encoded as channelMode (upstream meaning).
       {
          static std::vector<std::string> sNames;
+         static std::string sDevice;
          static double sNextRefresh = 0.0;
          if (ImGui::GetTime() >= sNextRefresh)
          {
             sNames = Platform::AudioInputChannelNames();
+            sDevice = Platform::AudioInputDeviceName();
             sNextRefresh = ImGui::GetTime() + 1.0;
          }
+         n->SyncChannelKeys();
+         auto chName = [](int ch) { return ch < (int)sNames.size() ? sNames[ch] : std::string(); };
          const int count = std::max(2, (int)sNames.size());
          std::vector<std::string> options;
-         std::vector<std::pair<int, bool>> choices; // (first, mono)
+         std::vector<std::pair<int, int>> choices; // (channelMode, firstChannel)
          for (int ch = 0; ch + 1 < count; ch += 2)
          {
-            options.push_back("in " + std::to_string(ch + 1) + "+" + std::to_string(ch + 2));
-            choices.push_back({ ch, false });
+            std::string label = "in " + std::to_string(ch + 1) + "+" + std::to_string(ch + 2);
+            if (!chName(ch).empty())
+               label += "  " + chName(ch) + " / " + chName(ch + 1);
+            options.push_back(label);
+            choices.push_back({ 0, ch });
          }
          for (int ch = 0; ch < count; ch++)
          {
             std::string label = "in " + std::to_string(ch + 1) + " (mono)";
-            if (ch < (int)sNames.size() && !sNames[ch].empty())
-               label += "  " + sNames[ch];
+            if (!chName(ch).empty())
+               label += "  " + chName(ch);
             options.push_back(label);
-            choices.push_back({ ch, true });
+            choices.push_back({ ch + 1, ch });
          }
-         int current = 0;
+         options.push_back("mix (all inputs)");
+         choices.push_back({ AudioInputNode::kChannelModeMix, n->firstChannel });
+         int current = -1;
          for (int i = 0; i < (int)choices.size(); i++)
-            if (choices[i].first == n->firstChannel && choices[i].second == n->mono)
+            if (choices[i].first == n->channelMode && (n->channelMode != 0 || choices[i].second == n->firstChannel))
                current = i;
+         bool missing = false;
+         if (current < 0) // saved on a device with more inputs than this one
+         {
+            missing = true;
+            options.push_back(n->channelMode > 0 ? "in " + std::to_string(n->channelMode) + " (mono)"
+                                                 : "in " + std::to_string(n->firstChannel + 1) + "+" +
+                                                       std::to_string(n->firstChannel + 2));
+            choices.push_back({ n->channelMode, n->firstChannel });
+            current = (int)choices.size() - 1;
+         }
          DropdownButton("inputs", options, current, [n, choices](int i) {
             PushUndoCheckpoint();
-            n->firstChannel = choices[i].first;
-            n->mono = choices[i].second;
+            n->channelMode = choices[i].first;
+            n->firstChannel = choices[i].second;
+            n->mono = choices[i].first > 0;
+            n->SyncChannelKeys();
+            n->deviceName = sDevice; // remember which device the choice was made on
          }, gAudioContentW, false);
-         const std::string dev = Platform::AudioInputDeviceName();
-         ImGui::TextDisabled("%s", dev.empty() ? "default input (Settings > Audio)" : dev.c_str());
+         ImGui::TextDisabled("%s", sDevice.empty() ? "default input (Settings > Audio)" : sDevice.c_str());
+         if (missing && !sNames.empty())
+            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f), "not on this device");
+         else if (!n->deviceName.empty() && !sDevice.empty() && n->deviceName != sDevice)
+         {
+            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f), "set on another device");
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("Channels were chosen on \"%s\".\nTurbo reads the input device picked in Settings > Audio.",
+                                 n->deviceName.c_str());
+         }
       }
 
       const float faderH = 132.0f;
@@ -13758,6 +13816,11 @@ namespace
                   NoteNameList()[n->rangeLow % 12].c_str(), NoteNameList()[n->rangeHigh % 12].c_str());
       else
          snprintf(stat, sizeof(stat), "last: %s%d", NoteNameList()[last % 12].c_str(), last / 12 - 1);
+      if (n->groove > 0.001f) // Turbo 0.48: show swing amount
+      {
+         const size_t len = strlen(stat);
+         snprintf(stat + len, sizeof(stat) - len, " - %.0f%% groove", n->groove * 100.0f);
+      }
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
@@ -13783,6 +13846,9 @@ namespace
       }
 
       ModCheckbox("Global Scale##rngGlobal", &n->useGlobalScale);
+      // Turbo 0.48 (upstream port): swing. Drawn last so existing modulation pin
+      // ordinals (draw order) stay put.
+      AudioSlider("groove", &n->groove, 0.0f, 1.0f, "%.2f", AudioFullWidth());
 
       EndAudioBody();
    }
@@ -14496,6 +14562,149 @@ namespace
       AudioToggleButton("bass", &n->bass, 56.0f);
       ImGui::SameLine();
       AudioToggleButton("sets key", &n->setsKey, 76.0f);
+
+      EndAudioBody();
+   }
+
+   // Turbo 0.48: MIDI File. Load, file tempo, a mini piano roll of the notes
+   // that will play (track / channel filter applied, the rest faint) with
+   // the loop end and the playhead, then the filter and playback controls.
+   void DrawMidiFileBody(GraphNode& gn, MidiFileNode* n)
+   {
+      const MidiFile::Data* d = n->Data();
+      char stat[200];
+      if (!n->FileName().empty())
+         snprintf(stat, sizeof(stat), "%s  -  %s", n->FileName().c_str(), n->Status().c_str());
+      else
+         snprintf(stat, sizeof(stat), "%s", n->Status().c_str());
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      if (ImGui::Button("Load...##midiLoad", ImVec2(90, 0)))
+         StartNodeFileDialog(n, Platform::OpenMidiDialog, [](auto* m, const std::string& path) {
+            PushUndoCheckpoint();
+            m->LoadFile(path);
+            gPatchDirty = true;
+         });
+      if (d != nullptr)
+      {
+         ImGui::SameLine();
+         char tempoLabel[64];
+         snprintf(tempoLabel, sizeof(tempoLabel), "use file tempo (%.1f)##midiTempo", n->FileTempo());
+         if (ImGui::Button(tempoLabel))
+            Transport::Instance().SetTempo((float)std::clamp(n->FileTempo(), 20.0, 400.0));
+         if (ImGui::IsItemHovered())
+            SetAudioReadout("tempo", "sets the transport tempo to the file's first tempo");
+      }
+
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Piano roll.
+      {
+         const bool isLight = IsThemeLight();
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const float w = gAudioContentW;
+         const float h = 96.0f;
+         const ImVec2 mn(gAudioContentX, ImGui::GetCursorScreenPos().y);
+         const ImVec2 mx(mn.x + w, mn.y + h);
+         dl->AddRectFilled(mn, mx, isLight ? IM_COL32(226, 230, 238, 255) : IM_COL32(22, 24, 31, 255), 4.0f);
+         if (d != nullptr && !d->notes.empty())
+         {
+            const double fileLen = std::max(d->LengthBeats(), 1.0e-3);
+            const double playLen = std::max(n->PlayLengthBeats(), 1.0e-3);
+            const double span = std::max(fileLen, playLen);
+            const double bpb = std::max(0.25, Transport::Instance().BeatsPerBar());
+            int lo = 127, hi = 0;
+            for (const MidiFile::Note& note : d->notes)
+            {
+               lo = std::min(lo, (int)note.key);
+               hi = std::max(hi, (int)note.key);
+            }
+            lo = std::max(0, lo - 1);
+            hi = std::min(127, hi + 1);
+            const float rowH = (h - 4.0f) / (float)(hi - lo + 1);
+            auto xOf = [&](double beat) { return mn.x + 2.0f + (float)(beat / span) * (w - 4.0f); };
+            dl->PushClipRect(mn, mx, true);
+            const ImU32 barCol = isLight ? IM_COL32(190, 196, 210, 255) : IM_COL32(44, 48, 60, 255);
+            const int bars = (int)std::min(512.0, std::ceil(span / bpb));
+            for (int b = 1; b < bars; b++)
+               dl->AddLine(ImVec2(xOf(b * bpb), mn.y), ImVec2(xOf(b * bpb), mx.y), barCol);
+            const ImU32 onCol = isLight ? IM_COL32(60, 120, 230, 255) : IM_COL32(110, 170, 255, 255);
+            const ImU32 offCol = isLight ? IM_COL32(170, 178, 196, 255) : IM_COL32(64, 70, 88, 255);
+            int drawn = 0;
+            for (const MidiFile::Note& note : d->notes)
+            {
+               if (++drawn > 20000)
+                  break;
+               const bool plays = (n->track == 0 || note.track + 1 == n->track) &&
+                                  (n->channel == 0 || note.channel + 1 == n->channel);
+               const double s0 = d->TicksToBeats(note.startTick);
+               const double s1 = std::max(s0 + span * 0.002, d->TicksToBeats(note.endTick));
+               const float y1 = mx.y - 2.0f - (float)(note.key - lo) * rowH;
+               dl->AddRectFilled(ImVec2(xOf(s0), y1 - std::max(1.0f, rowH - 0.5f)), ImVec2(xOf(s1), y1),
+                                 plays && s0 < playLen ? onCol : offCol);
+            }
+            if (playLen < span - 1.0e-6)
+            {
+               // Loop end: the part after it never plays.
+               dl->AddRectFilled(ImVec2(xOf(playLen), mn.y), mx, isLight ? IM_COL32(0, 0, 0, 30) : IM_COL32(0, 0, 0, 90));
+               dl->AddLine(ImVec2(xOf(playLen), mn.y), ImVec2(xOf(playLen), mx.y), IM_COL32(230, 160, 60, 255), 1.5f);
+            }
+            const double ph = n->PlayheadBeats();
+            if (ph >= 0.0)
+               dl->AddLine(ImVec2(xOf(ph), mn.y), ImVec2(xOf(ph), mx.y), isLight ? IM_COL32(20, 20, 20, 255) : IM_COL32(255, 255, 255, 230), 1.5f);
+            dl->PopClipRect();
+         }
+         else
+         {
+            const char* hint = "load or drop a .mid file";
+            const ImVec2 ts = ImGui::CalcTextSize(hint);
+            dl->AddText(ImVec2(mn.x + (w - ts.x) * 0.5f, mn.y + (h - ts.y) * 0.5f),
+                        isLight ? IM_COL32(110, 116, 130, 255) : IM_COL32(120, 126, 142, 255), hint);
+         }
+         ImGui::SetCursorScreenPos(mn);
+         ImGui::Dummy(ImVec2(w, h));
+      }
+
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      // Which notes: track, channel, and the grid playback starts on. The
+      // track list always has an entry so the dropdown keeps its param slot.
+      {
+         static const std::vector<std::string> kNoTracks = { "all tracks" };
+         static const std::vector<std::string> kChannels = [] {
+            std::vector<std::string> v = { "all" };
+            for (int c = 1; c <= 16; c++)
+               v.push_back(std::to_string(c));
+            return v;
+         }();
+         const std::vector<std::string>& tracks = n->TrackNames().empty() ? kNoTracks : n->TrackNames();
+         AudioKnobRow row(3, kKnobSmall, ImGui::GetFrameHeight() + 5.0f);
+         row.Dropdown("track", tracks, std::clamp(n->track, 0, (int)tracks.size() - 1),
+                      [n](int i) { PushUndoCheckpoint(); n->track = i; });
+         row.Dropdown("channel", kChannels, std::clamp(n->channel, 0, 16),
+                      [n](int i) { PushUndoCheckpoint(); n->channel = i; });
+         row.Dropdown("start", MusicTime::RateDivisionList(),
+                      std::clamp(n->quantize, 0, MusicTime::kNumRateDivisions - 1),
+                      [n](int i) { PushUndoCheckpoint(); n->quantize = i; });
+         row.End();
+      }
+      {
+         AudioKnobRow row(3, kKnobLarge);
+         row.KnobInt("transpose", &n->transpose, -48, 48, kKnobLarge);
+         row.Knob("velocity", &n->velocityScale, 0.0f, 2.0f, "%.2f", kKnobLarge);
+         ImGui::BeginDisabled(!n->loop);
+         row.KnobInt("loop bars", &n->loopBars, 0, 64, kKnobLarge);
+         ImGui::EndDisabled();
+         row.End();
+      }
+      AudioToggleButton("play##midiPlay", &n->play, 56.0f);
+      ImGui::SameLine();
+      AudioToggleButton("loop##midiLoop", &n->loop, 56.0f);
+      if (n->loop && n->loopBars == 0)
+      {
+         ImGui::SameLine();
+         ImGui::TextDisabled("loop = file length");
+      }
 
       EndAudioBody();
    }
@@ -18084,7 +18293,10 @@ namespace
       {
          char armed[96];
          snprintf(armed, sizeof(armed), "armed - starts on the next %s in %.2f s",
-                  n->lengthMode == LooperNode::kLengthSubBar ? "sub-bar" : "bar", n->ArmedSeconds());
+                  n->lengthMode == LooperNode::kLengthSubBar     ? "sub-bar"
+                  : n->lengthMode == LooperNode::kLengthDivision ? "grid line"
+                                                                 : "bar",
+                  n->ArmedSeconds());
          dl->AddText(ImVec2(o.x + 10.0f, o.y + h * 0.5f - 7.0f), col, armed);
       }
       else if (n->HasLoop())
@@ -18127,22 +18339,26 @@ namespace
 
          ImGui::PushStyleColor(ImGuiCol_Button, n->IsRecordingOrArmed() ? ImVec4(0.75f, 0.18f, 0.18f, 1.0f)
                                                                          : ImVec4(0.30f, 0.12f, 0.12f, 1.0f));
+         // Turbo 0.48: each press (click or CV rising edge) is resolved on
+         // the audio thread, so repeated Macro Triggers fire every time.
          if (ModStateButton("REC##looperRec", n->IsRecordingOrArmed(), requested, size, /*toggleOnRise=*/true))
-            n->SetRecord(requested);
+            n->PressRecord();
          ImGui::PopStyleColor();
          ImGui::SameLine();
 
-         ImGui::PushStyleColor(ImGuiCol_Button, n->IsPlaying() ? ImVec4(0.20f, 0.55f, 0.32f, 1.0f)
-                                                               : ImVec4(0.12f, 0.24f, 0.16f, 1.0f));
+         // A quantized PLAY waiting for its line blinks.
+         const bool playWaiting = n->PlayWaitSeconds() > 0.0f && std::fmod(ImGui::GetTime(), 0.5) < 0.25;
+         ImGui::PushStyleColor(ImGuiCol_Button, (n->IsPlaying() || playWaiting) ? ImVec4(0.20f, 0.55f, 0.32f, 1.0f)
+                                                                                : ImVec4(0.12f, 0.24f, 0.16f, 1.0f));
          if (ModStateButton("PLAY##looperPlay", n->IsPlaying(), requested, size, /*toggleOnRise=*/true))
-            n->SetPlay(requested);
+            n->PressPlay();
          ImGui::PopStyleColor();
          ImGui::SameLine();
 
          ImGui::PushStyleColor(ImGuiCol_Button, n->IsOverdubbing() ? ImVec4(0.80f, 0.50f, 0.15f, 1.0f)
                                                                    : ImVec4(0.30f, 0.20f, 0.10f, 1.0f));
          if (ModStateButton("DUB##looperDub", n->IsOverdubbing(), requested, size, /*toggleOnRise=*/true))
-            n->SetOverdub(requested);
+            n->PressOverdub();
          ImGui::PopStyleColor();
          ImGui::SameLine();
 
@@ -18192,27 +18408,92 @@ namespace
       }
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
-      BeginAudioSection("length");
+      // Turbo 0.48: one "take length" menu instead of mode + bars + sub-bar +
+      // division controls. It writes the same saved keys (lengthMode, bars,
+      // subDivision); a Division take (RPC / older 0.48 patches) shows as the
+      // last entry.
+      BeginAudioSection("take length");
       {
-         static const std::vector<std::string> kModes = { "Bars", "Sub-bar", "Free" };
-         static const std::vector<std::string> kSubs = { "1/2 bar", "1/4 bar", "1/8 bar", "1/16 bar" };
-         AudioKnobRow row(3, kKnobStd);
-         row.Dropdown("mode##looperMode", kModes, n->lengthMode,
-                      [n](int v) { PushUndoCheckpoint(); n->lengthMode = v; });
-         if (n->lengthMode != LooperNode::kLengthBars)
-            ImGui::BeginDisabled();
-         row.KnobInt("bars", &n->bars, 1, 32);
-         if (n->lengthMode != LooperNode::kLengthBars)
-            ImGui::EndDisabled();
-         row.Dropdown("sub-bar##looperSub", kSubs, n->subDivision,
-                      [n](int v) { PushUndoCheckpoint(); n->subDivision = v; });
-         row.End();
+         struct LenChoice { const char* name; int mode; int bars; int sub; };
+         static const LenChoice kChoices[] = {
+            { "free: press REC again to close", LooperNode::kLengthFree, 0, 0 },
+            { "1/16 bar", LooperNode::kLengthSubBar, 0, 3 },
+            { "1/8 bar", LooperNode::kLengthSubBar, 0, 2 },
+            { "1/4 bar (1 beat)", LooperNode::kLengthSubBar, 0, 1 },
+            { "1/2 bar", LooperNode::kLengthSubBar, 0, 0 },
+            { "1 bar", LooperNode::kLengthBars, 1, 0 },
+            { "2 bars", LooperNode::kLengthBars, 2, 0 },
+            { "3 bars", LooperNode::kLengthBars, 3, 0 },
+            { "4 bars", LooperNode::kLengthBars, 4, 0 },
+            { "6 bars", LooperNode::kLengthBars, 6, 0 },
+            { "8 bars", LooperNode::kLengthBars, 8, 0 },
+            { "12 bars", LooperNode::kLengthBars, 12, 0 },
+            { "16 bars", LooperNode::kLengthBars, 16, 0 },
+            { "24 bars", LooperNode::kLengthBars, 24, 0 },
+            { "32 bars", LooperNode::kLengthBars, 32, 0 },
+         };
+         constexpr int kNumChoices = (int)(sizeof(kChoices) / sizeof(kChoices[0]));
+         int current = -1;
+         for (int c = 0; c < kNumChoices && current < 0; c++)
+         {
+            const LenChoice& ch = kChoices[c];
+            if (ch.mode != n->lengthMode)
+               continue;
+            if ((ch.mode == LooperNode::kLengthFree) || (ch.mode == LooperNode::kLengthBars && ch.bars == n->bars) ||
+                (ch.mode == LooperNode::kLengthSubBar && ch.sub == n->subDivision))
+               current = c;
+         }
+         // The last entry is whatever the menu has no row for (5 bars, a division).
+         std::vector<std::string> names;
+         for (const LenChoice& ch : kChoices)
+            names.push_back(ch.name);
+         char other[64];
+         if (n->lengthMode == LooperNode::kLengthDivision)
+            snprintf(other, sizeof(other), "%s (division)", MusicTime::RateDivisionName(n->takeDivision));
+         else if (current < 0 && n->lengthMode == LooperNode::kLengthBars)
+            snprintf(other, sizeof(other), "%d bars", n->bars);
+         else
+            snprintf(other, sizeof(other), "other (set from MCP)");
+         names.push_back(other);
+         if (current < 0)
+            current = kNumChoices;
+         const float gap = ImGui::GetStyle().ItemSpacing.x;
+         ImGui::TextDisabled("length");
+         ImGui::SameLine();
+         AudioBareDropdown("length##looperLen", names, current,
+                           [n](int c) {
+                              if (c < 0 || c >= (int)(sizeof(kChoices) / sizeof(kChoices[0])))
+                                 return; // the "other" row keeps what is set
+                              PushUndoCheckpoint();
+                              n->lengthMode = kChoices[c].mode;
+                              if (kChoices[c].mode == LooperNode::kLengthBars)
+                                 n->bars = kChoices[c].bars;
+                              if (kChoices[c].mode == LooperNode::kLengthSubBar)
+                                 n->subDivision = kChoices[c].sub;
+                           },
+                           gAudioContentW - ImGui::CalcTextSize("length").x - gap, {}, true);
+         // The old "bars" knob had a positional pin: keep its slot so the
+         // knobs below keep their modulation pin numbers in saved patches.
+         gParamCounter++;
       }
-      if (AudioToggleButton("sync to bar##looperSync", &n->syncStart, 110.0f))
+      if (AudioToggleButton("in time##looperSync", &n->syncStart, 90.0f))
          PushUndoCheckpoint();
+      if (ImGui::IsItemHovered())
+         ImGui::SetTooltip("REC, PLAY and DUB wait for the next bar line (or the take length, if shorter)\n"
+                           "while the transport plays; pressed just after a line they start at once, in time");
       ImGui::SameLine();
       if (AudioToggleButton("loop##looperLoop", &n->loop, 70.0f))
          PushUndoCheckpoint();
+      if (n->PlayWaitSeconds() > 0.0f)
+      {
+         ImGui::SameLine();
+         ImGui::TextColored(ImVec4(0.45f, 0.85f, 0.55f, 1.0f), "play in %.1f s", n->PlayWaitSeconds());
+      }
+      else if (n->CurrentState() == LooperNode::kArmed)
+      {
+         ImGui::SameLine();
+         ImGui::TextColored(ImVec4(0.95f, 0.45f, 0.40f, 1.0f), "rec in %.1f s", n->ArmedSeconds());
+      }
       EndAudioSection();
 
       BeginAudioSection("playback");
@@ -18237,6 +18518,25 @@ namespace
          ImGui::TextDisabled("comp %.1f ms", n->CompensationMs());
          AudioKnobRow row(1, kKnobStd);
          row.Knob("offset ms", &n->latencyOffsetMs, -100.0f, 300.0f, "%+.0f ms");
+         row.End();
+      }
+      EndAudioSection();
+
+      // Turbo 0.48 (from upstream): varispeed playback, per-pass fades and
+      // output volume. Drawn last so the knobs above keep their pin numbers.
+      BeginAudioSection(n->AtUnity() ? "speed / fades" : "speed / fades - drifts, overdub paused");
+      {
+         AudioKnobRow row(3, kKnobStd);
+         row.Knob("speed", &n->speed, -2.0f, 2.0f, "%.2fx");
+         row.Knob("pitch", &n->pitch, -24.0f, 24.0f, "%+.1f st");
+         row.Knob("fine", &n->finetune, -50.0f, 50.0f, "%+.0f ct");
+         row.End();
+      }
+      {
+         AudioKnobRow row(3, kKnobStd);
+         row.Knob("fade in", &n->fadeIn, 0.0f, 250.0f, "%.0f ms");
+         row.Knob("fade out", &n->fadeOut, 0.0f, 250.0f, "%.0f ms");
+         row.Knob("volume", &n->volume, 0.0f, 2.0f, "%.2f");
          row.End();
       }
       EndAudioSection();
@@ -18421,6 +18721,49 @@ namespace
       ImGui::SetNextItemWidth(third);
       ImGui::DragFloat("##mpcPan", &n->padPan[p], 0.005f, -1.0f, 1.0f, "pan %.2f", clampFlags);
       if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+      // Turbo 0.48 (from upstream): speed, fine tune, per-pass fades, sync.
+      const float quarter = (gAudioContentW - 3.0f * ImGui::GetStyle().ItemSpacing.x) / 4.0f;
+      ImGui::SetNextItemWidth(quarter);
+      ImGui::DragFloat("##mpcSpeed", &n->padSpeed[p], 0.005f, -2.0f, 2.0f, "speed %.2fx", clampFlags);
+      if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(quarter);
+      ImGui::DragFloat("##mpcFine", &n->padFine[p], 0.25f, -50.0f, 50.0f, "fine %+.0f ct", clampFlags);
+      if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(quarter);
+      ImGui::DragFloat("##mpcFadeIn", &n->padFadeIn[p], 0.5f, 0.0f, 250.0f, "in %.0f ms", clampFlags);
+      if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(quarter);
+      ImGui::DragFloat("##mpcFadeOut", &n->padFadeOut[p], 0.5f, 0.0f, 250.0f, "out %.0f ms", clampFlags);
+      if (ImGui::IsItemActivated()) PushUndoCheckpoint();
+      bool synced = n->padSync[p] == MpcNode::kSynced;
+      if (ImGui::Checkbox("sync to##mpcSync", &synced))
+      {
+         PushUndoCheckpoint();
+         n->padSync[p] = synced ? MpcNode::kSynced : MpcNode::kFree;
+      }
+      if (ImGui::IsItemHovered())
+         ImGui::SetTooltip("a hit waits for the next line of this division (loop: one pass per division)");
+      ImGui::SameLine();
+      if (!synced)
+         ImGui::BeginDisabled();
+      const std::vector<std::string>& divs = MusicTime::RateDivisionList();
+      const int div = std::clamp(n->padDiv[p], 0, (int)divs.size() - 1);
+      ImGui::SetNextItemWidth(90.0f);
+      if (ImGui::BeginCombo("##mpcDiv", divs[(size_t)div].c_str()))
+      {
+         for (int d = 0; d < (int)divs.size(); d++)
+            if (ImGui::Selectable(divs[(size_t)d].c_str(), d == div))
+            {
+               PushUndoCheckpoint();
+               n->padDiv[p] = d;
+            }
+         ImGui::EndCombo();
+      }
+      if (!synced)
+         ImGui::EndDisabled();
       ImGui::PopID();
       EndAudioSection();
 
@@ -19759,6 +20102,8 @@ namespace
          DrawTransportControlBody(gn, n);
       else if (auto* n = dynamic_cast<ChordProgressionNode*>(gn.node.get()))
          DrawChordProgressionBody(gn, n);
+      else if (auto* n = dynamic_cast<MidiFileNode*>(gn.node.get()))
+         DrawMidiFileBody(gn, n); // Turbo 0.48
       else if (auto* n = dynamic_cast<GrainMolderNode*>(gn.node.get()))
          DrawGrainMolderBody(gn, n);
       else if (auto* n = dynamic_cast<MolderNode*>(gn.node.get()))
@@ -23427,7 +23772,7 @@ namespace
          { "Timeline", "The Arrangement Timeline's video as a node: the composite of every video track at the playhead (blend modes, opacity, fades, grade). Wire it to an Output to project the arrangement, or into filters like any image. width/height set its resolution. Open the timeline with Shift+T (VIEW > Arrangement timeline)." },
          { "Looper", "A live looper on one audio input. REC starts a take (with sync on, it waits for the next bar or sub-bar line of the transport), PLAY starts/stops the loop, DUB layers the input over the loop while it plays, CLEAR empties it. Length: a number of bars, a fraction of a bar, or free (REC again ends the take). Playback forward, reverse or ping-pong, looping or once. thru is the input monitoring level, level the loop volume. Every button has a CV pin. Takes are shifted by the interface round-trip latency (auto, plus a manual offset in ms) so they land on the grid. A REC pressed up to 200 ms after a line still starts on that line. UNDO / REDO step through the takes and overdub layers (UNDO during an overdub closes and removes it). The loop is saved with the patch (a WAV in the Recordings folder) and EXPORT WAV writes the mix of all layers. Up to 120 s at 48 kHz." },
          { "Super Mixer", "A 16-channel mixer: per channel an input gain (+/-24 dB), a fader, pan, mute, solo and a 3-band EQ (low shelf 120 Hz, sweepable mid peak, high shelf 8 kHz, each +/-15 dB), plus a master fader. Every control has a CV pin." },
-         { "Audio In", "Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch." },
+         { "Audio In", "Captures the input device chosen in Settings > Audio (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. The inputs menu picks a stereo pair, a single channel (mono) or a mix of every input, so several Audio In nodes can split one multichannel interface. Trim is a plain gain stage; capture starts the first time this node cooks, so it stays idle until it's actually in a patch." },
          { "Audio Filter", "One filter, one of 12 types (LP/HP at 12/24/36 dB, BP, notch, shelves, peak, all-pass). Drag the handle on the response curve to set frequency and gain, scroll over it to change Q - the picture is the control." },
          { "Audio Color Ramp", "Splits incoming audio into up to 8 frequency bands - drag the dividers right on the spectrum display to resize them - and assigns each one a colour, VIBGYOR by default from low to high. With no image patched in it outputs the resulting gradient standalone; patch one into its optional image input and it grades that image by luminance through the same audio-reactive palette instead." },
          { "EQ", "Five fixed bands (low shelf, three peaks, high shelf by default), each switchable to any of low shelf/peak/high shelf/hp 12/lp 12 and independently on or off. Drag a band's dot on the curve to set its frequency and gain, drag its diamond to set Q, double-click the dot to bypass that band - the knob row below always follows whichever band you last touched." },
@@ -36453,10 +36798,41 @@ int main(int argc, char** argv)
                   ImGui::PushStyleColor(ImGuiCol_Button, flash ? (downbeat ? ImVec4(0.95f, 0.55f, 0.20f, 1.0f)
                                                                           : ImVec4(0.30f, 0.65f, 0.95f, 1.0f))
                                                                : ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
-               if (ImGui::Button("CLICK"))
+               // Turbo 0.48: a drawn metronome instead of the "CLICK" text (as
+               // upstream), same width so the top-bar layout math is unchanged.
+               if (ImGui::Button("##clickBtn", ImVec2(clickBtnWidth, 0.0f)))
                   AudioEngine::Instance().SetTopBarClick(!clickOn);
                if (pushed)
                   ImGui::PopStyleColor();
+               {
+                  ImDrawList* dl = ImGui::GetWindowDrawList();
+                  const ImVec2 bmin = ImGui::GetItemRectMin();
+                  const ImVec2 bmax = ImGui::GetItemRectMax();
+                  const float h = (bmax.y - bmin.y) * 0.74f;
+                  const float cx = (bmin.x + bmax.x) * 0.5f;
+                  const float top = (bmin.y + bmax.y) * 0.5f - h * 0.5f;
+                  const float bot = top + h;
+                  ImVec4 col = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+                  if (!clickOn)
+                     col.w *= 0.6f;
+                  const ImU32 c = ImGui::GetColorU32(col);
+                  const float th = std::max(1.0f, h * 0.075f);
+                  // Body: a trapezoid, narrow at the top, plus the base.
+                  const ImVec2 body[4] = { ImVec2(cx - h * 0.14f, top), ImVec2(cx + h * 0.14f, top),
+                                           ImVec2(cx + h * 0.36f, bot), ImVec2(cx - h * 0.36f, bot) };
+                  dl->AddPolyline(body, 4, c, ImDrawFlags_Closed, th);
+                  dl->AddLine(ImVec2(cx - h * 0.42f, bot), ImVec2(cx + h * 0.42f, bot), c, th);
+                  // Rod from a pivot near the base. Beat-locked: it reaches a
+                  // side exactly on each beat and crosses the middle between.
+                  const bool swinging = clickOn && tr.IsPlaying();
+                  const float angle = swinging ? 0.55f * (float)std::cos(3.14159265358979 * beat) : 0.35f;
+                  const ImVec2 pivot(cx, bot - h * 0.16f);
+                  const float len = h * 0.86f;
+                  const ImVec2 tip(pivot.x + std::sin(angle) * len, pivot.y - std::cos(angle) * len);
+                  dl->AddLine(pivot, tip, c, th);
+                  const ImVec2 weight(pivot.x + std::sin(angle) * len * 0.62f, pivot.y - std::cos(angle) * len * 0.62f);
+                  dl->AddCircleFilled(weight, std::max(1.5f, h * 0.09f), c);
+               }
                if (ImGui::IsItemHovered())
                   ImGui::SetTooltip("metronome on the audio output while the transport plays");
                ImGui::SameLine(perfBtnX);
@@ -36778,6 +37154,24 @@ int main(int argc, char** argv)
                ensureDroppedCheckpoint();
                dropTargetDrum->LoadFileToLane(dropTargetLane, path);
                dropTargetLane = (dropTargetLane + 1) % DrumSequencerNode::kNumLanes;
+               gPatchDirty = true;
+               continue;
+            }
+
+            // Turbo 0.48: a MIDI file loads into the MIDI File node it is
+            // dropped on, or spawns a new one already loaded.
+            if (HasExtension(path, std::vector<std::string> { "mid", "midi" }))
+            {
+               if (MidiFileNode* target = FindNodeUnderCanvasPoint<MidiFileNode>(canvasPos))
+               {
+                  ensureDroppedCheckpoint();
+                  target->LoadFile(path);
+               }
+               else if (GraphNode* g = SpawnNode("MIDI File", "Notes", canvasPos.x + offset, canvasPos.y))
+               {
+                  static_cast<MidiFileNode*>(g->node.get())->LoadFile(path);
+                  offset += 240.0f;
+               }
                gPatchDirty = true;
                continue;
             }

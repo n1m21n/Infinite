@@ -879,37 +879,72 @@ void ArrangeFrameUpdate()
 float ArrangePxPerBeat();
 double ArrangeSampleEffBpm(const Arrange::Clip& c);
 
-// Live: what each audio clip actually played, peak per 1/16 beat, measured
-// by the audio thread (upstream's approach - works for synths, plugins,
-// anything). Static: for file-backed clips the whole file is analysed once
-// in the background, so the waveform is there before the first play.
+// Live: what each audio clip actually played, measured by the audio thread
+// (upstream WP8 - works for synths, plugins, live inputs, anything).
+// Position-indexed: bucket k is always the same 1/16 beat of the clip, so
+// replaying a bar overwrites it and a stretch never played stays empty.
+// Static: for file-backed clips the whole file is analysed once in the
+// background, so the waveform is there before the first play.
+constexpr Arrange::Tick kArrangeWaveBucketTicks = Arrange::kPPQ / 16; // = kClipPeakBucketsPerBeat
+// Guard (~1 hour at 120 bpm): a longer clip is not cached rather than
+// allocating without bound.
+constexpr int kArrangeWaveMaxBuckets = 128 * 1024;
 struct ArrangeLiveWave
 {
    uint64_t shape = 0;
-   std::vector<float> peaks; // -1 = not measured yet
+   std::vector<float> minv, maxv;
+   std::vector<uint8_t> filled;
 };
 std::map<uint64_t, ArrangeLiveWave> gArrangeLiveWaves;
 
+int ArrangeWaveBucketCount(Arrange::Tick length)
+{
+   const long long n = ((long long)std::max<Arrange::Tick>(0, length) + kArrangeWaveBucketTicks - 1) /
+                       kArrangeWaveBucketTicks;
+   return (int)std::clamp<long long>(n, 0, kArrangeWaveMaxBuckets);
+}
+
 void ArrangeDrainPeaks()
 {
-   AudioEngine::Instance().DrainArrangePeaks([](const ArrangePeak& p)
+   // Drained every frame (panel open or not), or the ring fills and drops.
+   static ClipPeak sPeaks[256];
+   int n = 0;
+   while ((n = AudioEngine::Instance().ClipPeaks().Read(sPeaks, 256)) > 0)
    {
-      const Arrange::Clip* c = Arrange::FindClip(gArrange, p.clipId);
-      if (c == nullptr || p.bucket < 0)
-         return;
-      const uint64_t shape = ArrangeClipShape(*c);
-      if (p.shape != shape)
-         return; // measured under an older shape (the audio thread lags an edit)
-      ArrangeLiveWave& w = gArrangeLiveWaves[p.clipId];
-      const size_t n = (size_t)std::max<int64_t>(1, (int64_t)std::ceil(Arrange::TicksToBeats(c->length) * 4.0));
-      if (w.shape != shape || w.peaks.size() != n)
+      for (int i = 0; i < n; i++)
       {
-         w.shape = shape;
-         w.peaks.assign(n, -1.0f);
+         const ClipPeak& p = sPeaks[i];
+         if (p.bucket < 0)
+            continue;
+         auto it = gArrangeLiveWaves.find(p.clipId);
+         if (it == gArrangeLiveWaves.end() || it->second.shape != p.shape)
+         {
+            // First bucket since the clip appeared or was reshaped: size the
+            // cache from the model, and drop a bucket measured under an
+            // older shape (the audio thread lags an edit).
+            const Arrange::Clip* c = Arrange::FindClip(gArrange, p.clipId);
+            if (c == nullptr || ArrangeClipShape(*c) != p.shape)
+               continue;
+            const int nb = ArrangeWaveBucketCount(c->length);
+            if (nb <= 0)
+               continue;
+            ArrangeLiveWave& w = gArrangeLiveWaves[p.clipId];
+            w.shape = p.shape;
+            w.minv.assign((size_t)nb, 0.0f);
+            w.maxv.assign((size_t)nb, 0.0f);
+            w.filled.assign((size_t)nb, 0);
+            it = gArrangeLiveWaves.find(p.clipId);
+         }
+         ArrangeLiveWave& w = it->second;
+         if (p.bucket >= (int)w.minv.size())
+            continue;
+         w.minv[(size_t)p.bucket] = p.minValue;
+         w.maxv[(size_t)p.bucket] = p.maxValue;
+         w.filled[(size_t)p.bucket] = 1;
       }
-      if ((size_t)p.bucket < n)
-         w.peaks[(size_t)p.bucket] = p.peak;
-   });
+      if (n < 256)
+         break;
+   }
    static int sPrune = 0;
    if (++sPrune % 300 == 0)
       for (auto it = gArrangeLiveWaves.begin(); it != gArrangeLiveWaves.end();)
@@ -1014,21 +1049,45 @@ void DrawArrangeClipWave(ImDrawList* dl, const Arrange::Clip& c, float x0, float
       }
       return;
    }
-   // Live peaks.
+   // Turbo 0.48 (upstream WP8): live min/max buckets. A centre line marks
+   // the clip as audio; a stretch that has not played yet stays on it.
+   dl->AddLine(ImVec2(vx0, mid), ImVec2(vx1, mid), (col & ~IM_COL32_A_MASK) | IM_COL32(0, 0, 0, 60), 1.0f);
    auto it = gArrangeLiveWaves.find(c.id);
-   if (it == gArrangeLiveWaves.end() || it->second.shape != ArrangeClipShape(c))
+   if (it == gArrangeLiveWaves.end() || it->second.shape != ArrangeClipShape(c) || c.length <= 0)
       return;
-   const std::vector<float>& pk = it->second.peaks;
-   const float bucketPx = ppb * 0.25f;
-   for (size_t b = 0; b < pk.size(); b++)
+   const ArrangeLiveWave& wv = it->second;
+   const int nb = (int)wv.minv.size();
+   if (nb <= 0 || ppb <= 0.0f)
+      return;
+   const float g = DspMath::DbToLinear(c.gainDb);
+   // x -> tick -> bucket; one column may span many buckets when zoomed out,
+   // so take the envelope over all of them.
+   const double ticksPerPx = (double)Arrange::kPPQ / (double)ppb;
+   for (float x = std::floor(vx0); x < vx1; x += 1.0f)
    {
-      if (pk[b] < 0.0f)
+      const double tA = (double)(x - clipX0) * ticksPerPx;
+      const double tB = tA + ticksPerPx;
+      int b0 = (int)std::floor(tA / (double)kArrangeWaveBucketTicks);
+      int b1 = (int)std::floor((tB - 1.0) / (double)kArrangeWaveBucketTicks);
+      if (b1 < 0 || b0 >= nb)
          continue;
-      const float bx0 = clipX0 + bucketPx * (float)b, bx1 = bx0 + std::max(1.0f, bucketPx - (bucketPx > 3.0f ? 1.0f : 0.0f));
-      if (bx1 < vx0 || bx0 > vx1)
+      b0 = std::clamp(b0, 0, nb - 1);
+      b1 = std::clamp(std::max(b1, b0), 0, nb - 1);
+      float lo = 0.0f, hi = 0.0f;
+      bool any = false;
+      for (int b = b0; b <= b1; b++)
+      {
+         if (wv.filled[(size_t)b] == 0)
+            continue;
+         lo = std::min(lo, wv.minv[(size_t)b]);
+         hi = std::max(hi, wv.maxv[(size_t)b]);
+         any = true;
+      }
+      if (!any)
          continue;
-      const float a = std::min(1.0f, pk[b]) * half;
-      dl->AddRectFilled(ImVec2(std::max(bx0, vx0), mid - a), ImVec2(std::min(bx1, vx1), mid + a + 1.0f), col);
+      const float yTop = mid - std::clamp(hi * g, -1.0f, 1.0f) * half;
+      const float yBot = mid - std::clamp(lo * g, -1.0f, 1.0f) * half;
+      dl->AddLine(ImVec2(x + 0.5f, yTop), ImVec2(x + 0.5f, std::max(yBot, yTop + 1.0f)), col, 1.0f);
    }
 }
 
