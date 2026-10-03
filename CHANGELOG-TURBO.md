@@ -1,5 +1,66 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.47.0-turbo (2026-10-02)
+
+### Claude chat inside the app
+- **CLAUDE** in the top bar (or Shift+C, or VIEW > Claude chat) opens a chat window. It runs the
+  Claude Code CLI you already have, logged in with your Claude account (Pro / Max), so it costs
+  nothing beyond your plan and needs no API key. Its only tools are Infinite-Turbo's own MCP
+  tools, so Claude reads and edits the open patch, looks at the picture and loads grooves, the
+  same as from Claude Desktop. Model menu (default, sonnet, opus, haiku), New chat, Stop; the
+  conversation continues between messages. Every change is one undo step.
+- Not installed yet? The window shows the one-line cmd install
+  (`curl -fsSL https://claude.ai/install.cmd -o install.cmd && install.cmd && del install.cmd`)
+  and asks you to run `claude` once to log in. `INFINITE_CLAUDE_PATH` points it at another exe.
+
+### Drum Sequencer: pattern library
+- **141 grooves in 10 groups, each with three parts**: A verse (main groove), B bridge (lighter
+  or breakdown) and C chorus (fuller, often two bars ending in a fill). Rock & Pop, Funk & Breaks
+  (Funky Drummer, Amen, Impeach, Levee feels), Hip Hop (boom bap, Dilla, trap, drill, Baltimore /
+  Jersey club, footwork), Electronic (house, techno, garage, DnB, jungle, dubstep, trip-hop
+  Massive Attack / Portishead feels, Björk feels, big beat Prodigy / Chemical Brothers feels,
+  IDM), Latin & Caribbean (son and rumba clave, cascara, tumbao, salsa, mambo, cha-cha-chá,
+  songo, mozambique, bembé, guaguancó, reggaeton, cumbia, merengue, bolero, reggae, ska, soca),
+  Brazil (ijexá, samba batucada, partido alto, bossa, baião, xote, arrasta-pé, xaxado, maracatu,
+  samba-reggae, frevo, coco, ciranda, funk carioca tamborzão and Volt Mix, axé), Middle East &
+  North Africa (maqsum, baladi, saidi, malfuf, ayoub, chiftetelli, samai 10/8, karsilama 9/8,
+  aksak, fallahi, gnawa), India (teentaal, keherwa, dadra, rupak, jhaptaal, ektaal with bayan /
+  dayan and doubled-bol fills, bhangra), Africa & World and Jazz.
+- The Brazilian, Afro-Cuban, Caribbean and Middle Eastern grooves were rewritten part by part
+  from the traditional ensembles (agogô, atabaques and xequerê in ijexá, surdos 1/2/3, caixa,
+  tamborim and agogô in the batucada, zabumba and triângulo in baião, dum / tek / ka in the
+  doumbek rhythms...). Song-named entries are feel sketches, not transcriptions.
+- **Picker**: group, groove (only that group's, so the list is short), < > to step through
+  grooves, and A / B / C buttons that switch the part in one click while it plays. The groove
+  and part are saved with the patch. A pattern sets steps, rate (triplet grids for 6/8, 12/8
+  and swing) and swing; the groove shows a suggested tempo.
+- **Accent pitch** per lane (lane card): accented steps play that many semitones away, so one
+  lane plays a two-tone bell (agogô, campana, cencerro: X = low bell, x = high). Grooves set it.
+- Lanes show their role when empty (1 kick, 2 snare, 3 closed hat, 4 open hat, 5 clap / rim,
+  6 low tom / conga, 7 high tom / conga, 8 bell / ride). Empty lanes get the bundled **Turbo kit**
+  (eight synthesized one-shots in `assets/drumkits/turbo-basic`, the bell an agogô), hats in one
+  choke group.
+- MCP: **`drum_pattern`** lists the library (optionally one category) or loads a groove and part.
+
+### Chord Progression: more chords
+- 26 new builder qualities: 11 (9sus4), m11, maj7#11, maj9#11, 13, m13, maj13, 13sus4, 9#11,
+  m(maj9), 7b9, 7#9, 7#11, 7b13, 7alt, m7b9, 7#5, 7b5, maj7#5, dim(maj7), 6/9, m6/9, madd9, add11,
+  quartal and the "so what" voicing. The quality menu is grouped (triads, 6ths & adds, 7ths,
+  9ths / 11ths / 13ths, altered, voicings). Saved patches keep their chords.
+
+### Fixes
+- **File > New crashed while audio was playing** (e.g. right after startup, with the example
+  running): New dropped the nodes but never told the audio thread, which kept processing freed
+  nodes. New now republishes the (empty) audio graph, and removed nodes are destroyed only after
+  the audio thread has finished two blocks without them. New also clears the Performance panel.
+
+- **Dropping a WAV onto a Drum Sequencer lane that was sounding crashed**: the lane's voices kept
+  reading the replaced sample after it was freed. Its voices now stop the moment the new sample
+  takes over (also on the lane's x and when the kit loads).
+
+### Small
+- Long dropdowns get a filter box; dropdown items with the same name no longer collide.
+
 ## 0.46.0-turbo (2026-10-02)
 
 The rest of upstream's Windows-relevant features: Performance Mode, MCP phases 3 and 4, and the

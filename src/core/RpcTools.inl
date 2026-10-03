@@ -52,10 +52,21 @@ void RpcRefreshParamCache()
 
 std::string RpcNorm(const std::string& s)
 {
+   // Turbo 0.47: Latin-1 accents fold to the base letter (UTF-8 C3 xx), so
+   // "ijexa" finds "Ijexá" and "bjork" finds "Björk".
+   static const char kFold[64 + 1] = "AAAAAAACEEEEIIIIDNOOOOOxOUUUUYTsaaaaaaaceeeeiiiidnooooo/ouuuuyty";
    std::string out;
-   for (char c : s)
+   for (size_t i = 0; i < s.size(); i++)
+   {
+      unsigned char c = (unsigned char)s[i];
+      if (c == 0xC3 && i + 1 < s.size() && (unsigned char)s[i + 1] >= 0x80 && (unsigned char)s[i + 1] <= 0xBF)
+      {
+         c = (unsigned char)kFold[(unsigned char)s[i + 1] - 0x80];
+         i++;
+      }
       if (c != ' ' && c != '_' && c != '-' && c != '.')
-         out += (char)std::tolower((unsigned char)c);
+         out += (char)std::tolower(c);
+   }
    return out;
 }
 

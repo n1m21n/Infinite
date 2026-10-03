@@ -55,6 +55,8 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 | **MPC** / **MPC Out** | 16 sample pads (one shot, gate, loop), trim, pitch, pan, a CV pin per pad, one output per pad |
 | **VMPC** | the MPC for video clips, with their soundtrack |
 | **Super Mixer** | 16 channels, EQ, pan, mute / solo, CV everywhere |
+| **Drum Sequencer patterns** | 141 grooves in 10 groups (rock, funk and breaks, hip hop, electronic, latin, Brazil, Middle East, India, Africa, jazz), each in three parts (A verse, B bridge, C chorus with a fill), picked by group and groove with A / B / C buttons; two-tone bells; empty lanes get the bundled Turbo kit |
+| **Chord Progression** | chords held per bar, strum / arp / pulse modes; the builder now has extended, altered and quartal chords (11, 13, maj9#11, 7alt, 7#9, 6/9, so what...) |
 
 ### Video and output
 
@@ -103,6 +105,10 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 
 ## Build patches with Claude (MCP)
 
+**Inside the app**: CLAUDE in the top bar (Shift+C) opens a chat that runs your own Claude Code (logged in with your Claude account, nothing extra to pay) with Infinite-Turbo's tools. If Claude Code is missing, the window shows the cmd line that installs it: `curl -fsSL https://claude.ai/install.cmd -o install.cmd && install.cmd && del install.cmd`, then run `claude` once to log in.
+
+**From Claude Desktop**:
+
 Infinite-Turbo is also an [MCP](https://modelcontextprotocol.io) server: `Infinite-Turbo.exe --mcp` lets Claude (or any MCP client) read and edit the patch open in the running app.
 
 1. Run `setup-mcp.bat` once. It registers the exe in Claude Desktop's config (other servers are kept, the old file is saved as `.bak`).
@@ -127,6 +133,7 @@ If the app is closed, the first request starts it. Every change is one undo step
 | `screenshot_node`, `render_frame` | look at a node's image or the live Output |
 | `authoring_guide` (and the `build_patch` prompt) | the patch-building guide; read once before building |
 | `clip_matrix`, `pads`, `looper` | Turbo only: launch clips and scenes, hit MPC/VMPC pads, drive the Looper |
+| `drum_pattern` | Turbo only: list the Drum Sequencer's pattern library or load a groove and part (A / B / C) into a node |
 | `perf_list`, `perf_add`, `perf_remove`, `perf_show` | Turbo only: build and open the Performance Mode panel |
 | `auto_layout`, `fit_view`, `transport`, `undo`, `redo`, `load_patch`, `save_patch`, `new_patch` | the rest |
 
@@ -146,6 +153,7 @@ The control port listens on `127.0.0.1:7777` only (`INFINITE_CONTROL_PORT` chang
 | Ctrl+M | MIDI learn mode |
 | Shift+M | modulation matrix |
 | Shift+P | Performance Mode |
+| Shift+C | Claude chat |
 | Space | play / stop |
 | Double-click a knob, slider or field | type a value (`=` starts an expression) |
 | Shift + drag a knob | record a gesture |

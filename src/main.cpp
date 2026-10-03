@@ -65,6 +65,7 @@
 #include "core/Base64.h"
 #include "platform/McpBridge.h"
 #include "platform/AISkillContent.h"
+#include "platform/ClaudeChat.h"
 #include "core/RuntimeLog.h"
 #include "core/PatchJson.h"
 #include "platform/SettingsPaths.h"
@@ -149,6 +150,7 @@
 #include "nodes/PaulStretchNode.h"
 #include "nodes/GranularNode.h"
 #include "nodes/DrumSequencerNode.h"
+#include "nodes/DrumPatterns.h"
 #include "nodes/AudioPluginNode.h"
 
 // Infinite-Turbo build identity: CMake passes the project version; the
@@ -1249,22 +1251,26 @@ namespace
 
    void PrepareDropdown(const std::vector<std::string>& options,
                         const std::vector<std::string>& categories, int current,
-                        std::function<void(int)> onSelect)
+                        std::function<void(int)> onSelect, bool keepOrder = false)
    {
       std::vector<int> order(options.size());
       for (int i = 0; i < (int)order.size(); ++i) order[i] = i;
+      // Turbo: keepOrder lists the options as given (categories in their own
+      // order, e.g. the drum pattern library), and current = -1 means no
+      // item is marked, so every pick fires onSelect, even the same one twice.
       auto lower = [](std::string s) {
          std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return (char)std::tolower(c); });
          return s;
       };
-      std::stable_sort(order.begin(), order.end(), [&](int a, int b) {
+      if (!keepOrder)
+         std::stable_sort(order.begin(), order.end(), [&](int a, int b) {
          const std::string ca = a < (int)categories.size() ? lower(categories[a]) : std::string();
          const std::string cb = b < (int)categories.size() ? lower(categories[b]) : std::string();
          return ca == cb ? lower(options[a]) < lower(options[b]) : ca < cb;
       });
       gDropdown.options.clear();
       gDropdown.categories.clear();
-      int sortedCurrent = 0;
+      int sortedCurrent = (keepOrder && current < 0) ? -1 : 0;
       for (int i = 0; i < (int)order.size(); ++i)
       {
          const int original = order[i];
@@ -8909,7 +8915,7 @@ namespace
    // button's own text is the label.
    void AudioBareDropdown(const char* id, const std::vector<std::string>& options, int current,
                           std::function<void(int)> onSelect, float width,
-                          const std::vector<std::string>& categories = {})
+                          const std::vector<std::string>& categories = {}, bool keepOrder = false)
    {
       if (options.empty())
          return;
@@ -8930,7 +8936,7 @@ namespace
       const std::string caption = options[safe] + "##" + id;
       if (ImGui::Button(caption.c_str(), ImVec2(std::max(24.0f, width - 18.0f), 0)))
       {
-         PrepareDropdown(options, categories, safe, std::move(onSelect));
+         PrepareDropdown(options, categories, safe, std::move(onSelect), keepOrder);
       }
       const bool hovered = ImGui::IsItemHovered(ref.valid && ref.modulated
                                                    ? ImGuiHoveredFlags_AllowWhenDisabled
@@ -11187,6 +11193,175 @@ namespace
    // DrawDrumSequencerBody, so gAudioBodyW/gAudioContentW already read as
    // the column's width - the section panel and knob row size themselves
    // from that with no extra plumbing (the "width is a scope" rule).
+   // Turbo: the bundled drum kit (assets/drumkits/turbo-basic), next to the
+   // exe in a build or package, else relative to the working directory.
+   // Empty when neither exists.
+   std::string TurboDrumKitDir()
+   {
+      const std::filesystem::path exeDir =
+         std::filesystem::u8path(Platform::ExecutablePath()).parent_path();
+      const std::filesystem::path candidates[] = {
+         exeDir / "assets" / "drumkits" / "turbo-basic",
+         std::filesystem::u8path("assets/drumkits/turbo-basic"),
+      };
+      std::error_code ec;
+      for (const std::filesystem::path& p : candidates)
+         if (std::filesystem::exists(p / DrumPatterns::KitFile(0), ec))
+            return p.u8string();
+      return std::string();
+   }
+
+   // Turbo 0.47: groove index of the node's saved pattern name, -1 if none.
+   int DrumGrooveIndex(const DrumSequencerNode* n)
+   {
+      if (n->patternName.empty())
+         return -1;
+      int count = 0;
+      const DrumPatterns::Groove* all = DrumPatterns::All(count);
+      for (int i = 0; i < count; i++)
+         if (n->patternName == all[i].name)
+            return i;
+      return -1;
+   }
+
+   // Applies groove / part to a node that may have been deleted meanwhile
+   // (dropdown callbacks run later in the frame), loading the kit into empty
+   // lanes. Undo checkpoints are the caller's.
+   void DrumApplyGroove(INode* target, int groove, int part)
+   {
+      DrumSequencerNode* d = nullptr;
+      for (GraphNode& g : gNodes)
+         if (g.node.get() == target)
+            d = dynamic_cast<DrumSequencerNode*>(g.node.get());
+      if (d == nullptr || !d->ApplyPattern(groove, part))
+         return;
+      d->browsingCategory = false;
+      d->LoadKitIntoEmptyLanes(TurboDrumKitDir());
+      gPatchDirty = true;
+   }
+
+   // The pattern picker: category, groove (only that category's, so the list
+   // stays short), prev / next, and the three parts as buttons.
+   void DrawDrumPatternPicker(DrumSequencerNode* n)
+   {
+      int count = 0, catCount = 0;
+      const DrumPatterns::Groove* all = DrumPatterns::All(count);
+      const char* const* cats = DrumPatterns::Categories(catCount);
+      const int current = DrumGrooveIndex(n);
+      if (current >= 0 && !n->browsingCategory)
+         for (int c = 0; c < catCount; c++)
+            if (strcmp(cats[c], all[current].category) == 0)
+               n->patternCategory = c;
+      n->patternCategory = std::clamp(n->patternCategory, 0, catCount - 1);
+      std::vector<int> inCat;
+      for (int i = 0; i < count; i++)
+         if (strcmp(all[i].category, cats[n->patternCategory]) == 0)
+            inCat.push_back(i);
+      INode* target = n;
+      const int part = std::clamp(n->patternPart, 0, 2);
+
+      const float gap = ImGui::GetStyle().ItemSpacing.x;
+      const float full = AudioFullWidth();
+      const float arrowW = ImGui::GetFrameHeight();
+      const float catW = std::floor((full - arrowW * 2.0f - gap * 3.0f) * 0.40f);
+      const float grooveW = full - catW - arrowW * 2.0f - gap * 3.0f;
+
+      // Category: switching it shows that list; nothing changes until a groove is picked.
+      if (ImGui::Button((std::string(cats[n->patternCategory]) + "##drumCat").c_str(), ImVec2(catW, 0)))
+      {
+         std::vector<std::string> names(cats, cats + catCount);
+         PrepareDropdown(names, {}, n->patternCategory, [target](int c) {
+            for (GraphNode& g : gNodes)
+               if (g.node.get() == target)
+                  if (auto* d = dynamic_cast<DrumSequencerNode*>(g.node.get()))
+                  {
+                     d->patternCategory = c; // browse it; the grid and the A / B / C groove stay
+                     d->browsingCategory = true;
+                  }
+         }, true);
+      }
+      if (ImGui::IsItemHovered())
+         ImGui::SetTooltip("pattern library: groups");
+      ImGui::SameLine(0.0f, gap);
+      const bool inThisCat = current >= 0 && std::find(inCat.begin(), inCat.end(), current) != inCat.end();
+      std::string grooveCaption = inThisCat ? std::string(all[current].name) : std::string("choose a groove...");
+      grooveCaption += "##drumGroove";
+      if (ImGui::Button(grooveCaption.c_str(), ImVec2(grooveW, 0)))
+      {
+         std::vector<std::string> names;
+         int shown = -1;
+         for (int k = 0; k < (int)inCat.size(); k++)
+         {
+            char row[160];
+            snprintf(row, sizeof(row), "%s   ~%d bpm", all[inCat[k]].name, all[inCat[k]].bpm);
+            names.push_back(row);
+            if (inCat[k] == current)
+               shown = k;
+         }
+         PrepareDropdown(names, {}, shown, [target, inCat, part](int k) {
+            if (k >= 0 && k < (int)inCat.size())
+               DrumApplyGroove(target, inCat[k], part);
+         }, true);
+      }
+      if (ImGui::IsItemHovered())
+      {
+         if (inThisCat)
+            ImGui::SetTooltip("%s - suggested tempo %d bpm\nLanes: 1 kick, 2 snare, 3 closed hat, 4 open hat, 5 clap/rim,\n"
+                              "6 low tom/conga, 7 high tom/conga, 8 bell/ride. Empty lanes get the Turbo kit.",
+                              all[current].name, all[current].bpm);
+         else
+            ImGui::SetTooltip("pick a groove: fills the grid, steps, rate and swing (empty lanes get the Turbo kit)");
+      }
+      auto step = [&](int dir) {
+         if (inCat.empty())
+            return;
+         int k = 0;
+         if (inThisCat)
+            k = (int)(std::find(inCat.begin(), inCat.end(), current) - inCat.begin()) + dir;
+         else
+            k = dir > 0 ? 0 : (int)inCat.size() - 1;
+         k = (k % (int)inCat.size() + (int)inCat.size()) % (int)inCat.size();
+         PushUndoCheckpoint();
+         DrumApplyGroove(target, inCat[k], part);
+      };
+      ImGui::SameLine(0.0f, gap);
+      if (ImGui::Button("<##drumPrev", ImVec2(arrowW, 0)))
+         step(-1);
+      if (ImGui::IsItemHovered())
+         ImGui::SetTooltip("previous groove");
+      ImGui::SameLine(0.0f, gap);
+      if (ImGui::Button(">##drumNext", ImVec2(arrowW, 0)))
+         step(1);
+      if (ImGui::IsItemHovered())
+         ImGui::SetTooltip("next groove");
+
+      // Parts: A verse, B bridge, C chorus. The lit one is what the grid holds.
+      const float partW = (full - gap * 2.0f) / 3.0f;
+      for (int pi = 0; pi < 3; pi++)
+      {
+         if (pi > 0)
+            ImGui::SameLine(0.0f, gap);
+         const bool lit = current >= 0 && pi == part;
+         if (lit)
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
+         ImGui::BeginDisabled(current < 0);
+         char label[32];
+         snprintf(label, sizeof(label), "%s##drumPart%d", DrumPatterns::PartName(pi), pi);
+         if (ImGui::Button(label, ImVec2(partW, 0)))
+         {
+            PushUndoCheckpoint();
+            DrumApplyGroove(target, current, pi);
+         }
+         ImGui::EndDisabled();
+         if (lit)
+            ImGui::PopStyleColor();
+         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip(pi == 0 ? "A: the main groove (verse)"
+                              : pi == 1 ? "B: lighter / breakdown variation (bridge)"
+                                        : "C: fuller variation, often two bars ending in a fill (chorus)");
+      }
+   }
+
    void DrawDrumLaneCard(DrumSequencerNode* n, int lane)
    {
       ImGui::PushID(lane);
@@ -11203,7 +11378,7 @@ namespace
       char header[48];
       const std::string& fn = n->FileName(lane);
       if (fn.empty())
-         snprintf(header, sizeof(header), "lane %d", lane + 1);
+         snprintf(header, sizeof(header), "lane %d - (%s)", lane + 1, DrumPatterns::LaneRole(lane));
       else
       {
          std::string trimmed = fn.size() > 20 ? fn.substr(0, 19) + "." : fn;
@@ -11246,6 +11421,8 @@ namespace
          AudioSlider("volume", &n->laneVolume[lane], 0.0f, 1.0f, "%.2f", half);
          ImGui::SameLine();
          AudioSlider("pan", &n->lanePan[lane], -1.0f, 1.0f, "%.2f", half);
+         // Turbo 0.47: pitch of the accented steps (two-tone bells).
+         AudioSlider("accent pitch", &n->laneAccentPitch[lane], -24.0f, 24.0f, "%.1f st", half);
       }
 
       EndAudioSection();
@@ -11439,6 +11616,9 @@ namespace
          row.Knob("pan", &n->globalPan, -1.0f, 1.0f, "%.2f");
          row.End();
       }
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      // Turbo 0.47: pattern library picker (category, groove, A / B / C).
+      DrawDrumPatternPicker(n);
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
       {
          const float gap = ImGui::GetStyle().ItemSpacing.x;
@@ -14227,8 +14407,27 @@ namespace
                            [n](int i) { n->builderRoot = i; }, rootW);
          x += rootW + gap;
          ImGui::SetCursorScreenPos(ImVec2(x, y));
-         AudioBareDropdown("cpQuality", CP::QualityNames(), n->builderQuality,
-                           [n](int i) { n->builderQuality = i; }, qualW);
+         {
+            // Turbo: grouped (triads, 6ths, 7ths, extended, altered, voicings),
+            // listed in group order; the dropdown works on display positions.
+            static std::vector<std::string> qNames, qCats;
+            const std::vector<int>& qOrder = CP::QualityDisplayOrder();
+            if (qNames.empty())
+               for (int q : qOrder)
+               {
+                  qNames.push_back(CP::QualityNames()[q]);
+                  qCats.push_back(CP::QualityCategories()[q]);
+               }
+            int shown = 0;
+            for (int i = 0; i < (int)qOrder.size(); i++)
+               if (qOrder[i] == n->builderQuality)
+                  shown = i;
+            AudioBareDropdown("cpQuality", qNames, shown,
+                              [n, &qOrder](int i) {
+                                 if (i >= 0 && i < (int)qOrder.size())
+                                    n->builderQuality = qOrder[i];
+                              }, qualW, qCats, true);
+         }
          x += qualW + gap;
 
          ImGui::SetCursorScreenPos(ImVec2(x, y));
@@ -22193,6 +22392,12 @@ namespace
    // texture; map::node_type from extract() moves the whole tree node instead
    // of the mapped value, sidestepping that.
    std::vector<std::unique_ptr<INode>> gRetiredNodes;
+   // Turbo 0.47: retired nodes may still be in the process list the audio
+   // thread is running. They are destroyed only once two audio blocks have
+   // finished since the last topology publish (or audio is off). Fixes the
+   // crash on File > New with audio playing (NewPatch never republished the
+   // topology, so the audio thread kept running freed nodes).
+   uint64_t gRetiredSafeAfterBlocks = 0;
    std::vector<std::map<int, NodeViewport>::node_type> gRetiredViewports;
 
    // A geometry-producing node's own solo render, independent of whatever a
@@ -24207,6 +24412,7 @@ namespace
       topology.terminalBufferIndices = std::move(terminals);
       topology.numBuffers = (int)topology.order.size();
       AudioEngine::Instance().SetTopology(std::move(topology));
+      gRetiredSafeAfterBlocks = AudioEngine::Instance().BlocksDone() + 2; // Turbo 0.47
    }
 
    // Single choke point for turning the audio engine on. Every call site that
@@ -24907,6 +25113,15 @@ namespace
          Transport::Instance().SetTimeSignature(4, 4);
          Transport::Instance().SetKey(0);
          Transport::Instance().SetScale(0);
+         // Turbo 0.47: drop the old nodes from the audio thread's process list
+         // now; ApplyPatchData rebuilds it itself after restoring a snapshot.
+         RebuildAudioTopology();
+         gPerfElements.clear();
+         gPerfSelection.clear();
+         gPerfAssigningElemIdx = -1;
+         gPerfMidiLearnIdx = -1;
+         gPerfMidiRuntimeStates.clear();
+         gPerfPendingWrites.clear();
       }
    }
 
@@ -25532,6 +25747,7 @@ namespace
 #include "core/PerfPanel.inl"
    // Turbo 0.46: RPC / MCP tools for Turbo-only nodes and Performance Mode.
 #include "core/RpcTurboTools.inl"
+#include "core/ClaudeChatPanel.inl"
 
    // Sets one saved setting by its patch key name (what get_params / explain
    // "settings" list), replaying the right type letter.
@@ -34726,7 +34942,10 @@ int main(int argc, char** argv)
       // Actually tear down anything retired by RemoveNodeByIndex last frame.
       // Safe here: the frame that queued draw commands referencing these
       // textures has already been submitted and presented.
-      gRetiredNodes.clear();
+      if (!gRetiredNodes.empty() &&
+          (AudioEngine::Instance().SampleRate() <= 0.0 || AudioEngine::Instance().InProcess() == 0 ||
+           AudioEngine::Instance().BlocksDone() >= gRetiredSafeAfterBlocks))
+         gRetiredNodes.clear();
       gRetiredViewports.clear();
 
       // dev-only: drive copy/paste/delete with synthetic key events so the
@@ -35481,6 +35700,11 @@ int main(int argc, char** argv)
                gArrangePanelOpen = !gArrangePanelOpen;
             if (ImGui::MenuItem("Performance mode", "Shift+P", gPerfPanelOpen))
                gPerfPanelOpen = !gPerfPanelOpen;
+            if (ImGui::MenuItem("Claude chat", "Shift+C", gChatOpen))
+            {
+               gChatOpen = !gChatOpen;
+               gChatFocusInput = gChatOpen;
+            }
             ImGui::SeparatorText("Output behind the canvas");
             GraphNode* bgNode = gCanvasBgNodeIndex >= 0 ? FindNodeByIndex(gCanvasBgNodeIndex) : nullptr;
             if (bgNode != nullptr)
@@ -35831,6 +36055,11 @@ int main(int argc, char** argv)
 
             // Turbo 0.46: AI assistants (MCP server + patch-building skill).
             ImGui::SeparatorText("AI assistants (Claude / MCP)");
+            if (ImGui::MenuItem("Claude chat in this window", "Shift+C", gChatOpen))
+            {
+               gChatOpen = !gChatOpen;
+               gChatFocusInput = gChatOpen;
+            }
             if (ImGui::MenuItem("Connect to Claude Desktop (MCP)"))
                InstallMcpConfig(); // reports in a message box
             if (ImGui::IsItemHovered())
@@ -36129,6 +36358,9 @@ int main(int argc, char** argv)
          const float clickBtnWidth = ImGui::CalcTextSize("CLICK").x + ImGui::GetStyle().FramePadding.x * 2.0f;
          const float perfBtnX = searchX - perfBtnWidth - smallGap;
          const float clickBtnX = perfBtnX - clickBtnWidth - smallGap;
+         // Turbo 0.47: CLAUDE (chat) left of CLICK.
+         const float chatBtnWidth = ImGui::CalcTextSize("CLAUDE").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+         const float chatBtnX = clickBtnX - chatBtnWidth - smallGap;
          float updateBadgeW = 0.0f; // Turbo 0.46: room for the UPDATE badge
          if (TurboUpdate::gStatus.load() == 3)
          {
@@ -36136,7 +36368,7 @@ int main(int argc, char** argv)
             updateBadgeW = ImGui::CalcTextSize(("UPDATE " + TurboUpdate::gLatest).c_str()).x +
                            ImGui::GetStyle().FramePadding.x * 2.0f + smallGap;
          }
-         const float gpuX = clickBtnX - updateBadgeW - gpuWidth - itemGap;
+         const float gpuX = chatBtnX - updateBadgeW - gpuWidth - itemGap;
          const float audioX = gpuX - audioWidth - itemGap;
 
          {
@@ -36183,7 +36415,7 @@ int main(int argc, char** argv)
                }
                const std::string badge = "UPDATE " + latest;
                const float badgeW = ImGui::CalcTextSize(badge.c_str()).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-               ImGui::SameLine(clickBtnX - badgeW - smallGap);
+               ImGui::SameLine(chatBtnX - badgeW - smallGap);
                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.55f, 0.30f, 1.0f));
                if (ImGui::Button(badge.c_str()))
                   Platform::OpenUrl(url);
@@ -36200,6 +36432,21 @@ int main(int argc, char** argv)
                const double frac = beat - std::floor(beat);
                const bool flash = clickOn && tr.IsPlaying() && frac < 0.18;
                const bool downbeat = flash && std::fmod(std::floor(beat), std::max(1.0, (double)tr.BeatsPerBar())) < 0.5;
+               ImGui::SameLine(chatBtnX);
+               {
+                  const bool chatWasOpen = gChatOpen;
+                  if (chatWasOpen)
+                     ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
+                  if (ImGui::Button("CLAUDE"))
+                  {
+                     gChatOpen = !gChatOpen;
+                     gChatFocusInput = gChatOpen;
+                  }
+                  if (chatWasOpen)
+                     ImGui::PopStyleColor();
+                  if (ImGui::IsItemHovered())
+                     ImGui::SetTooltip("chat with Claude about this patch (Shift+C); uses your Claude Code login");
+               }
                ImGui::SameLine(clickBtnX);
                const int pushed = clickOn ? 1 : 0;
                if (clickOn)
@@ -44181,6 +44428,13 @@ int main(int argc, char** argv)
       if (!ImGui::GetIO().WantTextInput && !ImGui::GetIO().KeyCtrl && ImGui::GetIO().KeyShift &&
           ImGui::IsKeyPressed(ImGuiKey_P, false))
          gPerfPanelOpen = !gPerfPanelOpen; // Turbo 0.46: Performance Mode
+      if (!ImGui::GetIO().WantTextInput && !ImGui::GetIO().KeyCtrl && ImGui::GetIO().KeyShift &&
+          ImGui::IsKeyPressed(ImGuiKey_C, false))
+      {
+         gChatOpen = !gChatOpen; // Turbo 0.47: Claude chat
+         gChatFocusInput = gChatOpen;
+      }
+      DrawClaudeChat();
       if (gModMatrixOpen)
       {
          ImGui::SetNextWindowSize(ImVec2(820, 420), ImGuiCond_FirstUseEver);
@@ -44945,21 +45199,69 @@ int main(int argc, char** argv)
       ImGui::SetNextWindowSizeConstraints(ImVec2(220, 0), ImVec2(420, 480));
       if (ImGui::BeginPopup("##dropdown"))
       {
+         // Turbo: long lists (the drum pattern library) get a filter box.
+         static char ddFilter[64] = "";
+         const bool longList = gDropdown.options.size() > 30;
+         if (ImGui::IsWindowAppearing())
+            ddFilter[0] = '\0';
+         std::string filterLower;
+         if (longList)
+         {
+            if (ImGui::IsWindowAppearing())
+               ImGui::SetKeyboardFocusHere();
+            ImGui::SetNextItemWidth(-1.0f);
+            ImGui::InputTextWithHint("##ddfilter", "filter...", ddFilter, sizeof(ddFilter));
+            filterLower = ddFilter;
+            std::transform(filterLower.begin(), filterLower.end(), filterLower.begin(),
+                           [](unsigned char ch) { return (char)std::tolower(ch); });
+         }
+         auto ddMatches = [&](int i) {
+            if (filterLower.empty())
+               return true;
+            std::string hay = gDropdown.options[i];
+            if (i < (int)gDropdown.categories.size())
+               hay += " " + gDropdown.categories[i];
+            std::transform(hay.begin(), hay.end(), hay.begin(), [](unsigned char ch) { return (char)std::tolower(ch); });
+            if (hay.find(filterLower) != std::string::npos)
+               return true;
+            // Accent-free match too ("ijexa" finds "ijexá"): drop UTF-8 lead bytes, keep ASCII.
+            std::string plain;
+            for (size_t k = 0; k < hay.size(); k++)
+            {
+               const unsigned char ch = (unsigned char)hay[k];
+               if (ch == 0xC3 && k + 1 < hay.size())
+               {
+                  static const char kFold[65] = "aaaaaaaceeeeiiiidnooooo/ouuuuytsaaaaaaaceeeeiiiidnooooo/ouuuuyty";
+                  const unsigned char nx = (unsigned char)hay[k + 1];
+                  if (nx >= 0x80 && nx <= 0xBF)
+                  {
+                     plain += kFold[nx - 0x80];
+                     k++;
+                     continue;
+                  }
+               }
+               plain += (char)ch;
+            }
+            return plain.find(filterLower) != std::string::npos;
+         };
          std::string lastCat = "";
          for (int i = 0; i < (int)gDropdown.options.size(); i++)
          {
+            if (!ddMatches(i))
+               continue;
             if (i < (int)gDropdown.categories.size() && !gDropdown.categories[i].empty())
             {
                if (gDropdown.categories[i] != lastCat)
                {
-                  lastCat = gDropdown.categories[i];
-                  if (i > 0)
+                  if (!lastCat.empty())
                      ImGui::Spacing();
+                  lastCat = gDropdown.categories[i];
                   ImGui::TextColored(ImVec4(0.55f, 0.70f, 0.95f, 0.85f), "%s", lastCat.c_str());
                   ImGui::Separator();
                }
             }
             bool selected = (i == gDropdown.current);
+            ImGui::PushID(i);
             if (ImGui::Selectable(gDropdown.options[i].c_str(), selected))
             {
                if (gDropdown.onSelect && i != gDropdown.current)
@@ -44969,6 +45271,7 @@ int main(int argc, char** argv)
                }
                ImGui::CloseCurrentPopup();
             }
+            ImGui::PopID();
             if (selected && ImGui::IsWindowAppearing())
                ImGui::SetScrollHereY(0.5f);
          }

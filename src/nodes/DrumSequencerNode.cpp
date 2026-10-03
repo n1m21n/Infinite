@@ -1,4 +1,5 @@
 #include "DrumSequencerNode.h"
+#include "DrumPatterns.h"
 
 #include <algorithm>
 #include <atomic>
@@ -111,6 +112,8 @@ public:
       mLaneBoostDecayCoeff[lane].store(boostDecayCoeff, std::memory_order_relaxed);
    }
 
+   void PushLaneAccentPitch(int lane, float semis) { mLaneAccentPitch[lane].store(semis, std::memory_order_relaxed); }
+
    void PushLaneState(int lane, bool mute, bool solo, int choke)
    {
       mLaneMute[lane].store(mute, std::memory_order_relaxed);
@@ -139,8 +142,15 @@ public:
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int numInputs, AudioBuffer& buffer) override
    {
       (void)numInputs;
-      for (auto& slot : mSampleSlots)
-         slot.SwapIn();
+      // Turbo 0.47: a lane that just got a new sample (file drop, kit load,
+      // clear) retires its old buffer, which the main thread frees a frame
+      // later. Voices still playing the old one must stop now, before they
+      // read freed memory: that was the crash on dropping a WAV onto a lane
+      // that was sounding.
+      for (int lane = 0; lane < kNumLanes; lane++)
+         if (mSampleSlots[lane].SwapIn())
+            for (int slot = 0; slot < kVoicesPerLane; slot++)
+               mVoices[lane * kVoicesPerLane + slot].active = false;
 
       for (int ch = 0; ch < buffer.numChannels; ch++)
          std::fill(buffer.channels[ch], buffer.channels[ch] + buffer.numFrames, 0.0f);
@@ -359,7 +369,8 @@ private:
       voice.buffer = buf;
       voice.readPos = (double)startFrac * buf->numFrames;
       voice.endFrame = (double)endFrac * buf->numFrames;
-      voice.rate = NoteRateForPitch(lanePitchNow[lane]);
+      const float accentSemis = velocity >= 0.99f ? mLaneAccentPitch[lane].load(std::memory_order_relaxed) : 0.0f;
+      voice.rate = NoteRateForPitch(lanePitchNow[lane] + accentSemis);
       voice.velocity = velocity * laneVolNow[lane];
       DspMath::EqualPowerPan(lanePanNow[lane], voice.panL, voice.panR);
       voice.attackLevel = 0.0f;
@@ -401,6 +412,7 @@ private:
    std::atomic<bool> mLaneMute[kNumLanes] = {};
    std::atomic<bool> mLaneSolo[kNumLanes] = {};
    std::atomic<int> mLaneChoke[kNumLanes] = {};
+   std::atomic<float> mLaneAccentPitch[kNumLanes] = {};
    std::atomic<float> mStepVel[kNumLanes][kMaxSteps] = {};
    std::atomic<float> mLaneStart[kNumLanes] = {};
    std::atomic<float> mLaneEnd[kNumLanes] = {};
@@ -429,6 +441,8 @@ DrumSequencerNode::DrumSequencerNode()
       laneMute[lane] = false;
       laneSolo[lane] = false;
       laneChoke[lane] = 0;
+      laneAccentPitch[lane] = 0.0f;
+      mLastLaneAccentPitch[lane] = -999.0f;
 
       mLastLaneVolume[lane] = -1.0f;
       mLastLanePan[lane] = -99.0f;
@@ -560,6 +574,12 @@ void DrumSequencerNode::PushDirtyParams()
          mLastLaneEnd[lane] = laneEnd[lane];
       }
 
+      if (laneAccentPitch[lane] != mLastLaneAccentPitch[lane])
+      {
+         mAudioNode->PushLaneAccentPitch(lane, std::clamp(laneAccentPitch[lane], -24.0f, 24.0f));
+         mLastLaneAccentPitch[lane] = laneAccentPitch[lane];
+      }
+
       if (mFirstCook || laneMute[lane] != mLastLaneMute[lane] || laneSolo[lane] != mLastLaneSolo[lane] ||
           laneChoke[lane] != mLastLaneChoke[lane])
       {
@@ -649,6 +669,14 @@ void DrumSequencerNode::VisitParams(ParamVisitor& v)
    v.Float("globalDecay", globalDecay);
    v.Float("globalPitch", globalPitch);
    v.Float("globalPan", globalPan);
+   // Turbo 0.47, appended so the older params keep their order.
+   for (int lane = 0; lane < kNumLanes; lane++)
+   {
+      snprintf(name, sizeof(name), "lane%d_accentPitch", lane);
+      v.Float(name, laneAccentPitch[lane]);
+   }
+   v.Text("patternName", patternName);
+   v.Int("patternPart", patternPart);
 }
 
 int DrumSequencerNode::CurrentStep() const
@@ -816,4 +844,54 @@ void DrumSequencerNode::ClearLane(int lane)
    laneWaveCount[lane] = 0;
    laneStart[lane] = 0.0f;
    laneEnd[lane] = 1.0f;
+}
+
+bool DrumSequencerNode::ApplyPattern(int groove, int part)
+{
+   int count = 0;
+   const DrumPatterns::Groove* all = DrumPatterns::All(count);
+   if (groove < 0 || groove >= count || part < 0 || part > 2)
+      return false;
+   const DrumPatterns::Groove& g = all[groove];
+   const DrumPatterns::Part& pt = g.parts[part];
+   numSteps = std::clamp(pt.steps, 1, kMaxSteps);
+   rate = std::clamp(g.rate, 0, (int)MusicTime::kNumRateDivisions - 1);
+   swing = std::clamp(g.swing, 0.0f, 1.0f);
+   editPage = 0;
+   for (int lane = 0; lane < kNumLanes; lane++)
+   {
+      const char* cells = lane < 8 ? pt.lanes[lane] : nullptr;
+      const size_t len = cells != nullptr ? strlen(cells) : 0;
+      for (int s = 0; s < kMaxSteps; s++)
+         stepVel[lane][s] = (cells != nullptr && s < numSteps && (size_t)s < len) ? DrumPatterns::CellVelocity(cells[s]) : 0.0f;
+      laneAccentPitch[lane] = lane < 8 ? g.tones[lane] : 0.0f;
+   }
+   patternName = g.name;
+   patternPart = part;
+   return true;
+}
+
+int DrumSequencerNode::LoadKitIntoEmptyLanes(const std::string& kitDir)
+{
+   if (kitDir.empty())
+      return 0;
+   int loaded = 0;
+   for (int lane = 0; lane < kNumLanes; lane++)
+   {
+      if (!laneFilePath[lane].empty())
+         continue;
+      std::string path = kitDir;
+      if (path.back() != '/' && path.back() != '\\')
+         path += '/';
+      path += DrumPatterns::KitFile(lane);
+      if (LoadFileToLane(lane, path))
+      {
+         loaded++;
+         // Closed and open hat share a choke group, as on hardware, unless
+         // the lane already has one.
+         if ((lane == 2 || lane == 3) && laneChoke[lane] == 0)
+            laneChoke[lane] = 1;
+      }
+   }
+   return loaded;
 }

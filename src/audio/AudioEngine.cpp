@@ -107,6 +107,11 @@ double AudioEngine::SampleRate() const
    return mSampleRate.load(std::memory_order_relaxed);
 }
 
+uint64_t AudioEngine::BlocksDone() const
+{
+   return mBlocksDone.load(std::memory_order_acquire);
+}
+
 uint64_t AudioEngine::XrunCount() const
 {
    return mXrunCount.load(std::memory_order_relaxed);
@@ -525,14 +530,20 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
          if (buffers[ch] != nullptr)
             std::fill(buffers[ch], buffers[ch] + numFrames, 0.0f);
       mLastCallbackMs.store(NowMs(), std::memory_order_relaxed); // still alive
+      mBlocksDone.fetch_add(1, std::memory_order_acq_rel);
       mInProcess.fetch_sub(1, std::memory_order_acq_rel);
       return;
    }
    struct InProcessGuard
    {
       std::atomic<int>& c;
-      ~InProcessGuard() { c.fetch_sub(1, std::memory_order_acq_rel); }
-   } inProcessGuard{ mInProcess };
+      std::atomic<uint64_t>& done;
+      ~InProcessGuard()
+      {
+         done.fetch_add(1, std::memory_order_acq_rel); // Turbo 0.47: see BlocksDone()
+         c.fetch_sub(1, std::memory_order_acq_rel);
+      }
+   } inProcessGuard{ mInProcess, mBlocksDone };
 
    const double sampleRate = mSampleRate.load(std::memory_order_relaxed);
    const double nowMs = NowMs();

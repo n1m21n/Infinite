@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.25)
 # Unofficial Windows-only fork of Infinite (https://github.com/n1m21n/Infinite).
 # macOS support was removed on purpose: every platform path below is Windows
 # (MSVC 2022, x64, vcpkg static triplet, JUCE, OpenCV, Spout2, Windows ML).
-project(InfiniteTurbo VERSION 0.46.0 LANGUAGES C CXX)
+project(InfiniteTurbo VERSION 0.47.0 LANGUAGES C CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Infinite-Turbo builds only on Windows x64 with MSVC (Visual Studio 2022).")
@@ -187,6 +187,7 @@ add_executable(Infinite WIN32
     src/arrange/ArrangeModel.cpp
     src/core/RemoteControl.cpp
     src/platform/McpBridgeWindows.cpp
+    src/platform/ClaudeChatWindows.cpp
     src/core/RuntimeLog.cpp
     src/core/PatchJson.cpp
     src/core/OscMessage.cpp
@@ -484,6 +485,10 @@ add_custom_command(TARGET Infinite POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/examples/superSynthMCP.inf"
         "$<TARGET_FILE_DIR:Infinite>/assets/examples/superSynthMCP.inf"
+    # Turbo 0.47: the drum kit the Drum Sequencer's pattern library loads.
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/drumkits"
+        "$<TARGET_FILE_DIR:Infinite>/assets/drumkits"
     VERBATIM)
 # The upstream codebase stores UTF-8 paths in std::string. Preserve that
 # ABI while using C++20 for the Windows ML headers.

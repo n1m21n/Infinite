@@ -88,6 +88,10 @@ public:
    std::string ChordName(int index) const;
 
    static const std::vector<std::string>& QualityNames();
+   // Turbo: group of each quality ("triads", "7ths", "altered"...) and the
+   // order the builder dropdown lists them in (quality indices).
+   static const std::vector<std::string>& QualityCategories();
+   static const std::vector<int>& QualityDisplayOrder();
    static int BuildMask(int rootPc, int quality);
    static int InvertMask(int mask);
    static std::string NameForMask(int mask);

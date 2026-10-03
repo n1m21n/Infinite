@@ -39,6 +39,8 @@ Copy-Item -LiteralPath (Join-Path $root 'assets\fonts\OFL.txt') -Destination $fo
 $exampleTarget = Join-Path $package 'assets\examples'
 New-Item -ItemType Directory -Path $exampleTarget -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $root 'assets\examples\superSynthMCP.inf') -Destination $exampleTarget
+# Turbo 0.47: drum kit for the Drum Sequencer pattern library
+Copy-Item -LiteralPath (Join-Path $root 'assets\drumkits') -Destination (Join-Path $package 'assets') -Recurse -Force
 
 # Windows ML is self-contained: keep ONNX Runtime and DirectML next to the EXE.
 Get-ChildItem -LiteralPath (Split-Path -Parent $exe) -Filter '*.dll' -File |

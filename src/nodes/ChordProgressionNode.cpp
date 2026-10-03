@@ -44,6 +44,35 @@ namespace
       { "7sus4", "7sus4", { 0, 5, 7, 10 }, 4 },
       { "m(maj7)", "m(maj7)", { 0, 3, 7, 11 }, 4 },
       { "5", "5", { 0, 7 }, 2 },
+      // Turbo 0.47: extended, altered and voicing qualities. 13ths drop the
+      // 11th, 7alt drops the 5th (six notes max). Intervals above 12 are
+      // voiced in the upper octave of the two-octave keyboard.
+      { "11 (9sus4)", "11", { 0, 7, 10, 14, 17 }, 5 },
+      { "m11", "m11", { 0, 3, 7, 10, 14, 17 }, 6 },
+      { "maj7#11", "maj7#11", { 0, 4, 7, 11, 18 }, 5 },
+      { "maj9#11", "maj9#11", { 0, 4, 7, 11, 14, 18 }, 6 },
+      { "13", "13", { 0, 4, 7, 10, 14, 21 }, 6 },
+      { "m13", "m13", { 0, 3, 7, 10, 14, 21 }, 6 },
+      { "maj13", "maj13", { 0, 4, 7, 11, 14, 21 }, 6 },
+      { "13sus4", "13sus4", { 0, 5, 7, 10, 14, 21 }, 6 },
+      { "9#11", "9#11", { 0, 4, 7, 10, 14, 18 }, 6 },
+      { "m(maj9)", "m(maj9)", { 0, 3, 7, 11, 14 }, 5 },
+      { "7b9", "7b9", { 0, 4, 7, 10, 13 }, 5 },
+      { "7#9", "7#9", { 0, 4, 7, 10, 15 }, 5 },
+      { "7#11", "7#11", { 0, 4, 7, 10, 18 }, 5 },
+      { "7b13", "7b13", { 0, 4, 7, 10, 20 }, 5 },
+      { "7alt", "7alt", { 0, 4, 10, 13, 15, 20 }, 6 },
+      { "m7b9", "m7b9", { 0, 3, 7, 10, 13 }, 5 },
+      { "7#5", "7#5", { 0, 4, 8, 10 }, 4 },
+      { "7b5", "7b5", { 0, 4, 6, 10 }, 4 },
+      { "maj7#5", "maj7#5", { 0, 4, 8, 11 }, 4 },
+      { "dim(maj7)", "dim(maj7)", { 0, 3, 6, 11 }, 4 },
+      { "6/9", "6/9", { 0, 4, 7, 9, 14 }, 5 },
+      { "m6/9", "m6/9", { 0, 3, 7, 9, 14 }, 5 },
+      { "madd9", "madd9", { 0, 3, 7, 14 }, 4 },
+      { "add11", "add11", { 0, 4, 7, 17 }, 4 },
+      { "quartal (4ths)", "quartal", { 0, 5, 10, 15 }, 4 },
+      { "so what", "(so what)", { 0, 5, 10, 15, 19 }, 5 },
    };
    constexpr int kNumQualities = (int)(sizeof(kQualities) / sizeof(kQualities[0]));
 
@@ -588,6 +617,43 @@ const std::vector<std::string>& ChordProgressionNode::QualityNames()
    return names;
 }
 
+const std::vector<std::string>& ChordProgressionNode::QualityCategories()
+{
+   // Parallel to kQualities: the builder dropdown groups by these, in this
+   // order (QualityDisplayOrder).
+   static const std::vector<std::string> cats = [] {
+      static const char* const kCat[] = {
+         "triads", "triads", "7ths", "7ths", "7ths", "triads", "triads", "triads", "triads", "6ths & adds",
+         "6ths & adds", "9ths, 11ths, 13ths", "9ths, 11ths, 13ths", "9ths, 11ths, 13ths", "7ths", "7ths",
+         "6ths & adds", "7ths", "7ths", "triads",
+         "9ths, 11ths, 13ths", "9ths, 11ths, 13ths", "9ths, 11ths, 13ths", "9ths, 11ths, 13ths",
+         "9ths, 11ths, 13ths", "9ths, 11ths, 13ths", "9ths, 11ths, 13ths", "9ths, 11ths, 13ths",
+         "9ths, 11ths, 13ths", "9ths, 11ths, 13ths",
+         "altered", "altered", "altered", "altered", "altered", "altered",
+         "7ths", "7ths", "7ths", "7ths",
+         "6ths & adds", "6ths & adds", "6ths & adds", "6ths & adds",
+         "voicings", "voicings",
+      };
+      static_assert(sizeof(kCat) / sizeof(kCat[0]) == (size_t)kNumQualities, "one category per quality");
+      return std::vector<std::string>(kCat, kCat + kNumQualities);
+   }();
+   return cats;
+}
+
+const std::vector<int>& ChordProgressionNode::QualityDisplayOrder()
+{
+   static const std::vector<int> order = [] {
+      static const char* const kRank[] = { "triads", "6ths & adds", "7ths", "9ths, 11ths, 13ths", "altered", "voicings" };
+      std::vector<int> v;
+      for (const char* rank : kRank)
+         for (int q = 0; q < kNumQualities; q++)
+            if (QualityCategories()[q] == rank)
+               v.push_back(q);
+      return v;
+   }();
+   return order;
+}
+
 int ChordProgressionNode::BuildMask(int rootPc, int quality)
 {
    const Quality& q = kQualities[std::clamp(quality, 0, kNumQualities - 1)];
@@ -668,7 +734,33 @@ int ChordProgressionNode::ScaleForQuality(int quality)
       MusicTime::kMajor,          // add9
       MusicTime::kMixolydian,     // 7sus4
       MusicTime::kMelodicMinor,   // m(maj7)
-      MusicTime::kMinorPentatonic // 5
+      MusicTime::kMinorPentatonic, // 5
+      MusicTime::kMixolydian,      // 11 (9sus4)
+      MusicTime::kDorian,          // m11
+      MusicTime::kLydian,          // maj7#11
+      MusicTime::kLydian,          // maj9#11
+      MusicTime::kMixolydian,      // 13
+      MusicTime::kDorian,          // m13
+      MusicTime::kMajor,           // maj13
+      MusicTime::kMixolydian,      // 13sus4
+      -1,                          // 9#11 (lydian dominant: not in the scale list)
+      MusicTime::kMelodicMinor,    // m(maj9)
+      -1,                          // 7b9
+      -1,                          // 7#9
+      -1,                          // 7#11
+      -1,                          // 7b13
+      -1,                          // 7alt
+      MusicTime::kPhrygian,        // m7b9
+      MusicTime::kWholeTone,       // 7#5
+      MusicTime::kWholeTone,       // 7b5
+      -1,                          // maj7#5
+      -1,                          // dim(maj7)
+      MusicTime::kMajorPentatonic, // 6/9
+      MusicTime::kDorian,          // m6/9
+      MusicTime::kNaturalMinor,    // madd9
+      MusicTime::kMajor,           // add11
+      MusicTime::kMinorPentatonic, // quartal
+      MusicTime::kDorian           // so what
    };
    static_assert(sizeof(kScale) / sizeof(kScale[0]) == (size_t)kNumQualities, "one scale per quality");
    return kScale[std::clamp(quality, 0, kNumQualities - 1)];

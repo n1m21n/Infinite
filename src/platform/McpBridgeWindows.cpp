@@ -35,7 +35,7 @@ using json = nlohmann::json;
 
 namespace
 {
-   const char* kServerVersion = "0.46.0";
+   const char* kServerVersion = "0.47.0";
 
    // ------------------------------------------------------------ stdio ---
    HANDLE gIn = INVALID_HANDLE_VALUE;
@@ -358,6 +358,12 @@ namespace
         R"({"type":"object","properties":{"index":{"type":"integer"},"pad":{"type":"integer"},"action":{"type":"string","enum":["hit","down","up","stop_all"]},"velocity":{"type":"number"}},"required":["index","pad"]})" },
       { "looper", "Drives a Looper: record, stop_record, play, stop, overdub, stop_overdub, clear, undo, redo, state.",
         R"({"type":"object","properties":{"index":{"type":"integer"},"action":{"type":"string"}},"required":["index","action"]})" },
+      { "drum_pattern", "Drum Sequencer pattern library (Turbo): without pattern, lists the 141 grooves (rock, funk, "
+                        "breaks, hip hop, electronic, latin, Brazil, Middle East, India, Africa, jazz; category filters) "
+                        "and the lane roles. With index + pattern (number or name) + part (A verse, B bridge, C chorus), "
+                        "fills that node's grid, steps, rate and swing, and loads the bundled kit into empty lanes "
+                        "(kit:false skips it). Does not change the tempo. Use A / B / C for song sections.",
+        R"({"type":"object","properties":{"index":{"type":"integer"},"pattern":{"type":["integer","string"]},"part":{"type":["string","integer"]},"category":{"type":"string"},"kit":{"type":"boolean"}}})" },
       { "perf_list", "The Performance Mode panel: pages and every control with what it drives.",
         R"({"type":"object","properties":{}})" },
       { "perf_add", "Puts a parameter on the Performance Mode panel (by its drawn name, as explain lists it). kind: knob, "
@@ -393,7 +399,7 @@ namespace
       "(patch_format) and validate_patch_text before load_patch_text -> explain to check the result. An image "
       "chain needs an Output node at the end to be seen. Params that modulate / set_expression take are the "
       "drawn control names explain lists. render_frame / screenshot_node show the picture. Turbo-only tools: "
-      "clip_matrix, pads (MPC / VMPC), looper, perf_* (Performance Mode). Read authoring_guide once before "
+      "clip_matrix, pads (MPC / VMPC), looper, drum_pattern (Drum Sequencer grooves), perf_* (Performance Mode). Read authoring_guide once before "
       "building. Everything is undoable (undo).";
 
    json ToolList()

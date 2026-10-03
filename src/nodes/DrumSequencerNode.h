@@ -74,6 +74,21 @@ public:
    // using the same seeding rules as Randomize() but scoped to a single
    // lane.
    void RandomizeLane(int lane);
+   // Turbo: replaces the pattern with part `part` (0 A verse, 1 B bridge,
+   // 2 C chorus) of DrumPatterns groove `groove`: steps, rate, swing and the
+   // lanes' accent pitch too; lanes the part leaves out are cleared. Samples
+   // and the other per-lane knobs are untouched. False for a bad index.
+   bool ApplyPattern(int groove, int part);
+   // Turbo: loads the bundled kit (one file per lane, DrumPatterns::KitFile)
+   // into every lane that has no sample. Returns how many lanes it filled.
+   int LoadKitIntoEmptyLanes(const std::string& kitDir);
+   // UI state of the pattern picker (saved): the groove by name, so a later
+   // library with a different order still finds it, and the part.
+   std::string patternName;
+   int patternPart = 0;
+   int patternCategory = 0;       // picker only, not saved
+   bool browsingCategory = false; // a category picked but no groove from it yet
+
    // The lane card's `x` button: clears the loaded sample (buffer, path,
    // name, status, waveform cache) but leaves the lane's pattern/knobs
    // alone.
@@ -94,6 +109,9 @@ public:
    bool laneMute[kNumLanes];
    bool laneSolo[kNumLanes];
    int laneChoke[kNumLanes]; // 0 = no choke group
+   // Turbo 0.47: semitones added to this lane's accented (velocity 1.0)
+   // steps, on top of pitch - a two-tone bell (agogo low/high) on one lane.
+   float laneAccentPitch[kNumLanes];
 
    // Decimated min/max waveform for each lane card's visualizer, filled
    // once at load time (see FinishLaneBuffer) - mirrors SamplerNode's
@@ -198,6 +216,7 @@ private:
    bool mLastLaneMute[kNumLanes];
    bool mLastLaneSolo[kNumLanes];
    int mLastLaneChoke[kNumLanes];
+   float mLastLaneAccentPitch[kNumLanes];
    int mLastRate = -1;
    int mLastNumSteps = -1;
    float mLastSwing = -1.0f;

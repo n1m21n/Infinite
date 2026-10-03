@@ -203,6 +203,13 @@ public:
 
    double SampleRate() const;
    uint64_t XrunCount() const;
+   // Turbo 0.47: audio callbacks finished so far. Once it has moved two past
+   // a SetTopology, no callback can still be running the old process list,
+   // so nodes dropped from it may be destroyed.
+   uint64_t BlocksDone() const;
+   // Audio callbacks running right now (0 = none: any later one reads the
+   // process list current at that moment).
+   int InProcess() const { return mInProcess.load(std::memory_order_acquire); }
    // Increments after every successful device start. Plugin hosts use this
    // to re-run prepareToPlay even when a stop/start negotiates the same rate
    // and block size: many VST3 instruments keep device-owned state that is
@@ -381,6 +388,7 @@ private:
    std::atomic<double> mSampleRate { 0.0 };
    std::atomic<uint64_t> mStartGeneration { 0 };
    std::atomic<uint64_t> mXrunCount { 0 };
+   std::atomic<uint64_t> mBlocksDone { 0 };
    std::atomic<double> mLastCallbackMs { -1.0 };
    std::atomic<double> mLastBlockLoad { 0.0 };
    // Set in Start(), read by IsAlive() as the "no callback yet" baseline -

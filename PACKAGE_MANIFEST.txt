@@ -1,5 +1,5 @@
 Infinite-Turbo (for Windows) - source package
-Version: 0.46.0-turbo (base: Windows R31a port)
+Version: 0.47.0-turbo (base: Windows R31a port)
 Upstream: https://github.com/n1m21n/Infinite
 Upstream commit: 788404af4b378941394e2d5dcc45c5542cc903fd
 Target: Windows 10/11 x64 only, Visual Studio 2022 (MSVC), vcpkg x64-windows-static
@@ -18,6 +18,9 @@ Entry points:
 
 macOS sources (Objective-C++ platform layer, Syphon, Steinberg VST3 SDK
 submodule, app bundle resources, DMG tooling, website) were removed in 0.32.
+
+Bundled drum kit (Drum Sequencer pattern library, synthesized for Turbo):
+- assets/drumkits/turbo-basic/01-kick.wav ... 08-bell.wav
 
 Bundled UI font:
 - assets/fonts/IBMPlexSans-Regular.ttf

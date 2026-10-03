@@ -180,6 +180,23 @@ toggle, xy with `param_y`, trigger, numbox, selector, bipolar, stepgate; the def
 param), `perf_list`, `perf_remove`, `perf_show {"open":true,"perform":true}`. When you build
 something meant to be played, finish by putting its 4-8 most expressive params on the panel.
 
+**Drum Sequencer patterns** (Turbo): 141 grooves, each in three parts: A verse, B bridge
+(lighter / breakdown), C chorus (fuller, often 2 bars ending in a fill). `drum_pattern {}` lists
+them (`{"category":"brazil"}` filters) with the lane roles; `drum_pattern {"index":N,
+"pattern":"ijexa","part":"C"}` (name, part of a name, or number) fills steps, rate, swing and
+accent pitch and loads the bundled kit into empty lanes. For a song, switch parts per section
+(A for verses, C for choruses, B for a break). Lanes: 1 kick, 2 snare, 3 closed hat, 4 open hat,
+5 clap / rim / clave, 6 low tom / conga, 7 high tom / conga, 8 bell / ride (two-tone: accented
+steps play `lane<L>_accentPitch` semitones away), so samples you load should follow that order.
+The groove lists a suggested tempo; set it with `transport` if the user wants that feel. Edit
+single steps with `set_param` on `lane<L>_step<S>` (velocity 0..1, 0 = off).
+
+**Chord Progression qualities** (the builder dropdown): triads, 6ths / add9 / 6/9, 7ths (incl.
+7#5, 7b5, maj7#5, dim(maj7)), 9ths / 11ths / 13ths (11, m11, maj7#11, maj9#11, 13, m13, maj13,
+13sus4, 9#11, m(maj9)), altered dominants (7b9, 7#9, 7#11, 7b13, 7alt, m7b9) and voicings
+(quartal, so what). From the tools, write each chord as `mask<N>`: bit k = key k counted up from
+C of `baseOctave`, two octaves (bits 0-23), e.g. C13 = keys 0,4,7,10,14,21. Chord names follow.
+
 **Other Turbo nodes**: OSC to CV (8 OSC addresses to 8 CV outputs), Plugin (VST3 instruments and
 effects; settings `plugin_id` etc., the plugin state is saved with the patch), Chord Progression
 (sets the global key), Predictive Notes / Quantize / Velocity / Rhythm, Macro controls (Knob,

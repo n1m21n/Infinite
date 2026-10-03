@@ -1,5 +1,5 @@
 // Infinite-Turbo 0.46: RPC / MCP tools for Turbo-only features (Clip Matrix,
-// MPC / VMPC pads, Looper, Performance Mode). Included by main.cpp inside its
+// MPC / VMPC pads, Looper, Performance Mode; 0.47: Drum Sequencer patterns). Included by main.cpp inside its
 // anonymous namespace after PerfPanel.inl; dispatched from HandleRpcCommand.
 
 int RpcPerfKind(const nlohmann::json& v)
@@ -133,6 +133,87 @@ bool HandleRpcCommandTurbo(const std::string& method, const nlohmann::json& para
       }
       outResult = { { "recording", lp->IsRecordingOrArmed() }, { "playing", lp->IsPlaying() },
                     { "overdubbing", lp->IsOverdubbing() }, { "has_loop", lp->HasLoop() } };
+      return true;
+   }
+   if (method == "drum_pattern")
+   {
+      // Turbo 0.47: the Drum Sequencer's pattern library. Without `pattern`
+      // it lists the grooves; with it, fills the grid like the picker (empty
+      // lanes get the bundled kit unless kit is false). part: A / B / C.
+      int count = 0;
+      const DrumPatterns::Groove* all = DrumPatterns::All(count);
+      if (!params.contains("pattern"))
+      {
+         const std::string onlyCat = params.contains("category") && params["category"].is_string()
+                                        ? RpcNorm(params["category"].get<std::string>()) : std::string();
+         json list = json::array();
+         for (int i = 0; i < count; i++)
+         {
+            if (!onlyCat.empty() && RpcNorm(all[i].category).find(onlyCat) == std::string::npos)
+               continue;
+            list.push_back({ { "pattern", i }, { "category", all[i].category }, { "name", all[i].name },
+                             { "bpm", all[i].bpm },
+                             { "steps", { all[i].parts[0].steps, all[i].parts[1].steps, all[i].parts[2].steps } } });
+         }
+         json lanes = json::array();
+         for (int l = 0; l < 8; l++)
+            lanes.push_back(DrumPatterns::LaneRole(l));
+         outResult = { { "patterns", list }, { "lanes", lanes },
+                       { "parts", { "A verse", "B bridge", "C chorus (often 2 bars with a fill)" } } };
+         return true;
+      }
+      GraphNode* gn = FindNodeByIndex(params.value("index", -1));
+      auto* drum = gn ? dynamic_cast<DrumSequencerNode*>(gn->node.get()) : nullptr;
+      if (drum == nullptr)
+      {
+         outError = "index is not a Drum Sequencer node";
+         return false;
+      }
+      int pick = -1;
+      const json& want = params["pattern"];
+      if (want.is_number_integer())
+         pick = want.get<int>();
+      else if (want.is_string())
+      {
+         const std::string w = RpcNorm(want.get<std::string>());
+         for (int i = 0; i < count && pick < 0; i++)
+            if (RpcNorm(all[i].name) == w)
+               pick = i;
+         for (int i = 0; i < count && pick < 0; i++) // then a partial match
+            if (RpcNorm(all[i].name).find(w) != std::string::npos)
+               pick = i;
+      }
+      if (pick < 0 || pick >= count)
+      {
+         outError = "unknown pattern (call drum_pattern without pattern for the list)";
+         return false;
+      }
+      int part = 0;
+      if (params.contains("part"))
+      {
+         const json& pv = params["part"];
+         part = -1;
+         if (pv.is_number())
+            part = (int)std::lround(pv.get<double>());
+         else if (pv.is_string() && !pv.get<std::string>().empty())
+         {
+            const char ch = (char)std::toupper((unsigned char)pv.get<std::string>()[0]);
+            part = ch == 'A' || ch == '0' ? 0 : (ch == 'B' || ch == '1' ? 1 : (ch == 'C' || ch == '2' ? 2 : -1));
+         }
+      }
+      if (part < 0 || part > 2)
+      {
+         outError = "part: A, B or C (0-2)";
+         return false;
+      }
+      PushUndoCheckpoint();
+      drum->ApplyPattern(pick, part);
+      int kitLanes = 0;
+      if (params.value("kit", true))
+         kitLanes = drum->LoadKitIntoEmptyLanes(TurboDrumKitDir());
+      gPatchDirty = true;
+      outResult = { { "pattern", pick }, { "name", all[pick].name }, { "part", DrumPatterns::PartName(part) },
+                    { "steps", drum->numSteps }, { "suggested_bpm", all[pick].bpm }, { "kit_lanes_loaded", kitLanes } };
       return true;
    }
    if (method == "perf_list")
