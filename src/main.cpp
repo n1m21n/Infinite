@@ -87302,8 +87302,41 @@ int main(int argc, char** argv)
                CopyParams(b.get(), a.get());
                std::vector<std::pair<std::string, std::string>> paramsB;
                Patch::SaveParams(b.get(), paramsB);
-               if (paramsB != paramsA)
+               // CopyParams deliberately resets the learned blob on Predictive nodes (a pasted copy
+               // starts at "press Learn"), so that one key is expected to differ on the copy path.
+               // Every other param on those nodes must still round-trip. Save/load keeps the blob.
+               std::vector<std::pair<std::string, std::string>> expectB = paramsA;
+               const char* learnedKey = nullptr;
+               if (dynamic_cast<PredictiveModulatorNode*>(a.get()))
+                  learnedKey = "fitData";
+               else if (dynamic_cast<PredictiveNotesNode*>(a.get()) ||
+                        dynamic_cast<PredictiveRhythmNode*>(a.get()))
+                  learnedKey = "model";
+               if (learnedKey != nullptr)
                {
+                  expectB.erase(std::remove_if(expectB.begin(), expectB.end(),
+                                               [&](const std::pair<std::string, std::string>& kv)
+                                               { return kv.first.size() > 2 && kv.first.compare(2, std::string::npos, learnedKey) == 0; }),
+                                expectB.end());
+                  paramsB.erase(std::remove_if(paramsB.begin(), paramsB.end(),
+                                               [&](const std::pair<std::string, std::string>& kv)
+                                               { return kv.first.size() > 2 && kv.first.compare(2, std::string::npos, learnedKey) == 0; }),
+                                paramsB.end());
+               }
+               if (paramsB != expectB)
+               {
+                  for (size_t k = 0; k < std::max(paramsB.size(), expectB.size()); k++)
+                  {
+                     const bool haveB = k < paramsB.size(), haveE = k < expectB.size();
+                     if (!haveB || !haveE || paramsB[k] != expectB[k])
+                     {
+                        printf("  %s: key '%s' expected '%.40s' got '%.40s'\n", name.c_str(),
+                               haveE ? expectB[k].first.c_str() : "(none)",
+                               haveE ? expectB[k].second.c_str() : "",
+                               haveB ? paramsB[k].second.c_str() : "");
+                        break;
+                     }
+                  }
                   copyFails++;
                   copyFailNames.push_back(name);
                }
