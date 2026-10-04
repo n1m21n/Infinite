@@ -50980,7 +50980,13 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       // an earlier window that went fullscreen (which sets FLOATING TRUE)
       // would leak that attribute into every later window created.
       glfwWindowHint(GLFW_FLOATING, GLFW_FALSE);
+      // Alpha-capable window: a node with a transparent background shows the
+      // desktop through the windowed Output (OBS window capture) instead of a
+      // checkerboard. Sticky like the hints above, so set explicitly and
+      // reset after creation; opaque output is unaffected (alpha 1).
+      glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
       GLFWwindow* projWindow = glfwCreateWindow(w, h, NodeTitleWithInstance(gn).c_str(), nullptr, mainWindow);
+      glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_FALSE);
       if (projWindow == nullptr)
       {
          glfwMakeContextCurrent(mainWindow);
@@ -103755,7 +103761,8 @@ int main(int argc, char** argv)
                if (dynamic_cast<ProjectionNode*>(DisplayNode(src->node.get())) != nullptr)
                   GLUtil::DrawTextureToScreen(tex, pw, ph, 0, 0, /*checkerBg=*/false);
                else
-                  GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/true);
+                  GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/true,
+                                              /*transparentWindow=*/!gProjectorWindows[i].fullscreen);
             }
             else
             {

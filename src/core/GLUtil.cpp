@@ -333,7 +333,7 @@ namespace GLUtil
    }
 
    void DrawTextureToScreen(unsigned int tex, int windowW, int windowH, int texW, int texH,
-                             bool checkerBg)
+                             bool checkerBg, bool transparentWindow)
    {
       static const char* kBlitFragSrc =
          "#version 150\n"
@@ -361,6 +361,18 @@ namespace GLUtil
          "   fragColor = vec4(mix(bg, c.rgb, c.a), 1.0);\n"
          "}\n";
 
+      // For a window with a transparent framebuffer: the texture's own alpha
+      // goes to the window (premultiplied, what every compositor expects) so
+      // the desktop / OBS window capture sees through it, no backdrop.
+      static const char* kBlitPremulFragSrc =
+         "#version 150\n"
+         "in vec2 vUv;\n"
+         "out vec4 fragColor;\n"
+         "uniform sampler2D uTex;\n"
+         "void main() { vec4 c = texture(uTex, vUv); fragColor = vec4(c.rgb * c.a, c.a); }\n";
+
+      static unsigned int sPremulProgram = 0;
+      static int sLocTexPremul = -1;
       static unsigned int sBlitProgram = 0;
       static int sLocTex = -1;
       static unsigned int sCheckerProgram = 0;
@@ -375,14 +387,23 @@ namespace GLUtil
          sCheckerProgram = CompileProgram(kBlitCheckerFragSrc);
          sLocTexChecker = glGetUniformLocation(sCheckerProgram, "uTex");
       }
-      const unsigned int program = checkerBg ? sCheckerProgram : sBlitProgram;
-      const int locTex = checkerBg ? sLocTexChecker : sLocTex;
+      if (transparentWindow && sPremulProgram == 0)
+      {
+         sPremulProgram = CompileProgram(kBlitPremulFragSrc);
+         sLocTexPremul = glGetUniformLocation(sPremulProgram, "uTex");
+      }
+      const unsigned int program = transparentWindow ? sPremulProgram : (checkerBg ? sCheckerProgram : sBlitProgram);
+      const int locTex = transparentWindow ? sLocTexPremul : (checkerBg ? sLocTexChecker : sLocTex);
       if (program == 0)
          return;
 
       // Clear the full window first (letterbox bars, if any, show this).
+      // Transparent window: the bars are transparent too.
       glViewport(0, 0, windowW, windowH);
-      glClearColor(0.1f, 0.1f, 0.1f, 1);
+      if (transparentWindow)
+         glClearColor(0, 0, 0, 0);
+      else
+         glClearColor(0.1f, 0.1f, 0.1f, 1);
       glClear(GL_COLOR_BUFFER_BIT);
 
       int vpX = 0, vpY = 0, vpW = windowW, vpH = windowH;
