@@ -1913,6 +1913,47 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    ImVec4 gEqTestRect(0.0f, 0.0f, 0.0f, 0.0f);
    ImVec4 gEqTestScreen(0.0f, 0.0f, 0.0f, 0.0f);
 
+   // Lowercases and strips accents so the dropdown search finds "cafe" from "café". Covers the
+   // Latin-1 supplement and Latin Extended-A (U+00C0..U+017F), which is every accented letter
+   // that shows up in node, device and preset names; anything else passes through unchanged.
+   inline std::string FoldForSearch(const std::string& in)
+   {
+      static const char* const kFold[0x180 - 0xC0] = {
+         "a", "a", "a", "a", "a", "a", "ae", "c", "e", "e", "e", "e", "i", "i", "i", "i",
+         "d", "n", "o", "o", "o", "o", "o", "", "o", "u", "u", "u", "u", "y", "th", "ss",
+         "a", "a", "a", "a", "a", "a", "ae", "c", "e", "e", "e", "e", "i", "i", "i", "i",
+         "d", "n", "o", "o", "o", "o", "o", "", "o", "u", "u", "u", "u", "y", "th", "y",
+         "a", "a", "a", "a", "a", "a", "c", "c", "c", "c", "c", "c", "c", "c", "d", "d",
+         "d", "d", "e", "e", "e", "e", "e", "e", "e", "e", "e", "e", "g", "g", "g", "g",
+         "g", "g", "g", "g", "h", "h", "h", "h", "i", "i", "i", "i", "i", "i", "i", "i",
+         "i", "i", "ij", "ij", "j", "j", "k", "k", "k", "l", "l", "l", "l", "l", "l", "l",
+         "l", "l", "l", "n", "n", "n", "n", "n", "n", "n", "n", "n", "o", "o", "o", "o",
+         "o", "o", "oe", "oe", "r", "r", "r", "r", "r", "r", "s", "s", "s", "s", "s", "s",
+         "s", "s", "t", "t", "t", "t", "t", "t", "u", "u", "u", "u", "u", "u", "u", "u",
+         "u", "u", "u", "u", "w", "w", "y", "y", "y", "z", "z", "z", "z", "z", "z", "s"
+      };
+      std::string out;
+      out.reserve(in.size());
+      for (size_t i = 0; i < in.size(); i++)
+      {
+         const unsigned char c = (unsigned char)in[i];
+         if (c < 0x80)
+            out += (char)std::tolower(c);
+         else if ((c == 0xC3 || c == 0xC4 || c == 0xC5) && i + 1 < in.size())
+         {
+            const unsigned cp = ((c & 0x1Fu) << 6) | ((unsigned char)in[i + 1] & 0x3Fu);
+            out += kFold[cp - 0xC0];
+            i++;
+         }
+         else
+            out += (char)c;
+      }
+      return out;
+   }
+
+   // Lists at least this long get a search box without the call site asking for one.
+   constexpr size_t kDropdownAutoSearchMin = 12;
+
    // ---- deferred dropdown -------------------------------------------------
    // ImGui combos opened inside a node get clipped and mis-scaled by the node
    // editor's canvas transform. Instead a node draws a plain button, records
@@ -99548,6 +99589,7 @@ int main(int argc, char** argv)
       {
          ImGui::OpenPopup("##dropdown");
          gDropdown.justOpened = false;
+         gDropdown.filterBuf[0] = '\0'; // never reopen on the previous list's search text
       }
 
       if (getenv("INFINITE_COLORTEST") != nullptr && frameId == 6)
@@ -99903,11 +99945,11 @@ int main(int argc, char** argv)
       ImGui::SetNextWindowSizeConstraints(ImVec2(dropdownMinWidth, 0), ImVec2(520, 480));
       if (ImGui::BeginPopup("##dropdown"))
       {
-         const bool showSearch = gDropdown.focusSearch;
+         const bool showSearch = gDropdown.focusSearch || gDropdown.options.size() >= kDropdownAutoSearchMin;
          if (showSearch)
          {
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f, 3.0f));
-            if (gDropdown.focusSearch && ImGui::IsWindowAppearing())
+            if (ImGui::IsWindowAppearing())
                ImGui::SetKeyboardFocusHere();
             ImGui::SetNextItemWidth(-1.0f);
             ImGui::InputTextWithHint("##ddsearch", "Search...", gDropdown.filterBuf, sizeof(gDropdown.filterBuf));
@@ -99915,8 +99957,7 @@ int main(int argc, char** argv)
             ImGui::Separator();
          }
 
-         std::string q = gDropdown.filterBuf;
-         std::transform(q.begin(), q.end(), q.begin(), ::tolower);
+         const std::string q = showSearch ? FoldForSearch(gDropdown.filterBuf) : std::string();
 
          // The pill still spans the full row (NoPadWithHalfSpacing below
          // keeps the gap between rows real, and item spacing is tightened
@@ -99933,7 +99974,7 @@ int main(int argc, char** argv)
                std::string hay = gDropdown.options[i];
                if (i < (int)gDropdown.categories.size() && !gDropdown.categories[i].empty())
                   hay += " " + gDropdown.categories[i];
-               std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
+               hay = FoldForSearch(hay);
                if (hay.find(q) == std::string::npos)
                   continue;
             }
