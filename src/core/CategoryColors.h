@@ -88,6 +88,11 @@ namespace CategoryColors
    // 1.0 = no manual adjustment (the default).
    float GetUiScale();
    void SetUiScale(float scale, bool saveToFile = true);
+
+   // Interface font id: "" is the bundled default (Inter); anything else names an entry in
+   // main.cpp's interface font table. Unknown ids fall back to the default there.
+   std::string GetUiFont();
+   void SetUiFont(const std::string& id, bool saveToFile = true);
    bool HasUiScaleOverride();
 
    // Reset all appearance overrides for active polarity (or both)
