@@ -1913,6 +1913,19 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    ImVec4 gEqTestRect(0.0f, 0.0f, 0.0f, 0.0f);
    ImVec4 gEqTestScreen(0.0f, 0.0f, 0.0f, 0.0f);
 
+   // Interface fonts the preference offers. `file` is relative to the bundled fonts folder; the
+   // first entry is the default and is what an unknown or missing saved choice falls back to.
+   struct InterfaceFont
+   {
+      const char* id;    // saved in the appearance file ("" = default)
+      const char* label; // shown in Preferences
+      const char* file;
+   };
+   static const InterfaceFont kInterfaceFonts[] = {
+      { "", "Inter (default)", "fonts/Inter-Regular.ttf" },
+      { "atkinson", "Atkinson Hyperlegible", "fonts/AtkinsonHyperlegible-Regular.ttf" },
+   };
+
    // Lowercases and strips accents so the dropdown search finds "cafe" from "café". Covers the
    // Latin-1 supplement and Latin Extended-A (U+00C0..U+017F), which is every accented letter
    // that shows up in node, device and preset names; anything else passes through unchanged.
@@ -46892,6 +46905,27 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             }
             ImGui::TextWrapped("Manual multiplier on top of the display's own DPI scale. Scales the whole interface, node bodies included.");
 
+            {
+               const std::string currentFont = CategoryColors::GetUiFont();
+               const char* currentLabel = kInterfaceFonts[0].label;
+               for (const InterfaceFont& f : kInterfaceFonts)
+                  if (currentFont == f.id)
+                     currentLabel = f.label;
+               ImGui::SetNextItemWidth(200.0f);
+               if (ImGui::BeginCombo("Interface font", currentLabel))
+               {
+                  for (const InterfaceFont& f : kInterfaceFonts)
+                  {
+                     if (ImGui::Selectable(f.label, currentFont == f.id) && currentFont != f.id)
+                     {
+                        CategoryColors::SetUiFont(f.id); // saves
+                        UiScale::RequestRescale();       // rebakes the atlas with the new face
+                     }
+                  }
+                  ImGui::EndCombo();
+               }
+            }
+
             ImGui::Spacing();
             // Transparency Backdrop
             ImGui::SeparatorText("Transparency Backdrop");
@@ -71855,7 +71889,15 @@ static void ApplyUiScale(GLFWwindow* window, bool rendererReady)
 
    const float bakedPx = UiScale::BakedFontPx(r.bakeScale);
    const std::string bundledInter = BundledResourcePath("fonts/Inter-Regular.ttf");
+   std::string chosenFontPath;
+   {
+      const std::string wanted = CategoryColors::GetUiFont();
+      for (const InterfaceFont& f : kInterfaceFonts)
+         if (wanted == f.id && wanted[0] != '\0')
+            chosenFontPath = BundledResourcePath(f.file);
+   }
    const char* candidates[] = {
+      chosenFontPath.c_str(), // empty for the default, or if the bundled file is missing
       bundledInter.c_str(),
       "/System/Library/Fonts/SFNS.ttf",
       "/System/Library/Fonts/HelveticaNeue.ttc",

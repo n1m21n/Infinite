@@ -250,6 +250,7 @@ float gTintWeightDark = -1.0f;
 float gTintWeightLight = -1.0f;
 float gNodeRounding = -1.0f;
 float gUiScale = -1.0f;
+std::string gUiFont;
 
 std::string ThemePath()
 {
@@ -283,6 +284,7 @@ void LoadAppearanceOverrides()
    gTintWeightLight = -1.0f;
    gNodeRounding = -1.0f;
    gUiScale = -1.0f;
+   gUiFont.clear();
 
    const std::string path = AppearancePath();
    if (path.empty())
@@ -361,6 +363,10 @@ void LoadAppearanceOverrides()
       else if (key == "ui.scale")
       {
          gUiScale = std::strtof(val.c_str(), nullptr);
+      }
+      else if (key == "ui.font")
+      {
+         gUiFont = val;
       }
    }
 }
@@ -655,6 +661,18 @@ void SetUiScale(float scale, bool saveToFile)
       SaveAppearanceOverrides();
 }
 
+std::string GetUiFont()
+{
+   return gUiFont;
+}
+
+void SetUiFont(const std::string& id, bool saveToFile)
+{
+   gUiFont = id;
+   if (saveToFile)
+      SaveAppearanceOverrides();
+}
+
 void ResetAllAppearance(bool light)
 {
    ResetAllCategoryColors(light);
@@ -690,7 +708,7 @@ void SaveAppearanceOverrides()
        gCableOverridesDark.empty() && gCableOverridesLight.empty() &&
        gNodeOpacityDark < 0.0f && gNodeOpacityLight < 0.0f &&
        gTintWeightDark < 0.0f && gTintWeightLight < 0.0f &&
-       gNodeRounding < 0.0f && gUiScale < 0.0f)
+       gNodeRounding < 0.0f && gUiScale < 0.0f && gUiFont.empty())
    {
       std::remove(path.c_str());
       return;
@@ -721,6 +739,8 @@ void SaveAppearanceOverrides()
       file << "node.rounding=" << gNodeRounding << "\n";
    if (gUiScale >= 0.0f)
       file << "ui.scale=" << gUiScale << "\n";
+   if (!gUiFont.empty())
+      file << "ui.font=" << gUiFont << "\n";
 }
 
 int SemanticRank(const std::string& category)
