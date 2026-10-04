@@ -282,6 +282,11 @@ public:
    // 0 = WAV, 1 = FLAC, 2 = MP3
    int formatIndex = 0;
 
+   // Live monitoring: this Audio Out is not delayed to line up with other Audio Outs that carry
+   // more plugin latency. It plays as early as its own chain allows, and the other Audio Outs
+   // align among themselves as before. Plugin delay compensation inside the chain is unchanged.
+   bool live = false;
+
    // Where "Choose..." last pointed, or empty for the ~/Desktop default -
    // not persisted as an in-progress recording (nothing about a recording
    // survives save/load, same as every other recorder in this app - see the

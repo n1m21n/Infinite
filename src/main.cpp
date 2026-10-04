@@ -25691,6 +25691,24 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       ImGui::EndDisabled();
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
 
+      // Live: skip alignment against other Audio Outs (see AudioOutputNode::live).
+      {
+         if (n->live)
+            ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
+         if (ImGui::Button("live##audioOutLive", ImVec2(AudioFullWidth(), 0)))
+         {
+            PushUndoCheckpoint();
+            n->live = !n->live;
+            gPatchDirty = true;
+            RebuildAudioTopology();
+         }
+         if (n->live)
+            ImGui::PopStyleColor();
+         if (ImGui::IsItemHovered())
+            SetAudioReadout("live", n->live ? "not delayed to match other outputs" : "aligned with other outputs");
+      }
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+
       // Record/Stop is the only control that ever starts or stops a
       // recording - Choose... below only ever changes where the *next*
       // recording will land, never triggers one itself, so picking a folder
@@ -41703,7 +41721,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Audio Texture", "Renders incoming audio as an image, so every image node in the app becomes an audio visualiser: Waveform draws the oscilloscope trace, Spectrum the FFT magnitude across a chosen window size. gain scales the drawn amplitude, smoothing damps it between frames. Distinct from Audio Analyze, which produces numbers for modulation - this produces pixels." },
 
          // ---------------- Audio routing (Utility) ----------------
-         { "Audio Out", "The terminal node for audio, the counterpart of Output for images: whatever is patched in is summed into the selected output device. It has no processing of its own and no output pin. Two cables into one Audio Out is refused on purpose - route them through a Mixer instead, which is the only node in the app that sums audio." },
+         { "Audio Out", "The terminal node for audio, the counterpart of Output for images: whatever is patched in is summed into the selected output device. It has no processing of its own and no output pin. Two cables into one Audio Out is refused on purpose - route them through a Mixer instead, which is the only node in the app that sums audio. With several Audio Outs, plugin delay is compensated between them so they land together; press live to opt this one out when you are playing through it and want the lowest delay." },
          { "Mixer", "The only node that sums audio - every other audio input pin takes exactly one cable, so any time two signals have to meet, they meet here. Four to eight slots, each with its own gain, pan, mute and solo, summed to one output." },
          { "Splitter", "The explicit fan-out point for audio: an ordinary audio output feeds exactly one destination, so sending one signal to several places needs this node. Its own output is the one exempt from that rule. On the audio thread it is a plain copy - it exists for the graph-level visibility and the fan-out cap, not because copying is otherwise needed." },
          { "Gain", "A single gain stage in dB, with a level meter - the simplest audio utility there is. Reach for it to trim a source before a Mixer, or to set up a clean level for something that has no output volume of its own." },
@@ -43186,6 +43204,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                      // Capture is set unconditionally, gated at write-time on
                      // the ring's own `enabled` flag - see AudioTerminal's comment.
                      terminals.push_back({ idx, ring });
+                     terminals.back().live = audioOut != nullptr && audioOut->live;
                   }
                }
             }
@@ -43470,12 +43489,12 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       {
          int maxAmongTerminals = 0;
          for (const AudioTerminal& terminal : terminals)
-            if (terminal.bufferIndex >= 0 && terminal.bufferIndex < (int)cumulativeLatencyByBuffer.size())
+            if (!terminal.live && terminal.bufferIndex >= 0 && terminal.bufferIndex < (int)cumulativeLatencyByBuffer.size())
                maxAmongTerminals = std::max(maxAmongTerminals, cumulativeLatencyByBuffer[(size_t)terminal.bufferIndex]);
          for (AudioTerminal& terminal : terminals)
          {
             int delay = 0;
-            if (terminal.bufferIndex >= 0 && terminal.bufferIndex < (int)cumulativeLatencyByBuffer.size())
+            if (!terminal.live && terminal.bufferIndex >= 0 && terminal.bufferIndex < (int)cumulativeLatencyByBuffer.size())
                delay = maxAmongTerminals - cumulativeLatencyByBuffer[(size_t)terminal.bufferIndex];
             CompensationDelay& terminalComp = terminal.capture != nullptr
                                                   ? terminal.capture->compensation
