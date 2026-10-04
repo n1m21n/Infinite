@@ -74,9 +74,12 @@ namespace GLUtil
    // original stretch-to-fill behavior). checkerBg composites the texture's
    // own alpha over the same checkerboard pattern the node editor draws
    // behind a transparent preview, instead of showing raw (unpremultiplied)
-   // color where alpha is 0.
+   // color where alpha is 0. transparentWindow (window made with a transparent
+   // framebuffer) instead writes premultiplied alpha, clears to alpha 0 and
+   // draws no checkerboard, so the window itself is see-through.
    void DrawTextureToScreen(unsigned int tex, int windowW, int windowH,
-                             int texW = 0, int texH = 0, bool checkerBg = false);
+                             int texW = 0, int texH = 0, bool checkerBg = false,
+                             bool transparentWindow = false);
 
    // Reads an existing GPU texture's pixels back to the CPU as RGBA floats,
    // for nodes that need to sample a texture per-vertex rather than per-pixel
