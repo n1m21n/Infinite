@@ -1,5 +1,5 @@
 // Infinite — Art Gallery museum.
-// One set of ten framed pieces, three rooms (hall / rotunda / wall). Switching rooms re-hangs the
+// One set of framed pieces, three rooms (hall / rotunda / wall). Switching rooms re-hangs the
 // same frames along arcs with a stagger, so the pieces stay the same objects, not a cut.
 import * as THREE from 'three';
 
@@ -20,6 +20,8 @@ const WORKS = [
   { file: '08', kind: 'video', w: 1.2, h: 1.6, title: 'Halftone',   meta: 'Infinite, 2026 · 15 s loop' },
   { file: '09', kind: 'still', w: 1.2, h: 1.6, title: 'Eclipse',    meta: 'Infinite, 2026 · still' },
   { file: '10', kind: 'video', w: 1.2, h: 1.6, title: 'Distortion', meta: 'Infinite, 2026 · 11 s loop' },
+  { file: '11', kind: 'video', w: 1.2, h: 1.6, title: 'Sheep',      meta: 'Infinite, 2026 · 15 s loop' },
+  { file: '12', kind: 'video', w: 1.4, h: 1.4, title: 'Hydra',      meta: 'Infinite, 2026 · 15 s loop' },
 ];
 const N = WORKS.length;
 const EYE = 1.65;           // camera height (m)
