@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "audio/WavePeaks.h"
 #include "core/AudioCable.h"
 #include "core/INode.h"
 #include "core/NoteCable.h"
@@ -119,10 +120,22 @@ public:
    float waveformMin[kWaveformCacheSize] = {};
    float waveformMax[kWaveformCacheSize] = {};
    int waveformCacheCount = 0;
+   // Turbo 0.49: multi-resolution peaks for the waveform view, built with
+   // the legacy cache above in FinishBuffer.
+   WavePeaks peaks;
 
    // Current playhead of the most recently triggered voice, 0..1 of the
    // loaded sample's length, drained from the audio node's MeterRing.
    float Playhead() const { return mPlayhead; }
+
+   // ---- VoicePositions (Turbo 0.49) ----
+   // Play positions (0..1 of the whole loaded sample) of every sounding
+   // voice, note lane and self lane, published per block by the audio
+   // thread through lock-free atomics. Writes at most `max` into `out`,
+   // returns how many. Main thread only.
+   static constexpr int kMaxVoicePositions = 16; // = the note voice count
+   int VoicePositions(float* out, int max) const;
+   // ---- end VoicePositions (Turbo 0.49) ----
 
    float pitch = 0.0f;    // semitones, +/-24, on top of the note-relative pitch
    float finetune = 0.0f; // cents, +/-50, stacks on top of pitch

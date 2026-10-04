@@ -423,10 +423,12 @@ void DrawClipMatrixParams(GraphNode& gn, ClipMatrixNode* n)
          const bool rec = n->recordToArrangement;
          if (rec)
             ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(200, 60, 60, 255));
-         if (ImGui::Button("REC > ARR"))
+         // Turbo 0.49: mappable (CV / MIDI / Performance).
+         bool requested = rec;
+         if (ModStateButton("REC > ARR##cmRecArr", rec, requested, ImVec2(100.0f, 0.0f)))
          {
             PushUndoCheckpoint();
-            n->recordToArrangement = !n->recordToArrangement;
+            n->recordToArrangement = requested;
          }
          if (rec)
             ImGui::PopStyleColor();

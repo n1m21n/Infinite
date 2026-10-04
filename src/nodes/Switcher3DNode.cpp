@@ -155,6 +155,13 @@ unsigned long long Switcher3DNode::PointCloudRevision()
    return active ? active->PointCloudRevision() : 0;
 }
 
+// Turbo 0.49: sprite base size follows the active slot, like the cloud itself.
+float Switcher3DNode::PointBaseSize() const
+{
+   IGeometrySource* active = Active();
+   return active ? active->PointBaseSize() : 1.0f;
+}
+
 const Polyline* Switcher3DNode::GetCurve()
 {
    IGeometrySource* active = Active();

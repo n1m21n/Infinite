@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "audio/WavePeaks.h"
 #include "core/AudioCable.h"
 #include "core/INode.h"
 #include "core/NoteCable.h"
@@ -100,6 +101,11 @@ public:
    float padWaveMin[kPads][kWaveCache] = {};
    float padWaveMax[kPads][kWaveCache] = {};
    int padWaveCount[kPads] = {};
+   // Turbo 0.49: multi-resolution peaks for the pad waveform view.
+   WavePeaks padPeaks[kPads];
+   // Turbo 0.49: the pad voice's play position, 0..1 of the whole sample,
+   // published per block by the audio thread; < 0 when the pad is silent.
+   float PadPlayPosition(int pad) const;
 
    // Persisted file paths (VisitParams).
    std::string padPath[kPads];

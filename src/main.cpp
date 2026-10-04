@@ -921,11 +921,14 @@ namespace
    {
       Sample,
       Media,
-      Plugin
+      Plugin,
+      SampleFolder // Turbo 0.49: a library folder row, fills lanes / pads
    };
    LibraryDragKind gSampleDragKind = LibraryDragKind::Sample;
    std::string gSampleDragPath; // Sample/Media only: the file being dragged
    std::string gSampleDragName;
+   // Turbo 0.49: SampleFolder drags only, the folder's audio files by name.
+   std::vector<std::string> gSampleDragFolderFiles;
 
    // Path of the sample currently auditioning from the Samples panel, or
    // empty. Only one preview plays at a time - clicking a row's play button
@@ -1994,10 +1997,15 @@ namespace
       ImGui::TextDisabled("%s", shown.c_str());
    }
 
-   bool ModTriggerButton(const char* label, const ImVec2& size)
+   // Turbo 0.49: `caption` (optional) is the button's text when it differs
+   // from the param's name, e.g. a "<" arrow whose param reads "prev groove"
+   // in MIDI learn, the Performance panel and the MCP param list.
+   bool ModTriggerButton(const char* label, const ImVec2& size, const char* caption = nullptr)
    {
+      if (caption == nullptr)
+         caption = label;
       if (gCurrentNodeIndex < 0)
-         return ImGui::Button(label, size);
+         return ImGui::Button(caption, size);
 
       DiscreteParamRef ref = BeginDiscreteParam(label, 0.0f, 0.0f, 1.0f, 2);
       const std::pair<int, int> key(ref.nodeIndex, ref.paramIndex);
@@ -2015,7 +2023,7 @@ namespace
       }
 
       const float width = size.x > 0.0f ? std::max(8.0f, size.x - 18.0f) : size.x;
-      const bool clicked = ImGui::Button(label, ImVec2(width, size.y));
+      const bool clicked = ImGui::Button(caption, ImVec2(width, size.y));
       const bool hovered = ImGui::IsItemHovered(ref.modulated ? ImGuiHoveredFlags_AllowWhenDisabled
                                                               : ImGuiHoveredFlags_None);
       if (ref.modulated)
@@ -6363,9 +6371,11 @@ namespace
          snprintf(label, sizeof(label), "record###cvRec");
       if (recording)
          ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
-      if (ImGui::Button(label, ImVec2(kPreviewSize, 0)))
+      // Turbo 0.49: mappable (CV / MIDI / Performance): high records, low stops.
+      bool requestedRecording = recording;
+      if (ModStateButton(label, recording, requestedRecording, ImVec2(kPreviewSize, 0)))
       {
-         if (recording)
+         if (!requestedRecording)
             n->StopRecording();
          else
          {
@@ -8074,6 +8084,371 @@ namespace
       ImGui::Dummy(ImVec2(w, h));
    }
 
+   // ======================================================================
+   // Turbo 0.49: shared waveform view (peaks, play cursors, trim handles)
+   // ======================================================================
+   // Every sample node's waveform strip goes through these helpers so they
+   // all read the same: WavePeaks (audio/WavePeaks.h) drawn one column per
+   // real screen pixel, RMS brighter inside the min/max envelope, play
+   // cursors with a small head, and trim handles with a time label while
+   // dragged and Shift for fine adjustment.
+   //
+   // Zoom (the one solution for "node zoomed in / trim range tiny"): the
+   // column-per-pixel drawing picks a finer peak level whenever the node
+   // editor zooms in, and a small magnifier chip in the strip's bottom-right
+   // corner toggles "zoom to trim": the view then spans the start..end range
+   // plus a little margin on each side, so both handles stay grabbable and
+   // the trimmed audio fills the strip. A thin bar along the bottom shows
+   // where that view sits in the whole sample. While a handle is dragged the
+   // view stays frozen (otherwise it would chase the handle); it re-fits on
+   // release. The toggle is UI state only (ImGui storage), never saved.
+   struct WaveView
+   {
+      ImVec2 o { 0.0f, 0.0f };
+      ImVec2 br { 0.0f, 0.0f };
+      float w = 1.0f;
+      float h = 1.0f;
+      float v0 = 0.0f; // visible fraction of the whole buffer
+      float v1 = 1.0f;
+      bool zoomed = false;
+      bool canZoom = false;
+      ImGuiID keyZoom = 0, keyV0 = 0, keyV1 = 0, keyDrag = 0;
+
+      float Span() const { return std::max(1e-7f, v1 - v0); }
+      float X(float f) const { return o.x + w * (f - v0) / Span(); }
+      float Frac(float x) const { return v0 + (x - o.x) / w * Span(); }
+      float MouseFrac() const { return std::clamp(Frac(ImGui::GetIO().MousePos.x), 0.0f, 1.0f); }
+      bool Visible(float f) const { return f >= v0 - 1e-6f && f <= v1 + 1e-6f; }
+   };
+
+   // Pixels per canvas unit: node bodies draw in canvas space and the node
+   // editor scales them, so a "one column per pixel" waveform needs the zoom.
+   // ed::GetCurrentZoom() returns the view's InvScale (canvas units per pixel),
+   // so the pixels per unit is its reciprocal.
+   float WaveViewPixelScale()
+   {
+      const float inv = ed::GetCurrentZoom();
+      if (!(inv > 0.0f) || !std::isfinite(inv))
+         return 1.0f;
+      return std::clamp(1.0f / inv, 0.1f, 8.0f);
+   }
+
+   // Sets up the mapping for one strip. `trimStart/trimEnd` < 0 = the node
+   // has no trim range (no zoom chip). Call before the body click-catcher so
+   // its click can use MouseFrac().
+   WaveView WaveViewBegin(const char* id, ImVec2 origin, float w, float h, float trimStart, float trimEnd,
+                          int numFrames)
+   {
+      WaveView v;
+      v.o = origin;
+      v.w = std::max(1.0f, w);
+      v.h = h;
+      v.br = ImVec2(origin.x + v.w, origin.y + h);
+      v.canZoom = trimStart >= 0.0f && trimEnd > trimStart;
+      ImGui::PushID(id);
+      v.keyZoom = ImGui::GetID("zoom");
+      v.keyV0 = ImGui::GetID("v0");
+      v.keyV1 = ImGui::GetID("v1");
+      v.keyDrag = ImGui::GetID("drag");
+      ImGui::PopID();
+      ImGuiStorage* st = ImGui::GetStateStorage();
+      v.zoomed = v.canZoom && st->GetBool(v.keyZoom, false);
+      if (v.zoomed)
+      {
+         if (st->GetBool(v.keyDrag, false))
+         {
+            v.v0 = st->GetFloat(v.keyV0, 0.0f);
+            v.v1 = st->GetFloat(v.keyV1, 1.0f);
+         }
+         else
+         {
+            // At least ~64 frames visible, so a sample-accurate trim still
+            // has some context around it.
+            const float minSpan = numFrames > 0 ? std::min(1.0f, 64.0f / (float)numFrames) : 1e-4f;
+            const float s = std::clamp(trimStart, 0.0f, 1.0f);
+            const float e = std::clamp(trimEnd, s, 1.0f);
+            const float pad = std::max((e - s) * 0.08f, minSpan * 0.5f);
+            v.v0 = std::max(0.0f, s - pad);
+            v.v1 = std::min(1.0f, e + pad);
+            if (v.v1 - v.v0 < minSpan)
+            {
+               const float c = 0.5f * (v.v0 + v.v1);
+               v.v0 = std::clamp(c - minSpan * 0.5f, 0.0f, 1.0f - minSpan);
+               v.v1 = v.v0 + minSpan;
+            }
+            st->SetFloat(v.keyV0, v.v0);
+            st->SetFloat(v.keyV1, v.v1);
+         }
+         if (!(v.v1 > v.v0))
+         {
+            v.v0 = 0.0f;
+            v.v1 = 1.0f;
+         }
+      }
+      return v;
+   }
+
+   // Brighter (dark theme) / deeper (light theme) shade of a waveform colour
+   // for the RMS body.
+   ImU32 WaveRmsColor(ImU32 base, bool isLight)
+   {
+      ImVec4 c = ImGui::ColorConvertU32ToFloat4(base);
+      const float k = isLight ? -0.30f : 0.40f;
+      auto mix = [k](float x) { return k >= 0.0f ? x + (1.0f - x) * k : x * (1.0f + k); };
+      return ImGui::ColorConvertFloat4ToU32(ImVec4(mix(c.x), mix(c.y), mix(c.z), 1.0f));
+   }
+
+   // The waveform itself: min/max envelope in `col` (at reduced alpha), RMS
+   // brighter on top, dimming outside [trimStart, trimEnd] (pass 0..1 for no
+   // trim). Caller has drawn the background and pushed a clip rect.
+   void DrawWavePeaks(ImDrawList* dl, const WaveView& v, const WavePeaks& peaks, float trimStart, float trimEnd,
+                      ImU32 col, float amp = 0.45f)
+   {
+      const bool isLight = IsThemeLight();
+      const float midY = v.o.y + v.h * 0.5f;
+      dl->AddLine(ImVec2(v.o.x, midY), ImVec2(v.br.x, midY), ScopeMidLineCol(), 1.0f);
+      if (!peaks.Empty())
+      {
+         const float scale = WaveViewPixelScale();
+         const int columns = std::clamp((int)std::ceil(v.w * scale), 1, 8192);
+         const float colW = v.w / (float)columns;
+         const float span = v.Span();
+         const int level = peaks.PickLevel(span, (float)columns);
+         ImVec4 ec = ImGui::ColorConvertU32ToFloat4(col);
+         ec.w *= 0.55f;
+         const ImU32 envCol = ImGui::ColorConvertFloat4ToU32(ec);
+         const ImU32 rmsCol = WaveRmsColor(col, isLight);
+         const float minH = 1.0f / scale; // keep silence visible as a 1 px line
+         for (int c = 0; c < columns; c++)
+         {
+            const float f0 = v.v0 + span * (float)c / (float)columns;
+            const float f1 = v.v0 + span * (float)(c + 1) / (float)columns;
+            float mn = 0.0f, mx = 0.0f, rms = 0.0f;
+            if (!peaks.Range(f0, f1, level, mn, mx, rms))
+               break;
+            const float x0 = v.o.x + colW * (float)c;
+            const float x1 = x0 + colW;
+            float top = midY - mx * v.h * amp;
+            float bot = midY - mn * v.h * amp;
+            if (bot - top < minH)
+            {
+               top = midY - minH * 0.5f;
+               bot = midY + minH * 0.5f;
+            }
+            dl->AddRectFilled(ImVec2(x0, top), ImVec2(x1, bot), envCol);
+            const float r = std::min(rms, std::max(mx, -mn)) * v.h * amp;
+            if (r * scale >= 0.5f)
+               dl->AddRectFilled(ImVec2(x0, midY - r), ImVec2(x1, midY + r), rmsCol);
+         }
+      }
+
+      const ImU32 dimCol = isLight ? IM_COL32(255, 255, 255, 140) : IM_COL32(0, 0, 0, 130);
+      const float sx = std::clamp(v.X(std::clamp(trimStart, 0.0f, 1.0f)), v.o.x, v.br.x);
+      const float ex = std::clamp(v.X(std::clamp(trimEnd, 0.0f, 1.0f)), v.o.x, v.br.x);
+      if (sx > v.o.x)
+         dl->AddRectFilled(v.o, ImVec2(sx, v.br.y), dimCol);
+      if (ex < v.br.x)
+         dl->AddRectFilled(ImVec2(ex, v.o.y), v.br, dimCol);
+
+      // Zoomed: where the visible window sits in the whole sample.
+      if (v.zoomed)
+      {
+         const float y0 = v.br.y - 3.0f;
+         dl->AddRectFilled(ImVec2(v.o.x, y0), v.br, isLight ? IM_COL32(0, 0, 0, 30) : IM_COL32(255, 255, 255, 26));
+         dl->AddRectFilled(ImVec2(v.o.x + v.w * v.v0, y0), ImVec2(v.o.x + v.w * std::max(v.v1, v.v0 + 0.004f), v.br.y),
+                           isLight ? IM_COL32(230, 140, 20, 220) : IM_COL32(255, 200, 90, 200));
+      }
+   }
+
+   ImU32 PlayCursorColor(int alpha = 255)
+   {
+      alpha = std::clamp(alpha, 0, 255);
+      return IsThemeLight() ? IM_COL32(230, 120, 0, alpha) : IM_COL32(255, 226, 120, alpha);
+   }
+
+   // One play cursor: a thin bright line with a small downward triangle head.
+   void DrawPlayCursor(ImDrawList* dl, const WaveView& v, float frac, ImU32 col, float thickness = 1.5f)
+   {
+      if (frac < 0.0f || !v.Visible(frac))
+         return;
+      const float x = v.X(frac);
+      dl->AddLine(ImVec2(x, v.o.y), ImVec2(x, v.br.y), col, thickness);
+      const float head = 5.0f;
+      dl->AddTriangleFilled(ImVec2(x - head, v.o.y), ImVec2(x + head, v.o.y), ImVec2(x, v.o.y + head * 1.2f), col);
+   }
+
+   // "1.234 s" below a minute, "1:02.345" above; a percentage when the
+   // sample rate is unknown.
+   void FormatTrimTime(char* buf, size_t size, float frac, const WavePeaks* peaks)
+   {
+      const double secs = peaks != nullptr ? peaks->Seconds() : 0.0;
+      if (secs <= 0.0)
+      {
+         snprintf(buf, size, "%.2f%%", frac * 100.0f);
+         return;
+      }
+      const double t = std::clamp((double)frac, 0.0, 1.0) * secs;
+      if (t < 60.0)
+         snprintf(buf, size, "%.3f s", t);
+      else
+         snprintf(buf, size, "%d:%06.3f", (int)(t / 60.0), std::fmod(t, 60.0));
+   }
+
+   // Small boxed label next to a handle (flips to its left near the right
+   // edge), drawn inside the strip.
+   void DrawTrimTimeLabel(ImDrawList* dl, const WaveView& v, float frac, const WavePeaks* peaks, ImU32 col)
+   {
+      char buf[32];
+      FormatTrimTime(buf, sizeof(buf), frac, peaks);
+      const ImVec2 ts = ImGui::CalcTextSize(buf);
+      const float x = v.X(frac);
+      float lx = x + 5.0f;
+      if (lx + ts.x + 4.0f > v.br.x)
+         lx = x - 5.0f - ts.x - 4.0f;
+      lx = std::clamp(lx, v.o.x + 1.0f, std::max(v.o.x + 1.0f, v.br.x - ts.x - 5.0f));
+      const float ly = v.o.y + std::max(2.0f, v.h * 0.5f - ts.y - 4.0f);
+      dl->AddRectFilled(ImVec2(lx - 2.0f, ly - 1.0f), ImVec2(lx + ts.x + 2.0f, ly + ts.y + 1.0f),
+                        IsThemeLight() ? IM_COL32(255, 255, 255, 225) : IM_COL32(12, 14, 20, 225), 3.0f);
+      dl->AddRect(ImVec2(lx - 2.0f, ly - 1.0f), ImVec2(lx + ts.x + 2.0f, ly + ts.y + 1.0f), col, 3.0f);
+      dl->AddText(ImVec2(lx, ly), ScopeTextCol(), buf);
+   }
+
+   // Relative drag for a trim value: no jump on grab (unless `jumpToMouse`),
+   // one view-pixel per pixel, a tenth of that with Shift. Re-anchors when
+   // Shift changes so toggling it mid-drag never jumps.
+   struct TrimDragState
+   {
+      ImGuiID owner = 0;
+      float anchorVal = 0.0f;
+      float anchorX = 0.0f;
+      bool fine = false;
+   };
+   TrimDragState gTrimDrag;
+
+   float TrimDragValue(ImGuiID item, const WaveView& v, float current, bool activated, bool jumpToMouse)
+   {
+      const ImGuiIO& io = ImGui::GetIO();
+      const bool fine = io.KeyShift;
+      if (activated || gTrimDrag.owner != item || fine != gTrimDrag.fine)
+      {
+         gTrimDrag.owner = item;
+         gTrimDrag.anchorVal = (activated && jumpToMouse) ? v.MouseFrac() : current;
+         gTrimDrag.anchorX = io.MousePos.x;
+         gTrimDrag.fine = fine;
+      }
+      const float perPx = v.Span() / v.w;
+      return gTrimDrag.anchorVal + (io.MousePos.x - gTrimDrag.anchorX) * perPx * (fine ? 0.1f : 1.0f);
+   }
+
+   // Magnifier chip, bottom-right: toggles zoom-to-trim. Submitted before
+   // the handles so it keeps the click where they overlap.
+   void WaveZoomChip(WaveView& v)
+   {
+      if (!v.canZoom || v.w < 60.0f || v.h < 24.0f)
+         return;
+      const ImVec2 sz(18.0f, 13.0f);
+      const ImVec2 p(v.br.x - 12.0f - sz.x, v.br.y - sz.y - 5.0f);
+      ImGui::SetCursorScreenPos(p);
+      ImGui::InvisibleButton("##wavezoom", sz);
+      const bool hov = ImGui::IsItemHovered();
+      if (ImGui::IsItemClicked())
+      {
+         v.zoomed = !v.zoomed;
+         ImGui::GetStateStorage()->SetBool(v.keyZoom, v.zoomed);
+      }
+      if (hov)
+         SetAudioReadout("#", v.zoomed ? "zoomed to the trim range - click for the whole sample"
+                                       : "zoom the waveform to the trim range");
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const bool isLight = IsThemeLight();
+      const ImU32 bg = v.zoomed ? (isLight ? IM_COL32(230, 140, 20, 230) : IM_COL32(255, 200, 90, 220))
+                                : (isLight ? IM_COL32(255, 255, 255, hov ? 230 : 170) : IM_COL32(20, 22, 30, hov ? 235 : 175));
+      const ImU32 fg = v.zoomed ? IM_COL32(20, 20, 24, 255) : ScopeTextCol();
+      dl->AddRectFilled(p, ImVec2(p.x + sz.x, p.y + sz.y), bg, 3.0f);
+      dl->AddRect(p, ImVec2(p.x + sz.x, p.y + sz.y), ScopeBorderCol(), 3.0f);
+      const ImVec2 c(p.x + 7.5f, p.y + 5.8f);
+      dl->AddCircle(c, 3.6f, fg, 12, 1.3f);
+      dl->AddLine(ImVec2(c.x + 2.6f, c.y + 2.6f), ImVec2(c.x + 6.5f, c.y + 6.0f), fg, 1.6f);
+   }
+
+   // Start/end trim handles over a WaveView: lines, triangle grips,
+   // grab-zones (submitted after the body button, see DrawSamplerWaveform's
+   // overlap note), relative drag with Shift = fine, a time label while
+   // dragging and the value in the readout strip. Pushes an undo checkpoint
+   // on grab. Returns 1 / 2 while the start / end handle is held, else 0.
+   // A handle scrolled out of a zoomed view is not drawn (its button stays
+   // alive only while it is being dragged).
+   int WaveTrimHandles(WaveView& v, const char* id, float* start, float* end, float minGap,
+                       const WavePeaks* peaks, ImU32 startCol, ImU32 endCol)
+   {
+      WaveZoomChip(v);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      ImGui::PushID(id);
+      int held = 0;
+      for (int which = 0; which < 2; which++)
+      {
+         float* val = which == 0 ? start : end;
+         const ImU32 col = which == 0 ? startCol : endCol;
+         const float f = std::clamp(*val, 0.0f, 1.0f);
+         const char* btnId = which == 0 ? "##trimstart" : "##trimend";
+         // Turbo 0.49: the handle being dragged keeps its button even when it
+         // leaves a zoomed view (x clamped into the view), otherwise the drag
+         // would drop the moment it scrolls out; only its drawing is skipped.
+         const bool dragging = ImGui::GetActiveID() != 0 && ImGui::GetActiveID() == ImGui::GetID(btnId);
+         const bool visible = v.Visible(f);
+         if (!visible && !dragging)
+            continue;
+         const float x = std::clamp(v.X(f), v.o.x, v.br.x);
+         if (visible)
+         {
+            dl->AddLine(ImVec2(x, v.o.y), ImVec2(x, v.br.y), col, 2.0f);
+            const float grip = 8.0f;
+            const float gx = std::clamp(x, v.o.x + grip * 0.5f, v.br.x - grip * 0.5f);
+            dl->AddTriangleFilled(ImVec2(gx - grip * 0.5f, v.o.y), ImVec2(gx + grip * 0.5f, v.o.y),
+                                  ImVec2(gx, v.o.y + grip), col);
+            dl->AddTriangleFilled(ImVec2(gx - grip * 0.5f, v.br.y), ImVec2(gx + grip * 0.5f, v.br.y),
+                                  ImVec2(gx, v.br.y - grip), col);
+         }
+
+         const float handleW = 10.0f;
+         const float bx = std::clamp(x - handleW * 0.5f, v.o.x, v.br.x - handleW);
+         ImGui::SetCursorScreenPos(ImVec2(bx, v.o.y));
+         ImGui::InvisibleButton(btnId, ImVec2(handleW, v.h));
+         const bool activated = ImGui::IsItemActivated();
+         if (activated)
+            PushUndoCheckpoint();
+         if (ImGui::IsItemActive())
+         {
+            const float raw = TrimDragValue(ImGui::GetItemID(), v, *val, activated, false);
+            if (which == 0)
+               *start = std::clamp(raw, 0.0f, std::max(0.0f, *end - minGap));
+            else
+               *end = std::clamp(raw, std::min(1.0f, *start + minGap), 1.0f);
+            held = which + 1;
+         }
+         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+         {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+            char t0[32], t1[32], line[96];
+            FormatTrimTime(t0, sizeof(t0), *start, peaks);
+            FormatTrimTime(t1, sizeof(t1), *end, peaks);
+            snprintf(line, sizeof(line), "%s %s - range %s..%s - shift: fine", which == 0 ? "start" : "end",
+                     which == 0 ? t0 : t1, t0, t1);
+            SetAudioReadout("#", line);
+         }
+      }
+      ImGui::PopID();
+      if (held != 0)
+         DrawTrimTimeLabel(dl, v, held == 1 ? *start : *end, peaks, held == 1 ? startCol : endCol);
+      ImGui::GetStateStorage()->SetBool(v.keyDrag, held != 0);
+      return held;
+   }
+
+   // Default trim colours (the existing green start / red end pair).
+   ImU32 TrimStartCol() { return IsThemeLight() ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 255); }
+   ImU32 TrimEndCol() { return IsThemeLight() ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 255); }
+   // ======================================================================
+
    // Sampler's waveform + playhead: a static min/max envelope (the sample
    // data never changes during playback, so there's nothing to redecimate
    // per frame - unlike DrawWavetableScope's live trace) with a moving
@@ -8091,6 +8466,8 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
       const bool hasSample = n->waveformCacheCount > 0;
+      // Turbo 0.49: shared view (zoom-to-trim, per-pixel peaks, cursors).
+      WaveView view = WaveViewBegin("##samplerwave", origin, w, h, n->start, n->end, n->peaks.NumFrames());
 
       // Body click-catcher first, so it owns hover/active by default; the
       // handle grab-zones are added afterwards at the same screen position.
@@ -8104,7 +8481,7 @@ namespace
       ImGui::InvisibleButton("##samplerwavebody", ImVec2(w, h));
       if (hasSample && ImGui::IsItemActivated())
       {
-         const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
+         const float frac = view.MouseFrac();
          // A click outside the start/end range starts from the range's
          // start rather than from the click point - clicking past the red
          // marker used to trigger a voice already past its own end bound,
@@ -8119,96 +8496,41 @@ namespace
       dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
-      const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
-
       if (hasSample)
       {
-         const int count = n->waveformCacheCount;
+         DrawWavePeaks(dl, view, n->peaks, n->start, n->end,
+                       isLight ? IM_COL32(30, 110, 230, 230) : IM_COL32(150, 214, 255, 220));
+
+         // Turbo 0.49: one cursor per sounding voice (self lane and every
+         // note voice), not just the most recent one.
+         float pos[SamplerNode::kMaxVoicePositions + 1]; // note voices + the self voice
+         const int count = n->VoicePositions(pos, SamplerNode::kMaxVoicePositions + 1);
          for (int i = 0; i < count; i++)
-         {
-            const float x = origin.x + w * (float)i / (float)count;
-            const float barW = std::max(1.0f, w / (float)count);
-            const float top = midY - n->waveformMax[i] * h * 0.45f;
-            const float bottom = midY - n->waveformMin[i] * h * 0.45f;
-            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? IM_COL32(30, 110, 230, 210) : IM_COL32(150, 214, 255, 200));
-         }
-
-         // Dim whatever the start/end range excludes, so the active loop
-         // region reads at a glance rather than needing the two handles
-         // read numerically against each other.
-         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
-         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
-         const ImU32 dimCol = isLight ? IM_COL32(255, 255, 255, 140) : IM_COL32(0, 0, 0, 130);
-         if (startX > origin.x)
-            dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
-         if (endX < br.x)
-            dl->AddRectFilled(ImVec2(endX, origin.y), br, dimCol);
-
-         const float px = origin.x + w * std::clamp(n->Playhead(), 0.0f, 1.0f);
-         dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
-                     isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 200, 90, 230), 2.0f);
-
-         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
-                     isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 235), 2.0f);
-         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
-                     isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 235), 2.0f);
+            DrawPlayCursor(dl, view, pos[i], PlayCursorColor());
       }
       else
       {
+         const float midY = origin.y + h * 0.5f;
+         dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
          dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "no sample loaded");
       }
 
       dl->PopClipRect();
       dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
 
+      // Triangle grips at top and bottom of each marker, anchored a few
+      // pixels in from the true edge so they stay visible/grabbable even at
+      // the default start=0/end=1 (see WaveTrimHandles).
       if (hasSample)
-      {
-         // Narrow grab-zones centred on each marker, drawn (and therefore
-         // hit-tested) after the body button above.
-         const float handleW = 10.0f;
-         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
-         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
-
-         // Triangle grips at top and bottom of each marker, anchored a few
-         // pixels in from the true edge so they stay visible/grabbable even
-         // at the default start=0/end=1 - at those values the marker line
-         // sits flush on the border and is otherwise unreadable as a handle.
-         const float grip = 8.0f;
-         const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const ImU32 startCol = isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 255);
-         const ImU32 endCol = isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 255);
-         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y), ImVec2(startGripX, origin.y + grip), startCol);
-         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y), ImVec2(startGripX, br.y - grip), startCol);
-         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
-         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, br.y), ImVec2(endGripX + grip * 0.5f, br.y), ImVec2(endGripX, br.y - grip), endCol);
-
-         ImGui::SetCursorScreenPos(ImVec2(startX - handleW * 0.5f, origin.y));
-         ImGui::InvisibleButton("##samplerstarthandle", ImVec2(handleW, h));
-         if (ImGui::IsItemActivated())
-            PushUndoCheckpoint();
-         if (ImGui::IsItemActive())
-            n->start = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, n->end - 0.01f);
-         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-
-         ImGui::SetCursorScreenPos(ImVec2(endX - handleW * 0.5f, origin.y));
-         ImGui::InvisibleButton("##samplerendhandle", ImVec2(handleW, h));
-         if (ImGui::IsItemActivated())
-            PushUndoCheckpoint();
-         if (ImGui::IsItemActive())
-            n->end = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, n->start + 0.01f, 1.0f);
-         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-      }
+         WaveTrimHandles(view, "##samplertrim", &n->start, &n->end, std::max(0.001f, 0.01f * view.Span()), &n->peaks, TrimStartCol(),
+                         TrimEndCol());
 
       ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(w, h));
    }
 
    // Waveform and playhead renderer for PaulStretch extreme time-stretcher
+   // (Turbo 0.49: shared WaveView helpers).
    void DrawPaulStretchWaveform(PaulStretchNode* n, float h, float width)
    {
       const float w = width > 0.0f ? width : gAudioContentW;
@@ -8216,13 +8538,14 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
       const bool hasSample = n->waveformCacheCount > 0;
+      WaveView view = WaveViewBegin("##paulstretchwave", origin, w, h, n->start, n->end, n->peaks.NumFrames());
 
       ImGui::SetNextItemAllowOverlap();
       ImGui::SetCursorScreenPos(origin);
       ImGui::InvisibleButton("##paulstretchwavebody", ImVec2(w, h));
       if (hasSample && (ImGui::IsItemActivated() || (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))))
       {
-         const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
+         const float frac = view.MouseFrac();
          const float target = (frac < n->start || frac > n->end) ? n->start : frac;
          n->position = target;
          n->Seek(target);
@@ -8234,93 +8557,33 @@ namespace
       dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
-      const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
-
       if (hasSample)
       {
-         const int count = n->waveformCacheCount;
-         for (int i = 0; i < count; i++)
-         {
-            const float x = origin.x + w * (float)i / (float)count;
-            const float barW = std::max(1.0f, w / (float)count);
-            const float top = midY - n->waveformMax[i] * h * 0.45f;
-            const float bottom = midY - n->waveformMin[i] * h * 0.45f;
-            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? IM_COL32(40, 100, 230, 210) : IM_COL32(165, 180, 255, 210));
-         }
-
-         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
-         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
-         const ImU32 dimCol = isLight ? IM_COL32(255, 255, 255, 140) : IM_COL32(0, 0, 0, 130);
-         if (startX > origin.x)
-            dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
-         if (endX < br.x)
-            dl->AddRectFilled(ImVec2(endX, origin.y), br, dimCol);
-
-         const float px = origin.x + w * std::clamp(n->Playhead(), 0.0f, 1.0f);
-         dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
-                     isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 200, 90, 230), 2.0f);
-
-         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
-                     isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 235), 2.0f);
-         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
-                     isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 235), 2.0f);
+         DrawWavePeaks(dl, view, n->peaks, n->start, n->end,
+                       isLight ? IM_COL32(40, 100, 230, 230) : IM_COL32(165, 180, 255, 225));
+         DrawPlayCursor(dl, view, std::clamp(n->Playhead(), 0.0f, 1.0f), PlayCursorColor(n->IsPlaying() ? 255 : 120), 2.0f);
       }
       else
       {
+         const float midY = origin.y + h * 0.5f;
+         dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
          dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "no sample loaded");
       }
 
       dl->PopClipRect();
       dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
 
-      if (hasSample)
-      {
-         const float handleW = 10.0f;
-         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
-         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
-
-         const float grip = 8.0f;
-         const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const ImU32 startCol = isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 255);
-         const ImU32 endCol = isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 255);
-         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y), ImVec2(startGripX, origin.y + grip), startCol);
-         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y), ImVec2(startGripX, br.y - grip), startCol);
-         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
-         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, br.y), ImVec2(endGripX + grip * 0.5f, br.y), ImVec2(endGripX, br.y - grip), endCol);
-
-         ImGui::SetCursorScreenPos(ImVec2(startX - handleW * 0.5f, origin.y));
-         ImGui::InvisibleButton("##paulstretchstarthandle", ImVec2(handleW, h));
-         if (ImGui::IsItemActivated())
-            PushUndoCheckpoint();
-         if (ImGui::IsItemActive())
-         {
-            n->start = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, n->end - 0.01f);
-            n->position = std::clamp(n->position, n->start, n->end);
-         }
-         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-
-         ImGui::SetCursorScreenPos(ImVec2(endX - handleW * 0.5f, origin.y));
-         ImGui::InvisibleButton("##paulstretchendhandle", ImVec2(handleW, h));
-         if (ImGui::IsItemActivated())
-            PushUndoCheckpoint();
-         if (ImGui::IsItemActive())
-         {
-            n->end = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, n->start + 0.01f, 1.0f);
-            n->position = std::clamp(n->position, n->start, n->end);
-         }
-         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-      }
+      if (hasSample && WaveTrimHandles(view, "##paulstretchtrim", &n->start, &n->end,
+                                       std::max(0.001f, 0.01f * view.Span()), &n->peaks, TrimStartCol(),
+                                       TrimEndCol()) != 0)
+         n->position = std::clamp(n->position, n->start, n->end);
 
       ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(w, h));
    }
 
    // Waveform and real-time grain particle renderer for Granular synthesis node
+   // (Turbo 0.49: shared WaveView helpers).
    void DrawGranularWaveform(GranularNode* n, float h, float width)
    {
       const float w = width > 0.0f ? width : gAudioContentW;
@@ -8328,53 +8591,33 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
       const bool hasSample = n->waveformCacheCount > 0;
+      WaveView view = WaveViewBegin("##granularwave", origin, w, h, n->start, n->end, n->peaks.NumFrames());
 
       ImGui::SetNextItemAllowOverlap();
       ImGui::SetCursorScreenPos(origin);
       ImGui::InvisibleButton("##granularwavebody", ImVec2(w, h));
       if (hasSample && (ImGui::IsItemActivated() || (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))))
-      {
-         const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
-         n->Seek(frac);
-      }
+         n->Seek(view.MouseFrac());
 
       const bool isLight = IsThemeLight();
       dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
       const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
-
       if (hasSample)
       {
-         const int count = n->waveformCacheCount;
-         for (int i = 0; i < count; i++)
-         {
-            const float x = origin.x + w * (float)i / (float)count;
-            const float barW = std::max(1.0f, w / (float)count);
-            const float top = midY - n->waveformMax[i] * h * 0.44f;
-            const float bottom = midY - n->waveformMin[i] * h * 0.44f;
-            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? IM_COL32(40, 90, 200, 200) : IM_COL32(140, 160, 220, 175));
-         }
-
-         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
-         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
-         const ImU32 dimCol = isLight ? IM_COL32(255, 255, 255, 140) : IM_COL32(0, 0, 0, 140);
-         if (startX > origin.x)
-            dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
-         if (endX < br.x)
-            dl->AddRectFilled(ImVec2(endX, origin.y), br, dimCol);
+         DrawWavePeaks(dl, view, n->peaks, n->start, n->end,
+                       isLight ? IM_COL32(40, 90, 200, 220) : IM_COL32(140, 160, 220, 200), 0.44f);
 
          // Render active real-time grain particles/dots
          const auto& snap = n->VisualSnapshot();
          for (int g = 0; g < snap.count; ++g)
          {
             const auto& gr = snap.grains[g];
-            if (gr.amp < 0.01f)
+            if (gr.amp < 0.01f || !view.Visible(gr.position))
                continue;
 
-            const float gx = origin.x + w * std::clamp(gr.position, 0.0f, 1.0f);
+            const float gx = view.X(std::clamp(gr.position, 0.0f, 1.0f));
             const float gy = midY + (gr.pan * 0.38f * h);
             const float radius = 2.0f + gr.amp * 3.5f;
 
@@ -8397,22 +8640,21 @@ namespace
             }
          }
 
-         // Current playing playhead (pos)
-         const float px = origin.x + w * std::clamp(n->Playhead(), 0.0f, 1.0f);
-         dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
-                     isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 205, 80, 235), 2.0f);
-         const float pGrip = 8.0f;
-         const ImU32 pCol = isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 205, 80, 255);
-         dl->AddTriangleFilled(ImVec2(px - pGrip * 0.5f, origin.y), ImVec2(px + pGrip * 0.5f, origin.y), ImVec2(px, origin.y + pGrip), pCol);
-         dl->AddTriangleFilled(ImVec2(px - pGrip * 0.5f, br.y), ImVec2(px + pGrip * 0.5f, br.y), ImVec2(px, br.y - pGrip), pCol);
-
-         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
-                     isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 235), 2.0f);
-         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
-                     isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 235), 2.0f);
+         // Current playing playhead (pos), with a grip at the bottom too
+         // (it is also the scrub target).
+         const float ph = std::clamp(n->Playhead(), 0.0f, 1.0f);
+         DrawPlayCursor(dl, view, ph, PlayCursorColor(), 2.0f);
+         if (view.Visible(ph))
+         {
+            const float px = view.X(ph);
+            const float pGrip = 8.0f;
+            dl->AddTriangleFilled(ImVec2(px - pGrip * 0.5f, br.y), ImVec2(px + pGrip * 0.5f, br.y), ImVec2(px, br.y - pGrip),
+                                  PlayCursorColor());
+         }
       }
       else
       {
+         dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
          dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "no sample loaded");
       }
 
@@ -8420,39 +8662,8 @@ namespace
       dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
 
       if (hasSample)
-      {
-         const float handleW = 10.0f;
-         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
-         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
-
-         const float grip = 8.0f;
-         const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const ImU32 startCol = isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 255);
-         const ImU32 endCol = isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 255);
-         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y), ImVec2(startGripX, origin.y + grip), startCol);
-         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y), ImVec2(startGripX, br.y - grip), startCol);
-         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
-         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, br.y), ImVec2(endGripX + grip * 0.5f, br.y), ImVec2(endGripX, br.y - grip), endCol);
-
-         ImGui::SetCursorScreenPos(ImVec2(startX - handleW * 0.5f, origin.y));
-         ImGui::InvisibleButton("##granularstarthandle", ImVec2(handleW, h));
-         if (ImGui::IsItemActivated())
-            PushUndoCheckpoint();
-         if (ImGui::IsItemActive())
-            n->start = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, n->end - 0.01f);
-         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-
-         ImGui::SetCursorScreenPos(ImVec2(endX - handleW * 0.5f, origin.y));
-         ImGui::InvisibleButton("##granularendhandle", ImVec2(handleW, h));
-         if (ImGui::IsItemActivated())
-            PushUndoCheckpoint();
-         if (ImGui::IsItemActive())
-            n->end = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, n->start + 0.01f, 1.0f);
-         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-      }
+         WaveTrimHandles(view, "##granulartrim", &n->start, &n->end, std::max(0.001f, 0.01f * view.Span()), &n->peaks,
+                         TrimStartCol(), TrimEndCol());
 
       ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(w, h));
@@ -11120,6 +11331,10 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
       const bool hasSample = n->laneWaveCount[lane] > 0;
+      const WavePeaks& peaks = n->lanePeaks[lane];
+      // Turbo 0.49: shared view (zoom-to-trim, per-pixel peaks, cursors).
+      WaveView view = WaveViewBegin("##drumlanewave", origin, w, h, n->laneStart[lane], n->laneEnd[lane],
+                                    peaks.NumFrames());
 
       ImGui::SetNextItemAllowOverlap();
       ImGui::SetCursorScreenPos(origin);
@@ -11136,37 +11351,20 @@ namespace
       dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
-      const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
-
       if (hasSample)
       {
-         const int count = n->laneWaveCount[lane];
+         DrawWavePeaks(dl, view, peaks, n->laneStart[lane], n->laneEnd[lane],
+                       isLight ? IM_COL32(30, 110, 230, 230) : IM_COL32(150, 214, 255, 220));
+         // Turbo 0.49: a cursor per sounding voice of this lane.
+         float pos[DrumSequencerNode::kVoicesPerLane];
+         const int count = n->LaneVoicePositions(lane, pos, DrumSequencerNode::kVoicesPerLane);
          for (int i = 0; i < count; i++)
-         {
-            const float x = origin.x + w * (float)i / (float)count;
-            const float barW = std::max(1.0f, w / (float)count);
-            const float top = midY - n->laneWaveMax[lane][i] * h * 0.45f;
-            const float bottom = midY - n->laneWaveMin[lane][i] * h * 0.45f;
-            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? IM_COL32(30, 110, 230, 210) : IM_COL32(150, 214, 255, 200));
-         }
-
-         const float startX = origin.x + w * std::clamp(n->laneStart[lane], 0.0f, 1.0f);
-         const float endX = origin.x + w * std::clamp(n->laneEnd[lane], 0.0f, 1.0f);
-         const ImU32 dimCol = isLight ? IM_COL32(255, 255, 255, 140) : IM_COL32(0, 0, 0, 130);
-         if (startX > origin.x)
-            dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
-         if (endX < br.x)
-            dl->AddRectFilled(ImVec2(endX, origin.y), br, dimCol);
-
-         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
-                     isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 235), 2.0f);
-         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
-                     isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 235), 2.0f);
+            DrawPlayCursor(dl, view, pos[i], PlayCursorColor());
       }
       else
       {
+         const float midY = origin.y + h * 0.5f;
+         dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
          dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(), "drop sample / click");
       }
 
@@ -11174,42 +11372,8 @@ namespace
       dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
 
       if (hasSample)
-      {
-         const float handleW = 10.0f;
-         const float startX = origin.x + w * std::clamp(n->laneStart[lane], 0.0f, 1.0f);
-         const float endX = origin.x + w * std::clamp(n->laneEnd[lane], 0.0f, 1.0f);
-         const float grip = 8.0f;
-         const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const ImU32 startCol = IM_COL32(120, 220, 150, 255);
-         const ImU32 endCol = IM_COL32(220, 120, 150, 255);
-         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y),
-                               ImVec2(startGripX, origin.y + grip), startCol);
-         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y),
-                               ImVec2(startGripX, br.y - grip), startCol);
-         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y),
-                               ImVec2(endGripX, origin.y + grip), endCol);
-         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, br.y), ImVec2(endGripX + grip * 0.5f, br.y),
-                               ImVec2(endGripX, br.y - grip), endCol);
-
-         ImGui::SetCursorScreenPos(ImVec2(startX - handleW * 0.5f, origin.y));
-         ImGui::InvisibleButton("##drumlanestarthandle", ImVec2(handleW, h));
-         if (ImGui::IsItemActivated())
-            PushUndoCheckpoint();
-         if (ImGui::IsItemActive())
-            n->laneStart[lane] = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, n->laneEnd[lane] - 0.01f);
-         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-
-         ImGui::SetCursorScreenPos(ImVec2(endX - handleW * 0.5f, origin.y));
-         ImGui::InvisibleButton("##drumlaneendhandle", ImVec2(handleW, h));
-         if (ImGui::IsItemActivated())
-            PushUndoCheckpoint();
-         if (ImGui::IsItemActive())
-            n->laneEnd[lane] = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, n->laneStart[lane] + 0.01f, 1.0f);
-         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-      }
+         WaveTrimHandles(view, "##drumlanetrim", &n->laneStart[lane], &n->laneEnd[lane],
+                         std::max(0.001f, 0.01f * view.Span()), &peaks, TrimStartCol(), TrimEndCol());
 
       ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(w, h));
@@ -11267,8 +11431,43 @@ namespace
       gPatchDirty = true;
    }
 
+   // Turbo 0.49: what a CV / MIDI / Performance drive last selected on an
+   // edge-driven selector (drum part, groove). Applying a groove rewrites the
+   // grid, so a held value applies once when it changes, never every frame.
+   std::map<std::pair<int, int>, int> gDiscreteLastDriven;
+
+   // The driven option index when the drive changed this frame, else -1.
+   int DiscreteDrivenChange(const DiscreteParamRef& ref, int optionCount)
+   {
+      if (!ref.valid || optionCount <= 0)
+         return -1;
+      const std::pair<int, int> key(ref.nodeIndex, ref.paramIndex);
+      if (!ref.modulated)
+      {
+         gDiscreteLastDriven.erase(key);
+         return -1;
+      }
+      const int driven = std::clamp((int)lroundf(*ref.value), 0, optionCount - 1);
+      auto it = gDiscreteLastDriven.find(key);
+      const bool changed = it == gDiscreteLastDriven.end() || it->second != driven;
+      gDiscreteLastDriven[key] = driven;
+      return changed ? driven : -1;
+   }
+
+   // One undo step per driven change from MIDI or the Performance panel (a
+   // performer's gesture); none for a CV cable, which can change it every
+   // beat, like gApplyingDiscreteCv elsewhere.
+   void PushUndoForDrivenChange(const DiscreteParamRef& ref)
+   {
+      if (!Modulation::Instance().IsModulated(ref.nodeIndex, ref.paramIndex))
+         PushUndoCheckpoint();
+   }
+
    // The pattern picker: category, groove (only that category's, so the list
    // stays short), prev / next, and the three parts as buttons.
+   // Turbo 0.49: groove, prev / next, the part (one 3-way "part" selector pin
+   // at the row start) and each part button are mappable (CV, MIDI learn,
+   // Performance Mode), so a pad can fire "B bridge".
    void DrawDrumPatternPicker(DrumSequencerNode* n)
    {
       int count = 0, catCount = 0;
@@ -11289,7 +11488,8 @@ namespace
 
       const float gap = ImGui::GetStyle().ItemSpacing.x;
       const float full = AudioFullWidth();
-      const float arrowW = ImGui::GetFrameHeight();
+      constexpr float kPinSlot = 18.0f; // a discrete param's pin + its spacing
+      const float arrowW = ImGui::GetFrameHeight() + kPinSlot;
       const float catW = std::floor((full - arrowW * 2.0f - gap * 3.0f) * 0.40f);
       const float grooveW = full - catW - arrowW * 2.0f - gap * 3.0f;
 
@@ -11311,40 +11511,59 @@ namespace
          ImGui::SetTooltip("pattern library: groups");
       ImGui::SameLine(0.0f, gap);
       const bool inThisCat = current >= 0 && std::find(inCat.begin(), inCat.end(), current) != inCat.end();
-      std::string grooveCaption = inThisCat ? std::string(all[current].name) : std::string("choose a groove...");
-      grooveCaption += "##drumGroove";
-      if (ImGui::Button(grooveCaption.c_str(), ImVec2(grooveW, 0)))
+      const int shownK = inThisCat ? (int)(std::find(inCat.begin(), inCat.end(), current) - inCat.begin()) : -1;
+      std::vector<std::string> grooveNames;
+      for (int k = 0; k < (int)inCat.size(); k++)
+         grooveNames.push_back(all[inCat[k]].name);
+
+      // Groove: a selector over the shown category's list (index into it).
+      // A drive applies the groove with the current part when it changes.
       {
-         std::vector<std::string> names;
-         int shown = -1;
-         for (int k = 0; k < (int)inCat.size(); k++)
+         DiscreteParamRef ref;
+         if (!inCat.empty())
+            ref = BeginDiscreteParam("groove##drumGroove", (float)std::max(0, shownK), 0.0f,
+                                     (float)inCat.size() - 1.0f, 3, &grooveNames);
+         const int driven = DiscreteDrivenChange(ref, (int)inCat.size());
+         if (driven >= 0 && driven != shownK)
          {
-            char row[160];
-            snprintf(row, sizeof(row), "%s   ~%d bpm", all[inCat[k]].name, all[inCat[k]].bpm);
-            names.push_back(row);
-            if (inCat[k] == current)
-               shown = k;
+            PushUndoForDrivenChange(ref);
+            DrumApplyGroove(target, inCat[driven], part);
          }
-         PrepareDropdown(names, {}, shown, [target, inCat, part](int k) {
-            if (k >= 0 && k < (int)inCat.size())
-               DrumApplyGroove(target, inCat[k], part);
-         }, true);
-      }
-      if (ImGui::IsItemHovered())
-      {
-         if (inThisCat)
-            ImGui::SetTooltip("%s - suggested tempo %d bpm\nLanes: 1 kick, 2 snare, 3 closed hat, 4 open hat, 5 clap/rim,\n"
-                              "6 low tom/conga, 7 high tom/conga, 8 bell/ride. Empty lanes get the Turbo kit.",
-                              all[current].name, all[current].bpm);
-         else
-            ImGui::SetTooltip("pick a groove: fills the grid, steps, rate and swing (empty lanes get the Turbo kit)");
+         std::string grooveCaption = inThisCat ? std::string(all[current].name) : std::string("choose a groove...");
+         grooveCaption += "##drumGrooveBtn";
+         const float btnW = ref.valid ? std::max(24.0f, grooveW - kPinSlot) : grooveW;
+         if (ImGui::Button(grooveCaption.c_str(), ImVec2(btnW, 0)))
+         {
+            std::vector<std::string> names;
+            for (int k = 0; k < (int)inCat.size(); k++)
+            {
+               char row[160];
+               snprintf(row, sizeof(row), "%s   ~%d bpm", all[inCat[k]].name, all[inCat[k]].bpm);
+               names.push_back(row);
+            }
+            PrepareDropdown(names, {}, shownK, [target, inCat, part](int k) {
+               if (k >= 0 && k < (int)inCat.size())
+                  DrumApplyGroove(target, inCat[k], part);
+            }, true);
+         }
+         const bool hovered = ImGui::IsItemHovered();
+         if (hovered)
+         {
+            if (inThisCat)
+               ImGui::SetTooltip("%s - suggested tempo %d bpm\nLanes: 1 kick, 2 snare, 3 closed hat, 4 open hat, 5 clap/rim,\n"
+                                 "6 low tom/conga, 7 high tom/conga, 8 bell/ride. Empty lanes get the Turbo kit.",
+                                 all[current].name, all[current].bpm);
+            else
+               ImGui::SetTooltip("pick a groove: fills the grid, steps, rate and swing (empty lanes get the Turbo kit)");
+         }
+         EndDiscreteParam(ref, hovered);
       }
       auto step = [&](int dir) {
          if (inCat.empty())
             return;
          int k = 0;
          if (inThisCat)
-            k = (int)(std::find(inCat.begin(), inCat.end(), current) - inCat.begin()) + dir;
+            k = shownK + dir;
          else
             k = dir > 0 ? 0 : (int)inCat.size() - 1;
          k = (k % (int)inCat.size() + (int)inCat.size()) % (int)inCat.size();
@@ -11352,18 +11571,38 @@ namespace
          DrumApplyGroove(target, inCat[k], part);
       };
       ImGui::SameLine(0.0f, gap);
-      if (ImGui::Button("<##drumPrev", ImVec2(arrowW, 0)))
+      if (ModTriggerButton("prev groove##drumPrev", ImVec2(arrowW, 0), "<##drumPrevBtn"))
          step(-1);
       if (ImGui::IsItemHovered())
          ImGui::SetTooltip("previous groove");
       ImGui::SameLine(0.0f, gap);
-      if (ImGui::Button(">##drumNext", ImVec2(arrowW, 0)))
+      if (ModTriggerButton("next groove##drumNext", ImVec2(arrowW, 0), ">##drumNextBtn"))
          step(1);
       if (ImGui::IsItemHovered())
          ImGui::SetTooltip("next groove");
 
       // Parts: A verse, B bridge, C chorus. The lit one is what the grid holds.
-      const float partW = (full - gap * 2.0f) / 3.0f;
+      // The row starts with the "part" selector's pin (0 A, 1 B, 2 C): a CV,
+      // MIDI knob or Performance selector switches the part when it changes.
+      {
+         static const std::vector<std::string> kPartNames = {
+            DrumPatterns::PartName(0), DrumPatterns::PartName(1), DrumPatterns::PartName(2) };
+         DiscreteParamRef ref = BeginDiscreteParam("part##drumPartSel", (float)part, 0.0f, 2.0f, 3, &kPartNames);
+         const bool pinHovered = ref.valid && ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+         const int driven = DiscreteDrivenChange(ref, 3);
+         if (driven >= 0 && driven != part)
+         {
+            PushUndoForDrivenChange(ref);
+            if (current >= 0)
+               DrumApplyGroove(target, current, driven);
+            else
+               n->patternPart = driven; // no groove yet: the next pick uses this part
+         }
+         if (pinHovered)
+            ImGui::SetTooltip("part selector (A / B / C) for CV, MIDI or a Performance selector");
+         EndDiscreteParam(ref, pinHovered);
+      }
+      const float partW = (full - kPinSlot - gap * 2.0f) / 3.0f;
       for (int pi = 0; pi < 3; pi++)
       {
          if (pi > 0)
@@ -11374,7 +11613,8 @@ namespace
          ImGui::BeginDisabled(current < 0);
          char label[32];
          snprintf(label, sizeof(label), "%s##drumPart%d", DrumPatterns::PartName(pi), pi);
-         if (ImGui::Button(label, ImVec2(partW, 0)))
+         // A momentary trigger per part, so a MIDI pad or Perf trigger fires it.
+         if (ModTriggerButton(label, ImVec2(partW, 0)) && current >= 0)
          {
             PushUndoCheckpoint();
             DrumApplyGroove(target, current, pi);
@@ -11973,76 +12213,308 @@ namespace
       }
    }
 
+   // Turbo 0.49: the library as a folder tree, rebuilt from the scanner's
+   // index whenever it changes, so a kit's files show together under their
+   // folder instead of one flat list. Keys are PathKey(root) + "|" +
+   // PathKey(relative folder); the root itself has an empty relative part.
+   struct LibFolderNode
+   {
+      std::string key, parentKey;
+      std::string root;      // library root this folder lives under
+      std::string rel;       // '/'-separated, "" for the root itself
+      std::string name;      // display name (a root: its label or folder name)
+      std::string nameLower;
+      std::string absPath;
+      std::vector<std::string> children;               // keys, sorted by name
+      std::vector<const SampleScanner::Entry*> files;  // files directly in it
+      int total = 0;                                   // files here and below
+   };
+
+   struct LibFolderTree
+   {
+      uint64_t version = 0;
+      std::unordered_map<std::string, LibFolderNode> folders;
+      std::vector<std::string> roots; // keys, in the user's order
+
+      const LibFolderNode* Find(const std::string& key) const
+      {
+         auto it = folders.find(key);
+         return it == folders.end() ? nullptr : &it->second;
+      }
+   };
+
+   std::string LibFolderKey(const std::string& rootKey, const std::string& rel)
+   {
+      return rootKey + "|" + SampleScanner::PathKey(rel);
+   }
+
+   std::string LibLower(std::string s)
+   {
+      std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+      return s;
+   }
+
+   int LibFolderTotal(LibFolderTree& t, const std::string& key)
+   {
+      auto it = t.folders.find(key);
+      if (it == t.folders.end())
+         return 0;
+      int sum = (int)it->second.files.size();
+      const std::vector<std::string> children = it->second.children;
+      for (const std::string& c : children)
+         sum += LibFolderTotal(t, c);
+      t.folders[key].total = sum;
+      return sum;
+   }
+
+   void RebuildLibFolderTree(LibFolderTree& t, const SampleScanner& scanner)
+   {
+      t.folders.clear();
+      t.roots.clear();
+#ifdef _WIN32
+      const char sep = '\\';
+#else
+      const char sep = '/';
+#endif
+      std::unordered_map<std::string, std::string> rootKeyOf; // root spelling -> PathKey
+      for (const std::string& r : scanner.Folders())
+      {
+         const std::string rk = SampleScanner::PathKey(r);
+         const std::string key = LibFolderKey(rk, "");
+         if (t.folders.count(key) > 0)
+            continue;
+         LibFolderNode& n = t.folders[key];
+         n.key = key;
+         n.root = r;
+         n.name = scanner.FolderDisplayName(r);
+         n.nameLower = LibLower(n.name);
+         n.absPath = r;
+         t.roots.push_back(key);
+         rootKeyOf[r] = rk;
+      }
+
+      // Scan order groups a folder's files together, so the last leaf is
+      // reused until the folder changes (map element pointers stay valid
+      // across inserts).
+      LibFolderNode* last = nullptr;
+      const SampleScanner::Entry* lastEntry = nullptr;
+      for (const SampleScanner::Entry& e : scanner.Index())
+      {
+         if (last == nullptr || lastEntry == nullptr || lastEntry->folderRoot != e.folderRoot || lastEntry->relDir != e.relDir)
+         {
+            last = nullptr;
+            auto rit = rootKeyOf.find(e.folderRoot);
+            if (rit == rootKeyOf.end())
+               continue;
+            LibFolderNode* node = &t.folders[LibFolderKey(rit->second, "")];
+            size_t pos = 0;
+            while (pos < e.relDir.size())
+            {
+               size_t slash = e.relDir.find('/', pos);
+               if (slash == std::string::npos)
+                  slash = e.relDir.size();
+               const std::string rel = e.relDir.substr(0, slash);
+               const std::string key = LibFolderKey(rit->second, rel);
+               auto [cit, inserted] = t.folders.try_emplace(key);
+               LibFolderNode& child = cit->second;
+               if (inserted)
+               {
+                  child.key = key;
+                  child.parentKey = node->key;
+                  child.root = e.folderRoot;
+                  child.rel = rel;
+                  child.name = e.relDir.substr(pos, slash - pos);
+                  child.nameLower = LibLower(child.name);
+                  std::string relNative = rel;
+                  std::replace(relNative.begin(), relNative.end(), '/', sep);
+                  child.absPath = e.folderRoot;
+                  if (!child.absPath.empty() && child.absPath.back() != '/' && child.absPath.back() != '\\')
+                     child.absPath += sep;
+                  child.absPath += relNative;
+                  node->children.push_back(key);
+               }
+               node = &child;
+               pos = slash + 1;
+            }
+            last = node;
+            lastEntry = &e;
+         }
+         last->files.push_back(&e);
+      }
+
+      for (auto& [key, node] : t.folders)
+         std::sort(node.children.begin(), node.children.end(), [&t](const std::string& a, const std::string& b) {
+            return t.folders.at(a).nameLower < t.folders.at(b).nameLower;
+         });
+      for (const std::string& r : t.roots)
+         LibFolderTotal(t, r);
+      t.version = scanner.IndexVersion();
+   }
+
+   // The audio files a folder drag loads, in name order: the folder's own
+   // files, or (a folder holding only subfolders) every file below it.
+   std::vector<std::string> LibFolderDragFiles(const LibFolderTree& t, const LibFolderNode& folder)
+   {
+      std::vector<const SampleScanner::Entry*> picked = folder.files;
+      if (picked.empty())
+      {
+         std::vector<const LibFolderNode*> stack { &folder };
+         while (!stack.empty())
+         {
+            const LibFolderNode* n = stack.back();
+            stack.pop_back();
+            picked.insert(picked.end(), n->files.begin(), n->files.end());
+            for (const std::string& c : n->children)
+               if (const LibFolderNode* cn = t.Find(c))
+                  stack.push_back(cn);
+         }
+      }
+      std::stable_sort(picked.begin(), picked.end(), [](const SampleScanner::Entry* a, const SampleScanner::Entry* b) {
+         const std::string ka = LibLower(a->relDir) + "/" + a->fileNameLower;
+         const std::string kb = LibLower(b->relDir) + "/" + b->fileNameLower;
+         return ka < kb;
+      });
+      std::vector<std::string> out;
+      out.reserve(picked.size());
+      for (const SampleScanner::Entry* e : picked)
+         out.push_back(e->path);
+      return out;
+   }
+
+   // A small folder glyph drawn as shapes (the UI font has Basic Latin only).
+   void DrawLibFolderIcon(ImDrawList* dl, ImVec2 mn, ImVec2 mx, ImU32 col)
+   {
+      const float w = mx.x - mn.x, h = mx.y - mn.y;
+      const float s = std::min(w, h * 1.25f);
+      const ImVec2 o(mn.x + (w - s) * 0.5f, mn.y + (h - s * 0.8f) * 0.5f);
+      const float bh = s * 0.8f;
+      dl->AddRectFilled(ImVec2(o.x, o.y), ImVec2(o.x + s * 0.45f, o.y + bh * 0.3f), col, s * 0.08f);
+      dl->AddRectFilled(ImVec2(o.x, o.y + bh * 0.18f), ImVec2(o.x + s, o.y + bh), col, s * 0.1f);
+   }
+
    void DrawLibrarySearchPanel(SampleScanner& scanner, const char* idPrefix, const char* searchHint, bool mediaKind)
    {
       scanner.PollResults();
 
       ImGui::PushID(idPrefix);
 
-      if (ImGui::Button("Add folder...", ImVec2(-1.0f, 0)))
+      // Per-mode browsing state: the folder on show ("" = the list of
+      // library roots) and the root being renamed.
+      struct LibraryBrowseState
       {
-         SampleScanner* target = &scanner;
-         StartFileDialog([] { return Platform::OpenFolderDialog(); },
-                         [target](const std::string& path) { target->AddFolder(path); });
-      }
+         std::string folderKey;
+         std::string renameRoot;
+         char renameBuf[128] = "";
+         bool openRoots = false; // open the folders list (rename from a row menu)
+         LibFolderTree tree;
+      };
+      static LibraryBrowseState sSampleBrowse, sMediaBrowse;
+      LibraryBrowseState& browse = mediaKind ? sMediaBrowse : sSampleBrowse;
+      if (browse.tree.version != scanner.IndexVersion())
+         RebuildLibFolderTree(browse.tree, scanner);
+      const LibFolderTree& tree = browse.tree;
 
-      // Folders list, each with its own refresh and remove button. Kept
-      // short (no scroll region of its own) since a handful of library
-      // folders is the expected case - the result list below is where
-      // scrolling matters.
-      std::string folderToRemove;
-      std::string folderToScan;
-      bool scanAll = false;
       const bool scanning = scanner.IsScanning();
-      const float panelW = ImGui::GetContentRegionAvail().x;
-      for (const std::string& folder : scanner.Folders())
       {
-         ImGui::PushID(folder.c_str());
-         const float btnW = ImGui::GetFrameHeight();
-         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + panelW - 2.0f * btnW - 14.0f);
-         ImGui::TextDisabled("%s", folder.c_str());
-         ImGui::PopTextWrapPos();
-         ImGui::SameLine(panelW - 2.0f * btnW - 4.0f);
+         const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+         if (ImGui::Button("Add folder...", ImVec2(half, 0)))
+         {
+            SampleScanner* target = &scanner;
+            StartFileDialog([] { return Platform::OpenFolderDialog("Add a library folder"); },
+                            [target](const std::string& path) { target->AddFolder(path); });
+         }
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Add a folder to the library (its subfolders are included)");
+         ImGui::SameLine();
          if (scanning)
             ImGui::BeginDisabled();
-         if (ImGui::Button("\xe2\x86\xbb", ImVec2(btnW, 0))) // U+21BB clockwise open circle arrow
-            folderToScan = folder;
+         if (ImGui::Button("Rescan", ImVec2(-1.0f, 0)))
+            scanner.StartScan();
          if (scanning)
             ImGui::EndDisabled();
-         ImGui::SameLine(panelW - btnW);
-         if (ImGui::Button("x", ImVec2(btnW, 0)))
-            folderToRemove = folder;
-         ImGui::PopID();
-      }
-      if (!folderToRemove.empty())
-         scanner.RemoveFolder(folderToRemove);
-
-      ImGui::Dummy(ImVec2(0.0f, 4.0f));
-      {
-         if (scanning)
-            ImGui::BeginDisabled();
-         if (ImGui::Button("Refresh all", ImVec2(-1.0f, 0)))
-            scanAll = true;
-         if (scanning)
-            ImGui::EndDisabled();
+         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("Scan every library folder again (runs in the background)");
          if (scanning)
             ImGui::TextDisabled("scanning... (%d found)", scanner.FilesFoundSoFar());
       }
-      if (scanAll)
-         scanner.StartScan();
-      else if (!folderToScan.empty())
-         scanner.StartScan(folderToScan);
+
+      // Library roots: label, rename, remove. Collapsed by default, the
+      // browser below is what the panel is for.
+      // Removal waits for the end of the panel: it erases index entries
+      // the rows below point at.
+      std::string rootToRemove, rootToBrowse;
+      char rootsHeader[64];
+      snprintf(rootsHeader, sizeof(rootsHeader), "Library folders (%d)###libroots", (int)scanner.Folders().size());
+      if (browse.openRoots)
+      {
+         ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+         browse.openRoots = false;
+      }
+      if (ImGui::TreeNodeEx(rootsHeader, ImGuiTreeNodeFlags_SpanAvailWidth))
+      {
+         const float frameH = ImGui::GetFrameHeight();
+         for (const std::string& root : scanner.Folders())
+         {
+            ImGui::PushID(root.c_str());
+            const float avail = ImGui::GetContentRegionAvail().x;
+            const float btnW = ImGui::CalcTextSize("Rename").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+            const float nameW = std::max(20.0f, avail - btnW - frameH - ImGui::GetStyle().ItemSpacing.x * 2.0f);
+            if (browse.renameRoot == root)
+            {
+               ImGui::SetNextItemWidth(nameW);
+               if (ImGui::IsWindowAppearing() || !ImGui::IsAnyItemActive())
+                  ImGui::SetKeyboardFocusHere();
+               const bool enter = ImGui::InputTextWithHint("##rename", "label (empty = folder name)", browse.renameBuf,
+                                                           sizeof(browse.renameBuf), ImGuiInputTextFlags_EnterReturnsTrue);
+               if (enter || ImGui::IsItemDeactivated())
+               {
+                  if (!ImGui::IsKeyPressed(ImGuiKey_Escape))
+                     scanner.SetFolderLabel(root, browse.renameBuf);
+                  browse.renameRoot.clear();
+               }
+            }
+            else
+            {
+               const std::string name = scanner.FolderDisplayName(root);
+               if (ImGui::Selectable(name.c_str(), false, 0, ImVec2(nameW, 0)))
+                  rootToBrowse = root;
+               if (ImGui::IsItemHovered())
+                  ImGui::SetTooltip("%s\nclick to browse", root.c_str());
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Rename", ImVec2(btnW, 0)))
+            {
+               browse.renameRoot = root;
+               snprintf(browse.renameBuf, sizeof(browse.renameBuf), "%s", scanner.FolderLabel(root).c_str());
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("x", ImVec2(frameH, 0)))
+               rootToRemove = root;
+            if (ImGui::IsItemHovered())
+               ImGui::SetTooltip("Remove from the library (the files stay on disk)");
+            ImGui::PopID();
+         }
+         if (scanner.Folders().empty())
+            ImGui::TextDisabled("no folders yet - Add folder...");
+         ImGui::TreePop();
+      }
 
       ImGui::Separator();
 
+      struct LibraryRow
+      {
+         const LibFolderNode* folder = nullptr;
+         const SampleScanner::Entry* entry = nullptr;
+      };
       struct LibraryFilterCache
       {
-         std::string lastQuery;
+         std::string lastQuery, lastFolder;
          uint64_t lastIndexVersion = 0;
          uint64_t lastFavVersion = 0;
          int lastFilter = -1, lastSort = -1;
          bool lastDescending = false;
-         std::vector<const SampleScanner::Entry*> filtered;
+         std::vector<LibraryRow> rows;
+         int fileCount = 0;
       };
       static LibraryFilterCache sSampleCache;
       static LibraryFilterCache sMediaCache;
@@ -12058,10 +12530,94 @@ namespace
       char* searchBuf = mediaKind ? mediaSearch : sampleSearch;
       ImGui::SetNextItemWidth(-1.0f);
       ImGui::InputTextWithHint("##librarysearch", searchHint, searchBuf, 128);
+      if (ImGui::IsItemHovered() && searchBuf[0] == '\0')
+         ImGui::SetTooltip("Type to search every library folder; empty shows the current folder");
       DrawBrowserListOptions(opts, mediaKind ? MediaFilterNames() : SampleFilterNames(), LibrarySortNames());
 
       std::string q = searchBuf;
       std::transform(q.begin(), q.end(), q.begin(), ::tolower);
+      // Searching, or showing favourites, covers every root; otherwise the
+      // list is the current folder.
+      const bool everywhere = !q.empty() || opts.filter == 1;
+
+      // Where we are. A single root is opened directly (no one-item list
+      // of roots); a folder that vanished in a rescan falls back to home.
+      if (!browse.folderKey.empty() && tree.Find(browse.folderKey) == nullptr)
+         browse.folderKey.clear();
+      if (browse.folderKey.empty() && tree.roots.size() == 1)
+         browse.folderKey = tree.roots[0];
+      const LibFolderNode* current = browse.folderKey.empty() ? nullptr : tree.Find(browse.folderKey);
+
+      // Breadcrumb: back button, then "root / sub / sub" with each part
+      // clickable. Long paths keep their tail and elide the head.
+      if (!everywhere)
+      {
+         const float frameH = ImGui::GetFrameHeight();
+         const bool canGoUp = current != nullptr && (!current->parentKey.empty() || tree.roots.size() > 1);
+         if (!canGoUp)
+            ImGui::BeginDisabled();
+         if (ImGui::Button("<##libup", ImVec2(frameH, 0)) && current != nullptr)
+            browse.folderKey = current->parentKey;
+         if (!canGoUp)
+            ImGui::EndDisabled();
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Up one folder");
+
+         std::vector<const LibFolderNode*> chain;
+         for (const LibFolderNode* n = current; n != nullptr; n = n->parentKey.empty() ? nullptr : tree.Find(n->parentKey))
+            chain.insert(chain.begin(), n);
+         struct Crumb
+         {
+            std::string label, key;
+         };
+         std::vector<Crumb> crumbs;
+         if (tree.roots.size() > 1 || chain.empty())
+            crumbs.push_back({ "Library", std::string() });
+         for (const LibFolderNode* n : chain)
+            crumbs.push_back({ n->name, n->key });
+
+         const ImGuiStyle& st = ImGui::GetStyle();
+         const float sepW = ImGui::CalcTextSize("/").x + st.ItemSpacing.x * 2.0f;
+         float avail = ImGui::GetContentRegionAvail().x - frameH - st.ItemSpacing.x;
+         size_t first = crumbs.size();
+         float used = 0.0f;
+         const float ellW = ImGui::CalcTextSize("...").x + st.ItemSpacing.x;
+         while (first > 0)
+         {
+            const float w = ImGui::CalcTextSize(crumbs[first - 1].label.c_str()).x + st.FramePadding.x * 2.0f +
+                            (first < crumbs.size() ? sepW : 0.0f);
+            if (used + w > avail - (first > 1 ? ellW : 0.0f) && first < crumbs.size())
+               break;
+            used += w;
+            first--;
+         }
+         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+         if (first > 0)
+         {
+            ImGui::SameLine();
+            ImGui::TextDisabled("...");
+         }
+         for (size_t i = first; i < crumbs.size(); i++)
+         {
+            ImGui::SameLine();
+            if (i > first)
+            {
+               ImGui::TextDisabled("/");
+               ImGui::SameLine();
+            }
+            ImGui::PushID((int)i);
+            const bool last = (i + 1 == crumbs.size());
+            if (last)
+               ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            else
+               ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            if (ImGui::Button(crumbs[i].label.c_str()) && !last)
+               browse.folderKey = crumbs[i].key;
+            ImGui::PopStyleColor();
+            ImGui::PopID();
+         }
+         ImGui::PopStyleColor();
+      }
 
       // The button un-latches by itself once the file finishes playing -
       // once per frame, not per row, since it's a property of the preview
@@ -12069,28 +12625,65 @@ namespace
       if (!mediaKind && !gPreviewingSamplePath.empty() && !AudioEngine::Instance().Preview().IsPlaying())
          gPreviewingSamplePath.clear();
 
-      // Filtered/sorted only when something that affects the list changes
-      // (0 ms when idle/scrolling). Pre-computed lowercase fileNameLower
-      // eliminates per-entry string allocation.
+      // Rows rebuilt only when something that affects the list changes
+      // (0 ms when idle/scrolling). Folders first (by name), then files
+      // filtered and sorted by the options row.
       gBrowserFavorites.EnsureLoaded();
-      if (cache.lastQuery != q || cache.lastIndexVersion != scanner.IndexVersion() ||
+      const std::string folderState = everywhere ? std::string("\x01") : browse.folderKey;
+      if (cache.lastQuery != q || cache.lastIndexVersion != tree.version ||
           cache.lastFavVersion != gBrowserFavorites.version || cache.lastFilter != opts.filter ||
-          cache.lastSort != opts.sort || cache.lastDescending != opts.descending)
+          cache.lastSort != opts.sort || cache.lastDescending != opts.descending || cache.lastFolder != folderState)
       {
-         cache.filtered.clear();
-         const auto& index = scanner.Index();
-         cache.filtered.reserve(index.size());
-         for (const SampleScanner::Entry& entry : index)
+         cache.rows.clear();
+         std::vector<const SampleScanner::Entry*> files;
+         if (everywhere)
          {
-            if (!q.empty() && entry.fileNameLower.find(q) == std::string::npos)
-               continue;
-            if (!LibraryEntryPasses(entry, opts.filter, mediaKind))
-               continue;
-            cache.filtered.push_back(&entry);
+            // Folders whose name matches come first (a kit is often what
+            // is being looked for), capped so they never bury the files.
+            if (!q.empty())
+            {
+               std::vector<const LibFolderNode*> matches;
+               for (const auto& [key, node] : tree.folders)
+                  if (node.nameLower.find(q) != std::string::npos)
+                     matches.push_back(&node);
+               std::sort(matches.begin(), matches.end(), [](const LibFolderNode* a, const LibFolderNode* b) {
+                  return a->nameLower != b->nameLower ? a->nameLower < b->nameLower : a->key < b->key;
+               });
+               if (matches.size() > 40)
+                  matches.resize(40);
+               for (const LibFolderNode* m : matches)
+                  cache.rows.push_back({ m, nullptr });
+            }
+            const auto& index = scanner.Index();
+            files.reserve(index.size());
+            for (const SampleScanner::Entry& entry : index)
+            {
+               if (!q.empty() && entry.fileNameLower.find(q) == std::string::npos)
+                  continue;
+               if (!LibraryEntryPasses(entry, opts.filter, mediaKind))
+                  continue;
+               files.push_back(&entry);
+            }
          }
+         else if (current == nullptr)
+         {
+            for (const std::string& r : tree.roots)
+               if (const LibFolderNode* rn = tree.Find(r))
+                  cache.rows.push_back({ rn, nullptr });
+         }
+         else
+         {
+            for (const std::string& c : current->children)
+               if (const LibFolderNode* cn = tree.Find(c))
+                  cache.rows.push_back({ cn, nullptr });
+            for (const SampleScanner::Entry* entry : current->files)
+               if (LibraryEntryPasses(*entry, opts.filter, mediaKind))
+                  files.push_back(entry);
+         }
+
          const int sortMode = opts.sort;
          const char* favSection = mediaKind ? "media" : "samples";
-         std::stable_sort(cache.filtered.begin(), cache.filtered.end(),
+         std::stable_sort(files.begin(), files.end(),
                           [sortMode, favSection](const SampleScanner::Entry* a, const SampleScanner::Entry* b) {
                              if (sortMode == 3)
                              {
@@ -12114,19 +12707,42 @@ namespace
                              }
                              if (a->fileNameLower != b->fileNameLower)
                                 return a->fileNameLower < b->fileNameLower;
-                             return a->fileName < b->fileName;
+                             return a->path < b->path;
                           });
          if (opts.descending)
-            std::reverse(cache.filtered.begin(), cache.filtered.end());
+            std::reverse(files.begin(), files.end());
+         cache.fileCount = (int)files.size();
+         for (const SampleScanner::Entry* f : files)
+            cache.rows.push_back({ nullptr, f });
+
          cache.lastQuery = q;
-         cache.lastIndexVersion = scanner.IndexVersion();
+         cache.lastFolder = folderState;
+         cache.lastIndexVersion = tree.version;
          cache.lastFavVersion = gBrowserFavorites.version;
          cache.lastFilter = opts.filter;
          cache.lastSort = opts.sort;
          cache.lastDescending = opts.descending;
       }
 
-      const auto& filtered = cache.filtered;
+      if (everywhere)
+         ImGui::TextDisabled("%d file%s in all library folders", cache.fileCount, cache.fileCount == 1 ? "" : "s");
+      else if (cache.rows.empty())
+         ImGui::TextDisabled(scanner.Folders().empty() ? "add a folder to start a library"
+                             : scanning                ? "scanning..."
+                                                       : "nothing here (try Rescan)");
+
+      const auto& rows = cache.rows;
+      std::string navigateTo;
+      bool clearSearch = false;
+
+      // "root / sub" for a search hit, so same-named files are told apart.
+      auto hitFolderText = [&tree](const std::string& root, const std::string& rel) {
+         const LibFolderNode* rn = tree.Find(LibFolderKey(SampleScanner::PathKey(root), ""));
+         std::string s = rn != nullptr ? rn->name : root;
+         if (!rel.empty())
+            s += "/" + rel;
+         return s;
+      };
 
       // Tighter vertical rhythm than ImGui's default ItemSpacing - a few
       // hundred one-shot rows is the point of this panel, and the default
@@ -12138,19 +12754,128 @@ namespace
       // submitting a Selectable (now a button too) for every one of them
       // regardless of scroll position is what tanked this panel's frame
       // time. The clipper only visits rows actually on screen; row height
-      // must be uniform for it to skip the rest correctly, which holds here
-      // since every row is exactly one frame-height button/Selectable tall.
-      // No explicit row-height guess - letting the clipper measure the
-      // first row itself avoids even a one-pixel mismatch against the real
-      // rendered height, which compounds over thousands of rows into a
-      // visible gap of blank space once scrolled near the end of the list.
+      // must be uniform for it to skip the rest correctly, so folder rows
+      // below copy the file rows' layout (star slot, play-button slot,
+      // Selectable) item for item. No explicit row-height guess - letting
+      // the clipper measure the first row itself avoids even a one-pixel
+      // mismatch against the real rendered height.
       ImGuiListClipper clipper;
-      clipper.Begin((int)filtered.size());
+      clipper.Begin((int)rows.size());
       while (clipper.Step())
       {
          for (int rowIdx = clipper.DisplayStart; rowIdx < clipper.DisplayEnd; rowIdx++)
          {
-            const SampleScanner::Entry& entry = *filtered[rowIdx];
+            if (const LibFolderNode* folder = rows[rowIdx].folder)
+            {
+               ImGui::PushID(("F" + folder->key).c_str());
+               const float frameH = ImGui::GetFrameHeight();
+               const float rowH = mediaKind ? 54.0f : frameH;
+               const float starSz = frameH * 0.75f;
+               const float rowY = ImGui::GetCursorPosY();
+               ImGui::SetCursorPosY(rowY + (rowH - starSz) * 0.5f);
+               ImGui::Dummy(ImVec2(starSz, starSz));
+               ImGui::SameLine();
+               ImGui::SetCursorPosY(rowY);
+               const ImU32 iconCol = IM_COL32(214, 178, 92, 255);
+               if (!mediaKind)
+               {
+                  const float btnH = frameH * 0.7f;
+                  ImGui::SetCursorPosY(rowY + (rowH - btnH) * 0.5f);
+                  ImGui::Dummy(ImVec2(btnH, btnH));
+                  DrawLibFolderIcon(ImGui::GetWindowDrawList(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), iconCol);
+                  ImGui::SameLine();
+                  ImGui::SetCursorPosY(rowY);
+               }
+               const bool pressed = mediaKind ? ImGui::Selectable("##folderrow", false, 0, ImVec2(0.0f, rowH))
+                                              : ImGui::Selectable(("##folderrow" + folder->name).c_str());
+               const ImVec2 mn = ImGui::GetItemRectMin();
+               const ImVec2 mx = ImGui::GetItemRectMax();
+               ImDrawList* dl = ImGui::GetWindowDrawList();
+               char countText[32];
+               snprintf(countText, sizeof(countText), "%d", folder->total);
+               const float countW = ImGui::CalcTextSize(countText).x;
+               const float textX = mediaKind ? mn.x + 73.0f : mn.x;
+               if (mediaKind)
+               {
+                  const ImVec2 boxMin(mn.x + 3.0f, mn.y + 3.0f), boxMax(mn.x + 67.0f, mx.y - 3.0f);
+                  dl->AddRectFilled(boxMin, boxMax, IM_COL32(22, 25, 34, 255), 3.0f);
+                  DrawLibFolderIcon(dl, ImVec2(boxMin.x + 14.0f, boxMin.y + 10.0f), ImVec2(boxMax.x - 14.0f, boxMax.y - 10.0f), iconCol);
+               }
+               const float lineH = ImGui::GetTextLineHeight();
+               const bool twoLines = everywhere && mediaKind;
+               const float nameY = twoLines ? mn.y + rowH * 0.5f - lineH - 1.0f : mn.y + ((mx.y - mn.y) - lineH) * 0.5f;
+               dl->PushClipRect(ImVec2(textX, mn.y), ImVec2(mx.x - countW - 8.0f, mx.y), true);
+               dl->AddText(ImVec2(textX, nameY), ImGui::GetColorU32(ImGuiCol_Text), folder->name.c_str());
+               if (everywhere && !folder->rel.empty())
+               {
+                  // Where the matching folder lives.
+                  const size_t slash = folder->rel.find_last_of('/');
+                  const std::string where =
+                     hitFolderText(folder->root, slash == std::string::npos ? std::string() : folder->rel.substr(0, slash));
+                  const float nameW = ImGui::CalcTextSize(folder->name.c_str()).x;
+                  const ImVec2 at = twoLines ? ImVec2(textX, mn.y + rowH * 0.5f + 1.0f) : ImVec2(textX + nameW + 10.0f, nameY);
+                  dl->AddText(at, ImGui::GetColorU32(ImGuiCol_TextDisabled), where.c_str());
+               }
+               dl->PopClipRect();
+               dl->AddText(ImVec2(mx.x - countW - 4.0f, mn.y + ((mx.y - mn.y) - lineH) * 0.5f),
+                           ImGui::GetColorU32(ImGuiCol_TextDisabled), countText);
+
+               // Click opens the folder; a drag that started here is a
+               // folder drag (Samples only) and must not navigate.
+               if (pressed && ImGui::GetIO().MouseDragMaxDistanceSqr[ImGuiMouseButton_Left] < 16.0f)
+               {
+                  navigateTo = folder->key;
+                  clearSearch = everywhere;
+               }
+               if (!mediaKind && ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 4.0f) &&
+                   !gSampleDragActive)
+               {
+                  gSampleDragFolderFiles = LibFolderDragFiles(tree, *folder);
+                  if (!gSampleDragFolderFiles.empty())
+                  {
+                     gSampleDragActive = true;
+                     gSampleDragKind = LibraryDragKind::SampleFolder;
+                     gSampleDragPath = folder->absPath;
+                     gSampleDragName = folder->name + " (" + std::to_string(gSampleDragFolderFiles.size()) + " files)";
+                  }
+               }
+               if (ImGui::IsItemHovered() && !gSampleDragActive)
+               {
+                  if (mediaKind)
+                     ImGui::SetTooltip("%s\nclick to open", folder->absPath.c_str());
+                  else
+                     ImGui::SetTooltip("%s\nclick to open\ndrag onto a Drum Sequencer or MPC to load its audio files\n"
+                                       "into the lanes / pads in order (by name); drop on empty canvas\n"
+                                       "for a new Drum Sequencer with them",
+                                       folder->absPath.c_str());
+               }
+               if (ImGui::BeginPopupContextItem("##libraryfoldermenu"))
+               {
+                  if (ImGui::MenuItem("Open"))
+                     navigateTo = folder->key;
+                  if (ImGui::MenuItem("Show in Explorer"))
+                     Platform::RevealInFileManager(folder->absPath);
+                  if (ImGui::MenuItem("Copy path"))
+                     ImGui::SetClipboardText(folder->absPath.c_str());
+                  if (folder->rel.empty())
+                  {
+                     ImGui::Separator();
+                     if (ImGui::MenuItem("Rename label..."))
+                     {
+                        browse.renameRoot = folder->root;
+                        snprintf(browse.renameBuf, sizeof(browse.renameBuf), "%s", scanner.FolderLabel(folder->root).c_str());
+                        browse.openRoots = true;
+                     }
+                     if (ImGui::MenuItem("Remove from library"))
+                        rootToRemove = folder->root;
+                  }
+                  ImGui::EndPopup();
+               }
+               ImGui::PopID();
+               continue;
+            }
+
+            const SampleScanner::Entry& entry = *rows[rowIdx].entry;
 
             ImGui::PushID(entry.path.c_str());
 
@@ -12300,14 +13025,37 @@ namespace
             }
 
             const ImVec2 textSize = ImGui::CalcTextSize(entry.fileName.c_str());
-            const float textY = mn.y + (rowH - textSize.y) * 0.5f;
             dl->PushClipRect(ImVec2(mn.x + 73.0f, mn.y), mx, true);
-            dl->AddText(ImVec2(mn.x + 73.0f, textY), ImGui::GetColorU32(ImGuiCol_Text), entry.fileName.c_str());
+            if (everywhere)
+            {
+               // Turbo 0.49: search hits name their folder on a second line.
+               dl->AddText(ImVec2(mn.x + 73.0f, mn.y + rowH * 0.5f - textSize.y - 1.0f), ImGui::GetColorU32(ImGuiCol_Text),
+                           entry.fileName.c_str());
+               dl->AddText(ImVec2(mn.x + 73.0f, mn.y + rowH * 0.5f + 1.0f), ImGui::GetColorU32(ImGuiCol_TextDisabled),
+                           hitFolderText(entry.folderRoot, entry.relDir).c_str());
+            }
+            else
+            {
+               const float textY = mn.y + (rowH - textSize.y) * 0.5f;
+               dl->AddText(ImVec2(mn.x + 73.0f, textY), ImGui::GetColorU32(ImGuiCol_Text), entry.fileName.c_str());
+            }
             dl->PopClipRect();
          }
          else
          {
             ImGui::Selectable(entry.fileName.c_str());
+            if (everywhere)
+            {
+               // Turbo 0.49: search hits name their folder after the file.
+               const ImVec2 mn = ImGui::GetItemRectMin();
+               const ImVec2 mx = ImGui::GetItemRectMax();
+               const float nameW = ImGui::CalcTextSize(entry.fileName.c_str()).x;
+               ImDrawList* dl = ImGui::GetWindowDrawList();
+               dl->PushClipRect(ImVec2(mn.x + nameW + 8.0f, mn.y), mx, true);
+               dl->AddText(ImVec2(mn.x + nameW + 10.0f, mn.y), ImGui::GetColorU32(ImGuiCol_TextDisabled),
+                           hitFolderText(entry.folderRoot, entry.relDir).c_str());
+               dl->PopClipRect();
+            }
          }
          if (!mediaKind && getenv("INFINITE_SAMPLERDRAGTEST") != nullptr)
          {
@@ -12358,6 +13106,24 @@ namespace
       }
       ImGui::EndChild();
       ImGui::PopStyleVar();
+
+      if (!rootToBrowse.empty())
+      {
+         navigateTo = LibFolderKey(SampleScanner::PathKey(rootToBrowse), "");
+         clearSearch = true;
+      }
+      if (!navigateTo.empty())
+      {
+         browse.folderKey = navigateTo;
+         if (clearSearch)
+         {
+            searchBuf[0] = '\0';
+            if (opts.filter == 1)
+               opts.filter = 0;
+         }
+      }
+      if (!rootToRemove.empty())
+         scanner.RemoveFolder(rootToRemove);
 
       ImGui::PopID();
    }
@@ -13349,10 +14115,12 @@ namespace
          const float w = gAudioContentW;
          const float h = ImGui::GetFrameHeight();
          const bool learning = n->IsLearning();
-         if (ImGui::Button(learning ? "Stop##prLearn" : "Learn##prLearn", ImVec2(w, h)))
+         // Turbo 0.49: mappable (CV / MIDI / Performance).
+         bool requestedLearning = learning;
+         if (ModStateButton(learning ? "Stop##prLearn" : "Learn##prLearn", learning, requestedLearning, ImVec2(w, h)))
          {
             PushUndoCheckpoint();
-            n->SetLearning(!learning);
+            n->SetLearning(requestedLearning);
          }
       }
       {
@@ -13401,10 +14169,13 @@ namespace
          const float w = gAudioContentW;
          const float h = ImGui::GetFrameHeight();
          const bool learning = n->IsLearning();
-         if (ImGui::Button(learning ? "Stop##predLearn" : "Learn##predLearn", ImVec2(w * 0.3f, h)))
+         // Turbo 0.49: mappable (CV / MIDI / Performance).
+         bool requestedLearning = learning;
+         if (ModStateButton(learning ? "Stop##predLearn" : "Learn##predLearn", learning, requestedLearning,
+                            ImVec2(w * 0.3f, h)))
          {
             PushUndoCheckpoint();
-            n->SetLearning(!learning);
+            n->SetLearning(requestedLearning);
          }
          ImGui::SameLine();
          // Learning meter: how much the model beats a memoryless one, per captured bar.
@@ -13849,6 +14620,14 @@ namespace
       // Turbo 0.48 (upstream port): swing. Drawn last so existing modulation pin
       // ordinals (draw order) stay put.
       AudioSlider("groove", &n->groove, 0.0f, 1.0f, "%.2f", AudioFullWidth());
+      // Turbo 0.49 (upstream): note-picking style, drawn last for the same reason.
+      {
+         static const std::vector<std::string> kRandomNoteStyles = { "walk", "melodic" };
+         AudioKnobRow row(4);
+         row.Dropdown("style", kRandomNoteStyles, std::clamp(n->style, 0, 1),
+                      [n](int i) { PushUndoCheckpoint(); n->style = i; });
+         row.End();
+      }
 
       EndAudioBody();
    }
@@ -18305,6 +19084,8 @@ namespace
          dl->AddRectFilled(ImVec2(o.x + 2.0f, o.y + 2.0f), ImVec2(x, br.y - 2.0f),
                            (col & 0x00FFFFFF) | 0x50000000, 3.0f);
          dl->AddLine(ImVec2(x, o.y + 2.0f), ImVec2(x, br.y - 2.0f), col, 2.0f);
+         // Turbo 0.49: same cursor head as the sample nodes' play cursors.
+         dl->AddTriangleFilled(ImVec2(x - 5.0f, o.y + 2.0f), ImVec2(x + 5.0f, o.y + 2.0f), ImVec2(x, o.y + 8.0f), col);
       }
       else
       {
@@ -18552,30 +19333,36 @@ namespace
       const ImVec2 br(o.x + w, o.y + h);
       ImDrawList* dl = ImGui::GetWindowDrawList();
       dl->AddRectFilled(o, br, ScopeBgCol(), 3.0f);
-      const int count = n->padWaveCount[p];
-      const float innerW = w - 4.0f;
-      if (count > 1)
+      const WavePeaks& peaks = n->padPeaks[p];
+      if (n->padWaveCount[p] > 1 && !peaks.Empty())
       {
-         const float mid = o.y + h * 0.5f;
-         for (int b = 0; b < count; b++)
-         {
-            const float x = o.x + 2.0f + innerW * (float)b / (float)(count - 1);
-            dl->AddLine(ImVec2(x, mid - n->padWaveMax[p][b] * h * 0.45f),
-                        ImVec2(x, mid - n->padWaveMin[p][b] * h * 0.45f), IM_COL32(120, 190, 255, 220), 1.5f);
-         }
-         const float xs = o.x + 2.0f + innerW * std::clamp(n->padStart[p], 0.0f, 1.0f);
-         const float xe = o.x + 2.0f + innerW * std::clamp(n->padEnd[p], 0.0f, 1.0f);
-         dl->AddRectFilled(ImVec2(o.x, o.y), ImVec2(xs, br.y), IM_COL32(0, 0, 0, 140), 3.0f);
-         dl->AddRectFilled(ImVec2(xe, o.y), br, IM_COL32(0, 0, 0, 140), 3.0f);
-         dl->AddLine(ImVec2(xs, o.y), ImVec2(xs, br.y), IM_COL32(120, 230, 140, 255), 2.0f);
-         dl->AddLine(ImVec2(xe, o.y), ImVec2(xe, br.y), IM_COL32(240, 120, 110, 255), 2.0f);
-         dl->AddTriangleFilled(ImVec2(xs, o.y), ImVec2(xs + 7.0f, o.y), ImVec2(xs, o.y + 7.0f), IM_COL32(120, 230, 140, 255));
-         dl->AddTriangleFilled(ImVec2(xe, o.y), ImVec2(xe - 7.0f, o.y), ImVec2(xe, o.y + 7.0f), IM_COL32(240, 120, 110, 255));
+         // Turbo 0.49: shared view (zoom-to-trim, per-pixel peaks, cursor,
+         // time label, Shift = fine). Click/drag anywhere still moves the
+         // nearest handle, as before.
+         WaveView view = WaveViewBegin("##mpcwave", o, w, h, n->padStart[p], n->padEnd[p], peaks.NumFrames());
+         const bool isLight = IsThemeLight();
+         dl->PushClipRect(o, br, true);
+         DrawWavePeaks(dl, view, peaks, n->padStart[p], n->padEnd[p],
+                       isLight ? IM_COL32(30, 110, 230, 230) : IM_COL32(120, 190, 255, 230));
+         DrawPlayCursor(dl, view, n->PadPlayPosition(p), PlayCursorColor());
+         const ImU32 startCol = TrimStartCol();
+         const ImU32 endCol = TrimEndCol();
+         const float xs = view.X(std::clamp(n->padStart[p], 0.0f, 1.0f));
+         const float xe = view.X(std::clamp(n->padEnd[p], 0.0f, 1.0f));
+         dl->AddLine(ImVec2(xs, o.y), ImVec2(xs, br.y), startCol, 2.0f);
+         dl->AddLine(ImVec2(xe, o.y), ImVec2(xe, br.y), endCol, 2.0f);
+         dl->AddTriangleFilled(ImVec2(xs, o.y), ImVec2(xs + 7.0f, o.y), ImVec2(xs, o.y + 7.0f), startCol);
+         dl->AddTriangleFilled(ImVec2(xe, o.y), ImVec2(xe - 7.0f, o.y), ImVec2(xe, o.y + 7.0f), endCol);
+         dl->PopClipRect();
 
+         // Chip first: the full-strip trim button below has no overlap
+         // opt-in, so the chip keeps its clicks.
+         WaveZoomChip(view);
          ImGui::SetCursorScreenPos(o);
          ImGui::InvisibleButton("##mpcTrim", ImVec2(w, h));
          static int sDragHandle = -1; // 0 = start, 1 = end
-         if (ImGui::IsItemActivated())
+         const bool activated = ImGui::IsItemActivated();
+         if (activated)
          {
             PushUndoCheckpoint();
             const float mx = ImGui::GetIO().MousePos.x;
@@ -18583,16 +19370,28 @@ namespace
          }
          if (ImGui::IsItemActive() && sDragHandle >= 0)
          {
-            const float t = std::clamp((ImGui::GetIO().MousePos.x - o.x - 2.0f) / std::max(1.0f, innerW), 0.0f, 1.0f);
+            float* val = sDragHandle == 0 ? &n->padStart[p] : &n->padEnd[p];
+            const float t = std::clamp(TrimDragValue(ImGui::GetItemID(), view, *val, activated, true), 0.0f, 1.0f);
             if (sDragHandle == 0)
                n->padStart[p] = std::min(t, n->padEnd[p] - 0.001f);
             else
                n->padEnd[p] = std::max(t, n->padStart[p] + 0.001f);
+            DrawTrimTimeLabel(dl, view, *val, &peaks, sDragHandle == 0 ? startCol : endCol);
          }
+         ImGui::GetStateStorage()->SetBool(view.keyDrag, ImGui::IsItemActive() && sDragHandle >= 0);
          if (ImGui::IsItemDeactivated())
             sDragHandle = -1;
-         if (ImGui::IsItemHovered())
+         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+         {
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+            char t0[32], t1[32], line[96];
+            FormatTrimTime(t0, sizeof(t0), n->padStart[p], &peaks);
+            FormatTrimTime(t1, sizeof(t1), n->padEnd[p], &peaks);
+            snprintf(line, sizeof(line), "trim %s..%s - drag moves the nearest edge, shift: fine", t0, t1);
+            SetAudioReadout("#", line);
+         }
+         ImGui::SetCursorScreenPos(o);
+         ImGui::Dummy(ImVec2(w, h));
       }
       else
       {
@@ -18600,6 +19399,45 @@ namespace
          ImGui::Dummy(ImVec2(w, h));
       }
       dl->AddRect(o, br, ScopeBorderCol(), 3.0f);
+   }
+
+   // Turbo 0.49: each MPC's pad grid in canvas space (origin, pitch), so a
+   // sample dragged from the library panel lands on the pad under the
+   // cursor. Each rect carries the frame it was drawn in: only a recent one
+   // is trusted (a deleted node's address can be reused by a new MPC), and
+   // stale entries are pruned once per frame.
+   struct MpcPadGridRect
+   {
+      ImVec4 rect;   // origin x/y, column/row pitch
+      int frame = 0; // ImGui::GetFrameCount() when drawn
+   };
+   std::unordered_map<const MpcNode*, MpcPadGridRect> gMpcPadGridCanvas;
+
+   void PruneMpcPadGrids()
+   {
+      static int sLastPrune = -1;
+      const int frame = ImGui::GetFrameCount();
+      if (frame == sLastPrune)
+         return;
+      sLastPrune = frame;
+      for (auto it = gMpcPadGridCanvas.begin(); it != gMpcPadGridCanvas.end();)
+         it = (frame - it->second.frame > 2) ? gMpcPadGridCanvas.erase(it) : std::next(it);
+   }
+
+   int MpcPadForCanvasPos(const MpcNode* n, float x, float y)
+   {
+      auto it = gMpcPadGridCanvas.find(n);
+      const ImVec4* r = nullptr;
+      if (it != gMpcPadGridCanvas.end() && ImGui::GetFrameCount() - it->second.frame <= 2)
+         r = &it->second.rect;
+      if (r != nullptr && r->z > 0.0f && r->w > 0.0f)
+      {
+         const int col = (int)std::floor((x - r->x) / r->z);
+         const int row = (int)std::floor((y - r->y) / r->w);
+         if (col >= 0 && col < 4 && row >= 0 && row < 4)
+            return (3 - row) * 4 + col;
+      }
+      return std::clamp(n->selectedPad, 0, MpcNode::kPads - 1);
    }
 
    void DrawMpcBody(GraphNode& gn, MpcNode* n)
@@ -18623,6 +19461,8 @@ namespace
          const float padW = (gAudioContentW - gap * 3.0f) / 4.0f;
          const float padH = 58.0f;
          const ImVec2 origin = ImGui::GetCursorScreenPos();
+         PruneMpcPadGrids();
+         gMpcPadGridCanvas[n] = { ImVec4(origin.x, origin.y, padW + gap, padH + gap), ImGui::GetFrameCount() }; // Turbo 0.49
          for (int row = 0; row < 4; row++)
          {
             for (int col = 0; col < 4; col++)
@@ -19086,6 +19926,9 @@ namespace
       const bool hasSample = n->waveformCacheCount > 0;
       const std::vector<float>& slices = n->Slices();
       const int sliceCount = (int)slices.size();
+      // Turbo 0.49: shared view (per-pixel peaks, cursors with heads). No
+      // trim range here, so no zoom chip.
+      const WaveView view = WaveViewBegin("##slicerwave", origin, w, h, -1.0f, -1.0f, n->peaks.NumFrames());
 
       // Body click-catcher first, so it owns hover/active by default; the
       // marker grab-zones are added afterwards at the same screen position.
@@ -19097,7 +19940,7 @@ namespace
       ImGui::InvisibleButton("##slicerwavebody", ImVec2(w, h));
       if (hasSample && sliceCount > 0 && ImGui::IsItemActivated())
       {
-         const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
+         const float frac = view.MouseFrac();
          int hit = 0;
          for (int i = 0; i < sliceCount; i++)
          {
@@ -19108,7 +19951,7 @@ namespace
       }
       if (hasSample && sliceCount > 0 && ImGui::IsItemHovered())
       {
-         const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
+         const float frac = view.MouseFrac();
          int hit = 0;
          for (int i = 0; i < sliceCount; i++)
          {
@@ -19126,8 +19969,11 @@ namespace
       dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
-      const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+      if (!hasSample)
+      {
+         const float midY = origin.y + h * 0.5f;
+         dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
+      }
 
       if (hasSample)
       {
@@ -19141,16 +19987,8 @@ namespace
                               isLight ? IM_COL32(0, 0, 0, 14) : IM_COL32(255, 255, 255, 12));
          }
 
-         const int count = n->waveformCacheCount;
-         for (int i = 0; i < count; i++)
-         {
-            const float x = origin.x + w * (float)i / (float)count;
-            const float barW = std::max(1.0f, w / (float)count);
-            const float top = midY - n->waveformMax[i] * h * 0.45f;
-            const float bottom = midY - n->waveformMin[i] * h * 0.45f;
-            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? IM_COL32(30, 110, 230, 210) : IM_COL32(150, 214, 255, 200));
-         }
+         DrawWavePeaks(dl, view, n->peaks, 0.0f, 1.0f,
+                       isLight ? IM_COL32(30, 110, 230, 230) : IM_COL32(150, 214, 255, 220));
 
          // Voices in flight, faded by their own amplitude.
          const SlicerVoiceSnapshot& snap = n->VisualSnapshot();
@@ -19158,10 +19996,8 @@ namespace
          {
             if (snap.voices[v].amp < 0.002f)
                continue;
-            const float px = origin.x + w * std::clamp(snap.voices[v].position, 0.0f, 1.0f);
             const int alpha = (int)(std::clamp(snap.voices[v].amp, 0.0f, 1.0f) * 235.0f) + 20;
-            dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
-                        isLight ? IM_COL32(230, 140, 20, alpha) : IM_COL32(255, 200, 90, alpha), 2.0f);
+            DrawPlayCursor(dl, view, std::clamp(snap.voices[v].position, 0.0f, 1.0f), PlayCursorColor(alpha));
          }
 
          // Slice markers, plus the note each slice answers to when it fits.
@@ -19204,7 +20040,13 @@ namespace
             if (ImGui::IsItemActivated())
                PushUndoCheckpoint();
             if (ImGui::IsItemActive())
+            {
                n->MoveSliceMarker(i, (ImGui::GetIO().MousePos.x - origin.x) / w);
+               // Turbo 0.49: the marker's time while dragging.
+               if (i < (int)n->Slices().size())
+                  DrawTrimTimeLabel(dl, view, std::clamp(n->Slices()[(size_t)i], 0.0f, 1.0f), &n->peaks,
+                                    isLight ? IM_COL32(20, 140, 90, 230) : IM_COL32(120, 230, 175, 220));
+            }
             if (ImGui::IsItemHovered() || ImGui::IsItemActive())
                ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
          }
@@ -19282,13 +20124,16 @@ namespace
       const bool recording = n->IsRecording();
       if (recording)
          ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
-      if (ImGui::Button(recording ? "Stop" : "Record", ImVec2(70, 0)))
+      // Turbo 0.49: mappable (CV / MIDI / Performance), like the Sampler's.
+      bool requestedRecording = recording;
+      if (ModStateButton(recording ? "Stop##slicerRecord" : "Record##slicerRecord",
+                         recording, requestedRecording, ImVec2(70, 0)))
       {
          PushUndoCheckpoint();
-         if (recording)
-            n->StopRecording();
-         else
+         if (requestedRecording)
             n->StartRecording();
+         else
+            n->StopRecording();
       }
       if (recording)
          ImGui::PopStyleColor();
@@ -19297,12 +20142,14 @@ namespace
       const bool playing = n->IsPlaying();
       if (playing)
          ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
-      if (ImGui::Button(playing ? "Stop" : "Audition", ImVec2(90, 0)))
+      bool requestedPlaying = playing;
+      if (ModStateButton(playing ? "Stop##slicerAudition" : "Audition##slicerAudition",
+                         playing, requestedPlaying, ImVec2(90, 0)))
       {
-         if (playing)
-            n->StopPreview();
-         else
+         if (requestedPlaying)
             n->TriggerSlicePreview(-1);
+         else
+            n->StopPreview();
       }
       if (playing)
          ImGui::PopStyleColor();
@@ -19311,7 +20158,7 @@ namespace
 
       ImGui::SameLine();
       ImGui::BeginDisabled(n->FileName().empty() || n->sliceBy != 0);
-      if (ImGui::Button("re-slice", ImVec2(90, 0)))
+      if (ModTriggerButton("re-slice##slicerReslice", ImVec2(90, 0)))
       {
          PushUndoCheckpoint();
          n->ReSlice();
@@ -19419,6 +20266,8 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
       const bool hasSample = n->waveformCacheCount > 0;
+      // Turbo 0.49: shared view (zoom-to-trim, per-pixel peaks, cursor).
+      WaveView view = WaveViewBegin("##molderwave", origin, w, h, n->start, n->end, n->peaks.NumFrames());
 
       // Body click-catcher first (see DrawSamplerWaveform's comment on
       // overlap ordering) - the two range-handle grab-zones are added after,
@@ -19429,7 +20278,7 @@ namespace
       ImGui::InvisibleButton("##molderwavebody", ImVec2(w, h));
       if (hasSample && ImGui::IsItemActivated())
       {
-         const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
+         const float frac = view.MouseFrac();
          const float target = (frac < n->start || frac > n->end) ? n->start : frac;
          n->TriggerPreview(target);
       }
@@ -19438,42 +20287,17 @@ namespace
       dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
-      const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
-
       if (hasSample)
       {
-         const int count = n->waveformCacheCount;
-         for (int i = 0; i < count; i++)
-         {
-            const float x = origin.x + w * (float)i / (float)count;
-            const float barW = std::max(1.0f, w / (float)count);
-            const float top = midY - n->waveformMax[i] * h * 0.45f;
-            const float bottom = midY - n->waveformMin[i] * h * 0.45f;
-            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? IM_COL32(40, 100, 230, 210) : IM_COL32(165, 180, 255, 210));
-         }
-
-         // Dim whatever the start/end range excludes.
-         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
-         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
-         const ImU32 dimCol = isLight ? IM_COL32(255, 255, 255, 140) : IM_COL32(0, 0, 0, 130);
-         if (startX > origin.x)
-            dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
-         if (endX < br.x)
-            dl->AddRectFilled(ImVec2(endX, origin.y), br, dimCol);
-
-         const float px = origin.x + w * std::clamp(n->Playhead(), 0.0f, 1.0f);
-         dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y),
-                     isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 200, 90, 230), 2.0f);
-
-         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
-                     isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 235), 2.0f);
-         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
-                     isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 235), 2.0f);
+         DrawWavePeaks(dl, view, n->peaks, n->start, n->end,
+                       isLight ? IM_COL32(40, 100, 230, 230) : IM_COL32(165, 180, 255, 225));
+         DrawPlayCursor(dl, view, std::clamp(n->Playhead(), 0.0f, 1.0f), PlayCursorColor(n->IsPlaying() ? 255 : 120),
+                        2.0f);
       }
       else
       {
+         const float midY = origin.y + h * 0.5f;
+         dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
          dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(),
                      n->IsAnalyzing() ? "analyzing..." : "no sample loaded");
       }
@@ -19481,42 +20305,8 @@ namespace
       dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
 
       if (hasSample)
-      {
-         const float handleW = 10.0f;
-         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
-         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
-
-         const float grip = 8.0f;
-         const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const ImU32 startCol = isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 255);
-         const ImU32 endCol = isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 255);
-         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y), ImVec2(startGripX, origin.y + grip), startCol);
-         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y), ImVec2(startGripX, br.y - grip), startCol);
-         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
-         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, br.y), ImVec2(endGripX + grip * 0.5f, br.y), ImVec2(endGripX, br.y - grip), endCol);
-
-         const float startBtnX = std::clamp(startX - handleW * 0.5f, origin.x, br.x - handleW);
-         const float endBtnX = std::clamp(endX - handleW * 0.5f, origin.x, br.x - handleW);
-
-         ImGui::SetCursorScreenPos(ImVec2(startBtnX, origin.y));
-         ImGui::InvisibleButton("##molderstarthandle", ImVec2(handleW, h));
-         if (ImGui::IsItemActivated())
-            PushUndoCheckpoint();
-         if (ImGui::IsItemActive())
-            n->start = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, n->end - 0.01f);
-         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-
-         ImGui::SetCursorScreenPos(ImVec2(endBtnX, origin.y));
-         ImGui::InvisibleButton("##molderendhandle", ImVec2(handleW, h));
-         if (ImGui::IsItemActivated())
-            PushUndoCheckpoint();
-         if (ImGui::IsItemActive())
-            n->end = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, n->start + 0.01f, 1.0f);
-         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-      }
+         WaveTrimHandles(view, "##moldertrim", &n->start, &n->end, std::max(0.001f, 0.01f * view.Span()), &n->peaks,
+                         TrimStartCol(), TrimEndCol());
 
       ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(w, h));
@@ -19582,31 +20372,35 @@ namespace
       const bool recording = n->IsRecording();
       if (recording)
          ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
-      if (ImGui::Button(recording ? "Stop##molderRec" : "Record##molderRec", ImVec2(70, 0)))
+      // Turbo 0.49: transport and actions mappable (CV / MIDI / Performance).
+      // Widths grew by the 18 px pin each so the captions still fit.
+      bool requestedRecording = recording;
+      if (ModStateButton(recording ? "Stop##molderRec" : "Record##molderRec",
+                         recording, requestedRecording, ImVec2(76, 0)))
       {
          PushUndoCheckpoint();
-         if (recording)
-            n->StopRecording();
-         else
+         if (requestedRecording)
             n->StartRecording();
+         else
+            n->StopRecording();
       }
       if (recording)
          ImGui::PopStyleColor();
 
       ImGui::SameLine();
-      if (ImGui::Button("Roll", ImVec2(60, 0)))
+      if (ModTriggerButton("Roll##molderRoll", ImVec2(64, 0)))
       {
          PushUndoCheckpoint();
          n->Roll();
       }
       ImGui::SameLine();
-      if (ImGui::Button("Iterate", ImVec2(70, 0)))
+      if (ModTriggerButton("Iterate##molderIterate", ImVec2(80, 0)))
       {
          PushUndoCheckpoint();
          n->Iterate();
       }
       ImGui::SameLine();
-      if (ImGui::Button("Reset##molder", ImVec2(60, 0)))
+      if (ModTriggerButton("Reset##molder", ImVec2(70, 0)))
       {
          PushUndoCheckpoint();
          n->Reset();
@@ -19683,13 +20477,15 @@ namespace
       ImDrawList* dl = ImGui::GetWindowDrawList();
       const ImVec2 br(origin.x + w, origin.y + h);
       const bool hasSample = n->waveformCacheCount > 0;
+      // Turbo 0.49: shared view (zoom-to-trim, per-pixel peaks, cursors).
+      WaveView view = WaveViewBegin("##grainmolderwave", origin, w, h, n->start, n->end, n->peaks.NumFrames());
 
       ImGui::SetNextItemAllowOverlap();
       ImGui::SetCursorScreenPos(origin);
       ImGui::InvisibleButton("##grainmolderwavebody", ImVec2(w, h));
       if (hasSample && (ImGui::IsItemActivated() || ImGui::IsItemActive()))
       {
-         const float frac = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, 1.0f);
+         const float frac = view.MouseFrac();
          const float target = std::clamp(frac, n->start, n->end);
          n->position = target;
          if (ImGui::IsItemActivated())
@@ -19700,37 +20496,16 @@ namespace
       dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
       dl->PushClipRect(origin, br, true);
 
-      const float midY = origin.y + h * 0.5f;
-      dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
-
       if (hasSample)
       {
-         const int count = n->waveformCacheCount;
-         for (int i = 0; i < count; i++)
-         {
-            const float x = origin.x + w * (float)i / (float)count;
-            const float barW = std::max(1.0f, w / (float)count);
-            const float top = midY - n->waveformMax[i] * h * 0.45f;
-            const float bottom = midY - n->waveformMin[i] * h * 0.45f;
-            dl->AddRectFilled(ImVec2(x, top), ImVec2(x + barW, bottom),
-                              isLight ? IM_COL32(50, 160, 190, 210) : IM_COL32(110, 210, 240, 210));
-         }
-
-         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
-         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
-         const ImU32 dimCol = isLight ? IM_COL32(255, 255, 255, 140) : IM_COL32(0, 0, 0, 130);
-         if (startX > origin.x)
-            dl->AddRectFilled(origin, ImVec2(startX, br.y), dimCol);
-         if (endX < br.x)
-            dl->AddRectFilled(ImVec2(endX, origin.y), br, dimCol);
+         DrawWavePeaks(dl, view, n->peaks, n->start, n->end,
+                       isLight ? IM_COL32(50, 160, 190, 230) : IM_COL32(110, 210, 240, 225));
 
          // Primary yellow playhead: stays between start and end musically and UI-wise
          const auto& snap = n->VisualSnapshot();
          const float posClamped = std::clamp(n->position, n->start, n->end);
          const float activeFrac = (snap.selfActive && snap.selfPos >= 0.0f) ? snap.selfPos : posClamped;
-         const float posX = origin.x + w * std::clamp(activeFrac, 0.0f, 1.0f);
-         const ImU32 yellowCol = isLight ? IM_COL32(230, 140, 20, 255) : IM_COL32(255, 200, 90, 240);
-         dl->AddLine(ImVec2(posX, origin.y), ImVec2(posX, br.y), yellowCol, 2.0f);
+         DrawPlayCursor(dl, view, std::clamp(activeFrac, 0.0f, 1.0f), PlayCursorColor(), 2.0f);
 
          // Polyphonic white playheads moving at different speeds according to incoming pitch
          for (int v = 0; v < snap.count; v++)
@@ -19738,19 +20513,15 @@ namespace
             const auto& voice = snap.voices[v];
             if (voice.amp < 0.002f)
                continue;
-            const float px = origin.x + w * std::clamp(voice.position, 0.0f, 1.0f);
-            const int alpha = (int)(voice.amp * 255.0f);
+            const int alpha = std::clamp((int)(voice.amp * 255.0f), 0, 255);
             const ImU32 whiteCol = isLight ? IM_COL32(40, 45, 55, alpha) : IM_COL32(255, 255, 255, alpha);
-            dl->AddLine(ImVec2(px, origin.y), ImVec2(px, br.y), whiteCol, 1.5f);
+            DrawPlayCursor(dl, view, std::clamp(voice.position, 0.0f, 1.0f), whiteCol);
          }
-
-         dl->AddLine(ImVec2(startX, origin.y), ImVec2(startX, br.y),
-                     isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 235), 2.0f);
-         dl->AddLine(ImVec2(endX, origin.y), ImVec2(endX, br.y),
-                     isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 235), 2.0f);
       }
       else
       {
+         const float midY = origin.y + h * 0.5f;
+         dl->AddLine(ImVec2(origin.x, midY), ImVec2(br.x, midY), ScopeMidLineCol(), 1.0f);
          dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 4.0f), ScopeTextCol(),
                      n->IsRendering() ? "molding..." : "no sample loaded");
       }
@@ -19758,42 +20529,8 @@ namespace
       dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
 
       if (hasSample)
-      {
-         const float handleW = 10.0f;
-         const float startX = origin.x + w * std::clamp(n->start, 0.0f, 1.0f);
-         const float endX = origin.x + w * std::clamp(n->end, 0.0f, 1.0f);
-
-         const float grip = 8.0f;
-         const float startGripX = std::clamp(startX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const float endGripX = std::clamp(endX, origin.x + grip * 0.5f, br.x - grip * 0.5f);
-         const ImU32 startCol = isLight ? IM_COL32(20, 160, 60, 255) : IM_COL32(120, 220, 150, 255);
-         const ImU32 endCol = isLight ? IM_COL32(220, 40, 40, 255) : IM_COL32(220, 120, 150, 255);
-         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, origin.y), ImVec2(startGripX + grip * 0.5f, origin.y), ImVec2(startGripX, origin.y + grip), startCol);
-         dl->AddTriangleFilled(ImVec2(startGripX - grip * 0.5f, br.y), ImVec2(startGripX + grip * 0.5f, br.y), ImVec2(startGripX, br.y - grip), startCol);
-         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, origin.y), ImVec2(endGripX + grip * 0.5f, origin.y), ImVec2(endGripX, origin.y + grip), endCol);
-         dl->AddTriangleFilled(ImVec2(endGripX - grip * 0.5f, br.y), ImVec2(endGripX + grip * 0.5f, br.y), ImVec2(endGripX, br.y - grip), endCol);
-
-         const float startBtnX = std::clamp(startX - handleW * 0.5f, origin.x, br.x - handleW);
-         const float endBtnX = std::clamp(endX - handleW * 0.5f, origin.x, br.x - handleW);
-
-         ImGui::SetCursorScreenPos(ImVec2(startBtnX, origin.y));
-         ImGui::InvisibleButton("##gmstarthandle", ImVec2(handleW, h));
-         if (ImGui::IsItemActivated())
-            PushUndoCheckpoint();
-         if (ImGui::IsItemActive())
-            n->start = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, 0.0f, n->end - 0.01f);
-         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-
-         ImGui::SetCursorScreenPos(ImVec2(endBtnX, origin.y));
-         ImGui::InvisibleButton("##gmendhandle", ImVec2(handleW, h));
-         if (ImGui::IsItemActivated())
-            PushUndoCheckpoint();
-         if (ImGui::IsItemActive())
-            n->end = std::clamp((ImGui::GetIO().MousePos.x - origin.x) / w, n->start + 0.01f, 1.0f);
-         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-      }
+         WaveTrimHandles(view, "##gmtrim", &n->start, &n->end, std::max(0.001f, 0.01f * view.Span()), &n->peaks,
+                         TrimStartCol(), TrimEndCol());
 
       ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(w, h));
@@ -19821,13 +20558,16 @@ namespace
       const bool recording = n->IsRecording();
       if (recording)
          ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
-      if (ImGui::Button(recording ? "Stop##gmRec" : "Record##gmRec", ImVec2(70, 0)))
+      // Turbo 0.49: mappable (CV / MIDI / Performance), like the Sampler's.
+      bool requestedRecording = recording;
+      if (ModStateButton(recording ? "Stop##gmRec" : "Record##gmRec",
+                         recording, requestedRecording, ImVec2(70, 0)))
       {
          PushUndoCheckpoint();
-         if (recording)
-            n->StopRecording();
-         else
+         if (requestedRecording)
             n->StartRecording();
+         else
+            n->StopRecording();
       }
       if (recording)
          ImGui::PopStyleColor();
@@ -19836,12 +20576,14 @@ namespace
       const bool playing = n->IsPlaying();
       if (playing)
          ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 60, 60, 255));
-      if (ImGui::Button(playing ? "Stop##gmAud" : "Audition##gmAud", ImVec2(80, 0)))
+      bool requestedPlaying = playing;
+      if (ModStateButton(playing ? "Stop##gmAud" : "Audition##gmAud",
+                         playing, requestedPlaying, ImVec2(80, 0)))
       {
-         if (playing)
-            n->StopPreview();
-         else
+         if (requestedPlaying)
             n->TriggerPreview(n->start);
+         else
+            n->StopPreview();
       }
       if (playing)
          ImGui::PopStyleColor();
@@ -20883,7 +21625,11 @@ namespace
 
       NodeSeparator("appearance");
       if (n->outputType == DepthProjectionNode::kPoints)
+      {
          ModSlider("point size", &n->pointSize, 0.01f, 4.0f);
+         // Turbo 0.49: Render 3D sprite radius = point size x half a grid cell.
+         ModCheckbox("size relative to cell", &n->relativePointSize);
+      }
       else
          ModSlider("edge tear", &n->edgeTearThreshold, 0.01f, 2.0f);
 
@@ -20951,6 +21697,9 @@ namespace
       NodeSeparator("points");
       ModSlider("point size", &n->pointSize, 0.01f, 4.0f);
       ModSlider("size from luma", &n->sizeFromLuma, -1.0f, 1.0f);
+      // Turbo 0.49: Render 3D sprites sized like the swatch quads (point size 1
+      // fills a grid cell) instead of point size = absolute radius.
+      ModCheckbox("size relative to cell", &n->relativePointSize);
       ModCheckbox("use image colour", &n->useImageColor);
       ColorSwatch("tint", n->tint, n);
    }
@@ -33596,6 +34345,12 @@ int main(int argc, char** argv)
    // ever happens from an explicit Refresh click in the Samples/Media panel.
    gSampleScanner.LoadFromDisk();
    gMediaScanner.LoadFromDisk();
+   // Turbo 0.49: the bundled kits (assets/drumkits) join the Samples
+   // library once; removing them from the panel is remembered. Adding them
+   // starts a background scan.
+   if (const std::string kit = TurboDrumKitDir(); !kit.empty())
+      gSampleScanner.SeedDefaultFolders(
+         { { std::filesystem::u8path(kit).parent_path().u8string(), "Turbo kits" } });
    // Never a scan at launch, for the same reason the two above aren't:
    // the cached index is shown instantly and rebuilding it is the user's
    // explicit Rescan.
@@ -45143,6 +45898,48 @@ int main(int argc, char** argv)
                   }
                }
             }
+            else if (gSampleDragKind == LibraryDragKind::SampleFolder)
+            {
+               // Turbo 0.49: a library folder fills a Drum Sequencer's
+               // lanes or an MPC's pads in name order, or spawns a Drum
+               // Sequencer holding it on empty canvas (other nodes: ignored).
+               const std::vector<std::string>& files = gSampleDragFolderFiles;
+               auto fillDrum = [&files](DrumSequencerNode* d) {
+                  for (int lane = 0; lane < DrumSequencerNode::kNumLanes && lane < (int)files.size(); lane++)
+                     d->LoadFileToLane(lane, files[(size_t)lane]);
+               };
+               if (DrumSequencerNode* targetDrum = FindNodeUnderCanvasPoint<DrumSequencerNode>(canvasMouse))
+               {
+                  PushUndoCheckpoint();
+                  fillDrum(targetDrum);
+                  gPatchDirty = true;
+               }
+               else if (MpcNode* targetMpc = FindNodeUnderCanvasPoint<MpcNode>(canvasMouse))
+               {
+                  PushUndoCheckpoint();
+                  int pad = 0;
+                  for (size_t i = 0; i < files.size() && pad < MpcNode::kPads; i++)
+                     if (targetMpc->LoadPad(pad, files[i]))
+                     {
+                        targetMpc->padStart[pad] = 0.0f;
+                        targetMpc->padEnd[pad] = 1.0f;
+                        pad++;
+                     }
+                  gPatchDirty = true;
+               }
+               else if (overCanvas && FindNodeUnderCanvasPoint<INode>(canvasMouse) == nullptr)
+               {
+                  // Turbo 0.49 review: only empty canvas spawns; a folder dropped
+                  // on a Sampler, Slicer or any other node is ignored there.
+                  GraphNode* spawned = SpawnNode("Drum Sequencer", "Synths", canvasMouse.x, canvasMouse.y);
+                  if (spawned != nullptr)
+                  {
+                     if (auto* drum = dynamic_cast<DrumSequencerNode*>(spawned->node.get()))
+                        fillDrum(drum);
+                     gPatchDirty = true;
+                  }
+               }
+            }
             else if (gSampleDragKind == LibraryDragKind::Sample)
             {
                // Checked before Sampler: a plain rect test on gNodes order,
@@ -45155,6 +45952,20 @@ int main(int argc, char** argv)
                   PushUndoCheckpoint();
                   const int lane = DrumSequencerLaneForCanvasPos(targetDrum, canvasMouse.x, canvasMouse.y);
                   targetDrum->LoadFileToLane(lane, gSampleDragPath);
+                  gPatchDirty = true;
+               }
+               else if (MpcNode* targetMpc = FindNodeUnderCanvasPoint<MpcNode>(canvasMouse))
+               {
+                  // Turbo 0.49: onto the MPC pad under the cursor (else the
+                  // selected pad).
+                  PushUndoCheckpoint();
+                  const int pad = MpcPadForCanvasPos(targetMpc, canvasMouse.x, canvasMouse.y);
+                  if (targetMpc->LoadPad(pad, gSampleDragPath))
+                  {
+                     targetMpc->padStart[pad] = 0.0f;
+                     targetMpc->padEnd[pad] = 1.0f;
+                     targetMpc->selectedPad = pad;
+                  }
                   gPatchDirty = true;
                }
                else if (SamplerNode* targetSampler = FindNodeUnderCanvasPoint<SamplerNode>(canvasMouse))
@@ -45259,6 +46070,7 @@ int main(int argc, char** argv)
             gSampleDragKind = LibraryDragKind::Sample;
             gSampleDragPath.clear();
             gSampleDragName.clear();
+            gSampleDragFolderFiles.clear();
             gPluginDragDesc = Platform::PluginDesc();
          }
       }

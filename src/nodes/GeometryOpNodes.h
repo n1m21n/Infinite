@@ -97,6 +97,7 @@ public:
    unsigned long long CurveStamp() override;
    const std::vector<Particle>* GetPointCloud() override;
    unsigned long long PointCloudRevision() override;
+   float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; } // Turbo 0.49
    // When this node (or the chain of GeometryOpNodes it's wired through) sits
    // downstream of an InstanceOnPoints and op is kTransform, GetMesh() leaves
    // the stamp mesh alone and this returns the move/rotate/scale as a matrix
@@ -657,6 +658,7 @@ public:
    // Curve is a plain passthrough - Set Color only writes vertex/particle colour.
    const Polyline* GetCurve() override { return input ? input->GetCurve() : nullptr; }
    unsigned long long CurveStamp() override { return input ? input->CurveStamp() : 0; }
+   float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; } // Turbo 0.49
    // Forwarded, not identity - see DisplacementNode for why.
    Mat4 GetModelMatrix() const override
    {

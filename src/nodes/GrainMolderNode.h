@@ -6,6 +6,7 @@
 #include <thread>
 #include <vector>
 
+#include "audio/WavePeaks.h"
 #include "audio/dsp/GrainMolderDsp.h"
 #include "core/AudioCable.h"
 #include "core/INode.h"
@@ -85,6 +86,7 @@ public:
    float waveformMin[kWaveformCacheSize] = {};
    float waveformMax[kWaveformCacheSize] = {};
    int waveformCacheCount = 0;
+   WavePeaks peaks; // Turbo 0.49: multi-resolution peaks for the waveform view
 
    // ---- Exposed controls ------------------------------------------------
    float grain = 100.0f;    // 10..500 ms

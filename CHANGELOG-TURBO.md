@@ -1,5 +1,66 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.49.0-turbo (2026-10-03)
+
+### Waveforms you can trim by eye
+- Sampler, Drum Sequencer lanes, MPC pads, Slicer, Molder, Grain Molder, Granular and Paul
+  Stretch draw a real waveform: min / max with the RMS body inside, one column per screen pixel,
+  finer as you zoom the canvas in (a multi-resolution peak cache built once per sample).
+- **Play cursors**: a line with a small head for every sounding voice (Sampler note voices and
+  audition, each Drum lane voice, MPC pads, Slicer, Molder, Granular...), placed on the whole
+  sample so it lines up with the trim handles.
+- **Zoom to trim**: the magnifier chip in a waveform's corner shows only start..end (plus a
+  margin), with a bar locating it in the whole sample.
+- **Trim handles**: the time shows while dragging (1.234 s / m:ss.mmm), Shift drags 10x finer,
+  grabbing no longer jumps, and the range can go down to 0.1% of the sample.
+
+### Side panel: Samples and Media by folder
+- **Library folders** you manage: Add folder, Rescan, rename or remove a root (files stay on
+  disk); the bundled Turbo kits are added once as "Turbo kits". Saved in
+  `%LOCALAPPDATA%\Infinite\SampleFolders.json` / `MediaFolders.json`.
+- **Browse by folder** with a breadcrumb (Library / root / kit / sub): subfolders first with
+  their file counts, then the files. Typing in the search box searches every folder and shows
+  where each hit lives.
+- **No duplicates**: a file reached through two roots, a root inside another root, different
+  spellings of the same path or a link loop is listed once.
+- **Drag a folder** onto a Drum Sequencer (lanes 1-8) or an MPC (pads 1-16) to load its audio
+  files in name order; onto empty canvas it creates a Drum Sequencer with them. Single samples
+  can now be dropped onto an MPC pad too.
+- Scans run in the background and only the new folder is scanned when one is added.
+
+### Crash fix: plugins
+- **Crash writing MIDI into a plugin that was being reloaded or re-prepared** (seen in a crash
+  dump: the pitch-bend range message going into a freed MIDI buffer). The plugin node now holds
+  the plugin for its whole audio block, MIDI included, and reload / prepare / remove wait for it;
+  a plugin still busy after 2 s is left in memory instead of freed under the audio thread.
+- Release builds now write a PDB next to the exe, so future crash dumps can be read with names.
+
+### Mappable controls
+More node buttons go through the param machinery, so they can be MIDI-learned (Ctrl+M or
+right-click), driven by a CV cable and put on the Performance panel:
+- **Drum Sequencer** pattern picker: a `part` selector (A / B / C; a CV, MIDI knob or
+  Performance selector switches the part once when it changes), the **A verse / B bridge /
+  C chorus** buttons as triggers (a MIDI pad fires "B"), **< / >** groove as triggers
+  ("prev groove" / "next groove") and `groove` (index in the shown category). A driven change
+  from MIDI or the Performance panel is one undo step; a CV cable adds none.
+- **Slicer**: Record, Audition (state buttons like the Sampler's), re-slice (trigger).
+- **Molder**: Record (state), Roll, Iterate, Reset (triggers).
+- **Grain Molder**: Record, Audition (state).
+- **CV Recorder**: record / stop (state: high records, low stops).
+- **Predictive Rhythm / Predictive Notes**: Learn / Stop (state).
+- **Clip Matrix**: REC > ARR (state).
+
+### From upstream Infinite
+- **Sampler**: 16 voices (was 8); a file shared by several Samplers or reloaded is decoded once
+  (decode cache).
+- **Timeline clip pitch** for clips of a Sampler or an Analog (a "pitch (st)" slider in the
+  clip settings), added on top of the node's own pitch; it lasts only while the clip plays.
+- **Random Note**: style "melodic" (upstream's melody picker with bar / beat accent velocities)
+  next to the original "walk" (default, so old patches play the same).
+- **Geometry point size**: Image to Points and Depth Projection get "size relative to cell"
+  (upstream's point base size: point size 1 matches the cell, carried through Geometry Op, Set
+  Color and Switcher 3D into Render 3D). Off by default, so old patches look the same.
+
 ## 0.48.0-turbo (2026-10-03)
 
 ### New: MIDI File node (Notes)

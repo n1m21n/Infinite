@@ -54,6 +54,7 @@ public:
    // slot as the mesh, so a point cloud or curve survives the switcher.
    const std::vector<Particle>* GetPointCloud() override;
    unsigned long long PointCloudRevision() override;
+   float PointBaseSize() const override; // Turbo 0.49
    const Polyline* GetCurve() override;
    unsigned long long CurveStamp() override;
 

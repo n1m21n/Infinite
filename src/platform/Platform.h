@@ -560,6 +560,15 @@ namespace Platform
    // channel 0). A no-op if the plugin never published a schedule block (an
    // effect with no MIDI input, or one that doesn't support it) - the node
    // degrades to rendering with no note input rather than crashing.
+   // Turbo 0.49: an audio-thread user brackets ALL its use of a handle (MIDI
+   // scheduling and PluginRender) with Enter / Exit; PluginPrepare and
+   // PluginDestroy wait until no user is inside. Enter, then re-check that the
+   // handle is still the published one (see AudioPluginAudioNode), so a
+   // handle being torn down is never touched. PluginAudioEnabled is false
+   // while a prepare is in progress: skip MIDI writes then.
+   void PluginAudioEnter(PluginHandle* handle);
+   void PluginAudioExit(PluginHandle* handle);
+   bool PluginAudioEnabled(PluginHandle* handle);
    void PluginScheduleMIDIEvent(PluginHandle* handle, int frameOffset, const unsigned char* bytes,
                                 int byteCount);
 

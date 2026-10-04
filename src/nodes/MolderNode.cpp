@@ -416,6 +416,7 @@ void MolderNode::JoinWorkerIfDone()
                     buf->channelData.begin() + numFrames);
 
       RebuildWaveformCache(mPendingResult.rendered);
+      peaks.BuildFrom(*buf); // Turbo 0.49
 
       if (mAudioNode == nullptr)
          mAudioNode = std::make_unique<AudioMolderNode>();

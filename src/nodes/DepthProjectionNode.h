@@ -89,7 +89,9 @@ public:
    {
       return (bypassed || outputType == kMesh) ? 0 : mPointRevision;
    }
-   float PointBaseSize() const;
+   // Turbo 0.49: Render3D sprite base size (see IGeometrySource). 1.0 unless
+   // relativePointSize is on, then half a grid cell, so pointSize 1 fills it.
+   float PointBaseSize() const override;
 
    // IGeometrySource: Mesh
    const Mesh& GetMesh() override;
@@ -142,6 +144,7 @@ public:
    // Sampling & Geometry
    int density = 128;
    float pointSize = 1.0f;
+   bool relativePointSize = false; // Turbo 0.49: see PointBaseSize()
    float edgeTearThreshold = 0.25f; // Max depth delta across edge before splitting triangle
    bool computeNormals = true;
    float tint[3] = { 1.0f, 1.0f, 1.0f };
@@ -185,6 +188,7 @@ public:
       v.Float("posX", posX); v.Float("posY", posY); v.Float("posZ", posZ);
       v.Float("rotX", rotX); v.Float("rotY", rotY); v.Float("rotZ", rotZ);
       v.Float("scaleX", scaleX); v.Float("scaleY", scaleY); v.Float("scaleZ", scaleZ);
+      v.Bool("relativePointSize", relativePointSize); // Turbo 0.49: appended last
    }
 
 private:

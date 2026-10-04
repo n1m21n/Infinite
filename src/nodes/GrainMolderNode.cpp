@@ -765,6 +765,7 @@ void GrainMolderNode::CookIfNeeded(int frameId)
       }
 
       RebuildWaveformCache(mPendingResult.isStereo ? mPendingResult.renderedL : sampleBuf->channelData);
+      peaks.BuildFrom(*sampleBuf); // Turbo 0.49
       const int numFrames = sampleBuf->numFrames;
       const double sampleRate = sampleBuf->sampleRate;
       if (mAudioNode)

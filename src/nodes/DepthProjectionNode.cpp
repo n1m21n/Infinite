@@ -133,6 +133,8 @@ bool DepthProjectionNode::EnsureResources(int n)
 
 float DepthProjectionNode::PointBaseSize() const
 {
+   if (!relativePointSize)
+      return 1.0f;
    const int n = std::max(2, std::min(density, 512));
    const float dim = std::min(planarWidth, planarHeight);
    return (dim / (float)n) * 0.5f;

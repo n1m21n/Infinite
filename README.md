@@ -55,6 +55,8 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 | **MPC** / **MPC Out** | 16 sample pads (one shot, gate, loop), trim, pitch, fine tune, speed (negative = reverse), fades, pan, sync to a musical division, a CV pin per pad, one output per pad |
 | **VMPC** | the MPC for video clips, with their soundtrack |
 | **Super Mixer** | 16 channels, EQ, pan, mute / solo, CV everywhere |
+| **Waveforms and trim** | real min / max / RMS waveforms with a play cursor per voice, zoom to the trim range, time readout and Shift-fine trim handles (Sampler, Drum lanes, MPC pads, Slicer, Molder, Granular, Paul Stretch) |
+| **Sample / media library** | your own library folders, browse by folder with a breadcrumb, search across all, no duplicates; drag a kit folder onto a Drum Sequencer or MPC |
 | **MIDI File** | plays a .mid file (drop it on the canvas) in time with the transport, starting on the quantize grid; track and channel filter, transpose, velocity, loop, piano-roll preview |
 | **Drum Sequencer patterns** | 141 grooves in 10 groups (rock, funk and breaks, hip hop, electronic, latin, Brazil, Middle East, India, Africa, jazz), each in three parts (A verse, B bridge, C chorus with a fill), picked by group and groove with A / B / C buttons; two-tone bells; empty lanes get the bundled Turbo kit |
 | **Chord Progression** | chords held per bar, strum / arp / pulse modes; the builder now has extended, altered and quartal chords (11, 13, maj9#11, 7alt, 7#9, 6/9, so what...) |

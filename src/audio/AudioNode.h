@@ -47,6 +47,16 @@ public:
       (void)sourceSeconds; (void)sourcePerSecond; (void)pitchSemitones; (void)force;
    }
 
+   // Turbo 0.49 (upstream's contract): an Arrangement Timeline clip's pitch, in
+   // semitones, for a source that is not position-locked (Sampler, synths).
+   // Audio thread, called right before ProcessBlock every block a clip of this
+   // node is under the playhead (at most once per block per node). Valid for that
+   // block only: an implementation consumes it in ProcessBlock and eases back to 0
+   // on a block without the call (no explicit reset is ever sent). Sent for Sample
+   // clips too (the file player takes its pitch from SetClipSamplePosition and
+   // ignores this). No-op by default.
+   virtual void SetClipPitchOverride(float semitones) { (void)semitones; }
+
    // Samples of latency this node's own processing adds (lookahead,
    // oversampling, a hosted plugin's reported latency, ...) at whatever rate
    // it was last PrepareToPlay'd at. 0 (the default) for the overwhelming

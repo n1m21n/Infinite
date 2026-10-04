@@ -142,6 +142,9 @@ struct ArrangeTerminal
    mutable int cursor = 0;    // audio thread scratch
    mutable int activeWindow = -1;
    mutable uint32_t seenSeekSerial = 0;
+   // Turbo 0.49: audio thread scratch, this block's clip pitch (if under a clip).
+   mutable bool clipPitchActive = false;
+   mutable float clipPitch = 0.0f;
    // Turbo 0.48 (upstream WP8): live waveform bucket in progress, flushed
    // into AudioEngine::ClipPeaks() once the playhead leaves it.
    mutable uint64_t peakClipId = 0;

@@ -202,6 +202,10 @@ accent pitch and loads the bundled kit into empty lanes. For a song, switch part
 steps play `lane<L>_accentPitch` semitones away), so samples you load should follow that order.
 The groove lists a suggested tempo; set it with `transport` if the user wants that feel. Edit
 single steps with `set_param` on `lane<L>_step<S>` (velocity 0..1, 0 = off).
+For live part changes the node has mappable controls: `part` (selector 0 A, 1 B, 2 C, applies
+when it changes), triggers `A verse`, `B bridge`, `C chorus`, `prev groove`, `next groove`, and
+`groove` (index in the shown category); e.g. `perf_add {"index":N,"param":"B bridge"}` adds a
+trigger, `{"param":"part","kind":"selector"}` a 3-way switch.
 
 **Chord Progression qualities** (the builder dropdown): triads, 6ths / add9 / 6/9, 7ths (incl.
 7#5, 7b5, maj7#5, dim(maj7)), 9ths / 11ths / 13ths (11, m11, maj7#11, maj9#11, 13, m13, maj13,
@@ -216,6 +220,10 @@ setting it loads it), `track` (0 all, N = track N), `channel` (0 all, 1-16), `tr
 `quantize` (start grid as a rate division, 2 = 1 bar default; playback starts, restarts and
 loops on it), `play`. Wire its note output into a synth. The body shows the file's tempo with a
 button that copies it to the transport; dropping a .mid on the canvas spawns one.
+
+**0.49 notes**: Random Note `style` (0 walk = classic, 1 melodic with accents); Sampler has 16
+voices; Image to Points / Depth Projection `relativePointSize` (true = point size 1 fills a cell);
+an Arrangement clip of a Sampler or Analog can carry its own pitch (clip settings).
 
 **Other Turbo nodes**: OSC to CV (8 OSC addresses to 8 CV outputs), Plugin (VST3 instruments and
 effects; settings `plugin_id` etc., the plugin state is saved with the patch), Chord Progression

@@ -266,9 +266,13 @@ public:
       mNoteCursor = cursor;
    }
 
-   void SetClipPitchOverride(float semitones)
+   // Turbo 0.49: driven by the engine's arrange lookahead (audio thread). Like the
+   // Sampler, valid for one block only: ProcessBlock consumes it and eases back to 0
+   // on any block without the call (muted / deleted lane, timeline off, rebuild).
+   void SetClipPitchOverride(float semitones) override
    {
-      mMailbox.SetImmediate(AnalogSynthCore::kClipPitchParam, semitones);
+      mClipPitch = std::isfinite(semitones) ? std::clamp(semitones, -24.0f, 24.0f) : 0.0f;
+      mClipPitchFresh = true;
    }
 
    // One filter chain, run over whichever state pair it is handed. Both the
@@ -355,6 +359,10 @@ public:
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& buffer) override
    {
       using namespace AnalogSynthCore;
+
+      // Turbo 0.49: one-block clip pitch (see SetClipPitchOverride), smoothed.
+      mMailbox.Push(kClipPitchParam, mClipPitchFresh ? mClipPitch : 0.0f);
+      mClipPitchFresh = false;
 
       const int wave1 = mWave1.load(std::memory_order_relaxed);
       const int wave2 = mWave2.load(std::memory_order_relaxed);
@@ -842,6 +850,8 @@ private:
    uint64_t mNextAge = 1;
    float mLastNotePitch = 60.0f;
    bool mHasLastNote = false;
+   float mClipPitch = 0.0f;      // audio thread (Turbo 0.49)
+   bool mClipPitchFresh = false; // audio thread
 
    // Free-running fallback state
    DspMath::OnePole mFreeGlide;

@@ -11,6 +11,7 @@
 #include "audio/DspMath.h"
 #include "audio/MusicTime.h"
 #include "audio/NoteEventQueue.h"
+#include "audio/NoteTheory.h"
 #include "core/Transport.h"
 #include "platform/Platform.h"
 
@@ -2648,6 +2649,7 @@ public:
       mPendingOffActive = false;
       mPendingOnActive = false;
       mPrevNote = -1;
+      mMelody = NoteTheory::MelodyState();
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
@@ -2663,6 +2665,7 @@ public:
       const float rateSecondsP = std::max(0.01f, mRateSeconds.load(std::memory_order_relaxed));
       const int maxStep = std::max(1, mMaxStep.load(std::memory_order_relaxed));
       const float groove = std::clamp(mGroove.load(std::memory_order_relaxed), 0.0f, 1.0f);
+      const bool melodic = mStyle.load(std::memory_order_relaxed) == 1;
       const double bpm = (double)Transport::Instance().Tempo();
       const double rateBeats = std::max(0.001, rateMode == 1 ? (double)rateSecondsP * bpm / 60.0 : (double)rateBeatsP);
 
@@ -2675,11 +2678,36 @@ public:
       {
          mLastStep = step;
 
-         const int base = (mPrevNote >= 0) ? mPrevNote : (rangeLow + rangeHigh) / 2;
-         const int delta = (int)std::lround(mRng.Next() * (float)maxStep);
-         const int raw = std::clamp(base + delta, 0, 127);
-         const int snapped = MusicTime::SnapToScale(raw, root, scale, MusicTime::kSnapNearest);
-         const int note = std::clamp(snapped, rangeLow, rangeHigh);
+         int note = -1;
+         float velocity = 0.0f;
+         if (melodic)
+         {
+            // Turbo 0.49 (upstream): constrained melodic walk (proximity, gap fill, tonal
+            // stability, centre pull, phrase cadence) over the in-scale notes of the
+            // range, with the bar line and beat accented. Per step, not per sample.
+            int scaleNotes[NoteTheory::kMaxScaleNotes];
+            const int nScaleNotes = NoteTheory::CollectScaleNotes(root, scale, rangeLow, rangeHigh, scaleNotes,
+                                                                  NoteTheory::kMaxScaleNotes);
+            const float metric = NoteTheory::MetricStrength((double)step * rateBeats,
+                                                             Transport::Instance().BeatsPerBar());
+            if (mPrevNote >= 0 && mMelody.prevNote < 0)
+               mMelody.prevNote = mPrevNote; // switched from walk: continue from the last note
+            note = NoteTheory::PickMelodyNote(mMelody, scaleNotes, nScaleNotes, root, maxStep, metric,
+                                              mRng.Next() * 0.5f + 0.5f);
+            if (note < 0)
+               note = MusicTime::SnapToScaleInRange((rangeLow + rangeHigh) / 2, root, scale, rangeLow, rangeHigh);
+            velocity = std::clamp(0.55f + 0.25f * metric + (mRng.Next() * 0.5f + 0.5f) * 0.15f, 0.05f, 1.0f);
+         }
+         else
+         {
+            const int base = (mPrevNote >= 0) ? mPrevNote : (rangeLow + rangeHigh) / 2;
+            const int delta = (int)std::lround(mRng.Next() * (float)maxStep);
+            const int raw = std::clamp(base + delta, 0, 127);
+            const int snapped = MusicTime::SnapToScale(raw, root, scale, MusicTime::kSnapNearest);
+            note = std::clamp(snapped, rangeLow, rangeHigh);
+            velocity = 0.6f + (mRng.Next() * 0.5f + 0.5f) * 0.3f;
+            mMelody.prevNote = -1; // a later switch to melodic picks up from mPrevNote
+         }
          mPrevNote = note;
          mLastNoteReadout.store(note, std::memory_order_relaxed);
 
@@ -2710,7 +2738,7 @@ public:
 
          mPendingOnSample = mSamplePos + (uint64_t)std::llround(swingSamplesD);
          mPendingOnNote = note;
-         mPendingOnVelocity = 0.6f + (mRng.Next() * 0.5f + 0.5f) * 0.3f;
+         mPendingOnVelocity = velocity;
          // 70% gate of what remains after the swung onset, so the off stays before
          // the next boundary for any groove in [0, 1]; counted from the real on.
          mPendingOnGate = (uint64_t)std::max(0.0, (stepSamples - swingSamplesD) * 0.7);
@@ -2757,6 +2785,7 @@ public:
       mMaxStep.store(n.maxStep, std::memory_order_relaxed);
       mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
       mGroove.store(n.groove, std::memory_order_relaxed);
+      mStyle.store(n.style, std::memory_order_relaxed);
    }
 
    int LastNote() const { return mLastNoteReadout.load(std::memory_order_relaxed); }
@@ -2809,7 +2838,9 @@ private:
    std::atomic<int> mMaxStep { 4 };
    std::atomic<bool> mUseGlobalScale { true };
    std::atomic<float> mGroove { 0.0f };
+   std::atomic<int> mStyle { 0 };
    std::atomic<int> mLastNoteReadout { -1 };
+   NoteTheory::MelodyState mMelody; // audio thread, melodic style only
 };
 
 RandomNoteGeneratorNode::RandomNoteGeneratorNode() = default;
@@ -2837,6 +2868,7 @@ void RandomNoteGeneratorNode::VisitParams(ParamVisitor& v)
    v.Int("maxStep", maxStep);
    v.Bool("useGlobalScale", useGlobalScale);
    v.Float("groove", groove); // Turbo 0.48: appended, save-compat
+   v.Int("style", style);     // Turbo 0.49: appended, 0 = old walk
 }
 
 AudioNode* RandomNoteGeneratorNode::GetAudioNode()

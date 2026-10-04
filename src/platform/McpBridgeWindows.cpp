@@ -35,7 +35,7 @@ using json = nlohmann::json;
 
 namespace
 {
-   const char* kServerVersion = "0.48.0";
+   const char* kServerVersion = "0.49.0";
 
    // ------------------------------------------------------------ stdio ---
    HANDLE gIn = INVALID_HANDLE_VALUE;

@@ -1370,6 +1370,7 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
       sig.surfaceTexRev[i] = source->SurfaceTextureRevision();
       sig.material[i] = source->GetMaterial();
       sig.modelMatrix[i] = source->GetModelMatrix();
+      sig.pointBaseSize[i] = source->PointBaseSize();
       if (auto* instancer = FindInstancer(source))
       {
          sig.instanceRev[i] = instancer->InstanceRevision();
@@ -1816,7 +1817,11 @@ void Render3DNode::CookIfNeeded(int frameId)
       const unsigned int surface = cloud->GetSurfaceTexture();
 
       const unsigned long long revision = cloud->PointCloudRevision();
-      if (gpu.instanceRevision != revision || !(gpu.instanceGroupMatrix == model))
+      // Turbo 0.49: p.scale is relative to the source's PointBaseSize()
+      // (1.0 for every source unless it opts in, so old patches draw as before).
+      const float baseSize = cloud->PointBaseSize();
+      if (gpu.instanceRevision != revision || !(gpu.instanceGroupMatrix == model) ||
+          gpu.instanceBaseSize != baseSize)
       {
          // A billboard has no orientation of its own to carry the rest of the
          // matrix, so only a uniform-ish scale - the length of the model's
@@ -1834,7 +1839,7 @@ void Render3DNode::CookIfNeeded(int frameId)
             const float wx = model.m[0]*p.px + model.m[4]*p.py + model.m[8]*p.pz + model.m[12];
             const float wy = model.m[1]*p.px + model.m[5]*p.py + model.m[9]*p.pz + model.m[13];
             const float wz = model.m[2]*p.px + model.m[6]*p.py + model.m[10]*p.pz + model.m[14];
-            const float s = p.scale * scaleX;
+            const float s = p.scale * baseSize * scaleX;
             xforms.push_back(Mat4::Multiply(Mat4::Translation(wx, wy, wz), Mat4::Scale(s, s, s)));
             colors.push_back(p.r); colors.push_back(p.g); colors.push_back(p.b);
          }
@@ -1864,6 +1869,7 @@ void Render3DNode::CookIfNeeded(int frameId)
          gpu.instanceColored = true;
          gpu.instanceRevision = revision;
          gpu.instanceGroupMatrix = model;
+         gpu.instanceBaseSize = baseSize;
 
          // Bounds for shadow-volume fitting (SceneBounds), expanded by each
          // sprite's radius - computed here, the one place the points are

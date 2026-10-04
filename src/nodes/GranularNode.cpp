@@ -772,6 +772,10 @@ void GranularNode::FinishBuffer(Platform::SampleBuffer* decoded, const std::stri
    {
       waveformCacheCount = 0;
    }
+   if (decoded != nullptr)
+      peaks.BuildFrom(*decoded); // Turbo 0.49
+   else
+      peaks.Clear();
 
    mAudioNode->PushBuffer(decoded);
 }

@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "audio/WavePeaks.h"
 #include "core/AudioCable.h"
 #include "core/INode.h"
 
@@ -90,6 +91,7 @@ public:
    float waveformMin[kWaveformCacheSize] = {};
    float waveformMax[kWaveformCacheSize] = {};
    int waveformCacheCount = 0;
+   WavePeaks peaks; // Turbo 0.49: multi-resolution peaks for the waveform view
 
    float Playhead() const { return mPlayhead; }
    const GrainVisualSnapshot& VisualSnapshot() const { return mLatestVisualSnapshot; }

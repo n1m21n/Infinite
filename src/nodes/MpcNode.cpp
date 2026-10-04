@@ -118,6 +118,7 @@ public:
    }
 
    unsigned int PlayingMask() const { return mPlayingMask.load(std::memory_order_relaxed); }
+   float CursorAt(int pad) const { return mCursors.At(pad); } // Turbo 0.49
    float Peak() const { return mPeak.load(std::memory_order_relaxed); }
 
    // ---- MPC Out tap (audio thread, after this node's ProcessBlock) -------
@@ -241,6 +242,15 @@ public:
          if (mVoice[p].active)
             mask |= 1u << p;
       mPlayingMask.store(mask, std::memory_order_relaxed);
+      // Turbo 0.49: pad play cursors (0..1 of the whole buffer, -1 = idle).
+      for (int p = 0; p < MpcNode::kPads; p++)
+      {
+         const Platform::SampleBuffer* buf = mActive[p];
+         if (mVoice[p].active && buf != nullptr && buf->numFrames > 0)
+            mCursors.Publish(p, (float)(mVoice[p].pos / (double)buf->numFrames));
+         else
+            mCursors.Idle(p);
+      }
       mPeak.store(peak, std::memory_order_relaxed);
       mLastFrames = numFrames;
       mBlockCounter.fetch_add(1, std::memory_order_release);
@@ -636,6 +646,7 @@ private:
    std::atomic<bool> mVelocitySensitive { true };
 
    std::atomic<unsigned int> mPlayingMask { 0 };
+   PlayCursorSet<MpcNode::kPads> mCursors; // Turbo 0.49
    std::atomic<float> mPeak { 0.0f };
    std::atomic<uint64_t> mBlockCounter { 0 };
 };
@@ -712,6 +723,7 @@ bool MpcNode::LoadPad(int pad, const std::string& path)
          padWaveMax[pad][b] = mx;
       }
    }
+   padPeaks[pad].BuildFrom(*decoded); // Turbo 0.49
    mAudioNode->PushBuffer(pad, decoded);
    return true;
 }
@@ -754,7 +766,13 @@ void MpcNode::ClearPad(int pad)
    padName[pad].clear();
    padStatus[pad] = "empty";
    padWaveCount[pad] = 0;
+   padPeaks[pad].Clear();
    mAudioNode->PushBuffer(pad, new Platform::SampleBuffer());
+}
+
+float MpcNode::PadPlayPosition(int pad) const
+{
+   return mAudioNode ? mAudioNode->CursorAt(Clamp(pad)) : -1.0f;
 }
 
 void MpcNode::ReloadFromPaths()

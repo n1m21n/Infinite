@@ -459,7 +459,10 @@ namespace Platform
       std::atomic<PluginLoadState> state { PluginLoadState::Pending };
       std::atomic<unsigned long long> learned { ~0ULL };
       std::atomic<bool> learnEnabled { false };
-      std::atomic<bool> renderInFlight { false };
+      // Turbo 0.49: audio-thread users of this handle (the plugin node's whole
+      // ProcessBlock, MIDI writes included, plus PluginRender). Prepare and
+      // Destroy wait for 0. A counter, not a bool, so nested users nest.
+      std::atomic<int> renderInFlight { 0 };
       std::atomic<bool> renderEnabled { true };
       juce::AudioBuffer<float> work;
       juce::MidiBuffer midi;
@@ -642,13 +645,13 @@ namespace Platform
          outError = "plugin is not ready";
          return false;
       }
-      handle->renderEnabled.store(false, std::memory_order_release);
+      handle->renderEnabled.store(false, std::memory_order_seq_cst);
       // The audio half unpublishes the handle before this call, but a block
       // that already loaded the old pointer may still be inside processBlock.
       // Never release a plugin's resources under that callback.
-      for (int i = 0; i < 250 && handle->renderInFlight.load(std::memory_order_acquire); ++i)
+      for (int i = 0; i < 2000 && handle->renderInFlight.load(std::memory_order_seq_cst) > 0; ++i)
          Sleep(1);
-      if (handle->renderInFlight.load(std::memory_order_acquire))
+      if (handle->renderInFlight.load(std::memory_order_seq_cst) > 0)
       {
          outError = "plugin render did not finish before prepare";
          VstLog("prepare timed out waiting for render: " + handle->desc.name);
@@ -697,8 +700,19 @@ namespace Platform
          handle->asyncState->handle = nullptr;
       }
       PluginCloseEditor(handle);
-      for (int i = 0; i < 100 && handle->renderInFlight.load(std::memory_order_acquire); ++i)
+      // Turbo 0.49: wait for every audio-thread user (the plugin node's MIDI
+      // writes too, not only the render). Deleting under one of them was a
+      // use-after-free: a crash writing the pitch-bend RPN into a freed
+      // MidiBuffer when a plugin was reloaded or re-prepared mid-playback.
+      for (int i = 0; i < 2000 && handle->renderInFlight.load(std::memory_order_seq_cst) > 0; ++i)
          Sleep(1);
+      if (handle->renderInFlight.load(std::memory_order_seq_cst) > 0)
+      {
+         // Still in use after 2 s (a stuck plugin): leaking it is safer than
+         // freeing memory the audio thread is touching.
+         VstLog("destroy: render still in flight after 2 s, leaking " + handle->desc.name);
+         return;
+      }
       if (handle->instance)
       {
          handle->instance->removeListener(handle);
@@ -741,9 +755,9 @@ namespace Platform
          PluginHandle* h;
          explicit RenderGuard(PluginHandle* value) : h(value)
          {
-            h->renderInFlight.store(true, std::memory_order_release);
+            h->renderInFlight.fetch_add(1, std::memory_order_seq_cst);
          }
-         ~RenderGuard() { h->renderInFlight.store(false, std::memory_order_release); }
+         ~RenderGuard() { h->renderInFlight.fetch_sub(1, std::memory_order_seq_cst); }
       } guard(handle);
       // Close the small race where this callback read renderEnabled just
       // before the main thread disabled it and started waiting. Once the
@@ -823,6 +837,24 @@ namespace Platform
          handle->rejectedBlocks.fetch_add(1, std::memory_order_relaxed);
          passThrough();
       }
+   }
+
+   // Turbo 0.49: see PluginHandle::renderInFlight.
+   void PluginAudioEnter(PluginHandle* handle)
+   {
+      if (handle)
+         handle->renderInFlight.fetch_add(1, std::memory_order_seq_cst);
+   }
+
+   void PluginAudioExit(PluginHandle* handle)
+   {
+      if (handle)
+         handle->renderInFlight.fetch_sub(1, std::memory_order_seq_cst);
+   }
+
+   bool PluginAudioEnabled(PluginHandle* handle)
+   {
+      return handle && handle->renderEnabled.load(std::memory_order_seq_cst);
    }
 
    void PluginScheduleMIDIEvent(PluginHandle* handle, int frameOffset, const unsigned char* bytes, int byteCount)

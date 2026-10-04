@@ -298,7 +298,20 @@ public:
          if (buffer.numChannels > 1)
             buffer.channels[1][i] = sampleR * masterVolNow;
       }
+
+      // Turbo 0.49: publish each voice's play position for the lane cards'
+      // play cursors (0..1 of the whole buffer, -1 = idle).
+      for (int v = 0; v < kNumVoices; v++)
+      {
+         const Voice& voice = mVoices[v];
+         if (voice.active && voice.buffer != nullptr && voice.buffer->numFrames > 0)
+            mCursors.Publish(v, (float)(voice.readPos / (double)voice.buffer->numFrames));
+         else
+            mCursors.Idle(v);
+      }
    }
+
+   PlayCursorSet<kNumVoices>& Cursors() { return mCursors; }
 
 private:
    struct Voice
@@ -396,6 +409,7 @@ private:
    ParamMailbox mMailbox;
 
    Voice mVoices[kNumVoices];
+   PlayCursorSet<kNumVoices> mCursors; // Turbo 0.49
    int mLaneVoiceCursor[kNumLanes] = {};
    double mPrevRawPos = 0.0;
 
@@ -747,6 +761,9 @@ void DrumSequencerNode::FinishLaneBuffer(int lane, Platform::SampleBuffer* decod
       }
    }
 
+   // Turbo 0.49: full-resolution peaks for the waveform view (all channels).
+   lanePeaks[lane].BuildFrom(*decoded);
+
    mAudioNode->PushBuffer(lane, decoded);
    laneFilePath[lane] = filePath;
    laneFileName[lane] = fileName;
@@ -827,6 +844,14 @@ void DrumSequencerNode::RandomizeLane(int lane)
       stepVel[lane][s] = 0.0f;
 }
 
+int DrumSequencerNode::LaneVoicePositions(int lane, float* out, int max) const
+{
+   if (!mAudioNode || out == nullptr || max <= 0)
+      return 0;
+   lane = Clamp(lane);
+   return mAudioNode->Cursors().Collect(out, max, lane * kVoicesPerLane, kVoicesPerLane);
+}
+
 void DrumSequencerNode::ClearLane(int lane)
 {
    lane = Clamp(lane);
@@ -842,6 +867,7 @@ void DrumSequencerNode::ClearLane(int lane)
    laneFileName[lane].clear();
    laneStatus[lane] = "--";
    laneWaveCount[lane] = 0;
+   lanePeaks[lane].Clear();
    laneStart[lane] = 0.0f;
    laneEnd[lane] = 1.0f;
 }

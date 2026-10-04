@@ -898,6 +898,8 @@ void SlicerNode::FinishBuffer(Platform::SampleBuffer* decoded, const std::string
       }
    }
 
+   peaks.BuildFrom(*decoded); // Turbo 0.49
+
    mSourceFrames = decoded->numFrames;
    mSourceSR = decoded->sampleRate > 0.0 ? decoded->sampleRate : 44100.0;
    mSourceMono.assign(decoded->channelData.begin(),

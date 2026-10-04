@@ -350,11 +350,12 @@ namespace
 void AudioEngine::RunArrangeLookahead(ProcessList* list, int numFrames)
 {
    Transport& transport = Transport::Instance();
-   if (!transport.IsPlaying())
-      return;
    const double sr = mSampleRate.load(std::memory_order_relaxed);
    const double bps = ArrangeBeatsPerSample(sr > 0.0 ? sr : 48000.0);
-   if (bps <= 0.0)
+   // Turbo 0.49: no clip pitch reset needed anywhere here: SetClipPitchOverride is
+   // valid for one block only, so a block without the call (stopped, gap, timeline
+   // off, lane gone after a rebuild) eases the node back to its own pitch.
+   if (!transport.IsPlaying() || bps <= 0.0)
       return;
    const double bpm = std::max(1.0, (double)transport.Tempo());
    const double blockStart = ArrangeBlockStartBeat();
@@ -374,16 +375,56 @@ void AudioEngine::RunArrangeLookahead(ProcessList* list, int numFrames)
       if (k >= t.numWindows || w[k].startBeat >= blockEnd)
       {
          t.activeWindow = -1;
+         t.clipPitchActive = false;
          continue;
       }
       const bool entered = t.activeWindow != k;
       t.activeWindow = k;
+      // Turbo 0.49 (upstream): per-clip pitch for every clip, every block, so a node
+      // shared by several clips plays each at its own pitch (block-granular).
+      // Applied below, once per source.
+      t.clipPitchActive = true;
+      t.clipPitch = w[k].pitch;
       if (!w[k].seekSource)
          continue;
       const double effBpm = (w[k].syncToTempo && w[k].sampleBpm > 0.0f) ? (double)w[k].sampleBpm : bpm;
       const double secs = w[k].sourceOffsetSeconds + (blockStart - w[k].startBeat) * 60.0 / effBpm;
       const double perSecond = bpm / effBpm;
       t.source->SetClipSamplePosition(secs, perSecond, w[k].pitch, jumped || entered);
+   }
+
+   // Turbo 0.49: one clip pitch per source per block. A source on several lanes
+   // gets it from its first terminal under a clip on an audible lane (else the
+   // first under a clip at all), applied once; a terminal outside its clips never
+   // resets a pitch another lane of the same source is applying.
+   const auto& terms = list->topology.arrangeTerminals;
+   const size_t nt = terms.size();
+   for (size_t i = 0; i < nt; i++)
+   {
+      const ArrangeTerminal& t = terms[i];
+      if (t.source == nullptr || t.numWindows <= 0 || !t.clipPitchActive)
+         continue;
+      bool done = false;
+      for (size_t j = 0; j < i && !done; j++)
+         done = terms[j].source == t.source && terms[j].numWindows > 0 && terms[j].clipPitchActive;
+      if (done)
+         continue; // an earlier terminal of this source already applied it
+      float pitch = t.clipPitch;
+      for (size_t j = i; j < nt; j++)
+      {
+         const ArrangeTerminal& u = terms[j];
+         if (u.source != t.source || u.numWindows <= 0 || !u.clipPitchActive)
+            continue;
+         const int slot = u.laneSlot;
+         const bool audible = slot >= 0 && slot < kMaxArrangeLanes &&
+                              mLaneGain[slot].load(std::memory_order_relaxed) > 0.0f;
+         if (audible)
+         {
+            pitch = u.clipPitch;
+            break;
+         }
+      }
+      t.source->SetClipPitchOverride(pitch);
    }
 }
 

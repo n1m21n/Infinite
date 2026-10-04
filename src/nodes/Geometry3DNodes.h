@@ -174,6 +174,13 @@ public:
    // geometry-ish source shared one interface.
    virtual const std::vector<Particle>* GetPointCloud() { return nullptr; }
    virtual unsigned long long PointCloudRevision() { return 0; }
+   // Turbo 0.49: world-space half-extent that Particle::scale is relative to
+   // when Render3D draws this source's points as sprites (sprite radius =
+   // p.scale * PointBaseSize()). 1.0 means p.scale is already absolute, which
+   // is every source's default; Image to Points and Depth Projection return
+   // their grid cell size when their "Relative Point Size" option is on.
+   // Pass-through nodes forward their input's value.
+   virtual float PointBaseSize() const { return 1.0f; }
    virtual const Polyline* GetCurve() { return nullptr; }
    virtual unsigned long long CurveStamp() { return 0; }
 };
@@ -507,6 +514,9 @@ private:
       // which doesn't bump the instancer's own InstanceRevision() - still
       // triggers a re-upload.
       Mat4 instanceGroupMatrix;
+      // Turbo 0.49: PointBaseSize() baked into a cloud's sprite instances, so
+      // flipping it (no cloud revision bump) still re-uploads.
+      float instanceBaseSize = 1.0f;
    };
 
    bool EnsureResources(int w, int h, int sampleCount);
@@ -583,6 +593,7 @@ private:
       unsigned long long instanceRev[kSlots] = { 0, 0, 0, 0 };
       size_t instanceCount[kSlots] = { 0, 0, 0, 0 };
       Mat4 instanceGroupMatrix[kSlots];
+      float pointBaseSize[kSlots] = { 1.0f, 1.0f, 1.0f, 1.0f }; // Turbo 0.49
       bool envConnected = false;
       unsigned long long envRev = 0;
       float envRotation = 0.0f;
@@ -604,7 +615,7 @@ private:
             if (hasGeom[i] != o.hasGeom[i] || meshRev[i] != o.meshRev[i] ||
                 cloudRev[i] != o.cloudRev[i] || curveRev[i] != o.curveRev[i] ||
                 surfaceTexRev[i] != o.surfaceTexRev[i] || instanceRev[i] != o.instanceRev[i] ||
-                instanceCount[i] != o.instanceCount[i])
+                instanceCount[i] != o.instanceCount[i] || pointBaseSize[i] != o.pointBaseSize[i])
                return false;
             if (hasGeom[i] && memcmp(&material[i], &o.material[i], sizeof(Material)) != 0)
                return false;

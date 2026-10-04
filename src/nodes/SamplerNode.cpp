@@ -15,6 +15,7 @@
 #include "platform/Platform.h"
 #include "Transport.h"
 #include "core/AudioTopologyRequest.h"
+#include "core/AudioDecodeCache.h"
 #include "audio/WavWriter.h"
 
 namespace
@@ -29,8 +30,15 @@ namespace
    constexpr int kFadeInParam = 6;   // fade-in ms at the start of every pass (from upstream)
    constexpr int kFadeOutParam = 7;  // fade-out ms at the end of every pass
    // reverse travels via the plain mReverse atomic instead - see ProcessBlock/TriggerVoice.
+   // Turbo 0.49: Arrangement Timeline per-clip pitch, semitones added on top of
+   // pitch/finetune. Written by the audio thread itself (SetClipPitchOverride runs
+   // in the engine's lookahead right before ProcessBlock), held to 0 otherwise.
+   constexpr int kClipPitchParam = 8;
 
-   constexpr int kMaxVoices = 8;
+   // Turbo 0.49 (upstream): 16 note voices (was 8). Still allocated once in the
+   // constructor; SamplerNode::kMaxVoicePositions mirrors it for the UI snapshot.
+   constexpr int kMaxVoices = 16;
+   static_assert(kMaxVoices == SamplerNode::kMaxVoicePositions, "keep the voice snapshot in step");
    constexpr int kReferenceNote = 60; // sample's own recorded pitch plays back at rate 1.0
 
    // Recording capacity: 30s mono at a generous upper-bound sample rate.
@@ -144,6 +152,7 @@ public:
       mMailbox.SetImmediate(kPingpongParam, mPingpong.load(std::memory_order_relaxed) ? 1.0f : 0.0f);
       mMailbox.SetImmediate(kFadeInParam, mFadeIn.load(std::memory_order_relaxed));
       mMailbox.SetImmediate(kFadeOutParam, mFadeOut.load(std::memory_order_relaxed));
+      mMailbox.SetImmediate(kClipPitchParam, 0.0f);
       // No envelope shaping to speak of - fast fixed attack/release just
       // enough to avoid a click on trigger/steal, not a musical parameter.
       mVoices.SetSampleRate(sampleRate);
@@ -198,6 +207,19 @@ public:
    }
 
    MeterRing& PlayheadRing() { return mPlayheadRing; }
+   // VoicePositions (Turbo 0.49): slots 0..kMaxVoices-1 note voices, kMaxVoices the self voice.
+   const PlayCursorSet<kMaxVoices + 1>& Cursors() const { return mCursors; }
+
+   // Turbo 0.49 (upstream port): Arrangement Timeline per-clip pitch. Audio thread,
+   // called by the engine's lookahead every block a clip of this node is under the
+   // playhead. Additive (clip pitch 0 = the node's own pitch, so old patches and
+   // clips play unchanged; upstream replaces the knob instead). Valid for that
+   // block only: a block without the call (gap, stop, clip removed) eases back to 0.
+   void SetClipPitchOverride(float semitones) override
+   {
+      mClipPitch = std::isfinite(semitones) ? std::clamp(semitones, -24.0f, 24.0f) : 0.0f;
+      mClipPitchFresh = true;
+   }
 
    // Main thread. Auditions the loaded sample from `frac` right away,
    // independent of the note graph and the transport - the last-write-wins
@@ -272,8 +294,16 @@ public:
       for (int ch = 0; ch < buffer.numChannels; ch++)
          std::fill(buffer.channels[ch], buffer.channels[ch] + buffer.numFrames, 0.0f);
 
+      // Turbo 0.49: clip pitch lives for one block (see SetClipPitchOverride).
+      mMailbox.Push(kClipPitchParam, mClipPitchFresh ? mClipPitch : 0.0f);
+      mClipPitchFresh = false;
+
       if (mActiveBuffer == nullptr || mActiveBuffer->numFrames <= 0)
+      {
+         for (int v = 0; v <= kMaxVoices; v++)
+            mCursors.Idle(v);
          return;
+      }
 
       // Turbo 0.48 (upstream port): note voices decay to silence over `decay` seconds.
       // 0 keeps the old held envelope (fixed 2 ms attack, full sustain, 15 ms release).
@@ -366,7 +396,8 @@ public:
             evtIdx++;
          }
 
-         const float pitchSemis = mMailbox.SmoothedValue(kPitchParam) + mMailbox.SmoothedValue(kFinetuneParam) / 100.0f;
+         const float pitchSemis = mMailbox.SmoothedValue(kPitchParam) + mMailbox.SmoothedValue(kFinetuneParam) / 100.0f +
+                                  mMailbox.SmoothedValue(kClipPitchParam);
          const float speed = mMailbox.SmoothedValue(kSpeedParam);
          const float volume = mMailbox.SmoothedValue(kVolumeParam);
          const float startFrac = mStart.load(std::memory_order_relaxed);
@@ -454,6 +485,22 @@ public:
          playheadOut = mStart.load(std::memory_order_relaxed);
 
       mPlayheadRing.Write(&playheadOut, 1);
+
+      // ---- VoicePositions (Turbo 0.49): publish every voice's position ----
+      {
+         const double frames = (double)std::max(1, mActiveBuffer->numFrames);
+         for (int v = 0; v < kMaxVoices; v++)
+         {
+            if (v < mVoices.NumVoices() && mVoices.IsVoiceActive(v))
+               mCursors.Publish(v, (float)(mVoicePos[v] / frames));
+            else
+               mCursors.Idle(v);
+         }
+         if (mSelfEnv.IsActive())
+            mCursors.Publish(kMaxVoices, (float)(mSelfPos / frames));
+         else
+            mCursors.Idle(kMaxVoices);
+      }
 
       mIsPlaying.store(mSelfEnv.IsActive(), std::memory_order_relaxed);
       mSelfOwnedByUserPublished.store(mSelfOwner == SelfOwner::User, std::memory_order_relaxed);
@@ -582,6 +629,7 @@ private:
    double mSampleRate = 44100.0;
    ParamMailbox mMailbox;
    MeterRing mPlayheadRing;
+   PlayCursorSet<kMaxVoices + 1> mCursors; // VoicePositions (Turbo 0.49)
    NoteEventQueue* mNoteInbox = nullptr;
    int mNoteCursor = -1;
 
@@ -620,6 +668,8 @@ private:
    std::atomic<float> mPosition { 0.0f };
    std::atomic<float> mDecay { 0.0f };
    float mLastDecaySec = -1.0f; // audio thread
+   float mClipPitch = 0.0f;      // audio thread (Turbo 0.49)
+   bool mClipPitchFresh = false; // audio thread
    float mLastPosParam = 0.0f; // audio thread, raw `position` of the last block
    bool mPosParamSeen = false; // audio thread
    std::atomic<float> mStart { 0.0f };
@@ -683,6 +733,15 @@ AudioNode* SamplerNode::GetAudioNode()
    return mAudioNode.get();
 }
 
+// ---- VoicePositions (Turbo 0.49) ----
+int SamplerNode::VoicePositions(float* out, int max) const
+{
+   if (!mAudioNode || out == nullptr || max <= 0)
+      return 0;
+   return mAudioNode->Cursors().Collect(out, max);
+}
+// ---- end VoicePositions (Turbo 0.49) ----
+
 void SamplerNode::TriggerPreview(float frac)
 {
    if (!mAudioNode)
@@ -743,7 +802,9 @@ bool SamplerNode::LoadFile(const std::string& path)
 {
    auto* decoded = new Platform::SampleBuffer();
    std::string error;
-   if (!Platform::DecodeAudioFileToBuffer(path, *decoded, error))
+   // Turbo 0.49 (upstream): shared decode cache, so a reload (undo, paste, patch
+   // load) or several Samplers on one file decode it once.
+   if (!AudioDecodeCache::DecodeCached(path, *decoded, error))
    {
       delete decoded;
       mStatus = error.empty() ? "failed to load" : error;
@@ -783,6 +844,9 @@ void SamplerNode::FinishBuffer(Platform::SampleBuffer* decoded, const std::strin
 
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioSamplerNode>();
+   // Turbo 0.49: full-resolution peaks for the waveform view (all channels).
+   peaks.BuildFrom(*decoded);
+
    mAudioNode->PushBuffer(decoded);
 
    mFilePath = filePath;

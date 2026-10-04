@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -144,6 +145,18 @@ public:
    unsigned long long PointRevision() { return mRevision; }
    const std::vector<Particle>* GetPointCloud() override { return &mPoints; }
    unsigned long long PointCloudRevision() override { return mRevision; }
+   // Turbo 0.49 (upstream PointBaseSize): with relativePointSize on, Render3D
+   // sizes each sprite like its swatch quad (cell * 0.45, the same sizing
+   // RebuildMeshIfNeeded bakes), so pointSize 1 means "fills its grid cell".
+   // Off (default, and every older patch) keeps the absolute radius.
+   float PointBaseSize() const override
+   {
+      if (!relativePointSize)
+         return 1.0f;
+      const int n = std::max(2, std::min(density, 512));
+      const float cell = std::min(width, height) / (float)n;
+      return cell * 0.45f;
+   }
 
    // IGeometrySource: a swatch quad per point, each sampling its own texel of
    // the downsampled source image rather than the whole image tiled per-quad
@@ -177,6 +190,7 @@ public:
    bool useImageColor = true;
    float tint[3] = { 1.0f, 1.0f, 1.0f };
    float sizeFromLuma = 0.0f;
+   bool relativePointSize = false; // Turbo 0.49: see PointBaseSize()
 
    void VisitParams(ParamVisitor& v) override
    {
@@ -186,6 +200,7 @@ public:
       v.Float("pointSize", pointSize); v.Float("threshold", threshold);
       v.Bool("useImageColor", useImageColor); v.Color("tint", tint);
       v.Float("sizeFromLuma", sizeFromLuma);
+      v.Bool("relativePointSize", relativePointSize); // Turbo 0.49: appended last
    }
 
 private:

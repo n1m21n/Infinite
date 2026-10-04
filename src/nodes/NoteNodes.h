@@ -684,6 +684,11 @@ public:
    int maxStep = 4; // semitones, max wander per step
    bool useGlobalScale = true; // follow Transport key/scale by default
    float groove = 0.0f; // Turbo 0.48: 0..1 swing, delays every odd step by groove * 0.5 * rateBeats
+   // Turbo 0.49: note-picking algorithm. 0 = walk (prev note + random offset up to
+   // `wander`, snapped to scale; the pre-0.49 behaviour, so old patches play the same),
+   // 1 = melodic (upstream's constrained melodic walk, NoteTheory::PickMelodyNote,
+   // with bar/beat accent velocities).
+   int style = 0;
 
    int LastNote() const; // main-thread readout for the visualizer
 

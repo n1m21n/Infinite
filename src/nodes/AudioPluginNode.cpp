@@ -48,7 +48,33 @@ public:
    void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& output) override
    {
       const AudioBuffer* in = (numInputs > 0) ? inputs[0] : nullptr;
-      Platform::PluginHandle* handle = mHandle.load(std::memory_order_acquire);
+      // Turbo 0.49: hold the handle for the whole block (MIDI writes and the
+      // render). Enter, then re-check it is still published: the main thread
+      // unpublishes before Prepare / Destroy and then waits for no user, so
+      // either we see the nullptr here or it sees us and waits. A handle in
+      // the middle of a prepare (renderEnabled false) is skipped too, since
+      // its MidiBuffer is being reset on the main thread.
+      Platform::PluginHandle* handle = mHandle.load(std::memory_order_seq_cst);
+      struct HandleUse
+      {
+         Platform::PluginHandle* h = nullptr;
+         ~HandleUse()
+         {
+            if (h != nullptr)
+               Platform::PluginAudioExit(h);
+         }
+      } use;
+      if (handle != nullptr)
+      {
+         Platform::PluginAudioEnter(handle);
+         if (mHandle.load(std::memory_order_seq_cst) != handle || !Platform::PluginAudioEnabled(handle))
+         {
+            Platform::PluginAudioExit(handle);
+            handle = nullptr;
+         }
+         else
+            use.h = handle;
+      }
       const bool bypassed = mBypass.load(std::memory_order_relaxed);
 
       // A fresh handle (new plugin published, or handle gone to nullptr) means
@@ -167,7 +193,7 @@ public:
    }
 
    // Main thread only.
-   void SetHandle(Platform::PluginHandle* handle) { mHandle.store(handle, std::memory_order_release); }
+   void SetHandle(Platform::PluginHandle* handle) { mHandle.store(handle, std::memory_order_seq_cst); }
    void SetBypass(bool bypass) { mBypass.store(bypass, std::memory_order_relaxed); }
    double SampleRate() const { return mSampleRate.load(std::memory_order_relaxed); }
    int MaxBlockSize() const { return mMaxBlockSize.load(std::memory_order_relaxed); }

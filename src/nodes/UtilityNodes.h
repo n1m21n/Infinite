@@ -166,6 +166,7 @@ public:
       return input ? input->SurfaceTextureRevision() : 0;
    }
 
+   float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; } // Turbo 0.49
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }
@@ -211,6 +212,7 @@ public:
       return input ? input->GetMappingTransform() : MappingTransform();
    }
 
+   float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; } // Turbo 0.49
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* PassthroughSource() const override { return input; }
    IGeometrySource* input = nullptr;
@@ -352,6 +354,7 @@ public:
    }
    MappingTransform GetMappingTransform() const override;
 
+   float PointBaseSize() const override { return input ? input->PointBaseSize() : 1.0f; } // Turbo 0.49
    INode* BypassSource() override { return dynamic_cast<INode*>(input); }
    IGeometrySource* input = nullptr;
    IGeometrySource** GeometryInputSlot(int slot) override { return slot == 0 ? &input : nullptr; }

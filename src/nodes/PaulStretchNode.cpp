@@ -762,6 +762,7 @@ void PaulStretchNode::FinishBuffer(Platform::SampleBuffer* decoded, const std::s
          waveformMax[b] = mx;
       }
    }
+   peaks.BuildFrom(*decoded); // Turbo 0.49
 
    mAudioNode->PushBuffer(decoded);
 }

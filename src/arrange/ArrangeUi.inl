@@ -2371,6 +2371,23 @@ void DrawArrangeClipSettingsWindow()
       if (ImGui::SliderFloat("pan", &c->pan, -1.0f, 1.0f, "%.2f"))
          gArrange.revision++;
       ArrangeTrackGesture();
+      // Turbo 0.49 (upstream): per-clip pitch for a Sampler (or Analog) clip, added
+      // to the node's own pitch while this clip plays (AudioNode::SetClipPitchOverride).
+      // Sample clips have their own pitch control in the "sample" section below.
+      if (!ArrangeClipIsAudioSample(*c))
+         if (GraphNode* psrc = FindNodeByUid(c->srcUid))
+            if (dynamic_cast<SamplerNode*>(psrc->node.get()) != nullptr ||
+                dynamic_cast<AnalogNode*>(psrc->node.get()) != nullptr)
+            {
+               if (ImGui::SliderFloat("pitch (st)##clippitch", &c->pitch, -24.0f, 24.0f, "%+.1f st"))
+               {
+                  c->pitch = std::clamp(c->pitch, -24.0f, 24.0f);
+                  gArrange.revision++;
+               }
+               ArrangeTrackGesture();
+               if (ImGui::IsItemHovered())
+                  ImGui::SetTooltip("added to the node's own pitch while this clip plays");
+            }
    }
    else
    {
