@@ -183,6 +183,10 @@ struct AudioTerminal
    // terminal still writes its own capture ring, so a recording is unchanged.
    bool mixToDevice = true;
 
+   // A live-monitoring Audio Out: skipped by terminal-level delay compensation, so it is neither
+   // delayed to match a slower terminal nor counted when finding the slowest one.
+   bool live = false;
+
    // Arrangement Timeline clip scheduling. `numWindows > 0` marks this as a
    // timeline terminal: [windowOffset, windowOffset + numWindows) indexes
    // AudioTopology::clipWindows, sorted by startBeat and non-overlapping (one
