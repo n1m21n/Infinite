@@ -1,6 +1,6 @@
 ---
 name: shortcuts-sweep
-description: "Static cross-check of every keyboard shortcut: each help-window row has a handler, no undocumented bindings, no handler gated on Cmd alone. Use for \"do the shortcuts work\", after adding/changing a key binding or the shortcuts window, or when a key does nothing on Windows/Linux."
+description: "Static cross-check of every keyboard shortcut against the help window. Use for \"do the shortcuts work\", after changing a key binding, or when a key does nothing on Windows/Linux."
 ---
 
 ## When to use (full scope)

@@ -1,6 +1,6 @@
 ---
 name: codebase-navigation
-description: "How to search Infinite completely: trace an interface to every implementer and hand-maintained registration site, check every platform path, use the hotspot map. Use at the start of ANY investigation, sweep or plan touching src/, before claiming \"the code does X\". Add new wiring hotspots to it."
+description: "How to search Infinite completely: every implementer, registration site and platform path, plus the hotspot map. Use at the start of ANY investigation, sweep or plan touching src/."
 ---
 
 ## When to use (full scope)

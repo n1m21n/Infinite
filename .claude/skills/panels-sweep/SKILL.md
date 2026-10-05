@@ -1,6 +1,6 @@
 ---
 name: panels-sweep
-description: "Docked-panel regression sweep: modulation matrix (rows, scroll, all four docks, round trip), performance matrix, browser sort/filter, viewport cards. Use after changing any panel, dock layout, browser controls or macro types; when rows are blank/misaligned or a panel breaks in one dock; before a release."
+description: "Docked-panel sweep: modulation and performance matrices, browser, viewport cards. Use after changing a panel, dock layout or browser, when rows are blank/misaligned, or before a release."
 ---
 
 ## When to use (full scope)

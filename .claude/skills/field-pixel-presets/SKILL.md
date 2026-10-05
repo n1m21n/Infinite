@@ -1,6 +1,6 @@
 ---
 name: field-pixel-presets
-description: "Writing Field Pixel presets (FieldPixelNode::Presets()): reserved names, aspect correction, the metaball/SDF falloff trap, buildable shapes. Use BEFORE adding/editing/debugging a Field Pixel preset, or when one looks stretched, flat, or like a blob that won't blend."
+description: "Writing Field Pixel presets: reserved names, aspect correction, the SDF falloff trap. Use before adding or debugging one, or when it looks stretched, flat, or blobs won't blend."
 ---
 
 ## When to use (full scope)
@@ -205,7 +205,7 @@ pixel's own `uv`.** `col`/`src` are computed once, up front, as
 `texture(fld_srcTex, vUv)` (`GlslBackend.cpp:683`) - a fixed sample, not a
 function. There is no `Call`-kind handling anywhere in `GlslBackend.cpp` for
 an image name (only `state` names get that, via the `A(coord)` offset-read
-added in build step 22 - see `field-language`'s offset-reads section). So a
+added in build step 22 - see `field-language/references/simulation-reads.md`). So a
 kernel cannot say "sample the input image shifted by `(dx, dy)`" to translate,
 warp, or reposition it.
 

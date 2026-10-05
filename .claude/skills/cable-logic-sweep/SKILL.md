@@ -1,6 +1,6 @@
 ---
 name: cable-logic-sweep
-description: "Check connection rules: what can patch into what, what's refused, whether a node's pins are reachable; cross-checks main.cpp's four wiring chains statically. Use for \"can this connect to that\", \"why won't this cable attach\", after adding any node with an input, or when a link vanishes on save."
+description: "Connection rules: what can patch into what, and why a cable is refused. Use for \"why won't this cable attach\", after adding a node with inputs, or when a link vanishes on save."
 ---
 
 ## When to use (full scope)

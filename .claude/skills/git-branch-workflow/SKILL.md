@@ -1,6 +1,6 @@
 ---
 name: git-branch-workflow
-description: "Branch-per-feature workflow: feature/<slug> or bugfix/<slug> off main, commit per step with explicit git add, merge straight back to main (no PR). Use whenever a feature or fix starts (\"start work on X\") before writing code, and when work is ready to land."
+description: "Branch-per-feature: feature/ or bugfix/ off main, commit per step, merge straight back (no PR). Use when any feature or fix starts, before writing code, and when work is ready to land."
 ---
 
 ## When to use (full scope)

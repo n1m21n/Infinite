@@ -1,6 +1,6 @@
 ---
 name: node-ui-sweep
-description: "Node UI/UX regression sweep: pins, cable drag/draw, node drag vs pan, collapse, sizing, node viewports, in-node editors, groups, undo, copy/paste, browser drops, modulation reach. Use after changing node bodies, widgets, canvas, groups or undo; when a cable lands wrong or a node box jitters; or before a release."
+description: "Node UI/UX regression sweep (pins, cables, drag, groups, undo, copy/paste). Use after changing node bodies, widgets, canvas or undo, when a cable lands wrong, or before a release."
 ---
 
 ## When to use (full scope)

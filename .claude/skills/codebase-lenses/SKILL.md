@@ -1,6 +1,6 @@
 ---
 name: codebase-lenses
-description: "Split any request into seven concern lenses (Structure, Execution, Data & State, UI/UX, Platform, Performance, Correctness) to see which skills a change needs; Change mode and Deep-dive mode. Use before any non-trivial change or plan, for \"deep dive into X\", \"what does this touch\", or when triage/planner/cartographer picks skills."
+description: "Split a request into seven concern lenses to decide which skills it needs. Use before any non-trivial change or plan, or for \"deep dive into X\" / \"what does this touch\"."
 ---
 
 ## When to use (full scope)

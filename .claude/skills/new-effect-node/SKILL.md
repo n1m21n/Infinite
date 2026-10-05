@@ -1,6 +1,6 @@
 ---
 name: new-effect-node
-description: "Procedure for adding an Effects/Color node: FilterDef table entry vs C++ class, shared GLSL preamble, the caching trap, exit criterion. Use when implementing an image effect or colour-grading module, writing a prompt for one, or when a filter is black/frozen/doesn't animate or params don't reach the shader."
+description: "Procedure for adding an Effects/Color node (FilterDef pattern). Use when implementing an image effect or grade, or when a filter is black/frozen or params don't reach the shader."
 ---
 
 ## When to use (full scope)

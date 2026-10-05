@@ -1,6 +1,6 @@
 ---
 name: run-infinite-hygiene
-description: "Build, launch and drive Infinite's self-test harness on macOS before commit/push (undo, save/load, groups, macros, bypass, geometry, shading, audio sweeps, ROUNDTRIPTEST of every node), plus the efficient A/B and gate routes. Use for \"run the tests\", \"hygiene check\", \"pre-commit check\", \"verify the build\"."
+description: "Build, launch and drive Infinite's self-test harness, plus the A/B and gate routes. Use for \"run the tests\", \"hygiene check\", \"pre-commit check\" or \"verify the build\"."
 ---
 
 ## When to use (full scope)

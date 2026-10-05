@@ -1,6 +1,6 @@
 ---
 name: invariant-interaction-audit
-description: "When code establishes a guarantee (in scale, normalized, under budget), check every later control/branch/stage that could undo it, then grep for the same undo-shape in siblings. Use before shipping any invariant-adding fix, as a self-check after writing it, and when a \"we already fixed this\" bug returns."
+description: "When a fix establishes a guarantee, check every later control or call site that could undo it. Use before shipping an invariant-adding fix, or when a \"we already fixed this\" bug returns."
 ---
 
 ## When to use (full scope)

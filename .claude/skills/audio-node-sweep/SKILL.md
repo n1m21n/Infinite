@@ -1,6 +1,6 @@
 ---
 name: audio-node-sweep
-description: "Sweep every audio/note node for param save/load + audio-thread delivery (AUDIOPARAMSWEEPTEST) and mid-playback spawn/wire/delete safety (AUDIOTEARDOWNSWEEPTEST). Use after adding/touching an audio or note node, or when asked to \"sweep the audio nodes\" or \"does deleting an audio node crash\"."
+description: "Sweep every audio/note node for param save/load, audio-thread delivery and mid-playback delete safety. Use after touching an audio/note node, or for \"does deleting it crash\"."
 ---
 
 ## When to use (full scope)

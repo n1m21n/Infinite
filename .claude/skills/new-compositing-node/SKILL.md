@@ -1,6 +1,6 @@
 ---
 name: new-compositing-node
-description: "Procedure for adding a Compositing node (multi-input or frame-persistent image node: Blend, Layer Stack, Feedback, Trails, ...): the four wiring chains, BypassSource rule, ping-pong cooking, exit criterion. Use when implementing one, or when a new image node has no input pins, ignores a cable, or breaks when bypassed."
+description: "Procedure for adding a multi-input or frame-persistent image node (Blend, Feedback, Trails). Use when implementing one, or when it has no input pins, ignores a cable, or breaks when bypassed."
 ---
 
 ## When to use (full scope)

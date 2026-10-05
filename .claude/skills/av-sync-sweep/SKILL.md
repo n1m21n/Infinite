@@ -1,6 +1,6 @@
 ---
 name: av-sync-sweep
-description: "Sweep exported-movie audio/video sync: drift, dropped frames, missing audio, wrong duration, speed/reverse, PDC smear, recorder teardown. Use after touching OutputNode recording, readback, recorder/muxer, decoder, playback speed or PDC, when export sound lags/leads picture, or before a release that ships export."
+description: "Exported-movie audio/video sync sweep (drift, dropped frames, missing audio). Use after touching recording, muxer, decoder or PDC, when export sound lags picture, or before a release."
 ---
 
 ## When to use (full scope)

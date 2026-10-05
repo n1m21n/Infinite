@@ -1,6 +1,6 @@
 ---
 name: node-param-audit
-description: "Regenerate docs/node_param_audit.md: every node's on-screen controls and whether each is modulatable (registers a ParamRef). Use for \"can this param be modulated\", \"what params does node X have\", after changing any Draw*Body/Draw*Params, or before claiming everything is modulatable."
+description: "Regenerate docs/node_param_audit.md (which controls are modulatable). Use for \"can this param be modulated\", \"what params does node X have\", or after changing any Draw*Body/Draw*Params."
 ---
 
 ## When to use (full scope)

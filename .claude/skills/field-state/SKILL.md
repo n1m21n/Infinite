@@ -1,6 +1,6 @@
 ---
 name: field-state
-description: "Field `state` cells: delay-sugar semantics, cycle-needs-a-delay rule, reset on seek/loop/stop, patch serialization, hot-reload transplant, per-domain memory cost, pixel ping-pong. Use when writing/reviewing/lowering `state`, filters/feedback/smoothers, or wrong tails/resets after reload."
+description: "Field `state` cells: delay semantics, reset on seek/loop, serialization, hot-reload. Use when writing filters, feedback or smoothers, or for wrong tails/resets after reload."
 ---
 
 ## When to use (full scope)
