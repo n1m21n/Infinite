@@ -56507,6 +56507,129 @@ static bool RunDrumSequencerFixture()
       ok &= reloadTrimOk;
    }
 
+   // 15) 32 steps: only step 20 set. At 120 BPM 1/16 a step is 6000 frames @48k,
+   // so the first hit lands at 20*6000 = 120000 (+-1) and the pattern repeats
+   // every 32*6000 = 192000 frames.
+   {
+      resetTransport();
+      auto node = makeNode(shortClickPath);
+      node->numSteps = 32;
+      node->stepVel[0][20] = 0.8f;
+      const int stepFrames = (int)std::lround(sampleRate * 0.125);
+      const int total = 32 * stepFrames + 22 * stepFrames;
+      const auto buf = Render(*node, total, blockSize, sampleRate);
+      // The click's own attack puts the threshold crossing a few dozen frames
+      // after the step boundary, so measure against step 0 of an identical node.
+      resetTransport();
+      auto refNode = makeNode(shortClickPath);
+      refNode->numSteps = 32;
+      refNode->stepVel[0][0] = 0.8f;
+      const auto refBuf = Render(*refNode, stepFrames * 4, blockSize, sampleRate);
+      const int refOnset = FindOnset(refBuf, 0);
+      const int onset1 = FindOnset(buf, 0);
+      const int onset2 = onset1 >= 0 ? FindOnset(buf, onset1 + stepFrames * 4) : -1;
+      const bool firstOk = onset1 >= 0 && refOnset >= 0 && std::abs((onset1 - refOnset) - 20 * stepFrames) <= 1;
+      const bool periodOk = onset2 >= 0 && std::abs((onset2 - onset1) - 32 * stepFrames) <= 1;
+      printf("DRUMSEQTEST 32-step timing %s (onset1=%d ref0=%d expected delta=%d onset2=%d period=%d expected=%d)\n",
+             (firstOk && periodOk) ? "OK" : "FAIL", onset1, refOnset, 20 * stepFrames, onset2, onset2 - onset1, 32 * stepFrames);
+      ok &= firstOk && periodOk;
+   }
+
+   // 16) Save/load round trip of step 31 (the last cell of page 2) and the
+   // step count; editPage is runtime-only and must not be saved.
+   {
+      auto src = std::make_unique<DrumSequencerNode>();
+      src->numSteps = 32;
+      src->stepVel[3][31] = 0.55f;
+      src->stepVel[0][8] = 0.9f;
+      src->editPage = 1;
+      std::vector<std::pair<std::string, std::string>> saved;
+      Patch::SaveParams(src.get(), saved);
+      bool pageSaved = false;
+      for (const auto& kv : saved)
+         if (kv.first.find("editPage") != std::string::npos || kv.first.find("page") != std::string::npos)
+            pageSaved = true;
+      auto dst = std::make_unique<DrumSequencerNode>();
+      Patch::LoadParams(dst.get(), saved);
+      const bool rtOk = dst->numSteps == 32 && std::fabs(dst->stepVel[3][31] - 0.55f) < 1e-4f &&
+                        std::fabs(dst->stepVel[0][8] - 0.9f) < 1e-4f && dst->editPage == 0 && !pageSaved;
+      // editPage clamp: 1 page when steps <= 16
+      dst->numSteps = 10;
+      dst->editPage = 1;
+      dst->CookIfNeeded(1);
+      const bool clampOk = dst->editPage == 0;
+      printf("DRUMSEQTEST 32-step save/load %s (rt=%d pageSaved=%d clamp=%d)\n", (rtOk && clampOk) ? "OK" : "FAIL",
+             rtOk, pageSaved, clampOk);
+      ok &= rtOk && clampOk;
+   }
+
+   // 17) Legacy 8-step patch: only the old keys (lane0_step0..7, steps=8)
+   // exist. Steps 8..31 must load as 0 and the render must be identical to a
+   // node built directly with the same 8 steps.
+   {
+      std::vector<std::pair<std::string, std::string>> legacy;
+      for (int st = 0; st < 8; st++)
+         if (st % 2 == 0)
+            legacy.push_back({ "f lane0_step" + std::to_string(st), "0.8" }); // Patch keys carry a type prefix
+      legacy.push_back({ "i rate", std::to_string((int)MusicTime::kSixteenth) });
+      legacy.push_back({ "i steps", "8" });
+      auto old = std::make_unique<DrumSequencerNode>();
+      Patch::LoadParams(old.get(), legacy);
+      bool tailZero = true;
+      for (int lane = 0; lane < DrumSequencerNode::kNumLanes; lane++)
+         for (int st = 8; st < DrumSequencerNode::kMaxSteps; st++)
+            if (old->stepVel[lane][st] != 0.0f)
+               tailZero = false;
+      old->LoadFileToLane(0, shortClickPath);
+
+      auto ref = makeNode(shortClickPath);
+      for (int st = 0; st < 8; st += 2)
+         ref->stepVel[0][st] = 0.8f;
+      resetTransport();
+      const auto a = Render(*old, sampleRate * 2, blockSize, sampleRate);
+      resetTransport();
+      const auto b = Render(*ref, sampleRate * 2, blockSize, sampleRate);
+      const bool same = a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin());
+      const bool legacyOk = tailZero && old->numSteps == 8 && same && FindOnset(a, 0) >= 0;
+      printf("DRUMSEQTEST legacy 8-step load %s (tailZero=%d identical=%d)\n", legacyOk ? "OK" : "FAIL", tailZero, same);
+      ok &= legacyOk;
+   }
+
+   // 18) Randomize / RandomizeLane / ClearPattern never leave a step set at or
+   // beyond numSteps (checked for 20 and 32), and do set something inside.
+   {
+      bool randOk = true;
+      for (int ns : { 20, 32 })
+      {
+         auto node = std::make_unique<DrumSequencerNode>();
+         node->numSteps = ns;
+         for (int lane = 0; lane < DrumSequencerNode::kNumLanes; lane++)
+            for (int st = 0; st < DrumSequencerNode::kMaxSteps; st++)
+               node->stepVel[lane][st] = 0.5f; // pre-dirty everything
+         node->Randomize();
+         bool inside = false, beyond = false;
+         for (int lane = 0; lane < DrumSequencerNode::kNumLanes; lane++)
+            for (int st = 0; st < DrumSequencerNode::kMaxSteps; st++)
+            {
+               if (st < ns && node->stepVel[lane][st] > 0.0f) inside = true;
+               if (st >= ns && node->stepVel[lane][st] != 0.0f) beyond = true;
+            }
+         for (int st = 0; st < DrumSequencerNode::kMaxSteps; st++)
+            node->stepVel[2][st] = 0.5f;
+         node->RandomizeLane(2);
+         for (int st = ns; st < DrumSequencerNode::kMaxSteps; st++)
+            if (node->stepVel[2][st] != 0.0f) beyond = true;
+         node->ClearPattern();
+         for (int lane = 0; lane < DrumSequencerNode::kNumLanes; lane++)
+            for (int st = 0; st < DrumSequencerNode::kMaxSteps; st++)
+               if (node->stepVel[lane][st] != 0.0f) beyond = true;
+         if (!inside || beyond)
+            randOk = false;
+      }
+      printf("DRUMSEQTEST randomize within numSteps %s\n", randOk ? "OK" : "FAIL");
+      ok &= randOk;
+   }
+
    remove(shortClickPath.c_str());
    remove(longClickPath.c_str());
 
