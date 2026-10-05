@@ -12,8 +12,8 @@ namespace Platform
    struct SampleBuffer;
 }
 
-// An 8-lane, 8-step drum machine, laid out as 8 lane cards (waveform +
-// per-lane transient/decay/pitch/volume/pan) above an 8x8 step grid. Each
+// An 8-lane, up-to-32-step drum machine, laid out as 8 lane cards (waveform +
+// per-lane transient/decay/pitch/volume/pan) above an 8-lane step grid (16 steps per page). Each
 // step carries only trigger + velocity; every other per-lane control now
 // shows on its own card rather than a single "selected lane" strip - see
 // docs/plans/audio/drum-sequencer-v2-prompt.md, which supersedes the
