@@ -517,6 +517,7 @@ void DrumSequencerNode::CookIfNeeded(int frameId)
    if (frameId == mLastCookFrame)
       return;
    mLastCookFrame = frameId;
+   editPage = std::clamp(editPage, 0, (std::clamp(numSteps, 1, kMaxSteps) - 1) / kEditPageSteps);
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioDrumSequencerNode>();
 
