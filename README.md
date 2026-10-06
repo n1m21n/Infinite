@@ -33,7 +33,7 @@ A unified node-based audiovisual modular workstation for **macOS**, **Windows**,
 
 ## Node Library Overview
 
-Infinite features **140+ modular node types**:
+Infinite features **290+ modular node types**:
 
 | Domain | Key Nodes |
 |---|---|
