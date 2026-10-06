@@ -25895,8 +25895,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    {
       if (!n->recordDirectory.empty())
          return n->recordDirectory;
-      const std::string home = AppPaths::HomeDir();
-      return home.empty() ? "." : home + "/Desktop";
+      return AppPaths::DesktopDir();
    }
 
    void DrawAudioOutBody(GraphNode& gn, AudioOutputNode* n)
@@ -34477,7 +34476,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       for (int n = 2; n < 1000; n++)
       {
          const std::string candidate = stem + " (" + std::to_string(n) + ")" + ext;
-         if (!std::filesystem::exists(candidate, ec) && !ArrangeRenderPathQueued(candidate, 0))
+         if (!std::filesystem::exists(AppPaths::FsPath(candidate), ec) && !ArrangeRenderPathQueued(candidate, 0))
             return candidate;
       }
       return path;
@@ -34522,8 +34521,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       std::string folder = gArrange.settings.renderFolder;
       if (folder.empty())
       {
-         const std::string home = AppPaths::HomeDir();
-         folder = home.empty() ? std::string(".") : home + "/Desktop";
+         folder = AppPaths::DesktopDir();
       }
       while (!folder.empty() && (folder.back() == '/' || folder.back() == '\\'))
          folder.pop_back();
@@ -34970,8 +34968,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                std::string folder = rset.renderFolder;
                if (folder.empty())
                {
-                  const std::string home = AppPaths::HomeDir();
-                  folder = home.empty() ? std::string(".") : home + "/Desktop";
+                  folder = AppPaths::DesktopDir();
                }
                while (!folder.empty() && (folder.back() == '/' || folder.back() == '\\'))
                   folder.pop_back();
@@ -34992,8 +34989,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                }
                if (rset.renderFolder.empty())
                {
-                  const std::string home = AppPaths::HomeDir();
-                  rset.renderFolder = home.empty() ? std::string(".") : home + "/Desktop";
+                  rset.renderFolder = AppPaths::DesktopDir();
                }
                ImGui::OpenPopup("##arrangeRenderPopup");
             }
@@ -35205,7 +35201,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                   ArrangeRenderJob job = buildJob();
                   std::error_code ec;
                   const bool collides =
-                     std::filesystem::exists(job.path, ec) || ArrangeRenderPathQueued(job.path, 0);
+                     std::filesystem::exists(AppPaths::FsPath(job.path), ec) || ArrangeRenderPathQueued(job.path, 0);
                   if (collides)
                   {
                      // Asking before the queue gets there, not while it runs:
@@ -45347,6 +45343,24 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       {
          ArrangeRenderFailJob(job, "no output path");
          return false;
+      }
+
+      // The folder is typed by hand and the default (Desktop) may not exist
+      // (redirected, renamed, a typo), so make it here: Media Foundation and
+      // fopen both fail on a missing parent with an opaque error. FsPath keeps
+      // a non-ASCII folder name intact on Windows.
+      {
+         std::error_code dirEc;
+         const std::filesystem::path parent = AppPaths::FsPath(job.path).parent_path();
+         if (!parent.empty() && !std::filesystem::is_directory(parent, dirEc))
+         {
+            std::filesystem::create_directories(parent, dirEc);
+            if (!std::filesystem::is_directory(parent, dirEc))
+            {
+               ArrangeRenderFailJob(job, "could not create the folder " + parent.u8string());
+               return false;
+            }
+         }
       }
 
       gArrangeRenderActiveJobId = job.id;
@@ -76083,10 +76097,7 @@ int main(int argc, char** argv)
 
    // Cocoa chdir's a bundled app to Contents/Resources, so a bare relative path
    // would silently write inside the .app. Default somewhere the user can find.
-   const std::string desktopDir = []() {
-      const std::string home = AppPaths::HomeDir();
-      return home.empty() ? std::string(".") : home + "/Desktop";
-   }();
+   const std::string desktopDir = AppPaths::DesktopDir();
 
    char exportPath[512] = "";
    snprintf(exportPath, sizeof(exportPath), "%s/infinite_output.png", desktopDir.c_str());
@@ -97557,19 +97568,11 @@ int main(int argc, char** argv)
             {
                if (n->exportImagePath.empty())
                {
-                  const std::string home = AppPaths::HomeDir();
-                  if (!home.empty())
-                     n->exportImagePath = home + "/Desktop/infinite_output." + (n->imageFormat == 1 ? "jpg" : "png");
-                  else
-                     n->exportImagePath = "infinite_output." + std::string(n->imageFormat == 1 ? "jpg" : "png");
+                  n->exportImagePath = AppPaths::DesktopDir() + "/infinite_output." + (n->imageFormat == 1 ? "jpg" : "png");
                }
                if (n->recordVideoPath.empty())
                {
-                  const std::string home = AppPaths::HomeDir();
-                  if (!home.empty())
-                     n->recordVideoPath = home + "/Desktop/infinite_output." + (n->videoFormat == 1 ? "mov" : "mp4");
-                  else
-                     n->recordVideoPath = "infinite_output." + std::string(n->videoFormat == 1 ? "mov" : "mp4");
+                  n->recordVideoPath = AppPaths::DesktopDir() + "/infinite_output." + (n->videoFormat == 1 ? "mov" : "mp4");
                }
 
                char imgBuf[512];

@@ -40,6 +40,7 @@
 #include <atomic>
 #include <memory>
 #include <chrono>
+#include <cctype>
 #include <cmath>
 #include <condition_variable>
 #include <cstring>
@@ -1701,9 +1702,26 @@ namespace Platform
       HRESULT CreateRecorderSinkWriter(const std::string& path, IMFSinkWriter** outWriter)
       {
          IMFAttributes* attrs = nullptr;
-         HRESULT hr = MFCreateAttributes(&attrs, 1);
+         HRESULT hr = MFCreateAttributes(&attrs, 2);
          if (SUCCEEDED(hr))
             hr = attrs->SetUINT32(MF_SINK_WRITER_DISABLE_THROTTLING, TRUE);
+         if (SUCCEEDED(hr))
+         {
+            // The sink writer picks its muxer from the file extension, and
+            // Media Foundation has no QuickTime muxer: a ".mov" URL fails with
+            // MF_E_UNSUPPORTED_BYTESTREAM_TYPE, so every Render with the .mov
+            // button on (timeline and Output node alike) died at start. Name
+            // the container explicitly instead. The H.264/AAC MPEG-4 file it
+            // writes is what QuickTime/Premiere/Resolve read as .mov too.
+            std::string lower = path;
+            for (char& c : lower)
+               c = (char)std::tolower((unsigned char)c);
+            const bool knownExt = lower.size() >= 4 &&
+                                  (lower.compare(lower.size() - 4, 4, ".mp4") == 0 ||
+                                   lower.compare(lower.size() - 4, 4, ".m4v") == 0);
+            if (!knownExt)
+               hr = attrs->SetGUID(MF_TRANSCODE_CONTAINERTYPE, MFTranscodeContainerType_MPEG4);
+         }
          if (SUCCEEDED(hr))
             hr = MFCreateSinkWriterFromURL(WinCommon::Utf8ToWide(path).c_str(), nullptr,
                                            attrs, outWriter);
