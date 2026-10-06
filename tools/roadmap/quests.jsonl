@@ -2192,3 +2192,11 @@
 {"ts": "2026-10-06T08:19:27+00:00", "event": "edit", "id": "R569", "commits": ["f4eac336"]}
 {"ts": "2026-10-06T08:19:32+00:00", "event": "add", "id": "R578", "track": "platform", "kind": "fix", "horizon": "now", "title": "Linux AppImage CI: appimagetool 'continuous' download no longer matches the pinned SHA256", "why": "Build run 37431393778: package-appimage.sh:273 pulls the moving 'continuous' release; pin a versioned release and its hash", "after": [], "user": false, "origin": "explore", "effort": "S"}
 {"ts": "2026-10-06T08:19:37+00:00", "event": "add", "id": "R579", "track": "engine", "kind": "fix", "horizon": "now", "title": "ASan job: AUDIOPARAMSWEEPTEST exits 1 on Linux (passes under macOS ASan)", "why": "Build run 37431393778; headless-tests.sh now prints the report, rerun CI to see it (R553)", "after": [], "user": false, "origin": "explore", "effort": "S"}
+{"ts": "2026-10-06T13:37:32+05:30", "event": "add", "id": "R580", "after": [], "user": false, "src": "merge:bugfix/ci-sweep-output", "track": "platform", "kind": "fix", "horizon": "later", "title": "Ci sweep output", "why": "merged into main (1d92bcb)", "origin": "merge"}
+{"ts": "2026-10-06T13:48:54+05:30", "event": "done", "id": "R580", "why": "merged into main (1d92bcb)"}
+{"ts": "2026-10-06T13:48:54+05:30", "event": "edit", "id": "R580", "opened": "2026-10-06T13:37:32+05:30", "closed": "2026-10-06T13:48:54+05:30", "release": "", "commits": ["1d92bcb"]}
+{"ts": "2026-10-06T13:51:00+05:30", "event": "add", "id": "R581", "after": [], "user": false, "src": "merge:bugfix/appimagetool-pin", "track": "platform", "kind": "fix", "horizon": "later", "title": "Appimagetool pin", "why": "merged into main (41a9f20)", "origin": "merge"}
+{"ts": "2026-10-06T13:51:01+05:30", "event": "done", "id": "R581", "why": "merged into main (41a9f20)"}
+{"ts": "2026-10-06T13:51:01+05:30", "event": "edit", "id": "R581", "opened": "2026-10-06T13:51:00+05:30", "closed": "2026-10-06T13:51:01+05:30", "release": "", "commits": ["41a9f20"]}
+{"ts": "2026-10-06T08:21:11+00:00", "event": "done", "id": "R578", "why": "appimagetool pinned to versioned 1.9.1 with its release digest; closes once CI packages an AppImage"}
+{"ts": "2026-10-06T08:21:11+00:00", "event": "edit", "id": "R578", "commits": ["d4f7120f"]}
