@@ -50316,7 +50316,10 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       const std::string exe = Platform::ExecutablePath();
       if (exe.empty())
          return {};
-      std::filesystem::path exeDir = std::filesystem::path(exe).parent_path();
+      // Platform::ExecutablePath is UTF-8 on every platform; u8path reads it as
+      // such (a plain path(std::string) on Windows would use the ANSI code page
+      // and miss Resources\ under a non-ASCII user or install folder).
+      std::filesystem::path exeDir = std::filesystem::u8path(exe).parent_path();
 #if defined(__APPLE__)
       // exe is at Contents/MacOS/Infinite -> Resources is a sibling of MacOS.
       std::filesystem::path resourceDir = exeDir.parent_path() / "Resources";
@@ -50328,7 +50331,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       std::error_code ec;
       if (!std::filesystem::exists(full, ec))
          return {};
-      return full.string();
+      return full.u8string(); // UTF-8 back out, same convention as ExecutablePath
    }
 
    static void SetWindowIcon(GLFWwindow* window)
@@ -56822,6 +56825,11 @@ static bool RunDrumSequencerFixture()
                bad(gr.name, "name matches artist/song denylist");
          if (!seen.insert(lower).second)
             bad(gr.name, "duplicate name");
+         // The UI font has Basic Latin only (anything else draws '?') and MSVC
+         // reads sources in the ANSI code page, so names must be plain ASCII.
+         for (const char* c = gr.name; *c; c++)
+            if ((unsigned char)*c < 0x20 || (unsigned char)*c > 0x7e)
+               bad(gr.name, "name is not printable ASCII");
          bool catOk = false;
          for (int c = 0; c < nCats; c++)
             catOk |= strcmp(cats[c], gr.category) == 0;
