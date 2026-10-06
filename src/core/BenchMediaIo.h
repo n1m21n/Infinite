@@ -78,6 +78,12 @@ namespace Bench
       // BGRA->RGBA flip for frames that get shown), Windows ReadNextVideoFrame (ReadSample + RGB32->RGBA flip),
       // Linux decodeOneFrame (avcodec + sws_scale + flip).
       SpscSampleRing decodeMs;
+      // The two halves of decodeMs on macOS (R554): pullMs is every
+      // copyNextSampleBuffer (the hardware/AVFoundation decode, shown or not),
+      // convertMs the BGRA->RGBA permute of frames that get shown. Other
+      // platforms leave them empty. The GL upload is MediaClipCounters::uploadCpuMs.
+      SpscSampleRing pullMs;
+      SpscSampleRing convertMs;
       // A request served from the decoded-frame cache instead of the decoder
       // (macOS TryUseCache, Linux TryUseCacheLocked). Windows has no cache.
       SpscSampleRing cacheHitMs;

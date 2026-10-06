@@ -94472,7 +94472,7 @@ int main(int argc, char** argv)
          {
             Bench::MediaClipCounters counters;
             size_t uploadSamples = 0;
-            uint64_t decodeSamples = 0, cacheSamples = 0, loopSamples = 0;
+            uint64_t decodeSamples = 0, cacheSamples = 0, loopSamples = 0, pullSamples = 0, convertSamples = 0;
             uint32_t decoded = 0, cacheHits = 0, dropped = 0, restarts = 0;
          };
          static std::vector<B8ClipStart> sClipStart;
@@ -94610,6 +94610,8 @@ int main(int argc, char** argv)
                   {
                      st.decodeSamples = ds->decodeMs.Count();
                      st.cacheSamples = ds->cacheHitMs.Count();
+                     st.pullSamples = ds->pullMs.Count();
+                     st.convertSamples = ds->convertMs.Count();
                      st.loopSamples = ds->loopDecodeMs.Count();
                      st.decoded = ds->decoded.load();
                      st.cacheHits = ds->cacheHits.load();
@@ -94755,11 +94757,15 @@ int main(int argc, char** argv)
                      const int decoded = (int)(ds->decoded.load() - st.decoded);
                      dropped = (int)(ds->dropped.load() - st.dropped);
                      decodedFps = (double)decoded / sampleSec;
-                     Bench::PercentileRing dec, hit, loopRing;
+                     Bench::PercentileRing dec, hit, loopRing, pull, conv;
+                     for (double v : ds->pullMs.SnapshotSince(st.pullSamples)) pull.Push(v);
+                     for (double v : ds->convertMs.SnapshotSince(st.convertSamples)) conv.Push(v);
                      for (double v : ds->decodeMs.SnapshotSince(st.decodeSamples)) dec.Push(v);
                      for (double v : ds->cacheHitMs.SnapshotSince(st.cacheSamples)) hit.Push(v);
                      for (double v : ds->loopDecodeMs.SnapshotSince(st.loopSamples)) loopRing.Push(v);
                      cj["decode_ms"] = p5099max(dec);
+                     cj["pull_ms"] = p5099max(pull);
+                     cj["convert_ms"] = p5099max(conv);
                      cj["cache_hit_ms"] = p5099max(hit);
                      cj["loop_decode_ms"] = p5099max(loopRing);
                      cj["decoded"] = decoded;
