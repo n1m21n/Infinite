@@ -2308,6 +2308,25 @@ namespace
    // ------------------------------------------------------------------------
    std::atomic<int> gWinOpenPluginEditorCount { 0 };
 
+   // Editors that draw with OpenGL on the UI thread (Antares Auto-Tune, some
+   // iZotope / NI UIs) call wglMakeCurrent for their own context while their
+   // window paints and do not put ours back. Every later GL call of the main
+   // window then lands in the plugin's context: Infinite stops updating (it
+   // looks frozen while audio keeps running) and the driver can hang on the
+   // next swap. Anything that can run plugin UI code on the UI thread saves
+   // the current WGL context and restores it afterwards. Found by the Turbo
+   // fork (PR #24).
+   struct GlContextKeeper
+   {
+      HDC dc = wglGetCurrentDC();
+      HGLRC rc = wglGetCurrentContext();
+      ~GlContextKeeper()
+      {
+         if (wglGetCurrentContext() != rc || wglGetCurrentDC() != dc)
+            wglMakeCurrent(dc, rc);
+      }
+   };
+
    void SetPluginEditorOpenWin(Platform::PluginHandle* h, bool open)
    {
       if (h == nullptr || h->vst3 == nullptr)
@@ -3276,6 +3295,7 @@ namespace Platform
          return false;
       }
       PluginVST3State* v = h->vst3;
+      GlContextKeeper keepGl;
 
       EnsureOleInitializedOnThisThreadOnce();
 
@@ -3407,6 +3427,7 @@ namespace Platform
       if (h == nullptr || h->vst3 == nullptr || h->vst3->editorHwnd == nullptr)
          return;
       PluginVST3State* v = h->vst3;
+      GlContextKeeper keepGl;
 
       // Fully detach, not just hide: a merely-hidden window left the
       // plugin's view attached() and its GUI timer armed indefinitely.
@@ -3436,6 +3457,7 @@ namespace Platform
 
    bool PluginVST3PumpEditorEvents()
    {
+      GlContextKeeper keepGl;
       MSG msg;
       bool any = false;
       while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE))

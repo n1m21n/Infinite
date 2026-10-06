@@ -117,6 +117,8 @@ guessing at a fix has been wrong every time it was tried.
   non-standard part and the direct cause of this whole crash class. Do not
   "optimise" it back onto a background queue.
 
+- **GL context around plugin UI (Windows).** Plugin editors that draw with OpenGL (Auto-Tune) leave their own WGL context current; the main window then stops updating. `GlContextKeeper` in `PluginVST3Win.cpp` saves/restores the context around open-editor, close-editor and the event pump. Any new Windows path that can run plugin UI code on the UI thread needs it too.
+
 **Tier 2, shipped:** `RunPluginCallGuarded()`
 (`src/platform/PluginVST3.mm:2135`) — `sigsetjmp`/`siglongjmp` with a
 `SIGSEGV`/`SIGBUS`/`SIGILL` handler, wrapping exactly two call groups:
