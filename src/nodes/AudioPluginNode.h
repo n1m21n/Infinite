@@ -170,6 +170,7 @@ private:
    // (AcceptsNotes) and never changes without a different plugin being
    // loaded, so it's cheap to cache rather than re-derive every frame.
    bool mAcceptsNotes = false;
+   int mMapSlotsParam = 0; // VisitParams scratch for map_slots; a member so retaining visitors never hold a dead stack address
 
    Platform::PluginHandle* mHandle = nullptr;  // the one being loaded / live
    Platform::PluginHandle* mLive = nullptr;    // currently published

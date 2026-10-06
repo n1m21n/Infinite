@@ -758,9 +758,9 @@ void AudioPluginNode::VisitParams(ParamVisitor& v)
    // first so the load side knows how many to read back. Trailing empty slots
    // carry no information and 32 x 6 unconditional keys per node would bloat
    // every patch that has a plugin in it.
-   int slotCount = HighestAssignedSlot() + 1;
-   v.Int("map_slots", slotCount);
-   slotCount = std::clamp(slotCount, 0, kMaxMappedParams);
+   mMapSlotsParam = HighestAssignedSlot() + 1;
+   v.Int("map_slots", mMapSlotsParam);
+   const int slotCount = std::clamp(mMapSlotsParam, 0, kMaxMappedParams);
 
    char name[32];
    for (int i = 0; i < slotCount; i++)
