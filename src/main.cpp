@@ -3704,6 +3704,18 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       }
    }
 
+   // Pins and mod dots are drawn small but hit-tested at >= 20 pt (R572). The
+   // rect grows up/down and away from the control (left), never rightwards:
+   // the widget the pin belongs to starts a few px past the box, and a rect
+   // overlapping it would turn the widget's first pixels into a link drag.
+   // Call between ed::BeginPin and ed::EndPin.
+   inline void ExpandPinHit(const ImVec2& c, float boxRight)
+   {
+      const float kMin = 20.0f;
+      ed::PinRect(ImVec2(std::min(c.x - kMin * 0.5f, boxRight - kMin), c.y - kMin * 0.5f),
+                  ImVec2(boxRight, c.y + kMin * 0.5f));
+   }
+
    // Same pin id scheme, colours and gParamPinScreenList entry as ModSlider's
    // pin - that list is what the performance matrix's "Assign Parameter" picker
    // hit-tests, so registering here is what makes a mode or a checkbox
@@ -3740,6 +3752,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       dl->AddCircle(c, h.modulated ? 4.0f : 4.5f, pinColor, 12, 2.0f);
       if (h.modulated)
          dl->AddCircleFilled(c, 2.0f, pinColor);
+      ExpandPinHit(c, p.x + box);
       ed::EndPin();
 
       GraphNode* curGn = FindNodeByIndex(h.nodeIndex);
@@ -4176,6 +4189,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             : isLight ? IM_COL32(170, 175, 190, 255) : IM_COL32(70, 75, 90, 255);
       dl->AddCircleFilled(c, 4.0f, pinColor);
       dl->AddCircle(c, 4.0f, isLight ? IM_COL32(110, 115, 130, 255) : IM_COL32(30, 32, 40, 255), 16, 1.0f);
+      ExpandPinHit(c, p.x + box);
       ed::EndPin();
       GraphNode* curGn = FindNodeByIndex(nodeIndex);
       // rowMin starts after the pin box + its SameLine gap, not at the pin
@@ -5591,6 +5605,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          dl->AddCircle(c, modulated || hasExpr ? 4.0f : 4.5f, pinColor, 12, 2.0f);
          if (modulated || hasExpr)
             dl->AddCircleFilled(c, 2.0f, pinColor);
+         ExpandPinHit(c, pinTL.x + box);
          ed::EndPin();
          GraphNode* curGn = FindNodeByIndex(nodeIndex);
          ParamPinScreenInfo pinInfo{ nodeIndex, paramIndex, curGn ? curGn->typeName : "", label ? label : "", c,
@@ -5690,6 +5705,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       dl->AddRectFilled(ImVec2(c.x - 4.0f, c.y - 4.0f), ImVec2(c.x + 4.0f, c.y + 4.0f),
                         isBound ? IM_COL32(130, 220, 190, 255) : IM_COL32(95, 100, 120, 255),
                         1.0f);
+      ExpandPinHit(c, p.x + box);
       ed::EndPin();
       ImGui::SameLine(0.0f, 4.0f);
 
