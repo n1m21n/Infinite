@@ -57096,6 +57096,31 @@ static bool RunDrumSequencerFixture()
       ok &= rtOk;
    }
 
+   // 25) The kit that actually ships: BundledResourcePath resolves it next to
+   // the running binary (Contents/Resources on macOS, Resources/ beside the
+   // exe on Windows and Linux), all eight KitFile() names exist with that exact
+   // case (Linux is case-sensitive) and decode, and every lane fills.
+   {
+      const std::string real = BundledResourcePath("drumkits/infinite-basic");
+      bool realOk = !real.empty();
+      int filled = 0;
+      if (realOk)
+      {
+         DrumSequencerNode::SetKitDir(real);
+         auto node = std::make_unique<DrumSequencerNode>();
+         const DrumPatterns::Groove& g0 = DrumPatterns::All(nG)[0];
+         DrumPatterns::Part full = g0.parts[0];
+         for (int l = 0; l < 8; l++)
+            full.lanes[l] = "X";
+         node->LoadKitIntoEmptyLanes(full);
+         filled = node->LoadedLaneCount();
+         realOk = filled == 8 && node->laneChoke[2] == 1 && node->laneChoke[3] == 1;
+      }
+      printf("DRUMSEQTEST bundled kit %s (dir=%s filled=%d/8)\n", realOk ? "OK" : "FAIL", real.empty() ? "<not found>" : real.c_str(),
+             filled);
+      ok &= realOk;
+   }
+
    DrumSequencerNode::SetKitDir(savedKitDir);
    {
       std::error_code ec;
