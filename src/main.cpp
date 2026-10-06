@@ -17600,6 +17600,41 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       }
    }
 
+   // Compact segmented pill: equal cells, 1px apart, frame-height tall (the same
+   // height as every other strip button). Cell width fits the widest label with
+   // the bundled font at the current UI scale, never below minW. Returns the
+   // clicked cell or -1. markCell draws the playhead dot on that cell.
+   float DrumPillCellW(const char* const* labels, int count, float minW)
+   {
+      float w = minW;
+      for (int i = 0; i < count; i++)
+         w = std::max(w, ImGui::CalcTextSize(labels[i]).x + ImGui::GetStyle().FramePadding.x * 2.0f + 4.0f);
+      return std::ceil(w);
+   }
+
+   int DrumSegmentedPill(const char* id, const char* const* labels, int count, int selected, float cellW, int markCell = -1)
+   {
+      int clicked = -1;
+      for (int i = 0; i < count; i++)
+      {
+         if (i > 0)
+            ImGui::SameLine(0.0f, 1.0f);
+         bool on = (selected == i);
+         char lbl[48];
+         snprintf(lbl, sizeof(lbl), "%s##%s%d", labels[i], id, i);
+         if (AudioToggleButton(lbl, &on, cellW))
+            clicked = i;
+         if (i == markCell)
+         {
+            const ImVec2 bmin = ImGui::GetItemRectMin();
+            const ImVec2 bmax = ImGui::GetItemRectMax();
+            ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(bmax.x - 5.0f, bmin.y + 5.0f), 2.5f,
+                                                        IM_COL32(255, 200, 100, 255));
+         }
+      }
+      return clicked;
+   }
+
    void DrawDrumSequencerBody(GraphNode& gn, DrumSequencerNode* n)
    {
       const DrumGrooveLists& gl = DrumGrooves();
@@ -17644,19 +17679,25 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       }
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
 
-      // ---- groove picker: two full-width strips on one 3-cell grid, so the
-      // category / groove / prev-next cells sit directly over A / B / C.
-      // Applying a groove replaces the pattern, rate, swing and step count and
-      // fills empty lanes from the bundled kit (one undo step).
+      // ---- groove picker: ONE row. category | groove | < > | A B C pill.
+      // The dropdowns share the remaining width, the nav buttons and the part
+      // pill cells share one cell width, so the row spans the node edge to
+      // edge. Applying a groove replaces the pattern, rate, swing and step
+      // count and fills empty lanes from the bundled kit (one undo step).
       {
          const float gap = ImGui::GetStyle().ItemSpacing.x;
-         const float cellW = (AudioFullWidth() - gap * 2.0f) / 3.0f;
-         const float navW = (cellW - gap) * 0.5f;
+         static const char* const kParts[3] = { "A", "B", "C" };
+         const float pcw = DrumPillCellW(kParts, 3, 24.0f);
+         const float pillW = pcw * 3.0f + 2.0f;
+         const float navW = pcw;
+         const float dropW = AudioFullWidth() - pillW - navW * 2.0f - gap * 4.0f;
+         const float catW = std::floor(dropW * 0.34f);
+         const float grvW = dropW - catW;
          const int curCat = grooveIdx >= 0 ? gl.IndexOfCategory(gl.cats[(size_t)grooveIdx]) : -1;
          const int part = std::clamp(n->patternPart, 0, 2);
 
          DrumPickerDropdown("drumcat", curCat >= 0 ? gl.catNames[(size_t)curCat].c_str() : "category", gl.catNames, {}, curCat,
-                            cellW,
+                            catW,
                             [n, part](int c) {
                                const DrumGrooveLists& l = DrumGrooves();
                                if (c >= 0 && c < (int)l.catFirst.size() && l.catFirst[(size_t)c] >= 0)
@@ -17665,7 +17706,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                             /*focusSearch=*/false);
          ImGui::SameLine();
          DrumPickerDropdown("drumgroove", grooveIdx >= 0 ? gl.names[(size_t)grooveIdx].c_str() : "pick a groove", gl.names, gl.cats,
-                            grooveIdx, cellW, [n, part](int i) { ApplyDrumGroove(n, i, part); }, /*focusSearch=*/true);
+                            grooveIdx, grvW, [n, part](int i) { ApplyDrumGroove(n, i, part); }, /*focusSearch=*/true);
          ImGui::SameLine();
          const bool prev = ImGui::Button("<##drumgrvprev", ImVec2(navW, 0));
          ImGui::SameLine();
@@ -17676,20 +17717,13 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                                              : (grooveIdx + (next ? 1 : gl.count - 1)) % gl.count;
             ApplyDrumGroove(n, target, part);
          }
-
+         ImGui::SameLine();
          // Parts: greyed out until a groove has been picked (nothing to switch).
          if (grooveIdx < 0)
             ImGui::BeginDisabled();
-         for (int p = 0; p < 3; p++)
-         {
-            if (p > 0)
-               ImGui::SameLine();
-            bool on = (grooveIdx >= 0 && part == p);
-            char lbl[32];
-            snprintf(lbl, sizeof(lbl), "%c##drumpart%d", 'A' + p, p);
-            if (AudioToggleButton(lbl, &on, cellW) && grooveIdx >= 0)
-               ApplyDrumGroove(n, grooveIdx, p);
-         }
+         const int pc = DrumSegmentedPill("drumpart", kParts, 3, grooveIdx >= 0 ? part : -1, pcw);
+         if (pc >= 0 && grooveIdx >= 0)
+            ApplyDrumGroove(n, grooveIdx, pc);
          if (grooveIdx < 0)
             ImGui::EndDisabled();
       }
@@ -17838,34 +17872,26 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             ImVec2(origin.x, origin.y + (float)DrumSequencerNode::kNumLanes * (rowH + rowGap) + 4.0f));
          ImGui::Dummy(ImVec2(gAudioBodyW, 1.0f));
 
-         // ---- page toggle: full-width strip, equal cells (same btnW
-         // arithmetic as the Run/Randomise/Clear strip). Greyed out, never
-         // hidden, at <= 16 steps so the body doesn't change height.
+         // ---- grid stat line: left readout, compact '1-16 | 17-32' pill
+         // right-aligned. Always drawn (greyed via BeginDisabled at <= 16
+         // steps) so the node never changes height; same frame height as the
+         // other strip buttons. The dot marks the page the playhead is on.
          {
-            const float gap = ImGui::GetStyle().ItemSpacing.x;
-            const float btnW = (AudioFullWidth() - gap) / 2.0f;
+            static const char* const kPages[2] = { "1-16", "17-32" };
+            const float pgw = DrumPillCellW(kPages, 2, 24.0f);
+            const float pillW = pgw * 2.0f + 1.0f;
             const bool paged = steps > pageSteps;
             const int playPage = (n->run && paged) ? curStep / pageSteps : -1;
+            const float startX = ImGui::GetCursorPosX();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("%d steps - %s", steps, MusicTime::RateDivisionName(n->rate));
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(startX + AudioFullWidth() - pillW);
             if (!paged)
                ImGui::BeginDisabled();
-            for (int pg = 0; pg < 2; pg++)
-            {
-               if (pg > 0)
-                  ImGui::SameLine();
-               bool on = (page == pg);
-               char lbl[32];
-               snprintf(lbl, sizeof(lbl), pg == 0 ? "1-16##drumpage0" : "17-32##drumpage1");
-               if (AudioToggleButton(lbl, &on, btnW))
-                  n->editPage = pg;
-               if (pg == playPage)
-               {
-                  // playhead marker: small dot in the button's top-right corner
-                  const ImVec2 bmax = ImGui::GetItemRectMax();
-                  const ImVec2 bmin = ImGui::GetItemRectMin();
-                  ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(bmax.x - 7.0f, bmin.y + 7.0f), 3.0f,
-                                                              IM_COL32(255, 200, 100, 255));
-               }
-            }
+            const int pc = DrumSegmentedPill("drumpage", kPages, 2, page, pgw, playPage);
+            if (pc >= 0)
+               n->editPage = pc;
             if (!paged)
                ImGui::EndDisabled();
          }
@@ -41782,7 +41808,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Slicer", "Chops a sample into slices and maps them chromatically to the keyboard from MIDI note 36 upward - note 36 plays slice 1, 37 plays slice 2, and so on. A note past the last slice is silent; it does not wrap round to slice 1. Load a file (or drag one in from the Samples panel), or record from the audio input pin. slice by picks where the boundaries come from: onsets runs transient detection over the sample on a background thread, grid divides it arithmetically at the *global transport tempo* (there is no per-node bpm - change the tempo and the grid follows). sensitivity is the detection threshold and is the only control that re-runs the analysis; onsets just caps the result to the strongest N, and division/slice by recompute boundaries instantly. Click a slice band in the waveform to audition it, and in onsets mode drag any marker to move a boundary by hand - hand-edited markers are saved with the patch. Two separate controls decide how long a slice lasts: crossthrough sets whether playback may run PAST the slice's own next onset (off by default - each slice stops where the next begins), while decay shapes only the amplitude envelope, reading 'hold' at the top of its throw where the slice stays at full level. So: crossthrough off + hold is the classic tight chop; crossthrough off + a decay ends at whichever comes first; crossthrough on + hold plays through the rest of the sample; crossthrough on + a decay is a one-shot with a tail over the rest of the break. attack extends each slice's own fade-in from instant up to half a second." },
          { "Molder", "Analysis/genome resynthesis: decomposes a loaded or recorded sample into tracked harmonic partials plus a real residual waveform, then Roll mutates a parameter genome and re-renders a new sample from it - each roll walks further from the last, not from the original. Iterate feeds the last render back in as the new source and re-analyses it (progressively eating the sound); Reset returns fully to the originally loaded/recorded sample - generation 0 and the six shaping knobs (tone/air/snap/stretch/time/pitch) back to neutral, and the analysis itself restored, undoing any Iterate. chaos sets how far the next roll jumps; pitch offsets on top of the genome's own pitch walk; tone balances partials against residual; air/snap are the residual's steady-hiss and transient-attack levels; stretch scales inharmonicity together with harmonic spacing; time warps the attack/decay timing without changing the sample's length. This is a sound designer, not a playable instrument - it takes no note input, only a single self-triggered voice with start/end range, loop, reverse and ping-pong, the same transport as Sampler. Analysis and rendering both run on a background thread, so rolling never stalls the UI. seed/gen/f0/harm in the readout are the exact genome (seed + generation count) and the analysed pitch - two integers are enough to reproduce any rolled sound exactly on reload." },
          { "Grain Molder", "Slices audio into overlapping grains, calculates per-grain metrics (Level, Brightness, Random), and rearranges them based on a continuous blend between original temporal position and metric rank. At amount 0 it is the clean identity passthrough; at 1 it is fully sorted into a swell or brightness contour. Rendering runs asynchronously on a worker thread." },
-         { "Drum Sequencer", "An 8-lane, up-to-32-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8-lane step grid that shows 16 steps at a time (the 1-16 / 17-32 strip under it switches pages once steps goes past 16; a dot marks the page the playhead is on). Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. Between the lane cards and the grid, the groove picker holds a built-in library of 141 grooves in 10 categories: pick a category (jumps to its first groove) or a groove (the list is grouped and has a filter box), step through with < and >, and switch the groove's A verse / B bridge / C chorus part with the three buttons; picking replaces the pattern, rate, swing and step count in one undo step and fills any empty lane from the bundled kit (a lane you loaded yourself is never touched). The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
+         { "Drum Sequencer", "An 8-lane, up-to-32-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8-lane step grid that shows 16 steps at a time (the small 1-16 | 17-32 pill at the right of the line under it switches pages once steps goes past 16 - greyed out until then; a dot marks the page the playhead is on). Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. Between the lane cards and the grid, the groove picker holds a built-in library of 141 grooves in 10 categories: pick a category (jumps to its first groove) or a groove (the list is grouped and has a filter box), step through with < and >, and switch the groove's A verse / B bridge / C chorus part with the small A B C pill at the end of the row; picking replaces the pattern, rate, swing and step count in one undo step and fills any empty lane from the bundled kit (a lane you loaded yourself is never touched). The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
          { "MPC", "How to use: wire the out into Audio Out, drop audio files onto the pads (or click an empty pad, or Load... / Folder... for the first 16 files of a folder), then click a pad or send notes into the notes input - notes 36 to 51 play pads 1 to 16. A 16-pad sample player: pad 1 is bottom-left like a hardware MPC, every pad is a square tile showing its waveform, number and mode, and each pad has its own CV pin, so a MIDI CC / Note modulator or any gate can play it. Every pad is its own voice, so pads play together, and a click plays at once. A hit follows the pad's mode: one shot plays the whole sample and a new hit restarts it; gate plays while held (mouse down, CV high or note held) and stops on release; loop toggles a looping playback on each hit. Click selects a pad (right-click selects without playing); the rows below the pads edit the selected pad: sync and rate, fine tune (cents), pitch (semitones), speed (negative plays backwards), volume, pan, mode, and fade in / fade out (ms, at the start and end of every pass), defined as on the Sampler. sync is per pad: Free (the default) plays a hit at once; Synced latches the hit and fires it on the next grid line of the transport at the chosen rate (1/4, 1/8, 1 bar ... the same divisions as every other node), sample-accurately; a hit on the line itself fires on it, with the transport stopped it fires at once, and in gate mode letting go before the line cancels the hit. In loop mode a synced pad re-triggers the sample on every division while it is on (one pass per division: a longer sample is cut at the line, a shorter one leaves a gap), and with the transport stopped it plays as a plain loop. The rate control is greyed while a pad is Free. Every param of every pad can be modulated at any time: a cable stays bound to its own pad when you select another pad, and an orange dot on a tile shows that pad has a modulated param. A tile shows the mode and, when synced, the rate. The node's audio out is the mix of all pads. Loaded sample paths and pad settings are saved with the patch; the audio is re-read on load." },
          { "Looper", "How to use: wire the sound to loop into the input and the out to Audio Out, press Rec (with the transport playing and sync on it waits for the next bar; pressed up to 200 ms late, the take still starts on the line just passed), and the take ends by itself after the take length, then loops; Play stops and restarts it, Dub layers what comes in over it, Clear empties it. The waveform shows the loop with a playhead and the beat grid, and the line under the title says what the looper is doing. Each button has a CV pin, so a footswitch or MIDI note can drive them (a rising edge presses). take sets the length: a musical division (1 bar by default), or free, where the next Rec press ends it. Pressing Dub while recording ends the take and goes straight into overdub. Undo steps back one layer at a time (the last take, overdub or Clear, up to 8 steps) and the loop keeps playing; pressed during an overdub it throws that layer away. Playback has the Sampler's controls: finetune (cents), pitch (semitones), speed (negative plays backwards), volume, and fade in / fade out (ms) at the start and end of every pass. At exactly 1.00x the loop stays on the grid; at any other rate it plays in length / rate and DRIFTS against the transport, and Dub is paused while it does (layers are only written at the rate they were recorded). thru monitors the live input. Each take is always shifted by the audio interface's measured round-trip latency, so a loop played in time sits on the grid. The loop (up to 60 s) is saved as a WAV in your Recordings folder and comes back, stopped, when the patch is opened." },
          { "Audio In","Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch. The capture runs on its own engine bound to the system default input, independently of whichever output device is selected, and the header line says why it isn't live when it isn't." },
