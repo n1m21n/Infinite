@@ -72636,14 +72636,34 @@ static void ApplyUiScale(GLFWwindow* window, bool rendererReady)
       "/System/Library/Fonts/Helvetica.ttc",
       "/System/Library/Fonts/Supplemental/Arial.ttf",
    };
+   // ImGui bakes only Basic Latin + Latin-1 unless told otherwise, so names in other scripts
+   // (ł, ő, Ж, λ, ạ) drew as '?'. Latin Extended-A/B, Greek, Cyrillic, Latin Extended
+   // Additional, general punctuation and currency symbols are all in the bundled Inter; CJK is
+   // not baked (thousands of glyphs, and no bundled face has them).
+   static const ImWchar kUiGlyphRanges[] = {
+      0x0020, 0x00FF, 0x0100, 0x024F, 0x0370, 0x03FF, 0x0400, 0x04FF,
+      0x1E00, 0x1EFF, 0x2000, 0x206F, 0x20A0, 0x20CF, 0
+   };
    ImFont* uiFont = nullptr;
+   const char* uiFontPath = nullptr;
    for (const char* path : candidates)
    {
       if (path[0] == '\0')
          continue;
-      uiFont = io.Fonts->AddFontFromFileTTF(path, bakedPx);
+      uiFont = io.Fonts->AddFontFromFileTTF(path, bakedPx, nullptr, kUiGlyphRanges);
       if (uiFont != nullptr)
+      {
+         uiFontPath = path;
          break;
+      }
+   }
+   // A face that lacks those scripts (Atkinson has no Greek or Cyrillic) borrows Inter's glyphs
+   // for the ones it is missing; merged glyphs never replace the primary face's own.
+   if (uiFont != nullptr && !bundledInter.empty() && std::strcmp(uiFontPath, bundledInter.c_str()) != 0)
+   {
+      ImFontConfig fallbackCfg;
+      fallbackCfg.MergeMode = true;
+      io.Fonts->AddFontFromFileTTF(bundledInter.c_str(), bakedPx, &fallbackCfg, kUiGlyphRanges);
    }
    // Only a real TTF is baked at bakedPx; ImGui's bitmap fallback is 13 px at 1x and must
    // not be shrunk.
