@@ -412,15 +412,15 @@ jobs:
           path: build-linux/Infinite
           if-no-files-found: error
 
-  # Headless self-tests under ASan+UBSan (clang). Informational until the first
-  # baseline is triaged: a finding here is a real memory/UB bug in code the
-  # normal Release build runs silently. Flip continue-on-error off once clean.
+  # Headless self-tests under ASan+UBSan (clang). A finding here is a real
+  # memory/UB bug in code the normal Release build runs silently, so this job
+  # gates (R553): first clean run was 25af09f7 after the Molder and AudioPlugin
+  # dangling-VisitParams fixes.
   linux-sanitize:
     name: Linux sanitizers (ASan+UBSan)
     needs: detect
     if: needs.detect.outputs.has_linux == 'true'
     runs-on: ubuntu-24.04
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -452,6 +452,7 @@ jobs:
       # main.cpp (105k lines) is skipped - too slow, and it is split by R555.
       - name: clang-tidy baseline (src/audio, src/core)
         run: |
+          sudo apt-get update
           sudo apt-get install -y clang-tidy
           find src/audio src/core -name '*.cpp' | sort \
             | xargs -P"$(nproc)" -n4 clang-tidy -p build-san --quiet > clang-tidy.log 2>&1 || true
