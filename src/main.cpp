@@ -17443,7 +17443,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       char header[48];
       const std::string& fn = n->FileName(lane);
       if (fn.empty())
-         snprintf(header, sizeof(header), "lane %d", lane + 1);
+         snprintf(header, sizeof(header), "lane %d - %s", lane + 1, DrumPatterns::LaneRole(lane)); // role the groove library gives this lane
       else
       {
          std::string trimmed = fn.size() > 20 ? fn.substr(0, 19) + "." : fn;
@@ -17516,14 +17516,105 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       ImGui::PopID();
    }
 
+   // ---- groove picker (library in nodes/DrumPatterns.h) -------------------
+   // All 141 grooves as one flat list with a parallel category column, so the
+   // existing dropdown popup shows category headers and its filter box.
+   struct DrumGrooveLists
+   {
+      std::vector<std::string> names;
+      std::vector<std::string> cats; // per groove, for gDropdown.categories
+      std::vector<std::string> catNames;
+      std::vector<int> catFirst; // first groove index of each category
+      int count = 0;
+      DrumGrooveLists()
+      {
+         const DrumPatterns::Groove* g = DrumPatterns::All(count);
+         int nc = 0;
+         const char* const* cn = DrumPatterns::Categories(nc);
+         for (int c = 0; c < nc; c++)
+         {
+            catNames.push_back(cn[c]);
+            catFirst.push_back(-1);
+         }
+         for (int i = 0; i < count; i++)
+         {
+            names.push_back(g[i].name);
+            cats.push_back(g[i].category);
+            for (int c = 0; c < nc; c++)
+               if (catNames[(size_t)c] == g[i].category && catFirst[(size_t)c] < 0)
+                  catFirst[(size_t)c] = i;
+         }
+      }
+      int IndexOfName(const std::string& name) const
+      {
+         for (int i = 0; i < count; i++)
+            if (names[(size_t)i] == name)
+               return i;
+         return -1;
+      }
+      int IndexOfCategory(const std::string& cat) const
+      {
+         for (size_t c = 0; c < catNames.size(); c++)
+            if (catNames[c] == cat)
+               return (int)c;
+         return -1;
+      }
+   };
+   const DrumGrooveLists& DrumGrooves()
+   {
+      static const DrumGrooveLists lists;
+      return lists;
+   }
+
+   // One undo step for the whole pick (pattern, rate, swing, steps, accents,
+   // kit fill). Inside a dropdown pick the checkpoint is already taken and this
+   // one is suppressed, so it never doubles.
+   void ApplyDrumGroove(DrumSequencerNode* n, int grooveIdx, int part)
+   {
+      int count = 0;
+      const DrumPatterns::Groove* all = DrumPatterns::All(count);
+      if (grooveIdx < 0 || grooveIdx >= count)
+         return;
+      PushUndoCheckpoint();
+      n->ApplyPattern(all[grooveIdx], std::clamp(part, 0, 2));
+   }
+
+   // Picker dropdown. Deliberately NOT AudioBareDropdown: that registers the
+   // button as a modulatable enum param, and a cable on it would re-apply a
+   // whole groove (and push an undo step) on every change of the driven value.
+   // This opens the shared popup directly and never registers a param.
+   void DrumPickerDropdown(const char* id, const char* caption, const std::vector<std::string>& options,
+                           const std::vector<std::string>& categories, int current, float width,
+                           std::function<void(int)> onSelect, bool focusSearch)
+   {
+      const std::string label = std::string(caption) + "##" + id;
+      if (ImGui::Button(label.c_str(), ImVec2(width, 0)))
+      {
+         gDropdown.options = options;
+         gDropdown.categories = categories;
+         gDropdown.onSelect = std::move(onSelect);
+         gDropdown.current = current;
+         gDropdown.justOpened = true;
+         gDropdown.focusSearch = focusSearch;
+         gDropdown.filterBuf[0] = '\0';
+      }
+   }
+
    void DrawDrumSequencerBody(GraphNode& gn, DrumSequencerNode* n)
    {
-      char stat[80];
+      const DrumGrooveLists& gl = DrumGrooves();
+      const int grooveIdx = gl.IndexOfName(n->patternName);
+      char grooveLabel[96];
+      if (grooveIdx >= 0)
+         snprintf(grooveLabel, sizeof(grooveLabel), "%s - %c", n->patternName.c_str(), 'A' + std::clamp(n->patternPart, 0, 2));
+      else
+         snprintf(grooveLabel, sizeof(grooveLabel), "custom pattern");
+      char stat[160];
       if (n->run)
-         snprintf(stat, sizeof(stat), "%d steps - %s - %d loaded", std::clamp(n->numSteps, 1, DrumSequencerNode::kMaxSteps),
+         snprintf(stat, sizeof(stat), "%s - %d steps - %s - %d loaded", grooveLabel, std::clamp(n->numSteps, 1, DrumSequencerNode::kMaxSteps),
                   MusicTime::RateDivisionName(n->rate), n->LoadedLaneCount());
       else
-         snprintf(stat, sizeof(stat), "stopped - %d steps - %s", std::clamp(n->numSteps, 1, DrumSequencerNode::kMaxSteps),
+         snprintf(stat, sizeof(stat), "stopped - %s - %d steps - %s", grooveLabel, std::clamp(n->numSteps, 1, DrumSequencerNode::kMaxSteps),
                   MusicTime::RateDivisionName(n->rate));
 
       BeginAudioBody(gn.index, gn.category, kAudioWideWidth, stat);
@@ -17550,6 +17641,57 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          }
          EndAudioColumn();
          EndAudioColumns();
+      }
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+
+      // ---- groove picker: two full-width strips on one 3-cell grid, so the
+      // category / groove / prev-next cells sit directly over A / B / C.
+      // Applying a groove replaces the pattern, rate, swing and step count and
+      // fills empty lanes from the bundled kit (one undo step).
+      {
+         const float gap = ImGui::GetStyle().ItemSpacing.x;
+         const float cellW = (AudioFullWidth() - gap * 2.0f) / 3.0f;
+         const float navW = (cellW - gap) * 0.5f;
+         const int curCat = grooveIdx >= 0 ? gl.IndexOfCategory(gl.cats[(size_t)grooveIdx]) : -1;
+         const int part = std::clamp(n->patternPart, 0, 2);
+
+         DrumPickerDropdown("drumcat", curCat >= 0 ? gl.catNames[(size_t)curCat].c_str() : "category", gl.catNames, {}, curCat,
+                            cellW,
+                            [n, part](int c) {
+                               const DrumGrooveLists& l = DrumGrooves();
+                               if (c >= 0 && c < (int)l.catFirst.size() && l.catFirst[(size_t)c] >= 0)
+                                  ApplyDrumGroove(n, l.catFirst[(size_t)c], part);
+                            },
+                            /*focusSearch=*/false);
+         ImGui::SameLine();
+         DrumPickerDropdown("drumgroove", grooveIdx >= 0 ? gl.names[(size_t)grooveIdx].c_str() : "pick a groove", gl.names, gl.cats,
+                            grooveIdx, cellW, [n, part](int i) { ApplyDrumGroove(n, i, part); }, /*focusSearch=*/true);
+         ImGui::SameLine();
+         const bool prev = ImGui::Button("<##drumgrvprev", ImVec2(navW, 0));
+         ImGui::SameLine();
+         const bool next = ImGui::Button(">##drumgrvnext", ImVec2(navW, 0));
+         if ((prev || next) && gl.count > 0)
+         {
+            const int target = grooveIdx < 0 ? (next ? 0 : gl.count - 1)
+                                             : (grooveIdx + (next ? 1 : gl.count - 1)) % gl.count;
+            ApplyDrumGroove(n, target, part);
+         }
+
+         // Parts: greyed out until a groove has been picked (nothing to switch).
+         if (grooveIdx < 0)
+            ImGui::BeginDisabled();
+         for (int p = 0; p < 3; p++)
+         {
+            if (p > 0)
+               ImGui::SameLine();
+            bool on = (grooveIdx >= 0 && part == p);
+            char lbl[32];
+            snprintf(lbl, sizeof(lbl), "%c##drumpart%d", 'A' + p, p);
+            if (AudioToggleButton(lbl, &on, cellW) && grooveIdx >= 0)
+               ApplyDrumGroove(n, grooveIdx, p);
+         }
+         if (grooveIdx < 0)
+            ImGui::EndDisabled();
       }
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
 
