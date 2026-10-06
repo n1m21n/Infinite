@@ -2162,3 +2162,9 @@
 {"ts": "2026-10-06T06:50:02+00:00", "event": "drop", "id": "R565", "why": "Owner asked to remove: not an engineering quest"}
 {"ts": "2026-10-06T07:10:03+00:00", "event": "done", "id": "R559", "why": "TSan run found+fixed audio start race (StartAudioEngine); clang-tidy baseline step added to linux-sanitize CI job; no TSan CI job (headless subset can't exercise threads)"}
 {"ts": "2026-10-06T07:10:03+00:00", "event": "edit", "id": "R559", "commits": ["421b34e9"]}
+{"ts": "2026-10-06T07:10:18+00:00", "event": "edit", "id": "R559", "opened": "2026-10-06T12:39:58+05:30", "commits": ["421b34e"], "closed": "2026-10-06T12:39:58+05:30", "release": ""}
+{"ts": "2026-10-06T12:44:24+05:30", "event": "add", "id": "R567", "after": [], "user": false, "src": "merge:bugfix/readme-node-count", "track": "growth", "kind": "fix", "horizon": "later", "title": "Readme node count", "why": "merged into main (09ff71f)", "origin": "merge"}
+{"ts": "2026-10-06T12:44:24+05:30", "event": "done", "id": "R567", "why": "merged into main (09ff71f)"}
+{"ts": "2026-10-06T12:44:24+05:30", "event": "edit", "id": "R567", "opened": "2026-10-06T12:44:24+05:30", "closed": "2026-10-06T12:44:24+05:30", "release": "", "commits": ["09ff71f"]}
+{"ts": "2026-10-06T07:14:45+00:00", "event": "done", "id": "R566", "why": "README says 290+, website node list regenerated from the 299-type census (229 -> 298 entries)"}
+{"ts": "2026-10-06T07:14:45+00:00", "event": "edit", "id": "R566", "commits": ["09ff71f8"]}
