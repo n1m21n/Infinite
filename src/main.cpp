@@ -1367,6 +1367,10 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    bool gRequestDuplicate = false;
    bool gRequestDelete = false;
    bool gRequestSelectAll = false;
+   // Keyboard cursor (R571 slice 1): runtime only, never saved. nodeIndex is a
+   // GraphNode::index, re-resolved through FindNodeByIndex every frame because
+   // gNodes reallocates on spawn; -1 = cursor off.
+   int gKbCursorNode = -1;
    bool gRequestAddNode = false;
    bool gRequestAddComment = false;
    int gContextMenuNodeIndex = -1; // node the right-click context menu is open for
@@ -42238,6 +42242,11 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Edit & Canvas", "Delete", "Delete / Backspace / Shift+X", "Delete selected nodes, groups, or links" },
          { "Edit & Canvas", "Delete Cable", "X", "Delete selected cable/link only" },
          { "Edit & Canvas", "Select All", "Shift+A", "Select all nodes on the canvas" },
+         { "Edit & Canvas", "Keyboard Cursor", "Tab / Shift+Tab", "Put a focus ring on a node and walk the nodes in reading order. Esc or a click leaves it" },
+         { "Edit & Canvas", "Move Cursor", "Up / Down / Left / Right (cursor on)", "Jump the focus ring to the nearest node in that direction" },
+         { "Edit & Canvas", "Select Under Cursor", "Enter", "Select the node under the focus ring. Shift+Enter adds it to the selection" },
+         { "Edit & Canvas", "Move Selected Nodes", "Alt+Arrow keys (cursor on)", "Nudge the selected nodes by a fixed screen distance; Shift = x10" },
+         { "Edit & Canvas", "Frame Cursor Node", "F", "With the focus ring on, zoom the view to the node under it" },
          { "Edit & Canvas", "Bypass Selection", "B", "Toggle bypass (power off) on the selected nodes. Canvas only - with the timeline focused, B is the blade tool instead" },
          { "Edit & Canvas", "Group Selection", MODKEY "+G", "Wrap selected nodes in a group box" },
          { "Edit & Canvas", "Ungroup", MODKEY "+Shift+G", "Dissolve group without deleting nodes" },
@@ -73674,6 +73683,7 @@ int main(int argc, char** argv)
          getenv("INFINITE_MPCMODTEST") != nullptr ||
          getenv("INFINITE_LOOPERTRIGTEST") != nullptr ||
          getenv("INFINITE_MIDILEARNTEST") != nullptr ||
+         getenv("INFINITE_KBCURSORTEST") != nullptr ||
          getenv("INFINITE_MODMATRIXGEOM") != nullptr;
 
       if (getenv("INFINITE_AUDIOUITEST") != nullptr)
@@ -74052,6 +74062,13 @@ int main(int argc, char** argv)
                       getenv("INFINITE_EDPERF_CAT") ? getenv("INFINITE_EDPERF_CAT") : "Utility",
                       40.0f + col * 260.0f, 40.0f + row * 200.0f);
          }
+      }
+      else if (getenv("INFINITE_KBCURSORTEST") != nullptr)
+      {
+         // R571 slice 1: three nodes in a row, reading order = spawn order.
+         SpawnNode("Shape", "Source", 40.0f, 40.0f);   // 0
+         SpawnNode("Shape", "Source", 420.0f, 40.0f);  // 1
+         SpawnNode("Shape", "Source", 800.0f, 40.0f);  // 2
       }
       else if (getenv("INFINITE_BYPASSTEST") != nullptr)
       {
@@ -96712,6 +96729,50 @@ int main(int argc, char** argv)
          }
       }
 
+      if (getenv("INFINITE_KBCURSORTEST") != nullptr)
+      {
+         // Keys are injected one frame before the check so the handler has run.
+         ImGuiIO& tio = ImGui::GetIO();
+         auto tap = [&tio](ImGuiKey k, int f, int now) {
+            if (now == f) tio.AddKeyEvent(k, true);
+            if (now == f + 1) tio.AddKeyEvent(k, false);
+         };
+         tap(ImGuiKey_Tab, 4, frameId);           // cursor -> node 0
+         tap(ImGuiKey_Tab, 8, frameId);           // -> node 1
+         tap(ImGuiKey_RightArrow, 12, frameId);   // -> node 2
+         tap(ImGuiKey_LeftArrow, 16, frameId);    // -> node 1
+         static ImVec2 startPos(0, 0);
+         if (frameId == 18) startPos = ed::GetNodePosition(gNodes[1].NodeId());
+         if (frameId == 19) { tio.AddKeyEvent(ImGuiMod_Alt, true); tio.AddKeyEvent(ImGuiKey_RightArrow, true); }
+         if (frameId == 20) { tio.AddKeyEvent(ImGuiKey_RightArrow, false); tio.AddKeyEvent(ImGuiMod_Alt, false); }
+         tap(ImGuiKey_Escape, 24, frameId);       // off
+         static bool ok = true;
+         auto expect = [&](int frame, int want, const char* what) {
+            if (frameId != frame) return;
+            const int wantIdx = (want < 0) ? -1 : gNodes[want].index;
+            const bool good = (gKbCursorNode == wantIdx);
+            ok = ok && good;
+            printf("kbcursor %s: cursor=%d want=%d %s\n", what, gKbCursorNode, want, good ? "ok" : "FAIL");
+         };
+         expect(6, 0, "Tab");
+         expect(10, 1, "Tab again");
+         expect(14, 2, "Right");
+         expect(18, 1, "Left");
+         if (frameId == 22)
+         {
+            const ImVec2 now = ed::GetNodePosition(gNodes[1].NodeId());
+            const bool moved = now.x > startPos.x + 1.0f && std::fabs(now.y - startPos.y) < 0.5f;
+            ok = ok && moved;
+            printf("kbcursor Alt+Right: x %.1f -> %.1f %s\n", startPos.x, now.x, moved ? "ok" : "FAIL");
+         }
+         expect(26, -1, "Esc");
+         if (frameId == 26)
+         {
+            printf("kbcursor result: %s\n", ok ? "KBCURSOR OK" : "KBCURSOR FAIL");
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
       if (getenv("INFINITE_INPUTTEST") != nullptr)
       {
          if (frameId == 2)
@@ -98580,6 +98641,128 @@ int main(int argc, char** argv)
          ed::ClearSelection();
          for (GraphNode& gn : gNodes)
             ed::SelectNode(gn.NodeId(), true);
+      }
+
+      // ---- keyboard cursor (R571 slice 1) ----
+      // Tab puts a focus ring on a node, Tab/Shift+Tab walk the nodes in
+      // reading order, arrows jump to the nearest node in that direction,
+      // Enter selects, F frames, Esc leaves. Gated like the other plain-key
+      // canvas shortcuts so it never fires while a text field, popup or the
+      // timeline owns the keyboard.
+      {
+         if (gKbCursorNode >= 0 && FindNodeByIndex(gKbCursorNode) == nullptr)
+            gKbCursorNode = -1; // node deleted / patch replaced
+         const bool kbFree = !typing && !cmdOrCtrl && !io.KeyAlt && !gArrangeFocused && !gPerfMatrixFocused &&
+                             gCommentEdit.target == nullptr && gTypedParam.empty() &&
+                             !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
+         if (kbFree && !gNodes.empty())
+         {
+            struct Slot { int index; ImVec2 c; };
+            std::vector<Slot> slots;
+            slots.reserve(gNodes.size());
+            for (GraphNode& gn : gNodes)
+            {
+               const ImVec2 p = ed::GetNodePosition(gn.NodeId());
+               const ImVec2 sz = ed::GetNodeSize(gn.NodeId());
+               slots.push_back({ gn.index, ImVec2(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f) });
+            }
+            // Reading order: rows of 200 canvas units top to bottom, then left to right.
+            std::sort(slots.begin(), slots.end(), [](const Slot& l, const Slot& r) {
+               const int lr = static_cast<int>(std::floor(l.c.y / 200.0f));
+               const int rr = static_cast<int>(std::floor(r.c.y / 200.0f));
+               if (lr != rr) return lr < rr;
+               if (l.c.x != r.c.x) return l.c.x < r.c.x;
+               return l.index < r.index;
+            });
+            auto setCursor = [&](int idx) {
+               gKbCursorNode = idx;
+               ed::ClearSelection();
+               ed::SelectNode(FindNodeByIndex(idx)->NodeId(), false);
+            };
+            if (ImGui::IsKeyPressed(ImGuiKey_Tab, true))
+            {
+               const int n = static_cast<int>(slots.size());
+               int pos = -1;
+               for (int i = 0; i < n; ++i)
+                  if (slots[i].index == gKbCursorNode) pos = i;
+               const int next = (pos < 0) ? (io.KeyShift ? n - 1 : 0)
+                                          : ((pos + (io.KeyShift ? n - 1 : 1)) % n);
+               setCursor(slots[next].index);
+            }
+            else if (gKbCursorNode >= 0)
+            {
+               float dx = 0.0f, dy = 0.0f;
+               if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true)) dx = -1.0f;
+               else if (ImGui::IsKeyPressed(ImGuiKey_RightArrow, true)) dx = 1.0f;
+               else if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true)) dy = -1.0f;
+               else if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true)) dy = 1.0f;
+               if (dx != 0.0f || dy != 0.0f)
+               {
+                  ImVec2 from(0, 0);
+                  for (const Slot& sl : slots)
+                     if (sl.index == gKbCursorNode) from = sl.c;
+                  int best = -1;
+                  float bestScore = 1e30f;
+                  for (const Slot& sl : slots)
+                  {
+                     if (sl.index == gKbCursorNode) continue;
+                     const float along = (sl.c.x - from.x) * dx + (sl.c.y - from.y) * dy;
+                     const float across = std::fabs((sl.c.x - from.x) * dy - (sl.c.y - from.y) * dx);
+                     if (along <= 0.0f || across > along * 2.0f) continue; // outside a ~63 degree cone
+                     const float score = along + across * 2.0f;
+                     if (score < bestScore) { bestScore = score; best = sl.index; }
+                  }
+                  if (best >= 0)
+                     setCursor(best);
+               }
+               if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))
+               {
+                  if (GraphNode* cn = FindNodeByIndex(gKbCursorNode))
+                  {
+                     if (!io.KeyShift)
+                        ed::ClearSelection();
+                     ed::SelectNode(cn->NodeId(), io.KeyShift);
+                  }
+               }
+               if (!io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_F, false))
+                  gRequestFitViewNodeIndex = gKbCursorNode;
+               if (ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+                  gKbCursorNode = -1;
+            }
+         }
+         // Slice 2: Alt+arrows move the selected nodes (Shift = x10). Step is 16
+         // screen pixels, so it feels the same at any zoom. One undo entry per
+         // burst of presses, like one entry per mouse drag.
+         if (gKbCursorNode >= 0 && !typing && !cmdOrCtrl && io.KeyAlt && !gArrangeFocused && !gPerfMatrixFocused &&
+             gCommentEdit.target == nullptr && gTypedParam.empty() &&
+             !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel))
+         {
+            float dx = 0.0f, dy = 0.0f;
+            if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true)) dx = -1.0f;
+            else if (ImGui::IsKeyPressed(ImGuiKey_RightArrow, true)) dx = 1.0f;
+            else if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true)) dy = -1.0f;
+            else if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true)) dy = 1.0f;
+            const int selCount = ed::GetSelectedObjectCount();
+            if ((dx != 0.0f || dy != 0.0f) && selCount > 0)
+            {
+               static double lastMoveTime = -10.0;
+               const double now = ImGui::GetTime();
+               if (now - lastMoveTime > 0.6)
+                  PushUndoCheckpoint();
+               lastMoveTime = now;
+               const float step = 16.0f * (io.KeyShift ? 10.0f : 1.0f) / std::max(0.05f, ed::GetCurrentZoom());
+               std::vector<ed::NodeId> selNodes(selCount);
+               const int nSel = ed::GetSelectedNodes(selNodes.data(), selCount);
+               for (int i = 0; i < nSel; ++i)
+               {
+                  const ImVec2 p = ed::GetNodePosition(selNodes[i]);
+                  ed::SetNodePosition(selNodes[i], ImVec2(p.x + dx * step, p.y + dy * step));
+               }
+            }
+         }
+         // A canvas click puts the mouse back in charge.
+         if (gKbCursorNode >= 0 && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsAnyItemActive())
+            gKbCursorNode = -1;
       }
 
       // "/" drops a comment under the pointer and puts the caret straight into
@@ -101420,6 +101603,15 @@ int main(int argc, char** argv)
          // clearly visible dark line in light mode. Suppressed the same way the
          // menu-bar/canvas seam was: make the two colors it reads transparent
          // for just this call.
+         if (GraphNode* kc = (gKbCursorNode >= 0) ? FindNodeByIndex(gKbCursorNode) : nullptr)
+         {
+            const ImVec2 kp = ed::GetNodePosition(kc->NodeId());
+            const ImVec2 ks = ed::GetNodeSize(kc->NodeId());
+            const ImU32 ringCol = ImGui::GetColorU32(ImGuiCol_NavHighlight);
+            ed::GetNodeBackgroundDrawList(kc->NodeId())->AddRect(
+               ImVec2(kp.x - 5.0f, kp.y - 5.0f), ImVec2(kp.x + ks.x + 5.0f, kp.y + ks.y + 5.0f),
+               ringCol, 8.0f, 0, 2.5f);
+         }
          ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
          ImGui::PushStyleColor(ImGuiCol_BorderShadow, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
          ed::End();
