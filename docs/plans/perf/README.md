@@ -1221,34 +1221,37 @@ plus the inline `VideoFrameAtExact`), `src/nodes/VideoSourceNode.cpp`
 has). `VideoFrameAtExact` loops on
 `VideoDecodeIsCatchingUp`, which MediaWin/MediaLinux already implement.
 
-### B8 video cost split (R554, 2026-10-06, `perf/b8-cost-split`, macOS M2 8 GB)
+### B8 video cost split (R554, 2026-10-06, macOS M2 8 GB)
 
 New bench fields per clip in the B8 JSON (`media_io.clips[]`): `pull_ms` (every
 `copyNextSampleBuffer`) and `convert_ms` (the BGRA->RGBA vImage permute of shown
 frames); `decode_ms` is still their sum and `upload_cpu_ms` is the GL upload on the
-main thread. Two full `run_all.sh --quiet --only B8` passes, quiet machine
-(ChatGPT closed, daemon paused, caffeinate), all `unfocused=1`. p50 / p99 ms, mean
-over clips:
+main thread. Three full `run_all.sh --quiet --only B8` passes. The first two ran
+while a git push hook and a build were using the machine and are **not** used
+(they showed 4x2160 at 14 ms convert, 168-188 drops and two variants decoding 0
+frames; the third pass, on a quiet machine, decodes every variant with 0 drops).
+Numbers below are that third pass, p50 / p99 ms, mean over clips:
 
 | Variant | pull | convert | upload (main thread) | dropped |
 |---|---|---|---|---|
-| 2x1080 | 0.11-0.13 / 0.6-1.0 | 0.72-0.75 / 1.9-2.5 | 2.2-2.7 / 3.7-4.3 | 0 |
-| 4x1080 | 0.07-0.09 / 0.3-0.6 | 0.64-0.71 / 2.4-2.9 | 2.1 / 2.8-4.0 | 0 |
-| 4x2160, no windows (run 2 only, see below) | 0.62 / 89 | 14.3 / 71.8 | 3.6 / 10.0 | 168 |
-| heavy 4x2160 + 3 windows + camera + Syphon (run 1 / run 2) | 0.15-0.35 / 4-110 | 4.6 / 28 and 9.0 / 66 | 2.3-2.9 / 10-13 | 46 / 188 |
+| 2x1080 | 0.13 / 0.6-1.0 | 0.75 / 1.9-2.5 | 2.2-2.7 / 3.7-4.3 | 0 |
+| 4x1080 | 0.09 / 0.3-0.6 | 0.71 / 2.4-2.9 | 2.2 / 4.0 | 0 |
+| 2x2160 | 0.19 / 0.4 | 4.0 / 5.8 | 1.9 / 3.5 | 0 |
+| 4x2160 | 0.14 / 0.9 | 3.6 / 8.2 | 2.0 / 4.1 | 0 |
+| heavy 4x2160 + 3 windows + camera + Syphon | 0.15 / 1.1 | 4.2 / 13.3 | 2.1 / 5.8 | 0 |
 
-- **The BGRA->RGBA convert is the biggest per-frame cost**, not the decode and not
-  the upload: at 1080p it is ~6x the pull and ~1/3 of the upload; at 4x2160 it is
-  4.6-14 ms p50 and 28-72 ms p99 per frame on each clip's decode thread, while the
-  upload stays 2-4 ms p50. The convert is what makes the heavy case miss real time.
+- **The BGRA->RGBA convert is the biggest per-frame cost** and scales with
+  pixels (0.7 ms at 1080p, ~4 ms at 2160p, ~2x the upload there, 13 ms p99 in
+  the heavy case). It runs on each clip's decode thread, so it is what a
+  4-clip load multiplies. The pull is negligible (<0.2 ms p50).
 - `pull_ms` is only the time `copyNextSampleBuffer` takes to return; if AVFoundation
   hands back a lazily decoded buffer, part of the hardware decode lands inside the
-  convert's first read. Treat pull + convert as "decode"; the split between them is
-  indicative, the convert-vs-upload split is solid.
+  convert's first read. Treat pull + convert as "decode"; the convert-vs-upload split
+  is solid.
 - **Choice for zero-copy:** do the cheap step first - upload the pixel buffer as
   `GL_BGRA` and flip in the sampler, deleting the convert (R568). IOSurface-backed
-  textures would also remove the upload, but the upload is 2-4 ms p50 against a
-  convert that dominates at 4K, so it is the second step, only if heavy is still
-  short afterwards.
-- Found: `clips=2,res=2160,windows=0` decodes 0 frames in both runs (0 uploads, 268
-  requests, `decode_realtime: false`). Not seen in the Block 3 resumed table; logged as R569.
+  textures would also remove the upload (~2 ms p50, main thread), the second step,
+  only if the heavy case is still short afterwards.
+- **Contention trap:** a B8 run during a build or the pre-push hook can decode 0
+  frames for a variant (2x2160 and 4x2160 did, repeatably) and inflate convert 4x;
+  rerun on a quiet machine before believing a B8 row (R569, not a code bug).
