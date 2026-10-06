@@ -47063,6 +47063,11 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          // Inside this branch and not above it, so an undo/redo - which runs
          // NewPatch as its first step - never changes what you are hearing.
          gAudioMode = AudioMode::Canvas;
+         // The nodes are gone; publish the empty graph so the engine stops
+         // rendering them (otherwise the old sound plays on after New and the
+         // retired nodes stay pinned by the old topology). Not for the
+         // ApplyPatchData path, which rebuilds once the patch is restored.
+         RebuildAudioTopology();
       }
    }
 
@@ -74894,6 +74899,21 @@ int main(int argc, char** argv)
          out->input.Connect(gain);
          RebuildAudioTopology();
       }
+      else if (getenv("INFINITE_NEWPATCHAUDIOTEST") != nullptr)
+      {
+         // Wavetable -> Gain -> Audio Out, rendered, then File > New. See the
+         // frameId == 4 block that drives it.
+         SpawnNode("Wavetable", "Synths", 40.0f, 40.0f);
+         SpawnNode("Gain", "Synths", 320.0f, 40.0f);
+         SpawnNode("Audio Out", "Utility", 600.0f, 40.0f);
+
+         auto* osc = static_cast<WavetableNode*>(gNodes[0].node.get());
+         auto* gain = static_cast<GainNode*>(gNodes[1].node.get());
+         auto* out = static_cast<AudioOutputNode*>(gNodes[2].node.get());
+         gain->input.Connect(osc);
+         out->input.Connect(gain);
+         RebuildAudioTopology();
+      }
       else if (getenv("INFINITE_AUDIOLIFECYCLETEST") != nullptr)
       {
          // Repro + regression guard for
@@ -93256,6 +93276,49 @@ int main(int argc, char** argv)
          const bool clearedAfterDelete = out != nullptr && out->input.GetSource() == nullptr;
          printf("audio delete-crash: survived cook, cleared=%d  %s\n",
                 clearedAfterDelete, (out != nullptr && clearedAfterDelete) ? "OK" : "FAIL");
+      }
+
+      // File > New with audio rendering. NewPatch retires every node and
+      // clears gNodes; the published audio topology must be republished with
+      // it, or the engine keeps rendering the old nodes (audible after New,
+      // and with no device the retire drain frees nodes the topology still
+      // points at). frameId 4: render, New, render; frameId 12: the retired
+      // nodes must have been drained.
+      if (getenv("INFINITE_NEWPATCHAUDIOTEST") != nullptr && (frameId == 4 || frameId == 12))
+      {
+         static float sPeakBefore = 0.0f;
+         static float sPeakAfter = 0.0f;
+         if (frameId == 4)
+         {
+            std::vector<float> renderL(256), renderR(256);
+            float* renderChans[2] = { renderL.data(), renderR.data() };
+            AudioBuffer renderBuf;
+            renderBuf.channels = renderChans;
+            renderBuf.numChannels = 2;
+            renderBuf.numFrames = 256;
+            auto peakOfBlocks = [&](int blocks)
+            {
+               float peak = 0.0f;
+               for (int b = 0; b < blocks; b++)
+               {
+                  AudioEngine::Instance().ProcessOffline(renderBuf);
+                  for (int i = 0; i < renderBuf.numFrames; i++)
+                     peak = std::max(peak, std::max(std::fabs(renderL[i]), std::fabs(renderR[i])));
+               }
+               return peak;
+            };
+            sPeakBefore = peakOfBlocks(8);
+            NewPatch(); // what File > New and Cmd+N run
+            sPeakAfter = peakOfBlocks(8);
+         }
+         else
+         {
+            const bool silentAfterNew = sPeakAfter == 0.0f;
+            const bool drained = gRetiredNodes.empty();
+            printf("new patch audio: before=%.4f after=%.4f retired left=%zu  %s\n", sPeakBefore, sPeakAfter,
+                   gRetiredNodes.size(),
+                   (sPeakBefore > 0.0f && silentAfterNew && drained) ? "NEWPATCH AUDIO OK" : "NEWPATCH AUDIO FAIL");
+         }
       }
 
       if (getenv("INFINITE_MATFRAMETEST") != nullptr && frameId == 4)
