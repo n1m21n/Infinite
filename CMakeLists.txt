@@ -70,6 +70,17 @@ if(MSVC)
     endif()
 endif()
 
+# Sanitizer builds: -DINFINITE_SANITIZE=address,undefined (or thread). Off by
+# default and never part of a shipped build. Set before any target is created
+# so every dependency built from source agrees on the runtime. Not combinable
+# with the static MSVC CRT above, so non-MSVC only.
+set(INFINITE_SANITIZE "" CACHE STRING "Comma-separated -fsanitize list (address,undefined | thread); empty = off")
+if(INFINITE_SANITIZE AND NOT MSVC)
+    add_compile_options(-fsanitize=${INFINITE_SANITIZE} -fno-omit-frame-pointer -fno-sanitize-recover=undefined)
+    add_link_options(-fsanitize=${INFINITE_SANITIZE})
+    message(STATUS "Sanitizers enabled: ${INFINITE_SANITIZE}")
+endif()
+
 # GLFW is built from source and linked statically rather than taken from
 # Homebrew: a downloaded .app must not depend on /opt/homebrew existing. (On
 # Windows the same reasoning applies to any vcpkg/system copy.)
