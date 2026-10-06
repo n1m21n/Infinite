@@ -57082,10 +57082,13 @@ static bool RunDrumSequencerFixture()
       const std::string fwd = "/Applications/Old/Infinite.app/Contents/Resources/drumkits/infinite-basic/02-snare.wav";
       const std::string back = "C:\\Old Install\\Resources\\drumkits\\infinite-basic\\03-closed-hat.wav";
       const std::string other = "/Applications/Old/Resources/drumkits/other-kit/02-snare.wav";
+      // The rewritten path takes the kit folder's own separator (a Windows temp path has
+      // backslashes), so compare with separators folded.
+      auto slashed = [](std::string v) { std::replace(v.begin(), v.end(), '\\', '/'); return v; };
       const bool r1 = node->LoadFileToLane(1, fwd);
-      const bool p1 = node->FilePath(1) == kitDir + "/02-snare.wav";
+      const bool p1 = slashed(node->FilePath(1)) == slashed(kitDir + "/02-snare.wav");
       const bool r2 = node->LoadFileToLane(2, back);
-      const bool p2 = node->FilePath(2) == kitDir + "/03-closed-hat.wav";
+      const bool p2 = slashed(node->FilePath(2)) == slashed(kitDir + "/03-closed-hat.wav");
       const bool r3 = node->LoadFileToLane(3, other);
       DrumSequencerNode::SetKitDir("");
       const bool r4 = node->LoadFileToLane(4, fwd);
@@ -57100,7 +57103,7 @@ static bool RunDrumSequencerFixture()
       auto dst = std::make_unique<DrumSequencerNode>();
       Patch::LoadParams(dst.get(), params);
       dst->ReloadFromPaths();
-      const bool viaPatch = dst->FilePath(0) == kitDir + "/02-snare.wav" && dst->LoadedLaneCount() == 1;
+      const bool viaPatch = slashed(dst->FilePath(0)) == slashed(kitDir + "/02-snare.wav") && dst->LoadedLaneCount() == 1;
       const bool staleOk = r1 && p1 && r2 && p2 && !r3 && !r4 && viaPatch;
       printf("DRUMSEQTEST stale kit path %s (fwd=%d/%d back=%d/%d other=%d noKit=%d viaPatch=%d)\n",
              staleOk ? "OK" : "FAIL", r1, p1, r2, p2, r3, r4, viaPatch);
