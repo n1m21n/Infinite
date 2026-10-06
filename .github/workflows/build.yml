@@ -257,6 +257,10 @@ jobs:
           cp build/Release/onnxruntime.dll dist/Infinite/
           cp build/Release/DirectML.dll dist/Infinite/
           cp build/Release/assets/models/u2netp.onnx dist/Infinite/assets/models/
+          # Resources/ (fonts, icons, drumkits/infinite-basic) is what
+          # BundledResourcePath() finds next to the exe; the POST_BUILD copy
+          # fills it. Without it the Drum Sequencer's groove picker has no kit.
+          cp -r build/Release/Resources dist/Infinite/
           cp README.md LICENSE dist/Infinite/ 2>/dev/null || true
 
       - name: Upload

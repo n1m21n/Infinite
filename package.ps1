@@ -77,6 +77,10 @@ Copy-Item $OrtDll $Stage
 Copy-Item $DmlDll $Stage
 New-Item -ItemType Directory -Force (Join-Path $Stage "assets\models") | Out-Null
 Copy-Item (Join-Path $ModelDir "u2netp.onnx") (Join-Path $Stage "assets\models")
+# Resources\ (fonts, icons, drumkits) sits next to the exe: BundledResourcePath()
+# in main.cpp looks for it there. The POST_BUILD copy in CMakeLists.txt fills it.
+$ResDir = Join-Path (Split-Path -Parent $Exe) "Resources"
+if (Test-Path $ResDir) { Copy-Item -Recurse -Force $ResDir $Stage }
 
 Write-Host "==> done: $Stage\Infinite.exe"
 if ($Launch) {

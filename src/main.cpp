@@ -243,6 +243,7 @@ static void JoinLiveTier1();                          // defined next to ParamKe
 #include "nodes/GrainMolderNode.h"
 #include "nodes/GranularNode.h"
 #include "nodes/DrumSequencerNode.h"
+#include "nodes/DrumPatterns.h"
 #include "nodes/LooperNode.h"
 #include "nodes/MpcNode.h"
 #include "nodes/AudioPluginNode.h"
@@ -17442,7 +17443,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       char header[48];
       const std::string& fn = n->FileName(lane);
       if (fn.empty())
-         snprintf(header, sizeof(header), "lane %d", lane + 1);
+         snprintf(header, sizeof(header), "lane %d - %s", lane + 1, DrumPatterns::LaneRole(lane)); // role the groove library gives this lane
       else
       {
          std::string trimmed = fn.size() > 20 ? fn.substr(0, 19) + "." : fn;
@@ -17499,6 +17500,15 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          AudioSlider("volume", &n->laneVolume[lane], 0.0f, 1.0f, "%.2f", half);
          ImGui::SameLine();
          AudioSlider("pan", &n->lanePan[lane], -1.0f, 1.0f, "%.2f", half);
+         // Fourth row, full width: semitones added on full-velocity steps
+         // only (two-tone bells). Explicit param index 300 + lane keeps it out
+         // of the gParamCounter sequence, so the six sliders above (and every
+         // saved modulation binding on them) keep their ordinals; 300..307 sit
+         // between the float ordinals (< ~60) and kDiscreteParamBase (400).
+         char accentName[24];
+         snprintf(accentName, sizeof(accentName), "lane %d accent", lane + 1);
+         AudioSlider("accent", &n->laneAccentPitch[lane], -24.0f, 24.0f, "%+.1f st", AudioFullWidth(), nullptr,
+                     nullptr, 300 + lane, accentName);
       }
 
       EndAudioSection();
@@ -17506,14 +17516,140 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       ImGui::PopID();
    }
 
+   // ---- groove picker (library in nodes/DrumPatterns.h) -------------------
+   // All 141 grooves as one flat list with a parallel category column, so the
+   // existing dropdown popup shows category headers and its filter box.
+   struct DrumGrooveLists
+   {
+      std::vector<std::string> names;
+      std::vector<std::string> cats; // per groove, for gDropdown.categories
+      std::vector<std::string> catNames;
+      std::vector<int> catFirst; // first groove index of each category
+      int count = 0;
+      DrumGrooveLists()
+      {
+         const DrumPatterns::Groove* g = DrumPatterns::All(count);
+         int nc = 0;
+         const char* const* cn = DrumPatterns::Categories(nc);
+         for (int c = 0; c < nc; c++)
+         {
+            catNames.push_back(cn[c]);
+            catFirst.push_back(-1);
+         }
+         for (int i = 0; i < count; i++)
+         {
+            names.push_back(g[i].name);
+            cats.push_back(g[i].category);
+            for (int c = 0; c < nc; c++)
+               if (catNames[(size_t)c] == g[i].category && catFirst[(size_t)c] < 0)
+                  catFirst[(size_t)c] = i;
+         }
+      }
+      int IndexOfName(const std::string& name) const
+      {
+         for (int i = 0; i < count; i++)
+            if (names[(size_t)i] == name)
+               return i;
+         return -1;
+      }
+      int IndexOfCategory(const std::string& cat) const
+      {
+         for (size_t c = 0; c < catNames.size(); c++)
+            if (catNames[c] == cat)
+               return (int)c;
+         return -1;
+      }
+   };
+   const DrumGrooveLists& DrumGrooves()
+   {
+      static const DrumGrooveLists lists;
+      return lists;
+   }
+
+   // One undo step for the whole pick (pattern, rate, swing, steps, accents,
+   // kit fill). Inside a dropdown pick the checkpoint is already taken and this
+   // one is suppressed, so it never doubles.
+   void ApplyDrumGroove(DrumSequencerNode* n, int grooveIdx, int part)
+   {
+      int count = 0;
+      const DrumPatterns::Groove* all = DrumPatterns::All(count);
+      if (grooveIdx < 0 || grooveIdx >= count)
+         return;
+      PushUndoCheckpoint();
+      n->ApplyPattern(all[grooveIdx], std::clamp(part, 0, 2));
+   }
+
+   // Picker dropdown. Deliberately NOT AudioBareDropdown: that registers the
+   // button as a modulatable enum param, and a cable on it would re-apply a
+   // whole groove (and push an undo step) on every change of the driven value.
+   // This opens the shared popup directly and never registers a param.
+   void DrumPickerDropdown(const char* id, const char* caption, const std::vector<std::string>& options,
+                           const std::vector<std::string>& categories, int current, float width,
+                           std::function<void(int)> onSelect, bool focusSearch)
+   {
+      const std::string label = std::string(caption) + "##" + id;
+      if (ImGui::Button(label.c_str(), ImVec2(width, 0)))
+      {
+         gDropdown.options = options;
+         gDropdown.categories = categories;
+         gDropdown.onSelect = std::move(onSelect);
+         gDropdown.current = current;
+         gDropdown.justOpened = true;
+         gDropdown.focusSearch = focusSearch;
+         gDropdown.filterBuf[0] = '\0';
+      }
+   }
+
+   // Compact segmented pill: equal cells, 1px apart, frame-height tall (the same
+   // height as every other strip button). Cell width fits the widest label with
+   // the bundled font at the current UI scale, never below minW. Returns the
+   // clicked cell or -1. markCell draws the playhead dot on that cell.
+   float DrumPillCellW(const char* const* labels, int count, float minW)
+   {
+      float w = minW;
+      for (int i = 0; i < count; i++)
+         w = std::max(w, ImGui::CalcTextSize(labels[i]).x + ImGui::GetStyle().FramePadding.x * 2.0f + 4.0f);
+      return std::ceil(w);
+   }
+
+   int DrumSegmentedPill(const char* id, const char* const* labels, int count, int selected, float cellW, int markCell = -1)
+   {
+      int clicked = -1;
+      for (int i = 0; i < count; i++)
+      {
+         if (i > 0)
+            ImGui::SameLine(0.0f, 1.0f);
+         bool on = (selected == i);
+         char lbl[48];
+         snprintf(lbl, sizeof(lbl), "%s##%s%d", labels[i], id, i);
+         if (AudioToggleButton(lbl, &on, cellW))
+            clicked = i;
+         if (i == markCell)
+         {
+            const ImVec2 bmin = ImGui::GetItemRectMin();
+            const ImVec2 bmax = ImGui::GetItemRectMax();
+            ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(bmax.x - 5.0f, bmin.y + 5.0f), 2.5f,
+                                                        IM_COL32(255, 200, 100, 255));
+         }
+      }
+      return clicked;
+   }
+
    void DrawDrumSequencerBody(GraphNode& gn, DrumSequencerNode* n)
    {
-      char stat[80];
+      const DrumGrooveLists& gl = DrumGrooves();
+      const int grooveIdx = gl.IndexOfName(n->patternName);
+      char grooveLabel[96];
+      if (grooveIdx >= 0)
+         snprintf(grooveLabel, sizeof(grooveLabel), "%s - %c", n->patternName.c_str(), 'A' + std::clamp(n->patternPart, 0, 2));
+      else
+         snprintf(grooveLabel, sizeof(grooveLabel), "custom pattern");
+      char stat[160];
       if (n->run)
-         snprintf(stat, sizeof(stat), "%d steps - %s - %d loaded", std::clamp(n->numSteps, 1, DrumSequencerNode::kMaxSteps),
+         snprintf(stat, sizeof(stat), "%s - %d steps - %s - %d loaded", grooveLabel, std::clamp(n->numSteps, 1, DrumSequencerNode::kMaxSteps),
                   MusicTime::RateDivisionName(n->rate), n->LoadedLaneCount());
       else
-         snprintf(stat, sizeof(stat), "stopped - %d steps - %s", std::clamp(n->numSteps, 1, DrumSequencerNode::kMaxSteps),
+         snprintf(stat, sizeof(stat), "stopped - %s - %d steps - %s", grooveLabel, std::clamp(n->numSteps, 1, DrumSequencerNode::kMaxSteps),
                   MusicTime::RateDivisionName(n->rate));
 
       BeginAudioBody(gn.index, gn.category, kAudioWideWidth, stat);
@@ -17543,9 +17679,67 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       }
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
 
+      // ---- groove picker: ONE row. category | groove | < > | A B C pill.
+      // The dropdowns share the remaining width, the nav buttons and the part
+      // pill cells share one cell width, so the row spans the node edge to
+      // edge. Applying a groove replaces the pattern, rate, swing and step
+      // count and fills empty lanes from the bundled kit (one undo step).
+      {
+         const float gap = ImGui::GetStyle().ItemSpacing.x;
+         static const char* const kParts[3] = { "A", "B", "C" };
+         const float pcw = DrumPillCellW(kParts, 3, 24.0f);
+         const float pillW = pcw * 3.0f + 2.0f;
+         const float navW = pcw;
+         const float dropW = AudioFullWidth() - pillW - navW * 2.0f - gap * 4.0f;
+         const float catW = std::floor(dropW * 0.34f);
+         const float grvW = dropW - catW;
+         const int curCat = grooveIdx >= 0 ? gl.IndexOfCategory(gl.cats[(size_t)grooveIdx]) : -1;
+         const int part = std::clamp(n->patternPart, 0, 2);
+
+         DrumPickerDropdown("drumcat", curCat >= 0 ? gl.catNames[(size_t)curCat].c_str() : "category", gl.catNames, {}, curCat,
+                            catW,
+                            [n, part](int c) {
+                               const DrumGrooveLists& l = DrumGrooves();
+                               if (c >= 0 && c < (int)l.catFirst.size() && l.catFirst[(size_t)c] >= 0)
+                                  ApplyDrumGroove(n, l.catFirst[(size_t)c], part);
+                            },
+                            /*focusSearch=*/false);
+         ImGui::SameLine();
+         DrumPickerDropdown("drumgroove", grooveIdx >= 0 ? gl.names[(size_t)grooveIdx].c_str() : "pick a groove", gl.names, gl.cats,
+                            grooveIdx, grvW, [n, part](int i) { ApplyDrumGroove(n, i, part); }, /*focusSearch=*/true);
+         ImGui::SameLine();
+         const bool prev = ImGui::Button("<##drumgrvprev", ImVec2(navW, 0));
+         ImGui::SameLine();
+         const bool next = ImGui::Button(">##drumgrvnext", ImVec2(navW, 0));
+         if ((prev || next) && gl.count > 0)
+         {
+            const int target = grooveIdx < 0 ? (next ? 0 : gl.count - 1)
+                                             : (grooveIdx + (next ? 1 : gl.count - 1)) % gl.count;
+            ApplyDrumGroove(n, target, part);
+         }
+         ImGui::SameLine();
+         // Parts: greyed out until a groove has been picked (nothing to switch).
+         if (grooveIdx < 0)
+            ImGui::BeginDisabled();
+         const int pc = DrumSegmentedPill("drumpart", kParts, 3, grooveIdx >= 0 ? part : -1, pcw);
+         if (pc >= 0 && grooveIdx >= 0)
+            ApplyDrumGroove(n, grooveIdx, pc);
+         if (grooveIdx < 0)
+            ImGui::EndDisabled();
+      }
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+
       // ---- step grid: the visualizer, and the primary editable control ----
       {
          const int steps = std::clamp(n->numSteps, 1, DrumSequencerNode::kMaxSteps);
+         // Paging: columns per page = min(steps, 16); cell width is fixed by
+         // that so the grid doesn't change shape between pages. A short last
+         // page (e.g. steps 17-20) draws only its real steps.
+         const int pageSteps = DrumSequencerNode::kEditPageSteps;
+         const int gridCols = std::min(steps, pageSteps);
+         const int page = std::clamp(n->editPage, 0, (steps - 1) / pageSteps);
+         const int pageFirst = page * pageSteps;
+         const int pageCols = std::min(gridCols, steps - pageFirst);
          const float toggleW = 20.0f;
          const float gutterW = toggleW * 3.0f + 2.0f * 2.0f + 6.0f; // R | M | S (70px)
          const float rightGutterW = 32.0f; // Output pin gutter on the right
@@ -17553,7 +17747,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          const float rowGap = 2.0f;
          const float cellGap = 1.0f;
          const float stepsW = gAudioBodyW - gutterW - rightGutterW;
-         const float cellW = (stepsW - cellGap * (float)(steps - 1)) / (float)steps;
+         const float cellW = (stepsW - cellGap * (float)(gridCols - 1)) / (float)gridCols;
          const ImVec2 origin = ImGui::GetCursorScreenPos();
          n->gridCanvasTopY = origin.y;
          n->gridCanvasRowH = rowH + rowGap;
@@ -17592,9 +17786,10 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             }
 
             // ---- steps -----------------------------------------------------
-            for (int s = 0; s < steps; s++)
+            for (int sc = 0; sc < pageCols; sc++)
             {
-               const float x0 = origin.x + gutterW + (float)s * (cellW + cellGap);
+               const int s = pageFirst + sc; // absolute step index
+               const float x0 = origin.x + gutterW + (float)sc * (cellW + cellGap);
                ImGui::PushID(s);
                ImGui::SetCursorScreenPos(ImVec2(x0, y0));
                ImGui::InvisibleButton("cell", ImVec2(cellW, rowH));
@@ -17676,6 +17871,30 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          ImGui::SetCursorScreenPos(
             ImVec2(origin.x, origin.y + (float)DrumSequencerNode::kNumLanes * (rowH + rowGap) + 4.0f));
          ImGui::Dummy(ImVec2(gAudioBodyW, 1.0f));
+
+         // ---- grid stat line: left readout, compact '1-16 | 17-32' pill
+         // right-aligned. Always drawn (greyed via BeginDisabled at <= 16
+         // steps) so the node never changes height; same frame height as the
+         // other strip buttons. The dot marks the page the playhead is on.
+         {
+            static const char* const kPages[2] = { "1-16", "17-32" };
+            const float pgw = DrumPillCellW(kPages, 2, 24.0f);
+            const float pillW = pgw * 2.0f + 1.0f;
+            const bool paged = steps > pageSteps;
+            const int playPage = (n->run && paged) ? curStep / pageSteps : -1;
+            const float startX = ImGui::GetCursorPosX();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("%d steps - %s", steps, MusicTime::RateDivisionName(n->rate));
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(startX + AudioFullWidth() - pillW);
+            if (!paged)
+               ImGui::BeginDisabled();
+            const int pc = DrumSegmentedPill("drumpage", kPages, 2, page, pgw, playPage);
+            if (pc >= 0)
+               n->editPage = pc;
+            if (!paged)
+               ImGui::EndDisabled();
+         }
       }
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
 
@@ -41589,7 +41808,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Slicer", "Chops a sample into slices and maps them chromatically to the keyboard from MIDI note 36 upward - note 36 plays slice 1, 37 plays slice 2, and so on. A note past the last slice is silent; it does not wrap round to slice 1. Load a file (or drag one in from the Samples panel), or record from the audio input pin. slice by picks where the boundaries come from: onsets runs transient detection over the sample on a background thread, grid divides it arithmetically at the *global transport tempo* (there is no per-node bpm - change the tempo and the grid follows). sensitivity is the detection threshold and is the only control that re-runs the analysis; onsets just caps the result to the strongest N, and division/slice by recompute boundaries instantly. Click a slice band in the waveform to audition it, and in onsets mode drag any marker to move a boundary by hand - hand-edited markers are saved with the patch. Two separate controls decide how long a slice lasts: crossthrough sets whether playback may run PAST the slice's own next onset (off by default - each slice stops where the next begins), while decay shapes only the amplitude envelope, reading 'hold' at the top of its throw where the slice stays at full level. So: crossthrough off + hold is the classic tight chop; crossthrough off + a decay ends at whichever comes first; crossthrough on + hold plays through the rest of the sample; crossthrough on + a decay is a one-shot with a tail over the rest of the break. attack extends each slice's own fade-in from instant up to half a second." },
          { "Molder", "Analysis/genome resynthesis: decomposes a loaded or recorded sample into tracked harmonic partials plus a real residual waveform, then Roll mutates a parameter genome and re-renders a new sample from it - each roll walks further from the last, not from the original. Iterate feeds the last render back in as the new source and re-analyses it (progressively eating the sound); Reset returns fully to the originally loaded/recorded sample - generation 0 and the six shaping knobs (tone/air/snap/stretch/time/pitch) back to neutral, and the analysis itself restored, undoing any Iterate. chaos sets how far the next roll jumps; pitch offsets on top of the genome's own pitch walk; tone balances partials against residual; air/snap are the residual's steady-hiss and transient-attack levels; stretch scales inharmonicity together with harmonic spacing; time warps the attack/decay timing without changing the sample's length. This is a sound designer, not a playable instrument - it takes no note input, only a single self-triggered voice with start/end range, loop, reverse and ping-pong, the same transport as Sampler. Analysis and rendering both run on a background thread, so rolling never stalls the UI. seed/gen/f0/harm in the readout are the exact genome (seed + generation count) and the analysed pitch - two integers are enough to reproduce any rolled sound exactly on reload." },
          { "Grain Molder", "Slices audio into overlapping grains, calculates per-grain metrics (Level, Brightness, Random), and rearranges them based on a continuous blend between original temporal position and metric rank. At amount 0 it is the clean identity passthrough; at 1 it is fully sorted into a swell or brightness contour. Rendering runs asynchronously on a worker thread." },
-         { "Drum Sequencer", "An 8-lane, 8-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8x8 step grid. Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
+         { "Drum Sequencer", "An 8-lane, up-to-32-step drum machine: 8 lane cards (waveform + transient/decay/pitch/fine tune/volume/pan) above an 8-lane step grid that shows 16 steps at a time (the small 1-16 | 17-32 pill at the right of the line under it switches pages once steps goes past 16 - greyed out until then; a dot marks the page the playhead is on). Click a card's waveform to load its sample (a drag from the Samples panel or an OS file drop also work), or drag its edge handles to trim the playback range; x clears it, and the choke button cycles its choke group (0 = none - two lanes sharing a group cut each other off, the closed/open hi-hat case). In the grid, R randomises that lane's fill, M/S mute or solo it. Click a step to toggle it, drag vertically on a lit step to set its velocity, drag horizontally to paint a run of steps on/off. Between the lane cards and the grid, the groove picker holds a built-in library of 141 grooves in 10 categories: pick a category (jumps to its first groove) or a groove (the list is grouped and has a filter box), step through with < and >, and switch the groove's A verse / B bridge / C chorus part with the small A B C pill at the end of the row; picking replaces the pattern, rate, swing and step count in one undo step and fills any empty lane from the bundled kit (a lane you loaded yourself is never touched). The bottom rows are pattern-wide: rate/steps/swing/output, then four offsets (transient/decay/pitch/pan) composed on top of every lane's own value. Plays the moment it's patched, phase-locked to the transport - there's no note input, just its own Transport-derived sequence. run stops this node's own step firing without touching the transport; randomise seeds a musical kick/snare/hat starting pattern." },
          { "MPC", "How to use: wire the out into Audio Out, drop audio files onto the pads (or click an empty pad, or Load... / Folder... for the first 16 files of a folder), then click a pad or send notes into the notes input - notes 36 to 51 play pads 1 to 16. A 16-pad sample player: pad 1 is bottom-left like a hardware MPC, every pad is a square tile showing its waveform, number and mode, and each pad has its own CV pin, so a MIDI CC / Note modulator or any gate can play it. Every pad is its own voice, so pads play together, and a click plays at once. A hit follows the pad's mode: one shot plays the whole sample and a new hit restarts it; gate plays while held (mouse down, CV high or note held) and stops on release; loop toggles a looping playback on each hit. Click selects a pad (right-click selects without playing); the rows below the pads edit the selected pad: sync and rate, fine tune (cents), pitch (semitones), speed (negative plays backwards), volume, pan, mode, and fade in / fade out (ms, at the start and end of every pass), defined as on the Sampler. sync is per pad: Free (the default) plays a hit at once; Synced latches the hit and fires it on the next grid line of the transport at the chosen rate (1/4, 1/8, 1 bar ... the same divisions as every other node), sample-accurately; a hit on the line itself fires on it, with the transport stopped it fires at once, and in gate mode letting go before the line cancels the hit. In loop mode a synced pad re-triggers the sample on every division while it is on (one pass per division: a longer sample is cut at the line, a shorter one leaves a gap), and with the transport stopped it plays as a plain loop. The rate control is greyed while a pad is Free. Every param of every pad can be modulated at any time: a cable stays bound to its own pad when you select another pad, and an orange dot on a tile shows that pad has a modulated param. A tile shows the mode and, when synced, the rate. The node's audio out is the mix of all pads. Loaded sample paths and pad settings are saved with the patch; the audio is re-read on load." },
          { "Looper", "How to use: wire the sound to loop into the input and the out to Audio Out, press Rec (with the transport playing and sync on it waits for the next bar; pressed up to 200 ms late, the take still starts on the line just passed), and the take ends by itself after the take length, then loops; Play stops and restarts it, Dub layers what comes in over it, Clear empties it. The waveform shows the loop with a playhead and the beat grid, and the line under the title says what the looper is doing. Each button has a CV pin, so a footswitch or MIDI note can drive them (a rising edge presses). take sets the length: a musical division (1 bar by default), or free, where the next Rec press ends it. Pressing Dub while recording ends the take and goes straight into overdub. Undo steps back one layer at a time (the last take, overdub or Clear, up to 8 steps) and the loop keeps playing; pressed during an overdub it throws that layer away. Playback has the Sampler's controls: finetune (cents), pitch (semitones), speed (negative plays backwards), volume, and fade in / fade out (ms) at the start and end of every pass. At exactly 1.00x the loop stays on the grid; at any other rate it plays in length / rate and DRIFTS against the transport, and Dub is paused while it does (layers are only written at the rate they were recorded). thru monitors the live input. Each take is always shifted by the audio interface's measured round-trip latency, so a loop played in time sits on the grid. The loop (up to 60 s) is saved as a WAV in your Recordings folder and comes back, stopped, when the patch is opened." },
          { "Audio In","Captures the default input device (mic or line-in) as a live audio source for the effects graph - patch it into a Filter, Delay, Mixer or straight to Audio Out. Trim is a plain gain stage; the mic tap starts the first time this node cooks and macOS will prompt for microphone permission then, so it stays idle until it's actually in a patch. The capture runs on its own engine bound to the system default input, independently of whichever output device is selected, and the header line says why it isn't live when it isn't." },
@@ -42415,7 +42634,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                { "Wavetable", "Multi-voice polyphonic wavetable oscillator (up to 8 voices) with two independent A/B wavetable engines crossfaded against each other, wavetable position morphing, detuned unison, and integrated stereo spread." },
                { "Analog", "Virtual-analog polyphonic synth with dual oscillators, unevenly detuned unison stacking, osc hard sync, sub-oscillator, noise, pre-filter drive, nonlinear ZDF Moog ladder and SVF filters, dual-path stereo spread, and amp ADSR." },
                { "Sampler", "High-resolution multi-sample player with pitch tracking, root note detection, start/end trimming, loop crossfades, and one-shot playback." },
-               { "Drum Sequencer", "8-lane pattern drum sequencer with individual sample slots, per-step velocity, swing, choke groups, per-lane mute/solo, and decay envelopes." },
+               { "Drum Sequencer", "8-lane, up to 32-step pattern drum sequencer with a 141-groove library and bundled kit, individual sample slots, per-step velocity, swing, choke groups, per-lane mute/solo, and decay envelopes." },
               { "MPC", "16-pad sample player: per-pad mode (one shot / gate / loop), sync (free or quantised to a division), volume, pitch, pan, speed, fine tune, fade in / out; polyphonic; pads playable by mouse, CV pin or note 36-51." },
                    { "Looper", "Live audio looper: record, play, overdub and clear with tempo-synced take lengths and interface latency compensation." },
                { "Slicer","Transient- or grid-sliced sample playback: chops a loaded sample into up to 64 slices and maps them chromatically from MIDI note 36, with draggable slice markers, a per-slice attack/decay pair, and a crossthrough toggle that lets a slice run past its own boundary." },
@@ -50123,7 +50342,10 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       const std::string exe = Platform::ExecutablePath();
       if (exe.empty())
          return {};
-      std::filesystem::path exeDir = std::filesystem::path(exe).parent_path();
+      // Platform::ExecutablePath is UTF-8 on every platform; u8path reads it as
+      // such (a plain path(std::string) on Windows would use the ANSI code page
+      // and miss Resources\ under a non-ASCII user or install folder).
+      std::filesystem::path exeDir = std::filesystem::u8path(exe).parent_path();
 #if defined(__APPLE__)
       // exe is at Contents/MacOS/Infinite -> Resources is a sibling of MacOS.
       std::filesystem::path resourceDir = exeDir.parent_path() / "Resources";
@@ -50135,7 +50357,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       std::error_code ec;
       if (!std::filesystem::exists(full, ec))
          return {};
-      return full.string();
+      return full.u8string(); // UTF-8 back out, same convention as ExecutablePath
    }
 
    static void SetWindowIcon(GLFWwindow* window)
@@ -56464,6 +56686,471 @@ static bool RunDrumSequencerFixture()
              reloadTrimOk ? "OK" : "FAIL", paramsLoadedOk, trimPreservedAfterReload,
              dst->laneStart[0], dst->laneEnd[0]);
       ok &= reloadTrimOk;
+   }
+
+   // 15) 32 steps: only step 20 set. At 120 BPM 1/16 a step is 6000 frames @48k,
+   // so the first hit lands at 20*6000 = 120000 (+-1) and the pattern repeats
+   // every 32*6000 = 192000 frames.
+   {
+      resetTransport();
+      auto node = makeNode(shortClickPath);
+      node->numSteps = 32;
+      node->stepVel[0][20] = 0.8f;
+      const int stepFrames = (int)std::lround(sampleRate * 0.125);
+      const int total = 32 * stepFrames + 22 * stepFrames;
+      const auto buf = Render(*node, total, blockSize, sampleRate);
+      // The click's own attack puts the threshold crossing a few dozen frames
+      // after the step boundary, so measure against step 0 of an identical node.
+      resetTransport();
+      auto refNode = makeNode(shortClickPath);
+      refNode->numSteps = 32;
+      refNode->stepVel[0][0] = 0.8f;
+      const auto refBuf = Render(*refNode, stepFrames * 4, blockSize, sampleRate);
+      const int refOnset = FindOnset(refBuf, 0);
+      const int onset1 = FindOnset(buf, 0);
+      const int onset2 = onset1 >= 0 ? FindOnset(buf, onset1 + stepFrames * 4) : -1;
+      const bool firstOk = onset1 >= 0 && refOnset >= 0 && std::abs((onset1 - refOnset) - 20 * stepFrames) <= 1;
+      const bool periodOk = onset2 >= 0 && std::abs((onset2 - onset1) - 32 * stepFrames) <= 1;
+      printf("DRUMSEQTEST 32-step timing %s (onset1=%d ref0=%d expected delta=%d onset2=%d period=%d expected=%d)\n",
+             (firstOk && periodOk) ? "OK" : "FAIL", onset1, refOnset, 20 * stepFrames, onset2, onset2 - onset1, 32 * stepFrames);
+      ok &= firstOk && periodOk;
+   }
+
+   // 16) Save/load round trip of step 31 (the last cell of page 2) and the
+   // step count; editPage is runtime-only and must not be saved.
+   {
+      auto src = std::make_unique<DrumSequencerNode>();
+      src->numSteps = 32;
+      src->stepVel[3][31] = 0.55f;
+      src->stepVel[0][8] = 0.9f;
+      src->editPage = 1;
+      std::vector<std::pair<std::string, std::string>> saved;
+      Patch::SaveParams(src.get(), saved);
+      bool pageSaved = false;
+      for (const auto& kv : saved)
+         if (kv.first.find("editPage") != std::string::npos || kv.first.find("page") != std::string::npos)
+            pageSaved = true;
+      auto dst = std::make_unique<DrumSequencerNode>();
+      Patch::LoadParams(dst.get(), saved);
+      const bool rtOk = dst->numSteps == 32 && std::fabs(dst->stepVel[3][31] - 0.55f) < 1e-4f &&
+                        std::fabs(dst->stepVel[0][8] - 0.9f) < 1e-4f && dst->editPage == 0 && !pageSaved;
+      // editPage clamp: 1 page when steps <= 16
+      dst->numSteps = 10;
+      dst->editPage = 1;
+      dst->CookIfNeeded(1);
+      const bool clampOk = dst->editPage == 0;
+      printf("DRUMSEQTEST 32-step save/load %s (rt=%d pageSaved=%d clamp=%d)\n", (rtOk && clampOk) ? "OK" : "FAIL",
+             rtOk, pageSaved, clampOk);
+      ok &= rtOk && clampOk;
+   }
+
+   // 17) Legacy 8-step patch: only the old keys (lane0_step0..7, steps=8)
+   // exist. Steps 8..31 must load as 0 and the render must be identical to a
+   // node built directly with the same 8 steps.
+   {
+      std::vector<std::pair<std::string, std::string>> legacy;
+      for (int st = 0; st < 8; st++)
+         if (st % 2 == 0)
+            legacy.push_back({ "f lane0_step" + std::to_string(st), "0.8" }); // Patch keys carry a type prefix
+      legacy.push_back({ "i rate", std::to_string((int)MusicTime::kSixteenth) });
+      legacy.push_back({ "i steps", "8" });
+      auto old = std::make_unique<DrumSequencerNode>();
+      Patch::LoadParams(old.get(), legacy);
+      bool tailZero = true;
+      for (int lane = 0; lane < DrumSequencerNode::kNumLanes; lane++)
+         for (int st = 8; st < DrumSequencerNode::kMaxSteps; st++)
+            if (old->stepVel[lane][st] != 0.0f)
+               tailZero = false;
+      old->LoadFileToLane(0, shortClickPath);
+
+      auto ref = makeNode(shortClickPath);
+      for (int st = 0; st < 8; st += 2)
+         ref->stepVel[0][st] = 0.8f;
+      resetTransport();
+      const auto a = Render(*old, sampleRate * 2, blockSize, sampleRate);
+      resetTransport();
+      const auto b = Render(*ref, sampleRate * 2, blockSize, sampleRate);
+      const bool same = a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin());
+      const bool legacyOk = tailZero && old->numSteps == 8 && same && FindOnset(a, 0) >= 0;
+      printf("DRUMSEQTEST legacy 8-step load %s (tailZero=%d identical=%d)\n", legacyOk ? "OK" : "FAIL", tailZero, same);
+      ok &= legacyOk;
+   }
+
+   // 18) Randomize / RandomizeLane / ClearPattern never leave a step set at or
+   // beyond numSteps (checked for 20 and 32), and do set something inside.
+   {
+      bool randOk = true;
+      for (int ns : { 20, 32 })
+      {
+         auto node = std::make_unique<DrumSequencerNode>();
+         node->numSteps = ns;
+         for (int lane = 0; lane < DrumSequencerNode::kNumLanes; lane++)
+            for (int st = 0; st < DrumSequencerNode::kMaxSteps; st++)
+               node->stepVel[lane][st] = 0.5f; // pre-dirty everything
+         node->Randomize();
+         bool inside = false, beyond = false;
+         for (int lane = 0; lane < DrumSequencerNode::kNumLanes; lane++)
+            for (int st = 0; st < DrumSequencerNode::kMaxSteps; st++)
+            {
+               if (st < ns && node->stepVel[lane][st] > 0.0f) inside = true;
+               if (st >= ns && node->stepVel[lane][st] != 0.0f) beyond = true;
+            }
+         for (int st = 0; st < DrumSequencerNode::kMaxSteps; st++)
+            node->stepVel[2][st] = 0.5f;
+         node->RandomizeLane(2);
+         for (int st = ns; st < DrumSequencerNode::kMaxSteps; st++)
+            if (node->stepVel[2][st] != 0.0f) beyond = true;
+         node->ClearPattern();
+         for (int lane = 0; lane < DrumSequencerNode::kNumLanes; lane++)
+            for (int st = 0; st < DrumSequencerNode::kMaxSteps; st++)
+               if (node->stepVel[lane][st] != 0.0f) beyond = true;
+         if (!inside || beyond)
+            randOk = false;
+      }
+      printf("DRUMSEQTEST randomize within numSteps %s\n", randOk ? "OK" : "FAIL");
+      ok &= randOk;
+   }
+
+   // 19) Groove library self-test: every Part.steps in 1..kMaxSteps, every
+   // non-null lane string at least `steps` long and made of X/x/o/. only, rate
+   // a valid MusicTime division, swing/tones in range, category listed, names
+   // unique and free of artist / song titles, and each part has a hit.
+   {
+      int nGrooves = 0, nCats = 0;
+      const DrumPatterns::Groove* grooves = DrumPatterns::All(nGrooves);
+      const char* const* cats = DrumPatterns::Categories(nCats);
+      std::string firstBad;
+      auto bad = [&](const char* name, const char* why)
+      {
+         if (firstBad.empty())
+            firstBad = std::string(name) + ": " + why;
+      };
+      static const char* const kDenylist[] = {
+         "queen", "jackson", "ronettes", "billie", "be my baby", "we will rock", "neu!", "kraftwerk", "purdie",
+         "rosanna", "james brown", "funky drummer", "winstons", "amen", "honey drippers", "impeach", "led zeppelin",
+         "levee", "bongo band", "apache", "cold sweat", "tony allen", "prodigy", "chemical brothers", "dilla",
+         "bambaataa", "planet rock", "teardrop", "massive attack", "portishead", "bjork", "army of me",
+         "hyperballad", "bo diddley", "motown", "volt mix", "feel", "909",
+      };
+      std::set<std::string> seen;
+      for (int g = 0; g < nGrooves; g++)
+      {
+         const DrumPatterns::Groove& gr = grooves[g];
+         // Whole-word match on a lowercased, punctuation-stripped name, so
+         // "amen" flags "Amen break" but not "Flamenco".
+         auto norm = [](const char* in)
+         {
+            std::string out = " ";
+            for (; *in != '\0'; in++)
+               out += isalnum((unsigned char)*in) ? (char)tolower((unsigned char)*in) : ' ';
+            return out + " ";
+         };
+         const std::string lower = norm(gr.name);
+         for (const char* d : kDenylist)
+            if (lower.find(norm(d)) != std::string::npos)
+               bad(gr.name, "name matches artist/song denylist");
+         if (!seen.insert(lower).second)
+            bad(gr.name, "duplicate name");
+         // The UI font has Basic Latin only (anything else draws '?') and MSVC
+         // reads sources in the ANSI code page, so names must be plain ASCII.
+         for (const char* c = gr.name; *c; c++)
+            if ((unsigned char)*c < 0x20 || (unsigned char)*c > 0x7e)
+               bad(gr.name, "name is not printable ASCII");
+         bool catOk = false;
+         for (int c = 0; c < nCats; c++)
+            catOk |= strcmp(cats[c], gr.category) == 0;
+         if (!catOk)
+            bad(gr.name, "category not in Categories()");
+         if (gr.rate < 0 || gr.rate >= MusicTime::kNumRateDivisions)
+            bad(gr.name, "rate out of range");
+         if (!(gr.swing >= 0.0f && gr.swing <= 1.0f) || gr.bpm <= 0)
+            bad(gr.name, "swing/bpm out of range");
+         for (int l = 0; l < 8; l++)
+            if (!(gr.tones[l] >= -24.0f && gr.tones[l] <= 24.0f))
+               bad(gr.name, "tone out of range");
+         for (int p = 0; p < 3; p++)
+         {
+            const DrumPatterns::Part& part = gr.parts[p];
+            if (part.steps < 1 || part.steps > DrumSequencerNode::kMaxSteps)
+            {
+               bad(gr.name, "part steps out of 1..kMaxSteps");
+               continue;
+            }
+            bool anyHit = false;
+            for (int l = 0; l < 8; l++)
+            {
+               const char* s = part.lanes[l];
+               if (s == nullptr)
+                  continue;
+               if ((int)strlen(s) < part.steps)
+                  bad(gr.name, "lane string shorter than steps");
+               for (int i = 0; i < part.steps && s[i] != '\0'; i++)
+               {
+                  if (strchr("Xxo.", s[i]) == nullptr)
+                     bad(gr.name, "bad cell character");
+                  anyHit |= DrumPatterns::CellVelocity(s[i]) > 0.0f;
+               }
+            }
+            if (!anyHit)
+               bad(gr.name, "part has no hits");
+         }
+      }
+      const bool libOk = nGrooves == 141 && nCats == 10 && firstBad.empty();
+      printf("DRUMSEQTEST groove library %s (%d grooves, %d categories%s%s)\n", libOk ? "OK" : "FAIL", nGrooves, nCats,
+             firstBad.empty() ? "" : ", first problem: ", firstBad.c_str());
+      ok &= libOk;
+   }
+
+   // 20) Accent: a full-velocity (>= 0.99) step plays laneAccentPitch semitones
+   // higher, so at +12 st a sustained sample ends at half its length; a 0.8
+   // step on the same lane is unaffected.
+   {
+      auto soundedFrames = [&](float vel, float accent)
+      {
+         resetTransport();
+         auto node = makeNode(longClickPath);
+         node->numSteps = 32; // one hit per 4 s: no retrigger inside the render
+         node->stepVel[0][0] = vel;
+         node->laneAccentPitch[0] = accent;
+         const auto buf = Render(*node, kSustainFrames + 6000, blockSize, sampleRate);
+         int first = -1, last = -1;
+         for (int i = 0; i < (int)buf.size(); i++)
+            if (std::fabs(buf[i]) > 0.01f)
+            {
+               if (first < 0)
+                  first = i;
+               last = i;
+            }
+         return first >= 0 ? last - first + 1 : 0;
+      };
+      const int plain = soundedFrames(1.0f, 0.0f);
+      const int accented = soundedFrames(1.0f, 12.0f);
+      const int ghostAccented = soundedFrames(0.8f, 12.0f);
+      const bool halfOk = plain > kSustainFrames * 9 / 10 && std::abs(accented * 2 - plain) <= plain / 50;
+      const bool ghostOk = std::abs(ghostAccented - plain) <= plain / 100;
+      printf("DRUMSEQTEST accent %s (plain=%d accent+12=%d vel0.8+accent=%d)\n", halfOk && ghostOk ? "OK" : "FAIL",
+             plain, accented, ghostAccented);
+      ok &= halfOk && ghostOk;
+   }
+
+   // Throwaway kit folder named like the bundled one, with eight click WAVs.
+   const std::string kitRoot = TmpPath("infinite_drumseq_kit");
+   const std::string kitDir = kitRoot + "/infinite-basic";
+   {
+      std::error_code ec;
+      std::filesystem::create_directories(kitDir, ec);
+      for (int l = 0; l < 8; l++)
+         WriteClickWav(kitDir + "/" + DrumPatterns::KitFile(l), 4000, sampleRate);
+   }
+   const std::string savedKitDir = DrumSequencerNode::KitDir();
+   DrumSequencerNode::SetKitDir(kitDir);
+
+   int nG = 0;
+   const DrumPatterns::Groove* gs = DrumPatterns::All(nG);
+   auto pickPart = [&](auto pred, int& gOut, int& pOut)
+   {
+      for (int g = 0; g < nG; g++)
+         for (int p = 0; p < 3; p++)
+            if (pred(gs[g], gs[g].parts[p]))
+            {
+               gOut = g;
+               pOut = p;
+               return true;
+            }
+      return false;
+   };
+
+   // 21) ApplyPattern: slots past the part's length are zeroed, settings land,
+   // a lane the user loaded is not replaced, accent resets when the groove
+   // gives none, and the kit fills only empty lanes the part uses.
+   {
+      int gLong = -1, pLong = -1, gShort = -1, pShort = -1;
+      const bool found =
+         pickPart([](const DrumPatterns::Groove&, const DrumPatterns::Part& p) { return p.steps == 32; }, gLong, pLong) &&
+         pickPart([](const DrumPatterns::Groove&, const DrumPatterns::Part& p) { return p.steps == 12; }, gShort, pShort);
+      bool applyOk = found;
+      if (found)
+      {
+         auto node = std::make_unique<DrumSequencerNode>();
+         node->ApplyPattern(gs[gLong], pLong);
+         applyOk &= node->numSteps == 32;
+         node->ApplyPattern(gs[gShort], pShort);
+         bool tailZero = true, anyIn = false;
+         for (int lane = 0; lane < DrumSequencerNode::kNumLanes; lane++)
+            for (int st = 0; st < DrumSequencerNode::kMaxSteps; st++)
+            {
+               if (st >= 12 && node->stepVel[lane][st] != 0.0f)
+                  tailZero = false;
+               if (st < 12 && node->stepVel[lane][st] > 0.0f)
+                  anyIn = true;
+            }
+         applyOk &= tailZero && anyIn && node->numSteps == 12 && node->editPage == 0 &&
+                    node->rate == gs[gShort].rate && node->swing == gs[gShort].swing &&
+                    node->patternName == gs[gShort].name && node->patternPart == pShort;
+         // pushed to the audio side without tripping anything
+         node->CookIfNeeded(1);
+      }
+      printf("DRUMSEQTEST apply pattern %s\n", applyOk ? "OK" : "FAIL");
+      ok &= applyOk;
+
+      // Accent: set from tones, and reset to 0 when the next groove has none.
+      int gTone = -1, pTone = -1, gNoTone = -1, pNoTone = -1;
+      bool accentOk = pickPart([](const DrumPatterns::Groove& g, const DrumPatterns::Part&)
+                               { return g.tones[7] != 0.0f; }, gTone, pTone) &&
+                      pickPart([](const DrumPatterns::Groove& g, const DrumPatterns::Part&)
+                               { return g.tones[7] == 0.0f; }, gNoTone, pNoTone);
+      if (accentOk)
+      {
+         auto node = std::make_unique<DrumSequencerNode>();
+         node->ApplyPattern(gs[gTone], pTone);
+         const bool set = node->laneAccentPitch[7] == gs[gTone].tones[7];
+         node->laneAccentPitch[3] = 7.0f; // a stray hand-set accent on another lane
+         node->ApplyPattern(gs[gNoTone], pNoTone);
+         accentOk = set && node->laneAccentPitch[7] == 0.0f && node->laneAccentPitch[3] == 0.0f;
+      }
+      printf("DRUMSEQTEST apply pattern accent reset %s\n", accentOk ? "OK" : "FAIL");
+      ok &= accentOk;
+   }
+
+   // 22) Kit fill: empty lanes the part uses are loaded from the kit, a lane
+   // the user loaded keeps its sample, and the hats only join choke group 1
+   // when both were kit-filled by the same call.
+   {
+      int gHats = -1, pHats = -1, gClosedOnly = -1, pClosedOnly = -1;
+      bool kitOk =
+         pickPart([](const DrumPatterns::Groove&, const DrumPatterns::Part& p)
+                  { return p.lanes[0] && p.lanes[2] && p.lanes[3]; }, gHats, pHats) &&
+         pickPart([](const DrumPatterns::Groove&, const DrumPatterns::Part& p)
+                  { return p.lanes[2] && !p.lanes[3]; }, gClosedOnly, pClosedOnly);
+      if (kitOk)
+      {
+         // both hats filled -> choke 1 on both; lanes the part skips stay empty
+         auto a = std::make_unique<DrumSequencerNode>();
+         a->ApplyPattern(gs[gHats], pHats);
+         const DrumPatterns::Part& ph = gs[gHats].parts[pHats];
+         for (int l = 0; l < 8; l++)
+            kitOk &= (ph.lanes[l] != nullptr) == !a->FilePath(l).empty();
+         kitOk &= a->FileName(0) == DrumPatterns::KitFile(0) && a->laneChoke[2] == 1 && a->laneChoke[3] == 1;
+
+         // user already loaded the open hat: kept, and no choke is invented
+         auto b = std::make_unique<DrumSequencerNode>();
+         b->LoadFileToLane(3, shortClickPath);
+         b->ApplyPattern(gs[gHats], pHats);
+         kitOk &= b->FilePath(3) == shortClickPath && !b->FilePath(2).empty() && b->laneChoke[2] == 0 &&
+                  b->laneChoke[3] == 0;
+
+         // part without an open hat: closed hat filled, no choke
+         auto c = std::make_unique<DrumSequencerNode>();
+         c->ApplyPattern(gs[gClosedOnly], pClosedOnly);
+         kitOk &= !c->FilePath(2).empty() && c->FilePath(3).empty() && c->laneChoke[2] == 0 && c->laneChoke[3] == 0;
+
+         // a second apply never replaces what the first one loaded, nor a user choke setting
+         a->laneChoke[2] = 2;
+         a->laneChoke[3] = 0;
+         a->ClearLane(3);
+         a->ApplyPattern(gs[gHats], pHats);
+         kitOk &= a->laneChoke[2] == 2 && a->laneChoke[3] == 0;
+
+         // missing kit folder: no-op, status untouched
+         DrumSequencerNode::SetKitDir(kitRoot + "/does-not-exist");
+         auto d = std::make_unique<DrumSequencerNode>();
+         d->ApplyPattern(gs[gHats], pHats);
+         kitOk &= d->LoadedLaneCount() == 0 && d->LaneStatus(0) == "--";
+         DrumSequencerNode::SetKitDir("");
+         auto e = std::make_unique<DrumSequencerNode>();
+         e->ApplyPattern(gs[gHats], pHats);
+         kitOk &= e->LoadedLaneCount() == 0;
+         DrumSequencerNode::SetKitDir(kitDir);
+      }
+      printf("DRUMSEQTEST kit fill %s\n", kitOk ? "OK" : "FAIL");
+      ok &= kitOk;
+   }
+
+   // 23) Stale kit path: a saved path inside .../infinite-basic/ whose folder no
+   // longer exists retries from the current kit folder (forward or back
+   // slashes) and rewrites the path; other parents do not retry.
+   {
+      auto node = std::make_unique<DrumSequencerNode>();
+      const std::string fwd = "/Applications/Old/Infinite.app/Contents/Resources/drumkits/infinite-basic/02-snare.wav";
+      const std::string back = "C:\\Old Install\\Resources\\drumkits\\infinite-basic\\03-closed-hat.wav";
+      const std::string other = "/Applications/Old/Resources/drumkits/other-kit/02-snare.wav";
+      const bool r1 = node->LoadFileToLane(1, fwd);
+      const bool p1 = node->FilePath(1) == kitDir + "/02-snare.wav";
+      const bool r2 = node->LoadFileToLane(2, back);
+      const bool p2 = node->FilePath(2) == kitDir + "/03-closed-hat.wav";
+      const bool r3 = node->LoadFileToLane(3, other);
+      DrumSequencerNode::SetKitDir("");
+      const bool r4 = node->LoadFileToLane(4, fwd);
+      DrumSequencerNode::SetKitDir(kitDir);
+      // through a save/load/reload, as a patch opened from another install would
+      auto src = std::make_unique<DrumSequencerNode>();
+      std::vector<std::pair<std::string, std::string>> params;
+      Patch::SaveParams(src.get(), params);
+      for (auto& kv : params)
+         if (kv.first == "s lane0_path")
+            kv.second = fwd;
+      auto dst = std::make_unique<DrumSequencerNode>();
+      Patch::LoadParams(dst.get(), params);
+      dst->ReloadFromPaths();
+      const bool viaPatch = dst->FilePath(0) == kitDir + "/02-snare.wav" && dst->LoadedLaneCount() == 1;
+      const bool staleOk = r1 && p1 && r2 && p2 && !r3 && !r4 && viaPatch;
+      printf("DRUMSEQTEST stale kit path %s (fwd=%d/%d back=%d/%d other=%d noKit=%d viaPatch=%d)\n",
+             staleOk ? "OK" : "FAIL", r1, p1, r2, p2, r3, r4, viaPatch);
+      ok &= staleOk;
+   }
+
+   // 24) accentPitch / patternName / patternPart survive save -> load, and a
+   // restored "no sample" state clears a lane that still holds one.
+   {
+      auto src = std::make_unique<DrumSequencerNode>();
+      src->laneAccentPitch[5] = -7.5f;
+      src->patternName = "Test groove";
+      src->patternPart = 2;
+      std::vector<std::pair<std::string, std::string>> params;
+      Patch::SaveParams(src.get(), params);
+      auto dst = std::make_unique<DrumSequencerNode>();
+      Patch::LoadParams(dst.get(), params);
+      bool rtOk = std::fabs(dst->laneAccentPitch[5] + 7.5f) < 1e-4f && dst->patternName == "Test groove" &&
+                  dst->patternPart == 2 && dst->laneAccentPitch[4] == 0.0f;
+
+      auto held = std::make_unique<DrumSequencerNode>();
+      held->LoadFileToLane(0, shortClickPath);
+      Patch::LoadParams(held.get(), params); // restored state: lane 0 has no path
+      held->ReloadFromPaths();
+      rtOk &= held->FileName(0).empty() && held->LoadedLaneCount() == 0;
+      printf("DRUMSEQTEST accent/pattern round trip %s\n", rtOk ? "OK" : "FAIL");
+      ok &= rtOk;
+   }
+
+   // 25) The kit that actually ships: BundledResourcePath resolves it next to
+   // the running binary (Contents/Resources on macOS, Resources/ beside the
+   // exe on Windows and Linux), all eight KitFile() names exist with that exact
+   // case (Linux is case-sensitive) and decode, and every lane fills.
+   {
+      const std::string real = BundledResourcePath("drumkits/infinite-basic");
+      bool realOk = !real.empty();
+      int filled = 0;
+      if (realOk)
+      {
+         DrumSequencerNode::SetKitDir(real);
+         auto node = std::make_unique<DrumSequencerNode>();
+         const DrumPatterns::Groove& g0 = DrumPatterns::All(nG)[0];
+         DrumPatterns::Part full = g0.parts[0];
+         for (int l = 0; l < 8; l++)
+            full.lanes[l] = "X";
+         node->LoadKitIntoEmptyLanes(full);
+         filled = node->LoadedLaneCount();
+         realOk = filled == 8 && node->laneChoke[2] == 1 && node->laneChoke[3] == 1;
+      }
+      printf("DRUMSEQTEST bundled kit %s (dir=%s filled=%d/8)\n", realOk ? "OK" : "FAIL", real.empty() ? "<not found>" : real.c_str(),
+             filled);
+      ok &= realOk;
+   }
+
+   DrumSequencerNode::SetKitDir(savedKitDir);
+   {
+      std::error_code ec;
+      std::filesystem::remove_all(kitRoot, ec);
    }
 
    remove(shortClickPath.c_str());
@@ -71953,6 +72640,10 @@ static void ApplyUiScale(GLFWwindow* window, bool rendererReady)
 
 int main(int argc, char** argv)
 {
+   // Where the Drum Sequencer finds its bundled kit (Resources/drumkits/
+   // infinite-basic); empty when the folder is absent, which the node treats as
+   // "no kit". Set first so headless jobs that load patches see it too.
+   DrumSequencerNode::SetKitDir(BundledResourcePath("drumkits/infinite-basic"));
    const double sMainStartMs = Bench::ScopedStageTimer::NowMs();
    const double sMainRssStartMb = Bench::ProcessRssMb();
    const double sMainFootStartMb = Bench::ProcessFootprintMb();
@@ -100173,7 +100864,7 @@ int main(int argc, char** argv)
                { "Sampler",        "Synths",     "Sample playback with pitch & envelope" },
                { "Audio File",     "Modulators", "Streaming playback & follower" },
                { "Slicer",         "Synths",     "Beat/transient slicer" },
-               { "Drum Sequencer", "Synths",     "Step sequencer & drum kit" },
+               { "Drum Sequencer", "Synths",     "Step sequencer, grooves & drum kit" },
                { "MPC",            "Synths",     "16-pad sample player" },
                { "PaulStretch",    "Synths",     "Extreme time-stretch & wash" },
                { "Granular",       "Synths",     "Granular cloud synthesis" },
