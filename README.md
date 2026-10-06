@@ -184,31 +184,13 @@ The Linux build has the same node graph and file format as macOS/Windows, with t
 Contributions, bug reports, and node ideas are welcome!
 - Join the discussion and share creations in our [Discord Community](https://discord.gg/7cpQfCxnx).
 - File bugs or feature requests in [GitHub Issues](https://github.com/n1m21n/Infinite/issues).
-- Submit Pull Requests with clean-room MIT-compatible code following [docs/CODE_STANDARDS.md](docs/CODE_STANDARDS.md).
+- Submit Pull Requests with clean-room MIT-compatible code following [docs/CODE_STANDARDS.md](docs/CODE_STANDARDS.md). See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
 ## Prior Art & Acknowledgements
 
-Infinite is its own codebase, but its ideas stand on a long line of tools that came before it. We want to name them plainly.
-
-**Node-based audio and visual environments.** Patching signal through a graph of modules is the tradition of [Max/MSP and Jitter](https://cycling74.com/), [Pure Data](https://puredata.info/), [Reaktor](https://www.native-instruments.com/en/products/komplete/synths/reaktor-6/), [Bitwig's The Grid](https://www.bitwig.com/the-grid/), [VCV Rack](https://vcvrack.com/) and [BespokeSynth](https://www.bespokesynth.com/). Mixing audio, video and 3D in one graph is the territory of [TouchDesigner](https://derivative.ca/), Max/Jitter and [Houdini](https://www.sidefx.com/). Infinite's first building blocks (the node registry, the base node interface, pull-based per-frame cooking, the OpenGL render-pass helpers and a single node shell that hosts many effect types) were written with BespokeSynth's source open as a design reference, under an explicit instruction not to copy its code. The node registry and shader compiler have since been rewritten from scratch, and the rest has grown far past those first versions.
-
-**Geometry.** The per-element attribute model (`P`, `N`, `uv`, `Cd`) follows Houdini's SOP conventions. Several geometry nodes follow behaviour a [Blender Geometry Nodes](https://docs.blender.org/manual/en/latest/modeling/geometry_nodes/) user would expect, and some compositing nodes are named after their TouchDesigner equivalents (Fit, for example).
-
-**Field.** Field's building blocks all have precedent:
-- per-element kernels over geometry attributes come from Houdini VEX, and an early draft even used VEX's `@` sigil before it was removed;
-- running parts of a program at different rates follows Faust's computation levels and the rate model in V. Norilo, *"Kronos: A Declarative Metaprogramming Language for Digital Signal Processing"*, Computer Music Journal 39:4 (2015);
-- `param` declarations echo Houdini's `chf()` and Cabbage's markup;
-- pixel kernels compile to GLSL in the way Shadertoy-style tools work.
-
-What Field adds is putting these together: **one kernel syntax whose domain (graph, frame, element, pixel or sample) is inferred from what the code touches**, compiled to the matching backend and wired into a live audiovisual node graph as real, modulatable, savable nodes.
-
-**Community.** [Ricardo Palmieri](https://github.com/ricardopalmieri) ([@ricardopalmieri](https://www.instagram.com/ricardopalmieri/)) built a Windows-focused fork of Infinite and opened [PR #24](https://github.com/n1m21n/Infinite/pull/24). Infinite did not merge it as one piece and almost none of its code was copied (the exception is the Drum Sequencer's groove table, adapted from his MIT-licensed `DrumPatterns.h` with every title rewritten to a generic style name, and played through a drum kit synthesized by `tools/make-drumkit.py`), but his work showed which features were worth building, and the native versions here credit it as the origin of the idea: Windows low-latency audio (shared-mode and exclusive output, round-trip latency readout), the Looper, the 16-pad MPC sampler and per-parameter MIDI learn. His fork also pointed to the Drum Sequencer's groove library (now shipped), a Clip Matrix, a Chord Progression node, a MIDI File node and an MCP bridge for AI assistants; if any of the others ship, they will be credited the same way. He also gave the reproduction details for the Auto-Tune Pro editor freeze.
-
-**How it is built.** Infinite is developed by n1m21n with extensive AI coding assistance from Anthropic's Claude. AI-assisted commits carry a `Co-Authored-By` trailer in the git history.
-
-**Third-party libraries** are vendored under `external/` and `third_party/`, each with its own licence (Dear ImGui, imgui-node-editor, miniaudio, dr_libs, stb, nlohmann/json, tinyfiledialogs and others). The Steinberg VST3 SDK is covered under [License](#license) below, and libraries that carry extra distribution obligations (FFmpeg, x264, Signalsmith Stretch) are documented in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
+The tools and papers Infinite builds on are named in [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md), and the people who contributed are credited in [CONTRIBUTING.md](CONTRIBUTING.md#community-and-contributors).
 
 ---
 
