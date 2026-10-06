@@ -2215,3 +2215,6 @@
 {"ts": "2026-10-06T10:29:38+00:00", "event": "edit", "id": "R553", "commits": ["f3937093"]}
 {"ts": "2026-10-06T10:43:04+00:00", "event": "move", "id": "R568", "horizon": "later"}
 {"ts": "2026-10-06T10:43:09+00:00", "event": "edit", "id": "R568", "title": "Video: skip the BGRA->RGBA convert (needs a Platform.h pixel-format contract change on 3 platforms; ~4 ms p50 at 4K, macOS only; deferred 2026-10-06)"}
+{"ts": "2026-10-06T10:47:27+00:00", "event": "done", "id": "R572", "why": "ExpandPinHit() sets ed::PinRect to >=20 pt tall and wide, extending away from the widget so the control's own first pixels are not stolen. Applied to discrete, slider, knob and colour pins. Builds, shortcuts-sweep clean; not eyeballed in the UI (owner to check feel)."}
+{"ts": "2026-10-06T10:47:27+00:00", "event": "edit", "id": "R572", "commits": ["d808b0de"]}
+{"ts": "2026-10-06T10:47:42+00:00", "event": "add", "id": "R584", "after": [], "user": false, "src": "plan:keyboard-nav", "track": "engine", "kind": "feature", "horizon": "later", "title": "Plan: R571 - Keyboard-only use (keyboard cursor over nodes and pins, ImGui nav for popups and pa", "why": "docs/plans/keyboard-nav"}
