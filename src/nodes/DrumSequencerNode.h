@@ -11,6 +11,11 @@ namespace Platform
 {
    struct SampleBuffer;
 }
+namespace DrumPatterns
+{
+   struct Groove;
+   struct Part;
+}
 
 // An 8-lane, up-to-32-step drum machine, laid out as 8 lane cards (waveform +
 // per-lane transient/decay/pitch/volume/pan) above an 8-lane step grid (16 steps per page). Each
@@ -65,6 +70,27 @@ public:
    // rather than blocking the rest of the patch load.
    void ReloadFromPaths();
 
+   // Directory holding the bundled kit (assets/drumkits/infinite-basic,
+   // shipped in Resources/). Set once at startup from main.cpp; empty means
+   // "no kit", and LoadKitIntoEmptyLanes then does nothing. Main thread only.
+   static void SetKitDir(const std::string& dir);
+   static const std::string& KitDir();
+
+   // Main thread. Replaces the whole pattern with groove `g`, part `part`
+   // (0 = A, 1 = B, 2 = C): clears every step slot (including those past the
+   // part's own length), writes the part's cells, sets rate / swing / steps,
+   // page 0, each lane's accent pitch (0 when the groove gives none), and the
+   // pattern name/part; then fills still-empty lanes from the bundled kit.
+   // One call, so a caller that pushes one undo checkpoint first gets one undo
+   // step for all of it. Lanes the user loaded a sample into are never touched.
+   void ApplyPattern(const DrumPatterns::Groove& g, int part);
+
+   // Loads the bundled kit file into every lane that has no sample and that
+   // `part` actually uses (non-null lane string). If lanes 2 and 3 (closed and
+   // open hat) were both filled by this call and both have no choke group, puts
+   // them in choke group 1. No-op when the kit directory is unset or missing.
+   void LoadKitIntoEmptyLanes(const DrumPatterns::Part& part);
+
    const std::string& FilePath(int lane) const { return laneFilePath[Clamp(lane)]; }
    const std::string& FileName(int lane) const { return laneFileName[Clamp(lane)]; }
    const std::string& LaneStatus(int lane) const { return laneStatus[Clamp(lane)]; }
@@ -103,6 +129,10 @@ public:
    bool laneMute[kNumLanes];
    bool laneSolo[kNumLanes];
    int laneChoke[kNumLanes]; // 0 = no choke group
+   // Semitones added to this lane's pitch on full-velocity (>= 0.99) steps
+   // only - the "accent" of a two-tone lane (agogo / campana bells). -24..24,
+   // clamped on the main thread, so lane pitch + accent stays within +-48 st.
+   float laneAccentPitch[kNumLanes];
 
    // Decimated min/max waveform for each lane card's visualizer, filled
    // once at load time (see FinishLaneBuffer) - mirrors SamplerNode's
@@ -117,6 +147,10 @@ public:
    int editPage = 0;    // UI only, not saved: which 16-step page the grid shows (clamped in CookIfNeeded)
    float swing = 0.0f;  // 0..1
    float volume = 0.8f; // node output level
+   // Which library groove / part last landed here (ApplyPattern). Saved, but
+   // informational: hand-editing steps afterwards does not clear it.
+   std::string patternName;
+   int patternPart = 0; // 0 = A, 1 = B, 2 = C
    bool run = true;
 
    // Offsets applied on top of every lane's own value - additive for
@@ -174,6 +208,9 @@ private:
    void FinishLaneBuffer(int lane, Platform::SampleBuffer* decoded, const std::string& fileName,
                           const std::string& filePath, const std::string& status);
    void PushDirtyParams();
+   // Decodes `path` into `lane` and finishes the load; on failure leaves the
+   // lane (and its status) untouched and returns the decoder's message.
+   bool TryLoadLane(int lane, const std::string& path, std::string& error);
 
    std::unique_ptr<AudioDrumSequencerNode> mAudioNode;
    int mLastCookFrame = -1;
@@ -207,6 +244,7 @@ private:
    bool mLastLaneMute[kNumLanes];
    bool mLastLaneSolo[kNumLanes];
    int mLastLaneChoke[kNumLanes];
+   float mLastLaneAccentPitch[kNumLanes];
    int mLastRate = -1;
    int mLastNumSteps = -1;
    float mLastSwing = -1.0f;

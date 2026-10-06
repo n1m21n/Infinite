@@ -1,4 +1,5 @@
 #include "DrumSequencerNode.h"
+#include "DrumPatterns.h"
 
 #include <algorithm>
 #include <atomic>
@@ -118,6 +119,11 @@ public:
       mLaneSolo[lane].store(solo, std::memory_order_relaxed);
       mLaneChoke[lane].store(choke, std::memory_order_relaxed);
    }
+
+   // `accent` is already clamped to +-24 st on the main thread
+   // (DrumSequencerNode::PushDirtyParams); TriggerLane adds it to the lane's
+   // pitch for full-velocity steps only.
+   void PushLaneAccent(int lane, float accent) { mLaneAccentPitch[lane].store(accent, std::memory_order_relaxed); }
 
    void PushStep(int lane, int step, float vel) { mStepVel[lane][step].store(vel, std::memory_order_relaxed); }
 
@@ -419,7 +425,11 @@ private:
       voice.buffer = buf;
       voice.readPos = (double)startFrac * buf->numFrames;
       voice.endFrame = (double)endFrac * buf->numFrames;
-      voice.rate = NoteRateForPitch(lanePitchNow[lane]);
+      // Accent: full-velocity steps (X cells / a fully dragged cell) play
+      // accent semitones higher. Both terms are clamped to +-24 on the main
+      // thread, so the sum stays within +-48 st with no clamp needed here.
+      const float accent = velocity >= 0.99f ? mLaneAccentPitch[lane].load(std::memory_order_relaxed) : 0.0f;
+      voice.rate = NoteRateForPitch(lanePitchNow[lane] + accent);
       voice.velocity = velocity * laneVolNow[lane];
       DspMath::EqualPowerPan(lanePanNow[lane], voice.panL, voice.panR);
       voice.attackLevel = 0.0f;
@@ -461,6 +471,7 @@ private:
    std::atomic<bool> mLaneMute[kNumLanes] = {};
    std::atomic<bool> mLaneSolo[kNumLanes] = {};
    std::atomic<int> mLaneChoke[kNumLanes] = {};
+   std::atomic<float> mLaneAccentPitch[kNumLanes] = {};
    std::atomic<float> mStepVel[kNumLanes][kMaxSteps] = {};
    std::atomic<float> mLaneStart[kNumLanes] = {};
    std::atomic<float> mLaneEnd[kNumLanes] = {};
@@ -489,6 +500,7 @@ DrumSequencerNode::DrumSequencerNode()
       laneMute[lane] = false;
       laneSolo[lane] = false;
       laneChoke[lane] = 0;
+      laneAccentPitch[lane] = 0.0f;
 
       mLastLaneVolume[lane] = -1.0f;
       mLastLanePan[lane] = -99.0f;
@@ -501,6 +513,7 @@ DrumSequencerNode::DrumSequencerNode()
       mLastLaneMute[lane] = false;
       mLastLaneSolo[lane] = false;
       mLastLaneChoke[lane] = -1;
+      mLastLaneAccentPitch[lane] = -999.0f;
    }
 }
 DrumSequencerNode::~DrumSequencerNode() = default;
@@ -630,6 +643,15 @@ void DrumSequencerNode::PushDirtyParams()
          mLastLaneChoke[lane] = laneChoke[lane];
       }
 
+      if (mFirstCook || laneAccentPitch[lane] != mLastLaneAccentPitch[lane])
+      {
+         // Clamped here, on the main thread; a patch or a modulator can hand
+         // over anything. NaN reads as "no accent".
+         const float acc = std::isfinite(laneAccentPitch[lane]) ? std::clamp(laneAccentPitch[lane], -24.0f, 24.0f) : 0.0f;
+         mAudioNode->PushLaneAccent(lane, acc);
+         mLastLaneAccentPitch[lane] = laneAccentPitch[lane];
+      }
+
       for (int step = 0; step < kMaxSteps; step++)
       {
          if (mFirstCook || stepVel[lane][step] != mLastStepVel[lane][step])
@@ -690,6 +712,8 @@ void DrumSequencerNode::VisitParams(ParamVisitor& v)
       v.Bool(name, laneSolo[lane]);
       snprintf(name, sizeof(name), "lane%d_choke", lane);
       v.Int(name, laneChoke[lane]);
+      snprintf(name, sizeof(name), "lane%d_accentPitch", lane);
+      v.Float(name, laneAccentPitch[lane]);
       snprintf(name, sizeof(name), "lane%d_start", lane);
       v.Float(name, laneStart[lane]);
       snprintf(name, sizeof(name), "lane%d_end", lane);
@@ -705,6 +729,8 @@ void DrumSequencerNode::VisitParams(ParamVisitor& v)
    v.Float("swing", swing);
    v.Float("volume", volume);
    v.Bool("run", run);
+   v.Text("patternName", patternName);
+   v.Int("patternPart", patternPart);
    v.Float("globalTransient", globalTransient);
    v.Float("globalDecay", globalDecay);
    v.Float("globalPitch", globalPitch);
@@ -729,21 +755,69 @@ int DrumSequencerNode::LoadedLaneCount() const
    return n;
 }
 
-bool DrumSequencerNode::LoadFileToLane(int lane, const std::string& path)
+namespace
 {
-   lane = Clamp(lane);
+   std::string gKitDir;
+
+   // A lane path saved from a bundled-kit load points inside the app's
+   // Resources/drumkits/infinite-basic folder, which moves when the app is
+   // reinstalled elsewhere (or a patch travels to another machine). Returns
+   // where the same file would be in the current kit folder, or "" when `path`
+   // is not a bundled-kit path or no kit folder is set. Splits on both / and \
+   // because the saved path may come from another OS.
+   std::string StaleKitRetryPath(const std::string& path)
+   {
+      if (gKitDir.empty())
+         return {};
+      const size_t last = path.find_last_of("/\\");
+      if (last == std::string::npos || last == 0)
+         return {};
+      const size_t prev = path.find_last_of("/\\", last - 1);
+      const std::string parent = path.substr(prev == std::string::npos ? 0 : prev + 1,
+                                             last - (prev == std::string::npos ? 0 : prev + 1));
+      if (parent != "infinite-basic")
+         return {};
+      const char sep = gKitDir.find('\\') != std::string::npos ? '\\' : '/';
+      const char tail = gKitDir.back();
+      return gKitDir + ((tail == '/' || tail == '\\') ? "" : std::string(1, sep)) + path.substr(last + 1);
+   }
+}
+
+void DrumSequencerNode::SetKitDir(const std::string& dir) { gKitDir = dir; }
+const std::string& DrumSequencerNode::KitDir() { return gKitDir; }
+
+bool DrumSequencerNode::TryLoadLane(int lane, const std::string& path, std::string& error)
+{
    auto* decoded = new Platform::SampleBuffer();
-   std::string error;
+   error.clear();
    if (!AudioDecodeCache::DecodeCached(path, *decoded, error))
    {
       delete decoded;
-      laneStatus[lane] = error.empty() ? "failed to load" : error;
       return false;
    }
    const size_t slash = path.find_last_of("/\\");
    const std::string fileName = (slash == std::string::npos) ? path : path.substr(slash + 1);
    FinishLaneBuffer(lane, decoded, fileName, path, "loaded");
    return true;
+}
+
+bool DrumSequencerNode::LoadFileToLane(int lane, const std::string& path)
+{
+   lane = Clamp(lane);
+   std::string error;
+   if (TryLoadLane(lane, path, error))
+      return true;
+   // Stale bundled-kit path: retry from the current kit folder, and on success
+   // FinishLaneBuffer has already rewritten laneFilePath to the new location.
+   const std::string retry = StaleKitRetryPath(path);
+   if (!retry.empty() && retry != path)
+   {
+      std::string retryError;
+      if (TryLoadLane(lane, retry, retryError))
+         return true;
+   }
+   laneStatus[lane] = error.empty() ? "failed to load" : error;
+   return false;
 }
 
 void DrumSequencerNode::FinishLaneBuffer(int lane, Platform::SampleBuffer* decoded, const std::string& fileName,
@@ -814,6 +888,15 @@ void DrumSequencerNode::ReloadFromPaths()
       if (!laneFilePath[lane].empty())
       {
          LoadFileToLane(lane, laneFilePath[lane]);
+         laneStart[lane] = savedStart[lane];
+         laneEnd[lane] = savedEnd[lane];
+      }
+      else if (!laneFileName[lane].empty())
+      {
+         // The restored state says "no sample" but this node still holds one
+         // (e.g. a state captured before a kit auto-fill, applied in place):
+         // follow the restored state rather than keep the stale buffer.
+         ClearLane(lane);
          laneStart[lane] = savedStart[lane];
          laneEnd[lane] = savedEnd[lane];
       }
@@ -900,4 +983,65 @@ void DrumSequencerNode::ClearLane(int lane)
    mLastLaneDecay[lane] = -1.0f;
    mLastLaneStart[lane] = -1.0f;
    mLastLaneEnd[lane] = -1.0f;
+}
+
+void DrumSequencerNode::ApplyPattern(const DrumPatterns::Groove& g, int part)
+{
+   part = std::clamp(part, 0, 2);
+   const DrumPatterns::Part& p = g.parts[part];
+   const int steps = std::clamp(p.steps, 1, kMaxSteps);
+
+   // Every slot, not just the part's own length: a 12-step part applied over a
+   // 32-step pattern must not leave steps 12..31 of the old pattern behind.
+   for (int lane = 0; lane < kNumLanes; lane++)
+   {
+      for (int s = 0; s < kMaxSteps; s++)
+         stepVel[lane][s] = 0.0f;
+      const char* cells = p.lanes[lane];
+      if (cells == nullptr)
+         continue;
+      for (int s = 0; s < steps && cells[s] != '\0'; s++)
+         stepVel[lane][s] = DrumPatterns::CellVelocity(cells[s]);
+   }
+
+   rate = std::clamp(g.rate, 0, (int)MusicTime::kNumRateDivisions - 1);
+   swing = std::clamp(g.swing, 0.0f, 1.0f);
+   numSteps = steps;
+   editPage = 0;
+   // Assigned for every lane, so a lane the groove gives no accent (0) drops
+   // the accent a previous groove left on it.
+   for (int lane = 0; lane < kNumLanes; lane++)
+      laneAccentPitch[lane] = std::clamp(g.tones[lane], -24.0f, 24.0f);
+   patternName = g.name;
+   patternPart = part;
+
+   LoadKitIntoEmptyLanes(p);
+}
+
+void DrumSequencerNode::LoadKitIntoEmptyLanes(const DrumPatterns::Part& part)
+{
+   if (gKitDir.empty())
+      return;
+   const char sep = gKitDir.find('\\') != std::string::npos ? '\\' : '/';
+   const char tail = gKitDir.back();
+   const std::string base = gKitDir + ((tail == '/' || tail == '\\') ? "" : std::string(1, sep));
+
+   bool filled[kNumLanes] = {};
+   for (int lane = 0; lane < kNumLanes; lane++)
+   {
+      // Empty = nothing loaded AND no path to a sample that is merely
+      // missing: a lane the user loaded (even one whose file has since moved)
+      // is theirs and is never replaced.
+      if (part.lanes[lane] == nullptr || !laneFilePath[lane].empty() || !laneFileName[lane].empty())
+         continue;
+      std::string error; // a missing kit is silent: lane status stays "--"
+      filled[lane] = TryLoadLane(lane, base + DrumPatterns::KitFile(lane), error);
+   }
+   // Closed hat (lane 2) cuts the open hat (lane 3) - only when this call put
+   // both there and the user has not set a choke group on either.
+   if (filled[2] && filled[3] && laneChoke[2] == 0 && laneChoke[3] == 0)
+   {
+      laneChoke[2] = 1;
+      laneChoke[3] = 1;
+   }
 }

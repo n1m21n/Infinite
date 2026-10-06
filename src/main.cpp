@@ -17500,6 +17500,15 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          AudioSlider("volume", &n->laneVolume[lane], 0.0f, 1.0f, "%.2f", half);
          ImGui::SameLine();
          AudioSlider("pan", &n->lanePan[lane], -1.0f, 1.0f, "%.2f", half);
+         // Fourth row, full width: semitones added on full-velocity steps
+         // only (two-tone bells). Explicit param index 300 + lane keeps it out
+         // of the gParamCounter sequence, so the six sliders above (and every
+         // saved modulation binding on them) keep their ordinals; 300..307 sit
+         // between the float ordinals (< ~60) and kDiscreteParamBase (400).
+         char accentName[24];
+         snprintf(accentName, sizeof(accentName), "lane %d accent", lane + 1);
+         AudioSlider("accent", &n->laneAccentPitch[lane], -24.0f, 24.0f, "%+.1f st", AudioFullWidth(), nullptr,
+                     nullptr, 300 + lane, accentName);
       }
 
       EndAudioSection();
@@ -56716,6 +56725,233 @@ static bool RunDrumSequencerFixture()
       ok &= libOk;
    }
 
+   // 20) Accent: a full-velocity (>= 0.99) step plays laneAccentPitch semitones
+   // higher, so at +12 st a sustained sample ends at half its length; a 0.8
+   // step on the same lane is unaffected.
+   {
+      auto soundedFrames = [&](float vel, float accent)
+      {
+         resetTransport();
+         auto node = makeNode(longClickPath);
+         node->numSteps = 32; // one hit per 4 s: no retrigger inside the render
+         node->stepVel[0][0] = vel;
+         node->laneAccentPitch[0] = accent;
+         const auto buf = Render(*node, kSustainFrames + 6000, blockSize, sampleRate);
+         int first = -1, last = -1;
+         for (int i = 0; i < (int)buf.size(); i++)
+            if (std::fabs(buf[i]) > 0.01f)
+            {
+               if (first < 0)
+                  first = i;
+               last = i;
+            }
+         return first >= 0 ? last - first + 1 : 0;
+      };
+      const int plain = soundedFrames(1.0f, 0.0f);
+      const int accented = soundedFrames(1.0f, 12.0f);
+      const int ghostAccented = soundedFrames(0.8f, 12.0f);
+      const bool halfOk = plain > kSustainFrames * 9 / 10 && std::abs(accented * 2 - plain) <= plain / 50;
+      const bool ghostOk = std::abs(ghostAccented - plain) <= plain / 100;
+      printf("DRUMSEQTEST accent %s (plain=%d accent+12=%d vel0.8+accent=%d)\n", halfOk && ghostOk ? "OK" : "FAIL",
+             plain, accented, ghostAccented);
+      ok &= halfOk && ghostOk;
+   }
+
+   // Throwaway kit folder named like the bundled one, with eight click WAVs.
+   const std::string kitRoot = TmpPath("infinite_drumseq_kit");
+   const std::string kitDir = kitRoot + "/infinite-basic";
+   {
+      std::error_code ec;
+      std::filesystem::create_directories(kitDir, ec);
+      for (int l = 0; l < 8; l++)
+         WriteClickWav(kitDir + "/" + DrumPatterns::KitFile(l), 4000, sampleRate);
+   }
+   const std::string savedKitDir = DrumSequencerNode::KitDir();
+   DrumSequencerNode::SetKitDir(kitDir);
+
+   int nG = 0;
+   const DrumPatterns::Groove* gs = DrumPatterns::All(nG);
+   auto pickPart = [&](auto pred, int& gOut, int& pOut)
+   {
+      for (int g = 0; g < nG; g++)
+         for (int p = 0; p < 3; p++)
+            if (pred(gs[g], gs[g].parts[p]))
+            {
+               gOut = g;
+               pOut = p;
+               return true;
+            }
+      return false;
+   };
+
+   // 21) ApplyPattern: slots past the part's length are zeroed, settings land,
+   // a lane the user loaded is not replaced, accent resets when the groove
+   // gives none, and the kit fills only empty lanes the part uses.
+   {
+      int gLong = -1, pLong = -1, gShort = -1, pShort = -1;
+      const bool found =
+         pickPart([](const DrumPatterns::Groove&, const DrumPatterns::Part& p) { return p.steps == 32; }, gLong, pLong) &&
+         pickPart([](const DrumPatterns::Groove&, const DrumPatterns::Part& p) { return p.steps == 12; }, gShort, pShort);
+      bool applyOk = found;
+      if (found)
+      {
+         auto node = std::make_unique<DrumSequencerNode>();
+         node->ApplyPattern(gs[gLong], pLong);
+         applyOk &= node->numSteps == 32;
+         node->ApplyPattern(gs[gShort], pShort);
+         bool tailZero = true, anyIn = false;
+         for (int lane = 0; lane < DrumSequencerNode::kNumLanes; lane++)
+            for (int st = 0; st < DrumSequencerNode::kMaxSteps; st++)
+            {
+               if (st >= 12 && node->stepVel[lane][st] != 0.0f)
+                  tailZero = false;
+               if (st < 12 && node->stepVel[lane][st] > 0.0f)
+                  anyIn = true;
+            }
+         applyOk &= tailZero && anyIn && node->numSteps == 12 && node->editPage == 0 &&
+                    node->rate == gs[gShort].rate && node->swing == gs[gShort].swing &&
+                    node->patternName == gs[gShort].name && node->patternPart == pShort;
+         // pushed to the audio side without tripping anything
+         node->CookIfNeeded(1);
+      }
+      printf("DRUMSEQTEST apply pattern %s\n", applyOk ? "OK" : "FAIL");
+      ok &= applyOk;
+
+      // Accent: set from tones, and reset to 0 when the next groove has none.
+      int gTone = -1, pTone = -1, gNoTone = -1, pNoTone = -1;
+      bool accentOk = pickPart([](const DrumPatterns::Groove& g, const DrumPatterns::Part&)
+                               { return g.tones[7] != 0.0f; }, gTone, pTone) &&
+                      pickPart([](const DrumPatterns::Groove& g, const DrumPatterns::Part&)
+                               { return g.tones[7] == 0.0f; }, gNoTone, pNoTone);
+      if (accentOk)
+      {
+         auto node = std::make_unique<DrumSequencerNode>();
+         node->ApplyPattern(gs[gTone], pTone);
+         const bool set = node->laneAccentPitch[7] == gs[gTone].tones[7];
+         node->laneAccentPitch[3] = 7.0f; // a stray hand-set accent on another lane
+         node->ApplyPattern(gs[gNoTone], pNoTone);
+         accentOk = set && node->laneAccentPitch[7] == 0.0f && node->laneAccentPitch[3] == 0.0f;
+      }
+      printf("DRUMSEQTEST apply pattern accent reset %s\n", accentOk ? "OK" : "FAIL");
+      ok &= accentOk;
+   }
+
+   // 22) Kit fill: empty lanes the part uses are loaded from the kit, a lane
+   // the user loaded keeps its sample, and the hats only join choke group 1
+   // when both were kit-filled by the same call.
+   {
+      int gHats = -1, pHats = -1, gClosedOnly = -1, pClosedOnly = -1;
+      bool kitOk =
+         pickPart([](const DrumPatterns::Groove&, const DrumPatterns::Part& p)
+                  { return p.lanes[0] && p.lanes[2] && p.lanes[3]; }, gHats, pHats) &&
+         pickPart([](const DrumPatterns::Groove&, const DrumPatterns::Part& p)
+                  { return p.lanes[2] && !p.lanes[3]; }, gClosedOnly, pClosedOnly);
+      if (kitOk)
+      {
+         // both hats filled -> choke 1 on both; lanes the part skips stay empty
+         auto a = std::make_unique<DrumSequencerNode>();
+         a->ApplyPattern(gs[gHats], pHats);
+         const DrumPatterns::Part& ph = gs[gHats].parts[pHats];
+         for (int l = 0; l < 8; l++)
+            kitOk &= (ph.lanes[l] != nullptr) == !a->FilePath(l).empty();
+         kitOk &= a->FileName(0) == DrumPatterns::KitFile(0) && a->laneChoke[2] == 1 && a->laneChoke[3] == 1;
+
+         // user already loaded the open hat: kept, and no choke is invented
+         auto b = std::make_unique<DrumSequencerNode>();
+         b->LoadFileToLane(3, shortClickPath);
+         b->ApplyPattern(gs[gHats], pHats);
+         kitOk &= b->FilePath(3) == shortClickPath && !b->FilePath(2).empty() && b->laneChoke[2] == 0 &&
+                  b->laneChoke[3] == 0;
+
+         // part without an open hat: closed hat filled, no choke
+         auto c = std::make_unique<DrumSequencerNode>();
+         c->ApplyPattern(gs[gClosedOnly], pClosedOnly);
+         kitOk &= !c->FilePath(2).empty() && c->FilePath(3).empty() && c->laneChoke[2] == 0 && c->laneChoke[3] == 0;
+
+         // a second apply never replaces what the first one loaded, nor a user choke setting
+         a->laneChoke[2] = 2;
+         a->laneChoke[3] = 0;
+         a->ClearLane(3);
+         a->ApplyPattern(gs[gHats], pHats);
+         kitOk &= a->laneChoke[2] == 2 && a->laneChoke[3] == 0;
+
+         // missing kit folder: no-op, status untouched
+         DrumSequencerNode::SetKitDir(kitRoot + "/does-not-exist");
+         auto d = std::make_unique<DrumSequencerNode>();
+         d->ApplyPattern(gs[gHats], pHats);
+         kitOk &= d->LoadedLaneCount() == 0 && d->LaneStatus(0) == "--";
+         DrumSequencerNode::SetKitDir("");
+         auto e = std::make_unique<DrumSequencerNode>();
+         e->ApplyPattern(gs[gHats], pHats);
+         kitOk &= e->LoadedLaneCount() == 0;
+         DrumSequencerNode::SetKitDir(kitDir);
+      }
+      printf("DRUMSEQTEST kit fill %s\n", kitOk ? "OK" : "FAIL");
+      ok &= kitOk;
+   }
+
+   // 23) Stale kit path: a saved path inside .../infinite-basic/ whose folder no
+   // longer exists retries from the current kit folder (forward or back
+   // slashes) and rewrites the path; other parents do not retry.
+   {
+      auto node = std::make_unique<DrumSequencerNode>();
+      const std::string fwd = "/Applications/Old/Infinite.app/Contents/Resources/drumkits/infinite-basic/02-snare.wav";
+      const std::string back = "C:\\Old Install\\Resources\\drumkits\\infinite-basic\\03-closed-hat.wav";
+      const std::string other = "/Applications/Old/Resources/drumkits/other-kit/02-snare.wav";
+      const bool r1 = node->LoadFileToLane(1, fwd);
+      const bool p1 = node->FilePath(1) == kitDir + "/02-snare.wav";
+      const bool r2 = node->LoadFileToLane(2, back);
+      const bool p2 = node->FilePath(2) == kitDir + "/03-closed-hat.wav";
+      const bool r3 = node->LoadFileToLane(3, other);
+      DrumSequencerNode::SetKitDir("");
+      const bool r4 = node->LoadFileToLane(4, fwd);
+      DrumSequencerNode::SetKitDir(kitDir);
+      // through a save/load/reload, as a patch opened from another install would
+      auto src = std::make_unique<DrumSequencerNode>();
+      std::vector<std::pair<std::string, std::string>> params;
+      Patch::SaveParams(src.get(), params);
+      for (auto& kv : params)
+         if (kv.first == "s lane0_path")
+            kv.second = fwd;
+      auto dst = std::make_unique<DrumSequencerNode>();
+      Patch::LoadParams(dst.get(), params);
+      dst->ReloadFromPaths();
+      const bool viaPatch = dst->FilePath(0) == kitDir + "/02-snare.wav" && dst->LoadedLaneCount() == 1;
+      const bool staleOk = r1 && p1 && r2 && p2 && !r3 && !r4 && viaPatch;
+      printf("DRUMSEQTEST stale kit path %s (fwd=%d/%d back=%d/%d other=%d noKit=%d viaPatch=%d)\n",
+             staleOk ? "OK" : "FAIL", r1, p1, r2, p2, r3, r4, viaPatch);
+      ok &= staleOk;
+   }
+
+   // 24) accentPitch / patternName / patternPart survive save -> load, and a
+   // restored "no sample" state clears a lane that still holds one.
+   {
+      auto src = std::make_unique<DrumSequencerNode>();
+      src->laneAccentPitch[5] = -7.5f;
+      src->patternName = "Test groove";
+      src->patternPart = 2;
+      std::vector<std::pair<std::string, std::string>> params;
+      Patch::SaveParams(src.get(), params);
+      auto dst = std::make_unique<DrumSequencerNode>();
+      Patch::LoadParams(dst.get(), params);
+      bool rtOk = std::fabs(dst->laneAccentPitch[5] + 7.5f) < 1e-4f && dst->patternName == "Test groove" &&
+                  dst->patternPart == 2 && dst->laneAccentPitch[4] == 0.0f;
+
+      auto held = std::make_unique<DrumSequencerNode>();
+      held->LoadFileToLane(0, shortClickPath);
+      Patch::LoadParams(held.get(), params); // restored state: lane 0 has no path
+      held->ReloadFromPaths();
+      rtOk &= held->FileName(0).empty() && held->LoadedLaneCount() == 0;
+      printf("DRUMSEQTEST accent/pattern round trip %s\n", rtOk ? "OK" : "FAIL");
+      ok &= rtOk;
+   }
+
+   DrumSequencerNode::SetKitDir(savedKitDir);
+   {
+      std::error_code ec;
+      std::filesystem::remove_all(kitRoot, ec);
+   }
+
    remove(shortClickPath.c_str());
    remove(longClickPath.c_str());
 
@@ -72203,6 +72439,10 @@ static void ApplyUiScale(GLFWwindow* window, bool rendererReady)
 
 int main(int argc, char** argv)
 {
+   // Where the Drum Sequencer finds its bundled kit (Resources/drumkits/
+   // infinite-basic); empty when the folder is absent, which the node treats as
+   // "no kit". Set first so headless jobs that load patches see it too.
+   DrumSequencerNode::SetKitDir(BundledResourcePath("drumkits/infinite-basic"));
    const double sMainStartMs = Bench::ScopedStageTimer::NowMs();
    const double sMainRssStartMb = Bench::ProcessRssMb();
    const double sMainFootStartMb = Bench::ProcessFootprintMb();
