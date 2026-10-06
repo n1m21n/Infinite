@@ -19,6 +19,12 @@ CMAKE_FLAGS=(
   -DCMAKE_BUILD_TYPE=Release
 )
 
+# SANITIZE=address,undefined (or thread) builds an instrumented binary; use a
+# separate BUILD_DIR so it does not clobber the release tree.
+if [ -n "${SANITIZE:-}" ]; then
+  CMAKE_FLAGS+=(-DINFINITE_SANITIZE="$SANITIZE" -DCMAKE_BUILD_TYPE=RelWithDebInfo)
+fi
+
 if command -v ccache >/dev/null 2>&1; then
   CMAKE_FLAGS+=(
     -DCMAKE_C_COMPILER_LAUNCHER=ccache

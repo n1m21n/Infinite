@@ -2,13 +2,13 @@
 
 Documentation-only index of where things live in this codebase. No code was
 moved to produce this — `main.cpp` is a single file that has grown to roughly
-71,000 lines (almost entirely one `int main()` plus the free functions it
+105,000 lines (almost entirely one `int main()` plus the free functions it
 calls), so instead of a risky physical split, this doc tells you which named
 symbol to grep for a given kind of task.
 
 **Anchors below are symbols (function names, global variables, or — where
 neither exists because the code is inline in `main()` — a distinctive
-`grep`-able call/string right at that spot), never line numbers.** A 71k-line
+`grep`-able call/string right at that spot), never line numbers.** A 105k-line
 file that gets edited constantly makes any line number stale within days;
 `grep -n '\bSymbolName\b' src/main.cpp` finds the current location in
 milliseconds and was used to verify every row in this doc. When a row's

@@ -412,6 +412,41 @@ jobs:
           path: build-linux/Infinite
           if-no-files-found: error
 
+  # Headless self-tests under ASan+UBSan (clang). Informational until the first
+  # baseline is triaged: a finding here is a real memory/UB bug in code the
+  # normal Release build runs silently. Flip continue-on-error off once clean.
+  linux-sanitize:
+    name: Linux sanitizers (ASan+UBSan)
+    needs: detect
+    if: needs.detect.outputs.has_linux == 'true'
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: sudo tools/linux/deps-apt.sh
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: linux-sanitize-${{ github.ref }}
+          restore-keys: |
+            linux-sanitize-
+
+      - name: Build (instrumented)
+        run: |
+          export CC_FAMILY=clang SANITIZE=address,undefined BUILD_DIR=build-san
+          tools/linux/build.sh
+
+      - name: Headless self-tests under ASan+UBSan
+        env:
+          ASAN_OPTIONS: detect_leaks=0:abort_on_error=0:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ./.github/scripts/headless-tests.sh build-san/Infinite
+
   # Phase 5 task 5.1/5.2: the real release artifact. Runs on ubuntu-22.04
   # directly (equivalent to building inside tools/linux/Dockerfile.release -
   # same glibc-2.35 floor, same deps-apt.sh) rather than in a nested
