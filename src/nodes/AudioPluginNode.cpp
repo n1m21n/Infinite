@@ -4,6 +4,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <chrono>
+#include <thread>
 
 #include "audio/AudioEngine.h"
 #include "audio/AudioNode.h"
@@ -12,9 +14,9 @@ namespace
 {
    // 0xB0 7B/78 - All Notes Off / All Sound Off, channel 0 (every event this
    // bridge sends is channel 0 - see the pitch-bend comment below on why MPE
-   // was not adopted). Fire-and-forget: safe to call from either thread, since
-   // AUScheduleMIDIEventBlock is documented real-time-safe from any thread,
-   // not just the render thread.
+   // was not adopted). Fire-and-forget on the AU side, but a plugin's MIDI
+   // input has one producer: call it from the audio half, or from the main
+   // thread only once the handle is unpublished and WaitForAudioIdle returned.
    void FlushPluginNotes(Platform::PluginHandle* handle)
    {
       if (handle == nullptr)
@@ -49,7 +51,14 @@ public:
    void ProcessBlock(const AudioBuffer* const* inputs, int numInputs, AudioBuffer& output) override
    {
       const AudioBuffer* in = (numInputs > 0) ? inputs[0] : nullptr;
-      Platform::PluginHandle* handle = mHandle.load(std::memory_order_acquire);
+      // Count this block as a user of whatever handle it loads, for the whole
+      // block: the MIDI sends below (RPN, flush, notes) touch the plugin
+      // before PluginRender ever runs, and Platform::PluginRender's own
+      // inRender flag only covers the render call. The increment comes
+      // before the load (both seq_cst) so the main thread's "unpublish, then
+      // wait for zero users" is airtight - see WaitForAudioIdle.
+      AudioUserScope userScope(mUsers);
+      Platform::PluginHandle* handle = mHandle.load(std::memory_order_seq_cst);
       const bool bypassed = mBypass.load(std::memory_order_relaxed);
 
       // A fresh handle (new plugin published, or handle gone to nullptr) means
@@ -65,6 +74,14 @@ public:
          if (handle != nullptr)
             SendPitchBendRangeRpn(handle);
          mLastSeenHandle = handle;
+      }
+
+      if (mFlushRequested.exchange(false, std::memory_order_acq_rel))
+      {
+         if (handle != nullptr)
+            FlushPluginNotes(handle);
+         mActiveVoiceCount = 0;
+         mLastStartedVoiceId = 0;
       }
 
       // Bypass never touches the handle, so a voice held at the moment of the
@@ -133,21 +150,16 @@ public:
    // disconnected (or the graph is tearing this node's note input down) -
    // whatever the old inbox's producer left held in the plugin would
    // otherwise sustain forever, since nothing will ever deliver its note-off
-   // once the inbox pointer is gone. Flush here, the same way the bypass
-   // rising edge and the main-thread half's Unload/LoadPlugin/re-prepare sites
-   // do. Called from the main thread (RebuildAudioTopology), same as the
-   // plain pointer write to mNoteInbox already was before this change - no
-   // new synchronization requirement over what already existed here.
+   // once the inbox pointer is gone. Flushed by the audio half at the top of
+   // its next block (the same way the bypass rising edge is); this call, from
+   // the main thread (RebuildAudioTopology), only raises the request.
    void SetNoteInbox(NoteEventQueue* inbox, int cursor) override
    {
+      // Only a request here: the flush itself and the voice bookkeeping are
+      // audio-thread work (single MIDI producer), done at the top of the
+      // next ProcessBlock.
       if (inbox == nullptr && mNoteInbox != nullptr)
-      {
-         Platform::PluginHandle* handle = mHandle.load(std::memory_order_acquire);
-         if (handle != nullptr)
-            FlushPluginNotes(handle);
-         mActiveVoiceCount = 0;
-         mLastStartedVoiceId = 0;
-      }
+         mFlushRequested.store(true, std::memory_order_release);
       mNoteInbox = inbox;
       mNoteCursor = cursor;
    }
@@ -164,8 +176,29 @@ public:
       return handle != nullptr ? Platform::PluginLatencySamples(handle) : 0;
    }
 
-   // Main thread only.
-   void SetHandle(Platform::PluginHandle* handle) { mHandle.store(handle, std::memory_order_release); }
+   // Main thread only. seq_cst, paired with AudioUserScope's seq_cst
+   // increment in ProcessBlock: once this has stored a handle that differs
+   // from the one a block loaded, WaitForAudioIdle() sees that block's user
+   // count or the block sees the new handle - never neither.
+   void SetHandle(Platform::PluginHandle* handle) { mHandle.store(handle, std::memory_order_seq_cst); }
+
+   // Main thread only. Call AFTER SetHandle() has unpublished a handle and
+   // BEFORE destroying, re-preparing or sending MIDI into it: waits until no
+   // audio block that began before the unpublish is still running. Bounded -
+   // a plugin that hangs inside its own render must not hang the UI too.
+   // Returns false on timeout, and the caller must then leak the handle
+   // rather than free memory the stuck render still reads.
+   bool WaitForAudioIdle(int timeoutMs)
+   {
+      const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
+      while (mUsers.load(std::memory_order_seq_cst) != 0)
+      {
+         if (std::chrono::steady_clock::now() >= deadline)
+            return false;
+         std::this_thread::sleep_for(std::chrono::microseconds(200));
+      }
+      return true;
+   }
    void SetBypass(bool bypass) { mBypass.store(bypass, std::memory_order_relaxed); }
    double SampleRate() const { return mSampleRate.load(std::memory_order_relaxed); }
    int MaxBlockSize() const { return mMaxBlockSize.load(std::memory_order_relaxed); }
@@ -298,6 +331,18 @@ private:
       }
    }
 
+   // Number of ProcessBlock calls currently running (0 or 1 in practice; a
+   // counter so a second caller could never be missed).
+   struct AudioUserScope
+   {
+      explicit AudioUserScope(std::atomic<int>& n) : mN(n) { mN.fetch_add(1, std::memory_order_seq_cst); }
+      ~AudioUserScope() { mN.fetch_sub(1, std::memory_order_seq_cst); }
+      AudioUserScope(const AudioUserScope&) = delete;
+      AudioUserScope& operator=(const AudioUserScope&) = delete;
+      std::atomic<int>& mN;
+   };
+   std::atomic<int> mUsers { 0 };
+   std::atomic<bool> mFlushRequested { false }; // SetNoteInbox -> next ProcessBlock
    std::atomic<Platform::PluginHandle*> mHandle { nullptr };
    std::atomic<bool> mBypass { false };
    NoteEventQueue* mNoteInbox = nullptr; // set by SetNoteInbox; see its comment
@@ -324,9 +369,9 @@ AudioPluginNode::AudioPluginNode() = default;
 
 AudioPluginNode::~AudioPluginNode()
 {
-   // Unpublish first, then tear down. Platform::PluginDestroy waits out an
-   // in-flight render before touching the unit, so the window between the
-   // store below and the destroy is closed on that side rather than here.
+   // Unpublish first, then tear down. DestroyHandle waits until the audio half
+   // is out of the plugin - render and the MIDI sends before it - so the
+   // window between the store below and the destroy is closed.
    if (mAudioNode)
       mAudioNode->SetHandle(nullptr);
    DestroyAllHandles();
@@ -358,22 +403,51 @@ void AudioPluginNode::DestroyAllHandles()
    mHandle = nullptr;
 
    if (retired != nullptr && retired != live)
-      Platform::PluginDestroy(retired);
+      DestroyHandle(retired);
    if (live != nullptr)
-      Platform::PluginDestroy(live);
+      DestroyHandle(live);
    if (pending != nullptr && pending != live && pending != retired)
-      Platform::PluginDestroy(pending);
+      DestroyHandle(pending);
+}
+
+void AudioPluginNode::DestroyHandle(Platform::PluginHandle* handle)
+{
+   if (handle == nullptr)
+      return;
+   // Every caller has already unpublished `handle` (or it is a generation
+   // that was). A block that loaded it before that may still be inside the
+   // plugin - MIDI sends included, which Platform::PluginDestroy's inRender
+   // spin does not see. A render stuck for 2 s is a hung plugin: leaking its
+   // handle is the only choice that cannot crash.
+   if (mAudioNode && !mAudioNode->WaitForAudioIdle(kAudioIdleTimeoutMs))
+   {
+      std::fprintf(stderr, "AudioPluginNode: audio thread still inside plugin '%s' after %d ms; leaking its handle\n",
+                   pluginName.c_str(), kAudioIdleTimeoutMs);
+      return;
+   }
+   Platform::PluginDestroy(handle);
 }
 
 void AudioPluginNode::PublishHandle(Platform::PluginHandle* handle)
 {
+   // Re-publishing the handle that is already live (a re-prepare at a new
+   // rate) retires nothing. The retire shuffle below would otherwise make
+   // mRetired and mLive the same object, and the *next* re-prepare would
+   // destroy the live plugin while publishing it.
+   if (handle == mLive)
+   {
+      if (!mAudioNode)
+         mAudioNode = std::make_unique<AudioPluginAudioNode>();
+      mAudioNode->SetHandle(handle);
+      return;
+   }
    // One-generation retire, exactly as AudioEngine::SetTopology does it: the
    // generation before last is provably unreachable from any callback that
    // could still be running, so it is safe to destroy here; the one being
    // displaced is only retired.
    if (mRetired != nullptr)
    {
-      Platform::PluginDestroy(mRetired);
+      DestroyHandle(mRetired);
       mRetired = nullptr;
    }
    mRetired = mLive;
@@ -405,25 +479,27 @@ void AudioPluginNode::LoadPlugin(const Platform::PluginDesc& desc)
    if (!mAcceptsNotes)
       noteInput.Disconnect();
 
-   // A note the outgoing plugin is holding would otherwise sustain forever -
-   // nothing will ever deliver its note-off once mLive is unpublished below.
-   if (mLive != nullptr)
-      FlushPluginNotes(mLive);
-
    // Unpublish before creating: the previous plugin must stop being reachable
    // from the audio thread the moment the user asks for a different one, not
    // whenever the new one finishes loading.
    if (mAudioNode)
       mAudioNode->SetHandle(nullptr);
+   // A note the outgoing plugin is holding would otherwise sustain forever -
+   // nothing will ever deliver its note-off once mLive is unpublished. Sent
+   // only once the audio thread has left the plugin: a plugin's MIDI input
+   // has a single producer (the audio half), so this thread must not be a
+   // second one while a block can still be running.
+   if (mLive != nullptr && (!mAudioNode || mAudioNode->WaitForAudioIdle(kAudioIdleTimeoutMs)))
+      FlushPluginNotes(mLive);
    if (mRetired != nullptr)
    {
-      Platform::PluginDestroy(mRetired);
+      DestroyHandle(mRetired);
       mRetired = nullptr;
    }
    mRetired = mLive;
    mLive = nullptr;
    if (mHandle != nullptr && mHandle != mRetired)
-      Platform::PluginDestroy(mHandle);
+      DestroyHandle(mHandle);
 
    mReady = false;
    mLoadFailed = false;
@@ -469,10 +545,10 @@ void AudioPluginNode::Unload()
 {
    // Same reasoning as LoadPlugin's flush: a note held in the plugin at
    // unload time would otherwise never get its note-off.
-   if (mLive != nullptr)
-      FlushPluginNotes(mLive);
    if (mAudioNode)
       mAudioNode->SetHandle(nullptr);
+   if (mLive != nullptr && (!mAudioNode || mAudioNode->WaitForAudioIdle(kAudioIdleTimeoutMs)))
+      FlushPluginNotes(mLive);
    SetConfiguring(false);
    DestroyAllHandles();
    pluginFormat.clear();
@@ -653,8 +729,15 @@ void AudioPluginNode::CookIfNeeded(int frameId)
       // A note held across this unpublish window would otherwise sustain
       // forever - the re-prepare below tears down and rebuilds the plugin's
       // render resources, but its held-note state goes with it either way.
-      FlushPluginNotes(mHandle);
       mAudioNode->SetHandle(nullptr);
+      // PluginPrepare tears the plugin's render resources down and rebuilds
+      // them. A block that loaded this handle before the unpublish must be
+      // out of it first (its MIDI sends are not covered by the plugin's own
+      // in-render flag). Not idle yet: stay unpublished, nothing is marked
+      // prepared, so the next cook retries.
+      if (!mAudioNode->WaitForAudioIdle(kAudioIdleTimeoutMs))
+         return;
+      FlushPluginNotes(mHandle);
       std::string error;
       if (!Platform::PluginPrepare(mHandle, rate, kAudioMaxBlockFrames, error))
       {

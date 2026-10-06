@@ -68253,6 +68253,103 @@ int RunPluginScanTest()
    return 0;
 }
 
+// ====================================================== INFINITE_PLUGINNODETEST
+//
+// Handle lifetime of AudioPluginNode against a running audio half. A stand-in
+// audio thread calls the node's real ProcessBlock in a loop while the main
+// thread reloads, unloads and re-prepares the plugin as fast as it can. Every
+// new handle gets a pitch-bend-range RPN sent into it before its first
+// render, and a re-prepare tears the plugin's render resources down - the two
+// windows Platform::PluginRender's own in-render flag never covered. Run it
+// from an ASan build to make a use-after-free fail loudly; a normal build
+// still exercises the double-destroy a second re-prepare used to cause.
+// SKIPs without Apple's AUDelay.
+int RunPluginNodeHandleTest()
+{
+   setvbuf(stdout, nullptr, _IONBF, 0);
+   std::vector<Platform::PluginDesc> plugins;
+   Platform::EnumerateAudioUnits(plugins);
+   const Platform::PluginDesc* chosen = nullptr;
+   for (const Platform::PluginDesc& d : plugins)
+      if (d.identifier == "au:aufx:dely:appl")
+         chosen = &d;
+   if (chosen == nullptr)
+   {
+      printf("PLUGINNODETEST SKIP (AUDelay not installed)\n");
+      return 0;
+   }
+
+   AudioPluginNode node;
+   AudioNode* audio = node.GetAudioNode();
+   audio->PrepareToPlay(48000.0, 512);
+
+   std::atomic<bool> stop { false };
+   std::atomic<long> blocks { 0 };
+   std::thread audioThread(
+      [&]
+      {
+         std::vector<float> l(512, 0.0f), r(512, 0.0f);
+         float* ch[2] = { l.data(), r.data() };
+         AudioBuffer out;
+         out.channels = ch;
+         out.numChannels = 2;
+         out.numFrames = 512;
+         const AudioBuffer* in[1] = { nullptr };
+         while (!stop.load(std::memory_order_relaxed))
+         {
+            audio->ProcessBlock(in, 0, out);
+            blocks.fetch_add(1, std::memory_order_relaxed);
+            std::this_thread::sleep_for(std::chrono::microseconds(60));
+         }
+      });
+
+   int frame = 0;
+   auto cookUntilSettled = [&]
+   {
+      for (int i = 0; i < 600; i++)
+      {
+         node.CookIfNeeded(++frame);
+         if (!node.IsLoading())
+            break;
+         std::this_thread::sleep_for(std::chrono::milliseconds(2));
+      }
+   };
+
+   node.LoadPlugin(*chosen);
+   cookUntilSettled();
+   bool ok = node.IsReady();
+   int reprepares = 0;
+   for (int iter = 0; iter < 300 && ok; iter++)
+   {
+      // Alternating rates make every cook a re-prepare of the live handle.
+      audio->PrepareToPlay((iter & 1) ? 44100.0 : 48000.0, 512);
+      node.CookIfNeeded(++frame);
+      reprepares++;
+      if (iter % 11 == 10)
+      {
+         node.LoadPlugin(*chosen);
+         cookUntilSettled();
+      }
+      else if (iter % 29 == 28)
+      {
+         node.Unload();
+         node.LoadPlugin(*chosen);
+         cookUntilSettled();
+      }
+      std::this_thread::sleep_for(std::chrono::microseconds(150));
+      ok = node.IsReady() || node.IsLoading();
+   }
+   cookUntilSettled();
+   const bool readyAtEnd = node.IsReady();
+   stop.store(true);
+   audioThread.join();
+
+   const bool audioRan = blocks.load() > 100;
+   printf("PLUGINNODETEST %d re-prepares, %ld blocks rendered, ready at end=%d  %s\n", reprepares, blocks.load(),
+          readyAtEnd ? 1 : 0, (ok && readyAtEnd && audioRan) ? "OK" : "FAIL");
+   return 0;
+}
+
 #if INFINITE_ENABLE_VST3
 // ====================================================== INFINITE_VST3SCANTEST
 //
@@ -73039,6 +73136,8 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_PLUGINSCANTEST") != nullptr)
       return RunPluginScanTest();
+   if (getenv("INFINITE_PLUGINNODETEST") != nullptr)
+      return RunPluginNodeHandleTest();
 
 #if INFINITE_ENABLE_VST3
    if (getenv("INFINITE_VST3SCANTEST") != nullptr)

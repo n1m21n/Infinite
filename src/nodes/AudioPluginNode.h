@@ -160,6 +160,10 @@ private:
    // destroying the generation before that. Main thread only.
    void PublishHandle(Platform::PluginHandle* handle);
    void DestroyAllHandles();
+   // Destroys an already-unpublished handle once the audio half has left it
+   // (bounded wait; a stuck render leaks the handle instead). Main thread.
+   void DestroyHandle(Platform::PluginHandle* handle);
+   static constexpr int kAudioIdleTimeoutMs = 2000;
    void RefreshAvailableParams();
 
    std::unique_ptr<AudioPluginAudioNode> mAudioNode;
