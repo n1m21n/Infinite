@@ -2204,3 +2204,12 @@
 {"ts": "2026-10-06T08:52:13+00:00", "event": "edit", "id": "R578", "opened": "2026-10-06T13:51:11+05:30", "commits": ["d4f7120"], "closed": "2026-10-06T13:51:11+05:30", "release": ""}
 {"ts": "2026-10-06T08:53:41+00:00", "event": "done", "id": "R579", "why": "Root cause: MolderNode::VisitParams passed &seedInt (stack local) to the visitor; Collector retains pointers, so the sweep read a dead frame. ASan stack-use-after-return caught it on Linux (fake-stack). Fixed by making mSeed an int."}
 {"ts": "2026-10-06T08:53:41+00:00", "event": "edit", "id": "R579", "commits": ["e1bb421e"]}
+{"ts": "2026-10-06T08:54:31+00:00", "event": "edit", "id": "R579", "opened": "2026-10-06T14:23:40+05:30", "commits": ["e1bb421"], "closed": "2026-10-06T14:23:40+05:30", "release": ""}
+{"ts": "2026-10-06T15:00:00+05:30", "event": "add", "id": "R582", "after": [], "user": false, "src": "merge:bugfix/audioplugin-slotcount-dangling", "track": "engine", "kind": "fix", "horizon": "later", "title": "Audioplugin slotcount dangling", "why": "merged into main (25af09f)", "origin": "merge"}
+{"ts": "2026-10-06T15:00:01+05:30", "event": "done", "id": "R582", "why": "merged into main (25af09f)"}
+{"ts": "2026-10-06T15:00:01+05:30", "event": "edit", "id": "R582", "opened": "2026-10-06T15:00:00+05:30", "closed": "2026-10-06T15:00:01+05:30", "release": "", "commits": ["25af09f"]}
+{"ts": "2026-10-06T15:28:56+05:30", "event": "add", "id": "R583", "after": [], "user": false, "src": "merge:bugfix/sanitize-gate-clean", "track": "platform", "kind": "fix", "horizon": "later", "title": "Sanitize gate clean", "why": "merged into main (f393709)", "origin": "merge"}
+{"ts": "2026-10-06T15:28:56+05:30", "event": "done", "id": "R583", "why": "merged into main (f393709)"}
+{"ts": "2026-10-06T15:28:56+05:30", "event": "edit", "id": "R583", "opened": "2026-10-06T15:28:56+05:30", "closed": "2026-10-06T15:28:56+05:30", "release": "", "commits": ["f393709"]}
+{"ts": "2026-10-06T10:29:38+00:00", "event": "done", "id": "R553", "why": "ASan+UBSan job green on f3937093 and now gates (continue-on-error removed). Found and fixed two real dangling-VisitParams bugs (Molder seed, AudioPlugin map_slots); clang-tidy step fixed with apt-get update."}
+{"ts": "2026-10-06T10:29:38+00:00", "event": "edit", "id": "R553", "commits": ["f3937093"]}
