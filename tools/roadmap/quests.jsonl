@@ -2200,3 +2200,7 @@
 {"ts": "2026-10-06T13:51:01+05:30", "event": "edit", "id": "R581", "opened": "2026-10-06T13:51:00+05:30", "closed": "2026-10-06T13:51:01+05:30", "release": "", "commits": ["41a9f20"]}
 {"ts": "2026-10-06T08:21:11+00:00", "event": "done", "id": "R578", "why": "appimagetool pinned to versioned 1.9.1 with its release digest; closes once CI packages an AppImage"}
 {"ts": "2026-10-06T08:21:11+00:00", "event": "edit", "id": "R578", "commits": ["d4f7120f"]}
+{"ts": "2026-10-06T08:21:24+00:00", "event": "edit", "id": "R569", "opened": "2026-10-06T13:49:25+05:30", "commits": ["f4eac33"], "closed": "2026-10-06T13:49:25+05:30", "release": ""}
+{"ts": "2026-10-06T08:52:13+00:00", "event": "edit", "id": "R578", "opened": "2026-10-06T13:51:11+05:30", "commits": ["d4f7120"], "closed": "2026-10-06T13:51:11+05:30", "release": ""}
+{"ts": "2026-10-06T08:53:41+00:00", "event": "done", "id": "R579", "why": "Root cause: MolderNode::VisitParams passed &seedInt (stack local) to the visitor; Collector retains pointers, so the sweep read a dead frame. ASan stack-use-after-return caught it on Linux (fake-stack). Fixed by making mSeed an int."}
+{"ts": "2026-10-06T08:53:41+00:00", "event": "edit", "id": "R579", "commits": ["e1bb421e"]}
