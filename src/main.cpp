@@ -4662,7 +4662,9 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             HandleParamTypeHotkeys(editKey, value);
       }
 
-      changed = KbParamHook(nodeIndex, paramIndex, value, minV, maxV, step, fmt, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), false) || changed;
+      changed = KbParamHook(nodeIndex, paramIndex, value, minV, maxV, step, fmt, ImGui::GetItemRectMin(),
+                          ImVec2(std::min(ImGui::GetItemRectMax().x, ImGui::GetItemRectMin().x + (width - box - 4.0f)), ImGui::GetItemRectMax().y),
+                          false) || changed;
       ImGui::PopID();
       return changed;
    }
