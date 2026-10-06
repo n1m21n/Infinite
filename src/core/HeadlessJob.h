@@ -11,7 +11,8 @@
 //            [--json <file>] [--timeout S] [--lenient]
 //   Infinite --frame  <patch.inf> <T | T1,T2,...> <out.png | out_dir/>
 //            [--contact-sheet <sheet.png>] [--fps N] [--output <index|name>]
-//            [--sample-rate HZ] [--json <file>] [--lenient]
+//            [--sample-rate HZ] [--json <file>] [--lenient] [--repeat N]
+//   --repeat N (--frame, out_dir only): render the same times N times in this one process, reloading the patch between passes, into out_dir/pass1 .. passN (tools/determinism-check.py --in-process).
 //   Infinite --frames-dir <patch.inf> <out_dir> --duration S [--start S] [--fps N] [--alpha]
 //            [--node <index[:output]>] [--output <index>] [--set <node>.<param>=<value>]... [--json <file>] [--lenient]
 //            [--size WxH] [--depth 8|16] [--png-level 0..9]
@@ -57,6 +58,7 @@ namespace Headless
       std::string noteMap;       // --note-map: event type -> note target (R471 7.5)
       std::string stemsDir;      // --stems-dir: where the per-node WAVs go
       std::vector<std::string> stems; // --stems <id>,<id>: one sample-aligned WAV per node's own audio output
+      int repeat = 1;            // --frame --repeat N: N passes in one process, patch reloaded between them
       std::string contactSheet;  // --frame --contact-sheet: every requested time on one PNG
       std::string output;        // --output: node index or name; empty = the only Output
       std::string node;          // --node <index[:output]>: tap this node's image instead of an Output's
