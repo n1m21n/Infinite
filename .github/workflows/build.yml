@@ -447,6 +447,23 @@ jobs:
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: ./.github/scripts/headless-tests.sh build-san/Infinite
 
+      # Static analysis rides on this job's compile_commands.json (no second
+      # build). Informational: prints a baseline count so R559 can ratchet it.
+      # main.cpp (105k lines) is skipped - too slow, and it is split by R555.
+      - name: clang-tidy baseline (src/audio, src/core)
+        run: |
+          sudo apt-get install -y clang-tidy
+          find src/audio src/core -name '*.cpp' | sort \
+            | xargs -P"$(nproc)" -n4 clang-tidy -p build-san --quiet > clang-tidy.log 2>&1 || true
+          echo "clang-tidy warnings: $(grep -c 'warning:' clang-tidy.log)"
+          grep 'warning:' clang-tidy.log | sed -E 's/.*\[(.*)\]$/\1/' | sort | uniq -c | sort -rn | head -20
+
+      - name: Upload clang-tidy log
+        uses: actions/upload-artifact@v4
+        with:
+          name: clang-tidy-log
+          path: clang-tidy.log
+
   # Phase 5 task 5.1/5.2: the real release artifact. Runs on ubuntu-22.04
   # directly (equivalent to building inside tools/linux/Dockerfile.release -
   # same glibc-2.35 floor, same deps-apt.sh) rather than in a nested

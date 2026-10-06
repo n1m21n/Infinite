@@ -1,0 +1,16 @@
+# Baseline set (R559): real-bug checks only, no style. Widen once the count is known.
+Checks: >
+  -*,
+  bugprone-use-after-move,
+  bugprone-undefined-memory-manipulation,
+  bugprone-dangling-handle,
+  bugprone-infinite-loop,
+  bugprone-integer-division,
+  bugprone-misplaced-widening-cast,
+  bugprone-suspicious-memset-usage,
+  bugprone-unused-return-value,
+  clang-analyzer-core.*,
+  clang-analyzer-cplusplus.*,
+  concurrency-mt-unsafe
+WarningsAsErrors: ''
+HeaderFilterRegex: 'src/(audio|core)/'
