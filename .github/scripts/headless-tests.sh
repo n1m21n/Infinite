@@ -143,10 +143,15 @@ fi
 # --- crash-only (baseline too large to gate on) ----------------------------
 
 echo "== INFINITE_AUDIOPARAMSWEEPTEST (crash check only)"
-if INFINITE_AUDIOPARAMSWEEPTEST=1 "$BIN" > /dev/null 2>&1; then
+# Output is kept so a sanitizer report (which exits 1) is visible in the CI log.
+sweep_out="$(INFINITE_AUDIOPARAMSWEEPTEST=1 "$BIN" 2>&1)"
+sweep_rc=$?
+if [ "$sweep_rc" -eq 0 ]; then
    echo "   pass (did not crash)"
 else
-   echo "   FAIL (crashed, exit $?)"
+   echo "   FAIL (crashed, exit $sweep_rc)"
+   printf '%s\n' "$sweep_out" | grep -n -i -E "runtime error|AddressSanitizer|SUMMARY" | head -20
+   printf '%s\n' "$sweep_out" | tail -40
    status=1
 fi
 
