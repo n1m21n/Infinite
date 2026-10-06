@@ -45152,11 +45152,48 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       return Arrange::TicksToSeconds((Arrange::Tick)t, std::max(1.0, (double)Transport::Instance().Tempo()));
    }
 
+   // The export queue window is gone, so a job that fails to start used to
+   // leave no trace at all: Render Now closed the popup and nothing happened,
+   // with the reason (a refused encoder, a locked file, a missing device)
+   // sitting unread in job.message. The reason is held here until the user has
+   // seen it in DrawArrangeRenderFailNotice.
+   std::string gArrangeRenderFailNotice;
+   bool gArrangeRenderFailNoticeOpen = false;
+
    void ArrangeRenderFailJob(ArrangeRenderJob& job, const std::string& why)
    {
       job.status = kArrangeJobFailed;
       job.message = why;
       gArrangeRenderActiveJobId = 0;
+      gArrangeRenderFailNotice = "\"" + job.path + "\"\n\n" + why;
+      gArrangeRenderFailNoticeOpen = true;
+      fprintf(stderr, "timeline render failed: %s (%s)\n", why.c_str(), job.path.c_str());
+   }
+
+   void DrawArrangeRenderFailNotice()
+   {
+      if (gArrangeRenderFailNoticeOpen)
+      {
+         ImGui::OpenPopup("Render failed##arrangeRenderFail");
+         gArrangeRenderFailNoticeOpen = false;
+      }
+      ImGuiIO& io = ImGui::GetIO();
+      ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
+                              ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(320.0f, 0.0f), ImVec2(560.0f, 400.0f));
+      if (ImGui::BeginPopupModal("Render failed##arrangeRenderFail", nullptr,
+                                 ImGuiWindowFlags_AlwaysAutoResize))
+      {
+         ImGui::PushTextWrapPos(520.0f);
+         ImGui::TextWrapped("The timeline render did not start.");
+         ImGui::Dummy(ImVec2(0, 4));
+         ImGui::TextWrapped("%s", gArrangeRenderFailNotice.c_str());
+         ImGui::PopTextWrapPos();
+         ImGui::Dummy(ImVec2(0, 4));
+         if (ImGui::Button("OK", ImVec2(100, 0)))
+            ImGui::CloseCurrentPopup();
+         ImGui::EndPopup();
+      }
    }
 
    // Restores everything a take borrowed. Shared by the WAV path's finish and
@@ -45459,6 +45496,18 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                job->status = cancelled ? kArrangeJobCancelled : kArrangeJobDone;
                if (cancelled)
                   job->message = "cancelled";
+               else
+               {
+                  // A take that ran to its last frame but left no file (the
+                  // encoder rejected the stream, or finalizing failed) must
+                  // not read as Done.
+                  std::error_code sizeEc;
+                  const std::filesystem::path outPath = AppPaths::FsPath(job->path);
+                  const bool wrote = std::filesystem::exists(outPath, sizeEc) &&
+                                     std::filesystem::file_size(outPath, sizeEc) > 0;
+                  if (!wrote)
+                     ArrangeRenderFailJob(*job, "the encoder finished but no file was written");
+               }
             }
          }
          gArrangeRenderActiveJobId = 0;
@@ -104403,6 +104452,7 @@ int main(int argc, char** argv)
       if (gOfflineRender.active)
          DrawOfflineRenderProgressWindow();
       DrawArrangeWavRenderProgressWindow();
+      DrawArrangeRenderFailNotice();
 
       int fbW, fbH;
       glfwGetFramebufferSize(window, &fbW, &fbH);
