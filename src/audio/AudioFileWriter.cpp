@@ -11,6 +11,16 @@
 #include <atomic>
 #include <sys/stat.h>
 
+#if defined(_WIN32)
+   #ifndef WIN32_LEAN_AND_MEAN
+      #define WIN32_LEAN_AND_MEAN
+   #endif
+   #ifndef NOMINMAX
+      #define NOMINMAX
+   #endif
+   #include <windows.h>
+#endif
+
 // Portable replacement for the former AudioFileWriter.mm: same WAV (raw RIFF)
 // and MP3 (shine) paths, with FLAC written by libFLAC (fetched by CMake on
 // Windows - dr_libs is decode-only, so it can't encode) instead of CoreAudio's
@@ -42,12 +52,38 @@ namespace
    // are lower_case - libFLAC naming is inconsistent by design.
    FLAC__StreamEncoder* AsFlac(void* handle) { return static_cast<FLAC__StreamEncoder*>(handle); }
 
+   // fopen() on Windows reads a narrow path in the ANSI code page, so a UTF-8
+   // path under a non-ASCII folder ("C:\\Users\\Müller\\Desktop") fails to open
+   // and the whole export dies with "could not create". Convert and use
+   // _wfopen; every other platform's fopen already takes UTF-8.
+   FILE* OpenFileUtf8(const std::string& path, const char* mode)
+   {
+#if defined(_WIN32)
+      const int pn = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, nullptr, 0);
+      const int mn = MultiByteToWideChar(CP_UTF8, 0, mode, -1, nullptr, 0);
+      if (pn <= 0 || mn <= 0)
+         return nullptr;
+      std::wstring wpath((size_t)pn, L'\0'), wmode((size_t)mn, L'\0');
+      MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, wpath.data(), pn);
+      MultiByteToWideChar(CP_UTF8, 0, mode, -1, wmode.data(), mn);
+      return _wfopen(wpath.c_str(), wmode.c_str());
+#else
+      return fopen(path.c_str(), mode);
+#endif
+   }
+
    void StatFileSize(const std::string& path, int64_t& outSize)
    {
 #if defined(_WIN32)
       struct _stat64 st;
-      if (_stat64(path.c_str(), &st) == 0)
-         outSize = st.st_size;
+      const int pn = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, nullptr, 0);
+      if (pn > 0)
+      {
+         std::wstring wpath((size_t)pn, L'\0');
+         MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, wpath.data(), pn);
+         if (_wstat64(wpath.c_str(), &st) == 0)
+            outSize = st.st_size;
+      }
 #else
       struct stat st;
       if (stat(path.c_str(), &st) == 0)
@@ -123,8 +159,19 @@ bool AudioFileWriter::Open(const std::string& path, double sampleRate, int numCh
          FLAC__stream_encoder_set_bits_per_sample(encoder, 16); // matches the WAV path
          FLAC__stream_encoder_set_sample_rate(encoder, (uint32_t)std::lround(sampleRate));
          FLAC__stream_encoder_set_compression_level(encoder, 5);
-         if (FLAC__stream_encoder_init_file(encoder, path.c_str(), nullptr, nullptr) ==
-             FLAC__STREAM_ENCODER_INIT_STATUS_OK)
+#if defined(_WIN32)
+         // init_file() takes a narrow path; hand libFLAC an already-open FILE
+         // instead (it closes it in finish(), and "w+b" lets it rewrite
+         // STREAMINFO at the end).
+         FILE* flacFile = OpenFileUtf8(path, "w+b");
+         const bool flacOk = flacFile != nullptr &&
+            FLAC__stream_encoder_init_FILE(encoder, flacFile, nullptr, nullptr) ==
+               FLAC__STREAM_ENCODER_INIT_STATUS_OK;
+#else
+         const bool flacOk = FLAC__stream_encoder_init_file(encoder, path.c_str(), nullptr, nullptr) ==
+                             FLAC__STREAM_ENCODER_INIT_STATUS_OK;
+#endif
+         if (flacOk)
          {
             mExtAudioFile = encoder;
             return true;
@@ -151,7 +198,7 @@ bool AudioFileWriter::Open(const std::string& path, double sampleRate, int numCh
       }
       else
       {
-         mMp3File = fopen(path.c_str(), "wb");
+         mMp3File = OpenFileUtf8(path, "wb");
          if (!mMp3File)
          {
             shine_close(shine);
@@ -164,7 +211,7 @@ bool AudioFileWriter::Open(const std::string& path, double sampleRate, int numCh
 
    // Default / WAV format
    mFormat = Format::Wav;
-   mFile = fopen(path.c_str(), "wb");
+   mFile = OpenFileUtf8(path, "wb");
    if (mFile == nullptr)
       return false;
 

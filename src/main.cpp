@@ -25895,8 +25895,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    {
       if (!n->recordDirectory.empty())
          return n->recordDirectory;
-      const std::string home = AppPaths::HomeDir();
-      return home.empty() ? "." : home + "/Desktop";
+      return AppPaths::DesktopDir();
    }
 
    void DrawAudioOutBody(GraphNode& gn, AudioOutputNode* n)
@@ -34477,7 +34476,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       for (int n = 2; n < 1000; n++)
       {
          const std::string candidate = stem + " (" + std::to_string(n) + ")" + ext;
-         if (!std::filesystem::exists(candidate, ec) && !ArrangeRenderPathQueued(candidate, 0))
+         if (!std::filesystem::exists(AppPaths::FsPath(candidate), ec) && !ArrangeRenderPathQueued(candidate, 0))
             return candidate;
       }
       return path;
@@ -34522,8 +34521,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       std::string folder = gArrange.settings.renderFolder;
       if (folder.empty())
       {
-         const std::string home = AppPaths::HomeDir();
-         folder = home.empty() ? std::string(".") : home + "/Desktop";
+         folder = AppPaths::DesktopDir();
       }
       while (!folder.empty() && (folder.back() == '/' || folder.back() == '\\'))
          folder.pop_back();
@@ -34970,8 +34968,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                std::string folder = rset.renderFolder;
                if (folder.empty())
                {
-                  const std::string home = AppPaths::HomeDir();
-                  folder = home.empty() ? std::string(".") : home + "/Desktop";
+                  folder = AppPaths::DesktopDir();
                }
                while (!folder.empty() && (folder.back() == '/' || folder.back() == '\\'))
                   folder.pop_back();
@@ -34992,8 +34989,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                }
                if (rset.renderFolder.empty())
                {
-                  const std::string home = AppPaths::HomeDir();
-                  rset.renderFolder = home.empty() ? std::string(".") : home + "/Desktop";
+                  rset.renderFolder = AppPaths::DesktopDir();
                }
                ImGui::OpenPopup("##arrangeRenderPopup");
             }
@@ -35205,7 +35201,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                   ArrangeRenderJob job = buildJob();
                   std::error_code ec;
                   const bool collides =
-                     std::filesystem::exists(job.path, ec) || ArrangeRenderPathQueued(job.path, 0);
+                     std::filesystem::exists(AppPaths::FsPath(job.path), ec) || ArrangeRenderPathQueued(job.path, 0);
                   if (collides)
                   {
                      // Asking before the queue gets there, not while it runs:
@@ -45156,11 +45152,48 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       return Arrange::TicksToSeconds((Arrange::Tick)t, std::max(1.0, (double)Transport::Instance().Tempo()));
    }
 
+   // The export queue window is gone, so a job that fails to start used to
+   // leave no trace at all: Render Now closed the popup and nothing happened,
+   // with the reason (a refused encoder, a locked file, a missing device)
+   // sitting unread in job.message. The reason is held here until the user has
+   // seen it in DrawArrangeRenderFailNotice.
+   std::string gArrangeRenderFailNotice;
+   bool gArrangeRenderFailNoticeOpen = false;
+
    void ArrangeRenderFailJob(ArrangeRenderJob& job, const std::string& why)
    {
       job.status = kArrangeJobFailed;
       job.message = why;
       gArrangeRenderActiveJobId = 0;
+      gArrangeRenderFailNotice = "\"" + job.path + "\"\n\n" + why;
+      gArrangeRenderFailNoticeOpen = true;
+      fprintf(stderr, "timeline render failed: %s (%s)\n", why.c_str(), job.path.c_str());
+   }
+
+   void DrawArrangeRenderFailNotice()
+   {
+      if (gArrangeRenderFailNoticeOpen)
+      {
+         ImGui::OpenPopup("Render failed##arrangeRenderFail");
+         gArrangeRenderFailNoticeOpen = false;
+      }
+      ImGuiIO& io = ImGui::GetIO();
+      ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
+                              ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+      ImGui::SetNextWindowSizeConstraints(ImVec2(320.0f, 0.0f), ImVec2(560.0f, 400.0f));
+      if (ImGui::BeginPopupModal("Render failed##arrangeRenderFail", nullptr,
+                                 ImGuiWindowFlags_AlwaysAutoResize))
+      {
+         ImGui::PushTextWrapPos(520.0f);
+         ImGui::TextWrapped("The timeline render did not start.");
+         ImGui::Dummy(ImVec2(0, 4));
+         ImGui::TextWrapped("%s", gArrangeRenderFailNotice.c_str());
+         ImGui::PopTextWrapPos();
+         ImGui::Dummy(ImVec2(0, 4));
+         if (ImGui::Button("OK", ImVec2(100, 0)))
+            ImGui::CloseCurrentPopup();
+         ImGui::EndPopup();
+      }
    }
 
    // Restores everything a take borrowed. Shared by the WAV path's finish and
@@ -45349,6 +45382,24 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          return false;
       }
 
+      // The folder is typed by hand and the default (Desktop) may not exist
+      // (redirected, renamed, a typo), so make it here: Media Foundation and
+      // fopen both fail on a missing parent with an opaque error. FsPath keeps
+      // a non-ASCII folder name intact on Windows.
+      {
+         std::error_code dirEc;
+         const std::filesystem::path parent = AppPaths::FsPath(job.path).parent_path();
+         if (!parent.empty() && !std::filesystem::is_directory(parent, dirEc))
+         {
+            std::filesystem::create_directories(parent, dirEc);
+            if (!std::filesystem::is_directory(parent, dirEc))
+            {
+               ArrangeRenderFailJob(job, "could not create the folder " + parent.u8string());
+               return false;
+            }
+         }
+      }
+
       gArrangeRenderActiveJobId = job.id;
 
       // Empty scope (the common case: whole-project Render) leaves both
@@ -45445,6 +45496,18 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                job->status = cancelled ? kArrangeJobCancelled : kArrangeJobDone;
                if (cancelled)
                   job->message = "cancelled";
+               else
+               {
+                  // A take that ran to its last frame but left no file (the
+                  // encoder rejected the stream, or finalizing failed) must
+                  // not read as Done.
+                  std::error_code sizeEc;
+                  const std::filesystem::path outPath = AppPaths::FsPath(job->path);
+                  const bool wrote = std::filesystem::exists(outPath, sizeEc) &&
+                                     std::filesystem::file_size(outPath, sizeEc) > 0;
+                  if (!wrote)
+                     ArrangeRenderFailJob(*job, "the encoder finished but no file was written");
+               }
             }
          }
          gArrangeRenderActiveJobId = 0;
@@ -76083,10 +76146,7 @@ int main(int argc, char** argv)
 
    // Cocoa chdir's a bundled app to Contents/Resources, so a bare relative path
    // would silently write inside the .app. Default somewhere the user can find.
-   const std::string desktopDir = []() {
-      const std::string home = AppPaths::HomeDir();
-      return home.empty() ? std::string(".") : home + "/Desktop";
-   }();
+   const std::string desktopDir = AppPaths::DesktopDir();
 
    char exportPath[512] = "";
    snprintf(exportPath, sizeof(exportPath), "%s/infinite_output.png", desktopDir.c_str());
@@ -97557,19 +97617,11 @@ int main(int argc, char** argv)
             {
                if (n->exportImagePath.empty())
                {
-                  const std::string home = AppPaths::HomeDir();
-                  if (!home.empty())
-                     n->exportImagePath = home + "/Desktop/infinite_output." + (n->imageFormat == 1 ? "jpg" : "png");
-                  else
-                     n->exportImagePath = "infinite_output." + std::string(n->imageFormat == 1 ? "jpg" : "png");
+                  n->exportImagePath = AppPaths::DesktopDir() + "/infinite_output." + (n->imageFormat == 1 ? "jpg" : "png");
                }
                if (n->recordVideoPath.empty())
                {
-                  const std::string home = AppPaths::HomeDir();
-                  if (!home.empty())
-                     n->recordVideoPath = home + "/Desktop/infinite_output." + (n->videoFormat == 1 ? "mov" : "mp4");
-                  else
-                     n->recordVideoPath = "infinite_output." + std::string(n->videoFormat == 1 ? "mov" : "mp4");
+                  n->recordVideoPath = AppPaths::DesktopDir() + "/infinite_output." + (n->videoFormat == 1 ? "mov" : "mp4");
                }
 
                char imgBuf[512];
@@ -104400,6 +104452,7 @@ int main(int argc, char** argv)
       if (gOfflineRender.active)
          DrawOfflineRenderProgressWindow();
       DrawArrangeWavRenderProgressWindow();
+      DrawArrangeRenderFailNotice();
 
       int fbW, fbH;
       glfwGetFramebufferSize(window, &fbW, &fbH);

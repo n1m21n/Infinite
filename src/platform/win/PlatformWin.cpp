@@ -241,6 +241,24 @@ namespace
    };
 }
 
+// The real Desktop folder. OneDrive "Backup Desktop" and group-policy folder
+// redirection move it out from under %USERPROFILE%, so USERPROFILE + "\\Desktop"
+// can name a folder that does not exist - every default export path built
+// from it then fails to open.
+namespace AppPaths
+{
+   std::string DesktopDirWin()
+   {
+      PWSTR wide = nullptr;
+      std::string out;
+      if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Desktop, KF_FLAG_DEFAULT, nullptr, &wide)) && wide != nullptr)
+         out = WinCommon::WideToUtf8(wide);
+      if (wide != nullptr)
+         CoTaskMemFree(wide);
+      return out;
+   }
+}
+
 namespace Platform
 {
    void PreventAppNap()

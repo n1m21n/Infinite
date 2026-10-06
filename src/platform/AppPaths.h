@@ -29,6 +29,16 @@
 // Layout mirrors the macOS one semantically: a single per-user directory the
 // app owns. macOS keeps ~/Library/Application Support/Infinite; Windows uses
 // %APPDATA%\Infinite (roaming, like Application Support).
+#if defined(_WIN32)
+namespace AppPaths
+{
+   // Defined in src/platform/win/PlatformWin.cpp (SHGetKnownFolderPath, which
+   // needs windows.h - kept out of this widely-included header). Returns a
+   // UTF-8 path, or "" when the shell has no Desktop for this user.
+   std::string DesktopDirWin();
+}
+#endif
+
 namespace AppPaths
 {
 
@@ -43,13 +53,38 @@ namespace AppPaths
       return {};
    }
 
+   // Engine paths are UTF-8 std::string everywhere. std::filesystem::path's
+   // string constructor reads them in the ANSI code page on Windows, which
+   // mangles any non-ASCII folder (a user called "Müller", a Cyrillic
+   // Desktop) - exists() then lies and create_directories() makes the wrong
+   // folder. Route every std::filesystem call on an engine path through this.
+   inline std::filesystem::path FsPath(const std::string& utf8)
+   {
+      return std::filesystem::u8path(utf8);
+   }
+
+   // The user's Desktop. Windows asks the shell, because the folder is often
+   // redirected (OneDrive "Backup Desktop") and then is NOT under
+   // USERPROFILE; macOS/Linux use ~/Desktop. Falls back to the home folder
+   // when there is no Desktop at all, and to "." with no home either.
+   inline std::string DesktopDir()
+   {
+#if defined(_WIN32)
+      const std::string known = DesktopDirWin();
+      if (!known.empty())
+         return known;
+#endif
+      const std::string home = HomeDir();
+      return home.empty() ? std::string(".") : home + "/Desktop";
+   }
+
    // True when `path` exists and is a directory.
    inline bool DirExists(const std::string& path)
    {
       if (path.empty())
          return false;
       std::error_code ec;
-      return std::filesystem::is_directory(path, ec);
+      return std::filesystem::is_directory(FsPath(path), ec);
    }
 
    // Creates a directory and any missing parent directories (no-op if it already exists).
@@ -61,7 +96,7 @@ namespace AppPaths
       if (DirExists(path))
          return true;
       std::error_code ec;
-      std::filesystem::create_directories(path, ec);
+      std::filesystem::create_directories(FsPath(path), ec);
       return DirExists(path);
    }
 
