@@ -117,6 +117,18 @@ guessing at a fix has been wrong every time it was tried.
   non-standard part and the direct cause of this whole crash class. Do not
   "optimise" it back onto a background queue.
 
+- **Handle lifetime against the audio thread** (`src/nodes/AudioPluginNode.cpp`).
+  The audio half counts itself as a user of the handle for the whole block
+  (`AudioUserScope`), because the RPN/flush/note MIDI sends run *before*
+  `PluginRender` and the platform `inRender` flag never covered them. Every
+  destroy, re-prepare and main-thread MIDI send happens after
+  `SetHandle(nullptr)` + `WaitForAudioIdle` (bounded 2 s; a stuck render leaks
+  the handle instead of freeing it). `PublishHandle` of the already-live handle
+  retires nothing (a second re-prepare used to destroy the live plugin).
+  `SetNoteInbox` only raises `mFlushRequested`; a plugin's MIDI input has one
+  producer. Regression: `INFINITE_PLUGINNODETEST` (macOS, AUDelay; crashes 3/3
+  on the old code).
+
 **Tier 2, shipped:** `RunPluginCallGuarded()`
 (`src/platform/PluginVST3.mm:2135`) — `sigsetjmp`/`siglongjmp` with a
 `SIGSEGV`/`SIGBUS`/`SIGILL` handler, wrapping exactly two call groups:
