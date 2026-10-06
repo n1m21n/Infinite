@@ -1387,6 +1387,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    bool gRequestAddComment = false;
    int gContextMenuNodeIndex = -1; // node the right-click context menu is open for
    int gHelpPopupNodeIndex = -1; // node the per-node "Help" popup is open for
+   bool gNodeHelpShown = false;    // the help popup was drawn last frame (H toggles it shut)
+   bool gCloseNodeHelp = false;
    bool gOpenNodeHelpPopup = false; // set for one frame to open it (can't OpenPopup from inside another popup's Begin/End and have it show the same frame)
    // Which param's modulation-binding menu (Absolute/Bipolar/depth/Unbind) is
    // open. Same reason as gContextMenuNodeIndex/gOpenNodeHelpPopup above: the
@@ -42313,7 +42315,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Edit & Canvas", "Move Node", "Up / Down / Left / Right", "Click a node, then the arrow keys move it one grid step. With a param focused they nudge the value instead" },
          { "Edit & Canvas", "Next Node", "Shift+Up / Down / Left / Right", "Select the neighbouring node in that direction" },
          { "Edit & Canvas", "Zoom Into Node", "Shift+Enter", "Zoom the view into the selected node; Enter zooms back out to where you were" },
-         { "Edit & Canvas", "Node Help", "H", "Show the help for the selected node" },
+         { "Edit & Canvas", "Node Help", "H (again to close)", "Show the help for the selected node" },
          { "Edit & Canvas", "Bypass Selection", "B", "Toggle bypass (power off) on the selected nodes. Canvas only - with the timeline focused, B is the blade tool instead" },
          { "Edit & Canvas", "Group Selection", MODKEY "+G", "Wrap selected nodes in a group box" },
          { "Edit & Canvas", "Ungroup", MODKEY "+U / " MODKEY "+Shift+G", "Dissolve the selected group without deleting nodes" },
@@ -96924,6 +96926,17 @@ int main(int argc, char** argv)
          if (frameId == f0 + 59)
          {
             check(FindNodeByIndex(grpIdx) == nullptr && FindNodeByIndex(memberIdx) != nullptr, "Cmd/Ctrl+U ungroups, members stay");
+            ed::ClearSelection();
+            ed::SelectNode(gNodes[0].NodeId(), false);
+         }
+         // H opens the node help, H again closes it.
+         tap(ImGuiKey_H, f0 + 62);
+         if (frameId == f0 + 67)
+            check(gNodeHelpShown, "H opens the node help");
+         tap(ImGuiKey_H, f0 + 68);
+         if (frameId == f0 + 74)
+         {
+            check(!gNodeHelpShown, "H again closes the node help");
             printf("kbtest result: %s\n", ok ? "KBCURSOR OK" : "KBCURSOR FAIL");
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
@@ -98992,6 +99005,11 @@ int main(int argc, char** argv)
             }
          }
 
+         // ---- H again closes the help popup (kbFree is off while any popup is open) ----
+         if (gNodeHelpShown && !typing && !cmdOrCtrl && !io.KeyShift && !io.KeyAlt && ImGui::IsKeyPressed(ImGuiKey_H, false))
+            gCloseNodeHelp = true;
+         gNodeHelpShown = false;
+
          // ---- single-key node commands ----
          const bool plain = kbFree && !io.KeyAlt && !io.KeyShift && !gComputerKeyboardHot;
          if (plain && active != nullptr && ImGui::IsKeyPressed(ImGuiKey_H, false))
@@ -100249,8 +100267,14 @@ int main(int argc, char** argv)
       ImGui::SetNextWindowSizeConstraints(ImVec2(280, 0), ImVec2(420, FLT_MAX));
       if (ImGui::BeginPopup("##nodehelp"))
       {
+         gNodeHelpShown = true;
          GraphNode* gn = FindNodeByIndex(gHelpPopupNodeIndex);
-         if (gn == nullptr)
+         if (gCloseNodeHelp)
+         {
+            gCloseNodeHelp = false;
+            ImGui::CloseCurrentPopup();
+         }
+         else if (gn == nullptr)
          {
             ImGui::CloseCurrentPopup();
          }

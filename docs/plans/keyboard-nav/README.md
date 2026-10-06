@@ -14,7 +14,7 @@ Click a node to make it the **active node** (exactly one node selected). Then:
 | Up / Down / Left / Right (no param focused) | Move the selected nodes one grid step (one undo entry per burst). A selected group carries all its members. |
 | Shift + arrow | Select the neighbouring node in that direction |
 | Shift+Enter / Enter | Zoom into the active node / back out to the saved view |
-| H | Node help |
+| H (again to close) | Node help |
 | B | Bypass (pre-existing) |
 | Cmd/Ctrl+U (also Cmd/Ctrl+Shift+G) | Ungroup the selected group |
 | W A S D | Pan the canvas |
