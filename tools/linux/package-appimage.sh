@@ -231,7 +231,7 @@ fi
 #    fails loudly on the mismatch rather than silently trusting whatever is
 #    there that day. appimagetool has versioned tags, so it is pinned to 1.9.1
 #    (the "continuous" build was republished 2026-10-04 and broke the old pin,
-#    R572); bump the tag and the hash together, hash from the release's own digest.
+#    R578); bump the tag and the hash together, hash from the release's own digest.
 # ---------------------------------------------------------------------------
 sha_check() {
   local file="$1" expected="$2" actual
