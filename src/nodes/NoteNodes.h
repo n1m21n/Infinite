@@ -2,7 +2,10 @@
 
 #include <algorithm>
 #include <memory>
+#include <string>
+#include <vector>
 
+#include "audio/QuantizedRestart.h"
 #include "core/INode.h"
 #include "core/Modulation.h"
 #include "core/NoteCable.h"
@@ -73,7 +76,7 @@ public:
    // engine on; kept as a bool return to surface a device-open failure.
    bool StartListening();
 
-   int channel = -1;             // -1 = omni, else 0-15
+   int channel = -1;             // -1 = omni, else 0-15 (MIDI channel 1-16)
    int transpose = 0;            // semitones applied to every incoming note
    float velocityScale = 1.0f;   // 0..2, applied before the note leaves this node
    bool useGlobalScale = false;  // snap incoming notes to Transport's key/scale
@@ -84,9 +87,22 @@ public:
    int HeldCount() const;
    int LastNote() const;   // -1 if nothing has played yet
 
+   // Turbo 0.50: channel of the most recent note-on from any device (before
+   // the filter), -1 if none yet. "learn" sets `channel` from the next one.
+   int LastChannel() const;
+   void StartChannelLearn();
+   void CancelChannelLearn() { mLearning = false; }
+   bool IsLearningChannel() const { return mLearning; }
+   // Runs regardless of cables so the channel readout and learn work before
+   // the node is patched into a synth.
+   bool RequiresAudioProcessing() const override { return true; }
+
 private:
+   void UpdateChannelLearn();
    std::unique_ptr<AudioMidiNotesNode> mAudioNode;
    int mLastCookFrame = -1;
+   bool mLearning = false;
+   unsigned int mLearnCount = 0;
 };
 
 // Note pitch -> normalized modulation value, so a note stream can drive a
@@ -600,6 +616,11 @@ public:
    int HeldCount() const;      // main-thread readouts for the visualizer
    int CurrentNote() const;    // -1 if nothing is currently sounding
    int CurrentGridStep() const; // -1 if nothing is currently held (playhead parked)
+   // Turbo 0.50: quantized restart ("restart" trigger + "restart q"); the
+   // anchor is not saved, a loaded patch starts on the transport grid.
+   int restartQuant = QuantizedRestart::kBar; // QuantizedRestart::Quant
+   void RequestRestart();
+   bool RestartArmed() const;
 
 private:
    std::unique_ptr<AudioArpeggiatorNode> mAudioNode;
@@ -644,6 +665,11 @@ public:
    bool stepEnabled[kMaxSteps];
 
    int CurrentStep() const; // main-thread readout for the visualizer, -1 if stopped
+   // Turbo 0.50: quantized restart ("restart" trigger + "restart q"); the
+   // anchor is not saved, a loaded patch starts on the transport grid.
+   int restartQuant = QuantizedRestart::kBar; // QuantizedRestart::Quant
+   void RequestRestart();
+   bool RestartArmed() const;
 
 private:
    std::unique_ptr<AudioNoteSequencerNode> mAudioNode;
@@ -1003,15 +1029,33 @@ private:
    int mLastCookFrame = -1;
 };
 
-// Cycles between up to four connected note inputs on a fixed interval
+// Cycles between up to eight connected note inputs on a fixed interval
 // (beats or seconds) or manually - the note-cable counterpart of SwitcherNode
 // (2D) and Switcher3DNode (3D). When the active slot changes, new note-ons
 // come exclusively from the new slot, while notes held on the old slot have
 // their note-offs passed through when they naturally release.
+//
+// Turbo 0.50: eight slots (was four). `inputs` sets how many pins show
+// (2..8, 4 = the old node); a connected pin past it always stays visible.
+// Every slot answers NoteInputSlot so a patch's cables load whatever order
+// params and connections arrive in. In manual mode a slot change can wait
+// for a grid line (`switchQuant`).
 class NoteSwitcherNode : public INode, public INoteSource
 {
 public:
-   static constexpr int kSlots = 4;
+   static constexpr int kSlots = 8;
+   static constexpr int kLegacySlots = 4; // pre-0.50 node, default `inputs`
+
+   enum SwitchQuant
+   {
+      kSwitchNow = 0,
+      kSwitchBeat,
+      kSwitchBar,
+      kSwitch2Bars,
+      kSwitch4Bars,
+      kNumSwitchQuants
+   };
+   static const std::vector<std::string>& SwitchQuantNames();
 
    static INode* Create() { return new NoteSwitcherNode(); }
    NoteSwitcherNode();
@@ -1031,6 +1075,9 @@ public:
    AudioNode* GetAudioNode() override;
 
    int ActiveSlot() const;
+   int PendingSlot() const; // -1 unless a quantized switch is waiting
+   // Pins to draw: `inputs`, widened to the highest connected slot.
+   int VisibleSlots() const;
 
    NoteCable noteInputs[kSlots];
 
@@ -1039,6 +1086,8 @@ public:
    float rateSeconds = 1.0f;  // interval in seconds when free
    bool manual = false;
    int manualSlot = 0;        // 0..kSlots-1
+   int inputs = kLegacySlots; // Turbo 0.50: pins shown, 2..kSlots
+   int switchQuant = kSwitchNow; // Turbo 0.50: manual changes wait for this grid
 
 private:
    std::unique_ptr<AudioNoteSwitcherNode> mAudioNode;

@@ -171,6 +171,19 @@ void MidiTriggerNode::CookIfNeeded(int frameId)
    if (!IsBound())
       return;
 
+   // Turbo 0.50: the channel can be edited after learning; reseed the hit
+   // counter on a change so switching channel doesn't fire a phantom hit.
+   if (channel != mSeqChannel || note != mSeqNote || mode != mSeqMode)
+   {
+      mSeqChannel = channel;
+      mSeqNote = note;
+      mSeqMode = mode;
+      Platform::MidiLastNote ln;
+      mLastHitSeq = mode == kKeyboard
+                       ? (Platform::MidiChannelLastNote((Platform::MidiDeviceId)device, channel, ln) ? ln.hitSeq : 0)
+                       : Platform::MidiNoteHitCount((Platform::MidiDeviceId)device, channel, note);
+   }
+
    if (mode == kKeyboard)
    {
       // A keyboard reports which key is down, not a bang: hold the played

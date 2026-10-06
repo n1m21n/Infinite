@@ -1,5 +1,8 @@
 #pragma once
 
+#include <initializer_list>
+#include <string>
+
 // Turbo: the Drum Sequencer's pattern library. Generated from a table: every
 // groove has three parts, A (verse / main groove), B (bridge / breakdown) and
 // C (chorus / fuller, often two bars ending in a fill). Every pattern assumes
@@ -63,6 +66,48 @@ namespace DrumPatterns
       };
       count = (int)(sizeof(kCats) / sizeof(kCats[0]));
       return kCats;
+   }
+
+   // Turbo 0.50: files in the user's MIDI folder carry free-form styles
+   // ("electro-funk", "r-b", "miami-bass"). This folds a style into one of
+   // the built-in categories above so the picker stays one list of groups;
+   // -1 = no match (the picker then shows it as "MIDI: <style>"). Order
+   // matters: Brazil before funk (funk carioca), electronic before latin
+   // (dubstep vs dub), hip hop before electronic (trap).
+   inline int StyleToCategory(const std::string& style)
+   {
+      std::string s;
+      for (char c : style)
+         s += (char)((c >= 'A' && c <= 'Z') ? c - 'A' + 'a' : c);
+      auto any = [&](std::initializer_list<const char*> keys) {
+         for (const char* k : keys)
+            if (s.find(k) != std::string::npos)
+               return true;
+         return false;
+      };
+      if (any({ "brazil", "brasil", "samba", "bossa", "baiao", "forro", "maracatu", "carioca", "baile", "axe", "frevo", "ijexa" }))
+         return 5;
+      if (any({ "hip", "hop", "rap", "boom bap", "lofi", "lo-fi", "drill", "grime" }))
+         return 2;
+      if (any({ "electr", "house", "techno", "trance", "dnb", "drum and bass", "drum & bass", "jungle", "dubstep", "edm",
+                "miami", "garage", "synth", "808", "909", "idm", "ambient", "dance", "disco", "industrial", "acid" }))
+         return 3;
+      if (any({ "latin", "reggae", "dub", "dancehall", "ska", "salsa", "cumbia", "mambo", "calypso", "soca", "merengue",
+                "bachata", "rumba", "cha cha", "bolero", "tango", "caribb", "beguine", "afro-cuban", "clave" }))
+         return 4;
+      if (any({ "funk", "break", "soul", "r-b", "rnb", "r&b", "r and b", "gospel", "motown", "groove" }))
+         return 1;
+      if (any({ "jazz", "swing", "bebop", "bop", "shuffle", "big band", "brush" }))
+         return 9;
+      if (any({ "rock", "pop", "punk", "metal", "indie", "ballad", "country", "blues", "grunge", "new wave", "surf" }))
+         return 0;
+      if (any({ "arab", "middle", "maqsum", "belly", "turk", "persian", "egypt", "maghreb", "gnawa" }))
+         return 6;
+      if (any({ "india", "tabla", "bhangra", "bollywood", "carnatic", "hindustani" }))
+         return 7;
+      if (any({ "africa", "afro", "world", "highlife", "kuduro", "soukous", "mbalax", "celtic", "balkan", "klezmer" }))
+         return 8;
+      return -1;
    }
 
    inline const Groove* All(int& count)

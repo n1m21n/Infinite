@@ -81,12 +81,13 @@ void PluginScanner::StartScan(const std::string& folder)
    }
    else
    {
-      if (const char* common = getenv("CommonProgramFiles"))
-         vst3Folders.push_back((fs::u8path(common) / "VST3").u8string());
-      if (const char* commonX86 = getenv("CommonProgramFiles(x86)"))
-         vst3Folders.push_back((fs::u8path(commonX86) / "VST3").u8string());
-      if (const char* local = getenv("LOCALAPPDATA"))
-         vst3Folders.push_back((fs::u8path(local) / "Programs" / "Common" / "VST3").u8string());
+      // Wide environment reads (InfiniteEnvPath): non-ASCII user names.
+      if (const fs::path common = InfiniteEnvPath("CommonProgramFiles"); !common.empty())
+         vst3Folders.push_back((common / "VST3").u8string());
+      if (const fs::path commonX86 = InfiniteEnvPath("CommonProgramFiles(x86)"); !commonX86.empty())
+         vst3Folders.push_back((commonX86 / "VST3").u8string());
+      if (const fs::path local = InfiniteEnvPath("LOCALAPPDATA"); !local.empty())
+         vst3Folders.push_back((local / "Programs" / "Common" / "VST3").u8string());
       for (const std::string& userFolder : mFolders)
          if (std::find(vst3Folders.begin(), vst3Folders.end(), userFolder) == vst3Folders.end())
             vst3Folders.push_back(userFolder);

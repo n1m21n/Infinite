@@ -10,6 +10,7 @@
 #include "audio/MusicTime.h"
 #include "audio/NoteEvent.h"
 #include "audio/NoteEventQueue.h"
+#include "audio/QuantizedRestart.h"
 #include "audio/SampleSlot.h"
 #include "core/Transport.h"
 
@@ -95,6 +96,7 @@ public:
       const bool active = transport.IsPlaying() && mPlay.load(std::memory_order_relaxed) && data != nullptr;
       if (!active)
       {
+         mRestart.Update(false, 0.0, 4.0); // an armed line waits for play again
          ReleaseAll(0, numFrames);
          mWasActive = false;
          mPlayhead.store(-1.0, std::memory_order_relaxed);
@@ -152,52 +154,68 @@ public:
          return std::clamp((int)((beat - beats0) * samplesPerBeat), 0, numFrames - 1);
       };
 
-      for (int guard = 0; guard < 8 && !mDone && playLen > 0.0; guard++)
-      {
-         const double iterEnd = mAnchor + playLen;
-         const double segEnd = std::min(beats1, iterEnd);
-
-         ReleaseDue(segEnd, beats0, samplesPerBeat, numFrames);
-         while (mNextIdx < numNotes)
+      // Turbo 0.50: a restart splits the block at its grid line: the file
+      // plays from the old anchor up to the line, then from the top.
+      mRestart.Update(true, beats0, beatsPerBar);
+      auto playUntil = [&](double limit) {
+         for (int guard = 0; guard < 8 && !mDone && playLen > 0.0; guard++)
          {
-            const MidiPlayNote& pn = data->notes[mNextIdx];
-            if (pn.start >= playLen - 1.0e-9)
+            const double iterEnd = mAnchor + playLen;
+            const double segEnd = std::min(limit, iterEnd);
+
+            ReleaseDue(segEnd, beats0, samplesPerBeat, numFrames);
+            while (mNextIdx < numNotes)
             {
-               mNextIdx = numNotes; // sorted: everything after is past the loop end
-               break;
+               const MidiPlayNote& pn = data->notes[mNextIdx];
+               if (pn.start >= playLen - 1.0e-9)
+               {
+                  mNextIdx = numNotes; // sorted: everything after is past the loop end
+                  break;
+               }
+               const double at = mAnchor + pn.start;
+               if (at >= segEnd)
+                  break;
+               if (mNumOut >= kMaxOnsPerBlock)
+                  break; // a huge chord cluster: the rest play next block
+               mNextIdx++;
+               if ((track != 0 && pn.track != track) || (channel != 0 && pn.channel != channel))
+                  continue;
+               const int key = (int)pn.key + transpose;
+               if (key < 0 || key > 127)
+                  continue;
+               const float vel = std::clamp((float)pn.velocity / 127.0f * velScale, 0.0f, 1.0f);
+               if (vel <= 0.0f)
+                  continue;
+               EmitOn(key, vel, offsetOf(at), mAnchor + std::min(pn.end, playLen));
             }
-            const double at = mAnchor + pn.start;
-            if (at >= segEnd)
-               break;
-            if (mNumOut >= kMaxOnsPerBlock)
-               break; // a huge chord cluster: the rest play next block
-            mNextIdx++;
-            if ((track != 0 && pn.track != track) || (channel != 0 && pn.channel != channel))
-               continue;
-            const int key = (int)pn.key + transpose;
-            if (key < 0 || key > 127)
-               continue;
-            const float vel = std::clamp((float)pn.velocity / 127.0f * velScale, 0.0f, 1.0f);
-            if (vel <= 0.0f)
-               continue;
-            EmitOn(key, vel, offsetOf(at), mAnchor + std::min(pn.end, playLen));
-         }
-         ReleaseDue(segEnd, beats0, samplesPerBeat, numFrames); // notes shorter than the block
+            ReleaseDue(segEnd, beats0, samplesPerBeat, numFrames); // notes shorter than the block
 
-         if (iterEnd >= beats1)
-            break;
-         // The file (or loop) ends inside this block.
-         ReleaseAll(offsetOf(iterEnd), numFrames);
-         if (loop)
-         {
-            mAnchor = CeilGrid(std::max(iterEnd, beats0), grid);
-            mNextIdx = 0;
+            if (iterEnd >= limit)
+               break;
+            // The file (or loop) ends inside this block.
+            ReleaseAll(offsetOf(iterEnd), numFrames);
+            if (loop)
+            {
+               mAnchor = CeilGrid(std::max(iterEnd, beats0), grid);
+               mNextIdx = 0;
+            }
+            else
+            {
+               mDone = true;
+            }
          }
-         else
-         {
-            mDone = true;
-         }
+      };
+      if (mRestart.Due(beats1))
+      {
+         const double at = mRestart.ArmBeat();
+         mRestart.Fire();
+         playUntil(at);
+         ReleaseAll(offsetOf(at), numFrames);
+         mAnchor = at;
+         mNextIdx = 0;
+         mDone = false;
       }
+      playUntil(beats1);
 
       const double pos = beats0 - mAnchor;
       mPlayhead.store((mDone || pos < 0.0) ? -1.0 : pos, std::memory_order_relaxed);
@@ -217,7 +235,11 @@ public:
       mLoopBars.store(std::clamp(n.loopBars, 0, 256), std::memory_order_relaxed);
       mQuantize.store(n.quantize, std::memory_order_relaxed);
       mPlay.store(n.play, std::memory_order_relaxed);
+      mRestart.SetQuant(n.restartQuant);
    }
+   // Turbo 0.50: quantized restart (main thread).
+   void RequestRestart() { mRestart.Request(); }
+   bool RestartArmed() const { return mRestart.Armed(); }
    void PushData(MidiPlayData* d) { mSlot.Push(d); }
    void DrainRetired() { mSlot.DrainRetired(); }
    double Playhead() const { return mPlayhead.load(std::memory_order_relaxed); }
@@ -337,6 +359,7 @@ private:
    bool mNeedAnchor = true;
    bool mDone = false;
    double mAnchor = 0.0;
+   QuantizedRestart mRestart; // Turbo 0.50
    size_t mNextIdx = 0;
    uint32_t mSeekSerial = 0;
    int mLastTrack = 0;
@@ -398,6 +421,7 @@ void MidiFileNode::VisitParams(ParamVisitor& v)
    v.Int("loopBars", loopBars);
    v.Int("quantize", quantize);
    v.Bool("play", play);
+   v.Int("restartQuant", restartQuant); // Turbo 0.50, appended
 }
 
 bool MidiFileNode::LoadFile(const std::string& p)
@@ -494,4 +518,16 @@ double MidiFileNode::PlayLengthBeats() const
 double MidiFileNode::PlayheadBeats() const
 {
    return mAudioNode ? mAudioNode->Playhead() : -1.0;
+}
+
+void MidiFileNode::RequestRestart()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioMidiFileNode>();
+   mAudioNode->RequestRestart();
+}
+
+bool MidiFileNode::RestartArmed() const
+{
+   return mAudioNode ? mAudioNode->RestartArmed() : false;
 }

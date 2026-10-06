@@ -1,4 +1,5 @@
 #include "AudioFileWriter.h"
+#include "platform/SettingsPaths.h"
 
 
 #include "shine.h"
@@ -103,7 +104,7 @@ void AudioFileWriter::Close(){CloseWav();CloseFlac();CloseMp3();}
 
 namespace AudioRecordings
 {
-   std::string GetRecordingsDirectory(){const char*local=getenv("LOCALAPPDATA");fs::path dir=(local?fs::u8path(local):fs::temp_directory_path())/"Infinite"/"Recordings";std::error_code ec;fs::create_directories(dir,ec);return dir.u8string();}
+   std::string GetRecordingsDirectory(){const fs::path local=InfiniteEnvPath("LOCALAPPDATA");fs::path dir=(!local.empty()?local:fs::temp_directory_path())/"Infinite"/"Recordings";std::error_code ec;fs::create_directories(dir,ec);return dir.u8string();}
    std::string GenerateFilePath(const std::string&prefix,const std::string&ext){auto now=std::chrono::system_clock::now();auto tt=std::chrono::system_clock::to_time_t(now);std::tm tm{};localtime_s(&tm,&tt);auto ms=std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch())%1000;static std::atomic<uint32_t>count{0};char name[256];snprintf(name,sizeof(name),"recording_%s_%04d%02d%02d_%02d%02d%02d_%03d_%u.%s",prefix.c_str(),tm.tm_year+1900,tm.tm_mon+1,tm.tm_mday,tm.tm_hour,tm.tm_min,tm.tm_sec,(int)ms.count(),++count,ext.c_str());return (fs::u8path(GetRecordingsDirectory())/name).u8string();}
    bool WriteWav(const std::string&path,const float*data,int frames,double rate,int channels){if(!data||frames<=0||rate<=0)return false;AudioFileWriter w;if(!w.Open(path,rate,channels,AudioFileWriter::Format::Wav))return false;w.Append(data,frames);w.Close();return true;}
 }

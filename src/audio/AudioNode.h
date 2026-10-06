@@ -67,6 +67,12 @@ public:
    // and AudioPluginAudioNode's overrides.
    virtual int LatencySamples() const { return 0; }
 
+   // Turbo 0.50: true when LatencySamples() can change without a graph edit
+   // (the Super Mixer limiter's switch and lookahead). main.cpp then polls
+   // it once per frame, wherever it feeds a delay-compensation merge, and
+   // rebuilds the topology when it changed. Main thread only.
+   virtual bool LatencyMayChange() const { return false; }
+
    // --- note ports (P3a) ---------------------------------------------------
    // Optional; the overwhelming majority of AudioNode subclasses carry no
    // note data and use neither. See docs/plans/audio/P3a-notes-prompt.md

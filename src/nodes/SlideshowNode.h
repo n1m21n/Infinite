@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <string>
 #include <vector>
 
@@ -52,6 +53,14 @@ public:
    int CurrentImageNumber() const;
    std::string CurrentFileName() const;
 
+   // Turbo 0.50: manual stepping (UI, MIDI learn, Performance Mode, CV via
+   // the buttons' pins). Applied on the next cook. Restart cuts to the first
+   // image and restarts the hold timer; next / prev play the chosen
+   // transition, then the auto-advance carries on from the new image.
+   void RequestRestart() { mRequest = Request::Restart; }
+   void RequestNext() { mRequest = Request::Next; }
+   void RequestPrev() { mRequest = Request::Prev; }
+
    float holdDuration = 3.0f;
    float transitionDuration = 1.0f;
    int transition = 0;
@@ -90,7 +99,10 @@ private:
    };
 
    bool EnsureShader();
-   bool ResolveFrames(long long ordinal, int& slotA, int& slotB, int& indexA, int& indexB);
+   // direction: +1 shows ordinal -> ordinal + 1, -1 (manual prev) ordinal -> ordinal - 1.
+   bool ResolveFrames(long long ordinal, int direction, int& slotA, int& slotB, int& indexA, int& indexB);
+   void AutoPhase(double now, double hold, double fade, double step, long long& ordinal, float& progress) const;
+   void ApplyRequest(double now, double hold, double fade, double step);
    bool LoadSlot(int slot, int fileIndex);
 
    std::string mFolderPath;
@@ -110,4 +122,15 @@ private:
    unsigned long long mRevision = 0;
    bool mHasBuilt = false;
    Signature mBuilt;
+
+   // Turbo 0.50: manual stepping state (runtime only, not saved). With no
+   // step taken, offset 0 and origin 0 reproduce the old pure-transport timing.
+   enum class Request { None, Restart, Next, Prev };
+   Request mRequest = Request::None;
+   long long mOrdinalOffset = 0;
+   double mTimeOrigin = 0.0; // transport seconds where mOrdinalOffset's hold began
+   bool mManual = false;     // a next/prev transition is running (wall clock, so it animates with the transport stopped)
+   long long mManualFrom = 0;
+   long long mManualTo = 0;
+   std::chrono::steady_clock::time_point mManualStart;
 };

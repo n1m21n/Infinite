@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
+#include <initializer_list>
+#include <utility>
 
 #include "audio/AudioBuffer.h"
 #include "audio/AudioNode.h"
@@ -15,6 +17,7 @@
 #include "audio/NoteEventQueue.h"
 #include "audio/SampleSlot.h"
 #include "core/AudioTopologyRequest.h"
+#include "nodes/ImageTransition.h"
 
 // Audio-thread half: forwards notes to the main thread, and plays the active
 // pad's soundtrack (monophonic, like the picture). The main thread sends
@@ -263,6 +266,22 @@ VmpcNode::~VmpcNode()
       glDeleteTextures(1, &mTex);
    if (mClearTex != 0)
       glDeleteTextures(1, &mClearTex);
+   if (mPrevTex != 0)
+      glDeleteTextures(1, &mPrevTex);
+   GLUtil::DestroyFbo(mOut);
+   if (mProgram != 0)
+      glDeleteProgram(mProgram);
+}
+
+const std::vector<std::string>& VmpcNode::TransitionNames()
+{
+   static const std::vector<std::string> names = [] {
+      std::vector<std::string> v { "Cut" };
+      for (const std::string& n : ImageTransition::Names())
+         v.push_back(n);
+      return v;
+   }();
+   return names;
 }
 
 AudioNode* VmpcNode::GetAudioNode()
@@ -292,10 +311,14 @@ void VmpcNode::EnsureTextures()
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
       glBindTexture(GL_TEXTURE_2D, 0);
    }
-   if (mTex == 0)
+   // Turbo 0.50: mPrevTex is the second frame texture; the two swap names
+   // on each transition, so both need identical sampling state.
+   for (unsigned int* tex : { &mTex, &mPrevTex })
    {
-      glGenTextures(1, &mTex);
-      glBindTexture(GL_TEXTURE_2D, mTex);
+      if (*tex != 0)
+         continue;
+      glGenTextures(1, tex);
+      glBindTexture(GL_TEXTURE_2D, *tex);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -308,7 +331,14 @@ unsigned int VmpcNode::GetOutputTexture()
 {
    EnsureTextures();
    const bool show = mShowClip && (mPlaying || holdLastFrame);
-   return show ? mTex : mClearTex;
+   if (!show)
+      return mClearTex;
+   // Turbo 0.50: until the incoming clip's first frame, the outgoing one.
+   if (mTransState == kTransWaiting)
+      return mPrevTex;
+   if (mTransState == kTransRunning && mOut.tex != 0)
+      return mOut.tex;
+   return mTex;
 }
 
 bool VmpcNode::LoadPad(int pad, const std::string& path)
@@ -439,6 +469,26 @@ void VmpcNode::StartPad(int pad)
 {
    double from = 0.0, to = 0.0;
    RangeSeconds(pad, from, to);
+
+   // Turbo 0.50: switching from a visible clip to another pad keeps the
+   // outgoing frame (texture swap, no copy) for the transition.
+   const bool visible = mShowClip && (mPlaying || holdLastFrame) && mActive >= 0;
+   if (transitionStyle > 0 && transitionTime > 0.0f && visible && pad != mActive)
+   {
+      // Already waiting: mPrevTex still holds what is on screen, keep it.
+      if (mTransState != kTransWaiting)
+      {
+         std::swap(mTex, mPrevTex);
+         std::swap(mTexW, mPrevW);
+         std::swap(mTexH, mPrevH);
+      }
+      mTransState = kTransWaiting;
+      mTransStyle = std::clamp(transitionStyle - 1, 0, (int)ImageTransition::kStyleCount - 1);
+      mTransSeconds = std::clamp((double)transitionTime, 0.0, 30.0);
+   }
+   else
+      CancelTransition();
+
    mActive = pad;
    mPlaying = true;
    // Keep showing the previous frame until the new clip delivers its first
@@ -458,8 +508,67 @@ void VmpcNode::StartPad(int pad)
       mAudio->Stop();
 }
 
+void VmpcNode::CancelTransition()
+{
+   if (mTransState == kTransWaiting)
+   {
+      // The incoming clip never delivered: mPrevTex still holds the frame
+      // last shown, so swap back (mTex is what Cut / hold last frame show).
+      std::swap(mTex, mPrevTex);
+      std::swap(mTexW, mPrevW);
+      std::swap(mTexH, mPrevH);
+   }
+   if (mTransState != kTransNone)
+      mRevision = NextTextureRevision();
+   mTransState = kTransNone;
+}
+
+void VmpcNode::RenderTransition()
+{
+   if (mTransState != kTransRunning)
+      return;
+   if (!(mShowClip && (mPlaying || holdLastFrame)))
+   {
+      CancelTransition();
+      return;
+   }
+   const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - mTransStart).count();
+   if (elapsed >= mTransSeconds)
+   {
+      mTransState = kTransNone;
+      mRevision = NextTextureRevision();
+      return;
+   }
+   if (!mShaderTried)
+   {
+      mShaderTried = true;
+      mProgram = GLUtil::CompileProgram(ImageTransition::kFragSrc);
+   }
+   const int dstW = std::max(1, mWidth);
+   const int dstH = std::max(1, mHeight);
+   if (mProgram == 0 || !GLUtil::EnsureFbo(mOut, dstW, dstH))
+   {
+      mTransState = kTransNone; // no GL program: behave like Cut
+      return;
+   }
+
+   // The outgoing frame letterboxed into the incoming clip's size.
+   float scaleAX = 1.0f, scaleAY = 1.0f;
+   ImageTransition::ProportionalScale(mPrevW, mPrevH, dstW, dstH, scaleAX, scaleAY);
+   const float progress = (float)std::clamp(elapsed / std::max(1e-6, mTransSeconds), 0.0, 1.0);
+   const unsigned int texA = mPrevTex;
+   const unsigned int texB = mTex;
+   const unsigned int program = mProgram;
+   const int style = mTransStyle;
+   GLUtil::RunShaderPass(mOut, program, [=]() {
+      ImageTransition::SetUniforms(program, texA, texB, scaleAX, scaleAY, 1.0f, 1.0f, progress, style, dstW);
+   });
+   mRevision = NextTextureRevision();
+}
+
 void VmpcNode::StopPlayback()
 {
+   CancelTransition();
    mPlaying = false;
    mAudioStarted = false;
    mAudio->Stop();
@@ -502,6 +611,12 @@ void VmpcNode::CookIfNeeded(int frameId)
    if (mLastCookFrame == frameId)
       return;
    mLastCookFrame = frameId;
+   CookClip();
+   RenderTransition(); // Turbo 0.50
+}
+
+void VmpcNode::CookClip()
+{
    EnsureTextures();
    mAudio->DrainRetired();
    mAudio->SetVolume(std::clamp(audioVolume, 0.0f, 2.0f));
@@ -596,6 +711,12 @@ void VmpcNode::CookIfNeeded(int frameId)
          mHeight = h;
          mShowClip = true;
          mRevision = NextTextureRevision();
+         if (mTransState == kTransWaiting)
+         {
+            // Turbo 0.50: the incoming clip's first frame starts the blend.
+            mTransState = kTransRunning;
+            mTransStart = now;
+         }
       }
    }
 }
@@ -621,4 +742,7 @@ void VmpcNode::VisitParams(ParamVisitor& v)
    v.Bool("playAudio", playAudio);
    v.Float("audioVolume", audioVolume);
    v.Int("selectedPad", selectedPad);
+   // Turbo 0.50 (appended): defaults are Cut, so older patches look the same.
+   v.Int("transitionStyle", transitionStyle);
+   v.Float("transitionTime", transitionTime);
 }

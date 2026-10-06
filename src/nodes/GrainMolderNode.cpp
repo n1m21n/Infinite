@@ -509,6 +509,10 @@ void GrainMolderNode::VisitParams(ParamVisitor& v)
    v.Bool("loop", loop);
    v.Bool("reverse", reverse);
    v.Bool("pingpong", pingpong);
+   // Turbo 0.50: appended. The source file was never saved, so a reopened
+   // patch came back empty and its trim (start/end above) had nothing to
+   // apply to. Old patches have no key and keep an empty path.
+   v.Text("path", mFilePath);
 }
 
 void GrainMolderNode::TriggerPreview(float frac)
@@ -613,7 +617,14 @@ bool GrainMolderNode::LoadFile(const std::string& path)
 void GrainMolderNode::ReloadFromPath()
 {
    if (!mFilePath.empty())
+   {
+      // Turbo 0.50: keep the saved trim/playhead across the reload.
+      const float savedStart = start, savedEnd = end, savedPos = position;
       LoadFile(mFilePath);
+      start = savedStart;
+      end = savedEnd;
+      position = savedPos;
+   }
 }
 
 void GrainMolderNode::LaunchJob(Job job, std::vector<float> sourceOverride, double sourceOverrideSR)

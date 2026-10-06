@@ -83,6 +83,7 @@
 #include "nodes/TextureNode.h"
 #include "nodes/ResynthNode.h"
 #include "nodes/MacroNodes.h"
+#include "nodes/ScenesNode.h" // Turbo 0.50
 #include "nodes/DriftNode.h"
 #include "nodes/SlideshowNode.h"
 #include "nodes/AudioMeterNode.h"
@@ -152,6 +153,7 @@
 #include "nodes/GranularNode.h"
 #include "nodes/DrumSequencerNode.h"
 #include "nodes/DrumPatterns.h"
+#include "nodes/DrumMidiLibrary.h"
 #include "nodes/AudioPluginNode.h"
 
 // Infinite-Turbo build identity: CMake passes the project version; the
@@ -1997,10 +1999,47 @@ namespace
       ImGui::TextDisabled("%s", shown.c_str());
    }
 
+   // Turbo 0.50: shared MIDI channel picker for every MIDI input node. The
+   // stored int keeps its 0-based meaning (-1 = omni, 0-15 = channel 1-16) so
+   // saved patches are unchanged; only the UI speaks 1-16.
+   const std::vector<std::string>& MidiChannelNames(bool withOmni)
+   {
+      static std::vector<std::string> omni, plain;
+      if (plain.empty())
+      {
+         omni.push_back("omni");
+         for (int c = 1; c <= 16; c++)
+         {
+            const std::string name = "ch " + std::to_string(c);
+            omni.push_back(name);
+            plain.push_back(name);
+         }
+      }
+      return withOmni ? omni : plain;
+   }
+
+   void MidiChannelDropdown(const char* label, int* channel, bool withOmni, float width = kParamWidth)
+   {
+      const int current = withOmni ? std::clamp(*channel, -1, 15) + 1 : std::clamp(*channel, 0, 15);
+      DropdownButton(label, MidiChannelNames(withOmni), current,
+                     [channel, withOmni](int i) {
+                        const int v = withOmni ? i - 1 : i;
+                        if (v == *channel)
+                           return;
+                        if (!gApplyingDiscreteCv)
+                           PushUndoCheckpoint();
+                        *channel = v;
+                     },
+                     width);
+   }
+
    // Turbo 0.49: `caption` (optional) is the button's text when it differs
    // from the param's name, e.g. a "<" arrow whose param reads "prev groove"
    // in MIDI learn, the Performance panel and the MCP param list.
-   bool ModTriggerButton(const char* label, const ImVec2& size, const char* caption = nullptr)
+   // Turbo 0.50: `outParamIndex` (optional) receives the hashed param index,
+   // so a node can tell the Performance panel which trigger to light.
+   bool ModTriggerButton(const char* label, const ImVec2& size, const char* caption = nullptr,
+                         int* outParamIndex = nullptr)
    {
       if (caption == nullptr)
          caption = label;
@@ -2008,6 +2047,8 @@ namespace
          return ImGui::Button(caption, size);
 
       DiscreteParamRef ref = BeginDiscreteParam(label, 0.0f, 0.0f, 1.0f, 2);
+      if (outParamIndex != nullptr)
+         *outParamIndex = ref.paramIndex;
       const std::pair<int, int> key(ref.nodeIndex, ref.paramIndex);
       bool firedByCv = false;
       if (ref.modulated)
@@ -3640,6 +3681,7 @@ namespace
       REGISTER_NODE(MacroNumBoxNode, Macro NumBox, "Macros");
       REGISTER_NODE(MacroRadioSelectorNode, Macro Radio Selector, "Macros");
       REGISTER_NODE(MacroStepGateNode, Macro Step Gate, "Macros");
+      REGISTER_NODE(ScenesNode, Scenes, "Macros"); // Turbo 0.50
       REGISTER_NODE(DriftNode, Drift, "Modulators");
       NodeFactory::Instance().Register("Button", &UIButtonNode::Create, "UI");
       NodeFactory::Instance().Register("Horizontal Slider", &UISliderNode::CreateHorizontal, "UI");
@@ -3971,6 +4013,10 @@ namespace
          return LayoutNode::kSlots;
       if (dynamic_cast<SwitcherNode*>(gn.node.get()) != nullptr)
          return SwitcherNode::kSlots;
+      // Turbo 0.50: Note Switcher answers all 8 note slots (so cables always
+      // load) but shows only its `inputs` count plus any connected pin past it.
+      if (auto* ns = dynamic_cast<NoteSwitcherNode*>(gn.node.get()))
+         return ns->VisibleSlots();
       // Modulator input nodes (Math, Range to Range, Smooth, ...) take modulator
       // cables rather than images, but they are still ordinary input pins as far
       // as the editor is concerned.
@@ -4220,8 +4266,8 @@ namespace
    // patches keep loading unchanged - which needed this bumped to 2 and that
    // wiring pass turned into a real loop; see its comment. NoteMergeNode's
    // 4-way fan-in (mirroring NoteRouterNode's 4-way fan-out) needed this
-   // bumped again to 4.
-   const int kMaxNoteSlots = 4;
+   // bumped again to 4. Turbo 0.50: Note Switcher has 8 note inputs.
+   const int kMaxNoteSlots = 8;
 
    // Most IAudioSource nodes have one audio-only output. Video Player is a
    // mixed media source: pin 0 is its image and pin 1 is its soundtrack.
@@ -4723,6 +4769,37 @@ namespace
       return center; // exhausted the search area - stack rather than fail
    }
 
+   // Turbo 0.50: new nodes draw in front. node-editor reuses its per-id
+   // state, and editor ids are index * kStride, so after a patch load or undo
+   // (indices restart) a new node can inherit a stale entry from early in the
+   // draw list and render behind existing nodes. ApplyBringToFront (inside
+   // the editor frame) lifts each queued node with a one-frame z of 1, which
+   // the editor's stable z sort moves to the end of the draw list; the next
+   // frame puts z back to 0 and the order stays, so click-to-front still works.
+   std::vector<int> gBringToFrontQueue;
+   std::vector<int> gBringToFrontReset;
+
+   void ApplyBringToFront()
+   {
+      // GetNodeZPosition returns 0 for an unknown id, so this never recreates
+      // a node deleted in between (SetNodeZPosition would).
+      for (int index : gBringToFrontReset)
+      {
+         const ed::NodeId id(index * GraphNode::kStride);
+         if (ed::GetNodeZPosition(id) != 0.0f)
+            ed::SetNodeZPosition(id, 0.0f);
+      }
+      gBringToFrontReset.clear();
+      for (int index : gBringToFrontQueue)
+      {
+         if (FindNodeByIndex(index) == nullptr)
+            continue;
+         ed::SetNodeZPosition(ed::NodeId(index * GraphNode::kStride), 1.0f);
+         gBringToFrontReset.push_back(index);
+      }
+      gBringToFrontQueue.clear();
+   }
+
    GraphNode* SpawnNode(const std::string& requestedTypeName, const std::string& category,
                         float x = 0.0f, float y = 0.0f)
    {
@@ -4752,6 +4829,7 @@ namespace
           dynamic_cast<FeedbackNode*>(node) != nullptr || dynamic_cast<OutputNode*>(node) != nullptr ||
           dynamic_cast<ClipMatrixNode*>(node) != nullptr || dynamic_cast<ClipMatrixOutNode*>(node) != nullptr)
          gn.showParams = true;
+      gBringToFrontQueue.push_back(gn.index); // Turbo 0.50
       gNodes.push_back(std::move(gn));
       return &gNodes.back();
    }
@@ -4789,7 +4867,7 @@ namespace
       if (auto* gran = dynamic_cast<GranularNode*>(node))
          gran->ReloadFromPath();
       if (auto* drum = dynamic_cast<DrumSequencerNode*>(node))
-         drum->ReloadFromPaths();
+         drum->ReloadFromPaths(); // Turbo 0.50: keeps the saved lane trims itself
       if (auto* mpc = dynamic_cast<MpcNode*>(node))
          mpc->ReloadFromPaths();
       if (auto* vmpc = dynamic_cast<VmpcNode*>(node))
@@ -6409,6 +6487,19 @@ namespace
          if (ImGui::Button("Refresh", ImVec2(kPreviewSize, 0)))
             n->ReloadFromFolder();
       }
+      // Turbo 0.50: mappable stepping (MIDI learn, Performance Mode, CV pins).
+      // The param names are the label before "##"; the captions are short.
+      {
+         const float third = (kPreviewSize - 2.0f * ImGui::GetStyle().ItemSpacing.x) / 3.0f;
+         if (ModTriggerButton("restart sequence##slideshowRestart", ImVec2(third, 0), "|<##slideshowRestartBtn"))
+            n->RequestRestart();
+         ImGui::SameLine();
+         if (ModTriggerButton("prev image##slideshowPrev", ImVec2(third, 0), "<##slideshowPrevBtn"))
+            n->RequestPrev();
+         ImGui::SameLine();
+         if (ModTriggerButton("next image##slideshowNext", ImVec2(third, 0), ">##slideshowNextBtn"))
+            n->RequestNext();
+      }
       DropdownButton("transition", SlideshowNode::TransitionNames(), n->transition,
                      [n](int i) { n->transition = i; });
       ModSlider("hold", &n->holdDuration, 0.05f, 60.0f, "%.2f s");
@@ -6630,6 +6721,11 @@ namespace
       ImGui::PopTextWrapPos();
 
       ImGui::Text("bound: %s", n->BindingLabel().c_str());
+      // Turbo 0.50: the learned channel can be changed without re-learning
+      // (same controller layout on another channel). Bindings are always one
+      // exact channel, so no omni here.
+      if (n->IsBound())
+         MidiChannelDropdown("channel##midiCCCh", &n->channel, false);
       ImGui::ProgressBar(n->Value01(), ImVec2(kPreviewSize * 0.6f, 0), "");
 
       ModSlider("low", &n->low, 0.0f, 1.0f);
@@ -6663,6 +6759,8 @@ namespace
       ImGui::PopTextWrapPos();
 
       ImGui::Text("bound: %s", n->BindingLabel().c_str());
+      if (n->IsBound()) // Turbo 0.50: see DrawMidiCCParams
+         MidiChannelDropdown("channel##midiTrigCh", &n->channel, false);
       ImGui::ProgressBar(n->Value01(), ImVec2(kPreviewSize * 0.6f, 0), "");
 
       if (n->mode == MidiTriggerNode::kKeyboard)
@@ -10226,7 +10324,8 @@ namespace
 
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
          AudioBareDropdown("eqPreset", EquationNode::PresetNames(), n->presetIndex,
-                           [n](int i) { PushUndoCheckpoint(); n->LoadPreset(i); }, preW);
+                           [n](int i) { PushUndoCheckpoint(); n->LoadPreset(i); }, preW,
+                           EquationNode::PresetCategories(), true); // Turbo 0.50: grouped, file order
 
          ImGui::SetCursorScreenPos(ImVec2(x0 + preW + gap, y));
          AudioBareDropdown("eqDom", EquationNode::DomainNames(), n->domainMode,
@@ -11405,30 +11504,61 @@ namespace
    // Turbo 0.47: groove index of the node's saved pattern name, -1 if none.
    int DrumGrooveIndex(const DrumSequencerNode* n)
    {
-      if (n->patternName.empty())
-         return -1;
-      int count = 0;
-      const DrumPatterns::Groove* all = DrumPatterns::All(count);
-      for (int i = 0; i < count; i++)
-         if (n->patternName == all[i].name)
-            return i;
-      return -1;
+      return n->GrooveIndex();
+   }
+
+   DrumSequencerNode* LiveDrumNode(INode* target)
+   {
+      for (GraphNode& g : gNodes)
+         if (g.node.get() == target)
+            return dynamic_cast<DrumSequencerNode*>(g.node.get());
+      return nullptr;
    }
 
    // Applies groove / part to a node that may have been deleted meanwhile
    // (dropdown callbacks run later in the frame), loading the kit into empty
    // lanes. Undo checkpoints are the caller's.
+   // Turbo 0.50: through SelectGroove, so the groove being left keeps its
+   // edits (restored when it is picked again) and the same groove only
+   // switches part (rate and swing stay as the user set them).
    void DrumApplyGroove(INode* target, int groove, int part)
    {
-      DrumSequencerNode* d = nullptr;
-      for (GraphNode& g : gNodes)
-         if (g.node.get() == target)
-            d = dynamic_cast<DrumSequencerNode*>(g.node.get());
-      if (d == nullptr || !d->ApplyPattern(groove, part))
+      DrumSequencerNode* d = LiveDrumNode(target);
+      if (d == nullptr || !d->SelectGroove(groove, part))
          return;
       d->browsingCategory = false;
       d->LoadKitIntoEmptyLanes(TurboDrumKitDir());
       gPatchDirty = true;
+   }
+
+   // Turbo 0.50: a groove from the user's MIDI folder, same contract as
+   // DrumApplyGroove (the node's status line says why when the file fails).
+   void DrumApplyMidi(INode* target, const std::string& path, int part)
+   {
+      DrumSequencerNode* d = LiveDrumNode(target);
+      std::string msg;
+      if (d == nullptr || !d->SelectMidiGroove(path, part, false, msg))
+         return;
+      d->browsingCategory = false;
+      d->LoadKitIntoEmptyLanes(TurboDrumKitDir());
+      gPatchDirty = true;
+   }
+
+   // One row of the picker's groove list: a library groove or a MIDI file.
+   struct DrumPickItem
+   {
+      int lib = -1;     // DrumPatterns index, or -1 for a MIDI file
+      std::string path; // MIDI file
+      std::string name;
+      std::string row;  // the dropdown line, with the tempo
+   };
+
+   void DrumApplyItem(INode* target, const DrumPickItem& item, int part)
+   {
+      if (item.lib >= 0)
+         DrumApplyGroove(target, item.lib, part);
+      else
+         DrumApplyMidi(target, item.path, part);
    }
 
    // Turbo 0.49: what a CV / MIDI / Performance drive last selected on an
@@ -11473,16 +11603,90 @@ namespace
       int count = 0, catCount = 0;
       const DrumPatterns::Groove* all = DrumPatterns::All(count);
       const char* const* cats = DrumPatterns::Categories(catCount);
+      // Turbo 0.50: the user's MIDI folder (scanned in the background) is
+      // folded into the built-in groups by style (DrumPatterns::StyleToCategory),
+      // so "electro-funk" sits in Electronic next to the library grooves. Only
+      // styles that match no group get their own "MIDI: <style>" entry.
+      DrumMidi::EnsureScanned();
+      const std::shared_ptr<const DrumMidi::Library> midi = DrumMidi::Current();
+      std::vector<std::string> extraGroups; // unmatched MIDI styles, in folder order
+      std::vector<int> entryCat(midi->entries.size(), -1);
+      for (size_t e = 0; e < midi->entries.size(); e++)
+      {
+         int c = DrumPatterns::StyleToCategory(midi->entries[e].group);
+         if (c < 0 || c >= catCount)
+         {
+            const std::string& g = midi->entries[e].group;
+            auto it = std::find(extraGroups.begin(), extraGroups.end(), g);
+            c = catCount + (int)(it - extraGroups.begin());
+            if (it == extraGroups.end())
+               extraGroups.push_back(g);
+         }
+         entryCat[e] = c;
+      }
+      const int midiGroups = (int)extraGroups.size();
+      const int catTotal = catCount + midiGroups;
       const int current = DrumGrooveIndex(n);
-      if (current >= 0 && !n->browsingCategory)
-         for (int c = 0; c < catCount; c++)
-            if (strcmp(cats[c], all[current].category) == 0)
-               n->patternCategory = c;
-      n->patternCategory = std::clamp(n->patternCategory, 0, catCount - 1);
-      std::vector<int> inCat;
-      for (int i = 0; i < count; i++)
-         if (strcmp(all[i].category, cats[n->patternCategory]) == 0)
-            inCat.push_back(i);
+      const int currentMidi = n->IsMidiGroove() ? midi->Find(n->MidiGroovePath()) : -1;
+      if (!n->browsingCategory)
+      {
+         if (current >= 0)
+         {
+            for (int c = 0; c < catCount; c++)
+               if (strcmp(cats[c], all[current].category) == 0)
+                  n->patternCategory = c;
+         }
+         else if (currentMidi >= 0 && currentMidi < (int)entryCat.size())
+            n->patternCategory = entryCat[currentMidi];
+      }
+      n->patternCategory = std::clamp(n->patternCategory, 0, catTotal - 1);
+      const bool midiCat = n->patternCategory >= catCount;
+      std::vector<DrumPickItem> inCat;
+      int shownK = -1;
+      if (!midiCat)
+      {
+         for (int i = 0; i < count; i++)
+            if (strcmp(all[i].category, cats[n->patternCategory]) == 0)
+            {
+               DrumPickItem it;
+               it.lib = i;
+               it.name = all[i].name;
+               char row[160];
+               snprintf(row, sizeof(row), "%s   ~%d bpm", all[i].name, all[i].bpm);
+               it.row = row;
+               if (i == current)
+                  shownK = (int)inCat.size();
+               inCat.push_back(std::move(it));
+            }
+      }
+      // The group's MIDI files after its library grooves (all of them for a
+      // "MIDI: <style>" group), tagged so they read apart from the library.
+      for (size_t e = 0; e < midi->entries.size(); e++)
+      {
+         if (entryCat[e] != n->patternCategory)
+            continue;
+         const DrumMidi::Entry& en = midi->entries[e];
+         DrumPickItem it;
+         it.path = en.path;
+         it.name = en.title;
+         it.row = en.title + "   MIDI";
+         if (!midiCat && !en.group.empty())
+            it.row += " " + en.group;
+         if (en.unreadable)
+            it.row += ", unreadable";
+         else if (en.empty)
+            it.row += ", no drum notes";
+         else
+         {
+            if (en.bpm > 0)
+               it.row += ", orig " + std::to_string(en.bpm) + " bpm";
+            if (en.bars > 0)
+               it.row += ", " + std::to_string(en.bars) + (en.bars == 1 ? " bar" : " bars");
+         }
+         if ((int)e == currentMidi)
+            shownK = (int)inCat.size();
+         inCat.push_back(std::move(it));
+      }
       INode* target = n;
       const int part = std::clamp(n->patternPart, 0, 2);
 
@@ -11494,27 +11698,52 @@ namespace
       const float grooveW = full - catW - arrowW * 2.0f - gap * 3.0f;
 
       // Category: switching it shows that list; nothing changes until a groove is picked.
-      if (ImGui::Button((std::string(cats[n->patternCategory]) + "##drumCat").c_str(), ImVec2(catW, 0)))
+      const std::string catLabel = midiCat ? "MIDI: " + extraGroups[n->patternCategory - catCount]
+                                           : std::string(cats[n->patternCategory]);
+      if (ImGui::Button((catLabel + "##drumCat").c_str(), ImVec2(catW, 0)))
       {
          std::vector<std::string> names(cats, cats + catCount);
-         PrepareDropdown(names, {}, n->patternCategory, [target](int c) {
-            for (GraphNode& g : gNodes)
-               if (g.node.get() == target)
-                  if (auto* d = dynamic_cast<DrumSequencerNode*>(g.node.get()))
-                  {
-                     d->patternCategory = c; // browse it; the grid and the A / B / C groove stay
-                     d->browsingCategory = true;
-                  }
+         std::vector<std::string> groups(catCount, "pattern library");
+         for (const std::string& g : extraGroups)
+            names.push_back("MIDI: " + g);
+         names.push_back(midi->scanning ? "MIDI: rescan folder (scanning...)" : "MIDI: rescan folder");
+         names.push_back(midiGroups == 0 ? "MIDI: open folder (put .mid files there)" : "MIDI: open folder");
+         groups.resize(names.size(), "your MIDI folder");
+         PrepareDropdown(names, groups, n->patternCategory, [target, catTotal](int c) {
+            if (c == catTotal)
+            {
+               DrumMidi::RequestScan();
+               return;
+            }
+            if (c == catTotal + 1)
+            {
+               const std::string dir = DrumMidi::DefaultFolder();
+               if (!dir.empty())
+                  Platform::RevealInFileManager(dir);
+               return;
+            }
+            if (DrumSequencerNode* d = LiveDrumNode(target))
+            {
+               d->patternCategory = c; // browse it; the grid and the A / B / C groove stay
+               d->browsingCategory = true;
+            }
          }, true);
       }
       if (ImGui::IsItemHovered())
-         ImGui::SetTooltip("pattern library: groups");
+      {
+         if (midi->entries.empty())
+            ImGui::SetTooltip("pattern library: groups\nyour own .mid drum patterns: put them (in subfolders or with an "
+                              "index.json) in\n%s\nthen pick \"MIDI: rescan folder\"",
+                              midi->root.empty() ? DrumMidi::DefaultFolder().c_str() : midi->root.c_str());
+         else
+            ImGui::SetTooltip("pattern library: groups, then your MIDI folder (%d files)\n%s", (int)midi->entries.size(),
+                              midi->root.c_str());
+      }
       ImGui::SameLine(0.0f, gap);
-      const bool inThisCat = current >= 0 && std::find(inCat.begin(), inCat.end(), current) != inCat.end();
-      const int shownK = inThisCat ? (int)(std::find(inCat.begin(), inCat.end(), current) - inCat.begin()) : -1;
+      const bool inThisCat = shownK >= 0;
       std::vector<std::string> grooveNames;
-      for (int k = 0; k < (int)inCat.size(); k++)
-         grooveNames.push_back(all[inCat[k]].name);
+      for (const DrumPickItem& it : inCat)
+         grooveNames.push_back(it.name);
 
       // Groove: a selector over the shown category's list (index into it).
       // A drive applies the groove with the current part when it changes.
@@ -11527,32 +11756,46 @@ namespace
          if (driven >= 0 && driven != shownK)
          {
             PushUndoForDrivenChange(ref);
-            DrumApplyGroove(target, inCat[driven], part);
+            DrumApplyItem(target, inCat[driven], part);
          }
-         std::string grooveCaption = inThisCat ? std::string(all[current].name) : std::string("choose a groove...");
+         std::string grooveCaption = inThisCat ? inCat[shownK].name : std::string("choose a groove...");
+         // A MIDI groove whose file is not in the folder (moved, or loaded by path over MCP).
+         if (!inThisCat && !n->browsingCategory && n->IsMidiGroove())
+            grooveCaption = DrumMidi::TitleFromFileName(n->MidiGroovePath());
          grooveCaption += "##drumGrooveBtn";
          const float btnW = ref.valid ? std::max(24.0f, grooveW - kPinSlot) : grooveW;
          if (ImGui::Button(grooveCaption.c_str(), ImVec2(btnW, 0)))
          {
             std::vector<std::string> names;
-            for (int k = 0; k < (int)inCat.size(); k++)
-            {
-               char row[160];
-               snprintf(row, sizeof(row), "%s   ~%d bpm", all[inCat[k]].name, all[inCat[k]].bpm);
-               names.push_back(row);
-            }
-            PrepareDropdown(names, {}, shownK, [target, inCat, part](int k) {
-               if (k >= 0 && k < (int)inCat.size())
-                  DrumApplyGroove(target, inCat[k], part);
-            }, true);
+            for (const DrumPickItem& it : inCat)
+               names.push_back(it.row);
+            if (names.empty())
+               n->importStatus = "no grooves in this group: rescan the MIDI folder";
+            else
+               PrepareDropdown(names, {}, shownK, [target, inCat, part](int k) {
+                  if (k >= 0 && k < (int)inCat.size())
+                     DrumApplyItem(target, inCat[k], part);
+               }, true);
          }
          const bool hovered = ImGui::IsItemHovered();
          if (hovered)
          {
-            if (inThisCat)
+            if (inThisCat && inCat[shownK].lib >= 0 && current >= 0)
                ImGui::SetTooltip("%s - suggested tempo %d bpm\nLanes: 1 kick, 2 snare, 3 closed hat, 4 open hat, 5 clap/rim,\n"
                                  "6 low tom/conga, 7 high tom/conga, 8 bell/ride. Empty lanes get the Turbo kit.",
                                  all[current].name, all[current].bpm);
+            else if (n->IsMidiGroove() && !n->browsingCategory)
+            {
+               const int bpm = n->MidiGrooveBpm();
+               ImGui::SetTooltip("%s\nfrom your MIDI folder%s (the tempo is not changed)\nA, B, C: the file's first "
+                                 "distinct chunks of bars (copies of A for a short file)\n%s",
+                                 grooveCaption.substr(0, grooveCaption.find("##")).c_str(),
+                                 bpm > 0 ? (", original tempo " + std::to_string(bpm) + " bpm").c_str() : "",
+                                 n->MidiGroovePath().c_str());
+            }
+            else if (midiCat)
+               ImGui::SetTooltip("pick a MIDI file: A / B / C get its first chunks of bars, rate and swing from the file\n"
+                                 "(GM drum map; empty lanes get the Turbo kit; the tempo is not changed)");
             else
                ImGui::SetTooltip("pick a groove: fills the grid, steps, rate and swing (empty lanes get the Turbo kit)");
          }
@@ -11568,7 +11811,7 @@ namespace
             k = dir > 0 ? 0 : (int)inCat.size() - 1;
          k = (k % (int)inCat.size() + (int)inCat.size()) % (int)inCat.size();
          PushUndoCheckpoint();
-         DrumApplyGroove(target, inCat[k], part);
+         DrumApplyItem(target, inCat[k], part);
       };
       ImGui::SameLine(0.0f, gap);
       if (ModTriggerButton("prev groove##drumPrev", ImVec2(arrowW, 0), "<##drumPrevBtn"))
@@ -11593,10 +11836,8 @@ namespace
          if (driven >= 0 && driven != part)
          {
             PushUndoForDrivenChange(ref);
-            if (current >= 0)
-               DrumApplyGroove(target, current, driven);
-            else
-               n->patternPart = driven; // no groove yet: the next pick uses this part
+            n->SwitchPart(driven); // Turbo 0.50: keeps each part's edits, rate and swing
+            gPatchDirty = true;
          }
          if (pinHovered)
             ImGui::SetTooltip("part selector (A / B / C) for CV, MIDI or a Performance selector");
@@ -11607,25 +11848,97 @@ namespace
       {
          if (pi > 0)
             ImGui::SameLine(0.0f, gap);
-         const bool lit = current >= 0 && pi == part;
+         // Turbo 0.50: parts work without a library groove too (a manual,
+         // imported or preset pattern), and each keeps its own edits.
+         const bool lit = pi == part;
          if (lit)
             ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
-         ImGui::BeginDisabled(current < 0);
          char label[32];
          snprintf(label, sizeof(label), "%s##drumPart%d", DrumPatterns::PartName(pi), pi);
          // A momentary trigger per part, so a MIDI pad or Perf trigger fires it.
-         if (ModTriggerButton(label, ImVec2(partW, 0)) && current >= 0)
+         if (ModTriggerButton(label, ImVec2(partW, 0)) && pi != part)
          {
             PushUndoCheckpoint();
-            DrumApplyGroove(target, current, pi);
+            n->SwitchPart(pi);
+            gPatchDirty = true;
          }
-         ImGui::EndDisabled();
          if (lit)
             ImGui::PopStyleColor();
-         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            ImGui::SetTooltip(pi == 0 ? "A: the main groove (verse)"
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s\nyour edits stay with each part; rate and swing are shared",
+                              pi == 0 ? "A: the main groove (verse)"
                               : pi == 1 ? "B: lighter / breakdown variation (bridge)"
                                         : "C: fuller variation, often two bars ending in a fill (chorus)");
+      }
+
+      // Turbo 0.50: user presets (all three parts, rate, swing, accents) and
+      // a revert of the live part to the library groove.
+      {
+         const float revertW = 58.0f;
+         const float saveW = 46.0f;
+         const float listW = std::floor((full - revertW - saveW - gap * 3.0f) * 0.5f);
+         const float nameW = full - revertW - saveW - listW - gap * 3.0f;
+         std::string listCaption = n->presetName.empty() ? std::string("presets...") : n->presetName;
+         listCaption += "##drumPresetList";
+         if (ImGui::Button(listCaption.c_str(), ImVec2(listW, 0)))
+         {
+            std::vector<std::string> names = DrumSequencerNode::ListPresets();
+            if (names.empty())
+               n->importStatus = "no presets yet: type a name and press save";
+            else
+               PrepareDropdown(names, {}, -1, [target, names](int k) {
+                  DrumSequencerNode* d = LiveDrumNode(target);
+                  if (d == nullptr || k < 0 || k >= (int)names.size())
+                     return;
+                  PushUndoCheckpoint();
+                  std::string err;
+                  if (d->LoadPreset(names[k], err))
+                  {
+                     d->importStatus = "preset loaded: " + names[k];
+                     d->LoadKitIntoEmptyLanes(TurboDrumKitDir());
+                  }
+                  else
+                     d->importStatus = err;
+                  gPatchDirty = true;
+               }, true);
+         }
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("load a saved drum preset (all parts, rate, swing)");
+         ImGui::SameLine(0.0f, gap);
+         static std::map<INode*, std::string> sPresetDraft; // per node, UI only
+         std::string& draft = sPresetDraft[target];
+         char buf[96];
+         snprintf(buf, sizeof(buf), "%s", draft.c_str());
+         ImGui::SetNextItemWidth(nameW);
+         if (ImGui::InputTextWithHint("##drumPresetName", "preset name", buf, sizeof(buf)))
+            draft = buf;
+         ImGui::SameLine(0.0f, gap);
+         ImGui::BeginDisabled(draft.empty());
+         if (ImGui::Button("save##drumPresetSave", ImVec2(saveW, 0)))
+         {
+            std::string err;
+            if (n->SavePreset(draft, err))
+            {
+               n->importStatus = "preset saved: " + n->presetName;
+               draft.clear();
+            }
+            else
+               n->importStatus = err;
+         }
+         ImGui::EndDisabled();
+         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("save all three parts, rate, swing and accents as a preset\n(same name overwrites)");
+         ImGui::SameLine(0.0f, gap);
+         ImGui::BeginDisabled(current < 0 && !n->IsMidiGroove());
+         if (ImGui::Button("revert##drumRevert", ImVec2(revertW, 0)))
+         {
+            PushUndoCheckpoint();
+            n->RevertPart();
+            gPatchDirty = true;
+         }
+         ImGui::EndDisabled();
+         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("reload this part from the library groove or MIDI file (drops your edits to it)");
       }
    }
 
@@ -11889,7 +12202,7 @@ namespace
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
       {
          const float gap = ImGui::GetStyle().ItemSpacing.x;
-         const float btnW = (AudioFullWidth() - gap * 2.0f) / 3.0f;
+         const float btnW = (AudioFullWidth() - gap * 3.0f) / 4.0f;
          AudioToggleButton(n->run ? "Stop##drumrun" : "Run##drumrun", &n->run, btnW);
          ImGui::SameLine();
          if (ModTriggerButton("Randomise##drumRandomise", ImVec2(btnW, 0)))
@@ -11903,6 +12216,25 @@ namespace
             PushUndoCheckpoint();
             n->ClearPattern();
          }
+         // Turbo 0.50: a .mid drum pattern into the live part (dropping a
+         // .mid on the node does the same).
+         ImGui::SameLine();
+         if (ImGui::Button("Import .mid##drumImport", ImVec2(btnW, 0)))
+            StartNodeFileDialog(n, Platform::OpenMidiDialog, [](auto* d, const std::string& path) {
+               PushUndoCheckpoint();
+               std::string msg;
+               d->ImportMidiFile(path, msg);
+               gPatchDirty = true;
+            });
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("import a drum pattern from a MIDI file into this part\n"
+                              "(GM drum notes: kick, snare, hats, clap/rim, toms, bells/cymbals)");
+      }
+      if (!n->importStatus.empty())
+      {
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + AudioFullWidth());
+         ImGui::TextDisabled("%s", n->importStatus.c_str());
+         ImGui::PopTextWrapPos();
       }
 
       EndAudioBody();
@@ -13593,9 +13925,10 @@ namespace
          snprintf(stat, sizeof(stat), "no MIDI input");
       else if (count > 0)
          snprintf(stat, sizeof(stat), "%d key%s held", count, count == 1 ? "" : "s");
+      else if (n->channel < 0)
+         snprintf(stat, sizeof(stat), "listening  -  omni");
       else
-         snprintf(stat, sizeof(stat), "listening  -  %s",
-                  n->channel < 0 ? "omni" : "one channel");
+         snprintf(stat, sizeof(stat), "listening  -  ch %d only", n->channel + 1);
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       // Centred on the last note played so a keyboard playing outside the
@@ -13606,10 +13939,43 @@ namespace
       ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
       {
-         AudioKnobRow row(3);
-         // -1 is omni, so the knob's low end is a mode rather than a channel
-         // number - spelled out in the readout format rather than hidden.
-         row.KnobInt("channel", &n->channel, -1, 15, kKnobLarge);
+         // Turbo 0.50: channel is a dropdown ("omni", "ch 1".."ch 16") instead
+         // of a 0-based knob, plus "learn" (takes the next note-on's channel)
+         // and a readout of the last channel heard, so a controller whose pads
+         // and keys send on different channels can be split by two nodes.
+         const float gap = ImGui::GetStyle().ItemSpacing.x;
+         const float learnW = 62.0f;
+         MidiChannelDropdown("channel##midiNotesCh", &n->channel, true,
+                             std::max(90.0f, gAudioContentW - learnW - gap - ImGui::CalcTextSize("channel").x - gap));
+         ImGui::SameLine();
+         if (n->IsLearningChannel())
+         {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.55f, 0.1f, 1.0f));
+            if (ImGui::Button("cancel##midiNotesLearn", ImVec2(learnW, 0)))
+               n->CancelChannelLearn();
+            ImGui::PopStyleColor();
+         }
+         else if (ImGui::Button("learn##midiNotesLearn", ImVec2(learnW, 0)))
+         {
+            PushUndoCheckpoint();
+            n->StartChannelLearn();
+         }
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("set the channel from the next note you play\n(hit a pad to listen only to the pads)");
+         const int lastCh = n->LastChannel();
+         if (n->IsLearningChannel())
+            ImGui::TextDisabled("play a note on the channel to keep...");
+         else if (lastCh >= 0)
+            ImGui::TextDisabled("last note in: ch %d%s", lastCh + 1,
+                                (n->channel >= 0 && n->channel != lastCh) ? "  (filtered out)" : "");
+         else
+            ImGui::TextDisabled("last note in: none yet");
+         // The old channel knob took a positional modulation slot: keep it so
+         // transpose/velocity keep their pin numbers in saved patches.
+         gParamCounter++;
+      }
+      {
+         AudioKnobRow row(2);
          row.KnobInt("transpose", &n->transpose, -24, 24, kKnobLarge);
          row.Knob("velocity", &n->velocityScale, 0.0f, 2.0f, "%.2f", kKnobLarge);
          row.End();
@@ -13628,7 +13994,6 @@ namespace
       {
          ImGui::TextUnformatted(Platform::MidiDeviceSummary().c_str());
       }
-      ImGui::TextDisabled("%s", n->channel < 0 ? "channel: omni (-1)" : "channel: filtered");
       EndAudioSection();
 
       EndAudioBody();
@@ -14409,6 +14774,43 @@ namespace
       ImGui::Dummy(ImVec2(w, h));
    }
 
+   // Turbo 0.50: the shared quantized-restart row of the sequencers (Chord
+   // Progression, Note Sequencer, Arpeggiator, MIDI File). "restart" and
+   // "restart q" are discrete controls keyed by label, so they get stable
+   // pins for MIDI learn, CV and Performance Mode; a modulator's rising edge
+   // on the "restart" pin fires it too. Returns true when restart fired.
+   bool DrawRestartControls(int* quant, bool armed)
+   {
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+      const bool fired = ModTriggerButton("restart", ImVec2(92.0f, 0.0f));
+      if (ImGui::IsItemHovered())
+         SetAudioReadout("restart", "starts again from the top at the next grid line");
+      ImGui::SameLine();
+      DropdownButton("restart q", QuantizedRestart::Names(),
+                     std::clamp(*quant, 0, QuantizedRestart::kNumQuants - 1),
+                     [quant](int i) {
+                        if (!gApplyingDiscreteCv)
+                           PushUndoCheckpoint();
+                        *quant = i;
+                        gPatchDirty = true;
+                     },
+                     118.0f, true);
+      if (armed)
+      {
+         // Blinking dot + caption while the restart waits for its grid line.
+         ImGui::SameLine();
+         const ImVec2 p = ImGui::GetCursorScreenPos();
+         const float h = ImGui::GetFrameHeight();
+         const bool blink = std::fmod(ImGui::GetTime(), 0.5) < 0.25;
+         ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(p.x + 6.0f, p.y + h * 0.5f), 4.5f,
+                                                     blink ? IM_COL32(255, 170, 60, 255) : IM_COL32(150, 95, 30, 255));
+         ImGui::Dummy(ImVec2(14.0f, h));
+         ImGui::SameLine(0.0f, 2.0f);
+         ImGui::TextUnformatted("armed");
+      }
+      return fired;
+   }
+
    void DrawArpeggiatorBody(GraphNode& gn, ArpeggiatorNode* n)
    {
       // Display order per the design ask; enum values (mode's serialized
@@ -14458,6 +14860,8 @@ namespace
       }
 
       ModCheckbox("Snap to Key##arpSnap", &n->useGlobalScale);
+      if (DrawRestartControls(&n->restartQuant, n->RestartArmed())) // Turbo 0.50
+         n->RequestRestart();
 
       EndAudioBody();
    }
@@ -14574,6 +14978,8 @@ namespace
       }
 
       ModCheckbox("Snap to Key##seqSnap", &n->useGlobalScale);
+      if (DrawRestartControls(&n->restartQuant, n->RestartArmed())) // Turbo 0.50
+         n->RequestRestart();
 
       EndAudioBody();
    }
@@ -15142,12 +15548,15 @@ namespace
       const int sel = n->selected;
       const int playing = n->PlayingIndex();
 
-      char stat[96];
+      const bool armed = n->RestartArmed();
+      char stat[128];
       if (playing >= 0 && playing < count)
-         snprintf(stat, sizeof(stat), "chord %d/%d  -  %s  -  %s", playing + 1, count, n->ChordName(playing).c_str(),
-                  CP::PlayModeNames()[std::clamp(n->playMode, 0, CP::kNumPlayModes - 1)].c_str());
+         snprintf(stat, sizeof(stat), "chord %d/%d  -  %s  -  %s%s", playing + 1, count, n->ChordName(playing).c_str(),
+                  CP::PlayModeNames()[std::clamp(n->playMode, 0, CP::kNumPlayModes - 1)].c_str(),
+                  armed ? "  -  restart armed" : "");
       else
-         snprintf(stat, sizeof(stat), "%d chords, %.1f bars  -  press play", count, n->TotalBars());
+         snprintf(stat, sizeof(stat), "%d chords, %.1f bars  -  %s", count, n->TotalBars(),
+                  armed ? "restart armed" : "press play");
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
 
       const bool isLight = IsThemeLight();
@@ -15160,7 +15569,7 @@ namespace
          const int rows = (count + perRow - 1) / perRow;
          const float gap = 4.0f;
          const float cellW = (w - gap * (float)(perRow - 1)) / (float)perRow;
-         const float cellH = 36.0f;
+         const float cellH = 46.0f; // Turbo 0.50: room for a two-line chord name
          const ImVec2 origin = ImGui::GetCursorScreenPos();
          const ImU32 idleCol = isLight ? IM_COL32(222, 226, 236, 255) : IM_COL32(40, 43, 54, 255);
          const ImU32 selCol = isLight ? IM_COL32(196, 210, 238, 255) : IM_COL32(58, 66, 90, 255);
@@ -15189,15 +15598,28 @@ namespace
             }
             if (i == n->selected || hovered)
                dl->AddRect(mn, mx, i == n->selected ? borderCol : subCol, 4.0f, 0, i == n->selected ? 1.8f : 1.0f);
+            // Turbo 0.50: a name too wide for the cell ("C# MIN7b5") wraps
+            // at its first space: root on top, quality underneath.
             const std::string name = n->ChordName(i);
+            const ImU32 nameCol = i == playing ? IM_COL32(255, 255, 255, 255) : textCol;
             ImVec2 ts = ImGui::CalcTextSize(name.c_str());
             dl->PushClipRect(mn, mx, true);
-            dl->AddText(ImVec2(mn.x + std::max(3.0f, (cellW - ts.x) * 0.5f), mn.y + 4.0f),
-                        i == playing ? IM_COL32(255, 255, 255, 255) : textCol, name.c_str());
+            const size_t space = name.find(' ');
+            if (ts.x > cellW - 4.0f && space != std::string::npos)
+            {
+               const std::string top = name.substr(0, space), bottom = name.substr(space + 1);
+               const ImVec2 t1 = ImGui::CalcTextSize(top.c_str()), t2 = ImGui::CalcTextSize(bottom.c_str());
+               dl->AddText(ImVec2(mn.x + std::max(3.0f, (cellW - t1.x) * 0.5f), mn.y + 3.0f), nameCol, top.c_str());
+               dl->AddText(ImVec2(mn.x + std::max(3.0f, (cellW - t2.x) * 0.5f), mn.y + 16.0f), nameCol, bottom.c_str());
+            }
+            else
+            {
+               dl->AddText(ImVec2(mn.x + std::max(3.0f, (cellW - ts.x) * 0.5f), mn.y + 9.0f), nameCol, name.c_str());
+            }
             char bars[24];
             snprintf(bars, sizeof(bars), "%g bar", n->chordBars[i]);
             ts = ImGui::CalcTextSize(bars);
-            dl->AddText(ImVec2(mn.x + (cellW - ts.x) * 0.5f, mn.y + 18.0f),
+            dl->AddText(ImVec2(mn.x + (cellW - ts.x) * 0.5f, mn.y + 29.0f),
                         i == playing ? IM_COL32(235, 240, 255, 220) : subCol, bars);
             dl->PopClipRect();
          }
@@ -15342,6 +15764,10 @@ namespace
       ImGui::SameLine();
       AudioToggleButton("sets key", &n->setsKey, 76.0f);
 
+      // Turbo 0.50: quantized restart.
+      if (DrawRestartControls(&n->restartQuant, armed))
+         n->RequestRestart();
+
       EndAudioBody();
    }
 
@@ -15484,6 +15910,8 @@ namespace
          ImGui::SameLine();
          ImGui::TextDisabled("loop = file length");
       }
+      if (DrawRestartControls(&n->restartQuant, n->RestartArmed())) // Turbo 0.50
+         n->RequestRestart();
 
       EndAudioBody();
    }
@@ -15562,9 +15990,14 @@ namespace
    // ---- Note Switcher -------------------------------------------------------
    void DrawNoteSwitcherBody(GraphNode& gn, NoteSwitcherNode* n)
    {
+      using NS = NoteSwitcherNode;
       const int active = n->ActiveSlot();
-      char stat[64];
-      if (n->manual)
+      const int pending = n->PendingSlot();
+      const int shown = n->VisibleSlots();
+      char stat[80];
+      if (n->manual && pending >= 0)
+         snprintf(stat, sizeof(stat), "manual - slot %d > %d", active + 1, pending + 1);
+      else if (n->manual)
          snprintf(stat, sizeof(stat), "manual - slot %d", active + 1);
       else if (n->rateMode == 0)
          snprintf(stat, sizeof(stat), "every %s - slot %d",
@@ -15574,18 +16007,21 @@ namespace
 
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
       {
-         // active slot lit, connected dim, unconnected darkest
+         // active slot lit, pending (Turbo 0.50) amber, connected dim,
+         // unconnected darkest; only the visible pins get a dot.
          const float w = gAudioBodyW;
          const ImVec2 origin = ImGui::GetCursorScreenPos();
          ImDrawList* dl = ImGui::GetWindowDrawList();
          const float dia = 14.0f;
-         const float gap = (w - (float)NoteSwitcherNode::kSlots * dia) / (float)(NoteSwitcherNode::kSlots + 1);
-         for (int i = 0; i < NoteSwitcherNode::kSlots; i++)
+         const float gap = (w - (float)shown * dia) / (float)(shown + 1);
+         for (int i = 0; i < shown; i++)
          {
             const float cx = origin.x + gap * (float)(i + 1) + dia * (float)i + dia * 0.5f;
             ImU32 col = IM_COL32(50, 53, 64, 255);
             if (i == active)
                col = IM_COL32(120, 200, 255, 255);
+            else if (i == pending)
+               col = IM_COL32(255, 170, 60, 255);
             else if (n->noteInputs[i].IsConnected())
                col = IM_COL32(70, 120, 170, 255);
             dl->AddCircleFilled(ImVec2(cx, origin.y + dia * 0.5f), dia * 0.5f, col);
@@ -15599,7 +16035,52 @@ namespace
       }
       AudioToggleButton("manual", &n->manual, 64.0f);
       if (n->manual)
-         ModSliderInt("slot", &n->manualSlot, 0, NoteSwitcherNode::kSlots - 1, gAudioBodyW);
+         ModSliderInt("slot", &n->manualSlot, 0, shown - 1, gAudioBodyW);
+
+      // Turbo 0.50: per-slot triggers (discrete, keyed by label "slot N", so
+      // Performance Mode / MIDI learn can pick a slot) plus the pin count and
+      // the switch grid. A slot trigger also turns manual on.
+      {
+         const int perRow = 4;
+         const float gapX = 4.0f;
+         const float cellW = (gAudioContentW - gapX * (float)(perRow - 1)) / (float)perRow;
+         for (int i = 0; i < shown; i++)
+         {
+            if (i % perRow != 0)
+               ImGui::SameLine(0.0f, gapX);
+            char label[16], caption[24];
+            snprintf(label, sizeof(label), "slot %d", i + 1);
+            snprintf(caption, sizeof(caption), "%d##nsSlotBtn%d", i + 1, i);
+            if (ModTriggerButton(label, ImVec2(cellW, 0.0f), caption))
+            {
+               if (!n->manual || n->manualSlot != i)
+                  PushUndoCheckpoint();
+               n->manual = true;
+               n->manualSlot = i;
+               gPatchDirty = true;
+            }
+         }
+      }
+      {
+         static const std::vector<std::string> kInputCounts = { "2", "3", "4", "5", "6", "7", "8" };
+         AudioKnobRow row(2, kKnobSmall, ImGui::GetFrameHeight() + 5.0f);
+         row.Dropdown("inputs", kInputCounts, std::clamp(n->inputs, 2, NS::kSlots) - 2,
+                      [n](int i) {
+                         if (!gApplyingDiscreteCv)
+                            PushUndoCheckpoint();
+                         n->inputs = std::clamp(i + 2, 2, NS::kSlots);
+                         gPatchDirty = true;
+                      });
+         row.Dropdown("switch q", NS::SwitchQuantNames(),
+                      std::clamp(n->switchQuant, 0, NS::kNumSwitchQuants - 1),
+                      [n](int i) {
+                         if (!gApplyingDiscreteCv)
+                            PushUndoCheckpoint();
+                         n->switchQuant = i;
+                         gPatchDirty = true;
+                      });
+         row.End();
+      }
       EndAudioBody();
    }
 
@@ -19641,12 +20122,167 @@ namespace
       EndAudioBody();
    }
 
+   // Turbo 0.50: the Super Mixer's master meter. Stereo bars on an IEC 60268-18
+   // style scale (more room at the top, where mixing decisions happen): RMS
+   // solid, peak lighter behind it, a 1.5 s peak-hold tick, and clip LEDs
+   // that latch until clicked. Below: numeric readouts and the compressor
+   // and limiter gain-reduction bars.
+   void DrawSuperMixerMasterMeter(SuperMixerNode* n, float x, float y, float w, float h)
+   {
+      const SuperMixerNode::MasterMeter& m = n->Meter();
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const bool isLight = IsThemeLight();
+      const ImU32 textCol = ImGui::GetColorU32(ImGuiCol_Text);
+      const ImU32 dimCol = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+      const float lineH = ImGui::GetTextLineHeight();
+
+      auto iecFrac = [](float db) {
+         float pct;
+         if (db < -70.0f)
+            pct = 0.0f;
+         else if (db < -60.0f)
+            pct = (db + 70.0f) * 0.25f;
+         else if (db < -50.0f)
+            pct = (db + 60.0f) * 0.5f + 2.5f;
+         else if (db < -40.0f)
+            pct = (db + 50.0f) * 0.75f + 7.5f;
+         else if (db < -30.0f)
+            pct = (db + 40.0f) * 1.5f + 15.0f;
+         else if (db < -20.0f)
+            pct = (db + 30.0f) * 2.0f + 30.0f;
+         else
+            pct = (db + 20.0f) * 2.5f + 50.0f;
+         return std::clamp(pct / 100.0f, 0.0f, 1.0f);
+      };
+      auto zoneCol = [](float db, int alpha) {
+         return db >= -1.0f  ? IM_COL32(255, 80, 70, alpha)
+              : db >= -6.0f  ? IM_COL32(255, 175, 70, alpha)
+              : db >= -18.0f ? IM_COL32(220, 220, 90, alpha)
+                             : IM_COL32(110, 205, 150, alpha);
+      };
+
+      const float labelW = 14.0f, ledW = 16.0f, barH = 13.0f, gap = 3.0f;
+      const float bx0 = x + labelW, bx1 = x + w - ledW - 4.0f, bw = bx1 - bx0;
+      for (int ch = 0; ch < 2; ch++)
+      {
+         const float by = y + (float)ch * (barH + gap);
+         dl->AddText(ImVec2(x + 2.0f, by), dimCol, ch == 0 ? "L" : "R");
+         dl->AddRectFilled(ImVec2(bx0, by), ImVec2(bx1, by + barH), ScopeBgCol(), 2.0f);
+         // Colour zones are drawn segment by segment so a bar shows green up
+         // to -18, yellow to -6, orange to -1, red above.
+         auto bar = [&](float db, float inset, int alpha) {
+            const float f = iecFrac(db);
+            if (f <= 0.0f)
+               return;
+            static const float kEdges[5] = { -200.0f, -18.0f, -6.0f, -1.0f, 200.0f };
+            static const float kZoneDb[4] = { -30.0f, -10.0f, -3.0f, 0.0f };
+            for (int z = 0; z < 4; z++)
+            {
+               const float f0 = iecFrac(kEdges[z]), f1 = std::min(f, iecFrac(kEdges[z + 1]));
+               if (f1 <= f0)
+                  break;
+               dl->AddRectFilled(ImVec2(bx0 + bw * f0, by + inset), ImVec2(bx0 + bw * f1, by + barH - inset),
+                                 zoneCol(kZoneDb[z], alpha));
+            }
+         };
+         bar(m.peakDb[ch], 1.0f, 95);
+         bar(m.rmsDb[ch], 3.0f, 235);
+         if (m.holdDb[ch] > -70.0f)
+         {
+            const float hx = bx0 + bw * iecFrac(m.holdDb[ch]);
+            dl->AddLine(ImVec2(hx, by + 1.0f), ImVec2(hx, by + barH - 1.0f),
+                        m.holdDb[ch] >= -1.0f ? IM_COL32(255, 80, 70, 255)
+                                              : (isLight ? IM_COL32(30, 30, 40, 255) : IM_COL32(245, 245, 250, 255)),
+                        2.0f);
+         }
+         dl->AddRect(ImVec2(bx0, by), ImVec2(bx1, by + barH), ScopeBorderCol(), 2.0f);
+
+         // Clip LED, latched; click either one to clear both.
+         const ImVec2 l0(bx1 + 4.0f, by), l1(bx1 + 4.0f + ledW, by + barH);
+         dl->AddRectFilled(l0, l1, m.clip[ch] ? IM_COL32(255, 40, 40, 255)
+                                              : (isLight ? IM_COL32(200, 200, 205, 255) : IM_COL32(70, 40, 40, 255)), 2.0f);
+         ImGui::SetCursorScreenPos(l0);
+         ImGui::PushID(ch);
+         if (ImGui::InvisibleButton("##smClip", ImVec2(ledW, barH)))
+            n->ClearClip();
+         if (ImGui::IsItemHovered())
+            SetAudioReadout("clip", m.clip[ch] ? "output hit 0 dBFS - click to reset" : "no clip since last reset");
+         ImGui::PopID();
+      }
+
+      // dB scale under the bars.
+      const float scaleY = y + 2.0f * (barH + gap);
+      static const float kTicks[] = { -60.0f, -40.0f, -30.0f, -20.0f, -12.0f, -6.0f, -3.0f, 0.0f };
+      for (float db : kTicks)
+      {
+         const float tx = bx0 + bw * iecFrac(db);
+         dl->AddLine(ImVec2(tx, scaleY - gap), ImVec2(tx, scaleY + 2.0f), dimCol, 1.0f);
+         char t[8];
+         snprintf(t, sizeof(t), "%.0f", db);
+         const float tw = ImGui::CalcTextSize(t).x;
+         dl->AddText(ImVec2(std::clamp(tx - tw * 0.5f, bx0, bx1 - tw), scaleY + 2.0f), dimCol, t);
+      }
+
+      // Numeric readouts.
+      const float readY = scaleY + lineH + 4.0f;
+      auto fmtDb = [](char* buf, size_t sz, float db) {
+         if (db <= -99.0f)
+            snprintf(buf, sz, " -inf");
+         else
+            snprintf(buf, sz, "%+5.1f", db);
+      };
+      char pl[12], pr[12], rl[12], rr[12], hl[12], hr[12];
+      fmtDb(pl, sizeof(pl), m.peakDb[0]);
+      fmtDb(pr, sizeof(pr), m.peakDb[1]);
+      fmtDb(rl, sizeof(rl), m.rmsDb[0]);
+      fmtDb(rr, sizeof(rr), m.rmsDb[1]);
+      fmtDb(hl, sizeof(hl), m.holdDb[0]);
+      fmtDb(hr, sizeof(hr), m.holdDb[1]);
+      char line[160];
+      snprintf(line, sizeof(line), "peak %s / %s   hold %s / %s   rms %s / %s dB%s", pl, pr, hl, hr, rl, rr,
+               n->masterMute ? "   MUTED" : "");
+      dl->AddText(ImVec2(bx0, readY), n->masterMute ? IM_COL32(235, 90, 80, 255) : textCol, line);
+
+      // Gain reduction: 0..20 dB, growing from the left.
+      auto grBar = [&](float gy, const char* label, float grDb, bool on, bool warn) {
+         const float gx0 = bx0 + 52.0f, gx1 = bx1 - 64.0f;
+         dl->AddText(ImVec2(bx0, gy - 2.0f), on ? textCol : dimCol, label);
+         dl->AddRectFilled(ImVec2(gx0, gy), ImVec2(gx1, gy + 9.0f), ScopeBgCol(), 2.0f);
+         if (on && grDb > 0.05f)
+         {
+            const float f = std::clamp(grDb / 20.0f, 0.0f, 1.0f);
+            dl->AddRectFilled(ImVec2(gx0 + 1.0f, gy + 1.0f), ImVec2(gx0 + 1.0f + (gx1 - gx0 - 2.0f) * f, gy + 8.0f),
+                              IM_COL32(255, 170, 60, 235), 1.0f);
+         }
+         for (float t : { 3.0f, 6.0f, 10.0f })
+         {
+            const float tx = gx0 + (gx1 - gx0) * (t / 20.0f);
+            dl->AddLine(ImVec2(tx, gy), ImVec2(tx, gy + 9.0f), ScopeMidLineCol(), 1.0f);
+         }
+         dl->AddRect(ImVec2(gx0, gy), ImVec2(gx1, gy + 9.0f), ScopeBorderCol(), 2.0f);
+         char v[24];
+         if (on)
+            snprintf(v, sizeof(v), "-%.1f dB", grDb);
+         else
+            snprintf(v, sizeof(v), "bypass");
+         dl->AddText(ImVec2(gx1 + 6.0f, gy - 2.0f), on ? textCol : dimCol, v);
+         // Turbo 0.50: the limiter's last-resort clamp caught something.
+         if (warn)
+            dl->AddCircleFilled(ImVec2(gx1 + 6.0f + ImGui::CalcTextSize(v).x + 7.0f, gy + 4.5f), 3.5f,
+                                IM_COL32(255, 40, 40, 255));
+      };
+      const float grY = readY + lineH + 6.0f;
+      grBar(grY, "comp GR", m.compGrDb, n->fxCompOn, false);
+      grBar(grY + 14.0f, "limit GR", m.limGrDb, n->fxLimOn, m.limClamps > 0);
+      (void)h;
+   }
+
    void DrawSuperMixerBody(GraphNode& gn, SuperMixerNode* n)
    {
       constexpr int N = SuperMixerNode::kChannels;
       char stat[64];
-      snprintf(stat, sizeof(stat), "16 in -> 1 out   sum %+.1f dB",
-               DspMath::LinearToDb(std::max(n->Level(), 1e-5f)));
+      snprintf(stat, sizeof(stat), "16 in -> 1 out   sum %+.1f dB%s",
+               DspMath::LinearToDb(std::max(n->Level(), 1e-5f)), n->masterMute ? "   MASTER MUTED" : "");
       BeginAudioBody(gn.index, gn.category, kAudioWideWidth + 80.0f, stat);
       const float dia = 34.0f;
 
@@ -19758,16 +20394,239 @@ namespace
          row.End();
       }
 
+      // Turbo 0.50: master bus. Positional order after "master": "master pan",
+      // then the 18 FX knobs, then "lim lookahead" and "lim link" (always
+      // registered, drawn only when expanded).
       BeginAudioSection("master");
       {
          AudioKnobRow row(6, 110.0f);
          row.Fader("master", &n->masterDb, -60.0f, 12.0f, "%.1f dB", 110.0f, /*dbTaper=*/true);
+         const float cell1X = row.x0 + row.cellW;
+         row.Knob("master pan", &n->masterPan, -1.0f, 1.0f, "%+.2f", kKnobStd);
+         // Mute sits above the pan knob in the same cell (discrete pin, hashed
+         // by its ## id, so it never shifts a positional pin).
+         ImGui::SetCursorScreenPos(ImVec2(cell1X + 6.0f, row.y0 + 2.0f));
+         {
+            bool v = n->masterMute;
+            if (AudioToggleButton("MUTE##smMasterMute", &v, row.cellW - 12.0f))
+            {
+               PushUndoCheckpoint();
+               n->masterMute = v;
+            }
+            if (n->masterMute)
+            {
+               // Red wash over the lit button (its own colours are fixed):
+               // a muted master must read from across the room. The button
+               // starts after the 14 px pin + 4 px gap BeginDiscreteParam draws.
+               const ImVec2 b0(cell1X + 6.0f + 18.0f, row.y0 + 2.0f);
+               const ImVec2 b1(b0.x + std::max(8.0f, row.cellW - 12.0f - 18.0f), b0.y + ImGui::GetFrameHeight());
+               ImGui::GetWindowDrawList()->AddRectFilled(b0, b1, IM_COL32(230, 50, 45, 150), 3.0f);
+               ImGui::GetWindowDrawList()->AddText(ImVec2(b0.x + 6.0f, b0.y + ImGui::GetStyle().FramePadding.y),
+                                                   IM_COL32(255, 255, 255, 255), "MUTE");
+            }
+         }
+         DrawSuperMixerMasterMeter(n, row.x0 + 2.0f * row.cellW + 4.0f, row.y0 + 2.0f, row.cellW * 4.0f - 8.0f,
+                                   106.0f);
+         row.Skip();
+         row.Skip();
+         row.Skip();
+         row.Skip();
          row.End();
+      }
+      ImGui::Dummy(ImVec2(0.0f, 2.0f));
+
+      // Stage switches (lit = in, dark = bypassed) plus the expander. The
+      // switches stay visible while the knobs are folded away, so a stage can
+      // be dropped in or out live with one click or one MIDI note.
+      float expanderX = 0.0f, expanderY = 0.0f;
+      {
+         struct StageSwitch { const char* label; bool* on; };
+         const StageSwitch switches[5] = {
+            { "EQ##smFxEq", &n->fxEqOn },       { "COMP##smFxComp", &n->fxCompOn },
+            { "WIDTH##smFxWidth", &n->fxWidthOn }, { "SAT##smFxSat", &n->fxSatOn },
+            { "LIMIT##smFxLim", &n->fxLimOn },
+         };
+         const float cellW = gAudioContentW / 6.0f;
+         const float rowY = ImGui::GetCursorScreenPos().y;
+         for (int i = 0; i < 5; i++)
+         {
+            ImGui::SetCursorScreenPos(ImVec2(gAudioContentX + (float)i * cellW + 4.0f, rowY));
+            bool v = *switches[i].on;
+            if (AudioToggleButton(switches[i].label, &v, cellW - 8.0f))
+            {
+               PushUndoCheckpoint();
+               *switches[i].on = v;
+            }
+         }
+         expanderX = gAudioContentX + 5.0f * cellW + 4.0f;
+         expanderY = rowY;
+         ImGui::SetCursorScreenPos(ImVec2(expanderX, rowY));
+         if (ImGui::Button(n->fxOpen ? "master FX  -###smFxOpen" : "master FX  +###smFxOpen", ImVec2(cellW - 8.0f, 0)))
+            n->fxOpen = !n->fxOpen;
+         ImGui::SetCursorScreenPos(ImVec2(gAudioContentX, rowY));
+         ImGui::Dummy(ImVec2(gAudioContentW, ImGui::GetFrameHeight() + 3.0f));
       }
       EndAudioSection();
 
+      // The FX knobs. Collapsed, each one still takes its paramIndex and stays
+      // registered (same trick as DrawRateModeControls), so pins after it never
+      // shift and a CV / MIDI / Performance binding keeps driving it.
+      struct FxKnob { const char* label; float* v; float lo, hi; const char* fmt; bool freq; };
+      const FxKnob eqKnobs[7] = {
+         { "eq low f", &n->fxEqLowHz, 20.0f, 1000.0f, "%.0f Hz", true },
+         { "eq low", &n->fxEqLowDb, -15.0f, 15.0f, "%+.1f dB", false },
+         { "eq mid f", &n->fxEqMidHz, 40.0f, 16000.0f, "%.0f Hz", true },
+         { "eq mid", &n->fxEqMidDb, -15.0f, 15.0f, "%+.1f dB", false },
+         { "eq mid q", &n->fxEqMidQ, 0.2f, 10.0f, "%.2f", false },
+         { "eq high f", &n->fxEqHighHz, 1000.0f, 20000.0f, "%.0f Hz", true },
+         { "eq high", &n->fxEqHighDb, -15.0f, 15.0f, "%+.1f dB", false },
+      };
+      const FxKnob compKnobs[5] = {
+         { "comp thresh", &n->fxCompThreshDb, -48.0f, 0.0f, "%.1f dB", false },
+         { "comp ratio", &n->fxCompRatio, 1.0f, 20.0f, "%.1f:1", false },
+         { "comp attack", &n->fxCompAttackMs, 0.1f, 100.0f, "%.1f ms", false },
+         { "comp release", &n->fxCompReleaseMs, 20.0f, 2000.0f, "%.0f ms", false },
+         { "comp makeup", &n->fxCompMakeupDb, 0.0f, 24.0f, "%+.1f dB", false },
+      };
+      const FxKnob tailKnobs[6] = {
+         { "width", &n->fxWidth, 0.0f, 2.0f, "%.2f", false },
+         { "sat drive", &n->fxSatDriveDb, 0.0f, 24.0f, "%.1f dB", false },
+         { "sat mix", &n->fxSatMix, 0.0f, 1.0f, "%.2f", false },
+         { "sat out", &n->fxSatOutDb, -12.0f, 6.0f, "%+.1f dB", false },
+         { "lim ceiling", &n->fxLimCeilingDb, -24.0f, 0.0f, "%.1f dBFS", false },
+         { "lim release", &n->fxLimReleaseMs, 1.0f, 2000.0f, "%.0f ms", false },
+      };
+      auto fxRow = [&](const FxKnob* k, int count) {
+         if (n->fxOpen)
+         {
+            AudioKnobRow row(count, kKnobStd);
+            for (int i = 0; i < count; i++)
+               row.Knob(k[i].label, k[i].v, k[i].lo, k[i].hi, k[i].fmt, kKnobStd, false, k[i].freq);
+            row.End();
+            return;
+         }
+         for (int i = 0; i < count; i++)
+         {
+            ParamRef ref;
+            ref.nodeIndex = gCurrentNodeIndex;
+            ref.paramIndex = gParamCounter++;
+            ref.value = k[i].v;
+            ref.minValue = k[i].lo;
+            ref.maxValue = k[i].hi;
+            ref.taper = k[i].freq ? 2 : 0;
+            ref.name = k[i].label;
+            Modulation::Instance().RegisterParam(ref);
+         }
+      };
+      const int firstFxParam = gParamCounter;
+      if (n->fxOpen)
+         BeginAudioSection("master FX  -  EQ / glue comp / width + saturation + true-peak limiter");
+      fxRow(eqKnobs, 7);
+      fxRow(compKnobs, 5);
+      fxRow(tailKnobs, 6);
+
+      // Turbo 0.50: limiter v2. The two knobs are positional and come after
+      // every older positional control, so existing pin numbers never move;
+      // style and the two switches are hashed discrete controls.
+      const FxKnob limKnobs[2] = {
+         { "lim lookahead", &n->fxLimLookaheadMs, 0.5f, 5.0f, "%.1f ms", false },
+         { "lim link", &n->fxLimLink, 0.0f, 100.0f, "%.0f %%", false },
+      };
+      if (!n->fxOpen)
+         fxRow(limKnobs, 2);
+      else
+      {
+         AudioKnobRow row(7, kKnobStd);
+         for (int i = 0; i < 2; i++)
+            row.Knob(limKnobs[i].label, limKnobs[i].v, limKnobs[i].lo, limKnobs[i].hi, limKnobs[i].fmt, kKnobStd);
+         static const std::vector<std::string> kLimStyles = { "transparent", "punchy", "loud" };
+         row.Dropdown("lim style", kLimStyles, n->fxLimStyle, [n](int i) {
+            PushUndoCheckpoint();
+            n->fxLimStyle = i;
+         });
+         row.Checkbox("true peak##smLimTp", &n->fxLimTruePeak);
+         row.Checkbox("auto rel##smLimAuto", &n->fxLimAutoRelease);
+
+         // Last two cells: GR history (about 3 s, newest right, hanging
+         // from the top like the GR bar), latency and the safety-clamp LED.
+         const SuperMixerNode::MasterMeter& mm = n->Meter();
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const ImU32 dimCol = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+         const ImU32 textCol = ImGui::GetColorU32(ImGuiCol_Text);
+         const float lineH = ImGui::GetTextLineHeight();
+         const float hx0 = row.x0 + 5.0f * row.cellW + 6.0f, hx1 = row.x0 + 7.0f * row.cellW - 6.0f;
+         const float hy0 = row.y0 + lineH + 4.0f, hy1 = row.y0 + kKnobStd;
+         char info[64];
+         snprintf(info, sizeof(info), "latency %.2f ms%s", n->LimLatencyMs(), n->fxLimOn ? "" : " (when on)");
+         dl->AddText(ImVec2(hx0, row.y0), n->fxLimOn ? textCol : dimCol, info);
+         // Clamp LED, top right: lit once the last-resort clamp has caught
+         // an over (should never happen); click to reset.
+         const ImVec2 led0(hx1 - 12.0f, row.y0 + 1.0f), led1(hx1, row.y0 + 13.0f);
+         dl->AddRectFilled(led0, led1, mm.limClamps > 0 ? IM_COL32(255, 40, 40, 255)
+                                                        : (IsThemeLight() ? IM_COL32(200, 200, 205, 255)
+                                                                          : IM_COL32(70, 40, 40, 255)), 2.0f);
+         ImGui::SetCursorScreenPos(led0);
+         if (ImGui::InvisibleButton("##smLimClamp", ImVec2(12.0f, 12.0f)))
+            n->ClearLimClamps();
+         if (ImGui::IsItemHovered())
+         {
+            char tip[80];
+            snprintf(tip, sizeof(tip), "%u safety clamps (ISP / clip) since reset - click to reset", mm.limClamps);
+            SetAudioReadout("lim clamp", tip);
+         }
+         dl->AddRectFilled(ImVec2(hx0, hy0), ImVec2(hx1, hy1), ScopeBgCol(), 2.0f);
+         const int K = SuperMixerNode::MasterMeter::kGrHist;
+         const float colW = (hx1 - hx0 - 2.0f) / (float)K;
+         for (int i = 0; i < K; i++)
+         {
+            const float gr = mm.grHist[(mm.grHistPos + i) % K];
+            if (gr <= 0.05f)
+               continue;
+            const float f = std::clamp(gr / 12.0f, 0.0f, 1.0f);
+            const float cx = hx0 + 1.0f + colW * (float)i;
+            dl->AddRectFilled(ImVec2(cx, hy0 + 1.0f), ImVec2(cx + std::max(1.0f, colW), hy0 + 1.0f + (hy1 - hy0 - 2.0f) * f),
+                              IM_COL32(255, 170, 60, 220));
+         }
+         for (float t : { 3.0f, 6.0f })
+         {
+            const float ty = hy0 + 1.0f + (hy1 - hy0 - 2.0f) * (t / 12.0f);
+            dl->AddLine(ImVec2(hx0, ty), ImVec2(hx1, ty), ScopeMidLineCol(), 1.0f);
+         }
+         dl->AddRect(ImVec2(hx0, hy0), ImVec2(hx1, hy1), ScopeBorderCol(), 2.0f);
+         dl->AddText(ImVec2(hx0, row.y0 + kKnobStd + 4.0f), dimCol, "limit GR, 3 s (0..12 dB)");
+         row.Skip();
+         row.Skip();
+         row.End();
+      }
+      if (n->fxOpen)
+         EndAudioSection();
+      else
+      {
+         // Folded: give any cable bound to a hidden knob a 1px landing pin on
+         // the expander, so the link is drawn instead of looking lost.
+         const int lastFxParam = gParamCounter;
+         const ImVec2 restore = ImGui::GetCursorScreenPos();
+         for (const auto& link : Modulation::Instance().Links())
+         {
+            if (link.first.first != gCurrentNodeIndex || link.first.second < firstFxParam ||
+                link.first.second >= lastFxParam)
+               continue;
+            const int pinId = gCurrentNodeIndex * GraphNode::kStride + GraphNode::kParamBase + link.first.second;
+            if (gDrawnParamPins.count(pinId) > 0)
+               continue;
+            gDrawnParamPins.insert(pinId);
+            ImGui::SetCursorScreenPos(ImVec2(expanderX, expanderY + ImGui::GetFrameHeight() * 0.5f));
+            ed::BeginPin(pinId, ed::PinKind::Input);
+            ed::PinPivotAlignment(ImVec2(0.5f, 0.5f));
+            ImGui::Dummy(ImVec2(1.0f, 1.0f));
+            ed::EndPin();
+         }
+         ImGui::SetCursorScreenPos(restore);
+      }
+
       EndAudioBody();
    }
+
 
    void DrawAnalogBody(GraphNode& gn, AnalogNode* n)
    {
@@ -24437,7 +25296,7 @@ namespace
          // ---------------- Source / Text ----------------
          { "Image Source", "Loads a still image. Opens the native file picker and decodes anything macOS can read - PNG, JPEG, TIFF, HEIC, RAW and more." },
          { "Video", "Plays video and its soundtrack from separate video/audio output pins. Includes trim in/out, restart, reverse, loop and four cue inputs. Click the timeline to seek or Shift-click to create a cue; any cue input crossing above zero jumps to its marker." },
-         { "VMPC", "VJ clip launcher, the MPC for video: 16 pads, one video clip each, hit with the mouse, a CV pin per pad or the note input (base note 36 = pad 1). Per pad: one shot, gate (loops while held) or loop (toggle), trim in/out and speed (negative = reverse). The output is the clip of the last pad hit; with nothing playing it is transparent (or the last frame with hold last frame). Silent: use a Video node for soundtracks." },
+         { "VMPC", "VJ clip launcher, the MPC for video: 16 pads, one video clip each, hit with the mouse, a CV pin per pad or the note input (base note 36 = pad 1). Per pad: one shot, gate (loops while held) or loop (toggle), trim in/out and speed (negative = reverse). The output is the clip of the last pad hit; with nothing playing it is transparent (or the last frame with hold last frame). Transition (cut, fade, slide, wipe, zoom) and its time apply when a hit switches clips. Silent: use a Video node for soundtracks." },
          { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included. The 4D types (Simplex, Perlin, Ridged, Turbulence, Billow 4D) work like TouchDesigner's Noise TOP: the picture is a slice of 4D noise and speed moves along the 4th axis, so it morphs in place; drift adds an optional scroll, plus translate, z, rotate and exponent." },
          { "Shape", "The base 2D vector-primitive node - pick any of its 20 shapes from the dropdown, with fill, stroke, feather and background controls. Each shape also has its own directly-spawnable named node (Circle, Hexagon, Star, ...) that just starts on that shape." },
          { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Record, then draw - replaying redraws the stroke in time, and the canvas size follows the input when one is patched in." },
@@ -24481,7 +25340,7 @@ namespace
          { "Cycle Shaper", "Replaces every wavecycle of the input with a clean geometric waveform (Sine, Square, Triangle) of the same period and peak amplitude. Timbre is rebuilt while pitch and rhythm survive. Latency is one wavecycle." },
          { "Spec Blur", "Streaming phase vocoder (N=2048, hop 512) that smears spectral magnitude in time. Transients dissolve into a harmonic cloud with tilt, phase diffusion and freeze. Latency is 42.7 ms (2048 samples); default mix is pinned at 1.0." },
                { "Cycle Shaper", "Single-cycle waveform distortion and crossfade shaper." },
-         { "Slideshow", "Plays the images of one folder in alphabetical order with a transition (fade, slide, wipe, zoom). Hold and transition time follow the transport; Native keeps source pixels 1:1, Best Fit stretches to fill, Proportional Fit preserves aspect." },
+         { "Slideshow", "Plays the images of one folder in alphabetical order with a transition (fade, slide, wipe, zoom). Hold and transition time follow the transport; Native keeps source pixels 1:1, Best Fit stretches to fill, Proportional Fit preserves aspect. Restart / prev / next buttons are mappable (MIDI learn, Performance Mode, CV)." },
          { "Macro XY", "A 2D pad exposing X and Y as two separate modulator outputs from one drag. The pad's path can be recorded, looped and replayed in time, like Resynthesize's orb." },
          { "Keyboard", "A hardware-free note source: click-and-drag the on-screen piano, or hover the node and type on your laptop keyboard (Logic/GarageBand's Musical Typing layout - ZXCVBNM... is one octave, QWERTY... the octave above) to test a patch with no MIDI controller at all." },
          { "Chord Progression", "Plays a looped chord progression locked to the transport. Click a slot to select a chord, click the keys to set its notes (or pick a root and quality and press set; inv moves the lowest note up an octave), and set how many bars it lasts. chords sets how many slots play, octave moves the keyboard, transpose shifts the whole progression, gate shortens each chord (1 = legato), and bass adds the lowest note an octave down. sets key makes each chord set the global key and a matching scale, so key-aware nodes follow the progression. play sets how each chord is played: block, strum up/down (strum = ms between notes), arp up/down/up-down/random (one note per rate step, over 1-3 octaves), pulse (the whole chord re-struck every step), alberti (low-high-middle-high) and bass + chord (oom-pah); gate is the fraction of the chord in block/strum and of each step in the stepped modes. Patch the note output into any synth or plugin instrument." },
@@ -24494,6 +25353,7 @@ namespace
          { "Macro NumBox", "A number box with drag-to-scrub and direct typing, over a range and step you set yourself - for when the value matters as a number (a count, a Hz figure, a bar length) and a 0..1 slider would be the wrong instrument." },
          { "Macro Radio Selector", "A multiple-choice selector emitting one discrete step per option - the control to use for a dropdown-shaped parameter (a mode, a waveform, a preset index), where a continuous slider would land between valid values. 'count' sets how many options." },
          { "Macro Step Gate", "An 8-step gate that advances on the transport at rate - a rhythm you draw rather than a curve. The output is the current step's on/off state, so it is the Macro family's answer to 'make this parameter pulse in time' without wiring an LFO and a Compare." },
+         { "Scenes", "Turbo 0.50: one button, several changes, as radio buttons. A grid of up to 8 scenes (rows) x 8 outputs (columns), with an off row on top; cable each output to any param (a mute, a switcher slot, a drum part, a restart trigger). Press a scene: its row turns on and every output follows that row, so whatever was ON in the previous scene and is OFF here switches off. Press it again: the off row (option press again = off; all off does the same). Output modes: on/off (1 or 0, the default), choice (a stepped value, auto follows the cabled dropdown or slot), level (0..1) and pulse (a short trigger when a scene whose cell is ON starts). Scene buttons (scene 1..8), all off, prev / next and the scene selector are mappable (Performance Mode, where a scene trigger lights while its scene plays, MIDI learn, CV), and q makes changes wait for the next beat or bar." },
          { "Velocity to CV", "Converts how hard each note is played into a modulator (its 0..1 velocity), so touch can drive any parameter - brightness, pan, a filter opening on accents. It holds the last note's velocity through release. range low/high pick which velocities map onto the full 0..1 span (swap them to invert). The pitch counterpart is Note to CV." },
          { "Note Switcher", "Cycles between up to four connected note inputs every N beats or seconds, or pins to one slot with 'manual' - the note-cable counterpart of Switcher (2D) and Switcher 3D. When the active slot changes, new note-ons come only from the new slot, while notes already held on the old one still get their note-offs passed through, so nothing hangs." },
          { "Drift", "A musical random walk: an Ornstein-Uhlenbeck drift that keeps wandering around a home point and never jumps. speed is how fast it moves, stray how far it roams (a temperature), momentum how long a push carries on, range lo/hi the walls it bounces off, depth scales the swing. quantize holds the value on a tempo grid (a stepped, sample-and-hold drift) and smoothing rounds the steps off. Turbo keeps upstream's physics around a fixed home instead of the landscape upstream learns from your hand moves." },
@@ -24930,7 +25790,7 @@ namespace
             { "Source", {
                { "Image Source", "Loads a still image. Opens the native file picker and decodes anything macOS can read - PNG, JPEG, TIFF, HEIC, RAW and more." },
                { "Video", "Plays a video file. Position follows the transport, so it pauses with everything else. Loop and speed (including reverse) are available." },
-               { "VMPC", "VJ clip launcher, the MPC for video: 16 pads, one video clip each, hit with the mouse, a CV pin per pad or the note input (base note 36 = pad 1). Per pad: one shot, gate (loops while held) or loop (toggle), trim in/out and speed (negative = reverse). The output is the clip of the last pad hit; with nothing playing it is transparent (or the last frame with hold last frame). Silent: use a Video node for soundtracks." },
+               { "VMPC", "VJ clip launcher, the MPC for video: 16 pads, one video clip each, hit with the mouse, a CV pin per pad or the note input (base note 36 = pad 1). Per pad: one shot, gate (loops while held) or loop (toggle), trim in/out and speed (negative = reverse). The output is the clip of the last pad hit; with nothing playing it is transparent (or the last frame with hold last frame). Transition (cut, fade, slide, wipe, zoom) and its time apply when a hit switches clips. Silent: use a Video node for soundtracks." },
                { "Shape", "Ten vector primitives - circle, ellipse, rectangle, rounded rect, triangle, polygon, star, ring, cross, line - with fill, stroke, feather and background." },
                { "Noise", "Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included. The 4D types (Simplex, Perlin, Ridged, Turbulence, Billow 4D) work like TouchDesigner's Noise TOP: the picture is a slice of 4D noise and speed moves along the 4th axis, so it morphs in place; drift adds an optional scroll, plus translate, z, rotate and exponent." },
                { "Draw", "Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Strokes can be recorded and replayed as an animation." },
@@ -25254,8 +26114,23 @@ namespace
    // AudioOutputNode and OutputNode contribute no AudioNode of their own to
    // `order`, but each connected audio input's source buffer becomes a
    // terminal entry wired into that node's capture ring.
+   // Turbo 0.50: nodes whose LatencySamples() can change without a graph
+   // edit (AudioNode::LatencyMayChange, the Super Mixer limiter), captured
+   // by RebuildAudioTopology only where that latency reaches a delay-
+   // compensation merge. The main loop polls them once per frame and asks
+   // for a rebuild when one changed, so a limiter toggle on a plain
+   // mixer -> Audio Out chain never rebuilds (a rebuild re-prepares, and so
+   // resets, every effect in the patch).
+   struct LatencyWatch
+   {
+      AudioNode* node;
+      int latency;
+   };
+   std::vector<LatencyWatch> gLatencyWatch;
+
    void RebuildAudioTopology()
    {
+      gLatencyWatch.clear(); // never keep pointers past a rebuild (or a deferred one)
       if (gDeferAudioRebuild)
          return;
       std::vector<AudioTopologyEntry> order;
@@ -25492,6 +26367,37 @@ namespace
             if (delay > 0)
                terminal.compensation.Prepare(delay, kAudioMaxChannels);
          }
+      }
+
+      // Turbo 0.50: which nodes' latency feeds a merge (a node with 2+
+      // connected inputs, or 2+ aligned Audio Outs). `order` is topological,
+      // so one reverse pass carries the mark from every merge back up to all
+      // of its ancestors.
+      {
+         std::vector<char> feedsMerge(order.size(), 0);
+         int aligned = 0;
+         for (size_t t = 0; t < terminals.size(); t++)
+            if (terminals[t].bufferIndex >= 0 && !(t < terminalLive.size() && terminalLive[t]))
+               aligned++;
+         if (aligned > 1)
+            for (size_t t = 0; t < terminals.size(); t++)
+               if (terminals[t].bufferIndex >= 0 && !(t < terminalLive.size() && terminalLive[t]))
+                  feedsMerge[(size_t)terminals[t].bufferIndex] = 1;
+         for (size_t k = order.size(); k-- > 0;)
+         {
+            const AudioTopologyEntry& entry = order[k];
+            int connected = 0;
+            for (int i = 0; i < entry.numInputs; i++)
+               connected += entry.inputBufferIndices[i] >= 0 ? 1 : 0;
+            if (connected < 2 && !feedsMerge[k])
+               continue;
+            for (int i = 0; i < entry.numInputs; i++)
+               if (entry.inputBufferIndices[i] >= 0)
+                  feedsMerge[(size_t)entry.inputBufferIndices[i]] = 1;
+         }
+         for (size_t k = 0; k < order.size(); k++)
+            if (feedsMerge[k] && order[k].node->LatencyMayChange())
+               gLatencyWatch.push_back({ order[k].node, order[k].node->LatencySamples() });
       }
 
       // Turbo: taps between nodes (MPC Out -> MPC) resolve against the graph
@@ -26496,6 +27402,9 @@ namespace
 
       LooperNode::SetRestoringPatch(false);
       gSuppressUndoCheckpoints = false;
+      // Turbo 0.50: a restored graph keeps its own order; only nodes the
+      // user adds afterwards are lifted to the front.
+      gBringToFrontQueue.clear();
    }
 
    bool LoadPatchFrom(const std::string& path)
@@ -26680,10 +27589,10 @@ namespace
       std::filesystem::path base;
       if (folder.empty())
       {
-         const char* profile = std::getenv("USERPROFILE");
-         if (profile == nullptr)
+         const std::filesystem::path profile = InfiniteEnvPath("USERPROFILE");
+         if (profile.empty())
             return "AI skill: USERPROFILE is not set";
-         base = std::filesystem::u8path(profile) / ".claude" / "skills";
+         base = profile / ".claude" / "skills";
       }
       else
          base = std::filesystem::u8path(folder);
@@ -26839,6 +27748,8 @@ namespace
 #include "core/RpcTools.inl"
    // Turbo 0.46: Performance Mode (upstream's Performance Matrix).
 #include "core/PerfPanel.inl"
+   // Turbo 0.50: Scenes node (one button drives several params).
+#include "nodes/ScenesUi.inl"
    // Turbo 0.46: RPC / MCP tools for Turbo-only nodes and Performance Mode.
 #include "core/RpcTurboTools.inl"
 #include "core/ClaudeChatPanel.inl"
@@ -28257,6 +29168,12 @@ namespace
       if (ModCheckbox("play audio", &n->playAudio))
          PushUndoCheckpoint();
       ModSlider("audio volume", &n->audioVolume, 0.0f, 1.5f, "%.2f");
+      // Turbo 0.50: how a hit on another pad replaces the clip on air (the
+      // Slideshow's transitions). Slider added after "audio volume" so the
+      // existing modulation pins keep their numbers.
+      DropdownButton("transition##vmpcTransition", VmpcNode::TransitionNames(), n->transitionStyle,
+                     [n](int i) { n->transitionStyle = i; });
+      ModSlider("transition time", &n->transitionTime, 0.0f, 10.0f, "%.2f s");
       if (ModTriggerButton("STOP##vmpcStop", ImVec2(W, 0)))
          n->StopAll();
 
@@ -37913,6 +38830,17 @@ int main(int argc, char** argv)
                continue;
             }
 
+            // Turbo 0.50: a .mid dropped on a Drum Sequencer imports its
+            // drum notes into the live part.
+            if (dropTargetDrum != nullptr && HasExtension(path, std::vector<std::string> { "mid", "midi", "rmi" }))
+            {
+               ensureDroppedCheckpoint();
+               std::string msg;
+               dropTargetDrum->ImportMidiFile(path, msg);
+               gPatchDirty = true;
+               continue;
+            }
+
             // Turbo 0.48: a MIDI file loads into the MIDI File node it is
             // dropped on, or spawns a new one already loaded.
             if (HasExtension(path, std::vector<std::string> { "mid", "midi" }))
@@ -43288,6 +44216,8 @@ int main(int argc, char** argv)
                                   cullExemptNodes.count(gn.index) > 0 ||
                                   ImGui::GetCurrentContext()->OpenPopupStack.Size > 0 ||
                                   dynamic_cast<KeyboardNode*>(gn.node.get()) != nullptr ||
+                                  // Turbo 0.50: Scenes ticks its quantize grid and pulses in its body.
+                                  dynamic_cast<ScenesNode*>(gn.node.get()) != nullptr ||
                                   gn.NodeId() == gPendingSidebarRevealNodeId ||
                                   ((frameId + gn.index) % kCullRefresh) == 0;
             if (!mustDraw && ed::KeepOffscreenNodeAlive(gn.NodeId(), kCullMargin))
@@ -43388,7 +44318,9 @@ int main(int argc, char** argv)
          const bool isAudioBodyNode = IsAudioBodyNode(gn.node.get());
          const bool canTogglePreview = CanToggleInlinePreview(gn);
          const bool inlinePreviewEnabled = !canTogglePreview || InlinePreviewEnabled(gn);
-         if (multiOutModulator)
+         if (auto* scenesNode = dynamic_cast<ScenesNode*>(gn.node.get()))
+            DrawScenesBody(scenesNode, gn.index); // Turbo 0.50
+         else if (multiOutModulator)
             ; // these draw their own meters in the params panel
          else if (auto* uiButton = dynamic_cast<UIButtonNode*>(gn.node.get()))
             DrawUIButtonBody(uiButton, gn.index, frameId, inlinePreviewEnabled);
@@ -43738,6 +44670,8 @@ int main(int argc, char** argv)
                DrawMacroRadioSelectorParams(n);
             else if (auto* n = dynamic_cast<MacroStepGateNode*>(gn.node.get()))
                DrawMacroStepGateParams(n);
+            else if (auto* n = dynamic_cast<ScenesNode*>(gn.node.get()))
+               DrawScenesParams(n); // Turbo 0.50
             else if (auto* n = dynamic_cast<DriftNode*>(gn.node.get()))
                DrawDriftParams(n);
             else if (auto* n = dynamic_cast<UIButtonNode*>(gn.node.get()))
@@ -44149,14 +45083,23 @@ int main(int argc, char** argv)
                hl->AddCircle(pickSpot->c, 11.0f, IM_COL32(0, 230, 255, 200), 20, 2.0f);
                const Patch::PerfRecord& el = gPerfElements[(size_t)gPerfAssigningElemIdx];
                GraphNode* tn = FindNodeByIndex(pick.first);
-               gLiveIssueTip = "Assign '" + el.label + "' " + (gPerfAssigningAxis == 1 ? "(Y axis) " : "") + "-> " +
+               gLiveIssueTip = "Assign '" + el.label + "' " + (gPerfAssigningAxis == 1 ? "(Y axis) " : gPerfAssigningAxis == 2 ? "(extra target) " : "") + "-> " +
                                (tn ? NodeTitleWithInstance(*tn) : std::string("node")) + " / " + pickSpot->name +
                                "\n(click to assign, Esc or right-click cancels)";
                if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
                {
                   PushUndoCheckpoint();
                   Patch::PerfRecord& e = gPerfElements[(size_t)gPerfAssigningElemIdx];
-                  if (gPerfAssigningAxis == 0)
+                  if (gPerfAssigningAxis == 2)
+                  {
+                     // Turbo 0.50: "+ Add Another Parameter": appended, no duplicates.
+                     bool dup = e.dstIndex == pick.first && e.dstParam == pick.second;
+                     for (const auto& t : e.targets)
+                        dup = dup || (t.dstIndex == pick.first && t.dstParam == pick.second);
+                     if (!dup)
+                        e.targets.push_back({ pick.first, pick.second, std::string() });
+                  }
+                  else if (gPerfAssigningAxis == 0)
                   {
                      e.dstIndex = pick.first;
                      e.dstParam = pick.second;
@@ -46533,6 +47476,8 @@ int main(int argc, char** argv)
       if (getenv("INFINITE_HIDETEST") != nullptr && frameId == 3)
          gRequestFitView = true; // dev screenshot: frame the whole fixture
 
+      ApplyBringToFront(); // Turbo 0.50: new nodes draw in front
+
       ed::End();
       ed::GetStyle().Colors[ed::StyleColor_Bg] = savedEdBg;
       ed::GetStyle().Colors[ed::StyleColor_Grid] = savedEdGrid;
@@ -47016,6 +47961,14 @@ int main(int argc, char** argv)
       // topology rebuild outside the usual connect/disconnect/spawn/delete
       // actions - see AudioTopologyRequest.h for why it can't just call
       // RebuildAudioTopology() itself.
+      // Turbo 0.50: a watched node's latency changed (Super Mixer limiter
+      // switched or its lookahead moved): re-run delay compensation.
+      for (const LatencyWatch& w : gLatencyWatch)
+         if (w.node->LatencySamples() != w.latency)
+         {
+            AudioTopologyRequest::Request();
+            break;
+         }
       if (AudioTopologyRequest::PendingRebuild())
       {
          AudioTopologyRequest::PendingRebuild() = false;
@@ -47088,6 +48041,12 @@ int main(int argc, char** argv)
             gPerfSlotWrites[{ ref.nodeIndex, ref.paramIndex }] = *ref.value;
          }
          gPerfPendingWrites.clear();
+
+         // Turbo 0.50: Scenes also ticks here (frame-guarded), so quantized
+         // scene changes land even when the graph is hidden (Performance Mode).
+         for (GraphNode& gn : gNodes)
+            if (auto* sc = dynamic_cast<ScenesNode*>(gn.node.get()))
+               sc->Tick(ImGui::GetFrameCount());
 
          const double t = Transport::Instance().Seconds();
          // Patch-wide named values, evaluated once before any parameter reads

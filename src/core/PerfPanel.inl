@@ -18,6 +18,21 @@ FaderValueToPosFn TaperV2P(int taper)
    return taper == 1 ? &ConsoleFaderTaper::ValueToPos : taper == 2 ? &FrequencyTaper::ValueToPos : nullptr;
 }
 
+// Turbo 0.50: a trigger whose node reports a lit state (a Scenes button while
+// its scene plays, "all off" while off). Such a trigger toggles itself, so a
+// Toggle element bound to it shows that state and sends one press per click.
+bool PerfParamLit(int dstIndex, int dstParam, bool& lit)
+{
+   if (dstIndex < 0 || dstParam < 0)
+      return false;
+   GraphNode* gn = FindNodeByIndex(dstIndex);
+   if (gn == nullptr)
+      return false;
+   if (auto* sc = dynamic_cast<ScenesNode*>(gn->node.get()))
+      return sc->ParamLit(dstParam, lit);
+   return false;
+}
+
    // ---- Performance Matrix ----
    void PerfPanelDockCombo()
    {
@@ -705,6 +720,38 @@ FaderValueToPosFn TaperV2P(int taper)
                   elem.targets.clear();
                }
 
+               // Turbo 0.50: one control can drive several params (the runtime
+               // always wrote elem.targets, but only a paste could fill them).
+               // Every extra target gets the same value / bang as the primary.
+               if (elem.dstIndex >= 0 && elem.dstParam >= 0 && elem.kind != 9)
+               {
+                  if (ImGui::MenuItem("+ Add Another Parameter..."))
+                  {
+                     gPerfAssigningElemIdx = (int)elemIdx;
+                     gPerfAssigningAxis = 2;
+                     ImGui::CloseCurrentPopup();
+                  }
+                  int removeAt = -1;
+                  for (size_t ti = 0; ti < elem.targets.size(); ti++)
+                  {
+                     const Patch::PerfTarget& t = elem.targets[ti];
+                     GraphNode* tgn = FindNodeByIndex(t.dstIndex);
+                     const ParamRef* tkp = Modulation::Instance().KnownParam(t.dstIndex, t.dstParam);
+                     const std::string tStr = "x  " + (tgn ? tgn->typeName : std::string("Node")) + " - " +
+                                              (!t.boolName.empty() ? t.boolName : tkp ? tkp->name : std::to_string(t.dstParam)) +
+                                              "##perfTarget" + std::to_string(ti);
+                     if (ImGui::MenuItem(tStr.c_str()))
+                        removeAt = (int)ti;
+                     if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Click to remove this extra target");
+                  }
+                  if (removeAt >= 0)
+                  {
+                     PushUndoCheckpoint();
+                     elem.targets.erase(elem.targets.begin() + removeAt);
+                  }
+               }
+
                if (elem.kind != 9) // Step Gate does not use MIDI Learn
                {
                   ImGui::Separator();
@@ -974,7 +1021,11 @@ FaderValueToPosFn TaperV2P(int taper)
       else if (elem.kind == 3) // Toggle (1x1)
       {
          bool curVal = false;
-         if (dstNode != nullptr && !elem.boolName.empty())
+         bool litVal = false;
+         const bool litTarget = elem.boolName.empty() && PerfParamLit(elem.dstIndex, elem.dstParam, litVal);
+         if (litTarget)
+            curVal = litVal; // Turbo 0.50: the node's own on state
+         else if (dstNode != nullptr && !elem.boolName.empty())
             curVal = ReadNodeBool(dstNode, elem.boolName, elem.dstParam);
          else if (elem.dstIndex >= 0 && elem.dstParam >= 0)
          {
@@ -1003,7 +1054,13 @@ FaderValueToPosFn TaperV2P(int taper)
                                          ((themeTint >> 16) & 0xFF) / 255.0f, 1.0f)
                                 : (isLight ? ImVec4(0.85f, 0.88f, 0.92f, 1.0f) : ImVec4(0.16f, 0.18f, 0.24f, 1.0f));
          ImGui::PushStyleColor(ImGuiCol_Button, btnCol);
-         if (ImGui::Button(curVal ? "ON" : "OFF", ImVec2(btnSize, btnSize)))
+         const bool toggleClicked = ImGui::Button(curVal ? "ON" : "OFF", ImVec2(btnSize, btnSize));
+         if (toggleClicked && litTarget)
+         {
+            elem.value = 0.0f;
+            gPerfPendingWrites[{elem.dstIndex, elem.dstParam}] = 1.0f; // one press
+         }
+         else if (toggleClicked)
          {
             bool newVal = !curVal;
             elem.value = newVal ? 1.0f : 0.0f;
@@ -1209,6 +1266,10 @@ FaderValueToPosFn TaperV2P(int taper)
          float r = padSize * 0.44f;
          ImU32 baseCol = isLight ? IM_COL32(215, 222, 235, 255) : IM_COL32(32, 36, 48, 255);
          dl->AddCircleFilled(center, r, baseCol, 32);
+         // Turbo 0.50: lit while the node says so (a Scenes button's scene plays).
+         bool litNow = false;
+         if (elem.boolName.empty() && PerfParamLit(elem.dstIndex, elem.dstParam, litNow) && litNow)
+            dl->AddCircleFilled(center, r, (themeTint & 0x00FFFFFF) | 0xD0000000, 32);
 
          if (flash > 0.0f)
          {
@@ -1563,7 +1624,14 @@ FaderValueToPosFn TaperV2P(int taper)
                {
                   unsigned int hitSeq = Platform::MidiNoteHitCount(elem.midiDevice, elem.midiChannel, elem.midiController);
                   if (st.lastHitSeq == 0) st.lastHitSeq = hitSeq;
-                  if (hitSeq > st.lastHitSeq)
+                  bool litVal = false;
+                  if (hitSeq > st.lastHitSeq && elem.boolName.empty() && PerfParamLit(elem.dstIndex, elem.dstParam, litVal))
+                  {
+                     // Turbo 0.50: a self-toggling trigger, one press per hit.
+                     st.lastHitSeq = hitSeq;
+                     gPerfPendingWrites[{elem.dstIndex, elem.dstParam}] = 1.0f;
+                  }
+                  else if (hitSeq > st.lastHitSeq)
                   {
                      st.lastHitSeq = hitSeq;
                      bool curVal = elem.value > 0.5f;

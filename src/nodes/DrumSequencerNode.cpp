@@ -1,12 +1,17 @@
 #include "DrumSequencerNode.h"
 #include "DrumPatterns.h"
+#include "DrumMidiLibrary.h"
 
 #include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <climits>
+#include <filesystem>
+#include <fstream>
 #include <cstring>
+#include <vector>
 
 #include "audio/AudioBuffer.h"
 #include "audio/AudioNode.h"
@@ -14,6 +19,9 @@
 #include "audio/MusicTime.h"
 #include "audio/ParamMailbox.h"
 #include "audio/SampleSlot.h"
+#include "core/MidiFile.h"
+#include "platform/SettingsPaths.h"
+#include "json.hpp"
 #include "core/Transport.h"
 #include "platform/Platform.h"
 
@@ -440,6 +448,18 @@ private:
    friend class ::DrumSequencerNode;
 };
 
+// Turbo 0.50: the analysed MIDI groove file. Complete before the
+// constructor and destructor below, which own it through a unique_ptr.
+struct DrumSequencerNode::MidiCache
+{
+   std::string path;
+   Part parts[3];
+   int rate = (int)MusicTime::kSixteenth;
+   float swing = 0.0f;
+   int bpm = 0;
+   std::string info;
+};
+
 DrumSequencerNode::DrumSequencerNode()
 {
    for (int lane = 0; lane < kNumLanes; lane++)
@@ -691,6 +711,15 @@ void DrumSequencerNode::VisitParams(ParamVisitor& v)
    }
    v.Text("patternName", patternName);
    v.Int("patternPart", patternPart);
+   // Turbo 0.50, appended: the other parts' edits, the per-groove stash and
+   // the preset name. The visitor is read or write with one interface: a
+   // value that comes back different from what was handed in was read.
+   std::string blob = SerializeParts();
+   const std::string written = blob;
+   v.Text("partData", blob);
+   if (blob != written)
+      DeserializeParts(blob);
+   v.Text("presetName", presetName);
 }
 
 int DrumSequencerNode::CurrentStep() const
@@ -779,9 +808,19 @@ void DrumSequencerNode::FinishLaneBuffer(int lane, Platform::SampleBuffer* decod
 
 void DrumSequencerNode::ReloadFromPaths()
 {
+   // Turbo 0.50: LoadFileToLane resets the lane trim to the full sample
+   // (right for a freshly picked file), which wiped the saved start/end on
+   // every patch load, paste and undo. Keep the loaded values.
    for (int lane = 0; lane < kNumLanes; lane++)
-      if (!laneFilePath[lane].empty())
-         LoadFileToLane(lane, laneFilePath[lane]);
+   {
+      if (laneFilePath[lane].empty())
+         continue;
+      const float savedStart = std::clamp(laneStart[lane], 0.0f, 1.0f);
+      const float savedEnd = std::clamp(laneEnd[lane], savedStart, 1.0f);
+      LoadFileToLane(lane, laneFilePath[lane]);
+      laneStart[lane] = savedStart;
+      laneEnd[lane] = savedEnd;
+   }
 }
 
 void DrumSequencerNode::Randomize()
@@ -920,4 +959,719 @@ int DrumSequencerNode::LoadKitIntoEmptyLanes(const std::string& kitDir)
       }
    }
    return loaded;
+}
+
+// ------------------------------------------------------------ Turbo 0.50: .mid import
+// The analysis (GM map, grid, swing / triplet detection, bars through the
+// time signature map) lives in DrumMidiLibrary, shared with the MIDI folder
+// browser below.
+bool DrumSequencerNode::ImportMidiFile(const std::string& path, std::string& message)
+{
+   MidiFile::Data data;
+   std::string error;
+   if (!MidiFile::Load(path, data, error))
+   {
+      message = error.empty() ? "could not read the MIDI file" : error;
+      importStatus = message;
+      return false;
+   }
+   std::string name = path;
+   const size_t slash = name.find_last_of("/\\");
+   if (slash != std::string::npos)
+      name = name.substr(slash + 1);
+   return ImportMidiData(data, name, message);
+}
+
+namespace
+{
+   // The notes the analysis left out or changed, for the status line.
+   std::string MidiImportNotes(const DrumMidi::Pattern& p)
+   {
+      std::string out;
+      if (p.meter != "4/4" && !p.meter.empty())
+         out += ", " + p.meter;
+      if (p.swing > 0.0f)
+         out += ", swing";
+      if (p.leadBars > 0)
+         out += ", " + std::to_string(p.leadBars) + " empty bar" + (p.leadBars == 1 ? "" : "s") + " dropped";
+      if (p.pickupNotes > 0)
+         out += ", pickup bar dropped";
+      if (p.merged > 0)
+         out += ", " + std::to_string(p.merged) + " notes merged";
+      if (p.skipped > 0)
+         out += ", " + std::to_string(p.skipped) + " non-drum notes skipped";
+      if (p.allChannels)
+         out += ", no channel 10 (all channels read)";
+      return out;
+   }
+
+   void PartFromPattern(const DrumMidi::Pattern& p, int firstBar, int maxSteps, DrumSequencerNode::Part& out)
+   {
+      out = DrumSequencerNode::Part();
+      out.filled = true;
+      const int start = p.BarStart(firstBar);
+      out.steps = std::clamp(std::min(maxSteps, p.Steps() - start), 1, kMaxSteps);
+      for (int st = 0; st < out.steps; st++)
+         for (int lane = 0; lane < kNumLanes; lane++)
+            out.vel[lane][st] = p.cells[(size_t)(start + st)][lane];
+   }
+}
+
+bool DrumSequencerNode::ImportMidiData(const MidiFile::Data& data, const std::string& name, std::string& message)
+{
+   DrumMidi::Pattern pat;
+   std::string error;
+   if (!DrumMidi::Analyze(data, pat, error))
+   {
+      message = error + " in " + name;
+      importStatus = message;
+      return false;
+   }
+   // Whole bars from the first one with a note, as many as fit kMaxSteps.
+   int bars = 0, steps = 0;
+   while (bars < pat.Bars() && steps + pat.barSteps[bars] <= kMaxSteps)
+      steps += pat.barSteps[bars++];
+   const bool truncated = bars < pat.Bars();
+   if (bars == 0) // one bar longer than kMaxSteps: cut
+   {
+      bars = 1;
+      steps = kMaxSteps;
+   }
+
+   // Into the live part only: the other parts keep their content, made
+   // concrete first since the groove name is about to go.
+   MaterializeParts();
+   Part live;
+   PartFromPattern(pat, 0, steps, live);
+   int placed = 0;
+   for (int lane = 0; lane < kNumLanes; lane++)
+      for (int s = 0; s < live.steps; s++)
+         placed += live.vel[lane][s] > 0.0f ? 1 : 0;
+   // Library grooves use accent pitch for two-tone bells; an imported
+   // accent means velocity only.
+   for (int lane = 0; lane < kNumLanes; lane++)
+      laneAccentPitch[lane] = 0.0f;
+   LoadLivePart(live);
+   rate = pat.triplet ? (int)MusicTime::kSixteenthTrip : (int)MusicTime::kSixteenth;
+   swing = pat.swing;
+   patternName.clear(); // no longer a library groove
+   presetName.clear();
+   browsingCategory = false;
+   StoreLivePart();
+
+   char buf[256];
+   snprintf(buf, sizeof(buf), "%s: %d bar%s, %d steps of %s, %d hits%s", name.c_str(), bars, bars == 1 ? "" : "s",
+            numSteps, pat.triplet ? "1/16T" : "1/16", placed, truncated ? " (cut to fit)" : "");
+   message = buf + MidiImportNotes(pat);
+   importStatus = message;
+   return true;
+}
+
+// ------------------------------------------- Turbo 0.50: grooves from the MIDI folder
+
+bool DrumSequencerNode::LoadMidiCache(const std::string& rawPath, bool reload, std::string& message)
+{
+   const std::string path = std::filesystem::u8path(rawPath).lexically_normal().u8string();
+   if (!reload && mMidi && mMidi->path == path)
+      return true;
+   std::error_code ec;
+   const uintmax_t size = std::filesystem::file_size(std::filesystem::u8path(path), ec);
+   if (ec)
+   {
+      message = "MIDI file not found: " + path;
+      return false;
+   }
+   if (size > 4u * 1024u * 1024u)
+   {
+      message = "MIDI file too large for a drum pattern: " + path;
+      return false;
+   }
+   MidiFile::Data data;
+   std::string error;
+   if (!MidiFile::Load(path, data, error))
+   {
+      message = error.empty() ? "could not read " + path : error;
+      return false;
+   }
+   DrumMidi::Pattern pat;
+   if (!DrumMidi::Analyze(data, pat, error))
+   {
+      message = error + ": " + DrumMidi::TitleFromFileName(path);
+      return false;
+   }
+   DrumMidi::PartSpan spans[3];
+   DrumMidi::SplitParts(pat, kMaxSteps, spans);
+   auto cache = std::make_unique<MidiCache>();
+   cache->path = path;
+   for (int pi = 0; pi < 3; pi++)
+      PartFromPattern(pat, spans[pi].firstBar, spans[pi].steps, cache->parts[pi]);
+   cache->rate = pat.triplet ? (int)MusicTime::kSixteenthTrip : (int)MusicTime::kSixteenth;
+   cache->swing = pat.swing;
+
+   // Title and bpm as the browser shows them (index.json when there is one).
+   std::string title = DrumMidi::TitleFromFileName(path);
+   const std::shared_ptr<const DrumMidi::Library> lib = DrumMidi::Current();
+   const int entry = lib->Find(path);
+   if (entry >= 0)
+   {
+      title = lib->entries[entry].title;
+      cache->bpm = lib->entries[entry].bpm;
+   }
+   if (cache->bpm <= 0 && !data.tempos.empty())
+      cache->bpm = (int)std::lround(pat.bpm);
+   std::string info = title + ": ";
+   if (cache->bpm > 0)
+      info += "orig " + std::to_string(cache->bpm) + " bpm, ";
+   info += std::to_string(pat.Bars()) + (pat.Bars() == 1 ? " bar" : " bars") + (pat.triplet ? " of 1/16T" : "");
+   info += "; A " + DrumMidi::SpanLabel(spans[0]) + ", B " + DrumMidi::SpanLabel(spans[1]) + ", C " +
+           DrumMidi::SpanLabel(spans[2]);
+   if (pat.tempoChanges > 0)
+      info += ", tempo changes in the file";
+   cache->info = info + MidiImportNotes(pat);
+   mMidi = std::move(cache);
+   return true;
+}
+
+int DrumSequencerNode::MidiGrooveBpm() const
+{
+   if (!IsMidiGroove())
+      return 0;
+   if (mMidi && mMidi->path == MidiGroovePath())
+      return mMidi->bpm;
+   const std::shared_ptr<const DrumMidi::Library> lib = DrumMidi::Current();
+   const int entry = lib->Find(MidiGroovePath());
+   return entry >= 0 ? lib->entries[entry].bpm : 0;
+}
+
+bool DrumSequencerNode::SelectMidiGroove(const std::string& path, int part, bool fresh, std::string& message)
+{
+   if (part < 0 || part > 2)
+   {
+      message = "part: A, B or C (0-2)";
+      return false;
+   }
+   // Always re-read on a pick: the file may have been edited since.
+   if (!LoadMidiCache(path, true, message))
+   {
+      importStatus = message;
+      return false;
+   }
+   const std::string name = kMidiPrefix + mMidi->path;
+   message = mMidi->info;
+   importStatus = message;
+   if (fresh && grooveStash.erase(name) > 0)
+      mStashRev++;
+   if (name == patternName && !fresh)
+   {
+      SwitchPart(part);
+      return true;
+   }
+   if (name != patternName)
+      StashCurrent();
+   presetName.clear();
+   if (RestoreStash(name, part))
+      return true;
+   for (int pi = 0; pi < 3; pi++)
+      parts[pi] = mMidi->parts[pi];
+   rate = mMidi->rate;
+   swing = mMidi->swing;
+   for (int lane = 0; lane < kNumLanes; lane++)
+      laneAccentPitch[lane] = 0.0f;
+   patternName = name;
+   patternPart = part;
+   LoadLivePart(parts[part]);
+   return true;
+}
+
+bool DrumSequencerNode::SourcePart(int part, Part& out)
+{
+   if (LibraryPart(GrooveIndex(), part, out))
+      return true;
+   if (!IsMidiGroove() || part < 0 || part > 2)
+      return false;
+   std::string message;
+   if (!LoadMidiCache(MidiGroovePath(), false, message))
+   {
+      importStatus = message;
+      return false;
+   }
+   out = mMidi->parts[part];
+   return true;
+}
+
+// ------------------------------------------------- Turbo 0.50: parts, stash, presets
+void DrumSequencerNode::StoreLivePart()
+{
+   Part& p = parts[std::clamp(patternPart, 0, 2)];
+   p.filled = true;
+   p.steps = std::clamp(numSteps, 1, kMaxSteps);
+   memcpy(p.vel, stepVel, sizeof(stepVel));
+}
+
+void DrumSequencerNode::LoadLivePart(const Part& part)
+{
+   numSteps = std::clamp(part.steps, 1, kMaxSteps);
+   memcpy(stepVel, part.vel, sizeof(stepVel));
+   editPage = 0;
+}
+
+int DrumSequencerNode::GrooveIndex() const
+{
+   if (patternName.empty())
+      return -1;
+   int count = 0;
+   const DrumPatterns::Groove* all = DrumPatterns::All(count);
+   for (int i = 0; i < count; i++)
+      if (patternName == all[i].name)
+         return i;
+   return -1;
+}
+
+bool DrumSequencerNode::LibraryPart(int groove, int part, Part& out) const
+{
+   int count = 0;
+   const DrumPatterns::Groove* all = DrumPatterns::All(count);
+   if (groove < 0 || groove >= count || part < 0 || part > 2)
+      return false;
+   const DrumPatterns::Part& pt = all[groove].parts[part];
+   out.filled = true;
+   out.steps = std::clamp(pt.steps, 1, kMaxSteps);
+   for (int lane = 0; lane < kNumLanes; lane++)
+   {
+      const char* cells = pt.lanes[lane];
+      const size_t len = cells != nullptr ? strlen(cells) : 0;
+      for (int st = 0; st < kMaxSteps; st++)
+         out.vel[lane][st] = (cells != nullptr && st < out.steps && (size_t)st < len) ? DrumPatterns::CellVelocity(cells[st]) : 0.0f;
+   }
+   return true;
+}
+
+void DrumSequencerNode::MaterializeParts()
+{
+   for (int pi = 0; pi < 3; pi++)
+   {
+      if (parts[pi].filled || pi == patternPart)
+         continue;
+      if (!SourcePart(pi, parts[pi]))
+      {
+         parts[pi].filled = true;
+         parts[pi].steps = std::clamp(numSteps, 1, kMaxSteps);
+         memcpy(parts[pi].vel, stepVel, sizeof(stepVel));
+      }
+   }
+}
+
+void DrumSequencerNode::SwitchPart(int part)
+{
+   part = std::clamp(part, 0, 2);
+   if (part == patternPart && parts[part].filled)
+      return;
+   StoreLivePart();
+   patternPart = part;
+   if (parts[part].filled)
+      LoadLivePart(parts[part]);
+   else if (SourcePart(part, parts[part]))
+      LoadLivePart(parts[part]);
+   else
+      StoreLivePart(); // no groove: a new part starts as a copy of the grid
+}
+
+void DrumSequencerNode::StashCurrent()
+{
+   bool any = false;
+   for (const Part& p : parts)
+      any = any || p.filled;
+   if (patternName.empty() && !any)
+      return; // a fresh node: nothing of the user's to keep
+   StoreLivePart();
+   GrooveStash st;
+   for (int pi = 0; pi < 3; pi++)
+      st.parts[pi] = parts[pi];
+   st.part = patternPart;
+   st.rate = rate;
+   st.swing = swing;
+   memcpy(st.accentPitch, laneAccentPitch, sizeof(laneAccentPitch));
+   // Bounded so a long browsing session can't grow the patch forever.
+   if (grooveStash.size() >= 32 && grooveStash.find(patternName) == grooveStash.end())
+      grooveStash.erase(grooveStash.begin());
+   grooveStash[patternName] = st;
+   mStashRev++;
+}
+
+bool DrumSequencerNode::SelectGroove(int groove, int part, bool fresh)
+{
+   int count = 0;
+   const DrumPatterns::Groove* all = DrumPatterns::All(count);
+   if (groove < 0 || groove >= count || part < 0 || part > 2)
+      return false;
+   const std::string name = all[groove].name;
+   if (fresh && grooveStash.erase(name) > 0)
+      mStashRev++;
+   if (name == patternName && !fresh)
+   {
+      SwitchPart(part);
+      return true;
+   }
+   if (name != patternName)
+      StashCurrent();
+   presetName.clear();
+   if (RestoreStash(name, part))
+      return true;
+   for (Part& p : parts)
+      p.filled = false;
+   ApplyPattern(groove, part); // a new groove brings its own rate and swing
+   StoreLivePart();
+   return true;
+}
+
+bool DrumSequencerNode::RestoreStash(const std::string& name, int part)
+{
+   auto it = grooveStash.find(name);
+   if (it == grooveStash.end())
+      return false;
+   const GrooveStash& st = it->second;
+   for (int pi = 0; pi < 3; pi++)
+      parts[pi] = st.parts[pi];
+   rate = st.rate;
+   swing = st.swing;
+   memcpy(laneAccentPitch, st.accentPitch, sizeof(laneAccentPitch));
+   patternName = name;
+   patternPart = part;
+   if (parts[part].filled || SourcePart(part, parts[part]))
+      LoadLivePart(parts[part]);
+   return true;
+}
+
+bool DrumSequencerNode::RevertPart()
+{
+   Part p;
+   if (!SourcePart(std::clamp(patternPart, 0, 2), p))
+      return false;
+   parts[std::clamp(patternPart, 0, 2)] = p;
+   LoadLivePart(p);
+   return true;
+}
+
+namespace
+{
+   using json = nlohmann::json;
+
+   json PartToJson(const DrumSequencerNode::Part& p)
+   {
+      static const char* kHex = "0123456789abcdef";
+      json lanes = json::array();
+      const int steps = std::clamp(p.steps, 1, kMaxSteps);
+      for (int lane = 0; lane < kNumLanes; lane++)
+      {
+         // Two hex digits per step (velocity * 255, 00 = off): compact and exact enough.
+         std::string cells;
+         cells.reserve((size_t)steps * 2);
+         for (int st = 0; st < steps; st++)
+         {
+            const float v = std::clamp(p.vel[lane][st], 0.0f, 1.0f);
+            const int b = v <= 0.0f ? 0 : std::max(1, (int)std::lround(v * 255.0f));
+            cells += kHex[b >> 4];
+            cells += kHex[b & 15];
+         }
+         lanes.push_back(cells);
+      }
+      return json { { "filled", p.filled }, { "steps", steps }, { "lanes", lanes } };
+   }
+
+   int HexDigit(char c)
+   {
+      if (c >= '0' && c <= '9') return c - '0';
+      if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+      if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+      return 0;
+   }
+
+   void PartFromJson(const json& j, DrumSequencerNode::Part& p)
+   {
+      p = DrumSequencerNode::Part();
+      if (!j.is_object())
+         return;
+      p.filled = j.value("filled", true);
+      p.steps = std::clamp(j.value("steps", 16), 1, kMaxSteps);
+      const json lanes = j.value("lanes", json::array());
+      for (int lane = 0; lane < kNumLanes && lane < (int)lanes.size(); lane++)
+      {
+         if (!lanes[lane].is_string())
+            continue;
+         const std::string& cells = lanes[lane].get_ref<const std::string&>();
+         for (int st = 0; st < p.steps && (size_t)st * 2 + 1 < cells.size(); st++)
+            p.vel[lane][st] = (float)(HexDigit(cells[(size_t)st * 2]) * 16 + HexDigit(cells[(size_t)st * 2 + 1])) / 255.0f;
+      }
+   }
+
+   json AccentToJson(const float* a)
+   {
+      json arr = json::array();
+      for (int lane = 0; lane < kNumLanes; lane++)
+         arr.push_back(a[lane]);
+      return arr;
+   }
+
+   void AccentFromJson(const json& j, float* a)
+   {
+      if (!j.is_array())
+         return;
+      for (int lane = 0; lane < kNumLanes && lane < (int)j.size(); lane++)
+         if (j[lane].is_number())
+            a[lane] = std::clamp(j[lane].get<float>(), -24.0f, 24.0f);
+   }
+
+   std::string SanitizePresetName(const std::string& name)
+   {
+      std::string out;
+      for (char c : name)
+         if ((unsigned char)c >= 32 && strchr("<>:\"/\\|?*", c) == nullptr)
+            out += c;
+      while (!out.empty() && (out.back() == ' ' || out.back() == '.'))
+         out.pop_back();
+      while (!out.empty() && out.front() == ' ')
+         out.erase(out.begin());
+      return out.substr(0, 80);
+   }
+}
+
+std::string DrumSequencerNode::SerializeParts() const
+{
+   bool same = mBlobValid && mBlobStashRev == mStashRev && mBlobNumSteps == numSteps && mBlobPart == patternPart &&
+               memcmp(mBlobLive, stepVel, sizeof(stepVel)) == 0;
+   for (int pi = 0; pi < 3 && same; pi++)
+      same = mBlobParts[pi].filled == parts[pi].filled && mBlobParts[pi].steps == parts[pi].steps &&
+             memcmp(mBlobParts[pi].vel, parts[pi].vel, sizeof(parts[pi].vel)) == 0;
+   if (same)
+      return mBlobCache;
+   mBlobCache = SerializePartsUncached();
+   mBlobValid = true;
+   mBlobStashRev = mStashRev;
+   mBlobNumSteps = numSteps;
+   mBlobPart = patternPart;
+   memcpy(mBlobLive, stepVel, sizeof(stepVel));
+   for (int pi = 0; pi < 3; pi++)
+      mBlobParts[pi] = parts[pi];
+   return mBlobCache;
+}
+
+std::string DrumSequencerNode::SerializePartsUncached() const
+{
+   // Nothing to keep (an old patch, or parts never used): write nothing so
+   // the patch and the MCP param list stay as they were.
+   bool any = !grooveStash.empty();
+   for (const Part& p : parts)
+      any = any || p.filled;
+   if (!any)
+      return std::string();
+   json j;
+   json ps = json::array();
+   for (int pi = 0; pi < 3; pi++)
+   {
+      if (pi == patternPart)
+      {
+         // The live part is the grid itself (saved as lane<L>_step<S>);
+         // written here too so the blob is complete on its own.
+         Part live;
+         live.filled = true;
+         live.steps = numSteps;
+         memcpy(live.vel, stepVel, sizeof(stepVel));
+         ps.push_back(PartToJson(live));
+      }
+      else
+         ps.push_back(PartToJson(parts[pi]));
+   }
+   j["parts"] = ps;
+   json stash = json::object();
+   for (const auto& kv : grooveStash)
+   {
+      json e;
+      json sp = json::array();
+      for (int pi = 0; pi < 3; pi++)
+         sp.push_back(PartToJson(kv.second.parts[pi]));
+      e["parts"] = sp;
+      e["part"] = kv.second.part;
+      e["rate"] = kv.second.rate;
+      e["swing"] = kv.second.swing;
+      e["accentPitch"] = AccentToJson(kv.second.accentPitch);
+      stash[kv.first] = e;
+   }
+   j["stash"] = stash;
+   return j.dump();
+}
+
+void DrumSequencerNode::DeserializeParts(const std::string& blob)
+{
+   for (Part& p : parts)
+      p = Part();
+   grooveStash.clear();
+   mStashRev++;
+   if (blob.empty())
+      return;
+   const json j = json::parse(blob, nullptr, false);
+   if (j.is_discarded() || !j.is_object())
+      return;
+   try // json::value throws on a wrong type (a hand-edited patch)
+   {
+   const json ps = j.value("parts", json::array());
+   for (int pi = 0; pi < 3 && pi < (int)ps.size(); pi++)
+      PartFromJson(ps[pi], parts[pi]);
+   const json stash = j.value("stash", json::object());
+   if (stash.is_object())
+      for (auto it = stash.begin(); it != stash.end(); ++it)
+      {
+         GrooveStash st;
+         const json sp = it.value().value("parts", json::array());
+         for (int pi = 0; pi < 3 && pi < (int)sp.size(); pi++)
+            PartFromJson(sp[pi], st.parts[pi]);
+         st.part = std::clamp(it.value().value("part", 0), 0, 2);
+         st.rate = std::clamp(it.value().value("rate", 12), 0, (int)MusicTime::kNumRateDivisions - 1);
+         st.swing = std::clamp(it.value().value("swing", 0.0f), 0.0f, 1.0f);
+         AccentFromJson(it.value().value("accentPitch", json::array()), st.accentPitch);
+         grooveStash[it.key()] = st;
+      }
+   }
+   catch (const std::exception&)
+   {
+      for (Part& p : parts)
+         p = Part();
+      grooveStash.clear();
+   }
+}
+
+std::string DrumSequencerNode::PresetDirectory()
+{
+   const std::string root = InfiniteSettingsDirectory();
+   if (root.empty())
+      return std::string();
+   const std::filesystem::path dir = std::filesystem::u8path(root) / "DrumPresets";
+   std::error_code ec;
+   std::filesystem::create_directories(dir, ec);
+   return ec ? std::string() : dir.u8string();
+}
+
+std::vector<std::string> DrumSequencerNode::ListPresets()
+{
+   std::vector<std::string> out;
+   const std::string dir = PresetDirectory();
+   if (dir.empty())
+      return out;
+   // increment(ec), not a range-for: operator++ throws on an I/O error.
+   std::error_code ec;
+   for (std::filesystem::directory_iterator it(std::filesystem::u8path(dir), ec), end; !ec && it != end;
+        it.increment(ec))
+   {
+      std::error_code fileEc;
+      if (it->is_regular_file(fileEc) && it->path().extension() == ".json")
+         out.push_back(it->path().stem().u8string());
+   }
+   std::sort(out.begin(), out.end());
+   return out;
+}
+
+bool DrumSequencerNode::SavePreset(const std::string& rawName, std::string& error)
+{
+   const std::string name = SanitizePresetName(rawName);
+   const std::string dir = PresetDirectory();
+   if (name.empty() || dir.empty())
+   {
+      error = name.empty() ? "preset name is empty" : "no user data folder";
+      return false;
+   }
+   // A preset holds every part: empty slots are filled from the groove first.
+   StoreLivePart();
+   MaterializeParts();
+   json j;
+   j["format"] = "infinite-turbo-drum-preset";
+   j["version"] = 1;
+   j["name"] = name;
+   j["groove"] = patternName;
+   j["part"] = patternPart;
+   j["rate"] = rate;
+   j["swing"] = swing;
+   j["accentPitch"] = AccentToJson(laneAccentPitch);
+   json ps = json::array();
+   for (const Part& p : parts)
+      ps.push_back(PartToJson(p));
+   j["parts"] = ps;
+   const std::filesystem::path path = std::filesystem::u8path(dir) / std::filesystem::u8path(name + ".json");
+   std::ofstream f(path, std::ios::binary | std::ios::trunc);
+   if (!f)
+   {
+      error = "cannot write " + path.u8string();
+      return false;
+   }
+   f << j.dump(1);
+   f.close();
+   if (!f)
+   {
+      error = "could not finish writing " + path.u8string();
+      return false;
+   }
+   presetName = name;
+   return true;
+}
+
+bool DrumSequencerNode::LoadPreset(const std::string& rawName, std::string& error)
+{
+   const std::string name = SanitizePresetName(rawName);
+   const std::string dir = PresetDirectory();
+   if (name.empty() || dir.empty())
+   {
+      error = name.empty() ? "preset name is empty" : "no user data folder";
+      return false;
+   }
+   std::ifstream f(std::filesystem::u8path(dir) / std::filesystem::u8path(name + ".json"), std::ios::binary);
+   if (!f)
+   {
+      error = "no preset named " + name;
+      return false;
+   }
+   std::string text((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+   const json j = json::parse(text, nullptr, false);
+   if (j.is_discarded() || !j.is_object() || !j.contains("parts"))
+   {
+      error = "not a drum preset: " + name;
+      return false;
+   }
+   // Parse into locals first: a malformed file leaves the node untouched.
+   Part loaded[3];
+   int newRate = rate, newPart = 0;
+   float newSwing = swing;
+   float newAccent[kNumLanes];
+   memcpy(newAccent, laneAccentPitch, sizeof(newAccent));
+   try
+   {
+      const json ps = j["parts"];
+      for (int pi = 0; pi < 3 && ps.is_array() && pi < (int)ps.size(); pi++)
+         PartFromJson(ps[pi], loaded[pi]);
+      newRate = std::clamp(j.value("rate", rate), 0, (int)MusicTime::kNumRateDivisions - 1);
+      newSwing = std::clamp(j.value("swing", swing), 0.0f, 1.0f);
+      newPart = std::clamp(j.value("part", 0), 0, 2);
+      AccentFromJson(j.value("accentPitch", json::array()), newAccent);
+   }
+   catch (const std::exception&)
+   {
+      error = "not a drum preset: " + name;
+      return false;
+   }
+   StashCurrent(); // the pattern being replaced stays reachable from its groove
+   for (int pi = 0; pi < 3; pi++)
+      parts[pi] = loaded[pi];
+   rate = newRate;
+   swing = newSwing;
+   memcpy(laneAccentPitch, newAccent, sizeof(laneAccentPitch));
+   // A preset is its own pattern, not the library groove it may have
+   // started from: leaving the groove name empty keeps the stash of that
+   // groove separate from the preset.
+   patternName.clear();
+   presetName = name;
+   patternPart = newPart;
+   if (!parts[patternPart].filled)
+      StoreLivePart();
+   LoadLivePart(parts[patternPart]);
+   for (Part& p : parts)
+      if (!p.filled)
+         p = parts[patternPart];
+   return true;
 }

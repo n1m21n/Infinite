@@ -3,7 +3,7 @@
 [![Original project](https://img.shields.io/badge/original-n1m21n%2FInfinite-181717?logo=github)](https://github.com/n1m21n/Infinite)
 [![Discord](https://img.shields.io/badge/Discord-Infinite-5865F2?logo=discord&logoColor=white)](https://discord.gg/wpKdexvhn)
 
-**Version 0.49.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
+**Version 0.50.0-turbo** · Windows 10/11 x64 · unofficial mod of [Infinite](https://github.com/n1m21n/Infinite)
 
 Infinite-Turbo is a Windows-only mod of **Infinite**, the node-based audiovisual workstation by Naman Soni: realtime image and video processing, procedural 3D, synthesis and DSP, VST3 hosting, MIDI, OSC and CV modulation across all of them, in one patch.
 
@@ -53,13 +53,15 @@ Version by version detail: [CHANGELOG-TURBO.md](CHANGELOG-TURBO.md).
 | **Transport Control** | play / stop / tap, tempo glide, external MIDI clock, key and scale, time signature, metronome; every control is a CV pin (the metronome icon in the top bar is a metronome without a node) |
 | **Looper** | REC / PLAY / DUB that start in time on the bar, one take-length menu (free, 1/16 bar to 32 bars), layer undo / redo, speed / pitch / fine tune (varispeed), fades, volume, export WAV, latency compensation |
 | **MPC** / **MPC Out** | 16 sample pads (one shot, gate, loop), trim, pitch, fine tune, speed (negative = reverse), fades, pan, sync to a musical division, a CV pin per pad, one output per pad |
-| **VMPC** | the MPC for video clips, with their soundtrack |
-| **Super Mixer** | 16 channels, EQ, pan, mute / solo, CV everywhere |
+| **VMPC** | the MPC for video clips, with their soundtrack; transitions between clips (the Slideshow set) |
+| **Super Mixer** | 16 channels, EQ, pan, mute / solo, CV everywhere; master VU, pan, mute and a mastering chain (EQ, glue comp, width, saturation, true-peak limiter, each with bypass) |
 | **Waveforms and trim** | real min / max / RMS waveforms with a play cursor per voice, zoom to the trim range, time readout and Shift-fine trim handles (Sampler, Drum lanes, MPC pads, Slicer, Molder, Granular, Paul Stretch) |
 | **Sample / media library** | your own library folders, browse by folder with a breadcrumb, search across all, no duplicates; drag a kit folder onto a Drum Sequencer or MPC |
 | **MIDI File** | plays a .mid file (drop it on the canvas) in time with the transport, starting on the quantize grid; track and channel filter, transpose, velocity, loop, piano-roll preview |
-| **Drum Sequencer patterns** | 141 grooves in 10 groups (rock, funk and breaks, hip hop, electronic, latin, Brazil, Middle East, India, Africa, jazz), each in three parts (A verse, B bridge, C chorus with a fill), picked by group and groove with A / B / C buttons; two-tone bells; empty lanes get the bundled Turbo kit |
-| **Chord Progression** | chords held per bar, strum / arp / pulse modes; the builder now has extended, altered and quartal chords (11, 13, maj9#11, 7alt, 7#9, 6/9, so what...) |
+| **Drum Sequencer patterns** | 141 grooves in 10 groups (rock, funk and breaks, hip hop, electronic, latin, Brazil, Middle East, India, Africa, jazz), each in three parts (A verse, B bridge, C chorus with a fill), picked by group and groove with A / B / C buttons; two-tone bells; empty lanes get the bundled Turbo kit; edits kept per part, user presets, import .mid (GM drums), your own MIDI groove folder |
+| **Chord Progression** | chords held per bar, strum / arp / pulse modes; the builder now has extended, altered and quartal chords (11, 13, maj9#11, 7alt, 7#9, 6/9, so what...); quantized restart; chord names spelled MAJ / MIN |
+| **Scenes** | radio-button scene launcher, one button for several changes: up to 8 scenes x 8 outputs cabled to any params (switcher slot, drum part, mutes, restart triggers), quantized, every scene mappable |
+| **Note Switcher** | up to 8 note inputs, quantized manual switching, mappable slot buttons |
 
 ### Video and output
 
@@ -136,7 +138,8 @@ If the app is closed, the first request starts it. Every change is one undo step
 | `screenshot_node`, `render_frame` | look at a node's image or the live Output |
 | `authoring_guide` (and the `build_patch` prompt) | the patch-building guide; read once before building |
 | `clip_matrix`, `pads`, `looper` | Turbo only: launch clips and scenes, hit MPC/VMPC pads, drive the Looper |
-| `drum_pattern` | Turbo only: list the Drum Sequencer's pattern library or load a groove and part (A / B / C) into a node |
+| `drum_pattern` | Turbo only: list the Drum Sequencer's pattern library, load a groove and part (A / B / C), import a .mid, save / load presets |
+| `scenes` | Turbo only: set up and fire a Scenes node |
 | `perf_list`, `perf_add`, `perf_remove`, `perf_show` | Turbo only: build and open the Performance Mode panel |
 | `auto_layout`, `fit_view`, `transport`, `undo`, `redo`, `load_patch`, `save_patch`, `new_patch` | the rest |
 

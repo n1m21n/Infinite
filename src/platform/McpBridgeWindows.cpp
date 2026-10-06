@@ -35,7 +35,7 @@ using json = nlohmann::json;
 
 namespace
 {
-   const char* kServerVersion = "0.49.0";
+   const char* kServerVersion = "0.50.0";
 
    // ------------------------------------------------------------ stdio ---
    HANDLE gIn = INVALID_HANDLE_VALUE;
@@ -369,14 +369,32 @@ namespace
                         "breaks, hip hop, electronic, latin, Brazil, Middle East, India, Africa, jazz; category filters) "
                         "and the lane roles. With index + pattern (number or name) + part (A verse, B bridge, C chorus), "
                         "fills that node's grid, steps, rate and swing, and loads the bundled kit into empty lanes "
-                        "(kit:false skips it). Does not change the tempo. Use A / B / C for song sections.",
-        R"({"type":"object","properties":{"index":{"type":"integer"},"pattern":{"type":["integer","string"]},"part":{"type":["string","integer"]},"category":{"type":"string"},"kit":{"type":"boolean"}}})" },
+                        "(kit:false skips it). Does not change the tempo. Use A / B / C for song sections. Each part keeps "
+                        "its edits (reset:true reloads the library groove); index + part alone switches part (rate and swing "
+                        "stay). import: a .mid path, GM drum notes into the live part (16ths, bars from the file). "
+                        "list_presets, save_preset / load_preset (name): user presets with all parts, rate, swing. "
+                        "The list also has the user's MIDI files (%LOCALAPPDATA%\\Infinite\\DrumPatterns, index.json "
+                        "aware; source \"midi\", category = the matching library group (else \"MIDI: <style>\"), style, path, orig_bpm, bars): load one with pattern = "
+                        "its path or name (A / B / C = the file's first distinct chunks of bars, rate and swing from the file, "
+                        "tempo unchanged). source: library | midi filters the list or the name match; rescan:true rescans the folder.",
+        R"({"type":"object","properties":{"index":{"type":"integer"},"pattern":{"type":["integer","string"]},"part":{"type":["string","integer"]},"category":{"type":"string"},"source":{"type":"string","enum":["library","midi"]},"rescan":{"type":"boolean"},"kit":{"type":"boolean"},"reset":{"type":"boolean"},"import":{"type":"string"},"list_presets":{"type":"boolean"},"save_preset":{"type":"string"},"load_preset":{"type":"string"}}})" },
+      { "scenes", "Scenes node (Turbo 0.50, radio-button scene launcher): rows = scenes plus an off row, columns = "
+                  "outputs, each output cabled (modulate) to any param. Entering a scene sets every output to that row, "
+                  "so what is ON elsewhere and OFF here switches off; pressing the playing scene again goes to the off "
+                  "row. Optional settings first: scenes / outputs (1-8), quantize (immediate, next beat, next bar, 2 bars, "
+                  "4 bars), press_again_off, names, outs [{label, mode on/off|choice|level|pulse, steps auto|2..128 "
+                  "(choice)}], grid (rows of cells), off (the off row) or cells [[scene,output,value]] (scene -1 = off). "
+                  "Cells: 0/1 or \"on\"/\"off\" for on/off and pulse, a 0-based choice (or its dropdown name), a 0..1 level. "
+                  "action: state (default), go (scene, -1 = off; now skips quantize), press (scene, like the button: "
+                  "again = off), off, next, prev, cancel.",
+        R"({"type":"object","properties":{"index":{"type":"integer"},"action":{"type":"string","enum":["state","go","press","off","next","prev","cancel"]},"scene":{"type":"integer"},"now":{"type":"boolean"},"scenes":{"type":"integer"},"outputs":{"type":"integer"},"quantize":{"type":["integer","string"]},"press_again_off":{"type":"boolean"},"names":{"type":"array","items":{"type":"string"}},"outs":{"type":"array","items":{"type":"object","properties":{"label":{"type":"string"},"mode":{"type":"string","enum":["on/off","choice","level","pulse"]},"steps":{"type":["integer","string"]}}}},"grid":{"type":"array","items":{"type":"array","items":{}}},"off":{"type":"array","items":{}},"cells":{"type":"array","items":{"type":"array","items":{}}}},"required":["index"]})" },
       { "perf_list", "The Performance Mode panel: pages and every control with what it drives.",
         R"({"type":"object","properties":{}})" },
       { "perf_add", "Puts a parameter on the Performance Mode panel (by its drawn name, as explain lists it). kind: knob, "
                     "fader, slider, toggle, xy (param + param_y), trigger, numbox, selector, bipolar, stepgate; default "
-                    "follows the param (toggle for checkboxes, selector for dropdowns). Optional label and page.",
-        R"({"type":"object","properties":{"index":{"type":"integer"},"param":{"type":["string","integer"]},"param_y":{"type":["string","integer"]},"kind":{"type":["string","integer"]},"label":{"type":"string"},"page":{"type":"integer"}},"required":["index","param"]})" },
+                    "follows the param (toggle for checkboxes, selector for dropdowns). Optional label and page. With element "
+                    "(from perf_list) the param is added as one more destination of that existing control instead.",
+        R"({"type":"object","properties":{"index":{"type":"integer"},"param":{"type":["string","integer"]},"element":{"type":"integer"},"param_y":{"type":["string","integer"]},"kind":{"type":["string","integer"]},"label":{"type":"string"},"page":{"type":"integer"}},"required":["index","param"]})" },
       { "perf_remove", "Removes a control from the Performance Mode panel (element number from perf_list).",
         R"({"type":"object","properties":{"element":{"type":"integer"}},"required":["element"]})" },
       { "perf_show", "Opens / closes the Performance Mode panel, switches Perform (true) / Edit mode, page, dock side.",
@@ -406,7 +424,7 @@ namespace
       "(patch_format) and validate_patch_text before load_patch_text -> explain to check the result. An image "
       "chain needs an Output node at the end to be seen. Params that modulate / set_expression take are the "
       "drawn control names explain lists. render_frame / screenshot_node show the picture. Turbo-only tools: "
-      "clip_matrix, pads (MPC / VMPC), looper, drum_pattern (Drum Sequencer grooves), perf_* (Performance Mode). Read authoring_guide once before "
+      "clip_matrix, pads (MPC / VMPC), looper, drum_pattern (Drum Sequencer grooves), scenes (radio scene launcher, one button many params), perf_* (Performance Mode). Read authoring_guide once before "
       "building. Everything is undoable (undo).";
 
    json ToolList()
@@ -581,11 +599,12 @@ int InstallMcpConfig()
 
    std::vector<fs::path> dirs;
    std::error_code ec;
-   if (const char* appData = std::getenv("APPDATA"))
-      dirs.push_back(fs::u8path(appData) / "Claude");
-   if (const char* local = std::getenv("LOCALAPPDATA"))
+   // Wide environment reads: a non-ASCII user name breaks u8path(getenv()).
+   if (const fs::path appData = InfiniteEnvPath("APPDATA"); !appData.empty())
+      dirs.push_back(appData / "Claude");
+   if (const fs::path local = InfiniteEnvPath("LOCALAPPDATA"); !local.empty())
    {
-      const fs::path packages = fs::u8path(local) / "Packages";
+      const fs::path packages = local / "Packages";
       for (fs::directory_iterator it(packages, ec), end; !ec && it != end; it.increment(ec))
          if (it->path().filename().u8string().rfind("Claude", 0) == 0)
          {

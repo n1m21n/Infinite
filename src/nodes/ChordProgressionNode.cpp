@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <climits>
 #include <cstdio>
 
 #include "audio/AudioBuffer.h"
@@ -10,6 +11,7 @@
 #include "audio/MusicTime.h"
 #include "audio/NoteEvent.h"
 #include "audio/NoteEventQueue.h"
+#include "audio/QuantizedRestart.h"
 #include "core/Transport.h"
 
 namespace
@@ -17,62 +19,68 @@ namespace
    struct Quality
    {
       const char* name;   // shown in the builder dropdown
-      const char* suffix; // appended to the root in chord names
+      // Appended to the root in chord names. Turbo 0.50: the UI font is
+      // all caps, so "Am" and "AM" read alike: qualities are spelled out
+      // ("C MAJ", "A MIN7"); a bare number stays a dominant / plain chord
+      // ("C7", "C6", "C5"). Names are display only, never parsed back.
+      const char* suffix;
       int intervals[6];
       int count;
    };
 
-   // Order is the saved builderQuality index: append only.
+   // Order is the saved builderQuality index: append only. Turbo 0.50:
+   // minor qualities read "min..." in the builder too (an uppercase "m7"
+   // looked like "M7", the usual shorthand for maj7).
    const Quality kQualities[] = {
-      { "maj", "", { 0, 4, 7 }, 3 },
-      { "min", "m", { 0, 3, 7 }, 3 },
+      { "maj", " MAJ", { 0, 4, 7 }, 3 },
+      { "min", " MIN", { 0, 3, 7 }, 3 },
       { "7", "7", { 0, 4, 7, 10 }, 4 },
-      { "maj7", "maj7", { 0, 4, 7, 11 }, 4 },
-      { "m7", "m7", { 0, 3, 7, 10 }, 4 },
-      { "dim", "dim", { 0, 3, 6 }, 3 },
-      { "aug", "aug", { 0, 4, 8 }, 3 },
-      { "sus2", "sus2", { 0, 2, 7 }, 3 },
-      { "sus4", "sus4", { 0, 5, 7 }, 3 },
+      { "maj7", " MAJ7", { 0, 4, 7, 11 }, 4 },
+      { "min7", " MIN7", { 0, 3, 7, 10 }, 4 },
+      { "dim", " DIM", { 0, 3, 6 }, 3 },
+      { "aug", " AUG", { 0, 4, 8 }, 3 },
+      { "sus2", " SUS2", { 0, 2, 7 }, 3 },
+      { "sus4", " SUS4", { 0, 5, 7 }, 3 },
       { "6", "6", { 0, 4, 7, 9 }, 4 },
-      { "m6", "m6", { 0, 3, 7, 9 }, 4 },
+      { "min6", " MIN6", { 0, 3, 7, 9 }, 4 },
       { "9", "9", { 0, 4, 7, 10, 14 }, 5 },
-      { "maj9", "maj9", { 0, 4, 7, 11, 14 }, 5 },
-      { "m9", "m9", { 0, 3, 7, 10, 14 }, 5 },
-      { "m7b5", "m7b5", { 0, 3, 6, 10 }, 4 },
-      { "dim7", "dim7", { 0, 3, 6, 9 }, 4 },
-      { "add9", "add9", { 0, 4, 7, 14 }, 4 },
-      { "7sus4", "7sus4", { 0, 5, 7, 10 }, 4 },
-      { "m(maj7)", "m(maj7)", { 0, 3, 7, 11 }, 4 },
+      { "maj9", " MAJ9", { 0, 4, 7, 11, 14 }, 5 },
+      { "min9", " MIN9", { 0, 3, 7, 10, 14 }, 5 },
+      { "min7b5", " MIN7b5", { 0, 3, 6, 10 }, 4 },
+      { "dim7", " DIM7", { 0, 3, 6, 9 }, 4 },
+      { "add9", " ADD9", { 0, 4, 7, 14 }, 4 },
+      { "7sus4", "7 SUS4", { 0, 5, 7, 10 }, 4 },
+      { "min(maj7)", " MIN(MAJ7)", { 0, 3, 7, 11 }, 4 },
       { "5", "5", { 0, 7 }, 2 },
       // Turbo 0.47: extended, altered and voicing qualities. 13ths drop the
       // 11th, 7alt drops the 5th (six notes max). Intervals above 12 are
       // voiced in the upper octave of the two-octave keyboard.
       { "11 (9sus4)", "11", { 0, 7, 10, 14, 17 }, 5 },
-      { "m11", "m11", { 0, 3, 7, 10, 14, 17 }, 6 },
-      { "maj7#11", "maj7#11", { 0, 4, 7, 11, 18 }, 5 },
-      { "maj9#11", "maj9#11", { 0, 4, 7, 11, 14, 18 }, 6 },
+      { "min11", " MIN11", { 0, 3, 7, 10, 14, 17 }, 6 },
+      { "maj7#11", " MAJ7#11", { 0, 4, 7, 11, 18 }, 5 },
+      { "maj9#11", " MAJ9#11", { 0, 4, 7, 11, 14, 18 }, 6 },
       { "13", "13", { 0, 4, 7, 10, 14, 21 }, 6 },
-      { "m13", "m13", { 0, 3, 7, 10, 14, 21 }, 6 },
-      { "maj13", "maj13", { 0, 4, 7, 11, 14, 21 }, 6 },
-      { "13sus4", "13sus4", { 0, 5, 7, 10, 14, 21 }, 6 },
+      { "min13", " MIN13", { 0, 3, 7, 10, 14, 21 }, 6 },
+      { "maj13", " MAJ13", { 0, 4, 7, 11, 14, 21 }, 6 },
+      { "13sus4", "13 SUS4", { 0, 5, 7, 10, 14, 21 }, 6 },
       { "9#11", "9#11", { 0, 4, 7, 10, 14, 18 }, 6 },
-      { "m(maj9)", "m(maj9)", { 0, 3, 7, 11, 14 }, 5 },
+      { "min(maj9)", " MIN(MAJ9)", { 0, 3, 7, 11, 14 }, 5 },
       { "7b9", "7b9", { 0, 4, 7, 10, 13 }, 5 },
       { "7#9", "7#9", { 0, 4, 7, 10, 15 }, 5 },
       { "7#11", "7#11", { 0, 4, 7, 10, 18 }, 5 },
       { "7b13", "7b13", { 0, 4, 7, 10, 20 }, 5 },
-      { "7alt", "7alt", { 0, 4, 10, 13, 15, 20 }, 6 },
-      { "m7b9", "m7b9", { 0, 3, 7, 10, 13 }, 5 },
+      { "7alt", "7 ALT", { 0, 4, 10, 13, 15, 20 }, 6 },
+      { "min7b9", " MIN7b9", { 0, 3, 7, 10, 13 }, 5 },
       { "7#5", "7#5", { 0, 4, 8, 10 }, 4 },
       { "7b5", "7b5", { 0, 4, 6, 10 }, 4 },
-      { "maj7#5", "maj7#5", { 0, 4, 8, 11 }, 4 },
-      { "dim(maj7)", "dim(maj7)", { 0, 3, 6, 11 }, 4 },
+      { "maj7#5", " MAJ7#5", { 0, 4, 8, 11 }, 4 },
+      { "dim(maj7)", " DIM(MAJ7)", { 0, 3, 6, 11 }, 4 },
       { "6/9", "6/9", { 0, 4, 7, 9, 14 }, 5 },
-      { "m6/9", "m6/9", { 0, 3, 7, 9, 14 }, 5 },
-      { "madd9", "madd9", { 0, 3, 7, 14 }, 4 },
-      { "add11", "add11", { 0, 4, 7, 17 }, 4 },
-      { "quartal (4ths)", "quartal", { 0, 5, 10, 15 }, 4 },
-      { "so what", "(so what)", { 0, 5, 10, 15, 19 }, 5 },
+      { "min6/9", " MIN6/9", { 0, 3, 7, 9, 14 }, 5 },
+      { "min add9", " MIN ADD9", { 0, 3, 7, 14 }, 4 },
+      { "add11", " ADD11", { 0, 4, 7, 17 }, 4 },
+      { "quartal (4ths)", " QUARTAL", { 0, 5, 10, 15 }, 4 },
+      { "so what", " SO WHAT", { 0, 5, 10, 15, 19 }, 5 },
    };
    constexpr int kNumQualities = (int)(sizeof(kQualities) / sizeof(kQualities[0]));
 
@@ -97,8 +105,8 @@ namespace
 }
 
 // ------------------------------------------------------------- audio half
-// Timing: chord changes are detected at block start (the chord index comes
-// from Transport::Bars()). Everything inside a chord - strum delays, arp and
+// Timing: the chord index comes from the transport position minus the
+// restart anchor (Turbo 0.50), measured from the block start. Everything inside a chord - strum delays, arp and
 // pulse steps, their gate releases - is scheduled in samples and emitted at
 // its exact frameOffset, sorted, because synths walk a block's events in
 // order of frameOffset.
@@ -110,7 +118,7 @@ public:
       mSampleRate = sampleRate;
       mNumSounding = 0;
       mNumPending = 0;
-      mLastKey = -1;
+      mLastKey = kNoKey;
       mSamplePos = 0;
       mPlaying.store(-1, std::memory_order_relaxed);
    }
@@ -120,10 +128,16 @@ public:
       const int numFrames = std::max(1, output.numFrames);
       mNumOut = 0;
       Transport& transport = Transport::Instance();
+
       if (!transport.IsPlaying())
       {
          ReleaseAll(0);
-         mLastKey = -1;
+         mLastKey = kNoKey;
+         // A rewind to 0 drops the restart anchor so a fresh start is
+         // bar 1 = chord 1, as before.
+         mRestart.Update(false, 0.0, 4.0);
+         if (transport.Beats() <= 1.0e-9)
+            mAnchor = 0.0;
          mPlaying.store(-1, std::memory_order_relaxed);
          Flush();
          mSamplePos += (uint64_t)numFrames;
@@ -138,22 +152,34 @@ public:
       const double beatsPerBar = std::max(0.25, transport.BeatsPerBar());
       const double bpm = std::max(1.0, (double)transport.Tempo());
       const double samplesPerBeat = mSampleRate * 60.0 / bpm;
-      const double beats0 = std::max(0.0, transport.Beats());
-      const double beats1 = beats0 + (double)numFrames / samplesPerBeat;
+      // Turbo 0.50: Beats() inside ProcessBlock is the block END (the clock
+      // advances before the nodes run), so the block starts one block back.
+      const double beats1 = std::max(0.0, transport.Beats());
+      const double beats0 = std::max(0.0, beats1 - (double)numFrames / samplesPerBeat);
       const int mode = std::clamp(mMode.load(std::memory_order_relaxed), 0, ChordProgressionNode::kNumPlayModes - 1);
       const float gate = std::clamp(mGate.load(std::memory_order_relaxed), 0.05f, 1.0f);
       const bool stepMode = ChordProgressionNode::IsStepMode(mode);
       const double stepBeats = std::max(1.0 / 64.0, MusicTime::BeatsFor((MusicTime::RateDivision)std::clamp(
                                   mRateDiv.load(std::memory_order_relaxed), 0, MusicTime::kNumRateDivisions - 1)));
 
-      // A block can cross a chord boundary; each segment is handled at its
-      // own offset so chord changes land on the beat, not a block late.
+      mRestart.Update(true, beats0, beatsPerBar); // Turbo 0.50
+
+      // A block can cross a chord boundary (or the restart line); each
+      // segment is handled at its own offset so changes land on the beat.
       double segBeat = beats0;
       int idx = 0;
       double inChord = 0.0;
-      for (int seg = 0; seg < 4; seg++)
+      for (int seg = 0; seg < 8; seg++)
       {
-         const double bars = segBeat / beatsPerBar;
+         if (mRestart.IsArmed() && segBeat >= mRestart.ArmBeat() - 1.0e-9)
+         {
+            // Restart: chord 1 begins exactly here.
+            segBeat = std::max(segBeat, mRestart.ArmBeat());
+            mAnchor = mRestart.ArmBeat();
+            mRestart.Fire();
+            mLastKey = kNoKey; // re-strike even if chord 1 is already playing
+         }
+         const double bars = (segBeat - mAnchor) / beatsPerBar;
          const long long cycle = (long long)std::floor(bars / total);
          const double pos = bars - (double)cycle * total;
          double start = 0.0;
@@ -166,7 +192,7 @@ public:
             start += len;
          }
          inChord = std::clamp((pos - start) / len, 0.0, 1.0);
-         const double chordStartBeat = ((double)cycle * total + start) * beatsPerBar;
+         const double chordStartBeat = mAnchor + ((double)cycle * total + start) * beatsPerBar;
          const double chordEndBeat = chordStartBeat + len * beatsPerBar;
          const int segOffset = std::clamp((int)((segBeat - beats0) * samplesPerBeat), 0, numFrames - 1);
 
@@ -186,7 +212,10 @@ public:
             ReleaseAll(segOffset);
          }
 
-         const double segEnd = std::min(beats1, chordEndBeat);
+         // The segment also ends at an armed restart line inside this chord.
+         const bool restartFirst = mRestart.IsArmed() && mRestart.ArmBeat() < chordEndBeat;
+         const double boundary = restartFirst ? mRestart.ArmBeat() : chordEndBeat;
+         const double segEnd = std::min(beats1, boundary);
          if (stepMode && mNumNotes > 0)
          {
             // Every step starting before this segment ends. A step already
@@ -211,9 +240,9 @@ public:
             }
          }
 
-         if (chordEndBeat >= beats1)
+         if (boundary >= beats1)
             break;
-         segBeat = chordEndBeat + 1.0e-9;
+         segBeat = restartFirst ? boundary : chordEndBeat + 1.0e-9;
       }
 
       // Pending events (strum note-ons, step gate note-offs) due this block.
@@ -241,6 +270,7 @@ public:
       mRateDiv.store(n.rateDiv, std::memory_order_relaxed);
       mStrumMs.store(n.strumMs, std::memory_order_relaxed);
       mOctaves.store(n.arpOctaves, std::memory_order_relaxed);
+      mRestart.SetQuant(n.restartQuant);
       for (int i = 0; i < ChordProgressionNode::kMaxChords; i++)
       {
          mMask[i].store(n.chordMask[i], std::memory_order_relaxed);
@@ -249,6 +279,9 @@ public:
    }
 
    int Playing() const { return mPlaying.load(std::memory_order_relaxed); }
+   // Main thread: arm a restart (Turbo 0.50).
+   void RequestRestart() { mRestart.Request(); }
+   bool Armed() const { return mRestart.Armed(); }
    float Progress() const { return mProgress.load(std::memory_order_relaxed); }
 
 private:
@@ -256,6 +289,9 @@ private:
    static constexpr int kMaxSounding = kMaxNotes * 3;
    static constexpr int kMaxPending = 128;
    static constexpr int kMaxOut = 256;
+   // Never a real chord key: cycles go negative once a restart anchor sits
+   // ahead of a rewound transport, so -1 is no longer free.
+   static constexpr long long kNoKey = LLONG_MIN;
 
    struct Sounding { int note; int voiceId; };
    struct Pending { uint64_t sample; int note; int voiceId; bool on; };
@@ -476,7 +512,11 @@ private:
    int mNotes[kMaxNotes] = {};
    int mNumNotes = 0;
    int mNextStep = 0;
-   long long mLastKey = -1;
+   long long mLastKey = kNoKey;
+
+   // Restart (Turbo 0.50).
+   QuantizedRestart mRestart;
+   double mAnchor = 0.0; // transport beat where chord 1 of cycle 0 starts
    uint32_t mRng = 0x2545F491u;
 
    std::atomic<int> mCount { 4 };
@@ -563,6 +603,7 @@ void ChordProgressionNode::VisitParams(ParamVisitor& v)
       snprintf(key, sizeof(key), "bars%d", i);
       v.Float(key, chordBars[i]);
    }
+   v.Int("restartQuant", restartQuant); // Turbo 0.50, appended
 }
 
 AudioNode* ChordProgressionNode::GetAudioNode()
@@ -575,6 +616,23 @@ AudioNode* ChordProgressionNode::GetAudioNode()
 int ChordProgressionNode::PlayingIndex() const
 {
    return mAudioNode ? mAudioNode->Playing() : -1;
+}
+
+void ChordProgressionNode::RequestRestart()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioChordProgressionNode>();
+   mAudioNode->RequestRestart();
+}
+
+bool ChordProgressionNode::RestartArmed() const
+{
+   return mAudioNode ? mAudioNode->Armed() : false;
+}
+
+const std::vector<std::string>& ChordProgressionNode::RestartQuantNames()
+{
+   return QuantizedRestart::Names();
 }
 
 float ChordProgressionNode::PlayingProgress() const

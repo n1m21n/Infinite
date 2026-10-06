@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "audio/QuantizedRestart.h"
 #include "core/INode.h"
 #include "core/NoteCable.h"
 
@@ -74,6 +75,15 @@ public:
 
    int chordMask[kMaxChords];
    float chordBars[kMaxChords]; // 0.5..16
+
+   // Turbo 0.50: quantized restart. RequestRestart() arms a re-anchor: at the
+   // next grid line (restartQuant, transport-beat based) the progression
+   // starts again from chord 1. The anchor itself is not saved (a loaded
+   // patch starts from the transport's bar 1 as before).
+   static const std::vector<std::string>& RestartQuantNames();
+   int restartQuant = QuantizedRestart::kBar; // QuantizedRestart::Quant
+   void RequestRestart();
+   bool RestartArmed() const; // a restart waits for its grid line
 
    // UI-only state (saved so a reopened patch lands on the same chord).
    int selected = 0;

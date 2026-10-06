@@ -2,11 +2,13 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 
 #include "audio/AudioNode.h"
 #include "audio/DspMath.h"
+#include "audio/MasterChain.h"
 
 namespace
 {
@@ -23,9 +25,11 @@ public:
 
    void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
    {
+      mMasterChain.Prepare(sampleRate);
       if (sampleRate > 0.0 && sampleRate != mSampleRate)
       {
          mSampleRate = sampleRate;
+         mLatRate.store(sampleRate, std::memory_order_relaxed);
          for (int c = 0; c < N; c++)
             mEqDirty[c] = true;
       }
@@ -47,8 +51,62 @@ public:
          mMidFreq[c].store(std::clamp(n.eqMidFreq[c], 200.0f, 8000.0f), std::memory_order_relaxed);
          mHigh[c].store(std::clamp(n.eqHigh[c], -15.0f, 15.0f), std::memory_order_relaxed);
       }
-      mMaster.store(DspMath::DbToLinear(std::clamp(n.masterDb, -60.0f, 12.0f)), std::memory_order_relaxed);
+      // Turbo 0.50: the master bus (fader included) runs in MasterChain.
+      using namespace MasterDsp;
+      MasterChain& m = mMasterChain;
+      m.SetParam(kFaderGain, DspMath::DbToLinear(std::clamp(n.masterDb, -60.0f, 12.0f)));
+      m.SetParam(kBalance, std::clamp(n.masterPan, -1.0f, 1.0f));
+      m.SetParam(kMute, n.masterMute ? 1.0f : 0.0f);
+      m.SetParam(kEqOn, n.fxEqOn ? 1.0f : 0.0f);
+      m.SetParam(kEqLowHz, n.fxEqLowHz);
+      m.SetParam(kEqLowDb, n.fxEqLowDb);
+      m.SetParam(kEqMidHz, n.fxEqMidHz);
+      m.SetParam(kEqMidDb, n.fxEqMidDb);
+      m.SetParam(kEqMidQ, n.fxEqMidQ);
+      m.SetParam(kEqHighHz, n.fxEqHighHz);
+      m.SetParam(kEqHighDb, n.fxEqHighDb);
+      m.SetParam(kCompOn, n.fxCompOn ? 1.0f : 0.0f);
+      m.SetParam(kCompThreshDb, n.fxCompThreshDb);
+      m.SetParam(kCompRatio, n.fxCompRatio);
+      m.SetParam(kCompAttackMs, n.fxCompAttackMs);
+      m.SetParam(kCompReleaseMs, n.fxCompReleaseMs);
+      m.SetParam(kCompMakeupDb, n.fxCompMakeupDb);
+      m.SetParam(kWidthOn, n.fxWidthOn ? 1.0f : 0.0f);
+      m.SetParam(kWidth, n.fxWidth);
+      m.SetParam(kSatOn, n.fxSatOn ? 1.0f : 0.0f);
+      m.SetParam(kSatDriveDb, n.fxSatDriveDb);
+      m.SetParam(kSatMix, n.fxSatMix);
+      m.SetParam(kSatOutDb, n.fxSatOutDb);
+      m.SetParam(kLimOn, n.fxLimOn ? 1.0f : 0.0f);
+      m.SetParam(kLimCeilingDb, n.fxLimCeilingDb);
+      m.SetParam(kLimReleaseMs, n.fxLimReleaseMs);
+      // Turbo 0.50: limiter v2.
+      const float look = n.LimLookaheadApplied();
+      m.SetParam(kLimLookaheadMs, look);
+      m.SetParam(kLimLink, std::clamp(n.fxLimLink, 0.0f, 100.0f) * 0.01f);
+      m.SetParam(kLimTruePeak, n.fxLimTruePeak ? 1.0f : 0.0f);
+      m.SetParam(kLimAutoRelease, n.fxLimAutoRelease ? 1.0f : 0.0f);
+      m.SetParam(kLimStyle, (float)std::clamp(n.fxLimStyle, 0, MasterDsp::MasterChain::kLimStyleCount - 1));
+      mLatOn.store(n.fxLimOn, std::memory_order_relaxed);
+      mLatMs.store(look, std::memory_order_relaxed);
    }
+
+   // Turbo 0.50: the limiter's lookahead while it is switched in, 0 while
+   // it is out (bypassed means no delay at all). Read by RebuildAudioTopology
+   // and the per-frame latency watch, main thread only. The audio thread
+   // follows the switch with a 2 ms duck, so delay compensation and the
+   // actual delay disagree for at most a few ms around a toggle.
+   int LatencySamples() const override
+   {
+      if (!mLatOn.load(std::memory_order_relaxed))
+         return 0;
+      return MasterDsp::MasterChain::LimiterLatencySamples(mLatMs.load(std::memory_order_relaxed),
+                                                          mLatRate.load(std::memory_order_relaxed));
+   }
+   bool LatencyMayChange() const override { return true; }
+   double LatencyRate() const { return mLatRate.load(std::memory_order_relaxed); }
+
+   MasterDsp::MasterChain& Master() { return mMasterChain; }
 
    float Peak() const { return mPeak.load(std::memory_order_relaxed); }
    float ChannelPeak(int c) const { return mChannelPeak[c].load(std::memory_order_relaxed); }
@@ -115,20 +173,16 @@ public:
          mChannelPeak[c].store(peak, std::memory_order_relaxed);
       }
 
-      const float master = mMaster.load(std::memory_order_relaxed);
-      float peak = 0.0f;
-      for (int ch = 0; ch < output.numChannels; ch++)
+      // Turbo 0.50: master chain (FX, fader, balance, limiter, mute,
+      // meters) on the stereo pair; extra channels mirror the left one, as
+      // before.
+      if (output.numChannels > 0)
       {
-         float* o = output.channels[ch];
-         if (ch >= 2)
-            std::copy(output.channels[0], output.channels[0] + frames, o);
-         for (int i = 0; i < frames; i++)
-         {
-            o[i] *= master;
-            peak = std::max(peak, std::fabs(o[i]));
-         }
+         mMasterChain.Process(output.channels[0], output.numChannels > 1 ? output.channels[1] : nullptr, frames);
+         for (int ch = 2; ch < output.numChannels; ch++)
+            std::copy(output.channels[0], output.channels[0] + frames, output.channels[ch]);
       }
-      mPeak.store(peak, std::memory_order_relaxed);
+      mPeak.store(mMasterChain.BlockPeak(), std::memory_order_relaxed);
    }
 
 private:
@@ -181,7 +235,10 @@ private:
    std::atomic<float> mMid[N] {};
    std::atomic<float> mMidFreq[N] {};
    std::atomic<float> mHigh[N] {};
-   std::atomic<float> mMaster { 1.0f };
+   MasterDsp::MasterChain mMasterChain;
+   std::atomic<bool> mLatOn { false };
+   std::atomic<float> mLatMs { 1.5f };
+   std::atomic<double> mLatRate { 48000.0 };
    std::atomic<float> mPeak { 0.0f };
    std::atomic<float> mChannelPeak[N] {};
 };
@@ -210,15 +267,86 @@ AudioNode* SuperMixerNode::GetAudioNode()
    return mAudioNode.get();
 }
 
+float SuperMixerNode::LimLookaheadApplied() const
+{
+   if (mLookApplied >= 0.0f)
+      return mLookApplied;
+   return std::round(std::clamp(fxLimLookaheadMs, 0.5f, 5.0f) * 10.0f) * 0.1f;
+}
+
+float SuperMixerNode::LimLatencyMs() const
+{
+   const double sr = mAudioNode->LatencyRate();
+   return (float)(1000.0 * MasterDsp::MasterChain::LimiterLatencySamples(LimLookaheadApplied(), sr) / sr);
+}
+
 void SuperMixerNode::CookIfNeeded(int frameId)
 {
    if (frameId == mLastCookFrame)
       return;
    mLastCookFrame = frameId;
+   const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+
+   // Turbo 0.50: the lookahead changes the delay (a 2 ms duck on the audio
+   // thread, maybe a PDC rebuild), so it is quantised to 0.1 ms and applied
+   // at most every 0.25 s: a single change lands at once, a knob drag or a
+   // modulator lands 4 times a second and once more when it rests.
+   const float look = std::round(std::clamp(fxLimLookaheadMs, 0.5f, 5.0f) * 10.0f) * 0.1f;
+   if (look != mLookPending)
+   {
+      mLookPending = look;
+      mLookPendingSince = now;
+   }
+   if (mLookApplied < 0.0f ||
+       (look != mLookApplied && (now - mLookPendingSince >= 0.25 || now - mLookAppliedAt >= 0.25)))
+   {
+      mLookApplied = look;
+      mLookAppliedAt = now;
+   }
+
    mAudioNode->PushParams(*this);
    mLevel = mAudioNode->Peak();
    for (int c = 0; c < kChannels; c++)
       mChannelLevel[c] = mAudioNode->ChannelPeak(c);
+
+   // Turbo 0.50: master meter ballistics (main thread).
+   const float dt = mLastMeterTime < 0.0 ? 0.0f : (float)std::clamp(now - mLastMeterTime, 0.0, 0.25);
+   mLastMeterTime = now;
+   MasterDsp::MasterChain& m = mAudioNode->Master();
+   auto toDb = [](float lin) { return lin > 1e-6f ? DspMath::LinearToDb(lin) : -120.0f; };
+   for (int ch = 0; ch < 2; ch++)
+   {
+      const float pk = toDb(m.TakePeak(ch));
+      mMeter.peakDb[ch] = std::max(pk, mMeter.peakDb[ch] - 24.0f * dt);
+      if (pk >= mMeter.holdDb[ch])
+      {
+         mMeter.holdDb[ch] = pk;
+         mMeter.holdAge[ch] = 0.0f;
+      }
+      else
+      {
+         mMeter.holdAge[ch] += dt;
+         if (mMeter.holdAge[ch] > 1.5f)
+            mMeter.holdDb[ch] = std::max(mMeter.peakDb[ch], mMeter.holdDb[ch] - 12.0f * dt);
+      }
+      mMeter.rmsDb[ch] = toDb(m.Rms(ch));
+      if (m.TakeClip(ch))
+         mMeter.clip[ch] = true;
+   }
+   mMeter.compGrDb = std::max(m.TakeCompGrDb(), mMeter.compGrDb - 20.0f * dt);
+   const float limGr = m.TakeLimGrDb();
+   mMeter.limGrDb = std::max(limGr, mMeter.limGrDb - 20.0f * dt);
+   mMeter.limClamps += m.TakeLimClamps();
+   // GR history strip: one column per ~33 ms, holding that step's max.
+   mMeter.grHistAcc = std::max(mMeter.grHistAcc, limGr);
+   mMeter.grHistTime += dt;
+   if (mMeter.grHistTime >= 1.0f / 30.0f)
+   {
+      mMeter.grHistTime = std::fmod(mMeter.grHistTime, 1.0f / 30.0f);
+      mMeter.grHist[mMeter.grHistPos] = mMeter.grHistAcc;
+      mMeter.grHistPos = (mMeter.grHistPos + 1) % MasterMeter::kGrHist;
+      mMeter.grHistAcc = 0.0f;
+   }
 }
 
 void SuperMixerNode::VisitParams(ParamVisitor& v)
@@ -246,4 +374,38 @@ void SuperMixerNode::VisitParams(ParamVisitor& v)
       v.Float(key, eqHigh[c]);
    }
    v.Float("master", masterDb);
+
+   // Turbo 0.50: master bus, appended so older patches load unchanged.
+   v.Float("masterPan", masterPan);
+   v.Bool("masterMute", masterMute);
+   v.Bool("fxOpen", fxOpen);
+   v.Bool("fxEqOn", fxEqOn);
+   v.Float("fxEqLowHz", fxEqLowHz);
+   v.Float("fxEqLowDb", fxEqLowDb);
+   v.Float("fxEqMidHz", fxEqMidHz);
+   v.Float("fxEqMidDb", fxEqMidDb);
+   v.Float("fxEqMidQ", fxEqMidQ);
+   v.Float("fxEqHighHz", fxEqHighHz);
+   v.Float("fxEqHighDb", fxEqHighDb);
+   v.Bool("fxCompOn", fxCompOn);
+   v.Float("fxCompThreshDb", fxCompThreshDb);
+   v.Float("fxCompRatio", fxCompRatio);
+   v.Float("fxCompAttackMs", fxCompAttackMs);
+   v.Float("fxCompReleaseMs", fxCompReleaseMs);
+   v.Float("fxCompMakeupDb", fxCompMakeupDb);
+   v.Bool("fxWidthOn", fxWidthOn);
+   v.Float("fxWidth", fxWidth);
+   v.Bool("fxSatOn", fxSatOn);
+   v.Float("fxSatDriveDb", fxSatDriveDb);
+   v.Float("fxSatMix", fxSatMix);
+   v.Float("fxSatOutDb", fxSatOutDb);
+   v.Bool("fxLimOn", fxLimOn);
+   v.Float("fxLimCeilingDb", fxLimCeilingDb);
+   v.Float("fxLimReleaseMs", fxLimReleaseMs);
+   // Turbo 0.50: limiter v2, appended.
+   v.Float("fxLimLookaheadMs", fxLimLookaheadMs);
+   v.Float("fxLimLink", fxLimLink);
+   v.Bool("fxLimTruePeak", fxLimTruePeak);
+   v.Bool("fxLimAutoRelease", fxLimAutoRelease);
+   v.Int("fxLimStyle", fxLimStyle);
 }

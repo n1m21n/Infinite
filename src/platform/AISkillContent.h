@@ -161,6 +161,13 @@ loop pad restarts on every line. Play with `pads {"index":N,"pad":0}` (`down` / 
 pads; `"action":"state"` with `speed` / `fine` / `fade_in` / `fade_out` / `sync` / `division`
 only sets them), or notes (base note 36 = pad 0). **MPC Out** (wired from the MPC's output) picks
 one pad's own audio for its own effect chain.
+VMPC clip switches (Turbo 0.50): `transitionStyle` 0 Cut (default), 1 Fade, 2 Slide Left,
+3 Slide Right, 4 Wipe Left, 5 Wipe Right, 6 Zoom Fade; `transitionTime` in seconds. Applies when a
+hit replaces another pad's visible clip; the blend starts on the new clip's first frame.
+
+**Slideshow** stepping (Turbo 0.50): mappable triggers `restart sequence` (cut to the first
+image, hold timer restarts), `prev image`, `next image` (play the node's `transition`, then the
+auto-advance carries on from there); e.g. `perf_add {"index":N,"param":"next image"}`.
 
 **Looper** (audio in): one "take length" menu: free (REC again closes it), 1/16 to 1/2 bar,
 1 to 32 bars. From the tools: `looper {"index":N,"length":"2 bars","action":"record"}`, then
@@ -176,6 +183,23 @@ to REC / PLAY / DUB or to an MPC pad presses it on every trigger.
 
 **Super Mixer** (16 channels): per channel `trim<n>` / `gain<n>` / `pan<n>` / `mute<n>` /
 `solo<n>` / `eqLow<n>` / `eqMid<n>` / `eqHigh<n>`, plus `master`. Every control is modulatable.
+Master bus (0.50): `masterPan` (balance -1..1, unity at centre), `masterMute` (click-free), a
+stereo peak / RMS meter with peak hold and latched clip LEDs, and a mastering chain run in this
+order, each stage with its own switch (all off by default): EQ `fxEqOn` (`fxEqLowHz`/`fxEqLowDb`
+low shelf, `fxEqMidHz`/`fxEqMidDb`/`fxEqMidQ` peak, `fxEqHighHz`/`fxEqHighDb` high shelf, +/-15
+dB), glue compressor `fxCompOn` (`fxCompThreshDb`, `fxCompRatio`, `fxCompAttackMs`,
+`fxCompReleaseMs`, `fxCompMakeupDb`; stereo-linked, soft knee), width `fxWidthOn` / `fxWidth` (0
+mono, 1 unchanged, 2 wide), saturation `fxSatOn` (`fxSatDriveDb`, `fxSatMix`, `fxSatOutDb`), then
+the master fader and balance, then a true-peak lookahead limiter `fxLimOn` (`fxLimCeilingDb`
+dBTP, default -0.3; `fxLimReleaseMs`; `fxLimLookaheadMs` 0.5..5, default 1.5, never below ~0.9
+ms at 48 kHz; `fxLimLink` stereo link 0..100 %; `fxLimTruePeak` 4x inter-sample peak detection,
+default on; `fxLimAutoRelease` program-dependent release, default on, the knob then sets the
+fast stage; `fxLimStyle` 0 transparent, 1 punchy, 2 loud). While switched in it delays the
+master by its lookahead and reports it for delay compensation; switched out there is no delay
+and the signal is untouched. Toggling ducks for 2 ms then crossfades (no comb). A red dot on
+the limit GR bar means the last-resort clamp caught an over (click the LED to reset). For a
+live set: limiter on, ceiling -1, comp at 2:1 with 2-4 dB of gain reduction. `fxOpen` only
+unfolds the knobs.
 
 **Layout** (pixel-exact canvas, 8 image inputs): `canvasW` / `canvasH`, per layer `x<n>` / `y<n>`
 (canvas pixels), `scale<n>`, `opacity<n>`, `visible<n>`. Use it to place several images exactly
@@ -206,12 +230,65 @@ For live part changes the node has mappable controls: `part` (selector 0 A, 1 B,
 when it changes), triggers `A verse`, `B bridge`, `C chorus`, `prev groove`, `next groove`, and
 `groove` (index in the shown category); e.g. `perf_add {"index":N,"param":"B bridge"}` adds a
 trigger, `{"param":"part","kind":"selector"}` a 3-way switch.
+0.50: each part keeps its edits (switching A / B / C or groove and back restores them; rate and
+swing are shared and never change on a part switch; `reset:true` reloads the library groove).
+`drum_pattern {"index":N,"part":"B"}` switches part, `{"index":N,"import":"C:/x/beat.mid"}` reads
+GM drum notes from a .mid into the live part (16ths, swing estimated, velocity >= 100 = accent),
+`{"list_presets":true}`, `{"index":N,"save_preset":"name"}`, `{"index":N,"load_preset":"name"}`.
+The user's own MIDI patterns: .mid files in `%LOCALAPPDATA%\Infinite\DrumPatterns` (subfolders
+become styles; an `index.json` array with arquivo/file, titulo/title, estilo/style, bpm,
+compassos/bars names them) are folded by style into the library groups (electro-funk in
+Electronic, r-b in Funk & Breaks; unmatched styles get a `MIDI: <style>` group) and listed in
+the `drum_pattern {}` list with `"source":"midi"`, `path`, `orig_bpm`, `bars`. Load one with
+`drum_pattern {"index":N,"pattern":"<path or name>","part":"A"}`: A is the file's first chunk of
+whole bars that fits 128 steps (8 bars of 4/4), B and C the next chunks that differ from it
+(copies of A for a short file); rate and swing come from the file, the tempo does not change
+(say the orig_bpm if the user wants that feel). Edits are kept per file like a library groove.
+`{"rescan":true}` rescans the folder after the user adds files.
+
+**Scenes** (Macros, Turbo 0.50): a radio-button scene launcher for live sets. Rows are scenes
+(`scenes`, 1-8, default 4) plus an off row on top (the base state); columns are outputs (`outputs`,
+1-8), each cabled to a param: `modulate {"index":DST,"param":"mute","srcIndex":SCENES,"srcOutput":2}`
+(outputs numbered from 0 or named by their label). Pressing a scene enters its row: every output
+follows that row, so whatever is ON in the old scene and OFF in the new one switches off by itself.
+Pressing the playing scene again goes to the off row (`press_again_off`, default true; false =
+restart). Output modes: `on/off` (default, 1 or 0: mutes, toggles, enable switches), `choice` (a
+stepped value; steps `auto` = the cabled param's options, e.g. a Note Switcher slot or a drum
+`part`, or 2..128), `level` (0..1), `pulse` (a short trigger when a scene whose cell is ON starts:
+wire to a restart button or `B bridge`). Set up with `scenes {"index":N,"names":["intro","verse"],
+"outs":[{"label":"lead","mode":"on/off"},{"label":"part","mode":"choice"},{"label":"rst",
+"mode":"pulse"}],"grid":[["on","A",1],["off","B",1]],"off":["off","A",0]}` (cells: 0/1 or
+"on"/"off", a 0-based choice or its dropdown name, a level; `cells [[scene,output,value]]`, scene -1 =
+off row; `state` lists each output's target, choices and live values). Actions: `go` (scene, -1 =
+off), `press` (scene, like the button), `off`, `next`, `prev`, `cancel`. `quantize` (0 immediate,
+1 next beat, 2 next bar, 3 2 bars, 4 4 bars) makes changes, off included, wait for the grid while the
+transport plays. Mappable: triggers `scene 1`..`scene 8`, `all off`, `prev scene`, `next scene`,
+selector `scene` (0 = off). `perf_add {"index":N,"param":"scene 2","label":"verse"}` gives one
+Performance trigger per scene; it lights while its scene plays (a toggle element works too). A cabled
+output owns its param (the knob follows the scene), so cable only what scenes should change. A
+Performance control can also drive several params directly: `perf_add {"index":DST,"param":"<name>",
+"element":E}` adds a destination to control E (same value).
 
 **Chord Progression qualities** (the builder dropdown): triads, 6ths / add9 / 6/9, 7ths (incl.
 7#5, 7b5, maj7#5, dim(maj7)), 9ths / 11ths / 13ths (11, m11, maj7#11, maj9#11, 13, m13, maj13,
 13sus4, 9#11, m(maj9)), altered dominants (7b9, 7#9, 7#11, 7b13, 7alt, m7b9) and voicings
 (quartal, so what). From the tools, write each chord as `mask<N>`: bit k = key k counted up from
 C of `baseOctave`, two octaves (bits 0-23), e.g. C13 = keys 0,4,7,10,14,21. Chord names follow.
+Chord names spell the quality out (the UI is all caps): "C MAJ", "A MIN", "A MIN7", "C MAJ7",
+"B DIM", "C SUS4"; a bare number is dominant or plain ("C7", "C6", "C9", "C5"). Minor qualities
+read "min..." in the builder (min7, min9, min(maj7)...). Live restart (0.50): trigger `restart`
+starts the progression again from chord 1 at the next grid line set by `restartQuant` (0
+immediate, 1 next beat, 2 next bar = default, 3 next 2 bars, 4 next 4 bars); `perf_add
+{"index":N,"param":"restart"}` adds it to a Performance page, a modulator's rising edge on the
+`restart` pin fires it too. Note Sequencer, Arpeggiator (pattern and gate grid from step 1) and MIDI
+File (file from the top, even after it ended) have the same `restart` trigger and
+`restartQuant` setting.
+
+**Note Switcher** (0.50): 8 note inputs (slots 0-7). `inputs` (2-8, default 4) sets how many
+pins show; set it before connecting to a slot past it. `switchQuant` (0 immediate = default, 1
+next beat, 2 next bar, 3 next 2 bars, 4 next 4 bars) makes a manual slot change wait for that
+grid line. Triggers `slot 1` .. `slot 8` pick a slot (and turn `manual` on), good Performance
+Mode buttons. Notes held on the old slot still release normally.
 
 **MIDI File** (Notes): plays a Standard MIDI File (.mid, format 0/1) as notes, locked to the
 transport in beats, so it follows the app tempo (not the file's). Settings: `path` (the file;
@@ -220,6 +297,10 @@ setting it loads it), `track` (0 all, N = track N), `channel` (0 all, 1-16), `tr
 `quantize` (start grid as a rate division, 2 = 1 bar default; playback starts, restarts and
 loops on it), `play`. Wire its note output into a synth. The body shows the file's tempo with a
 button that copies it to the transport; dropping a .mid on the canvas spawns one.
+
+**MIDI Notes** (Notes): live MIDI input as notes. `channel` is stored 0-based: -1 omni, 0-15 =
+MIDI channel 1-16 (the body shows "ch 1".."ch 16" and the last channel heard). Use one node per
+channel to split a controller's keys and pads. MIDI CC / MIDI Trigger `channel` is also 0-15.
 
 **0.49 notes**: Random Note `style` (0 walk = classic, 1 melodic with accents); Sampler has 16
 voices; Image to Points / Depth Projection `relativePointSize` (true = point size 1 fills a cell);

@@ -1,7 +1,9 @@
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "audio/WavePeaks.h"
 #include "core/AudioCable.h"
@@ -11,6 +13,10 @@ class AudioDrumSequencerNode;
 namespace Platform
 {
    struct SampleBuffer;
+}
+namespace MidiFile
+{
+   struct Data;
 }
 
 // An 8-lane, 8-step drum machine, laid out as 8 lane cards (waveform +
@@ -80,6 +86,84 @@ public:
    // lanes' accent pitch too; lanes the part leaves out are cleared. Samples
    // and the other per-lane knobs are untouched. False for a bad index.
    bool ApplyPattern(int groove, int part);
+   // Turbo 0.50: replaces the pattern with the drum notes of a Standard MIDI
+   // File (GM drum map onto the 8 lanes, see GmDrumLane in the .cpp),
+   // quantised to 16ths (or 16th triplets when the file is clearly on that
+   // grid), length from the file rounded to whole bars (leading empty bars
+   // dropped, at most kMaxSteps), swing estimated from late off-beats,
+   // bars through the time signature map with a pickup bar dropped (the
+   // analysis is DrumMidi::Analyze, shared with the MIDI folder browser),
+   // velocity >= 100 as an accent (1.0). Samples and lane knobs are untouched;
+   // the library groove name is cleared. Returns false with `message` set
+   // when the file has no usable drum notes; on success `message` is a short
+   // summary for the UI / MCP. Undo checkpoints are the caller's.
+   bool ImportMidiFile(const std::string& path, std::string& message);
+   bool ImportMidiData(const MidiFile::Data& data, const std::string& name, std::string& message);
+   std::string importStatus; // last import / preset message for the body, not saved
+
+   // ---- Turbo 0.50: parts that keep user edits, and user presets ---------
+   // The grid (stepVel / numSteps) is always the live part, `patternPart`.
+   // The other two parts live in `parts`: switching part stores the grid in
+   // its slot and loads the target slot, so edits survive A -> B -> A.
+   // A slot never filled yet comes from the library groove (or, with no
+   // groove, starts as a copy of the grid). Rate and swing are global: a
+   // part switch never touches them (before 0.50 it re-applied the groove's
+   // rate and swing, losing what the user had set).
+   struct Part
+   {
+      bool filled = false;
+      int steps = 16;
+      float vel[kNumLanes][kMaxSteps] = {};
+   };
+   Part parts[3];
+   // Edits of grooves left behind, by groove name ("" = the manual pattern),
+   // so picking another groove and coming back restores them. Saved.
+   struct GrooveStash
+   {
+      Part parts[3];
+      int part = 0;
+      int rate = 12;
+      float swing = 0.0f;
+      float accentPitch[kNumLanes] = {};
+   };
+   std::map<std::string, GrooveStash> grooveStash;
+   std::string presetName; // last preset loaded / saved (saved, display only)
+
+   // Switches the live part (0 A, 1 B, 2 C) keeping every part's edits.
+   void SwitchPart(int part);
+   // Picks library groove `groove` at part `part`: same groove = SwitchPart;
+   // else stashes the current groove's edits and restores the new groove's
+   // stash, or loads it fresh from the library (rate and swing included).
+   // `fresh` drops any stash of that groove first. False for a bad index.
+   bool SelectGroove(int groove, int part, bool fresh = false);
+   // Reloads the live part from the library groove (no-op without one).
+   bool RevertPart();
+   // Library groove index of patternName, -1 if none.
+   int GrooveIndex() const;
+
+   // ---- Turbo 0.50: grooves from the user's MIDI folder ------------------
+   // (DrumMidiLibrary: %LOCALAPPDATA%\Infinite\DrumPatterns). A MIDI groove
+   // is patternName "midi:<path>", so its edits and stash work like a
+   // library groove's, keyed by the file path. Picking one reads the file:
+   // part A is the first chunk of bars that fits kMaxSteps, B and C the next
+   // distinct chunks (copies of A for a short file); rate and swing come
+   // from the import; accents are velocity only. The tempo is not changed.
+   // False (node untouched) with `message` set when the file is unusable;
+   // on success `message` describes the parts and the original bpm.
+   static constexpr const char* kMidiPrefix = "midi:";
+   bool SelectMidiGroove(const std::string& path, int part, bool fresh, std::string& message);
+   bool IsMidiGroove() const { return patternName.rfind(kMidiPrefix, 0) == 0; }
+   std::string MidiGroovePath() const { return IsMidiGroove() ? patternName.substr(5) : std::string(); }
+   // Original bpm of the current MIDI groove's file (0 unknown / not loaded).
+   int MidiGrooveBpm() const;
+
+   // User presets: JSON files in %LOCALAPPDATA%\Infinite\DrumPresets
+   // holding all three parts, live part, rate, swing and accent pitch.
+   static std::string PresetDirectory();
+   static std::vector<std::string> ListPresets();
+   bool SavePreset(const std::string& name, std::string& error);
+   bool LoadPreset(const std::string& name, std::string& error);
+
    // Turbo: loads the bundled kit (one file per lane, DrumPatterns::KitFile)
    // into every lane that has no sample. Returns how many lanes it filled.
    int LoadKitIntoEmptyLanes(const std::string& kitDir);
@@ -186,6 +270,33 @@ public:
    float laneCardCanvasY1[kNumLanes] = {};
 
 private:
+   struct MidiCache; // the analysed MIDI groove file (parts, rate, swing, info)
+   std::unique_ptr<MidiCache> mMidi;
+   bool LoadMidiCache(const std::string& path, bool reload, std::string& message);
+   // The groove's own version of `part`: the library groove, or the MIDI
+   // groove's file. False with neither (a manual, imported or preset pattern).
+   bool SourcePart(int part, Part& out);
+   // Restores the stashed edits of groove `name` at `part`; false without a stash.
+   bool RestoreStash(const std::string& name, int part);
+   void StoreLivePart();
+   void LoadLivePart(const Part& part);
+   bool LibraryPart(int groove, int part, Part& out) const;
+   void MaterializeParts(); // fills every empty slot (library or a copy of the grid)
+   void StashCurrent();
+   std::string SerializeParts() const;
+   void DeserializeParts(const std::string& blob);
+   std::string SerializePartsUncached() const;
+   // SerializeParts runs on every VisitParams (the Performance panel reads
+   // node bools through it each frame), so the JSON is cached against a
+   // copy of its inputs and a stash revision.
+   mutable std::string mBlobCache;
+   mutable bool mBlobValid = false;
+   mutable Part mBlobParts[3];
+   mutable float mBlobLive[kNumLanes][kMaxSteps] = {};
+   mutable int mBlobNumSteps = -1, mBlobPart = -1;
+   mutable unsigned int mBlobStashRev = 0;
+   unsigned int mStashRev = 1;
+
    static int Clamp(int lane) { return lane < 0 ? 0 : (lane >= kNumLanes ? kNumLanes - 1 : lane); }
 
    void FinishLaneBuffer(int lane, Platform::SampleBuffer* decoded, const std::string& fileName,

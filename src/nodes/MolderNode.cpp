@@ -613,7 +613,13 @@ bool MolderNode::LoadFile(const std::string& path)
 void MolderNode::ReloadFromPath()
 {
    if (!mFilePath.empty())
+   {
+      // Turbo 0.50: keep the saved trim across the reload (same as Sampler).
+      const float savedStart = start, savedEnd = end;
       LoadFile(mFilePath);
+      start = savedStart;
+      end = savedEnd;
+   }
 }
 
 void MolderNode::StartRecording()

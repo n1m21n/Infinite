@@ -1,5 +1,73 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.50.0-turbo (2026-10-06)
+
+### Quantized restart on sequencers
+- **Chord Progression, Note Sequencer, Arpeggiator and MIDI File** get a mappable **restart**
+  button and a **restart q** setting (immediate, next beat, next bar, 2 bars, 4 bars; default next
+  bar). The sequence starts again from step 1 / chord 1 on the grid line. A blinking dot shows a
+  restart waiting. Map it to MIDI, CV or a Performance button.
+- Chord Progression now lands chord changes on the real block start (they were one audio block late).
+
+### Chord names spelled out
+- Qualities read **MAJ / MIN** in the all-caps UI: C MAJ, A MIN, A MIN7, C MAJ7, B DIM, C AUG,
+  C SUS4. Plain numbers stay (C7, C9). Long names wrap root over quality.
+
+### Note Switcher
+- **8 inputs** (the **inputs** setting shows 2-8 pins; old patches keep 4).
+- **switch q**: in manual mode a slot change waits for the next beat / bar / 2 / 4 bars and lands on
+  the exact sample. Pending slot shows in amber.
+- **slot 1..8** buttons (mappable) pick a slot and turn manual on.
+
+### Scenes node (Macros): one button, several changes
+- A radio-button scene launcher: up to 8 scenes x 8 outputs, cabled to any params. Entering a
+  scene sets every output to that row, so what is ON in another scene and OFF here switches off.
+- Output modes: **on/off** (default: mutes, switches), **choice** (switcher slot, drum part:
+  follows the cabled dropdown), **level** (0..1), **pulse** (a trigger on entry: restarts).
+- **Off row** on top of the grid: pressing the playing scene again goes there (option), plus a
+  mappable **all off**. **q** quantizes every change; the queued scene blinks.
+- **scene 1..8**, prev / next and the selector are mappable; a Performance button bound to a
+  scene lights while that scene plays.
+- Performance Mode: right-click a control, **+ Add Another Parameter...** to drive several params
+  with one control. MCP: new `scenes` tool, `perf_add` with `element`.
+
+### MIDI channels
+- **MIDI Notes**: channel is a dropdown (omni, ch 1-16), a **learn** button takes the channel of the
+  next note, and "last note in: ch N" shows what arrives (marked when filtered out). Example:
+  MiniLab keys on ch 1, pads on ch 7, one MIDI Notes per channel.
+- MIDI CC and MIDI Trigger get a channel dropdown; MIDI Trigger no longer fires when edited.
+
+### Drum Sequencer
+- **Import .mid**: button, drag and drop, or MCP. GM drum notes go to the 8 lanes, quantized to 16ths
+  (swing or triplets detected), bars from the file, velocity 100+ as accent, into the live part.
+- **Rate and swing stay** when switching A / B / C.
+- **Edits are kept** per part and per groove; **revert** reloads the library part.
+- **Your MIDI folder**: .mid files in `%LOCALAPPDATA%\Infinite\DrumPatterns` (subfolders, or an
+  index.json with title, style, bpm) join the matching library group by style (electro-funk in
+  Electronic, r-b in Funk & Breaks), tagged MIDI; unmatched styles get a "MIDI: <style>" group. A / B / C are
+  the file's first distinct 8-bar chunks; the tempo is not changed. Rescan / open folder in the menu.
+- **User presets**: save / load by name (all parts, rate, swing) in `%LOCALAPPDATA%\Infinite\DrumPresets`.
+- Lane trims survive patch load, undo and paste.
+
+### Super Mixer master
+- Stereo **VU** (peak, RMS, peak hold, clip LEDs), **master pan** and **MUTE** (click-free).
+- **Mastering chain** with a bypass each (all off by default): 3-band EQ, glue compressor,
+  stereo width, saturation and a mastering limiter, with gain-reduction meters.
+- **Limiter**: true-peak (4x oversampled) ceiling in dBTP, lookahead 0.5-5 ms with a smooth
+  attack, auto release (fast for transients, slow for dense material), stereo link, styles
+  (transparent, punchy, loud), GR history. Its lookahead is reported to delay compensation;
+  with the limiter off there is no delay.
+
+### Visuals
+- **Slideshow**: mappable restart / prev / next.
+- **VMPC**: transition styles between clips (the Slideshow set) and transition time; default Cut.
+
+### Other
+- New nodes always appear in front of existing ones.
+- **Equation Synth**: 30 new presets (pads, plucks, basses, bells, leads, organs, percussion,
+  drones), grouped by category, with envelope, filter, unison and drive.
+- Grain Molder saves its sample file in the patch (it reopened empty before).
+
 ## 0.49.0-turbo (2026-10-03)
 
 ### Waveforms you can trim by eye

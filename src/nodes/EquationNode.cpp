@@ -31,7 +31,72 @@ namespace
       { "Pulse Width Morph", "if(x < a, 1, -1)", EquationDsp::kDomainZeroToOne, 0.5f, 0.0f, 0.0f, 0.0f },
       { "Formant Vowel Peak", "sin(2*pi*x) * exp(-a*25 * (x - b)^2)", EquationDsp::kDomainZeroToOne, 0.5f, 0.5f, 0.0f, 0.0f },
       { "Fold / Tangent Warp", "tan(x * pi * a * 0.96)", EquationDsp::kDomainNegOneToOne, 0.75f, 0.0f, 0.0f, 0.0f },
-      { "Sawtooth Morph", "(x - floor(x)) * 2 - 1 + a * sin(2*pi*b*x)", EquationDsp::kDomainZeroToOne, 0.0f, 1.0f, 0.0f, 0.0f }
+      { "Sawtooth Morph", "(x - floor(x)) * 2 - 1 + a * sin(2*pi*b*x)", EquationDsp::kDomainZeroToOne, 0.0f, 1.0f, 0.0f, 0.0f },
+      // Turbo 0.50: timbre presets, appended (saved patches store the preset
+      // index). Each is one cycle, so the character comes from the spectrum
+      // plus the voice settings (amp envelope, filter, unison, drive).
+      // Voice: { set, attack, decay, sustain, release (ms), filterType,
+      // cutoff, resonance, unison, detune (cents), drive }.
+      { "Warm Pad", "sin(2*pi*x) / (1 - 2*(0.3+a*0.6)*cos(2*pi*x) + (0.3+a*0.6)^2)", EquationDsp::kDomainZeroToOne, 0.45f, 0.0f, 0.0f, 0.0f,
+        "Pads", { true, 600.0f, 1500.0f, 0.8f, 1500.0f, 2, 3200.0f, 0.15f, 4, 14.0f, 0.0f } },
+      { "Choir Pad", "sin(2*pi*x) + 0.5*sin(4*pi*x) + (0.4+a*0.4)*sin(10*pi*x) + (0.3+a*0.3)*sin(12*pi*x) + b*0.3*sin(22*pi*x)", EquationDsp::kDomainZeroToOne, 0.5f, 0.4f, 0.0f, 0.0f,
+        "Pads", { true, 800.0f, 1800.0f, 0.85f, 2000.0f, 1, 5000.0f, 0.1f, 5, 18.0f, 0.0f } },
+      { "Glass Pad", "sin(2*pi*x) + a*0.45*sin(10*pi*x) + 0.25*sin(18*pi*x) + b*0.2*sin(26*pi*x)", EquationDsp::kDomainZeroToOne, 0.6f, 0.5f, 0.0f, 0.0f,
+        "Pads", { true, 1200.0f, 2000.0f, 0.75f, 2500.0f, 1, 9000.0f, 0.1f, 3, 9.0f, 0.0f } },
+      { "PWM Strings", "saw(x) - saw(x + 0.2 + a*0.3)", EquationDsp::kDomainZeroToOne, 0.4f, 0.0f, 0.0f, 0.0f,
+        "Pads", { true, 450.0f, 1200.0f, 0.85f, 1100.0f, 2, 4500.0f, 0.1f, 6, 20.0f, 0.0f } },
+      { "Plucked String", "sin(1*pi*(0.12+a*0.38))*sin(2*pi*x) + sin(2*pi*(0.12+a*0.38))/4*sin(4*pi*x) + sin(3*pi*(0.12+a*0.38))/9*sin(6*pi*x) + sin(4*pi*(0.12+a*0.38))/16*sin(8*pi*x) + sin(5*pi*(0.12+a*0.38))/25*sin(10*pi*x) + sin(6*pi*(0.12+a*0.38))/36*sin(12*pi*x) + sin(7*pi*(0.12+a*0.38))/49*sin(14*pi*x) + sin(8*pi*(0.12+a*0.38))/64*sin(16*pi*x)", EquationDsp::kDomainZeroToOne, 0.2f, 0.0f, 0.0f, 0.0f,
+        "Plucks & Keys", { true, 1.0f, 700.0f, 0.0f, 350.0f, 2, 3500.0f, 0.1f, 1, 12.0f, 0.0f } },
+      { "Saw Pluck", "saw(x) + a*0.5*saw(2*x)", EquationDsp::kDomainZeroToOne, 0.3f, 0.0f, 0.0f, 0.0f,
+        "Plucks & Keys", { true, 1.0f, 450.0f, 0.0f, 250.0f, 2, 1800.0f, 0.3f, 2, 8.0f, 0.0f } },
+      { "Marimba", "sin(2*pi*x) + a*0.5*sin(8*pi*x) + b*0.2*sin(20*pi*x)", EquationDsp::kDomainZeroToOne, 0.6f, 0.4f, 0.0f, 0.0f,
+        "Plucks & Keys", { true, 1.0f, 650.0f, 0.0f, 400.0f, 0, 12000.0f, 0.2f, 1, 12.0f, 0.0f } },
+      { "Harp", "tri(x + 0.25) + a*0.35*sin(4*pi*x) + b*0.15*sin(6*pi*x)", EquationDsp::kDomainZeroToOne, 0.5f, 0.3f, 0.0f, 0.0f,
+        "Plucks & Keys", { true, 2.0f, 1400.0f, 0.0f, 900.0f, 1, 6000.0f, 0.1f, 1, 12.0f, 0.0f } },
+      { "FM Electric Piano", "sin(2*pi*x + (0.4+a*2)*sin(2*pi*x)) + b*0.25*sin(28*pi*x)", EquationDsp::kDomainZeroToOne, 0.4f, 0.5f, 0.0f, 0.0f,
+        "Plucks & Keys", { true, 2.0f, 1800.0f, 0.25f, 500.0f, 1, 7000.0f, 0.1f, 1, 12.0f, 0.0f } },
+      { "Sub Bass", "sin(2*pi*x) + a*0.3*sin(4*pi*x)", EquationDsp::kDomainZeroToOne, 0.2f, 0.0f, 0.0f, 0.0f,
+        "Basses", { true, 3.0f, 200.0f, 0.9f, 120.0f, 1, 900.0f, 0.1f, 1, 12.0f, 0.1f } },
+      { "Reese Bass", "saw(x)*(1 - a*0.5) + a*0.5*sqr(x)", EquationDsp::kDomainZeroToOne, 0.3f, 0.0f, 0.0f, 0.0f,
+        "Basses", { true, 5.0f, 400.0f, 0.85f, 150.0f, 2, 1300.0f, 0.2f, 3, 25.0f, 0.25f } },
+      { "Acid Bass", "saw(x) - b*0.5*sqr(x)", EquationDsp::kDomainZeroToOne, 0.0f, 0.3f, 0.0f, 0.0f,
+        "Basses", { true, 2.0f, 300.0f, 0.6f, 80.0f, 2, 700.0f, 0.7f, 1, 12.0f, 0.2f } },
+      { "FM Bass", "sin(2*pi*x + (1+a*4)*sin(2*pi*x))", EquationDsp::kDomainZeroToOne, 0.4f, 0.0f, 0.0f, 0.0f,
+        "Basses", { true, 2.0f, 350.0f, 0.6f, 120.0f, 1, 2500.0f, 0.1f, 1, 12.0f, 0.1f } },
+      { "Growl Bass", "sin(2*pi*x + a*6*sin(4*pi*x) + b*3*sin(6*pi*x))", EquationDsp::kDomainZeroToOne, 0.5f, 0.4f, 0.0f, 0.0f,
+        "Basses", { true, 4.0f, 300.0f, 0.8f, 120.0f, 2, 1800.0f, 0.3f, 2, 10.0f, 0.3f } },
+      { "FM Bell (1:7)", "sin(2*pi*x + (0.5+a*4)*sin(14*pi*x))", EquationDsp::kDomainZeroToOne, 0.3f, 0.0f, 0.0f, 0.0f,
+        "Bells & FM", { true, 1.0f, 2600.0f, 0.0f, 2200.0f, 0, 12000.0f, 0.2f, 1, 12.0f, 0.0f } },
+      { "Tubular Chime", "sin(2*pi*x) + 0.6*sin(4*pi*x + 1) + 0.5*sin(6*pi*x + 2) + a*0.45*sin(10*pi*x) + b*0.35*sin(16*pi*x) + 0.2*sin(22*pi*x)", EquationDsp::kDomainZeroToOne, 0.6f, 0.5f, 0.0f, 0.0f,
+        "Bells & FM", { true, 1.0f, 3000.0f, 0.0f, 2500.0f, 1, 9000.0f, 0.1f, 1, 12.0f, 0.0f } },
+      { "Metallic FM (1:11)", "sin(2*pi*x + a*4*sin(22*pi*x) + b*2*sin(6*pi*x))", EquationDsp::kDomainZeroToOne, 0.5f, 0.3f, 0.0f, 0.0f,
+        "Bells & FM", { true, 1.0f, 1500.0f, 0.1f, 1200.0f, 1, 8000.0f, 0.1f, 1, 12.0f, 0.0f } },
+      { "Kalimba", "sin(2*pi*x) + a*0.4*sin(12*pi*x) + b*0.15*sin(34*pi*x)", EquationDsp::kDomainZeroToOne, 0.5f, 0.4f, 0.0f, 0.0f,
+        "Bells & FM", { true, 1.0f, 900.0f, 0.0f, 600.0f, 0, 12000.0f, 0.2f, 1, 12.0f, 0.0f } },
+      { "Hard Sync Lead", "sin(2*pi*(1 + a*7)*x)", EquationDsp::kDomainZeroToOne, 0.4f, 0.0f, 0.0f, 0.0f,
+        "Leads", { true, 5.0f, 400.0f, 0.8f, 250.0f, 1, 6000.0f, 0.2f, 2, 10.0f, 0.15f } },
+      { "Supersaw Lead", "saw(x) + a*0.4*saw(2*x)", EquationDsp::kDomainZeroToOne, 0.2f, 0.0f, 0.0f, 0.0f,
+        "Leads", { true, 8.0f, 400.0f, 0.85f, 350.0f, 2, 7000.0f, 0.15f, 7, 32.0f, 0.0f } },
+      { "8-bit Triangle", "round(tri(x)*(2 + floor(a*6))) / (2 + floor(a*6))", EquationDsp::kDomainZeroToOne, 0.5f, 0.0f, 0.0f, 0.0f,
+        "Leads", { true, 2.0f, 200.0f, 0.9f, 80.0f, 0, 12000.0f, 0.2f, 1, 12.0f, 0.0f } },
+      { "Brass", "sin(2*pi*x) / (1 - 2*(0.6+a*0.3)*cos(2*pi*x) + (0.6+a*0.3)^2)", EquationDsp::kDomainZeroToOne, 0.5f, 0.0f, 0.0f, 0.0f,
+        "Leads", { true, 40.0f, 500.0f, 0.8f, 250.0f, 2, 2200.0f, 0.15f, 2, 8.0f, 0.1f } },
+      { "Drawbar Organ", "sin(2*pi*x) + a*sin(4*pi*x) + b*sin(6*pi*x) + c*sin(8*pi*x) + d*sin(12*pi*x) + 0.3*sin(16*pi*x)", EquationDsp::kDomainZeroToOne, 0.8f, 0.6f, 0.5f, 0.3f,
+        "Organs", { true, 3.0f, 50.0f, 1.0f, 40.0f, 0, 12000.0f, 0.2f, 1, 12.0f, 0.05f } },
+      { "Reed Organ", "0.7*if(x < 0.33, 1, -1) + 0.3*sin(2*pi*x) + a*0.2*sin(10*pi*x)", EquationDsp::kDomainZeroToOne, 0.4f, 0.0f, 0.0f, 0.0f,
+        "Organs", { true, 60.0f, 200.0f, 0.95f, 150.0f, 1, 3500.0f, 0.1f, 2, 6.0f, 0.0f } },
+      { "Hashed Noise", "2*(sin(floor(x*(32+a*480))*12.9898)*43758.5453 - floor(sin(floor(x*(32+a*480))*12.9898)*43758.5453)) - 1", EquationDsp::kDomainZeroToOne, 0.6f, 0.0f, 0.0f, 0.0f,
+        "Percussive & Noise", { true, 0.0f, 140.0f, 0.0f, 90.0f, 3, 700.0f, 0.1f, 1, 12.0f, 0.0f } },
+      { "Metal Clang", "sin(2*pi*x + 3*sin(26*pi*x) + b*2*sin(58*pi*x)) * (0.6 + a*0.4)", EquationDsp::kDomainZeroToOne, 1.0f, 0.5f, 0.0f, 0.0f,
+        "Percussive & Noise", { true, 0.0f, 400.0f, 0.0f, 300.0f, 3, 500.0f, 0.2f, 1, 12.0f, 0.0f } },
+      { "Bitcrushed Saw", "floor(saw(x)*(2 + a*14)) / (2 + a*14)", EquationDsp::kDomainZeroToOne, 0.2f, 0.0f, 0.0f, 0.0f,
+        "Percussive & Noise", { true, 1.0f, 250.0f, 0.0f, 150.0f, 2, 5000.0f, 0.3f, 1, 12.0f, 0.2f } },
+      { "Drone Cluster", "sin(2*pi*x) + 0.7*sin(4*pi*x + a*3) + 0.5*sin(6*pi*x) + 0.4*sin(10*pi*x + b*2) + 0.35*sin(14*pi*x) + 0.25*sin(18*pi*x)", EquationDsp::kDomainZeroToOne, 0.3f, 0.6f, 0.0f, 0.0f,
+        "Drones & Textures", { true, 2500.0f, 3000.0f, 0.9f, 4000.0f, 2, 2500.0f, 0.25f, 8, 8.0f, 0.1f } },
+      { "Shimmer", "0.4*sin(2*pi*x) + 0.5*sin(16*pi*x + a*6) + b*0.4*sin(24*pi*x) + 0.3*sin(32*pi*x + c*6) + 0.2*sin(48*pi*x)", EquationDsp::kDomainZeroToOne, 0.4f, 0.6f, 0.3f, 0.0f,
+        "Drones & Textures", { true, 1500.0f, 3000.0f, 0.8f, 3500.0f, 3, 400.0f, 0.1f, 8, 40.0f, 0.0f } },
+      { "Wavefolder", "sin((1 + a*8)*sin(2*pi*x) + b*3*sin(6*pi*x))", EquationDsp::kDomainZeroToOne, 0.4f, 0.2f, 0.0f, 0.0f,
+        "Drones & Textures", { true, 300.0f, 1500.0f, 0.8f, 1500.0f, 2, 4000.0f, 0.2f, 3, 12.0f, 0.0f } }
    };
 
    const std::vector<std::string> kDomainNames = {
@@ -81,6 +146,17 @@ const std::vector<std::string>& EquationNode::PresetNames()
          sNames.push_back(p.name);
    }
    return sNames;
+}
+
+const std::vector<std::string>& EquationNode::PresetCategories()
+{
+   static std::vector<std::string> sCategories;
+   if (sCategories.empty())
+   {
+      for (const auto& p : kPresets)
+         sCategories.push_back(p.category);
+   }
+   return sCategories;
 }
 
 const std::vector<std::string>& EquationNode::DomainNames() { return kDomainNames; }
@@ -564,6 +640,20 @@ void EquationNode::LoadPreset(int index)
    knobB = p.b;
    knobC = p.c;
    knobD = p.d;
+   if (p.voice.set)
+   {
+      const PresetVoice& v = p.voice;
+      ampAttack = v.ampAttack;
+      ampDecay = v.ampDecay;
+      ampSustain = v.ampSustain;
+      ampRelease = v.ampRelease;
+      filterType = v.filterType;
+      cutoff = v.cutoff;
+      resonance = v.resonance;
+      unison = v.unison;
+      detune = v.detune;
+      drive = v.drive;
+   }
    CompileEquation();
    RebuildBank();
 }

@@ -46,6 +46,14 @@ public:
    {
       if (paramName.rfind("eqMidFreq", 0) == 0)
          return { { "eqMid" + paramName.substr(9), 12.0f } };
+      // Turbo 0.50: limiter settings only act with the limiter in and
+      // working, so switch it in with a low ceiling first.
+      if (paramName.rfind("fxLim", 0) == 0 && paramName != "fxLimOn")
+      {
+         if (paramName == "fxLimCeilingDb")
+            return { { "fxLimOn", 1.0f } };
+         return { { "fxLimOn", 1.0f }, { "fxLimCeilingDb", -24.0f } };
+      }
       return {};
    }
 
@@ -64,9 +72,68 @@ public:
    float masterDb = 0.0f;
    AudioCable inputs[kChannels];
 
+   // Turbo 0.50: master bus. Defaults reproduce the pre-0.50 output exactly
+   // (balance centred, unmuted, every FX stage off). Saved after `master`.
+   float masterPan = 0.0f;  // balance, -1..1 (equal-power, unity at centre)
+   bool masterMute = false; // 10 ms ramp, click-free
+   bool fxOpen = false;     // UI only: master FX area expanded
+   bool fxEqOn = false;
+   float fxEqLowHz = 100.0f, fxEqLowDb = 0.0f;
+   float fxEqMidHz = 1000.0f, fxEqMidDb = 0.0f, fxEqMidQ = 0.7f;
+   float fxEqHighHz = 10000.0f, fxEqHighDb = 0.0f;
+   bool fxCompOn = false;
+   float fxCompThreshDb = -12.0f, fxCompRatio = 2.0f, fxCompAttackMs = 10.0f, fxCompReleaseMs = 200.0f,
+         fxCompMakeupDb = 0.0f;
+   bool fxWidthOn = false;
+   float fxWidth = 1.0f;
+   bool fxSatOn = false;
+   float fxSatDriveDb = 6.0f, fxSatMix = 1.0f, fxSatOutDb = 0.0f;
+   bool fxLimOn = false;
+   float fxLimCeilingDb = -0.3f, fxLimReleaseMs = 100.0f;
+   // Turbo 0.50: limiter v2 (saved after fxLimReleaseMs). Lookahead applies
+   // once the knob has rested 0.25 s (it changes the reported latency).
+   float fxLimLookaheadMs = 1.5f; // 0.5..5
+   float fxLimLink = 100.0f;      // stereo link, %
+   bool fxLimTruePeak = true;     // 4x oversampled inter-sample peak detection
+   bool fxLimAutoRelease = true;  // program-dependent dual-stage release
+   int fxLimStyle = 0;            // 0 transparent, 1 punchy, 2 loud
+
+   // Turbo 0.50: master meter state for the UI, refreshed in CookIfNeeded.
+   // Ballistics live here (main thread): the audio thread only reports
+   // "max since last read" peaks, a 300 ms RMS and clip flags.
+   struct MasterMeter
+   {
+      float peakDb[2] = { -120.0f, -120.0f }; // falls at 24 dB/s
+      float holdDb[2] = { -120.0f, -120.0f }; // held 1.5 s, then falls
+      float holdAge[2] = {};
+      float rmsDb[2] = { -120.0f, -120.0f };
+      bool clip[2] = {};                      // latched until clicked
+      float compGrDb = 0.0f, limGrDb = 0.0f;  // positive dB, fast attack / 20 dB/s fall
+      // Turbo 0.50: limiter GR history (max per ~33 ms step, oldest first
+      // from grHistPos) and safety-clamp engagements since the last reset.
+      static constexpr int kGrHist = 96;
+      float grHist[kGrHist] = {};
+      int grHistPos = 0;
+      float grHistAcc = 0.0f, grHistTime = 0.0f;
+      unsigned limClamps = 0;
+   };
+   const MasterMeter& Meter() const { return mMeter; }
+   void ClearClip() { mMeter.clip[0] = mMeter.clip[1] = false; }
+   void ClearLimClamps() { mMeter.limClamps = 0; }
+
+   // Turbo 0.50: the lookahead the audio thread runs with (quantised to
+   // 0.1 ms, applied after the knob rests) and the limiter's latency in ms
+   // at the current rate (what it adds while switched in).
+   float LimLookaheadApplied() const;
+   float LimLatencyMs() const;
+
 private:
    std::unique_ptr<AudioSuperMixerNode> mAudioNode;
    int mLastCookFrame = -1;
    float mLevel = 0.0f;
    float mChannelLevel[kChannels] = {};
+   MasterMeter mMeter;
+   double mLastMeterTime = -1.0;
+   float mLookApplied = -1.0f, mLookPending = -1.0f;
+   double mLookPendingSince = 0.0, mLookAppliedAt = -1.0e9;
 };

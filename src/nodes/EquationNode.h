@@ -21,17 +21,33 @@ public:
    static constexpr int kMaxUnison = 8;
    static constexpr int kScopeCapacity = 128;
 
+   // Turbo 0.50: optional voice settings a preset applies along with its
+   // formula (only controls the node shows). The original presets leave
+   // `set` false and keep the user's envelope/filter untouched, as before.
+   struct PresetVoice
+   {
+      bool set = false;
+      float ampAttack = 5.0f, ampDecay = 250.0f, ampSustain = 0.75f, ampRelease = 200.0f;
+      int filterType = 1;
+      float cutoff = 12000.0f, resonance = 0.2f;
+      int unison = 1;
+      float detune = 12.0f, drive = 0.0f;
+   };
+
    struct Preset
    {
       const char* name;
       const char* formula;
       int domainMode;
       float a, b, c, d;
+      const char* category = "Math"; // Turbo 0.50: dropdown group
+      PresetVoice voice = {};
    };
 
    static INode* Create() { return new EquationNode(); }
    static const std::vector<Preset>& Presets();
    static const std::vector<std::string>& PresetNames();
+   static const std::vector<std::string>& PresetCategories(); // Turbo 0.50
    static const std::vector<std::string>& DomainNames();
    static const std::vector<std::string>& FilterTypeNames();
 

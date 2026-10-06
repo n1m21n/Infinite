@@ -33,6 +33,18 @@ nlohmann::json RpcPerfElementJson(size_t i)
          j["param_y"] = p2 != nullptr ? nlohmann::json(p2->name) : nlohmann::json(e.dstParam2);
       }
    }
+   // Turbo 0.50: extra destinations driven with the same value / bang.
+   if (!e.targets.empty())
+   {
+      nlohmann::json extra = nlohmann::json::array();
+      for (const Patch::PerfTarget& t : e.targets)
+      {
+         const ParamRef* p = Modulation::Instance().KnownParam(t.dstIndex, t.dstParam);
+         extra.push_back({ { "node", t.dstIndex },
+                           { "param", !t.boolName.empty() ? nlohmann::json(t.boolName) : p != nullptr ? nlohmann::json(p->name) : nlohmann::json(t.dstParam) } });
+      }
+      j["extra_targets"] = extra;
+   }
    if (e.midiDevice != 0)
       j["midi"] = std::string(e.midiIsNote ? "note " : "cc ") + std::to_string(e.midiController) +
                   " ch " + std::to_string(e.midiChannel + 1);
@@ -365,24 +377,138 @@ bool HandleRpcCommandTurbo(const std::string& method, const nlohmann::json& para
       // lanes get the bundled kit unless kit is false). part: A / B / C.
       int count = 0;
       const DrumPatterns::Groove* all = DrumPatterns::All(count);
+      // Turbo 0.50: the user's MIDI folder. The UI scans it in the
+      // background; before the first scan finished, a quick listing (files
+      // and index.json, no file reads) answers this call.
+      if (params.value("rescan", false))
+         DrumMidi::RequestScan();
+      else
+         DrumMidi::EnsureScanned();
+      std::shared_ptr<const DrumMidi::Library> midiLib = DrumMidi::Current();
+      if (!midiLib->scanned)
+         midiLib = std::make_shared<DrumMidi::Library>(DrumMidi::Scan(DrumMidi::DefaultFolder(), false));
+      // Turbo 0.50: presets, .mid import and part switching, each on a node.
+      if (params.value("list_presets", false))
+      {
+         outResult = { { "presets", DrumSequencerNode::ListPresets() },
+                       { "folder", DrumSequencerNode::PresetDirectory() } };
+         return true;
+      }
+      if (params.contains("import") || params.contains("save_preset") || params.contains("load_preset") ||
+          (params.contains("part") && !params.contains("pattern") && params.contains("index")))
+      {
+         GraphNode* tgn = FindNodeByIndex(params.value("index", -1));
+         auto* d = tgn ? dynamic_cast<DrumSequencerNode*>(tgn->node.get()) : nullptr;
+         if (d == nullptr)
+         {
+            outError = "index is not a Drum Sequencer node";
+            return false;
+         }
+         auto partOf = [](const json& pv) {
+            if (pv.is_number())
+               return (int)std::lround(pv.get<double>());
+            if (pv.is_string() && !pv.get<std::string>().empty())
+            {
+               const char ch = (char)std::toupper((unsigned char)pv.get<std::string>()[0]);
+               return ch == 'A' || ch == '0' ? 0 : (ch == 'B' || ch == '1' ? 1 : (ch == 'C' || ch == '2' ? 2 : -1));
+            }
+            return -1;
+         };
+         std::string msg;
+         if (params.contains("save_preset"))
+         {
+            if (!params["save_preset"].is_string() || !d->SavePreset(params["save_preset"].get<std::string>(), msg))
+            {
+               outError = msg.empty() ? "save_preset: a name" : msg;
+               return false;
+            }
+            outResult = { { "saved", d->presetName }, { "folder", DrumSequencerNode::PresetDirectory() } };
+            return true;
+         }
+         PushUndoCheckpoint();
+         if (params.contains("load_preset"))
+         {
+            if (!params["load_preset"].is_string() || !d->LoadPreset(params["load_preset"].get<std::string>(), msg))
+            {
+               outError = msg.empty() ? "load_preset: a name from list_presets" : msg;
+               return false;
+            }
+            if (params.value("kit", true))
+               d->LoadKitIntoEmptyLanes(TurboDrumKitDir());
+            msg = "preset loaded: " + d->presetName;
+            d->importStatus = msg;
+         }
+         if (params.contains("part"))
+         {
+            const int part = partOf(params["part"]);
+            if (part < 0 || part > 2)
+            {
+               outError = "part: A, B or C (0-2)";
+               return false;
+            }
+            d->SwitchPart(part); // before an import, so the import lands in that part
+         }
+         if (params.contains("import"))
+         {
+            if (!params["import"].is_string() || !d->ImportMidiFile(params["import"].get<std::string>(), msg))
+            {
+               outError = msg.empty() ? "import: a .mid file path" : msg;
+               return false;
+            }
+         }
+         gPatchDirty = true;
+         outResult = { { "message", msg }, { "part", DrumPatterns::PartName(d->patternPart) },
+                       { "steps", d->numSteps }, { "rate", MusicTime::RateDivisionName(d->rate) },
+                       { "swing", d->swing } };
+         return true;
+      }
       if (!params.contains("pattern"))
       {
          const std::string onlyCat = params.contains("category") && params["category"].is_string()
                                         ? RpcNorm(params["category"].get<std::string>()) : std::string();
+         const std::string onlySource = params.value("source", std::string());
          json list = json::array();
-         for (int i = 0; i < count; i++)
+         for (int i = 0; i < count && onlySource != "midi"; i++)
          {
             if (!onlyCat.empty() && RpcNorm(all[i].category).find(onlyCat) == std::string::npos)
                continue;
-            list.push_back({ { "pattern", i }, { "category", all[i].category }, { "name", all[i].name },
-                             { "bpm", all[i].bpm },
+            list.push_back({ { "pattern", i }, { "source", "library" }, { "category", all[i].category },
+                             { "name", all[i].name }, { "bpm", all[i].bpm },
                              { "steps", { all[i].parts[0].steps, all[i].parts[1].steps, all[i].parts[2].steps } } });
+         }
+         // Turbo 0.50: the user's MIDI files ("MIDI: <style>"), loaded by path or name.
+         for (size_t e = 0; e < midiLib->entries.size() && onlySource != "library"; e++)
+         {
+            const DrumMidi::Entry& en = midiLib->entries[e];
+            // Folded into a built-in group by style, like the picker; else "MIDI: <style>".
+            int catCount = 0;
+            const char* const* cats = DrumPatterns::Categories(catCount);
+            const int ci = DrumPatterns::StyleToCategory(en.group);
+            const std::string cat = ci >= 0 && ci < catCount ? std::string(cats[ci]) : "MIDI: " + en.group;
+            if (!onlyCat.empty() && RpcNorm(cat).find(onlyCat) == std::string::npos &&
+                RpcNorm(en.group).find(onlyCat) == std::string::npos)
+               continue;
+            json row = { { "source", "midi" }, { "category", cat }, { "style", en.group }, { "name", en.title },
+                         { "path", en.path }, { "orig_bpm", en.bpm } };
+            if (en.bars > 0)
+               row["bars"] = en.bars;
+            if (en.empty)
+               row["empty"] = true;
+            if (en.unreadable)
+               row["unreadable"] = true;
+            list.push_back(row);
          }
          json lanes = json::array();
          for (int l = 0; l < 8; l++)
             lanes.push_back(DrumPatterns::LaneRole(l));
          outResult = { { "patterns", list }, { "lanes", lanes },
-                       { "parts", { "A verse", "B bridge", "C chorus (often 2 bars with a fill)" } } };
+                       { "parts", { "A verse", "B bridge", "C chorus (often 2 bars with a fill)" } },
+                       { "midi_folder", midiLib->root.empty() ? DrumMidi::DefaultFolder() : midiLib->root },
+                       { "midi_files", midiLib->entries.size() } };
+         if (!midiLib->error.empty())
+            outResult["midi_error"] = midiLib->error;
+         if (midiLib->truncated)
+            outResult["midi_truncated"] = true;
          return true;
       }
       GraphNode* gn = FindNodeByIndex(params.value("index", -1));
@@ -393,20 +519,71 @@ bool HandleRpcCommandTurbo(const std::string& method, const nlohmann::json& para
          return false;
       }
       int pick = -1;
+      std::string midiPath; // Turbo 0.50: a MIDI groove instead of a library one
       const json& want = params["pattern"];
-      if (want.is_number_integer())
+      const bool midiOnly = params.value("source", std::string()) == "midi";
+      if (want.is_number_integer() && !midiOnly)
          pick = want.get<int>();
       else if (want.is_string())
       {
-         const std::string w = RpcNorm(want.get<std::string>());
-         for (int i = 0; i < count && pick < 0; i++)
+         std::string raw = want.get<std::string>();
+         const bool prefixed = raw.rfind(DrumSequencerNode::kMidiPrefix, 0) == 0;
+         if (prefixed)
+            raw = raw.substr(5);
+         std::string lower = raw;
+         std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+         auto endsWith = [&](const char* sfx) {
+            const size_t n = strlen(sfx);
+            return lower.size() >= n && lower.compare(lower.size() - n, n, sfx) == 0;
+         };
+         // Library names hold slashes ("Calypso / soca"): a path is a .mid
+         // name, a "midi:" key, or an absolute path.
+         const bool isPath = prefixed || endsWith(".mid") || endsWith(".midi") ||
+                             (raw.size() > 2 && raw[1] == ':' && (raw[2] == '\\' || raw[2] == '/')) ||
+                             (!raw.empty() && (raw[0] == '/' || raw[0] == '\\'));
+         const std::string w = RpcNorm(raw);
+         if (isPath)
+         {
+            // A full path, or one relative to the MIDI folder.
+            std::filesystem::path pth = std::filesystem::u8path(raw);
+            if (pth.is_relative() && !midiLib->root.empty())
+               pth = std::filesystem::u8path(midiLib->root) / pth;
+            midiPath = pth.lexically_normal().u8string();
+            // A bare file name may sit in a subfolder: match the listing's tail.
+            std::error_code ec;
+            if (!std::filesystem::exists(pth, ec))
+            {
+               std::string wantTail = lower;
+               std::replace(wantTail.begin(), wantTail.end(), '\\', '/');
+               for (const DrumMidi::Entry& en : midiLib->entries)
+               {
+                  std::string tail = en.path;
+                  std::transform(tail.begin(), tail.end(), tail.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+                  std::replace(tail.begin(), tail.end(), '\\', '/');
+                  if (tail.size() > wantTail.size() && tail[tail.size() - wantTail.size() - 1] == '/' &&
+                      tail.compare(tail.size() - wantTail.size(), wantTail.size(), wantTail) == 0)
+                  {
+                     midiPath = en.path;
+                     break;
+                  }
+               }
+            }
+         }
+         // Library exact, MIDI exact, library partial, MIDI partial.
+         for (int i = 0; i < count && pick < 0 && midiPath.empty() && !midiOnly; i++)
             if (RpcNorm(all[i].name) == w)
                pick = i;
-         for (int i = 0; i < count && pick < 0; i++) // then a partial match
+         for (size_t e = 0; e < midiLib->entries.size() && pick < 0 && midiPath.empty(); e++)
+            if (RpcNorm(midiLib->entries[e].title) == w)
+               midiPath = midiLib->entries[e].path;
+         for (int i = 0; i < count && pick < 0 && midiPath.empty() && !midiOnly; i++) // then a partial match
             if (RpcNorm(all[i].name).find(w) != std::string::npos)
                pick = i;
+         for (size_t e = 0; e < midiLib->entries.size() && pick < 0 && midiPath.empty(); e++)
+            if (RpcNorm(midiLib->entries[e].title).find(w) != std::string::npos)
+               midiPath = midiLib->entries[e].path;
       }
-      if (pick < 0 || pick >= count)
+      if (midiPath.empty() && (pick < 0 || pick >= count))
       {
          outError = "unknown pattern (call drum_pattern without pattern for the list)";
          return false;
@@ -429,8 +606,31 @@ bool HandleRpcCommandTurbo(const std::string& method, const nlohmann::json& para
          outError = "part: A, B or C (0-2)";
          return false;
       }
+      if (!midiPath.empty())
+      {
+         // A bad file leaves the node untouched (the undo step is then a no-op).
+         PushUndoCheckpoint();
+         std::string msg;
+         if (!drum->SelectMidiGroove(midiPath, part, params.value("reset", false), msg))
+         {
+            outError = msg;
+            return false;
+         }
+         drum->browsingCategory = false;
+         int midiKit = 0;
+         if (params.value("kit", true))
+            midiKit = drum->LoadKitIntoEmptyLanes(TurboDrumKitDir());
+         gPatchDirty = true;
+         outResult = { { "source", "midi" }, { "path", drum->MidiGroovePath() },
+                       { "part", DrumPatterns::PartName(part) }, { "steps", drum->numSteps },
+                       { "rate", MusicTime::RateDivisionName(drum->rate) }, { "swing", drum->swing },
+                       { "orig_bpm", drum->MidiGrooveBpm() }, { "message", msg }, { "kit_lanes_loaded", midiKit } };
+         return true;
+      }
       PushUndoCheckpoint();
-      drum->ApplyPattern(pick, part);
+      // Turbo 0.50: like the picker, edits of each groove and part are kept;
+      // reset:true reloads the library groove.
+      drum->SelectGroove(pick, part, params.value("reset", false));
       int kitLanes = 0;
       if (params.value("kit", true))
          kitLanes = drum->LoadKitIntoEmptyLanes(TurboDrumKitDir());
@@ -465,6 +665,37 @@ bool HandleRpcCommandTurbo(const std::string& method, const nlohmann::json& para
          outError = "param not found among the node's drawn params (explain lists them; a brand-new node "
                     "needs a frame to draw - try again)";
          return false;
+      }
+      // Turbo 0.50: element = an existing control: add this param as one
+      // more destination of it (one button, several params).
+      if (params.contains("element"))
+      {
+         const int e = params.value("element", -1);
+         if (e < 0 || e >= (int)gPerfElements.size())
+         {
+            outError = "unknown element (perf_list numbers them)";
+            return false;
+         }
+         Patch::PerfRecord& rec = gPerfElements[(size_t)e];
+         if (rec.dstIndex < 0 || rec.dstParam < 0)
+         {
+            PushUndoCheckpoint();
+            rec.dstIndex = gn->index; // an empty control: this becomes its primary
+            rec.dstParam = p->paramIndex;
+         }
+         else
+         {
+            bool dup = rec.dstIndex == gn->index && rec.dstParam == p->paramIndex;
+            for (const Patch::PerfTarget& t : rec.targets)
+               dup = dup || (t.dstIndex == gn->index && t.dstParam == p->paramIndex);
+            if (!dup)
+            {
+               PushUndoCheckpoint();
+               rec.targets.push_back({ gn->index, p->paramIndex, std::string() });
+            }
+         }
+         outResult = RpcPerfElementJson((size_t)e);
+         return true;
       }
       const ParamRef* known = Modulation::Instance().KnownParam(gn->index, p->paramIndex);
       int kind = params.contains("kind") ? RpcPerfKind(params["kind"])
@@ -528,6 +759,308 @@ bool HandleRpcCommandTurbo(const std::string& method, const nlohmann::json& para
          gPerfPanelDock = d == "right" ? 1 : d == "left" ? 2 : d == "top" ? 3 : 0;
       }
       outResult = { { "open", gPerfPanelOpen }, { "perform", !gPerfEditMode }, { "page", gPerfActivePage } };
+      return true;
+   }
+   // Turbo 0.50: Scenes node. Settings first (all validated before anything
+   // changes), then the action. Cell values are in the user's units: 0/1 for
+   // on/off and pulse, a 0-based choice, or a 0..1 level. Scene -1 = off row.
+   if (method == "scenes")
+   {
+      GraphNode* gn = FindNodeByIndex(params.value("index", -1));
+      auto* sc = gn ? dynamic_cast<ScenesNode*>(gn->node.get()) : nullptr;
+      if (sc == nullptr)
+      {
+         outError = "index is not a Scenes node";
+         return false;
+      }
+      const std::string action = params.value("action", std::string("state"));
+      if (action != "state" && action != "go" && action != "press" && action != "off" && action != "next" &&
+          action != "prev" && action != "cancel")
+      {
+         outError = "action: state, go (scene), press (scene, toggles), off, next, prev, cancel";
+         return false;
+      }
+      auto countOk = [&](const char* key) {
+         return !params.contains(key) || (params[key].is_number_integer() && params[key].get<int>() >= 1 &&
+                                          params[key].get<int>() <= ScenesNode::kMax);
+      };
+      if (!countOk("scenes") || !countOk("outputs"))
+      {
+         outError = "scenes / outputs: 1..8";
+         return false;
+      }
+      int quant = -1;
+      if (params.contains("quantize"))
+      {
+         const json& q = params["quantize"];
+         if (q.is_number_integer())
+            quant = q.get<int>();
+         else if (q.is_string())
+            for (int i = 0; i < ScenesNode::kQuantCount; i++)
+               if (RpcNorm(q.get<std::string>()) == RpcNorm(ScenesNode::QuantName(i)))
+                  quant = i;
+         if (quant < 0 || quant >= ScenesNode::kQuantCount)
+         {
+            outError = "quantize: 0 immediate, 1 next beat, 2 next bar, 3 2 bars, 4 4 bars (number or name)";
+            return false;
+         }
+      }
+      if (params.contains("press_again_off") && !params["press_again_off"].is_boolean())
+      {
+         outError = "press_again_off: true or false";
+         return false;
+      }
+      if (params.contains("names") && !params["names"].is_array())
+      {
+         outError = "names: an array of scene names";
+         return false;
+      }
+      // Mode names; "value" / "smooth" from the first draft still parse.
+      auto parseMode = [](const std::string& m) -> int {
+         const std::string k = RpcNorm(m);
+         if (k == "on/off" || k == "onoff" || k == "on" || k == "toggle" || k == "switch")
+            return ScenesNode::kOnOff;
+         if (k == "choice" || k == "value" || k == "stepped")
+            return ScenesNode::kChoice;
+         if (k == "level" || k == "smooth" || k == "continuous")
+            return ScenesNode::kLevel;
+         if (k == "pulse" || k == "trigger")
+            return ScenesNode::kPulse;
+         return -1;
+      };
+      if (params.contains("outs"))
+      {
+         if (!params["outs"].is_array() || params["outs"].size() > (size_t)ScenesNode::kMax)
+         {
+            outError = "outs: up to 8 objects {label, mode: on/off|choice|level|pulse, steps: auto|2..128 (choice)}";
+            return false;
+         }
+         for (const json& o : params["outs"])
+         {
+            if (!o.is_object())
+            {
+               outError = "outs: objects {label, mode, steps}";
+               return false;
+            }
+            if (o.contains("mode") && !(o["mode"].is_string() && parseMode(o["mode"].get<std::string>()) >= 0))
+            {
+               outError = "outs[].mode: on/off, choice, level or pulse";
+               return false;
+            }
+            if (o.contains("steps") && !(o["steps"].is_string() ? (o["steps"].get<std::string>() == "auto" || o["steps"].get<std::string>() == "smooth")
+                                                                : (o["steps"].is_number_integer() && o["steps"].get<int>() >= 2 && o["steps"].get<int>() <= 128)))
+            {
+               outError = "outs[].steps (choice): \"auto\" or 2..128";
+               return false;
+            }
+         }
+      }
+      auto rowOk = [](const json& row) {
+         bool ok = row.is_array() && row.size() <= (size_t)ScenesNode::kMax;
+         if (ok)
+            for (const json& v : row)
+               ok = ok && (v.is_number() || v.is_boolean() || v.is_null() || v.is_string());
+         return ok;
+      };
+      if (params.contains("grid"))
+      {
+         bool ok = params["grid"].is_array() && params["grid"].size() <= (size_t)ScenesNode::kMax;
+         if (ok)
+            for (const json& row : params["grid"])
+               ok = ok && rowOk(row);
+         if (!ok)
+         {
+            outError = "grid: rows (scenes) of cells (outputs); null keeps a cell";
+            return false;
+         }
+      }
+      if (params.contains("off") && !rowOk(params["off"]))
+      {
+         outError = "off: one row of cells (outputs), the state with no scene playing";
+         return false;
+      }
+      if (params.contains("cells"))
+      {
+         bool ok = params["cells"].is_array();
+         if (ok)
+            for (const json& c : params["cells"])
+               ok = ok && c.is_array() && c.size() == 3 && c[0].is_number_integer() && c[1].is_number_integer() &&
+                    (c[2].is_number() || c[2].is_boolean() || c[2].is_string()) && c[0].get<int>() >= ScenesNode::kOff &&
+                    c[0].get<int>() < ScenesNode::kMax && c[1].get<int>() >= 0 && c[1].get<int>() < ScenesNode::kMax;
+         if (!ok)
+         {
+            outError = "cells: [[scene, output, value], ...] (0-based, scene -1 = off row)";
+            return false;
+         }
+      }
+      if ((action == "go" || action == "press") && !params.contains("scene"))
+      {
+         outError = "go / press need scene (0-based; go accepts -1 = off)";
+         return false;
+      }
+
+      const bool edits = params.contains("scenes") || params.contains("outputs") || quant >= 0 || params.contains("names") ||
+                         params.contains("outs") || params.contains("grid") || params.contains("cells") ||
+                         params.contains("off") || params.contains("press_again_off");
+      if (edits)
+      {
+         PushUndoCheckpoint();
+         gPatchDirty = true;
+         if (params.contains("scenes")) sc->scenes = params["scenes"].get<int>();
+         if (params.contains("outputs")) sc->outputs = params["outputs"].get<int>();
+         if (quant >= 0) sc->quantize = quant;
+         if (params.contains("press_again_off")) sc->pressAgainOff = params["press_again_off"].get<bool>();
+         if (params.contains("names"))
+         {
+            size_t i = 0;
+            for (const json& nm : params["names"])
+               if (i < (size_t)ScenesNode::kMax)
+                  sc->sceneName[i++] = nm.is_string() ? nm.get<std::string>() : std::string();
+         }
+         if (params.contains("outs"))
+         {
+            size_t i = 0;
+            for (const json& o : params["outs"])
+            {
+               if (o.contains("label") && o["label"].is_string()) sc->label[i] = o["label"].get<std::string>();
+               if (o.contains("mode")) sc->mode[i] = parseMode(o["mode"].get<std::string>());
+               if (o.contains("steps"))
+               {
+                  if (o["steps"].is_string() && o["steps"].get<std::string>() == "smooth")
+                     sc->mode[i] = ScenesNode::kLevel; // first-draft spelling
+                  else
+                     sc->steps[i] = o["steps"].is_string() ? -1 : o["steps"].get<int>();
+               }
+               i++;
+            }
+         }
+      }
+      // Auto choices come from the cables: resolve before reading or writing cells.
+      ScenesTarget targets[ScenesNode::kMax];
+      ScenesResolve(sc, gn->index, targets);
+      // A cell: number, bool, "on"/"off", or a choice by its dropdown name.
+      auto cellValue = [&](const json& v, int o, float& out) {
+         if (v.is_boolean())
+            out = v.get<bool>() ? 1.0f : 0.0f;
+         else if (v.is_number())
+            out = v.get<float>();
+         else
+         {
+            const std::string k = RpcNorm(v.get<std::string>());
+            if (k == "on" || k == "true")
+               out = 1.0f;
+            else if (k == "off" || k == "false")
+               out = 0.0f;
+            else
+            {
+               const ParamRef* p = targets[o].param;
+               if (p == nullptr || !p->isEnum)
+                  return false;
+               // Exact name first, then a prefix ("A" finds "A verse").
+               for (int pass = 0; pass < 2; pass++)
+                  for (size_t i = 0; i < p->enumOptions.size(); i++)
+                  {
+                     const std::string opt = RpcNorm(p->enumOptions[i]);
+                     if (pass == 0 ? opt == k : (!k.empty() && opt.compare(0, k.size(), k) == 0))
+                     {
+                        out = (float)i;
+                        return true;
+                     }
+                  }
+               return false;
+            }
+         }
+         return true;
+      };
+      std::string cellErrors;
+      auto setCell = [&](int s, int o, const json& v) {
+         float f = 0.0f;
+         if (cellValue(v, o, f))
+            sc->SetCellUser(s, o, f);
+         else if (cellErrors.size() < 200)
+            cellErrors += "output " + std::to_string(o) + ": unknown choice \"" + v.get<std::string>() + "\"; ";
+      };
+      if (params.contains("grid"))
+      {
+         int r = 0;
+         for (const json& row : params["grid"])
+         {
+            int c = 0;
+            for (const json& v : row)
+            {
+               if (!v.is_null())
+                  setCell(r, c, v);
+               c++;
+            }
+            r++;
+         }
+      }
+      if (params.contains("off"))
+      {
+         int c = 0;
+         for (const json& v : params["off"])
+         {
+            if (!v.is_null())
+               setCell(ScenesNode::kOff, c, v);
+            c++;
+         }
+      }
+      if (params.contains("cells"))
+         for (const json& c : params["cells"])
+            setCell(c[0].get<int>(), c[1].get<int>(), c[2]);
+
+      const bool now = params.value("now", false);
+      if (action == "go")
+         sc->Request(params.value("scene", 0), true, now);
+      else if (action == "press")
+         sc->Press(params.value("scene", 0));
+      else if (action == "off")
+         sc->Request(ScenesNode::kOff, false, now);
+      else if (action == "next")
+         sc->Step(1);
+      else if (action == "prev")
+         sc->Step(-1);
+      else if (action == "cancel")
+         sc->CancelPending();
+
+      json outs = json::array(), values = json::array();
+      for (int o = 0; o < sc->Outputs(); o++)
+      {
+         json jo = { { "output", o }, { "label", sc->OutputLabel(o) },
+                     { "mode", ScenesNode::ModeName(sc->mode[o]) },
+                     { "target", ScenesTargetText(targets[o]) } };
+         if (sc->mode[o] == ScenesNode::kChoice)
+         {
+            jo["choices"] = sc->ChoiceCount(o);
+            jo["steps_setting"] = sc->steps[o] < 0 ? json("auto") : json(sc->steps[o]);
+            if (targets[o].param != nullptr && targets[o].param->isEnum && sc->ChoiceAutoResolved(o))
+               jo["choice_names"] = targets[o].param->enumOptions;
+         }
+         outs.push_back(jo);
+         values.push_back(sc->OutputValue(o));
+      }
+      json grid = json::array(), names = json::array(), offRow = json::array();
+      for (int o = 0; o < sc->Outputs(); o++)
+         offRow.push_back(sc->CellUser(ScenesNode::kOff, o));
+      for (int s = 0; s < sc->Scenes(); s++)
+      {
+         json row = json::array();
+         for (int o = 0; o < sc->Outputs(); o++)
+            row.push_back(sc->CellUser(s, o));
+         grid.push_back(row);
+         names.push_back(ScenesSceneName(sc, s));
+      }
+      outResult = { { "current", sc->Current() }, { "current_name", ScenesSceneName(sc, sc->Current()) },
+                    { "pending", sc->HasPending() ? json(sc->Pending()) : json(nullptr) },
+                    { "quantize", ScenesNode::QuantName(sc->quantize) }, { "press_again_off", sc->pressAgainOff },
+                    { "names", names }, { "outputs", outs }, { "off", offRow }, { "grid", grid },
+                    { "output_values", values },
+                    { "params", "mappable triggers: \"scene 1\"..\"scene 8\" (press: radio, again = off), \"all off\", "
+                                "\"prev scene\", \"next scene\"; selector \"scene\" (0 = off, 1.. = scenes)" } };
+      if (sc->HasPending())
+         outResult["pending_in_beats"] = std::max(0.0, sc->PendingBeat() - Transport::Instance().Beats());
+      if (!cellErrors.empty())
+         outResult["warnings"] = cellErrors;
       return true;
    }
    handled = false;

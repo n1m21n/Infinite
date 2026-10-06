@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "GLUtil.h"
 #include "INode.h"
 #include "NoteCable.h"
 #include "Platform.h"
@@ -88,6 +89,11 @@ public:
    bool playAudio = true;
    float audioVolume = 1.0f;
    int selectedPad = 0;
+   // Turbo 0.50: transition when a hit switches to another pad's clip.
+   // 0 = Cut (the old behaviour), 1.. = ImageTransition styles + 1.
+   int transitionStyle = 0;
+   float transitionTime = 0.5f; // seconds
+   static const std::vector<std::string>& TransitionNames();
    NoteCable noteInput;
 
    // UI edge detection for the pad buttons (main thread only).
@@ -114,6 +120,9 @@ private:
    void EnsureTextures();
    void RangeSeconds(int pad, double& from, double& to) const;
    bool AudioDriven() const;
+   void CookClip();
+   void RenderTransition();
+   void CancelTransition();
 
    Pad mPads[kPads];
    std::unique_ptr<AudioVmpcNode> mAudio;
@@ -135,4 +144,22 @@ private:
    std::chrono::steady_clock::time_point mLastTick;
    bool mHaveTick = false;
    int mLastCookFrame = -1;
+
+   // Turbo 0.50: clip transitions. On a switch the outgoing frame's texture
+   // is swapped (not copied) into mPrevTex and the incoming clip decodes into
+   // mTex as usual; the blend into mOut starts on the incoming clip's first
+   // frame, so the decode never waits on the transition. Both textures are
+   // node-owned: clearing or reloading a pad mid-transition frees only the
+   // pad's decoder, never a texture the blend is reading.
+   enum TransState { kTransNone = 0, kTransWaiting = 1, kTransRunning = 2 };
+   int mTransState = kTransNone;
+   int mTransStyle = 0; // ImageTransition style of the running transition
+   double mTransSeconds = 0.0;
+   std::chrono::steady_clock::time_point mTransStart;
+   unsigned int mPrevTex = 0;
+   int mPrevW = 0; // allocated size of mPrevTex (= the outgoing frame's)
+   int mPrevH = 0;
+   GLUtil::Fbo mOut;
+   unsigned int mProgram = 0;
+   bool mShaderTried = false;
 };

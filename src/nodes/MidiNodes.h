@@ -109,5 +109,6 @@ private:
    float mEnvelope = 0.0f;
    double mLastSeconds = 0.0;
    unsigned int mLastHitSeq = 0; // last hit-counter value consumed from Platform
+   int mSeqChannel = -2, mSeqNote = -2, mSeqMode = -1; // binding mLastHitSeq was seeded for
    int mLastCookFrame = -1;
 };

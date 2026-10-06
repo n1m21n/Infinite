@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <climits>
 #include <cmath>
 #include <cstdint>
 
@@ -12,6 +13,7 @@
 #include "audio/MusicTime.h"
 #include "audio/NoteEventQueue.h"
 #include "audio/NoteTheory.h"
+#include "audio/QuantizedRestart.h"
 #include "core/Transport.h"
 #include "platform/Platform.h"
 
@@ -117,6 +119,12 @@ namespace
 class AudioMidiNotesNode : public AudioNode
 {
 public:
+   AudioMidiNotesNode()
+   {
+      for (int& c : mVoiceChannel)
+         c = -1;
+   }
+
    void PrepareToPlay(double /*sampleRate*/, int /*maxBlockSize*/) override
    {
       // Start at the live end of the stream: a topology rebuild shouldn't
@@ -124,6 +132,8 @@ public:
       mCursor = Platform::MidiNoteStreamPosition();
       mHeld[0].store(0, std::memory_order_relaxed);
       mHeld[1].store(0, std::memory_order_relaxed);
+      // mVoiceChannel is not reset here: every topology rebuild calls
+      // PrepareToPlay, and a key held across one must still get its note-off.
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& /*output*/) override
@@ -139,8 +149,30 @@ public:
 
       for (int i = 0; i < n; i++)
       {
-         if (channelFilter >= 0 && msgs[i].channel != channelFilter)
-            continue;
+         const int src = msgs[i].note & 127;
+         // Turbo 0.50: the last channel seen (before filtering) is what the
+         // body shows and what "learn" copies, so a MiniLab's pads on ch 7
+         // can be identified without a MIDI monitor.
+         if (msgs[i].isNoteOn)
+         {
+            mLastChannel.store(msgs[i].channel, std::memory_order_relaxed);
+            mNoteOnCount.fetch_add(1, std::memory_order_relaxed);
+         }
+         if (msgs[i].isNoteOn)
+         {
+            if (channelFilter >= 0 && msgs[i].channel != channelFilter)
+               continue;
+         }
+         else
+         {
+            // A note-off only ends a voice this node started on that same
+            // channel: pads on another channel sharing a note number can't
+            // cut a held key, and changing the filter mid-hold can't strand
+            // a voice (its note-off still gets through).
+            if (mVoiceChannel[src] != msgs[i].channel)
+               continue;
+            mVoiceChannel[src] = -1;
+         }
          int note = msgs[i].note + transpose;
          if (note < 0 || note > 127)
             continue;
@@ -159,6 +191,7 @@ public:
          if (e.isNoteOn)
          {
             e.voiceId = NextVoiceId();
+            mVoiceChannel[src] = msgs[i].channel;
             mActiveVoiceId[msgs[i].note] = e.voiceId;
             mMappedNote[msgs[i].note] = note;
          }
@@ -188,12 +221,17 @@ public:
 
    uint64_t HeldWord(int w) const { return mHeld[w].load(std::memory_order_relaxed); }
    int LastNote() const { return mLastNote.load(std::memory_order_relaxed); }
+   int LastChannel() const { return mLastChannel.load(std::memory_order_relaxed); }
+   unsigned int NoteOnCount() const { return mNoteOnCount.load(std::memory_order_relaxed); }
 
 private:
    NoteEventQueue mOutbox;
    unsigned long long mCursor = 0;
    int mActiveVoiceId[128] = {};
    int mMappedNote[128] = {};
+   int mVoiceChannel[128]; // per source note: channel of its sounding note-on, -1 none
+   std::atomic<int> mLastChannel { -1 };
+   std::atomic<unsigned int> mNoteOnCount { 0 };
 
    std::atomic<uint64_t> mHeld[2] { { 0 }, { 0 } };
    std::atomic<int> mLastNote { -1 };
@@ -219,6 +257,7 @@ void MidiNotesNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioMidiNotesNode>();
+   UpdateChannelLearn();
    mAudioNode->PushParams(*this);
 }
 
@@ -268,6 +307,29 @@ int MidiNotesNode::HeldCount() const
 int MidiNotesNode::LastNote() const
 {
    return mAudioNode ? mAudioNode->LastNote() : -1;
+}
+
+int MidiNotesNode::LastChannel() const
+{
+   return mAudioNode ? mAudioNode->LastChannel() : -1;
+}
+
+void MidiNotesNode::StartChannelLearn()
+{
+   StartListening();
+   mLearning = true;
+   mLearnCount = mAudioNode ? mAudioNode->NoteOnCount() : 0;
+}
+
+void MidiNotesNode::UpdateChannelLearn()
+{
+   if (!mLearning || !mAudioNode)
+      return;
+   if (mAudioNode->NoteOnCount() != mLearnCount && mAudioNode->LastChannel() >= 0)
+   {
+      channel = mAudioNode->LastChannel();
+      mLearning = false;
+   }
 }
 
 // ---------------------------------------------------------------- Note to CV
@@ -2033,7 +2095,25 @@ public:
       }
 
       const double beats = Transport::Instance().Beats();
-      const long long step = (long long)std::floor(beats / (double)rateBeats);
+      // Turbo 0.50: quantized restart. Block-accurate like this step clock
+      // (Beats() is the block end): at the block holding the grid line the
+      // step clock re-anchors there and the pattern starts over.
+      {
+         Transport& tr = Transport::Instance();
+         const double spb = mSampleRate * 60.0 / std::max(1.0, bpm);
+         mRestart.Update(tr.IsPlaying(), std::max(0.0, beats - (double)numFrames / spb), tr.BeatsPerBar());
+         if (!tr.IsPlaying() && beats <= 1.0e-9)
+            mAnchor = 0.0; // rewound: step 0 on beat 0 again, as before
+         if (mRestart.Due(beats))
+         {
+            mAnchor = mRestart.ArmBeat();
+            mRestart.Fire();
+            mLastStep = LLONG_MIN; // step 0 plays even if it equals the last index
+            mStepCounter = 0;
+            mGridStep = 0;
+         }
+      }
+      const long long step = (long long)std::floor((beats - mAnchor) / (double)rateBeats);
       if (step != mLastStep)
       {
          mLastStep = step;
@@ -2162,7 +2242,11 @@ public:
       mGatePercent.store(n.gatePercent, std::memory_order_relaxed);
       mStepGates.store(n.stepGates, std::memory_order_relaxed);
       mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
+      mRestart.SetQuant(n.restartQuant);
    }
+   // Turbo 0.50: quantized restart (main thread).
+   void RequestRestart() { mRestart.Request(); }
+   bool RestartArmed() const { return mRestart.Armed(); }
 
    int HeldCount() const { return mHeldCountReadout.load(std::memory_order_relaxed); }
    int CurrentNote() const { return mCurrentOutNoteReadout.load(std::memory_order_relaxed); }
@@ -2326,6 +2410,8 @@ private:
    long long mLastStep = -1;
    uint64_t mStepCounter = 0;
    uint64_t mGridStep = 0;
+   QuantizedRestart mRestart; // Turbo 0.50
+   double mAnchor = 0.0;      // transport beat where step 0 falls
    int mCurrentOutNote = -1;
    int mCurrentOutVoiceId = 0;
    bool mPendingOffActive = false;
@@ -2367,6 +2453,7 @@ void ArpeggiatorNode::VisitParams(ParamVisitor& v)
    v.Float("gatePercent", gatePercent);
    v.Int("stepGates", stepGates);
    v.Bool("useGlobalScale", useGlobalScale);
+   v.Int("restartQuant", restartQuant); // Turbo 0.50, appended
 }
 
 AudioNode* ArpeggiatorNode::GetAudioNode()
@@ -2389,6 +2476,18 @@ int ArpeggiatorNode::CurrentNote() const
 int ArpeggiatorNode::CurrentGridStep() const
 {
    return mAudioNode ? mAudioNode->CurrentGridStep() : -1;
+}
+
+void ArpeggiatorNode::RequestRestart()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioArpeggiatorNode>();
+   mAudioNode->RequestRestart();
+}
+
+bool ArpeggiatorNode::RestartArmed() const
+{
+   return mAudioNode ? mAudioNode->RestartArmed() : false;
 }
 
 const std::vector<std::string>& ArpeggiatorNode::PresetNames()
@@ -2490,7 +2589,23 @@ public:
       }
 
       const double beats = Transport::Instance().Beats();
-      const long long step = (long long)std::floor(beats / (double)rateBeats);
+      // Turbo 0.50: quantized restart. Block-accurate like this step clock
+      // (Beats() is the block end): at the block holding the grid line the
+      // step clock re-anchors there and the pattern starts over.
+      {
+         Transport& tr = Transport::Instance();
+         const double spb = mSampleRate * 60.0 / std::max(1.0, bpm);
+         mRestart.Update(tr.IsPlaying(), std::max(0.0, beats - (double)numFrames / spb), tr.BeatsPerBar());
+         if (!tr.IsPlaying() && beats <= 1.0e-9)
+            mAnchor = 0.0; // rewound: step 0 on beat 0 again, as before
+         if (mRestart.Due(beats))
+         {
+            mAnchor = mRestart.ArmBeat();
+            mRestart.Fire();
+            mLastStep = LLONG_MIN; // step 0 plays even if it equals the last index
+         }
+      }
+      const long long step = (long long)std::floor((beats - mAnchor) / (double)rateBeats);
       if (step != mLastStep)
       {
          mLastStep = step;
@@ -2542,6 +2657,7 @@ public:
    // Main thread only.
    void PushParams(const NoteSequencerNode& n)
    {
+      mRestart.SetQuant(n.restartQuant);
       mSteps.store(n.steps, std::memory_order_relaxed);
       mRateMode.store(n.rateMode, std::memory_order_relaxed);
       mRateBeats.store(n.rateBeats, std::memory_order_relaxed);
@@ -2556,6 +2672,9 @@ public:
       }
    }
 
+   // Turbo 0.50: quantized restart (main thread).
+   void RequestRestart() { mRestart.Request(); }
+   bool RestartArmed() const { return mRestart.Armed(); }
    int CurrentStep() const { return mCurrentStepReadout.load(std::memory_order_relaxed); }
 
 private:
@@ -2568,6 +2687,8 @@ private:
    int mCurrentOutVoiceId = 0;
    bool mPendingOffActive = false;
    uint64_t mPendingOffSample = 0;
+   QuantizedRestart mRestart; // Turbo 0.50
+   double mAnchor = 0.0;      // transport beat where step 0 falls
 
    std::atomic<int> mSteps { 8 };
    std::atomic<int> mRateMode { 0 };
@@ -2621,6 +2742,7 @@ void NoteSequencerNode::VisitParams(ParamVisitor& v)
       snprintf(key, sizeof(key), "en%d", i);
       v.Bool(key, stepEnabled[i]);
    }
+   v.Int("restartQuant", restartQuant); // Turbo 0.50, appended
 }
 
 AudioNode* NoteSequencerNode::GetAudioNode()
@@ -2633,6 +2755,18 @@ AudioNode* NoteSequencerNode::GetAudioNode()
 int NoteSequencerNode::CurrentStep() const
 {
    return mAudioNode ? mAudioNode->CurrentStep() : -1;
+}
+
+void NoteSequencerNode::RequestRestart()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioNoteSequencerNode>();
+   mAudioNode->RequestRestart();
+}
+
+bool NoteSequencerNode::RestartArmed() const
+{
+   return mAudioNode ? mAudioNode->RestartArmed() : false;
 }
 
 // ------------------------------------------------------- Random Note Generator
@@ -4330,6 +4464,7 @@ class AudioNoteSwitcherNode : public AudioNode
 {
 public:
    static constexpr int kSlots = NoteSwitcherNode::kSlots;
+   static constexpr int kEventsPerSlot = 64;
 
    struct VoiceInfo
    {
@@ -4337,15 +4472,20 @@ public:
       int note = 0;
    };
 
-   void PrepareToPlay(double /*sampleRate*/, int /*maxBlockSize*/) override
+   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
    {
+      mSampleRate = sampleRate > 0.0 ? sampleRate : 48000.0;
       mSourceSlot.Clear();
+      // mCurrentSlot / mPendingSlot are audio-thread state and are not reset
+      // here: PrepareToPlay runs on every topology rebuild, which must not
+      // cancel (or force at once) a quantized switch that is waiting.
       mActiveSlotReadout.store(-1, std::memory_order_relaxed);
+      mPendingSlotReadout.store(-1, std::memory_order_relaxed);
    }
 
-   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& /*output*/) override
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
    {
-      // 1. Compute active connected slot from clock or manualSlot
+      // 1. Compute the wanted connected slot from clock or manualSlot
       int connected[kSlots];
       int count = 0;
       for (int i = 0; i < kSlots; i++)
@@ -4354,15 +4494,15 @@ public:
             connected[count++] = i;
       }
 
-      int activeSlot = -1;
+      const bool manual = mManual.load(std::memory_order_relaxed);
+      int wanted = -1;
       if (count > 0)
       {
-         const bool manual = mManual.load(std::memory_order_relaxed);
          const int manualSlot = mManualSlot.load(std::memory_order_relaxed);
          if (manual || count == 1)
          {
             const int pick = manual ? std::clamp(manualSlot, 0, kSlots - 1) : connected[0];
-            activeSlot = (mInbox[pick] != nullptr) ? pick : connected[0];
+            wanted = (mInbox[pick] != nullptr) ? pick : connected[0];
          }
          else
          {
@@ -4373,7 +4513,7 @@ public:
                const double clock = Transport::Instance().Beats();
                const double pos = clock / (double)rateBeats;
                const long long index = (long long)std::floor(pos);
-               activeSlot = connected[(int)(((index % count) + count) % count)];
+               wanted = connected[(int)(((index % count) + count) % count)];
             }
             else
             {
@@ -4381,45 +4521,85 @@ public:
                const double clock = Transport::Instance().Seconds();
                const double pos = clock / (double)rateSeconds;
                const long long index = (long long)std::floor(pos);
-               activeSlot = connected[(int)(((index % count) + count) % count)];
+               wanted = connected[(int)(((index % count) + count) % count)];
             }
          }
       }
-      mActiveSlotReadout.store(activeSlot, std::memory_order_relaxed);
 
-      // 2. Pop events from all 4 inboxes
-      struct TaggedEvent
+      // Turbo 0.50: a manual change (click, slot trigger, CV on the slot)
+      // waits for the next grid line when switchQuant asks for it, and lands
+      // on that line's sample: events before it still follow the old slot.
+      // Stopped transport, no live current slot, or clocked cycling: now.
+      int switchOffset = -1; // frame where mPendingSlot takes over, this block
+      Transport& transport = Transport::Instance();
+      const int q = std::clamp(mSwitchQ.load(std::memory_order_relaxed), 0, NoteSwitcherNode::kNumSwitchQuants - 1);
+      const bool quantize = manual && q != NoteSwitcherNode::kSwitchNow && transport.IsPlaying() && wanted >= 0 &&
+                            mCurrentSlot >= 0 && mCurrentSlot < kSlots && mInbox[mCurrentSlot] != nullptr;
+      if (!quantize)
       {
-         NoteEvent event;
-         uint8_t slot;
-      };
-      TaggedEvent all[kSlots * 64];
-      int total = 0;
+         mCurrentSlot = wanted;
+         mPendingSlot = -1;
+      }
+      else if (wanted == mCurrentSlot)
+      {
+         mPendingSlot = -1; // changed back before the line: nothing to do
+      }
+      else
+      {
+         const int numFrames = std::max(1, output.numFrames);
+         const double bpb = std::max(0.25, transport.BeatsPerBar());
+         const double samplesPerBeat = mSampleRate * 60.0 / std::max(1.0, (double)transport.Tempo());
+         // Beats() inside ProcessBlock is the block end.
+         const double beats1 = std::max(0.0, transport.Beats());
+         const double beats0 = std::max(0.0, beats1 - (double)numFrames / samplesPerBeat);
+         const double grid = std::max(1.0e-3, QuantizedRestart::GridBeats(q, bpb)); // same grid list
+         const bool stale = mSwitchBeat < beats0 - 1.0e-9 || mSwitchBeat > beats0 + grid + 1.0e-9;
+         if (wanted != mPendingSlot || stale)
+         {
+            mPendingSlot = wanted;
+            mSwitchBeat = std::max(beats0, std::ceil(beats0 / grid - 1.0e-9) * grid);
+         }
+         if (mSwitchBeat < beats1)
+            switchOffset = std::clamp((int)((mSwitchBeat - beats0) * samplesPerBeat), 0, numFrames - 1);
+      }
 
+      // 2. Pop events from every inbox
+      int total = 0;
       for (int s = 0; s < kSlots; s++)
       {
          if (mInbox[s] == nullptr)
             continue;
-         NoteEvent evts[64];
-         const int n = mInbox[s]->Pop(mCursor[s], evts, 64);
-         for (int i = 0; i < n && total < kSlots * 64; i++)
+         NoteEvent evts[kEventsPerSlot];
+         const int n = mInbox[s]->Pop(mCursor[s], evts, kEventsPerSlot);
+         for (int i = 0; i < n && total < kSlots * kEventsPerSlot; i++)
          {
-            all[total].event = evts[i];
-            all[total].slot = (uint8_t)s;
+            mAll[total].event = evts[i];
+            mAll[total].slot = (uint8_t)s;
             total++;
          }
       }
 
-      std::stable_sort(all, all + total, [](const TaggedEvent& a, const TaggedEvent& b)
+      // Stable insertion sort by frameOffset: std::stable_sort may allocate
+      // a temporary buffer, not allowed on the audio thread (and the list is
+      // short and nearly sorted per slot).
+      for (int i = 1; i < total; i++)
       {
-         return a.event.frameOffset < b.event.frameOffset;
-      });
+         const TaggedEvent key = mAll[i];
+         int j = i - 1;
+         while (j >= 0 && mAll[j].event.frameOffset > key.event.frameOffset)
+         {
+            mAll[j + 1] = mAll[j];
+            j--;
+         }
+         mAll[j + 1] = key;
+      }
 
       // 3-5. Forward note-ons from active slot, note-offs/bends from registered voices
       for (int i = 0; i < total; i++)
       {
-         const NoteEvent& e = all[i].event;
-         const uint8_t slot = all[i].slot;
+         const NoteEvent& e = mAll[i].event;
+         const uint8_t slot = mAll[i].slot;
+         const int activeSlot = (switchOffset >= 0 && e.frameOffset >= switchOffset) ? mPendingSlot : mCurrentSlot;
 
          if (e.isNoteOn)
          {
@@ -4443,6 +4623,13 @@ public:
             }
          }
       }
+      if (switchOffset >= 0)
+      {
+         mCurrentSlot = mPendingSlot;
+         mPendingSlot = -1;
+      }
+      mActiveSlotReadout.store(mCurrentSlot, std::memory_order_relaxed);
+      mPendingSlotReadout.store(mPendingSlot, std::memory_order_relaxed);
 
       // 6. Orphan flush: if slot for a sounding voice became disconnected, emit note-off and erase
       mSourceSlot.ForEach([this](int voiceId, VoiceInfo& v) -> bool
@@ -4474,29 +4661,46 @@ public:
       }
    }
 
-   void PushParams(int rateMode, float rateBeats, float rateSeconds, bool manual, int manualSlot)
+   void PushParams(int rateMode, float rateBeats, float rateSeconds, bool manual, int manualSlot, int switchQuant)
    {
       mRateMode.store(rateMode, std::memory_order_relaxed);
       mRateBeats.store(rateBeats, std::memory_order_relaxed);
       mRateSeconds.store(rateSeconds, std::memory_order_relaxed);
       mManual.store(manual, std::memory_order_relaxed);
       mManualSlot.store(manualSlot, std::memory_order_relaxed);
+      mSwitchQ.store(switchQuant, std::memory_order_relaxed);
    }
 
    int ActiveSlot() const { return mActiveSlotReadout.load(std::memory_order_relaxed); }
+   int PendingSlot() const { return mPendingSlotReadout.load(std::memory_order_relaxed); }
 
 private:
+   struct TaggedEvent
+   {
+      NoteEvent event;
+      uint8_t slot;
+   };
+
    NoteEventQueue mOutbox;
    NoteEventQueue* mInbox[kSlots] = {};
-   int mCursor[kSlots] = { -1, -1, -1, -1 };
+   int mCursor[kSlots] = { -1, -1, -1, -1, -1, -1, -1, -1 };
    VoiceIdMap<VoiceInfo, 128> mSourceSlot;
+   // Turbo 0.50: a member, not a stack array: 8 slots x 64 events is ~30 KB.
+   TaggedEvent mAll[kSlots * kEventsPerSlot] = {};
+
+   double mSampleRate = 48000.0;
+   int mCurrentSlot = -1;   // audio thread: the slot note-ons come from
+   int mPendingSlot = -1;   // audio thread: waiting for mSwitchBeat
+   double mSwitchBeat = 0.0;
 
    std::atomic<int> mActiveSlotReadout { -1 };
+   std::atomic<int> mPendingSlotReadout { -1 };
    std::atomic<int> mRateMode { 0 };
    std::atomic<float> mRateBeats { 4.0f };
    std::atomic<float> mRateSeconds { 1.0f };
    std::atomic<bool> mManual { false };
    std::atomic<int> mManualSlot { 0 };
+   std::atomic<int> mSwitchQ { 0 };
 };
 
 NoteSwitcherNode::NoteSwitcherNode() = default;
@@ -4509,7 +4713,8 @@ void NoteSwitcherNode::CookIfNeeded(int frameId)
    mLastCookFrame = frameId;
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioNoteSwitcherNode>();
-   mAudioNode->PushParams(rateMode, rateBeats, rateSeconds, manual, manualSlot);
+   inputs = std::clamp(inputs, 2, kSlots);
+   mAudioNode->PushParams(rateMode, rateBeats, rateSeconds, manual, manualSlot, switchQuant);
 }
 
 void NoteSwitcherNode::VisitParams(ParamVisitor& v)
@@ -4519,6 +4724,9 @@ void NoteSwitcherNode::VisitParams(ParamVisitor& v)
    v.Float("rateSeconds", rateSeconds);
    v.Bool("manual", manual);
    v.Int("manualSlot", manualSlot);
+   // Turbo 0.50, appended: older patches load with 4 pins, switching now.
+   v.Int("inputs", inputs);
+   v.Int("switchQuant", switchQuant);
 }
 
 AudioNode* NoteSwitcherNode::GetAudioNode()
@@ -4530,11 +4738,34 @@ AudioNode* NoteSwitcherNode::GetAudioNode()
 
 const char* NoteSwitcherNode::InputLabel(int slot) const
 {
-   static const char* kLabels[kSlots] = { "1", "2", "3", "4" };
+   static const char* kLabels[kSlots] = { "1", "2", "3", "4", "5", "6", "7", "8" };
    return (slot >= 0 && slot < kSlots) ? kLabels[slot] : nullptr;
 }
 
 int NoteSwitcherNode::ActiveSlot() const
 {
    return mAudioNode ? mAudioNode->ActiveSlot() : -1;
+}
+
+int NoteSwitcherNode::PendingSlot() const
+{
+   return mAudioNode ? mAudioNode->PendingSlot() : -1;
+}
+
+int NoteSwitcherNode::VisibleSlots() const
+{
+   int shown = std::clamp(inputs, 2, kSlots);
+   for (int i = kSlots - 1; i >= shown; i--)
+      if (noteInputs[i].IsConnected())
+         return i + 1;
+   return shown;
+}
+
+static_assert(NoteSwitcherNode::kNumSwitchQuants == QuantizedRestart::kNumQuants &&
+                 NoteSwitcherNode::kSwitchBar == QuantizedRestart::kBar,
+              "Note Switcher's grid list is QuantizedRestart's");
+
+const std::vector<std::string>& NoteSwitcherNode::SwitchQuantNames()
+{
+   return QuantizedRestart::Names();
 }

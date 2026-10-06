@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "audio/QuantizedRestart.h"
 #include "core/INode.h"
 #include "core/MidiFile.h"
 #include "core/NoteCable.h"
@@ -43,6 +44,11 @@ public:
    int loopBars = 0;         // 0 = file length rounded up to whole bars
    int quantize = 2;         // MusicTime::RateDivision, default 1 bar
    bool play = true;
+   // Turbo 0.50: quantized restart ("restart" trigger + "restart q"): the
+   // file starts again from its top at that grid line, even after it ended.
+   int restartQuant = QuantizedRestart::kBar; // QuantizedRestart::Quant
+   void RequestRestart();
+   bool RestartArmed() const;
 
    // Main thread. Loads `p` and remembers it as `path`; false (with Status()
    // explaining) when it could not be read. Playback restarts on the grid.

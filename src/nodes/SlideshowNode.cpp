@@ -7,6 +7,7 @@
 #include <cmath>
 #include <filesystem>
 
+#include "ImageTransition.h"
 #include "MediaExtensions.h"
 #include "Platform.h"
 #include "Transport.h"
@@ -16,71 +17,6 @@ namespace
    const std::vector<std::string> kFitModeNames = {
       "Native Size", "Best Fit", "Proportional Fit"
    };
-
-   const std::vector<std::string> kTransitionNames = {
-      "Fade", "Slide Left", "Slide Right", "Wipe Left", "Wipe Right", "Zoom Fade"
-   };
-
-   const char* kFragSrc =
-      "#version 150\n"
-      "in vec2 vUv;\n"
-      "out vec4 fragColor;\n"
-      "uniform sampler2D uA;\n"
-      "uniform sampler2D uB;\n"
-      "uniform vec2 uScaleA;\n"
-      "uniform vec2 uScaleB;\n"
-      "uniform float uProgress;\n"
-      "uniform float uWipeFeather;\n"
-      "uniform int uTransition;\n"
-      "vec4 sampleFrame(sampler2D tex, vec2 screenUv, vec2 scale) {\n"
-      "   if (screenUv.x < 0.0 || screenUv.x > 1.0 || screenUv.y < 0.0 || screenUv.y > 1.0)\n"
-      "      return vec4(0.0);\n"
-      "   vec2 uv = (screenUv - 0.5) * scale + 0.5;\n"
-      "   if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0)\n"
-      "      return vec4(0.0);\n"
-      "   return texture(tex, uv);\n"
-      "}\n"
-      "vec4 over(vec4 back, vec4 front) {\n"
-      "   float alpha = front.a + back.a * (1.0 - front.a);\n"
-      "   if (alpha <= 0.00001) return vec4(0.0);\n"
-      "   vec3 rgb = (front.rgb * front.a + back.rgb * back.a * (1.0 - front.a)) / alpha;\n"
-      "   return vec4(rgb, alpha);\n"
-      "}\n"
-      "void main() {\n"
-      "   float t = smoothstep(0.0, 1.0, uProgress);\n"
-      "   vec4 a;\n"
-      "   vec4 b;\n"
-      "   if (uTransition == 1) {\n"
-      "      a = sampleFrame(uA, vUv + vec2(t, 0.0), uScaleA);\n"
-      "      b = sampleFrame(uB, vUv - vec2(1.0 - t, 0.0), uScaleB);\n"
-      "      fragColor = over(a, b);\n"
-      "   } else if (uTransition == 2) {\n"
-      "      a = sampleFrame(uA, vUv - vec2(t, 0.0), uScaleA);\n"
-      "      b = sampleFrame(uB, vUv + vec2(1.0 - t, 0.0), uScaleB);\n"
-      "      fragColor = over(a, b);\n"
-      "   } else if (uTransition == 3) {\n"
-      "      a = sampleFrame(uA, vUv, uScaleA);\n"
-      "      b = sampleFrame(uB, vUv, uScaleB);\n"
-      "      float mask = 1.0 - smoothstep(t - uWipeFeather, t + uWipeFeather, vUv.x);\n"
-      "      fragColor = mix(a, b, mask);\n"
-      "   } else if (uTransition == 4) {\n"
-      "      a = sampleFrame(uA, vUv, uScaleA);\n"
-      "      b = sampleFrame(uB, vUv, uScaleB);\n"
-      "      float edge = 1.0 - t;\n"
-      "      float mask = smoothstep(edge - uWipeFeather, edge + uWipeFeather, vUv.x);\n"
-      "      fragColor = mix(a, b, mask);\n"
-      "   } else if (uTransition == 5) {\n"
-      "      vec2 uvA = (vUv - 0.5) * (1.0 - 0.12 * t) + 0.5;\n"
-      "      vec2 uvB = (vUv - 0.5) * (1.12 - 0.12 * t) + 0.5;\n"
-      "      a = sampleFrame(uA, uvA, uScaleA);\n"
-      "      b = sampleFrame(uB, uvB, uScaleB);\n"
-      "      fragColor = mix(a, b, t);\n"
-      "   } else {\n"
-      "      a = sampleFrame(uA, vUv, uScaleA);\n"
-      "      b = sampleFrame(uB, vUv, uScaleB);\n"
-      "      fragColor = mix(a, b, t);\n"
-      "   }\n"
-      "}\n";
 
    std::string Lower(std::string value)
    {
@@ -134,7 +70,7 @@ const std::vector<std::string>& SlideshowNode::FitModeNames()
 
 const std::vector<std::string>& SlideshowNode::TransitionNames()
 {
-   return kTransitionNames;
+   return ImageTransition::Names();
 }
 
 bool SlideshowNode::Signature::operator==(const Signature& other) const
@@ -160,7 +96,7 @@ bool SlideshowNode::EnsureShader()
    if (mShaderTried)
       return mProgram != 0;
    mShaderTried = true;
-   mProgram = GLUtil::CompileProgram(kFragSrc);
+   mProgram = GLUtil::CompileProgram(ImageTransition::kFragSrc);
    return mProgram != 0;
 }
 
@@ -277,7 +213,7 @@ bool SlideshowNode::LoadSlot(int slot, int fileIndex)
    return true;
 }
 
-bool SlideshowNode::ResolveFrames(long long ordinal, int& slotA, int& slotB,
+bool SlideshowNode::ResolveFrames(long long ordinal, int direction, int& slotA, int& slotB,
                                   int& indexA, int& indexB)
 {
    const size_t maxAttempts = mFiles.size();
@@ -288,7 +224,8 @@ bool SlideshowNode::ResolveFrames(long long ordinal, int& slotA, int& slotB,
 
       const int position = PositiveModulo(ordinal, (int)mPlayableIndices.size());
       indexA = mPlayableIndices[position];
-      indexB = mPlayableIndices[(position + 1) % mPlayableIndices.size()];
+      indexB = mPlayableIndices[PositiveModulo((long long)position + (direction < 0 ? -1 : 1),
+                                               (int)mPlayableIndices.size())];
 
       slotA = mLoadedIndices[0] == indexA ? 0 : (mLoadedIndices[1] == indexA ? 1 : -1);
       if (slotA < 0)
@@ -316,6 +253,60 @@ bool SlideshowNode::ResolveFrames(long long ordinal, int& slotA, int& slotB,
    return false;
 }
 
+void SlideshowNode::AutoPhase(double now, double hold, double fade, double step,
+                              long long& ordinal, float& progress) const
+{
+   const double position = (now - mTimeOrigin) / step;
+   const long long base = (long long)std::floor(position);
+   const double phaseSeconds = (position - (double)base) * step;
+   ordinal = base + mOrdinalOffset;
+   progress = fade > 0.0 && phaseSeconds > hold ? (float)((phaseSeconds - hold) / fade) : 0.0f;
+   progress = std::max(0.0f, std::min(progress, 1.0f));
+}
+
+// Turbo 0.50: restart / next / prev. Main thread, inside the cook, so the
+// current position is read from the same clock the frame is drawn with.
+void SlideshowNode::ApplyRequest(double now, double hold, double fade, double step)
+{
+   const Request request = mRequest;
+   mRequest = Request::None;
+   if (request == Request::None)
+      return;
+
+   if (request == Request::Restart)
+   {
+      mManual = false;
+      mOrdinalOffset = 0;
+      mTimeOrigin = now;
+      return;
+   }
+
+   // The image on screen: mid-transition, the one we are heading to once
+   // past halfway, so a press always moves one image away from what is seen.
+   long long current = 0;
+   if (mManual)
+      current = mManualTo;
+   else
+   {
+      float progress = 0.0f;
+      AutoPhase(now, hold, fade, step, current, progress);
+      if (progress >= 0.5f)
+         ++current;
+   }
+   const long long target = current + (request == Request::Next ? 1 : -1);
+   if (fade <= 0.0)
+   {
+      mManual = false;
+      mOrdinalOffset = target;
+      mTimeOrigin = now;
+      return;
+   }
+   mManual = true;
+   mManualFrom = current;
+   mManualTo = target;
+   mManualStart = std::chrono::steady_clock::now();
+}
+
 void SlideshowNode::CookIfNeeded(int frameId)
 {
    if (mLastCookFrame == frameId)
@@ -327,19 +318,45 @@ void SlideshowNode::CookIfNeeded(int frameId)
    const double hold = std::max(0.05f, holdDuration);
    const double fade = std::max(0.0f, transitionDuration);
    const double step = hold + fade;
-   const double position = Transport::Instance().Seconds() / step;
-   const long long ordinal = (long long)std::floor(position);
-   const double phaseSeconds = (position - (double)ordinal) * step;
-   float progress = fade > 0.0 && phaseSeconds > hold
-                       ? (float)((phaseSeconds - hold) / fade)
-                       : 0.0f;
-   progress = std::max(0.0f, std::min(progress, 1.0f));
+   const double now = Transport::Instance().Seconds();
+   // A rewind behind the last restart / step goes back to the plain
+   // transport timing (image 1 at 0 s), as before 0.50.
+   if (!mManual && now < mTimeOrigin - 1.0e-6)
+   {
+      mTimeOrigin = 0.0;
+      mOrdinalOffset = 0;
+   }
+   ApplyRequest(now, hold, fade, step);
+
+   long long ordinal = 0;
+   int direction = 1;
+   float progress = 0.0f;
+   if (mManual)
+   {
+      const double elapsed =
+         std::chrono::duration<double>(std::chrono::steady_clock::now() - mManualStart).count();
+      if (fade <= 0.0 || elapsed >= fade)
+      {
+         // Landed: the hold of the new image starts now.
+         mManual = false;
+         mOrdinalOffset = mManualTo;
+         mTimeOrigin = now;
+      }
+      else
+      {
+         ordinal = mManualFrom;
+         direction = mManualTo < mManualFrom ? -1 : 1;
+         progress = (float)std::max(0.0, std::min(elapsed / fade, 1.0));
+      }
+   }
+   if (!mManual)
+      AutoPhase(now, hold, fade, step, ordinal, progress);
 
    int slotA = 0;
    int slotB = 0;
    int indexA = -1;
    int indexB = -1;
-   if (!ResolveFrames(ordinal, slotA, slotB, indexA, indexB))
+   if (!ResolveFrames(ordinal, direction, slotA, slotB, indexA, indexB))
    {
       // A fresh/failed node still renders the same visible checker used by
       // Image Source, while LastError explains why no folder image is shown.
@@ -388,17 +405,8 @@ void SlideshowNode::CookIfNeeded(int frameId)
    GLUtil::RunShaderPass(mOut, mProgram,
       [this, texA, texB, scaleAX, scaleAY, scaleBX, scaleBY, sig, dstW]()
    {
-      glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, texA);
-      glUniform1i(glGetUniformLocation(mProgram, "uA"), 0);
-      glActiveTexture(GL_TEXTURE1);
-      glBindTexture(GL_TEXTURE_2D, texB);
-      glUniform1i(glGetUniformLocation(mProgram, "uB"), 1);
-      glUniform2f(glGetUniformLocation(mProgram, "uScaleA"), scaleAX, scaleAY);
-      glUniform2f(glGetUniformLocation(mProgram, "uScaleB"), scaleBX, scaleBY);
-      glUniform1f(glGetUniformLocation(mProgram, "uProgress"), sig.progress);
-      glUniform1f(glGetUniformLocation(mProgram, "uWipeFeather"), 2.0f / (float)dstW);
-      glUniform1i(glGetUniformLocation(mProgram, "uTransition"), sig.transitionType);
+      ImageTransition::SetUniforms(mProgram, texA, texB, scaleAX, scaleAY, scaleBX, scaleBY,
+                                   sig.progress, sig.transitionType, dstW);
    });
 
    mBuilt = sig;
