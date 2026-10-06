@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include "Transport.h"
+
 namespace
 {
    const char* kCopyFrag =
@@ -386,4 +388,285 @@ void ReactionDiffusionNode::CookIfNeeded(int frameId)
       glUniform3f(glGetUniformLocation(mDrawProgram, "uLow"), lowColor[0], lowColor[1], lowColor[2]);
       glUniform3f(glGetUniformLocation(mDrawProgram, "uHigh"), highColor[0], highColor[1], highColor[2]);
    });
+}
+
+// ================================================================ Datamosh
+
+namespace
+{
+   const char* kDmHash =
+      "uint pcg(uint v) {\n"
+      "   uint s = v * 747796405u + 2891336453u;\n"
+      "   uint w = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u;\n"
+      "   return (w >> 22u) ^ w;\n"
+      "}\n"
+      "uint hash2(uint a, uint b) { return pcg(a + pcg(b)); }\n"
+      "uint hash3(uint a, uint b, uint c) { return pcg(a + pcg(b + pcg(c))); }\n"
+      "float h01(uint h) { return float(h >> 8u) * (1.0 / 16777216.0); }\n";
+
+   // Block motion estimation, one fragment per 16 px block. SAD over a 4x4 sample
+   // grid inside the block, +-12 px search in 2 px steps, biased toward zero.
+   // Output = accumulated vector (state * bloom + new vector), in uv units.
+   const char* kDmMeFrag =
+      "#version 150\n"
+      "in vec2 vUv;\n"
+      "out vec4 fragColor;\n"
+      "uniform sampler2D uCur;\n"
+      "uniform sampler2D uPrevIn;\n"
+      "uniform sampler2D uState;\n"
+      "uniform vec2 uTexel;\n"     // texel size of the motion source
+      "uniform float uBloom;\n"
+      "uniform float uThreshold;\n" // pixels
+      "uniform int uReset;\n"
+      "float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }\n"
+      "void main() {\n"
+      "   vec2 center = vUv;\n"
+      "   float cur[16];\n"
+      "   for (int i = 0; i < 16; i++) {\n"
+      "      vec2 o = (vec2(float(i & 3), float(i >> 2)) - 1.5) * 4.0;\n"
+      "      cur[i] = luma(texture(uCur, center + o * uTexel).rgb);\n"
+      "   }\n"
+      "   float best = 1e9; vec2 bestD = vec2(0.0);\n"
+      "   for (int j = -6; j <= 6; j++) {\n"
+      "      for (int k = -6; k <= 6; k++) {\n"
+      "         vec2 d = vec2(float(k), float(j)) * 2.0;\n"
+      "         float sad = 0.0;\n"
+      "         for (int i = 0; i < 16; i++) {\n"
+      "            vec2 o = (vec2(float(i & 3), float(i >> 2)) - 1.5) * 4.0;\n"
+      "            sad += abs(cur[i] - luma(texture(uPrevIn, center + (o + d) * uTexel).rgb));\n"
+      "         }\n"
+      "         sad += 0.01 * length(d);\n"
+      "         if (sad < best) { best = sad; bestD = d; }\n"
+      "      }\n"
+      "   }\n"
+      "   if (length(bestD) < uThreshold) bestD = vec2(0.0);\n"
+      "   vec2 mv = bestD * uTexel;\n"
+      "   vec2 st = (uReset == 1) ? vec2(0.0) : texture(uState, vUv).rg;\n"
+      "   fragColor = vec4(clamp(st * uBloom + mv, vec2(-0.5), vec2(0.5)), 0.0, 1.0);\n"
+      "}\n";
+
+   // Mosh pass. Block layout is static (depends on the seed only): a uniform grid,
+   // or a weighted random split when Block Var > 0. A held block samples the
+   // previous output displaced by its vector; the rest show the live image.
+   const char* kDmMoshFrag =
+      "#version 150\n"
+      "in vec2 vUv;\n"
+      "out vec4 fragColor;\n"
+      "uniform sampler2D uSrc;\n"
+      "uniform sampler2D uPrevOut;\n"
+      "uniform sampler2D uMv;\n"
+      "uniform vec2 uRes;\n"
+      "uniform float uMosh;\n"
+      "uniform float uGain;\n"
+      "uniform float uBlock;\n"
+      "uniform float uBlockVar;\n"
+      "uniform float uLeak;\n"
+      "uniform float uChance;\n"
+      "uniform int uRefresh;\n"
+      "uniform int uInit;\n"
+      "uniform int uSeedI;\n"
+      "uniform int uEpochI;\n"
+      "%HASH%"
+      "void main() {\n"
+      "   vec4 cur = texture(uSrc, vUv);\n"
+      "   if (uInit == 1) { fragColor = cur; return; }\n"
+      "   uint seedU = uint(uSeedI);\n"
+      "   vec2 px = vUv * uRes;\n"
+      "   uint id; vec2 ctr;\n"
+      "   if (uBlockVar <= 0.0) {\n"
+      "      vec2 bi = floor(px / uBlock);\n"
+      "      id = hash2(uint(bi.x), uint(bi.y) + 4096u);\n"
+      "      ctr = (bi + 0.5) * uBlock / uRes;\n"
+      "   } else {\n"
+      "      vec4 r = vec4(0.0, 0.0, 1.0, 1.0);\n"
+      "      id = seedU;\n"
+      "      for (int i = 0; i < 14; i++) {\n"
+      "         vec2 sz = (r.zw - r.xy) * uRes;\n"
+      "         bool sx = sz.x >= sz.y;\n"
+      "         float len = sx ? sz.x : sz.y;\n"
+      "         if (len < 2.0 * uBlock) break;\n"
+      "         uint h = pcg(id + 0x9e3779b9u);\n"
+      "         if (i > 1 && h01(pcg(h)) < 0.25 * uBlockVar) break;\n"
+      "         float w = mix(0.5, 0.12 + 0.76 * h01(h), uBlockVar);\n"
+      "         if (sx) {\n"
+      "            float m = r.x + (r.z - r.x) * w;\n"
+      "            if (vUv.x < m) { r.z = m; id = pcg(id * 2u + 1u); } else { r.x = m; id = pcg(id * 2u + 2u); }\n"
+      "         } else {\n"
+      "            float m = r.y + (r.w - r.y) * w;\n"
+      "            if (vUv.y < m) { r.w = m; id = pcg(id * 2u + 1u); } else { r.y = m; id = pcg(id * 2u + 2u); }\n"
+      "         }\n"
+      "      }\n"
+      "      ctr = (r.xy + r.zw) * 0.5;\n"
+      "   }\n"
+      "   bool refreshed = uRefresh == 1 && h01(hash3(id, uint(uEpochI), seedU + 202u)) < uChance;\n"
+      "   bool held = !refreshed && h01(hash2(id, seedU + 101u)) < uMosh;\n"
+      "   vec2 mv = texture(uMv, ctr).rg * uGain;\n"
+      "   vec4 moshed = texture(uPrevOut, clamp(vUv + mv, 0.0, 1.0));\n"
+      "   if (refreshed) fragColor = cur;\n"
+      "   else if (held) fragColor = moshed;\n"
+      "   else fragColor = mix(cur, moshed, uLeak);\n"
+      "}\n";
+
+   const char* kDmCopyFrag =
+      "#version 150\n"
+      "in vec2 vUv;\n"
+      "out vec4 fragColor;\n"
+      "uniform sampler2D uSrc;\n"
+      "void main() { fragColor = texture(uSrc, vUv); }\n";
+}
+
+const std::vector<std::string>& DatamoshNode::BlockNames()
+{
+   static const std::vector<std::string> n = { "8", "16", "32" };
+   return n;
+}
+
+const std::vector<std::string>& DatamoshNode::RefreshNames()
+{
+   static const std::vector<std::string> n = { "Off", "1 bar", "1 beat", "1/2 beat", "1/4 beat", "1/8 beat" };
+   return n;
+}
+
+DatamoshNode::~DatamoshNode()
+{
+   GLUtil::DestroyFbo(mOut[0]);
+   GLUtil::DestroyFbo(mOut[1]);
+   GLUtil::DestroyFbo(mMv[0]);
+   GLUtil::DestroyFbo(mMv[1]);
+   GLUtil::DestroyFbo(mPrevIn);
+   if (mMeProgram != 0) glDeleteProgram(mMeProgram);
+   if (mMoshProgram != 0) glDeleteProgram(mMoshProgram);
+   if (mCopyProgram != 0) glDeleteProgram(mCopyProgram);
+}
+
+bool DatamoshNode::EnsureShaders()
+{
+   if (mShaderTried)
+      return mMeProgram != 0 && mMoshProgram != 0 && mCopyProgram != 0;
+   mShaderTried = true;
+   std::string mosh = kDmMoshFrag;
+   const size_t at = mosh.find("%HASH%");
+   mosh.replace(at, 6, kDmHash);
+   mMeProgram = GLUtil::CompileProgram(kDmMeFrag);
+   mMoshProgram = GLUtil::CompileProgram(mosh.c_str());
+   mCopyProgram = GLUtil::CompileProgram(kDmCopyFrag);
+   return mMeProgram != 0 && mMoshProgram != 0 && mCopyProgram != 0;
+}
+
+void DatamoshNode::CookIfNeeded(int frameId)
+{
+   if (mLastCookFrame == frameId)
+      return;
+   mLastCookFrame = frameId;
+
+   unsigned int srcTex = mInput.Pull(frameId);
+   if (srcTex == 0)
+      return;
+   unsigned int motionTex = mMotion.Pull(frameId);
+   if (motionTex == 0)
+      motionTex = srcTex;
+   const int motionW = (mMotion.GetSource() != nullptr && mMotion.Width() > 0) ? mMotion.Width() : mInput.Width();
+   const int motionH = (mMotion.GetSource() != nullptr && mMotion.Height() > 0) ? mMotion.Height() : mInput.Height();
+   if (!EnsureShaders())
+      return;
+
+   const int w = std::max(1, mInput.Width());
+   const int h = std::max(1, mInput.Height());
+   const int mw = std::max(1, (w + 15) / 16);
+   const int mh = std::max(1, (h + 15) / 16);
+
+   // Resize: reallocating drops the history, so restart from the live image.
+   if (mOut[0].w != w || mOut[0].h != h || mMv[0].w != mw || mMv[0].h != mh)
+      mNeedsInit = true;
+   if (mPrevIn.w != motionW || mPrevIn.h != motionH)
+      mHavePrevIn = false; // reallocated below, contents undefined
+   if (!GLUtil::EnsureFbo(mOut[0], w, h, GL_RGBA16F) || !GLUtil::EnsureFbo(mOut[1], w, h, GL_RGBA16F) ||
+       !GLUtil::EnsureFbo(mMv[0], mw, mh, GL_RG16F) || !GLUtil::EnsureFbo(mMv[1], mw, mh, GL_RG16F) ||
+       !GLUtil::EnsureFbo(mPrevIn, std::max(1, motionW), std::max(1, motionH), GL_RGBA8))
+      return;
+
+   // Refresh ticks: tempo grid (transport beats) or the trigger. Both reset a
+   // random share (Refresh Chance) of blocks to the live image on this frame.
+   bool refreshNow = mRefreshPending;
+   mRefreshPending = false;
+   if (refresh > 0)
+   {
+      static const double kBeats[6] = { 0.0, 0.0, 1.0, 0.5, 0.25, 0.125 };
+      const Transport& tp = Transport::Instance();
+      const double period = (refresh == 1) ? tp.BeatsPerBar() : kBeats[refresh];
+      const long long tick = (long long)std::floor(tp.Beats() / std::max(period, 1e-6));
+      if (tick != mLastTick)
+      {
+         refreshNow = refreshNow || mLastTick >= 0;
+         mLastTick = tick;
+      }
+   }
+   else
+      mLastTick = -1;
+   if (refreshNow)
+      mEpoch++;
+
+   const bool init = mNeedsInit;
+   const int blockPx = (block == 0) ? 8 : (block == 2 ? 32 : 16);
+   const int seedI = (int)(seed * 131.0f) + 12345;
+
+   // 1. Block motion estimation (needs the previous motion-source frame).
+   const int mvBack = 1 - mMvFront;
+   const bool noPrev = init || !mHavePrevIn;
+   GLUtil::RunShaderPass(mMv[mvBack], mMeProgram, [&]()
+   {
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, motionTex);
+      glUniform1i(glGetUniformLocation(mMeProgram, "uCur"), 0);
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, noPrev ? motionTex : GLUtil::FboTexture(mPrevIn));
+      glUniform1i(glGetUniformLocation(mMeProgram, "uPrevIn"), 1);
+      glActiveTexture(GL_TEXTURE2);
+      glBindTexture(GL_TEXTURE_2D, GLUtil::FboTexture(mMv[mMvFront]));
+      glUniform1i(glGetUniformLocation(mMeProgram, "uState"), 2);
+      glUniform2f(glGetUniformLocation(mMeProgram, "uTexel"), 1.0f / motionW, 1.0f / motionH);
+      glUniform1f(glGetUniformLocation(mMeProgram, "uBloom"), std::clamp(bloom, 0.0f, 0.98f));
+      glUniform1f(glGetUniformLocation(mMeProgram, "uThreshold"), threshold * 8.0f);
+      glUniform1i(glGetUniformLocation(mMeProgram, "uReset"), init ? 1 : 0);
+      glActiveTexture(GL_TEXTURE0);
+   });
+   mMvFront = mvBack;
+
+   // 2. Mosh pass: previous output + vectors + live image -> new output.
+   const int back = 1 - mFront;
+   GLUtil::RunShaderPass(mOut[back], mMoshProgram, [&]()
+   {
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, srcTex);
+      glUniform1i(glGetUniformLocation(mMoshProgram, "uSrc"), 0);
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, GLUtil::FboTexture(mOut[mFront]));
+      glUniform1i(glGetUniformLocation(mMoshProgram, "uPrevOut"), 1);
+      glActiveTexture(GL_TEXTURE2);
+      glBindTexture(GL_TEXTURE_2D, GLUtil::FboTexture(mMv[mMvFront]));
+      glUniform1i(glGetUniformLocation(mMoshProgram, "uMv"), 2);
+      glUniform2f(glGetUniformLocation(mMoshProgram, "uRes"), (float)w, (float)h);
+      glUniform1f(glGetUniformLocation(mMoshProgram, "uMosh"), mosh);
+      glUniform1f(glGetUniformLocation(mMoshProgram, "uGain"), gain);
+      glUniform1f(glGetUniformLocation(mMoshProgram, "uBlock"), (float)blockPx);
+      glUniform1f(glGetUniformLocation(mMoshProgram, "uBlockVar"), blockVar);
+      glUniform1f(glGetUniformLocation(mMoshProgram, "uLeak"), leak);
+      glUniform1f(glGetUniformLocation(mMoshProgram, "uChance"), refreshChance);
+      glUniform1i(glGetUniformLocation(mMoshProgram, "uRefresh"), refreshNow ? 1 : 0);
+      glUniform1i(glGetUniformLocation(mMoshProgram, "uInit"), init ? 1 : 0);
+      glUniform1i(glGetUniformLocation(mMoshProgram, "uSeedI"), seedI);
+      glUniform1i(glGetUniformLocation(mMoshProgram, "uEpochI"), (int)(mEpoch & 0x7fffffffu));
+      glActiveTexture(GL_TEXTURE0);
+   });
+   mFront = back;
+
+   // 3. Keep this frame of the motion source for the next estimation.
+   GLUtil::RunShaderPass(mPrevIn, mCopyProgram, [&]()
+   {
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, motionTex);
+      glUniform1i(glGetUniformLocation(mCopyProgram, "uSrc"), 0);
+   });
+   mHavePrevIn = true;
+   mNeedsInit = false;
 }

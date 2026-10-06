@@ -19,7 +19,13 @@ class AudioEffectNode;
 // folds it back rather than clipping it - true wavefolding, seamless because
 // every bank table is synthesised from a harmonic series and is therefore
 // periodic and continuous end-to-end (see Wavetable.h's class comment).
-// `position` morphs the curve across the table's 8 frames.
+// `position` morphs the curve across the table's 8 frames. `stereo` offsets
+// `position` in opposite directions for L and R (L: position - stereo*0.5,
+// R: position + stereo*0.5, each fed through Shape()'s own position clamp -
+// no separate policy), so the two channels are shaped by different frames.
+// At stereo=0 both channels land back on the same frame - bit-identical to
+// the pre-stereo output, which is what keeps existing patches sounding the
+// same after load.
 //
 // `smooth` selects (a continuous crossfade of) the bank's mip level. A
 // band-limited frame has strictly less high-order harmonic content in its
@@ -97,6 +103,7 @@ public:
       kBias,
       kSmooth,
       kOutputDb,
+      kStereo,
       kNumSlots
    };
 

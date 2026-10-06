@@ -1,5 +1,8 @@
 #include "FilterDefs.h"
 
+#include <string>
+#include "GlitchShader.inl"
+
 namespace
 {
    using T = FilterParamDef::Type;
@@ -472,63 +475,26 @@ const std::vector<FilterDef>& GetFilterDefs()
       // One node, six algorithms behind a dropdown, rather than six near-identical
       // nodes cluttering the spawn menu.
       { "glitch", "Effects",
-        "uniform int uKind;\n"
-        "uniform float uAmount;\n"
-        "uniform float uDetail;\n"
-        "uniform float uSpeed;\n"
-        "uniform float uSeed;\n"
-        "float rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898, 78.233)) + uSeed) * 43758.5453); }\n"
-        "void main() {\n"
-        "   float t = uTime * uSpeed;\n"
-        "   vec2 uv = vUv;\n"
-        "\n"
-        "   if (uKind == 0) {\n"           // Slice shift (the original)
-        "      float blockY = floor(uv.y * max(1.0, uDetail * 40.0));\n"
-        "      uv.x += (rand(vec2(blockY, floor(t * 10.0))) - 0.5) * uAmount * 0.2;\n"
-        "      vec4 c = texture(uSrc, uv);\n"
-        "      vec4 cr = texture(uSrc, uv + vec2(uAmount * 0.01, 0.0));\n"
-        "      vec4 cb = texture(uSrc, uv - vec2(uAmount * 0.01, 0.0));\n"
-        "      fragColor = vec4(cr.r, c.g, cb.b, c.a);\n"
-        "      return;\n"
-        "   }\n"
-        "   if (uKind == 1) {\n"           // RGB shift
-        "      vec2 dir = vec2(cos(uDetail * 6.2832), sin(uDetail * 6.2832)) * uAmount * 0.02;\n"
-        "      fragColor = vec4(texture(uSrc, uv + dir).r, texture(uSrc, uv).g,\n"
-        "                       texture(uSrc, uv - dir).b, texture(uSrc, uv).a);\n"
-        "      return;\n"
-        "   }\n"
-        "   if (uKind == 2) {\n"           // Scanlines
-        "      vec4 c = texture(uSrc, uv);\n"
-        "      float line = sin((uv.y + t * 0.1) * max(10.0, uDetail * 800.0) * 3.14159);\n"
-        "      fragColor = vec4(c.rgb * (1.0 - uAmount * step(0.0, -line)), c.a);\n"
-        "      return;\n"
-        "   }\n"
-        "   if (uKind == 3) {\n"           // Blocks
-        "      vec2 grid = max(vec2(2.0), vec2(uDetail * 60.0));\n"
-        "      vec2 cell = floor(uv * grid);\n"
-        "      if (rand(cell + floor(t * 8.0)) > 1.0 - uAmount)\n"
-        "         uv += (vec2(rand(cell + 1.0), rand(cell + 2.0)) - 0.5) * 0.15;\n"
-        "      fragColor = texture(uSrc, clamp(uv, 0.0, 1.0));\n"
-        "      return;\n"
-        "   }\n"
-        "   if (uKind == 4) {\n"           // Wave
-        "      uv.x += sin(uv.y * max(1.0, uDetail * 200.0) + t * 2.0) * uAmount * 0.05;\n"
-        "      fragColor = texture(uSrc, clamp(uv, 0.0, 1.0));\n"
-        "      return;\n"
-        "   }\n"
-        "   // Datamosh\n"
-        "   float slice = floor(uv.y * max(2.0, uDetail * 120.0));\n"
-        "   float r = rand(vec2(slice, floor(t * 4.0)));\n"
-        "   uv.x = fract(uv.x + (r - 0.5) * uAmount * 0.5);\n"
-        "   vec4 c = texture(uSrc, uv);\n"
-        "   if (r > 0.85) c.rgb = c.gbr;\n"
-        "   fragColor = c;\n"
-        "}\n",
-        { E("kind", "uKind", { "Slice Shift", "RGB Shift", "Scanlines", "Blocks", "Wave", "Datamosh" }, 0),
+        glitchsrc::Body(),
+        { E("kind", "uKind", { "Slice Shift", "RGB Shift", "Scanlines", "Blocks", "Wave", "Datamosh",
+                                  "Scan Jitter", "VHS", "Compression", "Pixel Sort" }, 0),
           P("Amount", "uAmount", T::Float, 0.0f, 2.0f, 0.6f),
           P("Detail", "uDetail", T::Float, 0.02f, 1.0f, 0.4f),
           P("Speed", "uSpeed", T::Float, 0.0f, 4.0f, 1.0f),
-          P("Seed", "uSeed", T::Float, 0.0f, 100.0f, 0.0f) } },
+          P("Seed", "uSeed", T::Float, 0.0f, 100.0f, 0.0f),
+          // Turbo 0.51: appended params; defaults keep the old look (see the shader's "plain" test)
+          S("Structure", P("Size Var", "uSizeVar", T::Float, 0.0f, 1.0f, 0.0f)),
+          P("Splits", "uSplits", T::Int, 1.0f, 8.0f, 5.0f),
+          P("Contrast", "uContrast", T::Float, 0.0f, 1.0f, 0.0f),
+          P("Density", "uDensity", T::Float, 0.0f, 1.0f, 1.0f),
+          S("Timing", P("Stagger", "uStagger", T::Float, 0.0f, 1.0f, 0.0f)),
+          P("Burst", "uBurst", T::Float, 0.0f, 1.0f, 0.0f),
+          P("Decay", "uDecay", T::Float, 0.0f, 1.0f, 0.0f),
+          E("Sync", "uSync", { "Free", "1 bar", "1/2", "1/4", "1/8", "1/16", "1/32" }, 0),
+          S("Colour", P("RGB Var", "uRgbVar", T::Float, 0.0f, 1.0f, 0.0f)),
+          P("Color FX", "uColorFx", T::Float, 0.0f, 1.0f, 0.0f),
+          E("Axis", "uAxis", { "Horizontal", "Vertical", "Both" }, 0),
+          E("Clock", "uClockMode", { "Transport", "Free-run" }, 0) } },
 
       // ---------------- Effects: lens / warp ----------------
       { "lensdistortion", "Effects",

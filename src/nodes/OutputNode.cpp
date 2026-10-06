@@ -134,6 +134,9 @@ void OutputNode::StopRecording()
 
    mCaptureRing.enabled.store(false, std::memory_order_relaxed);
    DrainAudioCapture();
+   if (mAudioLostFrames > 0)
+      RuntimeLog::Write("OUTPUT recording audio ring overflow: %lld frames replaced by silence", mAudioLostFrames);
+   mAudioLostFrames = 0;
    FlushReadbacks();
 
    const int frames = Platform::RecorderFrameCount(mRecorder);
@@ -163,6 +166,22 @@ void OutputNode::DrainAudioCapture()
    while ((n = mCaptureRing.Read(scratch, 4096)) > 0)
    {
       Platform::RecorderAppendAudio(mRecorder, scratch, n / 2);
+   }
+
+   // Turbo 0.51: samples dropped on ring overflow are replaced by silence so
+   // audio keeps its length and stays in sync with the video.
+   uint64_t lost = mCaptureRing.overflowCount.exchange(0, std::memory_order_relaxed);
+   if (lost >= 2)
+   {
+      mAudioLostFrames += (long long)(lost / 2);
+      long long remaining = (long long)(lost / 2);
+      float zeros[2048] = {};
+      while (remaining > 0)
+      {
+         const int chunk = (int)std::min<long long>(remaining, 1024);
+         Platform::RecorderAppendAudio(mRecorder, zeros, chunk);
+         remaining -= chunk;
+      }
    }
 }
 

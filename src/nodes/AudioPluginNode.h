@@ -190,6 +190,7 @@ private:
    std::vector<Platform::PluginParamInfo> mAvailableParams;
    int mReadbackCursor = 0;
    int mCookCounter = 0;
+   int mMapSlotsParam = 0; // VisitParams scratch for map_slots (a member, never a stack address)
    float mLastPushed[kMaxMappedParams] = {};
    bool mLastPushedValid[kMaxMappedParams] = {};
 

@@ -206,6 +206,10 @@ public:
    // a SetTopology, no callback can still be running the old process list,
    // so nodes dropped from it may be destroyed.
    uint64_t BlocksDone() const;
+   // Turbo 0.51 (upstream): generation of the topology the audio thread last
+   // fully ran, and of the one currently published.
+   uint64_t CurrentGeneration() const { return mPublishedGeneration.load(std::memory_order_relaxed); }
+   uint64_t CompletedGeneration() const { return mCompletedGeneration.load(std::memory_order_relaxed); }
    // Audio callbacks running right now (0 = none: any later one reads the
    // process list current at that moment).
    int InProcess() const { return mInProcess.load(std::memory_order_acquire); }
@@ -302,7 +306,7 @@ public:
    void RenderOfflineBlock(AudioBuffer& buffer); // advances the transport by buffer.numFrames
 
 private:
-   AudioEngine() = default;
+   AudioEngine(); // wires the scratch channel tables below
 
    struct ProcessList;
    void RunArrangeLookahead(ProcessList* list, int numFrames);
@@ -351,9 +355,26 @@ private:
    {
       AudioTopology topology;
       std::vector<PooledBuffer> buffers;
+      uint64_t generation = 0;
    };
    std::atomic<ProcessList*> mCurrent { nullptr };
-   ProcessList* mRetiring = nullptr; // freed on the NEXT SetTopology call
+   // Turbo 0.51 (upstream): superseded lists wait here until the audio thread
+   // completes a pass over a strictly newer generation (see DrainRetired).
+   // Main thread only.
+   std::vector<ProcessList*> mRetiring;
+   std::atomic<bool> mDeviceOpen { false }; // raised BEFORE the device opens
+   std::atomic<uint64_t> mPublishedGeneration { 0 };
+   std::atomic<uint64_t> mCompletedGeneration { 0 }; // audio thread: last generation fully run
+   void DrainRetired();
+
+   // Turbo 0.51: RunTopology scratch as plain members (RunTopology never runs
+   // concurrently with itself), replacing thread_local / leaked heap. The
+   // channel tables are wired once in the constructor.
+   float mCompScratch[kAudioMaxNodeInputs][kAudioMaxChannels][kAudioMaxBlockFrames];
+   float* mCompScratchChannels[kAudioMaxNodeInputs][kAudioMaxChannels];
+   float mTerminalScratch[kAudioMaxChannels][kAudioMaxBlockFrames];
+   float* mTerminalScratchChannels[kAudioMaxChannels];
+   float mInterleaveScratch[kAudioMaxBlockFrames * 2];
 
    // Shared by Process() (real device callback) and ProcessOffline() (tests):
    // walks `list`'s topology in order, handing each node its declared input

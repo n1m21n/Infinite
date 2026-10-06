@@ -11,6 +11,7 @@ void DynamicsKernel::PushParams(const AudioEffectNode& node, double sampleRate)
 
    mDetectorRms.store(node.Param("detectorRms") != 0.0f ? 1 : 0, std::memory_order_relaxed);
    mSidechainExternal.store(node.Param("sidechainExternal") != 0.0f ? 1 : 0, std::memory_order_relaxed);
+   mAnalog.store(node.Param("analog") != 0.0f ? 1 : 0, std::memory_order_relaxed);
 
    mMailbox.Push(kThreshold, node.Param("threshold"));
    mMailbox.Push(kRatio, node.Param("ratio"));

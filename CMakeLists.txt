@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.25)
 # Unofficial Windows-only fork of Infinite (https://github.com/n1m21n/Infinite).
 # macOS support was removed on purpose: every platform path below is Windows
 # (MSVC 2022, x64, vcpkg static triplet, JUCE, OpenCV, Spout2, Windows ML).
-project(InfiniteTurbo VERSION 0.50.0 LANGUAGES C CXX)
+project(InfiniteTurbo VERSION 0.51.0 LANGUAGES C CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Infinite-Turbo builds only on Windows x64 with MSVC (Visual Studio 2022).")
@@ -482,6 +482,13 @@ add_custom_command(TARGET Infinite POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL.txt"
         "$<TARGET_FILE_DIR:Infinite>/assets/fonts/OFL.txt"
+    # Turbo 0.51: optional interface font (Preferences), OFL licensed.
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/AtkinsonHyperlegible-Regular.ttf"
+        "$<TARGET_FILE_DIR:Infinite>/assets/fonts/AtkinsonHyperlegible-Regular.ttf"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-AtkinsonHyperlegible.txt"
+        "$<TARGET_FILE_DIR:Infinite>/assets/fonts/OFL-AtkinsonHyperlegible.txt"
     # Turbo 0.46: the example patch Infinite-Turbo opens with.
     COMMAND ${CMAKE_COMMAND} -E make_directory
         "$<TARGET_FILE_DIR:Infinite>/assets/examples"

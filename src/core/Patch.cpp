@@ -43,6 +43,12 @@ namespace
       file << p << "audioSampleRate " << s.audioSampleRate << "\n";
       file << p << "audioBufferFrames " << s.audioBufferFrames << "\n";
       file << p << "audioDriver " << s.audioDriver << "\n";
+      file << p << "audioMirror " << (s.audioMirror ? 1 : 0) << "\n";
+      {
+         std::string dev = s.audioMirrorDevice;
+         for (char& c : dev) if (c == '\n' || c == '\r') c = ' ';
+         file << p << "audioMirrorDevice " << dev << "\n";
+      }
       file << p << "audioOversample " << s.audioOversample << "\n";
       file << p << "targetFps " << s.targetFps << "\n";
       file << p << "vsync " << (s.vsync ? 1 : 0) << "\n";
@@ -64,6 +70,8 @@ namespace
       file << p << "autosaveSeconds " << s.autosaveSeconds << "\n";
       file << p << "audioAutoStart " << (s.audioAutoStart ? 1 : 0) << "\n";
       file << p << "uiScale " << s.uiScale << "\n";
+      if (!s.uiFont.empty())
+         file << p << "uiFont " << s.uiFont << "\n";
       file << p << "updateCheck " << (s.updateCheck ? 1 : 0) << "\n";
       file << p << "startWithExample " << (s.startWithExample ? 1 : 0) << "\n";
    }
@@ -76,6 +84,13 @@ namespace
       else if (key == "audioSampleRate") in >> s.audioSampleRate;
       else if (key == "audioBufferFrames") in >> s.audioBufferFrames;
       else if (key == "audioDriver") in >> s.audioDriver;
+      else if (key == "audioMirror") { int v = 0; in >> v; s.audioMirror = v != 0; }
+      else if (key == "audioMirrorDevice")
+      {
+         std::getline(in >> std::ws, s.audioMirrorDevice);
+         while (!s.audioMirrorDevice.empty() && (s.audioMirrorDevice.back() == '\r' || s.audioMirrorDevice.back() == ' '))
+            s.audioMirrorDevice.pop_back();
+      }
       else if (key == "audioOversample") in >> s.audioOversample;
       else if (key == "targetFps") in >> s.targetFps;
       else if (key == "vsync") { int v = 0; in >> v; s.vsync = v != 0; }
@@ -97,6 +112,7 @@ namespace
       else if (key == "autosaveSeconds") in >> s.autosaveSeconds;
       else if (key == "audioAutoStart") { int v = 0; in >> v; s.audioAutoStart = v != 0; }
       else if (key == "uiScale") in >> s.uiScale;
+      else if (key == "uiFont") in >> s.uiFont;
       else if (key == "updateCheck") { int v = 1; in >> v; s.updateCheck = v != 0; }
       else if (key == "startWithExample") { int v = 1; in >> v; s.startWithExample = v != 0; }
    }

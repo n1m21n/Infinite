@@ -255,13 +255,14 @@ public:
    std::string label = "Step Gate";
    void VisitParams(ParamVisitor& v) override
    {
-      int patInt = (int)pattern;
-      v.Int("pattern", patInt);
-      pattern = (uint8_t)patInt;
+      mPatInt = (int)pattern; // Turbo 0.51: member, not a stack temp
+      v.Int("pattern", mPatInt);
+      pattern = (uint8_t)mPatInt;
       v.Float("rateBeats", rateBeats);
       v.Text("label", label);
    }
 
 private:
    int mCurrentStep = 0;
+   int mPatInt = 0;
 };

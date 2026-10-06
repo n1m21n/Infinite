@@ -12,7 +12,7 @@
 class AudioCaptureRing
 {
 public:
-   static constexpr size_t kCapacity = 192000;
+   static constexpr size_t kCapacity = 1 << 20; // Turbo 0.51: ~10 s of 48k stereo
 
    // Audio thread only. Drops (and counts) samples past the ring's capacity
    // rather than blocking - a stall shows up as a reported overflow instead
@@ -20,6 +20,8 @@ public:
    void Write(const float* samples, int count);
 
    // Main thread only. Returns the number of samples actually read.
+   // Turbo 0.51: Write accepts whole stereo frames only and Read returns even
+   // counts, so an overflow can never swap L/R.
    int Read(float* out, int maxCount);
 
    // Audio thread checks this before writing; main thread sets it when

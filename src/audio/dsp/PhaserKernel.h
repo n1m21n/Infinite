@@ -4,6 +4,7 @@
 #include <atomic>
 #include <cmath>
 
+#include "AnalogPrimitives.h"
 #include "IEffectKernel.h"
 #include "audio/DspMath.h"
 #include "audio/MusicTime.h"
@@ -60,6 +61,7 @@ public:
 
    void Reset() override
    {
+      mDriftLfo.Reset();
       for (int i = 0; i < kMaxStages; i++)
       {
          mStagesL[i].Reset();
@@ -87,6 +89,10 @@ private:
    double mSampleRate = 44100.0;
 
    std::atomic<int> mStageCount { 4 };
+   // Turbo 0.51: analog character mode (ported from upstream), driven by
+   // Turbo's own feedback knob instead of upstream's fixed loop gain.
+   std::atomic<int> mAnalog { 0 };
+   AnalogDsp::DriftLfo mDriftLfo;
    std::atomic<int> mSync { 0 };
    std::atomic<int> mRateDiv { MusicTime::kQuarter };
 

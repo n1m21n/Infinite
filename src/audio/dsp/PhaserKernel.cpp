@@ -11,6 +11,7 @@ void PhaserKernel::PushParams(const AudioEffectNode& node, double sampleRate)
    mMailbox.Push(kDepth, node.Param("depth"));
    mMailbox.Push(kSpread, node.Param("spread"));
    mMailbox.Push(kFeedback, node.Param("feedback"));
+   mAnalog.store(node.Param("analog") != 0.0f ? 1 : 0, std::memory_order_relaxed);
    mStageCount.store(std::clamp((int)(node.Param("order") + 0.5f) & ~1, 2, kMaxStages), std::memory_order_relaxed);
    mSync.store(node.Param("sync") != 0.0f ? 1 : 0, std::memory_order_relaxed);
    mRateDiv.store(std::clamp((int)(node.Param("rateDiv") + 0.5f), 0, MusicTime::kNumRateDivisions - 1),
@@ -23,6 +24,7 @@ void PhaserKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
    const int stages = mStageCount.load(std::memory_order_relaxed);
    const bool sync = mSync.load(std::memory_order_relaxed) != 0;
    const int rateDiv = mRateDiv.load(std::memory_order_relaxed);
+   const bool analog = mAnalog.load(std::memory_order_relaxed) != 0;
 
    for (int i = 0; i < out.numFrames; i++)
    {
@@ -47,19 +49,39 @@ void PhaserKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*side
       // exponential sweep (not linear) reads as musically even across the
       // whole range, the same reason Audio Filter's freq axis is log.
       const float octaves = depth * 1.0f;
-      const float fcL = cutoffHz * powf(2.0f, octaves * sinf(2.0f * (float)M_PI * (float)mPhase));
-      const float fcR = cutoffHz * powf(2.0f, octaves * sinf(2.0f * (float)M_PI * ((float)mPhase + spread * 0.5f)));
-      const float aL = AllpassCoeff(fcL, (float)mSampleRate);
-      const float aR = AllpassCoeff(fcR, (float)mSampleRate);
-
-      // The cascade is unity-magnitude, so |fb| < 1 is stable; the tanh only
-      // tames transients when feedback and a hot input stack up.
-      float xL = std::tanh(in.channels[0][i] + fb * mFbL);
-      float xR = std::tanh((numChannels >= 2 ? in.channels[1][i] : in.channels[0][i]) + fb * mFbR);
-      for (int s = 0; s < stages; s++)
+      float xL, xR;
+      if (analog)
       {
-         xL = mStagesL[s].Process(xL, aL);
-         xR = mStagesR[s].Process(xR, aR);
+         const float lfoDrift = mDriftLfo.Advance(std::max(0.1f, rateHz), 0.15f, 0.04f, mSampleRate) * 0.04f;
+         const float fcL = cutoffHz * powf(2.0f, octaves * sinf(2.0f * (float)M_PI * ((float)mPhase + lfoDrift)));
+         const float fcR = cutoffHz * powf(2.0f, octaves * sinf(2.0f * (float)M_PI * ((float)mPhase + spread * 0.5f + lfoDrift)));
+         const float aL = AllpassCoeff(fcL, (float)mSampleRate);
+         const float aR = AllpassCoeff(fcR, (float)mSampleRate);
+
+         xL = AnalogDsp::AsymTanh(in.channels[0][i] + fb * mFbL, 0.06f);
+         xR = numChannels >= 2 ? AnalogDsp::AsymTanh(in.channels[1][i] + fb * mFbR, 0.06f) : xL;
+         for (int s = 0; s < stages; s++)
+         {
+            xL = AnalogDsp::AsymTanh(mStagesL[s].Process(xL, aL), 0.04f);
+            xR = AnalogDsp::AsymTanh(mStagesR[s].Process(xR, aR), 0.04f);
+         }
+      }
+      else
+      {
+         const float fcL = cutoffHz * powf(2.0f, octaves * sinf(2.0f * (float)M_PI * (float)mPhase));
+         const float fcR = cutoffHz * powf(2.0f, octaves * sinf(2.0f * (float)M_PI * ((float)mPhase + spread * 0.5f)));
+         const float aL = AllpassCoeff(fcL, (float)mSampleRate);
+         const float aR = AllpassCoeff(fcR, (float)mSampleRate);
+
+         // The cascade is unity-magnitude, so |fb| < 1 is stable; the tanh only
+         // tames transients when feedback and a hot input stack up.
+         xL = std::tanh(in.channels[0][i] + fb * mFbL);
+         xR = std::tanh((numChannels >= 2 ? in.channels[1][i] : in.channels[0][i]) + fb * mFbR);
+         for (int s = 0; s < stages; s++)
+         {
+            xL = mStagesL[s].Process(xL, aL);
+            xR = mStagesR[s].Process(xR, aR);
+         }
       }
       mFbL = xL;
       mFbR = xR;

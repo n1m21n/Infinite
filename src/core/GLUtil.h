@@ -64,7 +64,12 @@ namespace GLUtil
    enum OutputFitMode { kFitLetterbox = 0, kFitPixel = 1, kFitFill = 2, kFitStretch = 3 };
    void DrawTextureToScreen(unsigned int tex, int windowW, int windowH,
                              int texW = 0, int texH = 0, bool checkerBg = false,
-                             int fitMode = kFitLetterbox, const float* bgRGB = nullptr);
+                             int fitMode = kFitLetterbox, const float* bgRGB = nullptr,
+                             bool transparentWindow = false);
+   // Turbo 0.51 (upstream 8af69a1): transparentWindow (a window made with a
+   // transparent framebuffer) writes the texture's alpha premultiplied, clears
+   // to alpha 0 and skips the background mix, so the desktop / OBS window
+   // capture sees through a node with a transparent background.
 
    // Draws the shared unit quad (clip-space -1..1, vUv 0..1) with whatever
    // program/viewport is bound. Used by nodes that composite into sub-rects.

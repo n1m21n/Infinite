@@ -1,5 +1,57 @@
 # Infinite-Turbo (for Windows) - changelog
 
+## 0.51.0-turbo (2026-10-06)
+
+### Glitch, rebuilt
+- Slices and blocks now come in **varied sizes** (Size Var, Splits): big and tiny pieces side by side.
+- **Contrast** (most slices move a little, a few jump far), **Density**, **Stagger** (each slice on its
+  own clock), **Burst / Decay** (glitch bursts with clean frames between), **RGB Var**, **Color FX**,
+  **Axis** (horizontal, vertical, both).
+- **Sync** to the beat (bar to 1/32) and a **Free-run** clock that keeps moving with the transport stopped.
+- New kinds: **Scan Jitter**, **VHS**, **Compression** (macroblocks), **Pixel Sort**.
+- Old patches look the same: every new control defaults to the previous behaviour.
+- New **Datamosh** node: real codec-style moshing with block motion vectors on the previous frame,
+  bloom (smear), threshold, block size, leak, refresh on the beat or by a mappable button, and an
+  optional second input whose motion moves the first image.
+
+### Chord Progression
+- **Slots**: right-click to duplicate, insert, delete, move, copy and paste; drag to reorder; "+" cell;
+  Ctrl+D, Ctrl+C, Ctrl+V, Delete, Alt+arrows.
+- **Length**: double-click to type (2, 1.5, 3b for beats, 1.2 for bars.beats), drag snaps to beats;
+  minimum 1/16 bar.
+- **Extension chips** (7, maj7, b9, 9, #9, 11, #11, b13, 13, add9, sus2, sus4, no3, no5) add to the chord.
+- **Keyboard plays** when clicked, shows the root, spans **4 octaves**, Shift+click sets a slash bass.
+- Voicings: close, drop2, spread, octave up / down, lead (smallest movement); inversions wrap around.
+- Any note set gets a name ("C MAJ7(9,#11)/E"). MCP: new `chord_progression` tool (chord symbols).
+
+### Mixer faders
+- Faders follow the **console law** on screen (0 dB at 3/4, as MIDI and Performance Mode already did),
+  with dB marks, "-inf" at the bottom, Ctrl / Alt + click resets to 0 dB. Same fix on the Mixer, Gain,
+  MPC Out, Clip Matrix gains and every frequency knob. Saved values are unchanged.
+
+### Audio effects (from upstream Infinite)
+- **Analog** character mode on Dynamics, Delay, Chorus, Flanger, Phaser, Pitch Shifter, Bitcrush,
+  Ring Mod and Frequency Shifter; Flanger spread; Wavetable Shaper stereo.
+- Audio Filter **LFO** (free or synced) next to the envelope and the cutoff-mod input.
+- EQ: new band types hp / lp 24 and 36, band pass, notch, all pass (comb kept).
+- Metallic resonator: correct long decays, clean release, calibrated strike.
+
+### Fixes and polish (from upstream Infinite)
+- **Crash fix**: the audio engine frees old node lists by generation; two rebuilds inside one audio
+  block (paste plus a sample finishing to load) could crash. The audio thread starts on an empty list.
+- Accented and non-Latin names (ł, ő, Ж, quotes, dashes) draw instead of "?".
+- Interface font choice: IBM Plex or **Atkinson Hyperlegible**.
+- Old patches whose bundled drum kit folder moved (each release unzips to a new folder) reload the kit.
+- Dropdown search from 12 items, accent-insensitive.
+- Output windows can be transparent when the Layout background is transparent.
+
+### Recording and plugins
+
+- Fixed a crash with audio plugins: a re-prepare (sample rate, block size or engine restart) republished the same plugin handle and a later swap destroyed the live plugin, so autosave read freed memory.
+- Output recording no longer drops audio when the UI stalls: the capture ring is about 10 s, takes whole stereo frames only (no left/right swap after an overflow), and any lost samples are replaced by silence so audio stays in sync with video. Overflows are logged once per recording.
+- The encoder thread now writes all pending audio blocks each time it wakes.
+- Mirror output (Settings > Audio): plays a copy of the master on a Windows Audio device so OBS or screen recorders can capture it while ASIO is in use. Drift between the two devices is compensated; off by default.
+
 ## 0.50.0-turbo (2026-10-06)
 
 ### Quantized restart on sequencers

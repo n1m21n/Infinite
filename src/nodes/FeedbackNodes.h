@@ -152,3 +152,70 @@ private:
    bool mNeedsSeed = true;
    int mLastCookFrame = -1;
 };
+
+// --- Datamosh (Turbo 0.51) ----------------------------------------------
+// Codec-style datamosh: blocks that are "held" keep sampling the previous output,
+// displaced by a motion vector estimated between the previous and current frame
+// of the motion source (the image itself when no motion source is patched).
+// Refreshing ("I-frames", on a tempo grid or by trigger) copies the live image
+// back into a share of the blocks. Renders every frame (state lives in the node).
+class DatamoshNode : public INode
+{
+public:
+   static INode* Create() { return new DatamoshNode(); }
+   ~DatamoshNode() override;
+
+   unsigned int GetOutputTexture() override { return GLUtil::FboTexture(mOut[mFront]); }
+   int GetOutputWidth() const override { return mOut[mFront].w; }
+   int GetOutputHeight() const override { return mOut[mFront].h; }
+   void CookIfNeeded(int frameId) override;
+
+   ImageCable& Input() { return mInput; }
+   ImageCable& MotionInput() { return mMotion; }
+   INode* BypassSource() override { return mInput.GetSource(); }
+   const char* InputLabel(int slot) const override { return slot == 0 ? "image" : (slot == 1 ? "motion" : nullptr); }
+   void Refresh() { mRefreshPending = true; }
+
+   static const std::vector<std::string>& BlockNames();
+   static const std::vector<std::string>& RefreshNames();
+
+   float mosh = 0.6f;        // share of blocks held (moshed)
+   float gain = 1.0f;        // motion vector multiplier
+   float bloom = 0.3f;       // how much of the last vector keeps accumulating
+   float threshold = 0.1f;   // motion below this (0..1 = 0..8 px) is ignored
+   int block = 1;            // 0 = 8, 1 = 16, 2 = 32 px
+   float blockVar = 0.0f;    // 0 = uniform grid, 1 = widely varying block sizes
+   float leak = 0.0f;        // mosh bleeding into refreshed blocks
+   int refresh = 0;          // 0 off, 1 bar, 2 beat, 3 1/2, 4 1/4, 5 1/8
+   float refreshChance = 1.0f; // share of blocks reset on each refresh
+   float seed = 0.0f;
+
+   void VisitParams(ParamVisitor& v) override
+   {
+      v.Float("mosh", mosh); v.Float("gain", gain); v.Float("bloom", bloom);
+      v.Float("threshold", threshold); v.Int("block", block); v.Float("blockVar", blockVar);
+      v.Float("leak", leak); v.Int("refresh", refresh); v.Float("refreshChance", refreshChance);
+      v.Float("seed", seed);
+   }
+
+private:
+   bool EnsureShaders();
+
+   ImageCable mInput;
+   ImageCable mMotion;
+   GLUtil::Fbo mOut[2];   // previous / current output (RGBA16F)
+   GLUtil::Fbo mMv[2];    // one texel per 16 px block: accumulated motion vector (RG16F)
+   GLUtil::Fbo mPrevIn;   // previous frame of the motion source
+   int mFront = 0;        // index of the latest output
+   int mMvFront = 0;
+   unsigned int mMeProgram = 0;
+   unsigned int mMoshProgram = 0;
+   unsigned int mCopyProgram = 0;
+   bool mShaderTried = false;
+   bool mNeedsInit = true;
+   bool mHavePrevIn = false;
+   bool mRefreshPending = false;
+   long long mLastTick = -1;
+   unsigned int mEpoch = 0;
+   int mLastCookFrame = -1;
+};

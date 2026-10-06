@@ -24,7 +24,7 @@ void EqKernel::PushParams(const AudioEffectNode& node, double sampleRate)
 
    for (int b = 0; b < kNumBands; b++)
    {
-      const int type = std::clamp((int)(node.Param(kTypeNames[b]) + 0.5f), 0, EqDsp::kNumBandTypes - 1);
+      const int type = EqDsp::SanitizeType(node.Param(kTypeNames[b]));
       const float freq = node.Param(kFreqNames[b]);
       const float q = node.Param(kQNames[b]);
       const float gainDb = node.Param(kGainNames[b]);
@@ -47,6 +47,7 @@ void EqKernel::PushParams(const AudioEffectNode& node, double sampleRate)
       // the bypass biquad.
       mMailbox.Push(kBandFreqSlot0 + b, freq);
       mMailbox.Push(kBandQSlot0 + b, q);
+      mBandStages[b].store(on ? EqDsp::StageCount(type) : 1, std::memory_order_relaxed);
       mBandIsComb[b].store(on && EqDsp::IsComb(type), std::memory_order_relaxed);
       mBandCombNegative[b].store(EqDsp::CombIsNegative(type), std::memory_order_relaxed);
    }

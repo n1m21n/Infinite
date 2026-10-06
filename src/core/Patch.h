@@ -152,6 +152,8 @@ namespace Patch
       uint32_t audioInputDeviceId = 0;
       double audioSampleRate = 0.0;
       int audioBufferFrames = 512;
+      bool audioMirror = false;          // Turbo 0.51: mirror master out to a Windows device (OBS)
+      std::string audioMirrorDevice;     // empty = Windows default output
       int audioDriver = 0; // Turbo: 0 WASAPI shared, 1 ASIO, 2 WASAPI exclusive, 3 WASAPI low latency, 4 DirectSound
       float audioOversample = 1.0f;
       int targetFps = 60;
@@ -175,6 +177,7 @@ namespace Patch
       bool audioAutoStart = false; // Turbo: start the audio engine when the app opens (app-level only)
       bool startWithExample = true; // Turbo 0.46: open the bundled example at startup (app-level only)
       bool updateCheck = true; // Turbo 0.46: look for a newer release at startup (app-level only)
+      std::string uiFont; // Turbo 0.51: interface font id ("" = IBM Plex default, "atkinson"), app-level only
       float uiScale = 0.0f; // Turbo 0.46: 0 = follow Windows' display scale, else a fixed factor (app-level only)
    };
 

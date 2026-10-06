@@ -1350,6 +1350,114 @@ namespace Platform
          }
       };
 
+      struct MirrorOut;
+      std::atomic<MirrorOut*> gMirror {nullptr};
+      std::atomic<double> gMirrorMainRate {48000.0};
+
+      // Turbo 0.51: mirror output. The main (ASIO) callback pushes its final
+      // stereo output into a lock-free SPSC ring; a second device manager on
+      // "Windows Audio" shared mode pulls from it with a linear resampler whose
+      // ratio is nudged by a P controller on the ring fill (clock drift between
+      // the two devices). No locks or allocations on either audio thread.
+      struct MirrorOut final : juce::AudioIODeviceCallback
+      {
+         static constexpr uint64_t kCap = 1u << 16; // frames, power of two
+         static constexpr uint64_t kMask = kCap - 1;
+         juce::AudioDeviceManager manager;
+         std::vector<float> buf = std::vector<float>((size_t)kCap * 2, 0.0f);
+         std::atomic<unsigned long long> writePos {0};
+         std::atomic<bool> active {false};
+         std::atomic<unsigned long long> underflows {0}, overflows {0};
+         // consumer (mirror callback) state
+         double readPos = 0.0, filtFill = 0.0, mirrorRate = 48000.0;
+         bool primed = false;
+         // main thread state
+         bool callbackAdded = false, enabled = false;
+         std::string deviceName, status;
+
+         void push(const float* const* out, int numOut, int frames)
+         {
+            if (!active.load(std::memory_order_relaxed) || numOut < 1 || !out[0]) return;
+            unsigned long long w = writePos.load(std::memory_order_relaxed);
+            const float* l = out[0];
+            const float* r = (numOut > 1 && out[1]) ? out[1] : out[0];
+            for (int i = 0; i < frames; ++i)
+            {
+               const size_t idx = (size_t)((w + (unsigned long long)i) & kMask) * 2;
+               buf[idx] = l[i];
+               buf[idx + 1] = r[i];
+            }
+            writePos.store(w + (unsigned long long)frames, std::memory_order_release);
+         }
+
+         void audioDeviceAboutToStart(juce::AudioIODevice* device) override
+         {
+            if (device) mirrorRate = std::max(8000.0, device->getCurrentSampleRate());
+            primed = false;
+         }
+         void audioDeviceStopped() override { primed = false; }
+         void audioDeviceError(const juce::String&) override { primed = false; }
+
+         void audioDeviceIOCallbackWithContext(const float* const*, int, float* const* out, int numOut,
+             int frames, const juce::AudioIODeviceCallbackContext&) override
+         {
+            for (int ch = 0; ch < numOut; ++ch) if (out[ch]) std::fill(out[ch], out[ch] + frames, 0.0f);
+            if (!active.load(std::memory_order_relaxed) || numOut < 1 || frames <= 0) { primed = false; return; }
+            const double mainRate = gMirrorMainRate.load(std::memory_order_relaxed);
+            const double base = mainRate / mirrorRate;
+            const double target = 2.5 * frames * base;
+            const unsigned long long w = writePos.load(std::memory_order_acquire);
+            double fill = (double)w - readPos;
+            if (!primed)
+            {
+               if (fill < target) return; // keep silence until the cushion exists
+               readPos = (double)w - target;
+               filtFill = target;
+               fill = target;
+               primed = true;
+            }
+            if (fill > (double)(kCap / 2) || fill < 0.0)
+            {
+               overflows.fetch_add(1, std::memory_order_relaxed);
+               readPos = (double)w - target;
+               filtFill = target;
+               fill = target;
+            }
+            filtFill += 0.02 * (fill - filtFill);
+            const double err = (filtFill - target) / target;
+            const double adj = std::clamp(err * 0.002, -0.0005, 0.0005); // +-0.05%
+            const double ratio = base * (1.0 + adj);
+            if (fill < ratio * frames + 2.0)
+            {
+               underflows.fetch_add(1, std::memory_order_relaxed);
+               primed = false;
+               return;
+            }
+            for (int i = 0; i < frames; ++i)
+            {
+               const unsigned long long i0 = (unsigned long long)readPos;
+               const float frac = (float)(readPos - (double)i0);
+               const size_t a = (size_t)(i0 & kMask) * 2, b = (size_t)((i0 + 1) & kMask) * 2;
+               const float l = buf[a] + (buf[b] - buf[a]) * frac;
+               const float r = buf[a + 1] + (buf[b + 1] - buf[a + 1]) * frac;
+               if (numOut == 1 && out[0]) out[0][i] = 0.5f * (l + r);
+               else
+               {
+                  if (out[0]) out[0][i] = l;
+                  if (numOut > 1 && out[1]) out[1][i] = r;
+               }
+               readPos += ratio;
+            }
+         }
+      };
+      MirrorOut& MirrorInstance()
+      {
+         EnsureJuceInitialised();
+         static MirrorOut instance;
+         gMirror.store(&instance, std::memory_order_release);
+         return instance;
+      }
+
       struct AudioBridge final : juce::AudioIODeviceCallback
       {
          juce::AudioDeviceManager manager;
@@ -1387,6 +1495,7 @@ namespace Platform
          {
             if (!device) return;
             sampleRate = device->getCurrentSampleRate();
+            gMirrorMainRate.store(sampleRate, std::memory_order_relaxed);
             blockSize = device->getCurrentBufferSizeSamples();
             roundTripFrames.store(std::max(0, device->getInputLatencyInSamples()) +
                                   std::max(0, device->getOutputLatencyInSamples()) + std::max(0, blockSize));
@@ -1452,6 +1561,7 @@ namespace Platform
             // Infinite callback only writes sample data and never rebinds a
             // channel pointer. Remove only that outer const qualification.
             if (callback) callback(const_cast<float**>(output), numOut, frames, user);
+            if (MirrorOut* m = gMirror.load(std::memory_order_acquire)) m->push(output, numOut, frames);
          }
       };
       // AudioDeviceManager reaches JUCE's message/device infrastructure from
@@ -1542,6 +1652,103 @@ namespace Platform
    {
       return AudioBridgeInstance().manager.getCurrentAudioDeviceType().toStdString();
    }
+   // ---- Turbo 0.51: Windows mirror output ----
+   bool AudioMirrorApply(bool enable, const std::string& deviceName, std::string& error)
+   {
+      EnsureJuceInitialised();
+      MirrorOut& m = MirrorInstance();
+      m.deviceName = deviceName;
+      m.enabled = enable;
+      if (!enable)
+      {
+         m.active.store(false);
+         if (m.callbackAdded) { m.manager.removeAudioCallback(&m); m.callbackAdded = false; }
+         m.manager.closeAudioDevice();
+         m.status.clear();
+         return true;
+      }
+      m.active.store(false);
+      if (m.callbackAdded) { m.manager.removeAudioCallback(&m); m.callbackAdded = false; }
+      const juce::String type = "Windows Audio";
+      bool hasType = false;
+      juce::String outName(deviceName);
+      for (auto* t : m.manager.getAvailableDeviceTypes())
+         if (t && t->getTypeName() == type)
+         {
+            hasType = true;
+            // Empty name = the Windows default output (an empty outputDeviceName
+            // would open no output at all).
+            if (outName.isEmpty())
+            {
+               t->scanForDevices();
+               const juce::StringArray names = t->getDeviceNames(false);
+               const int def = t->getDefaultDeviceIndex(false);
+               if (names.size() > 0)
+                  outName = names[def >= 0 && def < names.size() ? def : 0];
+            }
+         }
+      if (!hasType) { error = "Windows Audio driver not available"; m.status = error; return false; }
+      m.manager.setCurrentAudioDeviceType(type, true);
+      auto setup = m.manager.getAudioDeviceSetup();
+      setup.outputDeviceName = outName;
+      setup.inputDeviceName = juce::String();
+      setup.useDefaultInputChannels = false;
+      setup.inputChannels.clear();
+      setup.useDefaultOutputChannels = true;
+      const juce::String result = m.manager.setAudioDeviceSetup(setup, true);
+      if (result.isNotEmpty() || m.manager.getCurrentAudioDevice() == nullptr)
+      {
+         error = result.isNotEmpty() ? result.toStdString() : std::string("mirror device did not open");
+         m.status = "mirror: " + error;
+         return false;
+      }
+      m.primed = false;
+      m.readPos = 0.0;
+      m.writePos.store(0);
+      m.manager.addAudioCallback(&m);
+      m.callbackAdded = true;
+      m.active.store(true);
+      return true;
+   }
+   std::vector<std::string> AudioMirrorListDevices()
+   {
+      EnsureJuceInitialised();
+      std::vector<std::string> out;
+      MirrorOut& m = MirrorInstance();
+      for (auto* t : m.manager.getAvailableDeviceTypes())
+      {
+         if (!t || t->getTypeName() != juce::String("Windows Audio")) continue;
+         t->scanForDevices();
+         for (const auto& n : t->getDeviceNames(false)) out.push_back(n.toStdString());
+      }
+      return out;
+   }
+   bool AudioMirrorEnabled()
+   {
+      MirrorOut* m = gMirror.load(std::memory_order_acquire);
+      return m && m->enabled;
+   }
+   std::string AudioMirrorDeviceName()
+   {
+      MirrorOut* m = gMirror.load(std::memory_order_acquire);
+      return m ? m->deviceName : std::string();
+   }
+   std::string AudioMirrorStatus()
+   {
+      MirrorOut* m = gMirror.load(std::memory_order_acquire);
+      if (!m || !m->enabled) return std::string();
+      if (!m->status.empty() && !m->active.load()) return m->status;
+      auto* dev = m->manager.getCurrentAudioDevice();
+      if (!dev) return "mirror: no device";
+      const std::string name = dev->getName().toStdString();
+      std::string text = "Mirror: " + name + ", " + std::to_string((int)dev->getCurrentSampleRate()) +
+                         " Hz, underruns " + std::to_string(m->underflows.load()) +
+                         ", resets " + std::to_string(m->overflows.load());
+      if (name == AudioBridgeInstance().lastDevice)
+         text += " (same device as the main output, pick another one)";
+      return text;
+   }
+
    std::vector<int> AudioAvailableDrivers()
    {
       EnsureJuceInitialised();
@@ -1853,7 +2060,7 @@ namespace Platform
       for (;;)
       {
          RecorderHandle::FramePacket frame;
-         std::vector<float> audio;
+         std::deque<std::vector<float>> audioBlocks; // Turbo 0.51: drain all pending audio per wake
          bool hasFrame = false;
          {
             std::unique_lock<std::mutex> lock(r->frameMutex);
@@ -1869,11 +2076,7 @@ namespace Platform
             }
             // Drain one audio block and one video packet per wake. File I/O,
             // colour conversion and codec work all remain on this worker.
-            if (!r->audioQueue.empty())
-            {
-               audio = std::move(r->audioQueue.front());
-               r->audioQueue.pop_front();
-            }
+            audioBlocks.swap(r->audioQueue);
             if (!r->frameQueue.empty())
             {
                frame = std::move(r->frameQueue.front());
@@ -1882,8 +2085,10 @@ namespace Platform
             }
          }
 
-         if (!audio.empty() && r->hasLiveAudio)
-            r->audio.Append(audio.data(), (int)(audio.size() / std::max(1, r->liveAudioChannels)));
+         if (r->hasLiveAudio)
+            for (const std::vector<float>& audio : audioBlocks)
+               if (!audio.empty())
+                  r->audio.Append(audio.data(), (int)(audio.size() / std::max(1, r->liveAudioChannels)));
 
          if (hasFrame)
          {

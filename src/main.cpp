@@ -502,6 +502,19 @@ namespace
    // Turbo 0.46 (upstream R527): interface scale. 0 = follow Windows' display
    // scale (per monitor); otherwise a fixed factor (Settings > Interface scale).
    float gUiScaleSetting = 0.0f;
+   // Turbo 0.51 (upstream 42e4902): interface font choice. `file` is under
+   // assets/fonts; the first entry (IBM Plex) is the default and the fallback.
+   struct InterfaceFont
+   {
+      const char* id;
+      const char* label;
+      const char* file;
+   };
+   const InterfaceFont kInterfaceFonts[] = {
+      { "", "IBM Plex Sans (default)", "IBMPlexSans-Regular.ttf" },
+      { "atkinson", "Atkinson Hyperlegible", "AtkinsonHyperlegible-Regular.ttf" },
+   };
+   std::string gUiFontId; // saved with the machine settings (SceneSettings::uiFont)
    bool gUiRescaleRequested = false;
    float gUiPointScale = 1.0f;
 
@@ -615,6 +628,12 @@ namespace
       std::vector<std::string> candidates;
       const std::filesystem::path exeDir =
          std::filesystem::u8path(Platform::ExecutablePath()).parent_path();
+      for (const InterfaceFont& f : kInterfaceFonts)
+         if (!gUiFontId.empty() && gUiFontId == f.id)
+         {
+            candidates.push_back((exeDir / "assets" / "fonts" / f.file).u8string());
+            candidates.push_back(std::string("assets/fonts/") + f.file);
+         }
       candidates.push_back((exeDir / "assets" / "fonts" / "IBMPlexSans-Regular.ttf").u8string());
       candidates.push_back("assets/fonts/IBMPlexSans-Regular.ttf");
       candidates.push_back("C:/Windows/Fonts/SegUIVar.ttf");
@@ -622,10 +641,17 @@ namespace
       candidates.push_back("C:/Windows/Fonts/arial.ttf");
       ImGuiIO& io = ImGui::GetIO();
       io.Fonts->Clear();
+      // Turbo 0.51 (upstream bfb1833): ImGui bakes only Basic Latin + Latin-1 by
+      // default, so names with l-stroke, double acute, Cyrillic, Greek or
+      // Vietnamese letters drew as '?'. Glyphs a face lacks are simply skipped.
+      static const ImWchar kUiGlyphRanges[] = {
+         0x0020, 0x00FF, 0x0100, 0x024F, 0x0370, 0x03FF, 0x0400, 0x04FF,
+         0x1E00, 0x1EFF, 0x2000, 0x206F, 0x20A0, 0x20CF, 0
+      };
       ImFont* uiFont = nullptr;
       for (const std::string& path : candidates)
       {
-         uiFont = io.Fonts->AddFontFromFileTTF(path.c_str(), bakedPx);
+         uiFont = io.Fonts->AddFontFromFileTTF(path.c_str(), bakedPx, nullptr, kUiGlyphRanges);
          if (uiFont != nullptr)
          {
             io.FontGlobalScale = baseSize / bakedPx;
@@ -795,6 +821,11 @@ namespace
    // True while the timeline panel has keyboard focus: the canvas shortcuts
    // (Delete, Ctrl+D, Ctrl+C/V, ...) stand down and the timeline takes them.
    bool gArrangeKeysOwned = false;
+   // Turbo 0.51: the Chord Progression slot strip owns Ctrl+D / Ctrl+C /
+   // Ctrl+V / Delete / Alt+arrows while a slot is hovered or was the last
+   // thing clicked. The body sets it each frame; the shortcut code reads it
+   // (as `typing`) and clears it.
+   bool gChordSlotsKeysOwned = false;
    // Turbo 0.45 (upstream R470): during a timeline render, gesture loops play
    // on the render's own video time (seconds since the take started, one
    // step per rendered frame) instead of the wall-clock UI clock, so a take
@@ -1049,6 +1080,8 @@ namespace
    // kernels are the intended future consumer (see README.md's Effects
    // table); this phase just makes the setting exist and be visible.
    float gAudioOversample = 1.0f;
+   bool gAudioMirror = false;            // Turbo 0.51: Windows mirror output (OBS)
+   std::string gAudioMirrorDevice;       // empty = Windows default
    int gAudioDriver = 0; // Turbo: see Platform::AudioSetRequestedDriver
    std::string gPatchPath;      // "" until the patch has been saved somewhere
    bool gPatchDirty = false;
@@ -1165,6 +1198,14 @@ namespace
       int pixelW = 0;
       int pixelH = 0;
    };
+   // Turbo 0.51: a node whose own background is transparent (alpha mode). Only
+   // then does a windowed Output pass alpha through to the desktop.
+   bool OutputNodeHasTransparentBg(INode* node)
+   {
+      if (const auto* layout = dynamic_cast<const LayoutNode*>(node))
+         return layout->bgAlpha < 0.999f;
+      return false;
+   }
    int gProjectorDefaultFitMode = 0; // new output windows inherit the last choice
    std::vector<ProjectorWindow> gProjectorWindows;
    GLFWwindow* gMainWindow = nullptr;
@@ -1253,6 +1294,44 @@ namespace
       int current = 0;
       bool justOpened = false;
    };
+   // Turbo 0.51 (upstream f08e6bf): lowercases and strips accents so the dropdown
+   // search finds "cafe" from "café". Latin-1 supplement and Latin Extended-A
+   // (U+00C0..U+017F); anything else passes through unchanged.
+   inline std::string FoldForSearch(const std::string& in)
+   {
+      static const char* const kFold[0x180 - 0xC0] = {
+         "a", "a", "a", "a", "a", "a", "ae", "c", "e", "e", "e", "e", "i", "i", "i", "i",
+         "d", "n", "o", "o", "o", "o", "o", "", "o", "u", "u", "u", "u", "y", "th", "ss",
+         "a", "a", "a", "a", "a", "a", "ae", "c", "e", "e", "e", "e", "i", "i", "i", "i",
+         "d", "n", "o", "o", "o", "o", "o", "", "o", "u", "u", "u", "u", "y", "th", "y",
+         "a", "a", "a", "a", "a", "a", "c", "c", "c", "c", "c", "c", "c", "c", "d", "d",
+         "d", "d", "e", "e", "e", "e", "e", "e", "e", "e", "e", "e", "g", "g", "g", "g",
+         "g", "g", "g", "g", "h", "h", "h", "h", "i", "i", "i", "i", "i", "i", "i", "i",
+         "i", "i", "ij", "ij", "j", "j", "k", "k", "k", "l", "l", "l", "l", "l", "l", "l",
+         "l", "l", "l", "n", "n", "n", "n", "n", "n", "n", "n", "n", "o", "o", "o", "o",
+         "o", "o", "oe", "oe", "r", "r", "r", "r", "r", "r", "s", "s", "s", "s", "s", "s",
+         "s", "s", "t", "t", "t", "t", "t", "t", "u", "u", "u", "u", "u", "u", "u", "u",
+         "u", "u", "u", "u", "w", "w", "y", "y", "y", "z", "z", "z", "z", "z", "z", "s"
+      };
+      std::string out;
+      out.reserve(in.size());
+      for (size_t i = 0; i < in.size(); i++)
+      {
+         const unsigned char c = (unsigned char)in[i];
+         if (c < 0x80)
+            out += (char)std::tolower(c);
+         else if ((c == 0xC3 || c == 0xC4 || c == 0xC5) && i + 1 < in.size())
+         {
+            const unsigned cp = ((c & 0x1Fu) << 6) | ((unsigned char)in[i + 1] & 0x3Fu);
+            out += kFold[cp - 0xC0];
+            i++;
+         }
+         else
+            out += (char)c;
+      }
+      return out;
+   }
+
    DropdownRequest gDropdown;
 
    void PrepareDropdown(const std::vector<std::string>& options,
@@ -1521,11 +1600,21 @@ namespace
       gDiscreteLabelsThisNode.clear();
    }
 
+   // Turbo 0.51: a console-taper dB control reads "-inf dB" at its floor (the
+   // DSP already treats <= -59.9 dB as silence).
+   void FormatParamValue(char* buf, size_t n, const char* fmt, float v, bool dbTaper)
+   {
+      if (dbTaper && v <= -59.9f)
+         snprintf(buf, n, "-inf dB");
+      else
+         snprintf(buf, n, fmt, v);
+   }
+
    // Opens the text field for a param, seeded either from its current numeric
    // value or (if it's already driven by an expression) from that expression
    // text with its '=' prefix - used by both double-click and right-click.
    void BeginTypedEditFromCurrent(const std::pair<int, int>& editKey, int nodeIndex, int paramIndex,
-                                   float* value, const char* fmt, bool hasExpr)
+                                   float* value, const char* fmt, bool hasExpr, bool dbTaper = false)
    {
       if (hasExpr)
       {
@@ -1535,7 +1624,7 @@ namespace
       else
       {
          char seed[64];
-         snprintf(seed, sizeof(seed), fmt, *value);
+         FormatParamValue(seed, sizeof(seed), fmt, *value, dbTaper);
          gTypedParamText[editKey] = seed;
       }
       gTypedParam.insert(editKey);
@@ -2612,7 +2701,7 @@ namespace
       constexpr int kCount = sizeof(kPoints) / sizeof(kPoints[0]);
       // Detents drawn on a tapered fader, in dB - meaningless as even quarters
       // of the throw once the taper is nonlinear.
-      const float kDetentsDb[] = { 0.0f, -10.0f, -20.0f, -30.0f, -60.0f };
+      const float kDetentsDb[] = { 12.0f, 6.0f, 0.0f, -6.0f, -12.0f, -20.0f, -30.0f, -40.0f, -60.0f }; // Turbo 0.51
       constexpr int kNumDetents = sizeof(kDetentsDb) / sizeof(kDetentsDb[0]);
 
       float PosToDb(float pos)
@@ -2648,6 +2737,31 @@ namespace
 
       float PosToValue(float pos01, float /*minV*/, float /*maxV*/) { return PosToDb(pos01); }
       float ValueToPos(float value, float /*minV*/, float /*maxV*/) { return DbToPos(value); }
+   }
+
+   // Turbo 0.51: horizontal dB slider through ConsoleFaderTaper (the clip matrix
+   // cell/row gains). Stored value stays dB. Ctrl/Alt+click resets to 0 dB.
+   bool TaperedDbSlider(const char* label, float* db, float lo, float hi, bool infAtFloor = false)
+   {
+      float pos = std::clamp(ConsoleFaderTaper::ValueToPos(*db, lo, hi), 0.0f, 1.0f);
+      char txt[32];
+      if (infAtFloor && *db <= -59.9f)
+         snprintf(txt, sizeof(txt), "-inf dB");
+      else
+         snprintf(txt, sizeof(txt), "%.1f dB", *db);
+      bool changed = false;
+      if (ImGui::SliderFloat(label, &pos, 0.0f, 1.0f, txt, ImGuiSliderFlags_NoInput))
+      {
+         *db = std::clamp(ConsoleFaderTaper::PosToValue(pos, lo, hi), lo, hi);
+         changed = true;
+      }
+      if (ImGui::IsItemActivated() && (ImGui::GetIO().KeyCtrl || ImGui::GetIO().KeyAlt))
+      {
+         PushUndoCheckpoint();
+         *db = 0.0f;
+         changed = true;
+      }
+      return changed;
    }
 
    // Vertical fader with KnobFloat's exact contract - draws at the cursor,
@@ -2785,6 +2899,35 @@ namespace
                         IM_COL32(255, 255, 255, 60), 4.0f, 0, 2.0f);
       }
 
+      // Turbo 0.51: tapered faders get a brighter 0 dB tick and, when tall enough,
+      // small dB labels beside the track.
+      if (valueToPos != nullptr)
+      {
+         const float y0 = bottom - std::clamp(valueToPos(0.0f, minV, maxV), 0.0f, 1.0f) * (bottom - top);
+         const ImU32 zeroCol = isLight ? IM_COL32(0, 0, 0, 150) : IM_COL32(255, 255, 255, 140);
+         dl->AddLine(ImVec2(cx + 5.0f, y0), ImVec2(cx + 10.0f, y0), zeroCol, 1.5f);
+         dl->AddLine(ImVec2(cx - 10.0f, y0), ImVec2(cx - 5.0f, y0), zeroCol, 1.5f);
+         if (height >= 40.0f && cell >= 40.0f)
+         {
+            const float fs = ImGui::GetFontSize() * 0.62f;
+            const ImU32 labCol = isLight ? IM_COL32(0, 0, 0, 120) : IM_COL32(255, 255, 255, 105);
+            float lastY = -1.0e9f;
+            for (int i = 0; i < ConsoleFaderTaper::kNumDetents; i++)
+            {
+               const float dv = ConsoleFaderTaper::kDetentsDb[i];
+               if (dv < minV || dv > maxV)
+                  continue;
+               const float y = bottom - std::clamp(valueToPos(dv, minV, maxV), 0.0f, 1.0f) * (bottom - top);
+               if (fabsf(y - lastY) < fs + 1.0f)
+                  continue;
+               lastY = y;
+               char lab[8];
+               snprintf(lab, sizeof(lab), "%d", (int)dv);
+               dl->AddText(ImGui::GetFont(), fs, ImVec2(cx + 11.0f, y - fs * 0.5f), labCol, lab);
+            }
+         }
+      }
+
       // Caption below, same baseline rule as the knob's.
       const char* caption = label[0] == '#' ? "" : label;
       const ImVec2 textSize = ImGui::CalcTextSize(caption);
@@ -2799,7 +2942,7 @@ namespace
       if (hovered || active)
       {
          char buf[48];
-         snprintf(buf, sizeof(buf), fmt, *value);
+         FormatParamValue(buf, sizeof(buf), fmt, *value, valueToPos == ConsoleFaderTaper::ValueToPos);
          SetAudioReadout(caption, buf);
       }
 
@@ -2933,7 +3076,7 @@ namespace
       if (hovered || active)
       {
          char buf[48];
-         snprintf(buf, sizeof(buf), fmt, *value);
+         FormatParamValue(buf, sizeof(buf), fmt, *value, valueToPos == ConsoleFaderTaper::ValueToPos);
          SetAudioReadout(caption, buf);
       }
 
@@ -2960,18 +3103,28 @@ namespace
                 float diameter = kKnobDiameter, float cellW = 0.0f,
                 AudioWidgetStyle style = AudioWidgetStyle::Knob)
    {
+      // Turbo 0.51 (upstream): the dB styles run through the console taper, the
+      // frequency style through the octave-linear one.
+      FaderPosToValueFn p2v = nullptr;
+      FaderValueToPosFn v2p = nullptr;
+      if (style == AudioWidgetStyle::VFaderDb || style == AudioWidgetStyle::KnobDb)
+      {
+         p2v = ConsoleFaderTaper::PosToValue;
+         v2p = ConsoleFaderTaper::ValueToPos;
+      }
+      else if (style == AudioWidgetStyle::KnobFreq)
+      {
+         p2v = FrequencyTaper::PosToValue;
+         v2p = FrequencyTaper::ValueToPos;
+      }
       auto DrawWidget = [&](float* v, ImU32 col, bool readOnly) -> bool
       {
-         if (style == AudioWidgetStyle::VFaderDb)
-            return VFaderFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f);
-         if (style == AudioWidgetStyle::KnobDb)
-            return KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f);
-         if (style == AudioWidgetStyle::KnobFreq)
-            return KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f);
-         return style == AudioWidgetStyle::VFader
-            ? VFaderFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f)
-            : KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cellW > 0.0f ? cellW : 0.0f);
+         const float cw = cellW > 0.0f ? cellW : 0.0f;
+         if (style == AudioWidgetStyle::VFader || style == AudioWidgetStyle::VFaderDb)
+            return VFaderFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cw, p2v, v2p);
+         return KnobFloat(label, v, minV, maxV, fmt, diameter, col, readOnly, cw, p2v, v2p);
       };
+      const bool dbTaperStyle = style == AudioWidgetStyle::VFaderDb || style == AudioWidgetStyle::KnobDb;
       const float widgetW = (style == AudioWidgetStyle::VFader || style == AudioWidgetStyle::VFaderDb)
                                ? kFaderWidth : diameter;
 
@@ -3076,6 +3229,13 @@ namespace
                {
                   char* end = nullptr;
                   float parsed = strtof(trimmed.c_str(), &end);
+                  // Turbo 0.51: "-inf" (also "-inf dB") sets the floor explicitly.
+                  if (trimmed.size() >= 4 && trimmed[0] == '-' && (trimmed[1] | 32) == 'i' &&
+                      (trimmed[2] | 32) == 'n' && (trimmed[3] | 32) == 'f')
+                  {
+                     parsed = -1.0e9f;
+                     end = const_cast<char*>(trimmed.c_str()) + 4;
+                  }
                   if (end != trimmed.c_str())
                   {
                      *value = std::clamp(parsed, std::min(minV, maxV), std::max(minV, maxV));
@@ -3123,10 +3283,10 @@ namespace
          const bool hovered = knobHovered;
          ImGui::SetCursorScreenPos(cursorAfterKnob);
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-            BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
+            BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true, dbTaperStyle);
          if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
          {
-            BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true);
+            BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/true, dbTaperStyle);
             gParamRightClickConsumedThisFrame = true;
          }
          if (hovered)
@@ -3136,15 +3296,23 @@ namespace
       {
          changed = DrawWidget(value, IM_COL32(120, 200, 255, 235), /*readOnly=*/false);
          if (gLastAudioWidgetInteraction.activated)
+         {
             PushUndoCheckpoint();
+            // Turbo 0.51: Ctrl/Alt+click on a dB-taper control resets it to 0 dB.
+            if (dbTaperStyle && (ImGui::GetIO().KeyCtrl || ImGui::GetIO().KeyAlt) && minV <= 0.0f && maxV >= 0.0f)
+            {
+               *value = 0.0f;
+               changed = true;
+            }
+         }
          GestureWidgetHook(nodeIndex, paramIndex, *value, gLastAudioWidgetInteraction.active,
                            gLastAudioWidgetInteraction.activated);
          const bool hovered = gLastAudioWidgetInteraction.hovered;
          if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-            BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/false);
+            BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/false, dbTaperStyle);
          if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
          {
-            BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/false);
+            BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, value, fmt, /*hasExpr=*/false, dbTaperStyle);
             gParamRightClickConsumedThisFrame = true;
          }
          if (hovered && !gLastAudioWidgetInteraction.active)
@@ -3651,6 +3819,7 @@ namespace
       REGISTER_NODE(RemoveBgNode, Remove Background, "Mask");
       REGISTER_NODE(FeedbackNode, Feedback, "Feedback");
       REGISTER_NODE(TrailsNode, Trails, "Feedback");
+      REGISTER_NODE(DatamoshNode, Datamosh, "Effects"); // Turbo 0.51:
       REGISTER_NODE(ReactionDiffusionNode, Reaction Diffusion, "Feedback");
       REGISTER_NODE(BlendNode, Blend, "Compositing");
       REGISTER_NODE(LayerStackNode, Layer Stack, "Compositing");
@@ -4111,6 +4280,8 @@ namespace
          return 1;
       if (dynamic_cast<TrailsNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<DatamoshNode*>(gn.node.get()) != nullptr)
+         return 2; // image, optional motion source
       if (dynamic_cast<ReactionDiffusionNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<WaveTerrainNode*>(gn.node.get()) != nullptr)
@@ -4217,6 +4388,8 @@ namespace
          return slot == 0 ? &fb->Input() : nullptr;
       if (auto* trails = dynamic_cast<TrailsNode*>(gn.node.get()))
          return slot == 0 ? &trails->Input() : nullptr;
+      if (auto* dm = dynamic_cast<DatamoshNode*>(gn.node.get()))
+         return slot == 0 ? &dm->Input() : (slot == 1 ? &dm->MotionInput() : nullptr);
       if (auto* rd = dynamic_cast<ReactionDiffusionNode*>(gn.node.get()))
          return slot == 0 ? &rd->Input() : nullptr;
       if (auto* wt = dynamic_cast<WaveTerrainNode*>(gn.node.get()))
@@ -7046,6 +7219,23 @@ namespace
       ModSlider("hue shift", &n->hueShift, -0.05f, 0.05f);
       if (ModTriggerButton("Clear##trailsClear", ImVec2(kPreviewSize, 0)))
          n->Clear();
+   }
+
+   // Turbo 0.51: codec-style datamosh (block motion estimation + held blocks).
+   void DrawDatamoshParams(DatamoshNode* n)
+   {
+      ModSlider("mosh", &n->mosh, 0.0f, 1.0f);
+      ModSlider("gain", &n->gain, 0.0f, 4.0f);
+      ModSlider("bloom", &n->bloom, 0.0f, 0.98f);
+      ModSlider("threshold", &n->threshold, 0.0f, 1.0f);
+      DropdownButton("block", DatamoshNode::BlockNames(), n->block, [n](int i) { n->block = i; });
+      ModSlider("block var", &n->blockVar, 0.0f, 1.0f);
+      ModSlider("leak", &n->leak, 0.0f, 1.0f);
+      DropdownButton("refresh", DatamoshNode::RefreshNames(), n->refresh, [n](int i) { n->refresh = i; });
+      ModSlider("refresh chance", &n->refreshChance, 0.0f, 1.0f);
+      ModSlider("seed", &n->seed, 0.0f, 100.0f, "%.0f");
+      if (ModTriggerButton("Refresh##datamoshRefresh", ImVec2(kPreviewSize, 0)))
+         n->Refresh();
    }
 
    void DrawReactionDiffusionParams(ReactionDiffusionNode* n)
@@ -15430,7 +15620,10 @@ namespace
    // ---- Keyboard (ported from upstream) -----------------------------------
    // Fixed lowNote on purpose: a widget that recentred under an active click
    // (like the MIDI Notes display) makes the pressed key slide away.
-   int DrawInteractiveKeyboard(const bool held[128], int lowNote, int octaves)
+   // Turbo 0.51: marks[note] 1 = chord root, 2 = slash bass; octaveLabels
+   // names every C ("C3", note/12-1 convention).
+   int DrawInteractiveKeyboard(const bool held[128], int lowNote, int octaves,
+                               const signed char* marks = nullptr, bool octaveLabels = false)
    {
       const float w = gAudioBodyW, h = 64.0f;
       const ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -15507,6 +15700,51 @@ namespace
          }
       }
 
+      if (octaveLabels)
+      {
+         const ImU32 labelCol = isLight ? IM_COL32(70, 76, 92, 255) : IM_COL32(70, 76, 92, 255);
+         for (int o = 0; o < octaves; o++)
+         {
+            const int note = lowNote + o * 12;
+            char lab[8];
+            snprintf(lab, sizeof(lab), "C%d", note / 12 - 1);
+            dl->AddText(ImVec2(origin.x + 3.0f + (float)(o * 7) * keyW, br.y - 17.0f), labelCol, lab);
+         }
+      }
+      if (marks != nullptr)
+      {
+         for (int o = 0; o < octaves; o++)
+            for (int semi = 0; semi < 12; semi++)
+            {
+               const int note = lowNote + o * 12 + semi;
+               if (note < 0 || note > 127 || marks[note] == 0)
+                  continue;
+               float cx = 0.0f, cy = 0.0f;
+               int slot = -1;
+               for (int k = 0; k < 7; k++)
+                  if (kWhiteOffsets[k] == semi)
+                     slot = k;
+               if (slot >= 0)
+               {
+                  cx = origin.x + 2.0f + (float)(o * 7 + slot) * keyW + keyW * 0.5f;
+                  cy = origin.y + 46.0f;
+               }
+               else
+               {
+                  int b = 0;
+                  for (int k = 0; k < 5; k++)
+                     if (kBlackOffsets[k] == semi)
+                        b = k;
+                  cx = origin.x + 2.0f + ((float)(o * 7) + kBlackSlot[b] + 1.0f) * keyW;
+                  cy = origin.y + h * 0.62f - 8.0f;
+               }
+               if (marks[note] == 1)
+                  dl->AddCircleFilled(ImVec2(cx, cy), 3.2f, IM_COL32(240, 110, 60, 255));
+               else
+                  dl->AddCircle(ImVec2(cx, cy), 3.4f, IM_COL32(60, 200, 120, 255), 0, 2.0f);
+            }
+      }
+
       dl->PopClipRect();
       dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
       return hitNote;
@@ -15543,9 +15781,9 @@ namespace
    {
       using CP = ChordProgressionNode;
       n->chordCount = std::clamp(n->chordCount, 1, CP::kMaxChords);
-      const int count = n->chordCount;
+      int count = n->chordCount;
       n->selected = std::clamp(n->selected, 0, count - 1);
-      const int sel = n->selected;
+      int sel = n->selected;
       const int playing = n->PlayingIndex();
 
       const bool armed = n->RestartArmed();
@@ -15561,12 +15799,49 @@ namespace
 
       const bool isLight = IsThemeLight();
       ImDrawList* dl = ImGui::GetWindowDrawList();
+      ImGuiIO& cio = ImGui::GetIO();
+      const double beatsPerBar = Transport::Instance().BeatsPerBar();
+      static CP::Slot sClip; // slot clipboard (Copy / Paste), shared by every node
+      static bool sHasClip = false;
 
-      // Slot strip: 8 per row.
+      // Keyboard audition (Turbo 0.51): the notes sound while the mouse is
+      // down (keys) or ~400 ms (chips, voicings); the audio half also cuts
+      // them after 1.5 s, so a missed mouse-up never leaves a stuck note.
+      static ChordProgressionNode* sAudNode = nullptr;
+      static double sAudStop = 0.0;
+      static bool sAudHold = false;
+      if (sAudNode == n && (ImGui::GetTime() >= sAudStop || (sAudHold && !ImGui::IsMouseDown(ImGuiMouseButton_Left))))
+      {
+         n->PreviewNotes(0, false);
+         sAudNode = nullptr;
+      }
+      auto audition = [&](uint64_t m, bool hold) {
+         if (m == 0)
+            return;
+         n->PreviewNotes(m, true);
+         sAudNode = n;
+         sAudHold = hold;
+         sAudStop = ImGui::GetTime() + (hold ? 1.5 : 0.4);
+      };
+
+      // Slot strip: 8 per row, a "+" ghost cell after the last chord.
+      // Click selects, drag reorders (insertion caret), right-click opens
+      // the slot menu; Ctrl+D / Ctrl+C / Ctrl+V / Delete / Alt+arrows work
+      // while a slot is hovered or was the last thing clicked.
+      static ChordProgressionNode* sKeysNode = nullptr;
+      static ChordProgressionNode* sDragNode = nullptr;
+      static int sDragFrom = -1;
+      static bool sDragLive = false;
+      static ImVec2 sDragStart(0.0f, 0.0f);
+      enum SlotOp { kOpNone, kOpDup, kOpInsBefore, kOpInsAfter, kOpDelete, kOpLeft, kOpRight, kOpCopy,
+                    kOpPasteRep, kOpPasteIns, kOpClear, kOpAddGhost };
+      SlotOp op = kOpNone;
+      int opSlot = -1;
       {
          const float w = gAudioBodyW;
          const int perRow = 8;
-         const int rows = (count + perRow - 1) / perRow;
+         const int cells = count + (count < CP::kMaxChords ? 1 : 0);
+         const int rows = (cells + perRow - 1) / perRow;
          const float gap = 4.0f;
          const float cellW = (w - gap * (float)(perRow - 1)) / (float)perRow;
          const float cellH = 46.0f; // Turbo 0.50: room for a two-line chord name
@@ -15577,17 +15852,57 @@ namespace
          const ImU32 borderCol = isLight ? IM_COL32(40, 90, 200, 255) : IM_COL32(150, 200, 255, 255);
          const ImU32 textCol = isLight ? IM_COL32(30, 34, 44, 255) : IM_COL32(226, 230, 240, 255);
          const ImU32 subCol = isLight ? IM_COL32(80, 86, 100, 255) : IM_COL32(150, 156, 172, 255);
-         for (int i = 0; i < count; i++)
+         auto cellMin = [&](int i) {
+            return ImVec2(origin.x + (float)(i % perRow) * (cellW + gap), origin.y + (float)(i / perRow) * (cellH + gap));
+         };
+         bool anyHover = false;
+         int hoverIdx = -1;
+         bool openMenu = false;
+         for (int i = 0; i < cells; i++)
          {
-            const int r = i / perRow, c = i % perRow;
-            const ImVec2 mn(origin.x + (float)c * (cellW + gap), origin.y + (float)r * (cellH + gap));
+            const ImVec2 mn = cellMin(i);
             const ImVec2 mx(mn.x + cellW, mn.y + cellH);
             ImGui::SetCursorScreenPos(mn);
             ImGui::PushID(i);
-            if (ImGui::InvisibleButton("##cpslot", ImVec2(cellW, cellH)))
-               n->selected = i;
+            ImGui::InvisibleButton("##cpslot", ImVec2(cellW, cellH));
             const bool hovered = ImGui::IsItemHovered();
+            const bool activated = ImGui::IsItemActivated();
+            const bool rightClicked = ImGui::IsItemClicked(ImGuiMouseButton_Right);
             ImGui::PopID();
+            if (hovered)
+            {
+               anyHover = true;
+               hoverIdx = i;
+            }
+            if (i >= count)
+            {
+               // Ghost cell: duplicates the last chord at the end.
+               dl->AddRect(mn, mx, hovered ? borderCol : subCol, 4.0f, 0, 1.0f);
+               const ImVec2 ts = ImGui::CalcTextSize("+");
+               dl->AddText(ImVec2(mn.x + (cellW - ts.x) * 0.5f, mn.y + (cellH - ts.y) * 0.5f),
+                           hovered ? borderCol : subCol, "+");
+               if (hovered)
+                  ImGui::SetTooltip("add a chord (copy of the last)");
+               if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+                  op = kOpAddGhost;
+               continue;
+            }
+            if (activated)
+            {
+               n->selected = i;
+               sKeysNode = n;
+               sDragNode = n;
+               sDragFrom = i;
+               sDragLive = false;
+               sDragStart = cio.MousePos;
+            }
+            if (rightClicked)
+            {
+               n->selected = i;
+               sKeysNode = n;
+               opSlot = i;
+               openMenu = true;
+            }
             ImU32 bg = (i == playing) ? playCol : (i == n->selected ? selCol : idleCol);
             dl->AddRectFilled(mn, mx, bg, 4.0f);
             if (i == playing)
@@ -15616,34 +15931,324 @@ namespace
             {
                dl->AddText(ImVec2(mn.x + std::max(3.0f, (cellW - ts.x) * 0.5f), mn.y + 9.0f), nameCol, name.c_str());
             }
-            char bars[24];
-            snprintf(bars, sizeof(bars), "%g bar", n->chordBars[i]);
-            ts = ImGui::CalcTextSize(bars);
+            const std::string bars = CP::BarsLabel(n->chordBars[i], beatsPerBar);
+            ts = ImGui::CalcTextSize(bars.c_str());
             dl->AddText(ImVec2(mn.x + (cellW - ts.x) * 0.5f, mn.y + 29.0f),
-                        i == playing ? IM_COL32(235, 240, 255, 220) : subCol, bars);
+                        i == playing ? IM_COL32(235, 240, 255, 220) : subCol, bars.c_str());
             dl->PopClipRect();
          }
+
+         // Manual drag (as the Layer Stack): past a small threshold the slot
+         // follows the mouse and an insertion caret shows where it lands.
+         if (sDragNode == n && sDragFrom >= 0 && sDragFrom < count)
+         {
+            if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
+            {
+               const ImVec2 m = cio.MousePos;
+               if (!sDragLive && std::fabs(m.x - sDragStart.x) + std::fabs(m.y - sDragStart.y) > 6.0f)
+                  sDragLive = true;
+               if (sDragLive)
+               {
+                  const int col = std::clamp((int)std::floor((m.x - origin.x) / (cellW + gap)), 0, perRow - 1);
+                  const int row = std::clamp((int)std::floor((m.y - origin.y) / (cellH + gap)), 0, rows - 1);
+                  const int idx = std::clamp(row * perRow + col, 0, count - 1);
+                  const ImVec2 mn = cellMin(idx);
+                  const bool before = m.x < mn.x + cellW * 0.5f;
+                  const float cx = before ? mn.x - gap * 0.5f : mn.x + cellW + gap * 0.5f;
+                  const ImVec2 fromMn = cellMin(sDragFrom);
+                  dl->AddRectFilled(fromMn, ImVec2(fromMn.x + cellW, fromMn.y + cellH), IM_COL32(0, 0, 0, 70), 4.0f);
+                  dl->AddLine(ImVec2(cx, mn.y - 1.0f), ImVec2(cx, mn.y + cellH + 1.0f), borderCol, 3.0f);
+               }
+            }
+            else
+            {
+               if (sDragLive)
+               {
+                  const ImVec2 m = cio.MousePos;
+                  const int col = std::clamp((int)std::floor((m.x - origin.x) / (cellW + gap)), 0, perRow - 1);
+                  const int row = std::clamp((int)std::floor((m.y - origin.y) / (cellH + gap)), 0, rows - 1);
+                  const int idx = std::clamp(row * perRow + col, 0, count - 1);
+                  const ImVec2 mn = cellMin(idx);
+                  const int pos = idx + (m.x < mn.x + cellW * 0.5f ? 0 : 1);
+                  const int dest = pos > sDragFrom ? pos - 1 : pos;
+                  if (dest != sDragFrom && dest >= 0 && dest < count)
+                  {
+                     PushUndoCheckpoint();
+                     n->MoveSlot(sDragFrom, dest);
+                     gPatchDirty = true;
+                  }
+               }
+               sDragNode = nullptr;
+               sDragFrom = -1;
+               sDragLive = false;
+            }
+         }
+         static int sMenuSlot = -1;
+         if (openMenu)
+         {
+            sMenuSlot = opSlot;
+            ImGui::OpenPopup("##cpslotmenu");
+         }
+         if (ImGui::BeginPopup("##cpslotmenu"))
+         {
+            const int ms = std::clamp(sMenuSlot, 0, count - 1);
+            const bool full = count >= CP::kMaxChords;
+            if (ImGui::MenuItem("Duplicate", "Ctrl+D", false, !full)) { op = kOpDup; opSlot = ms; }
+            if (ImGui::MenuItem("Insert empty before", nullptr, false, !full)) { op = kOpInsBefore; opSlot = ms; }
+            if (ImGui::MenuItem("Insert empty after", nullptr, false, !full)) { op = kOpInsAfter; opSlot = ms; }
+            if (ImGui::MenuItem("Delete", "Del", false, count > 1)) { op = kOpDelete; opSlot = ms; }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Move left", "Alt+Left", false, ms > 0)) { op = kOpLeft; opSlot = ms; }
+            if (ImGui::MenuItem("Move right", "Alt+Right", false, ms < count - 1)) { op = kOpRight; opSlot = ms; }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Copy", "Ctrl+C")) { op = kOpCopy; opSlot = ms; }
+            if (ImGui::MenuItem("Paste (replace)", "Ctrl+V", false, sHasClip)) { op = kOpPasteRep; opSlot = ms; }
+            if (ImGui::MenuItem("Paste (insert after)", "Ctrl+Shift+V", false, sHasClip && !full)) { op = kOpPasteIns; opSlot = ms; }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Clear")) { op = kOpClear; opSlot = ms; }
+            ImGui::EndPopup();
+         }
+
+         // Keys: only while the pointer is over the strip or a slot was the
+         // last thing clicked (a click anywhere else lets go).
+         if ((ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right)) &&
+             !anyHover && sKeysNode == n)
+            sKeysNode = nullptr;
+         if ((anyHover || sKeysNode == n || sDragLive) && !cio.WantTextInput)
+         {
+            gChordSlotsKeysOwned = true;
+            const int target = (hoverIdx >= 0 && hoverIdx < count) ? hoverIdx : n->selected;
+            if (op == kOpNone)
+            {
+               if (cio.KeyCtrl && !cio.KeyShift && ImGui::IsKeyPressed(ImGuiKey_D, false)) { op = kOpDup; opSlot = target; }
+               else if (cio.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_C, false)) { op = kOpCopy; opSlot = target; }
+               else if (cio.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V, false))
+               {
+                  op = cio.KeyShift ? kOpPasteIns : kOpPasteRep;
+                  opSlot = target;
+               }
+               else if (ImGui::IsKeyPressed(ImGuiKey_Delete, false)) { op = kOpDelete; opSlot = target; }
+               else if (cio.KeyAlt && ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true)) { op = kOpLeft; opSlot = target; }
+               else if (cio.KeyAlt && ImGui::IsKeyPressed(ImGuiKey_RightArrow, true)) { op = kOpRight; opSlot = target; }
+            }
+         }
+
+         // Apply the chosen operation (one undo step each).
+         if (op != kOpNone)
+         {
+            const int at = std::clamp(opSlot, 0, count - 1);
+            bool changed = true;
+            const bool pasting = op == kOpPasteRep || op == kOpPasteIns;
+            if (op != kOpCopy && (!pasting || sHasClip))
+               PushUndoCheckpoint();
+            switch (op)
+            {
+               case kOpAddGhost: n->selected = count - 1; changed = n->DuplicateSlot(count - 1); break;
+               case kOpDup: changed = n->DuplicateSlot(at); break;
+               case kOpInsBefore:
+               {
+                  CP::Slot e;
+                  e.bars = n->chordBars[at];
+                  changed = n->InsertSlot(at, e);
+                  if (changed)
+                     n->selected = at;
+                  break;
+               }
+               case kOpInsAfter:
+               {
+                  CP::Slot e;
+                  e.bars = n->chordBars[at];
+                  changed = n->InsertSlot(at + 1, e);
+                  if (changed)
+                     n->selected = at + 1;
+                  break;
+               }
+               case kOpDelete: changed = n->DeleteSlot(at); break;
+               case kOpLeft: changed = n->MoveSlot(at, at - 1); break;
+               case kOpRight: changed = n->MoveSlot(at, at + 1); break;
+               case kOpCopy: sClip = n->GetSlot(at); sHasClip = true; changed = false; break;
+               case kOpPasteRep:
+                  changed = sHasClip;
+                  if (changed)
+                     n->SetSlot(at, sClip);
+                  break;
+               case kOpPasteIns:
+                  changed = sHasClip && n->InsertSlot(at + 1, sClip);
+                  if (changed)
+                     n->selected = at + 1;
+                  break;
+               case kOpClear:
+               {
+                  CP::Slot e = n->GetSlot(at);
+                  e.lo = e.hi = 0;
+                  e.slash = -1;
+                  n->SetSlot(at, e);
+                  break;
+               }
+               default: changed = false; break;
+            }
+            if (changed)
+               gPatchDirty = true;
+            count = std::clamp(n->chordCount, 1, CP::kMaxChords);
+            n->selected = std::clamp(n->selected, 0, count - 1);
+            sel = n->selected;
+         }
+         sel = n->selected = std::clamp(n->selected, 0, count - 1);
          ImGui::SetCursorScreenPos(origin);
          ImGui::Dummy(ImVec2(w, (float)rows * cellH + (float)(rows - 1) * gap));
       }
 
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
-      // Keyboard: the selected chord's keys, click to toggle.
+      // The selected chord's full 4-octave mask, its root and slash bass.
+      uint64_t selMask = n->FullMask(sel);
+      int selRoot = 0, selQuality = -1;
+      CP::AnalyseMask(selMask, selRoot, selQuality, n->slashBass[sel]);
+      if (selMask == 0)
+         selRoot = n->builderRoot;
+
+      // Keyboard: the selected chord's keys, click to toggle and audition,
+      // Shift+click sets the slash bass. It shows two of the four octaves
+      // (the "<" ">" buttons below scroll it; independent of playback).
       {
          bool held[128] = {};
-         const int low = std::clamp((n->baseOctave + 1) * 12, 0, 104);
-         const int mask = n->chordMask[n->selected];
-         for (int k = 0; k < CP::kKeys; k++)
-            if ((mask & (1 << k)) && low + k < 128)
-               held[low + k] = true;
-         const int hit = DrawInteractiveKeyboard(held, low, 2);
-         if (ImGui::IsItemActivated() && hit >= low && hit < low + CP::kKeys)
+         signed char marks[128] = {};
+         const int base = (n->baseOctave + 1) * 12;
+         const int vo = std::clamp(n->viewOctave, 0, 2);
+         const int low = base + vo * 12;
+         int rootKey = -1;
+         for (int k = 0; k < CP::kKeysTotal; k++)
+            if (selMask & (1ull << k))
+            {
+               if (base + k >= 0 && base + k < 128)
+                  held[base + k] = true;
+               if (rootKey < 0 && k % 12 == selRoot)
+                  rootKey = k;
+            }
+         if (rootKey >= 0 && base + rootKey < 128)
+            marks[base + rootKey] = 1;
+         if (n->slashBass[sel] >= 0)
+            for (int k = vo * 12; k < vo * 12 + 24; k++)
+               if (k % 12 == n->slashBass[sel] && base + k >= 0 && base + k < 128)
+               {
+                  if (marks[base + k] == 0)
+                     marks[base + k] = 2;
+                  break;
+               }
+         const int hit = DrawInteractiveKeyboard(held, low, 2, marks, true);
+         if (ImGui::IsItemActivated() && hit >= low && hit < low + 24)
          {
+            const int key = hit - base;
             PushUndoCheckpoint();
-            n->chordMask[n->selected] ^= (1 << (hit - low));
+            if (cio.KeyShift)
+            {
+               n->slashBass[sel] = (n->slashBass[sel] == key % 12) ? -1 : key % 12; // click again clears
+               audition(1ull << key, true);
+            }
+            else
+            {
+               selMask ^= 1ull << key;
+               n->SetFullMask(sel, selMask);
+               if (selMask & (1ull << key))
+                  audition(1ull << key, true);
+            }
             gPatchDirty = true;
          }
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("click: toggle a note\nShift+click: slash bass (again clears)\nwheel: scroll octaves");
+         if (ImGui::IsItemHovered() && cio.MouseWheel != 0.0f)
+            n->viewOctave = std::clamp(n->viewOctave + (cio.MouseWheel > 0.0f ? 1 : -1), 0, 2);
+      }
+
+      // View + voicing row.
+      {
+         const float x0 = gAudioContentX;
+         const float gap = 4.0f;
+         const float btnW = (gAudioContentW - gap * 7.0f) / 8.0f;
+         const float y = ImGui::GetCursorScreenPos().y + 3.0f;
+         float x = x0;
+         auto btn = [&](const char* label, bool enabled) {
+            ImGui::SetCursorScreenPos(ImVec2(x, y));
+            ImGui::BeginDisabled(!enabled);
+            const bool pressed = ImGui::Button(label, ImVec2(btnW, 0.0f));
+            ImGui::EndDisabled();
+            x += btnW + gap;
+            return pressed;
+         };
+         if (btn("<##cpview", n->viewOctave > 0))
+            n->viewOctave--;
+         if (btn(">##cpview", n->viewOctave < 2))
+            n->viewOctave++;
+         struct { const char* label; int op; } kVoicings[] = {
+            { "close##cpv", 0 }, { "drop2##cpv", 1 }, { "spread##cpv", 2 }, { "8va+##cpv", 3 }, { "8va-##cpv", 4 }
+         };
+         for (const auto& v : kVoicings)
+            if (btn(v.label, selMask != 0))
+            {
+               const uint64_t out = CP::Voice(selMask, v.op);
+               if (out != selMask)
+               {
+                  PushUndoCheckpoint();
+                  n->SetFullMask(sel, out);
+                  gPatchDirty = true;
+                  audition(out, false);
+                  selMask = out;
+               }
+            }
+         if (btn("lead##cp", selMask != 0))
+         {
+            // Nearest inversion / octave to the previous chord (cyclic).
+            const int prevIdx = sel > 0 ? sel - 1 : (count > 1 ? count - 1 : -1);
+            const uint64_t out = CP::VoiceLead(prevIdx >= 0 ? n->FullMask(prevIdx) : 0, selMask);
+            if (out != selMask)
+            {
+               PushUndoCheckpoint();
+               n->SetFullMask(sel, out);
+               gPatchDirty = true;
+               audition(out, false);
+               selMask = out;
+            }
+         }
+         if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("voice-lead: the inversion and octave closest to the previous chord");
+         ImGui::SetCursorScreenPos(ImVec2(x0, y));
+         ImGui::Dummy(ImVec2(gAudioContentW, ImGui::GetFrameHeight()));
+      }
+
+      // Extension chips: add / remove intervals relative to the detected
+      // root on the current notes (lit = present).
+      {
+         const float x0 = gAudioContentX;
+         const float gap = 4.0f;
+         const int perRow = 7;
+         const float chipW = (gAudioContentW - gap * (float)(perRow - 1)) / (float)perRow;
+         const float y0 = ImGui::GetCursorScreenPos().y + 2.0f;
+         const ImVec4 litCol = ImGui::ColorConvertU32ToFloat4(isLight ? IM_COL32(70, 140, 245, 255) : IM_COL32(70, 130, 210, 255));
+         for (int e = 0; e < CP::kNumExtensions; e++)
+         {
+            const bool lit = CP::HasExtension(selMask, selRoot, e);
+            ImGui::SetCursorScreenPos(ImVec2(x0 + (float)(e % perRow) * (chipW + gap),
+                                             y0 + (float)(e / perRow) * (ImGui::GetFrameHeight() + 3.0f)));
+            if (lit)
+            {
+               ImGui::PushStyleColor(ImGuiCol_Button, litCol);
+               ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
+            }
+            char label[24];
+            snprintf(label, sizeof(label), "%s##cpext%d", CP::ExtensionName(e), e);
+            if (ImGui::Button(label, ImVec2(chipW, 0.0f)))
+            {
+               PushUndoCheckpoint();
+               const uint64_t out = CP::ToggleExtension(selMask, selRoot, e);
+               n->SetFullMask(sel, out);
+               gPatchDirty = true;
+               audition(out, false);
+            }
+            if (lit)
+               ImGui::PopStyleColor(2);
+         }
+         ImGui::SetCursorScreenPos(ImVec2(x0, y0));
+         ImGui::Dummy(ImVec2(gAudioContentW, 2.0f * ImGui::GetFrameHeight() + 3.0f));
       }
 
       ImGui::Dummy(ImVec2(0.0f, 4.0f));
@@ -15653,20 +16258,109 @@ namespace
          const float x0 = gAudioContentX;
          const float y = ImGui::GetCursorScreenPos().y;
          const float gap = 5.0f;
-         const float lenW = 118.0f, rootW = 58.0f, qualW = 82.0f;
+         const float lenW = 96.0f, rootW = 58.0f, qualW = 82.0f;
          const float btnW = (gAudioContentW - lenW - rootW - qualW - gap * 5.0f) / 3.0f;
          float x = x0;
 
-         ImGui::SetCursorScreenPos(ImVec2(x, y));
-         ImGui::SetNextItemWidth(lenW);
-         float len = n->chordBars[n->selected];
-         if (ImGui::SliderFloat("##cpbars", &len, 0.5f, 16.0f, "%.1f bars"))
+         // Length: a value field, not a slider. Drag snaps to 1 beat (Shift
+         // 1/4 beat, Alt 1 bar); double-click, right-click or typing a digit
+         // opens text entry ("2", "1.5", "3b", "1.2" = bar.beat, "2:2").
+         // No modulation param: it is per slot, like the keys.
          {
-            n->chordBars[n->selected] = std::clamp(std::round(len * 2.0f) * 0.5f, 0.5f, 16.0f);
-            gPatchDirty = true;
+            static bool sEdit = false;
+            static bool sFocus = false;
+            static int sEditFrames = 0;
+            static char sBuf[32] = "";
+            static float sDragBase = 0.0f;
+            static float sDragPx = 0.0f;
+            static bool sDragUndo = false;
+            ImGui::SetCursorScreenPos(ImVec2(x, y));
+            const float fh = ImGui::GetFrameHeight();
+            if (sEdit)
+            {
+               ImGui::SetNextItemWidth(lenW);
+               if (sFocus)
+               {
+                  ImGui::SetKeyboardFocusHere();
+                  sFocus = false;
+               }
+               const bool enter = ImGui::InputText("##cpbarsText", sBuf, sizeof(sBuf),
+                                                   ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+               float v = 0.0f;
+               if (enter && CP::ParseBarsText(sBuf, beatsPerBar, v))
+               {
+                  PushUndoCheckpoint();
+                  n->chordBars[sel] = v;
+                  gPatchDirty = true;
+               }
+               sEditFrames++;
+               if (enter || ImGui::IsItemDeactivated() || (sEditFrames > 3 && !ImGui::IsItemActive()))
+                  sEdit = false;
+            }
+            else
+            {
+               ImGui::InvisibleButton("##cpbars", ImVec2(lenW, fh));
+               const bool hov = ImGui::IsItemHovered();
+               const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
+               if (ImGui::IsItemActivated())
+               {
+                  sDragBase = n->chordBars[sel];
+                  sDragPx = 0.0f;
+                  sDragUndo = false;
+               }
+               if (ImGui::IsItemActive())
+               {
+                  sDragPx += cio.MouseDelta.x;
+                  const double beat = 1.0 / std::max(1.0, beatsPerBar);
+                  const double step = cio.KeyAlt ? 1.0 : (cio.KeyShift ? beat * 0.25 : beat);
+                  const double snapped = std::round((double)sDragBase / step) * step;
+                  const double nv = std::clamp(snapped + std::round((double)sDragPx / 10.0) * step,
+                                               (double)CP::kMinBars, 16.0);
+                  if (std::fabs(nv - (double)n->chordBars[sel]) > 1.0e-6)
+                  {
+                     if (!sDragUndo)
+                     {
+                        PushUndoCheckpoint();
+                        sDragUndo = true;
+                     }
+                     n->chordBars[sel] = (float)nv;
+                     gPatchDirty = true;
+                  }
+               }
+               bool open = hov && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+               open = open || ImGui::IsItemClicked(ImGuiMouseButton_Right);
+               bool typed = false;
+               if (hov && !cio.WantTextInput && !cio.KeyCtrl)
+                  for (int c = 0; c < cio.InputQueueCharacters.Size; c++)
+                  {
+                     const ImWchar ch = cio.InputQueueCharacters[c];
+                     if ((ch >= '0' && ch <= '9') || ch == '.')
+                        typed = true;
+                  }
+               if (open || typed)
+               {
+                  sEdit = true;
+                  sFocus = true;
+                  sEditFrames = 0;
+                  sBuf[0] = '\0';
+                  if (open)
+                  {
+                     const std::string cur = CP::BarsLabel(n->chordBars[sel], beatsPerBar);
+                     const size_t sp = cur.find(' ');
+                     snprintf(sBuf, sizeof(sBuf), "%s%s", cur.substr(0, sp).c_str(),
+                              cur.compare(sp + 1, std::string::npos, "beat") == 0 ? "b" : "");
+                  }
+               }
+               dl->AddRectFilled(mn, mx, ImGui::GetColorU32(hov ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg), 4.0f);
+               const std::string label = CP::BarsLabel(n->chordBars[sel], beatsPerBar);
+               const ImVec2 ts = ImGui::CalcTextSize(label.c_str());
+               dl->AddText(ImVec2(mn.x + (lenW - ts.x) * 0.5f, mn.y + (fh - ts.y) * 0.5f),
+                           ImGui::GetColorU32(ImGuiCol_Text), label.c_str());
+               if (hov)
+                  ImGui::SetTooltip("length: drag = 1 beat (Shift 1/4 beat, Alt 1 bar)\n"
+                                    "double-click or type: 2, 1.5, 3b, 1.2 (bar.beat), 2:2");
+            }
          }
-         if (ImGui::IsItemActivated())
-            PushUndoCheckpoint();
          x += lenW + gap;
 
          ImGui::SetCursorScreenPos(ImVec2(x, y));
@@ -15701,23 +16395,27 @@ namespace
          if (ImGui::Button("set##cp", ImVec2(btnW, 0.0f)))
          {
             PushUndoCheckpoint();
-            n->chordMask[n->selected] = CP::BuildMask(n->builderRoot, n->builderQuality);
+            n->SetFullMask(sel, CP::BuildMask(n->builderRoot, n->builderQuality));
+            n->slashBass[sel] = -1;
             gPatchDirty = true;
+            audition(n->FullMask(sel), false);
          }
          x += btnW + gap;
          ImGui::SetCursorScreenPos(ImVec2(x, y));
          if (ImGui::Button("inv##cp", ImVec2(btnW, 0.0f)))
          {
             PushUndoCheckpoint();
-            n->chordMask[n->selected] = CP::InvertMask(n->chordMask[n->selected]);
+            n->SetFullMask(sel, CP::InvertMask(n->FullMask(sel)));
             gPatchDirty = true;
+            audition(n->FullMask(sel), false);
          }
          x += btnW + gap;
          ImGui::SetCursorScreenPos(ImVec2(x, y));
          if (ImGui::Button("clear##cp", ImVec2(btnW, 0.0f)))
          {
             PushUndoCheckpoint();
-            n->chordMask[n->selected] = 0;
+            n->SetFullMask(sel, 0);
+            n->slashBass[sel] = -1;
             gPatchDirty = true;
          }
          ImGui::SetCursorScreenPos(ImVec2(x0, y));
@@ -16793,6 +17491,21 @@ namespace
       // between it and whatever's drawn next.
    }
 
+   // Turbo 0.51: "analog" character-mode checkbox (appended param on the
+   // effects ported from upstream), drawn after the effect's other controls.
+   void DrawAnalogToggle(AudioEffectNode* n, const char* checkboxId)
+   {
+      bool analog = n->Param("analog") != 0.0f;
+      if (ModCheckbox(checkboxId, &analog))
+      {
+         PushUndoCheckpoint();
+         *n->ParamPtr("analog") = analog ? 1.0f : 0.0f;
+      }
+   }
+
+   void AddSyncedRateCell(AudioKnobRow& row, AudioEffectNode* n);
+   void DrawSyncToggle(AudioEffectNode* n, const char* checkboxId);
+
    void DrawAudioFilterBody(GraphNode& gn, AudioEffectNode* n)
    {
       const int type = (int)(n->Param("type") + 0.5f);
@@ -16839,6 +17552,15 @@ namespace
          row.End();
       }
       EndAudioSection();
+
+      {
+         // Turbo 0.51: internal sine LFO sweep (depth, rate, sync).
+         AudioKnobRow row(2);
+         row.Knob("lfo", n->ParamPtr("lfoAmount"), -1.0f, 1.0f, "%.2f", kKnobLarge);
+         AddSyncedRateCell(row, n);
+         row.End();
+      }
+      DrawSyncToggle(n, "lfo sync to tempo##afLfoSync");
 
       EndAudioBody();
    }
@@ -17418,6 +18140,8 @@ namespace
          *n->ParamPtr("sidechainExternal") = external ? 1.0f : 0.0f;
       }
 
+      DrawAnalogToggle(n, "analog##dynAnalog");
+
       EndAudioBody();
    }
 
@@ -17634,6 +18358,8 @@ namespace
          PushUndoCheckpoint();
          *n->ParamPtr("bounce") = bounceBool ? 1.0f : 0.0f;
       }
+
+      DrawAnalogToggle(n, "analog##delayAnalog");
 
       EndAudioBody();
    }
@@ -17948,6 +18674,12 @@ namespace
          row.End();
       }
 
+      {
+         AudioKnobRow row(1);
+         row.Knob("stereo", n->ParamPtr("stereo"), 0.0f, 1.0f, "%.2f", kKnobSmall);
+         row.End();
+      }
+
       EndAudioBody();
    }
 
@@ -18119,6 +18851,8 @@ namespace
       row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
       row.End();
 
+      DrawAnalogToggle(n, "analog##psAnalog");
+
       EndAudioBody();
    }
 
@@ -18258,6 +18992,9 @@ namespace
          *n->ParamPtr("taps") = taps3 ? 3.0f : 2.0f;
       }
 
+      ImGui::SameLine();
+      DrawAnalogToggle(n, "analog##chorusAnalog");
+
       EndAudioBody();
    }
 
@@ -18364,6 +19101,18 @@ namespace
       }
 
       DrawSyncToggle(n, "sync to tempo##flangerSync");
+
+      {
+         AudioKnobRow row(2);
+         row.Knob("spread", n->ParamPtr("spread"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         bool analog = n->Param("analog") != 0.0f;
+         if (row.Checkbox("analog##flangerAnalog", &analog))
+         {
+            PushUndoCheckpoint();
+            *n->ParamPtr("analog") = analog ? 1.0f : 0.0f;
+         }
+         row.End();
+      }
 
       EndAudioBody();
    }
@@ -18484,6 +19233,8 @@ namespace
 
       DrawSyncToggle(n, "sync to tempo##phaserSync");
 
+      DrawAnalogToggle(n, "analog##phaserAnalog");
+
       EndAudioBody();
    }
 
@@ -18574,6 +19325,8 @@ namespace
       row.Knob("bits", n->ParamPtr("bits"), 1.0f, 16.0f, "%.0f", kKnobLarge);
       row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
       row.End();
+
+      DrawAnalogToggle(n, "analog##bitcrushAnalog");
 
       EndAudioBody();
    }
@@ -18852,6 +19605,8 @@ namespace
          row.End();
       }
 
+      DrawAnalogToggle(n, "analog##ringmodAnalog");
+
       EndAudioBody();
    }
 
@@ -19002,6 +19757,8 @@ namespace
          row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
          row.End();
       }
+
+      DrawAnalogToggle(n, "analog##freqshiftAnalog");
 
       EndAudioBody();
    }
@@ -25534,7 +26291,8 @@ namespace
          { "exposure", "Multiplies brightness by powers of two, like a camera's exposure stop (compare Levels' linear/gamma remap)." },
          { "bloom", "Isolates pixels above a brightness Threshold, blurs them outward by Radius, and adds the glow back at Intensity - classic HDR-style bloom." },
          { "diffuseglow", "Screens a blurred copy of the whole image back over itself, glowing everything rather than just bright spots (compare Bloom, which is threshold-based)." },
-         { "glitch", "Six glitch algorithms behind one 'kind' dropdown: Slice Shift (blocky RGB-split rows), RGB Shift, Scanlines, Blocks (jittered tiles), Wave, and Datamosh (sliced/shuffled rows with colour smear). Amount/Detail control strength/scale, Speed animates it, Seed reseeds the randomness." },
+         { "glitch", "Ten glitch algorithms behind one 'kind' dropdown: Slice Shift (RGB-split rows), RGB Shift, Scanlines, Blocks (jittered tiles), Wave, Datamosh (shifted slices with a streak smear), Scan Jitter (per-line exponential offsets and tear bands), VHS (drifting tracking band, chroma bleed, head-switch noise, tape noise), Compression (8/16 px macroblocks, chroma subsampling, per-block posterize, stale blocks; Detail below 0.5 = 8 px, above = 16 px) and Pixel Sort (single-pass approximation along bright spans; Detail = threshold, Amount = span length). Amount/Detail control strength/scale, Speed animates it, Seed reseeds the randomness. Extra controls (all off by default, so older patches look the same): Size Var (uneven slice/block sizes from a random split) and Splits (split depth), Contrast (more small offsets, a few big ones), Density (share of slices that move), Stagger (each slice on its own step phase), Burst (share of clean 4-step blocks), Decay (offsets settle within a block), Sync (steps locked to the beat, 1 bar to 1/32; Free uses Speed; 1 bar assumes 4/4), RGB Var (per-slice channel split), Color FX (per-slice channel swap, invert or posterize), Axis (Horizontal, Vertical, Both) and Clock (Transport follows play/pause, Free-run keeps moving while stopped)." },
+         { "Datamosh", "Codec-style datamosh. Blocks that are held keep sampling the previous output displaced by a motion vector, estimated from the image (or the optional second input, the motion source) between frames. Mosh = share of held blocks, Gain scales the vectors, Bloom keeps accumulating the last vector so smears grow, Threshold ignores small motion, Block (8/16/32) and Block Var (uneven block sizes), Leak lets some mosh into refreshed blocks. Refresh (off, bar, beat, 1/2, 1/4, 1/8 of a beat) or the Refresh button (mappable) copies the live image back into a share of the blocks (Refresh Chance), like an I-frame. Seed picks which blocks are held. Renders every frame." },
          { "lensdistortion", "Simulates a camera lens: Barrel bows the image in or out, Chromatic separates the colour channels' distortion for fringing, Zoom scales the result." },
          { "displace", "Offsets each pixel using a second patched-in image's red/green channels as a displacement map, or a built-in animated wave if nothing is patched. Map Scale tiles the map." },
          { "liquify", "Flows pixels around using animated Perlin-style noise, like a liquid warp. Scale sets the flow's feature size, Speed animates it." },
@@ -25805,7 +26563,7 @@ namespace
                { "Bloom / Diffuse Glow", "Bloom isolates pixels above a threshold and blooms them outward. Diffuse Glow screens a blurred copy back over the image." },
                { "Sharpen", "Unsharp mask - blurs a copy and adds back the difference." },
                { "Distortion", "Twirl, pinch/punch, ripple, lens distortion (with chromatic aberration), displace and liquify. Position-dependent effects have Centre X/Y." },
-               { "Glitch family", "Five kinds: the original combined glitch, RGB shift, scanlines, blocks, wave and datamosh." },
+               { "Glitch family", "Ten kinds: slice shift, RGB shift, scanlines, blocks, wave, datamosh, scan jitter, VHS, compression and pixel sort, with size variation, beat sync, bursts and per-slice colour tricks. The separate Datamosh node does real block motion-vector datamosh." },
                { "Symmetry", "Symmetry (mirror about X, Y or both), Kaleidoscope (segment count, rotation, zoom) and Mirror Tile." },
                { "Stylise", "Halftone (mono or CMY-style colour), Sobel edge detection and Edge Outline." },
                { "Pixelate / Noise / Vignette", "Block pixelation, additive grain and a vignette with its own centre." },
@@ -26451,6 +27209,10 @@ namespace
    // exactly one SetTopology call, same as every other caller.
    bool StartAudioEngine(std::string& outError)
    {
+      // Turbo 0.51 (upstream 0141df2): park the audio thread on an empty topology
+      // BEFORE the device opens, so the rebuild's PrepareToPlay never writes
+      // nodes a live callback can still reach.
+      AudioEngine::Instance().SetTopology(AudioTopology{});
       if (!AudioEngine::Instance().Start(outError))
          return false;
       RebuildAudioTopology();
@@ -26464,6 +27226,8 @@ namespace
       s.audioOutputDeviceId = gAudioOutputDeviceId;
       s.audioInputDeviceId = gAudioInputDeviceId;
       s.audioDriver = gAudioDriver;
+      s.audioMirror = gAudioMirror;
+      s.audioMirrorDevice = gAudioMirrorDevice;
       s.audioSampleRate = gAudioSampleRate;
       s.audioBufferFrames = gAudioBufferFrames;
       s.audioOversample = gAudioOversample;
@@ -26487,6 +27251,7 @@ namespace
       s.autosaveSeconds = gAutosaveSeconds;
       s.audioAutoStart = gAudioAutoStart;
       s.uiScale = gUiScaleSetting;
+      s.uiFont = gUiFontId;
       s.updateCheck = gUpdateCheckEnabled;
       s.startWithExample = gStartWithExample;
       return s;
@@ -26504,6 +27269,8 @@ namespace
       gAudioOutputDeviceId = s.audioOutputDeviceId;
       gAudioInputDeviceId = s.audioInputDeviceId;
       gAudioDriver = std::max(0, std::min(s.audioDriver, 4));
+      gAudioMirror = s.audioMirror;
+      gAudioMirrorDevice = s.audioMirrorDevice;
       gAudioSampleRate = s.audioSampleRate;
       gAudioBufferFrames = std::max(32, std::min(s.audioBufferFrames, 8192));
       gAudioOversample = std::max(1.0f, std::min(s.audioOversample, 4.0f));
@@ -26537,10 +27304,19 @@ namespace
             gUiScaleSetting = wantScale;
             gUiRescaleRequested = true;
          }
+         if (s.uiFont != gUiFontId)
+         {
+            gUiFontId = s.uiFont;
+            gUiRescaleRequested = true;
+         }
       }
       RuntimeLog::SetEnabled(gDiagnosticLogEnabled);
 
       Platform::AudioSetRequestedDriver(gAudioDriver);
+      {
+         std::string mirrorError;
+         Platform::AudioMirrorApply(gAudioMirror, gAudioMirrorDevice, mirrorError);
+      }
       AudioEngine::Instance().SetRequestedDevice(gAudioOutputDeviceId);
       AudioEngine::Instance().SetRequestedInputDevice(gAudioInputDeviceId);
       AudioEngine::Instance().SetRequestedSampleRate(gAudioSampleRate);
@@ -26561,6 +27337,7 @@ namespace
    {
       return a.audioOutputDeviceId == b.audioOutputDeviceId &&
              a.audioInputDeviceId == b.audioInputDeviceId && a.audioDriver == b.audioDriver &&
+             a.audioMirror == b.audioMirror && a.audioMirrorDevice == b.audioMirrorDevice &&
              a.audioSampleRate == b.audioSampleRate &&
              a.audioBufferFrames == b.audioBufferFrames &&
              a.audioOversample == b.audioOversample && a.targetFps == b.targetFps &&
@@ -26573,7 +27350,7 @@ namespace
              a.viewportPanelHeight == b.viewportPanelHeight && a.themePreset == b.themePreset &&
              a.diagnosticLog == b.diagnosticLog && a.autosaveEnabled == b.autosaveEnabled &&
              a.autosaveSeconds == b.autosaveSeconds && a.audioAutoStart == b.audioAutoStart &&
-             a.uiScale == b.uiScale && a.updateCheck == b.updateCheck &&
+             a.uiScale == b.uiScale && a.uiFont == b.uiFont && a.updateCheck == b.updateCheck &&
              a.startWithExample == b.startWithExample;
    }
 
@@ -28707,7 +29484,13 @@ namespace
       glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
       glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
       glfwWindowHint(GLFW_FLOATING, GLFW_FALSE);
+      // Turbo 0.51 (upstream 8af69a1): alpha-capable framebuffer, so a node with a
+      // transparent background can show the desktop through a windowed Output
+      // (OBS window capture). Opaque output still writes alpha 1: unchanged.
+      // Sticky hint, reset right after creation.
+      glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
       GLFWwindow* projWindow = glfwCreateWindow(w, h, NodeTitleWithInstance(gn).c_str(), nullptr, mainWindow);
+      glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_FALSE);
       if (projWindow == nullptr)
       {
          glfwMakeContextCurrent(mainWindow);
@@ -37850,6 +38633,23 @@ int main(int argc, char** argv)
                   ImGui::SetTooltip("Size of the whole interface. Auto follows the scale Windows uses\n"
                                     "for the monitor the window is on (and changes when you move it).");
             }
+            {
+               const char* currentLabel = kInterfaceFonts[0].label;
+               for (const InterfaceFont& f : kInterfaceFonts)
+                  if (gUiFontId == f.id)
+                     currentLabel = f.label;
+               ImGui::SetNextItemWidth(190);
+               if (ImGui::BeginCombo("Interface font", currentLabel))
+               {
+                  for (const InterfaceFont& f : kInterfaceFonts)
+                     if (ImGui::Selectable(f.label, gUiFontId == f.id) && gUiFontId != f.id)
+                     {
+                        gUiFontId = f.id;
+                        gUiRescaleRequested = true; // rebakes the atlas with the new face
+                     }
+                  ImGui::EndCombo();
+               }
+            }
             ImGui::SeparatorText("Theme");
             {
                const std::vector<std::string>& presets = CategoryColors::PresetNames();
@@ -38027,8 +38827,39 @@ int main(int argc, char** argv)
                                          Platform::AudioCurrentDriverName().c_str(), 1000.0 * rtFrames / sr);
                }
 
+               // Turbo 0.51: second output on a Windows (WASAPI shared) device
+               // that mirrors the master, so OBS can capture it while ASIO owns
+               // the interface.
+               ImGui::SeparatorText("Mirror output");
+               ImGui::Checkbox("Mirror output to Windows device (for OBS / screen recorders)", &gAudioMirror);
+               if (gAudioMirror)
+               {
+                  const std::vector<std::string> mirrorDevices = Platform::AudioMirrorListDevices();
+                  ImGui::SetNextItemWidth(220);
+                  if (ImGui::BeginCombo("Mirror device", gAudioMirrorDevice.empty() ? "Windows default" : gAudioMirrorDevice.c_str()))
+                  {
+                     if (ImGui::Selectable("Windows default", gAudioMirrorDevice.empty()))
+                        gAudioMirrorDevice.clear();
+                     for (const std::string& n : mirrorDevices)
+                        if (ImGui::Selectable(n.c_str(), n == gAudioMirrorDevice))
+                           gAudioMirrorDevice = n;
+                     ImGui::EndCombo();
+                  }
+                  if (gAudioDriver != 1)
+                     ImGui::TextDisabled("Meant for ASIO. With other drivers pick a different device than the main output.");
+               }
+               {
+                  const std::string mirrorStatus = Platform::AudioMirrorStatus();
+                  if (!mirrorStatus.empty())
+                     ImGui::TextDisabled("%s", mirrorStatus.c_str());
+               }
+
                if (ImGui::MenuItem("Apply audio settings"))
                {
+                  {
+                     std::string mirrorError;
+                     Platform::AudioMirrorApply(gAudioMirror, gAudioMirrorDevice, mirrorError);
+                  }
                   const bool wasRunning = AudioEngine::Instance().SampleRate() > 0.0;
                   if (wasRunning)
                      AudioEngine::Instance().Stop();
@@ -44797,6 +45628,8 @@ int main(int argc, char** argv)
                DrawFeedbackParams(n);
             else if (auto* n = dynamic_cast<TrailsNode*>(gn.node.get()))
                DrawTrailsParams(n);
+            else if (auto* n = dynamic_cast<DatamoshNode*>(gn.node.get()))
+               DrawDatamoshParams(n);
             else if (auto* n = dynamic_cast<ReactionDiffusionNode*>(gn.node.get()))
                DrawReactionDiffusionParams(n);
             else if (auto* n = dynamic_cast<SwitcherNode*>(gn.node.get()))
@@ -45615,7 +46448,8 @@ int main(int argc, char** argv)
       ed::EndCreate();
 
       // ---- keyboard: delete + copy/paste ----
-      const bool typing = io.WantTextInput || gArrangeKeysOwned || gPerfMatrixFocused; // Turbo 0.46
+      const bool typing = io.WantTextInput || gArrangeKeysOwned || gPerfMatrixFocused || gChordSlotsKeysOwned; // Turbo 0.46, 0.51
+      gChordSlotsKeysOwned = false;
       const bool cmdOrCtrl = io.KeyCtrl || io.KeySuper;
 
       // Shift+Cmd+Z is the Mac convention for redo; Ctrl+Y also works for
@@ -47348,9 +48182,9 @@ int main(int argc, char** argv)
       ImGui::SetNextWindowSizeConstraints(ImVec2(220, 0), ImVec2(420, 480));
       if (ImGui::BeginPopup("##dropdown"))
       {
-         // Turbo: long lists (the drum pattern library) get a filter box.
+         // Turbo: lists of 12+ (the drum pattern library, devices) get a filter box.
          static char ddFilter[64] = "";
-         const bool longList = gDropdown.options.size() > 30;
+         const bool longList = gDropdown.options.size() >= 12; // Turbo 0.51 (upstream f08e6bf): was 30
          if (ImGui::IsWindowAppearing())
             ddFilter[0] = '\0';
          std::string filterLower;
@@ -47360,9 +48194,7 @@ int main(int argc, char** argv)
                ImGui::SetKeyboardFocusHere();
             ImGui::SetNextItemWidth(-1.0f);
             ImGui::InputTextWithHint("##ddfilter", "filter...", ddFilter, sizeof(ddFilter));
-            filterLower = ddFilter;
-            std::transform(filterLower.begin(), filterLower.end(), filterLower.begin(),
-                           [](unsigned char ch) { return (char)std::tolower(ch); });
+            filterLower = FoldForSearch(ddFilter); // Turbo 0.51: accent-insensitive, Latin-1 + Latin Ext-A
          }
          auto ddMatches = [&](int i) {
             if (filterLower.empty())
@@ -47370,28 +48202,7 @@ int main(int argc, char** argv)
             std::string hay = gDropdown.options[i];
             if (i < (int)gDropdown.categories.size())
                hay += " " + gDropdown.categories[i];
-            std::transform(hay.begin(), hay.end(), hay.begin(), [](unsigned char ch) { return (char)std::tolower(ch); });
-            if (hay.find(filterLower) != std::string::npos)
-               return true;
-            // Accent-free match too ("ijexa" finds "ijexá"): drop UTF-8 lead bytes, keep ASCII.
-            std::string plain;
-            for (size_t k = 0; k < hay.size(); k++)
-            {
-               const unsigned char ch = (unsigned char)hay[k];
-               if (ch == 0xC3 && k + 1 < hay.size())
-               {
-                  static const char kFold[65] = "aaaaaaaceeeeiiiidnooooo/ouuuuytsaaaaaaaceeeeiiiidnooooo/ouuuuyty";
-                  const unsigned char nx = (unsigned char)hay[k + 1];
-                  if (nx >= 0x80 && nx <= 0xBF)
-                  {
-                     plain += kFold[nx - 0x80];
-                     k++;
-                     continue;
-                  }
-               }
-               plain += (char)ch;
-            }
-            return plain.find(filterLower) != std::string::npos;
+            return FoldForSearch(hay).find(filterLower) != std::string::npos;
          };
          std::string lastCat = "";
          for (int i = 0; i < (int)gDropdown.options.size(); i++)
@@ -48636,7 +49447,9 @@ int main(int argc, char** argv)
                GLUtil::DrawTextureToScreen(tex, pw, ph, 0, 0, /*checkerBg=*/false);
             else
                GLUtil::DrawTextureToScreen(tex, pw, ph, texW, texH, /*checkerBg=*/false,
-                                           gProjectorWindows[i].fitMode);
+                                           gProjectorWindows[i].fitMode, nullptr,
+                                           /*transparentWindow=*/!gProjectorWindows[i].fullscreen &&
+                                              OutputNodeHasTransparentBg(src->node.get()));
          }
          else
          {

@@ -6,16 +6,12 @@
 
 #include "IEffectKernel.h"
 #include "DelayKernel.h" // reuses DelayLine - Hermite-interpolated fractional read, already proven by Delay
+#include "AnalogPrimitives.h"
 #include "audio/DspMath.h"
 #include "audio/MusicTime.h"
 #include "audio/ParamMailbox.h"
 
-// Chorus's kernel - `taps` (2 or 3) modulated delay-line voices per channel,
-// summed. Primary reference: Dattorro, "Effect Design Part 2: Delay-Line
-// Modulation and Chorus" (JAES 1997) - the standard modulated-delay chorus
-// topology (short base delay, sinusoidal LFO depth, multiple detuned voices,
-// stereo-decorrelated via LFO phase offset). Matches the KHS Audio Chorus
-// module's Delay/Spread/Taps/Depth/Rate/Mix control set directly.
+// Chorus's kernel - modulated delay-line voices per channel with digital and analog modes.
 class AudioEffectNode;
 
 class ChorusKernel : public IEffectKernel
@@ -41,6 +37,13 @@ public:
       const int maxSamples = (int)std::ceil(kMaxDelayMs * 0.001 * sampleRate) + 8;
       mLineL.Prepare(maxSamples);
       mLineR.Prepare(maxSamples);
+      for (int i = 0; i < 2; i++)
+      {
+         mFilterL[i].SetSampleRate(sampleRate);
+         mFilterL[i].SetCutoff(7500.0f, 0.707f);
+         mFilterR[i].SetSampleRate(sampleRate);
+         mFilterR[i].SetCutoff(7500.0f, 0.707f);
+      }
       Reset();
    }
 
@@ -49,6 +52,12 @@ public:
       mLineL.Reset();
       mLineR.Reset();
       mPhase = 0.0;
+      mDriftLfo.Reset();
+      for (int i = 0; i < 2; i++)
+      {
+         mFilterL[i].Reset();
+         mFilterR[i].Reset();
+      }
    }
 
    void PushParams(const AudioEffectNode& node, double sampleRate) override;
@@ -64,7 +73,13 @@ private:
    std::atomic<int> mTaps { 2 };
    std::atomic<int> mSync { 0 };
    std::atomic<int> mRateDiv { MusicTime::kQuarter };
+   std::atomic<int> mAnalog { 0 };
 
    DelayLine mLineL, mLineR;
-   double mPhase = 0.0; // 0..1, one shared LFO cycle every voice/channel reads at its own offset
+   double mPhase = 0.0;
+
+   // Analog mode components
+   AnalogDsp::DriftLfo mDriftLfo;
+   DspMath::TptSvf mFilterL[2];
+   DspMath::TptSvf mFilterR[2];
 };

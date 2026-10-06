@@ -47,13 +47,29 @@ AudioEngine& AudioEngine::Instance()
    return sInstance;
 }
 
+AudioEngine::AudioEngine()
+{
+   for (int i = 0; i < kAudioMaxNodeInputs; i++)
+      for (int ch = 0; ch < kAudioMaxChannels; ch++)
+         mCompScratchChannels[i][ch] = mCompScratch[i][ch];
+   for (int ch = 0; ch < kAudioMaxChannels; ch++)
+      mTerminalScratchChannels[ch] = mTerminalScratch[ch];
+}
+
 bool AudioEngine::Start(std::string& outError)
 {
    double sampleRate = 0.0;
+   // Turbo 0.51 (upstream): raised BEFORE the device opens, the first callback
+   // can fire before AudioDeviceOpen returns and the retire drain must not
+   // treat that window as "no audio thread".
+   mDeviceOpen.store(true, std::memory_order_release);
    if (!Platform::AudioDeviceOpen(&AudioEngine::RenderThunk, this, sampleRate, outError,
                                   mRequestedDeviceId, mRequestedSampleRate, mRequestedBufferFrames,
                                   mRequestedInputDeviceId))
+   {
+      mDeviceOpen.store(false, std::memory_order_release);
       return false;
+   }
    mSampleRate.store(sampleRate, std::memory_order_relaxed);
    mStartGeneration.fetch_add(1, std::memory_order_relaxed);
    mStartedAtMs.store(NowMs(), std::memory_order_relaxed);
@@ -66,6 +82,9 @@ void AudioEngine::Stop()
 {
    Platform::AudioDeviceClose();
    mSampleRate.store(0.0, std::memory_order_relaxed);
+   // AudioDeviceClose has returned: no callback can still hold a list.
+   mDeviceOpen.store(false, std::memory_order_release);
+   DrainRetired();
 
    // Reset xrun-detection state here, on Stop(), not on the next Start():
    // Platform::AudioDeviceClose() has already returned, so Process() cannot
@@ -96,10 +115,33 @@ void AudioEngine::SetTopology(AudioTopology topology)
    for (PooledBuffer& b : fresh->buffers) // main thread only - never inside Process()
       b.Allocate();
 
-   ProcessList* old = mCurrent.exchange(fresh, std::memory_order_acq_rel);
+   fresh->generation = mPublishedGeneration.fetch_add(1, std::memory_order_relaxed) + 1;
 
-   delete mRetiring; // safe: the audio thread finished with this one a full generation ago
-   mRetiring = old;
+   ProcessList* old = mCurrent.exchange(fresh, std::memory_order_acq_rel);
+   if (old != nullptr)
+      mRetiring.push_back(old);
+   DrainRetired();
+}
+
+// Turbo 0.51 (upstream): a superseded list is freed only once the audio thread
+// has COMPLETED a pass over a strictly newer generation (callbacks are serial),
+// or when no callback can be using it (no device, or offline render, where the
+// device callback returns before touching the graph). The old "freed one
+// SetTopology later" rule crashed when two rebuilds landed inside one block.
+void AudioEngine::DrainRetired()
+{
+   const bool noAudioThread = !mDeviceOpen.load(std::memory_order_acquire) || mOffline.load(std::memory_order_acquire);
+   const uint64_t completed = mCompletedGeneration.load(std::memory_order_acquire);
+   size_t keep = 0;
+   for (size_t i = 0; i < mRetiring.size(); i++)
+   {
+      ProcessList* list = mRetiring[i];
+      if (noAudioThread || completed > list->generation)
+         delete list;
+      else
+         mRetiring[keep++] = list;
+   }
+   mRetiring.resize(keep);
 }
 
 double AudioEngine::SampleRate() const
@@ -166,6 +208,7 @@ void AudioEngine::PumpMainThread()
    // retired (superseded by a newer Play(), or Stop()'s buffer once a new
    // one lands) rather than leaving it to leak.
    mPreviewPlayer.DrainRetired();
+   DrainRetired();
 }
 
 void AudioEngine::ProcessOffline(AudioBuffer& buffer)
@@ -204,18 +247,7 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
    // same discipline as sInterleaveScratch below. Only touched for a pin
    // whose CompensationDelay::IsActive() is true; the common all-zero-
    // latency topology never writes to this at all.
-   // Turbo: heap-allocated once per real-time thread instead of a 2 MB
-   // thread_local array - MSVC reserves static TLS for EVERY thread in the
-   // process (JUCE, decoders, workers...), not just the audio thread.
-   static thread_local float* sCompScratch = nullptr;
-   static thread_local float* sCompScratchChannels[kAudioMaxNodeInputs][kAudioMaxChannels];
-   if (sCompScratch == nullptr)
-   {
-      sCompScratch = new float[(size_t)kAudioMaxNodeInputs * kAudioMaxChannels * kAudioMaxBlockFrames]();
-      for (int i = 0; i < kAudioMaxNodeInputs; i++)
-         for (int ch = 0; ch < kAudioMaxChannels; ch++)
-            sCompScratchChannels[i][ch] = sCompScratch + ((size_t)i * kAudioMaxChannels + (size_t)ch) * kAudioMaxBlockFrames;
-   }
+   // Turbo 0.51: mCompScratch/mCompScratchChannels are AudioEngine members.
 
    const bool timeline = mTimelineMode.load(std::memory_order_relaxed);
    if (timeline && !list->topology.arrangeTerminals.empty())
@@ -236,7 +268,7 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
          {
             AudioBuffer src = list->buffers[idx].View(numFrames, numChannels);
             AudioBuffer delayed;
-            delayed.channels = sCompScratchChannels[i];
+            delayed.channels = mCompScratchChannels[i];
             delayed.numChannels = numChannels;
             delayed.numFrames = numFrames;
             entry.inputCompensation[i].ProcessBlock(src, delayed);
@@ -253,24 +285,7 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
       entry.node->ProcessBlock(inputPtrs, entry.numInputs, output);
    }
 
-   // Scratch interleave buffer for capture rings - thread_local so it's
-   // allocated once per real-time thread rather than per block, and never
-   // touched off the audio thread.
-   static thread_local std::vector<float> sInterleaveScratch;
-
-   // Terminal-summation PDC scratch: one shared landing spot, reused
-   // terminal to terminal since each is summed into deviceBuffer (and
-   // captured) immediately, before the next terminal's turn - never two
-   // terminals' delayed copies needed live at once.
-   static thread_local float sTerminalScratch[kAudioMaxChannels][kAudioMaxBlockFrames];
-   static thread_local float* sTerminalScratchChannels[kAudioMaxChannels];
-   static thread_local bool sTerminalScratchInited = false;
-   if (!sTerminalScratchInited)
-   {
-      for (int ch = 0; ch < kAudioMaxChannels; ch++)
-         sTerminalScratchChannels[ch] = sTerminalScratch[ch];
-      sTerminalScratchInited = true;
-   }
+   // Turbo 0.51: mInterleaveScratch / mTerminalScratch are AudioEngine members.
 
    for (AudioTerminal& terminal : list->topology.terminalBufferIndices)
    {
@@ -278,7 +293,7 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
       if (terminal.compensation.IsActive())
       {
          AudioBuffer delayed;
-         delayed.channels = sTerminalScratchChannels;
+         delayed.channels = mTerminalScratchChannels;
          delayed.numChannels = numChannels;
          delayed.numFrames = numFrames;
          terminal.compensation.ProcessBlock(src, delayed);
@@ -295,15 +310,14 @@ void AudioEngine::RunTopology(ProcessList* list, AudioBuffer& deviceBuffer)
          // Always interleaved stereo for the WAV writer, regardless of the
          // topology's actual channel count - mono sources duplicate to both
          // channels, anything wider than stereo is summed down to it.
-         sInterleaveScratch.resize((size_t)numFrames * 2);
          for (int i = 0; i < numFrames; i++)
          {
             const float l = src.channels[0][i];
             const float r = numChannels > 1 ? src.channels[1][i] : l;
-            sInterleaveScratch[(size_t)i * 2 + 0] = l;
-            sInterleaveScratch[(size_t)i * 2 + 1] = r;
+            mInterleaveScratch[(size_t)i * 2 + 0] = l;
+            mInterleaveScratch[(size_t)i * 2 + 1] = r;
          }
-         terminal.capture->Write(sInterleaveScratch.data(), numFrames * 2);
+         terminal.capture->Write(mInterleaveScratch, numFrames * 2);
       }
    }
 
@@ -619,6 +633,9 @@ void AudioEngine::Process(float** buffers, int numChannels, int numFrames)
    const double topologyStartMs = NowMs();
    ProcessList* list = mCurrent.load(std::memory_order_acquire);
    RunTopology(list, buffer);
+   // Turbo 0.51: published only after RunTopology returns, see DrainRetired.
+   if (list != nullptr)
+      mCompletedGeneration.store(list->generation, std::memory_order_release);
    // Deliberately after RunTopology, not part of it: the preview is not in
    // the node topology at all, so it stays audible (and unaffected by
    // bypass/the transport) across a topology swap, and even with nothing

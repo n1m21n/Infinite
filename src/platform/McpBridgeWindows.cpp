@@ -35,7 +35,7 @@ using json = nlohmann::json;
 
 namespace
 {
-   const char* kServerVersion = "0.50.0";
+   const char* kServerVersion = "0.51.0";
 
    // ------------------------------------------------------------ stdio ---
    HANDLE gIn = INVALID_HANDLE_VALUE;
@@ -388,6 +388,13 @@ namespace
                   "action: state (default), go (scene, -1 = off; now skips quantize), press (scene, like the button: "
                   "again = off), off, next, prev, cancel.",
         R"({"type":"object","properties":{"index":{"type":"integer"},"action":{"type":"string","enum":["state","go","press","off","next","prev","cancel"]},"scene":{"type":"integer"},"now":{"type":"boolean"},"scenes":{"type":"integer"},"outputs":{"type":"integer"},"quantize":{"type":["integer","string"]},"press_again_off":{"type":"boolean"},"names":{"type":"array","items":{"type":"string"}},"outs":{"type":"array","items":{"type":"object","properties":{"label":{"type":"string"},"mode":{"type":"string","enum":["on/off","choice","level","pulse"]},"steps":{"type":["integer","string"]}}}},"grid":{"type":"array","items":{"type":"array","items":{}}},"off":{"type":"array","items":{}},"cells":{"type":"array","items":{"type":"array","items":{}}}},"required":["index"]})" },
+      { "chord_progression", "Chord Progression node (Turbo): get (slots with chord name, MIDI notes, bars, slash bass), "
+                             "set_slots (replaces the progression, 1-16 slots), insert (at, slot), duplicate / delete (slot), "
+                             "move (from, to). A slot is a chord symbol (\"Cmaj7(9,11)/E\", \"Am7\", \"F#m7b5\", \"C6/9\", "
+                             "\"G7(b9,#11)\") or {chord | notes (MIDI numbers, \"C3\" names, or pitch classes stacked upward), "
+                             "bars (2, 1.5, \"3b\" beats, \"2:2\" bars:beats; min 1/16), slash (bass note), rest:true}. "
+                             "Keys span four octaves from C of baseOctave.",
+        R"({"type":"object","properties":{"index":{"type":"integer"},"action":{"type":"string","enum":["get","set_slots","insert","duplicate","delete","move"]},"slots":{"type":"array","items":{}},"slot":{},"at":{"type":"integer"},"from":{"type":"integer"},"to":{"type":"integer"}},"required":["index"]})" },
       { "perf_list", "The Performance Mode panel: pages and every control with what it drives.",
         R"({"type":"object","properties":{}})" },
       { "perf_add", "Puts a parameter on the Performance Mode panel (by its drawn name, as explain lists it). kind: knob, "
@@ -424,7 +431,7 @@ namespace
       "(patch_format) and validate_patch_text before load_patch_text -> explain to check the result. An image "
       "chain needs an Output node at the end to be seen. Params that modulate / set_expression take are the "
       "drawn control names explain lists. render_frame / screenshot_node show the picture. Turbo-only tools: "
-      "clip_matrix, pads (MPC / VMPC), looper, drum_pattern (Drum Sequencer grooves), scenes (radio scene launcher, one button many params), perf_* (Performance Mode). Read authoring_guide once before "
+      "clip_matrix, pads (MPC / VMPC), looper, chord_progression, drum_pattern (Drum Sequencer grooves), scenes (radio scene launcher, one button many params), perf_* (Performance Mode). Read authoring_guide once before "
       "building. Everything is undoable (undo).";
 
    json ToolList()

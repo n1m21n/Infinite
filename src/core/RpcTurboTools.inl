@@ -51,11 +51,271 @@ nlohmann::json RpcPerfElementJson(size_t i)
    return j;
 }
 
+// Turbo 0.51: Chord Progression helpers. A note list (MIDI numbers, "C3"
+// names, or bare pitch classes "C E G" stacked upward from C of baseOctave)
+// becomes a 4-octave key mask.
+bool RpcChordNotesToMask(const nlohmann::json& arr, int baseOctave, uint64_t& mask, std::string& err)
+{
+   mask = 0;
+   if (!arr.is_array())
+   {
+      err = "notes: an array of MIDI numbers or note names";
+      return false;
+   }
+   const int base = (baseOctave + 1) * 12;
+   int last = -1;
+   for (const nlohmann::json& v : arr)
+   {
+      int key = -1;
+      if (v.is_number())
+         key = (int)std::lround(v.get<double>()) - base;
+      else if (v.is_string())
+      {
+         const std::string t = v.get<std::string>();
+         if (t.empty() || std::toupper((unsigned char)t[0]) < 'A' || std::toupper((unsigned char)t[0]) > 'G')
+         {
+            err = "bad note: " + t;
+            return false;
+         }
+         static const int kBase[7] = { 9, 11, 0, 2, 4, 5, 7 };
+         int pc = kBase[std::toupper((unsigned char)t[0]) - 'A'];
+         size_t i = 1;
+         if (i < t.size() && t[i] == '#') { pc++; i++; }
+         else if (i < t.size() && t[i] == 'b') { pc--; i++; }
+         if (i < t.size())
+         {
+            // with an octave: C3 = (3 + 1) * 12
+            const int oct = std::atoi(t.c_str() + i);
+            key = (oct + 1) * 12 + pc - base;
+         }
+         else
+         {
+            pc = (pc + 12) % 12;
+            key = last < 0 ? pc : last + 1;
+            while (key % 12 != pc)
+               key++;
+         }
+      }
+      else
+      {
+         err = "notes: numbers or strings";
+         return false;
+      }
+      if (key < 0 || key >= ChordProgressionNode::kKeysTotal)
+      {
+         err = "note out of range (keys 0-47 from C of baseOctave " + std::to_string(baseOctave) + ")";
+         return false;
+      }
+      mask |= 1ull << key;
+      last = key;
+   }
+   return true;
+}
+
+// One slot from a chord symbol string or {chord | notes, bars | length, slash}.
+bool RpcChordSlot(const nlohmann::json& v, const ChordProgressionNode& n, ChordProgressionNode::Slot& out,
+                  std::string& err)
+{
+   using CP = ChordProgressionNode;
+   out = CP::Slot();
+   const double bpb = Transport::Instance().BeatsPerBar();
+   uint64_t mask = 0;
+   int slash = -1;
+   auto symbol = [&](const std::string& text) {
+      if (!CP::ParseChordSymbol(text, mask, slash))
+      {
+         err = "cannot read chord symbol: " + text;
+         return false;
+      }
+      return true;
+   };
+   if (v.is_string())
+   {
+      if (!symbol(v.get<std::string>()))
+         return false;
+   }
+   else if (v.is_object())
+   {
+      if (v.contains("chord") && v["chord"].is_string())
+      {
+         if (!symbol(v["chord"].get<std::string>()))
+            return false;
+      }
+      else if (v.contains("notes"))
+      {
+         if (!RpcChordNotesToMask(v["notes"], n.baseOctave, mask, err))
+            return false;
+      }
+      else if (!v.value("rest", false))
+      {
+         err = "a slot needs chord, notes or rest";
+         return false;
+      }
+      if (v.contains("slash"))
+      {
+         if (v["slash"].is_string())
+         {
+            uint64_t sm = 0;
+            int ignore = -1;
+            if (!CP::ParseChordSymbol(v["slash"].get<std::string>(), sm, ignore) || sm == 0)
+            {
+               err = "slash: a note name such as E";
+               return false;
+            }
+            slash = 0;
+            while (!(sm & (1ull << slash)))
+               slash++;
+            slash %= 12;
+         }
+         else if (v["slash"].is_number())
+            slash = ((v["slash"].get<int>() % 12) + 12) % 12;
+      }
+      const char* lenKey = v.contains("bars") ? "bars" : (v.contains("length") ? "length" : nullptr);
+      if (lenKey != nullptr)
+      {
+         const nlohmann::json& l = v[lenKey];
+         float bars = 1.0f;
+         if (l.is_number())
+            bars = std::clamp(l.get<float>(), CP::kMinBars, 16.0f);
+         else if (!l.is_string() || !CP::ParseBarsText(l.get<std::string>(), bpb, bars))
+         {
+            err = "bars: a number of bars or text such as \"3b\" or \"2:2\"";
+            return false;
+         }
+         out.bars = bars;
+      }
+   }
+   else
+   {
+      err = "a slot is a chord symbol string or an object";
+      return false;
+   }
+   out.lo = (int)(mask & 0xFFFFFFu);
+   out.hi = (int)((mask >> CP::kKeys) & 0xFFFFFFu);
+   out.slash = slash;
+   return true;
+}
+
+nlohmann::json RpcChordStateJson(const ChordProgressionNode& n)
+{
+   using CP = ChordProgressionNode;
+   nlohmann::json slots = nlohmann::json::array();
+   const int base = (n.baseOctave + 1) * 12;
+   for (int i = 0; i < n.chordCount; i++)
+   {
+      nlohmann::json notes = nlohmann::json::array();
+      for (int k = 0; k < CP::kKeysTotal; k++)
+         if (n.FullMask(i) & (1ull << k))
+            notes.push_back(base + k);
+      slots.push_back({ { "slot", i }, { "chord", n.ChordName(i) }, { "notes", notes }, { "bars", n.chordBars[i] },
+                        { "slash", n.slashBass[i] } });
+   }
+   return { { "count", n.chordCount }, { "selected", n.selected }, { "baseOctave", n.baseOctave },
+            { "total_bars", n.TotalBars() }, { "slots", slots } };
+}
+
 bool HandleRpcCommandTurbo(const std::string& method, const nlohmann::json& params,
                            nlohmann::json& outResult, std::string& outError, bool& handled)
 {
    using json = nlohmann::json;
    handled = true;
+
+   if (method == "chord_progression")
+   {
+      // Turbo 0.51: edit a Chord Progression node. get | set_slots | insert |
+      // duplicate | delete | move. Slots are chord symbols ("Cmaj7(9,11)/E")
+      // or {chord | notes, bars, slash}; bars take "2", "1.5", "3b", "2:2".
+      using CP = ChordProgressionNode;
+      GraphNode* gn = FindNodeByIndex(params.value("index", -1));
+      auto* cp = gn ? dynamic_cast<CP*>(gn->node.get()) : nullptr;
+      if (cp == nullptr)
+      {
+         outError = "index is not a Chord Progression node";
+         return false;
+      }
+      const std::string action = params.value("action", std::string("get"));
+      std::string err;
+      if (action == "get")
+      {
+         outResult = RpcChordStateJson(*cp);
+         return true;
+      }
+      if (action == "set_slots")
+      {
+         if (!params.contains("slots") || !params["slots"].is_array() || params["slots"].empty() ||
+             params["slots"].size() > (size_t)CP::kMaxChords)
+         {
+            outError = "slots: 1-16 chord symbols or objects";
+            return false;
+         }
+         std::vector<CP::Slot> parsed;
+         for (const json& item : params["slots"])
+         {
+            CP::Slot sl;
+            if (!RpcChordSlot(item, *cp, sl, err))
+            {
+               outError = err;
+               return false;
+            }
+            parsed.push_back(sl);
+         }
+         PushUndoCheckpoint();
+         for (size_t i = 0; i < parsed.size(); i++)
+            cp->SetSlot((int)i, parsed[i]);
+         cp->chordCount = (int)parsed.size();
+         cp->selected = std::clamp(cp->selected, 0, cp->chordCount - 1);
+         gPatchDirty = true;
+         outResult = RpcChordStateJson(*cp);
+         return true;
+      }
+      const int count = cp->chordCount;
+      bool ok = false;
+      if (action == "insert")
+      {
+         CP::Slot sl;
+         if (params.contains("slot") && !RpcChordSlot(params["slot"], *cp, sl, err))
+         {
+            outError = err;
+            return false;
+         }
+         PushUndoCheckpoint();
+         ok = cp->InsertSlot(params.value("at", count), sl);
+         if (!ok) outError = "the progression is full (16 chords)";
+      }
+      else if (action == "duplicate" || action == "delete")
+      {
+         const int slot = params.value("slot", cp->selected);
+         if (slot < 0 || slot >= count)
+         {
+            outError = "slot out of range (0-" + std::to_string(count - 1) + ")";
+            return false;
+         }
+         PushUndoCheckpoint();
+         ok = action == "duplicate" ? cp->DuplicateSlot(slot) : cp->DeleteSlot(slot);
+         if (!ok) outError = action == "duplicate" ? "the progression is full (16 chords)" : "cannot delete the last chord";
+      }
+      else if (action == "move")
+      {
+         const int from = params.value("from", -1), to = params.value("to", -1);
+         if (from < 0 || from >= count || to < 0 || to >= count)
+         {
+            outError = "move: from and to (0-" + std::to_string(count - 1) + ")";
+            return false;
+         }
+         PushUndoCheckpoint();
+         ok = from == to || cp->MoveSlot(from, to);
+      }
+      else
+      {
+         outError = "action: get, set_slots, insert, duplicate, delete or move";
+         return false;
+      }
+      if (!ok)
+         return false;
+      gPatchDirty = true;
+      outResult = RpcChordStateJson(*cp);
+      return true;
+   }
 
    if (method == "clip_matrix")
    {

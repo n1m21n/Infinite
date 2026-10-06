@@ -282,7 +282,7 @@ MolderDsp::Genome MolderNode::BuildDesiredGenome() const
 {
    MolderDsp::Genome g;
    {
-      MolderDsp::Rng rng(mSeed);
+      MolderDsp::Rng rng((uint32_t)mSeed);
       for (int i = 0; i < mGeneration; ++i)
          MolderDsp::Mutate(g, chaos, rng);
    }
@@ -325,7 +325,7 @@ void MolderNode::LaunchJob(Job job, std::vector<float> sourceOverride, double so
    std::atomic<bool>* readyPtr = &mResultReady;
    PendingResult* pending = &mPendingResult;
 
-   mLastDispatched.seed = mSeed;
+   mLastDispatched.seed = (uint32_t)mSeed;
    mLastDispatched.generation = mGeneration;
    mLastDispatched.chaos = chaos;
    mLastDispatched.pitch = pitch;
@@ -477,7 +477,7 @@ void MolderNode::CookIfNeeded(int frameId)
    if (!mWorking.load(std::memory_order_relaxed) && mCooldownFrames == 0 && mAnalysis.valid)
    {
       DispatchSnapshot now;
-      now.seed = mSeed;
+      now.seed = (uint32_t)mSeed;
       now.generation = mGeneration;
       now.chaos = chaos;
       now.pitch = pitch;
@@ -510,9 +510,7 @@ void MolderNode::VisitParams(ParamVisitor& v)
    v.Bool("loop", loop);
    v.Bool("reverse", reverse);
    v.Bool("pingpong", pingpong);
-   int seedInt = (int)mSeed;
-   v.Int("seed", seedInt);
-   mSeed = (uint32_t)seedInt;
+   v.Int("seed", mSeed); // Turbo 0.51: a member, a stack temp dangles in retaining visitors
    v.Int("generation", mGeneration);
 }
 
@@ -603,7 +601,7 @@ bool MolderNode::LoadFile(const std::string& path)
    mOriginalSR = sr;
 
    std::random_device rd;
-   mSeed = rd();
+   mSeed = (int)rd();
    mGeneration = 0;
 
    LaunchJob(Job::AnalyzeThenRender, mono, sr, /*isOriginalSource=*/true);
@@ -661,7 +659,7 @@ void MolderNode::StopRecording()
    mOriginalSR = sr;
 
    std::random_device rd;
-   mSeed = rd();
+   mSeed = (int)rd();
    mGeneration = 0;
 
    LaunchJob(Job::AnalyzeThenRender, mono, sr, /*isOriginalSource=*/true);

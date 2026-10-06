@@ -453,8 +453,18 @@ namespace GLUtil
    }
 
    void DrawTextureToScreen(unsigned int tex, int windowW, int windowH, int texW, int texH,
-                             bool checkerBg, int fitMode, const float* bgRGB)
+                             bool checkerBg, int fitMode, const float* bgRGB, bool transparentWindow)
    {
+      // Turbo 0.51: premultiplied alpha straight to a transparent-framebuffer window.
+      static const char* kBlitPremulFragSrc =
+         "#version 150\n"
+         "in vec2 vUv;\n"
+         "out vec4 fragColor;\n"
+         "uniform sampler2D uTex;\n"
+         "void main() { vec4 c = texture(uTex, vUv); fragColor = vec4(c.rgb * c.a, c.a); }\n";
+      static unsigned int sPremulProgram = 0;
+      static int sLocTexPremul = -1;
+
       static const char* kBlitFragSrc =
          "#version 150\n"
          "in vec2 vUv;\n"
@@ -501,14 +511,22 @@ namespace GLUtil
          sCheckerProgram = CompileProgram(kBlitCheckerFragSrc);
          sLocTexChecker = glGetUniformLocation(sCheckerProgram, "uTex");
       }
-      const unsigned int program = checkerBg ? sCheckerProgram : sBlitProgram;
-      const int locTex = checkerBg ? sLocTexChecker : sLocTex;
+      if (transparentWindow && sPremulProgram == 0)
+      {
+         sPremulProgram = CompileProgram(kBlitPremulFragSrc);
+         sLocTexPremul = glGetUniformLocation(sPremulProgram, "uTex");
+      }
+      const bool premul = transparentWindow && sPremulProgram != 0;
+      const unsigned int program = premul ? sPremulProgram : (checkerBg ? sCheckerProgram : sBlitProgram);
+      const int locTex = premul ? sLocTexPremul : (checkerBg ? sLocTexChecker : sLocTex);
       if (program == 0)
          return;
 
       // Clear the full window first (letterbox bars, if any, show this).
       glViewport(0, 0, windowW, windowH);
-      if (bgRGB != nullptr)
+      if (premul)
+         glClearColor(0.0f, 0.0f, 0.0f, 0.0f); // bars are transparent too
+      else if (bgRGB != nullptr)
          glClearColor(bgRGB[0], bgRGB[1], bgRGB[2], 1);
       else
          glClearColor(0.0f, 0.0f, 0.0f, 1);
@@ -566,7 +584,7 @@ namespace GLUtil
       glBindTexture(GL_TEXTURE_2D, tex);
       if (locTex >= 0)
          glUniform1i(locTex, 0);
-      if (!checkerBg && sLocBg >= 0)
+      if (!premul && !checkerBg && sLocBg >= 0)
       {
          if (bgRGB != nullptr)
             glUniform3f(sLocBg, bgRGB[0], bgRGB[1], bgRGB[2]);

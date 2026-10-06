@@ -7,11 +7,13 @@ void PitchShiftKernel::PushParams(const AudioEffectNode& node, double sampleRate
    mSampleRate = sampleRate;
    mMailbox.Push(kSemitones, node.Param("pitch"));
    mMailbox.Push(kGrainMs, node.Param("grain"));
+   mAnalog.store(node.Param("analog") != 0.0f ? 1 : 0, std::memory_order_relaxed);
 }
 
 void PitchShiftKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*sidechain*/, AudioBuffer& out)
 {
    const int numChannels = std::min(in.numChannels, std::min(out.numChannels, 2));
+   const bool analog = mAnalog.load(std::memory_order_relaxed) != 0;
 
    for (int i = 0; i < out.numFrames; i++)
    {
@@ -23,10 +25,6 @@ void PitchShiftKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*
 
       if (!mTapsInitialized)
       {
-         // Half a grain apart, so the two triangle windows are a half-cycle
-         // out of phase and sum to a constant 1 everywhere - without this,
-         // both taps start in lockstep and briefly double the gain until
-         // their first wrap re-separates them.
          mTap0 = 1.0f;
          mTap1 = grainSamples * 0.5f;
          mTapsInitialized = true;
@@ -52,12 +50,43 @@ void PitchShiftKernel::ProcessBlock(const AudioBuffer& in, const AudioBuffer* /*
       mLineL.Write(inL);
       mLineR.Write(inR);
 
-      const float outL = mLineL.Read(mTap0) * w0 + mLineL.Read(mTap1) * w1;
-      const float outR = mLineR.Read(mTap0) * w0 + mLineR.Read(mTap1) * w1;
+      if (analog)
+      {
+         mJitterPhase += 17.3f / (float)mSampleRate;
+         if (mJitterPhase >= 1.0f)
+            mJitterPhase -= 1.0f;
+         const float jitter = sinf(mJitterPhase * 2.0f * (float)M_PI) * 0.35f;
 
-      out.channels[0][i] = outL;
-      if (numChannels >= 2)
-         out.channels[1][i] = outR;
+         const float readTap0 = std::max(1.0f, mTap0 + jitter);
+         const float readTap1 = std::max(1.0f, mTap1 + jitter);
+
+         float outL = mLineL.Read(readTap0) * w0 + mLineL.Read(readTap1) * w1;
+         float outR = mLineR.Read(readTap0) * w0 + mLineR.Read(readTap1) * w1;
+
+         // 4th-order 9kHz lowpass reconstruction filter
+         outL = mFilterL[0].Process(outL).low;
+         outL = mFilterL[1].Process(outL).low;
+         outR = mFilterR[0].Process(outR).low;
+         outR = mFilterR[1].Process(outR).low;
+
+         // Harmonic grain saturation
+         outL = AnalogDsp::AsymTanh(outL, 0.12f);
+         outR = AnalogDsp::AsymTanh(outR, 0.12f);
+
+         out.channels[0][i] = outL;
+         if (numChannels >= 2)
+            out.channels[1][i] = outR;
+      }
+      else
+      {
+         const float outL = mLineL.Read(mTap0) * w0 + mLineL.Read(mTap1) * w1;
+         const float outR = mLineR.Read(mTap0) * w0 + mLineR.Read(mTap1) * w1;
+
+         out.channels[0][i] = outL;
+         if (numChannels >= 2)
+            out.channels[1][i] = outR;
+      }
+
       for (int ch = 2; ch < out.numChannels; ch++)
          out.channels[ch][i] = 0.0f;
    }

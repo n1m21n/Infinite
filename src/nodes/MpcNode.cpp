@@ -1,4 +1,5 @@
 #include "MpcNode.h"
+#include "DrumPatterns.h"
 
 #include <algorithm>
 #include <atomic>
@@ -782,6 +783,10 @@ void MpcNode::ReloadFromPaths()
       if (padPath[p].empty())
          continue;
       const std::string path = padPath[p];
+      // Turbo 0.51: stale bundled-kit path, retry from the current kit folder.
+      const std::string retry = DrumPatterns::StaleKitRetryPath(path);
+      if (!retry.empty() && LoadPad(p, retry))
+         continue;
       if (!LoadPad(p, path))
          padPath[p] = path; // keep the reference so a re-save doesn't lose it
    }
@@ -848,7 +853,8 @@ public:
    void PushParams(int pad, float gainDb)
    {
       mPad.store(std::clamp(pad, 0, MpcNode::kPads - 1), std::memory_order_relaxed);
-      mGain.store(DspMath::DbToLinear(std::clamp(gainDb, -60.0f, 12.0f)), std::memory_order_relaxed);
+      mGain.store(DspMath::DbToLinear(std::clamp(gainDb, -60.0f, 12.0f)) * (gainDb <= -59.9f ? 0.0f : 1.0f),
+                  std::memory_order_relaxed); // Turbo 0.51: -inf at the floor
    }
    float Peak() const { return mPeak.load(std::memory_order_relaxed); }
 

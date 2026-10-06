@@ -62,6 +62,15 @@ namespace
          def.params.push_back({ "modAmount", -1.0f, 1.0f, 0.0f });
          def.hasSidechain = true;
          def.sidechainLabel = "cutoff mod";
+         // Turbo 0.51: upstream's internal sweep LFO, appended. lfoAmount is
+         // our own depth knob (upstream reused envAmount, which Turbo keeps as
+         // the envelope follower); sync/rateDiv/rate as in Chorus/Phaser.
+         def.params.push_back({ "lfoAmount", -1.0f, 1.0f, 0.0f });
+         def.params.push_back({ "sync", 0.0f, 1.0f, 0.0f, false, { { "lfoAmount", 1.0f } } });
+         def.params.push_back(
+            { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter });
+         def.params.push_back(
+            { "rate", 0.02f, 5.0f, 0.5f, false, { { "sync", 0.0f }, { "lfoAmount", 1.0f } } });
          def.makeKernel = []() { return std::make_unique<AudioFilterKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -191,6 +200,8 @@ namespace
          def.params.push_back({ "sidechainExternal", 0.0f, 1.0f, 0.0f });
          // mix is AudioEffectNode's universal field, not a second param here.
 
+         // Turbo 0.51: appended (saved order + positional pins), default = old sound.
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<DynamicsKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -287,6 +298,8 @@ namespace
          // mix is AudioEffectNode's universal field (defaultMix above), not
          // a table row.
 
+         // Turbo 0.51: appended (saved order + positional pins), default = old sound.
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f, false, kShortPathPrereq });
          def.makeKernel = []() { return std::make_unique<DelayKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -415,6 +428,8 @@ namespace
          def.visualizerId = EffectVisualizerId::kPitchShiftDisplay;
          def.params.push_back({ "pitch", -24.0f, 24.0f, 0.0f });
          def.params.push_back({ "grain", 10.0f, 250.0f, 80.0f });
+         // Turbo 0.51: appended (saved order + positional pins), default = old sound.
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f, false, { { "pitch", 7.0f } } });
          def.makeKernel = []() { return std::make_unique<PitchShiftKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -446,6 +461,8 @@ namespace
          // window). `sync`/`rateDiv` stay confirmed (by hand) blind spots,
          // same as Delay's.
          def.params.push_back({ "rate", 0.02f, 5.0f, 0.5f, false, { { "sync", 0.0f } } });
+         // Turbo 0.51: appended (saved order + positional pins), default = old sound.
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<ChorusKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -471,6 +488,9 @@ namespace
          def.params.push_back(
             { "rateDiv", 0.0f, (float)(MusicTime::kNumRateDivisions - 1), (float)MusicTime::kQuarter });
          def.params.push_back({ "rate", 0.02f, 5.0f, 0.2f, false, { { "sync", 0.0f } } });
+         // Turbo 0.51: appended (saved order + positional pins), default = old sound.
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
+         def.params.push_back({ "spread", 0.0f, 1.0f, 0.5f });
          def.makeKernel = []() { return std::make_unique<FlangerKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -498,6 +518,8 @@ namespace
          // Output of the allpass cascade fed back into its input: deepens the
          // notches into the resonant swoosh of a Phase 90 / Small Stone.
          def.params.push_back({ "feedback", -0.9f, 0.9f, 0.5f });
+         // Turbo 0.51: appended (saved order + positional pins), default = old sound.
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<PhaserKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -515,6 +537,8 @@ namespace
          def.visualizerId = EffectVisualizerId::kBitcrushWave;
          def.params.push_back({ "rate", 200.0f, 44100.0f, 6000.0f });
          def.params.push_back({ "bits", 1.0f, 16.0f, 8.0f });
+         // Turbo 0.51: appended (saved order + positional pins), default = old sound.
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<BitcrushKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -588,6 +612,8 @@ namespace
          def.visualizerId = EffectVisualizerId::kRingModWave;
          def.params.push_back({ "freq", 1.0f, 5000.0f, 220.0f });
          def.params.push_back({ "waveform", 0.0f, (float)DspMath::kWaveSquare, (float)DspMath::kWaveSine });
+         // Turbo 0.51: appended (saved order + positional pins), default = old sound.
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<RingModKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -607,6 +633,8 @@ namespace
          def.params.push_back({ "feedback", 0.0f, 0.95f, 0.0f });
          def.params.push_back({ "spread", 0.0f, 100.0f, 0.0f });
          def.params.push_back({ "range", 0.0f, 1.0f, 0.0f, true /* uiOnly */ });
+         // Turbo 0.51: appended (saved order + positional pins), default = old sound.
+         def.params.push_back({ "analog", 0.0f, 1.0f, 0.0f, false, { { "shift", 200.0f } } });
          def.makeKernel = []() { return std::make_unique<FrequencyShifterKernel>(); };
          defs.push_back(std::move(def));
       }
@@ -677,6 +705,8 @@ namespace
          static const std::vector<EffectParamPrereq> kSmoothPrereq = { { "position", 0.5f } };
          def.params.push_back({ "smooth", 0.0f, 1.0f, 0.0f, false, kSmoothPrereq });
          def.params.push_back({ "output", -24.0f, 12.0f, 0.0f });
+         // Turbo 0.51: appended (saved order + positional pins), default = old sound.
+         def.params.push_back({ "stereo", 0.0f, 1.0f, 0.0f });
          def.makeKernel = []() { return std::make_unique<WavetableShaperKernel>(); };
          defs.push_back(std::move(def));
       }

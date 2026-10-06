@@ -14,6 +14,13 @@
 namespace
 {
    constexpr int kGainDbParam = 0;
+
+   // Turbo 0.51: the console fader's floor is -inf (the UI reads "-inf dB" at
+   // -60), so the bottom of the throw is true silence, not -60 dB.
+   inline float FaderGainFromDb(float db)
+   {
+      return db <= -59.5f ? 0.0f : DspMath::DbToLinear(db);
+   }
 }
 
 // ----------------------------------------------------------------------- Gain
@@ -32,7 +39,7 @@ public:
       float peak = 0.0f;
       for (int i = 0; i < buffer.numFrames; i++)
       {
-         const float linear = DspMath::DbToLinear(mMailbox.SmoothedValue(kGainDbParam));
+         const float linear = FaderGainFromDb(mMailbox.SmoothedValue(kGainDbParam));
          for (int ch = 0; ch < buffer.numChannels; ch++)
          {
             const float s = (in != nullptr) ? in->channels[ch][i] : 0.0f;
@@ -128,7 +135,7 @@ public:
       {
          float linear[MixerNode::kSlots];
          for (int s = 0; s < MixerNode::kSlots; s++)
-            linear[s] = DspMath::DbToLinear(mMailbox.SmoothedValue(s));
+            linear[s] = FaderGainFromDb(mMailbox.SmoothedValue(s));
 
          for (int ch = 0; ch < output.numChannels; ch++)
          {
@@ -402,7 +409,7 @@ public:
       float peak = 0.0f;
       for (int i = 0; i < buffer.numFrames; i++)
       {
-         const float linear = DspMath::DbToLinear(mMailbox.SmoothedValue(kGainDbParam));
+         const float linear = FaderGainFromDb(mMailbox.SmoothedValue(kGainDbParam));
          for (int ch = 0; ch < buffer.numChannels; ch++)
          {
             const float s = (captured > 0) ? buffer.channels[std::min(ch, captured - 1)][i] : 0.0f;

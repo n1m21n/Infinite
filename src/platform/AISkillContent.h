@@ -320,5 +320,24 @@ Analog synths fed by Note Sequencers through Note Switchers, Delay / Mixer / Rev
 Out, an Audio Analyze driving the visuals (Noise, kaleidoscope, Blend, glitch, bloom), and a
 Performance page with chords, delay, filters, autoplay and reverb. `explain` it to learn a working
 layout.
+)SKILL"
+R"SKILL(
+**Chord Progression editing (0.51)**: `chord_progression {"index":N,"action":"set_slots",
+"slots":["Cmaj7(9,11)/E","Am7",{"chord":"F","bars":"3b"},{"notes":["C3","E3","G3","B3"],"bars":2}]}`
+replaces the progression (1-16 slots); `get`, `insert` (at, slot), `duplicate` / `delete` (slot) and
+`move` (from, to) edit it. Symbols take a root, a quality ("m7", "maj7", "7sus4", "6/9", "m7b5", "dim7"...),
+extensions in parentheses ("(9,11)", "(b9,#11)", "(no5)") and a slash bass ("/E"). `bars` takes 2, 1.5,
+"3b" (beats), "2:2" (bars:beats); the minimum is 1/16 bar. Keys now span four octaves (extra save keys
+`maskHi0`..`maskHi15` = keys 24-47, `slashBass0`..`slashBass15` = pitch class or -1); `mask<N>` keeps keys 0-23.
+Names of chords outside the quality table come from interval analysis ("C MAJ7(9,11)", "G7(b9,#11)", "/E").
+
+## Glitch and Datamosh (Turbo 0.51)
+
+`glitch` (Effects) has ten kinds: Slice Shift, RGB Shift, Scanlines, Blocks, Wave, Datamosh, Scan Jitter, VHS,
+Compression, Pixel Sort. The params after Seed (Size Var, Splits, Contrast, Density, Stagger, Burst, Decay, Sync,
+RGB Var, Color FX, Axis, Clock) default to the old look, so only set them to change it. Sync (1 bar to 1/32)
+locks steps to the transport beat; Clock = Free-run keeps it moving while the transport is stopped.
+The `Datamosh` node (Effects) is the real codec-style effect: inputs `image` and optional `motion`; params
+mosh, gain, bloom, threshold, block, blockVar, leak, refresh, refreshChance, seed.
 )SKILL";
 }

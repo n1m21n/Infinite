@@ -817,7 +817,12 @@ void DrumSequencerNode::ReloadFromPaths()
          continue;
       const float savedStart = std::clamp(laneStart[lane], 0.0f, 1.0f);
       const float savedEnd = std::clamp(laneEnd[lane], savedStart, 1.0f);
-      LoadFileToLane(lane, laneFilePath[lane]);
+      const std::string saved = laneFilePath[lane];
+      // Turbo 0.51: a stale bundled-kit path (install moved) retries from the
+      // current kit folder by file name; success rewrites the saved path.
+      const std::string retry = DrumPatterns::StaleKitRetryPath(saved);
+      if (!(!retry.empty() && LoadFileToLane(lane, retry)))
+         LoadFileToLane(lane, saved);
       laneStart[lane] = savedStart;
       laneEnd[lane] = savedEnd;
    }

@@ -54,7 +54,9 @@ public:
       // Turbo 0.50: the master bus (fader included) runs in MasterChain.
       using namespace MasterDsp;
       MasterChain& m = mMasterChain;
-      m.SetParam(kFaderGain, DspMath::DbToLinear(std::clamp(n.masterDb, -60.0f, 12.0f)));
+      // Turbo 0.51: -inf at the bottom of the throw, like the strips above.
+      m.SetParam(kFaderGain, DspMath::DbToLinear(std::clamp(n.masterDb, -60.0f, 12.0f)) *
+                                (n.masterDb <= -59.9f ? 0.0f : 1.0f));
       m.SetParam(kBalance, std::clamp(n.masterPan, -1.0f, 1.0f));
       m.SetParam(kMute, n.masterMute ? 1.0f : 0.0f);
       m.SetParam(kEqOn, n.fxEqOn ? 1.0f : 0.0f);

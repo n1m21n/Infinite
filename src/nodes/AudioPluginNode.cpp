@@ -400,11 +400,18 @@ void AudioPluginNode::PublishHandle(Platform::PluginHandle* handle)
    // generation before last is provably unreachable from any callback that
    // could still be running, so it is safe to destroy here; the one being
    // displaced is only retired.
-   if (mRetired != nullptr)
+   // Turbo 0.51: a re-prepare republishes the SAME handle. Retiring it would
+   // make mRetired == mLive and the next swap would destroy the live plugin
+   // (use-after-free in autosave PluginSaveState).
+   if (handle == mLive && handle != nullptr)
    {
-      Platform::PluginDestroy(mRetired);
-      mRetired = nullptr;
+      if (!mAudioNode)
+         mAudioNode = std::make_unique<AudioPluginAudioNode>();
+      mAudioNode->SetHandle(handle);
+      return;
    }
+   if (mRetired != nullptr && mRetired != handle && mRetired != mLive)
+      Platform::PluginDestroy(mRetired);
    mRetired = mLive;
    mLive = handle;
    if (!mAudioNode)
@@ -439,11 +446,8 @@ void AudioPluginNode::LoadPlugin(const Platform::PluginDesc& desc)
    // whenever the new one finishes loading.
    if (mAudioNode)
       mAudioNode->SetHandle(nullptr);
-   if (mRetired != nullptr)
-   {
+   if (mRetired != nullptr && mRetired != mLive)
       Platform::PluginDestroy(mRetired);
-      mRetired = nullptr;
-   }
    mRetired = mLive;
    mLive = nullptr;
    if (mHandle != nullptr && mHandle != mRetired)
@@ -790,9 +794,9 @@ void AudioPluginNode::VisitParams(ParamVisitor& v)
    // first so the load side knows how many to read back. Trailing empty slots
    // carry no information and 32 x 6 unconditional keys per node would bloat
    // every patch that has a plugin in it.
-   int slotCount = HighestAssignedSlot() + 1;
-   v.Int("map_slots", slotCount);
-   slotCount = std::clamp(slotCount, 0, kMaxMappedParams);
+   mMapSlotsParam = HighestAssignedSlot() + 1;
+   v.Int("map_slots", mMapSlotsParam);
+   const int slotCount = std::clamp(mMapSlotsParam, 0, kMaxMappedParams);
 
    char name[32];
    for (int i = 0; i < slotCount; i++)

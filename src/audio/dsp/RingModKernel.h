@@ -34,7 +34,11 @@ public:
       Reset();
    }
 
-   void Reset() override { mOsc.phase = 0.0; }
+   void Reset() override
+   {
+      mOsc.phase = 0.0;
+      mEnvFollower = 0.0f;
+   }
 
    void PushParams(const AudioEffectNode& node, double sampleRate) override;
 
@@ -47,5 +51,7 @@ private:
    double mSampleRate = 44100.0;
 
    std::atomic<int> mWaveform { DspMath::kWaveSine };
+   std::atomic<int> mAnalog { 0 };
    DspMath::PolyBlepOsc mOsc;
+   float mEnvFollower = 0.0f;
 };

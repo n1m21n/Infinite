@@ -109,7 +109,7 @@ public:
    // "100% harmonic" for "nothing to measure".
    float HarmonicityPercent() const;
 
-   uint32_t Seed() const { return mSeed; }
+   uint32_t Seed() const { return (uint32_t)mSeed; }
    int Generation() const { return mGeneration; }
 
    // ---- the eight exposed controls (Tier 1 - see SKILL.md) --------------
@@ -186,7 +186,7 @@ private:
    std::vector<float> mLastRenderedMono;
    double mLastRenderedSR = 44100.0;
 
-   uint32_t mSeed = 1;
+   int mSeed = 1; // int so VisitParams can hand out &mSeed (a stack temp dangles in retaining visitors)
    int mGeneration = 0;
 
    // Worker thread lifecycle: one job at a time, joined before the next one

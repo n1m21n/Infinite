@@ -97,6 +97,7 @@ private:
    double mRecordStartedSeconds = 0.0;
    int mActiveRecordFps = 30;
    long long mScheduledFrames = 0;
+   long long mAudioLostFrames = 0; // Turbo 0.51
    int mReadbacksCompleted = 0;
    double mReadbackWaitTotalMs = 0.0;
    double mReadbackWaitMaxMs = 0.0;

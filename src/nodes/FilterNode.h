@@ -67,13 +67,15 @@ private:
       GLint pass = -1;
       GLint texel = -1;
       GLint time = -1;
+      GLint beats = -1;
+      GLint clock = -1;
       std::vector<GLint> params;
    };
 
    bool EnsureShader();
    void LookupLocs(unsigned int program, PassLocs& locs) const;
    void BindUniforms(const PassLocs& locs, unsigned int srcTex, unsigned int srcTex2,
-                     unsigned int passTex, float time) const;
+                     unsigned int passTex, float time, float beats, float clock) const;
 
    // Everything the shader pass's output depends on. Reusing mOut's contents
    // is only safe when all of this is identical to the last time it ran -
@@ -90,12 +92,16 @@ private:
       // on a stopped transport caches like any other instead of re-rendering
       // an identical image and forcing everything downstream to recook.
       float time = 0.0f;
+      // Turbo 0.51: uBeats / uClock as uploaded (0 when unused). The wall clock
+      // is only part of the signature in free-run mode.
+      float beats = 0.0f;
+      float clock = 0.0f;
 
       bool operator==(const Signature& o) const
       {
          return upstreamRev == o.upstreamRev && upstreamRev2 == o.upstreamRev2 &&
                 width == o.width && height == o.height && params == o.params &&
-                time == o.time;
+                time == o.time && beats == o.beats && clock == o.clock;
       }
    };
 
@@ -116,6 +122,8 @@ private:
    // Filters whose shader reads uTime are inherently animated, so the
    // uploaded time value is part of Signature.
    bool mUsesTime = false;
+   bool mUsesClock = false;
+   int mClockModeParam = -1; // index of the "uClockMode" param, if the def has one
    bool mHasBuilt = false;
    Signature mBuilt;
    unsigned long long mRevision = 0;

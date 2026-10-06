@@ -1,6 +1,7 @@
 #include "FilterNode.h"
 
 #include "platform/OpenGLHeaders.h"
+#include <chrono>
 #include <cstdio>
 #include <string>
 
@@ -8,6 +9,13 @@
 
 namespace
 {
+   // Seconds on a monotonic wall clock since the first call.
+   float WallClockSeconds()
+   {
+      static const auto t0 = std::chrono::steady_clock::now();
+      return std::chrono::duration<float>(std::chrono::steady_clock::now() - t0).count();
+   }
+
    // Shared preamble every FilterDef's fragmentBody is appended to.
    const char* kPreamble =
       "#version 150\n"
@@ -16,6 +24,8 @@ namespace
       "uniform sampler2D uSrc;\n"
       "uniform vec2 uTexelSize;\n"
       "uniform float uTime;\n"
+      "uniform float uBeats;\n" // Turbo 0.51: transport beats (or a wall-clock beat count when the shader's Clock is free-run)
+      "uniform float uClock;\n" // Turbo 0.51: wall-clock seconds, runs while the transport is stopped
       "uniform sampler2D uSrc2;\n"
       "uniform int uHasSrc2;\n"
       "uniform sampler2D uPass;\n"; // prePassBody's output, two-pass filters only
@@ -42,8 +52,19 @@ FilterNode::FilterNode(const FilterDef& def)
       mParamValues[i][1] = def.params[i].defaultVal[1];
       mParamValues[i][2] = def.params[i].defaultVal[2];
    }
-   mUsesTime = mDef.fragmentBody.find("uTime") != std::string::npos ||
-               mDef.prePassBody.find("uTime") != std::string::npos;
+   auto uses = [this](const char* name)
+   {
+      return mDef.fragmentBody.find(name) != std::string::npos ||
+             mDef.prePassBody.find(name) != std::string::npos;
+   };
+   // Turbo 0.51: uBeats and uClock also make a filter animated.
+   mUsesClock = uses("uClock");
+   mUsesTime = uses("uTime") || uses("uBeats") || mUsesClock;
+   // A filter with an int/enum "uClockMode" param (1 = free-run) swaps its time
+   // base to the wall clock, so it keeps animating while the transport is stopped.
+   for (size_t i = 0; i < mDef.params.size(); i++)
+      if (mDef.params[i].uniformName == "uClockMode")
+         mClockModeParam = (int)i;
 }
 
 bool FilterNode::EnsureShader()
@@ -77,13 +98,15 @@ void FilterNode::LookupLocs(unsigned int program, PassLocs& locs) const
    locs.pass = glGetUniformLocation(program, "uPass");
    locs.texel = glGetUniformLocation(program, "uTexelSize");
    locs.time = glGetUniformLocation(program, "uTime");
+   locs.beats = glGetUniformLocation(program, "uBeats");
+   locs.clock = glGetUniformLocation(program, "uClock");
    locs.params.resize(mDef.params.size());
    for (size_t i = 0; i < mDef.params.size(); i++)
       locs.params[i] = glGetUniformLocation(program, mDef.params[i].uniformName.c_str());
 }
 
 void FilterNode::BindUniforms(const PassLocs& locs, unsigned int srcTex, unsigned int srcTex2,
-                              unsigned int passTex, float time) const
+                              unsigned int passTex, float time, float beats, float clock) const
 {
    glActiveTexture(GL_TEXTURE0);
    glBindTexture(GL_TEXTURE_2D, srcTex);
@@ -104,6 +127,8 @@ void FilterNode::BindUniforms(const PassLocs& locs, unsigned int srcTex, unsigne
    glUniform2f(locs.texel, 1.0f / mInput.Width(), 1.0f / mInput.Height());
 
    glUniform1f(locs.time, time);
+   glUniform1f(locs.beats, beats);
+   glUniform1f(locs.clock, clock);
 
    for (size_t i = 0; i < mDef.params.size(); i++)
    {
@@ -157,6 +182,14 @@ void FilterNode::CookIfNeeded(int frameId)
    sig.height = mInput.Height();
    sig.params = mParamValues;
    sig.time = mUsesTime ? (float)Transport::Instance().Seconds() : 0.0f;
+   if (mUsesTime)
+   {
+      const bool freeRun = mClockModeParam >= 0 && mParamValues[mClockModeParam][0] >= 0.5f;
+      const float wall = WallClockSeconds();
+      sig.clock = (mUsesClock && freeRun) ? wall : 0.0f; // only free-run forces a recook while stopped
+      sig.beats = freeRun ? wall * Transport::Instance().Tempo() / 60.0f
+                          : (float)Transport::Instance().Beats();
+   }
 
    if (mHasBuilt && sig == mBuilt)
       return; // nothing changed since the last cook - reuse mOut as-is
@@ -175,13 +208,13 @@ void FilterNode::CookIfNeeded(int frameId)
          return;
       GLUtil::RunShaderPass(*mid, mPreProgram, [this, srcTex, srcTex2, &sig]()
       {
-         BindUniforms(mPreLocs, srcTex, srcTex2, 0, sig.time);
+         BindUniforms(mPreLocs, srcTex, srcTex2, 0, sig.time, sig.beats, sig.clock);
       });
       passTex = GLUtil::FboTexture(*mid);
    }
    GLUtil::RunShaderPass(mOut, mProgram, [this, srcTex, srcTex2, passTex, &sig]()
    {
-      BindUniforms(mMainLocs, srcTex, srcTex2, passTex, sig.time);
+      BindUniforms(mMainLocs, srcTex, srcTex2, passTex, sig.time, sig.beats, sig.clock);
    });
 
    mBuilt = sig;

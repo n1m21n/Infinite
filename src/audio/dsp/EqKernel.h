@@ -21,6 +21,10 @@ namespace EqDsp
    {
       kLowShelf = 0, kPeak, kHighShelf, kHp12, kLp12,
       kCombPos, kCombNeg, // from upstream; appended so saved band types keep their meaning
+      // Turbo 0.51: upstream's extra band types, appended after the comb pair so
+      // indices 0-6 keep their meaning in saved patches (upstream numbers these
+      // differently and folded comb away; we keep comb).
+      kHp24, kHp36, kLp24, kLp36, kBP, kNotch, kAllpass,
       kNumBandTypes
    };
 
@@ -28,7 +32,8 @@ namespace EqDsp
    {
       static const char* const kNames[kNumBandTypes] = {
          "low shelf", "peak", "high shelf", "hp 12", "lp 12",
-         "comb +", "comb -"
+         "comb +", "comb -",
+         "hp 24", "hp 36", "lp 24", "lp 36", "bp", "notch", "all-pass"
       };
       return kNames;
    }
@@ -48,6 +53,20 @@ namespace EqDsp
    }
 
    inline bool UsesGain(int type) { return type == kLowShelf || type == kPeak || type == kHighShelf; }
+   // Cascaded identical biquads for the steeper slopes (as upstream).
+   inline int StageCount(int type)
+   {
+      switch (type)
+      {
+         case kHp24: case kLp24: return 2;
+         case kHp36: case kLp36: return 3;
+         default: return 1;
+      }
+   }
+   inline int SanitizeType(float storedValue)
+   {
+      return std::clamp((int)(storedValue + 0.5f), 0, kNumBandTypes - 1);
+   }
    inline bool IsComb(int type) { return type == kCombPos || type == kCombNeg; }
    inline bool CombIsNegative(int type) { return type == kCombNeg; }
 
@@ -61,8 +80,11 @@ namespace EqDsp
       {
          case kLowShelf: bq.SetLowShelf(freq, q, gainDb, sampleRate); break;
          case kHighShelf: bq.SetHighShelf(freq, q, gainDb, sampleRate); break;
-         case kHp12: bq.SetHighpass(freq, q, sampleRate); break;
-         case kLp12: bq.SetLowpass(freq, q, sampleRate); break;
+         case kHp12: case kHp24: case kHp36: bq.SetHighpass(freq, q, sampleRate); break;
+         case kLp12: case kLp24: case kLp36: bq.SetLowpass(freq, q, sampleRate); break;
+         case kBP: bq.SetBandpass(freq, q, sampleRate); break;
+         case kNotch: bq.SetNotch(freq, q, sampleRate); break;
+         case kAllpass: bq.SetAllpass(freq, q, sampleRate); break;
          case kCombPos: case kCombNeg: // delay line, not a biquad - see IsComb; biquad slots carry identity
             bq.b0 = 1.0f; bq.b1 = 0.0f; bq.b2 = 0.0f; bq.a1 = 0.0f; bq.a2 = 0.0f;
             break;
@@ -114,7 +136,7 @@ namespace EqDsp
          ConfigureBiquad(bq, type, freq, q, gainDb, sampleRate);
       else
          ConfigureBypass(bq);
-      return BiquadMagnitudeDb(bq, evalHz, sampleRate);
+      return BiquadMagnitudeDb(bq, evalHz, sampleRate) * (float)(enabled ? StageCount(type) : 1);
    }
 }
 
@@ -146,8 +168,9 @@ public:
    void Reset() override
    {
       for (auto& band : mBiquad)
-         for (auto& bq : band)
-            bq.Reset();
+         for (auto& stage : band)
+            for (auto& bq : stage)
+               bq.Reset();
       for (auto& band : mComb)
          for (auto& comb : band)
             comb.Reset();
@@ -161,10 +184,12 @@ public:
 
       bool bandIsComb[kNumBands];
       bool bandCombNegative[kNumBands];
+      int bandStages[kNumBands];
       for (int b = 0; b < kNumBands; b++)
       {
          bandIsComb[b] = mBandIsComb[b].load(std::memory_order_relaxed);
          bandCombNegative[b] = mBandCombNegative[b].load(std::memory_order_relaxed);
+         bandStages[b] = std::clamp(mBandStages[b].load(std::memory_order_relaxed), 1, kMaxStagesPerBand);
       }
 
       for (int i = 0; i < out.numFrames; i++)
@@ -200,13 +225,17 @@ public:
                   s = comb.Process(s);
                   continue;
                }
-               DspMath::Biquad& bq = mBiquad[b][ch];
-               bq.b0 = coeffs[b][0];
-               bq.b1 = coeffs[b][1];
-               bq.b2 = coeffs[b][2];
-               bq.a1 = coeffs[b][3];
-               bq.a2 = coeffs[b][4];
-               s = bq.Process(s);
+               // Extra stages reuse the band's coefficients (identical cascade).
+               for (int st = 0; st < bandStages[b]; st++)
+               {
+                  DspMath::Biquad& bq = mBiquad[b][st][ch];
+                  bq.b0 = coeffs[b][0];
+                  bq.b1 = coeffs[b][1];
+                  bq.b2 = coeffs[b][2];
+                  bq.a1 = coeffs[b][3];
+                  bq.a2 = coeffs[b][4];
+                  s = bq.Process(s);
+               }
             }
 
             out.channels[ch][i] = s * outputGain;
@@ -219,7 +248,9 @@ public:
 private:
    ParamMailbox mMailbox;
    double mSampleRate = 44100.0;
-   DspMath::Biquad mBiquad[kNumBands][kMaxChannels];
+   static constexpr int kMaxStagesPerBand = 3;
+   DspMath::Biquad mBiquad[kNumBands][kMaxStagesPerBand][kMaxChannels];
+   std::atomic<int> mBandStages[kNumBands] {};
    DspMath::CombFilter mComb[kNumBands][kMaxChannels];
    std::atomic<bool> mBandIsComb[kNumBands] {};
    std::atomic<bool> mBandCombNegative[kNumBands] {};

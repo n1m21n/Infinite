@@ -248,7 +248,7 @@ void DrawClipMatrixEditor(ClipMatrixNode* n, float W)
                            [cp](int i) { PushUndoCheckpoint(); cp->quant = i - 1; }, fw * 0.7f, false);
          }
          ImGui::SetNextItemWidth(fw * 0.7f);
-         ImGui::SliderFloat("gain", &cell.gainDb, -60.0f, 12.0f, "%.1f dB");
+         TaperedDbSlider("gain", &cell.gainDb, -60.0f, 12.0f); // Turbo 0.51: console taper
          if (ImGui::IsItemDeactivatedAfterEdit())
             PushUndoCheckpoint();
          if (cell.kind != ClipMatrixNode::kImage)
@@ -369,7 +369,7 @@ void DrawClipMatrixEditor(ClipMatrixNode* n, float W)
          }
       }
       ImGui::SetNextItemWidth(fw * 0.7f);
-      ImGui::SliderFloat("gain##row", &rp.gainDb, -60.0f, 12.0f, "%.1f dB");
+      TaperedDbSlider("gain##row", &rp.gainDb, -60.0f, 12.0f);
       if (ImGui::IsItemDeactivatedAfterEdit())
          PushUndoCheckpoint();
       check(ImGui::Checkbox("mute", &rp.mute));

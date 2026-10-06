@@ -1,7 +1,10 @@
 #pragma once
 
+#include <filesystem>
 #include <initializer_list>
 #include <string>
+
+#include "platform/Platform.h"
 
 // Turbo: the Drum Sequencer's pattern library. Generated from a table: every
 // groove has three parts, A (verse / main groove), B (bridge / breakdown) and
@@ -52,6 +55,48 @@ namespace DrumPatterns
       static const char* const kFiles[8] = { "01-kick.wav", "02-snare.wav", "03-closed-hat.wav", "04-open-hat.wav",
                                              "05-clap.wav", "06-low-tom.wav", "07-high-tom.wav", "08-bell.wav" };
       return (lane >= 0 && lane < 8) ? kFiles[lane] : "";
+   }
+
+   // Turbo 0.51 (upstream 46c64b5, adapted): the bundled kit folder next to the
+   // exe (or relative to the working directory), "" when neither has the kit.
+   inline std::string BundledKitDir()
+   {
+      const std::filesystem::path exeDir = std::filesystem::u8path(Platform::ExecutablePath()).parent_path();
+      const std::filesystem::path candidates[] = {
+         exeDir / "assets" / "drumkits" / "turbo-basic",
+         std::filesystem::u8path("assets/drumkits/turbo-basic"),
+      };
+      std::error_code ec;
+      for (const std::filesystem::path& p : candidates)
+         if (std::filesystem::exists(p / KitFile(0), ec))
+            return p.u8string();
+      return std::string();
+   }
+
+   // A lane / pad path saved from a bundled-kit load points inside
+   // .../drumkits/turbo-basic/, which moves with the install. When `path` no
+   // longer exists and sits in such a folder, returns where the same file name
+   // is in the current kit folder; "" otherwise. Splits on / and \.
+   inline std::string StaleKitRetryPath(const std::string& path)
+   {
+      std::error_code ec;
+      if (path.empty() || std::filesystem::exists(std::filesystem::u8path(path), ec))
+         return std::string();
+      const size_t last = path.find_last_of("/\\");
+      if (last == std::string::npos || last == 0)
+         return std::string();
+      const size_t prev = path.find_last_of("/\\", last - 1);
+      const std::string parent = path.substr(prev == std::string::npos ? 0 : prev + 1,
+                                             last - (prev == std::string::npos ? 0 : prev + 1));
+      if (parent != "turbo-basic")
+         return std::string();
+      const std::string dir = BundledKitDir();
+      if (dir.empty())
+         return std::string();
+      const std::filesystem::path retry = std::filesystem::u8path(dir) / std::filesystem::u8path(path.substr(last + 1));
+      if (!std::filesystem::exists(retry, ec))
+         return std::string();
+      return retry.u8string();
    }
 
    inline float CellVelocity(char c)

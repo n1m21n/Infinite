@@ -6,20 +6,18 @@
 
 #include "IEffectKernel.h"
 #include "DelayKernel.h" // reuses DelayLine
+#include "AnalogPrimitives.h"
 #include "audio/DspMath.h"
 #include "audio/MusicTime.h"
 #include "audio/ParamMailbox.h"
 
-// Flanger's kernel - one short modulated delay line per channel with
-// feedback, the classic jet-swoosh comb-filter topology. Primary reference:
-// Dattorro's "Effect Design Part 2" (as with Chorus) covers flanging as the
-// same modulated-delay-line family at a shorter base delay with feedback
-// added - the feedback path is what turns the broad chorus comb into
-// flanging's narrow, resonant one. Right channel reads its LFO a fixed
-// quarter-cycle ahead of the left for stereo width, hardcoded rather than a
-// param (`spread`/`offset`/`motion` in the design doc's KHS reference are
-// cut per .claude/skills/new-audio-node/SKILL.md's minimalism rule - the
-// knob budget goes to feedback instead, which flanging is not itself without).
+// Flanger's kernel - modulated delay line per channel with digital and
+// analog modes. The feedback tap runs through a fixed ~7kHz damping filter
+// (mFbDampL/R) before being written back into the line, in both modes - a
+// real BBD/tape flanger loop always loses a little top end on every pass
+// (the bucket-brigade compander's own bandwidth limit), and a plain
+// unfiltered comb loop reads as harsher/more metallic than that. No new
+// param - still the same 5 knobs (delay, depth, rate, feedback, spread).
 class AudioEffectNode;
 
 class FlangerKernel : public IEffectKernel
@@ -33,6 +31,7 @@ public:
       kDepthMs,
       kRateHz,
       kFeedback,
+      kSpread,
       kNumSlots
    };
 
@@ -43,6 +42,15 @@ public:
       const int maxSamples = (int)std::ceil(kMaxDelayMs * 0.001 * sampleRate) + 8;
       mLineL.Prepare(maxSamples);
       mLineR.Prepare(maxSamples);
+      for (int i = 0; i < 2; i++)
+      {
+         mFilterL[i].SetSampleRate(sampleRate);
+         mFilterL[i].SetCutoff(9000.0f, 0.707f);
+         mFilterR[i].SetSampleRate(sampleRate);
+         mFilterR[i].SetCutoff(9000.0f, 0.707f);
+      }
+      mFbDampL.SetCutoff(7000.0f, sampleRate);
+      mFbDampR.SetCutoff(7000.0f, sampleRate);
       Reset();
    }
 
@@ -51,7 +59,14 @@ public:
       mLineL.Reset();
       mLineR.Reset();
       mPhase = 0.0;
-      mDampL = mDampR = 0.0f;
+      mDriftLfo.Reset();
+      for (int i = 0; i < 2; i++)
+      {
+         mFilterL[i].Reset();
+         mFilterR[i].Reset();
+      }
+      mFbDampL.Reset();
+      mFbDampR.Reset();
    }
 
    void PushParams(const AudioEffectNode& node, double sampleRate) override;
@@ -66,10 +81,16 @@ private:
 
    std::atomic<int> mSync { 0 };
    std::atomic<int> mRateDiv { MusicTime::kQuarter };
+   std::atomic<int> mAnalog { 0 };
 
    DelayLine mLineL, mLineR;
    double mPhase = 0.0;
-   // One-pole low-pass (~7 kHz) on the feedback tap only, like a BBD loop:
-   // repeats darken on every pass while the first tap stays full-band.
-   float mDampL = 0.0f, mDampR = 0.0f;
+
+   // Analog mode components
+   AnalogDsp::DriftLfo mDriftLfo;
+   DspMath::TptSvf mFilterL[2];
+   DspMath::TptSvf mFilterR[2];
+
+   // Feedback-path damping - fixed cutoff, always on (both modes).
+   AnalogDsp::OnePoleLP mFbDampL, mFbDampR;
 };

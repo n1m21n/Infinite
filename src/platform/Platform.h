@@ -322,6 +322,17 @@ namespace Platform
    std::string AudioDriverLabel(int driver);
    std::string AudioCurrentDriverName();
 
+   // Turbo 0.51: Windows mirror output. A second shared-mode ("Windows Audio")
+   // output device that plays a copy of the master stereo output, so OBS or a
+   // screen recorder can capture it while the main driver is ASIO. Main thread.
+   // deviceName empty = Windows default output. Returns false and fills error
+   // when the device cannot be opened (the main output is unaffected).
+   bool AudioMirrorApply(bool enable, const std::string& deviceName, std::string& error);
+   std::vector<std::string> AudioMirrorListDevices();
+   bool AudioMirrorEnabled();
+   std::string AudioMirrorDeviceName();
+   std::string AudioMirrorStatus(); // "" when off
+
    // ---- sample library ----
    // Native open panel restricted to picking a single directory (no files).
    // Returns "" if cancelled. `title` sets the panel's title (defaults to

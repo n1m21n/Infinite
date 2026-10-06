@@ -1,6 +1,5 @@
 #pragma once
 
-#include "audio/SynthModes.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -8,6 +7,7 @@
 #include <string>
 
 #include "audio/DspMath.h"
+#include "audio/SynthModes.h"
 
 // Physical Modelling Metallic Synthesizer DSP Kernel.
 // Combines:
@@ -383,7 +383,15 @@ namespace MetallicDsp
          const float f = std::clamp(freqHz, 10.0f, maxHz);
          const float dt = 1.0f / (float)sampleRate;
 
-         const float r = std::clamp(expf(-6.907755f * dt / std::max(0.005f, t60Sec)), 0.0f, 0.99995f);
+         // The pole radius ceiling used to be a fixed 0.99995, which is a T60
+         // cap that scales inversely with sample rate (~3.1s at 44.1kHz,
+         // ~1.4s at 96kHz) - the mode bank physically could not ring past
+         // that no matter what the decay knob asked for. Derive the ceiling
+         // from a fixed max T60 instead so it holds across sample rates, with
+         // a hard sub-1.0 guard so the Direct Form II biquad (a2 = -r*r)
+         // never sees an undamped pole.
+         const float rMax = std::min(0.999999f, expf(-6.907755f * dt / 40.0f));
+         const float r = std::clamp(expf(-6.907755f * dt / std::max(0.005f, t60Sec)), 0.0f, rMax);
          const float w = 2.0f * (float)M_PI * f * dt;
 
          targetA1 = 2.0f * r * cosf(w);
@@ -547,6 +555,14 @@ namespace MetallicDsp
       bool active = false;
       float ampDecay = 0.0f;
       float voiceLevel = 0.0f;
+      // Set by Release(); once true, UpdateAcoustics() stops recomputing
+      // ampDecay from the decay knob so a control-rate refresh can't slow the
+      // envelope back down after note-off already sped it up.
+      bool released = false;
+      // Consecutive samples the post-envelope output has stayed below
+      // audibility. Frees the voice on real silence rather than waiting on
+      // the slow safety-net envelope - see ampDecay's comment in Trigger().
+      int silentSamples = 0;
 
       // Per-voice portamento. Shared glide state would drag every held note
       // toward one pitch; seeding it at Trigger() means a new note starts *at*
@@ -556,6 +572,11 @@ namespace MetallicDsp
       // ~5 ms coefficient slew, recomputed with the sample rate.
       float coefSlew = 0.02f;
 
+      // Gain that makes this strike's modal onset peak equal its velocity.
+      // Measured once per Trigger() by CalibrateBurstGain(); UpdateAcoustics()
+      // folds it into every mode amplitude. 1 until a strike has calibrated it.
+      float burstGain = 1.0f;
+
       // Last inputs UpdateAcoustics() was called with, so a settled patch is
       // completely static instead of rewriting 12 biquads every control block.
       int cachedMaterial = -1;
@@ -563,6 +584,10 @@ namespace MetallicDsp
       float cachedDecay = -1.0f;
       float cachedStiffness = -1.0f;
       float cachedSpread = -2.0f;
+
+      // Cached so Process() (which takes no sampleRate) can size the
+      // silence-window used to free a voice - see silentSamples above.
+      double voiceSampleRate = 44100.0;
 
       void Reset()
       {
@@ -578,6 +603,8 @@ namespace MetallicDsp
          active = false;
          midiNote = -1;
          voiceLevel = 0.0f;
+         released = false;
+         silentSamples = 0;
          cachedMaterial = -1;
          cachedFreq = -1.0f;
          cachedDecay = -1.0f;
@@ -586,7 +613,8 @@ namespace MetallicDsp
       }
 
       void Trigger(int note, float vel, int id, float freqHz, float transient, float decaySec,
-                   float stiffness, int materialPreset, float stereoSpread, double sampleRate)
+                   float stiffness, int materialPreset, float stereoSpread, double sampleRate,
+                   float startPitchHz = -1.0f)
       {
          // A stolen voice still holds 4096 samples of the previous note's
          // waveguide energy; re-reading that at a shorter delay length with
@@ -596,23 +624,88 @@ namespace MetallicDsp
          midiNote = note;
          velocity = vel;
          voiceId = id;
-         currentFreq = freqHz;
+         const float initPitch = (startPitchHz > 0.0f) ? startPitchHz : freqHz;
+         currentFreq = initPitch;
          active = true;
          voiceLevel = 1.0f;
          coefSlew = (sampleRate > 0.0) ? (1.0f - expf(-1.0f / (0.005f * (float)sampleRate))) : 0.02f;
-         pitchSmoother.SetImmediate(freqHz);
+         pitchSmoother.SetImmediate(initPitch);
 
          const MaterialProfile mat = GetMaterialProfile(materialPreset);
          const float effectiveHardness = std::clamp(transient * mat.strikeHardness, 0.1f, 2.5f);
 
-         exciter.Trigger(vel, effectiveHardness, freqHz, sampleRate);
-         UpdateAcoustics(freqHz, decaySec, stiffness, materialPreset, stereoSpread, sampleRate, true);
+         exciter.Trigger(vel, effectiveHardness, initPitch, sampleRate);
+         burstGain = 1.0f;
+         UpdateAcoustics(initPitch, decaySec, stiffness, materialPreset, stereoSpread, sampleRate, true);
+         CalibrateBurstGain(initPitch, sampleRate);
+         ampDecay = ComputeAmpDecay(decaySec, sampleRate);
+      }
 
-         const float effectiveDecay = std::clamp(decaySec * (mat.defaultDecay / 2.0f), 0.02f, 20.0f);
-         const float totalDecaySamples = effectiveDecay * 1.5f * (float)sampleRate;
-         // -80 dB over the voice's decay time, matching the shutoff threshold in
-         // Process() so a voice actually frees at the end of its own decay.
-         ampDecay = expf(-9.2103f / std::max(64.0f, totalDecaySamples));
+      // The `decay` knob is documented in seconds and is what UpdateAcoustics
+      // hands to each mode's own T60 pole (ResonantMode::Setup), so the modal
+      // decay alone already matches the knob. ampDecay used to add a second,
+      // independent -80 dB/1.5x-decay envelope on top, and the two rates
+      // summed - a 9.9s knob produced ~5.2s of audible ring even with the
+      // pole ceiling in Setup() raised. Pre-compensating exactly would mean
+      // ampDecay contributes zero loss, at which point it can't do its job
+      // (killing a voice that never otherwise reaches the silence floor, e.g.
+      // if a future mode/material combination decays slower than expected).
+      // Instead make it a safety net far below the modal rate - only ~8 dB of
+      // its 80 dB budget has elapsed by the time the modal T60 hits, so the
+      // combined T60 stays within the fixture's tolerance - and free the
+      // voice on measured silence (see silentSamples in Process()) rather
+      // than waiting on this envelope's own -80 dB point.
+      static float ComputeAmpDecay(float decaySec, double sampleRate)
+      {
+         const float effectiveDecay = std::clamp(decaySec, 0.02f, 20.0f);
+         const float totalDecaySamples = effectiveDecay * 8.0f * (float)sampleRate;
+         return expf(-9.2103f / std::max(64.0f, totalDecaySamples));
+      }
+
+      // Level-calibrates the strike the way a sampler/physical-model plugin
+      // does: play it once offline and normalise to the measured peak. The
+      // bank's per-mode normalisation and the bankNorm sum both assume an
+      // impulse, but the mallet is a 4-14 ms burst, so each mode keeps
+      // integrating for hundreds of samples and the true onset peak depends on
+      // pitch, material and decay (+0.1..+10.6 dBFS across materials, +12.4
+      // dBFS at 55 Hz down to +1.8 at 1760 Hz, before this). No closed form
+      // covers the noise component, so measure it instead.
+      //
+      // The rehearsal runs a copy of the exciter (identical noise state, so it
+      // sees exactly the strike the voice is about to play) through a copy of
+      // the just-snapped modes, and rescales every mode by velocity / peak.
+      // Because the measured peak already includes ring time, a longer decay
+      // is still not a quieter strike - the property 6b3ae42 protects.
+      void CalibrateBurstGain(float freqHz, double sampleRate)
+      {
+         if (sampleRate <= 0.0) return;
+         const float target = (velocity > 0.0f ? velocity : 0.8f);
+
+         ResonantMode probe[kNumModes];
+         for (int m = 0; m < kNumModes; m++)
+            probe[m] = modes[m];
+         MalletExciter ex = exciter;
+
+         // Burst length is unbounded in principle, but the exciter deactivates
+         // itself; past that the bank only rings down, so one more fundamental
+         // period (plus margin) covers the last possible peak.
+         const int tail = (int)(1.5 * sampleRate / std::max(20.0f, freqHz));
+         const int limit = (int)(0.15 * sampleRate);
+         float peak = 0.0f;
+         int after = 0;
+         for (int i = 0; i < limit && after < tail; i++)
+         {
+            const float strike = ex.Process();
+            if (!ex.active) after++;
+            float l = 0.0f, r = 0.0f;
+            for (int m = 0; m < kNumModes; m++)
+               probe[m].Process(strike, coefSlew, l, r);
+            peak = std::max(peak, std::max(std::fabs(l), std::fabs(r)));
+         }
+         if (peak < 1e-6f) return;
+
+         burstGain = target / peak;
+         UpdateAcoustics(freqHz, cachedDecay, cachedStiffness, cachedMaterial, cachedSpread, sampleRate, true);
       }
 
       // Advances the per-voice glide by one control block of `blockSamples` and
@@ -647,22 +740,64 @@ namespace MetallicDsp
          cachedSpread = stereoSpread;
 
          currentFreq = freqHz;
+         voiceSampleRate = sampleRate;
          const MaterialProfile mat = GetMaterialProfile(materialPreset);
          const float effectiveStiffness = std::clamp(stiffness * mat.defaultStiffness * 2.0f, 0.0f, 2.5f);
-         const float effectiveDecay = std::clamp(decaySec * (mat.defaultDecay / 2.0f), 0.02f, 20.0f);
+         // The knob is documented in seconds ("%.2f s" in the UI) and
+         // SetMaterialPreset() already seeds `decay` from the material's
+         // default on preset change, so effectiveDecay is the knob value
+         // itself - not further rescaled per material. It used to be
+         // multiplied by (mat.defaultDecay / 2), so the same "9.00 s" reading
+         // meant 2.7s on Ceramic and 18s on Gong.
+         const float effectiveDecay = std::clamp(decaySec, 0.02f, 20.0f);
 
+         // Mode frequencies first, because the bank's gain normalisation below
+         // needs to know which of them Setup() will actually sound.
+         float modeFreq[kNumModes];
          for (int m = 0; m < kNumModes; m++)
          {
             const float inharm = sqrtf(1.0f + effectiveStiffness * (float)(m * m));
             const float beat = 1.0f + (m % 2 == 1 ? mat.nonLinearBeating : -mat.nonLinearBeating) * (float)m;
-            const float modeFreq = freqHz * mat.modeRatios[m] * inharm * beat;
+            modeFreq[m] = freqHz * mat.modeRatios[m] * inharm * beat;
+         }
 
-            const float modeLoss = expf(-mat.highFreqLoss * (float)m * 0.4f);
+         // Setup() normalises each mode so that mode's *own* impulse peak
+         // equals its amplitude, independent of ring time - which is right per
+         // mode and wrong for the bank, because a single mallet impulse starts
+         // all twelve modes in phase at n = 0. Their peaks coincide at the
+         // strike, so the voice's onset peak is the *sum* of the amplitudes,
+         // not the largest of them: +11.1 dB on Steel, +14.6 dB on Gong, only
+         // +7.0 dB on Vibraphone. That is both a blanket ~12 dB of headroom
+         // eaten before the volume knob is touched, and a material-to-material
+         // level jump of ~7.6 dB at identical settings.
+         //
+         // Dividing by that sum puts the bank's onset peak at `velocity` for
+         // every material. It leaves the per-mode normalisation that Setup()
+         // documents untouched - in particular it is still independent of the
+         // pole radius, so the "longer decay must not mean a quieter strike"
+         // property that motivated amplitude * sin(w) still holds.
+         //
+         // Only in-band modes are counted, matching Setup()'s own 0.45 * SR
+         // mute: several materials put most of their ratios above Nyquist at
+         // normal fundamentals (Vibraphone's ratio 150, Titanium's 74), and
+         // dividing by amplitudes that were then silenced would make exactly
+         // those patches far too quiet.
+         const float bandLimitHz = (float)sampleRate * 0.45f;
+         float ampSum = 0.0f;
+         for (int m = 0; m < kNumModes; m++)
+            if (modeFreq[m] <= bandLimitHz)
+               ampSum += mat.modeAmplitudes[m];
+         const float bankNorm = (ampSum > 1e-4f) ? (1.0f / ampSum) : 0.0f;
+
+         for (int m = 0; m < kNumModes; m++)
+         {
+            const float lossScale = 1.0f / (1.0f + 0.15f * effectiveDecay);
+            const float modeLoss = expf(-mat.highFreqLoss * (float)m * 0.4f * lossScale);
             const float modeDecay = effectiveDecay * modeLoss;
-            const float amp = mat.modeAmplitudes[m] * (velocity > 0.0f ? velocity : 0.8f);
+            const float amp = mat.modeAmplitudes[m] * bankNorm * burstGain * (velocity > 0.0f ? velocity : 0.8f);
             const float modePan = (m == 0) ? 0.0f : ((m % 2 == 1 ? 1.0f : -1.0f) * stereoSpread * (0.3f + 0.7f * ((float)m / (float)kNumModes)));
 
-            modes[m].Setup(modeFreq, modeDecay, amp, modePan, sampleRate);
+            modes[m].Setup(modeFreq[m], modeDecay, amp, modePan, sampleRate);
             if (immediate)
                modes[m].SnapToTargets();
          }
@@ -680,14 +815,31 @@ namespace MetallicDsp
          {
             dispersionChain[i].c = allpassC;
          }
+
+         // Re-derive ampDecay from the (possibly just-changed) decay knob so
+         // moving it while a voice rings updates the safety-net envelope too,
+         // not just the modal decay set up above. Skipped once Release() has
+         // fired: that already sped ampDecay up for note-off, and the next
+         // control block recomputing it from the still-held knob would slow
+         // it back down and undo the release.
+         if (!released)
+            ampDecay = ComputeAmpDecay(decaySec, sampleRate);
       }
 
-      // -80 dB over releaseSec, so note-off fades instead of hard-cutting.
+      // A struck metal bar keeps ringing after the mallet lifts - its modal
+      // decay (set up from the `decay` knob) doesn't change on note-off, so
+      // release only needs to retarget the same safety-net envelope
+      // ComputeAmpDecay() already uses, at `releaseSec` in place of the live
+      // decay knob. Passing releaseSec == effectiveDecay (the caller's
+      // default) reproduces the un-released envelope almost exactly, i.e.
+      // "don't damp beyond the knob's own decay"; a smaller releaseSec damps
+      // harder. `std::min` only ever speeds ampDecay up here, never slows it
+      // back down, matching the "once released, stay released" contract
+      // UpdateAcoustics() relies on via the `released` flag.
       void Release(double sampleRate, float releaseSec = 0.4f)
       {
-         const float samples = std::max(64.0f, releaseSec * (float)(sampleRate > 0.0 ? sampleRate : 44100.0));
-         const float releaseDecay = expf(-9.2103f / samples);
-         ampDecay = std::min(ampDecay, releaseDecay);
+         released = true;
+         ampDecay = std::min(ampDecay, ComputeAmpDecay(releaseSec, sampleRate));
       }
 
       inline void Process(float& outL, float& outR)
@@ -740,7 +892,21 @@ namespace MetallicDsp
          outR += vR;
 
          voiceLevel *= ampDecay;
-         if (voiceLevel < 0.0001f && !exciter.active)
+
+         // ampDecay is a slow safety net (see its comment in Trigger()), so
+         // waiting on voiceLevel alone to cross -80 dB would hold a voice
+         // open for ~8x its knob-set decay. The modal poles and waveguide
+         // loop gain actually govern the audible decay and settle to silence
+         // near the knob value; free the voice as soon as its output has
+         // been silent for a short window, and keep the voiceLevel check
+         // only as the ultimate backstop.
+         const float mag = std::max(std::fabs(vL), std::fabs(vR));
+         if (mag < 5e-5f)
+            silentSamples++;
+         else
+            silentSamples = 0;
+         const int silenceWindow = (int)(0.05 * std::max(1.0, voiceSampleRate));
+         if ((voiceLevel < 0.0001f || silentSamples >= silenceWindow) && !exciter.active)
          {
             active = false;
             midiNote = -1;
