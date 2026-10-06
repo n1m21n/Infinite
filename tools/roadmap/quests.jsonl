@@ -2230,3 +2230,17 @@
 {"ts": "2026-10-06T21:09:24+05:30", "event": "edit", "id": "R586", "opened": "2026-10-06T21:05:44+05:30", "closed": "2026-10-06T21:09:24+05:30", "release": "", "commits": ["c88dd34"]}
 {"ts": "2026-10-06T16:32:00+00:00", "event": "edit", "id": "R571", "title": "Keyboard-only use: v2 model merged to main 2026-10-06 (Tab params, arrows move, Shift+arrow select, Shift+Enter zoom, H/F/Shift+U/WASD); open: popup/panel nav (slice 4)"}
 {"ts": "2026-10-06T16:32:08+00:00", "event": "add", "id": "R587", "track": "ux", "kind": "fix", "horizon": "next", "title": "Keyboard v2 gaps: Tab-focus checkboxes and dropdowns; tests for Shift+U, H, F", "why": "Found finishing R571 v2: Tab walks only ModSlider/ModKnob params, so toggles and combos are unreachable by keyboard; Shift+U ungroup, H help and F frame have no KBCURSORTEST coverage", "after": ["R571"], "user": false, "origin": "explore", "effort": "S"}
+{"ts": "2026-10-06T22:51:34+05:30", "event": "add", "id": "R588", "after": [], "user": false, "src": "merge:bugfix/plugin-handle-audio-users", "track": "platform", "kind": "fix", "horizon": "later", "title": "Plugin handle audio users", "why": "merged into main (977a01c)", "origin": "merge"}
+{"ts": "2026-10-06T23:11:36+05:30", "event": "done", "id": "R588", "why": "merged into main (977a01c)"}
+{"ts": "2026-10-06T23:11:36+05:30", "event": "edit", "id": "R588", "opened": "2026-10-06T22:51:34+05:30", "closed": "2026-10-06T23:11:36+05:30", "release": "", "commits": ["977a01c"]}
+{"ts": "2026-10-06T17:45:28+00:00", "event": "add", "id": "R589", "track": "engine", "kind": "fix", "horizon": "now", "title": "Plugin node: handle lifetime vs audio thread (MIDI crash, double destroy on re-prepare)", "why": "Owner asked 2026-10-06; PLUGINNODETEST crashes 3/3 on old code", "after": [], "user": false, "origin": "ask", "effort": "M"}
+{"ts": "2026-10-06T17:45:35+00:00", "event": "add", "id": "R590", "track": "engine", "kind": "fix", "horizon": "now", "title": "File > New: republish audio topology so old sound stops and retired nodes drain", "why": "Owner asked 2026-10-06; NEWPATCHAUDIOTEST peak 0.4435 after New before fix", "after": [], "user": false, "origin": "ask", "effort": "S"}
+{"ts": "2026-10-06T17:45:42+00:00", "event": "add", "id": "R591", "track": "engine", "kind": "fix", "horizon": "now", "title": "Drum lane WAV drop crash (Turbo same-name bug): already fixed in 88a127aa", "why": "Checked 2026-10-06 against SampleSlot swap; no dedicated regression test", "after": [], "user": false, "origin": "explore", "effort": "S"}
+{"ts": "2026-10-06T17:45:47+00:00", "event": "done", "id": "R282", "why": "Ported the Turbo fix idea (GlContextKeeper: save/restore WGL context around plugin UI); merged, NOT verified on Windows - no build here"}
+{"ts": "2026-10-06T17:45:47+00:00", "event": "edit", "id": "R282", "commits": ["d028a1d3"]}
+{"ts": "2026-10-06T17:45:59+00:00", "event": "done", "id": "R589", "why": "merged to main, PLUGINNODETEST ok"}
+{"ts": "2026-10-06T17:45:59+00:00", "event": "edit", "id": "R589", "commits": ["2d138b51"]}
+{"ts": "2026-10-06T17:46:03+00:00", "event": "done", "id": "R590", "why": "merged to main, NEWPATCHAUDIOTEST ok"}
+{"ts": "2026-10-06T17:46:03+00:00", "event": "edit", "id": "R590", "commits": ["4b81c9ad"]}
+{"ts": "2026-10-06T17:46:08+00:00", "event": "done", "id": "R591", "why": "already fixed on main before this session"}
+{"ts": "2026-10-06T17:46:08+00:00", "event": "edit", "id": "R591", "commits": ["88a127aa"]}
