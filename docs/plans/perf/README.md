@@ -1246,9 +1246,9 @@ over clips:
   convert's first read. Treat pull + convert as "decode"; the split between them is
   indicative, the convert-vs-upload split is solid.
 - **Choice for zero-copy:** do the cheap step first - upload the pixel buffer as
-  `GL_BGRA` and flip in the sampler, deleting the convert (R567). IOSurface-backed
+  `GL_BGRA` and flip in the sampler, deleting the convert (R568). IOSurface-backed
   textures would also remove the upload, but the upload is 2-4 ms p50 against a
   convert that dominates at 4K, so it is the second step, only if heavy is still
   short afterwards.
 - Found: `clips=2,res=2160,windows=0` decodes 0 frames in both runs (0 uploads, 268
-  requests, `decode_realtime: false`). Not seen in the Block 3 resumed table; logged as R568.
+  requests, `decode_realtime: false`). Not seen in the Block 3 resumed table; logged as R569.
