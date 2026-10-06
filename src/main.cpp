@@ -243,6 +243,7 @@ static void JoinLiveTier1();                          // defined next to ParamKe
 #include "nodes/GrainMolderNode.h"
 #include "nodes/GranularNode.h"
 #include "nodes/DrumSequencerNode.h"
+#include "nodes/DrumPatterns.h"
 #include "nodes/LooperNode.h"
 #include "nodes/MpcNode.h"
 #include "nodes/AudioPluginNode.h"
@@ -56628,6 +56629,91 @@ static bool RunDrumSequencerFixture()
       }
       printf("DRUMSEQTEST randomize within numSteps %s\n", randOk ? "OK" : "FAIL");
       ok &= randOk;
+   }
+
+   // 19) Groove library self-test: every Part.steps in 1..kMaxSteps, every
+   // non-null lane string at least `steps` long and made of X/x/o/. only, rate
+   // a valid MusicTime division, swing/tones in range, category listed, names
+   // unique and free of artist / song titles, and each part has a hit.
+   {
+      int nGrooves = 0, nCats = 0;
+      const DrumPatterns::Groove* grooves = DrumPatterns::All(nGrooves);
+      const char* const* cats = DrumPatterns::Categories(nCats);
+      std::string firstBad;
+      auto bad = [&](const char* name, const char* why)
+      {
+         if (firstBad.empty())
+            firstBad = std::string(name) + ": " + why;
+      };
+      static const char* const kDenylist[] = {
+         "queen", "jackson", "ronettes", "billie", "be my baby", "we will rock", "neu!", "kraftwerk", "purdie",
+         "rosanna", "james brown", "funky drummer", "winstons", "amen", "honey drippers", "impeach", "led zeppelin",
+         "levee", "bongo band", "apache", "cold sweat", "tony allen", "prodigy", "chemical brothers", "dilla",
+         "bambaataa", "planet rock", "teardrop", "massive attack", "portishead", "bjork", "army of me",
+         "hyperballad", "bo diddley", "motown", "volt mix", "feel", "909",
+      };
+      std::set<std::string> seen;
+      for (int g = 0; g < nGrooves; g++)
+      {
+         const DrumPatterns::Groove& gr = grooves[g];
+         // Whole-word match on a lowercased, punctuation-stripped name, so
+         // "amen" flags "Amen break" but not "Flamenco".
+         auto norm = [](const char* in)
+         {
+            std::string out = " ";
+            for (; *in != '\0'; in++)
+               out += isalnum((unsigned char)*in) ? (char)tolower((unsigned char)*in) : ' ';
+            return out + " ";
+         };
+         const std::string lower = norm(gr.name);
+         for (const char* d : kDenylist)
+            if (lower.find(norm(d)) != std::string::npos)
+               bad(gr.name, "name matches artist/song denylist");
+         if (!seen.insert(lower).second)
+            bad(gr.name, "duplicate name");
+         bool catOk = false;
+         for (int c = 0; c < nCats; c++)
+            catOk |= strcmp(cats[c], gr.category) == 0;
+         if (!catOk)
+            bad(gr.name, "category not in Categories()");
+         if (gr.rate < 0 || gr.rate >= MusicTime::kNumRateDivisions)
+            bad(gr.name, "rate out of range");
+         if (!(gr.swing >= 0.0f && gr.swing <= 1.0f) || gr.bpm <= 0)
+            bad(gr.name, "swing/bpm out of range");
+         for (int l = 0; l < 8; l++)
+            if (!(gr.tones[l] >= -24.0f && gr.tones[l] <= 24.0f))
+               bad(gr.name, "tone out of range");
+         for (int p = 0; p < 3; p++)
+         {
+            const DrumPatterns::Part& part = gr.parts[p];
+            if (part.steps < 1 || part.steps > DrumSequencerNode::kMaxSteps)
+            {
+               bad(gr.name, "part steps out of 1..kMaxSteps");
+               continue;
+            }
+            bool anyHit = false;
+            for (int l = 0; l < 8; l++)
+            {
+               const char* s = part.lanes[l];
+               if (s == nullptr)
+                  continue;
+               if ((int)strlen(s) < part.steps)
+                  bad(gr.name, "lane string shorter than steps");
+               for (int i = 0; i < part.steps && s[i] != '\0'; i++)
+               {
+                  if (strchr("Xxo.", s[i]) == nullptr)
+                     bad(gr.name, "bad cell character");
+                  anyHit |= DrumPatterns::CellVelocity(s[i]) > 0.0f;
+               }
+            }
+            if (!anyHit)
+               bad(gr.name, "part has no hits");
+         }
+      }
+      const bool libOk = nGrooves == 141 && nCats == 10 && firstBad.empty();
+      printf("DRUMSEQTEST groove library %s (%d grooves, %d categories%s%s)\n", libOk ? "OK" : "FAIL", nGrooves, nCats,
+             firstBad.empty() ? "" : ", first problem: ", firstBad.c_str());
+      ok &= libOk;
    }
 
    remove(shortClickPath.c_str());
