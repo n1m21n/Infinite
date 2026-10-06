@@ -43825,6 +43825,14 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    // exactly one SetTopology call, same as every other caller.
    bool StartAudioEngine(std::string& outError)
    {
+      // Park the audio thread on an empty topology BEFORE the device opens.
+      // Start() makes the callback live immediately, and the rebuild below
+      // calls PrepareToPlay (plain-field writes: sample rate, smoothers,
+      // voices) on the very nodes the old topology still references - TSan
+      // flagged that as a data race on every start / rate change. With the
+      // empty list published first, nothing the callback can reach is being
+      // re-prepared; the rebuild's SetTopology then publishes the real one.
+      AudioEngine::Instance().SetTopology(AudioTopology{});
       if (!AudioEngine::Instance().Start(outError))
          return false;
       RebuildAudioTopology();
