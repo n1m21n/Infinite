@@ -2213,3 +2213,5 @@
 {"ts": "2026-10-06T15:28:56+05:30", "event": "edit", "id": "R583", "opened": "2026-10-06T15:28:56+05:30", "closed": "2026-10-06T15:28:56+05:30", "release": "", "commits": ["f393709"]}
 {"ts": "2026-10-06T10:29:38+00:00", "event": "done", "id": "R553", "why": "ASan+UBSan job green on f3937093 and now gates (continue-on-error removed). Found and fixed two real dangling-VisitParams bugs (Molder seed, AudioPlugin map_slots); clang-tidy step fixed with apt-get update."}
 {"ts": "2026-10-06T10:29:38+00:00", "event": "edit", "id": "R553", "commits": ["f3937093"]}
+{"ts": "2026-10-06T10:43:04+00:00", "event": "move", "id": "R568", "horizon": "later"}
+{"ts": "2026-10-06T10:43:09+00:00", "event": "edit", "id": "R568", "title": "Video: skip the BGRA->RGBA convert (needs a Platform.h pixel-format contract change on 3 platforms; ~4 ms p50 at 4K, macOS only; deferred 2026-10-06)"}
