@@ -42245,6 +42245,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Edit & Canvas", "Keyboard Cursor", "Tab / Shift+Tab", "Put a focus ring on a node and walk the nodes in reading order. Esc or a click leaves it" },
          { "Edit & Canvas", "Move Cursor", "Up / Down / Left / Right (cursor on)", "Jump the focus ring to the nearest node in that direction" },
          { "Edit & Canvas", "Select Under Cursor", "Enter", "Select the node under the focus ring. Shift+Enter adds it to the selection" },
+         { "Edit & Canvas", "Move Selected Nodes", "Alt+Arrow keys (cursor on)", "Nudge the selected nodes by a fixed screen distance; Shift = x10" },
          { "Edit & Canvas", "Frame Cursor Node", "F", "With the focus ring on, zoom the view to the node under it" },
          { "Edit & Canvas", "Bypass Selection", "B", "Toggle bypass (power off) on the selected nodes. Canvas only - with the timeline focused, B is the blade tool instead" },
          { "Edit & Canvas", "Group Selection", MODKEY "+G", "Wrap selected nodes in a group box" },
@@ -96740,7 +96741,11 @@ int main(int argc, char** argv)
          tap(ImGuiKey_Tab, 8, frameId);           // -> node 1
          tap(ImGuiKey_RightArrow, 12, frameId);   // -> node 2
          tap(ImGuiKey_LeftArrow, 16, frameId);    // -> node 1
-         tap(ImGuiKey_Escape, 20, frameId);       // off
+         static ImVec2 startPos(0, 0);
+         if (frameId == 18) startPos = ed::GetNodePosition(gNodes[1].NodeId());
+         if (frameId == 19) { tio.AddKeyEvent(ImGuiMod_Alt, true); tio.AddKeyEvent(ImGuiKey_RightArrow, true); }
+         if (frameId == 20) { tio.AddKeyEvent(ImGuiKey_RightArrow, false); tio.AddKeyEvent(ImGuiMod_Alt, false); }
+         tap(ImGuiKey_Escape, 24, frameId);       // off
          static bool ok = true;
          auto expect = [&](int frame, int want, const char* what) {
             if (frameId != frame) return;
@@ -96753,10 +96758,16 @@ int main(int argc, char** argv)
          expect(10, 1, "Tab again");
          expect(14, 2, "Right");
          expect(18, 1, "Left");
-         expect(22, -1, "Esc");
          if (frameId == 22)
          {
-            // Esc must not leave a stale selection-follow state, and Enter on a live cursor selects.
+            const ImVec2 now = ed::GetNodePosition(gNodes[1].NodeId());
+            const bool moved = now.x > startPos.x + 1.0f && std::fabs(now.y - startPos.y) < 0.5f;
+            ok = ok && moved;
+            printf("kbcursor Alt+Right: x %.1f -> %.1f %s\n", startPos.x, now.x, moved ? "ok" : "FAIL");
+         }
+         expect(26, -1, "Esc");
+         if (frameId == 26)
+         {
             printf("kbcursor result: %s\n", ok ? "KBCURSOR OK" : "KBCURSOR FAIL");
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
@@ -98717,6 +98728,36 @@ int main(int argc, char** argv)
                   gRequestFitViewNodeIndex = gKbCursorNode;
                if (ImGui::IsKeyPressed(ImGuiKey_Escape, false))
                   gKbCursorNode = -1;
+            }
+         }
+         // Slice 2: Alt+arrows move the selected nodes (Shift = x10). Step is 16
+         // screen pixels, so it feels the same at any zoom. One undo entry per
+         // burst of presses, like one entry per mouse drag.
+         if (gKbCursorNode >= 0 && !typing && !cmdOrCtrl && io.KeyAlt && !gArrangeFocused && !gPerfMatrixFocused &&
+             gCommentEdit.target == nullptr && gTypedParam.empty() &&
+             !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel))
+         {
+            float dx = 0.0f, dy = 0.0f;
+            if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true)) dx = -1.0f;
+            else if (ImGui::IsKeyPressed(ImGuiKey_RightArrow, true)) dx = 1.0f;
+            else if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true)) dy = -1.0f;
+            else if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true)) dy = 1.0f;
+            const int selCount = ed::GetSelectedObjectCount();
+            if ((dx != 0.0f || dy != 0.0f) && selCount > 0)
+            {
+               static double lastMoveTime = -10.0;
+               const double now = ImGui::GetTime();
+               if (now - lastMoveTime > 0.6)
+                  PushUndoCheckpoint();
+               lastMoveTime = now;
+               const float step = 16.0f * (io.KeyShift ? 10.0f : 1.0f) / std::max(0.05f, ed::GetCurrentZoom());
+               std::vector<ed::NodeId> selNodes(selCount);
+               const int nSel = ed::GetSelectedNodes(selNodes.data(), selCount);
+               for (int i = 0; i < nSel; ++i)
+               {
+                  const ImVec2 p = ed::GetNodePosition(selNodes[i]);
+                  ed::SetNodePosition(selNodes[i], ImVec2(p.x + dx * step, p.y + dy * step));
+               }
             }
          }
          // A canvas click puts the mouse back in charge.
