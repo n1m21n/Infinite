@@ -1141,7 +1141,10 @@ namespace Platform
                sample = DecodeNext(h->stream, pts);
                const double pullMs = bench ? Bench::MediaNowMs() - pullStartMs : 0.0;
                if (bench && sample != nullptr)
+               {
                   bench->decoded.fetch_add(1, std::memory_order_relaxed);
+                  bench->pullMs.Push(pullMs);
+               }
 
                if (h->pending != nullptr)
                {
@@ -1167,7 +1170,11 @@ namespace Platform
                      push = ConvertSample(h->pending, out.pixels);
                      out.pts = h->pendingPts;
                      if (bench)
-                        bench->decodeMs.Push(pendingPullMs + Bench::MediaNowMs() - convertStartMs);
+                     {
+                        const double convertMs = Bench::MediaNowMs() - convertStartMs;
+                        bench->convertMs.Push(convertMs);
+                        bench->decodeMs.Push(pendingPullMs + convertMs);
+                     }
                   }
                   ReleasePending(h);
                }
