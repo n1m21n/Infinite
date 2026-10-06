@@ -1,4 +1,39 @@
-# R571 - Keyboard-only use (keyboard cursor over nodes and pins, ImGui nav for popups and panels)
+# R571 - Keyboard-only use
+
+> **Status (2026-10-06): the owner's revised model replaced the Tab-cursor design below. Slices 1-3 of the old
+> design are superseded; the old text is kept underneath as history only. Slice 4 (popup/panel nav) is still open.**
+
+## Current model (shipped on `feature/keyboard-v2`, test: `INFINITE_KBCURSORTEST`)
+
+Click a node to make it the **active node** (exactly one node selected). Then:
+
+| Key | Does |
+|---|---|
+| Tab / Shift+Tab | Walk **that node's params only**, in a loop. Stops when another node is clicked. |
+| Left / Right (param focused) | Nudge the value. Alt = x10. Digits start typed entry. |
+| Up / Down / Left / Right (no param focused) | Move the selected nodes one grid step (one undo entry per burst) |
+| Shift + arrow | Select the neighbouring node in that direction |
+| Shift+Enter / Enter | Zoom into the active node / back out to the saved view |
+| H | Node help |
+| B | Bypass (pre-existing) |
+| Shift+U | Ungroup the selected group |
+| W A S D | Pan the canvas |
+| F | Centre and frame everything |
+| Esc | Leave param focus |
+
+Mechanics worth knowing:
+- Tab is claimed with `SetKeyOwner(ImGuiKey_Tab, kKbTabOwner, LockUntilRelease)` before `NewFrame` while a node is
+  active. Without it ImGui's own Tab nav puts a slider into text edit, sets `WantTextInput`, and every plain-key
+  shortcut switches off (found by `KBCURSORTEST`).
+- Params register in draw order through `KbParamHook` at the end of `ModSlider`/`ModKnob`, keyed `(nodeIndex, paramIndex)`.
+- View changes (zoom, pan) are queued and applied just before `ed::Begin`; doing it mid-frame crashed (SIGBUS).
+- The rows live in `kShortcuts[]` (in-app shortcuts window); `shortcuts-sweep/check.py` keeps them honest.
+- Not covered yet: checkboxes and dropdowns are not Tab-focusable; Shift+U, H and F have no test.
+
+---
+
+## History: the original Tab-cursor design (superseded)
+
 
 Status: plan, nothing built. Found by the R560 UX audit: `NavEnableKeyboard` has zero hits in `src/`
 (`grep -rn "ConfigFlags\|NavEnable" src` is empty; `io.ConfigFlags` is never touched after

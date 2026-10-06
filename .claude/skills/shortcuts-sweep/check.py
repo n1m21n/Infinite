@@ -5,7 +5,7 @@ Three questions, none of which need a build or a running app:
 
   1. Documented but unhandled - every row of the `kShortcuts` table in
      DrawShortcutsWindow (src/main.cpp) names a key. Is there a real
-     ImGui::IsKeyPressed handler for that key anywhere in main.cpp?
+     ImGui::IsKeyPressed (or hold-key IsKeyDown) handler for that key anywhere in main.cpp?
   2. Handled but undocumented - the reverse. A binding nobody can discover is
      a binding that does not exist for most users.
   3. macOS-only modifier - a handler gated on io.KeySuper (or ImGuiMod_Super)
@@ -97,7 +97,7 @@ def main():
 
     # ---- 2. the real handlers ----------------------------------------------
     handlers = {}     # ImGuiKey suffix -> [line numbers]
-    for m in re.finditer(r"IsKeyPressed\(ImGuiKey_([A-Za-z0-9]+)", src):
+    for m in re.finditer(r"IsKey(?:Pressed|Down)\(ImGuiKey_([A-Za-z0-9]+)", src):
         k = m.group(1)
         line = src.count("\n", 0, m.start()) + 1
         handlers.setdefault(k, []).append(line)

@@ -1367,10 +1367,22 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    bool gRequestDuplicate = false;
    bool gRequestDelete = false;
    bool gRequestSelectAll = false;
-   // Keyboard cursor (R571 slice 1): runtime only, never saved. nodeIndex is a
-   // GraphNode::index, re-resolved through FindNodeByIndex every frame because
-   // gNodes reallocates on spawn; -1 = cursor off.
-   int gKbCursorNode = -1;
+   // Keyboard model (R571): the active node is simply the one selected node
+   // (click it). Tab walks that node's params; arrows move it on the grid;
+   // runtime only, never saved.
+   int gKbFocusNode = -1;   // GraphNode::index of the Tab-focused param's node
+   int gKbFocusParam = -1;  // its paramIndex; -1 = no param focused
+   int gKbNudge = 0;        // signed value steps queued for the focused param, applied in its widget
+   struct KbParamEntry { int node; int param; };
+   std::vector<KbParamEntry> gKbParams; // params drawn this frame, in draw order (Tab order)
+   constexpr ImGuiID kKbTabOwner = 0x4B425441u;
+   bool gKbOwnTab = false;  // an active node exists: Tab belongs to the param walker, not ImGui nav
+   bool gKbZoomed = false;  // Shift+Enter zoomed into a node; Enter restores the saved view
+   ImVec2 gKbSavedScroll(0.0f, 0.0f);
+   float gKbSavedZoom = 1.0f;
+   bool gKbViewRestore = false;       // applied just before ed::Begin: the editor can't take a view change mid-frame
+   ImVec2 gKbPan(0.0f, 0.0f);         // queued WASD pan, canvas units, applied the same way
+   bool gComputerKeyboardHot = false; // a hovered audio keyboard is using letter keys this frame
    bool gRequestAddNode = false;
    bool gRequestAddComment = false;
    int gContextMenuNodeIndex = -1; // node the right-click context menu is open for
@@ -2911,6 +2923,43 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       }
    }
 
+   // Keyboard param focus (Tab). Called once at the end of ModSlider/ModKnob
+   // (ints reach them through float slots, with step 1): records the param in
+   // draw order for Tab, and for the focused one draws the ring, applies a
+   // queued Left/Right nudge through the same min/max the widget clamps to,
+   // and lets digits start typed entry as if it were hovered. Returns true
+   // when the value changed so the caller reports it like a mouse edit.
+   bool KbParamHook(int nodeIndex, int paramIndex, float* value, float minV, float maxV, float step,
+                    const char* fmt, ImVec2 start)
+   {
+      bool seen = false;
+      for (const KbParamEntry& e : gKbParams)
+         seen = seen || (e.node == nodeIndex && e.param == paramIndex);
+      if (!seen)
+         gKbParams.push_back({ nodeIndex, paramIndex });
+      if (nodeIndex != gKbFocusNode || paramIndex != gKbFocusParam)
+         return false;
+
+      const ImVec2 itemMax = ImGui::GetItemRectMax();
+      const ImVec2 cur = ImGui::GetCursorScreenPos();
+      const ImVec2 mx(std::max(itemMax.x, start.x + 4.0f), std::max(itemMax.y, cur.y - ImGui::GetStyle().ItemSpacing.y));
+      ImGui::GetWindowDrawList()->AddRect(ImVec2(start.x - 3.0f, start.y - 3.0f), ImVec2(mx.x + 3.0f, mx.y + 3.0f),
+                                          ImGui::GetColorU32(ImGuiCol_NavHighlight), 4.0f, 0, 2.0f);
+      bool changed = false;
+      if (gKbNudge != 0 && !Modulation::Instance().IsModulated(nodeIndex, paramIndex))
+      {
+         float st = step;
+         if (st <= 0.0f)
+            st = (fmt != nullptr && strcmp(fmt, "%.0f") == 0) ? 1.0f : (maxV - minV) / 100.0f;
+         const float before = *value;
+         *value = std::clamp(*value + st * (float)gKbNudge, minV, maxV);
+         changed = (*value != before);
+      }
+      gKbNudge = 0;
+      HandleParamTypeHotkeys(std::make_pair(nodeIndex, paramIndex), value);
+      return changed;
+   }
+
    // ---- audio node value readout -----------------------------------------
    // v2 showed a hovered knob's value via ImGui::SetTooltip from inside
    // ed::Begin()/ed::End() with no ed::Suspend() around it, so the node
@@ -4144,6 +4193,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       Modulation::Instance().RegisterParam(ref);
       if (gParamRegisterOnly)
          return false; // registered, deliberately not drawn - see gParamRegisterOnly
+      const ImVec2 kbStart = ImGui::GetCursorScreenPos();
 
       const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kParamBase + paramIndex;
       const bool modulated = Modulation::Instance().IsModulated(nodeIndex, paramIndex);
@@ -4609,6 +4659,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             HandleParamTypeHotkeys(editKey, value);
       }
 
+      changed = KbParamHook(nodeIndex, paramIndex, value, minV, maxV, step, fmt, kbStart) || changed;
       ImGui::PopID();
       return changed;
    }
@@ -5386,6 +5437,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       Modulation::Instance().RegisterParam(ref);
       if (gParamRegisterOnly)
          return false; // registered, deliberately not drawn - see gParamRegisterOnly
+      const ImVec2 kbStart = ImGui::GetCursorScreenPos();
 
       const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kParamBase + paramIndex;
       const bool modulated = Modulation::Instance().IsModulated(nodeIndex, paramIndex);
@@ -5625,6 +5677,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          ImGui::SetCursorScreenPos(cursorAfter);
       }
 
+      changed = KbParamHook(nodeIndex, paramIndex, value, minV, maxV, step, fmt, kbStart) || changed;
       ImGui::PopID();
       return changed;
    }
@@ -20233,6 +20286,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       }
 
       const bool isHovered = ed::GetHoveredNode() == ed::NodeId(gn.NodeId());
+      if (n->computerKeyboardEnabled && isHovered)
+         gComputerKeyboardHot = true; // letter keys belong to this node; canvas WASD/F/H/U stand down
       for (const TypingKey& tk : kTypingKeys)
       {
          const int note = std::clamp(baseNote + tk.semitone, 0, 127);
@@ -42242,14 +42297,15 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Edit & Canvas", "Delete", "Delete / Backspace / Shift+X", "Delete selected nodes, groups, or links" },
          { "Edit & Canvas", "Delete Cable", "X", "Delete selected cable/link only" },
          { "Edit & Canvas", "Select All", "Shift+A", "Select all nodes on the canvas" },
-         { "Edit & Canvas", "Keyboard Cursor", "Tab / Shift+Tab", "Put a focus ring on a node and walk the nodes in reading order. Esc or a click leaves it" },
-         { "Edit & Canvas", "Move Cursor", "Up / Down / Left / Right (cursor on)", "Jump the focus ring to the nearest node in that direction" },
-         { "Edit & Canvas", "Select Under Cursor", "Enter", "Select the node under the focus ring. Shift+Enter adds it to the selection" },
-         { "Edit & Canvas", "Move Selected Nodes", "Alt+Arrow keys (cursor on)", "Nudge the selected nodes by a fixed screen distance; Shift = x10" },
-         { "Edit & Canvas", "Frame Cursor Node", "F", "With the focus ring on, zoom the view to the node under it" },
+         { "Edit & Canvas", "Walk Params", "Tab / Shift+Tab", "Click a node, then Tab loops through that node's parameters (Shift+Tab goes backwards). Digits type a value; Esc leaves" },
+         { "Edit & Canvas", "Nudge Param", "Left / Right", "With a param focused by Tab: Left/Down lowers it, Right/Up raises it one step; Alt = x10" },
+         { "Edit & Canvas", "Move Node", "Up / Down / Left / Right", "Click a node, then the arrow keys move it one grid step. With a param focused they nudge the value instead" },
+         { "Edit & Canvas", "Next Node", "Shift+Up / Down / Left / Right", "Select the neighbouring node in that direction" },
+         { "Edit & Canvas", "Zoom Into Node", "Shift+Enter", "Zoom the view into the selected node; Enter zooms back out to where you were" },
+         { "Edit & Canvas", "Node Help", "H", "Show the help for the selected node" },
          { "Edit & Canvas", "Bypass Selection", "B", "Toggle bypass (power off) on the selected nodes. Canvas only - with the timeline focused, B is the blade tool instead" },
          { "Edit & Canvas", "Group Selection", MODKEY "+G", "Wrap selected nodes in a group box" },
-         { "Edit & Canvas", "Ungroup", MODKEY "+Shift+G", "Dissolve group without deleting nodes" },
+         { "Edit & Canvas", "Ungroup", MODKEY "+Shift+G / Shift+U", "Dissolve the selected group without deleting nodes" },
          { "Edit & Canvas", "Add Node", "Shift+N", "Open quick type-to-filter node picker" },
          { "Edit & Canvas", "Add Note / Comment", "/", "Drop a comment note under mouse pointer" },
 
@@ -42262,7 +42318,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Canvas & View", "Modulation Matrix", "Shift+M", "Toggle docked modulation matrix" },
          { "Canvas & View", "Performance Matrix", "Shift+P", "Toggle docked performance matrix" },
          { "Canvas & View", "Arrangement Timeline", "Shift+T", "Toggle docked arrangement timeline" },
-         { "Canvas & View", "Fit View to Content", "Shift+Y", "Frame the whole patch in the canvas view" },
+         { "Canvas & View", "Fit View to Content", "F / Shift+Y", "Frame the whole patch in the canvas view" },
+         { "Canvas & View", "Pan Canvas (keys)", "W / A / S / D", "Hold to pan the canvas up / left / down / right. Not while a hovered audio keyboard node is using the letters" },
 
          // Transport & Audio
          { "Transport & Audio", "Play / Pause", "Space", "Start / pause timeline and animations" },
@@ -74069,6 +74126,8 @@ int main(int argc, char** argv)
          SpawnNode("Shape", "Source", 40.0f, 40.0f);   // 0
          SpawnNode("Shape", "Source", 420.0f, 40.0f);  // 1
          SpawnNode("Shape", "Source", 800.0f, 40.0f);  // 2
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true; // Tab walks params, so they have to be drawn
       }
       else if (getenv("INFINITE_BYPASSTEST") != nullptr)
       {
@@ -77295,6 +77354,10 @@ int main(int argc, char** argv)
             tio.AddMousePosEvent(gTestMouse.x, gTestMouse.y);
       }
 
+      // R571: while a node is the active node Tab belongs to the param walker,
+      // not to ImGui's own tab navigation (which drops a slider into text edit).
+      if (gKbOwnTab)
+         ImGui::SetKeyOwner(ImGuiKey_Tab, kKbTabOwner, ImGuiInputFlags_LockUntilRelease);
       ImGui::NewFrame();
       if (Bench::Tail().active)
          Bench::Tail().MarkAt(Bench::FrameTail::kMarkNewFrame, Bench::ScopedStageTimer::NowMs());
@@ -78603,6 +78666,18 @@ int main(int argc, char** argv)
                                 graphHeight);
 
       ed::GetStyle().GridSpacing = gGridSnap;
+      if (gKbViewRestore)
+      {
+         ed::SetViewZoom(gKbSavedZoom);
+         ed::SetViewScroll(gKbSavedScroll);
+         gKbViewRestore = false;
+      }
+      if (gKbPan.x != 0.0f || gKbPan.y != 0.0f)
+      {
+         const ImVec2 sc = ed::GetViewScroll();
+         ed::SetViewScroll(ImVec2(sc.x + gKbPan.x, sc.y + gKbPan.y));
+         gKbPan = ImVec2(0.0f, 0.0f);
+      }
       ed::Begin("graph", ImVec2(graphWidth, graphHeight));
       gParamPinScreenList.clear();
       // Shift-held movement is the sole trigger for gesture recording - see
@@ -96731,44 +96806,85 @@ int main(int argc, char** argv)
 
       if (getenv("INFINITE_KBCURSORTEST") != nullptr)
       {
-         // Keys are injected one frame before the check so the handler has run.
+         // R571 keyboard model. Keys go in one frame before the check so the handler has run.
          ImGuiIO& tio = ImGui::GetIO();
-         auto tap = [&tio](ImGuiKey k, int f, int now) {
-            if (now == f) tio.AddKeyEvent(k, true);
-            if (now == f + 1) tio.AddKeyEvent(k, false);
+         auto tap = [&](ImGuiKey k, int f, bool shift = false) {
+            if (frameId == f) { if (shift) tio.AddKeyEvent(ImGuiMod_Shift, true); tio.AddKeyEvent(k, true); }
+            if (frameId == f + 1) { tio.AddKeyEvent(k, false); if (shift) tio.AddKeyEvent(ImGuiMod_Shift, false); }
          };
-         tap(ImGuiKey_Tab, 4, frameId);           // cursor -> node 0
-         tap(ImGuiKey_Tab, 8, frameId);           // -> node 1
-         tap(ImGuiKey_RightArrow, 12, frameId);   // -> node 2
-         tap(ImGuiKey_LeftArrow, 16, frameId);    // -> node 1
-         static ImVec2 startPos(0, 0);
-         if (frameId == 18) startPos = ed::GetNodePosition(gNodes[1].NodeId());
-         if (frameId == 19) { tio.AddKeyEvent(ImGuiMod_Alt, true); tio.AddKeyEvent(ImGuiKey_RightArrow, true); }
-         if (frameId == 20) { tio.AddKeyEvent(ImGuiKey_RightArrow, false); tio.AddKeyEvent(ImGuiMod_Alt, false); }
-         tap(ImGuiKey_Escape, 24, frameId);       // off
          static bool ok = true;
-         auto expect = [&](int frame, int want, const char* what) {
-            if (frameId != frame) return;
-            const int wantIdx = (want < 0) ? -1 : gNodes[want].index;
-            const bool good = (gKbCursorNode == wantIdx);
+         static std::vector<int> tabParams;
+         static ImVec2 pos1(0, 0);
+         static float scrollBefore = 0.0f;
+         auto check = [&](bool good, const char* what) {
             ok = ok && good;
-            printf("kbcursor %s: cursor=%d want=%d %s\n", what, gKbCursorNode, want, good ? "ok" : "FAIL");
+            printf("kbtest %-44s %s\n", what, good ? "ok" : "FAIL");
          };
-         expect(6, 0, "Tab");
-         expect(10, 1, "Tab again");
-         expect(14, 2, "Right");
-         expect(18, 1, "Left");
-         if (frameId == 22)
+         const int n1 = gNodes[1].index, n2 = gNodes[2].index;
+         if (frameId == 3) { ed::ClearSelection(); ed::SelectNode(gNodes[1].NodeId(), false); }
+         // 12 Tabs on node 1: focus stays on node 1 and loops.
+         constexpr int kTabs = 12;
+         for (int i = 0; i < kTabs; ++i)
+         {
+            tap(ImGuiKey_Tab, 5 + i * 4);
+            if (frameId == 8 + i * 4)
+            {
+
+               if (gKbFocusNode != n1) check(false, "Tab stays on the active node");
+               tabParams.push_back(gKbFocusParam);
+            }
+         }
+         if (frameId == 8 + kTabs * 4)
+         {
+            std::set<int> distinct(tabParams.begin(), tabParams.end());
+            const size_t d = distinct.size();
+            check(d >= 2, "Tab visits more than one param");
+            check(tabParams.size() > d && tabParams[0] == tabParams[d], "Tab loops back to the first param");
+            check(gKbFocusNode == n1, "focus never left node 1");
+            pos1 = ed::GetNodePosition(gNodes[1].NodeId());
+         }
+         const int f0 = 8 + kTabs * 4 + 1; // 57
+         tap(ImGuiKey_RightArrow, f0);
+         if (frameId == f0 + 3)
          {
             const ImVec2 now = ed::GetNodePosition(gNodes[1].NodeId());
-            const bool moved = now.x > startPos.x + 1.0f && std::fabs(now.y - startPos.y) < 0.5f;
-            ok = ok && moved;
-            printf("kbcursor Alt+Right: x %.1f -> %.1f %s\n", startPos.x, now.x, moved ? "ok" : "FAIL");
+            check(now.x == pos1.x && now.y == pos1.y, "arrow on a focused param does not move the node");
+            check(gKbNudge == 0, "nudge consumed by the param widget");
          }
-         expect(26, -1, "Esc");
-         if (frameId == 26)
+         tap(ImGuiKey_Escape, f0 + 4);
+         if (frameId == f0 + 7)
          {
-            printf("kbcursor result: %s\n", ok ? "KBCURSOR OK" : "KBCURSOR FAIL");
+            printf("kbtest esc: focusNode=%d focusParam=%d popup=%d typed=%zu wantText=%d\n", gKbFocusNode, gKbFocusParam,
+                   (int)ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel), gTypedParam.size(), (int)tio.WantTextInput);
+            check(gKbFocusParam == -1, "Esc leaves param focus");
+         }
+         tap(ImGuiKey_RightArrow, f0 + 8);
+         if (frameId == f0 + 11)
+         {
+            const ImVec2 now = ed::GetNodePosition(gNodes[1].NodeId());
+            check(now.x > pos1.x && std::fmod(now.x, gGridSnap) == 0.0f && now.y == pos1.y, "Right arrow moves the node one grid step");
+         }
+         tap(ImGuiKey_RightArrow, f0 + 12, /*shift=*/true);
+         if (frameId == f0 + 15)
+            check(ed::IsNodeSelected(gNodes[2].NodeId()) && !ed::IsNodeSelected(gNodes[1].NodeId()), "Shift+Right selects the next node");
+         tap(ImGuiKey_Tab, f0 + 16);
+         if (frameId == f0 + 19)
+            check(gKbFocusNode == n2, "Tab now walks the new node's params");
+         tap(ImGuiKey_Escape, f0 + 20);
+         tap(ImGuiKey_Enter, f0 + 24, /*shift=*/true);
+         if (frameId == f0 + 27)
+            check(gKbZoomed, "Shift+Enter zooms into the node");
+         tap(ImGuiKey_Enter, f0 + 28);
+         if (frameId == f0 + 31)
+            check(!gKbZoomed, "Enter zooms back out");
+         if (frameId == f0 + 32) { scrollBefore = ed::GetViewScroll().y; tio.AddKeyEvent(ImGuiKey_W, true); }
+         if (frameId == f0 + 38) tio.AddKeyEvent(ImGuiKey_W, false);
+         if (frameId == f0 + 40)
+         {
+            const float after = ed::GetViewScroll().y;
+            printf("kbtest W pan: scroll.y %.1f -> %.1f\n", scrollBefore, after);
+            check(after < scrollBefore, "W pans the view up");
+            printf("kbtest result: %s\n", ok ? "KBCURSOR OK" : "KBCURSOR FAIL");
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
       }
@@ -98643,126 +98759,208 @@ int main(int argc, char** argv)
             ed::SelectNode(gn.NodeId(), true);
       }
 
-      // ---- keyboard cursor (R571 slice 1) ----
-      // Tab puts a focus ring on a node, Tab/Shift+Tab walk the nodes in
-      // reading order, arrows jump to the nearest node in that direction,
-      // Enter selects, F frames, Esc leaves. Gated like the other plain-key
-      // canvas shortcuts so it never fires while a text field, popup or the
-      // timeline owns the keyboard.
+      // ---- keyboard model (R571) ----
+      // Click a node to make it the active node, then:
+      //   Tab / Shift+Tab   walk that node's params in a loop (never other nodes)
+      //   Left/Right (param focused) nudge the value; Alt = x10; digits type a value
+      //   Arrows            move the selected nodes one grid step
+      //   Shift+Arrows      select the neighbouring node in that direction
+      //   Shift+Enter / Enter  zoom into the node / back out
+      //   H help, B bypass, Shift+U ungroup, F frame everything, W A S D pan
+      // All gated like the other plain-key canvas shortcuts: never while a text
+      // field, popup, the timeline or a hovered audio keyboard owns the keys.
       {
-         if (gKbCursorNode >= 0 && FindNodeByIndex(gKbCursorNode) == nullptr)
-            gKbCursorNode = -1; // node deleted / patch replaced
-         const bool kbFree = !typing && !cmdOrCtrl && !io.KeyAlt && !gArrangeFocused && !gPerfMatrixFocused &&
+         const bool kbFree = !typing && !cmdOrCtrl && !gArrangeFocused && !gPerfMatrixFocused &&
                              gCommentEdit.target == nullptr && gTypedParam.empty() &&
                              !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
-         if (kbFree && !gNodes.empty())
+
+         // The active node: exactly one node selected and nothing else.
+         GraphNode* active = nullptr;
          {
-            struct Slot { int index; ImVec2 c; };
-            std::vector<Slot> slots;
-            slots.reserve(gNodes.size());
-            for (GraphNode& gn : gNodes)
+            const int selObj = ed::GetSelectedObjectCount();
+            if (selObj == 1)
             {
-               const ImVec2 p = ed::GetNodePosition(gn.NodeId());
-               const ImVec2 sz = ed::GetNodeSize(gn.NodeId());
-               slots.push_back({ gn.index, ImVec2(p.x + sz.x * 0.5f, p.y + sz.y * 0.5f) });
-            }
-            // Reading order: rows of 200 canvas units top to bottom, then left to right.
-            std::sort(slots.begin(), slots.end(), [](const Slot& l, const Slot& r) {
-               const int lr = static_cast<int>(std::floor(l.c.y / 200.0f));
-               const int rr = static_cast<int>(std::floor(r.c.y / 200.0f));
-               if (lr != rr) return lr < rr;
-               if (l.c.x != r.c.x) return l.c.x < r.c.x;
-               return l.index < r.index;
-            });
-            auto setCursor = [&](int idx) {
-               gKbCursorNode = idx;
-               ed::ClearSelection();
-               ed::SelectNode(FindNodeByIndex(idx)->NodeId(), false);
-            };
-            if (ImGui::IsKeyPressed(ImGuiKey_Tab, true))
-            {
-               const int n = static_cast<int>(slots.size());
-               int pos = -1;
-               for (int i = 0; i < n; ++i)
-                  if (slots[i].index == gKbCursorNode) pos = i;
-               const int next = (pos < 0) ? (io.KeyShift ? n - 1 : 0)
-                                          : ((pos + (io.KeyShift ? n - 1 : 1)) % n);
-               setCursor(slots[next].index);
-            }
-            else if (gKbCursorNode >= 0)
-            {
-               float dx = 0.0f, dy = 0.0f;
-               if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true)) dx = -1.0f;
-               else if (ImGui::IsKeyPressed(ImGuiKey_RightArrow, true)) dx = 1.0f;
-               else if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true)) dy = -1.0f;
-               else if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true)) dy = 1.0f;
-               if (dx != 0.0f || dy != 0.0f)
-               {
-                  ImVec2 from(0, 0);
-                  for (const Slot& sl : slots)
-                     if (sl.index == gKbCursorNode) from = sl.c;
-                  int best = -1;
-                  float bestScore = 1e30f;
-                  for (const Slot& sl : slots)
-                  {
-                     if (sl.index == gKbCursorNode) continue;
-                     const float along = (sl.c.x - from.x) * dx + (sl.c.y - from.y) * dy;
-                     const float across = std::fabs((sl.c.x - from.x) * dy - (sl.c.y - from.y) * dx);
-                     if (along <= 0.0f || across > along * 2.0f) continue; // outside a ~63 degree cone
-                     const float score = along + across * 2.0f;
-                     if (score < bestScore) { bestScore = score; best = sl.index; }
-                  }
-                  if (best >= 0)
-                     setCursor(best);
-               }
-               if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))
-               {
-                  if (GraphNode* cn = FindNodeByIndex(gKbCursorNode))
-                  {
-                     if (!io.KeyShift)
-                        ed::ClearSelection();
-                     ed::SelectNode(cn->NodeId(), io.KeyShift);
-                  }
-               }
-               if (!io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_F, false))
-                  gRequestFitViewNodeIndex = gKbCursorNode;
-               if (ImGui::IsKeyPressed(ImGuiKey_Escape, false))
-                  gKbCursorNode = -1;
+               ed::NodeId one;
+               if (ed::GetSelectedNodes(&one, 1) == 1)
+                  for (GraphNode& gn : gNodes)
+                     if (gn.NodeId() == (int)one.Get())
+                        active = &gn;
             }
          }
-         // Slice 2: Alt+arrows move the selected nodes (Shift = x10). Step is 16
-         // screen pixels, so it feels the same at any zoom. One undo entry per
-         // burst of presses, like one entry per mouse drag.
-         if (gKbCursorNode >= 0 && !typing && !cmdOrCtrl && io.KeyAlt && !gArrangeFocused && !gPerfMatrixFocused &&
-             gCommentEdit.target == nullptr && gTypedParam.empty() &&
-             !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel))
+         if (gKbFocusNode >= 0 && (active == nullptr || active->index != gKbFocusNode))
          {
-            float dx = 0.0f, dy = 0.0f;
+            gKbFocusNode = -1;
+            gKbFocusParam = -1;
+         }
+
+         auto dirKey = [&](float& dx, float& dy) {
+            dx = dy = 0.0f;
             if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true)) dx = -1.0f;
             else if (ImGui::IsKeyPressed(ImGuiKey_RightArrow, true)) dx = 1.0f;
             else if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true)) dy = -1.0f;
             else if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true)) dy = 1.0f;
-            const int selCount = ed::GetSelectedObjectCount();
-            if ((dx != 0.0f || dy != 0.0f) && selCount > 0)
+            return dx != 0.0f || dy != 0.0f;
+         };
+         // One undo entry per burst of presses, like one entry per mouse drag.
+         auto burstUndo = [&]() {
+            static double lastTime = -10.0;
+            const double now = ImGui::GetTime();
+            if (now - lastTime > 0.6)
+               PushUndoCheckpoint();
+            lastTime = now;
+         };
+
+         gKbOwnTab = kbFree && active != nullptr;
+         if (kbFree && !io.KeyAlt)
+         {
+            // ---- Tab: params of the active node, looped ----
+            if (active != nullptr && ImGui::IsKeyPressed(ImGuiKey_Tab, ImGuiInputFlags_Repeat, kKbTabOwner))
             {
-               static double lastMoveTime = -10.0;
-               const double now = ImGui::GetTime();
-               if (now - lastMoveTime > 0.6)
-                  PushUndoCheckpoint();
-               lastMoveTime = now;
-               const float step = 16.0f * (io.KeyShift ? 10.0f : 1.0f) / std::max(0.05f, ed::GetCurrentZoom());
-               std::vector<ed::NodeId> selNodes(selCount);
-               const int nSel = ed::GetSelectedNodes(selNodes.data(), selCount);
-               for (int i = 0; i < nSel; ++i)
+               std::vector<int> mine;
+               for (const KbParamEntry& e : gKbParams)
+                  if (e.node == active->index)
+                     mine.push_back(e.param);
+               if (!mine.empty())
                {
-                  const ImVec2 p = ed::GetNodePosition(selNodes[i]);
-                  ed::SetNodePosition(selNodes[i], ImVec2(p.x + dx * step, p.y + dy * step));
+                  const int n = static_cast<int>(mine.size());
+                  int pos = -1;
+                  for (int i = 0; i < n; ++i)
+                     if (gKbFocusNode == active->index && mine[i] == gKbFocusParam) pos = i;
+                  const int next = (pos < 0) ? (io.KeyShift ? n - 1 : 0) : ((pos + (io.KeyShift ? n - 1 : 1)) % n);
+                  gKbFocusNode = active->index;
+                  gKbFocusParam = mine[next];
                }
             }
+            else if (ImGui::IsKeyPressed(ImGuiKey_Escape, false) && gKbFocusNode >= 0)
+            {
+               gKbFocusNode = -1;
+               gKbFocusParam = -1;
+            }
+
+            float dx = 0.0f, dy = 0.0f;
+            if (active != nullptr && dirKey(dx, dy))
+            {
+               if (io.KeyShift)
+               {
+                  // ---- Shift+arrow: neighbour node in that direction ----
+                  const ImVec2 ap = ed::GetNodePosition(active->NodeId());
+                  const ImVec2 as = ed::GetNodeSize(active->NodeId());
+                  const ImVec2 from(ap.x + as.x * 0.5f, ap.y + as.y * 0.5f);
+                  GraphNode* best = nullptr;
+                  float bestScore = 1e30f;
+                  for (GraphNode& gn : gNodes)
+                  {
+                     if (&gn == active) continue;
+                     const ImVec2 p = ed::GetNodePosition(gn.NodeId());
+                     const ImVec2 sz = ed::GetNodeSize(gn.NodeId());
+                     const float cx = p.x + sz.x * 0.5f - from.x, cy = p.y + sz.y * 0.5f - from.y;
+                     const float along = cx * dx + cy * dy;
+                     const float across = std::fabs(cx * dy - cy * dx);
+                     if (along <= 0.0f || across > along * 2.0f) continue; // outside a ~63 degree cone
+                     const float score = along + across * 2.0f;
+                     if (score < bestScore) { bestScore = score; best = &gn; }
+                  }
+                  if (best != nullptr)
+                  {
+                     ed::ClearSelection();
+                     ed::SelectNode(best->NodeId(), false);
+                     const ImVec2 bp = ed::CanvasToScreen(ed::GetNodePosition(best->NodeId()));
+                     const bool onScreen = bp.x >= gGraphScreenTL.x && bp.y >= gGraphScreenTL.y &&
+                                           bp.x <= gGraphScreenTL.x + gGraphScreenSize.x &&
+                                           bp.y <= gGraphScreenTL.y + gGraphScreenSize.y;
+                     if (!onScreen)
+                        ed::NavigateToSelection(false, 0.2f);
+                  }
+               }
+               else if (gKbFocusNode >= 0)
+               {
+                  // ---- arrows on a focused param: nudge its value ----
+                  burstUndo();
+                  gKbNudge = ((dx > 0.0f || dy < 0.0f) ? 1 : -1) * (io.KeyShift ? 1 : 1);
+               }
+               else
+               {
+                  // ---- arrows: move the node one grid step ----
+                  burstUndo();
+                  const float kStep = gGridSnap > 0.0f ? gGridSnap : 40.0f;
+                  const int selCount = ed::GetSelectedObjectCount();
+                  std::vector<ed::NodeId> selNodes(selCount);
+                  const int nSel = ed::GetSelectedNodes(selNodes.data(), selCount);
+                  auto snapStep = [&](float v, float dir) {
+                     return dir > 0.0f ? (std::floor(v / kStep + 0.001f) + 1.0f) * kStep
+                                       : (std::ceil(v / kStep - 0.001f) - 1.0f) * kStep;
+                  };
+                  for (int i = 0; i < nSel; ++i)
+                  {
+                     const ImVec2 p = ed::GetNodePosition(selNodes[i]);
+                     ed::SetNodePosition(selNodes[i], ImVec2(dx != 0.0f ? snapStep(p.x, dx) : p.x,
+                                                             dy != 0.0f ? snapStep(p.y, dy) : p.y));
+                  }
+               }
+            }
+            // Arrow keys on a focused param with Alt held: coarse nudge.
          }
-         // A canvas click puts the mouse back in charge.
-         if (gKbCursorNode >= 0 && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsAnyItemActive())
-            gKbCursorNode = -1;
+         else if (kbFree && io.KeyAlt && gKbFocusNode >= 0 && !io.KeyShift)
+         {
+            float dx = 0.0f, dy = 0.0f;
+            if (dirKey(dx, dy))
+            {
+               burstUndo();
+               gKbNudge = ((dx > 0.0f || dy < 0.0f) ? 10 : -10);
+            }
+         }
+
+         // ---- Shift+Enter zooms into the node, Enter zooms back out ----
+         if (kbFree && !io.KeyAlt)
+         {
+            const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false);
+            if (enter && gKbZoomed)
+            {
+               gKbViewRestore = true;
+               gKbZoomed = false;
+            }
+            else if (enter && io.KeyShift && active != nullptr)
+            {
+               gKbSavedScroll = ed::GetViewScroll();
+               gKbSavedZoom = ed::GetViewZoom();
+               ed::NavigateToSelection(true, 0.0f);
+               gKbZoomed = true;
+            }
+         }
+
+         // ---- single-key node commands ----
+         const bool plain = kbFree && !io.KeyAlt && !io.KeyShift && !gComputerKeyboardHot;
+         if (plain && active != nullptr && ImGui::IsKeyPressed(ImGuiKey_H, false))
+         {
+            gHelpPopupNodeIndex = active->index;
+            gOpenNodeHelpPopup = true;
+         }
+         if (plain && ImGui::IsKeyPressed(ImGuiKey_F, false))
+            gRequestFitView = true;
+         if (kbFree && !io.KeyAlt && io.KeyShift && !gComputerKeyboardHot && ImGui::IsKeyPressed(ImGuiKey_U, false))
+            gRequestUngroup = true;
+
+         // ---- W A S D pan the canvas while held ----
+         if (plain)
+         {
+            float px = (ImGui::IsKeyDown(ImGuiKey_D) ? 1.0f : 0.0f) - (ImGui::IsKeyDown(ImGuiKey_A) ? 1.0f : 0.0f);
+            float py = (ImGui::IsKeyDown(ImGuiKey_S) ? 1.0f : 0.0f) - (ImGui::IsKeyDown(ImGuiKey_W) ? 1.0f : 0.0f);
+            if (px != 0.0f || py != 0.0f)
+            {
+               const float perFrame = 900.0f * io.DeltaTime / std::max(0.05f, ed::GetCurrentZoom());
+               gKbPan = ImVec2(gKbPan.x + px * perFrame, gKbPan.y + py * perFrame);
+               gKbZoomed = false; // the saved view no longer matches what is on screen
+            }
+         }
+
+         // A canvas click puts the mouse back in charge of param focus.
+         if (gKbFocusNode >= 0 && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsAnyItemActive())
+         {
+            gKbFocusNode = -1;
+            gKbFocusParam = -1;
+         }
+         gKbParams.clear();
+         gComputerKeyboardHot = false;
       }
 
       // "/" drops a comment under the pointer and puts the caret straight into
@@ -101603,15 +101801,6 @@ int main(int argc, char** argv)
          // clearly visible dark line in light mode. Suppressed the same way the
          // menu-bar/canvas seam was: make the two colors it reads transparent
          // for just this call.
-         if (GraphNode* kc = (gKbCursorNode >= 0) ? FindNodeByIndex(gKbCursorNode) : nullptr)
-         {
-            const ImVec2 kp = ed::GetNodePosition(kc->NodeId());
-            const ImVec2 ks = ed::GetNodeSize(kc->NodeId());
-            const ImU32 ringCol = ImGui::GetColorU32(ImGuiCol_NavHighlight);
-            ed::GetNodeBackgroundDrawList(kc->NodeId())->AddRect(
-               ImVec2(kp.x - 5.0f, kp.y - 5.0f), ImVec2(kp.x + ks.x + 5.0f, kp.y + ks.y + 5.0f),
-               ringCol, 8.0f, 0, 2.5f);
-         }
          ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
          ImGui::PushStyleColor(ImGuiCol_BorderShadow, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
          ed::End();
