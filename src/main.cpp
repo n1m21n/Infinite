@@ -71319,6 +71319,7 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
    static int sNodeStartFrame = 0, sNodeEndFrame = 0;
    static Phase sPhase = Phase::Warm;
    static int sTicks = 0;
+   static int sPass = 0;                    // --frame --repeat: which pass is running (0-based)
    static double sWall = -1.0;
    static Headless::Status sStatus;
    static OutputNode* sOut = nullptr;
@@ -72125,6 +72126,22 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
       if (job.pngLevel >= 0)
          stbi_write_png_compression_level = job.pngLevel;
 
+      // --repeat N: every pass writes into its own pass<k>/ under the requested directory.
+      if (job.repeat > 1)
+      {
+         static std::string sBaseOut;
+         if (sPass == 0)
+         {
+            sBaseOut = job.out;
+            std::string e = std::filesystem::path(sBaseOut).extension().string();
+            for (char& c : e)
+               c = (char)tolower((unsigned char)c);
+            if (e == ".png")
+               return fail("E_USAGE", "--repeat needs an output directory, not a .png file");
+         }
+         gHeadlessJob.out = sBaseOut + (sBaseOut.back() == '/' ? "" : "/") + "pass" + std::to_string(sPass + 1) + "/";
+      }
+
       // --frame: a single .png, or a directory for one or several times.
       std::string ext = std::filesystem::path(job.out).extension().string();
       for (char& c : ext)
@@ -72381,6 +72398,18 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
             return;
       }
       Transport::Instance().SetOfflineMode(false);
+      if (job.mode == Headless::Mode::Frame && sPass + 1 < job.repeat)
+      {
+         // Another pass: reload the patch in this same process, so static state the first
+         // load or render left behind is still alive when the second one runs.
+         sPass++;
+         sTicks = 0;
+         sNextTime = 0;
+         sNextFrame = 0;
+         sPhase = Phase::Warm;
+         LoadPatchFrom(job.patch);
+         return;
+      }
       if (sPngWriter != nullptr)
       {
          const std::vector<std::string> failed = sPngWriter->Finish();
@@ -72404,6 +72433,8 @@ static void HeadlessTick(int& frameId, GLFWwindow* window)
             sStatus.files.push_back(metaPath);
          }
       }
+      if (job.repeat > 1)
+         sStatus.extraJson.push_back("\"passes\":" + std::to_string(job.repeat));
       sStatus.extraJson.push_back("\"frame_stats\":[" + sFrameStats + "]");
       if (!job.contactSheet.empty())
       {

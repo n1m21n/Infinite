@@ -104,6 +104,9 @@ def main():
     ap.add_argument("--timeout", type=float, default=300.0)
     ap.add_argument("--bisect", action="store_true",
                     help="when a frame differs, also name the first node (patch order) whose own image differs")
+    ap.add_argument("--in-process", action="store_true",
+                    help="also render the patch twice inside ONE process (--frame --repeat 2, patch reloaded between "
+                         "passes) and compare, to catch static state that two fresh processes hide")
     ap.add_argument("--json", action="store_true", help="print the result as one JSON object")
     args = ap.parse_args()
 
@@ -132,6 +135,25 @@ def main():
                     t = args.times.split(",")[result["frames_compared"] - 1]
                     result["first_differing_node"] = first_differing_node(args.binary, args.patch, t, tmp, args.timeout)
 
+        if args.in_process:
+            d = os.path.join(tmp, "inproc")
+            code, status = run(args.binary, ["--frame", args.patch, args.times, d, "--repeat", "2", "--lenient"], args.timeout)
+            if code != 0:
+                print(f"error: --frame --repeat failed (exit {code}): {json.dumps(status.get('errors', status))}", file=sys.stderr)
+                return 2
+            p1 = sorted(f for f in status.get("files", []) if "/pass1/" in f)
+            p2 = sorted(f for f in status.get("files", []) if "/pass2/" in f)
+            result["in_process"] = "identical"
+            if len(p1) != len(p2) or not p1:
+                result["in_process"] = "failed"
+                result["deterministic"] = False
+            for i, (fa, fb) in enumerate(zip(p1, p2)):
+                if sha(fa) != sha(fb):
+                    result["in_process"] = "differs"
+                    result["in_process_first_differing_frame"] = os.path.basename(fa)
+                    result["deterministic"] = False
+                    break
+
         wavs = []
         for tag in ("a", "b"):
             wav = os.path.join(tmp, tag + ".wav")
@@ -154,6 +176,10 @@ def main():
         verdict = "deterministic" if result["deterministic"] and not result.get("note") else (
             "nondeterministic_by_design" if by_design else "NOT deterministic")
         print(f"{args.patch}: {verdict} ({result['frames_compared']} frames, audio {result['audio']})")
+        if "in_process" in result:
+            print(f"  in-process twice: {result['in_process']}"
+                  + (f" (first differing frame {result['in_process_first_differing_frame']})"
+                     if result.get("in_process_first_differing_frame") else ""))
         if result["first_differing_frame"]:
             print(f"  first differing frame: {result['first_differing_frame']}")
         if result["first_differing_node"] is not None:

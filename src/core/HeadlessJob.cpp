@@ -355,6 +355,18 @@ namespace Headless
                return true;
             job.contactSheet = v;
          }
+         else if (a == "--repeat" && job.mode == Mode::Frame)
+         {
+            const char* v = next("--repeat");
+            if (v == nullptr)
+               return true;
+            job.repeat = std::atoi(v);
+            if (job.repeat < 1 || job.repeat > 8)
+            {
+               usageError = "--repeat takes 1..8";
+               return true;
+            }
+         }
          else if (a == "--node" && (job.mode == Mode::Frame || job.mode == Mode::Frames || job.mode == Mode::Render))
          {
             const char* v = next("--node");
@@ -460,7 +472,7 @@ namespace Headless
                               ? "usage: Infinite --frames-dir <patch.inf> <out_dir> --duration S [--start S] [--fps N] [--alpha] [--node <index[:output]>] [options]"
                          : job.mode == Mode::AudioSummary
                               ? "usage: Infinite --audio-summary <patch.inf> <out.json> [--start S] [--duration S] [--wav <out.wav>] [--notes <events.json> --note-map <map.json>] [--stems <id>,<id> --stems-dir <dir>] [options]"
-                              : "usage: Infinite --frame <patch.inf> <T[,T...]> <out.png|out_dir/> [--contact-sheet <sheet.png>] [options]";
+                              : "usage: Infinite --frame <patch.inf> <T[,T...]> <out.png|out_dir/> [--contact-sheet <sheet.png>] [--repeat N] [options]";
          return true;
       }
 

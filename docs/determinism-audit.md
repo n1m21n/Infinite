@@ -29,8 +29,14 @@ Nothing here needs a by-design exception, so `tools/determinism-by-design.txt` i
   Wired into the macOS and Linux (Xvfb, clang) jobs in `.github/workflows/build.yml`.
   Update goldens deliberately: `python3 tools/render-check.py --update`.
 
+## In-process twice (R516)
+
+`Infinite --frame <patch> <times> <out_dir/> --repeat N` renders the same times N times in one
+process, reloading the patch between passes, into `out_dir/pass1 .. passN`.
+`tools/determinism-check.py <patch> --in-process` runs it with N=2 and compares the passes byte for
+byte, which catches static state that two fresh processes hide. All five `tests/render/*.inf`
+fixtures are identical in-process on macOS. Video only; audio is still compared across processes.
+
 ## Not done
 
-- "In-process twice": rendering the same patch twice inside one process (catches leaked static
-  state that two fresh processes hide). Needs a headless mode in `HeadlessJob`; tracked as a new quest.
 - Windows is not in the golden job yet (no Windows machine to produce a first run).
