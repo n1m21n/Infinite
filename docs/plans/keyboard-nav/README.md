@@ -11,12 +11,12 @@ Click a node to make it the **active node** (exactly one node selected). Then:
 |---|---|
 | Tab / Shift+Tab | Walk **that node's params only**, in a loop. Stops when another node is clicked. |
 | Left / Right (param focused) | Nudge the value. Alt = x10. Digits start typed entry. |
-| Up / Down / Left / Right (no param focused) | Move the selected nodes one grid step (one undo entry per burst) |
+| Up / Down / Left / Right (no param focused) | Move the selected nodes one grid step (one undo entry per burst). A selected group carries all its members. |
 | Shift + arrow | Select the neighbouring node in that direction |
 | Shift+Enter / Enter | Zoom into the active node / back out to the saved view |
 | H | Node help |
 | B | Bypass (pre-existing) |
-| Shift+U | Ungroup the selected group |
+| Cmd/Ctrl+U (also Cmd/Ctrl+Shift+G) | Ungroup the selected group |
 | W A S D | Pan the canvas |
 | F | Centre and frame everything |
 | Esc | Leave param focus |
@@ -28,7 +28,8 @@ Mechanics worth knowing:
 - Params register in draw order through `KbParamHook` at the end of `ModSlider`/`ModKnob`, keyed `(nodeIndex, paramIndex)`.
 - View changes (zoom, pan) are queued and applied just before `ed::Begin`; doing it mid-frame crashed (SIGBUS).
 - The rows live in `kShortcuts[]` (in-app shortcuts window); `shortcuts-sweep/check.py` keeps them honest.
-- Not covered yet: checkboxes and dropdowns are not Tab-focusable; Shift+U, H and F have no test.
+- The focus ring hugs the control: the slider's own box, the knob's circle, the mixer fader's track (never the pin dot or caption).
+- Not covered yet: checkboxes and dropdowns are not Tab-focusable (R587); H and F have no test.
 
 ---
 

@@ -2930,7 +2930,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    // and lets digits start typed entry as if it were hovered. Returns true
    // when the value changed so the caller reports it like a mouse edit.
    bool KbParamHook(int nodeIndex, int paramIndex, float* value, float minV, float maxV, float step,
-                    const char* fmt, ImVec2 start)
+                    const char* fmt, ImVec2 rmin, ImVec2 rmax, bool circle)
    {
       bool seen = false;
       for (const KbParamEntry& e : gKbParams)
@@ -2940,11 +2940,15 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       if (nodeIndex != gKbFocusNode || paramIndex != gKbFocusParam)
          return false;
 
-      const ImVec2 itemMax = ImGui::GetItemRectMax();
-      const ImVec2 cur = ImGui::GetCursorScreenPos();
-      const ImVec2 mx(std::max(itemMax.x, start.x + 4.0f), std::max(itemMax.y, cur.y - ImGui::GetStyle().ItemSpacing.y));
-      ImGui::GetWindowDrawList()->AddRect(ImVec2(start.x - 3.0f, start.y - 3.0f), ImVec2(mx.x + 3.0f, mx.y + 3.0f),
-                                          ImGui::GetColorU32(ImGuiCol_NavHighlight), 4.0f, 0, 2.0f);
+      // The ring hugs the control itself: the slider's own box, the knob's
+      // circle, the fader's track. Never the pin dot or the caption.
+      ImDrawList* kdl = ImGui::GetWindowDrawList();
+      const ImU32 ringCol = ImGui::GetColorU32(ImGuiCol_NavHighlight);
+      if (circle)
+         kdl->AddCircle(ImVec2((rmin.x + rmax.x) * 0.5f, (rmin.y + rmax.y) * 0.5f), (rmax.x - rmin.x) * 0.5f + 1.0f,
+                        ringCol, 48, 2.0f);
+      else
+         kdl->AddRect(ImVec2(rmin.x - 2.0f, rmin.y - 2.0f), ImVec2(rmax.x + 2.0f, rmax.y + 2.0f), ringCol, 4.0f, 0, 2.0f);
       bool changed = false;
       if (gKbNudge != 0 && !Modulation::Instance().IsModulated(nodeIndex, paramIndex))
       {
@@ -4193,7 +4197,6 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       Modulation::Instance().RegisterParam(ref);
       if (gParamRegisterOnly)
          return false; // registered, deliberately not drawn - see gParamRegisterOnly
-      const ImVec2 kbStart = ImGui::GetCursorScreenPos();
 
       const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kParamBase + paramIndex;
       const bool modulated = Modulation::Instance().IsModulated(nodeIndex, paramIndex);
@@ -4659,7 +4662,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             HandleParamTypeHotkeys(editKey, value);
       }
 
-      changed = KbParamHook(nodeIndex, paramIndex, value, minV, maxV, step, fmt, kbStart) || changed;
+      changed = KbParamHook(nodeIndex, paramIndex, value, minV, maxV, step, fmt, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), false) || changed;
       ImGui::PopID();
       return changed;
    }
@@ -5437,7 +5440,6 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       Modulation::Instance().RegisterParam(ref);
       if (gParamRegisterOnly)
          return false; // registered, deliberately not drawn - see gParamRegisterOnly
-      const ImVec2 kbStart = ImGui::GetCursorScreenPos();
 
       const int pinId = nodeIndex * GraphNode::kStride + GraphNode::kParamBase + paramIndex;
       const bool modulated = Modulation::Instance().IsModulated(nodeIndex, paramIndex);
@@ -5677,7 +5679,14 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          ImGui::SetCursorScreenPos(cursorAfter);
       }
 
-      changed = KbParamHook(nodeIndex, paramIndex, value, minV, maxV, step, fmt, kbStart) || changed;
+      {
+         const bool kbCircle = (style != AudioWidgetStyle::VFader && style != AudioWidgetStyle::VFaderDb);
+         const float kcx = cellOrigin.x + cell * 0.5f;
+         const ImVec2 kmin = kbCircle ? ImVec2(kcx - diameter * 0.5f, cellOrigin.y) : ImVec2(kcx - 7.0f, cellOrigin.y);
+         const ImVec2 kmax = kbCircle ? ImVec2(kcx + diameter * 0.5f, cellOrigin.y + diameter)
+                                      : ImVec2(kcx + 7.0f, cellOrigin.y + diameter);
+         changed = KbParamHook(nodeIndex, paramIndex, value, minV, maxV, step, fmt, kmin, kmax, kbCircle) || changed;
+      }
       ImGui::PopID();
       return changed;
    }
@@ -41842,7 +41851,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Switcher", "Cycles between its connected inputs every N beats or seconds, with an optional crossfade. Can be pinned to one input with 'manual'." },
          { "Fit", "Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Offset X/Y slides the result in output pixels (+ right, + up). Use it to make differently-sized sources composite predictably." },
          { "Comment", "A free-floating note on the canvas - has no image input or output, just text. Double-click to edit." },
-         { "Group", "Created with " MODKEY "+G on a selection, not spawned from the palette. Sizes itself automatically to fit its members - drag a node in to grow the box, drag one out to shrink it. Drag anywhere inside the box to move the whole group; right-click > Ungroup (or " MODKEY "+Shift+G) dissolves it, leaving members in place (or ungroup one member from its own context menu)." },
+         { "Group", "Created with " MODKEY "+G on a selection, not spawned from the palette. Sizes itself automatically to fit its members - drag a node in to grow the box, drag one out to shrink it. Drag anywhere inside the box to move the whole group; right-click > Ungroup (or " MODKEY "+U, " MODKEY "+Shift+G) dissolves it, leaving members in place (or ungroup one member from its own context menu)." },
          { "Null", "A pass-through node: its output is exactly its input, unchanged. Useful as a stable junction point to branch a cable to several destinations, or as a placeholder while rewiring." },
          { "Viewport", "Shows its input at actual pixel size in its own resizable window, separate from the small node preview - useful for judging detail without zooming the whole canvas." },
 
@@ -42305,7 +42314,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Edit & Canvas", "Node Help", "H", "Show the help for the selected node" },
          { "Edit & Canvas", "Bypass Selection", "B", "Toggle bypass (power off) on the selected nodes. Canvas only - with the timeline focused, B is the blade tool instead" },
          { "Edit & Canvas", "Group Selection", MODKEY "+G", "Wrap selected nodes in a group box" },
-         { "Edit & Canvas", "Ungroup", MODKEY "+Shift+G / Shift+U", "Dissolve the selected group without deleting nodes" },
+         { "Edit & Canvas", "Ungroup", MODKEY "+U / " MODKEY "+Shift+G", "Dissolve the selected group without deleting nodes" },
          { "Edit & Canvas", "Add Node", "Shift+N", "Open quick type-to-filter node picker" },
          { "Edit & Canvas", "Add Note / Comment", "/", "Drop a comment note under mouse pointer" },
 
@@ -77520,7 +77529,7 @@ int main(int argc, char** argv)
             ImGui::Separator();
             if (ImGui::MenuItem("Group selection", MODKEY "+G"))
                gRequestGroup = true;
-            if (ImGui::MenuItem("Ungroup", MODKEY "+Shift+G"))
+            if (ImGui::MenuItem("Ungroup", MODKEY "+U"))
                gRequestUngroup = true;
             ImGui::Separator();
             if (ImGui::MenuItem("Add Node...", "Shift+N"))
@@ -96884,6 +96893,35 @@ int main(int argc, char** argv)
             const float after = ed::GetViewScroll().y;
             printf("kbtest W pan: scroll.y %.1f -> %.1f\n", scrollBefore, after);
             check(after < scrollBefore, "W pans the view up");
+         }
+         // A selected group: arrows carry its members, Cmd/Ctrl+U dissolves it.
+         static int grpIdx = -1, memberIdx = -1;
+         static ImVec2 memberBefore(0, 0);
+         if (frameId == f0 + 41)
+         {
+            memberIdx = gNodes[2].index;
+            memberBefore = ed::GetNodePosition(gNodes[2].NodeId());
+            GraphNode* gn = SpawnNode("Group", "Compositing", memberBefore.x - 24.0f, memberBefore.y - 60.0f);
+            grpIdx = gn->index;
+            gGroupMembers[static_cast<GroupNode*>(gn->node.get())] = { memberIdx };
+         }
+         if (frameId == f0 + 44)
+         {
+            ed::ClearSelection();
+            ed::SelectNode(FindNodeByIndex(grpIdx)->NodeId(), false);
+         }
+         tap(ImGuiKey_RightArrow, f0 + 47);
+         if (frameId == f0 + 51)
+         {
+            GraphNode* m = FindNodeByIndex(memberIdx);
+            const ImVec2 now = m ? ed::GetNodePosition(m->NodeId()) : ImVec2(0, 0);
+            check(m != nullptr && now.x > memberBefore.x && now.y == memberBefore.y, "arrow on a selected group moves its members");
+         }
+         if (frameId == f0 + 53) { tio.AddKeyEvent(ImGuiMod_Ctrl, true); tio.AddKeyEvent(ImGuiKey_U, true); }
+         if (frameId == f0 + 54) { tio.AddKeyEvent(ImGuiKey_U, false); tio.AddKeyEvent(ImGuiMod_Ctrl, false); }
+         if (frameId == f0 + 59)
+         {
+            check(FindNodeByIndex(grpIdx) == nullptr && FindNodeByIndex(memberIdx) != nullptr, "Cmd/Ctrl+U ungroups, members stay");
             printf("kbtest result: %s\n", ok ? "KBCURSOR OK" : "KBCURSOR FAIL");
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
@@ -98766,7 +98804,7 @@ int main(int argc, char** argv)
       //   Arrows            move the selected nodes one grid step
       //   Shift+Arrows      select the neighbouring node in that direction
       //   Shift+Enter / Enter  zoom into the node / back out
-      //   H help, B bypass, Shift+U ungroup, F frame everything, W A S D pan
+      //   H help, B bypass, Cmd/Ctrl+U ungroup, F frame everything, W A S D pan
       // All gated like the other plain-key canvas shortcuts: never while a text
       // field, popup, the timeline or a hovered audio keyboard owns the keys.
       {
@@ -98890,11 +98928,35 @@ int main(int argc, char** argv)
                      return dir > 0.0f ? (std::floor(v / kStep + 0.001f) + 1.0f) * kStep
                                        : (std::ceil(v / kStep - 0.001f) - 1.0f) * kStep;
                   };
+                  std::set<int> selIdx;
+                  for (int i = 0; i < nSel; ++i)
+                     selIdx.insert((int)selNodes[i].Get());
                   for (int i = 0; i < nSel; ++i)
                   {
                      const ImVec2 p = ed::GetNodePosition(selNodes[i]);
-                     ed::SetNodePosition(selNodes[i], ImVec2(dx != 0.0f ? snapStep(p.x, dx) : p.x,
-                                                             dy != 0.0f ? snapStep(p.y, dy) : p.y));
+                     const ImVec2 np(dx != 0.0f ? snapStep(p.x, dx) : p.x, dy != 0.0f ? snapStep(p.y, dy) : p.y);
+                     ed::SetNodePosition(selNodes[i], np);
+                     // A group box refits to its members every frame, so moving
+                     // the box alone would snap straight back: carry the members
+                     // (unless they are selected themselves and move on their own).
+                     for (GraphNode& gn : gNodes)
+                     {
+                        GroupNode* grp = dynamic_cast<GroupNode*>(gn.node.get());
+                        if (grp == nullptr || gn.NodeId() != (int)selNodes[i].Get())
+                           continue;
+                        const auto it = gGroupMembers.find(grp);
+                        if (it == gGroupMembers.end())
+                           break;
+                        for (int memberIdx : it->second)
+                        {
+                           GraphNode* member = FindNodeByIndex(memberIdx);
+                           if (member == nullptr || selIdx.count((int)member->NodeId()) != 0)
+                              continue;
+                           const ImVec2 mp = ed::GetNodePosition(member->NodeId());
+                           ed::SetNodePosition(member->NodeId(), ImVec2(mp.x + (np.x - p.x), mp.y + (np.y - p.y)));
+                        }
+                        break;
+                     }
                   }
                }
             }
@@ -98937,7 +98999,9 @@ int main(int argc, char** argv)
          }
          if (plain && ImGui::IsKeyPressed(ImGuiKey_F, false))
             gRequestFitView = true;
-         if (kbFree && !io.KeyAlt && io.KeyShift && !gComputerKeyboardHot && ImGui::IsKeyPressed(ImGuiKey_U, false))
+         // Cmd/Ctrl+U ungroups (kbFree excludes Cmd/Ctrl, so it is gated on its own).
+         if (!typing && !gArrangeFocused && cmdOrCtrl && !io.KeyShift && !io.KeyAlt && !gComputerKeyboardHot &&
+             gKbFocusNode < 0 && ImGui::IsKeyPressed(ImGuiKey_U, false))
             gRequestUngroup = true;
 
          // ---- W A S D pan the canvas while held ----
