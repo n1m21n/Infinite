@@ -2332,3 +2332,6 @@
 {"ts": "2026-10-07T04:01:31+00:00", "event": "add", "id": "R615", "track": "nodes", "kind": "feature", "horizon": "later", "title": "Key-Snap: key from a note/modulator pin, title-bar global-scale glyph", "why": "R605 first slice takes scale/root from params or the transport (globalKey). Owner's brief also wanted the key to follow a pin so it can change live, and P8 wants the global-scale glyph, which needs a bool flag on the node rather than a float param.", "after": [], "user": false, "origin": "explore", "effort": "M"}
 {"ts": "2026-10-07T04:25:26+00:00", "event": "done", "id": "R605", "why": "Key-Snap shipped: polyphonic peak-locked vocoder scale snap, scale/root/global key, glide, visualizer"}
 {"ts": "2026-10-07T04:25:26+00:00", "event": "edit", "id": "R605", "commits": ["278dbe51", "fc8de2ec"]}
+{"ts": "2026-10-07T04:36:16+00:00", "event": "edit", "id": "R605", "opened": "2026-10-07T09:30:56+05:30", "commits": ["278dbe5", "fc8de2e"], "closed": "2026-10-07T09:54:18+05:30", "release": ""}
+{"ts": "2026-10-07T04:55:32+00:00", "event": "done", "id": "R604", "why": "Spectrum Slide shipped: two-input spectral morph by 1D optimal transport, tested by owner"}
+{"ts": "2026-10-07T04:55:32+00:00", "event": "edit", "id": "R604", "commits": ["23c33c53"]}
