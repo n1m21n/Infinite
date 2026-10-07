@@ -143,39 +143,39 @@ namespace app
 
       if (ImGui::BeginPopupContextItem("##curve_ctx"))
       {
-         ImGui::TextDisabled("Modulation Curve");
+         ImGui::TextDisabled("%s", T("Modulation Curve"));
          ImGui::Separator();
-         if (ImGui::MenuItem("Linear (Reset)", nullptr, std::abs(*curve) < 0.001f))
+         if (ImGui::MenuItem(L("Linear (Reset)"), nullptr, std::abs(*curve) < 0.001f))
          {
             PushUndoCheckpoint();
             *curve = 0.0f;
             changed = true;
          }
-         if (ImGui::MenuItem("Ease In (+0.50)", nullptr, std::abs(*curve - 0.5f) < 0.05f))
+         if (ImGui::MenuItem(L("Ease In (+0.50)"), nullptr, std::abs(*curve - 0.5f) < 0.05f))
          {
             PushUndoCheckpoint();
             *curve = 0.5f;
             changed = true;
          }
-         if (ImGui::MenuItem("Ease Out (-0.50)", nullptr, std::abs(*curve - (-0.5f)) < 0.05f))
+         if (ImGui::MenuItem(L("Ease Out (-0.50)"), nullptr, std::abs(*curve - (-0.5f)) < 0.05f))
          {
             PushUndoCheckpoint();
             *curve = -0.5f;
             changed = true;
          }
-         if (ImGui::MenuItem("Steep Exp (+0.85)", nullptr, std::abs(*curve - 0.85f) < 0.05f))
+         if (ImGui::MenuItem(L("Steep Exp (+0.85)"), nullptr, std::abs(*curve - 0.85f) < 0.05f))
          {
             PushUndoCheckpoint();
             *curve = 0.85f;
             changed = true;
          }
-         if (ImGui::MenuItem("Steep Log (-0.85)", nullptr, std::abs(*curve - (-0.85f)) < 0.05f))
+         if (ImGui::MenuItem(L("Steep Log (-0.85)"), nullptr, std::abs(*curve - (-0.85f)) < 0.05f))
          {
             PushUndoCheckpoint();
             *curve = -0.85f;
             changed = true;
          }
-         if (ImGui::MenuItem("Invert Curve", nullptr, false, std::abs(*curve) > 0.001f))
+         if (ImGui::MenuItem(L("Invert Curve"), nullptr, false, std::abs(*curve) > 0.001f))
          {
             PushUndoCheckpoint();
             *curve = -*curve;
@@ -302,8 +302,8 @@ namespace app
       GestureRecorder& rec = GestureRecorder::Instance();
       if (mod.Links().empty() && mod.Expressions().empty() && rec.Playbacks().empty())
       {
-         ImGui::TextDisabled("No active modulations.");
-         ImGui::TextDisabled("Patch a modulator, type a formula, or record a gesture to see it here.");
+         ImGui::TextDisabled("%s", T("No active modulations."));
+         ImGui::TextDisabled("%s", T("Patch a modulator, type a formula, or record a gesture to see it here."));
       }
       else
       {
@@ -439,7 +439,7 @@ namespace app
                ImGui::GetWindowDrawList()->AddCircleFilled(
                   ImVec2(dotCursor.x + dotH * 0.5f, dotCursor.y + dotH * 0.5f), dotH * 0.35f, dotColour);
                if (inert && ImGui::IsItemHovered())
-                  ImGui::SetTooltip("A predictor drives continuous parameters only - this binding is inactive.");
+                  ImGui::SetTooltip("%s", T("A predictor drives continuous parameters only - this binding is inactive."));
 
                const ImVec4 textColour = (src.enabled && !inert) ? ImGui::GetStyle().Colors[ImGuiCol_Text]
                                                      : ImGui::GetStyle().Colors[ImGuiCol_TextDisabled];
@@ -460,7 +460,7 @@ namespace app
                if (known != nullptr)
                   ImGui::TextUnformatted(known->name.c_str());
                else
-                  ImGui::Text("param %d", dstParam);
+                  ImGui::Text(T("param %d"), dstParam);
 
                // Value - this frame's live value only; a collapsed node's
                // destination hasn't registered a float* to read this frame.
@@ -537,7 +537,7 @@ namespace app
                // doesn't checkpoint either (a range edit, not a structural
                // change like Unbind or the enable toggle above).
                ImGui::TableNextColumn();
-               if (ImGui::SmallButton("Inv"))
+               if (ImGui::SmallButton(L("Inv")))
                   mod.SetRange(dstIndex, dstParam, src.hi, src.lo);
 
                // Curve
@@ -833,7 +833,7 @@ namespace app
                }
 
                ImGui::TableNextColumn();
-               if (ImGui::SmallButton("Full"))
+               if (ImGui::SmallButton(L("Full")))
                   rec.ClearPlaybackRange(dstIndex, dstParam);
 
                // Curve
@@ -954,7 +954,7 @@ namespace app
             if (ImGui::MenuItem(kDockLabels[i], nullptr, i == gModMatrixDock))
                gModMatrixDock = i;
          ImGui::Separator();
-         if (ImGui::MenuItem("Close panel"))
+         if (ImGui::MenuItem(L("Close panel")))
             gModMatrixOpen = false;
          ImGui::EndPopup();
       }

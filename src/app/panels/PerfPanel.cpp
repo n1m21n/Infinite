@@ -481,31 +481,31 @@ namespace app
          ImGui::SetNextWindowSizeConstraints(ImVec2(180.0f, 0.0f), ImVec2(240.0f, 480.0f));
          if (ImGui::BeginPopupContextItem("##elemcontext", ImGuiPopupFlags_MouseButtonRight))
          {
-            if (ImGui::MenuItem("Rename"))
+            if (ImGui::MenuItem(L("Rename")))
             {
                gPerfRenamingElementIdx = (int)elemIdx;
                snprintf(gPerfRenameElementBuffer, sizeof(gPerfRenameElementBuffer), "%s", displayLabel.c_str());
             }
 
-            if (ImGui::BeginMenu("Type"))
+            if (ImGui::BeginMenu(L("Type")))
             {
-               if (ImGui::MenuItem("Knob (1x1)", nullptr, elem.kind == 0)) { PushUndoCheckpoint(); elem.kind = 0; }
-               if (ImGui::MenuItem("Vertical Fader (1x2)", nullptr, elem.kind == 1)) { PushUndoCheckpoint(); elem.kind = 1; }
-               if (ImGui::MenuItem("Horizontal Slider (2x1)", nullptr, elem.kind == 2)) { PushUndoCheckpoint(); elem.kind = 2; }
-               if (ImGui::MenuItem("Toggle (1x1)", nullptr, elem.kind == 3)) { PushUndoCheckpoint(); elem.kind = 3; }
-               if (ImGui::MenuItem("XY Pad (2x2)", nullptr, elem.kind == 4)) { PushUndoCheckpoint(); elem.kind = 4; }
-               if (ImGui::MenuItem("Trigger / Bang (1x1)", nullptr, elem.kind == 5)) { PushUndoCheckpoint(); elem.kind = 5; }
-               if (ImGui::MenuItem("Number Box (1x1)", nullptr, elem.kind == 6)) { PushUndoCheckpoint(); elem.kind = 6; }
-               if (ImGui::MenuItem("Radio Selector (2x1)", nullptr, elem.kind == 7)) { PushUndoCheckpoint(); elem.kind = 7; }
-               if (ImGui::MenuItem("Bipolar Knob (1x1)", nullptr, elem.kind == 8)) { PushUndoCheckpoint(); elem.kind = 8; }
-               if (ImGui::MenuItem("Step Gate (3x1)", nullptr, elem.kind == 9)) { PushUndoCheckpoint(); elem.kind = 9; }
+               if (ImGui::MenuItem(L("Knob (1x1)"), nullptr, elem.kind == 0)) { PushUndoCheckpoint(); elem.kind = 0; }
+               if (ImGui::MenuItem(L("Vertical Fader (1x2)"), nullptr, elem.kind == 1)) { PushUndoCheckpoint(); elem.kind = 1; }
+               if (ImGui::MenuItem(L("Horizontal Slider (2x1)"), nullptr, elem.kind == 2)) { PushUndoCheckpoint(); elem.kind = 2; }
+               if (ImGui::MenuItem(L("Toggle (1x1)"), nullptr, elem.kind == 3)) { PushUndoCheckpoint(); elem.kind = 3; }
+               if (ImGui::MenuItem(L("XY Pad (2x2)"), nullptr, elem.kind == 4)) { PushUndoCheckpoint(); elem.kind = 4; }
+               if (ImGui::MenuItem(L("Trigger / Bang (1x1)"), nullptr, elem.kind == 5)) { PushUndoCheckpoint(); elem.kind = 5; }
+               if (ImGui::MenuItem(L("Number Box (1x1)"), nullptr, elem.kind == 6)) { PushUndoCheckpoint(); elem.kind = 6; }
+               if (ImGui::MenuItem(L("Radio Selector (2x1)"), nullptr, elem.kind == 7)) { PushUndoCheckpoint(); elem.kind = 7; }
+               if (ImGui::MenuItem(L("Bipolar Knob (1x1)"), nullptr, elem.kind == 8)) { PushUndoCheckpoint(); elem.kind = 8; }
+               if (ImGui::MenuItem(L("Step Gate (3x1)"), nullptr, elem.kind == 9)) { PushUndoCheckpoint(); elem.kind = 9; }
                ImGui::EndMenu();
             }
 
             ImGui::Separator();
             if (elem.kind == 4) // XY Pad
             {
-               if (ImGui::MenuItem("Assign X Axis..."))
+               if (ImGui::MenuItem(L("Assign X Axis...")))
                {
                   gPerfAssigningElemIdx = (int)elemIdx;
                   gPerfAssigningAxis = 0;
@@ -519,7 +519,7 @@ namespace app
                   ImGui::TextDisabled("%s", xStr.c_str());
                }
 
-               if (ImGui::MenuItem("Assign Y Axis..."))
+               if (ImGui::MenuItem(L("Assign Y Axis...")))
                {
                   gPerfAssigningElemIdx = (int)elemIdx;
                   gPerfAssigningAxis = 1;
@@ -534,7 +534,7 @@ namespace app
                   ImGui::TextDisabled("%s", yStr.c_str());
                }
 
-               if (elem.dstIndex >= 0 && ImGui::MenuItem("Clear Destinations"))
+               if (elem.dstIndex >= 0 && ImGui::MenuItem(L("Clear Destinations")))
                {
                   PushUndoCheckpoint();
                   elem.dstIndex = -1;
@@ -550,7 +550,7 @@ namespace app
                const bool isLearningY = (gPerfMidiLearnIdx == (int)elemIdx && gPerfMidiLearnAxis == 1);
                if (isLearningX)
                {
-                  if (ImGui::MenuItem("Listening X... (Move MIDI CC)"))
+                  if (ImGui::MenuItem(L("Listening X... (Move MIDI CC)")))
                      gPerfMidiLearnIdx = -1;
                }
                else
@@ -577,7 +577,7 @@ namespace app
 
                if (isLearningY)
                {
-                  if (ImGui::MenuItem("Listening Y... (Move MIDI CC)"))
+                  if (ImGui::MenuItem(L("Listening Y... (Move MIDI CC)")))
                      gPerfMidiLearnIdx = -1;
                }
                else
@@ -602,7 +602,7 @@ namespace app
                   ImGui::TextDisabled("%s", bindStr.c_str());
                }
 
-               if ((elem.midiDevice != 0 || elem.midiDeviceY != 0) && ImGui::MenuItem("Clear MIDI Bindings"))
+               if ((elem.midiDevice != 0 || elem.midiDeviceY != 0) && ImGui::MenuItem(L("Clear MIDI Bindings")))
                {
                   PushUndoCheckpoint();
                   elem.midiDevice = 0; elem.midiChannel = -1; elem.midiController = -1; elem.midiIsNote = false;
@@ -612,7 +612,7 @@ namespace app
             }
             else // Regular single-axis control
             {
-               if (ImGui::MenuItem("Assign Parameter..."))
+               if (ImGui::MenuItem(L("Assign Parameter...")))
                {
                   gPerfAssigningElemIdx = (int)elemIdx;
                   gPerfAssigningAxis = 0;
@@ -626,7 +626,7 @@ namespace app
                   ImGui::TextDisabled("%s", dStr.c_str());
                }
 
-               if (elem.dstIndex >= 0 && ImGui::MenuItem("Clear Destination"))
+               if (elem.dstIndex >= 0 && ImGui::MenuItem(L("Clear Destination")))
                {
                   PushUndoCheckpoint();
                   elem.dstIndex = -1;
@@ -671,7 +671,7 @@ namespace app
                      std::string bindStr = "MIDI: " + (devName.empty() ? "" : devName + " \xC2\xB7 ") + "Ch " + std::to_string(elem.midiChannel + 1) + " \xC2\xB7 " + Platform::MidiBindingName(elem.midiIsNote, elem.midiController);
                      ImGui::TextDisabled("%s", bindStr.c_str());
 
-                     if (ImGui::MenuItem("Clear MIDI Binding"))
+                     if (ImGui::MenuItem(L("Clear MIDI Binding")))
                      {
                         PushUndoCheckpoint();
                         elem.midiDevice = 0;
@@ -685,7 +685,7 @@ namespace app
             }
 
             ImGui::Separator();
-            if (ImGui::BeginMenu("Color Tint"))
+            if (ImGui::BeginMenu(L("Color Tint")))
             {
                static const struct { const char* name; ImU32 col; } kPaletteColors[10] = {
                   { "Default", IM_COL32(110, 120, 140, 255) },
@@ -1424,7 +1424,7 @@ namespace app
             dl->AddRectFilled(ImVec2(tagTL.x - 3.0f, tagTL.y), tagBR, cardBg, 3.0f);
             dl->AddText(tagTL, isLight ? IM_COL32(190, 110, 30, 255) : IM_COL32(240, 170, 70, 255), tag);
             if (ImGui::IsMouseHoveringRect(ImVec2(tagTL.x - 3.0f, tagTL.y), tagBR))
-               ImGui::SetTooltip("This node is bypassed - the control still stores its value, which applies when the node is back in the chain");
+               ImGui::SetTooltip("%s", T("This node is bypassed - the control still stores its value, which applies when the node is back in the chain"));
          }
       }
 
@@ -2052,14 +2052,14 @@ namespace app
    {
       if (ParamMidiLearnIsActiveFor(nodeIndex, paramIndex))
       {
-         if (ImGui::MenuItem("Listening... (click or Esc to cancel)"))
+         if (ImGui::MenuItem(L("Listening... (click or Esc to cancel)")))
             MidiLearnCancelAll();
          return;
       }
       if (!ParamMidiLearnable(nodeIndex, paramIndex))
       {
          ImGui::BeginDisabled();
-         ImGui::MenuItem("MIDI learn (already driven by something else)");
+         ImGui::MenuItem(L("MIDI learn (already driven by something else)"));
          ImGui::EndDisabled();
          return;
       }
@@ -2091,7 +2091,7 @@ namespace app
             : "MIDI CC Learn for '" + elem.label + "'" + axisStr + ": Move any CC knob, fader, or wheel on your MIDI controller (Esc to cancel)...";
          ImGui::Text("%s", prompt.c_str());
          ImGui::SameLine();
-         if (ImGui::SmallButton("Cancel##cancelmidilearn"))
+         if (ImGui::SmallButton(L("Cancel##cancelmidilearn")))
             gPerfMidiLearnIdx = -1;
          ImGui::PopStyleColor();
       }
@@ -2109,7 +2109,7 @@ namespace app
       {
          ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
          ImGui::PushStyleColor(ImGuiCol_ButtonHovered, AccentEmphasisPressed());
-         if (ImGui::Button("Edit Mode", ImVec2(86, 24)))
+         if (ImGui::Button(L("Edit Mode"), ImVec2(86, 24)))
             gPerfEditMode = false;
          ImGui::PopStyleColor(2);
       }
@@ -2117,7 +2117,7 @@ namespace app
       {
          ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.58f, 0.32f, 1.0f));
          ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.68f, 0.38f, 1.0f));
-         if (ImGui::Button("Perform", ImVec2(86, 24)))
+         if (ImGui::Button(L("Perform"), ImVec2(86, 24)))
             gPerfEditMode = true;
          ImGui::PopStyleColor(2);
       }
@@ -2126,22 +2126,22 @@ namespace app
       if (gPerfEditMode)
       {
          ImGui::SameLine();
-         if (ImGui::Button("+ Add Control", ImVec2(100, 24)))
+         if (ImGui::Button(L("+ Add Control"), ImVec2(100, 24)))
             ImGui::OpenPopup("##perfaddcontrolmenu");
 
          if (ImGui::BeginPopup("##perfaddcontrolmenu"))
          {
-            if (ImGui::MenuItem("Knob (1x1)")) AddPerfElementToCurrentPage(0);
-            if (ImGui::MenuItem("Vertical Fader (1x2)")) AddPerfElementToCurrentPage(1);
-            if (ImGui::MenuItem("Horizontal Slider (2x1)")) AddPerfElementToCurrentPage(2);
-            if (ImGui::MenuItem("Toggle (1x1)")) AddPerfElementToCurrentPage(3);
-            if (ImGui::MenuItem("XY Pad (2x2)")) AddPerfElementToCurrentPage(4);
+            if (ImGui::MenuItem(L("Knob (1x1)"))) AddPerfElementToCurrentPage(0);
+            if (ImGui::MenuItem(L("Vertical Fader (1x2)"))) AddPerfElementToCurrentPage(1);
+            if (ImGui::MenuItem(L("Horizontal Slider (2x1)"))) AddPerfElementToCurrentPage(2);
+            if (ImGui::MenuItem(L("Toggle (1x1)"))) AddPerfElementToCurrentPage(3);
+            if (ImGui::MenuItem(L("XY Pad (2x2)"))) AddPerfElementToCurrentPage(4);
             ImGui::Separator();
-            if (ImGui::MenuItem("Momentary Trigger / Bang (1x1)")) AddPerfElementToCurrentPage(5);
-            if (ImGui::MenuItem("Digital Number Box (1x1)")) AddPerfElementToCurrentPage(6);
-            if (ImGui::MenuItem("Radio Selector (2x1)")) AddPerfElementToCurrentPage(7);
-            if (ImGui::MenuItem("Bipolar Pan Knob (1x1)")) AddPerfElementToCurrentPage(8);
-            if (ImGui::MenuItem("Step Gate Ribbon (3x1)")) AddPerfElementToCurrentPage(9);
+            if (ImGui::MenuItem(L("Momentary Trigger / Bang (1x1)"))) AddPerfElementToCurrentPage(5);
+            if (ImGui::MenuItem(L("Digital Number Box (1x1)"))) AddPerfElementToCurrentPage(6);
+            if (ImGui::MenuItem(L("Radio Selector (2x1)"))) AddPerfElementToCurrentPage(7);
+            if (ImGui::MenuItem(L("Bipolar Pan Knob (1x1)"))) AddPerfElementToCurrentPage(8);
+            if (ImGui::MenuItem(L("Step Gate Ribbon (3x1)"))) AddPerfElementToCurrentPage(9);
             ImGui::EndPopup();
          }
       }
@@ -2226,7 +2226,7 @@ namespace app
             if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
             {
                ImGui::SetDragDropPayload("PERF_PAGE_TAB", &p, sizeof(int));
-               ImGui::Text("Move %s", pageTitle.c_str());
+               ImGui::Text(T("Move %s"), pageTitle.c_str());
                ImGui::EndDragDropSource();
             }
             if (ImGui::BeginDragDropTarget())
@@ -2242,12 +2242,12 @@ namespace app
             // Right click context menu on page tab
             if (ImGui::BeginPopupContextItem("##pagetabcontext"))
             {
-               if (ImGui::MenuItem("Rename Page"))
+               if (ImGui::MenuItem(L("Rename Page")))
                {
                   gPerfRenamingPage = p;
                   snprintf(gPerfRenamePageBuffer, sizeof(gPerfRenamePageBuffer), "%s", pageTitle.c_str());
                }
-               if (ImGui::MenuItem("Duplicate Page"))
+               if (ImGui::MenuItem(L("Duplicate Page")))
                {
                   PushUndoCheckpoint();
                   int newP = gPerfLayout.pageCount++;
@@ -2263,7 +2263,7 @@ namespace app
                   }
                   gPerfActivePage = newP;
                }
-               if (gPerfLayout.pageCount > 1 && ImGui::MenuItem("Delete Page"))
+               if (gPerfLayout.pageCount > 1 && ImGui::MenuItem(L("Delete Page")))
                {
                   PushUndoCheckpoint();
                   gPerfElements.erase(std::remove_if(gPerfElements.begin(), gPerfElements.end(),
@@ -2287,7 +2287,7 @@ namespace app
       if (gPerfLayout.pageCount < 12)
       {
          ImGui::SameLine();
-         if (ImGui::Button("+##addpagebtn", ImVec2(24, 24)))
+         if (ImGui::Button(L("+##addpagebtn"), ImVec2(24, 24)))
          {
             PushUndoCheckpoint();
             int newP = gPerfLayout.pageCount++;
@@ -2295,7 +2295,7 @@ namespace app
             gPerfActivePage = newP;
          }
          if (ImGui::IsItemHovered())
-            HelpTip("Add New Page");
+            HelpTip("%s", T("Add New Page"));
       }
 
       // Calculate dynamic content bounding box on active page
@@ -2392,31 +2392,31 @@ namespace app
       // Context menu anywhere on blank canvas background (only if not hovering any control)
       if (!mouseOverAnyElement && ImGui::BeginPopupContextWindow("##perfcanvascontext", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
       {
-         if (ImGui::BeginMenu("Dock Position"))
+         if (ImGui::BeginMenu(L("Dock Position")))
          {
-            if (ImGui::MenuItem("Bottom", nullptr, gPerfPanelDock == 0)) gPerfPanelDock = 0;
-            if (ImGui::MenuItem("Right", nullptr, gPerfPanelDock == 1)) gPerfPanelDock = 1;
-            if (ImGui::MenuItem("Left", nullptr, gPerfPanelDock == 2)) gPerfPanelDock = 2;
-            if (ImGui::MenuItem("Top", nullptr, gPerfPanelDock == 3)) gPerfPanelDock = 3;
+            if (ImGui::MenuItem(L("Bottom"), nullptr, gPerfPanelDock == 0)) gPerfPanelDock = 0;
+            if (ImGui::MenuItem(L("Right"), nullptr, gPerfPanelDock == 1)) gPerfPanelDock = 1;
+            if (ImGui::MenuItem(L("Left"), nullptr, gPerfPanelDock == 2)) gPerfPanelDock = 2;
+            if (ImGui::MenuItem(L("Top"), nullptr, gPerfPanelDock == 3)) gPerfPanelDock = 3;
             ImGui::EndMenu();
          }
          ImGui::Separator();
-         if (ImGui::BeginMenu("+ Add Control"))
+         if (ImGui::BeginMenu(L("+ Add Control")))
          {
-            if (ImGui::MenuItem("Knob (1x1)")) AddPerfElementToCurrentPage(0);
-            if (ImGui::MenuItem("Vertical Fader (1x2)")) AddPerfElementToCurrentPage(1);
-            if (ImGui::MenuItem("Horizontal Slider (2x1)")) AddPerfElementToCurrentPage(2);
-            if (ImGui::MenuItem("Toggle (1x1)")) AddPerfElementToCurrentPage(3);
-            if (ImGui::MenuItem("XY Pad (2x2)")) AddPerfElementToCurrentPage(4);
+            if (ImGui::MenuItem(L("Knob (1x1)"))) AddPerfElementToCurrentPage(0);
+            if (ImGui::MenuItem(L("Vertical Fader (1x2)"))) AddPerfElementToCurrentPage(1);
+            if (ImGui::MenuItem(L("Horizontal Slider (2x1)"))) AddPerfElementToCurrentPage(2);
+            if (ImGui::MenuItem(L("Toggle (1x1)"))) AddPerfElementToCurrentPage(3);
+            if (ImGui::MenuItem(L("XY Pad (2x2)"))) AddPerfElementToCurrentPage(4);
             ImGui::Separator();
-            if (ImGui::MenuItem("Momentary Trigger / Bang (1x1)")) AddPerfElementToCurrentPage(5);
-            if (ImGui::MenuItem("Digital Number Box (1x1)")) AddPerfElementToCurrentPage(6);
-            if (ImGui::MenuItem("Radio Selector (2x1)")) AddPerfElementToCurrentPage(7);
-            if (ImGui::MenuItem("Bipolar Pan Knob (1x1)")) AddPerfElementToCurrentPage(8);
-            if (ImGui::MenuItem("Step Gate Ribbon (3x1)")) AddPerfElementToCurrentPage(9);
+            if (ImGui::MenuItem(L("Momentary Trigger / Bang (1x1)"))) AddPerfElementToCurrentPage(5);
+            if (ImGui::MenuItem(L("Digital Number Box (1x1)"))) AddPerfElementToCurrentPage(6);
+            if (ImGui::MenuItem(L("Radio Selector (2x1)"))) AddPerfElementToCurrentPage(7);
+            if (ImGui::MenuItem(L("Bipolar Pan Knob (1x1)"))) AddPerfElementToCurrentPage(8);
+            if (ImGui::MenuItem(L("Step Gate Ribbon (3x1)"))) AddPerfElementToCurrentPage(9);
             ImGui::EndMenu();
          }
-         if (ImGui::MenuItem("Clear Page Controls"))
+         if (ImGui::MenuItem(L("Clear Page Controls")))
          {
             PushUndoCheckpoint();
             gPerfElements.erase(std::remove_if(gPerfElements.begin(), gPerfElements.end(),
@@ -2425,7 +2425,7 @@ namespace app
             gPerfSelection.clear();
          }
          ImGui::Separator();
-         if (ImGui::MenuItem("Close Performance Matrix"))
+         if (ImGui::MenuItem(L("Close Performance Matrix")))
          {
             gPerfPanelOpen = false;
          }

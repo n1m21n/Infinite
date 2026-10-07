@@ -270,7 +270,7 @@ namespace app
          if (scanning)
             ImGui::EndDisabled();
          if (scanning)
-            ImGui::TextDisabled("scanning... (%d found)", scanner.FilesFoundSoFar());
+            ImGui::TextDisabled(T("scanning... (%d found)"), scanner.FilesFoundSoFar());
       }
       if (scanAll)
          scanner.StartScan();
@@ -509,7 +509,7 @@ namespace app
                else
                   gBrowserFavorites.ToggleSample(entry.path);
             }
-            if (ImGui::MenuItem("Add to canvas"))
+            if (ImGui::MenuItem(L("Add to canvas")))
             {
                const ImVec2 spawnPos = FindFreeSpawnPosition(gViewCenterCanvas);
                PushUndoCheckpoint();
@@ -658,21 +658,21 @@ namespace app
       const bool scanning = gPluginScanner.IsScanning();
       if (scanning)
          ImGui::BeginDisabled();
-      if (ImGui::Button("Rescan plugins", ImVec2(-1.0f, 0)))
+      if (ImGui::Button(L("Rescan plugins"), ImVec2(-1.0f, 0)))
          gPluginScanner.StartScan();
       if (scanning)
          ImGui::EndDisabled();
 
       if (scanning)
-         ImGui::TextDisabled("scanning... (%d found)", gPluginScanner.PluginsFoundSoFar());
+         ImGui::TextDisabled(T("scanning... (%d found)"), gPluginScanner.PluginsFoundSoFar());
       else if (gPluginScanner.Index().empty())
-         ImGui::TextDisabled("no plugins indexed yet - hit Rescan plugins");
+         ImGui::TextDisabled("%s", T("no plugins indexed yet - hit Rescan plugins"));
 
 #if INFINITE_ENABLE_VST3
       // VST3 folder management: AU is discovered entirely through the OS
       // component registry and needs none of this, but VST3 has no registry -
       // only the two OS-standard directories plus whatever the user adds here.
-      if (ImGui::TreeNodeEx("VST3 search folders", ImGuiTreeNodeFlags_None))
+      if (ImGui::TreeNodeEx(L("VST3 search folders"), ImGuiTreeNodeFlags_None))
       {
          // Snapshot rather than iterate gPluginScanner.Folders() directly:
          // RemoveFolder() below erases from that same live vector, which
@@ -683,13 +683,13 @@ namespace app
             // Button first, path wrapped after it: a long folder path used to
             // push Remove past the right edge of the panel, out of reach.
             ImGui::PushID(folder.c_str());
-            if (ImGui::SmallButton("Remove"))
+            if (ImGui::SmallButton(L("Remove")))
                gPluginScanner.RemoveFolder(folder);
             ImGui::PopID();
             ImGui::SameLine();
             ImGui::TextWrapped("%s", folder.c_str());
          }
-         if (ImGui::Button("Add VST3 folder...", ImVec2(-1.0f, 0)))
+         if (ImGui::Button(L("Add VST3 folder..."), ImVec2(-1.0f, 0)))
          {
             const std::string folder = Platform::OpenFolderDialog("Add VST3 folder");
             if (!folder.empty())
@@ -702,13 +702,13 @@ namespace app
       if (!blocklist.empty())
       {
          ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.55f, 0.25f, 1.0f));
-         if (ImGui::TreeNodeEx("Blocklisted VST3 bundles (crashed or hung while scanning)",
+         if (ImGui::TreeNodeEx(L("Blocklisted VST3 bundles (crashed or hung while scanning)"),
                                 ImGuiTreeNodeFlags_None))
          {
             ImGui::PopStyleColor();
             for (const std::string& path : blocklist)
                ImGui::TextWrapped("%s", path.c_str());
-            if (ImGui::Button("Clear blocklist and retry", ImVec2(-1.0f, 0)))
+            if (ImGui::Button(L("Clear blocklist and retry"), ImVec2(-1.0f, 0)))
                Platform::ClearVST3Blocklist();
             ImGui::TreePop();
          }
@@ -720,7 +720,7 @@ namespace app
 
       if (!gPluginScanner.FailedBundles().empty())
       {
-         if (ImGui::TreeNodeEx("Bundles that failed to describe", ImGuiTreeNodeFlags_None))
+         if (ImGui::TreeNodeEx(L("Bundles that failed to describe"), ImGuiTreeNodeFlags_None))
          {
             for (const std::string& path : gPluginScanner.FailedBundles())
                ImGui::TextWrapped("%s", path.c_str());
@@ -741,7 +741,7 @@ namespace app
          }
       }
 #else
-      ImGui::TextDisabled("VST3 support is not compiled into this build.");
+      ImGui::TextDisabled("%s", T("VST3 support is not compiled into this build."));
 #endif
 
       ImGui::Separator();
@@ -894,7 +894,7 @@ namespace app
             gPluginDragDesc = entry;
          }
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s\n%s", entry.format.c_str(), entry.identifier.c_str());
+            ImGui::SetTooltip(T("%s\n%s"), entry.format.c_str(), entry.identifier.c_str());
 
          DrawFavoriteBadge(selMin, selMax, isFav);
 
@@ -902,7 +902,7 @@ namespace app
          {
             if (ImGui::MenuItem(isFav ? "Remove from favourites" : "Add to favourites"))
                gBrowserFavorites.TogglePlugin(entry.identifier);
-            if (ImGui::MenuItem("Add to canvas"))
+            if (ImGui::MenuItem(L("Add to canvas")))
             {
                const ImVec2 spawnPos = FindFreeSpawnPosition(gViewCenterCanvas);
                PushUndoCheckpoint();
@@ -1099,7 +1099,7 @@ namespace app
             {
                if (ImGui::MenuItem(isFav ? "Remove from favourites" : "Add to favourites"))
                   gBrowserFavorites.ToggleFieldPreset(entry.name);
-               if (ImGui::MenuItem("Add to canvas"))
+               if (ImGui::MenuItem(L("Add to canvas")))
                {
                   const ImVec2 spawnPos = FindFreeSpawnPosition(gViewCenterCanvas);
                   SpawnFieldPresetNode(entry, spawnPos.x, spawnPos.y);

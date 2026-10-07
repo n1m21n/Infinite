@@ -471,11 +471,11 @@ namespace app
             if (ImGui::MenuItem(kDockLabels[i], nullptr, i == gViewportPanelDock))
                gViewportPanelDock = i;
          ImGui::Separator();
-         if (ImGui::MenuItem("Close panel"))
+         if (ImGui::MenuItem(L("Close panel")))
             gViewportPanelOpen = false;
          if (!gViewportPanelNodes.empty())
          {
-            if (ImGui::MenuItem("Clear all cards"))
+            if (ImGui::MenuItem(L("Clear all cards")))
             {
                gViewportPanelNodes.clear();
                gViewportPanelOpen = false;

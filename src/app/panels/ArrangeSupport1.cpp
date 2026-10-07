@@ -200,13 +200,13 @@ namespace app
    {
       const double tempo = std::max(1.0, (double)Transport::Instance().Tempo());
       if (c.origBpm > 0.0f)
-         ImGui::TextDisabled("Detected: %.1f BPM", (double)c.origBpm);
+         ImGui::TextDisabled(T("Detected: %.1f BPM"), (double)c.origBpm);
       else
-         ImGui::TextDisabled("Detected: none (no clear beat)");
+         ImGui::TextDisabled("%s", T("Detected: none (no clear beat)"));
       if (c.syncToTempo)
-         ImGui::TextDisabled("Stretched x%.3f to %.1f BPM", tempo / std::max(1.0, (double)c.sampleBpm), tempo);
+         ImGui::TextDisabled(T("Stretched x%.3f to %.1f BPM"), tempo / std::max(1.0, (double)c.sampleBpm), tempo);
       else
-         ImGui::TextDisabled("Native speed - turn on Sync to Tempo to set Sample BPM");
+         ImGui::TextDisabled("%s", T("Native speed - turn on Sync to Tempo to set Sample BPM"));
    }
 
 
