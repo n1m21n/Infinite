@@ -47,7 +47,6 @@ namespace MidiFile
          bool on;
       };
 
-      struct Tempo { uint64_t tick; uint32_t usPerQN; };
    }
 
    bool Parse(const uint8_t* data, size_t size, Song& out, std::string& error)
@@ -89,7 +88,6 @@ namespace MidiFile
          ticksPerBeat = (double)fps * (double)sub / 2.0; // 2 beats per second
       }
       else if (division == 0) { error = "bad MIDI division"; return false; }
-      std::vector<Tempo> tempos;
 
       std::vector<RawEvent> raw;
       int noteTracks = 0;
@@ -119,12 +117,6 @@ namespace MidiFile
             {
                const uint8_t type = tr.U8();
                const uint32_t mlen = tr.VarLen();
-               if (type == 0x51 && mlen == 3 && tr.Left() >= 3)
-               {
-                  const uint32_t us = ((uint32_t)tr.p[0] << 16) | ((uint32_t)tr.p[1] << 8) | tr.p[2];
-                  if (us > 0)
-                     tempos.push_back({ tick, us });
-               }
                tr.Skip(mlen);
                if (type == 0x2F)
                   break;
@@ -169,29 +161,6 @@ namespace MidiFile
          if (a.tick != b.tick) return a.tick < b.tick;
          return !a.on && b.on;
       });
-      // Tempo map -> relative beat position (see MidiFile.h). SMPTE has no tempo map.
-      std::stable_sort(tempos.begin(), tempos.end(), [](const Tempo& a, const Tempo& b) { return a.tick < b.tick; });
-      if (smpte)
-         tempos.clear();
-      const double base = tempos.empty() || tempos.front().tick > 0 ? 500000.0 : (double)tempos.front().usPerQN;
-      for (const Tempo& t : tempos)
-         if ((double)t.usPerQN != base)
-            out.hasTempoChanges = true;
-      auto tempoBeatAt = [&](uint64_t tick) {
-         double beats = 0.0;
-         uint64_t prev = 0;
-         double cur = base; // tempo in force before the first change
-         for (const Tempo& t : tempos)
-         {
-            if (t.tick >= tick)
-               break;
-            beats += (double)(t.tick - prev) / ticksPerBeat * (cur / base);
-            prev = t.tick;
-            cur = (double)t.usPerQN;
-         }
-         return beats + (double)(tick - prev) / ticksPerBeat * (cur / base);
-      };
-
       out.events.reserve(raw.size() + 16);
       // Notes still sounding at the end of the file get an off there, so a missing note-off never sticks.
       std::vector<Event> open;
@@ -199,7 +168,6 @@ namespace MidiFile
       {
          Event ev;
          ev.beat = (double)e.tick / ticksPerBeat;
-         ev.tempoBeat = tempoBeatAt(e.tick);
          ev.note = e.note;
          ev.velocity = e.velocity;
          ev.track = e.track;
@@ -207,7 +175,6 @@ namespace MidiFile
          ev.on = e.on;
          out.events.push_back(ev);
          out.lengthBeats = std::max(out.lengthBeats, ev.beat);
-         out.lengthTempoBeats = std::max(out.lengthTempoBeats, ev.tempoBeat);
          if (e.on)
          {
             out.noteCount++;
@@ -228,7 +195,6 @@ namespace MidiFile
          off.on = false;
          off.velocity = 0;
          off.beat = out.lengthBeats;
-         off.tempoBeat = out.lengthTempoBeats;
          out.events.push_back(off);
       }
       out.trackCount = noteTracks;

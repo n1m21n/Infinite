@@ -1092,10 +1092,10 @@ public:
 
    std::string path;
    int transpose = 0;   // semitones
-   float position = 0.0f; // beats: shifts where in the file the playhead sits (0 = file start at transport start)
+   float position = 0.0f; // 0..1 across the file: where playback starts (and jumps to when moved)
    bool loop = true;
    float velocity = 1.0f; // scales every note's velocity
-   bool fileTempo = true; // keep the file's tempo changes as relative speed (off: straight ticks/beat)
+   float speed = 1.0f;    // 1 = project bpm; the file's own tempo is ignored
 
    bool LoadFile(const std::string& filePath);
    const MidiFile::Song* GetSong() const { return mSong; }

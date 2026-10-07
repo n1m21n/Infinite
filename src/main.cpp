@@ -21729,13 +21729,13 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             {
                const int key = e.note;
                if (e.on)
-                  open[key].push_back({ e.track, n->fileTempo ? e.tempoBeat : e.beat });
+                  open[key].push_back({ e.track, e.beat });
                else
                   for (size_t i = 0; i < open[key].size(); i++)
                      if (open[key][i].first == e.track)
                      {
                                                 const float x0 = origin.x + (float)(open[key][i].second / len) * w;
-                        const float x1 = std::max(x0 + 1.0f, origin.x + (float)((n->fileTempo ? e.tempoBeat : e.beat) / len) * w);
+                        const float x1 = std::max(x0 + 1.0f, origin.x + (float)((e.beat) / len) * w);
                         const float y = br.y - 3.0f - (float)(key - lo + 1) * noteH;
                         dl->AddRectFilled(ImVec2(x0, y), ImVec2(x1, y + noteH - 0.5f), on);
                         open[key].erase(open[key].begin() + (long)i);
@@ -21756,10 +21756,10 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       {
          AudioKnobRow row(5);
          row.KnobInt("transpose", &n->transpose, -48, 48);
-         row.Knob("position", &n->position, 0.0f, (float)n->LoopBeats(), "%.1f", kKnobSmall);
+         row.Knob("position", &n->position, 0.0f, 1.0f, "%.2f", kKnobSmall);
+         row.Knob("speed", &n->speed, 0.25f, 4.0f, "%.2fx", kKnobSmall);
          row.Knob("vel", &n->velocity, 0.0f, 2.0f, "%.2f", kKnobSmall);
          row.Checkbox("loop", &n->loop);
-         row.Checkbox("file tempo", &n->fileTempo);
          row.End();
       }
 
@@ -42539,7 +42539,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Note Merge", "The system's only note fan-in point: up to four note inputs merged into one output stream, in timestamp order. Each input's notes stay independent voices matched by voice id, not pitch - so two inputs playing the same note at the same time sound as two overlapping voices, not a collision." },
          { "Arpeggiator", "Holds whatever notes are currently down and replays them one at a time on its own clock, either synced to tempo (a note division) or free-running in seconds. Up/Down/Up-Down/Down-Up/As Played order the held notes by pitch or by the order they were pressed; Converge alternates outside-in (lowest, highest, next-lowest...), Diverge alternates inside-out from the middle; Random picks one per step. Repeat x2/x4 fires each note 2 or 4 times in a row before advancing. Stairs Up/Down walks the pattern in overlapping two-note steps (C E, E G, G C...). Join and Spread only differ once octaves is above 1: Spread stacks the pattern octave-by-octave (C3 D3 E3, C4 D4 E4), Join interleaves each note's octaves together (C3 C4, D3 D4, E3 E4), and Join/Spread alternates between the two every full pass - at octaves = 1 all three play identically to Up. The 8-step gate grid below the readout is the primary control: click or drag across cells to mute individual steps without changing the note order (advancing past a muted step still moves the pattern forward, punching a rhythmic hole rather than skipping a note), and the lit cell tracks the currently-sounding step. Octaves stacks the pattern up to 4 octaves higher. Gate sets how much of each step the note actually sounds for before its off. Preset loads a complete starting point (mode, octaves, rate, gate and gate pattern) in one click." },
          { "Note Sequencer", "A self-playing step sequencer, up to 16 steps. Drag a bar's tall upper area to set that step's pitch, drag the thin strip below it to set velocity, click the strip to toggle the step on/off. Steps sets how many loop, rate is either synced to tempo (a note division) or free-running in seconds, gate is how much of each step the note actually sounds for." },
-         { "MIDI File", "Plays a Standard MIDI File as a note source. Load a .mid (or drop one on the canvas) and it follows the transport: play, stop and seek move the playhead through the file, and the project tempo rules - the file's own tempo is ignored. transpose shifts every note, position moves the playhead within the file (in beats, so you can start mid-song), vel scales every velocity, and loop repeats the file, rounded up to a whole 4/4 bar. file tempo keeps the file's own tempo changes as relative speed (a ritardando survives; the project bpm stays the base), off plays it dead straight. Drum-channel (10) notes are never transposed. Format 0/1/2, SMPTE-timed (mapped at 2 beats per second) and RMID-wrapped files load; pitch bend and CCs are not played. Notes held when the transport stops or jumps are released." },
+         { "MIDI File", "Plays a Standard MIDI File as a note source. Load a .mid (or drop one on the canvas) and it follows the transport: play, stop and seek move the playhead through the file, and the project tempo rules - the file's own tempo is ignored. transpose shifts every note, position (0 to 1 across the file) is where playback starts - it restarts from there whenever the transport starts or seeks, and jumps there when you move the knob. speed 1 follows the project bpm and scales it from there (the file's own tempo is ignored - it is just notes). vel scales every velocity, and loop repeats the file, rounded up to a whole 4/4 bar. Drum-channel (10) notes are never transposed. Format 0/1/2, SMPTE-timed (mapped at 2 beats per second) and RMID-wrapped files load; pitch bend and CCs are not played." },
          { "Random Note Generator", "A generative source that free-runs on its own clock (synced to tempo or free-running seconds) rather than only reacting to a knob edit: each new note is the previous one plus a small random step (wander sets the max semitones), clamped to lo..hi and snapped to the chosen scale - a bounded random walk, not independent-per-step randomness, so the line wanders rather than jumps around." },
          { "Chorder", "A self-playing generative chord engine. Every groove step it picks a random scale degree and stacks chord-sized thirds on top of it, in key. Strum spaces each chord tone's onset apart instead of firing them all at once; humanise timing and velocity add per-note randomness on top; harmonics is the chance any given chord gets an extra note an octave above one of its tones." },
          { "Note Stack", "Layers transposed copies of every incoming note on top of the original - eight independent semitone voices, each switched on or off on its own. The dry note always sounds; the enabled voices are added to it, not instead of it. The set of voices is captured when a note starts, so switching one off mid-note never leaves it hanging." },
@@ -55582,17 +55582,6 @@ static bool RunMidiFileFixture()
       MidiFile::Song s2;
       check(MidiFile::Parse(f2.data(), f2.size(), s2, err) && s2.noteCount == 3, "format 2 loads");
    }
-   // Tempo map: 500000 us/qn at tick 0, then 1000000 (half speed) from beat 1. A note at beat 2 then sits at
-   // 1 + 1*2 = 3 relative beats.
-   {
-      const uint8_t ttrk[] = { 0x00, 0xFF, 0x51, 0x03, 0x07, 0xA1, 0x20,  0x83, 0x60, 0xFF, 0x51, 0x03, 0x0F, 0x42, 0x40,
-                               0x83, 0x60, 0x90, 60, 100,  0x83, 0x60, 0x80, 60, 0,  0x00, 0xFF, 0x2F, 0x00 };
-      std::vector<uint8_t> tm = { 'M', 'T', 'h', 'd', 0, 0, 0, 6, 0, 0, 0, 1, 0x01, 0xE0, 'M', 'T', 'r', 'k', 0, 0, 0, (uint8_t)sizeof(ttrk) };
-      tm.insert(tm.end(), ttrk, ttrk + sizeof(ttrk));
-      MidiFile::Song ts;
-      check(MidiFile::Parse(tm.data(), tm.size(), ts, err) && ts.hasTempoChanges, "tempo changes detected");
-      check(std::fabs(ts.events[0].beat - 2.0) < 1e-6 && std::fabs(ts.events[0].tempoBeat - 3.0) < 1e-6, "tempo map stretches beat 2 to 3");
-   }
    // A note-on with no note-off is closed at the end of the file.
    {
       const uint8_t otrk[] = { 0x00, 0x90, 60, 100, 0x83, 0x60, 0x90, 62, 100, 0x00, 0xFF, 0x2F, 0x00 };
@@ -55657,19 +55646,31 @@ static bool RunMidiFileFixture()
 
    // Stop mid-note: held notes must be released.
    got.clear();
-   Transport::Instance().SeekBeats(1.98);
-   run(3);
+   Transport::Instance().SeekBeats(0.0);
+   run(100); // 2.1 beats in: the G is sounding
    const int gOn = count(79, true);
    Transport::Instance().SeekBeats(0.5);
    run(1);
    check(gOn == 1 && count(79, false) >= 1, "seek releases the held G");
-   // position = 2 beats: the file's beat 2 (the G) now sounds at transport beat 0.
+   // position 0.5 of a 4-beat file = beat 2: the G now sounds at transport beat 0.
    got.clear();
-   node.position = 2.0f;
+   node.position = 0.5f;
    node.CookIfNeeded(3);
    Transport::Instance().SeekBeats(0.0);
    run(2);
    check(count(79, true) == 1 && count(72, true) == 0, "position shifts the playhead into the file");
+   // Speed 2: the file's beat 1 (the E) arrives at transport beat 0.5, independent of the project bpm.
+   got.clear();
+   node.position = 0.0f;
+   node.speed = 2.0f;
+   node.CookIfNeeded(4);
+   Transport::Instance().SeekBeats(0.0);
+   run(30);
+   bool fast = false;
+   for (auto& g : got)
+      if (g.note == 76 && g.on && std::fabs(g.beat - 0.5) < 0.03)
+         fast = true;
+   check(fast, "speed 2 plays the file twice as fast");
    Transport::Instance().SetPlaying(false);
    Transport::Instance().NotifyAudioEngineStopped();
    std::remove(path.c_str());
@@ -94161,6 +94162,70 @@ int main(int argc, char** argv)
                 openInput, outputEmpty, other, marked ? "OK" : "FAIL",
                 gLiveIssues.size(), gLiveIssues.empty() ? "OK" : "FAIL");
       }
+
+      // R617: Shape Resonator inside the real graph - eight instances on one source, save/load with the shape
+      // pin wired, source deleted mid-ring, and the pin counted as an input slot.
+      if (getenv("INFINITE_SHAPERESGRAPHTEST") != nullptr && frameId == 4)
+      {
+         const std::string path = "/tmp/infinite_shaperes_graph.inf";
+         {
+            std::ofstream f(path);
+            f << "infinite-patch 1\nnode 1 3D Cube\nend\n";
+            for (int i = 0; i < 8; i++)
+               f << "node " << (2 + i) << " AudioEffects Shape Resonator\nend\n";
+            for (int i = 0; i < 8; i++)
+               f << "geo " << (2 + i) << " 1 1\n";
+         }
+         LoadPatchFrom(path);
+      }
+      auto ShapeResFixtureReport = [&](const char* stage, bool wantWired) {
+         int resonators = 0, wired = 0, slotOk = 0;
+         for (GraphNode& gn : gNodes)
+         {
+            auto* fx = dynamic_cast<AudioEffectNode*>(gn.node.get());
+            if (!fx || gn.typeName != "Shape Resonator")
+               continue;
+            resonators++;
+            fx->CookIfNeeded(frameId); // must not crash on a freed or swapped source
+            wired += (fx->geometry != nullptr);
+            slotOk += (InputCountFor(gn) >= 2);
+         }
+         const bool ok = resonators == 8 && (wantWired ? wired == 8 : wired == 0) && slotOk == 8;
+         printf("SHAPERESGRAPHTEST %s: resonators=%d wired=%d shape-pin-counted=%d  %s\n", stage, resonators, wired,
+                slotOk, ok ? "OK" : "FAIL");
+      };
+      if (getenv("INFINITE_SHAPERESGRAPHTEST") != nullptr && frameId == 6)
+         ShapeResFixtureReport("after load", true);
+      if (getenv("INFINITE_SHAPERESGRAPHTEST") != nullptr && frameId == 8)
+      {
+         // The workers solve in the background: give them time, then the modes must have landed.
+         std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+         int ringing = 0;
+         for (GraphNode& gn : gNodes)
+            if (auto* fx = dynamic_cast<AudioEffectNode*>(gn.node.get()); fx && gn.typeName == "Shape Resonator")
+            {
+               fx->CookIfNeeded(frameId);
+               float f[32];
+               ringing += (fx->ReadModeFrequencies(f, 32, nullptr) > 0);
+            }
+         printf("SHAPERESGRAPHTEST eight instances solved: ringing=%d  %s\n", ringing, ringing == 8 ? "OK" : "FAIL");
+         const std::string path = "/tmp/infinite_shaperes_graph2.inf";
+         const bool saved = SavePatchTo(path);
+         const bool loaded = saved && LoadPatchFrom(path);
+         printf("SHAPERESGRAPHTEST save/load: saved=%d loaded=%d  %s\n", saved, loaded, (saved && loaded) ? "OK" : "FAIL");
+      }
+      if (getenv("INFINITE_SHAPERESGRAPHTEST") != nullptr && frameId == 10)
+      {
+         ShapeResFixtureReport("after save/load", true);
+         for (GraphNode& gn : gNodes)
+            if (gn.typeName == "Cube")
+            {
+               RemoveNodeByIndex(gn.index); // the source dies while eight resonators are ringing on it
+               break;
+            }
+      }
+      if (getenv("INFINITE_SHAPERESGRAPHTEST") != nullptr && frameId == 12)
+         ShapeResFixtureReport("after source deleted", false);
 
       if (getenv("INFINITE_DELETECRASHTEST") != nullptr && frameId == 4)
       {
