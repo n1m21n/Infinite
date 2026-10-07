@@ -182,10 +182,10 @@ Record each as: lever → median of 3 → keep/drop (keep only if it's faster, a
 
 | Measure | Before (A0) | After A | After B | After C |
 |---|---|---|---|---|
-| `touch` one panel file → rebuild | n/a (=full main.cpp) | | | |
-| `touch src/main.cpp` → rebuild | 182.3 s (median of 3) | 74.4 s (1 run) | | |
+| `touch` one panel file → rebuild | n/a (=full main.cpp) | | 10.4 s (PerfPanel.cpp) | |
+| `touch src/main.cpp` → rebuild | 182.3 s (median of 3) | 74.4 s (1 run) | 49.7 s (1 run) | |
 | clean full build `-j8` | | | | |
-| largest TU (lines) | 107,480 | 69,142 (main.cpp); largest new TU ~3,000 | | |
+| largest TU (lines) | 107,480 | 69,142 (main.cpp); largest new TU ~3,000 | 18,527 (main.cpp); largest new TU 4,549 (ArrangePanel.cpp) | |
 
 ## 7. Stop conditions
 
@@ -243,3 +243,12 @@ Run each block in its own session, only after the previous block is merged to ma
 - Generator: moves are produced mechanically from the pristine baseline (exposure analysis -> header declarations, compiler-driven for A3); nothing hand-edited.
 - A3 deviation from the brief: no registry. Each moved block is `if (getenv(...)) {...}` verbatim inside `FrameTest_<NAME>(int frameId, GLFWwindow* window)`, called unconditionally at the block's original position in the loop (order, ImGui context and `ed::` scope unchanged). 136 of 156 blocks moved; 20 stay in `main()` (section 7): they use main/loop locals (`searchBuf`, `offlineClockDone`, the `sUnpackTest*`/`sPhase1*` loop statics, `ShapeResFixtureReport`), `return` from the loop, have a block-scope `extern`, or hit a name collision (`lastFrameMs`).
 - Gate A: hygiene `--full` 110/112 on first run; the 2 misses are load-sensitive flakes that pass in isolation: PLUGINDRAGTEST (also fails 1/12 on a `main` build), RECEXPORTTEST (passed alone).
+
+## Block B result (2026-10-07, `feature/main-split-b`)
+
+- B1 `5e49b7d8` ui/; B2 `be7945f1` bodies/; B3 `d439f653` panels/; B4 `78d722cd` graph/; B5 `c64517fc` AppState.cpp (every non-const global, original textual order, so static-init order is unchanged; no symptom seen).
+- Deviations from the brief: one generated `src/app/AppShared.h` instead of per-domain headers; no separate `Layout.h` (consts are exposed as `inline` in the header automatically); domain file names differ slightly from section 3.
+- Bug fixed on the way: Block A's header could carry `inline template <...>` (invalid); the generator no longer prefixes templates with `inline`.
+- Generator rules worth knowing: namespaces with exposed items move whole with `inline const` edits; 3 structs with trailing declarators are split in the baseline on the same line; `SampleScanner gMediaScanner(Kind::Media);` is a variable, not a function declaration (g[A-Z] names are always variables); `#if/#else` regions are re-wrapped per item.
+- Debug tools (`gUiDebuggerOpen`, `gUiStyleEditorOpen`) keep their `#ifndef NDEBUG` guards in AppState.cpp, AppShared.h and main.cpp.
+- Gate B: `--skip-build --full` 111 passed, 1 failed (PLUGINDRAGTEST, known load flake; passes in the `--group ui` rerun), 2 xfail. Checkers read `src/main.cpp` + `src/app` via `scripts/appsrc.py`.

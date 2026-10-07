@@ -73,7 +73,7 @@ entry if a refactor makes it stale.
 
 - **Node type registration**: a new node class also needs a constructor
   entry in `main.cpp`'s node-type table and (for file-droppable types) an
-  extension allowlist like `kModelExt` (`main.cpp:41352-41354`) — see
+  extension allowlist like `kModelExt` (`main.cpp` (frame loop, drop handler)) — see
   `new-*-node` skills per node category for the full checklist.
 - **The four cable-wiring chains** (what can connect to what) are
   hand-maintained in `main.cpp`, independent of what pins a node's header
@@ -102,7 +102,7 @@ entry if a refactor makes it stale.
   Windows and vice versa.
 - **File-import decode is synchronous on the main thread** for both images
   (`ImageSourceNode::Load`) and models (`ModelSourceNode::Load`, called
-  inline from the drop handler at `main.cpp:41508-41519`). The only
+  inline from the drop handler at `main.cpp` (frame loop, drop handler)). The only
   precedent for async/worker-thread loading in this codebase is audio-side
   (`ARCHITECTURE.md:90-168`, e.g. SampleScanner) — don't assume an async
   pattern exists elsewhere just because it would make sense.
@@ -137,7 +137,7 @@ entry if a refactor makes it stale.
 - **Querying `ed::GetNodePosition`/`GetNodeSize` right after spawning (or
   loading) a node reads a stale/zero result** — the node editor only
   syncs a `GraphNode`'s `ed::` position/size from `spawnX`/`spawnY` later
-  in the same frame's draw pass (`main.cpp` ~line 47870,
+  in the same frame's draw pass (`main.cpp` frame loop,
   `ed::SetNodePosition(gn.NodeId(), ImVec2(gn.spawnX, gn.spawnY))`), and
   size is only known after the node has actually been drawn once
   (`FindFreeSpawnPosition`'s comment: "never laid out ... nothing to avoid
@@ -145,7 +145,7 @@ entry if a refactor makes it stale.
   rect (e.g. a test fixture driving `gDroppedFiles`/`gDropPos` to target
   an existing node) has to wait at least one full frame after the spawn/
   load before reading its position, not query it the same frame.
-- **`gDroppedFiles`/`gDropPos`** (`main.cpp:948-949`) is the same queue a
+- **`gDroppedFiles`/`gDropPos`** (`src/app/AppState.cpp`) is the same queue a
   real OS file-drop populates (`OnFilesDropped`) and is processed
   unconditionally every frame (`main.cpp`'s `if (!gDroppedFiles.empty())`
   block, ~line 41346) — a self-test fixture can drive the real drop-handler
@@ -169,10 +169,10 @@ entry if a refactor makes it stale.
   crashing test repeatedly never caught the misattribution because nobody
   diffed the log against source per-test. The real bug (fixed) was two
   independent issues stacked in the `FIELDGRAPHTEST` fixture itself, not the
-  app: `main.cpp:48193` declared `param int voices` when
+  app: `main.cpp` declared `param int voices` when
   `src/core/field/FieldParse.cpp:404-407` only ever allowed `float` params
   (causing an unguarded `ParamTable::Find("voices")->value` null-deref at
-  `main.cpp:48224`), and its for-loop used `i` as the loop variable, which
+  `main.cpp`), and its for-loop used `i` as the loop variable, which
   `i` is reserved as the element-domain per-element index in Field (see
   `field-language`) — every sibling fixture in the file already used `k`.
 
