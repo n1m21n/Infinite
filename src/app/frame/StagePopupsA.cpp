@@ -321,7 +321,7 @@ void DrawPopupsA(FrameCtx& fc)
             ImGui::TextUnformatted(NodeTitle(*gn).c_str());
             ImGui::Separator();
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 380.0f);
-            ImGui::TextWrapped("%s", NodeHelpText(*gn));
+            ImGui::TextWrapped("%s", HelpT(NodeHelpText(*gn)));
             ImGui::PopTextWrapPos();
          }
          ImGui::EndPopup();

@@ -4571,6 +4571,8 @@ void DrawModulatorMeter(IModulator* mod, int nodeIndex);
 void DisconnectLinkById(int id);
 
 const char* NodeHelpText(const GraphNode& gn);
+// Translated help text; "{mod}" in the key expands to Cmd / Ctrl.
+const char* HelpT(const char* key);
 
 void DrawSettingsWindow(bool* open);
 
