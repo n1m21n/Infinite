@@ -729,8 +729,24 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
    // The launcher card plays in its own window first (core/LauncherCard.h); the main window stays
    // hidden until it ends.
-   LauncherCard::Enabled() = !gHeadlessTestWindow && !IsHeadlessProcess() && getenv("INFINITE_NOSPLASH") == nullptr &&
-                             getenv("INFINITE_SPLASHTEST") == nullptr;
+   // INFINITE_LAUNCHERCARDTEST forces it on under the harness, with its sentinel in a temp dir.
+   const bool launcherCardTest = getenv("INFINITE_LAUNCHERCARDTEST") != nullptr;
+   const std::string launcherCardDir =
+      launcherCardTest ? AppPaths::TempDir() + "/infinite-launchercard-test" : AppPaths::AppSupportDir();
+   if (launcherCardTest)
+      AppPaths::EnsureDir(launcherCardDir);
+   LauncherCard::Enabled() = launcherCardTest || (!gHeadlessTestWindow && !IsHeadlessProcess() &&
+                                                  getenv("INFINITE_NOSPLASH") == nullptr &&
+                                                  getenv("INFINITE_SPLASHTEST") == nullptr);
+   if (LauncherCard::Enabled() && !launcherCardTest && LauncherCard::ConsumeStaleSentinel(launcherCardDir))
+   {
+      Platform::AppendLogLine("[startup] launcher card skipped once: the previous start did not get past it");
+      LauncherCard::Enabled() = false;
+   }
+   // What later windows (projectors) must inherit once the card is done with the sticky hints.
+   LauncherCard::WindowHints mainWindowHints;
+   mainWindowHints.visible = gHeadlessTestWindow ? GLFW_FALSE : GLFW_TRUE;
+   mainWindowHints.scaleToMonitor = gHeadlessTestWindow ? GLFW_FALSE : GLFW_TRUE;
    if (LauncherCard::Enabled())
       glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
    window = glfwCreateWindow(1600, 1000, "Infinite", nullptr, nullptr);
@@ -815,6 +831,47 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // applicationShouldTerminate: through the same _glfwInputWindowCloseRequest
    // as the window's own close button, so one callback gates both.
    glfwSetWindowCloseCallback(window, [](GLFWwindow* w) { RequestClose(w); });
+
+   // The launcher card plays here, before ImGui::CreateContext() and ImGui_ImplGlfw_InitForOpenGL:
+   // with no GLFW backend installed on the main window there are no ImGui callbacks or Windows
+   // WndProc hook for its events to reach while the card's private context is current. Played
+   // after them, it crashed v0.4.7 on Windows (see core/LauncherCard.h). The sentinel lets the
+   // next start skip the card once if this one dies inside it.
+   bool launcherCardPlayed = false;
+   if (LauncherCard::Enabled())
+   {
+      int injected = 0;
+      std::function<void()> inject;
+      if (launcherCardTest)
+      {
+         // Stale-sentinel contract first: a leftover sentinel is reported once, then gone.
+         LauncherCard::MarkRunning(launcherCardDir);
+         const bool staleSeen = LauncherCard::ConsumeStaleSentinel(launcherCardDir);
+         const bool staleGone = !LauncherCard::ConsumeStaleSentinel(launcherCardDir);
+         printf("LAUNCHER CARD SENTINEL TEST: stale-seen=%d consumed=%d %s\n", (int)staleSeen, (int)staleGone,
+                staleSeen && staleGone ? "OK" : "FAIL");
+         inject = [&]() { injected += LauncherCard::InjectMainWindowEvents(window); };
+      }
+      ImGuiContext* ctxBefore = ImGui::GetCurrentContext();
+      LauncherCard::MarkRunning(launcherCardDir);
+      // The test starts the card near its end so it finishes in about half a second.
+      launcherCardPlayed = LauncherCard::Run(window, BundledResourcePath("fonts/Inter-Regular.ttf"), mainWindowHints,
+                                             launcherCardTest ? Splash::kMinShow - 0.1f : 0.0f, inject);
+      LauncherCard::ClearRunning(launcherCardDir);
+      if (launcherCardTest)
+      {
+         // Pass = no crash while whatever main-window callbacks exist fired every card frame,
+         // the card played, the ImGui context is back, and the sentinel is cleared.
+         const bool ok = launcherCardPlayed && ImGui::GetCurrentContext() == ctxBefore &&
+                         !LauncherCard::ConsumeStaleSentinel(launcherCardDir);
+         printf("LAUNCHER CARD TEST: played=%d callbacks-hit=%d %s\n", (int)launcherCardPlayed, injected,
+                ok ? "OK" : "FAIL");
+         fflush(stdout);
+         glfwDestroyWindow(window);
+         glfwTerminate();
+         return ok ? 0 : 1;
+      }
+   }
 
    tWindowGl = Bench::ScopedStageTimer::NowMs();
    IMGUI_CHECKVERSION();
@@ -3755,10 +3812,12 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    splashEnabled = splashTest != nullptr || (!gHeadlessTestWindow && !IsHeadlessProcess() && getenv("INFINITE_NOSPLASH") == nullptr);
    if (LauncherCard::Enabled())
    {
-      LauncherCard::Run(window, BundledResourcePath("fonts/Inter-Regular.ttf"));
       glfwShowWindow(window);
       glfwFocusWindow(window);
-      splashEnabled = false; // already played, in its own window
+      if (launcherCardPlayed)
+         splashEnabled = false; // already played, in its own window
+      else if (splashEnabled)
+         Splash::Begin(0.0f); // the card window failed: fall back to the in-window splash
    }
    else if (splashEnabled)
       Splash::Begin(splashTest ? (float)atof(splashTest) : 0.0f);   return -1;
