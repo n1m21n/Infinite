@@ -229,6 +229,8 @@ entry if a refactor makes it stale.
   reaches `Transport` only through `PublishArrangeLoop()`/`ArrangeSetLoop()`
   (~5663-5690).
 
+- **Render 3D draws a flattened list, not its four pins.** `Render3DNode::CollectDraw()`/`FlattenedGeometry()` (`Geometry3DNodes.cpp`) expand `Group3DNode` children (`GroupChildCount`/`GroupChild` on `IGeometrySource`) depth-first into `mDraw`, capped at `kMaxDraw` (64) and depth 8. `mGpu` and `SceneSignature` are sized from it, so any new per-slot loop in Render 3D must iterate `mDraw`, not `kSlots`. `kSlots` itself must not change: saved pin indices depend on it.
+
 ## Adding to this map
 
 At the end of a task that touched `src/`, if you found a cross-file wiring
