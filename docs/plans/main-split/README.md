@@ -182,10 +182,10 @@ Record each as: lever → median of 3 → keep/drop (keep only if it's faster, a
 
 | Measure | Before (A0) | After A | After B | After C |
 |---|---|---|---|---|
-| `touch` one panel file → rebuild | n/a (=full main.cpp) | | 10.4 s (PerfPanel.cpp) | |
-| `touch src/main.cpp` → rebuild | 182.3 s (median of 3) | 74.4 s (1 run) | 49.7 s (1 run) | |
+| `touch` one panel file → rebuild | n/a (=full main.cpp) | | 10.4 s (PerfPanel.cpp) | 6.2 s (StageMenuBar.cpp) |
+| `touch src/main.cpp` → rebuild | 182.3 s (median of 3) | 74.4 s (1 run) | 49.7 s (1 run) | 6.7 s (1 run; main.cpp is now 119 lines) |
 | clean full build `-j8` | | | | |
-| largest TU (lines) | 107,480 | 69,142 (main.cpp); largest new TU ~3,000 | 18,527 (main.cpp); largest new TU 4,549 (ArrangePanel.cpp) | |
+| largest TU (lines) | 107,480 | 69,142 (main.cpp); largest new TU ~3,000 | 18,527 (main.cpp); largest new TU 4,549 (ArrangePanel.cpp) | 119 (main.cpp); largest TU 4,549 (ArrangePanel.cpp), Startup.cpp 3,697 |
 
 ## 7. Stop conditions
 
@@ -252,3 +252,11 @@ Run each block in its own session, only after the previous block is merged to ma
 - Generator rules worth knowing: namespaces with exposed items move whole with `inline const` edits; 3 structs with trailing declarators are split in the baseline on the same line; `SampleScanner gMediaScanner(Kind::Media);` is a variable, not a function declaration (g[A-Z] names are always variables); `#if/#else` regions are re-wrapped per item.
 - Debug tools (`gUiDebuggerOpen`, `gUiStyleEditorOpen`) keep their `#ifndef NDEBUG` guards in AppState.cpp, AppShared.h and main.cpp.
 - Gate B: `--skip-build --full` 111 passed, 1 failed (PLUGINDRAGTEST, known load flake; passes in the `--group ui` rerun), 2 xfail. Checkers read `src/main.cpp` + `src/app` via `scripts/appsrc.py`.
+
+## Block C result (2026-10-07, `feature/main-split-c`)
+
+- C1-C3 are one commit: the generator (`c1`-`c7` in the session scratchpad, driven off the pre-C `main.cpp`) cuts `main()` at top-level statement boundaries, so a per-step commit would not have been bisectable anyway. `main.cpp` 18,527 -> 119 lines: it creates `FrameCtx`, calls `InitApp`, runs the loop calling the 15 stage functions in the original order, then runs the original shutdown code verbatim.
+- Files: `src/app/Startup.cpp` (`int InitApp(FrameCtx&, argc, argv)`, -1 = go on, otherwise the exit code; the many early `return` test dispatches are unchanged), `src/app/frame/Stage*.cpp` (FramePump, MenuBar, Layout, DropHandling, FrameTestsA, BenchHarness, NodeBodies, Links, Keyboard, PopupsA, PopupsB, SidePanels, Floating, TestsB, Present), `src/app/frame/FrameCtx.h`, `src/app/frame/FrameStatics.cpp`.
+- How locals were handled (all mechanical): a local used by another stage becomes a `FrameCtx` member, with `auto& name = fc.name;` at the top of each stage that uses it and `name = init;` at the original declaration; shared function-local `static`s became namespace-level globals (FrameStatics.cpp + `extern` in FrameCtx.h; they hold constants or default-constructed values, so initialisation order is not observable); the 4 RAII stage timers are `std::optional` members reset at the end of each iteration in reverse declaration order; reference locals (`io`, `style`, `defStreamCol`) are re-declared in later stages that use them; `struct BenchB8Window` moved to FrameCtx.h; `ApplyUiScale` moved to Startup.cpp. Three `return 1;` fixture-failure exits (TestsB, Floating) propagate as the stage's `int` return and `main()` returns it.
+- `/Od` override for `src/main.cpp` removed from CMakeLists (main.cpp is a 119-line driver now). **Not verified here:** the Windows /O2 build; if CL.exe still crashes, scope `/Od` to the one `Stage*.cpp` that does it (comment left in CMakeLists).
+- Gate C (macOS): hygiene `--full` 111 passed / 1 failed (PLUGINDRAGTEST, known flake, passes in the `--group ui` rerun); `av-sync-sweep` 19/19; `shortcuts-sweep` OK (53 documented, 0 unhandled); `output-projection-sweep` fails 3 items that are not caused by the split: SPOUTLOOPTEST skips (Windows-only), IMAGERESYNTH_SELFTEST reports the same node-type failures as the pre-split build (38 there, 39 now with 5 more node types), and the static check lists Platform:: functions implemented on one OS only. Windows and Linux CI plus a manual launch are still to do.
