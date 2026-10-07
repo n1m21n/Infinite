@@ -4,7 +4,19 @@
 
 namespace app
 {
+bool TextFocusClaimed();
+
+bool IsUserSpawnable(const std::string& name);
+
+std::string NodeTitle(const GraphNode& gn);
+
 void PushUndoCheckpoint();
+
+extern bool gSuppressUndoCheckpoints;
+
+void PushArrangeUndo();
+
+void PushArrangeUndoSnapshot(const Arrange::Model& before);
 
 GraphNode* FindNodeByIndex(int index);
 
@@ -12,9 +24,34 @@ INode* FindHardwareDrivenNode();
 
 void StartOfflineRenderSession(OutputNode* n, int width = 0, int height = 0, bool isArrange = false);
 
+void ArrangeCollectClipModBindings(const GraphNode& node,
+                                      std::vector<std::pair<int, std::string>>& out);
+
 bool StartAudioEngine(std::string& outError);
 
 extern std::vector<GraphNode> gNodes;
+
+int GetNodeInstanceIndexScan(const GraphNode& targetNode, int* outTotalCount);
+
+extern int gTitleInstanceRebuilds;
+
+int GetNodeInstanceIndex(const GraphNode& targetNode, int* outTotalCount = nullptr);
+
+std::string NodeTitleWithInstance(const GraphNode& gn);
+
+extern std::map<GroupNode*, std::set<int>> gGroupMembers;
+
+extern ed::EditorContext* gEditor;
+
+extern bool gPaletteTestOk;
+
+extern bool gPaletteTestPending;
+
+extern ImVec2 gSpawnPos;
+
+extern Platform::PluginDesc gPluginDragDesc;
+
+extern PluginScanner gPluginScanner;
 
  // 0 = Modules, 1 = Samples, 2 = Media, 3 = Plugins, 4 = Field
 
@@ -34,6 +71,53 @@ extern std::vector<GraphNode> gNodes;
       int  typeFilter = 0;
       bool descending = false;
    };
+
+extern ImVec4 gSamplerDragTestRowRect;
+
+extern ImVec2 gSamplerDragTestTargetScreen;
+
+extern bool gSamplerDragTestTargetValid;
+
+extern ImVec4 gMediaDragTestRowRect;
+
+extern ImVec2 gMediaDragTestTargetScreen;
+
+extern bool gMediaDragTestTargetValid;
+
+extern ImVec4 gPluginDragTestRowRect;
+
+extern std::string gPluginDragTestRowId;
+
+extern ImVec2 gPluginDragTestTargetScreen;
+
+extern bool gPluginDragTestTargetValid;
+
+extern int gPluginDragTestPhase;
+
+extern int gSamplerDragTestPhase;
+
+extern int gMediaDragTestPhase;
+
+
+
+   struct LinkInfo
+   {
+      int id = 0;
+      int srcPin = 0;
+      int dstPin = 0;
+   };
+
+extern std::vector<LinkInfo> gLinks;
+
+bool FieldOutputPinHasLiveCable(int nodeIndex, int outputIndex);
+
+extern float gGridSnap;
+
+extern uint32_t gAudioOutputDeviceId;
+
+extern double gAudioSampleRate;
+
+extern int gAudioBufferFrames;
 
 extern std::string gAudioStartError;
 
@@ -126,15 +210,316 @@ extern std::set<int> gHeadlessDrawn;
 
 bool HeadlessJobActive();
 
+
+
+   // ---- Arrangement render jobs (WP7) --------------------------------------
+   // One job = one file. The timeline's Render popup fills one in, and either
+   // runs it immediately or parks it in the queue; both paths go through
+   // ArrangeRenderBeginJob, so the hardware-source refusal, the overwrite
+   // check and the source routing can't be skipped by one of them.
+   enum ArrangeRenderAudioSource { kArrangeAudioTimeline = 0, kArrangeAudioCanvas = 1, kArrangeAudioNone = 2 };
+
+
+   enum ArrangeRenderVideoSource { kArrangeVideoTimeline = 0, kArrangeVideoCanvas = 1, kArrangeVideoNone = 2 };
+
+
+   enum ArrangeRenderRangeKind { kArrangeRangeWhole = 0, kArrangeRangeLoop = 1, kArrangeRangeMarkers = 2, kArrangeRangeCustom = 3 };
+
+
+   enum ArrangeRenderStatus
+   {
+      kArrangeJobQueued = 0,
+      kArrangeJobRendering,
+      kArrangeJobFinalizing,
+      kArrangeJobDone,
+      kArrangeJobFailed,
+      kArrangeJobCancelled
+   };
+
+
+
+   struct ArrangeRenderJob
+   {
+      uint64_t id = 0;
+      int rangeKind = kArrangeRangeWhole;
+      int64_t startTick = 0;
+      int64_t endTick = 0;
+      int audioSource = kArrangeAudioTimeline;
+      int videoSource = kArrangeVideoTimeline;
+      uint64_t canvasVideoUid = 0; // only when videoSource == kArrangeVideoCanvas
+      int width = 1920, height = 1080, fps = 60;
+      int sampleRate = 48000;
+      int format = 0;              // 0 = mp4, 1 = mov, 2 = wav
+      std::string path;
+      int status = kArrangeJobQueued;
+      std::string message;         // failure reason, or a note about the take
+      int framesDone = 0, framesTotal = 0;
+      double startedTime = 0.0;    // glfwGetTime() when it began, for the ETA
+      // Empty = whole project (every lane), matching the original behavior.
+      // Non-empty scopes the take to just these lane ids ("Render Track" /
+      // "Render Group"). Only meaningful when videoSource is Timeline or
+      // None - a canvas take isn't a lane concept, so it always ignores this.
+      std::vector<uint64_t> laneScope;
+   };
+
+extern std::vector<ArrangeRenderJob> gArrangeRenderQueue;
+
+extern uint64_t gArrangeRenderNextJobId;
+
+extern uint64_t gArrangeRenderActiveJobId;
+
+extern bool gArrangeRenderQueueRunning;
+
+
+
+   // An audio-only take (Video source = None). It has no OutputNode, no
+   // encoder and no frames - just AudioEngine::ProcessOffline block by block
+   // into a WAV file - so it can't ride on gOfflineRender, which is built
+   // around a node's video take. Only one of the two ever runs at a time.
+   struct ArrangeWavRenderState
+   {
+      bool active = false;
+      bool timelineAudio = true;   // same meaning as gOfflineRender.timelineAudio
+      bool cancelRequested = false;
+      AudioFileWriter writer;
+      long long framesTotal = 0, framesDone = 0;
+      double sampleRate = 0.0;
+      double startSeconds = 0.0, endSeconds = 0.0;
+      bool deviceWasRunning = false, wasPlaying = true, vsyncWasOn = true;
+      double startedTime = 0.0;
+   };
+
+extern ArrangeWavRenderState gArrangeWavRender;
+
+void ArrangeRenderQueueTick();
+
+void ArrangeRenderCancelAll();
+
+bool ArrangeRenderBusy();
+
+extern double gLastFrameMs;
+
+extern int gTargetFps;
+
+extern bool gVsync;
+
+extern bool gRequestFitView;
+
+extern bool gRequestUngroup;
+
+extern int gKbFocusNode;
+
+extern int gKbFocusParam;
+
+extern int gKbNudge;
+
+extern bool gKbZoomed;
+
+extern bool gNodeHelpShown;
+
+extern bool  gArrangePanelOpen;
+
+extern bool  gArrangeScrubbing;
+
+extern uint64_t gArrangeMarkerDragId;
+
+extern uint64_t gArrangeRevealClipId;
+
+extern uint64_t gArrangeFlashClipId;
+
+
+   // Which of the two mutually exclusive audio routings is live (overhaul
+   // WP3). Canvas = the node graph's own Audio Out nodes feed the device, the
+   // arrangement is silent. Timeline = the arrangement's audio clips feed the
+   // device directly and every canvas Audio Out is bypassed.
+   //
+   // Deliberately NOT persisted and NOT part of a patch: it is a monitoring
+   // choice, not a property of the work, and a patch that silently reopened
+   // in Timeline mode would play nothing until the user found the button.
+   // Reset to Canvas on launch (this initialiser), File > New and File > Open.
+   //
+   // Routing depends on this and nothing else. It used to also require the
+   // arrangement panel to be open and the transport to be playing, which made
+   // hiding the panel or hitting pause change what the topology contained -
+   // a rebuild-driven mode leak rather than a routing rule.
+   enum class AudioMode { Canvas, Timeline };
+
+extern AudioMode gAudioMode;
+
+extern int   gPerfMidiLearnIdx;
+
+void MidiLearnCancelAll();
+
+void StartParamMidiLearn(int nodeIndex, int paramIndex);
+
+bool ParamMidiLearnIsActiveFor(int nodeIndex, int paramIndex);
+
+int  MidiLearnActiveCount();
+
+bool ParamMidiLearnActive();
+
+bool ParamMidiLearnable(int nodeIndex, int paramIndex);
+
+bool ParamMidiLearnCommit(int nodeIndex, int paramIndex, const Platform::MidiCCValue& last);
+
 extern Patch::PerfLayoutRecord gPerfLayout;
 
 extern std::vector<Patch::PerfRecord> gPerfElements;
 
 extern Arrange::Model gArrange;
 
+extern std::set<uint64_t> gArrangeSel;
+
+extern uint64_t gArrangeSelAnchor;
+
+extern bool gArrangeGestureOpen;
+
+
+
+   // Live clip drag. Every frame the model is rebuilt from the gesture
+   // snapshot plus the current (delta, laneDelta) through the same op the
+   // release would run, so what is drawn is exactly what the drop will do.
+   enum ArrangeDragMode
+   {
+      kArrangeDragNone = 0,
+      kArrangeDragMove,
+      kArrangeDragTrimStart,
+      kArrangeDragTrimEnd,
+      kArrangeDragGroupEdge,   // TrimGroupEdge: only members flush with the edge
+      kArrangeDragGroupScale,  // ScaleGroup: Shift-drag on a group edge
+   };
+
+
+
+   // One dropped-media-file decode in flight (or about to be), tracking the
+   // clip/node already placed in a "loading" state so ArrangePollMediaImports
+   // can find them again once Arrange::MediaImportManager finishes decoding.
+   // See ArrangeImportMediaFile/ArrangePollMediaImports below.
+   struct ArrangePendingImport
+   {
+      uint64_t jobId = 0;
+      uint64_t clipId = 0;
+      uint64_t nodeUid = 0;
+      Arrange::ImportMediaKind kind = Arrange::ImportMediaKind::Audio;
+      // True for a re-decode kicked by ArrangeRespawnCloneNode (paste/
+      // duplicate/split of an existing Sample clip) rather than a fresh
+      // drop from ArrangeImportMediaFile - the clip already has correct
+      // sampleBpm/origBpm/length/sourceDurationSeconds from the original,
+      // so ArrangePollMediaImports must not re-estimate/overwrite them,
+      // just attach the newly decoded buffer to the clone's own node.
+      bool isClone = false;
+   };
+
+extern std::vector<ArrangePendingImport> gArrangePendingImports;
+
 extern std::map<std::pair<int, int>, float> gPerfPendingWrites;
 
 extern int   gCableVisibilityMask;
+
+extern ImVec2 gGraphScreenTL;
+
+extern ImVec2 gGraphScreenSize;
+
+void SetCanvasSwapInterval(int interval);
+
+extern ImVec2 gDragTestNodeScreen;
+
+extern ImVec2 gDragTestNodePos;
+
+extern ImVec2 gTestMouse;
+
+extern std::vector<ImVec4> gWtTestRects;
+
+extern bool gWtDragOk;
+
+extern std::vector<ImVec4> gWtTestScreen;
+
+extern ImVec2 gDragTestViewAnchor;
+
+extern ImVec4 gEqTestScreen;
+
+
+
+   // ---- deferred dropdown -------------------------------------------------
+   // ImGui combos opened inside a node get clipped and mis-scaled by the node
+   // editor's canvas transform. Instead a node draws a plain button, records
+   // what it wants to show, and the popup is rendered once per frame outside
+   // the canvas (inside ed::Suspend) as a normal, scrollable ImGui popup.
+   struct DropdownRequest
+   {
+      // Stored BY VALUE, not as a pointer to the caller's vector: several call
+      // sites pass an inline temporary (e.g. `{ "Free", "Synced" }`), which is
+      // destroyed at the end of that statement. The popup itself doesn't
+      // render until later - ImGui::OpenPopup here just flags it, and
+      // BeginPopup happens further down this same frame - so a stored pointer
+      // would already be dangling by then. This was the Stutter "Synced"
+      // crash: its sync dropdown is exactly such a temporary.
+      std::vector<std::string> options;
+      std::vector<std::string> categories;
+      std::function<void(int)> onSelect;
+      int current = 0;
+      bool justOpened = false;
+      bool focusSearch = false;
+      char filterBuf[64] = "";
+   };
+
+extern DropdownRequest gDropdown;
+
+void CommitDropdownPick(int i);
+
+extern std::pair<int, int> gDropdownTestOpenKey;
+
+
+
+   // Same story for ImGui's colour picker: opened inside a node it inherits the
+   // canvas transform and the hue bar / sliders stop tracking the cursor. Route
+   // it through a popup rendered outside the canvas instead.
+   struct ColorRequest
+   {
+      float* target = nullptr;
+      const INode* owner = nullptr; // revalidated each frame; nodes can be deleted
+      std::string label;
+      bool justOpened = false;
+   };
+
+extern ColorRequest gColor;
+
+extern ImVec4 gColorPickerRect;
+
+extern ImVec4 gCommentBodyRect;
+
+
+
+   // Phase 2 of the unpack operation: a poll-and-validate tick driven once
+   // per frame (also after ed::End(), alongside the drain above) while
+   // `active` is true. Phase 1 reveals the mounted children at a provisional
+   // layout and arms this; phase 2 waits for every revealed child's ed::
+   // node size to read as a real measurement (not a freshly-spawned node's
+   // sentinel/placeholder size - doc §3.3/trap 3) before finalizing row
+   // heights and spawning the wrapping GroupNode. Capped at kMaxRetries
+   // frames, after which it finalizes with the kUnpackDYMin-only fallback
+   // stacking rather than waiting forever (doc's own defensive framing of
+   // the "two-frame operation").
+   struct FieldGraphUnpackPhase2State
+   {
+      bool active = false;
+      FieldGraphNode* target = nullptr;
+      std::vector<int> members;               // mounted indices, in layout order
+      std::map<int, int> depthByIndex;        // member index -> topological depth
+      std::map<int, float> columnX;           // depth -> this column's x
+      int retriesLeft = 0;
+      static constexpr int kMaxRetries = 10;
+   };
+
+extern FieldGraphUnpackPhase2State gFieldGraphUnpackPhase2;
+
+extern bool gShortcutsOpen;
+
+extern bool gNavOwnsKeys;
+
+extern std::vector<std::string> gDroppedFiles;
+
+extern ImVec2 gDropPos;
 
 int DrumSequencerLaneForCanvasPos(DrumSequencerNode* n, float canvasX, float canvasY);
 
@@ -287,6 +672,8 @@ extern BrowserFavorites gBrowserFavorites;
 
 extern bool gPatchDirty;
 
+int DiscreteParamSlot(int nodeIndex, const std::string& rawLabel);
+
 extern std::set<std::pair<int, int>> gTypedParam;
 
 extern std::map<std::pair<int, int>, std::string> gTypedParamText;
@@ -299,6 +686,8 @@ void BeginNodeParams(int nodeIndex);
 
 void EndNodeParams();
 
+bool TextFocusClaimed();
+
 extern std::set<ParamKey> gPredictorGrabs;
 
 uint64_t UidForIndex(int nodeIndex);
@@ -307,6 +696,8 @@ float ParamToPos(const ParamRef& r, float v);
 
 float PosToParam(const ParamRef& r, float pos);
 
+extern std::map<std::pair<int, int>, float> gIntParamStore;
+
 void RegisterNodes();
 
 IModulator* ModulatorForOutput(INode* node, int outputIndex);
@@ -314,6 +705,108 @@ IModulator* ModulatorForOutput(INode* node, int outputIndex);
 GraphNode* FindNodeByIndex(int index);
 
 GraphNode* FindNodeByUid(uint64_t uid);
+
+void ArrangeCommitEdit();
+
+
+
+   // Runs `op` against gArrange and, if it changed anything (the revision
+   // moved), pushes one timeline undo entry holding the pre-edit model.
+   // Returns whether anything changed. The one shape every discrete timeline
+   // edit (key, menu item, button) goes through.
+   inline template <class Op>
+   bool ArrangeEdit(Op&& op)
+   {
+      Arrange::Model before = gArrange;
+      op();
+      if (gArrange.revision == before.revision)
+         return false;
+      PushArrangeUndoSnapshot(before);
+      ArrangeCommitEdit();
+      return true;
+   }
+
+   // Continuous-gesture undo (drag, popup DragFloat, rename): snapshot at the
+   // gesture's start, push at its end only if the revision moved.
+   bool ArrangeGestureEnd();
+
+void ArrangeGestureBegin();
+
+bool ArrangeGestureEnd();
+
+void ArrangeSetLoop(bool enabled, Arrange::Tick start, Arrange::Tick end);
+
+void ArrangeSetTimeDisplay(int mode);
+
+void ArrangeSetSnap(int division, bool triplet);
+
+Arrange::Tick ArrangeSnapGridTicks();
+
+Arrange::Tick ArrangePlayTick();
+
+void ArrangeSeekTick(Arrange::Tick t);
+
+void ArrangeScrubBegin(Arrange::Tick t, ImGuiMouseButton button = ImGuiMouseButton_Left);
+
+void ArrangeScrubUpdate(Arrange::Tick t);
+
+bool ArrangeScrubEnd();
+
+void ArrangeScrubCancel();
+
+Arrange::Tick ArrangeEndKeyTargetTick();
+
+uint32_t ArrangeMarkerRGBA(ImU32 col);
+
+
+   inline constexpr uint32_t kArrangeDefaultMarkerRGBA = 0xF59E0BFFu;
+
+ // amber
+
+   // The one colour list the timeline's Color Tint menu and the marker menu
+   // both offer. Entry 0 is "no tint" for clips and the default for markers.
+   struct ArrangePaletteEntry { const char* name; ImU32 col; };
+
+
+   inline const ArrangePaletteEntry kArrangePalette[10] = {
+      { "Default", IM_COL32(110, 120, 140, 255) },
+      { "Crimson", IM_COL32(239, 68, 68, 255) },
+      { "Orange",  IM_COL32(249, 115, 22, 255) },
+      { "Amber",   IM_COL32(245, 158, 11, 255) },
+      { "Emerald", IM_COL32(16, 185, 129, 255) },
+      { "Cyan",    IM_COL32(6, 182, 212, 255) },
+      { "Blue",    IM_COL32(59, 130, 246, 255) },
+      { "Purple",  IM_COL32(139, 92, 246, 255) },
+      { "Magenta", IM_COL32(217, 70, 239, 255) },
+      { "Rose",    IM_COL32(244, 63, 94, 255) }
+   };
+
+
+
+   // The snap grids the timeline offers: MusicTime RateDivision entries
+   // (names and lengths come from that one table - rhythmic-quantization-
+   // standard) mapped onto Settings::snapDivision / snapTriplet. rd -1 = Off.
+   // INFINITE_ARRANGEMARKERTEST checks every row against MusicTime::BeatsFor.
+   struct ArrangeGridChoice { int rd; int division; bool triplet; };
+
+
+   inline const ArrangeGridChoice kArrangeGridChoices[10] = {
+      { -1, 0, false },
+      { MusicTime::k1Bar, 1, false },
+      { MusicTime::kHalf, 2, false },          { MusicTime::kHalfTrip, 2, true },
+      { MusicTime::kQuarter, 4, false },       { MusicTime::kQuarterTrip, 4, true },
+      { MusicTime::kEighth, 8, false },        { MusicTime::kEighthTrip, 8, true },
+      { MusicTime::kSixteenth, 16, false },    { MusicTime::kSixteenthTrip, 16, true },
+   };
+
+uint64_t ArrangeAddMarkerAtPlayhead();
+
+bool ArrangeJumpToMarker(int dir);
+
+void ArrangeModelToPatchData(const Arrange::Model& m, Patch::Data& data);
+
+void PatchDataToArrangeModel(const Patch::Data& data, Arrange::Model& m,
+                                const std::function<uint64_t(int)>& resolveLegacy = {});
 
 int InputCountFor(const GraphNode& gn);
 
@@ -327,11 +820,34 @@ ImageCable* CableFor(GraphNode& gn, int slot);
    // The widest today is Mixer, at MixerNode::kMaxSlots (12).
    inline const int kMaxAudioSlots = 12;
 
+
+   // Every note-consuming node before AudioPluginNode carried its one note
+   // pin at unified slot 0 (Sampler, Envelope, ...), which is why this was 1
+   // and the topology builder's wiring pass (RebuildAudioTopology) used to
+   // just call NoteInputSlot(0) directly rather than loop. AudioPluginNode's
+   // note pin lives at slot 1 instead - so audio stays at slot 0 and existing
+   // patches keep loading unchanged - which needed this bumped to 2 and that
+   // wiring pass turned into a real loop; see its comment. NoteMergeNode's
+   // 4-way fan-in (mirroring NoteRouterNode's 4-way fan-out) needed this
+   // bumped again to 4.
+   //
+   // Mirrors AudioNode::kMaxNoteSlots (src/audio/AudioNode.h), which needs
+   // the same bound for its fixed appliedInbox/appliedCursor arrays - kept
+   // as a separate local alias rather than replacing every call site below
+   // with the qualified name.
+   inline const int kMaxNoteSlots = AudioNode::kMaxNoteSlots;
+
 void RebuildAudioTopology();
 
 void ForceAudioRepare();
 
+void RemoveNodeByIndex(int index);
+
+void ArrangeRespawnCloneNode(uint64_t clipId);
+
 void WireInputSlot(GraphNode& srcNode, GraphNode& dstNode, int slot, int srcOutputIndex = 0);
+
+bool ConnectNodes(int srcIndex, int srcOutputIndex, int dstIndex, int dstSlot, std::string& outError);
 
 
 
@@ -357,8 +873,89 @@ const PatchSchema::TypeSchema* SchemaFor(const std::string& typeName);
 
 PatchSchema::Env MakeSchemaEnv(bool forRender);
 
+
+
+   // Connections captured for a copy/duplicate cluster, in terms of *original*
+   // gNodes indices - resolved against the fresh copies (and, for external
+   // sources, re-validated against the live graph) only at apply time, since
+   // the graph can change between capture and apply (Cmd+C to Cmd+V) or even
+   // within the same frame (a node in the cluster could reference another
+   // that failed to spawn).
+   struct ClusterLink
+   {
+      int srcIndex = -1;       // orig gNodes index of the plain-slot source
+      int srcOutputIndex = 0;
+      int dstIndex = -1;       // orig gNodes index of the destination (always in the cluster)
+      int dstSlot = 0;
+   };
+
+
+   struct ClusterModLink
+   {
+      int dstIndex = -1;
+      int paramIndex = 0;
+      Modulation::Source source; // source.nodeIndex is the ORIGINAL modulator's gNodes index
+   };
+
+
+   struct ClusterPaletteLink
+   {
+      int dstIndex = -1;
+      int colorIndex = 0;
+      int paletteOrigIndex = -1;
+      int swatchIndex = 0;
+   };
+
+
+   // A typed expression on one of the cluster's params. Unlike a mod link
+   // this names no source node - the text is self-contained (patch-wide
+   // named values it reads live in ExprGlobals, which the copy shares) - so
+   // there is nothing to rewire, only to carry across.
+   struct ClusterExprLink
+   {
+      int dstIndex = -1;
+      int paramIndex = 0;
+      std::string text;
+   };
+
+
+   // A Shift-drag recording looping on one of the cluster's params. Session
+   // state rather than patch content (see UndoEntry), and carried for the
+   // same reason: the user sees a red, moving knob, so a copy of that node
+   // that came back still is a copy of something they aren't looking at.
+   struct ClusterGestureLink
+   {
+      int dstIndex = -1;
+      int paramIndex = 0;
+      GestureRecorder::Playback playback;
+   };
+
+
+
+   // Everything about a set of nodes that is NOT stored on the nodes
+   // themselves: it all keys off (nodeIndex, paramIndex) or off a pin, so it
+   // has to be captured before the copies are spawned and rewired onto them
+   // afterwards. One struct rather than parallel vectors because there are
+   // five capture/apply sites, and every kind added as a separate out-param
+   // was another edit at all ten - which is exactly how expressions and
+   // recordings came to be silently dropped by duplicate and paste.
+   struct ClusterClipboard
+   {
+      std::vector<ClusterLink> links;
+      std::vector<ClusterModLink> modLinks;
+      std::vector<ClusterPaletteLink> paletteLinks;
+      std::vector<ClusterExprLink> exprs;
+      std::vector<ClusterGestureLink> gestures;
+   };
+
+void CaptureClusterLinks(const std::set<int>& indices, ClusterClipboard& out);
+
+void ApplyClusterLinks(const std::map<int, GraphNode*>& newByOrig, const ClusterClipboard& clip);
+
 GraphNode* SpawnNode(const std::string& typeName, const std::string& category,
                         float x = 0.0f, float y = 0.0f);
+
+void CopyParams(INode* dstNode, INode* srcNode);
 
 
 
@@ -374,6 +971,38 @@ GraphNode* SpawnNode(const std::string& typeName, const std::string& category,
 
 void DrawFieldElementParams(FieldElementNode* n);
 
+
+
+   // Directly editable ADSR: four draggable handles on the curve itself.
+   // Attack and decay are the x of their own corner, sustain the y of the
+   // sustain shelf, release the x of the tail - which is the mapping every
+   // envelope editor uses, so it needs no explanation to anyone who has seen
+   // ADSR Layout Geometry: computes relative, adaptive timebase points
+   // so envelopes always span across the visualizer width with proper visual weight
+   struct ADSRLayout
+   {
+      ImVec2 p0; // start (0, 0)
+      ImVec2 pA; // attack peak (Ax, 1.0)
+      ImVec2 pD; // decay end / sustain start (Dx, S)
+      ImVec2 pS; // sustain end / release start (Sx, S)
+      ImVec2 pR; // release end (Rx, 0.0)
+      float x0, topY, baseY, spanY;
+      float wA, wD, wShelf, wR;
+      float timeW; // usable width minus the shelf - what wA/wD/wR are drawn from
+   };
+
+ADSRLayout ComputeADSRLayout(ImVec2 origin, float w, float h, float attackMs, float decayMs,
+                                       float sustain, float releaseMs, float maxTimeMs = 4000.0f);
+
+std::string MpcModeLabel(int pad);
+
+std::string MpcParamName(int pad, int k);
+
+
+   enum MpcDiscreteKind { kMpcMode = 0, kMpcSync, kMpcDiv, kMpcNumDiscrete };
+
+std::string MpcDiscreteLabel(int pad, int which);
+
 const std::vector<std::string>& MediaTypeFilterNames();
 
 std::vector<const SampleScanner::Entry*> FilterAndSortSampleEntries(
@@ -385,7 +1014,75 @@ bool ILess(const std::string& a, const std::string& b);
 std::vector<const PluginScanner::Entry*> FilterAndSortPluginEntries(
       const std::vector<PluginScanner::Entry>& index, const std::string& lowerQuery, const BrowserFilterState& state);
 
+
+
+   // ---- Audio Filter -----------------------------------------------------
+   // Cached per-node response curve. MagnitudeDb (AudioFilterKernel.h) used
+   // to be a settled-sine simulation of up to ~8000 samples per point (up to
+   // ~1.28M simulated samples per 160-point curve), which is what the
+   // throttling below was built around; it is now the closed-form transfer
+   // function (~microseconds per curve), so the throttle only saves a little
+   // draw-list churn. Recomputed only
+   // when the signature (everything it depends on) actually changed (per
+   // audio-node-ui-system.md §3f's "computed main-thread ... never by
+   // calling into the live AudioNode" - this recomputes from a *scratch*
+   // Biquad/TptSvf, same as the kernel's own PushParams, not the running
+   // one) - AND, while a drag is actively changing the signature every
+   // frame, throttled to at most once per kFilterCurveThrottleSec so a drag
+   // doesn't force a full recompute at UI frame rate. The heuristic for "a
+   // drag is happening" is deliberately the same one the task that added
+   // this used: the signature changed on this exact frame AND the mouse
+   // button is currently held (a typed edit or a single modulation step
+   // changes the signature without the button held, and gets an immediate,
+   // un-throttled, full-resolution recompute - so the *final* curve after
+   // any change, drag or not, is always full 160-point resolution).
+   //
+   // Continuous motion that is NOT a drag - an LFO, expression, macro or
+   // Drift moving freq/Q/gain every frame - used to fall through to the
+   // un-throttled full recompute on every frame, for every modulated filter
+   // on the canvas (~31% of the main thread with 72 modulated filters). A
+   // signature that changes on two frames in a row is now "in motion": the
+   // first change of a streak still recomputes at once (so a typed edit or a
+   // single stepped-modulator jump is exact immediately), later ones are
+   // capped per node to kFilterCurveMotionSec and staggered by node index
+   // (FilterCurvePhase) so the filters on a canvas don't all land on one
+   // frame. The first frame the signature holds still, the curve is
+   // recomputed at full resolution - including after a drag or motion
+   // streak whose last recompute was a coarse one (FilterCurveCache::coarse).
+   struct FilterCurveCache
+   {
+      std::vector<float> curveDb; // one entry per x pixel column sampled
+      std::vector<float> signature;    // signature that produced curveDb
+      std::vector<float> lastSeenSignature; // signature observed last frame
+      double lastRecomputeTime = -1.0;
+      double nextDue = -1.0;          // earliest time a recompute during a motion streak may run
+      bool changedLastFrame = false;  // signature also changed on the previous drawn frame
+      bool coarse = false;            // curveDb holds a reduced-resolution recompute
+      float lastOriginX = 0.0f;       // x origin / width curveDb was sampled at
+      float lastWidth = 0.0f;
+      bool dragIsQ = false; // which handle the current drag (if any) is grabbing
+   };
+
+extern std::map<int, FilterCurveCache> gFilterCurveCache;
+
+extern int gFilterCurveRecomputes;
+
+ // self-test visibility only
+   inline const double kFilterCurveMotionSec = 0.05;
+
+
+   inline const int kFilterCurveFullPoints = 160;
+
+float FilterVizFreqToX(float hz, float x0, float w);
+
+float FilterVizDbToY(float db, float y0, float h);
+
+void ComputeFilterCurve(std::vector<float>& out, int numPoints, int type, float freq, float q, float gain,
+                           double sampleRate, float originX, float w);
+
 extern bool gPatchDirty;
+
+void FrameSceneInView(Render3DNode* n);
 
 void ExportImage(INode* out, const std::string& path, int jpgQuality = 90,
                     std::vector<unsigned char>* keepPixels = nullptr, int outputIndex = 0);
@@ -502,11 +1199,296 @@ std::vector<uint8_t> EncodePng16(int w, int h, const uint16_t* rgba, int level);
       bool mStop = false;
    };
 
+GroupNode* GroupOwning(int nodeIndex);
+
+
+
+   // Nodes/viewports retired by RemoveNodeByIndex/NewPatch, held past the GL
+   // texture hazard (their own draw calls can't happen synchronously - see
+   // RemoveNodeByIndex) AND past the audio hazard: a retired node's AudioNode
+   // may still be reachable through AudioEngine's currently-published topology
+   // for a little while after it leaves gNodes (RebuildAudioTopology hasn't
+   // republished yet, or the audio thread hasn't finished a block against the
+   // last topology that included it). safeAfterGeneration records
+   // AudioEngine::CurrentGeneration() at the moment of retirement - "the last
+   // topology generation that can still reach this node" - and the node is
+   // only actually destroyed once AudioEngine::CompletedGeneration() confirms
+   // the audio thread has moved past it. A plain one-video-frame delay isn't
+   // enough here: nothing ties a video frame's length to the audio thread's
+   // own progress (see the crash this replaced - Cmd+Z destroying a node
+   // whose AudioNode the audio thread was still mid-ProcessBlock on).
+   // NodeViewport has a user-declared destructor (which suppresses its
+   // implicit move ctor), so it can't live in a vector<NodeViewport> without a
+   // copy that would double-free its GL texture; map::node_type from
+   // extract() moves the whole tree node instead of the mapped value,
+   // sidestepping that.
+   struct RetiredNode
+   {
+      std::unique_ptr<INode> node;
+      uint64_t safeAfterGeneration = 0;
+   };
+
+extern std::vector<RetiredNode> gRetiredNodes;
+
+extern std::map<int, NodeViewport> gPanelViewports;
+
 float ApplyModulationCurve(float v, float curve);
+
+bool IsNodeVideoCompatible(const GraphNode& gn);
+
+bool IsNodeAudioCompatible(const GraphNode& gn);
+
+
+
+   // ---- arrangement video compositing (overhaul WP4) ---------------------
+   //
+   // One pass per active video lane, bottom lane first, so the lane drawn at
+   // the TOP of the panel lands in front - the NLE convention (spec §1). Each
+   // caller owns an ArrangeCompositeTarget: the live monitor has one, the
+   // offline render another. They used to share a single static scratch FBO,
+   // which the two resized against each other every frame a render ran with
+   // the panel open.
+
+   // A render target's private GL state. `scratch` is the ping-pong pair the
+   // lane passes alternate between; `result` is the stable output for a
+   // caller that has no FBO of its own to land in (the monitor). `slot` keys
+   // this target's own geometry viewports (gArrangeGeomViewports), so two
+   // targets at different sizes never share - and thrash - one NodeViewport.
+   struct ArrangeCompositeTarget
+   {
+      int slot = 0;
+      GLUtil::Fbo scratch[2];
+      GLUtil::Fbo result;
+      // `result` from before its last resize. The monitor's texture id goes
+      // into the ImGui draw list during the UI pass, and the composite runs
+      // after the cook loop but before ImGui::Render - so a resize there
+      // would leave the draw list sampling a deleted texture for one frame.
+      // Kept one composite longer, then freed.
+      GLUtil::Fbo retiredResult;
+      // Set by the monitor during the UI pass; consumed by the post-cook
+      // composite. 0 = the panel did not draw the monitor this frame.
+      int requestW = 0;
+      int requestH = 0;
+   };
+
+
+
+   // Geometry clips' solo renders. A geometry node has no image of its own
+   // (GeometryNode::GetOutputTexture), so a clip of one needs a NodeViewport
+   // sized to the composite. These used to borrow gPanelViewports, which the
+   // Viewport Panel erases every frame for any node it is not showing - so a
+   // geometry clip allocated and freed a full-size FBO every frame (4K per
+   // frame during a render). Keyed by (node uid, target slot); an entry
+   // unused for kArrangeGeomEvictFrames main-loop frames is dropped by
+   // ReapArrangeGeomViewports(). std::map, not unordered: NodeViewport is
+   // neither copyable nor movable, and a node-based map never relocates it.
+   struct ArrangeGeomViewport
+   {
+      NodeViewport viewport;
+      uint64_t lastUsedFrame = 0;
+   };
+
+extern std::map<std::pair<uint64_t, int>, ArrangeGeomViewport> gArrangeGeomViewports;
+
+
+   inline constexpr uint64_t kArrangeGeomEvictFrames = 120;
+
+void ReapArrangeGeomViewports();
+
+
+
+   // ---- Live clip waveforms (WP8) --------------------------------------
+   // One position-indexed peak cache per audio clip, filled by the audio
+   // thread as the clip plays (AudioEngine::ClipPeaks) and drained here.
+   // Position-indexed, not streamed: bucket k always means the same slice of
+   // the clip, so playing the same bar twice overwrites rather than appends,
+   // and scrubbing backwards fills in what was skipped.
+   //
+   // Never saved and never pre-decoded: a clip's source is a live node, not a
+   // file, so there is nothing to read ahead of the playhead. A clip that has
+   // not been played yet draws a flat centre line, which is the honest
+   // picture of "nothing has come out of this node here yet".
+   struct ArrangeClipWave
+   {
+      // The clip shape this cache was sized and measured for. Any change to
+      // these four means the buckets no longer describe what the clip holds,
+      // so the cache is cleared - they are exactly the fields WP8 names
+      // (src, output, start, length). `start` is in the list because a clip's
+      // source is a live node rather than a file: moved two beats later, the
+      // clip plays whatever the node emits two beats later, not the material
+      // that was measured. Gains and fades are deliberately NOT here - the
+      // audio thread measures pre-envelope, pre-gain, so they change how the
+      // clip sounds without changing what the buckets describe.
+      uint64_t srcUid = 0;
+      int      srcOutput = 0;
+      Arrange::Tick start = 0;
+      Arrange::Tick length = 0;
+      // The same four fields hashed, as ArrangeClipShape spells it. Carried
+      // into every ClipWindow so a bucket measured under the previous shape
+      // and still in flight when an edit lands is dropped on arrival rather
+      // than written into the reshaped array at a coincidentally valid index.
+      uint64_t shape = 0;
+      // Audio Sample static waves only: the remaining inputs the slice
+      // depends on, so ArrangeSyncClipVisuals can tell a stale entry from a
+      // current one after ANY edit (trim, split, paste, undo, BPM or sync
+      // change, a project-tempo change on an unsynced clip).
+      double   sampleEffBpm = 0.0;
+      float    sampleOffset = 0.0f;
+      const Platform::SampleBuffer* sampleBuf = nullptr;
+      std::vector<float>   minv;
+      std::vector<float>   maxv;
+      std::vector<uint8_t> filled;
+   };
+
+extern std::unordered_map<uint64_t, ArrangeClipWave> gArrangeClipWaves;
+
+extern std::unordered_map<uint64_t, ArrangeClipWave> gArrangeSampleStaticWaves;
+
+
+   // Ticks per bucket, the main-thread spelling of kClipPeakBucketsPerBeat.
+   inline constexpr Arrange::Tick kArrangeWaveBucketTicks = Arrange::kPPQ / 16;
+
+
+   // A clip longer than this many buckets (~1 hour at 120 bpm) stops being
+   // cached rather than allocating without bound. Nothing in the model caps
+   // clip length, so this is a guard, not a policy.
+   inline constexpr int kArrangeWaveMaxBuckets = 128 * 1024;
+
+int ArrangeWaveBucketCount(Arrange::Tick length);
+
+void ArrangeSetSampleSync(uint64_t clipId, bool sync);
+
+void ArrangeSetSampleBpm(uint64_t clipId, float bpm);
+
+
+
+   // ---- Clip thumbnails (WP8) ------------------------------------------
+   // One 96x54 FBO per *video* clip id, blitted from whatever texture the
+   // composite already resolved for that clip - so a thumbnail costs one
+   // small aspect-fit pass and never a second decode or a second render of
+   // the source. Refreshed at most once a second while the clip is active,
+   // and immediately after a reassign (lastCapture reset below).
+   struct ArrangeClipThumb
+   {
+      GLUtil::Fbo fbo;
+      double   lastCapture = -1.0; // glfwGetTime(); < 0 means "never captured"
+      uint64_t srcUid = 0;
+      int      srcOutput = 0;
+   };
+
+extern std::map<uint64_t, ArrangeClipThumb> gArrangeClipThumbs;
+
+void ArrangeSyncClipVisuals();
+
+int CountActiveArrangeVideoClips(double beat, std::string* outFrontTitle = nullptr);
 
 void ArrangeSeekVideoSampleSources(double beat);
 
+unsigned int CompositeArrangeTimelineVideo(ArrangeCompositeTarget& target, GLUtil::Fbo* dest,
+                                              double beat, int targetW, int targetH);
+
+int ArrangeLaneTypeForNode(const GraphNode& gn);
+
+void ArrangePruneSelection();
+
+std::vector<uint64_t> ArrangeSelectionIds();
+
+void ArrangeClickSelect(uint64_t clipId, bool toggle, bool singleMember);
+
+bool ArrangeCopySelection();
+
+bool ArrangePasteAt(Arrange::Tick atTick);
+
+bool ArrangeDuplicateSelection();
+
+bool ArrangeDeleteSelection();
+
+bool ArrangeBladeSplitAt(uint64_t clipId, Arrange::Tick tick);
+
+bool ArrangeToggleEnabledSelection();
+
+bool ArrangeCanGroupSelection();
+
+bool ArrangeCanUngroupSelection();
+
+bool ArrangeGroupSelection();
+
+bool ArrangeUngroupSelection();
+
+bool ArrangeNudge(int dir);
+
+bool ArrangeDragUpdate(Arrange::Tick value, int laneDelta);
+
+bool ArrangeDragEnd();
+
+uint64_t AddNodeToArrangeTimeline(int nodeIndex, int laneType = -1, int srcOutput = -1);
+
+bool ArrangeAssignClipSource(uint64_t clipId, uint64_t uid);
+
+std::string ArrangeFormatBBT(Arrange::Tick t);
+
+std::string ArrangeFormatBBTLength(Arrange::Tick t);
+
+std::string ArrangeFormatTickSeconds(Arrange::Tick t);
+
+std::string ArrangeFormatPos(Arrange::Tick t);
+
+std::string ArrangeFormatLength(Arrange::Tick t);
+
+Arrange::Tick ArrangeParsePos(const char* buf);
+
+Arrange::Tick ArrangeParseLen(const char* buf);
+
+extern int gArrangeFieldHotFrame;
+
+void ArrangeMarkFieldHot();
+
+bool ArrangeFieldHot();
+
+int ArrangeRenderVideoClipsInRange(Arrange::Tick a, Arrange::Tick b);
+
+int ArrangeRenderEffectiveAudioSource();
+
+int ArrangeRenderEffectiveVideoSource(Arrange::Tick a, Arrange::Tick b);
+
+bool ArrangeRenderPathQueued(const std::string& path, uint64_t exceptJobId);
+
+void ArrangeRenderResolveRange(int kind, int markerA, int markerB, Arrange::Tick customStart,
+                                  Arrange::Tick customEnd, Arrange::Tick& outA, Arrange::Tick& outB);
+
+int ArrangeRenderFrameBudget(double durSec, int fps);
+
+long long ArrangeRenderSampleBudget(double durSec, double rate);
+
+double ArrangeRenderActiveSampleRate();
+
+
+
+   // The block size an offline take should pump in. Node behaviour is
+   // block-granular - MixerNode latches pan/mute/solo once per block before
+   // its per-sample loop, for one - so a take pumped in kAudioMaxBlockFrames
+   // slabs does not sound like what the user heard through their configured
+   // buffer size. Follow the device's real period where the platform reports
+   // one, the Settings -> Audio value otherwise, and never exceed the
+   // capacity every node was prepared with.
+   //
+   // A headless job is the exception: it must sound the same on every machine
+   // and in CI, so it pumps a fixed block and ignores both the device period
+   // and the Settings value (R478).
+   inline constexpr int kHeadlessAudioBlockFrames = 512;
+
 int OfflineAudioBlockFrames();
+
+void ArrangeImportMediaFile(const std::string& path, uint64_t laneId, Arrange::Tick atTick,
+                               Arrange::ImportMediaKind kind);
+
+void ArrangeRespawnCloneNode(uint64_t clipId);
+
+bool ArrangeMakeClipSourceUnique(uint64_t clipId);
+
+void ArrangePollMediaImports();
+
+std::string ArrangeRenderUniquePath(const std::string& path);
 
 ImVec2 GetPerfElementCellSpan(int kind);
 
@@ -514,19 +1496,276 @@ void ReorderPerfPages(int src, int dst);
 
 void UpdatePerformanceMatrixMIDI();
 
+bool ParamMidiLearnActive();
+
+int MidiLearnActiveCount();
+
+void MidiLearnCancelAll();
+
+bool ParamMidiLearnIsActiveFor(int nodeIndex, int paramIndex);
+
+void StartParamMidiLearn(int nodeIndex, int paramIndex);
+
+bool ParamMidiLearnable(int nodeIndex, int paramIndex);
+
+bool ParamMidiLearnCommit(int nodeIndex, int paramIndex, const Platform::MidiCCValue& last);
+
+AudioNode* AudioNodeOfAny(INode* node);
+
+INode* ResolvedAudioSource(INode* source, bool* didHop = nullptr);
+
+extern bool gDeferAudioRebuild;
+
+extern unsigned long long gAudioTopologyRebuildCount;
+
+void ArrangeCollectClipModBindings(const GraphNode& node,
+                                      std::vector<std::pair<int, std::string>>& out);
+
 bool ArrangeTimelineRoutingActive();
 
 void ForceAudioRepare();
 
 void RebuildAudioTopology();
 
+bool ArrangeAudioRebuildIfStale();
+
 bool StartAudioEngine(std::string& outError);
 
 INode* FindHardwareDrivenNode();
 
+INode* FindHardwareDrivenNodeInArrangeRange(int64_t startTick, int64_t endTick,
+                                               bool wantVideo, bool wantAudio);
+
 void StartOfflineRenderSession(OutputNode* n, int width, int height, bool isArrange);
 
+void ArrangeRenderCancelAll();
+
+bool ArrangeRenderBusy();
+
+ArrangeRenderJob* ArrangeRenderFindJob(uint64_t id);
+
+void ArrangeRenderQueueTick();
+
+void RemoveNodeByIndex(int index);
+
+
+
+   // Field 'graph' domain (build step 10): thin forwarder from
+   // Field::IFieldGraphHost onto the real graph (gNodes/SpawnNode/
+   // RemoveNodeByIndex/ConnectNodes above). No policy here - the reconciler
+   // (FieldGraphReconciler.cpp) owns every decision about what to mount/
+   // update/unmount/connect; this only carries the calls out.
+   struct MainGraphHost final : public Field::IFieldGraphHost
+   {
+      int mDroppedModCount = 0;
+      int mDetachedCableCount = 0;
+      int DroppedModCount() const override { return mDroppedModCount; }
+      int DetachedCableCount() const override { return mDetachedCableCount; }
+
+      int Mount(const std::string& typeName) override
+      {
+         if (!Spawnable(typeName))
+            return -1;
+         std::string category;
+         for (const auto& cat : NodeFactory::Instance().GetCategories())
+         {
+            const auto& names = NodeFactory::Instance().GetNodesInCategory(cat);
+            if (std::find(names.begin(), names.end(), typeName) != names.end())
+            {
+               category = cat;
+               break;
+            }
+         }
+         GraphNode* gn = SpawnNode(typeName, category, 0.0f, 0.0f);
+         return gn != nullptr ? gn->index : -1;
+      }
+
+      void Unmount(int id) override
+      {
+         for (const auto& entry : Modulation::Instance().Links())
+            if (entry.first.first == id) mDroppedModCount++;
+
+         GraphNode* unmounting = FindNodeByIndex(id);
+         if (unmounting && unmounting->node)
+         {
+            INode* targetSrc = unmounting->node.get();
+            for (GraphNode& gn : gNodes)
+            {
+               if (gn.index == id) continue;
+               int inputs = InputCountFor(gn);
+               for (int slot = 0; slot < inputs; slot++)
+               {
+                  ImageCable* cable = CableFor(gn, slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     mDetachedCableCount++;
+               }
+               for (int slot = 0; slot < kMaxAudioSlots; slot++)
+               {
+                  AudioCable* cable = gn.node->AudioInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     mDetachedCableCount++;
+               }
+               for (int slot = 0; slot < kMaxNoteSlots; slot++)
+               {
+                  NoteCable* cable = gn.node->NoteInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     mDetachedCableCount++;
+               }
+            }
+         }
+         RemoveNodeByIndex(id);
+      }
+
+      int Remount(int existing, const std::string& typeName) override
+      {
+         // 1. Group membership rescue (doc §5.7 Case 2)
+         GroupNode* ownerGroup = nullptr;
+         for (auto& entry : gGroupMembers)
+         {
+            if (entry.second.count(existing))
+            {
+               ownerGroup = entry.first;
+               break;
+            }
+         }
+
+         // 2. Modulation / inbound cluster link rescue (doc §5.7 Case 4 & 5)
+         std::set<int> dying = { existing };
+         ClusterClipboard rescued;
+         CaptureClusterLinks(dying, rescued);
+
+         // 3. Outbound cable rescue (generated node feeding external node, doc §5.7 Case 5)
+         struct OutboundLink {
+            int srcSlot;
+            int dstIndex;
+            int dstSlot;
+         };
+         std::vector<OutboundLink> rescuedOutbound;
+         GraphNode* dyingGn = FindNodeByIndex(existing);
+         if (dyingGn && dyingGn->node)
+         {
+            INode* targetSrc = dyingGn->node.get();
+            for (GraphNode& gn : gNodes)
+            {
+               if (gn.index == existing) continue;
+               int inputs = InputCountFor(gn);
+               for (int slot = 0; slot < inputs; slot++)
+               {
+                  ImageCable* cable = CableFor(gn, slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     rescuedOutbound.push_back({ 0, gn.index, slot });
+               }
+               for (int slot = 0; slot < kMaxAudioSlots; slot++)
+               {
+                  AudioCable* cable = gn.node->AudioInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     rescuedOutbound.push_back({ cable->GetOutputSlot(), gn.index, slot });
+               }
+               for (int slot = 0; slot < kMaxNoteSlots; slot++)
+               {
+                  NoteCable* cable = gn.node->NoteInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     rescuedOutbound.push_back({ 0, gn.index, slot });
+               }
+            }
+         }
+
+         RemoveNodeByIndex(existing);
+         int fresh = Mount(typeName);
+         if (fresh >= 0)
+         {
+            if (ownerGroup)
+               gGroupMembers[ownerGroup].insert(fresh);
+
+            GraphNode* freshGn = FindNodeByIndex(fresh);
+            if (freshGn)
+            {
+               std::map<int, GraphNode*> newByOrig;
+               newByOrig[existing] = freshGn;
+               ApplyClusterLinks(newByOrig, rescued);
+            }
+
+            for (const auto& ob : rescuedOutbound)
+            {
+               std::string connErr;
+               ConnectNodes(fresh, ob.srcSlot, ob.dstIndex, ob.dstSlot, connErr);
+            }
+         }
+         return fresh;
+      }
+
+      void SetParam(int id, const std::string& paramName, float value) override
+      {
+         GraphNode* gn = FindNodeByIndex(id);
+         if (gn == nullptr)
+            return;
+
+         struct SetFloatVisitor : public ParamVisitor
+         {
+            const std::string& targetName;
+            float targetValue;
+            explicit SetFloatVisitor(const std::string& name, float v) : targetName(name), targetValue(v) {}
+            void Float(const char* name, float& v) override { if (targetName == name) v = targetValue; }
+            void Int(const char* name, int& v) override { if (targetName == name) v = (int)std::lround((double)targetValue); }
+            void Bool(const char* name, bool& v) override { if (targetName == name) v = targetValue != 0.0f; }
+            void Text(const char*, std::string&) override {}
+            void Color(const char*, float[3]) override {}
+         } visitor(paramName, value);
+         gn->node->VisitParams(visitor);
+      }
+
+      void Connect(int srcId, int srcSlot, int dstId, int dstSlot) override
+      {
+         std::string err;
+         ConnectNodes(srcId, srcSlot, dstId, dstSlot, err);
+      }
+
+      void Place(int id, float x, float y) override
+      {
+         GraphNode* gn = FindNodeByIndex(id);
+         if (gn == nullptr)
+            return;
+         gn->spawnX = x;
+         gn->spawnY = y;
+         gn->liveX = x;
+         gn->liveY = y;
+         // Do NOT clear needsPosition here: for a freshly-mounted node it is
+         // still true, and it's the only signal that tells the main.cpp:~53053
+         // per-frame tick to push spawnX/spawnY into the node-editor library
+         // via ed::SetNodePosition on the next frame. Clearing it here (as
+         // this used to) stomped that pending push before it ever fired, so
+         // every place()'d node kept whatever default position the editor
+         // library assigns unpositioned nodes - producing the fully-stacked
+         // cluster instead of the requested layout.
+      }
+
+      bool Alive(int id) const override { return FindNodeByIndex(id) != nullptr; }
+
+      std::string TypeNameOf(int id) const override
+      {
+         GraphNode* gn = FindNodeByIndex(id);
+         return gn != nullptr ? gn->typeName : std::string();
+      }
+
+      bool Spawnable(const std::string& typeName) const override
+      {
+         if (typeName == "Field Graph" || !IsUserSpawnable(typeName))
+            return false;
+         for (const auto& cat : NodeFactory::Instance().GetCategories())
+         {
+            const auto& names = NodeFactory::Instance().GetNodesInCategory(cat);
+            if (std::find(names.begin(), names.end(), typeName) != names.end())
+               return true;
+         }
+         return false;
+      }
+   };
+
+bool CanBindModulation(int dstNodeIndex, int paramIndex);
+
 extern bool gPatchDirty;
+
+extern std::string gPatchStatus;
 
 extern bool gShowAutosaveRecoveryModal;
 
@@ -542,7 +1781,13 @@ std::string AutosavePath();
 
 std::string AutosaveMarkerPath();
 
+bool WriteAutosaveNow();
+
 void CheckAutosaveRecovery();
+
+bool SavePatchTo(const std::string& path);
+
+extern bool gSuppressUndoCheckpoints;
 
 
    // deque, not vector: erase(begin()) at the depth cap below shifts every
@@ -586,13 +1831,52 @@ void NewPatch();
 
 void ApplyPatchData(const Patch::Data& data, std::map<int, int>* outRemap = nullptr, bool keepIndices = false);
 
+
+
+   // reload = the file watcher re-reading the open file (R39): same read and
+   // resolve, but applied like an undo step - one checkpoint first, the stacks,
+   // view and routing mode kept, no recents/autosave bookkeeping.
+   // A patch with no `pos` records (hand-written / headless-authored) loads with
+   // every node at 0,0. Real sizes only exist once the nodes have drawn, so the
+   // layout waits for them (same shape as RunFieldGraphUnpackPhase2Tick): the
+   // load stashes the data it needs, the per-frame tick measures, places, and
+   // asks for a fit-to-content. Nodes without a measurement after the retry
+   // budget use PatchLayout::EstimateSize.
+   struct PendingAutoLayout
+   {
+      bool active = false;
+      Patch::Data data;          // nodes + cables only
+      std::map<int, int> remap;  // NodeRecord::index -> live GraphNode index
+      int framesWaited = 0;
+   };
+
+extern PendingAutoLayout gPendingAutoLayout;
+
 bool LoadPatchFromImpl(const std::string& path, bool reload);
 
 bool LoadPatchFrom(const std::string& path);
 
 void FinishCanonicalize(Patch::Data& data, const Headless::Job& job, Headless::Status& st);
 
+extern std::unordered_map<int, std::vector<Headless::Issue>> gLiveIssues;
+
+extern double gLiveIssueEditTime;
+
+void RefreshLiveIssues();
+
 void PushUndoCheckpoint();
+
+INode* ResolveFieldGraphBoundaryTerminal(FieldGraphNode* fgn);
+
+void RunFieldGraphRegenerate(FieldGraphNode* target);
+
+void RunFieldGraphUnpackPhase1(FieldGraphNode* target);
+
+void PerformCopyPaste(const std::set<int>& toCopy);
+
+void PushArrangeUndoSnapshot(const Arrange::Model& before);
+
+void PushArrangeUndo();
 
 void Undo();
 
