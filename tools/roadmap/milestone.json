@@ -1,7 +1,7 @@
 {
   "version": "v0.4.7",
   "since": "v0.4.6",
-  "theme": "Next release (set the theme)",
+  "theme": "MIDI File, Shape Resonator, keyboard-only use",
   "note": "Edit this file at each release: bump version/since, rewrite goals, list the still-open quest ids per goal. Merged quests that no tag contains yet count automatically; the first goal whose rule matches a quest claims it. Growth quests and epics are not release content.",
   "goals": [
     {
