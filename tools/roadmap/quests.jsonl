@@ -2281,3 +2281,6 @@
 {"ts": "2026-10-07T01:03:19+00:00", "event": "edit", "id": "R273", "opened": "2026-10-07T06:32:21+05:30", "commits": ["d0249ee", "135aa7c"], "closed": "2026-10-07T06:32:37+05:30", "release": ""}
 {"ts": "2026-10-07T01:16:08+00:00", "event": "done", "id": "R274", "why": "Group 3D node: up to 8 inputs per pin, nestable, Render 3D flattens to kMaxDraw 64; kSlots unchanged so saved patches keep their pins"}
 {"ts": "2026-10-07T01:16:08+00:00", "event": "edit", "id": "R274", "commits": ["eb5ed1c7", "91b89e74"]}
+{"ts": "2026-10-07T01:16:45+00:00", "event": "edit", "id": "R274", "opened": "2026-10-07T06:45:59+05:30", "commits": ["eb5ed1c", "91b89e7"], "closed": "2026-10-07T06:46:03+05:30", "release": ""}
+{"ts": "2026-10-07T01:22:42+00:00", "event": "done", "id": "R601", "why": "KBCURSORTEST now asserts F frames the graph (view moves, request consumed). Ungroup is Cmd/Ctrl+U, already covered; there is no Shift+U binding"}
+{"ts": "2026-10-07T01:22:42+00:00", "event": "edit", "id": "R601", "commits": ["a05d9b18", "93090cf9"]}
