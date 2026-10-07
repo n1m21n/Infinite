@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <thread>
 #include <vector>
@@ -54,7 +55,9 @@ private:
       float gOut[kMaxModes] = {};
    };
 
-   void StartSolve(std::vector<float> positions, std::vector<uint32_t> indices);
+   // What the worker solves: triangles, a point cloud (no indices) or a curve.
+   enum class Kind { kMesh, kCloud, kCurve };
+   void StartSolve(Kind kind, bool closed, std::vector<float> positions, std::vector<uint32_t> indices);
    void CollectSolve();
    void Publish(const Coeffs& c);
 
@@ -66,6 +69,9 @@ private:
    unsigned long long mSolvedRev = 0;
    bool mHaveRequest = false;
    bool mJobRunning = false;
+   // An animated source (particles, Ocean, Cloth) bumps its revision every frame; re-solving that often
+   // would pin a core and swap the modes under the player. Solves start at most this far apart.
+   std::chrono::steady_clock::time_point mLastSolveStart {};
    const void* mJobGeo = nullptr;
    unsigned long long mJobRev = 0;
    std::thread mWorker;
