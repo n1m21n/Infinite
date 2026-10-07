@@ -2292,3 +2292,7 @@
 {"ts": "2026-10-07T01:36:50+00:00", "event": "edit", "id": "R571", "commits": ["8e8dcfa0", "fc24ba0c"]}
 {"ts": "2026-10-07T01:43:25+00:00", "event": "done", "id": "R573", "why": "Measured: dim text was 2.1-3.6:1 on 7 of 10 themes (Solarized text 4.28). Presets() now lifts text and textDim to 4.5:1 against window and panel at load, minimal shift toward white/black. THEMECONTRASTTEST covers all presets"}
 {"ts": "2026-10-07T01:43:25+00:00", "event": "edit", "id": "R573", "commits": ["79ac4f7d", "78945291"]}
+{"ts": "2026-10-07T01:44:23+00:00", "event": "edit", "id": "R571", "opened": "2026-10-07T07:06:47+05:30", "commits": ["8e8dcfa", "fc24ba0"], "closed": "2026-10-07T07:06:48+05:30", "release": ""}
+{"ts": "2026-10-07T01:44:23+00:00", "event": "edit", "id": "R573", "opened": "2026-10-07T07:13:22+05:30", "commits": ["79ac4f7", "7894529"], "closed": "2026-10-07T07:13:22+05:30", "release": ""}
+{"ts": "2026-10-07T01:56:56+00:00", "event": "done", "id": "R575", "why": "TextFocusClaimed() replaces four separate WantTextInput gates (view hotkeys, param digits, computer keyboard, comment grip). It also reads the live active InputText/temp-input, which WantTextInput misses for one frame. TEXTFOCUSTEST proves the lag and the catch"}
+{"ts": "2026-10-07T01:56:56+00:00", "event": "edit", "id": "R575", "commits": ["ddbb879b", "05cadb0d"]}
