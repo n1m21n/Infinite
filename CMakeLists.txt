@@ -417,6 +417,17 @@ set(COMMON_SOURCES
     src/app/frame/FrameTests4.cpp
     src/app/frame/FrameTests5.cpp
     src/app/frame/FrameTests6.cpp
+    src/app/panels/ArrangePanel.cpp
+    src/app/panels/ArrangeRender.cpp
+    src/app/panels/ArrangeSupport1.cpp
+    src/app/panels/ArrangeSupport2.cpp
+    src/app/panels/HelpWindows.cpp
+    src/app/panels/LibraryPanels.cpp
+    src/app/panels/Minimap.cpp
+    src/app/panels/ModMatrixPanel.cpp
+    src/app/panels/PerfPanel.cpp
+    src/app/panels/SettingsWindow.cpp
+    src/app/panels/ViewportPanel.cpp
     src/app/selftest/AudioSweepTests.cpp
     src/app/selftest/AvRecTests.cpp
     src/app/selftest/BenchScenes.cpp
