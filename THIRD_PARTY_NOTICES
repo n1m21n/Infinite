@@ -151,3 +151,14 @@ user's machine at run time (`NDI_RUNTIME_DIR_V6`/`V5` or the standard install
 paths) and the nodes say so when it is missing. NDI is named only to identify
 compatibility with NDI products; Infinite is not a product of, or sponsored
 by, NDI. Get the runtime and NDI Tools from https://ndi.video/tools/.
+
+Noto Sans SC / Noto Sans JP (all platforms)
+-------------------------------------------
+
+Used for Chinese (Simplified) and Japanese interface text
+(`external/fonts/Noto/NotoSans{SC,JP}-Subset.otf`). Copyright 2014-2021
+Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'. Licensed
+under the SIL Open Font License 1.1; full text in
+`external/fonts/Noto/OFL.txt`. The files are subsets of the upstream
+Regular weight (notofonts/noto-cjk), cut to the glyphs used by the
+translation tables by `tools/i18n/subset_fonts.py`.
