@@ -491,6 +491,8 @@ set(COMMON_SOURCES
     src/audio/dsp/SpecBlurKernel.cpp
     src/audio/dsp/KeySnapKernel.cpp
     src/audio/dsp/SpectrumSlideKernel.cpp
+    src/audio/dsp/ShapeResonatorKernel.cpp
+    src/audio/dsp/MeshModalSolver.cpp
     src/nodes/ImageSourceNode.cpp
     src/nodes/SlideshowNode.cpp
     src/nodes/ShapeNode.cpp

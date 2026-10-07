@@ -288,6 +288,7 @@ static void JoinLiveTier1();                          // defined next to ParamKe
 #include "audio/dsp/SpecBlurKernel.h"
 #include "audio/dsp/KeySnapKernel.h"
 #include "audio/dsp/SpectrumSlideKernel.h"
+#include "audio/dsp/ShapeResonatorKernel.h"
 #include "audio/dsp/SlicerDsp.h"
 #include "audio/dsp/ReverbKernel.h"
 
@@ -26144,6 +26145,88 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       EndAudioBody();
    }
 
+   void DrawShapeResonatorVisualizer(AudioEffectNode* n)
+   {
+      const float w = gAudioBodyW;
+      const float h = kAudioTimeVizH;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float loHz = 30.0f, hiHz = 12000.0f;
+      const float logLo = log10f(loHz), logSpan = log10f(hiHz) - logLo;
+      const ImU32 gridCol = isLight ? IM_COL32(40, 40, 60, 28) : IM_COL32(255, 255, 255, 22);
+      for (float hz : { 100.0f, 1000.0f, 10000.0f })
+      {
+         const float x = origin.x + (log10f(hz) - logLo) / logSpan * w;
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), gridCol, 1.0f);
+      }
+
+      float freqs[ShapeResonatorKernel::kMaxModes];
+      bool solving = false;
+      const int count = n->ReadModeFrequencies(freqs, ShapeResonatorKernel::kMaxModes, &solving);
+      const float decay = std::clamp(n->Param("decay"), 0.02f, 20.0f);
+      const float damping = std::clamp(n->Param("damping"), 0.0f, 1.0f);
+      const float tune = std::max(n->Param("tune"), 20.0f);
+      const ImU32 lineCol = isLight ? IM_COL32(150, 60, 230, 230) : IM_COL32(200, 130, 255, 230);
+      for (int i = 0; i < count; i++)
+      {
+         // Line height = how long this mode rings relative to the longest.
+         const float t60 = decay * powf(tune / freqs[i], damping * 1.5f);
+         const float rel = std::clamp(log10f(t60 / 0.02f) / log10f(20.0f / 0.02f), 0.05f, 1.0f);
+         const float x = origin.x + (log10f(freqs[i]) - logLo) / logSpan * w;
+         dl->AddLine(ImVec2(x, br.y - 4.0f), ImVec2(x, br.y - 4.0f - rel * (h - 14.0f)), lineCol, 2.0f);
+      }
+      if (solving || count == 0)
+         dl->AddText(ImVec2(origin.x + 8.0f, origin.y + 6.0f), isLight ? IM_COL32(40, 40, 60, 160) : IM_COL32(255, 255, 255, 150),
+                     solving ? "solving shape..." : "no modes");
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+      if (ImGui::IsMouseHoveringRect(origin, br))
+      {
+         char buf[64];
+         snprintf(buf, sizeof(buf), "%d modes, line height = ring time", count);
+         SetAudioReadout("shape modes", buf);
+      }
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawShapeResonatorBody(GraphNode& gn, AudioEffectNode* n)
+   {
+      float freqs[ShapeResonatorKernel::kMaxModes];
+      const int count = n->ReadModeFrequencies(freqs, ShapeResonatorKernel::kMaxModes);
+      char stat[64];
+      if (count > 0)
+         snprintf(stat, sizeof(stat), "%d modes - %s", count, n->geometry ? "from shape" : "default plate");
+      else
+         snprintf(stat, sizeof(stat), "%s", n->geometry ? "shape - no modes" : "default plate");
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawShapeResonatorVisualizer(n);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      {
+         AudioKnobRow row(3, kKnobLarge);
+         row.Knob("tune", n->ParamPtr("tune"), 20.0f, 2000.0f, "%.0f Hz", kKnobLarge);
+         row.Knob("decay", n->ParamPtr("decay"), 0.02f, 20.0f, "%.2f s", kKnobLarge);
+         row.Knob("damping", n->ParamPtr("damping"), 0.0f, 1.0f, "%.2f");
+         row.End();
+      }
+      {
+         AudioKnobRow row(3);
+         row.Knob("pos", n->ParamPtr("pos"), 0.0f, 1.0f, "%.2f");
+         row.Knob("modes", n->ParamPtr("modes"), 1.0f, 32.0f, "%.0f");
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f");
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
    // The hosted-plugin body. Its own controls stay minimal on purpose (the
    // node is a shell around someone else's plugin, not an instrument of its
    // own): the plugin's name, an open-editor button, bypass, and configure.
@@ -26820,6 +26903,9 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             break;
          case EffectVisualizerId::kSpectrumSlide:
             DrawSpectrumSlideBody(gn, n);
+            break;
+         case EffectVisualizerId::kShapeResonator:
+            DrawShapeResonatorBody(gn, n);
             break;
          default:
             break;
@@ -42328,6 +42414,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Resonator Bank", "Tuned bank of up to 16 parallel bandpass resonators excited by incoming audio. Four harmonic/tuning structures (Harmonic, Odd, Chord, Metallic) with decay (T60), scatter detune and stereo spread." },
          { "Cycle Shaper", "Replaces every wavecycle of the input with a clean geometric waveform (Sine, Square, Triangle) of the same period and peak amplitude. Timbre is rebuilt while pitch and rhythm survive. Latency is one wavecycle." },
          { "Key-Snap", "Moves every spectral peak of the sound to the nearest note of a scale, so chords and layered sources stay in key. Snap blends between untouched and fully in tune, glide sets how fast a peak slides to its new note, and global key follows the transport's key and scale. Latency is 42.7 ms (2048 samples)." },
+         { "Shape Resonator", "Rings the vibration modes of the shape on the 'shape' pin, like striking that object. Tune sets the lowest mode's pitch; the other modes follow from the shape's geometry, so a flat plate sounds bell-like and a long bar nearly harmonic. Pos is where it is struck and heard from: a mode stays silent when struck on its node line. With no shape connected it rings a flat rectangular plate." },
          { "Spectrum Slide", "Morphs the sound into the one on the 'to' pin by sliding its spectral peaks toward the other's positions instead of cross-fading, so a 440 Hz tone becomes 880 Hz by passing through 660 Hz. Slide sets how far along the way; with nothing on 'to' it passes the sound through. Latency is 42.7 ms (2048 samples)." },
          { "Spec Blur", "Streaming phase vocoder (N=2048, hop 512) that smears spectral magnitude in time. Transients dissolve into a harmonic cloud with tilt, phase diffusion and freeze. Latency is 42.7 ms (2048 samples); default mix is pinned at 1.0." },
          { "MIDI Notes", "Reads note events from a connected MIDI input device and outputs them as a note cable - the entry point for playing a synth or sampler from an external keyboard/controller." },
@@ -43162,6 +43249,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                { "Resonator Bank", "Up to 16 parallel bandpass resonators forming a tuned modal filter bank, including a 'Metallic' tuning mode." },
                { "Cycle Shaper", "Single-cycle waveform distortion and crossfade shaper." },
                { "Key-Snap", "Snaps every spectral peak of the sound to the nearest note of a scale, polyphonically." },
+               { "Shape Resonator", "Rings the vibration modes of a geometry input." },
                { "Spectrum Slide", "Morphs one sound into another by sliding spectral peaks instead of cross-fading." },
                { "Spectral Blur & Frequency Shifter", "FFT spectral domain phase smearing, freeze, and frequency SSB modulation." },
                { "Field Effect", "An audio effect whose DSP is a Field kernel you write in the node, compiled to a sample-domain register machine rather than interpreted. Field Synth is its note-driven sibling and Field Graph plots what a kernel does." },
@@ -55350,6 +55438,158 @@ static bool RunCycleShaperFixture()
 // ============================================= INFINITE_SPECTRUMSLIDETEST
 // Two sines: slide 0 keeps the first, slide 1 gives the second, and in between
 // the peak sits at the interpolated frequency (not two half-level peaks).
+static bool RunShapeResonatorFixture()
+{
+   bool ok = true;
+   const double sr = 48000.0;
+   const int blockSize = 512;
+
+   const EffectDef* def = nullptr;
+   for (const auto& d : GetEffectDefs())
+      if (d.name == "Shape Resonator")
+         def = &d;
+   if (!def)
+   {
+      printf("SHAPERESONATORTEST def not found FAIL\n");
+      return false;
+   }
+
+   auto energyAt = [&](const std::vector<float>& x, double hz) {
+      double re = 0.0, im = 0.0;
+      const int n = (int)x.size();
+      for (int i = 0; i < n; i++)
+      {
+         const double w = 0.5 * (1.0 - cos(2.0 * M_PI * (double)i / (double)(n - 1)));
+         const double ph = 2.0 * M_PI * hz * (double)i / sr;
+         re += w * x[i] * cos(ph);
+         im += w * x[i] * sin(ph);
+      }
+      return (re * re + im * im) / ((double)n * (double)n);
+   };
+   auto dB = [](double a, double b) { return 10.0 * log10((a + 1e-20) / (b + 1e-20)); };
+
+   // One impulse in, one second of ring out. `geo` null = the default plate.
+   auto ring = [&](IGeometrySource* geo, float tune, float pos, std::vector<float>& rec, int* modeCount, float decay = 2.0f,
+                   float damping = 0.0f, float modes = 16.0f) {
+      ShapeResonatorKernel kernel;
+      kernel.PrepareToPlay(sr, blockSize);
+      AudioEffectNode node(*def);
+      node.geometry = geo;
+      *node.ParamPtr("tune") = tune;
+      *node.ParamPtr("decay") = decay;
+      *node.ParamPtr("damping") = damping;
+      *node.ParamPtr("pos") = pos;
+      *node.ParamPtr("modes") = modes;
+      node.mix = 1.0f;
+      for (int tries = 0; tries < 400 && kernel.SolvedModeCount() == 0; tries++)
+      {
+         kernel.PushParams(node, sr);
+         std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+      kernel.PushParams(node, sr);
+      if (modeCount)
+         *modeCount = kernel.SolvedModeCount();
+
+      std::vector<float> iL(blockSize, 0.0f), iR(blockSize, 0.0f), oL(blockSize), oR(blockSize);
+      float* iCh[2] = { iL.data(), iR.data() };
+      float* oCh[2] = { oL.data(), oR.data() };
+      AudioBuffer inBuf { iCh, 2, blockSize };
+      AudioBuffer outBuf { oCh, 2, blockSize };
+      const int numBlocks = (int)(1.0 * sr / blockSize);
+      rec.assign((size_t)numBlocks * blockSize, 0.0f);
+      for (int b = 0; b < numBlocks; b++)
+      {
+         std::fill(iL.begin(), iL.end(), 0.0f);
+         std::fill(iR.begin(), iR.end(), 0.0f);
+         if (b == 0)
+            iL[0] = iR[0] = 1.0f;
+         kernel.ProcessBlock(inBuf, nullptr, outBuf);
+         for (int i = 0; i < blockSize; i++)
+            rec[(size_t)b * blockSize + i] = oL[i];
+      }
+   };
+
+   // 1. Default plate (1.5 x 1, free edges): first mode, then (0,1) at 1.5x.
+   {
+      std::vector<float> rec;
+      int modes = 0;
+      ring(nullptr, 200.0f, 0.1f, rec, &modes);
+      const double e200 = energyAt(rec, 200.0);
+      const double e283 = energyAt(rec, 300.0);
+      const double off = energyAt(rec, 240.0);
+      const double m1 = dB(e200, off), m2 = dB(e283, off);
+      const bool pass = modes >= 8 && m1 > 15.0 && m2 > 15.0;
+      printf("SHAPERESONATORTEST plate: %d modes, 200 Hz %.1f dB and 300 Hz %.1f dB over 240 Hz %s\n", modes, m1, m2,
+             pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   }
+
+   // 2. Strike position: at the node line of the first mode it must not speak.
+   {
+      std::vector<float> a, b;
+      ring(nullptr, 200.0f, 0.02f, a, nullptr);
+      ring(nullptr, 200.0f, 0.5f, b, nullptr);
+      const double d = dB(energyAt(a, 200.0), energyAt(b, 200.0));
+      const bool pass = d > 15.0;
+      printf("SHAPERESONATORTEST strike: edge vs centre at the first mode %.1f dB %s\n", d, pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   }
+
+   // 3. A real geometry input: a sphere's first modes (l = 1) sit at
+   //    tune * sqrt(6 / 2) = 1.73 x tune, and there is a ringing set.
+   {
+      GeometryNode sphere;
+      const auto& names = GeometryNode::ShapeNames();
+      for (size_t i = 0; i < names.size(); i++)
+         if (names[i] == "Sphere" || names[i] == "sphere")
+            sphere.shape = (int)i;
+      std::vector<float> rec;
+      int modes = 0;
+      ring(&sphere, 200.0f, 0.3f, rec, &modes);
+      const double e = energyAt(rec, 346.4);
+      const double off = energyAt(rec, 300.0);
+      const double m = dB(e, off);
+      const bool pass = modes >= 8 && m > 10.0;
+      printf("SHAPERESONATORTEST sphere: %d modes, l=1 triplet at 346 Hz %.1f dB over 300 Hz %s\n", modes, m,
+             pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   }
+
+   // 4. Level: an impulse must not blow up or vanish.
+   {
+      std::vector<float> rec;
+      ring(nullptr, 200.0f, 0.1f, rec, nullptr);
+      float peak = 0.0f;
+      for (float v : rec)
+         peak = std::max(peak, std::fabs(v));
+      const bool pass = peak > 0.01f && peak < 4.0f && std::isfinite(peak);
+      printf("SHAPERESONATORTEST level: impulse peak %.3f %s\n", peak, pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   }
+
+   // 5. decay, damping and modes each change the ring (the generic param sweep
+   //    cannot see them: the solve is asynchronous, so its short rig hears silence).
+   {
+      std::vector<float> a, b, c, d, e;
+      ring(nullptr, 200.0f, 0.1f, a, nullptr, 0.3f);
+      ring(nullptr, 200.0f, 0.1f, b, nullptr, 3.0f);
+      const double dDecay = dB(energyAt(b, 200.0), energyAt(a, 200.0));
+      ring(nullptr, 200.0f, 0.1f, c, nullptr, 2.0f, 1.0f);
+      ring(nullptr, 200.0f, 0.1f, d, nullptr, 2.0f, 0.0f);
+      // damping shortens the high modes: compare the 300 Hz mode, 1.5 x the tune
+      const double dDamp = dB(energyAt(d, 300.0), energyAt(c, 300.0));
+      ring(nullptr, 200.0f, 0.1f, e, nullptr, 2.0f, 0.0f, 1.0f);
+      const double dModes = dB(energyAt(d, 300.0), energyAt(e, 300.0));
+      const bool pass = dDecay > 6.0 && dDamp > 3.0 && dModes > 10.0;
+      printf("SHAPERESONATORTEST params: decay %.1f dB, damping %.1f dB, modes %.1f dB %s\n", dDecay, dDamp, dModes,
+             pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   }
+
+   printf("SHAPERESONATORTEST %s\n", ok ? "OK" : "FAIL");
+   return ok;
+}
+
 static bool RunSpectrumSlideFixture()
 {
    bool ok = true;
@@ -73924,6 +74164,9 @@ int main(int argc, char** argv)
    if (getenv("INFINITE_SPECTRUMSLIDETEST") != nullptr)
       return RunSpectrumSlideFixture() ? 0 : 1;
 
+   if (getenv("INFINITE_SHAPERESONATORTEST") != nullptr)
+      return RunShapeResonatorFixture() ? 0 : 1;
+
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return RunDspTest();
 
@@ -74699,7 +74942,8 @@ int main(int argc, char** argv)
          // breaks the fixture.
          SpawnNode("Key-Snap", "AudioEffects", 5900.0f, 700.0f);        // 31
          SpawnNode("Spectrum Slide", "AudioEffects", 6300.0f, 700.0f);   // 32
-         SpawnNode("Slicer", "Synths", 5900.0f, 20.0f);                 // 33
+         SpawnNode("Shape Resonator", "AudioEffects", 6300.0f, 900.0f); // 33
+         SpawnNode("Slicer", "Synths", 5900.0f, 20.0f);                 // 34
          {
             // Multi-transient WAV so the slicer's body draws real markers and
             // a real slice count rather than the empty placeholder.

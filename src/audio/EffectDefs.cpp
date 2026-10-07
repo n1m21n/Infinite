@@ -27,6 +27,7 @@
 #include "dsp/SpecBlurKernel.h"
 #include "dsp/KeySnapKernel.h"
 #include "dsp/SpectrumSlideKernel.h"
+#include "dsp/ShapeResonatorKernel.h"
 #include "MusicTime.h"
 
 namespace
@@ -826,6 +827,24 @@ namespace
          // has nothing to move; see audio-param-sweep-expected.txt.
          def.params.push_back({ "slide", 0.0f, 1.0f, 0.5f });
          def.makeKernel = []() { return std::make_unique<SpectrumSlideKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // -------------------------------------------------------------- Shape Resonator
+      {
+         EffectDef def;
+         def.name = "Shape Resonator";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kShapeResonator;
+         def.defaultMix = 1.0f;
+         def.hasGeometryInput = true;
+         def.params.push_back({ "tune", 20.0f, 2000.0f, 110.0f });
+         def.params.push_back({ "decay", 0.02f, 20.0f, 2.0f });
+         def.params.push_back({ "damping", 0.0f, 1.0f, 0.5f });
+         def.params.push_back({ "pos", 0.0f, 1.0f, 0.3f });
+         def.params.push_back({ "modes", 1.0f, 32.0f, 16.0f });
+         def.makeKernel = []() { return std::make_unique<ShapeResonatorKernel>(); };
          defs.push_back(std::move(def));
       }
 

@@ -91,6 +91,7 @@ enum class EffectVisualizerId
    kSpecBlurSpectrum,
    kKeySnapScale,
    kSpectrumSlide,
+   kShapeResonator,
 };
 
 struct EffectDef
@@ -126,6 +127,8 @@ struct EffectDef
    // stored value is left untouched (VisitParams still round-trips it) -
    // only its audio-thread effect is suppressed.
    bool forceFullyWet = false;
+   // True if slot 1 is a geometry input ("shape") instead of a sidechain.
+   bool hasGeometryInput = false;
 };
 
 const std::vector<EffectDef>& GetEffectDefs();
