@@ -47336,7 +47336,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             ImGui::SeparatorText("Node Card Styling");
             float opacity = CategoryColors::GetNodeOpacity();
             ImGui::SetNextItemWidth(200.0f);
-            if (ImGui::SliderFloat("Node Opacity", &opacity, 0.10f, 1.00f, "%.2f"))
+            if (ImGui::SliderFloat("Node Opacity", &opacity, 0.10f, 1.00f, "%.2f", ImGuiSliderFlags_AlwaysClamp))
             {
                CategoryColors::SetNodeOpacity(opacity, isLight, false);
             }
@@ -47347,7 +47347,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
 
             float rounding = CategoryColors::GetNodeRounding();
             ImGui::SetNextItemWidth(200.0f);
-            if (ImGui::SliderFloat("Node Corner Radius", &rounding, 0.0f, 24.0f, "%.0f px"))
+            if (ImGui::SliderFloat("Node Corner Radius", &rounding, 0.0f, 24.0f, "%.0f px", ImGuiSliderFlags_AlwaysClamp))
             {
                CategoryColors::SetNodeRounding(rounding, false);
                ApplyTheme();
@@ -47359,7 +47359,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
 
             float tintWeight = CategoryColors::GetTintWeight();
             ImGui::SetNextItemWidth(200.0f);
-            if (ImGui::SliderFloat("Tint", &tintWeight, 0.0f, 0.50f, "%.2f"))
+            if (ImGui::SliderFloat("Tint", &tintWeight, 0.0f, 0.50f, "%.2f", ImGuiSliderFlags_AlwaysClamp))
             {
                CategoryColors::SetTintWeight(tintWeight, isLight, false);
             }
@@ -47372,7 +47372,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             ImGui::SeparatorText("Display");
             float uiScale = CategoryColors::GetUiScale();
             ImGui::SetNextItemWidth(200.0f);
-            if (ImGui::SliderFloat("UI Scale", &uiScale, 0.5f, 2.0f, "%.2fx"))
+            if (ImGui::SliderFloat("UI Scale", &uiScale, 0.5f, 2.0f, "%.2fx", ImGuiSliderFlags_AlwaysClamp))
             {
                CategoryColors::SetUiScale(uiScale, false);
             }
@@ -47383,12 +47383,10 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                CategoryColors::SaveAppearanceOverrides();
                UiScale::RequestRescale();
             }
-            ImGui::TextWrapped("Manual multiplier on top of the display's own DPI scale. Scales the whole interface, node bodies included.");
             {
                bool tips = CategoryColors::GetTooltips();
                if (ImGui::Checkbox("Help tooltips", &tips))
                   CategoryColors::SetTooltips(tips);
-               ImGui::TextWrapped("Hover a control to see what it does and its shortcut. Off by default.");
             }
 
             {
@@ -47423,7 +47421,6 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                gCheckerboardBackdrop = (backdropStyle == 0);
                SaveGeneralSettings();
             }
-            ImGui::TextWrapped("How node previews show transparent areas.");
 
             ImGui::EndTabItem();
          }
