@@ -4531,7 +4531,7 @@ public:
    {
       mSampleRate = sampleRate;
       mHeldCount = 0;
-      mLastBeats = -1.0;
+      mLastTransport = -1.0;
    }
 
    void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
@@ -4541,31 +4541,39 @@ public:
       if (!song || !Transport::Instance().IsPlaying())
       {
          ReleaseAll(0);
-         mLastBeats = -1.0;
+         mLastTransport = -1.0;
          mPlayhead.store(-1.0, std::memory_order_relaxed);
          return;
       }
 
       const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
-      const double dBeats = (double)numFrames * bpm / (60.0 * mSampleRate);
-      // Start of this block (the clock was advanced before the graph ran, so Beats() would be its end).
-      // position shifts the file against the transport; a change of it is a jump and releases held notes below.
-      const double t0 = Transport::Instance().BlockStartBeats() + (double)mPosition.load(std::memory_order_relaxed);
-      const double t1 = t0 + dBeats;
+      const double speed = std::clamp((double)mSpeed.load(std::memory_order_relaxed), 0.05, 8.0);
+      // Speed 1 is the project bpm; the file's own tempo never matters, it is just notes on a beat grid.
+      const double dTransport = (double)numFrames * bpm / (60.0 * mSampleRate); // transport beats this block
+      const double dBeats = dTransport * speed;                                  // file beats this block
       const bool loop = mLoop.load(std::memory_order_relaxed);
       const double len = std::max(4.0, (double)mLoopBeats.load(std::memory_order_relaxed));
       const int transpose = mTranspose.load(std::memory_order_relaxed);
       const float velScale = mVelocity.load(std::memory_order_relaxed);
-      const bool ft = mFileTempo.load(std::memory_order_relaxed);
-      auto beatOf = [ft](const MidiFile::Event& e) { return ft ? e.tempoBeat : e.beat; };
+      auto beatOf = [](const MidiFile::Event& e) { return e.beat; };
 
-      // A seek (or a first block after stop) is not continuous with the last block: drop what is held.
-      if (mLastBeats < 0.0 || t0 < mLastBeats - 1e-6 || t0 > mLastBeats + dBeats * 4.0 + 0.05)
+      // The node keeps its own playhead. It starts at `position` (0 = file start, 1 = file end) whenever the
+      // transport starts, seeks or loops back, and whenever the position knob moves; otherwise it runs on.
+      const double tStart = Transport::Instance().BlockStartBeats(); // the clock was advanced before the graph ran
+      const float position = std::clamp(mPosition.load(std::memory_order_relaxed), 0.0f, 1.0f);
+      const bool jumped = mLastTransport < 0.0 || tStart < mLastTransport - 1e-6 ||
+                          tStart > mLastTransport + dTransport * 4.0 + 0.05 || std::fabs(position - mLastPosition) > 1e-6f;
+      mLastTransport = tStart + dTransport;
+      mLastPosition = position;
+      if (jumped)
+      {
          ReleaseAll(0);
-      mLastBeats = t1;
-      mPlayhead.store(loop ? std::fmod(std::max(0.0, t0), len) : t0, std::memory_order_relaxed);
-      if (t0 < 0.0)
-         return;
+         mPlay = (double)position * len;
+      }
+      const double t0 = mPlay;
+      const double t1 = t0 + dBeats;
+      mPlayhead.store(t0, std::memory_order_relaxed);
+      mPlay = loop ? std::fmod(t1, len) : t1;
 
       const auto& ev = song->events;
       const long long k0 = loop ? (long long)std::floor(t0 / len) : 0;
@@ -4621,7 +4629,7 @@ public:
       mTranspose.store(n.transpose, std::memory_order_relaxed);
       mPosition.store(n.position, std::memory_order_relaxed);
       mLoop.store(n.loop, std::memory_order_relaxed);
-      mFileTempo.store(n.fileTempo, std::memory_order_relaxed);
+      mSpeed.store(n.speed, std::memory_order_relaxed);
       mVelocity.store(n.velocity, std::memory_order_relaxed);
       mLoopBeats.store((float)n.LoopBeats(), std::memory_order_relaxed);
       mSong.store(song, std::memory_order_release);
@@ -4652,14 +4660,16 @@ private:
 
    NoteEventQueue mOutbox;
    double mSampleRate = 48000.0;
-   double mLastBeats = -1.0;
+   double mLastTransport = -1.0;
+   float mLastPosition = 0.0f;
+   double mPlay = 0.0; // file position in beats
    Held mHeld[kMaxHeld] = {};
    int mHeldCount = 0;
    std::atomic<const MidiFile::Song*> mSong { nullptr };
    std::atomic<int> mTranspose { 0 };
    std::atomic<float> mPosition { 0.0f };
    std::atomic<bool> mLoop { true };
-   std::atomic<bool> mFileTempo { true };
+   std::atomic<float> mSpeed { 1.0f };
    std::atomic<float> mVelocity { 1.0f };
    std::atomic<float> mLoopBeats { 4.0f };
    std::atomic<double> mPlayhead { -1.0 };
@@ -4689,8 +4699,7 @@ double MidiFileNode::LoopBeats() const
 {
    if (!mSong)
       return 4.0;
-   const double l = fileTempo ? mSong->lengthTempoBeats : mSong->lengthBeats;
-   return std::max(4.0, std::ceil(l / 4.0 - 1e-9) * 4.0);
+   return std::max(4.0, std::ceil(mSong->lengthBeats / 4.0 - 1e-9) * 4.0);
 }
 
 double MidiFileNode::PlayheadBeats() const
@@ -4731,7 +4740,7 @@ void MidiFileNode::VisitParams(ParamVisitor& v)
    v.Float("position", position);
    v.Bool("loop", loop);
    v.Float("velocity", velocity);
-   v.Bool("fileTempo", fileTempo);
+   v.Float("speed", speed);
 }
 
 AudioNode* MidiFileNode::GetAudioNode()
