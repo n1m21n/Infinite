@@ -62,6 +62,7 @@ One owner per topic: if two files seem to disagree, the skill named in this tabl
 | `pillar-parity-audit` | Platform | Cross-platform feature coverage audit |
 | `plugin-host-hardening` | Platform | Plugin host robustness |
 | `run-infinite-hygiene` | Release | Build/test/self-test harness; owns the "Efficient routes" table |
+| `ci-failure-triage` | Release | Read a failed CI run once, name the cause, fix every candidate in one push (owns the CL.exe crash recipe) |
 | `ship-infinite` | Release | Full release/build/publish workflow |
 | `release-notes-audit` | Release | Verify release notes match actual code |
 

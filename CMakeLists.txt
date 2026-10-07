@@ -812,10 +812,15 @@ set(LINUX_SOURCES
 #   set_source_files_properties(src/app/frame/<File>.cpp PROPERTIES COMPILE_OPTIONS "/Od")
 # It did, in the self-test split: CL.exe died (exit -529706956) in both Windows x64 runs
 # on DspFixtures2.cpp (CL prints a file's name when it starts compiling it, so the last
-# name in the log is the one that crashed). Test-only code, so
-# /Od costs nothing that matters.
+# name in the log is the one that crashed). The other self-test files over 3000 lines
+# (same split, same shape) are scoped too so the next run does not crash one file later.
+# Test-only code, so /Od costs nothing that matters. See .claude/skills/ci-failure-triage.
 if(MSVC)
-    set_source_files_properties(src/app/selftest/DspFixtures2.cpp PROPERTIES COMPILE_OPTIONS "/Od")
+    set_source_files_properties(
+        src/app/selftest/DspFixtures2.cpp
+        src/app/selftest/DspFixtures3.cpp
+        src/app/selftest/FieldTests2.cpp
+        PROPERTIES COMPILE_OPTIONS "/Od")
 endif()
 
 # Dev-only tool: compiles a Field pixel/element source file through the same
