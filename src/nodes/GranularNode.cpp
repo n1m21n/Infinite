@@ -12,6 +12,7 @@
 #include "audio/MeterRing.h"
 #include "audio/ParamMailbox.h"
 #include "audio/SampleSlot.h"
+#include "audio/SweepTone.h"
 #include "core/AudioDecodeCache.h"
 #include "platform/Platform.h"
 #include "Transport.h"
@@ -817,4 +818,9 @@ void GranularNode::FinishBuffer(Platform::SampleBuffer* decoded, const std::stri
    }
 
    mAudioNode->PushBuffer(decoded);
+}
+
+void GranularNode::SweepPrepare()
+{
+   mAudioNode->PushBuffer(MakeSweepToneBuffer());
 }
