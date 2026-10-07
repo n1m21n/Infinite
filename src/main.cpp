@@ -23,6 +23,7 @@
 // before a same-frame keystroke is processed, so typed-param entry sets the
 // cursor/selection state explicitly once the field is confirmed active.
 #include "imgui_internal.h"
+#include <cstdarg>
 #include "TablerIcons.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -2860,6 +2861,23 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       gDiscreteParamCounter = kDiscreteParamBase;
    }
 
+   // Help tooltips (what a control does, its shortcut) are opt-in in Settings. Diagnostics - errors,
+   // rejection reasons, live value readouts - use ImGui::SetTooltip directly and always show.
+   void HelpTip(const char* fmt, ...)
+   {
+      if (!CategoryColors::GetTooltips())
+         return;
+      // Inside a node the editor's canvas transform is live and would offset the tooltip from the cursor.
+      if (gInsideNodeCanvas)
+         ed::Suspend();
+      va_list args;
+      va_start(args, fmt);
+      ImGui::SetTooltipV(fmt, args);
+      va_end(args);
+      if (gInsideNodeCanvas)
+         ed::Resume();
+   }
+
    // io.WantTextInput is computed at the end of the previous frame, so on the frame a text field takes
    // focus it is still false and hover-to-type would eat the first keystroke for a knob under the
    // pointer. This also reads the live ImGui state (an InputText or temp-input that already owns the
@@ -2958,6 +2976,13 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          seen = seen || (e.node == nodeIndex && e.param == paramIndex);
       if (!seen)
          gKbParams.push_back({ nodeIndex, paramIndex });
+      if (CategoryColors::GetTooltips() && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip) && !ImGui::IsItemActive())
+      {
+         char lo[48], hi[48];
+         snprintf(lo, sizeof(lo), fmt, minV);
+         snprintf(hi, sizeof(hi), fmt, maxV);
+         HelpTip("Range %s to %s\nDouble-click, or hover and type, to enter a value", lo, hi);
+      }
       if (nodeIndex != gKbFocusNode || paramIndex != gKbFocusParam)
          return false;
 
@@ -3508,6 +3533,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          seen = seen || (e.node == nodeIndex && e.param == paramIndex);
       if (!seen)
          gKbParams.push_back({ nodeIndex, paramIndex });
+      if (CategoryColors::GetTooltips() && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip) && !ImGui::IsItemActive())
+         HelpTip("Click to change. With the node selected, Tab to focus it and Left/Right to step");
       if (nodeIndex != gKbFocusNode || paramIndex != gKbFocusParam)
          return 0;
       const ImVec2 rmin = ImGui::GetItemRectMin();
@@ -35454,7 +35481,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             if (viewportWasOn)
                ImGui::PopStyleColor(2);
             if (ImGui::IsItemHovered())
-               ImGui::SetTooltip(viewportWasOn ? "Viewport Monitor: Visible (Right-click for Dock Position)" : "Toggle Viewport Monitor (Right-click for Dock Position)");
+               HelpTip(viewportWasOn ? "Viewport Monitor: Visible (Right-click for Dock Position)" : "Toggle Viewport Monitor (Right-click for Dock Position)");
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
@@ -35488,7 +35515,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          if (arrangeIsPlaying)
             ImGui::PopStyleColor(2);
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(arrangeIsPlaying ? "Pause (Space)" : "Play (Space)");
+            HelpTip(arrangeIsPlaying ? "Pause (Space)" : "Play (Space)");
          {
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
@@ -35506,7 +35533,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          if (ImGui::Button("##arrangerewindbtn", ImVec2(30, 0)))
             tr.Rewind();
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Return to Start (Enter)");
+            HelpTip("Return to Start (Enter)");
          {
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
@@ -35541,7 +35568,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                if (on)
                   ImGui::PopStyleColor(2);
                if (ImGui::IsItemHovered())
-                  ImGui::SetTooltip(u == 0 ? "Switch display to Bars / Beats (BBT)" : "Switch display to Time (Minutes:Seconds)");
+                  HelpTip(u == 0 ? "Switch display to Bars / Beats (BBT)" : "Switch display to Time (Minutes:Seconds)");
             }
             ImGui::PopStyleVar();
          }
@@ -35569,7 +35596,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          if (snapWasOn)
             ImGui::PopStyleColor(2);
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(snapWasOn ? "Snap to Grid: On" : "Snap to Grid: Off");
+            HelpTip(snapWasOn ? "Snap to Grid: On" : "Snap to Grid: Off");
          {
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
@@ -35601,7 +35628,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                ImGui::OpenPopup("##arrgridpopup");
             PopDropdownStyle();
             if (ImGui::IsItemHovered())
-               ImGui::SetTooltip("Snap Grid Division");
+               HelpTip("Snap Grid Division");
             if (ImGui::BeginPopup("##arrgridpopup"))
             {
                for (const GridChoice& c : kGridChoices)
@@ -35629,7 +35656,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          if (loopWasOn)
             ImGui::PopStyleColor(2);
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(loopWasOn ? "Loop Region: Enabled" : "Toggle Loop Region (Shift+drag on ruler)");
+            HelpTip(loopWasOn ? "Loop Region: Enabled" : "Toggle Loop Region (Shift+drag on ruler)");
          {
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
@@ -35668,7 +35695,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             case ArrangeTool::Pencil: toolTooltip = "Tool: Pencil / Draw (P) - Click to choose tool"; break;
          }
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", toolTooltip);
+            HelpTip("%s", toolTooltip);
 
          // Draw current tool icon + chevron
          {
@@ -35739,7 +35766,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          if (ImGui::Button("##arrangemarkerbtn", ImVec2(30, 0)))
             ArrangeAddMarkerAtPlayhead();
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Add Marker at Playhead (M)");
+            HelpTip("Add Marker at Playhead (M)");
          {
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
@@ -35778,7 +35805,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                : (arrangeIconCol & 0x60FFFFFFu);
             Tabler::DrawLineHeight(ImGui::GetWindowDrawList(), rcenter, (rbmax.y - rbmin.y) * 0.65f, barCol);
             if (hovered)
-               ImGui::SetTooltip(anyResized ? "Reset all track heights to default" : "All tracks already at default height");
+               HelpTip(anyResized ? "Reset all track heights to default" : "All tracks already at default height");
          }
 
          // Inspector / Clip Settings toggle. Icon is the edit/pencil
@@ -35795,7 +35822,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          if (inspectorWasOpen)
             ImGui::PopStyleColor(2);
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(inspectorWasOpen ? "Clip / Track Inspector: Open" : "Toggle Clip / Track Inspector");
+            HelpTip(inspectorWasOpen ? "Clip / Track Inspector: Open" : "Toggle Clip / Track Inspector");
          {
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
@@ -41484,7 +41511,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             gPerfActivePage = newP;
          }
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Add New Page");
+            HelpTip("Add New Page");
       }
 
       // Calculate dynamic content bounding box on active page
@@ -42372,6 +42399,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Edit & Canvas", "Delete", "Delete / Backspace / Shift+X", "Delete selected nodes, groups, or links" },
          { "Edit & Canvas", "Delete Cable", "X", "Delete selected cable/link only" },
          { "Edit & Canvas", "Select All", "Shift+A", "Select all nodes on the canvas" },
+         { "Edit & Canvas", "UI Scale", MODKEY "+= / " MODKEY "+-", "Make the whole interface bigger or smaller in 0.1 steps (0.5x to 2x); same setting as Settings > UI Scale" },
          { "Edit & Canvas", "Walk Params", "Tab / Shift+Tab", "Click a node, then Tab loops through that node's parameters (Shift+Tab goes backwards). Digits type a value; Esc leaves" },
          { "Edit & Canvas", "Nudge Param", "Left / Right", "With a param focused by Tab: Left/Down lowers it, Right/Up raises it one step; Alt = x10" },
          { "Edit & Canvas", "Move Node", "Up / Down / Left / Right", "Click a node, then the arrow keys move it one grid step. With a param focused they nudge the value instead" },
@@ -47356,6 +47384,12 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                UiScale::RequestRescale();
             }
             ImGui::TextWrapped("Manual multiplier on top of the display's own DPI scale. Scales the whole interface, node bodies included.");
+            {
+               bool tips = CategoryColors::GetTooltips();
+               if (ImGui::Checkbox("Help tooltips", &tips))
+                  CategoryColors::SetTooltips(tips);
+               ImGui::TextWrapped("Hover a control to see what it does and its shortcut. Off by default.");
+            }
 
             {
                const std::string currentFont = CategoryColors::GetUiFont();
@@ -47559,7 +47593,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
 #if defined(_WIN32)
             ImGui::EndDisabled();
             if (ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()))
-               ImGui::SetTooltip("Windows shared-mode audio always runs at the format set in "
+               HelpTip("Windows shared-mode audio always runs at the format set in "
                                  "Sound settings. Change the sample rate there.");
 #endif
 
@@ -47584,7 +47618,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
 #if defined(_WIN32)
             ImGui::EndDisabled();
             if (ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()))
-               ImGui::SetTooltip("Windows shared-mode audio always runs at the device's own "
+               HelpTip("Windows shared-mode audio always runs at the device's own "
                                  "period. Change it in Sound settings.");
 #endif
 
@@ -47608,7 +47642,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                   ImGui::EndCombo();
                }
                if (ImGui::IsItemHovered())
-                  ImGui::SetTooltip("Standard: Windows shared mode (default).\n"
+                  HelpTip("Standard: Windows shared mode (default).\n"
                                     "Low latency: shared mode at the driver's smallest period "
                                     "(Windows 10+).\n"
                                     "Exclusive: takes the device from other apps for the lowest "
@@ -47659,7 +47693,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                   else
                      ImGui::TextDisabled("Round-trip latency: unknown");
                   if (ImGui::IsItemHovered())
-                     ImGui::SetTooltip("Estimate: output device + stream + buffer, plus the input "
+                     HelpTip("Estimate: output device + stream + buffer, plus the input "
                                        "device's own latency. Real hardware chains can add more "
                                        "(interfaces, Bluetooth, drivers).");
                }
@@ -47746,7 +47780,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             }
             ImGui::EndDisabled();
             if (gVsync && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-               ImGui::SetTooltip("Disabled while Vsync is on - Vsync alone paces the frame.\nTurn Vsync off to use a manual FPS cap.");
+               HelpTip("Disabled while Vsync is on - Vsync alone paces the frame.\nTurn Vsync off to use a manual FPS cap.");
 
             if (ImGui::Checkbox("Vsync", &gVsync))
             {
@@ -47814,7 +47848,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                   sPatchSkillStatus = SaveAISkillFile(folder, "infinite-patch-authoring.md", AISkillContent::kPatchAuthoringMarkdown);
             }
             if (ImGui::IsItemHovered())
-               ImGui::SetTooltip("Save a reference file you can hand to any AI assistant (or drop into ~/.claude/skills/)\nso it can write, check and render Infinite patches from the command line.");
+               HelpTip("Save a reference file you can hand to any AI assistant (or drop into ~/.claude/skills/)\nso it can write, check and render Infinite patches from the command line.");
             if (!sPatchSkillStatus.empty())
             {
                ImGui::SameLine();
@@ -47870,7 +47904,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                   sFieldSkillStatus = SaveAISkillFile(folder, "infinite-field-language.md", AISkillContent::kFieldLanguageMarkdown);
             }
             if (ImGui::IsItemHovered())
-               ImGui::SetTooltip("Save a Field-language reference file you can hand to any AI assistant\n(or drop into ~/.claude/skills/) so it can write Field kernels for you.");
+               HelpTip("Save a Field-language reference file you can hand to any AI assistant\n(or drop into ~/.claude/skills/) so it can write Field kernels for you.");
             if (!sFieldSkillStatus.empty())
             {
                ImGui::SameLine();
@@ -48178,7 +48212,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                   sExprSkillStatus = SaveAISkillFile(folder, "infinite-expression-globals.md", AISkillContent::kExpressionGlobalsMarkdown);
             }
             if (ImGui::IsItemHovered())
-               ImGui::SetTooltip("Save a reference file you can hand to any AI assistant\n(or drop into ~/.claude/skills/) so it can write '=' expressions and Globals for you.");
+               HelpTip("Save a reference file you can hand to any AI assistant\n(or drop into ~/.claude/skills/) so it can write '=' expressions and Globals for you.");
             if (!sExprSkillStatus.empty())
             {
                ImGui::SameLine();
@@ -77990,7 +78024,7 @@ int main(int argc, char** argv)
                Tabler::DrawPlayerPlay(dl, center, iconSize, col, true);
          }
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s (Space)", isTransportPlaying ? "Pause" : "Play");
+            HelpTip("%s (Space)", isTransportPlaying ? "Pause" : "Play");
          if (isTransportPlaying)
             ImGui::PopStyleColor(3);
 
@@ -78007,7 +78041,7 @@ int main(int argc, char** argv)
             Tabler::DrawPlayerRewind(dl, center, iconSize, col);
          }
          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Rewind (Return)");
+            HelpTip("Rewind (Return)");
 
          TopBarSameLine(4.0f);
 
@@ -78058,7 +78092,7 @@ int main(int argc, char** argv)
                dl->AddRect(bmin, bmax, edge, 3.0f, 0, 1.0f);
                dl->AddText(ImVec2(bmin.x + pad.x, bmin.y + pad.y), edge, badge);
                if (ImGui::IsItemHovered())
-                  ImGui::SetTooltip(engineOn
+                  HelpTip(engineOn
                      ? "The Arrangement Timeline is driving audio. Hand it back to the canvas from the timeline panel."
                      : "The Arrangement Timeline will drive audio once the engine is started.");
             }
@@ -78124,7 +78158,7 @@ int main(int argc, char** argv)
                snprintf(bpmBuf, sizeof(bpmBuf), "%.1f###bpmBtn", bpm);
                ImGui::Button(bpmBuf);
                if (!ImGui::IsItemActive() && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
-                  ImGui::SetTooltip("Tempo - drag, double-click or type to change.\n"
+                  HelpTip("Tempo - drag, double-click or type to change.\n"
                                     "Arrangement Timeline clips keep their bar/beat positions:\n"
                                     "a tempo change moves their times in seconds, not their bars.");
                if (ImGui::IsItemHovered())
@@ -78570,7 +78604,7 @@ int main(int argc, char** argv)
             if (isOpen)
                ImGui::PopStyleColor();
             if (ImGui::IsItemHovered())
-               ImGui::SetTooltip("%s", tooltip);
+               HelpTip("%s", tooltip);
 
             ImDrawList* dl = ImGui::GetWindowDrawList();
             const ImVec2 bmin = ImGui::GetItemRectMin();
@@ -85220,6 +85254,40 @@ int main(int argc, char** argv)
             const bool ok = claimedIdle && sawLag && claimedOnLag;
             printf("[TEXTFOCUSTEST] idle=%d lagSeen=%d claimedOnLag=%d\n", (int)claimedIdle, (int)sawLag, (int)claimedOnLag);
             printf("[TEXTFOCUSTEST] %s\n", ok ? "TEXTFOCUSTEST OK" : "TEXTFOCUSTEST FAIL");
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      // R576: help tooltips default to off; Cmd/Ctrl+= and Cmd/Ctrl+- step the UI scale by 0.1.
+      if (getenv("INFINITE_UXLEFTOVERSTEST") != nullptr)
+      {
+         ImGuiIO& tio = ImGui::GetIO();
+         tio.ConfigInputTrickleEventQueue = false;
+         tio.AddFocusEvent(true);
+         static bool ok = true;
+         static float orig = 1.0f;
+         auto check = [&](bool good, const char* what) {
+            ok = ok && good;
+            printf("[UXLEFTOVERSTEST] %-46s %s\n", what, good ? "ok" : "FAIL");
+         };
+         if (frameId == 3)
+         {
+            orig = CategoryColors::GetUiScale();
+            CategoryColors::SetUiScale(1.0f, false);
+            check(!CategoryColors::GetTooltips(), "help tooltips are off by default");
+         }
+         if (frameId == 5) { tio.AddKeyEvent(ImGuiMod_Ctrl, true); tio.AddKeyEvent(ImGuiKey_Equal, true); }
+         if (frameId == 6) { tio.AddKeyEvent(ImGuiKey_Equal, false); tio.AddKeyEvent(ImGuiMod_Ctrl, false); }
+         if (frameId == 9)
+            check(std::fabs(CategoryColors::GetUiScale() - 1.1f) < 0.001f, "Ctrl+= raises the UI scale by 0.1");
+         if (frameId == 12) { tio.AddKeyEvent(ImGuiMod_Ctrl, true); tio.AddKeyEvent(ImGuiKey_Minus, true); }
+         if (frameId == 13) { tio.AddKeyEvent(ImGuiKey_Minus, false); tio.AddKeyEvent(ImGuiMod_Ctrl, false); }
+         if (frameId == 16)
+         {
+            check(std::fabs(CategoryColors::GetUiScale() - 1.0f) < 0.001f, "Ctrl+- lowers it back");
+            CategoryColors::SetUiScale(orig);
+            UiScale::RequestRescale();
+            printf("[UXLEFTOVERSTEST] %s\n", ok ? "UXLEFTOVERSTEST OK" : "UXLEFTOVERSTEST FAIL");
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
       }
@@ -105697,6 +105765,17 @@ int main(int argc, char** argv)
       {
          if (ImGui::IsKeyPressed(ImGuiKey_0, false))
             gSettingsOpen = true;
+         else if (ImGui::IsKeyPressed(ImGuiKey_Equal, true) || ImGui::IsKeyPressed(ImGuiKey_Minus, true))
+         {
+            // UI scale in 0.1 steps, like a browser's zoom. Applied through the same rescale path as the Settings slider.
+            const bool up = ImGui::IsKeyPressed(ImGuiKey_Equal, true);
+            const float next = std::clamp(std::round((CategoryColors::GetUiScale() + (up ? 0.1f : -0.1f)) * 10.0f) / 10.0f, 0.5f, 2.0f);
+            if (next != CategoryColors::GetUiScale())
+            {
+               CategoryColors::SetUiScale(next);
+               UiScale::RequestRescale();
+            }
+         }
          else if (ImGui::IsKeyPressed(ImGuiKey_S, false))
             SavePatchInteractive(ImGui::GetIO().KeyShift);
          else if (ImGui::IsKeyPressed(ImGuiKey_O, false))
