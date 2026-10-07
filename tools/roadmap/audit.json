@@ -1,16 +1,16 @@
 {
  "merges": [
-  298,
-  332
+  312,
+  347
  ],
  "direct": [
-  417,
-  449
+  421,
+  463
  ],
  "notes_total": 367,
  "evidence": [
-  482,
-  559
+  498,
+  579
  ],
  "per_release": {
   "v0.1": {
@@ -115,6 +115,16 @@
   }
  },
  "loose": [
+  "2026-10-07 9315838 Launcher: no ghost logo on exit, faster fade, shown once per installed version",
+  "2026-10-07 4efecda Roadmap: close R604 Spectrum Slide",
+  "2026-10-07 beb298a Node search: treat hyphen/underscore as space and match with spaces dropped (key snap / ke",
+  "2026-10-07 b84d7f9 Roadmap: close R605 Key-Snap",
+  "2026-10-07 b27fa34 Key-Snap: knob row on top, selectors below; teal in-scale / amber root / grey off-scale no",
+  "2026-10-07 9f41328 Roadmap: add Key-Snap follow-ups and the AUDIOUITEST crash",
+  "2026-10-07 686d10d Regenerate patch-authoring node facts (adds Key-Snap, refreshes stale param counts)",
+  "2026-10-07 1a2fffc Roadmap: close R606, drop duplicate R610, add sweep follow-ups",
+  "2026-10-07 8d37a86 Roadmap: refresh metrics",
+  "2026-10-07 bfb0381 Roadmap: close R607",
   "2026-10-07 e44cc97 Roadmap: close R551",
   "2026-10-07 be1da03 Roadmap: close R576, add screen-reader quest",
   "2026-10-07 4fe7cb0 Roadmap: close R575",
@@ -225,7 +235,11 @@
   "R543 Audio param sweep: ~490 'reaches audio thread' failures on main",
   "R550 Drum Sequencer: raise max steps 8 to 32 with 16-step pages (prerequisite for R54",
   "R560 UX audit: ImGui accessibility, HiDPI, text input, keyboard-only use",
-  "R592 Fixed a crash in the Drum Sequencer when swapping a lane's sample while voices w"
+  "R592 Fixed a crash in the Drum Sequencer when swapping a lane's sample while voices w",
+  "R603 Shape Resonator: ring the vibration modes of any geometry input (audio effect no",
+  "R614 INFINITE_AUDIOUITEST screenshot fixture segfaults in AudioEffectNode::ParamIndex",
+  "R616 Shape Resonator: accept point clouds and curves, not only meshes",
+  "R618 Launcher screen: animated Infinite logo, vertical credits (authors, contributors"
  ],
  "first_commit": "2026-08-10"
 }

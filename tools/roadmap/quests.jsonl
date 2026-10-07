@@ -2342,3 +2342,99 @@
 {"ts": "2026-10-07T10:47:34+05:30", "event": "add", "id": "R619", "after": [], "user": false, "src": "merge:feature/shape-resonator", "track": "nodes", "kind": "feature", "horizon": "later", "title": "Shape resonator", "why": "merged into main (42ce7cd)", "origin": "merge"}
 {"ts": "2026-10-07T12:20:13+05:30", "event": "done", "id": "R619", "why": "merged into main (42ce7cd)"}
 {"ts": "2026-10-07T12:20:13+05:30", "event": "edit", "id": "R619", "opened": "2026-10-07T10:47:34+05:30", "closed": "2026-10-07T12:20:13+05:30", "release": "", "commits": ["42ce7cd"]}
+{"ts": "2026-10-07T12:29:11+05:30", "event": "add", "id": "R620", "after": [], "user": false, "src": "merge:feature/launcher-splash", "track": "growth", "kind": "feature", "horizon": "later", "title": "Launcher splash", "why": "merged into main (caa224c)", "origin": "merge"}
+{"ts": "2026-10-07T12:29:12+05:30", "event": "done", "id": "R620", "why": "merged into main (caa224c)"}
+{"ts": "2026-10-07T12:29:12+05:30", "event": "edit", "id": "R620", "opened": "2026-10-07T12:29:11+05:30", "closed": "2026-10-07T12:29:12+05:30", "release": "", "commits": ["caa224c"]}
+{"ts": "2026-10-07T12:42:38+05:30", "event": "add", "id": "R621", "after": [], "user": false, "src": "merge:bugfix/splash-centre-and-type", "track": "growth", "kind": "fix", "horizon": "later", "title": "Splash centre and type", "why": "merged into main (0b5085f)", "origin": "merge"}
+{"ts": "2026-10-07T12:42:39+05:30", "event": "done", "id": "R621", "why": "merged into main (0b5085f)"}
+{"ts": "2026-10-07T12:42:39+05:30", "event": "edit", "id": "R621", "opened": "2026-10-07T12:42:38+05:30", "closed": "2026-10-07T12:42:39+05:30", "release": "", "commits": ["0b5085f"]}
+{"ts": "2026-10-07T13:00:50+05:30", "event": "add", "id": "R622", "after": [], "user": false, "src": "merge:bugfix/splash-fade-polygon", "track": "growth", "kind": "fix", "horizon": "later", "title": "Splash fade polygon", "why": "merged into main (b5a32ff)", "origin": "merge"}
+{"ts": "2026-10-07T13:00:51+05:30", "event": "done", "id": "R622", "why": "merged into main (b5a32ff)"}
+{"ts": "2026-10-07T13:00:51+05:30", "event": "edit", "id": "R622", "opened": "2026-10-07T13:00:50+05:30", "closed": "2026-10-07T13:00:51+05:30", "release": "", "commits": ["b5a32ff"]}
+{"ts": "2026-10-07T07:49:17+00:00", "event": "done", "id": "R614", "why": "fixture indexed gNodes by hard-coded position; dead Scale Notes spawn shifted them. Now by type name; exits 0"}
+{"ts": "2026-10-07T13:18:18+05:30", "event": "add", "id": "R623", "after": [], "user": false, "src": "merge:bugfix/splash-exit-ghost", "track": "ship", "kind": "fix", "horizon": "later", "title": "Splash exit ghost", "why": "merged into main (5300846)", "origin": "merge"}
+{"ts": "2026-10-07T13:19:28+05:30", "event": "done", "id": "R623", "why": "merged into main (5300846)"}
+{"ts": "2026-10-07T13:19:28+05:30", "event": "edit", "id": "R623", "opened": "2026-10-07T13:18:18+05:30", "closed": "2026-10-07T13:19:28+05:30", "release": "", "commits": ["5300846"]}
+{"ts": "2026-10-07T07:55:31+00:00", "event": "done", "id": "R616", "why": "SolveCloud (kNN graph Laplacian) and SolveCurve (free string / ring) added; kernel picks mesh, cloud or curve; SHAPERESONATORTEST string 1:2:3:4, ring pairs, cloud, end-to-end all OK"}
+{"ts": "2026-10-07T07:55:40+00:00", "event": "edit", "id": "R617", "title": "Shape Resonator: remaining checks (source deleted/cable swapped mid-ring, many instances, save/load+paste with shape pin, InputCountFor pin check)"}
+{"ts": "2026-10-07T13:25:09+05:30", "event": "add", "id": "R624", "after": [], "user": false, "src": "merge:feature/shape-resonator-hardening", "track": "engine", "kind": "feature", "horizon": "later", "title": "Shape resonator hardening", "why": "merged into main (bce08c5)", "origin": "merge"}
+{"ts": "2026-10-07T13:25:26+05:30", "event": "done", "id": "R624", "why": "merged into main (bce08c5)"}
+{"ts": "2026-10-07T13:25:26+05:30", "event": "edit", "id": "R624", "opened": "2026-10-07T13:25:09+05:30", "closed": "2026-10-07T13:25:26+05:30", "release": "", "commits": ["bce08c5"]}
+{"ts": "2026-10-07T13:25:09+05:30", "event": "add", "id": "R625", "after": [], "user": false, "src": "merge:feature/launcher-card", "track": "growth", "kind": "feature", "horizon": "later", "title": "Launcher card", "why": "merged into main (9d84595)", "origin": "merge"}
+{"ts": "2026-10-07T13:26:14+05:30", "event": "done", "id": "R625", "why": "merged into main (9d84595)"}
+{"ts": "2026-10-07T13:26:14+05:30", "event": "edit", "id": "R625", "opened": "2026-10-07T13:25:09+05:30", "closed": "2026-10-07T13:26:14+05:30", "release": "", "commits": ["9d84595"]}
+{"ts": "2026-10-07T07:58:15+00:00", "event": "drop", "id": "R599", "why": "owner 2026-10-07: abandon, little OS/hardware support"}
+{"ts": "2026-10-07T07:58:19+00:00", "event": "drop", "id": "R598", "why": "owner 2026-10-07: abandon, Link is GPL or paid"}
+{"ts": "2026-10-07T07:58:23+00:00", "event": "drop", "id": "R546", "why": "owner 2026-10-07: not needed"}
+{"ts": "2026-10-07T07:58:27+00:00", "event": "drop", "id": "R538", "why": "owner 2026-10-07: not needed, headless engine integration covers it"}
+{"ts": "2026-10-07T07:58:31+00:00", "event": "drop", "id": "R28", "why": "owner 2026-10-07: abandon"}
+{"ts": "2026-10-07T07:58:35+00:00", "event": "drop", "id": "R27", "why": "owner 2026-10-07: abandon for now"}
+{"ts": "2026-10-07T07:58:39+00:00", "event": "drop", "id": "R537", "why": "owner 2026-10-07: abandon for now"}
+{"ts": "2026-10-07T07:58:43+00:00", "event": "edit", "id": "R547", "user": false}
+{"ts": "2026-10-07T07:58:47+00:00", "event": "edit", "id": "R555", "user": false}
+{"ts": "2026-10-07T07:58:51+00:00", "event": "move", "id": "R555", "horizon": "later"}
+{"ts": "2026-10-07T07:58:54+00:00", "event": "move", "id": "R26", "horizon": "later"}
+{"ts": "2026-10-07T07:59:05+00:00", "event": "edit", "id": "R26", "user": false}
+{"ts": "2026-10-07T08:04:17+00:00", "event": "drop", "id": "R564", "why": "owner 2026-10-07: no stem separation, audio-to-MIDI doesn't fit Infinite (not MIDI-centric), generative covered by the agent"}
+{"ts": "2026-10-07T08:04:22+00:00", "event": "edit", "id": "R562", "user": false}
+{"ts": "2026-10-07T08:04:26+00:00", "event": "edit", "id": "R556", "user": false}
+{"ts": "2026-10-07T13:38:35+05:30", "event": "add", "id": "R626", "after": [], "user": false, "src": "merge:bugfix/launcher-footer", "track": "growth", "kind": "fix", "horizon": "later", "title": "Launcher footer", "why": "merged into main (15a2c12)", "origin": "merge"}
+{"ts": "2026-10-07T13:38:36+05:30", "event": "done", "id": "R626", "why": "merged into main (15a2c12)"}
+{"ts": "2026-10-07T13:38:36+05:30", "event": "edit", "id": "R626", "opened": "2026-10-07T13:38:35+05:30", "closed": "2026-10-07T13:38:36+05:30", "release": "", "commits": ["15a2c12"]}
+{"ts": "2026-10-07T08:19:33+00:00", "event": "done", "id": "R547", "why": "MIDI File node merged: SMF parser, beat-timed playback with transpose/track/loop/velocity, piano-roll preview, .mid drop, MIDIFILETEST"}
+{"ts": "2026-10-07T13:49:27+05:30", "event": "add", "id": "R627", "after": [], "user": false, "src": "merge:feature/midi-file-node", "track": "timeline", "kind": "feature", "horizon": "later", "title": "Midi file node", "why": "merged into main (60e4445)", "origin": "merge"}
+{"ts": "2026-10-07T13:49:32+05:30", "event": "done", "id": "R627", "why": "merged into main (60e4445)"}
+{"ts": "2026-10-07T13:49:32+05:30", "event": "edit", "id": "R627", "opened": "2026-10-07T13:49:27+05:30", "closed": "2026-10-07T13:49:32+05:30", "release": "", "commits": ["60e4445"]}
+{"ts": "2026-10-07T14:05:22+05:30", "event": "add", "id": "R628", "after": [], "user": false, "src": "merge:feature/midi-file-complete", "track": "ship", "kind": "feature", "horizon": "later", "title": "Midi file complete", "why": "merged into main (72f28fd)", "origin": "merge"}
+{"ts": "2026-10-07T14:05:23+05:30", "event": "done", "id": "R628", "why": "merged into main (72f28fd)"}
+{"ts": "2026-10-07T14:05:23+05:30", "event": "edit", "id": "R628", "opened": "2026-10-07T14:05:22+05:30", "closed": "2026-10-07T14:05:23+05:30", "release": "", "commits": ["72f28fd"]}
+{"ts": "2026-10-07T09:17:22+00:00", "event": "done", "id": "R617", "why": "SHAPERESGRAPHTEST: eight instances on one source solve, save/load with the shape pin wired, source deleted mid-ring clears the pin, pin counted as an input slot"}
+{"ts": "2026-10-07T09:17:26+00:00", "event": "done", "id": "R603", "why": "Shape Resonator shipped to main (modes, curves, clouds, throttling) with all edge-case checks"}
+{"ts": "2026-10-07T14:47:20+05:30", "event": "add", "id": "R629", "after": [], "user": false, "src": "merge:feature/shape-resonator-graph-checks", "track": "engine", "kind": "feature", "horizon": "later", "title": "Shape resonator graph checks", "why": "merged into main (aec7547)", "origin": "merge"}
+{"ts": "2026-10-07T14:47:21+05:30", "event": "done", "id": "R629", "why": "merged into main (aec7547)"}
+{"ts": "2026-10-07T14:47:21+05:30", "event": "edit", "id": "R629", "opened": "2026-10-07T14:47:20+05:30", "closed": "2026-10-07T14:47:21+05:30", "release": "", "commits": ["aec7547"]}
+{"ts": "2026-10-07T09:19:22+00:00", "event": "edit", "id": "R617", "commits": ["bce08c5", "1d6f4a2c", "c61a88c7", "458825f4", "aec7547"]}
+{"ts": "2026-10-07T09:19:26+00:00", "event": "edit", "id": "R547", "commits": ["b2168ef8", "60e4445", "31fdb9d9", "72f28fd"]}
+{"ts": "2026-10-07T09:19:30+00:00", "event": "drop", "id": "R624", "why": "duplicate of R617 (Shape Resonator hardening)"}
+{"ts": "2026-10-07T09:19:34+00:00", "event": "drop", "id": "R629", "why": "duplicate of R617 (graph checks)"}
+{"ts": "2026-10-07T09:19:38+00:00", "event": "drop", "id": "R627", "why": "duplicate of R547 (MIDI File node)"}
+{"ts": "2026-10-07T09:19:43+00:00", "event": "drop", "id": "R628", "why": "duplicate of R547 (MIDI File complete)"}
+{"ts": "2026-10-07T09:20:11+00:00", "event": "edit", "id": "R547", "opened": "2026-10-07T13:49:27+05:30", "commits": ["b2168ef", "60e4445", "31fdb9d", "72f28fd"], "closed": "2026-10-07T14:05:23+05:30", "release": ""}
+{"ts": "2026-10-07T09:20:12+00:00", "event": "edit", "id": "R617", "opened": "2026-10-07T13:25:09+05:30", "commits": ["bce08c5", "1d6f4a2", "c61a88c", "458825f", "aec7547"], "closed": "2026-10-07T14:47:21+05:30", "release": ""}
+{"ts": "2026-10-07T09:22:51+00:00", "event": "done", "id": "R618", "why": "Launcher card + footer shipped by the launcher session (compact centred card, shown on every start); owner confirmed done 2026-10-07"}
+{"ts": "2026-10-07T09:23:02+00:00", "event": "drop", "id": "R615", "why": "Owner: delete (2026-10-07)"}
+{"ts": "2026-10-07T09:32:45+00:00", "event": "drop", "id": "R21", "why": "parked, not v0.4.7 (docs/plans/parked-ideas.md)"}
+{"ts": "2026-10-07T09:32:49+00:00", "event": "drop", "id": "R29", "why": "parked, not v0.4.7 (docs/plans/parked-ideas.md)"}
+{"ts": "2026-10-07T09:32:53+00:00", "event": "drop", "id": "R26", "why": "parked, not v0.4.7 (docs/plans/parked-ideas.md)"}
+{"ts": "2026-10-07T09:32:57+00:00", "event": "drop", "id": "R31", "why": "parked, not v0.4.7 (docs/plans/parked-ideas.md)"}
+{"ts": "2026-10-07T09:33:01+00:00", "event": "drop", "id": "R555", "why": "parked, not v0.4.7 (docs/plans/parked-ideas.md)"}
+{"ts": "2026-10-07T09:33:04+00:00", "event": "drop", "id": "R556", "why": "parked, not v0.4.7 (docs/plans/parked-ideas.md)"}
+{"ts": "2026-10-07T09:33:08+00:00", "event": "drop", "id": "R562", "why": "parked, not v0.4.7 (docs/plans/parked-ideas.md)"}
+{"ts": "2026-10-07T09:33:12+00:00", "event": "drop", "id": "R568", "why": "parked, not v0.4.7 (docs/plans/parked-ideas.md)"}
+{"ts": "2026-10-07T09:33:17+00:00", "event": "drop", "id": "R574", "why": "parked, not v0.4.7 (docs/plans/parked-ideas.md)"}
+{"ts": "2026-10-07T09:33:21+00:00", "event": "drop", "id": "R584", "why": "parked, not v0.4.7 (docs/plans/parked-ideas.md)"}
+{"ts": "2026-10-07T09:33:25+00:00", "event": "drop", "id": "R597", "why": "parked, not v0.4.7 (docs/plans/parked-ideas.md)"}
+{"ts": "2026-10-07T09:33:28+00:00", "event": "drop", "id": "R602", "why": "parked, not v0.4.7 (docs/plans/parked-ideas.md)"}
+{"ts": "2026-10-07T09:33:32+00:00", "event": "drop", "id": "R611", "why": "parked, not v0.4.7 (docs/plans/parked-ideas.md)"}
+{"ts": "2026-10-07T09:33:35+00:00", "event": "drop", "id": "R612", "why": "parked, not v0.4.7 (docs/plans/parked-ideas.md)"}
+{"ts": "2026-10-07T09:33:39+00:00", "event": "drop", "id": "R613", "why": "parked, not v0.4.7 (docs/plans/parked-ideas.md)"}
+{"ts": "2026-10-07T09:33:49+00:00", "event": "add", "id": "R630", "after": [], "user": false, "src": "plan:parked-ideas.md", "track": "engine", "kind": "feature", "horizon": "later", "title": "Plan: Parked ideas (dropped from the quest board 2026-10-07)", "why": "docs/plans/parked-ideas.md"}
+{"ts": "2026-10-07T09:33:49+00:00", "event": "add", "id": "R631", "after": [], "user": false, "src": "plan:release-v0.4.7.md", "track": "engine", "kind": "feature", "horizon": "later", "title": "Plan: v0.4.7 release run (3 h budget, 2026-10-07)", "why": "docs/plans/release-v0.4.7.md"}
+{"ts": "2026-10-07T09:34:02+00:00", "event": "drop", "id": "R630", "why": "parking list, not a quest"}
+{"ts": "2026-10-07T09:35:38+00:00", "event": "drop", "id": "R594", "why": "no crash report coming; not actionable"}
+{"ts": "2026-10-07T09:35:42+00:00", "event": "drop", "id": "R561", "why": "parked, not v0.4.7 (docs/plans/parked-ideas.md)"}
+{"ts": "2026-10-07T15:15:20+05:30", "event": "add", "id": "R632", "after": [], "user": false, "src": "merge:feature/audio-sweep-rigs", "track": "engine", "kind": "feature", "horizon": "later", "title": "Audio sweep rigs", "why": "merged into main (8ad4234)", "origin": "merge"}
+{"ts": "2026-10-07T15:15:20+05:30", "event": "done", "id": "R632", "why": "merged into main (8ad4234)"}
+{"ts": "2026-10-07T15:15:20+05:30", "event": "edit", "id": "R632", "opened": "2026-10-07T15:15:20+05:30", "closed": "2026-10-07T15:15:20+05:30", "release": "", "commits": ["8ad4234"]}
+{"ts": "2026-10-07T09:49:12+00:00", "event": "drop", "id": "R631", "why": "release run cancelled by owner 2026-10-07, much work left"}
+{"ts": "2026-10-07T10:00:25+00:00", "event": "add", "id": "R633", "track": "engine", "kind": "feature", "horizon": "now", "title": "MPE input: per-note bend, pressure and slide (v0.4.7)", "why": "Owner approved for v0.4.7 2026-10-07; plan docs/plans/mpe/README.md", "after": [], "user": true, "origin": "ask", "effort": "L"}
+{"ts": "2026-10-07T10:00:29+00:00", "event": "add", "id": "R634", "track": "platform", "kind": "feature", "horizon": "now", "title": "NDI video in/out (v0.4.7)", "why": "Owner approved for v0.4.7 2026-10-07; plan docs/plans/ndi/README.md; needs NDI SDK headers from owner", "after": [], "user": true, "origin": "ask", "effort": "L"}
+{"ts": "2026-10-07T10:02:26+00:00", "event": "drop", "id": "R633", "why": "MPE is being built in another session (owner 2026-10-07); not duplicated here"}
+{"ts": "2026-10-07T10:05:05+00:00", "event": "add", "id": "R635", "track": "engine", "kind": "feature", "horizon": "now", "title": "MPE input: per-note bend on MIDI Notes, Note Pressure and Slide controllers", "why": "Owner approved docs/plans/mpe", "after": [], "user": false, "origin": "ask", "effort": "M"}
+{"ts": "2026-10-07T10:08:14+00:00", "event": "edit", "id": "R635", "commits": ["cf64c025"]}
+{"ts": "2026-10-07T10:08:17+00:00", "event": "done", "id": "R635", "why": "MPE input shipped to main: per-note bend, master bend, Note Pressure/Slide controllers, MPETEST"}
+{"ts": "2026-10-07T10:08:45+00:00", "event": "edit", "id": "R635", "opened": "2026-10-07T15:38:08+05:30", "commits": ["cf64c02"], "closed": "2026-10-07T15:38:08+05:30", "release": ""}
+{"ts": "2026-10-07T10:09:08+00:00", "event": "add", "id": "R636", "after": [], "user": false, "src": "plan:mpe", "track": "engine", "kind": "feature", "horizon": "later", "title": "Plan: MPE input (R597, proposed for v0.4.8)", "why": "docs/plans/mpe"}
+{"ts": "2026-10-07T10:09:08+00:00", "event": "add", "id": "R637", "after": [], "user": false, "src": "plan:ndi", "track": "engine", "kind": "feature", "horizon": "later", "title": "Plan: NDI video in/out (R562, proposed for v0.4.8)", "why": "docs/plans/ndi"}
+{"ts": "2026-10-07T10:09:17+00:00", "event": "drop", "id": "R636", "why": "duplicate of R635"}
+{"ts": "2026-10-07T10:09:22+00:00", "event": "drop", "id": "R637", "why": "plan doc only, not scheduled; parked"}
