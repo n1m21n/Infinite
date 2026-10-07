@@ -354,6 +354,7 @@ public:
    float anisotropyRotation = 0.0f;
    float dispersion = 0.0f;
    float alphaCutoff = 0.0f;
+   bool textureAlpha = false;
    // How the albedo/roughness/metallic/normal/ao/emission/clearcoat/sheen
    // maps sample outside 0..1 UV - 0=Clamp (smear edge pixel, matches every
    // saved patch before this param existed), 1=Repeat, 2=Mirror.
@@ -382,6 +383,7 @@ public:
       v.Float("iridescenceThickness", iridescenceThickness);
       v.Float("anisotropy", anisotropy); v.Float("anisotropyRotation", anisotropyRotation);
       v.Float("dispersion", dispersion); v.Float("alphaCutoff", alphaCutoff);
+      v.Bool("textureAlpha", textureAlpha);
       v.Float("normalStrength", normalStrength);
    }
 private:

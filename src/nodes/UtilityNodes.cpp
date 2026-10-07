@@ -84,6 +84,7 @@ Material MaterialNode::GetMaterial() const
    m.anisotropyRotation = anisotropyRotation;
    m.dispersion = dispersion;
    m.alphaCutoff = alphaCutoff;
+   m.textureAlpha = textureAlpha;
    return m;
 }
 

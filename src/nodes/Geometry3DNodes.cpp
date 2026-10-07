@@ -384,6 +384,7 @@ namespace
       "uniform float uAnisotropyRotation;\n"
       "uniform float uDispersion;\n"
       "uniform float uAlphaCutoff;\n"
+      "uniform int uTextureAlpha;\n"
       "uniform float uTransmission;\n"
       "uniform float uTransmissionRoughness;\n"
       "uniform sampler2D uSceneColor;\n"
@@ -617,7 +618,9 @@ namespace
       "      vec2 d = vUv * 2.0 - 1.0;\n"
       "      if (dot(d, d) > 1.0) discard;\n"
       "   }\n"
-      "   if (uAlphaCutoff > 0.0 && uOpacity < uAlphaCutoff) discard;\n"
+      "   float alpha = uOpacity;\n"
+      "   if (uTextureAlpha == 1 && uHasTexture == 1) alpha *= sampleMap(uTexture, normalize(vNormal), computeMapUv(normalize(vNormal))).a;\n"
+      "   if (uAlphaCutoff > 0.0 && alpha < uAlphaCutoff) discard;\n"
       "   vec3 n = normalize(vNormal);\n"
       "   if (uRenderPass == 1) {\n"
       "      float d = clamp((length(vWorldPos - uCamPos) - uNear) / max(0.001, uFar - uNear), 0.0, 1.0);\n"
@@ -786,7 +789,7 @@ namespace
       "      }\n"
       "      col = mix(col, refracted, uTransmission);\n"
       "   }\n"
-      "   fragColor = vec4(col, uOpacity);\n"
+      "   fragColor = vec4(col, alpha);\n"
       "}\n";
 }
 
@@ -2037,6 +2040,7 @@ void Render3DNode::CookIfNeeded(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uAnisotropyRotation"), material.anisotropyRotation);
       glUniform1f(glGetUniformLocation(mProgram, "uDispersion"), 0.0f);
       glUniform1f(glGetUniformLocation(mProgram, "uAlphaCutoff"), material.alphaCutoff);
+      glUniform1i(glGetUniformLocation(mProgram, "uTextureAlpha"), material.textureAlpha ? 1 : 0);
       glUniform1f(glGetUniformLocation(mProgram, "uTransmission"), 0.0f);
       glUniform1f(glGetUniformLocation(mProgram, "uTransmissionRoughness"), 0.0f);
 
@@ -2344,6 +2348,7 @@ void Render3DNode::CookIfNeeded(int frameId)
       glUniform1f(glGetUniformLocation(mProgram, "uAnisotropyRotation"), material.anisotropyRotation);
       glUniform1f(glGetUniformLocation(mProgram, "uDispersion"), material.dispersion);
       glUniform1f(glGetUniformLocation(mProgram, "uAlphaCutoff"), material.alphaCutoff);
+      glUniform1i(glGetUniformLocation(mProgram, "uTextureAlpha"), material.textureAlpha ? 1 : 0);
       glUniform1f(glGetUniformLocation(mProgram, "uTransmission"), material.transmission);
       glUniform1f(glGetUniformLocation(mProgram, "uTransmissionRoughness"), material.transmissionRoughness);
 
@@ -2413,7 +2418,7 @@ void Render3DNode::CookIfNeeded(int frameId)
       if (s == nullptr || s->GetPointCloud() != nullptr)
          return false;
       const Material m = s->GetMaterial();
-      return m.opacity < 0.999f && m.transmission <= 0.001f;
+      return (m.opacity < 0.999f || m.textureAlpha) && m.transmission <= 0.001f;
    };
 
    bool anyTransmissive = false;
