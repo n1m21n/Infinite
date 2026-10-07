@@ -2287,3 +2287,6 @@
 {"ts": "2026-10-07T01:23:36+00:00", "event": "edit", "id": "R601", "opened": "2026-10-07T06:52:39+05:30", "commits": ["a05d9b1", "93090cf"], "closed": "2026-10-07T06:52:40+05:30", "release": ""}
 {"ts": "2026-10-07T01:29:32+00:00", "event": "done", "id": "R506", "why": "Shape composites premultiplied then un-premultiplies: edge pixels keep the fill colour, only alpha falls off. SHAPEEDGETEST failed 644/644 before, 0 after. Display paths already treat textures as straight alpha"}
 {"ts": "2026-10-07T01:29:32+00:00", "event": "edit", "id": "R506", "commits": ["793213eb", "75f2fa8e"]}
+{"ts": "2026-10-07T01:30:24+00:00", "event": "edit", "id": "R506", "opened": "2026-10-07T06:59:29+05:30", "commits": ["793213e", "75f2fa8"], "closed": "2026-10-07T06:59:30+05:30", "release": ""}
+{"ts": "2026-10-07T01:36:50+00:00", "event": "done", "id": "R571", "why": "Slice 4: ImGui keyboard nav toggled per frame, on only while a popup or non-canvas window has focus; canvas keys stand down while nav shows its ring. NAVTEST covers it. Decision on open Q5: on for everyone"}
+{"ts": "2026-10-07T01:36:50+00:00", "event": "edit", "id": "R571", "commits": ["8e8dcfa0", "fc24ba0c"]}
