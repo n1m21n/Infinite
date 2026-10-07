@@ -106,6 +106,7 @@ namespace
 #include "core/NodeFactory.h"
 #include "core/CategoryColors.h"
 #include "core/UiScale.h"
+#include "core/SplashScreen.h"
 #include "core/GLUtil.h"
 #include "core/GraphNode.h"
 #include "core/FilterDefs.h"
@@ -77499,6 +77500,13 @@ int main(int argc, char** argv)
    double sFirstFrameEndMs = 0.0;
    int frameId = 0;
 
+   // Launcher screen over the first seconds (core/SplashScreen.h). Never in headless/test runs.
+   // INFINITE_SPLASHTEST=<seconds> forces it on under the screenshot harness, starting that far in.
+   const char* splashTest = getenv("INFINITE_SPLASHTEST");
+   const bool splashEnabled = splashTest != nullptr || (!gHeadlessTestWindow && !IsHeadlessProcess() && getenv("INFINITE_NOSPLASH") == nullptr);
+   if (splashEnabled)
+      Splash::Begin(splashTest ? (float)atof(splashTest) : 0.0f);
+
    while (!glfwWindowShouldClose(window))
    {
       static Bench::PercentileRing sStageModulation;
@@ -106382,6 +106390,8 @@ int main(int argc, char** argv)
          DrawOfflineRenderProgressWindow();
       DrawArrangeWavRenderProgressWindow();
       DrawArrangeRenderFailNotice();
+      if (splashEnabled)
+         Splash::Draw();
 
       int fbW, fbH;
       glfwGetFramebufferSize(window, &fbW, &fbH);
