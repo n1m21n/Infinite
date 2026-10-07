@@ -3,7 +3,7 @@
 
 namespace app
 {
-   // Lowercases and strips accents so the dropdown search finds "cafe" from "café". Covers the
+   // Lowercases (incl. Cyrillic) and strips accents so the dropdown search finds "cafe" from "café". Covers the
    // Latin-1 supplement and Latin Extended-A (U+00C0..U+017F), which is every accented letter
    // that shows up in node, device and preset names; anything else passes through unchanged.
    std::string FoldForSearch(const std::string& in)
@@ -33,6 +33,21 @@ namespace app
          {
             const unsigned cp = ((c & 0x1Fu) << 6) | ((unsigned char)in[i + 1] & 0x3Fu);
             out += kFold[cp - 0xC0];
+            i++;
+         }
+         else if ((c == 0xD0 || c == 0xD1) && i + 1 < in.size())
+         {
+            // Cyrillic: U+0410..042F -> 0430..044F, U+0400..040F -> 0450..045F, yo -> ye.
+            const unsigned cp = ((c & 0x1Fu) << 6) | ((unsigned char)in[i + 1] & 0x3Fu);
+            unsigned lo = cp;
+            if (cp >= 0x410 && cp <= 0x42F)
+               lo = cp + 0x20;
+            else if (cp >= 0x400 && cp <= 0x40F)
+               lo = cp + 0x50;
+            if (lo == 0x451)
+               lo = 0x435;
+            out += (char)(0xC0 | (lo >> 6));
+            out += (char)(0x80 | (lo & 0x3F));
             i++;
          }
          else

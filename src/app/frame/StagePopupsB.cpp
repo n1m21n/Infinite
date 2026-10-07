@@ -277,6 +277,8 @@ void DrawPopupsB(FrameCtx& fc)
             for (const auto& t : allTypes)
             {
                std::string hay = DisplayName(t.first) + " " + DisplayName(t.second);
+               if (I18n::CurrentLanguage() != "en")
+                  hay += " " + NodeSearchHaystack(t.first, t.second);
                if (!NodeSearchMatches(hay, q))
                   continue;
                ++shown;

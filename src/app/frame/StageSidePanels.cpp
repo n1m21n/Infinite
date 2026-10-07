@@ -384,7 +384,7 @@ void DrawSidePanels(FrameCtx& fc)
                         continue;
                      if (!q.empty())
                      {
-                        std::string hay = name + " " + category;
+                        std::string hay = NodeSearchHaystack(name, category);
                         if (!NodeSearchMatches(hay, q))
                            continue;
                      }
@@ -470,7 +470,7 @@ void DrawSidePanels(FrameCtx& fc)
                         matches.push_back(name);
                         continue;
                      }
-                     std::string hay = name + " " + category;
+                     std::string hay = NodeSearchHaystack(name, category);
                      if (NodeSearchMatches(hay, q))
                         matches.push_back(name);
                   }

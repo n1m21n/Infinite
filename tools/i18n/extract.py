@@ -93,7 +93,7 @@ def load_table(code):
 
 def fmt_sig(s):
     return [m.group(2) + (m.group(1) or '')
-            for m in re.finditer(r'%(?!%)[-+ #0]*\d*(\.\d+)?(?:l|ll|h|z)?([a-zA-Z])', s)]
+            for m in re.finditer(r'(?<![0-9%])%(?!%)[-+ #0]*\d*(\.\d+)?(?:l|ll|h|z)?([a-zA-Z])', s)]
 
 
 def font_gaps():

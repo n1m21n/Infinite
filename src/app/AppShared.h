@@ -4571,6 +4571,9 @@ void DrawModulatorMeter(IModulator* mod, int nodeIndex);
 void DisconnectLinkById(int id);
 
 const char* NodeHelpText(const GraphNode& gn);
+const char* NodeHelpTextFor(const std::string& typeName, const std::string& category);
+// typeName + category, plus the help prose (English and translated) when the UI is not English.
+std::string NodeSearchHaystack(const std::string& typeName, const std::string& category);
 // Translated help text; "{mod}" in the key expands to Cmd / Ctrl.
 const char* HelpT(const char* key);
 

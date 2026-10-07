@@ -76,16 +76,14 @@ namespace app
 
    // Node search: case-insensitive substring that treats '-' and '_' as
    // spaces, and also matches with spaces dropped, so "key snap", "key-snap"
-   // and "keysnap" all find "Key-Snap". `q` must already be lowercase.
+   // and "keysnap" all find "Key-Snap". Both sides are folded (case, Latin accents, Cyrillic).
    bool NodeSearchMatches(std::string hay, std::string q)
    {
       auto norm = [](std::string& t) {
+         t = FoldForSearch(t);
          for (char& c : t)
-         {
-            c = (char)std::tolower((unsigned char)c);
             if (c == '-' || c == '_')
                c = ' ';
-         }
       };
       auto strip = [](const std::string& t) {
          std::string o;

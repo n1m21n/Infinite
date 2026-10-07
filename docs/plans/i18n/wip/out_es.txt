@@ -1,0 +1,246 @@
+1¦Abrir parche
+2¦Abre un archivo de parche .inf existente
+3¦Abre los ajustes de apariencia, lienzo, audio y rendimiento
+4¦Abre el selector rápido de nodos con filtro por escritura
+5¦O arrastra sobre un espacio vacío de la pista para dibujar un clip y luego asígnale un nodo fuente desde el inspector.
+6¦Output muestra el resultado, exporta un PNG o graba un vídeo.
+7¦Devuelve 1 cuando se cumple la comparación y 0 en caso contrario - >, >=, <, <=, ==, != entre dos moduladores, con una tolerancia para las comparaciones de igualdad.
+8¦Devuelve 1 cuando se cumple la comparación y 0 en caso contrario.
+9¦Devuelve un punto 3D en movimiento (X/Y/Z, cada uno conectable por separado) que recorre una forma integrada (círculo, hélice, espiral, lissajous, etc.) a una velocidad sincronizada con el tempo, o que sigue los puntos de una fuente de geometría/curva conectada.
+10¦Devuelve un número fijo - el modulador más simple posible, útil para alimentar una entrada de Math o una ranura de modulación que espera un cable en lugar de control manual.
+11¦Devuelve el fotograma anterior - un retardo de un fotograma, no un efecto. Solo hace algo visible dentro de un bucle: conecta la salida de un nodo posterior a la entrada de un nodo Feedback y usa esa salida de Feedback aguas arriba, sin que el grafo se vuelva recursivo. Consulta Menú > Ayuda > 'Uso de Feedback' para ver el parche completo.
+12¦Devuelve el fotograma anterior. No muestra nada por sí solo - es el retardo que hace válido un bucle. Consulta 'Uso de Feedback' más arriba.
+13¦Cambia la duración de una nota: holdMs programa el note-off esos ms después del note-on en lugar de dejar pasar el real, con una duración fija sin importar cuánto tiempo se mantuvo la tecla. 0 = paso directo (desactivado).
+14¦Pinta directamente sobre la vista previa del nodo. Seis pinceles procedurales, borrador, espaciado y jitter. Conecta una imagen para pintar encima. Graba y luego dibuja - al reproducir se vuelve a dibujar el trazo en el tiempo, y el tamaño del lienzo sigue a la entrada cuando hay una conectada.
+15¦Pinta directamente sobre la vista previa del nodo. Seis pinceles procedurales, borrador, espaciado y jitter. Conecta una imagen para pintar encima. Los trazos se pueden grabar y reproducir como una animación.
+16¦Desplazar lienzo
+17¦Desplazar lienzo (teclas)
+18¦Desplazar la vista del grafo
+19¦Desplaza el lienzo
+20¦Parte del flujo de geometría y renderizado 3D - los nodos de geometría y de nubes de puntos alimentan Render 3D mediante una Camera y Lights.
+21¦Parte de la cadena de notas - recibe eventos de nota en su pin 'notes' y los devuelve modificados. Alimenta un sintetizador (Wavetable, Sampler) desde el final de la cadena.
+22¦Particle System es un emisor 3D con gravedad, turbulencia, planos de colisión y dinámica de masa-resorte. Cloth es una malla de masa-resorte anclada, con viento y colisión.
+23¦Nodo de modulación de paso directo que acepta un modulador entrante y lo reenvía a su salida. Útil para monitorizar, enrutar señales o como marcador de posición.
+24¦Pega los nodos copiados con desplazamiento automático
+25¦Editor de curvas spline por canal - arrastra los puntos de control en Red/Green/Blue/Luminance, al estilo de las Curvas de Photoshop.
+26¦Modelado físico de metal golpeado y pulsado - campanas, gongs, barras, placas, carillones, púas, cuerdas - mediante guías de onda Karplus-Strong extendidas y bancos de resonadores modales inarmónicos.
+27¦Generador de notas por rebote con gravedad física (hasta 12 bolas, con controles de velocidad, tamaño y rango) que crea polirritmias orgánicas cuando las bolas golpean las paredes.
+28¦Cambio de tono, desplazamiento de intervalo, modulación de la rueda de tono y curvas de velocity no lineales.
+29¦Reproducir / Pausa
+30¦Reproduce / pausa todo
+31¦Botón de reproducción en la barra superior
+32¦Cabezal al final
+33¦Cabezal al inicio
+34¦Reproduce un archivo MIDI estándar como fuente de notas. Carga un .mid (o suéltalo en el lienzo) y sigue el transporte: reproducir, detener y buscar mueven el cabezal por el archivo, y manda el tempo del proyecto - el tempo propio del archivo se ignora. transpose desplaza todas las notas, position (de 0 a 1 a lo largo del archivo) es donde empieza la reproducción - se reinicia desde ahí cada vez que el transporte arranca o busca, y salta ahí cuando mueves el control. speed 1 sigue el bpm del proyecto y lo escala a partir de ahí (el tempo propio del archivo se ignora - solo cuentan las notas). vel escala todas las velocities, y loop repite el archivo, redondeado hacia arriba a un compás completo de 4/4. Las notas del canal de batería (10) nunca se transponen. Se cargan archivos de formato 0/1/2, con tiempo SMPTE (asignado a 2 tiempos por segundo) y envueltos en RMID; no se reproducen pitch bend ni CCs.
+35¦Reproduce una escala cromática rápida entre una nota y la siguiente como aproximación del portamento (NoteEvent no tiene tono continuo, así que es un glissando, no una verdadera rampa de tono).
+36¦Reproduce un archivo de vídeo. La posición sigue al transporte, así que se pausa junto con todo lo demás. Dispone de loop y speed (incluida la reversa). También devuelve la pista de audio propia del clip, si la tiene, con el mismo reloj del transporte que la imagen (audioEnabled/volume).
+37¦Reproduce en orden alfabético las imágenes compatibles de una carpeta. El tiempo de mantenimiento y de transición siguen al transporte global; Native Size conserva los píxeles de origen 1:1, Best Fit estira para rellenar y Proportional Fit conserva la proporción.
+38¦Dibuja la salida de cualquier kernel de Field como curva o superficie, para que veas qué hace un kernel antes de conectarlo a Field Effect, Field Synth o FieldPixel.
+39¦Nube de puntos de entrada, malla de salida: un vértice por punto, sin aristas ni caras. Es el puente que permite que una nube (Particle System, un nodo Distribute, Image to Points) vuelva a entrar en los operadores de malla que solo saben recorrer una Mesh. 'alive only' omite las partículas muertas.
+40¦Generador polifónico de acordes, generador de armonías y apilado de intervalos.
+41¦Las posiciones se expresan en compases y tiempos, nunca en segundos, así que todo el arreglo se reajusta con el BPM de la barra superior. Los clips de audio de un archivo pueden seguir el tempo del proyecto: activa Sync en el inspector y el clip se estira en el tiempo según tempo / BPM de la muestra, en directo, al cambiar el tempo. Desactívalo y el clip se reproduce a su velocidad original.
+42¦Predictive Notes aprende una frase tocada como un modelo de Markov y sigue tocando en ese estilo. Predictive Quantize aprende el espaciado real entre tus ataques y acerca el timing futuro a él - una plantilla de groove, no la cuadrícula fija de Quantizer. Predictive Velocity aprende la forma de tu propio rango dinámico y reasigna las velocities futuras sobre él, en lugar del único exponente fijo de Velocity Curve.
+43¦Pulsa / y empieza a escribir. Haz doble clic en una nota existente para editarla.
+44¦Marcador anterior / siguiente
+45¦Ruido procedural: value, fBm, ridged, Voronoi, bordes Worley y blanco. Incluye deformación de dominio, octavas y mapeo de color.
+46¦Procesa audio: un cable de entrada, un cable de salida. Cada pin de entrada de audio admite exactamente un cable - usa un Mixer para sumar señales y un Splitter para repartir una. Consulta Menú > Ayuda > Referencia de módulos para ver las familias de efectos.
+47¦Produce un número que cambia con el tiempo, no una imagen. Conecta su salida al pequeño punto junto a cualquier deslizador para controlar ese parámetro.
+48¦Publica la imagen conectada como una fuente de vídeo NDI con nombre en la red local (OBS, vMix, Resolume, NDI Studio Monitor). Solo vídeo, sin audio. Requiere el runtime NDI gratuito de ndi.video; sin él, el nodo lo indica y todo lo demás funciona. NDI(R) es una marca registrada de Vizrt NDI AB.
+49¦Atrae los píxeles hacia un punto central o los aleja de él. Un Amount superior a 1 empuja hacia fuera, e inferior a 1 comprime hacia dentro.
+50¦Empuja cada cara hacia fuera desde el centro de la malla a lo largo de su propia normal, según Amount, con aleatoriedad por cara determinada por Seed.
+51¦Pon un nodo Fit antes de un Blend o un Layer Stack cuando tus fuentes tengan tamaños distintos.
+52¦Quantizer ajusta las notas entrantes a una escala y un modo (los modos estándar hasta Chromatic). Chorder construye un acorde a partir de cada nota que recibe.
+53¦Cuantiza un modulador a pasos de semitono en el rango low..high, mostrado como una lectura grande +/-N st. Sigue devolviendo 0..1 como cualquier modulador - solo restringe dónde dentro de 0..1 puede caer el valor, de modo que el intervalo se asigna a semitonos enteros. Scale/root ajustan a los grados de la escala en lugar de a cada semitono (chromatic = desactivado); glide añade portamento entre pasos, dejando pasar a propósito los valores sin cuantizar durante la transición.
+54¦Cuantiza el tono de cada nota entrante al grado más cercano de la escala/raíz elegida - nada más de la nota (timing, velocity) cambia. Una simple puerta en línea, distinta del filtrado por rango/probabilidad de Note Filter.
+55¦Rasteriza el grafo de geometría / cámara / luz / material en una imagen, con mapeo de sombras, oclusión ambiental y reflejos de entorno HDR (conecta un nodo HDRI a su entrada env para sustituir el cielo procedural). El antialiasing baja automáticamente con tamaños de salida grandes para mantenerse dentro de los límites de la GPU.
+56¦Rasteriza el grafo de geometría/cámara/luz/material en una imagen. El antialiasing se reduce automáticamente con tamaños de salida grandes para mantenerse dentro de los límites de la GPU. Las escenas de más de ~2 millones de triángulos son notablemente más pesadas de renderizar. Un nodo HDRI conectado a la entrada env sustituye el degradado de cielo procedural para el fondo, los reflejos y la luz ambiental.
+57¦Vuelve a triangular la malla; Jitter aleatoriza cómo se divide cada cara, para un aspecto más orgánico y menos uniforme.
+58¦Lee eventos de nota de un dispositivo de entrada MIDI conectado y los devuelve como un cable de notas - el punto de entrada para tocar un sintetizador o sampler desde un teclado/controlador externo. Activa mpe para un controlador MPE (Seaboard, Osmose, Linnstrument): cada nota mantenida sigue su propio pitch bend.
+59¦Síntesis bytebeat y de expresiones matemáticas en tiempo real que evalúa fórmulas del usuario con variables dinámicas (t, x, y, entradas).
+60¦Recibe una textura de vídeo publicada por otra aplicación de Windows mediante Spout, sin copias en la GPU. Elige un publicador de la lista del nodo.
+61¦Recibe una textura de vídeo publicada por otra aplicación de macOS mediante Syphon, sin copias en la GPU. Elige un publicador de la lista del nodo.
+62¦Recibe cualquier fuente de vídeo NDI de la red como imagen - elígela de la lista, que se vuelve a buscar en segundo plano. Solo vídeo, sin audio. Requiere el runtime NDI gratuito de ndi.video. NDI(R) es una marca registrada de Vizrt NDI AB.
+63¦Recibe vídeo en tiempo real de otra aplicación de Windows mediante Spout2 - Resolume, OBS, TouchDesigner, MadMapper, Unreal, Unity - como una textura de GPU compartida sin copias. Elige un emisor de la lista; se vuelve a buscar periódicamente, así que un emisor que arranque después de este nodo aparecerá.
+64¦Recibe vídeo en tiempo real de otra aplicación de macOS mediante Syphon - Resolume, OBS, TouchDesigner, MadMapper, Unreal, Unity - como una textura de GPU compartida sin copias (IOSurface). Elige un servidor de la lista; se vuelve a buscar periódicamente, así que un servidor que arranque después de este nodo aparecerá.
+65¦Recolorea cualquier entrada en escala de grises 0-1 mediante paradas definidas por el usuario, hasta 32, con interpolación lineal o constante. A diferencia de Gradient Map, no tiene forma propia - la forma viene de aguas arriba.
+66¦Recolorea usando una segunda imagen conectada como tira de paleta 1D - la Luminance de este píxel (o un canal elegido) indexa a lo largo de ella. Offset desplaza el índice, Mix mezcla con el original.
+67¦Recalcula las normales de los vértices - 'flat shade' da bordes duros por cara en lugar de un sombreado suave, 'flip' invierte hacia dónde apunta cada cara.
+68¦Graba cualquier modulador conectado a su entrada y lo reproduce. Pulsa Rec para capturar (la entrada en vivo pasa mientras se graba), pulsa Rec de nuevo para detener y empieza a repetirse de inmediato. speed es la velocidad de reproducción - 2x reproduce la toma al doble de velocidad - y low/high asignan la toma a un rango de salida. Las tomas se miden en tiempos, así que siguen al tempo y se pausan con el transporte (hasta 64 tiempos), y se guardan con el parche. Sin nada conectado, graba su propio mando in, así que puedes ejecutar un gesto a mano.
+69¦Graba cualquier modulador conectado - pulsa Rec y luego repite la toma con velocidad y rango low/high ajustables.
+70¦Graba la primera fracción grain de cada ciclo sincronizado con el tempo (o en ms libres) y luego repite ese fragmento capturado durante el resto del ciclo antes de grabar audio nuevo en el siguiente ciclo - un efecto glitch de repetición de tiempo.
+71¦Rehace la última acción deshecha
+72¦Reduce la imagen a un número fijo de niveles tonales (Levels) por canal, produciendo bandas de color planas.
+73¦Reasigna un modulador mediante una curva de transferencia arrastrable - una curva en S, una escalera o una respuesta exponencial, cosas que un deslizador no puede expresar.
+74¦Reasigna un modulador mediante una curva de transferencia arrastrable - haz clic en un espacio vacío para añadir un punto, arrástralo para moverlo, haz clic derecho para quitarlo (o haz clic derecho en un espacio vacío para restablecer una línea recta). La línea de la cuadrícula marca 0.5, donde está el punto de 'sin modulación' de un enlace bipolar, y el punto móvil muestra dónde se encuentra ahora la entrada sobre la curva. mix mezcla entre la entrada sin procesar y la salida curvada, así que 0 es un bypass real.
+75¦Reasigna la luminancia a un degradado de dos colores (Shadow a Highlight), al estilo del Gradient Map de Photoshop. Mix mezcla con el color original.
+76¦Reasigna la luminancia a un degradado de dos colores.
+77¦Reasigna el rango de entrada de un modulador a un rango de salida distinto - conecta un LFO de 0..1 y reasígnalo a -2..2, por ejemplo.
+78¦Reasigna el rango de entrada de un modulador a un rango de salida distinto.
+79¦Elimina un Key Colour elegido (al estilo de pantalla verde/azul), comparado en un espacio de color independiente del brillo. Tolerance/Softness dan forma al borde, Spill Removal desatura los bordes con dominante de color, 'show: Matte' previsualiza el alfa en lugar del resultado con clave.
+80¦Renombrar la pista, el grupo, el clip seleccionados o varios clips seleccionados
+81¦Renderiza el audio entrante como una imagen, de modo que cada nodo de imagen de la aplicación se convierte en un visualizador de audio: Waveform dibuja la traza del osciloscopio, Spectrum la magnitud FFT en una ventana de tamaño elegido. gain escala la amplitud dibujada, smoothing la amortigua entre fotogramas. Distinto de Audio Analyze, que produce números para la modulación - este produce píxeles.
+82¦Renderiza texto con cualquier fuente instalada en el sistema, con tamaño, color, espaciado, alineación y posición.
+83¦Renderiza la imagen como un patrón de puntos, como en la impresión offset. Scale define la densidad de puntos, Angle gira la cuadrícula de puntos, 'style: Colour' usa tres capas de puntos angulados al estilo CMY en lugar de una sola capa en escala de grises.
+84¦Repite cada evento de nota entrante, separados por delay ms, con la velocity decayendo y el tono desplazándose en cada repetición - una línea de retardo para notas en lugar de audio. La nota original siempre pasa primero; las repeticiones se añaden encima, no la sustituyen.
+85¦Sustituye cada ciclo de onda de la entrada por una forma de onda geométrica limpia (Sine, Square, Triangle) del mismo periodo y amplitud de pico. El timbre se reconstruye mientras el tono y el ritmo se conservan. La latencia es de un ciclo de onda.
+86¦Sustituye las caras sólidas por un tubo de alambre a lo largo de cada arista, con un Thickness elegido.
+87¦Sustituye por completo el canal alfa por la luminancia de una segunda imagen conectada - máscaras dibujadas a mano, un Shape, un Ramp o la salida 'show alpha' de otra rama. Sin nada conectado a la segunda entrada, la imagen se fuerza a totalmente opaca.
+88¦Remuestrea una entrada a una resolución elegida. Fit añade bandas negras, Fill recorta, Stretch ignora la proporción, Native pasa sin cambios. Offset X/Y desplaza el resultado en píxeles de salida (+ derecha, + arriba). Úsalo para que fuentes de distintos tamaños se compongan de forma predecible.
+89¦Remodela la velocity de las notas entrantes mediante una curva de respuesta (soft/linear/hard, o una curva personalizada) - el equivalente en la cadena de notas del ajuste de curva de velocity de un teclado.
+90¦Haz clic derecho en la cabecera de una pista o grupo para renderizar o exportar solo esa pista o grupo; la exportación completa del parche sigue en la barra superior.
+91¦Haz clic derecho o doble clic en el lienzo y escribe para filtrar - o pulsa Shift+N en cualquier lugar (Shift+N de nuevo lo cierra)
+92¦Hace sonar los modos de vibración de una entrada de geometría.
+93¦Hace sonar los modos de vibración de la forma en el pin 'shape', como si golpearas ese objeto. Tune define el tono del modo más grave; los demás modos se derivan de la geometría de la forma, así que una placa plana suena a campana y una barra larga casi armónica. Pos es el punto donde se golpea y desde el que se escucha: un modo permanece en silencio si se golpea sobre su línea nodal. Sin forma conectada, suena una placa rectangular plana.
+94¦Gira los píxeles cada vez más cuanto más cerca están de un punto central, como un remolino. Angle es la cantidad de torsión, Radius hasta dónde llega.
+95¦Selección con rectángulo
+96¦Selección con rectángulo
+97¦Ejecuta un kernel de Field una vez por muestra de audio, en el hilo de audio - escribe tu propio efecto de audio en el dominio de la muestra. `in` es el pin de entrada de audio, `state` declara memoria por voz, `param` expone un mando modulable. `reduce.rms(in, loHz, hiHz)` publica una lectura de medidor RMS de banda limitada una vez por bloque.
+98¦Ejecuta un kernel de Field una vez por píxel de salida, en la GPU - escribe tu propio generador de imágenes o efecto en Field en lugar de GLSL. `state` declara memoria persistente por píxel que sobrevive al siguiente fotograma (lo que permite expresar aquí reacción-difusión y efectos de estela), `param` expone un mando modulable, y el kernel puede declarar pines extra de imagen de entrada/salida. width/height definen la resolución de salida; los presets son kernels de partida completos.
+99¦Ejecuta un kernel de Field una vez, durante la edición, para construir parte del propio grafo - emit("Type Name", k0, k1, ...) crea un nodo y devuelve un handle, connect()/set()/place() lo conectan, ajustan sus parámetros y lo colocan. Pulsa Regenerate para volver a ejecutar: compara con lo construido la última vez (por identidad del sitio de emit) en lugar de borrar y volver a crear, de modo que los cambios manuales de parámetros en los nodos creados sobreviven a un Regenerate ajeno.
+100¦Ejecuta un kernel de Field por vértice sobre la geometría, modificando P, N, uv, Cd y atributos personalizados con ejecución de tasa inferida.
+101¦Reducción de frecuencia de muestreo (rate, retención de orden cero) y cuantización de profundidad de bits (bits) - las dos degradaciones digitales lo-fi clásicas, independientes entre sí.
+102¦Toma muestras de color de una imagen de referencia, cargada aquí o conectada - un cable conectado anula el archivo cargado, pero el archivo se conserva para volver a él al desconectar. Arrastra su 'out' al punto cuadrado junto a cualquier muestra de color para enlazarla - cada cable nuevo toma la siguiente muestra, y al hacer clic en una muestra enlazada se avanza un paso. Su salida de imagen es un degradado de la paleta.
+103¦Toma como nube de puntos el punto central de cada cara de la malla de entrada, para alimentar Instance on Points o Metaballs.
+104¦Toma como nube de puntos muestras de puntos a lo largo de las aristas de la malla de entrada, para alimentar Instance on Points o Metaballs.
+105¦Toma como nube de puntos los vértices de la malla de entrada, para alimentar Instance on Points o Metaballs.
+106¦Toma hasta 16 puntos de una fuente de geometría conectada y devuelve cada uno como su propio modulador X/Y/Z, además de un centroide (cx/cy/cz) y un agregado de dispersión (spread) que siguen siendo significativos aunque cambie el número de filas o el conjunto de puntos. El modo Vertex lee los vértices nativos (o los puntos de una nube de puntos, que siempre prevalecen sobre su propia malla de billboard); Scatter lee en su lugar una muestra aleatoria ponderada por área; Contour recorre en orden el contorno de borde/corte de la malla (o una curva conectada). Sort convierte la tabla en algo específico - por eje para un banco de rampas, por ángulo para un anillo ordenado por fase, por distancia al centro. offset desplaza un cabezal de lectura por el conjunto muestreado sin volver a muestrear, así que es el único control que vale la pena enlazar a un LFO. Fixed space asigna unidades del mundo mediante `extent` (hasta dónde puede desplazarse el objeto, no su tamaño); Bounds se autoescala a la caja delimitadora del propio conjunto muestreado, lo que significa que una traslación rígida de la fuente no produce ningún cambio - es intencionado, no un error.
+107¦Guarda el parche actual
+108¦Guarda el parche en un archivo nuevo
+109¦Escala cuánto de la oscilación de un modulador llega a su destino, sin necesidad de saber nada del destino. Como un enlace de modulación anula el mando por completo, 'depth' colapsa la señal hacia 0.5 en lugar de sumar una fracción encima: con 0 el destino se queda en su punto medio y el modulador no influye, con 1 la fuente pasa sin cambios. Un depth negativo invierte, así que un solo mando cubre cuánto y en qué dirección.
+110¦Escala todo el alfa existente de la imagen por Opacity - un fundido uniforme que deja el color intacto. A diferencia de Color Overlay, no se tiñe nada; a diferencia de la opacidad de un Blend, la transparencia queda incorporada a la imagen y viaja con ella por la cadena.
+111¦Dispersa puntos por la superficie de la malla de entrada, ponderados por área para que las caras grandes reciban proporcionalmente más - cobertura uniforme, a diferencia de Mesh to Points, que recorre la lista de vértices y por tanto se agrupa donde lo hace la topología (los polos de una UV Sphere). Density define cuántos; 'method' elige entre Random simple o Poisson (ruido azul, respetando Min Distance para que no se amontonen dos puntos).
+112¦Aplica Screen con una copia desenfocada de toda la imagen sobre sí misma, haciendo brillar todo y no solo los puntos brillantes (compara con Bloom, que se basa en un umbral).
+113¦Desplazamiento (la velocidad se ajusta en el Menú)
+114¦Selecciona todos los nodos del lienzo
+115¦Selecciona varios nodos con un recuadro
+116¦Seleccionar varios
+117¦Selecciona el nodo vecino en esa dirección
+118¦Selecciona y luego pulsa Delete, Backspace o Shift+X
+119¦Envía su entrada de modulador conectada como un mensaje Open Sound Control (dirección + float) a un host:puerto por UDP, al cambiar (más allá de un epsilon) o al menos cada intervalo - el único nodo del parche sin salida propia.
+120¦Los ajustes y el último diseño del grafo se guardan en $XDG_CONFIG_HOME/Infinite (~/.config/Infinite por defecto).
+121¦Los ajustes y el último diseño del grafo se guardan en %%APPDATA%%\\Infinite.
+122¦Los ajustes y el último diseño del grafo se guardan en ~/Library/Application Support/Infinite.
+123¦Elevación de sombras / medios tonos / luces más un control de curva en S, por canal RGB o todos juntos. Arrastra puntos de la curva para doblarla, haz clic en una parte vacía de la curva para añadir un punto, haz clic derecho en un punto para quitarlo.
+124¦Shape (o cualquier fuente)  ->  entrada A de Blend
+125¦Da forma a un modulador entrante con un contorno ADSR, activado cuando cruza el umbral, en lugar de generar su propio disparo.
+126¦Shift + arrastrar
+127¦Shift + arrastra un recuadro a su alrededor, o haz Shift+clic (o Ctrl+clic) en cada uno para añadirlo. Luego muévelos, duplícalos o elimínalos como grupo.
+128¦Shift+H - los nodos seleccionados, o todos los nodos si no hay ninguno seleccionado
+129¦Shift+J añade una pista de vídeo, Shift+K una pista de audio (con la línea de tiempo enfocada).
+130¦Shift+K, igual que Iniciar/Detener audio de la barra superior
+131¦Shift+M muestra u oculta la matriz acoplada con todos los enlaces activos
+132¦Shift+T abre una línea de tiempo acoplada junto al lienzo. No sustituye al parche - lo programa. Una pista ('lane') es de vídeo o de audio, y cada clip en ella apunta a un nodo que ya existe en tu grafo; el clip decide CUÁNDO se oye o se ve ese nodo, no lo que hace.
+133¦Shift+T muestra u oculta la línea de tiempo acoplada. Cuando tiene el foco, sus propias teclas toman el control - consulta 'Línea de tiempo de arreglo' más abajo, o Menú > Ayuda > Atajos para ver la lista completa.
+134¦Shift+V muestra u oculta el panel (o acopla/desacopla los nodos seleccionados)
+135¦Desplaza el tono de cada nota entrante un número fijo de semitonos.
+136¦Atajo
+137¦Mostrar / ocultar los mandos y deslizadores de parámetros
+138¦Muestra la ayuda del nodo seleccionado
+139¦Muestra su entrada a tamaño real de píxel en su propia ventana redimensionable, separada de la pequeña vista previa del nodo - útil para juzgar el detalle sin hacer zoom en todo el lienzo.
+140¦Muestra el canal alfa como una imagen en escala de grises, totalmente opaca - el blanco es sólido, el negro es transparente. Es un visor, no una edición: sustituye el color para que veas la máscara que produjo una clave, y suele ser lo primero que conviene usar cuando una composición va mal.
+141¦Geometría de distancia con signo escrita como kernels de Field y combinada/deformada por modificadores, y luego convertida en malla - la contrapartida procedural de las primitivas fijas.
+142¦Simula una lente de cámara: Barrel curva la imagen hacia dentro o fuera, Chromatic separa la distorsión de los canales de color para crear halos, Zoom escala el resultado.
+143¦Sine, triangle, saw up/down, square y sample-and-hold. Rate en tiempos, más fase y un rango de salida.
+144¦Una sola entrada de notas, con la misma forma que Predictive Notes, pero el tono se aprende como un intervalo respecto a una nota 'root' en lugar de un tono absoluto. Root se detecta automáticamente como la nota aprendida más frecuente y después es un parámetro normal - el relPitch del patrón queda fijado por lo aprendido, pero cambiar root después transpone la reproducción en directo sin volver a aprender, ya que la resolución ocurre al reproducir respecto a la root seleccionada en ese momento.
+145¦Distorsión de forma de onda de un solo ciclo y modelador de crossfade.
+146¦Seis algoritmos de glitch tras un único desplegable 'kind': Slice Shift (filas con división RGB en bloques), RGB Shift, Scanlines, Blocks (teselas con jitter), Wave y Datamosh (filas cortadas/mezcladas con arrastre de color). Amount/Detail controlan la intensidad/escala, Speed lo anima, Seed reinicia la aleatoriedad.
+147¦Corta el audio en granos solapados, calcula métricas por grano (Level, Brightness, Random) y los reordena según una mezcla continua entre la posición temporal original y el rango de la métrica. Con amount en 0 es un paso directo idéntico y limpio; en 1 queda totalmente ordenado en un contorno creciente o de brillo. El renderizado se ejecuta de forma asíncrona en un hilo de trabajo.
+148¦Corta la imagen en Segments angulares alrededor de un centro y refleja cada uno, al estilo caleidoscopio. Rotation hace girar el patrón, Zoom lo escala.
+149¦Difumina la imagen a lo largo de una línea recta, como el movimiento de la cámara o del sujeto. Angle define la dirección, Distance cuánto se difumina.
+150¦Ajusta cada pico espectral del sonido a la nota más cercana de una escala, de forma polifónica.
+151¦Ajusta el timing de las notas note-on entrantes hacia delante hasta la línea de cuadrícula más cercana, con una división de nota elegida.
+152¦Source (imagen, vídeo, forma, ruido, fórmula) crea una imagen.
+153¦Dividir en el cabezal
+154¦Divide el audio entrante en hasta 8 bandas de frecuencia - arrastra los divisores directamente sobre la pantalla del espectro para cambiar su tamaño - y asigna un color a cada una, VIBGYOR por defecto de graves a agudos. Sin imagen conectada, devuelve el degradado resultante por sí solo; si conectas una a su entrada opcional de imagen, la gradúa por luminancia a través de la misma paleta reactiva al audio.
+155¦Reparte las notas de un acorde en el tiempo en lugar de dispararlas juntas - strumMs por voz, en orden ascendente de tono, conservando la duración de puerta original de cada nota. Un solo mando: en 0 es un paso directo, y cuanto más sube, más suena el acorde rasgueado en vez de golpeado.
+156¦Estampa una forma en cada punto de una fuente de puntos, dibujada en una sola llamada instanciada. La entrada A es la fuente de puntos (muestreador Faces/Edges/Points, una nube de puntos, etc.), la entrada B es la forma que se estampa en cada punto - ambas son necesarias para que dibuje algo. Cualquier nodo encadenado después de este opera sobre la forma estampada, una sola vez, no sobre la dispersión realizada - excepto Transform, que es la excepción y mueve toda la dispersión como un grupo rígido.
+157¦Inicia / pausa la línea de tiempo y las animaciones
+158¦Inicia / detiene el dispositivo de audio. Solo en el lienzo - con la línea de tiempo enfocada, Shift+K añade una pista de audio
+159¦Recorre una carpeta de imágenes a intervalos de tiempo, con un crossfade opcional.
+160¦Vocoder de fase en streaming (N=2048, hop 512) que difumina en el tiempo la magnitud espectral. Los transitorios se disuelven en una nube armónica con inclinación, difusión de fase y congelación. La latencia es de 42.7 ms (2048 muestras); la mezcla por defecto está fijada en 1.0.
+161¦Superficie de subdivisión. Cada nivel multiplica aproximadamente por cuatro el número de triángulos, así que los niveles altos se vuelven costosos enseguida; Smooth controla cuánto redondea las esquinas.
+162¦Cambia transparente por sólido y viceversa (alpha = 1 - alpha), dejando el color intacto - el interruptor de 'invertir máscara' para el que una clave necesitaría otro nodo.
+163¦Barre el perfil de entrada alrededor de un Axis en una trayectoria helicoidal - Steps define la resolución, Turns el número de vueltas, Rise/turn el paso y Radius desplaza el barrido hacia fuera.
+164¦Symmetry (espejo sobre X, Y o ambos), Kaleidoscope (número de segmentos, rotación, zoom) y Mirror Tile.
+165¦La compartición de texturas Syphon/Spout no está disponible en Linux, así que este nodo no tiene emisor del que recibir y devuelve un marcador de posición. Usa Video In (V4L2) o una fuente de archivo.
+166¦La compartición de texturas Syphon/Spout no está disponible en Linux, así que este nodo no tiene fuentes de las que recibir.
+167¦La compartición de texturas Syphon/Spout no está disponible en Linux.
+168¦Patrones de arpegio sincronizados con el tempo (Up, Down, Up/Down, Random, Chord, As-Played), rango de octavas y duración de puerta.
+169¦Retardo ping-pong / rebote estéreo sincronizado con el tempo, filtros de feedback, reverberador de red de retardo de feedback (FDN) de alta densidad con predelay y amortiguación.
+170¦Nodo terminal. Muestra la imagen final, exporta un PNG y graba un .mov H.264 a una tasa de fotogramas elegida. La grabación captura la salida procesada, así que lo que ves es lo que se escribe.
+171¦El remapeo de Levels aplicado solo al canal alfa: Low/High recortan y normalizan el rango de la máscara (apretando un borde suave o ampliándolo) y Gamma curva la caída entre ellos. El paso de limpieza habitual después de Chroma Key o Alpha from Luma.
+172¦La familia de enrutamiento de audio. Audio Out es el nodo terminal. Cada pin de entrada de audio admite exactamente un cable, así que Mixer es el único nodo que suma (4-8 ranuras, cada una con gain/pan/mute/solo) y Splitter es el único punto de reparto. Gain es una etapa única en dB con medidor; Blend Audio es un crossfade de potencia constante entre dos entradas.
+173¦El nodo base de primitivas vectoriales 2D - elige cualquiera de sus 20 formas en el desplegable, con controles de relleno, trazo, feather y fondo. Cada forma tiene además su propio nodo con nombre que se puede crear directamente (Circle, Hexagon, Star, ...) y que simplemente empieza con esa forma.
+174¦El nodo base de primitivas 3D - elige cualquiera de sus 24 formas en el desplegable. Cada forma tiene además su propio nodo con nombre que se puede crear directamente (Cube, Sphere, Torus, ...) y que simplemente empieza con esa forma.
+175¦El punto de reparto explícito para audio: una salida de audio normal alimenta exactamente un destino, así que enviar una señal a varios sitios requiere este nodo. Su propia salida es la única exenta de esa regla. En el hilo de audio es una simple copia - existe por la visibilidad en el grafo y el límite de reparto, no porque copiar sea necesario por otra razón.
+176¦El equivalente en malla de Resynthesize: cada generación aplica una mezcla ponderada de operadores de geometría a la anterior, haciendo derivar la forma con el tiempo. 'step' avanza una generación manualmente, 'auto step' la ejecuta de forma continua, 'randomise' vuelve a sortear la semilla.
+177¦La única familia que edita un canal alfa existente en lugar de crear uno nuevo: Show Alpha (ver la máscara), Opacity, Set Alpha (toma el alfa de la luminancia de una segunda imagen), Alpha Invert, Alpha from Luma, Alpha Levels (apretar o ampliar un borde suave) y Premultiply / Unpremultiply.
+178¦El único nodo que suma audio - cualquier otro pin de entrada de audio admite exactamente un cable, así que siempre que dos señales deban unirse, se unen aquí. De cuatro a ocho ranuras, cada una con su propio gain, pan, mute y solo, sumadas en una salida.
+179¦La contrapartida con pads de MIDI CC: dispara un pulso 0..1 decreciente cada vez que se toca una nota MIDI concreta, y luego se queda en 0. Un golpe de pad es un evento y no una posición, así que sube y decae durante 'hold' segundos como la salida de ataque de Audio Analyze, en lugar de mantener un valor en vivo. La sensibilidad a la velocity escala el pico según la fuerza con que se golpeó el pad.
+180¦El único punto de convergencia de notas del sistema: hasta cuatro entradas de notas fusionadas en un solo flujo de salida, en orden de marca de tiempo. Las notas de cada entrada siguen siendo voces independientes identificadas por id de voz, no por tono - así que dos entradas que tocan la misma nota a la vez suenan como dos voces superpuestas, no como una colisión.
+181¦El único punto de reparto de notas del sistema: una entrada, cuatro salidas distintas. Round Robin recorre las salidas en ciclo, Random elige una por nota, Chain avanza solo cuando cambia el tono (una nota mantenida se queda donde está), y Probability sortea cada salida de forma independiente - una nota puede acabar en varias salidas a la vez o (raramente) en ninguna, en cuyo caso recurre a la salida 1. Toda la vida de una nota (de on a off) permanece siempre en la(s) salida(s) en que empezó.
+182¦El nodo terminal del audio, la contrapartida de Output para imágenes: lo que se conecte se suma en el dispositivo de salida seleccionado. No tiene procesamiento propio ni pin de salida. Dos cables en un mismo Audio Out se rechazan a propósito - enrútalos a través de un Mixer, que es el único nodo de la aplicación que suma audio. Con varios Audio Out, el retardo de los plugins se compensa entre ellos para que lleguen a la vez; activa live para excluir este cuando toques a través de él y quieras el menor retardo.
+183¦La barra superior contiene un reloj global: Reproducir/Pausa, Rebobinar y BPM. Todo lo basado en el tiempo lee de él - moduladores, reproducción de vídeo y shaders animados - así que pausar congela todo el parche y cambiar el tempo reajusta todo a la vez.
+184¦Tres resonadores pasabanda en paralelo sintonizados a los formantes de una vocal (F1/F2/F3), transformados de forma continua A-E-I-O-U con el mando vowel - un filtro con forma de tracto vocal para cualquier entrada, no solo voz.
+185¦Repite la imagen en teselas y refleja alternativamente cada una para que los bordes encajen sin costuras, a diferencia de una repetición simple. Tiles define cuántas repeticiones.
+186¦Consejos
+187¦Para construir un arreglo:
+188¦Activar/desactivar motor de audio
+189¦Mostrar/ocultar parámetros
+190¦Activa o desactiva el bypass (apagado) de los nodos seleccionados. Solo en el lienzo - con la línea de tiempo enfocada, B es la herramienta cuchilla
+191¦Mostrar/ocultar la línea de tiempo de arreglo acoplada
+192¦Mostrar/ocultar la matriz de modulación acoplada
+193¦Mostrar/ocultar la matriz de rendimiento acoplada
+194¦Activa o desactiva la cuchilla: haz clic en un clip para cortarlo (y su grupo) en la posición del ratón; Esc la desactiva (B hace bypass de los nodos cuando el lienzo tiene el foco)
+195¦Mostrar/ocultar el panel de vista (o acoplar los nodos seleccionados)
+196¦Transform, Array, Subdivide, Solidify, Extrude, Wireframe, Triangulate, Normals, Explode, Twist, Smooth, Mirror y Screw - además de Select y las operaciones que actúan solo sobre sus caras marcadas (Delete / Transform / Extrude Selected), las booleanas de Join Geometry (Union, Intersect, Difference), Displacement, Wrap y Merge by Distance.
+197¦Transforma una imagen en otra. Sus parámetros (y la forma de su nombre) describen lo que cambia; consulta Menú > Ayuda > Referencia de módulos para ver las familias de efectos.
+198¦Transforma las coordenadas de textura UV o 3D usadas por los materiales/texturas posteriores - traslada, rota y escala, independientemente de mover la propia geometría.
+199¦Reproducción de muestras cortadas por transitorios o por cuadrícula: divide una muestra cargada en hasta 64 cortes y los asigna cromáticamente desde la nota MIDI 36, con marcadores de corte arrastrables, un par de attack/decay por corte y un interruptor crossthrough que deja que un corte siga más allá de su propio límite.
+200¦Traslada, escala, rota, voltea en horizontal y voltea en vertical.
+201¦Traslada, escala, rota y voltea (horizontal/vertical) toda la imagen. Scale X/Y permiten estirar de forma no uniforme sobre el Scale global. Crop X/Y recortan simétricamente la fuente desde cada eje antes de aplicar el resto de la transformación.
+202¦Transporte y audio
+203¦Transporte y modulación
+204¦Banco afinado de hasta 16 resonadores pasabanda en paralelo excitados por el audio entrante. Cuatro estructuras armónicas/de afinación (Harmonic, Odd, Chord, Metallic) con decay (T60), desafinación por dispersión (scatter) y apertura estéreo.
+205¦Convierte una imagen o un vídeo en valores de control y canales de modulación. Admite sondas de punto UV, cajas ROI, 22 operaciones matemáticas/de color, fórmulas algebraicas personalizadas y varias tomas de salida de modulación.
+206¦Convierte el audio en una malla 3D de la forma más literal posible: la forma de onda extruida como una cinta plana por el espacio, de Segments puntos de ancho, con escala de width/height y su propia transformación. Smoothing amortigua la traza entre fotogramas para que se vea como una superficie y no como un parpadeo. Recibe audio en su propio pin - es una fuente de geometría, así que va a Render 3D, no a Audio Out.
+207¦Convierte los bordes en un aspecto de relieve restando la imagen consigo misma desplazada a lo largo de Angle/Distance. 'style: Over colour' conserva los colores originales y añade el relieve encima; 'Grey' sustituye la imagen por un relieve plano.
+208¦Convierte el audio en vivo en una imagen - espectrograma con desplazamiento, forma de onda o campo de nivel - para que cualquier efecto de imagen posterior se convierta en un visualizador de audio.
+209¦Convierte la velocity de las notas en un modulador 0..1 con un rango de velocity ajustable.
+210¦Veinte primitivas vectoriales - círculo, elipse, rectángulo, rectángulo redondeado, triángulo, polígono, estrella, anillo, cruz, línea, hexágono, corazón, flecha, creciente, engranaje, superelipse, sector, lágrima, chevron y mancha - con relleno, trazo, feather y fondo. Cada una también se puede crear directamente como su propio nodo con nombre.
+211¦Remolino, pellizco/expansión, ondulación, distorsión de lente (con aberración cromática), desplazamiento y licuar. Los efectos que dependen de la posición tienen Centre X/Y.
+212¦Retuerce la malla alrededor de un Axis elegido según Angle - cuanto más lejos está un punto a lo largo de ese eje, más rota.
+213¦Dos clips en pistas distintas no deben compartir un mismo nodo fuente: hay una sola posición de reproducción por nodo, así que no pueden redispararse de forma independiente. El inspector te avisa cuando ocurre, con un botón Make Unique que da al clip su propia copia del nodo - mismas entradas, mismas modulaciones, su propia posición.
+214¦Dos motores wavetable independientes con unison, filtro y envolventes de tono/filtro/amplitud, mezclados con un control A/B. Sin cable de notas conectado, funciona libremente a una frecuencia fija; si conectas un cable de notas, pasa a ser polifónico y controlado por envolvente.
+215¦Dos entradas y 32 modos de mezcla - el conjunto completo Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity, además de Erase.
+216¦Escribir un valor exacto
+217¦Deshacer la última acción del grafo
+218¦Desproyecta un mapa de profundidad 2D y una imagen en color opcional en una nube de puntos 3D o una malla de superficie triangulada, con proyecciones estenopeica, plana, radial y cilíndrica, curvas de profundidad y rotura de bordes.
+219¦Máscara de enfoque (unsharp mask) - desenfoca una copia y vuelve a sumar la diferencia.
+220¦Máscara de enfoque (unsharp mask): desenfoca una copia de la imagen y vuelve a sumar la diferencia, exagerando los bordes. Amount es la intensidad, Radius qué anchura de borde afecta.
+221¦Hasta 16 resonadores pasabanda en paralelo que forman un banco de filtros modales afinado, con un modo de afinación 'Metallic'.
+222¦Usa un fotograma de wavetable como curva de transferencia de waveshaping: la amplitud de la muestra de entrada selecciona una fase en la tabla, y el valor de la tabla en ese punto es la salida. Un Drive por encima de 0dB empuja la fase más allá de los extremos de la tabla, donde se envuelve en lugar de recortarse - auténtico wavefolding, no distorsión. Position transforma la curva a lo largo de los 8 fotogramas de la tabla, smooth cruza a una versión de la misma curva con menos armónicos (más oscura).
+223¦=en
+224¦Nodo de utilidad: enrutamiento de audio, nodos terminales/de salida (muestran, exportan o graban el resultado final), E/S de Syphon y OSC.
+225¦Las pistas de vídeo se componen de atrás hacia delante, cada clip con su propio modo de mezcla, opacidad y gradación de brillo/contraste/saturación. Los clips de audio llevan gain, pan, tono y fundidos, sumados por pista. La forma de onda de un clip se dibuja a partir de lo que realmente se reprodujo, así que un clip que aún no has reproducido muestra una línea plana hasta que el cabezal lo ha cruzado una vez.
+226¦Panel de vista
+227¦Sintetizador polifónico de analógico virtual con dos osciladores, apilado de unison con desafinación desigual, sincronización dura de osciladores, suboscilador, ruido, drive previo al filtro, filtros Moog ladder ZDF no lineales y SVF, apertura estéreo de doble ruta y ADSR de amplitud.
+228¦Recorrer parámetros
+229¦Deforma, ancla las esquinas y corrige la perspectiva de una imagen para proyectores, paredes planas o pantallas curvas, con patrones de prueba de alineación integrados y resolución de destino personalizada.
+230¦Síntesis por terreno de onda: una imagen conectada se lee como un campo de alturas z = T(u,v), y la forma de onda del oscilador es lo que devuelve una órbita cerrada trazada sobre ese terreno. Orbit type/centre/radius/ratio deciden la trayectoria, así que mover la órbita controla el timbre y no el tono - y como el terreno es una entrada de imagen normal, un nodo Noise, Draw, Video o Reaction Diffusion aguas arriba remodela el sonido en vivo. Cada ciclo se limita en banda mediante una pirámide mip de 10 niveles, así que no hay aliasing por muy nítida que sea la imagen de origen.
+231¦Suelda los vértices más cercanos entre sí que Threshold en uno solo - el paso de limpieza que hace utilizable el resultado de una dispersión o conversión, cerrando las costuras que dejó una conversión. Con un radio grande colapsa la geometría por completo, que a veces es justo lo que se busca.
+232¦Conecta un modulador y pulsa Learn: deja pasar la señal mientras escucha, ajusta un pequeño modelo dinámico (Dynamic Mode Decomposition) de su forma y, al pulsar Stop, ejecuta ese modelo por su cuenta - desacoplado del cable en vivo - en lugar de reproducir la grabación exacta. Rank define de cuántas copias retardadas de la señal se construye el ajuste (2, 3, 4 u 8); la lectura muestra el radio espectral del ajuste, lo cerca que está el patrón aprendido del límite de inestabilidad.
+233¦Conecta una cadena de notas y pulsa Learn: escucha (dejando pasar las notas), aprende los tonos, el ritmo, las duraciones y las velocities como un modelo de Markov de orden variable y luego toca por su cuenta en ese estilo. Stray abajo repite la frase, en medio toca con carácter, arriba ignora el modelo y elige libremente dentro del rango. Las notas aprendidas se guardan con el parche.
+234¦Conecta cualquier fuente de notas y pulsa Learn, igual que en Predictive Notes. Aprende el ritmo, la duración de las notas y la velocity como su propio hábito, pero aprende el tono como un intervalo respecto a una nota 'root' en lugar de un tono absoluto - así que lo que devuelve se lee como un patrón repetitivo anclado en una nota con desviaciones ocasionales (piensa en C2 C2 C2 D3 C2 C2 C2), no como una melodía libre. Root se detecta automáticamente como la nota que más tocaste cuando Learn termina; cámbiala después con el desplegable para transponer todo el patrón aprendido sin volver a aprender.
+235¦Con un parámetro enfocado con Tab: Left/Down lo reduce, Right/Up lo aumenta un paso; Alt = x10
+236¦Envuelve los nodos seleccionados en un cuadro de grupo
+237¦Escribe color por elemento - colores de vértice en una malla, color por partícula en una nube de puntos, lo que lleve realmente la entrada. 'source' elige de dónde viene el color: un color Flat, una rampa Ramp de dos colores, Random por elemento, una textura conectada muestreada en la UV de cada elemento, o las muestras de un nodo Palette conectado (offset indica con qué muestra empieza la serie). Nada posterior necesita saber cuál - Render 3D lee lo que haya quedado ahí.
+238¦Tus faders macro de Your Moves: extrae los ejes principales de tus gestos con varios mandos mediante PCA sobre deltas, para que unos pocos faders macro controlen juntos muchos parámetros acoplados a tu estilo.
+239¦Tus faders macro de Your Moves: pocos faders controlan muchos parámetros según la co-variación aprendida mediante PCA.
+240¦Zoom al nodo
+241¦Zoom de la línea de tiempo
+242¦Zoom alrededor del ratón (el gesto de pellizco del trackpad también funciona)
+243¦Acercar y alejar
+244¦Acerca la vista al nodo seleccionado; Enter vuelve a alejar hasta donde estabas
+245¦transform  ->  de vuelta a la entrada de Feedback   <- esto cierra el bucle
+246¦{mod}+C / {mod}+V, o Shift+D / {mod}+D para duplicar en el mismo lugar

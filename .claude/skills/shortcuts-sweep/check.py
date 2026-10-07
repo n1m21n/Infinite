@@ -77,7 +77,9 @@ def main():
     if not tbl:
         print("SHORTCUTSWEEP FAIL - could not find the kShortcuts table in src/main.cpp or src/app")
         return 1
-    rows = re.findall(r'\{\s*"([^"]*)"\s*,\s*"([^"]*)"\s*,\s*([^,]+?)\s*,\s*"([^"]*)"\s*\}', tbl.group(1))
+    # Cells may be wrapped in I18N_KEY("...") (i18n key marker); the key column is a plain expression.
+    S = r'(?:I18N_KEY\(\s*)?"([^"]*)"\s*\)?'
+    rows = re.findall(r'\{\s*' + S + r'\s*,\s*' + S + r'\s*,\s*([^,]+?)\s*,\s*' + S + r'\s*\}', tbl.group(1))
 
     documented = {}   # ImGuiKey suffix -> [action, ...]
     unmappable = []

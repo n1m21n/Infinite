@@ -454,17 +454,39 @@ namespace app
    }
 
 
+   const char* NodeHelpTextFor(const std::string& typeName, const std::string& category)
+   {
+      if (const char* specific = SpecificNodeHelpText(typeName))
+         return specific;
+      if (const char* filter = FilterHelpText(typeName))
+         return filter;
+      if (const char* shape = ShapeHelpText(typeName))
+         return shape;
+      if (const char* geo3d = Geometry3DHelpText(typeName))
+         return geo3d;
+      return CategoryHelpText(category);
+   }
+
    const char* NodeHelpText(const GraphNode& gn)
    {
-      if (const char* specific = SpecificNodeHelpText(gn.typeName))
-         return specific;
-      if (const char* filter = FilterHelpText(gn.typeName))
-         return filter;
-      if (const char* shape = ShapeHelpText(gn.typeName))
-         return shape;
-      if (const char* geo3d = Geometry3DHelpText(gn.typeName))
-         return geo3d;
-      return CategoryHelpText(gn.category);
+      return NodeHelpTextFor(gn.typeName, gn.category);
+   }
+
+   // Haystack for the node pickers. Node and category names stay English (D2); in another language
+   // the help prose is searchable too, in both the English source and the translation, so "retraso"
+   // and "delay" both find Delay. English keeps matching names only, so a query never hits prose.
+   std::string NodeSearchHaystack(const std::string& typeName, const std::string& category)
+   {
+      std::string hay = typeName + " " + category;
+      if (I18n::CurrentLanguage() != "en")
+      {
+         const char* key = NodeHelpTextFor(typeName, category);
+         hay += " ";
+         hay += key;
+         hay += " ";
+         hay += HelpT(key);
+      }
+      return hay;
    }
 
 

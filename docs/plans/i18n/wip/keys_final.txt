@@ -1,0 +1,246 @@
+1¦Open Patch
+2¦Open an existing .inf patch file
+3¦Open appearance, canvas, audio, and performance settings
+4¦Open quick type-to-filter node picker
+5¦Or drag empty track space to draw a clip, then assign a source node to it from the inspector.
+6¦Output shows the result, exports a PNG, or records a video.
+7¦Outputs 1 when the comparison holds, 0 otherwise - >, >=, <, <=, ==, != between two modulators, with a tolerance for the equality checks.
+8¦Outputs 1 when the comparison holds, 0 otherwise.
+9¦Outputs a moving 3D point (X/Y/Z, each patchable separately) travelling around a built-in shape (circle, helix, spiral, lissajous, etc.) at a beat-synced speed, or along the points of a patched-in geometry/curve source instead.
+10¦Outputs one fixed number - the simplest possible modulator, useful for feeding a Math input or a modulation slot that expects a cable rather than manual control.
+11¦Outputs the previous frame - a one-frame delay, not an effect. It only does something visible inside a loop: patch a downstream node's output back into a Feedback node's input, then use that Feedback output upstream, without the graph recursing. See Menu > Help > 'Using Feedback' for the full patch.
+12¦Outputs the previous frame. Nothing visible on its own - it is the delay that makes a loop legal. See 'Using Feedback' above.
+13¦Overrides how long a note sounds: holdMs schedules the note-off that many ms after note-on instead of passing the real one through, for a fixed duration regardless of how long the key was held. 0 = passthrough (off).
+14¦Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Record, then draw - replaying redraws the stroke in time, and the canvas size follows the input when one is patched in.
+15¦Paint straight onto the node preview. Six procedural brushes, eraser, spacing and jitter. Patch an image in to paint over it. Strokes can be recorded and replayed as an animation.
+16¦Pan Canvas
+17¦Pan Canvas (keys)
+18¦Pan graph view
+19¦Pan the canvas
+20¦Part of the 3D geometry/render pipeline - geometry and point-cloud nodes feed into Render 3D via a Camera and Lights.
+21¦Part of the note chain - takes note events in on its 'notes' pin and passes them out, changed. Feed a synth (Wavetable, Sampler) from the end of the chain.
+22¦Particle System is a 3D emitter with gravity, turbulence, collision planes and spring-mass dynamics. Cloth is a pinned mass-spring sheet with wind and collision.
+23¦Pass-through modulation node that accepts an incoming modulator and forwards it to its output. Useful for monitoring, signal routing, or placeholders.
+24¦Paste copied nodes with automatic offset
+25¦Per-channel spline curve editor - drag control points on Red/Green/Blue/Luminance, Photoshop Curves-style.
+26¦Physical modelling for struck and plucked metal - bells, gongs, bars, plates, chimes, tines, strings - via extended Karplus-Strong waveguides and inharmonic modal resonator banks.
+27¦Physics-based gravity bounce note generator (up to 12 balls, with speed, size, and range controls) creating organic rhythmic polyrhythms as balls hit walls.
+28¦Pitch shifting, interval offset, pitch wheel modulation, and non-linear velocity mapping curves.
+29¦Play / Pause
+30¦Play / pause everything
+31¦Play button in the top bar
+32¦Playhead to End
+33¦Playhead to Start
+34¦Plays a Standard MIDI File as a note source. Load a .mid (or drop one on the canvas) and it follows the transport: play, stop and seek move the playhead through the file, and the project tempo rules - the file's own tempo is ignored. transpose shifts every note, position (0 to 1 across the file) is where playback starts - it restarts from there whenever the transport starts or seeks, and jumps there when you move the knob. speed 1 follows the project bpm and scales it from there (the file's own tempo is ignored - it is just notes). vel scales every velocity, and loop repeats the file, rounded up to a whole 4/4 bar. Drum-channel (10) notes are never transposed. Format 0/1/2, SMPTE-timed (mapped at 2 beats per second) and RMID-wrapped files load; pitch bend and CCs are not played.
+35¦Plays a fast chromatic run between a note and the next one as an approximation of portamento (NoteEvent has no continuous pitch, so this is a glissando, not a true pitch ramp).
+36¦Plays a video file. Position follows the transport, so it pauses with everything else. Loop and speed (including reverse) are available. Also outputs the clip's own audio track, if it has one, on the same transport-driven clock as the picture (audioEnabled/volume).
+37¦Plays the supported images in one folder in alphabetical order. Hold and transition time follow the global transport; Native Size keeps source pixels 1:1, Best Fit stretches to fill, and Proportional Fit preserves aspect.
+38¦Plots any Field kernel's output as a curve or surface, so you can see what a kernel does before patching it into Field Effect, Field Synth or FieldPixel.
+39¦Point cloud in, mesh out: one vertex per point, with no edges or faces. This is the bridge that lets a cloud (Particle System, a Distribute node, Image to Points) re-enter the mesh operators that only know how to walk a Mesh. 'alive only' skips dead particles.
+40¦Polyphonic chord generator, harmony generator, and interval stacking.
+41¦Positions are in bars and beats, never seconds, so the whole arrangement retimes with the top bar's BPM. Audio clips from a file can follow project tempo: switch Sync on in the inspector and the clip is time-stretched by tempo / sample BPM, live, as you change the tempo. Switch it off and the clip plays at its native speed instead.
+42¦Predictive Notes learns a played phrase as a Markov model and plays on in that style. Predictive Quantize learns the actual spacing between your onsets and pulls future timing toward it - a groove template, not Quantizer's fixed grid. Predictive Velocity learns the shape of your own dynamic range and remaps future velocities onto it, instead of Velocity Curve's one fixed exponent.
+43¦Press / and start typing. Double-click an existing note to edit it.
+44¦Previous / Next Marker
+45¦Procedural noise: value, fBm, ridged, Voronoi, Worley edges and white. Domain warping, octaves and colour mapping included.
+46¦Processes audio: one cable in, one cable out. Audio input pins take exactly one cable each - use a Mixer to sum signals and a Splitter to fan one out. See Menu > Help > Module reference for the effect families.
+47¦Produces a changing number over time, not an image. Patch its output onto the small dot beside any slider to drive that parameter.
+48¦Publishes the connected image as a named NDI video source on the local network (OBS, vMix, Resolume, NDI Studio Monitor). Video only, no audio. Needs the free NDI runtime from ndi.video; without it the node says so and everything else works. NDI(R) is a registered trademark of Vizrt NDI AB.
+49¦Pulls pixels toward, or pushes them away from, a centre point. Amount above 1 punches outward, below 1 pinches inward.
+50¦Pushes each face outward from the mesh's centre along its own normal, by Amount, randomized per-face by Seed.
+51¦Put a Fit node before a Blend or Layer Stack when your sources are different sizes.
+52¦Quantizer snaps incoming notes to a scale and mode (the standard modes through Chromatic). Chorder builds a chord from each single note it is given.
+53¦Quantizes a modulator to semitone steps over range low..high, shown as a large +/-N st readout. Still outputs 0..1 like any modulator - it just restricts where in 0..1 the value can land, so the span maps onto whole semitones. Scale/root snap to scale degrees instead of every semitone (chromatic = off); glide adds portamento between steps, passing through unquantized values in transit on purpose.
+54¦Quantizes every incoming note's pitch to the nearest degree of the chosen scale/root - nothing else about the note (timing, velocity) changes. A plain inline gate, distinct from Note Filter's range/chance gating.
+55¦Rasterizes the geometry / camera / light / material graph into an image, with shadow mapping, ambient occlusion and HDR environment reflections (patch an HDRI node into its env input to replace the procedural sky). Antialiasing steps down automatically at large output sizes to stay inside GPU limits.
+56¦Rasterizes the geometry/camera/light/material graph into an image. Antialiasing is reduced automatically at large output sizes to stay within GPU limits. Scenes over ~2 million triangles get noticeably heavier to render. An HDRI node patched into the env input replaces the procedural sky gradient for background, reflections and ambient light.
+57¦Re-triangulates the mesh; Jitter randomizes how each face is split, for a more organic, less uniform look.
+58¦Reads note events from a connected MIDI input device and outputs them as a note cable - the entry point for playing a synth or sampler from an external keyboard/controller. Turn on mpe for an MPE controller (Seaboard, Osmose, Linnstrument): each held note follows its own pitch bend.
+59¦Real-time bytebeat and mathematical expression synthesis evaluating user formulas with dynamic variables (t, x, y, inputs).
+60¦Receives a video texture published by another Windows application over Spout, zero-copy on the GPU. Pick a publisher from the node's list.
+61¦Receives a video texture published by another macOS application over Syphon, zero-copy on the GPU. Pick a publisher from the node's list.
+62¦Receives any NDI video source on the network as an image - pick it from the list, which rescans in the background. Video only, no audio. Needs the free NDI runtime from ndi.video. NDI(R) is a registered trademark of Vizrt NDI AB.
+63¦Receives real-time video from another Windows application over Spout2 - Resolume, OBS, TouchDesigner, MadMapper, Unreal, Unity - as a zero-copy shared GPU texture. Pick a sender from the list; it rescans periodically, so a sender that starts after this node does will appear.
+64¦Receives real-time video from another macOS application over Syphon - Resolume, OBS, TouchDesigner, MadMapper, Unreal, Unity - as a zero-copy shared GPU texture (IOSurface). Pick a server from the list; it rescans periodically, so a server that starts after this node does will appear.
+65¦Recolors any 0-1 grayscale input through user-authored stops, up to 32 of them, with linear or constant interpolation. Unlike Gradient Map, it has no shape of its own - the shape comes from upstream.
+66¦Recolors using a second patched-in image as a 1D palette strip - this pixel's Luminance (or a chosen channel) indexes across it. Offset shifts the index, Mix blends with the original.
+67¦Recomputes vertex normals - 'flat shade' gives hard per-face edges instead of smooth shading, 'flip' inverts which way every face points.
+68¦Records any modulator patched into its input and plays it back. Press Rec to capture (live input passes through while recording), press Rec again to stop and it starts looping straight away. speed is the playback rate - 2x plays the take twice as fast - and low/high map the take onto an output range. Takes are timed in beats, so they follow the tempo and pause with the transport (up to 64 beats), and they are saved with the patch. With nothing patched in, it records its own in knob, so you can perform a gesture by hand.
+69¦Records any patched modulator - hit Rec, then it loops the take back with adjustable speed and low/high range.
+70¦Records the first `grain` fraction of each tempo-synced (or free-ms) cycle, then loops that captured slice for the rest of the cycle before recording fresh audio next cycle - a beat-repeat glitch effect.
+71¦Redo last undone action
+72¦Reduces the image to a fixed number of tonal Levels per channel, producing flat colour bands.
+73¦Remaps a modulator through a draggable transfer curve - an S-curve, staircase, or exponential response, all things a slider can't express.
+74¦Remaps a modulator through a draggable transfer curve - click empty space to add a point, drag to move it, right-click to remove it (or right-click empty space to reset to a straight line). The gridline marks 0.5, where a bipolar binding's 'no modulation' point lives, and the moving dot shows where the input currently sits on the curve. mix blends between the raw input and the curved output, so 0 is a true bypass.
+75¦Remaps luminance onto a two-colour gradient (Shadow to Highlight), Photoshop Gradient Map-style. Mix blends with the original colour.
+76¦Remaps luminance onto a two-colour gradient.
+77¦Remaps one modulator's input range onto a different output range - patch in a 0..1 LFO and remap it to -2..2, for example.
+78¦Remaps one modulator's input range onto a different output range.
+79¦Removes a chosen Key Colour (green/blue-screen style), matched in a brightness-independent colour space. Tolerance/Softness shape the edge, Spill Removal desaturates colour-cast fringes, 'show: Matte' previews the alpha instead of the keyed result.
+80¦Rename selected track, group, clip, or multiple selected clips
+81¦Renders incoming audio as an image, so every image node in the app becomes an audio visualiser: Waveform draws the oscilloscope trace, Spectrum the FFT magnitude across a chosen window size. gain scales the drawn amplitude, smoothing damps it between frames. Distinct from Audio Analyze, which produces numbers for modulation - this produces pixels.
+82¦Renders text using any font installed on the system, with size, colour, tracking, alignment and position.
+83¦Renders the image as a dot pattern like offset printing. Scale sets dot density, Angle rotates the dot grid, 'style: Colour' uses three angled CMY-style dot layers instead of one greyscale layer.
+84¦Repeats every incoming note event, delay ms apart, with velocity decaying and pitch shifting per repeat - a delay line for notes rather than audio. The original note always passes through first; the repeats are on top of it, not instead of it.
+85¦Replaces every wavecycle of the input with a clean geometric waveform (Sine, Square, Triangle) of the same period and peak amplitude. Timbre is rebuilt while pitch and rhythm survive. Latency is one wavecycle.
+86¦Replaces solid faces with a wireframe tube running along each edge, at a chosen Thickness.
+87¦Replaces the alpha channel outright with the luminance of a second patched-in image - hand-drawn mattes, a Shape, a Ramp, or another branch's 'show alpha' output. With nothing patched into the second input the image is forced fully opaque instead.
+88¦Resamples an input to a chosen resolution. Fit letterboxes, Fill crops, Stretch ignores aspect, Native passes through. Offset X/Y slides the result in output pixels (+ right, + up). Use it to make differently-sized sources composite predictably.
+89¦Reshapes incoming note velocity through a response curve (soft/linear/hard, or a custom curve) - the note-chain equivalent of a keybed velocity curve setting.
+90¦Right-click a track or group header to render or export just that track or group; the full patch export is still in the top bar.
+91¦Right-click or double-click the canvas, then type to filter - or press Shift+N anywhere (Shift+N again closes it)
+92¦Rings the vibration modes of a geometry input.
+93¦Rings the vibration modes of the shape on the 'shape' pin, like striking that object. Tune sets the lowest mode's pitch; the other modes follow from the shape's geometry, so a flat plate sounds bell-like and a long bar nearly harmonic. Pos is where it is struck and heard from: a mode stays silent when struck on its node line. With no shape connected it rings a flat rectangular plate.
+94¦Rotates pixels increasingly the closer they are to a centre point, like a whirlpool. Angle is the twist amount, Radius how far it reaches.
+95¦Rubber-band Select
+96¦Rubber-band select
+97¦Runs a Field kernel once per audio sample, on the audio thread - write your own sample-domain audio effect. `in` is the audio input pin, `state` declares per-voice memory, `param` exposes a modulatable knob. `reduce.rms(in, loHz, hiHz)` publishes a band-limited RMS meter reading once per block.
+98¦Runs a Field kernel once per output pixel, on the GPU - write your own image generator or effect in Field instead of GLSL. `state` declares persistent per-pixel memory that survives to the next frame (which is what makes reaction-diffusion and trail effects expressible here), `param` exposes a modulatable knob, and extra input/output image pins can be declared by the kernel. width/height set the output resolution; presets are complete starting kernels.
+99¦Runs a Field kernel once, at edit time, to build part of the graph itself - emit("Type Name", k0, k1, ...) spawns a node and hands back a handle, connect()/set()/place() wire it up, set its params and position it. Press Regenerate to re-run: it diffs against what it built last time (by emit-site identity) instead of deleting and respawning, so hand-edits to params on the spawned nodes survive an unrelated Regenerate.
+100¦Runs a per-vertex Field kernel over geometry, modifying P, N, uv, Cd and custom attributes with rate-inferred execution.
+101¦Sample-rate reduction (rate, zero-order hold) and bit-depth quantization (bits) - the two classic lo-fi digital degradations, independent of each other.
+102¦Samples colours from a reference image, loaded here or patched in - a patched cable overrides the loaded file, but the file is kept so unplugging falls back to it. Drag its 'out' onto the square dot beside any colour swatch to bind it - each new cable takes the next swatch, and clicking a bound swatch steps it. Its image output is a gradient of the palette.
+103¦Samples each face's centre point of the input mesh as a point cloud, for feeding Instance on Points or Metaballs.
+104¦Samples points along the input mesh's edges as a point cloud, for feeding Instance on Points or Metaballs.
+105¦Samples the input mesh's vertices as a point cloud, for feeding Instance on Points or Metaballs.
+106¦Samples up to 16 points off a patched geometry source and outputs each as its own X/Y/Z modulator, plus a centroid (cx/cy/cz) and spread aggregate that stay meaningful however the row count or point set changes. Vertex mode reads native vertices (or a point cloud's points, which always wins over its own billboard mesh); Scatter reads an area-weighted random sample instead; Contour walks the mesh's boundary/slice outline (or a patched curve) in order. Sort turns the table into something specific - by axis for a ramp bank, by angle for a phase-ordered ring, by distance from the centre. offset scrubs a read head across the sampled set without re-sampling, so it's the one control worth binding to an LFO. Fixed space maps world units through `extent` (how far the object may travel, not how big it is); Bounds self-scales to the sampled set's own bounding box, which means a rigid translation of the source produces no change - that's by design, not a bug.
+107¦Save current patch
+108¦Save patch to a new file
+109¦Scales how much of a modulator's swing reaches its destination, without having to know anything about the destination. Because a modulation binding overrides the knob outright, 'depth' collapses the signal toward 0.5 rather than adding a fraction on top: at 0 the destination sits at its own mid-range and the modulator has no say, at 1 the source passes through unchanged. Negative depth inverts, so one knob covers how much and which direction.
+110¦Scales the whole image's existing alpha by Opacity - a uniform fade that keeps the colour untouched. Unlike Color Overlay, nothing is tinted; unlike a Blend's opacity, the transparency is baked into the image and travels with it down the chain.
+111¦Scatters points across the input mesh's surface, area-weighted so large faces get proportionally more - even coverage, unlike Mesh to Points, which walks the vertex list and therefore clumps wherever the topology does (a UV Sphere's poles). Density sets how many; 'method' chooses plain Random or Poisson (blue-noise, honouring Min Distance so no two points crowd together).
+112¦Screens a blurred copy of the whole image back over itself, glowing everything rather than just bright spots (compare Bloom, which is threshold-based).
+113¦Scroll (speed is adjustable in the Menu)
+114¦Select all nodes on the canvas
+115¦Select multiple nodes in box
+116¦Select several
+117¦Select the neighbouring node in that direction
+118¦Select, then Delete, Backspace or Shift+X
+119¦Sends its patched modulator input as an Open Sound Control message (address + float) to a host:port over UDP, on change (past an epsilon) or at least every interval - the one node in the patch with no output of its own.
+120¦Settings and the last graph layout are stored in $XDG_CONFIG_HOME/Infinite (~/.config/Infinite by default).
+121¦Settings and the last graph layout are stored in %%APPDATA%%\\Infinite.
+122¦Settings and the last graph layout are stored in ~/Library/Application Support/Infinite.
+123¦Shadow / midtone / highlight lift plus an S-curve control, per RGB channel or all together. Drag points on the curve to bend it, click empty curve to add a point, right-click a point to remove it.
+124¦Shape (or any source)  ->  Blend input A
+125¦Shapes an incoming modulator with an ADSR contour, gated by it crossing threshold, instead of generating its own trigger.
+126¦Shift + drag
+127¦Shift + drag a box around them, or Shift-click (or Ctrl-click) each one to add it. Then move, duplicate or delete as a group.
+128¦Shift+H - the selected nodes, or every node when nothing is selected
+129¦Shift+J adds a video track, Shift+K an audio track (with the timeline focused).
+130¦Shift+K, same as the top bar's Start/Stop Audio
+131¦Shift+M toggles the docked matrix of every active binding
+132¦Shift+T opens a timeline docked beside the canvas. It does not replace the patch - it schedules it. A track ('lane') is video or audio, and every clip on it points at a node that already exists in your graph; the clip decides WHEN that node is heard or seen, not what it does.
+133¦Shift+T toggles the docked timeline. Once it has focus its own keys take over - see 'Arrangement timeline' below, or Menu > Help > Shortcuts for the full list.
+134¦Shift+V toggles panel (or docks/undocks selected nodes)
+135¦Shifts every incoming note's pitch by a fixed number of semitones.
+136¦Shortcut
+137¦Show / hide parameter knobs & sliders
+138¦Show the help for the selected node
+139¦Shows its input at actual pixel size in its own resizable window, separate from the small node preview - useful for judging detail without zooming the whole canvas.
+140¦Shows the alpha channel as a greyscale image, fully opaque - white is solid, black is transparent. A viewer, not an edit: it replaces the colour so you can see the matte a key produced, and is usually the first thing to reach for when a composite is going wrong.
+141¦Signed-distance geometry written as Field kernels and combined/warped by modifiers, then meshed - the procedural counterpart to the fixed primitives.
+142¦Simulates a camera lens: Barrel bows the image in or out, Chromatic separates the colour channels' distortion for fringing, Zoom scales the result.
+143¦Sine, triangle, saw up/down, square and sample-and-hold. Rate in beats, plus phase and an output range.
+144¦Single note input, same shape as Predictive Notes, but pitch is learned as an interval from a 'root' note rather than an absolute pitch. Root auto-detects to the most common learned note and is then a plain param - the pattern's relPitch is fixed by what was learned, but changing root after the fact transposes playback live without relearning, since resolution happens at play time against whatever root is currently selected.
+145¦Single-cycle waveform distortion and crossfade shaper.
+146¦Six glitch algorithms behind one 'kind' dropdown: Slice Shift (blocky RGB-split rows), RGB Shift, Scanlines, Blocks (jittered tiles), Wave, and Datamosh (sliced/shuffled rows with colour smear). Amount/Detail control strength/scale, Speed animates it, Seed reseeds the randomness.
+147¦Slices audio into overlapping grains, calculates per-grain metrics (Level, Brightness, Random), and rearranges them based on a continuous blend between original temporal position and metric rank. At amount 0 it is the clean identity passthrough; at 1 it is fully sorted into a swell or brightness contour. Rendering runs asynchronously on a worker thread.
+148¦Slices the image into angular Segments around a centre and mirrors each one, kaleidoscope-style. Rotation spins the pattern, Zoom scales it.
+149¦Smears the image along a straight line, like camera or subject motion. Angle sets the direction, Distance how far it smears.
+150¦Snaps every spectral peak of the sound to the nearest note of a scale, polyphonically.
+151¦Snaps incoming note-on timing forward to the nearest grid line, at a chosen note division.
+152¦Source (image, video, shape, noise, formula) makes a picture.
+153¦Split at Playhead
+154¦Splits incoming audio into up to 8 frequency bands - drag the dividers right on the spectrum display to resize them - and assigns each one a colour, VIBGYOR by default from low to high. With no image patched in it outputs the resulting gradient standalone; patch one into its optional image input and it grades that image by luminance through the same audio-reactive palette instead.
+155¦Spreads the notes of a chord across time instead of firing them together - strumMs per voice, in ascending pitch order, with each note's original gate length preserved. One knob: at 0 it is a passthrough, and the further up it goes the more the chord reads as strummed rather than struck.
+156¦Stamps a shape at every point of a point source, drawn in one instanced call. Input A is the points source (Faces/Edges/Points sampler, a point cloud, etc.), input B is the shape to stamp at each point - both are required before it draws anything. Any node chained after this one operates on the shape being stamped, once, not on the realized scatter - except Transform, which is the exception that moves the whole scatter as one rigid group.
+157¦Start / pause timeline and animations
+158¦Start / stop audio device. Canvas only - with the timeline focused, Shift+K adds an audio track instead
+159¦Steps through a folder of images on a beat interval, with an optional crossfade.
+160¦Streaming phase vocoder (N=2048, hop 512) that smears spectral magnitude in time. Transients dissolve into a harmonic cloud with tilt, phase diffusion and freeze. Latency is 42.7 ms (2048 samples); default mix is pinned at 1.0.
+161¦Subdivision surface. Each level roughly quadruples the triangle count, so higher levels get expensive fast; Smooth controls how much it rounds corners.
+162¦Swaps transparent for solid and back (alpha = 1 - alpha), leaving the colour alone - the 'invert matte' switch a key would otherwise need a second node to get.
+163¦Sweeps the input profile around an Axis in a helical path - Steps sets resolution, Turns the number of revolutions, Rise/turn the pitch, Radius offsets the sweep outward.
+164¦Symmetry (mirror about X, Y or both), Kaleidoscope (segment count, rotation, zoom) and Mirror Tile.
+165¦Syphon/Spout texture sharing is not available on Linux, so this node has no sender to receive from and outputs a placeholder. Use Video In (V4L2) or a file source instead.
+166¦Syphon/Spout texture sharing is not available on Linux, so this node has no sources to receive from.
+167¦Syphon/Spout texture sharing is not available on Linux.
+168¦Tempo-synced arpeggiation patterns (Up, Down, Up/Down, Random, Chord, As-Played), octave span, and gate length.
+169¦Tempo-synced ping-pong / stereo bounce delay, feedback filters, high-density Feedback Delay Network (FDN) reverberator with predelay and damping.
+170¦Terminal node. Shows the final image, exports a PNG, and records an H.264 .mov at a chosen frame rate. Recording captures the cooked output, so what you see is what is written.
+171¦The Levels remap applied to the alpha channel only: Low/High clamp and normalise the matte's range (choking a soft edge tighter or spreading it wider) and Gamma bends the falloff between them. The go-to cleanup pass after Chroma Key or Alpha from Luma.
+172¦The audio routing family. Audio Out is the terminal node. Every audio input pin takes exactly one cable, so Mixer is the only node that sums (4-8 slots, each with gain/pan/mute/solo) and Splitter is the only fan-out point. Gain is a single dB stage with a meter; Blend Audio is an equal-power crossfade between two inputs.
+173¦The base 2D vector-primitive node - pick any of its 20 shapes from the dropdown, with fill, stroke, feather and background controls. Each shape also has its own directly-spawnable named node (Circle, Hexagon, Star, ...) that just starts on that shape.
+174¦The base 3D primitive node - pick any of its 24 shapes from the dropdown. Each shape also has its own directly-spawnable named node (Cube, Sphere, Torus, ...) that just starts on that shape.
+175¦The explicit fan-out point for audio: an ordinary audio output feeds exactly one destination, so sending one signal to several places needs this node. Its own output is the one exempt from that rule. On the audio thread it is a plain copy - it exists for the graph-level visibility and the fan-out cap, not because copying is otherwise needed.
+176¦The mesh equivalent of Resynthesize: each generation applies a weighted mix of geometry operators to the previous one, drifting the shape over time. 'step' advances one generation manually, 'auto step' runs it continuously, 'randomise' re-rolls the seed.
+177¦The one family that edits an existing alpha channel rather than making a new one: Show Alpha (view the matte), Opacity, Set Alpha (take alpha from a second image's luminance), Alpha Invert, Alpha from Luma, Alpha Levels (choke or spread a soft edge) and Premultiply / Unpremultiply.
+178¦The only node that sums audio - every other audio input pin takes exactly one cable, so any time two signals have to meet, they meet here. Four to eight slots, each with its own gain, pan, mute and solo, summed to one output.
+179¦The pad counterpart of MIDI CC: it fires a decaying 0..1 pulse whenever one specific MIDI note is hit, then sits at 0. A pad hit is an event rather than a position, so this spikes and decays over 'hold' seconds the way Audio Analyze's onset output does, instead of holding a live value. Velocity sensitivity scales the spike by how hard the pad was struck.
+180¦The system's only note fan-in point: up to four note inputs merged into one output stream, in timestamp order. Each input's notes stay independent voices matched by voice id, not pitch - so two inputs playing the same note at the same time sound as two overlapping voices, not a collision.
+181¦The system's only note fan-out point: one input, four distinct outputs. Round Robin cycles through them, Random picks one per note, Chain advances only when the pitch changes (a held note stays put), and Probability rolls each output independently - a note can end up on several outputs at once, or (rarely) none, in which case it falls back to output 1. A note's whole lifetime (on through off) always stays on the output(s) it started on.
+182¦The terminal node for audio, the counterpart of Output for images: whatever is patched in is summed into the selected output device. It has no processing of its own and no output pin. Two cables into one Audio Out is refused on purpose - route them through a Mixer instead, which is the only node in the app that sums audio. With several Audio Outs, plugin delay is compensated between them so they land together; press live to opt this one out when you are playing through it and want the lowest delay.
+183¦The top bar holds a global clock: Play/Pause, Rewind and BPM. Everything time-based reads from it - modulators, video playback and animated shaders - so pausing freezes the whole patch and changing the tempo retimes all of it at once.
+184¦Three parallel bandpass resonators tuned to a vowel's formants (F1/F2/F3), morphed continuously A-E-I-O-U by the vowel knob - a vocal-tract-shaped filter for any input, not just voice.
+185¦Tiles the image and alternately mirrors each tile so the edges line up seamlessly, unlike a plain repeat. Tiles sets how many repeats.
+186¦Tips
+187¦To build an arrangement:
+188¦Toggle Audio Engine
+189¦Toggle Params
+190¦Toggle bypass (power off) on the selected nodes. Canvas only - with the timeline focused, B is the blade tool instead
+191¦Toggle docked arrangement timeline
+192¦Toggle docked modulation matrix
+193¦Toggle docked performance matrix
+194¦Toggle the blade: click a clip to cut it (and its group) at the mouse; Esc turns it off (B bypasses nodes when the canvas has focus)
+195¦Toggle viewport panel (or dock selected nodes)
+196¦Transform, Array, Subdivide, Solidify, Extrude, Wireframe, Triangulate, Normals, Explode, Twist, Smooth, Mirror and Screw - plus Select and the ops that act only on its marked faces (Delete / Transform / Extrude Selected), Join Geometry's booleans (Union, Intersect, Difference), Displacement, Wrap and Merge by Distance.
+197¦Transforms one image into another. Its parameters (and the shape of its name) describe what it changes; see Menu > Help > Module reference for the effect families.
+198¦Transforms the UV or 3D texture coordinates used by materials/textures downstream - translate, rotate and scale, independent of moving the geometry itself.
+199¦Transient- or grid-sliced sample playback: chops a loaded sample into up to 64 slices and maps them chromatically from MIDI note 36, with draggable slice markers, a per-slice attack/decay pair, and a crossthrough toggle that lets a slice run past its own boundary.
+200¦Translate, scale, rotate, flip horizontal and flip vertical.
+201¦Translates, scales, rotates, and flips (horizontal/vertical) the whole image. Scale X/Y let you stretch non-uniformly on top of the overall Scale. Crop X/Y symmetrically crop the source in from each axis before the rest of the transform is applied.
+202¦Transport & Audio
+203¦Transport and modulation
+204¦Tuned bank of up to 16 parallel bandpass resonators excited by incoming audio. Four harmonic/tuning structures (Harmonic, Odd, Chord, Metallic) with decay (T60), scatter detune and stereo spread.
+205¦Turns an image or video into control values and modulation channels. Supports UV point probes, ROI boxes, 22 math/color operations, custom algebraic formulas, and multiple modulation output taps.
+206¦Turns audio into a 3D mesh in the most literal way available: the waveform extruded as a flat ribbon through space, Segments points wide, with width/height scale and its own transform. Smoothing damps the trace between frames so it reads as a surface rather than a flicker. Takes audio on its own pin - it is a geometry source, so it goes into Render 3D, not into Audio Out.
+207¦Turns edges into a relief/bump look by differencing the image against itself offset along Angle/Distance. 'style: Over colour' keeps the original colours and adds the emboss on top; 'Grey' replaces the image with a flat emboss.
+208¦Turns live audio into an image - scrolling spectrogram, waveform or level field - so any image effect downstream becomes an audio visualiser.
+209¦Turns note velocity into a 0..1 modulator with an adjustable velocity range.
+210¦Twenty vector primitives - circle, ellipse, rectangle, rounded rect, triangle, polygon, star, ring, cross, line, hexagon, heart, arrow, crescent, gear, superellipse, pie, teardrop, chevron and blob - with fill, stroke, feather and background. Each one is also directly spawnable as its own named node.
+211¦Twirl, pinch/punch, ripple, lens distortion (with chromatic aberration), displace and liquify. Position-dependent effects have Centre X/Y.
+212¦Twists the mesh around a chosen Axis by Angle - the further a point is along that axis, the more it rotates.
+213¦Two clips on different tracks should not share one source node: there is one playback position per node, so they cannot be retriggered independently. The inspector warns you when that happens, with a Make Unique button that gives the clip its own copy of the node - same inputs, same modulations, its own position.
+214¦Two independent wavetable engines with unison, filter, and pitch/filter/amp envelopes, mixed by an A/B control. With no note cable connected, it free-runs at a set frequency; connect a note cable and it becomes polyphonic and envelope-gated.
+215¦Two inputs and 32 blend modes - the full Normal / Multiply / Screen / Overlay / Hue / Saturation / Colour / Luminosity set, plus Erase.
+216¦Type an exact value
+217¦Undo last graph action
+218¦Unprojects a 2D depth map and optional color image into a 3D point cloud or triangulated surface mesh, supporting pinhole camera, planar, radial and cylindrical projections with depth curves and edge tearing.
+219¦Unsharp mask - blurs a copy and adds back the difference.
+220¦Unsharp mask: blurs a copy of the image and adds back the difference, exaggerating edges. Amount is the strength, Radius how wide an edge it reacts to.
+221¦Up to 16 parallel bandpass resonators forming a tuned modal filter bank, including a 'Metallic' tuning mode.
+222¦Uses a wavetable frame as a waveshaping transfer curve: the input sample's amplitude selects a phase into the table, the table's value there is the output. Drive past 0dB pushes the phase past the table's ends, where it wraps instead of clipping - true wavefolding, not distortion. Position morphs the curve across the table's 8 frames, smooth crosses to a lower-harmonic (darker) version of the same curve.
+223¦Using Feedback
+224¦Utility node: audio routing, terminal/output nodes (shows, exports or records the final result), Syphon and OSC I/O.
+225¦Video tracks composite back to front, each clip with its own blend mode, opacity and brightness/contrast/saturation grade. Audio clips carry gain, pan, pitch and fades, summed per track. A clip's waveform is drawn from what was actually played, so a clip you have not played yet shows a flat line until the playhead has crossed it once.
+226¦Viewport Panel
+227¦Virtual-analog polyphonic synth with dual oscillators, unevenly detuned unison stacking, osc hard sync, sub-oscillator, noise, pre-filter drive, nonlinear ZDF Moog ladder and SVF filters, dual-path stereo spread, and amp ADSR.
+228¦Walk Params
+229¦Warp, corner-pin and perspective-correct an image for projectors, flat walls, or curved screens, with built-in alignment test patterns and custom resolution target.
+230¦Wave terrain synthesis: an image patched in is read as a height field z = T(u,v), and the oscillator's waveform is whatever a closed orbit traced across that terrain reads back. Orbit type/centre/radius/ratio decide the path, so moving the orbit is a timbre control rather than a pitch one - and because the terrain is an ordinary image input, a Noise, Draw, Video or Reaction Diffusion node upstream reshapes the sound live. Each cycle is band-limited through a 10-level mip pyramid, so it stays alias-free however sharp the source image is.
+231¦Welds vertices closer together than Threshold into one - the cleanup pass that makes a scatter or conversion result usable, closing seams a conversion left behind. Pushed to a large radius it collapses the geometry outright, which is sometimes the point.
+232¦Wire a modulator in and press Learn: it passes the signal through while it listens, fits a small dynamical model (Dynamic Mode Decomposition) of its shape, then on Stop free-runs that model on its own - decoupled from the live cable - instead of replaying the exact recording. Rank sets how many delayed copies of the signal the fit is built from (2, 3, 4 or 8); the readout shows the fit's spectral radius, how close the learned pattern sits to the edge of instability.
+233¦Wire a note chain in and press Learn: it listens (passing the notes through), learns the pitches, rhythm, lengths and velocities as a variable-order Markov model, then plays on its own in that style. Stray at the bottom replays the phrase, the middle plays in character, the top ignores the model and picks freely in range. The learned notes are saved with the patch.
+234¦Wire any note source in and press Learn, same as Predictive Notes. It learns the rhythm, note lengths and velocity as its own habit, but learns pitch as an interval from a 'root' note instead of an absolute pitch - so what comes back out reads as a repeating pattern anchored on one note with occasional deviation (think C2 C2 C2 D3 C2 C2 C2), not a free melody. Root auto-detects to the most common note you played when Learn finishes; change it afterward with the dropdown to transpose the whole learned pattern without relearning.
+235¦With a param focused by Tab: Left/Down lowers it, Right/Up raises it one step; Alt = x10
+236¦Wrap selected nodes in a group box
+237¦Writes per-element colour - vertex colours on a mesh, per-particle colour on a point cloud, whichever the input actually carries. 'source' picks where the colour comes from: a Flat colour, a two-colour Ramp, Random per element, a patched texture sampled at each element's UV, or a patched Palette node's swatches (offset steps which swatch starts the run). Nothing downstream has to know which - Render 3D reads whatever ended up there.
+238¦Your Moves macro faders: extracts the principal axes of your multi-knob gestures using PCA on deltas, letting a few macro faders drive many coupled parameters together in your style.
+239¦Your Moves macro faders: few faders drive many parameters based on learned co-movement PCA.
+240¦Zoom Into Node
+241¦Zoom Timeline
+242¦Zoom around the mouse (trackpad pinch works too)
+243¦Zoom in and out
+244¦Zoom the view into the selected node; Enter zooms back out to where you were
+245¦transform  ->  back into Feedback's input   <- this closes the loop
+246¦{mod}+C / {mod}+V, or Shift+D / {mod}+D to duplicate in place

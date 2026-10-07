@@ -358,6 +358,8 @@ std::string FormatSignature(const std::string& s)
          i++;
          continue;
       }
+      if (i > 0 && s[i - 1] >= '0' && s[i - 1] <= '9')
+         continue; // "100% on" is prose, not a spec
       size_t j = i + 1;
       while (j < s.size() && std::strchr("0123456789.-+ #*lhzjt", s[j]) != nullptr)
          j++;
