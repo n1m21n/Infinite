@@ -140,6 +140,8 @@ void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, float size, float r
 
 bool TextFocusClaimed();
 
+bool ApplyViewHotkeys(float& azimuth, float& elevation, const std::function<void()>& onWillChange = nullptr);
+
 bool IsUserSpawnable(const std::string& name);
 
 std::string NodeTitle(const GraphNode& gn);
@@ -464,6 +466,8 @@ extern std::vector<KbParamEntry> gKbParams;
 
 extern bool gKbZoomed;
 
+extern bool gComputerKeyboardHot;
+
 extern bool gNodeHelpShown;
 
 extern int gModBindingMenuNode;
@@ -481,6 +485,8 @@ extern uint64_t gArrangeMarkerDragId;
 extern uint64_t gArrangeRevealClipId;
 
 extern uint64_t gArrangeFlashClipId;
+
+extern bool  gArrangeFocused;
 
 
    // Which of the two mutually exclusive audio routings is live (overhaul
@@ -619,7 +625,11 @@ extern bool gWtDragOk;
 
 extern std::vector<ImVec4> gWtTestScreen;
 
+void PublishWtTestRect();
+
 extern ImVec2 gDragTestViewAnchor;
+
+extern ImVec4 gEqTestRect;
 
 extern ImVec4 gEqTestScreen;
 
@@ -723,6 +733,8 @@ extern ImVec4 gCommentBodyRect;
       bool justOpened = false;
    };
 
+extern FieldDeviceSaveRequest gFieldDeviceSave;
+
 
 
    // Per-domain cache of the user's saved .infdev files under
@@ -741,6 +753,42 @@ extern std::map<std::string, FieldDeviceLibraryCache> gFieldDeviceLibrary;
 const FieldDeviceLibraryCache& GetFieldDeviceLibrary(const std::string& domain);
 
 void InvalidateFieldDeviceLibrary(const std::string& domain);
+
+extern ImVec4 gCommentEditRect;
+
+extern float gCommentEditZoom;
+
+extern FormulaNode* gFormulaEditor;
+
+extern bool gFormulaEditorOpen;
+
+extern FieldElementNode* gFieldElementEditor;
+
+extern bool gFieldElementEditorOpen;
+
+extern FieldPrimitiveNode* gFieldPrimitiveEditor;
+
+extern bool gFieldPrimitiveEditorOpen;
+
+extern FieldPixelNode* gFieldPixelEditor;
+
+extern bool gFieldPixelEditorOpen;
+
+extern FieldSampleNode* gFieldSampleEditor;
+
+extern bool gFieldSampleEditorOpen;
+
+extern FieldSynthNode* gFieldSynthEditor;
+
+extern bool gFieldSynthEditorOpen;
+
+extern FieldGraphNode* gFieldGraphEditor;
+
+extern bool gFieldGraphEditorOpen;
+
+extern FieldGraphNode* gFieldGraphPendingRegenerate;
+
+extern FieldGraphNode* gFieldGraphPendingUnpack;
 
 
 
@@ -1784,7 +1832,765 @@ void ApplyClusterLinks(const std::map<int, GraphNode*>& newByOrig, const Cluster
 GraphNode* SpawnNode(const std::string& typeName, const std::string& category,
                         float x = 0.0f, float y = 0.0f);
 
+void ReloadDerivedState(INode* node);
+
 void CopyParams(INode* dstNode, INode* srcNode);
+
+void DrawImageSourceParams(ImageSourceNode* n);
+
+void DrawSlideshowParams(SlideshowNode* n);
+
+void DrawSyphonOutParams(SyphonOutNode* n);
+
+void DrawSyphonInParams(SyphonInNode* n);
+
+void DrawOscReceiveParams(OscReceiveNode* n);
+
+void DrawOscSendParams(OscSendNode* n);
+
+void DrawEnvironmentParams(EnvironmentNode* n);
+
+void DrawShapeParams(ShapeNode* n);
+
+
+
+   // Field build step 17: the "Devices" dropdown + Save/Export/Import row
+   // shared by all five Field*Params functions (plan §6). `factoryNames`
+   // is nullptr for FieldSampleNode/FieldGraphNode, which have no factory
+   // Presets() table (plan §0.2) - the dropdown then shows only user
+   // devices, no factory section/separator.
+   //
+   // `onFactorySelect` is called with a freshly-resolved NodeT* (never the
+   // pointer captured at draw time) so that FieldElementNode's existing
+   // `n->presetIndex = i; n->LoadPreset(i);` idiom keeps working unchanged
+   // even though the actual selection happens on a later frame, once the
+   // deferred dropdown popup (gDropdown) is clicked - same lifetime
+   // discipline as the Save popup above.
+   template <typename NodeT>
+   void DrawFieldDeviceControls(NodeT* n, const std::string& domain,
+                                const std::vector<std::string>* factoryNames,
+                                std::function<void(NodeT*, int)> onFactorySelect)
+   {
+      const int nodeIndex = gCurrentNodeIndex;
+      const FieldDeviceLibraryCache& lib = GetFieldDeviceLibrary(domain);
+
+      std::vector<std::string> options;
+      std::vector<std::string> categories;
+      if (factoryNames != nullptr)
+      {
+         for (const std::string& s : *factoryNames)
+         {
+            options.push_back(s);
+            categories.push_back("Factory");
+         }
+      }
+      for (const std::string& s : lib.names)
+      {
+         options.push_back(s);
+         categories.push_back("Devices");
+      }
+      const size_t factoryCount = factoryNames ? factoryNames->size() : 0;
+      const std::vector<std::string> userPaths = lib.paths;
+
+      PushDropdownStyle();
+      std::string btnLabel = "Load device...";
+      if (factoryNames != nullptr && n->presetIndex >= 0 && (size_t)n->presetIndex < factoryCount)
+         btnLabel = (*factoryNames)[n->presetIndex];
+      const std::string dropdownId = btnLabel + "##fdd_" + domain;
+      const float spacing = ImGui::GetStyle().ItemSpacing.x;
+
+      auto openDropdownAction = [=, &options, &categories, &userPaths](bool focusSearch)
+      {
+         gDropdown.options = options;
+         gDropdown.categories = categories;
+         gDropdown.current = (factoryNames != nullptr && n->presetIndex >= 0 && (size_t)n->presetIndex < factoryCount) ? n->presetIndex : -1;
+         gDropdown.onSelect = [nodeIndex, onFactorySelect, factoryCount, userPaths, domain](int idx)
+         {
+            GraphNode* gn = FindNodeByIndex(nodeIndex);
+            NodeT* n2 = gn ? dynamic_cast<NodeT*>(gn->node.get()) : nullptr;
+            if (n2 == nullptr)
+               return;
+            if ((size_t)idx < factoryCount)
+            {
+               if (onFactorySelect)
+                  onFactorySelect(n2, idx);
+               return;
+            }
+            const size_t userIdx = (size_t)idx - factoryCount;
+            if (userIdx >= userPaths.size())
+               return;
+            Field::DeviceFile device;
+            std::string err;
+            if (Field::LoadFromFieldFile(userPaths[userIdx], device, err) && device.domain == domain)
+               n2->LoadDeviceFile(device);
+         };
+         gDropdown.justOpened = true;
+         gDropdown.focusSearch = focusSearch;
+         gDropdown.filterBuf[0] = '\0';
+      };
+
+      if (options.empty())
+      {
+         ImGui::BeginDisabled();
+         ImGui::Button(dropdownId.c_str(), ImVec2(kPreviewSize, 0));
+         ImGui::EndDisabled();
+      }
+      else
+      {
+         if (ImGui::Button(dropdownId.c_str(), ImVec2(kPreviewSize, 0)))
+            openDropdownAction(true);
+      }
+      PopDropdownStyle();
+
+      const float btnW = (kPreviewSize - 2.0f * spacing) / 3.0f;
+      if (ImGui::Button(("Save##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
+      {
+         snprintf(gFieldDeviceSave.nameBuf, sizeof(gFieldDeviceSave.nameBuf), "Untitled");
+         gFieldDeviceSave.domain = domain;
+         gFieldDeviceSave.getDeviceFile = [nodeIndex](Field::DeviceFile& out) -> bool
+         {
+            GraphNode* gn = FindNodeByIndex(nodeIndex);
+            NodeT* n2 = gn ? dynamic_cast<NodeT*>(gn->node.get()) : nullptr;
+            if (n2 == nullptr)
+               return false;
+            out = n2->ToDeviceFile();
+            return true;
+         };
+         gFieldDeviceSave.justOpened = true;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button(("Export##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
+      {
+         const std::string path = Platform::SaveDeviceDialog("Untitled.field");
+         if (!path.empty())
+            Field::SaveToFieldFile(path, n->ToDeviceFile());
+      }
+      ImGui::SameLine();
+      if (ImGui::Button(("Import##fdd_" + domain).c_str(), ImVec2(btnW, 0)))
+      {
+         const std::string path = Platform::OpenDeviceDialog();
+         if (!path.empty())
+         {
+            Field::DeviceFile device;
+            std::string err;
+            if (Field::LoadFromFieldFile(path, device, err) && device.domain == domain)
+               n->LoadDeviceFile(device);
+         }
+      }
+   }
+
+void DrawFormulaParams(FormulaNode* n);
+
+void DrawTextParams(TextNode* n);
+
+void DrawVideoParams(VideoSourceNode* n);
+
+void DrawVideoInParams(VideoInNode* n);
+
+void DrawFitParams(FitNode* n);
+
+void DrawProjectionHandleOverlay(ProjectionNode* node, ImVec2 origin, ImVec2 imageSize, const char* btnIdSuffix);
+
+void DrawProjectionPreview(ProjectionNode* node);
+
+void DrawProjectionParams(ProjectionNode* n);
+
+void DrawLFOParams(LFONode* n);
+
+void DrawRandomParams(RandomNode* n);
+
+
+
+   // Drag/paint state for the pattern step grid. A horizontal paint gesture
+   // spans many frames and, unlike a click-to-toggle grid, needs to remember
+   // which bar the mouse was over last frame - otherwise a fast drag leaves
+   // gaps between samples instead of a continuous paint.
+   struct PatternGridDragState
+   {
+      PatternNode* node = nullptr;
+      int lastStep = -1;
+   };
+
+extern PatternGridDragState gPatternGridDrag;
+
+void DrawPatternParams(PatternNode* n);
+
+void DrawMathParams(MathNode* n);
+
+void DrawCompareParams(CompareNode* n);
+
+void DrawRangeToRangeParams(RangeToRangeNode* n);
+
+void DrawSmoothParams(SmoothNode* n);
+
+void DrawInvertParams(InvertNode* n);
+
+void DrawModDepthParams(ModDepthNode* n);
+
+void DrawNoiseParams(NoiseNode* n);
+
+void DrawTextureParams(TextureNode* n);
+
+void DrawSwitcherParams(SwitcherNode* n);
+
+void DrawResynthParams(ResynthNode* n);
+
+void DrawMacroKnobBody(MacroKnobNode* n);
+
+void DrawMacroKnobParams(MacroKnobNode* n);
+
+void DrawMacroSliderBody(MacroSliderNode* n);
+
+void DrawMacroSliderParams(MacroSliderNode* n);
+
+void DrawMacroBipolarKnobBody(MacroBipolarKnobNode* n);
+
+void DrawMacroBipolarKnobParams(MacroBipolarKnobNode* n);
+
+void DrawMacroToggleBody(MacroToggleNode* n);
+
+void DrawMacroToggleParams(MacroToggleNode* n);
+
+void DrawMacroTriggerBody(MacroTriggerNode* n);
+
+void DrawMacroTriggerParams(MacroTriggerNode* n);
+
+void DrawMacroNumBoxBody(MacroNumBoxNode* n);
+
+void DrawMacroNumBoxParams(MacroNumBoxNode* n);
+
+void DrawMacroRadioSelectorBody(MacroRadioSelectorNode* n);
+
+void DrawMacroRadioSelectorParams(MacroRadioSelectorNode* n);
+
+void DrawMacroStepGateBody(MacroStepGateNode* n);
+
+void DrawMacroStepGateParams(MacroStepGateNode* n);
+
+void DrawMidiCCParams(MidiCCNode* n);
+
+void DrawMidiTriggerParams(MidiTriggerNode* n);
+
+void DrawMacroXYBody(MacroXYNode* n);
+
+void DrawMacroXYParams(MacroXYNode* n);
+
+void DrawCurvesParams(CurvesNode* n);
+
+void DrawPredictiveColoringParams(PredictiveColoringNode* n);
+
+void DrawModCurveParams(ModCurveNode* n);
+
+void DrawRemoveBgParams(RemoveBgNode* n);
+
+void DrawFeedbackParams(FeedbackNode*);
+
+void DrawTrailsParams(TrailsNode* n);
+
+void DrawReactionDiffusionParams(ReactionDiffusionNode* n);
+
+void DrawPalettePreview(PaletteNode* n);
+
+void DrawPaletteParams(PaletteNode* n);
+
+void DrawRampParams(RampNode* n);
+
+void DrawColorRampParams(ColorRampNode* n);
+
+void DrawImageAnalyzeParams(ImageAnalyzeNode* n);
+
+void DrawNullModulatorParams(NullModulatorNode* n);
+
+extern float gAudioBodyW;
+
+extern float gAudioBodyX;
+
+extern float gAudioContentX;
+
+extern float gAudioContentW;
+
+extern CategoryColors::Color gAudioTint;
+
+extern std::map<std::pair<int, int>, float> gAudioSectionHeight;
+
+extern int gAudioSectionIndex;
+
+extern float gAudioSectionTop;
+
+void BeginAudioBody(int nodeIndex, const std::string& category, float width, const char* idleStat);
+
+
+
+   // ---- columns ----------------------------------------------------------
+   // Splits the body into N side-by-side columns. Every helper below already
+   // derives from gAudioBodyX/gAudioBodyW (panels) and gAudioContentX/
+   // gAudioContentW (rows and sliders), so pointing those four at a column is
+   // all it takes for sections, knob rows and sliders to lay out inside it -
+   // the "width is a scope" rule doing exactly what it was written for.
+   struct AudioColumnState
+   {
+      float bodyX, bodyW, contentX, contentW, top, maxBottom;
+      int count;
+   };
+
+extern AudioColumnState gAudioColumn;
+
+void BeginAudioColumns(int count);
+
+void BeginAudioColumn(int index);
+
+void EndAudioColumn();
+
+void EndAudioColumns();
+
+void EndAudioBody();
+
+void BeginAudioSection(const char* label);
+
+void EndAudioSection();
+
+
+
+   // A row of N equal cells across the current content column. Cell width is
+   // gAudioContentW / N, so a row is exactly the content width by
+   // construction and the v2 overflow (a 556px row inside a 440px node) is
+   // structurally impossible rather than something to remember to check.
+   //
+   // Cells bottom-align on the largest control in the row, so mixed
+   // large/small knobs share one caption baseline - the thing that makes a
+   // row read as a rack strip rather than as dials scattered at random
+   // heights.
+   struct AudioKnobRow
+   {
+      float x0, y0, cellW, maxDia, rowH, headerH;
+      int count, index;
+
+      // `headerRowH` reserves a strip above the knobs for cells that carry a
+      // mode dropdown over their knob (see DropdownKnob). Plain knobs in the
+      // same row drop below it, so every cap and every caption in the row
+      // still shares one baseline - the alternative, letting the dropdown
+      // cells be taller, is exactly the ragged row the bottom-align exists to
+      // prevent.
+      // gParamRegisterOnly (a collapsed node, or - see DrawFieldElementParams
+      // et al. - a headless param-declaration test that runs before ImGui
+      // even has a context) means every ImGui:: call below is unsafe: there
+      // may be no current window, or no context at all. y0/rowH/Place() are
+      // only ever read to position real widgets, so it is safe to leave them
+      // at 0 in that mode - nothing downstream dereferences them before the
+      // early-outs in Knob()/Checkbox()/KnobInt()/Dropdown() below skip the
+      // draw.
+      AudioKnobRow(int cellCount, float maxDiameter = kKnobSmall, float headerRowH = 0.0f, bool hasCaptions = true)
+      {
+         count = std::max(1, cellCount);
+         maxDia = maxDiameter;
+         headerH = headerRowH;
+         x0 = gAudioContentX;
+         y0 = gParamRegisterOnly ? 0.0f : ImGui::GetCursorScreenPos().y;
+         cellW = gAudioContentW / (float)count;
+         index = 0;
+         rowH = headerH + maxDia + (hasCaptions && !gParamRegisterOnly ? (4.0f + ImGui::GetTextLineHeight()) : 0.0f);
+      }
+
+      void Place(float dia) const
+      {
+         if (gParamRegisterOnly)
+            return;
+         ImGui::SetCursorScreenPos(ImVec2(x0 + (float)index * cellW, y0 + headerH + (maxDia - dia)));
+      }
+
+      void Knob(const char* label, float* v, float lo, float hi, const char* fmt,
+                float dia = kKnobSmall, bool dbTaper = false, bool freqTaper = false,
+                AudioWidgetStyle explicitStyle = AudioWidgetStyle::Knob,
+                FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
+                int explicitParamIndex = -1, const char* nameOverride = nullptr)
+      {
+         Place(dia);
+         AudioWidgetStyle style = explicitStyle;
+         if (style == AudioWidgetStyle::Knob && posToValue == nullptr)
+         {
+            if (dbTaper)
+            {
+               style = AudioWidgetStyle::KnobDb;
+            }
+            else if (freqTaper || (lo > 0.0f && (hi / lo >= 9.0f) &&
+                     (strstr(fmt, "Hz") != nullptr || strcmp(label, "freq") == 0 || strcmp(label, "cutoff") == 0 || strcmp(label, "filter") == 0)))
+            {
+               style = AudioWidgetStyle::KnobFreq;
+            }
+            else if (lo > 0.0f && (hi / lo >= 9.0f) &&
+                     (strstr(fmt, "ms") != nullptr || (strstr(fmt, "s") != nullptr && strstr(fmt, "st") == nullptr && strstr(fmt, "step") == nullptr && strstr(fmt, "semi") == nullptr)))
+            {
+               style = AudioWidgetStyle::KnobLog;
+            }
+         }
+         ModKnob(label, v, lo, hi, fmt, dia, cellW, style, 0.0f, posToValue, valueToPos, explicitParamIndex,
+                 nameOverride);
+         index++;
+      }
+
+      void KnobInt(const char* label, int* v, int lo, int hi, float dia = kKnobSmall)
+      {
+         Place(dia);
+         ModKnobInt(label, v, lo, hi, dia, cellW);
+         index++;
+      }
+
+      bool Button(const char* label)
+      {
+         if (gParamRegisterOnly)
+         {
+            index++;
+            return false;
+         }
+         const float cellX0 = x0 + (float)index * cellW;
+         const float btnH = ImGui::GetFrameHeight();
+         const float btnY = y0 + headerH + (maxDia - btnH) * 0.5f;
+         const float btnW = std::min(cellW - 8.0f, 96.0f);
+         const float btnX = cellX0 + (cellW - btnW) * 0.5f;
+         ImGui::SetCursorScreenPos(ImVec2(btnX, btnY));
+         const bool clicked = ImGui::Button(label, ImVec2(btnW, 0));
+         index++;
+         return clicked;
+      }
+
+      // A vertical fader occupying one cell of the same row. `height` plays
+      // the role `dia` does for a knob, so a row of faders bottom-aligns with
+      // a row of knobs on the same caption baseline. `dbTaper` opts into the
+      // console taper (unity at 75% of throw) - only meaningful for a
+      // -60..+12 dB range, so a symmetric trim like Audio In leaves it off.
+      void Fader(const char* label, float* v, float lo, float hi, const char* fmt, float height,
+                 bool dbTaper = false)
+      {
+         Place(height);
+         ModKnob(label, v, lo, hi, fmt, height, cellW, dbTaper ? AudioWidgetStyle::VFaderDb : AudioWidgetStyle::VFader);
+         index++;
+      }
+
+      // An enum param as a cell of the same pitch: button on top, caption
+      // underneath in the same style and on the same baseline as a knob's,
+      // so it reads as one of the row. v2's DropdownButton put its label to
+      // the *right* of the button, which both broke the row's rhythm and ate
+      // ~60px of its width.
+      void Dropdown(const char* label, const std::vector<std::string>& options, int current,
+                    std::function<void(int)> onSelect,
+                    const std::vector<std::string>& categories = {})
+      {
+         if (options.empty())
+         {
+            index++;
+            return;
+         }
+         const float cellX0 = x0 + (float)index * cellW;
+         const float btnH = ImGui::GetFrameHeight();
+         const float btnY = y0 + headerH + (maxDia - btnH) * 0.5f;
+         const int lastIndex = (int)options.size() - 1;
+         int safe = std::max(0, std::min(current, lastIndex));
+
+         const DiscreteParamHandle h =
+            RegisterDiscreteParam(label, (float)safe, (float)lastIndex, /*isBool=*/false, &options);
+
+         const float knobW = (maxDia >= kKnobLarge) ? kKnobLarge : kKnobSmall;
+         const float pinX = cellX0 + std::max(2.0f, (cellW - knobW) * 0.5f - 12.0f - 8.0f);
+         const float pinW = 16.0f;
+         float btnX = cellX0 + 4.0f;
+         float btnW = std::min(cellW - 8.0f, 118.0f);
+
+         if (h.registered)
+         {
+            if (h.driven)
+            {
+               const int drivenIdx = std::clamp((int)lroundf(h.value), 0, lastIndex);
+               if (drivenIdx != current && onSelect)
+               {
+                  // Modulation never creates an undo entry or dirties the patch:
+                  // most onSelect lambdas open with PushUndoCheckpoint() for the
+                  // user-click path, so suppress it here. The param write still runs.
+                  const bool wasSuppressed = gSuppressUndoCheckpoints;
+                  gSuppressUndoCheckpoints = true;
+                  onSelect(drivenIdx);
+                  gSuppressUndoCheckpoints = wasSuppressed;
+               }
+               safe = drivenIdx;
+            }
+            if (!h.draw)
+            {
+               index++;
+               return; // registered so the modulator keeps writing; just not drawn
+            }
+            ImGui::SetCursorScreenPos(ImVec2(pinX, btnY + (btnH - 12.0f) * 0.5f));
+            DrawDiscreteParamPin(h, label, cellW - (pinX - cellX0) - pinW);
+            btnX = pinX + pinW;
+            const float btnRight = cellX0 + cellW - std::max(4.0f, (pinX - cellX0));
+            btnW = std::max(20.0f, std::min(btnRight - btnX, 118.0f));
+         }
+
+         ImGui::SetCursorScreenPos(ImVec2(btnX, btnY));
+
+         const std::string caption = options[safe] + "##" + label;
+         PushDropdownStyle();
+         if (h.modulated)
+         {
+            ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? ImVec4(0.55f, 0.38f, 0.10f, 1.0f)
+                                                                : ImVec4(1.0f, 0.75f, 0.35f, 1.0f));
+            ImGui::BeginDisabled();
+            ImGui::Button(caption.c_str(), ImVec2(btnW, 0));
+            ImGui::EndDisabled();
+            ImGui::PopStyleColor();
+            DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
+                                      ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(),
+                                                                 ImGui::GetItemRectMax()));
+         }
+         else
+         {
+            if (ImGui::Button(caption.c_str(), ImVec2(btnW, 0)) ||
+                DropdownTestWantsOpen(h.registered, h.nodeIndex, h.paramIndex))
+            {
+               gDropdown.options = options;
+               gDropdown.categories = categories;
+               gDropdown.onSelect = std::move(onSelect);
+               gDropdown.current = safe;
+               gDropdown.justOpened = true;
+               gDropdown.focusSearch = false;
+            }
+            if (h.registered)
+               DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
+         }
+         PopDropdownStyle();
+
+         index++;
+      }
+
+      // One cell holding a mode dropdown directly above its knob - the shape
+      // the reference sketch asks for wherever a knob's meaning is set by a
+      // selector ("which filter", "which warp"). Reading them as one control
+      // is the point: the pair is a single decision, and splitting them across
+      // two rows made the knob look like it belonged to whatever sat above it.
+      // `knobDisabled` greys the knob only. The dropdown must stay live: the
+      // knob is meaningless precisely when the mode is "off", and disabling
+      // the whole cell would leave no way to select any other mode.
+      void DropdownKnob(const char* dropId, const std::vector<std::string>& options, int current,
+                        std::function<void(int)> onSelect, const char* knobLabel, float* v,
+                        float lo, float hi, const char* fmt, bool knobDisabled = false,
+                        float dia = kKnobSmall, bool freqTaper = false)
+      {
+         if (!options.empty())
+         {
+            const float cellX0 = x0 + (float)index * cellW;
+            const float btnH = ImGui::GetFrameHeight();
+            const int lastIndex = (int)options.size() - 1;
+            int safe = std::max(0, std::min(current, lastIndex));
+
+            // Modulatable, same as AudioKnobRow::Dropdown above.
+            const DiscreteParamHandle h =
+               RegisterDiscreteParam(dropId, (float)safe, (float)lastIndex, /*isBool=*/false, &options);
+            bool drawIt = true;
+            if (h.registered)
+            {
+               if (h.driven)
+               {
+                  const int drivenIdx = std::clamp((int)lroundf(h.value), 0, lastIndex);
+                  if (drivenIdx != current && onSelect)
+                  {
+                     // Modulation never creates an undo entry or dirties the patch:
+                     // most onSelect lambdas open with PushUndoCheckpoint() for the
+                     // user-click path, so suppress it here. The param write still runs.
+                     const bool wasSuppressed = gSuppressUndoCheckpoints;
+                     gSuppressUndoCheckpoints = true;
+                     onSelect(drivenIdx);
+                     gSuppressUndoCheckpoints = wasSuppressed;
+                  }
+                  safe = drivenIdx;
+               }
+               drawIt = h.draw;
+            }
+            if (drawIt)
+            {
+               const float knobW = dia;
+               const float pinX = cellX0 + std::max(2.0f, (cellW - knobW) * 0.5f - 12.0f - 8.0f);
+               const float pinW = 16.0f;
+               float btnX = cellX0 + 4.0f;
+               float btnW = std::min(cellW - 8.0f, 112.0f);
+
+               if (h.registered)
+               {
+                  ImGui::SetCursorScreenPos(ImVec2(pinX, y0 + (btnH - 12.0f) * 0.5f));
+                  DrawDiscreteParamPin(h, dropId, cellW - (pinX - cellX0) - pinW);
+                  btnX = pinX + pinW;
+                  const float btnRight = cellX0 + cellW - std::max(4.0f, (pinX - cellX0));
+                  btnW = std::max(20.0f, std::min(btnRight - btnX, 112.0f));
+               }
+
+               ImGui::SetCursorScreenPos(ImVec2(btnX, y0));
+
+               const std::string caption = options[safe] + "##" + dropId;
+               PushDropdownStyle();
+               if (h.modulated)
+               {
+                  ImGui::PushStyleColor(ImGuiCol_Text, IsThemeLight() ? ImVec4(0.55f, 0.38f, 0.10f, 1.0f)
+                                                                      : ImVec4(1.0f, 0.75f, 0.35f, 1.0f));
+                  ImGui::BeginDisabled();
+                  ImGui::Button(caption.c_str(), ImVec2(btnW, 0));
+                  ImGui::EndDisabled();
+                  ImGui::PopStyleColor();
+                  DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
+                                            ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(),
+                                                                       ImGui::GetItemRectMax()));
+               }
+               else
+               {
+                  if (ImGui::Button(caption.c_str(), ImVec2(btnW, 0)))
+                  {
+                     gDropdown.options = options;
+                     gDropdown.categories.clear(); // this call site has no category grouping - drop whatever the last dropdown left behind
+                     gDropdown.onSelect = std::move(onSelect);
+                     gDropdown.current = safe;
+                     gDropdown.justOpened = true;
+                     gDropdown.focusSearch = false;
+                  }
+                  if (h.registered)
+                     DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
+               }
+               PopDropdownStyle();
+            }
+         }
+         Place(dia);
+         if (knobDisabled)
+            ImGui::BeginDisabled();
+         AudioWidgetStyle style = AudioWidgetStyle::Knob;
+         if (freqTaper || (lo > 0.0f && (hi / lo >= 9.0f) && (strstr(fmt, "Hz") != nullptr || strcmp(knobLabel, "freq") == 0 || strcmp(knobLabel, "cutoff") == 0 || strcmp(knobLabel, "filter") == 0)))
+            style = AudioWidgetStyle::KnobFreq;
+         ModKnob(knobLabel, v, lo, hi, fmt, dia, cellW, style);
+         if (knobDisabled)
+            ImGui::EndDisabled();
+         index++;
+      }
+
+      // Same contract as ModCheckbox: the return value reports a click OR a
+      // cable-driven flip (callers copy it into node state), and the optional
+      // outUserChanged is set only by a real click. A caller that pushes an
+      // undo checkpoint must key it on outUserChanged, so modulation never
+      // creates an undo entry or dirties the patch.
+      bool Checkbox(const char* label, bool* value, bool* outUserChanged = nullptr)
+      {
+         if (outUserChanged)
+            *outUserChanged = false;
+         if (value == nullptr)
+         {
+            index++;
+            return false;
+         }
+         const DiscreteParamHandle h =
+            RegisterDiscreteParam(label, *value ? 1.0f : 0.0f, 1.0f, /*isBool=*/true, nullptr);
+
+         bool changed = false;
+         if (h.registered)
+         {
+            const bool incoming = *value;
+            if (h.driven)
+            {
+               *value = h.value >= 0.5f;
+               changed = (*value != incoming);
+            }
+            if (!h.draw)
+            {
+               index++;
+               return changed;
+            }
+         }
+
+         // Geometry math below is unsafe under gParamRegisterOnly (no ImGui
+         // context guaranteed - see AudioKnobRow's constructor comment), but
+         // h.draw is exactly !gParamRegisterOnly, so the `if (!h.draw) return`
+         // above already exits before this point whenever that mode is on.
+         const float cellX0 = x0 + (float)index * cellW;
+         const float knobW = (maxDia >= kKnobLarge) ? kKnobLarge : kKnobSmall;
+         const float pinX = cellX0 + std::max(2.0f, (cellW - knobW) * 0.5f - 12.0f - 8.0f);
+         const float pinW = 16.0f;
+         const float checkY = y0 + headerH + (maxDia - ImGui::GetFrameHeight()) * 0.5f;
+
+         if (h.registered)
+         {
+            ImGui::SetCursorScreenPos(ImVec2(pinX, checkY + (ImGui::GetFrameHeight() - 12.0f) * 0.5f));
+            DrawDiscreteParamPin(h, label, cellW - (pinX - cellX0) - pinW);
+         }
+
+         const float checkX = pinX + (h.registered ? pinW : 0.0f);
+         ImGui::SetCursorScreenPos(ImVec2(checkX, checkY));
+
+         PushCheckboxStyle();
+         if (h.modulated)
+         {
+            bool shown = *value;
+            ImGui::PushStyleColor(ImGuiCol_CheckMark, IsThemeLight() ? ImVec4(0.84f, 0.49f, 0.08f, 1.0f)
+                                                                     : ImVec4(1.0f, 0.75f, 0.35f, 1.0f));
+            ImGui::BeginDisabled();
+            ImGui::Checkbox(label, &shown);
+            ImGui::EndDisabled();
+            ImGui::PopStyleColor();
+            DrawModulationBindingMenu(h.nodeIndex, h.paramIndex,
+                                      ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(),
+                                                                 ImGui::GetItemRectMax()));
+         }
+         else
+         {
+            const bool clicked = ImGui::Checkbox(label, value);
+            if (outUserChanged)
+               *outUserChanged = clicked;
+            changed = clicked || changed;
+            if (h.registered)
+               DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
+         }
+         PopCheckboxStyle();
+
+         index++;
+         return changed;
+      }
+
+      void Skip() { index++; }
+
+      void End() const
+      {
+         if (gParamRegisterOnly)
+            return;
+         ImGui::SetCursorScreenPos(ImVec2(x0, y0));
+         ImGui::Dummy(ImVec2(gAudioContentW, rowH));
+      }
+   };
+
+
+
+   // The multi-destination trace. A Drift node writes a DIFFERENT value into every knob it is
+   // dragged onto - independent slots, independent learned landscapes - so the old single
+   // 64-bin histogram of slot 0, drawn as if it were "the node's" output, was showing one
+   // destination's shape and implying it was all of them. One graph, one line per destination,
+   // each line labelled and carrying its own live value; there is deliberately no aggregate
+   // number anywhere, because no such number exists for this node.
+   //
+   // History lives here rather than in DriftNode because it is pure presentation: nothing in the
+   // dynamics reads it, it must not be saved, and a node that is never drawn should not pay for
+   // it. Keyed by (source node UID, destination) so two Drift nodes on the same knob stay
+   // separate - uid, not index, because RemoveNodeByIndex reuses indices and a new node would
+   // otherwise inherit a deleted one's trace (Modulation.h's uid stability rule).
+   inline constexpr int kDriftTraceLen = 128;
+
+
+   struct DriftTrace
+   {
+      float v[kDriftTraceLen] = {};
+      int head = 0;
+      int filled = 0;
+      int lastFrame = -1;
+   };
+
+extern std::map<std::pair<uint64_t, ParamKey>, DriftTrace> gDriftTraces;
+
+void DrawDriftMeter(DriftNode* n, int nodeIndex);
+
+void DrawDriftParams(GraphNode& gn, DriftNode* n);
+
+void DrawMovesParams(MovesNode* n);
+
+void DrawPredictiveModulatorParams(PredictiveModulatorNode* n);
 
 
 
@@ -1798,7 +2604,101 @@ void CopyParams(INode* dstNode, INode* srcNode);
    // and the first declared param, with p.id == 1, collided with the second).
    inline const int kFieldDeclaredParamBase = 50;
 
+
+
+   template <typename NodeT>
+   void DrawFieldParamSliders(NodeT* n)
+   {
+      auto& allParams = n->GetParamTable().Params();
+      for (auto& p : allParams)
+      {
+         if (p.isDeclared)
+         {
+            const int paramIndex = kFieldDeclaredParamBase + p.id;
+            ModSlider(p.name.c_str(), &p.value, p.minValue, p.maxValue, "%.3f", kParamWidth, false, 0.0f, nullptr, nullptr, paramIndex);
+         }
+      }
+   }
+
+float AudioFullWidth();
+
+float AudioHalfWidth();
+
+bool AudioSlider(const char* label, float* v, float lo, float hi, const char* fmt, float width,
+                    FaderPosToValueFn posToValue = nullptr, FaderValueToPosFn valueToPos = nullptr,
+                    int explicitParamIndex = -1, const char* nameOverride = nullptr);
+
+bool AudioSliderInt(const char* label, int* v, int lo, int hi, float width);
+
+bool AudioToggleButton(const char* label, bool* value, float width = 44.0f, float height = 0.0f);
+
+
+
+   // A momentary button that is also a CV-gate destination. Draws the
+   // modulation pin (vertically centred on the control, P2), then an invisible
+   // button that `paint` dresses; returns the button's LEVEL - CV high when a
+   // cable drives it, else the mouse being held on it. The node turns level
+   // changes into edges (Looper::SetButtonLevel / Mpc::SetPadHeld), so a held
+   // mouse or a held CV presses exactly once. `paint(dl, min, max, hovered,
+   // level)` draws the face; `activated` reports a fresh mouse press.
+   using GatePainter = std::function<void(ImDrawList*, ImVec2, ImVec2, bool, bool)>;
+
+bool DrawGateButton(const char* id, float totalW, float height, const GatePainter& paint,
+                       bool* activated = nullptr);
+
+bool DrawGateControl(const char* id, const char* label, float btnW, int style, bool lit);
+
+bool AudioSoloButton(const char* label, bool* value, float width = 26.0f, float height = 0.0f);
+
+bool AudioMuteButton(const char* label, bool* value, float width = 26.0f, float height = 0.0f);
+
+bool AudioSmallButton(const char* label, float width = 26.0f, float height = 0.0f);
+
+bool IsAudioBodyNode(INode* node);
+
+
+
+   // MPC: four columns of (16 px gate pin gutter + a square pad), so the pads
+   // can be 105 px a side (+25% on the 440 px node's ~84). The node is as wide
+   // as that grid needs, not the shared 440.
+   inline constexpr float kMpcPadSide = 105.0f;
+
+
+   inline constexpr float kMpcPinGutter = 16.0f;
+
+float MpcNodeWidth();
+
+float AudioNodeWidth(INode* node);
+
+void DrawWavetableScope(WavetableNode* n, float h, float width);
+
+void DrawFieldSampleScope(FieldSampleNode* n, float h, float width);
+
+void DrawFieldSynthScope(FieldSynthNode* n, float h, float width);
+
 void DrawFieldElementParams(FieldElementNode* n);
+
+void DrawFieldPrimitiveParams(FieldPrimitiveNode* n);
+
+void DrawFieldSampleParams(FieldSampleNode* n);
+
+void DrawFieldSynthParams(FieldSynthNode* n);
+
+void DrawFieldGraphParams(FieldGraphNode* n);
+
+void DrawFieldPixelParams(FieldPixelNode* n);
+
+void DrawSamplerWaveform(SamplerNode* n, float h, float width);
+
+void DrawSlicerWaveform(SlicerNode* n, float h, float width);
+
+void DrawPaulStretchWaveform(PaulStretchNode* n, float h, float width);
+
+void DrawGranularWaveform(GranularNode* n, float h, float width);
+
+void DrawStripMeter(float x, float y, float w, float h, float level);
+
+void PublishWtTestRect();
 
 
 
@@ -1823,6 +2723,68 @@ void DrawFieldElementParams(FieldElementNode* n);
 ADSRLayout ComputeADSRLayout(ImVec2 origin, float w, float h, float attackMs, float decayMs,
                                        float sustain, float releaseMs, float maxTimeMs = 4000.0f);
 
+const std::vector<std::string>& WavetableNames();
+
+const std::vector<std::string>& OctaveNames();
+
+void AudioBareDropdown(const char* id, const std::vector<std::string>& options, int current,
+                          std::function<void(int)> onSelect, float width,
+                          const std::vector<std::string>& categories = {},
+                          bool focusSearch = false);
+
+void DrawEnvelopePanel(const char* title, const char* curveId, float* attackMs, float* decayMs,
+                          float* sustain, float* releaseMs, float* amount, float amountLo,
+                          float amountHi, const char* amountFmt, ImU32 color);
+
+void DrawWavetableBody(GraphNode& gn, WavetableNode* n);
+
+void DrawOscillatorBody(GraphNode& gn, OscillatorNode* n);
+
+void DrawMetallicBody(GraphNode& gn, MetallicNode* n);
+
+void DrawWaveTerrainBody(GraphNode& gn, WaveTerrainNode* n);
+
+void DrawEquationBody(GraphNode& gn, EquationNode* n);
+
+void DrawImageSpectralSynthBody(GraphNode& gn, ImageSpectralSynthNode* n);
+
+void DrawAudioMeterBody(GraphNode& gn, AudioMeterNode* n);
+
+void DrawGainBody(GraphNode& gn, GainNode* n);
+
+void DrawBlendAudioBody(GraphNode& gn, BlendAudioNode* n);
+
+void DrawSamplerBody(GraphNode& gn, SamplerNode* n);
+
+void DrawSlicerBody(GraphNode& gn, SlicerNode* n);
+
+void DrawPaulStretchBody(GraphNode& gn, PaulStretchNode* n);
+
+void DrawMolderBody(GraphNode& gn, MolderNode* n);
+
+void DrawGrainMolderBody(GraphNode& gn, GrainMolderNode* n);
+
+void DrawGranularBody(GraphNode& gn, GranularNode* n);
+
+
+
+   // Drag state for the step grid's paint/velocity gestures - file-scope
+   // like gSampleDragActive, since a drag spans many frames and many
+   // per-cell InvisibleButton calls. See DrawDrumSequencerBody's grid loop.
+   struct DrumGridDragState
+   {
+      bool active = false;
+      bool paintOn = false;
+      int originLane = -1;
+      int originStep = -1;
+   };
+
+extern DrumGridDragState gDrumGridDrag;
+
+void DrawDrumSequencerBody(GraphNode& gn, DrumSequencerNode* n);
+
+void DrawLooperBody(GraphNode& gn, LooperNode* n);
+
 std::string MpcModeLabel(int pad);
 
 std::string MpcParamName(int pad, int k);
@@ -1831,6 +2793,10 @@ std::string MpcParamName(int pad, int k);
    enum MpcDiscreteKind { kMpcMode = 0, kMpcSync, kMpcDiv, kMpcNumDiscrete };
 
 std::string MpcDiscreteLabel(int pad, int which);
+
+void MpcDropFiles(MpcNode* n, float cx, float cy, const std::vector<std::string>& paths);
+
+void DrawMpcBody(GraphNode& gn, MpcNode* n);
 
 const std::vector<std::string>& MediaTypeFilterNames();
 
@@ -1842,6 +2808,97 @@ bool ILess(const std::string& a, const std::string& b);
 
 std::vector<const PluginScanner::Entry*> FilterAndSortPluginEntries(
       const std::vector<PluginScanner::Entry>& index, const std::string& lowerQuery, const BrowserFilterState& state);
+
+void DrawAudioInBody(GraphNode& gn, AudioInputNode* n);
+
+void DrawMixerBody(GraphNode& gn, MixerNode* n);
+
+void DrawSplitterBody(GraphNode& gn, SplitterNode*);
+
+void DrawMidiNotesBody(GraphNode& gn, MidiNotesNode* n);
+
+void DrawKeyboardBody(GraphNode& gn, KeyboardNode* n);
+
+const std::vector<std::string>& NoteNameList();
+
+void DrawCVToPitchParams(CVToPitchNode* n);
+
+void DrawNoteToCVParams(NoteToCVNode* n);
+
+void DrawVelocityToCVParams(VelocityToCVNode* n);
+
+void DrawCVRecorderParams(CVRecorderNode* n);
+
+void DrawNoteFilterBody(GraphNode& gn, NoteFilterNode* n);
+
+void DrawNoteTransposeBody(GraphNode& gn, NoteTransposeNode* n);
+
+void DrawPitchBendBody(GraphNode& gn, PitchBendNode* n);
+
+void DrawGateBody(GraphNode& gn, GateNode* n);
+
+void DrawGlideBody(GraphNode& gn, GlideNode* n);
+
+void DrawVibratoBody(GraphNode& gn, VibratoNode* n);
+
+void DrawVelocityCurveBody(GraphNode& gn, VelocityCurveNode* n);
+
+void DrawHumanizerBody(GraphNode& gn, HumanizerNode* n);
+
+void DrawQuantizerBody(GraphNode& gn, QuantizerNode* n);
+
+void DrawPredictiveQuantizeBody(GraphNode& gn, PredictiveQuantizeNode* n);
+
+void DrawPredictiveVelocityBody(GraphNode& gn, PredictiveVelocityNode* n);
+
+void DrawPredictiveRhythmBody(GraphNode& gn, PredictiveRhythmNode* n);
+
+void DrawNoteEchoBody(GraphNode& gn, NoteEchoNode* n);
+
+void DrawPredictiveNotesBody(GraphNode& gn, PredictiveNotesNode* n);
+
+void DrawNoteMergeBody(GraphNode& gn, NoteMergeNode* n);
+
+void DrawNoteSwitcherBody(GraphNode& gn, NoteSwitcherNode* n);
+
+void DrawNoteRouterBody(GraphNode& gn, NoteRouterNode* n);
+
+
+
+   // Drag state for the gate grid's paint gesture - file-scope like
+   // gDrumGridDrag, since a drag spans many frames and many per-cell
+   // InvisibleButton calls. A distinct struct from the drum grid's (rather
+   // than reused) since this one has no lane dimension, just a step origin.
+   struct ArpGateDragState
+   {
+      bool active = false;
+      bool paintOn = false;
+      int originStep = -1;
+   };
+
+extern ArpGateDragState gArpGateDrag;
+
+void DrawArpeggiatorBody(GraphNode& gn, ArpeggiatorNode* n);
+
+void DrawNoteSequencerBody(GraphNode& gn, NoteSequencerNode* n);
+
+void DrawMidiFileBody(GraphNode& gn, MidiFileNode* n);
+
+void DrawRandomNoteGeneratorBody(GraphNode& gn, RandomNoteGeneratorNode* n);
+
+void DrawChorderBody(GraphNode& gn, ChorderNode* n);
+
+void DrawNoteStackBody(GraphNode& gn, NoteStackNode* n);
+
+void DrawNoteCapturerBody(GraphNode& gn, NoteCapturerNode* n);
+
+void DrawBouncingBallsBody(GraphNode& gn, BouncingBallsNode* n);
+
+void DrawStrumBody(GraphNode& gn, NoteStrumNode* n);
+
+void DrawAudioToCVBody(GraphNode& gn, AudioToCVNode* n);
+
+void DrawEnvelopeBody(GraphNode& gn, EnvelopeNode* n);
 
 
 
@@ -1906,12 +2963,232 @@ float FilterVizFreqToX(float hz, float x0, float w);
 
 float FilterVizDbToY(float db, float y0, float h);
 
+
+
+   // Live incoming-signal spectrum drawn behind the response curve (the
+   // thing FabFilter Pro-Q shows) - shared by Audio Filter and EQ so both
+   // visualizers show the same live analyzer, not two separate ones. Taps
+   // the post-mix mono ring AudioEffectRuntime writes every audio block
+   // (AudioEffectNode.cpp's mSpectrumRing) and runs it through the same
+   // Hann-window + Radix2FFT recipe AudioColorRampNode::ProcessAudioFFT
+   // already uses (AudioColorRampNode.cpp) - just plotted against this
+   // visualizer's own log-frequency axis instead of feeding a color ramp.
+   struct AudioSpectrumState
+   {
+      std::vector<float> window = std::vector<float>(1024, 0.0f);
+      std::vector<float> smoothed = std::vector<float>(512, 0.0f);
+   };
+
+extern std::map<int, AudioSpectrumState> gAudioSpectrumCache;
+
 void ComputeFilterCurve(std::vector<float>& out, int numPoints, int type, float freq, float q, float gain,
                            double sampleRate, float originX, float w);
 
+void AddRateModeCells(AudioKnobRow& row, AudioEffectNode* n, const char* syncLabel,
+                         float rateLo = 0.02f, float rateHi = 5.0f);
+
+void DrawAudioFilterBody(GraphNode& gn, AudioEffectNode* n);
+
+
+
+   // ---- EQ -------------------------------------------------------------
+   // Five fixed bands, always present - docs/plans/audio/eq-node-prompt.md.
+   // Reuses Audio Filter's log-frequency graticule/mapping helpers verbatim
+   // (FilterVizFreqToX/XToFreq/DbToY/YToDb, kFilterViz*) rather than defining
+   // a second copy - both nodes share the same 20 Hz-20 kHz / +-24 dB frame.
+   struct EqCurveCache
+   {
+      std::vector<float> curveDb;       // composite, one entry per x column
+      std::vector<float> bandCurveDb[5]; // per-band, only enabled ones drawn
+      std::vector<float> signature;
+      int dragBand = -1;
+      bool dragInert = false; // this gesture is a select-only click or a double-click toggle
+   };
+
+extern std::map<int, EqCurveCache> gEqCurveCache;
+
+
+
+   inline const char* const kEqTypeParam[5] = { "band1Type", "band2Type", "band3Type", "band4Type", "band5Type" };
+
+
+   inline const char* const kEqFreqParam[5] = { "band1Freq", "band2Freq", "band3Freq", "band4Freq", "band5Freq" };
+
+
+   inline const char* const kEqQParam[5] = { "band1Q", "band2Q", "band3Q", "band4Q", "band5Q" };
+
+
+   inline const char* const kEqGainParam[5] = { "band1Gain", "band2Gain", "band3Gain", "band4Gain", "band5Gain" };
+
+
+   inline const char* const kEqOnParam[5] = { "band1On", "band2On", "band3On", "band4On", "band5On" };
+
+void DrawEqBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawDynamicsBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawLimiterBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawDelayBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawReverbBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawDriveBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawWavetableShaperBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawStereoBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawPitchShiftBody(GraphNode& gn, AudioEffectNode* n);
+
+void AddSyncedRateCell(AudioKnobRow& row, AudioEffectNode* n, float rateLo = 0.02f, float rateHi = 5.0f);
+
+void AddRateModeCells(AudioKnobRow& row, AudioEffectNode* n, const char* syncLabel,
+                         float rateLo, float rateHi);
+
+void DrawChorusBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawFlangerBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawPhaserBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawBitcrushBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawTransientShaperBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawStutterBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawRingModBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawFrequencyShifterBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawTremoloBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawFormantFilterBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawResonatorBankBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawCycleShaperBody(GraphNode& gn, AudioEffectNode* n);
+
+
+
+   // ---- Spec Blur ------------------------------------------------------
+   struct SpecBlurSpectrumState
+   {
+      std::vector<float> window;
+      float smoothed[512] = {};
+      SpecBlurSpectrumState() { window.assign(1024, 0.0f); }
+   };
+
+extern std::unordered_map<AudioEffectNode*, SpecBlurSpectrumState> sSpecBlurSpectrums;
+
+void DrawSpecBlurBody(GraphNode& gn, AudioEffectNode* n);
+
+
+
+   // ---- Key-Snap -------------------------------------------------------
+   struct KeySnapSpectrumState
+   {
+      std::vector<float> window;
+      float smoothed[512] = {};
+      KeySnapSpectrumState() { window.assign(1024, 0.0f); }
+   };
+
+extern std::unordered_map<AudioEffectNode*, KeySnapSpectrumState> sKeySnapSpectrums;
+
+void DrawKeySnapBody(GraphNode& gn, AudioEffectNode* n);
+
+extern std::unordered_map<AudioEffectNode*, KeySnapSpectrumState> sSpectrumSlideSpectrums;
+
+void DrawSpectrumSlideBody(GraphNode& gn, AudioEffectNode* n);
+
+void DrawShapeResonatorBody(GraphNode& gn, AudioEffectNode* n);
+
+extern std::string gPatchPath;
+
 extern bool gPatchDirty;
 
+void DrawAudioNodeBody(GraphNode& gn);
+
+void DrawAudioFileParams(AudioFileNode* n);
+
+void DrawAudioAnalyzeParams(AudioAnalyzeNode* n);
+
+void DrawPathParams(PathNode* n);
+
+void DrawGeometryTableParams(GeometryTableNode* n);
+
+void DrawOceanParams(OceanNode* n);
+
+void DrawCurveParams(CurveNode* n);
+
+void DrawMetaBallParams(MetaBallNode* n);
+
+void DrawJoinGeometryParams(JoinGeometryNode* n);
+
+void DrawSwitcher3DParams(Switcher3DNode* n);
+
+void DrawWrapParams(WrapNode* n);
+
+void DrawClothParams(ClothNode* n);
+
+void DrawParticleSystemParams(ParticleSystemNode* n);
+
+void DrawMaterialParams(MaterialNode* n);
+
+void DrawMappingParams(MappingNode* n);
+
+void DrawMeshResynthParams(MeshResynthNode* n);
+
+void DrawImageToPointsParams(ImageToPointsNode* n);
+
+void DrawDepthProjectionParams(DepthProjectionNode* n);
+
+void DrawMeshToPointsParams(MeshToPointsNode* n);
+
+void DrawDistributePointsOnFacesParams(DistributePointsOnFacesNode* n);
+
+void DrawPointsToVerticesParams(PointsToVerticesNode* n);
+
+void DrawDistributePointsInGridParams(DistributePointsInGridNode* n);
+
+void DrawMergeByDistanceParams(MergeByDistanceNode* n);
+
+void DrawText3DParams(Text3DNode* n);
+
+void DrawModelParams(ModelSourceNode* n);
+
+void DrawGeometryParams(GeometryNode* n);
+
+void DrawGeometryOpParams(GeometryOpNode* n);
+
+void DrawDisplacementParams(DisplacementNode* n);
+
+void DrawAudioDisplacementParams(AudioDisplacementNode* n);
+
+void DrawAudioTextureParams(AudioTextureNode* n);
+
+void DrawAudioColorRampParams(AudioColorRampNode* n);
+
+void DrawAudioRibbonParams(AudioRibbonNode* n);
+
+void DrawSetColorParams(SetColorNode* n);
+
+void DrawInstanceParams(InstanceOnPointsNode* n);
+
+void DrawCameraParams(CameraNode* n);
+
+void DrawLightParams(LightNode* n);
+
 void FrameSceneInView(Render3DNode* n);
+
+void DrawRender3DParams(Render3DNode* n);
+
+void DrawBlendParams(BlendNode* n);
+
+void DrawLayerStackParams(LayerStackNode* n);
+
+void DrawFilterParams(FilterNode* n);
 
 void ExportImage(INode* out, const std::string& path, int jpgQuality = 90,
                     std::vector<unsigned char>* keepPixels = nullptr, int outputIndex = 0);
@@ -2028,7 +3305,33 @@ std::vector<uint8_t> EncodePng16(int w, int h, const uint16_t* rgba, int level);
       bool mStop = false;
    };
 
+void DrawPaintablePreview(DrawNode* node);
+
+float CommentFontScale(int sizeIdx);
+
+void DrawCommentPreview(CommentNode* n);
+
+void DrawCommentParams(CommentNode*);
+
 GroupNode* GroupOwning(int nodeIndex);
+
+int IndexOfGroupNode(GroupNode* g);
+
+ImVec2 ClusterOffset(const std::set<int>& indices);
+
+void PruneDeadGroups();
+
+void DrawGroupNode(GraphNode& gn, GroupNode* n);
+
+void DrawDrawParams(DrawNode* n);
+
+INode* DisplayNode(INode* node);
+
+const char* EmptyPreviewLabel(INode* node, const char* fallback);
+
+void DrawPreview(INode* node);
+
+void DrawFieldGraphWaveform(FieldGraphNode* fgn, INode* audioTerminal);
 
 
 
@@ -2591,6 +3894,8 @@ void RemoveNodeByIndex(int index);
    };
 
 bool CanBindModulation(int dstNodeIndex, int paramIndex);
+
+extern std::string gPatchPath;
 
 extern bool gPatchDirty;
 

@@ -54,22 +54,22 @@ step_push() {
 
 # --------------------------------------------------------------- nodediff ---
 # Reports node-catalog lines (REGISTER_NODE calls + the two help-text tables
-# in src/main.cpp) that were added, removed, or changed between two refs.
+# in src/main.cpp and src/app/) that were added, removed, or changed between two refs.
 # Usage: nodediff <base-ref> [head-ref=HEAD]
 step_nodediff() {
     local base="${1:?base ref required, e.g. origin/main or a commit before your change}"
     local head="${2:-HEAD}"
-    echo "==> nodediff: $base..$head (src/main.cpp node tables)"
+    echo "==> nodediff: $base..$head (src/main.cpp + src/app node tables)"
     local pattern='REGISTER_NODE\(|^\s*\{ ".*", ".*" \},?\s*$'
     local changed
-    changed=$(git diff -U0 "$base" "$head" -- src/main.cpp \
+    changed=$(git diff -U0 "$base" "$head" -- src/main.cpp src/app \
         | grep -E '^[+-]' | grep -v '^[+-][+-][+-]' \
         | grep -E "$pattern" || true)
     if [ -z "$changed" ]; then
         echo "    no node-catalog or help-text lines changed — manual likely doesn't need an update"
         return 1
     fi
-    echo "    node-relevant lines changed in src/main.cpp:"
+    echo "    node-relevant lines changed in src/main.cpp / src/app:"
     echo "$changed" | sed 's/^/    /'
     echo
     echo "    ACTION NEEDED: review these against Infinite_Node_Reference_Manual.pdf"

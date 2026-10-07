@@ -65,8 +65,9 @@ import re
 import sys
 from collections import defaultdict
 
+import appsrc  # src/main.cpp + src/app/**/*.cpp (main.cpp was split)
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MAIN_CPP = os.path.join(ROOT, "src", "main.cpp")
 NODES_DIR = os.path.join(ROOT, "src", "nodes")
 # The AudioEffects category (Delay, Reverb, Chorus, ... - 23 effects) is a
 # second, separate architecture: AudioEffectNode doesn't use ParamMailbox
@@ -369,7 +370,7 @@ def main():
     ap.add_argument("--node", help="Only report fields whose name contains this substring")
     args = ap.parse_args()
 
-    main_text = open(MAIN_CPP, encoding="utf-8", errors="replace").read()
+    main_text, locate = appsrc.read_indexed(ROOT)
     bodies = function_bodies(main_text)
     dispatch = dispatch_map(main_text)
 
@@ -518,7 +519,7 @@ def main():
         print(f"=== {len(mismatches)} RANGE MISMATCH(ES) ===\n")
         for field, label, ui_lo, ui_hi, dsp_lo, dsp_hi, direction, path, line, ui_line in mismatches:
             print(f'  "{label}" (field `{field}`)')
-            print(f"    UI  (src/main.cpp:{ui_line}):  {ui_lo:g}..{ui_hi:g}")
+            print(f"    UI  ({locate(ui_line)}):  {ui_lo:g}..{ui_hi:g}")
             print(f"    DSP ({path}:{line}):  {dsp_lo:g}..{dsp_hi:g}")
             print(f"    -> {direction}\n")
     else:
@@ -538,7 +539,7 @@ def main():
             if ui_matches:
                 for label, ui_lo, ui_hi, fmt, ui_line in ui_matches:
                     fmt_part = f' fmt="{fmt}"' if fmt else " fmt=? (not captured, check src/main.cpp by hand)"
-                    print(f'    UI  (src/main.cpp:{ui_line}):  "{label}" {ui_lo}..{ui_hi}{fmt_part}')
+                    print(f'    UI  ({locate(ui_line)}):  "{label}" {ui_lo}..{ui_hi}{fmt_part}')
             else:
                 print("    UI: no matching knob/slider call found in this node's Draw*Body")
             print()
