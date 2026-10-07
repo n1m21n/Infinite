@@ -534,6 +534,34 @@ namespace
       return true;
    }
 
+   // Node search: case-insensitive substring that treats '-' and '_' as
+   // spaces, and also matches with spaces dropped, so "key snap", "key-snap"
+   // and "keysnap" all find "Key-Snap". `q` must already be lowercase.
+   bool NodeSearchMatches(std::string hay, std::string q)
+   {
+      auto norm = [](std::string& t) {
+         for (char& c : t)
+         {
+            c = (char)std::tolower((unsigned char)c);
+            if (c == '-' || c == '_')
+               c = ' ';
+         }
+      };
+      auto strip = [](const std::string& t) {
+         std::string o;
+         for (char c : t)
+            if (c != ' ')
+               o += c;
+         return o;
+      };
+      norm(hay);
+      norm(q);
+      if (hay.find(q) != std::string::npos)
+         return true;
+      const std::string qs = strip(q);
+      return !qs.empty() && strip(hay).find(qs) != std::string::npos;
+   }
+
    // Registered node names are the patch-file keys and must not change, so
    // casing is a display concern only - lowering it here keeps saved patches
    // loading while the UI reads the way the user asked for.
@@ -102119,8 +102147,7 @@ int main(int argc, char** argv)
             for (const auto& t : allTypes)
             {
                std::string hay = DisplayName(t.first) + " " + DisplayName(t.second);
-               std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
-               if (hay.find(q) == std::string::npos)
+               if (!NodeSearchMatches(hay, q))
                   continue;
                ++shown;
                const std::string title = DisplayName(t.first);
@@ -103071,8 +103098,7 @@ int main(int argc, char** argv)
                      if (!q.empty())
                      {
                         std::string hay = name + " " + category;
-                        std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
-                        if (hay.find(q) == std::string::npos)
+                        if (!NodeSearchMatches(hay, q))
                            continue;
                      }
                      matches.emplace_back(name, category);
@@ -103158,8 +103184,7 @@ int main(int argc, char** argv)
                         continue;
                      }
                      std::string hay = name + " " + category;
-                     std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
-                     if (hay.find(q) != std::string::npos)
+                     if (NodeSearchMatches(hay, q))
                         matches.push_back(name);
                   }
                   if (matches.empty())
