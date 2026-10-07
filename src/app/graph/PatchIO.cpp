@@ -663,7 +663,7 @@ namespace app
                // than deleting it - a corrupt file the user can still find
                // and inspect beats one silently erased.
                gAutosaveRecoveryError = error;
-               gPatchStatus = "Autosave found but could not be read: " + error;
+               gPatchStatus = std::string(T("Autosave found but could not be read: ")) + error;
             }
          }
          // Marker present, no autosave: nothing to offer, not an error.
@@ -685,7 +685,7 @@ namespace app
       std::string error;
       if (!Patch::Write(path, data, error))
       {
-         gPatchStatus = "Save failed: " + error;
+         gPatchStatus = std::string(T("Save failed: ")) + error;
          return false;
       }
 
@@ -861,7 +861,7 @@ namespace app
       // document still carries. ApplyPatchData clamps it upward, never down.
       gPatchPath.clear();
       gPatchDirty = false;
-      gPatchStatus = "New patch";
+      gPatchStatus = T("New patch");
       // Only for a genuine "start a fresh document" - not when NewPatch is
       // called from inside ApplyPatchData as the first step of restoring a
       // snapshot, which must leave the stacks alone.

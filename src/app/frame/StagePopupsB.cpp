@@ -214,7 +214,7 @@ void DrawPopupsB(FrameCtx& fc)
             searchJustOpened = false;
          }
          ImGui::SetNextItemWidth(-FLT_MIN);
-         ImGui::InputTextWithHint("##q", "search nodes...", searchBuf, sizeof(searchBuf));
+         ImGui::InputTextWithHint("##q", T("search nodes..."), searchBuf, sizeof(searchBuf));
          ImGui::Separator();
 
          std::string q(searchBuf);
@@ -466,7 +466,7 @@ void DrawPopupsB(FrameCtx& fc)
       }
       if (ImGui::BeginPopup("##fielddevicesave"))
       {
-         ImGui::TextUnformatted("Save device as:");
+         ImGui::TextUnformatted(T("Save device as:"));
          ImGui::SetNextItemWidth(220.0f);
          bool enterPressed = ImGui::InputText("##fielddevicesavename", gFieldDeviceSave.nameBuf,
                                               sizeof(gFieldDeviceSave.nameBuf),

@@ -388,66 +388,66 @@ void DrawNodeBodies(FrameCtx& fc)
                if (o->ActsOnInstanceStamp())
                {
                   if (o->op == GeometryOpNode::kTransform)
-                     snprintf(line, sizeof(line), "moving group (%zu copies)", o->UpstreamInstanceCount());
+                     snprintf(line, sizeof(line), T("moving group (%zu copies)"), o->UpstreamInstanceCount());
                   else
-                     snprintf(line, sizeof(line), "%zu tris, stamped x%zu", o->TriangleCount(), o->UpstreamInstanceCount());
+                     snprintf(line, sizeof(line), T("%zu tris, stamped x%zu"), o->TriangleCount(), o->UpstreamInstanceCount());
                }
                else
-                  snprintf(line, sizeof(line), "%zu triangles", o->TriangleCount());
+                  snprintf(line, sizeof(line), T("%zu triangles"), o->TriangleCount());
             }
             else if (auto* inst = dynamic_cast<InstanceOnPointsNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%zu instances", inst->InstanceCount());
+               snprintf(line, sizeof(line), T("%zu instances"), inst->InstanceCount());
             else if (auto* model = dynamic_cast<ModelSourceNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%zu triangles", model->TriangleCount());
+               snprintf(line, sizeof(line), T("%zu triangles"), model->TriangleCount());
             else if (auto* t3d = dynamic_cast<Text3DNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%zu triangles", t3d->TriangleCount());
+               snprintf(line, sizeof(line), T("%zu triangles"), t3d->TriangleCount());
             else if (auto* n3d = dynamic_cast<Null3DNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%zu triangles", n3d->TriangleCount());
+               snprintf(line, sizeof(line), T("%zu triangles"), n3d->TriangleCount());
             else if (auto* mapn = dynamic_cast<MappingNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%zu triangles", mapn->TriangleCount());
+               snprintf(line, sizeof(line), T("%zu triangles"), mapn->TriangleCount());
             else if (auto* m2p = dynamic_cast<MeshToPointsNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%zu points", m2p->PointCount());
+               snprintf(line, sizeof(line), T("%zu points"), m2p->PointCount());
             else if (auto* oc = dynamic_cast<OceanNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%zu triangles", oc->TriangleCount());
+               snprintf(line, sizeof(line), T("%zu triangles"), oc->TriangleCount());
             else if (auto* mat = dynamic_cast<MaterialNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%zu triangles", mat->TriangleCount());
+               snprintf(line, sizeof(line), T("%zu triangles"), mat->TriangleCount());
             else if (auto* disp = dynamic_cast<DisplacementNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%zu triangles", disp->TriangleCount());
+               snprintf(line, sizeof(line), T("%zu triangles"), disp->TriangleCount());
             else if (auto* adisp = dynamic_cast<AudioDisplacementNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%zu triangles", adisp->TriangleCount());
+               snprintf(line, sizeof(line), T("%zu triangles"), adisp->TriangleCount());
             else if (auto* arib = dynamic_cast<AudioRibbonNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%zu triangles", arib->TriangleCount());
+               snprintf(line, sizeof(line), T("%zu triangles"), arib->TriangleCount());
             else if (auto* setColor = dynamic_cast<SetColorNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%zu triangles", setColor->TriangleCount());
+               snprintf(line, sizeof(line), T("%zu triangles"), setColor->TriangleCount());
             else if (auto* ps = dynamic_cast<ParticleSystemNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%zu particles", ps->AliveCount());
+               snprintf(line, sizeof(line), T("%zu particles"), ps->AliveCount());
             else if (auto* cv = dynamic_cast<CurveNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%zu points, %zu tris", cv->PointCount(), cv->TriangleCount());
+               snprintf(line, sizeof(line), T("%zu points, %zu tris"), cv->PointCount(), cv->TriangleCount());
             else if (auto* mb = dynamic_cast<MetaBallNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%zu balls, %zu tris", mb->BallCount(), mb->TriangleCount());
+               snprintf(line, sizeof(line), T("%zu balls, %zu tris"), mb->BallCount(), mb->TriangleCount());
             else if (auto* jn = dynamic_cast<JoinGeometryNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%d inputs, %zu tris", jn->ConnectedCount(), jn->TriangleCount());
+               snprintf(line, sizeof(line), T("%d inputs, %zu tris"), jn->ConnectedCount(), jn->TriangleCount());
             else if (auto* wr = dynamic_cast<WrapNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%zu tris", wr->TriangleCount());
+               snprintf(line, sizeof(line), T("%zu tris"), wr->TriangleCount());
             else if (auto* sw3 = dynamic_cast<Switcher3DNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "showing input %c", 'A' + sw3->ActiveSlot());
+               snprintf(line, sizeof(line), T("showing input %c"), 'A' + sw3->ActiveSlot());
             else if (auto* grp = dynamic_cast<Group3DNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%d in group", grp->GroupChildCount());
+               snprintf(line, sizeof(line), T("%d in group"), grp->GroupChildCount());
             else if (auto* cl = dynamic_cast<ClothNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%zu tris, %zu links", cl->TriangleCount(), cl->ConstraintCount());
+               snprintf(line, sizeof(line), T("%zu tris, %zu links"), cl->TriangleCount(), cl->ConstraintCount());
             else if (auto* mrs = dynamic_cast<MeshResynthNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "gen %d, %zu tris", mrs->Generation(), mrs->TriangleCount());
+               snprintf(line, sizeof(line), T("gen %d, %zu tris"), mrs->Generation(), mrs->TriangleCount());
             else if (auto* i2p = dynamic_cast<ImageToPointsNode*>(gn.node.get()))
-               snprintf(line, sizeof(line), "%zu points", i2p->PointCount());
+               snprintf(line, sizeof(line), T("%zu points"), i2p->PointCount());
             else if (auto* dp = dynamic_cast<DepthProjectionNode*>(gn.node.get()))
             {
                if (dp->outputType == DepthProjectionNode::kPoints)
-                  snprintf(line, sizeof(line), "%zu points", dp->PointCount());
+                  snprintf(line, sizeof(line), T("%zu points"), dp->PointCount());
                else
-                  snprintf(line, sizeof(line), "%zu triangles", dp->TriangleCount());
+                  snprintf(line, sizeof(line), T("%zu triangles"), dp->TriangleCount());
             }
             else
-               snprintf(line, sizeof(line), "scene node");
+               snprintf(line, sizeof(line), "%s", T("scene node"));
             dl->AddText(ImVec2(origin.x + 12, origin.y + 10),
                         isLight ? IM_COL32(30, 36, 52, 255) : IM_COL32(200, 206, 226, 255),
                         NodeTitleWithInstance(gn).c_str());
@@ -474,7 +474,7 @@ void DrawNodeBodies(FrameCtx& fc)
             dl->AddText(ImVec2(origin.x + 12, origin.y + 34),
                         isLight ? IM_COL32(95, 105, 125, 255) : IM_COL32(130, 136, 156, 255), tris);
             dl->AddText(ImVec2(origin.x + 12, origin.y + 54),
-                        isLight ? IM_COL32(95, 105, 125, 255) : IM_COL32(130, 136, 156, 255), "geometry -> Render 3D");
+                        isLight ? IM_COL32(95, 105, 125, 255) : IM_COL32(130, 136, 156, 255), T("geometry -> Render 3D"));
          }
          else if (auto* draw = dynamic_cast<DrawNode*>(gn.node.get()))
             DrawPaintablePreview(draw);
@@ -1062,7 +1062,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   if (ImGui::Button(L("Stop recording"), ImVec2(kPreviewSize, 0)))
                      n->RequestStopRecording();
                   ImGui::PopStyleColor();
-                  ImGui::TextColored(ImVec4(1, 0.5f, 0.4f, 1), "REC  %d frames", n->RecordedFrames());
+                  ImGui::TextColored(ImVec4(1, 0.5f, 0.4f, 1), T("REC  %d frames"), n->RecordedFrames());
                   const int pending = n->PendingFrames();
                   const int dropped = n->DroppedFrames();
                   if (pending > 0)
@@ -1075,7 +1075,7 @@ void DrawNodeBodies(FrameCtx& fc)
                      // Same orange as the VST3 blocklist warning - "this is a
                      // problem, not an error": the encoder is losing frames,
                      // but recording is continuing.
-                     ImGui::TextColored(ImVec4(0.9f, 0.55f, 0.25f, 1.0f), "%d frames dropped - encoder can't keep up", dropped);
+                     ImGui::TextColored(ImVec4(0.9f, 0.55f, 0.25f, 1.0f), T("%d frames dropped - encoder can't keep up"), dropped);
                   }
                }
                else

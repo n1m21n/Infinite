@@ -347,7 +347,7 @@ void DrawSidePanels(FrameCtx& fc)
             }
 
             static const std::vector<std::string> kModuleSortNames = { "Category", "Name", "Favourites" };
-            if (DrawBrowserFilterStrip(gModulesFilter, "search modules...", kModuleSortNames, categoryNames))
+            if (DrawBrowserFilterStrip(gModulesFilter, T("search modules..."), kModuleSortNames, categoryNames))
                SaveBrowserFilterPrefs();
 
             std::string q = gModulesFilter.query;
@@ -437,7 +437,7 @@ void DrawSidePanels(FrameCtx& fc)
                   DrawFavoriteBadge(selMin, selMax, isFav);
                   if (ImGui::BeginPopupContextItem("##mod_ctx"))
                   {
-                     if (ImGui::MenuItem(isFav ? "Remove from favourites" : "Add to favourites"))
+                     if (ImGui::MenuItem(isFav ? L("Remove from favourites") : L("Add to favourites")))
                         gBrowserFavorites.ToggleModule(match.first);
                      if (ImGui::MenuItem(L("Add to canvas")))
                      {
@@ -500,7 +500,7 @@ void DrawSidePanels(FrameCtx& fc)
                      DrawFavoriteBadge(selMin, selMax, isFav);
                      if (ImGui::BeginPopupContextItem("##mod_cat_ctx"))
                      {
-                        if (ImGui::MenuItem(isFav ? "Remove from favourites" : "Add to favourites"))
+                        if (ImGui::MenuItem(isFav ? L("Remove from favourites") : L("Add to favourites")))
                            gBrowserFavorites.ToggleModule(name);
                         if (ImGui::MenuItem(L("Add to canvas")))
                         {
@@ -529,11 +529,11 @@ void DrawSidePanels(FrameCtx& fc)
          }
          else if (gSearchPanelMode == 1)
          {
-            DrawLibrarySearchPanel(gSampleScanner, "##samples", "search samples...", false);
+            DrawLibrarySearchPanel(gSampleScanner, "##samples", T("search samples..."), false);
          }
          else if (gSearchPanelMode == 2)
          {
-            DrawLibrarySearchPanel(gMediaScanner, "##media", "search media...", true);
+            DrawLibrarySearchPanel(gMediaScanner, "##media", T("search media..."), true);
          }
          else if (gSearchPanelMode == 4)
          {

@@ -335,7 +335,7 @@ namespace app
          {
             const bool engineOn = AudioEngine::Instance().SampleRate() > 0.0;
             const bool timelineMode = gAudioMode == AudioMode::Timeline;
-            const char* audioLabel = timelineMode ? "Timeline Audio On" : "Enable Timeline Audio";
+            const char* audioLabel = timelineMode ? T("Timeline Audio On") : T("Enable Timeline Audio");
             const float audioBtnW = ImGui::CalcTextSize(audioLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f + 12.0f;
             const ImVec2 audioBtnPos(panelOrigin.x + panelSize.x - audioBtnW - 6.0f, panelOrigin.y + 2.0f);
             const ImVec2 savedCursor = ImGui::GetCursorScreenPos();
@@ -707,7 +707,7 @@ namespace app
                                        ImGuiWindowFlags_AlwaysAutoResize))
             {
                const bool queuedClash = ArrangeRenderPathQueued(sArrangePendingJob.path, 0);
-               ImGui::TextUnformatted(queuedClash ? "Another queued job already writes:" : "This file already exists:");
+               ImGui::TextUnformatted(queuedClash ? T("Another queued job already writes:") : T("This file already exists:"));
                ImGui::TextDisabled("%s", sArrangePendingJob.path.c_str());
                ImGui::Dummy(ImVec2(0, 4));
                if (ImGui::Button(L("Overwrite"), ImVec2(100, 0)))
@@ -868,7 +868,7 @@ namespace app
                if (on)
                   ImGui::PopStyleColor(2);
                if (ImGui::IsItemHovered())
-                  HelpTip(u == 0 ? "Switch display to Bars / Beats (BBT)" : "Switch display to Time (Minutes:Seconds)");
+                  HelpTip(u == 0 ? T("Switch display to Bars / Beats (BBT)") : T("Switch display to Time (Minutes:Seconds)"));
             }
             ImGui::PopStyleVar();
          }
@@ -983,16 +983,16 @@ namespace app
          if (toolNonDefault)
             ImGui::PopStyleColor(2);
 
-         const char* toolTooltip = "Tool: Select (A)";
+         const char* toolTooltip = T("Tool: Select (A)");
          switch (gArrangeTool)
          {
-            case ArrangeTool::Select: toolTooltip = "Tool: Select (A) - Click to choose tool"; break;
-            case ArrangeTool::Trim:   toolTooltip = "Tool: Trim (T) - Click to choose tool"; break;
-            case ArrangeTool::Range:  toolTooltip = "Tool: Range Selection (R) - Click to choose tool"; break;
-            case ArrangeTool::Blade:  toolTooltip = "Tool: Blade / Cut (B) - Click to choose tool"; break;
-            case ArrangeTool::Zoom:   toolTooltip = "Tool: Zoom (Z) - Click to choose tool"; break;
-            case ArrangeTool::Hand:   toolTooltip = "Tool: Hand / Pan (H) - Click to choose tool"; break;
-            case ArrangeTool::Pencil: toolTooltip = "Tool: Pencil / Draw (P) - Click to choose tool"; break;
+            case ArrangeTool::Select: toolTooltip = T("Tool: Select (A) - Click to choose tool"); break;
+            case ArrangeTool::Trim:   toolTooltip = T("Tool: Trim (T) - Click to choose tool"); break;
+            case ArrangeTool::Range:  toolTooltip = T("Tool: Range Selection (R) - Click to choose tool"); break;
+            case ArrangeTool::Blade:  toolTooltip = T("Tool: Blade / Cut (B) - Click to choose tool"); break;
+            case ArrangeTool::Zoom:   toolTooltip = T("Tool: Zoom (Z) - Click to choose tool"); break;
+            case ArrangeTool::Hand:   toolTooltip = T("Tool: Hand / Pan (H) - Click to choose tool"); break;
+            case ArrangeTool::Pencil: toolTooltip = T("Tool: Pencil / Draw (P) - Click to choose tool"); break;
          }
          if (ImGui::IsItemHovered())
             HelpTip("%s", toolTooltip);
@@ -4454,7 +4454,7 @@ namespace app
          const ImVec2 a = gArrangePanelRectMin, b = gArrangePanelRectMax;
          odl->PushClipRect(a, b, true);
          odl->AddRectFilled(a, b, IM_COL32(0, 0, 0, 110));
-         const char* lockText = "Rendering - timeline locked";
+         const char* lockText = T("Rendering - timeline locked");
          const ImVec2 ts = ImGui::CalcTextSize(lockText);
          const ImVec2 c((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
          const ImVec2 t0(c.x - ts.x * 0.5f, c.y - ts.y * 0.5f);

@@ -243,7 +243,7 @@ void DrawLinks(FrameCtx& fc)
                      if (valid && IsKernelDrivenParam(dstNode->index, GraphNode::ParamIndexFromPin(b)))
                      {
                         valid = false;
-                        rejectReason = "Cannot modulate a parameter driven by a Field Graph kernel";
+                        rejectReason = T("Cannot modulate a parameter driven by a Field Graph kernel");
                      }
                      if (valid)
                      {
@@ -270,13 +270,13 @@ void DrawLinks(FrameCtx& fc)
                          WouldCreateAudioCycle(srcNode->node.get(), dstNode->node.get()))
                      {
                         valid = false;
-                        rejectReason = "Cannot connect: this would create an audio feedback loop";
+                        rejectReason = T("Cannot connect: this would create an audio feedback loop");
                      }
                      if (valid && srcIsNoteSource &&
                          WouldCreateNoteCycle(srcNode->node.get(), dstNode->node.get()))
                      {
                         valid = false;
-                        rejectReason = "Cannot connect: this would create a note feedback loop";
+                        rejectReason = T("Cannot connect: this would create a note feedback loop");
                      }
                   }
                }
@@ -291,31 +291,31 @@ void DrawLinks(FrameCtx& fc)
                   // wording for the self-connection case; the UI now says it too.
                   if (!differentNodes)
                   {
-                     rejectReason = "A node can't be connected to itself";
+                     rejectReason = T("A node can't be connected to itself");
                   }
                   else if (!GraphNode::IsOutputPin(a) || GraphNode::IsOutputPin(b))
                   {
-                     rejectReason = "Drag from an output pin on the right of a node to an input pin on the left of another";
+                     rejectReason = T("Drag from an output pin on the right of a node to an input pin on the left of another");
                   }
                   else if (GraphNode::IsColorPin(b))
                   {
-                     rejectReason = "This color slot only accepts a Palette node";
+                     rejectReason = T("This color slot only accepts a Palette node");
                   }
                   else if (GraphNode::IsParamPin(b))
                   {
                      if (srcIsAudioNode || srcIsNoteSource)
-                        rejectReason = "Audio/note signals can't drive a parameter pin - only a modulator can";
+                        rejectReason = T("Audio/note signals can't drive a parameter pin - only a modulator can");
                      else if (srcGeometry != nullptr || srcCamera != nullptr || srcLight != nullptr)
-                        rejectReason = "3D objects cannot drive a parameter pin - only a modulator can";
+                        rejectReason = T("3D objects cannot drive a parameter pin - only a modulator can");
                      else if (!srcIsModulator)
-                        rejectReason = "Only modulator nodes (LFO, Envelope, Formula, etc.) can drive a parameter pin";
+                        rejectReason = T("Only modulator nodes (LFO, Envelope, Formula, etc.) can drive a parameter pin");
                   }
                   else if (srcIsPredictor && GraphNode::IsInputPin(b))
                   {
                      // Source-driven refusal: it applies to every slot on every
                      // node, so it is read before any of the destination-shaped
                      // messages in the branch below.
-                     rejectReason = "Predictive LFO / Macro can only drive a parameter, knob or slider - not another node";
+                     rejectReason = T("Predictive LFO / Macro can only drive a parameter, knob or slider - not another node");
                   }
                   else if (GraphNode::IsInputPin(b))
                   {
@@ -330,89 +330,89 @@ void DrawLinks(FrameCtx& fc)
 
                      if (dstWantsAudio && !srcIsAudioNode)
                         rejectReason = srcIsModulator
-                           ? "A modulator can't drive an audio signal pin - only another audio source can"
-                           : "This pin only accepts an audio source";
+                           ? T("A modulator can't drive an audio signal pin - only another audio source can")
+                           : T("This pin only accepts an audio source");
                      else if (dstWantsNote && !srcIsNoteSource)
-                        rejectReason = "This pin only accepts a note source";
+                        rejectReason = T("This pin only accepts a note source");
                      else if ((srcIsAudioNode || srcIsNoteSource) && !dstWantsAudio && !dstWantsNote)
-                        rejectReason = "Audio/note signals only connect to a matching audio/note pin";
+                        rejectReason = T("Audio/note signals only connect to a matching audio/note pin");
                      else if (dstRenderNode != nullptr)
                      {
                         if (slot < Render3DNode::kSlots)
                         {
                            if (srcCamera != nullptr)
-                              rejectReason = "Camera connects to the Camera slot (slot 5), not geometry slots";
+                              rejectReason = T("Camera connects to the Camera slot (slot 5), not geometry slots");
                            else if (srcLight != nullptr)
-                              rejectReason = "Light connects to the Light slots (slots 6-8), not geometry slots";
+                              rejectReason = T("Light connects to the Light slots (slots 6-8), not geometry slots");
                            else if (srcIsEnvironment)
-                              rejectReason = "HDRI connects to the Environment slot (slot 9), not geometry slots";
+                              rejectReason = T("HDRI connects to the Environment slot (slot 9), not geometry slots");
                            else
-                              rejectReason = "Render 3D geometry slots only accept 3D geometry sources";
+                              rejectReason = T("Render 3D geometry slots only accept 3D geometry sources");
                         }
                         else if (slot == Render3DNode::kSlots)
-                           rejectReason = "This slot only accepts a Camera 3D node";
+                           rejectReason = T("This slot only accepts a Camera 3D node");
                         else if (slot == Render3DNode::kEnvSlot)
-                           rejectReason = "Environment slot only accepts an HDRI Environment node";
+                           rejectReason = T("Environment slot only accepts an HDRI Environment node");
                         else
-                           rejectReason = "This slot only accepts a Light 3D node";
+                           rejectReason = T("This slot only accepts a Light 3D node");
                      }
                      else if (dstMaterialNode != nullptr && slot >= 1 && slot <= kMapCount)
                      {
                         if (srcGeometry != nullptr)
-                           rejectReason = "Material map slots accept 2D images or textures, not 3D geometry";
+                           rejectReason = T("Material map slots accept 2D images or textures, not 3D geometry");
                         else if (srcIsModulator)
-                           rejectReason = "Material map slots accept 2D images or textures, not modulators";
+                           rejectReason = T("Material map slots accept 2D images or textures, not modulators");
                         else
-                           rejectReason = "Material map slots accept 2D images or textures";
+                           rejectReason = T("Material map slots accept 2D images or textures");
                      }
                      else if (dstDispNode != nullptr && slot == 1)
                      {
                         if (srcGeometry != nullptr)
-                           rejectReason = "Displacement height slot accepts a 2D image or texture map, not 3D geometry";
+                           rejectReason = T("Displacement height slot accepts a 2D image or texture map, not 3D geometry");
                         else
-                           rejectReason = "Displacement height slot accepts a 2D image or texture map";
+                           rejectReason = T("Displacement height slot accepts a 2D image or texture map");
                      }
                      else if (dstSetColorNode != nullptr && slot == 2)
                      {
-                        rejectReason = "Set Vertex Color palette slot only accepts a Palette node";
+                        rejectReason = T("Set Vertex Color palette slot only accepts a Palette node");
                      }
                      else if (dstSetColorNode != nullptr && slot == 1)
                      {
                         if (srcGeometry != nullptr)
-                           rejectReason = "Set Vertex Color texture slot accepts a 2D image or texture map, not 3D geometry";
+                           rejectReason = T("Set Vertex Color texture slot accepts a 2D image or texture map, not 3D geometry");
                         else
-                           rejectReason = "Set Vertex Color texture slot accepts a 2D image or texture map";
+                           rejectReason = T("Set Vertex Color texture slot accepts a 2D image or texture map");
                      }
                      else if (dstMappingNode != nullptr)
                      {
-                        rejectReason = "Mapping transforms 3D surface coordinates. Wire 3D geometry into Mapping, then into Material or Render 3D.";
+                        rejectReason = T("Mapping transforms 3D surface coordinates. Wire 3D geometry into Mapping, then into Material or Render 3D.");
                      }
                      else if (dstNode->node->GeometryInputSlot(slot) != nullptr)
                      {
                         if (srcCamera != nullptr || srcLight != nullptr)
-                           rejectReason = "Camera and Light nodes connect to Render 3D, not geometry operators";
+                           rejectReason = T("Camera and Light nodes connect to Render 3D, not geometry operators");
                         else
-                           rejectReason = "This pin requires a 3D geometry source, not a 2D image";
+                           rejectReason = T("This pin requires a 3D geometry source, not a 2D image");
                      }
                      else if (srcGeometry != nullptr || srcCamera != nullptr || srcLight != nullptr)
                      {
-                        rejectReason = "3D geometry cannot be connected directly to a 2D image node. Connect geometry into a Render 3D node first.";
+                        rejectReason = T("3D geometry cannot be connected directly to a 2D image node. Connect geometry into a Render 3D node first.");
                      }
                      else if (dynamic_cast<AudioAnalyzeNode*>(dstNode->node.get()) != nullptr)
                      {
-                        rejectReason = "Audio Analyze accepts any audio source - Audio In, Audio File, an effect, a Mixer";
+                        rejectReason = T("Audio Analyze accepts any audio source - Audio In, Audio File, an effect, a Mixer");
                      }
                      else if (dstNode->node->ModulatorInputSlot(slot) != nullptr && dynamic_cast<ImageAnalyzeNode*>(dstNode->node.get()) == nullptr)
                      {
-                        rejectReason = "This pin only accepts a modulator source";
+                        rejectReason = T("This pin only accepts a modulator source");
                      }
                      else if (srcIsModulator)
                      {
-                        rejectReason = "Image inputs accept 2D image sources, not modulators";
+                        rejectReason = T("Image inputs accept 2D image sources, not modulators");
                      }
                      else
                      {
-                        rejectReason = "Incompatible connection";
+                        rejectReason = T("Incompatible connection");
                      }
                   }
                }

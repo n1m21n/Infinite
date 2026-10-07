@@ -79,7 +79,7 @@ int DrawFloating(FrameCtx& fc)
                           ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
                              ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav))
          {
-            ImGui::TextUnformatted("File changed on disk.");
+            ImGui::TextUnformatted(T("File changed on disk."));
             ImGui::SameLine();
             if (ImGui::Button(L("Reload")))
             {
@@ -272,7 +272,7 @@ int DrawFloating(FrameCtx& fc)
             gRedoStack.clear();
             gPatchPath.clear();          // it is not the user's file - force Save As
             gPatchDirty = true;          // it is unsaved work, and should say so
-            gPatchStatus = "Recovered autosave. Save the project to keep it.";
+            gPatchStatus = T("Recovered autosave. Save the project to keep it.");
             // A recovery that leaves the file behind offers itself again on
             // the next launch.
             DiscardAutosave();

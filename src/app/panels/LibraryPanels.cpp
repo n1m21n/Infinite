@@ -162,7 +162,7 @@ namespace app
       ImGui::PushID(idPrefix);
 
       {
-         const char* addLabel = "Add folder...";
+         const char* addLabel = T("Add folder...");
          const float iconSize = ImGui::GetFrameHeight() * 0.65f;
          const float iconGap = 6.0f;
          const ImVec2 btnPos = ImGui::GetCursorScreenPos();
@@ -247,7 +247,7 @@ namespace app
       {
          if (scanning)
             ImGui::BeginDisabled();
-         const char* refreshLabel = "Refresh all";
+         const char* refreshLabel = T("Refresh all");
          const float iconSize = ImGui::GetFrameHeight() * 0.65f;
          const float iconGap = 6.0f;
          const bool clicked = ImGui::Button("##refreshall", ImVec2(-1.0f, 0));
@@ -502,7 +502,7 @@ namespace app
 
          if (ImGui::BeginPopupContextItem("##entry_ctx"))
          {
-            if (ImGui::MenuItem(isFav ? "Remove from favourites" : "Add to favourites"))
+            if (ImGui::MenuItem(isFav ? L("Remove from favourites") : L("Add to favourites")))
             {
                if (mediaKind)
                   gBrowserFavorites.ToggleMedia(entry.path);
@@ -691,7 +691,7 @@ namespace app
          }
          if (ImGui::Button(L("Add VST3 folder..."), ImVec2(-1.0f, 0)))
          {
-            const std::string folder = Platform::OpenFolderDialog("Add VST3 folder");
+            const std::string folder = Platform::OpenFolderDialog(T("Add VST3 folder"));
             if (!folder.empty())
                gPluginScanner.AddFolder(folder);
          }
@@ -811,7 +811,7 @@ namespace app
       static const std::vector<std::string> pluginTypeNames;
 #endif
       const bool filterChanged =
-         DrawBrowserFilterStrip(gPluginFilter, "search plugins...", kPluginSortNames, pluginTypeNames);
+         DrawBrowserFilterStrip(gPluginFilter, T("search plugins..."), kPluginSortNames, pluginTypeNames);
       if (filterChanged)
          SaveBrowserFilterPrefs();
 
@@ -900,7 +900,7 @@ namespace app
 
          if (ImGui::BeginPopupContextItem("##plugin_ctx"))
          {
-            if (ImGui::MenuItem(isFav ? "Remove from favourites" : "Add to favourites"))
+            if (ImGui::MenuItem(isFav ? L("Remove from favourites") : L("Add to favourites")))
                gBrowserFavorites.TogglePlugin(entry.identifier);
             if (ImGui::MenuItem(L("Add to canvas")))
             {
@@ -995,7 +995,7 @@ namespace app
       static const std::vector<std::string> kFieldSortNames = { "Category", "Name", "Favourites" };
       static const std::vector<std::string> kFieldCategories = { "All", "Synth", "Effects", "Modifiers", "3D Shapes", "2D Visuals" };
 
-      if (DrawBrowserFilterStrip(gFieldFilter, "search field presets...", kFieldSortNames, kFieldCategories))
+      if (DrawBrowserFilterStrip(gFieldFilter, T("search field presets..."), kFieldSortNames, kFieldCategories))
          SaveBrowserFilterPrefs();
 
       std::string q = gFieldFilter.query;
@@ -1097,7 +1097,7 @@ namespace app
 
             if (ImGui::BeginPopupContextItem("##field_ctx"))
             {
-               if (ImGui::MenuItem(isFav ? "Remove from favourites" : "Add to favourites"))
+               if (ImGui::MenuItem(isFav ? L("Remove from favourites") : L("Add to favourites")))
                   gBrowserFavorites.ToggleFieldPreset(entry.name);
                if (ImGui::MenuItem(L("Add to canvas")))
                {

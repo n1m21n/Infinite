@@ -403,7 +403,7 @@ namespace app
       std::string error;
       if (!Patch::Read(path, data, error))
       {
-         gPatchStatus = "Open failed: " + error;
+         gPatchStatus = std::string(T("Open failed: ")) + error;
          return false;
       }
       return LoadPatchDataImpl(data, path, reload);
@@ -543,7 +543,7 @@ namespace app
          PatchSchema::Resolve(data, MakeSchemaEnv(false), resolveErrors);
          if (!resolveErrors.empty())
          {
-            gPatchStatus = "Open failed: line " + std::to_string(resolveErrors.front().line) + ": " + resolveErrors.front().message;
+            gPatchStatus = std::string(T("Open failed: line "))  + std::to_string(resolveErrors.front().line) + ": " + resolveErrors.front().message;
             return false;
          }
       }
@@ -597,12 +597,12 @@ namespace app
          {
             gPatchPath = keptPath; // NewPatch cleared it; the text is an edit of that file
             gPatchDirty = true;
-            gPatchStatus = openNote.empty() ? "Patch replaced over RPC" : openNote;
+            gPatchStatus = openNote.empty() ? T("Patch replaced over RPC") : openNote;
             return true;
          }
          gPatchPath = path;
          gPatchDirty = false;
-         gPatchStatus = openNote.empty() ? "Reloaded (file changed on disk)" : openNote;
+         gPatchStatus = openNote.empty() ? T("Reloaded (file changed on disk)") : openNote;
          NotePatchFileStamp(path);
          return true;
       }
