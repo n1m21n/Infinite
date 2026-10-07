@@ -3475,6 +3475,31 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       return a;
    }
 
+   // Keyboard focus for the discrete params (checkboxes, dropdowns): the same
+   // Tab walk and ring as KbParamHook, called right after the widget is drawn
+   // so the ring can hug its rect. Returns the queued Left/Right step (-1, 0,
+   // +1) for the caller to apply the way its widget applies a click. A cable-
+   // driven param is skipped: it ignores keys exactly as it ignores the mouse.
+   int KbDiscreteHook(int nodeIndex, int paramIndex, bool modulated)
+   {
+      if (modulated)
+         return 0;
+      bool seen = false;
+      for (const KbParamEntry& e : gKbParams)
+         seen = seen || (e.node == nodeIndex && e.param == paramIndex);
+      if (!seen)
+         gKbParams.push_back({ nodeIndex, paramIndex });
+      if (nodeIndex != gKbFocusNode || paramIndex != gKbFocusParam)
+         return 0;
+      const ImVec2 rmin = ImGui::GetItemRectMin();
+      const ImVec2 rmax = ImGui::GetItemRectMax();
+      ImGui::GetWindowDrawList()->AddRect(ImVec2(rmin.x - 2.0f, rmin.y - 2.0f), ImVec2(rmax.x + 2.0f, rmax.y + 2.0f),
+                                          ImGui::GetColorU32(ImGuiCol_NavHighlight), 4.0f, 0, 2.0f);
+      const int step = gKbNudge > 0 ? 1 : (gKbNudge < 0 ? -1 : 0);
+      gKbNudge = 0;
+      return step;
+   }
+
    DiscreteParamHandle RegisterDiscreteParam(const char* label, float current, float maxV,
                                              bool isBool, const std::vector<std::string>* options,
                                              bool momentary = false)
@@ -3890,6 +3915,14 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          gDropdown.justOpened = true;
          gDropdown.focusSearch = false;
       }
+      if (h.registered && h.draw)
+      {
+         // Tab + Left/Right on a focused dropdown steps to the previous / next option.
+         const int step = KbDiscreteHook(h.nodeIndex, h.paramIndex, h.modulated);
+         const int stepped = std::clamp(safeCurrent + step, 0, lastIndex);
+         if (step != 0 && stepped != safeCurrent && onSelect) // empty if a click just moved it into gDropdown
+            onSelect(stepped);
+      }
       PopDropdownStyle();
       if (!showCaption)
          return;
@@ -4159,11 +4192,19 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       }
       else
       {
-         const bool clicked = ImGui::Checkbox(label, value);
+         bool clicked = ImGui::Checkbox(label, value);
+         const bool hovered = ImGui::IsItemHovered();
+         // Tab + Left/Right on a focused checkbox: right = on, left = off.
+         const int step = KbDiscreteHook(h.nodeIndex, h.paramIndex, false);
+         if (step != 0 && *value != (step > 0))
+         {
+            *value = step > 0;
+            clicked = true;
+         }
          if (outUserChanged)
             *outUserChanged = clicked;
          changed = clicked || changed;
-         DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
+         DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, hovered);
       }
       PopCheckboxStyle();
       return changed;
@@ -73907,6 +73948,7 @@ int main(int argc, char** argv)
          getenv("INFINITE_LOOPERTRIGTEST") != nullptr ||
          getenv("INFINITE_MIDILEARNTEST") != nullptr ||
          getenv("INFINITE_KBCURSORTEST") != nullptr ||
+         getenv("INFINITE_KBDISCRETETEST") != nullptr ||
          getenv("INFINITE_MODMATRIXGEOM") != nullptr;
 
       if (getenv("INFINITE_AUDIOUITEST") != nullptr)
@@ -74294,6 +74336,14 @@ int main(int argc, char** argv)
          SpawnNode("Shape", "Source", 800.0f, 40.0f);  // 2
          for (GraphNode& gn : gNodes)
             gn.showParams = true; // Tab walks params, so they have to be drawn
+      }
+      else if (getenv("INFINITE_KBDISCRETETEST") != nullptr)
+      {
+         // R587: Tab reaches dropdowns and checkboxes, Left/Right changes them.
+         SpawnNode("Shape", "Source", 40.0f, 40.0f);    // 0: "shape" dropdown
+         SpawnNode("Formula", "Source", 420.0f, 40.0f); // 1: "animate" checkbox (starts on)
+         for (GraphNode& gn : gNodes)
+            gn.showParams = true;
       }
       else if (getenv("INFINITE_BYPASSTEST") != nullptr)
       {
@@ -97047,7 +97097,7 @@ int main(int argc, char** argv)
          const int n1 = gNodes[1].index, n2 = gNodes[2].index;
          if (frameId == 3) { ed::ClearSelection(); ed::SelectNode(gNodes[1].NodeId(), false); }
          // 12 Tabs on node 1: focus stays on node 1 and loops.
-         constexpr int kTabs = 12;
+         constexpr int kTabs = 24; // more than twice the node's params now that toggles and dropdowns are in the walk
          for (int i = 0; i < kTabs; ++i)
          {
             tap(ImGuiKey_Tab, 5 + i * 4);
@@ -97149,6 +97199,59 @@ int main(int argc, char** argv)
          {
             check(!gNodeHelpShown, "H again closes the node help");
             printf("kbtest result: %s\n", ok ? "KBCURSOR OK" : "KBCURSOR FAIL");
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
+      }
+
+      if (getenv("INFINITE_KBDISCRETETEST") != nullptr)
+      {
+         ImGuiIO& tio = ImGui::GetIO();
+         auto tap = [&](ImGuiKey k, int f) {
+            if (frameId == f) tio.AddKeyEvent(k, true);
+            if (frameId == f + 1) tio.AddKeyEvent(k, false);
+         };
+         auto* shape = static_cast<ShapeNode*>(gNodes[0].node.get());
+         auto* formula = static_cast<FormulaNode*>(gNodes[1].node.get());
+         static int shapeBefore = -1;
+         static bool ok = true;
+         constexpr int kSteps = 14;
+         if (frameId == 3)
+         {
+            shapeBefore = shape->shapeType;
+            ed::ClearSelection();
+            ed::SelectNode(gNodes[0].NodeId(), false);
+         }
+         // Walk node 0's params, pressing Right on each: only the dropdown reacts to a +1 step with a visible change.
+         for (int i = 0; i < kSteps; ++i)
+         {
+            tap(ImGuiKey_Tab, 5 + i * 6);
+            tap(ImGuiKey_RightArrow, 8 + i * 6);
+         }
+         const int f1 = 5 + kSteps * 6 + 4;
+         if (frameId == f1)
+         {
+            const bool good = shape->shapeType != shapeBefore;
+            ok = ok && good;
+            printf("kbdiscrete dropdown %d -> %d  %s\n", shapeBefore, shape->shapeType, good ? "ok" : "FAIL");
+            tio.AddKeyEvent(ImGuiKey_Escape, true);
+         }
+         if (frameId == f1 + 1) tio.AddKeyEvent(ImGuiKey_Escape, false);
+         if (frameId == f1 + 3)
+         {
+            ed::ClearSelection();
+            ed::SelectNode(gNodes[1].NodeId(), false);
+         }
+         for (int i = 0; i < kSteps; ++i)
+         {
+            tap(ImGuiKey_Tab, f1 + 6 + i * 6);
+            tap(ImGuiKey_LeftArrow, f1 + 9 + i * 6);
+         }
+         if (frameId == f1 + 6 + kSteps * 6 + 4)
+         {
+            const bool good = !formula->animate;
+            ok = ok && good;
+            printf("kbdiscrete checkbox animate on -> %s  %s\n", formula->animate ? "on" : "off", good ? "ok" : "FAIL");
+            printf("kbdiscrete result: %s\n", ok ? "KBDISCRETE OK" : "KBDISCRETE FAIL");
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
       }
