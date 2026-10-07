@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <functional>
 #include <string>
 #include <vector>
@@ -47,7 +48,7 @@ namespace Splash
    constexpr float kLogoDrawEnd = 1.50f;
    constexpr float kCreditsStart = 1.00f;
    constexpr float kSkipAfter = 0.70f;
-   constexpr float kFadeOut = 0.45f;
+   constexpr float kFadeOut = 0.70f; // logo melts into the backdrop first, then the backdrop fades
    constexpr float kHardCap = 12.0f; // never hold the app hostage, whatever the tasks do
 
    struct State
@@ -165,6 +166,11 @@ namespace Splash
       const double now = ImGui::GetTime();
       const float t = (float)(now - st.t0);
 
+      if (st.fadeStart < 0.0)
+         if (const char* f = getenv("INFINITE_SPLASHFADE")) // dev: start the exit fade, N s in, once the clock allows
+            if (now > atof(f) + 0.05)
+               st.fadeStart = now - atof(f);
+
       // --- input: skip -------------------------------------------------------------------
       if (st.fadeStart < 0.0 && t >= kSkipAfter)
       {
@@ -204,10 +210,15 @@ namespace Splash
       if (st.fadeStart < 0.0 && ((creditsDone && Tasks().empty()) || t > kHardCap))
          st.fadeStart = now;
 
-      float alpha = 1.0f;
+      // Exit: the logo, bead and text never go translucent (the figure-eight overlaps itself at
+      // the crossing, and translucent overlap shows as a polygon). They blend opaquely toward
+      // the backdrop colour (fadeK), and only then does the backdrop itself fade (alpha).
+      float alpha = 1.0f, fadeK = 0.0f;
       if (st.fadeStart >= 0.0)
       {
-         alpha = 1.0f - Smooth((float)((now - st.fadeStart) / kFadeOut));
+         const float e = (float)(now - st.fadeStart);
+         fadeK = Smooth(e / 0.40f);
+         alpha = 1.0f - Smooth((e - 0.30f) / 0.40f);
          if (alpha <= 0.0f)
          {
             st.finished = true;
@@ -227,6 +238,16 @@ namespace Splash
                       ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoScrollWithMouse);
       ImGui::InvisibleButton("##swallow", io.DisplaySize); // eats clicks meant for the canvas
       ImDrawList* dl = ImGui::GetWindowDrawList();
+
+      // Blend a colour toward the backdrop gradient at height y, keeping its alpha.
+      auto mixBg = [&](ImU32 c, float y) {
+         const float k = Clamp01(y / H);
+         const float br = 0x15 + (0x23 - 0x15) * k, bg = 0x1A + (0x27 - 0x1A) * k, bb = 0x2F + (0x46 - 0x2F) * k;
+         const float r = (float)((c >> IM_COL32_R_SHIFT) & 255), g = (float)((c >> IM_COL32_G_SHIFT) & 255),
+                     b = (float)((c >> IM_COL32_B_SHIFT) & 255);
+         return IM_COL32((int)(r + (br - r) * fadeK), (int)(g + (bg - g) * fadeK), (int)(b + (bb - b) * fadeK),
+                         (int)((c >> IM_COL32_A_SHIFT) & 255));
+      };
 
       // background: the icon's navy, slightly lighter toward the bottom
       const int a255 = (int)(alpha * 255.0f);
@@ -257,7 +278,7 @@ namespace Splash
                ty = tl > 0.0f ? ty / tl : 0.0f;
                const float nx = -ty, ny = tx;
                const ImVec2 c(cx + q.x * A, cy + q.y * A);
-               const ImU32 on = BrandColor((q.x + 1.0f) * 0.5f, alpha);
+               const ImU32 on = mixBg(BrandColor((q.x + 1.0f) * 0.5f, 1.0f), c.y);
                const ImU32 off = on & ~IM_COL32_A_MASK;
                dl->PrimWriteVtx(ImVec2(c.x + nx * (hw + aa), c.y + ny * (hw + aa)), uv, off);
                dl->PrimWriteVtx(ImVec2(c.x + nx * hw, c.y + ny * hw), uv, on);
@@ -281,7 +302,8 @@ namespace Splash
             if (draw < 1.0f)
             {
                const ImVec2 hq = Lemniscate(twoPi * draw);
-               dl->AddCircleFilled(ImVec2(cx + hq.x * A, cy + hq.y * A), hw, BrandColor((hq.x + 1.0f) * 0.5f, alpha), 48);
+               dl->AddCircleFilled(ImVec2(cx + hq.x * A, cy + hq.y * A), hw,
+                                  mixBg(BrandColor((hq.x + 1.0f) * 0.5f, 1.0f), cy + hq.y * A), 48);
             }
          }
       }
@@ -296,18 +318,18 @@ namespace Splash
          const ImVec2 q = Lemniscate(6.28318530718f * (e - std::floor(e)));
          const ImVec2 c(cx + q.x * A, cy + q.y * A);
          const float r = strokeW * 0.30f;
-         dl->AddCircleFilled(c, r, IM_COL32(0xC2, 0x59, 0x3F, (int)(255.0f * fadeIn * alpha)), 24);
+         dl->AddCircleFilled(c, r, mixBg(IM_COL32(0xC2, 0x59, 0x3F, (int)(255.0f * fadeIn)), c.y), 24);
          dl->AddCircleFilled(ImVec2(c.x - r * 0.18f, c.y - r * 0.2f), r * 0.78f,
-                             IM_COL32(0xF9, 0xA5, 0x8F, (int)(255.0f * fadeIn * alpha)), 24);
+                             mixBg(IM_COL32(0xF9, 0xA5, 0x8F, (int)(255.0f * fadeIn)), c.y), 24);
          dl->AddCircleFilled(ImVec2(c.x - r * 0.34f, c.y - r * 0.38f), r * 0.28f,
-                             IM_COL32(255, 255, 255, (int)(230.0f * fadeIn * alpha)), 16);
+                             mixBg(IM_COL32(255, 255, 255, (int)(230.0f * fadeIn)), c.y), 16);
       }
 
       // --- credits: vertical marquee, clipped to a region, eased at both edges -----------
       {
          ImFont* font = ImGui::GetFont();
          const float fadeEdge = 42.0f * sc;
-         const float cdAlpha = Smooth(creditsT * 1.5f) * alpha;
+         const float cdAlpha = Smooth(creditsT * 1.5f) * (1.0f - fadeK);
          dl->PushClipRect(ImVec2(0, regionTop), ImVec2(W, regionBot), true);
          float y = regionBot - scrolled;
          for (const CreditSection& sec : Credits())
@@ -348,8 +370,8 @@ namespace Splash
       {
          const float frac = (float)st.tasksDone / (float)st.tasksTotal;
          const float w = 160.0f * sc, x0 = cx - w * 0.5f, yy = H - 28.0f * sc;
-         dl->AddLine(ImVec2(x0, yy), ImVec2(x0 + w, yy), IM_COL32(0x8F, 0x98, 0xB8, (int)(60.0f * alpha)), 1.0f);
-         dl->AddLine(ImVec2(x0, yy), ImVec2(x0 + w * frac, yy), BrandColor(0.5f, alpha), 1.5f);
+         dl->AddLine(ImVec2(x0, yy), ImVec2(x0 + w, yy), IM_COL32(0x8F, 0x98, 0xB8, (int)(60.0f * (1.0f - fadeK))), 1.0f);
+         dl->AddLine(ImVec2(x0, yy), ImVec2(x0 + w * frac, yy), BrandColor(0.5f, 1.0f - fadeK), 1.5f);
       }
 
       ImGui::End();
