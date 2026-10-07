@@ -25871,11 +25871,11 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       int scale = 0, root = 0;
       KeySnapScaleRoot(n, scale, root);
       const uint32_t mask = KeySnapKernel::ScaleMask(scale, root);
-      // Three tiers so the key reads at a glance: out-of-scale notes faint grey,
-      // in-scale notes teal, the root amber - none of them the spectrum's purple.
-      const ImU32 offCol = isLight ? IM_COL32(60, 60, 70, 40) : IM_COL32(200, 200, 215, 28);
-      const ImU32 noteCol = isLight ? IM_COL32(0, 130, 135, 190) : IM_COL32(60, 210, 205, 170);
-      const ImU32 rootCol = isLight ? IM_COL32(215, 120, 0, 255) : IM_COL32(255, 175, 50, 255);
+      // Three opacity tiers of one neutral (white on dark, ink on light), all fainter
+      // than the purple spectrum: off-scale barely there, in-scale soft, root strongest.
+      const ImU32 offCol = isLight ? IM_COL32(40, 40, 60, 14) : IM_COL32(255, 255, 255, 10);
+      const ImU32 noteCol = isLight ? IM_COL32(40, 40, 60, 60) : IM_COL32(255, 255, 255, 48);
+      const ImU32 rootCol = isLight ? IM_COL32(40, 40, 60, 130) : IM_COL32(255, 255, 255, 110);
       for (int pass = 0; pass < 3; pass++) // off-scale first, root last, so root is never overdrawn
       {
          for (int midi = 24; midi <= 120; midi++)
