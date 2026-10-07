@@ -878,7 +878,7 @@ int RunPluginNodeHandleTest()
          chosen = &d;
    if (chosen == nullptr)
    {
-      printf("PLUGINNODETEST SKIP (AUDelay not installed)\n");
+      printf("PLUGINNODETEST (AUDelay not installed) SKIP\n");
       return 0;
    }
 
