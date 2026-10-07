@@ -398,6 +398,19 @@ endif()
 set(COMMON_SOURCES
     src/main.cpp
     # src/app/**: code that used to live in src/main.cpp
+    src/app/AppState.cpp
+    src/app/bodies/AudioBodyKit.cpp
+    src/app/bodies/AudioNodeBodies.cpp
+    src/app/bodies/FieldParams.cpp
+    src/app/bodies/FxBodies1.cpp
+    src/app/bodies/FxBodies2.cpp
+    src/app/bodies/GeometryParams.cpp
+    src/app/bodies/NoteBodies.cpp
+    src/app/bodies/OscBodies.cpp
+    src/app/bodies/ParamBodies1.cpp
+    src/app/bodies/ParamBodies2.cpp
+    src/app/bodies/PreviewBodies.cpp
+    src/app/bodies/SamplerBodies.cpp
     src/app/frame/CookFrame.cpp
     src/app/frame/FrameTests1.cpp
     src/app/frame/FrameTests2.cpp
@@ -405,6 +418,29 @@ set(COMMON_SOURCES
     src/app/frame/FrameTests4.cpp
     src/app/frame/FrameTests5.cpp
     src/app/frame/FrameTests6.cpp
+    src/app/graph/AudioTopology.cpp
+    src/app/graph/Core.cpp
+    src/app/graph/Disconnect.cpp
+    src/app/graph/ExportImage.cpp
+    src/app/graph/GraphHosts.cpp
+    src/app/graph/NodeRegistry.cpp
+    src/app/graph/PatchFiles.cpp
+    src/app/graph/PatchIO.cpp
+    src/app/graph/PatchLoad.cpp
+    src/app/graph/Projector.cpp
+    src/app/graph/Rpc.cpp
+    src/app/graph/Wiring.cpp
+    src/app/panels/ArrangePanel.cpp
+    src/app/panels/ArrangeRender.cpp
+    src/app/panels/ArrangeSupport1.cpp
+    src/app/panels/ArrangeSupport2.cpp
+    src/app/panels/HelpWindows.cpp
+    src/app/panels/LibraryPanels.cpp
+    src/app/panels/Minimap.cpp
+    src/app/panels/ModMatrixPanel.cpp
+    src/app/panels/PerfPanel.cpp
+    src/app/panels/SettingsWindow.cpp
+    src/app/panels/ViewportPanel.cpp
     src/app/selftest/AudioSweepTests.cpp
     src/app/selftest/AvRecTests.cpp
     src/app/selftest/BenchScenes.cpp
@@ -416,6 +452,10 @@ set(COMMON_SOURCES
     src/app/selftest/Headless.cpp
     src/app/selftest/MiscTests.cpp
     src/app/selftest/PlatformTests.cpp
+    src/app/ui/BrowserUi.cpp
+    src/app/ui/ModWidgets.cpp
+    src/app/ui/ParamWidgets.cpp
+    src/app/ui/Theme.cpp
     src/core/GLUtil.cpp
     src/core/CurveShape.cpp
     src/core/NodeFactory.cpp

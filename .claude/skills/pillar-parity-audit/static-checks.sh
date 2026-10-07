@@ -89,17 +89,23 @@ fi
 head2 "P2 shortcuts - nothing advertised is unwired"
 # Why: DrawShortcutsWindow's kShortcuts[] table is the app's public contract
 # for keyboard control. A key listed there with no live ImGuiKey_ reference in
-# main.cpp is a shortcut the docs promise and the app ignores. (A real
+# the app sources (main.cpp + src/app) is a shortcut the docs promise and the app ignores. (A real
 # INFINITE_SHORTCUTSWEEPTEST that injects each chord and asserts the action
 # fired is the proper closure - see SKILL.md's backlog. This is the cheap
 # guard that catches the removal case.)
-KEYS=$(sed -n '/static const ShortcutEntry kShortcuts\[\]/,/^      };/p' src/main.cpp \
+# src/main.cpp was split into src/app/**: read them as one text, fail loudly if absent.
+if [ ! -f src/main.cpp ] || [ -z "$(find src/app -name '*.cpp' 2>/dev/null | head -1)" ]; then
+   echo "static-checks: src/main.cpp or src/app/**/*.cpp missing - checker is stale" >&2; exit 2
+fi
+APP_ALL=$(mktemp); trap 'rm -f "$APP_ALL"' EXIT
+cat src/main.cpp $(find src/app -name '*.cpp' | sort) > "$APP_ALL"
+KEYS=$(sed -n '/static const ShortcutEntry kShortcuts\[\]/,/^      };/p' "$APP_ALL" \
        | grep -oE '"[^"]*"' | grep -oE '\b(Space|Delete|Backspace|Slash|[A-Z])\b' \
        | sort -u)
 unwired=()
 for k in $KEYS; do
    case "$k" in Shift|Ctrl|Cmd|MODKEY) continue;; esac
-   grep -q "ImGuiKey_${k}\b" src/main.cpp || unwired+=("$k")
+   grep -q "ImGuiKey_${k}\b" "$APP_ALL" || unwired+=("$k")
 done
 [ -z "$(printf '%s' "$KEYS")" ] && bad "could not parse kShortcuts[] - has DrawShortcutsWindow moved?"
 if [ ${#unwired[@]} -eq 0 ] && [ -n "$KEYS" ]; then
@@ -109,7 +115,7 @@ else
 fi
 # Modifier parity: the handler must accept Ctrl as well as Cmd, or every
 # MODKEY shortcut in the table is dead on Windows.
-if grep -q 'io.KeyCtrl || io.KeySuper\|KeySuper || .*KeyCtrl' src/main.cpp; then
+if grep -q 'io.KeyCtrl || io.KeySuper\|KeySuper || .*KeyCtrl' "$APP_ALL"; then
    ok "modifier handling accepts Ctrl and Cmd (MODKEY chords work on both platforms)"
 else
    bad "no 'KeyCtrl || KeySuper' modifier check - MODKEY shortcuts may be macOS-only"
@@ -136,7 +142,7 @@ for fn in InstallCrashHandler AppendLogLine; do
       && ok "$fn implemented on both platforms" \
       || bad "$fn missing an implementation on one platform"
 done
-grep -q 'InstallCrashHandler' src/main.cpp \
+grep -q 'InstallCrashHandler' "$APP_ALL" \
    && ok "main() installs the crash handler" \
    || bad "main() never calls Platform::InstallCrashHandler()"
 

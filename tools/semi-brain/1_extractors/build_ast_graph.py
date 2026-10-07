@@ -46,7 +46,7 @@ def infer_subsystem(file_path: str) -> str:
         return "render_3d"
     elif "src/field/" in fp or "src/compiler/" in fp:
         return "field_compiler"
-    elif "src/ui/" in fp or "main.cpp" in fp:
+    elif "src/ui/" in fp or "src/app/" in fp or "main.cpp" in fp:
         return "ui_shell"
     return "general"
 
