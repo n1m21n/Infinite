@@ -69,6 +69,13 @@ struct Material
    // Alpha test / cutout threshold (0 = smooth alpha blend, >0 = mask cutoff)
    float alphaCutoff = 0.0f;
 
+   // Normal slot: strength scales the tilt; bump=1 reads the slot as a
+   // height map (grayscale) and derives the normal from its slope. Carried
+   // here, not read off the MaterialNode, so a passthrough node between
+   // Material and Render 3D can't drop them.
+   float normalStrength = 1.0f;
+   int normalBump = 0;
+
    // Multiply the albedo texture's own alpha into opacity (sparkle / cutout
    // sprites). Off by default so existing patches render unchanged; on, the
    // slot joins Render 3D's sorted translucent pass.

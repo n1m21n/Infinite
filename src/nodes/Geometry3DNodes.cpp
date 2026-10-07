@@ -417,6 +417,7 @@ namespace
       "uniform int uHasClearcoatMap;\n"
       "uniform int uHasSheenMap;\n"
       "uniform float uNormalStrength;\n"
+      "uniform int uNormalBump;\n"
       // Mapping: which coordinate space the material maps sample (UV /
       // Generated / Object) and the offset/rotation/scale applied to it before
       // lookup. uObjLo/uObjHi are the mesh's own object-space bounds, needed to
@@ -558,7 +559,20 @@ namespace
       "   vec3 tangent, bitangent;\n"
       "   getCotangentFrame(normal, vWorldPos, uv, tangent, bitangent);\n"
       "   mat3 tbn = mat3(tangent, bitangent, normal);\n"
-      "   vec3 sampled = texture(uNormalMap, uv).rgb * 2.0 - 1.0;\n"
+      "   vec3 sampled;\n"
+      "   if (uNormalBump == 1) {\n"
+      // Grayscale height: slope from central differences, +Z up. Height
+      // falls toward +U/+V -> normal tilts toward +U/+V.
+      "      vec2 px = 1.0 / vec2(textureSize(uNormalMap, 0));\n"
+      "      const vec3 lum = vec3(0.2126, 0.7152, 0.0722);\n"
+      "      float hl = dot(texture(uNormalMap, uv - vec2(px.x, 0.0)).rgb, lum);\n"
+      "      float hr = dot(texture(uNormalMap, uv + vec2(px.x, 0.0)).rgb, lum);\n"
+      "      float hd = dot(texture(uNormalMap, uv - vec2(0.0, px.y)).rgb, lum);\n"
+      "      float hu = dot(texture(uNormalMap, uv + vec2(0.0, px.y)).rgb, lum);\n"
+      "      sampled = normalize(vec3((hl - hr) * 2.0, (hd - hu) * 2.0, 1.0));\n"
+      "   } else {\n"
+      "      sampled = texture(uNormalMap, uv).rgb * 2.0 - 1.0;\n"
+      "   }\n"
       "   sampled.xy *= uNormalStrength;\n"
       "   return normalize(tbn * sampled);\n"
       "}\n"
@@ -2263,9 +2277,9 @@ void Render3DNode::CookIfNeeded(int frameId)
          glActiveTexture(GL_TEXTURE0);
       }
       {
-         auto* asMaterial = dynamic_cast<MaterialNode*>(source);
-         glUniform1f(glGetUniformLocation(mProgram, "uNormalStrength"),
-                     asMaterial ? asMaterial->normalStrength : 1.0f);
+         const Material mat = source->GetMaterial();
+         glUniform1f(glGetUniformLocation(mProgram, "uNormalStrength"), mat.normalStrength);
+         glUniform1i(glGetUniformLocation(mProgram, "uNormalBump"), mat.normalBump);
       }
 
       {
