@@ -1073,7 +1073,7 @@ namespace MidiFile { struct Song; }
 // Plays a Standard MIDI File as a note source: the file's notes land on the
 // transport's beat timeline (the file's own tempo is ignored, the project bpm
 // rules), so it follows play / stop / seek like every other beat-synced note
-// node. Transpose shifts every note, track picks one track of a multi-track
+// node. Transpose shifts every note, position moves the playhead within the
 // file, loop repeats the file (rounded up to a whole bar) forever.
 class MidiFileNode : public INode, public INoteSource
 {
@@ -1092,9 +1092,10 @@ public:
 
    std::string path;
    int transpose = 0;   // semitones
-   int track = 0;       // 0 = all tracks, n = the n-th track that holds notes
+   float position = 0.0f; // beats: shifts where in the file the playhead sits (0 = file start at transport start)
    bool loop = true;
    float velocity = 1.0f; // scales every note's velocity
+   bool fileTempo = true; // keep the file's tempo changes as relative speed (off: straight ticks/beat)
 
    bool LoadFile(const std::string& filePath);
    const MidiFile::Song* GetSong() const { return mSong; }
