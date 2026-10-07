@@ -2244,3 +2244,15 @@
 {"ts": "2026-10-06T17:46:03+00:00", "event": "edit", "id": "R590", "commits": ["4b81c9ad"]}
 {"ts": "2026-10-06T17:46:08+00:00", "event": "done", "id": "R591", "why": "already fixed on main before this session"}
 {"ts": "2026-10-06T17:46:08+00:00", "event": "edit", "id": "R591", "commits": ["88a127aa"]}
+{"ts": "2026-10-06T18:20:16+00:00", "event": "edit", "id": "R282", "opened": "2026-10-06T23:10:39+05:30", "commits": ["d028a1d"], "closed": "2026-10-06T23:10:39+05:30", "release": ""}
+{"ts": "2026-10-06T18:20:53+00:00", "event": "edit", "id": "R589", "opened": "2026-10-06T22:51:34+05:30", "commits": ["2d138b5"], "closed": "2026-10-06T22:51:34+05:30", "release": ""}
+{"ts": "2026-10-06T18:20:53+00:00", "event": "edit", "id": "R590", "opened": "2026-10-06T23:02:24+05:30", "commits": ["4b81c9a"], "closed": "2026-10-06T23:02:24+05:30", "release": ""}
+{"ts": "2026-10-06T18:20:53+00:00", "event": "edit", "id": "R591", "opened": "2026-09-23T15:46:32+05:30", "commits": ["88a127a"], "closed": "2026-09-23T15:46:32+05:30", "release": "v0.4.4"}
+{"ts": "2026-09-25T22:00:29+05:30", "event": "add", "id": "R592", "after": [], "user": false, "src": "note:v0.4.4:19", "track": "timeline", "kind": "fix", "horizon": "later", "title": "Fixed a crash in the Drum Sequencer when swapping a lane's sample while voices were still ", "why": "v0.4.4 release notes, no single matching commit", "origin": "merge"}
+{"ts": "2026-09-25T22:00:29+05:30", "event": "done", "id": "R592", "why": "v0.4.4 release notes, no single matching commit", "release": "v0.4.4"}
+{"ts": "2026-09-25T22:00:29+05:30", "event": "edit", "id": "R592", "opened": "2026-09-25T22:00:29+05:30", "closed": "2026-09-25T22:00:29+05:30", "release": "v0.4.4", "commits": []}
+{"ts": "2026-10-07T00:24:48+00:00", "event": "add", "id": "R593", "track": "engine", "kind": "fix", "horizon": "now", "title": "VST3 folder list: Remove button cut off by long paths", "why": "Keith (Discord): far right of the panel cut off, cannot reach the folder remove button", "after": [], "user": false, "origin": "ask", "effort": "S"}
+{"ts": "2026-10-07T00:24:57+00:00", "event": "add", "id": "R594", "track": "platform", "kind": "fix", "horizon": "now", "title": "Adding a new VST3 plugin crashes the app (Keith, Discord) - need crash report", "why": "No repro; ask Keith for the crash folder dump, plugin name and OS; may be the handle-lifetime fix already on main", "after": [], "user": false, "origin": "ask", "effort": "M"}
+{"ts": "2026-10-07T05:54:45+05:30", "event": "add", "id": "R595", "after": [], "user": false, "src": "merge:bugfix/plugin-folders-layout", "track": "platform", "kind": "fix", "horizon": "later", "title": "Plugin folders layout", "why": "merged into main (caf3da7)", "origin": "merge"}
+{"ts": "2026-10-07T05:54:45+05:30", "event": "done", "id": "R595", "why": "merged into main (caf3da7)"}
+{"ts": "2026-10-07T05:54:45+05:30", "event": "edit", "id": "R595", "opened": "2026-10-07T05:54:45+05:30", "closed": "2026-10-07T05:54:45+05:30", "release": "", "commits": ["caf3da7"]}
