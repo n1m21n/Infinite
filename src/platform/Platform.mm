@@ -5151,6 +5151,19 @@ namespace Platform
             gMidiState.lastTouched = MidiCCValue{ device, channel, ev.controller, false, v };
             gMidiState.lastTouchedPending = true;
          }
+         else if ((hiNibble == 0xE0 && len >= 3) || hiNibble == 0xD0)
+         {
+            // Pitch bend (14-bit, centre 0.5) and channel aftertouch (7-bit):
+            // stored as the virtual controllers 128 / 129, see Platform.h.
+            const bool bend = hiNibble == 0xE0;
+            const int controller = bend ? kMidiControllerPitchBend : kMidiControllerAftertouch;
+            const float v = bend ? (float)((int)data[1] | ((int)data[2] << 7)) / 16383.0f
+                                 : (float)data[1] / 127.0f;
+            std::lock_guard<std::mutex> lock(gMidiState.mutex);
+            gMidiState.values[MidiKey{ device, channel, controller, false }] = v;
+            gMidiState.lastTouched = MidiCCValue{ device, channel, controller, false, v };
+            gMidiState.lastTouchedPending = true;
+         }
          else if (hiNibble == 0x80 && len >= 3)
          {
             // Note Off. Deliberately absent from the polled maps above (a

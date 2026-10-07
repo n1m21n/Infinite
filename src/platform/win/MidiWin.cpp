@@ -283,6 +283,22 @@ namespace
             gState.lastTouchedPending = true;
             break;
          }
+         case 0xE0: // Pitch bend (14-bit) and 0xD0 channel aftertouch (7-bit),
+         case 0xD0: // stored as virtual controllers 128 / 129, see Platform.h
+         {
+            const bool bend = type == 0xE0;
+            const int controller = bend ? Platform::kMidiControllerPitchBend : Platform::kMidiControllerAftertouch;
+            const float value01 = bend ? (float)((int)d1 | ((int)d2 << 7)) / 16383.0f : (float)d1 / 127.0f;
+            std::lock_guard<std::mutex> lock(gState.mutex);
+            gState.values[{ dev, channel, controller, false }] = value01;
+            gState.lastTouched.device = dev;
+            gState.lastTouched.channel = channel;
+            gState.lastTouched.controller = controller;
+            gState.lastTouched.isNote = false;
+            gState.lastTouched.value01 = value01;
+            gState.lastTouchedPending = true;
+            break;
+         }
          default:
             break;
       }

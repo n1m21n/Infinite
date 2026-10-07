@@ -39713,7 +39713,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                if (elem.midiDevice != 0)
                {
                   std::string devName = Platform::MidiDeviceName((Platform::MidiDeviceId)elem.midiDevice);
-                  std::string bindStr = "MIDI X: " + (devName.empty() ? "" : devName + " \xC2\xB7 ") + "Ch " + std::to_string(elem.midiChannel + 1) + " \xC2\xB7 " + (elem.midiIsNote ? "Note " : "CC ") + std::to_string(elem.midiController);
+                  std::string bindStr = "MIDI X: " + (devName.empty() ? "" : devName + " \xC2\xB7 ") + "Ch " + std::to_string(elem.midiChannel + 1) + " \xC2\xB7 " + Platform::MidiBindingName(elem.midiIsNote, elem.midiController);
                   ImGui::TextDisabled("%s", bindStr.c_str());
                }
 
@@ -39740,7 +39740,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                if (elem.midiDeviceY != 0)
                {
                   std::string devName = Platform::MidiDeviceName((Platform::MidiDeviceId)elem.midiDeviceY);
-                  std::string bindStr = "MIDI Y: " + (devName.empty() ? "" : devName + " \xC2\xB7 ") + "Ch " + std::to_string(elem.midiChannelY + 1) + " \xC2\xB7 " + (elem.midiIsNoteY ? "Note " : "CC ") + std::to_string(elem.midiControllerY);
+                  std::string bindStr = "MIDI Y: " + (devName.empty() ? "" : devName + " \xC2\xB7 ") + "Ch " + std::to_string(elem.midiChannelY + 1) + " \xC2\xB7 " + Platform::MidiBindingName(elem.midiIsNoteY, elem.midiControllerY);
                   ImGui::TextDisabled("%s", bindStr.c_str());
                }
 
@@ -39810,7 +39810,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                   if (elem.midiDevice != 0)
                   {
                      std::string devName = Platform::MidiDeviceName((Platform::MidiDeviceId)elem.midiDevice);
-                     std::string bindStr = "MIDI: " + (devName.empty() ? "" : devName + " \xC2\xB7 ") + "Ch " + std::to_string(elem.midiChannel + 1) + " \xC2\xB7 " + (elem.midiIsNote ? "Note " : "CC ") + std::to_string(elem.midiController);
+                     std::string bindStr = "MIDI: " + (devName.empty() ? "" : devName + " \xC2\xB7 ") + "Ch " + std::to_string(elem.midiChannel + 1) + " \xC2\xB7 " + Platform::MidiBindingName(elem.midiIsNote, elem.midiController);
                      ImGui::TextDisabled("%s", bindStr.c_str());
 
                      if (ImGui::MenuItem("Clear MIDI Binding"))
@@ -68271,6 +68271,51 @@ int RunPluginScanTest()
 // from an ASan build to make a use-after-free fail loudly; a normal build
 // still exercises the double-destroy a second re-prepare used to cause.
 // SKIPs without Apple's AUDelay.
+// Pitch bend and channel aftertouch arrive as virtual controllers 128 / 129
+// (Platform.h). Injects raw bytes the way hardware would and reads them back.
+int RunMidiBendTest()
+{
+   std::string err;
+   Platform::MidiStart(err);
+   const Platform::MidiDeviceId dev = 4242;
+   bool ok = true;
+   auto check = [&](bool cond, const char* what)
+   {
+      if (!cond)
+      {
+         printf("MIDIBENDTEST FAIL: %s\n", what);
+         ok = false;
+      }
+   };
+   auto feed = [&](std::initializer_list<unsigned char> bytes)
+   {
+      std::vector<unsigned char> b(bytes);
+      Platform::MidiInjectBytes(b.data(), b.size(), dev);
+   };
+   float v = -1.0f;
+   check(!Platform::MidiRead(dev, 2, Platform::kMidiControllerPitchBend, false, v), "bend unseen before any message");
+   feed({ 0xE2, 0x00, 0x40 }); // channel 3, 14-bit 8192 = centre
+   check(Platform::MidiRead(dev, 2, Platform::kMidiControllerPitchBend, false, v) && std::fabs(v - 8192.0f / 16383.0f) < 0.0005f,
+         "bend centre reads 0.5");
+   feed({ 0xE2, 0x7F, 0x7F }); // full up
+   check(Platform::MidiRead(dev, 2, Platform::kMidiControllerPitchBend, false, v) && v == 1.0f, "bend max reads 1");
+   feed({ 0xE2, 0x00, 0x00 }); // full down
+   check(Platform::MidiRead(dev, 2, Platform::kMidiControllerPitchBend, false, v) && v == 0.0f, "bend min reads 0");
+   feed({ 0xD2, 127 });
+   check(Platform::MidiRead(dev, 2, Platform::kMidiControllerAftertouch, false, v) && v == 1.0f, "aftertouch max reads 1");
+   feed({ 0xD2, 0 });
+   check(Platform::MidiRead(dev, 2, Platform::kMidiControllerAftertouch, false, v) && v == 0.0f, "aftertouch zero reads 0");
+   check(!Platform::MidiRead(dev, 3, Platform::kMidiControllerAftertouch, false, v), "other channel untouched");
+   Platform::MidiCCValue last;
+   check(Platform::MidiPollLastTouched(last) && last.controller == Platform::kMidiControllerAftertouch && !last.isNote,
+         "learn sees aftertouch as the last touched control");
+   check(Platform::MidiBindingName(false, 128) == "Pitch Bend" && Platform::MidiBindingName(false, 129) == "Aftertouch"
+            && Platform::MidiBindingName(false, 7) == "CC 7" && Platform::MidiBindingName(true, 60) == "Note 60",
+         "binding names");
+   printf("MIDIBENDTEST %s\n", ok ? "OK" : "FAIL");
+   return ok ? 0 : 1;
+}
+
 int RunPluginNodeHandleTest()
 {
    setvbuf(stdout, nullptr, _IONBF, 0);
@@ -73143,6 +73188,8 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_PLUGINSCANTEST") != nullptr)
       return RunPluginScanTest();
+   if (getenv("INFINITE_MIDIBENDTEST") != nullptr)
+      return RunMidiBendTest();
    if (getenv("INFINITE_PLUGINNODETEST") != nullptr)
       return RunPluginNodeHandleTest();
 
