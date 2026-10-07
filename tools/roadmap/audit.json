@@ -1,16 +1,16 @@
 {
  "merges": [
-  282,
-  292
+  297,
+  320
  ],
  "direct": [
-  415,
-  415
+  417,
+  438
  ],
  "notes_total": 367,
  "evidence": [
-  432,
-  504
+  470,
+  547
  ],
  "per_release": {
   "v0.1": {
@@ -102,7 +102,7 @@
    "notes": 9
   },
   "v0.4.4": {
-   "quests": 56,
+   "quests": 58,
    "notes": 29
   },
   "v0.4.5": {
@@ -114,7 +114,29 @@
    "notes": 31
   }
  },
- "loose": [],
+ "loose": [
+  "2026-10-07 dbeef25 Roadmap: close R593",
+  "2026-10-06 e81d974 Roadmap: log and close R589-R591, close R282",
+  "2026-10-06 e0b13f1 Keyboard: H again closes the node help popup (KBCURSORTEST covers it)",
+  "2026-10-06 4b9445d Keyboard focus ring: stop at the slider box, do not enclose the label",
+  "2026-10-06 9c5a976 Keyboard v2 polish (R571): focus ring hugs the control, groups move with arrows, Cmd/Ctrl+",
+  "2026-10-06 619918e Roadmap: R571 keyboard v2 merged, add follow-up gaps quest",
+  "2026-10-06 31f5376 Keyboard model v2 (R571): Tab walks the active node's params, arrows move, Shift+arrow sel",
+  "2026-10-06 1705195 Plan: R571 keyboard-only use (slices, keymap, owner questions)",
+  "2026-10-06 2944e6c Roadmap: defer R568 (contract change for ~4 ms at 4K)",
+  "2026-10-06 b99ea38 Roadmap: close R553",
+  "2026-10-06 18ab432 Roadmap: close R578",
+  "2026-10-06 6409d02 Roadmap: close R569, log CI findings",
+  "2026-10-06 9650547 Roadmap: close R570",
+  "2026-10-06 874169c Roadmap: log R560 audit findings as quests",
+  "2026-10-06 3f4ff7b Roadmap: close R560, log its findings",
+  "2026-10-06 216f5cd Roadmap: close R554, log R568 R569",
+  "2026-10-06 687bb00 Roadmap: close R566",
+  "2026-10-06 06e9bd4 Roadmap: close R559",
+  "2026-10-06 197c334 Roadmap: drop R565 (Reddit post)",
+  "2026-10-06 657ea4b Roadmap: log tech-audit quests (TSan/tidy, UX audit, CLAP, NDI, Link/MPE, ML nodes, Reddit",
+  "2026-10-01 2a7c3d5 Roadmap: close R527/R529 as shipped in v0.4.6, milestone -> v0.4.7"
+ ],
  "no_evidence": [
   "R1 v0.1: 80+ realtime 2D/3D nodes, synthesis, DSP, AU/VST3 hosting, MIDI",
   "R5 Field language: sample/pixel/element/graph domains, dynamic pins, state",
@@ -186,8 +208,13 @@
   "R480 Join Geometry: remove resurrected keepInputColours; instancer input must not cou",
   "R485 Roadmap ranking: exclude blocked/needs-input from next, don't let guessed rating",
   "R502 Motion film: cat photo -> Wave Terrain synth -> bends a cube (cat-synth, 30 s, g",
+  "R516 determinism-check: in-process twice mode (leaked static state)",
   "R530 Interface scaling on high-resolution monitors: the whole interface (text, nodes,",
-  "R531 Field Language Manual gains a \"What's new since v1\" addendum: offset reads of pi"
+  "R531 Field Language Manual gains a \"What's new since v1\" addendum: offset reads of pi",
+  "R543 Audio param sweep: ~490 'reaches audio thread' failures on main",
+  "R550 Drum Sequencer: raise max steps 8 to 32 with 16-step pages (prerequisite for R54",
+  "R560 UX audit: ImGui accessibility, HiDPI, text input, keyboard-only use",
+  "R592 Fixed a crash in the Drum Sequencer when swapping a lane's sample while voices w"
  ],
  "first_commit": "2026-08-10"
 }

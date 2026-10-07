@@ -2278,3 +2278,6 @@
 {"ts": "2026-10-07T00:55:18+00:00", "event": "edit", "id": "R596", "opened": "2026-10-07T06:03:40+05:30", "commits": ["7da571a"], "closed": "2026-10-07T06:03:40+05:30", "release": ""}
 {"ts": "2026-10-07T01:02:44+00:00", "event": "done", "id": "R273", "why": "Material 'texture alpha' switch: texture .a into alpha, slot joins the sorted translucent pass; alpha cutoff uses it"}
 {"ts": "2026-10-07T01:02:44+00:00", "event": "edit", "id": "R273", "commits": ["d0249ee7", "135aa7c0"]}
+{"ts": "2026-10-07T01:03:19+00:00", "event": "edit", "id": "R273", "opened": "2026-10-07T06:32:21+05:30", "commits": ["d0249ee", "135aa7c"], "closed": "2026-10-07T06:32:37+05:30", "release": ""}
+{"ts": "2026-10-07T01:16:08+00:00", "event": "done", "id": "R274", "why": "Group 3D node: up to 8 inputs per pin, nestable, Render 3D flattens to kMaxDraw 64; kSlots unchanged so saved patches keep their pins"}
+{"ts": "2026-10-07T01:16:08+00:00", "event": "edit", "id": "R274", "commits": ["eb5ed1c7", "91b89e74"]}
