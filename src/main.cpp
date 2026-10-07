@@ -7559,6 +7559,9 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          return 2; // geometry, then the displacement texture
       if (dynamic_cast<AudioDisplacementNode*>(gn.node.get()) != nullptr)
          return 2; // geometry, then the audio input
+      if (auto* fx = dynamic_cast<AudioEffectNode*>(gn.node.get()))
+         if (fx->Def().hasGeometryInput)
+            return 2; // audio (slot 0) + shape (slot 1), Shape Resonator
       if (dynamic_cast<SetColorNode*>(gn.node.get()) != nullptr)
          return 3; // geometry, texture, palette
       if (dynamic_cast<InstanceOnPointsNode*>(gn.node.get()) != nullptr)
@@ -26198,12 +26201,15 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    void DrawShapeResonatorBody(GraphNode& gn, AudioEffectNode* n)
    {
       float freqs[ShapeResonatorKernel::kMaxModes];
-      const int count = n->ReadModeFrequencies(freqs, ShapeResonatorKernel::kMaxModes);
+      bool solving = false;
+      const int count = n->ReadModeFrequencies(freqs, ShapeResonatorKernel::kMaxModes, &solving);
       char stat[64];
       if (count > 0)
          snprintf(stat, sizeof(stat), "%d modes - %s", count, n->geometry ? "from shape" : "default plate");
+      else if (n->geometry && !solving)
+         snprintf(stat, sizeof(stat), "shape has no surface (needs a mesh)");
       else
-         snprintf(stat, sizeof(stat), "%s", n->geometry ? "shape - no modes" : "default plate");
+         snprintf(stat, sizeof(stat), "%s", n->geometry ? "solving shape..." : "default plate");
 
       BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
       DrawShapeResonatorVisualizer(n);
