@@ -715,6 +715,11 @@ set(SYPHON_SOURCES
     ${SYPHON_DIR}/src/SyphonServerRendererLegacyGL.m
 )
 
+# Interface translation (docs/plans/i18n): <code>.tsv tables and the CJK font subsets, copied
+# into every platform's Resources/ layout below. Globbed so a new language is one new file.
+file(GLOB INFINITE_LANG_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/resources/lang/*.tsv")
+file(GLOB INFINITE_NOTO_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Noto/*-Subset.otf")
+
 set(APPLE_SOURCES
     src/platform/Platform.mm
     src/audio/AudioFileWriter.mm
@@ -1055,7 +1060,13 @@ if(WIN32)
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-Medium.ttf"
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-SemiBold.ttf"
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/AtkinsonHyperlegible/AtkinsonHyperlegible-Regular.ttf"
+                ${INFINITE_NOTO_FILES}
                 "$<TARGET_FILE_DIR:Infinite>/Resources/fonts/"
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:Infinite>/Resources/lang"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/resources/lang"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/lang"
         COMMAND ${CMAKE_COMMAND} -E copy
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
@@ -1100,7 +1111,13 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-Medium.ttf"
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-SemiBold.ttf"
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/AtkinsonHyperlegible/AtkinsonHyperlegible-Regular.ttf"
+                ${INFINITE_NOTO_FILES}
                 "$<TARGET_FILE_DIR:Infinite>/Resources/fonts/"
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:Infinite>/Resources/lang"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/resources/lang"
+                "$<TARGET_FILE_DIR:Infinite>/Resources/lang"
         COMMAND ${CMAKE_COMMAND} -E copy
                 "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf"
                 "$<TARGET_FILE_DIR:Infinite>/Resources/icons/"
@@ -1398,9 +1415,11 @@ if(APPLE)
         "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-Medium.ttf"
         "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/Inter/Inter-SemiBold.ttf"
         "${CMAKE_CURRENT_SOURCE_DIR}/external/fonts/AtkinsonHyperlegible/AtkinsonHyperlegible-Regular.ttf")
+    list(APPEND INFINITE_FONT_FILES ${INFINITE_NOTO_FILES})
     set(INFINITE_ICON_FONT_FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/external/icons/Lucide/lucide.ttf")
-    target_sources(Infinite PRIVATE ${INFINITE_FONT_FILES} ${INFINITE_ICON_FONT_FILES})
+    target_sources(Infinite PRIVATE ${INFINITE_FONT_FILES} ${INFINITE_ICON_FONT_FILES} ${INFINITE_LANG_FILES})
+    set_source_files_properties(${INFINITE_LANG_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/lang")
     set_source_files_properties(${INFINITE_FONT_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/fonts")
     set_source_files_properties(${INFINITE_ICON_FONT_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/icons")
 

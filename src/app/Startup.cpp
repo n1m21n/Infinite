@@ -73,6 +73,38 @@ void ApplyUiScale(GLFWwindow* window, bool rendererReady)
       fallbackCfg.MergeMode = true;
       io.Fonts->AddFontFromFileTTF(bundledInter.c_str(), bakedPx, &fallbackCfg, kUiGlyphRanges);
    }
+   // CJK: Inter has no Han/kana, so a subsetted Noto face is merged for exactly the glyphs the
+   // active language table needs. Every language also gets the picker's native names (日本語,
+   // 中文简体) so the Language list never shows '?'. Noto SC for zh and for names, JP for ja:
+   // the two draw the same Han code points with different shapes. Absent file => '?' only.
+   if (uiFont != nullptr)
+   {
+      const bool ja = I18n::CurrentLanguage() == "ja";
+      const bool cjk = I18n::CurrentLanguageNeedsCjk();
+      const std::string notoPath =
+         BundledResourcePath(ja ? "fonts/NotoSansJP-Subset.otf" : "fonts/NotoSansSC-Subset.otf");
+      if (!notoPath.empty())
+      {
+         static ImVector<ImWchar> notoRanges; // must outlive the atlas build
+         ImFontGlyphRangesBuilder builder;
+         const std::vector<uint32_t> glyphs = cjk ? I18n::GlyphsForCurrentLanguage() : I18n::NativeNameGlyphs();
+         for (uint32_t cp : glyphs)
+            if (cp >= 0x2E00 && cp <= 0xFFFF)
+               builder.AddChar(static_cast<ImWchar>(cp));
+         if (cjk)
+         {
+            for (uint32_t cp = 0x3000; cp <= 0x30FF; cp++) // CJK punctuation, hiragana, katakana
+               builder.AddChar(static_cast<ImWchar>(cp));
+            for (uint32_t cp = 0xFF00; cp <= 0xFFEF; cp++) // fullwidth forms
+               builder.AddChar(static_cast<ImWchar>(cp));
+         }
+         notoRanges.clear();
+         builder.BuildRanges(&notoRanges);
+         ImFontConfig cjkCfg;
+         cjkCfg.MergeMode = true;
+         io.Fonts->AddFontFromFileTTF(notoPath.c_str(), bakedPx, &cjkCfg, notoRanges.Data);
+      }
+   }
    // Only a real TTF is baked at bakedPx; ImGui's bitmap fallback is 13 px at 1x and must
    // not be shrunk.
    io.FontGlobalScale = uiFont != nullptr ? r.fontGlobalScale : 1.0f;
