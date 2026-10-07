@@ -97243,6 +97243,22 @@ int main(int argc, char** argv)
          if (frameId == f0 + 74)
          {
             check(!gNodeHelpShown, "H again closes the node help");
+         }
+         // F frames the whole graph: pan away with S, then F must bring the view back to the content.
+         static ImVec2 viewBeforeFit(0, 0);
+         static float zoomBeforeFit = 0.0f;
+         if (frameId == f0 + 75) tio.AddKeyEvent(ImGuiKey_S, true);
+         if (frameId == f0 + 90) tio.AddKeyEvent(ImGuiKey_S, false);
+         if (frameId == f0 + 92) { viewBeforeFit = ed::GetViewScroll(); zoomBeforeFit = ed::GetViewZoom(); }
+         tap(ImGuiKey_F, f0 + 93);
+         if (frameId == f0 + 100)
+         {
+            const ImVec2 now = ed::GetViewScroll();
+            const bool moved = std::fabs(now.x - viewBeforeFit.x) > 1.0f || std::fabs(now.y - viewBeforeFit.y) > 1.0f ||
+                               std::fabs(ed::GetViewZoom() - zoomBeforeFit) > 0.001f;
+            printf("kbtest F fit: scroll (%.1f,%.1f) -> (%.1f,%.1f)\n", viewBeforeFit.x, viewBeforeFit.y, now.x, now.y);
+            check(moved, "F frames the whole graph");
+            check(!gRequestFitView, "F request consumed");
             printf("kbtest result: %s\n", ok ? "KBCURSOR OK" : "KBCURSOR FAIL");
             glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
