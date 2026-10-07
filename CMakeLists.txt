@@ -467,6 +467,7 @@ set(COMMON_SOURCES
     src/app/selftest/FieldTests1.cpp
     src/app/selftest/FieldTests2.cpp
     src/app/selftest/Headless.cpp
+    src/app/selftest/I18nTests.cpp
     src/app/selftest/MiscTests.cpp
     src/app/selftest/PlatformTests.cpp
     src/app/ui/BrowserUi.cpp

@@ -473,6 +473,12 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       return 0;
    }
 
+   if (getenv("INFINITE_I18NTEST") != nullptr)
+   {
+      RunI18nTest();
+      return 0; // verdict is the printf line, not $?
+   }
+
    if (getenv("INFINITE_AUDIOPCMTEST") != nullptr)
       return Platform::AudioPcmConversionSelfTest() ? 0 : 1;
 
@@ -827,6 +833,9 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
       std::string lang = CategoryColors::GetLanguage();
       if (!I18n::IsSupported(lang))
          lang = I18n::MatchSupported(Platform::PreferredLanguages());
+      // Test hook: run any self-test under a chosen language (locale-leak checks use "de").
+      if (const char* forced = getenv("INFINITE_LANG"); forced && I18n::IsSupported(forced))
+         lang = forced;
       I18n::RequestLanguage(lang);
    }
 

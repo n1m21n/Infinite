@@ -116,6 +116,8 @@ TIER1_CHECKS=(
   "ARRANGESAMPLETEST:400"
   "PATCHTEST:30"
   "ROUNDTRIPTEST:35"
+  "ROUNDTRIPTEST@de:35"
+  "I18NTEST:1"
   "SYPHONPATCHTEST:1"
   "PATCHLAYOUTTEST:1"
   "PATCHLAYOUTLIVETEST:25"
@@ -316,6 +318,8 @@ FULL_TESTS=(
   "UNDOPERFTEST:10"
   "PATCHTEST:30"
   "ROUNDTRIPTEST:35"
+  "ROUNDTRIPTEST@de:35"
+  "I18NTEST:1"
   "SYPHONPATCHTEST:1"
   "PATCHLAYOUTTEST:1"
   "PATCHLAYOUTLIVETEST:25"
@@ -574,7 +578,9 @@ for spec in "${SELECTED_TESTS[@]}"; do
     *" $name "*) test_value="$(mktemp -d "/tmp/infinite_${name}.XXXXXX")" ;;
     *)           test_value=1 ;;
   esac
-  env "INFINITE_${name}=$test_value" INFINITE_EXITAFTER="$frames" "$BIN" >"$out" 2>&1
+  # "NAME@de" runs NAME under interface language de (locale-leak check, docs/plans/i18n D6).
+  base="${name%%@*}"; lang=""; [ "$base" != "$name" ] && lang="${name#*@}"
+  env "INFINITE_${base}=$test_value" INFINITE_LANG="$lang" INFINITE_EXITAFTER="$frames" "$BIN" >"$out" 2>&1
   rc=$?
   if [ $rc -ne 0 ]; then
     if is_known_failure "$name"; then

@@ -42,6 +42,8 @@ def tsv_unesc(s):
 def keys_in_src():
     keys = {}
     for dirpath, _, files in os.walk(os.path.join(ROOT, 'src')):
+        if os.sep + 'selftest' in dirpath:
+            continue
         for f in files:
             if not f.endswith(('.cpp', '.h', '.mm')):
                 continue
@@ -81,6 +83,27 @@ def load_table(code):
 def fmt_sig(s):
     return [m.group(2) + (m.group(1) or '')
             for m in re.finditer(r'%(?!%)[-+ #0]*\d*(\.\d+)?(?:l|ll|h|z)?([a-zA-Z])', s)]
+
+
+def font_gaps():
+    """Codepoints (>= U+2E00) in zh/ja tables that the bundled Noto subset lacks. Needs fontTools."""
+    try:
+        from fontTools.ttLib import TTFont
+    except ImportError:
+        print("  fonts: fontTools not installed, glyph coverage not checked")
+        return 0
+    bad = 0
+    for code, name in (('zh', 'NotoSansSC-Subset.otf'), ('ja', 'NotoSansJP-Subset.otf')):
+        t = load_table(code) or {}
+        need = {ord(c) for v in t.values() for c in v if ord(c) >= 0x2E00}
+        path = os.path.join(ROOT, 'external', 'fonts', 'Noto', name)
+        have = set(TTFont(path).getBestCmap())
+        gap = sorted(need - have)
+        print(f"  {code} glyphs: {len(need)} needed, {len(gap)} missing from {name}")
+        if gap:
+            print("      rerun tools/i18n/subset_fonts.py; missing:", ''.join(chr(c) for c in gap[:20]))
+            bad = 1
+    return bad | font_gaps()
 
 
 def main():

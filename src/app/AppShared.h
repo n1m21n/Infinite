@@ -5766,6 +5766,7 @@ void RunVideoExactTest();
 void RunRecExportTest(int width, int height, bool starved, const char* label);
 
 bool RunAudioPdcTest();
+bool RunI18nTest();
 
 #if defined(__linux__)
 int RunMidiParseTest();
