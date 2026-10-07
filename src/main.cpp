@@ -42506,7 +42506,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             ImGui::PopStyleColor();
 
             ImGui::TableSetColumnIndex(2);
-            ImGui::TextUnformatted(s.description);
+            ImGui::TextWrapped("%s", s.description);
          }
       }
 
