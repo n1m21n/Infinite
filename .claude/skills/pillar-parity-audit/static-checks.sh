@@ -78,10 +78,10 @@ if [ ${#SPLIT[@]} -eq 0 ]; then
 else
    printf '  %d dual-path file(s) - each needs a cross-branch assertion in RunDspTest():\n' "${#SPLIT[@]}"
    printf '         %s\n' "${SPLIT[@]}"
-   if grep -q 'PortableFft' src/main.cpp; then
-      ok "src/main.cpp references PortableFft (round-trip assertion present in the DSP test)"
+   if grep -rq 'PortableFft' src/main.cpp src/app; then
+      ok "src/main.cpp or src/app references PortableFft (round-trip assertion present in the DSP test)"
    else
-      bad "src/main.cpp never names PortableFft - INFINITE_DSPTEST cannot be testing the portable branch"
+      bad "neither src/main.cpp nor src/app names PortableFft - INFINITE_DSPTEST cannot be testing the portable branch"
    fi
 fi
 

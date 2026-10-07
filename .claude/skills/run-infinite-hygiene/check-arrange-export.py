@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Measure what INFINITE_ARRANGESAMPLEEXPORTTEST actually wrote.
 
-The fixture (src/main.cpp, search INFINITE_ARRANGESAMPLEEXPORTTEST) renders a
+The fixture (src/app/frame, search INFINITE_ARRANGESAMPLEEXPORTTEST) renders a
 6 s window through the real arrangement render queue: a 100 BPM click track,
 tempo-synced at 120 BPM, whose clip starts at beat 2, on an audio lane, plus a
 Ramp clip starting at the same beat on a video lane. So in BOTH files:

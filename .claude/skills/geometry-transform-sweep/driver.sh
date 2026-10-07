@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Generic node-type sweeps for Infinite's 3D geometry nodes.
 #
-# Runs the env-var-gated fixtures (src/main.cpp, search "SWEEPTEST") through
+# Runs the env-var-gated fixtures (src/app/frame + src/main.cpp, search "SWEEPTEST") through
 # the real compiled .app binary. Each wraps a real mesh source in a small
 # probe IGeometrySource and wires it into every node type that takes a
 # geometry input (GeometryOpNode, DisplacementNode, MeshResynthNode,

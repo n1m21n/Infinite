@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Generic node-type sweeps for Infinite's audio/note nodes.
 #
-# Runs two env-var-gated fixtures (src/main.cpp, search "AUDIOPARAMSWEEPTEST"
+# Runs two env-var-gated fixtures (src/app/selftest + src/main.cpp, search "AUDIOPARAMSWEEPTEST"
 # and "AUDIOTEARDOWNSWEEPTEST") through the real compiled .app binary. Both
 # discover candidate node types from NodeFactory - the same registry
 # RegisterNodes() populates - rather than a hand-maintained list, so a node

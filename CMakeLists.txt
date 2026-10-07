@@ -397,6 +397,25 @@ endif()
 
 set(COMMON_SOURCES
     src/main.cpp
+    # src/app/**: code that used to live in src/main.cpp
+    src/app/frame/CookFrame.cpp
+    src/app/frame/FrameTests1.cpp
+    src/app/frame/FrameTests2.cpp
+    src/app/frame/FrameTests3.cpp
+    src/app/frame/FrameTests4.cpp
+    src/app/frame/FrameTests5.cpp
+    src/app/frame/FrameTests6.cpp
+    src/app/selftest/AudioSweepTests.cpp
+    src/app/selftest/AvRecTests.cpp
+    src/app/selftest/BenchScenes.cpp
+    src/app/selftest/DspFixtures1.cpp
+    src/app/selftest/DspFixtures2.cpp
+    src/app/selftest/DspFixtures3.cpp
+    src/app/selftest/FieldTests1.cpp
+    src/app/selftest/FieldTests2.cpp
+    src/app/selftest/Headless.cpp
+    src/app/selftest/MiscTests.cpp
+    src/app/selftest/PlatformTests.cpp
     src/core/GLUtil.cpp
     src/core/CurveShape.cpp
     src/core/NodeFactory.cpp
