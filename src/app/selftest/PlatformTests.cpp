@@ -8,6 +8,7 @@ namespace app
 {
 // ===================================================== INFINITE_CAMERACONVTEST
 #if defined(__linux__)
+} // namespace app (the test hook lives in the global Platform namespace)
 namespace Platform { namespace CameraLinuxTest {
    // Declared in CameraLinux.cpp, exposed only for this test - see the file
    // comment there ("Synthetic-buffer self-test").
@@ -16,6 +17,8 @@ namespace Platform { namespace CameraLinuxTest {
    bool MjpegToRgbaForTest(const unsigned char* data, size_t size, int expectedWidth, int expectedHeight,
                            std::vector<unsigned char>& outRgba);
 } }
+namespace app
+{
 
 // Exercises CameraLinux.cpp's YUYV->RGBA and MJPEG->RGBA converters on
 // hand-built buffers, since neither CI nor any container here has a real
@@ -101,7 +104,7 @@ int RunHostEnvTest()
       setenv("LD_LIBRARY_PATH", "/tmp/.mount_Inf123/usr/lib:/orig/path", 1);
       setenv("APPIMAGE_ORIGINAL_LD_LIBRARY_PATH", "/orig/path", 1);
       {
-         Platform::ScopedHostEnvironment env;
+         ::Platform::ScopedHostEnvironment env;
          const char* val = getenv("LD_LIBRARY_PATH");
          const bool match = val && std::string(val) == "/orig/path";
          if (!match) ok = false;
@@ -118,7 +121,7 @@ int RunHostEnvTest()
       setenv("LD_LIBRARY_PATH", "/tmp/.mount_Inf123/usr/lib", 1);
       setenv("APPIMAGE_ORIGINAL_LD_LIBRARY_PATH", "", 1);
       {
-         Platform::ScopedHostEnvironment env;
+         ::Platform::ScopedHostEnvironment env;
          const char* val = getenv("LD_LIBRARY_PATH");
          const bool match = (val == nullptr);
          if (!match) ok = false;
@@ -136,7 +139,7 @@ int RunHostEnvTest()
       setenv("APPDIR", "/tmp/.mount_InfABC", 1);
       setenv("LD_LIBRARY_PATH", "/tmp/.mount_InfABC/usr/lib:/usr/local/cuda/lib", 1);
       {
-         Platform::ScopedHostEnvironment env;
+         ::Platform::ScopedHostEnvironment env;
          const char* val = getenv("LD_LIBRARY_PATH");
          const bool match = val && std::string(val) == "/usr/local/cuda/lib";
          if (!match) ok = false;
@@ -154,7 +157,7 @@ int RunHostEnvTest()
       setenv("APPDIR", "/tmp/.mount_InfABC", 1);
       setenv("LD_LIBRARY_PATH", "/tmp/.mount_InfABC/usr/lib:/tmp/.mount_InfABC/lib", 1);
       {
-         Platform::ScopedHostEnvironment env;
+         ::Platform::ScopedHostEnvironment env;
          const char* val = getenv("LD_LIBRARY_PATH");
          const bool match = (val == nullptr);
          if (!match) ok = false;
@@ -172,7 +175,7 @@ int RunHostEnvTest()
       unsetenv("APPDIR");
       unsetenv("LD_LIBRARY_PATH");
       {
-         Platform::ScopedHostEnvironment env;
+         ::Platform::ScopedHostEnvironment env;
          const char* val = getenv("LD_LIBRARY_PATH");
          const bool match = (val == nullptr);
          if (!match) ok = false;
