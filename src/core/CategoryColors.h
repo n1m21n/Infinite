@@ -92,6 +92,11 @@ namespace CategoryColors
    float GetUiScale();
    void SetUiScale(float scale, bool saveToFile = true);
 
+   // Help tooltips (what a control does, its shortcut). Off by default; diagnostics such as error
+   // messages and rejection reasons always show.
+   bool GetTooltips();
+   void SetTooltips(bool on, bool saveToFile = true);
+
    // Interface font id: "" is the bundled default (Inter); anything else names an entry in
    // main.cpp's interface font table. Unknown ids fall back to the default there.
    std::string GetUiFont();

@@ -26,6 +26,7 @@ KEY_ALIASES = {
     "scroll wheel": None, "drag canvas": None, "shift + drag": None,
     "left": "LeftArrow", "right": "RightArrow", "up": "UpArrow", "down": "DownArrow",
     "home": "Home", "end": "End",
+    "=": "Equal", "-": "Minus",
 }
 
 def norm_key(tok):
