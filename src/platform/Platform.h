@@ -838,6 +838,20 @@ namespace Platform
       float value01 = 0.0f;
    };
 
+   // Pitch bend and channel aftertouch have no CC number of their own, so they
+   // live in the same (device, channel, controller) table under numbers just
+   // above the CC range (0-127). MIDI learn, bindings and MidiRead need no
+   // special case. Pitch bend is 14-bit scaled to 0..1 with centre 0.5;
+   // aftertouch is 0..1. Poly aftertouch is not modelled.
+   constexpr int kMidiControllerPitchBend = 128;
+   constexpr int kMidiControllerAftertouch = 129;
+   inline std::string MidiBindingName(bool isNote, int controller)
+   {
+      if (!isNote && controller == kMidiControllerPitchBend) return "Pitch Bend";
+      if (!isNote && controller == kMidiControllerAftertouch) return "Aftertouch";
+      return std::string(isNote ? "Note " : "CC ") + std::to_string(controller);
+   }
+
    bool MidiStart(std::string& outError);
    void MidiStop();
    bool MidiIsRunning();

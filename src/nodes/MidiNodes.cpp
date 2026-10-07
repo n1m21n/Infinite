@@ -51,7 +51,7 @@ std::string MidiCCNode::BindingLabel() const
    std::ostringstream ss;
    if (!deviceName.empty())
       ss << deviceName << " \xC2\xB7 ";
-   ss << "Ch " << (channel + 1) << " \xC2\xB7 " << (isNote ? "Note " : "CC ") << controller;
+   ss << "Ch " << (channel + 1) << " \xC2\xB7 " << Platform::MidiBindingName(isNote, controller);
    return ss.str();
 }
 

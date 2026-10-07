@@ -308,14 +308,23 @@ namespace
             break;
          }
          case SND_SEQ_EVENT_PITCHBEND:
+         case SND_SEQ_EVENT_CHANPRESS:
          {
-            // Not part of the CC/note table contract on any platform today
-            // (Platform.h has no pitch-bend accessor) - accepted and ignored,
-            // same as MidiWin.cpp's `default: break;` for anything it
-            // doesn't model. Listed as its own case (rather than falling into
-            // default) purely so a future reader sees it was considered, per
-            // the plan's "distinct event types" requirement for clock only -
-            // pitch bend isn't clock, but is worth naming explicitly here.
+            // Stored as virtual controllers 128 / 129, see Platform.h. ALSA
+            // gives pitch bend as -8192..8191 and pressure as 0..127.
+            const bool bend = ev.type == SND_SEQ_EVENT_PITCHBEND;
+            const int channel = ev.data.control.channel;
+            const int controller = bend ? Platform::kMidiControllerPitchBend : Platform::kMidiControllerAftertouch;
+            const float value01 = bend ? (float)(std::clamp((int)ev.data.control.value, -8192, 8191) + 8192) / 16383.0f
+                                       : (float)std::clamp((int)ev.data.control.value, 0, 127) / 127.0f;
+            std::lock_guard<std::mutex> lock(gState.mutex);
+            gState.values[{ dev, channel, controller, false }] = value01;
+            gState.lastTouched.device = dev;
+            gState.lastTouched.channel = channel;
+            gState.lastTouched.controller = controller;
+            gState.lastTouched.isNote = false;
+            gState.lastTouched.value01 = value01;
+            gState.lastTouchedPending = true;
             break;
          }
          case SND_SEQ_EVENT_CLOCK:
@@ -740,6 +749,20 @@ namespace Platform
          ev.data.control.channel = channel;
          ev.data.control.param = data[1];
          ev.data.control.value = data[2];
+         HandleSeqEvent((unsigned int)device, ev);
+      }
+      else if (status == 0xE0 && len >= 3)
+      {
+         ev.type = SND_SEQ_EVENT_PITCHBEND;
+         ev.data.control.channel = channel;
+         ev.data.control.value = ((int)data[1] | ((int)data[2] << 7)) - 8192;
+         HandleSeqEvent((unsigned int)device, ev);
+      }
+      else if (status == 0xD0 && len >= 2)
+      {
+         ev.type = SND_SEQ_EVENT_CHANPRESS;
+         ev.data.control.channel = channel;
+         ev.data.control.value = data[1];
          HandleSeqEvent((unsigned int)device, ev);
       }
       else if (data[0] == 0xF8)
