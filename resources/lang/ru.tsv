@@ -1,0 +1,155 @@
+# Русский - key<TAB>text. English source is the key. Machine-drafted (beta) until a native speaker signs off.
+# Glossary: glossary.tsv. "=en" means intentionally identical to English. Escapes: \n \t \\ \c.
+%s (Space)	%s (Пробел)
+(%.1f MB used)	(занято %.1f МБ)
+AI assistants	ИИ-ассистенты
+Active: %.0f Hz, %u frames	Активно: %.0f Гц, %u кадров
+Add Node...	Добавить узел...
+Add Note	Добавить заметку
+All shortcuts...	Все сочетания клавиш...
+Appearance	Оформление
+Application & Updates	Приложение и обновления
+Apply audio settings	Применить настройки звука
+Arrangement Timeline	Таймлайн аранжировки
+Arrangement timeline	Таймлайн аранжировки
+Audio	Звук
+Audio & note cables	Кабели звука и нот
+Audio Devices & Format	Аудиоустройства и формат
+Autosave	Автосохранение
+Autosave enabled	Автосохранение включено
+Autosave interval	Интервал автосохранения
+Autosave is FAILING - save manually	Автосохранение НЕ РАБОТАЕТ — сохраните вручную
+Bottom left	Внизу слева
+Bottom right	Внизу справа
+Buffer size	Размер буфера
+Bypass selection	Обойти выделенное (байпас)
+Cable Category Colors	Цвета кабелей по категориям
+Cable Visibility	Видимость кабелей
+Canvas & Workspace	Холст и рабочее пространство
+Check for updates	Проверить обновления
+Check for updates...	Проверить обновления...
+Checkerboard	Шахматная доска
+Clear cards	Очистить карточки
+Close viewport panel	Закрыть панель вьюпорта
+Could not write %s.\nCheck permissions and free disk space.	Не удалось записать %s.\nПроверьте права доступа и свободное место на диске.
+Cut / Copy	Вырезать / Копировать
+Delete	Удалить
+Device default	По умолчанию для устройства
+Disabled while Vsync is on - Vsync alone paces the frame.\nTurn Vsync off to use a manual FPS cap.	Недоступно при включённой Vsync — частоту кадров задаёт сама Vsync.\nОтключите Vsync, чтобы вручную ограничить FPS.
+Display	Экран
+Dock	Закрепить
+Duplicate	Дублировать
+Edit	Правка
+Edit Mode	Режим правки
+Estimate: output device + stream + buffer, plus the input device's own latency. Real hardware chains can add more (interfaces, Bluetooth, drivers).	Оценка: устройство вывода + поток + буфер плюс собственная задержка устройства ввода. В реальной цепочке может быть больше (интерфейсы, Bluetooth, драйверы).
+Exclusive	Монопольный
+Expression Globals	Глобальные выражений
+Field Language	Язык Field
+File	Файл
+General & Performance	Общие и производительность
+Grid & Canvas	Сетка и холст
+Grid size	Размер сетки
+Group selection	Сгруппировать выделенное
+Height	Высота
+Help / module reference	Справка / описание модулей
+Help tooltips	Подсказки
+Hide all cables	Скрыть все кабели
+Hide all params	Скрыть все параметры
+Image & geometry cables	Кабели изображений и геометрии
+Input device	Устройство ввода
+Install AI Skill	Установить навык ИИ
+Interface font	Шрифт интерфейса
+Language	Язык
+Low latency (shared)	Низкая задержка (общий)
+Menu	Меню
+Minimap	Миникарта
+Modulation cables	Кабели модуляции
+Modulation matrix	Матрица модуляции
+Movement Log	Журнал действий
+New	Новый
+Node Card Styling	Стиль карточек узлов
+Node Corner Radius	Радиус углов узла
+Node Module Category Colors	Цвета категорий модулей узлов
+Node Opacity	Непрозрачность узла
+Nodes	Узлы
+Note: Image & geometry toggle also covers palette cables.	Примечание: переключатель «Изображения и геометрия» действует и на кабели палитры.
+Opacity	Непрозрачность
+Open Recent	Открыть недавние
+Open log folder	Открыть папку журналов
+Open...	Открыть...
+Output device	Устройство вывода
+Output mode	Режим вывода
+Output mode in use: %s	Используемый режим вывода: %s
+Oversampling	Оверсэмплинг
+Paste	Вставить
+Pause	Пауза
+Performance & Rendering	Производительность и рендеринг
+Performance Matrix	Матрица исполнения
+Performance mode	Режим выступления
+Play	Воспроизвести
+Position	Положение
+Preview Background	Фон предпросмотра
+Quit	Выход
+Record movement log	Записывать журнал действий
+Redo	Повторить
+Reset to Defaults	Сбросить по умолчанию
+Retention cap	Лимит хранения
+Rewind (Return)	Перемотка в начало (Return)
+Round-trip latency: unknown	Сквозная задержка: неизвестна
+Round-trip latency: ~%.1f ms (%u frames)	Сквозная задержка: ~%.1f мс (%u кадров)
+Sample rate	Частота дискретизации
+Save	Сохранить
+Save As...	Сохранить как...
+Save a reference file you can hand to any AI assistant (or drop into ~/.claude/skills/)\nso it can write, check and render Infinite patches from the command line.	Сохраняет справочный файл, который можно передать любому ИИ-ассистенту (или положить в ~/.claude/skills/),\nчтобы он писал, проверял и рендерил патчи Infinite из командной строки.
+Select All	Выделить всё
+Settings	Настройки
+Settings...	Настройки...
+Show Arrangement Timeline	Показать таймлайн аранжировки
+Show Performance Matrix	Показать матрицу исполнения
+Show all cables	Показать все кабели
+Show all params	Показать все параметры
+Show minimap	Показать миникарту
+Show modulation matrix	Показать матрицу модуляции
+Show viewport panel	Показать панель вьюпорта
+Size	Размер
+Snap to grid	Привязка к сетке
+Solid Color	Сплошной цвет
+Standard (shared)	Стандартный (общий)
+Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it.	Стандартный: общий режим Windows (по умолчанию).\nНизкая задержка: общий режим с наименьшим периодом драйвера (Windows 10+).\nМонопольный: забирает устройство у других программ ради минимальной задержки.\nЕсли режим недоступен, Infinite переключается в сторону «Стандартного». Нажмите «Применить настройки звука», чтобы использовать его.
+Start Audio	Запустить звук
+Stop Audio	Остановить звук
+System default	По умолчанию в системе
+Target FPS	Целевой FPS
+Tempo - drag, double-click or type to change.\nArrangement Timeline clips keep their bar/beat positions:\na tempo change moves their times in seconds, not their bars.	Темп — перетащите, дважды щёлкните или введите значение.\nКлипы таймлайна аранжировки сохраняют позиции по тактам и долям:\nпри смене темпа меняется их время в секундах, а не такты.
+The Arrangement Timeline is driving audio. Hand it back to the canvas from the timeline panel.	Звук ведёт таймлайн аранжировки. Верните управление холсту на панели таймлайна.
+The Arrangement Timeline will drive audio once the engine is started.	Таймлайн аранжировки будет вести звук после запуска движка.
+Theme Preset & Palette	Пресет темы и палитра
+Timeline	Таймлайн
+Tint	Оттенок
+Top left	Вверху слева
+Top right	Вверху справа
+Transparency Backdrop	Фон прозрачности
+UI Scale	Масштаб интерфейса
+Undo	Отменить
+Ungroup	Разгруппировать
+Unknown device	Неизвестное устройство
+Unlimited	Без ограничения
+Update	Обновить
+Version: %s	Версия: %s
+Viewport panel	Панель вьюпорта
+Vsync	Вертикальная синхронизация
+Width	Ширина
+Windows shared-mode audio always runs at the device's own period. Change it in Sound settings.	В общем режиме Windows звук всегда работает с периодом самого устройства. Измените его в настройках звука.
+Windows shared-mode audio always runs at the format set in Sound settings. Change the sample rate there.	В общем режиме Windows звук всегда работает в формате из настроек звука. Частоту дискретизации меняйте там.
+Zoom sensitivity	Чувствительность масштабирования
+accent first beat	акцент на первую долю
+bar %d  beat %.2f	такт %d  доля %.2f
+cpu lost	CPU потеряна
+exclusive	монопольный
+low-latency shared	общий, низкая задержка
+search	поиск
+standard	стандартный
+the settings directory	папку настроек
+version %s is available (you have %s) - click to download	доступна версия %s (у вас %s) — нажмите, чтобы скачать
+volume	громкость
+xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device	xruns=%llu за сессию\n%llu запоздавших блоков (рендер не уложился в срок)\n%llu сообщено аудиоустройством

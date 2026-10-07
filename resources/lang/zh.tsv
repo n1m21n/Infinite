@@ -1,0 +1,155 @@
+# 中文简体 - key<TAB>text. English source is the key. Machine-drafted (beta) until a native speaker signs off.
+# Glossary: glossary.tsv. "=en" means intentionally identical to English. Escapes: \n \t \\ \c.
+%s (Space)	%s（空格键）
+(%.1f MB used)	（已用 %.1f MB）
+AI assistants	AI 助手
+Active: %.0f Hz, %u frames	当前：%.0f Hz，%u 帧
+Add Node...	添加节点...
+Add Note	添加便签
+All shortcuts...	所有快捷键...
+Appearance	外观
+Application & Updates	应用与更新
+Apply audio settings	应用音频设置
+Arrangement Timeline	编排时间线
+Arrangement timeline	编排时间线
+Audio	音频
+Audio & note cables	音频与音符连线
+Audio Devices & Format	音频设备与格式
+Autosave	自动保存
+Autosave enabled	启用自动保存
+Autosave interval	自动保存间隔
+Autosave is FAILING - save manually	自动保存失败——请手动保存
+Bottom left	左下
+Bottom right	右下
+Buffer size	缓冲区大小
+Bypass selection	旁通所选
+Cable Category Colors	连线分类颜色
+Cable Visibility	连线可见性
+Canvas & Workspace	画布与工作区
+Check for updates	检查更新
+Check for updates...	检查更新...
+Checkerboard	棋盘格
+Clear cards	清除卡片
+Close viewport panel	关闭视口面板
+Could not write %s.\nCheck permissions and free disk space.	无法写入 %s。\n请检查权限和可用磁盘空间。
+Cut / Copy	剪切 / 复制
+Delete	删除
+Device default	设备默认
+Disabled while Vsync is on - Vsync alone paces the frame.\nTurn Vsync off to use a manual FPS cap.	垂直同步开启时不可用——垂直同步本身会控制帧率。\n关闭垂直同步后可手动限制 FPS。
+Display	显示
+Dock	停靠
+Duplicate	复制一份
+Edit	编辑
+Edit Mode	编辑模式
+Estimate: output device + stream + buffer, plus the input device's own latency. Real hardware chains can add more (interfaces, Bluetooth, drivers).	估算：输出设备 + 音频流 + 缓冲区，再加上输入设备自身的延迟。实际硬件链路可能更高（声卡、蓝牙、驱动）。
+Exclusive	独占
+Expression Globals	表达式全局变量
+Field Language	Field 语言
+File	文件
+General & Performance	常规与性能
+Grid & Canvas	网格与画布
+Grid size	网格大小
+Group selection	编组所选
+Height	高度
+Help / module reference	帮助 / 模块参考
+Help tooltips	帮助提示
+Hide all cables	隐藏所有连线
+Hide all params	隐藏所有参数
+Image & geometry cables	图像与几何连线
+Input device	输入设备
+Install AI Skill	安装 AI 技能
+Interface font	界面字体
+Language	语言
+Low latency (shared)	低延迟（共享）
+Menu	菜单
+Minimap	小地图
+Modulation cables	调制连线
+Modulation matrix	调制矩阵
+Movement Log	操作记录
+New	新建
+Node Card Styling	节点卡片样式
+Node Corner Radius	节点圆角半径
+Node Module Category Colors	节点模块分类颜色
+Node Opacity	节点不透明度
+Nodes	节点
+Note: Image & geometry toggle also covers palette cables.	注意：“图像与几何”开关同样适用于调色板连线。
+Opacity	不透明度
+Open Recent	打开最近文件
+Open log folder	打开日志文件夹
+Open...	打开...
+Output device	输出设备
+Output mode	输出模式
+Output mode in use: %s	当前输出模式：%s
+Oversampling	过采样
+Paste	粘贴
+Pause	暂停
+Performance & Rendering	性能与渲染
+Performance Matrix	演出矩阵
+Performance mode	演出模式
+Play	播放
+Position	位置
+Preview Background	预览背景
+Quit	退出
+Record movement log	记录操作日志
+Redo	重做
+Reset to Defaults	恢复默认
+Retention cap	保留上限
+Rewind (Return)	回到开头（回车键）
+Round-trip latency: unknown	往返延迟：未知
+Round-trip latency: ~%.1f ms (%u frames)	往返延迟：约 %.1f ms（%u 帧）
+Sample rate	采样率
+Save	保存
+Save As...	另存为...
+Save a reference file you can hand to any AI assistant (or drop into ~/.claude/skills/)\nso it can write, check and render Infinite patches from the command line.	保存一份参考文件，可交给任意 AI 助手（或放入 ~/.claude/skills/），\n让它通过命令行编写、检查并渲染 Infinite 补丁。
+Select All	全选
+Settings	设置
+Settings...	设置...
+Show Arrangement Timeline	显示编排时间线
+Show Performance Matrix	显示演出矩阵
+Show all cables	显示所有连线
+Show all params	显示所有参数
+Show minimap	显示小地图
+Show modulation matrix	显示调制矩阵
+Show viewport panel	显示视口面板
+Size	大小
+Snap to grid	吸附到网格
+Solid Color	纯色
+Standard (shared)	标准（共享）
+Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it.	标准：Windows 共享模式（默认）。\n低延迟：以驱动支持的最小周期运行共享模式（Windows 10+）。\n独占：从其他应用手中接管设备，以获得最低延迟。\n若某模式不可用，Infinite 会逐步退回到“标准”。点击“应用音频设置”后生效。
+Start Audio	启动音频
+Stop Audio	停止音频
+System default	系统默认
+Target FPS	目标 FPS
+Tempo - drag, double-click or type to change.\nArrangement Timeline clips keep their bar/beat positions:\na tempo change moves their times in seconds, not their bars.	速度——拖动、双击或键入即可修改。\n编排时间线上的片段保持其小节/拍位置：\n速度改变会移动它们的秒数时间，而不是小节位置。
+The Arrangement Timeline is driving audio. Hand it back to the canvas from the timeline panel.	编排时间线正在驱动音频。可在时间线面板中交还给画布。
+The Arrangement Timeline will drive audio once the engine is started.	音频引擎启动后，将由编排时间线驱动音频。
+Theme Preset & Palette	主题预设与调色板
+Timeline	时间线
+Tint	着色
+Top left	左上
+Top right	右上
+Transparency Backdrop	透明背景
+UI Scale	界面缩放
+Undo	撤销
+Ungroup	取消编组
+Unknown device	未知设备
+Unlimited	不限制
+Update	更新
+Version: %s	版本：%s
+Viewport panel	视口面板
+Vsync	垂直同步
+Width	宽度
+Windows shared-mode audio always runs at the device's own period. Change it in Sound settings.	Windows 共享模式的音频始终使用设备自身的周期。请在“声音设置”中更改。
+Windows shared-mode audio always runs at the format set in Sound settings. Change the sample rate there.	Windows 共享模式的音频始终使用“声音设置”中设定的格式。请在那里更改采样率。
+Zoom sensitivity	缩放灵敏度
+accent first beat	强调第一拍
+bar %d  beat %.2f	小节 %d  拍 %.2f
+cpu lost	CPU 丢失
+exclusive	独占
+low-latency shared	低延迟共享
+search	搜索
+standard	标准
+the settings directory	设置目录
+version %s is available (you have %s) - click to download	版本 %s 已发布（当前为 %s）——点击下载
+volume	音量
+xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device	本次会话 xruns=%llu\n%llu 个延迟块（渲染超出时限）\n%llu 个由音频设备报告

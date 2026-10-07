@@ -1,0 +1,155 @@
+# Español - key<TAB>text. English source is the key. Machine-drafted (beta) until a native speaker signs off.
+# Glossary: glossary.tsv. "=en" means intentionally identical to English. Escapes: \n \t \\ \c.
+%s (Space)	%s (Espacio)
+(%.1f MB used)	(%.1f MB en uso)
+AI assistants	Asistentes de IA
+Active: %.0f Hz, %u frames	Activo: %.0f Hz, %u fotogramas
+Add Node...	Añadir nodo...
+Add Note	Añadir nota
+All shortcuts...	Todos los atajos...
+Appearance	Apariencia
+Application & Updates	Aplicación y actualizaciones
+Apply audio settings	Aplicar ajustes de audio
+Arrangement Timeline	Línea de tiempo de arreglo
+Arrangement timeline	Línea de tiempo de arreglo
+Audio	Audio
+Audio & note cables	Cables de audio y notas
+Audio Devices & Format	Dispositivos y formato de audio
+Autosave	Autoguardado
+Autosave enabled	Autoguardado activado
+Autosave interval	Intervalo de autoguardado
+Autosave is FAILING - save manually	El autoguardado FALLA: guarda manualmente
+Bottom left	Abajo a la izquierda
+Bottom right	Abajo a la derecha
+Buffer size	Tamaño del búfer
+Bypass selection	Omitir selección (bypass)
+Cable Category Colors	Colores de cables por categoría
+Cable Visibility	Visibilidad de cables
+Canvas & Workspace	Lienzo y espacio de trabajo
+Check for updates	Buscar actualizaciones
+Check for updates...	Buscar actualizaciones...
+Checkerboard	Tablero de ajedrez
+Clear cards	Borrar tarjetas
+Close viewport panel	Cerrar panel de vista
+Could not write %s.\nCheck permissions and free disk space.	No se pudo escribir %s.\nComprueba los permisos y el espacio libre en disco.
+Cut / Copy	Cortar / Copiar
+Delete	Eliminar
+Device default	Predeterminado del dispositivo
+Disabled while Vsync is on - Vsync alone paces the frame.\nTurn Vsync off to use a manual FPS cap.	Desactivado mientras Vsync está activo: Vsync ya regula el fotograma.\nDesactiva Vsync para usar un límite de FPS manual.
+Display	Pantalla
+Dock	Acoplar
+Duplicate	Duplicar
+Edit	Edición
+Edit Mode	Modo de edición
+Estimate: output device + stream + buffer, plus the input device's own latency. Real hardware chains can add more (interfaces, Bluetooth, drivers).	Estimación: dispositivo de salida + flujo + búfer, más la latencia propia del dispositivo de entrada. Las cadenas de hardware reales pueden añadir más (interfaces, Bluetooth, controladores).
+Exclusive	Exclusivo
+Expression Globals	Globales de expresión
+Field Language	Lenguaje Field
+File	Archivo
+General & Performance	General y rendimiento
+Grid & Canvas	Cuadrícula y lienzo
+Grid size	Tamaño de cuadrícula
+Group selection	Agrupar selección
+Height	Alto
+Help / module reference	Ayuda / referencia de módulos
+Help tooltips	Consejos de ayuda
+Hide all cables	Ocultar todos los cables
+Hide all params	Ocultar todos los parámetros
+Image & geometry cables	Cables de imagen y geometría
+Input device	Dispositivo de entrada
+Install AI Skill	Instalar habilidad de IA
+Interface font	Fuente de la interfaz
+Language	Idioma
+Low latency (shared)	Baja latencia (compartido)
+Menu	Menú
+Minimap	Minimapa
+Modulation cables	Cables de modulación
+Modulation matrix	Matriz de modulación
+Movement Log	Registro de movimientos
+New	Nuevo
+Node Card Styling	Estilo de las tarjetas de nodo
+Node Corner Radius	Radio de esquina del nodo
+Node Module Category Colors	Colores de categoría de módulos de nodo
+Node Opacity	Opacidad del nodo
+Nodes	Nodos
+Note: Image & geometry toggle also covers palette cables.	Nota: el interruptor de imagen y geometría también incluye los cables de paleta.
+Opacity	Opacidad
+Open Recent	Abrir reciente
+Open log folder	Abrir carpeta de registros
+Open...	Abrir...
+Output device	Dispositivo de salida
+Output mode	Modo de salida
+Output mode in use: %s	Modo de salida en uso: %s
+Oversampling	Sobremuestreo
+Paste	Pegar
+Pause	Pausa
+Performance & Rendering	Rendimiento y renderizado
+Performance Matrix	Matriz de rendimiento
+Performance mode	Modo de actuación
+Play	Reproducir
+Position	Posición
+Preview Background	Fondo de la vista previa
+Quit	Salir
+Record movement log	Registrar movimientos
+Redo	Rehacer
+Reset to Defaults	Restablecer valores predeterminados
+Retention cap	Límite de retención
+Rewind (Return)	Rebobinar (Intro)
+Round-trip latency: unknown	Latencia de ida y vuelta: desconocida
+Round-trip latency: ~%.1f ms (%u frames)	Latencia de ida y vuelta: ~%.1f ms (%u fotogramas)
+Sample rate	Frecuencia de muestreo
+Save	Guardar
+Save As...	Guardar como...
+Save a reference file you can hand to any AI assistant (or drop into ~/.claude/skills/)\nso it can write, check and render Infinite patches from the command line.	Guarda un archivo de referencia que puedes dar a cualquier asistente de IA (o copiar en ~/.claude/skills/)\npara que escriba, compruebe y renderice patches de Infinite desde la línea de comandos.
+Select All	Seleccionar todo
+Settings	Ajustes
+Settings...	Ajustes...
+Show Arrangement Timeline	Mostrar línea de tiempo de arreglo
+Show Performance Matrix	Mostrar matriz de rendimiento
+Show all cables	Mostrar todos los cables
+Show all params	Mostrar todos los parámetros
+Show minimap	Mostrar minimapa
+Show modulation matrix	Mostrar matriz de modulación
+Show viewport panel	Mostrar panel de vista
+Size	Tamaño
+Snap to grid	Ajustar a la cuadrícula
+Solid Color	Color sólido
+Standard (shared)	Estándar (compartido)
+Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it.	Estándar: modo compartido de Windows (predeterminado).\nBaja latencia: modo compartido con el período más pequeño del controlador (Windows 10+).\nExclusivo: toma el dispositivo de otras aplicaciones para obtener la menor latencia.\nSi un modo no está disponible, Infinite vuelve hacia Estándar. Pulsa Aplicar ajustes de audio para usarlo.
+Start Audio	Iniciar audio
+Stop Audio	Detener audio
+System default	Predeterminado del sistema
+Target FPS	FPS objetivo
+Tempo - drag, double-click or type to change.\nArrangement Timeline clips keep their bar/beat positions:\na tempo change moves their times in seconds, not their bars.	Tempo: arrastra, haz doble clic o escribe para cambiarlo.\nLos clips de la línea de tiempo de arreglo conservan sus posiciones de compás/tiempo:\nun cambio de tempo mueve sus tiempos en segundos, no sus compases.
+The Arrangement Timeline is driving audio. Hand it back to the canvas from the timeline panel.	La línea de tiempo de arreglo controla el audio. Devuélvelo al lienzo desde el panel de la línea de tiempo.
+The Arrangement Timeline will drive audio once the engine is started.	La línea de tiempo de arreglo controlará el audio cuando se inicie el motor.
+Theme Preset & Palette	Tema y paleta predefinidos
+Timeline	Línea de tiempo
+Tint	Tono
+Top left	Arriba a la izquierda
+Top right	Arriba a la derecha
+Transparency Backdrop	Fondo de transparencia
+UI Scale	Escala de la interfaz
+Undo	Deshacer
+Ungroup	Desagrupar
+Unknown device	Dispositivo desconocido
+Unlimited	Sin límite
+Update	Actualizar
+Version: %s	Versión: %s
+Viewport panel	Panel de vista
+Vsync	Vsync
+Width	Ancho
+Windows shared-mode audio always runs at the device's own period. Change it in Sound settings.	El audio en modo compartido de Windows siempre usa el período propio del dispositivo. Cámbialo en los ajustes de sonido.
+Windows shared-mode audio always runs at the format set in Sound settings. Change the sample rate there.	El audio en modo compartido de Windows siempre usa el formato definido en los ajustes de sonido. Cambia allí la frecuencia de muestreo.
+Zoom sensitivity	Sensibilidad del zoom
+accent first beat	acentuar el primer tiempo
+bar %d  beat %.2f	compás %d  tiempo %.2f
+cpu lost	cpu perdida
+exclusive	exclusivo
+low-latency shared	compartido de baja latencia
+search	buscar
+standard	estándar
+the settings directory	la carpeta de ajustes
+version %s is available (you have %s) - click to download	la versión %s está disponible (tienes la %s): haz clic para descargar
+volume	volumen
+xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device	xruns=%llu en esta sesión\n%llu bloque(s) tardío(s) (renderizado fuera de plazo)\n%llu notificados por el dispositivo de audio

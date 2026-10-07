@@ -14,7 +14,7 @@ namespace app
       ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       ImGui::SetNextWindowSize(ImVec2(740, 560), ImGuiCond_FirstUseEver);
       PushElevatedPanelStyle(/*isChild=*/false);
-      if (!ImGui::Begin("Settings", open, ImGuiWindowFlags_NoCollapse))
+      if (!ImGui::Begin(L("Settings"), open, ImGuiWindowFlags_NoCollapse))
       {
          ImGui::End();
          PopElevatedPanelStyle();
@@ -24,11 +24,11 @@ namespace app
       if (ImGui::BeginTabBar("SettingsTabs", ImGuiTabBarFlags_None))
       {
          // 1. Appearance Tab
-         if (ImGui::BeginTabItem("Appearance"))
+         if (ImGui::BeginTabItem(L("Appearance")))
          {
             const bool isLight = CategoryColors::IsThemeLight();
             ImGui::Spacing();
-            ImGui::SeparatorText("Theme Preset & Palette");
+            ImGui::SeparatorText(T("Theme Preset & Palette"));
 
             const std::vector<std::string>& presets = CategoryColors::PresetNames();
             const int currentPreset = CategoryColors::CurrentPreset();
@@ -90,7 +90,7 @@ namespace app
                ImGui::Dummy(ImVec2(kSwatchStripW, rowH));
             }
             ImGui::SameLine();
-            if (ImGui::Button("Reset to Defaults"))
+            if (ImGui::Button(L("Reset to Defaults")))
             {
                CategoryColors::ResetAllAppearanceBoth();
                ApplyTheme();
@@ -98,7 +98,7 @@ namespace app
             ImGui::Spacing();
 
             // Node Module Category Colors
-            ImGui::SeparatorText("Node Module Category Colors");
+            ImGui::SeparatorText(T("Node Module Category Colors"));
             const std::vector<std::string>& catNames = CategoryColors::CategoryNames();
             if (ImGui::BeginTable("CatColorsTbl", 2, ImGuiTableFlags_None))
             {
@@ -129,7 +129,7 @@ namespace app
 
             ImGui::Spacing();
             // Cable Category Colors
-            ImGui::SeparatorText("Cable Category Colors");
+            ImGui::SeparatorText(T("Cable Category Colors"));
             const std::vector<std::string>& cableNames = CategoryColors::CableTypeNames();
             if (ImGui::BeginTable("CableColorsTbl", 2, ImGuiTableFlags_None))
             {
@@ -160,10 +160,10 @@ namespace app
 
             ImGui::Spacing();
             // Node Card Styling
-            ImGui::SeparatorText("Node Card Styling");
+            ImGui::SeparatorText(T("Node Card Styling"));
             float opacity = CategoryColors::GetNodeOpacity();
             ImGui::SetNextItemWidth(200.0f);
-            if (ImGui::SliderFloat("Node Opacity", &opacity, 0.10f, 1.00f, "%.2f", ImGuiSliderFlags_AlwaysClamp))
+            if (ImGui::SliderFloat(L("Node Opacity"), &opacity, 0.10f, 1.00f, "%.2f", ImGuiSliderFlags_AlwaysClamp))
             {
                CategoryColors::SetNodeOpacity(opacity, isLight, false);
             }
@@ -174,7 +174,7 @@ namespace app
 
             float rounding = CategoryColors::GetNodeRounding();
             ImGui::SetNextItemWidth(200.0f);
-            if (ImGui::SliderFloat("Node Corner Radius", &rounding, 0.0f, 24.0f, "%.0f px", ImGuiSliderFlags_AlwaysClamp))
+            if (ImGui::SliderFloat(L("Node Corner Radius"), &rounding, 0.0f, 24.0f, "%.0f px", ImGuiSliderFlags_AlwaysClamp))
             {
                CategoryColors::SetNodeRounding(rounding, false);
                ApplyTheme();
@@ -186,7 +186,7 @@ namespace app
 
             float tintWeight = CategoryColors::GetTintWeight();
             ImGui::SetNextItemWidth(200.0f);
-            if (ImGui::SliderFloat("Tint", &tintWeight, 0.0f, 0.50f, "%.2f", ImGuiSliderFlags_AlwaysClamp))
+            if (ImGui::SliderFloat(L("Tint"), &tintWeight, 0.0f, 0.50f, "%.2f", ImGuiSliderFlags_AlwaysClamp))
             {
                CategoryColors::SetTintWeight(tintWeight, isLight, false);
             }
@@ -196,10 +196,10 @@ namespace app
             }
 
             ImGui::Spacing();
-            ImGui::SeparatorText("Display");
+            ImGui::SeparatorText(T("Display"));
             float uiScale = CategoryColors::GetUiScale();
             ImGui::SetNextItemWidth(200.0f);
-            if (ImGui::SliderFloat("UI Scale", &uiScale, 0.5f, 2.0f, "%.2fx", ImGuiSliderFlags_AlwaysClamp))
+            if (ImGui::SliderFloat(L("UI Scale"), &uiScale, 0.5f, 2.0f, "%.2fx", ImGuiSliderFlags_AlwaysClamp))
             {
                CategoryColors::SetUiScale(uiScale, false);
             }
@@ -212,7 +212,7 @@ namespace app
             }
             {
                bool tips = CategoryColors::GetTooltips();
-               if (ImGui::Checkbox("Help tooltips", &tips))
+               if (ImGui::Checkbox(L("Help tooltips"), &tips))
                   CategoryColors::SetTooltips(tips);
             }
 
@@ -223,7 +223,7 @@ namespace app
                   if (currentFont == f.id)
                      currentLabel = f.label;
                ImGui::SetNextItemWidth(200.0f);
-               if (ImGui::BeginCombo("Interface font", currentLabel))
+               if (ImGui::BeginCombo(L("Interface font"), currentLabel))
                {
                   for (const InterfaceFont& f : kInterfaceFonts)
                   {
@@ -252,7 +252,7 @@ namespace app
                   if (current == l.code)
                      currentLabel = labelOf(l);
                ImGui::SetNextItemWidth(200.0f);
-               if (ImGui::BeginCombo("Language", currentLabel.c_str()))
+               if (ImGui::BeginCombo(L("Language"), currentLabel.c_str()))
                {
                   for (const I18n::Language& l : I18n::Languages())
                   {
@@ -270,11 +270,11 @@ namespace app
 
             ImGui::Spacing();
             // Transparency Backdrop
-            ImGui::SeparatorText("Transparency Backdrop");
-            static const char* kBackdropStyles[] = { "Checkerboard", "Solid Color" };
+            ImGui::SeparatorText(T("Transparency Backdrop"));
+            const char* kBackdropStyles[] = { T("Checkerboard"), T("Solid Color") };
             int backdropStyle = gCheckerboardBackdrop ? 0 : 1;
             ImGui::SetNextItemWidth(200.0f);
-            if (ImGui::Combo("Preview Background", &backdropStyle, kBackdropStyles, IM_ARRAYSIZE(kBackdropStyles)))
+            if (ImGui::Combo(L("Preview Background"), &backdropStyle, kBackdropStyles, IM_ARRAYSIZE(kBackdropStyles)))
             {
                gCheckerboardBackdrop = (backdropStyle == 0);
                SaveGeneralSettings();
@@ -284,32 +284,32 @@ namespace app
          }
 
          // 2. Canvas & Workspace Tab
-         if (ImGui::BeginTabItem("Canvas & Workspace"))
+         if (ImGui::BeginTabItem(L("Canvas & Workspace")))
          {
             ImGui::Spacing();
-            ImGui::SeparatorText("Grid & Canvas");
-            if (ImGui::Checkbox("Snap to grid", &gSnapToGrid))
+            ImGui::SeparatorText(T("Grid & Canvas"));
+            if (ImGui::Checkbox(L("Snap to grid"), &gSnapToGrid))
                SaveWorkspaceSettings();
             ImGui::SetNextItemWidth(180.0f);
-            ImGui::SliderFloat("Grid size", &gGridSnap, 5.0f, 100.0f, "%.0f px");
+            ImGui::SliderFloat(L("Grid size"), &gGridSnap, 5.0f, 100.0f, "%.0f px");
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveWorkspaceSettings();
             ImGui::SetNextItemWidth(180.0f);
-            ImGui::SliderFloat("Zoom sensitivity", &gZoomSensitivity, 0.05f, 1.5f, "%.2f");
+            ImGui::SliderFloat(L("Zoom sensitivity"), &gZoomSensitivity, 0.05f, 1.5f, "%.2f");
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveWorkspaceSettings();
 
             ImGui::Spacing();
-            ImGui::SeparatorText("Minimap");
-            if (ImGui::Checkbox("Show minimap", &gMinimapEnabled))
+            ImGui::SeparatorText(T("Minimap"));
+            if (ImGui::Checkbox(L("Show minimap"), &gMinimapEnabled))
                SaveWorkspaceSettings();
             if (gMinimapEnabled)
             {
-               static const char* kCorners[] = {
-                  "Top left", "Top right", "Bottom left", "Bottom right"
+               const char* kCorners[] = {
+                  T("Top left"), T("Top right"), T("Bottom left"), T("Bottom right")
                };
                ImGui::SetNextItemWidth(180.0f);
-               if (ImGui::BeginCombo("Position", kCorners[gMinimapCorner]))
+               if (ImGui::BeginCombo(L("Position"), kCorners[gMinimapCorner]))
                {
                   for (int i = 0; i < 4; i++)
                      if (ImGui::Selectable(kCorners[i], i == gMinimapCorner))
@@ -320,46 +320,46 @@ namespace app
                   ImGui::EndCombo();
                }
                ImGui::SetNextItemWidth(180.0f);
-               ImGui::SliderFloat("Size", &gMinimapSize, 120.0f, 360.0f, "%.0f px");
+               ImGui::SliderFloat(L("Size"), &gMinimapSize, 120.0f, 360.0f, "%.0f px");
                if (ImGui::IsItemDeactivatedAfterEdit())
                   SaveWorkspaceSettings();
                ImGui::SetNextItemWidth(180.0f);
-               ImGui::SliderFloat("Opacity", &gMinimapOpacity, 0.2f, 1.0f, "%.2f");
+               ImGui::SliderFloat(L("Opacity"), &gMinimapOpacity, 0.2f, 1.0f, "%.2f");
                if (ImGui::IsItemDeactivatedAfterEdit())
                   SaveWorkspaceSettings();
             }
 
             ImGui::Spacing();
-            ImGui::SeparatorText("Cable Visibility");
+            ImGui::SeparatorText(T("Cable Visibility"));
             bool showMod = (gCableVisibilityMask & 0x4) != 0;
             bool showAudNote = (gCableVisibilityMask & 0x2) != 0;
             bool showImg = (gCableVisibilityMask & 0x1) != 0;
 
-            if (ImGui::Checkbox("Modulation cables", &showMod))
+            if (ImGui::Checkbox(L("Modulation cables"), &showMod))
             {
                gCableVisibilityMask = (gCableVisibilityMask & ~0x4) | (showMod ? 0x4 : 0);
                SaveWorkspaceSettings();
             }
-            if (ImGui::Checkbox("Audio & note cables", &showAudNote))
+            if (ImGui::Checkbox(L("Audio & note cables"), &showAudNote))
             {
                gCableVisibilityMask = (gCableVisibilityMask & ~0x2) | (showAudNote ? 0x2 : 0);
                SaveWorkspaceSettings();
             }
-            if (ImGui::Checkbox("Image & geometry cables", &showImg))
+            if (ImGui::Checkbox(L("Image & geometry cables"), &showImg))
             {
                gCableVisibilityMask = (gCableVisibilityMask & ~0x1) | (showImg ? 0x1 : 0);
                SaveWorkspaceSettings();
             }
 
-            ImGui::TextDisabled("Note: Image & geometry toggle also covers palette cables.");
+            ImGui::TextDisabled("%s", T("Note: Image & geometry toggle also covers palette cables."));
             ImGui::Spacing();
-            if (ImGui::Button("Show all cables"))
+            if (ImGui::Button(L("Show all cables")))
             {
                gCableVisibilityMask = 0x7;
                SaveWorkspaceSettings();
             }
             ImGui::SameLine();
-            if (ImGui::Button("Hide all cables"))
+            if (ImGui::Button(L("Hide all cables")))
             {
                gCableVisibilityMask = 0x0;
                SaveWorkspaceSettings();
@@ -369,21 +369,21 @@ namespace app
          }
 
          // 3. Audio Tab
-         if (ImGui::BeginTabItem("Audio"))
+         if (ImGui::BeginTabItem(L("Audio")))
          {
             ImGui::Spacing();
-            ImGui::SeparatorText("Audio Devices & Format");
+            ImGui::SeparatorText(T("Audio Devices & Format"));
             const std::vector<Platform::AudioDeviceInfo> devices = Platform::AudioListDevices();
             const bool audioRunning = AudioEngine::Instance().SampleRate() > 0.0;
 
-            std::string outputLabel = (gAudioOutputDeviceId == 0) ? "System default" : "Unknown device";
+            std::string outputLabel = (gAudioOutputDeviceId == 0) ? T("System default") : T("Unknown device");
             for (const Platform::AudioDeviceInfo& d : devices)
                if (d.isOutput && d.deviceId == gAudioOutputDeviceId)
                   outputLabel = d.name;
             ImGui::SetNextItemWidth(240.0f);
-            if (ImGui::BeginCombo("Output device", outputLabel.c_str()))
+            if (ImGui::BeginCombo(L("Output device"), outputLabel.c_str()))
             {
-               if (ImGui::Selectable("System default", gAudioOutputDeviceId == 0))
+               if (ImGui::Selectable(L("System default"), gAudioOutputDeviceId == 0))
                   gAudioOutputDeviceId = 0;
                for (const Platform::AudioDeviceInfo& d : devices)
                {
@@ -395,14 +395,14 @@ namespace app
                ImGui::EndCombo();
             }
 
-            std::string inputLabel = (gAudioInputDeviceId == 0) ? "System default" : "Unknown device";
+            std::string inputLabel = (gAudioInputDeviceId == 0) ? T("System default") : T("Unknown device");
             for (const Platform::AudioDeviceInfo& d : devices)
                if (d.isInput && d.deviceId == gAudioInputDeviceId)
                   inputLabel = d.name;
             ImGui::SetNextItemWidth(240.0f);
-            if (ImGui::BeginCombo("Input device", inputLabel.c_str()))
+            if (ImGui::BeginCombo(L("Input device"), inputLabel.c_str()))
             {
-               if (ImGui::Selectable("System default", gAudioInputDeviceId == 0))
+               if (ImGui::Selectable(L("System default"), gAudioInputDeviceId == 0))
                {
                   gAudioInputDeviceId = 0;
                   Platform::AudioInputCaptureSetDevice(0);
@@ -421,7 +421,7 @@ namespace app
             }
 
             static const double kSampleRates[] = { 44100.0, 48000.0, 88200.0, 96000.0 };
-            std::string rateLabel = (gAudioSampleRate == 0.0) ? "Device default" : "";
+            std::string rateLabel = (gAudioSampleRate == 0.0) ? T("Device default") : "";
             if (gAudioSampleRate != 0.0)
             {
                char buf[32];
@@ -432,9 +432,9 @@ namespace app
             ImGui::BeginDisabled();
 #endif
             ImGui::SetNextItemWidth(240.0f);
-            if (ImGui::BeginCombo("Sample rate", rateLabel.c_str()))
+            if (ImGui::BeginCombo(L("Sample rate"), rateLabel.c_str()))
             {
-               if (ImGui::Selectable("Device default", gAudioSampleRate == 0.0))
+               if (ImGui::Selectable(L("Device default"), gAudioSampleRate == 0.0))
                   gAudioSampleRate = 0.0;
                for (double rate : kSampleRates)
                {
@@ -448,8 +448,7 @@ namespace app
 #if defined(_WIN32)
             ImGui::EndDisabled();
             if (ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()))
-               HelpTip("Windows shared-mode audio always runs at the format set in "
-                                 "Sound settings. Change the sample rate there.");
+               HelpTip("%s", T("Windows shared-mode audio always runs at the format set in Sound settings. Change the sample rate there."));
 #endif
 
             static const int kBufferSizes[] = { 64, 128, 256, 512, 1024, 2048 };
@@ -459,7 +458,7 @@ namespace app
             ImGui::BeginDisabled();
 #endif
             ImGui::SetNextItemWidth(240.0f);
-            if (ImGui::BeginCombo("Buffer size", bufferLabel))
+            if (ImGui::BeginCombo(L("Buffer size"), bufferLabel))
             {
                for (int frames : kBufferSizes)
                {
@@ -473,8 +472,7 @@ namespace app
 #if defined(_WIN32)
             ImGui::EndDisabled();
             if (ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()))
-               HelpTip("Windows shared-mode audio always runs at the device's own "
-                                 "period. Change it in Sound settings.");
+               HelpTip("%s", T("Windows shared-mode audio always runs at the device's own period. Change it in Sound settings."));
 #endif
 
 #if defined(_WIN32)
@@ -482,11 +480,11 @@ namespace app
                // Opt-in low-latency output. Every mode falls back toward
                // Standard if the device or driver refuses it, so choosing
                // one can never leave the app silent; takes effect on Apply.
-               static const char* kOutputModeLabels[] = { "Standard (shared)", "Low latency (shared)",
-                                                          "Exclusive" };
+               const char* kOutputModeLabels[] = { T("Standard (shared)"), T("Low latency (shared)"),
+                                                   T("Exclusive") };
                gAudioOutputMode = std::clamp(gAudioOutputMode, 0, 2);
                ImGui::SetNextItemWidth(240.0f);
-               if (ImGui::BeginCombo("Output mode", kOutputModeLabels[gAudioOutputMode]))
+               if (ImGui::BeginCombo(L("Output mode"), kOutputModeLabels[gAudioOutputMode]))
                {
                   for (int i = 0; i < 3; i++)
                      if (ImGui::Selectable(kOutputModeLabels[i], gAudioOutputMode == i))
@@ -497,13 +495,7 @@ namespace app
                   ImGui::EndCombo();
                }
                if (ImGui::IsItemHovered())
-                  HelpTip("Standard: Windows shared mode (default).\n"
-                                    "Low latency: shared mode at the driver's smallest period "
-                                    "(Windows 10+).\n"
-                                    "Exclusive: takes the device from other apps for the lowest "
-                                    "latency.\n"
-                                    "If a mode is unavailable Infinite steps back toward Standard. "
-                                    "Click Apply audio settings to use it.");
+                  HelpTip("%s", T("Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it."));
             }
 #endif
 
@@ -514,7 +506,7 @@ namespace app
                if (kOversampleValues[i] == gAudioOversample)
                   oversampleIdx = i;
             ImGui::SetNextItemWidth(240.0f);
-            if (ImGui::BeginCombo("Oversampling", kOversampleLabels[oversampleIdx]))
+            if (ImGui::BeginCombo(L("Oversampling"), kOversampleLabels[oversampleIdx]))
             {
                for (int i = 0; i < 3; i++)
                   if (ImGui::Selectable(kOversampleLabels[i], oversampleIdx == i))
@@ -528,12 +520,12 @@ namespace app
             if (audioRunning)
             {
                const uint32_t actualBufferFrames = Platform::AudioDeviceBufferFrames(gAudioOutputDeviceId);
-               ImGui::TextDisabled("Active: %.0f Hz, %u frames", AudioEngine::Instance().SampleRate(),
+               ImGui::TextDisabled(T("Active: %.0f Hz, %u frames"), AudioEngine::Instance().SampleRate(),
                                    actualBufferFrames);
 #if defined(_WIN32)
                {
-                  static const char* kActiveModeLabels[] = { "standard", "low-latency shared", "exclusive" };
-                  ImGui::TextDisabled("Output mode in use: %s",
+                  const char* kActiveModeLabels[] = { T("standard"), T("low-latency shared"), T("exclusive") };
+                  ImGui::TextDisabled(T("Output mode in use: %s"),
                                       kActiveModeLabels[std::clamp(Platform::AudioOutputModeActive(), 0, 2)]);
                }
 #endif
@@ -543,19 +535,17 @@ namespace app
                   const double rate = AudioEngine::Instance().SampleRate();
                   const uint32_t rtFrames = Platform::AudioRoundTripLatencyFrames(gAudioOutputDeviceId);
                   if (rtFrames > 0 && rate > 0.0)
-                     ImGui::TextDisabled("Round-trip latency: ~%.1f ms (%u frames)",
+                     ImGui::TextDisabled(T("Round-trip latency: ~%.1f ms (%u frames)"),
                                          (double)rtFrames * 1000.0 / rate, rtFrames);
                   else
-                     ImGui::TextDisabled("Round-trip latency: unknown");
+                     ImGui::TextDisabled("%s", T("Round-trip latency: unknown"));
                   if (ImGui::IsItemHovered())
-                     HelpTip("Estimate: output device + stream + buffer, plus the input "
-                                       "device's own latency. Real hardware chains can add more "
-                                       "(interfaces, Bluetooth, drivers).");
+                     HelpTip("%s", T("Estimate: output device + stream + buffer, plus the input device's own latency. Real hardware chains can add more (interfaces, Bluetooth, drivers)."));
                }
             }
 
             ImGui::Spacing();
-            if (ImGui::Button("Apply audio settings", ImVec2(180, 0)))
+            if (ImGui::Button(L("Apply audio settings"), ImVec2(180, 0)))
             {
                const bool wasRunning = AudioEngine::Instance().SampleRate() > 0.0;
                if (wasRunning)
@@ -579,34 +569,34 @@ namespace app
          }
 
          // 4. General & Performance Tab
-         if (ImGui::BeginTabItem("General & Performance"))
+         if (ImGui::BeginTabItem(L("General & Performance")))
          {
             ImGui::Spacing();
-            ImGui::SeparatorText("Autosave");
+            ImGui::SeparatorText(T("Autosave"));
             if (gAutosaveFailed)
             {
                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.42f, 0.35f, 1.0f));
-               ImGui::TextUnformatted("Autosave is FAILING - save manually");
+               ImGui::TextUnformatted(T("Autosave is FAILING - save manually"));
                ImGui::PopStyleColor();
                if (ImGui::IsItemHovered())
                {
                   const std::string path = AutosavePath();
-                  ImGui::SetTooltip("Could not write %s.\nCheck permissions and free disk space.",
-                                    path.empty() ? "the settings directory" : path.c_str());
+                  ImGui::SetTooltip(T("Could not write %s.\nCheck permissions and free disk space."),
+                                    path.empty() ? T("the settings directory") : path.c_str());
                }
             }
-            if (ImGui::Checkbox("Autosave enabled", &gAutosaveEnabled))
+            if (ImGui::Checkbox(L("Autosave enabled"), &gAutosaveEnabled))
                SaveGeneralSettings();
             ImGui::SetNextItemWidth(180.0f);
             int seconds = gAutosaveSeconds;
-            if (ImGui::SliderInt("Autosave interval", &seconds, 15, 300, "%d sec"))
+            if (ImGui::SliderInt(L("Autosave interval"), &seconds, 15, 300, "%d sec"))
                gAutosaveSeconds = seconds;
             if (ImGui::IsItemDeactivatedAfterEdit())
                SaveGeneralSettings();
 
             ImGui::Spacing();
-            ImGui::SeparatorText("Performance & Rendering");
-            static const char* kFpsLabels[] = { "Unlimited", "30", "60", "120" };
+            ImGui::SeparatorText(T("Performance & Rendering"));
+            const char* kFpsLabels[] = { T("Unlimited"), "30", "60", "120" };
             static const int kFpsValues[] = { 0, 30, 60, 120 };
             int current = 0;
             for (int i = 0; i < 4; i++)
@@ -621,7 +611,7 @@ namespace app
             // exclusive rather than combined - matches how most games do it.
             ImGui::BeginDisabled(gVsync);
             ImGui::SetNextItemWidth(180.0f);
-            if (ImGui::BeginCombo("Target FPS", kFpsLabels[current]))
+            if (ImGui::BeginCombo(L("Target FPS"), kFpsLabels[current]))
             {
                for (int i = 0; i < 4; i++)
                {
@@ -635,9 +625,9 @@ namespace app
             }
             ImGui::EndDisabled();
             if (gVsync && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-               HelpTip("Disabled while Vsync is on - Vsync alone paces the frame.\nTurn Vsync off to use a manual FPS cap.");
+               HelpTip("%s", T("Disabled while Vsync is on - Vsync alone paces the frame.\nTurn Vsync off to use a manual FPS cap."));
 
-            if (ImGui::Checkbox("Vsync", &gVsync))
+            if (ImGui::Checkbox(L("Vsync"), &gVsync))
             {
                SetCanvasSwapInterval(gVsync ? 1 : 0);
                SaveGeneralSettings();
@@ -645,13 +635,13 @@ namespace app
 
             ImGui::Spacing();
             ImGui::Spacing();
-            ImGui::SeparatorText("Movement Log");
+            ImGui::SeparatorText(T("Movement Log"));
             bool moveLogEnabled = MovementLog::IsEnabled();
-            if (ImGui::Checkbox("Record movement log", &moveLogEnabled))
+            if (ImGui::Checkbox(L("Record movement log"), &moveLogEnabled))
             {
                MovementLog::SetEnabled(moveLogEnabled);
             }
-            if (ImGui::Button("Open log folder"))
+            if (ImGui::Button(L("Open log folder")))
             {
                std::string dir = MovementLog::GetLogDirectory();
                if (!dir.empty())
@@ -660,7 +650,7 @@ namespace app
             ImGui::SameLine();
             const uint64_t folderBytes = MovementLog::GetLogFolderSizeBytes();
             const float folderMB = (float)folderBytes / (1024.0f * 1024.0f);
-            ImGui::Text("(%.1f MB used)", folderMB);
+            ImGui::Text(T("(%.1f MB used)"), folderMB);
 
             static const char* kCapLabels[] = { "256 MB", "1 GB", "4 GB" };
             static const uint64_t kCapValues[] = { 256ULL * 1024 * 1024, 1024ULL * 1024 * 1024, 4096ULL * 1024 * 1024 };
@@ -672,7 +662,7 @@ namespace app
                   capIdx = i;
             }
             ImGui::SetNextItemWidth(180.0f);
-            if (ImGui::BeginCombo("Retention cap", kCapLabels[capIdx]))
+            if (ImGui::BeginCombo(L("Retention cap"), kCapLabels[capIdx]))
             {
                for (int i = 0; i < 3; i++)
                {
@@ -685,25 +675,25 @@ namespace app
             }
 
             ImGui::Spacing();
-            ImGui::SeparatorText("Application & Updates");
-            ImGui::Text("Version: %s", INFINITE_VERSION_STRING);
-            if (ImGui::Button("Check for updates..."))
+            ImGui::SeparatorText(T("Application & Updates"));
+            ImGui::Text(T("Version: %s"), INFINITE_VERSION_STRING);
+            if (ImGui::Button(L("Check for updates...")))
             {
                UpdateCheck::Start();
                gShowUpdateCheckModal = true;
             }
 
             ImGui::Spacing();
-            ImGui::SeparatorText("AI assistants");
+            ImGui::SeparatorText(T("AI assistants"));
             static std::string sPatchSkillStatus;
-            if (ImGui::Button("Install AI Skill##patchAuthoring"))
+            if (ImGui::Button(L("Install AI Skill##patchAuthoring")))
             {
                const std::string folder = Platform::OpenFolderDialog("Choose folder for the patch authoring AI skill file");
                if (!folder.empty())
                   sPatchSkillStatus = SaveAISkillFile(folder, "infinite-patch-authoring.md", AISkillContent::kPatchAuthoringMarkdown);
             }
             if (ImGui::IsItemHovered())
-               HelpTip("Save a reference file you can hand to any AI assistant (or drop into ~/.claude/skills/)\nso it can write, check and render Infinite patches from the command line.");
+               HelpTip("%s", T("Save a reference file you can hand to any AI assistant (or drop into ~/.claude/skills/)\nso it can write, check and render Infinite patches from the command line."));
             if (!sPatchSkillStatus.empty())
             {
                ImGui::SameLine();
@@ -714,7 +704,7 @@ namespace app
          }
 
          // 5. Field Language Reference Tab
-         if (ImGui::BeginTabItem("Field Language"))
+         if (ImGui::BeginTabItem(L("Field Language")))
          {
             static char sFilterBuf[64] = "";
             static int sSelectedSection = 0;
@@ -1039,7 +1029,7 @@ namespace app
          }
 
          // 6. Expression Globals Tab
-         if (ImGui::BeginTabItem("Expression Globals"))
+         if (ImGui::BeginTabItem(L("Expression Globals")))
          {
             ImGui::Spacing();
             ImGui::TextDisabled("Named values every '=' parameter expression can read.");

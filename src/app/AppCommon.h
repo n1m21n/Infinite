@@ -295,4 +295,6 @@ inline std::string TmpPath(const std::string& name)
 #include "audio/dsp/SlicerDsp.h"
 #include "audio/dsp/ReverbKernel.h"
 
+namespace app { using I18n::T; using I18n::TC; using I18n::L; using I18n::LC; }
+
 namespace ed = ax::NodeEditor;

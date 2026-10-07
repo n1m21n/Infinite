@@ -1,0 +1,155 @@
+# Deutsch - key<TAB>text. English source is the key. Machine-drafted (beta) until a native speaker signs off.
+# Glossary: glossary.tsv. "=en" means intentionally identical to English. Escapes: \n \t \\ \c.
+%s (Space)	%s (Leertaste)
+(%.1f MB used)	(%.1f MB belegt)
+AI assistants	KI-Assistenten
+Active: %.0f Hz, %u frames	Aktiv: %.0f Hz, %u Frames
+Add Node...	Node hinzufügen...
+Add Note	Notiz hinzufügen
+All shortcuts...	Alle Tastenkürzel...
+Appearance	Darstellung
+Application & Updates	Anwendung & Updates
+Apply audio settings	Audioeinstellungen anwenden
+Arrangement Timeline	Arrangement-Timeline
+Arrangement timeline	Arrangement-Timeline
+Audio	Audio
+Audio & note cables	Audio- & Notenkabel
+Audio Devices & Format	Audiogeräte & Format
+Autosave	Automatisch speichern
+Autosave enabled	Automatisches Speichern aktiv
+Autosave interval	Speicherintervall
+Autosave is FAILING - save manually	Automatisches Speichern SCHLÄGT FEHL – bitte manuell speichern
+Bottom left	Unten links
+Bottom right	Unten rechts
+Buffer size	Puffergröße
+Bypass selection	Auswahl überbrücken
+Cable Category Colors	Kabelfarben nach Kategorie
+Cable Visibility	Kabelsichtbarkeit
+Canvas & Workspace	Canvas & Arbeitsbereich
+Check for updates	Nach Updates suchen
+Check for updates...	Nach Updates suchen...
+Checkerboard	Schachbrett
+Clear cards	Karten entfernen
+Close viewport panel	Viewport-Panel schließen
+Could not write %s.\nCheck permissions and free disk space.	%s konnte nicht geschrieben werden.\nBerechtigungen und freien Speicherplatz prüfen.
+Cut / Copy	Ausschneiden / Kopieren
+Delete	Löschen
+Device default	Gerätestandard
+Disabled while Vsync is on - Vsync alone paces the frame.\nTurn Vsync off to use a manual FPS cap.	Deaktiviert, solange VSync an ist – VSync taktet das Bild allein.\nVSync ausschalten, um ein manuelles FPS-Limit zu nutzen.
+Display	Anzeige
+Dock	Andocken
+Duplicate	Duplizieren
+Edit	Bearbeiten
+Edit Mode	Bearbeitungsmodus
+Estimate: output device + stream + buffer, plus the input device's own latency. Real hardware chains can add more (interfaces, Bluetooth, drivers).	Schätzung: Ausgabegerät + Stream + Puffer, plus die Eigenlatenz des Eingabegeräts. Reale Hardwareketten können mehr hinzufügen (Interfaces, Bluetooth, Treiber).
+Exclusive	Exklusiv
+Expression Globals	Ausdrucks-Globals
+Field Language	Field-Sprache
+File	Datei
+General & Performance	Allgemein & Leistung
+Grid & Canvas	Raster & Canvas
+Grid size	Rastergröße
+Group selection	Auswahl gruppieren
+Height	Höhe
+Help / module reference	Hilfe / Modulreferenz
+Help tooltips	Hilfe-Tooltips
+Hide all cables	Alle Kabel ausblenden
+Hide all params	Alle Parameter ausblenden
+Image & geometry cables	Bild- & Geometriekabel
+Input device	Eingabegerät
+Install AI Skill	KI-Skill installieren
+Interface font	Oberflächenschrift
+Language	Sprache
+Low latency (shared)	Niedrige Latenz (geteilt)
+Menu	Menü
+Minimap	Minimap
+Modulation cables	Modulationskabel
+Modulation matrix	Modulationsmatrix
+Movement Log	Bewegungsprotokoll
+New	Neu
+Node Card Styling	Node-Karten-Stil
+Node Corner Radius	Node-Eckenradius
+Node Module Category Colors	Farben der Node-Modulkategorien
+Node Opacity	Node-Deckkraft
+Nodes	Nodes
+Note: Image & geometry toggle also covers palette cables.	Hinweis: Der Schalter für Bild & Geometrie gilt auch für Palettenkabel.
+Opacity	Deckkraft
+Open Recent	Zuletzt geöffnet
+Open log folder	Protokollordner öffnen
+Open...	Öffnen...
+Output device	Ausgabegerät
+Output mode	Ausgabemodus
+Output mode in use: %s	Verwendeter Ausgabemodus: %s
+Oversampling	Oversampling
+Paste	Einfügen
+Pause	Pause
+Performance & Rendering	Leistung & Rendering
+Performance Matrix	Performance-Matrix
+Performance mode	Performance-Modus
+Play	Wiedergabe
+Position	Position
+Preview Background	Vorschau-Hintergrund
+Quit	Beenden
+Record movement log	Bewegungsprotokoll aufzeichnen
+Redo	Wiederholen
+Reset to Defaults	Auf Standard zurücksetzen
+Retention cap	Aufbewahrungslimit
+Rewind (Return)	Zurückspulen (Eingabe)
+Round-trip latency: unknown	Roundtrip-Latenz: unbekannt
+Round-trip latency: ~%.1f ms (%u frames)	Roundtrip-Latenz: ~%.1f ms (%u Frames)
+Sample rate	Abtastrate
+Save	Speichern
+Save As...	Speichern unter...
+Save a reference file you can hand to any AI assistant (or drop into ~/.claude/skills/)\nso it can write, check and render Infinite patches from the command line.	Speichert eine Referenzdatei, die du jedem KI-Assistenten geben (oder in ~/.claude/skills/ ablegen) kannst,\ndamit er Infinite-Patches per Kommandozeile schreiben, prüfen und rendern kann.
+Select All	Alles auswählen
+Settings	Einstellungen
+Settings...	Einstellungen...
+Show Arrangement Timeline	Arrangement-Timeline anzeigen
+Show Performance Matrix	Performance-Matrix anzeigen
+Show all cables	Alle Kabel anzeigen
+Show all params	Alle Parameter anzeigen
+Show minimap	Minimap anzeigen
+Show modulation matrix	Modulationsmatrix anzeigen
+Show viewport panel	Viewport-Panel anzeigen
+Size	Größe
+Snap to grid	Am Raster ausrichten
+Solid Color	Einfarbig
+Standard (shared)	Standard (geteilt)
+Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it.	Standard: gemeinsamer Windows-Modus (Voreinstellung).\nNiedrige Latenz: gemeinsamer Modus mit der kleinsten Periode des Treibers (Windows 10+).\nExklusiv: belegt das Gerät für sich, für die niedrigste Latenz.\nIst ein Modus nicht verfügbar, fällt Infinite Richtung Standard zurück. Zum Übernehmen „Audioeinstellungen anwenden“ klicken.
+Start Audio	Audio starten
+Stop Audio	Audio stoppen
+System default	Systemstandard
+Target FPS	Ziel-FPS
+Tempo - drag, double-click or type to change.\nArrangement Timeline clips keep their bar/beat positions:\na tempo change moves their times in seconds, not their bars.	Tempo – ziehen, doppelklicken oder tippen zum Ändern.\nClips der Arrangement-Timeline behalten ihre Takt-/Schlagpositionen:\nein Tempowechsel verschiebt ihre Zeiten in Sekunden, nicht ihre Takte.
+The Arrangement Timeline is driving audio. Hand it back to the canvas from the timeline panel.	Die Arrangement-Timeline steuert das Audio. Im Timeline-Panel an den Canvas zurückgeben.
+The Arrangement Timeline will drive audio once the engine is started.	Die Arrangement-Timeline steuert das Audio, sobald die Engine gestartet ist.
+Theme Preset & Palette	Theme-Preset & Palette
+Timeline	Timeline
+Tint	Tönung
+Top left	Oben links
+Top right	Oben rechts
+Transparency Backdrop	Transparenz-Hintergrund
+UI Scale	Oberflächen-Skalierung
+Undo	Rückgängig
+Ungroup	Gruppierung aufheben
+Unknown device	Unbekanntes Gerät
+Unlimited	Unbegrenzt
+Update	Update
+Version: %s	Version: %s
+Viewport panel	Viewport-Panel
+Vsync	VSync
+Width	Breite
+Windows shared-mode audio always runs at the device's own period. Change it in Sound settings.	Windows-Audio im gemeinsamen Modus läuft immer mit der Periode des Geräts. Im Windows-Soundmenü ändern.
+Windows shared-mode audio always runs at the format set in Sound settings. Change the sample rate there.	Windows-Audio im gemeinsamen Modus läuft immer im Format der Soundeinstellungen. Die Abtastrate dort ändern.
+Zoom sensitivity	Zoom-Empfindlichkeit
+accent first beat	ersten Schlag betonen
+bar %d  beat %.2f	Takt %d  Schlag %.2f
+cpu lost	CPU verloren
+exclusive	exklusiv
+low-latency shared	geteilt, niedrige Latenz
+search	suchen
+standard	Standard
+the settings directory	dem Einstellungsordner
+version %s is available (you have %s) - click to download	Version %s ist verfügbar (du hast %s) – zum Herunterladen klicken
+volume	Lautstärke
+xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device	xruns=%llu in dieser Sitzung\n%llu verspätete(r) Block/Blöcke (Rendering über der Frist)\n%llu vom Audiogerät gemeldet

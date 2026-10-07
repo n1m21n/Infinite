@@ -1,0 +1,24 @@
+# Glossary - en<TAB>es<TAB>de<TAB>zh<TAB>ja<TAB>ru. Kept in English everywhere: node names, param names, Field, LFO, ADSR, BPM, MIDI, OSC, NDI, Syphon, Spout, VST3, AU, FPS, file formats.
+patch	parche	Patch	补丁	パッチ	патч
+node	nodo	Node	节点	ノード	узел
+cable	cable	Kabel	连线	ケーブル	кабель
+canvas	lienzo	Canvas	画布	キャンバス	холст
+timeline	línea de tiempo	Timeline	时间线	タイムライン	таймлайн
+clip	clip	Clip	片段	クリップ	клип
+lane	pista	Spur	轨道	レーン	дорожка
+modulation	modulación	Modulation	调制	モジュレーション	модуляция
+macro	macro	Makro	宏	マクロ	макрос
+bypass	bypass	Bypass	旁通	バイパス	байпас
+render	renderizar	rendern	渲染	レンダリング	рендерить
+export	exportar	exportieren	导出	書き出し	экспорт
+preset	preajuste	Preset	预设	プリセット	пресет
+viewport	vista	Viewport	视口	ビューポート	вьюпорт
+projector	proyector	Projektor	投影	プロジェクター	проектор
+sample	muestra	Sample	采样	サンプル	сэмпл
+bar	compás	Takt	小节	小節	такт
+beat	tiempo	Schlag	拍	拍	доля
+matrix	matriz	Matrix	矩阵	マトリクス	матрица
+param	parámetro	Parameter	参数	パラメータ	параметр
+buffer	búfer	Puffer	缓冲区	バッファ	буфер
+latency	latencia	Latenz	延迟	レイテンシ	задержка
+sample rate	frecuencia de muestreo	Abtastrate	采样率	サンプルレート	частота дискретизации

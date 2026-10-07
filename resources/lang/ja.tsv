@@ -1,0 +1,155 @@
+# 日本語 - key<TAB>text. English source is the key. Machine-drafted (beta) until a native speaker signs off.
+# Glossary: glossary.tsv. "=en" means intentionally identical to English. Escapes: \n \t \\ \c.
+%s (Space)	%s（スペース）
+(%.1f MB used)	（%.1f MB 使用中）
+AI assistants	AIアシスタント
+Active: %.0f Hz, %u frames	現在：%.0f Hz、%u フレーム
+Add Node...	ノードを追加...
+Add Note	メモを追加
+All shortcuts...	すべてのショートカット...
+Appearance	外観
+Application & Updates	アプリとアップデート
+Apply audio settings	オーディオ設定を適用
+Arrangement Timeline	アレンジメント・タイムライン
+Arrangement timeline	アレンジメント・タイムライン
+Audio	オーディオ
+Audio & note cables	オーディオ／ノートのケーブル
+Audio Devices & Format	オーディオデバイスとフォーマット
+Autosave	自動保存
+Autosave enabled	自動保存を有効にする
+Autosave interval	自動保存の間隔
+Autosave is FAILING - save manually	自動保存に失敗しています。手動で保存してください
+Bottom left	左下
+Bottom right	右下
+Buffer size	バッファサイズ
+Bypass selection	選択をバイパス
+Cable Category Colors	ケーブルのカテゴリ色
+Cable Visibility	ケーブルの表示
+Canvas & Workspace	キャンバスとワークスペース
+Check for updates	アップデートを確認
+Check for updates...	アップデートを確認...
+Checkerboard	チェッカーボード
+Clear cards	カードをクリア
+Close viewport panel	ビューポートパネルを閉じる
+Could not write %s.\nCheck permissions and free disk space.	%s に書き込めませんでした。\n権限とディスクの空き容量を確認してください。
+Cut / Copy	切り取り／コピー
+Delete	削除
+Device default	デバイスのデフォルト
+Disabled while Vsync is on - Vsync alone paces the frame.\nTurn Vsync off to use a manual FPS cap.	VSync がオンの間は無効です。VSync だけでフレームが制御されます。\n手動の FPS 上限を使うには VSync をオフにしてください。
+Display	表示
+Dock	ドッキング
+Duplicate	複製
+Edit	編集
+Edit Mode	編集モード
+Estimate: output device + stream + buffer, plus the input device's own latency. Real hardware chains can add more (interfaces, Bluetooth, drivers).	推定値：出力デバイス＋ストリーム＋バッファに、入力デバイス自体のレイテンシを加えたものです。実際の機器構成ではさらに増える場合があります（インターフェース、Bluetooth、ドライバー）。
+Exclusive	排他
+Expression Globals	式のグローバル
+Field Language	Field 言語
+File	ファイル
+General & Performance	一般とパフォーマンス
+Grid & Canvas	グリッドとキャンバス
+Grid size	グリッドサイズ
+Group selection	選択をグループ化
+Height	高さ
+Help / module reference	ヘルプ／モジュールリファレンス
+Help tooltips	ヘルプのツールチップ
+Hide all cables	すべてのケーブルを非表示
+Hide all params	すべてのパラメータを非表示
+Image & geometry cables	画像／ジオメトリのケーブル
+Input device	入力デバイス
+Install AI Skill	AIスキルをインストール
+Interface font	インターフェースのフォント
+Language	言語
+Low latency (shared)	低レイテンシ（共有）
+Menu	メニュー
+Minimap	ミニマップ
+Modulation cables	モジュレーションのケーブル
+Modulation matrix	モジュレーション・マトリクス
+Movement Log	動作ログ
+New	新規
+Node Card Styling	ノードカードのスタイル
+Node Corner Radius	ノードの角丸
+Node Module Category Colors	ノードモジュールのカテゴリ色
+Node Opacity	ノードの不透明度
+Nodes	ノード
+Note: Image & geometry toggle also covers palette cables.	メモ：「画像／ジオメトリ」の切り替えはパレットのケーブルにも適用されます。
+Opacity	不透明度
+Open Recent	最近使った項目を開く
+Open log folder	ログフォルダを開く
+Open...	開く...
+Output device	出力デバイス
+Output mode	出力モード
+Output mode in use: %s	使用中の出力モード：%s
+Oversampling	オーバーサンプリング
+Paste	貼り付け
+Pause	一時停止
+Performance & Rendering	パフォーマンスとレンダリング
+Performance Matrix	パフォーマンス・マトリクス
+Performance mode	パフォーマンスモード
+Play	再生
+Position	位置
+Preview Background	プレビューの背景
+Quit	終了
+Record movement log	動作ログを記録
+Redo	やり直し
+Reset to Defaults	デフォルトに戻す
+Retention cap	保持上限
+Rewind (Return)	巻き戻し（Return）
+Round-trip latency: unknown	往復レイテンシ：不明
+Round-trip latency: ~%.1f ms (%u frames)	往復レイテンシ：約 %.1f ms（%u フレーム）
+Sample rate	サンプルレート
+Save	保存
+Save As...	別名で保存...
+Save a reference file you can hand to any AI assistant (or drop into ~/.claude/skills/)\nso it can write, check and render Infinite patches from the command line.	任意のAIアシスタントに渡せる（または ~/.claude/skills/ に置ける）リファレンスファイルを保存します。\nコマンドラインから Infinite のパッチを作成・検証・レンダリングできるようになります。
+Select All	すべて選択
+Settings	設定
+Settings...	設定...
+Show Arrangement Timeline	アレンジメント・タイムラインを表示
+Show Performance Matrix	パフォーマンス・マトリクスを表示
+Show all cables	すべてのケーブルを表示
+Show all params	すべてのパラメータを表示
+Show minimap	ミニマップを表示
+Show modulation matrix	モジュレーション・マトリクスを表示
+Show viewport panel	ビューポートパネルを表示
+Size	サイズ
+Snap to grid	グリッドにスナップ
+Solid Color	単色
+Standard (shared)	標準（共有）
+Standard: Windows shared mode (default).\nLow latency: shared mode at the driver's smallest period (Windows 10+).\nExclusive: takes the device from other apps for the lowest latency.\nIf a mode is unavailable Infinite steps back toward Standard. Click Apply audio settings to use it.	標準：Windows の共有モード（デフォルト）。\n低レイテンシ：ドライバーの最小周期で動作する共有モード（Windows 10以降）。\n排他：他のアプリからデバイスを占有し、最小のレイテンシにします。\nモードが使えない場合、Infinite は標準の方向へ戻ります。使用するには「オーディオ設定を適用」を押してください。
+Start Audio	オーディオ開始
+Stop Audio	オーディオ停止
+System default	システムのデフォルト
+Target FPS	目標FPS
+Tempo - drag, double-click or type to change.\nArrangement Timeline clips keep their bar/beat positions:\na tempo change moves their times in seconds, not their bars.	テンポ：ドラッグ、ダブルクリック、または入力で変更します。\nアレンジメント・タイムラインのクリップは小節／拍の位置を保ちます。\nテンポを変えると、小節ではなく秒単位の時間が移動します。
+The Arrangement Timeline is driving audio. Hand it back to the canvas from the timeline panel.	アレンジメント・タイムラインがオーディオを駆動しています。タイムラインパネルからキャンバスに戻せます。
+The Arrangement Timeline will drive audio once the engine is started.	エンジンが開始すると、アレンジメント・タイムラインがオーディオを駆動します。
+Theme Preset & Palette	テーマプリセットとパレット
+Timeline	タイムライン
+Tint	ティント
+Top left	左上
+Top right	右上
+Transparency Backdrop	透明部分の背景
+UI Scale	UIスケール
+Undo	元に戻す
+Ungroup	グループ解除
+Unknown device	不明なデバイス
+Unlimited	無制限
+Update	アップデート
+Version: %s	バージョン：%s
+Viewport panel	ビューポートパネル
+Vsync	VSync
+Width	幅
+Windows shared-mode audio always runs at the device's own period. Change it in Sound settings.	Windowsの共有モードのオーディオは常にデバイス固有の周期で動作します。変更するにはサウンド設定を使用してください。
+Windows shared-mode audio always runs at the format set in Sound settings. Change the sample rate there.	Windowsの共有モードのオーディオは常にサウンド設定のフォーマットで動作します。サンプルレートはそちらで変更してください。
+Zoom sensitivity	ズーム感度
+accent first beat	1拍目を強調
+bar %d  beat %.2f	小節 %d  拍 %.2f
+cpu lost	CPU 喪失
+exclusive	排他
+low-latency shared	低レイテンシ共有
+search	検索
+standard	標準
+the settings directory	設定フォルダ
+version %s is available (you have %s) - click to download	バージョン %s が利用可能です（現在 %s）。クリックしてダウンロード
+volume	ボリューム
+xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device	このセッションの xruns=%llu\n遅延ブロック %llu 個（レンダリングが期限超過）\nオーディオデバイスからの報告 %llu 件

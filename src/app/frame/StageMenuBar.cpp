@@ -38,18 +38,18 @@ void DrawMenuBar(FrameCtx& fc)
 
       if (ImGui::BeginMenuBar())
       {
-         if (ImGui::BeginMenu("File"))
+         if (ImGui::BeginMenu(L("File")))
          {
-            if (ImGui::MenuItem("New", MODKEY "+N"))
+            if (ImGui::MenuItem(L("New"), MODKEY "+N"))
                GuardUnsavedChanges([]() { NewPatch(); });
-            if (ImGui::MenuItem("Open...", MODKEY "+O"))
+            if (ImGui::MenuItem(L("Open..."), MODKEY "+O"))
             {
                const std::string path = Platform::OpenPatchDialog();
                if (!path.empty())
                   GuardUnsavedChanges([path]() { LoadPatchFrom(path); });
             }
 
-            if (ImGui::BeginMenu("Open Recent", !Patch::Recents().empty()))
+            if (ImGui::BeginMenu(L("Open Recent"), !Patch::Recents().empty()))
             {
                // Copied before iterating: opening one calls NoteRecent, which
                // reorders the very list being walked.
@@ -66,9 +66,9 @@ void DrawMenuBar(FrameCtx& fc)
             }
 
             ImGui::Separator();
-            if (ImGui::MenuItem("Save", MODKEY "+S"))
+            if (ImGui::MenuItem(L("Save"), MODKEY "+S"))
                SavePatchInteractive(false);
-            if (ImGui::MenuItem("Save As...", MODKEY "+Shift+S"))
+            if (ImGui::MenuItem(L("Save As..."), MODKEY "+Shift+S"))
                SavePatchInteractive(true);
 
             if (!gPatchPath.empty() || !gPatchStatus.empty())
@@ -87,70 +87,70 @@ void DrawMenuBar(FrameCtx& fc)
             ImGui::EndMenu();
          }
 
-         if (ImGui::BeginMenu("Edit"))
+         if (ImGui::BeginMenu(L("Edit")))
          {
-            if (ImGui::MenuItem("Undo", MODKEY "+Z", false, !gUndoStack.empty()))
+            if (ImGui::MenuItem(L("Undo"), MODKEY "+Z", false, !gUndoStack.empty()))
                Undo();
-            if (ImGui::MenuItem("Redo", MODKEY "+Shift+Z", false, !gRedoStack.empty()))
+            if (ImGui::MenuItem(L("Redo"), MODKEY "+Shift+Z", false, !gRedoStack.empty()))
                Redo();
             ImGui::Separator();
-            if (ImGui::MenuItem("Cut / Copy", MODKEY "+C"))
+            if (ImGui::MenuItem(L("Cut / Copy"), MODKEY "+C"))
                gRequestCopy = true;
-            if (ImGui::MenuItem("Paste", MODKEY "+V"))
+            if (ImGui::MenuItem(L("Paste"), MODKEY "+V"))
                gRequestPaste = true;
-            if (ImGui::MenuItem("Duplicate", MODKEY "+D"))
+            if (ImGui::MenuItem(L("Duplicate"), MODKEY "+D"))
                gRequestDuplicate = true;
-            if (ImGui::MenuItem("Delete", "Backspace"))
+            if (ImGui::MenuItem(L("Delete"), "Backspace"))
                gRequestDelete = true;
             ImGui::Separator();
-            if (ImGui::MenuItem("Select All", "Shift+A"))
+            if (ImGui::MenuItem(L("Select All"), "Shift+A"))
                gRequestSelectAll = true;
-            if (ImGui::MenuItem("Bypass selection", "B"))
+            if (ImGui::MenuItem(L("Bypass selection"), "B"))
                gRequestBypass = true;
             ImGui::Separator();
-            if (ImGui::MenuItem("Group selection", MODKEY "+G"))
+            if (ImGui::MenuItem(L("Group selection"), MODKEY "+G"))
                gRequestGroup = true;
-            if (ImGui::MenuItem("Ungroup", MODKEY "+U"))
+            if (ImGui::MenuItem(L("Ungroup"), MODKEY "+U"))
                gRequestUngroup = true;
             ImGui::Separator();
-            if (ImGui::MenuItem("Add Node...", "Shift+N"))
+            if (ImGui::MenuItem(L("Add Node..."), "Shift+N"))
                gRequestAddNode = true;
-            if (ImGui::MenuItem("Add Note", "/"))
+            if (ImGui::MenuItem(L("Add Note"), "/"))
                gRequestAddComment = true;
             ImGui::EndMenu();
          }
 
-         if (ImGui::BeginMenu("Menu"))
+         if (ImGui::BeginMenu(L("Menu")))
          {
-            if (ImGui::MenuItem("Settings...", MODKEY "+0"))
+            if (ImGui::MenuItem(L("Settings..."), MODKEY "+0"))
                gSettingsOpen = true;
 
             ImGui::Separator();
 
-            if (ImGui::BeginMenu("Viewport panel"))
+            if (ImGui::BeginMenu(L("Viewport panel")))
             {
-               ImGui::Checkbox("Show viewport panel", &gViewportPanelOpen);
+               ImGui::Checkbox(L("Show viewport panel"), &gViewportPanelOpen);
                if (gViewportPanelOpen)
                {
                   ImGui::SetNextItemWidth(150);
                   ViewportPanelDockCombo();
                   ImGui::SetNextItemWidth(150);
                   if (gViewportPanelDock == 1 || gViewportPanelDock == 2)
-                     ImGui::SliderFloat("Width", &gViewportPanelWidth,
+                     ImGui::SliderFloat(L("Width"), &gViewportPanelWidth,
                                         kViewportPanelMinWidth, 900.0f, "%.0f px");
                   else
-                     ImGui::SliderFloat("Height", &gViewportPanelHeight,
+                     ImGui::SliderFloat(L("Height"), &gViewportPanelHeight,
                                         kViewportPanelMinHeight, 800.0f, "%.0f px");
                   ImGui::Separator();
-                  if (!gViewportPanelNodes.empty() && ImGui::MenuItem("Clear cards"))
+                  if (!gViewportPanelNodes.empty() && ImGui::MenuItem(L("Clear cards")))
                      gViewportPanelNodes.clear();
-                  if (ImGui::MenuItem("Close viewport panel"))
+                  if (ImGui::MenuItem(L("Close viewport panel")))
                      gViewportPanelOpen = false;
                }
                ImGui::EndMenu();
             }
 
-            if (ImGui::BeginMenu("Modulation matrix"))
+            if (ImGui::BeginMenu(L("Modulation matrix")))
             {
                // Plain themed widgets, same as "Viewport panel" above - this
                // is menu chrome, not a node body, so it takes the app's own
@@ -158,46 +158,46 @@ void DrawMenuBar(FrameCtx& fc)
                // dark-contrast-budget style meant for controls inside a node.
                // The two styles side by side in one menu (one purple/clean,
                // one flat blue) is what read as inconsistent.
-               ImGui::Checkbox("Show modulation matrix", &gModMatrixOpen);
+               ImGui::Checkbox(L("Show modulation matrix"), &gModMatrixOpen);
                if (gModMatrixOpen)
                {
                   ImGui::SetNextItemWidth(150);
                   ModMatrixDockCombo();
                   ImGui::SetNextItemWidth(150);
                   if (gModMatrixDock == 1 || gModMatrixDock == 2)
-                     ImGui::SliderFloat("Width", &gModMatrixWidth,
+                     ImGui::SliderFloat(L("Width"), &gModMatrixWidth,
                                         kModMatrixMinWidth, 900.0f, "%.0f px");
                   else
-                     ImGui::SliderFloat("Height", &gModMatrixHeight,
+                     ImGui::SliderFloat(L("Height"), &gModMatrixHeight,
                                         kModMatrixMinHeight, 800.0f, "%.0f px");
                }
                ImGui::EndMenu();
             }
 
-            if (ImGui::BeginMenu("Performance Matrix"))
+            if (ImGui::BeginMenu(L("Performance Matrix")))
             {
                // Same reasoning as "Modulation matrix" above: plain themed
                // widgets, not the node-body P10 style.
-               ImGui::Checkbox("Show Performance Matrix", &gPerfPanelOpen);
+               ImGui::Checkbox(L("Show Performance Matrix"), &gPerfPanelOpen);
                if (gPerfPanelOpen)
                {
                   ImGui::SetNextItemWidth(150);
                   PerfPanelDockCombo();
                   ImGui::SetNextItemWidth(150);
                   if (gPerfPanelDock == 1 || gPerfPanelDock == 2)
-                     ImGui::SliderFloat("Width", &gPerfPanelWidth,
+                     ImGui::SliderFloat(L("Width"), &gPerfPanelWidth,
                                         kPerfPanelMinWidth, 900.0f, "%.0f px");
                   else
-                     ImGui::SliderFloat("Height", &gPerfPanelHeight,
+                     ImGui::SliderFloat(L("Height"), &gPerfPanelHeight,
                                         kPerfPanelMinHeight, 800.0f, "%.0f px");
-                  ImGui::Checkbox("Edit Mode", &gPerfEditMode);
+                  ImGui::Checkbox(L("Edit Mode"), &gPerfEditMode);
                }
                ImGui::EndMenu();
             }
 
-            if (ImGui::BeginMenu("Arrangement Timeline"))
+            if (ImGui::BeginMenu(L("Arrangement Timeline")))
             {
-               ImGui::Checkbox("Show Arrangement Timeline", &gArrangePanelOpen);
+               ImGui::Checkbox(L("Show Arrangement Timeline"), &gArrangePanelOpen);
                if (gArrangePanelOpen)
                {
                   // Bottom or top only - a timeline reads left-to-right, so a
@@ -205,27 +205,27 @@ void DrawMenuBar(FrameCtx& fc)
                   // Saved with the document (Settings.dockSide); not undoable.
                   int dockSide = gArrange.settings.dockSide == 1 ? 1 : 0;
                   ImGui::SetNextItemWidth(150);
-                  if (ImGui::Combo("Dock", &dockSide, "Bottom\0Top\0") && dockSide != gArrange.settings.dockSide)
+                  if (ImGui::Combo(L("Dock"), &dockSide, "Bottom\0Top\0") && dockSide != gArrange.settings.dockSide)
                   {
                      gArrange.settings.dockSide = dockSide;
                      gArrange.revision++; // a model field like any other (WP5b)
                      gPatchDirty = true;
                   }
                   ImGui::SetNextItemWidth(150);
-                  ImGui::SliderFloat("Height", &gArrangePanelHeight,
+                  ImGui::SliderFloat(L("Height"), &gArrangePanelHeight,
                                      kArrangePanelMinHeight, 800.0f, "%.0f px");
                }
                ImGui::EndMenu();
             }
 
-            if (ImGui::BeginMenu("Nodes"))
+            if (ImGui::BeginMenu(L("Nodes")))
             {
-               if (ImGui::MenuItem("Show all params"))
+               if (ImGui::MenuItem(L("Show all params")))
                {
                   for (GraphNode& gn : gNodes)
                      gn.showParams = true;
                }
-               if (ImGui::MenuItem("Hide all params"))
+               if (ImGui::MenuItem(L("Hide all params")))
                {
                   for (GraphNode& gn : gNodes)
                      gn.showParams = false;
@@ -234,9 +234,9 @@ void DrawMenuBar(FrameCtx& fc)
             }
 
             ImGui::Separator();
-            if (ImGui::MenuItem("All shortcuts..."))
+            if (ImGui::MenuItem(L("All shortcuts...")))
                gShortcutsOpen = true;
-            if (ImGui::MenuItem("Help / module reference"))
+            if (ImGui::MenuItem(L("Help / module reference")))
                gHelpOpen = true;
 #ifndef NDEBUG
             // ImGui's built-in inspectors, not a custom tool: the Debugger's
@@ -251,14 +251,14 @@ void DrawMenuBar(FrameCtx& fc)
             if (ImGui::MenuItem("UI Style Editor"))
                gUiStyleEditorOpen = true;
 #endif
-            if (ImGui::MenuItem("Check for updates"))
+            if (ImGui::MenuItem(L("Check for updates")))
             {
                UpdateCheck::Start();
                gShowUpdateCheckModal = true;
             }
 
             ImGui::Separator();
-            if (ImGui::MenuItem("Quit"))
+            if (ImGui::MenuItem(L("Quit")))
                RequestClose(window);
             ImGui::EndMenu();
          }
@@ -316,7 +316,7 @@ void DrawMenuBar(FrameCtx& fc)
                Tabler::DrawPlayerPlay(dl, center, iconSize, col, true);
          }
          if (ImGui::IsItemHovered())
-            HelpTip("%s (Space)", isTransportPlaying ? "Pause" : "Play");
+            HelpTip(T("%s (Space)"), isTransportPlaying ? T("Pause") : T("Play"));
          if (isTransportPlaying)
             ImGui::PopStyleColor(3);
 
@@ -333,7 +333,7 @@ void DrawMenuBar(FrameCtx& fc)
             Tabler::DrawPlayerRewind(dl, center, iconSize, col);
          }
          if (ImGui::IsItemHovered())
-            HelpTip("Rewind (Return)");
+            HelpTip("%s", T("Rewind (Return)"));
 
          TopBarSameLine(4.0f);
 
@@ -353,7 +353,7 @@ void DrawMenuBar(FrameCtx& fc)
             ImGui::PushStyleColor(ImGuiCol_Text, audioOn
                                                      ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f)
                                                      : (audioIsLight ? ImVec4(0.12f, 0.14f, 0.20f, 1.0f) : ImVec4(0.92f, 0.94f, 0.98f, 1.0f)));
-            if (ImGui::Button(audioOn ? "Stop Audio" : "Start Audio"))
+            if (ImGui::Button(audioOn ? L("Stop Audio") : L("Start Audio")))
             {
                if (audioOn)
                {
@@ -373,7 +373,7 @@ void DrawMenuBar(FrameCtx& fc)
             if (gAudioMode == AudioMode::Timeline)
             {
                TopBarSameLine(4.0f);
-               const char* badge = "Timeline";
+               const char* badge = T("Timeline");
                const ImVec2 textSize = ImGui::CalcTextSize(badge);
                const ImVec2 pad(6.0f, ImGui::GetStyle().FramePadding.y);
                const ImVec2 bmin = ImGui::GetCursorScreenPos();
@@ -385,8 +385,8 @@ void DrawMenuBar(FrameCtx& fc)
                dl->AddText(ImVec2(bmin.x + pad.x, bmin.y + pad.y), edge, badge);
                if (ImGui::IsItemHovered())
                   HelpTip(engineOn
-                     ? "The Arrangement Timeline is driving audio. Hand it back to the canvas from the timeline panel."
-                     : "The Arrangement Timeline will drive audio once the engine is started.");
+                     ? T("The Arrangement Timeline is driving audio. Hand it back to the canvas from the timeline panel.")
+                     : T("The Arrangement Timeline will drive audio once the engine is started."));
             }
          }
 
@@ -450,9 +450,7 @@ void DrawMenuBar(FrameCtx& fc)
                snprintf(bpmBuf, sizeof(bpmBuf), "%.1f###bpmBtn", bpm);
                ImGui::Button(bpmBuf);
                if (!ImGui::IsItemActive() && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
-                  HelpTip("Tempo - drag, double-click or type to change.\n"
-                                    "Arrangement Timeline clips keep their bar/beat positions:\n"
-                                    "a tempo change moves their times in seconds, not their bars.");
+                  HelpTip("%s", T("Tempo - drag, double-click or type to change.\nArrangement Timeline clips keep their bar/beat positions:\na tempo change moves their times in seconds, not their bars."));
                if (ImGui::IsItemHovered())
                {
                   ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
@@ -675,11 +673,11 @@ void DrawMenuBar(FrameCtx& fc)
                ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, base.Colors[ImGuiCol_FrameBgHovered]);
                ImGui::PushStyleColor(ImGuiCol_FrameBgActive, base.Colors[ImGuiCol_FrameBgActive]);
                ImGui::SetNextItemWidth(120.0f);
-               const bool volChanged = ImGui::SliderFloat("volume##metronomeVol", &gMetronomeVolume, 0.0f, 1.0f, "%.2f");
+               const bool volChanged = ImGui::SliderFloat(L("volume##metronomeVol"), &gMetronomeVolume, 0.0f, 1.0f, "%.2f");
                ImGui::PopStyleColor(3);
                if (volChanged)
                   gMetronomeDirty = true;
-               if (ImGui::Selectable("accent first beat", gMetronomeAccent, ImGuiSelectableFlags_DontClosePopups))
+               if (ImGui::Selectable(L("accent first beat"), gMetronomeAccent, ImGuiSelectableFlags_DontClosePopups))
                {
                   gMetronomeAccent = !gMetronomeAccent;
                   gMetronomeDirty = true;
@@ -764,7 +762,7 @@ void DrawMenuBar(FrameCtx& fc)
 
          // 4. Telemetry (Bar & beat, frame cost, CPU load)
          char barBeatBuf[64];
-         snprintf(barBeatBuf, sizeof(barBeatBuf), "bar %d  beat %.2f",
+         snprintf(barBeatBuf, sizeof(barBeatBuf), T("bar %d  beat %.2f"),
                   1 + (int)transport.Bars(),
                   std::fmod(transport.Beats(), transport.BeatsPerBar()) + 1.0);
 
@@ -785,7 +783,7 @@ void DrawMenuBar(FrameCtx& fc)
          const bool audioDead = audioEngineOn && !AudioEngine::Instance().IsAlive();
          char cpuReadout[32];
          if (audioDead)
-            snprintf(cpuReadout, sizeof(cpuReadout), "cpu lost");
+            snprintf(cpuReadout, sizeof(cpuReadout), "%s", T("cpu lost"));
          else if (audioEngineOn)
             snprintf(cpuReadout, sizeof(cpuReadout), "cpu %.0f%%%s", audioLoad * 100.0, xruns > 0 ? " !" : "");
          else
@@ -798,9 +796,9 @@ void DrawMenuBar(FrameCtx& fc)
          TopBarLabel(cpuReadout, true);
 
          if (audioEngineOn && xruns > 0 && ImGui::IsItemHovered())
-            ImGui::SetTooltip("xruns=%llu this session\n%llu late block%s (render over the deadline)\n%llu reported by the audio device",
+            ImGui::SetTooltip(T("xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device"),
                               (unsigned long long)xruns,
-                              (unsigned long long)xrunParts.deadline, xrunParts.deadline == 1 ? "" : "s",
+                              (unsigned long long)xrunParts.deadline,
                               (unsigned long long)xrunParts.os);
 
          // Left cluster's true rightmost extent (window-local X), used below
@@ -824,7 +822,7 @@ void DrawMenuBar(FrameCtx& fc)
 
          if (UpdateCheck::UpdateAvailable())
          {
-            const char* updateLabel = "Update";
+            const char* updateLabel = T("Update");
             const float updateWidth = ImGui::CalcTextSize(updateLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
             if (cursorX - updateWidth >= leftClusterEndX + minGap)
             {
@@ -840,7 +838,7 @@ void DrawMenuBar(FrameCtx& fc)
                ImGui::PopStyleColor(4);
                if (ImGui::IsItemHovered())
                {
-                  ImGui::SetTooltip("version %s is available (you have %s) - click to download",
+                  ImGui::SetTooltip(T("version %s is available (you have %s) - click to download"),
                                      UpdateCheck::LatestVersion().c_str(), INFINITE_VERSION_STRING);
                }
                if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
@@ -850,7 +848,7 @@ void DrawMenuBar(FrameCtx& fc)
          }
 
          {
-            const char* searchLabel = "search";
+            const char* searchLabel = T("search");
             const float iconSize = ImGui::GetFrameHeight() * 0.9f;
             const float iconSlot = iconSize + 7.0f;
             const float textW = ImGui::CalcTextSize(searchLabel).x;
@@ -913,13 +911,13 @@ void DrawMenuBar(FrameCtx& fc)
             return clicked;
          };
 
-         if (TopBarIconToggle("##arrangePanelToggle", gArrangePanelOpen, &Tabler::DrawBox3D, "Arrangement timeline"))
+         if (TopBarIconToggle("##arrangePanelToggle", gArrangePanelOpen, &Tabler::DrawBox3D, T("Arrangement timeline")))
             gArrangePanelOpen = !gArrangePanelOpen;
-         if (TopBarIconToggle("##perfPanelToggle", gPerfPanelOpen, &Tabler::DrawDisc, "Performance mode"))
+         if (TopBarIconToggle("##perfPanelToggle", gPerfPanelOpen, &Tabler::DrawDisc, T("Performance mode")))
             gPerfPanelOpen = !gPerfPanelOpen;
-         if (TopBarIconToggle("##modMatrixToggle", gModMatrixOpen, &Tabler::DrawGridDots, "Modulation matrix"))
+         if (TopBarIconToggle("##modMatrixToggle", gModMatrixOpen, &Tabler::DrawGridDots, T("Modulation matrix")))
             gModMatrixOpen = !gModMatrixOpen;
-         if (TopBarIconToggle("##viewportPanelToggle", gViewportPanelOpen, &Tabler::DrawLayoutSidebar, "Viewport panel"))
+         if (TopBarIconToggle("##viewportPanelToggle", gViewportPanelOpen, &Tabler::DrawLayoutSidebar, T("Viewport panel")))
             gViewportPanelOpen = !gViewportPanelOpen;
 
          ImGui::PopStyleColor(6);
