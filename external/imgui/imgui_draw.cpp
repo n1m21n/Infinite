@@ -3814,6 +3814,35 @@ static inline const char* CalcWordWrapNextLineStartA(const char* text, const cha
     return text;
 }
 
+// INFINITE PATCH (docs/plans/i18n, Block 1 step 5): CJK text has no blanks, so stock ImGui never
+// wraps a Chinese/Japanese paragraph. Han, kana, CJK punctuation and fullwidth forms are treated
+// as break opportunities between any two characters, except that closing punctuation never starts
+// a line and opening brackets never end one (kinsoku shori, minimal set).
+static inline bool ImCharIsCjkWrapW(unsigned int c)
+{
+    return (c >= 0x2E80 && c <= 0x9FFF && c != 0x3000) || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFF01 && c <= 0xFF60);
+}
+static inline bool ImCharIsCjkNoLineStartW(unsigned int c)
+{
+    switch (c)
+    {
+    case 0x3001: case 0x3002: case 0xFF0C: case 0xFF0E: case 0xFF1A: case 0xFF1B: case 0xFF01: case 0xFF1F:
+    case 0xFF09: case 0xFF3D: case 0xFF5D: case 0x300D: case 0x300F: case 0x3011: case 0x3009: case 0x300B: case 0x3015:
+    case 0x30FC:
+        return true;
+    }
+    return false;
+}
+static inline bool ImCharIsCjkNoLineEndW(unsigned int c)
+{
+    switch (c)
+    {
+    case 0xFF08: case 0xFF3B: case 0xFF5B: case 0x300C: case 0x300E: case 0x3010: case 0x3008: case 0x300A: case 0x3014:
+        return true;
+    }
+    return false;
+}
+
 // Simple word-wrapping for English, not full-featured. Please submit failing cases!
 // This will return the next location to wrap from. If no wrapping if necessary, this will fast-forward to e.g. text_end.
 // FIXME: Much possible improvements (don't cut things like "word !", "word!!!" but cut within "word,,,,", more sensible support for punctuations, support for Unicode punctuations, etc.)
@@ -3880,6 +3909,9 @@ const char* ImFont::CalcWordWrapPositionA(float scale, const char* text, const c
         }
         else
         {
+            const bool cjk = ImCharIsCjkWrapW(c);
+            if (cjk)
+                inside_word = ImCharIsCjkNoLineStartW(c); // break before it, unless it must not start a line
             word_width += char_width;
             if (inside_word)
             {
@@ -3893,7 +3925,10 @@ const char* ImFont::CalcWordWrapPositionA(float scale, const char* text, const c
             }
 
             // Allow wrapping after punctuation.
-            inside_word = (c != '.' && c != ',' && c != ';' && c != '!' && c != '?' && c != '\"');
+            if (cjk)
+                inside_word = ImCharIsCjkNoLineEndW(c); // break after it, unless it must not end a line
+            else
+                inside_word = (c != '.' && c != ',' && c != ';' && c != '!' && c != '?' && c != '\"');
         }
 
         // We ignore blank width at the end of the line (they can be skipped)
