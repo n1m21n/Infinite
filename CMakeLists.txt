@@ -399,6 +399,7 @@ set(COMMON_SOURCES
     src/main.cpp
     # src/app/**: code that used to live in src/main.cpp
     src/app/AppState.cpp
+    src/app/Startup.cpp
     src/app/bodies/AudioBodyKit.cpp
     src/app/bodies/AudioNodeBodies.cpp
     src/app/bodies/FieldParams.cpp
@@ -412,12 +413,28 @@ set(COMMON_SOURCES
     src/app/bodies/PreviewBodies.cpp
     src/app/bodies/SamplerBodies.cpp
     src/app/frame/CookFrame.cpp
+    src/app/frame/FrameStatics.cpp
     src/app/frame/FrameTests1.cpp
     src/app/frame/FrameTests2.cpp
     src/app/frame/FrameTests3.cpp
     src/app/frame/FrameTests4.cpp
     src/app/frame/FrameTests5.cpp
     src/app/frame/FrameTests6.cpp
+    src/app/frame/StageBenchHarness.cpp
+    src/app/frame/StageDropHandling.cpp
+    src/app/frame/StageFloating.cpp
+    src/app/frame/StageFramePump.cpp
+    src/app/frame/StageFrameTestsA.cpp
+    src/app/frame/StageKeyboard.cpp
+    src/app/frame/StageLayout.cpp
+    src/app/frame/StageLinks.cpp
+    src/app/frame/StageMenuBar.cpp
+    src/app/frame/StageNodeBodies.cpp
+    src/app/frame/StagePopupsA.cpp
+    src/app/frame/StagePopupsB.cpp
+    src/app/frame/StagePresent.cpp
+    src/app/frame/StageSidePanels.cpp
+    src/app/frame/StageTestsB.cpp
     src/app/graph/AudioTopology.cpp
     src/app/graph/Core.cpp
     src/app/graph/Disconnect.cpp
