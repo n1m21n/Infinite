@@ -2284,3 +2284,6 @@
 {"ts": "2026-10-07T01:16:45+00:00", "event": "edit", "id": "R274", "opened": "2026-10-07T06:45:59+05:30", "commits": ["eb5ed1c", "91b89e7"], "closed": "2026-10-07T06:46:03+05:30", "release": ""}
 {"ts": "2026-10-07T01:22:42+00:00", "event": "done", "id": "R601", "why": "KBCURSORTEST now asserts F frames the graph (view moves, request consumed). Ungroup is Cmd/Ctrl+U, already covered; there is no Shift+U binding"}
 {"ts": "2026-10-07T01:22:42+00:00", "event": "edit", "id": "R601", "commits": ["a05d9b18", "93090cf9"]}
+{"ts": "2026-10-07T01:23:36+00:00", "event": "edit", "id": "R601", "opened": "2026-10-07T06:52:39+05:30", "commits": ["a05d9b1", "93090cf"], "closed": "2026-10-07T06:52:40+05:30", "release": ""}
+{"ts": "2026-10-07T01:29:32+00:00", "event": "done", "id": "R506", "why": "Shape composites premultiplied then un-premultiplies: edge pixels keep the fill colour, only alpha falls off. SHAPEEDGETEST failed 644/644 before, 0 after. Display paths already treat textures as straight alpha"}
+{"ts": "2026-10-07T01:29:32+00:00", "event": "edit", "id": "R506", "commits": ["793213eb", "75f2fa8e"]}
