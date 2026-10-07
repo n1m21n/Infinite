@@ -810,6 +810,12 @@ set(LINUX_SOURCES
 # src/app/Startup.cpp and src/app/frame/Stage*.cpp, so the override is gone. If CL.exe
 # crashes again at /O2, scope /Od to the one Stage*.cpp file that does it:
 #   set_source_files_properties(src/app/frame/<File>.cpp PROPERTIES COMPILE_OPTIONS "/Od")
+# It did, in the self-test split: CL.exe died (exit -529706956) in both Windows x64 runs
+# right after DspFixtures2.cpp, i.e. while compiling DspFixtures3.cpp. Test-only code, so
+# /Od costs nothing that matters.
+if(MSVC)
+    set_source_files_properties(src/app/selftest/DspFixtures3.cpp PROPERTIES COMPILE_OPTIONS "/Od")
+endif()
 
 # Dev-only tool: compiles a Field pixel/element source file through the same
 # Lex/Parse/IR/GLSL pipeline FieldPixelNode::Apply() runs at load time, so a
