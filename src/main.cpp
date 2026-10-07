@@ -55593,6 +55593,176 @@ static bool RunShapeResonatorFixture()
       ok = ok && pass;
    }
 
+   // 6. Curves (R616): a free-ended string rings the harmonic series, lambda_n = (n pi / L)^2, so the
+   //    frequency ratios are 1:2:3:4 whatever the point spacing. A closed curve is a ring: modes in pairs.
+   {
+      const float line[6] = { 0, 0, 0, 3, 0, 0 }; // two points only: resampled internally
+      const auto m = MeshModalSolver::SolveCurve(line, 2, false, 8);
+      bool pass = m.valid && m.count >= 4;
+      double r[4] = {};
+      for (int k = 0; pass && k < 4; k++)
+      {
+         r[k] = std::sqrt(m.lambda[k] / m.lambda[0]);
+         pass = std::fabs(r[k] - (double)(k + 1)) < 0.03 * (k + 1);
+      }
+      printf("SHAPERESONATORTEST string: ratios %.3f %.3f %.3f %.3f (want 1 2 3 4) %s\n", r[0], r[1], r[2], r[3],
+             pass ? "OK" : "FAIL");
+      ok = ok && pass;
+
+      std::vector<float> circle;
+      for (int i = 0; i < 24; i++)
+         circle.insert(circle.end(), { cosf(6.2831853f * i / 24), sinf(6.2831853f * i / 24), 0.0f });
+      const auto ring2 = MeshModalSolver::SolveCurve(circle.data(), 24, true, 8);
+      const bool pairs = ring2.valid && ring2.count >= 4 && std::fabs(ring2.lambda[1] / ring2.lambda[0] - 1.0) < 0.05 &&
+                         std::fabs(ring2.lambda[2] / ring2.lambda[0] - 4.0) < 0.2 &&
+                         std::fabs(ring2.lambda[3] / ring2.lambda[0] - 4.0) < 0.2;
+      printf("SHAPERESONATORTEST ring: lambda ratios 1 : %.3f : %.3f : %.3f (want 1 1 4 4) %s\n",
+             ring2.count >= 4 ? ring2.lambda[1] / ring2.lambda[0] : 0.0, ring2.count >= 4 ? ring2.lambda[2] / ring2.lambda[0] : 0.0,
+             ring2.count >= 4 ? ring2.lambda[3] / ring2.lambda[0] : 0.0, pairs ? "OK" : "FAIL");
+      ok = ok && pairs;
+   }
+
+   // 7. Point clouds (R616): a grid of points rings an ascending, finite, positive set; two separate clusters
+   //    still solve (each is its own rigid body, so the zero modes are skipped).
+   {
+      std::vector<float> grid, twin;
+      for (int j = 0; j < 12; j++)
+         for (int i = 0; i < 18; i++)
+            grid.insert(grid.end(), { (float)i, (float)j, 0.0f });
+      for (int j = 0; j < 6; j++)
+         for (int i = 0; i < 6; i++)
+         {
+            twin.insert(twin.end(), { (float)i, (float)j, 0.0f });
+            twin.insert(twin.end(), { (float)i + 40.0f, (float)j, 0.0f });
+         }
+      bool pass = true;
+      for (const std::vector<float>* pts : { &grid, &twin })
+      {
+         const auto m = MeshModalSolver::SolveCloud(pts->data(), (int)(pts->size() / 3), 16);
+         bool good = m.valid && m.count >= 8;
+         for (int k = 0; good && k < m.count; k++)
+            good = std::isfinite(m.lambda[k]) && m.lambda[k] > 0.0f && (k == 0 || m.lambda[k] >= m.lambda[k - 1]);
+         printf("SHAPERESONATORTEST cloud: %zu points -> %d modes %s\n", pts->size() / 3, m.count, good ? "OK" : "FAIL");
+         pass = pass && good;
+      }
+      ok = ok && pass;
+   }
+
+   // 8. Unusable input must come back invalid, never crash or hang: empty, one triangle, NaN, collinear
+   //    (zero area), out-of-range indices, vertices without faces, too few points, a one-point curve.
+   {
+      const float tri[9] = { 0, 0, 0, 1, 0, 0, 0, 1, 0 };
+      const uint32_t triIdx[3] = { 0, 1, 2 };
+      std::vector<float> nanMesh, flat, plateV;
+      std::vector<uint32_t> plateI;
+      for (int i = 0; i < 12; i++)
+      {
+         nanMesh.insert(nanMesh.end(), { (float)i, (float)(i % 3), 0.0f });
+         flat.insert(flat.end(), { (float)i, 0.0f, 0.0f }); // collinear: every triangle has zero area
+      }
+      nanMesh[7] = std::nanf("");
+      std::vector<uint32_t> fan;
+      for (uint32_t i = 1; i + 1 < 12; i++)
+         fan.insert(fan.end(), { 0, i, i + 1 });
+      const std::vector<uint32_t> wild(fan.size(), 9999u);
+      const float one[3] = { 1, 2, 3 };
+      const float few[21] = {};
+      int bad = 0;
+      auto expectInvalid = [&](const char* what, const MeshModalSolver::Modes& m) {
+         if (m.valid)
+         {
+            printf("SHAPERESONATORTEST degenerate: %s came back valid FAIL\n", what);
+            bad++;
+         }
+      };
+      expectInvalid("null mesh", MeshModalSolver::Solve(nullptr, 0, nullptr, 0, 8));
+      expectInvalid("one triangle", MeshModalSolver::Solve(tri, 3, triIdx, 3, 8));
+      expectInvalid("NaN vertex", MeshModalSolver::Solve(nanMesh.data(), 12, fan.data(), (int)fan.size(), 8));
+      expectInvalid("zero-area mesh", MeshModalSolver::Solve(flat.data(), 12, fan.data(), (int)fan.size(), 8));
+      expectInvalid("out-of-range indices", MeshModalSolver::Solve(flat.data(), 12, wild.data(), (int)wild.size(), 8));
+      expectInvalid("seven-point cloud", MeshModalSolver::SolveCloud(few, 7, 8));
+      expectInvalid("one-point curve", MeshModalSolver::SolveCurve(one, 1, false, 8));
+      expectInvalid("NaN curve", MeshModalSolver::SolveCurve(nanMesh.data(), 12, false, 8));
+      expectInvalid("coincident curve", MeshModalSolver::SolveCurve(few, 7, false, 8));
+
+      // Two separate plates, and three triangles sharing one edge: must solve (or refuse) without crashing.
+      std::vector<float> twoV;
+      std::vector<uint32_t> twoI;
+      for (int plate = 0; plate < 2; plate++)
+         for (int j = 0; j <= 6; j++)
+            for (int i = 0; i <= 6; i++)
+               twoV.insert(twoV.end(), { (float)i + 20.0f * plate, (float)j, 0.0f });
+      for (int plate = 0; plate < 2; plate++)
+         for (int j = 0; j < 6; j++)
+            for (int i = 0; i < 6; i++)
+            {
+               const uint32_t v = (uint32_t)(plate * 49 + j * 7 + i);
+               twoI.insert(twoI.end(), { v, v + 1, v + 8, v, v + 8, v + 7 });
+            }
+      const auto two = MeshModalSolver::Solve(twoV.data(), (int)(twoV.size() / 3), twoI.data(), (int)twoI.size(), 8);
+      if (!two.valid || two.count < 4)
+      {
+         printf("SHAPERESONATORTEST degenerate: two disconnected plates gave %d modes FAIL\n", two.count);
+         bad++;
+      }
+      std::vector<float> fin = twoV;
+      fin.insert(fin.end(), { 3.0f, 3.0f, 5.0f });
+      std::vector<uint32_t> nm = twoI;
+      for (uint32_t k = 0; k < 3; k++)
+         nm.insert(nm.end(), { 24, 25, 98 + 0 * k });
+      (void)MeshModalSolver::Solve(fin.data(), (int)(fin.size() / 3), nm.data(), (int)nm.size(), 8);
+      printf("SHAPERESONATORTEST degenerate: %d unexpected valid, two plates %d modes %s\n", bad, two.count,
+             bad == 0 ? "OK" : "FAIL");
+      ok = ok && bad == 0;
+   }
+
+   // 9. End to end through the kernel with a source that is only a curve, and one that is only a cloud:
+   //    both must ring (this is the path R616 added), and a source that goes empty must fall silent.
+   {
+      struct StubSource : IGeometrySource
+      {
+         Mesh mesh;
+         std::vector<Particle> cloud;
+         Polyline curve;
+         bool hasCurve = false;
+         unsigned long long rev = 1;
+         const Mesh& GetMesh() override { return mesh; }
+         unsigned long long MeshRevision() override { return rev; }
+         Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+         Material GetMaterial() const override { return Material(); }
+         const std::vector<Particle>* GetPointCloud() override { return cloud.empty() ? nullptr : &cloud; }
+         unsigned long long PointCloudRevision() override { return cloud.size(); }
+         const Polyline* GetCurve() override { return hasCurve ? &curve : nullptr; }
+         unsigned long long CurveStamp() override { return hasCurve ? 7 : 0; }
+      };
+      StubSource curveSrc, cloudSrc;
+      curveSrc.hasCurve = true;
+      curveSrc.curve.points = { 0, 0, 0, 2, 0, 0, 2, 1, 0 };
+      for (int j = 0; j < 8; j++)
+         for (int i = 0; i < 10; i++)
+         {
+            Particle pt;
+            pt.px = (float)i;
+            pt.py = (float)j;
+            cloudSrc.cloud.push_back(pt);
+         }
+      std::vector<float> a, b;
+      int ma = 0, mb = 0;
+      ring(&curveSrc, 200.0f, 0.3f, a, &ma);
+      ring(&cloudSrc, 200.0f, 0.3f, b, &mb);
+      auto peakOf = [](const std::vector<float>& v) {
+         float pk = 0.0f;
+         for (float x : v)
+            pk = std::max(pk, std::fabs(x));
+         return pk;
+      };
+      const bool pass = ma >= 4 && mb >= 4 && peakOf(a) > 0.01f && peakOf(b) > 0.01f && std::isfinite(peakOf(a)) &&
+                        std::isfinite(peakOf(b));
+      printf("SHAPERESONATORTEST sources: curve %d modes (peak %.3f), cloud %d modes (peak %.3f) %s\n", ma, peakOf(a), mb,
+             peakOf(b), pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   }
+
    printf("SHAPERESONATORTEST %s\n", ok ? "OK" : "FAIL");
    return ok;
 }
@@ -77512,34 +77682,8 @@ int main(int argc, char** argv)
    // Launcher screen over the first seconds (core/SplashScreen.h). Never in headless/test runs.
    // INFINITE_SPLASHTEST=<seconds> forces it on under the screenshot harness, starting that far in.
    const char* splashTest = getenv("INFINITE_SPLASHTEST");
-   // Shown once per installed version (first run, and after each update), not on every launch.
-   // INFINITE_SPLASH=1 forces it; INFINITE_NOSPLASH=1 suppresses it.
-   bool splashDue = getenv("INFINITE_SPLASH") != nullptr;
-   if (!gHeadlessTestWindow && !IsHeadlessProcess() && getenv("INFINITE_NOSPLASH") == nullptr)
-   {
-#ifndef INFINITE_VERSION_STRING
-#define INFINITE_VERSION_STRING "0.0.0"
-#endif
-      const std::string marker = AppPaths::AppSupportDir() + "/splash_seen_version.txt";
-      std::string seen;
-      if (FILE* mf = fopen(marker.c_str(), "rb"))
-      {
-         char buf[64] = {0};
-         const size_t n = fread(buf, 1, sizeof(buf) - 1, mf);
-         seen.assign(buf, n);
-         fclose(mf);
-      }
-      if (seen != INFINITE_VERSION_STRING)
-      {
-         splashDue = true;
-         if (FILE* mf = fopen(marker.c_str(), "wb"))
-         {
-            fputs(INFINITE_VERSION_STRING, mf);
-            fclose(mf);
-         }
-      }
-   }
-   const bool splashEnabled = splashTest != nullptr || (splashDue && !gHeadlessTestWindow && !IsHeadlessProcess() && getenv("INFINITE_NOSPLASH") == nullptr);
+   // Launcher card on every normal start (core/SplashScreen.h). INFINITE_NOSPLASH=1 suppresses it.
+   const bool splashEnabled = splashTest != nullptr || (!gHeadlessTestWindow && !IsHeadlessProcess() && getenv("INFINITE_NOSPLASH") == nullptr);
    if (splashEnabled)
       Splash::Begin(splashTest ? (float)atof(splashTest) : 0.0f);
 

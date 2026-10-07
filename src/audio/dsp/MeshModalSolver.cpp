@@ -197,97 +197,14 @@ namespace
       }
       return true;
    }
-}
 
-Modes Solve(const float* positions, int numVertices, const uint32_t* indices, int numIndices, int maxModes, int vertexCap)
+// Eigen-solve of an assembled operator (stiffness weights `w`, lumped mass `mass`) on the welded/size-capped
+// vertex set `m`. Shared by the triangle-mesh, point-cloud and curve entry points.
+Modes SolveOperator(const Mesh3& m, std::vector<std::unordered_map<int, double>>& w, std::vector<double>& mass,
+                    double diam, const double ext[3], int maxModes, Modes result)
 {
-   Modes result;
-   maxModes = std::clamp(maxModes, 1, kMaxModes);
-   if (!positions || !indices || numVertices < 4 || numIndices < 3)
-      return result;
-
-   Mesh3 raw;
-   raw.p.resize((size_t)numVertices * 3);
-   double lo[3] = { 1e30, 1e30, 1e30 }, hi[3] = { -1e30, -1e30, -1e30 };
-   for (int v = 0; v < numVertices; v++)
-      for (int a = 0; a < 3; a++)
-      {
-         const double x = positions[3 * v + a];
-         raw.p[3 * v + a] = x;
-         lo[a] = std::min(lo[a], x);
-         hi[a] = std::max(hi[a], x);
-      }
-   for (int t = 0; t + 2 < numIndices; t += 3)
-   {
-      const uint32_t a = indices[t], b = indices[t + 1], c = indices[t + 2];
-      if ((int)a >= numVertices || (int)b >= numVertices || (int)c >= numVertices)
-         continue;
-      raw.tri.insert(raw.tri.end(), { (int)a, (int)b, (int)c });
-   }
-   const double ext[3] = { hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2] };
-   const double diam = std::sqrt(ext[0] * ext[0] + ext[1] * ext[1] + ext[2] * ext[2]);
-   if (!(diam > 1e-9))
-      return result;
-
-   // 1. Weld coincident vertices (flat-shaded meshes duplicate them per face).
-   Mesh3 m = Cluster(raw, diam * 1e-5, lo);
-   result.weldedVertices = m.nv();
-   // 2. Size cap: coarsen with a uniform grid until the system fits.
-   if (m.nv() > vertexCap)
-   {
-      double cell = diam / std::cbrt((double)vertexCap) * 0.5;
-      for (int it = 0; it < 40 && m.nv() > vertexCap; it++)
-      {
-         m = Cluster(m, cell, lo);
-         cell *= 1.25;
-      }
-   }
    const int n = m.nv();
-   result.solverVertices = n;
-   if (n < 8 || m.tri.size() < 3)
-      return result;
-
-   // 3. Cotangent stiffness and lumped mass.
-   std::vector<std::unordered_map<int, double>> w(n);
-   std::vector<double> mass(n, 0.0);
    auto P = [&](int v, int a) { return m.p[3 * v + a]; };
-   for (size_t t = 0; t + 2 < m.tri.size(); t += 3)
-   {
-      const int idx[3] = { m.tri[t], m.tri[t + 1], m.tri[t + 2] };
-      double e[3][3]; // edge opposite vertex k
-      for (int k = 0; k < 3; k++)
-         for (int a = 0; a < 3; a++)
-            e[k][a] = P(idx[(k + 2) % 3], a) - P(idx[(k + 1) % 3], a);
-      auto cross = [](const double* a, const double* b, double* o) {
-         o[0] = a[1] * b[2] - a[2] * b[1];
-         o[1] = a[2] * b[0] - a[0] * b[2];
-         o[2] = a[0] * b[1] - a[1] * b[0];
-      };
-      double cr[3];
-      const double ab[3] = { P(idx[1], 0) - P(idx[0], 0), P(idx[1], 1) - P(idx[0], 1), P(idx[1], 2) - P(idx[0], 2) };
-      const double ac[3] = { P(idx[2], 0) - P(idx[0], 0), P(idx[2], 1) - P(idx[0], 1), P(idx[2], 2) - P(idx[0], 2) };
-      cross(ab, ac, cr);
-      const double area2 = std::sqrt(cr[0] * cr[0] + cr[1] * cr[1] + cr[2] * cr[2]);
-      if (area2 < 1e-18)
-         continue;
-      for (int k = 0; k < 3; k++)
-      {
-         // cot at corner k = dot(u, v) / |u x v|, u,v the two edges meeting at k.
-         const int i = idx[(k + 1) % 3], j = idx[(k + 2) % 3];
-         double u[3], vv[3];
-         for (int a = 0; a < 3; a++)
-         {
-            u[a] = P(i, a) - P(idx[k], a);
-            vv[a] = P(j, a) - P(idx[k], a);
-         }
-         const double dot = u[0] * vv[0] + u[1] * vv[1] + u[2] * vv[2];
-         const double wgt = 0.5 * dot / area2 * 2.0 * 0.5; // 0.5 * cot, cot = dot / area2
-         w[i][j] += wgt;
-         w[j][i] += wgt;
-         mass[idx[k]] += area2 * 0.5 / 3.0;
-      }
-      (void)e;
-   }
    Csr S, M;
    S.n = M.n = n;
    S.rowStart.assign(n + 1, 0);
@@ -509,5 +426,250 @@ Modes Solve(const float* positions, int numVertices, const uint32_t* indices, in
    }
    result.valid = true;
    return result;
+}
+}
+
+Modes Solve(const float* positions, int numVertices, const uint32_t* indices, int numIndices, int maxModes, int vertexCap)
+{
+   Modes result;
+   maxModes = std::clamp(maxModes, 1, kMaxModes);
+   if (!positions || !indices || numVertices < 4 || numIndices < 3)
+      return result;
+
+   Mesh3 raw;
+   raw.p.resize((size_t)numVertices * 3);
+   double lo[3] = { 1e30, 1e30, 1e30 }, hi[3] = { -1e30, -1e30, -1e30 };
+   for (int v = 0; v < numVertices; v++)
+      for (int a = 0; a < 3; a++)
+      {
+         const double x = positions[3 * v + a];
+         if (!std::isfinite(x))
+            return result;
+         raw.p[3 * v + a] = x;
+         lo[a] = std::min(lo[a], x);
+         hi[a] = std::max(hi[a], x);
+      }
+   for (int t = 0; t + 2 < numIndices; t += 3)
+   {
+      const uint32_t a = indices[t], b = indices[t + 1], c = indices[t + 2];
+      if ((int)a >= numVertices || (int)b >= numVertices || (int)c >= numVertices)
+         continue;
+      raw.tri.insert(raw.tri.end(), { (int)a, (int)b, (int)c });
+   }
+   const double ext[3] = { hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2] };
+   const double diam = std::sqrt(ext[0] * ext[0] + ext[1] * ext[1] + ext[2] * ext[2]);
+   if (!(diam > 1e-9))
+      return result;
+
+   // 1. Weld coincident vertices (flat-shaded meshes duplicate them per face).
+   Mesh3 m = Cluster(raw, diam * 1e-5, lo);
+   result.weldedVertices = m.nv();
+   // 2. Size cap: coarsen with a uniform grid until the system fits.
+   if (m.nv() > vertexCap)
+   {
+      double cell = diam / std::cbrt((double)vertexCap) * 0.5;
+      for (int it = 0; it < 40 && m.nv() > vertexCap; it++)
+      {
+         m = Cluster(m, cell, lo);
+         cell *= 1.25;
+      }
+   }
+   const int n = m.nv();
+   result.solverVertices = n;
+   if (n < 8 || m.tri.size() < 3)
+      return result;
+
+   // 3. Cotangent stiffness and lumped mass.
+   std::vector<std::unordered_map<int, double>> w(n);
+   std::vector<double> mass(n, 0.0);
+   auto P = [&](int v, int a) { return m.p[3 * v + a]; };
+   for (size_t t = 0; t + 2 < m.tri.size(); t += 3)
+   {
+      const int idx[3] = { m.tri[t], m.tri[t + 1], m.tri[t + 2] };
+      double e[3][3]; // edge opposite vertex k
+      for (int k = 0; k < 3; k++)
+         for (int a = 0; a < 3; a++)
+            e[k][a] = P(idx[(k + 2) % 3], a) - P(idx[(k + 1) % 3], a);
+      auto cross = [](const double* a, const double* b, double* o) {
+         o[0] = a[1] * b[2] - a[2] * b[1];
+         o[1] = a[2] * b[0] - a[0] * b[2];
+         o[2] = a[0] * b[1] - a[1] * b[0];
+      };
+      double cr[3];
+      const double ab[3] = { P(idx[1], 0) - P(idx[0], 0), P(idx[1], 1) - P(idx[0], 1), P(idx[1], 2) - P(idx[0], 2) };
+      const double ac[3] = { P(idx[2], 0) - P(idx[0], 0), P(idx[2], 1) - P(idx[0], 1), P(idx[2], 2) - P(idx[0], 2) };
+      cross(ab, ac, cr);
+      const double area2 = std::sqrt(cr[0] * cr[0] + cr[1] * cr[1] + cr[2] * cr[2]);
+      if (area2 < 1e-18)
+         continue;
+      for (int k = 0; k < 3; k++)
+      {
+         // cot at corner k = dot(u, v) / |u x v|, u,v the two edges meeting at k.
+         const int i = idx[(k + 1) % 3], j = idx[(k + 2) % 3];
+         double u[3], vv[3];
+         for (int a = 0; a < 3; a++)
+         {
+            u[a] = P(i, a) - P(idx[k], a);
+            vv[a] = P(j, a) - P(idx[k], a);
+         }
+         const double dot = u[0] * vv[0] + u[1] * vv[1] + u[2] * vv[2];
+         const double wgt = 0.5 * dot / area2 * 2.0 * 0.5; // 0.5 * cot, cot = dot / area2
+         w[i][j] += wgt;
+         w[j][i] += wgt;
+         mass[idx[k]] += area2 * 0.5 / 3.0;
+      }
+      (void)e;
+   }
+   return SolveOperator(m, w, mass, diam, ext, maxModes, result);
+}
+
+Modes SolveCloud(const float* positions, int numVertices, int maxModes, int vertexCap)
+{
+   Modes result;
+   maxModes = std::clamp(maxModes, 1, kMaxModes);
+   if (!positions || numVertices < 8)
+      return result;
+   Mesh3 m;
+   m.p.resize((size_t)numVertices * 3);
+   double lo[3] = { 1e30, 1e30, 1e30 }, hi[3] = { -1e30, -1e30, -1e30 };
+   for (int v = 0; v < numVertices; v++)
+      for (int a = 0; a < 3; a++)
+      {
+         const double x = positions[3 * v + a];
+         if (!std::isfinite(x))
+            return result;
+         m.p[3 * v + a] = x;
+         lo[a] = std::min(lo[a], x);
+         hi[a] = std::max(hi[a], x);
+      }
+   const double ext[3] = { hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2] };
+   const double diam = std::sqrt(ext[0] * ext[0] + ext[1] * ext[1] + ext[2] * ext[2]);
+   if (!(diam > 1e-9))
+      return result;
+   m = Cluster(m, diam * 1e-5, lo);
+   result.weldedVertices = m.nv();
+   if (m.nv() > vertexCap)
+   {
+      double cell = diam / std::cbrt((double)vertexCap) * 0.5;
+      for (int it = 0; it < 40 && m.nv() > vertexCap; it++)
+      {
+         m = Cluster(m, cell, lo);
+         cell *= 1.25;
+      }
+   }
+   const int n = m.nv();
+   result.solverVertices = n;
+   if (n < 8)
+      return result;
+
+   // Graph Laplacian over each point's nearest neighbours, edge weight 1/d^2 and unit vertex mass: the
+   // same length-unit scaling a surface Laplacian has, so the shared solver's shift and zero-mode
+   // tolerance mean the same thing here. Brute-force kNN: n is capped at vertexCap, and this runs on a worker.
+   constexpr int kNeighbours = 6;
+   std::vector<std::unordered_map<int, double>> w(n);
+   std::vector<double> mass(n, 1.0);
+   std::vector<std::pair<double, int>> dist;
+   for (int i = 0; i < n; i++)
+   {
+      dist.clear();
+      for (int j = 0; j < n; j++)
+      {
+         if (j == i)
+            continue;
+         double d2 = 0.0;
+         for (int a = 0; a < 3; a++)
+         {
+            const double d = m.p[3 * i + a] - m.p[3 * j + a];
+            d2 += d * d;
+         }
+         dist.emplace_back(d2, j);
+      }
+      const int k = std::min<int>(kNeighbours, (int)dist.size());
+      std::partial_sort(dist.begin(), dist.begin() + k, dist.end());
+      for (int q = 0; q < k; q++)
+      {
+         const double wt = 1.0 / std::max(dist[q].first, diam * diam * 1e-12);
+         const int j = dist[q].second;
+         w[i][j] = std::max(w[i][j], wt);
+         w[j][i] = std::max(w[j][i], wt);
+      }
+   }
+   return SolveOperator(m, w, mass, diam, ext, maxModes, result);
+}
+
+Modes SolveCurve(const float* positions, int numVertices, bool closed, int maxModes)
+{
+   Modes result;
+   maxModes = std::clamp(maxModes, 1, kMaxModes);
+   if (!positions || numVertices < 2)
+      return result;
+   const int segs = closed ? numVertices : numVertices - 1;
+   std::vector<double> cum(segs + 1, 0.0);
+   for (int s = 0; s < segs; s++)
+   {
+      const float* a = positions + 3 * s;
+      const float* b = positions + 3 * ((s + 1) % numVertices);
+      double d2 = 0.0;
+      for (int k = 0; k < 3; k++)
+      {
+         if (!std::isfinite(a[k]) || !std::isfinite(b[k]))
+            return result;
+         const double d = (double)b[k] - (double)a[k];
+         d2 += d * d;
+      }
+      cum[s + 1] = cum[s] + std::sqrt(d2);
+   }
+   const double total = cum[segs];
+   if (!(total > 1e-9))
+      return result;
+
+   // Resample to evenly spaced points along the arc length, so the string's modes do not depend on how
+   // the curve happened to be sampled (a two-point line is a perfectly good string).
+   constexpr int kSamples = 200;
+   const int n = kSamples;
+   Mesh3 m;
+   m.p.resize((size_t)n * 3);
+   int seg = 0;
+   for (int i = 0; i < n; i++)
+   {
+      const double t = closed ? total * i / n : total * i / (n - 1);
+      while (seg < segs - 1 && cum[seg + 1] < t)
+         seg++;
+      const double len = std::max(cum[seg + 1] - cum[seg], 1e-12);
+      const double u = std::clamp((t - cum[seg]) / len, 0.0, 1.0);
+      const float* a = positions + 3 * seg;
+      const float* b = positions + 3 * ((seg + 1) % numVertices);
+      for (int k = 0; k < 3; k++)
+         m.p[3 * i + k] = (double)a[k] + ((double)b[k] - (double)a[k]) * u;
+   }
+   double lo[3] = { 1e30, 1e30, 1e30 }, hi[3] = { -1e30, -1e30, -1e30 };
+   for (int i = 0; i < n; i++)
+      for (int a = 0; a < 3; a++)
+      {
+         lo[a] = std::min(lo[a], m.p[3 * i + a]);
+         hi[a] = std::max(hi[a], m.p[3 * i + a]);
+      }
+   const double ext[3] = { hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2] };
+   // A string's first mode has wavelength 2 * its length, so use the arc length as the length scale
+   // (a bounding box of a coiled curve would put the shift and zero-mode tolerance in the wrong place).
+   const double diam = total;
+   result.weldedVertices = n;
+   result.solverVertices = n;
+
+   // 1D finite elements: stiffness 1/h per segment, mass h/2 to each end. Free ends (Neumann), like the
+   // free edge of a plate; a closed curve is a ring and its modes come in pairs.
+   const double h = total / (closed ? n : n - 1);
+   std::vector<std::unordered_map<int, double>> w(n);
+   std::vector<double> mass(n, 0.0);
+   const int links = closed ? n : n - 1;
+   for (int i = 0; i < links; i++)
+   {
+      const int j = (i + 1) % n;
+      w[i][j] += 1.0 / h;
+      w[j][i] += 1.0 / h;
+      mass[i] += 0.5 * h;
+      mass[j] += 0.5 * h;
+   }
+   return SolveOperator(m, w, mass, diam, ext, maxModes, result);
 }
 } // namespace MeshModalSolver

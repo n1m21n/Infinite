@@ -35,4 +35,12 @@ namespace MeshModalSolver
    // (larger meshes are clustered down first).
    Modes Solve(const float* positions, int numVertices, const uint32_t* indices, int numIndices, int maxModes,
                int vertexCap = 3000);
+
+   // The same modes for geometry that has no triangles (R616).
+   // Point cloud: graph Laplacian over each point's nearest neighbours (positions only, 3 floats per
+   // point); sparse or disconnected clouds ring as separate clusters.
+   Modes SolveCloud(const float* positions, int numVertices, int maxModes, int vertexCap = 3000);
+   // Curve (polyline, xyz triples, optionally closed): a free-ended string, or a ring when closed. The
+   // curve is resampled evenly in arc length first, so its modes do not depend on the point spacing.
+   Modes SolveCurve(const float* positions, int numVertices, bool closed, int maxModes);
 }

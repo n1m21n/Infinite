@@ -52,12 +52,25 @@ void ShapeResonatorKernel::Reset()
          mY1[c][m] = mY2[c][m] = 0.0f;
 }
 
-void ShapeResonatorKernel::StartSolve(std::vector<float> positions, std::vector<uint32_t> indices)
+void ShapeResonatorKernel::StartSolve(Kind kind, bool closed, std::vector<float> positions, std::vector<uint32_t> indices)
 {
    mJobDone.store(false, std::memory_order_relaxed);
    mJobRunning = true;
-   mWorker = std::thread([this, p = std::move(positions), i = std::move(indices)]() {
-      mJobResult = MeshModalSolver::Solve(p.data(), (int)(p.size() / 3), i.data(), (int)i.size(), kMaxModes);
+   mLastSolveStart = std::chrono::steady_clock::now();
+   mWorker = std::thread([this, kind, closed, p = std::move(positions), i = std::move(indices)]() {
+      const int nv = (int)(p.size() / 3);
+      switch (kind)
+      {
+         case Kind::kCloud:
+            mJobResult = MeshModalSolver::SolveCloud(p.data(), nv, kMaxModes);
+            break;
+         case Kind::kCurve:
+            mJobResult = MeshModalSolver::SolveCurve(p.data(), nv, closed, kMaxModes);
+            break;
+         default:
+            mJobResult = MeshModalSolver::Solve(p.data(), nv, i.data(), (int)i.size(), kMaxModes);
+            break;
+      }
       mJobDone.store(true, std::memory_order_release);
    });
 }
@@ -76,7 +89,9 @@ void ShapeResonatorKernel::CollectSolve()
    }
    else
    {
-      // Unusable mesh: remember the revision so we do not retry every cook.
+      // Unusable input (empty, degenerate, NaN): fall silent rather than keep ringing the previous shape, and
+      // remember the revision so we do not retry every cook.
+      mModes = MeshModalSolver::Modes();
       mSolvedGeo = mJobGeo;
       mSolvedRev = mJobRev;
    }
@@ -95,27 +110,60 @@ void ShapeResonatorKernel::PushParams(const AudioEffectNode& node, double sample
 
    IGeometrySource* geo = node.geometry;
    const void* geoKey = geo;
-   const unsigned long long rev = geo ? geo->MeshRevision() : 0ull;
+   unsigned long long rev = 0ull;
+   if (geo)
+      rev = geo->MeshRevision() * 1000003ull ^ geo->PointCloudRevision() * 998244353ull ^ geo->CurveStamp();
    const bool stale = !mHaveRequest || geoKey != mSolvedGeo || rev != mSolvedRev;
    const bool alreadyQueued = mJobRunning && geoKey == mJobGeo && rev == mJobRev;
-   if (stale && !mJobRunning && !alreadyQueued)
+   // A new source (or the first solve) goes straight away; only a revision change on the source we already
+   // solved waits out the throttle.
+   const bool sameSource = mHaveRequest && geoKey == mSolvedGeo;
+   const bool throttled = sameSource &&
+      std::chrono::steady_clock::now() - mLastSolveStart < std::chrono::milliseconds(400);
+   if (stale && !mJobRunning && !alreadyQueued && !throttled)
    {
       std::vector<float> pos;
       std::vector<uint32_t> idx;
+      Kind kind = Kind::kMesh;
+      bool closed = false;
       if (geo)
       {
          const Mesh& mesh = geo->GetMesh();
-         pos.reserve(mesh.vertices.size() * 3);
-         for (const Vertex& v : mesh.vertices)
-            pos.insert(pos.end(), { v.px, v.py, v.pz });
-         idx.assign(mesh.indices.begin(), mesh.indices.end());
+         const std::vector<Particle>* cloud = geo->GetPointCloud();
+         const Polyline* curve = geo->GetCurve();
+         if (!mesh.indices.empty())
+         {
+            pos.reserve(mesh.vertices.size() * 3);
+            for (const Vertex& v : mesh.vertices)
+               pos.insert(pos.end(), { v.px, v.py, v.pz });
+            idx.assign(mesh.indices.begin(), mesh.indices.end());
+         }
+         else if (cloud && !cloud->empty())
+         {
+            kind = Kind::kCloud;
+            for (const Particle& pt : *cloud)
+               if (pt.alive)
+                  pos.insert(pos.end(), { pt.px, pt.py, pt.pz });
+         }
+         else if (curve && !curve->Empty())
+         {
+            kind = Kind::kCurve;
+            closed = curve->closed;
+            pos = curve->points;
+         }
+         else if (!mesh.vertices.empty())
+         {
+            kind = Kind::kCloud; // vertices with no faces (Points to Vertices)
+            for (const Vertex& v : mesh.vertices)
+               pos.insert(pos.end(), { v.px, v.py, v.pz });
+         }
       }
       else
          BuildDefaultPlate(pos, idx);
       mHaveRequest = true;
       mJobGeo = geoKey;
       mJobRev = rev;
-      StartSolve(std::move(pos), std::move(idx));
+      StartSolve(kind, closed, std::move(pos), std::move(idx));
    }
 
    // Turn modes + params into resonator coefficients (main thread, cheap).
