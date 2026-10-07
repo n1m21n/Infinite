@@ -106,6 +106,7 @@ inline std::string TmpPath(const std::string& name)
 #include "core/CategoryColors.h"
 #include "core/UiScale.h"
 #include "core/SplashScreen.h"
+#include "core/LauncherCard.h"
 #include "core/GLUtil.h"
 #include "core/GraphNode.h"
 #include "core/FilterDefs.h"

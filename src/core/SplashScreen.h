@@ -59,6 +59,7 @@ namespace Splash
    {
       bool started = false;
       bool finished = false;
+      bool cardOnly = false; // the OS window IS the card (main.cpp shrinks it); no dim, no shadow, square corners
       double t0 = 0.0;
       double fadeStart = -1.0; // >= 0 once the exit fade has begun
       size_t tasksTotal = 0;
@@ -97,10 +98,11 @@ namespace Splash
    }
 
    // Call once, right before the main loop.
-   inline void Begin(float startAtSeconds = 0.0f)
+   inline void Begin(float startAtSeconds = 0.0f, bool cardOnly = false)
    {
       S() = State{};
       S().started = true;
+      S().cardOnly = cardOnly;
       S().t0 = ImGui::GetTime() - startAtSeconds;
    }
 
@@ -195,7 +197,9 @@ namespace Splash
          const float e = (float)(now - st.fadeStart);
          fadeK = Smooth(e / 0.18f);
          alpha = 1.0f - Smooth((e - 0.15f) / 0.30f);
-         if (alpha <= 0.0f)
+         if (st.cardOnly)
+            alpha = 1.0f; // the window itself is the card; the main window is restored right after the melt
+         if (st.cardOnly ? e > 0.22f : alpha <= 0.0f)
          {
             st.finished = true;
             return false;
@@ -203,9 +207,11 @@ namespace Splash
       }
 
       // --- layout: a card about 600 x 380 points ----------------------------------------
-      const float sc = std::max(0.7f, std::min(1.4f, std::min(W / 760.0f, H / 520.0f)));
-      const float cardW = 600.0f * sc, cardH = 380.0f * sc;
-      const float x0 = std::floor((W - cardW) * 0.5f), y0 = std::floor((H - cardH) * 0.5f);
+      const float sc = st.cardOnly ? std::min(W / 600.0f, H / 380.0f)
+                                   : std::max(0.7f, std::min(1.4f, std::min(W / 760.0f, H / 520.0f)));
+      const float cardW = st.cardOnly ? W : 600.0f * sc, cardH = st.cardOnly ? H : 380.0f * sc;
+      const float x0 = st.cardOnly ? 0.0f : std::floor((W - cardW) * 0.5f);
+      const float y0 = st.cardOnly ? 0.0f : std::floor((H - cardH) * 0.5f);
       const float x1 = x0 + cardW, y1 = y0 + cardH;
       const float rounding = 18.0f * sc;
       const float pad = 26.0f * sc;
@@ -245,8 +251,9 @@ namespace Splash
       ImDrawList* dl = ImGui::GetWindowDrawList();
 
       // dim the app behind the card, then the card with a soft shadow
-      dl->AddRectFilled(ImVec2(0, 0), ImVec2(W, H), IM_COL32(6, 8, 16, (int)(150.0f * alpha)));
-      for (int i = 6; i >= 1; --i)
+      if (!st.cardOnly)
+         dl->AddRectFilled(ImVec2(0, 0), ImVec2(W, H), IM_COL32(6, 8, 16, (int)(150.0f * alpha)));
+      for (int i = st.cardOnly ? 0 : 6; i >= 1; --i)
          dl->AddRectFilled(ImVec2(x0 - i * 4.0f * sc, y0 - i * 3.0f * sc + 10.0f * sc),
                            ImVec2(x1 + i * 4.0f * sc, y1 + i * 3.0f * sc + 10.0f * sc), IM_COL32(0, 0, 0, (int)(9.0f * alpha)),
                            rounding + i * 4.0f * sc);

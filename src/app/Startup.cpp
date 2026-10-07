@@ -684,6 +684,12 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // already point-based). Headless fixtures keep exact pixel sizes.
    if (!gHeadlessTestWindow)
       glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
+   // The launcher card plays in its own window first (core/LauncherCard.h); the main window stays
+   // hidden until it ends.
+   LauncherCard::Enabled() = !gHeadlessTestWindow && !IsHeadlessProcess() && getenv("INFINITE_NOSPLASH") == nullptr &&
+                             getenv("INFINITE_SPLASHTEST") == nullptr;
+   if (LauncherCard::Enabled())
+      glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
    window = glfwCreateWindow(1600, 1000, "Infinite", nullptr, nullptr);
    if (!window)
    {
@@ -3691,7 +3697,14 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    const char* splashTest = getenv("INFINITE_SPLASHTEST");
    // Launcher card on every normal start (core/SplashScreen.h). INFINITE_NOSPLASH=1 suppresses it.
    splashEnabled = splashTest != nullptr || (!gHeadlessTestWindow && !IsHeadlessProcess() && getenv("INFINITE_NOSPLASH") == nullptr);
-   if (splashEnabled)
+   if (LauncherCard::Enabled())
+   {
+      LauncherCard::Run(window, BundledResourcePath("fonts/Inter-Regular.ttf"));
+      glfwShowWindow(window);
+      glfwFocusWindow(window);
+      splashEnabled = false; // already played, in its own window
+   }
+   else if (splashEnabled)
       Splash::Begin(splashTest ? (float)atof(splashTest) : 0.0f);   return -1;
 }
 }
