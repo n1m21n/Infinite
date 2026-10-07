@@ -599,7 +599,7 @@ for spec in "${SELECTED_TESTS[@]}"; do
     while IFS= read -r line; do
       if [[ "$line" =~ \[FAIL\][[:space:]]+(.+[^[:space:]])[[:space:]]+param\ \'([^\']+)\' ]]; then
         node="${BASH_REMATCH[1]}"; param="${BASH_REMATCH[2]}"
-        if grep -qF "${node}|${param}|" "$EXPECTED_FILE"; then
+        if awk -F'|' -v n="$node" -v p="$param" '$1==n && $2==p {f=1} END {exit !f}' "$EXPECTED_FILE"; then
           xfail=$((xfail+1))
           echo "  [xfail] ${node}  param '${param}' — baselined, see audio-param-sweep-expected.txt" >> "$xfail_out"
         else
@@ -608,7 +608,7 @@ for spec in "${SELECTED_TESTS[@]}"; do
         fi
       elif [[ "$line" =~ \[pass\][[:space:]]+(.+[^[:space:]])[[:space:]]+param\ \'([^\']+)\'\ reaches\ audio\ thread ]]; then
         node="${BASH_REMATCH[1]}"; param="${BASH_REMATCH[2]}"
-        if grep -qF "${node}|${param}|" "$EXPECTED_FILE"; then
+        if awk -F'|' -v n="$node" -v p="$param" '$1==n && $2==p {f=1} END {exit !f}' "$EXPECTED_FILE"; then
           nowpass=$((nowpass+1))
           detail_lines+=("now passes: '${node}|${param}' — delete its line from audio-param-sweep-expected.txt")
         fi

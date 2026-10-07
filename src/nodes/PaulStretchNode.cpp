@@ -817,4 +817,8 @@ void PaulStretchNode::FinishBuffer(Platform::SampleBuffer* decoded, const std::s
 void PaulStretchNode::SweepPrepare()
 {
    mAudioNode->PushBuffer(MakeSweepToneBuffer());
+   // Start the audition lane too: these nodes stay silent until something triggers them.
+   mAudioNode->TriggerPreview(0.0f);
+   // Smallest window: the default 32768 needs ~16 blocks before its first hop, past the sweep's probe.
+   windowSizeIndex = 0;
 }

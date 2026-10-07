@@ -1040,4 +1040,6 @@ void SlicerNode::JoinWorkerIfDone()
 void SlicerNode::SweepPrepare()
 {
    mAudioNode->PushBuffer(MakeSweepToneBuffer());
+   // Start the audition lane too: these nodes stay silent until something triggers them.
+   mAudioNode->TriggerPreviewFromMainThread(-1);
 }

@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "audio/SweepTone.h"
 #include "audio/AudioBuffer.h"
 #include "audio/AudioNode.h"
 #include "audio/DspMath.h"
@@ -818,6 +819,20 @@ bool DrumSequencerNode::LoadFileToLane(int lane, const std::string& path)
    }
    laneStatus[lane] = error.empty() ? "failed to load" : error;
    return false;
+}
+
+void DrumSequencerNode::SweepPrepare()
+{
+   // A tone on every lane and a hit on every step of each, so lane and step params have something to
+   // change; the sweep ticks the transport (SweepNeedsClock) so the sequencer actually steps.
+   // 1/32 so every probe block (about 1.4 steps long) contains a step boundary; at 1/16 every third one is empty.
+   rate = MusicTime::kThirtySecond;
+   for (int lane = 0; lane < kNumLanes; lane++)
+   {
+      FinishLaneBuffer(lane, MakeSweepToneBuffer(), "sweep-tone", "sweep-tone.wav", "loaded");
+      for (int s = 0; s < numSteps; s++)
+         stepVel[lane][s] = 1.0f; // full velocity so accentPitch (>= 0.99 only) is audible
+   }
 }
 
 void DrumSequencerNode::FinishLaneBuffer(int lane, Platform::SampleBuffer* decoded, const std::string& fileName,
