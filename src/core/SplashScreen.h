@@ -48,7 +48,7 @@ namespace Splash
    constexpr float kLogoDrawEnd = 1.50f;
    constexpr float kCreditsStart = 1.00f;
    constexpr float kSkipAfter = 0.70f;
-   constexpr float kFadeOut = 0.70f; // logo melts into the backdrop first, then the backdrop fades
+   constexpr float kFadeOut = 0.45f; // logo melts into the backdrop first, then the backdrop fades
    constexpr float kHardCap = 12.0f; // never hold the app hostage, whatever the tasks do
 
    struct State
@@ -217,8 +217,8 @@ namespace Splash
       if (st.fadeStart >= 0.0)
       {
          const float e = (float)(now - st.fadeStart);
-         fadeK = Smooth(e / 0.40f);
-         alpha = 1.0f - Smooth((e - 0.30f) / 0.40f);
+         fadeK = Smooth(e / 0.18f);
+         alpha = 1.0f - Smooth((e - 0.15f) / 0.30f);
          if (alpha <= 0.0f)
          {
             st.finished = true;
@@ -264,7 +264,7 @@ namespace Splash
          const float hw = strokeW * 0.5f, aa = 1.0f;
          const ImVec2 uv = ImGui::GetDrawListSharedData()->TexUvWhitePixel;
          const float twoPi = 6.28318530718f;
-         if (draw > 0.0f)
+         if (draw > 0.0f && fadeK < 0.999f)
          {
             dl->PrimReserve((samples - 1) * 18, samples * 4);
             const ImDrawIdx base = (ImDrawIdx)dl->_VtxCurrentIdx;
@@ -309,7 +309,7 @@ namespace Splash
       }
       // The start cap sits on the crossing where the stroke ends too, so one cap covers both.
 
-      if (t > kLogoDrawEnd)
+      if (t > kLogoDrawEnd && fadeK < 0.999f)
       {
          const float bt = t - kLogoDrawEnd;
          const float fadeIn = Smooth(bt * 3.0f);
