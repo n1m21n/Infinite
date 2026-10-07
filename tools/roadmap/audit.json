@@ -1,16 +1,16 @@
 {
  "merges": [
-  312,
-  347
+  317,
+  352
  ],
  "direct": [
   421,
-  463
+  465
  ],
  "notes_total": 367,
  "evidence": [
-  498,
-  579
+  503,
+  584
  ],
  "per_release": {
   "v0.1": {
@@ -115,6 +115,8 @@
   }
  },
  "loose": [
+  "2026-10-07 4ff013a NDI plan: closed, parked",
+  "2026-10-07 292692a Roadmap: trim board to release-bound work, close R635 MPE, park the rest",
   "2026-10-07 9315838 Launcher: no ghost logo on exit, faster fade, shown once per installed version",
   "2026-10-07 4efecda Roadmap: close R604 Spectrum Slide",
   "2026-10-07 beb298a Node search: treat hyphen/underscore as space and match with spaces dropped (key snap / ke",

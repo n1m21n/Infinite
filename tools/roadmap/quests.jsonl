@@ -2438,3 +2438,24 @@
 {"ts": "2026-10-07T10:09:08+00:00", "event": "add", "id": "R637", "after": [], "user": false, "src": "plan:ndi", "track": "engine", "kind": "feature", "horizon": "later", "title": "Plan: NDI video in/out (R562, proposed for v0.4.8)", "why": "docs/plans/ndi"}
 {"ts": "2026-10-07T10:09:17+00:00", "event": "drop", "id": "R636", "why": "duplicate of R635"}
 {"ts": "2026-10-07T10:09:22+00:00", "event": "drop", "id": "R637", "why": "plan doc only, not scheduled; parked"}
+{"ts": "2026-10-07T15:59:47+05:30", "event": "add", "id": "R638", "after": [], "user": false, "src": "merge:feature/main-split-a", "track": "growth", "kind": "feature", "horizon": "later", "title": "Main split a", "why": "merged into main (2bd1885)", "origin": "merge"}
+{"ts": "2026-10-07T16:47:15+05:30", "event": "done", "id": "R638", "why": "merged into main (2bd1885)"}
+{"ts": "2026-10-07T16:47:15+05:30", "event": "edit", "id": "R638", "opened": "2026-10-07T15:59:47+05:30", "closed": "2026-10-07T16:47:15+05:30", "release": "", "commits": ["2bd1885"]}
+{"ts": "2026-10-07T11:17:56+00:00", "event": "add", "id": "R639", "after": [], "user": false, "src": "plan:main-split", "track": "engine", "kind": "feature", "horizon": "later", "title": "Plan: Split `src/main.cpp` \u2014 execution brief", "why": "docs/plans/main-split"}
+{"ts": "2026-10-07T16:58:10+05:30", "event": "add", "id": "R640", "after": [], "user": false, "src": "merge:feature/main-split-b", "track": "engine", "kind": "feature", "horizon": "later", "title": "Main split b", "why": "merged into main (e54cdc9)", "origin": "merge"}
+{"ts": "2026-10-07T17:25:20+05:30", "event": "done", "id": "R640", "why": "merged into main (e54cdc9)"}
+{"ts": "2026-10-07T17:25:20+05:30", "event": "edit", "id": "R640", "opened": "2026-10-07T16:58:10+05:30", "closed": "2026-10-07T17:25:20+05:30", "release": "", "commits": ["e54cdc9"]}
+{"ts": "2026-10-07T17:38:45+05:30", "event": "add", "id": "R641", "after": [], "user": false, "src": "merge:feature/main-split-c", "track": "engine", "kind": "feature", "horizon": "later", "title": "Main split c", "why": "merged into main (375dfb8)", "origin": "merge"}
+{"ts": "2026-10-07T17:49:32+05:30", "event": "done", "id": "R641", "why": "merged into main (375dfb8)"}
+{"ts": "2026-10-07T17:49:32+05:30", "event": "edit", "id": "R641", "opened": "2026-10-07T17:38:45+05:30", "closed": "2026-10-07T17:49:32+05:30", "release": "", "commits": ["375dfb8"]}
+{"ts": "2026-10-07T17:54:30+05:30", "event": "add", "id": "R642", "after": [], "user": false, "src": "merge:feature/launcher-card-window", "track": "growth", "kind": "feature", "horizon": "later", "title": "Launcher card window", "why": "merged into main (b06daa5)", "origin": "merge"}
+{"ts": "2026-10-07T17:54:30+05:30", "event": "done", "id": "R642", "why": "merged into main (b06daa5)"}
+{"ts": "2026-10-07T17:54:30+05:30", "event": "edit", "id": "R642", "opened": "2026-10-07T17:54:30+05:30", "closed": "2026-10-07T17:54:30+05:30", "release": "", "commits": ["b06daa5"]}
+{"ts": "2026-10-07T18:07:34+05:30", "event": "add", "id": "R643", "after": [], "user": false, "src": "merge:feature/ndi-in-out", "track": "growth", "kind": "feature", "horizon": "later", "title": "Ndi in out", "why": "merged into main (501df4f)", "origin": "merge"}
+{"ts": "2026-10-07T18:14:53+05:30", "event": "done", "id": "R643", "why": "merged into main (501df4f)"}
+{"ts": "2026-10-07T18:14:53+05:30", "event": "edit", "id": "R643", "opened": "2026-10-07T18:07:34+05:30", "closed": "2026-10-07T18:14:53+05:30", "release": "", "commits": ["501df4f"]}
+{"ts": "2026-10-07T12:47:22+00:00", "event": "done", "id": "R634", "why": "NDI In/Out merged to main (501df4f6); loopback self-test passes, live Out->In and perf bench not run"}
+{"ts": "2026-10-07T12:47:22+00:00", "event": "edit", "id": "R634", "commits": ["eae1b11d", "a6d0ca34", "ae078d68"]}
+{"ts": "2026-10-07T12:47:26+00:00", "event": "done", "id": "R639", "why": "main.cpp split A-C merged; main.cpp is 119 lines"}
+{"ts": "2026-10-07T12:47:26+00:00", "event": "edit", "id": "R639", "commits": ["375dfb85"]}
+{"ts": "2026-10-07T12:47:34+00:00", "event": "add", "id": "R644", "after": [], "user": false, "src": "brief:drum-groove-library.md", "track": "engine", "kind": "fix", "horizon": "next", "title": "Fix brief: R540 - Drum Sequencer groove library + bundled kit (verified brief)", "why": "docs/fix-briefs/drum-groove-library.md"}
