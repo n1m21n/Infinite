@@ -399,6 +399,7 @@ set(COMMON_SOURCES
     src/main.cpp
     # src/app/**: code that used to live in src/main.cpp
     src/app/AppState.cpp
+    src/app/Startup.cpp
     src/app/bodies/AudioBodyKit.cpp
     src/app/bodies/AudioNodeBodies.cpp
     src/app/bodies/FieldParams.cpp
@@ -412,12 +413,28 @@ set(COMMON_SOURCES
     src/app/bodies/PreviewBodies.cpp
     src/app/bodies/SamplerBodies.cpp
     src/app/frame/CookFrame.cpp
+    src/app/frame/FrameStatics.cpp
     src/app/frame/FrameTests1.cpp
     src/app/frame/FrameTests2.cpp
     src/app/frame/FrameTests3.cpp
     src/app/frame/FrameTests4.cpp
     src/app/frame/FrameTests5.cpp
     src/app/frame/FrameTests6.cpp
+    src/app/frame/StageBenchHarness.cpp
+    src/app/frame/StageDropHandling.cpp
+    src/app/frame/StageFloating.cpp
+    src/app/frame/StageFramePump.cpp
+    src/app/frame/StageFrameTestsA.cpp
+    src/app/frame/StageKeyboard.cpp
+    src/app/frame/StageLayout.cpp
+    src/app/frame/StageLinks.cpp
+    src/app/frame/StageMenuBar.cpp
+    src/app/frame/StageNodeBodies.cpp
+    src/app/frame/StagePopupsA.cpp
+    src/app/frame/StagePopupsB.cpp
+    src/app/frame/StagePresent.cpp
+    src/app/frame/StageSidePanels.cpp
+    src/app/frame/StageTestsB.cpp
     src/app/graph/AudioTopology.cpp
     src/app/graph/Core.cpp
     src/app/graph/Disconnect.cpp
@@ -778,34 +795,11 @@ set(LINUX_SOURCES
     external/glad/src/gl.c
 )
 
-# MSVC's x64 code generator hits an internal compiler error on src/main.cpp at
-# /O2 - no C1001, no source line, just CL.exe exiting with -529706956. ARM64
-# compiles the identical file, and it only started failing once a month of
-# feature work landed in this translation unit.
-#
-# Two cheaper theories were tested and both failed. /Ob1 (inline only where
-# marked) changed nothing, so it is not inlining. Giving main()'s 10k-line
-# frame loop its own function via a lambda changed nothing either - which
-# makes sense in hindsight: that moved the enormous body into the lambda's
-# operator() instead of shrinking it, so the largest single function the
-# backend has to work on was the same size as before.
-#
-# So the optimiser gets switched off for this one file. If the crash lives
-# anywhere in the optimiser, /Od removes it.
-#
-# main.cpp is ImGui drawing, the node editor and the headless fixtures - no
-# per-sample audio runs here, that is all in other TUs - so this is a real but
-# modest UI cost, on Windows only. Do not try to confirm this landed by
-# grepping the build log for the flag - MSBuild does not echo compiler flags at
-# default verbosity, and CMake does not pass this one on the command line
-# anyway: it becomes a per-file <Optimization>Disabled</Optimization> in
-# Infinite.vcxproj. The build workflow dumps that node so it stays checkable.
-#
-# The real fix is for this file to stop being 37k lines. Until then, keep this
-# scoped to the one file and the one compiler that needs it.
-if(MSVC)
-    set_source_files_properties(src/main.cpp PROPERTIES COMPILE_OPTIONS "/Od")
-endif()
+# (Was: /Od on src/main.cpp for an MSVC x64 internal compiler error caused by the
+# 37k-line main().) main() is now a ~120-line driver and the frame body lives in
+# src/app/Startup.cpp and src/app/frame/Stage*.cpp, so the override is gone. If CL.exe
+# crashes again at /O2, scope /Od to the one Stage*.cpp file that does it:
+#   set_source_files_properties(src/app/frame/<File>.cpp PROPERTIES COMPILE_OPTIONS "/Od")
 
 # Dev-only tool: compiles a Field pixel/element source file through the same
 # Lex/Parse/IR/GLSL pipeline FieldPixelNode::Apply() runs at load time, so a
