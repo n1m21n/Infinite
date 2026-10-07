@@ -101247,7 +101247,9 @@ int main(int argc, char** argv)
                              dblClickMouse.y >= gGraphScreenTL.y &&
                              dblClickMouse.x <= gGraphScreenTL.x + gGraphScreenSize.x &&
                              dblClickMouse.y <= gGraphScreenTL.y + gGraphScreenSize.y;
-      if (overGraph &&
+      // IsWindowHovered() is false while a floating window (Settings, panels) covers the cursor, so a
+      // double-click on a control inside one does not also open the spawner behind it.
+      if (overGraph && ImGui::IsWindowHovered() &&
           ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
           !ed::GetHoveredNode() && !ed::GetHoveredPin() && !ed::GetHoveredLink() &&
           gCommentEdit.target == nullptr)
