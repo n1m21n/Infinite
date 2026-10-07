@@ -477,6 +477,7 @@ set(COMMON_SOURCES
     src/core/CurveShape.cpp
     src/core/NodeFactory.cpp
     src/core/CategoryColors.cpp
+    src/core/I18n.cpp
     src/core/FilterDefs.cpp
     src/core/BlendModes.cpp
     src/core/Mesh.cpp
