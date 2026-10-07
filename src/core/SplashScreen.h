@@ -18,7 +18,7 @@
 // A compact card, centred over a dimmed window (the way Bitwig opens):
 //   - the Infinite mark (the same lemniscate the website draws) strokes itself in, then a
 //     bead rides the loop;
-//   - bottom left: Author / Contributors / Agent; bottom right: the version;
+//   - bottom left: one small footer line (trademark, made in India, open source); bottom right: the version;
 //   - queued background tasks (AddTask) run one per frame behind it, with a hairline of
 //     progress, so slow start-up work has somewhere to live without freezing a blank window.
 //
@@ -334,36 +334,22 @@ namespace Splash
       {
          ImFont* font = ImGui::GetFont();
          const float textA = Smooth((t - 0.6f) * 2.0f);
-         const float labelFs = 8.5f * sc, nameFs = 11.5f * sc, rowH = 17.0f * sc;
-         const float labelW = 92.0f * sc;
-         const float rows = (float)Credits().size();
-         float y = y1 - pad - rows * rowH + (rowH - nameFs) * 0.5f;
-         for (const CreditSection& sec : Credits())
-         {
-            std::string names;
-            for (const char* n : sec.names)
-            {
-               if (!names.empty())
-                  names += ", ";
-               names += n;
-            }
-            std::string spaced;
-            for (const char* p = sec.heading; *p; ++p)
-            {
-               spaced += *p;
-               if (p[1]) spaced += ' ';
-            }
-            dl->AddText(font, labelFs, ImVec2(x0 + pad, y + (nameFs - labelFs) * 0.5f),
-                        mixBg(IM_COL32(0x8F, 0x98, 0xB8, (int)(255.0f * textA)), y), spaced.c_str());
-            dl->AddText(font, nameFs, ImVec2(x0 + pad + labelW, y),
-                        mixBg(IM_COL32(0xE8, 0xEC, 0xF8, (int)(255.0f * textA)), y), names.c_str());
-            y += rowH;
-         }
+         // One quiet footer line, like Bitwig's. Names are not shown for now (Credits() is kept for later).
+         const float fs = 8.5f * sc;
+         // The font has no trademark glyph, so "TM" is drawn as a small raised superscript.
+         const ImU32 footCol = IM_COL32(0x8F, 0x98, 0xB8, (int)(210.0f * textA));
+         const float fy = y1 - pad - fs;
+         float fx = x0 + pad;
+         dl->AddText(font, fs, ImVec2(fx, fy), mixBg(footCol, fy), "Infinite");
+         fx += font->CalcTextSizeA(fs, FLT_MAX, 0.0f, "Infinite").x + 1.0f * sc;
+         dl->AddText(font, fs * 0.55f, ImVec2(fx, fy - fs * 0.12f), mixBg(footCol, fy), "TM");
+         fx += font->CalcTextSizeA(fs * 0.55f, FLT_MAX, 0.0f, "TM").x;
+         dl->AddText(font, fs, ImVec2(fx, fy), mixBg(footCol, fy), "   |   Made in India   |   Open source (MIT license)");
          const std::string ver = std::string("v") + INFINITE_VERSION_STRING;
-         const float vfs = 11.5f * sc;
+         const float vfs = 8.5f * sc;
          const ImVec2 vsz = font->CalcTextSizeA(vfs, FLT_MAX, 0.0f, ver.c_str());
          dl->AddText(font, vfs, ImVec2(x1 - pad - vsz.x, y1 - pad - vsz.y),
-                     mixBg(IM_COL32(0x8F, 0x98, 0xB8, (int)(255.0f * textA)), y1 - pad), ver.c_str());
+                     mixBg(footCol, y1 - pad), ver.c_str());
 
          // progress hairline under the mark, only while background tasks are queued
          if (st.tasksTotal > 0)
