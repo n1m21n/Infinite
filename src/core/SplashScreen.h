@@ -146,7 +146,7 @@ namespace Splash
    {
       float h = 0.0f;
       for (const CreditSection& sec : Credits())
-         h += 18.0f + 10.0f + 32.0f * (float)sec.names.size() + 46.0f;
+         h += 14.0f + 8.0f + 22.0f * (float)sec.names.size() + 30.0f;
       return h;
    }
 
@@ -190,12 +190,12 @@ namespace Splash
       const float A = 130.0f * sc;          // lemniscate half-width
       const float strokeW = 0.257f * A;     // 87/338 of A, as on the website
       const float cx = W * 0.5f;
-      const float cy = H * 0.34f;
+      const float cy = H * 0.5f; // the mark sits dead centre; credits roll in the space below
 
       const float regionTop = cy + A * 0.5f + 46.0f * sc;
       const float regionBot = H - 48.0f * sc;
       const float regionH = std::max(40.0f, regionBot - regionTop);
-      const float speed = 78.0f * sc;       // px / s
+      const float speed = 52.0f * sc;       // px / s
       const float creditsT = std::max(0.0f, t - kCreditsStart);
       const float scrolled = creditsT * speed;
       const float contentH = CreditsContentHeight() * sc;
@@ -235,17 +235,55 @@ namespace Splash
 
       // --- logo: stroke draws itself in, then a bead rides the loop ----------------------
       const float draw = EaseInOutCubic((t - kLogoDrawStart) / (kLogoDrawEnd - kLogoDrawStart));
-      const int kSeg = 220;
-      const int segsShown = (int)std::ceil(draw * (float)kSeg);
-      const float twoPi = 6.28318530718f;
-      for (int k = 0; k < segsShown; ++k)
+      // One continuous triangle strip with a 1-unit antialiased fringe on both edges. Stacking
+      // round-capped AddLine segments instead leaves a dotted, aliased outline.
       {
-         const ImVec2 p0 = Lemniscate(twoPi * (float)k / (float)kSeg);
-         const ImVec2 p1 = Lemniscate(twoPi * (float)(k + 1) / (float)kSeg);
-         const ImVec2 a(cx + p0.x * A, cy + p0.y * A), b(cx + p1.x * A, cy + p1.y * A);
-         const ImU32 col = BrandColor((p1.x + 1.0f) * 0.5f, alpha);
-         dl->AddLine(a, b, col, strokeW);
-         dl->AddCircleFilled(b, strokeW * 0.5f, col, 16); // round joints: no gaps on the curves
+         const int kSeg = 480;
+         const int samples = std::max(2, (int)std::ceil(draw * (float)kSeg) + 1);
+         const float hw = strokeW * 0.5f, aa = 1.0f;
+         const ImVec2 uv = ImGui::GetDrawListSharedData()->TexUvWhitePixel;
+         const float twoPi = 6.28318530718f;
+         if (draw > 0.0f)
+         {
+            dl->PrimReserve((samples - 1) * 18, samples * 4);
+            const ImDrawIdx base = (ImDrawIdx)dl->_VtxCurrentIdx;
+            for (int i = 0; i < samples; ++i)
+            {
+               const float p = twoPi * draw * (float)i / (float)(samples - 1);
+               const ImVec2 q0 = Lemniscate(p - 0.0005f), q1 = Lemniscate(p + 0.0005f), q = Lemniscate(p);
+               float tx = (q1.x - q0.x), ty = (q1.y - q0.y);
+               const float tl = std::sqrt(tx * tx + ty * ty);
+               tx = tl > 0.0f ? tx / tl : 1.0f;
+               ty = tl > 0.0f ? ty / tl : 0.0f;
+               const float nx = -ty, ny = tx;
+               const ImVec2 c(cx + q.x * A, cy + q.y * A);
+               const ImU32 on = BrandColor((q.x + 1.0f) * 0.5f, alpha);
+               const ImU32 off = on & ~IM_COL32_A_MASK;
+               dl->PrimWriteVtx(ImVec2(c.x + nx * (hw + aa), c.y + ny * (hw + aa)), uv, off);
+               dl->PrimWriteVtx(ImVec2(c.x + nx * hw, c.y + ny * hw), uv, on);
+               dl->PrimWriteVtx(ImVec2(c.x - nx * hw, c.y - ny * hw), uv, on);
+               dl->PrimWriteVtx(ImVec2(c.x - nx * (hw + aa), c.y - ny * (hw + aa)), uv, off);
+            }
+            for (int i = 0; i + 1 < samples; ++i)
+            {
+               const ImDrawIdx r0 = (ImDrawIdx)(base + i * 4), r1 = (ImDrawIdx)(base + (i + 1) * 4);
+               for (int k = 0; k < 3; ++k)
+               {
+                  dl->PrimWriteIdx((ImDrawIdx)(r0 + k));
+                  dl->PrimWriteIdx((ImDrawIdx)(r1 + k));
+                  dl->PrimWriteIdx((ImDrawIdx)(r1 + k + 1));
+                  dl->PrimWriteIdx((ImDrawIdx)(r0 + k));
+                  dl->PrimWriteIdx((ImDrawIdx)(r1 + k + 1));
+                  dl->PrimWriteIdx((ImDrawIdx)(r0 + k + 1));
+               }
+            }
+            // Round head while the stroke is still drawing in.
+            if (draw < 1.0f)
+            {
+               const ImVec2 hq = Lemniscate(twoPi * draw);
+               dl->AddCircleFilled(ImVec2(cx + hq.x * A, cy + hq.y * A), hw, BrandColor((hq.x + 1.0f) * 0.5f, alpha), 48);
+            }
+         }
       }
       // The start cap sits on the crossing where the stroke ends too, so one cap covers both.
 
@@ -255,10 +293,9 @@ namespace Splash
          const float fadeIn = Smooth(bt * 3.0f);
          const float u = std::fmod(bt / 4.0f, 1.0f);
          const float e = u + 0.035f * std::sin(u * 3.14159265f * 4.0f); // quicker through the crossing
-         const ImVec2 q = Lemniscate(twoPi * (e - std::floor(e)));
+         const ImVec2 q = Lemniscate(6.28318530718f * (e - std::floor(e)));
          const ImVec2 c(cx + q.x * A, cy + q.y * A);
          const float r = strokeW * 0.30f;
-         dl->AddCircleFilled(c, r * 1.9f, IM_COL32(0xF9, 0xA5, 0x8F, (int)(40.0f * fadeIn * alpha)), 24);
          dl->AddCircleFilled(c, r, IM_COL32(0xC2, 0x59, 0x3F, (int)(255.0f * fadeIn * alpha)), 24);
          dl->AddCircleFilled(ImVec2(c.x - r * 0.18f, c.y - r * 0.2f), r * 0.78f,
                              IM_COL32(0xF9, 0xA5, 0x8F, (int)(255.0f * fadeIn * alpha)), 24);
@@ -281,7 +318,7 @@ namespace Splash
             };
             // heading: small, spaced, muted
             {
-               const float fs = 12.0f * sc;
+               const float fs = 9.5f * sc;
                std::string spaced;
                for (const char* p = sec.heading; *p; ++p)
                {
@@ -289,19 +326,19 @@ namespace Splash
                   if (p[1]) spaced += ' ';
                }
                const ImVec2 sz = font->CalcTextSizeA(fs, FLT_MAX, 0.0f, spaced.c_str());
-               const float e = edge(y + 9.0f * sc) * cdAlpha;
+               const float e = edge(y + 7.0f * sc) * cdAlpha;
                dl->AddText(font, fs, ImVec2(cx - sz.x * 0.5f, y), IM_COL32(0x8F, 0x98, 0xB8, (int)(255.0f * e)), spaced.c_str());
             }
-            y += 18.0f * sc + 10.0f * sc;
+            y += 14.0f * sc + 8.0f * sc;
             for (const char* name : sec.names)
             {
-               const float fs = 24.0f * sc;
+               const float fs = 14.0f * sc;
                const ImVec2 sz = font->CalcTextSizeA(fs, FLT_MAX, 0.0f, name);
-               const float e = edge(y + 12.0f * sc) * cdAlpha;
+               const float e = edge(y + 8.0f * sc) * cdAlpha;
                dl->AddText(font, fs, ImVec2(cx - sz.x * 0.5f, y), IM_COL32(0xE8, 0xEC, 0xF8, (int)(255.0f * e)), name);
-               y += 32.0f * sc;
+               y += 22.0f * sc;
             }
-            y += 46.0f * sc;
+            y += 30.0f * sc;
          }
          dl->PopClipRect();
       }
