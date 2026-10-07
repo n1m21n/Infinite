@@ -2271,3 +2271,6 @@
 {"ts": "2026-10-07T00:28:51+00:00", "event": "edit", "id": "R563", "opened": "2026-10-07T05:55:21+05:30", "commits": ["56a249d"], "closed": "2026-10-07T05:55:21+05:30", "release": ""}
 {"ts": "2026-10-07T00:33:43+00:00", "event": "done", "id": "R596", "why": "pitch bend + channel aftertouch bindable on 3 platforms (poly aftertouch not modelled); MIDIBENDTEST ok on macOS, Win/Linux uncompiled"}
 {"ts": "2026-10-07T00:33:43+00:00", "event": "edit", "id": "R596", "commits": ["7da571a8"]}
+{"ts": "2026-10-07T00:54:22+00:00", "event": "add", "id": "R601", "track": "ux", "kind": "fix", "horizon": "later", "title": "KBCURSORTEST coverage for Shift+U (ungroup) and F (frame)", "why": "Split from R587: H and Cmd+U are covered, these two are not", "after": [], "user": false, "origin": "explore", "effort": "S"}
+{"ts": "2026-10-07T00:54:40+00:00", "event": "done", "id": "R587", "why": "Tab + Left/Right on dropdowns and checkboxes, KBDISCRETETEST ok; Shift+U/F tests split into a new quest"}
+{"ts": "2026-10-07T00:54:40+00:00", "event": "edit", "id": "R587", "commits": ["278a2d36"]}
