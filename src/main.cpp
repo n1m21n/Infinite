@@ -19359,12 +19359,14 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          const std::vector<std::string> folders = gPluginScanner.Folders();
          for (const std::string& folder : folders)
          {
-            ImGui::TextUnformatted(folder.c_str());
-            ImGui::SameLine();
+            // Button first, path wrapped after it: a long folder path used to
+            // push Remove past the right edge of the panel, out of reach.
             ImGui::PushID(folder.c_str());
             if (ImGui::SmallButton("Remove"))
                gPluginScanner.RemoveFolder(folder);
             ImGui::PopID();
+            ImGui::SameLine();
+            ImGui::TextWrapped("%s", folder.c_str());
          }
          if (ImGui::Button("Add VST3 folder...", ImVec2(-1.0f, 0)))
          {
