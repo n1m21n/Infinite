@@ -1,6 +1,6 @@
 # NDI video in/out (R562, closed)
 
-Status: CLOSED 2026-10-07 by owner. Not being built; parked (docs/plans/parked-ideas.md). Reopen by logging a quest.
+Status: BUILT 2026-10-07 on feature/ndi-in-out (owner reopened and asked to finish). Steps 1-3 and 6 (help, branding in help text) done; loopback verified on macOS with the real runtime (INFINITE_NDITEST). Windows/Linux builds not run from here. Runtime is found via NDI_RUNTIME_DIR_V6/V5 or default paths, never bundled. NDI frames are lossy (SpeedHQ), so the test compares within a tolerance.
 
 ## Goal
 Infinite publishes any image cable as a named NDI source on the local network, and takes any NDI source on the network
