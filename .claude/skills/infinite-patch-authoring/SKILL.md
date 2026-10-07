@@ -116,7 +116,7 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-299 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+301 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
@@ -150,6 +150,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Field Primitive` | none | geo:geometry | 13 | bypass |
 | `Gear 3D` | texture:image | out:geometry | 50 | bypass |
 | `Geometry` | texture:image | out:geometry | 50 | bypass |
+| `Group 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, geo_e:geometry, geo_f:geometry, geo_g:geometry, geo_h:geometry | out:geometry | 0 |  |
 | `HDRI` | none | out:environment | 3 | bypass |
 | `Helix` | texture:image | out:geometry | 50 | bypass |
 | `Icosphere` | texture:image | out:geometry | 50 | bypass |
@@ -160,7 +161,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Klein Bottle` | texture:image | out:geometry | 50 | bypass |
 | `Light` | none | out:light | 10 | bypass |
 | `Mapping` | geo:geometry | out:geometry | 11 | bypass |
-| `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image | out:geometry | 28 |  |
+| `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image | out:geometry | 29 |  |
 | `Merge by Distance` | geo:geometry | out:geometry | 1 | bypass |
 | `Mesh to Edges` | geo:geometry | out:geometry | 22 | bypass |
 | `Mesh to Faces` | geo:geometry | out:geometry | 22 | bypass |
@@ -220,6 +221,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Flanger` | audio:audio | out:audio | 9 | bypass |
 | `Formant Filter` | audio:audio | out:audio | 3 | bypass |
 | `Frequency Shifter` | audio:audio | out:audio | 6 | bypass |
+| `Key-Snap` | audio:audio | out:audio | 6 | bypass |
 | `Limiter` | audio:audio | out:audio | 5 | bypass |
 | `Phaser` | audio:audio | out:audio | 9 | bypass |
 | `Pitch Shifter` | audio:audio | out:audio | 4 | bypass |
@@ -244,7 +246,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Comment` | none | out:image | 5 |  |
 | `Curves` | input:image | out:image | 6 | bypass |
 | `Feedback` | input:image | out:image | 1 | bypass |
-| `Fit` | input:image | out:image | 6 | bypass |
+| `Fit` | input:image | out:image | 8 | bypass |
 | `Group` | none | out:image | 4 | bypass |
 | `Layer Stack` | input:image, input_2:image, input_3:image, input_4:image | out:image | 8 |  |
 | `Null` | in:image | out:image | 0 | bypass |
@@ -437,12 +439,12 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | Type | Inputs | Outputs | p | Notes |
 |---|---|---|---|---|
 | `Analog` | notes:note | out:audio | 33 | bypass |
-| `Drum Sequencer` | none | out:audio, 1:audio, 2:audio, 3:audio, 4:audio, 5:audio, 6:audio, 7:audio, 8:audio | 169 | bypass |
+| `Drum Sequencer` | none | out:audio, 1:audio, 2:audio, 3:audio, 4:audio, 5:audio, 6:audio, 7:audio, 8:audio | 371 | bypass |
 | `Equation Synth` | notes:note | out:audio | 30 | bypass |
 | `Field Synth` | notes:note, in:audio | out:audio | 13 | bypass |
 | `Grain Molder` | notes:note, record_in:audio | out:audio | 14 | bypass |
 | `Granular` | record_in:audio | out:audio | 21 | bypass |
-| `Looper` | audio:audio | out:audio | 9 | bypass |
+| `Looper` | audio:audio | out:audio | 10 | bypass |
 | `MPC` | notes:note | out:audio | 177 | bypass |
 | `Metallic` | notes:note | out:audio | 15 | bypass |
 | `Molder` | record_in:audio | out:audio | 16 | bypass |
@@ -460,7 +462,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 |---|---|---|---|---|
 | `Audio In` | none | out:audio | 4 | hardware: refused headless, bypass |
 | `Audio Meter` | audio:audio | out:audio | 0 | bypass |
-| `Audio Out` | audio:audio | out:image | 2 | bypass |
+| `Audio Out` | audio:audio | out:image | 3 | bypass |
 | `Blend Audio` | a:audio, b:audio | out:audio | 1 |  |
 | `Field Graph` | none | out:image | 7 | bypass |
 | `Gain` | audio:audio | out:audio | 1 | bypass |

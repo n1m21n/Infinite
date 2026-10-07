@@ -19,17 +19,24 @@ the result back as JSON. Never guess a node's name, keys, slots or ranges: ask t
    every node type you use. Not from memory.
 2. **Write** - the smallest patch that could work. Leave every parameter you do not change at its
    default; a node needs only the keys you set.
-3. **Validate** - `Infinite --validate patch.inf`. Strict by default: warnings are errors too.
+3. **Lay out and annotate** - a node with no `pos` spawns at 0,0, so a hand-written patch opens as one
+   stacked pile. Always finish with `python3 tools/patch-layout.py patch.inf`: Picture / Sound /
+   Modulation bands, left to right by wiring depth, sized per node type. Always add `Comment` nodes
+   (`node N Compositing Comment`, `s text ...`, `f width`, `f height`): one header per band
+   (`# band Picture` on the line before the node) and one beside every node a user would want explained
+   (`# near <id>`); the tool places them. Check with `python3 tools/patch-layout-preview.py patch.inf box.png`
+   (no GUI needed). New SIZES entries go in the tool when a type overlaps its neighbours.
+4. **Validate** - `Infinite --validate patch.inf`. Strict by default: warnings are errors too.
    Fix until the exit code is 0. Every error carries a line number and a hint.
-4. **Explain and compare to intent** - `Infinite --explain patch.inf`. It prints the graph that
+5. **Explain and compare to intent** - `Infinite --explain patch.inf`. It prints the graph that
    was actually built. Read it against what the user asked for: is every wire you wrote there,
    is every node you expect reachable from an Output or Audio Out, is any parameter still at a
    default you meant to change? A patch can validate and still be the wrong patch.
-5. **Look and listen** - `Infinite --frame patch.inf 0,1,2 dir/ --contact-sheet sheet.png` for
+6. **Look and listen** - `Infinite --frame patch.inf 0,1,2 dir/ --contact-sheet sheet.png` for
    pictures, `Infinite --audio-summary patch.inf out.json` for sound. Read `frame_stats` and
    `audio_summary` from the status line before you open any file.
-6. **Fix** - change the patch, go back to step 3. Change one thing at a time.
-7. **Render** - `Infinite --render patch.inf out.mp4 [--start S] [--duration S] [--fps N]`.
+7. **Fix** - change the patch, go back to step 4. Change one thing at a time.
+8. **Render** - `Infinite --render patch.inf out.mp4 [--start S] [--duration S] [--fps N]`.
 
 ## Reading the result
 
@@ -62,10 +69,8 @@ expr <dst> <param|key> <expression>        glob <name> <expression>
 ```
 
 - Wires read destination first: `cable out 0 shape` = "Output slot 0 is fed by shape".
-- Names work everywhere an index does: node `id`s, slot names (`input`, `input_2`, ...), a source's
-  output label (`mod glow uIntensity ears low 0 1 0.5 0.8 2.2`; `--describe` outputs), and a
-  parameter's saved key in `mod`/`expr` (`mod shape sizeX lfo 0 0 1 0.5`). A number is always an index.
-- Node indices need not be in order or contiguous; headless runs keep the file's numbers.
+- Names work everywhere an index does: node `id`s, slot names (`input`, `input_2`, ...), and a
+  parameter's saved key in `mod`/`expr` (`mod shape sizeX lfo 0 0 1 0.5`).
 - Free text (type names, strings, expressions) is always last on its line.
 - Full reference: `docs/reference/patch-format.md`. Three verified starting points live in
   `assets/examples/authoring/` (image, audio, modulation).
@@ -75,6 +80,14 @@ expr <dst> <param|key> <expression>        glob <name> <expression>
 - **Defaults rule.** Omit what you do not change. Never copy every key of a node into a patch.
 - **No sigils.** Field and expression code uses bare names (`P.y += bass * 2`), never `@P.y`.
   Field kernels: see the `infinite-field-language` skill.
+- **Field `param`s are not modulatable headless.** `mod scene myParam ...` fails `E_BAD_KEY` (only
+  width/height/animate are keyed). Animate Field code from `t` inside the kernel, and drive the rest of
+  the chain (bloom, lensdistortion, Trails, audio effects) from LFOs/`Audio Analyze`. To keep audio and
+  picture locked, give the LFO and the kernel the same period (kernel `sin(6.2832*t/12)` = LFO `rateBeats 24` at 120 bpm).
+- **Field kernels: unroll loops** (generate repeated blocks from Python) and declare no `param`s you cannot
+  reach. Check brightness with `frame_stats.mean_luma` (aim ~0.1-0.3 for dark-ground art); Trails in
+  Screen/Add mode accumulates to white, use Max. `--frame` times are seconds. A generator script like
+  `art/prism/gen_prism.py` is the easiest way to iterate.
 - **Bypass.** A node with two or more inputs never bypasses; a bypassed node does not cook.
   `flags 0 1 0 0` on such a node raises `W_BYPASS_IGNORED`.
 - **Something must be reachable.** An image needs an `Utility Output`; sound needs an
@@ -103,7 +116,7 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-299 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+301 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
@@ -137,6 +150,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Field Primitive` | none | geo:geometry | 13 | bypass |
 | `Gear 3D` | texture:image | out:geometry | 50 | bypass |
 | `Geometry` | texture:image | out:geometry | 50 | bypass |
+| `Group 3D` | geo_a:geometry, geo_b:geometry, geo_c:geometry, geo_d:geometry, geo_e:geometry, geo_f:geometry, geo_g:geometry, geo_h:geometry | out:geometry | 0 |  |
 | `HDRI` | none | out:environment | 3 | bypass |
 | `Helix` | texture:image | out:geometry | 50 | bypass |
 | `Icosphere` | texture:image | out:geometry | 50 | bypass |
@@ -147,7 +161,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Klein Bottle` | texture:image | out:geometry | 50 | bypass |
 | `Light` | none | out:light | 10 | bypass |
 | `Mapping` | geo:geometry | out:geometry | 11 | bypass |
-| `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image | out:geometry | 28 |  |
+| `Material` | geo:geometry, albedo:image, roughness:image, metallic:image, normal:image, ao:image, emission:image, clearcoat:image, sheen:image | out:geometry | 29 |  |
 | `Merge by Distance` | geo:geometry | out:geometry | 1 | bypass |
 | `Mesh to Edges` | geo:geometry | out:geometry | 22 | bypass |
 | `Mesh to Faces` | geo:geometry | out:geometry | 22 | bypass |
@@ -207,6 +221,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Flanger` | audio:audio | out:audio | 9 | bypass |
 | `Formant Filter` | audio:audio | out:audio | 3 | bypass |
 | `Frequency Shifter` | audio:audio | out:audio | 6 | bypass |
+| `Key-Snap` | audio:audio | out:audio | 6 | bypass |
 | `Limiter` | audio:audio | out:audio | 5 | bypass |
 | `Phaser` | audio:audio | out:audio | 9 | bypass |
 | `Pitch Shifter` | audio:audio | out:audio | 4 | bypass |
@@ -424,12 +439,12 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | Type | Inputs | Outputs | p | Notes |
 |---|---|---|---|---|
 | `Analog` | notes:note | out:audio | 33 | bypass |
-| `Drum Sequencer` | none | out:audio, 1:audio, 2:audio, 3:audio, 4:audio, 5:audio, 6:audio, 7:audio, 8:audio | 169 | bypass |
+| `Drum Sequencer` | none | out:audio, 1:audio, 2:audio, 3:audio, 4:audio, 5:audio, 6:audio, 7:audio, 8:audio | 371 | bypass |
 | `Equation Synth` | notes:note | out:audio | 30 | bypass |
 | `Field Synth` | notes:note, in:audio | out:audio | 13 | bypass |
 | `Grain Molder` | notes:note, record_in:audio | out:audio | 14 | bypass |
 | `Granular` | record_in:audio | out:audio | 21 | bypass |
-| `Looper` | audio:audio | out:audio | 9 | bypass |
+| `Looper` | audio:audio | out:audio | 10 | bypass |
 | `MPC` | notes:note | out:audio | 177 | bypass |
 | `Metallic` | notes:note | out:audio | 15 | bypass |
 | `Molder` | record_in:audio | out:audio | 16 | bypass |
@@ -447,7 +462,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 |---|---|---|---|---|
 | `Audio In` | none | out:audio | 4 | hardware: refused headless, bypass |
 | `Audio Meter` | audio:audio | out:audio | 0 | bypass |
-| `Audio Out` | audio:audio | out:image | 2 | bypass |
+| `Audio Out` | audio:audio | out:image | 3 | bypass |
 | `Blend Audio` | a:audio, b:audio | out:audio | 1 |  |
 | `Field Graph` | none | out:image | 7 | bypass |
 | `Gain` | audio:audio | out:audio | 1 | bypass |
