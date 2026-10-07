@@ -26956,7 +26956,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       ModSlider("specular", &n->specular, 0.0f, 1.0f, "%.3f", colW);
       ModSlider("ior", &n->ior, 1.0f, 3.0f, "%.3f", colW);
       ModSlider("opacity", &n->opacity, 0.0f, 1.0f, "%.3f", colW);
-      if (n->opacity < 1.0f || n->alphaCutoff > 0.0f)
+      ModCheckbox("texture alpha", &n->textureAlpha);
+      if (n->opacity < 1.0f || n->alphaCutoff > 0.0f || n->textureAlpha)
          ModSlider("alpha cutoff", &n->alphaCutoff, 0.0f, 1.0f, "%.3f", colW);
 
       NodeSeparator("emission", colW);
@@ -90068,6 +90069,7 @@ int main(int argc, char** argv)
          probe.material.anisotropyRotation = 0.25f;
          probe.material.dispersion = 0.18f;
          probe.material.alphaCutoff = 0.4f;
+         probe.material.textureAlpha = true;
 
          int frame = 22000;
          auto cook = [&](IGeometrySource* g) {
@@ -90089,7 +90091,7 @@ int main(int argc, char** argv)
                    near(a.iridescence, b.iridescence) && near(a.iridescenceIor, b.iridescenceIor) &&
                    near(a.iridescenceThickness, b.iridescenceThickness) && near(a.anisotropy, b.anisotropy) &&
                    near(a.anisotropyRotation, b.anisotropyRotation) && near(a.dispersion, b.dispersion) &&
-                   near(a.alphaCutoff, b.alphaCutoff);
+                   near(a.alphaCutoff, b.alphaCutoff) && a.textureAlpha == b.textureAlpha;
          };
 
          struct Result { std::string name; bool ok; };

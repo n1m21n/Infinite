@@ -68,6 +68,11 @@ struct Material
 
    // Alpha test / cutout threshold (0 = smooth alpha blend, >0 = mask cutoff)
    float alphaCutoff = 0.0f;
+
+   // Multiply the albedo texture's own alpha into opacity (sparkle / cutout
+   // sprites). Off by default so existing patches render unchanged; on, the
+   // slot joins Render 3D's sorted translucent pass.
+   bool textureAlpha = false;
 };
 
 // A node that supplies geometry to a Render node. Geometry travels down its own
