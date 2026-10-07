@@ -230,8 +230,9 @@ def board(ctx: dict | None = None) -> list[dict]:
 
 
 def ready(b: list[dict]) -> list[dict]:
-    """Open, unblocked, not waiting on the owner; best priority score first (ties: oldest quest)."""
-    r = [x for x in b if x["status"] == "open" and not x["blocked"] and not x.get("user")]
+    """Open and unblocked; best priority score first (ties: oldest quest). A quest flagged `user` has a proposed decision
+    awaiting the owner's approval: it still ranks, it is just not built until approved."""
+    r = [x for x in b if x["status"] == "open" and not x["blocked"]]
     return sorted(r, key=lambda x: (-x["score"], int(x["id"][1:])))
 
 
@@ -602,7 +603,7 @@ def show() -> None:
     for h in HORIZONS:
         for x in b:
             if x["status"] == "open" and x["horizon"] == h:
-                tag = "LOCKED" if x["blocked"] else ("NEEDS YOU" if x.get("user") else h.upper())
+                tag = "LOCKED" if x["blocked"] else ("PROPOSED" if x.get("user") else h.upper())
                 print(f"{x['id']:<4} [{x['track']:<8}] {x['kind']:<7} {tag:<9} {x['score']:>3}  {x['title']}")
     r = ready(b)
     print(f"-- {sum(x['status'] == 'open' for x in b)} open, {sum(x['status'] == 'done' for x in b)} done, "
@@ -633,7 +634,7 @@ def main() -> None:
     a.add_argument("--title", required=True)
     a.add_argument("--why", required=True)
     a.add_argument("--after", default="")
-    a.add_argument("--user", action="store_true", help="needs an owner decision before it can start")
+    a.add_argument("--user", action="store_true", help="proposed decision awaiting owner approval (still ranked, not built until approved)")
     a.add_argument("--origin", choices=ORIGINS, default="ask", help="ask=owner asked, explore=found while investigating, bug, idea, ...")
     a.add_argument("--effort", choices=list(EFFORT_W), default="M")
     a.add_argument("--rate", default="", help="impact 0-3 per axis, e.g. user=3,func=2,perf=0,ux=1")
@@ -663,8 +664,8 @@ def main() -> None:
     ed.add_argument("--title")
     ed.add_argument("--after", help="comma-separated quest ids this quest waits on (replaces the list)")
     ed.add_argument("--src", help="source key, e.g. merge:<sha7>, so backfill treats this quest as that merge")
-    ed.add_argument("--user", dest="needs_user", action="store_true", default=None, help="needs an owner decision or outside input: never offered as next")
-    ed.add_argument("--no-user", dest="needs_user", action="store_false", help="clear the needs-owner flag")
+    ed.add_argument("--user", dest="needs_user", action="store_true", default=None, help="proposed decision awaiting owner approval; still ranked")
+    ed.add_argument("--no-user", dest="needs_user", action="store_false", help="owner approved: clear the proposed flag")
     ed.add_argument("--epic", help="comma-separated child quest ids: this quest becomes an epic (0 XP, spans the children)")
     lk = sub.add_parser("link", help="attach git evidence to a quest; backfill.py derives opened/closed/release from it")
     lk.add_argument("id")
@@ -720,7 +721,7 @@ def main() -> None:
         if x["status"] != "open" or x["blocked"]:
             sys.exit(f"{args.id} is {x['status']}" + (f", waiting on {x['waiting_on']}" if x["blocked"] else ""))
         if x.get("user"):
-            sys.exit(f"{args.id} NEEDS YOU: ask the owner before starting")
+            print(f"{args.id} is PROPOSED: put your recommended decision to the owner (approve / change / abandon) before building")
         print(f"{x['id']} [{x['track']}] {x['title']}\n  why: {x['why']}\n  load skills: {', '.join(x['skills'])}"
               f"\n  branch: {'bugfix' if x['kind'] == 'fix' else 'feature'}/<slug> off main (git-branch-workflow)")
         return
