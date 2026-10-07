@@ -2274,3 +2274,7 @@
 {"ts": "2026-10-07T00:54:22+00:00", "event": "add", "id": "R601", "track": "ux", "kind": "fix", "horizon": "later", "title": "KBCURSORTEST coverage for Shift+U (ungroup) and F (frame)", "why": "Split from R587: H and Cmd+U are covered, these two are not", "after": [], "user": false, "origin": "explore", "effort": "S"}
 {"ts": "2026-10-07T00:54:40+00:00", "event": "done", "id": "R587", "why": "Tab + Left/Right on dropdowns and checkboxes, KBDISCRETETEST ok; Shift+U/F tests split into a new quest"}
 {"ts": "2026-10-07T00:54:40+00:00", "event": "edit", "id": "R587", "commits": ["278a2d36"]}
+{"ts": "2026-10-07T00:55:18+00:00", "event": "edit", "id": "R587", "opened": "2026-10-07T06:24:19+05:30", "commits": ["278a2d3"], "closed": "2026-10-07T06:24:19+05:30", "release": ""}
+{"ts": "2026-10-07T00:55:18+00:00", "event": "edit", "id": "R596", "opened": "2026-10-07T06:03:40+05:30", "commits": ["7da571a"], "closed": "2026-10-07T06:03:40+05:30", "release": ""}
+{"ts": "2026-10-07T01:02:44+00:00", "event": "done", "id": "R273", "why": "Material 'texture alpha' switch: texture .a into alpha, slot joins the sorted translucent pass; alpha cutoff uses it"}
+{"ts": "2026-10-07T01:02:44+00:00", "event": "edit", "id": "R273", "commits": ["d0249ee7", "135aa7c0"]}
