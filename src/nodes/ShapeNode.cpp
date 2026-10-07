@@ -156,12 +156,15 @@ namespace
       "   if (uStrokeWidth > 0.0)\n"
       "      strokeMask = smoothstep(aa, -aa, abs(d) - uStrokeWidth);\n"
       "\n"
-      "   vec4 col = vec4(uBgColor, uBgOpacity);\n"
-      "   col.rgb = mix(col.rgb, uFillColor, fillMask);\n"
-      "   col.a = max(col.a, fillMask);\n"
-      "   col.rgb = mix(col.rgb, uStrokeColor, strokeMask);\n"
-      "   col.a = max(col.a, strokeMask);\n"
-      "   fragColor = col;\n"
+      "   // Composite premultiplied, then un-premultiply, so the output is straight alpha:\n"
+      "   // an edge pixel keeps the shape's own colour and only its alpha falls off.\n"
+      "   vec3 pc = uBgColor * uBgOpacity;\n"
+      "   float pa = uBgOpacity;\n"
+      "   pc = uFillColor * fillMask + pc * (1.0 - fillMask);\n"
+      "   pa = fillMask + pa * (1.0 - fillMask);\n"
+      "   pc = uStrokeColor * strokeMask + pc * (1.0 - strokeMask);\n"
+      "   pa = strokeMask + pa * (1.0 - strokeMask);\n"
+      "   fragColor = vec4(pa > 1e-5 ? pc / pa : uBgColor, pa);\n"
       "}\n";
 }
 
