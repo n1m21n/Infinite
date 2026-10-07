@@ -219,6 +219,8 @@ inline std::string TmpPath(const std::string& name)
 #include "nodes/OutputNode.h"
 #include "nodes/SyphonInNode.h"
 #include "nodes/SyphonOutNode.h"
+#include "nodes/NdiInNode.h"
+#include "nodes/NdiOutNode.h"
 #include "nodes/ProjectionNode.h"
 #include "nodes/AudioNodes.h"
 #include "nodes/AudioMeterNode.h"

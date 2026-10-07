@@ -677,6 +677,8 @@ void DrawNodeBodies(FrameCtx& fc)
                DrawSlideshowParams(n);
             else if (auto* n = dynamic_cast<SyphonInNode*>(gn.node.get()))
                DrawSyphonInParams(n);
+            else if (auto* n = dynamic_cast<NdiInNode*>(gn.node.get()))
+               DrawNdiInParams(n);
             else if (auto* n = dynamic_cast<EnvironmentNode*>(gn.node.get()))
                DrawEnvironmentParams(n);
             else if (auto* n = dynamic_cast<VideoSourceNode*>(gn.node.get()))
@@ -1153,6 +1155,8 @@ void DrawNodeBodies(FrameCtx& fc)
             }
             else if (auto* n = dynamic_cast<SyphonOutNode*>(gn.node.get()))
                DrawSyphonOutParams(n);
+            else if (auto* n = dynamic_cast<NdiOutNode*>(gn.node.get()))
+               DrawNdiOutParams(n);
          }
          if (registerOnlyParams)
          {

@@ -441,6 +441,8 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    if (getenv("INFINITE_AUDIOPCMTEST") != nullptr)
       return Platform::AudioPcmConversionSelfTest() ? 0 : 1;
 
+   if (getenv("INFINITE_NDITEST") != nullptr)
+      return RunNdiTest();
    if (getenv("INFINITE_MIDICC14TEST") != nullptr)
       return RunMidiCC14Test();
    if (getenv("INFINITE_CVRECTEST") != nullptr)

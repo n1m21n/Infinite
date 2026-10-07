@@ -191,6 +191,81 @@ namespace app
    }
 
 
+   void DrawNdiOutParams(NdiOutNode* n)
+   {
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+      if (!Ndi::Available())
+      {
+         ImGui::TextDisabled("NDI runtime not found (install from ndi.video)");
+         ImGui::PopTextWrapPos();
+         return;
+      }
+      ImGui::PopTextWrapPos();
+
+      ImGui::SetNextItemWidth(kPreviewSize);
+      if (ImGui::InputText("##ndi_name", &n->sourceNameInput, ImGuiInputTextFlags_EnterReturnsTrue))
+         n->SetSourceName(n->sourceNameInput);
+      if (ImGui::IsItemDeactivatedAfterEdit())
+         n->SetSourceName(n->sourceNameInput);
+
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+      if (n->IsPublishing())
+      {
+         ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "Broadcasting: %dx%d", n->PublishedWidth(), n->PublishedHeight());
+         if (n->Connections() > 0)
+            ImGui::TextColored(ImVec4(0.3f, 0.9f, 1.0f, 1.0f), "Receivers: %d", n->Connections());
+         else
+            ImGui::TextDisabled("Receivers: waiting...");
+      }
+      else
+         ImGui::TextDisabled("Connect an image input to publish");
+      ImGui::PopTextWrapPos();
+   }
+
+
+   void DrawNdiInParams(NdiInNode* n)
+   {
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+      if (!Ndi::Available())
+      {
+         ImGui::TextDisabled("NDI runtime not found (install from ndi.video)");
+         ImGui::PopTextWrapPos();
+         return;
+      }
+      ImGui::PopTextWrapPos();
+
+      const std::vector<std::string> sources = n->AvailableSources();
+      if (sources.empty())
+      {
+         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+         ImGui::TextDisabled("No NDI sources found on the network.");
+         ImGui::PopTextWrapPos();
+         return;
+      }
+
+      int currentIdx = 0;
+      for (size_t i = 0; i < sources.size(); i++)
+         if (sources[i] == n->SourceName())
+            currentIdx = (int)i;
+      std::vector<std::string> labels;
+      labels.reserve(sources.size());
+      for (const std::string& s : sources)
+         labels.push_back(s);
+      DropdownButton("##ndi_source", labels, currentIdx, [n, sources](int idx) {
+         n->SelectSource(sources[(size_t)idx]);
+      }, kPreviewSize);
+
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kPreviewSize);
+      if (n->SourceName().empty())
+         ImGui::TextDisabled("Pick a source");
+      else if (n->IsReceiving())
+         ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "Receiving: %dx%d", n->GetOutputWidth(), n->GetOutputHeight());
+      else
+         ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "Waiting for frames...");
+      ImGui::PopTextWrapPos();
+   }
+
+
    void DrawOscReceiveParams(OscReceiveNode* n)
    {
       ModSliderInt("port", &n->port, 1, 65535);

@@ -630,6 +630,9 @@ set(COMMON_SOURCES
     src/nodes/OutputNode.cpp
     src/nodes/SyphonInNode.cpp
     src/nodes/SyphonOutNode.cpp
+    src/nodes/NdiInNode.cpp
+    src/nodes/NdiOutNode.cpp
+    src/platform/ndi/NdiRuntime.cpp
     src/nodes/ProjectionNode.cpp
     src/nodes/AudioNodes.cpp
     src/nodes/AudioMeterNode.cpp
@@ -873,6 +876,9 @@ target_include_directories(Infinite PRIVATE
     external/shine
     external/tinyfiledialogs
     external/glad/include
+    # NDI headers only (MIT, dynamic loader); the runtime is never bundled.
+    external/ndi/include
+    src/platform/ndi
 )
 
 target_link_libraries(Infinite PRIVATE glfw)

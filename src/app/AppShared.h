@@ -2548,6 +2548,10 @@ void DrawSyphonOutParams(SyphonOutNode* n);
 
 void DrawSyphonInParams(SyphonInNode* n);
 
+void DrawNdiOutParams(NdiOutNode* n);
+
+void DrawNdiInParams(NdiInNode* n);
+
 void DrawOscReceiveParams(OscReceiveNode* n);
 
 void DrawOscSendParams(OscSendNode* n);
@@ -5770,6 +5774,7 @@ int RunMidiParseTest();
 int RunCVRecorderTest();
 
 int RunMidiCC14Test();
+int RunNdiTest();
 
 int RunAudioParamSweepTest();
 
