@@ -1331,6 +1331,20 @@ void AudioFileNode::SweepPrepare()
    Play();
 }
 
+void AudioFileNode::SweepPostAlter(const std::string& paramName, int& frameId)
+{
+   if (paramName != "followTransport")
+      return;
+   // followTransport only acts on a transport play -> pause edge between cooks. Drive one, then restore.
+   Transport& tr = Transport::Instance();
+   const bool was = tr.IsPlaying();
+   tr.SetPlaying(true);
+   CookIfNeeded(frameId++);
+   tr.SetPlaying(false);
+   CookIfNeeded(frameId++);
+   tr.SetPlaying(was);
+}
+
 bool AudioFileNode::OpenViaDialog()
 {
    const std::string path = Platform::OpenAudioDialog();

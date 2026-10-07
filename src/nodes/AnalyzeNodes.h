@@ -205,6 +205,9 @@ public:
 
    AudioNode* GetAudioNode() override;
    void SweepPrepare() override;
+   // The sweep tone lasts 1 s (about 190 blocks of 256 at 48 kHz); measure past its end so loop shows.
+   int SweepMeasureBlocks() const override { return 230; }
+   void SweepPostAlter(const std::string& paramName, int& frameId) override;
 
    // While a file is loaded this node must keep processing every block even
    // with no path to an Audio Out - both to advance its own playhead and so

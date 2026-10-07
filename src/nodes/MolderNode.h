@@ -47,6 +47,20 @@ public:
    void CookIfNeeded(int frameId) override;
    void VisitParams(ParamVisitor& v) override;
    void SweepPrepare() override;
+   int SweepMeasureBlocks() const override { return 260; }
+   // chaos and seed only shape the mutation replay, which runs once per generation; pingpong acts at the
+   // end of the play range, so it needs loop on and a window that wraps.
+   std::vector<SweepParamPrereq> SweepPrerequisitesFor(const std::string& paramName) const override
+   {
+      if (paramName == "chaos" || paramName == "seed")
+         return { { "generation", 3.0f } };
+      if (paramName == "pingpong")
+         return { { "loop", 1.0f } };
+      return {};
+   }
+   // Every Molder knob re-renders on a worker thread; the sweep waits for it so the change is audible.
+   void SweepPostAlter(const std::string& paramName, int& frameId) override;
+   bool SweepSpectralSignature() const override { return true; }
 
    AudioNode* GetAudioNode() override;
    AudioCable* AudioInputSlot(int slot) override { return slot == 0 ? &audioInput : nullptr; }
@@ -135,6 +149,7 @@ public:
    AudioCable audioInput; // record source
 
 private:
+   void SweepWaitForJob();
    enum class Job
    {
       None,

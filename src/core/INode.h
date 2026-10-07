@@ -266,4 +266,15 @@ public:
    // True when the node only acts as the transport clock advances (a step/onset scheduler). The
    // sweep then runs the transport from beat 0 for that rig, so probes see more than the first block.
    virtual bool SweepNeedsClock() const { return false; }
+   // Blocks the sweep measures over (default 1). A node whose params only show up across a pattern, a
+   // loop wrap or a stretch window (Drum Sequencer steps, Audio File loop) asks for a longer window; the
+   // signature is then the sum of per-block RMS and the max peak, or the band energies below.
+   virtual int SweepMeasureBlocks() const { return 1; }
+   // True when peak/RMS cannot see the node's params (pitch/stretch/window changes move spectrum, not
+   // level). The measured window is then reduced to log band energies at fixed frequencies.
+   virtual bool SweepSpectralSignature() const { return false; }
+   // Runs once per rig after the optional param alteration and its cook (paramName is the param being
+   // probed), on the control and the altered rig alike. For params that act on an edge (transport play/pause) rather than a steady value; the
+   // node does its own CookIfNeeded(frameId++) calls so both rigs go through the same edge.
+   virtual void SweepPostAlter(const std::string& /*paramName*/, int& /*frameId*/) {}
 };

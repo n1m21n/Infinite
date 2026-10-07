@@ -830,8 +830,9 @@ void DrumSequencerNode::SweepPrepare()
    for (int lane = 0; lane < kNumLanes; lane++)
    {
       FinishLaneBuffer(lane, MakeSweepToneBuffer(), "sweep-tone", "sweep-tone.wav", "loaded");
-      for (int s = 0; s < numSteps; s++)
-         stepVel[lane][s] = 1.0f; // full velocity so accentPitch (>= 0.99 only) is audible
+      for (int s = 0; s < kMaxSteps; s++)
+         stepVel[lane][s] = (s % 3 == 0) ? 1.0f : 0.5f; // accentPitch (>= 0.99 only) is audible on every third step; the
+                                                         // unevenness lets a changed step count change the output
    }
 }
 

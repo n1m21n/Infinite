@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 #include <random>
+#include <thread>
 
 #include "audio/AudioBuffer.h"
 #include "audio/AudioNode.h"
@@ -718,9 +720,44 @@ void MolderNode::StopPreview()
    mSelfOwnedByUser = false;
 }
 
+void MolderNode::SweepWaitForJob()
+{
+   // Bounded: a render of the sweep tone takes well under a second.
+   for (int i = 0; i < 10000 && mWorking.load(std::memory_order_acquire); i++)
+      std::this_thread::sleep_for(std::chrono::milliseconds(2));
+   JoinWorkerIfDone();
+}
+
 void MolderNode::SweepPrepare()
 {
-   mAudioNode->PushBuffer(MakeSweepToneBuffer());
+   // Analyse the tone and render through the real worker, so every knob has a genome to act on. Pushing
+   // the raw tone as a buffer (as the other sampled nodes do) leaves mAnalysis invalid and every knob inert.
+   Platform::SampleBuffer* tone = MakeSweepToneBuffer();
+   std::vector<float> mono((size_t)tone->numFrames, 0.0f);
+   const int channels = std::max(1, tone->channels);
+   for (int ch = 0; ch < channels; ++ch)
+      for (int i = 0; i < tone->numFrames; ++i)
+         mono[i] += tone->channelData[(size_t)ch * tone->numFrames + i] / (float)channels;
+   const double sr = tone->sampleRate;
+   delete tone;
+   if (mAudioNode == nullptr)
+      mAudioNode = std::make_unique<AudioMolderNode>();
+   mOriginalMono = mono;
+   mOriginalSR = sr;
+   LaunchJob(Job::AnalyzeThenRender, std::move(mono), sr, /*isOriginalSource=*/true);
+   SweepWaitForJob();
    // Start the audition lane too: these nodes stay silent until something triggers them.
+   mAudioNode->TriggerPreview(0.0f);
+}
+
+void MolderNode::SweepPostAlter(const std::string& /*paramName*/, int& frameId)
+{
+   // The knob change is debounced (cooldown frames) and re-rendered on the worker: cook until the
+   // dispatched snapshot catches up, waiting for each render, then restart the audition.
+   for (int i = 0; i < 8; i++)
+   {
+      CookIfNeeded(frameId++);
+      SweepWaitForJob();
+   }
    mAudioNode->TriggerPreview(0.0f);
 }

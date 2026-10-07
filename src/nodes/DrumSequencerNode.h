@@ -50,6 +50,15 @@ public:
    void CookIfNeeded(int frameId) override;
    void SweepPrepare() override;
    bool SweepNeedsClock() const override { return true; }
+   // 1/32 steps, 32 steps = 4 beats; at the sweep's clock rate that is about 24 blocks. A step anywhere
+   // in the pattern must be inside the measured window, not just the one the clock happens to sit on.
+   int SweepMeasureBlocks() const override { return 40; }
+   std::vector<SweepParamPrereq> SweepPrerequisitesFor(const std::string& paramName) const override
+   {
+      if (paramName.rfind("lane", 0) == 0 && paramName.find("_step") != std::string::npos)
+         return { { "steps", (float)kMaxSteps } };
+      return {};
+   }
    void VisitParams(ParamVisitor& v) override;
    AudioNode* GetAudioNode() override;
    int OutputCount() const override { return 1 + kNumLanes; }

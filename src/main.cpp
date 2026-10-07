@@ -68063,12 +68063,12 @@ namespace AudioParamSweep
    struct Signature
    {
       bool valid = false;
-      float values[4] = {};
+      float values[8] = {};
       bool DiffersFrom(const Signature& o) const
       {
          if (valid != o.valid)
             return true;
-         for (int i = 0; i < 4; i++)
+         for (int i = 0; i < 8; i++)
             if (std::fabs(values[i] - o.values[i]) > 1e-4f)
                return true;
          return false;
@@ -68285,6 +68285,51 @@ namespace AudioParamSweep
       }
    }
 
+   // Multi-block PCM window for nodes whose params need more than one block to show (see
+   // INode::SweepMeasureBlocks / SweepSpectralSignature). Level mode sums per-block RMS and keeps the
+   // loudest peak; spectral mode reduces the left channel to dB energy at 8 fixed frequencies
+   // (Goertzel), which sees pitch, stretch and window changes that leave peak/RMS untouched.
+   inline Signature RunPcmWindow(Rig& rig, int blockSize, int numBlocks, bool spectral, double sampleRate)
+   {
+      Signature s;
+      s.valid = true;
+      std::vector<float> left;
+      if (spectral)
+         left.reserve((size_t)numBlocks * blockSize);
+      for (int b = 0; b < numBlocks; b++)
+      {
+         const Signature blk = RunOneBlock(rig, blockSize);
+         if (spectral)
+            left.insert(left.end(), rig.scratchL, rig.scratchL + blockSize);
+         else
+         {
+            s.values[0] += blk.values[0];
+            s.values[2] += blk.values[2];
+            s.values[1] = std::max(s.values[1], blk.values[1]);
+            s.values[3] = std::max(s.values[3], blk.values[3]);
+         }
+      }
+      if (spectral)
+      {
+         static const double kFreqs[8] = { 150, 300, 450, 600, 900, 1500, 3000, 6000 };
+         for (int k = 0; k < 8; k++)
+         {
+            const double w = 2.0 * M_PI * kFreqs[k] / sampleRate;
+            const double coeff = 2.0 * std::cos(w);
+            double q1 = 0.0, q2 = 0.0;
+            for (float x : left)
+            {
+               const double q0 = coeff * q1 - q2 + (double)x;
+               q2 = q1;
+               q1 = q0;
+            }
+            const double power = (q1 * q1 + q2 * q2 - coeff * q1 * q2) / std::max<size_t>(1, left.size());
+            s.values[k] = (float)(10.0 * std::log10(power + 1e-12));
+         }
+      }
+      return s;
+   }
+
    // kNoteOutbox measurement window, widened past RunOneBlock's single-block
    // read: runs `numBlocks` blocks and accumulates every popped event's
    // note, velocity, isNoteOn and frameOffset (block-relative, so events in
@@ -68435,6 +68480,7 @@ namespace AudioParamSweep
             }
             rig.node->CookIfNeeded(frame++);
          }
+         rig.node->SweepPostAlter(probeSlot.name, frame);
          return true;
       };
 
@@ -68453,6 +68499,10 @@ namespace AudioParamSweep
             for (int b = 0; b < extraBlocks; b++)
                RunOneBlock(rig, blockSize);
          }
+         const int window = rig.node->SweepMeasureBlocks();
+         const bool spectral = rig.node->SweepSpectralSignature();
+         if (rig.mode == ReadMode::kPcm && (window > 1 || spectral))
+            return RunPcmWindow(rig, blockSize, std::max(1, window), spectral, sampleRate);
          return RunOneBlock(rig, blockSize);
       };
 

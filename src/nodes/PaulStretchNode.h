@@ -39,6 +39,15 @@ public:
    void CookIfNeeded(int frameId) override;
    void VisitParams(ParamVisitor& v) override;
    void SweepPrepare() override;
+   int SweepMeasureBlocks() const override { return 200; }
+   bool SweepSpectralSignature() const override { return true; }
+   // detune spreads the unison voices, so it is a no-op with one.
+   std::vector<SweepParamPrereq> SweepPrerequisitesFor(const std::string& paramName) const override
+   {
+      if (paramName == "detune")
+         return { { "unison", 4.0f } };
+      return {};
+   }
 
    AudioNode* GetAudioNode() override;
    AudioCable* AudioInputSlot(int slot) override { return slot == 0 ? &audioInput : nullptr; }
