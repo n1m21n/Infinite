@@ -721,4 +721,6 @@ void MolderNode::StopPreview()
 void MolderNode::SweepPrepare()
 {
    mAudioNode->PushBuffer(MakeSweepToneBuffer());
+   // Start the audition lane too: these nodes stay silent until something triggers them.
+   mAudioNode->TriggerPreview(0.0f);
 }

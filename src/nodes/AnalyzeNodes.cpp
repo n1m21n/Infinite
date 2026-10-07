@@ -16,6 +16,7 @@
 #include "core/AudioDecodeCache.h"
 #include "core/Expression.h"
 #include "core/AudioTopologyRequest.h"
+#include "audio/SweepTone.h"
 #include "audio/AudioBuffer.h"
 #include "audio/AudioNode.h"
 #include "audio/ParamMailbox.h"
@@ -1322,6 +1323,12 @@ bool AudioFileNode::OpenFromDecoded(const std::string& path, Platform::SampleBuf
    // no path to an Audio Out.
    AudioTopologyRequest::Request();
    return true;
+}
+
+void AudioFileNode::SweepPrepare()
+{
+   OpenFromDecoded("sweep-tone.wav", MakeSweepToneBuffer());
+   Play();
 }
 
 bool AudioFileNode::OpenViaDialog()

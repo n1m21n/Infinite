@@ -204,6 +204,7 @@ public:
    void CookIfNeeded(int frameId) override;
 
    AudioNode* GetAudioNode() override;
+   void SweepPrepare() override;
 
    // While a file is loaded this node must keep processing every block even
    // with no path to an Audio Out - both to advance its own playhead and so

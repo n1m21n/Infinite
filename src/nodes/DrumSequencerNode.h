@@ -48,6 +48,8 @@ public:
    int GetOutputWidth() const override { return 0; }
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
+   void SweepPrepare() override;
+   bool SweepNeedsClock() const override { return true; }
    void VisitParams(ParamVisitor& v) override;
    AudioNode* GetAudioNode() override;
    int OutputCount() const override { return 1 + kNumLanes; }
