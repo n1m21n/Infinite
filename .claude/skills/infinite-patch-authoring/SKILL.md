@@ -369,7 +369,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Glide` | notes:note | out:note | 1 | bypass |
 | `Humanizer` | notes:note | out:note | 2 | bypass |
 | `Keyboard` | none | out:note | 5 | bypass |
-| `MIDI File` | none | out:note | 5 | bypass |
+| `MIDI File` | none | out:note | 6 | bypass |
 | `MIDI Notes` | none | out:note | 4 | hardware: refused headless, bypass |
 | `Note Capturer` | notes:note | out:note | 2 | bypass |
 | `Note Echo` | notes:note | out:note | 7 | bypass |

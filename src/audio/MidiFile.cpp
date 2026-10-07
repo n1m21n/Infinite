@@ -43,20 +43,33 @@ namespace MidiFile
       struct RawEvent
       {
          uint64_t tick;
-         uint8_t note, velocity, track;
+         uint8_t note, velocity, track, channel;
          bool on;
       };
+
+      struct Tempo { uint64_t tick; uint32_t usPerQN; };
    }
 
    bool Parse(const uint8_t* data, size_t size, Song& out, std::string& error)
    {
       out = Song();
-      Reader r { data, data + size };
-      if (size < 14 || data[0] != 'M' || data[1] != 'T' || data[2] != 'h' || data[3] != 'd')
+      // RMID files wrap the SMF in a RIFF chunk, and some exporters leave junk before the header:
+      // start at the first "MThd".
+      size_t start = size;
+      for (size_t i = 0; i + 14 <= size; i++)
+         if (data[i] == 'M' && data[i + 1] == 'T' && data[i + 2] == 'h' && data[i + 3] == 'd')
+         {
+            start = i;
+            break;
+         }
+      if (start == size)
       {
          error = "not a MIDI file";
          return false;
       }
+      data += start;
+      size -= start;
+      Reader r { data, data + size };
       r.Skip(4);
       const uint32_t headerLen = r.U32();
       const uint32_t format = r.U16();
@@ -64,8 +77,19 @@ namespace MidiFile
       const uint32_t division = r.U16();
       if (headerLen < 6) { error = "bad MIDI header"; return false; }
       r.Skip(headerLen - 6);
-      if (format > 1) { error = "MIDI format 2 is not supported"; return false; }
-      if (division == 0 || (division & 0x8000)) { error = "SMPTE-timed MIDI files are not supported"; return false; }
+      if (format > 2) { error = "unknown MIDI format"; return false; }
+      // Format 2 is independent sequences; they are played as parallel tracks like format 1.
+      const bool smpte = (division & 0x8000) != 0;
+      double ticksPerBeat = (double)division;
+      if (smpte)
+      {
+         const int fps = 256 - (int)(division >> 8); // high byte is the negated frame rate
+         const int sub = (int)(division & 0xFF);
+         if (fps <= 0 || sub <= 0) { error = "bad SMPTE division"; return false; }
+         ticksPerBeat = (double)fps * (double)sub / 2.0; // 2 beats per second
+      }
+      else if (division == 0) { error = "bad MIDI division"; return false; }
+      std::vector<Tempo> tempos;
 
       std::vector<RawEvent> raw;
       int noteTracks = 0;
@@ -95,6 +119,12 @@ namespace MidiFile
             {
                const uint8_t type = tr.U8();
                const uint32_t mlen = tr.VarLen();
+               if (type == 0x51 && mlen == 3 && tr.Left() >= 3)
+               {
+                  const uint32_t us = ((uint32_t)tr.p[0] << 16) | ((uint32_t)tr.p[1] << 8) | tr.p[2];
+                  if (us > 0)
+                     tempos.push_back({ tick, us });
+               }
                tr.Skip(mlen);
                if (type == 0x2F)
                   break;
@@ -122,7 +152,7 @@ namespace MidiFile
             if (kind == 0x90 || kind == 0x80)
             {
                const bool on = kind == 0x90 && d2 > 0;
-               raw.push_back({ tick, (uint8_t)(d1 & 0x7f), on ? (uint8_t)(d2 & 0x7f) : (uint8_t)0, trackIdx, on });
+               raw.push_back({ tick, (uint8_t)(d1 & 0x7f), on ? (uint8_t)(d2 & 0x7f) : (uint8_t)0, trackIdx, (uint8_t)(status & 0x0F), on });
             }
          }
          if (raw.size() > before)
@@ -139,23 +169,67 @@ namespace MidiFile
          if (a.tick != b.tick) return a.tick < b.tick;
          return !a.on && b.on;
       });
-      out.events.reserve(raw.size());
+      // Tempo map -> relative beat position (see MidiFile.h). SMPTE has no tempo map.
+      std::stable_sort(tempos.begin(), tempos.end(), [](const Tempo& a, const Tempo& b) { return a.tick < b.tick; });
+      if (smpte)
+         tempos.clear();
+      const double base = tempos.empty() || tempos.front().tick > 0 ? 500000.0 : (double)tempos.front().usPerQN;
+      for (const Tempo& t : tempos)
+         if ((double)t.usPerQN != base)
+            out.hasTempoChanges = true;
+      auto tempoBeatAt = [&](uint64_t tick) {
+         double beats = 0.0;
+         uint64_t prev = 0;
+         double cur = base; // tempo in force before the first change
+         for (const Tempo& t : tempos)
+         {
+            if (t.tick >= tick)
+               break;
+            beats += (double)(t.tick - prev) / ticksPerBeat * (cur / base);
+            prev = t.tick;
+            cur = (double)t.usPerQN;
+         }
+         return beats + (double)(tick - prev) / ticksPerBeat * (cur / base);
+      };
+
+      out.events.reserve(raw.size() + 16);
+      // Notes still sounding at the end of the file get an off there, so a missing note-off never sticks.
+      std::vector<Event> open;
       for (const RawEvent& e : raw)
       {
          Event ev;
-         ev.beat = (double)e.tick / (double)division;
+         ev.beat = (double)e.tick / ticksPerBeat;
+         ev.tempoBeat = tempoBeatAt(e.tick);
          ev.note = e.note;
          ev.velocity = e.velocity;
          ev.track = e.track;
+         ev.channel = e.channel;
          ev.on = e.on;
          out.events.push_back(ev);
          out.lengthBeats = std::max(out.lengthBeats, ev.beat);
+         out.lengthTempoBeats = std::max(out.lengthTempoBeats, ev.tempoBeat);
          if (e.on)
          {
             out.noteCount++;
             out.lowNote = std::min(out.lowNote, e.note);
             out.highNote = std::max(out.highNote, e.note);
+            open.push_back(ev);
          }
+         else
+            for (size_t i = 0; i < open.size(); i++)
+               if (open[i].note == e.note && open[i].track == e.track && open[i].channel == e.channel)
+               {
+                  open.erase(open.begin() + (long)i);
+                  break;
+               }
+      }
+      for (Event off : open)
+      {
+         off.on = false;
+         off.velocity = 0;
+         off.beat = out.lengthBeats;
+         off.tempoBeat = out.lengthTempoBeats;
+         out.events.push_back(off);
       }
       out.trackCount = noteTracks;
       return true;

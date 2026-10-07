@@ -4549,13 +4549,15 @@ public:
       const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
       const double dBeats = (double)numFrames * bpm / (60.0 * mSampleRate);
       // Start of this block (the clock was advanced before the graph ran, so Beats() would be its end).
-      const double t0 = Transport::Instance().BlockStartBeats();
+      // position shifts the file against the transport; a change of it is a jump and releases held notes below.
+      const double t0 = Transport::Instance().BlockStartBeats() + (double)mPosition.load(std::memory_order_relaxed);
       const double t1 = t0 + dBeats;
       const bool loop = mLoop.load(std::memory_order_relaxed);
       const double len = std::max(4.0, (double)mLoopBeats.load(std::memory_order_relaxed));
       const int transpose = mTranspose.load(std::memory_order_relaxed);
-      const int trackSel = mTrack.load(std::memory_order_relaxed);
       const float velScale = mVelocity.load(std::memory_order_relaxed);
+      const bool ft = mFileTempo.load(std::memory_order_relaxed);
+      auto beatOf = [ft](const MidiFile::Event& e) { return ft ? e.tempoBeat : e.beat; };
 
       // A seek (or a first block after stop) is not continuous with the last block: drop what is held.
       if (mLastBeats < 0.0 || t0 < mLastBeats - 1e-6 || t0 > mLastBeats + dBeats * 4.0 + 0.05)
@@ -4576,17 +4578,16 @@ public:
             ReleaseAll(std::clamp((int)((base - t0) / dBeats * (double)numFrames), 0, numFrames - 1));
          const double lo = std::max(0.0, t0 - base);
          const double hi = loop ? std::min(len, t1 - base) : t1;
-         auto it = std::lower_bound(ev.begin(), ev.end(), lo, [](const MidiFile::Event& e, double b) { return e.beat < b; });
-         for (; it != ev.end() && it->beat < hi; ++it)
+         auto it = std::lower_bound(ev.begin(), ev.end(), lo, [&](const MidiFile::Event& e, double b) { return beatOf(e) < b; });
+         for (; it != ev.end() && beatOf(*it) < hi; ++it)
          {
-            const double abs = base + it->beat;
+            const double abs = base + beatOf(*it);
             const int offset = std::clamp((int)((abs - t0) / dBeats * (double)numFrames), 0, numFrames - 1);
             if (it->on)
             {
-               if (trackSel > 0 && (int)it->track != trackSel - 1)
-                  continue;
                NoteEvent on;
-               on.note = std::clamp((int)it->note + transpose, 0, 127);
+               // General MIDI percussion (channel 10) is a drum map, not pitch: transposing it would change the instrument.
+               on.note = std::clamp((int)it->note + (it->channel == 9 ? 0 : transpose), 0, 127);
                on.velocity = std::clamp((float)it->velocity / 127.0f * velScale, 0.0f, 1.0f);
                on.isNoteOn = true;
                on.frameOffset = offset;
@@ -4618,8 +4619,9 @@ public:
    void PushParams(const MidiFileNode& n, const MidiFile::Song* song)
    {
       mTranspose.store(n.transpose, std::memory_order_relaxed);
-      mTrack.store(n.track, std::memory_order_relaxed);
+      mPosition.store(n.position, std::memory_order_relaxed);
       mLoop.store(n.loop, std::memory_order_relaxed);
+      mFileTempo.store(n.fileTempo, std::memory_order_relaxed);
       mVelocity.store(n.velocity, std::memory_order_relaxed);
       mLoopBeats.store((float)n.LoopBeats(), std::memory_order_relaxed);
       mSong.store(song, std::memory_order_release);
@@ -4655,8 +4657,9 @@ private:
    int mHeldCount = 0;
    std::atomic<const MidiFile::Song*> mSong { nullptr };
    std::atomic<int> mTranspose { 0 };
-   std::atomic<int> mTrack { 0 };
+   std::atomic<float> mPosition { 0.0f };
    std::atomic<bool> mLoop { true };
+   std::atomic<bool> mFileTempo { true };
    std::atomic<float> mVelocity { 1.0f };
    std::atomic<float> mLoopBeats { 4.0f };
    std::atomic<double> mPlayhead { -1.0 };
@@ -4679,8 +4682,6 @@ bool MidiFileNode::LoadFile(const std::string& filePath)
    mSong = song.get();
    mSongs.push_back(std::move(song));
    mStatus.clear();
-   if (track > mSong->trackCount)
-      track = 0;
    return true;
 }
 
@@ -4688,7 +4689,8 @@ double MidiFileNode::LoopBeats() const
 {
    if (!mSong)
       return 4.0;
-   return std::max(4.0, std::ceil(mSong->lengthBeats / 4.0 - 1e-9) * 4.0);
+   const double l = fileTempo ? mSong->lengthTempoBeats : mSong->lengthBeats;
+   return std::max(4.0, std::ceil(l / 4.0 - 1e-9) * 4.0);
 }
 
 double MidiFileNode::PlayheadBeats() const
@@ -4726,9 +4728,10 @@ void MidiFileNode::VisitParams(ParamVisitor& v)
 {
    v.Text("path", path);
    v.Int("transpose", transpose);
-   v.Int("track", track);
+   v.Float("position", position);
    v.Bool("loop", loop);
    v.Float("velocity", velocity);
+   v.Bool("fileTempo", fileTempo);
 }
 
 AudioNode* MidiFileNode::GetAudioNode()

@@ -14,9 +14,11 @@ namespace MidiFile
    struct Event
    {
       double beat = 0.0;
+      double tempoBeat = 0.0;
       uint8_t note = 0;
       uint8_t velocity = 0; // 0 for a note-off
       uint8_t track = 0;    // index among tracks that hold notes
+      uint8_t channel = 0;  // 0-based; 9 is General MIDI percussion
       bool on = false;
    };
 
@@ -24,6 +26,8 @@ namespace MidiFile
    {
       std::vector<Event> events; // sorted by beat, note-offs before note-ons at the same beat
       double lengthBeats = 0.0;  // beat of the last event
+      double lengthTempoBeats = 0.0;
+      bool hasTempoChanges = false; // the file's tempo map is not constant
       int trackCount = 0;        // tracks that hold at least one note
       int noteCount = 0;
       uint8_t lowNote = 127, highNote = 0;
