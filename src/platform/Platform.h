@@ -30,6 +30,13 @@ namespace Platform
    // Call once at startup and keep the app running for the token to matter.
    void PreventAppNap();
 
+   // The user's OS language preferences, most preferred first, as BCP-47-style tags ("de-DE",
+   // "zh-Hans-CN", "en"). Used only to pick the interface language on first launch; an explicit
+   // choice in Settings always wins. Empty when the OS reports nothing. macOS: NSLocale
+   // preferredLanguages; Windows: GetUserPreferredUILanguages; Linux: LANGUAGE / LC_ALL /
+   // LC_MESSAGES / LANG.
+   std::vector<std::string> PreferredLanguages();
+
    // Refresh clock of one display, used to pace projector (Output) windows to
    // the display they are on instead of to the canvas window's swap. (x, y)
    // is any point on that display in GLFW virtual-desktop coordinates

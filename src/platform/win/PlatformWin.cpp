@@ -40,6 +40,7 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <cwchar>
 #include <cstddef>
 #include <map>
 #include <memory>
@@ -261,6 +262,28 @@ namespace AppPaths
 
 namespace Platform
 {
+   std::vector<std::string> PreferredLanguages()
+   {
+      // Multistring of locale names ("de-DE\0en-US\0\0"), already in preference order.
+      std::vector<std::string> out;
+      ULONG count = 0, chars = 0;
+      if (!GetUserPreferredUILanguages(MUI_LANGUAGE_NAME, &count, nullptr, &chars) || chars == 0)
+         return out;
+      std::wstring buf(chars, L'\0');
+      if (!GetUserPreferredUILanguages(MUI_LANGUAGE_NAME, &count, buf.data(), &chars))
+         return out;
+      for (size_t i = 0; i < buf.size() && buf[i] != L'\0';)
+      {
+         const size_t len = wcslen(buf.c_str() + i);
+         std::string tag;
+         for (size_t k = 0; k < len; k++)
+            tag.push_back(buf[i + k] < 128 ? static_cast<char>(buf[i + k]) : '?');
+         out.push_back(tag);
+         i += len + 1;
+      }
+      return out;
+   }
+
    void PreventAppNap()
    {
       // macOS-only concern (App Nap throttling timer sources). Windows has no

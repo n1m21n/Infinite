@@ -101,6 +101,45 @@ namespace
 
 namespace Platform
 {
+   std::vector<std::string> PreferredLanguages()
+   {
+      // POSIX precedence: LANGUAGE (colon list, only honoured when the locale is not C), then
+      // LC_ALL, LC_MESSAGES, LANG. "de_DE.UTF-8@euro" -> "de-DE"; "C"/"POSIX" carry no language.
+      std::vector<std::string> out;
+      auto addTag = [&out](std::string tag) {
+         const size_t cut = tag.find_first_of(".@");
+         if (cut != std::string::npos)
+            tag.erase(cut);
+         if (tag.empty() || tag == "C" || tag == "POSIX")
+            return;
+         for (char& c : tag)
+            if (c == '_')
+               c = '-';
+         out.push_back(tag);
+      };
+      if (const char* langs = std::getenv("LANGUAGE"))
+      {
+         std::string all(langs);
+         size_t start = 0;
+         while (start <= all.size())
+         {
+            const size_t colon = all.find(':', start);
+            addTag(all.substr(start, colon == std::string::npos ? std::string::npos : colon - start));
+            if (colon == std::string::npos)
+               break;
+            start = colon + 1;
+         }
+      }
+      for (const char* var : { "LC_ALL", "LC_MESSAGES", "LANG" })
+         if (const char* v = std::getenv(var))
+            if (v[0] != '\0')
+            {
+               addTag(v);
+               break;
+            }
+      return out;
+   }
+
    bool HasGuiDialogHelper()
    {
       EnsureDialogBackendChecked();

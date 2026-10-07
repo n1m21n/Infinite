@@ -112,6 +112,17 @@ namespace
 
 namespace Platform
 {
+   std::vector<std::string> PreferredLanguages()
+   {
+      std::vector<std::string> out;
+      @autoreleasepool
+      {
+         for (NSString* lang in [NSLocale preferredLanguages])
+            out.emplace_back([lang UTF8String]);
+      }
+      return out;
+   }
+
    void PreventAppNap()
    {
       // The returned token must be retained for the activity to stay in
