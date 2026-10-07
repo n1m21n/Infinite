@@ -12,6 +12,7 @@
 #include "audio/MeterRing.h"
 #include "audio/ParamMailbox.h"
 #include "audio/SampleSlot.h"
+#include "audio/SweepTone.h"
 #include "audio/WavWriter.h"
 #include "audio/dsp/SlicerDsp.h"
 #include "core/AudioDecodeCache.h"
@@ -1034,4 +1035,9 @@ void SlicerNode::JoinWorkerIfDone()
       if (!mFileName.empty())
          mStatus = "loaded";
    }
+}
+
+void SlicerNode::SweepPrepare()
+{
+   mAudioNode->PushBuffer(MakeSweepToneBuffer());
 }

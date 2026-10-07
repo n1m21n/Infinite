@@ -18,6 +18,7 @@
 #include "audio/MeterRing.h"
 #include "audio/ParamMailbox.h"
 #include "audio/SampleSlot.h"
+#include "audio/SweepTone.h"
 #include "core/AudioDecodeCache.h"
 #include "platform/Platform.h"
 #include "Transport.h"
@@ -811,4 +812,9 @@ void PaulStretchNode::FinishBuffer(Platform::SampleBuffer* decoded, const std::s
    }
 
    mAudioNode->PushBuffer(decoded);
+}
+
+void PaulStretchNode::SweepPrepare()
+{
+   mAudioNode->PushBuffer(MakeSweepToneBuffer());
 }

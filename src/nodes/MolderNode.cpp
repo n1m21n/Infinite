@@ -9,6 +9,7 @@
 #include "audio/AudioVoice.h"
 #include "audio/MeterRing.h"
 #include "audio/SampleSlot.h"
+#include "audio/SweepTone.h"
 #include "core/AudioDecodeCache.h"
 #include "platform/Platform.h"
 #include "Transport.h"
@@ -715,4 +716,9 @@ void MolderNode::StopPreview()
    if (mAudioNode != nullptr)
       mAudioNode->StopPreview();
    mSelfOwnedByUser = false;
+}
+
+void MolderNode::SweepPrepare()
+{
+   mAudioNode->PushBuffer(MakeSweepToneBuffer());
 }

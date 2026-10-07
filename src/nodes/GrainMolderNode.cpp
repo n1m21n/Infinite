@@ -11,6 +11,7 @@
 #include "audio/AudioVoice.h"
 #include "audio/MeterRing.h"
 #include "audio/SampleSlot.h"
+#include "audio/SweepTone.h"
 #include "core/AudioDecodeCache.h"
 #include "platform/Platform.h"
 #include "Transport.h"
@@ -794,4 +795,9 @@ void GrainMolderNode::CookIfNeeded(int frameId)
          mCooldownFrames = 0;
       }
    }
+}
+
+void GrainMolderNode::SweepPrepare()
+{
+   mAudioNode->PushBuffer(MakeSweepToneBuffer());
 }

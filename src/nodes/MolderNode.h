@@ -46,6 +46,7 @@ public:
    int GetOutputHeight() const override { return 0; }
    void CookIfNeeded(int frameId) override;
    void VisitParams(ParamVisitor& v) override;
+   void SweepPrepare() override;
 
    AudioNode* GetAudioNode() override;
    AudioCable* AudioInputSlot(int slot) override { return slot == 0 ? &audioInput : nullptr; }

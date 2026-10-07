@@ -12,6 +12,7 @@
 #include "audio/MeterRing.h"
 #include "audio/ParamMailbox.h"
 #include "audio/SampleSlot.h"
+#include "audio/SweepTone.h"
 #include "core/AudioDecodeCache.h"
 #include "platform/Platform.h"
 #include "Transport.h"
@@ -844,4 +845,9 @@ void SamplerNode::ReloadFromPath()
       position = savedPos;
       decay = savedDecay;
    }
+}
+
+void SamplerNode::SweepPrepare()
+{
+   mAudioNode->PushBuffer(MakeSweepToneBuffer());
 }
