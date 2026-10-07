@@ -398,6 +398,7 @@ endif()
 set(COMMON_SOURCES
     src/main.cpp
     # src/app/**: code that used to live in src/main.cpp
+    src/app/AppState.cpp
     src/app/bodies/AudioBodyKit.cpp
     src/app/bodies/AudioNodeBodies.cpp
     src/app/bodies/FieldParams.cpp

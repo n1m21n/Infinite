@@ -138,9 +138,13 @@ ImU32 ScopeTextCol();
 
 extern bool gCheckerboardBackdrop;
 
+extern bool gMetronomeOn;
+
 extern float gMetronomeVolume;
 
 extern bool gMetronomeAccent;
+
+extern bool gMetronomeDirty;
 
 void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, ImVec2 br, float rounding = 4.0f);
 
@@ -240,6 +244,8 @@ extern int gNextIndex;
 
 extern ed::EditorContext* gEditor;
 
+extern GraphNode* gSelfTestFeeder;
+
 extern bool gPaletteTestOk;
 
 extern bool gPaletteTestPending;
@@ -284,7 +290,13 @@ extern std::string gPreviewErrorMessage;
 
 extern Platform::PluginDesc gPluginDragDesc;
 
+extern SampleScanner gSampleScanner;
+
+extern SampleScanner gMediaScanner;
+
 extern PluginScanner gPluginScanner;
+
+extern int gSearchPanelMode;
 
  // 0 = Modules, 1 = Samples, 2 = Media, 3 = Plugins, 4 = Field
 
@@ -341,6 +353,10 @@ extern int gSamplerDragTestPhase;
 
 extern int gMediaDragTestPhase;
 
+extern int gLinkDragSourcePin;
+
+extern std::vector<std::pair<std::string, std::string>> gLinkDragSuggestions;
+
 
 
    // Drop-target picker for audio samples dropped on empty canvas (from OS or
@@ -353,6 +369,8 @@ extern int gMediaDragTestPhase;
       ImVec2 screenPos{ 0.0f, 0.0f };
       std::vector<std::string> paths;
    };
+
+extern AudioDropPickerState gAudioDropPicker;
 
 
 
@@ -611,6 +629,8 @@ void ResetAudioRecoveryState();
 
 extern double gLastFrameMs;
 
+extern double gFrameStart;
+
 extern int gTargetFps;
 
 extern bool gVsync;
@@ -619,7 +639,21 @@ extern bool gRequestFitView;
 
 extern int gRequestFitViewNodeIndex;
 
+extern bool gRequestGroup;
+
 extern bool gRequestUngroup;
+
+extern bool gRequestBypass;
+
+extern bool gRequestCopy;
+
+extern bool gRequestPaste;
+
+extern bool gRequestDuplicate;
+
+extern bool gRequestDelete;
+
+extern bool gRequestSelectAll;
 
 extern int gKbFocusNode;
 
@@ -635,17 +669,51 @@ extern std::vector<KbParamEntry> gKbParams;
  // params drawn this frame, in draw order (Tab order)
    inline constexpr ImGuiID kKbTabOwner = 0x4B425441u;
 
+extern bool gKbOwnTab;
+
 extern bool gKbZoomed;
+
+extern ImVec2 gKbSavedScroll;
+
+extern float gKbSavedZoom;
+
+extern bool gKbViewRestore;
+
+extern ImVec2 gKbPan;
 
 extern bool gComputerKeyboardHot;
 
+extern bool gRequestAddNode;
+
+extern bool gRequestAddComment;
+
+extern int gContextMenuNodeIndex;
+
+extern int gHelpPopupNodeIndex;
+
 extern bool gNodeHelpShown;
+
+extern bool gCloseNodeHelp;
+
+extern bool gOpenNodeHelpPopup;
 
 extern int gModBindingMenuNode;
 
 extern int gModBindingMenuParam;
 
 extern bool gOpenModBindingMenu;
+
+extern int gModRangeTypedField;
+
+extern std::string gModRangeTypedText;
+
+extern bool gModRangeTypedJustOpened;
+
+extern bool gModRangeTypedPendingInit;
+
+extern bool gModRangeTypedNoAutoSelect;
+
+extern bool gNodePanelOpen;
 
 extern bool gViewportPanelOpen;
 
@@ -833,6 +901,8 @@ extern char  gPerfRenamePageBuffer[64];
 extern int   gPerfAssigningElemIdx;
 
 extern int   gPerfAssigningAxis;
+
+extern uint64_t gDriftFollowPickingUid;
 
 extern int   gPerfMidiLearnIdx;
 
@@ -1137,11 +1207,17 @@ extern float gMinimapOpacity;
 
 extern float gZoomSensitivity;
 
+extern bool gHoveringItem;
+
+extern bool gPanWithLeft;
+
 extern ImVec2 gDragTestNodeScreen;
 
 extern ImVec2 gDragTestNodePos;
 
 extern ImVec2 gTestMouse;
+
+extern ImVec4 gPredTestSliderScreen;
 
 extern ImVec4 gPredTestSliderCanvas;
 
@@ -1362,9 +1438,21 @@ extern FieldGraphNode* gFieldGraphPendingUnpack;
 
 extern FieldGraphUnpackPhase2State gFieldGraphUnpackPhase2;
 
+extern bool gHelpOpen;
+
 extern bool gShortcutsOpen;
 
 extern bool gNavOwnsKeys;
+
+#ifndef NDEBUG
+extern bool gUiDebuggerOpen;
+#endif
+
+#ifndef NDEBUG
+extern bool gUiStyleEditorOpen;
+#endif
+
+extern bool gSettingsOpen;
 
 extern bool gShowUpdateCheckModal;
 
@@ -4084,6 +4172,8 @@ bool IsNodeAudioCompatible(const GraphNode& gn);
 
 extern ArrangeCompositeTarget gArrangeMonitorTarget;
 
+extern ArrangeCompositeTarget gArrangeRenderTarget;
+
 
 
    // Geometry clips' solo renders. A geometry node has no image of its own
@@ -5260,6 +5350,12 @@ void RefreshLiveIssues();
 void PushUndoSnapshot(Patch::Data snapshot);
 
 void PushUndoCheckpoint();
+
+extern Patch::Data gDragStartSnapshot;
+
+extern bool gDragSnapshotValid;
+
+extern bool gDragSnapshotPushed;
 
 void RemapFieldGraphOwnership(const std::map<int, int>& remap);
 
