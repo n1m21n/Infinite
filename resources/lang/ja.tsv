@@ -153,3 +153,425 @@ the settings directory	設定フォルダ
 version %s is available (you have %s) - click to download	バージョン %s が利用可能です（現在 %s）。クリックしてダウンロード
 volume	ボリューム
 xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device	このセッションの xruns=%llu\n遅延ブロック %llu 個（レンダリングが期限超過）\nオーディオデバイスからの報告 %llu 件
+%.0f (%.2fx)	=en
+%.1f dB	=en
+%.1fs of %.1fs at %d Hz	%.1f秒 / %.1f秒（%d Hz）
+%.3f (%.2fx)	=en
+%d frames @ %dfps	%d フレーム @ %d fps
+%d frames dropped - encoder can't keep up	%d フレームが欠落：エンコーダーが追いつきません
+%d in group	グループ内 %d 個
+%d inputs, %zu tris	入力 %d、三角形 %zu
+%s\n%s	=en
+%s\nFormula: %s	%s\n数式：%s
+%zu balls, %zu tris	球 %zu、三角形 %zu
+%zu instances	インスタンス %zu
+%zu particles	パーティクル %zu
+%zu points	ポイント %zu
+%zu points, %zu tris	ポイント %zu、三角形 %zu
+%zu triangles	三角形 %zu
+%zu tris	三角形 %zu
+%zu tris, %zu links	三角形 %zu、リンク %zu
+%zu tris, stamped x%zu	三角形 %zu、スタンプ x%zu
+'state float x = 0' declares per-voice memory (resets on note-on/steal). 'param float p = 0..1' exposes a modulatable knob.	=en
+(%d pending)	（保留中 %d）
+(missing - sample's source node was deleted)	（欠落：サンプルのソースノードが削除されました）
+(needs two markers)	（マーカーが2つ必要です）
+(parameter not visible)	（パラメータは非表示）
+(unassigned)	（未割り当て）
++	=en
++ Add Control	+ コントロールを追加
++ Add Track	+ トラックを追加
+.jpg	=en
+.mov	=en
+.mp4	=en
+.png	=en
+3D geometry cannot be connected directly to a 2D image node. Connect geometry into a Render 3D node first.	3Dジオメトリは2D画像ノードに直接接続できません。先にジオメトリを Render 3D ノードに接続してください。
+3D objects cannot drive a parameter pin - only a modulator can	3Dオブジェクトはパラメータピンを駆動できません。駆動できるのはモジュレーターだけです
+A modulator can't drive an audio signal pin - only another audio source can	モジュレーターはオーディオ信号ピンを駆動できません。駆動できるのは別のオーディオソースだけです
+A node can't be connected to itself	ノードを自分自身に接続することはできません
+A predictor drives continuous parameters only - this binding is inactive.	プレディクターは連続パラメータだけを駆動します。このバインディングは無効です。
+A recovered version of your work from %s is available.	%s の作業内容の復元バージョンがあります。
+A recovered version of your work is available.	作業内容の復元バージョンがあります。
+Active	アクティブ
+Add Audio Track	オーディオトラックを追加
+Add Audio Track to Group	グループにオーディオトラックを追加
+Add Clip	クリップを追加
+Add Clip at %s	%s にクリップを追加
+Add Marker at Playhead (M)	再生ヘッドにマーカーを追加（M）
+Add New Page	新しいページを追加
+Add Track Group	トラックグループを追加
+Add VST3 folder	VST3フォルダを追加
+Add VST3 folder...	VST3フォルダを追加...
+Add Video Track	ビデオトラックを追加
+Add Video Track to Group	グループにビデオトラックを追加
+Add folder...	フォルダを追加...
+Add global	グローバルを追加
+Add to Performance Matrix	パフォーマンス・マトリクスに追加
+Add to Timeline	タイムラインに追加
+Add to canvas	キャンバスに追加
+Add to favourites	お気に入りに追加
+All tracks already at default height	すべてのトラックはすでに標準の高さです
+Another queued job already writes:	キュー内の別のジョブがすでに次に書き込み中です：
+Apply	適用
+Around current	現在位置の前後
+Assign Different Node...	別のノードを割り当て...
+Assign Node...	ノードを割り当て...
+Assign Parameter...	パラメータを割り当て...
+Assign X Axis...	X軸を割り当て...
+Assign Y Axis...	Y軸を割り当て...
+Assign clip source -> %s	クリップのソースを割り当て -> %s
+Assign to '%s' (%s) -> %s: %s	「%s」（%s）に割り当て -> %s: %s
+Audio Adjustments	オーディオ調整
+Audio Analyze accepts any audio source - Audio In, Audio File, an effect, a Mixer	Audio Analyze はあらゆるオーディオソース（Audio In、Audio File、エフェクト、Mixer）を受け付けます
+Audio Track	オーディオトラック
+Audio Track Controls	オーディオトラックのコントロール
+Audio/note signals can't drive a parameter pin - only a modulator can	オーディオ／ノート信号はパラメータピンを駆動できません。駆動できるのはモジュレーターだけです
+Audio/note signals only connect to a matching audio/note pin	オーディオ／ノート信号は、対応するオーディオ／ノートピンにのみ接続できます
+Auto-rename	自動で名前を変更
+Autosave found but could not be read: 	自動保存が見つかりましたが、読み込めませんでした：
+Bipolar Knob (1x1)	=en
+Bipolar Pan Knob (1x1)	=en
+Blade	ブレード
+Blend	ブレンド
+Blocklisted VST3 bundles (crashed or hung while scanning)	ブロックリストの VST3 バンドル（スキャン中にクラッシュまたはハング）
+Bottom	下
+Bundles that failed to describe	記述の取得に失敗したバンドル
+C	=en
+Camera and Light nodes connect to Render 3D, not geometry operators	Camera と Light ノードは、ジオメトリ演算ではなく Render 3D に接続します
+Camera connects to the Camera slot (slot 5), not geometry slots	Camera はジオメトリスロットではなく Camera スロット（スロット5）に接続します
+Cancel	キャンセル
+Cancel All	すべてキャンセル
+Cancel Recording	録音をキャンセル
+Cancelling...	キャンセル中...
+Cannot connect: this would create a note feedback loop	接続できません：ノートのフィードバックループになります
+Cannot connect: this would create an audio feedback loop	接続できません：オーディオのフィードバックループになります
+Cannot modulate a parameter driven by a Field Graph kernel	Field Graph カーネルが駆動しているパラメータはモジュレートできません
+Change Colour...	色を変更...
+Checking for updates%.*s	アップデートを確認中%.*s
+Clear Destination	宛先をクリア
+Clear Destinations	宛先をクリア
+Clear MIDI Binding	MIDIバインドをクリア
+Clear MIDI Bindings	MIDIバインドをクリア
+Clear Page Controls	ページのコントロールをクリア
+Clear Source	ソースをクリア
+Clear all cards	すべてのカードをクリア
+Clear blocklist and retry	ブロックリストをクリアして再試行
+Click to change. With the node selected, Tab to focus it and Left/Right to step	クリックで変更。ノードを選択した状態で Tab でフォーカスし、左右キーで刻みます
+Click to insert preset global:	クリックしてプリセットのグローバルを挿入：
+Clip / Track Inspector: Open	クリップ／トラック・インスペクター：開いています
+Close	閉じる
+Close Arrangement Timeline	アレンジメント・タイムラインを閉じる
+Close Performance Matrix	パフォーマンス・マトリクスを閉じる
+Close panel	パネルを閉じる
+Close window	ウィンドウを閉じる
+Color Grade	カラーグレード
+Color Tint	カラーティント
+Colour	色
+Compositing	コンポジット
+Compositing & Video	コンポジットとビデオ
+Confidence	信頼度
+Convert to Group	グループに変換
+Curve	カーブ
+Custom	カスタム
+Delete Group	グループを削除
+Delete Group + Tracks	グループとトラックを削除
+Delete Marker	マーカーを削除
+Delete Node	ノードを削除
+Delete Note	ノートを削除
+Delete Page	ページを削除
+Delete Selected Clips	選択したクリップを削除
+Delete Track	トラックを削除
+Destination	宛先
+Detected: %.1f BPM	検出：%.1f BPM
+Detected: none (no clear beat)	検出：なし（明確なビートなし）
+Digital Number Box (1x1)	=en
+Discard	破棄
+Displacement height slot accepts a 2D image or texture map	Displacement の高さスロットは2D画像またはテクスチャマップを受け付けます
+Displacement height slot accepts a 2D image or texture map, not 3D geometry	Displacement の高さスロットは2D画像またはテクスチャマップを受け付けます（3Dジオメトリは不可）
+Dock Left	左にドッキング
+Dock Position	ドッキング位置
+Dock Right	右にドッキング
+Don't Save	保存しない
+Download latest version	最新バージョンをダウンロード
+Drag from an output pin on the right of a node to an input pin on the left of another	ノード右側の出力ピンから、別のノード左側の入力ピンへドラッグしてください
+Duplicate Group	グループを複製
+Duplicate Page	ページを複製
+Duplicate Track	トラックを複製
+Each row sees t and the rows above it:  beat = mod(t * 2, 1) < 0.5	=en
+Ease In (+0.50)	イーズイン (+0.50)
+Ease Out (-0.50)	イーズアウト (-0.50)
+Edit Expression	式を編集
+Edit Note	ノートを編集
+Enable Timeline Audio	タイムラインのオーディオを有効化
+Enter Expression	式を入力
+Enter Value	値を入力
+Environment slot only accepts an HDRI Environment node	Environment スロットは HDRI Environment ノードのみ受け付けます
+Export Image	画像を書き出し
+Field	=en
+Field effect editor	Field エフェクトエディター
+Field effect kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, out	=en
+Field element editor	Field エレメントエディター
+Field element-domain kernel (per-vertex). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t	=en
+Field graph editor	Field グラフエディター
+Field graph-domain kernel (edit-time, runs once). emit("Type Name", k0, k1, ...) -> handle	=en
+Field pixel editor	Field ピクセルエディター
+Field pixel-domain kernel (per-pixel fragment shader).	=en
+Field polyphonic synth kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, freq, gate, out	=en
+Field primitive editor	Field プリミティブエディター
+Field primitive generator (from scratch). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t	=en
+Field synth editor	Field シンセエディター
+File changed on disk.	ファイルがディスク上で変更されました。
+Finalizing...	仕上げ中...
+Follow leader -> %s: %s	リーダーに追従 -> %s: %s
+Font Size	フォントサイズ
+Formula editor	数式エディター
+Full	フル
+Full range	全範囲
+Fullscreen	フルスクリーン
+Group	グループ
+Group Color	グループの色
+Group Selected	選択をグループ化
+HDRI connects to the Environment slot (slot 9), not geometry slots	HDRI はジオメトリスロットではなく Environment スロット（スロット9）に接続します
+Hand	手のひら
+Help	ヘルプ
+Hi	高
+Hide params	パラメータを隠す
+Hide viewport	ビューポートを隠す
+Horizontal Slider (2x1)	=en
+Image inputs accept 2D image sources, not modulators	画像入力は2D画像ソースを受け付けます（モジュレーターは不可）
+Incompatible connection	互換性のない接続
+Infinite closed unexpectedly.	Infinite が予期せず終了しました。
+Inspector	インスペクター
+Inv	反転
+Invert	反転
+Invert Curve	カーブを反転
+Job %d of %d	ジョブ %d / %d
+Keep mine	自分の変更を保持
+Knob (1x1)	=en
+Language Reference	言語リファレンス
+Later	後で
+Left	左
+Light connects to the Light slots (slots 6-8), not geometry slots	Light はジオメトリスロットではなく Light スロット（スロット6〜8）に接続します
+Linear (Reset)	リニア（リセット）
+Listening X... (Move MIDI CC)	X を待機中...（MIDI CC を動かしてください）
+Listening Y... (Move MIDI CC)	Y を待機中...（MIDI CC を動かしてください）
+Listening... (click or Esc to cancel)	待機中...（クリックまたは Esc でキャンセル）
+Live-editing this ImGuiStyle for inspection only - not saved.	=en
+Lo	低
+Load %d samples into:	%d 個のサンプルを読み込む先：
+Load %s into:	%s を読み込む先：
+Loop	ループ
+Loop Region: Enabled	ループ範囲：有効
+MIDI learn (already driven by something else)	MIDIラーン（すでに別のものが駆動しています）
+Make Unique	ユニーク化
+Mapping transforms 3D surface coordinates. Wire 3D geometry into Mapping, then into Material or Render 3D.	Mapping は3D表面座標を変換します。3Dジオメトリを Mapping に接続し、続けて Material または Render 3D に接続してください。
+Marker A -> B	マーカー A -> B
+Marker: %s	マーカー：%s
+Match Clips	クリップを合わせる
+Material map slots accept 2D images or textures	Material のマップスロットは2D画像またはテクスチャを受け付けます
+Material map slots accept 2D images or textures, not 3D geometry	Material のマップスロットは2D画像またはテクスチャを受け付けます（3Dジオメトリは不可）
+Material map slots accept 2D images or textures, not modulators	Material のマップスロットは2D画像またはテクスチャを受け付けます（モジュレーターは不可）
+Media	メディア
+Modulation Curve	モジュレーションカーブ
+Modulations	モジュレーション
+Modules	モジュール
+Momentary Trigger / Bang (1x1)	=en
+Move %s	%s を移動
+Move Group: %s	グループを移動：%s
+Move Track: %s	トラックを移動：%s
+Multiple Clips (%d)	複数のクリップ（%d）
+Mute	ミュート
+Named values every '=' parameter expression can read.	=en
+Native speed - turn on Sync to Tempo to set Sample BPM	ネイティブ速度：サンプル BPM を設定するには「テンポに同期」をオンにしてください
+New patch	新規パッチ
+No active modulations.	アクティブなモジュレーションはありません。
+No item selected.	項目が選択されていません。
+Node: %s	ノード：%s
+Number Box (1x1)	=en
+OK	OK
+Offline Render	オフラインレンダー
+Only modulator nodes (LFO, Envelope, Formula, etc.) can drive a parameter pin	パラメータピンを駆動できるのはモジュレーターノード（LFO、Envelope、Formula など）だけです
+Open failed: 	開けませんでした：
+Open failed: line 	開けませんでした：行 
+Open in new window	新しいウィンドウで開く
+Open in viewport panel	ビューポートパネルで開く
+Output	出力
+Output File:	出力ファイル：
+Output window	出力ウィンドウ
+Overwrite	上書き
+Overwrite file?	ファイルを上書きしますか？
+Parameter	パラメータ
+Patch a modulator, type a formula, or record a gesture to see it here.	モジュレーターを接続するか、数式を入力するか、ジェスチャーを録画すると、ここに表示されます。
+Patch replaced over RPC	パッチが RPC で置き換えられました
+Pause (Space)	一時停止（スペース）
+Pencil (Draw Clip)	鉛筆（クリップを描く）
+Perform	パフォーム
+Play (Space)	再生（スペース）
+Playback & Trigger	再生とトリガー
+Plugins	プラグイン
+Predictive LFO / Macro can only drive a parameter, knob or slider - not another node	Predictive LFO / Macro が駆動できるのはパラメータ、ノブ、スライダーのみで、他のノードは駆動できません
+Presets...	プリセット...
+Pure 3D geometry generator. Frame rate expressions are automatically hoisted.	=en
+REC  %d frames	REC  %d フレーム
+Radio Selector (2x1)	=en
+Range %s to %s\nDouble-click, or hover and type, to enter a value	範囲 %s 〜 %s\nダブルクリック、またはホバーして入力すると値を入力できます
+Range Selection	範囲選択
+Range:	範囲：
+Record Again	もう一度録画
+Record video	ビデオを録画
+Recover	復元
+Recover Autosave	自動保存を復元
+Recovered autosave. Save the project to keep it.	自動保存を復元しました。保持するにはプロジェクトを保存してください。
+Refresh all	すべて更新
+Regenerate	再生成
+Reload	再読み込み
+Reloaded (file changed on disk)	再読み込みしました（ディスク上でファイルが変更されました）
+Remove	削除
+Remove from Group	グループから削除
+Remove from favourites	お気に入りから削除
+Rename	名前を変更
+Rename All Selected	選択項目をすべて名前変更
+Rename Group	グループの名前を変更
+Rename Page	ページの名前を変更
+Rename Track	トラックの名前を変更
+Render	レンダー
+Render 3D geometry slots only accept 3D geometry sources	Render 3D のジオメトリスロットは3Dジオメトリソースのみ受け付けます
+Render Group	グループをレンダー
+Render Now	今すぐレンダー
+Render Track	トラックをレンダー
+Render failed	レンダーに失敗しました
+Rendering - timeline locked	レンダー中：タイムラインはロックされています
+Rendering Audio	オーディオをレンダー中
+Rendering...	レンダー中...
+Rendering... %d/%d	レンダー中... %d/%d
+Rescan plugins	プラグインを再スキャン
+Reserved: uv (vec2), xy (vec2), res (vec2), aspect, col (vec3), alpha, t, dt, frame	=en
+Reset Sample BPM to Detected	サンプル BPM を検出値にリセット
+Reset all track heights to default	すべてのトラックの高さを標準に戻す
+Reset to Detected	検出値にリセット
+Resolution:	解像度：
+Retry	再試行
+Return to Start (Enter)	先頭に戻る（Enter）
+Revert	元に戻す
+Right	右
+Samples	サンプル
+Save a Field-language reference file you can hand to any AI assistant\n(or drop into ~/.claude/skills/) so it can write Field kernels for you.	Field 言語のリファレンスファイルを保存します。任意の AI アシスタントに渡す\n（または ~/.claude/skills/ に置く）と、Field カーネルを書いてもらえます。
+Save a reference file you can hand to any AI assistant\n(or drop into ~/.claude/skills/) so it can write '=' expressions and Globals for you.	リファレンスファイルを保存します。任意の AI アシスタントに渡す\n（または ~/.claude/skills/ に置く）と、「=」式や Globals を書いてもらえます。
+Save before closing?	閉じる前に保存しますか？
+Save device as:	デバイスの保存名：
+Save failed: 	保存に失敗しました：
+Saved as your app-wide default - every new patch starts with this set.	アプリ全体の既定として保存しました。新しいパッチはすべてこの設定で始まります。
+Select	選択
+Select a clip, track, or group to inspect its properties.	クリップ、トラック、グループを選ぶとプロパティを確認できます。
+Set Vertex Color palette slot only accepts a Palette node	Set Vertex Color のパレットスロットは Palette ノードのみ受け付けます
+Set Vertex Color texture slot accepts a 2D image or texture map	Set Vertex Color のテクスチャスロットは2D画像またはテクスチャマップを受け付けます
+Set Vertex Color texture slot accepts a 2D image or texture map, not 3D geometry	Set Vertex Color のテクスチャスロットは2D画像またはテクスチャマップを受け付けます（3Dジオメトリは不可）
+Show params	パラメータを表示
+Show viewport	ビューポートを表示
+Signal	シグナル
+Snap Grid Division	スナップグリッド分割
+Snap to Grid: Off	グリッドにスナップ：オフ
+Snap to Grid: On	グリッドにスナップ：オン
+Solo	ソロ
+Source	ソース
+Source Node	ソースノード
+Start Recording	録画を開始
+Steep Exp (+0.85)	急な指数 (+0.85)
+Steep Log (-0.85)	急な対数 (-0.85)
+Step Gate (3x1)	=en
+Step Gate Ribbon (3x1)	=en
+Stop recording	録画を停止
+Stretched x%.3f to %.1f BPM	x%.3f に伸縮して %.1f BPM に
+Suggested	おすすめ
+Switch display to Bars / Beats (BBT)	表示を小節／拍（BBT）に切り替え
+Switch display to Time (Minutes:Seconds)	表示を時間（分:秒）に切り替え
+Sync to Tempo	テンポに同期
+Tempo Sync	テンポ同期
+The timeline render did not start.	タイムラインのレンダーが開始されませんでした。
+This color slot only accepts a Palette node	このカラースロットは Palette ノードのみ受け付けます
+This file already exists:	このファイルはすでに存在します：
+This node is bypassed - the control still stores its value, which applies when the node is back in the chain	このノードはバイパス中です。コントロールは値を保持し、ノードがチェーンに戻ると適用されます
+This patch has unsaved changes.	このパッチには未保存の変更があります。
+This pin only accepts a modulator source	このピンはモジュレーターソースのみ受け付けます
+This pin only accepts a note source	このピンはノートソースのみ受け付けます
+This pin only accepts an audio source	このピンはオーディオソースのみ受け付けます
+This pin requires a 3D geometry source, not a 2D image	このピンには2D画像ではなく3Dジオメトリソースが必要です
+This slot only accepts a Camera 3D node	このスロットは Camera 3D ノードのみ受け付けます
+This slot only accepts a Light 3D node	このスロットは Light 3D ノードのみ受け付けます
+Timeline Audio On	タイムラインのオーディオ オン
+Timeline Render Settings	タイムラインのレンダー設定
+Timeline at Bottom	タイムラインを下に配置
+Timeline at Top	タイムラインを上に配置
+Timing & Position	タイミングと位置
+Toggle (1x1)	=en
+Toggle Clip / Track Inspector	クリップ／トラック・インスペクターを切り替え
+Toggle Enabled	有効／無効を切り替え
+Toggle Loop Region (Shift+drag on ruler)	ループ範囲を切り替え（ルーラー上で Shift+ドラッグ）
+Toggle Viewport Monitor (Right-click for Dock Position)	ビューポートモニターを切り替え（右クリックでドッキング位置）
+Tool: Blade / Cut (B) - Click to choose tool	ツール：ブレード／カット（B）— クリックで選択
+Tool: Hand / Pan (H) - Click to choose tool	ツール：手のひら／パン（H）— クリックで選択
+Tool: Pencil / Draw (P) - Click to choose tool	ツール：鉛筆／描画（P）— クリックで選択
+Tool: Range Selection (R) - Click to choose tool	ツール：範囲選択（R）— クリックで選択
+Tool: Select (A)	ツール：選択（A）
+Tool: Select (A) - Click to choose tool	ツール：選択（A）— クリックで選択
+Tool: Trim (T) - Click to choose tool	ツール：トリム（T）— クリックで選択
+Tool: Zoom (Z) - Click to choose tool	ツール：ズーム（Z）— クリックで選択
+Top	上
+Topic	トピック
+Track Tint	トラックのティント
+Trigger / Bang (1x1)	=en
+Trim	トリム
+Type	タイプ
+Type: %s	タイプ：%s
+UI Debugger / Item Picker	=en
+UI Style Editor	=en
+Unbind	バインド解除
+Ungroup (Keep Tracks)	グループ解除（トラックは残す）
+Unsaved Changes	未保存の変更
+User attributes: 'attrib float heat = 0'. Frame rate expressions are automatically hoisted.	=en
+VST3 search folders	VST3の検索フォルダ
+VST3 support is not compiled into this build.	このビルドには VST3 サポートが含まれていません。
+Value	値
+Version %s is available (you have %s).	バージョン %s が利用可能です（現在は %s）。
+Vertical	縦
+Vertical Fader (1x2)	=en
+Video	ビデオ
+Video Track	ビデオトラック
+Video Track Controls	ビデオトラックのコントロール
+View in Modulation Matrix	モジュレーション・マトリクスで表示
+Viewport Monitor: Visible (Right-click for Dock Position)	ビューポートモニター：表示中（右クリックでドッキング位置）
+Viewport Position	ビューポートの位置
+Waiting for movement...	動きを待機中...
+Warming up... (%d frames left)	ウォームアップ中...（残り %d フレーム）
+Whole arrangement	アレンジメント全体
+XY Pad (2x2)	=en
+You're running the latest version (%s).	最新バージョン（%s）をお使いです。
+Zoom	ズーム
+body of  vec4 shape(vec2 uv, vec2 p, float t)	=en
+connect(src, srcSlot, dst, dstSlot)   set(handle, "paramName", value)   place(handle, x, y)	=en
+duration (s)	長さ（秒）
+finishing up, %d frames left	仕上げ中、残り %d フレーム
+fps	=en
+from: %s	元：%s
+gen %d, %zu tris	世代 %d、三角形 %zu
+geometry -> Render 3D	ジオメトリ -> Render 3D
+include audio	オーディオを含める
+locked for the current take	現在のテイクではロックされています
+moving group (%zu copies)	グループを移動中（コピー %zu 個）
+no matches	一致なし
+no plugins indexed yet - hit Rescan plugins	まだインデックスされたプラグインはありません。「プラグインを再スキャン」を押してください
+p is centred (-0.5..0.5), t is transport seconds, uA-uD are the knobs	=en
+param %d	パラメータ %d
+pass-through	パススルー
+preroll frames	プリロールフレーム数
+render fps	レンダー fps
+scanning... (%d found)	スキャン中...（%d 件見つかりました）
+scene node	シーンノード
+search field presets...	Field プリセットを検索...
+search media...	メディアを検索...
+search modules...	モジュールを検索...
+search nodes...	ノードを検索...
+search plugins...	プラグインを検索...
+search samples...	サンプルを検索...
+showing input %c	入力 %c を表示中
+x	=en

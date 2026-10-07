@@ -153,3 +153,425 @@ the settings directory	设置目录
 version %s is available (you have %s) - click to download	版本 %s 已发布（当前为 %s）——点击下载
 volume	音量
 xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device	本次会话 xruns=%llu\n%llu 个延迟块（渲染超出时限）\n%llu 个由音频设备报告
+%.0f (%.2fx)	=en
+%.1f dB	=en
+%.1fs of %.1fs at %d Hz	%.1f 秒 / %.1f 秒，%d Hz
+%.3f (%.2fx)	=en
+%d frames @ %dfps	%d 帧 @ %d fps
+%d frames dropped - encoder can't keep up	丢弃了 %d 帧——编码器跟不上
+%d in group	组内 %d 个
+%d inputs, %zu tris	%d 个输入，%zu 个三角面
+%s\n%s	=en
+%s\nFormula: %s	%s\n公式：%s
+%zu balls, %zu tris	%zu 个球，%zu 个三角面
+%zu instances	%zu 个实例
+%zu particles	%zu 个粒子
+%zu points	%zu 个点
+%zu points, %zu tris	%zu 个点，%zu 个三角面
+%zu triangles	%zu 个三角面
+%zu tris	%zu 个三角面
+%zu tris, %zu links	%zu 个三角面，%zu 条连接
+%zu tris, stamped x%zu	%zu 个三角面，盖印 x%zu
+'state float x = 0' declares per-voice memory (resets on note-on/steal). 'param float p = 0..1' exposes a modulatable knob.	=en
+(%d pending)	（%d 个待处理）
+(missing - sample's source node was deleted)	（缺失——采样的源节点已被删除）
+(needs two markers)	（需要两个标记）
+(parameter not visible)	（参数不可见）
+(unassigned)	（未分配）
++	=en
++ Add Control	+ 添加控件
++ Add Track	+ 添加轨道
+.jpg	=en
+.mov	=en
+.mp4	=en
+.png	=en
+3D geometry cannot be connected directly to a 2D image node. Connect geometry into a Render 3D node first.	3D 几何体不能直接连接到 2D 图像节点。请先将几何体连接到 Render 3D 节点。
+3D objects cannot drive a parameter pin - only a modulator can	3D 对象不能驱动参数引脚——只有调制器可以
+A modulator can't drive an audio signal pin - only another audio source can	调制器不能驱动音频信号引脚——只有其他音频源可以
+A node can't be connected to itself	节点不能连接到自身
+A predictor drives continuous parameters only - this binding is inactive.	预测器只能驱动连续参数——此绑定未生效。
+A recovered version of your work from %s is available.	有一份 %s 的工作恢复版本可用。
+A recovered version of your work is available.	有一份工作恢复版本可用。
+Active	活动
+Add Audio Track	添加音频轨道
+Add Audio Track to Group	向组添加音频轨道
+Add Clip	添加片段
+Add Clip at %s	在 %s 添加片段
+Add Marker at Playhead (M)	在播放头处添加标记（M）
+Add New Page	添加新页面
+Add Track Group	添加轨道组
+Add VST3 folder	添加 VST3 文件夹
+Add VST3 folder...	添加 VST3 文件夹...
+Add Video Track	添加视频轨道
+Add Video Track to Group	向组添加视频轨道
+Add folder...	添加文件夹...
+Add global	添加全局变量
+Add to Performance Matrix	添加到演出矩阵
+Add to Timeline	添加到时间线
+Add to canvas	添加到画布
+Add to favourites	添加到收藏
+All tracks already at default height	所有轨道均已是默认高度
+Another queued job already writes:	队列中的另一个任务已在写入：
+Apply	应用
+Around current	围绕当前位置
+Assign Different Node...	分配其他节点...
+Assign Node...	分配节点...
+Assign Parameter...	分配参数...
+Assign X Axis...	分配 X 轴...
+Assign Y Axis...	分配 Y 轴...
+Assign clip source -> %s	分配片段来源 -> %s
+Assign to '%s' (%s) -> %s: %s	分配给“%s”（%s）-> %s：%s
+Audio Adjustments	音频调整
+Audio Analyze accepts any audio source - Audio In, Audio File, an effect, a Mixer	Audio Analyze 接受任何音频源——Audio In、Audio File、效果器或 Mixer
+Audio Track	音频轨道
+Audio Track Controls	音频轨道控制
+Audio/note signals can't drive a parameter pin - only a modulator can	音频/音符信号不能驱动参数引脚——只有调制器可以
+Audio/note signals only connect to a matching audio/note pin	音频/音符信号只能连接到匹配的音频/音符引脚
+Auto-rename	自动重命名
+Autosave found but could not be read: 	找到了自动保存文件，但无法读取：
+Bipolar Knob (1x1)	=en
+Bipolar Pan Knob (1x1)	=en
+Blade	刀片
+Blend	混合
+Blocklisted VST3 bundles (crashed or hung while scanning)	已列入黑名单的 VST3 包（扫描时崩溃或卡死）
+Bottom	底部
+Bundles that failed to describe	无法读取描述的包
+C	=en
+Camera and Light nodes connect to Render 3D, not geometry operators	Camera 和 Light 节点应连接到 Render 3D，而不是几何运算节点
+Camera connects to the Camera slot (slot 5), not geometry slots	Camera 应连接到 Camera 插槽（插槽 5），而不是几何插槽
+Cancel	取消
+Cancel All	全部取消
+Cancel Recording	取消录制
+Cancelling...	正在取消...
+Cannot connect: this would create a note feedback loop	无法连接：这会形成音符反馈回路
+Cannot connect: this would create an audio feedback loop	无法连接：这会形成音频反馈回路
+Cannot modulate a parameter driven by a Field Graph kernel	无法调制由 Field Graph 内核驱动的参数
+Change Colour...	更改颜色...
+Checking for updates%.*s	正在检查更新%.*s
+Clear Destination	清除目标
+Clear Destinations	清除目标
+Clear MIDI Binding	清除 MIDI 绑定
+Clear MIDI Bindings	清除 MIDI 绑定
+Clear Page Controls	清除页面控件
+Clear Source	清除来源
+Clear all cards	清除所有卡片
+Clear blocklist and retry	清除黑名单并重试
+Click to change. With the node selected, Tab to focus it and Left/Right to step	点击更改。选中节点后，按 Tab 聚焦，再用左/右键逐步调整
+Click to insert preset global:	点击插入预设全局变量：
+Clip / Track Inspector: Open	片段 / 轨道检查器：已打开
+Close	关闭
+Close Arrangement Timeline	关闭编排时间线
+Close Performance Matrix	关闭演出矩阵
+Close panel	关闭面板
+Close window	关闭窗口
+Color Grade	调色
+Color Tint	色调
+Colour	颜色
+Compositing	合成
+Compositing & Video	合成与视频
+Confidence	置信度
+Convert to Group	转换为组
+Curve	曲线
+Custom	自定义
+Delete Group	删除组
+Delete Group + Tracks	删除组及其轨道
+Delete Marker	删除标记
+Delete Node	删除节点
+Delete Note	删除音符
+Delete Page	删除页面
+Delete Selected Clips	删除所选片段
+Delete Track	删除轨道
+Destination	目标
+Detected: %.1f BPM	检测到：%.1f BPM
+Detected: none (no clear beat)	检测到：无（没有明确的节拍）
+Digital Number Box (1x1)	=en
+Discard	放弃
+Displacement height slot accepts a 2D image or texture map	Displacement 高度插槽接受 2D 图像或纹理贴图
+Displacement height slot accepts a 2D image or texture map, not 3D geometry	Displacement 高度插槽接受 2D 图像或纹理贴图，不接受 3D 几何体
+Dock Left	停靠到左侧
+Dock Position	停靠位置
+Dock Right	停靠到右侧
+Don't Save	不保存
+Download latest version	下载最新版本
+Drag from an output pin on the right of a node to an input pin on the left of another	从节点右侧的输出引脚拖到另一个节点左侧的输入引脚
+Duplicate Group	复制组
+Duplicate Page	复制页面
+Duplicate Track	复制轨道
+Each row sees t and the rows above it:  beat = mod(t * 2, 1) < 0.5	=en
+Ease In (+0.50)	缓入 (+0.50)
+Ease Out (-0.50)	缓出 (-0.50)
+Edit Expression	编辑表达式
+Edit Note	编辑音符
+Enable Timeline Audio	启用时间线音频
+Enter Expression	输入表达式
+Enter Value	输入数值
+Environment slot only accepts an HDRI Environment node	Environment 插槽只接受 HDRI Environment 节点
+Export Image	导出图像
+Field	=en
+Field effect editor	Field 效果编辑器
+Field effect kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, out	=en
+Field element editor	Field 元素编辑器
+Field element-domain kernel (per-vertex). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t	=en
+Field graph editor	Field 图编辑器
+Field graph-domain kernel (edit-time, runs once). emit("Type Name", k0, k1, ...) -> handle	=en
+Field pixel editor	Field 像素编辑器
+Field pixel-domain kernel (per-pixel fragment shader).	=en
+Field polyphonic synth kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, freq, gate, out	=en
+Field primitive editor	Field 图元编辑器
+Field primitive generator (from scratch). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t	=en
+Field synth editor	Field 合成器编辑器
+File changed on disk.	磁盘上的文件已更改。
+Finalizing...	正在完成...
+Follow leader -> %s: %s	跟随主控 -> %s：%s
+Font Size	字体大小
+Formula editor	公式编辑器
+Full	完整
+Full range	完整范围
+Fullscreen	全屏
+Group	组
+Group Color	组颜色
+Group Selected	将所选内容编组
+HDRI connects to the Environment slot (slot 9), not geometry slots	HDRI 应连接到 Environment 插槽（插槽 9），而不是几何插槽
+Hand	抓手
+Help	帮助
+Hi	高
+Hide params	隐藏参数
+Hide viewport	隐藏视口
+Horizontal Slider (2x1)	=en
+Image inputs accept 2D image sources, not modulators	图像输入接受 2D 图像源，不接受调制器
+Incompatible connection	连接不兼容
+Infinite closed unexpectedly.	Infinite 意外退出。
+Inspector	检查器
+Inv	反转
+Invert	反转
+Invert Curve	反转曲线
+Job %d of %d	任务 %d / %d
+Keep mine	保留我的
+Knob (1x1)	=en
+Language Reference	语言参考
+Later	稍后
+Left	左
+Light connects to the Light slots (slots 6-8), not geometry slots	Light 应连接到 Light 插槽（插槽 6-8），而不是几何插槽
+Linear (Reset)	线性（重置）
+Listening X... (Move MIDI CC)	正在监听 X...（请移动 MIDI CC）
+Listening Y... (Move MIDI CC)	正在监听 Y...（请移动 MIDI CC）
+Listening... (click or Esc to cancel)	正在监听...（点击或按 Esc 取消）
+Live-editing this ImGuiStyle for inspection only - not saved.	=en
+Lo	低
+Load %d samples into:	将 %d 个采样载入：
+Load %s into:	将 %s 载入：
+Loop	循环
+Loop Region: Enabled	循环区域：已启用
+MIDI learn (already driven by something else)	MIDI 学习（已被其他来源驱动）
+Make Unique	设为唯一
+Mapping transforms 3D surface coordinates. Wire 3D geometry into Mapping, then into Material or Render 3D.	Mapping 用于变换 3D 表面坐标。请将 3D 几何体连接到 Mapping，再连接到 Material 或 Render 3D。
+Marker A -> B	标记 A -> B
+Marker: %s	标记：%s
+Match Clips	匹配片段
+Material map slots accept 2D images or textures	Material 贴图插槽接受 2D 图像或纹理
+Material map slots accept 2D images or textures, not 3D geometry	Material 贴图插槽接受 2D 图像或纹理，不接受 3D 几何体
+Material map slots accept 2D images or textures, not modulators	Material 贴图插槽接受 2D 图像或纹理，不接受调制器
+Media	媒体
+Modulation Curve	调制曲线
+Modulations	调制
+Modules	模块
+Momentary Trigger / Bang (1x1)	=en
+Move %s	移动 %s
+Move Group: %s	移动组：%s
+Move Track: %s	移动轨道：%s
+Multiple Clips (%d)	多个片段（%d）
+Mute	静音
+Named values every '=' parameter expression can read.	=en
+Native speed - turn on Sync to Tempo to set Sample BPM	原始速度——开启“同步到速度”以设置采样 BPM
+New patch	新建补丁
+No active modulations.	没有活动的调制。
+No item selected.	未选择任何项目。
+Node: %s	节点：%s
+Number Box (1x1)	=en
+OK	确定
+Offline Render	离线渲染
+Only modulator nodes (LFO, Envelope, Formula, etc.) can drive a parameter pin	只有调制器节点（LFO、Envelope、Formula 等）才能驱动参数引脚
+Open failed: 	打开失败：
+Open failed: line 	打开失败：第 
+Open in new window	在新窗口中打开
+Open in viewport panel	在视口面板中打开
+Output	输出
+Output File:	输出文件：
+Output window	输出窗口
+Overwrite	覆盖
+Overwrite file?	覆盖文件？
+Parameter	参数
+Patch a modulator, type a formula, or record a gesture to see it here.	连接调制器、输入公式或录制手势，即可在此处查看。
+Patch replaced over RPC	补丁已通过 RPC 替换
+Pause (Space)	暂停（空格）
+Pencil (Draw Clip)	铅笔（绘制片段）
+Perform	演出
+Play (Space)	播放（空格）
+Playback & Trigger	播放与触发
+Plugins	插件
+Predictive LFO / Macro can only drive a parameter, knob or slider - not another node	Predictive LFO / Macro 只能驱动参数、旋钮或滑块——不能驱动其他节点
+Presets...	预设...
+Pure 3D geometry generator. Frame rate expressions are automatically hoisted.	=en
+REC  %d frames	录制  %d 帧
+Radio Selector (2x1)	=en
+Range %s to %s\nDouble-click, or hover and type, to enter a value	范围 %s 到 %s\n双击，或悬停后直接输入，即可输入数值
+Range Selection	范围选择
+Range:	范围：
+Record Again	重新录制
+Record video	录制视频
+Recover	恢复
+Recover Autosave	恢复自动保存
+Recovered autosave. Save the project to keep it.	已恢复自动保存。请保存项目以保留。
+Refresh all	全部刷新
+Regenerate	重新生成
+Reload	重新加载
+Reloaded (file changed on disk)	已重新加载（磁盘上的文件已更改）
+Remove	移除
+Remove from Group	从组中移除
+Remove from favourites	从收藏中移除
+Rename	重命名
+Rename All Selected	重命名所有所选项
+Rename Group	重命名组
+Rename Page	重命名页面
+Rename Track	重命名轨道
+Render	渲染
+Render 3D geometry slots only accept 3D geometry sources	Render 3D 的几何插槽只接受 3D 几何体源
+Render Group	渲染组
+Render Now	立即渲染
+Render Track	渲染轨道
+Render failed	渲染失败
+Rendering - timeline locked	正在渲染——时间线已锁定
+Rendering Audio	正在渲染音频
+Rendering...	正在渲染...
+Rendering... %d/%d	正在渲染... %d/%d
+Rescan plugins	重新扫描插件
+Reserved: uv (vec2), xy (vec2), res (vec2), aspect, col (vec3), alpha, t, dt, frame	=en
+Reset Sample BPM to Detected	将采样 BPM 重置为检测值
+Reset all track heights to default	将所有轨道高度重置为默认
+Reset to Detected	重置为检测值
+Resolution:	分辨率：
+Retry	重试
+Return to Start (Enter)	返回开头（回车）
+Revert	还原
+Right	右
+Samples	采样
+Save a Field-language reference file you can hand to any AI assistant\n(or drop into ~/.claude/skills/) so it can write Field kernels for you.	保存一份 Field 语言参考文件，可交给任意 AI 助手\n（或放入 ~/.claude/skills/），让它为你编写 Field 内核。
+Save a reference file you can hand to any AI assistant\n(or drop into ~/.claude/skills/) so it can write '=' expressions and Globals for you.	保存一份参考文件，可交给任意 AI 助手\n（或放入 ~/.claude/skills/），让它为你编写“=”表达式和 Globals。
+Save before closing?	关闭前保存？
+Save device as:	将设备保存为：
+Save failed: 	保存失败：
+Saved as your app-wide default - every new patch starts with this set.	已保存为全应用默认值——每个新补丁都将以此开始。
+Select	选择
+Select a clip, track, or group to inspect its properties.	选择片段、轨道或组以查看其属性。
+Set Vertex Color palette slot only accepts a Palette node	Set Vertex Color 调色板插槽只接受 Palette 节点
+Set Vertex Color texture slot accepts a 2D image or texture map	Set Vertex Color 纹理插槽接受 2D 图像或纹理贴图
+Set Vertex Color texture slot accepts a 2D image or texture map, not 3D geometry	Set Vertex Color 纹理插槽接受 2D 图像或纹理贴图，不接受 3D 几何体
+Show params	显示参数
+Show viewport	显示视口
+Signal	信号
+Snap Grid Division	吸附网格划分
+Snap to Grid: Off	吸附到网格：关
+Snap to Grid: On	吸附到网格：开
+Solo	独奏
+Source	来源
+Source Node	源节点
+Start Recording	开始录制
+Steep Exp (+0.85)	陡峭指数 (+0.85)
+Steep Log (-0.85)	陡峭对数 (-0.85)
+Step Gate (3x1)	=en
+Step Gate Ribbon (3x1)	=en
+Stop recording	停止录制
+Stretched x%.3f to %.1f BPM	已拉伸 x%.3f 至 %.1f BPM
+Suggested	推荐
+Switch display to Bars / Beats (BBT)	将显示切换为小节 / 拍（BBT）
+Switch display to Time (Minutes:Seconds)	将显示切换为时间（分:秒）
+Sync to Tempo	同步到速度
+Tempo Sync	速度同步
+The timeline render did not start.	时间线渲染未能启动。
+This color slot only accepts a Palette node	此颜色插槽只接受 Palette 节点
+This file already exists:	此文件已存在：
+This node is bypassed - the control still stores its value, which applies when the node is back in the chain	此节点已旁通——控件仍会保存其值，节点回到链路后将生效
+This patch has unsaved changes.	此补丁有未保存的更改。
+This pin only accepts a modulator source	此引脚只接受调制器源
+This pin only accepts a note source	此引脚只接受音符源
+This pin only accepts an audio source	此引脚只接受音频源
+This pin requires a 3D geometry source, not a 2D image	此引脚需要 3D 几何体源，而不是 2D 图像
+This slot only accepts a Camera 3D node	此插槽只接受 Camera 3D 节点
+This slot only accepts a Light 3D node	此插槽只接受 Light 3D 节点
+Timeline Audio On	时间线音频已开启
+Timeline Render Settings	时间线渲染设置
+Timeline at Bottom	时间线置于底部
+Timeline at Top	时间线置于顶部
+Timing & Position	时间与位置
+Toggle (1x1)	=en
+Toggle Clip / Track Inspector	切换片段 / 轨道检查器
+Toggle Enabled	切换启用状态
+Toggle Loop Region (Shift+drag on ruler)	切换循环区域（在标尺上按住 Shift 拖动）
+Toggle Viewport Monitor (Right-click for Dock Position)	切换视口监视器（右键选择停靠位置）
+Tool: Blade / Cut (B) - Click to choose tool	工具：刀片 / 切割（B）——点击选择工具
+Tool: Hand / Pan (H) - Click to choose tool	工具：抓手 / 平移（H）——点击选择工具
+Tool: Pencil / Draw (P) - Click to choose tool	工具：铅笔 / 绘制（P）——点击选择工具
+Tool: Range Selection (R) - Click to choose tool	工具：范围选择（R）——点击选择工具
+Tool: Select (A)	工具：选择（A）
+Tool: Select (A) - Click to choose tool	工具：选择（A）——点击选择工具
+Tool: Trim (T) - Click to choose tool	工具：修剪（T）——点击选择工具
+Tool: Zoom (Z) - Click to choose tool	工具：缩放（Z）——点击选择工具
+Top	顶部
+Topic	主题
+Track Tint	轨道色调
+Trigger / Bang (1x1)	=en
+Trim	修剪
+Type	类型
+Type: %s	类型：%s
+UI Debugger / Item Picker	=en
+UI Style Editor	=en
+Unbind	解除绑定
+Ungroup (Keep Tracks)	取消编组（保留轨道）
+Unsaved Changes	未保存的更改
+User attributes: 'attrib float heat = 0'. Frame rate expressions are automatically hoisted.	=en
+VST3 search folders	VST3 搜索文件夹
+VST3 support is not compiled into this build.	此构建未包含 VST3 支持。
+Value	值
+Version %s is available (you have %s).	有新版本 %s 可用（当前为 %s）。
+Vertical	垂直
+Vertical Fader (1x2)	=en
+Video	视频
+Video Track	视频轨道
+Video Track Controls	视频轨道控制
+View in Modulation Matrix	在调制矩阵中查看
+Viewport Monitor: Visible (Right-click for Dock Position)	视口监视器：可见（右键选择停靠位置）
+Viewport Position	视口位置
+Waiting for movement...	等待移动...
+Warming up... (%d frames left)	预热中...（剩余 %d 帧）
+Whole arrangement	整个编排
+XY Pad (2x2)	=en
+You're running the latest version (%s).	您使用的已是最新版本（%s）。
+Zoom	缩放
+body of  vec4 shape(vec2 uv, vec2 p, float t)	=en
+connect(src, srcSlot, dst, dstSlot)   set(handle, "paramName", value)   place(handle, x, y)	=en
+duration (s)	时长（秒）
+finishing up, %d frames left	即将完成，剩余 %d 帧
+fps	=en
+from: %s	来自：%s
+gen %d, %zu tris	第 %d 代，%zu 个三角面
+geometry -> Render 3D	几何体 -> Render 3D
+include audio	包含音频
+locked for the current take	当前录制期间已锁定
+moving group (%zu copies)	正在移动组（%zu 份副本）
+no matches	无匹配项
+no plugins indexed yet - hit Rescan plugins	尚未索引任何插件——请点击“重新扫描插件”
+p is centred (-0.5..0.5), t is transport seconds, uA-uD are the knobs	=en
+param %d	参数 %d
+pass-through	直通
+preroll frames	预卷帧数
+render fps	渲染帧率
+scanning... (%d found)	正在扫描...（已找到 %d 个）
+scene node	场景节点
+search field presets...	搜索 Field 预设...
+search media...	搜索媒体...
+search modules...	搜索模块...
+search nodes...	搜索节点...
+search plugins...	搜索插件...
+search samples...	搜索采样...
+showing input %c	正在显示输入 %c
+x	=en

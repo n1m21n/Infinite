@@ -153,3 +153,425 @@ the settings directory	папку настроек
 version %s is available (you have %s) - click to download	доступна версия %s (у вас %s) — нажмите, чтобы скачать
 volume	громкость
 xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device	xruns=%llu за сессию\n%llu запоздавших блоков (рендер не уложился в срок)\n%llu сообщено аудиоустройством
+%.0f (%.2fx)	=en
+%.1f dB	=en
+%.1fs of %.1fs at %d Hz	%.1f с из %.1f с, %d Гц
+%.3f (%.2fx)	=en
+%d frames @ %dfps	%d кадров при %d fps
+%d frames dropped - encoder can't keep up	Пропущено кадров: %d — кодировщик не справляется
+%d in group	%d в группе
+%d inputs, %zu tris	Входов: %d, треугольников: %zu
+%s\n%s	=en
+%s\nFormula: %s	%s\nФормула: %s
+%zu balls, %zu tris	Шаров: %zu, треугольников: %zu
+%zu instances	Экземпляров: %zu
+%zu particles	Частиц: %zu
+%zu points	Точек: %zu
+%zu points, %zu tris	Точек: %zu, треугольников: %zu
+%zu triangles	Треугольников: %zu
+%zu tris	Треугольников: %zu
+%zu tris, %zu links	Треугольников: %zu, связей: %zu
+%zu tris, stamped x%zu	Треугольников: %zu, штамп x%zu
+'state float x = 0' declares per-voice memory (resets on note-on/steal). 'param float p = 0..1' exposes a modulatable knob.	=en
+(%d pending)	(в очереди: %d)
+(missing - sample's source node was deleted)	(отсутствует — исходный узел сэмпла удалён)
+(needs two markers)	(нужны два маркера)
+(parameter not visible)	(параметр не виден)
+(unassigned)	(не назначено)
++	=en
++ Add Control	+ Добавить элемент
++ Add Track	+ Добавить дорожку
+.jpg	=en
+.mov	=en
+.mp4	=en
+.png	=en
+3D geometry cannot be connected directly to a 2D image node. Connect geometry into a Render 3D node first.	3D-геометрию нельзя подключить напрямую к узлу 2D-изображения. Сначала подключите её к узлу Render 3D.
+3D objects cannot drive a parameter pin - only a modulator can	3D-объекты не могут управлять пином параметра — это умеют только модуляторы
+A modulator can't drive an audio signal pin - only another audio source can	Модулятор не может управлять пином аудиосигнала — это может только другой источник звука
+A node can't be connected to itself	Узел нельзя подключить к самому себе
+A predictor drives continuous parameters only - this binding is inactive.	Предиктор управляет только непрерывными параметрами — эта привязка неактивна.
+A recovered version of your work from %s is available.	Доступна восстановленная версия вашей работы от %s.
+A recovered version of your work is available.	Доступна восстановленная версия вашей работы.
+Active	Активно
+Add Audio Track	Добавить звуковую дорожку
+Add Audio Track to Group	Добавить звуковую дорожку в группу
+Add Clip	Добавить клип
+Add Clip at %s	Добавить клип на %s
+Add Marker at Playhead (M)	Добавить маркер на позиции воспроизведения (M)
+Add New Page	Добавить новую страницу
+Add Track Group	Добавить группу дорожек
+Add VST3 folder	Добавить папку VST3
+Add VST3 folder...	Добавить папку VST3...
+Add Video Track	Добавить видеодорожку
+Add Video Track to Group	Добавить видеодорожку в группу
+Add folder...	Добавить папку...
+Add global	Добавить глобальную
+Add to Performance Matrix	Добавить в матрицу исполнения
+Add to Timeline	Добавить на таймлайн
+Add to canvas	Добавить на холст
+Add to favourites	Добавить в избранное
+All tracks already at default height	У всех дорожек уже высота по умолчанию
+Another queued job already writes:	Другое задание в очереди уже записывает в:
+Apply	Применить
+Around current	Вокруг текущей позиции
+Assign Different Node...	Назначить другой узел...
+Assign Node...	Назначить узел...
+Assign Parameter...	Назначить параметр...
+Assign X Axis...	Назначить ось X...
+Assign Y Axis...	Назначить ось Y...
+Assign clip source -> %s	Назначить источник клипа -> %s
+Assign to '%s' (%s) -> %s: %s	Назначить на «%s» (%s) -> %s: %s
+Audio Adjustments	Настройки звука
+Audio Analyze accepts any audio source - Audio In, Audio File, an effect, a Mixer	Audio Analyze принимает любой источник звука — Audio In, Audio File, эффект или Mixer
+Audio Track	Звуковая дорожка
+Audio Track Controls	Управление звуковой дорожкой
+Audio/note signals can't drive a parameter pin - only a modulator can	Сигналы звука и нот не могут управлять пином параметра — это умеют только модуляторы
+Audio/note signals only connect to a matching audio/note pin	Сигналы звука и нот подключаются только к подходящему пину звука или нот
+Auto-rename	Переименовать автоматически
+Autosave found but could not be read: 	Автосохранение найдено, но прочитать его не удалось: 
+Bipolar Knob (1x1)	=en
+Bipolar Pan Knob (1x1)	=en
+Blade	Лезвие
+Blend	Смешивание
+Blocklisted VST3 bundles (crashed or hung while scanning)	VST3-пакеты в чёрном списке (вылетели или зависли при сканировании)
+Bottom	Снизу
+Bundles that failed to describe	Пакеты, которые не удалось описать
+C	=en
+Camera and Light nodes connect to Render 3D, not geometry operators	Узлы Camera и Light подключаются к Render 3D, а не к операторам геометрии
+Camera connects to the Camera slot (slot 5), not geometry slots	Camera подключается к слоту Camera (слот 5), а не к слотам геометрии
+Cancel	Отмена
+Cancel All	Отменить все
+Cancel Recording	Отменить запись
+Cancelling...	Отмена...
+Cannot connect: this would create a note feedback loop	Подключение невозможно: образуется петля обратной связи нот
+Cannot connect: this would create an audio feedback loop	Подключение невозможно: образуется петля аудиообратной связи
+Cannot modulate a parameter driven by a Field Graph kernel	Нельзя модулировать параметр, которым управляет ядро Field Graph
+Change Colour...	Изменить цвет...
+Checking for updates%.*s	Проверка обновлений%.*s
+Clear Destination	Очистить назначение
+Clear Destinations	Очистить назначения
+Clear MIDI Binding	Очистить привязку MIDI
+Clear MIDI Bindings	Очистить привязки MIDI
+Clear Page Controls	Очистить элементы страницы
+Clear Source	Очистить источник
+Clear all cards	Очистить все карточки
+Clear blocklist and retry	Очистить чёрный список и повторить
+Click to change. With the node selected, Tab to focus it and Left/Right to step	Нажмите, чтобы изменить. При выбранном узле Tab переводит фокус, стрелки влево/вправо меняют значение по шагам
+Click to insert preset global:	Нажмите, чтобы вставить готовую глобальную:
+Clip / Track Inspector: Open	Инспектор клипа / дорожки: открыт
+Close	Закрыть
+Close Arrangement Timeline	Закрыть таймлайн аранжировки
+Close Performance Matrix	Закрыть матрицу исполнения
+Close panel	Закрыть панель
+Close window	Закрыть окно
+Color Grade	Цветокоррекция
+Color Tint	Цветовой оттенок
+Colour	Цвет
+Compositing	Композитинг
+Compositing & Video	Композитинг и видео
+Confidence	Достоверность
+Convert to Group	Преобразовать в группу
+Curve	Кривая
+Custom	Своё
+Delete Group	Удалить группу
+Delete Group + Tracks	Удалить группу и дорожки
+Delete Marker	Удалить маркер
+Delete Node	Удалить узел
+Delete Note	Удалить ноту
+Delete Page	Удалить страницу
+Delete Selected Clips	Удалить выбранные клипы
+Delete Track	Удалить дорожку
+Destination	Назначение
+Detected: %.1f BPM	Определено: %.1f BPM
+Detected: none (no clear beat)	Определено: ничего (чёткого бита нет)
+Digital Number Box (1x1)	=en
+Discard	Отбросить
+Displacement height slot accepts a 2D image or texture map	Слот высоты Displacement принимает 2D-изображение или карту текстуры
+Displacement height slot accepts a 2D image or texture map, not 3D geometry	Слот высоты Displacement принимает 2D-изображение или карту текстуры, но не 3D-геометрию
+Dock Left	Закрепить слева
+Dock Position	Положение закрепления
+Dock Right	Закрепить справа
+Don't Save	Не сохранять
+Download latest version	Скачать последнюю версию
+Drag from an output pin on the right of a node to an input pin on the left of another	Тяните от выходного пина справа на узле к входному пину слева на другом
+Duplicate Group	Дублировать группу
+Duplicate Page	Дублировать страницу
+Duplicate Track	Дублировать дорожку
+Each row sees t and the rows above it:  beat = mod(t * 2, 1) < 0.5	=en
+Ease In (+0.50)	Плавное начало (+0.50)
+Ease Out (-0.50)	Плавный конец (-0.50)
+Edit Expression	Изменить выражение
+Edit Note	Изменить ноту
+Enable Timeline Audio	Включить звук таймлайна
+Enter Expression	Ввести выражение
+Enter Value	Ввести значение
+Environment slot only accepts an HDRI Environment node	Слот Environment принимает только узел HDRI Environment
+Export Image	Экспорт изображения
+Field	=en
+Field effect editor	Редактор эффекта Field
+Field effect kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, out	=en
+Field element editor	Редактор элемента Field
+Field element-domain kernel (per-vertex). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t	=en
+Field graph editor	Редактор графа Field
+Field graph-domain kernel (edit-time, runs once). emit("Type Name", k0, k1, ...) -> handle	=en
+Field pixel editor	Редактор пикселей Field
+Field pixel-domain kernel (per-pixel fragment shader).	=en
+Field polyphonic synth kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, freq, gate, out	=en
+Field primitive editor	Редактор примитивов Field
+Field primitive generator (from scratch). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t	=en
+Field synth editor	Редактор синтезатора Field
+File changed on disk.	Файл изменён на диске.
+Finalizing...	Завершение...
+Follow leader -> %s: %s	Следовать за ведущим -> %s: %s
+Font Size	Размер шрифта
+Formula editor	Редактор формул
+Full	Полный
+Full range	Полный диапазон
+Fullscreen	Полный экран
+Group	Группа
+Group Color	Цвет группы
+Group Selected	Сгруппировать выбранное
+HDRI connects to the Environment slot (slot 9), not geometry slots	HDRI подключается к слоту Environment (слот 9), а не к слотам геометрии
+Hand	Рука
+Help	Справка
+Hi	Выс.
+Hide params	Скрыть параметры
+Hide viewport	Скрыть вьюпорт
+Horizontal Slider (2x1)	=en
+Image inputs accept 2D image sources, not modulators	Входы изображения принимают 2D-источники, а не модуляторы
+Incompatible connection	Несовместимое подключение
+Infinite closed unexpectedly.	Infinite неожиданно закрылась.
+Inspector	Инспектор
+Inv	Инв.
+Invert	Инвертировать
+Invert Curve	Инвертировать кривую
+Job %d of %d	Задание %d из %d
+Keep mine	Оставить моё
+Knob (1x1)	=en
+Language Reference	Справочник по языку
+Later	Позже
+Left	Слева
+Light connects to the Light slots (slots 6-8), not geometry slots	Light подключается к слотам Light (слоты 6–8), а не к слотам геометрии
+Linear (Reset)	Линейная (сброс)
+Listening X... (Move MIDI CC)	Ожидание X... (подвигайте MIDI CC)
+Listening Y... (Move MIDI CC)	Ожидание Y... (подвигайте MIDI CC)
+Listening... (click or Esc to cancel)	Ожидание... (щёлкните или Esc для отмены)
+Live-editing this ImGuiStyle for inspection only - not saved.	=en
+Lo	Низ.
+Load %d samples into:	Загрузить сэмплы (%d) в:
+Load %s into:	Загрузить %s в:
+Loop	Цикл
+Loop Region: Enabled	Область цикла: включена
+MIDI learn (already driven by something else)	MIDI-обучение (уже управляется чем-то другим)
+Make Unique	Сделать уникальным
+Mapping transforms 3D surface coordinates. Wire 3D geometry into Mapping, then into Material or Render 3D.	Mapping преобразует координаты 3D-поверхности. Подключите 3D-геометрию к Mapping, затем к Material или Render 3D.
+Marker A -> B	Маркер A -> B
+Marker: %s	Маркер: %s
+Match Clips	Выровнять клипы
+Material map slots accept 2D images or textures	Слоты карт Material принимают 2D-изображения или текстуры
+Material map slots accept 2D images or textures, not 3D geometry	Слоты карт Material принимают 2D-изображения или текстуры, но не 3D-геометрию
+Material map slots accept 2D images or textures, not modulators	Слоты карт Material принимают 2D-изображения или текстуры, но не модуляторы
+Media	Медиа
+Modulation Curve	Кривая модуляции
+Modulations	Модуляции
+Modules	Модули
+Momentary Trigger / Bang (1x1)	=en
+Move %s	Переместить %s
+Move Group: %s	Переместить группу: %s
+Move Track: %s	Переместить дорожку: %s
+Multiple Clips (%d)	Несколько клипов (%d)
+Mute	Откл. звук
+Named values every '=' parameter expression can read.	=en
+Native speed - turn on Sync to Tempo to set Sample BPM	Исходная скорость — включите «Синхронизировать с темпом», чтобы задать BPM сэмпла
+New patch	Новый патч
+No active modulations.	Нет активных модуляций.
+No item selected.	Ничего не выбрано.
+Node: %s	Узел: %s
+Number Box (1x1)	=en
+OK	ОК
+Offline Render	Офлайн-рендер
+Only modulator nodes (LFO, Envelope, Formula, etc.) can drive a parameter pin	Управлять пином параметра могут только узлы-модуляторы (LFO, Envelope, Formula и т. д.)
+Open failed: 	Не удалось открыть: 
+Open failed: line 	Не удалось открыть: строка 
+Open in new window	Открыть в новом окне
+Open in viewport panel	Открыть в панели вьюпорта
+Output	Выход
+Output File:	Выходной файл:
+Output window	Окно вывода
+Overwrite	Перезаписать
+Overwrite file?	Перезаписать файл?
+Parameter	Параметр
+Patch a modulator, type a formula, or record a gesture to see it here.	Подключите модулятор, введите формулу или запишите жест — и он появится здесь.
+Patch replaced over RPC	Патч заменён через RPC
+Pause (Space)	Пауза (Пробел)
+Pencil (Draw Clip)	Карандаш (рисовать клип)
+Perform	Исполнение
+Play (Space)	Воспроизведение (Пробел)
+Playback & Trigger	Воспроизведение и триггер
+Plugins	Плагины
+Predictive LFO / Macro can only drive a parameter, knob or slider - not another node	Predictive LFO / Macro может управлять только параметром, ручкой или слайдером, но не другим узлом
+Presets...	Пресеты...
+Pure 3D geometry generator. Frame rate expressions are automatically hoisted.	=en
+REC  %d frames	ЗАП  %d кадров
+Radio Selector (2x1)	=en
+Range %s to %s\nDouble-click, or hover and type, to enter a value	Диапазон от %s до %s\nДважды щёлкните или наведите курсор и введите значение
+Range Selection	Выделение диапазона
+Range:	Диапазон:
+Record Again	Записать снова
+Record video	Записать видео
+Recover	Восстановить
+Recover Autosave	Восстановить автосохранение
+Recovered autosave. Save the project to keep it.	Автосохранение восстановлено. Сохраните проект, чтобы оставить его.
+Refresh all	Обновить все
+Regenerate	Сгенерировать заново
+Reload	Перезагрузить
+Reloaded (file changed on disk)	Перезагружено (файл изменён на диске)
+Remove	Удалить
+Remove from Group	Убрать из группы
+Remove from favourites	Убрать из избранного
+Rename	Переименовать
+Rename All Selected	Переименовать все выбранные
+Rename Group	Переименовать группу
+Rename Page	Переименовать страницу
+Rename Track	Переименовать дорожку
+Render	Рендер
+Render 3D geometry slots only accept 3D geometry sources	Слоты геометрии Render 3D принимают только источники 3D-геометрии
+Render Group	Рендер группы
+Render Now	Рендерить сейчас
+Render Track	Рендер дорожки
+Render failed	Ошибка рендера
+Rendering - timeline locked	Идёт рендер — таймлайн заблокирован
+Rendering Audio	Рендер звука
+Rendering...	Рендер...
+Rendering... %d/%d	Рендер... %d/%d
+Rescan plugins	Пересканировать плагины
+Reserved: uv (vec2), xy (vec2), res (vec2), aspect, col (vec3), alpha, t, dt, frame	=en
+Reset Sample BPM to Detected	Сбросить BPM сэмпла до определённого
+Reset all track heights to default	Сбросить высоту всех дорожек по умолчанию
+Reset to Detected	Сбросить до определённого
+Resolution:	Разрешение:
+Retry	Повторить
+Return to Start (Enter)	В начало (Enter)
+Revert	Вернуть
+Right	Справа
+Samples	Сэмплы
+Save a Field-language reference file you can hand to any AI assistant\n(or drop into ~/.claude/skills/) so it can write Field kernels for you.	Сохранить справочный файл по языку Field, который можно передать любому ИИ-ассистенту\n(или положить в ~/.claude/skills/), чтобы он писал для вас ядра Field.
+Save a reference file you can hand to any AI assistant\n(or drop into ~/.claude/skills/) so it can write '=' expressions and Globals for you.	Сохранить справочный файл, который можно передать любому ИИ-ассистенту\n(или положить в ~/.claude/skills/), чтобы он писал для вас выражения «=» и Globals.
+Save before closing?	Сохранить перед закрытием?
+Save device as:	Сохранить устройство как:
+Save failed: 	Не удалось сохранить: 
+Saved as your app-wide default - every new patch starts with this set.	Сохранено как значение по умолчанию для всего приложения — каждый новый патч начнётся с него.
+Select	Выбрать
+Select a clip, track, or group to inspect its properties.	Выберите клип, дорожку или группу, чтобы увидеть их свойства.
+Set Vertex Color palette slot only accepts a Palette node	Слот палитры Set Vertex Color принимает только узел Palette
+Set Vertex Color texture slot accepts a 2D image or texture map	Слот текстуры Set Vertex Color принимает 2D-изображение или карту текстуры
+Set Vertex Color texture slot accepts a 2D image or texture map, not 3D geometry	Слот текстуры Set Vertex Color принимает 2D-изображение или карту текстуры, но не 3D-геометрию
+Show params	Показать параметры
+Show viewport	Показать вьюпорт
+Signal	Сигнал
+Snap Grid Division	Шаг сетки привязки
+Snap to Grid: Off	Привязка к сетке: выкл.
+Snap to Grid: On	Привязка к сетке: вкл.
+Solo	Соло
+Source	Источник
+Source Node	Исходный узел
+Start Recording	Начать запись
+Steep Exp (+0.85)	Крутая эксп. (+0.85)
+Steep Log (-0.85)	Крутой лог. (-0.85)
+Step Gate (3x1)	=en
+Step Gate Ribbon (3x1)	=en
+Stop recording	Остановить запись
+Stretched x%.3f to %.1f BPM	Растянуто x%.3f до %.1f BPM
+Suggested	Рекомендуемые
+Switch display to Bars / Beats (BBT)	Переключить отображение на такты / доли (BBT)
+Switch display to Time (Minutes:Seconds)	Переключить отображение на время (минуты:секунды)
+Sync to Tempo	Синхронизировать с темпом
+Tempo Sync	Синхронизация с темпом
+The timeline render did not start.	Рендер таймлайна не запустился.
+This color slot only accepts a Palette node	Этот цветовой слот принимает только узел Palette
+This file already exists:	Этот файл уже существует:
+This node is bypassed - the control still stores its value, which applies when the node is back in the chain	Этот узел в обходе — элемент по-прежнему хранит значение, оно применится, когда узел вернётся в цепочку
+This patch has unsaved changes.	В этом патче есть несохранённые изменения.
+This pin only accepts a modulator source	Этот пин принимает только источник-модулятор
+This pin only accepts a note source	Этот пин принимает только источник нот
+This pin only accepts an audio source	Этот пин принимает только источник звука
+This pin requires a 3D geometry source, not a 2D image	Этому пину нужен источник 3D-геометрии, а не 2D-изображение
+This slot only accepts a Camera 3D node	Этот слот принимает только узел Camera 3D
+This slot only accepts a Light 3D node	Этот слот принимает только узел Light 3D
+Timeline Audio On	Звук таймлайна включён
+Timeline Render Settings	Настройки рендера таймлайна
+Timeline at Bottom	Таймлайн снизу
+Timeline at Top	Таймлайн сверху
+Timing & Position	Время и положение
+Toggle (1x1)	=en
+Toggle Clip / Track Inspector	Показать/скрыть инспектор клипа / дорожки
+Toggle Enabled	Переключить включение
+Toggle Loop Region (Shift+drag on ruler)	Включить/выключить область цикла (Shift+перетаскивание по линейке)
+Toggle Viewport Monitor (Right-click for Dock Position)	Включить/выключить монитор вьюпорта (правый клик — положение закрепления)
+Tool: Blade / Cut (B) - Click to choose tool	Инструмент: Лезвие / Разрез (B) — щёлкните для выбора
+Tool: Hand / Pan (H) - Click to choose tool	Инструмент: Рука / Сдвиг (H) — щёлкните для выбора
+Tool: Pencil / Draw (P) - Click to choose tool	Инструмент: Карандаш / Рисование (P) — щёлкните для выбора
+Tool: Range Selection (R) - Click to choose tool	Инструмент: Выделение диапазона (R) — щёлкните для выбора
+Tool: Select (A)	Инструмент: Выбор (A)
+Tool: Select (A) - Click to choose tool	Инструмент: Выбор (A) — щёлкните для выбора
+Tool: Trim (T) - Click to choose tool	Инструмент: Подрезка (T) — щёлкните для выбора
+Tool: Zoom (Z) - Click to choose tool	Инструмент: Масштаб (Z) — щёлкните для выбора
+Top	Сверху
+Topic	Тема
+Track Tint	Оттенок дорожки
+Trigger / Bang (1x1)	=en
+Trim	Подрезка
+Type	Тип
+Type: %s	Тип: %s
+UI Debugger / Item Picker	=en
+UI Style Editor	=en
+Unbind	Отвязать
+Ungroup (Keep Tracks)	Разгруппировать (оставить дорожки)
+Unsaved Changes	Несохранённые изменения
+User attributes: 'attrib float heat = 0'. Frame rate expressions are automatically hoisted.	=en
+VST3 search folders	Папки поиска VST3
+VST3 support is not compiled into this build.	В эту сборку не включена поддержка VST3.
+Value	Значение
+Version %s is available (you have %s).	Доступна версия %s (у вас %s).
+Vertical	Вертикально
+Vertical Fader (1x2)	=en
+Video	Видео
+Video Track	Видеодорожка
+Video Track Controls	Управление видеодорожкой
+View in Modulation Matrix	Показать в матрице модуляции
+Viewport Monitor: Visible (Right-click for Dock Position)	Монитор вьюпорта: виден (правый клик — положение закрепления)
+Viewport Position	Положение вьюпорта
+Waiting for movement...	Ожидание движения...
+Warming up... (%d frames left)	Прогрев... (осталось кадров: %d)
+Whole arrangement	Вся аранжировка
+XY Pad (2x2)	=en
+You're running the latest version (%s).	У вас последняя версия (%s).
+Zoom	Масштаб
+body of  vec4 shape(vec2 uv, vec2 p, float t)	=en
+connect(src, srcSlot, dst, dstSlot)   set(handle, "paramName", value)   place(handle, x, y)	=en
+duration (s)	длительность (с)
+finishing up, %d frames left	завершение, осталось кадров: %d
+fps	=en
+from: %s	от: %s
+gen %d, %zu tris	пок. %d, треугольников: %zu
+geometry -> Render 3D	геометрия -> Render 3D
+include audio	включить звук
+locked for the current take	заблокировано на время текущего дубля
+moving group (%zu copies)	перемещение группы (копий: %zu)
+no matches	нет совпадений
+no plugins indexed yet - hit Rescan plugins	плагины пока не проиндексированы — нажмите «Пересканировать плагины»
+p is centred (-0.5..0.5), t is transport seconds, uA-uD are the knobs	=en
+param %d	параметр %d
+pass-through	сквозной
+preroll frames	кадры предварительной прокрутки
+render fps	fps рендера
+scanning... (%d found)	сканирование... (найдено: %d)
+scene node	узел сцены
+search field presets...	поиск пресетов Field...
+search media...	поиск медиа...
+search modules...	поиск модулей...
+search nodes...	поиск узлов...
+search plugins...	поиск плагинов...
+search samples...	поиск сэмплов...
+showing input %c	показан вход %c
+x	=en

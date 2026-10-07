@@ -153,3 +153,425 @@ the settings directory	la carpeta de ajustes
 version %s is available (you have %s) - click to download	la versión %s está disponible (tienes la %s): haz clic para descargar
 volume	volumen
 xruns=%llu this session\n%llu late block(s) (render over the deadline)\n%llu reported by the audio device	xruns=%llu en esta sesión\n%llu bloque(s) tardío(s) (renderizado fuera de plazo)\n%llu notificados por el dispositivo de audio
+%.0f (%.2fx)	=en
+%.1f dB	=en
+%.1fs of %.1fs at %d Hz	%.1f s de %.1f s a %d Hz
+%.3f (%.2fx)	=en
+%d frames @ %dfps	%d fotogramas a %d fps
+%d frames dropped - encoder can't keep up	%d fotogramas perdidos: el codificador no da abasto
+%d in group	%d en el grupo
+%d inputs, %zu tris	%d entradas, %zu triángulos
+%s\n%s	=en
+%s\nFormula: %s	%s\nFórmula: %s
+%zu balls, %zu tris	%zu esferas, %zu triángulos
+%zu instances	%zu instancias
+%zu particles	%zu partículas
+%zu points	%zu puntos
+%zu points, %zu tris	%zu puntos, %zu triángulos
+%zu triangles	%zu triángulos
+%zu tris	%zu triángulos
+%zu tris, %zu links	%zu triángulos, %zu enlaces
+%zu tris, stamped x%zu	%zu triángulos, estampado x%zu
+'state float x = 0' declares per-voice memory (resets on note-on/steal). 'param float p = 0..1' exposes a modulatable knob.	=en
+(%d pending)	(%d pendientes)
+(missing - sample's source node was deleted)	(falta: se eliminó el nodo de origen de la muestra)
+(needs two markers)	(necesita dos marcadores)
+(parameter not visible)	(parámetro no visible)
+(unassigned)	(sin asignar)
++	=en
++ Add Control	+ Añadir control
++ Add Track	+ Añadir pista
+.jpg	=en
+.mov	=en
+.mp4	=en
+.png	=en
+3D geometry cannot be connected directly to a 2D image node. Connect geometry into a Render 3D node first.	La geometría 3D no se puede conectar directamente a un nodo de imagen 2D. Conéctala primero a un nodo Render 3D.
+3D objects cannot drive a parameter pin - only a modulator can	Los objetos 3D no pueden controlar un pin de parámetro: solo un modulador puede
+A modulator can't drive an audio signal pin - only another audio source can	Un modulador no puede controlar un pin de señal de audio: solo otra fuente de audio puede
+A node can't be connected to itself	Un nodo no se puede conectar consigo mismo
+A predictor drives continuous parameters only - this binding is inactive.	Un predictor solo controla parámetros continuos: este enlace está inactivo.
+A recovered version of your work from %s is available.	Hay disponible una versión recuperada de tu trabajo de %s.
+A recovered version of your work is available.	Hay disponible una versión recuperada de tu trabajo.
+Active	Activo
+Add Audio Track	Añadir pista de audio
+Add Audio Track to Group	Añadir pista de audio al grupo
+Add Clip	Añadir clip
+Add Clip at %s	Añadir clip en %s
+Add Marker at Playhead (M)	Añadir marcador en el cabezal (M)
+Add New Page	Añadir página nueva
+Add Track Group	Añadir grupo de pistas
+Add VST3 folder	Añadir carpeta VST3
+Add VST3 folder...	Añadir carpeta VST3...
+Add Video Track	Añadir pista de vídeo
+Add Video Track to Group	Añadir pista de vídeo al grupo
+Add folder...	Añadir carpeta...
+Add global	Añadir global
+Add to Performance Matrix	Añadir a la matriz de actuación
+Add to Timeline	Añadir a la línea de tiempo
+Add to canvas	Añadir al lienzo
+Add to favourites	Añadir a favoritos
+All tracks already at default height	Todas las pistas ya tienen la altura predeterminada
+Another queued job already writes:	Otro trabajo en cola ya escribe en:
+Apply	Aplicar
+Around current	Alrededor del actual
+Assign Different Node...	Asignar otro nodo...
+Assign Node...	Asignar nodo...
+Assign Parameter...	Asignar parámetro...
+Assign X Axis...	Asignar eje X...
+Assign Y Axis...	Asignar eje Y...
+Assign clip source -> %s	Asignar origen del clip -> %s
+Assign to '%s' (%s) -> %s: %s	Asignar a '%s' (%s) -> %s: %s
+Audio Adjustments	Ajustes de audio
+Audio Analyze accepts any audio source - Audio In, Audio File, an effect, a Mixer	Audio Analyze acepta cualquier fuente de audio: Audio In, Audio File, un efecto o un Mixer
+Audio Track	Pista de audio
+Audio Track Controls	Controles de pista de audio
+Audio/note signals can't drive a parameter pin - only a modulator can	Las señales de audio/nota no pueden controlar un pin de parámetro: solo un modulador puede
+Audio/note signals only connect to a matching audio/note pin	Las señales de audio/nota solo se conectan a un pin de audio/nota compatible
+Auto-rename	Renombrar automáticamente
+Autosave found but could not be read: 	Se encontró un autoguardado pero no se pudo leer: 
+Bipolar Knob (1x1)	=en
+Bipolar Pan Knob (1x1)	=en
+Blade	Cuchilla
+Blend	Mezcla
+Blocklisted VST3 bundles (crashed or hung while scanning)	Paquetes VST3 en lista de bloqueo (fallaron o se colgaron al escanear)
+Bottom	Abajo
+Bundles that failed to describe	Paquetes que no se pudieron describir
+C	=en
+Camera and Light nodes connect to Render 3D, not geometry operators	Los nodos Camera y Light se conectan a Render 3D, no a operadores de geometría
+Camera connects to the Camera slot (slot 5), not geometry slots	Camera se conecta a la ranura Camera (ranura 5), no a las de geometría
+Cancel	Cancelar
+Cancel All	Cancelar todo
+Cancel Recording	Cancelar grabación
+Cancelling...	Cancelando...
+Cannot connect: this would create a note feedback loop	No se puede conectar: se crearía un bucle de realimentación de notas
+Cannot connect: this would create an audio feedback loop	No se puede conectar: se crearía un bucle de realimentación de audio
+Cannot modulate a parameter driven by a Field Graph kernel	No se puede modular un parámetro controlado por un kernel Field Graph
+Change Colour...	Cambiar color...
+Checking for updates%.*s	Buscando actualizaciones%.*s
+Clear Destination	Borrar destino
+Clear Destinations	Borrar destinos
+Clear MIDI Binding	Borrar enlace MIDI
+Clear MIDI Bindings	Borrar enlaces MIDI
+Clear Page Controls	Borrar controles de la página
+Clear Source	Borrar origen
+Clear all cards	Borrar todas las tarjetas
+Clear blocklist and retry	Borrar lista de bloqueo y reintentar
+Click to change. With the node selected, Tab to focus it and Left/Right to step	Haz clic para cambiar. Con el nodo seleccionado, Tab para enfocarlo y Izquierda/Derecha para avanzar
+Click to insert preset global:	Haz clic para insertar un global predefinido:
+Clip / Track Inspector: Open	Inspector de clip / pista: abierto
+Close	Cerrar
+Close Arrangement Timeline	Cerrar línea de tiempo de arreglo
+Close Performance Matrix	Cerrar matriz de actuación
+Close panel	Cerrar panel
+Close window	Cerrar ventana
+Color Grade	Gradación de color
+Color Tint	Tinte de color
+Colour	Color
+Compositing	Composición
+Compositing & Video	Composición y vídeo
+Confidence	Confianza
+Convert to Group	Convertir en grupo
+Curve	Curva
+Custom	Personalizado
+Delete Group	Eliminar grupo
+Delete Group + Tracks	Eliminar grupo y pistas
+Delete Marker	Eliminar marcador
+Delete Node	Eliminar nodo
+Delete Note	Eliminar nota
+Delete Page	Eliminar página
+Delete Selected Clips	Eliminar clips seleccionados
+Delete Track	Eliminar pista
+Destination	Destino
+Detected: %.1f BPM	Detectado: %.1f BPM
+Detected: none (no clear beat)	Detectado: ninguno (sin pulso claro)
+Digital Number Box (1x1)	=en
+Discard	Descartar
+Displacement height slot accepts a 2D image or texture map	La ranura de altura de Displacement acepta una imagen 2D o un mapa de textura
+Displacement height slot accepts a 2D image or texture map, not 3D geometry	La ranura de altura de Displacement acepta una imagen 2D o un mapa de textura, no geometría 3D
+Dock Left	Acoplar a la izquierda
+Dock Position	Posición de acoplamiento
+Dock Right	Acoplar a la derecha
+Don't Save	No guardar
+Download latest version	Descargar la última versión
+Drag from an output pin on the right of a node to an input pin on the left of another	Arrastra desde un pin de salida a la derecha de un nodo hasta un pin de entrada a la izquierda de otro
+Duplicate Group	Duplicar grupo
+Duplicate Page	Duplicar página
+Duplicate Track	Duplicar pista
+Each row sees t and the rows above it:  beat = mod(t * 2, 1) < 0.5	=en
+Ease In (+0.50)	Entrada suave (+0.50)
+Ease Out (-0.50)	Salida suave (-0.50)
+Edit Expression	Editar expresión
+Edit Note	Editar nota
+Enable Timeline Audio	Activar audio de la línea de tiempo
+Enter Expression	Introducir expresión
+Enter Value	Introducir valor
+Environment slot only accepts an HDRI Environment node	La ranura Environment solo acepta un nodo HDRI Environment
+Export Image	Exportar imagen
+Field	=en
+Field effect editor	Editor de efecto Field
+Field effect kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, out	=en
+Field element editor	Editor de elemento Field
+Field element-domain kernel (per-vertex). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t	=en
+Field graph editor	Editor de grafo Field
+Field graph-domain kernel (edit-time, runs once). emit("Type Name", k0, k1, ...) -> handle	=en
+Field pixel editor	Editor de píxeles Field
+Field pixel-domain kernel (per-pixel fragment shader).	=en
+Field polyphonic synth kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, freq, gate, out	=en
+Field primitive editor	Editor de primitivas Field
+Field primitive generator (from scratch). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t	=en
+Field synth editor	Editor de sintetizador Field
+File changed on disk.	El archivo cambió en el disco.
+Finalizing...	Finalizando...
+Follow leader -> %s: %s	Seguir al líder -> %s: %s
+Font Size	Tamaño de fuente
+Formula editor	Editor de fórmulas
+Full	Completo
+Full range	Rango completo
+Fullscreen	Pantalla completa
+Group	Grupo
+Group Color	Color del grupo
+Group Selected	Agrupar selección
+HDRI connects to the Environment slot (slot 9), not geometry slots	HDRI se conecta a la ranura Environment (ranura 9), no a las de geometría
+Hand	Mano
+Help	Ayuda
+Hi	Alto
+Hide params	Ocultar parámetros
+Hide viewport	Ocultar vista
+Horizontal Slider (2x1)	=en
+Image inputs accept 2D image sources, not modulators	Las entradas de imagen aceptan fuentes de imagen 2D, no moduladores
+Incompatible connection	Conexión incompatible
+Infinite closed unexpectedly.	Infinite se cerró inesperadamente.
+Inspector	Inspector
+Inv	Inv
+Invert	Invertir
+Invert Curve	Invertir curva
+Job %d of %d	Trabajo %d de %d
+Keep mine	Conservar el mío
+Knob (1x1)	=en
+Language Reference	Referencia del lenguaje
+Later	Más tarde
+Left	Izquierda
+Light connects to the Light slots (slots 6-8), not geometry slots	Light se conecta a las ranuras Light (ranuras 6-8), no a las de geometría
+Linear (Reset)	Lineal (restablecer)
+Listening X... (Move MIDI CC)	Escuchando X... (mueve un MIDI CC)
+Listening Y... (Move MIDI CC)	Escuchando Y... (mueve un MIDI CC)
+Listening... (click or Esc to cancel)	Escuchando... (clic o Esc para cancelar)
+Live-editing this ImGuiStyle for inspection only - not saved.	=en
+Lo	Bajo
+Load %d samples into:	Cargar %d muestras en:
+Load %s into:	Cargar %s en:
+Loop	Bucle
+Loop Region: Enabled	Región de bucle: activada
+MIDI learn (already driven by something else)	Aprendizaje MIDI (ya controlado por otra cosa)
+Make Unique	Hacer único
+Mapping transforms 3D surface coordinates. Wire 3D geometry into Mapping, then into Material or Render 3D.	Mapping transforma las coordenadas de superficie 3D. Conecta geometría 3D a Mapping y luego a Material o Render 3D.
+Marker A -> B	Marcador A -> B
+Marker: %s	Marcador: %s
+Match Clips	Igualar clips
+Material map slots accept 2D images or textures	Las ranuras de mapa de Material aceptan imágenes 2D o texturas
+Material map slots accept 2D images or textures, not 3D geometry	Las ranuras de mapa de Material aceptan imágenes 2D o texturas, no geometría 3D
+Material map slots accept 2D images or textures, not modulators	Las ranuras de mapa de Material aceptan imágenes 2D o texturas, no moduladores
+Media	Medios
+Modulation Curve	Curva de modulación
+Modulations	Modulaciones
+Modules	Módulos
+Momentary Trigger / Bang (1x1)	=en
+Move %s	Mover %s
+Move Group: %s	Mover grupo: %s
+Move Track: %s	Mover pista: %s
+Multiple Clips (%d)	Varios clips (%d)
+Mute	Silenciar
+Named values every '=' parameter expression can read.	=en
+Native speed - turn on Sync to Tempo to set Sample BPM	Velocidad nativa: activa Sincronizar con tempo para fijar el BPM de la muestra
+New patch	Patch nuevo
+No active modulations.	No hay modulaciones activas.
+No item selected.	Ningún elemento seleccionado.
+Node: %s	Nodo: %s
+Number Box (1x1)	=en
+OK	=en
+Offline Render	Render sin conexión
+Only modulator nodes (LFO, Envelope, Formula, etc.) can drive a parameter pin	Solo los nodos moduladores (LFO, Envelope, Formula, etc.) pueden controlar un pin de parámetro
+Open failed: 	Error al abrir: 
+Open failed: line 	Error al abrir: línea 
+Open in new window	Abrir en ventana nueva
+Open in viewport panel	Abrir en el panel de vista
+Output	Salida
+Output File:	Archivo de salida:
+Output window	Ventana de salida
+Overwrite	Sobrescribir
+Overwrite file?	¿Sobrescribir el archivo?
+Parameter	Parámetro
+Patch a modulator, type a formula, or record a gesture to see it here.	Conecta un modulador, escribe una fórmula o graba un gesto para verlo aquí.
+Patch replaced over RPC	Patch reemplazado por RPC
+Pause (Space)	Pausa (Espacio)
+Pencil (Draw Clip)	Lápiz (dibujar clip)
+Perform	Actuar
+Play (Space)	Reproducir (Espacio)
+Playback & Trigger	Reproducción y disparo
+Plugins	Plugins
+Predictive LFO / Macro can only drive a parameter, knob or slider - not another node	Predictive LFO / Macro solo puede controlar un parámetro, un mando o un deslizador, no otro nodo
+Presets...	Preajustes...
+Pure 3D geometry generator. Frame rate expressions are automatically hoisted.	=en
+REC  %d frames	GRB  %d fotogramas
+Radio Selector (2x1)	=en
+Range %s to %s\nDouble-click, or hover and type, to enter a value	Rango %s a %s\nHaz doble clic, o pasa el cursor y escribe, para introducir un valor
+Range Selection	Selección de rango
+Range:	Rango:
+Record Again	Grabar de nuevo
+Record video	Grabar vídeo
+Recover	Recuperar
+Recover Autosave	Recuperar autoguardado
+Recovered autosave. Save the project to keep it.	Autoguardado recuperado. Guarda el proyecto para conservarlo.
+Refresh all	Actualizar todo
+Regenerate	Regenerar
+Reload	Recargar
+Reloaded (file changed on disk)	Recargado (el archivo cambió en el disco)
+Remove	Quitar
+Remove from Group	Quitar del grupo
+Remove from favourites	Quitar de favoritos
+Rename	Renombrar
+Rename All Selected	Renombrar toda la selección
+Rename Group	Renombrar grupo
+Rename Page	Renombrar página
+Rename Track	Renombrar pista
+Render	Renderizar
+Render 3D geometry slots only accept 3D geometry sources	Las ranuras de geometría de Render 3D solo aceptan fuentes de geometría 3D
+Render Group	Renderizar grupo
+Render Now	Renderizar ahora
+Render Track	Renderizar pista
+Render failed	Falló el renderizado
+Rendering - timeline locked	Renderizando: línea de tiempo bloqueada
+Rendering Audio	Renderizando audio
+Rendering...	Renderizando...
+Rendering... %d/%d	Renderizando... %d/%d
+Rescan plugins	Volver a escanear plugins
+Reserved: uv (vec2), xy (vec2), res (vec2), aspect, col (vec3), alpha, t, dt, frame	=en
+Reset Sample BPM to Detected	Restablecer BPM de la muestra al detectado
+Reset all track heights to default	Restablecer la altura de todas las pistas
+Reset to Detected	Restablecer al detectado
+Resolution:	Resolución:
+Retry	Reintentar
+Return to Start (Enter)	Volver al inicio (Intro)
+Revert	Revertir
+Right	Derecha
+Samples	Muestras
+Save a Field-language reference file you can hand to any AI assistant\n(or drop into ~/.claude/skills/) so it can write Field kernels for you.	Guarda un archivo de referencia del lenguaje Field que puedes dar a cualquier asistente de IA\n(o colocar en ~/.claude/skills/) para que escriba kernels Field por ti.
+Save a reference file you can hand to any AI assistant\n(or drop into ~/.claude/skills/) so it can write '=' expressions and Globals for you.	Guarda un archivo de referencia que puedes dar a cualquier asistente de IA\n(o colocar en ~/.claude/skills/) para que escriba expresiones '=' y Globals por ti.
+Save before closing?	¿Guardar antes de cerrar?
+Save device as:	Guardar dispositivo como:
+Save failed: 	Error al guardar: 
+Saved as your app-wide default - every new patch starts with this set.	Guardado como valor predeterminado de la app: cada patch nuevo empieza con esto.
+Select	Seleccionar
+Select a clip, track, or group to inspect its properties.	Selecciona un clip, una pista o un grupo para ver sus propiedades.
+Set Vertex Color palette slot only accepts a Palette node	La ranura de paleta de Set Vertex Color solo acepta un nodo Palette
+Set Vertex Color texture slot accepts a 2D image or texture map	La ranura de textura de Set Vertex Color acepta una imagen 2D o un mapa de textura
+Set Vertex Color texture slot accepts a 2D image or texture map, not 3D geometry	La ranura de textura de Set Vertex Color acepta una imagen 2D o un mapa de textura, no geometría 3D
+Show params	Mostrar parámetros
+Show viewport	Mostrar vista
+Signal	Señal
+Snap Grid Division	División de la cuadrícula de ajuste
+Snap to Grid: Off	Ajustar a cuadrícula: desactivado
+Snap to Grid: On	Ajustar a cuadrícula: activado
+Solo	Solo
+Source	Origen
+Source Node	Nodo de origen
+Start Recording	Iniciar grabación
+Steep Exp (+0.85)	Exp. pronunciada (+0.85)
+Steep Log (-0.85)	Log. pronunciada (-0.85)
+Step Gate (3x1)	=en
+Step Gate Ribbon (3x1)	=en
+Stop recording	Detener grabación
+Stretched x%.3f to %.1f BPM	Estirado x%.3f a %.1f BPM
+Suggested	Sugeridos
+Switch display to Bars / Beats (BBT)	Cambiar la vista a compases / tiempos (BBT)
+Switch display to Time (Minutes:Seconds)	Cambiar la vista a tiempo (minutos:segundos)
+Sync to Tempo	Sincronizar con el tempo
+Tempo Sync	Sincronía de tempo
+The timeline render did not start.	El renderizado de la línea de tiempo no se inició.
+This color slot only accepts a Palette node	Esta ranura de color solo acepta un nodo Palette
+This file already exists:	Este archivo ya existe:
+This node is bypassed - the control still stores its value, which applies when the node is back in the chain	Este nodo está en bypass: el control sigue guardando su valor, que se aplicará cuando el nodo vuelva a la cadena
+This patch has unsaved changes.	Este patch tiene cambios sin guardar.
+This pin only accepts a modulator source	Este pin solo acepta una fuente moduladora
+This pin only accepts a note source	Este pin solo acepta una fuente de notas
+This pin only accepts an audio source	Este pin solo acepta una fuente de audio
+This pin requires a 3D geometry source, not a 2D image	Este pin requiere una fuente de geometría 3D, no una imagen 2D
+This slot only accepts a Camera 3D node	Esta ranura solo acepta un nodo Camera 3D
+This slot only accepts a Light 3D node	Esta ranura solo acepta un nodo Light 3D
+Timeline Audio On	Audio de línea de tiempo activado
+Timeline Render Settings	Ajustes de renderizado de la línea de tiempo
+Timeline at Bottom	Línea de tiempo abajo
+Timeline at Top	Línea de tiempo arriba
+Timing & Position	Tiempo y posición
+Toggle (1x1)	=en
+Toggle Clip / Track Inspector	Mostrar/ocultar inspector de clip / pista
+Toggle Enabled	Alternar activado
+Toggle Loop Region (Shift+drag on ruler)	Alternar región de bucle (Mayús+arrastrar en la regla)
+Toggle Viewport Monitor (Right-click for Dock Position)	Alternar monitor de vista (clic derecho para la posición de acoplamiento)
+Tool: Blade / Cut (B) - Click to choose tool	Herramienta: Cuchilla / Cortar (B) - clic para elegir
+Tool: Hand / Pan (H) - Click to choose tool	Herramienta: Mano / Desplazar (H) - clic para elegir
+Tool: Pencil / Draw (P) - Click to choose tool	Herramienta: Lápiz / Dibujar (P) - clic para elegir
+Tool: Range Selection (R) - Click to choose tool	Herramienta: Selección de rango (R) - clic para elegir
+Tool: Select (A)	Herramienta: Seleccionar (A)
+Tool: Select (A) - Click to choose tool	Herramienta: Seleccionar (A) - clic para elegir
+Tool: Trim (T) - Click to choose tool	Herramienta: Recortar (T) - clic para elegir
+Tool: Zoom (Z) - Click to choose tool	Herramienta: Zoom (Z) - clic para elegir
+Top	Arriba
+Topic	Tema
+Track Tint	Tinte de pista
+Trigger / Bang (1x1)	=en
+Trim	Recortar
+Type	Tipo
+Type: %s	Tipo: %s
+UI Debugger / Item Picker	=en
+UI Style Editor	=en
+Unbind	Desvincular
+Ungroup (Keep Tracks)	Desagrupar (conservar pistas)
+Unsaved Changes	Cambios sin guardar
+User attributes: 'attrib float heat = 0'. Frame rate expressions are automatically hoisted.	=en
+VST3 search folders	Carpetas de búsqueda VST3
+VST3 support is not compiled into this build.	Esta compilación no incluye compatibilidad con VST3.
+Value	Valor
+Version %s is available (you have %s).	La versión %s está disponible (tienes la %s).
+Vertical	Vertical
+Vertical Fader (1x2)	=en
+Video	Vídeo
+Video Track	Pista de vídeo
+Video Track Controls	Controles de pista de vídeo
+View in Modulation Matrix	Ver en la matriz de modulación
+Viewport Monitor: Visible (Right-click for Dock Position)	Monitor de vista: visible (clic derecho para la posición de acoplamiento)
+Viewport Position	Posición de la vista
+Waiting for movement...	Esperando movimiento...
+Warming up... (%d frames left)	Calentando... (%d fotogramas restantes)
+Whole arrangement	Todo el arreglo
+XY Pad (2x2)	=en
+You're running the latest version (%s).	Tienes la última versión (%s).
+Zoom	Zoom
+body of  vec4 shape(vec2 uv, vec2 p, float t)	=en
+connect(src, srcSlot, dst, dstSlot)   set(handle, "paramName", value)   place(handle, x, y)	=en
+duration (s)	duración (s)
+finishing up, %d frames left	terminando, quedan %d fotogramas
+fps	=en
+from: %s	desde: %s
+gen %d, %zu tris	gen %d, %zu triángulos
+geometry -> Render 3D	geometría -> Render 3D
+include audio	incluir audio
+locked for the current take	bloqueado para la toma actual
+moving group (%zu copies)	moviendo grupo (%zu copias)
+no matches	sin resultados
+no plugins indexed yet - hit Rescan plugins	aún no hay plugins indexados: pulsa Volver a escanear plugins
+p is centred (-0.5..0.5), t is transport seconds, uA-uD are the knobs	=en
+param %d	parámetro %d
+pass-through	paso directo
+preroll frames	fotogramas de pre-roll
+render fps	fps de renderizado
+scanning... (%d found)	escaneando... (%d encontrados)
+scene node	nodo de escena
+search field presets...	buscar preajustes de Field...
+search media...	buscar medios...
+search modules...	buscar módulos...
+search nodes...	buscar nodos...
+search plugins...	buscar plugins...
+search samples...	buscar muestras...
+showing input %c	mostrando entrada %c
+x	=en
