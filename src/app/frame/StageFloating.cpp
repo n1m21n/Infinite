@@ -353,10 +353,13 @@ int DrawFloating(FrameCtx& fc)
             {
                if (auto* syphonOut = dynamic_cast<SyphonOutNode*>(gn.node.get()))
                   syphonOut->Withdraw();
+               else if (auto* ndiOut = dynamic_cast<NdiOutNode*>(gn.node.get()))
+                  ndiOut->Withdraw();
                continue;
             }
             if (dynamic_cast<OutputNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<SyphonOutNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<NdiOutNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<OscSendNode*>(gn.node.get()) != nullptr)
                gn.node->CookIfNeeded(frameId);
          }

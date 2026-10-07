@@ -156,6 +156,7 @@ namespace app
 #else
          { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders to other macOS applications in real-time via zero-copy GPU texture sharing." },
 #endif
+         { "NDI Out", "Publishes the connected image as a named NDI video source on the local network (OBS, vMix, Resolume, NDI Studio Monitor). Video only, no audio. Needs the free NDI runtime from ndi.video; without it the node says so and everything else works. NDI(R) is a registered trademark of Vizrt NDI AB." },
          { "Projection", "Warp, corner-pin and perspective-correct an image for projectors, flat walls, or curved screens, with built-in alignment test patterns and custom resolution target." },
 
          // ---------------- OSC ----------------
@@ -282,6 +283,7 @@ namespace app
 #else
          { "Syphon In", "Receives real-time video from another macOS application over Syphon - Resolume, OBS, TouchDesigner, MadMapper, Unreal, Unity - as a zero-copy shared GPU texture (IOSurface). Pick a server from the list; it rescans periodically, so a server that starts after this node does will appear." },
 #endif
+         { "NDI In", "Receives any NDI video source on the network as an image - pick it from the list, which rescans in the background. Video only, no audio. Needs the free NDI runtime from ndi.video. NDI(R) is a registered trademark of Vizrt NDI AB." },
          { "FieldPixel", "Runs a Field kernel once per output pixel, on the GPU - write your own image generator or effect in Field instead of GLSL. `state` declares persistent per-pixel memory that survives to the next frame (which is what makes reaction-diffusion and trail effects expressible here), `param` exposes a modulatable knob, and extra input/output image pins can be declared by the kernel. width/height set the output resolution; presets are complete starting kernels." },
       };
       auto it = kText.find(typeName);
@@ -894,6 +896,7 @@ namespace app
 #else
                { "Syphon Out", "Broadcasts video, 3D renders, or visual shaders to other macOS applications in real-time via zero-copy GPU texture sharing." },
 #endif
+               { "NDI Out", "Publishes the connected image as a named NDI video source on the local network (OBS, vMix, Resolume, NDI Studio Monitor). Video only, no audio. Needs the free NDI runtime from ndi.video; without it the node says so and everything else works. NDI(R) is a registered trademark of Vizrt NDI AB." },
 #if defined(_WIN32)
                { "Syphon In", "Receives a video texture published by another Windows application over Spout, zero-copy on the GPU. Pick a publisher from the node's list." },
 #elif !defined(__APPLE__)
@@ -901,6 +904,7 @@ namespace app
 #else
                { "Syphon In", "Receives a video texture published by another macOS application over Syphon, zero-copy on the GPU. Pick a publisher from the node's list." },
 #endif
+               { "NDI In", "Receives any NDI video source on the network as an image - pick it from the list, which rescans in the background. Video only, no audio. Needs the free NDI runtime from ndi.video. NDI(R) is a registered trademark of Vizrt NDI AB." },
                { "Audio In", "Live input from an audio device - the input side of the same engine Audio Out feeds. Choose the device in Settings > Audio." },
                { "Field Graph", "Plots any Field kernel's output as a curve or surface, so you can see what a kernel does before patching it into Field Effect, Field Synth or FieldPixel." },
                { "Projection", "Warp, corner-pin and perspective-correct an image for projectors, flat walls, or curved screens, with built-in alignment test patterns and custom resolution target." },

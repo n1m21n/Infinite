@@ -268,6 +268,8 @@ namespace app
          return 1;
       if (dynamic_cast<SyphonOutNode*>(gn.node.get()) != nullptr)
          return 1;
+      if (dynamic_cast<NdiOutNode*>(gn.node.get()) != nullptr)
+         return 1;
       if (dynamic_cast<ProjectionNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<ResynthNode*>(gn.node.get()) != nullptr)
@@ -508,6 +510,8 @@ namespace app
          return slot == 0 ? &out->Input() : nullptr;
       if (auto* syphonOut = dynamic_cast<SyphonOutNode*>(gn.node.get()))
          return slot == 0 ? &syphonOut->Input() : nullptr;
+      if (auto* ndiOut = dynamic_cast<NdiOutNode*>(gn.node.get()))
+         return slot == 0 ? &ndiOut->Input() : nullptr;
       if (auto* proj = dynamic_cast<ProjectionNode*>(gn.node.get()))
          return slot == 0 ? &proj->Input() : nullptr;
       return nullptr;

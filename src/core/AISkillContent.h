@@ -670,7 +670,7 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-304 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+306 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
@@ -925,7 +925,7 @@ R"AISKILL(| `Solidify` | geo:geometry | out:geometry | 65 | bypass |
 | `Humanizer` | notes:note | out:note | 2 | bypass |
 | `Keyboard` | none | out:note | 5 | bypass |
 | `MIDI File` | none | out:note | 6 | bypass |
-| `MIDI Notes` | none | out:note | 4 | hardware: refused headless, bypass |
+| `MIDI Notes` | none | out:note | 6 | hardware: refused headless, bypass |
 | `Note Capturer` | notes:note | out:note | 2 | bypass |
 | `Note Echo` | notes:note | out:note | 7 | bypass |
 | `Note Filter` | notes:note | out:note | 6 | bypass |
@@ -1026,6 +1026,8 @@ R"AISKILL(| `FieldPixel` | none | out:image | 9 | bypass |
 | `Field Graph` | none | out:image | 7 | bypass |
 | `Gain` | audio:audio | out:audio | 1 | bypass |
 | `Mixer` | in_1:audio, in_2:audio, in_3:audio, in_4:audio, in_5:audio, in_6:audio, in_7:audio, in_8:audio | out:audio | 49 |  |
+| `NDI In` | none | out:image | 1 | hardware: refused headless, bypass |
+| `NDI Out` | in:image | out:image | 1 | bypass |
 | `OSC Receive` | none | out:modulator | 4 | bypass |
 | `OSC Send` | in:modulator | out:image | 5 | bypass |
 | `Output` | in:image, audio:audio | out:image | 9 |  |

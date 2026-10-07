@@ -27,6 +27,7 @@ namespace app
       // with Utility rather than Source - alongside Syphon Out and the other
       // app-to-app/IO nodes, not the generators and loaders Source holds.
       REGISTER_NODE(SyphonInNode, Syphon In, "Utility");
+      REGISTER_NODE(NdiInNode, NDI In, "Utility");
       REGISTER_NODE(NoiseNode, Noise, "Source");
       REGISTER_NODE(TextureNode, Texture, "Source");
       REGISTER_NODE(RampNode, Ramp, "Source");
@@ -129,6 +130,7 @@ namespace app
       // would silently drop the node from any already-saved patch.
       REGISTER_NODE(OutputNode, Output, "Utility");
       REGISTER_NODE(SyphonOutNode, Syphon Out, "Utility");
+      REGISTER_NODE(NdiOutNode, NDI Out, "Utility");
       REGISTER_NODE(ProjectionNode, Projection, "Utility");
       REGISTER_NODE(LFONode, LFO, "Modulators");
       REGISTER_NODE(RandomNode, Random, "Modulators");

@@ -1,5 +1,6 @@
 // Recording / AV / PDC / MIDI self-tests (moved verbatim from main.cpp).
 #include "app/AppShared.h"
+#include "NdiRuntime.h"
 
 namespace app
 {
@@ -1347,5 +1348,90 @@ int RunMidiCC14Test()
 
    printf("%s\n", ok ? "MIDICC14TEST OK" : "MIDICC14TEST FAIL");
    return ok ? 0 : 1;
+}
+
+// ================================================== INFINITE_NDITEST
+// Headless NDI check: pure helpers always; when the NDI runtime is installed,
+// also a real loopback (sender -> finder -> receiver, one pixel compared).
+// Prints SKIP for the runtime half and exits 0 when NDI is absent, so CI stays green.
+int RunNdiTest()
+{
+   int fails = 0;
+   auto check = [&](bool ok, const char* what)
+   {
+      printf("NDITEST %s: %s\n", ok ? "PASS" : "FAIL", what);
+      if (!ok) fails++;
+   };
+
+   check(Ndi::ShortSourceName("MACHINE (Infinite)") == "Infinite", "short name strips machine");
+   check(Ndi::ShortSourceName("plain") == "plain", "short name without parens");
+   {
+      const unsigned char src[8] = {1, 2, 3, 4, 5, 6, 7, 8}; // two rows of 1 BGRA pixel
+      unsigned char dst[8] = {};
+      Ndi::CopyRowsFlipped(src, 4, dst, 4, 4, 2);
+      check(dst[0] == 5 && dst[4] == 1, "rows flip");
+   }
+
+   if (!Ndi::Available())
+   {
+      printf("NDITEST SKIP: %s\n", Ndi::StatusLine().c_str());
+      return fails == 0 ? 0 : 1;
+   }
+   printf("NDITEST runtime: %s\n", Ndi::StatusLine().c_str());
+
+   const NDIlib_v6* api = Ndi::Api();
+   NDIlib_send_create_t sd;
+   sd.p_ndi_name = "InfiniteNdiTest";
+   sd.clock_video = false;
+   sd.clock_audio = false;
+   NDIlib_send_instance_t sender = api->send_create(&sd);
+   check(sender != nullptr, "sender created");
+
+   NDIlib_find_create_t fd;
+   NDIlib_find_instance_t finder = api->find_create_v2(&fd);
+   std::string found;
+   for (int i = 0; i < 100 && found.empty(); i++)
+   {
+      api->find_wait_for_sources(finder, 100);
+      uint32_t n = 0;
+      const NDIlib_source_t* s = api->find_get_current_sources(finder, &n);
+      for (uint32_t k = 0; k < n; k++)
+         if (std::string(s[k].p_ndi_name).find("InfiniteNdiTest") != std::string::npos)
+            found = s[k].p_ndi_name;
+   }
+   check(!found.empty(), "finder sees the sender");
+
+   bool gotPixel = false;
+   if (!found.empty())
+   {
+      NDIlib_recv_create_v3_t rd;
+      rd.source_to_connect_to.p_ndi_name = found.c_str();
+      rd.color_format = NDIlib_recv_color_format_BGRX_BGRA;
+      NDIlib_recv_instance_t recv = api->recv_create_v3(&rd);
+      std::vector<unsigned char> px(16 * 16 * 4);
+      for (size_t i = 0; i < px.size(); i += 4) { px[i] = 10; px[i + 1] = 20; px[i + 2] = 30; px[i + 3] = 255; }
+      for (int i = 0; i < 100 && !gotPixel; i++)
+      {
+         NDIlib_video_frame_v2_t f;
+         f.xres = 16; f.yres = 16; f.FourCC = NDIlib_FourCC_video_type_BGRA;
+         f.frame_rate_N = 60; f.frame_rate_D = 1;
+         f.p_data = px.data(); f.line_stride_in_bytes = 64;
+         api->send_send_video_v2(sender, &f);
+         NDIlib_video_frame_v2_t in;
+         const NDIlib_frame_type_e ft = api->recv_capture_v2(recv, &in, nullptr, nullptr, 100);
+         if (ft == NDIlib_frame_type_video)
+         {
+            // NDI video is lossy (SpeedHQ), so compare within a small tolerance.
+            gotPixel = in.xres == 16 && std::abs((int)in.p_data[0] - 10) <= 6 && std::abs((int)in.p_data[1] - 20) <= 6 &&
+                       std::abs((int)in.p_data[2] - 30) <= 6;
+            api->recv_free_video_v2(recv, &in);
+         }
+      }
+      api->recv_destroy(recv);
+   }
+   check(gotPixel, "loopback frame arrives intact");
+   api->find_destroy(finder);
+   api->send_destroy(sender);
+   return fails == 0 ? 0 : 1;
 }
 }
