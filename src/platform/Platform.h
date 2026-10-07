@@ -351,6 +351,8 @@ namespace Platform
    // and runs its own AudioNode like SamplerNode, rather than owning a private
    // AVAudioEngine here. OpenAudioDialog is still shared with the file picker.
    std::string OpenAudioDialog();
+   // Standard MIDI files (.mid / .midi), for the MIDI File node.
+   std::string OpenMidiDialog();
 
    bool AudioStart(std::string& outError);
    void AudioStop();

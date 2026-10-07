@@ -670,7 +670,7 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-303 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+304 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
@@ -784,7 +784,7 @@ R"AISKILL(| `Solidify` | geo:geometry | out:geometry | 65 | bypass |
 | `Resonator Bank` | audio:audio | out:audio | 9 | bypass |
 | `Reverb` | audio:audio | out:audio | 7 | bypass |
 | `Ring Mod` | audio:audio | out:audio | 4 | bypass |
-| `Shape Resonator` | audio:audio, shape:geometry | out:audio | 6 | bypass |
+| `Shape Resonator` | audio:audio, shape:geometry | out:audio | 6 |  |
 | `Spec Blur` | audio:audio | out:audio | 6 | bypass |
 | `Spectrum Slide` | audio:audio, to:audio | out:audio | 2 |  |
 | `Stereo` | audio:audio | out:audio | 4 | bypass |
@@ -924,6 +924,7 @@ R"AISKILL(| `Solidify` | geo:geometry | out:geometry | 65 | bypass |
 | `Glide` | notes:note | out:note | 1 | bypass |
 | `Humanizer` | notes:note | out:note | 2 | bypass |
 | `Keyboard` | none | out:note | 5 | bypass |
+| `MIDI File` | none | out:note | 5 | bypass |
 | `MIDI Notes` | none | out:note | 4 | hardware: refused headless, bypass |
 | `Note Capturer` | notes:note | out:note | 2 | bypass |
 | `Note Echo` | notes:note | out:note | 7 | bypass |

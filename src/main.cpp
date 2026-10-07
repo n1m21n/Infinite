@@ -262,6 +262,7 @@ static void JoinLiveTier1();                          // defined next to ParamKe
 #include "audio/MeterRing.h"
 #include "audio/DspMath.h"
 #include "audio/NoteEventQueue.h"
+#include "audio/MidiFile.h"
 #include "audio/MusicTime.h"
 #include "audio/EffectDefs.h"
 #include "audio/dsp/PortableFft.h"
@@ -6551,6 +6552,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       REGISTER_NODE(ArpeggiatorNode, Arpeggiator, "Notes");
       REGISTER_NODE(NoteSequencerNode, Note Sequencer, "Notes");
       REGISTER_NODE(RandomNoteGeneratorNode, Random Note Generator, "Notes");
+      REGISTER_NODE(MidiFileNode, MIDI File, "Notes");
       REGISTER_NODE(ChorderNode, Chorder, "Notes");
       REGISTER_NODE(NoteStackNode, Note Stack, "Notes");
       REGISTER_NODE(NoteCapturerNode, Note Capturer, "Notes");
@@ -21673,6 +21675,99 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       EndAudioBody();
    }
 
+   void DrawMidiFileBody(GraphNode& gn, MidiFileNode* n)
+   {
+      const MidiFile::Song* song = n->GetSong();
+      char stat[96];
+      if (!n->Status().empty())
+         snprintf(stat, sizeof(stat), "%s", n->Status().c_str());
+      else if (song)
+         snprintf(stat, sizeof(stat), "%d notes - %d track%s - %.0f beats", song->noteCount, song->trackCount,
+                  song->trackCount == 1 ? "" : "s", n->LoopBeats());
+      else
+         snprintf(stat, sizeof(stat), "no file");
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+
+      if (ImGui::Button("Load...", ImVec2(90, 0)))
+      {
+         const std::string path = Platform::OpenMidiDialog();
+         if (!path.empty())
+         {
+            PushUndoCheckpoint();
+            n->path = path;
+            gPatchDirty = true;
+         }
+      }
+      if (!n->path.empty())
+      {
+         ImGui::SameLine();
+         ImGui::TextDisabled("%s", n->path.substr(n->path.find_last_of("/\\") == std::string::npos ? 0 : n->path.find_last_of("/\\") + 1).c_str());
+      }
+      else
+         ImGui::TextDisabled("Load a .mid file, or drop one on the canvas");
+
+      {
+         const float w = gAudioBodyW;
+         const float h = 96.0f;
+         const ImVec2 origin = ImGui::GetCursorScreenPos();
+         const ImVec2 br(origin.x + w, origin.y + h);
+         ImDrawList* dl = ImGui::GetWindowDrawList();
+         const bool isLight = IsThemeLight();
+         dl->AddRectFilled(origin, br, isLight ? IM_COL32(236, 240, 248, 255) : IM_COL32(16, 16, 22, 255), 4.0f);
+         if (song && !song->events.empty())
+         {
+            const double len = n->LoopBeats();
+            const int lo = std::max(0, (int)song->lowNote - 1);
+            const int hi = std::min(127, (int)song->highNote + 1);
+            const float noteH = std::max(1.5f, (h - 6.0f) / (float)(hi - lo + 1));
+            const ImU32 on = IM_COL32((int)(gAudioTint.r * 255.0f), (int)(gAudioTint.g * 255.0f),
+                                      (int)(gAudioTint.b * 255.0f), 220);
+            const ImU32 off = IM_COL32((int)(gAudioTint.r * 255.0f), (int)(gAudioTint.g * 255.0f),
+                                       (int)(gAudioTint.b * 255.0f), 70);
+            // Pair each on with the next off of the same note and track.
+            std::vector<std::pair<uint8_t, double>> open[128];
+            dl->PushClipRect(origin, br, true);
+            for (const MidiFile::Event& e : song->events)
+            {
+               const int key = e.note;
+               if (e.on)
+                  open[key].push_back({ e.track, e.beat });
+               else
+                  for (size_t i = 0; i < open[key].size(); i++)
+                     if (open[key][i].first == e.track)
+                     {
+                        const bool sel = n->track == 0 || (int)e.track == n->track - 1;
+                        const float x0 = origin.x + (float)(open[key][i].second / len) * w;
+                        const float x1 = std::max(x0 + 1.0f, origin.x + (float)(e.beat / len) * w);
+                        const float y = br.y - 3.0f - (float)(key - lo + 1) * noteH;
+                        dl->AddRectFilled(ImVec2(x0, y), ImVec2(x1, y + noteH - 0.5f), sel ? on : off);
+                        open[key].erase(open[key].begin() + (long)i);
+                        break;
+                     }
+            }
+            const double ph = n->PlayheadBeats();
+            if (ph >= 0.0)
+            {
+               const float x = origin.x + (float)(std::min(ph, len) / len) * w;
+               dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), isLight ? IM_COL32(40, 40, 60, 230) : IM_COL32(240, 240, 255, 230), 1.5f);
+            }
+            dl->PopClipRect();
+         }
+         ImGui::Dummy(ImVec2(w, h));
+      }
+
+      {
+         AudioKnobRow row(4);
+         row.KnobInt("transpose", &n->transpose, -48, 48);
+         row.KnobInt("track", &n->track, 0, std::max(0, song ? song->trackCount : 0));
+         row.Knob("vel", &n->velocity, 0.0f, 2.0f, "%.2f", kKnobSmall);
+         row.Checkbox("loop", &n->loop);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
    void DrawRandomNoteGeneratorBody(GraphNode& gn, RandomNoteGeneratorNode* n)
    {
       char stat[64];
@@ -26811,6 +26906,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          DrawNoteSequencerBody(gn, n);
       else if (auto* n = dynamic_cast<RandomNoteGeneratorNode*>(gn.node.get()))
          DrawRandomNoteGeneratorBody(gn, n);
+      else if (auto* n = dynamic_cast<MidiFileNode*>(gn.node.get()))
+         DrawMidiFileBody(gn, n);
       else if (auto* n = dynamic_cast<ChorderNode*>(gn.node.get()))
          DrawChorderBody(gn, n);
       else if (auto* n = dynamic_cast<NoteStackNode*>(gn.node.get()))
@@ -42444,6 +42541,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Note Merge", "The system's only note fan-in point: up to four note inputs merged into one output stream, in timestamp order. Each input's notes stay independent voices matched by voice id, not pitch - so two inputs playing the same note at the same time sound as two overlapping voices, not a collision." },
          { "Arpeggiator", "Holds whatever notes are currently down and replays them one at a time on its own clock, either synced to tempo (a note division) or free-running in seconds. Up/Down/Up-Down/Down-Up/As Played order the held notes by pitch or by the order they were pressed; Converge alternates outside-in (lowest, highest, next-lowest...), Diverge alternates inside-out from the middle; Random picks one per step. Repeat x2/x4 fires each note 2 or 4 times in a row before advancing. Stairs Up/Down walks the pattern in overlapping two-note steps (C E, E G, G C...). Join and Spread only differ once octaves is above 1: Spread stacks the pattern octave-by-octave (C3 D3 E3, C4 D4 E4), Join interleaves each note's octaves together (C3 C4, D3 D4, E3 E4), and Join/Spread alternates between the two every full pass - at octaves = 1 all three play identically to Up. The 8-step gate grid below the readout is the primary control: click or drag across cells to mute individual steps without changing the note order (advancing past a muted step still moves the pattern forward, punching a rhythmic hole rather than skipping a note), and the lit cell tracks the currently-sounding step. Octaves stacks the pattern up to 4 octaves higher. Gate sets how much of each step the note actually sounds for before its off. Preset loads a complete starting point (mode, octaves, rate, gate and gate pattern) in one click." },
          { "Note Sequencer", "A self-playing step sequencer, up to 16 steps. Drag a bar's tall upper area to set that step's pitch, drag the thin strip below it to set velocity, click the strip to toggle the step on/off. Steps sets how many loop, rate is either synced to tempo (a note division) or free-running in seconds, gate is how much of each step the note actually sounds for." },
+         { "MIDI File", "Plays a Standard MIDI File as a note source. Load a .mid (or drop one on the canvas) and it follows the transport: play, stop and seek move the playhead through the file, and the project tempo rules - the file's own tempo is ignored. transpose shifts every note, track picks one track of a multi-track file (0 = all), vel scales every velocity, and loop repeats the file, rounded up to a whole 4/4 bar. Notes held when the transport stops or jumps are released." },
          { "Random Note Generator", "A generative source that free-runs on its own clock (synced to tempo or free-running seconds) rather than only reacting to a knob edit: each new note is the previous one plus a small random step (wander sets the max semitones), clamped to lo..hi and snapped to the chosen scale - a bounded random walk, not independent-per-step randomness, so the line wanders rather than jumps around." },
          { "Chorder", "A self-playing generative chord engine. Every groove step it picks a random scale degree and stacks chord-sized thirds on top of it, in key. Strum spaces each chord tone's onset apart instead of firing them all at once; humanise timing and velocity add per-note randomness on top; harmonics is the chance any given chord gets an extra note an octave above one of its tones." },
          { "Note Stack", "Layers transposed copies of every incoming note on top of the original - eight independent semitone voices, each switched on or off on its own. The dry note always sounds; the enabled voices are added to it, not instead of it. The set of voices is captured when a note starts, so switching one off mid-note never leaves it hanging." },
@@ -55445,6 +55543,98 @@ static bool RunCycleShaperFixture()
 // ============================================= INFINITE_SPECTRUMSLIDETEST
 // Two sines: slide 0 keeps the first, slide 1 gives the second, and in between
 // the peak sits at the interpolated frequency (not two half-level peaks).
+static bool RunMidiFileFixture()
+{
+   bool ok = true;
+   auto check = [&](bool cond, const char* what) {
+      printf("MIDIFILETEST %s %s\n", what, cond ? "OK" : "FAIL");
+      ok = ok && cond;
+   };
+   // Format 0, 480 ticks per beat: C4 beat 0 for 1 beat, E4 beat 1 for 1 beat, G4 beat 2 for 2 beats
+   // (written with running status and a note-on-velocity-0 as the last off).
+   const uint8_t trk[] = {
+      0x00, 0x90, 60, 100,  0x83, 0x60, 60, 0,  0x00, 64, 100,  0x83, 0x60, 0x80, 64, 0,
+      0x00, 0x90, 67, 90,   0x87, 0x40, 67, 0,  0x00, 0xFF, 0x2F, 0x00 };
+   std::vector<uint8_t> bytes = { 'M', 'T', 'h', 'd', 0, 0, 0, 6, 0, 0, 0, 1, 0x01, 0xE0, 'M', 'T', 'r', 'k',
+                                  0, 0, 0, (uint8_t)sizeof(trk) };
+   bytes.insert(bytes.end(), trk, trk + sizeof(trk));
+   MidiFile::Song song;
+   std::string err;
+   check(MidiFile::Parse(bytes.data(), bytes.size(), song, err), "parse");
+   check(song.noteCount == 3 && song.trackCount == 1, "3 notes in 1 track");
+   check(std::fabs(song.lengthBeats - 4.0) < 1e-6, "length 4 beats");
+   check(!MidiFile::Parse(bytes.data(), 10, song, err), "truncated header rejected");
+   uint8_t smpte[] = { 'M', 'T', 'h', 'd', 0, 0, 0, 6, 0, 0, 0, 1, 0xE7, 0x28 };
+   check(!MidiFile::Parse(smpte, sizeof(smpte), song, err), "SMPTE rejected");
+
+   const std::string path = "/tmp/infinite_midifiletest.mid";
+   {
+      std::ofstream f(path, std::ios::binary);
+      f.write((const char*)bytes.data(), (std::streamsize)bytes.size());
+   }
+   MidiFileNode node;
+   node.path = path;
+   node.transpose = 12;
+   node.CookIfNeeded(1);
+   check(node.GetSong() != nullptr && node.Status().empty(), "node loads path on cook");
+
+   const int sr = 48000, block = 512;
+   AudioNode* an = node.GetAudioNode();
+   an->PrepareToPlay((double)sr, block);
+   node.CookIfNeeded(2);
+   NoteEventQueue* out = an->NoteOutbox();
+   const int cur = out->RegisterConsumer();
+   Transport::Instance().SetTempo(120.0f);
+   Transport::Instance().SeekBeats(0.0);
+   Transport::Instance().NotifyAudioEngineStarted((double)sr);
+   Transport::Instance().SetPlaying(true);
+
+   struct Got { double beat; int note; bool on; };
+   std::vector<Got> got;
+   auto run = [&](int blocks) {
+      for (int b = 0; b < blocks; b++)
+      {
+         Transport::Instance().AdvanceAudioClock(block);
+         const double start = Transport::Instance().BlockStartBeats();
+         std::vector<float> l(block, 0.0f);
+         float* ch[1] = { l.data() };
+         AudioBuffer buf;
+         buf.channels = ch;
+         buf.numChannels = 1;
+         buf.numFrames = block;
+         an->ProcessBlock(nullptr, 0, buf);
+         NoteEvent ev[32];
+         const int n = out->Pop(cur, ev, 32);
+         for (int i = 0; i < n; i++)
+            got.push_back({ start + (double)ev[i].frameOffset / (double)block * (block * 2.0 / sr), ev[i].note, ev[i].isNoteOn });
+      }
+   };
+   // 120 bpm: 2 beats/s = 96000 samples/4 beats... 4 beats = 2 s = 187.5 blocks. Run 3 s (one loop + 2 beats).
+   run((int)(3.0 * sr / block));
+   auto count = [&](int note, bool on) { int c = 0; for (auto& g : got) c += (g.note == note && g.on == on); return c; };
+   check(count(72, true) >= 2 && count(76, true) >= 1 && count(79, true) >= 1, "transposed notes fired (looped C twice)");
+   check(count(72, true) == count(72, false) || count(72, true) == count(72, false) + 1, "offs pair with ons");
+   bool timingOk = false;
+   for (auto& g : got)
+      if (g.note == 76 && g.on && std::fabs(g.beat - 1.0) < 0.03)
+         timingOk = true;
+   check(timingOk, "E lands on beat 1");
+
+   // Stop mid-note: held notes must be released.
+   got.clear();
+   Transport::Instance().SeekBeats(1.98);
+   run(3);
+   const int gOn = count(79, true);
+   Transport::Instance().SeekBeats(0.5);
+   run(1);
+   check(gOn == 1 && count(79, false) >= 1, "seek releases the held G");
+   Transport::Instance().SetPlaying(false);
+   Transport::Instance().NotifyAudioEngineStopped();
+   std::remove(path.c_str());
+   printf("MIDIFILETEST %s\n", ok ? "ALL OK" : "FAILED");
+   return ok;
+}
+
 static bool RunShapeResonatorFixture()
 {
    bool ok = true;
@@ -74341,6 +74531,9 @@ int main(int argc, char** argv)
    if (getenv("INFINITE_SPECTRUMSLIDETEST") != nullptr)
       return RunSpectrumSlideFixture() ? 0 : 1;
 
+   if (getenv("INFINITE_MIDIFILETEST") != nullptr)
+      return RunMidiFileFixture() ? 0 : 1;
+
    if (getenv("INFINITE_SHAPERESONATORTEST") != nullptr)
       return RunShapeResonatorFixture() ? 0 : 1;
 
@@ -80087,6 +80280,8 @@ int main(int argc, char** argv)
          DrumSequencerNode* dropTargetDrum = FindNodeUnderCanvasPoint<DrumSequencerNode>(canvasPos);
          int dropTargetLane =
             dropTargetDrum != nullptr ? DrumSequencerLaneForCanvasPos(dropTargetDrum, canvasPos.x, canvasPos.y) : 0;
+         static const std::vector<std::string> kMidiExt = { "mid", "midi" };
+         MidiFileNode* dropTargetMidi = FindNodeUnderCanvasPoint<MidiFileNode>(canvasPos);
          SamplerNode* dropTargetSampler = FindNodeUnderCanvasPoint<SamplerNode>(canvasPos);
          MpcNode* dropTargetMpc = FindNodeUnderCanvasPoint<MpcNode>(canvasPos);
          std::vector<std::string> mpcDropPaths;
@@ -80313,7 +80508,21 @@ int main(int argc, char** argv)
             }
 
             GraphNode* spawned = nullptr;
-            if (HasExtension(path, kPluginBundleExt))
+            if (HasExtension(path, kMidiExt))
+            {
+               if (dropTargetMidi != nullptr)
+               {
+                  ensureDroppedCheckpoint();
+                  dropTargetMidi->path = path;
+                  dropTargetMidi = nullptr;
+                  gPatchDirty = true;
+                  continue;
+               }
+               spawned = SpawnNode("MIDI File", "Notes", canvasPos.x + offset, canvasPos.y);
+               if (spawned != nullptr)
+                  static_cast<MidiFileNode*>(spawned->node.get())->path = path;
+            }
+            else if (HasExtension(path, kPluginBundleExt))
             {
                const bool isVst3 = HasExtension(path, std::vector<std::string> { "vst3" });
 #if !INFINITE_ENABLE_VST3

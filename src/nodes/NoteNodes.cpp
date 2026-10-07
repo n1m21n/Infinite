@@ -10,6 +10,7 @@
 #include "audio/AudioNode.h"
 #include "audio/AudioVoice.h"
 #include "audio/DspMath.h"
+#include "audio/MidiFile.h"
 #include "audio/MusicTime.h"
 #include "audio/NoteTheory.h"
 #include "audio/NoteEventQueue.h"
@@ -4520,4 +4521,219 @@ AudioNode* BouncingBallsNode::GetAudioNode()
 int BouncingBallsNode::BallPositions(float outX[kMaxBalls], float outY[kMaxBalls], float outFlash[kMaxBalls]) const
 {
    return mAudioNode ? mAudioNode->BallPositions(outX, outY, outFlash) : 0;
+}
+
+// ------------------------------------------------------------------ MIDI File
+class AudioMidiFileNode : public AudioNode
+{
+public:
+   void PrepareToPlay(double sampleRate, int /*maxBlockSize*/) override
+   {
+      mSampleRate = sampleRate;
+      mHeldCount = 0;
+      mLastBeats = -1.0;
+   }
+
+   void ProcessBlock(const AudioBuffer* const* /*inputs*/, int /*numInputs*/, AudioBuffer& output) override
+   {
+      const int numFrames = output.numFrames;
+      const MidiFile::Song* song = mSong.load(std::memory_order_acquire);
+      if (!song || !Transport::Instance().IsPlaying())
+      {
+         ReleaseAll(0);
+         mLastBeats = -1.0;
+         mPlayhead.store(-1.0, std::memory_order_relaxed);
+         return;
+      }
+
+      const double bpm = std::max(1.0, (double)Transport::Instance().Tempo());
+      const double dBeats = (double)numFrames * bpm / (60.0 * mSampleRate);
+      // Start of this block (the clock was advanced before the graph ran, so Beats() would be its end).
+      const double t0 = Transport::Instance().BlockStartBeats();
+      const double t1 = t0 + dBeats;
+      const bool loop = mLoop.load(std::memory_order_relaxed);
+      const double len = std::max(4.0, (double)mLoopBeats.load(std::memory_order_relaxed));
+      const int transpose = mTranspose.load(std::memory_order_relaxed);
+      const int trackSel = mTrack.load(std::memory_order_relaxed);
+      const float velScale = mVelocity.load(std::memory_order_relaxed);
+
+      // A seek (or a first block after stop) is not continuous with the last block: drop what is held.
+      if (mLastBeats < 0.0 || t0 < mLastBeats - 1e-6 || t0 > mLastBeats + dBeats * 4.0 + 0.05)
+         ReleaseAll(0);
+      mLastBeats = t1;
+      mPlayhead.store(loop ? std::fmod(std::max(0.0, t0), len) : t0, std::memory_order_relaxed);
+      if (t0 < 0.0)
+         return;
+
+      const auto& ev = song->events;
+      const long long k0 = loop ? (long long)std::floor(t0 / len) : 0;
+      const long long k1 = loop ? (long long)std::floor(t1 / len) : 0;
+      for (long long k = k0; k <= k1; k++)
+      {
+         const double base = loop ? (double)k * len : 0.0;
+         // The file wrapped inside this block: whatever is still held must not ring into the restart.
+         if (k > k0)
+            ReleaseAll(std::clamp((int)((base - t0) / dBeats * (double)numFrames), 0, numFrames - 1));
+         const double lo = std::max(0.0, t0 - base);
+         const double hi = loop ? std::min(len, t1 - base) : t1;
+         auto it = std::lower_bound(ev.begin(), ev.end(), lo, [](const MidiFile::Event& e, double b) { return e.beat < b; });
+         for (; it != ev.end() && it->beat < hi; ++it)
+         {
+            const double abs = base + it->beat;
+            const int offset = std::clamp((int)((abs - t0) / dBeats * (double)numFrames), 0, numFrames - 1);
+            if (it->on)
+            {
+               if (trackSel > 0 && (int)it->track != trackSel - 1)
+                  continue;
+               NoteEvent on;
+               on.note = std::clamp((int)it->note + transpose, 0, 127);
+               on.velocity = std::clamp((float)it->velocity / 127.0f * velScale, 0.0f, 1.0f);
+               on.isNoteOn = true;
+               on.frameOffset = offset;
+               on.source = this;
+               on.voiceId = NextVoiceId();
+               if (mHeldCount < kMaxHeld)
+               {
+                  mHeld[mHeldCount++] = { it->note, it->track, (uint8_t)on.note, on.voiceId };
+                  mOutbox.Push(on);
+               }
+            }
+            else
+            {
+               for (int i = 0; i < mHeldCount; i++)
+                  if (mHeld[i].note == it->note && mHeld[i].track == it->track)
+                  {
+                     PushOff(mHeld[i], offset);
+                     mHeld[i] = mHeld[--mHeldCount];
+                     break;
+                  }
+            }
+         }
+      }
+   }
+
+   NoteEventQueue* NoteOutbox() override { return &mOutbox; }
+
+   // Main thread only.
+   void PushParams(const MidiFileNode& n, const MidiFile::Song* song)
+   {
+      mTranspose.store(n.transpose, std::memory_order_relaxed);
+      mTrack.store(n.track, std::memory_order_relaxed);
+      mLoop.store(n.loop, std::memory_order_relaxed);
+      mVelocity.store(n.velocity, std::memory_order_relaxed);
+      mLoopBeats.store((float)n.LoopBeats(), std::memory_order_relaxed);
+      mSong.store(song, std::memory_order_release);
+   }
+   double Playhead() const { return mPlayhead.load(std::memory_order_relaxed); }
+
+private:
+   static constexpr int kMaxHeld = 64;
+   struct Held { uint8_t note, track, outNote; int voiceId; };
+
+   void PushOff(const Held& h, int offset)
+   {
+      NoteEvent off;
+      off.note = h.outNote;
+      off.velocity = 0.0f;
+      off.isNoteOn = false;
+      off.frameOffset = offset;
+      off.source = this;
+      off.voiceId = h.voiceId;
+      mOutbox.Push(off);
+   }
+   void ReleaseAll(int offset)
+   {
+      for (int i = 0; i < mHeldCount; i++)
+         PushOff(mHeld[i], offset);
+      mHeldCount = 0;
+   }
+
+   NoteEventQueue mOutbox;
+   double mSampleRate = 48000.0;
+   double mLastBeats = -1.0;
+   Held mHeld[kMaxHeld] = {};
+   int mHeldCount = 0;
+   std::atomic<const MidiFile::Song*> mSong { nullptr };
+   std::atomic<int> mTranspose { 0 };
+   std::atomic<int> mTrack { 0 };
+   std::atomic<bool> mLoop { true };
+   std::atomic<float> mVelocity { 1.0f };
+   std::atomic<float> mLoopBeats { 4.0f };
+   std::atomic<double> mPlayhead { -1.0 };
+};
+
+MidiFileNode::MidiFileNode() = default;
+MidiFileNode::~MidiFileNode() = default;
+
+bool MidiFileNode::LoadFile(const std::string& filePath)
+{
+   auto song = std::make_unique<MidiFile::Song>();
+   std::string err;
+   mLoadedPath = filePath;
+   if (!MidiFile::Load(filePath, *song, err))
+   {
+      mStatus = err;
+      return false;
+   }
+   path = filePath;
+   mSong = song.get();
+   mSongs.push_back(std::move(song));
+   mStatus.clear();
+   if (track > mSong->trackCount)
+      track = 0;
+   return true;
+}
+
+double MidiFileNode::LoopBeats() const
+{
+   if (!mSong)
+      return 4.0;
+   return std::max(4.0, std::ceil(mSong->lengthBeats / 4.0 - 1e-9) * 4.0);
+}
+
+double MidiFileNode::PlayheadBeats() const
+{
+   return mAudioNode ? mAudioNode->Playhead() : -1.0;
+}
+
+void MidiFileNode::CookIfNeeded(int frameId)
+{
+   if (frameId == mLastCookFrame)
+      return;
+   mLastCookFrame = frameId;
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioMidiFileNode>();
+   // A path set by a patch load (or by the file picker) is read here, once per change.
+   if (path != mLoadedPath)
+   {
+      if (path.empty())
+      {
+         mSong = nullptr;
+         mLoadedPath.clear();
+         mStatus.clear();
+      }
+      else
+      {
+         const std::string want = path;
+         if (!LoadFile(want))
+            path = want; // keep the path so the patch round-trips even when the file is missing
+      }
+   }
+   mAudioNode->PushParams(*this, mSong);
+}
+
+void MidiFileNode::VisitParams(ParamVisitor& v)
+{
+   v.Text("path", path);
+   v.Int("transpose", transpose);
+   v.Int("track", track);
+   v.Bool("loop", loop);
+   v.Float("velocity", velocity);
+}
+
+AudioNode* MidiFileNode::GetAudioNode()
+{
+   if (!mAudioNode)
+      mAudioNode = std::make_unique<AudioMidiFileNode>();
+   return mAudioNode.get();
 }

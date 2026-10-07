@@ -458,6 +458,7 @@ set(COMMON_SOURCES
     src/audio/AudioEngine.cpp
     src/audio/ParamMailbox.cpp
     src/audio/MeterRing.cpp
+    src/audio/MidiFile.cpp
     src/audio/AudioCaptureRing.cpp
     external/miniz.c
     external/shine/shine_mp3.c

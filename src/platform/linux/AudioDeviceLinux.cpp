@@ -906,6 +906,26 @@ namespace Platform
       return res ? std::string(res) : std::string();
    }
 
+   std::string OpenMidiDialog()
+   {
+      if (std::getenv("INFINITE_EXITAFTER") != nullptr) return "";
+      const char* disp = std::getenv("DISPLAY");
+      const char* wayland = std::getenv("WAYLAND_DISPLAY");
+      if ((!disp || disp[0] == '\0') && (!wayland || wayland[0] == '\0')) return "";
+
+      ScopedHostEnvironment hostEnv;
+      const char* const filterPatterns[] = { "*.mid", "*.midi" };
+      const char* res = tinyfd_openFileDialog(
+         "Choose MIDI File",
+         "",
+         (int)(sizeof(filterPatterns) / sizeof(filterPatterns[0])),
+         filterPatterns,
+         "MIDI files (*.mid, *.midi)",
+         0
+      );
+      return res ? std::string(res) : std::string();
+   }
+
    bool AudioSpikeStart(std::string& outError)
    {
       // Not a phase stub: this is a P0 throwaway that was never wired into
