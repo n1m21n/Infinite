@@ -811,10 +811,11 @@ set(LINUX_SOURCES
 # crashes again at /O2, scope /Od to the one Stage*.cpp file that does it:
 #   set_source_files_properties(src/app/frame/<File>.cpp PROPERTIES COMPILE_OPTIONS "/Od")
 # It did, in the self-test split: CL.exe died (exit -529706956) in both Windows x64 runs
-# right after DspFixtures2.cpp, i.e. while compiling DspFixtures3.cpp. Test-only code, so
+# on DspFixtures2.cpp (CL prints a file's name when it starts compiling it, so the last
+# name in the log is the one that crashed). Test-only code, so
 # /Od costs nothing that matters.
 if(MSVC)
-    set_source_files_properties(src/app/selftest/DspFixtures3.cpp PROPERTIES COMPILE_OPTIONS "/Od")
+    set_source_files_properties(src/app/selftest/DspFixtures2.cpp PROPERTIES COMPILE_OPTIONS "/Od")
 endif()
 
 # Dev-only tool: compiles a Field pixel/element source file through the same
