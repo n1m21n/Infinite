@@ -504,11 +504,126 @@ void NodeViewport::Zoom(float wheelDelta)
    mUserAdjusted = true;
 }
 
+namespace
+{
+   constexpr int kGroupPreviewMaxDepth = 8;      // matches Render3DNode's FlattenGeometry
+   constexpr size_t kGroupPreviewMaxLeaves = 64;
+   constexpr size_t kGroupPreviewMaxVertices = 600000;
+   constexpr int kGroupPreviewMaxInstances = 256;
+
+   // Depth-first expansion of nested groups into the sources they hold, bounded
+   // twice over so a group patched into itself cannot spin.
+   void FlattenGroupLeaves(IGeometrySource* source, int depth, std::vector<IGeometrySource*>& out)
+   {
+      if (source == nullptr || out.size() >= kGroupPreviewMaxLeaves)
+         return;
+      const int children = source->GroupChildCount();
+      if (children > 0 && depth < kGroupPreviewMaxDepth)
+      {
+         for (int i = 0; i < children; i++)
+            FlattenGroupLeaves(source->GroupChild(i), depth + 1, out);
+         return;
+      }
+      out.push_back(source);
+   }
+
+   void HashBytes(unsigned long long& h, const void* data, size_t size)
+   {
+      const unsigned char* bytes = static_cast<const unsigned char*>(data);
+      for (size_t i = 0; i < size; i++)
+      {
+         h ^= bytes[i];
+         h *= 1099511628211ull;
+      }
+   }
+}
+
+void NodeViewport::RefreshGroupPreview(IGeometrySource* group)
+{
+   std::vector<IGeometrySource*> leaves;
+   FlattenGroupLeaves(group, 0, leaves);
+
+   // Nothing in a leaf's mesh revision covers its model matrix, its colour or
+   // its instancer, so the rebuild gate hashes all of them.
+   unsigned long long signature = 1469598103934665603ull;
+   for (IGeometrySource* leaf : leaves)
+   {
+      const unsigned long long revision = leaf->MeshRevision();
+      const Mat4 model = leaf->GetModelMatrix();
+      const Material material = leaf->GetMaterial();
+      HashBytes(signature, &leaf, sizeof(leaf));
+      HashBytes(signature, &revision, sizeof(revision));
+      HashBytes(signature, model.m, sizeof(model.m));
+      HashBytes(signature, material.color, sizeof(material.color));
+      InstanceOnPointsNode* instancer = FindInstancer(leaf);
+      if (instancer != nullptr)
+      {
+         const unsigned long long instanceRevision = instancer->InstanceRevision();
+         const Mat4 groupMatrix = leaf->GetInstanceGroupMatrix();
+         HashBytes(signature, &instanceRevision, sizeof(instanceRevision));
+         HashBytes(signature, groupMatrix.m, sizeof(groupMatrix.m));
+      }
+   }
+   if (mGroupPreview.revision != 0 && signature == mGroupPreview.signature)
+      return;
+
+   Mesh combined;
+   for (IGeometrySource* leaf : leaves)
+   {
+      if (combined.vertices.size() >= kGroupPreviewMaxVertices)
+         break;
+      const Mesh& mesh = leaf->GetMesh();
+      if (mesh.vertices.empty())
+         continue;
+
+      Mesh placed;
+      InstanceOnPointsNode* instancer = FindInstancer(leaf);
+      if (instancer != nullptr && instancer->InstanceCount() > 0)
+         placed = MeshOps::RealizeInstances(mesh, ResolveInstanceTransforms(leaf, instancer),
+                                            leaf->GetInstanceGroupMatrix(), nullptr,
+                                            kGroupPreviewMaxInstances);
+      else
+         placed = MeshOps::Transform(mesh, leaf->GetModelMatrix());
+
+      // Only bake a colour where there is one to carry: a white, colourless
+      // child stays colourless, so a group of plain meshes does not grow a
+      // vertex-colour array that the thumbnail then has to upload.
+      const Material material = leaf->GetMaterial();
+      const bool tinted = material.color[0] != 1.0f || material.color[1] != 1.0f ||
+                          material.color[2] != 1.0f;
+      if (tinted)
+      {
+         if (placed.vertexColor.empty())
+            placed.vertexColor.assign(placed.vertices.size() * 3, 1.0f);
+         for (size_t v = 0; v < placed.vertices.size(); v++)
+            for (int c = 0; c < 3; c++)
+               placed.vertexColor[v * 3 + c] *= material.color[c];
+      }
+      MeshOps::AppendMesh(combined, placed);
+   }
+
+   mGroupPreview.mesh = std::move(combined);
+   mGroupPreview.signature = signature;
+   mGroupPreview.revision = NextMeshRevision();
+}
+
+const Mesh& NodeViewport::GroupPreviewMesh(IGeometrySource* group)
+{
+   RefreshGroupPreview(group);
+   return mGroupPreview.mesh;
+}
+
 unsigned int NodeViewport::Render(IGeometrySource* geo, const SharedViewportCamera& cam, int w, int h,
                                   bool forceRedraw)
 {
    if (geo == nullptr)
       return 0;
+   // A Group 3D has no mesh of its own - preview the children it carries.
+   if (geo->GroupChildCount() > 0)
+   {
+      RefreshGroupPreview(geo);
+      geo = &mGroupPreview;
+   }
    const Mesh& mesh = geo->GetMesh();
    // HasGeometry(), not Empty(): a vertices-only mesh (Points to Vertices'
    // output, indices empty) has nothing to preview as triangles but is still

@@ -38,7 +38,31 @@ public:
    void Orbit(SharedViewportCamera& cam, float dAzimuth, float dElevation);
    void Zoom(float wheelDelta);
 
+   // The mesh Render() draws for a Group 3D: its children baked into one,
+   // rebuilt only when a child's mesh, placement, colour or instancer changed.
+   // Needs no GL context, so the self-test can check it headless.
+   const Mesh& GroupPreviewMesh(IGeometrySource* group);
+   unsigned long long GroupPreviewRevision() const { return mGroupPreview.revision; }
+
 private:
+   // Stand-in source for a Group 3D container. The group itself hands out an
+   // empty mesh (it carries children, it has no mesh of its own), so the
+   // thumbnail draws this instead: every child baked into one mesh. One draw
+   // means one material, so a child's colour is carried as vertex colour and
+   // its textures are not shown here - Render 3D draws those.
+   struct GroupPreview : public IGeometrySource
+   {
+      Mesh mesh;
+      unsigned long long revision = 0;
+      unsigned long long signature = 0;
+      const Mesh& GetMesh() override { return mesh; }
+      unsigned long long MeshRevision() override { return revision; }
+      Mat4 GetModelMatrix() const override { return Mat4::Identity(); }
+      Material GetMaterial() const override { return Material(); }
+   };
+   void RefreshGroupPreview(IGeometrySource* group);
+   GroupPreview mGroupPreview;
+
    bool EnsureFbo(int w, int h);
    void ReleaseFbo();
    void UploadMesh(const Mesh& mesh, unsigned long long revision);
