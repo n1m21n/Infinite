@@ -85097,6 +85097,34 @@ int main(int argc, char** argv)
          }
       }
 
+      // R506: an anti-aliased edge keeps the shape's own colour and only alpha falls off (straight alpha).
+      if (getenv("INFINITE_SHAPEEDGETEST") != nullptr && frameId == 4)
+      {
+         ShapeNode node;
+         node.width = 64.0f; node.height = 64.0f;
+         node.fillColor[0] = 1.0f; node.fillColor[1] = 0.0f; node.fillColor[2] = 0.0f;
+         node.feather = 0.05f;
+         node.CookIfNeeded(300);
+         unsigned int scratchFbo = 0;
+         std::vector<float> px;
+         GLUtil::ReadTexturePixels(scratchFbo, node.GetOutputTexture(), 64, 64, px);
+         if (scratchFbo != 0) glDeleteFramebuffers(1, &scratchFbo);
+         int edge = 0, bad = 0;
+         for (size_t i = 0; i + 3 < px.size(); i += 4)
+         {
+            const float a = px[i + 3];
+            if (a > 0.05f && a < 0.95f)
+            {
+               ++edge;
+               if (px[i] < 0.95f || px[i + 1] > 0.05f || px[i + 2] > 0.05f) ++bad;
+            }
+         }
+         const bool pass = edge > 4 && bad == 0;
+         printf("[SHAPEEDGETEST] %d edge pixels, %d with a darkened colour\n", edge, bad);
+         printf("[SHAPEEDGETEST] %s\n", pass ? "SHAPEEDGETEST OK" : "SHAPEEDGETEST FAIL");
+         glfwSetWindowShouldClose(window, GLFW_TRUE);
+      }
+
       if (getenv("INFINITE_FIELDPIXELTEST") != nullptr && frameId == 4)
       {
          printf("[FIELDPIXELTEST] Running Field pixel-domain conformance harness...\n");
