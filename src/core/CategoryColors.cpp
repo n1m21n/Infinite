@@ -1,5 +1,7 @@
 #include "CategoryColors.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <map>
@@ -9,8 +11,17 @@
 
 namespace CategoryColors
 {
+float ContrastRatio(const Color& a, const Color& b)
+{
+   auto lin = [](float v) { return v <= 0.03928f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f); };
+   const float la = 0.2126f * lin(a.r) + 0.7152f * lin(a.g) + 0.0722f * lin(a.b);
+   const float lb = 0.2126f * lin(b.r) + 0.7152f * lin(b.g) + 0.0722f * lin(b.b);
+   return (std::max(la, lb) + 0.05f) / (std::min(la, lb) + 0.05f);
+}
+
 namespace
 {
+constexpr float kMinTextContrast = 4.5f;
 using Table = std::map<std::string, Color>;
 
 struct Preset
@@ -22,7 +33,7 @@ struct Preset
 
 // Every preset covers all 10 category keys, in the order RegisterNodes()
 // declares them. Ports of well-known themes have accents mapped to categories.
-const std::vector<Preset>& Presets()
+const std::vector<Preset>& RawPresets()
 {
    static const std::vector<Preset> presets = {
       { "Infinite", {
@@ -233,6 +244,50 @@ const std::vector<Preset>& Presets()
         { 0.102f, 0.431f, 0.231f } } // accent  Forest Emerald  #1A6E3B
       }
    };
+   return presets;
+}
+
+float RelLuminance(const Color& c)
+{
+   auto lin = [](float v) { return v <= 0.03928f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f); };
+   return 0.2126f * lin(c.r) + 0.7152f * lin(c.g) + 0.0722f * lin(c.b);
+}
+
+// Moves `fg` toward white (dark backgrounds) or black (light ones) by the least amount that
+// reaches `minRatio` against both backgrounds. Colours that already pass are returned untouched.
+Color WithContrast(const Color& fg, const Color& bgA, const Color& bgB, float minRatio)
+{
+   auto worst = [&](const Color& c) { return std::min(ContrastRatio(c, bgA), ContrastRatio(c, bgB)); };
+   if (worst(fg) >= minRatio)
+      return fg;
+   const bool lightBg = (RelLuminance(bgA) + RelLuminance(bgB)) * 0.5f > 0.4f;
+   const float target = lightBg ? 0.0f : 1.0f;
+   auto mixTo = [&](float t) {
+      return Color{ fg.r + (target - fg.r) * t, fg.g + (target - fg.g) * t, fg.b + (target - fg.b) * t };
+   };
+   float lo = 0.0f, hi = 1.0f;
+   for (int i = 0; i < 20; ++i)
+   {
+      const float mid = (lo + hi) * 0.5f;
+      if (worst(mixTo(mid)) >= minRatio) hi = mid; else lo = mid;
+   }
+   return mixTo(hi);
+}
+
+// The curated palettes are ports of well-known themes, several of which keep their secondary text
+// under WCAG AA. Chrome text has to stay readable, so both text tones are lifted to 4.5:1 against
+// the window and panel backgrounds at load.
+const std::vector<Preset>& Presets()
+{
+   static const std::vector<Preset> presets = [] {
+      std::vector<Preset> p = RawPresets();
+      for (Preset& preset : p)
+      {
+         preset.ui.text = WithContrast(preset.ui.text, preset.ui.windowBg, preset.ui.panelBg, kMinTextContrast);
+         preset.ui.textDim = WithContrast(preset.ui.textDim, preset.ui.windowBg, preset.ui.panelBg, kMinTextContrast);
+      }
+      return p;
+   }();
    return presets;
 }
 

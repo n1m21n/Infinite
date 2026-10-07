@@ -85159,6 +85159,26 @@ int main(int argc, char** argv)
          }
       }
 
+      // R573: every theme's text and dim text clear 4.5:1 against its window and panel backgrounds.
+      if (getenv("INFINITE_THEMECONTRASTTEST") != nullptr && frameId == 3)
+      {
+         bool ok = true;
+         const auto& names = CategoryColors::PresetNames();
+         for (int i = 0; i < (int)names.size(); ++i)
+         {
+            const CategoryColors::UiTheme& t = CategoryColors::UiThemeForPreset(i);
+            const float rows[4] = { CategoryColors::ContrastRatio(t.text, t.windowBg), CategoryColors::ContrastRatio(t.text, t.panelBg),
+                                    CategoryColors::ContrastRatio(t.textDim, t.windowBg), CategoryColors::ContrastRatio(t.textDim, t.panelBg) };
+            float lowest = rows[0];
+            for (float r : rows) lowest = std::min(lowest, r);
+            const bool good = lowest >= 4.499f;
+            ok = ok && good;
+            printf("[THEMECONTRASTTEST] %-18s lowest %.2f  %s\n", names[i].c_str(), lowest, good ? "ok" : "FAIL");
+         }
+         printf("[THEMECONTRASTTEST] %s\n", ok ? "THEMECONTRASTTEST OK" : "THEMECONTRASTTEST FAIL");
+         glfwSetWindowShouldClose(window, GLFW_TRUE);
+      }
+
       // R506: an anti-aliased edge keeps the shape's own colour and only alpha falls off (straight alpha).
       if (getenv("INFINITE_SHAPEEDGETEST") != nullptr && frameId == 4)
       {
