@@ -561,3 +561,4 @@ MPC|pad15_sync|Free is the default and the rig's note-on has the transport stopp
 MPC|pad15_div|the division only matters for a Synced pad with the transport running; the rig leaves the pad Free and the transport stopped. Covered by the MPCTEST fixture (quantised landing, loop re-trigger) and INFINITE_MPCMODTEST (binding).
 MPC|pad15_fadeout|fade out only shapes the tail at the end of a pass or on release; the rig holds one note inside the one-second seed sample and never releases. Covered by the MPCTEST fixture (fade out).
 Drum Sequencer|patternPart|patternPart is informational bookkeeping set by ApplyPattern; the audio thread never reads it (DrumSequencerNode.h)
+Spectrum Slide|slide|the rig wires the identical tone to the main and the 'to' input, so there is nothing to slide toward and the output is the same at every setting; moving the peak is checked by SPECTRUMSLIDETEST (endpoints, 550/660 Hz midpoints, level).

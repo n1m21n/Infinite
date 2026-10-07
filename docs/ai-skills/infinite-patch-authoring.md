@@ -116,7 +116,7 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-301 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+302 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
@@ -230,6 +230,7 @@ first, then the type name), then `--describe "<type>"` for parameters.
 | `Reverb` | audio:audio | out:audio | 7 | bypass |
 | `Ring Mod` | audio:audio | out:audio | 4 | bypass |
 | `Spec Blur` | audio:audio | out:audio | 6 | bypass |
+| `Spectrum Slide` | audio:audio, to:audio | out:audio | 2 |  |
 | `Stereo` | audio:audio | out:audio | 4 | bypass |
 | `Stutter` | audio:audio | out:audio | 6 | bypass |
 | `Transient Shaper` | audio:audio | out:audio | 3 | bypass |

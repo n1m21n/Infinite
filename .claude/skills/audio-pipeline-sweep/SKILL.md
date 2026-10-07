@@ -33,7 +33,7 @@ node params (UI thread)                    AUDIOPARAMSWEEPTEST
    |  written from the UI, read on the audio thread
    v
 DSP block render (audio thread)            DSPTEST, RESONATORTEST, CYCLESHAPERTEST,
-   |  per-node process(), never allocating   SPECBLURTEST, KEYSNAPTEST, MOLDERTEST, GRAINMOLDERTEST
+   |  per-node process(), never allocating   SPECBLURTEST, KEYSNAPTEST, SPECTRUMSLIDETEST, MOLDERTEST, GRAINMOLDERTEST
    v
 graph topology + cables                    AUDIOGRAPHTEST, AUDIOLIFECYCLETEST,
    |  AudioCable / NoteCable, PDC            AUDIOTEARDOWNSWEEPTEST, NOTEFANOUTTEST,

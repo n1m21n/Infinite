@@ -287,6 +287,7 @@ static void JoinLiveTier1();                          // defined next to ParamKe
 #include "audio/dsp/CycleShaperKernel.h"
 #include "audio/dsp/SpecBlurKernel.h"
 #include "audio/dsp/KeySnapKernel.h"
+#include "audio/dsp/SpectrumSlideKernel.h"
 #include "audio/dsp/SlicerDsp.h"
 #include "audio/dsp/ReverbKernel.h"
 
@@ -26029,6 +26030,120 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       EndAudioBody();
    }
 
+   // ---- Spectrum Slide -------------------------------------------------
+   static std::unordered_map<AudioEffectNode*, KeySnapSpectrumState> sSpectrumSlideSpectrums;
+
+   // Live output spectrum on a log axis; a marker under it shows where the
+   // slide sits between A (left end) and B (right end).
+   void DrawSpectrumSlideVisualizer(AudioEffectNode* n)
+   {
+      const float w = gAudioBodyW;
+      const float h = kAudioTimeVizH;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float loHz = 50.0f, hiHz = 12000.0f;
+      const float logLo = log10f(loHz), logSpan = log10f(hiHz) - logLo;
+      const ImU32 gridCol = isLight ? IM_COL32(40, 40, 60, 28) : IM_COL32(255, 255, 255, 22);
+      for (float hz : { 100.0f, 1000.0f, 10000.0f })
+      {
+         const float x = origin.x + (log10f(hz) - logLo) / logSpan * w;
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), gridCol, 1.0f);
+      }
+
+      KeySnapSpectrumState& st = sSpectrumSlideSpectrums[n];
+      const int winSize = 1024;
+      float tempBuf[1024];
+      const int readCount = n->ReadSpectrumSamples(tempBuf, winSize);
+      if (readCount > 0)
+      {
+         if (readCount >= winSize)
+            st.window.assign(tempBuf + (readCount - winSize), tempBuf + readCount);
+         else
+         {
+            std::copy(st.window.begin() + readCount, st.window.end(), st.window.begin());
+            std::copy(tempBuf, tempBuf + readCount, st.window.begin() + (winSize - readCount));
+         }
+      }
+      float re[1024];
+      float im[1024];
+      for (int i = 0; i < winSize; i++)
+      {
+         re[i] = st.window[i] * 0.5f * (1.0f - cosf(2.0f * (float)M_PI * (float)i / (float)(winSize - 1)));
+         im[i] = 0.0f;
+      }
+      WaveTerrainDsp::Radix2FFT::Instance().Forward(re, im);
+      for (int i = 1; i < 512; i++)
+      {
+         const float mag = sqrtf(re[i] * re[i] + im[i] * im[i]) * (2.0f / (float)winSize);
+         st.smoothed[i] = st.smoothed[i] * 0.7f + mag * 0.3f;
+      }
+
+      const double sr = 48000.0;
+      const int kPlotPoints = 160;
+      ImVec2 pts[kPlotPoints];
+      for (int i = 0; i < kPlotPoints; i++)
+      {
+         const float frac = (float)i / (float)(kPlotPoints - 1);
+         const float hz = powf(10.0f, logLo + frac * logSpan);
+         const int bin = std::clamp((int)(hz * (float)winSize / (float)sr), 1, 511);
+         const float db = 20.0f * log10f(std::max(st.smoothed[bin], 1e-4f));
+         const float normY = std::clamp((db + 60.0f) / 60.0f, 0.0f, 1.0f);
+         pts[i] = ImVec2(origin.x + frac * w, br.y - normY * (h * 0.9f) - 6.0f);
+      }
+      const ImU32 fillCol = isLight ? IM_COL32(140, 70, 220, 45) : IM_COL32(180, 100, 255, 45);
+      const ImU32 lineCol = isLight ? IM_COL32(150, 60, 230, 240) : IM_COL32(200, 130, 255, 240);
+      for (int i = 0; i < kPlotPoints - 1; i++)
+      {
+         ImVec2 quad[4] = { pts[i], pts[i + 1], ImVec2(pts[i + 1].x, br.y), ImVec2(pts[i].x, br.y) };
+         dl->AddConvexPolyFilled(quad, 4, fillCol);
+         dl->AddLine(pts[i], pts[i + 1], lineCol, 2.0f);
+      }
+
+      // A -> B track along the bottom edge with the slide position on it.
+      const float slide = std::clamp(n->Param("slide"), 0.0f, 1.0f);
+      const float ty = br.y - 3.0f;
+      const ImU32 trackCol = isLight ? IM_COL32(40, 40, 60, 60) : IM_COL32(255, 255, 255, 50);
+      const ImU32 dotCol = isLight ? IM_COL32(40, 40, 60, 200) : IM_COL32(255, 255, 255, 190);
+      dl->AddLine(ImVec2(origin.x + 8.0f, ty), ImVec2(br.x - 8.0f, ty), trackCol, 1.0f);
+      dl->AddCircleFilled(ImVec2(origin.x + 8.0f + slide * (w - 16.0f), ty), 2.5f, dotCol);
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+
+      if (ImGui::IsMouseHoveringRect(origin, br))
+      {
+         char buf[64];
+         snprintf(buf, sizeof(buf), "%.0f%% of the way from input to 'to'", slide * 100.0f);
+         SetAudioReadout("spectrum slide", buf);
+      }
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawSpectrumSlideBody(GraphNode& gn, AudioEffectNode* n)
+   {
+      const float slide = n->Param("slide");
+      char stat[64];
+      snprintf(stat, sizeof(stat), "slide %.0f%% - in -> to", slide * 100.0f);
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawSpectrumSlideVisualizer(n);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      {
+         AudioKnobRow row(2, kKnobLarge);
+         row.Knob("slide", n->ParamPtr("slide"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
    // The hosted-plugin body. Its own controls stay minimal on purpose (the
    // node is a shell around someone else's plugin, not an instrument of its
    // own): the plugin's name, an open-editor button, bypass, and configure.
@@ -26702,6 +26817,9 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             break;
          case EffectVisualizerId::kKeySnapScale:
             DrawKeySnapBody(gn, n);
+            break;
+         case EffectVisualizerId::kSpectrumSlide:
+            DrawSpectrumSlideBody(gn, n);
             break;
          default:
             break;
@@ -42210,6 +42328,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Resonator Bank", "Tuned bank of up to 16 parallel bandpass resonators excited by incoming audio. Four harmonic/tuning structures (Harmonic, Odd, Chord, Metallic) with decay (T60), scatter detune and stereo spread." },
          { "Cycle Shaper", "Replaces every wavecycle of the input with a clean geometric waveform (Sine, Square, Triangle) of the same period and peak amplitude. Timbre is rebuilt while pitch and rhythm survive. Latency is one wavecycle." },
          { "Key-Snap", "Moves every spectral peak of the sound to the nearest note of a scale, so chords and layered sources stay in key. Snap blends between untouched and fully in tune, glide sets how fast a peak slides to its new note, and global key follows the transport's key and scale. Latency is 42.7 ms (2048 samples)." },
+         { "Spectrum Slide", "Morphs the sound into the one on the 'to' pin by sliding its spectral peaks toward the other's positions instead of cross-fading, so a 440 Hz tone becomes 880 Hz by passing through 660 Hz. Slide sets how far along the way; with nothing on 'to' it passes the sound through. Latency is 42.7 ms (2048 samples)." },
          { "Spec Blur", "Streaming phase vocoder (N=2048, hop 512) that smears spectral magnitude in time. Transients dissolve into a harmonic cloud with tilt, phase diffusion and freeze. Latency is 42.7 ms (2048 samples); default mix is pinned at 1.0." },
          { "MIDI Notes", "Reads note events from a connected MIDI input device and outputs them as a note cable - the entry point for playing a synth or sampler from an external keyboard/controller." },
          { "Keyboard", "A hardware-free note source: click-and-drag the on-screen piano, or hover the node and type on your laptop keyboard (Logic/GarageBand's Musical Typing layout - ZXCVBNM... is one octave, QWERTY... the octave above) to test a patch with no MIDI controller at all." },
@@ -43043,6 +43162,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                { "Resonator Bank", "Up to 16 parallel bandpass resonators forming a tuned modal filter bank, including a 'Metallic' tuning mode." },
                { "Cycle Shaper", "Single-cycle waveform distortion and crossfade shaper." },
                { "Key-Snap", "Snaps every spectral peak of the sound to the nearest note of a scale, polyphonically." },
+               { "Spectrum Slide", "Morphs one sound into another by sliding spectral peaks instead of cross-fading." },
                { "Spectral Blur & Frequency Shifter", "FFT spectral domain phase smearing, freeze, and frequency SSB modulation." },
                { "Field Effect", "An audio effect whose DSP is a Field kernel you write in the node, compiled to a sample-domain register machine rather than interpreted. Field Synth is its note-driven sibling and Field Graph plots what a kernel does." },
 #if defined(_WIN32)
@@ -55224,6 +55344,153 @@ static bool RunCycleShaperFixture()
    }
 
    printf("%s\n", ok ? "CYCLESHAPERTEST OK" : "CYCLESHAPERTEST FAIL");
+   return ok;
+}
+
+// ============================================= INFINITE_SPECTRUMSLIDETEST
+// Two sines: slide 0 keeps the first, slide 1 gives the second, and in between
+// the peak sits at the interpolated frequency (not two half-level peaks).
+static bool RunSpectrumSlideFixture()
+{
+   bool ok = true;
+   const double sr = 48000.0;
+   const int blockSize = 512;
+
+   const EffectDef* def = nullptr;
+   for (const auto& d : GetEffectDefs())
+      if (d.name == "Spectrum Slide")
+         def = &d;
+   if (!def)
+   {
+      printf("SPECTRUMSLIDETEST def not found FAIL\n");
+      return false;
+   }
+
+   auto energyAt = [&](const std::vector<float>& x, int start, int n, double hz) {
+      double re = 0.0, im = 0.0;
+      for (int i = 0; i < n; i++)
+      {
+         const double w = 0.5 * (1.0 - cos(2.0 * M_PI * (double)i / (double)(n - 1)));
+         const double ph = 2.0 * M_PI * hz * (double)(start + i) / sr;
+         re += w * x[start + i] * cos(ph);
+         im += w * x[start + i] * sin(ph);
+      }
+      return (re * re + im * im) / ((double)n * (double)n);
+   };
+
+   // fA / fB of 0 means "no tone"; wireB false leaves the second input uncabled.
+   auto run = [&](float slide, double fA, double fB, bool wireB, std::vector<float>& outRec) {
+      SpectrumSlideKernel kernel;
+      kernel.PrepareToPlay(sr, blockSize);
+      AudioEffectNode node(*def);
+      *node.ParamPtr("slide") = slide;
+      node.mix = 1.0f;
+      kernel.PushParams(node, sr);
+
+      std::vector<float> aL(blockSize), aR(blockSize), bL(blockSize), bR(blockSize), oL(blockSize), oR(blockSize);
+      float* aCh[2] = { aL.data(), aR.data() };
+      float* bCh[2] = { bL.data(), bR.data() };
+      float* oCh[2] = { oL.data(), oR.data() };
+      AudioBuffer aBuf { aCh, 2, blockSize };
+      AudioBuffer bBuf { bCh, 2, blockSize };
+      AudioBuffer oBuf { oCh, 2, blockSize };
+
+      const int numBlocks = (int)(1.5 * sr / blockSize);
+      outRec.assign((size_t)numBlocks * blockSize, 0.0f);
+      for (int b = 0; b < numBlocks; b++)
+      {
+         for (int i = 0; i < blockSize; i++)
+         {
+            const double t = (double)(b * blockSize + i) / sr;
+            aL[i] = aR[i] = fA > 0.0 ? (float)(0.3 * sin(2.0 * M_PI * fA * t)) : 0.0f;
+            bL[i] = bR[i] = fB > 0.0 ? (float)(0.3 * sin(2.0 * M_PI * fB * t)) : 0.0f;
+         }
+         kernel.ProcessBlock(aBuf, wireB ? &bBuf : nullptr, oBuf);
+         for (int i = 0; i < blockSize; i++)
+            outRec[(size_t)b * blockSize + i] = oL[i];
+      }
+   };
+
+   const int start = (int)(0.5 * sr);
+   const int len = (int)(0.9 * sr);
+   auto dB = [](double a, double b) { return 10.0 * log10((a + 1e-20) / (b + 1e-20)); };
+
+   // 1. Endpoints: slide 0 is A, slide 1 is B.
+   for (int endpoint = 0; endpoint < 2; endpoint++)
+   {
+      std::vector<float> out;
+      run((float)endpoint, 440.0, 880.0, true, out);
+      const double want = endpoint ? 880.0 : 440.0;
+      const double other = endpoint ? 440.0 : 880.0;
+      const double margin = dB(energyAt(out, start, len, want), energyAt(out, start, len, other));
+      printf("SPECTRUMSLIDETEST slide %d -> %.0f Hz: %.1f dB over %.0f %s\n", endpoint, want, margin, other,
+             margin > 20.0 ? "OK" : "FAIL");
+      ok = ok && margin > 20.0;
+   }
+
+   // 2. Midpoint: 440 -> 880 at 0.5 lands on 660 Hz, well above both endpoints.
+   {
+      std::vector<float> out;
+      run(0.5f, 440.0, 880.0, true, out);
+      const double e660 = energyAt(out, start, len, 660.0);
+      const double m1 = dB(e660, energyAt(out, start, len, 440.0));
+      const double m2 = dB(e660, energyAt(out, start, len, 880.0));
+      const bool pass = m1 > 15.0 && m2 > 15.0;
+      printf("SPECTRUMSLIDETEST midpoint 660 Hz: %.1f / %.1f dB over the endpoints %s\n", m1, m2, pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   }
+
+   // 3. A quarter of the way: 440 -> 880 at 0.25 lands on 550 Hz.
+   {
+      std::vector<float> out;
+      run(0.25f, 440.0, 880.0, true, out);
+      const double e550 = energyAt(out, start, len, 550.0);
+      const double m1 = dB(e550, energyAt(out, start, len, 440.0));
+      const double m2 = dB(e550, energyAt(out, start, len, 880.0));
+      const bool pass = m1 > 12.0 && m2 > 12.0;
+      printf("SPECTRUMSLIDETEST quarter 550 Hz: %.1f / %.1f dB over the endpoints %s\n", m1, m2, pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   }
+
+   // 4. Level: a morph keeps the sound's loudness. Slide 0 must match the
+   //    input, and mid-slide may lose at most 4 dB against it (the moved lobe
+   //    is not the ideal window lobe, so overlap-add cancels a little).
+   {
+      auto rmsAt = [&](float slide) {
+         std::vector<float> out;
+         run(slide, 440.0, 880.0, true, out);
+         double acc = 0.0;
+         for (int i = 0; i < len; i++)
+            acc += (double)out[start + i] * out[start + i];
+         return sqrt(acc / len);
+      };
+      const double rmsIn = 0.3 * sqrt(0.5);
+      const double d0 = fabs(20.0 * log10(rmsAt(0.0f) / rmsIn));
+      const double dMid = 20.0 * log10(rmsAt(0.5f) / rmsIn);
+      const bool pass = d0 < 0.5 && dMid > -4.0 && dMid < 1.0;
+      printf("SPECTRUMSLIDETEST level: slide 0 %.2f dB off, midpoint %.2f dB %s\n", d0, dMid, pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   }
+
+   // 5. Nothing on 'to': the sound passes through unchanged in pitch.
+   {
+      std::vector<float> out;
+      run(1.0f, 440.0, 880.0, false, out);
+      const double margin = dB(energyAt(out, start, len, 440.0), energyAt(out, start, len, 880.0));
+      printf("SPECTRUMSLIDETEST uncabled 'to' keeps 440 Hz: %.1f dB %s\n", margin, margin > 20.0 ? "OK" : "FAIL");
+      ok = ok && margin > 20.0;
+   }
+
+   // 6. Silent 'to': a fade, not a pitch drag - the peak stays at 440 Hz.
+   {
+      std::vector<float> out;
+      run(0.5f, 440.0, 0.0, true, out);
+      const double margin = dB(energyAt(out, start, len, 440.0), energyAt(out, start, len, 330.0));
+      printf("SPECTRUMSLIDETEST silent 'to' keeps 440 Hz: %.1f dB %s\n", margin, margin > 20.0 ? "OK" : "FAIL");
+      ok = ok && margin > 20.0;
+   }
+
+   printf("%s\n", ok ? "SPECTRUMSLIDETEST OK" : "SPECTRUMSLIDETEST FAIL");
    return ok;
 }
 
@@ -73654,6 +73921,9 @@ int main(int argc, char** argv)
    if (getenv("INFINITE_KEYSNAPTEST") != nullptr)
       return RunKeySnapFixture() ? 0 : 1;
 
+   if (getenv("INFINITE_SPECTRUMSLIDETEST") != nullptr)
+      return RunSpectrumSlideFixture() ? 0 : 1;
+
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return RunDspTest();
 
@@ -74428,7 +74698,8 @@ int main(int argc, char** argv)
          // [8] by hard-coded number, so inserting anywhere earlier silently
          // breaks the fixture.
          SpawnNode("Key-Snap", "AudioEffects", 5900.0f, 700.0f);        // 31
-         SpawnNode("Slicer", "Synths", 5900.0f, 20.0f);                 // 32
+         SpawnNode("Spectrum Slide", "AudioEffects", 6300.0f, 700.0f);   // 32
+         SpawnNode("Slicer", "Synths", 5900.0f, 20.0f);                 // 33
          {
             // Multi-transient WAV so the slicer's body draws real markers and
             // a real slice count rather than the empty placeholder.

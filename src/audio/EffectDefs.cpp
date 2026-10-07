@@ -26,6 +26,7 @@
 #include "dsp/CycleShaperKernel.h"
 #include "dsp/SpecBlurKernel.h"
 #include "dsp/KeySnapKernel.h"
+#include "dsp/SpectrumSlideKernel.h"
 #include "MusicTime.h"
 
 namespace
@@ -808,6 +809,23 @@ namespace
          // scale is not the transport's (C major): pin it to minor pentatonic.
          def.params.push_back({ "globalKey", 0.0f, 1.0f, 0.0f, false, { { "scale", (float)MusicTime::kMinorPentatonic } } });
          def.makeKernel = []() { return std::make_unique<KeySnapKernel>(); };
+         defs.push_back(std::move(def));
+      }
+
+      // -------------------------------------------------------------- Spectrum Slide
+      {
+         EffectDef def;
+         def.name = "Spectrum Slide";
+         def.category = "AudioEffects";
+         def.bodyWidth = 440.0f;
+         def.visualizerId = EffectVisualizerId::kSpectrumSlide;
+         def.defaultMix = 1.0f;
+         def.hasSidechain = true;
+         def.sidechainLabel = "to";
+         // The generic rig drives both inputs with the same tone, so slide
+         // has nothing to move; see audio-param-sweep-expected.txt.
+         def.params.push_back({ "slide", 0.0f, 1.0f, 0.5f });
+         def.makeKernel = []() { return std::make_unique<SpectrumSlideKernel>(); };
          defs.push_back(std::move(def));
       }
 

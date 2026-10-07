@@ -670,7 +670,7 @@ Do not edit between the markers; run the script. Use the `node` line exactly as 
 first, then the type name), then `--describe "<type>"` for parameters.
 
 <!-- generated:begin -->
-301 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
+302 node types. `node <index> <category> <type>`; inputs are `slot name:kind`, outputs `label:kind`; `p` is the number of saved parameters; `bypass` marks single-input nodes that can be bypassed.
 
 
 ### 3D
@@ -785,6 +785,7 @@ R"AISKILL(| `Solidify` | geo:geometry | out:geometry | 65 | bypass |
 | `Reverb` | audio:audio | out:audio | 7 | bypass |
 | `Ring Mod` | audio:audio | out:audio | 4 | bypass |
 | `Spec Blur` | audio:audio | out:audio | 6 | bypass |
+| `Spectrum Slide` | audio:audio, to:audio | out:audio | 2 |  |
 | `Stereo` | audio:audio | out:audio | 4 | bypass |
 | `Stutter` | audio:audio | out:audio | 6 | bypass |
 | `Transient Shaper` | audio:audio | out:audio | 3 | bypass |
@@ -966,9 +967,9 @@ R"AISKILL(| `Solidify` | geo:geometry | out:geometry | 65 | bypass |
 | `Ellipse` | none | out:image | 20 | bypass |
 | `FieldPixel` | none | out:image | 9 | bypass |
 | `Formula` | none | out:image | 8 | bypass |
-| `Gear` | none | out:image | 20 | bypass |
 )AISKILL"
-R"AISKILL(| `Heart` | none | out:image | 20 | bypass |
+R"AISKILL(| `Gear` | none | out:image | 20 | bypass |
+| `Heart` | none | out:image | 20 | bypass |
 | `Hexagon` | none | out:image | 20 | bypass |
 | `Image Source` | none | out:image | 1 | bypass |
 | `Line` | none | out:image | 20 | bypass |
