@@ -25,6 +25,9 @@ namespace CategoryColors
       Color accent;
    };
 
+   // WCAG contrast ratio (1..21) between two colours.
+   float ContrastRatio(const Color& a, const Color& b);
+
    const UiTheme& CurrentUiTheme();
    bool IsThemeLight();
 
