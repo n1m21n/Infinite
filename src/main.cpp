@@ -286,6 +286,7 @@ static void JoinLiveTier1();                          // defined next to ParamKe
 #include "audio/dsp/ResonatorBankKernel.h"
 #include "audio/dsp/CycleShaperKernel.h"
 #include "audio/dsp/SpecBlurKernel.h"
+#include "audio/dsp/KeySnapKernel.h"
 #include "audio/dsp/SlicerDsp.h"
 #include "audio/dsp/ReverbKernel.h"
 
@@ -25829,6 +25830,168 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       EndAudioBody();
    }
 
+   // ---- Key-Snap -------------------------------------------------------
+   struct KeySnapSpectrumState
+   {
+      std::vector<float> window;
+      float smoothed[512] = {};
+      KeySnapSpectrumState() { window.assign(1024, 0.0f); }
+   };
+   static std::unordered_map<AudioEffectNode*, KeySnapSpectrumState> sKeySnapSpectrums;
+
+   // The scale in use: the node's own, or the transport's when globalKey is on.
+   void KeySnapScaleRoot(AudioEffectNode* n, int& scale, int& root)
+   {
+      scale = std::clamp((int)lroundf(n->Param("scale")), 0, (int)MusicTime::kNumScaleTypes - 1);
+      root = std::clamp((int)lroundf(n->Param("root")), 0, 11);
+      if (n->Param("globalKey") > 0.5f)
+      {
+         scale = std::clamp(Transport::Instance().Scale(), 0, (int)MusicTime::kNumScaleTypes - 1);
+         root = ((Transport::Instance().Key() % 12) + 12) % 12;
+      }
+   }
+
+   // Live output spectrum on a log axis with a line at every note of the
+   // scale (root brighter) - the peaks should sit on the lines.
+   void DrawKeySnapVisualizer(AudioEffectNode* n)
+   {
+      const float w = gAudioBodyW;
+      const float h = kAudioTimeVizH;
+      const ImVec2 origin = ImGui::GetCursorScreenPos();
+      const ImVec2 br(origin.x + w, origin.y + h);
+      ImDrawList* dl = ImGui::GetWindowDrawList();
+      const bool isLight = IsThemeLight();
+      dl->AddRectFilled(origin, br, ScopeBgCol(), 4.0f);
+      dl->PushClipRect(origin, br, true);
+
+      const float loHz = 50.0f, hiHz = 5000.0f;
+      const float logLo = log10f(loHz), logSpan = log10f(hiHz) - logLo;
+      auto hzToX = [&](float hz) { return origin.x + std::clamp((log10f(hz) - logLo) / logSpan, 0.0f, 1.0f) * w; };
+
+      int scale = 0, root = 0;
+      KeySnapScaleRoot(n, scale, root);
+      const uint32_t mask = KeySnapKernel::ScaleMask(scale, root);
+      const ImU32 noteCol = isLight ? IM_COL32(120, 60, 200, 70) : IM_COL32(190, 130, 255, 70);
+      const ImU32 rootCol = isLight ? IM_COL32(120, 60, 200, 170) : IM_COL32(210, 160, 255, 170);
+      for (int midi = 24; midi <= 120; midi++)
+      {
+         const int pc = midi % 12;
+         if (!(mask & (1u << pc)))
+            continue;
+         const float hz = 440.0f * powf(2.0f, (float)(midi - 69) / 12.0f);
+         if (hz < loHz || hz > hiHz)
+            continue;
+         const float x = hzToX(hz);
+         dl->AddLine(ImVec2(x, origin.y), ImVec2(x, br.y), pc == root ? rootCol : noteCol, 1.0f);
+      }
+
+      KeySnapSpectrumState& st = sKeySnapSpectrums[n];
+      const int winSize = 1024;
+      float tempBuf[1024];
+      const int readCount = n->ReadSpectrumSamples(tempBuf, winSize);
+      if (readCount > 0)
+      {
+         if (readCount >= winSize)
+            st.window.assign(tempBuf + (readCount - winSize), tempBuf + readCount);
+         else
+         {
+            std::copy(st.window.begin() + readCount, st.window.end(), st.window.begin());
+            std::copy(tempBuf, tempBuf + readCount, st.window.begin() + (winSize - readCount));
+         }
+      }
+      float re[1024];
+      float im[1024];
+      for (int i = 0; i < winSize; i++)
+      {
+         re[i] = st.window[i] * 0.5f * (1.0f - cosf(2.0f * (float)M_PI * (float)i / (float)(winSize - 1)));
+         im[i] = 0.0f;
+      }
+      WaveTerrainDsp::Radix2FFT::Instance().Forward(re, im);
+      for (int i = 1; i < 512; i++)
+      {
+         const float mag = sqrtf(re[i] * re[i] + im[i] * im[i]) * (2.0f / (float)winSize);
+         st.smoothed[i] = st.smoothed[i] * 0.7f + mag * 0.3f;
+      }
+
+      const double sr = 48000.0;
+      const int kPlotPoints = 160;
+      ImVec2 pts[kPlotPoints];
+      for (int i = 0; i < kPlotPoints; i++)
+      {
+         const float frac = (float)i / (float)(kPlotPoints - 1);
+         const float hz = powf(10.0f, logLo + frac * logSpan);
+         const int bin = std::clamp((int)(hz * (float)winSize / (float)sr), 1, 511);
+         const float db = 20.0f * log10f(std::max(st.smoothed[bin], 1e-4f));
+         const float normY = std::clamp((db + 60.0f) / 60.0f, 0.0f, 1.0f);
+         pts[i] = ImVec2(origin.x + frac * w, br.y - normY * (h * 0.9f) - 2.0f);
+      }
+      const ImU32 fillCol = isLight ? IM_COL32(140, 70, 220, 45) : IM_COL32(180, 100, 255, 45);
+      const ImU32 lineCol = isLight ? IM_COL32(150, 60, 230, 240) : IM_COL32(200, 130, 255, 240);
+      for (int i = 0; i < kPlotPoints - 1; i++)
+      {
+         ImVec2 quad[4] = { pts[i], pts[i + 1], ImVec2(pts[i + 1].x, br.y), ImVec2(pts[i].x, br.y) };
+         dl->AddConvexPolyFilled(quad, 4, fillCol);
+         dl->AddLine(pts[i], pts[i + 1], lineCol, 2.0f);
+      }
+
+      dl->PopClipRect();
+      dl->AddRect(origin, br, ScopeBorderCol(), 3.0f);
+
+      if (ImGui::IsMouseHoveringRect(origin, br))
+      {
+         char buf[64];
+         snprintf(buf, sizeof(buf), "%s %s", NoteNameList()[root].c_str(), MusicTime::ScaleTable(scale).name);
+         SetAudioReadout("key-snap", buf);
+      }
+      ImGui::Dummy(ImVec2(w, h));
+   }
+
+   void DrawKeySnapBody(GraphNode& gn, AudioEffectNode* n)
+   {
+      int scale = 0, root = 0;
+      KeySnapScaleRoot(n, scale, root);
+      const bool globalKey = n->Param("globalKey") > 0.5f;
+
+      char stat[80];
+      snprintf(stat, sizeof(stat), "%s %s - snap %.0f%%%s", NoteNameList()[root].c_str(),
+               MusicTime::ScaleTable(scale).name, n->Param("snap") * 100.0f, globalKey ? " - global key" : "");
+
+      BeginAudioBody(gn.index, gn.category, kAudioNodeWidth, stat);
+      DrawKeySnapVisualizer(n);
+      ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
+      {
+         AudioKnobRow row(3, 20.0f, 0.0f, false);
+         if (globalKey)
+            ImGui::BeginDisabled();
+         row.Dropdown("scale", MusicTime::ScaleTypeList(), (int)lroundf(n->Param("scale")),
+                      [n](int i) { PushUndoCheckpoint(); *n->ParamPtr("scale") = (float)i; });
+         row.Dropdown("root", NoteNameList(), (int)lroundf(n->Param("root")),
+                      [n](int i) { PushUndoCheckpoint(); *n->ParamPtr("root") = (float)i; });
+         if (globalKey)
+            ImGui::EndDisabled();
+         bool globalBool = globalKey;
+         bool globalChanged = false;
+         if (row.Checkbox("global key##keySnapGlobal", &globalBool, &globalChanged))
+         {
+            if (globalChanged) // a cable flip writes the value but never checkpoints
+               PushUndoCheckpoint();
+            *n->ParamPtr("globalKey") = globalBool ? 1.0f : 0.0f;
+         }
+         row.End();
+      }
+
+      {
+         AudioKnobRow row(3, kKnobLarge);
+         row.Knob("snap", n->ParamPtr("snap"), 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.Knob("glide", n->ParamPtr("glide"), 0.0f, 500.0f, "%.0fms", kKnobLarge);
+         row.Knob("mix", &n->mix, 0.0f, 1.0f, "%.2f", kKnobLarge);
+         row.End();
+      }
+
+      EndAudioBody();
+   }
+
    // The hosted-plugin body. Its own controls stay minimal on purpose (the
    // node is a shell around someone else's plugin, not an instrument of its
    // own): the plugin's name, an open-editor button, bypass, and configure.
@@ -26499,6 +26662,9 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             break;
          case EffectVisualizerId::kSpecBlurSpectrum:
             DrawSpecBlurBody(gn, n);
+            break;
+         case EffectVisualizerId::kKeySnapScale:
+            DrawKeySnapBody(gn, n);
             break;
          default:
             break;
@@ -42006,6 +42172,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Wavetable Shaper", "Uses a wavetable frame as a waveshaping transfer curve: the input sample's amplitude selects a phase into the table, the table's value there is the output. Drive past 0dB pushes the phase past the table's ends, where it wraps instead of clipping - true wavefolding, not distortion. Position morphs the curve across the table's 8 frames, smooth crosses to a lower-harmonic (darker) version of the same curve." },
          { "Resonator Bank", "Tuned bank of up to 16 parallel bandpass resonators excited by incoming audio. Four harmonic/tuning structures (Harmonic, Odd, Chord, Metallic) with decay (T60), scatter detune and stereo spread." },
          { "Cycle Shaper", "Replaces every wavecycle of the input with a clean geometric waveform (Sine, Square, Triangle) of the same period and peak amplitude. Timbre is rebuilt while pitch and rhythm survive. Latency is one wavecycle." },
+         { "Key-Snap", "Moves every spectral peak of the sound to the nearest note of a scale, so chords and layered sources stay in key. Snap blends between untouched and fully in tune, glide sets how fast a peak slides to its new note, and global key follows the transport's key and scale. Latency is 42.7 ms (2048 samples)." },
          { "Spec Blur", "Streaming phase vocoder (N=2048, hop 512) that smears spectral magnitude in time. Transients dissolve into a harmonic cloud with tilt, phase diffusion and freeze. Latency is 42.7 ms (2048 samples); default mix is pinned at 1.0." },
          { "MIDI Notes", "Reads note events from a connected MIDI input device and outputs them as a note cable - the entry point for playing a synth or sampler from an external keyboard/controller." },
          { "Keyboard", "A hardware-free note source: click-and-drag the on-screen piano, or hover the node and type on your laptop keyboard (Logic/GarageBand's Musical Typing layout - ZXCVBNM... is one octave, QWERTY... the octave above) to test a patch with no MIDI controller at all." },
@@ -42838,6 +43005,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
                { "EQ", "Five-band parametric equalizer - low shelf, three peaks and a high shelf by default, each switchable to shelf / peak / HP12 / LP12 and independently on or off - over an interactive frequency response display. Drag a band's dot for frequency and gain, Shift-drag for Q." },
                { "Resonator Bank", "Up to 16 parallel bandpass resonators forming a tuned modal filter bank, including a 'Metallic' tuning mode." },
                { "Cycle Shaper", "Single-cycle waveform distortion and crossfade shaper." },
+               { "Key-Snap", "Snaps every spectral peak of the sound to the nearest note of a scale, polyphonically." },
                { "Spectral Blur & Frequency Shifter", "FFT spectral domain phase smearing, freeze, and frequency SSB modulation." },
                { "Field Effect", "An audio effect whose DSP is a Field kernel you write in the node, compiled to a sample-domain register machine rather than interpreted. Field Synth is its note-driven sibling and Field Graph plots what a kernel does." },
 #if defined(_WIN32)
@@ -55019,6 +55187,136 @@ static bool RunCycleShaperFixture()
    }
 
    printf("%s\n", ok ? "CYCLESHAPERTEST OK" : "CYCLESHAPERTEST FAIL");
+   return ok;
+}
+
+// ==================================================== INFINITE_KEYSNAPTEST
+// Sines that sit between notes must land on the nearest note of the scale,
+// every peak independently; snap 0 must leave them where they are.
+static bool RunKeySnapFixture()
+{
+   bool ok = true;
+   const double sr = 48000.0;
+   const int blockSize = 512;
+
+   const EffectDef* def = nullptr;
+   for (const auto& d : GetEffectDefs())
+      if (d.name == "Key-Snap")
+         def = &d;
+   if (!def)
+   {
+      printf("KEYSNAPTEST Key-Snap def not found FAIL\n");
+      return false;
+   }
+
+   // Energy of `x` at `hz` over `n` samples (Hann-windowed Goertzel).
+   auto energyAt = [&](const std::vector<float>& x, int start, int n, double hz) {
+      double re = 0.0, im = 0.0;
+      for (int i = 0; i < n; i++)
+      {
+         const double w = 0.5 * (1.0 - cos(2.0 * M_PI * (double)i / (double)(n - 1)));
+         const double ph = 2.0 * M_PI * hz * (double)(start + i) / sr;
+         re += w * x[start + i] * cos(ph);
+         im += w * x[start + i] * sin(ph);
+      }
+      return (re * re + im * im) / ((double)n * (double)n);
+   };
+
+   auto run = [&](float snap, float glide, int scale, int root, const std::vector<double>& freqs, std::vector<float>& outRec) {
+      KeySnapKernel kernel;
+      kernel.PrepareToPlay(sr, blockSize);
+      AudioEffectNode node(*def);
+      *node.ParamPtr("snap") = snap;
+      *node.ParamPtr("glide") = glide;
+      *node.ParamPtr("scale") = (float)scale;
+      *node.ParamPtr("root") = (float)root;
+      node.mix = 1.0f;
+      kernel.PushParams(node, sr);
+
+      std::vector<float> inL(blockSize), inR(blockSize), outL(blockSize), outR(blockSize);
+      float* inChans[2] = { inL.data(), inR.data() };
+      float* outChans[2] = { outL.data(), outR.data() };
+      AudioBuffer inBuf { inChans, 2, blockSize };
+      AudioBuffer outBuf { outChans, 2, blockSize };
+
+      const int numBlocks = (int)(1.5 * sr / blockSize);
+      outRec.assign((size_t)numBlocks * blockSize, 0.0f);
+      for (int b = 0; b < numBlocks; b++)
+      {
+         for (int i = 0; i < blockSize; i++)
+         {
+            const double t = (double)(b * blockSize + i) / sr;
+            double v = 0.0;
+            for (double f : freqs)
+               v += 0.25 * sin(2.0 * M_PI * f * t);
+            inL[i] = inR[i] = (float)v;
+         }
+         kernel.ProcessBlock(inBuf, nullptr, outBuf);
+         for (int i = 0; i < blockSize; i++)
+            outRec[(size_t)b * blockSize + i] = outL[i];
+      }
+   };
+
+   const int start = (int)(0.5 * sr);
+   const int len = (int)(0.9 * sr);
+   auto dB = [](double a, double b) { return 10.0 * log10((a + 1e-20) / (b + 1e-20)); };
+
+   // 1. One sine at 450 Hz (A4 + 39 cents) in C major -> 440 Hz.
+   {
+      std::vector<float> out;
+      run(1.0f, 0.0f, MusicTime::kMajor, 0, { 450.0 }, out);
+      const double eT = energyAt(out, start, len, 440.0);
+      const double eO = energyAt(out, start, len, 450.0);
+      const double margin = dB(eT, eO);
+      printf("KEYSNAPTEST single 450->440 Hz: target %.1f dB over original %s\n", margin, margin > 20.0 ? "OK" : "FAIL");
+      ok = ok && margin > 20.0;
+   }
+
+   // 2. Two sines, 450 and 530 Hz, in C major -> 440 and 523.25 Hz (polyphonic).
+   {
+      std::vector<float> out;
+      run(1.0f, 0.0f, MusicTime::kMajor, 0, { 450.0, 530.0 }, out);
+      const double m1 = dB(energyAt(out, start, len, 440.0), energyAt(out, start, len, 450.0));
+      const double m2 = dB(energyAt(out, start, len, 523.25), energyAt(out, start, len, 530.0));
+      const bool pass = m1 > 20.0 && m2 > 20.0;
+      printf("KEYSNAPTEST chord 450+530: margins %.1f / %.1f dB %s\n", m1, m2, pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   }
+
+   // 3. snap 0 leaves the sine alone.
+   {
+      std::vector<float> out;
+      run(0.0f, 0.0f, MusicTime::kMajor, 0, { 450.0 }, out);
+      const double margin = dB(energyAt(out, start, len, 450.0), energyAt(out, start, len, 440.0));
+      printf("KEYSNAPTEST snap 0 keeps 450 Hz: %.1f dB over 440 %s\n", margin, margin > 20.0 ? "OK" : "FAIL");
+      ok = ok && margin > 20.0;
+   }
+
+   // 4. Level survives: output RMS within 3 dB of the input's.
+   {
+      std::vector<float> out;
+      run(1.0f, 0.0f, MusicTime::kMajor, 0, { 450.0, 530.0 }, out);
+      double acc = 0.0;
+      for (int i = 0; i < len; i++)
+         acc += (double)out[start + i] * out[start + i];
+      const double rmsOut = sqrt(acc / len);
+      const double rmsIn = 0.25 * sqrt(2.0 * 0.5); // two sines of amplitude 0.25
+      const double diff = fabs(20.0 * log10(rmsOut / rmsIn));
+      printf("KEYSNAPTEST level: out %.4f in %.4f (%.2f dB) %s\n", rmsOut, rmsIn, diff, diff < 3.0 ? "OK" : "FAIL");
+      ok = ok && diff < 3.0;
+   }
+
+   // 5. Scale lookup: 450 Hz in A minor pentatonic -> A (440), not B/C.
+   {
+      const uint32_t mask = KeySnapKernel::ScaleMask(MusicTime::kMinorPentatonic, 9);
+      const float midi = 69.0f + 12.0f * log2f(450.0f / 440.0f);
+      const float snapped = KeySnapKernel::NearestScaleNote(midi, mask);
+      const bool pass = snapped == 69.0f;
+      printf("KEYSNAPTEST scale lookup 450 Hz in A minor pent -> midi %.0f %s\n", snapped, pass ? "OK" : "FAIL");
+      ok = ok && pass;
+   }
+
+   printf("%s\n", ok ? "KEYSNAPTEST OK" : "KEYSNAPTEST FAIL");
    return ok;
 }
 
@@ -73316,6 +73614,9 @@ int main(int argc, char** argv)
    if (getenv("INFINITE_SPECBLURTEST") != nullptr)
       return RunSpecBlurFixture() ? 0 : 1;
 
+   if (getenv("INFINITE_KEYSNAPTEST") != nullptr)
+      return RunKeySnapFixture() ? 0 : 1;
+
    if (getenv("INFINITE_DSPTEST") != nullptr)
       return RunDspTest();
 
@@ -74089,7 +74390,8 @@ int main(int argc, char** argv)
          // indexes gNodes[24] (Sampler), [26] (EQ), [1], [3], [4], [6], [7],
          // [8] by hard-coded number, so inserting anywhere earlier silently
          // breaks the fixture.
-         SpawnNode("Slicer", "Synths", 5900.0f, 20.0f);                 // 31
+         SpawnNode("Key-Snap", "AudioEffects", 5900.0f, 700.0f);        // 31
+         SpawnNode("Slicer", "Synths", 5900.0f, 20.0f);                 // 32
          {
             // Multi-transient WAV so the slicer's body draws real markers and
             // a real slice count rather than the empty placeholder.

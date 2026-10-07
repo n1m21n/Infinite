@@ -489,6 +489,7 @@ set(COMMON_SOURCES
     src/audio/dsp/ResonatorBankKernel.cpp
     src/audio/dsp/CycleShaperKernel.cpp
     src/audio/dsp/SpecBlurKernel.cpp
+    src/audio/dsp/KeySnapKernel.cpp
     src/nodes/ImageSourceNode.cpp
     src/nodes/SlideshowNode.cpp
     src/nodes/ShapeNode.cpp

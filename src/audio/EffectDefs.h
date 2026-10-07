@@ -89,6 +89,7 @@ enum class EffectVisualizerId
    kResonatorBankSpectrum,
    kCycleShaperWave,
    kSpecBlurSpectrum,
+   kKeySnapScale,
 };
 
 struct EffectDef
