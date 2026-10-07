@@ -2265,3 +2265,9 @@
 {"ts": "2026-10-07T00:27:49+00:00", "event": "add", "id": "R599", "track": "engine", "kind": "feature", "horizon": "later", "title": "MIDI 2.0 / UMP input (low priority, little OS and hardware support)", "why": "R563 check: none. Suggest dropping unless a user asks", "after": [], "user": true, "origin": "explore", "effort": "L"}
 {"ts": "2026-10-07T00:27:54+00:00", "event": "done", "id": "R563", "why": "verified: MIDI clock yes; Link, MPE, MIDI 2.0, aftertouch no; gaps logged as quests"}
 {"ts": "2026-10-07T00:27:54+00:00", "event": "edit", "id": "R563", "commits": ["56a249de"]}
+{"ts": "2026-10-07T05:58:05+05:30", "event": "add", "id": "R600", "after": [], "user": false, "src": "merge:feature/verify-link-mpe-midi2", "track": "engine", "kind": "feature", "horizon": "later", "title": "Verify link mpe midi2", "why": "merged into main (613f670)", "origin": "merge"}
+{"ts": "2026-10-07T05:58:05+05:30", "event": "done", "id": "R600", "why": "merged into main (613f670)"}
+{"ts": "2026-10-07T05:58:05+05:30", "event": "edit", "id": "R600", "opened": "2026-10-07T05:58:05+05:30", "closed": "2026-10-07T05:58:05+05:30", "release": "", "commits": ["613f670"]}
+{"ts": "2026-10-07T00:28:51+00:00", "event": "edit", "id": "R563", "opened": "2026-10-07T05:55:21+05:30", "commits": ["56a249d"], "closed": "2026-10-07T05:55:21+05:30", "release": ""}
+{"ts": "2026-10-07T00:33:43+00:00", "event": "done", "id": "R596", "why": "pitch bend + channel aftertouch bindable on 3 platforms (poly aftertouch not modelled); MIDIBENDTEST ok on macOS, Win/Linux uncompiled"}
+{"ts": "2026-10-07T00:33:43+00:00", "event": "edit", "id": "R596", "commits": ["7da571a8"]}
