@@ -74870,6 +74870,16 @@ int main(int argc, char** argv)
          // Laid out so nothing overlaps the Wavetable: it is kAudioWideWidth
          // (960) across and the tallest body in the app, so the column of
          // utility nodes has to clear its right edge, not start at 540.
+         // Nodes past the first dozen are found by type, not by spawn index:
+         // removing or adding a spawn above used to shift every hard-coded
+         // index and static_cast the wrong node (R614 segfault).
+         auto FixtureNodeByType = [](const char* type) -> INode*
+         {
+            for (GraphNode& gn : gNodes)
+               if (gn.typeName == type)
+                  return gn.node.get();
+            return nullptr;
+         };
          SpawnNode("MIDI Notes", "Notes", 20.0f, 20.0f);            // 0
          SpawnNode("Wavetable", "Synths", 20.0f, 440.0f);           // 1
          SpawnNode("Envelope", "Modulators", 540.0f, 20.0f);        // 2
@@ -74883,7 +74893,6 @@ int main(int argc, char** argv)
          SpawnNode("Reverb", "AudioEffects", 2160.0f, 780.0f);      // 10
          SpawnNode("Stutter", "AudioEffects", 2470.0f, 20.0f);      // 11
          SpawnNode("Arpeggiator", "Notes", 2470.0f, 500.0f);        // 12
-         SpawnNode("Scale Notes", "Notes", 2470.0f, 900.0f);        // 13
          SpawnNode("Bouncing Balls", "Notes", 2720.0f, 900.0f);     // 14
          SpawnNode("Note to CV", "Modulators", 2960.0f, 900.0f);    // 15
          SpawnNode("Note Transpose", "Notes", 2960.0f, 20.0f);      // 16
@@ -74940,7 +74949,7 @@ int main(int argc, char** argv)
             f.write("data", 4); writeU32(dataSize);
             f.write((const char*)fixturePcm.data(), dataSize);
             f.close();
-            if (auto* samplerFixture = dynamic_cast<SamplerNode*>(gNodes[24].node.get()))
+            if (auto* samplerFixture = dynamic_cast<SamplerNode*>(FixtureNodeByType("Sampler")))
                samplerFixture->LoadFile(fixtureWav);
          }
          // Appended AFTER every earlier spawn on purpose: the block below
@@ -75000,7 +75009,7 @@ int main(int argc, char** argv)
             df.write("data", 4); writeU32(drumDataSize);
             df.write((const char*)drumPcm.data(), drumDataSize);
             df.close();
-            if (auto* drumFixture = dynamic_cast<DrumSequencerNode*>(gNodes[27].node.get()))
+            if (auto* drumFixture = dynamic_cast<DrumSequencerNode*>(FixtureNodeByType("Drum Sequencer")))
             {
                drumFixture->LoadFileToLane(0, drumWav);
                drumFixture->LoadFileToLane(1, drumWav);
@@ -75014,7 +75023,7 @@ int main(int argc, char** argv)
          // shift below the shape's vertices (see DrawBouncingBallsVisualizer's
          // comment) - showing Triangle here means that regression can't
          // silently come back unnoticed the way Circle/Square wouldn't catch it.
-         static_cast<BouncingBallsNode*>(gNodes[14].node.get())->shape = BouncingBallsNode::kTriangle;
+         static_cast<BouncingBallsNode*>(FixtureNodeByType("Bouncing Balls"))->shape = BouncingBallsNode::kTriangle;
 
          auto* osc = static_cast<WavetableNode*>(gNodes[1].node.get());
          // Both engines on, each cross-modulated by the other, so the fixture
@@ -75049,7 +75058,7 @@ int main(int argc, char** argv)
          // A couple of bands moved off 0 dB, so the fixture's screenshot
          // shows a real composite curve rather than a flat line at every
          // band's spawn default.
-         auto* eq = static_cast<AudioEffectNode*>(gNodes[26].node.get());
+         auto* eq = static_cast<AudioEffectNode*>(FixtureNodeByType("EQ"));
          *eq->ParamPtr("band1Gain") = -6.0f;
          *eq->ParamPtr("band3Gain") = 6.0f;
          *eq->ParamPtr("band3Q") = 2.0f;
@@ -77503,7 +77512,34 @@ int main(int argc, char** argv)
    // Launcher screen over the first seconds (core/SplashScreen.h). Never in headless/test runs.
    // INFINITE_SPLASHTEST=<seconds> forces it on under the screenshot harness, starting that far in.
    const char* splashTest = getenv("INFINITE_SPLASHTEST");
-   const bool splashEnabled = splashTest != nullptr || (!gHeadlessTestWindow && !IsHeadlessProcess() && getenv("INFINITE_NOSPLASH") == nullptr);
+   // Shown once per installed version (first run, and after each update), not on every launch.
+   // INFINITE_SPLASH=1 forces it; INFINITE_NOSPLASH=1 suppresses it.
+   bool splashDue = getenv("INFINITE_SPLASH") != nullptr;
+   if (!gHeadlessTestWindow && !IsHeadlessProcess() && getenv("INFINITE_NOSPLASH") == nullptr)
+   {
+#ifndef INFINITE_VERSION_STRING
+#define INFINITE_VERSION_STRING "0.0.0"
+#endif
+      const std::string marker = AppPaths::AppSupportDir() + "/splash_seen_version.txt";
+      std::string seen;
+      if (FILE* mf = fopen(marker.c_str(), "rb"))
+      {
+         char buf[64] = {0};
+         const size_t n = fread(buf, 1, sizeof(buf) - 1, mf);
+         seen.assign(buf, n);
+         fclose(mf);
+      }
+      if (seen != INFINITE_VERSION_STRING)
+      {
+         splashDue = true;
+         if (FILE* mf = fopen(marker.c_str(), "wb"))
+         {
+            fputs(INFINITE_VERSION_STRING, mf);
+            fclose(mf);
+         }
+      }
+   }
+   const bool splashEnabled = splashTest != nullptr || (splashDue && !gHeadlessTestWindow && !IsHeadlessProcess() && getenv("INFINITE_NOSPLASH") == nullptr);
    if (splashEnabled)
       Splash::Begin(splashTest ? (float)atof(splashTest) : 0.0f);
 

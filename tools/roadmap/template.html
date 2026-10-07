@@ -180,8 +180,8 @@ T.forEach(([k,nm])=>{const b=document.createElement('button');b.textContent=nm;b
 function show(k){T.forEach(([x])=>{$('p-'+x).classList.toggle('on',x==k);$('t-'+x).classList.toggle('on',x==k)});try{history.replaceState(null,'','#'+k)}catch(e){}}show(T.some(([x])=>'#'+x==location.hash)?location.hash.slice(1):'up');
 const CAT={engine:'#8ec5ff',nodes:'#1fbf3a',field:'#c9a3ff',timeline:'#ffc61a',learn:'#9be7d2',platform:'#ff8a3d',ux:'#ff4fa8',ship:'#f5d90a',growth:'#ff6f5e'};
 const ICON={feature:'★',fix:'✚',infra:'⚙',growth:'↑'};
-const state=x=>x.status!='open'?x.status:x.user?'needs you':x.blocked?'locked':'ready';
-const mark=s=>s=='ready'?'▶':s=='done'?'✓':s=='locked'?'🔒':s=='needs you'?'?':'✕';
+const state=x=>x.status!='open'?x.status:x.user?'proposed':x.blocked?'locked':'ready';
+const mark=s=>s=='ready'?'▶':s=='done'?'✓':s=='locked'?'🔒':s=='proposed'?'?':'✕';
 const day=t=>t?t.slice(0,10):'';const span=x=>{if(!x.closed||x.status=='open')return 'since '+day(x.ts);const d=Math.max(0,Math.round((new Date(x.closed)-new Date(x.ts))/864e5));return day(x.ts)+(day(x.ts)==day(x.closed)?'':' → '+day(x.closed))+' · '+(d?d+'d':'same day')};
 function qrow(x,host){const st=state(x);const a=document.createElement('div');a.className='row';a.style.opacity=(x.blocked||x.status!='open')?.7:1;
  a.innerHTML=`<span class=w><b class=t></b><span class=meta><span class=pill style="background:${CAT[x.track]};color:#000">${x.track}</span> ${x.id} · ${x.kind} · ${x.status=='open'?'priority '+x.score+' · ':''}${x.status=='done'?(x.release?'shipped '+x.release:'merged, not released'):st} · ${span(x)}${x.epic?' · <b>epic of '+x.epic.length+'</b>':''}</span></span><span class=xpv title="${st}">${mark(st)}</span>`;a.querySelector('.t').textContent=x.title;
@@ -193,12 +193,12 @@ $('upsub').textContent='Ranked by priority score: horizon + where it came from (
 D.ranked.forEach((x,i)=>{const a=document.createElement('div');a.className='row';a.style.cursor='default';
  a.innerHTML=`<span class=pill style="background:${CAT[x.track]};color:#000">${i+1}</span><span class=w><b class=t></b><span class=meta>${x.id} · ${x.track} · ${x.kind} · ${x.origin} · effort ${x.effort}</span></span><span class=xpv>${x.score}</span>`;
  a.querySelector('.t').textContent=x.title;a.title='priority '+x.score+' = '+x.score_why.join(' · ');$('uplist').appendChild(a)});
-if(D.needs_you.length){$('uplist').insertAdjacentHTML('beforeend','<h2 class=h>Waiting on you ('+D.needs_you.length+')</h2>');D.needs_you.forEach(x=>{const a=document.createElement('div');a.className='row';a.style.cursor='default';a.innerHTML='<span class=w><b class=t></b><span class=meta>'+x.id+'</span></span><span class=xpv>?</span>';a.querySelector('.t').textContent=x.title;$('uplist').appendChild(a)})}
+if(D.needs_you.length){$('uplist').insertAdjacentHTML('beforeend','<h2 class=h>Decisions to approve ('+D.needs_you.length+')</h2>');D.needs_you.forEach(x=>{const a=document.createElement('div');a.className='row';a.style.cursor='default';a.innerHTML='<span class=w><b class=t></b><span class=meta>'+x.id+'</span></span><span class=xpv>?</span>';a.querySelector('.t').textContent=x.title;$('uplist').appendChild(a)})}
 // roadmap columns
 let rf='all';const tracks=['all',...D.tracks];
 function chips(host,cnt,cb){tracks.forEach(m=>{const b=document.createElement('button');b.textContent=m+' '+cnt(m);b.className=m=='all'?'on':'';b.onclick=()=>{[...host.children].forEach(c=>c.classList.toggle('on',c===b));cb(m)};host.appendChild(b)})}
 chips($('rchips'),m=>Q.filter(x=>x.status=='open'&&(m=='all'||x.track==m)).length,m=>{rf=m;rdraw()});
-function rdraw(){$('cols').innerHTML='';const ord={ready:0,'needs you':1,locked:2};D.horizons.forEach(h=>{const c=document.createElement('div');c.className='col '+h;
+function rdraw(){$('cols').innerHTML='';const ord={ready:0,'proposed':1,locked:2};D.horizons.forEach(h=>{const c=document.createElement('div');c.className='col '+h;
  const xs=Q.filter(x=>x.status=='open'&&x.horizon==h&&(rf=='all'||x.track==rf)).sort((a,b)=>ord[state(a)]-ord[state(b)]||b.score-a.score);
  c.innerHTML=`<h2 class=px><span>${h}</span><span>${xs.length}</span></h2>`;if(!xs.length)c.insertAdjacentHTML('beforeend','<div class=sub>nothing here</div>');xs.forEach(x=>qrow(x,c));$('cols').appendChild(c)})}rdraw();
 // quest board
