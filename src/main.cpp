@@ -2208,6 +2208,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    FieldGraphUnpackPhase2State gFieldGraphUnpackPhase2;
    bool gHelpOpen = false;
    bool gShortcutsOpen = false;
+   bool gNavOwnsKeys = false; // R571 slice 4: a popup or panel is being driven by keyboard nav, so canvas keys stand down
 #ifndef NDEBUG
    // ImGui's own inspector windows, wired in for exact-value UI review: the
    // Metrics/Debugger's "Tools > Item Picker" reports the ImGuiCol_*/rect of
@@ -77590,6 +77591,20 @@ int main(int argc, char** argv)
       // not to ImGui's own tab navigation (which drops a slider into text edit).
       if (gKbOwnTab)
          ImGui::SetKeyOwner(ImGuiKey_Tab, kKbTabOwner, ImGuiInputFlags_LockUntilRelease);
+      // R571 slice 4: ImGui keyboard nav (Tab / arrows / Enter / Space) only while a popup or a window other than
+      // the canvas host has focus. The canvas shares the "Infinite" window with the menu bar and panels, so it
+      // can't be opted out per window; toggling per frame keeps the node keyboard model in charge of the canvas.
+      {
+         ImGuiContext& navCtx = *ImGui::GetCurrentContext();
+         const bool navPopup = ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
+         const bool navPanel = navCtx.NavWindow != nullptr && navCtx.NavWindow->RootWindow != nullptr &&
+                               std::strcmp(navCtx.NavWindow->RootWindow->Name, "Infinite") != 0;
+         const bool navOn = navPopup || navPanel;
+         ImGuiIO& nio = ImGui::GetIO();
+         if (navOn) nio.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+         else nio.ConfigFlags &= ~ImGuiConfigFlags_NavEnableKeyboard;
+         gNavOwnsKeys = navOn && nio.NavVisible;
+      }
       ImGui::NewFrame();
       if (Bench::Tail().active)
          Bench::Tail().MarkAt(Bench::FrameTail::kMarkNewFrame, Bench::ScopedStageTimer::NowMs());
@@ -85094,6 +85109,53 @@ int main(int argc, char** argv)
             }
 
             printf("%s\n", sOverallOk ? "GLTFDROPTEST OK" : "GLTFDROPTEST SUSPECT");
+         }
+      }
+
+      // R571 slice 4: with the Shortcuts window open, Tab drives ImGui nav and Space must not reach the transport.
+      if (getenv("INFINITE_NAVTEST") != nullptr)
+      {
+         ImGuiIO& tio = ImGui::GetIO();
+         tio.ConfigInputTrickleEventQueue = false;
+         tio.AddFocusEvent(true);
+         static bool ok = true;
+         auto check = [&](bool good, const char* what) {
+            ok = ok && good;
+            printf("navtest %-48s %s\n", what, good ? "ok" : "FAIL");
+         };
+         static bool wasPlaying = false;
+         if (frameId == 3)
+         {
+            check(!(tio.ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard), "nav is off over the canvas");
+            gShortcutsOpen = true;
+         }
+         if (frameId == 8)
+            check((tio.ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard) != 0, "nav turns on with the Shortcuts window focused");
+         if (frameId == 9) tio.AddKeyEvent(ImGuiKey_Tab, true);
+         if (frameId == 10) tio.AddKeyEvent(ImGuiKey_Tab, false);
+         if (frameId == 13)
+         {
+            check(tio.NavVisible, "Tab shows the focus ring");
+            check(gNavOwnsKeys, "canvas keys stand down while nav owns the keyboard");
+            wasPlaying = Transport::Instance().IsPlaying();
+            tio.AddKeyEvent(ImGuiKey_Space, true);
+         }
+         if (frameId == 14) tio.AddKeyEvent(ImGuiKey_Space, false);
+         if (frameId == 17)
+         {
+            check(Transport::Instance().IsPlaying() == wasPlaying, "Space on a nav item does not toggle the transport");
+            tio.AddKeyEvent(ImGuiKey_Escape, true);
+         }
+         if (frameId == 18) tio.AddKeyEvent(ImGuiKey_Escape, false);
+         if (frameId == 22)
+         {
+            gShortcutsOpen = false;
+         }
+         if (frameId == 26)
+         {
+            check(!(tio.ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard), "nav turns off again once the window closes");
+            printf("navtest result: %s\n", ok ? "NAV OK" : "NAV FAIL");
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
          }
       }
 
@@ -99194,7 +99256,7 @@ int main(int argc, char** argv)
       ed::EndCreate();
 
       // ---- keyboard: delete + copy/paste ----
-      const bool typing = io.WantTextInput;
+      const bool typing = io.WantTextInput || gNavOwnsKeys;
       const bool cmdOrCtrl = io.KeyCtrl || io.KeySuper;
 
       // Shift+Cmd+Z is the Mac convention for redo; Ctrl+Y also works for
