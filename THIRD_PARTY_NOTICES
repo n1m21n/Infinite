@@ -138,3 +138,16 @@ Measured at the same cost and bit-identical output to the Accelerate path.
 
 Licence: MIT. Licence texts: `external/signalsmith-stretch/LICENSE.txt` and
 `external/signalsmith-stretch/signalsmith-linear/LICENSE.txt`.
+
+NDI (video in/out)
+------------------
+
+NDI(R) is a registered trademark of Vizrt NDI AB. https://ndi.video/
+
+The NDI Out and NDI In nodes use NDI's C headers (`external/ndi/include/`,
+with the SDK licence text beside them in `external/ndi/SDK-LICENSE.txt`).
+Infinite does NOT bundle or redistribute the NDI runtime: it is found on the
+user's machine at run time (`NDI_RUNTIME_DIR_V6`/`V5` or the standard install
+paths) and the nodes say so when it is missing. NDI is named only to identify
+compatibility with NDI products; Infinite is not a product of, or sponsored
+by, NDI. Get the runtime and NDI Tools from https://ndi.video/tools/.
