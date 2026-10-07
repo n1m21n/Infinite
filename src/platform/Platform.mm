@@ -4746,6 +4746,34 @@ namespace Platform
       }
    }
 
+   std::string OpenMidiDialog()
+   {
+      @autoreleasepool
+      {
+         NSOpenPanel* panel = [NSOpenPanel openPanel];
+         [panel setCanChooseFiles:YES];
+         [panel setCanChooseDirectories:NO];
+         [panel setAllowsMultipleSelection:NO];
+         [panel setTitle:@"Open MIDI file"];
+         if (@available(macOS 11.0, *))
+         {
+            NSMutableArray* types = [NSMutableArray array];
+            for (NSString* ext in @[ @"mid", @"midi" ])
+            {
+               UTType* t = [UTType typeWithFilenameExtension:ext];
+               if (t)
+                  [types addObject:t];
+            }
+            if ([types count] > 0)
+               [panel setAllowedContentTypes:types];
+         }
+         if ([panel runModal] != NSModalResponseOK)
+            return std::string();
+         NSURL* url = [[panel URLs] firstObject];
+         return url ? std::string([[url path] UTF8String]) : std::string();
+      }
+   }
+
    std::string OpenFolderDialog(const char* title, const std::string& initialDir)
    {
       @autoreleasepool

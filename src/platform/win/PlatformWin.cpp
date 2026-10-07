@@ -501,6 +501,16 @@ namespace Platform
                            false, std::string(), err);
    }
 
+   std::string OpenMidiDialog()
+   {
+      std::string err;
+      return RunOpenDialog(L"Choose MIDI File",
+                           {
+                              { L"MIDI files", L"*.mid;*.midi" },
+                           },
+                           false, std::string(), err);
+   }
+
    std::string OpenFolderDialog(const char* title, const std::string& initialDir)
    {
       std::string err;

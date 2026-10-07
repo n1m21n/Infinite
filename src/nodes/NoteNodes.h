@@ -1066,3 +1066,49 @@ private:
    std::unique_ptr<AudioBouncingBallsNode> mAudioNode;
    int mLastCookFrame = -1;
 };
+
+class AudioMidiFileNode;
+namespace MidiFile { struct Song; }
+
+// Plays a Standard MIDI File as a note source: the file's notes land on the
+// transport's beat timeline (the file's own tempo is ignored, the project bpm
+// rules), so it follows play / stop / seek like every other beat-synced note
+// node. Transpose shifts every note, track picks one track of a multi-track
+// file, loop repeats the file (rounded up to a whole bar) forever.
+class MidiFileNode : public INode, public INoteSource
+{
+public:
+   static INode* Create() { return new MidiFileNode(); }
+   MidiFileNode();
+   ~MidiFileNode() override;
+
+   unsigned int GetOutputTexture() override { return 0; }
+   int GetOutputWidth() const override { return 0; }
+   int GetOutputHeight() const override { return 0; }
+   void CookIfNeeded(int frameId) override;
+   void VisitParams(ParamVisitor& v) override;
+
+   AudioNode* GetAudioNode() override;
+
+   std::string path;
+   int transpose = 0;   // semitones
+   int track = 0;       // 0 = all tracks, n = the n-th track that holds notes
+   bool loop = true;
+   float velocity = 1.0f; // scales every note's velocity
+
+   bool LoadFile(const std::string& filePath);
+   const MidiFile::Song* GetSong() const { return mSong; }
+   const std::string& Status() const { return mStatus; }
+   // Loop length in beats (the file rounded up to a whole 4/4 bar), >= 4.
+   double LoopBeats() const;
+   // Main-thread readout of the playhead inside the file, in beats, -1 when stopped.
+   double PlayheadBeats() const;
+
+private:
+   std::unique_ptr<AudioMidiFileNode> mAudioNode;
+   std::vector<std::unique_ptr<MidiFile::Song>> mSongs; // every loaded song stays alive: the audio thread may still hold the old pointer
+   const MidiFile::Song* mSong = nullptr;
+   std::string mLoadedPath;
+   std::string mStatus;
+   int mLastCookFrame = -1;
+};
