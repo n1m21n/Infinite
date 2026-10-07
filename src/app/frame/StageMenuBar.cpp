@@ -205,7 +205,7 @@ void DrawMenuBar(FrameCtx& fc)
                   // Saved with the document (Settings.dockSide); not undoable.
                   int dockSide = gArrange.settings.dockSide == 1 ? 1 : 0;
                   ImGui::SetNextItemWidth(150);
-                  if (ImGui::Combo(L("Dock"), &dockSide, "Bottom\0Top\0") && dockSide != gArrange.settings.dockSide)
+                  if (ImGui::Combo(L("Dock"), &dockSide, I18n::TList("Bottom\0Top\0")) && dockSide != gArrange.settings.dockSide)
                   {
                      gArrange.settings.dockSide = dockSide;
                      gArrange.revision++; // a model field like any other (WP5b)
@@ -246,9 +246,9 @@ void DrawMenuBar(FrameCtx& fc)
             // hand back "this exact knob, this exact number" instead of a
             // screenshot and a guess. Dev-only: excluded from Release builds
             // (NDEBUG) so shipped/public builds never expose these.
-            if (ImGui::MenuItem("UI Debugger / Item Picker"))
+            if (ImGui::MenuItem(L("UI Debugger / Item Picker"))) // i18n-ok (debug UI)
                gUiDebuggerOpen = true;
-            if (ImGui::MenuItem("UI Style Editor"))
+            if (ImGui::MenuItem(L("UI Style Editor"))) // i18n-ok (debug UI)
                gUiStyleEditorOpen = true;
 #endif
             if (ImGui::MenuItem(L("Check for updates")))

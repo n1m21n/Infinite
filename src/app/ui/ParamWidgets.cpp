@@ -150,7 +150,7 @@ namespace app
          char lo[48], hi[48];
          snprintf(lo, sizeof(lo), fmt, minV);
          snprintf(hi, sizeof(hi), fmt, maxV);
-         HelpTip("Range %s to %s\nDouble-click, or hover and type, to enter a value", lo, hi);
+         HelpTip(T("Range %s to %s\nDouble-click, or hover and type, to enter a value"), lo, hi);
       }
       if (nodeIndex != gKbFocusNode || paramIndex != gKbFocusParam)
          return false;
@@ -467,7 +467,7 @@ namespace app
       if (!seen)
          gKbParams.push_back({ nodeIndex, paramIndex });
       if (CategoryColors::GetTooltips() && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip) && !ImGui::IsItemActive())
-         HelpTip("Click to change. With the node selected, Tab to focus it and Left/Right to step");
+         HelpTip("%s", T("Click to change. With the node selected, Tab to focus it and Left/Right to step"));
       if (nodeIndex != gKbFocusNode || paramIndex != gKbFocusParam)
          return 0;
       const ImVec2 rmin = ImGui::GetItemRectMin();

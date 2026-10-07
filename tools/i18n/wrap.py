@@ -28,7 +28,27 @@ def has_letters(s):
     body = re.sub(r'%[-+ #0]*\d*(?:\.\d+)?[a-zA-Z]', '', s[1:-1])
     return re.search(r'[A-Za-zÀ-￿]', body) is not None
 
+tern_re = re.compile(r'\b(ImGui::)?(' + '|'.join(TEXT + APP_TEXT) + r')\s*\(\s*([A-Za-z_][\w.>\-\[\]()!&| ]*?)\s*\?\s*(' + LIT + r')\s*:\s*(' + LIT + r')\s*([,)])')
+
+def process_ternary(src):
+    n = 0
+    def rep(m):
+        nonlocal n
+        ns, name, cond, a, b, term = m.groups()
+        if ns is None and name not in APP_TEXT:
+            return m.group(0)
+        if not (has_letters(a) or has_letters(b)):
+            return m.group(0)
+        n += 1
+        return f'{ns or ""}{name}({cond} ? T({a}) : T({b}){term}'
+    return tern_re.sub(rep, src), n
+
 def process(src):
+    src, n0 = process_ternary(src)
+    out, n = _process(src)
+    return out, n + n0
+
+def _process(src):
     n = 0
     out = []
     pos = 0

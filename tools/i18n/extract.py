@@ -14,12 +14,14 @@ import os, re, sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 LIT = r'"((?:[^"\\\n]|\\.)*)"'
+KEYMARK = re.compile(r'I18N_KEY\s*\(\s*' + LIT + r'\s*\)')
+LISTCALL = re.compile(r'(?<![\w:.])(?:I18n::)?TList\s*\(\s*((?:' + LIT + r'\s*)+)\)')
 CALL = re.compile(r'(?<![\w:.])(?:I18n::)?(TC|LC|T|L)\s*\(\s*' + LIT + r'(?:\s*,\s*' + LIT + r')?')
 LANGS = ['es', 'de', 'zh', 'ja', 'ru']
 
 
 def unesc(s):
-    return re.sub(r'\\(.)', lambda m: {'n': '\n', 't': '\t', '"': '"', '\\': '\\'}.get(m.group(1), '\\' + m.group(1)), s)
+    return re.sub(r'\\(.)', lambda m: {'n': '\n', 't': '\t', '0': '\x00', '"': '"', '\\': '\\'}.get(m.group(1), '\\' + m.group(1)), s)
 
 
 def esc(s):
@@ -63,6 +65,15 @@ def keys_in_src():
                     continue
                 full = (ctx + '\x04' + key) if ctx else key
                 keys.setdefault(full, os.path.relpath(path, ROOT))
+            for m in KEYMARK.finditer(text):
+                k = unesc(m.group(1))
+                if k.strip():
+                    keys.setdefault(k, os.path.relpath(path, ROOT))
+            for m in LISTCALL.finditer(text):
+                joined = ''.join(unesc(x) for x in re.findall(LIT, m.group(1)))
+                for item in joined.split('\x00'):
+                    if item.strip():
+                        keys.setdefault(item, os.path.relpath(path, ROOT))
     return keys
 
 

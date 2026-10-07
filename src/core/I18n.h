@@ -42,6 +42,13 @@ namespace I18n
    const char* T(const char* key);
    const char* TC(const char* context, const char* key);
 
+   // For Combo()'s "A\0B\0C\0" item lists: each item translated, same NUL-separated layout.
+   const char* TList(const char* nulSeparated);
+
+   // Marks a string literal as a translation key without translating it there (arrays of labels
+   // translated at the use site with T()/L()); tools/i18n/extract.py picks it up.
+   #define I18N_KEY(s) s
+
    // Widget/window label: "Speichern###Save". The ID part is always the untranslated source
    // string, so imgui.ini state and widget IDs are identical in every language. A key that
    // already carries "##"/"###" or starts with "##" keeps its ID part untouched.

@@ -69,7 +69,7 @@ void DrawLayout(FrameCtx& fc)
          const ImVec2 mp = ImGui::GetMousePos();
          for (const char* wname : kFloatingWindowNames)
          {
-            ImGuiWindow* w = ImGui::FindWindowByName(wname);
+            ImGuiWindow* w = ImGui::FindWindowByName(I18n::L(wname));
             if (w != nullptr && w->WasActive)
             {
                ImRect r(w->Pos, w->Pos + w->Size);

@@ -23,6 +23,7 @@ namespace
    {
       Table table;
       std::unordered_map<std::string, std::string> labels; // L() results, node-stable
+      std::unordered_map<std::string, std::string> lists;  // TList() results, node-stable
    };
    std::unique_ptr<Generation> gGen(new Generation());
    std::unique_ptr<Generation> gRetired;
@@ -299,6 +300,34 @@ const char* T(const char* key)
 const char* TC(const char* context, const char* key)
 {
    return Translate(context, key);
+}
+
+const char* TList(const char* items)
+{
+   if (items == nullptr)
+      return "";
+   std::string raw;
+   const char* p = items;
+   while (*p != '\0')
+   {
+      const size_t n = std::strlen(p);
+      raw.append(p, n + 1);
+      p += n + 1;
+   }
+   raw.push_back('\0');
+   if (gCurrent == "en" || gGen->table.empty())
+      return items;
+   auto cached = gGen->lists.find(raw);
+   if (cached != gGen->lists.end())
+      return cached->second.c_str();
+   std::string out;
+   for (const char* q = items; *q != '\0'; q += std::strlen(q) + 1)
+   {
+      const char* hit = Lookup(q);
+      out += hit != nullptr ? hit : q;
+      out.push_back('\0');
+   }
+   return gGen->lists.emplace(raw, std::move(out)).first->second.c_str();
 }
 
 const char* L(const char* key)

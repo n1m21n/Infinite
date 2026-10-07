@@ -608,7 +608,7 @@ void DrawSidePanels(FrameCtx& fc)
       {
          ImGui::SetNextWindowSize(ImVec2(620, 460), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Formula editor", &gFormulaEditorOpen))
+         if (ImGui::Begin(L("Formula editor"), &gFormulaEditorOpen))
          {
             ImGui::TextDisabled("%s", T("body of  vec4 shape(vec2 uv, vec2 p, float t)"));
             ImGui::TextDisabled("%s", T("p is centred (-0.5..0.5), t is transport seconds, uA-uD are the knobs"));
@@ -664,7 +664,7 @@ void DrawSidePanels(FrameCtx& fc)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Field element editor", &gFieldElementEditorOpen))
+         if (ImGui::Begin(L("Field element editor"), &gFieldElementEditorOpen))
          {
             ImGui::TextDisabled("%s", T("Field element-domain kernel (per-vertex). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t"));
             ImGui::TextDisabled("%s", T("User attributes: 'attrib float heat = 0'. Frame rate expressions are automatically hoisted."));
@@ -735,7 +735,7 @@ void DrawSidePanels(FrameCtx& fc)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Field primitive editor", &gFieldPrimitiveEditorOpen))
+         if (ImGui::Begin(L("Field primitive editor"), &gFieldPrimitiveEditorOpen))
          {
             ImGui::TextDisabled("%s", T("Field primitive generator (from scratch). Reserved: P (vec3), N (vec3), uv (vec2), Cd (vec3), i, count, t"));
             ImGui::TextDisabled("%s", T("Pure 3D geometry generator. Frame rate expressions are automatically hoisted."));
@@ -784,7 +784,7 @@ void DrawSidePanels(FrameCtx& fc)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Field pixel editor", &gFieldPixelEditorOpen))
+         if (ImGui::Begin(L("Field pixel editor"), &gFieldPixelEditorOpen))
          {
             ImGui::TextDisabled("%s", T("Field pixel-domain kernel (per-pixel fragment shader)."));
             ImGui::TextDisabled("%s", T("Reserved: uv (vec2), xy (vec2), res (vec2), aspect, col (vec3), alpha, t, dt, frame"));
@@ -848,7 +848,7 @@ void DrawSidePanels(FrameCtx& fc)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Field effect editor", &gFieldSampleEditorOpen))
+         if (ImGui::Begin(L("Field effect editor"), &gFieldSampleEditorOpen))
          {
             ImGui::TextDisabled("%s", T("Field effect kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, out"));
             ImGui::TextDisabled("%s", T("'state float x = 0' declares per-voice memory (resets on note-on/steal). 'param float p = 0..1' exposes a modulatable knob."));
@@ -912,7 +912,7 @@ void DrawSidePanels(FrameCtx& fc)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Field synth editor", &gFieldSynthEditorOpen))
+         if (ImGui::Begin(L("Field synth editor"), &gFieldSynthEditorOpen))
          {
             ImGui::TextDisabled("%s", T("Field polyphonic synth kernel (per-sample, per-voice, audio thread). Reserved: in, sr, n, freq, gate, out"));
             ImGui::TextDisabled("%s", T("'state float x = 0' declares per-voice memory (resets on note-on/steal). 'param float p = 0..1' exposes a modulatable knob."));
@@ -976,7 +976,7 @@ void DrawSidePanels(FrameCtx& fc)
       {
          ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_FirstUseEver);
          PushElevatedPanelStyle(/*isChild=*/false);
-         if (ImGui::Begin("Field graph editor", &gFieldGraphEditorOpen))
+         if (ImGui::Begin(L("Field graph editor"), &gFieldGraphEditorOpen))
          {
             ImGui::TextDisabled("%s", T("Field graph-domain kernel (edit-time, runs once). emit(\"Type Name\", k0, k1, ...) -> handle"));
             ImGui::TextDisabled("%s", T("connect(src, srcSlot, dst, dstSlot)   set(handle, \"paramName\", value)   place(handle, x, y)"));

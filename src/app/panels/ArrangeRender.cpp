@@ -145,7 +145,7 @@ namespace app
       ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
                                ImGuiCond_Always, ImVec2(0.5f, 0.5f));
       PushElevatedPanelStyle(/*isChild=*/false);
-      ImGui::Begin("Offline Render", nullptr,
+      ImGui::Begin(L("Offline Render"), nullptr,
                     ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize |
                        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings);
 
@@ -233,7 +233,7 @@ namespace app
       ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
                               ImGuiCond_Always, ImVec2(0.5f, 0.5f));
       PushElevatedPanelStyle(/*isChild=*/false);
-      ImGui::Begin("Rendering Audio", nullptr,
+      ImGui::Begin(L("Rendering Audio"), nullptr,
                    ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize |
                       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings);
 
@@ -1187,14 +1187,14 @@ namespace app
    {
       if (gArrangeRenderFailNoticeOpen)
       {
-         ImGui::OpenPopup("Render failed##arrangeRenderFail");
+         ImGui::OpenPopup(L("Render failed##arrangeRenderFail"));
          gArrangeRenderFailNoticeOpen = false;
       }
       ImGuiIO& io = ImGui::GetIO();
       ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
                               ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       ImGui::SetNextWindowSizeConstraints(ImVec2(320.0f, 0.0f), ImVec2(560.0f, 400.0f));
-      if (ImGui::BeginPopupModal("Render failed##arrangeRenderFail", nullptr,
+      if (ImGui::BeginPopupModal(L("Render failed##arrangeRenderFail"), nullptr,
                                  ImGuiWindowFlags_AlwaysAutoResize))
       {
          ImGui::PushTextWrapPos(520.0f);

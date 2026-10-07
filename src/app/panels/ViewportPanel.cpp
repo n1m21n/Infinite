@@ -147,11 +147,11 @@ namespace app
    // so the two can't drift apart.
    void ViewportPanelDockCombo()
    {
-      static const char* kDockLabels[] = { "Bottom", "Right", "Left", "Top" };
-      if (ImGui::BeginCombo("##viewportdock", kDockLabels[gViewportPanelDock]))
+      static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
+      if (ImGui::BeginCombo("##viewportdock", T(kDockLabels[gViewportPanelDock])))
       {
          for (int i = 0; i < 4; i++)
-            if (ImGui::Selectable(kDockLabels[i], i == gViewportPanelDock))
+            if (ImGui::Selectable(L(kDockLabels[i]), i == gViewportPanelDock))
                gViewportPanelDock = i;
          ImGui::EndCombo();
       }
@@ -466,9 +466,9 @@ namespace app
 
       if (ImGui::BeginPopup("##viewportpanelctx"))
       {
-         static const char* kDockLabels[] = { "Bottom", "Right", "Left", "Top" };
+         static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
          for (int i = 0; i < 4; i++)
-            if (ImGui::MenuItem(kDockLabels[i], nullptr, i == gViewportPanelDock))
+            if (ImGui::MenuItem(L(kDockLabels[i]), nullptr, i == gViewportPanelDock))
                gViewportPanelDock = i;
          ImGui::Separator();
          if (ImGui::MenuItem(L("Close panel")))
@@ -594,11 +594,11 @@ namespace app
    // right-click menu and the Menu dropdown - see ViewportPanelDockCombo.
    void ModMatrixDockCombo()
    {
-      static const char* kDockLabels[] = { "Bottom", "Right", "Left", "Top" };
-      if (ImGui::BeginCombo("##modmatrixdock", kDockLabels[gModMatrixDock]))
+      static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
+      if (ImGui::BeginCombo("##modmatrixdock", T(kDockLabels[gModMatrixDock])))
       {
          for (int i = 0; i < 4; i++)
-            if (ImGui::Selectable(kDockLabels[i], i == gModMatrixDock))
+            if (ImGui::Selectable(L(kDockLabels[i]), i == gModMatrixDock))
                gModMatrixDock = i;
          ImGui::EndCombo();
       }

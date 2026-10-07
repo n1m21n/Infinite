@@ -6,11 +6,11 @@ namespace app
    // ---- Performance Matrix ----
    void PerfPanelDockCombo()
    {
-      static const char* kDockLabels[] = { "Bottom", "Right", "Left", "Top" };
-      if (ImGui::BeginCombo("##perfpaneldock", kDockLabels[gPerfPanelDock]))
+      static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
+      if (ImGui::BeginCombo("##perfpaneldock", T(kDockLabels[gPerfPanelDock])))
       {
          for (int i = 0; i < 4; i++)
-            if (ImGui::Selectable(kDockLabels[i], i == gPerfPanelDock))
+            if (ImGui::Selectable(L(kDockLabels[i]), i == gPerfPanelDock))
                gPerfPanelDock = i;
          ImGui::EndCombo();
       }

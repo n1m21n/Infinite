@@ -722,7 +722,7 @@ namespace app
 
             ImGui::Spacing();
             ImGui::SetNextItemWidth(220.0f);
-            ImGui::Combo("Topic", &sSelectedSection, kSections, IM_ARRAYSIZE(kSections));
+            ImGui::Combo(L("Topic"), &sSelectedSection, kSections, IM_ARRAYSIZE(kSections));
             ImGui::SameLine(0.0f, 12.0f);
             ImGui::SetNextItemWidth(200.0f);
             ImGui::InputTextWithHint("##fieldsearch", "Search functions / syntax...", sFilterBuf, sizeof(sFilterBuf));
@@ -742,14 +742,14 @@ namespace app
             }
 
             static std::string sFieldSkillStatus;
-            if (ImGui::Button("Install AI Skill##fieldLanguage"))
+            if (ImGui::Button(L("Install AI Skill##fieldLanguage")))
             {
                const std::string folder = Platform::OpenFolderDialog("Choose folder for the Field Language AI skill file");
                if (!folder.empty())
                   sFieldSkillStatus = SaveAISkillFile(folder, "infinite-field-language.md", AISkillContent::kFieldLanguageMarkdown);
             }
             if (ImGui::IsItemHovered())
-               HelpTip("Save a Field-language reference file you can hand to any AI assistant\n(or drop into ~/.claude/skills/) so it can write Field kernels for you.");
+               HelpTip("%s", T("Save a Field-language reference file you can hand to any AI assistant\n(or drop into ~/.claude/skills/) so it can write Field kernels for you."));
             if (!sFieldSkillStatus.empty())
             {
                ImGui::SameLine();
@@ -757,6 +757,7 @@ namespace app
             }
 
             ImGui::Spacing();
+            // i18n-skip-begin: Field language reference stays English (code vocabulary)
             // See DrawModMatrixDocked's inner-content child for why
             // AlwaysUseWindowPadding is needed alongside Border now.
             ImGui::BeginChild("##fieldrefcontent", ImVec2(0, 0),
@@ -1024,6 +1025,7 @@ namespace app
                ImGui::TextWrapped("Want geometry or pixels to react to audio? A single kernel can't read 'in' from an element or pixel domain - drive a param from an audio-analysis node through the modulation matrix instead, and reference the param (e.g. 'height' above) from within the geometry/pixel kernel.");
             }
 
+            // i18n-skip-end
             ImGui::EndChild();
             ImGui::EndTabItem();
          }
@@ -1032,11 +1034,12 @@ namespace app
          if (ImGui::BeginTabItem(L("Expression Globals")))
          {
             ImGui::Spacing();
-            ImGui::TextDisabled("Named values every '=' parameter expression can read.");
-            ImGui::TextDisabled("Each row sees t and the rows above it:  beat = mod(t * 2, 1) < 0.5");
-            ImGui::TextDisabled("Saved as your app-wide default - every new patch starts with this set.");
-            if (ImGui::CollapsingHeader("Language Reference"))
+            ImGui::TextDisabled("%s", T("Named values every '=' parameter expression can read."));
+            ImGui::TextDisabled("%s", T("Each row sees t and the rows above it:  beat = mod(t * 2, 1) < 0.5"));
+            ImGui::TextDisabled("%s", T("Saved as your app-wide default - every new patch starts with this set."));
+            if (ImGui::CollapsingHeader(L("Language Reference")))
             {
+               // i18n-skip-begin: expression vocabulary
                ImGui::TextDisabled("operators   + - * / %% ^   < <= > >= == !=   && || !   . (swizzle)");
                ImGui::TextDisabled("functions   sin cos tan abs sign sqrt exp log pow");
                ImGui::TextDisabled("            floor ceil round mod min max clamp lerp mix");
@@ -1047,17 +1050,18 @@ namespace app
                ImGui::TextDisabled("bound       t = transport seconds, pi");
                ImGui::TextDisabled("in a param  lo / hi = that param's own range, plus its siblings");
                ImGui::TextDisabled("            a sibling of the same name shadows a global");
+               // i18n-skip-end
             }
 
             static std::string sExprSkillStatus;
-            if (ImGui::Button("Install AI Skill##exprGlobals"))
+            if (ImGui::Button(L("Install AI Skill##exprGlobals")))
             {
                const std::string folder = Platform::OpenFolderDialog("Choose folder for the Expression Globals AI skill file");
                if (!folder.empty())
                   sExprSkillStatus = SaveAISkillFile(folder, "infinite-expression-globals.md", AISkillContent::kExpressionGlobalsMarkdown);
             }
             if (ImGui::IsItemHovered())
-               HelpTip("Save a reference file you can hand to any AI assistant\n(or drop into ~/.claude/skills/) so it can write '=' expressions and Globals for you.");
+               HelpTip("%s", T("Save a reference file you can hand to any AI assistant\n(or drop into ~/.claude/skills/) so it can write '=' expressions and Globals for you."));
             if (!sExprSkillStatus.empty())
             {
                ImGui::SameLine();
@@ -1144,7 +1148,7 @@ namespace app
             }
 
             ImGui::Separator();
-            if (ImGui::Button("Add global", ImVec2(110, 0)))
+            if (ImGui::Button(L("Add global"), ImVec2(110, 0)))
             {
                PushUndoCheckpoint();
                char name[32];
@@ -1154,14 +1158,14 @@ namespace app
                SaveDefaultExprGlobals();
             }
             ImGui::SameLine();
-            if (ImGui::Button("Presets...", ImVec2(110, 0)))
+            if (ImGui::Button(L("Presets..."), ImVec2(110, 0)))
             {
                ImGui::OpenPopup("ExprPresetsMenuSettings");
             }
 
             if (ImGui::BeginPopup("ExprPresetsMenuSettings"))
             {
-               ImGui::TextDisabled("Click to insert preset global:");
+               ImGui::TextDisabled("%s", T("Click to insert preset global:"));
                ImGui::Separator();
                std::string currentCategory;
                for (const ExprGlobals::Preset& p : ExprGlobals::Presets())
@@ -1198,7 +1202,7 @@ namespace app
                   }
                   if (ImGui::IsItemHovered())
                   {
-                     ImGui::SetTooltip("%s\nFormula: %s", p.description.c_str(), p.expr.c_str());
+                     ImGui::SetTooltip(T("%s\nFormula: %s"), p.description.c_str(), p.expr.c_str());
                   }
                }
                ImGui::EndPopup();

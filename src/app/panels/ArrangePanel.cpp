@@ -465,7 +465,7 @@ namespace app
                ImGui::TextDisabled("%s", T("Range:"));
                ImGui::SetNextItemWidth(150.0f);
                int rangeKind = std::clamp(rset.renderRangeKind, 0, 3);
-               if (ImGui::Combo("##arrRangeKind", &rangeKind, "Whole arrangement\0Loop\0Marker A -> B\0Custom\0"))
+               if (ImGui::Combo("##arrRangeKind", &rangeKind, I18n::TList("Whole arrangement\0Loop\0Marker A -> B\0Custom\0")))
                {
                   rset.renderRangeKind = rangeKind;
                   gPatchDirty = true;
@@ -536,7 +536,7 @@ namespace app
                   static int sArrangeRenderResPreset = 0; // 0=Match Clips, 1..4 fixed, 5=Custom
                   int detectedClipW = 0, detectedClipH = 0;
                   ArrangeRenderDetectClipSize(detectedClipW, detectedClipH);
-                  const char* kResPresets[] = { "Match Clips", "1080p", "4K", "720p", "Vertical", "Custom" };
+                  const char* kResPresets[] = { T("Match Clips"), "1080p", "4K", "720p", T("Vertical"), T("Custom") };
                   ImGui::SetNextItemWidth(120.0f);
                   if (ImGui::Combo("##arrResPreset", &sArrangeRenderResPreset, kResPresets, IM_ARRAYSIZE(kResPresets)))
                   {
@@ -700,10 +700,10 @@ namespace app
             // never opens.
             if (sArrangeOpenOverwrite)
             {
-               ImGui::OpenPopup("Overwrite file?##arrangeOverwrite");
+               ImGui::OpenPopup(L("Overwrite file?##arrangeOverwrite"));
                sArrangeOpenOverwrite = false;
             }
-            if (ImGui::BeginPopupModal("Overwrite file?##arrangeOverwrite", nullptr,
+            if (ImGui::BeginPopupModal(L("Overwrite file?##arrangeOverwrite"), nullptr,
                                        ImGuiWindowFlags_AlwaysAutoResize))
             {
                const bool queuedClash = ArrangeRenderPathQueued(sArrangePendingJob.path, 0);
@@ -781,7 +781,7 @@ namespace app
             if (viewportWasOn)
                ImGui::PopStyleColor(2);
             if (ImGui::IsItemHovered())
-               HelpTip(viewportWasOn ? "Viewport Monitor: Visible (Right-click for Dock Position)" : "Toggle Viewport Monitor (Right-click for Dock Position)");
+               HelpTip(viewportWasOn ? T("Viewport Monitor: Visible (Right-click for Dock Position)") : T("Toggle Viewport Monitor (Right-click for Dock Position)"));
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
             const ImVec2 center((bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f);
@@ -815,7 +815,7 @@ namespace app
          if (arrangeIsPlaying)
             ImGui::PopStyleColor(2);
          if (ImGui::IsItemHovered())
-            HelpTip(arrangeIsPlaying ? "Pause (Space)" : "Play (Space)");
+            HelpTip(arrangeIsPlaying ? T("Pause (Space)") : T("Play (Space)"));
          {
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
@@ -896,7 +896,7 @@ namespace app
          if (snapWasOn)
             ImGui::PopStyleColor(2);
          if (ImGui::IsItemHovered())
-            HelpTip(snapWasOn ? "Snap to Grid: On" : "Snap to Grid: Off");
+            HelpTip(snapWasOn ? T("Snap to Grid: On") : T("Snap to Grid: Off"));
          {
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
@@ -956,7 +956,7 @@ namespace app
          if (loopWasOn)
             ImGui::PopStyleColor(2);
          if (ImGui::IsItemHovered())
-            HelpTip(loopWasOn ? "Loop Region: Enabled" : "Toggle Loop Region (Shift+drag on ruler)");
+            HelpTip(loopWasOn ? T("Loop Region: Enabled") : T("Toggle Loop Region (Shift+drag on ruler)"));
          {
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();
@@ -1105,7 +1105,7 @@ namespace app
                : (arrangeIconCol & 0x60FFFFFFu);
             Tabler::DrawLineHeight(ImGui::GetWindowDrawList(), rcenter, (rbmax.y - rbmin.y) * 0.65f, barCol);
             if (hovered)
-               HelpTip(anyResized ? "Reset all track heights to default" : "All tracks already at default height");
+               HelpTip(anyResized ? T("Reset all track heights to default") : T("All tracks already at default height"));
          }
 
          // Inspector / Clip Settings toggle. Icon is the edit/pencil
@@ -1122,7 +1122,7 @@ namespace app
          if (inspectorWasOpen)
             ImGui::PopStyleColor(2);
          if (ImGui::IsItemHovered())
-            HelpTip(inspectorWasOpen ? "Clip / Track Inspector: Open" : "Toggle Clip / Track Inspector");
+            HelpTip(inspectorWasOpen ? T("Clip / Track Inspector: Open") : T("Toggle Clip / Track Inspector"));
          {
             const ImVec2 bmin = ImGui::GetItemRectMin();
             const ImVec2 bmax = ImGui::GetItemRectMax();

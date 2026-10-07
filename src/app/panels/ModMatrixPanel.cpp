@@ -352,16 +352,16 @@ namespace app
 
             ImGui::TableSetupScrollFreeze(0, 1);
             ImGui::TableSetupColumn("##en", ImGuiTableColumnFlags_WidthFixed, 18.0f);
-            ImGui::TableSetupColumn("Source", ImGuiTableColumnFlags_WidthFixed, wCol);
-            ImGui::TableSetupColumn("Destination", ImGuiTableColumnFlags_WidthFixed, wCol);
-            ImGui::TableSetupColumn("Parameter", ImGuiTableColumnFlags_WidthFixed, wCol);
-            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, wCol);
-            ImGui::TableSetupColumn("Confidence", ImGuiTableColumnFlags_WidthFixed, vertical ? 45.0f : 75.0f);
-            ImGui::TableSetupColumn("Lo", ImGuiTableColumnFlags_WidthFixed, wCol);
-            ImGui::TableSetupColumn("Hi", ImGuiTableColumnFlags_WidthFixed, wCol);
+            ImGui::TableSetupColumn(L("Source"), ImGuiTableColumnFlags_WidthFixed, wCol);
+            ImGui::TableSetupColumn(L("Destination"), ImGuiTableColumnFlags_WidthFixed, wCol);
+            ImGui::TableSetupColumn(L("Parameter"), ImGuiTableColumnFlags_WidthFixed, wCol);
+            ImGui::TableSetupColumn(L("Value"), ImGuiTableColumnFlags_WidthFixed, wCol);
+            ImGui::TableSetupColumn(L("Confidence"), ImGuiTableColumnFlags_WidthFixed, vertical ? 45.0f : 75.0f);
+            ImGui::TableSetupColumn(L("Lo"), ImGuiTableColumnFlags_WidthFixed, wCol);
+            ImGui::TableSetupColumn(L("Hi"), ImGuiTableColumnFlags_WidthFixed, wCol);
             ImGui::TableSetupColumn("##inv", ImGuiTableColumnFlags_WidthFixed, 30.0f);
-            ImGui::TableSetupColumn("Curve", ImGuiTableColumnFlags_WidthFixed, wCurve);
-            ImGui::TableSetupColumn("Signal", ImGuiTableColumnFlags_WidthFixed, vertical ? 42.0f : 55.0f);
+            ImGui::TableSetupColumn(L("Curve"), ImGuiTableColumnFlags_WidthFixed, wCurve);
+            ImGui::TableSetupColumn(L("Signal"), ImGuiTableColumnFlags_WidthFixed, vertical ? 42.0f : 55.0f);
             ImGui::TableSetupColumn("##unbind", ImGuiTableColumnFlags_WidthFixed, 20.0f);
             ImGui::TableHeadersRow();
 
@@ -796,7 +796,7 @@ namespace app
                }
                ImGui::TableNextColumn();
                if (frameRef != nullptr && frameRef->value != nullptr)
-                  ImGui::Text(isIntR ? "%.0f (%.2fx)" : "%.3f (%.2fx)", *frameRef->value,
+                  ImGui::Text(isIntR ? T("%.0f (%.2fx)") : T("%.3f (%.2fx)"), *frameRef->value,
                               rec.PlaybackSpeedFor(dstIndex, dstParam));
                else
                   ImGui::TextUnformatted("--");
@@ -949,9 +949,9 @@ namespace app
 
       if (ImGui::BeginPopup("##modmatrixctx"))
       {
-         static const char* kDockLabels[] = { "Bottom", "Right", "Left", "Top" };
+         static const char* kDockLabels[] = { I18N_KEY("Bottom"), I18N_KEY("Right"), I18N_KEY("Left"), I18N_KEY("Top") };
          for (int i = 0; i < 4; i++)
-            if (ImGui::MenuItem(kDockLabels[i], nullptr, i == gModMatrixDock))
+            if (ImGui::MenuItem(L(kDockLabels[i]), nullptr, i == gModMatrixDock))
                gModMatrixDock = i;
          ImGui::Separator();
          if (ImGui::MenuItem(L("Close panel")))

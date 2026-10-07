@@ -95,11 +95,11 @@ int DrawFloating(FrameCtx& fc)
 
       if (gShowUnsavedChangesModal)
       {
-         ImGui::OpenPopup("Unsaved Changes");
+         ImGui::OpenPopup(L("Unsaved Changes"));
          gShowUnsavedChangesModal = false;
       }
       ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-      if (ImGui::BeginPopupModal("Unsaved Changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+      if (ImGui::BeginPopupModal(L("Unsaved Changes"), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
       {
          ImGui::Text("%s", T("This patch has unsaved changes."));
          ImGui::Text("%s", T("Save before closing?"));
@@ -151,13 +151,13 @@ int DrawFloating(FrameCtx& fc)
       // ---- check for updates modal ----
       if (gShowUpdateCheckModal)
       {
-         ImGui::OpenPopup("Check for updates");
+         ImGui::OpenPopup(L("Check for updates"));
          gShowUpdateCheckModal = false;
       }
       ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       ImGui::SetNextWindowSize(ImVec2(380, 0), ImGuiCond_Appearing);
       bool isUpdateCheckOpen = true;
-      if (ImGui::BeginPopupModal("Check for updates", &isUpdateCheckOpen, ImGuiWindowFlags_AlwaysAutoResize))
+      if (ImGui::BeginPopupModal(L("Check for updates"), &isUpdateCheckOpen, ImGuiWindowFlags_AlwaysAutoResize))
       {
          if (!isUpdateCheckOpen)
             ImGui::CloseCurrentPopup();
@@ -225,11 +225,11 @@ int DrawFloating(FrameCtx& fc)
 
       if (gShowAutosaveRecoveryModal)
       {
-         ImGui::OpenPopup("Recover Autosave");
+         ImGui::OpenPopup(L("Recover Autosave"));
          gShowAutosaveRecoveryModal = false;
       }
       ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-      if (ImGui::BeginPopupModal("Recover Autosave", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+      if (ImGui::BeginPopupModal(L("Recover Autosave"), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
       {
          ImGui::Text("%s", T("Infinite closed unexpectedly."));
          if (!gAutosaveRecoveryTimestamp.empty())
