@@ -59,10 +59,18 @@ public:
          return &sidechainInput;
       return nullptr;
    }
+   // Slot 1 doubles as the geometry pin for an effect with hasGeometryInput
+   // (Shape Resonator); a def never sets both it and hasSidechain.
+   IGeometrySource** GeometryInputSlot(int slot) override
+   {
+      return (slot == 1 && mDef.hasGeometryInput) ? &geometry : nullptr;
+   }
    const char* InputLabel(int slot) const override
    {
       if (slot == 0)
          return "audio";
+      if (slot == 1 && mDef.hasGeometryInput)
+         return "shape";
       if (slot == 1 && mDef.hasSidechain)
          return mDef.sidechainLabel;
       return nullptr;
@@ -102,6 +110,10 @@ public:
    // visualizer is the only caller today) - returns 0 if the audio node
    // hasn't been created yet (no CookIfNeeded call landed before this draw).
    int ReadSpectrumSamples(float* out, int maxCount);
+   // Main thread only. Shape Resonator: frequencies (Hz) of the modes now
+   // ringing; *solving is set while a mesh solve is still running. 0 for any
+   // other effect.
+   int ReadModeFrequencies(float* out, int maxCount, bool* solving = nullptr);
    // Kernel-published extra meter values beyond AudioEffectRuntime's own
    // generic post-mix peak - Dynamics publishes {instantaneous input dB,
    // gain-reduction dB} for its transfer-curve visualizer's operating-point
@@ -114,6 +126,7 @@ public:
    }
 
    AudioCable input;
+   IGeometrySource* geometry = nullptr; // only wired when mDef.hasGeometryInput
    AudioCable sidechainInput; // only wired to a pin when mDef.hasSidechain
 
 private:

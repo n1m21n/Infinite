@@ -1,4 +1,5 @@
 #include "AudioEffectNode.h"
+#include "audio/dsp/ShapeResonatorKernel.h"
 
 #include <algorithm>
 #include <cmath>
@@ -207,4 +208,18 @@ int AudioEffectNode::LatencySamples() const
 int AudioEffectNode::ReadSpectrumSamples(float* out, int maxCount)
 {
    return mAudioNode ? mAudioNode->ReadSpectrumSamples(out, maxCount) : 0;
+}
+
+int AudioEffectNode::ReadModeFrequencies(float* out, int maxCount, bool* solving)
+{
+   if (solving)
+      *solving = false;
+   if (!mAudioNode)
+      return 0;
+   auto* k = dynamic_cast<ShapeResonatorKernel*>(&mAudioNode->Kernel());
+   if (!k)
+      return 0;
+   if (solving)
+      *solving = k->Solving();
+   return k->ModeFrequencies(out, maxCount);
 }

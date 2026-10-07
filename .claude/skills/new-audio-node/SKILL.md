@@ -161,6 +161,8 @@ What genuinely is per-node:
 generically by probing `AudioInputSlot`/`NoteInputSlot` over a shared slot
 index space. Keep it that way.
 
+**Exception: an audio node with a non-audio pin.** The generic probe only sees `AudioInputSlot`/`NoteInputSlot`. A node that also takes geometry/image/etc. (Shape Resonator's "shape" pin on slot 1) gets no pin for it and needs an explicit `InputCountFor` entry next to `AudioDisplacementNode`'s - the pin silently never appears otherwise.
+
 ---
 
 ## 4. Bug traps, each of which has already happened here
