@@ -2256,3 +2256,5 @@
 {"ts": "2026-10-07T05:54:45+05:30", "event": "add", "id": "R595", "after": [], "user": false, "src": "merge:bugfix/plugin-folders-layout", "track": "platform", "kind": "fix", "horizon": "later", "title": "Plugin folders layout", "why": "merged into main (caf3da7)", "origin": "merge"}
 {"ts": "2026-10-07T05:54:45+05:30", "event": "done", "id": "R595", "why": "merged into main (caf3da7)"}
 {"ts": "2026-10-07T05:54:45+05:30", "event": "edit", "id": "R595", "opened": "2026-10-07T05:54:45+05:30", "closed": "2026-10-07T05:54:45+05:30", "release": "", "commits": ["caf3da7"]}
+{"ts": "2026-10-07T00:25:25+00:00", "event": "done", "id": "R593", "why": "merged to main"}
+{"ts": "2026-10-07T00:25:25+00:00", "event": "edit", "id": "R593", "commits": ["46e40703"]}
