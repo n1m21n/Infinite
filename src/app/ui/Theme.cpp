@@ -8,7 +8,9 @@ namespace app
    // ImGui::SameLine's default spacing sit inside the same node body width
    // a full-width ModSlider already uses.
    const float kCompactParamWidth = 82.0f;
+
    const float kAudioHalfWidth = 214.0f;
+
    // Mixer needs a wider body than the standard 440: with 8 strips, cellW =
    // gAudioContentW / MixerNode::kSlots must leave room for both a 56px knob
    // and its modulation pin's left-margin gutter (ModKnob needs
@@ -16,7 +18,8 @@ namespace app
    // => body >= 768. 800 is the smallest round number above that floor -
    // don't shrink this back toward 440, the pin-clamp bug it fixes re-engages
    // below 768.
-   const float kAudioMixerWidth = 800.0f; // generous click target - small dots were unhittable
+   const float kAudioMixerWidth = 800.0f;
+ // generous click target - small dots were unhittable
 
    bool IsThemeLight()
    {
@@ -24,30 +27,36 @@ namespace app
       return (0.2126f * t.windowBg.r + 0.7152f * t.windowBg.g + 0.0722f * t.windowBg.b > 0.5f);
    }
 
+
    ImU32 ScopeBgCol()
    {
       return IsThemeLight() ? IM_COL32(236, 240, 248, 255) : IM_COL32(11, 12, 16, 255);
    }
+
 
    ImU32 ScopeBorderCol()
    {
       return IsThemeLight() ? IM_COL32(185, 192, 208, 255) : IM_COL32(64, 68, 84, 255);
    }
 
+
    ImU32 ScopeGridCol()
    {
       return IsThemeLight() ? IM_COL32(208, 215, 228, 255) : IM_COL32(255, 255, 255, 26);
    }
+
 
    ImU32 ScopeMidLineCol()
    {
       return IsThemeLight() ? IM_COL32(178, 186, 204, 255) : IM_COL32(255, 255, 255, 46);
    }
 
+
    ImU32 ScopeTextCol()
    {
       return IsThemeLight() ? IM_COL32(70, 78, 96, 255) : IM_COL32(120, 128, 150, 255);
-   } // settings file written once the drag ends
+   }
+ // settings file written once the drag ends
 
    void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, ImVec2 br, float rounding)
    {
@@ -71,12 +80,15 @@ namespace app
       }
    }
 
+
    void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, float size, float rounding)
    {
       DrawCheckerboardBackdrop(dl, origin, ImVec2(origin.x + size, origin.y + size), rounding);
    }
 
+
    bool TextFocusClaimed();
+
 
    // ---- The one selection/emphasis ladder ----
    //
@@ -109,6 +121,7 @@ namespace app
                     t.panelBg.b + (t.accent.b - t.panelBg.b) * amount, 1.0f);
    }
 
+
    // One set of numbers for both polarities. The earlier light/dark split
    // (0.34 vs 0.42 for "selected") was an attempt to equalise *perceived*
    // strength, but it meant a selected row was a different colour depending
@@ -116,8 +129,11 @@ namespace app
    // both values landed too weak to read as a selection at a glance. Selected
    // is 0.60 accent, everywhere, in every theme; hover and pressed bracket it.
    ImVec4 AccentEmphasisHover() { return AccentTint(0.36f); }
+
    ImVec4 AccentEmphasisSelected() { return AccentTint(0.60f); }
+
    ImVec4 AccentEmphasisPressed() { return AccentTint(0.78f); }
+
 
    // Shared "this is the recommended action" emphasis for a modal dialog's
    // button row - the app's accent color on exactly one button, matching
@@ -139,10 +155,12 @@ namespace app
       ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
    }
 
+
    void PopPrimaryButtonStyle()
    {
       ImGui::PopStyleColor(4);
    }
+
 
    void PushDropdownStyle()
    {
@@ -165,11 +183,13 @@ namespace app
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
    }
 
+
    void PopDropdownStyle()
    {
       ImGui::PopStyleVar(2);
       ImGui::PopStyleColor(5);
    }
+
 
    // Subtle "glass" elevation for a panel that floats above the main node
    // canvas (Settings, Formula/Field editors, the docked Modulation and
@@ -219,11 +239,13 @@ namespace app
       ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, isChild ? ImGui::GetStyle().WindowRounding : 12.0f);
    }
 
+
    void PopElevatedPanelStyle()
    {
       ImGui::PopStyleVar(3);
       ImGui::PopStyleColor(3);
    }
+
 
    // PushElevatedPanelStyle's white-tinted "catching light" border reads as
    // a subtle accent on a small, fully-enclosed floating dialog (Settings, a
@@ -253,11 +275,13 @@ namespace app
       ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
    }
 
+
    void PopDockedPanelStyle()
    {
       ImGui::PopStyleVar(2);
       ImGui::PopStyleColor(2);
    }
+
 
    // ---- The one panel seam ----
    //
@@ -284,6 +308,7 @@ namespace app
       };
       return ImGui::GetColorU32(ImVec4(step(t.windowBg.r), step(t.windowBg.g), step(t.windowBg.b), 1.0f));
    }
+
 
    // Draws that hairline along the just-submitted item's canvas-facing edge.
    // Call it straight after a docked panel's resize-grip InvisibleButton: the
@@ -313,6 +338,7 @@ namespace app
       }
    }
 
+
    // Pins and mod dots are drawn small but hit-tested at >= 20 pt (R572). The
    // rect grows up/down and away from the control (left), never rightwards:
    // the widget the pin belongs to starts a few px past the box, and a rect
@@ -324,6 +350,7 @@ namespace app
       ed::PinRect(ImVec2(std::min(c.x - kMin * 0.5f, boxRight - kMin), c.y - kMin * 0.5f),
                   ImVec2(boxRight, c.y + kMin * 0.5f));
    }
+
 
    // Restyles ImGui's whole palette plus the node-editor canvas from the
    // active CategoryColors preset, so switching presets re-themes the app

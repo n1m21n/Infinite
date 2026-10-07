@@ -107,6 +107,7 @@ namespace app
       RebuildAudioTopology();
    }
 
+
    // Small floating progress dialog, drawn once a frame (right before
    // ImGui::Render()) for the whole duration of a take - matches the
    // TouchDesigner/After Effects "rendering..." modal rather than living
@@ -203,6 +204,7 @@ namespace app
    }
 
 
+
    // The audio-only twin of DrawOfflineRenderProgressWindow. Same dim +
    // click-catcher discipline: a WAV take drives the graph synchronously from
    // the main loop, so editing underneath it while it runs would be editing
@@ -264,6 +266,7 @@ namespace app
       PopElevatedPanelStyle();
    }
 
+
    const char* ArrangeRenderStatusText(int status)
    {
       switch (status)
@@ -278,6 +281,7 @@ namespace app
       }
    }
 
+
    ImVec4 ArrangeRenderStatusColor(int status)
    {
       switch (status)
@@ -291,11 +295,13 @@ namespace app
       }
    }
 
+
    std::string ArrangeRenderFileName(const std::string& path)
    {
       const size_t slash = path.find_last_of("/\\");
       return slash == std::string::npos ? path : path.substr(slash + 1);
    }
+
 
    std::string ArrangeRenderJobSourceText(const ArrangeRenderJob& j)
    {
@@ -307,6 +313,7 @@ namespace app
                                                              : "-";
       return std::string("A:") + a + "  V:" + v;
    }
+
 
    // Seconds left on the running job, or -1 when there is nothing to go on
    // yet. Straight-line from the frames done so far, which is what every
@@ -321,6 +328,7 @@ namespace app
       const double perFrame = elapsed / (double)j.framesDone;
       return perFrame * (double)std::max(0, j.framesTotal - j.framesDone);
    }
+
 
    // Stops the run and marks everything still waiting as cancelled. Shared by
    // the queue window and by both progress dialogs, which float above the
@@ -339,6 +347,7 @@ namespace app
          }
       ArrangeRenderCancelActive();
    }
+
 
    // Docked inspector child panel for whatever is currently selected on the timeline -
    // a clip, a track, or a group. Pinned to the right side of the timeline panel.
@@ -1115,6 +1124,7 @@ namespace app
       ImGui::EndChild();
    }
 
+
    // "Job 2 of 5", for the progress dialogs. Counts every job that is not
    // already finished, so it reads as progress through the run rather than
    // through the list's history.
@@ -1134,12 +1144,14 @@ namespace app
       }
    }
 
+
    // ---- Arrangement render jobs: the runner (WP7) ---------------------------
 
    bool ArrangeRenderBusy()
    {
       return gOfflineRender.active || gArrangeWavRender.active;
    }
+
 
    ArrangeRenderJob* ArrangeRenderFindJob(uint64_t id)
    {
@@ -1148,6 +1160,7 @@ namespace app
             return &j;
       return nullptr;
    }
+
 
    // Seconds are derived from the live tempo at the moment the job starts, not
    // when it was queued: a job is a tick range, so re-tempoing the patch
@@ -1158,6 +1171,7 @@ namespace app
       return Arrange::TicksToSeconds((Arrange::Tick)t, std::max(1.0, (double)Transport::Instance().Tempo()));
    }
 
+
    void ArrangeRenderFailJob(ArrangeRenderJob& job, const std::string& why)
    {
       job.status = kArrangeJobFailed;
@@ -1167,6 +1181,7 @@ namespace app
       gArrangeRenderFailNoticeOpen = true;
       fprintf(stderr, "timeline render failed: %s (%s)\n", why.c_str(), job.path.c_str());
    }
+
 
    void DrawArrangeRenderFailNotice()
    {
@@ -1194,6 +1209,7 @@ namespace app
       }
    }
 
+
    // Restores everything a take borrowed. Shared by the WAV path's finish and
    // its failure exits so a half-started take can't leave the device detached
    // or the transport stuck in offline mode.
@@ -1213,6 +1229,7 @@ namespace app
       gArrangeRenderActiveLaneScope.clear();
       RebuildAudioTopology();
    }
+
 
    // Audio-only take: no encoder, no frames, no OutputNode. Follows the same
    // order as StartOfflineRenderSession - warm the graph, detach the device,
@@ -1288,6 +1305,7 @@ namespace app
       return true;
    }
 
+
    // One main-loop slice of an audio-only take. Same ~10Hz budget as the video
    // pump, for the same reason: the progress window and its Cancel button
    // still have to repaint.
@@ -1355,6 +1373,7 @@ namespace app
       }
       gArrangeRenderActiveJobId = 0;
    }
+
 
    bool ArrangeRenderBeginJob(ArrangeRenderJob& job)
    {
@@ -1465,6 +1484,7 @@ namespace app
       return true;
    }
 
+
    void ArrangeRenderCancelActive()
    {
       if (gArrangeWavRender.active)
@@ -1475,6 +1495,7 @@ namespace app
       if (gOfflineRender.active && gOfflineRender.node != nullptr)
          gOfflineRender.node->RequestFinishOfflineRender(true);
    }
+
 
    // Called once a frame from the main loop, after the offline pump has had
    // its slice. Notices a finished video take and starts the next queued job.

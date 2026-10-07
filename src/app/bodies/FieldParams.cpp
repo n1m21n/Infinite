@@ -63,6 +63,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawFieldSampleScope(FieldSampleNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
@@ -120,6 +121,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawFieldSynthScope(FieldSynthNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
@@ -176,6 +178,7 @@ namespace app
       dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
       ImGui::Dummy(ImVec2(w, h));
    }
+
 
    void DrawFieldElementParams(FieldElementNode* n)
    {
@@ -249,6 +252,7 @@ namespace app
 
       DrawFieldParamSliders(n);
    }
+
 
    void DrawFieldPrimitiveParams(FieldPrimitiveNode* n)
    {
@@ -327,6 +331,7 @@ namespace app
       DrawFieldParamSliders(n);
    }
 
+
    void DrawFieldSampleParams(FieldSampleNode* n)
    {
       n->SetNodeIndex(gCurrentNodeIndex);
@@ -389,6 +394,7 @@ namespace app
 
       DrawFieldParamSliders(n);
    }
+
 
    void DrawFieldSynthParams(FieldSynthNode* n)
    {
@@ -460,6 +466,7 @@ namespace app
 
       DrawFieldParamSliders(n);
    }
+
 
    void DrawFieldGraphParams(FieldGraphNode* n)
    {
@@ -536,6 +543,7 @@ namespace app
 
       DrawFieldParamSliders(n);
    }
+
 
    void DrawFieldPixelParams(FieldPixelNode* n)
    {

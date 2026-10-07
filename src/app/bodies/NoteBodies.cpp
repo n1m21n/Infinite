@@ -12,6 +12,7 @@ namespace app
       int channelMode = 0;     // 0 = Stereo (1+2), 1 = In 1, 2 = In 2, 3 = In 3...
    };
 
+
    // Mirror image of Audio Out's body (a terminal with no controls at all) -
    // Audio In has an input channel/device selector and a trim fader.
    // The stat line reports the active input and whether the mic tap is
@@ -123,6 +124,7 @@ namespace app
       row.End();
       EndAudioBody();
    }
+
 
    // Rule 2's one summing node (docs/plans/audio/audio-graph-semantics.md
    // §1), drawn the way a summing node is drawn everywhere else: eight
@@ -239,6 +241,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // No params - Splitter is a passthrough fan-out point, not a mixing
    // decision (audio-graph-semantics.md §1). Narrow body: there is nothing
    // here to spend 440px on.
@@ -249,6 +252,7 @@ namespace app
       BeginAudioBody(gn.index, gn.category, kAudioNarrowWidth, stat);
       EndAudioBody();
    }
+
 
    // Two octaves of piano keyboard showing what is held right now. This is the
    // MIDI Notes node's visualizer for the same reason the sequencer's step
@@ -315,6 +319,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawMidiNotesBody(GraphNode& gn, MidiNotesNode* n)
    {
       bool held[128];
@@ -372,6 +377,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    // Dedicated interactive piano for KeyboardNode - deliberately not shared
    // with DrawMidiKeyboard, whose caller (DrawMidiNotesBody above) recentres
@@ -463,7 +469,9 @@ namespace app
       return hitNote;
    }
 
+
    struct TypingKey { ImGuiKey key; int semitone; };
+
 
    // Logic Pro / GarageBand's "Musical Typing" layout - the de facto standard
    // for playing a software instrument from a QWERTY keyboard. Two rows, each
@@ -482,6 +490,7 @@ namespace app
       { ImGuiKey_I, 24 }, { ImGuiKey_9, 25 }, { ImGuiKey_O, 26 }, { ImGuiKey_0, 27 },
       { ImGuiKey_P, 28 },
    };
+
 
    void DrawKeyboardBody(GraphNode& gn, KeyboardNode* n)
    {
@@ -554,12 +563,14 @@ namespace app
       EndAudioBody();
    }
 
+
    const std::vector<std::string>& NoteNameList()
    {
       static std::vector<std::string> list = { "C", "C#", "D", "D#", "E", "F",
                                                 "F#", "G", "G#", "A", "A#", "B" };
       return list;
    }
+
 
    // Full MIDI note range (0..127) as "C-1".."G9", for a dropdown that picks one specific note
    // rather than just a pitch class - same naming convention as the "%s%d" readouts elsewhere
@@ -575,6 +586,7 @@ namespace app
       }();
       return list;
    }
+
 
    void DrawCVToPitchParams(CVToPitchNode* n)
    {
@@ -604,6 +616,7 @@ namespace app
       ModSlider("glide (ms)", &n->glideMs, 0.0f, 2000.0f);
    }
 
+
    void DrawNoteToCVParams(NoteToCVNode* n)
    {
       const int last = n->LastNote();
@@ -620,12 +633,14 @@ namespace app
       ModSlider("glide (ms)", &n->glideMs, 0.0f, 500.0f);
    }
 
+
    void DrawVelocityToCVParams(VelocityToCVNode* n)
    {
       ImGui::TextDisabled("velocity: %.2f", n->Value01());
       ModSlider("range low", &n->rangeLow, 0.0f, 1.0f);
       ModSlider("range high", &n->rangeHigh, 0.0f, 1.0f);
    }
+
 
    void DrawCVRecorderParams(CVRecorderNode* n)
    {
@@ -667,6 +682,7 @@ namespace app
       ModSlider("high", &n->high, 0.0f, 1.0f);
    }
 
+
    // Effective scale/root - the values AudioNoteFilterNode::ProcessBlock
    // (NoteNodes.cpp) actually gates against. When useGlobalScale is on, the
    // node's own scale/root fields are disabled in the UI and ignored on the
@@ -685,6 +701,7 @@ namespace app
          outRoot = n->root;
       }
    }
+
 
    // Reuses DrawMidiKeyboard's real black/white piano look (node-ui-pillars
    // P9/P3 feedback: this used to be an all-blue-tinted-rectangle strip with
@@ -721,6 +738,7 @@ namespace app
 
       DrawMidiKeyboard(lit, lowNote, octaves, n->LastNoteIn(), n->LastPassed());
    }
+
 
    void DrawNoteFilterBody(GraphNode& gn, NoteFilterNode* n)
    {
@@ -763,6 +781,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // Shared by every tempo-synced note generator (Arp, Note Sequencer,
    // Random Note Generator, Note Echo, Note Switcher): a rate expressed either
    // as a note division (synced to tempo) or free seconds.
@@ -770,6 +789,7 @@ namespace app
    {
       return (int)MusicTime::NearestRateDivision((double)beats);
    }
+
 
    // Draws a "rateMode" toggle plus whichever rate control it selects -
    // a division dropdown when synced, a seconds knob when free. `rowSlots`
@@ -810,9 +830,11 @@ namespace app
       }
    }
 
+
    // Shared "quantize to grid" dropdown - Off, 4 bars down to 1/32 (with dotted and triplets), 1/64 - used by
    // Quantizer (live note-on timing) and Note Capturer (recorded timing).
    #define kQuantizeLabels MusicTime::QuantizeGridList()
+
 
    // Standard shape for a one-knob note node (Note Transpose, Pitch Bend,
    // Gate, Glide, Vibrato below) - narrow body, one big centred knob, no
@@ -829,6 +851,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // Int counterpart of DrawSingleKnobAudioBody. A plain float local can't be
    // used here and then written back to an int param after the call, because
    // ModKnob registers the local's address with Modulation for the apply pass
@@ -844,12 +867,14 @@ namespace app
       EndAudioBody();
    }
 
+
    void DrawNoteTransposeBody(GraphNode& gn, NoteTransposeNode* n)
    {
       char stat[48];
       snprintf(stat, sizeof(stat), "%+d st", n->semitones);
       DrawSingleKnobIntAudioBody(gn, stat, "transpose", &n->semitones, -48, 48);
    }
+
 
    void DrawPitchBendBody(GraphNode& gn, PitchBendNode* n)
    {
@@ -859,12 +884,14 @@ namespace app
                                "%+.2f st");
    }
 
+
    void DrawGateBody(GraphNode& gn, GateNode* n)
    {
       char stat[48];
       snprintf(stat, sizeof(stat), "%s", n->holdMs > 0.0f ? "gated" : "off (passthrough)");
       DrawSingleKnobAudioBody(gn, stat, "hold", &n->holdMs, 0.0f, 3000.0f, "%.0f ms");
    }
+
 
    void DrawGlideBody(GraphNode& gn, GlideNode* n)
    {
@@ -873,12 +900,14 @@ namespace app
       DrawSingleKnobAudioBody(gn, stat, "glide", &n->glideMs, 0.0f, 2000.0f, "%.0f ms", AudioWidgetStyle::KnobSkewGlide150);
    }
 
+
    void DrawVibratoBody(GraphNode& gn, VibratoNode* n)
    {
       char stat[48];
       snprintf(stat, sizeof(stat), "%.1f Hz", n->rateHz);
       DrawSingleKnobAudioBody(gn, stat, "rate", &n->rateHz, 0.5f, 12.0f, "%.1f Hz");
    }
+
 
    // Velocity Curve's chart: y = x^curve over 0..1, both axes normalized -
    // the same "show the transfer function" idea as Audio Filter's response
@@ -923,6 +952,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawVelocityCurveBody(GraphNode& gn, VelocityCurveNode* n)
    {
       char stat[64];
@@ -938,6 +968,7 @@ namespace app
       EndAudioBody();
    }
 
+
    void DrawHumanizerBody(GraphNode& gn, HumanizerNode* n)
    {
       char stat[64];
@@ -950,6 +981,7 @@ namespace app
       row.End();
       EndAudioBody();
    }
+
 
    void DrawQuantizerBody(GraphNode& gn, QuantizerNode* n)
    {
@@ -967,6 +999,7 @@ namespace app
       row.End();
       EndAudioBody();
    }
+
 
    void DrawPredictiveQuantizeBody(GraphNode& gn, PredictiveQuantizeNode* n)
    {
@@ -1001,6 +1034,7 @@ namespace app
       EndAudioBody();
    }
 
+
    void DrawPredictiveVelocityBody(GraphNode& gn, PredictiveVelocityNode* n)
    {
       const float conf = n->Confidence01();
@@ -1033,6 +1067,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    void DrawPredictiveRhythmBody(GraphNode& gn, PredictiveRhythmNode* n)
    {
@@ -1087,6 +1122,7 @@ namespace app
       EndAudioBody();
    }
 
+
    void DrawNoteEchoBody(GraphNode& gn, NoteEchoNode* n)
    {
       char stat[64];
@@ -1116,6 +1152,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    void DrawPredictiveNotesBody(GraphNode& gn, PredictiveNotesNode* n)
    {
@@ -1207,6 +1244,7 @@ namespace app
       EndAudioBody();
    }
 
+
    void DrawNoteMergeBody(GraphNode& gn, NoteMergeNode* n)
    {
       int active = 0;
@@ -1227,6 +1265,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    void DrawNoteSwitcherBody(GraphNode& gn, NoteSwitcherNode* n)
    {
@@ -1285,6 +1324,7 @@ namespace app
       EndAudioBody();
    }
 
+
    void DrawNoteRouterBody(GraphNode& gn, NoteRouterNode* n)
    {
       static const std::vector<std::string> kModes = { "Round Robin", "Random", "Probability", "Chain" };
@@ -1323,6 +1363,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    // The 8-step gate grid: both the visualizer and the primary editable
    // control (replaces the old per-mode decorative shape, which couldn't
@@ -1393,6 +1434,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawArpeggiatorBody(GraphNode& gn, ArpeggiatorNode* n)
    {
       // Display order per the design ask; enum values (mode's serialized
@@ -1443,6 +1485,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    void DrawNoteSequencerBody(GraphNode& gn, NoteSequencerNode* n)
    {
@@ -1748,6 +1791,7 @@ namespace app
       EndAudioBody();
    }
 
+
    void DrawMidiFileBody(GraphNode& gn, MidiFileNode* n)
    {
       const MidiFile::Song* song = n->GetSong();
@@ -1839,6 +1883,7 @@ namespace app
       EndAudioBody();
    }
 
+
    void DrawRandomNoteGeneratorBody(GraphNode& gn, RandomNoteGeneratorNode* n)
    {
       char stat[64];
@@ -1894,6 +1939,7 @@ namespace app
       EndAudioBody();
    }
 
+
    void DrawChorderBody(GraphNode& gn, ChorderNode* n)
    {
       char stat[64];
@@ -1935,6 +1981,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // A row of 4 pill toggles, aligned under an AudioKnobRow(4)'s cells -
    // caption is the voice number, fixed text; the pill's fill colour is what
    // shows on/off, same convention as the Sampler's loop/rev/p-p toggles.
@@ -1963,6 +2010,7 @@ namespace app
       ImGui::SetWindowFontScale(1.0f);
       ImGui::SetCursorScreenPos(ImVec2(x0, y0 + btnH + 6.0f));
    }
+
 
    void DrawNoteStackBody(GraphNode& gn, NoteStackNode* n)
    {
@@ -2028,12 +2076,14 @@ namespace app
    }
 
 
+
    void DrawNoteCapturerVisualizer(NoteCapturerNode* n)
    {
       bool held[128];
       n->HeldKeys(held);
       DrawMidiKeyboard(held, 48, 3);
    }
+
 
    void DrawNoteCapturerBody(GraphNode& gn, NoteCapturerNode* n)
    {
@@ -2105,6 +2155,7 @@ namespace app
       EndAudioBody();
    }
 
+
    void DrawBouncingBallsVisualizer(BouncingBallsNode* n)
    {
       const float fullW = gAudioBodyW;
@@ -2164,6 +2215,7 @@ namespace app
       ImGui::Dummy(ImVec2(fullW, h));
    }
 
+
    void DrawBouncingBallsBody(GraphNode& gn, BouncingBallsNode* n)
    {
       static const std::vector<std::string> kShapes = { "Circle", "Square", "Triangle" };
@@ -2192,6 +2244,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // Single-macro bodies below: identical standard rhythm (narrow body, one
    // centred large knob, no second row) as Note Transpose / Pitch Bend / Gate
    // / Glide / Vibrato.
@@ -2209,6 +2262,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    void DrawAudioToCVBody(GraphNode& gn, AudioToCVNode* n)
    {
@@ -2235,6 +2289,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    void DrawEnvelopeBody(GraphNode& gn, EnvelopeNode* n)
    {

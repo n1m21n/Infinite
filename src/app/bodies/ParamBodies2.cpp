@@ -132,6 +132,7 @@ namespace app
       dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
    }
 
+
    void DrawCurvesParams(CurvesNode* n)
    {
       DropdownButton("channel", CurvesNode::ChannelNames(), n->activeChannel,
@@ -146,6 +147,7 @@ namespace app
          n->ResetChannel(n->activeChannel);
       ModSlider("mix", &n->mix, 0.0f, 1.0f);
    }
+
 
    void DrawPredictiveColoringParams(PredictiveColoringNode* n)
    {
@@ -203,6 +205,7 @@ namespace app
       ImGui::PopID();
    }
 
+
    void DrawModCurveParams(ModCurveNode* n)
    {
       const bool isLight = IsThemeLight();
@@ -215,6 +218,7 @@ namespace app
          ImGui::TextDisabled("in: patched");
       ModSlider("mix", &n->mix, 0.0f, 1.0f);
    }
+
 
    void DrawRemoveBgParams(RemoveBgNode* n)
    {
@@ -243,9 +247,11 @@ namespace app
       }
    }
 
+
    void DrawFeedbackParams(FeedbackNode*)
    {
    }
+
 
    void DrawTrailsParams(TrailsNode* n)
    {
@@ -260,6 +266,7 @@ namespace app
       if (ImGui::Button("Clear", ImVec2(kPreviewSize, 0)))
          n->Clear();
    }
+
 
    void DrawReactionDiffusionParams(ReactionDiffusionNode* n)
    {
@@ -279,6 +286,7 @@ namespace app
       if (ImGui::Button("Reseed", ImVec2(kPreviewSize, 0)))
          n->Reseed();
    }
+
 
    // --- Palette from Image ---------------------------------------------
    // Preview is the palette itself, not the strip texture: the strip is a
@@ -335,6 +343,7 @@ namespace app
       ImGui::Dummy(ImVec2(kPreviewSize, h));
    }
 
+
    void DrawPaletteParams(PaletteNode* n)
    {
       if (ImGui::Button("Choose reference...", ImVec2(kPreviewSize, 0)))
@@ -387,6 +396,7 @@ namespace app
       ImGui::TextDisabled("out is a gradient of the palette");
    }
 
+
    void DrawRampParams(RampNode* n)
    {
       DropdownButton("type", RampNode::TypeNames(), n->type, [n](int i) { n->type = i; });
@@ -412,6 +422,7 @@ namespace app
          ImGui::PopID();
       }
    }
+
 
    // Gradient-tool-style stop editor: drag a marker to reposition, click empty
    // track to add a stop (seeded with the color already showing there), right
@@ -584,6 +595,7 @@ namespace app
       ImGui::EndDisabled();
    }
 
+
    void DrawColorRampParams(ColorRampNode* n)
    {
       DrawColorRampEditor(n);
@@ -591,6 +603,7 @@ namespace app
                      [n](int i) { PushUndoCheckpoint(); n->interpMode = i; n->MarkDirty(); });
       ModSlider("mix", &n->mix, 0.0f, 1.0f);
    }
+
 
    void DrawImageAnalyzeParams(ImageAnalyzeNode* n)
    {
@@ -682,6 +695,7 @@ namespace app
 
       ImGui::EndGroup();
    }
+
 
    void DrawNullModulatorParams(NullModulatorNode* n)
    {

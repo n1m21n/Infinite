@@ -94,6 +94,7 @@ namespace app
       return changed;
    }
 
+
    float ApplyModulationCurve(float v, float curve)
    {
       v = std::clamp(v, 0.0f, 1.0f);
@@ -101,6 +102,7 @@ namespace app
          return v;
       return std::pow(v, std::exp2(curve * 3.0f));
    }
+
 
    bool DrawMiniCurveWidget(const char* strId, float* curve, float liveInput01 = -1.0f, float width = 50.0f)
    {
@@ -251,6 +253,7 @@ namespace app
       return changed;
    }
 
+
    void DrawSparklineMiniGraph(const char* strId, const SparklineHistory& hist, ImU32 lineCol, float width, float height)
    {
       const ImVec2 pos = ImGui::GetCursorScreenPos();
@@ -287,6 +290,7 @@ namespace app
       }
       ImGui::Dummy(ImVec2(width, height));
    }
+
 
    void DrawModMatrixTable()
    {
@@ -955,6 +959,7 @@ namespace app
          ImGui::EndPopup();
       }
    }
+
 
    // The panel's outer frame at every dock position - identical grip/border
    // structure to DrawViewportPanelDocked, just keyed off the matrix's own

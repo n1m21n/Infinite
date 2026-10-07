@@ -15,18 +15,25 @@ namespace app
       return v - std::floor(v);
    }
 
+
    // Throttling *how often* the recompute fires (below) caps it at ~12.5Hz.
    // kFilterCurveDragPoints drops the point count while a drag is live; it
    // dates from the settled-sine MagnitudeDb, when a full 160-point sweep
    // measured ~10-15ms at Q=18/48kHz - full kFilterCurveFullPoints
    // resolution always returns the instant the drag ends.
-   const double kFilterCurveThrottleSec = 0.08; // ~12.5 Hz cap on the full recompute while dragging
+   const double kFilterCurveThrottleSec = 0.08;
+ // ~12.5 Hz cap on the full recompute while dragging
    const int kFilterCurveDragPoints = 48;
 
+
    const float kFilterVizMinHz = 20.0f;
+
    const float kFilterVizMaxHz = 20000.0f;
+
    const float kFilterVizMinDb = -24.0f;
+
    const float kFilterVizMaxDb = 24.0f;
+
 
    float FilterVizFreqToX(float hz, float x0, float w)
    {
@@ -35,11 +42,13 @@ namespace app
       return x0 + std::clamp(t, 0.0f, 1.0f) * w;
    }
 
+
    float FilterVizXToFreq(float x, float x0, float w)
    {
       const float t = std::clamp((x - x0) / std::max(1.0f, w), 0.0f, 1.0f);
       return kFilterVizMinHz * powf(kFilterVizMaxHz / kFilterVizMinHz, t);
    }
+
 
    float FilterVizDbToY(float db, float y0, float h)
    {
@@ -47,11 +56,13 @@ namespace app
       return y0 + h - std::clamp(t, 0.0f, 1.0f) * h;
    }
 
+
    float FilterVizYToDb(float y, float y0, float h)
    {
       const float t = std::clamp((y0 + h - y) / h, 0.0f, 1.0f);
       return kFilterVizMinDb + t * (kFilterVizMaxDb - kFilterVizMinDb);
    }
+
 
    // Shared graticule for Audio Filter and EQ - decade-anchored frequency
    // ticks plus dB ticks, both labeled. The two callers were previously
@@ -104,17 +115,21 @@ namespace app
       }
    }
 
+
    // Spectrum level has its own dB scale, independent of the +-24 dB gain
    // axis the response curve uses - same relationship as Pro-Q, where the
    // analyzer trace and the response curve share an x-axis but not a y-axis.
    const float kAudioSpectrumFloorDb = -72.0f;
+
    const float kAudioSpectrumCeilDb = 0.0f;
+
 
    float AudioSpectrumDbToY(float db, float y0, float h)
    {
       const float t = (db - kAudioSpectrumFloorDb) / (kAudioSpectrumCeilDb - kAudioSpectrumFloorDb);
       return y0 + h - std::clamp(t, 0.0f, 1.0f) * h;
    }
+
 
    void UpdateAudioSpectrum(AudioEffectNode* n, AudioSpectrumState& st)
    {
@@ -158,6 +173,7 @@ namespace app
       }
    }
 
+
    void DrawAudioSpectrum(ImDrawList* dl, ImVec2 origin, float w, float h, double sampleRate, const AudioSpectrumState& st,
                        bool isLight)
    {
@@ -184,6 +200,7 @@ namespace app
       dl->PathStroke(lineCol, 0, 1.2f);
    }
 
+
    // Full-resolution response curve, exactly as the visualizer computes it -
    // the one definition both the cache and FILTERCURVECACHETEST use.
    void ComputeFilterCurve(std::vector<float>& out, int numPoints, int type, float freq, float q, float gain,
@@ -197,6 +214,7 @@ namespace app
          out[i] = AudioFilterDsp::MagnitudeDb(type, freq, q, gain, f, sampleRate);
       }
    }
+
 
    // Full-width log-frequency response curve with a draggable handle per
    // band - the reason Audio Filter is built first (§1.1): X = freq,
@@ -395,6 +413,7 @@ namespace app
       // between it and whatever's drawn next.
    }
 
+
    // Forward declaration: the shared sync/rate-mode cell pair Chorus/
    // Flanger/Phaser/Tremolo all use is defined further down (with the rest
    // of their shared helpers), but Audio Filter's own body is defined here,
@@ -405,6 +424,7 @@ namespace app
    // them.
    void AddRateModeCells(AudioKnobRow& row, AudioEffectNode* n, const char* syncLabel,
                          float rateLo, float rateHi);
+
 
    void DrawAudioFilterBody(GraphNode& gn, AudioEffectNode* n)
    {
@@ -471,6 +491,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // ---- per-band modulation addressing ---------------------------------
    // Only the selected band's controls are on screen, but a modulation
    // cable, an expression or a Shift-drag gesture recording belongs to the
@@ -488,7 +509,9 @@ namespace app
    // created EQ is selected to. Ordinals 3..14 were never issued by this
    // node before, so nothing else in an old patch can collide with them.
    inline int EqBandKnobParam(int band, int slot) { return band * 3 + slot; }
-   const int kEqBandKnobParamSpan = 15; // 5 bands x 3 knobs, reserved
+
+   const int kEqBandKnobParamSpan = 15;
+ // 5 bands x 3 knobs, reserved
 
    // Dropdowns get a per-band label instead, since that is what
    // DiscreteParamSlot hashes. Band 1's is aliased back to the bare "type"
@@ -497,6 +520,7 @@ namespace app
    static const char* const kEqTypeLabel[5] = { "band 1 type##eqType1", "band 2 type##eqType2",
                                                 "band 3 type##eqType3", "band 4 type##eqType4",
                                                 "band 5 type##eqType5" };
+
    // Param names for the modulation matrix and the binding menu. The knob
    // caps still read "freq"/"Q"/"gain" - a four-cell row has no space for
    // "band 3 freq", and the band is already named by the dropdown beside
@@ -508,12 +532,14 @@ namespace app
       { "band 3 freq", "band 3 Q", "band 3 gain" }, { "band 4 freq", "band 4 Q", "band 4 gain" },
       { "band 5 freq", "band 5 Q", "band 5 gain" } };
 
+
    struct EqBandValues
    {
       int type;
       float freq, q, gain;
       bool on;
    };
+
 
    void ReadEqBands(AudioEffectNode* n, EqBandValues bands[5])
    {
@@ -526,6 +552,7 @@ namespace app
          bands[b].on = n->Param(kEqOnParam[b]) >= 0.5f;
       }
    }
+
 
    void DrawEqVisualizer(AudioEffectNode* n, double sampleRate)
    {
@@ -807,6 +834,7 @@ namespace app
       // (w, h) layout space.
    }
 
+
    // One band's four cells - [type v][freq][Q][gain] - at that band's own
    // pin addresses (see kEqTypeLabel / EqBandKnobParam). Called once per band
    // per frame: the selected band draws, the other four run under
@@ -838,6 +866,7 @@ namespace app
       if (greyGain)
          ImGui::EndDisabled();
    }
+
 
    void DrawEqBody(GraphNode& gn, AudioEffectNode* n)
    {
@@ -933,6 +962,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // ---- Dynamics -----------------------------------------------------
    // Transfer curve (input dB -> output dB) with the live operating point
    // riding on it and a gain-reduction bar down the right edge - §1.2's
@@ -942,7 +972,9 @@ namespace app
    // system.md §3f); the dot and bar are the kernel's two published
    // ExtraMeterValue()s.
    const float kDynVizMinDb = -60.0f;
+
    const float kDynVizMaxDb = 6.0f;
+
 
    float DynVizXToDb(float x, float x0, float w)
    {
@@ -950,17 +982,20 @@ namespace app
       return kDynVizMinDb + t * (kDynVizMaxDb - kDynVizMinDb);
    }
 
+
    float DynVizDbToX(float db, float x0, float w)
    {
       const float t = (db - kDynVizMinDb) / (kDynVizMaxDb - kDynVizMinDb);
       return x0 + std::clamp(t, 0.0f, 1.0f) * w;
    }
 
+
    float DynVizDbToY(float db, float y0, float h)
    {
       const float t = (db - kDynVizMinDb) / (kDynVizMaxDb - kDynVizMinDb);
       return y0 + h - std::clamp(t, 0.0f, 1.0f) * h;
    }
+
 
    void DrawDynamicsVisualizer(AudioEffectNode* n, float threshold, float ratio, float makeupDb)
    {
@@ -1081,6 +1116,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawDynamicsBody(GraphNode& gn, AudioEffectNode* n)
    {
       const bool analog = n->Param("analog") != 0.0f;
@@ -1142,6 +1178,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // ---- Limiter ----------------------------------------------------------
    // A vertical gain-reduction meter, 0/-10/-20 dB scale, bar growing
    // downward from the 0 dB line by the live reduction amount - the shape
@@ -1186,6 +1223,7 @@ namespace app
       }
    }
 
+
    void DrawLimiterBody(GraphNode& gn, AudioEffectNode* n)
    {
       char stat[64];
@@ -1223,6 +1261,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    // ---- Delay ----------------------------------------------------------
    // Decaying tap bars on a time axis, synthesized from feedback (amplitude
@@ -1291,6 +1330,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+
 
    void DrawDelayBody(GraphNode& gn, AudioEffectNode* n)
    {
@@ -1380,6 +1420,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // ---- Reverb -----------------------------------------------------------
    // RT60 decay envelope on a time axis, with the predelay gap drawn before
    // the tail begins - a straight line from full amplitude at t=predelay
@@ -1452,6 +1493,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawReverbBody(GraphNode& gn, AudioEffectNode* n)
    {
       const bool analog = n->Param("analog") != 0.0f;
@@ -1506,6 +1548,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    // ---- Drive ------------------------------------------------------------
    // The transfer curve itself, input -1..+1 -> output -1..+1 - the node's
@@ -1568,6 +1611,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawDriveBody(GraphNode& gn, AudioEffectNode* n)
    {
       char stat[80];
@@ -1598,6 +1642,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    // ---- Wavetable Shaper ---------------------------------------------------
    // The transfer curve itself, input -1..+1 -> output -1..+1, exactly like
@@ -1699,6 +1744,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawWavetableShaperBody(GraphNode& gn, AudioEffectNode* n)
    {
       const float stereo = n->Param("stereo");
@@ -1745,6 +1791,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    // ---- Stereo -------------------------------------------------------------
    // A polar stereo-field imager matching the classic hardware-plugin
@@ -1842,6 +1889,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawStereoBody(GraphNode& gn, AudioEffectNode* n)
    {
       char stat[80];
@@ -1859,6 +1907,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    // ---- Pitch Shifter --------------------------------------------------
    // A simple bipolar meter (-24..+24 semitones) rather than a spectrogram -
@@ -1898,6 +1947,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+
 
    void DrawPitchShiftBody(GraphNode& gn, AudioEffectNode* n)
    {
@@ -1942,6 +1992,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // Shared rate control for Tremolo/Chorus/Flanger/Phaser - a rateDiv
    // dropdown when synced, a free-Hz knob when not - added as the next cell
    // of an already-open AudioKnobRow so it sits alongside the effect's other
@@ -1982,6 +2033,7 @@ namespace app
          row.Knob("rate", n->ParamPtr("rate"), rateLo, rateHi, "%.2f Hz", kKnobLarge);
       }
    }
+
 
    // Shared [rate-mode v][rate] pair for the four AudioEffects with a
    // tempo-sync toggle (Tremolo, Chorus, Flanger, Phaser) - the effect-side

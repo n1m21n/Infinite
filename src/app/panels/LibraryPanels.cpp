@@ -20,6 +20,7 @@ namespace app
       return names;
    }
 
+
    bool SampleEntryMatchesTypeFilter(const SampleScanner::Entry& e, int typeFilter)
    {
       switch (typeFilter)
@@ -33,6 +34,7 @@ namespace app
          default: return true; // 0 = All, and any out-of-range index
       }
    }
+
 
    // "All", "Video", "Image", then every individual extension from
    // MediaExtensions.h in the same order that header lists them - the
@@ -59,6 +61,7 @@ namespace app
       return names;
    }
 
+
    bool MediaEntryMatchesTypeFilter(const SampleScanner::Entry& e, int typeFilter)
    {
       const auto& video = MediaExtensions::Video();
@@ -77,6 +80,7 @@ namespace app
          return e.extension == image[imageIdx];
       return true; // out-of-range index
    }
+
 
    // Shared by Samples and Media - both draw from SampleScanner::Entry and
    // both modes' sort option list is the same four names (see
@@ -105,6 +109,7 @@ namespace app
          return a->fileNameLower < b->fileNameLower;
       return a->fileName < b->fileName; // stable tiebreak - see the comment above
    }
+
 
    // The actual filter+sort a scanner index goes through, factored out of
    // DrawLibrarySearchPanel's cache-rebuild block so INFINITE_BROWSERSORTTEST
@@ -138,6 +143,7 @@ namespace app
          std::reverse(filtered.begin(), filtered.end());
       return filtered;
    }
+
 
    // The Samples/Media modes of the docked node-browser panel (docs/plans/
    // audio/README.md P3e): folder list management, a background-thread scan
@@ -547,6 +553,7 @@ namespace app
       ImGui::PopID();
    }
 
+
    // Case-insensitive ASCII fold-and-compare - same fold SampleScanner's
    // ToLower uses, byte-wise rather than std::locale collation (see
    // CompareSampleEntries's comment; that decision applies here too).
@@ -562,6 +569,7 @@ namespace app
       return la != lb ? la < lb : a < b; // stable tiebreak on the raw string
    }
 
+
    // No "Favourites" entry - the sort dropdown beside this one already has
    // a Favourites option, and showing it in both was confusing.
    const std::vector<std::string>& PluginTypeFilterNames()
@@ -569,6 +577,7 @@ namespace app
       static const std::vector<std::string> names = { "All", "AU", "VST3" };
       return names;
    }
+
 
    bool PluginEntryMatchesTypeFilter(const PluginScanner::Entry& e, int typeFilter)
    {
@@ -579,6 +588,7 @@ namespace app
          default: return true; // 0 = All, and any out-of-range index
       }
    }
+
 
    // sortMode: 0 Name, 1 Format, 2 Manufacturer, 3 Favourites. Every branch falls through
    // to the name compare so ties within a format/manufacturer/favourites still read
@@ -598,6 +608,7 @@ namespace app
          return ILess(a->manufacturer, b->manufacturer);
       return ILess(a->name, b->name);
    }
+
 
    // Same reasoning as FilterAndSortSampleEntries above - factored out so
    // INFINITE_BROWSERSORTTEST exercises the real filter+sort path.
@@ -630,6 +641,7 @@ namespace app
          std::reverse(filtered.begin(), filtered.end());
       return filtered;
    }
+
 
    // The Plugins mode of the docked node-browser panel. Same shape as
    // DrawLibrarySearchPanel above, minus the folder machinery: Audio Unit
@@ -911,6 +923,7 @@ namespace app
       ImGui::PopID();
    }
 
+
    inline const std::vector<FieldSearchEntry>& GetAllFieldLibraryEntries()
    {
       static std::vector<FieldSearchEntry> sEntries;
@@ -938,6 +951,7 @@ namespace app
       }
       return sEntries;
    }
+
 
    void SpawnFieldPresetNode(const FieldSearchEntry& entry, float x, float y)
    {
@@ -972,6 +986,7 @@ namespace app
          gPatchDirty = true;
       }
    }
+
 
    void DrawFieldSearchPanel()
    {

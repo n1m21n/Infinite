@@ -76,6 +76,7 @@ namespace app
                      IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
    }
 
+
    // One node's card inside the viewport panel: a title row and the render.
    // Same drag-to-orbit / scroll-to-zoom as the inline mini-viewport - it
    // rotates this node's own gNodeCameras entry (SharedViewportCamera.h), the
@@ -101,6 +102,7 @@ namespace app
    {
       return dynamic_cast<ParticleSystemNode*>(n) == nullptr;
    }
+
 
    bool CanShowInViewportPanel(const GraphNode& gn)
    {
@@ -140,6 +142,7 @@ namespace app
       return true;
    }
 
+
    // The dock picker, shared by the panel's own header and the Menu dropdown
    // so the two can't drift apart.
    void ViewportPanelDockCombo()
@@ -154,6 +157,7 @@ namespace app
       }
    }
 
+
    // The title row's exact height: SmallButton is a text-height control (it
    // zeroes FramePadding.y), so this is what the row above the render costs.
    // Card and container both size against it, or the render overflows its
@@ -162,10 +166,12 @@ namespace app
    // it - without this the render started at the exact next-line cursor with
    // zero gap, so it visually touched the title row.
    constexpr float kViewportCardTitleGap = 6.0f;
+
    float ViewportPanelTitleHeight()
    {
       return ImGui::GetTextLineHeight() + ImGui::GetStyle().ItemSpacing.y + kViewportCardTitleGap;
    }
+
 
    void DrawViewportPanelCard(GraphNode& gn, const ImVec2& imageSize)
    {
@@ -366,6 +372,7 @@ namespace app
       }
    }
 
+
    // The dockable global viewport panel (see gViewportPanelNodes), opened via
    // a node's right-click menu -> "Open in viewport panel". Unlike the inline
    // per-node preview/mini-viewport above, this holds any number of nodes at
@@ -478,6 +485,7 @@ namespace app
       }
    }
 
+
    // The panel's outer frame at every dock position: a borderless child, and
    // no edge line of any kind. The panel's own opaque panelBg fill against the
    // canvas' windowBg is the whole separation - a hairline here (never mind a
@@ -580,6 +588,7 @@ namespace app
       // because its opaque panelBg fill differs from the canvas' windowBg;
       // the line added no information. Removed rather than re-tuned.
    }
+
 
    // The dock picker for the modulation matrix, shared by the panel's own
    // right-click menu and the Menu dropdown - see ViewportPanelDockCombo.

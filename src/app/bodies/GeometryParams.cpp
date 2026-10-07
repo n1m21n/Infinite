@@ -46,6 +46,7 @@ namespace app
       }
    }
 
+
    void DrawAudioAnalyzeParams(AudioAnalyzeNode* n)
    {
       const float colW = kParamWidth;
@@ -132,6 +133,7 @@ namespace app
       ImGui::EndGroup();
    }
 
+
    void DrawPathParams(PathNode* n)
    {
       if (n->IsFollowing())
@@ -173,6 +175,7 @@ namespace app
          ModSliderInt("ratio b", &n->lissajousB, 1, 9);
       }
    }
+
 
    // The row bank as an actual matrix rather than a column of "x1 .xx y1 .xx
    // z1 .xx" text lines: one bordered cell per (row, axis), value centred, a
@@ -254,6 +257,7 @@ namespace app
       ImGui::Dummy(ImVec2(gridW, 0.0f));
    }
 
+
    void DrawGeometryTableParams(GeometryTableNode* n)
    {
       if (n->HasSamples())
@@ -295,6 +299,7 @@ namespace app
       DrawGeometryTableGrid(n, gCurrentNodeIndex);
    }
 
+
    void DrawOceanParams(OceanNode* n)
    {
       NodeSeparator("surface");
@@ -310,6 +315,7 @@ namespace app
       ModSliderInt("octaves", &n->octaves, 1, 8);
       ModSlider("speed", &n->speed, -3.0f, 3.0f);
    }
+
 
    void DrawCurveParams(CurveNode* n)
    {
@@ -333,6 +339,7 @@ namespace app
       ModSlider("taper", &n->taper, 0.0f, 1.0f);
    }
 
+
    void DrawMetaBallParams(MetaBallNode* n)
    {
       ImGui::TextDisabled("%zu balls, %zu triangles", n->BallCount(), n->TriangleCount());
@@ -353,6 +360,7 @@ namespace app
       ModSliderInt("resolution", &n->resolution, 8, 96);
    }
 
+
    void DrawJoinGeometryParams(JoinGeometryNode* n)
    {
       ImGui::TextDisabled("%d inputs, %zu triangles", n->ConnectedCount(), n->TriangleCount());
@@ -362,6 +370,7 @@ namespace app
       // and shading now lives on the dedicated Material node.
       ModSliderInt("material from input", &n->materialFrom, 0, JoinGeometryNode::kSlots - 1);
    }
+
 
    void DrawSwitcher3DParams(Switcher3DNode* n)
    {
@@ -377,6 +386,7 @@ namespace app
          ImGui::TextDisabled("showing input %c", 'A' + n->ActiveSlot());
       }
    }
+
 
    void DrawWrapParams(WrapNode* n)
    {
@@ -407,6 +417,7 @@ namespace app
       ModCheckbox("flat shade", &n->flatShade);
       ModCheckbox("flip normals", &n->flipNormals);
    }
+
 
    void DrawClothParams(ClothNode* n)
    {
@@ -440,6 +451,7 @@ namespace app
          ModSlider("friction", &n->friction, 0.0f, 1.0f);
       }
    }
+
 
    void DrawParticleSystemParams(ParticleSystemNode* n)
    {
@@ -479,6 +491,7 @@ namespace app
       ColorSwatch("end colour", n->endColor, n);
       ModSlider("seed", &n->seed, 0.0f, 100.0f);
    }
+
 
    void DrawMaterialParams(MaterialNode* n)
    {
@@ -552,6 +565,7 @@ namespace app
       ImGui::EndGroup();
    }
 
+
    void DrawMappingParams(MappingNode* n)
    {
       ImGui::TextDisabled("%zu triangles", n->TriangleCount());
@@ -584,6 +598,7 @@ namespace app
          ModSlider("z", &n->scaleZ, 0.05f, 8.0f);
    }
 
+
    void DrawMeshResynthParams(MeshResynthNode* n)
    {
       ImGui::TextDisabled("generation %d, %zu triangles", n->Generation(), n->TriangleCount());
@@ -606,6 +621,7 @@ namespace app
          ModSlider(MeshResynthNode::OpNames()[i].c_str(), &n->weight[i], 0.0f, 1.0f);
    }
 
+
    void DrawImageToPointsParams(ImageToPointsNode* n)
    {
       ImGui::TextDisabled("%zu points", n->PointCount());
@@ -625,6 +641,7 @@ namespace app
       ModCheckbox("use image colour", &n->useImageColor);
       ColorSwatch("tint", n->tint, n);
    }
+
 
    void DrawDepthProjectionParams(DepthProjectionNode* n)
    {
@@ -680,6 +697,7 @@ namespace app
       ModSlider("roughness", &n->roughness, 0.0f, 1.0f);
    }
 
+
    void DrawMeshToPointsParams(MeshToPointsNode* n)
    {
       DropdownButton("sample", MeshToPointsNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
@@ -690,6 +708,7 @@ namespace app
       if (n->mode == 1)
          ModSlider("dissolve angle", &n->dissolveAngleDegrees, 0.0f, 30.0f);
    }
+
 
    void DrawDistributePointsOnFacesParams(DistributePointsOnFacesNode* n)
    {
@@ -703,11 +722,13 @@ namespace app
       ModSlider("seed", &n->seed, 0.0f, 100.0f);
    }
 
+
    void DrawPointsToVerticesParams(PointsToVerticesNode* n)
    {
       ImGui::TextDisabled("%zu vertices", n->VertexCount());
       ModCheckbox("alive only", &n->aliveOnly);
    }
+
 
    void DrawDistributePointsInGridParams(DistributePointsInGridNode* n)
    {
@@ -722,12 +743,14 @@ namespace app
       ColorSwatch("tint", n->tint, n);
    }
 
+
    void DrawMergeByDistanceParams(MergeByDistanceNode* n)
    {
       if (n->input != nullptr)
          ImGui::TextDisabled("%zu triangles", n->TriangleCount());
       ModSlider("threshold", &n->threshold, 0.0f, 0.5f, "%.4f");
    }
+
 
    void DrawText3DParams(Text3DNode* n)
    {
@@ -761,6 +784,7 @@ namespace app
       ModSlider("tracking", &n->letterSpacing, -0.1f, 0.5f);
    }
 
+
    void DrawModelParams(ModelSourceNode* n)
    {
       if (ImGui::Button("Open model...", ImVec2(kParamWidth, 0)))
@@ -789,6 +813,7 @@ namespace app
             n->Load(n->Path());
       }
    }
+
 
    void DrawGeometryParams(GeometryNode* n)
    {
@@ -861,6 +886,7 @@ namespace app
       }
    }
 
+
    // Which ops "only affects selected faces" is even meaningful for - group 1
    // (per-face independent) and kTwist (per-vertex) from
    // docs/plans/phase4-selection-as-input.md. Connectivity-dependent ops
@@ -887,6 +913,7 @@ namespace app
             return false;
       }
    }
+
 
    void DrawGeometryOpParams(GeometryOpNode* n)
    {
@@ -1096,6 +1123,7 @@ namespace app
       }
    }
 
+
    void DrawDisplacementParams(DisplacementNode* n)
    {
       if (n->input != nullptr)
@@ -1110,6 +1138,7 @@ namespace app
       ModCheckbox("flip normals", &n->flipNormals);
       ModCheckbox("selection only", &n->selectionOnly);
    }
+
 
    void DrawAudioDisplacementParams(AudioDisplacementNode* n)
    {
@@ -1153,6 +1182,7 @@ namespace app
       }
    }
 
+
    void DrawAudioTextureParams(AudioTextureNode* n)
    {
       DropdownButton("mode", AudioTextureNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
@@ -1170,6 +1200,7 @@ namespace app
       ModSlider("gain", &n->gain, 0.1f, 10.0f);
       ModSlider("smoothing", &n->smoothing, 0.0f, 0.99f);
    }
+
 
    void DrawAudioColorRampEditor(AudioColorRampNode* n)
    {
@@ -1303,6 +1334,7 @@ namespace app
       ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + barH + gap + readoutH + gap));
    }
 
+
    void DrawAudioColorRampParams(AudioColorRampNode* n)
    {
       DrawAudioColorRampEditor(n);
@@ -1339,6 +1371,7 @@ namespace app
       ModSlider("min glow", &n->minBrightness, 0.0f, 1.0f);
    }
 
+
    void DrawAudioRibbonParams(AudioRibbonNode* n)
    {
       ImGui::TextDisabled("%zu triangles", n->TriangleCount());
@@ -1370,6 +1403,7 @@ namespace app
       ModSlider("emission", &n->emission, 0.0f, 8.0f);
       ModSlider("ior", &n->ior, 1.0f, 3.0f);
    }
+
 
    void DrawSetColorParams(SetColorNode* n)
    {
@@ -1405,6 +1439,7 @@ namespace app
       }
    }
 
+
    void DrawInstanceParams(InstanceOnPointsNode* n)
    {
       if (n->pointSource != nullptr && n->instanceShape != nullptr)
@@ -1420,6 +1455,7 @@ namespace app
       ModCheckbox("align to normal", &n->alignToNormal);
       ModSlider("seed", &n->seed, 0.0f, 100.0f);
    }
+
 
    void DrawCameraParams(CameraNode* n)
    {
@@ -1441,6 +1477,7 @@ namespace app
       ModSlider("far", &n->farPlane, 5.0f, 500.0f);
    }
 
+
    void DrawLightParams(LightNode* n)
    {
       DropdownButton("type", LightNode::TypeNames(), n->type, [n](int i) { n->type = i; });
@@ -1457,6 +1494,7 @@ namespace app
       ModSlider("intensity", &n->intensity, 0.0f, 5.0f);
       ModSlider("orbit / beat", &n->orbitPerBeat, -1.0f, 1.0f);
    }
+
 
    // Fits the camera around everything patched into a Render node.
    //
@@ -1568,6 +1606,7 @@ namespace app
          n->camDistance = distance;
       }
    }
+
 
    void DrawRender3DParams(Render3DNode* n)
    {
@@ -1695,12 +1734,14 @@ namespace app
       ImGui::EndGroup();
    }
 
+
    void DrawBlendParams(BlendNode* n)
    {
       DropdownButton("mode", BlendNode::ModeNames(), n->ModeIndex(),
                      [n](int i) { n->ModeIndex() = i; });
       ModSlider("opacity", &n->Mix(), 0.0f, 1.0f);
    }
+
 
    void DrawLayerStackParams(LayerStackNode* n)
    {
@@ -1798,6 +1839,7 @@ namespace app
          }
       }
    }
+
 
    void DrawFilterParams(FilterNode* n)
    {

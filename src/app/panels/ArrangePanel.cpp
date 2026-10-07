@@ -4477,6 +4477,7 @@ namespace app
       }
    }
 
+
    void DrawArrangePanelDocked(const char* id, const ImVec2& size)
    {
       const float kGrip = 6.0f;

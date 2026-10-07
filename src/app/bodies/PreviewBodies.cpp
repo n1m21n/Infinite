@@ -45,6 +45,7 @@ namespace app
                   IM_COL32(90, 130, 190, 255), 4.0f, 0, 2.0f);
    }
 
+
    // A comment shows its note on the face of the node, not behind the params
    // (eye) toggle - the whole point of a note is to be readable without an
    inline float CommentFontSize(int sizeIdx, float baseFontSize)
@@ -57,6 +58,7 @@ namespace app
          case 3: return baseFontSize * 1.85f;  // Extra Large (~28px)
       }
    }
+
    float CommentFontScale(int sizeIdx)
    {
       switch (sizeIdx)
@@ -67,6 +69,7 @@ namespace app
          case 3: return 1.85f;
       }
    }
+
 
    // extra click, the same reasoning DrawNode's canvas is drawn directly
    // rather than collapsed.
@@ -216,12 +219,15 @@ namespace app
       }
    }
 
+
    void DrawCommentParams(CommentNode*)
    {
    }
 
+
    // Padding kept between a group's members and the edge of its box.
    const float kGroupPadding = 24.0f;
+
 
    // Which group, if any, currently owns a node. Membership is exclusive: a
    // node belongs to at most one group, which is what stops two groups from
@@ -237,6 +243,7 @@ namespace app
       return nullptr;
    }
 
+
    // The gNodes index a GroupNode* lives at, or -1 if it is not (or no longer)
    // in the graph. Used to translate group ownership into an index that
    // survives being carried around in a clipboard/duplicate item list.
@@ -251,6 +258,7 @@ namespace app
       }
       return -1;
    }
+
 
    // How far to shift a duplicated/pasted cluster so the copy reads as a
    // separate thing directly below the original, rather than sitting on
@@ -288,6 +296,7 @@ namespace app
       return ImVec2(0.0f, (bmax.y - bmin.y) + kMargin);
    }
 
+
    // Drops membership sets whose group no longer exists. Deleting a node goes
    // through RemoveNodeByIndex, which cleans up as it goes, but undo/redo
    // rebuilds gNodes wholesale without ever calling it - and a stale
@@ -305,6 +314,7 @@ namespace app
       for (auto it = gGroupMembers.begin(); it != gGroupMembers.end(); )
          it = (live.count(it->first) != 0) ? std::next(it) : gGroupMembers.erase(it);
    }
+
 
    // Fits a group's box to exactly its members' bounding box plus padding,
    // every frame, in both directions - so dragging a node towards the edge
@@ -393,6 +403,7 @@ namespace app
       n->width = size.x;
       n->height = size.y;
    }
+
 
    // Drawn as an ed::Group() rather than through the normal pin/param flow: a
    // group has no image in or out, and it needs the library's own notion of
@@ -496,6 +507,7 @@ namespace app
       n->height = std::max(60.0f, total.y - n->headerH);
    }
 
+
    void DrawDrawParams(DrawNode* n)
    {
       DropdownButton("brush", DrawNode::BrushNames(), n->brush, [n](int i) { n->brush = i; });
@@ -548,6 +560,7 @@ namespace app
       ModSlider("canvas h", &n->canvasHeight, 64.0f, 4096.0f, "%.0f");
    }
 
+
    // What a node *shows* - inline preview, mini viewport, viewport panel,
    // projector window. A bypassed node doesn't cook, so its own FBO/mesh is a
    // frozen last frame; showing that would claim the node is still in the
@@ -561,11 +574,13 @@ namespace app
       return (node != nullptr && node->bypassed) ? nullptr : node;
    }
 
+
    // Placeholder text for an empty preview: says *why* it's empty.
    const char* EmptyPreviewLabel(INode* node, const char* fallback)
    {
       return node->bypassed ? "bypassed" : fallback;
    }
+
 
    // Square, letterboxed preview so non-square sources still read 1:1.
    void DrawPreview(INode* node)
@@ -665,6 +680,7 @@ namespace app
          dl->AddRect(origin, ImVec2(origin.x + size, origin.y + size),
                      IM_COL32(120, 200, 255, 200), 4.0f, 0, 2.0f);
    }
+
 
    // Build step 15 follow-up (§5.3.1): inline min/max waveform preview for
    // an encapsulated FieldGraphNode's audio-domain terminal - the sibling of

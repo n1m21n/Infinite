@@ -54,6 +54,7 @@ namespace app
       }
    }
 
+
    void DrawAudioMeterVisualizer(AudioMeterNode* n, float x, float y, float w, float h)
    {
       using namespace AudioMeterScale;
@@ -203,6 +204,7 @@ namespace app
       }
    }
 
+
    void DrawAudioMeterBody(GraphNode& gn, AudioMeterNode* n)
    {
       using namespace AudioMeterScale;
@@ -234,6 +236,7 @@ namespace app
       EndAudioBody();
    }
 
+
    void DrawGainBody(GraphNode& gn, GainNode* n)
    {
       // One param, so §7's "a one-param node is visually smaller" holds. A
@@ -253,6 +256,7 @@ namespace app
       EndAudioBody();
    }
 
+
    void DrawBlendAudioBody(GraphNode& gn, BlendAudioNode* n)
    {
       char stat[48];
@@ -266,6 +270,7 @@ namespace app
       row.End();
       EndAudioBody();
    }
+
 
    // A sample player: load a file, record from the audio input pin, scrub/
    // audition by clicking the waveform, drag its two edge handles to trim
@@ -454,6 +459,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
 
    // Custom node body for the Slicer.
@@ -653,6 +659,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // Custom node body for PaulStretch
    void DrawPaulStretchBody(GraphNode& gn, PaulStretchNode* n)
    {
@@ -765,6 +772,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    // Decimated waveform + partial-spectrum strip for Molder, cached on the
    // node (rebuilt only when a new render/analysis lands - see
@@ -880,6 +888,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawMolderPartialBars(MolderNode* n, float h, float width)
    {
       const float w = width > 0.0f ? width : gAudioContentW;
@@ -917,6 +926,7 @@ namespace app
       ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(w, h));
    }
+
 
    void DrawMolderBody(GraphNode& gn, MolderNode* n)
    {
@@ -1032,6 +1042,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    // ----------------------------------------------------------- Grain Molder
    void DrawGrainMolderWaveform(GrainMolderNode* n, float h, float width)
@@ -1156,6 +1167,7 @@ namespace app
       ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(w, h));
    }
+
 
    void DrawGrainMolderBody(GraphNode& gn, GrainMolderNode* n)
    {
@@ -1320,6 +1332,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // Custom node body for Granular Synthesizer
    void DrawGranularBody(GraphNode& gn, GranularNode* n)
    {
@@ -1443,6 +1456,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // One lane's waveform view: a drag-&-drop/click-to-load target when
    // empty, or start/end range handles over the decimated waveform once a
    // sample is loaded - same overlap-ordering trick as DrawSamplerWaveform
@@ -1554,6 +1568,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    // One lane's card: waveform + clear/choke row + the five per-lane knobs.
    // Called once per lane inside each of the two BeginAudioColumn scopes in
    // DrawDrumSequencerBody, so gAudioBodyW/gAudioContentW already read as
@@ -1648,6 +1663,7 @@ namespace app
       ImGui::PopID();
    }
 
+
    // ---- groove picker (library in nodes/DrumPatterns.h) -------------------
    // All 141 grooves as one flat list with a parallel category column, so the
    // existing dropdown popup shows category headers and its filter box.
@@ -1692,11 +1708,13 @@ namespace app
          return -1;
       }
    };
+
    const DrumGrooveLists& DrumGrooves()
    {
       static const DrumGrooveLists lists;
       return lists;
    }
+
 
    // One undo step for the whole pick (pattern, rate, swing, steps, accents,
    // kit fill). Inside a dropdown pick the checkpoint is already taken and this
@@ -1710,6 +1728,7 @@ namespace app
       PushUndoCheckpoint();
       n->ApplyPattern(all[grooveIdx], std::clamp(part, 0, 2));
    }
+
 
    // Picker dropdown. Deliberately NOT AudioBareDropdown: that registers the
    // button as a modulatable enum param, and a cable on it would re-apply a
@@ -1732,6 +1751,7 @@ namespace app
       }
    }
 
+
    // Compact segmented pill: equal cells, 1px apart, frame-height tall (the same
    // height as every other strip button). Cell width fits the widest label with
    // the bundled font at the current UI scale, never below minW. Returns the
@@ -1743,6 +1763,7 @@ namespace app
          w = std::max(w, ImGui::CalcTextSize(labels[i]).x + ImGui::GetStyle().FramePadding.x * 2.0f + 4.0f);
       return std::ceil(w);
    }
+
 
    int DrumSegmentedPill(const char* id, const char* const* labels, int count, int selected, float cellW, int markCell = -1)
    {
@@ -1766,6 +1787,7 @@ namespace app
       }
       return clicked;
    }
+
 
    void DrawDrumSequencerBody(GraphNode& gn, DrumSequencerNode* n)
    {
@@ -2078,6 +2100,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // ---- Looper -----------------------------------------------------------
    // Status line: what the looper is doing right now and what a press will do.
    // Rate drift rule: at any playback rate other than exactly 1.0x the loop
@@ -2140,6 +2163,7 @@ namespace app
             snprintf(out + used, cap - used, " (paused off 1.00x)");
       }
    }
+
 
    // Loop waveform, drawn like the Sampler's (same 140 px box, same columns,
    // colours, playhead and border) with the Looper's extras: beat and bar ticks
@@ -2233,6 +2257,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawLooperBody(GraphNode& gn, LooperNode* n)
    {
       char stat[128];
@@ -2306,6 +2331,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // ---- MPC --------------------------------------------------------------
    // ---- MPC modulation addressing ------------------------------------------
    // Every pad's every param is a modulation destination with an address that is
@@ -2321,18 +2347,21 @@ namespace app
       static const std::vector<std::string> kModes = { "one shot", "gate", "loop" };
       return kModes;
    }
+
    std::string MpcModeLabel(int pad)
    {
       char buf[48];
       snprintf(buf, sizeof(buf), "pad %d mode##mpcmode%d", pad + 1, pad);
       return buf;
    }
+
    std::string MpcParamName(int pad, int k)
    {
       char buf[48];
       snprintf(buf, sizeof(buf), "pad %d %s", pad + 1, MpcNode::Info(k).name);
       return buf;
    }
+
    // Sync: Pattern A of the rhythmic-quantization-standard ("Synced"/"Free" then
    // the canonical division list), one pair per pad. Index 0 is Synced.
    const std::vector<std::string>& MpcSyncList()
@@ -2340,6 +2369,7 @@ namespace app
       static const std::vector<std::string> kSync = { "Synced", "Free" };
       return kSync;
    }
+
    std::string MpcDiscreteLabel(int pad, int which)
    {
       char buf[48];
@@ -2348,19 +2378,23 @@ namespace app
       snprintf(buf, sizeof(buf), which == kMpcSync ? "pad %d sync##mpcsync%d" : "pad %d rate##mpcdiv%d", pad + 1, pad);
       return buf;
    }
+
    int* MpcDiscreteValue(MpcNode* n, int pad, int which)
    {
       pad = MpcNode::Clamp(pad);
       return which == kMpcMode ? &n->padMode[pad] : (which == kMpcSync ? &n->padSync[pad] : &n->padDiv[pad]);
    }
+
    const std::vector<std::string>& MpcDiscreteList(int which)
    {
       return which == kMpcMode ? MpcModeList() : (which == kMpcSync ? MpcSyncList() : MusicTime::RateDivisionList());
    }
+
    int MpcDiscreteMax(int which)
    {
       return which == kMpcMode ? 2 : (which == kMpcSync ? 1 : (int)MusicTime::kNumRateDivisions - 1);
    }
+
    // Registers (never draws) one of `pad`'s dropdown params; applies a driven value.
    void RegisterMpcPadDiscrete(MpcNode* n, int pad, int which)
    {
@@ -2372,6 +2406,7 @@ namespace app
       if (h.driven)
          *value = std::clamp((int)lroundf(h.value), 0, hi);
    }
+
    // Registers (never draws) `pad`'s float params (the drawn pad's are the real widgets).
    void RegisterMpcPadFloats(MpcNode* n, int pad)
    {
@@ -2386,6 +2421,7 @@ namespace app
       }
       gParamRegisterOnly = saved;
    }
+
    // Register every pad's params in fixed order, whatever is selected:
    // DiscreteParamSlot probes on a hash collision in first-seen order, so the
    // order the dropdowns first register in must not depend on the selection. The
@@ -2402,6 +2438,7 @@ namespace app
          for (int p = 0; p < MpcNode::kPads; p++)
             RegisterMpcPadDiscrete(n, p, which);
    }
+
    // Pin ids currently bound on `pad` (floats then the dropdown slots).
    std::vector<int> MpcPadBoundPins(MpcNode* n, int pad, int nodeIndex)
    {
@@ -2418,6 +2455,7 @@ namespace app
       }
       return pins;
    }
+
 
    // Routes a dropped audio file to a pad: the pad under the drop, else the
    // selected-pad waveform's box (the selected pad), else the first empty pad,
@@ -2443,6 +2481,7 @@ namespace app
          pad = (next >= 0 && next != pad) ? next : -1;
       }
    }
+
 
    void DrawMpcBody(GraphNode& gn, MpcNode* n)
    {

@@ -11,6 +11,7 @@ namespace app
       gDiscreteParamCounter = kDiscreteParamBase;
    }
 
+
    // Node drawing is over: anything that draws afterwards (right/bottom-docked
    // panels, settings dialogs, the node browser) is not a node's param block.
    // Without this, gCurrentNodeIndex kept pointing at whichever node happened
@@ -23,6 +24,7 @@ namespace app
       gColorCounter = 0;
       gDiscreteParamCounter = kDiscreteParamBase;
    }
+
 
    // Help tooltips (what a control does, its shortcut) are opt-in in Settings. Diagnostics - errors,
    // rejection reasons, live value readouts - use ImGui::SetTooltip directly and always show.
@@ -41,6 +43,7 @@ namespace app
          ed::Resume();
    }
 
+
    // io.WantTextInput is computed at the end of the previous frame, so on the frame a text field takes
    // focus it is still false and hover-to-type would eat the first keystroke for a knob under the
    // pointer. This also reads the live ImGui state (an InputText or temp-input that already owns the
@@ -54,6 +57,7 @@ namespace app
          return true;
       return false;
    }
+
 
    // Opens the text field for a param, seeded either from its current numeric
    // value or (if it's already driven by an expression) from that expression
@@ -77,6 +81,7 @@ namespace app
       gTypedParamJustOpened = editKey;
       gTypedParamPendingInit.insert(editKey);
    }
+
 
    // Hovering a param (whether it's a plain slider or already showing an
    // expression) and pressing a digit/'-'/'.'/'=' jumps straight into typing
@@ -124,6 +129,7 @@ namespace app
          }
       }
    }
+
 
    // Keyboard param focus (Tab). Called once at the end of ModSlider/ModKnob
    // (ints reach them through float slots, with step 1): records the param in
@@ -173,6 +179,7 @@ namespace app
       return changed;
    }
 
+
    void SetAudioReadout(const char* label, const char* valueText)
    {
       if (gCurrentNodeIndex < 0)
@@ -184,6 +191,7 @@ namespace app
       snprintf(buf, sizeof(buf), "%s   %s", name != nullptr ? name : "", valueText);
       gAudioReadout[gCurrentNodeIndex] = buf;
    }
+
 
    // Adaptive format helper: scales display precision at small values so
    // tapered parameters do not display a static "0 ms" or dead string across the bottom sweep.
@@ -243,6 +251,7 @@ namespace app
       snprintf(outBuf, outSize, fmt, val);
    }
 
+
    // ---- horizontal audio slider -------------------------------------------
    // Label left, value right, both *inside* the track; a low-alpha fill from
    // the left edge to the current value instead of a grab handle. This is
@@ -260,14 +269,17 @@ namespace app
    // ("fine tune", "0 c") and any label drawn inside a widget (the MPC pads' number, mode
    // tag and file name) use it, so they cannot drift apart.
    float AudioLabelFontSize() { return ImGui::GetFontSize(); }
+
    void AudioLabelText(ImDrawList* dl, ImVec2 pos, ImU32 col, const char* text)
    {
       dl->AddText(ImGui::GetFont(), AudioLabelFontSize(), pos, col, text);
    }
+
    ImVec2 AudioLabelSize(const char* text)
    {
       return ImGui::GetFont()->CalcTextSizeA(AudioLabelFontSize(), FLT_MAX, 0.0f, text);
    }
+
 
    bool AudioSliderFloat(const char* label, float* value, float minV, float maxV, const char* fmt,
                          float width, ImU32 fillColor, bool readOnly,
@@ -399,6 +411,7 @@ namespace app
       return changed;
    }
 
+
    // Right-click on a modulated (read-only) param requests this: a polarity
    // toggle plus, in Bipolar mode, a depth slider - and Unbind, so there's
    // still a way to detach a cable without dragging it off or selecting the
@@ -419,6 +432,7 @@ namespace app
       }
    }
 
+
    // "mode##fitnode" -> "mode". The visible half of an ImGui label is what a
    // param is called in the matrix, the binding menu and the perf surface.
    std::string StripParamLabel(const char* label)
@@ -429,12 +443,14 @@ namespace app
          shown = shown.substr(0, hash);
       return shown;
    }
+
    const void* TakePendingSrcAddr(const void* fallback)
    {
       const void* a = gPendingSrcAddr != nullptr ? gPendingSrcAddr : fallback;
       gPendingSrcAddr = nullptr;
       return a;
    }
+
 
    // Keyboard focus for the discrete params (checkboxes, dropdowns): the same
    // Tab walk and ring as KbParamHook, called right after the widget is drawn
@@ -462,6 +478,7 @@ namespace app
       gKbNudge = 0;
       return step;
    }
+
 
    DiscreteParamHandle RegisterDiscreteParam(const char* label, float current, float maxV,
                                              bool isBool, const std::vector<std::string>* options,
@@ -516,6 +533,7 @@ namespace app
       return h;
    }
 
+
    // Same pin id scheme, colours and gParamPinScreenList entry as ModSlider's
    // pin - that list is what the performance matrix's "Assign Parameter" picker
    // hit-tests, so registering here is what makes a mode or a checkbox
@@ -565,6 +583,7 @@ namespace app
                                       ImVec2(p.x + width, p.y + box + 4.0f) });
       ImGui::SetCursorScreenPos(ImVec2(origin.x + box + 4.0f, origin.y));
    }
+
 
    void DropdownButton(const char* label, const std::vector<std::string>& options,
                        int current, std::function<void(int)> onSelect, float width,
@@ -646,6 +665,7 @@ namespace app
       ImGui::TextDisabled("%s", StripParamLabel(label).c_str());
    }
 
+
    void PushCheckboxStyle()
    {
       const bool isLight = IsThemeLight();
@@ -665,11 +685,13 @@ namespace app
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, isLight ? 1.0f : 0.0f);
    }
 
+
    void PopCheckboxStyle()
    {
       ImGui::PopStyleVar(2);
       ImGui::PopStyleColor(6);
    }
+
 
    // Same P10 budget as PushCheckboxStyle/PushDropdownStyle, applied to a
    // plain ImGui::SliderFloat/SliderInt track: the track fill is a recess
@@ -694,17 +716,20 @@ namespace app
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, isLight ? 1.0f : 0.0f);
    }
 
+
    void PopSliderStyle()
    {
       ImGui::PopStyleVar(2);
       ImGui::PopStyleColor(7);
    }
 
+
    uint64_t UidForIndex(int nodeIndex)
    {
       GraphNode* gn = FindNodeByIndex(nodeIndex);
       return gn != nullptr ? gn->uid : 0;
    }
+
 
    IPredictor* PredictorForParam(int nodeIndex, int paramIndex)
    {
@@ -714,6 +739,7 @@ namespace app
       GraphNode* gn = FindNodeByIndex(s.nodeIndex);
       return (gn != nullptr && gn->node != nullptr) ? dynamic_cast<IPredictor*>(gn->node.get()) : nullptr;
    }
+
 
    // Why a predictor (green) source may not be bound to this destination, or nullptr if it may.
    // Every user-facing bind path calls this; patch load / paste / undo cannot (the destination has
@@ -728,6 +754,7 @@ namespace app
       return nullptr;
    }
 
+
    // A predictor bound to a discrete param is inert: the apply loop never writes it.
    bool IsInertPredictorBinding(int dstNodeIndex, int dstParamIndex)
    {
@@ -735,6 +762,7 @@ namespace app
              PredictorBindRefusal(FindNodeByIndex(Modulation::Instance().ModulatorFor(dstNodeIndex, dstParamIndex).nodeIndex)->node.get(),
                                   dstNodeIndex, dstParamIndex) != nullptr;
    }
+
 
    // Anything from the Prediction category that drives a parameter reads as "predicted"
    // (green): Predictive LFO / Macro (IPredictor) and Predictive Modulator alike. Only the
@@ -745,11 +773,13 @@ namespace app
              (gn->category == "Prediction" || dynamic_cast<IPredictor*>(gn->node.get()) != nullptr);
    }
 
+
    bool IsPredictionBinding(int nodeIndex, int paramIndex)
    {
       const Modulation::Source s = Modulation::Instance().ModulatorFor(nodeIndex, paramIndex);
       return s.nodeIndex >= 0 && IsPredictionSourceNode(FindNodeByIndex(s.nodeIndex));
    }
+
 
    // Fader position (0..1) <-> parameter value, honouring the widget's own taper when it has one.
    float ParamToPos(const ParamRef& r, float v)
@@ -759,12 +789,14 @@ namespace app
       const float span = r.maxValue - r.minValue;
       return span != 0.0f ? std::clamp((v - r.minValue) / span, 0.0f, 1.0f) : 0.0f;
    }
+
    float PosToParam(const ParamRef& r, float pos)
    {
       if (r.posToValue != nullptr)
          return r.posToValue(pos, r.minValue, r.maxValue);
       return r.minValue + (r.maxValue - r.minValue) * pos;
    }
+
 
    PredictorGrabCtx BeginPredictorGrab(const ParamRef& ref)
    {
@@ -777,11 +809,13 @@ namespace app
       return c;
    }
 
+
    // Predictor destination widgets: clean view with no overlaid dots.
    void DrawPredictorDecor(const ParamRef& ref, float laneMin, float laneMax, float laneY)
    {
       (void)ref; (void)laneMin; (void)laneMax; (void)laneY;
    }
+
 
    // Call right after the widget's item is drawn (so the IsItem* queries refer to it).
    void EndPredictorGrab(const PredictorGrabCtx& c, const ParamRef& ref)

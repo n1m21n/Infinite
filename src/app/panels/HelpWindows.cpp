@@ -288,6 +288,7 @@ namespace app
       return it != kText.end() ? it->second : nullptr;
    }
 
+
    // Every filter-table effect - see core/FilterDefs.cpp for the actual shader
    // each of these names drives. Keyed by the raw (lowercase, spaceless-ish)
    // FilterDef::name, which is what GraphNode::typeName actually holds for these.
@@ -351,6 +352,7 @@ namespace app
       return it != kText.end() ? it->second : nullptr;
    }
 
+
    // The twenty 2D vector primitives spawned from ShapeNode::ShapeNames() (see
    // nodes/ShapeNode.cpp) - all one shader/class, told apart only by this text
    // since their on-node params are the shared fill/stroke/feather/background set.
@@ -381,6 +383,7 @@ namespace app
       auto it = kText.find(typeName);
       return it != kText.end() ? it->second : nullptr;
    }
+
 
    // The twenty-four 3D primitives spawned from GeometryNode::ShapeNames() (see
    // nodes/Geometry3DNodes.cpp) - one class/shader, told apart by this text since
@@ -417,6 +420,7 @@ namespace app
       return it != kText.end() ? it->second : nullptr;
    }
 
+
    const char* CategoryHelpText(const std::string& category)
    {
       if (category == "Source") return "A source node - generates or loads an image with no image input of its own.";
@@ -432,6 +436,7 @@ namespace app
       return "No additional notes for this node.";
    }
 
+
    const char* NodeHelpText(const GraphNode& gn)
    {
       if (const char* specific = SpecificNodeHelpText(gn.typeName))
@@ -445,7 +450,9 @@ namespace app
       return CategoryHelpText(gn.category);
    }
 
+
    void DrawSettingsWindow(bool* open);
+
 
    void DrawShortcutsWindow(bool* open)
    {
@@ -617,6 +624,7 @@ namespace app
       ImGui::End();
       PopElevatedPanelStyle();
    }
+
 
    void DrawHelpWindow(bool* open)
    {

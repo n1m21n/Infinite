@@ -72,6 +72,7 @@ namespace app
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
    }
 
+
    void BeginAudioColumns(int count)
    {
       gAudioColumn.bodyX = gAudioBodyX;
@@ -83,8 +84,10 @@ namespace app
       gAudioColumn.count = std::max(1, count);
    }
 
+
    // Gutter between columns, so two panels never share an edge.
    const float kAudioColumnGap = 12.0f;
+
 
    void BeginAudioColumn(int index)
    {
@@ -117,6 +120,7 @@ namespace app
       ImGui::BeginGroup();
    }
 
+
    void EndAudioColumn()
    {
       // Read the cursor before EndGroup: EndGroup emits the group's own
@@ -130,6 +134,7 @@ namespace app
       gAudioContentW = gAudioColumn.contentW;
    }
 
+
    // Reserves the tallest column's height in one go, so whatever follows the
    // column block starts below all of them.
    void EndAudioColumns()
@@ -138,11 +143,13 @@ namespace app
       ImGui::Dummy(ImVec2(gAudioColumn.contentW, gAudioColumn.maxBottom - gAudioColumn.top));
    }
 
+
    void EndAudioBody()
    {
       gAudioContentX = gAudioBodyX;
       gAudioContentW = gAudioBodyW;
    }
+
 
    // A labelled, inset sub-panel spanning the full body width - what v2's
    // NodeSeparator hairline was standing in for. Grouping is what turns a
@@ -181,6 +188,7 @@ namespace app
       gAudioContentW = gAudioBodyW - 2.0f * kAudioSectionPad;
    }
 
+
    void EndAudioSection()
    {
       ImGui::Unindent(kAudioSectionPad);
@@ -192,6 +200,7 @@ namespace app
       gAudioContentW = gAudioBodyW;
       ImGui::Dummy(ImVec2(0.0f, 3.0f));
    }
+
 
    // Field build step 18: the four Field*Params bodies (element/pixel/
    // sample/graph) aren't IsAudioBodyNode() participants - they're
@@ -215,6 +224,7 @@ namespace app
       gAudioBodyW = gAudioContentW = kPreviewSize;
    }
 
+
    // Per-line colour. Distinct hues rather than shades of the prediction green: the point of the
    // graph is telling the lines apart, and the node's category tint already says "prediction".
    ImU32 DriftLineColor(int i, int alpha)
@@ -233,6 +243,7 @@ namespace app
       return (c & 0x00FFFFFFu) | ((ImU32)std::clamp(alpha, 0, 255) << IM_COL32_A_SHIFT);
    }
 
+
    // "Filter 2 - cutoff", falling back to whatever is knowable. Short, because it is drawn at the
    // width of a node body next to a number.
    std::string DriftDestinationLabel(const ParamKey& key)
@@ -246,6 +257,7 @@ namespace app
          out += " - " + known->name;
       return out;
    }
+
 
    // Legend: one row per line, the destination it drives and that destination's own live value.
    // Deliberately no aggregate - no overall value, no min/max - because this node has no single
@@ -285,6 +297,7 @@ namespace app
          ImGui::TextDisabled("%s", value);
       }
    }
+
 
    // The node's main meter, in place of DrawModulatorMeter. Same box, same geometry, same 0..1
    // axis as every other modulator's preview - but N lines instead of one, because this node has
@@ -374,6 +387,7 @@ namespace app
       DrawDriftLegend(n);
    }
 
+
    void DrawDriftParams(GraphNode& gn, DriftNode* n)
    {
       ModSlider("speed", &n->speed, 0.1f, 4.0f, "%.2fx");
@@ -431,6 +445,7 @@ namespace app
       }
    }
 
+
    // Motion (Prediction) node body - Step 8 refinement round 3: no params, same as Drift. It
    // rides the strongest learned move across every knob it's coupled to and wanders on its own
    // via the same OU walk DriftNode uses; `gesture`/`amount`/the extra PCA-axis faders are all
@@ -450,6 +465,7 @@ namespace app
       ImGui::TextDisabled("%d coupled  |  Focus: %.0f%% energy", n->SlotCount(),
                           std::clamp(n->ExplainedVariance(0), 0.0f, 1.0f) * 100.0f);
    }
+
 
    // Predictive Modulator node body (Step 8 item 5): Learn/Stop + a progress meter, rank
    // dropdown, an honest read-only spectral-radius readout, and the constantIn fallback shown
@@ -514,16 +530,20 @@ namespace app
          ModSlider("constantIn", &n->constantIn, 0.0f, 1.0f, "%.2f");
    }
 
+
    template <typename NodeT>
    void DrawFieldParamKnobGrid(NodeT* n)
    {
       DrawFieldParamSliders(n);
    }
 
+
    // Full- and half-width audio sliders, sized from the content column so
    // two halves plus the gutter are exactly one full width.
    float AudioFullWidth() { return gAudioContentW; }
+
    float AudioHalfWidth() { return (gAudioContentW - ImGui::GetStyle().ItemSpacing.x) * 0.5f; }
+
 
    bool AudioSlider(const char* label, float* v, float lo, float hi, const char* fmt, float width,
                     FaderPosToValueFn posToValue, FaderValueToPosFn valueToPos,
@@ -533,10 +553,12 @@ namespace app
                        explicitParamIndex, nameOverride);
    }
 
+
    bool AudioSliderInt(const char* label, int* v, int lo, int hi, float width)
    {
       return ModSliderInt(label, v, lo, hi, width, /*audioStyle=*/true);
    }
+
 
    // A small pill toggle for boolean mods (loop/reverse/ping-pong) - not
    // ImGui::Checkbox, whose frame draws in the theme's FrameBg, and not a
@@ -576,6 +598,7 @@ namespace app
       return clicked;
    }
 
+
    bool AudioToggleButton(const char* label, bool* value, float width, float height)
    {
       return AudioToggleButtonEx(label, value, ImVec2(width, height),
@@ -584,6 +607,7 @@ namespace app
                                  IM_COL32(40, 95, 215, 255), IM_COL32(120, 144, 230, 255),
                                  IM_COL32(255, 255, 255, 255), IM_COL32(255, 255, 255, 255));
    }
+
    bool DrawGateButton(const char* id, float totalW, float height, const GatePainter& paint,
                        bool* activated)
    {
@@ -621,6 +645,7 @@ namespace app
          DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsMouseHoveringRect(mn, mx));
       return level;
    }
+
 
    // A Sampler-standard button that is also a CV-gate destination: same
    // ImGui::Button drawing, height and width rules as the Sampler's buttons, a
@@ -669,6 +694,7 @@ namespace app
       return h.driven ? (h.value >= 0.5f) : held;
    }
 
+
    bool AudioSoloButton(const char* label, bool* value, float width, float height)
    {
       return AudioToggleButtonEx(label, value, ImVec2(width, height),
@@ -678,6 +704,7 @@ namespace app
                                  IM_COL32(25, 25, 30, 255), IM_COL32(25, 25, 30, 255));
    }
 
+
    bool AudioMuteButton(const char* label, bool* value, float width, float height)
    {
       return AudioToggleButtonEx(label, value, ImVec2(width, height),
@@ -686,6 +713,7 @@ namespace app
                                  IM_COL32(175, 35, 35, 255), IM_COL32(140, 31, 31, 255),
                                  IM_COL32(255, 255, 255, 255), IM_COL32(255, 255, 255, 255));
    }
+
 
    bool AudioSmallButton(const char* label, float width, float height)
    {
@@ -701,6 +729,7 @@ namespace app
       ImGui::PopStyleVar();
       return clicked;
    }
+
 
    // ---- audio node body (docs/plans/audio/audio-node-ui-system.md) -------
    // Whether `node` should draw through DrawAudioNodeBody rather than the
@@ -765,10 +794,12 @@ namespace app
              dynamic_cast<INoteSource*>(node) != nullptr || node->NoteInputSlot(0) != nullptr ||
              dynamic_cast<VibratoNode*>(node) != nullptr || dynamic_cast<EnvelopeNode*>(node) != nullptr;
    }
+
    float MpcNodeWidth()
    {
       return 4.0f * (kMpcPinGutter + kMpcPadSide) + 3.0f * ImGui::GetStyle().ItemSpacing.x;
    }
+
 
    float AudioNodeWidth(INode* node)
    {

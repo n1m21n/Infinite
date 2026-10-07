@@ -77,6 +77,7 @@ namespace app
       PopCheckboxStyle();
       return changed;
    }
+
    // `audioStyle` swaps the widget in the middle of this function for
    // AudioSliderFloat above. Everything around it - the pin, the typed-edit
    // field, the expression/modulation branches, undo, hotkeys - is shared,
@@ -580,6 +581,7 @@ namespace app
       return changed;
    }
 
+
    bool ModSliderInt(const char* label, int* value, int minV, int maxV, float width,
                      bool audioStyle)
    {
@@ -606,6 +608,7 @@ namespace app
       return changed;
    }
 
+
    // ---- rotary knob (audio nodes' Tier 1 grid) ----------------------------
    // Raw draw+interaction primitive for a knob, built on InvisibleButton
    // rather than any ImGui slider. It still leaves the normal
@@ -631,6 +634,7 @@ namespace app
    // overhang). The interactive rect matches, for the same reason KnobFloat's
    // does: the cell's side margins belong to ModKnob's modulation pin.
    const float kFaderWidth = 22.0f;
+
 
    // Vertical fader with KnobFloat's exact contract - draws at the cursor,
    // reserves (cell, rowH), leaves IsItemHovered/IsItemActive queryable, fills
@@ -828,6 +832,7 @@ namespace app
       return changed;
    }
 
+
    bool KnobFloat(const char* label, float* value, float minV, float maxV, const char* fmt,
                   float diameter, ImU32 fillColor, bool readOnly, float cellW,
                   FaderPosToValueFn posToValue, FaderValueToPosFn valueToPos,
@@ -1022,6 +1027,7 @@ namespace app
       return changed;
    }
 
+
    bool BipolarKnobFloat(const char* label, float* value, float minV, float maxV, const char* fmt,
                          float diameter, ImU32 fillColor, bool readOnly, float cellW,
                          int gestureNodeIndex, int gestureParamIndex,
@@ -1214,6 +1220,7 @@ namespace app
       ImGui::ItemSize(ImVec2(cell, rowH));
       return changed;
    }
+
 
    // Knob counterpart of ModSlider - same pin/typing/expression/undo/hotkey
    // behaviour (copied verbatim), just a KnobFloat in place of each
@@ -1582,6 +1589,7 @@ namespace app
       return changed;
    }
 
+
    // Integer knob. Unlike ModSliderInt above, this one has to *accumulate*.
    //
    // A slider is absolute - the value is wherever the grab is, so re-deriving
@@ -1617,6 +1625,7 @@ namespace app
       gIntParamLastWritten[key] = *value;
       return changed;
    }
+
 
    // ---- palette-bindable colours ------------------------------------------
    // The colour counterpart of ModSlider. Every swatch in the app already goes
@@ -1705,6 +1714,7 @@ namespace app
       ImGui::PopID();
    }
 
+
    // A node with its params collapsed draws no param or colour pins, and a link
    // pointing at an undeclared pin is dead to the editor - so every cable feeding
    // a collapsed node used to vanish the moment the eye was closed, even though
@@ -1758,6 +1768,7 @@ namespace app
    }
 
 
+
    // ImGui's Separator / SeparatorText span the available content width, and
    // inside a node that width is unbounded - the rule shot off across the whole
    // canvas. Draw our own, clamped to the node's preview width.
@@ -1790,11 +1801,13 @@ namespace app
       ImGui::Dummy(ImVec2(0.0f, 2.0f));
    }
 
+
    const std::vector<std::string>& AlignOptions()
    {
       static const std::vector<std::string> kAlign = { "Left", "Center", "Right", "Justified" };
       return kAlign;
    }
+
 
    // Small eye toggle. Drawn rather than typed: the UI font has no eye glyph,
    // and an emoji would not render in a non-emoji face.
@@ -1838,6 +1851,7 @@ namespace app
       return pressed;
    }
 
+
    // Small monitor/screen toggle for a node's own mini 3D viewport. Deliberately
    // distinct from EyeToggle (params visibility) - this switches on a live
    // render pass, not just a UI panel, so it gets its own affordance rather
@@ -1869,6 +1883,7 @@ namespace app
 
       return pressed;
    }
+
 
    // Small toggle for Global Scale (snap to scale). Hand-drawn procedural vector glyph
    // rendering a high-precision beamed musical note (♫) symbol.
@@ -1942,6 +1957,7 @@ namespace app
       return pressed;
    }
 
+
    bool* GetNodeGlobalScaleFlag(INode* node)
    {
       if (node == nullptr) return nullptr;
@@ -1959,6 +1975,7 @@ namespace app
       if (auto* n = dynamic_cast<PredictiveNotesNode*>(node)) return &n->useGlobalScale;
       return nullptr;
    }
+
 
    // Small power / bypass toggle for a node. Hand-drawn procedural vector glyph
    // rendering an IEC 60417-5009 power symbol.
@@ -1999,6 +2016,7 @@ namespace app
 
       return pressed;
    }
+
 
    // ---- pins --------------------------------------------------------------
    // Drawn inside a kPinHit-wide box so the clickable area is far larger than

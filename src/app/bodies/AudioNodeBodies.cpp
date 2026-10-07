@@ -193,6 +193,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // Filename for a fresh recording that doesn't collide with anything
    // already in `dir`: Infinite-<patchname>-001.ext, -002, ... <patchname>
    // falls back to "Untitled" for an unsaved patch, same fallback the title
@@ -221,6 +222,7 @@ namespace app
       return fallback;
    }
 
+
    // Where the next recording lands: the folder last picked via Choose...,
    // or the user's Desktop when nothing has been picked yet.
    std::string RecordingDirFor(const AudioOutputNode* n)
@@ -229,6 +231,7 @@ namespace app
          return n->recordDirectory;
       return AppPaths::DesktopDir();
    }
+
 
    void DrawAudioOutBody(GraphNode& gn, AudioOutputNode* n)
    {
@@ -336,6 +339,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    void DrawAnalogBody(GraphNode& gn, AnalogNode* n)
    {
@@ -476,6 +480,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    // Dispatch for anything IsAudioBodyNode() accepts. Called from the
    // node-body loop's DrawPreview-replacement chain; audio nodes have no

@@ -14,6 +14,7 @@ namespace app
       return IM_COL32((int)(r * 255.0f), (int)(g * 255.0f), (int)(b * 255.0f), alpha);
    }
 
+
    // Diagonal hatch over a rect - the shared "this clip will not play" mark
    // for disabled and unassigned (offline) clips.
    void DrawArrangeHatch(ImDrawList* dl, ImVec2 a, ImVec2 b, ImU32 col, float spacing)
@@ -24,6 +25,7 @@ namespace app
          dl->AddLine(ImVec2(x, b.y), ImVec2(x + h, a.y), col, 1.0f);
       dl->PopClipRect();
    }
+
 
    // ---- time formatting (WP6) ----------------------------------------------
    // Positions are 1-indexed bar.beat.sixteenth ("5.1.1" is the downbeat of
@@ -39,6 +41,7 @@ namespace app
       beat = (long long)(inBar / Arrange::kPPQ);
       six = (long long)((inBar % Arrange::kPPQ) / (Arrange::kPPQ / 4));
    }
+
    std::string ArrangeFormatBBT(Arrange::Tick t)
    {
       long long bar, beat, six;
@@ -47,6 +50,7 @@ namespace app
       snprintf(buf, sizeof(buf), "%lld.%lld.%lld", bar + 1, beat + 1, six + 1);
       return buf;
    }
+
    std::string ArrangeFormatBBTLength(Arrange::Tick t)
    {
       long long bar, beat, six;
@@ -55,6 +59,7 @@ namespace app
       snprintf(buf, sizeof(buf), "%lld.%lld.%lld", bar, beat, six);
       return buf;
    }
+
    std::string ArrangeFormatSeconds(double sec, bool centis)
    {
       sec = std::max(0.0, sec);
@@ -69,15 +74,18 @@ namespace app
          snprintf(buf, sizeof(buf), "%d:%02d", mm, (int)std::floor(ss + 1e-6));
       return buf;
    }
+
    std::string ArrangeFormatTickSeconds(Arrange::Tick t)
    {
       return ArrangeFormatSeconds(Arrange::TicksToSeconds(t, std::max(1.0, (double)Transport::Instance().Tempo())));
    }
+
    // A position in the chosen unit (Settings::timeDisplay).
    std::string ArrangeFormatPos(Arrange::Tick t)
    {
       return gArrange.settings.timeDisplay == 1 ? ArrangeFormatTickSeconds(t) : ArrangeFormatBBT(t);
    }
+
    std::string ArrangeFormatLength(Arrange::Tick t)
    {
       if (gArrange.settings.timeDisplay == 1)
@@ -88,6 +96,7 @@ namespace app
       }
       return ArrangeFormatBBTLength(t);
    }
+
    // Parses a position typed in the chosen unit: Bars takes "5", "5.2" or
    // "5.2.3" (1-indexed); Time takes "M:SS(.cc)" or bare seconds. -1 when
    // it does not parse.
@@ -120,6 +129,7 @@ namespace app
    }
 
 
+
    // Parses a LENGTH typed in the chosen unit. Same shape as ArrangeParsePos
    // above but 0-indexed, matching ArrangeFormatBBTLength: a one-bar clip
    // reads and is typed as "1.0.0", where a clip starting at bar one reads
@@ -142,8 +152,11 @@ namespace app
                               (Arrange::Tick)six * (Arrange::kPPQ / 4);
       return std::clamp<Arrange::Tick>(t, 0, Arrange::kMaxTick);
    }
+
    void ArrangeMarkFieldHot() { gArrangeFieldHotFrame = ImGui::GetFrameCount(); }
+
    bool ArrangeFieldHot() { return (ImGui::GetFrameCount() - gArrangeFieldHotFrame) <= 1; }
+
 
    void ArrangeTypedEditOpen(ImGuiID id, const std::string& seed, bool selectAll)
    {
@@ -153,7 +166,9 @@ namespace app
       gArrangeTypedEdit.pendingInit = true;
       gArrangeTypedEdit.noAutoSelect = !selectAll;
    }
+
    void ArrangeTypedEditClose() { gArrangeTypedEdit = ArrangeTypedEditState(); }
+
 
    // Hover + a digit / '-' / '.' / ':' opens the editor seeded with that one
    // character. ':' is here for the Time display mode, where a position is
@@ -180,6 +195,7 @@ namespace app
       }
       return false;
    }
+
 
    // Draws the open editor in place of its value widget. Returns true on the
    // frame the user commits (Enter, or clicking away); `out` then holds the
@@ -245,6 +261,7 @@ namespace app
       }
       return false;
    }
+
 
    bool ArrangeSliderFloat(const char* label, float* v, float v_min, float v_max, const char* format, ImGuiSliderFlags flags)
    {
@@ -399,6 +416,7 @@ namespace app
       return value_changed;
    }
 
+
    bool ArrangeTickField(const char* label, Arrange::Tick cur, Arrange::Tick lo, Arrange::Tick hi,
                          ArrangeTickUnit unit, float width, Arrange::Tick* out)
    {
@@ -515,6 +533,7 @@ namespace app
       return *out != cur;
    }
 
+
    // A plain drag field with the same typing behaviour as the sliders beside
    // it. ImGui::DragFloat's own ctrl+click entry exists but opens on the old
    // text and does not hover-and-type, which is the inconsistency this whole
@@ -570,6 +589,7 @@ namespace app
       return dragged;
    }
 
+
    // ---- render-range and render-target helpers (WP7) ------------------------
 
    // The end of the arrangement as the *render* sees it: disabled clips and
@@ -589,6 +609,7 @@ namespace app
          }
       return end;
    }
+
 
    // "Match Clips": the first *renderable* video clip that actually reports a
    // size, else the patch's own Output node, else 1080p. A geometry clip has
@@ -633,6 +654,7 @@ namespace app
       outH = 1080;
    }
 
+
    // How many enabled, resolvable video clips a range actually covers. Decides
    // whether a timeline take writes a movie or a WAV, and is the whole of the
    // render dialog's source logic now that the Audio/Video source dropdowns
@@ -652,15 +674,18 @@ namespace app
       return n;
    }
 
+
    // The timeline Render dialog's sources. Audio is always the timeline - the
    // dialog renders the arrangement, and a canvas take is the Output node's
    // own record button. Video follows the range: a movie when there is
    // something to draw, a WAV when there is not.
    int ArrangeRenderEffectiveAudioSource() { return kArrangeAudioTimeline; }
+
    int ArrangeRenderEffectiveVideoSource(Arrange::Tick a, Arrange::Tick b)
    {
       return ArrangeRenderVideoClipsInRange(a, b) > 0 ? kArrangeVideoTimeline : kArrangeVideoNone;
    }
+
 
    // "name.mp4" -> "name (2).mp4", counting up past anything already on disk
    // or already queued (WP7 #8's Auto-rename).
@@ -682,6 +707,7 @@ namespace app
       }
       return false;
    }
+
 
    // The tick span a range kind resolves to against the model as it stands
    // right now. Extracted from the render popup so INFINITE_ARRANGERENDERTEST
@@ -721,6 +747,7 @@ namespace app
          outB = outA + Arrange::kPPQ;
    }
 
+
    // Frames a take of `durSec` writes at `fps`. ceil, not round or truncate:
    // a 2.4s range at 30fps is 72 frames, and dropping the partial one would
    // end the file short of the range the user asked for (WP7 #2). The clamp's
@@ -731,6 +758,7 @@ namespace app
       return std::clamp((int)std::ceil(durSec * (double)std::max(1, fps)), 1, 240 * 3600);
    }
 
+
    // Sample frames an audio-only take of `durSec` writes at `rate`. Round, not
    // ceil: unlike a video frame a sample is not a container for a slice of
    // time, so the nearest whole sample is the closest the file can get.
@@ -738,6 +766,7 @@ namespace app
    {
       return std::max<long long>(1, llround(durSec * rate));
    }
+
 
    // The sample rate an offline take will actually be written at. Every
    // AudioNode is PrepareToPlay'd at the rate the device negotiated, so the
@@ -756,6 +785,7 @@ namespace app
       return 48000.0;
    }
 
+
    int OfflineAudioBlockFrames()
    {
       if (gHeadlessJob.mode != Headless::Mode::None)
@@ -767,6 +797,7 @@ namespace app
          frames = 512;
       return std::clamp(frames, 1, kAudioMaxBlockFrames);
    }
+
 
    // Classifies a dropped file for Arrange media-drop import (audio sample,
    // video, or image). Video/image share their extension lists with the
@@ -784,6 +815,7 @@ namespace app
       if (HasExtension(path, MediaExtensions::Image())) { outKind = Arrange::ImportMediaKind::Image; return true; }
       return false;
    }
+
 
    // Drops `path` onto the Arrange timeline at (laneId, atTick): spawns the
    // matching source node, places a clip referencing it immediately in an
@@ -965,6 +997,7 @@ namespace app
       { if (detected) *detected = false; return fallbackBpm > 0.0f ? fallbackBpm : 120.0f; }
    }
 
+
    // Spawn the right node type for dropped media, place a clip in the lane,
    // and dispatch the decode job to the background import thread.
    void ArrangeImportMediaFile(const std::string& path, uint64_t laneId, Arrange::Tick atTick,
@@ -1054,6 +1087,7 @@ namespace app
       gPatchDirty = true;
    }
 
+
    // Gives a pasted/duplicated/split Sample clip its own private hidden node
    // and kicks a fresh async decode of the same source file, instead of
    // leaving it pointing at the original clip's node - see
@@ -1118,6 +1152,7 @@ namespace app
       gArrangePendingImports.push_back(pending);
    }
 
+
    // Hover detail for the shared-source warning. The warning itself is one
    // line by design - the explanation is real but nobody needs it on every
    // frame they have that clip selected, so it lives here, behind a hover,
@@ -1132,6 +1167,7 @@ namespace app
       ImGui::PopTextWrapPos();
       ImGui::EndTooltip();
    }
+
 
    // "Make Unique": gives this clip its own copy of its source node, so two
    // clips sharing one node stop fighting over the node's single playback
@@ -1240,6 +1276,7 @@ namespace app
       ArrangeCommitEdit();
       return true;
    }
+
 
    // Main thread, once per frame (called from DrawArrangePanelContent - the
    // Arrange panel is the only consumer of import results, same as
@@ -1366,6 +1403,7 @@ namespace app
       }
    }
 
+
    std::string ArrangeRenderUniquePath(const std::string& path)
    {
       const size_t dot = path.rfind('.');
@@ -1382,6 +1420,7 @@ namespace app
       }
       return path;
    }
+
 
    // Builds a render job scoped to a lane subset - shared by "Render Track"
    // (a single lane) and "Render Group" (a group's recursive lane subtree),
@@ -1433,6 +1472,7 @@ namespace app
       job.path = ArrangeRenderUniquePath(folder + "/" + safeName + ext);
       return job;
    }
+
 
    // Queues a lane-scoped job ahead of anything already parked - same
    // "Render Now" semantics as the main panel's button.

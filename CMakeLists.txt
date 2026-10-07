@@ -417,6 +417,18 @@ set(COMMON_SOURCES
     src/app/frame/FrameTests4.cpp
     src/app/frame/FrameTests5.cpp
     src/app/frame/FrameTests6.cpp
+    src/app/graph/AudioTopology.cpp
+    src/app/graph/Core.cpp
+    src/app/graph/Disconnect.cpp
+    src/app/graph/ExportImage.cpp
+    src/app/graph/GraphHosts.cpp
+    src/app/graph/NodeRegistry.cpp
+    src/app/graph/PatchFiles.cpp
+    src/app/graph/PatchIO.cpp
+    src/app/graph/PatchLoad.cpp
+    src/app/graph/Projector.cpp
+    src/app/graph/Rpc.cpp
+    src/app/graph/Wiring.cpp
     src/app/panels/ArrangePanel.cpp
     src/app/panels/ArrangeRender.cpp
     src/app/panels/ArrangeSupport1.cpp

@@ -138,6 +138,10 @@ ImU32 ScopeTextCol();
 
 extern bool gCheckerboardBackdrop;
 
+extern float gMetronomeVolume;
+
+extern bool gMetronomeAccent;
+
 void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, ImVec2 br, float rounding = 4.0f);
 
 void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, float size, float rounding = 4.0f);
@@ -145,6 +149,10 @@ void DrawCheckerboardBackdrop(ImDrawList* dl, ImVec2 origin, float size, float r
 bool TextFocusClaimed();
 
 bool ApplyViewHotkeys(float& azimuth, float& elevation, const std::function<void()>& onWillChange = nullptr);
+
+bool NodeSearchMatches(std::string hay, std::string q);
+
+std::string DisplayName(const std::string& name);
 
 bool IsUserSpawnable(const std::string& name);
 
@@ -159,6 +167,8 @@ void PushArrangeUndo();
 void PushArrangeUndoSnapshot(const Arrange::Model& before);
 
 GraphNode* FindNodeByIndex(int index);
+
+void RemapFieldGraphOwnership(const std::map<int, int>& remap);
 
 INode* FindHardwareDrivenNode();
 
@@ -179,13 +189,54 @@ extern std::vector<GraphNode> gNodes;
 
 int GetNodeInstanceIndexScan(const GraphNode& targetNode, int* outTotalCount);
 
+
+
+   // Cache behind GetNodeInstanceIndex: one entry per gNodes slot, holding the
+   // rank/total the scan above would return for that node. Kept exact, not
+   // just per-frame, because some callers run outside the canvas draw (the
+   // projector window title, the clip inspector, tooltips) right after a
+   // spawn/delete/load:
+   //  - Rebuilt when gNodes' storage or size moved, when InvalidateNodeByUid
+   //    fires (every erase/clear site, patch load, and once per frame from
+   //    the main loop), or when a lookup's own slot no longer matches.
+   //  - Every node whose title follows a live field (NodeTitleLiveField) is
+   //    re-checked on every lookup - a dropdown or modulation changing a
+   //    Geometry node's shape mid-frame renames it, which can change the
+   //    rank of every other node sharing either the old or the new title.
+   //    That check is a few loads per such node, not a NodeTitle() call.
+   // typeName is the only other title input and is written once, at spawn.
+   struct NodeTitleInstanceEntry
+   {
+      const INode* node = nullptr;
+      uint64_t uid = 0;
+      int index = 0;
+      const int* liveField = nullptr;
+      int liveValue = 0;
+      int rank = 0;
+      int total = 0;
+   };
+
+extern std::vector<NodeTitleInstanceEntry> gTitleInstance;
+
+extern std::vector<size_t> gTitleInstanceLive;
+
+extern bool gTitleInstanceDirty;
+
+extern const GraphNode* gTitleInstanceData;
+
+extern size_t gTitleInstanceSize;
+
 extern int gTitleInstanceRebuilds;
+
+void InvalidateNodeTitleInstances();
 
 int GetNodeInstanceIndex(const GraphNode& targetNode, int* outTotalCount = nullptr);
 
 std::string NodeTitleWithInstance(const GraphNode& gn);
 
 extern std::map<GroupNode*, std::set<int>> gGroupMembers;
+
+extern int gNextIndex;
 
 extern ed::EditorContext* gEditor;
 
@@ -292,6 +343,19 @@ extern int gMediaDragTestPhase;
 
 
 
+   // Drop-target picker for audio samples dropped on empty canvas (from OS or
+   // sample browser). Instead of auto-spawning one hardcoded node, prompts the
+   // user with a context menu of all sample-accepting nodes.
+   struct AudioDropPickerState
+   {
+      bool justOpened = false;
+      ImVec2 canvasPos{ 0.0f, 0.0f };
+      ImVec2 screenPos{ 0.0f, 0.0f };
+      std::vector<std::string> paths;
+   };
+
+
+
    struct LinkInfo
    {
       int id = 0;
@@ -299,9 +363,20 @@ extern int gMediaDragTestPhase;
       int dstPin = 0;
    };
 
+
+   inline const int kLinkIdBase = 4000000;
+
 extern std::vector<LinkInfo> gLinks;
 
+const LinkInfo* FindLink(int id);
+
 bool FieldOutputPinHasLiveCable(int nodeIndex, int outputIndex);
+
+bool CheckFieldLiveCableBridge(int nodeIndex, int slot, bool isOutput);
+
+void DisconnectLinkById(int id);
+
+void DisconnectFieldPinBridge(int nodeIndex, int slot, bool isOutput);
 
 extern bool gSnapToGrid;
 
@@ -410,6 +485,8 @@ extern std::set<int> gHeadlessDrawn;
 
 bool HeadlessJobActive();
 
+bool IsHeadlessProcess();
+
 
 
    // ---- Arrangement render jobs (WP7) --------------------------------------
@@ -507,6 +584,31 @@ void ArrangeRenderQueuePosition(int& outIndex, int& outTotal);
 
 bool ArrangeRenderBusy();
 
+
+
+   // ---- device-change / sleep-wake recovery state (PollAudioRecovery) ----
+   // docs/plans/optimization/prompts/02-device-change-and-wake-recovery.md.
+   // Bounds recovery to one attempt per kAudioRecoveryMinIntervalMs and no
+   // more than kAudioRecoveryMaxAttemptsPerWindow inside any
+   // kAudioRecoveryWindowMs rolling window, so a flapping device or a burst
+   // of notifications on wake can't spawn overlapping restarts or loop
+   // forever - see PollAudioRecovery's comment for how these are used.
+   inline constexpr double kAudioRecoveryMinIntervalMs = 500.0;
+
+
+   inline constexpr double kAudioRecoveryWindowMs = 10000.0;
+
+
+   inline constexpr int kAudioRecoveryMaxAttemptsPerWindow = 5;
+
+extern double gLastAudioRecoveryAttemptMs;
+
+extern double gAudioRecoveryWindowStartMs;
+
+extern int gAudioRecoveryAttemptsInWindow;
+
+void ResetAudioRecoveryState();
+
 extern double gLastFrameMs;
 
 extern int gTargetFps;
@@ -514,6 +616,8 @@ extern int gTargetFps;
 extern bool gVsync;
 
 extern bool gRequestFitView;
+
+extern int gRequestFitViewNodeIndex;
 
 extern bool gRequestUngroup;
 
@@ -527,6 +631,9 @@ extern int gKbNudge;
    struct KbParamEntry { int node; int param; };
 
 extern std::vector<KbParamEntry> gKbParams;
+
+ // params drawn this frame, in draw order (Tab order)
+   inline constexpr ImGuiID kKbTabOwner = 0x4B425441u;
 
 extern bool gKbZoomed;
 
@@ -957,6 +1064,8 @@ extern std::vector<ArrangePendingImport> gArrangePendingImports;
 
 extern ArrangePendingBrowserDrop gArrangePendingBrowserDrop;
 
+extern uint64_t gNextNodeUid;
+
 extern std::set<size_t> gPerfSelection;
 
 extern std::vector<Patch::PerfRecord> gPerfClipboard;
@@ -988,6 +1097,35 @@ extern ImVec2 gGraphScreenTL;
 extern ImVec2 gGraphScreenSize;
 
 extern bool gMinimapEnabled;
+
+
+
+   // Projector output: extra ordinary GLFW windows (sharing the main context)
+   // that each blit one node's texture live, for driving a projector or
+   // second screen at a show while the editor stays on the laptop panel. The
+   // user drags a window to whichever display and fullscreens it with the
+   // OS's own controls - we don't pick a monitor or go fullscreen ourselves.
+   // Opened/closed per-node via each node's right-click menu ("Open in new
+   // window" / "Close window"), not from any settings panel. Any number of
+   // nodes can have their own window open at once.
+   struct ProjectorWindow
+   {
+      GLFWwindow* window = nullptr;
+      int nodeIndex = -1; // GraphNode::index this window shows
+      bool fullscreen = false;
+      int monitorIndex = -1;   // display it was last placed on by us
+      int windowedX = 100, windowedY = 100, windowedW = 1280, windowedH = 720; // restore box
+   };
+
+extern std::vector<ProjectorWindow> gProjectorWindows;
+
+extern int gCanvasSwapInterval;
+
+extern int gAppliedCanvasSwapInterval;
+
+bool FrameClockActive();
+
+void ApplyCanvasSwapInterval();
 
 void SetCanvasSwapInterval(int interval);
 
@@ -1994,6 +2132,20 @@ IModulator* ModulatorForOutput(INode* node, int outputIndex);
 
 GraphNode* FindNodeByIndex(int index);
 
+extern std::unordered_map<uint64_t, GraphNode*> gNodeByUid;
+
+extern bool gNodeByUidDirty;
+
+extern const GraphNode* gNodeByUidData;
+
+extern size_t gNodeByUidSize;
+
+void InvalidateNodeByUid();
+
+void NoteNodeAppended();
+
+void NoteNodeUidChanged(uint64_t oldUid, GraphNode* gn);
+
 GraphNode* FindNodeByUid(uint64_t uid);
 
 void ArrangeCommitEdit();
@@ -2132,6 +2284,13 @@ ImageCable* CableFor(GraphNode& gn, int slot);
 
 
 
+   // Upper bound on how many geometry-input slots any single node exposes via
+   // GeometryInputSlot() - the widest today is Group3DNode at 8. Generic loops over
+   // "every geometry slot this node might have" stop here rather than walking off into unrelated pins.
+   inline const int kMaxGeometrySlots = 8;
+
+
+
    // Upper bound on how many audio/note-input slots any single node exposes.
    // The widest today is Mixer, at MixerNode::kMaxSlots (12).
    inline const int kMaxAudioSlots = 12;
@@ -2161,7 +2320,20 @@ void RemoveNodeByIndex(int index);
 
 void ArrangeRespawnCloneNode(uint64_t clipId);
 
+void ConnectGeometrySlot(GraphNode& dst, int slot, GraphNode& src, int srcOutput = 0);
+
+bool IsInputSlotCompatible(GraphNode* dstNode, int slot,
+                               bool srcIsModulator, IPaletteSource* srcPalette,
+                               IGeometrySource* srcGeometry, CameraNode* srcCamera,
+                               LightNode* srcLight,
+                               bool srcIsEnvironment, bool srcIsAudioNode, bool srcIsNoteSource,
+                               bool srcIsPredictor);
+
 void WireInputSlot(GraphNode& srcNode, GraphNode& dstNode, int slot, int srcOutputIndex = 0);
+
+bool WouldCreateAudioCycle(INode* src, INode* dst);
+
+bool WouldCreateNoteCycle(INode* src, INode* dst);
 
 bool ConnectNodes(int srcIndex, int srcOutputIndex, int dstIndex, int dstSlot, std::string& outError);
 
@@ -2267,6 +2439,9 @@ PatchSchema::Env MakeSchemaEnv(bool forRender);
 void CaptureClusterLinks(const std::set<int>& indices, ClusterClipboard& out);
 
 void ApplyClusterLinks(const std::map<int, GraphNode*>& newByOrig, const ClusterClipboard& clip);
+
+std::vector<std::pair<std::string, std::string>> RecommendedNodeTypesForOutput(GraphNode* srcNode,
+                                                                                    int srcOutputIndex = 0);
 
 ImVec2 FindFreeSpawnPosition(const ImVec2& center);
 
@@ -3765,6 +3940,8 @@ std::vector<uint8_t> EncodePng16(int w, int h, const uint16_t* rgba, int level);
       bool mStop = false;
    };
 
+void ExportPng(OutputNode* out, const std::string& path);
+
 void DrawPaintablePreview(DrawNode* node);
 
 float CommentFontScale(int sizeIdx);
@@ -3828,9 +4005,13 @@ extern std::map<int, SharedViewportCamera> gNodeCameras;
 
 extern std::vector<RetiredNode> gRetiredNodes;
 
+extern std::vector<std::map<int, NodeViewport>::node_type> gRetiredViewports;
+
 void DrawMiniViewport(GraphNode& gn, IGeometrySource* geo);
 
 extern std::map<int, NodeViewport> gPanelViewports;
+
+extern std::map<int, NodeViewport> gProjectorViewports;
 
 bool HasUsefulMiniViewport(INode* n);
 
@@ -4293,6 +4474,8 @@ void DrawPerfPanelDocked(const char* id, const ImVec2& size);
 
 void DrawModulatorMeter(IModulator* mod, int nodeIndex);
 
+void DisconnectLinkById(int id);
+
 const char* NodeHelpText(const GraphNode& gn);
 
 void DrawSettingsWindow(bool* open);
@@ -4301,15 +4484,116 @@ void DrawShortcutsWindow(bool* open);
 
 void DrawHelpWindow(bool* open);
 
+void DisconnectAllTo(INode* dying);
+
 AudioNode* AudioNodeOfAny(INode* node);
+
+int AudioBufferIndexOf(INode* node, int pinOutputSlot, const std::unordered_map<AudioNode*, int>& bufferIndexOf);
 
 INode* ResolvedAudioSource(INode* source, bool* didHop = nullptr);
 
 extern bool gDeferAudioRebuild;
 
+
+
+   // Timing for the undo/delete performance work in
+   // docs/plans/undo-delete-perf-prompt.md - off unless INFINITE_PERFTIMING
+   // is set, matching every other getenv("INFINITE_...") harness in this
+   // file. Declared here (this function's own definition is the earliest of
+   // the three it instruments) so it's visible everywhere it's used below.
+   // Checked once per construction rather than cached, so toggling the env
+   // var takes effect on the next call without a restart.
+   struct ScopedPerfTimer
+   {
+      const char* label;
+      std::chrono::steady_clock::time_point start;
+      bool enabled;
+      explicit ScopedPerfTimer(const char* l)
+         : label(l), enabled(getenv("INFINITE_PERFTIMING") != nullptr)
+      {
+         if (enabled)
+            start = std::chrono::steady_clock::now();
+      }
+      ~ScopedPerfTimer()
+      {
+         if (enabled)
+         {
+            double ms = std::chrono::duration<double, std::milli>(
+               std::chrono::steady_clock::now() - start).count();
+            fprintf(stderr, "[perf] %s: %.3f ms\n", label, ms);
+         }
+      }
+   };
+
+
+
+   // tailStage: also add this stage's time to the current frame's slow-frame
+   // record (Bench::Tail(), B3/B8 only) even when `sink` isn't sampling.
+   struct ConditionalStageTimer
+   {
+      Bench::PercentileRing* mSink;
+      int mTailStage;
+      double mStart;
+      bool mStopped = false;
+      explicit ConditionalStageTimer(Bench::PercentileRing* sink, int tailStage = -1)
+         : mSink(sink), mTailStage(Bench::Tail().active ? tailStage : -1),
+           mStart((sink || mTailStage >= 0) ? Bench::ScopedStageTimer::NowMs() : 0.0)
+      {
+      }
+      void Stop()
+      {
+         if ((mSink || mTailStage >= 0) && !mStopped)
+         {
+            const double ms = Bench::ScopedStageTimer::NowMs() - mStart;
+            if (mSink)
+               mSink->Push(ms);
+            if (mTailStage >= 0)
+               Bench::Tail().AddStage(mTailStage, ms);
+            mStopped = true;
+         }
+      }
+      ~ConditionalStageTimer()
+      {
+         Stop();
+      }
+   };
+
+
+
+   // ---- timeline terminal PDC (overhaul WP3) -----------------------------
+   //
+   // A timeline clip terminal has no AudioCaptureRing to hang its delay-
+   // compensation state on, and a value living in the disposable terminal
+   // vector is rebuilt from zero every generation - which clicked on every
+   // rebuild, and rebuilds used to happen at every clip boundary. So the
+   // state lives here instead, keyed by the same (laneId, srcUid, srcOutput)
+   // that identifies the terminal, and survives any number of rebuilds.
+   //
+   // unique_ptr, not a value: the audio thread holds a raw pointer to the
+   // CompensationDelay for the life of a generation, so it must not move when
+   // the map rehashes. Entries are dropped only once CompletedGeneration()
+   // confirms the audio thread has finished with the last topology that
+   // referenced them - the same rule gRetiredNodes uses.
+   struct ArrangeTerminalComp
+   {
+      std::unique_ptr<CompensationDelay> delay;
+      uint64_t lastUsedGeneration = 0;
+      bool usedThisRebuild = false;
+   };
+
+extern std::unordered_map<uint64_t, ArrangeTerminalComp> gArrangeTerminalComp;
+
+extern uint64_t gArrangeAudioBuiltRevision;
+
+extern bool gArrangeAudioBuiltRouting;
+
 extern std::set<uint64_t> gArrangeRetriggerConflictClipIds;
 
 extern unsigned long long gAudioTopologyRebuildCount;
+
+extern std::set<uint64_t> gArrangeVideoSourceConflictClipIds;
+
+extern uint64_t gArrangeVideoConflictBuiltRevision;
 
 const std::set<uint64_t>& ArrangeVideoSourceConflictClips();
 
@@ -4325,6 +4609,8 @@ void RebuildAudioTopology();
 bool ArrangeAudioRebuildIfStale();
 
 bool StartAudioEngine(std::string& outError);
+
+void PollAudioRecovery();
 
 INode* FindHardwareDrivenNode();
 
@@ -4574,6 +4860,216 @@ void RemoveNodeByIndex(int index);
       }
    };
 
+
+
+   // Build step 15 ("Instrument Mode"): identical to MainGraphHost in every
+   // respect except Mount flags the spawned node hiddenFromCanvas and adds
+   // it to the owning FieldGraphNode's mMountedIndices, Unmount removes it
+   // from that set, and Place() is a deliberate no-op (an encapsulated
+   // child's canvas position is meaningless - see doc §3.3). Deliberately
+   // NOT refactored to share a base with MainGraphHost (doc trap 4) - step
+   // 16 needs its own third variant, and unifying three not-yet-fully-
+   // understood shapes now would fossilize the wrong abstraction.
+   struct VirtualGraphHost final : public Field::IFieldGraphHost
+   {
+      FieldGraphNode* owner = nullptr;
+      int mDroppedModCount = 0;
+      int mDetachedCableCount = 0;
+      int DroppedModCount() const override { return mDroppedModCount; }
+      int DetachedCableCount() const override { return mDetachedCableCount; }
+
+      int Mount(const std::string& typeName) override
+      {
+         if (!Spawnable(typeName))
+            return -1;
+         std::string category;
+         for (const auto& cat : NodeFactory::Instance().GetCategories())
+         {
+            const auto& names = NodeFactory::Instance().GetNodesInCategory(cat);
+            if (std::find(names.begin(), names.end(), typeName) != names.end())
+            {
+               category = cat;
+               break;
+            }
+         }
+         GraphNode* gn = SpawnNode(typeName, category, 0.0f, 0.0f);
+         if (gn == nullptr)
+            return -1;
+         gn->hiddenFromCanvas = true;
+         return gn->index;
+      }
+
+      void Unmount(int id) override
+      {
+         for (const auto& entry : Modulation::Instance().Links())
+            if (entry.first.first == id) mDroppedModCount++;
+
+         GraphNode* unmounting = FindNodeByIndex(id);
+         if (unmounting && unmounting->node)
+         {
+            INode* targetSrc = unmounting->node.get();
+            for (GraphNode& gn : gNodes)
+            {
+               if (gn.index == id) continue;
+               int inputs = InputCountFor(gn);
+               for (int slot = 0; slot < inputs; slot++)
+               {
+                  ImageCable* cable = CableFor(gn, slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     mDetachedCableCount++;
+               }
+               for (int slot = 0; slot < kMaxAudioSlots; slot++)
+               {
+                  AudioCable* cable = gn.node->AudioInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     mDetachedCableCount++;
+               }
+               for (int slot = 0; slot < kMaxNoteSlots; slot++)
+               {
+                  NoteCable* cable = gn.node->NoteInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     mDetachedCableCount++;
+               }
+            }
+         }
+         RemoveNodeByIndex(id);
+      }
+
+      int Remount(int existing, const std::string& typeName) override
+      {
+         // Same rescue steps as MainGraphHost::Remount (group membership,
+         // modulation/cluster links, outbound cable rescue) - copied rather
+         // than shared, see this struct's header comment.
+         GroupNode* ownerGroup = nullptr;
+         for (auto& entry : gGroupMembers)
+         {
+            if (entry.second.count(existing))
+            {
+               ownerGroup = entry.first;
+               break;
+            }
+         }
+
+         std::set<int> dying = { existing };
+         ClusterClipboard rescued;
+         CaptureClusterLinks(dying, rescued);
+
+         struct OutboundLink {
+            int srcSlot;
+            int dstIndex;
+            int dstSlot;
+         };
+         std::vector<OutboundLink> rescuedOutbound;
+         GraphNode* dyingGn = FindNodeByIndex(existing);
+         if (dyingGn && dyingGn->node)
+         {
+            INode* targetSrc = dyingGn->node.get();
+            for (GraphNode& gn : gNodes)
+            {
+               if (gn.index == existing) continue;
+               int inputs = InputCountFor(gn);
+               for (int slot = 0; slot < inputs; slot++)
+               {
+                  ImageCable* cable = CableFor(gn, slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     rescuedOutbound.push_back({ 0, gn.index, slot });
+               }
+               for (int slot = 0; slot < kMaxAudioSlots; slot++)
+               {
+                  AudioCable* cable = gn.node->AudioInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     rescuedOutbound.push_back({ cable->GetOutputSlot(), gn.index, slot });
+               }
+               for (int slot = 0; slot < kMaxNoteSlots; slot++)
+               {
+                  NoteCable* cable = gn.node->NoteInputSlot(slot);
+                  if (cable && cable->IsConnected() && cable->GetSource() == targetSrc)
+                     rescuedOutbound.push_back({ 0, gn.index, slot });
+               }
+            }
+         }
+
+         Unmount(existing);
+         int fresh = Mount(typeName);
+         if (fresh >= 0)
+         {
+            if (ownerGroup)
+               gGroupMembers[ownerGroup].insert(fresh);
+
+            GraphNode* freshGn = FindNodeByIndex(fresh);
+            if (freshGn)
+            {
+               std::map<int, GraphNode*> newByOrig;
+               newByOrig[existing] = freshGn;
+               ApplyClusterLinks(newByOrig, rescued);
+            }
+
+            for (const auto& ob : rescuedOutbound)
+            {
+               std::string connErr;
+               ConnectNodes(fresh, ob.srcSlot, ob.dstIndex, ob.dstSlot, connErr);
+            }
+         }
+         return fresh;
+      }
+
+      void SetParam(int id, const std::string& paramName, float value) override
+      {
+         GraphNode* gn = FindNodeByIndex(id);
+         if (gn == nullptr)
+            return;
+
+         struct SetFloatVisitor : public ParamVisitor
+         {
+            const std::string& targetName;
+            float targetValue;
+            explicit SetFloatVisitor(const std::string& name, float v) : targetName(name), targetValue(v) {}
+            void Float(const char* name, float& v) override { if (targetName == name) v = targetValue; }
+            void Int(const char* name, int& v) override { if (targetName == name) v = (int)std::lround((double)targetValue); }
+            void Bool(const char* name, bool& v) override { if (targetName == name) v = targetValue != 0.0f; }
+            void Text(const char*, std::string&) override {}
+            void Color(const char*, float[3]) override {}
+         } visitor(paramName, value);
+         gn->node->VisitParams(visitor);
+      }
+
+      void Connect(int srcId, int srcSlot, int dstId, int dstSlot) override
+      {
+         std::string err;
+         ConnectNodes(srcId, srcSlot, dstId, dstSlot, err);
+      }
+
+      // Deliberately a no-op, not an error - an encapsulated child's
+      // position is meaningless (nothing ever draws it at (x,y)) but
+      // place() is still syntactically valid to call, e.g. code shared
+      // between a still-encapsulated and an already-unpacked (step 16)
+      // instance. See doc §3.3.
+      void Place(int /*id*/, float /*x*/, float /*y*/) override {}
+
+      bool Alive(int id) const override { return FindNodeByIndex(id) != nullptr; }
+
+      std::string TypeNameOf(int id) const override
+      {
+         GraphNode* gn = FindNodeByIndex(id);
+         return gn != nullptr ? gn->typeName : std::string();
+      }
+
+      bool Spawnable(const std::string& typeName) const override
+      {
+         if (typeName == "Field Graph" || !IsUserSpawnable(typeName))
+            return false;
+         for (const auto& cat : NodeFactory::Instance().GetCategories())
+         {
+            const auto& names = NodeFactory::Instance().GetNodesInCategory(cat);
+            if (std::find(names.begin(), names.end(), typeName) != names.end())
+               return true;
+         }
+         return false;
+      }
+   };
+
+bool IsKernelDrivenParam(int nodeIndex, int paramIndex);
+
 bool CanBindModulation(int dstNodeIndex, int paramIndex);
 
 extern std::string gPatchPath;
@@ -4587,6 +5083,10 @@ extern bool gAutosaveEnabled;
 extern int gAutosaveSeconds;
 
 extern bool gAutosaveFailed;
+
+extern bool gAutosaveFailureLogged;
+
+extern double gLastAutosaveTime;
 
 extern bool gShowAutosaveRecoveryModal;
 
@@ -4602,17 +5102,31 @@ std::string AutosavePath();
 
 std::string AutosaveMarkerPath();
 
+void LoadGeneralSettings();
+
 void SaveGeneralSettings();
+
+void LoadWorkspaceSettings();
 
 void SaveWorkspaceSettings();
 
+void LoadAudioSettings();
+
 void SaveAudioSettings();
+
+void LoadDefaultExprGlobals();
 
 void SaveDefaultExprGlobals();
 
+void DiscardAutosave();
+
 bool WriteAutosaveNow();
 
+void PollAutosave();
+
 void CheckAutosaveRecovery();
+
+void NotePatchFileStamp(const std::string& path);
 
 bool SavePatchTo(const std::string& path);
 
@@ -4652,9 +5166,21 @@ extern std::deque<UndoEntry> gUndoStack;
 
 extern std::deque<UndoEntry> gRedoStack;
 
+
+   inline const size_t kMaxUndoDepth = 200;
+
 double GesturePlaybackClock();
 
+double GestureClockNow();
+
 void GestureSyncClockAxis();
+
+GestureRecorder::PlaybackMap RemapGestures(const GestureRecorder::PlaybackMap& gestures,
+                                              const std::map<int, int>& remap);
+
+void SeedDefaultArrangeStreams();
+
+void ClearPatchWatch();
 
 void NewPatch();
 
@@ -4687,13 +5213,43 @@ void ApplyPatchData(const Patch::Data& data, std::map<int, int>* outRemap = null
 
 extern PendingAutoLayout gPendingAutoLayout;
 
+void RunAutoLayoutTick();
+
+bool LoadPatchDataImpl(Patch::Data& data, const std::string& path, bool reload);
+
 bool LoadPatchFromImpl(const std::string& path, bool reload);
+
+
+
+   // R501: `mod`/`expr` lines that name a control by key cannot be resolved while loading, because the
+   // window app has not drawn a node of that type yet. They wait here (saved-file indices, plus the
+   // file->live node map) until the nodes have drawn, then PollPendingKeyed resolves and applies them.
+   struct PendingKeyed
+   {
+      std::vector<Patch::ModRecord> mods;
+      std::vector<Patch::ExprRecord> exprs;
+      std::map<int, int> remap;
+      int waited = 0;
+      bool active = false;
+   };
+
+extern PendingKeyed gPendingKeyed;
+
+void ApplyHeadlessSets(Patch::Data& data, std::vector<Headless::Issue>* errors, std::vector<Headless::Issue>* warnings);
+
+bool LoadPatchDataImpl(Patch::Data& data, const std::string& path, bool reload);
 
 bool LoadPatchFrom(const std::string& path);
 
 void FinishCanonicalize(Patch::Data& data, const Headless::Job& job, Headless::Status& st);
 
+bool RunCanonicalize(const Headless::Job& job, Headless::Status& st);
+
 extern std::unordered_map<int, std::vector<Headless::Issue>> gLiveIssues;
+
+extern unsigned gLiveIssueSerial;
+
+extern unsigned gLiveIssueDoneSerial;
 
 extern double gLiveIssueEditTime;
 
@@ -4701,13 +5257,19 @@ void NoteGraphEditedForLiveIssues();
 
 void RefreshLiveIssues();
 
+void PushUndoSnapshot(Patch::Data snapshot);
+
 void PushUndoCheckpoint();
+
+void RemapFieldGraphOwnership(const std::map<int, int>& remap);
 
 INode* ResolveFieldGraphBoundaryTerminal(FieldGraphNode* fgn);
 
 void RunFieldGraphRegenerate(FieldGraphNode* target);
 
 void RunFieldGraphUnpackPhase1(FieldGraphNode* target);
+
+void RunFieldGraphUnpackPhase2Tick();
 
 void PerformCopyPaste(const std::set<int>& toCopy);
 
@@ -4726,9 +5288,195 @@ void DrawMinimap();
 
 std::string BundledResourcePath(const char* relPath);
 
+void SetWindowIcon(GLFWwindow* window);
+
+void SavePatchInteractive(bool forceDialog);
+
+
+
+   // Set for one frame when an action was deferred because the patch has
+   // unsaved changes, so the UI pass knows to pop the confirmation modal.
+   // ---- R39: watch the open patch file ------------------------------------
+   // An AI (or any editor) rewrites the open file; the canvas follows. Polled
+   // once a second on the main thread: mtime + size, no watcher thread and no
+   // Platform:: call. Clean canvas -> reload as one undo step; unsaved edits ->
+   // a banner instead of clobbering them.
+   struct PatchFileStamp
+   {
+      bool valid = false;
+      long long mtime = 0;
+      unsigned long long size = 0;
+      bool operator==(const PatchFileStamp& o) const { return valid == o.valid && mtime == o.mtime && size == o.size; }
+   };
+
+extern PatchFileStamp gPatchStamp;
+
+extern std::string gPatchWatchPath;
+
+extern double gPatchWatchNextPoll;
+
 extern bool gPatchChangedOnDisk;
 
+void NotePatchFileStamp(const std::string& path);
+
+void ClearPatchWatch();
+
+void PollPendingKeyed();
+
 void PollPatchFileWatch(bool force = false);
+
+extern bool gShowUnsavedChangesModal;
+
+extern std::function<void()> gPendingUnsavedAction;
+
+void GuardUnsavedChanges(std::function<void()> action);
+
+void RequestClose(GLFWwindow* window);
+
+void CloseProjectorWindow(size_t i);
+
+void CloseProjectorWindowFor(int nodeIndex);
+
+void CloseAllProjectorWindows();
+
+ProjectorWindow* FindProjectorWindow(int nodeIndex);
+
+int ProjectorMonitorIndex(GLFWwindow* w);
+
+
+
+   // Frame clock rate policy (FrameClockActive says when it applies).
+   // The primary Output is the first fullscreen projector window, else the
+   // first one opened; with two Outputs on displays of different refresh,
+   // only the primary's is presented on its refresh grid. With no projector
+   // open it is the canvas window's display.
+   //
+   // Rate: a whole divisor of that display's refresh R, never an uneven
+   // rate. The base divisor is the largest that still gives >= 60 fps
+   // (60 Hz -> every refresh, 120 -> every 2nd = 60 fps, 144 -> 72 fps).
+   // Native R only with headroom: the frame's own work (everything but the
+   // wait) must fit in 55% of a refresh at p95 over a 2 s window, and it drops
+   // back to the base divisor as soon as p95 crosses 85%.
+   struct ProjectorPacer
+   {
+      static constexpr int kWindow = 120;
+      double refreshHz = 0.0;
+      int baseIntervals = 1;
+      int intervals = 1;
+      int monitorX = 0, monitorY = 0;
+      bool haveMonitor = false;
+      double lastMonitorCheck = -1.0;
+      double lastPresent = -1.0; // glfwGetTime() when the last wait returned
+      std::vector<double> workMs;
+
+      void SetDisplay(int x, int y, double hz)
+      {
+         haveMonitor = true;
+         monitorX = x;
+         monitorY = y;
+         if (hz == refreshHz)
+            return;
+         refreshHz = hz;
+         baseIntervals = hz > 0.0 ? std::max(1, (int)std::floor(hz / 60.0 + 0.02)) : 1;
+         intervals = baseIntervals;
+         workMs.clear();
+      }
+
+      void AddWork(double ms)
+      {
+         if (baseIntervals <= 1 || refreshHz <= 0.0)
+            return;
+         workMs.push_back(ms);
+         if ((int)workMs.size() < kWindow)
+            return;
+         std::sort(workMs.begin(), workMs.end());
+         const double p95 = workMs[(size_t)(0.95 * (double)(workMs.size() - 1))];
+         const double periodMs = 1000.0 / refreshHz;
+         if (intervals == baseIntervals && p95 < 0.55 * periodMs)
+            intervals = 1;
+         else if (intervals == 1 && p95 > 0.85 * periodMs)
+            intervals = baseIntervals;
+         workMs.clear();
+      }
+
+      void Reset()
+      {
+         *this = ProjectorPacer{};
+      }
+   };
+
+extern ProjectorPacer gProjectorPacer;
+
+
+
+   // Slow-frame attribution (Bench::Tail, B3/B8 only): when the GPU finished
+   // a frame's work. A fence goes in after the canvas swap and after the last
+   // projector swap; it is polled without blocking at a few points in the
+   // following loop, and the first poll that sees it signaled writes "fence
+   // -> signaled" ms into the record of the frame that placed it. An upper
+   // bound, at the resolution of the poll points. Sync objects are shared
+   // across the share group, so any context may poll.
+   struct TailFence
+   {
+      GLsync sync = nullptr;
+      double placedMs = 0.0;
+      size_t record = 0; // Bench::Tail().all index of the frame that placed it
+      bool canvas = false;
+
+      void Place(bool isCanvas)
+      {
+         Bench::FrameTail& tail = Bench::Tail();
+         // Opt-in (INFINITE_BENCH_TAILFENCE=1): the fence's glFlush right after
+         // an interval-0 swap blocks ~10 ms on macOS, which turned B3 from
+         // 0.2% missed vsync into 1.6-13.8%. Off, the probe costs nothing.
+         static const bool sFencesOff = [] { const char* e = getenv("INFINITE_BENCH_TAILFENCE"); return !(e && e[0] == '1'); }();
+         if (!tail.active || sFencesOff)
+            return;
+         Drop();
+         sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+         glFlush();
+         placedMs = Bench::ScopedStageTimer::NowMs();
+         record = tail.all.size(); // `cur` is pushed at this index by EndFrame
+         canvas = isCanvas;
+      }
+      // True while the fence is still in flight.
+      bool Poll()
+      {
+         if (sync == nullptr)
+            return false;
+         const GLenum r = glClientWaitSync(sync, 0, 0);
+         if (r != GL_ALREADY_SIGNALED && r != GL_CONDITION_SATISFIED)
+            return r == GL_TIMEOUT_EXPIRED;
+         const double ms = Bench::ScopedStageTimer::NowMs() - placedMs;
+         Bench::FrameTail& tail = Bench::Tail();
+         Bench::FrameTail::Record* rec = record < tail.all.size() ? &tail.all[record]
+                                         : (record == tail.all.size() ? &tail.cur : nullptr);
+         if (rec != nullptr)
+            (canvas ? rec->canvasGpuMs : rec->projGpuMs) = ms;
+         Drop();
+         return false;
+      }
+      void Drop()
+      {
+         if (sync != nullptr)
+            glDeleteSync(sync);
+         sync = nullptr;
+      }
+   };
+
+extern TailFence gTailCanvasFence;
+
+extern TailFence gTailProjFence;
+
+void PollTailFences();
+
+void PaceProjectorPresent(GLFWwindow* canvas);
+
+void MoveProjectorToMonitor(ProjectorWindow& pw, int monitorIndex);
+
+void ToggleProjectorFullscreen(ProjectorWindow& pw);
+
+void OpenProjectorWindow(GLFWwindow* mainWindow, GraphNode& gn);
 
 
 // ================================================== Audio node sweep discovery

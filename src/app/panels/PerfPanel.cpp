@@ -16,6 +16,7 @@ namespace app
       }
    }
 
+
    ImVec2 GetPerfElementCellSpan(int kind)
    {
       switch (kind)
@@ -33,6 +34,7 @@ namespace app
          default: return ImVec2(1.0f, 1.0f);
       }
    }
+
 
    bool ReadNodeBool(GraphNode* gn, const std::string& boolName, int channelIdx = 0)
    {
@@ -60,6 +62,7 @@ namespace app
       gn->node->VisitParams(finder);
       return finder.found ? finder.val : false;
    }
+
 
    void WriteNodeBool(GraphNode* gn, const std::string& boolName, bool newVal, int channelIdx = 0)
    {
@@ -106,6 +109,7 @@ namespace app
       gn->node->VisitParams(mutator);
    }
 
+
    ImU32 GetPerfElementColor(const Patch::PerfRecord& elem, GraphNode* dstNode, bool isLight)
    {
       if (elem.colorR > 0.001f || elem.colorG > 0.001f || elem.colorB > 0.001f)
@@ -121,6 +125,7 @@ namespace app
       }
       return isLight ? IM_COL32(80, 90, 110, 255) : IM_COL32(140, 150, 175, 255);
    }
+
 
    void ReorderPerfPages(int src, int dst)
    {
@@ -145,6 +150,7 @@ namespace app
       }
       gPerfActivePage = dst;
    }
+
 
    std::pair<int, int> FindAdjustedNonOverlappingCell(int page, int elemIdx, int targetX, int targetY, int spanX, int spanY)
    {
@@ -200,6 +206,7 @@ namespace app
       return { bestX, bestY };
    }
 
+
    void AddToPerformanceMatrix(int nodeIndex, int paramIndex, int kind, const std::string& customLabel,
                                 int paramIndex2, const std::string& boolName)
    {
@@ -246,10 +253,12 @@ namespace app
       gPerfPanelOpen = true;
    }
 
+
    void AddPerfElementToCurrentPage(int kind)
    {
       AddToPerformanceMatrix(-1, -1, kind, "", -1, "");
    }
+
 
    std::vector<Patch::PerfRecord> PerfSelectedRecords()
    {
@@ -259,6 +268,7 @@ namespace app
             out.push_back(gPerfElements[i]);
       return out;
    }
+
 
    // Drops copies onto the active page, each one landing on the nearest free
    // cell to where it came from - so a duplicate appears beside its original
@@ -285,6 +295,7 @@ namespace app
       }
    }
 
+
    void PerfCopySelection()
    {
       std::vector<Patch::PerfRecord> picked = PerfSelectedRecords();
@@ -292,10 +303,12 @@ namespace app
          gPerfClipboard = picked;
    }
 
+
    void PerfDuplicateSelection()
    {
       PerfPasteRecords(PerfSelectedRecords());
    }
+
 
    void PerfDeleteSelection()
    {
@@ -309,6 +322,7 @@ namespace app
       gPerfSelection.clear();
    }
 
+
    void PerfSelectAllOnPage()
    {
       gPerfSelection.clear();
@@ -316,6 +330,7 @@ namespace app
          if (gPerfElements[i].page == gPerfActivePage)
             gPerfSelection.insert(i);
    }
+
 
    void DrawPerfElement(size_t elemIdx, const ImVec2& gridOrigin, float cellSize, bool& outMouseHovered)
    {
@@ -1416,6 +1431,7 @@ namespace app
       ImGui::PopID();
    }
 
+
    void UpdatePerformanceMatrixMIDI()
    {
       // 1. Process MIDI Learn if active
@@ -1785,6 +1801,7 @@ namespace app
       }
    }
 
+
    // ---- Per-parameter MIDI learn ------------------------------------------
    // Right-click a parameter > "MIDI learn", then move a hardware control. The
    // captured (device, channel, controller/note) becomes a MIDI CC modulator
@@ -1803,6 +1820,7 @@ namespace app
    {
       return gParamMidiLearnUid != 0 && gParamMidiLearnParam >= 0;
    }
+
 
    int MidiLearnActiveCount()
    {
@@ -1827,6 +1845,7 @@ namespace app
       return count;
    }
 
+
    void MidiLearnCancelAll()
    {
       gPerfMidiLearnIdx = -1;
@@ -1846,12 +1865,14 @@ namespace app
       }
    }
 
+
    bool ParamMidiLearnIsActiveFor(int nodeIndex, int paramIndex)
    {
       if (!ParamMidiLearnActive() || paramIndex != gParamMidiLearnParam)
          return false;
       return UidForIndex(nodeIndex) == gParamMidiLearnUid;
    }
+
 
    void StartParamMidiLearn(int nodeIndex, int paramIndex)
    {
@@ -1869,6 +1890,7 @@ namespace app
       Platform::MidiCCValue flush;
       while (Platform::MidiPollLastTouched(flush)) {}
    }
+
 
    // A learnable target is a param nothing else drives. A binding from a MIDI
    // CC node is fine (that is "re-learn"); a binding from any other modulator,
@@ -1892,6 +1914,7 @@ namespace app
       }
       return true;
    }
+
 
    // Core of the capture, separated from the polling so the headless test can
    // drive it. Returns true when the binding was made.
@@ -1969,6 +1992,7 @@ namespace app
       return true;
    }
 
+
    // Main thread, once per frame, outside ed::Begin/End and before the
    // modulation apply (which needs this frame's FrameParams for Bind).
    void UpdateParamMidiLearn()
@@ -1997,6 +2021,7 @@ namespace app
       ParamMidiLearnCommit(nodeIndex, paramIndex, last);
    }
 
+
    // Orange strip along the top of the canvas while listening. Drawn on the
    // foreground list so it needs no window of its own.
    void DrawParamMidiLearnBanner()
@@ -2021,6 +2046,7 @@ namespace app
       dl->AddText(ImVec2(a.x + 12.0f, a.y + 6.0f), IM_COL32(255, 185, 45, 255), text);
    }
 
+
    // The right-click entry. Inside the ##modbind popup.
    void DrawParamMidiLearnMenuItem(int nodeIndex, int paramIndex)
    {
@@ -2041,6 +2067,7 @@ namespace app
       if (ImGui::MenuItem(cur.nodeIndex >= 0 ? "Re-learn MIDI" : "MIDI learn"))
          StartParamMidiLearn(nodeIndex, paramIndex);
    }
+
 
    void DrawPerfPanelContent()
    {
@@ -2413,6 +2440,7 @@ namespace app
       ImGui::EndChild();
    }
 
+
    void DrawPerfPanelDocked(const char* id, const ImVec2& size)
    {
       const float kGrip = 6.0f;
@@ -2506,6 +2534,7 @@ namespace app
       // because its opaque panelBg fill differs from the canvas' windowBg;
       // the line added no information. Removed rather than re-tuned.
    }
+
 
    void DrawModulatorMeter(IModulator* mod, int nodeIndex)
    {

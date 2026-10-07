@@ -33,6 +33,7 @@ namespace app
          rn->ResetLearnedState();
    }
 
+
    // ---------------- per-node parameter UI ----------------
 
    void DrawImageSourceParams(ImageSourceNode* n)
@@ -59,6 +60,7 @@ namespace app
          ImGui::PopTextWrapPos();
       }
    }
+
 
    void DrawSlideshowParams(SlideshowNode* n)
    {
@@ -92,6 +94,7 @@ namespace app
          ImGui::TextDisabled("Choose a folder containing images.");
       ImGui::PopTextWrapPos();
    }
+
 
    void DrawSyphonOutParams(SyphonOutNode* n)
    {
@@ -129,6 +132,7 @@ namespace app
       ImGui::PopTextWrapPos();
 #endif
    }
+
 
    void DrawSyphonInParams(SyphonInNode* n)
    {
@@ -186,6 +190,7 @@ namespace app
 #endif
    }
 
+
    void DrawOscReceiveParams(OscReceiveNode* n)
    {
       ModSliderInt("port", &n->port, 1, 65535);
@@ -194,6 +199,7 @@ namespace app
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
    }
+
 
    void DrawOscSendParams(OscSendNode* n)
    {
@@ -209,6 +215,7 @@ namespace app
       else
          ImGui::TextDisabled("last sent: %.3f", n->LastSent());
    }
+
 
    void DrawEnvironmentParams(EnvironmentNode* n)
    {
@@ -240,6 +247,7 @@ namespace app
       ModSlider("intensity", &n->intensity, 0.0f, 8.0f);
       ModSlider("rotation", &n->rotation, -180.0f, 180.0f, "%.1f\xC2\xB0");
    }
+
 
    void DrawShapeParams(ShapeNode* n)
    {
@@ -275,6 +283,7 @@ namespace app
       ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
    }
 
+
    void DrawFormulaParams(FormulaNode* n)
    {
       // The GLSL editor lives in its own window, not inline: ImGui multi-line
@@ -309,6 +318,7 @@ namespace app
       ModSlider("uD", &n->knobD, 0.0f, 1.0f);
       ModCheckbox("animate", &n->animate);
    }
+
 
    void DrawTextParams(TextNode* n)
    {
@@ -357,6 +367,7 @@ namespace app
       ModSlider("height", &n->height, 16.0f, 4096.0f, "%.0f");
    }
 
+
    void DrawVideoParams(VideoSourceNode* n)
    {
       if (ImGui::Button("Choose video...", ImVec2(kPreviewSize, 0)))
@@ -402,6 +413,7 @@ namespace app
          ImGui::PopTextWrapPos();
       }
    }
+
 
    void DrawVideoInParams(VideoInNode* n)
    {
@@ -456,6 +468,7 @@ namespace app
       }
    }
 
+
    void DrawFitParams(FitNode* n)
    {
       DropdownButton("mode", FitNode::ModeNames(), n->mode, [n](int i) { n->mode = i; });
@@ -470,6 +483,7 @@ namespace app
       ColorSwatch("bg", n->bgColor, n);
       ModSlider("bg opacity", &n->bgOpacity, 0.0f, 1.0f);
    }
+
 
    void DrawProjectionHandleOverlay(ProjectionNode* node, ImVec2 origin, ImVec2 imageSize, const char* btnIdSuffix)
    {
@@ -585,6 +599,7 @@ namespace app
       }
    }
 
+
    void DrawProjectionPreview(ProjectionNode* node)
    {
       const float size = kViewportSize;
@@ -609,6 +624,7 @@ namespace app
       ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(size, size));
    }
+
 
    void DrawProjectionParams(ProjectionNode* n)
    {
@@ -678,6 +694,7 @@ namespace app
       }
    }
 
+
    void DrawLFOParams(LFONode* n)
    {
       DropdownButton("shape", LFONode::ShapeNames(), n->shape, [n](int i) { n->shape = i; });
@@ -687,6 +704,7 @@ namespace app
       ModSlider("high", &n->high, 0.0f, 1.0f);
    }
 
+
    void DrawRandomParams(RandomNode* n)
    {
       ModSlider("rate (beats)", &n->rateBeats, 0.05f, 32.0f);
@@ -695,6 +713,7 @@ namespace app
       ModSlider("high", &n->high, 0.0f, 1.0f);
       ModSlider("seed", &n->seed, 0.0f, 200.0f);
    }
+
 
    void DrawPatternStepGrid(PatternNode* n)
    {
@@ -912,6 +931,7 @@ namespace app
       ImGui::PopTextWrapPos();
    }
 
+
    void DrawPatternParams(PatternNode* n)
    {
       DrawPatternStepGrid(n);
@@ -922,6 +942,7 @@ namespace app
       ModSlider("low", &n->low, 0.0f, 1.0f);
       ModSlider("high", &n->high, 0.0f, 1.0f);
    }
+
 
    void DrawMathParams(MathNode* n)
    {
@@ -939,6 +960,7 @@ namespace app
       ModCheckbox("clamp to 0..1", &n->clampOutput);
    }
 
+
    void DrawCompareParams(CompareNode* n)
    {
       DropdownButton("operation", CompareNode::OpNames(), n->op, [n](int i) { n->op = i; });
@@ -954,6 +976,7 @@ namespace app
          ModSlider("tolerance", &n->tolerance, 0.0f, 0.1f);
    }
 
+
    void DrawRangeToRangeParams(RangeToRangeNode* n)
    {
       if (n->input == nullptr)
@@ -967,6 +990,7 @@ namespace app
       ModCheckbox("clamp to out range", &n->clampOutput);
    }
 
+
    void DrawSmoothParams(SmoothNode* n)
    {
       if (n->input == nullptr)
@@ -975,6 +999,7 @@ namespace app
          ImGui::TextDisabled("in: patched");
       ModSlider("amount", &n->amount, 0.0f, 0.99f);
    }
+
 
    void DrawInvertParams(InvertNode* n)
    {
@@ -986,6 +1011,7 @@ namespace app
       ModSlider("high", &n->high, -4.0f, 4.0f);
    }
 
+
    void DrawModDepthParams(ModDepthNode* n)
    {
       if (n->input == nullptr)
@@ -994,6 +1020,7 @@ namespace app
          ImGui::TextDisabled("in: patched");
       ModSlider("depth", &n->depth, -1.0f, 1.0f);
    }
+
 
    void DrawNoiseParams(NoiseNode* n)
    {
@@ -1016,6 +1043,7 @@ namespace app
          ColorSwatch("high", n->highColor, n);
       }
    }
+
 
    void DrawTextureParams(TextureNode* n)
    {
@@ -1109,6 +1137,7 @@ namespace app
       }
    }
 
+
    void DrawSwitcherParams(SwitcherNode* n)
    {
       DropdownButton("unit", SwitcherNode::UnitNames(), n->unit, [n](int i) { n->unit = i; });
@@ -1124,6 +1153,7 @@ namespace app
          ImGui::TextDisabled("showing input %c", 'A' + n->ActiveSlot());
       }
    }
+
 
    // 2D control surface. Dragging the orb sweeps the mutation weights; the
    // recorded path is drawn behind it so a loop is visible while it plays.
@@ -1186,6 +1216,7 @@ namespace app
       dl->AddCircle(orb, 9.0f, isLight ? IM_COL32(240, 240, 240, 255) : IM_COL32(20, 20, 28, 255), 0, 2.0f);
       dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
    }
+
 
    void DrawResynthParams(ResynthNode* n)
    {
@@ -1257,6 +1288,7 @@ namespace app
       ModSlider("seed", &n->seed, 0.0f, 100.0f);
    }
 
+
    // ---- macro node bodies -------------------------------------------------
    // Every macro body is drawn the same way: the control sits flush at the
    // top-left of its cell, its label is centred directly underneath, and the
@@ -1290,6 +1322,7 @@ namespace app
       ImGui::Dummy(ImVec2(cellW, contentH + 4.0f + textH));
    }
 
+
    // Same diameter every other audio/modulator knob in the app uses
    // (kKnobStd): KnobFloat's face shading and tick are pixel-offset constants
    // tuned for that size, so scaling the diameter up on its own (108 in an
@@ -1301,6 +1334,7 @@ namespace app
       const std::string caption = n->label.empty() ? std::string("macro") : n->label;
       ModKnob(caption.c_str(), &n->value, 0.0f, 1.0f, "%.3f", kKnobStd, kMacroCell);
    }
+
 
    // The name field is the only param most macro nodes have, and it used to be
    // kParamWidth (168px) plus a visible "name" label - together wider than any
@@ -1317,10 +1351,12 @@ namespace app
          label = buf;
    }
 
+
    void DrawMacroKnobParams(MacroKnobNode* n)
    {
       MacroNameField(n->label, kMacroCell);
    }
+
 
    void DrawMacroSliderBody(MacroSliderNode* n)
    {
@@ -1331,10 +1367,12 @@ namespace app
       ModKnob(caption.c_str(), &n->value, 0.0f, 1.0f, "%.2f", kMacroFaderH, kMacroCell, AudioWidgetStyle::VFader);
    }
 
+
    void DrawMacroSliderParams(MacroSliderNode* n)
    {
       MacroNameField(n->label, kMacroCell);
    }
+
 
    void DrawMacroBipolarKnobBody(MacroBipolarKnobNode* n)
    {
@@ -1342,10 +1380,12 @@ namespace app
       ModKnob(caption.c_str(), &n->value, -1.0f, 1.0f, "%.2f", kKnobStd, kMacroCell, AudioWidgetStyle::KnobBipolar);
    }
 
+
    void DrawMacroBipolarKnobParams(MacroBipolarKnobNode* n)
    {
       MacroNameField(n->label, kMacroCell);
    }
+
 
    void DrawMacroToggleBody(MacroToggleNode* n)
    {
@@ -1396,11 +1436,13 @@ namespace app
       MacroBodyEnd(origin, kMacroCell, btnH, n->label.empty() ? std::string("toggle") : n->label);
    }
 
+
    void DrawMacroToggleParams(MacroToggleNode* n)
    {
       MacroNameField(n->label, kMacroCell);
       ModCheckbox("state", &n->state);
    }
+
 
    void DrawMacroTriggerBody(MacroTriggerNode* n)
    {
@@ -1464,10 +1506,12 @@ namespace app
       MacroBodyEnd(origin, kMacroCell, contentH, n->label.empty() ? std::string("bang") : n->label);
    }
 
+
    void DrawMacroTriggerParams(MacroTriggerNode* n)
    {
       MacroNameField(n->label, kMacroCell);
    }
+
 
    void DrawMacroNumBoxBody(MacroNumBoxNode* n)
    {
@@ -1499,6 +1543,7 @@ namespace app
       MacroBodyEnd(origin, kMacroCell, boxH, n->label.empty() ? std::string("value") : n->label);
    }
 
+
    void DrawMacroNumBoxParams(MacroNumBoxNode* n)
    {
       MacroNameField(n->label, kMacroCell);
@@ -1506,6 +1551,7 @@ namespace app
       // destination clamps it to its own declared range on the way in (see
       // the MacroNumBox case in the modulation apply loop).
    }
+
 
    void DrawMacroRadioSelectorBody(MacroRadioSelectorNode* n)
    {
@@ -1546,6 +1592,7 @@ namespace app
       MacroBodyEnd(origin, kMacroWideCell, btnH, n->label.empty() ? std::string("selector") : n->label);
    }
 
+
    void DrawMacroRadioSelectorParams(MacroRadioSelectorNode* n)
    {
       MacroNameField(n->label, kMacroWideCell);
@@ -1553,6 +1600,7 @@ namespace app
       // 16 used to leave half the selector unreachable.
       ModSliderInt("count", &n->count, 2, 8);
    }
+
 
    void DrawMacroStepGateBody(MacroStepGateNode* n)
    {
@@ -1604,11 +1652,13 @@ namespace app
       MacroBodyEnd(origin, kMacroWideCell, stepH, n->label.empty() ? std::string("step gate") : n->label);
    }
 
+
    void DrawMacroStepGateParams(MacroStepGateNode* n)
    {
       MacroNameField(n->label, kMacroWideCell);
       ModSlider("rate (beats)", &n->rateBeats, 0.05f, 4.0f);
    }
+
 
    void DrawMidiCCParams(MidiCCNode* n)
    {
@@ -1635,6 +1685,7 @@ namespace app
       ModSlider("high", &n->high, 0.0f, 1.0f);
       ModCheckbox("invert", &n->invert);
    }
+
 
    void DrawMidiTriggerParams(MidiTriggerNode* n)
    {
@@ -1678,6 +1729,7 @@ namespace app
       }
    }
 
+
    void DrawMacroXYBody(MacroXYNode* n)
    {
       const float size = kPreviewSize;
@@ -1715,6 +1767,7 @@ namespace app
       dl->AddCircle(orb, 9.0f, isLight ? IM_COL32(240, 240, 240, 255) : IM_COL32(20, 20, 28, 255), 0, 2.0f);
       dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
    }
+
 
    void DrawMacroXYParams(MacroXYNode* n)
    {

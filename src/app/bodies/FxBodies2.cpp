@@ -69,6 +69,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawChorusBody(GraphNode& gn, AudioEffectNode* n)
    {
       const bool sync = n->Param("sync") != 0.0f;
@@ -151,6 +152,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // ---- Flanger --------------------------------------------------------
    // A dry reference line plus a modulated wet trace whose thickness and
    // ripple sharpness scale with `feedback` - a flanger's resonant comb
@@ -223,6 +225,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawFlangerBody(GraphNode& gn, AudioEffectNode* n)
    {
       const bool sync = n->Param("sync") != 0.0f;
@@ -293,6 +296,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    // ---- Phaser -----------------------------------------------------------
    // An illustrative magnitude-response curve on a log-frequency axis with
@@ -372,6 +376,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawPhaserBody(GraphNode& gn, AudioEffectNode* n)
    {
       const bool sync = n->Param("sync") != 0.0f;
@@ -449,6 +454,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // ---- Bitcrush -----------------------------------------------------------
    // A quantized, sample-and-held sine arch with a solid fill down to the
    // baseline, matching the reference bitcrusher's single-hump filled-
@@ -515,6 +521,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawBitcrushBody(GraphNode& gn, AudioEffectNode* n)
    {
       const bool analog = n->Param("analog") != 0.0f;
@@ -556,6 +563,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // ---- Transient Shaper -----------------------------------------------
    // A stylized transient spike (fast rise, slow decay) with the attack/
    // sustain knobs shown as gain bars either side, and the kernel's own
@@ -566,13 +574,16 @@ namespace app
    // Dynamics' kDynVizMinDb/kDynVizMaxDb (-60..+6), which would clip a
    // +24 dB attack boost off the top of the plot.
    const float kTsVizMinDb = -48.0f;
+
    const float kTsVizMaxDb = 24.0f;
+
 
    float TsVizDbToY(float db, float y0, float h)
    {
       const float t = (db - kTsVizMinDb) / (kTsVizMaxDb - kTsVizMinDb);
       return y0 + h - std::clamp(t, 0.0f, 1.0f) * h;
    }
+
 
    void DrawTransientShaperVisualizer(AudioEffectNode* n)
    {
@@ -653,6 +664,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawTransientShaperBody(GraphNode& gn, AudioEffectNode* n)
    {
       char stat[80];
@@ -672,6 +684,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    // ---- Stutter --------------------------------------------------------
    // One square per repeat in the cycle ("1/8 -> 8 steps"), click to mute
@@ -713,6 +726,7 @@ namespace app
       ImGui::SetCursorScreenPos(rowOrigin);
       ImGui::Dummy(ImVec2(w, h));
    }
+
 
    void DrawStutterBody(GraphNode& gn, AudioEffectNode* n)
    {
@@ -758,6 +772,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    // ---- Ring Mod ---------------------------------------------------------
    // The modulator waveform itself, one static cycle - the ring-modding
@@ -807,6 +822,7 @@ namespace app
 
       ImGui::Dummy(ImVec2(w, h));
    }
+
 
    void DrawRingModBody(GraphNode& gn, AudioEffectNode* n)
    {
@@ -860,6 +876,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    // ---- Frequency Shifter ----------------------------------------------
    // Comb-displacement visualizer: input partials on the upper row, shifted
@@ -975,6 +992,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawFrequencyShifterBody(GraphNode& gn, AudioEffectNode* n)
    {
       const bool analog = n->Param("analog") != 0.0f;
@@ -1028,6 +1046,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    // ---- Tremolo --------------------------------------------------------
    // The resulting *gain envelope*, not the raw bipolar LFO - a filled area
@@ -1117,6 +1136,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawTremoloBody(GraphNode& gn, AudioEffectNode* n)
    {
       char stat[64];
@@ -1156,6 +1176,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    // ---- Formant Filter -----------------------------------------------------
    // The three formant resonators' frequencies as markers on a log axis -
@@ -1212,6 +1233,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawFormantFilterBody(GraphNode& gn, AudioEffectNode* n)
    {
       static const char* kVowelNames[] = { "A", "E", "I", "O", "U" };
@@ -1232,6 +1254,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    // ---- Resonator Bank -------------------------------------------------
    // Log-frequency pole-distribution visualizer: stems showing each active
@@ -1336,6 +1359,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawResonatorBankBody(GraphNode& gn, AudioEffectNode* n)
    {
       const float rootFreq = n->Param("rootFreq");
@@ -1396,6 +1420,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    // ---- Cycle Shaper ---------------------------------------------------
    // Single-wavecycle replacement visualizer: shows the synthesized geometric
@@ -1465,6 +1490,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawCycleShaperBody(GraphNode& gn, AudioEffectNode* n)
    {
       const int waveform = std::clamp((int)std::round(n->Param("waveform")), 0, 2);
@@ -1512,6 +1538,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    void DrawSpecBlurVisualizer(AudioEffectNode* n)
    {
@@ -1616,6 +1643,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawSpecBlurBody(GraphNode& gn, AudioEffectNode* n)
    {
       const float blurTime = n->Param("blurTime");
@@ -1664,6 +1692,7 @@ namespace app
       EndAudioBody();
    }
 
+
    // The scale in use: the node's own, or the transport's when globalKey is on.
    void KeySnapScaleRoot(AudioEffectNode* n, int& scale, int& root)
    {
@@ -1675,6 +1704,7 @@ namespace app
          root = ((Transport::Instance().Key() % 12) + 12) % 12;
       }
    }
+
 
    // Live output spectrum on a log axis with a line at every note of the
    // scale (root brighter) - the peaks should sit on the lines.
@@ -1779,6 +1809,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawKeySnapBody(GraphNode& gn, AudioEffectNode* n)
    {
       int scale = 0, root = 0;
@@ -1825,6 +1856,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    // Live output spectrum on a log axis; a marker under it shows where the
    // slide sits between A (left end) and B (right end).
@@ -1917,6 +1949,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawSpectrumSlideBody(GraphNode& gn, AudioEffectNode* n)
    {
       const float slide = n->Param("slide");
@@ -1936,6 +1969,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    void DrawShapeResonatorVisualizer(AudioEffectNode* n)
    {
@@ -1986,6 +2020,7 @@ namespace app
       }
       ImGui::Dummy(ImVec2(w, h));
    }
+
 
    void DrawShapeResonatorBody(GraphNode& gn, AudioEffectNode* n)
    {

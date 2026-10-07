@@ -60,6 +60,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawMetallicScope(MetallicNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
@@ -116,6 +117,7 @@ namespace app
       dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
       ImGui::Dummy(ImVec2(w, h));
    }
+
 
    // Sampler's waveform + playhead: a static min/max envelope (the sample
    // data never changes during playback, so there's nothing to redecimate
@@ -269,6 +271,7 @@ namespace app
    }
 
 
+
    // Waveform + slice markers for the Slicer. Clicking inside a slice's band
    // auditions that slice; in onsets mode each marker (except the pinned one
    // at 0) can be dragged. Grid boundaries are derived from the transport, so
@@ -414,6 +417,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    // Waveform and playhead renderer for PaulStretch extreme time-stretcher
    void DrawPaulStretchWaveform(PaulStretchNode* n, float h, float width)
    {
@@ -528,6 +532,7 @@ namespace app
       ImGui::SetCursorScreenPos(origin);
       ImGui::Dummy(ImVec2(w, h));
    }
+
 
    // Waveform and real-time grain particle renderer for Granular synthesis node
    void DrawGranularWaveform(GranularNode* n, float h, float width)
@@ -681,6 +686,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    // Narrow vertical meter drawn beside a channel fader. Same traffic-light
    // reading as a horizontal meter, rotated - a mixer strip without one is
    // just a row of numbers you can't check against the sound.
@@ -720,6 +726,7 @@ namespace app
       dl->AddRect(tl, br, ScopeBorderCol(), 2.0f);
    }
 
+
    // The wavetable itself, drawn as a receding stack of single-cycle traces
    // with the frame the `position` knob currently sits on picked out, and
    // draggable: dragging left/right across it scrubs `position` directly.
@@ -740,6 +747,7 @@ namespace app
       const ImVec2 mx = ImGui::GetItemRectMax();
       gWtTestRects.push_back(ImVec4(mn.x, mn.y, mx.x, mx.y));
    }
+
 
    void DrawWavetableFrames(WavetableEngine& eng, const char* id, float h, float width, bool dim)
    {
@@ -828,6 +836,7 @@ namespace app
          SetAudioReadout("position", posText);
    }
 
+
    ADSRLayout ComputeADSRLayout(ImVec2 origin, float w, float h, float attackMs, float decayMs,
                                        float sustain, float releaseMs, float maxTimeMs)
    {
@@ -907,6 +916,7 @@ namespace app
 
       return l;
    }
+
 
    // Directly editable ADSR: interactive handles with proportional relative-time
    // display, analog exponential decay/release curves, and smooth responsive dragging.
@@ -1168,6 +1178,7 @@ namespace app
       }
    }
 
+
    // ---- Wavetable --------------------------------------------------------
    const std::vector<std::string>& WavetableNames()
    {
@@ -1181,6 +1192,7 @@ namespace app
       return names;
    }
 
+
    const std::vector<std::string>& WavetableCategories()
    {
       static std::vector<std::string> cats;
@@ -1192,6 +1204,7 @@ namespace app
       }
       return cats;
    }
+
 
    // Header tuning dropdowns. The values carry their own prefix inside the
    // button ("oct +1", not "+1") so the header needs no caption row under it -
@@ -1212,6 +1225,7 @@ namespace app
       return names;
    }
 
+
    const std::vector<std::string>& SemiNames()
    {
       static std::vector<std::string> names;
@@ -1226,6 +1240,7 @@ namespace app
       }
       return names;
    }
+
 
    // A dropdown button with no caption of its own, for header rows where the
    // button's own text is the label.
@@ -1296,6 +1311,7 @@ namespace app
          DrawModulationBindingMenu(h.nodeIndex, h.paramIndex, ImGui::IsItemHovered());
    }
 
+
    // One envelope panel: the editable curve on the left, its four (or five)
    // fields stacked to the right of it, which is the arrangement the reference
    // sketch asks for. Putting the fields *under* the curve - what shipped
@@ -1365,6 +1381,7 @@ namespace app
 
       EndAudioSection();
    }
+
 
    // One engine's whole column. Both engines draw this every frame - there is
    // no hidden half - which is what keeps their parameter indices distinct and
@@ -1510,6 +1527,7 @@ namespace app
       ImGui::PopID();
    }
 
+
    void DrawWavetableBody(GraphNode& gn, WavetableNode* n)
    {
       const bool noteDriven = n->noteInput.GetSource() != nullptr;
@@ -1582,6 +1600,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    void DrawOscillatorWaveform(int waveform, float phase, float h, float width)
    {
@@ -1694,6 +1713,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawOscillatorBody(GraphNode& gn, OscillatorNode* n)
    {
       const bool noteDriven = n->noteInput.GetSource() != nullptr;
@@ -1803,6 +1823,7 @@ namespace app
 
       EndAudioBody();
    }
+
 
    void DrawMetallicBody(GraphNode& gn, MetallicNode* n)
    {
@@ -1918,6 +1939,7 @@ namespace app
       EndAudioBody();
    }
 
+
    void DrawWaveTerrainScope(WaveTerrainNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
@@ -1969,6 +1991,7 @@ namespace app
       dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
       ImGui::Dummy(ImVec2(w, h));
    }
+
 
    void DrawWaveTerrainBody(GraphNode& gn, WaveTerrainNode* n)
    {
@@ -2176,6 +2199,7 @@ namespace app
        EndAudioBody();
     }
 
+
    void DrawEquationVisualizer(EquationNode* n, float h, float width)
    {
       const float w = width > 0.0f ? width : gAudioContentW;
@@ -2295,6 +2319,7 @@ namespace app
       ImGui::Dummy(ImVec2(w, h));
    }
 
+
    void DrawEquationBody(GraphNode& gn, EquationNode* n)
    {
       const bool noteDriven = n->NoteInput().GetSource() != nullptr;
@@ -2410,6 +2435,7 @@ namespace app
       EndAudioBody();
    }
 
+
    void DrawImageSpectralSynthScope(ImageSpectralSynthNode* n, float h, float width)
    {
       const double now = ImGui::GetTime();
@@ -2461,6 +2487,7 @@ namespace app
       dl->AddRect(origin, br, ScopeBorderCol(), 4.0f);
       ImGui::Dummy(ImVec2(w, h));
    }
+
 
    void DrawImageSpectralSynthBody(GraphNode& gn, ImageSpectralSynthNode* n)
    {

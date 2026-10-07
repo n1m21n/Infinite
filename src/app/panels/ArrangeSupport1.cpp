@@ -21,6 +21,7 @@ namespace app
              CanShowInViewportPanel(gn);
    }
 
+
    bool IsNodeAudioCompatible(const GraphNode& gn)
    {
       if (gn.node == nullptr) return false;
@@ -32,6 +33,7 @@ namespace app
       // clip get "assigned" to a node with no audio to actually play.
       return dynamic_cast<IAudioSource*>(gn.node.get()) != nullptr;
    }
+
 
    // Called once per main-loop frame, after that frame's composites. Safe to
    // free immediately: a geometry viewport's texture is only ever sampled by
@@ -49,6 +51,7 @@ namespace app
       }
       gArrangeGeomFrame++;
    }
+
 
    // A clip's waveform identity: the fields that decide whether existing
    // buckets still describe the clip. Not a security hash - a 64-bit FNV-1a
@@ -68,12 +71,14 @@ namespace app
       return h;
    }
 
+
    int ArrangeWaveBucketCount(Arrange::Tick length)
    {
       const long long n = ((long long)std::max<Arrange::Tick>(0, length) + kArrangeWaveBucketTicks - 1) /
                           kArrangeWaveBucketTicks;
       return (int)std::clamp<long long>(n, 0, kArrangeWaveMaxBuckets);
    }
+
 
    // The Audio Sample static waveform, computed from the fully decoded
    // source. Bucket b covers ticks [b, b+1) * kArrangeWaveBucketTicks of the
@@ -137,10 +142,12 @@ namespace app
       gArrangeSampleStaticWaves[clipId] = std::move(w);
    }
 
+
    double ArrangeSampleEffBpm(const Arrange::Clip& c)
    {
       return Arrange::SampleSourceBpm(c.syncToTempo, c.sampleBpm, (double)Transport::Instance().Tempo());
    }
+
 
    // Resizes a Sample's box so it keeps covering the same source audio when
    // its effective BPM changes (sync toggle, or a Sample BPM edit while
@@ -157,6 +164,7 @@ namespace app
       Arrange::TrimEdge(gArrange, clipId, Arrange::kEdgeEnd, c->start + newLength);
    }
 
+
    void ArrangeSetSampleSync(uint64_t clipId, bool sync)
    {
       Arrange::Clip* c = Arrange::FindClip(gArrange, clipId);
@@ -168,6 +176,7 @@ namespace app
       gArrange.revision++;
       ArrangeRescaleSampleBox(clipId, oldEff, newEff);
    }
+
 
    void ArrangeSetSampleBpm(uint64_t clipId, float bpm)
    {
@@ -184,6 +193,7 @@ namespace app
       ArrangeRescaleSampleBox(clipId, oldEff, newEff);
    }
 
+
    // Status line under the Sample BPM field, shared by the context menu and
    // the docked Clip Settings panel.
    void ArrangeDrawSampleTempoInfo(const Arrange::Clip& c)
@@ -199,6 +209,7 @@ namespace app
          ImGui::TextDisabled("Native speed - turn on Sync to Tempo to set Sample BPM");
    }
 
+
    // Resolves the decoded source buffer behind an Arrange::Clip's srcUid, for
    // recomputing a Sample's static waveform outside of import/bounce time
    // (e.g. right after a Split - see the two call sites in
@@ -213,6 +224,7 @@ namespace app
       AudioFileNode* afn = dynamic_cast<AudioFileNode*>(gn->node.get());
       return afn != nullptr ? afn->Buffer() : nullptr;
    }
+
 
    // Recomputes the static-waveform cache entry for a Sample clip, looking
    // up its own decoded buffer first. No-op (and clears any stale entry) for
@@ -234,7 +246,9 @@ namespace app
       ArrangeComputeSampleStaticWave(c->id, c->srcUid, c->srcOutput, c->start, c->length,
                                       ArrangeSampleEffBpm(*c), c->sourceOffsetSeconds, buf);
    }
+
    constexpr double kArrangeThumbRefreshSeconds = 1.0;
+
 
    // Aspect-fit copy, letterboxed to black - the same fit the composite uses,
    // so a thumbnail frames its clip the way the monitor does.
@@ -243,6 +257,7 @@ namespace app
       unsigned int program = 0;
       int uTex = -1, uFit = -1;
    };
+
    const ArrangeThumbProgram& ArrangeThumbShader()
    {
       static ArrangeThumbProgram sProg;
@@ -272,6 +287,7 @@ namespace app
       }
       return sProg;
    }
+
 
    // Called from inside the composite's resolve loop, which has not yet saved
    // the caller's framebuffer binding - so this saves and restores its own.
@@ -320,6 +336,7 @@ namespace app
       glViewport(prevVp[0], prevVp[1], prevVp[2], prevVp[3]);
       th.lastCapture = now;
    }
+
 
    // Once per main-loop frame, whether or not the panel is open: the ring has
    // to be drained even when nothing draws it, or it fills and starts
@@ -452,6 +469,7 @@ namespace app
       }
    }
 
+
    // One lane's contribution at a given instant.
    struct ArrangeVideoLayer
    {
@@ -466,6 +484,7 @@ namespace app
       float gradeContrast = 0.0f;
       float gradeSaturation = 1.0f;
    };
+
 
    // Every video lane's active clip at `beat`, in COMPOSITE order: bottom lane
    // first, top lane last (frontmost). Disabled clips and unassigned/offline
@@ -525,6 +544,7 @@ namespace app
       }
    }
 
+
    int CountActiveArrangeVideoClips(double beat, std::string* outFrontTitle)
    {
       static std::vector<ArrangeVideoLayer> sLayers;
@@ -533,6 +553,7 @@ namespace app
          *outFrontTitle = NodeTitle(*sLayers.back().gn);
       return (int)sLayers.size();
    }
+
 
    // Arrangement Timeline exact seek for Video Samples - the video-side
    // counterpart of AudioEngine::RunTopology's per-block audio seek
@@ -600,12 +621,14 @@ namespace app
       }
    }
 
+
    // The lane blend program, compiled once with its uniform locations.
    struct ArrangeComposeProgram
    {
       unsigned int program = 0;
       int uTexBase = -1, uTexTop = -1, uMode = -1, uOpacity = -1, uTopFit = -1, uGrade = -1;
    };
+
    const ArrangeComposeProgram& ArrangeComposeShader()
    {
       static ArrangeComposeProgram sProg;
@@ -660,6 +683,7 @@ namespace app
       }
       return sProg;
    }
+
 
    // Composites every active video lane at `beat` into `dest` (targetW x
    // targetH), or into target.result when `dest` is null. Each lane uses its
@@ -827,6 +851,7 @@ namespace app
       return dest->tex;
    }
 
+
    // The monitor's composite, run once per main-loop frame right after the
    // cook loop so it sees this frame's textures (it used to run inside the
    // panel draw, before the cook, and showed last frame's). The panel only
@@ -839,6 +864,7 @@ namespace app
       t.requestW = 0;
       t.requestH = 0;
    }
+
 
    // ---- arrangement editing on gArrange (overhaul WP5a) -------------------
    //
@@ -875,11 +901,13 @@ namespace app
       return out;
    }
 
+
    int ArrangeDefaultOutput(const GraphNode& gn, int laneType)
    {
       const std::vector<int> outs = ArrangeOutputsOfType(gn, laneType);
       return outs.empty() ? 0 : outs.front();
    }
+
 
    // A lane type's natural home for a node: anything that produces an image
    // goes on a video lane (including VideoSourceNode, whose audio half is
@@ -888,6 +916,7 @@ namespace app
    {
       return IsNodeVideoCompatible(gn) ? Arrange::kLaneVideo : Arrange::kLaneAudio;
    }
+
 
    // Drops everything that must not outlive its document or its clips: on a
    // new-document boundary the selection, rename/assign/context targets and
@@ -948,11 +977,13 @@ namespace app
          gArrangeAssigningClipId = 0;
    }
 
+
    std::vector<uint64_t> ArrangeSelectionIds()
    {
       ArrangePruneSelection();
       return std::vector<uint64_t>(gArrangeSel.begin(), gArrangeSel.end());
    }
+
 
    // Click semantics. A grouped clip selects its whole group unless
    // `singleMember` (Alt-click). `toggle` (Cmd/Shift-click) adds or removes
@@ -990,6 +1021,7 @@ namespace app
       gArrangeSelAnchor = gArrangeSel.count(clipId) ? clipId : 0;
    }
 
+
    bool ArrangeCopySelection()
    {
       const std::vector<uint64_t> ids = ArrangeSelectionIds();
@@ -1017,6 +1049,7 @@ namespace app
       }
       return true;
    }
+
 
    // Paste at `atTick` (the playhead) with the copied block's top lane on the
    // anchor clip's lane. A clipboard item whose relative lane is missing or of
@@ -1101,6 +1134,7 @@ namespace app
       return true;
    }
 
+
    bool ArrangeDuplicateSelection()
    {
       const std::vector<uint64_t> ids = ArrangeSelectionIds();
@@ -1119,6 +1153,7 @@ namespace app
       return true;
    }
 
+
    bool ArrangeDeleteSelection()
    {
       const std::vector<uint64_t> ids = ArrangeSelectionIds();
@@ -1128,6 +1163,7 @@ namespace app
       gArrangeSelAnchor = 0;
       return true;
    }
+
 
    // Cmd+E: cuts every selected clip the tick passes through; both halves
    // stay selected.
@@ -1156,6 +1192,7 @@ namespace app
       gArrangeSel.insert(rights.begin(), rights.end());
       return true;
    }
+
 
    // Blade click: cuts the clicked clip at `tick` - and, groups being whole,
    // every other member of its group the tick passes through. One undo
@@ -1187,6 +1224,7 @@ namespace app
       return true;
    }
 
+
    // `0`: a mixed selection is disabled first (any enabled clip wins), so one
    // press always leaves the whole selection in one state.
    bool ArrangeToggleEnabledSelection()
@@ -1198,6 +1236,7 @@ namespace app
             anyEnabled = anyEnabled || c->enabled;
       return ArrangeEdit([&]() { Arrange::SetEnabled(gArrange, ids, anyEnabled ? Arrange::kDisable : Arrange::kEnable); });
    }
+
 
    // Whether Group would do anything: the selection, grown to whole groups,
    // is at least two clips and not already exactly one group.
@@ -1217,6 +1256,7 @@ namespace app
       return false;
    }
 
+
    bool ArrangeCanUngroupSelection()
    {
       for (uint64_t id : ArrangeSelectionIds())
@@ -1225,6 +1265,7 @@ namespace app
                return true;
       return false;
    }
+
 
    // Groups are whole (Arrange::Group): grouping merges every group the
    // selection touches plus its loose clips into one, and the selection
@@ -1239,6 +1280,7 @@ namespace app
       return true;
    }
 
+
    bool ArrangeUngroupSelection()
    {
       std::vector<uint64_t> groups;
@@ -1248,6 +1290,7 @@ namespace app
                groups.push_back(c->groupId);
       return ArrangeEdit([&]() { Arrange::Ungroup(gArrange, groups); });
    }
+
 
    // ---- header-row (track/group) selection ops --------------------------
    // Shift+D, Delete and Cmd+G/Cmd+Shift+G act on gArrangeRowSel when it is
@@ -1327,6 +1370,7 @@ namespace app
       return true;
    }
 
+
    // Cmd+Shift+G with tracks/groups selected: ungroups every selected group
    // one level (members promoted to its own parent, same as the group
    // context menu's own Ungroup) - selected lanes are not group containers
@@ -1349,6 +1393,7 @@ namespace app
       gArrangeRowSelAnchor = 0;
       return true;
    }
+
 
    // Shift+D with tracks/groups selected: duplicates every selected row. A
    // selected group takes its whole subtree with it (DuplicateTrackGroup); a
@@ -1404,6 +1449,7 @@ namespace app
       return true;
    }
 
+
    // Delete with tracks/groups selected: deletes every selected row (a
    // selected group takes its whole subtree with it).
    bool ArrangeDeleteRowSelection()
@@ -1428,6 +1474,7 @@ namespace app
       gArrangeRowSelAnchor = 0;
       return true;
    }
+
 
    // Shift+J (Video) / Shift+K (Audio) on the timeline: adds a new track after the
    // current row-selection anchor (or at the end if nothing is selected).
@@ -1458,6 +1505,7 @@ namespace app
       return true;
    }
 
+
    // Left / Right (WP6): with clips selected, nudge the selection one grid
    // step through MoveClips (one undo entry; the block stops at 0 as a
    // whole). With nothing selected, step the playhead to the previous / next
@@ -1477,6 +1525,7 @@ namespace app
       ArrangeSeekTick(clamped);
       return true;
    }
+
 
    // Cmd+R / Ctrl+R: renames the active selection (track, group, clip, or
    // multiple selected clips). If header rows are selected, acts on the anchor
@@ -1528,6 +1577,7 @@ namespace app
       return false;
    }
 
+
    // ---- live clip drag ------------------------------------------------------
 
    // Starts a drag gesture on `clipId`. `mode` is an ArrangeDragMode; for a
@@ -1577,6 +1627,7 @@ namespace app
       d.appliedLaneDelta = 0;
       gArrangeDrag = d;
    }
+
 
    // Rebuilds gArrange as (gesture snapshot + this drag). `value` is the tick
    // delta for a move and the absolute edge tick for every edge mode.
@@ -1648,6 +1699,7 @@ namespace app
       return true;
    }
 
+
    // Mouse up. One undo entry for the whole drag, and none at all if it ended
    // where it started (ArrangeGestureEnd compares content, not revision).
    // Returns whether an entry was pushed.
@@ -1658,6 +1710,7 @@ namespace app
       gArrangeDrag = ArrangeDragState();
       return ArrangeGestureEnd();
    }
+
 
    // Adds `nodeIndex` to the timeline as a one-bar clip. `laneType` -1 picks
    // the node's natural lane (ArrangeLaneTypeForNode); `srcOutput` -1 picks
@@ -1719,6 +1772,7 @@ namespace app
       }
       return made;
    }
+
 
    // Adds an audio or video/image file drop onto the timeline at a given screen position.
    uint64_t AddFileToTimelineAt(const std::string& path, const ImVec2& screenPos)
@@ -1832,6 +1886,7 @@ namespace app
       }
       return made;
    }
+
 
    // Points clip `clipId` at node `uid` (the canvas "Assign Node..." picker
    // and the fixtures). The node must fit the clip's lane type; the output

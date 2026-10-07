@@ -1193,6 +1193,7 @@ namespace app
       PopElevatedPanelStyle();
    }
 
+
    // Rebuilds the live graph from a snapshot - shared by LoadPatchFrom (from
    // disk) and Undo/Redo (from the in-memory stacks). Callers decide what
    // happens to gPatchPath/gUndoStack/gRedoStack afterwards; a loaded file is

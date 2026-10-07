@@ -41,6 +41,7 @@ namespace app
       return out;
    }
 
+
    // A user picked row `i` in the dropdown popup. One click is one undo entry
    // holding the pre-click state, and this is it. The onSelect lambdas are
    // shared with the modulation-driven path (which suppresses checkpoints),
@@ -58,6 +59,7 @@ namespace app
       gDropdown.onSelect(i);
       gSuppressUndoCheckpoints = wasSuppressed;
    }
+
    bool DropdownTestWantsOpen(bool registered, int nodeIndex, int paramIndex)
    {
       if (!registered || gDropdownTestOpenKey.first < 0 ||
@@ -66,6 +68,7 @@ namespace app
       gDropdownTestOpenKey = std::pair<int, int>(-1, -1);
       return true;
    }
+
 
    const FieldDeviceLibraryCache& GetFieldDeviceLibrary(const std::string& domain)
    {
@@ -93,10 +96,12 @@ namespace app
       return cache;
    }
 
+
    void InvalidateFieldDeviceLibrary(const std::string& domain)
    {
       gFieldDeviceLibrary.erase(domain);
    }
+
 
    bool HasExtension(const std::string& path, const std::vector<std::string>& exts)
    {
@@ -116,6 +121,7 @@ namespace app
       return false;
    }
 
+
    // Resolves a canvas-space y (ed::ScreenToCanvas'd from a drag release or
    // a file-drop's real mouse position) to a lane index against whatever
    // DrumSequencerNode last cached its grid rect during
@@ -128,6 +134,7 @@ namespace app
       const int lane = (int)((canvasY - n->gridCanvasTopY) / n->gridCanvasRowH);
       return std::clamp(lane, 0, DrumSequencerNode::kNumLanes - 1);
    }
+
 
    // Same idea, but checks each lane card's cached rect first - that's what
    // a drop landing on a card (rather than down on the step grid) is
@@ -145,6 +152,7 @@ namespace app
       }
       return DrumSequencerLaneForCanvasY(n, canvasY);
    }
+
 
    void OnFilesDropped(GLFWwindow* window, int count, const char** paths)
    {
@@ -166,9 +174,11 @@ namespace app
          gDroppedFiles.push_back(paths[i]);
    }
 
+
    void DropdownButton(const char* label, const std::vector<std::string>& options,
                        int current, std::function<void(int)> onSelect, float width,
                        bool showCaption);
+
 
    // Search box + sort dropdown + type-filter dropdown for one mode of the
    // docked node-browser panel (see BrowserFilterState above). `sortNames`
@@ -242,6 +252,7 @@ namespace app
              before.typeFilter != state.typeFilter || before.descending != state.descending;
    }
 
+
    // Persisted sort/filter selections for the four browser panel modes -
    // NOT the free-typed query text, which (like the theme preset) is a
    // per-session choice, not a saved preference. Mirrors
@@ -254,6 +265,7 @@ namespace app
       const std::string dir = AppPaths::AppSupportDir();
       return dir.empty() ? std::string() : dir + "/Infinite.browserfilters";
    }
+
 
    void LoadBrowserFilterPrefs()
    {
@@ -275,6 +287,7 @@ namespace app
       }
    }
 
+
    void SaveBrowserFilterPrefs()
    {
       const std::string path = BrowserFilterPrefsPath();
@@ -287,6 +300,7 @@ namespace app
       for (int i = 0; i < 5; i++)
          file << states[i]->sortMode << " " << states[i]->typeFilter << " " << (states[i]->descending ? 1 : 0) << "\n";
    }
+
 
    // Draws a small yellow Tabler star icon on the right side of a row when favorited.
    // Pure draw list rendering; no interactive buttons or cursor offsets so ImGuiListClipper
@@ -301,6 +315,7 @@ namespace app
       const ImU32 starCol = IM_COL32(255, 205, 45, 255);
       Tabler::DrawStar(dl, center, starSize, starCol, /*filled=*/true);
    }
+
 
    // Truncates a row label to fit maxWidth, appending "..." when it doesn't -
    // browser panel rows (long sample/plugin/module names) otherwise just get
@@ -328,7 +343,9 @@ namespace app
       }
       return label.substr(0, lo) + kEllipsis;
    }
+
    const int kDiscreteParamSlots = 400;
+
 
    int DiscreteParamSlot(int nodeIndex, const std::string& rawLabel)
    {
@@ -384,6 +401,7 @@ namespace app
       return kDiscreteParamBase; // 400 discrete params in one node: not a real case
    }
 
+
    // A node index is being reused (node deleted, patch cleared): drop its slot
    // assignments so the next occupant hashes fresh instead of inheriting them.
    void ForgetDiscreteSlots(int nodeIndex)
@@ -394,14 +412,18 @@ namespace app
          it = (it->first.first == nodeIndex) ? gDiscreteLabelBySlot.erase(it) : std::next(it);
    }
 
+
    void ForgetAllDiscreteSlots()
    {
       gDiscreteSlotByLabel.clear();
       gDiscreteLabelBySlot.clear();
    }
+
    // Defined further down, once the gNodes lookup exists.
    IPaletteSource* PaletteSourceByIndex(int nodeIndex);
+
    std::string TrimCopy(const std::string& s);
+
    bool TypedTextIsUntouchedSeed(const std::pair<int, int>& key, const std::string& trimmed)
    {
       auto it = gTypedParamSeed.find(key);
@@ -409,6 +431,7 @@ namespace app
       gTypedParamSeed.erase(key);
       return untouched;
    }
+
 
    std::string TrimCopy(const std::string& s)
    {
