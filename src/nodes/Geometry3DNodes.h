@@ -237,6 +237,13 @@ public:
    // where the mesh actually comes from".
    virtual IGeometrySource* PassthroughSource() const { return nullptr; }
 
+   // A container (Group 3D) that hands Render 3D several sources through one
+   // pin. Render 3D draws each child as if it were patched into its own slot,
+   // so a scene is not capped at its four geometry pins. 0 by default: an
+   // ordinary source is its own single draw.
+   virtual int GroupChildCount() const { return 0; }
+   virtual IGeometrySource* GroupChild(int /*index*/) const { return nullptr; }
+
    // An extra rigid transform to compose onto each of an upstream instancer's
    // per-instance matrices, for a wrapper (Transform) that sits between an
    // InstanceOnPoints and whatever's drawing it - see GeometryOpNode's
@@ -506,6 +513,8 @@ class Render3DNode : public INode
 {
 public:
    static const int kSlots = 4;
+   // Most sources one Render 3D draws once Group 3D containers are expanded.
+   static const int kMaxDraw = 64;
 
    static INode* Create() { return new Render3DNode(); }
    static const std::vector<std::string>& ProjectionNames();
@@ -525,6 +534,11 @@ public:
    {
       return (slot >= 0 && slot < kSlots) ? &geometry[slot] : nullptr;
    }
+   // Rebuild and return the flattened list of sources this node draws (the
+   // four pins with Group 3D containers expanded, at most kMaxDraw).
+   const std::vector<IGeometrySource*>& CollectDraw();
+   // Same list without touching GPU state, for UI and framing code.
+   std::vector<IGeometrySource*> FlattenedGeometry() const;
 
    // Optional scene nodes. When null, the built-in camera/light values below
    // are used, so a Render node works on its own.
@@ -757,17 +771,19 @@ private:
       std::vector<float> camera;
       bool hasLight[kLightSlots] = { false, false, false };
       std::vector<float> light[kLightSlots];
-      bool hasGeom[kSlots] = { false, false, false, false };
-      unsigned long long meshRev[kSlots] = { 0, 0, 0, 0 };
-      unsigned long long cloudRev[kSlots] = { 0, 0, 0, 0 };
-      unsigned long long curveRev[kSlots] = { 0, 0, 0, 0 };
-      unsigned long long surfaceTexRev[kSlots] = { 0, 0, 0, 0 };
-      Material material[kSlots];
-      MappingTransform mapping[kSlots];
-      Mat4 modelMatrix[kSlots];
-      unsigned long long instanceRev[kSlots] = { 0, 0, 0, 0 };
-      size_t instanceCount[kSlots] = { 0, 0, 0, 0 };
-      Mat4 instanceGroupMatrix[kSlots];
+      // One entry per drawn source (the flattened draw list, groups expanded),
+      // sized by BuildSceneSignature. A different count is a different scene.
+      std::vector<unsigned char> hasGeom;
+      std::vector<unsigned long long> meshRev;
+      std::vector<unsigned long long> cloudRev;
+      std::vector<unsigned long long> curveRev;
+      std::vector<unsigned long long> surfaceTexRev;
+      std::vector<Material> material;
+      std::vector<MappingTransform> mapping;
+      std::vector<Mat4> modelMatrix;
+      std::vector<unsigned long long> instanceRev;
+      std::vector<size_t> instanceCount;
+      std::vector<Mat4> instanceGroupMatrix;
       bool envConnected = false;
       unsigned long long envRev = 0;
       float envRotation = 0.0f;
@@ -784,7 +800,9 @@ private:
          for (int i = 0; i < kLightSlots; i++)
             if (hasLight[i] != o.hasLight[i] || light[i] != o.light[i])
                return false;
-         for (int i = 0; i < kSlots; i++)
+         if (hasGeom.size() != o.hasGeom.size())
+            return false;
+         for (size_t i = 0; i < hasGeom.size(); i++)
          {
             if (hasGeom[i] != o.hasGeom[i] || meshRev[i] != o.meshRev[i] ||
                 cloudRev[i] != o.cloudRev[i] || curveRev[i] != o.curveRev[i] ||
@@ -844,7 +862,10 @@ private:
    unsigned int mShadowTex = 0;
    int mShadowSize = 0;
    Mat4 mLightViewProj;
-   GpuMesh mGpu[kSlots];
+   std::vector<GpuMesh> mGpu;
+   // The sources actually drawn: the four geometry pins with every Group 3D
+   // expanded into its children, rebuilt each cook.
+   std::vector<IGeometrySource*> mDraw;
    int mLastCookFrame = -1;
    // Last sprite-fill clamp factor this node reported (1 = not clamping).
    // The clamp is evaluated on every instance-buffer rebuild, which for an

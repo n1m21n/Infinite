@@ -1124,18 +1124,18 @@ bool Render3DNode::SceneBounds(float outLo[3], float outHi[3])
    outHi[0] = outHi[1] = outHi[2] = -1e30f;
    bool any = false;
 
-   for (int i = 0; i < kSlots; i++)
+   for (int i = 0; i < (int)mDraw.size(); i++)
    {
-      if (!mGpu[i].hasBounds)
+      if (i >= (int)mGpu.size() || !mGpu[i].hasBounds)
          continue;
-      if (geometry[i] == nullptr)
+      if (mDraw[i] == nullptr)
          continue;
       // A cloud slot's bounds are already world-space (drawCloudSlot bakes
       // its source's model matrix into every particle position before ever
-      // touching mGpu[i].lo/hi), so pushing them through geometry[i]'s model
+      // touching mGpu[i].lo/hi), so pushing them through mDraw[i]'s model
       // matrix here too would double-transform them.
-      const bool isCloud = geometry[i]->GetPointCloud() != nullptr;
-      const Mat4 model = isCloud ? Mat4::Identity() : geometry[i]->GetModelMatrix();
+      const bool isCloud = mDraw[i]->GetPointCloud() != nullptr;
+      const Mat4 model = isCloud ? Mat4::Identity() : mDraw[i]->GetModelMatrix();
       // The eight corners through the matrix: a rotated box's true extent
       // cannot be had from transforming the min and max alone.
       for (int corner = 0; corner < 8; corner++)
@@ -1174,8 +1174,8 @@ Render3DNode::~Render3DNode()
 {
    ReleaseTargets();
    ReleaseShadowTargets();
-   for (int i = 0; i < kSlots; i++)
-      ReleaseGpuMesh(mGpu[i]);
+   for (GpuMesh& gpu : mGpu)
+      ReleaseGpuMesh(gpu);
    if (mProgram != 0) glDeleteProgram(mProgram);
    if (mShadowProgram != 0) glDeleteProgram(mShadowProgram);
    if (mEnvBgProgram != 0) glDeleteProgram(mEnvBgProgram);
@@ -1369,6 +1369,45 @@ bool Render3DNode::EnsureResources(int w, int h, int sampleCount)
    return true;
 }
 
+namespace
+{
+   // Depth-first expansion of Group 3D containers into the sources they hold.
+   // Bounded twice over - the count cap and the depth cap - so a cycle (a group
+   // somehow patched into itself) cannot spin.
+   void FlattenGeometry(IGeometrySource* source, int depth, int maxCount,
+                        std::vector<IGeometrySource*>& out)
+   {
+      if (source == nullptr || (int)out.size() >= maxCount)
+         return;
+      const int children = source->GroupChildCount();
+      if (children > 0 && depth < 8)
+      {
+         for (int i = 0; i < children; i++)
+            FlattenGeometry(source->GroupChild(i), depth + 1, maxCount, out);
+         return;
+      }
+      out.push_back(source);
+   }
+}
+
+std::vector<IGeometrySource*> Render3DNode::FlattenedGeometry() const
+{
+   std::vector<IGeometrySource*> out;
+   for (int i = 0; i < kSlots; i++)
+      FlattenGeometry(geometry[i], 0, kMaxDraw, out);
+   return out;
+}
+
+const std::vector<IGeometrySource*>& Render3DNode::CollectDraw()
+{
+   mDraw = FlattenedGeometry();
+   // GPU buffers follow the draw list; a shrunk list gives its tail back.
+   for (size_t i = mDraw.size(); i < mGpu.size(); i++)
+      ReleaseGpuMesh(mGpu[i]);
+   mGpu.resize(mDraw.size());
+   return mDraw;
+}
+
 Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
 {
    SceneSignature sig;
@@ -1399,12 +1438,25 @@ Render3DNode::SceneSignature Render3DNode::BuildSceneSignature()
          sig.animated = true;
    }
 
-   for (int i = 0; i < kSlots; i++)
+   const size_t drawCount = mDraw.size();
+   sig.hasGeom.assign(drawCount, 0);
+   sig.meshRev.assign(drawCount, 0);
+   sig.cloudRev.assign(drawCount, 0);
+   sig.curveRev.assign(drawCount, 0);
+   sig.surfaceTexRev.assign(drawCount, 0);
+   sig.material.assign(drawCount, Material());
+   sig.mapping.assign(drawCount, MappingTransform());
+   sig.modelMatrix.assign(drawCount, Mat4::Identity());
+   sig.instanceRev.assign(drawCount, 0);
+   sig.instanceCount.assign(drawCount, 0);
+   sig.instanceGroupMatrix.assign(drawCount, Mat4::Identity());
+
+   for (int i = 0; i < (int)drawCount; i++)
    {
-      IGeometrySource* source = geometry[i];
+      IGeometrySource* source = mDraw[i];
       if (source == nullptr)
          continue;
-      sig.hasGeom[i] = true;
+      sig.hasGeom[i] = 1;
       // Tracked as three separate fields, not XOR-folded - see the comment
       // on SceneSignature in Geometry3DNodes.h for why folding them silently
       // broke cache invalidation for several node types.
@@ -1468,9 +1520,10 @@ void Render3DNode::CookIfNeeded(int frameId)
       return;
 
    // Pull any textures the geometry wants before we start drawing.
-   for (int i = 0; i < kSlots; i++)
+   CollectDraw();
+   for (int i = 0; i < (int)mDraw.size(); i++)
    {
-      if (auto* node = dynamic_cast<INode*>(geometry[i]))
+      if (auto* node = dynamic_cast<INode*>(mDraw[i]))
          node->CookIfNeeded(frameId);
    }
 
@@ -1654,9 +1707,9 @@ void Render3DNode::CookIfNeeded(int frameId)
          glUniformMatrix4fv(glGetUniformLocation(mShadowProgram, "uLightViewProj"),
                             1, GL_FALSE, mLightViewProj.m);
 
-         for (int i = 0; i < kSlots; i++)
+         for (int i = 0; i < (int)mDraw.size(); i++)
          {
-            IGeometrySource* source = geometry[i];
+            IGeometrySource* source = mDraw[i];
             if (source == nullptr || mGpu[i].vao == 0 || mGpu[i].indexCount == 0)
                continue;
             glBindVertexArray(mGpu[i].vao);
@@ -2062,7 +2115,7 @@ void Render3DNode::CookIfNeeded(int frameId)
    // the transmissive pass below - see the two-pass driver after this lambda.
    auto drawSlot = [&](int i)
    {
-      IGeometrySource* source = geometry[i];
+      IGeometrySource* source = mDraw[i];
       if (source == nullptr)
          return;
 
@@ -2422,9 +2475,9 @@ void Render3DNode::CookIfNeeded(int frameId)
    };
 
    bool anyTransmissive = false;
-   for (int i = 0; i < kSlots; i++)
+   for (int i = 0; i < (int)mDraw.size(); i++)
    {
-      IGeometrySource* s = geometry[i];
+      IGeometrySource* s = mDraw[i];
       if (s != nullptr && s->GetPointCloud() == nullptr && s->GetMaterial().transmission > 0.001f)
       {
          anyTransmissive = true;
@@ -2432,9 +2485,9 @@ void Render3DNode::CookIfNeeded(int frameId)
       }
    }
 
-   for (int i = 0; i < kSlots; i++)
+   for (int i = 0; i < (int)mDraw.size(); i++)
    {
-      IGeometrySource* s = geometry[i];
+      IGeometrySource* s = mDraw[i];
       if (s == nullptr)
          continue;
       // Transmissive slots are deferred to the pass below, which needs a
@@ -2482,9 +2535,9 @@ void Render3DNode::CookIfNeeded(int frameId)
       // other correctly - the known thick/overlapping-glass limitation noted
       // on Material::transmission.
       glDepthMask(GL_FALSE);
-      for (int i = 0; i < kSlots; i++)
+      for (int i = 0; i < (int)mDraw.size(); i++)
       {
-         IGeometrySource* s = geometry[i];
+         IGeometrySource* s = mDraw[i];
          if (s == nullptr || s->GetMaterial().transmission <= 0.001f)
             continue;
          drawSlot(i);
@@ -2499,9 +2552,9 @@ void Render3DNode::CookIfNeeded(int frameId)
    {
       struct TranslucentDraw { float depth; int slot; };
       std::vector<TranslucentDraw> translucent;
-      for (int i = 0; i < kSlots; i++)
+      for (int i = 0; i < (int)mDraw.size(); i++)
       {
-         IGeometrySource* s = geometry[i];
+         IGeometrySource* s = mDraw[i];
          if (!isTranslucentMesh(s))
             continue;
          const Mesh& mesh = s->GetMesh();

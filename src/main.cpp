@@ -205,6 +205,7 @@ static void JoinLiveTier1();                          // defined next to ParamKe
 #include "nodes/FeedbackNodes.h"
 #include "nodes/SwitcherNode.h"
 #include "nodes/Switcher3DNode.h"
+#include "nodes/Group3DNode.h"
 #include "nodes/ModulatorNodes.h"
 #include "nodes/PredictionNodes.h"
 #include "nodes/PredictiveNotesNode.h"
@@ -6323,6 +6324,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       REGISTER_NODE(DistributePointsInGridNode, Distribute Points in Grid, "3D");
       REGISTER_NODE(MergeByDistanceNode, Merge by Distance, "3D");
       REGISTER_NODE(Switcher3DNode, Switcher 3D, "3D");
+      REGISTER_NODE(Group3DNode, Group 3D, "3D");
       REGISTER_NODE(CameraNode, Camera, "3D");
       REGISTER_NODE(LightNode, Light, "3D");
       REGISTER_NODE(EnvironmentNode, HDRI, "3D");
@@ -7496,6 +7498,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       // DistributePointsInGridNode has no inputs - falls through to 0 below.
       if (dynamic_cast<Switcher3DNode*>(gn.node.get()) != nullptr)
          return Switcher3DNode::kSlots;
+      if (dynamic_cast<Group3DNode*>(gn.node.get()) != nullptr)
+         return Group3DNode::kSlots;
       if (dynamic_cast<FeedbackNode*>(gn.node.get()) != nullptr)
          return 1;
       if (dynamic_cast<TrailsNode*>(gn.node.get()) != nullptr)
@@ -7665,10 +7669,9 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
    }
 
    // Upper bound on how many geometry-input slots any single node exposes via
-   // GeometryInputSlot() - the widest today is JoinGeometryNode/Switcher3DNode
-   // at 4. Generic loops over "every geometry slot this node might have" stop
-   // here rather than walking off into unrelated pins.
-   const int kMaxGeometrySlots = 4;
+   // GeometryInputSlot() - the widest today is Group3DNode at 8. Generic loops over
+   // "every geometry slot this node might have" stop here rather than walking off into unrelated pins.
+   const int kMaxGeometrySlots = 8;
 
    // Upper bound on how many audio/note-input slots any single node exposes.
    // The widest today is Mixer, at MixerNode::kMaxSlots (12).
@@ -27925,9 +27928,8 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       float hi[3] = { -1e30f, -1e30f, -1e30f };
       bool any = false;
 
-      for (int i = 0; i < Render3DNode::kSlots; i++)
+      for (IGeometrySource* source : n->FlattenedGeometry())
       {
-         IGeometrySource* source = n->geometry[i];
          if (source == nullptr)
             continue;
          const Mesh& mesh = source->GetMesh();
@@ -28027,10 +28029,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
 
    void DrawRender3DParams(Render3DNode* n)
    {
-      int connected = 0;
-      for (int i = 0; i < Render3DNode::kSlots; i++)
-         if (n->geometry[i] != nullptr)
-            connected++;
+      const int connected = (int)n->FlattenedGeometry().size();
       ImGui::TextDisabled("%d geometry, %s camera", connected, n->camera ? "patched" : "built-in");
       ImGui::SameLine(0.0f, 16.0f);
       ImGui::TextDisabled("%zu triangles in %zu draw calls", n->LastTriangleCount(), n->LastDrawCalls());
@@ -42042,6 +42041,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Render 3D", "Rasterizes the geometry/camera/light/material graph into an image. Antialiasing is reduced automatically at large output sizes to stay within GPU limits. Scenes over ~2 million triangles get noticeably heavier to render. An HDRI node patched into the env input replaces the procedural sky gradient for background, reflections and ambient light." },
          { "Model 3D", "Loads a 3D model file - obj, ply, stl, usd or usdz." },
          { "Null 3D", "A pass-through node for geometry: its output is exactly its input mesh, unchanged. Useful as a stable junction point to branch geometry to several destinations." },
+         { "Group 3D", "Carries up to eight geometry inputs through one pin into Render 3D (or into another Group 3D), so a scene is not limited to Render 3D's four geometry pins. Nothing is merged: each input keeps its own material, texture, mapping and transform. It only means something to Render 3D - use Join Geometry to combine meshes into one." },
          { "Switcher 3D", "Cycles between up to four connected geometry inputs every N beats or seconds, forwarding whichever one is active. Can be pinned to one input with 'manual'. Unlike the 2D Switcher, there is no crossfade - it always hard-cuts, since interpolating between two arbitrary meshes' topology isn't generally well-defined." },
 
          // ---------------- Join Geometry boolean modes (also spawnable directly) ----------------
@@ -89058,6 +89058,49 @@ int main(int argc, char** argv)
          printf("%s\n", ok ? "PHASE E OK" : "SUSPECT");
       }
 
+      if (getenv("INFINITE_GROUP3DTEST") != nullptr && frameId == 6)
+      {
+         // R274: six objects reach one Render 3D through two pins by way of
+         // Group 3D, one of them nested inside the other. Every object must be
+         // drawn - the old four-pin cap would have dropped two - and the cap
+         // on a runaway group must hold.
+         std::vector<std::unique_ptr<GeometryNode>> cubes;
+         for (int i = 0; i < 6; i++)
+         {
+            cubes.emplace_back(new GeometryNode());
+            cubes.back()->shape = 0;
+         }
+         Group3DNode inner, outer;
+         Render3DNode render;
+         render.width = 64.0f; render.height = 64.0f;
+         for (int i = 0; i < 4; i++) outer.inputs[i] = cubes[i].get();
+         inner.inputs[0] = cubes[4].get();
+         inner.inputs[1] = cubes[5].get();
+         outer.inputs[4] = &inner;
+         render.geometry[0] = &outer;
+
+         const size_t perCube = cubes[0]->GetMesh().indices.size() / 3;
+         const size_t flat = render.FlattenedGeometry().size();
+         render.CookIfNeeded(frameId);
+         const bool flatOk = flat == 6;
+         const bool trisOk = perCube > 0 && render.LastTriangleCount() == perCube * 6;
+         printf("  flattened %zu of 6, triangles %zu (expect %zu)  %s\n", flat,
+                render.LastTriangleCount(), perCube * 6, (flatOk && trisOk) ? "OK" : "FAIL");
+
+         // A group patched into itself must terminate and stay under the cap.
+         Group3DNode loop;
+         loop.inputs[0] = &loop;
+         loop.inputs[1] = cubes[0].get();
+         Render3DNode loopRender;
+         loopRender.geometry[0] = &loop;
+         const size_t loopFlat = loopRender.FlattenedGeometry().size();
+         const bool loopOk = loopFlat <= (size_t)Render3DNode::kMaxDraw;
+         printf("  self-referencing group flattens to %zu (cap %d)  %s\n", loopFlat,
+                Render3DNode::kMaxDraw, loopOk ? "OK" : "FAIL");
+
+         printf("%s\n", (flatOk && trisOk && loopOk) ? "GROUP3DTEST OK" : "GROUP3DTEST FAIL - BUG");
+      }
+
       if (getenv("INFINITE_WRAPTEST") != nullptr && frameId == 4)
       {
          // The whole point of the cylindrical mode is that it is a coordinate
@@ -97639,6 +97682,7 @@ int main(int argc, char** argv)
                   dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<WrapNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<Switcher3DNode*>(gn.node.get()) != nullptr ||
+                  dynamic_cast<Group3DNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<MetaBallNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<CurveNode*>(gn.node.get()) != nullptr ||
                   dynamic_cast<MeshResynthNode*>(gn.node.get()) != nullptr ||
@@ -97708,6 +97752,8 @@ int main(int argc, char** argv)
                snprintf(line, sizeof(line), "%zu tris", wr->TriangleCount());
             else if (auto* sw3 = dynamic_cast<Switcher3DNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "showing input %c", 'A' + sw3->ActiveSlot());
+            else if (auto* grp = dynamic_cast<Group3DNode*>(gn.node.get()))
+               snprintf(line, sizeof(line), "%d in group", grp->GroupChildCount());
             else if (auto* cl = dynamic_cast<ClothNode*>(gn.node.get()))
                snprintf(line, sizeof(line), "%zu tris, %zu links", cl->TriangleCount(), cl->ConstraintCount());
             else if (auto* mrs = dynamic_cast<MeshResynthNode*>(gn.node.get()))
@@ -105150,6 +105196,7 @@ int main(int argc, char** argv)
                 dynamic_cast<JoinGeometryNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<WrapNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<Switcher3DNode*>(gn.node.get()) != nullptr ||
+                dynamic_cast<Group3DNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<MetaBallNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<CurveNode*>(gn.node.get()) != nullptr ||
                 dynamic_cast<MeshToPointsNode*>(gn.node.get()) != nullptr ||
