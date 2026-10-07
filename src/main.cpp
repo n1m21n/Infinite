@@ -462,6 +462,9 @@ namespace
       DrawCheckerboardBackdrop(dl, origin, ImVec2(origin.x + size, origin.y + size), rounding);
    }
 
+   bool TextFocusClaimed(); // one answer to "is a text field about to take the keystrokes" - defined below
+
+
    // Blender-style numpad view hotkeys for any hovered orbit-camera viewport
    // item (mini-viewport, viewport-panel card, Render3D preview): 1/3/7 snap
    // to front/right/top, Ctrl+1/3/7 to back/left/bottom, 0 to a default
@@ -480,7 +483,7 @@ namespace
    // matching drag-orbit there, which also pushes no undo checkpoint.
    bool ApplyViewHotkeys(float& azimuth, float& elevation, const std::function<void()>& onWillChange = nullptr)
    {
-      if (!ImGui::IsItemHovered() || ImGui::GetIO().WantTextInput)
+      if (!ImGui::IsItemHovered() || TextFocusClaimed())
          return false;
 
       const bool ctrl = ImGui::GetIO().KeyCtrl;
@@ -2857,6 +2860,20 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       gDiscreteParamCounter = kDiscreteParamBase;
    }
 
+   // io.WantTextInput is computed at the end of the previous frame, so on the frame a text field takes
+   // focus it is still false and hover-to-type would eat the first keystroke for a knob under the
+   // pointer. This also reads the live ImGui state (an InputText or temp-input that already owns the
+   // active id) and the app's own text owners, so every hover-to-type site shares one answer.
+   bool TextFocusClaimed()
+   {
+      ImGuiContext& g = *ImGui::GetCurrentContext();
+      if (g.IO.WantTextInput || !gTypedParam.empty() || gCommentEdit.target != nullptr || gNavOwnsKeys)
+         return true;
+      if (g.ActiveId != 0 && (g.InputTextState.ID == g.ActiveId || g.TempInputId == g.ActiveId))
+         return true;
+      return false;
+   }
+
    // Opens the text field for a param, seeded either from its current numeric
    // value or (if it's already driven by an expression) from that expression
    // text with its '=' prefix - used by both double-click and right-click.
@@ -2893,7 +2910,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
       // belongs to it. Without this, a mouse resting over a different param
       // treated the same keystrokes as its own hover-to-type, stole the
       // focus, and the field the user actually double-clicked closed empty.
-      if (!gTypedParam.empty() || io.WantTextInput)
+      if (TextFocusClaimed())
          return;
       for (int i = 0; i < io.InputQueueCharacters.Size; ++i)
       {
@@ -20359,7 +20376,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
             n->SetKeyState(note, false);
          // !gArrangeFocused: the timeline owns the keyboard (its M marker
          // key would otherwise also play a note here).
-         else if (n->computerKeyboardEnabled && isHovered && !ImGui::GetIO().WantTextInput && !gArrangeFocused
+         else if (n->computerKeyboardEnabled && isHovered && !TextFocusClaimed() && !gArrangeFocused
                   && ImGui::IsKeyPressed(tk.key, false))
             n->SetKeyState(note, true);
       }
@@ -28827,7 +28844,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
 
       // Hover & typing / double-click / Enter to edit
       ImGuiIO& io = ImGui::GetIO();
-      if (hovered && !gripHovered && !gripActive && gCommentEdit.target == nullptr && !io.WantTextInput)
+      if (hovered && !gripHovered && !gripActive && gCommentEdit.target == nullptr && !TextFocusClaimed())
       {
          bool shouldOpen = ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
          if (!shouldOpen && !io.KeyCtrl && !io.KeySuper && !io.KeyAlt)
@@ -85177,6 +85194,34 @@ int main(int argc, char** argv)
          }
          printf("[THEMECONTRASTTEST] %s\n", ok ? "THEMECONTRASTTEST OK" : "THEMECONTRASTTEST FAIL");
          glfwSetWindowShouldClose(window, GLFW_TRUE);
+      }
+
+      // R575: on the frame a text field takes focus io.WantTextInput is still false, TextFocusClaimed() is not.
+      if (getenv("INFINITE_TEXTFOCUSTEST") != nullptr && frameId >= 3 && frameId <= 8)
+      {
+         static bool sawLag = false, claimedOnLag = false, claimedIdle = true;
+         static char buf[16] = "";
+         ImGui::SetNextWindowPos(ImVec2(40, 40));
+         ImGui::Begin("##textfocustest", nullptr, ImGuiWindowFlags_NoNav);
+         if (frameId == 3)
+            claimedIdle = !TextFocusClaimed() ? true : false;
+         if (frameId == 5)
+            ImGui::SetKeyboardFocusHere();
+         ImGui::InputText("##tf", buf, sizeof(buf));
+         if (frameId >= 5 && !sawLag && ImGui::GetCurrentContext()->ActiveId != 0)
+         {
+            sawLag = !ImGui::GetIO().WantTextInput;
+            claimedOnLag = TextFocusClaimed();
+            printf("[TEXTFOCUSTEST] frame %d: WantTextInput=%d claimed=%d\n", frameId, (int)ImGui::GetIO().WantTextInput, (int)claimedOnLag);
+         }
+         ImGui::End();
+         if (frameId == 8)
+         {
+            const bool ok = claimedIdle && sawLag && claimedOnLag;
+            printf("[TEXTFOCUSTEST] idle=%d lagSeen=%d claimedOnLag=%d\n", (int)claimedIdle, (int)sawLag, (int)claimedOnLag);
+            printf("[TEXTFOCUSTEST] %s\n", ok ? "TEXTFOCUSTEST OK" : "TEXTFOCUSTEST FAIL");
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+         }
       }
 
       // R506: an anti-aliased edge keeps the shape's own colour and only alpha falls off (straight alpha).
