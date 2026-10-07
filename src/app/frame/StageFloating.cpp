@@ -43,7 +43,7 @@ int DrawFloating(FrameCtx& fc)
          if (ImGui::Begin("UI Style Editor", &gUiStyleEditorOpen))
          {
             ImGuiStyle& style = ImGui::GetStyle();
-            ImGui::TextDisabled("Live-editing this ImGuiStyle for inspection only - not saved.");
+            ImGui::TextDisabled("%s", T("Live-editing this ImGuiStyle for inspection only - not saved."));
             static char colorFilter[64] = "";
             ImGui::InputTextWithHint("##colorfilter", "filter colors...", colorFilter, sizeof(colorFilter));
             if (ImGui::BeginChild("##colorlist"))
@@ -81,13 +81,13 @@ int DrawFloating(FrameCtx& fc)
          {
             ImGui::TextUnformatted("File changed on disk.");
             ImGui::SameLine();
-            if (ImGui::Button("Reload"))
+            if (ImGui::Button(L("Reload")))
             {
                if (LoadPatchFromImpl(gPatchWatchPath, true))
                   gPatchChangedOnDisk = false;
             }
             ImGui::SameLine();
-            if (ImGui::Button("Keep mine"))
+            if (ImGui::Button(L("Keep mine")))
                gPatchChangedOnDisk = false;
          }
          ImGui::End();
@@ -101,8 +101,8 @@ int DrawFloating(FrameCtx& fc)
       ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       if (ImGui::BeginPopupModal("Unsaved Changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
       {
-         ImGui::Text("This patch has unsaved changes.");
-         ImGui::Text("Save before closing?");
+         ImGui::Text("%s", T("This patch has unsaved changes."));
+         ImGui::Text("%s", T("Save before closing?"));
          ImGui::Separator();
          const float btnW = 100.0f;
          const float spacing = ImGui::GetStyle().ItemSpacing.x;
@@ -114,13 +114,13 @@ int DrawFloating(FrameCtx& fc)
          // convention: the recommended default action is rightmost and
          // the only one drawn with emphasis - matching the fix in the
          // Recover Autosave modal below, which had the identical defect).
-         if (ImGui::Button("Cancel", ImVec2(btnW, 0)))
+         if (ImGui::Button(L("Cancel"), ImVec2(btnW, 0)))
          {
             gPendingUnsavedAction = nullptr;
             ImGui::CloseCurrentPopup();
          }
          ImGui::SameLine();
-         if (ImGui::Button("Don't Save", ImVec2(btnW, 0)))
+         if (ImGui::Button(L("Don't Save"), ImVec2(btnW, 0)))
          {
             if (gPendingUnsavedAction)
                gPendingUnsavedAction();
@@ -129,7 +129,7 @@ int DrawFloating(FrameCtx& fc)
          }
          ImGui::SameLine();
          PushPrimaryButtonStyle();
-         const bool doSave = ImGui::Button("Save", ImVec2(btnW, 0));
+         const bool doSave = ImGui::Button(L("Save"), ImVec2(btnW, 0));
          PopPrimaryButtonStyle();
          if (doSave)
          {
@@ -172,14 +172,14 @@ int DrawFloating(FrameCtx& fc)
                // clock, so the modal never looks frozen while the request
                // is in flight.
                int dots = ((int)(ImGui::GetTime() * 2.0) % 4);
-               ImGui::Text("Checking for updates%.*s", dots, "...");
+               ImGui::Text(T("Checking for updates%.*s"), dots, "...");
                break;
             }
             case UpdateCheck::Status::UpToDate:
-               ImGui::Text("You're running the latest version (%s).", INFINITE_VERSION_STRING);
+               ImGui::Text(T("You're running the latest version (%s)."), INFINITE_VERSION_STRING);
                break;
             case UpdateCheck::Status::UpdateAvailable:
-               ImGui::Text("Version %s is available (you have %s).",
+               ImGui::Text(T("Version %s is available (you have %s)."),
                            UpdateCheck::ResultVersion().c_str(), INFINITE_VERSION_STRING);
                break;
             case UpdateCheck::Status::Failed:
@@ -194,28 +194,28 @@ int DrawFloating(FrameCtx& fc)
          if (status == UpdateCheck::Status::UpdateAvailable)
          {
             PushPrimaryButtonStyle();
-            const bool doDownload = ImGui::Button("Download latest version");
+            const bool doDownload = ImGui::Button(L("Download latest version"));
             PopPrimaryButtonStyle();
             if (doDownload)
                Platform::OpenExternalUrl(UpdateCheck::DownloadUrl());
             ImGui::SameLine();
-            if (ImGui::Button("Later"))
+            if (ImGui::Button(L("Later")))
                ImGui::CloseCurrentPopup();
          }
          else if (status == UpdateCheck::Status::Failed)
          {
             PushPrimaryButtonStyle();
-            const bool doRetry = ImGui::Button("Retry");
+            const bool doRetry = ImGui::Button(L("Retry"));
             PopPrimaryButtonStyle();
             if (doRetry)
                UpdateCheck::Start();
             ImGui::SameLine();
-            if (ImGui::Button("Close"))
+            if (ImGui::Button(L("Close")))
                ImGui::CloseCurrentPopup();
          }
          else if (status == UpdateCheck::Status::UpToDate)
          {
-            if (ImGui::Button("Close"))
+            if (ImGui::Button(L("Close")))
                ImGui::CloseCurrentPopup();
          }
          // Idle/Checking: no buttons yet, just wait for Poll() to land a result.
@@ -231,12 +231,12 @@ int DrawFloating(FrameCtx& fc)
       ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
       if (ImGui::BeginPopupModal("Recover Autosave", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
       {
-         ImGui::Text("Infinite closed unexpectedly.");
+         ImGui::Text("%s", T("Infinite closed unexpectedly."));
          if (!gAutosaveRecoveryTimestamp.empty())
-            ImGui::Text("A recovered version of your work from %s is available.",
+            ImGui::Text(T("A recovered version of your work from %s is available."),
                         gAutosaveRecoveryTimestamp.c_str());
          else
-            ImGui::Text("A recovered version of your work is available.");
+            ImGui::Text("%s", T("A recovered version of your work is available."));
          ImGui::Separator();
          {
             const float btnW = 100.0f;
@@ -249,7 +249,7 @@ int DrawFloating(FrameCtx& fc)
          // Discard (destructive, plain) on the left, Recover (recommended,
          // emphasized) rightmost - same right-aligned/primary-emphasis
          // convention as the Unsaved Changes modal above.
-         if (ImGui::Button("Discard", ImVec2(100, 0)))
+         if (ImGui::Button(L("Discard"), ImVec2(100, 0)))
          {
             DiscardAutosave();
             const std::string marker = AutosaveMarkerPath();
@@ -262,7 +262,7 @@ int DrawFloating(FrameCtx& fc)
          }
          ImGui::SameLine();
          PushPrimaryButtonStyle();
-         const bool doRecover = ImGui::Button("Recover", ImVec2(100, 0));
+         const bool doRecover = ImGui::Button(L("Recover"), ImVec2(100, 0));
          PopPrimaryButtonStyle();
          if (doRecover)
          {

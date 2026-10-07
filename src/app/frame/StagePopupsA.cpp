@@ -19,19 +19,19 @@ void DrawPopupsA(FrameCtx& fc)
          }
          else if (auto* g = dynamic_cast<GroupNode*>(gn->node.get()))
          {
-            if (ImGui::MenuItem("Rename"))
+            if (ImGui::MenuItem(L("Rename")))
             {
                PushUndoCheckpoint();
                g->renaming = true;
                g->renameJustStarted = true;
             }
-            if (ImGui::MenuItem("Ungroup"))
+            if (ImGui::MenuItem(L("Ungroup")))
             {
                ed::ClearSelection();
                ed::SelectNode(gn->NodeId());
                gRequestUngroup = true;
             }
-            if (ImGui::MenuItem("Duplicate", MODKEY "+D"))
+            if (ImGui::MenuItem(L("Duplicate"), MODKEY "+D"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
                {
@@ -44,7 +44,7 @@ void DrawPopupsA(FrameCtx& fc)
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.35f, 0.35f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.85f, 0.20f, 0.20f, 0.25f));
             ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.85f, 0.20f, 0.20f, 0.40f));
-            if (ImGui::MenuItem("Delete Group", "Backspace"))
+            if (ImGui::MenuItem(L("Delete Group"), "Backspace"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
                {
@@ -57,13 +57,13 @@ void DrawPopupsA(FrameCtx& fc)
          }
          else if (auto* c = dynamic_cast<CommentNode*>(gn->node.get()))
          {
-            if (ImGui::MenuItem("Edit Note"))
+            if (ImGui::MenuItem(L("Edit Note")))
             {
                PushUndoCheckpoint();
                gCommentEdit.target = c;
                gCommentEdit.justOpened = true;
             }
-            if (ImGui::BeginMenu("Font Size"))
+            if (ImGui::BeginMenu(L("Font Size")))
             {
                const char* sizeLabels[] = { "Small", "Normal", "Large", "Extra Large" };
                for (int sIdx = 0; sIdx < 4; sIdx++)
@@ -78,7 +78,7 @@ void DrawPopupsA(FrameCtx& fc)
                }
                ImGui::EndMenu();
             }
-            if (ImGui::MenuItem("Change Colour..."))
+            if (ImGui::MenuItem(L("Change Colour...")))
             {
                PushUndoCheckpoint();
                gColor.target = c->color;
@@ -86,7 +86,7 @@ void DrawPopupsA(FrameCtx& fc)
                gColor.label = "colour";
                gColor.justOpened = true;
             }
-            if (ImGui::MenuItem("Duplicate", MODKEY "+D"))
+            if (ImGui::MenuItem(L("Duplicate"), MODKEY "+D"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
                {
@@ -97,7 +97,7 @@ void DrawPopupsA(FrameCtx& fc)
             }
             if (GroupNode* owner = GroupOwning(gn->index))
             {
-               if (ImGui::MenuItem("Ungroup"))
+               if (ImGui::MenuItem(L("Ungroup")))
                {
                   PushUndoCheckpoint();
                   gGroupMembers[owner].erase(gn->index);
@@ -117,7 +117,7 @@ void DrawPopupsA(FrameCtx& fc)
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.35f, 0.35f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.85f, 0.20f, 0.20f, 0.25f));
             ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.85f, 0.20f, 0.20f, 0.40f));
-            if (ImGui::MenuItem("Delete Note", "Backspace"))
+            if (ImGui::MenuItem(L("Delete Note"), "Backspace"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
                {
@@ -142,7 +142,7 @@ void DrawPopupsA(FrameCtx& fc)
                   RebuildAudioTopology();
                }
             }
-            if (ImGui::MenuItem("Duplicate", MODKEY "+D"))
+            if (ImGui::MenuItem(L("Duplicate"), MODKEY "+D"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
                {
@@ -157,12 +157,12 @@ void DrawPopupsA(FrameCtx& fc)
             {
                if (gn->showParams)
                {
-                  if (ImGui::MenuItem("Hide params"))
+                  if (ImGui::MenuItem(L("Hide params")))
                      gn->showParams = false;
                }
                else
                {
-                  if (ImGui::MenuItem("Show params"))
+                  if (ImGui::MenuItem(L("Show params")))
                      gn->showParams = true;
                }
             }
@@ -170,18 +170,18 @@ void DrawPopupsA(FrameCtx& fc)
             {
                if (gn->showMiniViewport)
                {
-                  if (ImGui::MenuItem("Hide viewport"))
+                  if (ImGui::MenuItem(L("Hide viewport")))
                      gn->showMiniViewport = false;
                }
                else
                {
-                  if (ImGui::MenuItem("Show viewport"))
+                  if (ImGui::MenuItem(L("Show viewport")))
                      gn->showMiniViewport = true;
                }
             }
             if (CanShowInViewportPanel(*gn))
             {
-               if (ImGui::MenuItem("Open in viewport panel"))
+               if (ImGui::MenuItem(L("Open in viewport panel")))
                {
                   if (std::find(gViewportPanelNodes.begin(), gViewportPanelNodes.end(), gn->index) ==
                       gViewportPanelNodes.end())
@@ -191,35 +191,35 @@ void DrawPopupsA(FrameCtx& fc)
             }
             if (dynamic_cast<IModulator*>(gn->node.get()) != nullptr)
             {
-               if (ImGui::MenuItem("Show modulation matrix"))
+               if (ImGui::MenuItem(L("Show modulation matrix")))
                   gModMatrixOpen = true;
             }
             if (IsNodeVideoCompatible(*gn) && IsNodeAudioCompatible(*gn))
             {
                // Picture and sound from one node (Video Source): the user
                // picks the lane; the audio clip reads its audio output.
-               if (ImGui::BeginMenu("Add to Timeline"))
+               if (ImGui::BeginMenu(L("Add to Timeline")))
                {
-                  if (ImGui::MenuItem("Video"))
+                  if (ImGui::MenuItem(L("Video")))
                      AddNodeToArrangeTimeline(gn->index, Arrange::kLaneVideo);
-                  if (ImGui::MenuItem("Audio"))
+                  if (ImGui::MenuItem(L("Audio")))
                      AddNodeToArrangeTimeline(gn->index, Arrange::kLaneAudio);
                   ImGui::EndMenu();
                }
             }
             else if (IsNodeVideoCompatible(*gn) || IsNodeAudioCompatible(*gn))
             {
-               if (ImGui::MenuItem("Add to Timeline"))
+               if (ImGui::MenuItem(L("Add to Timeline")))
                   AddNodeToArrangeTimeline(gn->index);
             }
             ProjectorWindow* projector = FindProjectorWindow(gn->index);
             if (CanShowInViewportPanel(*gn) && projector != nullptr)
             {
-               if (ImGui::BeginMenu("Output window"))
+               if (ImGui::BeginMenu(L("Output window")))
                {
-                  if (ImGui::MenuItem("Fullscreen", "F11", projector->fullscreen))
+                  if (ImGui::MenuItem(L("Fullscreen"), "F11", projector->fullscreen))
                      ToggleProjectorFullscreen(*projector);
-                  if (ImGui::BeginMenu("Display"))
+                  if (ImGui::BeginMenu(L("Display")))
                   {
                      int monitorCount = 0;
                      GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
@@ -234,21 +234,21 @@ void DrawPopupsA(FrameCtx& fc)
                      ImGui::EndMenu();
                   }
                   ImGui::Separator();
-                  if (ImGui::MenuItem("Close window"))
+                  if (ImGui::MenuItem(L("Close window")))
                      CloseProjectorWindowFor(gn->index);
                   ImGui::EndMenu();
                }
             }
             else if (CanShowInViewportPanel(*gn))
             {
-               if (ImGui::MenuItem("Open in new window"))
+               if (ImGui::MenuItem(L("Open in new window")))
                   OpenProjectorWindow(window, *gn);
             }
 
             ImGui::Separator();
 
             // Information & Hierarchy
-            if (ImGui::MenuItem("Help"))
+            if (ImGui::MenuItem(L("Help")))
             {
                gHelpPopupNodeIndex = gn->index;
                ImGui::CloseCurrentPopup();
@@ -256,7 +256,7 @@ void DrawPopupsA(FrameCtx& fc)
             }
             if (GroupNode* owner = GroupOwning(gn->index))
             {
-               if (ImGui::MenuItem("Ungroup"))
+               if (ImGui::MenuItem(L("Ungroup")))
                {
                   PushUndoCheckpoint();
                   gGroupMembers[owner].erase(gn->index);
@@ -279,7 +279,7 @@ void DrawPopupsA(FrameCtx& fc)
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.35f, 0.35f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.85f, 0.20f, 0.20f, 0.25f));
             ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.85f, 0.20f, 0.20f, 0.40f));
-            if (ImGui::MenuItem("Delete Node", "Backspace"))
+            if (ImGui::MenuItem(L("Delete Node"), "Backspace"))
             {
                if (!ed::IsNodeSelected(gn->NodeId()))
                {
@@ -479,7 +479,7 @@ void DrawPopupsA(FrameCtx& fc)
             {
                // The param didn't draw this frame (e.g. a collapsed node) -
                // nothing to edit against, so just offer Unbind.
-               ImGui::TextDisabled("(parameter not visible)");
+               ImGui::TextDisabled("%s", T("(parameter not visible)"));
             }
             else
             {
@@ -488,10 +488,10 @@ void DrawPopupsA(FrameCtx& fc)
                // A bool wants a toggle and an enum wants a selector; a knob
                // is only the right default for a continuous param.
                const int perfKind = destRef->isBool ? 3 : (destRef->isEnum ? 7 : 0);
-               if (ImGui::MenuItem("Add to Performance Matrix"))
+               if (ImGui::MenuItem(L("Add to Performance Matrix")))
                   AddToPerformanceMatrix(nodeIndex, paramIndex, perfKind);
                DrawParamMidiLearnMenuItem(nodeIndex, paramIndex);
-               if (ImGui::MenuItem("View in Modulation Matrix"))
+               if (ImGui::MenuItem(L("View in Modulation Matrix")))
                {
                   gModMatrixOpen = true;
                   gModMatrixHighlightNode = nodeIndex;
@@ -522,9 +522,9 @@ void DrawPopupsA(FrameCtx& fc)
                   mod.SetRange(nodeIndex, paramIndex, lo, hi);
                }
                ImGui::Separator();
-               if (ImGui::MenuItem("Full range"))
+               if (ImGui::MenuItem(L("Full range")))
                   mod.SetRange(nodeIndex, paramIndex, destRef->minValue, destRef->maxValue);
-               if (ImGui::MenuItem("Around current"))
+               if (ImGui::MenuItem(L("Around current")))
                {
                   const float span = (destRef->maxValue - destRef->minValue) * 0.25f;
                   const float centre = destRef->value != nullptr ? *destRef->value : src.centre;
@@ -532,11 +532,11 @@ void DrawPopupsA(FrameCtx& fc)
                               std::clamp(centre - span, destRef->minValue, destRef->maxValue),
                               std::clamp(centre + span, destRef->minValue, destRef->maxValue));
                }
-               if (ImGui::MenuItem("Invert"))
+               if (ImGui::MenuItem(L("Invert")))
                   mod.SetRange(nodeIndex, paramIndex, src.hi, src.lo);
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Unbind"))
+            if (ImGui::MenuItem(L("Unbind")))
             {
                PushUndoCheckpoint();
                mod.Unbind(nodeIndex, paramIndex);
@@ -546,14 +546,14 @@ void DrawPopupsA(FrameCtx& fc)
          {
             if (destRef == nullptr)
             {
-               ImGui::TextDisabled("(parameter not visible)");
+               ImGui::TextDisabled("%s", T("(parameter not visible)"));
             }
             else
             {
-               if (ImGui::MenuItem("Edit Expression"))
+               if (ImGui::MenuItem(L("Edit Expression")))
                   BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, destRef->value, valueFmt, /*hasExpr=*/true);
                const int perfKind = destRef->isBool ? 3 : (destRef->isEnum ? 7 : 0);
-               if (ImGui::MenuItem("Add to Performance Matrix"))
+               if (ImGui::MenuItem(L("Add to Performance Matrix")))
                   AddToPerformanceMatrix(nodeIndex, paramIndex, perfKind);
                ImGui::Separator();
                float lo, hi;
@@ -574,13 +574,13 @@ void DrawPopupsA(FrameCtx& fc)
                   mod.SetExpressionRange(nodeIndex, paramIndex, lo, hi);
                }
                ImGui::Separator();
-               if (ImGui::MenuItem("Full range"))
+               if (ImGui::MenuItem(L("Full range")))
                   mod.ClearExpressionRange(nodeIndex, paramIndex);
-               if (ImGui::MenuItem("Invert"))
+               if (ImGui::MenuItem(L("Invert")))
                   mod.SetExpressionRange(nodeIndex, paramIndex, hi, lo);
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Unbind"))
+            if (ImGui::MenuItem(L("Unbind")))
             {
                PushUndoCheckpoint();
                mod.ClearExpression(nodeIndex, paramIndex);
@@ -592,9 +592,9 @@ void DrawPopupsA(FrameCtx& fc)
             {
                // Armed but nothing dragged yet - nothing to configure
                // speed/range against, only the option to back out.
-               ImGui::TextDisabled("Waiting for movement...");
+               ImGui::TextDisabled("%s", T("Waiting for movement..."));
                ImGui::Separator();
-               if (ImGui::MenuItem("Cancel Recording"))
+               if (ImGui::MenuItem(L("Cancel Recording")))
                   rec.CancelArm(nodeIndex, paramIndex);
             }
             else
@@ -613,7 +613,7 @@ void DrawPopupsA(FrameCtx& fc)
                }
                ImGui::Separator();
                const int perfKind = destRef != nullptr ? (destRef->isBool ? 3 : (destRef->isEnum ? 7 : 0)) : 0;
-               if (ImGui::MenuItem("Add to Performance Matrix"))
+               if (ImGui::MenuItem(L("Add to Performance Matrix")))
                   AddToPerformanceMatrix(nodeIndex, paramIndex, perfKind);
                ImGui::Separator();
                const float defLo = destRef != nullptr ? destRef->minValue : 0.0f;
@@ -630,16 +630,16 @@ void DrawPopupsA(FrameCtx& fc)
                if (rangeChanged)
                   rec.SetPlaybackRange(nodeIndex, paramIndex, lo, hi);
                ImGui::Separator();
-               if (ImGui::MenuItem("Full range"))
+               if (ImGui::MenuItem(L("Full range")))
                   rec.ClearPlaybackRange(nodeIndex, paramIndex);
-               if (ImGui::MenuItem("Invert"))
+               if (ImGui::MenuItem(L("Invert")))
                   rec.SetPlaybackRange(nodeIndex, paramIndex, hi, lo);
                ImGui::Separator();
-               if (ImGui::MenuItem("Record Again"))
+               if (ImGui::MenuItem(L("Record Again")))
                   rec.ArmParam(nodeIndex, paramIndex);
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Unbind"))
+            if (ImGui::MenuItem(L("Unbind")))
             {
                rec.CancelArm(nodeIndex, paramIndex);
                rec.StopPlayback(nodeIndex, paramIndex);
@@ -649,7 +649,7 @@ void DrawPopupsA(FrameCtx& fc)
          {
             if (destRef == nullptr)
             {
-               ImGui::TextDisabled("(parameter not visible)");
+               ImGui::TextDisabled("%s", T("(parameter not visible)"));
             }
             else
             {
@@ -660,17 +660,17 @@ void DrawPopupsA(FrameCtx& fc)
                const int perfKind = destRef->isBool ? 3 : (destRef->isEnum ? 7 : 0);
                if (!destRef->isBool)
                {
-                  if (ImGui::MenuItem("Enter Value"))
+                  if (ImGui::MenuItem(L("Enter Value")))
                      BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, destRef->value, valueFmt, /*hasExpr=*/false);
                }
-               if (ImGui::MenuItem("Add to Performance Matrix"))
+               if (ImGui::MenuItem(L("Add to Performance Matrix")))
                   AddToPerformanceMatrix(nodeIndex, paramIndex, perfKind);
                DrawParamMidiLearnMenuItem(nodeIndex, paramIndex);
                if (!destRef->isBool)
                {
-                  if (ImGui::MenuItem("Enter Expression"))
+                  if (ImGui::MenuItem(L("Enter Expression")))
                      BeginTypedEditFromCurrent(editKey, nodeIndex, paramIndex, destRef->value, valueFmt, /*hasExpr=*/true);
-                  if (ImGui::MenuItem("Start Recording"))
+                  if (ImGui::MenuItem(L("Start Recording")))
                   {
                      PushUndoCheckpoint();
                      rec.ArmParam(nodeIndex, paramIndex);

@@ -231,7 +231,7 @@ void DrawPopupsB(FrameCtx& fc)
             // rather than making the user scroll every category to find one.
             if (!gLinkDragSuggestions.empty())
             {
-               ImGui::SeparatorText("Suggested");
+               ImGui::SeparatorText(T("Suggested"));
                for (const auto& t : gLinkDragSuggestions)
                {
                   ++shown;
@@ -292,7 +292,7 @@ void DrawPopupsB(FrameCtx& fc)
                }
             }
             if (shown == 0)
-               ImGui::TextDisabled("no matches");
+               ImGui::TextDisabled("%s", T("no matches"));
          }
 
          if (!spawnName.empty())
@@ -472,7 +472,7 @@ void DrawPopupsB(FrameCtx& fc)
                                               sizeof(gFieldDeviceSave.nameBuf),
                                               ImGuiInputTextFlags_EnterReturnsTrue);
          ImGui::SameLine();
-         bool doSave = enterPressed || ImGui::Button("Save##fielddevicesaveconfirm");
+         bool doSave = enterPressed || ImGui::Button(L("Save##fielddevicesaveconfirm"));
          if (doSave && gFieldDeviceSave.nameBuf[0] != '\0')
          {
             Field::DeviceFile device;
@@ -521,11 +521,11 @@ void DrawPopupsB(FrameCtx& fc)
                const size_t lastSlash = filename.find_last_of("/\\");
                if (lastSlash != std::string::npos)
                   filename = filename.substr(lastSlash + 1);
-               ImGui::TextDisabled("Load %s into:", filename.c_str());
+               ImGui::TextDisabled(T("Load %s into:"), filename.c_str());
             }
             else
             {
-               ImGui::TextDisabled("Load %d samples into:", (int)gAudioDropPicker.paths.size());
+               ImGui::TextDisabled(T("Load %d samples into:"), (int)gAudioDropPicker.paths.size());
             }
             ImGui::Separator();
 
@@ -739,7 +739,7 @@ void DrawPopupsB(FrameCtx& fc)
             }
             ed::Suspend();
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-            ImGui::SetTooltip("Assign to '%s' (%s) -> %s: %s",
+            ImGui::SetTooltip(T("Assign to '%s' (%s) -> %s: %s"),
                               assignElem.label.c_str(),
                               gPerfAssigningAxis == 1 ? "Y Axis" : (assignElem.kind == 4 ? "X Axis" : "Param"),
                               pInfo.nodeTitle.c_str(), pInfo.paramName.c_str());
@@ -836,7 +836,7 @@ void DrawPopupsB(FrameCtx& fc)
                }
                ed::Suspend();
                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-               ImGui::SetTooltip("Follow leader -> %s: %s", pInfo.nodeTitle.c_str(), pInfo.paramName.c_str());
+               ImGui::SetTooltip(T("Follow leader -> %s: %s"), pInfo.nodeTitle.c_str(), pInfo.paramName.c_str());
                ed::Resume();
                if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && pInfo.nodeIndex >= 0 &&
                    pInfo.nodeIndex < (int)gNodes.size())

@@ -799,7 +799,7 @@ void DrawNodeBodies(FrameCtx& fc)
                DrawOceanParams(n);
             else if (dynamic_cast<NullNode*>(gn.node.get()) != nullptr ||
                      dynamic_cast<Null3DNode*>(gn.node.get()) != nullptr)
-               ImGui::TextDisabled("pass-through");
+               ImGui::TextDisabled("%s", T("pass-through"));
             else if (auto* n = dynamic_cast<GeometryOpNode*>(gn.node.get()))
                DrawGeometryOpParams(n);
             else if (auto* n = dynamic_cast<DisplacementNode*>(gn.node.get()))
@@ -916,7 +916,7 @@ void DrawNodeBodies(FrameCtx& fc)
                const bool pngActive = (n->imageFormat == 0);
                if (pngActive)
                   ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-               if (ImGui::Button(".png##imgPng", ImVec2(halfBtnW, 0)))
+               if (ImGui::Button(L(".png##imgPng"), ImVec2(halfBtnW, 0)))
                {
                   n->imageFormat = 0;
                   size_t dot = n->exportImagePath.rfind('.');
@@ -933,7 +933,7 @@ void DrawNodeBodies(FrameCtx& fc)
                const bool jpgActive = (n->imageFormat == 1);
                if (jpgActive)
                   ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-               if (ImGui::Button(".jpg##imgJpg", ImVec2(halfBtnW, 0)))
+               if (ImGui::Button(L(".jpg##imgJpg"), ImVec2(halfBtnW, 0)))
                {
                   n->imageFormat = 1;
                   size_t dot = n->exportImagePath.rfind('.');
@@ -946,7 +946,7 @@ void DrawNodeBodies(FrameCtx& fc)
                if (jpgActive)
                   ImGui::PopStyleColor();
 
-               if (ImGui::Button("Export Image", ImVec2(kPreviewSize, 0)))
+               if (ImGui::Button(L("Export Image"), ImVec2(kPreviewSize, 0)))
                   ExportImage(n, n->exportImagePath);
 
                ImGui::Dummy(ImVec2(0, 4));
@@ -970,7 +970,7 @@ void DrawNodeBodies(FrameCtx& fc)
                const bool mp4Active = (n->videoFormat == 0);
                if (mp4Active)
                   ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-               if (ImGui::Button(".mp4##vidMp4", ImVec2(halfBtnW, 0)))
+               if (ImGui::Button(L(".mp4##vidMp4"), ImVec2(halfBtnW, 0)))
                {
                   n->videoFormat = 0;
                   size_t dot = n->recordVideoPath.rfind('.');
@@ -987,7 +987,7 @@ void DrawNodeBodies(FrameCtx& fc)
                const bool movActive = (n->videoFormat == 1);
                if (movActive)
                   ImGui::PushStyleColor(ImGuiCol_Button, AccentEmphasisSelected());
-               if (ImGui::Button(".mov##vidMov", ImVec2(halfBtnW, 0)))
+               if (ImGui::Button(L(".mov##vidMov"), ImVec2(halfBtnW, 0)))
                {
                   n->videoFormat = 1;
                   size_t dot = n->recordVideoPath.rfind('.');
@@ -1009,12 +1009,12 @@ void DrawNodeBodies(FrameCtx& fc)
                // reads it, so say plainly that the take owns them.
                ImGui::BeginDisabled(n->IsRecording());
                ImGui::SetNextItemWidth(kParamWidth);
-               ImGui::SliderInt("fps", &n->recordFps, 1, 60);
+               ImGui::SliderInt(L("fps"), &n->recordFps, 1, 60);
 
-               ImGui::Checkbox("include audio", &n->includeAudio);
+               ImGui::Checkbox(L("include audio"), &n->includeAudio);
                ImGui::EndDisabled();
                if (n->IsRecording() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-                  ImGui::SetTooltip("locked for the current take");
+                  ImGui::SetTooltip("%s", T("locked for the current take"));
                if (n->includeAudio && n->AudioInput().IsConnected())
                {
                   INode* src = n->AudioInput().GetSource();
@@ -1032,7 +1032,7 @@ void DrawNodeBodies(FrameCtx& fc)
                         }
                      }
                   }
-                  ImGui::TextDisabled("from: %s", srcName.c_str());
+                  ImGui::TextDisabled(T("from: %s"), srcName.c_str());
                }
 
                if (n->StopRequested() || n->IsFinalizing())
@@ -1047,19 +1047,19 @@ void DrawNodeBodies(FrameCtx& fc)
                   // here (the button stays disabled) since StartRecording()
                   // would otherwise briefly block on WaitForFinalize().
                   ImGui::BeginDisabled();
-                  ImGui::Button("Finalizing...", ImVec2(kPreviewSize, 0));
+                  ImGui::Button(L("Finalizing..."), ImVec2(kPreviewSize, 0));
                   ImGui::EndDisabled();
                   // PendingFrames() reads the live handle, which has already
                   // been handed off to the background thread once
                   // IsFinalizing() is true - nothing left here to report.
                   const int pending = n->StopRequested() ? n->PendingFrames() : 0;
                   if (pending > 0)
-                     ImGui::TextDisabled("finishing up, %d frames left", pending);
+                     ImGui::TextDisabled(T("finishing up, %d frames left"), pending);
                }
                else if (n->IsRecording())
                {
                   ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.15f, 0.15f, 1.0f));
-                  if (ImGui::Button("Stop recording", ImVec2(kPreviewSize, 0)))
+                  if (ImGui::Button(L("Stop recording"), ImVec2(kPreviewSize, 0)))
                      n->RequestStopRecording();
                   ImGui::PopStyleColor();
                   ImGui::TextColored(ImVec4(1, 0.5f, 0.4f, 1), "REC  %d frames", n->RecordedFrames());
@@ -1068,7 +1068,7 @@ void DrawNodeBodies(FrameCtx& fc)
                   if (pending > 0)
                   {
                      ImGui::SameLine();
-                     ImGui::TextDisabled("(%d pending)", pending);
+                     ImGui::TextDisabled(T("(%d pending)"), pending);
                   }
                   if (dropped > 0)
                   {
@@ -1080,7 +1080,7 @@ void DrawNodeBodies(FrameCtx& fc)
                }
                else
                {
-                  if (ImGui::Button("Record video", ImVec2(kPreviewSize, 0)))
+                  if (ImGui::Button(L("Record video"), ImVec2(kPreviewSize, 0)))
                      n->StartRecording(n->recordVideoPath);
                }
                if (!n->RecordStatus().empty())
@@ -1092,7 +1092,7 @@ void DrawNodeBodies(FrameCtx& fc)
 
                ImGui::Dummy(ImVec2(0, 8));
                NodeSeparator();
-               ImGui::TextDisabled("Offline Render");
+               ImGui::TextDisabled("%s", T("Offline Render"));
 
                // A take drives the whole patch's Transport/AudioEngine, not
                // just this node - only one can ever be in flight regardless
@@ -1104,7 +1104,7 @@ void DrawNodeBodies(FrameCtx& fc)
 
                ImGui::BeginDisabled(n->IsRecording() || n->IsFinalizing() || gOfflineRender.active);
                ImGui::SetNextItemWidth(kParamWidth);
-               ImGui::InputInt("render fps", &n->offlineFps);
+               ImGui::InputInt(L("render fps"), &n->offlineFps);
                n->offlineFps = std::clamp(n->offlineFps, 1, 240);
 
                // Duration is typed, not dragged: a render queue's length is a
@@ -1112,7 +1112,7 @@ void DrawNodeBodies(FrameCtx& fc)
                // exact value on a 1..600 slider is fiddly. The presets are
                // the common takes; the field takes anything up to an hour.
                ImGui::SetNextItemWidth(kParamWidth);
-               ImGui::InputInt("duration (s)", &n->offlineDurationSeconds);
+               ImGui::InputInt(L("duration (s)"), &n->offlineDurationSeconds);
                n->offlineDurationSeconds = std::clamp(n->offlineDurationSeconds, 1, 3600);
                for (int preset : { 15, 30, 45, 60 })
                {
@@ -1130,11 +1130,11 @@ void DrawNodeBodies(FrameCtx& fc)
                }
 
                ImGui::SetNextItemWidth(kParamWidth);
-               ImGui::InputInt("preroll frames", &n->offlinePrerollFrames);
+               ImGui::InputInt(L("preroll frames"), &n->offlinePrerollFrames);
                n->offlinePrerollFrames = std::clamp(n->offlinePrerollFrames, 0, 600);
                ImGui::EndDisabled();
 
-               ImGui::TextDisabled("%d frames @ %dfps", n->offlineDurationSeconds * n->offlineFps, n->offlineFps);
+               ImGui::TextDisabled(T("%d frames @ %dfps"), n->offlineDurationSeconds * n->offlineFps, n->offlineFps);
 
                if (thisNodeRendering)
                {
@@ -1142,13 +1142,13 @@ void DrawNodeBodies(FrameCtx& fc)
                   // live progress/Cancel button; this is just a disabled
                   // placeholder so the button doesn't visually disappear.
                   ImGui::BeginDisabled();
-                  ImGui::Button("Rendering...", ImVec2(kPreviewSize, 0));
+                  ImGui::Button(L("Rendering..."), ImVec2(kPreviewSize, 0));
                   ImGui::EndDisabled();
                }
                else
                {
                   ImGui::BeginDisabled(n->IsRecording() || n->IsFinalizing() || otherSessionActive);
-                  if (ImGui::Button("Render", ImVec2(kPreviewSize, 0)))
+                  if (ImGui::Button(L("Render"), ImVec2(kPreviewSize, 0)))
                      StartOfflineRenderSession(n);
                   ImGui::EndDisabled();
                }
