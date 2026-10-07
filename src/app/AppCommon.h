@@ -104,6 +104,7 @@ inline std::string TmpPath(const std::string& name)
 
 #include "core/NodeFactory.h"
 #include "core/CategoryColors.h"
+#include "core/I18n.h"
 #include "core/UiScale.h"
 #include "core/SplashScreen.h"
 #include "core/LauncherCard.h"

@@ -237,6 +237,37 @@ namespace app
                }
             }
 
+            {
+               // Native names in their own script, so a user who cannot read the current language
+               // can still find theirs. Machine-drafted languages carry "(beta)" until reviewed.
+               const std::string current = I18n::CurrentLanguage();
+               auto labelOf = [](const I18n::Language& l) {
+                  std::string s = l.nativeName;
+                  if (l.beta)
+                     s += " (beta)";
+                  return s;
+               };
+               std::string currentLabel = "English";
+               for (const I18n::Language& l : I18n::Languages())
+                  if (current == l.code)
+                     currentLabel = labelOf(l);
+               ImGui::SetNextItemWidth(200.0f);
+               if (ImGui::BeginCombo("Language", currentLabel.c_str()))
+               {
+                  for (const I18n::Language& l : I18n::Languages())
+                  {
+                     const std::string label = labelOf(l) + "##lang_" + l.code;
+                     if (ImGui::Selectable(label.c_str(), current == l.code) && current != l.code)
+                     {
+                        CategoryColors::SetLanguage(l.code); // saves
+                        I18n::RequestLanguage(l.code);
+                        UiScale::RequestRescale(); // applies the table and rebakes glyphs
+                     }
+                  }
+                  ImGui::EndCombo();
+               }
+            }
+
             ImGui::Spacing();
             // Transparency Backdrop
             ImGui::SeparatorText("Transparency Backdrop");

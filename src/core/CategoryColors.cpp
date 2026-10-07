@@ -306,6 +306,7 @@ float gTintWeightLight = -1.0f;
 float gNodeRounding = -1.0f;
 float gUiScale = -1.0f;
 std::string gUiFont;
+std::string gLanguage;
 bool gTooltips = false; // help tooltips are opt-in
 
 std::string ThemePath()
@@ -341,6 +342,7 @@ void LoadAppearanceOverrides()
    gNodeRounding = -1.0f;
    gUiScale = -1.0f;
    gUiFont.clear();
+   gLanguage.clear();
    gTooltips = false;
 
    const std::string path = AppearancePath();
@@ -428,6 +430,10 @@ void LoadAppearanceOverrides()
       else if (key == "ui.font")
       {
          gUiFont = val;
+      }
+      else if (key == "ui.lang")
+      {
+         gLanguage = val;
       }
    }
 }
@@ -746,6 +752,18 @@ void SetUiFont(const std::string& id, bool saveToFile)
       SaveAppearanceOverrides();
 }
 
+std::string GetLanguage()
+{
+   return gLanguage;
+}
+
+void SetLanguage(const std::string& code, bool saveToFile)
+{
+   gLanguage = code;
+   if (saveToFile)
+      SaveAppearanceOverrides();
+}
+
 void ResetAllAppearance(bool light)
 {
    ResetAllCategoryColors(light);
@@ -781,7 +799,7 @@ void SaveAppearanceOverrides()
        gCableOverridesDark.empty() && gCableOverridesLight.empty() &&
        gNodeOpacityDark < 0.0f && gNodeOpacityLight < 0.0f &&
        gTintWeightDark < 0.0f && gTintWeightLight < 0.0f &&
-       gNodeRounding < 0.0f && gUiScale < 0.0f && gUiFont.empty() && !gTooltips)
+       gNodeRounding < 0.0f && gUiScale < 0.0f && gUiFont.empty() && gLanguage.empty() && !gTooltips)
    {
       std::remove(path.c_str());
       return;
@@ -814,6 +832,8 @@ void SaveAppearanceOverrides()
       file << "ui.scale=" << gUiScale << "\n";
    if (!gUiFont.empty())
       file << "ui.font=" << gUiFont << "\n";
+   if (!gLanguage.empty())
+      file << "ui.lang=" << gLanguage << "\n";
    if (gTooltips)
       file << "ui.tooltips=1\n";
 }

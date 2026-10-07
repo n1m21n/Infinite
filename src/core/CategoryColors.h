@@ -101,6 +101,11 @@ namespace CategoryColors
    // main.cpp's interface font table. Unknown ids fall back to the default there.
    std::string GetUiFont();
    void SetUiFont(const std::string& id, bool saveToFile = true);
+
+   // Interface language code ("en", "de", ...). Empty until the user picks one, so first launch can
+   // follow the OS language; an explicit choice (including "en") is saved and always wins.
+   std::string GetLanguage();
+   void SetLanguage(const std::string& code, bool saveToFile = true);
    bool HasUiScaleOverride();
 
    // Reset all appearance overrides for active polarity (or both)

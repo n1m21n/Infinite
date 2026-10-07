@@ -10,6 +10,9 @@ namespace app
 // they are in points like everything else, so there is nothing to compound.
 void ApplyUiScale(GLFWwindow* window, bool rendererReady)
 {
+   // A queued language switch lands here, between frames, so no label pointer fetched earlier in
+   // a frame can outlive its table; the bake below then sees the new language's glyph needs.
+   I18n::ApplyPending();
    float xscale = 1.0f, yscale = 1.0f;
    glfwGetWindowContentScale(window, &xscale, &yscale);
    int winW = 0, winH = 0, fbW = 0, fbH = 0;
@@ -784,6 +787,16 @@ int InitApp(FrameCtx& fc, int argc, char** argv)
    // because the font/DPI block right below needs gUiScale before it bakes
    // the font atlas - loading it after the atlas already exists is too late.
    CategoryColors::LoadPreference();
+
+   // Interface language: an explicit choice wins, otherwise the first OS preference that is one of
+   // our six, otherwise English. The first ApplyUiScale() below applies it before the font bake.
+   I18n::SetResourceDir(BundledResourcePath("lang"));
+   {
+      std::string lang = CategoryColors::GetLanguage();
+      if (!I18n::IsSupported(lang))
+         lang = I18n::MatchSupported(Platform::PreferredLanguages());
+      I18n::RequestLanguage(lang);
+   }
 
    // A proper UI typeface instead of ImGui's bitmap default, baked sharp for the display.
    //
