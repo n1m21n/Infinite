@@ -1,16 +1,16 @@
 {
  "merges": [
-  297,
-  320
+  298,
+  332
  ],
  "direct": [
   417,
-  438
+  449
  ],
  "notes_total": 367,
  "evidence": [
-  470,
-  547
+  482,
+  559
  ],
  "per_release": {
   "v0.1": {
@@ -115,6 +115,17 @@
   }
  },
  "loose": [
+  "2026-10-07 e44cc97 Roadmap: close R551",
+  "2026-10-07 be1da03 Roadmap: close R576, add screen-reader quest",
+  "2026-10-07 4fe7cb0 Roadmap: close R575",
+  "2026-10-07 64162fe Roadmap: close R573",
+  "2026-10-07 e86e033 Roadmap: close R571",
+  "2026-10-07 5f5f7e5 Roadmap: close R506",
+  "2026-10-07 76af476 Roadmap: close R601",
+  "2026-10-07 370d6ba Roadmap: close R274",
+  "2026-10-07 aa231a3 Roadmap: close R273",
+  "2026-10-07 03d98a6 Roadmap: close R587, log the Shift+U/F test gap",
+  "2026-10-07 f5a9994 Roadmap: close R596",
   "2026-10-07 dbeef25 Roadmap: close R593",
   "2026-10-06 e81d974 Roadmap: log and close R589-R591, close R282",
   "2026-10-06 e0b13f1 Keyboard: H again closes the node help popup (KBCURSORTEST covers it)",
