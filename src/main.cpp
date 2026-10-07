@@ -20270,6 +20270,14 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          row.Knob("velocity", &n->velocityScale, 0.0f, 2.0f, "%.2f", kKnobLarge);
          row.End();
       }
+      {
+         // MPE: each held note follows its own member channel's pitch bend.
+         AudioKnobRow row(3, kKnobLarge);
+         row.Checkbox("mpe##midiMpe", &n->mpe);
+         row.Knob("bend st", &n->mpeBendRange, 1.0f, 96.0f, "%.0f", kKnobLarge);
+         row.Skip();
+         row.End();
+      }
 
       BeginAudioSection("input");
       if (!Platform::MidiIsRunning())
@@ -42519,7 +42527,7 @@ bool gHeadlessNeedProbe = false; // the patch names controls/options: draw one n
          { "Shape Resonator", "Rings the vibration modes of the shape on the 'shape' pin, like striking that object. Tune sets the lowest mode's pitch; the other modes follow from the shape's geometry, so a flat plate sounds bell-like and a long bar nearly harmonic. Pos is where it is struck and heard from: a mode stays silent when struck on its node line. With no shape connected it rings a flat rectangular plate." },
          { "Spectrum Slide", "Morphs the sound into the one on the 'to' pin by sliding its spectral peaks toward the other's positions instead of cross-fading, so a 440 Hz tone becomes 880 Hz by passing through 660 Hz. Slide sets how far along the way; with nothing on 'to' it passes the sound through. Latency is 42.7 ms (2048 samples)." },
          { "Spec Blur", "Streaming phase vocoder (N=2048, hop 512) that smears spectral magnitude in time. Transients dissolve into a harmonic cloud with tilt, phase diffusion and freeze. Latency is 42.7 ms (2048 samples); default mix is pinned at 1.0." },
-         { "MIDI Notes", "Reads note events from a connected MIDI input device and outputs them as a note cable - the entry point for playing a synth or sampler from an external keyboard/controller." },
+         { "MIDI Notes", "Reads note events from a connected MIDI input device and outputs them as a note cable - the entry point for playing a synth or sampler from an external keyboard/controller. Turn on mpe for an MPE controller (Seaboard, Osmose, Linnstrument): each held note follows its own pitch bend." },
          { "Keyboard", "A hardware-free note source: click-and-drag the on-screen piano, or hover the node and type on your laptop keyboard (Logic/GarageBand's Musical Typing layout - ZXCVBNM... is one octave, QWERTY... the octave above) to test a patch with no MIDI controller at all." },
          { "Note Transpose", "Shifts every incoming note's pitch by a fixed number of semitones." },
          { "Pitch Bend", "A hand-driven bend wheel, patched inline in the note chain like Note Transpose. Unlike a transpose (which can only re-pitch a note as it attacks), moving this knob slides every note currently held through it in real time - drag it while a chord rings and the chord bends, no need to route it onto a synth's own bend knob. Default range is +/-2 semitones, the standard wheel range." },
@@ -55675,6 +55683,133 @@ static bool RunMidiFileFixture()
    Transport::Instance().NotifyAudioEngineStopped();
    std::remove(path.c_str());
    printf("MIDIFILETEST %s\n", ok ? "ALL OK" : "FAILED");
+   return ok;
+}
+
+// ============================================== INFINITE_MPETEST
+// MPE input (R597): each held note follows its own member channel's pitch bend,
+// the master bend adds to every note, MPE off leaves ordinary keyboards alone,
+// and note pressure / slide only exist while an MPE node is listening.
+static bool RunMpeFixture()
+{
+   bool ok = true;
+   auto check = [&](bool cond, const char* what) {
+      printf("MPETEST %s %s\n", what, cond ? "OK" : "FAIL");
+      ok = ok && cond;
+   };
+   std::string err;
+   Platform::MidiStart(err);
+   const Platform::MidiDeviceId dev = 5150;
+   auto feed = [&](std::initializer_list<unsigned char> bytes) {
+      std::vector<unsigned char> b(bytes);
+      Platform::MidiInjectBytes(b.data(), b.size(), dev);
+   };
+
+   MidiNotesNode node;
+   node.mpe = true;
+   node.mpeBendRange = 48.0f;
+   int frame = 1;
+   node.CookIfNeeded(frame++);
+   AudioNode* audio = node.GetAudioNode();
+   audio->PrepareToPlay(48000.0, 64);
+   NoteEventQueue* q = audio->NoteOutbox();
+   q->ResetConsumers();
+   const int cursor = q->RegisterConsumer();
+   float l[64] = {}, r[64] = {};
+   float* chans[2] = { l, r };
+   AudioBuffer out { chans, 2, 64 };
+   NoteEvent ev[64];
+   auto run = [&]() {
+      audio->ProcessBlock(nullptr, 0, out);
+      return q->Pop(cursor, ev, 64);
+   };
+   auto find = [&](int n, bool on, bool bendUpd, int note) -> const NoteEvent* {
+      for (int i = 0; i < n; i++)
+         if (ev[i].note == note && ev[i].isNoteOn == on && ev[i].bendUpdate == bendUpd)
+            return &ev[i];
+      return nullptr;
+   };
+
+   // Bend arrives before the note-on, as controllers send it: note 60 on
+   // member channel 2 (index 1) at +half deflection starts at +24 st.
+   feed({ 0xE1, 0x00, 0x60 });
+   feed({ 0x91, 60, 100 });
+   feed({ 0x92, 64, 100 }); // member channel 3, centred
+   int n = run();
+   const NoteEvent* on60 = find(n, true, false, 60);
+   const NoteEvent* on64 = find(n, true, false, 64);
+   check(on60 && std::fabs(on60->bendSemitones - 24.0f) < 0.05f, "note starts at its member channel's bend (+24 st)");
+   check(on64 && std::fabs(on64->bendSemitones) < 0.05f, "second note on another channel starts unbent");
+   check(on60 && on64 && on60->voiceId != on64->voiceId, "two voices");
+
+   // Bending channel 3 moves only the note on channel 3.
+   feed({ 0xE2, 0x00, 0x20 });
+   n = run();
+   const NoteEvent* up64 = find(n, false, true, 64);
+   check(up64 && up64->voiceId == on64->voiceId && std::fabs(up64->bendSemitones + 24.0f) < 0.05f,
+         "bend on channel 3 retunes note 64 to -24 st");
+   check(find(n, false, true, 60) == nullptr, "note 60 is not touched by channel 3's bend");
+
+   // A bend that does not move produces no event.
+   check(run() == 0, "steady bend sends nothing");
+
+   // Note-off on channel 3 does not release note 60; 60 keeps following channel 2.
+   feed({ 0x82, 64, 0 });
+   n = run();
+   const NoteEvent* off64 = find(n, false, false, 64);
+   check(off64 && off64->voiceId == on64->voiceId, "note-off closes note 64's voice");
+   check(find(n, false, false, 60) == nullptr, "note 60 stays held");
+   feed({ 0xE1, 0x00, 0x40 }); // channel 2 back to centre
+   n = run();
+   const NoteEvent* up60 = find(n, false, true, 60);
+   check(up60 && up60->voiceId == on60->voiceId && std::fabs(up60->bendSemitones) < 0.05f, "note 60 follows channel 2 back to 0");
+
+   // Master channel bend (+-2 st) adds to every note.
+   feed({ 0xE0, 0x00, 0x60 });
+   n = run();
+   up60 = find(n, false, true, 60);
+   check(up60 && std::fabs(up60->bendSemitones - 1.0f) < 0.05f, "master bend adds +1 st to every note");
+   feed({ 0xE0, 0x00, 0x40 });
+   run();
+
+   // MPE off: a held bent note is straightened, and further member bends do nothing.
+   feed({ 0xE1, 0x00, 0x60 });
+   run();
+   node.mpe = false;
+   node.CookIfNeeded(frame++);
+   n = run();
+   up60 = find(n, false, true, 60);
+   check(up60 && up60->bendSemitones == 0.0f, "switching MPE off straightens a held note");
+   feed({ 0xE1, 0x00, 0x20 });
+   check(run() == 0, "MPE off: member-channel bend sends no per-note update (ordinary keyboard unchanged)");
+   feed({ 0x81, 60, 0 });
+   run();
+
+   // Pressure and slide exist only while an MPE node listens.
+   const Platform::MidiDeviceId dev2 = 5151;
+   auto feed2 = [&](std::initializer_list<unsigned char> bytes) {
+      std::vector<unsigned char> b(bytes);
+      Platform::MidiInjectBytes(b.data(), b.size(), dev2);
+   };
+   float v = -1.0f;
+   feed2({ 0xD2, 100 });
+   check(!Platform::MidiRead(dev2, 0, Platform::kMidiControllerNotePressure, false, v), "MPE off: no note-pressure controller");
+   node.mpe = true;
+   node.CookIfNeeded(frame++);
+   feed2({ 0xD2, 127 });
+   feed2({ 0xB3, 74, 64 });
+   check(Platform::MidiRead(dev2, 0, Platform::kMidiControllerNotePressure, false, v) && std::fabs(v - 1.0f) < 0.01f,
+         "MPE on: member-channel pressure reads as Note Pressure");
+   check(Platform::MidiRead(dev2, 0, Platform::kMidiControllerNoteSlide, false, v) && std::fabs(v - 64.0f / 127.0f) < 0.01f,
+         "MPE on: member-channel CC74 reads as Note Slide");
+   feed2({ 0xD0, 50 }); // master channel pressure is not a note's
+   check(Platform::MidiRead(dev2, 0, Platform::kMidiControllerNotePressure, false, v) && std::fabs(v - 1.0f) < 0.01f,
+         "master-channel pressure does not move Note Pressure");
+
+   // Param round trip is covered by ROUNDTRIPTEST and AUDIOPARAMSWEEPTEST.
+   check(Platform::MidiBindingName(false, Platform::kMidiControllerNoteSlide) == "Note Slide", "binding name");
+
+   printf("MPETEST %s\n", ok ? "ALL OK" : "FAILED");
    return ok;
 }
 
@@ -74626,6 +74761,9 @@ int main(int argc, char** argv)
 
    if (getenv("INFINITE_MIDIFILETEST") != nullptr)
       return RunMidiFileFixture() ? 0 : 1;
+
+   if (getenv("INFINITE_MPETEST") != nullptr)
+      return RunMpeFixture() ? 0 : 1;
 
    if (getenv("INFINITE_SHAPERESONATORTEST") != nullptr)
       return RunShapeResonatorFixture() ? 0 : 1;

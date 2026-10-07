@@ -5178,6 +5178,11 @@ namespace Platform
             gMidiState.values[key] = v;
             gMidiState.lastTouched = MidiCCValue{ device, channel, ev.controller, false, v };
             gMidiState.lastTouchedPending = true;
+            if (MidiMpeEnabled() && MidiIsMpeMemberChannel(channel) && (int)data[1] == kMidiSlideCC)
+            {
+               gMidiState.values[MidiKey{ device, 0, kMidiControllerNoteSlide, false }] = v;
+               gMidiState.lastTouched = MidiCCValue{ device, 0, kMidiControllerNoteSlide, false, v };
+            }
          }
          else if ((hiNibble == 0xE0 && len >= 3) || hiNibble == 0xD0)
          {
@@ -5187,10 +5192,17 @@ namespace Platform
             const int controller = bend ? kMidiControllerPitchBend : kMidiControllerAftertouch;
             const float v = bend ? (float)((int)data[1] | ((int)data[2] << 7)) / 16383.0f
                                  : (float)data[1] / 127.0f;
+            if (bend)
+               MidiStoreChannelBend(channel, MidiBend14ToSigned((int)data[1], (int)data[2]));
             std::lock_guard<std::mutex> lock(gMidiState.mutex);
             gMidiState.values[MidiKey{ device, channel, controller, false }] = v;
             gMidiState.lastTouched = MidiCCValue{ device, channel, controller, false, v };
             gMidiState.lastTouchedPending = true;
+            if (!bend && MidiMpeEnabled() && MidiIsMpeMemberChannel(channel))
+            {
+               gMidiState.values[MidiKey{ device, 0, kMidiControllerNotePressure, false }] = v;
+               gMidiState.lastTouched = MidiCCValue{ device, 0, kMidiControllerNotePressure, false, v };
+            }
          }
          else if (hiNibble == 0x80 && len >= 3)
          {

@@ -124,6 +124,11 @@ public:
       // Start at the live end of the stream: a topology rebuild shouldn't
       // replay every note played since the app launched.
       mCursor = Platform::MidiNoteStreamPosition();
+      for (int k = 0; k < 128; k++)
+      {
+         mVoiceLive[k] = false;
+         mLastBend[k] = 0.0f;
+      }
       mHeld[0].store(0, std::memory_order_relaxed);
       mHeld[1].store(0, std::memory_order_relaxed);
    }
@@ -133,6 +138,8 @@ public:
       const int channelFilter = mChannel.load(std::memory_order_relaxed);
       const int transpose = mTranspose.load(std::memory_order_relaxed);
       const float velScale = mVelocityScale.load(std::memory_order_relaxed);
+      const bool mpe = mMpe.load(std::memory_order_relaxed);
+      const float mpeRange = mMpeRange.load(std::memory_order_relaxed);
 
       // Bounded: at most 64 messages per block, the same cap every note
       // consumer in the system uses on its Pop.
@@ -163,17 +170,70 @@ public:
             e.voiceId = NextVoiceId();
             mActiveVoiceId[msgs[i].note] = e.voiceId;
             mMappedNote[msgs[i].note] = note;
+            // MPE: the member channel's bend was sent before the note-on, so
+            // the voice must start at it, not at zero and jump on the next
+            // bend message.
+            mVoiceChannel[msgs[i].note] = (signed char)msgs[i].channel;
+            mVoiceLive[msgs[i].note] = true;
+            if (mpe)
+            {
+               mLastBend[msgs[i].note] = MpeBend(msgs[i].channel, mpeRange);
+               e.bendSemitones = mLastBend[msgs[i].note];
+            }
          }
          else
          {
             e.voiceId = mActiveVoiceId[msgs[i].note];
             e.note = mMappedNote[msgs[i].note];
+            mVoiceLive[msgs[i].note] = false;
          }
          mOutbox.Push(e);
 
          SetKeyBit(mHeld, note, e.isNoteOn);
          if (e.isNoteOn)
             mLastNote.store(note, std::memory_order_relaxed);
+      }
+
+      // MPE: each held note follows its own member channel's pitch bend. One
+      // bendUpdate per note whose bend moved by more than a hundredth of a
+      // semitone, so a controller streaming bend does not flood the chain.
+      if (mpe)
+      {
+         for (int k = 0; k < 128; k++)
+         {
+            if (!mVoiceLive[k])
+               continue;
+            const float bend = MpeBend(mVoiceChannel[k], mpeRange);
+            if (std::fabs(bend - mLastBend[k]) < 0.01f)
+               continue;
+            mLastBend[k] = bend;
+            NoteEvent u;
+            u.note = mMappedNote[k];
+            u.isNoteOn = false;
+            u.bendUpdate = true;
+            u.bendSemitones = bend;
+            u.voiceId = mActiveVoiceId[k];
+            u.source = this;
+            mOutbox.Push(u);
+         }
+      }
+      else
+      {
+         // Switching MPE off mid-note must not leave a voice bent.
+         for (int k = 0; k < 128; k++)
+         {
+            if (!mVoiceLive[k] || mLastBend[k] == 0.0f)
+               continue;
+            mLastBend[k] = 0.0f;
+            NoteEvent u;
+            u.note = mMappedNote[k];
+            u.isNoteOn = false;
+            u.bendUpdate = true;
+            u.bendSemitones = 0.0f;
+            u.voiceId = mActiveVoiceId[k];
+            u.source = this;
+            mOutbox.Push(u);
+         }
       }
    }
 
@@ -186,16 +246,35 @@ public:
       mTranspose.store(n.transpose, std::memory_order_relaxed);
       mVelocityScale.store(n.velocityScale, std::memory_order_relaxed);
       mUseGlobalScale.store(n.useGlobalScale, std::memory_order_relaxed);
+      mMpe.store(n.mpe, std::memory_order_relaxed);
+      mMpeRange.store(std::clamp(n.mpeBendRange, 1.0f, 96.0f), std::memory_order_relaxed);
    }
 
    uint64_t HeldWord(int w) const { return mHeld[w].load(std::memory_order_relaxed); }
    int LastNote() const { return mLastNote.load(std::memory_order_relaxed); }
 
 private:
+   // Semitones for a note on `channel`: its member channel's bend over the
+   // member range, plus the master channel's bend over the standard +-2. A
+   // note on the master channel itself (a non-MPE keyboard) gets the master
+   // bend alone, so turning MPE on never breaks an ordinary controller.
+   static float MpeBend(int channel, float memberRange)
+   {
+      const float master = Platform::MidiChannelBend(0) * 2.0f;
+      if (!Platform::MidiIsMpeMemberChannel(channel))
+         return master;
+      return Platform::MidiChannelBend(channel) * memberRange + master;
+   }
+
    NoteEventQueue mOutbox;
    unsigned long long mCursor = 0;
    int mActiveVoiceId[128] = {};
    int mMappedNote[128] = {};
+   signed char mVoiceChannel[128] = {};
+   bool mVoiceLive[128] = {};
+   float mLastBend[128] = {};
+   std::atomic<bool> mMpe { false };
+   std::atomic<float> mMpeRange { 48.0f };
 
    std::atomic<uint64_t> mHeld[2] { { 0 }, { 0 } };
    std::atomic<int> mLastNote { -1 };
@@ -206,7 +285,11 @@ private:
 };
 
 MidiNotesNode::MidiNotesNode() = default;
-MidiNotesNode::~MidiNotesNode() = default;
+MidiNotesNode::~MidiNotesNode()
+{
+   if (mMpeRegistered)
+      Platform::MidiMpeEnabledCount().fetch_sub(1, std::memory_order_relaxed);
+}
 
 bool MidiNotesNode::StartListening()
 {
@@ -222,6 +305,13 @@ void MidiNotesNode::CookIfNeeded(int frameId)
    if (!mAudioNode)
       mAudioNode = std::make_unique<AudioMidiNotesNode>();
    mAudioNode->PushParams(*this);
+   // The MIDI backends only keep the note-pressure / note-slide virtual
+   // controllers while some node wants MPE, so ordinary CC learn is untouched.
+   if (mpe != mMpeRegistered)
+   {
+      Platform::MidiMpeEnabledCount().fetch_add(mpe ? 1 : -1, std::memory_order_relaxed);
+      mMpeRegistered = mpe;
+   }
 }
 
 void MidiNotesNode::VisitParams(ParamVisitor& v)
@@ -230,6 +320,8 @@ void MidiNotesNode::VisitParams(ParamVisitor& v)
    v.Int("transpose", transpose);
    v.Float("velocityScale", velocityScale);
    v.Bool("useGlobalScale", useGlobalScale);
+   v.Bool("mpe", mpe);
+   v.Float("mpeBendRange", mpeBendRange);
 }
 
 AudioNode* MidiNotesNode::GetAudioNode()

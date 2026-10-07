@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include <chrono>
 #include <cstdint>
 #include <string>
@@ -847,12 +849,48 @@ namespace Platform
    // aftertouch is 0..1. Poly aftertouch is not modelled.
    constexpr int kMidiControllerPitchBend = 128;
    constexpr int kMidiControllerAftertouch = 129;
+   // MPE (R597). Per-note pressure and slide arrive as channel aftertouch and
+   // CC74 on a member channel (zero-based 1..14), so the whole-channel tables
+   // above already hold them per channel. These two virtual controllers, only
+   // written while an MPE-enabled node is listening (MidiMpeEnabled), follow
+   // the most recently moved member channel on (device, channel 0) so one
+   // ordinary binding can read "the note being played" without knowing which
+   // member channel it landed on.
+   constexpr int kMidiControllerNotePressure = 130;
+   constexpr int kMidiControllerNoteSlide = 131;
+   constexpr int kMidiSlideCC = 74;
    inline std::string MidiBindingName(bool isNote, int controller)
    {
       if (!isNote && controller == kMidiControllerPitchBend) return "Pitch Bend";
       if (!isNote && controller == kMidiControllerAftertouch) return "Aftertouch";
+      if (!isNote && controller == kMidiControllerNotePressure) return "Note Pressure";
+      if (!isNote && controller == kMidiControllerNoteSlide) return "Note Slide";
       return std::string(isNote ? "Note " : "CC ") + std::to_string(controller);
    }
+
+   // MPE state shared by all three MIDI backends: one switch, and the latest
+   // pitch bend per channel (-1..+1, centre 0). Header-only so the platform
+   // files need no new symbol. The MIDI thread writes, the audio thread reads;
+   // relaxed atomics are enough because each value stands alone.
+   inline std::atomic<int>& MidiMpeEnabledCount()
+   {
+      static std::atomic<int> sCount { 0 };
+      return sCount;
+   }
+   inline bool MidiMpeEnabled() { return MidiMpeEnabledCount().load(std::memory_order_relaxed) > 0; }
+   inline std::atomic<float>& MidiChannelBendSlot(int channel)
+   {
+      static std::atomic<float> sBend[16] = {};
+      return sBend[channel & 15];
+   }
+   inline void MidiStoreChannelBend(int channel, float bendMinus1To1)
+   {
+      MidiChannelBendSlot(channel).store(bendMinus1To1, std::memory_order_relaxed);
+   }
+   inline float MidiChannelBend(int channel) { return MidiChannelBendSlot(channel).load(std::memory_order_relaxed); }
+   // Lower-zone member channels, zero-based. 0 is the master, 15 the upper-zone master.
+   inline bool MidiIsMpeMemberChannel(int channel) { return channel >= 1 && channel <= 14; }
+   inline float MidiBend14ToSigned(int lsb, int msb) { return (float)(((msb << 7) | lsb) - 8192) / 8192.0f; }
 
    bool MidiStart(std::string& outError);
    void MidiStop();

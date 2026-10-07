@@ -305,6 +305,12 @@ namespace
             gState.lastTouched.isNote = false;
             gState.lastTouched.value01 = value01;
             gState.lastTouchedPending = true;
+            if (Platform::MidiMpeEnabled() && Platform::MidiIsMpeMemberChannel(channel) && controller == Platform::kMidiSlideCC)
+            {
+               gState.values[{ dev, 0, Platform::kMidiControllerNoteSlide, false }] = value01;
+               gState.lastTouched.channel = 0;
+               gState.lastTouched.controller = Platform::kMidiControllerNoteSlide;
+            }
             break;
          }
          case SND_SEQ_EVENT_PITCHBEND:
@@ -317,6 +323,8 @@ namespace
             const int controller = bend ? Platform::kMidiControllerPitchBend : Platform::kMidiControllerAftertouch;
             const float value01 = bend ? (float)(std::clamp((int)ev.data.control.value, -8192, 8191) + 8192) / 16383.0f
                                        : (float)std::clamp((int)ev.data.control.value, 0, 127) / 127.0f;
+            if (bend)
+               Platform::MidiStoreChannelBend(channel, (float)std::clamp((int)ev.data.control.value, -8192, 8191) / 8192.0f);
             std::lock_guard<std::mutex> lock(gState.mutex);
             gState.values[{ dev, channel, controller, false }] = value01;
             gState.lastTouched.device = dev;
@@ -325,6 +333,12 @@ namespace
             gState.lastTouched.isNote = false;
             gState.lastTouched.value01 = value01;
             gState.lastTouchedPending = true;
+            if (!bend && Platform::MidiMpeEnabled() && Platform::MidiIsMpeMemberChannel(channel))
+            {
+               gState.values[{ dev, 0, Platform::kMidiControllerNotePressure, false }] = value01;
+               gState.lastTouched.channel = 0;
+               gState.lastTouched.controller = Platform::kMidiControllerNotePressure;
+            }
             break;
          }
          case SND_SEQ_EVENT_CLOCK:
